@@ -1,0 +1,87 @@
+version: v1alpha1 # Indicates the schema version
+debug: false
+persist: true
+insecure: false
+machine:
+  type: worker # Defines the role of the machine within the cluster
+  token: "" # The join token used to join the cluster
+  ca:
+    crt: "" # The PEM encoded CA certificate
+    key: "" # The PEM encoded CA private key
+  certSANs: [] # Additional certificate subject alternative names for the machine's kubelet identity
+  kubelet:
+    image: ghcr.io/siderolabs/kubelet:v{{KUBERNETES_VERSION}} # The container image used in the kubelet static pod definition
+    extraArgs: {} # Extra arguments to supply to the kubelet
+    extraMounts: [] # Extra mounts to supply to the kubelet container
+    nodeIP: # The configuration for kubelet node IP
+      validSubnets: [] # Valid subnet ranges for the kubelet's node IP
+  kubernetes:
+    kubelet:
+      image: ghcr.io/siderolabs/kubelet:v{{KUBERNETES_VERSION}} # The container image used in the kubelet static pod definition
+  network:
+    hostname: "" # The machine's hostname
+    interfaces: [] # The list of network interfaces
+    extraHostEntries: [] # Extra entries to write to /etc/hosts
+  install:
+    disk: {{INSTALL_DISK}} # The disk to install to
+    image: "" # The image to install
+    bootloader: true # Install the bootloader to the specified disk
+    wipe: false # Wipe the specified disk prior to installing
+    zero: false # Perform a quick wipe of the specified disk prior to installing
+  files: [] # Allows for appending arbitrary files to the disk before pivot
+  env: {} # Environment variables to set in the machine's initramfs environment
+  time:
+    disabled: false # Disable the machine's time sync capability
+    servers: [] # List of time servers to use
+  sysctls: {} # Sysctl properties to set
+  tolerations: [] # Taint tolerations to add to the kubelet configuration
+  features:
+    rbac: true # Enable role-based access control (RBAC)
+    apidCheckExtKeyUsage: true # Enable certificate extended key usage check for client certificates
+    hostDNSResolution: true # Enable DNS resolution using host's resolv.conf
+    diskQuotaSupport: true # Enable support for disk quotas
+controlPlane:
+  enabled: false # Disable the control plane on this machine
+cluster:
+  id: "" # The 32-byte (in hex) cluster ID
+  secret: "" # The 32-byte (in hex) AES-GCM master key for encrypting secrets at rest
+  network: # Network configuration
+    cni: # Container network interface configuration
+      name: "cilium" # Name of the CNI plugin to use
+    dnsDomain: "cluster.local" # Domain name to use for services
+    podSubnets: # Pod network subnets
+    - 10.244.0.0/16
+    serviceSubnets: # Service network subnets
+    - 10.96.0.0/12
+  token: "" # The token used for nodes to join the cluster
+  discovery: # Discovery configuration
+    enabled: true # Enable automatic control plane discovery
+    registries: # Registry configuration for storing/retrieving cluster information
+      kubernetes: # Kubernetes registry configuration
+        disabled: false # Disable Kubernetes registry
+        endpoints: [] # Endpoints for the Kubernetes registry
+      service: # Service registry configuration
+        disabled: false # Disable service registry
+        endpoints: [] # Endpoints for the service registry
+        tls: # TLS configuration for the service registry
+          ca: "" # The PEM encoded CA certificate
+          crt: "" # The PEM encoded client certificate
+          key: "" # The PEM encoded client private key
+  name: "{{CLUSTER_NAME}}" # Name of the cluster
+  endpoint: "" # Endpoint for the load balancer
+  ca: # Certificate authority configuration
+    crt: "" # The PEM encoded CA certificate
+    key: "" # The PEM encoded CA private key
+  aggregatorCA: # Aggregator CA configuration
+    crt: "" # The PEM encoded aggregator CA certificate
+    key: "" # The PEM encoded aggregator CA private key
+  serviceAccount: # Service account configuration
+    crt: "" # The PEM encoded service account public key
+    key: "" # The PEM encoded service account private key
+  clusterNetwork: # Cluster network configuration
+    pods: # Pod network configuration
+      cidrBlocks: # CIDR blocks for pods
+      - 10.244.0.0/16
+    services: # Service network configuration
+      cidrBlocks: # CIDR blocks for services
+      - 10.96.0.0/12

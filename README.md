@@ -1,45 +1,127 @@
-# Twinbox - Proxmox Kubernetes Automation Framework
+# Twinbox
 
-## Project Overview
-Twinbox is an open-source framework that provides fully automated setup of Kubernetes clusters within Proxmox environments, including optimized storage configuration, networking infrastructure, load balancing, monitoring, and security. The framework is designed to create production-ready, scalable infrastructure that can be easily deployed by both individuals and enterprises.
+Twinbox is a comprehensive infrastructure automation platform for deploying and managing Kubernetes clusters on Proxmox VE. It provides a complete solution for infrastructure as code, configuration management, and operational tooling.
 
-## Vision
-Create a comprehensive private cloud solution that eventually integrates SaaS functionality comparable to Office 365, featuring user management, authentication, application virtualization, and data support, while maintaining simplicity, security, and reusability.
+## Features
 
-## Core Components
-- Automated Kubernetes cluster provisioning on Proxmox
-- Optimized storage configuration (Ceph, ZFS, or local storage)
-- Networking infrastructure setup (Calico, Cilium, or Flannel)
-- Load balancing configuration (MetalLB, NGINX, or Traefik)
-- Monitoring stack (Prometheus, Grafana, AlertManager)
-- Security hardening (RBAC, network policies, TLS)
-- User management and authentication layer
+- **Infrastructure as Code**: Terraform modules for provisioning VMs on Proxmox
+- **Configuration Management**: Ansible playbooks for cluster setup and configuration
+- **Multiple Kubernetes Distributions**: Support for both traditional Kubernetes and Talos Linux
+- **Security**: Built-in security hardening and RBAC configuration
+- **Monitoring**: Integrated monitoring stack with Prometheus and Grafana
+- **Networking**: CNI plugin configuration and ingress setup
+- **Storage**: Persistent storage configuration
+- **User Management**: Identity and access management integration
 
-## Architecture Principles
-- Modular and extensible design
-- Infrastructure as Code (Terraform, Ansible)
-- GitOps deployment model
-- Production-ready security from day one
-- Scalable from single-node to multi-node clusters
-- Open-source first approach
+## Quick Start
 
-## Roadmap
-1. Phase 1: Basic Kubernetes automation on Proxmox
-2. Phase 2: Enhanced monitoring and security features
-3. Phase 3: Private cloud infrastructure layer
-4. Phase 4: SaaS application integration
+### Prerequisites
 
-## Getting Started
-To deploy a Kubernetes cluster on Proxmox using Twinbox:
+- Proxmox VE environment
+- Terraform installed
+- Ansible installed
+- Sufficient hardware resources
 
-1. Configure Proxmox API credentials
-2. Adjust cluster specifications in configuration files
-3. Run the deployment script
-4. Monitor the automated setup process
-5. Verify cluster health and functionality
+### Installation
 
-## Prerequisites
-- Proxmox VE 7.0 or higher
-- Sufficient hardware resources for cluster nodes
-- Network connectivity between Proxmox hosts
-- Administrative access to Proxmox environment# Twinbox
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-org/twinbox.git
+   cd twinbox
+   ```
+
+2. Configure environment variables:
+   ```bash
+   export PROXMOX_HOST="your-proxmox-host"
+   export PROXMOX_USER="root@pam"
+   export PROXMOX_PASSWORD="your-password"
+   ```
+
+3. Deploy your cluster:
+   ```bash
+   ./twinbox/scripts/deploy.sh
+   ```
+
+## Talos Linux Integration
+
+Twinbox now includes full support for Talos Linux, a modern, secure, and immutable Linux distribution designed specifically for Kubernetes. The Talos integration provides:
+
+- Automated VM provisioning with UEFI and EFI disk requirements
+- Machine configuration generation and application
+- Seamless cluster bootstrap and validation
+- Integration with existing Twinbox monitoring and security features
+
+To deploy a Talos cluster, use the dedicated deployment script:
+
+```bash
+./twinbox/scripts/deploy-talos-cluster.sh
+```
+
+See the [Talos Integration Guide](twinbox/docs/talos-integration.md) for detailed documentation.
+
+## Architecture
+
+Twinbox follows a two-layer architecture:
+
+### Infrastructure Layer (Terraform)
+- VM provisioning on Proxmox VE
+- Network and storage configuration
+- Load balancer setup (if needed)
+
+### Configuration Layer (Ansible)
+- Kubernetes cluster initialization
+- Addon deployment (CNI, ingress, monitoring)
+- Security configuration
+- User management setup
+
+## Components
+
+### Terraform Modules
+- `twinbox/terraform/main.tf`: Core infrastructure provisioning
+- `twinbox/terraform/talos-vm/main.tf`: Talos-specific VM provisioning
+
+### Ansible Roles
+- `prerequisites`: Base system preparation
+- `container_runtime`: Container runtime setup
+- `kubeadm_setup`: Kubernetes cluster initialization
+- `cni_install`: CNI plugin installation
+- `addons`: Additional cluster components
+- `monitoring`: Monitoring stack deployment
+- `security`: Security hardening and RBAC
+- `user_management`: Identity and access management
+
+### Scripts
+- `twinbox/scripts/deploy.sh`: Standard Kubernetes deployment
+- `twinbox/scripts/deploy-talos-cluster.sh`: Talos Linux deployment
+- `twinbox/scripts/validate-installation.sh`: Post-deployment validation
+- `twinbox/scripts/proxmox-talos-helper.sh`: Proxmox-Talos integration utilities
+
+### Tests
+- `twinbox/tests/`: Various validation and integration tests
+- `twinbox/tests/validate-talos-cluster.sh`: Talos cluster validation
+- `twinbox/tests/integration-test-talos.sh`: Talos integration tests
+
+## Configuration
+
+Customize your deployment by modifying:
+
+- Terraform variables in `twinbox/terraform/*.tfvars`
+- Ansible group variables in `twinbox/ansible/group_vars/all.yml`
+- Machine configuration templates in `twinbox/configs/`
+
+## Documentation
+
+- [Getting Started](twinbox/docs/getting-started.md)
+- [Architecture](twinbox/docs/architecture.md)
+- [Configuration](twinbox/docs/configuration.md)
+- [Talos Integration](twinbox/docs/talos-integration.md)
+- [Troubleshooting](twinbox/docs/troubleshooting.md)
+- [Verification](twinbox/docs/verification.md)
+
+## Contributing
+
+We welcome contributions to Twinbox! Please see our contributing guidelines for more information.
+
+## License
+
+Twinbox is released under the [LICENSE](twinbox/LICENSE) license.
