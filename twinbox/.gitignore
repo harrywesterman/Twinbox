@@ -1,0 +1,15 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+.terraform.lock.hcl
+
+# Ansible
+*.retry
+inventory/vagrant
+.vagrant/
+
+# OS
+.DS_Store
+Thumbs.db

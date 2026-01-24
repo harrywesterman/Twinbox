@@ -1,0 +1,75 @@
+---
+- name: Check if cluster is already initialized
+  stat:
+    path: /etc/kubernetes/admin.conf
+  register: cluster_initialized
+
+- name: Initialize cluster on master nodes
+  block:
+    - name: Generate kubeadm config
+      template:
+        src: kubeadm-config.yaml.j2
+        dest: /tmp/kubeadm-config.yaml
+      delegate_to: "{{ groups['k8s_masters'][0] }}"
+      run_once: true
+
+    - name: Initialize Kubernetes cluster
+      command: kubeadm init --config=/tmp/kubeadm-config.yaml --upload-certs
+      delegate_to: "{{ groups['k8s_masters'][0] }}"
+      run_once: true
+      register: kubeadm_init_result
+
+    - name: Create .kube directory for root user
+      file:
+        path: /root/.kube
+        state: directory
+        mode: '0700'
+
+    - name: Copy admin.conf to root .kube directory
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /root/.kube/config
+        remote_src: yes
+        mode: '0600'
+      delegate_to: "{{ groups['k8s_masters'][0] }}"
+      run_once: true
+
+    - name: Get join command
+      command: kubeadm token create --print-join-command
+      register: join_command
+      delegate_to: "{{ groups['k8s_masters'][0] }}"
+      run_once: true
+
+    - name: Set join command fact
+      set_fact:
+        kubeadm_join_command: "{{ join_command.stdout }}"
+      delegate_to: "{{ groups['k8s_masters'][0] }}"
+      run_once: true
+
+  when: inventory_hostname == groups['k8s_masters'][0] and not cluster_initialized.stat.exists
+
+- name: Join worker nodes to cluster
+  block:
+    - name: Wait for master to be ready
+      wait_for:
+        host: "{{ hostvars[groups['k8s_masters'][0]].ansible_default_ipv4.address }}"
+        port: 6443
+        timeout: 300
+        state: started
+
+    - name: Join worker node to cluster
+      command: "{{ hostvars[groups['k8s_masters'][0]]['kubeadm_join_command'] }}"
+      when: inventory_hostname in groups['k8s_workers']
+      register: join_result
+
+  when: inventory_hostname in groups['k8s_workers']
+
+- name: Install kubectl for ubuntu user
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /home/ubuntu/.kube/config
+    remote_src: yes
+    owner: ubuntu
+    group: ubuntu
+    mode: '0600'
+  when: inventory_hostname == groups['k8s_masters'][0]

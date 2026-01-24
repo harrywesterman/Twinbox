@@ -1,0 +1,83 @@
+---
+- name: Add Docker apt key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    id: 9DC858229FC7DD38854AE2D88D81803C0EBFCD88
+    state: present
+
+- name: Add Docker repository
+  apt_repository:
+    repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+    state: present
+    filename: docker
+
+- name: Install containerd
+  apt:
+    name: 
+      - containerd.io
+      - runc
+    state: present
+
+- name: Create containerd directory
+  file:
+    path: /etc/containerd
+    state: directory
+    mode: '0755'
+
+- name: Configure containerd
+  template:
+    src: containerd-config.toml.j2
+    dest: /etc/containerd/config.toml
+    mode: '0644'
+  notify: restart containerd
+
+- name: Enable and start containerd service
+  systemd:
+    name: containerd
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+- name: Add Kubernetes apt key
+  apt_key:
+    url: https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key
+    id: EA07426FBCAAE07E4CF7FBB99ADBE7A12AF6E839
+    state: present
+
+- name: Add Kubernetes apt repository
+  apt_repository:
+    repo: deb https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /
+    state: present
+    filename: kubernetes
+
+- name: Install Kubernetes components
+  apt:
+    name:
+      - kubelet={{ kubernetes_version.replace('v', '') }}*
+      - kubeadm={{ kubernetes_version.replace('v', '') }}*
+      - kubectl={{ kubernetes_version.replace('v', '') }}*
+    state: present
+    allow_downgrade: yes
+    update_cache: yes
+
+- name: Hold Kubernetes packages to prevent automatic updates
+  dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+
+- name: Configure kubelet to use containerd
+  lineinfile:
+    path: /etc/default/kubelet
+    line: KUBELET_EXTRA_ARGS="--container-runtime-endpoint=unix:///run/containerd/containerd.sock"
+    create: yes
+    mode: '0644'
+
+- name: Restart kubelet
+  systemd:
+    name: kubelet
+    state: restarted
+    daemon_reload: yes

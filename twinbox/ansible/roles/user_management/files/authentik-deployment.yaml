@@ -1,0 +1,224 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: authentik
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: authentik-secret
+  namespace: authentik
+type: Opaque
+data:
+  authentik_secret_key: $(openssl rand -base64 32 | tr -d '\n' | base64)
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authentik-server
+  namespace: authentik
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: authentik-server
+  template:
+    metadata:
+      labels:
+        app: authentik-server
+    spec:
+      containers:
+      - name: server
+        image: ghcr.io/goauthentik/server:2023.8.3
+        ports:
+        - containerPort: 9000
+        - containerPort: 9443
+        env:
+        - name: AUTHENTIK_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: authentik-secret
+              key: authentik_secret_key
+        - name: AUTHENTIK_POSTGRESQL__HOST
+          value: "postgres"
+        - name: AUTHENTIK_POSTGRESQL__NAME
+          value: "authentik"
+        - name: AUTHENTIK_POSTGRESQL__USER
+          value: "authentik"
+        - name: AUTHENTIK_POSTGRESQL__PASSWORD
+          value: "authentik"
+        - name: AUTHENTIK_REDIS__HOST
+          value: "redis"
+        - name: AUTHENTIK_REDIS__PASSWORD
+          value: ""
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        volumeMounts:
+        - name: media
+          mountPath: /media
+      volumes:
+      - name: media
+        emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authentik-worker
+  namespace: authentik
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: authentik-worker
+  template:
+    metadata:
+      labels:
+        app: authentik-worker
+    spec:
+      containers:
+      - name: worker
+        image: ghcr.io/goauthentik/server:2023.8.3
+        command: ["/server", "worker"]
+        env:
+        - name: AUTHENTIK_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: authentik-secret
+              key: authentik_secret_key
+        - name: AUTHENTIK_POSTGRESQL__HOST
+          value: "postgres"
+        - name: AUTHENTIK_POSTGRESQL__NAME
+          value: "authentik"
+        - name: AUTHENTIK_POSTGRESQL__USER
+          value: "authentik"
+        - name: AUTHENTIK_POSTGRESQL__PASSWORD
+          value: "authentik"
+        - name: AUTHENTIK_REDIS__HOST
+          value: "redis"
+        - name: AUTHENTIK_REDIS__PASSWORD
+          value: ""
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: authentik-server
+  namespace: authentik
+spec:
+  selector:
+    app: authentik-server
+  ports:
+    - protocol: TCP
+      port: 9000
+      targetPort: 9000
+    - protocol: TCP
+      port: 9443
+      targetPort: 9443
+  type: LoadBalancer
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: authentik
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_DB
+          value: "authentik"
+        - name: POSTGRES_USER
+          value: "authentik"
+        - name: POSTGRES_PASSWORD
+          value: "authentik"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 200m
+            memory: 512Mi
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+      volumes:
+      - name: postgres-data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: authentik
+spec:
+  selector:
+    app: postgres
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: authentik
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 100m
+            memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: authentik
+spec:
+  selector:
+    app: redis
+  ports:
+    - protocol: TCP
+      port: 6379
+      targetPort: 6379

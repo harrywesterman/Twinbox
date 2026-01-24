@@ -1,0 +1,95 @@
+---
+- name: Create addons directory
+  file:
+    path: /tmp/addons
+    state: directory
+    mode: '0755'
+  delegate_to: "{{ groups['k8s_masters'][0] }}"
+  run_once: true
+
+- name: Copy MetalLB manifest
+  copy:
+    src: metallb-native.yaml
+    dest: /tmp/addons/metallb-native.yaml
+  delegate_to: "{{ groups['k8s_masters'][0] }}"
+  run_once: true
+
+- name: Apply MetalLB
+  shell: |
+    export KUBECONFIG=/etc/kubernetes/admin.conf
+    kubectl apply -f /tmp/addons/metallb-native.yaml
+  delegate_to: "{{ groups['k8s_masters'][0] }}"
+  run_once: true
+
+- name: Wait for MetalLB pods to be ready
+  shell: |
+    export KUBECONFIG=/etc/kubernetes/admin.conf
+    kubectl wait --for=condition=ready pods -l app=metallb -n metallb-system --timeout=300s
+  delegate_to: "{{ groups['k8s_masters'][0] }}"
+  run_once: true
+  retries: 30
+  delay: 10
+
+- name: Configure MetalLB IP pool
+  shell: |
+    export KUBECONFIG=/etc/kubernetes/admin.conf
+    kubectl apply -f - <<EOF
+    apiVersion: metallb.io/v1beta1
+    kind: IPAddressPool
+    metadata:
+      name: production-pool
+      namespace: metallb-system
+    spec:
+      addresses:
+      - 192.168.1.100-192.168.1.110
+    ---
+    apiVersion: metallb.io/v1beta1
+    kind: L2Advertisement
+    metadata:
+      name: production-advertisement
+      namespace: metallb-system
+    spec:
+      ipAddressPools:
+      - production-pool
+    EOF
+  delegate_to: "{{ groups['k8s_masters'][0] }}"
+  run_once: true
+
+- name: Copy NGINX Ingress Controller manifest
+  copy:
+    src: nginx-ingress.yaml
+    dest: /tmp/addons/nginx-ingress.yaml
+  delegate_to: "{{ groups['k8s_masters'][0] }}"
+  run_once: true
+
+- name: Apply NGINX Ingress Controller
+  shell: |
+    export KUBECONFIG=/etc/kubernetes/admin.conf
+    kubectl apply -f /tmp/addons/nginx-ingress.yaml
+  delegate_to: "{{ groups['k8s_masters'][0] }}"
+  run_once: true
+
+- name: Wait for NGINX Ingress Controller pods to be ready
+  shell: |
+    export KUBECONFIG=/etc/kubernetes/admin.conf
+    kubectl wait --for=condition=ready pods -l app.kubernetes.io/name=ingress-nginx -n ingress-nginx --timeout=300s
+  delegate_to: "{{ groups['k8s_masters'][0] }}"
+  run_once: true
+  retries: 30
+  delay: 10
+
+- name: Create storage class for dynamic provisioning
+  shell: |
+    export KUBECONFIG=/etc/kubernetes/admin.conf
+    kubectl apply -f - <<EOF
+    apiVersion: storage.k8s.io/v1
+    kind: StorageClass
+    metadata:
+      name: fast-ssd
+    provisioner: kubernetes.io/no-provisioner
+    reclaimPolicy: Retain
+    volumeBindingMode: WaitForFirstConsumer
+    allowVolumeExpansion: true
+    EOF
+  delegate_to: "{{ groups['k8s_masters'][0] }}"
+  run_once: true

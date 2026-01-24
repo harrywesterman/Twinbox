@@ -1,0 +1,90 @@
+---
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install required packages
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - python3-pip
+      - python3-dev
+      - gcc
+      - conntrack
+    state: present
+
+- name: Disable swap
+  command: swapoff -a
+  when: disable_swap | default(true)
+  register: swap_disabled
+  changed_when: swap_disabled.rc == 0
+
+- name: Comment out swap in fstab
+  replace:
+    path: /etc/fstab
+    regexp: '^([^#].*swap.*)$'
+    replace: '# \1'
+  when: disable_swap | default(true)
+
+- name: Enable kernel modules
+  modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - br_netfilter
+    - overlay
+  when: enable_kernel_modules | default(true)
+
+- name: Load kernel modules persistently
+  lineinfile:
+    path: /etc/modules-load.d/k8s.conf
+    line: "{{ item }}"
+    create: yes
+  loop:
+    - br_netfilter
+    - overlay
+  when: enable_kernel_modules | default(true)
+
+- name: Set sysctl parameters for Kubernetes
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: yes
+  loop:
+    - { name: "net.ipv4.ip_forward", value: "1" }
+    - { name: "net.bridge.bridge-nf-call-iptables", value: "1" }
+    - { name: "net.bridge.bridge-nf-call-ip6tables", value: "1" }
+    - { name: "net.ipv4.ip_local_reserved_ports", value: "30000-32767" }
+    - { name: "fs.inotify.max_user_watches", value: "524288" }
+    - { name: "fs.inotify.max_user_instances", value: "256" }
+  notify: reload sysctl
+
+- name: Configure firewall rules
+  ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+    comment: "{{ item.comment }}"
+  loop: "{{ firewall_rules }}"
+  when: configure_firewall | default(true)
+
+- name: Enable UFW
+  ufw:
+    state: enabled
+  when: configure_firewall | default(true)
+
+- name: Verify hostname resolution
+  command: getent hosts {{ inventory_hostname }}
+  register: hostname_check
+  changed_when: false
+
+- name: Set hostname if needed
+  hostname:
+    name: "{{ inventory_hostname }}"
+  when: hostname_check.rc != 0

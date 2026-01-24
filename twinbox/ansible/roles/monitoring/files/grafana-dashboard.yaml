@@ -1,0 +1,265 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-prometheus
+  namespace: monitoring
+data:
+  prometheus-dashboard.json: |-
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Prometheus Stats",
+        "tags": [],
+        "style": "dark",
+        "timezone": "browser",
+        "refresh": "10s",
+        "schemaVersion": 12,
+        "version": 1,
+        "links": [],
+        "rows": [
+          {
+            "collapse": false,
+            "editable": true,
+            "height": "250px",
+            "panels": [
+              {
+                "cacheTimeout": null,
+                "colorBackground": false,
+                "colorValue": false,
+                "colors": [
+                  "rgba(245, 54, 54, 0.9)",
+                  "rgba(237, 129, 40, 0.89)",
+                  "rgba(50, 172, 45, 0.97)"
+                ],
+                "datasource": "Prometheus",
+                "decimals": 2,
+                "editable": true,
+                "error": false,
+                "format": "bytes",
+                "gauge": {
+                  "maxValue": 100,
+                  "minValue": 0,
+                  "show": false,
+                  "thresholdLabels": false,
+                  "thresholdMarkers": true
+                },
+                "id": 2,
+                "interval": null,
+                "isNew": true,
+                "links": [],
+                "mappingType": 1,
+                "mappingTypes": [
+                  {
+                    "name": "value to text",
+                    "value": 1
+                  },
+                  {
+                    "name": "range to text",
+                    "value": 2
+                  }
+                ],
+                "maxDataPoints": 100,
+                "nullPointMode": "connected",
+                "nullText": null,
+                "postfix": "s",
+                "postfixFontSize": "50%",
+                "prefix": "",
+                "prefixFontSize": "50%",
+                "rangeMaps": [
+                  {
+                    "from": "null",
+                    "text": "N/A",
+                    "to": "null"
+                  }
+                ],
+                "span": 4,
+                "sparkline": {
+                  "fillColor": "rgba(31, 118, 189, 0.18)",
+                  "full": false,
+                  "lineColor": "rgb(31, 120, 193)",
+                  "show": false
+                },
+                "targets": [
+                  {
+                    "expr": "sum(container_memory_usage_bytes{container_name!=\"\"})",
+                    "intervalFactor": 2,
+                    "refId": "A",
+                    "step": 4
+                  }
+                ],
+                "thresholds": "",
+                "title": "Total Memory Usage",
+                "type": "singlestat",
+                "valueFontSize": "80%",
+                "valueMaps": [
+                  {
+                    "op": "=",
+                    "text": "N/A",
+                    "value": "null"
+                  }
+                ],
+                "valueName": "current"
+              },
+              {
+                "cacheTimeout": null,
+                "colorBackground": false,
+                "colorValue": false,
+                "colors": [
+                  "rgba(245, 54, 54, 0.9)",
+                  "rgba(237, 129, 40, 0.89)",
+                  "rgba(50, 172, 45, 0.97)"
+                ],
+                "datasource": "Prometheus",
+                "decimals": 2,
+                "editable": true,
+                "error": false,
+                "format": "none",
+                "gauge": {
+                  "maxValue": 100,
+                  "minValue": 0,
+                  "show": false,
+                  "thresholdLabels": false,
+                  "thresholdMarkers": true
+                },
+                "id": 3,
+                "interval": null,
+                "isNew": true,
+                "links": [],
+                "mappingType": 1,
+                "mappingTypes": [
+                  {
+                    "name": "value to text",
+                    "value": 1
+                  },
+                  {
+                    "name": "range to text",
+                    "value": 2
+                  }
+                ],
+                "maxDataPoints": 100,
+                "nullPointMode": "connected",
+                "nullText": null,
+                "postfix": "cores",
+                "postfixFontSize": "50%",
+                "prefix": "",
+                "prefixFontSize": "50%",
+                "rangeMaps": [
+                  {
+                    "from": "null",
+                    "text": "N/A",
+                    "to": "null"
+                  }
+                ],
+                "span": 4,
+                "sparkline": {
+                  "fillColor": "rgba(31, 118, 189, 0.18)",
+                  "full": false,
+                  "lineColor": "rgb(31, 120, 193)",
+                  "show": false
+                },
+                "targets": [
+                  {
+                    "expr": "sum(rate(container_cpu_usage_seconds_total{container_name!=\"\"}[5m]))",
+                    "intervalFactor": 2,
+                    "refId": "A",
+                    "step": 4
+                  }
+                ],
+                "thresholds": "",
+                "title": "Total CPU Usage",
+                "type": "singlestat",
+                "valueFontSize": "80%",
+                "valueMaps": [
+                  {
+                    "op": "=",
+                    "text": "N/A",
+                    "value": "null"
+                  }
+                ],
+                "valueName": "current"
+              },
+              {
+                "cacheTimeout": null,
+                "colorBackground": false,
+                "colorValue": false,
+                "colors": [
+                  "rgba(245, 54, 54, 0.9)",
+                  "rgba(237, 129, 40, 0.89)",
+                  "rgba(50, 172, 45, 0.97)"
+                ],
+                "datasource": "Prometheus",
+                "decimals": 2,
+                "editable": true,
+                "error": false,
+                "format": "none",
+                "gauge": {
+                  "maxValue": 100,
+                  "minValue": 0,
+                  "show": false,
+                  "thresholdLabels": false,
+                  "thresholdMarkers": true
+                },
+                "id": 4,
+                "interval": null,
+                "isNew": true,
+                "links": [],
+                "mappingType": 1,
+                "mappingTypes": [
+                  {
+                    "name": "value to text",
+                    "value": 1
+                  },
+                  {
+                    "name": "range to text",
+                    "value": 2
+                  }
+                ],
+                "maxDataPoints": 100,
+                "nullPointMode": "connected",
+                "nullText": null,
+                "postfix": "containers",
+                "postfixFontSize": "50%",
+                "prefix": "",
+                "prefixFontSize": "50%",
+                "rangeMaps": [
+                  {
+                    "from": "null",
+                    "text": "N/A",
+                    "to": "null"
+                  }
+                ],
+                "span": 4,
+                "sparkline": {
+                  "fillColor": "rgba(31, 118, 189, 0.18)",
+                  "full": false,
+                  "lineColor": "rgb(31, 120, 193)",
+                  "show": false
+                },
+                "targets": [
+                  {
+                    "expr": "count(container_start_time_seconds{container_name!=\"\"})",
+                    "intervalFactor": 2,
+                    "refId": "A",
+                    "step": 4
+                  }
+                ],
+                "thresholds": "",
+                "title": "Total Running Containers",
+                "type": "singlestat",
+                "valueFontSize": "80%",
+                "valueMaps": [
+                  {
+                    "op": "=",
+                    "text": "N/A",
+                    "value": "null"
+                  }
+                ],
+                "valueName": "current"
+              }
+            ],
+            "title": "Row1"
+          }
+        ]
+      },
+      "overwrite": true
+    }

@@ -1,0 +1,50 @@
+---
+- name: Wait for Kubernetes API to be available
+  uri:
+    url: https://{{ hostvars[groups['k8s_masters'][0]].ansible_default_ipv4.address }}:6443/healthz
+    method: GET
+    validate_certs: no
+    status_code: 200
+  retries: 60
+  delay: 10
+  delegate_to: "{{ groups['k8s_masters'][0] }}"
+  run_once: true
+
+- name: Apply Calico CNI plugin
+  shell: |
+    export KUBECONFIG=/etc/kubernetes/admin.conf
+    kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/calico.yaml
+  delegate_to: "{{ groups['k8s_masters'][0] }}"
+  run_once: true
+  when: cni_plugin == "calico"
+
+- name: Wait for Calico pods to be ready
+  shell: |
+    export KUBECONFIG=/etc/kubernetes/admin.conf
+    kubectl wait --for=condition=ready pods -l k8s-app=calico-node -n kube-system --timeout=300s
+  delegate_to: "{{ groups['k8s_masters'][0] }}"
+  run_once: true
+  when: cni_plugin == "calico"
+  retries: 30
+  delay: 10
+
+- name: Apply Cilium CNI plugin
+  shell: |
+    export KUBECONFIG=/etc/kubernetes/admin.conf
+    curl -L --remote-name-all https://github.com/cilium/cilium-cli/releases/latest/download/cilium-linux-amd64.tar.gz
+    tar xzvfC cilium-linux-amd64.tar.gz /usr/local/bin
+    chmod +x /usr/local/bin/cilium
+    cilium install --version v1.14.0
+  delegate_to: "{{ groups['k8s_masters'][0] }}"
+  run_once: true
+  when: cni_plugin == "cilium"
+
+- name: Wait for Cilium pods to be ready
+  shell: |
+    export KUBECONFIG=/etc/kubernetes/admin.conf
+    kubectl wait --for=condition=ready pods -l k8s-app=cilium -n kube-system --timeout=300s
+  delegate_to: "{{ groups['k8s_masters'][0] }}"
+  run_once: true
+  when: cni_plugin == "cilium"
+  retries: 30
+  delay: 10
