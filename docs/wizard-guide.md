@@ -54,20 +54,32 @@ The interactive wizard will guide you through the following steps:
     - Specify the Proxmox Bridge interface (default: `vmbr0`).
     - Set the Cluster VIP (Virtual IP) and starting IP address for nodes.
 
-4.  **Confirmation & Installation:**
-    - Review your settings and confirm to start the installation.
-    - The script will automatically:
-        - Download the Talos Linux ISO.
-        - Install `talosctl` (if missing).
-        - Create the requested VMs with the correct configuration.
+4.  **Management Node:**
+    -   Option to install a dedicated Management VM (Ubuntu 24.04).
+    -   Requires your SSH Public Key (starts with `ssh-rsa` or `ssh-ed25519`).
+    -   This node will come pre-installed with `terraform`, `ansible`, `kubectl`, and `talosctl`.
+
+5.  **Confirmation & Installation:**
+    -   Review your settings and confirm to start the installation.
+    -   The script will automatically:
+        -   Download the Talos Linux ISO.
+        -   Download the Ubuntu Cloud Image (if Management Node selected).
+        -   Install `talosctl` (if missing).
+        -   Create the requested VMs with the correct configuration.
+        -   Configure Cloud-Init for the Management Node to auto-install tools.
 
 ## Post-Installation
 
 Once the wizard completes, your VMs will be created.
 
-1.  **Start VMs**: Go to the Proxmox GUI and start your new VMs.
-2.  **Generate Config**: On your local workstation (not the Proxmox host), use `talosctl` to generate your cluster configuration:
+1.  **Start VMs**: Go to the Proxmox GUI and start all new VMs.
+    -   *Note: The Management VM will take a few minutes to boot and run its cloud-init scripts to install software.*
+2.  **Access Management Node**: 
+    -   Find the IP address of the `twinbox-mgt` VM in Proxmox.
+    -   SSH into it: `ssh ubuntu@<MANAGEMENT_VM_IP>`
+3.  **Bootstrap Cluster**:
+    -   From the Management Node, use `talosctl` to generate your cluster configuration:
     ```bash
     talosctl gen config twinbox-cluster https://<VIP_IP>:6443
     ```
-3.  **Bootstrap**: Apply the configuration to your nodes to finish bootstrapping the cluster.
+    -   Apply the configuration to your nodes to finish bootstrapping the cluster.

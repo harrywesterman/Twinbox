@@ -116,8 +116,18 @@ start_wizard() {
     input_box "Network Configuration" "Cluster VIP (Control Plane Endpoint):" "192.168.1.50" VIP_IP
     input_box "Network Configuration" "First Node IP (others will increment):" "192.168.1.51" START_IP
 
+    # Management Node Config
+    input_box "Management Node" "Install Management Node (Ubuntu)? (y/n)" "y" INSTALL_MGT
+    if [ "$INSTALL_MGT" == "y" ]; then
+        input_box "Management Node" "Management Node ID:" "100" MGT_ID
+        input_box "Management Node" "Management Node RAM (MB):" "2048" MGT_RAM
+        input_box "Management Node" "Management Node Cores:" "2" MGT_CORES
+        # We need an SSH key for the management node
+        input_box "Management Node" "Paste your SSH Public Key (starts with ssh-rsa ...):" "" SSH_KEY
+    fi
+
     # Confirm
-    if whiptail --yesno "Ready to install?\n\nCluster: $CLUSTER_NAME\nNodes: $CP_COUNT CP / $WORKER_COUNT Worker\nResources: ${RAM_SIZE}MB / ${CPU_CORES} Core / ${DISK_SIZE}GB\nNetwork: $BRIDGE_IF (VIP: $VIP_IP)" 15 78; then
+    if whiptail --yesno "Ready to install?\n\nCluster: $CLUSTER_NAME\nNodes: $CP_COUNT CP / $WORKER_COUNT Worker\nResources: ${RAM_SIZE}MB / ${CPU_CORES} Core / ${DISK_SIZE}GB\nNetwork: $BRIDGE_IF (VIP: $VIP_IP)\n\nManagement Node: $INSTALL_MGT (ID: $MGT_ID)" 15 78; then
         install_cluster
     else
         echo "Cancelled."
@@ -130,6 +140,11 @@ install_cluster() {
     header_info
     echo -e "${GN}Starting Installation...${CL}"
     
+    # 0. Setup Storage
+    mkdir -p /var/lib/vz/template/iso
+    mkdir -p /var/lib/vz/template/cache
+    mkdir -p /var/lib/vz/snippets
+
     # 1. Download Talos ISO
     ISO_PATH="/var/lib/vz/template/iso/talos-${TALOS_VERSION}.iso"
     if [ ! -f "$ISO_PATH" ]; then
@@ -140,50 +155,42 @@ install_cluster() {
         msg_ok "Talos ISO already exists"
     fi
 
-    # 2. Check/Install talosctl
-    if ! command -v talosctl &> /dev/null; then
-        msg_info "Installing talosctl"
-        curl -sL https://talos.dev/install | bash &> /dev/null
-        msg_ok "Installed talosctl"
-    fi
-
-    # 3. Create VMs
+    # Initialize IP Arrays for Bootstrap Script
+    CP_IPS=()
+    WORKER_IPS=()
     CURRENT_ID=$START_ID
-    CURRENT_IP=$(echo "$START_IP" | awk -F. '{print $1"."$2"."$3"."$4}')
-    
-    # IP Increment Function
-    increment_ip() {
-        local ip=$1
-        local base=$(echo "$ip" | cut -d. -f1-3)
-        local last=$(echo "$ip" | cut -d. -f4)
-        echo "$base.$((last + 1))"
+    # Helper to calculate IP
+    get_ip() {
+        local offset=$1
+        local base=$(echo "$START_IP" | cut -d. -f1-3)
+        local start_octet=$(echo "$START_IP" | cut -d. -f4)
+        echo "$base.$((start_octet + offset))"
     }
 
+    # 2. Create Talos VMs (First, to gather IPs for Management Node)
+    
     # Loop CP
     for i in $(seq 1 $CP_COUNT); do
         NODENAME="${CLUSTER_NAME}-cp-${i}"
-        msg_info "Creating Control Plane: $NODENAME (ID: $CURRENT_ID, IP: $CURRENT_IP)"
+        NODE_IP=$(get_ip $((i - 1)))
+        CP_IPS+=("$NODE_IP")
         
+        msg_info "Creating Control Plane: $NODENAME (ID: $CURRENT_ID)"
         qm create $CURRENT_ID --name "$NODENAME" --memory $RAM_SIZE --cores $CPU_CORES --net0 virtio,bridge=$BRIDGE_IF \
           --scsihw virtio-scsi-pci --scsi0 local-lvm:vm-$CURRENT_ID-disk-0,size=${DISK_SIZE}G,ssd=1 \
           --cdrom local:iso/talos-${TALOS_VERSION}.iso --boot order=scsi0;ide2 --ostype l26
         
-        # We need to set up network config for Talos specifically or rely on DHCP.
-        # For simplicity here, we assume DHCP reservation OR we'd generate a strict ISO.
-        # But commonly with Proxmox/Talos scripts, we pass kernel args or use nocloud.
-        # HERE: We will simplisticially rely on DHCP for the wizard's MVP or we'd need to generate a custom ISO/image.
-        # However, to meet the "console script" requirement, let's keep it simple: Basic VM creation.
-        
         msg_ok "Created $NODENAME"
         CURRENT_ID=$((CURRENT_ID + 1))
-        CURRENT_IP=$(increment_ip "$CURRENT_IP")
     done
 
     # Loop Workers
     for i in $(seq 1 $WORKER_COUNT); do
         NODENAME="${CLUSTER_NAME}-worker-${i}"
+        NODE_IP=$(get_ip $((CP_COUNT + i - 1)))
+        WORKER_IPS+=("$NODE_IP")
+
         msg_info "Creating Worker: $NODENAME (ID: $CURRENT_ID)"
-        
         qm create $CURRENT_ID --name "$NODENAME" --memory $RAM_SIZE --cores $CPU_CORES --net0 virtio,bridge=$BRIDGE_IF \
           --scsihw virtio-scsi-pci --scsi0 local-lvm:vm-$CURRENT_ID-disk-0,size=${DISK_SIZE}G,ssd=1 \
           --cdrom local:iso/talos-${TALOS_VERSION}.iso --boot order=scsi0;ide2 --ostype l26
@@ -192,7 +199,138 @@ install_cluster() {
         CURRENT_ID=$((CURRENT_ID + 1))
     done
 
-    msg_box "Next Steps" "VMs have been created!\n\nSince this is an MVP wizard, the VMs configured to boot from the Talos ISO.\n\nYou now need to:\n1. Start the VMs in Proxmox\n2. Run 'talosctl gen config ...' on your workstation\n3. Apply config to the new nodes\n\n(Future improvement: The wizard will auto-generate and apply configs)"
+    # 3. Management Node Provisioning
+    if [ "$INSTALL_MGT" == "y" ]; then
+        UBUNTU_URL="https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
+        IMG_NAME="noble-server-cloudimg-amd64.img"
+        IMG_PATH="/var/lib/vz/template/cache/$IMG_NAME"
+        
+        if [ ! -f "$IMG_PATH" ]; then
+            msg_info "Downloading Ubuntu 24.04 Cloud Image"
+            curl -L -o "$IMG_PATH" "$UBUNTU_URL"
+            msg_ok "Downloaded Ubuntu Image"
+        else
+            msg_ok "Ubuntu Image already exists"
+        fi
+
+        msg_info "Creating Management Node (ID: $MGT_ID)"
+        
+        # Prepare IPs string for the script
+        CP_IPS_STR="${CP_IPS[*]}"
+        WORKER_IPS_STR="${WORKER_IPS[*]}"
+
+        # Create Cloud-Init Snippet
+        SNIPPET_FILE="/var/lib/vz/snippets/mgt-${MGT_ID}-user-data.yaml"
+        cat <<EOF > "$SNIPPET_FILE"
+#cloud-config
+hostname: twinbox-mgt
+manage_etc_hosts: true
+users:
+  - default
+  - name: ubuntu
+    groups: sudo
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    ssh_authorized_keys:
+      - $SSH_KEY
+package_update: true
+packages:
+  - curl
+  - wget
+  - unzip
+  - git
+  - software-properties-common
+write_files:
+  - path: /home/ubuntu/bootstrap-cluster.sh
+    permissions: '0755'
+    owner: ubuntu:ubuntu
+    content: |
+      #!/bin/bash
+      set -e
+      CLUSTER_NAME="$CLUSTER_NAME"
+      VIP_IP="$VIP_IP"
+      CP_IPS=($CP_IPS_STR)
+      WORKER_IPS=($WORKER_IPS_STR)
+      
+      echo "Bootstrapping \$CLUSTER_NAME..."
+      
+      # Generate Config
+      talosctl gen config \$CLUSTER_NAME https://\${VIP_IP}:6443
+      
+      # Apply Config to Control Plane
+      for ip in "\${CP_IPS[@]}"; do
+        echo "Applying controlplane config to \$ip..."
+        talosctl apply-config --insecure --nodes \$ip --file controlplane.yaml
+      done
+      
+      # Apply Config to Workers
+      for ip in "\${WORKER_IPS[@]}"; do
+        echo "Applying worker config to \$ip..."
+        talosctl apply-config --insecure --nodes \$ip --file worker.yaml
+      done
+      
+      # Bootstrap
+      echo "Bootstrapping etcd on \${CP_IPS[0]}..."
+      talosctl bootstrap --nodes \${CP_IPS[0]} --endpoints \${CP_IPS[0]} --talosconfig talosconfig
+      
+      # Kubeconfig
+      echo " retrieving kubeconfig..."
+      talosctl kubeconfig --nodes \${CP_IPS[0]} --endpoints \${CP_IPS[0]} --talosconfig talosconfig
+      
+      echo "Cluster bootstrapped! verify with: kubectl get nodes"
+
+runcmd:
+  # Install Terraform
+  - wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+  - echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com \$(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list
+  - apt-get update && apt-get install -y terraform
+  # Install Ansible
+  - apt-add-repository --yes --update ppa:ansible/ansible
+  - apt-get install -y ansible
+  # Install Kubectl
+  - curl -LO "https://dl.k8s.io/release/${K8S_VERSION}/bin/linux/amd64/kubectl"
+  - install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+  # Install Talosctl
+  - curl -sL https://talos.dev/install | bash
+  # Basic SSH Config
+  - mkdir -p /home/ubuntu/.ssh
+  - echo "Host *\n\tStrictHostKeyChecking no\n" > /home/ubuntu/.ssh/config
+  - chown -R ubuntu:ubuntu /home/ubuntu/.ssh
+EOF
+        
+        # Create VM
+        qm create $MGT_ID --name "twinbox-mgt" --memory $MGT_RAM --cores $MGT_CORES --net0 virtio,bridge=$BRIDGE_IF
+        qm importdisk $MGT_ID "$IMG_PATH" local-lvm
+        qm set $MGT_ID --scsihw virtio-scsi-pci --scsi0 local-lvm:vm-$MGT_ID-disk-0
+        qm set $MGT_ID --ide2 local-lvm:cloudinit
+        qm set $MGT_ID --boot c --bootdisk scsi0
+        qm set $MGT_ID --cicustom "user=local:snippets/$(basename $SNIPPET_FILE)"
+        qm set $MGT_ID --ipconfig0 ip=dhcp
+        qm resize $MGT_ID scsi0 +10G
+
+        msg_ok "Created Management Node ($MGT_ID)"
+    fi
+
+    # 4. Auto-Start VMs
+    msg_info "Starting VMs..."
+    
+    # Start MGT first
+    if [ "$INSTALL_MGT" == "y" ]; then
+        qm start $MGT_ID
+        msg_ok "Started Management Node ($MGT_ID)"
+    fi
+    
+    # Start Talos Nodes
+    # Using the IDs we looped through. Recalculate IDs for simplicity or store them.
+    # Re-loop to start
+    ITER_ID=$START_ID
+    for i in $(seq 1 $((CP_COUNT + WORKER_COUNT))); do
+       qm start $ITER_ID
+       msg_ok "Started Talos Node ($ITER_ID)"
+       ITER_ID=$((ITER_ID + 1))
+    done
+
+    msg_box "Done" "Installation & Startup Complete!\n\n1. Wait a few minutes for Management VM to initialize.\n2. Login: ssh ubuntu@<MGT_IP>\n3. Run: ./bootstrap-cluster.sh\n\nYour cluster will be ready!"
 }
 
 # Run
