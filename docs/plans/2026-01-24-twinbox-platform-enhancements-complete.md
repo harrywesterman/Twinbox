@@ -2,7 +2,7 @@
 
 **Goal:** Implement Rook/Ceph storage, Traefik ingress, ArgoCD GitOps, and Cloudflare tunnel features in the Twinbox platform with comprehensive TDD approach.
 
-**Architecture:** Extend existing Twinbox Ansible roles to include additional Kubernetes components while maintaining compatibility with both standard Kubernetes and Talos Linux deployments. Implement GitOps workflow with ArgoCD managing cluster state, Ceph for distributed storage, Traefik for ingress routing, and Cloudflare tunnels for secure external access.
+**Architecture:** Extend existing Twinbox Ansible roles to include additional Kubernetes components, focusing exclusively on Talos Linux deployments. Implement GitOps workflow with ArgoCD managing cluster state, Ceph for distributed storage, Traefik for ingress routing, and Cloudflare tunnels for secure external access.
 
 **Tech Stack:** Ansible, Kubernetes, Rook/Ceph, Traefik, ArgoCD, Cloudflare Tunnel, Terraform, Helm
 
