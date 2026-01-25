@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rook-ceph-cluster
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    chart: rook-ceph-cluster
+    repoURL: https://charts.rook.io/release
+    targetRevision: v1.14.3
+    helm:
+      values: |
+        operatorNamespace: rook-ceph
+        toolbox:
+          enabled: true
+        cephClusterSpec:
+          mon:
+            count: 3
+            allowMultiplePerNode: false
+          mgr:
+            count: 2
+          dashboard:
+            enabled: true
+            ssl: false
+          storage:
+            useAllNodes: true
+            useAllDevices: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: rook-ceph
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
