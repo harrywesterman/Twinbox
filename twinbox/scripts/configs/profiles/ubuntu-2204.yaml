@@ -1,0 +1,18 @@
+# Ubuntu 22.04 LTS VM Profile
+# Demonstrates standard Linux VM configuration
+
+vmid: 900
+name: ubuntu-2204-server
+cores: 2
+memory: 4096
+disk: 20G
+bridge: vmbr0
+storage: local-lvm
+iso_path: local:iso/ubuntu-22.04.3-live-server-amd64.iso
+
+# Optional: Additional VM settings
+# smbios_serial: ""
+# smbios_uuid: ""
+# smbios_mlb: ""
+# smbios_model: ""
+# vlan_id: 0

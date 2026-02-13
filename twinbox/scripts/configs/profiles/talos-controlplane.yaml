@@ -1,0 +1,18 @@
+# Talos Linux Control Plane Node Profile
+# For Kubernetes control plane nodes
+
+vmid: 910
+name: talos-cp-1
+cores: 4
+memory: 8192
+disk: 20G
+bridge: vmbr0
+storage: local-lvm
+iso_path: local:iso/talos-amd64.iso
+
+# Talos-specific settings
+node_type: controlplane
+cluster_name: talos-cluster
+
+# Optional: Additional settings
+# vlan_id: 0

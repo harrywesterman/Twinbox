@@ -11,6 +11,7 @@ An automated framework for deploying production-ready Kubernetes clusters on Pro
 - **Production Ready**: Security-hardened, monitored, and scalable
 - **Modular Design**: Separate infrastructure and configuration layers
 - **Comprehensive Stack**: Includes networking, load balancing, monitoring, and identity
+- **VM Manager**: Interactive VM creation with plan-then-execute pattern, dry-run support, and rollback protection
 
 ## 📋 Prerequisites
 
@@ -20,6 +21,7 @@ An automated framework for deploying production-ready Kubernetes clusters on Pro
 - kubectl
 - SSH access to Proxmox host
 - Ubuntu template VM prepared in Proxmox
+- **For VM Manager**: `jq` and `python3-yaml` packages
 
 ## 🛠️ Quick Start
 
@@ -40,9 +42,38 @@ An automated framework for deploying production-ready Kubernetes clusters on Pro
    ```
 
 3. **Deploy the cluster:**
-   ```bash
-   ./scripts/deploy.sh
-   ```
+    ```bash
+    ./scripts/deploy.sh
+    ```
+
+## 🖥️ VM Manager (Optional)
+
+For ad-hoc VM creation and testing, Twinbox includes a powerful Proxmox VM Manager:
+
+```bash
+# Check Proxmox environment
+./scripts/proxmox-vm-manager.sh preflight
+
+# List available VM profiles
+./scripts/proxmox-vm-manager.sh list-profiles
+
+# Create a VM (interactive with confirmation)
+./scripts/proxmox-vm-manager.sh create ubuntu-2204
+
+# Or use plan-then-execute for full control
+./scripts/proxmox-vm-manager.sh plan ubuntu-2204 --output plan.json
+./scripts/proxmox-vm-manager.sh apply plan.json --dry-run  # Preview
+./scripts/proxmox-vm-manager.sh apply plan.json           # Execute
+```
+
+**Key Features:**
+- ✅ Plan-then-execute with dry-run preview
+- ✅ Automatic snapshots and rollback
+- ✅ YAML-based reusable profiles
+- ✅ Supports Linux, Talos, and macOS VMs
+- ✅ Comprehensive validation and logging
+
+See [PROXMOX-VM-MANAGER.md](scripts/PROXMOX-VM-MANAGER.md) for full documentation.
 
 ## 🏗️ Architecture
 
@@ -66,6 +97,8 @@ Twinbox follows a two-layer architecture:
 - [Architecture](docs/architecture.md) - Technical architecture overview
 - [Troubleshooting](docs/troubleshooting.md) - Common issues and solutions
 - [Release Notes](RELEASE-NOTES.md) - Version information and features
+- [VM Manager Guide](scripts/PROXMOX-VM-MANAGER.md) - Proxmox VM Manager documentation
+- [VM Manager Integration](scripts/INTEGRATION-GUIDE.md) - Using VM Manager with Twinbox
 
 ## 🧩 Components
 
