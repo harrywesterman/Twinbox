@@ -1,0 +1,144 @@
+{% extends "layout.html" %}
+
+{% block title %}Twinbox - Cluster Deployment Complete{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <div class="text-center">
+        <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100">
+            <svg class="h-10 w-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+        </div>
+        <h2 class="mt-6 text-3xl font-bold text-gray-900">Cluster Ready!</h2>
+        <p class="mt-2 text-gray-600">Your Kubernetes cluster has been successfully deployed</p>
+    </div>
+
+    <div class="bg-white shadow rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Cluster Details</h3>
+        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Cluster Name</dt>
+                <dd class="mt-1 text-sm text-gray-900" id="cluster-name">{{ cluster.name }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Kubernetes Version</dt>
+                <dd class="mt-1 text-sm text-gray-900" id="k8s-version">1.28.x (Talos)</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Control Plane Nodes</dt>
+                <dd class="mt-1 text-sm text-gray-900" id="control-plane-count">3</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Worker Nodes</dt>
+                <dd class="mt-1 text-sm text-gray-900" id="worker-count">2</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Network CIDR</dt>
+                <dd class="mt-1 text-sm text-gray-900" id="network-cidr">10.244.0.0/16</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Ingress Controller</dt>
+                <dd class="mt-1 text-sm text-gray-900">Traefik</dd>
+            </div>
+        </dl>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white shadow rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Access Your Cluster</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-500 mb-2">Kubeconfig</label>
+                    <button hx-get="/api/cluster/{{ cluster.id }}/kubeconfig"
+                            hx-boost="false"
+                            download="kubeconfig-{{ cluster.name }}.yaml"
+                            class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        Download Kubeconfig
+                    </button>
+                    <p class="text-xs text-gray-500 mt-2">Save this file to ~/.kube/config or use with kubectl --kubeconfig</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-500 mb-2">Connect with kubectl</label>
+                    <div class="bg-gray-100 p-3 rounded-md font-mono text-xs text-gray-800 break-all">
+                        export KUBECONFIG=~/.kube/config<br>
+                        kubectl cluster-info
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-500 mb-2">Test your connection</label>
+                    <div class="bg-gray-100 p-3 rounded-md font-mono text-xs text-gray-800 break-all">
+                        kubectl get nodes
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white shadow rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Next Steps</h3>
+            <ul class="space-y-3">
+                <li class="flex items-start">
+                    <svg class="h-5 w-5 text-green-500 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="text-sm text-gray-700">Verify cluster status with <code class="bg-gray-100 px-1 rounded">kubectl get nodes</code></span>
+                </li>
+                <li class="flex items-start">
+                    <svg class="h-5 w-5 text-green-500 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="text-sm text-gray-700">Access <strong>Headlamp</strong> dashboard for visual cluster management</span>
+                </li>
+                <li class="flex items-start">
+                    <svg class="h-5 w-5 text-green-500 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="text-sm text-gray-700">Deploy applications via <strong>ArgoCD</strong> (GitOps)</span>
+                </li>
+                <li class="flex items-start">
+                    <svg class="h-5 w-5 text-green-500 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="text-sm text-gray-700">Configure <strong>Traefik</strong> ingress routes for your services</span>
+                </li>
+                <li class="flex items-start">
+                    <svg class="h-5 w-5 text-green-500 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="text-sm text-gray-700">Set up <strong>Velero</strong> for cluster backups</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div class="flex">
+            <svg class="h-5 w-5 text-blue-400 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+            </svg>
+            <div>
+                <p class="text-sm text-blue-700">
+                    <strong>Important:</strong> Keep your kubeconfig file secure! It contains credentials to access your cluster.
+                </p>
+                <p class="text-sm text-blue-700 mt-1">
+                    All deployed services (Headlamp, ArgoCD, Traefik) are accessible through the load balancer IP assigned by MetalLB.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex justify-between items-center">
+        <a href="/" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+            Back to Home
+        </a>
+        <a href="#" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+            View Cluster Details
+        </a>
+    </div>
+</div>
+{% endblock %}

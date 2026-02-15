@@ -1,0 +1,173 @@
+/* Custom scrollbar for log window */
+.log-window::-webkit-scrollbar {
+    width: 12px;
+}
+
+.log-window::-webkit-scrollbar-track {
+    background: #2a2a2a;
+    border-radius: 6px;
+}
+
+.log-window::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 6px;
+}
+
+.log-window::-webkit-scrollbar-thumb:hover {
+    background: #666;
+}
+
+/* Firefox scrollbar */
+.log-window {
+    scrollbar-width: thin;
+    scrollbar-color: #555 #2a2a2a;
+}
+
+/* Terminal cursor blinking animation */
+@keyframes blink-cursor {
+    0%, 50% {
+        opacity: 1;
+    }
+    51%, 100% {
+        opacity: 0;
+    }
+}
+
+.cursor {
+    display: inline-block;
+    width: 8px;
+    height: 16px;
+    margin-left: 2px;
+    background-color: #00ff00;
+    animation: blink-cursor 1s step-end infinite;
+    vertical-align: text-bottom;
+}
+
+/* Progress step animations */
+.progress-step {
+    transition: all 0.3s ease-in-out;
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin: 4px 0;
+}
+
+.progress-step:hover {
+    background-color: #f3f4f6;
+}
+
+.progress-step.completed {
+    color: #10b981;
+}
+
+.progress-step.active {
+    background-color: #eff6ff;
+    border-left: 3px solid #3b82f6;
+    padding-left: 12px;
+}
+
+.progress-step .step-checkbox {
+    font-weight: bold;
+    min-width: 24px;
+    display: inline-block;
+    text-align: center;
+}
+
+/* Smooth scrolling */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Focus styles for accessibility */
+button:focus,
+a:focus,
+input:focus,
+select:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+/* Skip link for accessibility */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: #000;
+    color: white;
+    padding: 8px;
+    z-index: 100;
+}
+
+.skip-link:focus {
+    top: 0;
+}
+
+/* Status badges */
+.status-badge {
+    font-size: 0.875rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+}
+
+.status-badge.success {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.status-badge.warning {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.status-badge.error {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+.status-badge.pending {
+    background-color: #e0e7ff;
+    color: #3730a3;
+}
+
+/* Form validation styles */
+input:invalid:not(:placeholder-shown),
+select:invalid:not(:placeholder-shown) {
+    border-color: #ef4444;
+}
+
+input:valid {
+    border-color: #10b981;
+}
+
+/* Loading spinner */
+.spinner {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #3b82f6;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.3s ease-in;
+}

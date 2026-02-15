@@ -1,0 +1,141 @@
+# Twinbox Project - Root .gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv
+*.egg-info/
+.installed.cfg
+pip-wheel-metadata/
+.tox/
+.coverage
+htmlcov/
+.pytest_cache/
+*.egg
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+*.env
+secrets/
+secret/
+credentials.json
+secrets.json
+secrets.yaml
+secrets.yml
+
+# Configuration files with secrets
+proxmox-creds.json
+proxmox-credentials.json
+kubeconfig
+.kube/
+**/kubeconfig
+**/.kube/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+dump.rdb
+
+# Logs
+*.log
+logs/
+log/
+/var/log/
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+.temp/
+.cache/
+
+# Build outputs
+dist/
+build/
+target/
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+Dockerfile.*
+
+# IDE specific
+.vscode/
+
+# Local development overrides
+local/
+dev/
+development/
+
+# Testing
+.test/
+tests/fixtures/
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
+# Twinbox specific
+./wizard/.env
+./wizard/secrets/
+./twinbox/.env
+./twinbox/secrets/
+./manager/.env
+./manager/secrets/
+
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+terraform.tfvars.json
+
+# Ansible
+inventory/
+.ansible_vault
+.vault_pass
+
+# Cloud credentials
+.aws/
+.azure/
+.gcp/
+
+# Misc
+.DS_Store
+package-lock.json
+yarn.lock

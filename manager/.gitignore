@@ -1,0 +1,125 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv
+
+# Poetry/Pipenv
+.python-version
+ Pipfile.lock
+poetry.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# Secrets and credentials
+*.pem
+*.key
+*.crt
+*.p12
+credentials.json
+secrets.json
+secrets.yaml
+secrets.yml
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+log/
+/var/log/
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+.temp/
+
+# Node.js (if any frontend in subdirectories)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+*.egg
+.eggs/
+.installed.cfg
+pip-wheel-metadata/
+
+# Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Kube config and certificates
+.kube/
+kubeconfig
+kubeconfig-*
+~/.kube/
+**/kubeconfig
+**/.kube/
+
+# Proxmox credentials
+proxmox-creds.json
+proxmox-credentials.json
+
+# Alembic versions (keep the directory but might want to be selective)
+alembic/versions/*_*.py
+!alembic/versions/001_initial_schema.py
+
+# Redis dump
+dump.rdb
+
+# Celery beats and workers
+celerybeat-schedule
+celerybeat.pid
+
+# Local development
+.devcontainer/
+local/
+testing/
+
+# Twinbox specific
+./wizard/.env
+./wizard/secrets/
+./twinbox/.env
+./twinbox/secrets/
