@@ -5,10 +5,10 @@ UBUNTU_VER="22.04"
 CLOUD_IMG="http://cloud-images.ubuntu.com/releases/${UBUNTU_VER}/release/ubuntu-${UBUNTU_VER}-live-server-amd64.img"
 CPU_CORES=2; RAM_MB=4096; DISK_GB=32; BRIDGE="vmbr0"; STORAGE="local-lvm"
 CLUSTER=""; SELECTED=""
-log() { echo -e "${YELLOW}[*] $*${NC}"; }
-ok() { echo -e "${GREEN}[✓] $*${NC}"; }
+log() { echo -e "${YELLOW}[*] $*${NC}" >&2; }
+ok() { echo -e "${GREEN}[✓] $*${NC}" >&2; }
 err() { echo -e "${RED}[✗] $*${NC}" >&2; }
-warn() { echo -e "${YELLOW}[!] $*${NC}"; }
+warn() { echo -e "${YELLOW}[!] $*${NC}" >&2; }
 
 check_proxmox() {
     [[ -d /etc/pve ]] || { err "This script must run on a Proxmox VE host"; exit 1; }
