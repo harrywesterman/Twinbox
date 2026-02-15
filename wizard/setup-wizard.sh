@@ -116,6 +116,7 @@ create_cloudinit_iso() {
     local meta_data="$base_dir/meta-data"
     local iso_tmp="/tmp/cloud-init-$CLUSTER.iso"
     local iso_name="cloud-init-$CLUSTER.iso"
+    local storage_iso_path="/var/lib/vz/template/iso/$iso_name"
     local creds_file="/tmp/twinbox-creds-$CLUSTER.env"
     [[ -f "$creds_file" ]] || { err "Credentials file not found. Run gen_token first."; exit 1; }
     source "$creds_file"
@@ -197,7 +198,7 @@ write_files:
       ==========================================
 
       Web UI: http://<this-vm-ip>:8080
-      SSH: ubuntu@<this-vm-ip>
+      SSH: ubuntu@<this-ip>
 
       Twinbox repository: /opt/twinbox
       Docker Compose: /opt/twinbox/docker-compose.yml
@@ -222,7 +223,7 @@ final_message: |
   Management VM is ready. The Twinbox web
   interface should be accessible shortly.
 
-  SSH to this VM: ssh ubuntu@<this-ip>
+  SSH to this vm: ssh ubuntu@<this-ip>
   View status: systemctl status twinbox
   View logs: journalctl -u twinbox -f
 
@@ -248,7 +249,11 @@ EOF_METADATA
 
     ok "Cloud-init ISO created"
 
-    echo "$iso_tmp"
+    # Copy ISO to Proxmox template directory so it's accessible via storage
+    mkdir -p /var/lib/vz/template/iso
+    cp "$iso_tmp" "$storage_iso_path" 2>/dev/null || true
+
+    echo "$iso_name"
 }
 
 create_vm() {
@@ -355,13 +360,13 @@ create_vm() {
 
     # Attach cloud-init ISO as CD-ROM (ide2)
     qm set "$vmid" \
-        --ide2 "local:iso/$(basename "$ci_iso")" \
+        --ide2 "local:iso/$(basename "$ci_iso"),media=cdrom" \
         --ipconfig0 "ip=dhcp" \
         --serial0 socket \
         &>/dev/null || warn "Cloud-init configuration may have issues"
 
     # Set boot order to boot from CD-ROM first (cloud-init), then disk
-    qm set "$vmid" --boot "order=ide2,scsi0" &>/dev/null
+    qm set "$vmid" --boot "order=ide2" &>/dev/null
 
     ok "Cloud-init configured"
 
