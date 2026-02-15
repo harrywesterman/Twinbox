@@ -665,7 +665,7 @@ final_message: |
   View logs: journalctl -u twinbox -f
 
   ==========================================
-EOF
+EOF_USERDATA
 
     ok "Cloud-init snippet created: $snippet_path"
     echo "$snippet_file"
