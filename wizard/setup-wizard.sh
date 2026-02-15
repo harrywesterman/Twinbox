@@ -307,11 +307,12 @@ create_vm() {
     log "Using VM ID $vmid (free)"
     log "Attempting to create VM $vmid: $name"
 
+    # Suppress qm create output (warnings go to /dev/null) to ensure only vmid is returned
     if ! qm create "$vmid" --name "$name" --memory "$RAM_MB" --cores "$CPU_CORES" \
         --net0 "virtio,bridge=$BRIDGE" \
         --scsi0 "$STORAGE:${DISK_GB},ssd=1" \
         --cdrom "$ISO" \
-        --boot "order=scsi0"; then
+        --boot "order=scsi0" >/dev/null 2>&1; then
         err "Failed to create VM $vmid"
         return 1
     fi
