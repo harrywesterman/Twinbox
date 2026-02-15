@@ -298,6 +298,7 @@ create_vm() {
     if ! qm create "$vmid" --name "$name" --memory "$RAM_MB" --cores "$CPU_CORES" \
         --net0 "virtio,bridge=$BRIDGE" \
         --agent 1 \
+        --scsihw virtio-scsi-single \
         --boot "order=scsi0" &>/dev/null; then
         err "Failed to create VM $vmid"
         return 1
