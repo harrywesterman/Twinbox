@@ -110,8 +110,12 @@ get_ubuntu_cloud_image() {
     CLOUD_IMAGE_PATH="$img_path"
 }
 
-create_cloudinit() {
-    local out="/tmp/cloud-init-$CLUSTER.yml"
+create_cloudinit_iso() {
+    local base_dir="/tmp/cloud-init-$CLUSTER"
+    local user_data="$base_dir/user-data"
+    local meta_data="$base_dir/meta-data"
+    local iso_tmp="/tmp/cloud-init-$CLUSTER.iso"
+    local iso_name="cloud-init-$CLUSTER.iso"
     local creds_file="/tmp/twinbox-creds-$CLUSTER.env"
     [[ -f "$creds_file" ]] || { err "Credentials file not found. Run gen_token first."; exit 1; }
     source "$creds_file"
@@ -119,7 +123,10 @@ create_cloudinit() {
     local db_pass=$(openssl rand -base64 32 | tr -d '/+=' | head -c 32 2>/dev/null || echo "CHANGE_$(date +%s)")
     local sec_key=$(openssl rand -base64 32 2>/dev/null || echo "CHANGE_$(date +%s)")
 
-    cat > "$out" <<EOF
+    mkdir -p "$base_dir"
+
+    # Create user-data (cloud-config)
+    cat > "$user_data" <<'EOF_USERDATA'
 #cloud-config
 package_update: true
 package_upgrade: true
@@ -135,9 +142,9 @@ write_files:
     permissions: '0600'
     owner: twinbox:twinbox
     content: |
-      api_url: "${API_URL}"
+      api_url: ${API_URL}
       user: "twinbox@pve"
-      token: "${API_TOKEN_SECRET}"
+      token: ${API_TOKEN_SECRET}
       verify_ssl: false
   - path: /opt/twinbox/config/cluster-name
     permissions: '0644'
@@ -210,7 +217,7 @@ runcmd:
 final_message: |
   ==========================================
    Twinbox Setup Complete!
-  ==========================================
+  ===========================================
 
   Management VM is ready. The Twinbox web
   interface should be accessible shortly.
@@ -220,9 +227,28 @@ final_message: |
   View logs: journalctl -u twinbox -f
 
   ==========================================
-EOF
-    ok "Cloud-init generated: $out"
-    echo "$out"
+EOF_USERDATA
+
+    # Create meta-data
+    cat > "$meta_data" <<'EOF_METADATA'
+instance-id: cloud-vm-VMID
+local-hostname: twinbox-mgmt-CLUSTER
+EOF_METADATA
+
+    # Create cloud-init ISO using cloud-localds (preferred) or mkisofs (fallback)
+    if command -v cloud-localds &>/dev/null; then
+        cloud-localds --disk-format raw "$iso_tmp" "$user_data" "$meta_data"
+    else
+        warn "cloud-localds not found, using mkisofs..."
+        mkisofs -o "$iso_tmp" -volid cidata -joliet -rock "$user_data" "$meta_data" 2>/dev/null || {
+            err "Failed to create cloud-init ISO. Install cloud-image-utils package."
+            return 1
+        }
+    fi
+
+    ok "Cloud-init ISO created"
+
+    echo "$iso_tmp"
 }
 
 create_vm() {
@@ -323,15 +349,19 @@ create_vm() {
     fi
     ok "Disk attached"
 
-    # Step 4: Configure cloud-init
-    local ci_file
-    ci_file=$(create_cloudinit) || return 1
+    # Step 4: Create cloud-init ISO and attach as CD-ROM
+    local ci_iso
+    ci_iso=$(create_cloudinit_iso) || return 1
 
+    # Attach cloud-init ISO as CD-ROM (ide2)
     qm set "$vmid" \
-        --cicustom "user=local:$ci_file" \
+        --ide2 "local:iso/$(basename "$ci_iso")" \
         --ipconfig0 "ip=dhcp" \
         --serial0 socket \
         &>/dev/null || warn "Cloud-init configuration may have issues"
+
+    # Set boot order to boot from CD-ROM first (cloud-init), then disk
+    qm set "$vmid" --boot "order=ide2,scsi0" &>/dev/null
 
     ok "Cloud-init configured"
 
