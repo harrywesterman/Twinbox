@@ -516,6 +516,12 @@ create_vm() {
         return 1
     fi
 
+    # Resize disk to the configured size
+    log "Resizing disk to ${DISK_GB}GB..."
+    if ! qm disk resize "$vmid" "scsi0" "+${DISK_GB}G" &>/dev/null; then
+        warn "Failed to resize disk, using default size"
+    fi
+
     # Step 3: Attach the imported disk as scsi0
     # The disk will be named vm-<vmid>-disk-0
     local disk_name="vm-${vmid}-disk-0"
