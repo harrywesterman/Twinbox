@@ -139,7 +139,7 @@ create_cloudinit_iso() {
     mkdir -p "$base_dir"
 
     # Create user-data (cloud-config)
-    cat > "$user_data" <<'EOF_USERDATA'
+    cat > "$user_data" <<EOF_USERDATA
 #cloud-config
 package_update: true
 package_upgrade: true
@@ -244,10 +244,10 @@ final_message: |
   ==========================================
 EOF_USERDATA
 
-    # Create meta-data
-    cat > "$meta_data" <<'EOF_METADATA'
-instance-id: cloud-vm-VMID
-local-hostname: twinbox-mgmt-CLUSTER
+    # Create meta-data (substitute actual VM ID and cluster name)
+    cat > "$meta_data" <<EOF_METADATA
+instance-id: cloud-vm-$vmid
+local-hostname: twinbox-mgmt-$CLUSTER
 EOF_METADATA
 
     # Create cloud-init ISO using cloud-localds (preferred) or mkisofs (fallback)
@@ -380,8 +380,8 @@ create_vm() {
         --serial0 socket \
         &>/dev/null || warn "Cloud-init configuration may have issues"
 
-    # Set boot order to boot from CD-ROM first (cloud-init), then disk
-    qm set "$vmid" --boot "order=ide2" &>/dev/null
+    # Set boot order: boot from disk (scsi0), cloud-init will be picked up from ide2
+    qm set "$vmid" --boot "order=scsi0" &>/dev/null
 
     ok "Cloud-init configured"
 
