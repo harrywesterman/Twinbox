@@ -78,46 +78,47 @@ EOF
     fi
 }
 
-get_ubuntu_iso() {
-    local iso_dir="/var/lib/vz/template/iso"
-    local iso_name="${UBUNTU_VER}-server-cloudimg-amd64.img"
-    local iso_path="$iso_dir/$iso_name"
+get_ubuntu_cloud_image() {
+    local storage_dir="/var/lib/vz"
+    local img_name="${UBUNTU_VER}-server-cloudimg-amd64.img"
+    local img_path="$storage_dir/$img_name"
+    local storage_ref="local:iso/$img_name"
 
-    # Check if ISO already exists in Proxmox storage
+    # Check if image already exists in Proxmox storage
     if pvesh get /nodes/$SELECTED/storage/local/content --output-format json 2>/dev/null | \
-        python3 -c "import sys, json; content = json.load(sys.stdin); print('yes' if any(item.get('volid','').endswith('$iso_name') for item in content) else 'no')" 2>/dev/null | grep -q yes; then
-        ok "Ubuntu cloud image already in storage: $iso_name"
-        ISO="local:iso/$iso_name"
+        python3 -c "import sys, json; content = json.load(sys.stdin); print('yes' if any(item.get('volid','').endswith('$img_name') for item in content) else 'no')" 2>/dev/null | grep -q yes; then
+        ok "Ubuntu cloud image already in storage: $storage_ref"
+        CLOUD_IMAGE="$storage_ref"
         return
     fi
 
-    mkdir -p "$iso_dir"
-    if [[ -f "$iso_path" ]]; then
-        ok "Ubuntu cloud image exists: $iso_path"
-        # Upload it to storage first if not already there
-        if pvesh create /nodes/$SELECTED/storage/local/content --content iso --filename "$iso_name" --file "$iso_path" &>/dev/null; then
+    mkdir -p "$storage_dir"
+    if [[ -f "$img_path" ]]; then
+        ok "Ubuntu cloud image exists locally: $img_path"
+        # Upload it to storage
+        if pvesh create /nodes/$SELECTED/storage/local/content --content iso --filename "$img_name" --file "$img_path" &>/dev/null; then
             ok "Uploaded to storage"
-            rm -f "$iso_path"
-            ISO="local:iso/$iso_name"
+            rm -f "$img_path"
+            CLOUD_IMAGE="$storage_ref"
         else
-            warn "Upload failed, using local file as cdrom"
-            ISO="$iso_path"
+            err "Upload to storage failed"
+            exit 1
         fi
         return
     fi
 
     log "Downloading Ubuntu $UBUNTU_VER cloud image..."
-    curl -sL -o "$iso_path" "$CLOUD_IMG" && ok "Downloaded" || { err "Download failed"; exit 1; }
+    curl -sL -o "$img_path" "$CLOUD_IMG" && ok "Downloaded" || { err "Download failed"; exit 1; }
 
     # Upload to Proxmox storage
     log "Uploading to Proxmox storage..."
-    if pvesh create /nodes/$SELECTED/storage/local/content --content iso --filename "$iso_name" --file "$iso_path" &>/dev/null; then
+    if pvesh create /nodes/$SELECTED/storage/local/content --content iso --filename "$img_name" --file "$img_path" &>/dev/null; then
         ok "Uploaded to storage"
-        rm -f "$iso_path"
-        ISO="local:iso/$iso_name"
+        rm -f "$img_path"
+        CLOUD_IMAGE="$storage_ref"
     else
-        warn "Upload failed, using local file"
-        ISO="$iso_path"
+        err "Upload to storage failed"
+        exit 1
     fi
 }
 
@@ -302,24 +303,48 @@ create_vm() {
     log "Using VM ID $vmid (free)"
     log "Attempting to create VM $vmid: $name"
 
-    # Suppress all qm create output to ensure clean vmid return
+    # Ensure cloud image is available
+    get_ubuntu_cloud_image || return 1
+
+    # Step 1: Create empty VM (no disk)
     if ! qm create "$vmid" --name "$name" --memory "$RAM_MB" --cores "$CPU_CORES" \
         --net0 "virtio,bridge=$BRIDGE" \
-        --scsi0 "$STORAGE:${DISK_GB},ssd=1" \
-        --cdrom "$ISO" \
-        --boot "order=ide2" &>/dev/null; then
+        --agent 1 \
+        --boot "order=scsi0" &>/dev/null; then
         err "Failed to create VM $vmid"
         return 1
     fi
+    ok "VM $vmid created (empty)"
 
-    ok "VM $vmid created"
+    # Step 2: Import cloud image as the boot disk
+    log "Importing cloud image as disk..."
+    if ! qm importdisk "$vmid" "$CLOUD_IMAGE" "$STORAGE" &>/dev/null; then
+        err "Failed to import disk for VM $vmid"
+        qm destroy "$vmid" 2>/dev/null || true
+        return 1
+    fi
 
+    # Step 3: Attach the imported disk as scsi0
+    # The disk will be named vm-<vmid>-disk-0
+    local disk_name="vm-${vmid}-disk-0"
+    if ! qm set "$vmid" --scsi0 "$STORAGE:$disk_name" &>/dev/null; then
+        err "Failed to attach disk to VM $vmid"
+        qm destroy "$vmid" 2>/dev/null || true
+        return 1
+    fi
+    ok "Disk attached"
+
+    # Step 4: Configure cloud-init
     local ci_file
     ci_file=$(create_cloudinit) || return 1
 
-    # Attach cloud-init config directly using local file path
-    qm set "$vmid" --cicustom "user=local:$ci_file" \
-        --ipconfig0 "ip=dhcp" &>/dev/null
+    qm set "$vmid" \
+        --cicustom "user=local:$ci_file" \
+        --ipconfig0 "ip=dhcp" \
+        --serial0 socket \
+        &>/dev/null || warn "Cloud-init configuration may have issues"
+
+    ok "Cloud-init configured"
 
     echo "$vmid"
     return 0
@@ -344,7 +369,7 @@ main() {
     check_proxmox; prompt_cluster
     log "Configuration:"; echo "  Cluster: $CLUSTER"; echo "  Node: $SELECTED"
     echo "  VM: ${CPU_CORES} CPU, ${RAM_MB}MB RAM, ${DISK_GB}GB disk"; echo "  Bridge: $BRIDGE"
-    create_twinbox_user; gen_token; get_ubuntu_iso
+    create_twinbox_user; gen_token; get_ubuntu_cloud_image
     local vmid
     vmid=$(create_vm) || exit 1
     qm start "$vmid"
