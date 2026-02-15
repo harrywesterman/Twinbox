@@ -399,21 +399,24 @@ main() {
  Twinbox Setup Complete!
 ==========================================
 
-Management VM ready!
+Phase 1: Management VM created!
 
   VM ID: $vmid
   Name: twinbox-mgmt-$CLUSTER
   IP: $ip
 
+NEXT STEPS:
+
 1. Wait 1-2 minutes for cloud-init to finish
-2. Open browser to: http://$ip:8080
-3. You'll see the Twinbox web interface
-
-To access the VM:
-  ssh twinbox@$ip
-  Password: $twinbox_pw
-
-The cluster will be ready to deploy from the web UI.
+2. SSH to the VM:
+     ssh twinbox@$ip
+     Password: $twinbox_pw
+3. Install the Twinbox platform:
+     git clone https://github.com/yourorg/Twinbox.git /opt/twinbox
+     cd /opt/twinbox/manager
+     cp .env.example .env  # Edit as needed
+     docker-compose up -d
+4. Access the web UI at http://$ip:8080
 
 ==========================================
 EOF
