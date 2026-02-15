@@ -35,6 +35,15 @@ prompt_cluster() {
         [[ "$CLUSTER" =~ ^[a-zA-Z0-9-]+$ ]] && break || warn "Invalid cluster name."
     done
 
+    # SSH public key (optional but recommended)
+    echo
+    read -p "Enter your SSH public key (optional, press Enter to skip): " SSH_PUBLIC_KEY
+    if [[ -n "$SSH_PUBLIC_KEY" ]]; then
+        ok "SSH public key will be configured for twinbox user"
+    else
+        warn "No SSH key provided. You can use password authentication."
+    fi
+
     # Always use the local node (the node where this script is running)
     SELECTED=$(hostname -s 2>/dev/null || echo "localhost")
     ok "Using local node: $SELECTED"
@@ -201,7 +210,20 @@ write_files:
       SECRET_KEY=${sec_key}
       PROXMOX_CREDENTIALS_PATH=/opt/twinbox/config/proxmox-creds.yaml
       CLUSTER_NAME=${CLUSTER}
+EOF_USERDATA
 
+    # Conditionally add SSH public key if provided
+    if [[ -n "$SSH_PUBLIC_KEY" ]]; then
+        cat >> "$user_data" <<EOF_USERDATA
+  - path: /home/twinbox/.ssh/authorized_keys
+    permissions: '0600'
+    owner: twinbox:twinbox
+    content: |
+      $SSH_PUBLIC_KEY
+EOF_USERDATA
+    fi
+
+    cat >> "$user_data" <<EOF_USERDATA
   - path: /opt/twinbox/docker-compose.yml
     permissions: '0644'
     owner: root:root
@@ -465,7 +487,20 @@ write_files:
       SECRET_KEY=${sec_key}
       PROXMOX_CREDENTIALS_PATH=/opt/twinbox/config/proxmox-creds.yaml
       CLUSTER_NAME=${CLUSTER}
+EOF_USERDATA
 
+    # Conditionally add SSH public key if provided
+    if [[ -n "$SSH_PUBLIC_KEY" ]]; then
+        cat >> "$user_data" <<EOF_USERDATA
+  - path: /home/twinbox/.ssh/authorized_keys
+    permissions: '0600'
+    owner: twinbox:twinbox
+    content: |
+      $SSH_PUBLIC_KEY
+EOF_USERDATA
+    fi
+
+    cat >> "$user_data" <<EOF_USERDATA
   - path: /opt/twinbox/docker-compose.yml
     permissions: '0644'
     owner: root:root
