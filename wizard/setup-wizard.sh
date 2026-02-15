@@ -179,6 +179,19 @@ runcmd:
   - [usermod, -aG, docker, twinbox]
   - [mkdir, -p, /opt/twinbox]
   - [chown, -R, twinbox:twinbox, /opt/twinbox]
+EOF_USERDATA
+
+    # Conditionally add SSH public key setup after twinbox user exists
+    if [[ -n "$SSH_PUBLIC_KEY" ]]; then
+        cat >> "$user_data" <<EOF_USERDATA
+  - [mkdir, -p, /home/twinbox/.ssh]
+  - [sh, -c, "echo '$SSH_PUBLIC_KEY' > /home/twinbox/.ssh/authorized_keys"]
+  - [chmod, 600, /home/twinbox/.ssh/authorized_keys]
+  - [chown, -R, twinbox:twinbox, /home/twinbox/.ssh]
+EOF_USERDATA
+    fi
+
+    cat >> "$user_data" <<EOF_USERDATA
   - [systemctl, enable, qemu-guest-agent]
   - [systemctl, start, qemu-guest-agent]
   - [systemctl, daemon-reload]
@@ -211,17 +224,6 @@ write_files:
       PROXMOX_CREDENTIALS_PATH=/opt/twinbox/config/proxmox-creds.yaml
       CLUSTER_NAME=${CLUSTER}
 EOF_USERDATA
-
-    # Conditionally add SSH public key if provided
-    if [[ -n "$SSH_PUBLIC_KEY" ]]; then
-        cat >> "$user_data" <<EOF_USERDATA
-  - path: /home/twinbox/.ssh/authorized_keys
-    permissions: '0600'
-    owner: twinbox:twinbox
-    content: |
-      $SSH_PUBLIC_KEY
-EOF_USERDATA
-    fi
 
     cat >> "$user_data" <<EOF_USERDATA
   - path: /opt/twinbox/docker-compose.yml
@@ -449,6 +451,19 @@ runcmd:
   - [usermod, -aG, docker, twinbox]
   - [mkdir, -p, /opt/twinbox]
   - [chown, -R, twinbox:twinbox, /opt/twinbox]
+EOF_USERDATA
+
+    # Conditionally add SSH public key setup after twinbox user exists
+    if [[ -n "$SSH_PUBLIC_KEY" ]]; then
+        cat >> "$snippet_path" <<EOF_USERDATA
+  - [mkdir, -p, /home/twinbox/.ssh]
+  - [sh, -c, "echo '$SSH_PUBLIC_KEY' > /home/twinbox/.ssh/authorized_keys"]
+  - [chmod, 600, /home/twinbox/.ssh/authorized_keys]
+  - [chown, -R, twinbox:twinbox, /home/twinbox/.ssh]
+EOF_USERDATA
+    fi
+
+    cat >> "$snippet_path" <<EOF_USERDATA
   - [systemctl, enable, qemu-guest-agent]
   - [systemctl, start, qemu-guest-agent]
   - [systemctl, daemon-reload]
@@ -489,18 +504,7 @@ write_files:
       CLUSTER_NAME=${CLUSTER}
 EOF_USERDATA
 
-    # Conditionally add SSH public key if provided
-    if [[ -n "$SSH_PUBLIC_KEY" ]]; then
-        cat >> "$user_data" <<EOF_USERDATA
-  - path: /home/twinbox/.ssh/authorized_keys
-    permissions: '0600'
-    owner: twinbox:twinbox
-    content: |
-      $SSH_PUBLIC_KEY
-EOF_USERDATA
-    fi
-
-    cat >> "$user_data" <<EOF_USERDATA
+    cat >> "$snippet_path" <<EOF_USERDATA
   - path: /opt/twinbox/docker-compose.yml
     permissions: '0644'
     owner: root:root
