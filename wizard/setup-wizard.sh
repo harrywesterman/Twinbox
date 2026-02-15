@@ -22,7 +22,20 @@ prompt_cluster() {
         read -p "Cluster name (alphanumeric, no spaces): " CLUSTER
         [[ "$CLUSTER" =~ ^[a-zA-Z0-9-]+$ ]] && break || warn "Invalid cluster name."
     done
-    nodes=($(pvesh get /nodes --output-format json 2>/dev/null | jq -r '.[] | select(.status=="online") | .id' 2>/dev/null || echo ""))
+    # Get node names (the .node field) for all online nodes using Python for JSON parsing
+    local nodes_json
+    nodes_json=$(pvesh get /nodes --output-format json 2>/dev/null) || nodes_json="[]"
+    nodes=($(echo "$nodes_json" | python3 -c '
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    for node in data:
+        if node.get("status") == "online":
+            print(node.get("node", ""))
+except Exception:
+    pass
+' 2>/dev/null | grep -v '^$'))
+
     if [[ ${#nodes[@]} -eq 0 ]]; then
         local hostname
         hostname=$(hostname -s 2>/dev/null || echo "localhost")
@@ -225,28 +238,54 @@ create_vm() {
 
     log "Discovering cluster-wide VM IDs to find a free one..."
 
-    # Get all VM IDs from all possible nodes: the SELECTED node plus cluster-wide discovery
+    # Get all VM IDs from all nodes using Python for JSON parsing
     local used_vm_ids=()
 
-    # Always check the SELECTED node (the node we're actually creating on)
+    # Function to fetch VM IDs from a node
+    fetch_vmids() {
+        local node="$1"
+        local json
+        json=$(pvesh get /nodes/$node/qemu --output-format json 2>/dev/null) || return 0
+        echo "$json" | python3 -c '
+import sys, json
+try:
+    for vm in json.load(sys.stdin):
+        vmid = vm.get("vmid")
+        if vmid is not None:
+            print(vmid)
+except Exception:
+    pass
+' 2>/dev/null
+    }
+
+    # Always check the SELECTED node first
     if [[ -n "$SELECTED" ]]; then
-        while IFS= read -r vmid_line; do
-            [[ -n "$vmid_line" ]] && used_vm_ids+=("$vmid_line")
-        done < <(pvesh get /nodes/$SELECTED/qemu --output-format json 2>/dev/null | \
-                  jq -r '.[].vmid' 2>/dev/null || true)
+        while IFS= read -r vmid; do
+            [[ -n "$vmid" ]] && used_vm_ids+=("$vmid")
+        done < <(fetch_vmids "$SELECTED")
     fi
 
-    # Also check other nodes cluster-wide
+    # Get all nodes in cluster and check each
+    local all_nodes_json
+    all_nodes_json=$(pvesh get /nodes --output-format json 2>/dev/null) || all_nodes_json="[]"
     while IFS= read -r node; do
-        [[ "$node" == "$SELECTED" ]] && continue  # Skip if already checked
-        while IFS= read -r vmid_line; do
-            [[ -n "$vmid_line" ]] && used_vm_ids+=("$vmid_line")
-        done < <(pvesh get /nodes/$node/qemu --output-format json 2>/dev/null | \
-                  jq -r '.[].vmid' 2>/dev/null || true)
-    done < <(pvesh get /nodes --output-format json 2>/dev/null | \
-              jq -r '.[] | .id' 2>/dev/null || true)
+        [[ "$node" == "$SELECTED" ]] && continue
+        while IFS= read -r vmid; do
+            [[ -n "$vmid" ]] && used_vm_ids+=("$vmid")
+        done < <(fetch_vmids "$node")
+    done < <(echo "$all_nodes_json" | python3 -c '
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    for item in data:
+        node = item.get("node")
+        if node:
+            print(node)
+except Exception:
+    pass
+' 2>/dev/null)
 
-    # Deduplicate
+    # Deduplicate and sort
     used_vm_ids=($(printf '%s\n' "${used_vm_ids[@]}" | sort -n | uniq))
 
     # Find first free VM ID starting from 100
