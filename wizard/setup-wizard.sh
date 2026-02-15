@@ -286,8 +286,15 @@ create_vm() {
 
     local ci_file
     ci_file=$(create_cloudinit) || return 1
-    qm set "$vmid" --cicustom "user=local:0,cloud-init.yml,$ci_file" \
-        --ipconfig0 "ip=dhcp" >/dev/null 2>&1 || warn "Cloud-init config may need manual setup"
+
+    # Upload cloud-init config to Proxmox storage and attach it
+    # Upload to local storage (default storage for ISOs)
+    if pvesh create /storage/local/content --content cloudinit --filename "cloud-init-$vmid.yml" --file "$ci_file" &>/dev/null; then
+        qm set "$vmid" --cicustom "user=local:cloud-init-$vmid.yml" \
+            --ipconfig0 "ip=dhcp" &>/dev/null
+    else
+        warn "Failed to upload cloud-init config, proceeding without it"
+    fi
 
     echo "$vmid"
     return 0
