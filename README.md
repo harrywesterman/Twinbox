@@ -9,7 +9,7 @@ A one-command, web-driven deployment of production-ready Kubernetes clusters on 
 On your Proxmox console:
 
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/your-org/twinbox/main/wizard/setup-wizard.sh)
+curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/setup-wizard.sh -o /tmp/setup-wizard.sh && bash /tmp/setup-wizard.sh
 ```
 
 Then open your browser to `http://<management-vm-ip>:8080` and follow the web wizard.

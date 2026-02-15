@@ -14,10 +14,10 @@ This guide explains how to use the interactive console wizard to bootstrap your 
 You can run the wizard directly from GitHub using `curl` and `bash`. Use the following command in your Proxmox shell:
 
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/your-org/twinbox/main/wizard/setup-wizard.sh)
+curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/setup-wizard.sh -o /tmp/setup-wizard.sh && bash /tmp/setup-wizard.sh
 ```
 
-*(Note: Replace `your-org/twinbox` with the actual repository path once published)*
+*(Note: The `curl | bash` pattern doesn't preserve interactive prompts. This approach downloads first, then runs, allowing you to enter your cluster name and other settings.)*
 
 ## Manual Usage
 

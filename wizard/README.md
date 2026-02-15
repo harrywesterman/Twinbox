@@ -14,14 +14,10 @@ bash wizard/setup-wizard.sh
 Or download and run directly with curl:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/setup-wizard.sh | bash
+curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/setup-wizard.sh -o /tmp/setup-wizard.sh && bash /tmp/setup-wizard.sh
 ```
 
-Or process substitution (bash only):
-
-```bash
-bash <(curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/setup-wizard.sh)
-```
+*(Note: The `curl | bash` approach doesn't support interactive prompts. Always download first, then execute.)*
 
 ## What It Does
 
