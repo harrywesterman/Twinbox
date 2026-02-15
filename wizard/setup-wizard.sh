@@ -225,13 +225,20 @@ EOF
 create_vm() {
     # Get all used VM IDs cluster-wide
     local used_vmids
-    used_vmids=$(pvesh get /cluster/resources --output-format json 2>/dev/null | jq -r '.[] | select(.type=="vm") | .vmid' 2>/dev/null | sort -n | uniq)
+    used_vmids=$(pvesh get /cluster/resources --output-format json 2>/dev/null | jq -r '.[] | select(.type=="vm") | .vmid // empty' 2>/dev/null | sort -n | uniq)
+
+    # Debug: show what we found
+    if [[ -n "$used_vmids" ]]; then
+        log "Used VM IDs: $used_vmids"
+    fi
 
     # Find first free VM ID starting from 100
     local vmid=100
     while echo "$used_vmids" | grep -q "^${vmid}$"; do
         vmid=$((vmid + 1))
     done
+
+    log "Selected free VM ID: $vmid"
 
     local name="twinbox-mgmt-${CLUSTER}"
     log "Creating VM $vmid: $name"
@@ -241,9 +248,9 @@ create_vm() {
         --net0 "virtio,bridge=$BRIDGE" \
         --scsi0 "$STORAGE:${DISK_GB},ssd=1" \
         --cdrom "$ISO" \
-        --boot "order=scsi0"; then
+        --boot "order=scsi0" 2>&1; then
         err "Failed to create VM $vmid"
-        exit 1
+        return 1
     fi
     ok "VM $vmid created"
 
