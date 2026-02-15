@@ -5,6 +5,7 @@ UBUNTU_VER="22.04"
 CLOUD_IMG="http://cloud-images.ubuntu.com/releases/${UBUNTU_VER}/release/ubuntu-${UBUNTU_VER}-live-server-amd64.img"
 CPU_CORES=2; RAM_MB=4096; DISK_GB=32; BRIDGE="vmbr0"; STORAGE="local-lvm"
 CLUSTER=""; SELECTED=""
+
 log() { echo -e "${YELLOW}[*] $*${NC}" >&2; }
 ok() { echo -e "${GREEN}[✓] $*${NC}" >&2; }
 err() { echo -e "${RED}[✗] $*${NC}" >&2; }
@@ -60,22 +61,18 @@ create_twinbox_user() {
 
 gen_token() {
     log "Generating API token..."
-    # Check if credentials file already exists (manual creation)
     if [[ -f "/tmp/twinbox-creds-$CLUSTER.env" ]]; then
         ok "Using existing credentials file"
         return 0
     fi
 
-    # Generate token using pveum (Proxmox VE User Management)
     local token_id="twinbox-token-$(date +%s)"
     local token_output
     token_output=$(pveum user token add twinbox@pve "$token_id" --privsep 0 2>&1)
 
     if [[ -n "$token_output" ]]; then
-        # pveum outputs two lines: first is the token name (value), second is the secret
         local token_name="twinbox@pve!$(echo "$token_output" | head -n1 | tr -d '[:space:]')"
         local token_secret=$(echo "$token_output" | tail -n1 | tr -d '[:space:]')
-
         if [[ -n "$token_name" && -n "$token_secret" && "$token_name" != "!" ]]; then
             ok "Token generated: $token_name"
             cat > "/tmp/twinbox-creds-$CLUSTER.env" <<EOF
@@ -223,41 +220,42 @@ EOF
 }
 
 create_vm() {
-    # Get all used VM IDs cluster-wide
-    local used_vmids
-    used_vmids=$(pvesh get /cluster/resources --output-format json 2>/dev/null | jq -r '.[] | select(.type=="vm") | .vmid // empty' 2>/dev/null | sort -n | uniq)
+    local vmid name
+    name="twinbox-mgmt-${CLUSTER}"
 
-    # Debug: show what we found
-    if [[ -n "$used_vmids" ]]; then
-        log "Used VM IDs: $used_vmids"
-    fi
-
-    # Find first free VM ID starting from 100
-    local vmid=100
-    while echo "$used_vmids" | grep -q "^${vmid}$"; do
-        vmid=$((vmid + 1))
+    local start_vmid=100
+    for ((vmid=start_vmid; vmid<start_vmid+100; vmid++)); do
+        if qm list 2>/dev/null | awk '{print $1}' | grep -q "^${vmid}$"; then
+            log "VM ID $vmid in use on local node, trying next..."
+            continue
+        fi
+        
+        log "Attempting to create VM $vmid: $name"
+        if qm create "$vmid" --name "$name" --memory "$RAM_MB" --cores "$CPU_CORES" \
+            --net0 "virtio,bridge=$BRIDGE" \
+            --scsi0 "$STORAGE:${DISK_GB},ssd=1" \
+            --cdrom "$ISO" \
+            --boot "order=scsi0"; then
+            ok "VM $vmid created"
+            break
+        else
+            log "VM ID $vmid creation failed, trying next..."
+            sleep 0.5
+        fi
     done
 
-    log "Selected free VM ID: $vmid"
-
-    local name="twinbox-mgmt-${CLUSTER}"
-    log "Creating VM $vmid: $name"
-
-    # Try create with minimal parameters
-    if ! qm create "$vmid" --name "$name" --memory "$RAM_MB" --cores "$CPU_CORES" \
-        --net0 "virtio,bridge=$BRIDGE" \
-        --scsi0 "$STORAGE:${DISK_GB},ssd=1" \
-        --cdrom "$ISO" \
-        --boot "order=scsi0" 2>&1; then
-        err "Failed to create VM $vmid"
+    if [[ -z "$vmid" ]] || ! qm status "$vmid" &>/dev/null; then
+        err "Failed to create VM after trying 100 IDs"
         return 1
     fi
-    ok "VM $vmid created"
 
-    local ci_file=$(create_cloudinit)
+    local ci_file
+    ci_file=$(create_cloudinit) || return 1
     qm set "$vmid" --cicustom "user=local:0,cloud-init.yml,$ci_file" \
         --ipconfig0 "ip=dhcp" 2>/dev/null || warn "Cloud-init config may need manual setup"
+
     echo "$vmid"
+    return 0
 }
 
 wait_ip() {
@@ -280,8 +278,11 @@ main() {
     log "Configuration:"; echo "  Cluster: $CLUSTER"; echo "  Node: $SELECTED"
     echo "  VM: ${CPU_CORES} CPU, ${RAM_MB}MB RAM, ${DISK_GB}GB disk"; echo "  Bridge: $BRIDGE"
     create_twinbox_user; gen_token; get_ubuntu_iso
-    local vmid=$(create_vm); qm start "$vmid"
-    local ip=$(wait_ip "$vmid")
+    local vmid
+    vmid=$(create_vm) || exit 1
+    qm start "$vmid"
+    local ip
+    ip=$(wait_ip "$vmid")
     cat <<EOF
 
 ==========================================
