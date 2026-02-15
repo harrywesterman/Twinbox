@@ -93,6 +93,18 @@ get_ubuntu_cloud_image() {
         ok "Ubuntu cloud image exists: $img_path"
     fi
 
+    # If virt-customize is available, install qemu-guest-agent into the image
+    if command -v virt-customize &>/dev/null; then
+        log "Customizing cloud image: installing qemu-guest-agent..."
+        if virt-customize -a "$img_path" --install qemu-guest-agent &>/dev/null; then
+            ok "qemu-guest-agent installed in base image"
+        else
+            warn "virt-customize failed, will rely on cloud-init to install agent"
+        fi
+    else
+        log "virt-customize not found (libguestfs-tools not installed). Will install qemu-guest-agent via cloud-init."
+    fi
+
     # Upload to Proxmox storage if not already there
     if pvesh get /nodes/$SELECTED/storage/local/content --output-format json 2>/dev/null | \
         python3 -c "import sys, json; content = json.load(sys.stdin); print('yes' if any(item.get('volid','').endswith('$img_name') for item in content) else 'no')" 2>/dev/null | grep -q yes; then
@@ -131,13 +143,15 @@ create_cloudinit_iso() {
 #cloud-config
 package_update: true
 package_upgrade: true
-packages: [docker.io, docker-compose, jq, yq, curl, git, python3-pip, python3-yaml]
+packages: [docker.io, docker-compose, jq, yq, curl, git, python3-pip, python3-yaml, qemu-guest-agent]
 runcmd:
   - [groupadd, -g, 999, twinbox]
   - [useradd, -u, 999, -g, twinbox, -m, -s, /bin/bash, twinbox]
   - [usermod, -aG, docker, twinbox]
   - [mkdir, -p, /opt/twinbox]
   - [chown, -R, twinbox:twinbox, /opt/twinbox]
+  - [systemctl, enable, qemu-guest-agent]
+  - [systemctl, start, qemu-guest-agent]
 write_files:
   - path: /opt/twinbox/config/proxmox-creds.yaml
     permissions: '0600'
