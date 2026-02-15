@@ -166,7 +166,7 @@ packages: [docker.io, docker-compose, jq, yq, curl, git, python3-pip, python3-ya
 runcmd:
   - [groupadd, twinbox]
   - [useradd, -g, twinbox, -m, -s, /bin/bash, twinbox]
-  - [echo, "twinbox:$twinbox_pw", "|", chpasswd]
+  - echo "twinbox:$twinbox_pw" | chpasswd
   - [usermod, -aG, docker, twinbox]
   - [mkdir, -p, /opt/twinbox]
   - [chown, -R, twinbox:twinbox, /opt/twinbox]
@@ -319,7 +319,7 @@ packages: [docker.io, docker-compose, jq, yq, curl, git, python3-pip, python3-ya
 runcmd:
   - [groupadd, twinbox]
   - [useradd, -g, twinbox, -m, -s, /bin/bash, twinbox]
-  - [echo, "twinbox:$twinbox_pw", "|", chpasswd]
+  - echo "twinbox:$twinbox_pw" | chpasswd
   - [usermod, -aG, docker, twinbox]
   - [mkdir, -p, /opt/twinbox]
   - [chown, -R, twinbox:twinbox, /opt/twinbox]
