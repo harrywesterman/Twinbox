@@ -11,20 +11,16 @@ This guide walks through testing Twinbox on a real Proxmox VE cluster.
 
 ## Phase 1: Run the Bootstrap Script
 
-1. **Transfer the Twinbox repository** to your Proxmox host (or clone it):
+1. **Run the wizard directly from GitHub** (no git required):
 ```bash
-# On your local machine, ensure repo is pushed to GitHub
-git remote add origin https://github.com/your-org/twinbox.git
-git push -u origin feat/simplified-deployment
-
-# On Proxmox, clone the repo:
-git clone https://github.com/your-org/twinbox.git
-cd twinbox
+curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/setup-wizard.sh | bash
 ```
 
-2. **Run the wizard**:
+Or download first, inspect, then run:
 ```bash
-bash wizard/setup-wizard.sh
+curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/setup-wizard.sh -o /tmp/setup-wizard.sh
+chmod +x /tmp/setup-wizard.sh
+bash /tmp/setup-wizard.sh
 ```
 
 3. **Answer the prompts**:

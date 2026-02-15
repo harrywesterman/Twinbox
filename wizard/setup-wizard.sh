@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UBUNTU_VER="22.04"
 CLOUD_IMG="http://cloud-images.ubuntu.com/releases/${UBUNTU_VER}/release/ubuntu-${UBUNTU_VER}-live-server-amd64.img"
 CPU_CORES=2; RAM_MB=4096; DISK_GB=32; BRIDGE="vmbr0"; STORAGE="local-lvm"
@@ -93,11 +92,10 @@ create_cloudinit() {
     [[ -f "$creds_file" ]] || { err "Credentials file not found. Run gen_token first."; exit 1; }
     source "$creds_file"
 
-    local tmpl="$SCRIPT_DIR/cloud-init.yml"
-    if [[ -f "$tmpl" ]]; then
-        cp "$tmpl" "$out"
-    else
-        cat > "$out" <<EOF
+    local db_pass=$(openssl rand -base64 32 | tr -d '/+=' | head -c 32 2>/dev/null || echo "CHANGE_$(date +%s)")
+    local sec_key=$(openssl rand -base64 32 2>/dev/null || echo "CHANGE_$(date +%s)")
+
+    cat > "$out" <<EOF
 #cloud-config
 package_update: true
 package_upgrade: true
@@ -122,12 +120,6 @@ write_files:
     owner: twinbox:twinbox
     content: |
       CLUSTER_NAME=${CLUSTER}
-EOF
-    fi
-
-    local db_pass=$(openssl rand -base64 32 | tr -d '/+=' | head -c 32 2>/dev/null || echo "CHANGE_$(date +%s)")
-    local sec_key=$(openssl rand -base64 32 2>/dev/null || echo "CHANGE_$(date +%s)")
-    cat >> "$out" <<EOF
 
 write_files:
   - path: /opt/twinbox/.env
@@ -139,6 +131,71 @@ write_files:
       SECRET_KEY=${sec_key}
       PROXMOX_CREDENTIALS_PATH=/opt/twinbox/config/proxmox-creds.yaml
       CLUSTER_NAME=${CLUSTER}
+
+write_files:
+  - path: /etc/systemd/system/twinbox.service
+    permissions: '0644'
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Twinbox Management Console
+      Requires=docker.service
+      After=docker.service
+      Wants=docker.service
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/usr/bin/docker-compose -f /opt/twinbox/docker-compose.yml up -d
+      ExecStop=/usr/bin/docker-compose -f /opt/twinbox/docker-compose.yml down
+      User=twinbox
+      Group=twinbox
+      WorkingDirectory=/opt/twinbox
+      Restart=on-failure
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/motd
+    permissions: '0644'
+    owner: root:root
+    content: |
+      ==========================================
+       Twinbox Management VM
+      ==========================================
+
+      Web UI: http://<this-vm-ip>:8080
+      SSH: ubuntu@<this-vm-ip>
+
+      Twinbox repository: /opt/twinbox
+      Docker Compose: /opt/twinbox/docker-compose.yml
+
+      Status: systemctl status twinbox
+      Logs: journalctl -u twinbox -f
+
+      ==========================================
+
+runcmd:
+  - [systemctl, daemon-reload]
+  - [systemctl, enable, twinbox.service]
+  - [systemctl, start, twinbox.service]
+  - [systemctl, enable, docker]
+  - [systemctl, start, docker]
+
+final_message: |
+  ==========================================
+   Twinbox Setup Complete!
+  ==========================================
+
+  Management VM is ready. The Twinbox web
+  interface should be accessible shortly.
+
+  SSH to this VM: ssh ubuntu@<this-ip>
+  View status: systemctl status twinbox
+  View logs: journalctl -u twinbox -f
+
+  ==========================================
 EOF
     ok "Cloud-init generated: $out"
     echo "$out"

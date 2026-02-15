@@ -8,9 +8,7 @@
 
 ```bash
 # 1. On your Proxmox console (as root):
-git clone https://github.com/your-org/twinbox.git
-cd twinbox
-bash wizard/setup-wizard.sh
+curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/setup-wizard.sh | bash
 
 # 2. Wait 2-3 minutes, then open browser to http://<management-vm-ip>:8080
 
@@ -43,12 +41,18 @@ All automatically provisioned and configured.
 
 ### Step 1: Bootstrap (Run on Proxmox)
 
-```bash
-cd /home/harry/Twinbox  # on your development machine, the repo is ready
-# Copy the entire repo to your Proxmox host, or push to GitHub and clone there
+**Option A: Direct download (simplest)**
 
-# On Proxmox:
-bash wizard/setup-wizard.sh
+```bash
+curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/setup-wizard.sh | bash
+```
+
+**Option B: Download first, inspect, then run**
+
+```bash
+curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/setup-wizard.sh -o /tmp/setup-wizard.sh
+chmod +x /tmp/setup-wizard.sh
+bash /tmp/setup-wizard.sh
 ```
 
 The script will:
