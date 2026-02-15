@@ -82,44 +82,32 @@ get_ubuntu_cloud_image() {
     local storage_dir="/var/lib/vz"
     local img_name="${UBUNTU_VER}-server-cloudimg-amd64.img"
     local img_path="$storage_dir/$img_name"
-    local storage_ref="local:iso/$img_name"
-
-    # Check if image already exists in Proxmox storage
-    if pvesh get /nodes/$SELECTED/storage/local/content --output-format json 2>/dev/null | \
-        python3 -c "import sys, json; content = json.load(sys.stdin); print('yes' if any(item.get('volid','').endswith('$img_name') for item in content) else 'no')" 2>/dev/null | grep -q yes; then
-        ok "Ubuntu cloud image already in storage: $storage_ref"
-        CLOUD_IMAGE="$storage_ref"
-        return
-    fi
 
     mkdir -p "$storage_dir"
-    if [[ -f "$img_path" ]]; then
-        ok "Ubuntu cloud image exists locally: $img_path"
-        # Upload it to storage
+
+    # Download if not exists locally
+    if [[ ! -f "$img_path" ]]; then
+        log "Downloading Ubuntu $UBUNTU_VER cloud image..."
+        curl -sL -o "$img_path" "$CLOUD_IMG" && ok "Downloaded" || { err "Download failed"; exit 1; }
+    else
+        ok "Ubuntu cloud image exists: $img_path"
+    fi
+
+    # Upload to Proxmox storage if not already there
+    if pvesh get /nodes/$SELECTED/storage/local/content --output-format json 2>/dev/null | \
+        python3 -c "import sys, json; content = json.load(sys.stdin); print('yes' if any(item.get('volid','').endswith('$img_name') for item in content) else 'no')" 2>/dev/null | grep -q yes; then
+        ok "Cloud image already in Proxmox storage"
+    else
+        log "Uploading to Proxmox storage..."
         if pvesh create /nodes/$SELECTED/storage/local/content --content iso --filename "$img_name" --file "$img_path" &>/dev/null; then
             ok "Uploaded to storage"
-            rm -f "$img_path"
-            CLOUD_IMAGE="$storage_ref"
         else
-            err "Upload to storage failed"
-            exit 1
+            warn "Upload to storage failed, will use local file"
         fi
-        return
     fi
 
-    log "Downloading Ubuntu $UBUNTU_VER cloud image..."
-    curl -sL -o "$img_path" "$CLOUD_IMG" && ok "Downloaded" || { err "Download failed"; exit 1; }
-
-    # Upload to Proxmox storage
-    log "Uploading to Proxmox storage..."
-    if pvesh create /nodes/$SELECTED/storage/local/content --content iso --filename "$img_name" --file "$img_path" &>/dev/null; then
-        ok "Uploaded to storage"
-        rm -f "$img_path"
-        CLOUD_IMAGE="$storage_ref"
-    else
-        err "Upload to storage failed"
-        exit 1
-    fi
+    # Store the path for importdisk (needs filesystem path, not storage ref)
+    CLOUD_IMAGE_PATH="$img_path"
 }
 
 create_cloudinit() {
@@ -318,7 +306,7 @@ create_vm() {
 
     # Step 2: Import cloud image as the boot disk
     log "Importing cloud image as disk..."
-    if ! qm importdisk "$vmid" "$CLOUD_IMAGE" "$STORAGE" &>/dev/null; then
+    if ! qm importdisk "$vmid" "$CLOUD_IMAGE_PATH" "$STORAGE" &>/dev/null; then
         err "Failed to import disk for VM $vmid"
         qm destroy "$vmid" 2>/dev/null || true
         return 1
