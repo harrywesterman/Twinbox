@@ -270,6 +270,130 @@ EOF_METADATA
     echo "$iso_name"
 }
 
+
+create_cloudinit_snippet() {
+    local snippet_dir="/var/lib/vz/snippets"
+    local snippet_file="twinbox-$CLUSTER-user.yaml"
+    local snippet_path="$snippet_dir/$snippet_file"
+    local creds_file="/tmp/twinbox-creds-$CLUSTER.env"
+    [[ -f "$creds_file" ]] || { err "Credentials file not found. Run gen_token first."; exit 1; }
+    source "$creds_file"
+
+    local db_pass=$(openssl rand -base64 32 | tr -d '/+=' | head -c 32 2>/dev/null || echo "CHANGE_$(date +%s)")
+    local sec_key=$(openssl rand -base64 32 2>/dev/null || echo "CHANGE_$(date +%s)")
+
+    mkdir -p "$snippet_dir"
+
+    cat > "$snippet_path" <<'EOF'
+#cloud-config
+package_update: true
+package_upgrade: true
+packages: [docker.io, docker-compose, jq, yq, curl, git, python3-pip, python3-yaml, qemu-guest-agent]
+runcmd:
+  - [groupadd, -g, 999, twinbox]
+  - [useradd, -u, 999, -g, twinbox, -m, -s, /bin/bash, twinbox]
+  - [usermod, -aG, docker, twinbox]
+  - [mkdir, -p, /opt/twinbox]
+  - [chown, -R, twinbox:twinbox, /opt/twinbox]
+  - [systemctl, enable, qemu-guest-agent]
+  - [systemctl, start, qemu-guest-agent]
+write_files:
+  - path: /opt/twinbox/config/proxmox-creds.yaml
+    permissions: '0600'
+    owner: twinbox:twinbox
+    content: |
+      api_url: ${API_URL}
+      user: "twinbox@pve"
+      token: ${API_TOKEN_SECRET}
+      verify_ssl: false
+  - path: /opt/twinbox/config/cluster-name
+    permissions: '0644'
+    owner: twinbox:twinbox
+    content: |
+      CLUSTER_NAME=${CLUSTER}
+
+write_files:
+  - path: /opt/twinbox/.env
+    permissions: '0600'
+    owner: twinbox:twinbox
+    content: |
+      DATABASE_URL=postgresql://twinbox:${db_pass}@localhost:5432/twinbox
+      REDIS_URL=redis://localhost:6379/0
+      SECRET_KEY=${sec_key}
+      PROXMOX_CREDENTIALS_PATH=/opt/twinbox/config/proxmox-creds.yaml
+      CLUSTER_NAME=${CLUSTER}
+
+write_files:
+  - path: /etc/systemd/system/twinbox.service
+    permissions: '0644'
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Twinbox Management Console
+      Requires=docker.service
+      After=docker.service
+      Wants=docker.service
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/usr/bin/docker-compose -f /opt/twinbox/docker-compose.yml up -d
+      ExecStop=/usr/bin/docker-compose -f /opt/twinbox/docker-compose.yml down
+      User=twinbox
+      Group=twinbox
+      WorkingDirectory=/opt/twinbox
+      Restart=on-failure
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/motd
+    permissions: '0644'
+    owner: root:root
+    content: |
+      ==========================================
+       Twinbox Management VM
+      ==========================================
+
+      Web UI: http://<this-vm-ip>:8080
+      SSH: ubuntu@<this-ip>
+
+      Twinbox repository: /opt/twinbox
+      Docker Compose: /opt/twinbox/docker-compose.yml
+
+      Status: systemctl status twinbox
+      Logs: journalctl -u twinbox -f
+
+      ==========================================
+
+runcmd:
+  - [systemctl, daemon-reload]
+  - [systemctl, enable, twinbox.service]
+  - [systemctl, start, twinbox.service]
+  - [systemctl, enable, docker]
+  - [systemctl, start, docker]
+
+final_message: |
+  ==========================================
+   Twinbox Setup Complete!
+  ===========================================
+
+  Management VM is ready. The Twinbox web
+  interface should be accessible shortly.
+
+  SSH to this VM: ssh ubuntu@<this-ip>
+  View status: systemctl status twinbox
+  View logs: journalctl -u twinbox -f
+
+  ==========================================
+EOF
+
+    ok "Cloud-init snippet created: $snippet_path"
+    echo "$snippet_file"
+}
+
+
 create_vm() {
     local name
     name="twinbox-mgmt-${CLUSTER}"
@@ -345,7 +469,7 @@ create_vm() {
         --agent 1 \
         --scsihw virtio-scsi-single \
         --onboot 1 \
-        --boot "order=scsi0" &>/dev/null; then
+        &>/dev/null; then
         err "Failed to create VM $vmid"
         return 1
     fi
@@ -369,14 +493,14 @@ create_vm() {
     fi
     ok "Disk attached"
 
-    # Step 4: Create cloud-init ISO and attach as CD-ROM
-    local ci_iso
-    ci_iso=$(create_cloudinit_iso) || return 1
+    # Step 4: Configure managed Cloud-Init drive
+    local ci_snippet
+    ci_snippet=$(create_cloudinit_snippet) || return 1
 
     # Attach cloud-init ISO as CD-ROM (ide2) and configure cloud-init drive
     qm set "$vmid" \
-        --ide2 "local:iso/$(basename "$ci_iso"),media=cdrom" \
-        --cicustom "user=local:iso/$(basename "$ci_iso")" \
+        --ide2 "local-lvm:cloudinit" \
+        --cicustom "user=local:snippets/$ci_snippet" \
         --ipconfig0 "ip=dhcp" \
         --serial0 socket \
         &>/dev/null || warn "Cloud-init configuration may have issues"
