@@ -16,8 +16,8 @@ from unittest.mock import Mock, patch, MagicMock
 from sqlalchemy.orm import Session
 from redis import Redis
 
-from twinbox.shared.database import Database, Base
-from twinbox.shared.models import (
+from manager.shared.database import Database, Base
+from manager.shared.models import (
     Cluster, Deployment, Job, Node, DeploymentLog,
     ClusterStatus, DeploymentStatus, JobType
 )

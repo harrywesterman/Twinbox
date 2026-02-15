@@ -88,6 +88,51 @@ class Cluster(Base):
         Text,
         nullable=True,
     )
+    # Proxmox credentials (encrypted)
+    proxmox_host: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+    proxmox_user: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+    proxmox_password_encrypted: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    # SSH key (encrypted, optional)
+    proxmox_ssh_key_encrypted: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    # Network configuration for VM deployment
+    network_bridge: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="vmbr0",
+    )
+    network_cidr: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+    )
+    network_gateway: Mapped[Optional[str]] = mapped_column(
+        String(45),
+        nullable=True,
+    )
+    ip_range_start: Mapped[Optional[str]] = mapped_column(
+        String(45),
+        nullable=True,
+    )
+    ip_range_end: Mapped[Optional[str]] = mapped_column(
+        String(45),
+        nullable=True,
+    )
+    dhcp_mode: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
     # Created/updated timestamps
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -129,9 +174,9 @@ class Cluster(Base):
 
 class VMPlan(Base):
     """
-    Represents a VM configuration plan for a cluster.
+    Represents an individual VM configuration plan for a cluster.
 
-    Stores resource allocation and Proxmox-specific settings.
+    Each record corresponds to a single VM to be created on a specific Proxmox node.
     """
     __tablename__ = "vm_plans"
 
@@ -147,27 +192,27 @@ class VMPlan(Base):
         nullable=False,
         index=True,
     )
+    vm_name: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        comment="VM name (e.g., talos-cp-1)",
+    )
     role: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
-        comment="Role: 'control-plane' or 'worker'",
+        comment="Role: 'management', 'controlplane', or 'worker'",
         index=True,
     )
-    node_count: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False,
-        default=1,
-    )
     # Resource specifications
-    memory_mb: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False,
-        comment="Memory in MB",
-    )
-    cores: Mapped[int] = mapped_column(
+    cpu: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
         comment="Number of CPU cores",
+    )
+    ram_mb: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        comment="Memory in MB",
     )
     disk_gb: Mapped[int] = mapped_column(
         Integer,
@@ -175,31 +220,50 @@ class VMPlan(Base):
         comment="Disk size in GB",
     )
     # Proxmox-specific
-    proxmox_node: Mapped[str] = mapped_column(
+    target_node: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
         comment="Target Proxmox node name",
     )
-    vm_template: Mapped[Optional[str]] = mapped_column(
-        String(255),
-        nullable=True,
-        comment="Template VM ID to clone from",
-    )
-    network_bridge: Mapped[str] = mapped_column(
+    bridge: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
         default="vmbr0",
+        comment="Network bridge interface",
     )
-    storage: Mapped[str] = mapped_column(
+    # Optional fields
+    ip_address: Mapped[Optional[str]] = mapped_column(
+        String(45),
+        nullable=True,
+        comment="Assigned IP address (if static allocation)",
+    )
+    mac_address: Mapped[Optional[str]] = mapped_column(
+        String(17),
+        nullable=True,
+        comment="MAC address for static IP assignment",
+    )
+    vmid: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="Proxmox VM ID after creation",
+    )
+    iso: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
-        comment="Proxmox storage ID",
+        default="local:iso/talos-amd64.iso",
+        comment="ISO or template to boot from",
     )
-    # Additional VM configuration as JSON
-    extra_config: Mapped[Optional[dict]] = mapped_column(
+    cloud_init_config: Mapped[Optional[dict]] = mapped_column(
         JSONB,
         nullable=True,
         default=dict,
+        comment="Cloud-init configuration",
+    )
+    status: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="pending",
+        comment="VM deployment status",
     )
 
     # Relationships
@@ -209,20 +273,16 @@ class VMPlan(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint("cluster_id", "role", name="uq_vmplan_cluster_role"),
-        Index("ix_vmplan_cluster_role", "cluster_id", "role"),
+        Index("ix_vmplan_cluster_id", "cluster_id"),
+        Index("ix_vmplan_role", "role"),
         CheckConstraint(
-            "node_count > 0",
-            name="ck_vmplan_node_count_positive"
-        ),
-        CheckConstraint(
-            "memory_mb > 0 AND cores > 0 AND disk_gb > 0",
+            "cpu > 0 AND ram_mb > 0 AND disk_gb > 0",
             name="ck_vmplan_resources_positive"
         ),
     )
 
     def __repr__(self) -> str:
-        return f"<VMPlan(id={self.id}, cluster_id={self.cluster_id}, role={self.role}, count={self.node_count})>"
+        return f"<VMPlan(id={self.id}, vm_name={self.vm_name}, role={self.role}, node={self.target_node})>"
 
 
 class Deployment(Base):

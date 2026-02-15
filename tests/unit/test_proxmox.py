@@ -12,7 +12,7 @@ Tests cover:
 
 import pytest
 from unittest.mock import Mock, patch, MagicMock
-from twinbox.shared.proxmox import ProxmoxAPI, ProxmoxAPIError
+from manager.shared.proxmox import ProxmoxAPI, ProxmoxAPIError
 
 
 class TestProxmoxAuthentication:

@@ -144,7 +144,7 @@ export PYTHONPATH="${PYTHONPATH}:/home/harry/Twinbox"
 If database errors occur:
 ```bash
 # Ensure tables are created
-python3 -c "from twinbox.shared.database import init_db; init_db()"
+python3 -c "from manager.shared.database import init_db; init_db()"
 ```
 
 For more information on the Twinbox architecture, see the main README.md.

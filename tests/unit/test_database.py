@@ -13,8 +13,8 @@ from unittest.mock import patch, Mock
 from sqlalchemy.orm import Session
 from sqlalchemy import inspect
 
-from twinbox.shared.database import Database, Base, get_db, init_db
-from twinbox.shared.models import Cluster, Deployment, Job, Node, DeploymentLog
+from manager.shared.database import Database, Base, get_db, init_db
+from manager.shared.models import Cluster, Deployment, Job, VMPlan, DeploymentLog, ClusterState
 
 
 class TestDatabase:
@@ -48,7 +48,7 @@ class TestDatabase:
         assert 'clusters' in tables
         assert 'deployments' in tables
         assert 'jobs' in tables
-        assert 'nodes' in tables
+        assert 'vm_plans' in tables
         assert 'deployment_logs' in tables
 
     def test_drop_tables(self, sqlite_db):
@@ -445,8 +445,8 @@ class TestModels:
         session.add(cluster)
         session.commit()
 
-        nodes = [
-            Node(
+        vm_plans = [
+            VMPlan(
                 cluster_id=cluster.id,
                 name=f"node-{i}",
                 vm_id=100 + i,
@@ -459,13 +459,13 @@ class TestModels:
             )
             for i in range(5)
         ]
-        session.add_all(nodes)
+        session.add_all(vm_plans)
         session.commit()
 
-        result_nodes = session.query(Node).filter_by(cluster_id=cluster.id).all()
-        assert len(result_nodes) == 5
-        assert any(n.role == "controlplane" for n in result_nodes)
-        assert sum(1 for n in result_nodes if n.role == "worker") == 4
+        result_plans = session.query(VMPlan).filter_by(cluster_id=cluster.id).all()
+        assert len(result_plans) == 5
+        assert any(p.role == "controlplane" for p in result_plans)
+        assert sum(1 for p in result_plans if p.role == "worker") == 4
 
     def test_job_status_transitions(self, session):
         """Test job status can transition through states."""

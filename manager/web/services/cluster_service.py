@@ -78,47 +78,31 @@ class ClusterService:
         if cluster_data.proxmox_ssh_key:
             encrypted_ssh_key = encrypt_credentials(cluster_data.proxmox_ssh_key)
 
-        # Create cluster record
+        # Create cluster record with all configuration
         cluster = Cluster(
             name=cluster_data.name,
             description=cluster_data.description,
             status="pending",
-            pod_cidr="10.244.0.0/16",  # Default Flannel CIDR
+            pod_cidr="10.244.0.0/16",  # Default Calico CIDR
             service_cidr="10.96.0.0/12",  # Default Kubernetes service CIDR
             talos_version=cluster_data.talos_version,
             kubernetes_version=cluster_data.kubernetes_version,
+            # Proxmox connection
+            proxmox_host=cluster_data.proxmox_host,
+            proxmox_user=cluster_data.proxmox_user,
+            proxmox_password_encrypted=encrypted_password,
+            proxmox_ssh_key_encrypted=encrypted_ssh_key,
+            # Network settings
+            network_bridge=cluster_data.network_bridge,
+            network_cidr=cluster_data.network_cidr,
+            network_gateway=cluster_data.network_gateway,
+            ip_range_start=cluster_data.ip_range_start,
+            ip_range_end=cluster_data.ip_range_end,
+            dhcp_mode=cluster_data.dhcp_mode,
         )
         self.db.add(cluster)
         self.db.commit()
         self.db.refresh(cluster)
-
-        # Store Proxmox credentials in separate secure storage
-        # For now, we'll store them in a VMPlan as a placeholder
-        # In production, use a dedicated credentials table or vault
-        vm_plan = VMPlan(
-            cluster_id=cluster.id,
-            role="management",
-            node_count=1,
-            memory_mb=4096,
-            cores=2,
-            disk_gb=32,
-            proxmox_node="",  # Will be determined by placement engine
-            network_bridge=cluster_data.network_bridge,
-            storage="local-lvm",  # Default storage
-            extra_config={
-                "proxmox_host": cluster_data.proxmox_host,
-                "proxmox_user": cluster_data.proxmox_user,
-                "proxmox_password_encrypted": encrypted_password,
-                "proxmox_ssh_key_encrypted": encrypted_ssh_key,
-                "network_cidr": cluster_data.network_cidr,
-                "network_gateway": cluster_data.network_gateway,
-                "ip_range_start": cluster_data.ip_range_start,
-                "ip_range_end": cluster_data.ip_range_end,
-                "dhcp_mode": cluster_data.dhcp_mode,
-            }
-        )
-        self.db.add(vm_plan)
-        self.db.commit()
 
         logger.info(f"Created cluster: {cluster.id} ({cluster.name})")
         return cluster

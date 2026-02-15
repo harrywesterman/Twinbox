@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 
-from twinbox.shared.database import Base, Database
-from twinbox.shared.models import Cluster, Deployment, Job, Node, DeploymentLog
-from twinbox.shared.proxmox import ProxmoxAPI
+from manager.shared.database import Base, Database
+from manager.shared.models import Cluster, Deployment, Job, VMPlan, DeploymentLog
+from manager.shared.proxmox import ProxmoxAPI
 
 
 @pytest.fixture(scope="session")
@@ -184,43 +184,46 @@ def populated_cluster(test_db_session, fake_config):
     ]
     test_db_session.add_all(jobs)
 
-    # Add nodes
-    nodes = [
-        Node(
+    # Add VM plans
+    vm_plans = [
+        VMPlan(
             cluster_id=cluster.id,
-            name='management',
-            vm_id=100,
+            vm_name='twinbox-mgmt-1',
             role='management',
-            ip_address='192.168.1.100',
+            target_node='pve1',
             cpu=4,
-            memory_mb=8192,
+            ram_mb=8192,
             disk_gb=50,
-            proxmox_node='pve1'
+            ip_address='192.168.1.100',
+            mac_address='00:16:3e:xx:xx:01',
+            bridge='vmbr0'
         ),
-        Node(
+        VMPlan(
             cluster_id=cluster.id,
-            name='controlplane-0',
-            vm_id=101,
+            vm_name='talos-cp-1',
             role='controlplane',
+            target_node='pve2',
+            cpu=2,
+            ram_mb=4096,
+            disk_gb=20,
             ip_address='192.168.1.101',
-            cpu=2,
-            memory_mb=4096,
-            disk_gb=20,
-            proxmox_node='pve2'
+            mac_address='00:16:3e:xx:xx:02',
+            bridge='vmbr0'
         ),
-        Node(
+        VMPlan(
             cluster_id=cluster.id,
-            name='worker-0',
-            vm_id=102,
+            vm_name='talos-worker-1',
             role='worker',
-            ip_address='192.168.1.102',
+            target_node='pve3',
             cpu=2,
-            memory_mb=4096,
+            ram_mb=4096,
             disk_gb=20,
-            proxmox_node='pve3'
+            ip_address='192.168.1.102',
+            mac_address='00:16:3e:xx:xx:03',
+            bridge='vmbr0'
         ),
     ]
-    test_db_session.add_all(nodes)
+    test_db_session.add_all(vm_plans)
 
     # Add some logs
     logs = [
@@ -238,7 +241,7 @@ def populated_cluster(test_db_session, fake_config):
         'cluster': cluster,
         'deployment': deployment,
         'jobs': jobs,
-        'nodes': nodes,
+        'vm_plans': vm_plans,
         'logs': logs
     }
 

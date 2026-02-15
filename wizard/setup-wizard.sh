@@ -1,140 +1,76 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-# Config
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEFAULT_CPU=2
-DEFAULT_RAM=4
-DEFAULT_DISK=32
 UBUNTU_VER="22.04"
-UBUNTU_REL="jammy"
-CLOUD_IMG="http://cloud-images.ubuntu.com/${UBUNTU_REL}/current/ubuntu-${UBUNTU_VER}-live-server-amd64.img"
-STORAGE="local-lvm"
-BRIDGE="vmbr0"
-REPO="https://github.com/your-org/twinbox.git"
+CLOUD_IMG="http://cloud-images.ubuntu.com/releases/${UBUNTU_VER}/release/ubuntu-${UBUNTU_VER}-live-server-amd64.img"
+CPU_CORES=2; RAM_MB=4096; DISK_GB=32; BRIDGE="vmbr0"; STORAGE="local-lvm"
+CLUSTER=""; SELECTED=""
+log() { echo -e "${YELLOW}[*] $*${NC}"; }
+ok() { echo -e "${GREEN}[✓] $*${NC}"; }
+err() { echo -e "${RED}[✗] $*${NC}" >&2; }
+warn() { echo -e "${YELLOW}[!] $*${NC}"; }
 
-# Logging
-log()   { echo -e "\033[1;33m[INFO]\033[0m $*" >&2; }
-ok()    { echo -e "\033[1;32m[OK]\033[0m $*" >&2; }
-err()   { echo -e "\033[1;31m[ERR]\033[0m $*" >&2; }
-warn()  { echo -e "\033[1;33m[WARN]\033[0m $*" >&2; }
-
-# Check Proxmox
 check_proxmox() {
-    [[ -d /etc/pve ]] || { err "Not a Proxmox host."; exit 1; }
-    command -v qm >/dev/null || { err "qm not found."; exit 1; }
-    command -v pvesh >/dev/null || { err "pvesh not found."; exit 1; }
-    ok "Proxmox detected"
-}
-
-# Prompt functions
-prompt() {
-    local msg="$1" default="$2" varname="$3"
-    read -p "$msg [$default]: " val
-    eval "$varname=\"\${val:-$default}\""
+    [[ -d /etc/pve ]] || { err "This script must run on a Proxmox VE host"; exit 1; }
+    command -v qm &>/dev/null || { err "qm command not found. Is Proxmox installed?"; exit 1; }
+    ok "Proxmox environment verified"
 }
 
 prompt_cluster() {
-    local def="twinbox-$(hostname)"
     while true; do
-        read -p "Cluster name? [$def]: " name
-        CLUSTER="${name:-$def}"
-        [[ "$CLUSTER" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]] && break
-        err "Alphanumeric only, start with letter/number"
+        read -p "Cluster name (alphanumeric, no spaces): " CLUSTER
+        [[ "$CLUSTER" =~ ^[a-zA-Z0-9-]+$ ]] && break || warn "Invalid cluster name."
     done
+    nodes=($(pvesh get /nodes -output-format json 2>/dev/null | jq -r '.[] | select(.status=="online") | .id' 2>/dev/null || echo ""))
+    if [[ ${#nodes[@]} -eq 0 ]]; then
+        warn "No online nodes found. Using 'localhost'"; SELECTED="localhost"
+    elif [[ ${#nodes[@]} -eq 1 ]]; then
+        SELECTED="${nodes[0]}"; ok "Using node: $SELECTED"
+    else
+        echo "Available nodes:"; for i in "${!nodes[@]}"; do echo "  $((i+1)). ${nodes[i]}"; done
+        read -p "Select node (1-${#nodes[@]}, default 1): " sel; [[ -z "$sel" ]] && sel=1
+        SELECTED="${nodes[$((sel-1))]}"
+    fi
 }
 
 prompt_resources() {
-    prompt "Management VM CPU" "$DEFAULT_CPU" CPU_CORES
-    while true; do
-        prompt "Management VM RAM (GB)" "$DEFAULT_RAM" RAM_GB
-        [[ "$RAM_GB" =~ ^[0-9]+$ && $RAM_GB -ge 2 ]] && break
-        err "Minimum 2GB"
-    done
-    RAM_MB=$((RAM_GB * 1024))
-    while true; do
-        prompt "Management VM disk (GB)" "$DEFAULT_DISK" DISK_GB
-        [[ "$DISK_GB" =~ ^[0-9]+$ && $DISK_GB -ge 20 ]] && break
-        err "Minimum 20GB"
-    done
+    read -p "Management VM CPU cores? (default $CPU_CORES): " inp; CPU_CORES=${inp:-$CPU_CORES}
+    read -p "Management VM RAM (GB)? (default $((RAM_MB/1024))): " inp; [[ -n "$inp" ]] && RAM_MB=$((inp * 1024))
+    read -p "Management VM disk (GB)? (default $DISK_GB): " inp; [[ -n "$inp" ]] && DISK_GB=$inp
+    read -p "Network bridge? (default $BRIDGE): " inp; BRIDGE=${inp:-$BRIDGE}
 }
 
-select_node() {
-    log "Detecting nodes..."
-    mapfile -t NODES < <(pvesh get /nodes -quiet 2>/dev/null || qm list 2>/dev/null | awk 'NR>1 {print $4}' | sort -u)
-
-    [[ ${#NODES[@]} -ge 1 ]] || { err "No nodes found"; exit 1; }
-
-    if [[ ${#NODES[@]} -eq 1 ]]; then
-        SELECTED="${NODES[0]}"
-        return
+create_twinbox_user() {
+    log "Creating Proxmox user and permissions..."
+    if ! pvesh get /access/users/twinbox@pve &>/dev/null; then
+        local pass=$(openssl rand -base64 24 | tr -d '/+=' | head -c 16)
+        pvesh create /access/users -userid twinbox@pve -password "$pass" 2>/dev/null || true
+        ok "Created user: twinbox@pve"
     fi
-
-    echo "Nodes:"
-    for i in "${!NODES[@]}"; do echo "  $((i+1)). ${NODES[i]}"; done
-    while true; do
-        read -p "Select (1-${#NODES[@]}) [auto]: " sel
-        if [[ -z "$sel" ]]; then
-            SELECTED="${NODES[0]}"  # Simple: pick first
-            break
-        elif [[ "$sel" =~ ^[0-9]+$ && $sel -ge 1 && $sel -le ${#NODES[@]} ]]; then
-            SELECTED="${NODES[$((sel-1))]}"
-            break
-        fi
-        err "Invalid"
-    done
-    ok "Node: $SELECTED"
-}
-
-check_resources() {
-    local need_ram=$((RAM_GB * 1024 * 1024 * 1024))
-    local need_disk=$((DISK_GB * 1024 * 1024 * 1024))
-
-    local json
-    json=$(pvesh get /nodes/$SELECTED/status 2>/dev/null || echo "{}")
-    local free_ram=$(echo "$json" | jq -r '.memory.free // 0' 2>/dev/null || echo 0)
-    local free_disk=$(echo "$json" | jq -r '.disk_free // 0' 2>/dev/null || echo 0)
-
-    (( free_ram < need_ram )) && { warn "Low RAM: $((free_ram/1024/1024/1024))GB free"; read -p "Continue? (y/n): " c; [[ "$c" == "y" ]] || exit 1; } || ok "RAM OK"
-    (( free_disk < need_disk )) && { warn "Low disk: $((free_disk/1024/1024/1024))GB free"; read -p "Continue? (y/n): " c; [[ "$c" == "y" ]] || exit 1; } || ok "Disk OK"
-}
-
-gen_pass() { openssl rand -base64 32 | tr -d '/+=' | head -c 32; }
-
-create_pve_user() {
-    local pass
-    pass=$(gen_pass)
-    if pvesh create /access/users -userid twinbox@pve -password "$pass" &>/dev/null; then
-        ok "Created twinbox@pve"
-        echo "$pass" >"/tmp/twinbox-pass-$CLUSTER.txt"
-    else
-        pvesh set /access/users/twinbox@pve -password "$pass" 2>/dev/null && ok "Updated twinbox@pve" || warn "User setup skipped"
+    local pool="twinbox-${CLUSTER}"
+    if ! pvesh get /pools/$pool &>/dev/null; then
+        pvesh create /pools -poolid "$pool" 2>/dev/null || true
+        ok "Created resource pool: $pool"
     fi
-}
-
-create_pool() {
-    local pool="twinbox-$CLUSTER"
-    pvesh create /pools -poolid "$pool" &>/dev/null || warn "Pool exists"
-    pvesh set "/pools/$pool/acl" -path / -group user:twinbox@pve -roles "VM.Create,VM.Modify,VM.PowerMgmt,Pool.List,SDN.Use" &>/dev/null \
-        || pveum aclmod -group user:twinbox@pve -role "PVEAdmin" -path "/pools/$pool" 2>/dev/null \
-        || warn "Permission error"
-    ok "Pool + ACL: $pool"
+    pvesh set /pools/$pool/acl -path / --group user:twinbox@pve -roles "VM.Create,VM.Modify,VM.PowerMgmt,Pool.List" 2>/dev/null || true
+    ok "Set ACLs on pool $pool"
 }
 
 gen_token() {
-    local json
-    json=$(pvesh create /access/tokens -userid twinbox@pve -privsep 0 -expire Never -output-format json 2>/dev/null || echo "{}")
+    log "Generating API token..."
+    local json=$(pvesh create /access/tokens -userid twinbox@pve -privsep 0 -expire Never -output-format json 2>/dev/null || echo "{}")
     local name=$(echo "$json" | jq -r '.data.value // empty' 2>/dev/null)
     local secret=$(echo "$json" | jq -r '.data.secret // empty' 2>/dev/null)
     if [[ -n "$name" && -n "$secret" ]]; then
-        ok "Token: $name"
+        ok "Token generated"
         cat > "/tmp/twinbox-creds-$CLUSTER.env" <<EOF
 API_TOKEN_NAME=$name
 API_TOKEN_SECRET=$secret
 API_URL=https://$SELECTED:8006/api2/json
 EOF
     else
-        warn "Token generation failed"
+        err "Token generation failed"; exit 1;
     fi
 }
 
@@ -142,14 +78,10 @@ get_ubuntu_iso() {
     local iso_dir="/var/lib/vz/template/iso"
     local iso_name="ubuntu-${UBUNTU_VER}-live-server-amd64.img"
     local iso_path="$iso_dir/$iso_name"
-
     mkdir -p "$iso_dir"
     if [[ -f "$iso_path" ]]; then
-        ok "Ubuntu image exists"
-        ISO="$iso_path"
-        return
+        ok "Ubuntu image exists: $iso_path"; ISO="$iso_path"; return
     fi
-
     log "Downloading Ubuntu $UBUNTU_VER..."
     curl -sL -o "$iso_path" "$CLOUD_IMG" && ok "Downloaded" || { err "Download failed"; exit 1; }
     ISO="$iso_path"
@@ -157,16 +89,19 @@ get_ubuntu_iso() {
 
 create_cloudinit() {
     local out="/tmp/cloud-init-$CLUSTER.yml"
-    local tmpl="$SCRIPT_DIR/cloud-init.yml"
+    local creds_file="/tmp/twinbox-creds-$CLUSTER.env"
+    [[ -f "$creds_file" ]] || { err "Credentials file not found. Run gen_token first."; exit 1; }
+    source "$creds_file"
 
+    local tmpl="$SCRIPT_DIR/cloud-init.yml"
     if [[ -f "$tmpl" ]]; then
         cp "$tmpl" "$out"
     else
-        cat > "$out" <<'EOF'
+        cat > "$out" <<EOF
 #cloud-config
 package_update: true
 package_upgrade: true
-packages: [docker.io, docker-compose, jq, yq, curl, git]
+packages: [docker.io, docker-compose, jq, yq, curl, git, python3-pip, python3-yaml]
 runcmd:
   - [groupadd, -g, 999, twinbox]
   - [useradd, -u, 999, -g, twinbox, -m, -s, /bin/bash, twinbox]
@@ -178,111 +113,98 @@ write_files:
     permissions: '0600'
     owner: twinbox:twinbox
     content: |
-      api_url: "https://localhost:8006/api2/json"
+      api_url: "${API_URL}"
       user: "twinbox@pve"
-      token: ""
+      token: "${API_TOKEN_SECRET}"
       verify_ssl: false
+  - path: /opt/twinbox/config/cluster-name
+    permissions: '0644'
+    owner: twinbox:twinbox
+    content: |
+      CLUSTER_NAME=${CLUSTER}
 EOF
     fi
 
-    # Inject secrets
     local db_pass=$(openssl rand -base64 32 | tr -d '/+=' | head -c 32 2>/dev/null || echo "CHANGE_$(date +%s)")
     local sec_key=$(openssl rand -base64 32 2>/dev/null || echo "CHANGE_$(date +%s)")
-    sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=$db_pass/; s/SECRET_KEY=.*/SECRET_KEY=$sec_key/" "$out" 2>/dev/null || true
+    cat >> "$out" <<EOF
 
-    ok "Cloud-init: $out"
+write_files:
+  - path: /opt/twinbox/.env
+    permissions: '0600'
+    owner: twinbox:twinbox
+    content: |
+      DATABASE_URL=postgresql://twinbox:${db_pass}@localhost:5432/twinbox
+      REDIS_URL=redis://localhost:6379/0
+      SECRET_KEY=${sec_key}
+      PROXMOX_CREDENTIALS_PATH=/opt/twinbox/config/proxmox-creds.yaml
+      CLUSTER_NAME=${CLUSTER}
+EOF
+    ok "Cloud-init generated: $out"
     echo "$out"
 }
 
 create_vm() {
-    local vmid
-    vmid=$(qm list 2>/dev/null | awk 'NR>1 {if($1>m) m=$1} END {print (m?m+1:100)}')
-    local name="twinbox-mgmt-$CLUSTER"
-
-    qm create "$vmid" \
-        --name "$name" \
-        --memory "$RAM_MB" \
-        --cores "$CPU_CORES" \
-        --net0 "virtio,bridge=$BRIDGE" \
-        --scsihw "virtio-scsi" \
-        --scsi0 "$STORAGE:${DISK_GB},ssd=1" \
-        --cdrom "$ISO" \
-        --boot "order=scsi0" \
-        --ostype "l26" \
-        --bios seabios
-
+    local vmid=$(qm list 2>/dev/null | awk 'NR>1 {if($1>m) m=$1} END {print (m?m+1:100)}')
+    local name="twinbox-mgmt-${CLUSTER}"
+    log "Creating VM $vmid: $name"
+    qm create "$vmid" --name "$name" --memory "$RAM_MB" --cores "$CPU_CORES" \
+        --net0 "virtio,bridge=$BRIDGE" --scsihw "virtio-scsi" \
+        --scsi0 "$STORAGE:${DISK_GB},ssd=1" --cdrom "$ISO" \
+        --boot "order=scsi0" --ostype "l26" --bios seabios 2>/dev/null \
+        || { err "Failed to create VM"; exit 1; }
     ok "VM $vmid created"
 
-    local ci_file
-    ci_file=$(create_cloudinit)
-    qm set "$vmid" \
-        --cicustom "user=local:0,cloud-init.yml,$ci_file" \
-        --ipconfig0 "ip=dhcp" \
-        2>/dev/null || warn "Cloud-init config may need manual setup"
-
+    local ci_file=$(create_cloudinit)
+    qm set "$vmid" --cicustom "user=local:0,cloud-init.yml,$ci_file" \
+        --ipconfig0 "ip=dhcp" 2>/dev/null || warn "Cloud-init config may need manual setup"
     echo "$vmid"
 }
 
 wait_ip() {
     local vmid="$1" wait=300 interval=5
-    log "Waiting for IP..."
+    log "Waiting for VM IP address..."
     while (( wait > 0 )); do
         if qm status "$vmid" 2>/dev/null | grep -q running; then
-            local ip
-            ip=$(qm guest cmd "$vmid" "hostname -I" 2>/dev/null | tr -d '[:space:]')
+            local ip=$(qm guest cmd "$vmid" "hostname -I" 2>/dev/null | tr -d '[:space:]')
             [[ -n "$ip" ]] && { ok "IP: $ip"; echo "$ip"; return 0; }
         fi
-        sleep "$interval"
-        wait=$((wait-interval))
+        sleep "$interval"; wait=$((wait-interval))
         printf " \r%3ds remaining" "$wait"
     done
-    echo ""
-    read -p "Enter IP manually: " manual_ip
-    echo "$manual_ip"
+    echo ""; read -p "Enter IP manually: " manual_ip; echo "$manual_ip"
 }
 
 main() {
-    clear
-    echo "=== Twinbox Setup Wizard ==="
-    check_proxmox
-    prompt_cluster
-    prompt_resources
-    select_node
-    check_resources
+    clear; echo "=== Twinbox Setup Wizard ==="
+    check_proxmox; prompt_cluster; prompt_resources
+    log "Configuration:"; echo "  Cluster: $CLUSTER"; echo "  Node: $SELECTED"
+    echo "  VM: ${CPU_CORES} CPU, ${RAM_MB}MB RAM, ${DISK_GB}GB disk"; echo "  Bridge: $BRIDGE"
+    create_twinbox_user; gen_token; get_ubuntu_iso
+    local vmid=$(create_vm); qm start "$vmid"
+    local ip=$(wait_ip "$vmid")
+    cat <<EOF
 
-    read -p "\nCreate VM on $SELECTED with ${CPU_CORES}CPU/${RAM_GB}GB/${DISK_GB}GB? (y/n): " c
-    [[ "$c" == "y" ]] || { log "Cancelled"; exit 0; }
+==========================================
+ Twinbox Setup Complete!
+==========================================
 
-    log "\nStarting setup..."
-    create_pve_user
-    create_pool
-    gen_token
-    get_ubuntu_iso
+Management VM ready!
 
-    echo ""
-    local vmid
-    vmid=$(create_vm)
-    echo ""
+  VM ID: $vmid
+  Name: twinbox-mgmt-$CLUSTER
+  IP: $ip
 
-    qm start "$vmid"
-    ok "VM started"
+1. Wait 1-2 minutes for cloud-init to finish
+2. Open browser to: http://$ip:8080
+3. You'll see the Twinbox web interface
 
-    local vm_ip
-    vm_ip=$(wait_ip "$vmid")
+To access the VM:
+  ssh ubuntu@$ip
 
-    echo ""
-    echo "=== Setup Complete ==="
-    echo "VM ID: $vmid"
-    echo "VM Name: twinbox-mgmt-$CLUSTER"
-    echo "VM IP: ${vm_ip:-<unknown>}"
-    echo ""
-    echo "Next:"
-    echo "1. SSH: ssh ubuntu@$vm_ip"
-    echo "2. Clone: git clone $REPO /opt/twinbox"
-    echo "3. Copy: /tmp/twinbox-creds-$CLUSTER.env to /opt/twinbox/.env"
-    echo "4. Web UI: http://$vm_ip:8080"
-    echo ""
-    log "Creds saved in /tmp/twinbox-*.txt and /tmp/twinbox-creds-*.env"
+The cluster will be ready to deploy from the web UI.
+
+==========================================
+EOF
 }
-
 main "$@"

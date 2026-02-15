@@ -512,19 +512,17 @@ def size_vms(
     for i, vm_plan in enumerate(vm_plan_objs):
         db_vm_plan = VMPlan(
             cluster_id=cluster.id,
+            vm_name=vm_plan.vm_name,
             role=vm_plan.role,
-            node_count=1,  # Each plan is for one VM
-            memory_mb=vm_plan.ram_mb,
-            cores=vm_plan.cpu,
+            cpu=vm_plan.cpu,
+            ram_mb=vm_plan.ram_mb,
             disk_gb=vm_plan.disk_gb,
-            proxmox_node=vm_plan.target_node,
-            network_bridge=vm_plan.bridge,
-            extra_config={
-                "vm_name": vm_plan.vm_name,
-                "iso": vm_plan.iso,
-                "ip_address": vm_plan.ip_address,
-                "mac_address": vm_plan.mac_address,
-            },
+            target_node=vm_plan.target_node,
+            bridge=vm_plan.bridge,
+            ip_address=vm_plan.ip_address,
+            mac_address=vm_plan.mac_address,
+            iso=vm_plan.iso,
+            status="planned",
         )
         db.add(db_vm_plan)
 

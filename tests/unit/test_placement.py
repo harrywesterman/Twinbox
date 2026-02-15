@@ -10,7 +10,7 @@ Tests cover:
 """
 
 import pytest
-from twinbox.shared.placement import (
+from manager.shared.placement import (
     discover_cluster_topology,
     calculate_resource_requirements,
     distribute_vms_across_nodes,

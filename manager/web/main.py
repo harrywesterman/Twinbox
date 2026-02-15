@@ -8,6 +8,7 @@ serves web UI templates and static files.
 import logging
 import os
 import sys
+import yaml
 from pathlib import Path
 from typing import Callable
 
@@ -112,6 +113,73 @@ async def startup_event():
         redis_conn.close()
     except Exception as e:
         logger.warning(f"Redis connection failed: {e}. Background jobs will not work.")
+
+    # Auto-create cluster from bootstrap credentials file (if exists)
+    creds_path = Path("/opt/twinbox/config/proxmox-creds.yaml")
+    if creds_path.exists():
+        logger.info("Found bootstrap credentials file, checking for existing cluster...")
+        try:
+            import yaml
+            from manager.shared.database import SessionLocal
+            from manager.web.services.cluster_service import ClusterService
+            from manager.shared.security import encrypt_credentials
+
+            with open(creds_path, 'r') as f:
+                creds = yaml.safe_load(f)
+
+            # Extract Proxmox connection info
+            api_url = creds.get("api_url", "")
+            proxmox_user = creds.get("user", "")
+            proxmox_token = creds.get("token", "")
+            verify_ssl = creds.get("verify_ssl", False)
+
+            if not api_url or not proxmox_user or not proxmox_token:
+                logger.warning("Credentials file incomplete, skipping auto-create")
+            else:
+                # Extract host from API URL (e.g., https://pve.example.com:8006/api2/json -> pve.example.com)
+                from urllib.parse import urlparse
+                parsed = urlparse(api_url)
+                proxmox_host = f"{parsed.scheme}://{parsed.netloc}"
+                if proxmox_host.endswith('/'):
+                    proxmox_host = proxmox_host[:-1]
+
+                # Check if cluster already exists
+                db = SessionLocal()
+                try:
+                    existing = db.query(Cluster).filter(Cluster.proxmox_host == proxmox_host).first()
+                    if existing:
+                        logger.info(f"Cluster already exists for Proxmox host {proxmox_host}")
+                    else:
+                        # Get cluster name from environment or default
+                        cluster_name = os.getenv("CLUSTER_NAME", f"cluster-{parsed.hostname or 'unknown'}")
+
+                        # Encrypt the token
+                        encrypted_token = encrypt_credentials(proxmox_token)
+
+                        # Create cluster record
+                        cluster_service = ClusterService(db)
+                        cluster = Cluster(
+                            name=cluster_name,
+                            description="Auto-created from bootstrap",
+                            status="pending",
+                            talos_version="1.8.0",
+                            kubernetes_version="v1.28.0",
+                            proxmox_host=proxmox_host,
+                            proxmox_user=proxmox_user,
+                            proxmox_password_encrypted=encrypted_token,
+                            network_bridge="vmbr0",
+                            dhcp_mode=True,
+                        )
+                        db.add(cluster)
+                        db.commit()
+                        logger.info(f"✅ Auto-created cluster '{cluster_name}' for Proxmox host {proxmox_host}")
+                        logger.info(f"   You can now deploy from the web UI: /deploy")
+                finally:
+                    db.close()
+        except Exception as e:
+            logger.error(f"Failed to auto-create cluster from credentials: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
     logger.info("Twinbox application started")
 
