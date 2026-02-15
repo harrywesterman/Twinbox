@@ -187,7 +187,7 @@ EOF_USERDATA
   - [systemctl, daemon-reload]
   - [systemctl, restart, ssh]
 write_files:
-  - path: /etc/ssh/sshd_config.d/99-twinbox.conf
+  - path: /etc/ssh/sshd_config.d/00-twinbox.conf
     permissions: '0644'
     content: |
       PasswordAuthentication yes
