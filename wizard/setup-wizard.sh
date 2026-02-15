@@ -448,9 +448,13 @@ create_vm() {
     # Check all other nodes in the cluster
     while IFS= read -r node; do
         [[ "$node" == "$SELECTED" ]] && continue
+        # Collect all IDs from this node into a temporary array to avoid nested process substitution issues
+        local node_ids=()
         while IFS= read -r vmid; do
-            [[ -n "$vmid" ]] && used_vm_ids+=("$vmid")
+            [[ -n "$vmid" ]] && node_ids+=("$vmid")
         done < <(get_vmids_from_node "$node")
+        # Append to global list
+        used_vm_ids+=("${node_ids[@]}")
     done < <(get_all_nodes)
 
     # Deduplicate and sort
