@@ -533,12 +533,28 @@ create_vm() {
 }
 
 wait_ip() {
-    local vmid="$1" wait=300 interval=5
+    local vmid="$1" wait=600 interval=2
     log "Waiting for VM IP address..."
     while (( wait > 0 )); do
         if qm status "$vmid" 2>/dev/null | grep -q running; then
-            local ip=$(qm guest cmd "$vmid" "hostname -I" 2>/dev/null | tr -d '[:space:]')
-            [[ -n "$ip" ]] && { ok "IP: $ip"; echo "$ip"; return 0; }
+            # Use guest agent's network-get-interfaces for reliable IP detection
+            local ip
+            ip=$(qm guest network-get-interfaces "$vmid" 2>/dev/null | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    for iface in data:
+        for addr in iface.get('ip-addresses', []):
+            if addr.get('ip-address-type') == 'ipv4':
+                print(addr['ip-address'])
+                sys.exit(0)
+except: pass
+" 2>/dev/null)
+            if [[ -n "$ip" ]]; then
+                ok "IP: $ip"
+                echo "$ip"
+                return 0
+            fi
         fi
         sleep "$interval"; wait=$((wait-interval))
         printf " \r%3ds remaining" "$wait"
