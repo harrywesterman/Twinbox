@@ -153,6 +153,7 @@ create_cloudinit_iso() {
 
     local db_pass=$(openssl rand -base64 32 | tr -d '/+=' | head -c 32 2>/dev/null || echo "CHANGE_$(date +%s)")
     local sec_key=$(openssl rand -base64 32 2>/dev/null || echo "CHANGE_$(date +%s)")
+    local twinbox_pw=$(openssl rand -base64 12 2>/dev/null || echo "ChangeMe$(date +%s)")
 
     mkdir -p "$base_dir"
 
@@ -165,6 +166,7 @@ packages: [docker.io, docker-compose, jq, yq, curl, git, python3-pip, python3-ya
 runcmd:
   - [groupadd, -g, 999, twinbox]
   - [useradd, -u, 999, -g, twinbox, -m, -s, /bin/bash, twinbox]
+  - [echo, "twinbox:$twinbox_pw", "|", chpasswd]
   - [usermod, -aG, docker, twinbox]
   - [mkdir, -p, /opt/twinbox]
   - [chown, -R, twinbox:twinbox, /opt/twinbox]
@@ -184,7 +186,6 @@ write_files:
     owner: twinbox:twinbox
     content: |
       CLUSTER_NAME=${CLUSTER}
-
 write_files:
   - path: /opt/twinbox/.env
     permissions: '0600'
@@ -195,7 +196,6 @@ write_files:
       SECRET_KEY=${sec_key}
       PROXMOX_CREDENTIALS_PATH=/opt/twinbox/config/proxmox-creds.yaml
       CLUSTER_NAME=${CLUSTER}
-
 write_files:
   - path: /etc/systemd/system/twinbox.service
     permissions: '0644'
@@ -220,7 +220,6 @@ write_files:
 
       [Install]
       WantedBy=multi-user.target
-
   - path: /etc/motd
     permissions: '0644'
     owner: root:root
@@ -230,7 +229,7 @@ write_files:
       ==========================================
 
       Web UI: http://<this-vm-ip>:8080
-      SSH: ubuntu@<this-ip>
+      SSH: twinbox@<this-ip>
 
       Twinbox repository: /opt/twinbox
       Docker Compose: /opt/twinbox/docker-compose.yml
@@ -239,14 +238,12 @@ write_files:
       Logs: journalctl -u twinbox -f
 
       ==========================================
-
 runcmd:
   - [systemctl, daemon-reload]
   - [systemctl, enable, twinbox.service]
   - [systemctl, start, twinbox.service]
   - [systemctl, enable, docker]
   - [systemctl, start, docker]
-
 final_message: |
   ==========================================
    Twinbox Setup Complete!
@@ -255,7 +252,8 @@ final_message: |
   Management VM is ready. The Twinbox web
   interface should be accessible shortly.
 
-  SSH to this vm: ssh ubuntu@<this-ip>
+  SSH to this VM: ssh twinbox@<this-ip>
+  Password: $twinbox_pw
   View status: systemctl status twinbox
   View logs: journalctl -u twinbox -f
 
@@ -299,10 +297,11 @@ create_cloudinit_snippet() {
 
     local db_pass=$(openssl rand -base64 32 | tr -d '/+=' | head -c 32 2>/dev/null || echo "CHANGE_$(date +%s)")
     local sec_key=$(openssl rand -base64 32 2>/dev/null || echo "CHANGE_$(date +%s)")
+    local twinbox_pw=$(openssl rand -base64 12 2>/dev/null || echo "ChangeMe$(date +%s)")
 
     mkdir -p "$snippet_dir"
 
-    cat > "$snippet_path" <<'EOF'
+    cat > "$snippet_path" <<EOF
 #cloud-config
 package_update: true
 package_upgrade: true
@@ -310,6 +309,7 @@ packages: [docker.io, docker-compose, jq, yq, curl, git, python3-pip, python3-ya
 runcmd:
   - [groupadd, -g, 999, twinbox]
   - [useradd, -u, 999, -g, twinbox, -m, -s, /bin/bash, twinbox]
+  - [echo, "twinbox:$twinbox_pw", "|", chpasswd]
   - [usermod, -aG, docker, twinbox]
   - [mkdir, -p, /opt/twinbox]
   - [chown, -R, twinbox:twinbox, /opt/twinbox]
@@ -375,7 +375,7 @@ write_files:
       ==========================================
 
       Web UI: http://<this-vm-ip>:8080
-      SSH: ubuntu@<this-ip>
+      SSH: twinbox@<this-ip>
 
       Twinbox repository: /opt/twinbox
       Docker Compose: /opt/twinbox/docker-compose.yml
@@ -400,7 +400,8 @@ final_message: |
   Management VM is ready. The Twinbox web
   interface should be accessible shortly.
 
-  SSH to this VM: ssh ubuntu@<this-ip>
+  SSH to this VM: ssh twinbox@<this-ip>
+  Password: $twinbox_pw
   View status: systemctl status twinbox
   View logs: journalctl -u twinbox -f
 
@@ -578,6 +579,14 @@ main() {
     log "Configuration:"; echo "  Cluster: $CLUSTER"; echo "  Node: $SELECTED"
     echo "  VM: ${CPU_CORES} CPU, ${RAM_MB}MB RAM, ${DISK_GB}GB disk"; echo "  Bridge: $BRIDGE"
     create_twinbox_user; gen_token; get_ubuntu_cloud_image
+
+    # Generate and save twinbox user password
+    local twinbox_pw
+    twinbox_pw=$(openssl rand -base64 12 2>/dev/null || echo "ChangeMe$(date +%s)")
+    echo "$twinbox_pw" > "/tmp/twinbox-vm-password-$CLUSTER.txt"
+    chmod 600 "/tmp/twinbox-vm-password-$CLUSTER.txt"
+    export TWINBOX_PASSWORD="$twinbox_pw"
+
     local vmid
     vmid=$(create_vm) || exit 1
     qm start "$vmid"
@@ -600,7 +609,8 @@ Management VM ready!
 3. You'll see the Twinbox web interface
 
 To access the VM:
-  ssh ubuntu@$ip
+  ssh twinbox@$ip
+  Password: $twinbox_pw
 
 The cluster will be ready to deploy from the web UI.
 
