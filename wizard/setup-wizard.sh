@@ -277,7 +277,7 @@ create_vm() {
         --net0 "virtio,bridge=$BRIDGE" \
         --scsi0 "$STORAGE:${DISK_GB},ssd=1" \
         --cdrom "$ISO" \
-        --boot "order=cdrom" &>/dev/null; then
+        --boot "order=ide2" &>/dev/null; then
         err "Failed to create VM $vmid"
         return 1
     fi
@@ -287,14 +287,9 @@ create_vm() {
     local ci_file
     ci_file=$(create_cloudinit) || return 1
 
-    # Upload cloud-init config to Proxmox storage and attach it
-    # Upload to local storage (default storage for ISOs)
-    if pvesh create /storage/local/content --content cloudinit --filename "cloud-init-$vmid.yml" --file "$ci_file" &>/dev/null; then
-        qm set "$vmid" --cicustom "user=local:cloud-init-$vmid.yml" \
-            --ipconfig0 "ip=dhcp" &>/dev/null
-    else
-        warn "Failed to upload cloud-init config, proceeding without it"
-    fi
+    # Attach cloud-init config directly using local file path
+    qm set "$vmid" --cicustom "user=local:$ci_file" \
+        --ipconfig0 "ip=dhcp" &>/dev/null
 
     echo "$vmid"
     return 0
