@@ -160,6 +160,12 @@ create_cloudinit_iso() {
     # Create user-data (cloud-config)
     cat > "$user_data" <<EOF_USERDATA
 #cloud-config
+# Expand root partition to fill available disk space
+growpart:
+  mode: auto
+  devices:
+    - "/"
+  ignore_growroot_disabled: True
 package_update: true
 package_upgrade: true
 packages: [docker.io, docker-compose, jq, yq, curl, git, python3-pip, python3-yaml, qemu-guest-agent]
@@ -308,6 +314,12 @@ create_cloudinit_snippet() {
 
     cat > "$snippet_path" <<EOF
 #cloud-config
+# Expand root partition to fill available disk space
+growpart:
+  mode: auto
+  devices:
+    - "/"
+  ignore_growroot_disabled: True
 package_update: true
 package_upgrade: true
 packages: [docker.io, docker-compose, jq, yq, curl, git, python3-pip, python3-yaml, qemu-guest-agent]
@@ -516,12 +528,6 @@ create_vm() {
         return 1
     fi
 
-    # Resize disk to the configured size
-    log "Resizing disk to ${DISK_GB}GB..."
-    if ! qm disk resize "$vmid" "scsi0" "+${DISK_GB}G" &>/dev/null; then
-        warn "Failed to resize disk, using default size"
-    fi
-
     # Step 3: Attach the imported disk as scsi0
     # The disk will be named vm-<vmid>-disk-0
     local disk_name="vm-${vmid}-disk-0"
@@ -531,6 +537,12 @@ create_vm() {
         return 1
     fi
     ok "Disk attached"
+
+    # Resize disk to the configured size (must be done after attachment)
+    log "Resizing disk to ${DISK_GB}GB..."
+    if ! qm disk resize "$vmid" "scsi0" "+${DISK_GB}G" &>/dev/null; then
+        warn "Failed to resize disk, using default size"
+    fi
 
     # Step 4: Configure managed Cloud-Init drive
     local ci_snippet
