@@ -23,44 +23,9 @@ prompt_cluster() {
         [[ "$CLUSTER" =~ ^[a-zA-Z0-9-]+$ ]] && break || warn "Invalid cluster name."
     done
 
-    # Get online nodes with their resource info using Python
-    local nodes_json memory_info
-    nodes_json=$(pvesh get /nodes --output-format json 2>/dev/null) || nodes_json="[]"
-
-    # Parse nodes and their free memory, build an array of the best node
-    local best_node="" best_free=0
-    while IFS= read -r line; do
-        [[ -z "$line" ]] && continue
-        local node="$line"
-        # Get node status to check free memory
-        local status_json
-        status_json=$(pvesh get /nodes/$node/status --output-format json 2>/dev/null) || continue
-        local free_mem
-        free_mem=$(echo "$status_json" | python3 -c "import sys, json; data=json.load(sys.stdin); print(int(data.get('memory', {}).get('free', 0)))" 2>/dev/null || echo "0")
-        if (( free_mem > best_free )); then
-            best_free=$free_mem
-            best_node="$node"
-        fi
-    done < <(echo "$nodes_json" | python3 -c '
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    for item in data:
-        if item.get("status") == "online":
-            print(item.get("node", ""))
-except Exception:
-    pass
-' 2>/dev/null | grep -v '^$')
-
-    if [[ -z "$best_node" ]]; then
-        local hostname
-        hostname=$(hostname -s 2>/dev/null || echo "localhost")
-        warn "No suitable online nodes found. Using '$hostname'"; SELECTED="$hostname"
-    else
-        local free_gb=$((best_free / 1024 / 1024))
-        ok "Auto-selected node: $best_node (${free_gb}GB free RAM)"
-        SELECTED="$best_node"
-    fi
+    # Always use the local node (the node where this script is running)
+    SELECTED=$(hostname -s 2>/dev/null || echo "localhost")
+    ok "Using local node: $SELECTED"
 }
 
 # Resources are using defaults; no prompts needed
