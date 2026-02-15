@@ -433,7 +433,7 @@ create_cloudinit_snippet() {
 
     mkdir -p "$snippet_dir"
 
-    cat > "$snippet_path" <<EOF
+    cat > "$snippet_path" <<EOF_USERDATA
 #cloud-config
 # Expand root partition to fill available disk space
 growpart:
