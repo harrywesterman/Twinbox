@@ -548,6 +548,9 @@ import sys, json
 try:
     data = json.load(sys.stdin)
     for iface in data:
+        # Skip loopback interface
+        if iface.get('name') == 'lo':
+            continue
         for addr in iface.get('ip-addresses', []):
             if addr.get('ip-address-type') == 'ipv4':
                 print(addr['ip-address'])
@@ -555,15 +558,18 @@ try:
 except: pass
 " 2>/dev/null)
             if [[ -n "$ip" ]]; then
+                printf "\r\033[K"  # Clear the countdown line
                 ok "IP: $ip"
                 echo "$ip"
                 return 0
             fi
         fi
         sleep "$interval"; wait=$((wait-interval))
-        printf " \r%3ds remaining" "$wait"
+        printf "\r\033[K%3ds remaining" "$wait"
     done
-    echo ""; read -p "Enter IP manually: " manual_ip; echo "$manual_ip"
+    printf "\r\033[K"
+    read -p "Enter IP manually: " manual_ip
+    echo "$manual_ip"
 }
 
 main() {
