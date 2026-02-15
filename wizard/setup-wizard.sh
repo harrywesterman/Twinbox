@@ -329,6 +329,12 @@ write_files:
     owner: twinbox:twinbox
     content: |
       CLUSTER_NAME=${CLUSTER}
+  - path: /etc/ssh/sshd_config.d/twinbox.conf
+    permissions: '0644'
+    owner: root:root
+    content: |
+      PasswordAuthentication yes
+      PermitRootLogin yes
 
 write_files:
   - path: /opt/twinbox/.env
@@ -385,12 +391,22 @@ write_files:
 
       ==========================================
 
+write_files:
+  - path: /etc/ssh/sshd_config.d/twinbox.conf
+    permissions: '0644'
+    owner: root:root
+    content: |
+      PasswordAuthentication yes
+      PermitRootLogin yes
+
 runcmd:
   - [systemctl, daemon-reload]
   - [systemctl, enable, twinbox.service]
   - [systemctl, start, twinbox.service]
   - [systemctl, enable, docker]
   - [systemctl, start, docker]
+  - [systemctl, restart, ssh]
+  - [systemctl, restart, ssh]
 
 final_message: |
   ==========================================
