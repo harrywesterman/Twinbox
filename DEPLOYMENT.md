@@ -1,31 +1,40 @@
 # Twinbox Quick Deploy Guide
 
-**Simplified Kubernetes on Proxmox - One Command to Cloud**
+**Simplified Kubernetes on Proxmox - Two-Phase Setup**
 
 ---
 
 ## TL;DR
 
 ```bash
-# 1. On your Proxmox console (as root):
+# Phase 1: On your Proxmox console (as root):
 curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/setup-wizard.sh | bash
 
-# 2. Wait 2-3 minutes, then open browser to http://<management-vm-ip>:8080
+# Phase 2: SSH to the Management VM and start the stack:
+ssh ubuntu@<management-vm-ip>
+cd /opt/twinbox/manager && docker-compose up -d
 
-# 3. Click "Deploy Complete Cluster" → Review → Start Deployment
-
-# 4. Wait 5-15 minutes. Download kubeconfig. Done.
+# Phase 3: Open browser to http://<management-vm-ip>:8080 and deploy cluster
 ```
 
 ---
 
 ## What Gets Deployed
 
-- **1 Management VM** (Ubuntu 22.04 Cloud) running:
-  - PostgreSQL database
-  - Redis queue
-  - FastAPI web service
-  - RQ worker
+**Phase 1 (Wizard) creates:**
+- **1 Management VM** (Ubuntu 22.04 Cloud) with:
+  - Docker installed and configured
+  - Git repository cloned to `/opt/twinbox`
+  - SSH access enabled for `ubuntu` user
+  - Docker Compose stack ready to start (but NOT auto-started)
+
+**Phase 2 (Manual) starts:**
+- PostgreSQL database
+- Redis queue
+- FastAPI web service
+- RQ worker
+
+**Phase 3 (Web UI) deploys:**
 - **N Talos control plane VMs** (immutable Kubernetes OS)
 - **M Talos worker VMs**
 - **Kubernetes cluster** with:
@@ -33,13 +42,11 @@ curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/s
   - MetalLB (load balancing)
   - Traefik (ingress controller)
 
-All automatically provisioned and configured.
-
 ---
 
 ## Detailed Steps
 
-### Step 1: Bootstrap (Run on Proxmox)
+### Phase 1: Bootstrap (Run on Proxmox)
 
 **Option A: Direct download (simplest)**
 
@@ -55,7 +62,7 @@ chmod +x /tmp/setup-wizard.sh
 bash /tmp/setup-wizard.sh
 ```
 
-The script will:
+The wizard will:
 1. Verify you're on Proxmox
 2. Ask for cluster name (e.g., "production")
 3. Ask for Management VM size (CPU/RAM/disk, defaults are fine)
@@ -63,13 +70,10 @@ The script will:
 5. Create `twinbox@pve` user with limited permissions
 6. Create resource pool `twinbox-<cluster-name>`
 7. Generate Proxmox API token
-8. Create Management VM with Ubuntu Cloud Image
+8. Create Management VM with minimal Ubuntu Cloud Image
 9. Start VM and wait for IP
 
-### Step 2: Wait for Cloud-Init
-
-After the script prints the VM IP:
-
+**Output includes:**
 ```
 ==========================================
  Twinbox Setup Complete!
@@ -81,36 +85,68 @@ Management VM ready!
   Name: twinbox-mgmt-production
   IP: 192.168.1.150
 
-1. Wait 1-2 minutes for cloud-init to finish
-2. Open browser to: http://192.168.1.150:8080
+NEXT STEPS:
+1. SSH to the VM: ssh ubuntu@192.168.1.150
+2. Start the stack: cd /opt/twinbox/manager && docker-compose up -d
+3. Open browser to: http://192.168.1.150:8080
 ```
 
-**Important**: Cloud-init installs Docker, downloads Twinbox repo, builds images, and starts containers. This takes 2-5 minutes. You can monitor progress:
+### Phase 2: Manual Startup (After Wizard Completes)
+
+After the wizard finishes and prints the VM IP:
+
+**Step 1: SSH to the Management VM**
 
 ```bash
-# SSH to the Management VM (if you want to watch):
 ssh ubuntu@192.168.1.150
-
-# Check cloud-init status:
-sudo cloud-init status --wait
-
-# Check Docker containers:
-docker-compose ps
-
-# View logs:
-docker-compose logs -f web
 ```
 
-### Step 3: Open Web UI
+**Step 2: Start the Docker Compose stack**
 
-Open `http://<management-vm-ip>:8080` in your browser.
+```bash
+cd /opt/twinbox/manager
+docker-compose up -d
+```
+
+**Step 3: Verify containers are running**
+
+```bash
+docker-compose ps
+```
+
+Expected output:
+```
+   Name                 Command               State                Ports
+-----------------------------------------------------------------------------------------
+postgres   docker-entrypoint.sh postgres   Up (healthy)   0.0.0.0:5432->5432/tcp
+redis      docker-entrypoint.sh redis ...   Up (healthy)   0.0.0.0:6379->6379/tcp
+web        uvicorn manager.web.main: ...   Up (healthy)   0.0.0.0:8000->8000/tcp
+worker     rq worker twinbox-high ...      Up (healthy)   ...
+```
+
+**Step 4: Check logs if needed**
+
+```bash
+# View web service logs
+docker-compose logs -f web
+
+# View worker logs
+docker-compose logs -f worker
+
+# Check all logs
+docker-compose logs -f
+```
+
+### Phase 3: Open Web UI
+
+After containers are running, open `http://<management-vm-ip>:8080` in your browser.
 
 You should see:
 - Cluster name displayed
 - Proxmox status: Connected ✓
 - Button: "Deploy Complete Cluster"
 
-### Step 4: Deploy the Cluster
+### Phase 4: Deploy the Cluster
 
 1. Click **"Deploy Complete Cluster"**
 
@@ -212,11 +248,48 @@ After deployment, you can:
 
 See [TESTING.md](TESTING.md) for comprehensive troubleshooting guide.
 
-Common issues:
+### Common Issues
 
-- **Web UI not loading**: Cloud-init still running; check `docker-compose ps` on Management VM
-- **Deployment fails**: Check Proxmox API token permissions, available resources
-- **Nodes not Ready**: Check Talos logs via `talosctl` or VM console
+**Web UI not accessible after wizard:**
+
+- Have you started the Docker stack? SSH to the VM and run: `cd /opt/twinbox/manager && docker-compose up -d`
+- Check container status: `docker-compose ps`
+- All containers must be "Up" (healthy). If not, check logs: `docker-compose logs`
+- Verify port 8080 is exposed and not blocked by firewall
+
+**Docker containers fail to start:**
+
+- Check Docker is installed: `docker --version`
+- Check Docker service: `sudo systemctl status docker`
+- Check disk space: `df -h` (need ~2GB free)
+- Check container logs: `docker-compose logs <service-name>`
+
+**Web UI loads but shows "Proxmox Disconnected":**
+
+- Check web container logs: `docker-compose logs web`
+- Verify credentials file exists: `ls /opt/twinbox/config/proxmox-creds.yaml`
+- Check file permissions: `sudo cat /opt/twinbox/config/proxmox-creds.yaml` (should be readable by ubuntu user)
+- Validate Proxmox API token has correct permissions (VM Admin, Sys Admin)
+
+**Deployment fails:**
+
+- Check worker logs: `docker-compose logs worker`
+- Check Proxmox API token permissions, available resources (CPU, RAM, disk)
+- Ensure resource pool exists: `pvesh get /pools` (should show `twinbox-<cluster-name>`)
+- Verify VM ID range doesn't conflict with existing VMs
+
+**Cannot SSH to Management VM:**
+
+- Verify VM is running in Proxmox: `qm status <vmid>`
+- Check VM IP in Proxmox console
+- Verify network bridge configuration is correct
+- Check VM console output via Proxmox UI for boot errors
+
+**Post-deployment: Nodes not Ready:**
+
+- Check Talos logs: `talosctl logs --nodes <node-ip>`
+- Verify Talos VMs have proper network access
+- Check MetalLB IP pool doesn't conflict with existing network
 
 ---
 

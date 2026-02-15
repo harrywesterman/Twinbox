@@ -1,40 +1,80 @@
 # Twinbox Setup Wizard
 
-The Twinbox Setup Wizard is a standalone bash script that creates a dedicated management VM on Proxmox VE with Twinbox pre-configured and ready to deploy Kubernetes clusters.
+The Twinbox Setup Wizard is a standalone bash script that creates a dedicated management VM on Proxmox VE. The VM boots with Ubuntu, Docker, and SSH access - **but does NOT automatically install the Twinbox platform**. After the wizard finishes, you must manually install the platform inside the VM.
+
+**Quick summary:**
+- Wizard creates: Ubuntu VM with Docker, git, SSH (twinbox user)
+- Wizard does NOT: Install Twinbox manager application
+- After wizard: SSH to VM, clone repo, run `docker-compose up -d`
+- Result: Twinbox web UI available on port 8080
 
 ## Quick Start
 
-Run the wizard directly on your Proxmox host:
+### Phase 1: Run the Wizard
+
+On your Proxmox host, run:
 
 ```bash
 cd /path/to/twinbox
 bash wizard/setup-wizard.sh
 ```
 
-Or download and run directly with curl:
+Or download and run directly:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/setup-wizard.sh -o /tmp/setup-wizard.sh && bash /tmp/setup-wizard.sh
+curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/setup-wizard.sh -o /tmp/setup-wizard.sh
+bash /tmp/setup-wizard.sh
 ```
 
-*(Note: The `curl | bash` approach doesn't support interactive prompts. Always download first, then execute.)*
+**Note**: The `curl | bash` pattern works but doesn't support interactive prompts. Always download first for interactive mode.
+
+### Phase 2: Manual Installation
+
+After the wizard completes and displays the VM IP, SSH to the VM and install Twinbox:
+
+```bash
+# 1. SSH to the VM (password from wizard output)
+ssh twinbox@<vm-ip>
+
+# 2. Clone the Twinbox repository
+git clone https://github.com/harrywesterman/Twinbox.git
+cd Twinbox/manager
+
+# 3. Create environment file (copy and edit .env.example)
+cp .env.example .env
+# Edit .env with your database settings (or use defaults for Docker Compose)
+
+# 4. Start Twinbox with Docker Compose
+docker-compose up -d
+
+# 5. Wait a minute for services to start, then access web UI
+# Open http://<vm-ip>:8080 in your browser
+```
+
+See **Post-Setup** below for detailed instructions.
 
 ## What It Does
 
 The wizard automates the following steps:
 
 1. **Validates Proxmox environment** - Checks for required commands (`qm`, `pvesh`)
-2. **Prompts for configuration** - Cluster name, VM resources, node selection
-3. **Checks resources** - Validates available RAM and disk space
-4. **Creates Twinbox user** - `twinbox@pve` with random password
-5. **Creates resource pool** - `twinbox-<cluster-name>` for organizing resources
-6. **Grants permissions** - Gives `twinbox@pve` necessary VM management rights
-7. **Generates API token** - For programmatic access to Proxmox API
-8. **Downloads Ubuntu Cloud image** - If not already present in `/var/lib/vz/template/iso`
-9. **Creates management VM** - With specified CPU, RAM, and disk
-10. **Configures cloud-init** - Installs Docker, Docker Compose, and Twinbox
-11. **Starts VM** - Boots the management VM and waits for IP
-12. **Displays next steps** - Shows IP and instructions for completing setup
+2. **Prompts for configuration** - Cluster name, VM resources, SSH public key (optional)
+3. **Creates Twinbox user** - `twinbox@pve` with random password
+4. **Creates resource pool** - `twinbox-<cluster-name>` for organizing resources
+5. **Grants permissions** - Gives `twinbox@pve` necessary VM management rights
+6. **Generates API token** - For programmatic access to Proxmox API
+7. **Downloads Ubuntu Cloud image** - If not already present in `/var/lib/vz/template/iso`
+8. **Creates management VM** - With specified CPU, RAM, and disk
+9. **Configures cloud-init** - Installs Docker, git, qemu-guest-agent; creates `twinbox` user
+10. **Starts VM** - Boots the management VM and waits for IP
+11. **Displays credentials and next steps** - Shows VM IP, password, and manual installation instructions
+
+**What the wizard does NOT do:**
+- Install the Twinbox manager platform (FastAPI + RQ worker)
+- Create Docker containers or run `docker-compose`
+- Configure the Twinbox web UI or API
+
+After the wizard finishes, you must manually SSH to the VM and run the installation steps.
 
 ## Prerequisites
 
@@ -120,28 +160,42 @@ export SELECTED_NODE="pve-node1"
 
 The cloud-init configuration is embedded directly in `setup-wizard.sh`. To customize the management VM setup, you can:
 
-1. Edit the `wizard/setup-wizard.sh` script and modify the cloud-init section in the `create_cloudinit` function
+1. Edit the `wizard/setup-wizard.sh` script and modify the `create_cloudinit_snippet` function
 2. Or fork the repository and update the embedded template
 
-The cloud-init config supports dynamic substitutions for `DB_PASSWORD` and `SECRET_KEY` which are generated automatically by the wizard.
+**What cloud-init installs on the VM:**
 
-### Systemd Service
+- **OS**: Ubuntu 24.04 (noble)
+- **Packages**:
+  - `docker.io` - Docker engine
+  - `git` - Version control (for cloning the Twinbox repo)
+  - `qemu-guest-agent` - For IP detection and VM management
+- **User account**: `twinbox` (UID 999, with sudo and docker group permissions)
+- **SSH**: Public key (if provided) or password authentication enabled
+- **Network**: DHCP (IP retrieved via QEMU guest agent)
+- **Services enabled**: qemu-guest-agent, Docker, SSH
+- **Message**: MOTD indicates that Phase 1 (wizard) is complete and Twinbox must be installed manually
 
-The systemd service file `manager/init/twinbox.service` is copied to the management VM during cloud-init. This service:
+The cloud-init config uses the `TWINBOX_PASSWORD` environment variable to set the password for the `twinbox` user.
 
-- Manages the Twinbox Docker Compose application
-- Starts on boot
-- Restarts on failure
-- Can be controlled with `systemctl` commands
+### Systemd Service (Not Used by Wizard)
 
-After setup, you can manage Twinbox on the management VM with:
+The systemd service file `manager/init/twinbox.service` is **NOT installed by the wizard**. This is because the wizard does not install the Twinbox platform itself.
 
-```bash
-sudo systemctl status twinbox
-sudo systemctl restart twinbox
-sudo systemctl stop twinbox
-sudo journalctl -u twinbox -f
-```
+After you manually install Twinbox on the VM (see Post-Setup below), you'll need to:
+1. Copy `manager/init/twinbox.service` to the VM at `/etc/systemd/system/twinbox.service`
+2. Enable and start it:
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl enable twinbox
+   sudo systemctl start twinbox
+   ```
+3. Then you can manage it with:
+   ```bash
+   sudo systemctl status twinbox
+   sudo systemctl restart twinbox
+   sudo journalctl -u twinbox -f
+   ```
 
 ## What Gets Created
 
@@ -151,21 +205,24 @@ sudo journalctl -u twinbox -f
 - **Resource Pool**: `twinbox-<cluster-name>`
 - **ACL**: Permissions for `twinbox@pve` on the pool
 - **API Token**: For programmatic access (name and secret saved to `/tmp`)
-- **VM**: `twinbox-mgmt-<cloud-init>` with Ubuntu Cloud image
+- **VM**: `twinbox-mgmt-<cluster-name>` with Ubuntu Cloud image and cloud-init configuration
 
-### On Management VM
+### On Management VM (from cloud-init)
 
-- **User**: `twinbox` (UID 999, GID 999)
-- **Group**: `twinbox`
-- **Directorys**:
-  - `/opt/twinbox` - Repository and application
-  - `/opt/twinbox/config` - Configuration files
-  - `/opt/twinbox/logs` - Application logs
-- **Files**:
-  - `/opt/twinbox/docker-compose.yml` - Docker Compose configuration
-  - `/opt/twinbox/.env` - Environment variables with generated secrets
-  - `/opt/twinbox/config/proxmox-creds.yaml` - Proxmox API credentials
-  - `/etc/systemd/system/twinbox.service` - Systemd service unit
+- **User**: `twinbox` (password randomly generated, with sudo and docker group access)
+- **Group**: `twinbox`, `docker`, `sudo`
+- **Packages installed**:
+  - `docker.io` - Docker engine
+  - `git` - For cloning the Twinbox repository
+  - `qemu-guest-agent` - For VM management and IP detection
+- **Services enabled and started**:
+  - `qemu-guest-agent`
+  - `docker`
+  - `ssh`
+- **Configuration files**:
+  - `/etc/ssh/sshd_config.d/99-twinbox.conf` - Enables password authentication
+  - `/etc/motd` - Post-setup message
+- **Note**: `/opt/twinbox` and Twinbox platform files **are NOT created** - you must install them manually
 
 ## Security Notes
 
@@ -177,11 +234,13 @@ sudo journalctl -u twinbox -f
 
 ## Output Files
 
-After successful execution, the wizard creates:
+After successful execution, the wizard creates these files on the **Proxmox host**:
 
-- `/tmp/twinbox-password-<cluster-name>.txt` - Password for `twinbox@pve`
-- `/tmp/twinbox-creds-<cluster-name>.env` - API token (name and secret)
-- `/tmp/cloud-init-<cluster-name>.yml` - The cloud-init config used (for reference)
+- `/tmp/twinbox-vm-password-<cluster-name>.txt` - Password for `twinbox` user on the VM
+- `/tmp/twinbox-creds-<cluster-name>.env` - API token credentials (name and secret)
+- `/var/lib/vz/snippets/twinbox-<cluster-name>-user.yaml` - Cloud-init config used (stored on Proxmox)
+
+**Important**: These files contain sensitive credentials. Store them securely and delete after use.
 
 ## Troubleshooting
 
@@ -193,12 +252,15 @@ After successful execution, the wizard creates:
 
 ### Cloud-Init Errors
 
-If the VM boots but Twinbox doesn't start:
+If the VM boots but Docker or SSH doesn't work:
 
-1. SSH to the management VM
+1. SSH to the management VM (use the password from wizard output)
 2. Check cloud-init logs: `cat /var/log/cloud-init-output.log`
-3. Check systemd service: `sudo systemctl status twinbox`
-4. Check Docker Compose: `sudo docker-compose -f /opt/twinbox/docker-compose.yml logs`
+3. Check services: `sudo systemctl status docker qemu-guest-agent`
+4. Verify twinbox user: `id twinbox`
+5. Verify Docker works: `docker --version && docker ps`
+
+**Note**: Twinbox platform is NOT installed by cloud-init. If Docker is running but Twinbox isn't, you need to manually install it (see Post-Setup above).
 
 ### IP Address Not Detected
 
@@ -230,7 +292,7 @@ If the Ubuntu Cloud image cannot be downloaded:
 ### Basic Setup
 
 ```bash
-# Run wizard
+# Run wizard on Proxmox host
 ./wizard/setup-wizard.sh
 
 # Enter prompts:
@@ -239,12 +301,28 @@ If the Ubuntu Cloud image cannot be downloaded:
 # Management VM RAM (GB)? 4
 # Management VM disk (GB)? 32
 # Proxmox node to use? (press Enter for auto)
+# SSH public key? (paste or skip)
 
-# After completion, SSH to management VM
-ssh ubuntu@192.168.1.100
+# Wizard output shows:
+# VM ID: 101
+# Name: twinbox-mgmt-mycluster
+# IP: 192.168.1.100
+# Password: <generated-twinbox-password>
 
-# Check Twinbox is running
+# SSH to the VM
+ssh twinbox@192.168.1.100
+
+# Install Twinbox platform
+sudo apt update && sudo apt install -y git  # if git not already installed
+git clone https://github.com/harrywesterman/Twinbox.git
+cd Twinbox/manager
+cp .env.example .env
+# Edit .env if needed (database defaults are fine)
+docker-compose up -d
+
+# Wait 30 seconds, then check
 docker ps
+# Should show: twinbox-web, twinbox-worker, postgres, redis
 
 # Access web UI at http://192.168.1.100:8080
 ```
@@ -270,13 +348,71 @@ export DEFAULT_STORAGE="proxmox-nvme"
 
 ## Post-Setup
 
-After the wizard completes:
+### Phase 2: Manual Twinbox Installation
 
-1. **SSH to management VM** using the displayed IP
-2. **Verify Twinbox is running**: `docker ps` should show the web container
-3. **Access web UI**: Open `http://<vm-ip>:8080` in browser
-4. **Securely store credentials**: Move `/tmp/twinbox-*.txt` and `/tmp/twinbox-creds-*.env` to password manager
-5. **Bootstrap first cluster**: Use the web UI or CLI to deploy Talos Kubernetes cluster
+After the wizard completes (Phase 1), you must manually install the Twinbox platform inside the VM:
+
+1. **SSH to the management VM** using the IP and password from wizard output
+   ```bash
+   ssh twinbox@<vm-ip>
+   Password: <from /tmp/twinbox-vm-password-<cluster>.txt>
+   ```
+
+2. **Clone the Twinbox repository**
+   ```bash
+   git clone https://github.com/harrywesterman/Twinbox.git
+   cd Twinbox/manager
+   ```
+
+3. **Create environment file**
+   ```bash
+   cp .env.example .env
+   # Edit .env if you need to customize database settings
+   # Defaults use Docker Compose internal networking (no changes needed)
+   ```
+
+4. **Start Twinbox with Docker Compose**
+   ```bash
+   docker-compose up -d
+   ```
+
+5. **Verify services are running**
+   ```bash
+   docker ps
+   # Expected containers: twinbox-web, twinbox-worker, postgres, redis
+   ```
+
+6. **Access the web UI**
+   - Open `http://<vm-ip>:8080` in your browser
+   - The UI should load and show the cluster dashboard
+
+### After Twinbox is Running
+
+1. **Securely store credentials** from Proxmox host:
+   - `/tmp/twinbox-password-<cluster-name>.txt` - Proxmox `twinbox@pve` password
+   - `/tmp/twinbox-creds-<cluster-name>.env` - API token credentials
+
+2. **Check VM provisioning**: The wizard automatically created a `Cluster` record in the database with Proxmox credentials already configured.
+
+3. **Deploy your first Kubernetes cluster**:
+   - Use the web UI to configure VM sizes, Talos config, etc.
+   - Click "Deploy" to start the Kubernetes deployment workflow
+   - Monitor progress in the UI; logs are stored in the database
+
+### Troubleshooting Installation
+
+If Docker Compose fails:
+```bash
+# Check Docker is running
+sudo systemctl status docker
+
+# Check logs
+docker-compose logs
+
+# Rebuild if needed
+docker-compose down
+docker-compose up -d --build
+```
 
 ## Advanced Configuration
 
@@ -318,7 +454,7 @@ fi
 
 - **Single management VM**: The wizard creates one management VM per cluster. For HA, you would need to manually create additional management VMs.
 - **DHCP only**: The management VM uses DHCP for networking. Static IP requires manual configuration post-setup.
-- **Ubuntu 22.04**: The cloud image is hardcoded to Ubuntu 22.04 LTS (Jammy). Modify `UBUNTU_VERSION` and `UBUNTU_RELEASE` to change.
+- **Ubuntu 24.04**: The cloud image is hardcoded to Ubuntu 24.04 LTS (Noble). Modify `UBUNTU_VER` in the script to change.
 - **Self-signed certs**: The Proxmox connection uses `verify_ssl: false`. Upload proper certificates and enable verification for production.
 
 ## Support

@@ -2,7 +2,7 @@
 
 **Simplified Kubernetes on Proxmox**
 
-A one-command, web-driven deployment of production-ready Kubernetes clusters on Proxmox VE.
+A one-command setup that creates a management VM on Proxmox VE, ready for manual Twinbox platform installation.
 
 ## Quick Start
 
@@ -12,29 +12,48 @@ On your Proxmox console:
 curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/setup-wizard.sh -o /tmp/setup-wizard.sh && bash /tmp/setup-wizard.sh
 ```
 
-Then open your browser to `http://<management-vm-ip>:8080` and follow the web wizard.
+After the wizard completes, note the management VM IP address. Then SSH to the VM:
 
-## What You Get
+```bash
+ssh ubuntu@<management-vm-ip>
+```
 
-- **Talos Linux** nodes (immutable, secure Kubernetes OS)
-- **Kubernetes** cluster with Calico CNI
-- **MetalLB** for load balancing
-- **Traefik** ingress controller
-- **Web UI** for easy management
+Once connected, install the Twinbox platform:
 
-Zero manual configuration. Just answer a few questions and click "Deploy".
+```bash
+# Clone the repository
+git clone https://github.com/harrywesterman/Twinbox.git
+cd Twinbox
+
+# Start the platform (web UI + worker)
+docker-compose up -d
+
+# Access the web UI at http://<management-vm-ip>:8080
+```
+
+## What You Get (Phase 1)
+
+The wizard creates a minimal Ubuntu VM with:
+
+- **Ubuntu 24.04** server installation
+- **Docker** and Docker Compose installed and configured
+- **SSH access** configured for the ubuntu user
+- **Static IP** configuration for reliable access
+- **Prerequisite tools** (git, curl, etc.)
+
+The management VM is ready for you to manually deploy the Twinbox platform (FastAPI web service + RQ worker) which will then orchestrate Kubernetes cluster deployments.
 
 ## Architecture
 
-- **Phase 1**: Single bash script creates a Management VM on Proxmox
-- **Phase 2**: Web GUI on Management VM auto-deploys complete cluster with intelligent resource discovery and placement
+- **Phase 1**: Single bash script (wizard) creates a Management VM on Proxmox with Docker and SSH
+- **Phase 2**: Administrator manually SSHes to VM, clones repo, and runs `docker-compose up` to start the platform
+- **Phase 3** (future): Web UI-driven deployment of Kubernetes clusters with Talos Linux
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full system design.
 
 ## Documentation
 
 - [Architecture Guide](docs/ARCHITECTURE.md)
-- [Simplified Design](docs/plans/2026-02-15-twinbox-simplified-design.md)
 - [Wizard README](wizard/README.md)
 - [Manager README](manager/README.md)
 

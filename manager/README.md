@@ -32,6 +32,52 @@ manager/
 └── docker-compose.yml # Local development
 ```
 
+## Installation After Wizard Setup
+
+After the wizard creates the management VM, the manager component must be installed and configured manually:
+
+1. **SSH into the management VM:**
+   ```bash
+   ssh root@<vm-ip>
+   ```
+
+2. **Clone the repository:**
+   ```bash
+   git clone <repository-url> /opt/twinbox
+   cd /opt/twinbox/manager
+   ```
+   (Replace `<repository-url>` with the actual Git repository URL)
+
+3. **Set up environment:**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
+   Required environment variables:
+   - `DATABASE_URL`: PostgreSQL connection (e.g., `postgresql+psycopg2://user:pass@postgres:5432/twinbox`)
+   - `REDIS_URL`: Redis connection (e.g., `redis://redis:6379/0`)
+   - `SECRET_KEY`: Generate a random 32-byte key for Fernet encryption
+   - `PROXMOX_CREDENTIALS_PATH`: `/opt/twinbox/config/proxmox-creds.yaml` (created by wizard)
+
+4. **Start services with Docker Compose:**
+   ```bash
+   docker-compose up -d
+   ```
+   This starts both the web service and RQ worker. You can also start them individually:
+   ```bash
+   docker-compose up -d web
+   docker-compose up -d worker
+   ```
+
+5. **Access the web UI:**
+   Open `http://<vm-ip>:8080` in your browser.
+
+**Notes:**
+- Alembic migrations run automatically on web service startup.
+- PostgreSQL and Redis services are managed via Docker Compose; ensure they're healthy before the web service starts.
+- To view logs: `docker-compose logs -f web` and `docker-compose logs -f worker`.
+
+
 ## Database Layer
 
 ### Configuration
@@ -54,67 +100,20 @@ All database models are defined in `shared/models.py`:
 - **DeploymentLog**: Structured log entries for deployments
 - **ClusterState**: Cached cluster state snapshots
 
-### Getting Started
+## Service Initialization
 
-#### 1. Set up environment variables
+The web service automatically runs Alembic migrations on startup (`alembic upgrade head`), ensuring the database schema is up-to-date before the service begins accepting requests.
 
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
-
-Required variables:
-- `DATABASE_URL`: PostgreSQL connection string
-- `SECRET_KEY`: Application secret for sessions/JWT
-- `PROXMOX_CREDENTIALS_PATH`: Path to Proxmox credentials file
-
-#### 2. Install dependencies
+During development, the manager services can be started manually:
 
 ```bash
-# As part of the overall project
-pip install -r requirements.txt
-# Or specifically for manager:
-pip install sqlalchemy alembic psycopg2-binary
-```
-
-#### 3. Initialize database
-
-Using Alembic:
-```bash
-alembic upgrade head
-```
-
-Or directly (for development only):
-```bash
-python -c "from manager.shared.database import init_db; init_db()"
-```
-
-#### 4. Run migrations
-
-```bash
-# Generate new migration after model changes
-alembic revision --autogenerate -m "Description of changes"
-
-# Apply migrations
-alembic upgrade head
-
-# Rollback one step
-alembic downgrade -1
-```
-
-#### 5. Run the web application
-
-```bash
+cd /opt/twinbox/manager
 uvicorn manager.web.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-#### 6. Run the worker
-
-```bash
+# In another terminal:
 rq worker twinbox-high twinbox-low twinbox-default
-# or with Celery:
-celery -A manager.worker worker --loglevel=info
 ```
+
+In production, Docker Compose is used to orchestrate all services (web, worker, PostgreSQL, Redis) with proper dependencies. See the docker-compose.yml for configuration.
 
 ### Database Schema
 

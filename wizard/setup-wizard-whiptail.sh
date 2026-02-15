@@ -35,15 +35,6 @@ prompt_cluster() {
         [[ "$CLUSTER" =~ ^[a-zA-Z0-9-]+$ ]] && break || warn "Invalid cluster name."
     done
 
-    # SSH public key (optional but recommended)
-    echo
-    read -p "Enter your SSH public key (optional, press Enter to skip): " SSH_PUBLIC_KEY
-    if [[ -n "$SSH_PUBLIC_KEY" ]]; then
-        ok "SSH public key will be configured for twinbox user"
-    else
-        warn "No SSH key provided. You can use password authentication."
-    fi
-
     # Always use the local node (the node where this script is running)
     SELECTED=$(hostname -s 2>/dev/null || echo "localhost")
     ok "Using local node: $SELECTED"
@@ -143,67 +134,297 @@ get_ubuntu_cloud_image() {
     CLOUD_IMAGE_PATH="$img_path"
 }
 
-create_cloudinit_snippet() {
-    local snippet_dir="/var/lib/vz/snippets"
-    local snippet_file="twinbox-$CLUSTER-user.yaml"
-    local snippet_path="$snippet_dir/$snippet_file"
+create_cloudinit_iso() {
+    local base_dir="/tmp/cloud-init-$CLUSTER"
+    local user_data="$base_dir/user-data"
+    local meta_data="$base_dir/meta-data"
+    local iso_tmp="/tmp/cloud-init-$CLUSTER.iso"
+    local iso_name="cloud-init-$CLUSTER.iso"
+    local storage_iso_path="/var/lib/vz/template/iso/$iso_name"
+    local creds_file="/tmp/twinbox-creds-$CLUSTER.env"
+    [[ -f "$creds_file" ]] || { err "Credentials file not found. Run gen_token first."; exit 1; }
+    source "$creds_file"
 
-    mkdir -p "$snippet_dir"
+    local db_pass=$(openssl rand -base64 32 | tr -d '/+=' | head -c 32 2>/dev/null || echo "CHANGE_$(date +%s)")
+    local sec_key=$(openssl rand -base64 32 2>/dev/null || echo "CHANGE_$(date +%s)")
+    local twinbox_pw=$(openssl rand -base64 12 2>/dev/null || echo "ChangeMe$(date +%s)")
 
-    cat > "$snippet_path" <<EOF_USERDATA
+    mkdir -p "$base_dir"
+
+    # Create user-data (cloud-config)
+    cat > "$user_data" <<EOF_USERDATA
 #cloud-config
 # Expand root partition to fill available disk space
 growpart:
   mode: auto
   devices:
     - "/"
-  ignore_growroot_disabled: true
+  ignore_growroot_disabled: True
 package_update: true
 package_upgrade: true
-packages: [docker.io, git, qemu-guest-agent]
+packages: [docker.io, docker-compose, jq, yq, curl, git, python3-pip, python3-yaml, qemu-guest-agent]
 runcmd:
-  - [groupadd, -r, twinbox]
-  - [useradd, -r, -g, twinbox, -m, -s, /bin/bash, twinbox]
-  - echo "twinbox:$TWINBOX_PASSWORD" | chpasswd
+  - [groupadd, -g, 999, twinbox]
+  - [useradd, -u, 999, -g, twinbox, -m, -s, /bin/bash, twinbox]
+  - [echo, "twinbox:$twinbox_pw", "|", chpasswd]
   - [usermod, -aG, docker, twinbox]
-  - [usermod, -aG, sudo, twinbox]
-EOF_USERDATA
-
-    # Add SSH public key if provided
-    if [[ -n "$SSH_PUBLIC_KEY" ]]; then
-        cat >> "$snippet_path" <<EOF_USERDATA
-  - [mkdir, -p, /home/twinbox/.ssh]
-  - [sh, -c, "echo '$SSH_PUBLIC_KEY' > /home/twinbox/.ssh/authorized_keys"]
-  - [chmod, 600, /home/twinbox/.ssh/authorized_keys]
-  - [chown, -R, twinbox:twinbox, /home/twinbox/.ssh]
-EOF_USERDATA
-    fi
-
-    cat >> "$snippet_path" <<EOF_USERDATA
+  - [mkdir, -p, /opt/twinbox]
+  - [chown, -R, twinbox:twinbox, /opt/twinbox]
   - [systemctl, enable, qemu-guest-agent]
   - [systemctl, start, qemu-guest-agent]
-  - [systemctl, enable, docker]
-  - [systemctl, start, docker]
-  - [systemctl, daemon-reload]
-  - [systemctl, restart, ssh]
 write_files:
-  - path: /etc/ssh/sshd_config.d/99-twinbox.conf
-    permissions: '0644'
+  - path: /opt/twinbox/config/proxmox-creds.yaml
+    permissions: '0600'
+    owner: root:root
     content: |
-      PasswordAuthentication yes
-      PermitRootLogin no
+      api_url: ${API_URL}
+      user: "twinbox@pve"
+      token: ${API_TOKEN_SECRET}
+      verify_ssl: false
+  - path: /opt/twinbox/config/cluster-name
+    permissions: '0644'
+    owner: root:root
+    content: |
+      CLUSTER_NAME=${CLUSTER}
+  - path: /opt/twinbox/.env
+    permissions: '0600'
+    owner: root:root
+    content: |
+      DATABASE_URL=postgresql://twinbox:${db_pass}@localhost:5432/twinbox
+      REDIS_URL=redis://localhost:6379/0
+      SECRET_KEY=${sec_key}
+      PROXMOX_CREDENTIALS_PATH=/opt/twinbox/config/proxmox-creds.yaml
+      CLUSTER_NAME=${CLUSTER}
+  - path: /etc/systemd/system/twinbox.service
+    permissions: '0644'
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Twinbox Management Console
+      Requires=docker.service
+      After=docker.service
+      Wants=docker.service
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/usr/bin/docker-compose -f /opt/twinbox/docker-compose.yml up -d
+      ExecStop=/usr/bin/docker-compose -f /opt/twinbox/docker-compose.yml down
+      User=twinbox
+      Group=twinbox
+      WorkingDirectory=/opt/twinbox
+      Restart=on-failure
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
   - path: /etc/motd
     permissions: '0644'
+    owner: root:root
     content: |
-      Twinbox Management VM
+      ==========================================
+       Twinbox Management VM
+      ==========================================
 
+      Web UI: http://<this-vm-ip>:8080
       SSH: twinbox@<this-ip>
-      Docker: Installed
 
-      Phase 1 complete. SSH into this VM and install the Twinbox platform manually.
+      Twinbox repository: /opt/twinbox
+      Docker Compose: /opt/twinbox/docker-compose.yml
+
+      Status: systemctl status twinbox
+      Logs: journalctl -u twinbox -f
+
+      ==========================================
+  - path: /etc/ssh/sshd_config.d/twinbox.conf
+    permissions: '0644'
+    owner: root:root
+    content: |
+      PasswordAuthentication yes
+      PermitRootLogin yes
+runcmd:
+  - [systemctl, daemon-reload]
+  - [systemctl, enable, twinbox.service]
+  - [systemctl, start, twinbox.service]
+  - [systemctl, enable, docker]
+  - [systemctl, restart, ssh]
+  - [systemctl, start, docker]
+final_message: |
+  ==========================================
+   Twinbox Setup Complete!
+  ===========================================
+
+  Management VM is ready. The Twinbox web
+  interface should be accessible shortly.
+
+  SSH to this VM: ssh twinbox@<this-ip>
+  Password: $twinbox_pw
+  View status: systemctl status twinbox
+  View logs: journalctl -u twinbox -f
+
+  ==========================================
 EOF_USERDATA
 
-    ok "Cloud-init snippet created"
+    # Create meta-data (substitute actual VM ID and cluster name)
+    cat > "$meta_data" <<EOF_METADATA
+instance-id: cloud-vm-$vmid
+local-hostname: twinbox-mgmt-$CLUSTER
+EOF_METADATA
+
+    # Create cloud-init ISO using cloud-localds (preferred) or mkisofs (fallback)
+    if command -v cloud-localds &>/dev/null; then
+        cloud-localds --disk-format raw "$iso_tmp" "$user_data" "$meta_data"
+    else
+        warn "cloud-localds not found, using mkisofs..."
+        mkisofs -o "$iso_tmp" -volid cidata -joliet -rock "$user_data" "$meta_data" 2>/dev/null || {
+            err "Failed to create cloud-init ISO. Install cloud-image-utils package."
+            return 1
+        }
+    fi
+
+    ok "Cloud-init ISO created"
+
+    # Copy ISO to Proxmox template directory so it's accessible via storage
+    mkdir -p /var/lib/vz/template/iso
+    cp "$iso_tmp" "$storage_iso_path" 2>/dev/null || true
+
+    echo "$iso_name"
+}
+
+
+create_cloudinit_snippet() {
+    local snippet_dir="/var/lib/vz/snippets"
+    local snippet_file="twinbox-$CLUSTER-user.yaml"
+    local snippet_path="$snippet_dir/$snippet_file"
+    local creds_file="/tmp/twinbox-creds-$CLUSTER.env"
+    [[ -f "$creds_file" ]] || { err "Credentials file not found. Run gen_token first."; exit 1; }
+    source "$creds_file"
+
+    local db_pass=$(openssl rand -base64 32 | tr -d '/+=' | head -c 32 2>/dev/null || echo "CHANGE_$(date +%s)")
+    local sec_key=$(openssl rand -base64 32 2>/dev/null || echo "CHANGE_$(date +%s)")
+    local twinbox_pw=$(openssl rand -base64 12 2>/dev/null || echo "ChangeMe$(date +%s)")
+
+    mkdir -p "$snippet_dir"
+
+    cat > "$snippet_path" <<EOF
+#cloud-config
+# Expand root partition to fill available disk space
+growpart:
+  mode: auto
+  devices:
+    - "/"
+  ignore_growroot_disabled: True
+package_update: true
+package_upgrade: true
+packages: [docker.io, docker-compose, jq, yq, curl, git, python3-pip, python3-yaml, qemu-guest-agent]
+runcmd:
+  - [groupadd, -g, 999, twinbox]
+  - [useradd, -u, 999, -g, twinbox, -m, -s, /bin/bash, twinbox]
+  - [echo, "twinbox:$twinbox_pw", "|", chpasswd]
+  - [usermod, -aG, docker, twinbox]
+  - [mkdir, -p, /opt/twinbox]
+  - [chown, -R, twinbox:twinbox, /opt/twinbox]
+  - [systemctl, enable, qemu-guest-agent]
+  - [systemctl, start, qemu-guest-agent]
+write_files:
+  - path: /opt/twinbox/config/proxmox-creds.yaml
+    permissions: '0600'
+    owner: root:root
+    content: |
+      api_url: ${API_URL}
+      user: "twinbox@pve"
+      token: ${API_TOKEN_SECRET}
+      verify_ssl: false
+  - path: /opt/twinbox/config/cluster-name
+    permissions: '0644'
+    owner: root:root
+    content: |
+      CLUSTER_NAME=${CLUSTER}
+  - path: /etc/ssh/sshd_config.d/twinbox.conf
+    permissions: '0644'
+    owner: root:root
+    content: |
+      PasswordAuthentication yes
+      PermitRootLogin yes
+
+  - path: /opt/twinbox/.env
+    permissions: '0600'
+    owner: root:root
+    content: |
+      DATABASE_URL=postgresql://twinbox:${db_pass}@localhost:5432/twinbox
+      REDIS_URL=redis://localhost:6379/0
+      SECRET_KEY=${sec_key}
+      PROXMOX_CREDENTIALS_PATH=/opt/twinbox/config/proxmox-creds.yaml
+      CLUSTER_NAME=${CLUSTER}
+
+  - path: /etc/systemd/system/twinbox.service
+    permissions: '0644'
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Twinbox Management Console
+      Requires=docker.service
+      After=docker.service
+      Wants=docker.service
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/usr/bin/docker-compose -f /opt/twinbox/docker-compose.yml up -d
+      ExecStop=/usr/bin/docker-compose -f /opt/twinbox/docker-compose.yml down
+      User=twinbox
+      Group=twinbox
+      WorkingDirectory=/opt/twinbox
+      Restart=on-failure
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/motd
+    permissions: '0644'
+    owner: root:root
+    content: |
+      ==========================================
+       Twinbox Management VM
+      ==========================================
+
+      Web UI: http://<this-vm-ip>:8080
+      SSH: twinbox@<this-ip>
+
+      Twinbox repository: /opt/twinbox
+      Docker Compose: /opt/twinbox/docker-compose.yml
+
+      Status: systemctl status twinbox
+      Logs: journalctl -u twinbox -f
+
+      ==========================================
+
+runcmd:
+  - [systemctl, daemon-reload]
+  - [systemctl, enable, twinbox.service]
+  - [systemctl, start, twinbox.service]
+  - [systemctl, enable, docker]
+  - [systemctl, start, docker]
+  - [systemctl, restart, ssh]
+
+final_message: |
+  ==========================================
+   Twinbox Setup Complete!
+  ===========================================
+
+  Management VM is ready. The Twinbox web
+  interface should be accessible shortly.
+
+  SSH to this VM: ssh twinbox@<this-ip>
+  Password: $twinbox_pw
+  View status: systemctl status twinbox
+  View logs: journalctl -u twinbox -f
+
+  ==========================================
+EOF
+
+    ok "Cloud-init snippet created: $snippet_path"
     echo "$snippet_file"
 }
 
