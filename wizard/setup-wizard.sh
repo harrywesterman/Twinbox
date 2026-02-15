@@ -223,7 +223,12 @@ EOF
 }
 
 create_vm() {
-    local vmid=$(qm list 2>/dev/null | awk 'NR>1 {if($1>m) m=$1} END {print (m?m+1:100)}')
+    # Get highest VM ID cluster-wide (not just local node)
+    local vmid
+    vmid=$(pvesh get /cluster/resources --output-format json 2>/dev/null | jq -r '.[] | select(.type=="vm") | .vmid' 2>/dev/null | sort -n | tail -1)
+    vmid=${vmid:-99}
+    vmid=$((vmid + 1))
+
     local name="twinbox-mgmt-${CLUSTER}"
     log "Creating VM $vmid: $name"
     # Try create with minimal parameters first
