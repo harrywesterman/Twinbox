@@ -322,7 +322,7 @@ create_vm() {
     local ci_file
     ci_file=$(create_cloudinit) || return 1
     qm set "$vmid" --cicustom "user=local:0,cloud-init.yml,$ci_file" \
-        --ipconfig0 "ip=dhcp" 2>/dev/null || warn "Cloud-init config may need manual setup"
+        --ipconfig0 "ip=dhcp" >/dev/null 2>&1 || warn "Cloud-init config may need manual setup"
 
     echo "$vmid"
     return 0
