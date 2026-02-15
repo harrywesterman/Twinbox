@@ -21,7 +21,7 @@ prompt_cluster() {
         read -p "Cluster name (alphanumeric, no spaces): " CLUSTER
         [[ "$CLUSTER" =~ ^[a-zA-Z0-9-]+$ ]] && break || warn "Invalid cluster name."
     done
-    nodes=($(pvesh get /nodes -output-format json 2>/dev/null | jq -r '.[] | select(.status=="online") | .id' 2>/dev/null || echo ""))
+    nodes=($(pvesh get /nodes --output-format json 2>/dev/null | jq -r '.[] | select(.status=="online") | .id' 2>/dev/null || echo ""))
     if [[ ${#nodes[@]} -eq 0 ]]; then
         warn "No online nodes found. Using 'localhost'"; SELECTED="localhost"
     elif [[ ${#nodes[@]} -eq 1 ]]; then
@@ -58,7 +58,7 @@ create_twinbox_user() {
 
 gen_token() {
     log "Generating API token..."
-    local json=$(pvesh create /access/tokens -userid twinbox@pve -privsep 0 -expire Never -output-format json 2>/dev/null || echo "{}")
+    local json=$(pvesh create /access/tokens -userid twinbox@pve -privsep 0 -expire Never --output-format json 2>/dev/null || echo "{}")
     local name=$(echo "$json" | jq -r '.data.value // empty' 2>/dev/null)
     local secret=$(echo "$json" | jq -r '.data.secret // empty' 2>/dev/null)
     if [[ -n "$name" && -n "$secret" ]]; then
