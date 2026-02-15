@@ -543,7 +543,7 @@ wait_ip() {
         if qm status "$vmid" 2>/dev/null | grep -q running; then
             # Use guest agent's network-get-interfaces for reliable IP detection
             local ip
-            ip=$(qm guest network-get-interfaces "$vmid" 2>/dev/null | python3 -c "
+            ip=$(qm guest cmd "$vmid" network-get-interfaces 2>/dev/null | python3 -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
