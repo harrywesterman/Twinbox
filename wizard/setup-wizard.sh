@@ -344,6 +344,7 @@ create_vm() {
         --net0 "virtio,bridge=$BRIDGE" \
         --agent 1 \
         --scsihw virtio-scsi-single \
+        --onboot 1 \
         --boot "order=scsi0" &>/dev/null; then
         err "Failed to create VM $vmid"
         return 1
