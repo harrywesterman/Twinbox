@@ -1,59 +1,43 @@
 # Twinbox
 
-Twinbox is a comprehensive infrastructure automation platform for deploying and managing **Talos Linux Kubernetes** clusters on **Proxmox VE**. It uses a "Console Wizard" approach to simplify bootstrapping from zero to a fully managed cluster.
+**Simplified Kubernetes on Proxmox**
 
-## Features
-
-- **Talos Linux First**: Secure, immutable, and minimal API-managed Kubernetes OS.
-- **Proxmox Console Wizard**: A standalone bash script (`setup-wizard.sh`) to bootstrap the cluster directly from the Proxmox host.
-- **Management Identity**: Deploys a dedicated Ubuntu **Management VM** pre-configured with all necessary tools (`talosctl`, `kubectl`, `terraform`, `ansible`).
-- **Platform Enhancements**: Plans for integrated storage (Rook/Ceph), Ingress (Traefik), and GitOps (ArgoCD).
+A one-command, web-driven deployment of production-ready Kubernetes clusters on Proxmox VE.
 
 ## Quick Start
 
-### Prerequisites
-
-- A Proxmox VE server with internet access.
-- Root access to the Proxmox console (SSH or Web Shell).
-- Sufficient resources (RAM/CPU/Disk) for your desired cluster size.
-
-### Installation (The "One-Liner")
-
-Run the setup wizard directly on your Proxmox host:
+On your Proxmox console:
 
 ```bash
 bash <(curl -s https://raw.githubusercontent.com/your-org/twinbox/main/wizard/setup-wizard.sh)
 ```
 
-*(Replace `your-org/twinbox` with the actual repository URL)*
+Then open your browser to `http://<management-vm-ip>:8080` and follow the web wizard.
 
-### What happens next?
+## What You Get
 
-1.  **Wizard**: You answer a few questions (Cluster Name, Node Count, Resources).
-2.  **Provisioning**: The wizard downloads ISOs and creates:
-    -   **Control Plane Node(s)** (Talos)
-    -   **Worker Node(s)** (Talos)
-    -   **Management Node** (Ubuntu Cloud)
-3.  **Auto-Start**: All VMs boot automatically.
-4.  **Bootstrap**:
-    -   SSH into the new Management Node: `ssh ubuntu@<IP>`
-    -   Run the helper script: `./bootstrap-cluster.sh`
-    -   **Done!** Your cluster is compliant and ready.
+- **Talos Linux** nodes (immutable, secure Kubernetes OS)
+- **Kubernetes** cluster with Calico CNI
+- **MetalLB** for load balancing
+- **Traefik** ingress controller
+- **Web UI** for easy management
+
+Zero manual configuration. Just answer a few questions and click "Deploy".
 
 ## Architecture
 
-Twinbox abandons the complexity of external Terraform/Ansible management machines in favor of a self-contained approach:
+- **Phase 1**: Single bash script creates a Management VM on Proxmox
+- **Phase 2**: Web GUI on Management VM auto-deploys complete cluster with intelligent resource discovery and placement
 
-1.  **Bootstrap Layer**: A lightweight bash script on Proxmox creates the VMs.
-2.  **Management Layer**: A dedicated VM inside the cluster environment holds the state and management tools.
-3.  **Cluster Layer**: Talos Linux nodes tailored for Kubernetes.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
 
-## Components
+## Documentation
 
-- `wizard/setup-wizard.sh`: The core bootstrapping logic.
-- `docs/wizard-guide.md`: Detailed usage guide.
-- `docs/plans/`: Architectural decisions and future roadmaps.
+- [Architecture Guide](docs/ARCHITECTURE.md)
+- [Simplified Design](docs/plans/2026-02-15-twinbox-simplified-design.md)
+- [Wizard README](wizard/README.md)
+- [Manager README](manager/README.md)
 
 ## License
 
-Twinbox is released under the [LICENSE](LICENSE) license.
+MIT
