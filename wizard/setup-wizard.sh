@@ -58,18 +58,35 @@ create_twinbox_user() {
 
 gen_token() {
     log "Generating API token..."
-    local json=$(pvesh create /access/tokens -userid twinbox@pve -privsep 0 -expire Never --output-format json 2>/dev/null || echo "{}")
-    local name=$(echo "$json" | jq -r '.data.value // empty' 2>/dev/null)
-    local secret=$(echo "$json" | jq -r '.data.secret // empty' 2>/dev/null)
-    if [[ -n "$name" && -n "$secret" ]]; then
-        ok "Token generated"
-        cat > "/tmp/twinbox-creds-$CLUSTER.env" <<EOF
-API_TOKEN_NAME=$name
-API_TOKEN_SECRET=$secret
+    # Check if credentials file already exists (manual creation)
+    if [[ -f "/tmp/twinbox-creds-$CLUSTER.env" ]]; then
+        ok "Using existing credentials file"
+        return 0
+    fi
+
+    # Generate token using pveum (Proxmox VE User Management)
+    local token_output
+    token_output=$(pveum user token add twinbox@pve twinbox-token-$(date +%s) --privsep 0 --expire Never 2>/dev/null)
+
+    if [[ -n "$token_output" ]]; then
+        # pveum outputs two lines: first is "tfull", second is the secret
+        local token_name="twinbox@pve!$(echo "$token_output" | head -n1 | tr -d '[:space:]')"
+        local token_secret=$(echo "$token_output" | tail -n1 | tr -d '[:space:]')
+
+        if [[ -n "$token_name" && -n "$token_secret" ]]; then
+            ok "Token generated"
+            cat > "/tmp/twinbox-creds-$CLUSTER.env" <<EOF
+API_TOKEN_NAME=$token_name
+API_TOKEN_SECRET=$token_secret
 API_URL=https://$SELECTED:8006/api2/json
 EOF
+        else
+            err "Token generation failed: could not parse output"
+            exit 1
+        fi
     else
-        err "Token generation failed"; exit 1;
+        err "Token generation failed: pveum returned empty output"
+        exit 1
     fi
 }
 
