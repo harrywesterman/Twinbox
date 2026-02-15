@@ -17,6 +17,24 @@ check_proxmox() {
     ok "Proxmox environment verified"
 }
 
+check_virt_customize() {
+    if ! command -v virt-customize &>/dev/null; then
+        log "virt-customize (libguestfs-tools) is not installed."
+        log "This tool can pre-install qemu-guest-agent into the cloud image for better reliability."
+        read -p "Install libguestfs-tools now? (recommended) [y/N]: " -r
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            log "Installing libguestfs-tools..."
+            if apt-get update &>/dev/null && apt-get install -y libguestfs-tools &>/dev/null; then
+                ok "libguestfs-tools installed"
+            else
+                err "Failed to install libguestfs-tools. Will continue without it."
+            fi
+        else
+            log "Skipping libguestfs-tools. qemu-guest-agent will be installed via cloud-init."
+        fi
+    fi
+}
+
 prompt_cluster() {
     while true; do
         read -p "Cluster name (alphanumeric, no spaces): " CLUSTER
@@ -530,7 +548,7 @@ wait_ip() {
 
 main() {
     clear; echo "=== Twinbox Setup Wizard ==="
-    check_proxmox; prompt_cluster
+    check_proxmox; check_virt_customize; prompt_cluster
     log "Configuration:"; echo "  Cluster: $CLUSTER"; echo "  Node: $SELECTED"
     echo "  VM: ${CPU_CORES} CPU, ${RAM_MB}MB RAM, ${DISK_GB}GB disk"; echo "  Bridge: $BRIDGE"
     create_twinbox_user; gen_token; get_ubuntu_cloud_image
