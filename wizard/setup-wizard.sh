@@ -20,17 +20,11 @@ check_proxmox() {
 check_virt_customize() {
     if ! command -v virt-customize &>/dev/null; then
         log "virt-customize (libguestfs-tools) is not installed."
-        log "This tool can pre-install qemu-guest-agent into the cloud image for better reliability."
-        read -p "Install libguestfs-tools now? (recommended) [y/N]: " -r
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            log "Installing libguestfs-tools..."
-            if apt-get update &>/dev/null && apt-get install -y libguestfs-tools &>/dev/null; then
-                ok "libguestfs-tools installed"
-            else
-                err "Failed to install libguestfs-tools. Will continue without it."
-            fi
+        log "Installing automatically for better reliability..."
+        if apt-get update &>/dev/null && apt-get install -y libguestfs-tools &>/dev/null; then
+            ok "libguestfs-tools installed"
         else
-            log "Skipping libguestfs-tools. qemu-guest-agent will be installed via cloud-init."
+            warn "Failed to install libguestfs-tools. Will continue without it."
         fi
     fi
 }
@@ -181,7 +175,7 @@ runcmd:
 write_files:
   - path: /opt/twinbox/config/proxmox-creds.yaml
     permissions: '0600'
-    owner: twinbox:twinbox
+    owner: root:root
     content: |
       api_url: ${API_URL}
       user: "twinbox@pve"
@@ -189,12 +183,12 @@ write_files:
       verify_ssl: false
   - path: /opt/twinbox/config/cluster-name
     permissions: '0644'
-    owner: twinbox:twinbox
+    owner: root:root
     content: |
       CLUSTER_NAME=${CLUSTER}
   - path: /opt/twinbox/.env
     permissions: '0600'
-    owner: twinbox:twinbox
+    owner: root:root
     content: |
       DATABASE_URL=postgresql://twinbox:${db_pass}@localhost:5432/twinbox
       REDIS_URL=redis://localhost:6379/0
@@ -335,7 +329,7 @@ runcmd:
 write_files:
   - path: /opt/twinbox/config/proxmox-creds.yaml
     permissions: '0600'
-    owner: twinbox:twinbox
+    owner: root:root
     content: |
       api_url: ${API_URL}
       user: "twinbox@pve"
@@ -343,7 +337,7 @@ write_files:
       verify_ssl: false
   - path: /opt/twinbox/config/cluster-name
     permissions: '0644'
-    owner: twinbox:twinbox
+    owner: root:root
     content: |
       CLUSTER_NAME=${CLUSTER}
   - path: /etc/ssh/sshd_config.d/twinbox.conf
@@ -355,7 +349,7 @@ write_files:
 
   - path: /opt/twinbox/.env
     permissions: '0600'
-    owner: twinbox:twinbox
+    owner: root:root
     content: |
       DATABASE_URL=postgresql://twinbox:${db_pass}@localhost:5432/twinbox
       REDIS_URL=redis://localhost:6379/0
