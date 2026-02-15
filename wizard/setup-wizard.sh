@@ -220,7 +220,7 @@ EOF
 }
 
 create_vm() {
-    local vmid name
+    local name
     name="twinbox-mgmt-${CLUSTER}"
 
     log "Discovering cluster-wide VM IDs to find a free one..."
@@ -228,7 +228,7 @@ create_vm() {
     # Get all VM IDs cluster-wide from all online nodes
     local used_vm_ids=()
     while IFS= read -r vmid_line; do
-        used_vm_ids+=("$vmid_line")
+        [[ -n "$vmid_line" ]] && used_vm_ids+=("$vmid_line")
     done < <(pvesh get /nodes --output-format json 2>/dev/null | \
               jq -r '.[] | select(.status=="online") | .id' 2>/dev/null | \
               while read -r node; do
@@ -237,28 +237,33 @@ create_vm() {
               done 2>/dev/null | sort -n | uniq)
 
     # Find first free VM ID starting from 100
+    local vmid=""
     local start_vmid=100
-    for ((vmid=start_vmid; vmid<start_vmid+1000; vmid++)); do
-        if ! printf '%s\n' "${used_vm_ids[@]}" | grep -qx "$vmid"; then
-            log "Attempting to create VM $vmid: $name"
-            if qm create "$vmid" --name "$name" --memory "$RAM_MB" --cores "$CPU_CORES" \
-                --net0 "virtio,bridge=$BRIDGE" \
-                --scsi0 "$STORAGE:${DISK_GB},ssd=1" \
-                --cdrom "$ISO" \
-                --boot "order=scsi0"; then
-                ok "VM $vmid created"
-                break
-            else
-                warn "VM $vmid creation failed despite not being in list, trying next..."
-                sleep 0.5
-            fi
+    for ((candidate=start_vmid; candidate<start_vmid+1000; candidate++)); do
+        if ! printf '%s\n' "${used_vm_ids[@]}" | grep -qx "$candidate"; then
+            vmid="$candidate"
+            break
         fi
     done
 
-    if [[ -z "$vmid" ]] || ! qm status "$vmid" &>/dev/null; then
-        err "Failed to create VM after trying 1000 IDs"
+    if [[ -z "$vmid" ]]; then
+        err "No free VM ID found in range 100-1099"
         return 1
     fi
+
+    log "Using VM ID $vmid (free)"
+    log "Attempting to create VM $vmid: $name"
+
+    if ! qm create "$vmid" --name "$name" --memory "$RAM_MB" --cores "$CPU_CORES" \
+        --net0 "virtio,bridge=$BRIDGE" \
+        --scsi0 "$STORAGE:${DISK_GB},ssd=1" \
+        --cdrom "$ISO" \
+        --boot "order=scsi0"; then
+        err "Failed to create VM $vmid"
+        return 1
+    fi
+
+    ok "VM $vmid created"
 
     local ci_file
     ci_file=$(create_cloudinit) || return 1
