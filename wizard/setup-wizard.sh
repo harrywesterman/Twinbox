@@ -277,7 +277,7 @@ create_vm() {
         --net0 "virtio,bridge=$BRIDGE" \
         --scsi0 "$STORAGE:${DISK_GB},ssd=1" \
         --cdrom "$ISO" \
-        --boot "order=scsi0" &>/dev/null; then
+        --boot "order=cdrom" &>/dev/null; then
         err "Failed to create VM $vmid"
         return 1
     fi
