@@ -14,7 +14,7 @@ package_reboot_after_update: true
 # Install required packages
 packages:
   - docker.io
-  - docker-compose
+  - docker-compose-plugin
   - jq
   - yq
   - curl
