@@ -238,55 +238,43 @@ create_vm() {
 
     log "Discovering cluster-wide VM IDs to find a free one..."
 
-    # Get all VM IDs from all nodes using Python for JSON parsing
+    # Collect all VM IDs from all nodes in the cluster
     local used_vm_ids=()
 
-    # Function to fetch VM IDs from a node
-    fetch_vmids() {
+    # Get VM IDs from a specific node using Python (one-liner to avoid indentation issues)
+    get_vmids_from_node() {
         local node="$1"
-        local json
-        json=$(pvesh get /nodes/$node/qemu --output-format json 2>/dev/null) || return 0
-        echo "$json" | python3 -c '
-import sys, json
-try:
-    for vm in json.load(sys.stdin):
-        vmid = vm.get("vmid")
-        if vmid is not None:
-            print(vmid)
-except Exception:
-    pass
-' 2>/dev/null
+        pvesh get /nodes/$node/qemu --output-format json 2>/dev/null | \
+        python3 -c "import sys, json; [print(vm['vmid']) for vm in json.load(sys.stdin) if 'vmid' in vm]" 2>/dev/null
+    }
+
+    # Get all node names in cluster
+    get_all_nodes() {
+        pvesh get /nodes --output-format json 2>/dev/null | \
+        python3 -c "import sys, json; [print(item['node']) for item in json.load(sys.stdin) if 'node' in item]" 2>/dev/null
     }
 
     # Always check the SELECTED node first
     if [[ -n "$SELECTED" ]]; then
         while IFS= read -r vmid; do
             [[ -n "$vmid" ]] && used_vm_ids+=("$vmid")
-        done < <(fetch_vmids "$SELECTED")
+        done < <(get_vmids_from_node "$SELECTED")
     fi
 
-    # Get all nodes in cluster and check each
-    local all_nodes_json
-    all_nodes_json=$(pvesh get /nodes --output-format json 2>/dev/null) || all_nodes_json="[]"
+    # Check all other nodes in the cluster
     while IFS= read -r node; do
         [[ "$node" == "$SELECTED" ]] && continue
         while IFS= read -r vmid; do
             [[ -n "$vmid" ]] && used_vm_ids+=("$vmid")
-        done < <(fetch_vmids "$node")
-    done < <(echo "$all_nodes_json" | python3 -c '
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    for item in data:
-        node = item.get("node")
-        if node:
-            print(node)
-except Exception:
-    pass
-' 2>/dev/null)
+        done < <(get_vmids_from_node "$node")
+    done < <(get_all_nodes)
 
     # Deduplicate and sort
-    used_vm_ids=($(printf '%s\n' "${used_vm_ids[@]}" | sort -n | uniq))
+    if [[ ${#used_vm_ids[@]} -gt 0 ]]; then
+        used_vm_ids=($(printf '%s\n' "${used_vm_ids[@]}" | sort -n | uniq))
+    fi
+
+    log "Used VM IDs found: ${used_vm_ids[*]:-none}"
 
     # Find first free VM ID starting from 100
     local vmid=""
@@ -300,7 +288,6 @@ except Exception:
 
     if [[ -z "$vmid" ]]; then
         err "No free VM ID found in range 100-1099"
-        log "Used VM IDs: ${used_vm_ids[*]:-none}"
         return 1
     fi
 
