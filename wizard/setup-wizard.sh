@@ -22,39 +22,48 @@ prompt_cluster() {
         read -p "Cluster name (alphanumeric, no spaces): " CLUSTER
         [[ "$CLUSTER" =~ ^[a-zA-Z0-9-]+$ ]] && break || warn "Invalid cluster name."
     done
-    # Get node names (the .node field) for all online nodes using Python for JSON parsing
-    local nodes_json
+
+    # Get online nodes with their resource info using Python
+    local nodes_json memory_info
     nodes_json=$(pvesh get /nodes --output-format json 2>/dev/null) || nodes_json="[]"
-    nodes=($(echo "$nodes_json" | python3 -c '
+
+    # Parse nodes and their free memory, build an array of the best node
+    local best_node="" best_free=0
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        local node="$line"
+        # Get node status to check free memory
+        local status_json
+        status_json=$(pvesh get /nodes/$node/status --output-format json 2>/dev/null) || continue
+        local free_mem
+        free_mem=$(echo "$status_json" | python3 -c "import sys, json; data=json.load(sys.stdin); print(int(data.get('memory', {}).get('free', 0)))" 2>/dev/null || echo "0")
+        if (( free_mem > best_free )); then
+            best_free=$free_mem
+            best_node="$node"
+        fi
+    done < <(echo "$nodes_json" | python3 -c '
 import sys, json
 try:
     data = json.load(sys.stdin)
-    for node in data:
-        if node.get("status") == "online":
-            print(node.get("node", ""))
+    for item in data:
+        if item.get("status") == "online":
+            print(item.get("node", ""))
 except Exception:
     pass
-' 2>/dev/null | grep -v '^$'))
+' 2>/dev/null | grep -v '^$')
 
-    if [[ ${#nodes[@]} -eq 0 ]]; then
+    if [[ -z "$best_node" ]]; then
         local hostname
         hostname=$(hostname -s 2>/dev/null || echo "localhost")
-        warn "No online nodes found. Using '$hostname'"; SELECTED="$hostname"
-    elif [[ ${#nodes[@]} -eq 1 ]]; then
-        SELECTED="${nodes[0]}"; ok "Using node: $SELECTED"
+        warn "No suitable online nodes found. Using '$hostname'"; SELECTED="$hostname"
     else
-        echo "Available nodes:"; for i in "${!nodes[@]}"; do echo "  $((i+1)). ${nodes[i]}"; done
-        read -p "Select node (1-${#nodes[@]}, default 1): " sel; [[ -z "$sel" ]] && sel=1
-        SELECTED="${nodes[$((sel-1))]}"
+        local free_gb=$((best_free / 1024 / 1024))
+        ok "Auto-selected node: $best_node (${free_gb}GB free RAM)"
+        SELECTED="$best_node"
     fi
 }
 
-prompt_resources() {
-    read -p "Management VM CPU cores? (default $CPU_CORES): " inp; CPU_CORES=${inp:-$CPU_CORES}
-    read -p "Management VM RAM (GB)? (default $((RAM_MB/1024))): " inp; [[ -n "$inp" ]] && RAM_MB=$((inp * 1024))
-    read -p "Management VM disk (GB)? (default $DISK_GB): " inp; [[ -n "$inp" ]] && DISK_GB=$inp
-    read -p "Network bridge? (default $BRIDGE): " inp; BRIDGE=${inp:-$BRIDGE}
-}
+# Resources are using defaults; no prompts needed
 
 create_twinbox_user() {
     log "Creating Proxmox user and permissions..."
@@ -334,7 +343,7 @@ wait_ip() {
 
 main() {
     clear; echo "=== Twinbox Setup Wizard ==="
-    check_proxmox; prompt_cluster; prompt_resources
+    check_proxmox; prompt_cluster
     log "Configuration:"; echo "  Cluster: $CLUSTER"; echo "  Node: $SELECTED"
     echo "  VM: ${CPU_CORES} CPU, ${RAM_MB}MB RAM, ${DISK_GB}GB disk"; echo "  Bridge: $BRIDGE"
     create_twinbox_user; gen_token; get_ubuntu_iso
