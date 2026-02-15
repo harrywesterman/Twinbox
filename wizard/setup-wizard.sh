@@ -23,7 +23,9 @@ prompt_cluster() {
     done
     nodes=($(pvesh get /nodes --output-format json 2>/dev/null | jq -r '.[] | select(.status=="online") | .id' 2>/dev/null || echo ""))
     if [[ ${#nodes[@]} -eq 0 ]]; then
-        warn "No online nodes found. Using 'localhost'"; SELECTED="localhost"
+        local hostname
+        hostname=$(hostname -s 2>/dev/null || echo "localhost")
+        warn "No online nodes found. Using '$hostname'"; SELECTED="$hostname"
     elif [[ ${#nodes[@]} -eq 1 ]]; then
         SELECTED="${nodes[0]}"; ok "Using node: $SELECTED"
     else
@@ -65,16 +67,17 @@ gen_token() {
     fi
 
     # Generate token using pveum (Proxmox VE User Management)
+    local token_id="twinbox-token-$(date +%s)"
     local token_output
-    token_output=$(pveum user token add twinbox@pve twinbox-token-$(date +%s) --privsep 0 --expire Never 2>/dev/null)
+    token_output=$(pveum user token add twinbox@pve "$token_id" --privsep 0 2>&1)
 
     if [[ -n "$token_output" ]]; then
-        # pveum outputs two lines: first is "tfull", second is the secret
+        # pveum outputs two lines: first is the token name (value), second is the secret
         local token_name="twinbox@pve!$(echo "$token_output" | head -n1 | tr -d '[:space:]')"
         local token_secret=$(echo "$token_output" | tail -n1 | tr -d '[:space:]')
 
-        if [[ -n "$token_name" && -n "$token_secret" ]]; then
-            ok "Token generated"
+        if [[ -n "$token_name" && -n "$token_secret" && "$token_name" != "!" ]]; then
+            ok "Token generated: $token_name"
             cat > "/tmp/twinbox-creds-$CLUSTER.env" <<EOF
 API_TOKEN_NAME=$token_name
 API_TOKEN_SECRET=$token_secret
@@ -82,6 +85,7 @@ API_URL=https://$SELECTED:8006/api2/json
 EOF
         else
             err "Token generation failed: could not parse output"
+            echo "Output was: $token_output"
             exit 1
         fi
     else
