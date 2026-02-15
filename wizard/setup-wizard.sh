@@ -373,14 +373,15 @@ create_vm() {
     local ci_iso
     ci_iso=$(create_cloudinit_iso) || return 1
 
-    # Attach cloud-init ISO as CD-ROM (ide2)
+    # Attach cloud-init ISO as CD-ROM (ide2) and configure cloud-init drive
     qm set "$vmid" \
         --ide2 "local:iso/$(basename "$ci_iso"),media=cdrom" \
+        --cicustom "user=local:iso/$(basename "$ci_iso")" \
         --ipconfig0 "ip=dhcp" \
         --serial0 socket \
         &>/dev/null || warn "Cloud-init configuration may have issues"
 
-    # Set boot order: boot from disk (scsi0), cloud-init will be picked up from ide2
+    # Set boot order: boot from disk (scsi0), cloud-init will be picked up automatically
     qm set "$vmid" --boot "order=scsi0" &>/dev/null
 
     ok "Cloud-init configured"
