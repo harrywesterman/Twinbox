@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
-UBUNTU_VER="22.04"
-CLOUD_IMG="http://cloud-images.ubuntu.com/releases/${UBUNTU_VER}/release/ubuntu-${UBUNTU_VER}-live-server-amd64.img"
+UBUNTU_VER="noble"
+CLOUD_IMG="https://cloud-images.ubuntu.com/${UBUNTU_VER}/current/${UBUNTU_VER}-server-cloudimg-amd64.img"
 CPU_CORES=2; RAM_MB=4096; DISK_GB=32; BRIDGE="vmbr0"; STORAGE="local-lvm"
 CLUSTER=""; SELECTED=""
 
@@ -80,15 +80,45 @@ EOF
 
 get_ubuntu_iso() {
     local iso_dir="/var/lib/vz/template/iso"
-    local iso_name="ubuntu-${UBUNTU_VER}-live-server-amd64.img"
+    local iso_name="${UBUNTU_VER}-server-cloudimg-amd64.img"
     local iso_path="$iso_dir/$iso_name"
+
+    # Check if ISO already exists in Proxmox storage
+    if pvesh get /nodes/$SELECTED/storage/local/content --output-format json 2>/dev/null | \
+        python3 -c "import sys, json; content = json.load(sys.stdin); print('yes' if any(item.get('volid','').endswith('$iso_name') for item in content) else 'no')" 2>/dev/null | grep -q yes; then
+        ok "Ubuntu cloud image already in storage: $iso_name"
+        ISO="local:iso/$iso_name"
+        return
+    fi
+
     mkdir -p "$iso_dir"
     if [[ -f "$iso_path" ]]; then
-        ok "Ubuntu image exists: $iso_path"; ISO="$iso_path"; return
+        ok "Ubuntu cloud image exists: $iso_path"
+        # Upload it to storage first if not already there
+        if pvesh create /nodes/$SELECTED/storage/local/content --content iso --filename "$iso_name" --file "$iso_path" &>/dev/null; then
+            ok "Uploaded to storage"
+            rm -f "$iso_path"
+            ISO="local:iso/$iso_name"
+        else
+            warn "Upload failed, using local file as cdrom"
+            ISO="$iso_path"
+        fi
+        return
     fi
-    log "Downloading Ubuntu $UBUNTU_VER..."
+
+    log "Downloading Ubuntu $UBUNTU_VER cloud image..."
     curl -sL -o "$iso_path" "$CLOUD_IMG" && ok "Downloaded" || { err "Download failed"; exit 1; }
-    ISO="$iso_path"
+
+    # Upload to Proxmox storage
+    log "Uploading to Proxmox storage..."
+    if pvesh create /nodes/$SELECTED/storage/local/content --content iso --filename "$iso_name" --file "$iso_path" &>/dev/null; then
+        ok "Uploaded to storage"
+        rm -f "$iso_path"
+        ISO="local:iso/$iso_name"
+    else
+        warn "Upload failed, using local file"
+        ISO="$iso_path"
+    fi
 }
 
 create_cloudinit() {
