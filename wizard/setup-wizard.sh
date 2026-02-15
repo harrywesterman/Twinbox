@@ -223,29 +223,40 @@ create_vm() {
     local vmid name
     name="twinbox-mgmt-${CLUSTER}"
 
+    log "Discovering cluster-wide VM IDs to find a free one..."
+
+    # Get all VM IDs cluster-wide from all online nodes
+    local used_vm_ids=()
+    while IFS= read -r vmid_line; do
+        used_vm_ids+=("$vmid_line")
+    done < <(pvesh get /nodes --output-format json 2>/dev/null | \
+              jq -r '.[] | select(.status=="online") | .id' 2>/dev/null | \
+              while read -r node; do
+                  pvesh get /nodes/$node/qemu --output-format json 2>/dev/null | \
+                  jq -r '.[].vmid' 2>/dev/null || true
+              done 2>/dev/null | sort -n | uniq)
+
+    # Find first free VM ID starting from 100
     local start_vmid=100
-    for ((vmid=start_vmid; vmid<start_vmid+100; vmid++)); do
-        if qm list 2>/dev/null | awk '{print $1}' | grep -q "^${vmid}$"; then
-            log "VM ID $vmid in use on local node, trying next..."
-            continue
-        fi
-        
-        log "Attempting to create VM $vmid: $name"
-        if qm create "$vmid" --name "$name" --memory "$RAM_MB" --cores "$CPU_CORES" \
-            --net0 "virtio,bridge=$BRIDGE" \
-            --scsi0 "$STORAGE:${DISK_GB},ssd=1" \
-            --cdrom "$ISO" \
-            --boot "order=scsi0"; then
-            ok "VM $vmid created"
-            break
-        else
-            log "VM ID $vmid creation failed, trying next..."
-            sleep 0.5
+    for ((vmid=start_vmid; vmid<start_vmid+1000; vmid++)); do
+        if ! printf '%s\n' "${used_vm_ids[@]}" | grep -qx "$vmid"; then
+            log "Attempting to create VM $vmid: $name"
+            if qm create "$vmid" --name "$name" --memory "$RAM_MB" --cores "$CPU_CORES" \
+                --net0 "virtio,bridge=$BRIDGE" \
+                --scsi0 "$STORAGE:${DISK_GB},ssd=1" \
+                --cdrom "$ISO" \
+                --boot "order=scsi0"; then
+                ok "VM $vmid created"
+                break
+            else
+                warn "VM $vmid creation failed despite not being in list, trying next..."
+                sleep 0.5
+            fi
         fi
     done
 
     if [[ -z "$vmid" ]] || ! qm status "$vmid" &>/dev/null; then
-        err "Failed to create VM after trying 100 IDs"
+        err "Failed to create VM after trying 1000 IDs"
         return 1
     fi
 
