@@ -241,11 +241,15 @@ create_vm() {
     # Collect all VM IDs from all nodes in the cluster
     local used_vm_ids=()
 
-    # Get VM IDs from a specific node using Python (one-liner to avoid indentation issues)
+    # Get VM/CT IDs from a specific node (both QEMU VMs and LXC containers)
     get_vmids_from_node() {
         local node="$1"
+        # Get QEMU VMs
         pvesh get /nodes/$node/qemu --output-format json 2>/dev/null | \
         python3 -c "import sys, json; [print(vm['vmid']) for vm in json.load(sys.stdin) if 'vmid' in vm]" 2>/dev/null
+        # Get LXC containers
+        pvesh get /nodes/$node/lxc --output-format json 2>/dev/null | \
+        python3 -c "import sys, json; [print(ct['vmid']) for ct in json.load(sys.stdin) if 'vmid' in ct]" 2>/dev/null
     }
 
     # Get all node names in cluster
