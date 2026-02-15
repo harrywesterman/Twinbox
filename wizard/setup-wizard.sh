@@ -164,8 +164,8 @@ package_update: true
 package_upgrade: true
 packages: [docker.io, docker-compose, jq, yq, curl, git, python3-pip, python3-yaml, qemu-guest-agent]
 runcmd:
-  - [groupadd, -g, 999, twinbox]
-  - [useradd, -u, 999, -g, twinbox, -m, -s, /bin/bash, twinbox]
+  - [groupadd, twinbox]
+  - [useradd, -g, twinbox, -m, -s, /bin/bash, twinbox]
   - [echo, "twinbox:$twinbox_pw", "|", chpasswd]
   - [usermod, -aG, docker, twinbox]
   - [mkdir, -p, /opt/twinbox]
@@ -317,8 +317,8 @@ package_update: true
 package_upgrade: true
 packages: [docker.io, docker-compose, jq, yq, curl, git, python3-pip, python3-yaml, qemu-guest-agent]
 runcmd:
-  - [groupadd, -g, 999, twinbox]
-  - [useradd, -u, 999, -g, twinbox, -m, -s, /bin/bash, twinbox]
+  - [groupadd, twinbox]
+  - [useradd, -g, twinbox, -m, -s, /bin/bash, twinbox]
   - [echo, "twinbox:$twinbox_pw", "|", chpasswd]
   - [usermod, -aG, docker, twinbox]
   - [mkdir, -p, /opt/twinbox]
