@@ -226,11 +226,15 @@ create_vm() {
     local vmid=$(qm list 2>/dev/null | awk 'NR>1 {if($1>m) m=$1} END {print (m?m+1:100)}')
     local name="twinbox-mgmt-${CLUSTER}"
     log "Creating VM $vmid: $name"
-    qm create "$vmid" --name "$name" --memory "$RAM_MB" --cores "$CPU_CORES" \
-        --net0 "virtio,bridge=$BRIDGE" --scsihw "virtio-scsi" \
-        --scsi0 "$STORAGE:${DISK_GB},ssd=1" --cdrom "$ISO" \
-        --boot "order=scsi0" --ostype "l26" --bios seabios 2>/dev/null \
-        || { err "Failed to create VM"; exit 1; }
+    # Try create with minimal parameters first
+    if ! qm create "$vmid" --name "$name" --memory "$RAM_MB" --cores "$CPU_CORES" \
+        --net0 "virtio,bridge=$BRIDGE" \
+        --scsi0 "$STORAGE:${DISK_GB},ssd=1" \
+        --cdrom "$ISO" \
+        --boot "order=scsi0"; then
+        err "Failed to create VM"
+        exit 1
+    fi
     ok "VM $vmid created"
 
     local ci_file=$(create_cloudinit)
