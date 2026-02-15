@@ -223,21 +223,26 @@ EOF
 }
 
 create_vm() {
-    # Get highest VM ID cluster-wide (not just local node)
-    local vmid
-    vmid=$(pvesh get /cluster/resources --output-format json 2>/dev/null | jq -r '.[] | select(.type=="vm") | .vmid' 2>/dev/null | sort -n | tail -1)
-    vmid=${vmid:-99}
-    vmid=$((vmid + 1))
+    # Get all used VM IDs cluster-wide
+    local used_vmids
+    used_vmids=$(pvesh get /cluster/resources --output-format json 2>/dev/null | jq -r '.[] | select(.type=="vm") | .vmid' 2>/dev/null | sort -n | uniq)
+
+    # Find first free VM ID starting from 100
+    local vmid=100
+    while echo "$used_vmids" | grep -q "^${vmid}$"; do
+        vmid=$((vmid + 1))
+    done
 
     local name="twinbox-mgmt-${CLUSTER}"
     log "Creating VM $vmid: $name"
-    # Try create with minimal parameters first
+
+    # Try create with minimal parameters
     if ! qm create "$vmid" --name "$name" --memory "$RAM_MB" --cores "$CPU_CORES" \
         --net0 "virtio,bridge=$BRIDGE" \
         --scsi0 "$STORAGE:${DISK_GB},ssd=1" \
         --cdrom "$ISO" \
         --boot "order=scsi0"; then
-        err "Failed to create VM"
+        err "Failed to create VM $vmid"
         exit 1
     fi
     ok "VM $vmid created"
