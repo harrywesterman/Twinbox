@@ -172,6 +172,12 @@ runcmd:
   - [chown, -R, twinbox:twinbox, /opt/twinbox]
   - [systemctl, enable, qemu-guest-agent]
   - [systemctl, start, qemu-guest-agent]
+  - [systemctl, daemon-reload]
+  - [systemctl, enable, twinbox.service]
+  - [systemctl, start, twinbox.service]
+  - [systemctl, enable, docker]
+  - [systemctl, start, docker]
+  - [systemctl, restart, ssh]
 write_files:
   - path: /opt/twinbox/config/proxmox-creds.yaml
     permissions: '0600'
@@ -241,13 +247,6 @@ write_files:
     owner: root:root
     content: |
       PasswordAuthentication yes
-      PermitRootLogin yes
-runcmd:
-  - [systemctl, daemon-reload]
-  - [systemctl, enable, twinbox.service]
-  - [systemctl, start, twinbox.service]
-  - [systemctl, enable, docker]
-  - [systemctl, restart, ssh]
   - [systemctl, start, docker]
 final_message: |
   ==========================================
@@ -326,6 +325,12 @@ runcmd:
   - [chown, -R, twinbox:twinbox, /opt/twinbox]
   - [systemctl, enable, qemu-guest-agent]
   - [systemctl, start, qemu-guest-agent]
+  - [systemctl, daemon-reload]
+  - [systemctl, enable, twinbox.service]
+  - [systemctl, start, twinbox.service]
+  - [systemctl, enable, docker]
+  - [systemctl, start, docker]
+  - [systemctl, restart, ssh]
 write_files:
   - path: /opt/twinbox/config/proxmox-creds.yaml
     permissions: '0600'
@@ -399,14 +404,6 @@ write_files:
       Logs: journalctl -u twinbox -f
 
       ==========================================
-
-runcmd:
-  - [systemctl, daemon-reload]
-  - [systemctl, enable, twinbox.service]
-  - [systemctl, start, twinbox.service]
-  - [systemctl, enable, docker]
-  - [systemctl, start, docker]
-  - [systemctl, restart, ssh]
 
 final_message: |
   ==========================================
