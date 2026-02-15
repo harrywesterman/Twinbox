@@ -30,6 +30,16 @@ check_virt_customize() {
 }
 
 prompt_cluster() {
+    # If running non-interactively (e.g., via curl | bash), use defaults
+    if [[ ! -t 0 ]]; then
+        CLUSTER="twinbox"
+        SELECTED=$(hostname -s 2>/dev/null || echo "localhost")
+        log "Non-interactive mode: using defaults"
+        log "  Cluster: $CLUSTER"
+        log "  Node: $SELECTED"
+        return 0
+    fi
+
     while true; do
         read -p "Cluster name (alphanumeric, no spaces): " CLUSTER
         [[ "$CLUSTER" =~ ^[a-zA-Z0-9-]+$ ]] && break || warn "Invalid cluster name."
@@ -591,8 +601,13 @@ except: pass
         printf "\r\033[K%3ds remaining" "$wait"
     done
     printf "\r\033[K"
-    read -p "Enter IP manually: " manual_ip
-    echo "$manual_ip"
+    if [[ -t 0 ]]; then
+        read -p "Enter IP manually: " manual_ip
+        echo "$manual_ip"
+    else
+        err "Failed to detect VM IP automatically. Exiting."
+        return 1
+    fi
 }
 
 main() {
