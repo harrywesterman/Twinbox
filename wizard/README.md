@@ -11,10 +11,16 @@ cd /path/to/twinbox
 bash wizard/setup-wizard.sh
 ```
 
-Or download and run directly:
+Or download and run directly with curl:
 
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/your-org/twinbox/main/wizard/setup-wizard.sh)
+curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/setup-wizard.sh | bash
+```
+
+Or process substitution (bash only):
+
+```bash
+bash <(curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/setup-wizard.sh)
 ```
 
 ## What It Does
@@ -116,14 +122,12 @@ export SELECTED_NODE="pve-node1"
 
 ### Cloud-Init Template
 
-The wizard uses a cloud-init configuration template at `wizard/cloud-init.yml` to set up the management VM. You can customize this file before running the wizard to:
+The cloud-init configuration is embedded directly in `setup-wizard.sh`. To customize the management VM setup, you can:
 
-- Install additional packages
-- Configure different users or groups
-- Change setup scripts
-- Add additional configuration files
+1. Edit the `wizard/setup-wizard.sh` script and modify the cloud-init section in the `create_cloudinit` function
+2. Or fork the repository and update the embedded template
 
-The template supports dynamic substitutions for `DB_PASSWORD` and `SECRET_KEY` which are generated automatically by the wizard.
+The cloud-init config supports dynamic substitutions for `DB_PASSWORD` and `SECRET_KEY` which are generated automatically by the wizard.
 
 ### Systemd Service
 
@@ -280,9 +284,9 @@ After the wizard completes:
 
 ## Advanced Configuration
 
-### Custom cloud-init.yml
+### Custom cloud-init Configuration
 
-If you need to customize the cloud-init configuration (e.g., install additional tools, configure networking, etc.), edit `wizard/cloud-init.yml` before running the wizard.
+If you need to customize the cloud-init configuration (e.g., install additional tools, configure networking, etc.), edit the `create_cloudinit` function in `wizard/setup-wizard.sh`.
 
 The cloud-init format supports:
 
