@@ -242,7 +242,7 @@ write_files:
       Logs: journalctl -u twinbox -f
 
       ==========================================
-  - path: /etc/ssh/sshd_config.d/twinbox.conf
+  - path: /etc/ssh/sshd_config.d/99-twinbox.conf
     permissions: '0644'
     owner: root:root
     content: |
@@ -345,7 +345,7 @@ write_files:
     owner: root:root
     content: |
       CLUSTER_NAME=${CLUSTER}
-  - path: /etc/ssh/sshd_config.d/twinbox.conf
+  - path: /etc/ssh/sshd_config.d/99-twinbox.conf
     permissions: '0644'
     owner: root:root
     content: |
