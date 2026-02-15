@@ -225,16 +225,29 @@ create_vm() {
 
     log "Discovering cluster-wide VM IDs to find a free one..."
 
-    # Get all VM IDs cluster-wide from all online nodes
+    # Get all VM IDs from all possible nodes: the SELECTED node plus cluster-wide discovery
     local used_vm_ids=()
-    while IFS= read -r vmid_line; do
-        [[ -n "$vmid_line" ]] && used_vm_ids+=("$vmid_line")
+
+    # Always check the SELECTED node (the node we're actually creating on)
+    if [[ -n "$SELECTED" ]]; then
+        while IFS= read -r vmid_line; do
+            [[ -n "$vmid_line" ]] && used_vm_ids+=("$vmid_line")
+        done < <(pvesh get /nodes/$SELECTED/qemu --output-format json 2>/dev/null | \
+                  jq -r '.[].vmid' 2>/dev/null || true)
+    fi
+
+    # Also check other nodes cluster-wide
+    while IFS= read -r node; do
+        [[ "$node" == "$SELECTED" ]] && continue  # Skip if already checked
+        while IFS= read -r vmid_line; do
+            [[ -n "$vmid_line" ]] && used_vm_ids+=("$vmid_line")
+        done < <(pvesh get /nodes/$node/qemu --output-format json 2>/dev/null | \
+                  jq -r '.[].vmid' 2>/dev/null || true)
     done < <(pvesh get /nodes --output-format json 2>/dev/null | \
-              jq -r '.[] | select(.status=="online") | .id' 2>/dev/null | \
-              while read -r node; do
-                  pvesh get /nodes/$node/qemu --output-format json 2>/dev/null | \
-                  jq -r '.[].vmid' 2>/dev/null || true
-              done 2>/dev/null | sort -n | uniq)
+              jq -r '.[] | .id' 2>/dev/null || true)
+
+    # Deduplicate
+    used_vm_ids=($(printf '%s\n' "${used_vm_ids[@]}" | sort -n | uniq))
 
     # Find first free VM ID starting from 100
     local vmid=""
@@ -248,6 +261,7 @@ create_vm() {
 
     if [[ -z "$vmid" ]]; then
         err "No free VM ID found in range 100-1099"
+        log "Used VM IDs: ${used_vm_ids[*]:-none}"
         return 1
     fi
 
