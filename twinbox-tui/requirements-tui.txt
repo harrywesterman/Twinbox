@@ -1,0 +1,38 @@
+# Textual TUI Dependencies
+
+# Core UI framework
+textual>=0.44.0
+
+# Async SSH for Phase 2 execution
+asyncssh[ssh2]>=2.14.0
+
+# Configuration and validation
+pydantic[email]>=2.0.0
+pydantic-settings>=2.0.0
+pyyaml>=6.0
+
+# Async file operations
+aiofiles>=23.0.0
+
+# HTTP client for Proxmox API
+httpx>=0.24.0
+
+# Rich formatting (textual dependency, but pin explicitly)
+rich>=13.0.0
+
+# Environment variable loading
+python-dotenv>=1.0.0
+
+# Database (lightweight, no external deps)
+sqlalchemy>=2.0.0
+
+# Testing
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.10.0
+responses>=0.23.0
+
+# Development (optional)
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.0.0
