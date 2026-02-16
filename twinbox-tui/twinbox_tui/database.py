@@ -317,6 +317,23 @@ class Database:
         with self.get_session() as session:
             return session.query(PreflightResult).order_by(PreflightResult.checked_at.desc()).all()
 
+    def list_deployments_for_cluster(self, cluster_id: str) -> list[Deployment]:
+        """Get all deployments for a cluster.
+
+        Args:
+            cluster_id: Cluster UUID
+
+        Returns:
+            List of Deployment objects ordered by start time
+        """
+        with self.get_session() as session:
+            query = (
+                session.query(Deployment)
+                .filter(Deployment.cluster_id == cluster_id)
+                .order_by(Deployment.started_at.desc())
+            )
+            return query.all()
+
     # Convenience: get cluster with deployment
     def get_cluster_with_latest_deployment(self, cluster_id: str) -> Optional[tuple[Cluster, Optional[Deployment]]]:
         """Get cluster and its most recent deployment."""

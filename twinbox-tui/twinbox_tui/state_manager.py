@@ -394,3 +394,30 @@ class StateManager:
         """
         cluster_data = self.get_cluster(cluster_id)
         return cluster_data["config"] if cluster_data else None
+
+    # Helper for listing deployments (for logs screen)
+
+    def list_deployments_for_cluster(self, cluster_id: str) -> List[Dict[str, Any]]:
+        """
+        Get all deployments for a cluster.
+
+        Args:
+            cluster_id: Cluster UUID
+
+        Returns:
+            List of deployment dicts
+        """
+        deployments = self.db.list_deployments_for_cluster(cluster_id)
+        result = []
+        for dep in deployments:
+            result.append({
+                "id": dep.id,
+                "cluster_id": dep.cluster_id,
+                "current_step": dep.current_step,
+                "progress": dep.progress,
+                "status": dep.status,
+                "error_message": dep.error_message,
+                "started_at": dep.started_at,
+                "completed_at": dep.completed_at,
+            })
+        return result
