@@ -57,7 +57,6 @@ PHASE_2_STEPS = [
     "Starting PostgreSQL and Redis",
     "Starting Web and Worker services",
     "Verifying service health endpoints",
-    "Generating kubeconfig",
     "Finalizing deployment",
 ]
 
