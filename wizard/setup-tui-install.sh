@@ -2,13 +2,41 @@
 set -euo pipefail
 
 # Twinbox TUI Installer for Proxmox Host
-# One-time installation - user starts the TUI manually when needed
+# Usage: setup-tui-install.sh [--start] [--help]
+#   --start    Automatically start the TUI after installation completes
+#   --help     Show this help message
+#
+# Without --start: installs and shows manual start instructions
+# With --start: installs and immediately launches the TUI
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 REPO_URL="${TWINBOX_REPO_URL:-https://github.com/harrywesterman/Twinbox.git}"
 INSTALL_DIR="${TWINBOX_INSTALL_DIR:-/opt/twinbox}"
 VENV_DIR="$INSTALL_DIR/twinbox-tui/.venv"
 LOG_FILE="/var/log/twinbox-tui-install.log"
+
+# Parse command line arguments
+AUTO_START=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --start)
+            AUTO_START=true
+            shift
+            ;;
+        --help)
+            echo "Twinbox TUI Installer"
+            echo "Usage: $0 [--start]"
+            echo "  --start    Automatically start the TUI after installation"
+            echo "  --help     Show this help message"
+            exit 0
+            ;;
+        *)
+            err "Unknown option: $1"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
 
 log() { echo -e "${YELLOW}[*] $*${NC}" | tee -a "$LOG_FILE"; }
 ok() { echo -e "${GREEN}[✓] $*${NC}" | tee -a "$LOG_FILE"; }
@@ -134,6 +162,15 @@ The Twinbox TUI has been installed and is ready to use.
 
 Repository: $INSTALL_DIR
 Virtual Environment: $VENV_DIR
+EOF
+
+    if $AUTO_START; then
+        echo ""
+        echo "Starting the TUI automatically..."
+        echo ""
+        exec "$VENV_DIR/bin/twinbox-tui"
+    else
+        cat <<'EOF'
 
 To start the TUI:
 
@@ -141,25 +178,26 @@ To start the TUI:
   sudo chvt 1
 
   # Start the TUI
-  sudo $VENV_DIR/bin/twinbox-tui
+  sudo /opt/twinbox/twinbox-tui/.venv/bin/twinbox-tui
 
   # Or activate the virtual environment and run:
-  # source $VENV_DIR/bin/activate
+  # source /opt/twinbox/twinbox-tui/.venv/bin/activate
   # twinbox-tui
 
 To update to the latest version:
 
-  git -C $INSTALL_DIR pull origin main
-  source $VENV_DIR/bin/activate
-  pip install -e $INSTALL_DIR/twinbox-tui
+  git -C /opt/twinbox pull origin main
+  source /opt/twinbox/twinbox-tui/.venv/bin/activate
+  pip install -e /opt/twinbox/twinbox-tui
 
 To uninstall:
 
-  rm -rf $INSTALL_DIR
+  rm -rf /opt/twinbox
   rm -rf /root/.local/share/twinbox
 
 ==========================================
 EOF
+    fi
 }
 
 main() {

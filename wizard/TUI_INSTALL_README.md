@@ -33,6 +33,24 @@ This is ideal for:
 
 Run the installer directly on your Proxmox host:
 
+### Option 1: One-liner (install and auto-start)
+
+Use the `--start` flag to install and immediately launch the TUI:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/setup-tui-install.sh -o /tmp/setup-tui-install.sh && chmod +x /tmp/setup-tui-install.sh && bash /tmp/setup-tui-install.sh --start
+```
+
+Or if you already have the Twinbox repository locally:
+
+```bash
+cd /path/to/Twinbox && bash wizard/setup-tui-install.sh --start
+```
+
+This will install the TUI and automatically start it after completion.
+
+### Option 2: Standard installation (manual start later)
+
 ```bash
 # One-command installation (clones repo and installs)
 curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/setup-tui-install.sh -o /tmp/setup-tui-install.sh
@@ -51,7 +69,7 @@ The installer will:
    - **tui** (minimal): Only clones the `twinbox-tui/` directory using sparse checkout (~1MB)
    - **full**: Clones the entire Twinbox repository (~50MB) including manager, worker, docs
 4. Create a Python virtual environment and install all dependencies
-5. Show completion message with instructions
+5. Show completion message with instructions (or auto-start if `--start` was used)
 
 ## Installation Type Comparison
 
@@ -66,7 +84,7 @@ The installer will:
 
 ## Running the TUI
 
-After installation completes, you can start the TUI in two ways:
+If you used `--start` during installation, the TUI is already running. Otherwise, after installation completes, you can start the TUI in two ways:
 
 ### Option 1: Via SSH (Recommended for remote management)
 
