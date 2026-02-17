@@ -64,6 +64,13 @@ class WizardNavigation(Horizontal):
         next_btn.on_click = lambda _: self._handle_next()
         yield next_btn
 
+    def on_mount(self) -> None:
+        """Called when widget is mounted - re-apply button states."""
+        super().on_mount()
+        # Re-apply button states to ensure they match the current _can_go_back/_can_go_forward
+        # This handles the case where set_can_go_forward() was called before buttons were composed
+        self._update_button_states()
+
     def update_step(self, step: int) -> None:
         """Update the current step indicator.
 
@@ -97,15 +104,16 @@ class WizardNavigation(Horizontal):
 
     def _update_button_states(self) -> None:
         """Update button disabled states."""
+        # Check if buttons exist (they might not be mounted yet)
         try:
             back_btn = self.query_one("#back-button", Button)
             next_btn = self.query_one("#next-button", Button)
-
-            back_btn.disabled = not self._can_go_back
-            next_btn.disabled = not self._can_go_forward
         except Exception:
-            # Widgets not yet mounted
-            pass
+            # Buttons not yet mounted, skip update
+            return
+
+        back_btn.disabled = not self._can_go_back
+        next_btn.disabled = not self._can_go_forward
 
     def _handle_back(self) -> None:
         """Handle back button click."""
