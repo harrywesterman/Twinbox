@@ -23,7 +23,7 @@ class WizardScreen(Screen):
         super().__init__(id=id, **kwargs)
         # Create initial wizard data
         self.wizard_data = WizardData(
-            cluster_name="",
+            cluster_name="default",
             ssh_public_key="",
             proxmox_url="",
             proxmox_token_name="",

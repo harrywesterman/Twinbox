@@ -50,7 +50,9 @@ class WizardData(BaseModel):
         """Validate cluster name is alphanumeric with hyphens."""
         import re
         # Allow empty string during initial wizard setup
-        if v and not re.match(r"^[a-zA-Z0-9][a-zA-Z0-9\-]*$", v):
+        if v == "":
+            return v
+        if not re.match(r"^[a-zA-Z0-9][a-zA-Z0-9\-]*$", v):
             raise ValueError("Cluster name must start with letter/number and contain only letters, numbers, and hyphens")
         return v.lower()
 
