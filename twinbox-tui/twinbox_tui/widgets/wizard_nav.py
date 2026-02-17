@@ -66,7 +66,6 @@ class WizardNavigation(Horizontal):
 
     def on_mount(self) -> None:
         """Called when widget is mounted - re-apply button states."""
-        super().on_mount()
         # Re-apply button states to ensure they match the current _can_go_back/_can_go_forward
         # This handles the case where set_can_go_forward() was called before buttons were composed
         self._update_button_states()
