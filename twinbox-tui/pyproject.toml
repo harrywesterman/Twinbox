@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "twinbox-tui"
+version = "0.1.0"
+description = "Textual TUI for Twinbox - Kubernetes on Proxmox"
+readme = "README-tui.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Twinbox Team"}
+]
+dependencies = [
+    "textual>=0.44.0",
+    "asyncssh[ssh2]>=2.14.0",
+    "pydantic[email]>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "pyyaml>=6.0",
+    "aiofiles>=23.0.0",
+    "httpx>=0.24.0",
+    "rich>=13.0.0",
+    "python-dotenv>=1.0.0",
+    "sqlalchemy>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.10.0",
+    "responses>=0.23.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+twinbox-tui = "twinbox_tui.app:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["twinbox_tui*"]
+
+[tool.setuptools.package-data]
+twinbox_tui = ["*.css", "*.txt"]
+
+[tool.black]
+line-length = 88
+target-version = ['py39']
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503"]
