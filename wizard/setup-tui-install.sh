@@ -75,7 +75,9 @@ clone_tui_only() {
     local temp_dir="/tmp/twinbox-temp-$$"
     local tui_target_dir="$INSTALL_DIR/twinbox-tui"
 
-    log "Installing twinbox-tui (minimal installation)..."
+-------
+
+
     if [[ -d "$tui_target_dir" ]]; then
         log "Existing installation found at $tui_target_dir, removing..."
         rm -rf "$tui_target_dir"
@@ -84,7 +86,7 @@ clone_tui_only() {
     log "Cloning only twinbox-tui directory (sparse checkout)..."
     mkdir -p "$INSTALL_DIR"
     mkdir -p "$temp_dir"
-    git init "$temp_dir"
+    git init --initial-branch=main "$temp_dir" 2>/dev/null || git init "$temp_dir" && git -C "$temp_dir" branch -m main
     git -C "$temp_dir" remote add origin "$REPO_URL"
     git -C "$temp_dir" config core.sparseCheckout true
     echo "twinbox-tui/" > "$temp_dir/.git/info/sparse-checkout"
