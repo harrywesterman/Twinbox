@@ -256,9 +256,9 @@ class DeploymentExecutor:
         if not vm_ip:
             raise ValueError("Management VM IP not available")
 
-        # Prepare SSH credentials - in MVP, use default twinbox password
-        # In production, this would be retrieved from secure storage
-        password = "changeme"  # TODO: Get from cluster config or state
+        # Get SSH credentials from cluster config
+        cluster_config = cluster.get("config", {})
+        password = cluster_config.get("twinbox_password", "changeme")
 
         ssh = SSHManager(
             host=vm_ip,

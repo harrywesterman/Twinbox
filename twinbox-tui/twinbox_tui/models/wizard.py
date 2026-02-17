@@ -25,6 +25,9 @@ class WizardData(BaseModel):
     proxmox_token_value: str = Field(default="", description="Proxmox API token secret")
     proxmox_verify_ssl: bool = Field(default=False, description="Verify Proxmox SSL certificates")
 
+    # Twinbox VM credentials (auto-generated when running on Proxmox)
+    twinbox_password: str = Field(default="", description="Password for twinbox user in management VM")
+
     # Management VM configuration
     vm_cpu_cores: int = Field(default=2, ge=1, le=16, description="VM CPU cores")
     vm_ram_mb: int = Field(default=4096, ge=512, le=131072, description="VM RAM in MB")

@@ -83,8 +83,14 @@ class ReviewScreen(Screen):
             f"## Workers: {data.worker_count}",
             "",
             "## Credentials",
-            f"Management VM SSH: twinbox@<vm-ip>",
         ]
+        
+        # Add password if available
+        if data.twinbox_password:
+            summary_lines.append(f"Management VM SSH: twinbox@<vm-ip>")
+            summary_lines.append(f"Password: {data.twinbox_password}")
+        else:
+            summary_lines.append(f"Management VM SSH: twinbox@<vm-ip> (password will be generated)")
 
         summary_text = "\n".join(summary_lines)
         container.update(summary_text)
