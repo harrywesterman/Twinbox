@@ -7,7 +7,7 @@ and convenient methods for cluster and deployment state management.
 
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from .config import get_config
 from .database import Database, Cluster, Deployment, DeploymentLog, PreflightResult
