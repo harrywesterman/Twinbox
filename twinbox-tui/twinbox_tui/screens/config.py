@@ -8,6 +8,7 @@ from typing import List
 
 from textual.app import ComposeResult
 from textual.containers import Vertical
+from textual.screen import Screen
 from textual.widgets import Static
 
 from ..models.wizard import WizardData
@@ -26,7 +27,7 @@ from ..widgets import (
 )
 
 
-class ConfigFormScreen(Vertical):
+class ConfigFormScreen(Screen):
     """Configuration form screen."""
 
     def __init__(

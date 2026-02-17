@@ -9,6 +9,7 @@ from typing import Optional
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
+from textual.screen import Screen
 from textual.widgets import Button, Static
 
 from ..deployment_executor import DeploymentExecutor
@@ -16,7 +17,7 @@ from ..models.wizard import WizardData
 from ..widgets import HorizontalProgressBar, LogViewer, WizardNavigation
 
 
-class ExecutionScreen(Vertical):
+class ExecutionScreen(Screen):
     """Execution progress screen."""
 
     def __init__(

@@ -9,13 +9,14 @@ from typing import List
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
+from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
 
 from ..state_manager import StateManager
 from ..widgets import ClusterTable
 
 
-class DashboardScreen(Vertical):
+class DashboardScreen(Screen):
     """Main dashboard screen."""
 
     BINDINGS = [

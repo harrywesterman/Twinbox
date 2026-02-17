@@ -64,7 +64,7 @@ class ClusterTable(DataTable):
 
     def _refresh_table(self) -> None:
         """Refresh the table display from _clusters data."""
-        self.clear(rows=True)
+        self.clear()
 
         for cluster in self._clusters:
             # Format status with color

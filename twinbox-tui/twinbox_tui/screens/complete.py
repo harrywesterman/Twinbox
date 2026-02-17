@@ -6,12 +6,13 @@ Shows final deployment status and next steps.
 
 from textual.app import ComposeResult
 from textual.containers import Vertical
+from textual.screen import Screen
 from textual.widgets import Button, Static
 
 from ..widgets import WizardNavigation
 
 
-class CompletionScreen(Vertical):
+class CompletionScreen(Screen):
     """Deployment completion screen."""
 
     def __init__(

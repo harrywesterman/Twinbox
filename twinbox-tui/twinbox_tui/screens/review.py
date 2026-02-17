@@ -8,13 +8,14 @@ from typing import List
 
 from textual.app import ComposeResult
 from textual.containers import Vertical
+from textual.screen import Screen
 from textual.widgets import Button, Checkbox, Static
 
 from ..models.wizard import WizardData
 from ..widgets import WizardNavigation
 
 
-class ReviewScreen(Vertical):
+class ReviewScreen(Screen):
     """Review configuration screen."""
 
     def __init__(

@@ -9,13 +9,14 @@ from typing import List
 
 from textual.app import ComposeResult
 from textual.containers import Vertical
+from textual.screen import Screen
 from textual.widgets import Static
 
 from ..proxmox import ProxmoxAPI
 from ..widgets import PreflightPanel, WizardNavigation
 
 
-class PreflightCheckScreen(Vertical):
+class PreflightCheckScreen(Screen):
     """Preflight checks screen."""
 
     # Define checks

@@ -6,12 +6,13 @@ Standalone screen for viewing deployment logs with filtering.
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
+from textual.screen import Screen
 from textual.widgets import Button, Select, Static
 
 from ..widgets import LogViewer
 
 
-class LogViewerScreen(Vertical):
+class LogViewerScreen(Screen):
     """Log viewer screen."""
 
     def __init__(self, *, id: str = "logs-screen", **kwargs) -> None:
