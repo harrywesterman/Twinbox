@@ -75,7 +75,6 @@ clone_tui_only() {
     local temp_dir="/tmp/twinbox-temp-$$"
     local tui_target_dir="$INSTALL_DIR/twinbox-tui"
 
--------
 
 
     if [[ -d "$tui_target_dir" ]]; then
