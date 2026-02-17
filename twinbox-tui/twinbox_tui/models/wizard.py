@@ -14,7 +14,7 @@ class WizardData(BaseModel):
     """Wizard configuration data that flows through all screens."""
 
     # Cluster basic info
-    cluster_name: str = Field(..., min_length=3, description="Cluster name")
+    cluster_name: str = Field(default="", description="Cluster name")
 
     # SSH credentials
     ssh_public_key: str = Field(default="", description="SSH public key for manager VM")
@@ -47,9 +47,8 @@ class WizardData(BaseModel):
     @field_validator("selected_nodes")
     @classmethod
     def validate_selected_nodes(cls, v: List[str]) -> List[str]:
-        """Validate node selection."""
-        if not v:
-            raise ValueError("At least one node must be selected")
+        """Validate node selection - allow empty during wizard, enforce at submission."""
+        # Allow empty list during initial wizard setup
         return v
 
     def to_dict(self) -> dict:
