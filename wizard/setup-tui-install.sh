@@ -74,15 +74,10 @@ clone_tui_only() {
     local temp_dir="/tmp/twinbox-temp-$$"
     local tui_target_dir="$INSTALL_DIR/twinbox-tui"
 
+    log "Installing twinbox-tui (minimal installation)..."
     if [[ -d "$tui_target_dir" ]]; then
-        log "twinbox-tui already exists at $tui_target_dir"
-        read -p "Reinstall? This will replace the existing installation. [y/N]: " -r REINSTALL
-        if [[ "$REINSTALL" =~ ^[Yy]$ ]]; then
-            rm -rf "$tui_target_dir"
-        else
-            ok "Using existing installation"
-            return 0
-        fi
+        log "Existing installation found at $tui_target_dir, removing..."
+        rm -rf "$tui_target_dir"
     fi
 
     log "Cloning only twinbox-tui directory (sparse checkout)..."
@@ -205,23 +200,8 @@ main() {
     check_proxmox
     install_dependencies
     
-    echo
-    read -p "Install only twinbox-tui (minimal) or full repository? [tui/full]: " -r INSTALL_TYPE
-    echo
-    
-    case "$INSTALL_TYPE" in
-        [Tt]*)
-            clone_tui_only
-            ;;
-        [Ff]*|"")
-            echo "Defaulting to full repository..."
-            clone_full_repo
-            ;;
-        *)
-            err "Invalid choice. Exiting."
-            exit 1
-            ;;
-    esac
+    log "Installing twinbox-tui (minimal installation)..."
+    clone_tui_only
     
     setup_runtime
     show_completion
