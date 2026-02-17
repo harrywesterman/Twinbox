@@ -18,6 +18,10 @@ from .form_fields import (
     BridgeSelect,
     StorageSelect,
     SSHKeyInput,
+    ProxmoxURLInput,
+    ProxmoxTokenNameInput,
+    ProxmoxTokenValueInput,
+    ProxmoxSSLVerifyCheck,
 )
 
 __all__ = [
@@ -36,4 +40,8 @@ __all__ = [
     "BridgeSelect",
     "StorageSelect",
     "SSHKeyInput",
+    "ProxmoxURLInput",
+    "ProxmoxTokenNameInput",
+    "ProxmoxTokenValueInput",
+    "ProxmoxSSLVerifyCheck",
 ]

@@ -113,6 +113,7 @@ class ConfigFormScreen(Screen):
 
     def _populate_from_wizard_data(self) -> None:
         """Populate form fields from existing wizard_data."""
+        # General fields
         if self.wizard_data.cluster_name:
             self.query_one("#cluster-name-input", ClusterNameInput).query_one(Input).value = self.wizard_data.cluster_name
         if self.wizard_data.ssh_public_key:

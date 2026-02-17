@@ -23,8 +23,12 @@ class WizardScreen(Screen):
         super().__init__(id=id, **kwargs)
         # Create initial wizard data
         self.wizard_data = WizardData(
-            cluster_name="cluster",
+            cluster_name="",
             ssh_public_key="",
+            proxmox_url="",
+            proxmox_token_name="",
+            proxmox_token_value="",
+            proxmox_verify_ssl=False,
             vm_cpu_cores=2,
             vm_ram_mb=4096,
             vm_disk_gb=32,
@@ -44,6 +48,6 @@ class WizardScreen(Screen):
 
     def on_mount(self) -> None:
         """Start wizard flow by pushing first screen."""
-        # Push preflight screen
+        # Push preflight screen first (will collect credentials and run checks)
         preflight = PreflightCheckScreen(self.wizard_data)
         self.app.push_screen(preflight)

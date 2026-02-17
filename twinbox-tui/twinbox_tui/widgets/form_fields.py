@@ -16,6 +16,70 @@ from textual.widgets import (
 )
 
 
+class ProxmoxURLInput(Vertical):
+    """Proxmox API URL input."""
+
+    def __init__(self, value: str = "", **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._value = value
+
+    def compose(self) -> ComposeResult:
+        yield Label("Proxmox API URL", classes="field-label")
+        yield Input(value=self._value, id="proxmox-url", placeholder="https://192.168.1.10:8006")
+
+    @property
+    def value(self) -> str:
+        return self.query_one(Input).value
+
+
+class ProxmoxTokenNameInput(Vertical):
+    """Proxmox API token name input."""
+
+    def __init__(self, value: str = "", **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._value = value
+
+    def compose(self) -> ComposeResult:
+        yield Label("Proxmox Token Name", classes="field-label")
+        yield Input(value=self._value, id="proxmox-token-name", placeholder="twinbox@pve!token-id")
+
+    @property
+    def value(self) -> str:
+        return self.query_one(Input).value
+
+
+class ProxmoxTokenValueInput(Vertical):
+    """Proxmox API token secret input (password masked)."""
+
+    def __init__(self, value: str = "", **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._value = value
+
+    def compose(self) -> ComposeResult:
+        yield Label("Proxmox Token Secret", classes="field-label")
+        yield Input(value=self._value, id="proxmox-token-value", placeholder="", password=True)
+
+    @property
+    def value(self) -> str:
+        return self.query_one(Input).value
+
+
+class ProxmoxSSLVerifyCheck(Vertical):
+    """Proxmox SSL verification checkbox."""
+
+    def __init__(self, value: bool = False, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._value = value
+
+    def compose(self) -> ComposeResult:
+        yield Label("Verify SSL Certificate", classes="field-label")
+        yield Checkbox("Verify Proxmox SSL certificate (disable for self-signed)", value=self._value, id="proxmox-verify-ssl")
+
+    @property
+    def value(self) -> bool:
+        return self.query_one(Checkbox).value
+
+
 class FormField(Vertical):
     """Base class for form fields with label."""
 
