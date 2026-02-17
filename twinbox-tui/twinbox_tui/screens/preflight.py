@@ -22,7 +22,7 @@ class PreflightCheckScreen(Screen):
     # Define checks
     CHECK_DEFINITIONS = [
         ("proxmox_connection", "Proxmox API Connection", "Check connectivity to Proxmox API"),
-        ("required_binaries", "Required Binaries", "Check for qm, pvesh, cloud-localds"),
+        ("required_binaries", "Required Binaries", "Check for qm, pvesh, and cloud-init tools (cloud-localds or mkisofs)"),
         ("node_count", "Available Nodes", "Count online Proxmox nodes"),
         ("storage_pools", "Storage Pools", "List available storage pools"),
         ("network_bridges", "Network Bridges", "Detect network bridges"),
@@ -125,7 +125,7 @@ class PreflightCheckScreen(Screen):
         """Check Proxmox API connectivity."""
         try:
             # Try to connect to Proxmox (will use credentials from environment/config)
-            proxmox = ProxmoxAPI()
+            proxmox = ProxmoxAPI.from_env()
             version = await asyncio.to_thread(proxmox.get_version)
             return {
                 "check_name": "proxmox_connection",
@@ -143,28 +143,36 @@ class PreflightCheckScreen(Screen):
         """Check for required system binaries."""
         import shutil
 
-        required = ["qm", "pvesh", "cloud-localds"]
-        missing = []
-        for binary in required:
-            if shutil.which(binary) is None:
-                missing.append(binary)
+        # Binaries required for the wizard to function
+        required_strict = ["qm", "pvesh"]
+        # At least one of these is needed for cloud-init ISO creation
+        iso_tools = ["cloud-localds", "mkisofs"]
 
-        if missing:
+        missing_strict = [b for b in required_strict if shutil.which(b) is None]
+        missing_iso = [b for b in iso_tools if shutil.which(b) is None]
+
+        if missing_strict:
             return {
                 "check_name": "required_binaries",
                 "status": "error",
-                "message": f"Missing: {', '.join(missing)}",
+                "message": f"Missing: {', '.join(missing_strict)}",
+            }
+        if missing_iso:
+            return {
+                "check_name": "required_binaries",
+                "status": "error",
+                "message": "Missing cloud-init ISO tools: need either cloud-localds or mkisofs",
             }
         return {
             "check_name": "required_binaries",
             "status": "success",
-            "message": "All binaries present",
+            "message": f"All binaries present ({', '.join(['qm', 'pvesh', 'cloud-localds/mkisofs'])})",
         }
 
     async def _check_node_count(self) -> dict:
         """Check available Proxmox nodes."""
         try:
-            proxmox = ProxmoxAPI()
+            proxmox = ProxmoxAPI.from_env()
             nodes = await asyncio.to_thread(proxmox.list_nodes)
             online = [n for n in nodes if n.get("status") == "online"]
 

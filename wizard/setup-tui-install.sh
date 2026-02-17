@@ -65,6 +65,7 @@ install_dependencies() {
         python3-pip \
         git \
         curl \
+        cloud-image-utils \
         >>"$LOG_FILE" 2>&1 || err "Failed to install packages"
     ok "Dependencies installed"
 }
