@@ -256,6 +256,8 @@ class PreflightCheckScreen(Screen):
     def on_mount(self) -> None:
         """Initialize screen."""
         self._navigation = self.query_one("#wizard-nav", WizardNavigation)
+        self._navigation.on_next = self.on_wizard_nav_next
+        self._navigation.on_back = self.on_wizard_nav_back
         self._navigation.set_can_go_back(False)  # Cannot go back from preflight
         self._navigation.set_can_go_forward(False)  # Enable only after checks complete
 
