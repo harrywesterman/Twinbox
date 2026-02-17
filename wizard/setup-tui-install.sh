@@ -40,7 +40,7 @@ done
 
 log() { echo -e "${YELLOW}[*] $*${NC}" | tee -a "$LOG_FILE"; }
 ok() { echo -e "${GREEN}[✓] $*${NC}" | tee -a "$LOG_FILE"; }
-err() { echo -e "${RED}[✗] $*${NC}" | tee -a "$LOG_FILE"; }
+err() { echo -e "${RED}[✗] $*${NC}" | tee -a "$LOG_FILE"; exit 1; }
 warn() { echo -e "${YELLOW}[!] $*${NC}" | tee -a "$LOG_FILE"; }
 
 require_root() {
