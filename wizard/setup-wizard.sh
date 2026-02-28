@@ -279,11 +279,19 @@ create_proxmox_api_user() {
   local proxmox_privs="VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.Audit"
 
   status_update "Ensuring Proxmox API user ${PROXMOX_USER} exists"
-  if ! pveum user add "$PROXMOX_USER" --comment "Twinbox service account" >/dev/null 2>&1; then
-    if ! pveum user list | awk 'NR>1 {print $1}' | grep -qx "$PROXMOX_USER"; then
+  if pveum user list | awk 'NR>1 {print $1}' | grep -qx "$PROXMOX_USER"; then
+    status_update "Proxmox API user ${PROXMOX_USER} already exists"
+  else
+    if ! pveum user add "$PROXMOX_USER" --comment "Twinbox service account" >/dev/null 2>&1; then
       msg_error "Failed to create Proxmox API user ${PROXMOX_USER}"
       exit 1
     fi
+    status_update "Created Proxmox API user ${PROXMOX_USER}"
+  fi
+
+  if ! pveum user list | awk 'NR>1 {print $1}' | grep -qx "$PROXMOX_USER"; then
+    msg_error "Proxmox API user ${PROXMOX_USER} not found after create/check"
+    exit 1
   fi
 
   status_update "Setting password for ${PROXMOX_USER}"

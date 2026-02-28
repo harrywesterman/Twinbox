@@ -164,8 +164,8 @@ def test_setup_wizard_requires_non_empty_ssh_key():
 def test_setup_wizard_creates_dedicated_limited_proxmox_api_user():
     text = _wizard_text()
     assert "create_proxmox_api_user()" in text
-    assert 'if ! pveum user add "$PROXMOX_USER"' in text
-    assert 'if ! pveum user list | awk \'NR>1 {print $1}\' | grep -qx "$PROXMOX_USER"; then' in text
+    assert 'if pveum user list | awk \'NR>1 {print $1}\' | grep -qx "$PROXMOX_USER"; then' in text
+    assert 'if ! pveum user add "$PROXMOX_USER" --comment "Twinbox service account" >/dev/null 2>&1; then' in text
     assert 'pveum passwd "$PROXMOX_USER"' in text
     assert 'pveum role add "$PROXMOX_ROLE"' in text
     assert 'VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.Audit' in text
