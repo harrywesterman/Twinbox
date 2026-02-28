@@ -4,6 +4,11 @@ import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+CREATE_TALOS_SCRIPT = REPO_ROOT / "scripts" / "manager" / "create-talos-vms.sh"
+
+
+def _create_talos_text() -> str:
+    return CREATE_TALOS_SCRIPT.read_text(encoding="utf-8")
 
 
 def test_create_talos_vms_requires_proxmox_env():
@@ -62,3 +67,11 @@ def test_collect_state_missing_cluster_file_fails():
         proc = subprocess.run(cmd, env=os.environ.copy(), capture_output=True, text=True)
         assert proc.returncode != 0
         assert "cluster not found" in (proc.stdout + proc.stderr)
+
+
+def test_create_talos_vms_sets_colorful_proxmox_tags():
+    text = _create_talos_text()
+    assert 'local role_tag="$3"' in text
+    assert '--data-urlencode "tags=twinbox;talos;${role_tag};cluster-${CLUSTER_ID}"' in text
+    assert 'create_vm "$current_vmid" "$vm_name" "controlplane"' in text
+    assert 'create_vm "$current_vmid" "$vm_name" "worker"' in text

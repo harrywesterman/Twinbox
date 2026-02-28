@@ -31,3 +31,81 @@ def test_setup_wizard_enables_guest_agent_on_management_vm():
     text = _wizard_text()
     assert "  - qemu-guest-agent" in text
     assert 'qm set "$MGT_ID" --agent enabled=1 >/dev/null' in text
+    assert '--tags "twinbox;management;docker;bootstrap"' in text
+
+
+def test_setup_wizard_collects_cloud_init_settings():
+    text = _wizard_text()
+    assert 'CLOUD_INIT_USER="twinbox"' in text
+    assert "CLOUD_INIT_PASSWORD=$(generate_cloud_init_password)" in text
+    assert 'input_box "Cloud-Init" "DNS search domain' in text
+    assert 'input_box "Cloud-Init" "DNS server IP' in text
+
+
+def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
+    text = _wizard_text()
+    assert "  - name: ${CLOUD_INIT_USER}" in text
+    assert "    sudo: ['ALL=(ALL) NOPASSWD:ALL']" in text
+    assert "  - path: /home/${CLOUD_INIT_USER}/twinbox.env.template" in text
+    assert 'qm set "$MGT_ID" --ciuser "$CLOUD_INIT_USER" >/dev/null' in text
+    assert 'qm set "$MGT_ID" --cipassword "$CLOUD_INIT_PASSWORD" >/dev/null' in text
+    assert 'qm set "$MGT_ID" --searchdomain "$CLOUD_INIT_DNS_DOMAIN" >/dev/null' in text
+    assert 'qm set "$MGT_ID" --nameserver "$CLOUD_INIT_DNS_IP" >/dev/null' in text
+
+
+def test_setup_wizard_discovers_management_vm_ip_via_guest_agent():
+    text = _wizard_text()
+    assert "discover_management_vm_ip()" in text
+    assert 'qm guest cmd "$MGT_ID" network-get-interfaces' in text
+    assert 'if [[ -n "${management_ip:-}" ]]; then' in text
+
+
+def test_setup_wizard_prints_resolved_urls_when_ip_is_available():
+    text = _wizard_text()
+    assert 'echo "2. Open: http://${management_ip}:3000"' in text
+    assert 'echo "3. Verify API health: http://${management_ip}:8080/api/health"' in text
+
+
+def test_setup_wizard_prints_generated_twinbox_credentials():
+    text = _wizard_text()
+    assert 'echo "Login user: ${CLOUD_INIT_USER}"' in text
+    assert 'echo "Login password: ${CLOUD_INIT_PASSWORD}"' in text
+
+
+def test_setup_wizard_has_auto_config_path():
+    text = _wizard_text()
+    assert "apply_educated_defaults()" in text
+    assert 'if whiptail --yesno "Use recommended settings with educated guesses?"' in text
+    assert "collect_manual_overrides" in text
+
+
+def test_setup_wizard_uses_detected_ssh_key_when_available():
+    text = _wizard_text()
+    assert "guess_ssh_public_key()" in text
+    assert 'if [[ -z "${SSH_KEY:-}" ]]; then' in text
+    assert 'input_box "Cloud-Init" "SSH public key" "" SSH_KEY' in text
+
+
+def test_setup_wizard_groups_manual_questions_with_review_screens():
+    text = _wizard_text()
+    assert "review_management_settings()" in text
+    assert "review_cloud_init_settings()" in text
+    assert "review_manager_env_settings()" in text
+    assert 'if whiptail --yesno "Management VM settings' in text
+    assert 'if whiptail --yesno "Cloud-Init settings' in text
+    assert 'if whiptail --yesno "Manager API settings' in text
+
+
+def test_setup_wizard_includes_more_explanatory_question_text():
+    text = _wizard_text()
+    assert "name shown in Proxmox UI" in text
+    assert "bridge used for VM network interface" in text
+    assert "search domain used in /etc/resolv.conf" in text
+    assert "used by worker to call Proxmox API" in text
+
+
+def test_setup_wizard_finds_first_free_vmid_cluster_wide():
+    text = _wizard_text()
+    assert 'pvesh get /cluster/resources --type vm --output-format json' in text
+    assert "used_vmids=$(printf '%s\\n' \"$cluster_vms\"" in text
+    assert 'while printf \'%s\\n\' "$used_vmids" | grep -qx "$candidate"; do' in text

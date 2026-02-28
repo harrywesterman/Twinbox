@@ -70,12 +70,15 @@ next_ip() {
 }
 
 create_vm() {
-  local vmid="$1" name="$2"
+  local vmid="$1"
+  local name="$2"
+  local role_tag="$3"
   task_post "https://${PROXMOX_HOST}:${PROXMOX_PORT}/api2/json/nodes/${PROXMOX_NODE}/qemu" \
     --data-urlencode "vmid=${vmid}" \
     --data-urlencode "name=${name}" \
     --data-urlencode "memory=${MEMORY_MB}" \
     --data-urlencode "cores=${CPU_CORES}" \
+    --data-urlencode "tags=twinbox;talos;${role_tag};cluster-${CLUSTER_ID}" \
     --data-urlencode "net0=virtio,bridge=${BRIDGE}" \
     --data-urlencode "scsihw=virtio-scsi-pci" \
     --data-urlencode "scsi0=${STORAGE_POOL}:${DISK_GB}" \
@@ -95,7 +98,7 @@ current_vmid="$START_VMID"
 for i in $(seq 1 "$CP_COUNT"); do
   vm_name="${NAME}-cp-${i}"
   ip=$(next_ip $((i - 1)))
-  create_vm "$current_vmid" "$vm_name"
+  create_vm "$current_vmid" "$vm_name" "controlplane"
   cp_ids+=("$current_vmid")
   cp_ips+=("$ip")
   current_vmid=$((current_vmid + 1))
@@ -105,7 +108,7 @@ done
 for i in $(seq 1 "$WORKER_COUNT"); do
   vm_name="${NAME}-worker-${i}"
   ip=$(next_ip $((CP_COUNT + i - 1)))
-  create_vm "$current_vmid" "$vm_name"
+  create_vm "$current_vmid" "$vm_name" "worker"
   worker_ids+=("$current_vmid")
   worker_ips+=("$ip")
   current_vmid=$((current_vmid + 1))

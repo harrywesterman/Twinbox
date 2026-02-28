@@ -64,9 +64,9 @@ check_root() {
 
 check_deps() {
   msg_info "Checking dependencies"
-  if ! command -v whiptail >/dev/null 2>&1; then
+  if ! command -v whiptail >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1 || ! command -v openssl >/dev/null 2>&1; then
     apt-get update -qq
-    apt-get install -y whiptail curl >/dev/null 2>&1
+    apt-get install -y whiptail curl openssl >/dev/null 2>&1
   fi
   msg_ok "Dependencies checked"
 }
@@ -102,34 +102,175 @@ msg_box() {
   whiptail --msgbox "$2" 12 78 --title "$1"
 }
 
-start_wizard() {
+guess_ssh_public_key() {
+  local key=""
+
+  for candidate in /root/.ssh/id_ed25519.pub /root/.ssh/id_rsa.pub /root/.ssh/authorized_keys; do
+    if [[ -f "$candidate" ]]; then
+      key=$(head -n1 "$candidate")
+      if [[ -n "$key" ]]; then
+        echo "$key"
+        return 0
+      fi
+    fi
+  done
+
+  return 1
+}
+
+guess_bridge_interface() {
+  if command -v brctl >/dev/null 2>&1; then
+    if brctl show vmbr0 >/dev/null 2>&1; then
+      echo "vmbr0"
+      return 0
+    fi
+  fi
+
+  ip -o link show | awk -F': ' '/vmbr/ {print $2; exit}'
+}
+
+guess_next_vmid() {
+  local cluster_vms=""
+  local used_vmids=""
+  local candidate=100
+
+  cluster_vms=$(pvesh get /cluster/resources --type vm --output-format json 2>/dev/null || true)
+  if [[ -n "$cluster_vms" ]]; then
+    used_vmids=$(printf '%s\n' "$cluster_vms" \
+      | grep -Eo '"vmid"[[:space:]]*:[[:space:]]*[0-9]+' \
+      | grep -Eo '[0-9]+' \
+      | sort -n \
+      | uniq)
+  else
+    used_vmids=$(qm list 2>/dev/null | awk 'NR>1 {print $1}' | sort -n | uniq || true)
+  fi
+
+  while printf '%s\n' "$used_vmids" | grep -qx "$candidate"; do
+    candidate=$((candidate + 1))
+  done
+
+  echo "$candidate"
+}
+
+generate_cloud_init_password() {
+  local generated=""
+
+  while [[ ${#generated} -lt 20 ]]; do
+    generated=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | cut -c1-20)
+  done
+
+  echo "$generated"
+}
+
+apply_educated_defaults() {
   local detected_host
+
   detected_host=$(hostname -I | awk '{print $1}')
+  detected_dns_ip=$(awk '/^nameserver / {print $2; exit}' /etc/resolv.conf)
+  guessed_bridge=$(guess_bridge_interface || true)
+  guessed_ssh_key=$(guess_ssh_public_key || true)
+
+  MGT_NAME="twinbox-mgt"
+  MGT_ID=$(guess_next_vmid)
+  MGT_RAM="4096"
+  MGT_CORES="2"
+  MGT_DISK="40"
+  BRIDGE_IF="${guessed_bridge:-vmbr0}"
+  CLOUD_INIT_USER="twinbox"
+  CLOUD_INIT_PASSWORD=$(generate_cloud_init_password)
+  CLOUD_INIT_DNS_DOMAIN="localdomain"
+  CLOUD_INIT_DNS_IP="${detected_dns_ip:-1.1.1.1}"
+  SSH_KEY="${guessed_ssh_key:-}"
+
+  PROXMOX_HOST="${detected_host:-192.168.1.10}"
+  PROXMOX_PORT="8006"
+  PROXMOX_USER="root@pam"
+  PROXMOX_PASSWORD="${PROXMOX_PASSWORD:-}"
+  PROXMOX_NODE="$(hostname)"
+  PROXMOX_STORAGE_POOL="local-lvm"
+  PROXMOX_ISO_STORAGE="local"
+  TALOS_ISO_FILE="talos-v1.7.4.iso"
+  TWINBOX_IMAGE_TAG="latest"
+}
+
+collect_manual_overrides() {
+  if review_management_settings; then
+    input_box "Management VM" "Management VM name (name shown in Proxmox UI)" "$MGT_NAME" MGT_NAME
+    input_box "Management VM" "Management VM ID (unique VMID in Proxmox)" "$MGT_ID" MGT_ID
+    input_box "Management VM" "Management VM RAM (MB) for manager services" "$MGT_RAM" MGT_RAM
+    input_box "Management VM" "Management VM CPU cores for manager services" "$MGT_CORES" MGT_CORES
+    input_box "Management VM" "Management VM disk size (GB) for OS + images" "$MGT_DISK" MGT_DISK
+    input_box "Management VM" "Bridge interface (bridge used for VM network interface)" "$BRIDGE_IF" BRIDGE_IF
+  fi
+
+  if review_cloud_init_settings; then
+    input_box "Cloud-Init" "DNS search domain (search domain used in /etc/resolv.conf)" "$CLOUD_INIT_DNS_DOMAIN" CLOUD_INIT_DNS_DOMAIN
+    input_box "Cloud-Init" "DNS server IP (resolver IP for management VM)" "$CLOUD_INIT_DNS_IP" CLOUD_INIT_DNS_IP
+    input_box "Cloud-Init" "SSH public key (used for initial SSH access)" "$SSH_KEY" SSH_KEY
+  fi
+
+  if review_manager_env_settings; then
+    input_box "Manager .env" "Proxmox API host (used by worker to call Proxmox API)" "$PROXMOX_HOST" PROXMOX_HOST
+    input_box "Manager .env" "Proxmox API port (usually 8006)" "$PROXMOX_PORT" PROXMOX_PORT
+    input_box "Manager .env" "Proxmox API user (service account user@realm)" "$PROXMOX_USER" PROXMOX_USER
+    password_box "Manager .env" "Proxmox API password (stored on management VM .env)" PROXMOX_PASSWORD
+    input_box "Manager .env" "Proxmox node (target node for VM creation)" "$PROXMOX_NODE" PROXMOX_NODE
+    input_box "Manager .env" "Proxmox storage pool (disk target for Talos VMs)" "$PROXMOX_STORAGE_POOL" PROXMOX_STORAGE_POOL
+    input_box "Manager .env" "Proxmox ISO storage (where Talos ISO is stored)" "$PROXMOX_ISO_STORAGE" PROXMOX_ISO_STORAGE
+    input_box "Manager .env" "Talos ISO file (filename in ISO storage)" "$TALOS_ISO_FILE" TALOS_ISO_FILE
+    input_box "Manager .env" "Image tag (Twinbox container image tag)" "$TWINBOX_IMAGE_TAG" TWINBOX_IMAGE_TAG
+  fi
+}
+
+review_management_settings() {
+  if whiptail --yesno "Management VM settings\n\nName: $MGT_NAME\nVMID: $MGT_ID\nRAM: ${MGT_RAM}MB\nCPU cores: $MGT_CORES\nDisk: ${MGT_DISK}GB\nBridge: $BRIDGE_IF\n\nEdit this group?" 18 78 --title "Management VM"; then
+    return 0
+  fi
+  return 1
+}
+
+review_cloud_init_settings() {
+  local ssh_key_detected="no"
+  if [[ -n "${SSH_KEY:-}" ]]; then
+    ssh_key_detected="yes"
+  fi
+
+  if whiptail --yesno "Cloud-Init settings\n\nUser: $CLOUD_INIT_USER\nDNS domain: $CLOUD_INIT_DNS_DOMAIN\nDNS server: $CLOUD_INIT_DNS_IP\nSSH key detected: ${ssh_key_detected}\n\nEdit this group?" 18 78 --title "Cloud-Init"; then
+    return 0
+  fi
+  return 1
+}
+
+review_manager_env_settings() {
+  if whiptail --yesno "Manager API settings\n\nHost: $PROXMOX_HOST\nPort: $PROXMOX_PORT\nUser: $PROXMOX_USER\nNode: $PROXMOX_NODE\nStorage: $PROXMOX_STORAGE_POOL\nISO storage: $PROXMOX_ISO_STORAGE\nTalos ISO: $TALOS_ISO_FILE\nImage tag: $TWINBOX_IMAGE_TAG\n\nEdit this group?" 22 78 --title "Manager .env"; then
+    return 0
+  fi
+  return 1
+}
+
+start_wizard() {
+  apply_educated_defaults
 
   header_info
-  msg_box "Twinbox Setup" "This wizard creates only the Management VM.\n\nThe VM installs Docker CE from the official Docker repo, clones ${GITHUB_REPO}, and starts manager-web automatically."
+  msg_box "Twinbox Setup" "This wizard creates only the Management VM.\n\nIt defaults to educated guesses and groups advanced values into 3 sections:\n- Management VM sizing/network\n- Cloud-Init access/network\n- Manager API/runtime settings\n\nYou can review each group and edit only what you need."
 
-  input_box "Management VM" "Management VM name" "twinbox-mgt" MGT_NAME
-  input_box "Management VM" "Management VM ID" "100" MGT_ID
-  input_box "Management VM" "Management VM RAM (MB)" "4096" MGT_RAM
-  input_box "Management VM" "Management VM CPU cores" "2" MGT_CORES
-  input_box "Management VM" "Management VM disk size (GB)" "40" MGT_DISK
-  input_box "Management VM" "Bridge interface" "vmbr0" BRIDGE_IF
-  input_box "Management VM" "SSH public key" "" SSH_KEY
+  if whiptail --yesno "Use recommended settings with educated guesses?" 10 78; then
+    :
+  else
+    collect_manual_overrides
+  fi
 
-  input_box "Manager .env" "Proxmox API host" "${detected_host:-192.168.1.10}" PROXMOX_HOST
-  input_box "Manager .env" "Proxmox API port" "8006" PROXMOX_PORT
-  input_box "Manager .env" "Proxmox API user" "root@pam" PROXMOX_USER
-  password_box "Manager .env" "Proxmox API password" PROXMOX_PASSWORD
-  input_box "Manager .env" "Proxmox node" "$(hostname)" PROXMOX_NODE
-  input_box "Manager .env" "Proxmox storage pool" "local-lvm" PROXMOX_STORAGE_POOL
-  input_box "Manager .env" "Proxmox ISO storage" "local" PROXMOX_ISO_STORAGE
-  input_box "Manager .env" "Talos ISO file" "talos-v1.7.4.iso" TALOS_ISO_FILE
-  input_box "Manager .env" "Image tag" "latest" TWINBOX_IMAGE_TAG
+  if [[ -z "${SSH_KEY:-}" ]]; then
+    input_box "Cloud-Init" "SSH public key" "" SSH_KEY
+  fi
+
+  if [[ -z "${PROXMOX_PASSWORD:-}" ]]; then
+    password_box "Manager .env" "Proxmox API password" PROXMOX_PASSWORD
+  fi
 
   msg_box "Security Notice" "Phase 1 is LAN-only and stores Proxmox credentials in /opt/twinbox/.env on the management VM.\n\nUse a dedicated Proxmox automation account and rotate credentials regularly."
 
-  if whiptail --yesno "Proceed with installation?\n\nVM Name: $MGT_NAME\nVM ID: $MGT_ID\nBridge: $BRIDGE_IF\nRepo: ${GITHUB_REPO}\nAuto-start manager stack: yes" 16 78; then
+  if whiptail --yesno "Proceed with installation?\n\nVM Name: $MGT_NAME\nVM ID: $MGT_ID\nBridge: $BRIDGE_IF\nCloud-Init user: $CLOUD_INIT_USER\nDNS: ${CLOUD_INIT_DNS_IP} (${CLOUD_INIT_DNS_DOMAIN})\nRepo: ${GITHUB_REPO}\nAuto-start manager stack: yes" 18 78; then
     create_management_vm
     print_next_steps
   else
@@ -162,8 +303,7 @@ create_management_vm() {
 hostname: ${MGT_NAME}
 manage_etc_hosts: true
 users:
-  - default
-  - name: ubuntu
+  - name: ${CLOUD_INIT_USER}
     groups: sudo,docker
     shell: /bin/bash
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
@@ -177,9 +317,9 @@ packages:
   - gnupg
   - qemu-guest-agent
 write_files:
-  - path: /home/ubuntu/twinbox.env.template
+  - path: /home/${CLOUD_INIT_USER}/twinbox.env.template
     permissions: '0600'
-    owner: ubuntu:ubuntu
+    owner: ${CLOUD_INIT_USER}:${CLOUD_INIT_USER}
     content: |
       PROXMOX_HOST=${PROXMOX_HOST}
       PROXMOX_PORT=${PROXMOX_PORT}
@@ -201,19 +341,24 @@ runcmd:
   - bash -lc 'docker --version'
   - bash -lc 'docker compose version'
   - install -d -m 0755 /opt/twinbox
-  - chown ubuntu:ubuntu /opt/twinbox
+  - chown ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} /opt/twinbox
   - bash -lc 'if [ ! -d /opt/twinbox/.git ]; then git clone https://github.com/${GITHUB_REPO}.git /opt/twinbox; fi'
-  - bash -lc 'cp /home/ubuntu/twinbox.env.template /opt/twinbox/.env'
+  - bash -lc 'cp /home/${CLOUD_INIT_USER}/twinbox.env.template /opt/twinbox/.env'
   - bash -lc 'cd /opt/twinbox && docker compose pull'
   - bash -lc 'cd /opt/twinbox && docker compose up -d'
 CLOUDINIT
   chmod 600 "$snippet_file"
 
   qm create "$MGT_ID" --name "$MGT_NAME" --memory "$MGT_RAM" --cores "$MGT_CORES" --net0 "virtio,bridge=${BRIDGE_IF}" \
+    --tags "twinbox;management;docker;bootstrap" \
     --scsihw virtio-scsi-pci --ide2 local-lvm:cloudinit --serial0 socket --vga serial0 --ostype l26 >/dev/null
   vm_created=1
   qm importdisk "$MGT_ID" "$img_path" local-lvm >/dev/null
   qm set "$MGT_ID" --scsi0 "local-lvm:vm-${MGT_ID}-disk-0" >/dev/null
+  qm set "$MGT_ID" --ciuser "$CLOUD_INIT_USER" >/dev/null
+  qm set "$MGT_ID" --cipassword "$CLOUD_INIT_PASSWORD" >/dev/null
+  qm set "$MGT_ID" --searchdomain "$CLOUD_INIT_DNS_DOMAIN" >/dev/null
+  qm set "$MGT_ID" --nameserver "$CLOUD_INIT_DNS_IP" >/dev/null
   qm set "$MGT_ID" --agent enabled=1 >/dev/null
   qm set "$MGT_ID" --cicustom "user=local:snippets/$(basename "$snippet_file")" >/dev/null
   qm set "$MGT_ID" --boot order=scsi0 >/dev/null
@@ -223,14 +368,52 @@ CLOUDINIT
   msg_ok "Management VM created"
 }
 
+discover_management_vm_ip() {
+  local attempts=24
+  local output=""
+  local ip=""
+
+  while [[ "$attempts" -gt 0 ]]; do
+    output=$(qm guest cmd "$MGT_ID" network-get-interfaces 2>/dev/null || true)
+    ip=$(
+      printf '%s\n' "$output" \
+      | grep -Eo '"ip-address"[[:space:]]*:[[:space:]]*"[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+"' \
+      | sed -E 's/.*"([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)"/\1/' \
+      | grep -Ev '^(127\.|169\.254\.)' \
+      | head -n1
+    )
+
+    if [[ -n "$ip" ]]; then
+      echo "$ip"
+      return 0
+    fi
+
+    sleep 5
+    attempts=$((attempts - 1))
+  done
+
+  return 1
+}
+
 print_next_steps() {
+  local management_ip=""
+  management_ip=$(discover_management_vm_ip || true)
+
   echo
   echo -e "${GN}Installation complete${CL}"
   echo
   echo "Next steps:"
-  echo "1. Wait for cloud-init on the management VM to finish."
-  echo "2. Open: http://<management-vm-ip>:3000"
-  echo "3. Verify API health: http://<management-vm-ip>:8080/api/health"
+  if [[ -n "${management_ip:-}" ]]; then
+    echo "1. Wait for cloud-init on the management VM to finish."
+    echo "2. Open: http://${management_ip}:3000"
+    echo "3. Verify API health: http://${management_ip}:8080/api/health"
+  else
+    echo "1. Wait for cloud-init on the management VM to finish."
+    echo "2. Open: http://<management-vm-ip>:3000"
+    echo "3. Verify API health: http://<management-vm-ip>:8080/api/health"
+  fi
+  echo "Login user: ${CLOUD_INIT_USER}"
+  echo "Login password: ${CLOUD_INIT_PASSWORD}"
   echo "4. If needed, edit /opt/twinbox/.env and run: cd /opt/twinbox && docker compose up -d"
   echo
 }
