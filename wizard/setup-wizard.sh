@@ -175,6 +175,7 @@ packages:
   - git
   - ca-certificates
   - gnupg
+  - qemu-guest-agent
 write_files:
   - path: /home/ubuntu/twinbox.env.template
     permissions: '0600'
@@ -213,6 +214,7 @@ CLOUDINIT
   vm_created=1
   qm importdisk "$MGT_ID" "$img_path" local-lvm >/dev/null
   qm set "$MGT_ID" --scsi0 "local-lvm:vm-${MGT_ID}-disk-0" >/dev/null
+  qm set "$MGT_ID" --agent enabled=1 >/dev/null
   qm set "$MGT_ID" --cicustom "user=local:snippets/$(basename "$snippet_file")" >/dev/null
   qm set "$MGT_ID" --boot order=scsi0 >/dev/null
   qm resize "$MGT_ID" scsi0 "${MGT_DISK}G" >/dev/null

@@ -25,3 +25,9 @@ def test_setup_wizard_cleanup_rolls_back_created_vm_on_error():
     assert '[[ "${vm_created:-0}" -eq 1 ]]' in text
     assert 'qm stop "$MGT_ID" --skiplock 1 >/dev/null 2>&1 || true' in text
     assert 'qm destroy "$MGT_ID" --purge 1 >/dev/null 2>&1 || true' in text
+
+
+def test_setup_wizard_enables_guest_agent_on_management_vm():
+    text = _wizard_text()
+    assert "  - qemu-guest-agent" in text
+    assert 'qm set "$MGT_ID" --agent enabled=1 >/dev/null' in text
