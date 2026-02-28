@@ -30,7 +30,6 @@
 
 - Removed historical plans under `docs/plans/`.
 - Removed legacy `twinbox/` directory tree.
-- Removed root `tests/` directory.
 - Migrated active docs and metadata to root locations.
 
 ### Documentation
