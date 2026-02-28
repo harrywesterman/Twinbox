@@ -1,0 +1,46 @@
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-test.txt
+
+      - name: Static checks
+        run: |
+          bash -n wizard/setup-wizard.sh scripts/manager/create-talos-vms.sh scripts/manager/bootstrap-talos.sh scripts/manager/collect-state.sh
+          node --check manager-api/src/server.js
+          node --check manager-worker/src/worker.js
+
+      - name: Compose config check
+        run: |
+          cp .env.example .env
+          docker compose config >/dev/null
+          rm .env
+
+      - name: Runtime tests
+        run: python -m pytest -q tests
