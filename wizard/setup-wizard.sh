@@ -107,6 +107,8 @@ start_wizard() {
   input_box "Manager .env" "Talos ISO file" "talos-v1.7.4.iso" TALOS_ISO_FILE
   input_box "Manager .env" "Image tag" "latest" TWINBOX_IMAGE_TAG
 
+  msg_box "Security Notice" "Phase 1 is LAN-only and stores Proxmox credentials in /opt/twinbox/.env on the management VM.\n\nUse a dedicated Proxmox automation account and rotate credentials regularly."
+
   if whiptail --yesno "Proceed with installation?\n\nVM Name: $MGT_NAME\nVM ID: $MGT_ID\nBridge: $BRIDGE_IF\nRepo: ${GITHUB_REPO}\nAuto-start manager stack: yes" 16 78; then
     create_management_vm
     print_next_steps
@@ -184,6 +186,7 @@ runcmd:
   - bash -lc 'cd /opt/twinbox && docker compose pull'
   - bash -lc 'cd /opt/twinbox && docker compose up -d'
 CLOUDINIT
+  chmod 600 "$snippet_file"
 
   qm create "$MGT_ID" --name "$MGT_NAME" --memory "$MGT_RAM" --cores "$MGT_CORES" --net0 "virtio,bridge=${BRIDGE_IF}" \
     --scsihw virtio-scsi-pci --ide2 local-lvm:cloudinit --serial0 socket --vga serial0 --ostype l26 >/dev/null

@@ -34,6 +34,42 @@ function readJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
+function parseIntInRange(value, field, min, max) {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < min || n > max) {
+    return { ok: false, error: `${field} must be an integer between ${min} and ${max}` };
+  }
+  return { ok: true, value: n };
+}
+
+function parseRequiredString(value, field) {
+  if (typeof value !== "string" || value.trim() === "") {
+    return { ok: false, error: `${field} must be a non-empty string` };
+  }
+  return { ok: true, value: value.trim() };
+}
+
+function parseIPv4(value, field) {
+  if (typeof value !== "string") {
+    return { ok: false, error: `${field} must be a valid IPv4 address` };
+  }
+  const parts = value.split(".");
+  if (parts.length !== 4) {
+    return { ok: false, error: `${field} must be a valid IPv4 address` };
+  }
+  const valid = parts.every((part) => {
+    if (!/^\d+$/.test(part)) {
+      return false;
+    }
+    const n = Number(part);
+    return n >= 0 && n <= 255;
+  });
+  if (!valid) {
+    return { ok: false, error: `${field} must be a valid IPv4 address` };
+  }
+  return { ok: true, value };
+}
+
 function queueJob(type, clusterId, payload) {
   const jobId = id("job");
   const job = {
@@ -70,26 +106,49 @@ app.get("/api/health", (_, res) => {
 
 app.post("/api/clusters", (req, res) => {
   const body = req.body || {};
-  const required = ["name", "controlplane_count", "worker_count", "cpu_cores", "memory_mb", "disk_gb", "bridge", "start_vmid", "vip_ip", "start_ip"];
-  const missing = required.filter((k) => body[k] === undefined || body[k] === null || body[k] === "");
 
-  if (missing.length > 0) {
-    return res.status(400).json({ error: `missing required fields: ${missing.join(", ")}` });
+  const parsedName = parseRequiredString(body.name, "name");
+  const parsedBridge = parseRequiredString(body.bridge, "bridge");
+  const parsedControlplanes = parseIntInRange(body.controlplane_count, "controlplane_count", 1, 15);
+  const parsedWorkers = parseIntInRange(body.worker_count, "worker_count", 0, 200);
+  const parsedCpu = parseIntInRange(body.cpu_cores, "cpu_cores", 1, 64);
+  const parsedMemory = parseIntInRange(body.memory_mb, "memory_mb", 512, 1048576);
+  const parsedDisk = parseIntInRange(body.disk_gb, "disk_gb", 10, 8192);
+  const parsedStartVmid = parseIntInRange(body.start_vmid, "start_vmid", 100, 999999);
+  const parsedVipIp = parseIPv4(body.vip_ip, "vip_ip");
+  const parsedStartIp = parseIPv4(body.start_ip, "start_ip");
+
+  const validations = [
+    parsedName,
+    parsedBridge,
+    parsedControlplanes,
+    parsedWorkers,
+    parsedCpu,
+    parsedMemory,
+    parsedDisk,
+    parsedStartVmid,
+    parsedVipIp,
+    parsedStartIp,
+  ];
+
+  const failed = validations.find((v) => !v.ok);
+  if (failed) {
+    return res.status(400).json({ error: failed.error });
   }
 
   const clusterId = id("cluster");
   const cluster = {
     id: clusterId,
-    name: String(body.name),
-    controlplane_count: Number(body.controlplane_count),
-    worker_count: Number(body.worker_count),
-    cpu_cores: Number(body.cpu_cores),
-    memory_mb: Number(body.memory_mb),
-    disk_gb: Number(body.disk_gb),
-    bridge: String(body.bridge),
-    start_vmid: Number(body.start_vmid),
-    vip_ip: String(body.vip_ip),
-    start_ip: String(body.start_ip),
+    name: parsedName.value,
+    controlplane_count: parsedControlplanes.value,
+    worker_count: parsedWorkers.value,
+    cpu_cores: parsedCpu.value,
+    memory_mb: parsedMemory.value,
+    disk_gb: parsedDisk.value,
+    bridge: parsedBridge.value,
+    start_vmid: parsedStartVmid.value,
+    vip_ip: parsedVipIp.value,
+    start_ip: parsedStartIp.value,
     status: "requested",
     created_at: now(),
     updated_at: now(),

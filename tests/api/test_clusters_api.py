@@ -58,7 +58,7 @@ def test_create_cluster_missing_required_fields():
             _wait_for_health(f"http://127.0.0.1:{port}")
             status, body = _post_json(f"http://127.0.0.1:{port}/api/clusters", {"name": "x"})
             assert status == 400
-            assert "missing required fields" in body["error"]
+            assert "must be" in body["error"]
         finally:
             proc.terminate()
             proc.wait(timeout=5)
