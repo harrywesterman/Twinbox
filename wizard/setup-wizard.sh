@@ -299,6 +299,22 @@ create_proxmox_api_user() {
     return 1
   }
 
+  set_proxmox_password_with_retry() {
+    local user="$1"
+    local password="$2"
+    local retries="${3:-10}"
+    local delay="${4:-1}"
+    local attempt=0
+    while [[ "$attempt" -lt "$retries" ]]; do
+      if printf '%s\n%s\n' "$password" "$password" | pveum passwd "$user" >/dev/null 2>&1; then
+        return 0
+      fi
+      attempt=$((attempt + 1))
+      sleep "$delay"
+    done
+    return 1
+  }
+
   status_update "Ensuring Proxmox API user ${PROXMOX_USER} exists"
   if proxmox_user_exists "$PROXMOX_USER"; then
     status_update "Proxmox API user ${PROXMOX_USER} already exists"
@@ -318,13 +334,17 @@ create_proxmox_api_user() {
 
   if ! wait_for_proxmox_user "$PROXMOX_USER" 15 1; then
     list_dump=$(pveum user list 2>&1 || true)
-    msg_error "Proxmox API user ${PROXMOX_USER} not found after create/check"
-    msg_error "pveum user list output: ${list_dump}"
-    exit 1
+    status_update "Proxmox API user ${PROXMOX_USER} not yet visible in list; continuing"
+    status_update "pveum user list output: ${list_dump}"
   fi
 
   status_update "Setting password for ${PROXMOX_USER}"
-  printf '%s\n%s\n' "$PROXMOX_PASSWORD" "$PROXMOX_PASSWORD" | pveum passwd "$PROXMOX_USER" >/dev/null
+  if ! set_proxmox_password_with_retry "$PROXMOX_USER" "$PROXMOX_PASSWORD" 15 1; then
+    list_dump=$(pveum user list 2>&1 || true)
+    msg_error "Failed to set password for Proxmox API user ${PROXMOX_USER}"
+    msg_error "pveum user list output: ${list_dump}"
+    exit 1
+  fi
 
   status_update "Ensuring least-privilege role ${PROXMOX_ROLE}"
   if pveum role list | awk 'NR>1 {print $1}' | grep -qx "$PROXMOX_ROLE"; then
