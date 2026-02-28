@@ -282,11 +282,17 @@ create_proxmox_api_user() {
   if pveum user list | awk 'NR>1 {print $1}' | grep -qx "$PROXMOX_USER"; then
     status_update "Proxmox API user ${PROXMOX_USER} already exists"
   else
-    if ! pveum user add "$PROXMOX_USER" --comment "Twinbox service account" >/dev/null 2>&1; then
-      msg_error "Failed to create Proxmox API user ${PROXMOX_USER}"
-      exit 1
+    local create_err=""
+    if ! create_err=$(pveum user add "$PROXMOX_USER" --comment "Twinbox service account" 2>&1); then
+      if pveum user list | awk 'NR>1 {print $1}' | grep -qx "$PROXMOX_USER"; then
+        status_update "Proxmox API user ${PROXMOX_USER} already exists"
+      else
+        msg_error "Failed to create Proxmox API user ${PROXMOX_USER}: ${create_err}"
+        exit 1
+      fi
+    else
+      status_update "Created Proxmox API user ${PROXMOX_USER}"
     fi
-    status_update "Created Proxmox API user ${PROXMOX_USER}"
   fi
 
   if ! pveum user list | awk 'NR>1 {print $1}' | grep -qx "$PROXMOX_USER"; then
