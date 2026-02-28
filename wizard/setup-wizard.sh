@@ -153,6 +153,39 @@ guess_next_vmid() {
   echo "$candidate"
 }
 
+guess_free_management_ip() {
+  local host_ip="$1"
+  local first="" second="" third="" fourth=""
+  local candidate_octet=50
+  local candidate=""
+
+  if [[ -z "${host_ip:-}" ]]; then
+    return 1
+  fi
+
+  IFS='.' read -r first second third fourth <<<"$host_ip"
+  if [[ -z "$first" || -z "$second" || -z "$third" || -z "$fourth" ]]; then
+    return 1
+  fi
+  if ! [[ "$first" =~ ^[0-9]+$ && "$second" =~ ^[0-9]+$ && "$third" =~ ^[0-9]+$ && "$fourth" =~ ^[0-9]+$ ]]; then
+    return 1
+  fi
+
+  for ((candidate_octet = 50; candidate_octet <= 254; candidate_octet++)); do
+    candidate="${first}.${second}.${third}.${candidate_octet}"
+    if [[ "$candidate" == "$host_ip" ]]; then
+      continue
+    fi
+    if ping -c 1 -W 1 "$candidate" >/dev/null 2>&1; then
+      continue
+    fi
+    echo "$candidate"
+    return 0
+  done
+
+  return 1
+}
+
 cidr_to_netmask() {
   local cidr="$1"
   local i octet mask=""
@@ -240,11 +273,13 @@ apply_educated_defaults() {
   local detected_host
   local detected_prefix
   local detected_gateway
+  local free_management_ip
 
   detected_host=$(hostname -I | awk '{print $1}')
   detected_prefix=$(ip -o -f inet addr show scope global | awk 'NR==1 {split($4, a, "/"); print a[2]}')
   detected_gateway=$(ip route | awk '/^default/ {print $3; exit}')
   detected_dns_ip=$(awk '/^nameserver / {print $2; exit}' /etc/resolv.conf)
+  free_management_ip=$(guess_free_management_ip "${detected_host:-}" || true)
   guessed_bridge=$(guess_bridge_interface || true)
   guessed_ssh_key=$(guess_ssh_public_key || true)
 
@@ -256,7 +291,7 @@ apply_educated_defaults() {
   BRIDGE_IF="${guessed_bridge:-vmbr0}"
   CLOUD_INIT_USER="twinbox"
   CLOUD_INIT_PASSWORD=""
-  CLOUD_INIT_IP="${detected_host:-192.168.1.50}"
+  CLOUD_INIT_IP="${free_management_ip:-192.168.1.50}"
   CLOUD_INIT_NETMASK="$(cidr_to_netmask "${detected_prefix:-24}")"
   CLOUD_INIT_GATEWAY="${detected_gateway:-192.168.1.1}"
   CLOUD_INIT_DNS_DOMAIN="localdomain"

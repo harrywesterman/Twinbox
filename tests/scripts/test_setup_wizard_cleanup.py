@@ -119,6 +119,14 @@ def test_setup_wizard_finds_first_free_vmid_cluster_wide():
     assert 'while printf \'%s\\n\' "$used_vmids" | grep -qx "$candidate"; do' in text
 
 
+def test_setup_wizard_auto_selects_management_ip_using_ping_probe():
+    text = _wizard_text()
+    assert "guess_free_management_ip()" in text
+    assert 'if ping -c 1 -W 1 "$candidate" >/dev/null 2>&1; then' in text
+    assert 'free_management_ip=$(guess_free_management_ip "${detected_host:-}" || true)' in text
+    assert 'CLOUD_INIT_IP="${free_management_ip:-192.168.1.50}"' in text
+
+
 def test_setup_wizard_generates_proxmox_api_password_without_prompting():
     text = _wizard_text()
     assert "PROXMOX_PASSWORD=$(generate_cloud_init_password)" in text
