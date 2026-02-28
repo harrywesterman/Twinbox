@@ -23,15 +23,15 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "${CLUSTER_ID:-}" ]] || { usage; fail "cluster-id required"; }
+
+IFS=',' read -r -a cp_ips <<< "${CONTROLPLANE_IPS:-}"
+IFS=',' read -r -a worker_ips <<< "${WORKER_IPS:-}"
+[[ ${#cp_ips[@]} -gt 0 && -n "${cp_ips[0]}" ]] || fail "At least one controlplane IP is required"
 command -v talosctl >/dev/null 2>&1 || fail "talosctl not found"
 
 clusters_dir="$DATA_DIR/clusters"
 cluster_dir="$clusters_dir/$CLUSTER_ID"
 mkdir -p "$cluster_dir"
-
-IFS=',' read -r -a cp_ips <<< "${CONTROLPLANE_IPS:-}"
-IFS=',' read -r -a worker_ips <<< "${WORKER_IPS:-}"
-[[ ${#cp_ips[@]} -gt 0 && -n "${cp_ips[0]}" ]] || fail "At least one controlplane IP is required"
 
 talos_dir="$cluster_dir/talos"
 mkdir -p "$talos_dir"

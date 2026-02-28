@@ -28,7 +28,9 @@ jobs:
           python-version: "3.12"
 
       - name: Install test dependencies
-        run: python -m pip install -r requirements-test.txt
+        run: |
+          python -m pip install -r requirements-test.txt
+          npm ci --prefix manager-api
 
       - name: Static checks
         run: |
