@@ -16,6 +16,9 @@ HOLD=" "
 CM="${GN}✓${CL}"
 CROSS="${RD}✗${CL}"
 
+snippet_file=""
+vm_created=0
+
 header_info() {
   clear
   cat << "BANNER"
@@ -33,6 +36,23 @@ BANNER
 msg_info() { echo -ne " ${HOLD} ${YW}$1..."; }
 msg_ok() { echo -e "${BFR} ${CM} ${GN}$1${CL}"; }
 msg_error() { echo -e "${BFR} ${CROSS} ${RD}$1${CL}"; }
+
+cleanup_after_run() {
+  local exit_code=$?
+
+  if [[ "$exit_code" -eq 0 ]]; then
+    return
+  fi
+
+  if [[ -n "${snippet_file:-}" && -f "$snippet_file" ]]; then
+    rm -f "$snippet_file"
+  fi
+
+  if [[ "${vm_created:-0}" -eq 1 ]]; then
+    qm stop "$MGT_ID" --skiplock 1 >/dev/null 2>&1 || true
+    qm destroy "$MGT_ID" --purge 1 >/dev/null 2>&1 || true
+  fi
+}
 
 check_root() {
   if [[ "$(id -u)" -ne 0 || $(ps -o comm= -p $$) == "sudo" ]]; then
@@ -135,7 +155,7 @@ create_management_vm() {
 
   msg_info "Creating management VM (ID: $MGT_ID)"
 
-  local snippet_file="/var/lib/vz/snippets/mgt-${MGT_ID}-user-data.yaml"
+  snippet_file="/var/lib/vz/snippets/mgt-${MGT_ID}-user-data.yaml"
 
   cat > "$snippet_file" <<CLOUDINIT
 #cloud-config
@@ -190,6 +210,7 @@ CLOUDINIT
 
   qm create "$MGT_ID" --name "$MGT_NAME" --memory "$MGT_RAM" --cores "$MGT_CORES" --net0 "virtio,bridge=${BRIDGE_IF}" \
     --scsihw virtio-scsi-pci --ide2 local-lvm:cloudinit --serial0 socket --vga serial0 --ostype l26 >/dev/null
+  vm_created=1
   qm importdisk "$MGT_ID" "$img_path" local-lvm >/dev/null
   qm set "$MGT_ID" --scsi0 "local-lvm:vm-${MGT_ID}-disk-0" >/dev/null
   qm set "$MGT_ID" --cicustom "user=local:snippets/$(basename "$snippet_file")" >/dev/null
@@ -213,6 +234,7 @@ print_next_steps() {
 }
 
 main() {
+  trap cleanup_after_run EXIT
   check_root
   check_deps
   start_wizard
