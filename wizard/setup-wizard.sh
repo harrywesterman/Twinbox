@@ -516,6 +516,8 @@ create_management_vm() {
     msg_ok "Ubuntu image already present"
   fi
 
+  ensure_talos_iso_available
+
   status_update "Preparing cloud-init configuration snippet"
 
   snippet_file="/var/lib/vz/snippets/mgt-${MGT_ID}-user-data.yaml"
@@ -597,6 +599,36 @@ CLOUDINIT
   qm start "$MGT_ID" >/dev/null
 
   msg_ok "Management VM created"
+}
+
+ensure_talos_iso_available() {
+  local talos_version=""
+  local talos_url=""
+  local iso_list=""
+
+  status_update "Checking Talos ISO in storage ${PROXMOX_ISO_STORAGE}"
+  iso_list=$(pvesm list "$PROXMOX_ISO_STORAGE" --content iso 2>/dev/null || true)
+  if printf '%s\n' "$iso_list" | grep -Fq "iso/${TALOS_ISO_FILE}"; then
+    msg_ok "Talos ISO already present (${TALOS_ISO_FILE})"
+    return 0
+  fi
+
+  talos_version="${TALOS_ISO_FILE%.iso}"
+  talos_version="${talos_version#talos-v}"
+  talos_version="${talos_version#v}"
+  if [[ -z "$talos_version" || "$talos_version" == "$TALOS_ISO_FILE" ]]; then
+    msg_error "Could not derive Talos version from ${TALOS_ISO_FILE}"
+    msg_error "Use format talos-vX.Y.Z.iso or pre-upload ISO to ${PROXMOX_ISO_STORAGE}"
+    exit 1
+  fi
+
+  talos_url="https://github.com/siderolabs/talos/releases/download/v${talos_version}/metal-amd64.iso"
+  msg_info "Downloading Talos ISO ${TALOS_ISO_FILE}"
+  if ! pvesm download "$PROXMOX_ISO_STORAGE" "$TALOS_ISO_FILE" "$talos_url" >/dev/null; then
+    msg_error "Failed to download Talos ISO from ${talos_url}"
+    exit 1
+  fi
+  msg_ok "Talos ISO downloaded (${TALOS_ISO_FILE})"
 }
 
 discover_management_vm_ip() {

@@ -164,6 +164,15 @@ def test_setup_wizard_shows_runtime_progress_feedback():
     assert 'status_update() { echo -e " ${HOLD} ${YW}[$(date \'+%H:%M:%S\')] $1${CL}" >&2; }' in text
 
 
+def test_setup_wizard_downloads_talos_iso_when_missing():
+    text = _wizard_text()
+    assert "ensure_talos_iso_available()" in text
+    assert 'status_update "Checking Talos ISO in storage ${PROXMOX_ISO_STORAGE}"' in text
+    assert 'pvesm list "$PROXMOX_ISO_STORAGE" --content iso' in text
+    assert 'pvesm download "$PROXMOX_ISO_STORAGE" "$TALOS_ISO_FILE" "$talos_url"' in text
+    assert 'msg_ok "Talos ISO downloaded (${TALOS_ISO_FILE})"' in text
+
+
 def test_setup_wizard_requires_non_empty_ssh_key():
     text = _wizard_text()
     assert 'if [[ -z "${SSH_KEY:-}" ]]; then' in text
