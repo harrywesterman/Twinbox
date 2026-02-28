@@ -36,7 +36,7 @@ BANNER
 msg_info() { echo -ne " ${HOLD} ${YW}$1..."; }
 msg_ok() { echo -e "${BFR} ${CM} ${GN}$1${CL}"; }
 msg_error() { echo -e "${BFR} ${CROSS} ${RD}$1${CL}"; }
-status_update() { echo -e " ${HOLD} ${YW}[$(date '+%H:%M:%S')] $1${CL}"; }
+status_update() { echo -e " ${HOLD} ${YW}[$(date '+%H:%M:%S')] $1${CL}" >&2; }
 
 cleanup_after_run() {
   local exit_code=$?
@@ -182,6 +182,7 @@ netmask_to_cidr() {
   local cidr=0
   local octets=()
   local octet=""
+  local seen_partial_or_zero=0
 
   IFS='.' read -r -a octets <<<"$netmask"
   if [[ "${#octets[@]}" -ne 4 ]]; then
@@ -189,17 +190,36 @@ netmask_to_cidr() {
   fi
 
   for octet in "${octets[@]}"; do
+    if [[ "$octet" -eq 255 ]]; then
+      if [[ "$seen_partial_or_zero" -eq 1 ]]; then
+        return 1
+      fi
+      cidr=$((cidr + 8))
+      continue
+    fi
+
     case "$octet" in
-      255) cidr=$((cidr + 8)) ;;
-      254) cidr=$((cidr + 7)) ;;
-      252) cidr=$((cidr + 6)) ;;
-      248) cidr=$((cidr + 5)) ;;
-      240) cidr=$((cidr + 4)) ;;
-      224) cidr=$((cidr + 3)) ;;
-      192) cidr=$((cidr + 2)) ;;
-      128) cidr=$((cidr + 1)) ;;
-      0) cidr=$cidr ;;
-      *) return 1 ;;
+      254|252|248|240|224|192|128)
+        if [[ "$seen_partial_or_zero" -eq 1 ]]; then
+          return 1
+        fi
+        case "$octet" in
+          254) cidr=$((cidr + 7)) ;;
+          252) cidr=$((cidr + 6)) ;;
+          248) cidr=$((cidr + 5)) ;;
+          240) cidr=$((cidr + 4)) ;;
+          224) cidr=$((cidr + 3)) ;;
+          192) cidr=$((cidr + 2)) ;;
+          128) cidr=$((cidr + 1)) ;;
+        esac
+        seen_partial_or_zero=1
+        ;;
+      0)
+        seen_partial_or_zero=1
+        ;;
+      *)
+        return 1
+        ;;
     esac
   done
 
@@ -259,8 +279,11 @@ create_proxmox_api_user() {
   local proxmox_privs="VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.Audit"
 
   status_update "Ensuring Proxmox API user ${PROXMOX_USER} exists"
-  if ! pveum user list | awk 'NR>1 {print $1}' | grep -qx "$PROXMOX_USER"; then
-    pveum user add "$PROXMOX_USER" --comment "Twinbox service account" >/dev/null
+  if ! pveum user add "$PROXMOX_USER" --comment "Twinbox service account" >/dev/null 2>&1; then
+    if ! pveum user list | awk 'NR>1 {print $1}' | grep -qx "$PROXMOX_USER"; then
+      msg_error "Failed to create Proxmox API user ${PROXMOX_USER}"
+      exit 1
+    fi
   fi
 
   status_update "Setting password for ${PROXMOX_USER}"
@@ -350,6 +373,10 @@ start_wizard() {
 
   if [[ -z "${SSH_KEY:-}" ]]; then
     input_box "Cloud-Init" "SSH public key" "" SSH_KEY
+  fi
+  if [[ -z "${SSH_KEY// }" ]]; then
+    msg_error "SSH public key is required for initial access"
+    exit 1
   fi
 
   password_box "Cloud-Init" "Twinbox login password" CLOUD_INIT_PASSWORD

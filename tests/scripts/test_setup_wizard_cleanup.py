@@ -138,6 +138,9 @@ def test_setup_wizard_converts_netmask_to_cidr():
     assert "netmask_to_cidr()" in text
     assert 'for octet in "${octets[@]}"; do' in text
     assert 'CLOUD_INIT_CIDR=$(netmask_to_cidr "$CLOUD_INIT_NETMASK")' in text
+    assert "local seen_partial_or_zero=0" in text
+    assert 'if [[ "$octet" -eq 255 ]]; then' in text
+    assert 'if [[ "$seen_partial_or_zero" -eq 1 ]]; then' in text
 
 
 def test_setup_wizard_shows_runtime_progress_feedback():
@@ -148,12 +151,21 @@ def test_setup_wizard_shows_runtime_progress_feedback():
     assert 'status_update "Importing base disk into VM storage"' in text
     assert 'status_update "Starting management VM"' in text
     assert 'status_update "Waiting for guest agent to report management VM IP"' in text
+    assert 'status_update() { echo -e " ${HOLD} ${YW}[$(date \'+%H:%M:%S\')] $1${CL}" >&2; }' in text
+
+
+def test_setup_wizard_requires_non_empty_ssh_key():
+    text = _wizard_text()
+    assert 'if [[ -z "${SSH_KEY:-}" ]]; then' in text
+    assert 'if [[ -z "${SSH_KEY// }" ]]; then' in text
+    assert 'msg_error "SSH public key is required for initial access"' in text
 
 
 def test_setup_wizard_creates_dedicated_limited_proxmox_api_user():
     text = _wizard_text()
     assert "create_proxmox_api_user()" in text
-    assert 'pveum user add "$PROXMOX_USER"' in text
+    assert 'if ! pveum user add "$PROXMOX_USER"' in text
+    assert 'if ! pveum user list | awk \'NR>1 {print $1}\' | grep -qx "$PROXMOX_USER"; then' in text
     assert 'pveum passwd "$PROXMOX_USER"' in text
     assert 'pveum role add "$PROXMOX_ROLE"' in text
     assert 'VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.Audit' in text
