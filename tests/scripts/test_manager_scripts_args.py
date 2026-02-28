@@ -79,7 +79,8 @@ def test_create_talos_vms_sets_colorful_proxmox_tags():
 
 def test_create_talos_vms_fails_fast_on_proxmox_api_errors():
     text = _create_talos_text()
-    assert "curl -k -sS --fail-with-body -X POST" in text
-    assert 'fail "Proxmox API POST failed (${endpoint}): ${response}"' in text
+    assert "curl -k -sS -o \"$body_file\" -w '%{http_code}' -X POST" in text
+    assert '-b "PVEAuthCookie=${TOKEN}"' in text
+    assert 'fail "Proxmox API POST failed (${endpoint}) [HTTP ${http_code}]: ${response}"' in text
     assert 'response_data=$(echo "$response" | jq -r \'.data // empty\')' in text
     assert 'fail "Proxmox API POST returned empty data (${endpoint}): ${response}"' in text

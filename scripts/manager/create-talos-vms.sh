@@ -42,27 +42,30 @@ done
 clusters_dir="$DATA_DIR/clusters"
 mkdir -p "$clusters_dir"
 
-cookie_file=$(mktemp)
-trap 'rm -f "$cookie_file"' EXIT
-
 auth_resp=$(curl -k -sS -d "username=${PROXMOX_USER}&password=${PROXMOX_PASSWORD}" "https://${PROXMOX_HOST}:${PROXMOX_PORT}/api2/json/access/ticket")
 TOKEN=$(echo "$auth_resp" | jq -r '.data.ticket // empty')
 CSRF=$(echo "$auth_resp" | jq -r '.data.CSRFPreventionToken // empty')
 [[ -n "$TOKEN" && -n "$CSRF" ]] || fail "Proxmox auth failed"
 
-echo "PVEAuthCookie=${TOKEN}" > "$cookie_file"
-
 task_post() {
   local endpoint="$1"
+  local body_file=""
+  local http_code=""
   local response=""
   local response_data=""
   shift
-  if ! response=$(curl -k -sS --fail-with-body -X POST \
-    -b "$cookie_file" \
+
+  body_file=$(mktemp)
+  http_code=$(curl -k -sS -o "$body_file" -w '%{http_code}' -X POST \
+    -b "PVEAuthCookie=${TOKEN}" \
     -H "CSRFPreventionToken: ${CSRF}" \
     "$endpoint" \
-    "$@"); then
-    fail "Proxmox API POST failed (${endpoint}): ${response}"
+    "$@")
+  response=$(cat "$body_file")
+  rm -f "$body_file"
+
+  if [[ "$http_code" -lt 200 || "$http_code" -ge 300 ]]; then
+    fail "Proxmox API POST failed (${endpoint}) [HTTP ${http_code}]: ${response}"
   fi
 
   response_data=$(echo "$response" | jq -r '.data // empty')
