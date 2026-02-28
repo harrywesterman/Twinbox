@@ -164,18 +164,18 @@ def test_setup_wizard_requires_non_empty_ssh_key():
 def test_setup_wizard_creates_dedicated_limited_proxmox_api_user():
     text = _wizard_text()
     assert "create_proxmox_api_user()" in text
-    assert 'proxmox_user_exists()' in text
-    assert 'if proxmox_user_exists "$PROXMOX_USER"; then' in text
-    assert 'if ! wait_for_proxmox_user "$PROXMOX_USER" 15 1; then' in text
-    assert 'status_update "Proxmox API user ${PROXMOX_USER} not yet visible in list; continuing"' in text
     assert 'create_err=$(pveum user add "$PROXMOX_USER" --comment "Twinbox service account" 2>&1)' in text
+    assert 'if printf \'%s\' "$create_err" | grep -qi "already exists"; then' in text
     assert 'msg_error "Failed to create Proxmox API user ${PROXMOX_USER}: ${create_err}"' in text
     assert 'set_proxmox_password_with_retry()' in text
     assert 'if ! set_proxmox_password_with_retry "$PROXMOX_USER" "$PROXMOX_PASSWORD" 15 1; then' in text
-    assert 'msg_error "Failed to set password for Proxmox API user ${PROXMOX_USER}"' in text
+    assert 'msg_error "Failed to set password for Proxmox API user ${PROXMOX_USER}: ${last_err}"' in text
     assert 'pveum passwd "$user"' in text
+    assert 'role_err=$(pveum role add "$PROXMOX_ROLE" -privs "$proxmox_privs" 2>&1)' in text
+    assert 'if printf \'%s\' "$role_err" | grep -qi "already exists"; then' in text
+    assert 'role_err=$(pveum role modify "$PROXMOX_ROLE" -privs "$proxmox_privs" 2>&1)' in text
+    assert 'apply_acl_with_retry()' in text
     assert 'pveum role add "$PROXMOX_ROLE"' in text
     assert 'VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.Audit' in text
-    assert 'pveum aclmod /vms -user "$PROXMOX_USER" -role "$PROXMOX_ROLE"' in text
-    assert 'pveum aclmod /storage -user "$PROXMOX_USER" -role "$PROXMOX_ROLE"' in text
-    assert 'pveum aclmod "/nodes/${PROXMOX_NODE}" -user "$PROXMOX_USER" -role "$PROXMOX_ROLE"' in text
+    assert 'for acl_path in /vms /storage "/nodes/${PROXMOX_NODE}"; do' in text
+    assert 'pveum aclmod "$path" -user "$user" -role "$role" 2>&1' in text

@@ -277,27 +277,10 @@ apply_educated_defaults() {
 
 create_proxmox_api_user() {
   local proxmox_privs="VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.Audit"
-  local list_dump=""
-
-  proxmox_user_exists() {
-    local user="$1"
-    pveum user list 2>/dev/null | awk '{print $1}' | grep -qx "$user"
-  }
-
-  wait_for_proxmox_user() {
-    local user="$1"
-    local retries="${2:-10}"
-    local delay="${3:-1}"
-    local attempt=0
-    while [[ "$attempt" -lt "$retries" ]]; do
-      if proxmox_user_exists "$user"; then
-        return 0
-      fi
-      attempt=$((attempt + 1))
-      sleep "$delay"
-    done
-    return 1
-  }
+  local create_err=""
+  local role_err=""
+  local last_err=""
+  local acl_path=""
 
   set_proxmox_password_with_retry() {
     local user="$1"
@@ -306,7 +289,26 @@ create_proxmox_api_user() {
     local delay="${4:-1}"
     local attempt=0
     while [[ "$attempt" -lt "$retries" ]]; do
-      if printf '%s\n%s\n' "$password" "$password" | pveum passwd "$user" >/dev/null 2>&1; then
+      if last_err=$(printf '%s\n%s\n' "$password" "$password" | pveum passwd "$user" 2>&1); then
+        last_err=""
+        return 0
+      fi
+      attempt=$((attempt + 1))
+      sleep "$delay"
+    done
+    return 1
+  }
+
+  apply_acl_with_retry() {
+    local path="$1"
+    local user="$2"
+    local role="$3"
+    local retries="${4:-10}"
+    local delay="${5:-1}"
+    local attempt=0
+    while [[ "$attempt" -lt "$retries" ]]; do
+      if last_err=$(pveum aclmod "$path" -user "$user" -role "$role" 2>&1); then
+        last_err=""
         return 0
       fi
       attempt=$((attempt + 1))
@@ -316,47 +318,45 @@ create_proxmox_api_user() {
   }
 
   status_update "Ensuring Proxmox API user ${PROXMOX_USER} exists"
-  if proxmox_user_exists "$PROXMOX_USER"; then
-    status_update "Proxmox API user ${PROXMOX_USER} already exists"
+  if create_err=$(pveum user add "$PROXMOX_USER" --comment "Twinbox service account" 2>&1); then
+    status_update "Created Proxmox API user ${PROXMOX_USER}"
   else
-    local create_err=""
-    if ! create_err=$(pveum user add "$PROXMOX_USER" --comment "Twinbox service account" 2>&1); then
-      if proxmox_user_exists "$PROXMOX_USER"; then
-        status_update "Proxmox API user ${PROXMOX_USER} already exists"
-      else
-        msg_error "Failed to create Proxmox API user ${PROXMOX_USER}: ${create_err}"
-        exit 1
-      fi
+    if printf '%s' "$create_err" | grep -qi "already exists"; then
+      status_update "Proxmox API user ${PROXMOX_USER} already exists"
     else
-      status_update "Created Proxmox API user ${PROXMOX_USER}"
+      msg_error "Failed to create Proxmox API user ${PROXMOX_USER}: ${create_err}"
+      exit 1
     fi
-  fi
-
-  if ! wait_for_proxmox_user "$PROXMOX_USER" 15 1; then
-    list_dump=$(pveum user list 2>&1 || true)
-    status_update "Proxmox API user ${PROXMOX_USER} not yet visible in list; continuing"
-    status_update "pveum user list output: ${list_dump}"
   fi
 
   status_update "Setting password for ${PROXMOX_USER}"
   if ! set_proxmox_password_with_retry "$PROXMOX_USER" "$PROXMOX_PASSWORD" 15 1; then
-    list_dump=$(pveum user list 2>&1 || true)
-    msg_error "Failed to set password for Proxmox API user ${PROXMOX_USER}"
-    msg_error "pveum user list output: ${list_dump}"
+    msg_error "Failed to set password for Proxmox API user ${PROXMOX_USER}: ${last_err}"
     exit 1
   fi
 
   status_update "Ensuring least-privilege role ${PROXMOX_ROLE}"
-  if pveum role list | awk 'NR>1 {print $1}' | grep -qx "$PROXMOX_ROLE"; then
-    pveum role modify "$PROXMOX_ROLE" -privs "$proxmox_privs" >/dev/null
+  if role_err=$(pveum role add "$PROXMOX_ROLE" -privs "$proxmox_privs" 2>&1); then
+    :
   else
-    pveum role add "$PROXMOX_ROLE" -privs "$proxmox_privs" >/dev/null
+    if printf '%s' "$role_err" | grep -qi "already exists"; then
+      if ! role_err=$(pveum role modify "$PROXMOX_ROLE" -privs "$proxmox_privs" 2>&1); then
+        msg_error "Failed to update Proxmox role ${PROXMOX_ROLE}: ${role_err}"
+        exit 1
+      fi
+    else
+      msg_error "Failed to create Proxmox role ${PROXMOX_ROLE}: ${role_err}"
+      exit 1
+    fi
   fi
 
   status_update "Applying ACLs for ${PROXMOX_USER}"
-  pveum aclmod /vms -user "$PROXMOX_USER" -role "$PROXMOX_ROLE" >/dev/null
-  pveum aclmod /storage -user "$PROXMOX_USER" -role "$PROXMOX_ROLE" >/dev/null
-  pveum aclmod "/nodes/${PROXMOX_NODE}" -user "$PROXMOX_USER" -role "$PROXMOX_ROLE" >/dev/null
+  for acl_path in /vms /storage "/nodes/${PROXMOX_NODE}"; do
+    if ! apply_acl_with_retry "$acl_path" "$PROXMOX_USER" "$PROXMOX_ROLE" 10 1; then
+      msg_error "Failed to apply ACL ${acl_path} for ${PROXMOX_USER}: ${last_err}"
+      exit 1
+    fi
+  done
 }
 
 collect_manual_overrides() {
