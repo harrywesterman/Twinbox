@@ -277,14 +277,35 @@ apply_educated_defaults() {
 
 create_proxmox_api_user() {
   local proxmox_privs="VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.Audit"
+  local list_dump=""
+
+  proxmox_user_exists() {
+    local user="$1"
+    pveum user list 2>/dev/null | awk '{print $1}' | grep -qx "$user"
+  }
+
+  wait_for_proxmox_user() {
+    local user="$1"
+    local retries="${2:-10}"
+    local delay="${3:-1}"
+    local attempt=0
+    while [[ "$attempt" -lt "$retries" ]]; do
+      if proxmox_user_exists "$user"; then
+        return 0
+      fi
+      attempt=$((attempt + 1))
+      sleep "$delay"
+    done
+    return 1
+  }
 
   status_update "Ensuring Proxmox API user ${PROXMOX_USER} exists"
-  if pveum user list | awk 'NR>1 {print $1}' | grep -qx "$PROXMOX_USER"; then
+  if proxmox_user_exists "$PROXMOX_USER"; then
     status_update "Proxmox API user ${PROXMOX_USER} already exists"
   else
     local create_err=""
     if ! create_err=$(pveum user add "$PROXMOX_USER" --comment "Twinbox service account" 2>&1); then
-      if pveum user list | awk 'NR>1 {print $1}' | grep -qx "$PROXMOX_USER"; then
+      if proxmox_user_exists "$PROXMOX_USER"; then
         status_update "Proxmox API user ${PROXMOX_USER} already exists"
       else
         msg_error "Failed to create Proxmox API user ${PROXMOX_USER}: ${create_err}"
@@ -295,8 +316,10 @@ create_proxmox_api_user() {
     fi
   fi
 
-  if ! pveum user list | awk 'NR>1 {print $1}' | grep -qx "$PROXMOX_USER"; then
+  if ! wait_for_proxmox_user "$PROXMOX_USER" 15 1; then
+    list_dump=$(pveum user list 2>&1 || true)
     msg_error "Proxmox API user ${PROXMOX_USER} not found after create/check"
+    msg_error "pveum user list output: ${list_dump}"
     exit 1
   fi
 
