@@ -1,119 +1,75 @@
 # Twinbox
 
-**Simplified Kubernetes on Proxmox**
+Twinbox is a manager-first platform for provisioning and bootstrapping Talos Kubernetes clusters on Proxmox.
 
-A one-command setup that creates a management VM on Proxmox VE, ready for manual Twinbox platform installation.
+## Current Workflow
+
+1. Run the Proxmox wizard: `wizard/setup-wizard.sh`.
+2. The wizard creates a Management VM only.
+3. Cloud-init on that VM installs Docker CE from the official Docker repo, clones this repository, and starts the manager stack automatically.
+4. Open the web UI and create/bootstrap Talos clusters from there.
 
 ## Quick Start
 
-### Option 1: Web UI (Recommended)
-
-On your Proxmox console:
+### 1. Run wizard on Proxmox
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/setup-wizard.sh -o /tmp/setup-wizard.sh && bash /tmp/setup-wizard.sh
+bash <(curl -fsSL https://raw.githubusercontent.com/harrywesterman/twinbox/main/wizard/setup-wizard.sh)
 ```
 
-After the wizard completes, note the management VM IP address. Then SSH to the VM:
+### 2. Open endpoints
+
+- UI: `http://<management-vm-ip>:3000`
+- API health: `http://<management-vm-ip>:8080/api/health`
+
+### 3. Optional manual recovery on Management VM
 
 ```bash
-ssh ubuntu@<management-vm-ip>
+cd /opt/twinbox
+# edit .env if needed
+docker compose pull
+docker compose up -d
 ```
 
-Once connected, install the Twinbox platform:
+## Docker Images (Prebuilt)
 
-```bash
-# Clone the repository
-git clone https://github.com/harrywesterman/Twinbox.git
-cd Twinbox
+Twinbox uses public prebuilt images from GHCR:
 
-# Start the platform (web UI + worker)
-docker-compose up -d
+- `ghcr.io/harrywesterman/twinbox-manager-api`
+- `ghcr.io/harrywesterman/twinbox-manager-worker`
+- `ghcr.io/harrywesterman/twinbox-manager-web`
 
-# Access the web UI at http://<management-vm-ip>:8080
+Image tag is controlled by `.env`:
+
+```dotenv
+TWINBOX_IMAGE_TAG=latest
 ```
 
-### Option 2: Terminal UI (TUI)
+## Repository Layout
 
-For a simpler, direct terminal interface on the Proxmox host itself:
+- `wizard/`: Proxmox setup wizard.
+- `manager-web/`: React frontend.
+- `manager-api/`: REST API and job metadata handling.
+- `manager-worker/`: Async job runner.
+- `scripts/manager/`: Provisioning/bootstrap scripts bundled into the worker image.
+- `docs/`: Operational documentation.
 
-```bash
-curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/setup-tui-install.sh -o /tmp/setup-tui-install.sh && chmod +x /tmp/setup-tui-install.sh && bash /tmp/setup-tui-install.sh --start
-```
+## Publishing Images
 
-This installs and immediately launches the Twinbox TUI, which runs directly on the Proxmox host without requiring a management VM. See [wizard/TUI_INSTALL_README.md](wizard/TUI_INSTALL_README.md) for details.
+GitHub Actions workflow `.github/workflows/docker-publish.yml` publishes images to GHCR on:
 
-## What You Get (Phase 1)
+- Push to `main`
+- Tags matching `v*`
+- Manual trigger (`workflow_dispatch`)
 
-On your Proxmox console:
+## Phase 1 Scope
 
-```bash
-curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/setup-wizard.sh -o /tmp/setup-wizard.sh && bash /tmp/setup-wizard.sh
-```
+- Submit Talos VM provisioning jobs from UI.
+- Submit Talos bootstrap jobs from UI.
+- Track jobs (`pending`, `running`, `succeeded`, `failed`) and logs.
 
-After the wizard completes, note the management VM IP address. Then SSH to the VM:
+## Security Baseline (Phase 1)
 
-```bash
-ssh ubuntu@<management-vm-ip>
-```
-
-Once connected, install the Twinbox platform:
-
-```bash
-# Clone the repository
-git clone https://github.com/harrywesterman/Twinbox.git
-cd Twinbox
-
-# Start the platform (web UI + worker)
-docker-compose up -d
-
-# Access the web UI at http://<management-vm-ip>:8080
-```
-
-The web UI option creates a minimal Ubuntu VM with:
-
-- **Ubuntu 24.04** server installation
-- **Docker** and Docker Compose installed and configured
-- **SSH access** configured for the ubuntu user
-- **Static IP** configuration for reliable access
-- **Prerequisite tools** (git, curl, etc.)
-
-The management VM is ready for you to manually deploy the Twinbox platform (FastAPI web service + RQ worker) which will then orchestrate Kubernetes cluster deployments.
-
-The TUI option installs the Twinbox TUI directly on the Proxmox host for immediate use without VM creation.
-
-## Architecture
-
-The wizard creates a minimal Ubuntu VM with:
-
-- **Ubuntu 24.04** server installation
-- **Docker** and Docker Compose installed and configured
-- **SSH access** configured for the ubuntu user
-- **Static IP** configuration for reliable access
-- **Prerequisite tools** (git, curl, etc.)
-
-The management VM is ready for you to manually deploy the Twinbox platform (FastAPI web service + RQ worker) which will then orchestrate Kubernetes cluster deployments.
-
-## Architecture
-
-### Web UI Path
-- **Phase 1**: Wizard creates a Management VM on Proxmox with Docker and SSH
-- **Phase 2**: Administrator SSHes to VM, clones repo, and runs `docker-compose up` to start the platform
-- **Phase 3** (future): Web UI-driven deployment of Kubernetes clusters with Talos Linux
-
-### Terminal UI (TUI) Path
-- **Single command**: Install and run the TUI directly on the Proxmox host
-- **No VM required**: Runs natively on Proxmox for direct cluster management
-- **Manual operation**: Interactive terminal interface for configuring and deploying clusters
-
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full system design.
-
-## Documentation
-
-- [Architecture Guide](docs/ARCHITECTURE.md)
-- [Wizard README](wizard/README.md)
-- [Manager README](manager/README.md)
-
-## License
-
-MIT
+- Intended for trusted LAN environments.
+- No app-level auth yet.
+- Runtime secrets are loaded from `.env`.

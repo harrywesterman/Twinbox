@@ -1,85 +1,33 @@
-# Twinbox Proxmox Console Wizard Guide
+# Wizard Guide
 
-This guide explains how to use the interactive console wizard to bootstrap your Twinbox Kubernetes cluster directly from your Proxmox VE server.
+`wizard/setup-wizard.sh` runs on Proxmox and prepares the Management VM.
 
-## Prerequisites
+## What It Does
 
-- Access to your Proxmox VE server via SSH or the Console (Shell).
-- Root privileges (`root` user).
-- Internet access on the Proxmox server (to download ISOs).
-- Sufficient resources (RAM, CPU, and Disk) for your desired cluster size.
+- Prompts for Management VM sizing/network values.
+- Collects Proxmox/Talos defaults for manager `.env`.
+- Creates the Management VM from Ubuntu 24.04 cloud image.
+- Installs Docker CE on Management VM using official Docker apt repo (`download.docker.com`).
+- Clones `https://github.com/harrywesterman/twinbox` into `/opt/twinbox`.
+- Starts the manager stack with `docker compose pull && docker compose up -d`.
 
-## Quick Start (One-Line Command)
-
-You can run the wizard directly from GitHub using `curl` and `bash`. Use the following command in your Proxmox shell:
+## Run
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/harrywesterman/Twinbox/main/wizard/setup-wizard.sh -o /tmp/setup-wizard.sh && bash /tmp/setup-wizard.sh
+bash <(curl -fsSL https://raw.githubusercontent.com/harrywesterman/twinbox/main/wizard/setup-wizard.sh)
 ```
 
-*(Note: The `curl | bash` pattern doesn't preserve interactive prompts. This approach downloads first, then runs, allowing you to enter your cluster name and other settings.)*
+## Validate Management VM
 
-## Manual Usage
+```bash
+ssh ubuntu@<management-vm-ip>
+docker --version
+docker compose version
+curl -fsS http://localhost:8080/api/health
+```
 
-Alternatively, you can clone the repository or copy the script manually:
+## Notes
 
-1.  **Download the script:**
-    ```bash
-    wget https://raw.githubusercontent.com/your-org/twinbox/main/wizard/setup-wizard.sh
-    ```
-
-2.  **Make it executable:**
-    ```bash
-    chmod +x setup-wizard.sh
-    ```
-
-3.  **Run the wizard:**
-    ```bash
-    ./setup-wizard.sh
-    ```
-
-## Wizard Steps
-
-The interactive wizard will guide you through the following steps:
-
-1.  **Cluster Configuration:**
-    - Name your cluster.
-    - Select the number of Control Plane and Worker nodes.
-    - Choose the starting VM ID (e.g., 200) to avoid conflicts.
-
-2.  **Resource Allocation:**
-    - Assign RAM, CPU cores, and Disk size for each node.
-
-3.  **Network Configuration:**
-    - Specify the Proxmox Bridge interface (default: `vmbr0`).
-    - Set the Cluster VIP (Virtual IP) and starting IP address for nodes.
-
-4.  **Management Node:**
-    -   Option to install a dedicated Management VM (Ubuntu 24.04).
-    -   Requires your SSH Public Key (starts with `ssh-rsa` or `ssh-ed25519`).
-    -   This node will come pre-installed with `terraform`, `ansible`, `kubectl`, and `talosctl`.
-
-5.  **Confirmation & Installation:**
-    -   Review your settings and confirm to start the installation.
-    -   The script will automatically:
-        -   Download the Talos Linux ISO.
-        -   Download the Ubuntu Cloud Image (if Management Node selected).
-        -   Install `talosctl` (if missing).
-        -   Create the requested VMs with the correct configuration.
-        -   Configure Cloud-Init for the Management Node to auto-install tools.
-
-## Post-Installation
-
-Once the wizard completes, your VMs will be created.
-
-1.  **Start VMs**: Go to the Proxmox GUI and start all new VMs.
-    -   *Note: The Management VM will take a few minutes to boot and run its cloud-init scripts to install software.*
-2.  **Access Management Node**: 
-    -   Find the IP address of the `twinbox-mgt` VM in Proxmox.
-    -   SSH into it: `ssh ubuntu@<MANAGEMENT_VM_IP>`
-3.  **Bootstrap Cluster**:
-    -   From the Management Node, use `talosctl` to generate your cluster configuration:
-    ```bash
-    talosctl gen config twinbox-cluster https://<VIP_IP>:6443
-    ```
-    -   Apply the configuration to your nodes to finish bootstrapping the cluster.
+- Twinbox compose uses prebuilt public GHCR images.
+- Docker source is official Docker repository, not Ubuntu `docker.io`.
+- Keep deployment in trusted LAN scope for phase 1.
