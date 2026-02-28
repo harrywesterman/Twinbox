@@ -53,7 +53,9 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     assert "    passwd: ${CLOUD_INIT_PASSWORD_HASH}" in text
     assert "ssh_pwauth: true" in text
     assert "    sudo: ['ALL=(ALL) NOPASSWD:ALL']" in text
-    assert "  - path: /home/${CLOUD_INIT_USER}/twinbox.env.template" in text
+    assert "  - path: /tmp/twinbox.env.template" in text
+    assert "    owner: root:root" in text
+    assert "  - bash -lc 'cp /tmp/twinbox.env.template /opt/twinbox/.env'" in text
     assert 'qm set "$MGT_ID" --ciuser "$CLOUD_INIT_USER" >/dev/null' in text
     assert 'qm set "$MGT_ID" --cipassword "$CLOUD_INIT_PASSWORD" >/dev/null' in text
     assert 'qm set "$MGT_ID" --searchdomain "$CLOUD_INIT_DNS_DOMAIN" >/dev/null' in text

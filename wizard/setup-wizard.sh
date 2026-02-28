@@ -538,9 +538,9 @@ packages:
   - gnupg
   - qemu-guest-agent
 write_files:
-  - path: /home/${CLOUD_INIT_USER}/twinbox.env.template
+  - path: /tmp/twinbox.env.template
     permissions: '0600'
-    owner: ${CLOUD_INIT_USER}:${CLOUD_INIT_USER}
+    owner: root:root
     content: |
       PROXMOX_HOST=${PROXMOX_HOST}
       PROXMOX_PORT=${PROXMOX_PORT}
@@ -565,7 +565,7 @@ runcmd:
   - install -d -m 0755 /opt/twinbox
   - chown ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} /opt/twinbox
   - bash -lc 'if [ ! -d /opt/twinbox/.git ]; then git clone https://github.com/${GITHUB_REPO}.git /opt/twinbox; fi'
-  - bash -lc 'cp /home/${CLOUD_INIT_USER}/twinbox.env.template /opt/twinbox/.env'
+  - bash -lc 'cp /tmp/twinbox.env.template /opt/twinbox/.env'
   - bash -lc 'cd /opt/twinbox && docker compose pull'
   - bash -lc 'cd /opt/twinbox && docker compose up -d'
 CLOUDINIT
