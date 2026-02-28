@@ -30,6 +30,7 @@ def test_setup_wizard_cleanup_rolls_back_created_vm_on_error():
 def test_setup_wizard_enables_guest_agent_on_management_vm():
     text = _wizard_text()
     assert "  - qemu-guest-agent" in text
+    assert "  - systemctl enable --now qemu-guest-agent" in text
     assert 'qm set "$MGT_ID" --agent enabled=1 >/dev/null' in text
     assert '--tags "twinbox;management;docker;bootstrap"' in text
 
@@ -48,6 +49,9 @@ def test_setup_wizard_collects_cloud_init_settings():
 def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     text = _wizard_text()
     assert "  - name: ${CLOUD_INIT_USER}" in text
+    assert "    lock_passwd: false" in text
+    assert "    passwd: ${CLOUD_INIT_PASSWORD_HASH}" in text
+    assert "ssh_pwauth: true" in text
     assert "    sudo: ['ALL=(ALL) NOPASSWD:ALL']" in text
     assert "  - path: /home/${CLOUD_INIT_USER}/twinbox.env.template" in text
     assert 'qm set "$MGT_ID" --ciuser "$CLOUD_INIT_USER" >/dev/null' in text
@@ -120,6 +124,7 @@ def test_setup_wizard_generates_proxmox_api_password_without_prompting():
     assert "PROXMOX_PASSWORD=$(generate_cloud_init_password)" in text
     assert 'password_box "Manager .env" "Proxmox API password' not in text
     assert 'if [[ -z "${PROXMOX_PASSWORD:-}" ]]; then' not in text
+    assert 'PROXMOX_USER="twinbox@pve"' in text
 
 
 def test_setup_wizard_prints_proxmox_api_credentials():
@@ -133,3 +138,25 @@ def test_setup_wizard_converts_netmask_to_cidr():
     assert "netmask_to_cidr()" in text
     assert 'for octet in "${octets[@]}"; do' in text
     assert 'CLOUD_INIT_CIDR=$(netmask_to_cidr "$CLOUD_INIT_NETMASK")' in text
+
+
+def test_setup_wizard_shows_runtime_progress_feedback():
+    text = _wizard_text()
+    assert "status_update()" in text
+    assert 'status_update "Preparing cloud-init configuration snippet"' in text
+    assert 'status_update "Creating VM shell in Proxmox"' in text
+    assert 'status_update "Importing base disk into VM storage"' in text
+    assert 'status_update "Starting management VM"' in text
+    assert 'status_update "Waiting for guest agent to report management VM IP"' in text
+
+
+def test_setup_wizard_creates_dedicated_limited_proxmox_api_user():
+    text = _wizard_text()
+    assert "create_proxmox_api_user()" in text
+    assert 'pveum user add "$PROXMOX_USER"' in text
+    assert 'pveum passwd "$PROXMOX_USER"' in text
+    assert 'pveum role add "$PROXMOX_ROLE"' in text
+    assert 'VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.Audit' in text
+    assert 'pveum aclmod /vms -user "$PROXMOX_USER" -role "$PROXMOX_ROLE"' in text
+    assert 'pveum aclmod /storage -user "$PROXMOX_USER" -role "$PROXMOX_ROLE"' in text
+    assert 'pveum aclmod "/nodes/${PROXMOX_NODE}" -user "$PROXMOX_USER" -role "$PROXMOX_ROLE"' in text

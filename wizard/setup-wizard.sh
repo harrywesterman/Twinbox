@@ -36,6 +36,7 @@ BANNER
 msg_info() { echo -ne " ${HOLD} ${YW}$1..."; }
 msg_ok() { echo -e "${BFR} ${CM} ${GN}$1${CL}"; }
 msg_error() { echo -e "${BFR} ${CROSS} ${RD}$1${CL}"; }
+status_update() { echo -e " ${HOLD} ${YW}[$(date '+%H:%M:%S')] $1${CL}"; }
 
 cleanup_after_run() {
   local exit_code=$?
@@ -244,13 +245,38 @@ apply_educated_defaults() {
 
   PROXMOX_HOST="${detected_host:-192.168.1.10}"
   PROXMOX_PORT="8006"
-  PROXMOX_USER="root@pam"
+  PROXMOX_USER="twinbox@pve"
+  PROXMOX_ROLE="TwinboxVMProvisioner"
   PROXMOX_PASSWORD=$(generate_cloud_init_password)
   PROXMOX_NODE="$(hostname)"
   PROXMOX_STORAGE_POOL="local-lvm"
   PROXMOX_ISO_STORAGE="local"
   TALOS_ISO_FILE="talos-v1.7.4.iso"
   TWINBOX_IMAGE_TAG="latest"
+}
+
+create_proxmox_api_user() {
+  local proxmox_privs="VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.Audit"
+
+  status_update "Ensuring Proxmox API user ${PROXMOX_USER} exists"
+  if ! pveum user list | awk 'NR>1 {print $1}' | grep -qx "$PROXMOX_USER"; then
+    pveum user add "$PROXMOX_USER" --comment "Twinbox service account" >/dev/null
+  fi
+
+  status_update "Setting password for ${PROXMOX_USER}"
+  printf '%s\n%s\n' "$PROXMOX_PASSWORD" "$PROXMOX_PASSWORD" | pveum passwd "$PROXMOX_USER" >/dev/null
+
+  status_update "Ensuring least-privilege role ${PROXMOX_ROLE}"
+  if pveum role list | awk 'NR>1 {print $1}' | grep -qx "$PROXMOX_ROLE"; then
+    pveum role modify "$PROXMOX_ROLE" -privs "$proxmox_privs" >/dev/null
+  else
+    pveum role add "$PROXMOX_ROLE" -privs "$proxmox_privs" >/dev/null
+  fi
+
+  status_update "Applying ACLs for ${PROXMOX_USER}"
+  pveum aclmod /vms -user "$PROXMOX_USER" -role "$PROXMOX_ROLE" >/dev/null
+  pveum aclmod /storage -user "$PROXMOX_USER" -role "$PROXMOX_ROLE" >/dev/null
+  pveum aclmod "/nodes/${PROXMOX_NODE}" -user "$PROXMOX_USER" -role "$PROXMOX_ROLE" >/dev/null
 }
 
 collect_manual_overrides() {
@@ -339,6 +365,7 @@ start_wizard() {
   msg_box "Security Notice" "Phase 1 is LAN-only and stores Proxmox credentials in /opt/twinbox/.env on the management VM.\n\nUse a dedicated Proxmox automation account and rotate credentials regularly."
 
   if whiptail --yesno "Proceed with installation?\n\nVM Name: $MGT_NAME\nVM ID: $MGT_ID\nBridge: $BRIDGE_IF\nCloud-Init user: $CLOUD_INIT_USER\nDNS: ${CLOUD_INIT_DNS_IP} (${CLOUD_INIT_DNS_DOMAIN})\nRepo: ${GITHUB_REPO}\nAuto-start manager stack: yes" 18 78; then
+    create_proxmox_api_user
     create_management_vm
     print_next_steps
   else
@@ -351,9 +378,13 @@ create_management_vm() {
   local ubuntu_url="https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
   local img_name="noble-server-cloudimg-amd64.img"
   local img_path="/var/lib/vz/template/cache/${img_name}"
+  local CLOUD_INIT_PASSWORD_HASH=""
+
+  CLOUD_INIT_PASSWORD_HASH=$(openssl passwd -6 "$CLOUD_INIT_PASSWORD")
 
   mkdir -p /var/lib/vz/template/cache /var/lib/vz/snippets
 
+  status_update "Checking Ubuntu cloud image cache"
   if [[ ! -f "$img_path" ]]; then
     msg_info "Downloading Ubuntu 24.04 cloud image"
     curl -fsSL -o "$img_path" "$ubuntu_url"
@@ -362,7 +393,7 @@ create_management_vm() {
     msg_ok "Ubuntu image already present"
   fi
 
-  msg_info "Creating management VM (ID: $MGT_ID)"
+  status_update "Preparing cloud-init configuration snippet"
 
   snippet_file="/var/lib/vz/snippets/mgt-${MGT_ID}-user-data.yaml"
 
@@ -370,8 +401,11 @@ create_management_vm() {
 #cloud-config
 hostname: ${MGT_NAME}
 manage_etc_hosts: true
+ssh_pwauth: true
 users:
   - name: ${CLOUD_INIT_USER}
+    lock_passwd: false
+    passwd: ${CLOUD_INIT_PASSWORD_HASH}
     groups: sudo,docker
     shell: /bin/bash
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
@@ -400,6 +434,7 @@ write_files:
       TWINBOX_IMAGE_TAG=${TWINBOX_IMAGE_TAG}
 runcmd:
   - install -m 0755 -d /etc/apt/keyrings
+  - systemctl enable --now qemu-guest-agent
   - bash -lc 'apt-get remove -y docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc || true'
   - bash -lc 'curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc'
   - chmod a+r /etc/apt/keyrings/docker.asc
@@ -417,11 +452,14 @@ runcmd:
 CLOUDINIT
   chmod 600 "$snippet_file"
 
+  status_update "Creating VM shell in Proxmox"
   qm create "$MGT_ID" --name "$MGT_NAME" --memory "$MGT_RAM" --cores "$MGT_CORES" --net0 "virtio,bridge=${BRIDGE_IF}" \
     --tags "twinbox;management;docker;bootstrap" \
     --scsihw virtio-scsi-pci --ide2 local-lvm:cloudinit --serial0 socket --vga serial0 --ostype l26 >/dev/null
   vm_created=1
+  status_update "Importing base disk into VM storage"
   qm importdisk "$MGT_ID" "$img_path" local-lvm >/dev/null
+  status_update "Applying cloud-init and boot configuration"
   qm set "$MGT_ID" --scsi0 "local-lvm:vm-${MGT_ID}-disk-0" >/dev/null
   qm set "$MGT_ID" --ciuser "$CLOUD_INIT_USER" >/dev/null
   qm set "$MGT_ID" --cipassword "$CLOUD_INIT_PASSWORD" >/dev/null
@@ -432,6 +470,7 @@ CLOUDINIT
   qm set "$MGT_ID" --cicustom "user=local:snippets/$(basename "$snippet_file")" >/dev/null
   qm set "$MGT_ID" --boot order=scsi0 >/dev/null
   qm resize "$MGT_ID" scsi0 "${MGT_DISK}G" >/dev/null
+  status_update "Starting management VM"
   qm start "$MGT_ID" >/dev/null
 
   msg_ok "Management VM created"
@@ -441,7 +480,9 @@ discover_management_vm_ip() {
   local attempts=24
   local output=""
   local ip=""
+  local polls=1
 
+  status_update "Waiting for guest agent to report management VM IP"
   while [[ "$attempts" -gt 0 ]]; do
     output=$(qm guest cmd "$MGT_ID" network-get-interfaces 2>/dev/null || true)
     ip=$(
@@ -457,10 +498,16 @@ discover_management_vm_ip() {
       return 0
     fi
 
+    if (( polls % 3 == 0 )); then
+      status_update "Still waiting for VM IP (retry ${polls}/24)"
+    fi
+
     sleep 5
     attempts=$((attempts - 1))
+    polls=$((polls + 1))
   done
 
+  status_update "Guest agent did not report an IP within timeout"
   return 1
 }
 
@@ -479,7 +526,7 @@ print_next_steps() {
   else
     echo "1. Wait for cloud-init on the management VM to finish."
     echo "2. Open: http://<management-vm-ip>:3000"
-  echo "3. Verify API health: http://<management-vm-ip>:8080/api/health"
+    echo "3. Verify API health: http://<management-vm-ip>:8080/api/health"
   fi
   echo "Login user: ${CLOUD_INIT_USER}"
   echo "Login password: ${CLOUD_INIT_PASSWORD}"
