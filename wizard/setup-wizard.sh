@@ -152,6 +152,59 @@ guess_next_vmid() {
   echo "$candidate"
 }
 
+cidr_to_netmask() {
+  local cidr="$1"
+  local i octet mask=""
+
+  for ((i = 0; i < 4; i++)); do
+    if ((cidr >= 8)); then
+      octet=255
+      cidr=$((cidr - 8))
+    elif ((cidr == 0)); then
+      octet=0
+    else
+      octet=$((256 - 2 ** (8 - cidr)))
+      cidr=0
+    fi
+
+    mask+="$octet"
+    if [[ "$i" -lt 3 ]]; then
+      mask+="."
+    fi
+  done
+
+  echo "$mask"
+}
+
+netmask_to_cidr() {
+  local netmask="$1"
+  local cidr=0
+  local octets=()
+  local octet=""
+
+  IFS='.' read -r -a octets <<<"$netmask"
+  if [[ "${#octets[@]}" -ne 4 ]]; then
+    return 1
+  fi
+
+  for octet in "${octets[@]}"; do
+    case "$octet" in
+      255) cidr=$((cidr + 8)) ;;
+      254) cidr=$((cidr + 7)) ;;
+      252) cidr=$((cidr + 6)) ;;
+      248) cidr=$((cidr + 5)) ;;
+      240) cidr=$((cidr + 4)) ;;
+      224) cidr=$((cidr + 3)) ;;
+      192) cidr=$((cidr + 2)) ;;
+      128) cidr=$((cidr + 1)) ;;
+      0) cidr=$cidr ;;
+      *) return 1 ;;
+    esac
+  done
+
+  echo "$cidr"
+}
+
 generate_cloud_init_password() {
   local generated=""
 
@@ -164,8 +217,12 @@ generate_cloud_init_password() {
 
 apply_educated_defaults() {
   local detected_host
+  local detected_prefix
+  local detected_gateway
 
   detected_host=$(hostname -I | awk '{print $1}')
+  detected_prefix=$(ip -o -f inet addr show scope global | awk 'NR==1 {split($4, a, "/"); print a[2]}')
+  detected_gateway=$(ip route | awk '/^default/ {print $3; exit}')
   detected_dns_ip=$(awk '/^nameserver / {print $2; exit}' /etc/resolv.conf)
   guessed_bridge=$(guess_bridge_interface || true)
   guessed_ssh_key=$(guess_ssh_public_key || true)
@@ -177,7 +234,10 @@ apply_educated_defaults() {
   MGT_DISK="40"
   BRIDGE_IF="${guessed_bridge:-vmbr0}"
   CLOUD_INIT_USER="twinbox"
-  CLOUD_INIT_PASSWORD=$(generate_cloud_init_password)
+  CLOUD_INIT_PASSWORD=""
+  CLOUD_INIT_IP="${detected_host:-192.168.1.50}"
+  CLOUD_INIT_NETMASK="$(cidr_to_netmask "${detected_prefix:-24}")"
+  CLOUD_INIT_GATEWAY="${detected_gateway:-192.168.1.1}"
   CLOUD_INIT_DNS_DOMAIN="localdomain"
   CLOUD_INIT_DNS_IP="${detected_dns_ip:-1.1.1.1}"
   SSH_KEY="${guessed_ssh_key:-}"
@@ -185,7 +245,7 @@ apply_educated_defaults() {
   PROXMOX_HOST="${detected_host:-192.168.1.10}"
   PROXMOX_PORT="8006"
   PROXMOX_USER="root@pam"
-  PROXMOX_PASSWORD="${PROXMOX_PASSWORD:-}"
+  PROXMOX_PASSWORD=$(generate_cloud_init_password)
   PROXMOX_NODE="$(hostname)"
   PROXMOX_STORAGE_POOL="local-lvm"
   PROXMOX_ISO_STORAGE="local"
@@ -204,16 +264,18 @@ collect_manual_overrides() {
   fi
 
   if review_cloud_init_settings; then
+    input_box "Cloud-Init" "SSH public key (used for initial SSH access)" "$SSH_KEY" SSH_KEY
     input_box "Cloud-Init" "DNS search domain (search domain used in /etc/resolv.conf)" "$CLOUD_INIT_DNS_DOMAIN" CLOUD_INIT_DNS_DOMAIN
     input_box "Cloud-Init" "DNS server IP (resolver IP for management VM)" "$CLOUD_INIT_DNS_IP" CLOUD_INIT_DNS_IP
-    input_box "Cloud-Init" "SSH public key (used for initial SSH access)" "$SSH_KEY" SSH_KEY
+    input_box "Cloud-Init" "Static IPv4 address (management VM)" "$CLOUD_INIT_IP" CLOUD_INIT_IP
+    input_box "Cloud-Init" "Netmask (for example 255.255.255.0)" "$CLOUD_INIT_NETMASK" CLOUD_INIT_NETMASK
+    input_box "Cloud-Init" "Default route (gateway)" "$CLOUD_INIT_GATEWAY" CLOUD_INIT_GATEWAY
   fi
 
   if review_manager_env_settings; then
     input_box "Manager .env" "Proxmox API host (used by worker to call Proxmox API)" "$PROXMOX_HOST" PROXMOX_HOST
     input_box "Manager .env" "Proxmox API port (usually 8006)" "$PROXMOX_PORT" PROXMOX_PORT
     input_box "Manager .env" "Proxmox API user (service account user@realm)" "$PROXMOX_USER" PROXMOX_USER
-    password_box "Manager .env" "Proxmox API password (stored on management VM .env)" PROXMOX_PASSWORD
     input_box "Manager .env" "Proxmox node (target node for VM creation)" "$PROXMOX_NODE" PROXMOX_NODE
     input_box "Manager .env" "Proxmox storage pool (disk target for Talos VMs)" "$PROXMOX_STORAGE_POOL" PROXMOX_STORAGE_POOL
     input_box "Manager .env" "Proxmox ISO storage (where Talos ISO is stored)" "$PROXMOX_ISO_STORAGE" PROXMOX_ISO_STORAGE
@@ -235,7 +297,7 @@ review_cloud_init_settings() {
     ssh_key_detected="yes"
   fi
 
-  if whiptail --yesno "Cloud-Init settings\n\nUser: $CLOUD_INIT_USER\nDNS domain: $CLOUD_INIT_DNS_DOMAIN\nDNS server: $CLOUD_INIT_DNS_IP\nSSH key detected: ${ssh_key_detected}\n\nEdit this group?" 18 78 --title "Cloud-Init"; then
+  if whiptail --yesno "Cloud-Init settings\n\nUser: $CLOUD_INIT_USER\nDNS domain: $CLOUD_INIT_DNS_DOMAIN\nDNS server: $CLOUD_INIT_DNS_IP\nStatic IP: $CLOUD_INIT_IP\nNetmask: $CLOUD_INIT_NETMASK\nGateway: $CLOUD_INIT_GATEWAY\nSSH key detected: ${ssh_key_detected}\n\nEdit this group?" 22 78 --title "Cloud-Init"; then
     return 0
   fi
   return 1
@@ -264,9 +326,15 @@ start_wizard() {
     input_box "Cloud-Init" "SSH public key" "" SSH_KEY
   fi
 
-  if [[ -z "${PROXMOX_PASSWORD:-}" ]]; then
-    password_box "Manager .env" "Proxmox API password" PROXMOX_PASSWORD
-  fi
+  password_box "Cloud-Init" "Twinbox login password" CLOUD_INIT_PASSWORD
+  input_box "Cloud-Init" "Static IPv4 address (management VM)" "$CLOUD_INIT_IP" CLOUD_INIT_IP
+  input_box "Cloud-Init" "Netmask (for example 255.255.255.0)" "$CLOUD_INIT_NETMASK" CLOUD_INIT_NETMASK
+  input_box "Cloud-Init" "Default route (gateway)" "$CLOUD_INIT_GATEWAY" CLOUD_INIT_GATEWAY
+
+  CLOUD_INIT_CIDR=$(netmask_to_cidr "$CLOUD_INIT_NETMASK") || {
+    msg_error "Invalid netmask: ${CLOUD_INIT_NETMASK}"
+    exit 1
+  }
 
   msg_box "Security Notice" "Phase 1 is LAN-only and stores Proxmox credentials in /opt/twinbox/.env on the management VM.\n\nUse a dedicated Proxmox automation account and rotate credentials regularly."
 
@@ -359,6 +427,7 @@ CLOUDINIT
   qm set "$MGT_ID" --cipassword "$CLOUD_INIT_PASSWORD" >/dev/null
   qm set "$MGT_ID" --searchdomain "$CLOUD_INIT_DNS_DOMAIN" >/dev/null
   qm set "$MGT_ID" --nameserver "$CLOUD_INIT_DNS_IP" >/dev/null
+  qm set "$MGT_ID" --ipconfig0 "ip=${CLOUD_INIT_IP}/${CLOUD_INIT_CIDR},gw=${CLOUD_INIT_GATEWAY}" >/dev/null
   qm set "$MGT_ID" --agent enabled=1 >/dev/null
   qm set "$MGT_ID" --cicustom "user=local:snippets/$(basename "$snippet_file")" >/dev/null
   qm set "$MGT_ID" --boot order=scsi0 >/dev/null
@@ -410,10 +479,12 @@ print_next_steps() {
   else
     echo "1. Wait for cloud-init on the management VM to finish."
     echo "2. Open: http://<management-vm-ip>:3000"
-    echo "3. Verify API health: http://<management-vm-ip>:8080/api/health"
+  echo "3. Verify API health: http://<management-vm-ip>:8080/api/health"
   fi
   echo "Login user: ${CLOUD_INIT_USER}"
   echo "Login password: ${CLOUD_INIT_PASSWORD}"
+  echo "Proxmox API user: ${PROXMOX_USER}"
+  echo "Proxmox API password: ${PROXMOX_PASSWORD}"
   echo "4. If needed, edit /opt/twinbox/.env and run: cd /opt/twinbox && docker compose up -d"
   echo
 }

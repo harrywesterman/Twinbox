@@ -37,7 +37,10 @@ def test_setup_wizard_enables_guest_agent_on_management_vm():
 def test_setup_wizard_collects_cloud_init_settings():
     text = _wizard_text()
     assert 'CLOUD_INIT_USER="twinbox"' in text
-    assert "CLOUD_INIT_PASSWORD=$(generate_cloud_init_password)" in text
+    assert 'password_box "Cloud-Init" "Twinbox login password" CLOUD_INIT_PASSWORD' in text
+    assert 'input_box "Cloud-Init" "Static IPv4 address' in text
+    assert 'input_box "Cloud-Init" "Netmask' in text
+    assert 'input_box "Cloud-Init" "Default route (gateway)' in text
     assert 'input_box "Cloud-Init" "DNS search domain' in text
     assert 'input_box "Cloud-Init" "DNS server IP' in text
 
@@ -51,6 +54,7 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     assert 'qm set "$MGT_ID" --cipassword "$CLOUD_INIT_PASSWORD" >/dev/null' in text
     assert 'qm set "$MGT_ID" --searchdomain "$CLOUD_INIT_DNS_DOMAIN" >/dev/null' in text
     assert 'qm set "$MGT_ID" --nameserver "$CLOUD_INIT_DNS_IP" >/dev/null' in text
+    assert 'qm set "$MGT_ID" --ipconfig0 "ip=${CLOUD_INIT_IP}/${CLOUD_INIT_CIDR},gw=${CLOUD_INIT_GATEWAY}" >/dev/null' in text
 
 
 def test_setup_wizard_discovers_management_vm_ip_via_guest_agent():
@@ -109,3 +113,23 @@ def test_setup_wizard_finds_first_free_vmid_cluster_wide():
     assert 'pvesh get /cluster/resources --type vm --output-format json' in text
     assert "used_vmids=$(printf '%s\\n' \"$cluster_vms\"" in text
     assert 'while printf \'%s\\n\' "$used_vmids" | grep -qx "$candidate"; do' in text
+
+
+def test_setup_wizard_generates_proxmox_api_password_without_prompting():
+    text = _wizard_text()
+    assert "PROXMOX_PASSWORD=$(generate_cloud_init_password)" in text
+    assert 'password_box "Manager .env" "Proxmox API password' not in text
+    assert 'if [[ -z "${PROXMOX_PASSWORD:-}" ]]; then' not in text
+
+
+def test_setup_wizard_prints_proxmox_api_credentials():
+    text = _wizard_text()
+    assert 'echo "Proxmox API user: ${PROXMOX_USER}"' in text
+    assert 'echo "Proxmox API password: ${PROXMOX_PASSWORD}"' in text
+
+
+def test_setup_wizard_converts_netmask_to_cidr():
+    text = _wizard_text()
+    assert "netmask_to_cidr()" in text
+    assert 'for octet in "${octets[@]}"; do' in text
+    assert 'CLOUD_INIT_CIDR=$(netmask_to_cidr "$CLOUD_INIT_NETMASK")' in text
