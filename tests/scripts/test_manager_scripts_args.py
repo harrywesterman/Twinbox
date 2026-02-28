@@ -75,3 +75,11 @@ def test_create_talos_vms_sets_colorful_proxmox_tags():
     assert '--data-urlencode "tags=twinbox;talos;${role_tag};cluster-${CLUSTER_ID}"' in text
     assert 'create_vm "$current_vmid" "$vm_name" "controlplane"' in text
     assert 'create_vm "$current_vmid" "$vm_name" "worker"' in text
+
+
+def test_create_talos_vms_fails_fast_on_proxmox_api_errors():
+    text = _create_talos_text()
+    assert "curl -k -sS --fail-with-body -X POST" in text
+    assert 'fail "Proxmox API POST failed (${endpoint}): ${response}"' in text
+    assert 'response_data=$(echo "$response" | jq -r \'.data // empty\')' in text
+    assert 'fail "Proxmox API POST returned empty data (${endpoint}): ${response}"' in text

@@ -54,12 +54,20 @@ echo "PVEAuthCookie=${TOKEN}" > "$cookie_file"
 
 task_post() {
   local endpoint="$1"
+  local response=""
+  local response_data=""
   shift
-  curl -k -sS -X POST \
+  if ! response=$(curl -k -sS --fail-with-body -X POST \
     -b "$cookie_file" \
     -H "CSRFPreventionToken: ${CSRF}" \
     "$endpoint" \
-    "$@"
+    "$@"); then
+    fail "Proxmox API POST failed (${endpoint}): ${response}"
+  fi
+
+  response_data=$(echo "$response" | jq -r '.data // empty')
+  [[ -n "$response_data" ]] || fail "Proxmox API POST returned empty data (${endpoint}): ${response}"
+  printf '%s\n' "$response"
 }
 
 next_ip() {
