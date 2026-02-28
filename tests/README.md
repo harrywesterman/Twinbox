@@ -1,16 +1,21 @@
-# Tests (Legacy)
+# Tests
 
-The test content in this directory targets an older architecture and is not the primary acceptance path for the current manager-first runtime.
+Test suite for the current manager-first runtime.
 
-## Current Verification Source
+## Scope
 
-Use:
+- `tests/api/`: API contract and file-persistence behavior
+- `tests/worker/`: worker queue lifecycle behavior
+- `tests/scripts/`: shell script argument/env validation
 
-- `docs/verification.md`
-- `TESTING.md`
+## Run
 
-These reflect the current flow:
+```bash
+python3 -m pip install -r requirements-test.txt
+python3 -m pytest -q tests
+```
 
-- wizard creates only the Management VM,
-- management stack runs from prebuilt GHCR images,
-- provisioning/bootstrap is triggered from the web UI.
+## Notes
+
+- Tests target `manager-api`, `manager-worker`, and `scripts/manager`.
+- Legacy `manager.shared` architecture tests were removed.
