@@ -1,0 +1,92 @@
+.layout {
+  min-height: 100vh;
+  background: linear-gradient(150deg, #f6f8fb, #d8e4f4);
+  color: #0f172a;
+  padding: 24px;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 32px;
+}
+
+.header p {
+  margin: 8px 0 24px;
+  color: #334155;
+}
+
+.content {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  background: #ffffffee;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+input {
+  border: 1px solid #94a3b8;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 14px;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+button {
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-weight: 600;
+  cursor: pointer;
+  background: #0f766e;
+  color: #fff;
+}
+
+button:disabled {
+  background: #64748b;
+  cursor: not-allowed;
+}
+
+.logs pre {
+  background: #0b1020;
+  color: #d1fae5;
+  border-radius: 8px;
+  min-height: 220px;
+  max-height: 300px;
+  overflow: auto;
+  padding: 12px;
+  font-size: 12px;
+}
+
+.error {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

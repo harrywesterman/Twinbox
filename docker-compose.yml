@@ -1,0 +1,37 @@
+services:
+  manager-api:
+    image: ghcr.io/harrywesterman/twinbox-manager-api:${TWINBOX_IMAGE_TAG:-latest}
+    container_name: twinbox-manager-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - MANAGER_DATA_DIR=/data
+      - MANAGER_API_PORT=8080
+    volumes:
+      - ./manager-data:/data
+    ports:
+      - "8080:8080"
+
+  manager-worker:
+    image: ghcr.io/harrywesterman/twinbox-manager-worker:${TWINBOX_IMAGE_TAG:-latest}
+    container_name: twinbox-manager-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - MANAGER_DATA_DIR=/data
+      - WORKER_POLL_MS=2000
+    volumes:
+      - ./manager-data:/data
+    depends_on:
+      - manager-api
+
+  manager-web:
+    image: ghcr.io/harrywesterman/twinbox-manager-web:${TWINBOX_IMAGE_TAG:-latest}
+    container_name: twinbox-manager-web
+    restart: unless-stopped
+    depends_on:
+      - manager-api
+    ports:
+      - "3000:80"

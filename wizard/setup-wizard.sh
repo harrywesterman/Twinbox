@@ -1,424 +1,218 @@
-#!/usr/bin/env bash
+#!/bin/bash
+
+# Twinbox - Proxmox Console Setup Wizard
+# Creates only the Ubuntu Management VM and auto-starts the manager stack.
+
 set -euo pipefail
-RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
-UBUNTU_VER="noble"
-CLOUD_IMG="https://cloud-images.ubuntu.com/${UBUNTU_VER}/current/${UBUNTU_VER}-server-cloudimg-amd64.img"
-CPU_CORES=2; RAM_MB=4096; DISK_GB=32; BRIDGE="vmbr0"; STORAGE="local-lvm"
-CLUSTER=""; SELECTED=""
 
-log() { echo -e "${YELLOW}[*] $*${NC}" >&2; }
-ok() { echo -e "${GREEN}[✓] $*${NC}" >&2; }
-err() { echo -e "${RED}[✗] $*${NC}" >&2; }
-warn() { echo -e "${YELLOW}[!] $*${NC}" >&2; }
+GITHUB_REPO="harrywesterman/twinbox"
 
-check_proxmox() {
-    [[ -d /etc/pve ]] || { err "This script must run on a Proxmox VE host"; exit 1; }
-    command -v qm &>/dev/null || { err "qm command not found. Is Proxmox installed?"; exit 1; }
-    ok "Proxmox environment verified"
+RD="\033[01;31m"
+YW="\033[33m"
+GN="\033[1;92m"
+CL="\033[m"
+BFR="\r\033[K"
+HOLD=" "
+CM="${GN}✓${CL}"
+CROSS="${RD}✗${CL}"
+
+header_info() {
+  clear
+  cat << "BANNER"
+  _______       _       _
+ |__   __|     (_)     | |
+    | |_      ___ _ __ | |__   _____  __
+    | \ \ /\ / / | '_ \| '_ \ / _ \ \/ /
+    | |\ V  V /| | | | | |_) | (_) >  <
+    |_| \_/\_/ |_|_| |_|_.__/ \___/_/\_\
+
+    Proxmox Management VM Bootstrap Wizard
+BANNER
 }
 
-check_virt_customize() {
-    if ! command -v virt-customize &>/dev/null; then
-        log "virt-customize (libguestfs-tools) is not installed."
-        log "Installing automatically for better reliability..."
-        if apt-get update &>/dev/null && apt-get install -y libguestfs-tools &>/dev/null; then
-            ok "libguestfs-tools installed"
-        else
-            warn "Failed to install libguestfs-tools. Will continue without it."
-        fi
-    fi
+msg_info() { echo -ne " ${HOLD} ${YW}$1..."; }
+msg_ok() { echo -e "${BFR} ${CM} ${GN}$1${CL}"; }
+msg_error() { echo -e "${BFR} ${CROSS} ${RD}$1${CL}"; }
+
+check_root() {
+  if [[ "$(id -u)" -ne 0 || $(ps -o comm= -p $$) == "sudo" ]]; then
+    clear
+    msg_error "Please run this script as root"
+    exit 1
+  fi
 }
 
-prompt_cluster() {
-    while true; do
-        read -p "Cluster name (alphanumeric, no spaces): " CLUSTER
-        [[ "$CLUSTER" =~ ^[a-zA-Z0-9-]+$ ]] && break || warn "Invalid cluster name."
-    done
-
-    # SSH public key (optional but recommended)
-    echo
-    read -p "Enter your SSH public key (optional, press Enter to skip): " SSH_PUBLIC_KEY
-    if [[ -n "$SSH_PUBLIC_KEY" ]]; then
-        ok "SSH public key will be configured for twinbox user"
-    else
-        warn "No SSH key provided. You can use password authentication."
-    fi
-
-    # Always use the local node (the node where this script is running)
-    SELECTED=$(hostname -s 2>/dev/null || echo "localhost")
-    ok "Using local node: $SELECTED"
+check_deps() {
+  msg_info "Checking dependencies"
+  if ! command -v whiptail >/dev/null 2>&1; then
+    apt-get update -qq
+    apt-get install -y whiptail curl >/dev/null 2>&1
+  fi
+  msg_ok "Dependencies checked"
 }
 
-# Resources are using defaults; no prompts needed
+input_box() {
+  local title="$1"
+  local text="$2"
+  local default_value="$3"
+  local var_name="$4"
 
-create_twinbox_user() {
-    log "Creating Proxmox user and permissions..."
-    if ! pvesh get /access/users/twinbox@pve &>/dev/null; then
-        local pass=$(openssl rand -base64 24 | tr -d '/+=' | head -c 16)
-        pvesh create /access/users -userid twinbox@pve -password "$pass" 2>/dev/null || true
-        ok "Created user: twinbox@pve"
-    fi
-    local pool="twinbox-${CLUSTER}"
-    if ! pvesh get /pools/$pool &>/dev/null; then
-        pvesh create /pools -poolid "$pool" 2>/dev/null || true
-        ok "Created resource pool: $pool"
-    fi
-    pvesh set /pools/$pool/acl -path / --group user:twinbox@pve -roles "VM.Create,VM.Modify,VM.PowerMgmt,Pool.List" 2>/dev/null || true
-    ok "Set ACLs on pool $pool"
+  local value
+  value=$(whiptail --inputbox "$text" 10 78 "$default_value" --title "$title" 3>&1 1>&2 2>&3) || {
+    echo "Cancelled"
+    exit 1
+  }
+  eval "$var_name=\"$value\""
 }
 
-gen_token() {
-    log "Generating API token..."
-    if [[ -f "/tmp/twinbox-creds-$CLUSTER.env" ]]; then
-        ok "Using existing credentials file"
-        return 0
-    fi
+password_box() {
+  local title="$1"
+  local text="$2"
+  local var_name="$3"
 
-    local token_id="twinbox-token-$(date +%s)"
-    local token_output
-    token_output=$(pveum user token add twinbox@pve "$token_id" --privsep 0 2>&1)
-
-    if [[ -n "$token_output" ]]; then
-        local token_name="twinbox@pve!$(echo "$token_output" | head -n1 | tr -d '[:space:]')"
-        local token_secret=$(echo "$token_output" | tail -n1 | tr -d '[:space:]')
-        if [[ -n "$token_name" && -n "$token_secret" && "$token_name" != "!" ]]; then
-            ok "Token generated: $token_name"
-            cat > "/tmp/twinbox-creds-$CLUSTER.env" <<EOF
-API_TOKEN_NAME=$token_name
-API_TOKEN_SECRET=$token_secret
-API_URL=https://$SELECTED:8006/api2/json
-EOF
-        else
-            err "Token generation failed: could not parse output"
-            echo "Output was: $token_output"
-            exit 1
-        fi
-    else
-        err "Token generation failed: pveum returned empty output"
-        exit 1
-    fi
+  local value
+  value=$(whiptail --passwordbox "$text" 10 78 --title "$title" 3>&1 1>&2 2>&3) || {
+    echo "Cancelled"
+    exit 1
+  }
+  eval "$var_name=\"$value\""
 }
 
-get_ubuntu_cloud_image() {
-    local storage_dir="/var/lib/vz"
-    local img_name="${UBUNTU_VER}-server-cloudimg-amd64.img"
-    local img_path="$storage_dir/$img_name"
-
-    mkdir -p "$storage_dir"
-
-    # Download if not exists locally
-    if [[ ! -f "$img_path" ]]; then
-        log "Downloading Ubuntu $UBUNTU_VER cloud image..."
-        curl -sL -o "$img_path" "$CLOUD_IMG" && ok "Downloaded" || { err "Download failed"; exit 1; }
-    else
-        ok "Ubuntu cloud image exists: $img_path"
-    fi
-
-    # If virt-customize is available, install qemu-guest-agent into the image
-    if command -v virt-customize &>/dev/null; then
-        log "Customizing cloud image: installing qemu-guest-agent..."
-        if virt-customize -a "$img_path" --install qemu-guest-agent &>/dev/null; then
-            ok "qemu-guest-agent installed in base image"
-        else
-            warn "virt-customize failed, will rely on cloud-init to install agent"
-        fi
-    else
-        log "virt-customize not found (libguestfs-tools not installed). Will install qemu-guest-agent via cloud-init."
-    fi
-
-    # Upload to Proxmox storage if not already there
-    if pvesh get /nodes/$SELECTED/storage/local/content --output-format json 2>/dev/null | \
-        python3 -c "import sys, json; content = json.load(sys.stdin); print('yes' if any(item.get('volid','').endswith('$img_name') for item in content) else 'no')" 2>/dev/null | grep -q yes; then
-        ok "Cloud image already in Proxmox storage"
-    else
-        log "Uploading to Proxmox storage..."
-        if pvesh create /nodes/$SELECTED/storage/local/content --content iso --filename "$img_name" --file "$img_path" &>/dev/null; then
-            ok "Uploaded to storage"
-        else
-            warn "Upload to storage failed, will use local file"
-        fi
-    fi
-
-    # Store the path for importdisk (needs filesystem path, not storage ref)
-    CLOUD_IMAGE_PATH="$img_path"
+msg_box() {
+  whiptail --msgbox "$2" 12 78 --title "$1"
 }
 
-create_cloudinit_snippet() {
-    local snippet_dir="/var/lib/vz/snippets"
-    local snippet_file="twinbox-$CLUSTER-user.yaml"
-    local snippet_path="$snippet_dir/$snippet_file"
+start_wizard() {
+  local detected_host
+  detected_host=$(hostname -I | awk '{print $1}')
 
-    mkdir -p "$snippet_dir"
+  header_info
+  msg_box "Twinbox Setup" "This wizard creates only the Management VM.\n\nThe VM installs Docker CE from the official Docker repo, clones ${GITHUB_REPO}, and starts manager-web automatically."
 
-    cat > "$snippet_path" <<EOF_USERDATA
+  input_box "Management VM" "Management VM name" "twinbox-mgt" MGT_NAME
+  input_box "Management VM" "Management VM ID" "100" MGT_ID
+  input_box "Management VM" "Management VM RAM (MB)" "4096" MGT_RAM
+  input_box "Management VM" "Management VM CPU cores" "2" MGT_CORES
+  input_box "Management VM" "Management VM disk size (GB)" "40" MGT_DISK
+  input_box "Management VM" "Bridge interface" "vmbr0" BRIDGE_IF
+  input_box "Management VM" "SSH public key" "" SSH_KEY
+
+  input_box "Manager .env" "Proxmox API host" "${detected_host:-192.168.1.10}" PROXMOX_HOST
+  input_box "Manager .env" "Proxmox API port" "8006" PROXMOX_PORT
+  input_box "Manager .env" "Proxmox API user" "root@pam" PROXMOX_USER
+  password_box "Manager .env" "Proxmox API password" PROXMOX_PASSWORD
+  input_box "Manager .env" "Proxmox node" "$(hostname)" PROXMOX_NODE
+  input_box "Manager .env" "Proxmox storage pool" "local-lvm" PROXMOX_STORAGE_POOL
+  input_box "Manager .env" "Proxmox ISO storage" "local" PROXMOX_ISO_STORAGE
+  input_box "Manager .env" "Talos ISO file" "talos-v1.7.4.iso" TALOS_ISO_FILE
+  input_box "Manager .env" "Image tag" "latest" TWINBOX_IMAGE_TAG
+
+  if whiptail --yesno "Proceed with installation?\n\nVM Name: $MGT_NAME\nVM ID: $MGT_ID\nBridge: $BRIDGE_IF\nRepo: ${GITHUB_REPO}\nAuto-start manager stack: yes" 16 78; then
+    create_management_vm
+    print_next_steps
+  else
+    echo "Cancelled"
+    exit 0
+  fi
+}
+
+create_management_vm() {
+  local ubuntu_url="https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
+  local img_name="noble-server-cloudimg-amd64.img"
+  local img_path="/var/lib/vz/template/cache/${img_name}"
+
+  mkdir -p /var/lib/vz/template/cache /var/lib/vz/snippets
+
+  if [[ ! -f "$img_path" ]]; then
+    msg_info "Downloading Ubuntu 24.04 cloud image"
+    curl -fsSL -o "$img_path" "$ubuntu_url"
+    msg_ok "Ubuntu image downloaded"
+  else
+    msg_ok "Ubuntu image already present"
+  fi
+
+  msg_info "Creating management VM (ID: $MGT_ID)"
+
+  local snippet_file="/var/lib/vz/snippets/mgt-${MGT_ID}-user-data.yaml"
+
+  cat > "$snippet_file" <<CLOUDINIT
 #cloud-config
-# Expand root partition to fill available disk space
-growpart:
-  mode: auto
-  devices:
-    - "/"
-  ignore_growroot_disabled: true
+hostname: ${MGT_NAME}
+manage_etc_hosts: true
+users:
+  - default
+  - name: ubuntu
+    groups: sudo,docker
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    ssh_authorized_keys:
+      - ${SSH_KEY}
 package_update: true
-package_upgrade: true
-packages: [docker.io, git, qemu-guest-agent]
-runcmd:
-  - [groupadd, -r, twinbox]
-  - [useradd, -r, -g, twinbox, -m, -s, /bin/bash, twinbox]
-  - echo "twinbox:$TWINBOX_PASSWORD" | chpasswd
-  - [usermod, -aG, docker, twinbox]
-  - [usermod, -aG, sudo, twinbox]
-EOF_USERDATA
-
-    # Add SSH public key if provided
-    if [[ -n "$SSH_PUBLIC_KEY" ]]; then
-        cat >> "$snippet_path" <<EOF_USERDATA
-  - [mkdir, -p, /home/twinbox/.ssh]
-  - [sh, -c, "echo '$SSH_PUBLIC_KEY' > /home/twinbox/.ssh/authorized_keys"]
-  - [chmod, 600, /home/twinbox/.ssh/authorized_keys]
-  - [chown, -R, twinbox:twinbox, /home/twinbox/.ssh]
-EOF_USERDATA
-    fi
-
-    cat >> "$snippet_path" <<EOF_USERDATA
-  - [systemctl, enable, qemu-guest-agent]
-  - [systemctl, start, qemu-guest-agent]
-  - [systemctl, enable, docker]
-  - [systemctl, start, docker]
-  - [systemctl, daemon-reload]
-  - [systemctl, restart, ssh]
+packages:
+  - curl
+  - git
+  - ca-certificates
+  - gnupg
 write_files:
-  - path: /etc/ssh/sshd_config.d/00-twinbox.conf
-    permissions: '0644'
+  - path: /home/ubuntu/twinbox.env.template
+    permissions: '0600'
+    owner: ubuntu:ubuntu
     content: |
-      PasswordAuthentication yes
-      PermitRootLogin no
-  - path: /etc/motd
-    permissions: '0644'
-    content: |
-      Twinbox Management VM
+      PROXMOX_HOST=${PROXMOX_HOST}
+      PROXMOX_PORT=${PROXMOX_PORT}
+      PROXMOX_USER=${PROXMOX_USER}
+      PROXMOX_PASSWORD=${PROXMOX_PASSWORD}
+      PROXMOX_NODE=${PROXMOX_NODE}
+      PROXMOX_STORAGE_POOL=${PROXMOX_STORAGE_POOL}
+      PROXMOX_ISO_STORAGE=${PROXMOX_ISO_STORAGE}
+      TALOS_ISO_FILE=${TALOS_ISO_FILE}
+      TWINBOX_IMAGE_TAG=${TWINBOX_IMAGE_TAG}
+runcmd:
+  - install -m 0755 -d /etc/apt/keyrings
+  - bash -lc 'apt-get remove -y docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc || true'
+  - bash -lc 'curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc'
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - bash -lc 'echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu noble stable" > /etc/apt/sources.list.d/docker.list'
+  - apt-get update
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  - bash -lc 'docker --version'
+  - bash -lc 'docker compose version'
+  - install -d -m 0755 /opt/twinbox
+  - chown ubuntu:ubuntu /opt/twinbox
+  - bash -lc 'if [ ! -d /opt/twinbox/.git ]; then git clone https://github.com/${GITHUB_REPO}.git /opt/twinbox; fi'
+  - bash -lc 'cp /home/ubuntu/twinbox.env.template /opt/twinbox/.env'
+  - bash -lc 'cd /opt/twinbox && docker compose pull'
+  - bash -lc 'cd /opt/twinbox && docker compose up -d'
+CLOUDINIT
 
-      SSH: twinbox@<this-ip>
-      Docker: Installed
+  qm create "$MGT_ID" --name "$MGT_NAME" --memory "$MGT_RAM" --cores "$MGT_CORES" --net0 "virtio,bridge=${BRIDGE_IF}" \
+    --scsihw virtio-scsi-pci --ide2 local-lvm:cloudinit --serial0 socket --vga serial0 --ostype l26 >/dev/null
+  qm importdisk "$MGT_ID" "$img_path" local-lvm >/dev/null
+  qm set "$MGT_ID" --scsi0 "local-lvm:vm-${MGT_ID}-disk-0" >/dev/null
+  qm set "$MGT_ID" --cicustom "user=local:snippets/$(basename "$snippet_file")" >/dev/null
+  qm set "$MGT_ID" --boot order=scsi0 >/dev/null
+  qm resize "$MGT_ID" scsi0 "${MGT_DISK}G" >/dev/null
+  qm start "$MGT_ID" >/dev/null
 
-      Phase 1 complete. SSH into this VM and install the Twinbox platform manually.
-EOF_USERDATA
-
-    ok "Cloud-init snippet created"
-    echo "$snippet_file"
+  msg_ok "Management VM created"
 }
 
-
-create_vm() {
-    local name
-    name="twinbox-mgmt-${CLUSTER}"
-
-    log "Discovering cluster-wide VM IDs to find a free one..."
-
-    # Collect all VM IDs from all nodes in the cluster
-    local used_vm_ids=()
-
-    # Get VM/CT IDs from a specific node (both QEMU VMs and LXC containers)
-    get_vmids_from_node() {
-        local node="$1"
-        # Get QEMU VMs
-        pvesh get /nodes/$node/qemu --output-format json 2>/dev/null | \
-        python3 -c "import sys, json; [print(vm['vmid']) for vm in json.load(sys.stdin) if 'vmid' in vm]" 2>/dev/null
-        # Get LXC containers
-        pvesh get /nodes/$node/lxc --output-format json 2>/dev/null | \
-        python3 -c "import sys, json; [print(ct['vmid']) for ct in json.load(sys.stdin) if 'vmid' in ct]" 2>/dev/null
-    }
-
-    # Get all node names in cluster
-    get_all_nodes() {
-        pvesh get /nodes --output-format json 2>/dev/null | \
-        python3 -c "import sys, json; [print(item['node']) for item in json.load(sys.stdin) if 'node' in item]" 2>/dev/null
-    }
-
-    # Always check the SELECTED node first
-    if [[ -n "$SELECTED" ]]; then
-        while IFS= read -r vmid; do
-            [[ -n "$vmid" ]] && used_vm_ids+=("$vmid")
-        done < <(get_vmids_from_node "$SELECTED")
-    fi
-
-    # Check all other nodes in the cluster
-    while IFS= read -r node; do
-        [[ "$node" == "$SELECTED" ]] && continue
-        # Collect all IDs from this node into a temporary array to avoid nested process substitution issues
-        local node_ids=()
-        while IFS= read -r vmid; do
-            [[ -n "$vmid" ]] && node_ids+=("$vmid")
-        done < <(get_vmids_from_node "$node")
-        # Append to global list
-        used_vm_ids+=("${node_ids[@]}")
-    done < <(get_all_nodes)
-
-    # Deduplicate and sort
-    if [[ ${#used_vm_ids[@]} -gt 0 ]]; then
-        used_vm_ids=($(printf '%s\n' "${used_vm_ids[@]}" | sort -n | uniq))
-    fi
-
-    log "Used VM IDs found: ${used_vm_ids[*]:-none}"
-
-    # Find first free VM ID starting from 100
-    local vmid=""
-    local start_vmid=100
-    for ((candidate=start_vmid; candidate<start_vmid+1000; candidate++)); do
-        if ! printf '%s\n' "${used_vm_ids[@]}" | grep -qx "$candidate"; then
-            vmid="$candidate"
-            break
-        fi
-    done
-
-    if [[ -z "$vmid" ]]; then
-        err "No free VM ID found in range 100-1099"
-        return 1
-    fi
-
-    log "Using VM ID $vmid (free)"
-    log "Attempting to create VM $vmid: $name"
-
-    # Ensure cloud image is available
-    get_ubuntu_cloud_image || return 1
-
-    # Step 1: Create empty VM (no disk)
-    if ! qm create "$vmid" --name "$name" --memory "$RAM_MB" --cores "$CPU_CORES" \
-        --net0 "virtio,bridge=$BRIDGE" \
-        --agent 1 \
-        --scsihw virtio-scsi-single \
-        --onboot 1 \
-        &>/dev/null; then
-        err "Failed to create VM $vmid"
-        return 1
-    fi
-    ok "VM $vmid created (empty)"
-
-    # Step 2: Import cloud image as the boot disk
-    log "Importing cloud image as disk..."
-    if ! qm importdisk "$vmid" "$CLOUD_IMAGE_PATH" "$STORAGE" &>/dev/null; then
-        err "Failed to import disk for VM $vmid"
-        qm destroy "$vmid" 2>/dev/null || true
-        return 1
-    fi
-
-    # Step 3: Attach the imported disk as scsi0
-    # The disk will be named vm-<vmid>-disk-0
-    local disk_name="vm-${vmid}-disk-0"
-    if ! qm set "$vmid" --scsi0 "$STORAGE:$disk_name" &>/dev/null; then
-        err "Failed to attach disk to VM $vmid"
-        qm destroy "$vmid" 2>/dev/null || true
-        return 1
-    fi
-    ok "Disk attached"
-
-    # Resize disk to the configured size (must be done after attachment)
-    log "Resizing disk to ${DISK_GB}GB..."
-    if ! qm disk resize "$vmid" "scsi0" "+${DISK_GB}G" &>/dev/null; then
-        warn "Failed to resize disk, using default size"
-    fi
-
-    # Step 4: Configure managed Cloud-Init drive
-    local ci_snippet
-    ci_snippet=$(create_cloudinit_snippet) || return 1
-
-    # Attach cloud-init ISO as CD-ROM (ide2) and configure cloud-init drive
-    qm set "$vmid" \
-        --ide2 "local-lvm:cloudinit" \
-        --cicustom "user=local:snippets/$ci_snippet" \
-        --ipconfig0 "ip=dhcp" \
-        --serial0 socket \
-        &>/dev/null || warn "Cloud-init configuration may have issues"
-
-    # Set boot order: boot from disk (scsi0), cloud-init will be picked up automatically
-    qm set "$vmid" --boot "order=scsi0" &>/dev/null
-
-    ok "Cloud-init configured"
-
-    echo "$vmid"
-    return 0
-}
-
-wait_ip() {
-    local vmid="$1" wait=600 interval=2
-    log "Waiting for VM IP address..."
-    while (( wait > 0 )); do
-        if qm status "$vmid" 2>/dev/null | grep -q running; then
-            # Use guest agent's network-get-interfaces for reliable IP detection
-            local ip
-            ip=$(qm guest cmd "$vmid" network-get-interfaces 2>/dev/null | python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    for iface in data:
-        # Skip loopback interface
-        if iface.get('name') == 'lo':
-            continue
-        for addr in iface.get('ip-addresses', []):
-            if addr.get('ip-address-type') == 'ipv4':
-                print(addr['ip-address'])
-                sys.exit(0)
-except: pass
-" 2>/dev/null)
-            if [[ -n "$ip" ]]; then
-                printf "\r\033[K"  # Clear the countdown line
-                ok "IP: $ip"
-                echo "$ip"
-                return 0
-            fi
-        fi
-        sleep "$interval"; wait=$((wait-interval))
-        printf "\r\033[K%3ds remaining" "$wait"
-    done
-    printf "\r\033[K"
-    read -p "Enter IP manually: " manual_ip
-    echo "$manual_ip"
+print_next_steps() {
+  echo
+  echo -e "${GN}Installation complete${CL}"
+  echo
+  echo "Next steps:"
+  echo "1. Wait for cloud-init on the management VM to finish."
+  echo "2. Open: http://<management-vm-ip>:3000"
+  echo "3. Verify API health: http://<management-vm-ip>:8080/api/health"
+  echo "4. If needed, edit /opt/twinbox/.env and run: cd /opt/twinbox && docker compose up -d"
+  echo
 }
 
 main() {
-    clear; echo "=== Twinbox Setup Wizard ==="
-    check_proxmox; check_virt_customize; prompt_cluster
-    log "Configuration:"; echo "  Cluster: $CLUSTER"; echo "  Node: $SELECTED"
-    echo "  VM: ${CPU_CORES} CPU, ${RAM_MB}MB RAM, ${DISK_GB}GB disk"; echo "  Bridge: $BRIDGE"
-    create_twinbox_user; gen_token; get_ubuntu_cloud_image
-
-    # Generate and save twinbox user password
-    local twinbox_pw
-    twinbox_pw=$(openssl rand -base64 12 2>/dev/null || echo "ChangeMe$(date +%s)")
-    echo "$twinbox_pw" > "/tmp/twinbox-vm-password-$CLUSTER.txt"
-    chmod 600 "/tmp/twinbox-vm-password-$CLUSTER.txt"
-    export TWINBOX_PASSWORD="$twinbox_pw"
-
-    local vmid
-    vmid=$(create_vm) || exit 1
-    qm start "$vmid"
-    local ip
-    ip=$(wait_ip "$vmid")
-    cat <<EOF
-
-==========================================
- Twinbox Setup Complete!
-==========================================
-
-Phase 1: Management VM created!
-
-  VM ID: $vmid
-  Name: twinbox-mgmt-$CLUSTER
-  IP: $ip
-
-NEXT STEPS:
-
-1. Wait 1-2 minutes for cloud-init to finish
-2. SSH to the VM:
-     ssh twinbox@$ip
-     Password: $twinbox_pw
-3. Install the Twinbox platform:
-     git clone https://github.com/yourorg/Twinbox.git /opt/twinbox
-     cd /opt/twinbox/manager
-     cp .env.example .env  # Edit as needed
-     docker-compose up -d
-4. Access the web UI at http://$ip:8080
-
-==========================================
-EOF
+  check_root
+  check_deps
+  start_wizard
 }
+
 main "$@"
