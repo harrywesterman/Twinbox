@@ -73,3 +73,4 @@ GitHub Actions workflow `.github/workflows/docker-publish.yml` publishes images 
 - Intended for trusted LAN environments.
 - No app-level auth yet.
 - Runtime secrets are loaded from `.env`.
+- Wizard-generated cloud-init snippets on Proxmox are written with `0600` permissions.

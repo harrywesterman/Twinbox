@@ -31,3 +31,4 @@ curl -fsS http://localhost:8080/api/health
 - Twinbox compose uses prebuilt public GHCR images.
 - Docker source is official Docker repository, not Ubuntu `docker.io`.
 - Keep deployment in trusted LAN scope for phase 1.
+- The wizard writes a cloud-init snippet under `/var/lib/vz/snippets/` with mode `0600`.
