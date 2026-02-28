@@ -84,3 +84,12 @@ def test_create_talos_vms_fails_fast_on_proxmox_api_errors():
     assert 'fail "Proxmox API POST failed (${endpoint}) [HTTP ${http_code}]: ${response}"' in text
     assert 'response_data=$(echo "$response" | jq -r \'.data // empty\')' in text
     assert 'fail "Proxmox API POST returned empty data (${endpoint}): ${response}"' in text
+
+
+def test_create_talos_vms_waits_for_proxmox_tasks_to_finish():
+    text = _create_talos_text()
+    assert "wait_for_task_completion()" in text
+    assert 'curl -k -sS -b "PVEAuthCookie=${TOKEN}" "https://${PROXMOX_HOST}:${PROXMOX_PORT}/api2/json/nodes/${PROXMOX_NODE}/tasks/${upid}/status"' in text
+    assert '[[ "$exitstatus" == "OK" ]] || fail "Proxmox task failed (${upid}): ${exitstatus}"' in text
+    assert 'wait_for_task_completion "$create_upid"' in text
+    assert 'wait_for_task_completion "$start_upid"' in text

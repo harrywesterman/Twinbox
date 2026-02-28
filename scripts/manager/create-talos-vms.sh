@@ -73,6 +73,30 @@ task_post() {
   printf '%s\n' "$response"
 }
 
+wait_for_task_completion() {
+  local upid="$1"
+  local attempts=120
+  local status_resp=""
+  local status=""
+  local exitstatus=""
+
+  while [[ "$attempts" -gt 0 ]]; do
+    status_resp=$(curl -k -sS -b "PVEAuthCookie=${TOKEN}" "https://${PROXMOX_HOST}:${PROXMOX_PORT}/api2/json/nodes/${PROXMOX_NODE}/tasks/${upid}/status")
+    status=$(echo "$status_resp" | jq -r '.data.status // empty')
+    exitstatus=$(echo "$status_resp" | jq -r '.data.exitstatus // empty')
+
+    if [[ "$status" == "stopped" ]]; then
+      [[ "$exitstatus" == "OK" ]] || fail "Proxmox task failed (${upid}): ${exitstatus}"
+      return 0
+    fi
+
+    sleep 1
+    attempts=$((attempts - 1))
+  done
+
+  fail "Timed out waiting for Proxmox task (${upid})"
+}
+
 next_ip() {
   local base octet
   base=$(echo "$START_IP" | cut -d. -f1-3)
@@ -84,7 +108,12 @@ create_vm() {
   local vmid="$1"
   local name="$2"
   local role_tag="$3"
-  task_post "https://${PROXMOX_HOST}:${PROXMOX_PORT}/api2/json/nodes/${PROXMOX_NODE}/qemu" \
+  local create_resp=""
+  local create_upid=""
+  local start_resp=""
+  local start_upid=""
+
+  create_resp=$(task_post "https://${PROXMOX_HOST}:${PROXMOX_PORT}/api2/json/nodes/${PROXMOX_NODE}/qemu" \
     --data-urlencode "vmid=${vmid}" \
     --data-urlencode "name=${name}" \
     --data-urlencode "memory=${MEMORY_MB}" \
@@ -95,9 +124,15 @@ create_vm() {
     --data-urlencode "scsi0=${STORAGE_POOL}:${DISK_GB}" \
     --data-urlencode "ide2=${ISO_STORAGE}:iso/${TALOS_ISO_FILE},media=cdrom" \
     --data-urlencode "boot=order=scsi0;ide2" \
-    --data-urlencode "ostype=l26" >/dev/null
+    --data-urlencode "ostype=l26")
+  create_upid=$(echo "$create_resp" | jq -r '.data // empty')
+  [[ -n "$create_upid" ]] || fail "Missing create task UPID for VM ${vmid}"
+  wait_for_task_completion "$create_upid"
 
-  task_post "https://${PROXMOX_HOST}:${PROXMOX_PORT}/api2/json/nodes/${PROXMOX_NODE}/qemu/${vmid}/status/start" >/dev/null
+  start_resp=$(task_post "https://${PROXMOX_HOST}:${PROXMOX_PORT}/api2/json/nodes/${PROXMOX_NODE}/qemu/${vmid}/status/start")
+  start_upid=$(echo "$start_resp" | jq -r '.data // empty')
+  [[ -n "$start_upid" ]] || fail "Missing start task UPID for VM ${vmid}"
+  wait_for_task_completion "$start_upid"
 }
 
 cp_ids=()
