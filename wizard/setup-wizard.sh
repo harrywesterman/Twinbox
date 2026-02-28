@@ -311,7 +311,7 @@ apply_educated_defaults() {
 }
 
 create_proxmox_api_user() {
-  local proxmox_privs="VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.Audit"
+  local proxmox_privs="VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.Audit,SDN.Use"
   local create_err=""
   local role_err=""
   local last_err=""
@@ -392,6 +392,10 @@ create_proxmox_api_user() {
       exit 1
     fi
   done
+  if ! apply_acl_with_retry "/sdn" "$PROXMOX_USER" "$PROXMOX_ROLE" 10 1; then
+    msg_error "Failed to apply ACL /sdn for ${PROXMOX_USER}: ${last_err}"
+    exit 1
+  fi
 }
 
 collect_manual_overrides() {
