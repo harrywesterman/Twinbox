@@ -5,10 +5,15 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CREATE_TALOS_SCRIPT = REPO_ROOT / "scripts" / "manager" / "create-talos-vms.sh"
+BOOTSTRAP_TALOS_SCRIPT = REPO_ROOT / "scripts" / "manager" / "bootstrap-talos.sh"
 
 
 def _create_talos_text() -> str:
     return CREATE_TALOS_SCRIPT.read_text(encoding="utf-8")
+
+
+def _bootstrap_talos_text() -> str:
+    return BOOTSTRAP_TALOS_SCRIPT.read_text(encoding="utf-8")
 
 
 def test_create_talos_vms_requires_proxmox_env():
@@ -93,3 +98,12 @@ def test_create_talos_vms_waits_for_proxmox_tasks_to_finish():
     assert '[[ "$exitstatus" == "OK" ]] || fail "Proxmox task failed (${upid}): ${exitstatus}"' in text
     assert 'wait_for_task_completion "$create_upid"' in text
     assert 'wait_for_task_completion "$start_upid"' in text
+
+
+def test_bootstrap_talos_detaches_iso_after_enrollment():
+    text = _bootstrap_talos_text()
+    assert "detach_vm_iso()" in text
+    assert '--data-urlencode "delete=ide2"' in text
+    assert "for vmid in" in text
+    assert "detach_vm_iso \"$vmid\"" in text
+    assert "detach_all_vm_isos" in text
