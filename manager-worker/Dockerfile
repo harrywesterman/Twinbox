@@ -1,13 +1,24 @@
 FROM node:20-bookworm-slim
 
 ARG TALOSCTL_VERSION=v1.7.4
+ARG KUBECTL_VERSION=v1.30.0
+ARG HELM_VERSION=v3.15.4
 
 WORKDIR /opt/twinbox
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends bash ca-certificates curl jq \
-  && curl -fsSL "https://github.com/siderolabs/talos/releases/download/${TALOSCTL_VERSION}/talosctl-linux-amd64" -o /usr/local/bin/talosctl \
+  && apt-get install -y --no-install-recommends bash ca-certificates curl jq tar \
+  && curl -fsSL "https://github.com/siderolabs/talos/releases/download/${TALOSCTL_VERSION}/talosctl-linux-amd64" -o /tmp/talosctl \
+  && curl -fsSL "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" -o /tmp/kubectl \
+  && curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" -o /tmp/helm.tar.gz \
+  && tar -xzf /tmp/helm.tar.gz -C /tmp \
+  && install -m 0755 /tmp/talosctl /usr/local/bin/talosctl \
+  && install -m 0755 /tmp/kubectl /usr/local/bin/kubectl \
+  && install -m 0755 /tmp/linux-amd64/helm /usr/local/bin/helm \
   && chmod +x /usr/local/bin/talosctl \
+  && chmod +x /usr/local/bin/kubectl \
+  && chmod +x /usr/local/bin/helm \
+  && rm -rf /tmp/talosctl /tmp/kubectl /tmp/helm.tar.gz /tmp/linux-amd64 \
   && rm -rf /var/lib/apt/lists/*
 
 COPY manager-worker/package.json ./manager-worker/package.json

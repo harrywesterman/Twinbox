@@ -56,6 +56,13 @@ if [[ ! -f .env ]]; then
   fi
 fi
 
+if [[ -x scripts/install-management-tools.sh ]]; then
+  log "Installing management host tools from .env versions"
+  sudo ./scripts/install-management-tools.sh --env-file .env
+else
+  fail "Missing scripts/install-management-tools.sh"
+fi
+
 log "Starting development stack"
 docker compose up -d --build
 

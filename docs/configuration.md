@@ -13,8 +13,17 @@ PROXMOX_NODE=pve
 PROXMOX_STORAGE_POOL=local-lvm
 PROXMOX_ISO_STORAGE=local
 TALOS_ISO_FILE=talos-v1.7.4.iso
+TALOSCTL_VERSION=v1.7.4
+KUBECTL_VERSION=v1.30.0
+HELM_VERSION=v3.15.4
 TWINBOX_IMAGE_TAG=latest
 ```
+
+Tooling version notes:
+
+- `TALOSCTL_VERSION`, `KUBECTL_VERSION`, and `HELM_VERSION` define the expected toolchain.
+- The management VM host install script uses these values.
+- `manager-worker` enforces these values at startup and exits if versions mismatch.
 
 ## Cluster Payload Validation
 

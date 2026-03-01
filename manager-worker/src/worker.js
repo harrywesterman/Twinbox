@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { spawn } from "child_process";
+import { spawn, spawnSync } from "child_process";
 
 const dataRoot = process.env.MANAGER_DATA_DIR || "/data";
 const workspace = process.env.WORKSPACE_ROOT || "/opt/twinbox";
@@ -62,6 +62,68 @@ function runCommand(jobId, command, args, env = {}) {
       }
     });
   });
+}
+
+function requireEnv(name) {
+  const value = process.env[name];
+  if (!value || value.trim() === "") {
+    throw new Error(`missing required environment variable: ${name}`);
+  }
+  return value.trim();
+}
+
+function normalizeVersion(value) {
+  return value.trim().replace(/^v/, "");
+}
+
+function extractSemver(value, label) {
+  const match = value.match(/v?(\d+\.\d+\.\d+)/);
+  if (!match) {
+    throw new Error(`failed to parse ${label} version from output: ${value}`);
+  }
+  return match[1];
+}
+
+function runVersionCommand(command, args) {
+  const result = spawnSync(command, args, { encoding: "utf8" });
+  if (result.error) {
+    throw new Error(`${command} failed: ${result.error.message}`);
+  }
+  if (result.status !== 0) {
+    const stderr = (result.stderr || "").trim();
+    throw new Error(`${command} ${args.join(" ")} exited with code ${result.status}${stderr ? `: ${stderr}` : ""}`);
+  }
+  const output = `${result.stdout || ""}\n${result.stderr || ""}`.trim();
+  return output;
+}
+
+function ensureToolVersionsMatchPolicy() {
+  const expectedTalosctl = normalizeVersion(requireEnv("TALOSCTL_VERSION"));
+  const expectedKubectl = normalizeVersion(requireEnv("KUBECTL_VERSION"));
+  const expectedHelm = normalizeVersion(requireEnv("HELM_VERSION"));
+
+  const talosOutput = runVersionCommand("talosctl", ["version", "--client"]);
+  const kubectlOutput = runVersionCommand("kubectl", ["version", "--client", "--output=json"]);
+  const helmOutput = runVersionCommand("helm", ["version", "--short"]);
+
+  const talosActual = extractSemver(talosOutput, "talosctl");
+  const kubectlActual = extractSemver(kubectlOutput, "kubectl");
+  const helmActual = extractSemver(helmOutput, "helm");
+
+  const mismatches = [];
+  if (talosActual !== expectedTalosctl) {
+    mismatches.push(`talosctl expected v${expectedTalosctl}, got v${talosActual}`);
+  }
+  if (kubectlActual !== expectedKubectl) {
+    mismatches.push(`kubectl expected v${expectedKubectl}, got v${kubectlActual}`);
+  }
+  if (helmActual !== expectedHelm) {
+    mismatches.push(`helm expected v${expectedHelm}, got v${helmActual}`);
+  }
+
+  if (mismatches.length > 0) {
+    throw new Error(`tool version mismatch: ${mismatches.join("; ")}`);
+  }
 }
 
 async function handleCreate(job) {
@@ -157,4 +219,11 @@ async function loop() {
 }
 
 console.log("manager-worker started");
+try {
+  ensureToolVersionsMatchPolicy();
+  console.log("manager-worker tool version check passed");
+} catch (err) {
+  console.error(`manager-worker startup failed: ${err.message}`);
+  process.exit(1);
+}
 loop();

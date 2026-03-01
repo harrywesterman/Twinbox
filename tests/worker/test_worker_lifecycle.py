@@ -15,19 +15,42 @@ def _wait_until(predicate, timeout=10):
     raise RuntimeError("condition not met in time")
 
 
+def _write_fake_tool(path: Path, body: str):
+    path.write_text(body)
+    path.chmod(0o755)
+
+
+def _prepare_fake_toolchain(bin_dir: Path):
+    _write_fake_tool(
+        bin_dir / "talosctl",
+        "#!/bin/bash\nif [[ \"$1\" == \"version\" ]]; then echo 'Client: v1.7.4'; exit 0; fi\nexit 0\n",
+    )
+    _write_fake_tool(
+        bin_dir / "kubectl",
+        "#!/bin/bash\nif [[ \"$1\" == \"version\" ]]; then echo '{\"clientVersion\":{\"gitVersion\":\"v1.30.0\"}}'; exit 0; fi\nexit 0\n",
+    )
+    _write_fake_tool(
+        bin_dir / "helm",
+        "#!/bin/bash\nif [[ \"$1\" == \"version\" ]]; then echo 'v3.15.4+gabcdef'; exit 0; fi\nexit 0\n",
+    )
+
+
 def test_worker_processes_pending_job_to_completed():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         data = root / "data"
         workspace = root / "workspace"
+        bin_dir = root / "bin"
         pending = data / "queue" / "pending"
         jobs = data / "jobs"
         logs = data / "logs"
         clusters = data / "clusters"
         script_dir = workspace / "scripts" / "manager"
 
-        for d in [pending, jobs, logs, clusters, script_dir]:
+        for d in [pending, jobs, logs, clusters, script_dir, bin_dir]:
             d.mkdir(parents=True, exist_ok=True)
+
+        _prepare_fake_toolchain(bin_dir)
 
         # Minimal script to emulate successful VM provisioning.
         create_script = script_dir / "create-talos-vms.sh"
@@ -86,6 +109,10 @@ def test_worker_processes_pending_job_to_completed():
         env["MANAGER_DATA_DIR"] = str(data)
         env["WORKSPACE_ROOT"] = str(workspace)
         env["WORKER_POLL_MS"] = "100"
+        env["TALOSCTL_VERSION"] = "v1.7.4"
+        env["KUBECTL_VERSION"] = "v1.30.0"
+        env["HELM_VERSION"] = "v3.15.4"
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
 
         proc = subprocess.Popen(
             ["node", "manager-worker/src/worker.js"],
@@ -110,3 +137,38 @@ def test_worker_processes_pending_job_to_completed():
         finally:
             proc.terminate()
             proc.wait(timeout=5)
+
+
+def test_worker_exits_on_tool_version_mismatch():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        data = root / "data"
+        workspace = root / "workspace"
+        bin_dir = root / "bin"
+
+        for d in [data / "queue" / "pending", data / "jobs", data / "logs", data / "clusters", workspace, bin_dir]:
+            d.mkdir(parents=True, exist_ok=True)
+
+        _prepare_fake_toolchain(bin_dir)
+
+        env = os.environ.copy()
+        env["MANAGER_DATA_DIR"] = str(data)
+        env["WORKSPACE_ROOT"] = str(workspace)
+        env["WORKER_POLL_MS"] = "100"
+        env["TALOSCTL_VERSION"] = "v1.7.4"
+        env["KUBECTL_VERSION"] = "v1.31.0"
+        env["HELM_VERSION"] = "v3.15.4"
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+
+        proc = subprocess.Popen(
+            ["node", "manager-worker/src/worker.js"],
+            cwd=Path(__file__).resolve().parents[2],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        stdout, stderr = proc.communicate(timeout=10)
+        assert proc.returncode != 0
+        assert "tool version mismatch" in stdout or "tool version mismatch" in stderr

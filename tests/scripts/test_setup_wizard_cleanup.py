@@ -55,7 +55,11 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     assert "    sudo: ['ALL=(ALL) NOPASSWD:ALL']" in text
     assert "  - path: /tmp/twinbox.env.template" in text
     assert "    owner: root:root" in text
+    assert "      TALOSCTL_VERSION=${TALOSCTL_VERSION}" in text
+    assert "      KUBECTL_VERSION=${KUBECTL_VERSION}" in text
+    assert "      HELM_VERSION=${HELM_VERSION}" in text
     assert "  - bash -lc 'cp /tmp/twinbox.env.template /opt/twinbox/.env'" in text
+    assert "  - bash -lc 'cd /opt/twinbox && chmod +x scripts/install-management-tools.sh && ./scripts/install-management-tools.sh --env-file /opt/twinbox/.env'" in text
     assert 'qm set "$MGT_ID" --ciuser "$CLOUD_INIT_USER" >/dev/null' in text
     assert 'qm set "$MGT_ID" --cipassword "$CLOUD_INIT_PASSWORD" >/dev/null' in text
     assert 'qm set "$MGT_ID" --searchdomain "$CLOUD_INIT_DNS_DOMAIN" >/dev/null' in text
@@ -112,6 +116,9 @@ def test_setup_wizard_includes_more_explanatory_question_text():
     assert "bridge used for VM network interface" in text
     assert "search domain used in /etc/resolv.conf" in text
     assert "used by worker to call Proxmox API" in text
+    assert "Talosctl version (tooling on management host and worker)" in text
+    assert "kubectl version (tooling on management host and worker)" in text
+    assert "Helm version (tooling on management host and worker)" in text
 
 
 def test_setup_wizard_finds_first_free_vmid_cluster_wide():

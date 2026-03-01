@@ -49,13 +49,20 @@ ls -la manager-data/queue/running
 
 ## Worker Job Fails Immediately
 
-The worker image already includes required runtime tools (`bash`, `curl`, `jq`, `talosctl`). If jobs still fail immediately:
+The worker image includes required runtime tools (`bash`, `curl`, `jq`, `talosctl`, `kubectl`, `helm`) and enforces tool versions from `.env` (`TALOSCTL_VERSION`, `KUBECTL_VERSION`, `HELM_VERSION`) at startup.
+
+If jobs fail immediately, first check worker startup logs for a version mismatch:
 
 ```bash
 docker compose pull manager-worker
 docker compose up -d manager-worker
 docker compose logs manager-worker --tail=200
 ```
+
+If you see `tool version mismatch`, either:
+
+1. Update `.env` tool versions to match the pulled image, or
+2. Switch `TWINBOX_IMAGE_TAG` to an image tag built with your desired tool versions.
 
 ## Proxmox Auth Errors
 

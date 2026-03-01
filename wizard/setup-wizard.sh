@@ -307,6 +307,9 @@ apply_educated_defaults() {
   PROXMOX_STORAGE_POOL="local-lvm"
   PROXMOX_ISO_STORAGE="local"
   TALOS_ISO_FILE="talos-v1.7.4.iso"
+  TALOSCTL_VERSION="v1.7.4"
+  KUBECTL_VERSION="v1.30.0"
+  HELM_VERSION="v3.15.4"
   TWINBOX_IMAGE_TAG="latest"
 }
 
@@ -425,6 +428,9 @@ collect_manual_overrides() {
     input_box "Manager .env" "Proxmox storage pool (disk target for Talos VMs)" "$PROXMOX_STORAGE_POOL" PROXMOX_STORAGE_POOL
     input_box "Manager .env" "Proxmox ISO storage (where Talos ISO is stored)" "$PROXMOX_ISO_STORAGE" PROXMOX_ISO_STORAGE
     input_box "Manager .env" "Talos ISO file (filename in ISO storage)" "$TALOS_ISO_FILE" TALOS_ISO_FILE
+    input_box "Manager .env" "Talosctl version (tooling on management host and worker)" "$TALOSCTL_VERSION" TALOSCTL_VERSION
+    input_box "Manager .env" "kubectl version (tooling on management host and worker)" "$KUBECTL_VERSION" KUBECTL_VERSION
+    input_box "Manager .env" "Helm version (tooling on management host and worker)" "$HELM_VERSION" HELM_VERSION
     input_box "Manager .env" "Image tag (Twinbox container image tag)" "$TWINBOX_IMAGE_TAG" TWINBOX_IMAGE_TAG
   fi
 }
@@ -449,7 +455,7 @@ review_cloud_init_settings() {
 }
 
 review_manager_env_settings() {
-  if whiptail --yesno "Manager API settings\n\nHost: $PROXMOX_HOST\nPort: $PROXMOX_PORT\nUser: $PROXMOX_USER\nNode: $PROXMOX_NODE\nStorage: $PROXMOX_STORAGE_POOL\nISO storage: $PROXMOX_ISO_STORAGE\nTalos ISO: $TALOS_ISO_FILE\nImage tag: $TWINBOX_IMAGE_TAG\n\nEdit this group?" 22 78 --title "Manager .env"; then
+  if whiptail --yesno "Manager API settings\n\nHost: $PROXMOX_HOST\nPort: $PROXMOX_PORT\nUser: $PROXMOX_USER\nNode: $PROXMOX_NODE\nStorage: $PROXMOX_STORAGE_POOL\nISO storage: $PROXMOX_ISO_STORAGE\nTalos ISO: $TALOS_ISO_FILE\nTalosctl: $TALOSCTL_VERSION\nkubectl: $KUBECTL_VERSION\nHelm: $HELM_VERSION\nImage tag: $TWINBOX_IMAGE_TAG\n\nEdit this group?" 24 78 --title "Manager .env"; then
     return 0
   fi
   return 1
@@ -556,6 +562,9 @@ write_files:
       PROXMOX_STORAGE_POOL=${PROXMOX_STORAGE_POOL}
       PROXMOX_ISO_STORAGE=${PROXMOX_ISO_STORAGE}
       TALOS_ISO_FILE=${TALOS_ISO_FILE}
+      TALOSCTL_VERSION=${TALOSCTL_VERSION}
+      KUBECTL_VERSION=${KUBECTL_VERSION}
+      HELM_VERSION=${HELM_VERSION}
       TWINBOX_IMAGE_TAG=${TWINBOX_IMAGE_TAG}
 runcmd:
   - install -m 0755 -d /etc/apt/keyrings
@@ -572,6 +581,7 @@ runcmd:
   - chown ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} /opt/twinbox
   - bash -lc 'if [ ! -d /opt/twinbox/.git ]; then git clone https://github.com/${GITHUB_REPO}.git /opt/twinbox; fi'
   - bash -lc 'cp /tmp/twinbox.env.template /opt/twinbox/.env'
+  - bash -lc 'cd /opt/twinbox && chmod +x scripts/install-management-tools.sh && ./scripts/install-management-tools.sh --env-file /opt/twinbox/.env'
   - bash -lc 'cd /opt/twinbox && docker compose pull'
   - bash -lc 'cd /opt/twinbox && docker compose up -d'
 CLOUDINIT

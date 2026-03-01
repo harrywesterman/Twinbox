@@ -7,6 +7,13 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
+if [[ -x scripts/install-management-tools.sh ]]; then
+  sudo ./scripts/install-management-tools.sh --env-file .env
+else
+  echo "Missing scripts/install-management-tools.sh"
+  exit 1
+fi
+
 docker compose pull
 docker compose up -d
 
