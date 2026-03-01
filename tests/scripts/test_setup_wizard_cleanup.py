@@ -117,6 +117,7 @@ def test_setup_wizard_includes_more_explanatory_question_text():
     assert "bridge used for VM network interface" in text
     assert "search domain used in /etc/resolv.conf" in text
     assert "used by worker to call Proxmox API" in text
+    assert "Management VM CPU type (use host or x86-64-v2-AES for latest talosctl)" in text
     assert "Talosctl version (tooling on management host and worker)" in text
     assert "kubectl version (tooling on management host and worker)" in text
     assert "Helm version (tooling on management host and worker)" in text
@@ -149,6 +150,12 @@ def test_setup_wizard_prints_proxmox_api_credentials():
     text = _wizard_text()
     assert 'echo "Proxmox API user: ${PROXMOX_USER}"' in text
     assert 'echo "Proxmox API password: ${PROXMOX_PASSWORD}"' in text
+
+
+def test_setup_wizard_uses_host_cpu_type_by_default():
+    text = _wizard_text()
+    assert 'MGT_CPU_TYPE="host"' in text
+    assert '--cpu "$MGT_CPU_TYPE"' in text
 
 
 def test_setup_wizard_converts_netmask_to_cidr():

@@ -516,6 +516,7 @@ apply_educated_defaults() {
   MGT_ID=$(guess_next_vmid)
   MGT_RAM="4096"
   MGT_CORES="2"
+  MGT_CPU_TYPE="host"
   MGT_DISK="40"
   BRIDGE_IF="${guessed_bridge:-vmbr0}"
   CLOUD_INIT_PASSWORD=""
@@ -633,6 +634,7 @@ collect_manual_overrides() {
     input_box "Management VM" "Management VM ID (unique VMID in Proxmox)" "$MGT_ID" MGT_ID
     input_box "Management VM" "Management VM RAM (MB) for manager services" "$MGT_RAM" MGT_RAM
     input_box "Management VM" "Management VM CPU cores for manager services" "$MGT_CORES" MGT_CORES
+    input_box "Management VM" "Management VM CPU type (use host or x86-64-v2-AES for latest talosctl)" "$MGT_CPU_TYPE" MGT_CPU_TYPE
     input_box "Management VM" "Management VM disk size (GB) for OS + images" "$MGT_DISK" MGT_DISK
     input_box "Management VM" "Bridge interface (bridge used for VM network interface)" "$BRIDGE_IF" BRIDGE_IF
   fi
@@ -662,7 +664,7 @@ collect_manual_overrides() {
 }
 
 review_management_settings() {
-  if whiptail --yesno "Management VM settings\n\nName: $MGT_NAME\nVMID: $MGT_ID\nRAM: ${MGT_RAM}MB\nCPU cores: $MGT_CORES\nDisk: ${MGT_DISK}GB\nBridge: $BRIDGE_IF\n\nEdit this group?" 18 78 --title "Management VM"; then
+  if whiptail --yesno "Management VM settings\n\nName: $MGT_NAME\nVMID: $MGT_ID\nRAM: ${MGT_RAM}MB\nCPU cores: $MGT_CORES\nCPU type: $MGT_CPU_TYPE\nDisk: ${MGT_DISK}GB\nBridge: $BRIDGE_IF\n\nEdit this group?" 20 78 --title "Management VM"; then
     return 0
   fi
   return 1
@@ -722,7 +724,7 @@ start_wizard() {
 
   msg_box "Security Notice" "Phase 1 is LAN-only and stores Proxmox credentials in ${TWINBOX_TARGET_DIR}/.env on the management VM.\n\nUse a dedicated Proxmox automation account and rotate credentials regularly."
 
-  if whiptail --yesno "Proceed with installation?\n\nCluster: ${CLUSTER_SLUG}\nVM Name: $MGT_NAME\nVM ID: $MGT_ID\nBridge: $BRIDGE_IF\nCloud-Init user: $CLOUD_INIT_USER\nDNS: ${CLOUD_INIT_DNS_IP} (${CLOUD_INIT_DNS_DOMAIN})\nRepo: ${GITHUB_REPO}\nTarget dir: ${TWINBOX_TARGET_DIR}\nAuto-start manager stack: yes" 20 78; then
+  if whiptail --yesno "Proceed with installation?\n\nCluster: ${CLUSTER_SLUG}\nVM Name: $MGT_NAME\nVM ID: $MGT_ID\nCPU type: $MGT_CPU_TYPE\nBridge: $BRIDGE_IF\nCloud-Init user: $CLOUD_INIT_USER\nDNS: ${CLOUD_INIT_DNS_IP} (${CLOUD_INIT_DNS_DOMAIN})\nRepo: ${GITHUB_REPO}\nTarget dir: ${TWINBOX_TARGET_DIR}\nAuto-start manager stack: yes" 21 78; then
     create_proxmox_api_user
     create_management_vm
     print_next_steps
@@ -818,7 +820,7 @@ CLOUDINIT
   chmod 600 "$snippet_file"
 
   status_update "Creating VM shell in Proxmox"
-  qm create "$MGT_ID" --name "$MGT_NAME" --memory "$MGT_RAM" --cores "$MGT_CORES" --net0 "virtio,bridge=${BRIDGE_IF}" \
+  qm create "$MGT_ID" --name "$MGT_NAME" --memory "$MGT_RAM" --cores "$MGT_CORES" --cpu "$MGT_CPU_TYPE" --net0 "virtio,bridge=${BRIDGE_IF}" \
     --tags "twinbox;management;docker;bootstrap;${CLUSTER_VM_TAG}" \
     --scsihw virtio-scsi-pci --ide2 local-lvm:cloudinit --serial0 socket --vga serial0 --ostype l26 >/dev/null
   vm_created=1
@@ -961,18 +963,53 @@ discover_management_vm_ip() {
   return 1
 }
 
+wait_for_web_interface() {
+  local management_ip="$1"
+  local attempts=72
+  local polls=1
+  local web_url="http://${management_ip}:3000"
+
+  status_update "Waiting for web interface on ${web_url}"
+  while [[ "$attempts" -gt 0 ]]; do
+    if curl -sS --output /dev/null --connect-timeout 2 --max-time 3 "$web_url"; then
+      status_update "Web interface is reachable on port 3000"
+      return 0
+    fi
+
+    if (( polls % 6 == 0 )); then
+      status_update "Web interface still starting (retry ${polls}/72)"
+    fi
+
+    sleep 5
+    attempts=$((attempts - 1))
+    polls=$((polls + 1))
+  done
+
+  status_update "Web interface did not become reachable within timeout"
+  return 1
+}
+
 print_next_steps() {
   local management_ip=""
+  local web_interface_ready=0
   management_ip=$(discover_management_vm_ip || true)
+
+  if [[ -n "${management_ip:-}" ]] && wait_for_web_interface "$management_ip"; then
+    web_interface_ready=1
+  fi
 
   echo
   echo -e "${GN}Installation complete${CL}"
   echo
   echo "Next steps:"
-  if [[ -n "${management_ip:-}" ]]; then
-    echo "1. Wait for cloud-init on the management VM to finish."
+  if [[ "$web_interface_ready" -eq 1 ]]; then
+    echo "1. Web interface is up on port 3000."
     echo "2. Open: http://${management_ip}:3000"
     echo "3. Verify API health: http://${management_ip}:8080/api/health"
+  elif [[ -n "${management_ip:-}" ]]; then
+    echo "1. Web interface on port 3000 is not reachable yet."
+    echo "2. Keep waiting for cloud-init/startup, then check: http://${management_ip}:3000"
+    echo "3. Verify API health when ready: http://${management_ip}:8080/api/health"
   else
     echo "1. Wait for cloud-init on the management VM to finish."
     echo "2. Open: http://<management-vm-ip>:3000"

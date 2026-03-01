@@ -67,6 +67,38 @@ normalize_version() {
   printf '%s' "$raw"
 }
 
+version_gte() {
+  local left="$1"
+  local right="$2"
+  [[ "$(printf '%s\n%s\n' "$right" "$left" | sort -V | head -n1)" == "$right" ]]
+}
+
+ensure_talos_cpu_compatibility() {
+  local talos_version=""
+  local cpu_flags=""
+  local required_flags=(ssse3 sse4_1 sse4_2 popcnt cx16 lahf_lm)
+  local missing_flags=()
+  local flag=""
+
+  talos_version="$(normalize_version "$TALOSCTL_VERSION")"
+  if ! version_gte "$talos_version" "1.7.0"; then
+    return 0
+  fi
+
+  cpu_flags="$(awk -F':' '/^flags[[:space:]]*:/{print $2; exit}' /proc/cpuinfo 2>/dev/null || true)"
+  [[ -n "$cpu_flags" ]] || fail "Could not read CPU flags from /proc/cpuinfo"
+
+  for flag in "${required_flags[@]}"; do
+    if ! printf '%s\n' "$cpu_flags" | grep -qw "$flag"; then
+      missing_flags+=("$flag")
+    fi
+  done
+
+  if [[ "${#missing_flags[@]}" -gt 0 ]]; then
+    fail "CPU misses x86-64-v2 flags needed by talosctl v${talos_version}: ${missing_flags[*]}. In Proxmox, set VM CPU type to 'host' (or x86-64-v2-AES), then cold reboot/recreate the VM."
+  fi
+}
+
 verify_checksum() {
   local file="$1"
   local expected="$2"
@@ -175,9 +207,9 @@ verify_versions() {
   local kubectl_expected
   local helm_expected
 
-  talos_output="$(/usr/local/bin/talosctl version --client 2>&1 || true)"
-  kubectl_output="$(/usr/local/bin/kubectl version --client --output=yaml 2>&1 || true)"
-  helm_output="$(/usr/local/bin/helm version --short 2>&1 || true)"
+  talos_output="$(/usr/local/bin/talosctl version --client 2>&1)" || fail "talosctl version check failed: ${talos_output}"
+  kubectl_output="$(/usr/local/bin/kubectl version --client --output=yaml 2>&1)" || fail "kubectl version check failed: ${kubectl_output}"
+  helm_output="$(/usr/local/bin/helm version --short 2>&1)" || fail "helm version check failed: ${helm_output}"
 
   talos_actual="$(extract_semver "$talos_output")"
   kubectl_actual="$(extract_semver "$kubectl_output")"
@@ -194,6 +226,7 @@ verify_versions() {
   log "Installed versions: talosctl=v${talos_actual}, kubectl=v${kubectl_actual}, helm=v${helm_actual}"
 }
 
+ensure_talos_cpu_compatibility
 install_talosctl
 install_kubectl
 install_helm

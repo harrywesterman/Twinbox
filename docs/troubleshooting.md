@@ -64,6 +64,36 @@ If you see `tool version mismatch`, either:
 1. Update `.env` tool versions to match the pulled image, or
 2. Switch `TWINBOX_IMAGE_TAG` to an image tag built with your desired tool versions.
 
+## Worker Fails With x86-64-v2 Error
+
+If logs contain:
+
+`This program can only be run on AMD64 processors with v2 microarchitecture support.`
+
+Then the management VM CPU type is too old for recent `talosctl` builds.
+
+Fix:
+
+```bash
+# On Proxmox host, set Management VM CPU to host (or x86-64-v2-AES) and cold reboot.
+qm set <management-vmid> --cpu host
+qm stop <management-vmid>
+qm start <management-vmid>
+```
+
+Verify inside management VM:
+
+```bash
+grep -m1 '^flags' /proc/cpuinfo | egrep -o 'ssse3|sse4_1|sse4_2|popcnt|cx16|lahf_lm' | xargs echo
+```
+
+Then restart worker:
+
+```bash
+docker compose up -d manager-worker
+docker compose logs manager-worker --tail=200
+```
+
 ## Proxmox Auth Errors
 
 - Validate `.env`: `PROXMOX_HOST`, `PROXMOX_PORT`, `PROXMOX_USER`, `PROXMOX_PASSWORD`.
