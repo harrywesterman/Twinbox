@@ -811,11 +811,11 @@ runcmd:
   - bash -lc 'docker compose version'
   - install -d -m 0755 ${TWINBOX_TARGET_DIR}
   - chown ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}
-  - bash -lc 'if [ ! -d ${TWINBOX_TARGET_DIR}/.git ]; then git clone https://github.com/${GITHUB_REPO}.git ${TWINBOX_TARGET_DIR}; fi'
-  - bash -lc 'cp /tmp/twinbox-${CLUSTER_SLUG}.env.template ${TWINBOX_TARGET_DIR}/.env'
+  - bash -lc 'sudo -u ${CLOUD_INIT_USER} -H bash -lc "if [ ! -d ${TWINBOX_TARGET_DIR}/.git ]; then git clone https://github.com/${GITHUB_REPO}.git ${TWINBOX_TARGET_DIR}; fi"'
+  - install -m 0600 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /tmp/twinbox-${CLUSTER_SLUG}.env.template ${TWINBOX_TARGET_DIR}/.env
+  - chown -R ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}
   - bash -lc 'cd ${TWINBOX_TARGET_DIR} && chmod +x scripts/install-management-tools.sh && ./scripts/install-management-tools.sh --env-file ${TWINBOX_TARGET_DIR}/.env'
-  - bash -lc 'cd ${TWINBOX_TARGET_DIR} && docker compose pull'
-  - bash -lc 'cd ${TWINBOX_TARGET_DIR} && docker compose up -d'
+  - bash -lc 'sudo -u ${CLOUD_INIT_USER} -H bash -lc "cd ${TWINBOX_TARGET_DIR} && docker compose pull && docker compose up -d"'
 CLOUDINIT
   chmod 600 "$snippet_file"
 
