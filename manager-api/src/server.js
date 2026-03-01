@@ -2,6 +2,7 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import { spawnSync } from "child_process";
 
 const app = express();
 const port = Number(process.env.MANAGER_API_PORT || 8080);
@@ -70,6 +71,104 @@ function parseIPv4(value, field) {
   return { ok: true, value };
 }
 
+function pickFirstString(value) {
+  if (Array.isArray(value)) {
+    return typeof value[0] === "string" ? value[0] : "";
+  }
+  return typeof value === "string" ? value : "";
+}
+
+function preferredVipOctets() {
+  const values = [];
+  for (let octet = 50; octet <= 240; octet += 1) values.push(octet);
+  for (let octet = 241; octet <= 254; octet += 1) values.push(octet);
+  for (let octet = 2; octet < 50; octet += 1) values.push(octet);
+  return values;
+}
+
+function preferredStartOctets() {
+  const values = [];
+  for (let octet = 50; octet <= 252; octet += 1) values.push(octet);
+  for (let octet = 2; octet < 50; octet += 1) values.push(octet);
+  return values;
+}
+
+function probeIpInUse(ip) {
+  const pingBin = process.env.MANAGER_API_PING_BIN || "ping";
+  const isDefaultPing = path.basename(pingBin) === "ping";
+  const args = isDefaultPing ? ["-n", "-c", "1", "-W", "1", ip] : [ip];
+  const result = spawnSync(pingBin, args, {
+    stdio: "ignore",
+    timeout: 1500,
+  });
+
+  if (result.error?.code === "ENOENT") {
+    throw new Error(`Ping command not found: ${pingBin}`);
+  }
+
+  return result.status === 0;
+}
+
+function suggestIpRange(managementIp) {
+  const octets = managementIp.split(".").map(Number);
+  const prefix = `${octets[0]}.${octets[1]}.${octets[2]}`;
+  const managementOctet = octets[3];
+  const inUseCache = new Map();
+  const vipCandidates = preferredVipOctets();
+  const startCandidates = preferredStartOctets();
+
+  const isIpInUse = (hostOctet) => {
+    if (inUseCache.has(hostOctet)) {
+      return inUseCache.get(hostOctet);
+    }
+    const inUse = probeIpInUse(`${prefix}.${hostOctet}`);
+    inUseCache.set(hostOctet, inUse);
+    return inUse;
+  };
+
+  let vipOctet = null;
+  for (const candidate of vipCandidates) {
+    if (candidate === managementOctet) continue;
+    if (!isIpInUse(candidate)) {
+      vipOctet = candidate;
+      break;
+    }
+  }
+
+  if (vipOctet === null) {
+    throw new Error(`No free VIP address found in ${prefix}.0/24`);
+  }
+
+  let startOctet = null;
+  for (const candidate of startCandidates) {
+    const block = [candidate, candidate + 1, candidate + 2];
+    if (block.some((octet) => octet > 254 || octet === managementOctet || octet === vipOctet)) {
+      continue;
+    }
+    if (block.every((octet) => !isIpInUse(octet))) {
+      startOctet = candidate;
+      break;
+    }
+  }
+
+  if (startOctet === null) {
+    throw new Error(`No free consecutive 3-IP block found in ${prefix}.0/24`);
+  }
+
+  return {
+    management_ip: managementIp,
+    subnet: `${prefix}.0/24`,
+    vip_ip: `${prefix}.${vipOctet}`,
+    start_ip: `${prefix}.${startOctet}`,
+    start_ip_block: [
+      `${prefix}.${startOctet}`,
+      `${prefix}.${startOctet + 1}`,
+      `${prefix}.${startOctet + 2}`,
+    ],
+    probed_addresses: inUseCache.size,
+  };
+}
+
 function queueJob(type, clusterId, payload) {
   const jobId = id("job");
   const job = {
@@ -102,6 +201,27 @@ function queueJob(type, clusterId, payload) {
 
 app.get("/api/health", (_, res) => {
   res.json({ ok: true, time: now() });
+});
+
+app.get("/api/ip-suggestions", (req, res) => {
+  const queryIp = pickFirstString(req.query.management_ip);
+  const fallbackHostIp = typeof req.hostname === "string" ? req.hostname : "";
+  const managementIp = queryIp || fallbackHostIp;
+  const parsedManagementIp = parseIPv4(managementIp, "management_ip");
+
+  if (!parsedManagementIp.ok) {
+    return res.status(400).json({
+      error: "management_ip must be a valid IPv4 address",
+    });
+  }
+
+  try {
+    return res.json(suggestIpRange(parsedManagementIp.value));
+  } catch (e) {
+    return res.status(500).json({
+      error: e instanceof Error ? e.message : "failed to suggest IP addresses",
+    });
+  }
 });
 
 app.post("/api/clusters", (req, res) => {

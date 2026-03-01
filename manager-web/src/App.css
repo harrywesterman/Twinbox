@@ -85,6 +85,12 @@ button:disabled {
   font-weight: 600;
 }
 
+.hint {
+  margin: 10px 0 0;
+  color: #0f766e;
+  font-size: 13px;
+}
+
 @media (max-width: 640px) {
   .grid {
     grid-template-columns: 1fr;

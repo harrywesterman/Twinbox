@@ -38,6 +38,16 @@ def _post_json(url, payload):
         return e.code, json.loads(body)
 
 
+def _get_json(url):
+    req = request.Request(url, method="GET")
+    try:
+        with request.urlopen(req, timeout=3) as resp:
+            return resp.status, json.loads(resp.read().decode("utf-8"))
+    except error.HTTPError as e:
+        body = e.read().decode("utf-8")
+        return e.code, json.loads(body)
+
+
 def test_create_cluster_missing_required_fields():
     with tempfile.TemporaryDirectory() as td:
         data_dir = Path(td) / "data"
@@ -109,6 +119,56 @@ def test_create_cluster_enqueues_job_and_persists_files():
             cluster = json.loads(cluster_file.read_text())
             assert cluster["name"] == "demo"
             assert cluster["status"] == "requested"
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
+def test_ip_suggestions_uses_management_subnet_and_free_consecutive_block():
+    with tempfile.TemporaryDirectory() as td:
+        data_dir = Path(td) / "data"
+        ping_mock = Path(td) / "mock-ping.sh"
+        ping_mock.write_text(
+            """#!/bin/sh
+ip="$1"
+case "$ip" in
+  192.168.2.20) exit 0 ;;
+  *) exit 1 ;;
+esac
+""",
+            encoding="utf-8",
+        )
+        ping_mock.chmod(0o755)
+
+        port = _find_free_port()
+        env = os.environ.copy()
+        env["MANAGER_DATA_DIR"] = str(data_dir)
+        env["MANAGER_API_PORT"] = str(port)
+        env["MANAGER_API_PING_BIN"] = str(ping_mock)
+
+        proc = subprocess.Popen(
+            ["node", "manager-api/src/server.js"],
+            cwd=Path(__file__).resolve().parents[2],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            _wait_for_health(f"http://127.0.0.1:{port}")
+            status, body = _get_json(
+                f"http://127.0.0.1:{port}/api/ip-suggestions?management_ip=192.168.2.20"
+            )
+            assert status == 200
+            assert body["management_ip"] == "192.168.2.20"
+            assert body["subnet"] == "192.168.2.0/24"
+            assert body["vip_ip"] == "192.168.2.50"
+            assert body["start_ip"] == "192.168.2.51"
+            assert body["start_ip_block"] == [
+                "192.168.2.51",
+                "192.168.2.52",
+                "192.168.2.53",
+            ]
         finally:
             proc.terminate()
             proc.wait(timeout=5)

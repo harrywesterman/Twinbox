@@ -14,6 +14,13 @@ const defaultForm = {
   start_ip: '192.168.1.51',
 };
 
+function isIPv4(value) {
+  if (typeof value !== 'string') return false;
+  const parts = value.split('.');
+  if (parts.length !== 4) return false;
+  return parts.every((part) => /^\d+$/.test(part) && Number(part) >= 0 && Number(part) <= 255);
+}
+
 function App() {
   const [form, setForm] = useState(defaultForm);
   const [clusterId, setClusterId] = useState('');
@@ -23,11 +30,44 @@ function App() {
   const [cluster, setCluster] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [ipSuggestion, setIpSuggestion] = useState('');
 
   const canBootstrap = useMemo(() => {
     if (!cluster) return false;
     return Array.isArray(cluster.controlplane_ips) && cluster.controlplane_ips.length > 0;
   }, [cluster]);
+
+  useEffect(() => {
+    const managementIp = window.location.hostname;
+    if (!isIPv4(managementIp)) return undefined;
+
+    let cancelled = false;
+    const loadIpSuggestions = async () => {
+      try {
+        const res = await fetch(`/api/ip-suggestions?management_ip=${encodeURIComponent(managementIp)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+
+        setForm((prev) => ({
+          ...prev,
+          vip_ip: prev.vip_ip === defaultForm.vip_ip ? (data.vip_ip || prev.vip_ip) : prev.vip_ip,
+          start_ip: prev.start_ip === defaultForm.start_ip ? (data.start_ip || prev.start_ip) : prev.start_ip,
+        }));
+
+        if (Array.isArray(data.start_ip_block) && data.start_ip_block.length === 3) {
+          setIpSuggestion(`Free range found: VIP ${data.vip_ip}, Start IP block ${data.start_ip_block.join(', ')}`);
+        }
+      } catch (_) {
+        // Keep manual input available if auto-suggestion fails.
+      }
+    };
+
+    loadIpSuggestions();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!jobId) return;
@@ -145,6 +185,7 @@ function App() {
             <label>VIP IP<input value={form.vip_ip} onChange={(e) => onChange('vip_ip', e.target.value)} /></label>
             <label>Start IP<input value={form.start_ip} onChange={(e) => onChange('start_ip', e.target.value)} /></label>
           </div>
+          {ipSuggestion ? <p className="hint">{ipSuggestion}</p> : null}
           <div className="row">
             <button onClick={startProvisioning} disabled={busy}>Start Provisioning</button>
             <button onClick={startBootstrap} disabled={busy || !canBootstrap}>Start Bootstrap</button>
