@@ -18,6 +18,15 @@ CROSS="${RD}✗${CL}"
 
 snippet_file=""
 vm_created=0
+CLUSTER_SLUG=""
+CLUSTER_VM_PREFIX=""
+CLUSTER_VM_TAG=""
+TWINBOX_TARGET_DIR=""
+EXISTING_VM_IDS=()
+EXISTING_VM_NAMES=()
+EXISTING_SNIPPETS=()
+EXISTING_USER_PRESENT=0
+EXISTING_ROLE_PRESENT=0
 
 header_info() {
   clear
@@ -101,6 +110,226 @@ password_box() {
 
 msg_box() {
   whiptail --msgbox "$2" 12 78 --title "$1"
+}
+
+sanitize_cluster_slug() {
+  local raw="$1"
+  local slug=""
+
+  slug=$(printf '%s' "$raw" \
+    | tr '[:upper:]' '[:lower:]' \
+    | sed -E 's/[^a-z0-9-]+/-/g; s/-+/-/g; s/^-+//; s/-+$//')
+
+  echo "$slug"
+}
+
+choose_cluster_slug() {
+  local selected=""
+  local custom_name=""
+  local sanitized=""
+
+  while true; do
+    selected=$(whiptail --menu "Choose a cluster name. Suggested presets:\n\n- ontwikkel\n- test\n- productie" 18 78 6 \
+      "ontwikkel" "Development cluster" \
+      "test" "Testing cluster" \
+      "productie" "Production cluster" \
+      "aangepast" "Custom cluster name" \
+      3>&1 1>&2 2>&3) || {
+      echo "Cancelled"
+      exit 0
+    }
+
+    if [[ "$selected" == "aangepast" ]]; then
+      custom_name=$(whiptail --inputbox "Custom cluster name" 10 78 "" --title "Cluster Name" 3>&1 1>&2 2>&3) || {
+        echo "Cancelled"
+        exit 0
+      }
+      sanitized=$(sanitize_cluster_slug "$custom_name")
+    else
+      sanitized=$(sanitize_cluster_slug "$selected")
+    fi
+
+    if [[ -n "$sanitized" ]]; then
+      CLUSTER_SLUG="$sanitized"
+      return 0
+    fi
+
+    msg_box "Invalid cluster name" "Cluster names can only contain letters, numbers and dashes after normalization.\n\nTry again."
+  done
+}
+
+set_cluster_naming_defaults() {
+  CLUSTER_VM_PREFIX="twinbox-${CLUSTER_SLUG}-"
+  CLUSTER_VM_TAG="cluster-${CLUSTER_SLUG}"
+  TWINBOX_TARGET_DIR="/opt/twinbox-${CLUSTER_SLUG}"
+  MGT_NAME="${CLUSTER_VM_PREFIX}mgt"
+  CLOUD_INIT_USER="twinbox-${CLUSTER_SLUG}"
+  PROXMOX_USER="twinbox-${CLUSTER_SLUG}@pve"
+  PROXMOX_ROLE="TwinboxVMProvisioner-${CLUSTER_SLUG}"
+}
+
+detect_existing_cluster_resources() {
+  local vmid=""
+  local config=""
+  local name=""
+  local tags=""
+  local snippet=""
+
+  EXISTING_VM_IDS=()
+  EXISTING_VM_NAMES=()
+  EXISTING_SNIPPETS=()
+  EXISTING_USER_PRESENT=0
+  EXISTING_ROLE_PRESENT=0
+
+  while read -r vmid; do
+    [[ -n "$vmid" ]] || continue
+    config=$(qm config "$vmid" 2>/dev/null || true)
+    [[ -n "$config" ]] || continue
+
+    name=$(printf '%s\n' "$config" | awk -F': ' '/^name:/ {print $2; exit}')
+    tags=$(printf '%s\n' "$config" | awk -F': ' '/^tags:/ {print $2; exit}')
+    [[ -n "$name" && -n "$tags" ]] || continue
+
+    if [[ "$name" == "${CLUSTER_VM_PREFIX}"* ]] && [[ "$tags" =~ (^|;)${CLUSTER_VM_TAG}($|;) ]]; then
+      EXISTING_VM_IDS+=("$vmid")
+      EXISTING_VM_NAMES+=("$name")
+    fi
+  done < <(qm list 2>/dev/null | awk 'NR>1 {print $1}')
+
+  if pveum user list 2>/dev/null | awk 'NR>1 {print $1}' | grep -Fxq "$PROXMOX_USER"; then
+    EXISTING_USER_PRESENT=1
+  fi
+
+  if pveum role list 2>/dev/null | awk 'NR>1 {print $1}' | grep -Fxq "$PROXMOX_ROLE"; then
+    EXISTING_ROLE_PRESENT=1
+  fi
+
+  while read -r snippet; do
+    [[ -n "$snippet" ]] || continue
+    EXISTING_SNIPPETS+=("$snippet")
+  done < <(find /var/lib/vz/snippets -maxdepth 1 -type f -name "twinbox-${CLUSTER_SLUG}-*.yaml" 2>/dev/null | sort)
+}
+
+cluster_resources_exist() {
+  if [[ "${#EXISTING_VM_IDS[@]}" -gt 0 || "${#EXISTING_SNIPPETS[@]}" -gt 0 || "${EXISTING_USER_PRESENT}" -eq 1 || "${EXISTING_ROLE_PRESENT}" -eq 1 ]]; then
+    return 0
+  fi
+  return 1
+}
+
+render_existing_cluster_inventory() {
+  local summary=""
+  local idx=0
+
+  summary+="Detected resources for cluster '${CLUSTER_SLUG}':"$'\n'$'\n'
+  summary+="VMs:"$'\n'
+  if [[ "${#EXISTING_VM_IDS[@]}" -gt 0 ]]; then
+    for idx in "${!EXISTING_VM_IDS[@]}"; do
+      summary+="  - VMID ${EXISTING_VM_IDS[$idx]} (${EXISTING_VM_NAMES[$idx]})"$'\n'
+    done
+  else
+    summary+="  - none"$'\n'
+  fi
+
+  summary+=$'\n'"Snippets:"$'\n'
+  if [[ "${#EXISTING_SNIPPETS[@]}" -gt 0 ]]; then
+    for snippet in "${EXISTING_SNIPPETS[@]}"; do
+      summary+="  - ${snippet}"$'\n'
+    done
+  else
+    summary+="  - none"$'\n'
+  fi
+
+  summary+=$'\n'"Proxmox API user:"$'\n'
+  if [[ "${EXISTING_USER_PRESENT}" -eq 1 ]]; then
+    summary+="  - ${PROXMOX_USER}"$'\n'
+  else
+    summary+="  - none"$'\n'
+  fi
+
+  summary+=$'\n'"Proxmox role:"$'\n'
+  if [[ "${EXISTING_ROLE_PRESENT}" -eq 1 ]]; then
+    summary+="  - ${PROXMOX_ROLE}"$'\n'
+  else
+    summary+="  - none"$'\n'
+  fi
+
+  printf '%s' "$summary"
+}
+
+cleanup_existing_cluster_resources() {
+  local idx=0
+  local vmid=""
+  local vm_name=""
+  local snippet=""
+  local acl_path=""
+
+  status_update "Removing resources for existing cluster ${CLUSTER_SLUG}"
+
+  for idx in "${!EXISTING_VM_IDS[@]}"; do
+    vmid="${EXISTING_VM_IDS[$idx]}"
+    vm_name="${EXISTING_VM_NAMES[$idx]}"
+    status_update "Destroying VM ${vmid} (${vm_name})"
+    qm stop "$vmid" --skiplock 1 >/dev/null 2>&1 || true
+    qm destroy "$vmid" --purge 1 >/dev/null 2>&1 || true
+  done
+
+  for snippet in "${EXISTING_SNIPPETS[@]}"; do
+    status_update "Removing snippet ${snippet}"
+    rm -f "$snippet" || true
+  done
+
+  for acl_path in /vms /storage "/nodes/${PROXMOX_NODE}" /sdn; do
+    pveum aclmod "$acl_path" -user "$PROXMOX_USER" -delete 1 >/dev/null 2>&1 || true
+  done
+
+  if [[ "${EXISTING_USER_PRESENT}" -eq 1 ]]; then
+    status_update "Removing Proxmox API user ${PROXMOX_USER}"
+    pveum user delete "$PROXMOX_USER" >/dev/null 2>&1 || true
+  fi
+
+  if [[ "${EXISTING_ROLE_PRESENT}" -eq 1 ]]; then
+    status_update "Removing Proxmox role ${PROXMOX_ROLE}"
+    pveum role delete "$PROXMOX_ROLE" >/dev/null 2>&1 || true
+  fi
+
+  msg_ok "Existing cluster resources removed"
+}
+
+handle_existing_cluster_conflict() {
+  local inventory=""
+  local confirm_slug=""
+
+  detect_existing_cluster_resources
+  if ! cluster_resources_exist; then
+    return 0
+  fi
+
+  inventory=$(render_existing_cluster_inventory)
+
+  if ! whiptail --yesno "A cluster with slug '${CLUSTER_SLUG}' already exists.\n\n${inventory}\nThis action permanently deletes the listed resources.\n\nDo you want to continue?" 32 100 --title "Cluster already exists"; then
+    echo "Cancelled"
+    exit 0
+  fi
+
+  confirm_slug=$(whiptail --inputbox "Type the cluster slug to confirm deletion:\n\n${CLUSTER_SLUG}" 12 78 --title "Confirm cluster deletion" 3>&1 1>&2 2>&3) || {
+    echo "Cancelled"
+    exit 0
+  }
+
+  if [[ "$confirm_slug" != "$CLUSTER_SLUG" ]]; then
+    msg_error "Cluster slug did not match. Aborting cleanup."
+    exit 1
+  fi
+
+  cleanup_existing_cluster_resources
+
+  if whiptail --yesno "Cleanup completed for cluster '${CLUSTER_SLUG}'.\n\nDo you want to recreate it now?" 12 78 --title "Recreate cluster"; then
+    return 0
+  fi
+
+  echo "Cancelled"
+  exit 0
 }
 
 guess_ssh_public_key() {
@@ -283,13 +512,12 @@ apply_educated_defaults() {
   guessed_bridge=$(guess_bridge_interface || true)
   guessed_ssh_key=$(guess_ssh_public_key || true)
 
-  MGT_NAME="twinbox-mgt"
+  set_cluster_naming_defaults
   MGT_ID=$(guess_next_vmid)
   MGT_RAM="4096"
   MGT_CORES="2"
   MGT_DISK="40"
   BRIDGE_IF="${guessed_bridge:-vmbr0}"
-  CLOUD_INIT_USER="twinbox"
   CLOUD_INIT_PASSWORD=""
   CLOUD_INIT_IP="${free_management_ip:-192.168.1.50}"
   CLOUD_INIT_NETMASK="$(cidr_to_netmask "${detected_prefix:-24}")"
@@ -300,8 +528,6 @@ apply_educated_defaults() {
 
   PROXMOX_HOST="${detected_host:-192.168.1.10}"
   PROXMOX_PORT="8006"
-  PROXMOX_USER="twinbox@pve"
-  PROXMOX_ROLE="TwinboxVMProvisioner"
   PROXMOX_PASSWORD=$(generate_cloud_init_password)
   PROXMOX_NODE="$(hostname)"
   PROXMOX_STORAGE_POOL="local-lvm"
@@ -356,7 +582,7 @@ create_proxmox_api_user() {
   }
 
   status_update "Ensuring Proxmox API user ${PROXMOX_USER} exists"
-  if create_err=$(pveum user add "$PROXMOX_USER" --comment "Twinbox service account" 2>&1); then
+  if create_err=$(pveum user add "$PROXMOX_USER" --comment "Twinbox service account (${CLUSTER_SLUG})" 2>&1); then
     status_update "Created Proxmox API user ${PROXMOX_USER}"
   else
     if printf '%s' "$create_err" | grep -qi "already exists"; then
@@ -455,17 +681,20 @@ review_cloud_init_settings() {
 }
 
 review_manager_env_settings() {
-  if whiptail --yesno "Manager API settings\n\nHost: $PROXMOX_HOST\nPort: $PROXMOX_PORT\nUser: $PROXMOX_USER\nNode: $PROXMOX_NODE\nStorage: $PROXMOX_STORAGE_POOL\nISO storage: $PROXMOX_ISO_STORAGE\nTalos ISO: $TALOS_ISO_FILE\nTalosctl: $TALOSCTL_VERSION\nkubectl: $KUBECTL_VERSION\nHelm: $HELM_VERSION\nImage tag: $TWINBOX_IMAGE_TAG\n\nEdit this group?" 24 78 --title "Manager .env"; then
+  if whiptail --yesno "Manager API settings\n\nHost: $PROXMOX_HOST\nPort: $PROXMOX_PORT\nUser: $PROXMOX_USER\nNode: $PROXMOX_NODE\nStorage: $PROXMOX_STORAGE_POOL\nISO storage: $PROXMOX_ISO_STORAGE\nTalos ISO: $TALOS_ISO_FILE\nTalosctl: $TALOSCTL_VERSION\nkubectl: $KUBECTL_VERSION\nHelm: $HELM_VERSION\nImage tag: $TWINBOX_IMAGE_TAG\nTarget dir: $TWINBOX_TARGET_DIR\n\nEdit this group?" 25 78 --title "Manager .env"; then
     return 0
   fi
   return 1
 }
 
 start_wizard() {
+  header_info
+  choose_cluster_slug
   apply_educated_defaults
+  handle_existing_cluster_conflict
 
   header_info
-  msg_box "Twinbox Setup" "This wizard creates only the Management VM.\n\nIt defaults to educated guesses and groups advanced values into 3 sections:\n- Management VM sizing/network\n- Cloud-Init access/network\n- Manager API/runtime settings\n\nYou can review each group and edit only what you need."
+  msg_box "Twinbox Setup" "This wizard creates only the Management VM for cluster '${CLUSTER_SLUG}'.\n\nIt defaults to educated guesses and groups advanced values into 3 sections:\n- Management VM sizing/network\n- Cloud-Init access/network\n- Manager API/runtime settings\n\nYou can review each group and edit only what you need."
 
   if whiptail --yesno "Use recommended settings with educated guesses?" 10 78; then
     :
@@ -491,9 +720,9 @@ start_wizard() {
     exit 1
   }
 
-  msg_box "Security Notice" "Phase 1 is LAN-only and stores Proxmox credentials in /opt/twinbox/.env on the management VM.\n\nUse a dedicated Proxmox automation account and rotate credentials regularly."
+  msg_box "Security Notice" "Phase 1 is LAN-only and stores Proxmox credentials in ${TWINBOX_TARGET_DIR}/.env on the management VM.\n\nUse a dedicated Proxmox automation account and rotate credentials regularly."
 
-  if whiptail --yesno "Proceed with installation?\n\nVM Name: $MGT_NAME\nVM ID: $MGT_ID\nBridge: $BRIDGE_IF\nCloud-Init user: $CLOUD_INIT_USER\nDNS: ${CLOUD_INIT_DNS_IP} (${CLOUD_INIT_DNS_DOMAIN})\nRepo: ${GITHUB_REPO}\nAuto-start manager stack: yes" 18 78; then
+  if whiptail --yesno "Proceed with installation?\n\nCluster: ${CLUSTER_SLUG}\nVM Name: $MGT_NAME\nVM ID: $MGT_ID\nBridge: $BRIDGE_IF\nCloud-Init user: $CLOUD_INIT_USER\nDNS: ${CLOUD_INIT_DNS_IP} (${CLOUD_INIT_DNS_DOMAIN})\nRepo: ${GITHUB_REPO}\nTarget dir: ${TWINBOX_TARGET_DIR}\nAuto-start manager stack: yes" 20 78; then
     create_proxmox_api_user
     create_management_vm
     print_next_steps
@@ -526,7 +755,7 @@ create_management_vm() {
 
   status_update "Preparing cloud-init configuration snippet"
 
-  snippet_file="/var/lib/vz/snippets/mgt-${MGT_ID}-user-data.yaml"
+  snippet_file="/var/lib/vz/snippets/twinbox-${CLUSTER_SLUG}-mgt-${MGT_ID}-user-data.yaml"
 
   cat > "$snippet_file" <<CLOUDINIT
 #cloud-config
@@ -550,10 +779,11 @@ packages:
   - gnupg
   - qemu-guest-agent
 write_files:
-  - path: /tmp/twinbox.env.template
+  - path: /tmp/twinbox-${CLUSTER_SLUG}.env.template
     permissions: '0600'
     owner: root:root
     content: |
+      TWINBOX_CLUSTER_SLUG=${CLUSTER_SLUG}
       PROXMOX_HOST=${PROXMOX_HOST}
       PROXMOX_PORT=${PROXMOX_PORT}
       PROXMOX_USER=${PROXMOX_USER}
@@ -577,19 +807,19 @@ runcmd:
   - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   - bash -lc 'docker --version'
   - bash -lc 'docker compose version'
-  - install -d -m 0755 /opt/twinbox
-  - chown ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} /opt/twinbox
-  - bash -lc 'if [ ! -d /opt/twinbox/.git ]; then git clone https://github.com/${GITHUB_REPO}.git /opt/twinbox; fi'
-  - bash -lc 'cp /tmp/twinbox.env.template /opt/twinbox/.env'
-  - bash -lc 'cd /opt/twinbox && chmod +x scripts/install-management-tools.sh && ./scripts/install-management-tools.sh --env-file /opt/twinbox/.env'
-  - bash -lc 'cd /opt/twinbox && docker compose pull'
-  - bash -lc 'cd /opt/twinbox && docker compose up -d'
+  - install -d -m 0755 ${TWINBOX_TARGET_DIR}
+  - chown ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}
+  - bash -lc 'if [ ! -d ${TWINBOX_TARGET_DIR}/.git ]; then git clone https://github.com/${GITHUB_REPO}.git ${TWINBOX_TARGET_DIR}; fi'
+  - bash -lc 'cp /tmp/twinbox-${CLUSTER_SLUG}.env.template ${TWINBOX_TARGET_DIR}/.env'
+  - bash -lc 'cd ${TWINBOX_TARGET_DIR} && chmod +x scripts/install-management-tools.sh && ./scripts/install-management-tools.sh --env-file ${TWINBOX_TARGET_DIR}/.env'
+  - bash -lc 'cd ${TWINBOX_TARGET_DIR} && docker compose pull'
+  - bash -lc 'cd ${TWINBOX_TARGET_DIR} && docker compose up -d'
 CLOUDINIT
   chmod 600 "$snippet_file"
 
   status_update "Creating VM shell in Proxmox"
   qm create "$MGT_ID" --name "$MGT_NAME" --memory "$MGT_RAM" --cores "$MGT_CORES" --net0 "virtio,bridge=${BRIDGE_IF}" \
-    --tags "twinbox;management;docker;bootstrap" \
+    --tags "twinbox;management;docker;bootstrap;${CLUSTER_VM_TAG}" \
     --scsihw virtio-scsi-pci --ide2 local-lvm:cloudinit --serial0 socket --vga serial0 --ostype l26 >/dev/null
   vm_created=1
   status_update "Importing base disk into VM storage"
@@ -752,7 +982,7 @@ print_next_steps() {
   echo "Login password: ${CLOUD_INIT_PASSWORD}"
   echo "Proxmox API user: ${PROXMOX_USER}"
   echo "Proxmox API password: ${PROXMOX_PASSWORD}"
-  echo "4. If needed, edit /opt/twinbox/.env and run: cd /opt/twinbox && docker compose up -d"
+  echo "4. If needed, edit ${TWINBOX_TARGET_DIR}/.env and run: cd ${TWINBOX_TARGET_DIR} && docker compose up -d"
   echo
 }
 

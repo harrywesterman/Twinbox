@@ -32,12 +32,12 @@ def test_setup_wizard_enables_guest_agent_on_management_vm():
     assert "  - qemu-guest-agent" in text
     assert "  - systemctl enable --now qemu-guest-agent" in text
     assert 'qm set "$MGT_ID" --agent enabled=1 >/dev/null' in text
-    assert '--tags "twinbox;management;docker;bootstrap"' in text
+    assert '--tags "twinbox;management;docker;bootstrap;${CLUSTER_VM_TAG}"' in text
 
 
 def test_setup_wizard_collects_cloud_init_settings():
     text = _wizard_text()
-    assert 'CLOUD_INIT_USER="twinbox"' in text
+    assert 'CLOUD_INIT_USER="twinbox-${CLUSTER_SLUG}"' in text
     assert 'password_box "Cloud-Init" "Twinbox login password" CLOUD_INIT_PASSWORD' in text
     assert 'input_box "Cloud-Init" "Static IPv4 address' in text
     assert 'input_box "Cloud-Init" "Netmask' in text
@@ -53,13 +53,14 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     assert "    passwd: ${CLOUD_INIT_PASSWORD_HASH}" in text
     assert "ssh_pwauth: true" in text
     assert "    sudo: ['ALL=(ALL) NOPASSWD:ALL']" in text
-    assert "  - path: /tmp/twinbox.env.template" in text
+    assert "  - path: /tmp/twinbox-${CLUSTER_SLUG}.env.template" in text
     assert "    owner: root:root" in text
+    assert "      TWINBOX_CLUSTER_SLUG=${CLUSTER_SLUG}" in text
     assert "      TALOSCTL_VERSION=${TALOSCTL_VERSION}" in text
     assert "      KUBECTL_VERSION=${KUBECTL_VERSION}" in text
     assert "      HELM_VERSION=${HELM_VERSION}" in text
-    assert "  - bash -lc 'cp /tmp/twinbox.env.template /opt/twinbox/.env'" in text
-    assert "  - bash -lc 'cd /opt/twinbox && chmod +x scripts/install-management-tools.sh && ./scripts/install-management-tools.sh --env-file /opt/twinbox/.env'" in text
+    assert "  - bash -lc 'cp /tmp/twinbox-${CLUSTER_SLUG}.env.template ${TWINBOX_TARGET_DIR}/.env'" in text
+    assert "  - bash -lc 'cd ${TWINBOX_TARGET_DIR} && chmod +x scripts/install-management-tools.sh && ./scripts/install-management-tools.sh --env-file ${TWINBOX_TARGET_DIR}/.env'" in text
     assert 'qm set "$MGT_ID" --ciuser "$CLOUD_INIT_USER" >/dev/null' in text
     assert 'qm set "$MGT_ID" --cipassword "$CLOUD_INIT_PASSWORD" >/dev/null' in text
     assert 'qm set "$MGT_ID" --searchdomain "$CLOUD_INIT_DNS_DOMAIN" >/dev/null' in text
@@ -141,7 +142,7 @@ def test_setup_wizard_generates_proxmox_api_password_without_prompting():
     assert "PROXMOX_PASSWORD=$(generate_cloud_init_password)" in text
     assert 'password_box "Manager .env" "Proxmox API password' not in text
     assert 'if [[ -z "${PROXMOX_PASSWORD:-}" ]]; then' not in text
-    assert 'PROXMOX_USER="twinbox@pve"' in text
+    assert 'PROXMOX_USER="twinbox-${CLUSTER_SLUG}@pve"' in text
 
 
 def test_setup_wizard_prints_proxmox_api_credentials():
@@ -190,7 +191,7 @@ def test_setup_wizard_requires_non_empty_ssh_key():
 def test_setup_wizard_creates_dedicated_limited_proxmox_api_user():
     text = _wizard_text()
     assert "create_proxmox_api_user()" in text
-    assert 'create_err=$(pveum user add "$PROXMOX_USER" --comment "Twinbox service account" 2>&1)' in text
+    assert 'create_err=$(pveum user add "$PROXMOX_USER" --comment "Twinbox service account (${CLUSTER_SLUG})" 2>&1)' in text
     assert 'if printf \'%s\' "$create_err" | grep -qi "already exists"; then' in text
     assert 'msg_error "Failed to create Proxmox API user ${PROXMOX_USER}: ${create_err}"' in text
     assert 'set_proxmox_password_with_retry()' in text
@@ -206,3 +207,31 @@ def test_setup_wizard_creates_dedicated_limited_proxmox_api_user():
     assert 'for acl_path in /vms /storage "/nodes/${PROXMOX_NODE}"; do' in text
     assert 'pveum aclmod "$path" -user "$user" -role "$role" 2>&1' in text
     assert 'if ! apply_acl_with_retry "/sdn" "$PROXMOX_USER" "$PROXMOX_ROLE" 10 1; then' in text
+
+
+def test_setup_wizard_supports_cluster_slug_selection_and_normalization():
+    text = _wizard_text()
+    assert "sanitize_cluster_slug()" in text
+    assert "choose_cluster_slug()" in text
+    assert '"ontwikkel" "Development cluster"' in text
+    assert '"test" "Testing cluster"' in text
+    assert '"productie" "Production cluster"' in text
+    assert '"aangepast" "Custom cluster name"' in text
+    assert "set_cluster_naming_defaults()" in text
+    assert 'MGT_NAME="${CLUSTER_VM_PREFIX}mgt"' in text
+    assert 'PROXMOX_ROLE="TwinboxVMProvisioner-${CLUSTER_SLUG}"' in text
+
+
+def test_setup_wizard_detects_and_cleans_up_existing_cluster_resources():
+    text = _wizard_text()
+    assert "detect_existing_cluster_resources()" in text
+    assert "cluster_resources_exist()" in text
+    assert "render_existing_cluster_inventory()" in text
+    assert "cleanup_existing_cluster_resources()" in text
+    assert "handle_existing_cluster_conflict()" in text
+    assert 'if [[ "$name" == "${CLUSTER_VM_PREFIX}"* ]] && [[ "$tags" =~ (^|;)${CLUSTER_VM_TAG}($|;) ]]; then' in text
+    assert 'pveum aclmod "$acl_path" -user "$PROXMOX_USER" -delete 1 >/dev/null 2>&1 || true' in text
+    assert 'pveum user delete "$PROXMOX_USER" >/dev/null 2>&1 || true' in text
+    assert 'pveum role delete "$PROXMOX_ROLE" >/dev/null 2>&1 || true' in text
+    assert "Type the cluster slug to confirm deletion" in text
+    assert "Do you want to recreate it now?" in text

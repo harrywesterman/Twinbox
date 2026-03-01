@@ -1,16 +1,19 @@
 # Wizard
 
-`wizard/setup-wizard.sh` runs on a Proxmox host and creates only the Twinbox Management VM.
+`wizard/setup-wizard.sh` runs on a Proxmox host and creates only a Twinbox Management VM for a selected cluster name.
 
 ## Current Behavior
 
 The wizard now does all of this automatically:
 
-1. Creates an Ubuntu 24.04 Management VM.
-2. Installs Docker CE from the official Docker APT repo (`download.docker.com`).
-3. Clones `https://github.com/harrywesterman/twinbox` into `/opt/twinbox`.
-4. Writes `/opt/twinbox/.env` from wizard input values.
-5. Starts the manager stack with Docker Compose.
+1. Prompts for a cluster name (`ontwikkel`, `test`, `productie`, or custom) and normalizes it.
+2. Detects existing resources for that cluster and can remove them after double confirmation.
+3. Creates an Ubuntu 24.04 Management VM with cluster-specific names/tags.
+4. Creates a cluster-specific Proxmox API user and role.
+5. Installs Docker CE from the official Docker APT repo (`download.docker.com`).
+6. Clones `https://github.com/harrywesterman/twinbox` into `/opt/twinbox-<cluster-slug>`.
+7. Writes `/opt/twinbox-<cluster-slug>/.env` from wizard input values.
+8. Starts the manager stack with Docker Compose.
 
 After cloud-init completes, open:
 
@@ -35,6 +38,7 @@ bash wizard/setup-wizard.sh
 
 The wizard asks for:
 
+- Cluster name selection
 - Management VM sizing and bridge settings
 - SSH public key
 - Proxmox API settings for manager runtime (`PROXMOX_*`)
@@ -60,7 +64,7 @@ curl -fsS http://localhost:8080/api/health
 If needed:
 
 ```bash
-cd /opt/twinbox
+cd /opt/twinbox-<cluster-slug>
 # adjust .env if required
 docker compose pull
 docker compose up -d
