@@ -118,6 +118,8 @@ create_vm() {
     --data-urlencode "name=${name}" \
     --data-urlencode "memory=${MEMORY_MB}" \
     --data-urlencode "cores=${CPU_CORES}" \
+    --data-urlencode "cpu=host" \
+    --data-urlencode "agent=1" \
     --data-urlencode "tags=twinbox;talos;${role_tag};cluster-${CLUSTER_ID}" \
     --data-urlencode "net0=virtio,bridge=${BRIDGE}" \
     --data-urlencode "scsihw=virtio-scsi-pci" \
