@@ -971,7 +971,7 @@ wait_for_web_interface() {
 
   status_update "Waiting for web interface on ${web_url}"
   while [[ "$attempts" -gt 0 ]]; do
-    if curl -sS --output /dev/null --connect-timeout 2 --max-time 3 "$web_url"; then
+    if curl --silent --output /dev/null --connect-timeout 2 --max-time 3 "$web_url" >/dev/null 2>&1; then
       status_update "Web interface is reachable on port 3000"
       return 0
     fi
@@ -1001,25 +1001,18 @@ print_next_steps() {
   echo
   echo -e "${GN}Installation complete${CL}"
   echo
-  echo "Next steps:"
   if [[ "$web_interface_ready" -eq 1 ]]; then
-    echo "1. Web interface is up on port 3000."
-    echo "2. Open: http://${management_ip}:3000"
-    echo "3. Verify API health: http://${management_ip}:8080/api/health"
+    echo "Open a web browser now: http://${management_ip}:3000"
+    echo "You can leave this screen."
   elif [[ -n "${management_ip:-}" ]]; then
-    echo "1. Web interface on port 3000 is not reachable yet."
-    echo "2. Keep waiting for cloud-init/startup, then check: http://${management_ip}:3000"
-    echo "3. Verify API health when ready: http://${management_ip}:8080/api/health"
+    echo "Web interface on port 3000 is not reachable yet."
+    echo "When it is ready, open: http://${management_ip}:3000"
+    echo "You can leave this screen."
   else
-    echo "1. Wait for cloud-init on the management VM to finish."
-    echo "2. Open: http://<management-vm-ip>:3000"
-    echo "3. Verify API health: http://<management-vm-ip>:8080/api/health"
+    echo "Management VM IP is not available yet."
+    echo "When it is known, open: http://<management-vm-ip>:3000"
+    echo "You can leave this screen."
   fi
-  echo "Login user: ${CLOUD_INIT_USER}"
-  echo "Login password: ${CLOUD_INIT_PASSWORD}"
-  echo "Proxmox API user: ${PROXMOX_USER}"
-  echo "Proxmox API password: ${PROXMOX_PASSWORD}"
-  echo "4. If needed, edit ${TWINBOX_TARGET_DIR}/.env and run: cd ${TWINBOX_TARGET_DIR} && docker compose up -d"
   echo
 }
 
