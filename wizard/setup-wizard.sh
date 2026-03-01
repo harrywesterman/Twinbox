@@ -605,6 +605,9 @@ ensure_talos_iso_available() {
   local talos_version=""
   local talos_url=""
   local iso_list=""
+  local tmp_iso=""
+  local storage_path=""
+  local iso_target_dir=""
 
   status_update "Checking Talos ISO in storage ${PROXMOX_ISO_STORAGE}"
   iso_list=$(pvesm list "$PROXMOX_ISO_STORAGE" --content iso 2>/dev/null || true)
@@ -624,8 +627,60 @@ ensure_talos_iso_available() {
 
   talos_url="https://github.com/siderolabs/talos/releases/download/v${talos_version}/metal-amd64.iso"
   msg_info "Downloading Talos ISO ${TALOS_ISO_FILE}"
-  if ! pvesm download "$PROXMOX_ISO_STORAGE" "$TALOS_ISO_FILE" "$talos_url" >/dev/null; then
-    msg_error "Failed to download Talos ISO from ${talos_url}"
+
+  # pvesm download is not available on some Proxmox versions.
+  if pvesm help 2>/dev/null | grep -q "pvesm download"; then
+    if ! pvesm download "$PROXMOX_ISO_STORAGE" "$TALOS_ISO_FILE" "$talos_url" >/dev/null; then
+      msg_error "Failed to download Talos ISO from ${talos_url}"
+      exit 1
+    fi
+  else
+    tmp_iso=$(mktemp "/tmp/${TALOS_ISO_FILE}.XXXXXX")
+    if ! curl -fsSL "$talos_url" -o "$tmp_iso"; then
+      rm -f "$tmp_iso"
+      msg_error "Failed to download Talos ISO from ${talos_url}"
+      exit 1
+    fi
+
+    storage_path=$(
+      awk -v storage="$PROXMOX_ISO_STORAGE" '
+        /^[[:space:]]*[a-zA-Z0-9_-]+:[[:space:]]*[a-zA-Z0-9_-]+[[:space:]]*$/ {
+          in_storage = 0
+          split($0, parts, ":")
+          name = parts[2]
+          sub(/^[[:space:]]+/, "", name)
+          if (name == storage) {
+            in_storage = 1
+          }
+          next
+        }
+        in_storage && $1 == "path" {
+          print $2
+          exit
+        }
+      ' /etc/pve/storage.cfg
+    )
+    iso_target_dir="${storage_path%/}/template/iso"
+
+    if [[ -z "$storage_path" || "$storage_path" == "$PROXMOX_ISO_STORAGE" ]]; then
+      rm -f "$tmp_iso"
+      msg_error "Storage ${PROXMOX_ISO_STORAGE} has no filesystem path in /etc/pve/storage.cfg"
+      msg_error "Upload ${TALOS_ISO_FILE} manually, then rerun the wizard"
+      exit 1
+    fi
+
+    mkdir -p "$iso_target_dir"
+    if ! install -m 0644 "$tmp_iso" "${iso_target_dir}/${TALOS_ISO_FILE}"; then
+      rm -f "$tmp_iso"
+      msg_error "Failed to place Talos ISO into ${iso_target_dir}"
+      exit 1
+    fi
+    rm -f "$tmp_iso"
+  fi
+
+  iso_list=$(pvesm list "$PROXMOX_ISO_STORAGE" --content iso 2>/dev/null || true)
+  if ! printf '%s\n' "$iso_list" | grep -Fq "iso/${TALOS_ISO_FILE}"; then
+    msg_error "Talos ISO upload verification failed for ${PROXMOX_ISO_STORAGE}"
     exit 1
   fi
   msg_ok "Talos ISO downloaded (${TALOS_ISO_FILE})"
