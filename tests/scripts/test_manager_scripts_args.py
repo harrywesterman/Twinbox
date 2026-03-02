@@ -77,7 +77,10 @@ def test_collect_state_missing_cluster_file_fails():
 def test_create_talos_vms_sets_colorful_proxmox_tags():
     text = _create_talos_text()
     assert 'local role_tag="$3"' in text
-    assert '--data-urlencode "tags=twinbox;talos;${role_tag};cluster-${CLUSTER_ID}"' in text
+    assert 'local cluster_scope_tag=""' in text
+    assert 'if [[ -n "${TWINBOX_CLUSTER_SLUG:-}" ]]; then' in text
+    assert 'cluster_scope_tag=";cluster-${TWINBOX_CLUSTER_SLUG}"' in text
+    assert '--data-urlencode "tags=twinbox;talos;${role_tag};cluster-${CLUSTER_ID}${cluster_scope_tag}"' in text
     assert 'create_vm "$current_vmid" "$vm_name" "controlplane"' in text
     assert 'create_vm "$current_vmid" "$vm_name" "worker"' in text
 

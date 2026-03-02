@@ -236,7 +236,7 @@ def test_setup_wizard_detects_and_cleans_up_existing_cluster_resources():
     assert "render_existing_cluster_inventory()" in text
     assert "cleanup_existing_cluster_resources()" in text
     assert "handle_existing_cluster_conflict()" in text
-    assert 'if [[ "$name" == "${CLUSTER_VM_PREFIX}"* ]] && [[ "$tags" =~ (^|;)${CLUSTER_VM_TAG}($|;) ]]; then' in text
+    assert 'if [[ "$tags" =~ (^|;)${CLUSTER_VM_TAG}($|;) ]]; then' in text
     assert 'pveum aclmod "$acl_path" -user "$PROXMOX_USER" -delete 1 >/dev/null 2>&1 || true' in text
     assert 'pveum user delete "$PROXMOX_USER" >/dev/null 2>&1 || true' in text
     assert 'pveum role delete "$PROXMOX_ROLE" >/dev/null 2>&1 || true' in text

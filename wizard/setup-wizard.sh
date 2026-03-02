@@ -190,7 +190,7 @@ detect_existing_cluster_resources() {
     tags=$(printf '%s\n' "$config" | awk -F': ' '/^tags:/ {print $2; exit}')
     [[ -n "$name" && -n "$tags" ]] || continue
 
-    if [[ "$name" == "${CLUSTER_VM_PREFIX}"* ]] && [[ "$tags" =~ (^|;)${CLUSTER_VM_TAG}($|;) ]]; then
+    if [[ "$tags" =~ (^|;)${CLUSTER_VM_TAG}($|;) ]]; then
       EXISTING_VM_IDS+=("$vmid")
       EXISTING_VM_NAMES+=("$name")
     fi

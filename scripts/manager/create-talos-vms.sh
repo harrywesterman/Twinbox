@@ -108,10 +108,15 @@ create_vm() {
   local vmid="$1"
   local name="$2"
   local role_tag="$3"
+  local cluster_scope_tag=""
   local create_resp=""
   local create_upid=""
   local start_resp=""
   local start_upid=""
+
+  if [[ -n "${TWINBOX_CLUSTER_SLUG:-}" ]]; then
+    cluster_scope_tag=";cluster-${TWINBOX_CLUSTER_SLUG}"
+  fi
 
   create_resp=$(task_post "https://${PROXMOX_HOST}:${PROXMOX_PORT}/api2/json/nodes/${PROXMOX_NODE}/qemu" \
     --data-urlencode "vmid=${vmid}" \
@@ -120,7 +125,7 @@ create_vm() {
     --data-urlencode "cores=${CPU_CORES}" \
     --data-urlencode "cpu=host" \
     --data-urlencode "agent=1" \
-    --data-urlencode "tags=twinbox;talos;${role_tag};cluster-${CLUSTER_ID}" \
+    --data-urlencode "tags=twinbox;talos;${role_tag};cluster-${CLUSTER_ID}${cluster_scope_tag}" \
     --data-urlencode "net0=virtio,bridge=${BRIDGE}" \
     --data-urlencode "scsihw=virtio-scsi-pci" \
     --data-urlencode "scsi0=${STORAGE_POOL}:${DISK_GB}" \
