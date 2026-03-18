@@ -15,6 +15,16 @@ Twinbox is a manager-first platform for provisioning and bootstrapping Talos Kub
 
 <p><code>bash &lt;(curl -fsSL https://raw.githubusercontent.com/harrywesterman/twinbox/main/wizard/setup-wizard.sh)</code> <kbd title="Kopieer">📋</kbd></p>
 
+For local wizard iteration without pushing to GitHub first:
+
+```bash
+cp .env.wizard.local.example .env.wizard.local
+# set WIZARD_DEV_SSH_TARGET=root@<proxmox-host>
+make wizard-dev-run
+```
+
+This uploads only your local `wizard/setup-wizard.sh` to the Proxmox host and runs it over SSH with a TTY. The Management VM still clones the repository from GitHub afterward.
+
 ### 2. Open endpoints
 
 - UI: `http://<management-vm-ip>:3000`

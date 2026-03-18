@@ -35,6 +35,16 @@ Or from a local clone:
 bash wizard/setup-wizard.sh
 ```
 
+For fast iteration from your local checkout without pushing first:
+
+```bash
+cp .env.wizard.local.example .env.wizard.local
+# set WIZARD_DEV_SSH_TARGET=root@<proxmox-host>
+make wizard-dev-run
+```
+
+This uploads the local `wizard/setup-wizard.sh` to the configured Proxmox host, then runs that remote copy with `ssh -tt` so the interactive `whiptail` UI keeps working. It only changes the wizard feedback loop: the Management VM still clones the rest of the repo from GitHub.
+
 ## Prompts
 
 The wizard asks for:

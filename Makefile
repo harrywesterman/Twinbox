@@ -1,6 +1,6 @@
 # Makefile for Twinbox testing
 
-.PHONY: help test unit integration coverage clean install
+.PHONY: help test unit integration coverage clean install wizard-dev-run
 
 help:
 	@echo "Available targets:"
@@ -10,6 +10,7 @@ help:
 	@echo "  coverage    - Run tests with coverage report"
 	@echo "  install     - Install test dependencies"
 	@echo "  clean       - Clean up test artifacts"
+	@echo "  wizard-dev-run - Upload local wizard to Proxmox and run it via SSH"
 
 install:
 	pip install -e .
@@ -42,3 +43,6 @@ test-watch:
 lint:
 	@echo "Linting code..."
 	# Add linting commands as needed (flake8, black, etc.)
+
+wizard-dev-run:
+	bash scripts/wizard-dev-run.sh
