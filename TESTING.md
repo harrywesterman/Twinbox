@@ -5,9 +5,10 @@ This project currently relies on operational verification for the manager-first 
 ## 1. Static Checks
 
 ```bash
-bash -n wizard/setup-wizard.sh scripts/manager/create-talos-vms.sh scripts/manager/bootstrap-talos.sh scripts/manager/collect-state.sh
+bash -n wizard/setup-wizard.sh scripts/wizard-dev-run.sh scripts/manager/create-talos-vms.sh scripts/manager/bootstrap-talos.sh scripts/manager/collect-state.sh
 node --check manager-api/src/server.js
 node --check manager-worker/src/worker.js
+python3 -m pytest -q tests/scripts/test_wizard_dev_run.py tests/scripts/test_setup_wizard_cleanup.py tests/scripts/test_manager_scripts_args.py
 ```
 
 ## 2. Compose Validation

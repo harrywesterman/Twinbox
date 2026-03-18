@@ -167,11 +167,15 @@ def test_setup_wizard_prints_proxmox_api_credentials():
 
 def test_setup_wizard_builds_editable_cluster_allocation_grid():
     text = _wizard_text()
+    assert "whiptail_supports_form()" in text
+    assert "edit_cluster_allocation_table_fallback()" in text
     assert "build_cluster_allocation_rows()" in text
     assert "render_cluster_allocation_table()" in text
     assert "edit_cluster_allocation_table()" in text
+    assert 'if whiptail_supports_form; then' in text
     assert 'collect_cluster_allocation "${MGT_ID}" "${CLOUD_INIT_IP}" "${CLOUD_INIT_NETMASK}" "${CLOUD_INIT_GATEWAY}" "${CLOUD_INIT_DNS_IP}" "${CLUSTER_CONTROLPLANE_COUNT}" "${CLUSTER_WORKER_COUNT}" cluster_vmids cluster_names cluster_ips cluster_subnets cluster_gateways cluster_dns cluster_roles' in text
     assert 'msg_box "Cluster Allocation" "Review the proposed allocation grid.' in text
+    assert 'input_box "Cluster Allocation" "Row ${i} (${_rows_roles[$i]})\\nEnter values as: vmid|name|ip|subnet|gateway|dns"' in text
 
 
 def test_setup_wizard_avoids_circular_nameref_calls_in_allocation_helpers():

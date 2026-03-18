@@ -1,6 +1,7 @@
 .env
 .env.local
 .env.*.local
+.worktrees/
 manager-data/
 
 node_modules/

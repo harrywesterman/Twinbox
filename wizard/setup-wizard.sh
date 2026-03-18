@@ -940,7 +940,11 @@ render_cluster_allocation_table() {
   printf '%b' "$output"
 }
 
-edit_cluster_allocation_table() {
+whiptail_supports_form() {
+  whiptail --help 2>&1 | grep -Fq -- "--form"
+}
+
+edit_cluster_allocation_table_form() {
   local title="$1"
   local rows_file=""
   local -n _rows_roles="$2"
@@ -994,6 +998,57 @@ edit_cluster_allocation_table() {
     _rows_gateways[$i]=$(trim_value "${form_lines[$((i * 6 + 4))]}")
     _rows_dns[$i]=$(trim_value "${form_lines[$((i * 6 + 5))]}")
   done
+}
+
+edit_cluster_allocation_table_fallback() {
+  local title="$1"
+  local -n _rows_roles="$2"
+  local -n _rows_vmids="$3"
+  local -n _rows_names="$4"
+  local -n _rows_ips="$5"
+  local -n _rows_subnets="$6"
+  local -n _rows_gateways="$7"
+  local -n _rows_dns="$8"
+  local row_count="${#_rows_names[@]}"
+  local i=0
+  local row_value=""
+  local current_value=""
+  local -a parts=()
+
+  msg_box "$title" "This Proxmox host uses a whiptail build without form support.\n\nThe allocation grid will be edited one row at a time as:\nvmid|name|ip|subnet|gateway|dns"
+
+  for ((i = 0; i < row_count; i++)); do
+    current_value="${_rows_vmids[$i]:-}|${_rows_names[$i]}|${_rows_ips[$i]}|${_rows_subnets[$i]}|${_rows_gateways[$i]}|${_rows_dns[$i]}"
+    input_box "Cluster Allocation" "Row ${i} (${_rows_roles[$i]})\nEnter values as: vmid|name|ip|subnet|gateway|dns" "$current_value" row_value
+    IFS='|' read -r -a parts <<< "$row_value"
+    if [[ "${#parts[@]}" -ne 6 ]]; then
+      msg_error "Allocation row ${i} must contain exactly 6 pipe-separated values"
+      return 1
+    fi
+    _rows_vmids[$i]=$(trim_value "${parts[0]}")
+    _rows_names[$i]=$(trim_value "${parts[1]}")
+    _rows_ips[$i]=$(trim_value "${parts[2]}")
+    _rows_subnets[$i]=$(trim_value "${parts[3]}")
+    _rows_gateways[$i]=$(trim_value "${parts[4]}")
+    _rows_dns[$i]=$(trim_value "${parts[5]}")
+  done
+}
+
+edit_cluster_allocation_table() {
+  local title="$1"
+  local -n _rows_roles="$2"
+  local -n _rows_vmids="$3"
+  local -n _rows_names="$4"
+  local -n _rows_ips="$5"
+  local -n _rows_subnets="$6"
+  local -n _rows_gateways="$7"
+  local -n _rows_dns="$8"
+
+  if whiptail_supports_form; then
+    edit_cluster_allocation_table_form "$title" "$2" "$3" "$4" "$5" "$6" "$7" "$8"
+  else
+    edit_cluster_allocation_table_fallback "$title" "$2" "$3" "$4" "$5" "$6" "$7" "$8"
+  fi
 }
 
 collect_cluster_allocation() {

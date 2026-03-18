@@ -21,6 +21,16 @@
 bash <(curl -fsSL https://raw.githubusercontent.com/harrywesterman/twinbox/main/wizard/setup-wizard.sh)
 ```
 
+For local development of the wizard itself:
+
+```bash
+cp .env.wizard.local.example .env.wizard.local
+# set WIZARD_DEV_SSH_TARGET=root@<proxmox-host>
+make wizard-dev-run
+```
+
+The dev runner uploads only the current local `wizard/setup-wizard.sh` to the Proxmox host and starts that copy over SSH with an interactive TTY. It does not sync other unpushed repository changes into the eventual Management VM clone.
+
 ## Validate Management VM
 
 ```bash
