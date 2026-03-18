@@ -13,9 +13,7 @@ Twinbox is a manager-first platform for provisioning and bootstrapping Talos Kub
 
 ### 1. Run wizard on Proxmox
 
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/harrywesterman/twinbox/main/wizard/setup-wizard.sh)
-```
+<p><code>bash &lt;(curl -fsSL https://raw.githubusercontent.com/harrywesterman/twinbox/main/wizard/setup-wizard.sh)</code> <kbd title="Kopieer">📋</kbd></p>
 
 ### 2. Open endpoints
 
