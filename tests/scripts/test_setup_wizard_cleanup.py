@@ -174,6 +174,12 @@ def test_setup_wizard_builds_editable_cluster_allocation_grid():
     assert 'msg_box "Cluster Allocation" "Review the proposed allocation grid.' in text
 
 
+def test_setup_wizard_avoids_circular_nameref_calls_in_allocation_helpers():
+    text = _wizard_text()
+    assert 'build_cluster_allocation_rows _rows_roles _rows_vmids _rows_names _rows_ips _rows_subnets _rows_gateways _rows_dns' not in text
+    assert 'edit_cluster_allocation_table "Cluster Allocation" _rows_roles _rows_vmids _rows_names _rows_ips _rows_subnets _rows_gateways _rows_dns' not in text
+
+
 def test_setup_wizard_uses_host_cpu_type_by_default():
     text = _wizard_text()
     assert 'MGT_CPU_TYPE="host"' in text

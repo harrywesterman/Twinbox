@@ -1004,20 +1004,27 @@ collect_cluster_allocation() {
   local dns="$5"
   local cp_count="$6"
   local worker_count="$7"
-  local -n _rows_vmids="$8"
-  local -n _rows_names="$9"
-  local -n _rows_ips="${10}"
-  local -n _rows_subnets="${11}"
-  local -n _rows_gateways="${12}"
-  local -n _rows_dns="${13}"
-  local -n _rows_roles="${14}"
+  local rows_vmids_name="$8"
+  local rows_names_name="$9"
+  local rows_ips_name="${10}"
+  local rows_subnets_name="${11}"
+  local rows_gateways_name="${12}"
+  local rows_dns_name="${13}"
+  local rows_roles_name="${14}"
+  local -n _rows_vmids="$rows_vmids_name"
+  local -n _rows_names="$rows_names_name"
+  local -n _rows_ips="$rows_ips_name"
+  local -n _rows_subnets="$rows_subnets_name"
+  local -n _rows_gateways="$rows_gateways_name"
+  local -n _rows_dns="$rows_dns_name"
+  local -n _rows_roles="$rows_roles_name"
 
-  build_cluster_allocation_rows _rows_roles _rows_vmids _rows_names _rows_ips _rows_subnets _rows_gateways _rows_dns \
+  build_cluster_allocation_rows "$rows_roles_name" "$rows_vmids_name" "$rows_names_name" "$rows_ips_name" "$rows_subnets_name" "$rows_gateways_name" "$rows_dns_name" \
     "$base_vmid" "$base_ip" "$subnet" "$gateway" "$dns" "$cp_count" "$worker_count"
 
   msg_box "Cluster Allocation" "Review the proposed allocation grid.\n\nIt reserves a contiguous VMID/IP block for the management VM, VIP and future Talos nodes.\n\nYou can edit any field before continuing."
 
-  if ! edit_cluster_allocation_table "Cluster Allocation" _rows_roles _rows_vmids _rows_names _rows_ips _rows_subnets _rows_gateways _rows_dns; then
+  if ! edit_cluster_allocation_table "Cluster Allocation" "$rows_roles_name" "$rows_vmids_name" "$rows_names_name" "$rows_ips_name" "$rows_subnets_name" "$rows_gateways_name" "$rows_dns_name"; then
     exit 1
   fi
 
