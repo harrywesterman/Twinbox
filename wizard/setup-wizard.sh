@@ -6,6 +6,7 @@
 set -euo pipefail
 
 GITHUB_REPO="harrywesterman/twinbox"
+BACKTITLE="Twinbox Cluster Wizard"
 
 RD="\033[01;31m"
 YW="\033[33m"
@@ -28,25 +29,62 @@ EXISTING_SNIPPETS=()
 EXISTING_USER_PRESENT=0
 EXISTING_ROLE_PRESENT=0
 allocation_file=""
+WIZARD_ACTION="create"
+CURRENT_PROGRESS_PHASE="Preparing cluster"
+WIZARD_LOG_FILE=""
+DETECTED_CLUSTER_SLUGS=()
+LIVE_LOG_MODE=0
+FINAL_COMPLETION_MESSAGE=""
+MANAGEMENT_WEB_URL=""
 
-header_info() {
-  clear
-  cat << "BANNER"
-  _______       _       _
- |__   __|     (_)     | |
-    | |_      ___ _ __ | |__   _____  __
-    | \ \ /\ / / | '_ \| '_ \ / _ \ \/ /
-    | |\ V  V /| | | | | |_) | (_) >  <
-    |_| \_/\_/ |_|_| |_|_.__/ \___/_/\_\
+gauge_emit() {
+  local percent="$1"
+  local message="$2"
 
-    Proxmox Management VM Bootstrap Wizard
-BANNER
+  printf 'XXX\n%s\n%s\nXXX\n' "$percent" "$message"
 }
 
-msg_info() { echo -ne " ${HOLD} ${YW}$1..."; }
-msg_ok() { echo -e "${BFR} ${CM} ${GN}$1${CL}"; }
-msg_error() { echo -e "${BFR} ${CROSS} ${RD}$1${CL}"; }
-status_update() { echo -e " ${HOLD} ${YW}[$(date '+%H:%M:%S')] $1${CL}" >&2; }
+log_event() {
+  local message="$1"
+
+  if [[ -n "${WIZARD_LOG_FILE:-}" ]]; then
+    printf '[%s] %s\n' "$(date '+%H:%M:%S')" "$message" >>"$WIZARD_LOG_FILE"
+  fi
+
+  if [[ "${LIVE_LOG_MODE:-0}" -eq 1 ]]; then
+    printf '[%s] %s\n' "$(date '+%H:%M:%S')" "$message"
+  fi
+}
+
+progress_update() {
+  local phase="$1"
+  local message="$2"
+
+  CURRENT_PROGRESS_PHASE="$phase"
+  log_event "${phase}: ${message}"
+  if [[ "${LIVE_LOG_MODE:-0}" -eq 1 ]]; then
+    printf '\n[%s] %s\n' "$phase" "$message"
+    return 0
+  fi
+  whiptail --backtitle "$BACKTITLE" --title "Twinbox" --infobox "Phase: ${phase}\n\n${message}" 10 78
+}
+
+msg_info() { progress_update "$CURRENT_PROGRESS_PHASE" "$1"; }
+msg_ok() { progress_update "$CURRENT_PROGRESS_PHASE" "$1"; }
+msg_error() {
+  log_event "ERROR: $1"
+  whiptail --backtitle "$BACKTITLE" --title "Twinbox" --msgbox "$1" 12 78
+}
+status_update() { progress_update "$CURRENT_PROGRESS_PHASE" "$1"; }
+
+yesno_box() {
+  local title="$1"
+  local text="$2"
+  local height="${3:-12}"
+  local width="${4:-78}"
+
+  whiptail --backtitle "$BACKTITLE" --title "$title" --yesno "$text" "$height" "$width"
+}
 
 cleanup_after_run() {
   local exit_code=$?
@@ -71,19 +109,18 @@ cleanup_after_run() {
 
 check_root() {
   if [[ "$(id -u)" -ne 0 || $(ps -o comm= -p $$) == "sudo" ]]; then
-    clear
-    msg_error "Please run this script as root"
+    printf 'Please run this script as root\n' >&2
     exit 1
   fi
 }
 
 check_deps() {
-  msg_info "Checking dependencies"
-  if ! command -v whiptail >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1 || ! command -v openssl >/dev/null 2>&1; then
+  if ! command -v whiptail >/dev/null 2>&1 || ! command -v dialog >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1 || ! command -v openssl >/dev/null 2>&1; then
+    printf 'Preparing Twinbox wizard...\n' >&2
     apt-get update -qq
-    apt-get install -y whiptail curl openssl >/dev/null 2>&1
+    apt-get install -y whiptail dialog curl openssl >/dev/null 2>&1
   fi
-  msg_ok "Dependencies checked"
+  WIZARD_LOG_FILE=$(mktemp "/tmp/twinbox-wizard.XXXXXX.log")
 }
 
 input_box() {
@@ -93,8 +130,7 @@ input_box() {
   local var_name="$4"
 
   local value
-  value=$(whiptail --inputbox "$text" 10 78 "$default_value" --title "$title" 3>&1 1>&2 2>&3) || {
-    echo "Cancelled"
+  value=$(whiptail --backtitle "$BACKTITLE" --title "$title" --inputbox "$text" 10 78 "$default_value" 3>&1 1>&2 2>&3) || {
     exit 1
   }
   eval "$var_name=\"$value\""
@@ -106,15 +142,40 @@ password_box() {
   local var_name="$3"
 
   local value
-  value=$(whiptail --passwordbox "$text" 10 78 --title "$title" 3>&1 1>&2 2>&3) || {
-    echo "Cancelled"
+  value=$(whiptail --backtitle "$BACKTITLE" --title "$title" --passwordbox "$text" 10 78 3>&1 1>&2 2>&3) || {
     exit 1
   }
   eval "$var_name=\"$value\""
 }
 
+password_box_confirm() {
+  local title="$1"
+  local text="$2"
+  local var_name="$3"
+  local first=""
+  local second=""
+
+  while true; do
+    password_box "$title" "$text" first
+    password_box "$title" "Confirm cluster login password" second
+
+    if [[ -z "${first// }" ]]; then
+      msg_box "$title" "Password is required."
+      continue
+    fi
+
+    if [[ "$first" != "$second" ]]; then
+      msg_box "$title" "Passwords do not match."
+      continue
+    fi
+
+    eval "$var_name=\"$first\""
+    return 0
+  done
+}
+
 msg_box() {
-  whiptail --msgbox "$2" 12 78 --title "$1"
+  whiptail --backtitle "$BACKTITLE" --title "$1" --msgbox "$2" 12 78
 }
 
 sanitize_cluster_slug() {
@@ -134,19 +195,17 @@ choose_cluster_slug() {
   local sanitized=""
 
   while true; do
-    selected=$(whiptail --menu "Choose a cluster name. Suggested presets:\n\n- ontwikkel\n- test\n- productie" 18 78 6 \
-      "ontwikkel" "Development cluster" \
-      "test" "Testing cluster" \
-      "productie" "Production cluster" \
-      "aangepast" "Custom cluster name" \
+    selected=$(whiptail --backtitle "$BACKTITLE" --title "Twinbox" --menu "Choose a cluster name." 16 78 5 \
+      "development" "Use Development" \
+      "test" "Use Test" \
+      "production" "Use Production" \
+      "custom" "Enter a custom name" \
       3>&1 1>&2 2>&3) || {
-      echo "Cancelled"
       exit 0
     }
 
-    if [[ "$selected" == "aangepast" ]]; then
-      custom_name=$(whiptail --inputbox "Custom cluster name" 10 78 "" --title "Cluster Name" 3>&1 1>&2 2>&3) || {
-        echo "Cancelled"
+    if [[ "$selected" == "custom" ]]; then
+      custom_name=$(whiptail --backtitle "$BACKTITLE" --title "Twinbox" --inputbox "Cluster name" 10 78 "" 3>&1 1>&2 2>&3) || {
         exit 0
       }
       sanitized=$(sanitize_cluster_slug "$custom_name")
@@ -159,8 +218,130 @@ choose_cluster_slug() {
       return 0
     fi
 
-    msg_box "Invalid cluster name" "Cluster names can only contain letters, numbers and dashes after normalization.\n\nTry again."
+    msg_box "Twinbox" "Use letters, numbers, and dashes only."
   done
+}
+
+add_detected_cluster_slug() {
+  local slug="$1"
+  local existing=""
+
+  [[ -n "$slug" ]] || return 0
+
+  for existing in "${DETECTED_CLUSTER_SLUGS[@]}"; do
+    if [[ "$existing" == "$slug" ]]; then
+      return 0
+    fi
+  done
+
+  DETECTED_CLUSTER_SLUGS+=("$slug")
+}
+
+detect_cluster_slugs() {
+  local vmid=""
+  local config=""
+  local tags=""
+  local tag=""
+  local snippet=""
+  local user=""
+  local role=""
+  local slug=""
+
+  DETECTED_CLUSTER_SLUGS=()
+
+  while read -r vmid; do
+    [[ -n "$vmid" ]] || continue
+    config=$(qm config "$vmid" 2>/dev/null || true)
+    tags=$(printf '%s\n' "$config" | awk -F': ' '/^tags:/ {print $2; exit}')
+    [[ -n "$tags" ]] || continue
+    IFS=';' read -r -a tag_parts <<<"$tags"
+    for tag in "${tag_parts[@]}"; do
+      if [[ "$tag" == cluster-* ]]; then
+        add_detected_cluster_slug "${tag#cluster-}"
+      fi
+    done
+  done < <(qm list 2>/dev/null | awk 'NR>1 {print $1}')
+
+  while read -r snippet; do
+    [[ -n "$snippet" ]] || continue
+    slug=$(basename "$snippet")
+    slug=$(printf '%s\n' "$slug" | sed -E 's/^twinbox-(.+)-mgt-[0-9]+-user-data\.yaml$/\1/')
+    add_detected_cluster_slug "$slug"
+  done < <(find /var/lib/vz/snippets -maxdepth 1 -type f -name "twinbox-*-*.yaml" 2>/dev/null | sort)
+
+  while read -r user; do
+    [[ "$user" == twinbox-*@pve ]] || continue
+    slug="${user#twinbox-}"
+    slug="${slug%@pve}"
+    add_detected_cluster_slug "$slug"
+  done < <(pveum user list 2>/dev/null | awk 'NR>1 {print $1}')
+
+  while read -r role; do
+    [[ "$role" == TwinboxVMProvisioner-* ]] || continue
+    slug="${role#TwinboxVMProvisioner-}"
+    add_detected_cluster_slug "$slug"
+  done < <(pveum role list 2>/dev/null | awk 'NR>1 {print $1}')
+}
+
+render_cluster_overview() {
+  local summary=""
+  local slug=""
+
+  if [[ "${#DETECTED_CLUSTER_SLUGS[@]}" -eq 0 ]]; then
+    printf '%s' "No Twinbox clusters detected."
+    return 0
+  fi
+
+  summary="Clusters on this host"$'\n'$'\n'
+  for slug in "${DETECTED_CLUSTER_SLUGS[@]}"; do
+    summary+="- ${slug}"$'\n'
+  done
+
+  printf '%s' "$summary"
+}
+
+choose_existing_cluster_for_removal() {
+  local prompt=""
+  local selected=""
+  local -a menu_args=()
+  local slug=""
+
+  if [[ "${#DETECTED_CLUSTER_SLUGS[@]}" -eq 0 ]]; then
+    msg_box "Twinbox" "No Twinbox clusters are available to remove."
+    exit 0
+  fi
+
+  for slug in "${DETECTED_CLUSTER_SLUGS[@]}"; do
+    menu_args+=("$slug" "Remove ${slug}")
+  done
+
+  prompt="$(render_cluster_overview)"$'\n'$'\n'"Choose a cluster to remove."
+  selected=$(whiptail --backtitle "$BACKTITLE" --title "Twinbox" --menu "$prompt" 20 78 10 "${menu_args[@]}" 3>&1 1>&2 2>&3) || exit 0
+  CLUSTER_SLUG="$selected"
+}
+
+choose_cluster_action() {
+  local prompt=""
+  local action=""
+
+  detect_cluster_slugs
+  prompt="Twinbox"$'\n'$'\n'"Kickstart a Twinbox cluster environment"$'\n'$'\n'"$(render_cluster_overview)"$'\n'$'\n'"Choose an action."
+
+  if [[ "${#DETECTED_CLUSTER_SLUGS[@]}" -eq 0 ]]; then
+    action=$(whiptail --backtitle "$BACKTITLE" --title "Twinbox" --menu "$prompt" 18 78 6 \
+      "create" "Start a new cluster" \
+      3>&1 1>&2 2>&3) || exit 0
+  else
+    action=$(whiptail --backtitle "$BACKTITLE" --title "Twinbox" --menu "$prompt" 20 78 8 \
+      "create" "Start a new cluster" \
+      "remove" "Remove a cluster" \
+      3>&1 1>&2 2>&3) || exit 0
+  fi
+
+  WIZARD_ACTION="$action"
+  if [[ "$WIZARD_ACTION" == "remove" ]]; then
+    choose_existing_cluster_for_removal
+  fi
 }
 
 set_cluster_naming_defaults() {
@@ -171,6 +352,7 @@ set_cluster_naming_defaults() {
   CLOUD_INIT_USER="twinbox-${CLUSTER_SLUG}"
   PROXMOX_USER="twinbox-${CLUSTER_SLUG}@pve"
   PROXMOX_ROLE="TwinboxVMProvisioner-${CLUSTER_SLUG}"
+  PROXMOX_NODE="${PROXMOX_NODE:-$(hostname)}"
 }
 
 detect_existing_cluster_resources() {
@@ -186,6 +368,7 @@ detect_existing_cluster_resources() {
   EXISTING_USER_PRESENT=0
   EXISTING_ROLE_PRESENT=0
 
+  progress_update "Checking cluster" "Checking cluster resources"
   while read -r vmid; do
     [[ -n "$vmid" ]] || continue
     config=$(qm config "$vmid" 2>/dev/null || true)
@@ -201,6 +384,7 @@ detect_existing_cluster_resources() {
     fi
   done < <(qm list 2>/dev/null | awk 'NR>1 {print $1}')
 
+  progress_update "Checking cluster" "Checking cluster access"
   if pveum user list 2>/dev/null | awk 'NR>1 {print $1}' | grep -Fxq "$PROXMOX_USER"; then
     EXISTING_USER_PRESENT=1
   fi
@@ -209,6 +393,7 @@ detect_existing_cluster_resources() {
     EXISTING_ROLE_PRESENT=1
   fi
 
+  progress_update "Checking cluster" "Checking cluster files"
   while read -r snippet; do
     [[ -n "$snippet" ]] || continue
     EXISTING_SNIPPETS+=("$snippet")
@@ -224,39 +409,20 @@ cluster_resources_exist() {
 
 render_existing_cluster_inventory() {
   local summary=""
-  local idx=0
-
-  summary+="Detected resources for cluster '${CLUSTER_SLUG}':"$'\n'$'\n'
-  summary+="VMs:"$'\n'
-  if [[ "${#EXISTING_VM_IDS[@]}" -gt 0 ]]; then
-    for idx in "${!EXISTING_VM_IDS[@]}"; do
-      summary+="  - VMID ${EXISTING_VM_IDS[$idx]} (${EXISTING_VM_NAMES[$idx]})"$'\n'
-    done
-  else
-    summary+="  - none"$'\n'
-  fi
-
-  summary+=$'\n'"Snippets:"$'\n'
-  if [[ "${#EXISTING_SNIPPETS[@]}" -gt 0 ]]; then
-    for snippet in "${EXISTING_SNIPPETS[@]}"; do
-      summary+="  - ${snippet}"$'\n'
-    done
-  else
-    summary+="  - none"$'\n'
-  fi
-
-  summary+=$'\n'"Proxmox API user:"$'\n'
+  summary+="Cluster: ${CLUSTER_SLUG}"$'\n'
+  summary+="VMs: ${#EXISTING_VM_IDS[@]}"$'\n'
+  summary+="Snippets: ${#EXISTING_SNIPPETS[@]}"$'\n'
+  summary+="API user: "
   if [[ "${EXISTING_USER_PRESENT}" -eq 1 ]]; then
-    summary+="  - ${PROXMOX_USER}"$'\n'
+    summary+="yes"$'\n'
   else
-    summary+="  - none"$'\n'
+    summary+="no"$'\n'
   fi
-
-  summary+=$'\n'"Proxmox role:"$'\n'
+  summary+="API role: "
   if [[ "${EXISTING_ROLE_PRESENT}" -eq 1 ]]; then
-    summary+="  - ${PROXMOX_ROLE}"$'\n'
+    summary+="yes"
   else
-    summary+="  - none"$'\n'
+    summary+="no"
   fi
 
   printf '%s' "$summary"
@@ -269,18 +435,18 @@ cleanup_existing_cluster_resources() {
   local snippet=""
   local acl_path=""
 
-  status_update "Removing resources for existing cluster ${CLUSTER_SLUG}"
+  progress_update "Removing cluster" "Removing cluster resources"
 
   for idx in "${!EXISTING_VM_IDS[@]}"; do
     vmid="${EXISTING_VM_IDS[$idx]}"
     vm_name="${EXISTING_VM_NAMES[$idx]}"
-    status_update "Destroying VM ${vmid} (${vm_name})"
+    log_event "Destroying VM ${vmid} (${vm_name})"
     qm stop "$vmid" --skiplock 1 >/dev/null 2>&1 || true
     qm destroy "$vmid" --purge 1 >/dev/null 2>&1 || true
   done
 
   for snippet in "${EXISTING_SNIPPETS[@]}"; do
-    status_update "Removing snippet ${snippet}"
+    log_event "Removing snippet ${snippet}"
     rm -f "$snippet" || true
   done
 
@@ -289,16 +455,16 @@ cleanup_existing_cluster_resources() {
   done
 
   if [[ "${EXISTING_USER_PRESENT}" -eq 1 ]]; then
-    status_update "Removing Proxmox API user ${PROXMOX_USER}"
+    log_event "Removing Proxmox API user ${PROXMOX_USER}"
     pveum user delete "$PROXMOX_USER" >/dev/null 2>&1 || true
   fi
 
   if [[ "${EXISTING_ROLE_PRESENT}" -eq 1 ]]; then
-    status_update "Removing Proxmox role ${PROXMOX_ROLE}"
+    log_event "Removing Proxmox role ${PROXMOX_ROLE}"
     pveum role delete "$PROXMOX_ROLE" >/dev/null 2>&1 || true
   fi
 
-  msg_ok "Existing cluster resources removed"
+  progress_update "Removing cluster" "Cluster removed"
 }
 
 handle_existing_cluster_conflict() {
@@ -312,29 +478,21 @@ handle_existing_cluster_conflict() {
 
   inventory=$(render_existing_cluster_inventory)
 
-  if ! whiptail --yesno "A cluster with slug '${CLUSTER_SLUG}' already exists.\n\n${inventory}\nThis action permanently deletes the listed resources.\n\nDo you want to continue?" 32 100 --title "Cluster already exists"; then
-    echo "Cancelled"
+  if ! yesno_box "Twinbox" "A cluster named '${CLUSTER_SLUG}' already exists.\n\n${inventory}\n\nRemove it before starting again?" 18 78; then
     exit 0
   fi
 
-  confirm_slug=$(whiptail --inputbox "Type the cluster slug to confirm deletion:\n\n${CLUSTER_SLUG}" 12 78 --title "Confirm cluster deletion" 3>&1 1>&2 2>&3) || {
-    echo "Cancelled"
+  confirm_slug=$(whiptail --backtitle "$BACKTITLE" --title "Twinbox" --inputbox "Type the cluster name to remove it:\n\n${CLUSTER_SLUG}" 12 78 3>&1 1>&2 2>&3) || {
     exit 0
   }
 
   if [[ "$confirm_slug" != "$CLUSTER_SLUG" ]]; then
-    msg_error "Cluster slug did not match. Aborting cleanup."
+    msg_error "Cluster name did not match."
     exit 1
   fi
 
   cleanup_existing_cluster_resources
-
-  if whiptail --yesno "Cleanup completed for cluster '${CLUSTER_SLUG}'.\n\nDo you want to recreate it now?" 12 78 --title "Recreate cluster"; then
-    return 0
-  fi
-
-  echo "Cancelled"
-  exit 0
+  return 0
 }
 
 guess_ssh_public_key() {
@@ -695,6 +853,91 @@ apply_educated_defaults() {
   TWINBOX_IMAGE_TAG="latest"
 }
 
+run_apply_educated_defaults_with_gauge() {
+  local defaults_file=""
+  defaults_file=$(mktemp "/tmp/twinbox-defaults.XXXXXX")
+
+  (
+    gauge_emit 5 "Checking network and free addresses"
+
+    detected_host=$(hostname -I | awk '{print $1}')
+    gauge_emit 15 "Checking network and free addresses"
+
+    detected_prefix=$(ip -o -f inet addr show scope global | awk 'NR==1 {split($4, a, "/"); print a[2]}')
+    detected_gateway=$(ip route | awk '/^default/ {print $3; exit}')
+    detected_dns_ip=$(awk '/^nameserver / {print $2; exit}' /etc/resolv.conf)
+    guessed_bridge=$(guess_bridge_interface || true)
+    guessed_ssh_key=$(guess_ssh_public_key || true)
+
+    gauge_emit 35 "Checking network and free addresses"
+
+    set_cluster_naming_defaults
+    CLUSTER_NAME="${CLUSTER_SLUG}"
+    CLUSTER_CONTROLPLANE_COUNT="1"
+    CLUSTER_WORKER_COUNT="2"
+    total_vmids=$((1 + CLUSTER_CONTROLPLANE_COUNT + CLUSTER_WORKER_COUNT))
+    total_ips=$((2 + CLUSTER_CONTROLPLANE_COUNT + CLUSTER_WORKER_COUNT))
+
+    gauge_emit 55 "Checking network and free addresses"
+    cluster_block_vmid=$(guess_free_vmid_block "$total_vmids" || true)
+
+    gauge_emit 75 "Checking network and free addresses"
+    cluster_block_ip=$(guess_free_ip_block "${detected_host:-}" "$total_ips" || true)
+
+    gauge_emit 95 "Checking network and free addresses"
+
+    cat >"$defaults_file" <<EOF
+detected_host=$(printf '%q' "${detected_host:-}")
+detected_prefix=$(printf '%q' "${detected_prefix:-}")
+detected_gateway=$(printf '%q' "${detected_gateway:-}")
+detected_dns_ip=$(printf '%q' "${detected_dns_ip:-}")
+guessed_bridge=$(printf '%q' "${guessed_bridge:-}")
+guessed_ssh_key=$(printf '%q' "${guessed_ssh_key:-}")
+cluster_block_vmid=$(printf '%q' "${cluster_block_vmid:-}")
+cluster_block_ip=$(printf '%q' "${cluster_block_ip:-}")
+EOF
+
+    gauge_emit 100 "Checking network and free addresses"
+  ) | whiptail --backtitle "$BACKTITLE" --title "Twinbox" --gauge "Checking network and free addresses" 10 78 0
+
+  progress_update "Preparing cluster" "Checking network and free addresses"
+
+  # shellcheck disable=SC1090
+  source "$defaults_file"
+  rm -f "$defaults_file"
+
+  set_cluster_naming_defaults
+  CLUSTER_NAME="${CLUSTER_SLUG}"
+  CLUSTER_CONTROLPLANE_COUNT="1"
+  CLUSTER_WORKER_COUNT="2"
+  total_vmids=$((1 + CLUSTER_CONTROLPLANE_COUNT + CLUSTER_WORKER_COUNT))
+  total_ips=$((2 + CLUSTER_CONTROLPLANE_COUNT + CLUSTER_WORKER_COUNT))
+  MGT_ID="${cluster_block_vmid:-$(guess_next_vmid)}"
+  MGT_RAM="4096"
+  MGT_CORES="2"
+  MGT_CPU_TYPE="host"
+  MGT_DISK="40"
+  BRIDGE_IF="${guessed_bridge:-vmbr0}"
+  CLOUD_INIT_PASSWORD=""
+  CLOUD_INIT_IP="${cluster_block_ip:-192.168.1.50}"
+  CLOUD_INIT_NETMASK="$(cidr_to_netmask "${detected_prefix:-24}")"
+  CLOUD_INIT_GATEWAY="${detected_gateway:-192.168.1.1}"
+  CLOUD_INIT_DNS_DOMAIN="localdomain"
+  CLOUD_INIT_DNS_IP="${detected_dns_ip:-1.1.1.1}"
+  SSH_KEY="${guessed_ssh_key:-}"
+  PROXMOX_HOST="${detected_host:-192.168.1.10}"
+  PROXMOX_PORT="8006"
+  PROXMOX_PASSWORD=$(generate_cloud_init_password)
+  PROXMOX_NODE="$(hostname)"
+  PROXMOX_STORAGE_POOL="local-lvm"
+  PROXMOX_ISO_STORAGE="local"
+  TALOS_ISO_FILE="talos-v1.7.4.iso"
+  TALOSCTL_VERSION="v1.7.4"
+  KUBECTL_VERSION="v1.30.0"
+  HELM_VERSION="v3.15.4"
+  TWINBOX_IMAGE_TAG="latest"
+}
+
 create_proxmox_api_user() {
   local proxmox_privs="VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.Audit,SDN.Use"
   local create_err=""
@@ -737,25 +980,25 @@ create_proxmox_api_user() {
     return 1
   }
 
-  status_update "Ensuring Proxmox API user ${PROXMOX_USER} exists"
+  progress_update "Preparing cluster" "Preparing cluster environment"
   if create_err=$(pveum user add "$PROXMOX_USER" --comment "Twinbox service account (${CLUSTER_SLUG})" 2>&1); then
-    status_update "Created Proxmox API user ${PROXMOX_USER}"
+    log_event "Created Proxmox API user ${PROXMOX_USER}"
   else
     if printf '%s' "$create_err" | grep -qi "already exists"; then
-      status_update "Proxmox API user ${PROXMOX_USER} already exists"
+      log_event "Proxmox API user ${PROXMOX_USER} already exists"
     else
       msg_error "Failed to create Proxmox API user ${PROXMOX_USER}: ${create_err}"
       exit 1
     fi
   fi
 
-  status_update "Setting password for ${PROXMOX_USER}"
+  log_event "Setting password for ${PROXMOX_USER}"
   if ! set_proxmox_password_with_retry "$PROXMOX_USER" "$PROXMOX_PASSWORD" 15 1; then
     msg_error "Failed to set password for Proxmox API user ${PROXMOX_USER}: ${last_err}"
     exit 1
   fi
 
-  status_update "Ensuring least-privilege role ${PROXMOX_ROLE}"
+  log_event "Ensuring least-privilege role ${PROXMOX_ROLE}"
   if role_err=$(pveum role add "$PROXMOX_ROLE" -privs "$proxmox_privs" 2>&1); then
     :
   else
@@ -770,7 +1013,7 @@ create_proxmox_api_user() {
     fi
   fi
 
-  status_update "Applying ACLs for ${PROXMOX_USER}"
+  log_event "Applying ACLs for ${PROXMOX_USER}"
   for acl_path in /vms /storage "/nodes/${PROXMOX_NODE}"; do
     if ! apply_acl_with_retry "$acl_path" "$PROXMOX_USER" "$PROXMOX_ROLE" 10 1; then
       msg_error "Failed to apply ACL ${acl_path} for ${PROXMOX_USER}: ${last_err}"
@@ -784,58 +1027,24 @@ create_proxmox_api_user() {
 }
 
 collect_manual_overrides() {
-  if review_management_settings; then
-    input_box "Management VM" "Management VM name (name shown in Proxmox UI)" "$MGT_NAME" MGT_NAME
-    input_box "Management VM" "Management VM RAM (MB) for manager services" "$MGT_RAM" MGT_RAM
-    input_box "Management VM" "Management VM CPU cores for manager services" "$MGT_CORES" MGT_CORES
-    input_box "Management VM" "Management VM CPU type (use host or x86-64-v2-AES for latest talosctl)" "$MGT_CPU_TYPE" MGT_CPU_TYPE
-    input_box "Management VM" "Management VM disk size (GB) for OS + images" "$MGT_DISK" MGT_DISK
-    input_box "Management VM" "Bridge interface (bridge used for VM network interface)" "$BRIDGE_IF" BRIDGE_IF
-  fi
-
-  if review_cloud_init_settings; then
-    input_box "Cloud-Init" "SSH public key (used for initial SSH access)" "$SSH_KEY" SSH_KEY
-  fi
-
-  if review_manager_env_settings; then
-    input_box "Manager .env" "Proxmox API host (used by worker to call Proxmox API)" "$PROXMOX_HOST" PROXMOX_HOST
-    input_box "Manager .env" "Proxmox API port (usually 8006)" "$PROXMOX_PORT" PROXMOX_PORT
-    input_box "Manager .env" "Proxmox API user (service account user@realm)" "$PROXMOX_USER" PROXMOX_USER
-    input_box "Manager .env" "Proxmox node (target node for VM creation)" "$PROXMOX_NODE" PROXMOX_NODE
-    input_box "Manager .env" "Proxmox storage pool (disk target for Talos VMs)" "$PROXMOX_STORAGE_POOL" PROXMOX_STORAGE_POOL
-    input_box "Manager .env" "Proxmox ISO storage (where Talos ISO is stored)" "$PROXMOX_ISO_STORAGE" PROXMOX_ISO_STORAGE
-    input_box "Manager .env" "Talos ISO file (filename in ISO storage)" "$TALOS_ISO_FILE" TALOS_ISO_FILE
-    input_box "Manager .env" "Talosctl version (tooling on management host and worker)" "$TALOSCTL_VERSION" TALOSCTL_VERSION
-    input_box "Manager .env" "kubectl version (tooling on management host and worker)" "$KUBECTL_VERSION" KUBECTL_VERSION
-    input_box "Manager .env" "Helm version (tooling on management host and worker)" "$HELM_VERSION" HELM_VERSION
-    input_box "Manager .env" "Image tag (Twinbox container image tag)" "$TWINBOX_IMAGE_TAG" TWINBOX_IMAGE_TAG
-  fi
-}
-
-review_management_settings() {
-  if whiptail --yesno "Management VM settings\n\nName: $MGT_NAME\nRAM: ${MGT_RAM}MB\nCPU cores: $MGT_CORES\nCPU type: $MGT_CPU_TYPE\nDisk: ${MGT_DISK}GB\nBridge: $BRIDGE_IF\n\nThe allocation grid sets VMID, IP and future cluster ranges.\n\nEdit this group?" 22 78 --title "Management VM"; then
-    return 0
-  fi
-  return 1
-}
-
-review_cloud_init_settings() {
-  local ssh_key_detected="no"
-  if [[ -n "${SSH_KEY:-}" ]]; then
-    ssh_key_detected="yes"
-  fi
-
-  if whiptail --yesno "Cloud-Init settings\n\nUser: $CLOUD_INIT_USER\nSSH key detected: ${ssh_key_detected}\n\nThe allocation grid fills the management VM network fields.\n\nEdit this group?" 18 78 --title "Cloud-Init"; then
-    return 0
-  fi
-  return 1
-}
-
-review_manager_env_settings() {
-  if whiptail --yesno "Manager API settings\n\nHost: $PROXMOX_HOST\nPort: $PROXMOX_PORT\nUser: $PROXMOX_USER\nNode: $PROXMOX_NODE\nStorage: $PROXMOX_STORAGE_POOL\nISO storage: $PROXMOX_ISO_STORAGE\nTalos ISO: $TALOS_ISO_FILE\nTalosctl: $TALOSCTL_VERSION\nkubectl: $KUBECTL_VERSION\nHelm: $HELM_VERSION\nImage tag: $TWINBOX_IMAGE_TAG\nTarget dir: $TWINBOX_TARGET_DIR\n\nEdit this group?" 25 78 --title "Manager .env"; then
-    return 0
-  fi
-  return 1
+  input_box "Twinbox" "Management VM name" "$MGT_NAME" MGT_NAME
+  input_box "Twinbox" "Management VM RAM (MB)" "$MGT_RAM" MGT_RAM
+  input_box "Twinbox" "Management VM CPU cores" "$MGT_CORES" MGT_CORES
+  input_box "Twinbox" "Management VM CPU type" "$MGT_CPU_TYPE" MGT_CPU_TYPE
+  input_box "Twinbox" "Management VM disk size (GB)" "$MGT_DISK" MGT_DISK
+  input_box "Twinbox" "Bridge interface" "$BRIDGE_IF" BRIDGE_IF
+  input_box "Twinbox" "SSH public key" "$SSH_KEY" SSH_KEY
+  input_box "Twinbox" "Proxmox host" "$PROXMOX_HOST" PROXMOX_HOST
+  input_box "Twinbox" "Proxmox port" "$PROXMOX_PORT" PROXMOX_PORT
+  input_box "Twinbox" "Proxmox API user" "$PROXMOX_USER" PROXMOX_USER
+  input_box "Twinbox" "Proxmox node" "$PROXMOX_NODE" PROXMOX_NODE
+  input_box "Twinbox" "Storage pool" "$PROXMOX_STORAGE_POOL" PROXMOX_STORAGE_POOL
+  input_box "Twinbox" "ISO storage" "$PROXMOX_ISO_STORAGE" PROXMOX_ISO_STORAGE
+  input_box "Twinbox" "Talos ISO file" "$TALOS_ISO_FILE" TALOS_ISO_FILE
+  input_box "Twinbox" "Talosctl version" "$TALOSCTL_VERSION" TALOSCTL_VERSION
+  input_box "Twinbox" "kubectl version" "$KUBECTL_VERSION" KUBECTL_VERSION
+  input_box "Twinbox" "Helm version" "$HELM_VERSION" HELM_VERSION
+  input_box "Twinbox" "Image tag" "$TWINBOX_IMAGE_TAG" TWINBOX_IMAGE_TAG
 }
 
 build_cluster_allocation_rows() {
@@ -881,7 +1090,7 @@ build_cluster_allocation_rows() {
   next_ip=$(int_to_ip "$next_ip_int")
   _rows_roles+=("vip")
   _rows_vmids+=("")
-  _rows_names+=("twinbox-vip")
+  _rows_names+=("twinbox-${CLUSTER_SLUG}-vip")
   _rows_ips+=("$next_ip")
   _rows_subnets+=("$subnet")
   _rows_gateways+=("$gateway")
@@ -891,7 +1100,7 @@ build_cluster_allocation_rows() {
   next_ip_int=$((next_ip_int + 1))
 
   for ((index = 1; index <= cp_count; index++)); do
-    role="twinbox-cp-${index}"
+    role="twinbox-${CLUSTER_SLUG}-cp-${index}"
     _rows_roles+=("controlplane-${index}")
     next_ip=$(int_to_ip "$next_ip_int")
     _rows_vmids+=("$next_vmid")
@@ -905,7 +1114,7 @@ build_cluster_allocation_rows() {
   done
 
   for ((index = 1; index <= worker_count; index++)); do
-    role="twinbox-worker-${index}"
+    role="twinbox-${CLUSTER_SLUG}-worker-${index}"
     _rows_roles+=("worker-${index}")
     next_ip=$(int_to_ip "$next_ip_int")
     _rows_vmids+=("$next_vmid")
@@ -944,6 +1153,10 @@ whiptail_supports_form() {
   whiptail --help 2>&1 | grep -Fq -- "--form"
 }
 
+dialog_supports_form() {
+  command -v dialog >/dev/null 2>&1
+}
+
 edit_cluster_allocation_table_form() {
   local title="$1"
   local rows_file=""
@@ -956,8 +1169,8 @@ edit_cluster_allocation_table_form() {
   local -n _rows_dns="$8"
   local row_count="${#_rows_names[@]}"
   local form_height=$((row_count + 2))
-  local form_width=120
-  local prompt="Edit the proposed allocation grid.\n\nColumns: vmid, name, ip, subnet, gateway, dns\nLeave a vmid blank for rows that are not actual VMs."
+  local form_width=92
+  local prompt="Edit the proposed allocation grid.\n\nColumns: vmid, name, ip"
   local form_output=""
   local -a form_args=()
   local i=0
@@ -972,11 +1185,8 @@ edit_cluster_allocation_table_form() {
     spec_y="$row_y"
     spec_x=1
     form_args+=("VMID" "$spec_y" "$spec_x" "${_rows_vmids[$i]:--}" "$spec_y" 7 8 8)
-    form_args+=("NAME" "$spec_y" 18 "${_rows_names[$i]}" "$spec_y" 24 18 32)
-    form_args+=("IP" "$spec_y" 46 "${_rows_ips[$i]}" "$spec_y" 49 16 16)
-    form_args+=("SUBNET" "$spec_y" 66 "${_rows_subnets[$i]}" "$spec_y" 73 16 16)
-    form_args+=("GATEWAY" "$spec_y" 86 "${_rows_gateways[$i]}" "$spec_y" 94 16 16)
-    form_args+=("DNS" "$spec_y" 107 "${_rows_dns[$i]}" "$spec_y" 111 16 16)
+    form_args+=("NAME" "$spec_y" 18 "${_rows_names[$i]}" "$spec_y" 24 26 34)
+    form_args+=("IP" "$spec_y" 61 "${_rows_ips[$i]}" "$spec_y" 64 15 15)
   done
 
   form_output=$(whiptail "${form_args[@]}" 3>&1 1>&2 2>&3) || return 1
@@ -985,18 +1195,56 @@ edit_cluster_allocation_table_form() {
   printf '%s\n' "$form_output" > "$allocation_file"
 
   mapfile -t form_lines < "$allocation_file"
-  if [[ "${#form_lines[@]}" -lt $((row_count * 6)) ]]; then
+  if [[ "${#form_lines[@]}" -lt $((row_count * 3)) ]]; then
     msg_error "Allocation grid returned incomplete data"
     return 1
   fi
 
   for ((i = 0; i < row_count; i++)); do
-    _rows_vmids[$i]=$(trim_value "${form_lines[$((i * 6 + 0))]}")
-    _rows_names[$i]=$(trim_value "${form_lines[$((i * 6 + 1))]}")
-    _rows_ips[$i]=$(trim_value "${form_lines[$((i * 6 + 2))]}")
-    _rows_subnets[$i]=$(trim_value "${form_lines[$((i * 6 + 3))]}")
-    _rows_gateways[$i]=$(trim_value "${form_lines[$((i * 6 + 4))]}")
-    _rows_dns[$i]=$(trim_value "${form_lines[$((i * 6 + 5))]}")
+    _rows_vmids[$i]=$(trim_value "${form_lines[$((i * 3 + 0))]}")
+    _rows_names[$i]=$(trim_value "${form_lines[$((i * 3 + 1))]}")
+    _rows_ips[$i]=$(trim_value "${form_lines[$((i * 3 + 2))]}")
+  done
+}
+
+edit_cluster_allocation_table_dialog_form() {
+  local title="$1"
+  local -n _rows_roles="$2"
+  local -n _rows_vmids="$3"
+  local -n _rows_names="$4"
+  local -n _rows_ips="$5"
+  local -n _rows_subnets="$6"
+  local -n _rows_gateways="$7"
+  local -n _rows_dns="$8"
+  local row_count="${#_rows_names[@]}"
+  local form_height=$((row_count + 2))
+  local form_width=92
+  local prompt="Edit the proposed allocation grid.\n\nColumns: vmid, name, ip"
+  local form_output=""
+  local i=0
+  local row_y=0
+  local -a form_args=()
+  local -a form_lines=()
+
+  form_args=(--stdout --backtitle "$BACKTITLE" --title "$title" --form "$prompt" "$((form_height + 8))" "$form_width" "$form_height")
+  for ((i = 0; i < row_count; i++)); do
+    row_y=$((1 + i))
+    form_args+=("VMID" "$row_y" 1 "${_rows_vmids[$i]:--}" "$row_y" 7 8 8)
+    form_args+=("NAME" "$row_y" 18 "${_rows_names[$i]}" "$row_y" 24 26 34)
+    form_args+=("IP" "$row_y" 61 "${_rows_ips[$i]}" "$row_y" 64 15 15)
+  done
+
+  form_output=$(dialog "${form_args[@]}") || return 1
+  mapfile -t form_lines <<<"$form_output"
+  if [[ "${#form_lines[@]}" -lt $((row_count * 3)) ]]; then
+    msg_error "Allocation grid returned incomplete data"
+    return 1
+  fi
+
+  for ((i = 0; i < row_count; i++)); do
+    _rows_vmids[$i]=$(trim_value "${form_lines[$((i * 3 + 0))]}")
+    _rows_names[$i]=$(trim_value "${form_lines[$((i * 3 + 1))]}")
+    _rows_ips[$i]=$(trim_value "${form_lines[$((i * 3 + 2))]}")
   done
 }
 
@@ -1015,22 +1263,37 @@ edit_cluster_allocation_table_fallback() {
   local current_value=""
   local -a parts=()
 
-  msg_box "$title" "This Proxmox host uses a whiptail build without form support.\n\nThe allocation grid will be edited one row at a time as:\nvmid|name|ip|subnet|gateway|dns"
-
   for ((i = 0; i < row_count; i++)); do
-    current_value="${_rows_vmids[$i]:-}|${_rows_names[$i]}|${_rows_ips[$i]}|${_rows_subnets[$i]}|${_rows_gateways[$i]}|${_rows_dns[$i]}"
-    input_box "Cluster Allocation" "Row ${i} (${_rows_roles[$i]})\nEnter values as: vmid|name|ip|subnet|gateway|dns" "$current_value" row_value
+    current_value="${_rows_vmids[$i]:-}|${_rows_names[$i]}|${_rows_ips[$i]}"
+    input_box "Cluster Allocation" "Row ${i} (${_rows_roles[$i]})\nvmid|name|ip" "$current_value" row_value
     IFS='|' read -r -a parts <<< "$row_value"
-    if [[ "${#parts[@]}" -ne 6 ]]; then
-      msg_error "Allocation row ${i} must contain exactly 6 pipe-separated values"
+    if [[ "${#parts[@]}" -ne 3 ]]; then
+      msg_error "Allocation row ${i} must contain exactly 3 pipe-separated values"
       return 1
     fi
     _rows_vmids[$i]=$(trim_value "${parts[0]}")
     _rows_names[$i]=$(trim_value "${parts[1]}")
     _rows_ips[$i]=$(trim_value "${parts[2]}")
-    _rows_subnets[$i]=$(trim_value "${parts[3]}")
-    _rows_gateways[$i]=$(trim_value "${parts[4]}")
-    _rows_dns[$i]=$(trim_value "${parts[5]}")
+  done
+}
+
+edit_cluster_network_settings() {
+  local -n _rows_subnets="$1"
+  local -n _rows_gateways="$2"
+  local -n _rows_dns="$3"
+  local subnet_value="${_rows_subnets[0]}"
+  local gateway_value="${_rows_gateways[0]}"
+  local dns_value="${_rows_dns[0]}"
+  local i=0
+
+  input_box "Cluster Network" "Subnet mask" "$subnet_value" subnet_value
+  input_box "Cluster Network" "Gateway" "$gateway_value" gateway_value
+  input_box "Cluster Network" "DNS" "$dns_value" dns_value
+
+  for ((i = 0; i < ${#_rows_subnets[@]}; i++)); do
+    _rows_subnets[$i]="$subnet_value"
+    _rows_gateways[$i]="$gateway_value"
+    _rows_dns[$i]="$dns_value"
   done
 }
 
@@ -1046,6 +1309,8 @@ edit_cluster_allocation_table() {
 
   if whiptail_supports_form; then
     edit_cluster_allocation_table_form "$title" "$2" "$3" "$4" "$5" "$6" "$7" "$8"
+  elif dialog_supports_form; then
+    edit_cluster_allocation_table_dialog_form "$title" "$2" "$3" "$4" "$5" "$6" "$7" "$8"
   else
     edit_cluster_allocation_table_fallback "$title" "$2" "$3" "$4" "$5" "$6" "$7" "$8"
   fi
@@ -1077,11 +1342,11 @@ collect_cluster_allocation() {
   build_cluster_allocation_rows "$rows_roles_name" "$rows_vmids_name" "$rows_names_name" "$rows_ips_name" "$rows_subnets_name" "$rows_gateways_name" "$rows_dns_name" \
     "$base_vmid" "$base_ip" "$subnet" "$gateway" "$dns" "$cp_count" "$worker_count"
 
-  msg_box "Cluster Allocation" "Review the proposed allocation grid.\n\nIt reserves a contiguous VMID/IP block for the management VM, VIP and future Talos nodes.\n\nYou can edit any field before continuing."
-
   if ! edit_cluster_allocation_table "Cluster Allocation" "$rows_roles_name" "$rows_vmids_name" "$rows_names_name" "$rows_ips_name" "$rows_subnets_name" "$rows_gateways_name" "$rows_dns_name"; then
     exit 1
   fi
+
+  edit_cluster_network_settings "$rows_subnets_name" "$rows_gateways_name" "$rows_dns_name"
 
   if [[ -z "${_rows_vmids[0]:-}" || ! "${_rows_vmids[0]}" =~ ^[0-9]+$ ]]; then
     msg_error "Management VMID must be a number"
@@ -1142,6 +1407,31 @@ collect_cluster_allocation() {
   _rows_vmids[1]=""
 }
 
+remove_cluster_flow() {
+  set_cluster_naming_defaults
+  detect_existing_cluster_resources
+
+  if ! cluster_resources_exist; then
+    msg_box "Twinbox" "No resources were found for ${CLUSTER_SLUG}."
+    exit 0
+  fi
+
+  if ! yesno_box "Twinbox" "$(render_existing_cluster_inventory)\n\nRemove this cluster?" 16 78; then
+    exit 0
+  fi
+
+  local confirm_slug=""
+  confirm_slug=$(whiptail --backtitle "$BACKTITLE" --title "Twinbox" --inputbox "Type the cluster name to remove it:\n\n${CLUSTER_SLUG}" 12 78 3>&1 1>&2 2>&3) || exit 0
+
+  if [[ "$confirm_slug" != "$CLUSTER_SLUG" ]]; then
+    msg_error "Cluster name did not match."
+    exit 1
+  fi
+
+  cleanup_existing_cluster_resources
+  msg_box "Twinbox" "Cluster removed.\n\nThis script will now close."
+}
+
 start_wizard() {
   local cluster_vmids=()
   local cluster_names=()
@@ -1150,22 +1440,19 @@ start_wizard() {
   local cluster_gateways=()
   local cluster_dns=()
   local cluster_roles=()
-  header_info
-  choose_cluster_slug
-  apply_educated_defaults
-  handle_existing_cluster_conflict
+  choose_cluster_action
 
-  header_info
-  msg_box "Twinbox Setup" "This wizard creates only the Management VM for cluster '${CLUSTER_SLUG}'.\n\nIt starts with a smart allocation grid for the management VM, VIP and future Talos nodes, then groups the remaining settings into:\n- Management VM sizing\n- Cloud-Init access\n- Manager API/runtime settings\n\nYou can review each group and edit only what you need."
-
-  if whiptail --yesno "Use recommended settings with educated guesses?" 10 78; then
-    :
-  else
-    collect_manual_overrides
+  if [[ "$WIZARD_ACTION" == "remove" ]]; then
+    remove_cluster_flow
+    return 0
   fi
 
+  choose_cluster_slug
+  run_apply_educated_defaults_with_gauge
+  handle_existing_cluster_conflict
+
   if [[ -z "${SSH_KEY:-}" ]]; then
-    input_box "Cloud-Init" "SSH public key" "" SSH_KEY
+    input_box "Twinbox" "SSH public key" "" SSH_KEY
   fi
   if [[ -z "${SSH_KEY// }" ]]; then
     msg_error "SSH public key is required for initial access"
@@ -1188,18 +1475,10 @@ start_wizard() {
     exit 1
   }
 
-  password_box "Cloud-Init" "Twinbox login password" CLOUD_INIT_PASSWORD
+  password_box_confirm "Twinbox" "Cluster login password" CLOUD_INIT_PASSWORD
 
-  msg_box "Security Notice" "Phase 1 is LAN-only and stores Proxmox credentials in ${TWINBOX_TARGET_DIR}/.env on the management VM.\n\nUse a dedicated Proxmox automation account and rotate credentials regularly."
-
-  if whiptail --yesno "Proceed with installation?\n\nCluster: ${CLUSTER_SLUG}\nVM Name: $MGT_NAME\nVM ID: $MGT_ID\nCPU type: $MGT_CPU_TYPE\nBridge: $BRIDGE_IF\nManagement IP: $CLOUD_INIT_IP\nVIP: $VIP_IP\nFuture Talos start VMID: $CLUSTER_START_VMID\nFuture Talos start IP: $CLUSTER_START_IP\nCloud-Init user: $CLOUD_INIT_USER\nDNS: ${CLOUD_INIT_DNS_IP} (${CLOUD_INIT_DNS_DOMAIN})\nRepo: ${GITHUB_REPO}\nTarget dir: ${TWINBOX_TARGET_DIR}\nAuto-start manager stack: yes" 24 78; then
-    create_proxmox_api_user
-    create_management_vm
-    print_next_steps
-  else
-    echo "Cancelled"
-    exit 0
-  fi
+  run_installation_flow
+  print_next_steps
 }
 
 create_management_vm() {
@@ -1212,18 +1491,18 @@ create_management_vm() {
 
   mkdir -p /var/lib/vz/template/cache /var/lib/vz/snippets
 
-  status_update "Checking Ubuntu cloud image cache"
+  progress_update "Preparing cluster" "Preparing cluster environment"
   if [[ ! -f "$img_path" ]]; then
-    msg_info "Downloading Ubuntu 24.04 cloud image"
+    log_event "Downloading Ubuntu 24.04 cloud image"
     curl -fsSL -o "$img_path" "$ubuntu_url"
-    msg_ok "Ubuntu image downloaded"
+    log_event "Ubuntu image downloaded"
   else
-    msg_ok "Ubuntu image already present"
+    log_event "Ubuntu image already present"
   fi
 
   ensure_talos_iso_available
 
-  status_update "Preparing cloud-init configuration snippet"
+  log_event "Preparing cloud-init configuration snippet"
 
   snippet_file="/var/lib/vz/snippets/twinbox-${CLUSTER_SLUG}-mgt-${MGT_ID}-user-data.yaml"
 
@@ -1295,14 +1574,14 @@ runcmd:
 CLOUDINIT
   chmod 600 "$snippet_file"
 
-  status_update "Creating VM shell in Proxmox"
+  progress_update "Starting environment" "Starting management environment"
   qm create "$MGT_ID" --name "$MGT_NAME" --memory "$MGT_RAM" --cores "$MGT_CORES" --cpu "$MGT_CPU_TYPE" --net0 "virtio,bridge=${BRIDGE_IF}" \
     --tags "twinbox;management;docker;bootstrap;${CLUSTER_VM_TAG}" \
     --scsihw virtio-scsi-pci --ide2 local-lvm:cloudinit --serial0 socket --vga serial0 --ostype l26 >/dev/null
   vm_created=1
-  status_update "Importing base disk into VM storage"
+  log_event "Importing base disk into VM storage"
   qm importdisk "$MGT_ID" "$img_path" local-lvm >/dev/null
-  status_update "Applying cloud-init and boot configuration"
+  log_event "Applying cloud-init and boot configuration"
   qm set "$MGT_ID" --scsi0 "local-lvm:vm-${MGT_ID}-disk-0" >/dev/null
   qm set "$MGT_ID" --ciuser "$CLOUD_INIT_USER" >/dev/null
   qm set "$MGT_ID" --cipassword "$CLOUD_INIT_PASSWORD" >/dev/null
@@ -1313,10 +1592,10 @@ CLOUDINIT
   qm set "$MGT_ID" --cicustom "user=local:snippets/$(basename "$snippet_file")" >/dev/null
   qm set "$MGT_ID" --boot order=scsi0 >/dev/null
   qm resize "$MGT_ID" scsi0 "${MGT_DISK}G" >/dev/null
-  status_update "Starting management VM"
+  log_event "Starting management VM"
   qm start "$MGT_ID" >/dev/null
 
-  msg_ok "Management VM created"
+  progress_update "Starting environment" "Management environment started"
 }
 
 ensure_talos_iso_available() {
@@ -1327,10 +1606,10 @@ ensure_talos_iso_available() {
   local storage_path=""
   local iso_target_dir=""
 
-  status_update "Checking Talos ISO in storage ${PROXMOX_ISO_STORAGE}"
+  progress_update "Preparing cluster" "Checking installation media"
   iso_list=$(pvesm list "$PROXMOX_ISO_STORAGE" --content iso 2>/dev/null || true)
   if printf '%s\n' "$iso_list" | grep -Fq "iso/${TALOS_ISO_FILE}"; then
-    msg_ok "Talos ISO already present (${TALOS_ISO_FILE})"
+    log_event "Talos ISO already present (${TALOS_ISO_FILE})"
     return 0
   fi
 
@@ -1344,7 +1623,7 @@ ensure_talos_iso_available() {
   fi
 
   talos_url="https://github.com/siderolabs/talos/releases/download/v${talos_version}/metal-amd64.iso"
-  msg_info "Downloading Talos ISO ${TALOS_ISO_FILE}"
+  log_event "Downloading Talos ISO ${TALOS_ISO_FILE}"
 
   # pvesm download is not available on some Proxmox versions.
   if pvesm help 2>/dev/null | grep -q "pvesm download"; then
@@ -1401,17 +1680,16 @@ ensure_talos_iso_available() {
     msg_error "Talos ISO upload verification failed for ${PROXMOX_ISO_STORAGE}"
     exit 1
   fi
-  msg_ok "Talos ISO downloaded (${TALOS_ISO_FILE})"
+  log_event "Talos ISO downloaded (${TALOS_ISO_FILE})"
 }
 
 discover_management_vm_ip() {
-  local attempts=24
   local output=""
   local ip=""
   local polls=1
 
-  status_update "Waiting for guest agent to report management VM IP"
-  while [[ "$attempts" -gt 0 ]]; do
+  progress_update "Waiting for Twinbox" "Waiting for Twinbox"
+  while true; do
     output=$(qm guest cmd "$MGT_ID" network-get-interfaces 2>/dev/null || true)
     ip=$(
       printf '%s\n' "$output" \
@@ -1422,82 +1700,120 @@ discover_management_vm_ip() {
     )
 
     if [[ -n "$ip" ]]; then
+      log_event "Management VM received an IP address"
       echo "$ip"
       return 0
     fi
 
-    if (( polls % 3 == 0 )); then
-      status_update "Still waiting for VM IP (retry ${polls}/24)"
+    if (( polls == 3 )); then
+      log_event "Waiting for the management VM to request an address."
+    elif (( polls == 9 )); then
+      log_event "The management VM is still booting. This can take a minute or two."
     fi
 
     sleep 5
-    attempts=$((attempts - 1))
     polls=$((polls + 1))
   done
+}
 
-  status_update "Guest agent did not report an IP within timeout"
-  return 1
+wait_for_management_vm_ping() {
+  local management_ip="$1"
+  local polls=1
+
+  progress_update "Waiting for Twinbox" "Waiting for Twinbox"
+  log_event "Management VM is starting on the network."
+
+  while true; do
+    if ping -c 1 -W 1 "$management_ip" >/dev/null 2>&1; then
+      log_event "Management VM is responding on the network"
+      return 0
+    fi
+
+    if (( polls == 3 )); then
+      log_event "Still waiting for the management VM to respond to network checks."
+    elif (( polls == 9 )); then
+      log_event "The operating system is still starting. This may take another minute."
+    fi
+
+    sleep 5
+    polls=$((polls + 1))
+  done
 }
 
 wait_for_web_interface() {
   local management_ip="$1"
-  local attempts=72
   local polls=1
   local web_url="http://${management_ip}:3000"
+  local elapsed_seconds=0
+  local http_code=""
+  local wait_stage=0
 
-  status_update "Waiting for web interface on ${web_url}"
-  while [[ "$attempts" -gt 0 ]]; do
-    if curl --silent --output /dev/null --connect-timeout 2 --max-time 3 "$web_url" >/dev/null 2>&1; then
-      status_update "Web interface is reachable on port 3000"
+  progress_update "Waiting for Twinbox" "Waiting for Twinbox"
+  log_event "Twinbox services are starting. This usually takes a few minutes on the first run."
+  while true; do
+    http_code=$(curl --silent --head --output /dev/null --write-out "%{http_code}" --connect-timeout 2 --max-time 10 "$web_url" || true)
+    if [[ "${http_code}" != "000" ]]; then
+      log_event "Web interface is reachable on port 3000"
       return 0
     fi
 
-    if (( polls % 6 == 0 )); then
-      status_update "Web interface still starting (retry ${polls}/72)"
+    elapsed_seconds=$(((polls - 1) * 5))
+
+    if (( elapsed_seconds >= 30 && wait_stage == 0 )); then
+      log_event "Twinbox is starting. Usually ready in 2-5 minutes."
+      wait_stage=1
+    elif (( elapsed_seconds >= 120 && wait_stage == 1 )); then
+      log_event "Still starting. Usually another 1-3 minutes."
+      wait_stage=2
+    elif (( elapsed_seconds >= 300 && wait_stage == 2 )); then
+      log_event "Still starting. Downloads may take a few more minutes."
+      wait_stage=3
+    elif (( elapsed_seconds >= 600 && wait_stage == 3 )); then
+      log_event "Still starting. This host is taking longer than usual."
+      wait_stage=4
     fi
 
     sleep 5
-    attempts=$((attempts - 1))
     polls=$((polls + 1))
   done
+}
 
-  status_update "Web interface did not become reachable within timeout"
-  return 1
+prepare_completion_message() {
+  local management_ip=""
+  management_ip=$(discover_management_vm_ip)
+  wait_for_web_interface "$management_ip"
+  MANAGEMENT_WEB_URL="http://${management_ip}:3000"
+  FINAL_COMPLETION_MESSAGE="Twinbox URL: ${MANAGEMENT_WEB_URL}"
+}
+
+run_installation_flow() {
+  local install_exit=0
+
+  set +e
+  {
+    LIVE_LOG_MODE=1
+    log_event "Twinbox is building the cluster environment."
+    create_proxmox_api_user
+    create_management_vm
+    prepare_completion_message
+  } 2>&1 | dialog \
+    --backtitle "$BACKTITLE" \
+    --title "Twinbox" \
+    --programbox "Twinbox is building the cluster environment." 20 78
+  install_exit=${PIPESTATUS[0]}
+  LIVE_LOG_MODE=0
+  set -e
+
+  if [[ "$install_exit" -ne 0 ]]; then
+    exit "$install_exit"
+  fi
 }
 
 print_next_steps() {
-  local management_ip=""
-  local web_interface_ready=0
-  management_ip=$(discover_management_vm_ip || true)
+  local message="${FINAL_COMPLETION_MESSAGE}"
 
-  if [[ -n "${management_ip:-}" ]] && wait_for_web_interface "$management_ip"; then
-    web_interface_ready=1
-  fi
-
-  echo
-  echo -e "${GN}Installation complete${CL}"
-  echo
-  if [[ "$web_interface_ready" -eq 1 ]]; then
-    echo "Open a web browser now: http://${management_ip}:3000"
-    echo "You can leave this screen."
-  elif [[ -n "${management_ip:-}" ]]; then
-    echo "Web interface on port 3000 is not reachable yet."
-    echo "When it is ready, open: http://${management_ip}:3000"
-    echo "You can leave this screen."
-  else
-    echo "Management VM IP is not available yet."
-    echo "When it is known, open: http://<management-vm-ip>:3000"
-    echo "You can leave this screen."
-  fi
-  echo "Login user: ${CLOUD_INIT_USER}"
-  echo "Login password: ${CLOUD_INIT_PASSWORD}"
-  echo "Proxmox API user: ${PROXMOX_USER}"
-  echo "Proxmox API password: ${PROXMOX_PASSWORD}"
-  echo "Cluster VIP: ${VIP_IP}"
-  echo "Cluster start VMID: ${CLUSTER_START_VMID}"
-  echo "Cluster start IP: ${CLUSTER_START_IP}"
-  echo "If needed, edit ${TWINBOX_TARGET_DIR}/.env and run: cd ${TWINBOX_TARGET_DIR} && docker compose up -d"
-  echo
+  clear
+  msg_box "Twinbox" "${message}\n\nOpen this in your browser:\n\n${MANAGEMENT_WEB_URL}\n\nThis script will now close."
 }
 
 main() {

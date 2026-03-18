@@ -38,9 +38,8 @@ def test_setup_wizard_enables_guest_agent_on_management_vm():
 def test_setup_wizard_collects_cloud_init_settings():
     text = _wizard_text()
     assert 'CLOUD_INIT_USER="twinbox-${CLUSTER_SLUG}"' in text
-    assert 'password_box "Cloud-Init" "Twinbox login password" CLOUD_INIT_PASSWORD' in text
-    assert 'input_box "Cloud-Init" "SSH public key (used for initial SSH access)" "$SSH_KEY" SSH_KEY' in text
-    assert 'The allocation grid fills the management VM network fields.' in text
+    assert 'password_box_confirm "Twinbox" "Cluster login password" CLOUD_INIT_PASSWORD' in text
+    assert 'input_box "Twinbox" "SSH public key" "$SSH_KEY" SSH_KEY' in text
 
 
 def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
@@ -77,58 +76,58 @@ def test_setup_wizard_discovers_management_vm_ip_via_guest_agent():
     text = _wizard_text()
     assert "discover_management_vm_ip()" in text
     assert 'qm guest cmd "$MGT_ID" network-get-interfaces' in text
-    assert 'if [[ -n "${management_ip:-}" ]]; then' in text
+    assert 'management_ip=$(discover_management_vm_ip)' in text
+    assert 'wait_for_web_interface "$management_ip"' in text
+
+
+def test_setup_wizard_does_not_block_website_detection_on_ping():
+    text = _wizard_text()
+    prepare_body = text.split("prepare_completion_message() {", 1)[1].split("run_installation_flow()", 1)[0]
+    assert 'wait_for_management_vm_ping "$management_ip"' not in prepare_body
+    assert 'wait_for_web_interface "$management_ip"' in prepare_body
 
 
 def test_setup_wizard_prints_resolved_urls_when_ip_is_available():
     text = _wizard_text()
-    assert 'echo "Open a web browser now: http://${management_ip}:3000"' in text
-    assert 'echo "When it is ready, open: http://${management_ip}:3000"' in text
+    assert 'Open this in your browser:' in text
+    assert 'Twinbox management website' not in text
+    assert 'MANAGEMENT_WEB_URL="http://${management_ip}:3000"' in text
+    assert 'FINAL_COMPLETION_MESSAGE="Twinbox URL: ${MANAGEMENT_WEB_URL}"' in text
+    assert 'Open this in your browser:\\n\\n${MANAGEMENT_WEB_URL}' in text
 
 
-def test_setup_wizard_prints_generated_twinbox_credentials():
+def test_setup_wizard_hides_generated_twinbox_credentials():
     text = _wizard_text()
-    assert 'echo "Login user: ${CLOUD_INIT_USER}"' in text
-    assert 'echo "Login password: ${CLOUD_INIT_PASSWORD}"' in text
+    assert 'Login password: ${CLOUD_INIT_PASSWORD}' not in text
+    assert 'Proxmox API password: ${PROXMOX_PASSWORD}' not in text
 
 
-def test_setup_wizard_has_auto_config_path():
+def test_setup_wizard_applies_defaults_without_extra_confirmation():
     text = _wizard_text()
     assert "apply_educated_defaults()" in text
-    assert 'if whiptail --yesno "Use recommended settings with educated guesses?"' in text
-    assert "collect_manual_overrides" in text
+    assert 'Use recommended defaults?' not in text
 
 
 def test_setup_wizard_uses_detected_ssh_key_when_available():
     text = _wizard_text()
     assert "guess_ssh_public_key()" in text
     assert 'if [[ -z "${SSH_KEY:-}" ]]; then' in text
-    assert 'input_box "Cloud-Init" "SSH public key" "" SSH_KEY' in text
+    assert 'input_box "Twinbox" "SSH public key" "" SSH_KEY' in text
 
 
-def test_setup_wizard_groups_manual_questions_with_review_screens():
+def test_setup_wizard_asks_manual_questions_without_review_screens():
     text = _wizard_text()
-    assert "review_management_settings()" in text
-    assert "review_cloud_init_settings()" in text
-    assert "review_manager_env_settings()" in text
-    assert 'if whiptail --yesno "Management VM settings' in text
-    assert 'if whiptail --yesno "Cloud-Init settings' in text
-    assert 'if whiptail --yesno "Manager API settings' in text
-    assert 'The allocation grid sets VMID, IP and future cluster ranges.' in text
-    assert 'The allocation grid fills the management VM network fields.' in text
+    assert "review_management_settings()" not in text
+    assert "review_cloud_init_settings()" not in text
+    assert "review_manager_env_settings()" not in text
 
 
-def test_setup_wizard_includes_more_explanatory_question_text():
+def test_setup_wizard_keeps_question_text_short():
     text = _wizard_text()
-    assert "name shown in Proxmox UI" in text
-    assert "bridge used for VM network interface" in text
-    assert "used by worker to call Proxmox API" in text
-    assert "Management VM CPU type (use host or x86-64-v2-AES for latest talosctl)" in text
-    assert "Talosctl version (tooling on management host and worker)" in text
-    assert "kubectl version (tooling on management host and worker)" in text
-    assert "Helm version (tooling on management host and worker)" in text
-    assert "The allocation grid sets VMID, IP and future cluster ranges." in text
-    assert "The allocation grid sets VMID, IP and future cluster ranges." in text
+    assert "name shown in Proxmox UI" not in text
+    assert "bridge used for VM network interface" not in text
+    assert "used by worker to call Proxmox API" not in text
+    assert "tooling on management host and worker" not in text
 
 
 def test_setup_wizard_finds_first_free_vmid_cluster_wide():
@@ -156,26 +155,41 @@ def test_setup_wizard_generates_proxmox_api_password_without_prompting():
     assert 'PROXMOX_USER="twinbox-${CLUSTER_SLUG}@pve"' in text
 
 
-def test_setup_wizard_prints_proxmox_api_credentials():
+def test_setup_wizard_does_not_print_proxmox_api_credentials():
     text = _wizard_text()
-    assert 'echo "Proxmox API user: ${PROXMOX_USER}"' in text
-    assert 'echo "Proxmox API password: ${PROXMOX_PASSWORD}"' in text
-    assert 'echo "Cluster VIP: ${VIP_IP}"' in text
-    assert 'echo "Cluster start VMID: ${CLUSTER_START_VMID}"' in text
-    assert 'echo "Cluster start IP: ${CLUSTER_START_IP}"' in text
+    assert 'Proxmox API user: ${PROXMOX_USER}' not in text
+    assert 'Proxmox API password: ${PROXMOX_PASSWORD}' not in text
 
 
 def test_setup_wizard_builds_editable_cluster_allocation_grid():
     text = _wizard_text()
     assert "whiptail_supports_form()" in text
+    assert "dialog_supports_form()" in text
+    assert "edit_cluster_network_settings()" in text
+    assert "edit_cluster_allocation_table_dialog_form()" in text
     assert "edit_cluster_allocation_table_fallback()" in text
     assert "build_cluster_allocation_rows()" in text
     assert "render_cluster_allocation_table()" in text
     assert "edit_cluster_allocation_table()" in text
     assert 'if whiptail_supports_form; then' in text
+    assert 'elif dialog_supports_form; then' in text
+    assert 'prompt="Edit the proposed allocation grid.\\n\\nColumns: vmid, name, ip"' in text
+    assert 'form_args=(--stdout --backtitle "$BACKTITLE" --title "$title" --form "$prompt"' in text
+    assert 'form_output=$(dialog "${form_args[@]}") || return 1' in text
+    assert 'input_box "Cluster Network" "Subnet mask"' in text
+    assert 'input_box "Cluster Network" "Gateway"' in text
+    assert 'input_box "Cluster Network" "DNS"' in text
     assert 'collect_cluster_allocation "${MGT_ID}" "${CLOUD_INIT_IP}" "${CLOUD_INIT_NETMASK}" "${CLOUD_INIT_GATEWAY}" "${CLOUD_INIT_DNS_IP}" "${CLUSTER_CONTROLPLANE_COUNT}" "${CLUSTER_WORKER_COUNT}" cluster_vmids cluster_names cluster_ips cluster_subnets cluster_gateways cluster_dns cluster_roles' in text
-    assert 'msg_box "Cluster Allocation" "Review the proposed allocation grid.' in text
-    assert 'input_box "Cluster Allocation" "Row ${i} (${_rows_roles[$i]})\\nEnter values as: vmid|name|ip|subnet|gateway|dns"' in text
+    assert 'msg_box "Cluster Allocation" "Review the proposed allocation grid.' not in text
+    assert 'whiptail build without form support' not in text
+    assert 'input_box "Cluster Allocation" "Row ${i} (${_rows_roles[$i]})\\nvmid|name|ip"' in text
+
+
+def test_setup_wizard_uses_cluster_slug_in_vip_and_talos_names():
+    text = _wizard_text()
+    assert '_rows_names+=("twinbox-${CLUSTER_SLUG}-vip")' in text
+    assert 'role="twinbox-${CLUSTER_SLUG}-cp-${index}"' in text
+    assert 'role="twinbox-${CLUSTER_SLUG}-worker-${index}"' in text
 
 
 def test_setup_wizard_avoids_circular_nameref_calls_in_allocation_helpers():
@@ -202,22 +216,53 @@ def test_setup_wizard_converts_netmask_to_cidr():
 
 def test_setup_wizard_shows_runtime_progress_feedback():
     text = _wizard_text()
-    assert "status_update()" in text
-    assert 'status_update "Preparing cloud-init configuration snippet"' in text
-    assert 'status_update "Creating VM shell in Proxmox"' in text
-    assert 'status_update "Importing base disk into VM storage"' in text
-    assert 'status_update "Starting management VM"' in text
-    assert 'status_update "Waiting for guest agent to report management VM IP"' in text
-    assert 'status_update() { echo -e " ${HOLD} ${YW}[$(date \'+%H:%M:%S\')] $1${CL}" >&2; }' in text
+    assert "LIVE_LOG_MODE=0" in text
+    assert "run_installation_flow()" in text
+    assert '--programbox "Twinbox is building the cluster environment."' in text
+    assert "progress_update()" in text
+    assert "run_apply_educated_defaults_with_gauge()" in text
+    assert '--gauge "Checking network and free addresses"' in text
+    assert 'progress_update "Preparing cluster" "Checking network and free addresses"' in text
+    assert 'progress_update "Preparing cluster" "Preparing cluster environment"' in text
+    assert 'progress_update "Starting environment" "Starting management environment"' in text
+    assert 'progress_update "Waiting for Twinbox" "Waiting for Twinbox"' in text
+    assert 'wait_for_management_vm_ping()' in text
+    assert 'log_event "Management VM is responding on the network"' in text
+    assert 'log_event "Twinbox services are starting. This usually takes a few minutes on the first run."' in text
+    assert 'log_event "Twinbox is starting. Usually ready in 2-5 minutes."' in text
+    assert 'log_event "Still starting. Usually another 1-3 minutes."' in text
+    assert 'log_event "Still starting. Downloads may take a few more minutes."' in text
+    assert 'log_event "Still starting. This host is taking longer than usual."' in text
+    assert 'Web interface still starting (retry ${polls}/72)' not in text
+    assert 'Web interface did not become reachable within timeout' not in text
+    assert 'Guest agent did not report an IP within timeout' not in text
+    assert 'Management VM did not respond to ping within timeout' not in text
+    assert 'log_event "The operating system is still starting. This may take another minute."' in text
+    assert 'This usually settles shortly.' not in text
+    assert 'Cloud-init is still finishing and Docker images may still be downloading. Estimated time remaining: ${eta_text}' not in text
+    assert 'Twinbox services are still starting. Estimated time remaining: ${eta_text}' not in text
+    assert 'Twinbox is still working in the background. Startup is taking longer than usual, but the wizard is still waiting.' not in text
+
+
+def test_setup_wizard_uses_more_lenient_http_readiness_check():
+    text = _wizard_text()
+    assert 'curl --silent --head --output /dev/null --write-out "%{http_code}" --connect-timeout 2 --max-time 10 "$web_url"' in text
+    assert 'if [[ "${http_code}" != "000" ]]; then' in text
+    assert 'curl --silent --output /dev/null --connect-timeout 2 --max-time 3 "$web_url"' not in text
+
+
+def test_setup_wizard_waits_for_real_management_url_without_placeholder_fallback():
+    text = _wizard_text()
+    assert 'FINAL_COMPLETION_MESSAGE="Twinbox URL: http://<management-vm-ip>:3000"' not in text
+    assert 'local message="${FINAL_COMPLETION_MESSAGE:-Twinbox URL: http://<management-vm-ip>:3000}"' not in text
 
 
 def test_setup_wizard_downloads_talos_iso_when_missing():
     text = _wizard_text()
     assert "ensure_talos_iso_available()" in text
-    assert 'status_update "Checking Talos ISO in storage ${PROXMOX_ISO_STORAGE}"' in text
+    assert 'progress_update "Preparing cluster" "Checking installation media"' in text
     assert 'pvesm list "$PROXMOX_ISO_STORAGE" --content iso' in text
     assert 'pvesm download "$PROXMOX_ISO_STORAGE" "$TALOS_ISO_FILE" "$talos_url"' in text
-    assert 'msg_ok "Talos ISO downloaded (${TALOS_ISO_FILE})"' in text
 
 
 def test_setup_wizard_requires_non_empty_ssh_key():
@@ -252,10 +297,9 @@ def test_setup_wizard_supports_cluster_slug_selection_and_normalization():
     text = _wizard_text()
     assert "sanitize_cluster_slug()" in text
     assert "choose_cluster_slug()" in text
-    assert '"ontwikkel" "Development cluster"' in text
-    assert '"test" "Testing cluster"' in text
-    assert '"productie" "Production cluster"' in text
-    assert '"aangepast" "Custom cluster name"' in text
+    assert '"development" "Use Development"' in text
+    assert '"test" "Use Test"' in text
+    assert '"production" "Use Production"' in text
     assert "set_cluster_naming_defaults()" in text
     assert 'MGT_NAME="${CLUSTER_VM_PREFIX}mgt"' in text
     assert 'PROXMOX_ROLE="TwinboxVMProvisioner-${CLUSTER_SLUG}"' in text
@@ -267,10 +311,57 @@ def test_setup_wizard_detects_and_cleans_up_existing_cluster_resources():
     assert "cluster_resources_exist()" in text
     assert "render_existing_cluster_inventory()" in text
     assert "cleanup_existing_cluster_resources()" in text
-    assert "handle_existing_cluster_conflict()" in text
+    assert "choose_cluster_action()" in text
     assert 'if [[ "$tags" =~ (^|;)${CLUSTER_VM_TAG}($|;) ]]; then' in text
     assert 'pveum aclmod "$acl_path" -user "$PROXMOX_USER" -delete 1 >/dev/null 2>&1 || true' in text
     assert 'pveum user delete "$PROXMOX_USER" >/dev/null 2>&1 || true' in text
     assert 'pveum role delete "$PROXMOX_ROLE" >/dev/null 2>&1 || true' in text
-    assert "Type the cluster slug to confirm deletion" in text
-    assert "Do you want to recreate it now?" in text
+    assert "Type the cluster name to remove it" in text
+
+
+def test_setup_wizard_shows_cluster_overview_before_action():
+    text = _wizard_text()
+    assert "detect_cluster_slugs()" in text
+    assert "render_cluster_overview()" in text
+    assert 'prompt="Twinbox"$\'\\n\'$\'\\n\'"Kickstart a Twinbox cluster environment"' in text
+    assert 'Clusters on this host' in text
+    assert '"create" "Start a new cluster"' in text
+
+
+def test_setup_wizard_requires_password_confirmation():
+    text = _wizard_text()
+    assert "password_box_confirm()" in text
+    assert 'Confirm cluster login password' in text
+    assert 'Passwords do not match.' in text
+
+
+def test_setup_wizard_uses_kickstart_positioning_and_minimal_handoff():
+    text = _wizard_text()
+    assert "Kickstart a Twinbox cluster environment" in text
+    assert "Open this in your browser:" in text
+    assert "This script will now close." in text
+    assert 'clear' in text.split("print_next_steps() {", 1)[1].split("main()", 1)[0]
+    assert "Security Notice" not in text
+
+
+def test_setup_wizard_avoids_extra_confirmation_screens_in_create_flow():
+    text = _wizard_text()
+    assert "Use recommended defaults?" not in text
+    assert "Start cluster ${CLUSTER_SLUG}?" not in text
+    assert 'msg_box "Cluster Allocation" "Review the proposed allocation grid.' not in text
+
+
+def test_setup_wizard_switches_to_live_install_log_after_password():
+    text = _wizard_text()
+    assert 'password_box_confirm "Twinbox" "Cluster login password" CLOUD_INIT_PASSWORD' in text
+    assert 'run_installation_flow' in text
+    assert 'create_proxmox_api_user' in text
+    assert 'create_management_vm' in text
+
+
+def test_setup_wizard_remove_flow_skips_create_defaults_scan_and_shows_progress():
+    text = _wizard_text()
+    assert "remove_cluster_flow()" in text
+    assert 'apply_educated_defaults' not in text.split("remove_cluster_flow() {", 1)[1].split("start_wizard()", 1)[0]
+    assert 'progress_update "Checking cluster" "Checking cluster resources"' in text
+    assert 'progress_update "Checking cluster" "Checking cluster access"' in text
