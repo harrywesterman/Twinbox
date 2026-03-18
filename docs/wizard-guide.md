@@ -8,6 +8,7 @@
 - Prompts for cluster name (`ontwikkel`, `test`, `productie`, or custom).
 - Uses the cluster slug in VM name, Proxmox API user/role, tags, and target path.
 - Detects existing resources for the same cluster and supports cleanup with explicit confirmation.
+- Builds a smart allocation grid for the management VM, VIP, and future Talos nodes.
 - Collects Proxmox/Talos defaults for manager `.env`.
 - Creates the Management VM from Ubuntu 24.04 cloud image.
 - Installs Docker CE on Management VM using official Docker apt repo (`download.docker.com`).
@@ -36,3 +37,6 @@ curl -fsS http://localhost:8080/api/health
 - Keep deployment in trusted LAN scope for phase 1.
 - The wizard writes a cloud-init snippet under `/var/lib/vz/snippets/` with mode `0600`.
 - Talos VM provisioning remains in the management stack/UI and is not created directly by the wizard.
+- The generated cloud-init template also stores the selected cluster allocation defaults for later reuse.
+ - Talos VM provisioning remains in the management stack/UI and is not created directly by the wizard.
+ - The generated cloud-init template also stores the selected cluster allocation defaults for later reuse.

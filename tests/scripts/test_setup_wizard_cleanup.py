@@ -39,11 +39,8 @@ def test_setup_wizard_collects_cloud_init_settings():
     text = _wizard_text()
     assert 'CLOUD_INIT_USER="twinbox-${CLUSTER_SLUG}"' in text
     assert 'password_box "Cloud-Init" "Twinbox login password" CLOUD_INIT_PASSWORD' in text
-    assert 'input_box "Cloud-Init" "Static IPv4 address' in text
-    assert 'input_box "Cloud-Init" "Netmask' in text
-    assert 'input_box "Cloud-Init" "Default route (gateway)' in text
-    assert 'input_box "Cloud-Init" "DNS search domain' in text
-    assert 'input_box "Cloud-Init" "DNS server IP' in text
+    assert 'input_box "Cloud-Init" "SSH public key (used for initial SSH access)" "$SSH_KEY" SSH_KEY' in text
+    assert 'The allocation grid fills the management VM network fields.' in text
 
 
 def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
@@ -59,13 +56,21 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     assert "      TALOSCTL_VERSION=${TALOSCTL_VERSION}" in text
     assert "      KUBECTL_VERSION=${KUBECTL_VERSION}" in text
     assert "      HELM_VERSION=${HELM_VERSION}" in text
-    assert "  - bash -lc 'cp /tmp/twinbox-${CLUSTER_SLUG}.env.template ${TWINBOX_TARGET_DIR}/.env'" in text
+    assert "  - install -m 0600 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /tmp/twinbox-${CLUSTER_SLUG}.env.template ${TWINBOX_TARGET_DIR}/.env" in text
     assert "  - bash -lc 'cd ${TWINBOX_TARGET_DIR} && chmod +x scripts/install-management-tools.sh && ./scripts/install-management-tools.sh --env-file ${TWINBOX_TARGET_DIR}/.env'" in text
     assert 'qm set "$MGT_ID" --ciuser "$CLOUD_INIT_USER" >/dev/null' in text
     assert 'qm set "$MGT_ID" --cipassword "$CLOUD_INIT_PASSWORD" >/dev/null' in text
     assert 'qm set "$MGT_ID" --searchdomain "$CLOUD_INIT_DNS_DOMAIN" >/dev/null' in text
     assert 'qm set "$MGT_ID" --nameserver "$CLOUD_INIT_DNS_IP" >/dev/null' in text
     assert 'qm set "$MGT_ID" --ipconfig0 "ip=${CLOUD_INIT_IP}/${CLOUD_INIT_CIDR},gw=${CLOUD_INIT_GATEWAY}" >/dev/null' in text
+    assert "CLUSTER_NAME=${CLUSTER_NAME}" in text
+    assert "CLUSTER_CONTROLPLANE_COUNT=${CLUSTER_CONTROLPLANE_COUNT}" in text
+    assert "CLUSTER_WORKER_COUNT=${CLUSTER_WORKER_COUNT}" in text
+    assert "MANAGEMENT_VM_ID=${MGT_ID}" in text
+    assert "MANAGEMENT_VM_IP=${CLOUD_INIT_IP}" in text
+    assert "VIP_IP=${VIP_IP}" in text
+    assert "CLUSTER_START_VMID=${CLUSTER_START_VMID}" in text
+    assert "CLUSTER_START_IP=${CLUSTER_START_IP}" in text
 
 
 def test_setup_wizard_discovers_management_vm_ip_via_guest_agent():
@@ -77,8 +82,8 @@ def test_setup_wizard_discovers_management_vm_ip_via_guest_agent():
 
 def test_setup_wizard_prints_resolved_urls_when_ip_is_available():
     text = _wizard_text()
-    assert 'echo "2. Open: http://${management_ip}:3000"' in text
-    assert 'echo "3. Verify API health: http://${management_ip}:8080/api/health"' in text
+    assert 'echo "Open a web browser now: http://${management_ip}:3000"' in text
+    assert 'echo "When it is ready, open: http://${management_ip}:3000"' in text
 
 
 def test_setup_wizard_prints_generated_twinbox_credentials():
@@ -109,33 +114,38 @@ def test_setup_wizard_groups_manual_questions_with_review_screens():
     assert 'if whiptail --yesno "Management VM settings' in text
     assert 'if whiptail --yesno "Cloud-Init settings' in text
     assert 'if whiptail --yesno "Manager API settings' in text
+    assert 'The allocation grid sets VMID, IP and future cluster ranges.' in text
+    assert 'The allocation grid fills the management VM network fields.' in text
 
 
 def test_setup_wizard_includes_more_explanatory_question_text():
     text = _wizard_text()
     assert "name shown in Proxmox UI" in text
     assert "bridge used for VM network interface" in text
-    assert "search domain used in /etc/resolv.conf" in text
     assert "used by worker to call Proxmox API" in text
     assert "Management VM CPU type (use host or x86-64-v2-AES for latest talosctl)" in text
     assert "Talosctl version (tooling on management host and worker)" in text
     assert "kubectl version (tooling on management host and worker)" in text
     assert "Helm version (tooling on management host and worker)" in text
+    assert "The allocation grid sets VMID, IP and future cluster ranges." in text
+    assert "The allocation grid sets VMID, IP and future cluster ranges." in text
 
 
 def test_setup_wizard_finds_first_free_vmid_cluster_wide():
     text = _wizard_text()
     assert 'pvesh get /cluster/resources --type vm --output-format json' in text
     assert "used_vmids=$(printf '%s\\n' \"$cluster_vms\"" in text
-    assert 'while printf \'%s\\n\' "$used_vmids" | grep -qx "$candidate"; do' in text
+    assert "guess_free_vmid_block()" in text
+    assert "guess_free_ip_block()" in text
+    assert 'guess_free_ip_block "${detected_host:-}" "$total_ips"' in text
 
 
 def test_setup_wizard_auto_selects_management_ip_using_ping_probe():
     text = _wizard_text()
     assert "guess_free_management_ip()" in text
     assert 'if ping -c 1 -W 1 "$candidate" >/dev/null 2>&1; then' in text
-    assert 'free_management_ip=$(guess_free_management_ip "${detected_host:-}" || true)' in text
-    assert 'CLOUD_INIT_IP="${free_management_ip:-192.168.1.50}"' in text
+    assert 'guess_free_ip_block()' in text
+    assert 'CLOUD_INIT_IP="${cluster_block_ip:-192.168.1.50}"' in text
 
 
 def test_setup_wizard_generates_proxmox_api_password_without_prompting():
@@ -150,6 +160,18 @@ def test_setup_wizard_prints_proxmox_api_credentials():
     text = _wizard_text()
     assert 'echo "Proxmox API user: ${PROXMOX_USER}"' in text
     assert 'echo "Proxmox API password: ${PROXMOX_PASSWORD}"' in text
+    assert 'echo "Cluster VIP: ${VIP_IP}"' in text
+    assert 'echo "Cluster start VMID: ${CLUSTER_START_VMID}"' in text
+    assert 'echo "Cluster start IP: ${CLUSTER_START_IP}"' in text
+
+
+def test_setup_wizard_builds_editable_cluster_allocation_grid():
+    text = _wizard_text()
+    assert "build_cluster_allocation_rows()" in text
+    assert "render_cluster_allocation_table()" in text
+    assert "edit_cluster_allocation_table()" in text
+    assert 'collect_cluster_allocation "${MGT_ID}" "${CLOUD_INIT_IP}" "${CLOUD_INIT_NETMASK}" "${CLOUD_INIT_GATEWAY}" "${CLOUD_INIT_DNS_IP}" "${CLUSTER_CONTROLPLANE_COUNT}" "${CLUSTER_WORKER_COUNT}" cluster_vmids cluster_names cluster_ips cluster_subnets cluster_gateways cluster_dns cluster_roles' in text
+    assert 'msg_box "Cluster Allocation" "Review the proposed allocation grid.' in text
 
 
 def test_setup_wizard_uses_host_cpu_type_by_default():

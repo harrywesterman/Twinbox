@@ -27,6 +27,7 @@ EXISTING_VM_NAMES=()
 EXISTING_SNIPPETS=()
 EXISTING_USER_PRESENT=0
 EXISTING_ROLE_PRESENT=0
+allocation_file=""
 
 header_info() {
   clear
@@ -49,6 +50,10 @@ status_update() { echo -e " ${HOLD} ${YW}[$(date '+%H:%M:%S')] $1${CL}" >&2; }
 
 cleanup_after_run() {
   local exit_code=$?
+
+  if [[ -n "${allocation_file:-}" && -f "$allocation_file" ]]; then
+    rm -f "$allocation_file"
+  fi
 
   if [[ "$exit_code" -eq 0 ]]; then
     return
@@ -415,6 +420,146 @@ guess_free_management_ip() {
   return 1
 }
 
+is_valid_ipv4() {
+  local value="$1"
+  local part=""
+  local -a parts=()
+
+  IFS='.' read -r -a parts <<<"$value"
+  if [[ "${#parts[@]}" -ne 4 ]]; then
+    return 1
+  fi
+
+  for part in "${parts[@]}"; do
+    if ! [[ "$part" =~ ^[0-9]+$ ]]; then
+      return 1
+    fi
+    if (( part < 0 || part > 255 )); then
+      return 1
+    fi
+  done
+
+  return 0
+}
+
+trim_value() {
+  local value="$1"
+
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  echo "$value"
+}
+
+ip_to_int() {
+  local a b c d
+  IFS='.' read -r a b c d <<<"$1"
+  echo "$(( (a << 24) + (b << 16) + (c << 8) + d ))"
+}
+
+int_to_ip() {
+  local value="$1"
+  echo "$(( (value >> 24) & 255 )).$(( (value >> 16) & 255 )).$(( (value >> 8) & 255 )).$(( value & 255 ))"
+}
+
+guess_free_vmid_block() {
+  local block_size="$1"
+  local cluster_vms=""
+  local used_vmids=""
+  local -A used_map=()
+  local candidate=100
+  local offset=0
+  local vmid=""
+
+  cluster_vms=$(pvesh get /cluster/resources --type vm --output-format json 2>/dev/null || true)
+  if [[ -n "$cluster_vms" ]]; then
+    used_vmids=$(printf '%s\n' "$cluster_vms" \
+      | grep -Eo '"vmid"[[:space:]]*:[[:space:]]*[0-9]+' \
+      | grep -Eo '[0-9]+' \
+      | sort -n \
+      | uniq)
+  else
+    used_vmids=$(qm list 2>/dev/null | awk 'NR>1 {print $1}' | sort -n | uniq || true)
+  fi
+
+  while IFS= read -r vmid; do
+    [[ -n "$vmid" ]] || continue
+    used_map["$vmid"]=1
+  done <<<"$used_vmids"
+
+  while [[ "$candidate" -le 999999 ]]; do
+    offset=0
+    while [[ "$offset" -lt "$block_size" ]]; do
+      if [[ -n "${used_map[$((candidate + offset))]:-}" ]]; then
+        break
+      fi
+      offset=$((offset + 1))
+    done
+
+    if [[ "$offset" -eq "$block_size" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+
+    candidate=$((candidate + 1))
+  done
+
+  return 1
+}
+
+guess_free_ip_block() {
+  local host_ip="$1"
+  local block_size="$2"
+  local first=""
+  local second=""
+  local third=""
+  local fourth=""
+  local candidate_octet=50
+  local offset=0
+  local candidate_ip=""
+
+  if [[ -z "${host_ip:-}" ]]; then
+    echo "192.168.1.50"
+    return 0
+  fi
+
+  IFS='.' read -r first second third fourth <<<"$host_ip"
+  if [[ -z "$first" || -z "$second" || -z "$third" || -z "$fourth" ]]; then
+    echo "192.168.1.50"
+    return 0
+  fi
+  if ! [[ "$first" =~ ^[0-9]+$ && "$second" =~ ^[0-9]+$ && "$third" =~ ^[0-9]+$ && "$fourth" =~ ^[0-9]+$ ]]; then
+    echo "192.168.1.50"
+    return 0
+  fi
+
+  while [[ "$candidate_octet" -le 254 ]]; do
+    if (( candidate_octet + block_size - 1 > 254 )); then
+      break
+    fi
+
+    offset=0
+    while [[ "$offset" -lt "$block_size" ]]; do
+      candidate_ip="${first}.${second}.${third}.$((candidate_octet + offset))"
+      if [[ "$candidate_ip" == "$host_ip" ]]; then
+        break
+      fi
+      if ping -c 1 -W 1 "$candidate_ip" >/dev/null 2>&1; then
+        break
+      fi
+      offset=$((offset + 1))
+    done
+
+    if [[ "$offset" -eq "$block_size" ]]; then
+      echo "${first}.${second}.${third}.${candidate_octet}"
+      return 0
+    fi
+
+    candidate_octet=$((candidate_octet + 1))
+  done
+
+  echo "${first}.${second}.${third}.50"
+}
+
 cidr_to_netmask() {
   local cidr="$1"
   local i octet mask=""
@@ -502,25 +647,35 @@ apply_educated_defaults() {
   local detected_host
   local detected_prefix
   local detected_gateway
-  local free_management_ip
+  local cluster_block_vmid
+  local cluster_block_ip
+  local total_vmids
+  local total_ips
 
   detected_host=$(hostname -I | awk '{print $1}')
   detected_prefix=$(ip -o -f inet addr show scope global | awk 'NR==1 {split($4, a, "/"); print a[2]}')
   detected_gateway=$(ip route | awk '/^default/ {print $3; exit}')
   detected_dns_ip=$(awk '/^nameserver / {print $2; exit}' /etc/resolv.conf)
-  free_management_ip=$(guess_free_management_ip "${detected_host:-}" || true)
   guessed_bridge=$(guess_bridge_interface || true)
   guessed_ssh_key=$(guess_ssh_public_key || true)
 
   set_cluster_naming_defaults
-  MGT_ID=$(guess_next_vmid)
+  CLUSTER_NAME="${CLUSTER_SLUG}"
+  CLUSTER_CONTROLPLANE_COUNT="1"
+  CLUSTER_WORKER_COUNT="2"
+  total_vmids=$((1 + CLUSTER_CONTROLPLANE_COUNT + CLUSTER_WORKER_COUNT))
+  total_ips=$((2 + CLUSTER_CONTROLPLANE_COUNT + CLUSTER_WORKER_COUNT))
+  cluster_block_vmid=$(guess_free_vmid_block "$total_vmids" || true)
+  cluster_block_ip=$(guess_free_ip_block "${detected_host:-}" "$total_ips" || true)
+
+  MGT_ID="${cluster_block_vmid:-$(guess_next_vmid)}"
   MGT_RAM="4096"
   MGT_CORES="2"
   MGT_CPU_TYPE="host"
   MGT_DISK="40"
   BRIDGE_IF="${guessed_bridge:-vmbr0}"
   CLOUD_INIT_PASSWORD=""
-  CLOUD_INIT_IP="${free_management_ip:-192.168.1.50}"
+  CLOUD_INIT_IP="${cluster_block_ip:-192.168.1.50}"
   CLOUD_INIT_NETMASK="$(cidr_to_netmask "${detected_prefix:-24}")"
   CLOUD_INIT_GATEWAY="${detected_gateway:-192.168.1.1}"
   CLOUD_INIT_DNS_DOMAIN="localdomain"
@@ -631,7 +786,6 @@ create_proxmox_api_user() {
 collect_manual_overrides() {
   if review_management_settings; then
     input_box "Management VM" "Management VM name (name shown in Proxmox UI)" "$MGT_NAME" MGT_NAME
-    input_box "Management VM" "Management VM ID (unique VMID in Proxmox)" "$MGT_ID" MGT_ID
     input_box "Management VM" "Management VM RAM (MB) for manager services" "$MGT_RAM" MGT_RAM
     input_box "Management VM" "Management VM CPU cores for manager services" "$MGT_CORES" MGT_CORES
     input_box "Management VM" "Management VM CPU type (use host or x86-64-v2-AES for latest talosctl)" "$MGT_CPU_TYPE" MGT_CPU_TYPE
@@ -641,11 +795,6 @@ collect_manual_overrides() {
 
   if review_cloud_init_settings; then
     input_box "Cloud-Init" "SSH public key (used for initial SSH access)" "$SSH_KEY" SSH_KEY
-    input_box "Cloud-Init" "DNS search domain (search domain used in /etc/resolv.conf)" "$CLOUD_INIT_DNS_DOMAIN" CLOUD_INIT_DNS_DOMAIN
-    input_box "Cloud-Init" "DNS server IP (resolver IP for management VM)" "$CLOUD_INIT_DNS_IP" CLOUD_INIT_DNS_IP
-    input_box "Cloud-Init" "Static IPv4 address (management VM)" "$CLOUD_INIT_IP" CLOUD_INIT_IP
-    input_box "Cloud-Init" "Netmask (for example 255.255.255.0)" "$CLOUD_INIT_NETMASK" CLOUD_INIT_NETMASK
-    input_box "Cloud-Init" "Default route (gateway)" "$CLOUD_INIT_GATEWAY" CLOUD_INIT_GATEWAY
   fi
 
   if review_manager_env_settings; then
@@ -664,7 +813,7 @@ collect_manual_overrides() {
 }
 
 review_management_settings() {
-  if whiptail --yesno "Management VM settings\n\nName: $MGT_NAME\nVMID: $MGT_ID\nRAM: ${MGT_RAM}MB\nCPU cores: $MGT_CORES\nCPU type: $MGT_CPU_TYPE\nDisk: ${MGT_DISK}GB\nBridge: $BRIDGE_IF\n\nEdit this group?" 20 78 --title "Management VM"; then
+  if whiptail --yesno "Management VM settings\n\nName: $MGT_NAME\nRAM: ${MGT_RAM}MB\nCPU cores: $MGT_CORES\nCPU type: $MGT_CPU_TYPE\nDisk: ${MGT_DISK}GB\nBridge: $BRIDGE_IF\n\nThe allocation grid sets VMID, IP and future cluster ranges.\n\nEdit this group?" 22 78 --title "Management VM"; then
     return 0
   fi
   return 1
@@ -676,7 +825,7 @@ review_cloud_init_settings() {
     ssh_key_detected="yes"
   fi
 
-  if whiptail --yesno "Cloud-Init settings\n\nUser: $CLOUD_INIT_USER\nDNS domain: $CLOUD_INIT_DNS_DOMAIN\nDNS server: $CLOUD_INIT_DNS_IP\nStatic IP: $CLOUD_INIT_IP\nNetmask: $CLOUD_INIT_NETMASK\nGateway: $CLOUD_INIT_GATEWAY\nSSH key detected: ${ssh_key_detected}\n\nEdit this group?" 22 78 --title "Cloud-Init"; then
+  if whiptail --yesno "Cloud-Init settings\n\nUser: $CLOUD_INIT_USER\nSSH key detected: ${ssh_key_detected}\n\nThe allocation grid fills the management VM network fields.\n\nEdit this group?" 18 78 --title "Cloud-Init"; then
     return 0
   fi
   return 1
@@ -689,14 +838,263 @@ review_manager_env_settings() {
   return 1
 }
 
+build_cluster_allocation_rows() {
+  local -n _rows_roles="$1"
+  local -n _rows_vmids="$2"
+  local -n _rows_names="$3"
+  local -n _rows_ips="$4"
+  local -n _rows_subnets="$5"
+  local -n _rows_gateways="$6"
+  local -n _rows_dns="$7"
+  local base_vmid="$8"
+  local base_ip="$9"
+  local subnet="${10}"
+  local gateway="${11}"
+  local dns="${12}"
+  local cp_count="${13}"
+  local worker_count="${14}"
+  local index=0
+  local next_vmid="$base_vmid"
+  local next_ip_int
+  local next_ip=""
+  local role=""
+
+  next_ip_int=$(ip_to_int "$base_ip")
+
+  _rows_roles=()
+  _rows_vmids=()
+  _rows_names=()
+  _rows_ips=()
+  _rows_subnets=()
+  _rows_gateways=()
+  _rows_dns=()
+
+  _rows_roles+=("management")
+  _rows_vmids+=("$next_vmid")
+  _rows_names+=("${MGT_NAME}")
+  _rows_ips+=("$base_ip")
+  _rows_subnets+=("$subnet")
+  _rows_gateways+=("$gateway")
+  _rows_dns+=("$dns")
+
+  next_ip_int=$((next_ip_int + 1))
+  next_ip=$(int_to_ip "$next_ip_int")
+  _rows_roles+=("vip")
+  _rows_vmids+=("")
+  _rows_names+=("twinbox-vip")
+  _rows_ips+=("$next_ip")
+  _rows_subnets+=("$subnet")
+  _rows_gateways+=("$gateway")
+  _rows_dns+=("$dns")
+
+  next_vmid=$((next_vmid + 1))
+  next_ip_int=$((next_ip_int + 1))
+
+  for ((index = 1; index <= cp_count; index++)); do
+    role="twinbox-cp-${index}"
+    _rows_roles+=("controlplane-${index}")
+    next_ip=$(int_to_ip "$next_ip_int")
+    _rows_vmids+=("$next_vmid")
+    _rows_names+=("$role")
+    _rows_ips+=("$next_ip")
+    _rows_subnets+=("$subnet")
+    _rows_gateways+=("$gateway")
+    _rows_dns+=("$dns")
+    next_vmid=$((next_vmid + 1))
+    next_ip_int=$((next_ip_int + 1))
+  done
+
+  for ((index = 1; index <= worker_count; index++)); do
+    role="twinbox-worker-${index}"
+    _rows_roles+=("worker-${index}")
+    next_ip=$(int_to_ip "$next_ip_int")
+    _rows_vmids+=("$next_vmid")
+    _rows_names+=("$role")
+    _rows_ips+=("$next_ip")
+    _rows_subnets+=("$subnet")
+    _rows_gateways+=("$gateway")
+    _rows_dns+=("$dns")
+    next_vmid=$((next_vmid + 1))
+    next_ip_int=$((next_ip_int + 1))
+  done
+}
+
+render_cluster_allocation_table() {
+  local -n _rows_roles="$1"
+  local -n _rows_vmids="$2"
+  local -n _rows_names="$3"
+  local -n _rows_ips="$4"
+  local -n _rows_subnets="$5"
+  local -n _rows_gateways="$6"
+  local -n _rows_dns="$7"
+  local output=""
+  local i=""
+
+  output+="role | vmid | name | ip | subnet | gateway | dns\n"
+  output+="----- | ---- | ---- | -- | ------ | ------- | ---\n"
+
+  for i in "${!_rows_names[@]}"; do
+    output+="${_rows_roles[$i]} | ${_rows_vmids[$i]:--} | ${_rows_names[$i]} | ${_rows_ips[$i]} | ${_rows_subnets[$i]} | ${_rows_gateways[$i]} | ${_rows_dns[$i]}\n"
+  done
+
+  printf '%b' "$output"
+}
+
+edit_cluster_allocation_table() {
+  local title="$1"
+  local rows_file=""
+  local -n _rows_roles="$2"
+  local -n _rows_vmids="$3"
+  local -n _rows_names="$4"
+  local -n _rows_ips="$5"
+  local -n _rows_subnets="$6"
+  local -n _rows_gateways="$7"
+  local -n _rows_dns="$8"
+  local row_count="${#_rows_names[@]}"
+  local form_height=$((row_count + 2))
+  local form_width=120
+  local prompt="Edit the proposed allocation grid.\n\nColumns: vmid, name, ip, subnet, gateway, dns\nLeave a vmid blank for rows that are not actual VMs."
+  local form_output=""
+  local -a form_args=()
+  local i=0
+  local base_y=1
+  local row_y=0
+  local spec_y=0
+  local spec_x=0
+
+  form_args=(--form "$prompt" "$((form_height + 8))" "$form_width" "$form_height")
+  for ((i = 0; i < row_count; i++)); do
+    row_y=$((base_y + i))
+    spec_y="$row_y"
+    spec_x=1
+    form_args+=("VMID" "$spec_y" "$spec_x" "${_rows_vmids[$i]:--}" "$spec_y" 7 8 8)
+    form_args+=("NAME" "$spec_y" 18 "${_rows_names[$i]}" "$spec_y" 24 18 32)
+    form_args+=("IP" "$spec_y" 46 "${_rows_ips[$i]}" "$spec_y" 49 16 16)
+    form_args+=("SUBNET" "$spec_y" 66 "${_rows_subnets[$i]}" "$spec_y" 73 16 16)
+    form_args+=("GATEWAY" "$spec_y" 86 "${_rows_gateways[$i]}" "$spec_y" 94 16 16)
+    form_args+=("DNS" "$spec_y" 107 "${_rows_dns[$i]}" "$spec_y" 111 16 16)
+  done
+
+  form_output=$(whiptail "${form_args[@]}" 3>&1 1>&2 2>&3) || return 1
+
+  allocation_file=$(mktemp)
+  printf '%s\n' "$form_output" > "$allocation_file"
+
+  mapfile -t form_lines < "$allocation_file"
+  if [[ "${#form_lines[@]}" -lt $((row_count * 6)) ]]; then
+    msg_error "Allocation grid returned incomplete data"
+    return 1
+  fi
+
+  for ((i = 0; i < row_count; i++)); do
+    _rows_vmids[$i]=$(trim_value "${form_lines[$((i * 6 + 0))]}")
+    _rows_names[$i]=$(trim_value "${form_lines[$((i * 6 + 1))]}")
+    _rows_ips[$i]=$(trim_value "${form_lines[$((i * 6 + 2))]}")
+    _rows_subnets[$i]=$(trim_value "${form_lines[$((i * 6 + 3))]}")
+    _rows_gateways[$i]=$(trim_value "${form_lines[$((i * 6 + 4))]}")
+    _rows_dns[$i]=$(trim_value "${form_lines[$((i * 6 + 5))]}")
+  done
+}
+
+collect_cluster_allocation() {
+  local base_vmid="$1"
+  local base_ip="$2"
+  local subnet="$3"
+  local gateway="$4"
+  local dns="$5"
+  local cp_count="$6"
+  local worker_count="$7"
+  local -n _rows_vmids="$8"
+  local -n _rows_names="$9"
+  local -n _rows_ips="${10}"
+  local -n _rows_subnets="${11}"
+  local -n _rows_gateways="${12}"
+  local -n _rows_dns="${13}"
+  local -n _rows_roles="${14}"
+
+  build_cluster_allocation_rows _rows_roles _rows_vmids _rows_names _rows_ips _rows_subnets _rows_gateways _rows_dns \
+    "$base_vmid" "$base_ip" "$subnet" "$gateway" "$dns" "$cp_count" "$worker_count"
+
+  msg_box "Cluster Allocation" "Review the proposed allocation grid.\n\nIt reserves a contiguous VMID/IP block for the management VM, VIP and future Talos nodes.\n\nYou can edit any field before continuing."
+
+  if ! edit_cluster_allocation_table "Cluster Allocation" _rows_roles _rows_vmids _rows_names _rows_ips _rows_subnets _rows_gateways _rows_dns; then
+    exit 1
+  fi
+
+  if [[ -z "${_rows_vmids[0]:-}" || ! "${_rows_vmids[0]}" =~ ^[0-9]+$ ]]; then
+    msg_error "Management VMID must be a number"
+    exit 1
+  fi
+  if [[ -z "${_rows_names[0]:-}" ]]; then
+    msg_error "Management VM name must not be empty"
+    exit 1
+  fi
+  if [[ -z "${_rows_ips[0]:-}" ]]; then
+    msg_error "Management VM IP must not be empty"
+    exit 1
+  fi
+  if ! netmask_to_cidr "${_rows_subnets[0]}" >/dev/null 2>&1; then
+    msg_error "Invalid management VM netmask: ${_rows_subnets[0]}"
+    exit 1
+  fi
+  if ! is_valid_ipv4 "${_rows_ips[0]}"; then
+    msg_error "Invalid management VM IP: ${_rows_ips[0]}"
+    exit 1
+  fi
+  if ! is_valid_ipv4 "${_rows_gateways[0]}"; then
+    msg_error "Invalid gateway IP: ${_rows_gateways[0]}"
+    exit 1
+  fi
+  if ! is_valid_ipv4 "${_rows_dns[0]}"; then
+    msg_error "Invalid DNS server IP: ${_rows_dns[0]}"
+    exit 1
+  fi
+  if ! is_valid_ipv4 "${_rows_ips[1]}"; then
+    msg_error "Invalid VIP IP: ${_rows_ips[1]}"
+    exit 1
+  fi
+
+  for ((i = 2; i < ${#_rows_names[@]}; i++)); do
+    if [[ -z "${_rows_vmids[$i]:-}" || ! "${_rows_vmids[$i]}" =~ ^[0-9]+$ ]]; then
+      msg_error "VMID for row ${i} must be a number"
+      exit 1
+    fi
+    if ! is_valid_ipv4 "${_rows_ips[$i]}"; then
+      msg_error "Invalid IP for row ${i}: ${_rows_ips[$i]}"
+      exit 1
+    fi
+    if ! netmask_to_cidr "${_rows_subnets[$i]}" >/dev/null 2>&1; then
+      msg_error "Invalid subnet for row ${i}: ${_rows_subnets[$i]}"
+      exit 1
+    fi
+    if ! is_valid_ipv4 "${_rows_gateways[$i]}"; then
+      msg_error "Invalid gateway for row ${i}: ${_rows_gateways[$i]}"
+      exit 1
+    fi
+    if ! is_valid_ipv4 "${_rows_dns[$i]}"; then
+      msg_error "Invalid DNS server for row ${i}: ${_rows_dns[$i]}"
+      exit 1
+    fi
+  done
+
+  _rows_vmids[1]=""
+}
+
 start_wizard() {
+  local cluster_vmids=()
+  local cluster_names=()
+  local cluster_ips=()
+  local cluster_subnets=()
+  local cluster_gateways=()
+  local cluster_dns=()
+  local cluster_roles=()
   header_info
   choose_cluster_slug
   apply_educated_defaults
   handle_existing_cluster_conflict
 
   header_info
-  msg_box "Twinbox Setup" "This wizard creates only the Management VM for cluster '${CLUSTER_SLUG}'.\n\nIt defaults to educated guesses and groups advanced values into 3 sections:\n- Management VM sizing/network\n- Cloud-Init access/network\n- Manager API/runtime settings\n\nYou can review each group and edit only what you need."
+  msg_box "Twinbox Setup" "This wizard creates only the Management VM for cluster '${CLUSTER_SLUG}'.\n\nIt starts with a smart allocation grid for the management VM, VIP and future Talos nodes, then groups the remaining settings into:\n- Management VM sizing\n- Cloud-Init access\n- Manager API/runtime settings\n\nYou can review each group and edit only what you need."
 
   if whiptail --yesno "Use recommended settings with educated guesses?" 10 78; then
     :
@@ -712,19 +1110,27 @@ start_wizard() {
     exit 1
   fi
 
-  password_box "Cloud-Init" "Twinbox login password" CLOUD_INIT_PASSWORD
-  input_box "Cloud-Init" "Static IPv4 address (management VM)" "$CLOUD_INIT_IP" CLOUD_INIT_IP
-  input_box "Cloud-Init" "Netmask (for example 255.255.255.0)" "$CLOUD_INIT_NETMASK" CLOUD_INIT_NETMASK
-  input_box "Cloud-Init" "Default route (gateway)" "$CLOUD_INIT_GATEWAY" CLOUD_INIT_GATEWAY
+  collect_cluster_allocation "${MGT_ID}" "${CLOUD_INIT_IP}" "${CLOUD_INIT_NETMASK}" "${CLOUD_INIT_GATEWAY}" "${CLOUD_INIT_DNS_IP}" "${CLUSTER_CONTROLPLANE_COUNT}" "${CLUSTER_WORKER_COUNT}" cluster_vmids cluster_names cluster_ips cluster_subnets cluster_gateways cluster_dns cluster_roles
 
+  MGT_ID="${cluster_vmids[0]}"
+  MGT_NAME="${cluster_names[0]}"
+  CLOUD_INIT_IP="${cluster_ips[0]}"
+  CLOUD_INIT_NETMASK="${cluster_subnets[0]}"
+  CLOUD_INIT_GATEWAY="${cluster_gateways[0]}"
+  CLOUD_INIT_DNS_IP="${cluster_dns[0]}"
+  VIP_IP="${cluster_ips[1]}"
+  CLUSTER_START_VMID="${cluster_vmids[2]}"
+  CLUSTER_START_IP="${cluster_ips[2]}"
   CLOUD_INIT_CIDR=$(netmask_to_cidr "$CLOUD_INIT_NETMASK") || {
     msg_error "Invalid netmask: ${CLOUD_INIT_NETMASK}"
     exit 1
   }
 
+  password_box "Cloud-Init" "Twinbox login password" CLOUD_INIT_PASSWORD
+
   msg_box "Security Notice" "Phase 1 is LAN-only and stores Proxmox credentials in ${TWINBOX_TARGET_DIR}/.env on the management VM.\n\nUse a dedicated Proxmox automation account and rotate credentials regularly."
 
-  if whiptail --yesno "Proceed with installation?\n\nCluster: ${CLUSTER_SLUG}\nVM Name: $MGT_NAME\nVM ID: $MGT_ID\nCPU type: $MGT_CPU_TYPE\nBridge: $BRIDGE_IF\nCloud-Init user: $CLOUD_INIT_USER\nDNS: ${CLOUD_INIT_DNS_IP} (${CLOUD_INIT_DNS_DOMAIN})\nRepo: ${GITHUB_REPO}\nTarget dir: ${TWINBOX_TARGET_DIR}\nAuto-start manager stack: yes" 21 78; then
+  if whiptail --yesno "Proceed with installation?\n\nCluster: ${CLUSTER_SLUG}\nVM Name: $MGT_NAME\nVM ID: $MGT_ID\nCPU type: $MGT_CPU_TYPE\nBridge: $BRIDGE_IF\nManagement IP: $CLOUD_INIT_IP\nVIP: $VIP_IP\nFuture Talos start VMID: $CLUSTER_START_VMID\nFuture Talos start IP: $CLUSTER_START_IP\nCloud-Init user: $CLOUD_INIT_USER\nDNS: ${CLOUD_INIT_DNS_IP} (${CLOUD_INIT_DNS_DOMAIN})\nRepo: ${GITHUB_REPO}\nTarget dir: ${TWINBOX_TARGET_DIR}\nAuto-start manager stack: yes" 24 78; then
     create_proxmox_api_user
     create_management_vm
     print_next_steps
@@ -798,6 +1204,14 @@ write_files:
       KUBECTL_VERSION=${KUBECTL_VERSION}
       HELM_VERSION=${HELM_VERSION}
       TWINBOX_IMAGE_TAG=${TWINBOX_IMAGE_TAG}
+      CLUSTER_NAME=${CLUSTER_NAME}
+      CLUSTER_CONTROLPLANE_COUNT=${CLUSTER_CONTROLPLANE_COUNT}
+      CLUSTER_WORKER_COUNT=${CLUSTER_WORKER_COUNT}
+      MANAGEMENT_VM_ID=${MGT_ID}
+      MANAGEMENT_VM_IP=${CLOUD_INIT_IP}
+      VIP_IP=${VIP_IP}
+      CLUSTER_START_VMID=${CLUSTER_START_VMID}
+      CLUSTER_START_IP=${CLUSTER_START_IP}
 runcmd:
   - install -m 0755 -d /etc/apt/keyrings
   - systemctl enable --now qemu-guest-agent
@@ -1013,6 +1427,14 @@ print_next_steps() {
     echo "When it is known, open: http://<management-vm-ip>:3000"
     echo "You can leave this screen."
   fi
+  echo "Login user: ${CLOUD_INIT_USER}"
+  echo "Login password: ${CLOUD_INIT_PASSWORD}"
+  echo "Proxmox API user: ${PROXMOX_USER}"
+  echo "Proxmox API password: ${PROXMOX_PASSWORD}"
+  echo "Cluster VIP: ${VIP_IP}"
+  echo "Cluster start VMID: ${CLUSTER_START_VMID}"
+  echo "Cluster start IP: ${CLUSTER_START_IP}"
+  echo "If needed, edit ${TWINBOX_TARGET_DIR}/.env and run: cd ${TWINBOX_TARGET_DIR} && docker compose up -d"
   echo
 }
 
