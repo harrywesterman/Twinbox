@@ -1242,32 +1242,21 @@ prepare_completion_message() {
 
 run_installation_flow() {
   local install_exit=0
-  local install_pid=0
-  local log_output=""
 
-  (
-    set -e
-    WIZARD_LOG_FILE=""
+  set +e
+  {
     LIVE_LOG_MODE=1
     log_event "Twinbox is building the cluster environment."
     create_proxmox_api_user
     create_management_vm
     prepare_completion_message
-  ) >"$WIZARD_LOG_FILE" 2>&1 &
-  install_pid=$!
-
-  while kill -0 "$install_pid" 2>/dev/null; do
-    log_output=$(tail -n 12 "$WIZARD_LOG_FILE" 2>/dev/null || true)
-    whiptail --backtitle "$BACKTITLE" --title "Twinbox" --infobox "Twinbox is building the cluster environment.\n\n${log_output}" 20 78
-    sleep 1
-  done
-
-  if wait "$install_pid"; then
-    install_exit=0
-  else
-    install_exit=$?
-  fi
+  } 2>&1 | dialog \
+    --backtitle "$BACKTITLE" \
+    --title "Twinbox" \
+    --programbox "Twinbox is building the cluster environment." 20 78
+  install_exit=${PIPESTATUS[0]}
   LIVE_LOG_MODE=0
+  set -e
 
   if [[ "$install_exit" -ne 0 ]]; then
     exit "$install_exit"

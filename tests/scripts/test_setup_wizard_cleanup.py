@@ -103,13 +103,13 @@ def test_setup_wizard_does_not_block_website_detection_on_ping():
     assert 'wait_for_web_interface "$management_ip"' in prepare_body
 
 
-def test_setup_wizard_persists_completion_message_across_background_install_flow():
+def test_setup_wizard_persists_completion_message_across_programbox_install_flow():
     text = _wizard_text()
     flow_body = text.split("run_installation_flow() {", 1)[1].split("print_next_steps()", 1)[0]
     assert flow_body.count("prepare_completion_message") == 1
-    assert 'install_pid=$!' in flow_body
-    assert 'while kill -0 "$install_pid" 2>/dev/null; do' in flow_body
-    assert 'if wait "$install_pid"; then' in flow_body
+    assert 'set +e' in flow_body
+    assert '} 2>&1 | dialog \\' in flow_body
+    assert 'install_exit=${PIPESTATUS[0]}' in flow_body
     assert 'if [[ "$install_exit" -ne 0 ]]; then' in flow_body
     assert 'MANAGEMENT_WEB_URL=$(tr -d \'\\r\' <"$completion_state_file")' in flow_body
     assert 'FINAL_COMPLETION_MESSAGE="Twinbox URL: ${MANAGEMENT_WEB_URL}"' in flow_body
@@ -244,9 +244,9 @@ def test_setup_wizard_shows_runtime_progress_feedback():
     text = _wizard_text()
     assert "LIVE_LOG_MODE=0" in text
     assert "run_installation_flow()" in text
-    assert '--programbox "Twinbox is building the cluster environment."' not in text
-    assert 'whiptail --backtitle "$BACKTITLE" --title "Twinbox" --infobox "Twinbox is building the cluster environment.\\n\\n${log_output}" 20 78' in text
-    assert 'while kill -0 "$install_pid" 2>/dev/null; do' in text
+    assert '--programbox "Twinbox is building the cluster environment." 20 78' in text
+    assert 'whiptail --backtitle "$BACKTITLE" --title "Twinbox" --infobox "Twinbox is building the cluster environment.\\n\\n${log_output}" 20 78' not in text
+    assert 'while kill -0 "$install_pid" 2>/dev/null; do' not in text
     assert "progress_update()" in text
     assert "run_apply_educated_defaults_with_gauge()" in text
     assert '--gauge "Checking network and free addresses"' in text
@@ -386,8 +386,8 @@ def test_setup_wizard_switches_to_live_install_log_after_password():
     assert 'create_proxmox_api_user' in text
     assert 'create_management_vm' in text
     flow_body = text.split("run_installation_flow() {", 1)[1].split("print_next_steps()", 1)[0]
-    assert "set +e" not in flow_body
-    assert "(\n    set -e" in flow_body
+    assert "set +e" in flow_body
+    assert "(\n    set -e" not in flow_body
 
 
 def test_setup_wizard_surfaces_friendly_proxmox_storage_errors():
