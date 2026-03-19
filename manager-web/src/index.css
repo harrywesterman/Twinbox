@@ -1,11 +1,40 @@
 :root {
-  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+  color-scheme: light;
+  --ink-1: #0f172a;
+  --ink-soft: #334155;
+  --ink-muted: #64748b;
+  --border-subtle: rgba(148, 163, 184, 0.2);
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  background: #dbe7f6;
+}
+
 body {
   margin: 0;
+  min-height: 100vh;
+  background: #dbe7f6;
+  color: var(--ink-1);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body,
+button,
+input {
+  font: inherit;
+}
+
+code,
+pre {
+  font-family: "IBM Plex Mono", "SFMono-Regular", "Cascadia Code", monospace;
+}
+
+#root {
+  min-height: 100vh;
 }
