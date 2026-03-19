@@ -5,24 +5,23 @@ import { readFile } from 'node:fs/promises';
 const appSourcePath = new URL('../src/App.jsx', import.meta.url);
 const appStylesPath = new URL('../src/App.css', import.meta.url);
 
-test('app source defines a hero, dashboard grid, and detached log panel', async () => {
+test('app source defines the mission control header, rail, workspace, and activity panels', async () => {
   const source = await readFile(appSourcePath, 'utf8');
 
-  assert.match(source, /className="hero"/, 'expected a hero section for control-plane context');
-  assert.match(source, /className="dashboard-grid"/, 'expected a dedicated dashboard grid for the main cards');
-  assert.match(source, /className="card log-panel"/, 'expected logs to render in a dedicated full-width panel');
-
-  const dashboardIndex = source.indexOf('className="dashboard-grid"');
-  const logPanelIndex = source.indexOf('className="card log-panel"');
-
-  assert.ok(dashboardIndex >= 0, 'expected dashboard grid markup');
-  assert.ok(logPanelIndex > dashboardIndex, 'expected log panel to render after the dashboard grid');
+  assert.match(source, /className="global-header"/, 'expected a global header for install progress and health');
+  assert.match(source, /className="journey-rail"/, 'expected a dedicated phase rail');
+  assert.match(source, /className="workspace-panel"/, 'expected a central active-step workspace');
+  assert.match(source, /className="activity-panel"/, 'expected a dedicated activity panel');
+  assert.match(source, /journey-rail-toggle/, 'expected a mobile rail toggle control');
+  assert.match(source, /Opslaan en later verder/, 'expected a save-and-resume action');
+  assert.match(source, /Volgende/, 'expected guided next-step navigation');
 });
 
-test('styles define a split dashboard layout and a taller console treatment', async () => {
+test('styles define a three-column mission control grid and responsive rail behavior', async () => {
   const css = await readFile(appStylesPath, 'utf8');
 
-  assert.match(css, /\.dashboard-grid\s*\{[\s\S]*grid-template-columns:/, 'expected dashboard grid columns in CSS');
-  assert.match(css, /\.log-panel pre\s*\{[\s\S]*min-height:\s*320px;/, 'expected taller log console styling');
-  assert.match(css, /@media\s*\(max-width:\s*960px\)/, 'expected a responsive breakpoint for stacked layout');
+  assert.match(css, /\.mission-grid\s*\{[\s\S]*grid-template-columns:/, 'expected mission control columns in CSS');
+  assert.match(css, /\.journey-rail-toggle\s*\{/, 'expected a mobile toggle style for the journey rail');
+  assert.match(css, /\.activity-panel\s*\{/, 'expected styling for the activity panel');
+  assert.match(css, /@media\s*\(max-width:\s*1100px\)/, 'expected a tablet breakpoint for rail and activity rearrangement');
 });
