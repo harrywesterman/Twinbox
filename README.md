@@ -25,6 +25,16 @@ make wizard-dev-run
 
 This uploads only your local `wizard/setup-wizard.sh` to the Proxmox host and runs it over SSH with a TTY. The Management VM still clones the repository from GitHub afterward.
 
+For normal `manager-web` iteration before commit/push, use the Management VM preview workflow:
+
+```bash
+cp .env.vm-preview.local.example .env.vm-preview.local
+# set TWINBOX_VM_PREVIEW_TARGET and TWINBOX_VM_PREVIEW_REMOTE_DIR
+bash scripts/manager-web-preview.sh
+```
+
+This syncs only your local `manager-web/` to a temporary directory on the Management VM, builds the frontend image there, and recreates only `manager-web`. The remote git checkout stays untouched. Full workflow: `docs/vm-dev.md`
+
 ### 2. Open endpoints
 
 - UI: `http://<management-vm-ip>:3000`
@@ -70,6 +80,7 @@ HELM_VERSION=v3.15.4
 - `manager-api/`: REST API and job metadata handling.
 - `manager-worker/`: Async job runner.
 - `scripts/manager/`: Provisioning/bootstrap scripts bundled into the worker image.
+- `scripts/manager-web-preview.sh`: Preview local frontend changes on the Management VM without a Git push.
 - `docs/`: Operational documentation.
 
 ## Publishing Images
