@@ -49,7 +49,10 @@ ls -la manager-data/queue/running
 
 ## Worker Job Fails Immediately
 
-The worker image includes required runtime tools (`bash`, `curl`, `jq`, `talosctl`, `kubectl`, `helm`) and enforces tool versions from `.env` (`TALOSCTL_VERSION`, `KUBECTL_VERSION`, `HELM_VERSION`) at startup.
+The worker image includes required runtime tools (`bash`, `curl`, `jq`, `talosctl`, `kubectl`, `helm`) and enforces tool versions at startup.
+
+- `talosctl` is checked against `config/pinned-defaults.sh`
+- `kubectl` and `helm` are checked against `.env`
 
 If jobs fail immediately, first check worker startup logs for a version mismatch:
 
@@ -61,7 +64,7 @@ docker compose logs manager-worker --tail=200
 
 If you see `tool version mismatch`, either:
 
-1. Update `.env` tool versions to match the pulled image, or
+1. Update `.env` `KUBECTL_VERSION` or `HELM_VERSION` to match the pulled image, or
 2. Switch `TWINBOX_IMAGE_TAG` to an image tag built with your desired tool versions.
 
 ## Worker Fails With x86-64-v2 Error

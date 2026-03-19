@@ -34,8 +34,6 @@ def test_create_talos_vms_requires_proxmox_env():
             "--vip-ip", "192.168.1.50",
             "--proxmox-node", "pve",
             "--storage-pool", "local-lvm",
-            "--iso-storage", "local",
-            "--talos-iso-file", "talos-v1.7.4.iso",
             "--data-dir", td,
         ]
         env = {"PATH": os.environ.get("PATH", "")}
@@ -83,6 +81,15 @@ def test_create_talos_vms_sets_colorful_proxmox_tags():
     assert '--data-urlencode "tags=twinbox;talos;${role_tag};cluster-${CLUSTER_ID}${cluster_scope_tag}"' in text
     assert 'create_vm "$current_vmid" "$vm_name" "controlplane"' in text
     assert 'create_vm "$current_vmid" "$vm_name" "worker"' in text
+
+
+def test_create_talos_vms_uses_pinned_talos_defaults():
+    text = _create_talos_text()
+    assert 'source "$SCRIPT_DIR/../../config/pinned-defaults.sh"' in text
+    assert 'talos_iso_file="talos-${PINNED_TALOS_VERSION}.iso"' in text
+    assert 'ide2=${PINNED_PROXMOX_ISO_STORAGE}:iso/${talos_iso_file},media=cdrom' in text
+    assert "--iso-storage" not in text
+    assert "--talos-iso-file" not in text
 
 
 def test_create_talos_vms_fails_fast_on_proxmox_api_errors():

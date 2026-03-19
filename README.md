@@ -53,13 +53,12 @@ Image tag is controlled by `.env`:
 TWINBOX_IMAGE_TAG=latest
 ```
 
-Tool versions are also pinned in `.env` and used for:
+Management tool versions are configured as follows:
 
-- Management VM host tools (`scripts/install-management-tools.sh`)
-- `manager-worker` image policy check at startup
+- `talosctl` is pinned in `config/pinned-defaults.sh`
+- `kubectl` and `helm` stay configurable in `.env`
 
 ```dotenv
-TALOSCTL_VERSION=v1.7.4
 KUBECTL_VERSION=v1.30.0
 HELM_VERSION=v3.15.4
 ```

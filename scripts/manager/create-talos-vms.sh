@@ -3,12 +3,16 @@ set -euo pipefail
 
 usage() {
   cat <<USAGE
-Usage: $0 --cluster-id ID --name NAME --controlplane-count N --worker-count N --cpu-cores N --memory-mb N --disk-gb N --bridge BR --start-vmid ID --start-ip IP --vip-ip IP --proxmox-node NODE --storage-pool POOL --iso-storage STORE --talos-iso-file FILE --data-dir DIR
+Usage: $0 --cluster-id ID --name NAME --controlplane-count N --worker-count N --cpu-cores N --memory-mb N --disk-gb N --bridge BR --start-vmid ID --start-ip IP --vip-ip IP --proxmox-node NODE --storage-pool POOL --data-dir DIR
 USAGE
 }
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 fail() { log "ERROR: $*"; exit 1; }
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/../../config/pinned-defaults.sh"
 
 required_env=(PROXMOX_HOST PROXMOX_PORT PROXMOX_USER PROXMOX_PASSWORD)
 for var in "${required_env[@]}"; do
@@ -30,8 +34,6 @@ while [[ $# -gt 0 ]]; do
     --vip-ip) VIP_IP="$2"; shift 2 ;;
     --proxmox-node) PROXMOX_NODE="$2"; shift 2 ;;
     --storage-pool) STORAGE_POOL="$2"; shift 2 ;;
-    --iso-storage) ISO_STORAGE="$2"; shift 2 ;;
-    --talos-iso-file) TALOS_ISO_FILE="$2"; shift 2 ;;
     --data-dir) DATA_DIR="$2"; shift 2 ;;
     *) usage; fail "Unknown argument: $1" ;;
   esac
@@ -113,6 +115,7 @@ create_vm() {
   local create_upid=""
   local start_resp=""
   local start_upid=""
+  local talos_iso_file="talos-${PINNED_TALOS_VERSION}.iso"
 
   if [[ -n "${TWINBOX_CLUSTER_SLUG:-}" ]]; then
     cluster_scope_tag=";cluster-${TWINBOX_CLUSTER_SLUG}"
@@ -129,7 +132,7 @@ create_vm() {
     --data-urlencode "net0=virtio,bridge=${BRIDGE}" \
     --data-urlencode "scsihw=virtio-scsi-pci" \
     --data-urlencode "scsi0=${STORAGE_POOL}:${DISK_GB}" \
-    --data-urlencode "ide2=${ISO_STORAGE}:iso/${TALOS_ISO_FILE},media=cdrom" \
+    --data-urlencode "ide2=${PINNED_PROXMOX_ISO_STORAGE}:iso/${talos_iso_file},media=cdrom" \
     --data-urlencode "boot=order=scsi0;ide2" \
     --data-urlencode "ostype=l26")
   create_upid=$(echo "$create_resp" | jq -r '.data // empty')

@@ -12,11 +12,6 @@ permissions:
   contents: read
   packages: write
 
-env:
-  TALOSCTL_VERSION: v1.7.4
-  KUBECTL_VERSION: v1.30.0
-  HELM_VERSION: v3.15.4
-
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -37,6 +32,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Load pinned defaults
+        run: |
+          source config/pinned-defaults.sh
+          echo "PINNED_TALOS_VERSION=${PINNED_TALOS_VERSION}" >> "$GITHUB_ENV"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -65,8 +65,8 @@ jobs:
           file: ${{ matrix.dockerfile }}
           push: true
           build-args: |
-            TALOSCTL_VERSION=${{ env.TALOSCTL_VERSION }}
-            KUBECTL_VERSION=${{ env.KUBECTL_VERSION }}
-            HELM_VERSION=${{ env.HELM_VERSION }}
+            TALOSCTL_VERSION=${{ env.PINNED_TALOS_VERSION }}
+            KUBECTL_VERSION=v1.30.0
+            HELM_VERSION=v3.15.4
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

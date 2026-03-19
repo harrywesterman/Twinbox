@@ -2,6 +2,9 @@
 set -euo pipefail
 
 ENV_FILE="/opt/twinbox/.env"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/../config/pinned-defaults.sh"
 
 usage() {
   cat <<'USAGE'
@@ -45,7 +48,7 @@ set -a
 source "$ENV_FILE"
 set +a
 
-required_vars=(TALOSCTL_VERSION KUBECTL_VERSION HELM_VERSION)
+required_vars=(KUBECTL_VERSION HELM_VERSION)
 for var in "${required_vars[@]}"; do
   [[ -n "${!var:-}" ]] || fail "Missing required variable in ${ENV_FILE}: ${var}"
 done
@@ -80,7 +83,7 @@ ensure_talos_cpu_compatibility() {
   local missing_flags=()
   local flag=""
 
-  talos_version="$(normalize_version "$TALOSCTL_VERSION")"
+  talos_version="$(normalize_version "$PINNED_TALOS_VERSION")"
   if ! version_gte "$talos_version" "1.7.0"; then
     return 0
   fi
@@ -123,7 +126,7 @@ install_talosctl() {
   local checksum_line=""
   local expected_checksum=""
 
-  version="$(normalize_version "$TALOSCTL_VERSION")"
+  version="$(normalize_version "$PINNED_TALOS_VERSION")"
   base_url="https://github.com/siderolabs/talos/releases/download/v${version}"
 
   log "Installing talosctl v${version}"
@@ -215,7 +218,7 @@ verify_versions() {
   kubectl_actual="$(extract_semver "$kubectl_output")"
   helm_actual="$(extract_semver "$helm_output")"
 
-  talos_expected="$(normalize_version "$TALOSCTL_VERSION")"
+  talos_expected="$(normalize_version "$PINNED_TALOS_VERSION")"
   kubectl_expected="$(normalize_version "$KUBECTL_VERSION")"
   helm_expected="$(normalize_version "$HELM_VERSION")"
 

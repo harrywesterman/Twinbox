@@ -72,6 +72,28 @@ function requireEnv(name) {
   return value.trim();
 }
 
+function loadPinnedDefaults() {
+  const file = path.join(workspace, "config", "pinned-defaults.sh");
+  if (!fs.existsSync(file)) {
+    throw new Error(`pinned defaults file not found: ${file}`);
+  }
+
+  const values = {};
+  for (const rawLine of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const [key, ...rest] = line.split("=");
+    if (!key || rest.length === 0) continue;
+    values[key.trim()] = rest.join("=").trim();
+  }
+
+  if (!values.PINNED_TALOS_VERSION) {
+    throw new Error(`missing PINNED_TALOS_VERSION in ${file}`);
+  }
+
+  return values;
+}
+
 function normalizeVersion(value) {
   return value.trim().replace(/^v/, "");
 }
@@ -98,7 +120,8 @@ function runVersionCommand(command, args) {
 }
 
 function ensureToolVersionsMatchPolicy() {
-  const expectedTalosctl = normalizeVersion(requireEnv("TALOSCTL_VERSION"));
+  const pinnedDefaults = loadPinnedDefaults();
+  const expectedTalosctl = normalizeVersion(pinnedDefaults.PINNED_TALOS_VERSION);
   const expectedKubectl = normalizeVersion(requireEnv("KUBECTL_VERSION"));
   const expectedHelm = normalizeVersion(requireEnv("HELM_VERSION"));
 
@@ -146,8 +169,6 @@ async function handleCreate(job) {
       "--vip-ip", cluster.vip_ip,
       "--proxmox-node", cluster.metadata.proxmox_node,
       "--storage-pool", cluster.metadata.storage_pool,
-      "--iso-storage", cluster.metadata.iso_storage,
-      "--talos-iso-file", cluster.metadata.talos_iso_file,
       "--data-dir", dataRoot,
     ],
   );

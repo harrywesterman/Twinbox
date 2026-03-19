@@ -119,6 +119,10 @@ def test_create_cluster_enqueues_job_and_persists_files():
             cluster = json.loads(cluster_file.read_text())
             assert cluster["name"] == "demo"
             assert cluster["status"] == "requested"
+            assert cluster["metadata"] == {
+                "proxmox_node": "pve",
+                "storage_pool": "local-lvm",
+            }
         finally:
             proc.terminate()
             proc.wait(timeout=5)

@@ -273,11 +273,8 @@ app.post("/api/clusters", (req, res) => {
     created_at: now(),
     updated_at: now(),
     metadata: {
-      talos_version: body.talos_version || "v1.7.4",
       proxmox_node: body.proxmox_node || process.env.PROXMOX_NODE || "pve",
       storage_pool: body.storage_pool || process.env.PROXMOX_STORAGE_POOL || "local-lvm",
-      iso_storage: body.iso_storage || process.env.PROXMOX_ISO_STORAGE || "local",
-      talos_iso_file: body.talos_iso_file || process.env.TALOS_ISO_FILE || "talos-v1.7.4.iso",
     },
   };
 

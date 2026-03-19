@@ -23,6 +23,7 @@ RUN apt-get update \
 
 COPY manager-worker/package.json ./manager-worker/package.json
 COPY manager-worker/src ./manager-worker/src
+COPY config ./config
 COPY scripts/manager ./scripts/manager
 
 RUN chmod +x ./scripts/manager/*.sh

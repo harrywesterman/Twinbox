@@ -35,6 +35,14 @@ def _prepare_fake_toolchain(bin_dir: Path):
     )
 
 
+def _write_pinned_defaults(workspace: Path, talos_version: str = "v1.7.4"):
+    config_dir = workspace / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    (config_dir / "pinned-defaults.sh").write_text(
+        f"PINNED_TALOS_VERSION={talos_version}\nPINNED_PROXMOX_ISO_STORAGE=local\n",
+    )
+
+
 def test_worker_processes_pending_job_to_completed():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
@@ -51,6 +59,7 @@ def test_worker_processes_pending_job_to_completed():
             d.mkdir(parents=True, exist_ok=True)
 
         _prepare_fake_toolchain(bin_dir)
+        _write_pinned_defaults(workspace)
 
         # Minimal script to emulate successful VM provisioning.
         create_script = script_dir / "create-talos-vms.sh"
@@ -77,8 +86,6 @@ def test_worker_processes_pending_job_to_completed():
             "metadata": {
                 "proxmox_node": "pve",
                 "storage_pool": "local-lvm",
-                "iso_storage": "local",
-                "talos_iso_file": "talos-v1.7.4.iso",
             },
         }
 
@@ -109,7 +116,6 @@ def test_worker_processes_pending_job_to_completed():
         env["MANAGER_DATA_DIR"] = str(data)
         env["WORKSPACE_ROOT"] = str(workspace)
         env["WORKER_POLL_MS"] = "100"
-        env["TALOSCTL_VERSION"] = "v1.7.4"
         env["KUBECTL_VERSION"] = "v1.30.0"
         env["HELM_VERSION"] = "v3.15.4"
         env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
@@ -150,12 +156,12 @@ def test_worker_exits_on_tool_version_mismatch():
             d.mkdir(parents=True, exist_ok=True)
 
         _prepare_fake_toolchain(bin_dir)
+        _write_pinned_defaults(workspace)
 
         env = os.environ.copy()
         env["MANAGER_DATA_DIR"] = str(data)
         env["WORKSPACE_ROOT"] = str(workspace)
         env["WORKER_POLL_MS"] = "100"
-        env["TALOSCTL_VERSION"] = "v1.7.4"
         env["KUBECTL_VERSION"] = "v1.31.0"
         env["HELM_VERSION"] = "v3.15.4"
         env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"

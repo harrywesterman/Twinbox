@@ -14,6 +14,12 @@ def test_setup_wizard_registers_exit_cleanup_trap():
     assert "trap cleanup_after_run EXIT" in text
 
 
+def test_setup_wizard_cleanup_removes_completion_state_file():
+    text = _wizard_text()
+    assert '[[ -n "${completion_state_file:-}" && -f "$completion_state_file" ]]' in text
+    assert 'rm -f "$completion_state_file"' in text
+
+
 def test_setup_wizard_cleanup_removes_snippet_on_error():
     text = _wizard_text()
     assert '[[ -n "${snippet_file:-}" && -f "$snippet_file" ]]' in text
@@ -52,9 +58,11 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     assert "  - path: /tmp/twinbox-${CLUSTER_SLUG}.env.template" in text
     assert "    owner: root:root" in text
     assert "      TWINBOX_CLUSTER_SLUG=${CLUSTER_SLUG}" in text
-    assert "      TALOSCTL_VERSION=${TALOSCTL_VERSION}" in text
     assert "      KUBECTL_VERSION=${KUBECTL_VERSION}" in text
     assert "      HELM_VERSION=${HELM_VERSION}" in text
+    assert "      TALOSCTL_VERSION=${TALOSCTL_VERSION}" not in text
+    assert "      PROXMOX_ISO_STORAGE=${PROXMOX_ISO_STORAGE}" not in text
+    assert "      TALOS_ISO_FILE=${TALOS_ISO_FILE}" not in text
     assert "  - install -m 0600 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /tmp/twinbox-${CLUSTER_SLUG}.env.template ${TWINBOX_TARGET_DIR}/.env" in text
     assert "  - bash -lc 'cd ${TWINBOX_TARGET_DIR} && chmod +x scripts/install-management-tools.sh && ./scripts/install-management-tools.sh --env-file ${TWINBOX_TARGET_DIR}/.env'" in text
     assert 'qm set "$MGT_ID" --ciuser "$CLOUD_INIT_USER" >/dev/null' in text
@@ -62,22 +70,30 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     assert 'qm set "$MGT_ID" --searchdomain "$CLOUD_INIT_DNS_DOMAIN" >/dev/null' in text
     assert 'qm set "$MGT_ID" --nameserver "$CLOUD_INIT_DNS_IP" >/dev/null' in text
     assert 'qm set "$MGT_ID" --ipconfig0 "ip=${CLOUD_INIT_IP}/${CLOUD_INIT_CIDR},gw=${CLOUD_INIT_GATEWAY}" >/dev/null' in text
-    assert "CLUSTER_NAME=${CLUSTER_NAME}" in text
-    assert "CLUSTER_CONTROLPLANE_COUNT=${CLUSTER_CONTROLPLANE_COUNT}" in text
-    assert "CLUSTER_WORKER_COUNT=${CLUSTER_WORKER_COUNT}" in text
     assert "MANAGEMENT_VM_ID=${MGT_ID}" in text
     assert "MANAGEMENT_VM_IP=${CLOUD_INIT_IP}" in text
-    assert "VIP_IP=${VIP_IP}" in text
-    assert "CLUSTER_START_VMID=${CLUSTER_START_VMID}" in text
-    assert "CLUSTER_START_IP=${CLUSTER_START_IP}" in text
+    assert "CLUSTER_NAME=${CLUSTER_NAME}" not in text
+    assert "CLUSTER_CONTROLPLANE_COUNT=${CLUSTER_CONTROLPLANE_COUNT}" not in text
+    assert "CLUSTER_WORKER_COUNT=${CLUSTER_WORKER_COUNT}" not in text
+    assert "VIP_IP=${VIP_IP}" not in text
+    assert "CLUSTER_START_VMID=${CLUSTER_START_VMID}" not in text
+    assert "CLUSTER_START_IP=${CLUSTER_START_IP}" not in text
 
 
 def test_setup_wizard_discovers_management_vm_ip_via_guest_agent():
     text = _wizard_text()
     assert "discover_management_vm_ip()" in text
     assert 'qm guest cmd "$MGT_ID" network-get-interfaces' in text
-    assert 'management_ip=$(discover_management_vm_ip)' in text
+    assert 'DISCOVERED_MANAGEMENT_IP="$ip"' in text
+    assert 'management_ip="${DISCOVERED_MANAGEMENT_IP:-}"' in text
+    assert 'management_ip=$(discover_management_vm_ip)' not in text
     assert 'wait_for_web_interface "$management_ip"' in text
+
+
+def test_setup_wizard_does_not_exit_when_guest_agent_has_no_ip_yet():
+    text = _wizard_text()
+    discover_body = text.split("discover_management_vm_ip() {", 1)[1].split("wait_for_management_vm_ping()", 1)[0]
+    assert '| head -n1 || true' in discover_body
 
 
 def test_setup_wizard_does_not_block_website_detection_on_ping():
@@ -87,13 +103,34 @@ def test_setup_wizard_does_not_block_website_detection_on_ping():
     assert 'wait_for_web_interface "$management_ip"' in prepare_body
 
 
+def test_setup_wizard_persists_completion_message_across_background_install_flow():
+    text = _wizard_text()
+    flow_body = text.split("run_installation_flow() {", 1)[1].split("print_next_steps()", 1)[0]
+    assert flow_body.count("prepare_completion_message") == 1
+    assert 'install_pid=$!' in flow_body
+    assert 'while kill -0 "$install_pid" 2>/dev/null; do' in flow_body
+    assert 'if wait "$install_pid"; then' in flow_body
+    assert 'if [[ "$install_exit" -ne 0 ]]; then' in flow_body
+    assert 'MANAGEMENT_WEB_URL=$(tr -d \'\\r\' <"$completion_state_file")' in flow_body
+    assert 'FINAL_COMPLETION_MESSAGE="Twinbox URL: ${MANAGEMENT_WEB_URL}"' in flow_body
+
+
 def test_setup_wizard_prints_resolved_urls_when_ip_is_available():
     text = _wizard_text()
     assert 'Open this in your browser:' in text
     assert 'Twinbox management website' not in text
     assert 'MANAGEMENT_WEB_URL="http://${management_ip}:3000"' in text
+    assert 'printf \'%s\\n\' "$MANAGEMENT_WEB_URL" >"$completion_state_file"' in text
+    assert 'log_event "Twinbox URL: ${MANAGEMENT_WEB_URL}"' in text
     assert 'FINAL_COMPLETION_MESSAGE="Twinbox URL: ${MANAGEMENT_WEB_URL}"' in text
     assert 'Open this in your browser:\\n\\n${MANAGEMENT_WEB_URL}' in text
+
+
+def test_setup_wizard_falls_back_to_cloud_init_ip_when_guest_agent_ip_is_empty():
+    text = _wizard_text()
+    prepare_body = text.split("prepare_completion_message() {", 1)[1].split("run_installation_flow()", 1)[0]
+    assert 'management_ip="${management_ip:-$CLOUD_INIT_IP}"' in prepare_body
+    assert 'MANAGEMENT_WEB_URL="http://${management_ip}:3000"' in prepare_body
 
 
 def test_setup_wizard_hides_generated_twinbox_credentials():
@@ -112,7 +149,7 @@ def test_setup_wizard_uses_detected_ssh_key_when_available():
     text = _wizard_text()
     assert "guess_ssh_public_key()" in text
     assert 'if [[ -z "${SSH_KEY:-}" ]]; then' in text
-    assert 'input_box "Twinbox" "SSH public key" "" SSH_KEY' in text
+    assert 'input_box "Twinbox" "SSH public key" "$SSH_KEY" SSH_KEY' in text
 
 
 def test_setup_wizard_asks_manual_questions_without_review_screens():
@@ -134,17 +171,17 @@ def test_setup_wizard_finds_first_free_vmid_cluster_wide():
     text = _wizard_text()
     assert 'pvesh get /cluster/resources --type vm --output-format json' in text
     assert "used_vmids=$(printf '%s\\n' \"$cluster_vms\"" in text
-    assert "guess_free_vmid_block()" in text
-    assert "guess_free_ip_block()" in text
-    assert 'guess_free_ip_block "${detected_host:-}" "$total_ips"' in text
+    assert "guess_next_vmid()" in text
+    assert "guess_free_vmid_block()" not in text
+    assert "guess_free_ip_block()" not in text
 
 
 def test_setup_wizard_auto_selects_management_ip_using_ping_probe():
     text = _wizard_text()
     assert "guess_free_management_ip()" in text
     assert 'if ping -c 1 -W 1 "$candidate" >/dev/null 2>&1; then' in text
-    assert 'guess_free_ip_block()' in text
-    assert 'CLOUD_INIT_IP="${cluster_block_ip:-192.168.1.50}"' in text
+    assert 'guess_free_ip_block()' not in text
+    assert 'CLOUD_INIT_IP="$(guess_free_management_ip "${detected_host:-}" || true)"' in text
 
 
 def test_setup_wizard_generates_proxmox_api_password_without_prompting():
@@ -161,35 +198,24 @@ def test_setup_wizard_does_not_print_proxmox_api_credentials():
     assert 'Proxmox API password: ${PROXMOX_PASSWORD}' not in text
 
 
-def test_setup_wizard_builds_editable_cluster_allocation_grid():
+def test_setup_wizard_collects_single_management_vm_form():
     text = _wizard_text()
-    assert "whiptail_supports_form()" in text
-    assert "dialog_supports_form()" in text
-    assert "edit_cluster_network_settings()" in text
-    assert "edit_cluster_allocation_table_dialog_form()" in text
-    assert "edit_cluster_allocation_table_fallback()" in text
-    assert "build_cluster_allocation_rows()" in text
-    assert "render_cluster_allocation_table()" in text
-    assert "edit_cluster_allocation_table()" in text
-    assert 'if whiptail_supports_form; then' in text
-    assert 'elif dialog_supports_form; then' in text
-    assert 'prompt="Edit the proposed allocation grid.\\n\\nColumns: vmid, name, ip"' in text
-    assert 'form_args=(--stdout --backtitle "$BACKTITLE" --title "$title" --form "$prompt"' in text
-    assert 'form_output=$(dialog "${form_args[@]}") || return 1' in text
-    assert 'input_box "Cluster Network" "Subnet mask"' in text
-    assert 'input_box "Cluster Network" "Gateway"' in text
-    assert 'input_box "Cluster Network" "DNS"' in text
-    assert 'collect_cluster_allocation "${MGT_ID}" "${CLOUD_INIT_IP}" "${CLOUD_INIT_NETMASK}" "${CLOUD_INIT_GATEWAY}" "${CLOUD_INIT_DNS_IP}" "${CLUSTER_CONTROLPLANE_COUNT}" "${CLUSTER_WORKER_COUNT}" cluster_vmids cluster_names cluster_ips cluster_subnets cluster_gateways cluster_dns cluster_roles' in text
-    assert 'msg_box "Cluster Allocation" "Review the proposed allocation grid.' not in text
-    assert 'whiptail build without form support' not in text
-    assert 'input_box "Cluster Allocation" "Row ${i} (${_rows_roles[$i]})\\nvmid|name|ip"' in text
+    assert "build_cluster_allocation_rows()" not in text
+    assert "edit_cluster_allocation_table()" not in text
+    assert "collect_cluster_allocation()" not in text
+    assert 'input_box "Management VM" "Management VM name"' in text
+    assert 'input_box "Management VM" "Management VM IP"' in text
+    assert 'input_box "Management VM" "Netmask"' in text
+    assert 'input_box "Management VM" "DNS server"' in text
+    assert 'input_box "Management VM" "Disk size (GB)"' in text
+    assert 'input_box "Management VM" "Memory (MB)"' in text
 
 
-def test_setup_wizard_uses_cluster_slug_in_vip_and_talos_names():
+def test_setup_wizard_no_longer_generates_vip_or_talos_vm_names():
     text = _wizard_text()
-    assert '_rows_names+=("twinbox-${CLUSTER_SLUG}-vip")' in text
-    assert 'role="twinbox-${CLUSTER_SLUG}-cp-${index}"' in text
-    assert 'role="twinbox-${CLUSTER_SLUG}-worker-${index}"' in text
+    assert '_rows_names+=("twinbox-${CLUSTER_SLUG}-vip")' not in text
+    assert 'role="twinbox-${CLUSTER_SLUG}-cp-${index}"' not in text
+    assert 'role="twinbox-${CLUSTER_SLUG}-worker-${index}"' not in text
 
 
 def test_setup_wizard_avoids_circular_nameref_calls_in_allocation_helpers():
@@ -218,7 +244,9 @@ def test_setup_wizard_shows_runtime_progress_feedback():
     text = _wizard_text()
     assert "LIVE_LOG_MODE=0" in text
     assert "run_installation_flow()" in text
-    assert '--programbox "Twinbox is building the cluster environment."' in text
+    assert '--programbox "Twinbox is building the cluster environment."' not in text
+    assert 'whiptail --backtitle "$BACKTITLE" --title "Twinbox" --infobox "Twinbox is building the cluster environment.\\n\\n${log_output}" 20 78' in text
+    assert 'while kill -0 "$install_pid" 2>/dev/null; do' in text
     assert "progress_update()" in text
     assert "run_apply_educated_defaults_with_gauge()" in text
     assert '--gauge "Checking network and free addresses"' in text
@@ -257,12 +285,12 @@ def test_setup_wizard_waits_for_real_management_url_without_placeholder_fallback
     assert 'local message="${FINAL_COMPLETION_MESSAGE:-Twinbox URL: http://<management-vm-ip>:3000}"' not in text
 
 
-def test_setup_wizard_downloads_talos_iso_when_missing():
+def test_setup_wizard_does_not_manage_talos_install_media():
     text = _wizard_text()
-    assert "ensure_talos_iso_available()" in text
-    assert 'progress_update "Preparing cluster" "Checking installation media"' in text
-    assert 'pvesm list "$PROXMOX_ISO_STORAGE" --content iso' in text
-    assert 'pvesm download "$PROXMOX_ISO_STORAGE" "$TALOS_ISO_FILE" "$talos_url"' in text
+    assert "ensure_talos_iso_available()" not in text
+    assert 'progress_update "Preparing cluster" "Checking installation media"' not in text
+    assert 'pvesm list "$PROXMOX_ISO_STORAGE" --content iso' not in text
+    assert 'pvesm download "$PROXMOX_ISO_STORAGE" "$TALOS_ISO_FILE" "$talos_url"' not in text
 
 
 def test_setup_wizard_requires_non_empty_ssh_key():
@@ -357,6 +385,17 @@ def test_setup_wizard_switches_to_live_install_log_after_password():
     assert 'run_installation_flow' in text
     assert 'create_proxmox_api_user' in text
     assert 'create_management_vm' in text
+    flow_body = text.split("run_installation_flow() {", 1)[1].split("print_next_steps()", 1)[0]
+    assert "set +e" not in flow_body
+    assert "(\n    set -e" in flow_body
+
+
+def test_setup_wizard_surfaces_friendly_proxmox_storage_errors():
+    text = _wizard_text()
+    assert "run_qm_command()" in text
+    assert 'run_qm_command "create management VM" qm create "$MGT_ID"' in text
+    assert 'Storage hint: check local-lvm free space or remove leftover disks for VMID ${MGT_ID}.' in text
+    assert 'Cloud-init hint: Proxmox could not create the cloud-init volume for VMID ${MGT_ID}.' in text
 
 
 def test_setup_wizard_remove_flow_skips_create_defaults_scan_and_shows_progress():
