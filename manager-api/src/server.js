@@ -1,6 +1,5 @@
 import express from "express";
 import fs from "fs";
-import https from "https";
 import path from "path";
 import { spawnSync } from "child_process";
 
@@ -80,54 +79,36 @@ function probeIpInUse(ip) {
   return result.status === 0;
 }
 
-async function proxmoxApiRequest(pathname, { method = "GET", body, headers = {} } = {}) {
+function proxmoxApiRequest(pathname, { method = "GET", body, headers = {} } = {}) {
   const proxmoxHost = process.env.PROXMOX_HOST;
   const proxmoxPort = process.env.PROXMOX_PORT || "8006";
   const payload = body ? body.toString() : "";
-  const requestHeaders = {
-    ...headers,
-  };
-  if (payload && requestHeaders["Content-Length"] === undefined) {
-    requestHeaders["Content-Length"] = Buffer.byteLength(payload);
+  const args = ["-k", "-sS", "-X", method];
+
+  for (const [key, value] of Object.entries(headers)) {
+    args.push("-H", `${key}: ${value}`);
   }
-  return new Promise((resolve, reject) => {
-    const request = https.request({
-      hostname: proxmoxHost,
-      port: Number(proxmoxPort),
-      path: pathname,
-      method,
-      headers: requestHeaders,
-      rejectUnauthorized: false,
-    }, (response) => {
-      let text = "";
-      response.setEncoding("utf8");
-      response.on("data", (chunk) => {
-        text += chunk;
-      });
-      response.on("end", () => {
-        let parsed = null;
-        try {
-          parsed = JSON.parse(text);
-        } catch {
-          parsed = null;
-        }
+  if (payload) {
+    args.push("--data", payload);
+  }
+  args.push(`https://${proxmoxHost}:${proxmoxPort}${pathname}`);
 
-        if ((response.statusCode || 500) < 200 || (response.statusCode || 500) >= 300) {
-          reject(new Error(`Proxmox API ${method} ${pathname} failed [HTTP ${response.statusCode}]: ${text}`));
-          return;
-        }
-
-        resolve(parsed);
-      });
-    });
-
-    request.on("error", reject);
-
-    if (body) {
-      request.write(payload);
-    }
-    request.end();
+  const result = spawnSync("curl", args, {
+    encoding: "utf8",
+    timeout: 5000,
   });
+  if (result.error?.code === "ENOENT") {
+    throw new Error("curl is required for Proxmox API suggestions");
+  }
+  if (result.status !== 0) {
+    throw new Error(result.stderr?.trim() || result.stdout?.trim() || `Proxmox API ${method} ${pathname} failed`);
+  }
+
+  try {
+    return JSON.parse(result.stdout || "{}");
+  } catch (error) {
+    throw new Error(`Failed to parse Proxmox API response: ${error instanceof Error ? error.message : "unknown error"}`);
+  }
 }
 
 async function listUsedVmidsViaProxmoxApi() {
@@ -143,7 +124,7 @@ async function listUsedVmidsViaProxmoxApi() {
     username,
     password,
   });
-  const auth = await proxmoxApiRequest("/api2/json/access/ticket", {
+  const auth = proxmoxApiRequest("/api2/json/access/ticket", {
     method: "POST",
     body,
     headers: {
@@ -155,7 +136,7 @@ async function listUsedVmidsViaProxmoxApi() {
     throw new Error("Proxmox auth failed while suggesting VMIDs");
   }
 
-  const resources = await proxmoxApiRequest("/api2/json/cluster/resources?type=vm", {
+  const resources = proxmoxApiRequest("/api2/json/cluster/resources?type=vm", {
     headers: {
       Cookie: `PVEAuthCookie=${ticket}`,
     },
