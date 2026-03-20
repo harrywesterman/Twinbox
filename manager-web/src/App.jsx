@@ -418,6 +418,7 @@ function App() {
         const data = await res.json();
         setDraftInputs((prev) => {
           const current = prev['provision-nodes'] || {};
+          const nameField = activeStep.inputs.find((input) => input.id === 'name');
           const vipField = activeStep.inputs.find((input) => input.id === 'vip_ip');
           const startField = activeStep.inputs.find((input) => input.id === 'start_ip');
           const vmidField = activeStep.inputs.find((input) => input.id === 'start_vmid');
@@ -426,6 +427,7 @@ function App() {
             ...prev,
             'provision-nodes': {
               ...current,
+              name: current.name === undefined || current.name === nameField?.default ? (data.name_suggestion || current.name) : current.name,
               start_vmid: current.start_vmid === undefined || current.start_vmid === vmidField?.default ? (data.start_vmid || current.start_vmid) : current.start_vmid,
               vip_ip: current.vip_ip === undefined || current.vip_ip === vipField?.default ? (data.vip_ip || current.vip_ip) : current.vip_ip,
               start_ip: current.start_ip === undefined || current.start_ip === startField?.default ? (data.start_ip || current.start_ip) : current.start_ip,

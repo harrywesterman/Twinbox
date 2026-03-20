@@ -1,9 +1,16 @@
 import express from "express";
 import fs from "fs";
+import https from "https";
 import path from "path";
 import { spawnSync } from "child_process";
 
-import { buildBootstrapPayload, buildClusterFromRequest, loadCluster, persistCluster } from "./lib/clusters.js";
+import {
+  buildBootstrapPayload,
+  buildClusterFromRequest,
+  loadCluster,
+  normalizeClusterName,
+  persistCluster,
+} from "./lib/clusters.js";
 import { buildCatalogResponse, validateStepInputs } from "./lib/catalog.js";
 import {
   buildDataDirs,
@@ -73,7 +80,90 @@ function probeIpInUse(ip) {
   return result.status === 0;
 }
 
-function listUsedVmids() {
+async function proxmoxApiRequest(pathname, { method = "GET", body, headers = {} } = {}) {
+  const proxmoxHost = process.env.PROXMOX_HOST;
+  const proxmoxPort = process.env.PROXMOX_PORT || "8006";
+  return new Promise((resolve, reject) => {
+    const request = https.request({
+      hostname: proxmoxHost,
+      port: Number(proxmoxPort),
+      path: pathname,
+      method,
+      headers,
+      rejectUnauthorized: false,
+    }, (response) => {
+      let text = "";
+      response.setEncoding("utf8");
+      response.on("data", (chunk) => {
+        text += chunk;
+      });
+      response.on("end", () => {
+        let parsed = null;
+        try {
+          parsed = JSON.parse(text);
+        } catch {
+          parsed = null;
+        }
+
+        if ((response.statusCode || 500) < 200 || (response.statusCode || 500) >= 300) {
+          reject(new Error(`Proxmox API ${method} ${pathname} failed [HTTP ${response.statusCode}]: ${text}`));
+          return;
+        }
+
+        resolve(parsed);
+      });
+    });
+
+    request.on("error", reject);
+
+    if (body) {
+      request.write(body.toString());
+    }
+    request.end();
+  });
+}
+
+async function listUsedVmidsViaProxmoxApi() {
+  const username = process.env.PROXMOX_USER;
+  const password = process.env.PROXMOX_PASSWORD;
+  const proxmoxHost = process.env.PROXMOX_HOST;
+
+  if (!proxmoxHost || !username || !password) {
+    throw new Error("Unable to inspect cluster VMIDs: pvesh and qm are both unavailable");
+  }
+
+  const body = new URLSearchParams({
+    username,
+    password,
+  });
+  const auth = await proxmoxApiRequest("/api2/json/access/ticket", {
+    method: "POST",
+    body,
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+  });
+  const ticket = auth?.data?.ticket;
+  if (!ticket) {
+    throw new Error("Proxmox auth failed while suggesting VMIDs");
+  }
+
+  const resources = await proxmoxApiRequest("/api2/json/cluster/resources?type=vm", {
+    headers: {
+      Cookie: `PVEAuthCookie=${ticket}`,
+    },
+  });
+
+  return new Set(
+    Array.isArray(resources?.data)
+      ? resources.data
+        .map((entry) => Number(entry?.vmid))
+        .filter((value) => Number.isInteger(value) && value >= 100)
+      : [],
+  );
+}
+
+async function listUsedVmids() {
   const resourcesBin = process.env.MANAGER_API_CLUSTER_RESOURCES_BIN || "pvesh";
   const isDefaultResourcesBin = path.basename(resourcesBin) === "pvesh";
   const args = isDefaultResourcesBin ? ["get", "/cluster/resources", "--type", "vm", "--output-format", "json"] : [];
@@ -89,7 +179,7 @@ function listUsedVmids() {
         timeout: 3000,
       });
       if (qmResult.error?.code === "ENOENT") {
-        throw new Error("Unable to inspect cluster VMIDs: pvesh and qm are both unavailable");
+        return listUsedVmidsViaProxmoxApi();
       }
       if (qmResult.status !== 0) {
         throw new Error(`qm list failed: ${(qmResult.stderr || qmResult.stdout || "").trim()}`);
@@ -124,8 +214,8 @@ function listUsedVmids() {
   }
 }
 
-function findFreeVmidBlock(nodeCount) {
-  const usedVmids = listUsedVmids();
+async function findFreeVmidBlock(nodeCount) {
+  const usedVmids = await listUsedVmids();
   let candidate = 100;
 
   while (candidate <= 999999) {
@@ -146,7 +236,13 @@ function buildIpBlock(prefix, startOctet, nodeCount) {
   return Array.from({ length: nodeCount }, (_, offset) => `${prefix}.${startOctet + offset}`);
 }
 
-function suggestAllocation(managementIp, nodeCount) {
+function suggestClusterName() {
+  const envSlug = process.env.TWINBOX_CLUSTER_SLUG || "";
+  const normalized = normalizeClusterName(envSlug);
+  return normalized?.name || "twinbox-cluster";
+}
+
+async function suggestAllocation(managementIp, nodeCount) {
   const octets = managementIp.split(".").map(Number);
   const prefix = `${octets[0]}.${octets[1]}.${octets[2]}`;
   const managementOctet = octets[3];
@@ -162,7 +258,7 @@ function suggestAllocation(managementIp, nodeCount) {
     return inUse;
   };
 
-  const vmidSuggestion = findFreeVmidBlock(nodeCount);
+  const vmidSuggestion = await findFreeVmidBlock(nodeCount);
   let vipOctet = null;
   for (const candidate of vipCandidates) {
     if (candidate === managementOctet) continue;
@@ -197,6 +293,7 @@ function suggestAllocation(managementIp, nodeCount) {
     management_ip: managementIp,
     subnet: `${prefix}.0/24`,
     node_count: nodeCount,
+    name_suggestion: suggestClusterName(),
     start_vmid: vmidSuggestion.start_vmid,
     vmid_block: vmidSuggestion.vmid_block,
     vip_ip: `${prefix}.${vipOctet}`,
@@ -206,8 +303,8 @@ function suggestAllocation(managementIp, nodeCount) {
   };
 }
 
-function validateRequestedAllocation({ startVmid, vipIp, startIp, nodeCount }) {
-  const usedVmids = listUsedVmids();
+async function validateRequestedAllocation({ startVmid, vipIp, startIp, nodeCount }) {
+  const usedVmids = await listUsedVmids();
   const requestedVmids = Array.from({ length: nodeCount }, (_, offset) => startVmid + offset);
   if (!requestedVmids.every((vmid) => !usedVmids.has(vmid))) {
     return {
@@ -290,7 +387,7 @@ app.get("/api/catalog", (_, res) => {
   });
 });
 
-app.get("/api/ip-suggestions", (req, res) => {
+app.get("/api/ip-suggestions", async (req, res) => {
   const queryIp = pickFirstString(req.query.management_ip);
   const fallbackHostIp = typeof req.hostname === "string" ? req.hostname : "";
   const managementIp = queryIp || fallbackHostIp;
@@ -304,7 +401,7 @@ app.get("/api/ip-suggestions", (req, res) => {
   }
 
   try {
-    return res.json(suggestAllocation(parsedManagementIp.value, nodeCount));
+    return res.json(await suggestAllocation(parsedManagementIp.value, nodeCount));
   } catch (e) {
     return res.status(500).json({
       error: e instanceof Error ? e.message : "failed to suggest IP addresses",
@@ -312,7 +409,7 @@ app.get("/api/ip-suggestions", (req, res) => {
   }
 });
 
-app.post("/api/clusters", (req, res) => {
+app.post("/api/clusters", async (req, res) => {
   const body = req.body || {};
   const built = buildClusterFromRequest(body, process.env);
   if (!built.ok) {
@@ -320,7 +417,7 @@ app.post("/api/clusters", (req, res) => {
   }
 
   try {
-    const allocation = validateRequestedAllocation({
+    const allocation = await validateRequestedAllocation({
       startVmid: built.cluster.start_vmid,
       vipIp: built.cluster.vip_ip,
       startIp: built.cluster.start_ip,
@@ -355,7 +452,7 @@ app.post("/api/clusters/:clusterId/bootstrap", (req, res) => {
   return res.status(202).json({ cluster_id: clusterId, job_id: job.id });
 });
 
-app.post("/api/steps/:stepId/execute", (req, res) => {
+app.post("/api/steps/:stepId/execute", async (req, res) => {
   const stepId = req.params.stepId;
   const catalog = buildCatalogResponse({ workspaceRoot, dirs });
   const step = catalog.stepsById.get(stepId);
@@ -384,7 +481,7 @@ app.post("/api/steps/:stepId/execute", (req, res) => {
     }
 
     try {
-      const allocation = validateRequestedAllocation({
+      const allocation = await validateRequestedAllocation({
         startVmid: built.cluster.start_vmid,
         vipIp: built.cluster.vip_ip,
         startIp: built.cluster.start_ip,

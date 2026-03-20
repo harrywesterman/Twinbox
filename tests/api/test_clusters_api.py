@@ -191,6 +191,7 @@ EOF
             assert body["subnet"] == "192.168.2.0/24"
             assert body["start_vmid"] == 106
             assert body["vmid_block"] == [106, 107, 108]
+            assert body["name_suggestion"] == "twinbox-cluster"
             assert body["vip_ip"] == "192.168.2.50"
             assert body["start_ip"] == "192.168.2.51"
             assert body["start_ip_block"] == [
@@ -198,6 +199,44 @@ EOF
                 "192.168.2.52",
                 "192.168.2.53",
             ]
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
+def test_ip_suggestions_uses_cluster_slug_for_name_suggestion():
+    with tempfile.TemporaryDirectory() as td:
+        data_dir = Path(td) / "data"
+        ping_mock = Path(td) / "mock-ping.sh"
+        vm_mock = Path(td) / "mock-vms.sh"
+        ping_mock.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+        ping_mock.chmod(0o755)
+        vm_mock.write_text("#!/bin/sh\necho '[]'\n", encoding="utf-8")
+        vm_mock.chmod(0o755)
+
+        port = _find_free_port()
+        env = os.environ.copy()
+        env["MANAGER_DATA_DIR"] = str(data_dir)
+        env["MANAGER_API_PORT"] = str(port)
+        env["MANAGER_API_PING_BIN"] = str(ping_mock)
+        env["MANAGER_API_CLUSTER_RESOURCES_BIN"] = str(vm_mock)
+        env["TWINBOX_CLUSTER_SLUG"] = "development"
+
+        proc = subprocess.Popen(
+            ["node", "manager-api/src/server.js"],
+            cwd=Path(__file__).resolve().parents[2],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            _wait_for_health(f"http://127.0.0.1:{port}")
+            status, body = _get_json(
+                f"http://127.0.0.1:{port}/api/ip-suggestions?management_ip=192.168.2.20&node_count=2"
+            )
+            assert status == 200
+            assert body["name_suggestion"] == "twinbox-development"
         finally:
             proc.terminate()
             proc.wait(timeout=5)
