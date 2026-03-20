@@ -848,7 +848,7 @@ EOF
 }
 
 create_proxmox_api_user() {
-  local proxmox_privs="VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.Audit,SDN.Use"
+  local proxmox_privs="VM.Audit,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.Audit,SDN.Use"
   local create_err=""
   local role_err=""
   local last_err=""
