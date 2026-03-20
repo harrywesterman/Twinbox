@@ -62,6 +62,20 @@ function buildProgress(steps, activeStep, categories) {
   };
 }
 
+function buildMode(steps) {
+  return steps.length > 0 && steps.every((step) => step.status === 'done') ? 'manage' : 'setup';
+}
+
+function buildStepRail(steps, activeStep) {
+  return steps.map((step, index) => ({
+    id: step.id,
+    title: step.title,
+    index: index + 1,
+    status: step.status,
+    isCurrent: step.id === activeStep?.id,
+  }));
+}
+
 function buildHealthBadges({ health, activeStep, catalogErrors, cluster }) {
   return [
     {
@@ -350,7 +364,7 @@ function buildRisks(activeStep, catalogErrors, error) {
   return risks;
 }
 
-function buildPrimaryAction(activeStep, nextStep, busy) {
+function buildPrimaryAction(activeStep, nextStep, busy, stepIndex, mode) {
   if (!activeStep) {
     return {
       type: 'noop',
@@ -381,7 +395,7 @@ function buildPrimaryAction(activeStep, nextStep, busy) {
   if (activeStep.status === 'done' && nextStep) {
     return {
       type: 'advance',
-      label: 'Next',
+      label: mode === 'setup' ? `Continue to step ${stepIndex + 1}` : 'Next',
       disabled: false,
       helperText: 'This step is complete. Continue to the next unlocked step.',
     };
@@ -390,7 +404,9 @@ function buildPrimaryAction(activeStep, nextStep, busy) {
   const rerun = activeStep.status === 'failed' || activeStep.status === 'done';
   return {
     type: 'execute',
-    label: rerun ? 'Run again' : 'Run step',
+    label: mode === 'setup'
+      ? (rerun ? `Retry step ${stepIndex}` : `Start step ${stepIndex}`)
+      : (rerun ? 'Run again' : 'Run step'),
     disabled: false,
     helperText: activeStep.type === 'config'
       ? 'Save the configuration and apply it on the Management VM.'
@@ -461,17 +477,21 @@ export function getMissionControlModel({
   const progress = buildProgress(steps, activeStep, categories);
   const catalogErrors = safeCatalog.errors || [];
   const runtime = buildRuntime(logs, activeStep);
+  const mode = buildMode(steps);
+  const stepRail = buildStepRail(steps, activeStep);
 
   return {
     categories,
     steps,
+    mode,
+    stepRail,
     activeCategory,
     activeStep,
     previousStep,
     nextStep,
     progress,
     healthBadges: buildHealthBadges({ health, activeStep, catalogErrors, cluster }),
-    primaryAction: buildPrimaryAction(activeStep, nextStep, busy),
+    primaryAction: buildPrimaryAction(activeStep, nextStep, busy, progress.stepIndex, mode),
     activity: {
       summary: activeStep?.summary || 'Catalog data is not available yet.',
       artifacts: buildArtifacts(activeStep, cluster),

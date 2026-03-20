@@ -122,6 +122,46 @@ test('mission control model exposes manifest-driven categories with locked depen
   assert.equal(model.progress.completedSteps, 0);
 });
 
+test('mission model exposes guided setup mode and numbered actions', () => {
+  const model = getMissionControlModel({
+    catalog,
+    logs: [],
+    cluster: null,
+    health: { ok: true },
+    error: '',
+    busy: false,
+    selectedStepId: 'provision-nodes',
+  });
+
+  assert.equal(model.mode, 'setup');
+  assert.equal(model.progress.stepIndex, 2);
+  assert.equal(model.primaryAction.label, 'Start step 2');
+  assert.equal(model.stepRail.length, 3);
+  assert.equal(model.stepRail[1].isCurrent, true);
+});
+
+test('mission model switches to manage mode when setup flow is complete', () => {
+  const completedCatalog = structuredClone(catalog);
+  for (const category of completedCatalog.categories) {
+    for (const step of category.steps) {
+      step.status = 'done';
+      step.state = { ...step.state, status: 'succeeded' };
+    }
+  }
+
+  const model = getMissionControlModel({
+    catalog: completedCatalog,
+    logs: [],
+    cluster: { id: 'cluster_demo', status: 'bootstrapped' },
+    health: { ok: true },
+    error: '',
+    busy: false,
+    selectedStepId: 'bootstrap-cluster',
+  });
+
+  assert.equal(model.mode, 'manage');
+});
+
 test('mission control model projects running and completed step state from catalog payload', () => {
   const runningCatalog = structuredClone(catalog);
   runningCatalog.categories[1].steps[0].status = 'done';
