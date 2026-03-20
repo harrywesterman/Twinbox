@@ -61,7 +61,6 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     assert "      KUBECTL_VERSION=${KUBECTL_VERSION}" in text
     assert "      HELM_VERSION=${HELM_VERSION}" in text
     assert "      TWINBOX_HOST_REPO_ROOT=${TWINBOX_TARGET_DIR}" in text
-    assert "      TALOS_IMAGE_PRESET=${TALOS_IMAGE_PRESET}" in text
     assert "      TALOS_IMAGE_SCHEMATIC=${TALOS_IMAGE_SCHEMATIC}" not in text
     assert "      TALOSCTL_VERSION=${TALOSCTL_VERSION}" not in text
     assert "      PROXMOX_ISO_STORAGE=${PROXMOX_ISO_STORAGE}" not in text
@@ -91,12 +90,6 @@ def test_setup_wizard_discovers_management_vm_ip_via_guest_agent():
     assert 'management_ip="${DISCOVERED_MANAGEMENT_IP:-}"' in text
     assert 'management_ip=$(discover_management_vm_ip)' not in text
     assert 'wait_for_web_interface "$management_ip"' in text
-
-
-def test_setup_wizard_does_not_exit_when_guest_agent_has_no_ip_yet():
-    text = _wizard_text()
-    discover_body = text.split("discover_management_vm_ip() {", 1)[1].split("wait_for_management_vm_ping()", 1)[0]
-    assert '| head -n1 || true' in discover_body
 
 
 def test_setup_wizard_does_not_block_website_detection_on_ping():
@@ -341,13 +334,11 @@ def test_setup_wizard_supports_cluster_slug_selection_and_normalization():
     assert 'PROXMOX_ROLE="TwinboxVMProvisioner-${CLUSTER_SLUG}"' in text
 
 
-def test_setup_wizard_asks_for_talos_image_preset():
+def test_setup_wizard_does_not_ask_for_talos_image_preset():
     text = _wizard_text()
-    assert "choose_talos_image_preset()" in text
-    assert 'whiptail --backtitle "$BACKTITLE" --title "Twinbox" --menu "Choose the Talos image preset."' in text
-    assert ' --default-item "$default_item" ' in text
-    assert '"qemu-guest-agent" "Recommended: Talos with the QEMU guest agent"' in text
-    assert '"vanilla" "Talos without extra extensions"' in text
+    assert "choose_talos_image_preset()" not in text
+    assert 'whiptail --backtitle "$BACKTITLE" --title "Twinbox" --menu "Choose the Talos image preset."' not in text
+    assert 'TALOS_IMAGE_PRESET' not in text
 
 
 def test_setup_wizard_detects_and_cleans_up_existing_cluster_resources():

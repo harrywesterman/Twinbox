@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Twinbox - Proxmox Console Setup Wizard
-# Creates only the Ubuntu Management VM and auto-starts the manager stack.
+# Twinbox - Proxmox Console Setup Wizard for the Twinbox Management Environment
+# Creates only the Twinbox Management Environment and auto-starts the manager stack.
 
 set -euo pipefail
 
 GITHUB_REPO="harrywesterman/twinbox"
-BACKTITLE="Twinbox Cluster Wizard"
+BACKTITLE="Twinbox"
 
 RD="\033[01;31m"
 YW="\033[33m"
@@ -31,14 +31,13 @@ EXISTING_ROLE_PRESENT=0
 allocation_file=""
 completion_state_file=""
 WIZARD_ACTION="create"
-CURRENT_PROGRESS_PHASE="Preparing cluster"
+CURRENT_PROGRESS_PHASE="Preparing"
 WIZARD_LOG_FILE=""
 DETECTED_CLUSTER_SLUGS=()
 LIVE_LOG_MODE=0
 FINAL_COMPLETION_MESSAGE=""
 MANAGEMENT_WEB_URL=""
 DISCOVERED_MANAGEMENT_IP=""
-TALOS_IMAGE_PRESET=""
 
 gauge_emit() {
   local percent="$1"
@@ -64,7 +63,7 @@ progress_update() {
   local message="$2"
 
   CURRENT_PROGRESS_PHASE="$phase"
-  log_event "${phase}: ${message}"
+  log_event "$message"
   if [[ "${LIVE_LOG_MODE:-0}" -eq 1 ]]; then
     printf '\n[%s] %s\n' "$phase" "$message"
     return 0
@@ -146,7 +145,7 @@ check_root() {
 
 check_deps() {
   if ! command -v whiptail >/dev/null 2>&1 || ! command -v dialog >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1 || ! command -v openssl >/dev/null 2>&1; then
-    printf 'Preparing Twinbox wizard...\n' >&2
+    printf 'Preparing setup...\n' >&2
     apt-get update -qq
     apt-get install -y whiptail dialog curl openssl >/dev/null 2>&1
   fi
@@ -253,28 +252,6 @@ choose_cluster_slug() {
   done
 }
 
-choose_talos_image_preset() {
-  local selected=""
-  local default_item="${TALOS_IMAGE_PRESET:-qemu-guest-agent}"
-
-  selected=$(whiptail --backtitle "$BACKTITLE" --title "Twinbox" --menu "Choose the Talos image preset." 14 78 4 \
-    --default-item "$default_item" \
-    "qemu-guest-agent" "Recommended: Talos with the QEMU guest agent" \
-    "vanilla" "Talos without extra extensions" \
-    3>&1 1>&2 2>&3) || {
-      exit 0
-    }
-
-  case "$selected" in
-    vanilla|qemu-guest-agent)
-      TALOS_IMAGE_PRESET="$selected"
-      ;;
-    *)
-      TALOS_IMAGE_PRESET="qemu-guest-agent"
-      ;;
-  esac
-}
-
 add_detected_cluster_slug() {
   local slug="$1"
   local existing=""
@@ -378,7 +355,7 @@ choose_cluster_action() {
   local action=""
 
   detect_cluster_slugs
-  prompt="Twinbox"$'\n'$'\n'"Kickstart a Twinbox cluster environment"$'\n'$'\n'"$(render_cluster_overview)"$'\n'$'\n'"Choose an action."
+  prompt="Twinbox"$'\n'$'\n'"Set up the VM"$'\n'$'\n'"$(render_cluster_overview)"$'\n'$'\n'"Choose an action."
 
   if [[ "${#DETECTED_CLUSTER_SLUGS[@]}" -eq 0 ]]; then
     action=$(whiptail --backtitle "$BACKTITLE" --title "Twinbox" --menu "$prompt" 18 78 6 \
@@ -792,6 +769,7 @@ apply_educated_defaults() {
   PROXMOX_PASSWORD=$(generate_cloud_init_password)
   PROXMOX_NODE="$(hostname)"
   PROXMOX_STORAGE_POOL="local-lvm"
+  PROXMOX_FILE_DATASTORE="local"
   KUBECTL_VERSION="v1.30.0"
   HELM_VERSION="v3.15.4"
   TWINBOX_IMAGE_TAG="latest"
@@ -839,7 +817,7 @@ EOF
     gauge_emit 100 "Checking network and free addresses"
   ) | whiptail --backtitle "$BACKTITLE" --title "Twinbox" --gauge "Checking network and free addresses" 10 78 0
 
-  progress_update "Preparing cluster" "Checking network and free addresses"
+  progress_update "Preparing" "Checking network and free addresses"
 
   # shellcheck disable=SC1090
   source "$defaults_file"
@@ -865,6 +843,7 @@ EOF
   PROXMOX_PASSWORD=$(generate_cloud_init_password)
   PROXMOX_NODE="$(hostname)"
   PROXMOX_STORAGE_POOL="local-lvm"
+  PROXMOX_FILE_DATASTORE="local"
   KUBECTL_VERSION="v1.30.0"
   HELM_VERSION="v3.15.4"
   TWINBOX_IMAGE_TAG="latest"
@@ -876,6 +855,7 @@ create_proxmox_api_user() {
   local role_err=""
   local last_err=""
   local acl_path=""
+  local file_datastore="${PROXMOX_FILE_DATASTORE:-local}"
 
   set_proxmox_password_with_retry() {
     local user="$1"
@@ -912,7 +892,7 @@ create_proxmox_api_user() {
     return 1
   }
 
-  progress_update "Preparing cluster" "Preparing cluster environment"
+  progress_update "Preparing" "Building the VM"
   if create_err=$(pveum user add "$PROXMOX_USER" --comment "Twinbox service account (${CLUSTER_SLUG})" 2>&1); then
     log_event "Created Proxmox API user ${PROXMOX_USER}"
   else
@@ -946,7 +926,7 @@ create_proxmox_api_user() {
   fi
 
   log_event "Applying ACLs for ${PROXMOX_USER}"
-  for acl_path in /vms "/storage/${PROXMOX_STORAGE_POOL}" "/storage/${PROXMOX_FILE_DATASTORE}" "/nodes/${PROXMOX_NODE}"; do
+  for acl_path in /vms "/storage/${PROXMOX_STORAGE_POOL}" "/storage/${file_datastore}" "/nodes/${PROXMOX_NODE}"; do
     if ! apply_acl_with_retry "$acl_path" "$PROXMOX_USER" "$PROXMOX_ROLE" 10 1; then
       msg_error "Failed to apply ACL ${acl_path} for ${PROXMOX_USER}: ${last_err}"
       exit 1
@@ -959,23 +939,23 @@ create_proxmox_api_user() {
 }
 
 collect_management_vm_settings() {
-  input_box "Management VM" "Management VM name" "$MGT_NAME" MGT_NAME
-  input_box "Management VM" "Management VM IP" "$CLOUD_INIT_IP" CLOUD_INIT_IP
+  input_box "Management VM" "Name" "$MGT_NAME" MGT_NAME
+  input_box "Management VM" "IP address" "$CLOUD_INIT_IP" CLOUD_INIT_IP
   input_box "Management VM" "Netmask" "$CLOUD_INIT_NETMASK" CLOUD_INIT_NETMASK
   input_box "Management VM" "DNS server" "$CLOUD_INIT_DNS_IP" CLOUD_INIT_DNS_IP
   input_box "Management VM" "Disk size (GB)" "$MGT_DISK" MGT_DISK
   input_box "Management VM" "Memory (MB)" "$MGT_RAM" MGT_RAM
 
   if [[ -z "${MGT_NAME:-}" ]]; then
-    msg_error "Management VM name must not be empty"
+    msg_error "VM name must not be empty"
     exit 1
   fi
   if ! is_valid_ipv4 "${CLOUD_INIT_IP:-}"; then
-    msg_error "Invalid management VM IP: ${CLOUD_INIT_IP}"
+    msg_error "Invalid VM IP: ${CLOUD_INIT_IP}"
     exit 1
   fi
   if ! netmask_to_cidr "${CLOUD_INIT_NETMASK}" >/dev/null 2>&1; then
-    msg_error "Invalid management VM netmask: ${CLOUD_INIT_NETMASK}"
+    msg_error "Invalid VM netmask: ${CLOUD_INIT_NETMASK}"
     exit 1
   fi
   if ! is_valid_ipv4 "${CLOUD_INIT_DNS_IP:-}"; then
@@ -983,11 +963,11 @@ collect_management_vm_settings() {
     exit 1
   fi
   if [[ ! "${MGT_DISK}" =~ ^[0-9]+$ ]]; then
-    msg_error "Management VM disk size must be a number"
+    msg_error "VM disk size must be a number"
     exit 1
   fi
   if [[ ! "${MGT_RAM}" =~ ^[0-9]+$ ]]; then
-    msg_error "Management VM memory must be a number"
+    msg_error "VM memory must be a number"
     exit 1
   fi
 }
@@ -1038,7 +1018,6 @@ start_wizard() {
   fi
 
   collect_management_vm_settings
-  choose_talos_image_preset
   CLOUD_INIT_CIDR=$(netmask_to_cidr "$CLOUD_INIT_NETMASK") || {
     msg_error "Invalid netmask: ${CLOUD_INIT_NETMASK}"
     exit 1
@@ -1060,7 +1039,7 @@ create_management_vm() {
 
   mkdir -p /var/lib/vz/template/cache /var/lib/vz/snippets
 
-  progress_update "Preparing cluster" "Preparing cluster environment"
+  progress_update "Preparing" "Building the VM"
   if [[ ! -f "$img_path" ]]; then
     log_event "Downloading Ubuntu 24.04 cloud image"
     curl -fsSL -o "$img_path" "$ubuntu_url"
@@ -1106,10 +1085,10 @@ write_files:
       PROXMOX_PASSWORD=${PROXMOX_PASSWORD}
       PROXMOX_NODE=${PROXMOX_NODE}
       PROXMOX_STORAGE_POOL=${PROXMOX_STORAGE_POOL}
+      PROXMOX_FILE_DATASTORE=${PROXMOX_FILE_DATASTORE}
       KUBECTL_VERSION=${KUBECTL_VERSION}
       HELM_VERSION=${HELM_VERSION}
       TWINBOX_IMAGE_TAG=${TWINBOX_IMAGE_TAG}
-      TALOS_IMAGE_PRESET=${TALOS_IMAGE_PRESET}
       TWINBOX_HOST_REPO_ROOT=${TWINBOX_TARGET_DIR}
       MANAGEMENT_VM_ID=${MGT_ID}
       MANAGEMENT_VM_IP=${CLOUD_INIT_IP}
@@ -1134,8 +1113,8 @@ runcmd:
 CLOUDINIT
   chmod 600 "$snippet_file"
 
-  progress_update "Starting environment" "Starting management environment"
-  run_qm_command "create management VM" qm create "$MGT_ID" --name "$MGT_NAME" --memory "$MGT_RAM" --cores "$MGT_CORES" --cpu "$MGT_CPU_TYPE" --net0 "virtio,bridge=${BRIDGE_IF}" \
+  progress_update "Starting VM" "Starting the VM"
+  run_qm_command "create VM" qm create "$MGT_ID" --name "$MGT_NAME" --memory "$MGT_RAM" --cores "$MGT_CORES" --cpu "$MGT_CPU_TYPE" --net0 "virtio,bridge=${BRIDGE_IF}" \
     --tags "twinbox;management;docker;bootstrap;${CLUSTER_VM_TAG}" \
     --scsihw virtio-scsi-pci --ide2 local-lvm:cloudinit --serial0 socket --vga serial0 --ostype l26 >/dev/null
   vm_created=1
@@ -1152,10 +1131,10 @@ CLOUDINIT
   qm set "$MGT_ID" --cicustom "user=local:snippets/$(basename "$snippet_file")" >/dev/null
   qm set "$MGT_ID" --boot order=scsi0 >/dev/null
   qm resize "$MGT_ID" scsi0 "${MGT_DISK}G" >/dev/null
-  log_event "Starting management VM"
+  log_event "Starting the management VM"
   qm start "$MGT_ID" >/dev/null
 
-  progress_update "Starting environment" "Management environment started"
+  progress_update "Starting VM" "VM started"
 }
 
 discover_management_vm_ip() {
@@ -1164,7 +1143,7 @@ discover_management_vm_ip() {
   local polls=1
 
   DISCOVERED_MANAGEMENT_IP=""
-  progress_update "Waiting for Twinbox" "Waiting for Twinbox"
+  progress_update "Waiting for VM" "Waiting for an IP address"
   while true; do
     output=$(qm guest cmd "$MGT_ID" network-get-interfaces 2>/dev/null || true)
     ip=$(
@@ -1177,14 +1156,14 @@ discover_management_vm_ip() {
 
     if [[ -n "$ip" ]]; then
       DISCOVERED_MANAGEMENT_IP="$ip"
-      log_event "Management VM received an IP address"
+      log_event "VM received an IP address"
       return 0
     fi
 
     if (( polls == 3 )); then
-      log_event "Waiting for the management VM to request an address."
+      log_event "Waiting for the VM to request an address."
     elif (( polls == 9 )); then
-      log_event "The management VM is still booting. This can take a minute or two."
+      log_event "The VM is still booting. This can take a minute or two."
     fi
 
     sleep 5
@@ -1196,17 +1175,17 @@ wait_for_management_vm_ping() {
   local management_ip="$1"
   local polls=1
 
-  progress_update "Waiting for Twinbox" "Waiting for Twinbox"
-  log_event "Management VM is starting on the network."
+  progress_update "Waiting for VM" "Waiting for the VM to come up"
+  log_event "The VM is starting on the network."
 
   while true; do
     if ping -c 1 -W 1 "$management_ip" >/dev/null 2>&1; then
-      log_event "Management VM is responding on the network"
+      log_event "The VM is responding on the network"
       return 0
     fi
 
     if (( polls == 3 )); then
-      log_event "Still waiting for the management VM to respond to network checks."
+      log_event "Still waiting for the VM to respond to network checks."
     elif (( polls == 9 )); then
       log_event "The operating system is still starting. This may take another minute."
     fi
@@ -1224,7 +1203,7 @@ wait_for_web_interface() {
   local http_code=""
   local wait_stage=0
 
-  progress_update "Waiting for Twinbox" "Waiting for Twinbox"
+  progress_update "Waiting for VM" "Waiting for the web UI"
   log_event "Twinbox services are starting. This usually takes a few minutes on the first run."
   while true; do
     http_code=$(curl --silent --head --output /dev/null --write-out "%{http_code}" --connect-timeout 2 --max-time 10 "$web_url" || true)
@@ -1272,14 +1251,14 @@ run_installation_flow() {
   set +e
   {
     LIVE_LOG_MODE=1
-    log_event "Twinbox is building the cluster environment."
+    log_event "Building the VM."
     create_proxmox_api_user
     create_management_vm
     prepare_completion_message
   } 2>&1 | dialog \
     --backtitle "$BACKTITLE" \
     --title "Twinbox" \
-    --programbox "Twinbox is building the cluster environment." 20 78
+    --programbox "Building the VM." 20 78
   install_exit=${PIPESTATUS[0]}
   LIVE_LOG_MODE=0
   set -e

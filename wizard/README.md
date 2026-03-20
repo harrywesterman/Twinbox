@@ -1,6 +1,6 @@
-# Wizard
+# Twinbox Management Environment
 
-`wizard/setup-wizard.sh` runs on a Proxmox host and kickstarts a Twinbox cluster environment for a selected cluster name.
+`wizard/setup-wizard.sh` runs on a Proxmox host and kickstarts the Twinbox Management Environment for a selected cluster name.
 
 ## Current Behavior
 
@@ -8,15 +8,15 @@ The wizard now does all of this automatically:
 
 1. Shows the Twinbox clusters already detected on the host.
 2. Lets you start a new cluster or remove an existing one.
-3. Builds a VMID/IP allocation for the management VM, VIP, and future Talos nodes.
-4. Creates an Ubuntu 24.04 management environment with cluster-specific names and tags.
+3. Builds a VMID/IP allocation for the Twinbox Management Environment, VIP, and future Talos nodes.
+4. Creates an Ubuntu 24.04 Twinbox Management Environment with cluster-specific names and tags.
 5. Creates a cluster-specific Proxmox API user and role.
 6. Installs Docker CE from the official Docker APT repo (`download.docker.com`).
 7. Clones `https://github.com/harrywesterman/twinbox` into `/opt/twinbox-<cluster-slug>`.
 8. Writes `/opt/twinbox-<cluster-slug>/.env` from wizard input values.
 9. Starts the manager stack with Docker Compose and hands off to the Twinbox web UI.
 
-After cloud-init completes, open the Twinbox management website:
+After cloud-init completes, open the Twinbox Management Environment website:
 
 - UI: `http://<management-vm-ip>:3000`
 - API health: `http://<management-vm-ip>:8080/api/health`
@@ -43,7 +43,7 @@ cp .env.wizard.local.example .env.wizard.local
 make wizard-dev-run
 ```
 
-This uploads the local `wizard/setup-wizard.sh` to the configured Proxmox host, then runs that remote copy with `ssh -tt` so the interactive `whiptail` UI keeps working. It only changes the wizard feedback loop: the Management VM still clones the rest of the repo from GitHub.
+This uploads the local `wizard/setup-wizard.sh` to the configured Proxmox host, then runs that remote copy with `ssh -tt` so the interactive `whiptail` UI keeps working. It only changes the wizard feedback loop: the Twinbox Management Environment still clones the rest of the repo from GitHub.
 
 ## Prompts
 
@@ -63,7 +63,7 @@ The wizard asks for:
 
 ## Validation
 
-On the Management VM:
+On the Twinbox Management Environment:
 
 ```bash
 docker --version
