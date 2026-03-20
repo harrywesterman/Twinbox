@@ -61,10 +61,12 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     assert "      KUBECTL_VERSION=${KUBECTL_VERSION}" in text
     assert "      HELM_VERSION=${HELM_VERSION}" in text
     assert "      TWINBOX_HOST_REPO_ROOT=${TWINBOX_TARGET_DIR}" in text
+    assert 'TWINBOX_TARGET_DIR="/opt/twinbox"' in text
     assert "      TALOS_IMAGE_SCHEMATIC=${TALOS_IMAGE_SCHEMATIC}" not in text
     assert "      TALOSCTL_VERSION=${TALOSCTL_VERSION}" not in text
     assert "      PROXMOX_ISO_STORAGE=${PROXMOX_ISO_STORAGE}" not in text
     assert "      TALOS_ISO_FILE=${TALOS_ISO_FILE}" not in text
+    assert "  - rm -rf ${TWINBOX_TARGET_DIR}" in text
     assert "  - install -m 0600 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /tmp/twinbox-${CLUSTER_SLUG}.env.template ${TWINBOX_TARGET_DIR}/.env" in text
     assert "  - bash -lc 'cd ${TWINBOX_TARGET_DIR} && chmod +x scripts/install-management-tools.sh && ./scripts/install-management-tools.sh --env-file ${TWINBOX_TARGET_DIR}/.env'" in text
     assert 'qm set "$MGT_ID" --ciuser "$CLOUD_INIT_USER" >/dev/null' in text
@@ -80,6 +82,8 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     assert "VIP_IP=${VIP_IP}" not in text
     assert "CLUSTER_START_VMID=${CLUSTER_START_VMID}" not in text
     assert "CLUSTER_START_IP=${CLUSTER_START_IP}" not in text
+    assert 'if [ ! -d ${TWINBOX_TARGET_DIR}/.git ]; then git clone https://github.com/${GITHUB_REPO}.git ${TWINBOX_TARGET_DIR}; fi' not in text
+    assert 'git clone https://github.com/${GITHUB_REPO}.git ${TWINBOX_TARGET_DIR}' in text
 
 
 def test_setup_wizard_discovers_management_vm_ip_via_guest_agent():
@@ -196,7 +200,7 @@ def test_setup_wizard_does_not_print_proxmox_api_credentials():
 
 def test_setup_wizard_grants_cloudinit_and_template_datastore_privileges():
     text = _wizard_text()
-    assert 'VM.Audit,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use' in text
+    assert 'VM.Audit,VM.Monitor,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use' in text
 
 
 def test_setup_wizard_collects_single_management_vm_form():
@@ -316,7 +320,7 @@ def test_setup_wizard_creates_dedicated_limited_proxmox_api_user():
     assert 'role_err=$(pveum role modify "$PROXMOX_ROLE" -privs "$proxmox_privs" 2>&1)' in text
     assert 'apply_acl_with_retry()' in text
     assert 'pveum role add "$PROXMOX_ROLE"' in text
-    assert 'VM.Audit,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use' in text
+    assert 'VM.Audit,VM.Monitor,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use' in text
     assert 'for acl_path in /vms "/storage/${PROXMOX_STORAGE_POOL}" "/storage/${PROXMOX_FILE_DATASTORE}" "/nodes/${PROXMOX_NODE}"; do' in text
     assert 'pveum aclmod "$path" -user "$user" -role "$role" 2>&1' in text
     assert 'if ! apply_acl_with_retry "/sdn" "$PROXMOX_USER" "$PROXMOX_ROLE" 10 1; then' in text

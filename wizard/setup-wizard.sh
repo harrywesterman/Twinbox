@@ -377,7 +377,7 @@ choose_cluster_action() {
 set_cluster_naming_defaults() {
   CLUSTER_VM_PREFIX="twinbox-${CLUSTER_SLUG}-"
   CLUSTER_VM_TAG="cluster-${CLUSTER_SLUG}"
-  TWINBOX_TARGET_DIR="/opt/twinbox-${CLUSTER_SLUG}"
+  TWINBOX_TARGET_DIR="/opt/twinbox"
   MGT_NAME="${CLUSTER_VM_PREFIX}mgt"
   CLOUD_INIT_USER="twinbox-${CLUSTER_SLUG}"
   PROXMOX_USER="twinbox-${CLUSTER_SLUG}@pve"
@@ -850,7 +850,7 @@ EOF
 }
 
 create_proxmox_api_user() {
-  local proxmox_privs="VM.Audit,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use"
+  local proxmox_privs="VM.Audit,VM.Monitor,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use"
   local create_err=""
   local role_err=""
   local last_err=""
@@ -1103,9 +1103,10 @@ runcmd:
   - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   - bash -lc 'docker --version'
   - bash -lc 'docker compose version'
+  - rm -rf ${TWINBOX_TARGET_DIR}
   - install -d -m 0755 ${TWINBOX_TARGET_DIR}
   - chown ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}
-  - bash -lc 'sudo -u ${CLOUD_INIT_USER} -H bash -lc "if [ ! -d ${TWINBOX_TARGET_DIR}/.git ]; then git clone https://github.com/${GITHUB_REPO}.git ${TWINBOX_TARGET_DIR}; fi"'
+  - bash -lc 'sudo -u ${CLOUD_INIT_USER} -H bash -lc "git clone https://github.com/${GITHUB_REPO}.git ${TWINBOX_TARGET_DIR}"'
   - install -m 0600 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /tmp/twinbox-${CLUSTER_SLUG}.env.template ${TWINBOX_TARGET_DIR}/.env
   - chown -R ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}
   - bash -lc 'cd ${TWINBOX_TARGET_DIR} && chmod +x scripts/install-management-tools.sh && ./scripts/install-management-tools.sh --env-file ${TWINBOX_TARGET_DIR}/.env'

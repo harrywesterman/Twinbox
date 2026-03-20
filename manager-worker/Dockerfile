@@ -1,6 +1,6 @@
 FROM node:20-bookworm-slim
 
-ARG TALOSCTL_VERSION=v1.7.4
+ARG TALOSCTL_VERSION=v1.12.6
 ARG OPENTOFU_VERSION=v1.8.8
 ARG KUBECTL_VERSION=v1.30.0
 ARG HELM_VERSION=v3.15.4
@@ -31,8 +31,10 @@ COPY manager-worker/src ./manager-worker/src
 COPY config ./config
 COPY infra ./infra
 COPY scripts/manager ./scripts/manager
+COPY scripts/get-talos-image-factory.sh ./scripts/get-talos-image-factory.sh
 
 RUN chmod +x ./scripts/manager/*.sh
+RUN chmod +x ./scripts/get-talos-image-factory.sh
 
 WORKDIR /opt/twinbox/manager-worker
 CMD ["npm", "start"]

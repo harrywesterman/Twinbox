@@ -118,6 +118,13 @@ def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
     assert 'talos_config_dir' in text
 
 
+def test_manager_worker_image_includes_talos_image_factory_helper():
+    text = (REPO_ROOT / "manager-worker" / "Dockerfile").read_text(encoding="utf-8")
+    assert 'ARG TALOSCTL_VERSION=v1.12.6' in text
+    assert 'COPY scripts/get-talos-image-factory.sh ./scripts/get-talos-image-factory.sh' in text
+    assert 'RUN chmod +x ./scripts/get-talos-image-factory.sh' in text
+
+
 def test_apply_cluster_uses_deterministic_mac_addresses_and_node_inventory():
     text = _apply_cluster_text()
     assert 'deterministic_mac()' in text

@@ -12,8 +12,8 @@ The wizard now does all of this automatically:
 4. Creates an Ubuntu 24.04 Twinbox Management Environment with cluster-specific names and tags.
 5. Creates a cluster-specific Proxmox API user and role.
 6. Installs Docker CE from the official Docker APT repo (`download.docker.com`).
-7. Clones `https://github.com/harrywesterman/twinbox` into `/opt/twinbox-<cluster-slug>`.
-8. Writes `/opt/twinbox-<cluster-slug>/.env` from wizard input values.
+7. Clones `https://github.com/harrywesterman/twinbox` into `/opt/twinbox`.
+8. Writes `/opt/twinbox/.env` from wizard input values.
 9. Starts the manager stack with Docker Compose and hands off to the Twinbox web UI.
 
 After cloud-init completes, open the Twinbox Management Environment website:
@@ -76,7 +76,7 @@ curl -fsS http://localhost:8080/api/health
 If needed:
 
 ```bash
-cd /opt/twinbox-<cluster-slug>
+cd /opt/twinbox
 # adjust .env if required
 docker compose pull
 docker compose up -d

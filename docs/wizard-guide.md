@@ -6,11 +6,11 @@
 
 - Prompts for one Management VM form with name, IP, netmask, DNS, disk size, and memory.
 - Prompts for cluster name (`ontwikkel`, `test`, `productie`, or custom).
-- Uses the cluster slug in VM name, Proxmox API user/role, tags, and target path.
+- Uses the cluster slug in VM name, Proxmox API user/role, and tags.
 - Detects existing resources for the same cluster and supports cleanup with explicit confirmation.
 - Creates the Management VM from Ubuntu 24.04 cloud image.
 - Installs Docker CE on Management VM using official Docker apt repo (`download.docker.com`).
-- Clones `https://github.com/harrywesterman/twinbox` into `/opt/twinbox-<cluster-slug>`.
+- Clones `https://github.com/harrywesterman/twinbox` into `/opt/twinbox`.
 - Starts the manager stack with `docker compose pull && docker compose up -d`.
 
 ## Run

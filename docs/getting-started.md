@@ -20,8 +20,8 @@ The wizard:
 - Creates the Management VM with cluster-specific naming and tags.
 - Detects existing resources for that cluster and can remove them after explicit confirmation.
 - Installs Docker CE on that VM from the official Docker repository.
-- Clones `https://github.com/harrywesterman/twinbox` into `/opt/twinbox-<cluster-slug>`.
-- Writes `/opt/twinbox-<cluster-slug>/.env` and starts the manager stack automatically.
+- Clones `https://github.com/harrywesterman/twinbox` into `/opt/twinbox`.
+- Writes `/opt/twinbox/.env` and starts the manager stack automatically.
 
 ## Step 2: Open UI
 
