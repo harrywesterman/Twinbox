@@ -26,6 +26,14 @@ Object.values(dirs).forEach((dir) => ensureDir(dir));
 
 app.use(express.json());
 
+function parseNodeCount(value, fallback = 3) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 215) {
+    return fallback;
+  }
+  return parsed;
+}
+
 function preferredVipOctets() {
   const values = [];
   for (let octet = 50; octet <= 240; octet += 1) values.push(octet);
@@ -39,6 +47,14 @@ function preferredStartOctets() {
   for (let octet = 50; octet <= 252; octet += 1) values.push(octet);
   for (let octet = 2; octet < 50; octet += 1) values.push(octet);
   return values;
+}
+
+function preferredStartOctetsForVip(vipOctet) {
+  const baseline = preferredStartOctets().filter((octet) => octet !== vipOctet + 1);
+  if (Number.isInteger(vipOctet + 1) && vipOctet + 1 <= 252) {
+    return [vipOctet + 1, ...baseline];
+  }
+  return baseline;
 }
 
 function probeIpInUse(ip) {
@@ -57,13 +73,85 @@ function probeIpInUse(ip) {
   return result.status === 0;
 }
 
-function suggestIpRange(managementIp) {
+function listUsedVmids() {
+  const resourcesBin = process.env.MANAGER_API_CLUSTER_RESOURCES_BIN || "pvesh";
+  const isDefaultResourcesBin = path.basename(resourcesBin) === "pvesh";
+  const args = isDefaultResourcesBin ? ["get", "/cluster/resources", "--type", "vm", "--output-format", "json"] : [];
+  const result = spawnSync(resourcesBin, args, {
+    encoding: "utf8",
+    timeout: 3000,
+  });
+
+  if (result.error?.code === "ENOENT") {
+    if (isDefaultResourcesBin) {
+      const qmResult = spawnSync("qm", ["list"], {
+        encoding: "utf8",
+        timeout: 3000,
+      });
+      if (qmResult.error?.code === "ENOENT") {
+        throw new Error("Unable to inspect cluster VMIDs: pvesh and qm are both unavailable");
+      }
+      if (qmResult.status !== 0) {
+        throw new Error(`qm list failed: ${(qmResult.stderr || qmResult.stdout || "").trim()}`);
+      }
+      return new Set(
+        (qmResult.stdout || "")
+          .split("\n")
+          .slice(1)
+          .map((line) => line.trim().split(/\s+/)[0])
+          .filter((value) => /^\d+$/.test(value))
+          .map(Number),
+      );
+    }
+    throw new Error(`Cluster resources command not found: ${resourcesBin}`);
+  }
+
+  if (result.status !== 0) {
+    throw new Error(`Cluster resources lookup failed: ${(result.stderr || result.stdout || "").trim()}`);
+  }
+
+  try {
+    const parsed = JSON.parse(result.stdout || "[]");
+    return new Set(
+      Array.isArray(parsed)
+        ? parsed
+          .map((entry) => Number(entry?.vmid))
+          .filter((value) => Number.isInteger(value) && value >= 100)
+        : [],
+    );
+  } catch (error) {
+    throw new Error(`Failed to parse cluster VM resources: ${error instanceof Error ? error.message : "unknown error"}`);
+  }
+}
+
+function findFreeVmidBlock(nodeCount) {
+  const usedVmids = listUsedVmids();
+  let candidate = 100;
+
+  while (candidate <= 999999) {
+    const block = Array.from({ length: nodeCount }, (_, offset) => candidate + offset);
+    if (block.every((vmid) => !usedVmids.has(vmid))) {
+      return {
+        start_vmid: candidate,
+        vmid_block: block,
+      };
+    }
+    candidate += 1;
+  }
+
+  throw new Error(`No free consecutive ${nodeCount}-VMID block found`);
+}
+
+function buildIpBlock(prefix, startOctet, nodeCount) {
+  return Array.from({ length: nodeCount }, (_, offset) => `${prefix}.${startOctet + offset}`);
+}
+
+function suggestAllocation(managementIp, nodeCount) {
   const octets = managementIp.split(".").map(Number);
   const prefix = `${octets[0]}.${octets[1]}.${octets[2]}`;
   const managementOctet = octets[3];
   const inUseCache = new Map();
   const vipCandidates = preferredVipOctets();
-  const startCandidates = preferredStartOctets();
 
   const isIpInUse = (hostOctet) => {
     if (inUseCache.has(hostOctet)) {
@@ -74,6 +162,7 @@ function suggestIpRange(managementIp) {
     return inUse;
   };
 
+  const vmidSuggestion = findFreeVmidBlock(nodeCount);
   let vipOctet = null;
   for (const candidate of vipCandidates) {
     if (candidate === managementOctet) continue;
@@ -88,8 +177,8 @@ function suggestIpRange(managementIp) {
   }
 
   let startOctet = null;
-  for (const candidate of startCandidates) {
-    const block = [candidate, candidate + 1, candidate + 2];
+  for (const candidate of preferredStartOctetsForVip(vipOctet)) {
+    const block = Array.from({ length: nodeCount }, (_, offset) => candidate + offset);
     if (block.some((octet) => octet > 254 || octet === managementOctet || octet === vipOctet)) {
       continue;
     }
@@ -100,21 +189,62 @@ function suggestIpRange(managementIp) {
   }
 
   if (startOctet === null) {
-    throw new Error(`No free consecutive 3-IP block found in ${prefix}.0/24`);
+    throw new Error(`No free consecutive ${nodeCount}-IP block found in ${prefix}.0/24`);
   }
 
+  const ipBlock = buildIpBlock(prefix, startOctet, nodeCount);
   return {
     management_ip: managementIp,
     subnet: `${prefix}.0/24`,
+    node_count: nodeCount,
+    start_vmid: vmidSuggestion.start_vmid,
+    vmid_block: vmidSuggestion.vmid_block,
     vip_ip: `${prefix}.${vipOctet}`,
     start_ip: `${prefix}.${startOctet}`,
-    start_ip_block: [
-      `${prefix}.${startOctet}`,
-      `${prefix}.${startOctet + 1}`,
-      `${prefix}.${startOctet + 2}`,
-    ],
+    start_ip_block: ipBlock,
     probed_addresses: inUseCache.size,
   };
+}
+
+function validateRequestedAllocation({ startVmid, vipIp, startIp, nodeCount }) {
+  const usedVmids = listUsedVmids();
+  const requestedVmids = Array.from({ length: nodeCount }, (_, offset) => startVmid + offset);
+  if (!requestedVmids.every((vmid) => !usedVmids.has(vmid))) {
+    return {
+      ok: false,
+      error: `VMID range ${requestedVmids[0]}-${requestedVmids[requestedVmids.length - 1]} is not free`,
+    };
+  }
+
+  const vipParts = vipIp.split(".");
+  const startParts = startIp.split(".");
+  const vipPrefix = vipParts.slice(0, 3).join(".");
+  const startPrefix = startParts.slice(0, 3).join(".");
+  if (vipPrefix !== startPrefix) {
+    return { ok: false, error: "vip_ip and start_ip must be in the same /24 subnet" };
+  }
+
+  const startOctet = Number(startParts[3]);
+  const vipOctet = Number(vipParts[3]);
+  const ipBlock = buildIpBlock(startPrefix, startOctet, nodeCount);
+  if (ipBlock.some((ip) => Number(ip.split(".")[3]) > 254)) {
+    return { ok: false, error: `Node IP range starting at ${startIp} exceeds the /24 subnet` };
+  }
+
+  if (vipOctet === startOctet || ipBlock.includes(vipIp)) {
+    return { ok: false, error: "vip_ip must not overlap with the node IP range" };
+  }
+
+  if (probeIpInUse(vipIp)) {
+    return { ok: false, error: `VIP IP ${vipIp} is already in use` };
+  }
+
+  const occupiedIp = ipBlock.find((ip) => probeIpInUse(ip));
+  if (occupiedIp) {
+    return { ok: false, error: `Node IP ${occupiedIp} is already in use` };
+  }
+
+  return { ok: true };
 }
 
 function readStepState(stepId) {
@@ -164,6 +294,7 @@ app.get("/api/ip-suggestions", (req, res) => {
   const queryIp = pickFirstString(req.query.management_ip);
   const fallbackHostIp = typeof req.hostname === "string" ? req.hostname : "";
   const managementIp = queryIp || fallbackHostIp;
+  const nodeCount = parseNodeCount(pickFirstString(req.query.node_count));
   const parsedManagementIp = parseIPv4(managementIp, "management_ip");
 
   if (!parsedManagementIp.ok) {
@@ -173,7 +304,7 @@ app.get("/api/ip-suggestions", (req, res) => {
   }
 
   try {
-    return res.json(suggestIpRange(parsedManagementIp.value));
+    return res.json(suggestAllocation(parsedManagementIp.value, nodeCount));
   } catch (e) {
     return res.status(500).json({
       error: e instanceof Error ? e.message : "failed to suggest IP addresses",
@@ -186,6 +317,22 @@ app.post("/api/clusters", (req, res) => {
   const built = buildClusterFromRequest(body, process.env);
   if (!built.ok) {
     return res.status(400).json({ error: built.error });
+  }
+
+  try {
+    const allocation = validateRequestedAllocation({
+      startVmid: built.cluster.start_vmid,
+      vipIp: built.cluster.vip_ip,
+      startIp: built.cluster.start_ip,
+      nodeCount: built.cluster.controlplane_count + built.cluster.worker_count,
+    });
+    if (!allocation.ok) {
+      return res.status(400).json({ error: allocation.error });
+    }
+  } catch (e) {
+    return res.status(500).json({
+      error: e instanceof Error ? e.message : "failed to validate allocation",
+    });
   }
 
   persistCluster(dirs, built.cluster);
@@ -234,6 +381,22 @@ app.post("/api/steps/:stepId/execute", (req, res) => {
     const built = buildClusterFromRequest(validated.value, process.env);
     if (!built.ok) {
       return res.status(400).json({ error: built.error });
+    }
+
+    try {
+      const allocation = validateRequestedAllocation({
+        startVmid: built.cluster.start_vmid,
+        vipIp: built.cluster.vip_ip,
+        startIp: built.cluster.start_ip,
+        nodeCount: built.cluster.controlplane_count + built.cluster.worker_count,
+      });
+      if (!allocation.ok) {
+        return res.status(400).json({ error: allocation.error });
+      }
+    } catch (e) {
+      return res.status(500).json({
+        error: e instanceof Error ? e.message : "failed to validate allocation",
+      });
     }
 
     persistCluster(dirs, built.cluster);

@@ -53,10 +53,18 @@ def _post_json(url, payload):
 
 
 def _start_api(data_dir: Path, port: int):
+    ping_mock = data_dir.parent / "mock-ping.sh"
+    vm_mock = data_dir.parent / "mock-vms.sh"
+    ping_mock.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    ping_mock.chmod(0o755)
+    vm_mock.write_text("#!/bin/sh\necho '[]'\n", encoding="utf-8")
+    vm_mock.chmod(0o755)
     env = os.environ.copy()
     env["MANAGER_DATA_DIR"] = str(data_dir)
     env["MANAGER_API_PORT"] = str(port)
     env["WORKSPACE_ROOT"] = str(REPO_ROOT)
+    env["MANAGER_API_PING_BIN"] = str(ping_mock)
+    env["MANAGER_API_CLUSTER_RESOURCES_BIN"] = str(vm_mock)
     return subprocess.Popen(
         ["node", "manager-api/src/server.js"],
         cwd=REPO_ROOT,

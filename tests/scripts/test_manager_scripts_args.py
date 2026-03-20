@@ -110,6 +110,15 @@ def test_create_talos_vms_waits_for_proxmox_tasks_to_finish():
     assert 'wait_for_task_completion "$start_upid"' in text
 
 
+def test_create_talos_vms_uses_twinbox_slugged_names():
+    text = _create_talos_text()
+    assert 'vm_base_name="${NAME}"' in text
+    assert 'if [[ "$vm_base_name" != twinbox-* ]]; then' in text
+    assert 'vm_base_name="twinbox-${vm_base_name}"' in text
+    assert 'vm_name="${vm_base_name}-cp-${i}"' in text
+    assert 'vm_name="${vm_base_name}-worker-${i}"' in text
+
+
 def test_bootstrap_talos_detaches_iso_after_enrollment():
     text = _bootstrap_talos_text()
     assert "detach_vm_iso()" in text

@@ -10,6 +10,26 @@ import {
   writeJson,
 } from "./common.js";
 
+export function normalizeClusterSlug(rawName) {
+  const trimmed = String(rawName || "").trim().toLowerCase();
+  const withoutPrefix = trimmed.startsWith("twinbox-") ? trimmed.slice("twinbox-".length) : trimmed;
+  return withoutPrefix
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export function normalizeClusterName(rawName) {
+  const slug = normalizeClusterSlug(rawName);
+  if (!slug) {
+    return null;
+  }
+  return {
+    slug,
+    name: `twinbox-${slug}`,
+  };
+}
+
 export function buildClusterFromRequest(body, env) {
   const parsedName = parseRequiredString(body.name, "name");
   const parsedBridge = parseRequiredString(body.bridge, "bridge");
@@ -40,12 +60,17 @@ export function buildClusterFromRequest(body, env) {
     return { ok: false, error: failed.error };
   }
 
+  const normalizedName = normalizeClusterName(parsedName.value);
+  if (!normalizedName) {
+    return { ok: false, error: "name must contain letters or numbers" };
+  }
+
   const clusterId = id("cluster");
   return {
     ok: true,
     cluster: {
       id: clusterId,
-      name: parsedName.value,
+      name: normalizedName.name,
       controlplane_count: parsedControlplanes.value,
       worker_count: parsedWorkers.value,
       cpu_cores: parsedCpu.value,
@@ -61,6 +86,7 @@ export function buildClusterFromRequest(body, env) {
       metadata: {
         proxmox_node: body.proxmox_node || env.PROXMOX_NODE || "pve",
         storage_pool: body.storage_pool || env.PROXMOX_STORAGE_POOL || "local-lvm",
+        cluster_slug: normalizedName.slug,
       },
     },
   };

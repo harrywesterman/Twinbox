@@ -149,10 +149,15 @@ cp_ids=()
 worker_ids=()
 cp_ips=()
 worker_ips=()
+vm_base_name="${NAME}"
+
+if [[ "$vm_base_name" != twinbox-* ]]; then
+  vm_base_name="twinbox-${vm_base_name}"
+fi
 
 current_vmid="$START_VMID"
 for i in $(seq 1 "$CP_COUNT"); do
-  vm_name="${NAME}-cp-${i}"
+  vm_name="${vm_base_name}-cp-${i}"
   ip=$(next_ip $((i - 1)))
   create_vm "$current_vmid" "$vm_name" "controlplane"
   cp_ids+=("$current_vmid")
@@ -162,7 +167,7 @@ for i in $(seq 1 "$CP_COUNT"); do
 done
 
 for i in $(seq 1 "$WORKER_COUNT"); do
-  vm_name="${NAME}-worker-${i}"
+  vm_name="${vm_base_name}-worker-${i}"
   ip=$(next_ip $((CP_COUNT + i - 1)))
   create_vm "$current_vmid" "$vm_name" "worker"
   worker_ids+=("$current_vmid")

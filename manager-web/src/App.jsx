@@ -394,6 +394,8 @@ function App() {
     };
   }, [activeClusterId]);
 
+  const provisionDraft = draftInputs['provision-nodes'] || {};
+
   useEffect(() => {
     if (activeStep?.id !== 'provision-nodes') {
       setIpSuggestion('');
@@ -402,11 +404,15 @@ function App() {
 
     const managementIp = window.location.hostname;
     if (!isIPv4(managementIp)) return undefined;
+    const controlplaneCount = Number(provisionDraft.controlplane_count ?? activeStep.inputs.find((input) => input.id === 'controlplane_count')?.default ?? 1);
+    const workerCount = Number(provisionDraft.worker_count ?? activeStep.inputs.find((input) => input.id === 'worker_count')?.default ?? 0);
+    const nodeCount = controlplaneCount + workerCount;
+    if (!Number.isInteger(nodeCount) || nodeCount < 1) return undefined;
 
     let cancelled = false;
     const loadIpSuggestions = async () => {
       try {
-        const res = await fetch(`/api/ip-suggestions?management_ip=${encodeURIComponent(managementIp)}`);
+        const res = await fetch(`/api/ip-suggestions?management_ip=${encodeURIComponent(managementIp)}&node_count=${encodeURIComponent(nodeCount)}`);
         if (!res.ok || cancelled) return;
 
         const data = await res.json();
@@ -414,19 +420,24 @@ function App() {
           const current = prev['provision-nodes'] || {};
           const vipField = activeStep.inputs.find((input) => input.id === 'vip_ip');
           const startField = activeStep.inputs.find((input) => input.id === 'start_ip');
+          const vmidField = activeStep.inputs.find((input) => input.id === 'start_vmid');
 
           return {
             ...prev,
             'provision-nodes': {
               ...current,
+              start_vmid: current.start_vmid === undefined || current.start_vmid === vmidField?.default ? (data.start_vmid || current.start_vmid) : current.start_vmid,
               vip_ip: current.vip_ip === undefined || current.vip_ip === vipField?.default ? (data.vip_ip || current.vip_ip) : current.vip_ip,
               start_ip: current.start_ip === undefined || current.start_ip === startField?.default ? (data.start_ip || current.start_ip) : current.start_ip,
             },
           };
         });
 
-        if (Array.isArray(data.start_ip_block) && data.start_ip_block.length === 3) {
-          setIpSuggestion(`Free range found: VIP ${data.vip_ip}, node block ${data.start_ip_block.join(', ')}`);
+        if (Array.isArray(data.start_ip_block) && data.start_ip_block.length === nodeCount) {
+          const vmidBlock = Array.isArray(data.vmid_block) && data.vmid_block.length > 0
+            ? `${data.vmid_block[0]}-${data.vmid_block[data.vmid_block.length - 1]}`
+            : data.start_vmid;
+          setIpSuggestion(`Free range found: VMIDs ${vmidBlock}, VIP ${data.vip_ip}, node block ${data.start_ip_block.join(', ')}`);
         }
       } catch {
         setIpSuggestion('');
@@ -437,7 +448,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [activeStep]);
+  }, [activeStep, provisionDraft.controlplane_count, provisionDraft.worker_count]);
 
   const goToStep = (stepId) => {
     const target = mission.steps.find((step) => step.id === stepId);

@@ -50,10 +50,28 @@ def _get_json(url):
 def test_job_status_and_logs_endpoints():
     with tempfile.TemporaryDirectory() as td:
         data_dir = Path(td) / "data"
+        ping_mock = Path(td) / "mock-ping.sh"
+        vm_mock = Path(td) / "mock-vms.sh"
+        ping_mock.write_text(
+            """#!/bin/sh
+exit 1
+""",
+            encoding="utf-8",
+        )
+        ping_mock.chmod(0o755)
+        vm_mock.write_text(
+            """#!/bin/sh
+echo '[]'
+""",
+            encoding="utf-8",
+        )
+        vm_mock.chmod(0o755)
         port = _find_free_port()
         env = os.environ.copy()
         env["MANAGER_DATA_DIR"] = str(data_dir)
         env["MANAGER_API_PORT"] = str(port)
+        env["MANAGER_API_PING_BIN"] = str(ping_mock)
+        env["MANAGER_API_CLUSTER_RESOURCES_BIN"] = str(vm_mock)
 
         proc = subprocess.Popen(
             ["node", "manager-api/src/server.js"],
@@ -69,7 +87,7 @@ def test_job_status_and_logs_endpoints():
             _wait_for_health(base)
 
             payload = {
-                "name": "demo",
+                "name": "development",
                 "controlplane_count": 1,
                 "worker_count": 1,
                 "cpu_cores": 2,
@@ -84,6 +102,10 @@ def test_job_status_and_logs_endpoints():
             assert status == 202
             job_id = created["job_id"]
             cluster_id = created["cluster_id"]
+
+            status, cluster = _get_json(f"{base}/api/clusters/{cluster_id}")
+            assert status == 200
+            assert cluster["name"] == "twinbox-development"
 
             status, job = _get_json(f"{base}/api/jobs/{job_id}")
             assert status == 200
