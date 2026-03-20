@@ -5,17 +5,15 @@ import { readFile } from 'node:fs/promises';
 const appSourcePath = new URL('../src/App.jsx', import.meta.url);
 const appStylesPath = new URL('../src/App.css', import.meta.url);
 
-test('app source defines the mission control header, rail, workspace, activity panels, and live runtime strip', async () => {
+test('app source defines a guided setup shell with compact progress and visible technical details', async () => {
   const source = await readFile(appSourcePath, 'utf8');
 
-  assert.match(source, /className="global-header"/, 'expected a global header for install progress and health');
-  assert.match(source, /className="journey-rail"/, 'expected a dedicated phase rail');
-  assert.match(source, /className="workspace-panel"/, 'expected a central active-step workspace');
-  assert.match(source, /className="activity-panel"/, 'expected a dedicated activity panel');
-  assert.match(source, /className="runtime-strip"/, 'expected a primary live runtime strip');
-  assert.match(source, /Current stage/, 'expected a current stage label in the runtime strip');
-  assert.match(source, /Updated/, 'expected last updated text for runtime freshness');
-  assert.match(source, /Timeline/, 'expected a visible timeline section');
+  assert.match(source, /mission\.mode === 'setup'/, 'expected a setup branch in the app source');
+  assert.match(source, /className="setup-progress-rail"/, 'expected a compact setup progress rail');
+  assert.match(source, /className="setup-workspace"/, 'expected a dominant setup workspace');
+  assert.match(source, /Technical details/, 'expected technical details to remain visible');
+  assert.match(source, /<details className="technical-panel" open>/, 'expected technical details to be open by default');
+  assert.match(source, /className="manage-workspace"/, 'expected a manage-mode fallback branch');
   assert.match(source, /journey-rail-toggle/, 'expected a mobile rail toggle control');
   assert.match(source, /fetch\('\/api\/catalog'\)/, 'expected catalog discovery from the backend');
   assert.match(source, /executeStep/, 'expected a catalog-driven step execution handler');
