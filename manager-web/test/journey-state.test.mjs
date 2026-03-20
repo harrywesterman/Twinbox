@@ -140,6 +140,51 @@ test('mission model exposes guided setup mode and numbered actions', () => {
   assert.equal(model.stepRail[1].isCurrent, true);
 });
 
+test('mission model labels the next action as continue when the current step is done', () => {
+  const completedStepCatalog = structuredClone(catalog);
+  completedStepCatalog.categories[1].steps[0].status = 'done';
+  completedStepCatalog.categories[1].steps[0].state = {
+    ...completedStepCatalog.categories[1].steps[0].state,
+    status: 'succeeded',
+  };
+
+  const model = getMissionControlModel({
+    catalog: completedStepCatalog,
+    logs: [],
+    cluster: { id: 'cluster_demo', status: 'provisioned' },
+    health: { ok: true },
+    error: '',
+    busy: false,
+    selectedStepId: 'provision-nodes',
+  });
+
+  assert.equal(model.mode, 'setup');
+  assert.equal(model.primaryAction.label, 'Continue to step 3');
+});
+
+test('mission model labels the primary action as retry when a setup step fails', () => {
+  const failedStepCatalog = structuredClone(catalog);
+  failedStepCatalog.categories[1].steps[0].status = 'failed';
+  failedStepCatalog.categories[1].steps[0].state = {
+    ...failedStepCatalog.categories[1].steps[0].state,
+    status: 'failed',
+    error: 'provisioning failed',
+  };
+
+  const model = getMissionControlModel({
+    catalog: failedStepCatalog,
+    logs: [],
+    cluster: null,
+    health: { ok: true },
+    error: '',
+    busy: false,
+    selectedStepId: 'provision-nodes',
+  });
+
+  assert.equal(model.mode, 'setup');
+  assert.equal(model.primaryAction.label, 'Retry step 2');
+});
+
 test('mission model switches to manage mode when setup flow is complete', () => {
   const completedCatalog = structuredClone(catalog);
   for (const category of completedCatalog.categories) {
