@@ -411,14 +411,6 @@ function SetupShell({
           ) : null}
 
           <div className="bottom-actions">
-            <button
-              type="button"
-              className="secondary-action"
-              onClick={() => mission.previousStep && goToStep(mission.previousStep.id)}
-              disabled={!mission.previousStep}
-            >
-              Previous
-            </button>
             <button type="button" className="ghost-action" onClick={fetchCatalogOnce}>
               Refresh catalog
             </button>
@@ -553,7 +545,7 @@ function ManageShell({
           </div>
         </aside>
 
-        <section className="manage-workspace">
+        <section className="workspace-panel manage-workspace">
           <div className="workspace-header">
             <div>
               <p className="section-kicker">{mission.activeCategory.title}</p>

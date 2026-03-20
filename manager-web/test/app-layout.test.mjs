@@ -7,13 +7,19 @@ const appStylesPath = new URL('../src/App.css', import.meta.url);
 
 test('app source defines a guided setup shell with compact progress and visible technical details', async () => {
   const source = await readFile(appSourcePath, 'utf8');
+  const setupStart = source.indexOf('function SetupShell');
+  const manageStart = source.indexOf('function ManageShell');
+  const setupSource = setupStart >= 0 && manageStart >= 0 ? source.slice(setupStart, manageStart) : source;
+  const manageSource = manageStart >= 0 ? source.slice(manageStart) : source;
 
   assert.match(source, /mission\.mode === 'setup'/, 'expected a setup branch in the app source');
   assert.match(source, /className="setup-progress-rail"/, 'expected a compact setup progress rail');
   assert.match(source, /className="setup-workspace"/, 'expected a dominant setup workspace');
   assert.match(source, /Technical details/, 'expected technical details to remain visible');
   assert.match(source, /<details className="technical-panel" open>/, 'expected technical details to be open by default');
-  assert.match(source, /className="manage-workspace"/, 'expected a manage-mode fallback branch');
+  assert.match(manageSource, /className="[^"]*workspace-panel[^"]*manage-workspace[^"]*"/, 'expected manage fallback to keep the workspace-panel contract alive');
+  assert.match(manageSource, /manage-workspace/, 'expected a manage-mode fallback marker');
+  assert.doesNotMatch(setupSource, /Previous/, 'setup mode should not show a Previous button');
   assert.match(source, /journey-rail-toggle/, 'expected a mobile rail toggle control');
   assert.match(source, /fetch\('\/api\/catalog'\)/, 'expected catalog discovery from the backend');
   assert.match(source, /executeStep/, 'expected a catalog-driven step execution handler');
