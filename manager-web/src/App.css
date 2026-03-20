@@ -212,6 +212,83 @@
   justify-self: start;
 }
 
+.setup-shell {
+  display: grid;
+  gap: 22px;
+}
+
+.setup-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.setup-progress-rail,
+.setup-workspace {
+  position: relative;
+  border: 1px solid var(--border-subtle);
+  border-radius: 28px;
+  background: rgba(252, 250, 247, 0.92);
+  box-shadow: 0 22px 50px rgba(15, 23, 42, 0.11);
+  backdrop-filter: blur(18px);
+}
+
+.setup-progress-rail {
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  position: sticky;
+  top: 20px;
+}
+
+.setup-workspace {
+  display: grid;
+  gap: 16px;
+  padding: 26px;
+}
+
+.setup-workspace .workspace-header h2 {
+  max-width: 11ch;
+  font-size: clamp(2.1rem, 4vw, 3.6rem);
+  line-height: 0.94;
+}
+
+.setup-workspace .section-header h3 {
+  font-size: 1.2rem;
+}
+
+.setup-workspace .bottom-actions {
+  justify-content: flex-start;
+}
+
+.setup-workspace .bottom-actions > button:last-child {
+  min-width: 170px;
+}
+
+.setup-workspace .technical-panel {
+  padding: 0;
+}
+
+.setup-workspace .technical-panel summary {
+  padding: 0 18px;
+}
+
+.setup-workspace .technical-panel pre {
+  margin: 14px 18px 18px;
+}
+
+.technical-panel[open] {
+  border-color: rgba(13, 148, 136, 0.22);
+  background: rgba(252, 250, 247, 0.96);
+  box-shadow: 0 22px 50px rgba(15, 23, 42, 0.11);
+}
+
+.manage-workspace {
+  display: grid;
+  gap: 16px;
+}
+
 .mission-grid {
   display: grid;
   grid-template-columns: minmax(260px, 320px) minmax(0, 1.45fr) minmax(280px, 0.9fr);
@@ -545,6 +622,10 @@ button:disabled {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .setup-grid {
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  }
+
   .mission-grid {
     grid-template-columns: minmax(230px, 280px) minmax(0, 1fr);
   }
@@ -560,8 +641,25 @@ button:disabled {
     display: inline-flex;
   }
 
+  .setup-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-progress-rail {
+    display: none;
+    position: static;
+  }
+
+  .setup-progress-rail[data-mobile-open="true"] {
+    display: grid;
+  }
+
   .mission-grid {
     grid-template-columns: 1fr;
+  }
+
+  .setup-shell .setup-progress-rail {
+    position: static;
   }
 
   .journey-rail {
@@ -584,8 +682,11 @@ button:disabled {
   }
 
   .global-header,
+  .setup-progress-rail,
+  .setup-workspace,
   .journey-rail,
   .workspace-panel,
+  .manage-workspace,
   .activity-panel,
   .panel-card,
   .workspace-section,
@@ -596,6 +697,7 @@ button:disabled {
 
   .global-header-stats,
   .health-strip,
+  .setup-grid,
   .workspace-meta,
   .field-grid,
   .result-grid,

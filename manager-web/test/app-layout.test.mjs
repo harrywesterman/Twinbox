@@ -26,9 +26,16 @@ test('app source defines a guided setup shell with compact progress and visible 
   assert.match(source, /executeStep/, 'expected a catalog-driven step execution handler');
 });
 
-test('styles define a three-column mission control grid, runtime strip, and responsive rail behavior', async () => {
+test('styles define a setup-first shell and preserve the manage fallback styles', async () => {
   const css = await readFile(appStylesPath, 'utf8');
 
+  assert.match(css, /\.setup-shell\s*\{/, 'expected a dedicated setup shell container');
+  assert.match(css, /\.setup-grid\s*\{/, 'expected setup layout columns');
+  assert.match(css, /\.setup-progress-rail\s*\{/, 'expected a compact setup progress rail');
+  assert.match(css, /\.setup-workspace\s*\{/, 'expected a dominant setup workspace');
+  assert.match(css, /\.technical-panel\[open\]\s*\{/, 'expected open technical details styling');
+  assert.match(css, /\.manage-workspace\s*\{/, 'expected the manage fallback workspace to remain styled');
+  assert.match(css, /\.workspace-panel\s*\{/, 'expected the legacy workspace-panel contract to remain styled');
   assert.match(css, /\.mission-grid\s*\{[\s\S]*grid-template-columns:/, 'expected mission control columns in CSS');
   assert.match(css, /\.runtime-strip\s*\{/, 'expected styling for the live runtime strip');
   assert.match(css, /\.runtime-pulse\s*\{/, 'expected a pulse indicator for live execution');
