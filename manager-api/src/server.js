@@ -1,82 +1,30 @@
 import express from "express";
 import fs from "fs";
 import path from "path";
-import crypto from "crypto";
 import { spawnSync } from "child_process";
+
+import { buildBootstrapPayload, buildClusterFromRequest, loadCluster, persistCluster } from "./lib/clusters.js";
+import { buildCatalogResponse, validateStepInputs } from "./lib/catalog.js";
+import {
+  buildDataDirs,
+  ensureDir,
+  now,
+  parseIPv4,
+  pickFirstString,
+  readJson,
+  writeJson,
+} from "./lib/common.js";
+import { queueJob } from "./lib/jobs.js";
 
 const app = express();
 const port = Number(process.env.MANAGER_API_PORT || 8080);
 const dataRoot = process.env.MANAGER_DATA_DIR || "/data";
+const workspaceRoot = process.env.WORKSPACE_ROOT || process.cwd();
+const dirs = buildDataDirs(dataRoot);
 
-const dirs = {
-  clusters: path.join(dataRoot, "clusters"),
-  jobs: path.join(dataRoot, "jobs"),
-  logs: path.join(dataRoot, "logs"),
-  pending: path.join(dataRoot, "queue", "pending"),
-};
-
-Object.values(dirs).forEach((dir) => fs.mkdirSync(dir, { recursive: true }));
+Object.values(dirs).forEach((dir) => ensureDir(dir));
 
 app.use(express.json());
-
-function now() {
-  return new Date().toISOString();
-}
-
-function id(prefix) {
-  return `${prefix}_${crypto.randomUUID().replace(/-/g, "")}`;
-}
-
-function writeJson(file, value) {
-  fs.writeFileSync(file, JSON.stringify(value, null, 2));
-}
-
-function readJson(file) {
-  return JSON.parse(fs.readFileSync(file, "utf8"));
-}
-
-function parseIntInRange(value, field, min, max) {
-  const n = Number(value);
-  if (!Number.isInteger(n) || n < min || n > max) {
-    return { ok: false, error: `${field} must be an integer between ${min} and ${max}` };
-  }
-  return { ok: true, value: n };
-}
-
-function parseRequiredString(value, field) {
-  if (typeof value !== "string" || value.trim() === "") {
-    return { ok: false, error: `${field} must be a non-empty string` };
-  }
-  return { ok: true, value: value.trim() };
-}
-
-function parseIPv4(value, field) {
-  if (typeof value !== "string") {
-    return { ok: false, error: `${field} must be a valid IPv4 address` };
-  }
-  const parts = value.split(".");
-  if (parts.length !== 4) {
-    return { ok: false, error: `${field} must be a valid IPv4 address` };
-  }
-  const valid = parts.every((part) => {
-    if (!/^\d+$/.test(part)) {
-      return false;
-    }
-    const n = Number(part);
-    return n >= 0 && n <= 255;
-  });
-  if (!valid) {
-    return { ok: false, error: `${field} must be a valid IPv4 address` };
-  }
-  return { ok: true, value };
-}
-
-function pickFirstString(value) {
-  if (Array.isArray(value)) {
-    return typeof value[0] === "string" ? value[0] : "";
-  }
-  return typeof value === "string" ? value : "";
-}
 
 function preferredVipOctets() {
   const values = [];
@@ -169,38 +117,47 @@ function suggestIpRange(managementIp) {
   };
 }
 
-function queueJob(type, clusterId, payload) {
-  const jobId = id("job");
-  const job = {
-    id: jobId,
-    type,
-    cluster_id: clusterId,
-    status: "pending",
-    step: "queued",
+function readStepState(stepId) {
+  const file = path.join(dirs.stepState, `${stepId}.json`);
+  if (!fs.existsSync(file)) {
+    return null;
+  }
+  return readJson(file);
+}
+
+function writeStepState(stepId, patch) {
+  const file = path.join(dirs.stepState, `${stepId}.json`);
+  const current = readStepState(stepId) || {
+    step_id: stepId,
+    status: "not_started",
+    inputs: {},
+    outputs: null,
+    cluster_id: null,
     error: null,
-    payload,
+    last_job_id: null,
     created_at: now(),
-    updated_at: now(),
-    started_at: null,
-    finished_at: null,
-    result: null,
   };
 
-  writeJson(path.join(dirs.jobs, `${jobId}.json`), job);
-  writeJson(path.join(dirs.pending, `${jobId}.json`), {
-    id: jobId,
-    type,
-    cluster_id: clusterId,
-    payload,
-    queued_at: now(),
-  });
-
-  fs.appendFileSync(path.join(dirs.logs, `${jobId}.log`), `[${now()}] queued ${type}\n`);
-  return job;
+  const next = {
+    ...current,
+    ...patch,
+    step_id: stepId,
+    updated_at: now(),
+  };
+  writeJson(file, next);
+  return next;
 }
 
 app.get("/api/health", (_, res) => {
   res.json({ ok: true, time: now() });
+});
+
+app.get("/api/catalog", (_, res) => {
+  const catalog = buildCatalogResponse({ workspaceRoot, dirs });
+  return res.json({
+    categories: catalog.categories,
+    errors: catalog.errors,
+  });
 });
 
 app.get("/api/ip-suggestions", (req, res) => {
@@ -226,62 +183,14 @@ app.get("/api/ip-suggestions", (req, res) => {
 
 app.post("/api/clusters", (req, res) => {
   const body = req.body || {};
-
-  const parsedName = parseRequiredString(body.name, "name");
-  const parsedBridge = parseRequiredString(body.bridge, "bridge");
-  const parsedControlplanes = parseIntInRange(body.controlplane_count, "controlplane_count", 1, 15);
-  const parsedWorkers = parseIntInRange(body.worker_count, "worker_count", 0, 200);
-  const parsedCpu = parseIntInRange(body.cpu_cores, "cpu_cores", 1, 64);
-  const parsedMemory = parseIntInRange(body.memory_mb, "memory_mb", 512, 1048576);
-  const parsedDisk = parseIntInRange(body.disk_gb, "disk_gb", 10, 8192);
-  const parsedStartVmid = parseIntInRange(body.start_vmid, "start_vmid", 100, 999999);
-  const parsedVipIp = parseIPv4(body.vip_ip, "vip_ip");
-  const parsedStartIp = parseIPv4(body.start_ip, "start_ip");
-
-  const validations = [
-    parsedName,
-    parsedBridge,
-    parsedControlplanes,
-    parsedWorkers,
-    parsedCpu,
-    parsedMemory,
-    parsedDisk,
-    parsedStartVmid,
-    parsedVipIp,
-    parsedStartIp,
-  ];
-
-  const failed = validations.find((v) => !v.ok);
-  if (failed) {
-    return res.status(400).json({ error: failed.error });
+  const built = buildClusterFromRequest(body, process.env);
+  if (!built.ok) {
+    return res.status(400).json({ error: built.error });
   }
 
-  const clusterId = id("cluster");
-  const cluster = {
-    id: clusterId,
-    name: parsedName.value,
-    controlplane_count: parsedControlplanes.value,
-    worker_count: parsedWorkers.value,
-    cpu_cores: parsedCpu.value,
-    memory_mb: parsedMemory.value,
-    disk_gb: parsedDisk.value,
-    bridge: parsedBridge.value,
-    start_vmid: parsedStartVmid.value,
-    vip_ip: parsedVipIp.value,
-    start_ip: parsedStartIp.value,
-    status: "requested",
-    created_at: now(),
-    updated_at: now(),
-    metadata: {
-      proxmox_node: body.proxmox_node || process.env.PROXMOX_NODE || "pve",
-      storage_pool: body.storage_pool || process.env.PROXMOX_STORAGE_POOL || "local-lvm",
-    },
-  };
-
-  writeJson(path.join(dirs.clusters, `${clusterId}.json`), cluster);
-  const job = queueJob("create_cluster", clusterId, cluster);
-
-  return res.status(202).json({ cluster_id: clusterId, job_id: job.id });
+  persistCluster(dirs, built.cluster);
+  const job = queueJob(dirs, "create_cluster", built.cluster.id, built.cluster);
+  return res.status(202).json({ cluster_id: built.cluster.id, job_id: job.id });
 });
 
 app.post("/api/clusters/:clusterId/bootstrap", (req, res) => {
@@ -293,15 +202,77 @@ app.post("/api/clusters/:clusterId/bootstrap", (req, res) => {
   }
 
   const cluster = readJson(clusterFile);
-  const payload = {
-    cluster,
-    controlplane_ips: req.body?.controlplane_ips || cluster.controlplane_ips || [],
-    worker_ips: req.body?.worker_ips || cluster.worker_ips || [],
-    vip_ip: req.body?.vip_ip || cluster.vip_ip,
-  };
+  const payload = buildBootstrapPayload(cluster, req.body || {});
 
-  const job = queueJob("bootstrap_cluster", clusterId, payload);
+  const job = queueJob(dirs, "bootstrap_cluster", clusterId, payload);
   return res.status(202).json({ cluster_id: clusterId, job_id: job.id });
+});
+
+app.post("/api/steps/:stepId/execute", (req, res) => {
+  const stepId = req.params.stepId;
+  const catalog = buildCatalogResponse({ workspaceRoot, dirs });
+  const step = catalog.stepsById.get(stepId);
+
+  if (!step) {
+    return res.status(404).json({ error: "step not found" });
+  }
+
+  const visibleStep = catalog.categories.flatMap((category) => category.steps).find((candidate) => candidate.id === stepId);
+  if (visibleStep?.status === "locked") {
+    return res.status(409).json({ error: `${stepId} is locked until its dependencies are complete` });
+  }
+
+  const validated = validateStepInputs(step, req.body?.inputs);
+  if (!validated.ok) {
+    return res.status(400).json({ error: validated.error });
+  }
+
+  let clusterId = null;
+  let context = {};
+
+  if (stepId === "provision-nodes") {
+    const built = buildClusterFromRequest(validated.value, process.env);
+    if (!built.ok) {
+      return res.status(400).json({ error: built.error });
+    }
+
+    persistCluster(dirs, built.cluster);
+    clusterId = built.cluster.id;
+    context = { cluster: built.cluster };
+  } else if (stepId === "bootstrap-cluster") {
+    const provisionState = readStepState("provision-nodes");
+    clusterId = provisionState?.cluster_id || null;
+    if (!clusterId) {
+      return res.status(409).json({ error: "bootstrap-cluster requires a completed provision-nodes step" });
+    }
+
+    const cluster = loadCluster(dirs, clusterId);
+    context = buildBootstrapPayload(cluster, {});
+  }
+
+  const payload = {
+    step_id: step.id,
+    step_type: step.type,
+    inputs: validated.value,
+    runner: step.runner,
+    context,
+  };
+  const job = queueJob(dirs, "run_step", clusterId, payload);
+
+  writeStepState(step.id, {
+    status: "pending",
+    inputs: validated.value,
+    outputs: null,
+    error: null,
+    last_job_id: job.id,
+    cluster_id: clusterId,
+  });
+
+  return res.status(202).json({
+    step_id: step.id,
+    job_id: job.id,
+    job_type: job.type,
+  });
 });
 
 app.get("/api/clusters/:clusterId", (req, res) => {

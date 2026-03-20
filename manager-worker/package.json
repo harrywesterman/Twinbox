@@ -6,5 +6,8 @@
   "main": "src/worker.js",
   "scripts": {
     "start": "node src/worker.js"
+  },
+  "dependencies": {
+    "yaml": "^2.8.2"
   }
 }

@@ -1,0 +1,34 @@
+id: configure-automatic-updates
+title: Configure automatic updates
+type: config
+order: 10
+summary: Configure the Management VM to refresh the Twinbox checkout each night.
+explanation: Save the nightly update policy and apply a managed cron entry on the Management VM host.
+side_help: Twinbox writes one guarded cron file for this step and can remove it again when the setting is disabled.
+depends_on: []
+inputs:
+  - id: enabled
+    label: Enable nightly updates
+    type: boolean
+    required: true
+    default: true
+    help: Keep the Management VM synced to the latest Twinbox checkout each day.
+  - id: schedule_hour
+    label: Hour
+    type: integer
+    required: true
+    min: 0
+    max: 23
+    default: 3
+    help: 24-hour clock hour for the nightly update.
+  - id: schedule_minute
+    label: Minute
+    type: integer
+    required: true
+    min: 0
+    max: 59
+    default: 17
+    help: Minute offset within the selected hour.
+runner:
+  kind: script
+  script: categories/management-vm/steps/configure-automatic-updates/apply.sh

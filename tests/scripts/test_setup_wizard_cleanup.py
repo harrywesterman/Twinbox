@@ -60,6 +60,7 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     assert "      TWINBOX_CLUSTER_SLUG=${CLUSTER_SLUG}" in text
     assert "      KUBECTL_VERSION=${KUBECTL_VERSION}" in text
     assert "      HELM_VERSION=${HELM_VERSION}" in text
+    assert "      TWINBOX_HOST_REPO_ROOT=${TWINBOX_TARGET_DIR}" in text
     assert "      TALOSCTL_VERSION=${TALOSCTL_VERSION}" not in text
     assert "      PROXMOX_ISO_STORAGE=${PROXMOX_ISO_STORAGE}" not in text
     assert "      TALOS_ISO_FILE=${TALOS_ISO_FILE}" not in text

@@ -1,0 +1,84 @@
+id: provision-nodes
+title: Provision nodes
+type: action
+order: 10
+summary: Create the Talos control plane and worker VMs on Proxmox.
+explanation: Capture the Talos cluster shape, persist the requested cluster record, and provision the VM inventory on Proxmox.
+side_help: This step uses the existing Twinbox Talos provisioning script and records the resulting cluster artifacts for the next step.
+depends_on: []
+inputs:
+  - id: name
+    label: Cluster name
+    type: string
+    required: true
+    default: twinbox-cluster
+    help: Readable Twinbox cluster name.
+  - id: controlplane_count
+    label: Control planes
+    type: integer
+    required: true
+    min: 1
+    max: 15
+    default: 1
+    help: Current API range is 1 to 15.
+  - id: worker_count
+    label: Workers
+    type: integer
+    required: true
+    min: 0
+    max: 200
+    default: 2
+    help: Current API range is 0 to 200.
+  - id: cpu_cores
+    label: CPU cores
+    type: integer
+    required: true
+    min: 1
+    max: 64
+    default: 2
+    help: Per-node CPU request.
+  - id: memory_mb
+    label: Memory MB
+    type: integer
+    required: true
+    min: 512
+    max: 1048576
+    default: 4096
+    help: Per-node memory allocation.
+  - id: disk_gb
+    label: Disk GB
+    type: integer
+    required: true
+    min: 10
+    max: 8192
+    default: 20
+    help: System disk size per VM.
+  - id: bridge
+    label: Bridge
+    type: string
+    required: true
+    default: vmbr0
+    help: Proxmox bridge for Talos node traffic.
+  - id: start_vmid
+    label: Start VMID
+    type: integer
+    required: true
+    min: 100
+    max: 999999
+    default: 200
+    help: Seed VMID for the cluster inventory.
+  - id: vip_ip
+    label: VIP IP
+    type: ipv4
+    required: true
+    default: 192.168.1.50
+    help: Virtual IP for the Talos control plane.
+  - id: start_ip
+    label: Start IP
+    type: ipv4
+    required: true
+    default: 192.168.1.51
+    help: First node address in the reserved block.
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/provision-nodes/run.sh

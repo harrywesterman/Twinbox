@@ -13,6 +13,8 @@ const dirs = {
   pending: path.join(dataRoot, "queue", "pending"),
   running: path.join(dataRoot, "queue", "running"),
   completed: path.join(dataRoot, "queue", "completed"),
+  stepState: path.join(dataRoot, "step-state"),
+  stepResults: path.join(dataRoot, "step-results"),
 };
 
 Object.values(dirs).forEach((dir) => fs.mkdirSync(dir, { recursive: true }));
@@ -26,6 +28,7 @@ function readJson(file) {
 }
 
 function writeJson(file, value) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(value, null, 2));
 }
 
@@ -39,6 +42,39 @@ function updateJob(jobId, patch) {
 
 function appendLog(jobId, message) {
   fs.appendFileSync(path.join(dirs.logs, `${jobId}.log`), `[${now()}] ${message}\n`);
+}
+
+function readJsonIfExists(file) {
+  if (!fs.existsSync(file)) {
+    return null;
+  }
+  return readJson(file);
+}
+
+function readStepState(stepId) {
+  return readJsonIfExists(path.join(dirs.stepState, `${stepId}.json`));
+}
+
+function updateStepState(stepId, patch) {
+  const file = path.join(dirs.stepState, `${stepId}.json`);
+  const current = readStepState(stepId) || {
+    step_id: stepId,
+    status: "not_started",
+    inputs: {},
+    outputs: null,
+    cluster_id: null,
+    error: null,
+    last_job_id: null,
+    created_at: now(),
+  };
+  const next = {
+    ...current,
+    ...patch,
+    step_id: stepId,
+    updated_at: now(),
+  };
+  writeJson(file, next);
+  return next;
 }
 
 function runCommand(jobId, command, args, env = {}) {
@@ -195,6 +231,78 @@ async function handleBootstrap(job) {
   );
 }
 
+async function handleRunStep(job) {
+  const payload = job.payload;
+  const stepId = payload.step_id;
+  const stepType = payload.step_type;
+  const runner = payload.runner || {};
+  const inputs = payload.inputs || {};
+  const context = payload.context || {};
+  const scriptPath = runner.script;
+
+  if (!stepId) {
+    throw new Error("run_step payload missing step_id");
+  }
+  if (!stepType) {
+    throw new Error("run_step payload missing step_type");
+  }
+  if (!scriptPath) {
+    throw new Error("run_step payload missing runner.script");
+  }
+
+  const clusterId = context?.cluster?.id || job.cluster_id || null;
+  const resultFile = path.join(dirs.stepResults, `${job.id}.json`);
+  fs.rmSync(resultFile, { force: true });
+
+  updateStepState(stepId, {
+    status: "running",
+    inputs,
+    outputs: null,
+    error: null,
+    last_job_id: job.id,
+    cluster_id: clusterId,
+    started_at: now(),
+    finished_at: null,
+  });
+
+  try {
+    await runCommand(
+      job.id,
+      "bash",
+      [scriptPath],
+      {
+        STEP_ID: stepId,
+        STEP_TYPE: stepType,
+        STEP_INPUTS_JSON: JSON.stringify(inputs),
+        STEP_CONTEXT_JSON: JSON.stringify(context),
+        STEP_RESULT_FILE: resultFile,
+        TWINBOX_HOST_CRON_DIR: process.env.TWINBOX_HOST_CRON_DIR || "/host/etc/cron.d",
+      },
+    );
+
+    const outputs = readJsonIfExists(resultFile);
+    updateStepState(stepId, {
+      status: stepType === "config" ? "configured" : "succeeded",
+      outputs,
+      error: null,
+      last_job_id: job.id,
+      cluster_id: outputs?.cluster_id || clusterId,
+      finished_at: now(),
+    });
+  } catch (err) {
+    updateStepState(stepId, {
+      status: "failed",
+      error: err.message,
+      last_job_id: job.id,
+      cluster_id: clusterId,
+      finished_at: now(),
+    });
+    throw err;
+  } finally {
+    fs.rmSync(resultFile, { force: true });
+  }
+}
+
 async function handleJob(queueFile) {
   const queued = readJson(queueFile);
   const runningFile = path.join(dirs.running, path.basename(queueFile));
@@ -208,6 +316,8 @@ async function handleJob(queueFile) {
       await handleCreate({ id: queued.id, payload: queued.payload });
     } else if (queued.type === "bootstrap_cluster") {
       await handleBootstrap({ id: queued.id, payload: queued.payload });
+    } else if (queued.type === "run_step") {
+      await handleRunStep({ id: queued.id, payload: queued.payload, cluster_id: queued.cluster_id });
     } else {
       throw new Error(`unsupported job type: ${queued.type}`);
     }

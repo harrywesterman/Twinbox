@@ -13,8 +13,8 @@ test('app source defines the mission control header, rail, workspace, and activi
   assert.match(source, /className="workspace-panel"/, 'expected a central active-step workspace');
   assert.match(source, /className="activity-panel"/, 'expected a dedicated activity panel');
   assert.match(source, /journey-rail-toggle/, 'expected a mobile rail toggle control');
-  assert.match(source, /Opslaan en later verder/, 'expected a save-and-resume action');
-  assert.match(source, /Volgende/, 'expected guided next-step navigation');
+  assert.match(source, /fetch\('\/api\/catalog'\)/, 'expected catalog discovery from the backend');
+  assert.match(source, /executeStep/, 'expected a catalog-driven step execution handler');
 });
 
 test('styles define a three-column mission control grid and responsive rail behavior', async () => {

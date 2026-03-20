@@ -8,8 +8,10 @@ services:
     environment:
       - MANAGER_DATA_DIR=/data
       - MANAGER_API_PORT=8080
+      - WORKSPACE_ROOT=/opt/twinbox
     volumes:
       - ./manager-data:/data
+      - ./categories:/opt/twinbox/categories:ro
     ports:
       - "8080:8080"
 
@@ -22,8 +24,13 @@ services:
     environment:
       - MANAGER_DATA_DIR=/data
       - WORKER_POLL_MS=2000
+      - WORKSPACE_ROOT=/opt/twinbox
+      - TWINBOX_HOST_CRON_DIR=/host/etc/cron.d
+      - TWINBOX_HOST_REPO_ROOT=${TWINBOX_HOST_REPO_ROOT}
     volumes:
       - ./manager-data:/data
+      - ./categories:/opt/twinbox/categories:ro
+      - /etc/cron.d:/host/etc/cron.d
     depends_on:
       - manager-api
 

@@ -8,6 +8,7 @@
     "start": "node src/server.js"
   },
   "dependencies": {
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "yaml": "^2.8.2"
   }
 }

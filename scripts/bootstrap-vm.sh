@@ -56,6 +56,11 @@ if [[ ! -f .env ]]; then
   fi
 fi
 
+if ! grep -q "^TWINBOX_HOST_REPO_ROOT=" .env; then
+  log "Recording host repository root in .env"
+  printf '\nTWINBOX_HOST_REPO_ROOT=%s\n' "$TARGET_DIR" >> .env
+fi
+
 if [[ -x scripts/install-management-tools.sh ]]; then
   log "Installing management host tools from .env versions"
   sudo ./scripts/install-management-tools.sh --env-file .env

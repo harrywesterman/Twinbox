@@ -7,7 +7,7 @@ Twinbox is a manager-first platform for provisioning and bootstrapping Talos Kub
 1. Run the Proxmox wizard: `wizard/setup-wizard.sh`.
 2. The wizard creates a Management VM only.
 3. Cloud-init on that VM installs Docker CE from the official Docker repo, clones this repository, installs `talosctl`/`kubectl`/`helm` from pinned `.env` versions, and starts the manager stack automatically.
-4. Open the web UI and create/bootstrap Talos clusters from there.
+4. Open the web UI and execute the catalog-driven Management VM and Talos steps from there.
 
 ## Quick Start
 
@@ -79,6 +79,7 @@ HELM_VERSION=v3.15.4
 - `manager-web/`: React frontend.
 - `manager-api/`: REST API and job metadata handling.
 - `manager-worker/`: Async job runner.
+- `categories/`: Manifest-driven category and step catalog mounted into the runtime.
 - `scripts/manager/`: Provisioning/bootstrap scripts bundled into the worker image.
 - `scripts/manager-web-preview.sh`: Preview local frontend changes on the Management VM without a Git push.
 - `docs/`: Operational documentation.
@@ -93,9 +94,10 @@ GitHub Actions workflow `.github/workflows/docker-publish.yml` publishes images 
 
 ## Phase 1 Scope
 
-- Submit Talos VM provisioning jobs from UI.
-- Submit Talos bootstrap jobs from UI.
-- Track jobs (`pending`, `running`, `succeeded`, `failed`) and logs.
+- Discover categories and steps from repo-owned manifests on the Management VM.
+- Configure Management VM automatic updates from the UI.
+- Submit Talos VM provisioning and bootstrap jobs from the UI.
+- Track step/job state (`pending`, `running`, `succeeded`, `failed`) and logs.
 
 ## Security Baseline (Phase 1)
 

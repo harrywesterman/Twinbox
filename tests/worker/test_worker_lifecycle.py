@@ -178,3 +178,294 @@ def test_worker_exits_on_tool_version_mismatch():
         stdout, stderr = proc.communicate(timeout=10)
         assert proc.returncode != 0
         assert "tool version mismatch" in stdout or "tool version mismatch" in stderr
+
+
+def test_worker_processes_run_step_config_job_and_persists_outputs():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        data = root / "data"
+        workspace = root / "workspace"
+        bin_dir = root / "bin"
+        host_cron_dir = root / "host-cron"
+
+        for d in [
+            data / "queue" / "pending",
+            data / "jobs",
+            data / "logs",
+            data / "clusters",
+            data / "step-state",
+            workspace / "categories" / "management-vm" / "steps" / "configure-automatic-updates",
+            host_cron_dir,
+            bin_dir,
+        ]:
+            d.mkdir(parents=True, exist_ok=True)
+
+        _prepare_fake_toolchain(bin_dir)
+        _write_pinned_defaults(workspace)
+
+        script = workspace / "categories" / "management-vm" / "steps" / "configure-automatic-updates" / "apply.sh"
+        script.write_text(
+            "#!/bin/bash\n"
+            "set -euo pipefail\n"
+            "echo config-step-running\n"
+            "touch \"$TWINBOX_HOST_CRON_DIR/twinbox-managed-test\"\n"
+            "printf '{\"applied\":true}' > \"$STEP_RESULT_FILE\"\n"
+        )
+        script.chmod(0o755)
+
+        job = {
+            "id": "job_config",
+            "type": "run_step",
+            "cluster_id": None,
+            "status": "pending",
+            "step": "queued",
+            "payload": {
+                "step_id": "configure-automatic-updates",
+                "step_type": "config",
+                "inputs": {"enabled": True, "schedule_hour": 3, "schedule_minute": 17},
+                "runner": {
+                    "kind": "script",
+                    "script": "categories/management-vm/steps/configure-automatic-updates/apply.sh",
+                },
+                "context": {},
+            },
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "started_at": None,
+            "finished_at": None,
+            "result": None,
+            "error": None,
+        }
+        (data / "jobs" / "job_config.json").write_text(json.dumps(job))
+        (data / "queue" / "pending" / "job_config.json").write_text(json.dumps({
+            "id": "job_config",
+            "type": "run_step",
+            "cluster_id": None,
+            "payload": job["payload"],
+            "queued_at": "2026-01-01T00:00:00Z",
+        }))
+
+        env = os.environ.copy()
+        env["MANAGER_DATA_DIR"] = str(data)
+        env["WORKSPACE_ROOT"] = str(workspace)
+        env["WORKER_POLL_MS"] = "100"
+        env["KUBECTL_VERSION"] = "v1.30.0"
+        env["HELM_VERSION"] = "v3.15.4"
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+        env["TWINBOX_HOST_CRON_DIR"] = str(host_cron_dir)
+        env["TWINBOX_HOST_REPO_ROOT"] = "/opt/twinbox-demo"
+
+        proc = subprocess.Popen(
+            ["node", "manager-worker/src/worker.js"],
+            cwd=Path(__file__).resolve().parents[2],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        try:
+            _wait_until(lambda: (data / "queue" / "completed" / "job_config.json").exists())
+
+            updated_job = json.loads((data / "jobs" / "job_config.json").read_text())
+            assert updated_job["status"] == "succeeded"
+
+            step_state = json.loads((data / "step-state" / "configure-automatic-updates.json").read_text())
+            assert step_state["status"] == "configured"
+            assert step_state["inputs"]["enabled"] is True
+            assert step_state["outputs"] == {"applied": True}
+            assert step_state["last_job_id"] == "job_config"
+
+            assert (host_cron_dir / "twinbox-managed-test").exists()
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
+def test_worker_processes_run_step_action_job_and_records_cluster_context():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        data = root / "data"
+        workspace = root / "workspace"
+        bin_dir = root / "bin"
+
+        for d in [
+            data / "queue" / "pending",
+            data / "jobs",
+            data / "logs",
+            data / "clusters",
+            data / "step-state",
+            workspace / "categories" / "talos-cluster" / "steps" / "provision-nodes",
+            bin_dir,
+        ]:
+            d.mkdir(parents=True, exist_ok=True)
+
+        _prepare_fake_toolchain(bin_dir)
+        _write_pinned_defaults(workspace)
+
+        script = workspace / "categories" / "talos-cluster" / "steps" / "provision-nodes" / "run.sh"
+        script.write_text(
+            "#!/bin/bash\n"
+            "set -euo pipefail\n"
+            "cluster_id=$(printf '%s' \"$STEP_CONTEXT_JSON\" | jq -r '.cluster.id')\n"
+            "echo action-step-running \"$cluster_id\"\n"
+            "printf '{\"cluster_id\":\"%s\"}' \"$cluster_id\" > \"$STEP_RESULT_FILE\"\n"
+        )
+        script.chmod(0o755)
+
+        job = {
+            "id": "job_action",
+            "type": "run_step",
+            "cluster_id": "cluster_test",
+            "status": "pending",
+            "step": "queued",
+            "payload": {
+                "step_id": "provision-nodes",
+                "step_type": "action",
+                "inputs": {"name": "demo"},
+                "runner": {
+                    "kind": "script",
+                    "script": "categories/talos-cluster/steps/provision-nodes/run.sh",
+                },
+                "context": {
+                    "cluster": {
+                        "id": "cluster_test",
+                        "name": "demo",
+                    }
+                },
+            },
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "started_at": None,
+            "finished_at": None,
+            "result": None,
+            "error": None,
+        }
+        (data / "jobs" / "job_action.json").write_text(json.dumps(job))
+        (data / "queue" / "pending" / "job_action.json").write_text(json.dumps({
+            "id": "job_action",
+            "type": "run_step",
+            "cluster_id": "cluster_test",
+            "payload": job["payload"],
+            "queued_at": "2026-01-01T00:00:00Z",
+        }))
+
+        env = os.environ.copy()
+        env["MANAGER_DATA_DIR"] = str(data)
+        env["WORKSPACE_ROOT"] = str(workspace)
+        env["WORKER_POLL_MS"] = "100"
+        env["KUBECTL_VERSION"] = "v1.30.0"
+        env["HELM_VERSION"] = "v3.15.4"
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+
+        proc = subprocess.Popen(
+            ["node", "manager-worker/src/worker.js"],
+            cwd=Path(__file__).resolve().parents[2],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        try:
+            _wait_until(lambda: (data / "queue" / "completed" / "job_action.json").exists())
+
+            updated_job = json.loads((data / "jobs" / "job_action.json").read_text())
+            assert updated_job["status"] == "succeeded"
+
+            step_state = json.loads((data / "step-state" / "provision-nodes.json").read_text())
+            assert step_state["status"] == "succeeded"
+            assert step_state["cluster_id"] == "cluster_test"
+            assert step_state["outputs"] == {"cluster_id": "cluster_test"}
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
+def test_worker_marks_run_step_job_failed_when_script_fails():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        data = root / "data"
+        workspace = root / "workspace"
+        bin_dir = root / "bin"
+
+        for d in [
+            data / "queue" / "pending",
+            data / "jobs",
+            data / "logs",
+            data / "clusters",
+            data / "step-state",
+            workspace / "categories" / "management-vm" / "steps" / "configure-automatic-updates",
+            bin_dir,
+        ]:
+            d.mkdir(parents=True, exist_ok=True)
+
+        _prepare_fake_toolchain(bin_dir)
+        _write_pinned_defaults(workspace)
+
+        script = workspace / "categories" / "management-vm" / "steps" / "configure-automatic-updates" / "apply.sh"
+        script.write_text("#!/bin/bash\nset -euo pipefail\necho boom >&2\nexit 42\n")
+        script.chmod(0o755)
+
+        job = {
+            "id": "job_failed_step",
+            "type": "run_step",
+            "cluster_id": None,
+            "status": "pending",
+            "step": "queued",
+            "payload": {
+                "step_id": "configure-automatic-updates",
+                "step_type": "config",
+                "inputs": {"enabled": True},
+                "runner": {
+                    "kind": "script",
+                    "script": "categories/management-vm/steps/configure-automatic-updates/apply.sh",
+                },
+                "context": {},
+            },
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "started_at": None,
+            "finished_at": None,
+            "result": None,
+            "error": None,
+        }
+        (data / "jobs" / "job_failed_step.json").write_text(json.dumps(job))
+        (data / "queue" / "pending" / "job_failed_step.json").write_text(json.dumps({
+            "id": "job_failed_step",
+            "type": "run_step",
+            "cluster_id": None,
+            "payload": job["payload"],
+            "queued_at": "2026-01-01T00:00:00Z",
+        }))
+
+        env = os.environ.copy()
+        env["MANAGER_DATA_DIR"] = str(data)
+        env["WORKSPACE_ROOT"] = str(workspace)
+        env["WORKER_POLL_MS"] = "100"
+        env["KUBECTL_VERSION"] = "v1.30.0"
+        env["HELM_VERSION"] = "v3.15.4"
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+
+        proc = subprocess.Popen(
+            ["node", "manager-worker/src/worker.js"],
+            cwd=Path(__file__).resolve().parents[2],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        try:
+            _wait_until(lambda: (data / "queue" / "completed" / "job_failed_step.json").exists())
+
+            updated_job = json.loads((data / "jobs" / "job_failed_step.json").read_text())
+            assert updated_job["status"] == "failed"
+            assert updated_job["error"] == "command exited with code 42"
+
+            step_state = json.loads((data / "step-state" / "configure-automatic-updates.json").read_text())
+            assert step_state["status"] == "failed"
+            assert step_state["error"] == "command exited with code 42"
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)

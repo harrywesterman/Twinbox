@@ -2,175 +2,178 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  defaultForm,
   getMissionControlModel,
-  restoreMissionState,
-  serializeMissionState,
+  restoreUiState,
+  serializeUiState,
 } from '../src/journey.js';
 
-test('mission control model exposes dependency-ordered phases with guided gating', () => {
+const catalog = {
+  categories: [
+    {
+      id: 'management-vm',
+      title: 'Management VM',
+      summary: 'Keep the management plane configured.',
+      status: 'ready',
+      steps: [
+        {
+          id: 'configure-automatic-updates',
+          title: 'Configure automatic updates',
+          type: 'config',
+          summary: 'Configure nightly updates.',
+          explanation: 'Persist and apply the nightly policy.',
+          side_help: 'Twinbox writes one managed cron file.',
+          inputs: [
+            { id: 'enabled', label: 'Enable nightly updates', type: 'boolean', default: true },
+          ],
+          depends_on: [],
+          status: 'ready',
+          state: {
+            status: 'not_started',
+            inputs: {},
+            outputs: null,
+            cluster_id: null,
+            error: null,
+            updated_at: null,
+          },
+          latest_job: null,
+        },
+      ],
+    },
+    {
+      id: 'talos-cluster',
+      title: 'Talos Cluster',
+      summary: 'Provision and bootstrap the cluster.',
+      status: 'ready',
+      steps: [
+        {
+          id: 'provision-nodes',
+          title: 'Provision nodes',
+          type: 'action',
+          summary: 'Create the Talos nodes.',
+          explanation: 'Provision the VM inventory.',
+          side_help: 'Uses the existing Talos VM provisioning path.',
+          inputs: [
+            { id: 'name', label: 'Cluster name', type: 'string', default: 'twinbox-cluster' },
+          ],
+          depends_on: [],
+          status: 'ready',
+          state: {
+            status: 'not_started',
+            inputs: {},
+            outputs: null,
+            cluster_id: null,
+            error: null,
+            updated_at: null,
+          },
+          latest_job: null,
+        },
+        {
+          id: 'bootstrap-cluster',
+          title: 'Bootstrap cluster',
+          type: 'action',
+          summary: 'Bootstrap the Talos control plane.',
+          explanation: 'Apply the Talos configuration.',
+          side_help: 'Waits for provisioning to finish.',
+          inputs: [],
+          depends_on: ['provision-nodes'],
+          status: 'locked',
+          state: {
+            status: 'not_started',
+            inputs: {},
+            outputs: null,
+            cluster_id: null,
+            error: null,
+            updated_at: null,
+          },
+          latest_job: null,
+        },
+      ],
+    },
+  ],
+  errors: [],
+};
+
+test('mission control model exposes manifest-driven categories with locked dependencies', () => {
   const model = getMissionControlModel({
-    form: defaultForm,
-    completedStepIds: [],
-    cluster: null,
-    job: null,
+    catalog,
     logs: [],
+    cluster: null,
     health: { ok: true },
-    selectedStepId: 'foundation-overview',
+    error: '',
+    busy: false,
+    selectedStepId: 'configure-automatic-updates',
   });
 
-  assert.equal(model.phases.length, 9);
+  assert.equal(model.categories.length, 2);
   assert.deepEqual(
-    model.phases.map((phase) => phase.title),
+    model.categories.map((category) => category.title),
     [
-      'Foundation',
+      'Management VM',
       'Talos Cluster',
-      'Core Networking',
-      'Identity & Access',
-      'Storage & Backups',
-      'GitOps & Platform Services',
-      'Applications',
-      'Hardening & Operations',
-      'Go Live',
     ],
   );
-
-  assert.equal(model.activeStep.id, 'foundation-overview');
+  assert.equal(model.activeStep.id, 'configure-automatic-updates');
   assert.equal(model.activeStep.status, 'ready');
-  assert.equal(model.activePhase.title, 'Foundation');
-  assert.equal(model.nextStep.id, 'foundation-cluster-profile');
-  assert.equal(model.canAdvance, true);
-  assert.equal(model.phases[1].status, 'locked');
+  assert.equal(model.activeCategory.title, 'Management VM');
+  assert.equal(model.nextStep.id, 'provision-nodes');
+  assert.equal(model.primaryAction.type, 'execute');
+  assert.equal(model.categories[1].steps[1].status, 'locked');
+  assert.equal(model.progress.totalSteps, 3);
+  assert.equal(model.progress.completedSteps, 0);
 });
 
-test('mission control model projects runtime into running, failed, done, and blocked steps', () => {
-  const completedStepIds = [
-    'foundation-overview',
-    'foundation-cluster-profile',
-    'foundation-network-plan',
-  ];
+test('mission control model projects running and completed step state from catalog payload', () => {
+  const runningCatalog = structuredClone(catalog);
+  runningCatalog.categories[1].steps[0].status = 'done';
+  runningCatalog.categories[1].steps[0].state = {
+    status: 'succeeded',
+    inputs: { name: 'demo' },
+    outputs: { cluster_id: 'cluster_demo' },
+    cluster_id: 'cluster_demo',
+    error: null,
+    updated_at: '2026-03-20T10:00:00Z',
+  };
+  runningCatalog.categories[1].steps[1].status = 'running';
+  runningCatalog.categories[1].steps[1].latest_job = {
+    id: 'job_bootstrap',
+    type: 'run_step',
+    status: 'running',
+    step: 'started',
+    error: null,
+  };
 
-  const runningModel = getMissionControlModel({
-    form: defaultForm,
-    completedStepIds,
+  const model = getMissionControlModel({
+    catalog: runningCatalog,
+    logs: [{ line: '[2026-03-20T10:10:00Z] bootstrapping cluster' }],
     cluster: {
-      id: 'cluster_twinbox',
-      status: 'requested',
-      metadata: { proxmox_node: 'pve' },
-    },
-    job: {
-      id: 'job_create',
-      type: 'create_cluster',
-      status: 'running',
-      step: 'started',
-    },
-    logs: [{ line: '[2026-03-19T10:00:00Z] creating control plane VMs' }],
-    health: { ok: true },
-  });
-
-  assert.equal(runningModel.activeStep.id, 'talos-provision');
-  assert.equal(runningModel.activeStep.status, 'running');
-  assert.equal(runningModel.phases[1].status, 'running');
-
-  const failedModel = getMissionControlModel({
-    form: defaultForm,
-    completedStepIds,
-    cluster: {
-      id: 'cluster_twinbox',
+      id: 'cluster_demo',
       status: 'provisioned',
-      metadata: { proxmox_node: 'pve' },
       controlplane_ips: ['192.168.1.51'],
       worker_ips: ['192.168.1.52', '192.168.1.53'],
       vip_ip: '192.168.1.50',
     },
-    job: {
-      id: 'job_bootstrap',
-      type: 'bootstrap_cluster',
-      status: 'failed',
-      step: 'failed',
-      error: 'Talos API did not answer in time',
-    },
-    logs: [{ line: '[2026-03-19T10:05:00Z] job failed: Talos API did not answer in time' }],
     health: { ok: true },
-    selectedStepId: 'talos-bootstrap',
+    error: '',
+    busy: false,
+    selectedStepId: 'bootstrap-cluster',
   });
 
-  assert.equal(failedModel.activeStep.id, 'talos-bootstrap');
-  assert.equal(failedModel.activeStep.status, 'failed');
-  assert.equal(failedModel.canAdvance, false);
-
-  const bootstrappedModel = getMissionControlModel({
-    form: defaultForm,
-    completedStepIds,
-    cluster: {
-      id: 'cluster_twinbox',
-      status: 'bootstrapped',
-      metadata: { proxmox_node: 'pve' },
-      controlplane_ips: ['192.168.1.51'],
-      worker_ips: ['192.168.1.52', '192.168.1.53'],
-      talos_config_dir: '/data/talos/cluster_twinbox',
-      vip_ip: '192.168.1.50',
-    },
-    job: {
-      id: 'job_bootstrap',
-      type: 'bootstrap_cluster',
-      status: 'succeeded',
-      step: 'completed',
-    },
-    logs: [{ line: '[2026-03-19T10:10:00Z] talos bootstrap completed' }],
-    health: { ok: true },
-  });
-
-  assert.equal(bootstrappedModel.steps.find((step) => step.id === 'talos-provision').status, 'done');
-  assert.equal(bootstrappedModel.steps.find((step) => step.id === 'talos-bootstrap').status, 'done');
-  assert.equal(bootstrappedModel.activeStep.id, 'talos-validate');
-  assert.equal(bootstrappedModel.activeStep.status, 'ready');
-  assert.equal(bootstrappedModel.healthBadges.find((badge) => badge.id === 'talos').tone, 'success');
-
-  const blockedModel = getMissionControlModel({
-    form: defaultForm,
-    completedStepIds: [...completedStepIds, 'talos-validate'],
-    cluster: {
-      id: 'cluster_twinbox',
-      status: 'bootstrapped',
-      metadata: { proxmox_node: 'pve' },
-      controlplane_ips: ['192.168.1.51'],
-      worker_ips: ['192.168.1.52', '192.168.1.53'],
-      talos_config_dir: '/data/talos/cluster_twinbox',
-      vip_ip: '192.168.1.50',
-    },
-    job: null,
-    logs: [],
-    health: { ok: true },
-  });
-
-  assert.equal(blockedModel.activePhase.title, 'Core Networking');
-  assert.equal(blockedModel.activeStep.id, 'networking-load-balancer');
-  assert.equal(blockedModel.activeStep.status, 'blocked');
+  assert.equal(model.activeStep.id, 'bootstrap-cluster');
+  assert.equal(model.activeStep.status, 'running');
+  assert.equal(model.previousStep.id, 'provision-nodes');
+  assert.equal(model.primaryAction.disabled, true);
+  assert.equal(model.progress.completedSteps, 1);
+  assert.equal(model.activity.artifacts.find((artifact) => artifact.label === 'Cluster ID').value, 'cluster_demo');
 });
 
-test('mission control state serialization restores the exact working context', () => {
-  const serialized = serializeMissionState({
-    form: {
-      ...defaultForm,
-      name: 'production',
-      vip_ip: '10.0.0.40',
-    },
-    completedStepIds: ['foundation-overview', 'foundation-cluster-profile'],
-    selectedStepId: 'foundation-network-plan',
-    clusterId: 'cluster_prod',
-    jobId: 'job_prod',
+test('ui state serialization restores the selected step preference', () => {
+  const serialized = serializeUiState({
+    selectedStepId: 'bootstrap-cluster',
   });
 
-  const restored = restoreMissionState(serialized);
-  assert.equal(restored.form.name, 'production');
-  assert.equal(restored.form.vip_ip, '10.0.0.40');
-  assert.deepEqual(restored.completedStepIds, ['foundation-overview', 'foundation-cluster-profile']);
-  assert.equal(restored.selectedStepId, 'foundation-network-plan');
-  assert.equal(restored.clusterId, 'cluster_prod');
-  assert.equal(restored.jobId, 'job_prod');
+  const restored = restoreUiState(serialized);
+  assert.equal(restored.selectedStepId, 'bootstrap-cluster');
 
-  const fallback = restoreMissionState('not-json');
-  assert.deepEqual(fallback.completedStepIds, []);
-  assert.equal(fallback.selectedStepId, 'foundation-overview');
+  const fallback = restoreUiState('not-json');
+  assert.equal(fallback.selectedStepId, '');
 });

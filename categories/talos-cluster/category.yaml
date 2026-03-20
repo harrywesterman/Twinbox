@@ -1,0 +1,4 @@
+id: talos-cluster
+title: Talos Cluster
+summary: Provision Talos infrastructure and bootstrap the cluster in guided steps.
+order: 20

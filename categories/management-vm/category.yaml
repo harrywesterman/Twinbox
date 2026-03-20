@@ -1,0 +1,4 @@
+id: management-vm
+title: Management VM
+summary: Keep the management plane configuration explicit and visible.
+order: 10
