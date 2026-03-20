@@ -19,6 +19,7 @@ test('app source defines a guided setup shell with compact progress and visible 
   assert.match(source, /<details className="technical-panel" open>/, 'expected technical details to be open by default');
   assert.match(manageSource, /className="[^"]*workspace-panel[^"]*manage-workspace[^"]*"/, 'expected manage fallback to keep the workspace-panel contract alive');
   assert.match(manageSource, /manage-workspace/, 'expected a manage-mode fallback marker');
+  assert.match(manageSource, /className="activity-panel"/, 'expected the manage fallback to keep the legacy sidebar surface');
   assert.doesNotMatch(setupSource, /Previous/, 'setup mode should not show a Previous button');
   assert.match(source, /journey-rail-toggle/, 'expected a mobile rail toggle control');
   assert.match(source, /fetch\('\/api\/catalog'\)/, 'expected catalog discovery from the backend');

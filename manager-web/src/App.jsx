@@ -690,6 +690,82 @@ function ManageShell({
             <pre>{mission.activity.rawLogOutput}</pre>
           </details>
         </section>
+
+        <aside className="activity-panel">
+          <section className="panel-card">
+            <div className="section-header">
+              <div>
+                <p className="section-kicker">Now active</p>
+                <h3>Step context</h3>
+              </div>
+              <span className={`status-chip tone-${toneForStatus(activeStep.status)}`}>{statusLabel(activeStep.status)}</span>
+            </div>
+            <p className="panel-summary">{mission.activity.summary}</p>
+          </section>
+
+          <section className="panel-card">
+            <div className="section-header">
+              <div>
+                <p className="section-kicker">Live summary</p>
+                <h3>Runtime snapshot</h3>
+              </div>
+              <span className={`status-chip tone-${toneForStatus(runtime.runState)}`}>{statusLabel(runtime.runState)}</span>
+            </div>
+            <div className="event-list">
+              <article className={`event-card tone-${toneForStatus(runtime.runState)}`}>
+                <strong>{runtime.currentStage}</strong>
+                <p>{runtime.lastUpdatedLabel}</p>
+              </article>
+              <article className="event-card tone-neutral">
+                <strong>Most recent event</strong>
+                <p>{runtime.timelineEvents.at(-1)?.detail || 'No worker output yet.'}</p>
+              </article>
+            </div>
+          </section>
+
+          <section className="panel-card">
+            <div className="section-header">
+              <div>
+                <p className="section-kicker">Artifacts</p>
+                <h3>Saved and discovered state</h3>
+              </div>
+              <span className="status-chip tone-neutral">{`${mission.activity.artifacts.length} items`}</span>
+            </div>
+            <dl className="artifact-list">
+              {mission.activity.artifacts.length ? (
+                mission.activity.artifacts.map((artifact) => (
+                  <div key={`${artifact.label}-${artifact.value}`} className="artifact-row">
+                    <dt>{artifact.label}</dt>
+                    <dd>{artifact.value}</dd>
+                  </div>
+                ))
+              ) : (
+                <div className="artifact-row">
+                  <dt>No artifacts yet</dt>
+                  <dd>Run the selected step to generate visible outputs.</dd>
+                </div>
+              )}
+            </dl>
+          </section>
+
+          <section className="panel-card">
+            <div className="section-header">
+              <div>
+                <p className="section-kicker">Risks / notes</p>
+                <h3>Operator context</h3>
+              </div>
+              <span className="status-chip tone-warning">{mission.activity.risks.length} notes</span>
+            </div>
+            <div className="risk-list">
+              {mission.activity.risks.map((risk) => (
+                <article key={`${risk.label}-${risk.detail}`} className={`risk-card tone-${risk.tone || 'neutral'}`}>
+                  <strong>{risk.label}</strong>
+                  <p>{risk.detail}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+        </aside>
       </section>
     </div>
   );
