@@ -461,11 +461,107 @@ def test_worker_marks_run_step_job_failed_when_script_fails():
 
             updated_job = json.loads((data / "jobs" / "job_failed_step.json").read_text())
             assert updated_job["status"] == "failed"
-            assert updated_job["error"] == "command exited with code 42"
+            assert updated_job["error"] == "command exited with code 42: boom"
 
             step_state = json.loads((data / "step-state" / "configure-automatic-updates.json").read_text())
             assert step_state["status"] == "failed"
-            assert step_state["error"] == "command exited with code 42"
+            assert step_state["error"] == "command exited with code 42: boom"
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
+def test_worker_includes_recent_script_output_in_failed_run_step_error():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        data = root / "data"
+        workspace = root / "workspace"
+        bin_dir = root / "bin"
+
+        for d in [
+            data / "queue" / "pending",
+            data / "jobs",
+            data / "logs",
+            data / "clusters",
+            data / "step-state",
+            workspace / "categories" / "management-vm" / "steps" / "configure-automatic-updates",
+            bin_dir,
+        ]:
+            d.mkdir(parents=True, exist_ok=True)
+
+        _prepare_fake_toolchain(bin_dir)
+        _write_pinned_defaults(workspace)
+
+        script = workspace / "categories" / "management-vm" / "steps" / "configure-automatic-updates" / "apply.sh"
+        script.write_text(
+            "#!/bin/bash\n"
+            "set -euo pipefail\n"
+            "echo first failure line >&2\n"
+            "echo second failure line >&2\n"
+            "exit 7\n"
+        )
+        script.chmod(0o755)
+
+        job = {
+            "id": "job_failed_step_output",
+            "type": "run_step",
+            "cluster_id": None,
+            "status": "pending",
+            "step": "queued",
+            "payload": {
+                "step_id": "configure-automatic-updates",
+                "step_type": "config",
+                "inputs": {"enabled": True},
+                "runner": {
+                    "kind": "script",
+                    "script": "categories/management-vm/steps/configure-automatic-updates/apply.sh",
+                },
+                "context": {},
+            },
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "started_at": None,
+            "finished_at": None,
+            "result": None,
+            "error": None,
+        }
+        (data / "jobs" / "job_failed_step_output.json").write_text(json.dumps(job))
+        (data / "queue" / "pending" / "job_failed_step_output.json").write_text(json.dumps({
+            "id": "job_failed_step_output",
+            "type": "run_step",
+            "cluster_id": None,
+            "payload": job["payload"],
+            "queued_at": "2026-01-01T00:00:00Z",
+        }))
+
+        env = os.environ.copy()
+        env["MANAGER_DATA_DIR"] = str(data)
+        env["WORKSPACE_ROOT"] = str(workspace)
+        env["WORKER_POLL_MS"] = "100"
+        env["KUBECTL_VERSION"] = "v1.30.0"
+        env["HELM_VERSION"] = "v3.15.4"
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+
+        proc = subprocess.Popen(
+            ["node", "manager-worker/src/worker.js"],
+            cwd=Path(__file__).resolve().parents[2],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        try:
+            _wait_until(lambda: (data / "queue" / "completed" / "job_failed_step_output.json").exists())
+
+            updated_job = json.loads((data / "jobs" / "job_failed_step_output.json").read_text())
+            assert updated_job["status"] == "failed"
+            assert "command exited with code 7" in updated_job["error"]
+            assert "second failure line" in updated_job["error"]
+
+            step_state = json.loads((data / "step-state" / "configure-automatic-updates.json").read_text())
+            assert step_state["status"] == "failed"
+            assert "second failure line" in step_state["error"]
         finally:
             proc.terminate()
             proc.wait(timeout=5)

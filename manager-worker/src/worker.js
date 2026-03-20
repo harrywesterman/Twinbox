@@ -44,6 +44,24 @@ function appendLog(jobId, message) {
   fs.appendFileSync(path.join(dirs.logs, `${jobId}.log`), `[${now()}] ${message}\n`);
 }
 
+function summarizeFailureOutput(lines, fallbackMessage) {
+  const cleaned = (lines || [])
+    .map((line) => String(line || "").trim())
+    .filter(Boolean)
+    .filter((line) => !line.startsWith("exec: "))
+    .filter((line) => !line.startsWith("running job type="))
+    .filter((line) => !line.startsWith("queued "))
+    .filter((line) => !line.startsWith("job failed:"))
+    .filter((line) => !line.startsWith("job completed"));
+
+  if (cleaned.length === 0) {
+    return fallbackMessage;
+  }
+
+  const recent = cleaned.slice(-3).join(" | ");
+  return `${fallbackMessage}: ${recent}`;
+}
+
 function readJsonIfExists(file) {
   if (!fs.existsSync(file)) {
     return null;
@@ -80,21 +98,35 @@ function updateStepState(stepId, patch) {
 function runCommand(jobId, command, args, env = {}) {
   return new Promise((resolve, reject) => {
     appendLog(jobId, `exec: ${command} ${args.join(" ")}`);
+    const recentOutput = [];
+    const recordChunk = (chunk) => {
+      const text = chunk.toString();
+      for (const line of text.split(/\r?\n/)) {
+        const trimmed = line.trimEnd();
+        if (!trimmed) continue;
+        recentOutput.push(trimmed);
+        if (recentOutput.length > 20) {
+          recentOutput.shift();
+        }
+        appendLog(jobId, trimmed);
+      }
+    };
+
     const child = spawn(command, args, {
       cwd: workspace,
       env: { ...process.env, ...env },
       stdio: ["ignore", "pipe", "pipe"],
     });
 
-    child.stdout.on("data", (chunk) => appendLog(jobId, chunk.toString().trimEnd()));
-    child.stderr.on("data", (chunk) => appendLog(jobId, chunk.toString().trimEnd()));
+    child.stdout.on("data", recordChunk);
+    child.stderr.on("data", recordChunk);
 
     child.on("error", (err) => reject(err));
     child.on("close", (code) => {
       if (code === 0) {
         resolve();
       } else {
-        reject(new Error(`command exited with code ${code}`));
+        reject(new Error(summarizeFailureOutput(recentOutput, `command exited with code ${code}`)));
       }
     });
   });

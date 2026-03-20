@@ -8,7 +8,7 @@ USAGE
 }
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
-fail() { log "ERROR: $*"; exit 1; }
+fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
