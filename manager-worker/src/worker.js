@@ -219,6 +219,7 @@ function ensureToolVersionsMatchPolicy() {
 
 async function handleCreate(job) {
   const cluster = job.payload;
+  const dnsServers = Array.isArray(cluster.dns_servers) ? cluster.dns_servers.join(",") : String(cluster.dns_servers || "");
   await runCommand(
     job.id,
     "bash",
@@ -235,6 +236,10 @@ async function handleCreate(job) {
       "--start-vmid", String(cluster.start_vmid),
       "--start-ip", cluster.start_ip,
       "--vip-ip", cluster.vip_ip,
+      "--node-prefix-length", String(cluster.node_prefix_length),
+      "--gateway-ip", cluster.gateway_ip,
+      "--dns-servers", dnsServers,
+      "--dns-domain", cluster.dns_domain,
       "--proxmox-node", cluster.metadata.proxmox_node,
       "--storage-pool", cluster.metadata.storage_pool,
       "--data-dir", dataRoot,

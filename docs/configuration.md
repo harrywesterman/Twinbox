@@ -36,6 +36,10 @@ Tooling version notes:
 - `start_vmid`: integer `100..999999`
 - `vip_ip`: valid IPv4
 - `start_ip`: valid IPv4
+- `node_prefix_length`: integer `1..32`
+- `gateway_ip`: valid IPv4
+- `dns_servers`: comma-separated IPv4 list or IPv4 array
+- `dns_domain`: non-empty string
 
 ## Compose Services
 

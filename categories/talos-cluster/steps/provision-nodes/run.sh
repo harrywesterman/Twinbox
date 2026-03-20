@@ -18,6 +18,10 @@ bash scripts/manager/create-talos-vms.sh \
   --start-vmid "$(printf '%s' "$cluster_json" | jq -r '.start_vmid')" \
   --start-ip "$(printf '%s' "$cluster_json" | jq -r '.start_ip')" \
   --vip-ip "$(printf '%s' "$cluster_json" | jq -r '.vip_ip')" \
+  --node-prefix-length "$(printf '%s' "$cluster_json" | jq -r '.node_prefix_length')" \
+  --gateway-ip "$(printf '%s' "$cluster_json" | jq -r '.gateway_ip')" \
+  --dns-servers "$(printf '%s' "$cluster_json" | jq -r '.dns_servers | join(",")')" \
+  --dns-domain "$(printf '%s' "$cluster_json" | jq -r '.dns_domain')" \
   --proxmox-node "$(printf '%s' "$cluster_json" | jq -r '.metadata.proxmox_node')" \
   --storage-pool "$(printf '%s' "$cluster_json" | jq -r '.metadata.storage_pool')" \
   --data-dir "$MANAGER_DATA_DIR"
