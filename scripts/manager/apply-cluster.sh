@@ -77,7 +77,7 @@ cluster_dir="$clusters_dir/$CLUSTER_ID"
 cluster_file="$clusters_dir/${CLUSTER_ID}.json"
 iac_dir="$cluster_dir/iac"
 work_module_dir="$iac_dir/module"
-tfvars_file="$iac_dir/cluster.auto.tfvars.json"
+tfvars_file="$work_module_dir/cluster.auto.tfvars.json"
 outputs_file="$iac_dir/outputs.json"
 kubeconfig_file="$cluster_dir/kubeconfig"
 
@@ -161,28 +161,45 @@ rm -rf "$work_module_dir"
 mkdir -p "$work_module_dir"
 cp -R "$MODULE_SOURCE/." "$work_module_dir/"
 
-cat > "$tfvars_file" <<EOF
-{
-  "proxmox_endpoint": "https://${PROXMOX_HOST}:${PROXMOX_PORT}",
-  "proxmox_username": ${PROXMOX_USER@Q},
-  "proxmox_password": ${PROXMOX_PASSWORD@Q},
-  "proxmox_node": ${PROXMOX_NODE@Q},
-  "vm_datastore": ${STORAGE_POOL@Q},
-  "file_datastore": ${FILE_DATASTORE@Q},
-  "bridge": ${BRIDGE@Q},
-  "gateway": ${GATEWAY_IP@Q},
-  "dns_servers": ${dns_servers_json},
-  "prefix": ${NODE_PREFIX_LENGTH},
-  "cluster_name": ${NAME@Q},
-  "cluster_slug": ${CLUSTER_ID@Q},
-  "cluster_endpoint": "https://${VIP_IP}:6443",
-  "vip_ip": ${VIP_IP@Q},
-  "talos_version": ${PINNED_TALOS_VERSION@Q},
-  "talos_image_url": ${image_url@Q},
-  "talos_image_cache_key": ${image_cache_key@Q},
-  "nodes": ${nodes_json}
-}
-EOF
+jq -n \
+  --arg proxmox_endpoint "https://${PROXMOX_HOST}:${PROXMOX_PORT}" \
+  --arg proxmox_username "$PROXMOX_USER" \
+  --arg proxmox_password "$PROXMOX_PASSWORD" \
+  --arg proxmox_node "$PROXMOX_NODE" \
+  --arg vm_datastore "$STORAGE_POOL" \
+  --arg file_datastore "$FILE_DATASTORE" \
+  --arg bridge "$BRIDGE" \
+  --arg gateway "$GATEWAY_IP" \
+  --arg cluster_name "$NAME" \
+  --arg cluster_slug "$CLUSTER_ID" \
+  --arg cluster_endpoint "https://${VIP_IP}:6443" \
+  --arg vip_ip "$VIP_IP" \
+  --arg talos_version "$PINNED_TALOS_VERSION" \
+  --arg talos_image_url "$image_url" \
+  --arg talos_image_cache_key "$image_cache_key" \
+  --argjson dns_servers "$dns_servers_json" \
+  --argjson prefix "$NODE_PREFIX_LENGTH" \
+  --argjson nodes "$nodes_json" \
+  '{
+    proxmox_endpoint: $proxmox_endpoint,
+    proxmox_username: $proxmox_username,
+    proxmox_password: $proxmox_password,
+    proxmox_node: $proxmox_node,
+    vm_datastore: $vm_datastore,
+    file_datastore: $file_datastore,
+    bridge: $bridge,
+    gateway: $gateway,
+    dns_servers: $dns_servers,
+    prefix: $prefix,
+    cluster_name: $cluster_name,
+    cluster_slug: $cluster_slug,
+    cluster_endpoint: $cluster_endpoint,
+    vip_ip: $vip_ip,
+    talos_version: $talos_version,
+    talos_image_url: $talos_image_url,
+    talos_image_cache_key: $talos_image_cache_key,
+    nodes: $nodes
+  }' > "$tfvars_file"
 
 update_cluster_status "applying" \
   ".iac = {
@@ -202,7 +219,7 @@ log "Preparing OpenTofu module"
 "$TOFU_BIN" init -input=false
 log "Generating NoCloud artifacts"
 log "Applying OpenTofu cluster plan"
-"$TOFU_BIN" apply -input=false -auto-approve
+"$TOFU_BIN" apply -input=false -auto-approve -var-file="$tfvars_file"
 log "Collecting OpenTofu outputs"
 "$TOFU_BIN" output -json > "$outputs_file"
 popd >/dev/null

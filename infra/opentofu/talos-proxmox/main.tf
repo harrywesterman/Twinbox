@@ -167,7 +167,6 @@ resource "talos_machine_configuration_apply" "node" {
   endpoint                     = each.value.type == "controlplane" ? each.value.ip : local.controlplanes[local.bootstrap_controlplane].ip
   client_configuration         = talos_machine_secrets.cluster.client_configuration
   machine_configuration_input  = data.talos_machine_configuration.node[each.key].machine_configuration
-  insecure                     = true
 
   depends_on = [
     proxmox_virtual_environment_vm.node,
