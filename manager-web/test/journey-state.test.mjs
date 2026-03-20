@@ -314,6 +314,36 @@ test('mission control model derives provisioning and failure runtime events from
   assert.equal(model.activity.runtime.timelineEvents.at(-1).tone, 'danger');
 });
 
+test('mission control model groups adjacent log lines into fewer timeline cards', () => {
+  const runningCatalog = structuredClone(catalog);
+  runningCatalog.categories[1].steps[0].status = 'running';
+  runningCatalog.categories[1].steps[0].latest_job = {
+    id: 'job_grouped',
+    type: 'run_step',
+    status: 'running',
+    step: 'started',
+    error: null,
+    updated_at: '2026-03-20T10:12:00Z',
+  };
+
+  const model = getMissionControlModel({
+    catalog: runningCatalog,
+    logs: [
+      { line: '[2026-03-20T10:11:55Z] [2026-03-20 10:11:55] OpenTofu has been successfully initialized!' },
+      { line: '[2026-03-20T10:11:56Z] [2026-03-20 10:11:56] You may now begin working with OpenTofu.' },
+      { line: '[2026-03-20T10:11:57Z] [2026-03-20 10:11:57] If you ever set or change modules or backend configuration for OpenTofu, rerun this command to reinitialize your working directory.' },
+    ],
+    cluster: null,
+    health: { ok: true },
+    error: '',
+    busy: false,
+    selectedStepId: 'provision-nodes',
+  });
+
+  assert.equal(model.activity.runtime.timelineEvents.length, 1);
+  assert.equal(model.activity.runtime.timelineEvents[0].detail.includes('more line'), true);
+});
+
 test('ui state serialization restores the selected step preference', () => {
   const serialized = serializeUiState({
     selectedStepId: 'provision-nodes',

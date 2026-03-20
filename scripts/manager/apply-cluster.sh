@@ -7,7 +7,7 @@ Usage: $0 --cluster-id ID --name NAME --controlplane-count N --worker-count N --
 USAGE
 }
 
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >&2; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,6 +26,8 @@ command -v curl >/dev/null 2>&1 || fail "curl not found"
 TOFU_BIN="${TOFU_BIN:-tofu}"
 command -v "$TOFU_BIN" >/dev/null 2>&1 || fail "tofu not found"
 command -v talosctl >/dev/null 2>&1 || fail "talosctl not found"
+export TF_IN_AUTOMATION=1
+export NO_COLOR=1
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -211,7 +213,7 @@ node_array() {
 }
 
 json_array_from_args() {
-  jq -nc --args "$@" '$ARGS.positional'
+  jq -nc '$ARGS.positional' --args "$@"
 }
 
 flatten_ipv4_candidates() {
@@ -275,8 +277,15 @@ discover_node_ip() {
   local label="$1"
   shift
   local candidates=("$@")
-  local attempts=60
   local candidate=""
+  local attempts=60
+
+  for candidate in "${candidates[@]}"; do
+    [[ -n "$candidate" ]] || continue
+    log "Guest agent reported ${label} at ${candidate}"
+    printf '%s\n' "$candidate"
+    return 0
+  done
 
   while [[ "$attempts" -gt 0 ]]; do
     for candidate in "${candidates[@]}"; do
@@ -295,6 +304,25 @@ discover_node_ip() {
   done
 
   fail "Timed out waiting for ${label} to answer on ${candidate}"
+}
+
+wait_for_talos_api() {
+  local label="$1"
+  local candidate="$2"
+  local attempts=60
+
+  while [[ "$attempts" -gt 0 ]]; do
+    if talosctl version \
+      --nodes "$candidate" \
+      --endpoints "$candidate" \
+      --talosconfig "$talos_dir/talosconfig" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 5
+    attempts=$((attempts - 1))
+  done
+
+  fail "Timed out waiting for Talos API on ${label} at ${candidate}"
 }
 
 write_node_patch() {
@@ -324,7 +352,6 @@ write_node_patch() {
   {
     echo "machine:"
     echo "  network:"
-    echo "    hostname: ${name}"
     [[ -n "$nameserver_block" ]] && printf '%s' "$nameserver_block"
     [[ -n "$search_domain_block" ]] && printf '%s' "$search_domain_block"
     echo "    interfaces:"
@@ -350,8 +377,12 @@ generate_talos_configs() {
   rm -rf "$talos_dir/base" "$talos_dir/generated"
   mkdir -p "$base_dir" "$talos_dir/generated"
 
-  log "Generating Talos secrets"
-  talosctl gen secrets -o "$talos_dir/secrets.yaml"
+  if [[ -s "$talos_dir/secrets.yaml" ]]; then
+    log "Reusing Talos secrets at ${talos_dir}/secrets.yaml"
+  else
+    log "Generating Talos secrets"
+    talosctl gen secrets -o "$talos_dir/secrets.yaml"
+  fi
 
   log "Generating base Talos config"
   talosctl gen config "$NAME" "https://${VIP_IP}:6443" \
@@ -408,6 +439,7 @@ apply_node_config() {
 
 bootstrap_cluster() {
   local first_cp_ip="$1"
+  wait_for_talos_api "control plane" "$first_cp_ip"
   log "Bootstrapping cluster from ${first_cp_ip}"
   talosctl bootstrap \
     --nodes "$first_cp_ip" \
@@ -422,6 +454,37 @@ bootstrap_cluster() {
     --force
 }
 
+sync_user_kubeconfig() {
+  local source_kubeconfig="$1"
+  local target_user="${2:-$NAME}"
+  local target_home="/home/${target_user}"
+  local target_kube_dir="${target_home}/.kube"
+  local target_kubeconfig="${target_kube_dir}/config"
+
+  [[ -d "$target_home" ]] || fail "home directory not found: ${target_home}"
+  install -d -m 700 -o "$target_user" -g "$target_user" "$target_kube_dir"
+  install -m 600 -o "$target_user" -g "$target_user" "$source_kubeconfig" "$target_kubeconfig"
+  log "Copied kubeconfig to ${target_kubeconfig}"
+}
+
+sync_user_talosconfig() {
+  local source_talosconfig="$1"
+  local default_node_ip="$2"
+  local target_user="${3:-$NAME}"
+  local target_home="/home/${target_user}"
+  local target_talos_dir="${target_home}/.talos"
+  local target_talosconfig="${target_talos_dir}/config"
+
+  [[ -d "$target_home" ]] || fail "home directory not found: ${target_home}"
+  install -d -m 700 -o "$target_user" -g "$target_user" "$target_talos_dir"
+  install -m 600 -o "$target_user" -g "$target_user" "$source_talosconfig" "$target_talosconfig"
+  talosctl config node "$default_node_ip" \
+    --talosconfig "$target_talosconfig" >/dev/null
+  talosctl config endpoint "$default_node_ip" \
+    --talosconfig "$target_talosconfig" >/dev/null
+  log "Copied talosconfig to ${target_talosconfig}"
+}
+
 talos_image_local_path="$talos_dir/talos-${image_cache_key}.iso"
 download_talos_image "$talos_image_local_path"
 
@@ -431,8 +494,12 @@ planned_worker_ips_json="$(node_array "ip" "worker")"
 controlplane_vm_ids_json="$(node_array "vmid" "controlplane")"
 worker_vm_ids_json="$(node_array "vmid" "worker")"
 
-rm -rf "$work_module_dir"
-mkdir -p "$work_module_dir"
+if [[ -f "$work_module_dir/terraform.tfstate" ]]; then
+  log "Reusing existing OpenTofu workspace at ${work_module_dir}"
+else
+  rm -rf "$work_module_dir"
+  mkdir -p "$work_module_dir"
+fi
 cp -R "$MODULE_SOURCE/." "$work_module_dir/"
 
 jq -n \
@@ -531,12 +598,18 @@ discovered_worker_ips_json="$(json_array_from_args "${discovered_worker_ips[@]}"
 
 generate_talos_configs
 
+controlplane_apply_index=0
+worker_apply_index=0
 while IFS=$'\t' read -r name type ip; do
   [[ -n "$name" ]] || continue
   if [[ "$type" == "controlplane" ]]; then
-    apply_node_config "$ip" "$talos_dir/${name}-controlplane.yaml"
+    discovered_ip="${discovered_controlplane_ips[$controlplane_apply_index]:-$ip}"
+    apply_node_config "$discovered_ip" "$talos_dir/${name}-controlplane.yaml"
+    controlplane_apply_index=$((controlplane_apply_index + 1))
   else
-    apply_node_config "$ip" "$talos_dir/${name}-worker.yaml"
+    discovered_ip="${discovered_worker_ips[$worker_apply_index]:-$ip}"
+    apply_node_config "$discovered_ip" "$talos_dir/${name}-worker.yaml"
+    worker_apply_index=$((worker_apply_index + 1))
   fi
 done < <(jq -r '
     to_entries
@@ -550,6 +623,8 @@ first_controlplane_ip="${discovered_controlplane_ips[0]:-}"
 [[ -n "$first_controlplane_ip" ]] || fail "No control plane IP discovered"
 
 bootstrap_cluster "$first_controlplane_ip"
+sync_user_talosconfig "$talos_dir/talosconfig" "$first_controlplane_ip"
+sync_user_kubeconfig "$kubeconfig_file"
 
 tmp="$(mktemp)"
 jq \

@@ -356,7 +356,7 @@ function SetupShell({
                       <strong>{event.title}</strong>
                       <span className="status-chip tone-neutral">{formatRuntimeTimestamp(event.timestamp)}</span>
                     </div>
-                    <p>{event.detail}</p>
+                    <p style={{ whiteSpace: 'pre-line' }}>{event.detail}</p>
                   </article>
                 ))}
               </div>
@@ -601,15 +601,15 @@ function ManageShell({
               </div>
 
               <div className="timeline-list">
-                {runtime.timelineEvents.map((event) => (
-                  <article key={event.id} className={`timeline-card tone-${event.tone}`}>
-                    <div className="timeline-card-top">
-                      <strong>{event.title}</strong>
-                      <span className="status-chip tone-neutral">{formatRuntimeTimestamp(event.timestamp)}</span>
-                    </div>
-                    <p>{event.detail}</p>
-                  </article>
-                ))}
+              {runtime.timelineEvents.map((event) => (
+                <article key={event.id} className={`timeline-card tone-${event.tone}`}>
+                  <div className="timeline-card-top">
+                    <strong>{event.title}</strong>
+                    <span className="status-chip tone-neutral">{formatRuntimeTimestamp(event.timestamp)}</span>
+                  </div>
+                  <p style={{ whiteSpace: 'pre-line' }}>{event.detail}</p>
+                </article>
+              ))}
               </div>
             </div>
           </section>

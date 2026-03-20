@@ -220,6 +220,24 @@ install_helm() {
   install -m 0755 "$tmp_dir/linux-amd64/helm" /usr/local/bin/helm
 }
 
+install_wrappers() {
+  local kubectl_wrapper="$tmp_dir/k"
+  local talosctl_wrapper="$tmp_dir/t"
+
+  cat > "$kubectl_wrapper" <<'EOF'
+#!/bin/sh
+exec kubectl "$@"
+EOF
+
+  cat > "$talosctl_wrapper" <<'EOF'
+#!/bin/sh
+exec talosctl "$@"
+EOF
+
+  install -m 0755 "$kubectl_wrapper" /usr/local/bin/k
+  install -m 0755 "$talosctl_wrapper" /usr/local/bin/t
+}
+
 extract_semver() {
   local value="$1"
   local parsed=""
@@ -270,6 +288,7 @@ install_talosctl
 install_tofu
 install_kubectl
 install_helm
+install_wrappers
 verify_versions
 
 log "Done"

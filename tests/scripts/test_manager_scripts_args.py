@@ -77,6 +77,8 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert '"$TOFU_BIN" -chdir="$work_module_dir" init -input=false' in text
     assert '"$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve' in text
     assert 'command -v talosctl' in text
+    assert 'export TF_IN_AUTOMATION=1' in text
+    assert 'export NO_COLOR=1' in text
     assert 'command -v curl' in text
     assert 'resolve_talos_image_assets()' in text
     assert 'scripts/get-talos-image-factory.sh' in text
@@ -114,8 +116,17 @@ def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
     assert 'discovered_controlplane_ips' in text
     assert 'generate_talos_configs()' in text
     assert 'discover_node_ip()' in text
+    assert 'Guest agent reported ${label} at ${candidate}' in text
+    assert 'wait_for_talos_api()' in text
     assert 'bootstrap_cluster()' in text
+    assert 'sync_user_kubeconfig()' in text
+    assert 'sync_user_talosconfig()' in text
+    assert 'Copied kubeconfig to ${target_kubeconfig}' in text
+    assert 'Copied talosconfig to ${target_talosconfig}' in text
+    assert 'talosctl config node "$default_node_ip"' in text
+    assert 'talosctl config endpoint "$default_node_ip"' in text
     assert 'talos_config_dir' in text
+    assert 'Reusing existing OpenTofu workspace at ${work_module_dir}' in text
 
 
 def test_manager_worker_image_includes_talos_image_factory_helper():

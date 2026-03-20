@@ -319,7 +319,9 @@ function buildRuntime(logs, activeStep) {
       };
     });
 
-  const timelineEvents = parsedEvents.length > 0 ? parsedEvents : [fallbackRuntimeEvent(activeStep, latestJob)];
+  const timelineEvents = parsedEvents.length > 0
+    ? groupTimelineEvents(parsedEvents)
+    : [fallbackRuntimeEvent(activeStep, latestJob)];
   const currentEvent = timelineEvents.at(-1);
   const currentStage = currentEvent?.title || formatState(latestJob?.status || activeStep?.status, 'Ready');
   const runState = latestJob?.status || activeStep?.status || 'ready';
@@ -338,6 +340,54 @@ function buildRuntime(logs, activeStep) {
     eventCount: timelineEvents.length,
     timelineEvents,
   };
+}
+
+function groupTimelineEvents(events) {
+  const grouped = [];
+  let currentGroup = null;
+
+  for (const event of events) {
+    const eventTime = event.timestamp instanceof Date && !Number.isNaN(event.timestamp.getTime())
+      ? event.timestamp
+      : null;
+    const lastTime = currentGroup?.timestamp instanceof Date && !Number.isNaN(currentGroup.timestamp.getTime())
+      ? currentGroup.timestamp
+      : null;
+    const sameStage = currentGroup
+      && currentGroup.title === event.title
+      && currentGroup.tone === event.tone;
+    const closeEnough = sameStage && eventTime && lastTime
+      ? Math.abs(eventTime.getTime() - lastTime.getTime()) <= 5000
+      : sameStage;
+
+    if (!currentGroup || !closeEnough) {
+      currentGroup = {
+        id: event.id,
+        title: event.title,
+        tone: event.tone,
+        timestamp: event.timestamp,
+        detailLines: [event.detail],
+        detail: event.detail,
+      };
+      grouped.push(currentGroup);
+      continue;
+    }
+
+    currentGroup.detailLines.push(event.detail);
+    currentGroup.detail = currentGroup.detailLines.join('\n');
+    if (!currentGroup.timestamp && event.timestamp) {
+      currentGroup.timestamp = event.timestamp;
+    }
+  }
+
+  return grouped.map((group, index) => ({
+    ...group,
+    id: `${group.id}-group-${index}`,
+    lineCount: group.detailLines.length,
+    detail: group.detailLines.length > 1
+      ? `${group.detailLines[0]}\n… ${group.detailLines.length - 1} more line${group.detailLines.length === 2 ? '' : 's'}`
+      : group.detailLines[0],
+  }));
 }
 
 function buildEvents(runtime) {
