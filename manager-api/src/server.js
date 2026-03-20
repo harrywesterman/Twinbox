@@ -66,10 +66,14 @@ function preferredStartOctetsForVip(vipOctet) {
 function probeIpInUse(ip) {
   const pingBin = process.env.MANAGER_API_PING_BIN || "ping";
   const isDefaultPing = path.basename(pingBin) === "ping";
-  const args = isDefaultPing ? ["-n", "-c", "1", "-W", "1", ip] : [ip];
+  const args = isDefaultPing
+    ? (process.platform === "darwin"
+      ? ["-n", "-c", "1", "-W", "200", ip]
+      : ["-n", "-c", "1", "-W", "0.2", ip])
+    : [ip];
   const result = spawnSync(pingBin, args, {
     stdio: "ignore",
-    timeout: 1500,
+    timeout: 700,
   });
 
   if (result.error?.code === "ENOENT") {
