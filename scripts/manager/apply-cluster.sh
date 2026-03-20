@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -Eeuo pipefail
 
 usage() {
   cat <<USAGE
@@ -24,26 +24,7 @@ done
 command -v jq >/dev/null 2>&1 || fail "jq not found"
 TOFU_BIN="${TOFU_BIN:-tofu}"
 command -v "$TOFU_BIN" >/dev/null 2>&1 || fail "tofu not found"
-
-update_cluster_status() {
-  local status="$1"
-  local extra_filter="${2:-.}"
-  local tmp=""
-
-  [[ -f "$cluster_file" ]] || return 0
-  tmp="$(mktemp)"
-  jq --arg status "$status" --arg updated_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
-    ".status = \$status | .updated_at = \$updated_at | ${extra_filter}" "$cluster_file" > "$tmp"
-  mv "$tmp" "$cluster_file"
-}
-
-on_error() {
-  local status=$?
-  update_cluster_status "failed" ".last_error = \"apply_cluster failed\""
-  exit "$status"
-}
-
-trap on_error ERR
+command -v talosctl >/dev/null 2>&1 || fail "talosctl not found"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -72,17 +53,37 @@ done
 
 [[ -n "${CLUSTER_ID:-}" ]] || { usage; fail "cluster-id required"; }
 
+INSTALL_DISK="${INSTALL_DISK:-/dev/vda}"
+
 clusters_dir="$DATA_DIR/clusters"
 cluster_dir="$clusters_dir/$CLUSTER_ID"
 cluster_file="$clusters_dir/${CLUSTER_ID}.json"
 iac_dir="$cluster_dir/iac"
 work_module_dir="$iac_dir/module"
 tfvars_file="$work_module_dir/cluster.auto.tfvars.json"
-outputs_file="$iac_dir/outputs.json"
 kubeconfig_file="$cluster_dir/kubeconfig"
+talos_dir="$cluster_dir/talos"
 
-mkdir -p "$clusters_dir" "$cluster_dir" "$iac_dir"
+mkdir -p "$clusters_dir" "$cluster_dir" "$iac_dir" "$talos_dir"
 [[ -f "$cluster_file" ]] || fail "cluster not found: ${CLUSTER_ID}"
+
+on_error() {
+  local status=$?
+  if [[ -f "$cluster_file" ]]; then
+    local tmp=""
+    tmp="$(mktemp)"
+    jq \
+      --arg status "failed" \
+      --arg updated_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+      --arg last_error "apply_cluster failed" \
+      '.status = $status | .updated_at = $updated_at | .last_error = $last_error' \
+      "$cluster_file" > "$tmp"
+    mv "$tmp" "$cluster_file"
+  fi
+  exit "$status"
+}
+
+trap on_error ERR
 
 image_schematic="${TALOS_IMAGE_SCHEMATIC:-$PINNED_TALOS_IMAGE_SCHEMATIC}"
 image_arch="${TALOS_IMAGE_ARCH:-$PINNED_TALOS_IMAGE_ARCH}"
@@ -109,10 +110,10 @@ deterministic_mac() {
 generate_nodes_json() {
   local nodes_json="{}"
   local current_vmid="$START_VMID"
+  local i=""
   local ip=""
   local name=""
   local mac=""
-  local i=""
 
   for i in $(seq 1 "$CP_COUNT"); do
     name="cp-${i}"
@@ -153,9 +154,214 @@ generate_nodes_json() {
   printf '%s\n' "$nodes_json"
 }
 
-log "Resolving Talos image"
+node_array() {
+  local field="$1"
+  local type="$2"
+  jq -c --arg type "$type" --arg field "$field" '
+    to_entries
+    | sort_by(.key)
+    | map(select(.value.type == $type) | .value[$field])
+  ' <<<"$nodes_json"
+}
+
+json_array_from_args() {
+  jq -nc --args "$@" '$ARGS.positional'
+}
+
+update_cluster_file() {
+  local status="$1"
+  local planned_controlplane_ips="$2"
+  local planned_worker_ips="$3"
+  local discovered_controlplane_ips="$4"
+  local discovered_worker_ips="$5"
+  local controlplane_vm_ids="$6"
+  local worker_vm_ids="$7"
+  local talos_dir_value="$8"
+  local kubeconfig_value="$9"
+  local tmp=""
+
+  tmp="$(mktemp)"
+  jq \
+    --arg status "$status" \
+    --arg updated_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+    --argjson planned_controlplane_ips "$planned_controlplane_ips" \
+    --argjson planned_worker_ips "$planned_worker_ips" \
+    --argjson discovered_controlplane_ips "$discovered_controlplane_ips" \
+    --argjson discovered_worker_ips "$discovered_worker_ips" \
+    --argjson controlplane_vm_ids "$controlplane_vm_ids" \
+    --argjson worker_vm_ids "$worker_vm_ids" \
+    --arg talos_dir "$talos_dir_value" \
+    --arg kubeconfig_path "$kubeconfig_value" \
+    --argjson controlplane_ips "$discovered_controlplane_ips" \
+    --argjson worker_ips "$discovered_worker_ips" \
+    '
+      .status = $status
+      | .updated_at = $updated_at
+      | .planned_controlplane_ips = $planned_controlplane_ips
+      | .planned_worker_ips = $planned_worker_ips
+      | .discovered_controlplane_ips = $discovered_controlplane_ips
+      | .discovered_worker_ips = $discovered_worker_ips
+      | .controlplane_ips = $controlplane_ips
+      | .worker_ips = $worker_ips
+      | .controlplane_vm_ids = $controlplane_vm_ids
+      | .worker_vm_ids = $worker_vm_ids
+      | .bootstrap_mode = "dhcp-first"
+      | .talos_config_dir = $talos_dir
+      | .talosconfig_path = ($talos_dir + "/talosconfig")
+      | .kubeconfig_path = $kubeconfig_path
+      | del(.last_error)
+    ' "$cluster_file" > "$tmp"
+  mv "$tmp" "$cluster_file"
+}
+
+discover_node_ip() {
+  local label="$1"
+  local candidate="$2"
+  local attempts=60
+
+  while [[ "$attempts" -gt 0 ]]; do
+    if talosctl version --insecure --nodes "$candidate" >/dev/null 2>&1; then
+      log "Discovered ${label} at ${candidate}"
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+    sleep 5
+    attempts=$((attempts - 1))
+  done
+
+  fail "Timed out waiting for ${label} to answer on ${candidate}"
+}
+
+write_node_patch() {
+  local name="$1"
+  local type="$2"
+  local mac="$3"
+  local patch_file="$4"
+  local nameserver_block=""
+  local search_domain_block=""
+
+  if [[ -n "${DNS_SERVERS:-}" ]]; then
+    IFS=',' read -r -a dns_servers_array <<< "$DNS_SERVERS"
+    if [[ ${#dns_servers_array[@]} -gt 0 ]]; then
+      nameserver_block=$'    nameservers:\n'
+      for server in "${dns_servers_array[@]}"; do
+        server="${server//[[:space:]]/}"
+        [[ -n "$server" ]] || continue
+        nameserver_block+=$'      - '"$server"$'\n'
+      done
+    fi
+  fi
+
+  if [[ -n "${DNS_DOMAIN:-}" ]]; then
+    search_domain_block=$'    searchDomains:\n      - '"$DNS_DOMAIN"$'\n'
+  fi
+
+  {
+    echo "machine:"
+    echo "  network:"
+    echo "    hostname: ${name}"
+    [[ -n "$nameserver_block" ]] && printf '%s' "$nameserver_block"
+    [[ -n "$search_domain_block" ]] && printf '%s' "$search_domain_block"
+    echo "    interfaces:"
+    echo "      - deviceSelector:"
+    echo "          hardwareAddr: ${mac}"
+    echo "        dhcp: true"
+    if [[ "$type" == "controlplane" ]]; then
+      echo "        vip:"
+      echo "          ip: ${VIP_IP}"
+    fi
+  } > "$patch_file"
+}
+
+generate_talos_configs() {
+  local base_dir="$talos_dir/base"
+  local node_dir=""
+  local patch_file=""
+  local name=""
+  local type=""
+  local mac=""
+  local config_file=""
+
+  rm -rf "$talos_dir/base" "$talos_dir/generated"
+  mkdir -p "$base_dir" "$talos_dir/generated"
+
+  log "Generating Talos secrets"
+  talosctl gen secrets -o "$talos_dir/secrets.yaml"
+
+  log "Generating base Talos config"
+  talosctl gen config "$NAME" "https://${VIP_IP}:6443" \
+    --output-dir "$base_dir" \
+    --with-secrets "$talos_dir/secrets.yaml" \
+    --install-disk "$INSTALL_DISK"
+
+  cp "$base_dir/talosconfig" "$talos_dir/talosconfig"
+
+  while IFS=$'\t' read -r name type mac; do
+    [[ -n "$name" ]] || continue
+    node_dir="$talos_dir/generated/$name"
+    patch_file="$node_dir/patch.yaml"
+    mkdir -p "$node_dir"
+    write_node_patch "$name" "$type" "$mac" "$patch_file"
+
+    log "Generating Talos config for ${name}"
+    if [[ "$type" == "controlplane" ]]; then
+      talosctl gen config "$NAME" "https://${VIP_IP}:6443" \
+        --output-dir "$node_dir" \
+        --with-secrets "$talos_dir/secrets.yaml" \
+        --install-disk "$INSTALL_DISK" \
+        --config-patch-control-plane "@${patch_file}"
+      config_file="$talos_dir/${name}-controlplane.yaml"
+      cp "$node_dir/controlplane.yaml" "$config_file"
+    else
+      talosctl gen config "$NAME" "https://${VIP_IP}:6443" \
+        --output-dir "$node_dir" \
+        --with-secrets "$talos_dir/secrets.yaml" \
+        --install-disk "$INSTALL_DISK" \
+        --config-patch-worker "@${patch_file}"
+      config_file="$talos_dir/${name}-worker.yaml"
+      cp "$node_dir/worker.yaml" "$config_file"
+    fi
+  done < <(jq -r '
+      to_entries
+      | sort_by(.key)
+      | .[]
+      | [.key, .value.type, .value.mac]
+      | @tsv
+    ' <<<"$nodes_json")
+}
+
+apply_node_config() {
+  local ip="$1"
+  local config_file="$2"
+  log "Applying Talos config to ${ip}"
+  talosctl apply-config \
+    --insecure \
+    --nodes "$ip" \
+    --talosconfig "$talos_dir/talosconfig" \
+    --file "$config_file"
+}
+
+bootstrap_cluster() {
+  local first_cp_ip="$1"
+  log "Bootstrapping cluster from ${first_cp_ip}"
+  talosctl bootstrap \
+    --nodes "$first_cp_ip" \
+    --endpoints "$first_cp_ip" \
+    --talosconfig "$talos_dir/talosconfig"
+
+  log "Writing kubeconfig"
+  talosctl kubeconfig "$kubeconfig_file" \
+    --nodes "$first_cp_ip" \
+    --endpoints "$first_cp_ip" \
+    --talosconfig "$talos_dir/talosconfig" \
+    --force
+}
+
 nodes_json="$(generate_nodes_json)"
-dns_servers_json="$(printf '%s' "$DNS_SERVERS" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))')"
+planned_controlplane_ips_json="$(node_array "ip" "controlplane")"
+planned_worker_ips_json="$(node_array "ip" "worker")"
+controlplane_vm_ids_json="$(node_array "vmid" "controlplane")"
+worker_vm_ids_json="$(node_array "vmid" "worker")"
 
 rm -rf "$work_module_dir"
 mkdir -p "$work_module_dir"
@@ -177,7 +383,7 @@ jq -n \
   --arg talos_version "$PINNED_TALOS_VERSION" \
   --arg talos_image_url "$image_url" \
   --arg talos_image_cache_key "$image_cache_key" \
-  --argjson dns_servers "$dns_servers_json" \
+  --argjson dns_servers "$(printf '%s' "$DNS_SERVERS" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))')" \
   --argjson prefix "$NODE_PREFIX_LENGTH" \
   --argjson nodes "$nodes_json" \
   '{
@@ -198,48 +404,93 @@ jq -n \
     talos_version: $talos_version,
     talos_image_url: $talos_image_url,
     talos_image_cache_key: $talos_image_cache_key,
+    install_disk: "'"$INSTALL_DISK"'",
     nodes: $nodes
   }' > "$tfvars_file"
 
-update_cluster_status "applying" \
-  ".iac = {
-      workdir: \"$work_module_dir\",
-      state_path: \"$work_module_dir/terraform.tfstate\",
-      tfvars_path: \"$tfvars_file\",
-      outputs_path: \"$outputs_file\",
-      image_cache_key: \"$image_cache_key\",
-      image_url: \"$image_url\"
-    } | del(.last_error)"
-
-export TF_IN_AUTOMATION=1
-export TF_DATA_DIR="$iac_dir/.terraform"
-
-pushd "$work_module_dir" >/dev/null
 log "Preparing OpenTofu module"
-"$TOFU_BIN" init -input=false
-log "Generating NoCloud artifacts"
-log "Applying OpenTofu cluster plan"
-"$TOFU_BIN" apply -input=false -auto-approve -var-file="$tfvars_file"
-log "Collecting OpenTofu outputs"
-"$TOFU_BIN" output -json > "$outputs_file"
-popd >/dev/null
+"$TOFU_BIN" -chdir="$work_module_dir" init -input=false
+log "Creating Proxmox VMs"
+"$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve -var-file="$tfvars_file"
 
-jq -r '.kubeconfig.value // empty' "$outputs_file" > "$kubeconfig_file"
+update_cluster_file "provisioned" "$planned_controlplane_ips_json" "$planned_worker_ips_json" "[]" "[]" "$controlplane_vm_ids_json" "$worker_vm_ids_json" "$talos_dir" ""
 
-update_cluster_status "bootstrapped" \
-  ".controlplane_ips = (.controlplane_ips // []) |
-   .worker_ips = (.worker_ips // []) |
-   .controlplane_vm_ids = (.controlplane_vm_ids // []) |
-   .worker_vm_ids = (.worker_vm_ids // []) |
-   .controlplane_ips = ($(jq -c '.controlplane_ips.value // []' "$outputs_file")) |
-   .worker_ips = ($(jq -c '.worker_ips.value // []' "$outputs_file")) |
-   .controlplane_vm_ids = ($(jq -c '.controlplane_vm_ids.value // []' "$outputs_file")) |
-   .worker_vm_ids = ($(jq -c '.worker_vm_ids.value // []' "$outputs_file")) |
-   .vip_ip = ($(jq -r '.vip_ip.value // empty' "$outputs_file" | jq -R '.')) |
-   .kubeconfig_path = \"$kubeconfig_file\" |
-   .iac = (.iac + {
-      module_path: \"$MODULE_SOURCE\"
-    })"
+log "Discovering DHCP addresses"
+discovered_controlplane_ips_json="[]"
+discovered_worker_ips_json="[]"
+discovered_controlplane_ips=()
+discovered_worker_ips=()
 
-log "Fetching kubeconfig"
-log "Cluster apply completed"
+while IFS=$'\t' read -r name type ip; do
+  [[ -n "$name" ]] || continue
+  discovered_ip="$(discover_node_ip "$name" "$ip")"
+  if [[ "$type" == "controlplane" ]]; then
+    discovered_controlplane_ips+=("$discovered_ip")
+  else
+    discovered_worker_ips+=("$discovered_ip")
+  fi
+done < <(jq -r '
+    to_entries
+    | sort_by(.key)
+    | .[]
+    | [.key, .value.type, .value.ip]
+    | @tsv
+  ' <<<"$nodes_json")
+
+discovered_controlplane_ips_json="$(json_array_from_args "${discovered_controlplane_ips[@]}")"
+discovered_worker_ips_json="$(json_array_from_args "${discovered_worker_ips[@]}")"
+
+generate_talos_configs
+
+while IFS=$'\t' read -r name type ip; do
+  [[ -n "$name" ]] || continue
+  if [[ "$type" == "controlplane" ]]; then
+    apply_node_config "$ip" "$talos_dir/${name}-controlplane.yaml"
+  else
+    apply_node_config "$ip" "$talos_dir/${name}-worker.yaml"
+  fi
+done < <(jq -r '
+    to_entries
+    | sort_by(.key)
+    | .[]
+    | [.key, .value.type, .value.ip]
+    | @tsv
+  ' <<<"$nodes_json")
+
+first_controlplane_ip="${discovered_controlplane_ips[0]:-}"
+[[ -n "$first_controlplane_ip" ]] || fail "No control plane IP discovered"
+
+bootstrap_cluster "$first_controlplane_ip"
+
+tmp="$(mktemp)"
+jq \
+  --arg status "bootstrapped" \
+  --arg updated_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+  --argjson planned_controlplane_ips "$planned_controlplane_ips_json" \
+  --argjson planned_worker_ips "$planned_worker_ips_json" \
+  --argjson discovered_controlplane_ips "$discovered_controlplane_ips_json" \
+  --argjson discovered_worker_ips "$discovered_worker_ips_json" \
+  --argjson controlplane_vm_ids "$controlplane_vm_ids_json" \
+  --argjson worker_vm_ids "$worker_vm_ids_json" \
+  --arg talos_dir "$talos_dir" \
+  --arg kubeconfig_path "$kubeconfig_file" \
+  '
+    .status = $status
+    | .updated_at = $updated_at
+    | .planned_controlplane_ips = $planned_controlplane_ips
+    | .planned_worker_ips = $planned_worker_ips
+    | .discovered_controlplane_ips = $discovered_controlplane_ips
+    | .discovered_worker_ips = $discovered_worker_ips
+    | .controlplane_ips = $discovered_controlplane_ips
+    | .worker_ips = $discovered_worker_ips
+    | .controlplane_vm_ids = $controlplane_vm_ids
+    | .worker_vm_ids = $worker_vm_ids
+    | .bootstrap_mode = "dhcp-first"
+    | .talos_config_dir = $talos_dir
+    | .talosconfig_path = ($talos_dir + "/talosconfig")
+    | .kubeconfig_path = $kubeconfig_path
+    | del(.last_error)
+  ' "$cluster_file" > "$tmp"
+mv "$tmp" "$cluster_file"
+
+log "Cluster provisioning finished"

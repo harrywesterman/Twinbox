@@ -8,8 +8,9 @@ Talos lifecycle operations are triggered through the manager stack.
 2. API validates payload and writes queue record.
 3. Worker executes `scripts/manager/apply-cluster.sh`.
 4. Script renders a per-cluster OpenTofu workspace and tfvars payload.
-5. OpenTofu downloads the Talos Image Factory asset on demand, uploads NoCloud snippets, creates Proxmox VMs, applies Talos machine configs, bootstraps the first control plane, and fetches kubeconfig.
-6. Cluster record is updated with VM IDs, static node IPs, state/workdir paths, and kubeconfig metadata.
+5. OpenTofu downloads the Talos image on demand and creates the Proxmox VMs.
+6. The worker discovers the DHCP addresses, generates per-node Talos configs, applies them with `talosctl`, bootstraps the first control plane, and fetches kubeconfig.
+7. Cluster record is updated with VM IDs, planned and discovered node IPs, state/workdir paths, and kubeconfig metadata.
 
 ## Compatibility Rerun
 
@@ -48,3 +49,5 @@ At runtime, worker scripts require:
 - Job metadata in `manager-data/jobs/`.
 - Job logs in `manager-data/logs/`.
 - Per-cluster OpenTofu workdirs and state in `manager-data/clusters/<cluster_id>/iac/`.
+- Talos configs and kubeconfig in `manager-data/clusters/<cluster_id>/talos/`.
+- Cluster state stores planned and discovered node IPs plus the kubeconfig path.

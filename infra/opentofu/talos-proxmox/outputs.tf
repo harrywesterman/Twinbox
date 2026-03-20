@@ -17,8 +17,3 @@ output "controlplane_vm_ids" {
 output "worker_vm_ids" {
   value = [for name in sort(keys(local.workers)) : local.workers[name].vmid]
 }
-
-output "kubeconfig" {
-  value     = talos_cluster_kubeconfig.cluster.kubeconfig_raw
-  sensitive = true
-}

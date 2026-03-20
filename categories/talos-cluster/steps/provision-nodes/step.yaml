@@ -2,8 +2,8 @@ id: provision-nodes
 title: Deploy cluster
 type: action
 order: 10
-summary: Create the Proxmox VMs, apply Talos, bootstrap the control plane, and fetch kubeconfig.
-explanation: Twinbox renders a per-cluster OpenTofu workspace, downloads the Talos image on demand, provisions NoCloud-backed VMs, applies Talos machine configs, bootstraps the first control plane, and stores the resulting artifacts.
+summary: Create the Proxmox VMs, discover their DHCP addresses, apply Talos, bootstrap the control plane, and fetch kubeconfig.
+explanation: Twinbox renders a per-cluster OpenTofu workspace, downloads the Talos image on demand, provisions the VMs, discovers the DHCP addresses, applies Talos machine configs, bootstraps the first control plane, and stores the resulting artifacts.
 side_help: The Management VM keeps the OpenTofu state, rendered variables, outputs, and kubeconfig for this cluster.
 depends_on: []
 inputs:

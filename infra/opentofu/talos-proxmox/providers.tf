@@ -4,5 +4,3 @@ provider "proxmox" {
   password = var.proxmox_password
   insecure = true
 }
-
-provider "talos" {}
