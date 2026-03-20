@@ -969,6 +969,11 @@ function App() {
           const vipField = activeStep.inputs.find((input) => input.id === 'vip_ip');
           const startField = activeStep.inputs.find((input) => input.id === 'start_ip');
           const vmidField = activeStep.inputs.find((input) => input.id === 'start_vmid');
+          const prefixField = activeStep.inputs.find((input) => input.id === 'node_prefix_length');
+          const gatewayField = activeStep.inputs.find((input) => input.id === 'gateway_ip');
+          const dnsServersField = activeStep.inputs.find((input) => input.id === 'dns_servers');
+          const dnsDomainField = activeStep.inputs.find((input) => input.id === 'dns_domain');
+          const suggestedDnsServers = Array.isArray(data.dns_servers) ? data.dns_servers.join(', ') : data.dns_servers;
 
           return {
             ...prev,
@@ -978,6 +983,10 @@ function App() {
               start_vmid: current.start_vmid === undefined || current.start_vmid === vmidField?.default ? (data.start_vmid || current.start_vmid) : current.start_vmid,
               vip_ip: current.vip_ip === undefined || current.vip_ip === vipField?.default ? (data.vip_ip || current.vip_ip) : current.vip_ip,
               start_ip: current.start_ip === undefined || current.start_ip === startField?.default ? (data.start_ip || current.start_ip) : current.start_ip,
+              node_prefix_length: current.node_prefix_length === undefined || current.node_prefix_length === prefixField?.default ? (data.node_prefix_length || current.node_prefix_length) : current.node_prefix_length,
+              gateway_ip: current.gateway_ip === undefined || current.gateway_ip === gatewayField?.default ? (data.gateway_ip || current.gateway_ip) : current.gateway_ip,
+              dns_servers: current.dns_servers === undefined || current.dns_servers === dnsServersField?.default ? (suggestedDnsServers || current.dns_servers) : current.dns_servers,
+              dns_domain: current.dns_domain === undefined || current.dns_domain === dnsDomainField?.default ? (data.dns_domain || current.dns_domain) : current.dns_domain,
             },
           };
         });

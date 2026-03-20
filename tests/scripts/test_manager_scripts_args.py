@@ -32,6 +32,10 @@ def test_create_talos_vms_requires_proxmox_env():
             "--start-vmid", "200",
             "--start-ip", "192.168.1.51",
             "--vip-ip", "192.168.1.50",
+            "--node-prefix-length", "24",
+            "--gateway-ip", "192.168.1.1",
+            "--dns-servers", "1.1.1.1,1.0.0.1",
+            "--dns-domain", "cluster.internal",
             "--proxmox-node", "pve",
             "--storage-pool", "local-lvm",
             "--data-dir", td,
@@ -88,6 +92,9 @@ def test_create_talos_vms_uses_pinned_talos_defaults():
     assert 'source "$SCRIPT_DIR/../../config/pinned-defaults.sh"' in text
     assert 'talos_iso_file="talos-${PINNED_TALOS_VERSION}.iso"' in text
     assert 'ide2=${PINNED_PROXMOX_ISO_STORAGE}:iso/${talos_iso_file},media=cdrom' in text
+    assert 'cloudinit' in text
+    assert 'cicustom=' in text
+    assert 'talosctl gen config' in text
     assert "--iso-storage" not in text
     assert "--talos-iso-file" not in text
 
@@ -126,3 +133,6 @@ def test_bootstrap_talos_detaches_iso_after_enrollment():
     assert "for vmid in" in text
     assert "detach_vm_iso \"$vmid\"" in text
     assert "detach_all_vm_isos" in text
+    assert "talosctl apply-config --insecure" not in text
+    assert "talosctl bootstrap" in text
+    assert "talosctl kubeconfig" in text

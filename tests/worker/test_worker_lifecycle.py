@@ -83,6 +83,10 @@ def test_worker_processes_pending_job_to_completed():
             "start_vmid": 200,
             "start_ip": "192.168.1.51",
             "vip_ip": "192.168.1.50",
+            "node_prefix_length": 24,
+            "gateway_ip": "192.168.1.1",
+            "dns_servers": ["1.1.1.1", "1.0.0.1"],
+            "dns_domain": "cluster.internal",
             "metadata": {
                 "proxmox_node": "pve",
                 "storage_pool": "local-lvm",
@@ -139,6 +143,10 @@ def test_worker_processes_pending_job_to_completed():
 
             log_text = (logs / "job_test.log").read_text()
             assert "running job type=create_cluster" in log_text
+            assert "--node-prefix-length 24" in log_text
+            assert "--gateway-ip 192.168.1.1" in log_text
+            assert "--dns-servers 1.1.1.1,1.0.0.1" in log_text
+            assert "--dns-domain cluster.internal" in log_text
             assert "job completed" in log_text
         finally:
             proc.terminate()

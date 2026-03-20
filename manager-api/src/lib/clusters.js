@@ -4,6 +4,7 @@ import {
   id,
   now,
   parseIPv4,
+  parseIPv4List,
   parseIntInRange,
   parseRequiredString,
   readJson,
@@ -41,6 +42,10 @@ export function buildClusterFromRequest(body, env) {
   const parsedStartVmid = parseIntInRange(body.start_vmid, "start_vmid", 100, 999999);
   const parsedVipIp = parseIPv4(body.vip_ip, "vip_ip");
   const parsedStartIp = parseIPv4(body.start_ip, "start_ip");
+  const parsedNodePrefixLength = parseIntInRange(body.node_prefix_length, "node_prefix_length", 1, 32);
+  const parsedGatewayIp = parseIPv4(body.gateway_ip, "gateway_ip");
+  const parsedDnsServers = parseIPv4List(body.dns_servers, "dns_servers");
+  const parsedDnsDomain = parseRequiredString(body.dns_domain, "dns_domain");
 
   const validations = [
     parsedName,
@@ -53,6 +58,10 @@ export function buildClusterFromRequest(body, env) {
     parsedStartVmid,
     parsedVipIp,
     parsedStartIp,
+    parsedNodePrefixLength,
+    parsedGatewayIp,
+    parsedDnsServers,
+    parsedDnsDomain,
   ];
 
   const failed = validations.find((value) => !value.ok);
@@ -80,6 +89,10 @@ export function buildClusterFromRequest(body, env) {
       start_vmid: parsedStartVmid.value,
       vip_ip: parsedVipIp.value,
       start_ip: parsedStartIp.value,
+      node_prefix_length: parsedNodePrefixLength.value,
+      gateway_ip: parsedGatewayIp.value,
+      dns_servers: parsedDnsServers.value,
+      dns_domain: parsedDnsDomain.value,
       status: "requested",
       created_at: now(),
       updated_at: now(),

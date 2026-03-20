@@ -7,19 +7,19 @@ Talos lifecycle operations are triggered through the manager stack.
 1. UI submits `POST /api/clusters`.
 2. API validates payload and writes queue record.
 3. Worker executes `scripts/manager/create-talos-vms.sh`.
-4. Script calls Proxmox API to create/start Talos VMs.
-5. Cluster record is updated with VM IDs and planned IPs.
+4. Script generates Talos `nocloud` machine configs and uploads Proxmox snippets.
+5. Script calls Proxmox API to create/start Talos VMs with static `ipconfig0`, DNS defaults, and `cicustom` user-data snippets.
+6. Cluster record is updated with VM IDs, static node IPs, and Talos config directory metadata.
 
 ## Bootstrap Flow
 
 1. UI submits `POST /api/clusters/{cluster_id}/bootstrap`.
 2. Worker executes `scripts/manager/bootstrap-talos.sh`.
 3. Script runs:
-   - `talosctl gen config`
-   - `talosctl apply-config` (control-plane + worker)
    - `talosctl bootstrap`
    - `talosctl kubeconfig`
-4. Cluster record is updated with config directory path.
+4. Script detaches the Talos install ISO from the provisioned VMs.
+5. Cluster record is updated with the Talos config directory path.
 
 ## Input Fields
 
@@ -35,6 +35,10 @@ Provisioning request body includes:
 - `start_vmid`
 - `vip_ip`
 - `start_ip`
+- `node_prefix_length`
+- `gateway_ip`
+- `dns_servers`
+- `dns_domain`
 
 ## Environment Dependencies
 

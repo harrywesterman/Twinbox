@@ -149,19 +149,7 @@ talos_dir="$cluster_dir/talos"
 mkdir -p "$talos_dir"
 pushd "$talos_dir" >/dev/null
 
-log "Generating Talos config"
-talosctl gen config "$NAME" "https://${VIP_IP}:6443"
-
-log "Applying controlplane config"
-for ip in "${cp_ips[@]}"; do
-  talosctl apply-config --insecure --nodes "$ip" --file controlplane.yaml
-done
-
-log "Applying worker config"
-for ip in "${worker_ips[@]}"; do
-  [[ -n "$ip" ]] || continue
-  talosctl apply-config --insecure --nodes "$ip" --file worker.yaml
-done
+[[ -f "talosconfig" ]] || fail "talosconfig not found in ${talos_dir}"
 
 log "Bootstrapping cluster"
 talosctl bootstrap --nodes "${cp_ips[0]}" --endpoints "${cp_ips[0]}" --talosconfig talosconfig

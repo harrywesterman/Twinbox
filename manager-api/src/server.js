@@ -228,6 +228,92 @@ function buildIpBlock(prefix, startOctet, nodeCount) {
   return Array.from({ length: nodeCount }, (_, offset) => `${prefix}.${startOctet + offset}`);
 }
 
+function readIpCommand(args) {
+  const ipBin = process.env.MANAGER_API_IP_BIN || "ip";
+  const result = spawnSync(ipBin, args, {
+    encoding: "utf8",
+    timeout: 1000,
+  });
+
+  if (result.error?.code === "ENOENT") {
+    return "";
+  }
+  if (result.status !== 0) {
+    return "";
+  }
+  return result.stdout || "";
+}
+
+function detectNodePrefixLength(managementIp) {
+  const output = readIpCommand(["-o", "-f", "inet", "addr", "show", "scope", "global"]);
+  const lines = output.split("\n").map((line) => line.trim()).filter(Boolean);
+  const exact = lines.find((line) => line.includes(` inet ${managementIp}/`));
+  const match = (exact || lines[0] || "").match(/\binet\s+\d+\.\d+\.\d+\.\d+\/(\d+)/);
+  const parsed = Number(match?.[1] || 24);
+  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 32 ? parsed : 24;
+}
+
+function detectGatewayIp(managementIp) {
+  const output = readIpCommand(["route"]);
+  const match = output.match(/^default via (\d+\.\d+\.\d+\.\d+)/m);
+  if (match?.[1]) {
+    return match[1];
+  }
+
+  const octets = managementIp.split(".");
+  return `${octets[0]}.${octets[1]}.${octets[2]}.1`;
+}
+
+function detectDnsDefaults() {
+  const resolvConf = process.env.MANAGER_API_RESOLV_CONF || "/etc/resolv.conf";
+  if (!fs.existsSync(resolvConf)) {
+    return {
+      dns_servers: ["1.1.1.1"],
+      dns_domain: "localdomain",
+    };
+  }
+
+  const lines = fs.readFileSync(resolvConf, "utf8").split(/\r?\n/);
+  const dnsServers = [];
+  let dnsDomain = "localdomain";
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+
+    if (line.startsWith("nameserver ")) {
+      const candidate = line.split(/\s+/)[1] || "";
+      const parsed = parseIPv4(candidate, "nameserver");
+      if (parsed.ok && !dnsServers.includes(parsed.value)) {
+        dnsServers.push(parsed.value);
+      }
+      continue;
+    }
+
+    if (line.startsWith("search ") || line.startsWith("domain ")) {
+      const parts = line.split(/\s+/).slice(1).filter(Boolean);
+      if (parts[0]) {
+        dnsDomain = parts[0];
+      }
+    }
+  }
+
+  return {
+    dns_servers: dnsServers.length > 0 ? dnsServers : ["1.1.1.1"],
+    dns_domain: dnsDomain,
+  };
+}
+
+function detectHostNetworkDefaults(managementIp) {
+  const dnsDefaults = detectDnsDefaults();
+  return {
+    node_prefix_length: detectNodePrefixLength(managementIp),
+    gateway_ip: detectGatewayIp(managementIp),
+    dns_servers: dnsDefaults.dns_servers,
+    dns_domain: dnsDefaults.dns_domain,
+  };
+}
+
 function suggestClusterName() {
   const envSlug = process.env.TWINBOX_CLUSTER_SLUG || "";
   const normalized = normalizeClusterName(envSlug);
@@ -240,6 +326,7 @@ async function suggestAllocation(managementIp, nodeCount) {
   const managementOctet = octets[3];
   const inUseCache = new Map();
   const vipCandidates = preferredVipOctets();
+  const networkDefaults = detectHostNetworkDefaults(managementIp);
 
   const isIpInUse = (hostOctet) => {
     if (inUseCache.has(hostOctet)) {
@@ -291,6 +378,10 @@ async function suggestAllocation(managementIp, nodeCount) {
     vip_ip: `${prefix}.${vipOctet}`,
     start_ip: `${prefix}.${startOctet}`,
     start_ip_block: ipBlock,
+    node_prefix_length: networkDefaults.node_prefix_length,
+    gateway_ip: networkDefaults.gateway_ip,
+    dns_servers: networkDefaults.dns_servers,
+    dns_domain: networkDefaults.dns_domain,
     probed_addresses: inUseCache.size,
   };
 }
