@@ -39,6 +39,19 @@ function normalizeInputDefinition(input, file) {
   };
 }
 
+function normalizeJourneyStage(value, file) {
+  if (value === undefined || value === null || value === "") {
+    return "setup";
+  }
+
+  const normalized = String(value);
+  if (normalized === "setup" || normalized === "manage") {
+    return normalized;
+  }
+
+  throw new Error(`journey_stage must be setup or manage in ${file}`);
+}
+
 function normalizeCategoryManifest(manifest, file) {
   const requiredFields = ["id", "title", "summary", "order"];
   for (const field of requiredFields) {
@@ -91,6 +104,7 @@ function normalizeStepManifest(manifest, file, categoryId) {
     category_id: categoryId,
     title: String(manifest.title),
     type: String(manifest.type),
+    journey_stage: normalizeJourneyStage(manifest.journey_stage, file),
     order: Number(manifest.order),
     summary: String(manifest.summary),
     explanation: String(manifest.explanation),
@@ -256,6 +270,7 @@ export function buildCatalogResponse({ workspaceRoot, dirs }) {
         category_id: step.category_id,
         title: step.title,
         type: step.type,
+        journey_stage: step.journey_stage,
         order: step.order,
         summary: step.summary,
         explanation: step.explanation,

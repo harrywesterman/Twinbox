@@ -98,6 +98,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "configure-automatic-updates",
             ]
             assert management["steps"][0]["type"] == "config"
+            assert management["steps"][0]["journey_stage"] == "manage"
             assert management["steps"][0]["status"] == "ready"
 
             talos = body["categories"][1]
@@ -105,6 +106,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "provision-nodes",
                 "bootstrap-cluster",
             ]
+            assert talos["steps"][0]["journey_stage"] == "setup"
             assert talos["steps"][0]["status"] == "ready"
             assert talos["steps"][1]["status"] == "locked"
         finally:

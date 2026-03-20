@@ -18,6 +18,10 @@ function flattenCategories(catalog) {
   );
 }
 
+function isSetupStep(step) {
+  return step?.journey_stage !== 'manage';
+}
+
 function pickActiveStep(steps, selectedStepId) {
   if (selectedStepId) {
     const selected = steps.find((step) => step.id === selectedStepId);
@@ -63,7 +67,11 @@ function buildProgress(steps, activeStep, categories) {
 }
 
 function buildMode(steps) {
-  return steps.length > 0 && steps.every((step) => step.status === 'done') ? 'manage' : 'setup';
+  if (steps.length === 0) {
+    return 'manage';
+  }
+
+  return steps.every((step) => step.status === 'done') ? 'manage' : 'setup';
 }
 
 function buildStepRail(steps, activeStep) {
@@ -466,7 +474,10 @@ export function getMissionControlModel({
 }) {
   const safeCatalog = catalog || fallbackCatalog();
   const categories = buildCategorySummaries(safeCatalog.categories || []);
-  const steps = flattenCategories({ categories });
+  const allSteps = flattenCategories({ categories });
+  const setupSteps = allSteps.filter(isSetupStep);
+  const mode = buildMode(setupSteps);
+  const steps = mode === 'setup' ? setupSteps : allSteps;
   const activeStep = pickActiveStep(steps, selectedStepId);
   const activeCategory = activeStep
     ? categories.find((category) => category.id === activeStep.categoryId)
@@ -477,7 +488,6 @@ export function getMissionControlModel({
   const progress = buildProgress(steps, activeStep, categories);
   const catalogErrors = safeCatalog.errors || [];
   const runtime = buildRuntime(logs, activeStep);
-  const mode = buildMode(steps);
   const stepRail = buildStepRail(steps, activeStep);
 
   return {

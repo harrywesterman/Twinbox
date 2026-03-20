@@ -19,6 +19,7 @@ const catalog = {
           id: 'configure-automatic-updates',
           title: 'Configure automatic updates',
           type: 'config',
+          journey_stage: 'manage',
           summary: 'Configure nightly updates.',
           explanation: 'Persist and apply the nightly policy.',
           side_help: 'Twinbox writes one managed cron file.',
@@ -49,6 +50,7 @@ const catalog = {
           id: 'provision-nodes',
           title: 'Provision nodes',
           type: 'action',
+          journey_stage: 'setup',
           summary: 'Create the Talos nodes.',
           explanation: 'Provision the VM inventory.',
           side_help: 'Uses the existing Talos VM provisioning path.',
@@ -71,6 +73,7 @@ const catalog = {
           id: 'bootstrap-cluster',
           title: 'Bootstrap cluster',
           type: 'action',
+          journey_stage: 'setup',
           summary: 'Bootstrap the Talos control plane.',
           explanation: 'Apply the Talos configuration.',
           side_help: 'Waits for provisioning to finish.',
@@ -112,13 +115,13 @@ test('mission control model exposes manifest-driven categories with locked depen
       'Talos Cluster',
     ],
   );
-  assert.equal(model.activeStep.id, 'configure-automatic-updates');
+  assert.equal(model.activeStep.id, 'provision-nodes');
   assert.equal(model.activeStep.status, 'ready');
-  assert.equal(model.activeCategory.title, 'Management VM');
-  assert.equal(model.nextStep.id, 'provision-nodes');
+  assert.equal(model.activeCategory.title, 'Talos Cluster');
+  assert.equal(model.nextStep.id, 'bootstrap-cluster');
   assert.equal(model.primaryAction.type, 'execute');
   assert.equal(model.categories[1].steps[1].status, 'locked');
-  assert.equal(model.progress.totalSteps, 3);
+  assert.equal(model.progress.totalSteps, 2);
   assert.equal(model.progress.completedSteps, 0);
 });
 
@@ -134,10 +137,10 @@ test('mission model exposes guided setup mode and numbered actions', () => {
   });
 
   assert.equal(model.mode, 'setup');
-  assert.equal(model.progress.stepIndex, 2);
-  assert.equal(model.primaryAction.label, 'Start step 2');
-  assert.equal(model.stepRail.length, 3);
-  assert.equal(model.stepRail[1].isCurrent, true);
+  assert.equal(model.progress.stepIndex, 1);
+  assert.equal(model.primaryAction.label, 'Start step 1');
+  assert.equal(model.stepRail.length, 2);
+  assert.equal(model.stepRail[0].isCurrent, true);
 });
 
 test('mission model labels the next action as continue when the current step is done', () => {
@@ -159,7 +162,7 @@ test('mission model labels the next action as continue when the current step is 
   });
 
   assert.equal(model.mode, 'setup');
-  assert.equal(model.primaryAction.label, 'Continue to step 3');
+  assert.equal(model.primaryAction.label, 'Continue to step 2');
 });
 
 test('mission model labels the primary action as retry when a setup step fails', () => {
@@ -182,17 +185,43 @@ test('mission model labels the primary action as retry when a setup step fails',
   });
 
   assert.equal(model.mode, 'setup');
-  assert.equal(model.primaryAction.label, 'Retry step 2');
+  assert.equal(model.primaryAction.label, 'Retry step 1');
+});
+
+test('mission model keeps manage-only steps out of the guided setup rail', () => {
+  const model = getMissionControlModel({
+    catalog,
+    logs: [],
+    cluster: null,
+    health: { ok: true },
+    error: '',
+    busy: false,
+    selectedStepId: '',
+  });
+
+  assert.equal(model.mode, 'setup');
+  assert.equal(model.activeStep.id, 'provision-nodes');
+  assert.equal(model.progress.totalSteps, 2);
+  assert.equal(model.progress.stepIndex, 1);
+  assert.deepEqual(
+    model.stepRail.map((step) => step.id),
+    ['provision-nodes', 'bootstrap-cluster'],
+  );
+  assert.equal(model.primaryAction.label, 'Start step 1');
 });
 
 test('mission model switches to manage mode when setup flow is complete', () => {
   const completedCatalog = structuredClone(catalog);
-  for (const category of completedCatalog.categories) {
-    for (const step of category.steps) {
-      step.status = 'done';
-      step.state = { ...step.state, status: 'succeeded' };
-    }
-  }
+  completedCatalog.categories[1].steps[0].status = 'done';
+  completedCatalog.categories[1].steps[0].state = {
+    ...completedCatalog.categories[1].steps[0].state,
+    status: 'succeeded',
+  };
+  completedCatalog.categories[1].steps[1].status = 'done';
+  completedCatalog.categories[1].steps[1].state = {
+    ...completedCatalog.categories[1].steps[1].state,
+    status: 'succeeded',
+  };
 
   const model = getMissionControlModel({
     catalog: completedCatalog,
@@ -201,10 +230,11 @@ test('mission model switches to manage mode when setup flow is complete', () => 
     health: { ok: true },
     error: '',
     busy: false,
-    selectedStepId: 'bootstrap-cluster',
+    selectedStepId: 'configure-automatic-updates',
   });
 
   assert.equal(model.mode, 'manage');
+  assert.equal(model.activeStep.id, 'configure-automatic-updates');
 });
 
 test('mission control model projects running and completed step state from catalog payload', () => {

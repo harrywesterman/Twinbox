@@ -1,6 +1,7 @@
 id: configure-automatic-updates
 title: Configure automatic updates
 type: config
+journey_stage: manage
 order: 10
 summary: Configure the Management VM to refresh the Twinbox checkout each night.
 explanation: Save the nightly update policy and apply a managed cron entry on the Management VM host.
