@@ -45,6 +45,16 @@ export function parseRequiredString(value, field) {
   return { ok: true, value: value.trim() };
 }
 
+export function parseOptionalString(value, field) {
+  if (value === undefined || value === null) {
+    return { ok: true, value: "" };
+  }
+  if (typeof value !== "string") {
+    return { ok: false, error: `${field} must be a string` };
+  }
+  return { ok: true, value: value.trim() };
+}
+
 export function parseIPv4(value, field) {
   if (typeof value !== "string") {
     return { ok: false, error: `${field} must be a valid IPv4 address` };

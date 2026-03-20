@@ -6,6 +6,7 @@ import {
   parseIPv4,
   parseIPv4List,
   parseIntInRange,
+  parseOptionalString,
   parseRequiredString,
   readJson,
   writeJson,
@@ -45,7 +46,7 @@ export function buildClusterFromRequest(body, env) {
   const parsedNodePrefixLength = parseIntInRange(body.node_prefix_length, "node_prefix_length", 1, 32);
   const parsedGatewayIp = parseIPv4(body.gateway_ip, "gateway_ip");
   const parsedDnsServers = parseIPv4List(body.dns_servers, "dns_servers");
-  const parsedDnsDomain = parseRequiredString(body.dns_domain, "dns_domain");
+  const parsedDnsDomain = parseOptionalString(body.dns_domain, "dns_domain");
 
   const validations = [
     parsedName,

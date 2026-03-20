@@ -279,6 +279,123 @@ def test_ip_suggestions_uses_cluster_slug_for_name_suggestion():
             proc.wait(timeout=5)
 
 
+def test_ip_suggestions_filters_container_dns_and_placeholder_domain():
+    with tempfile.TemporaryDirectory() as td:
+        data_dir = Path(td) / "data"
+        ping_mock = Path(td) / "mock-ping.sh"
+        vm_mock = Path(td) / "mock-vms.sh"
+        ip_mock = Path(td) / "mock-ip.sh"
+        resolv_conf = Path(td) / "resolv.conf"
+        ping_mock.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+        ping_mock.chmod(0o755)
+        vm_mock.write_text("#!/bin/sh\necho '[]'\n", encoding="utf-8")
+        vm_mock.chmod(0o755)
+        ip_mock.write_text(
+            """#!/bin/sh
+if [ "$1" = "-o" ] && [ "$2" = "-f" ] && [ "$3" = "inet" ] && [ "$4" = "addr" ] && [ "$5" = "show" ] && [ "$6" = "scope" ] && [ "$7" = "global" ]; then
+  echo "2: eth0    inet 192.168.2.51/24 brd 192.168.2.255 scope global eth0"
+  exit 0
+fi
+
+if [ "$1" = "route" ]; then
+  echo "default via 172.18.0.1 dev eth0"
+  exit 0
+fi
+
+exit 1
+""",
+            encoding="utf-8",
+        )
+        ip_mock.chmod(0o755)
+        resolv_conf.write_text(
+            "search localdomain\nnameserver 127.0.0.11\nnameserver 1.1.1.1\nnameserver 127.0.0.53\n",
+            encoding="utf-8",
+        )
+
+        port = _find_free_port()
+        env = os.environ.copy()
+        env["MANAGER_DATA_DIR"] = str(data_dir)
+        env["MANAGER_API_PORT"] = str(port)
+        env["MANAGER_API_PING_BIN"] = str(ping_mock)
+        env["MANAGER_API_CLUSTER_RESOURCES_BIN"] = str(vm_mock)
+        env["MANAGER_API_IP_BIN"] = str(ip_mock)
+        env["MANAGER_API_RESOLV_CONF"] = str(resolv_conf)
+
+        proc = subprocess.Popen(
+            ["node", "manager-api/src/server.js"],
+            cwd=Path(__file__).resolve().parents[2],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            _wait_for_health(f"http://127.0.0.1:{port}")
+            status, body = _get_json(
+                f"http://127.0.0.1:{port}/api/ip-suggestions?management_ip=192.168.2.51&node_count=3"
+            )
+            assert status == 200
+            assert body["gateway_ip"] == "192.168.2.1"
+            assert body["dns_servers"] == ["1.1.1.1"]
+            assert body["dns_domain"] == ""
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
+def test_create_cluster_accepts_empty_dns_domain():
+    with tempfile.TemporaryDirectory() as td:
+        data_dir = Path(td) / "data"
+        ping_mock = Path(td) / "mock-ping.sh"
+        vm_mock = Path(td) / "mock-vms.sh"
+        ping_mock.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+        ping_mock.chmod(0o755)
+        vm_mock.write_text("#!/bin/sh\necho '[]'\n", encoding="utf-8")
+        vm_mock.chmod(0o755)
+        port = _find_free_port()
+        env = os.environ.copy()
+        env["MANAGER_DATA_DIR"] = str(data_dir)
+        env["MANAGER_API_PORT"] = str(port)
+        env["MANAGER_API_PING_BIN"] = str(ping_mock)
+        env["MANAGER_API_CLUSTER_RESOURCES_BIN"] = str(vm_mock)
+
+        proc = subprocess.Popen(
+            ["node", "manager-api/src/server.js"],
+            cwd=Path(__file__).resolve().parents[2],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            _wait_for_health(f"http://127.0.0.1:{port}")
+            payload = {
+                "name": "demo",
+                "controlplane_count": 1,
+                "worker_count": 2,
+                "cpu_cores": 2,
+                "memory_mb": 4096,
+                "disk_gb": 20,
+                "bridge": "vmbr0",
+                "start_vmid": 200,
+                "vip_ip": "192.168.1.50",
+                "start_ip": "192.168.1.51",
+                "node_prefix_length": 24,
+                "gateway_ip": "192.168.1.1",
+                "dns_servers": "1.1.1.1, 1.0.0.1",
+                "dns_domain": "",
+            }
+            status, body = _post_json(f"http://127.0.0.1:{port}/api/clusters", payload)
+            assert status == 202
+
+            cluster_file = data_dir / "clusters" / f"{body['cluster_id']}.json"
+            cluster = json.loads(cluster_file.read_text())
+            assert cluster["dns_domain"] == ""
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
 def test_create_cluster_rejects_occupied_vmid_or_ip_ranges_and_normalizes_name():
     with tempfile.TemporaryDirectory() as td:
         data_dir = Path(td) / "data"

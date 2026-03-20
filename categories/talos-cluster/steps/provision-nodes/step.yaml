@@ -102,9 +102,9 @@ inputs:
   - id: dns_domain
     label: DNS domain
     type: string
-    required: true
-    default: localdomain
-    help: Search domain for Talos nodes.
+    required: false
+    default: ""
+    help: Optional search domain for Talos nodes.
 runner:
   kind: script
   script: categories/talos-cluster/steps/provision-nodes/run.sh

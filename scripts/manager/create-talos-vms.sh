@@ -195,11 +195,15 @@ create_vm() {
   local start_upid=""
   local talos_iso_file="talos-${PINNED_TALOS_VERSION}.iso"
   local proxmox_dns_servers=""
+  local searchdomain_arg=()
 
   if [[ -n "${TWINBOX_CLUSTER_SLUG:-}" ]]; then
     cluster_scope_tag=";cluster-${TWINBOX_CLUSTER_SLUG}"
   fi
   proxmox_dns_servers=$(printf '%s' "$DNS_SERVERS" | tr ',' ' ' | xargs)
+  if [[ -n "${DNS_DOMAIN:-}" ]]; then
+    searchdomain_arg=(--data-urlencode "searchdomain=${DNS_DOMAIN}")
+  fi
 
   create_resp=$(task_post "https://${PROXMOX_HOST}:${PROXMOX_PORT}/api2/json/nodes/${PROXMOX_NODE}/qemu" \
     --data-urlencode "vmid=${vmid}" \
@@ -212,7 +216,7 @@ create_vm() {
     --data-urlencode "net0=virtio,bridge=${BRIDGE}" \
     --data-urlencode "ipconfig0=ip=${ip}/${NODE_PREFIX_LENGTH},gw=${GATEWAY_IP}" \
     --data-urlencode "nameserver=${proxmox_dns_servers}" \
-    --data-urlencode "searchdomain=${DNS_DOMAIN}" \
+    "${searchdomain_arg[@]}" \
     --data-urlencode "cicustom=user=${PINNED_PROXMOX_ISO_STORAGE}:snippets/${snippet_name}" \
     --data-urlencode "scsihw=virtio-scsi-pci" \
     --data-urlencode "scsi0=${STORAGE_POOL}:${DISK_GB}" \

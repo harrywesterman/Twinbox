@@ -253,10 +253,19 @@ function detectNodePrefixLength(managementIp) {
   return Number.isInteger(parsed) && parsed >= 1 && parsed <= 32 ? parsed : 24;
 }
 
+function inSame24Subnet(left, right) {
+  const leftOctets = String(left || "").split(".");
+  const rightOctets = String(right || "").split(".");
+  if (leftOctets.length !== 4 || rightOctets.length !== 4) {
+    return false;
+  }
+  return leftOctets.slice(0, 3).join(".") === rightOctets.slice(0, 3).join(".");
+}
+
 function detectGatewayIp(managementIp) {
   const output = readIpCommand(["route"]);
   const match = output.match(/^default via (\d+\.\d+\.\d+\.\d+)/m);
-  if (match?.[1]) {
+  if (match?.[1] && inSame24Subnet(match[1], managementIp)) {
     return match[1];
   }
 
@@ -264,18 +273,27 @@ function detectGatewayIp(managementIp) {
   return `${octets[0]}.${octets[1]}.${octets[2]}.1`;
 }
 
+function isLoopbackIpv4(ip) {
+  return String(ip || "").startsWith("127.");
+}
+
+function isPlaceholderDnsDomain(domain) {
+  const normalized = String(domain || "").trim().toLowerCase();
+  return normalized === "localdomain" || normalized === "localhost.localdomain";
+}
+
 function detectDnsDefaults() {
   const resolvConf = process.env.MANAGER_API_RESOLV_CONF || "/etc/resolv.conf";
   if (!fs.existsSync(resolvConf)) {
     return {
       dns_servers: ["1.1.1.1"],
-      dns_domain: "localdomain",
+      dns_domain: "",
     };
   }
 
   const lines = fs.readFileSync(resolvConf, "utf8").split(/\r?\n/);
   const dnsServers = [];
-  let dnsDomain = "localdomain";
+  let dnsDomain = "";
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
@@ -284,7 +302,7 @@ function detectDnsDefaults() {
     if (line.startsWith("nameserver ")) {
       const candidate = line.split(/\s+/)[1] || "";
       const parsed = parseIPv4(candidate, "nameserver");
-      if (parsed.ok && !dnsServers.includes(parsed.value)) {
+      if (parsed.ok && !isLoopbackIpv4(parsed.value) && !dnsServers.includes(parsed.value)) {
         dnsServers.push(parsed.value);
       }
       continue;
@@ -292,8 +310,9 @@ function detectDnsDefaults() {
 
     if (line.startsWith("search ") || line.startsWith("domain ")) {
       const parts = line.split(/\s+/).slice(1).filter(Boolean);
-      if (parts[0]) {
-        dnsDomain = parts[0];
+      const candidate = parts.find((entry) => !isPlaceholderDnsDomain(entry));
+      if (candidate) {
+        dnsDomain = candidate;
       }
     }
   }

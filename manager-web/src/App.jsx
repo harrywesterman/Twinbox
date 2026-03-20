@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import {
   STORAGE_KEY,
@@ -9,6 +9,7 @@ import {
   serializeUiState,
   toneForStatus,
 } from './journey.js';
+import { buildSuggestedProvisionInputs, mergeSuggestedProvisionDraft } from './provision-defaults.js';
 
 function inputValueFromStep(step, input, currentDraft) {
   if (currentDraft && Object.prototype.hasOwnProperty.call(currentDraft, input.id)) {
@@ -783,6 +784,8 @@ function App() {
   const [railOpen, setRailOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [ipSuggestion, setIpSuggestion] = useState('');
+  const [provisionSuggestedInputs, setProvisionSuggestedInputs] = useState({});
+  const dirtyInputsRef = useRef({});
   const deferredLogs = useDeferredValue(logs);
 
   const mission = useMemo(
@@ -946,6 +949,7 @@ function App() {
   useEffect(() => {
     if (activeStep?.id !== 'provision-nodes') {
       setIpSuggestion('');
+      setProvisionSuggestedInputs({});
       return undefined;
     }
 
@@ -963,32 +967,22 @@ function App() {
         if (!res.ok || cancelled) return;
 
         const data = await res.json();
-        setDraftInputs((prev) => {
-          const current = prev['provision-nodes'] || {};
-          const nameField = activeStep.inputs.find((input) => input.id === 'name');
-          const vipField = activeStep.inputs.find((input) => input.id === 'vip_ip');
-          const startField = activeStep.inputs.find((input) => input.id === 'start_ip');
-          const vmidField = activeStep.inputs.find((input) => input.id === 'start_vmid');
-          const prefixField = activeStep.inputs.find((input) => input.id === 'node_prefix_length');
-          const gatewayField = activeStep.inputs.find((input) => input.id === 'gateway_ip');
-          const dnsServersField = activeStep.inputs.find((input) => input.id === 'dns_servers');
-          const dnsDomainField = activeStep.inputs.find((input) => input.id === 'dns_domain');
-          const suggestedDnsServers = Array.isArray(data.dns_servers) ? data.dns_servers.join(', ') : data.dns_servers;
-
-          return {
-            ...prev,
-            'provision-nodes': {
-              ...current,
-              name: current.name === undefined || current.name === nameField?.default ? (data.name_suggestion || current.name) : current.name,
-              start_vmid: current.start_vmid === undefined || current.start_vmid === vmidField?.default ? (data.start_vmid || current.start_vmid) : current.start_vmid,
-              vip_ip: current.vip_ip === undefined || current.vip_ip === vipField?.default ? (data.vip_ip || current.vip_ip) : current.vip_ip,
-              start_ip: current.start_ip === undefined || current.start_ip === startField?.default ? (data.start_ip || current.start_ip) : current.start_ip,
-              node_prefix_length: current.node_prefix_length === undefined || current.node_prefix_length === prefixField?.default ? (data.node_prefix_length || current.node_prefix_length) : current.node_prefix_length,
-              gateway_ip: current.gateway_ip === undefined || current.gateway_ip === gatewayField?.default ? (data.gateway_ip || current.gateway_ip) : current.gateway_ip,
-              dns_servers: current.dns_servers === undefined || current.dns_servers === dnsServersField?.default ? (suggestedDnsServers || current.dns_servers) : current.dns_servers,
-              dns_domain: current.dns_domain === undefined || current.dns_domain === dnsDomainField?.default ? (data.dns_domain || current.dns_domain) : current.dns_domain,
-            },
-          };
+        const nextSuggestedInputs = buildSuggestedProvisionInputs(data);
+        setProvisionSuggestedInputs((previousSuggested) => {
+          setDraftInputs((prev) => {
+            const current = prev['provision-nodes'] || {};
+            return {
+              ...prev,
+              'provision-nodes': mergeSuggestedProvisionDraft({
+                currentDraft: current,
+                previousSuggested,
+                suggestionData: data,
+                stepInputs: activeStep.inputs,
+                dirtyFields: dirtyInputsRef.current['provision-nodes'] || {},
+              }),
+            };
+          });
+          return nextSuggestedInputs;
         });
 
         if (Array.isArray(data.start_ip_block) && data.start_ip_block.length === nodeCount) {
@@ -1017,6 +1011,13 @@ function App() {
 
   const onInputChange = (inputId, value) => {
     if (!activeStep) return;
+    dirtyInputsRef.current = {
+      ...dirtyInputsRef.current,
+      [activeStep.id]: {
+        ...(dirtyInputsRef.current[activeStep.id] || {}),
+        [inputId]: true,
+      },
+    };
     setDraftInputs((prev) => ({
       ...prev,
       [activeStep.id]: {
