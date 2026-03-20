@@ -139,15 +139,158 @@ function buildArtifacts(activeStep, cluster) {
   return artifacts;
 }
 
-function buildEvents(logs, activeStep) {
-  const recentLogs = Array.isArray(logs) ? logs.slice(-6) : [];
-  if (recentLogs.length > 0) {
-    return recentLogs.map((entry, index) => ({
-      id: `${activeStep?.id || 'step'}-${index}`,
-      title: activeStep?.title || 'Step event',
-      detail: entry.line,
+function parseLoggedAt(line) {
+  if (typeof line !== 'string') return null;
+  const match = line.match(/^\[([^\]]+)\]\s*/);
+  if (!match) return null;
+  const parsed = new Date(match[1]);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
+function stripLogTimestamp(line) {
+  if (typeof line !== 'string') return '';
+  return line.replace(/^\[[^\]]+\]\s*/, '');
+}
+
+function summarizeStage(detail, activeStep) {
+  const normalized = detail.toLowerCase();
+
+  if (normalized.includes('queued run_step') || normalized.includes('queued bootstrap_cluster') || normalized.includes('queued create_cluster')) {
+    return { title: 'Queued', tone: 'neutral' };
+  }
+  if (normalized.includes('running job type=')) {
+    return { title: 'Starting step', tone: 'active' };
+  }
+  if (normalized.includes('created controlplane vm') || normalized.includes('created worker vm')) {
+    return { title: 'Creating VMs', tone: 'active' };
+  }
+  if (normalized.includes('generating talos config')) {
+    return { title: 'Preparing Talos', tone: 'active' };
+  }
+  if (normalized.includes('applying controlplane config') || normalized.includes('applying worker config')) {
+    return { title: 'Applying configuration', tone: 'active' };
+  }
+  if (normalized.includes('bootstrapping cluster')) {
+    return { title: 'Bootstrapping cluster', tone: 'active' };
+  }
+  if (normalized.includes('generating kubeconfig')) {
+    return { title: 'Fetching kubeconfig', tone: 'active' };
+  }
+  if (normalized.includes('detaching talos iso')) {
+    return { title: 'Cleaning up', tone: 'active' };
+  }
+  if (normalized.includes('job completed')) {
+    return { title: 'Done', tone: 'success' };
+  }
+  if (normalized.includes('job failed:')) {
+    return { title: 'Failed', tone: 'danger' };
+  }
+
+  return {
+    title: activeStep?.title || 'Step event',
+    tone: 'active',
+  };
+}
+
+function formatElapsedFrom(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    return 'Updated recently';
+  }
+
+  const seconds = Math.max(0, Math.round((Date.now() - date.getTime()) / 1000));
+  if (seconds <= 1) return 'Updated just now';
+  return `Updated ${seconds}s ago`;
+}
+
+function fallbackRuntimeEvent(activeStep, latestJob) {
+  const status = latestJob?.status || activeStep?.status || 'ready';
+  if (status === 'pending') {
+    return {
+      id: `${activeStep?.id || 'step'}-queued`,
+      title: 'Queued',
+      detail: 'Twinbox queued this step and is waiting for the worker.',
+      tone: 'neutral',
+      timestamp: null,
+    };
+  }
+  if (status === 'running') {
+    return {
+      id: `${activeStep?.id || 'step'}-running`,
+      title: 'Running',
+      detail: 'Twinbox is executing the selected step.',
       tone: 'active',
-    }));
+      timestamp: null,
+    };
+  }
+  if (status === 'failed') {
+    return {
+      id: `${activeStep?.id || 'step'}-failed`,
+      title: 'Failed',
+      detail: latestJob?.error || activeStep?.state?.error || 'The latest run failed.',
+      tone: 'danger',
+      timestamp: null,
+    };
+  }
+  if (status === 'succeeded' || status === 'done') {
+    return {
+      id: `${activeStep?.id || 'step'}-done`,
+      title: 'Done',
+      detail: 'The latest run completed successfully.',
+      tone: 'success',
+      timestamp: null,
+    };
+  }
+
+  return {
+    id: `${activeStep?.id || 'step'}-idle`,
+    title: 'Ready',
+    detail: 'Run the selected step to stream worker output here.',
+    tone: 'neutral',
+    timestamp: null,
+  };
+}
+
+function buildRuntime(logs, activeStep) {
+  const latestJob = activeStep?.latest_job || null;
+  const parsedEvents = (Array.isArray(logs) ? logs : [])
+    .filter((entry) => entry?.line)
+    .map((entry, index) => {
+      const detail = stripLogTimestamp(entry.line);
+      const stage = summarizeStage(detail, activeStep);
+      return {
+        id: `${activeStep?.id || 'step'}-${index}`,
+        title: stage.title,
+        detail,
+        tone: stage.tone,
+        timestamp: parseLoggedAt(entry.line),
+      };
+    });
+
+  const timelineEvents = parsedEvents.length > 0 ? parsedEvents : [fallbackRuntimeEvent(activeStep, latestJob)];
+  const currentEvent = timelineEvents.at(-1);
+  const currentStage = currentEvent?.title || formatState(latestJob?.status || activeStep?.status, 'Ready');
+  const runState = latestJob?.status || activeStep?.status || 'ready';
+  const latestTimestamp = currentEvent?.timestamp || (latestJob?.updated_at ? new Date(latestJob.updated_at) : null);
+  const lastUpdatedLabel = formatElapsedFrom(latestTimestamp);
+  const staleSeconds = latestTimestamp instanceof Date && !Number.isNaN(latestTimestamp.getTime())
+    ? Math.max(0, Math.round((Date.now() - latestTimestamp.getTime()) / 1000))
+    : 0;
+
+  return {
+    currentStage,
+    runState,
+    lastUpdatedLabel,
+    isLive: runState === 'running' || runState === 'pending',
+    isStale: (runState === 'running' || runState === 'pending') && staleSeconds >= 30,
+    eventCount: timelineEvents.length,
+    timelineEvents,
+  };
+}
+
+function buildEvents(runtime) {
+  if (runtime?.timelineEvents?.length) {
+    return runtime.timelineEvents;
   }
 
   return [
@@ -156,6 +299,7 @@ function buildEvents(logs, activeStep) {
       title: 'No live events yet',
       detail: 'Run the selected step to stream worker output here.',
       tone: 'neutral',
+      timestamp: null,
     },
   ];
 }
@@ -316,6 +460,7 @@ export function getMissionControlModel({
   const nextStep = activeIndex >= 0 && activeIndex < steps.length - 1 ? steps[activeIndex + 1] : null;
   const progress = buildProgress(steps, activeStep, categories);
   const catalogErrors = safeCatalog.errors || [];
+  const runtime = buildRuntime(logs, activeStep);
 
   return {
     categories,
@@ -330,7 +475,8 @@ export function getMissionControlModel({
     activity: {
       summary: activeStep?.summary || 'Catalog data is not available yet.',
       artifacts: buildArtifacts(activeStep, cluster),
-      events: buildEvents(logs, activeStep),
+      runtime,
+      events: buildEvents(runtime),
       risks: buildRisks(activeStep, catalogErrors, error),
       rawLogOutput: Array.isArray(logs) && logs.length ? logs.map((entry) => entry.line).join('\n') : 'No worker output yet.',
     },

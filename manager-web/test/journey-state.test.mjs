@@ -164,6 +164,74 @@ test('mission control model projects running and completed step state from catal
   assert.equal(model.primaryAction.disabled, true);
   assert.equal(model.progress.completedSteps, 1);
   assert.equal(model.activity.artifacts.find((artifact) => artifact.label === 'Cluster ID').value, 'cluster_demo');
+  assert.equal(model.activity.runtime.currentStage, 'Bootstrapping cluster');
+  assert.equal(model.activity.runtime.runState, 'running');
+  assert.equal(model.activity.runtime.timelineEvents.length, 1);
+  assert.match(model.activity.runtime.lastUpdatedLabel, /Updated/);
+});
+
+test('mission control model derives queued runtime state when no meaningful logs are present', () => {
+  const queuedCatalog = structuredClone(catalog);
+  queuedCatalog.categories[1].steps[0].status = 'running';
+  queuedCatalog.categories[1].steps[0].latest_job = {
+    id: 'job_queue',
+    type: 'run_step',
+    status: 'pending',
+    step: 'queued',
+    error: null,
+    updated_at: '2026-03-20T10:09:00Z',
+  };
+
+  const model = getMissionControlModel({
+    catalog: queuedCatalog,
+    logs: [],
+    cluster: null,
+    health: { ok: true },
+    error: '',
+    busy: false,
+    selectedStepId: 'provision-nodes',
+  });
+
+  assert.equal(model.activity.runtime.currentStage, 'Queued');
+  assert.equal(model.activity.runtime.runState, 'pending');
+  assert.equal(model.activity.runtime.timelineEvents[0].title, 'Queued');
+});
+
+test('mission control model derives provisioning and failure runtime events from logs', () => {
+  const runningCatalog = structuredClone(catalog);
+  runningCatalog.categories[1].steps[0].status = 'failed';
+  runningCatalog.categories[1].steps[0].latest_job = {
+    id: 'job_provision',
+    type: 'run_step',
+    status: 'failed',
+    step: 'failed',
+    error: 'command exited with code 1: Proxmox API POST failed',
+    updated_at: '2026-03-20T10:12:00Z',
+  };
+
+  const model = getMissionControlModel({
+    catalog: runningCatalog,
+    logs: [
+      { line: '[2026-03-20T10:11:55Z] queued run_step' },
+      { line: '[2026-03-20T10:11:56Z] running job type=run_step' },
+      { line: '[2026-03-20T10:11:58Z] [2026-03-20 10:11:58] Created controlplane VM twinbox-cluster-cp-1 (192.168.1.51)' },
+      { line: '[2026-03-20T10:12:00Z] job failed: command exited with code 1: Proxmox API POST failed' },
+    ],
+    cluster: {
+      id: 'cluster_demo',
+      status: 'requested',
+      vip_ip: '192.168.1.50',
+    },
+    health: { ok: true },
+    error: '',
+    busy: false,
+    selectedStepId: 'provision-nodes',
+  });
+
+  assert.equal(model.activity.runtime.currentStage, 'Failed');
+  assert.equal(model.activity.runtime.runState, 'failed');
+  assert.equal(model.activity.runtime.timelineEvents.some((event) => event.title === 'Creating VMs'), true);
+  assert.equal(model.activity.runtime.timelineEvents.at(-1).tone, 'danger');
 });
 
 test('ui state serialization restores the selected step preference', () => {

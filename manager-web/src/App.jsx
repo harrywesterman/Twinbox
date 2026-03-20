@@ -105,6 +105,17 @@ function statusLabel(status) {
   return formatState(status, 'Not started');
 }
 
+function formatRuntimeTimestamp(value) {
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+    return 'Waiting for updates';
+  }
+  return value.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
 function StepFields({ activeStep, draftInputs, onChange, ipSuggestion }) {
   if (!activeStep || !(activeStep.inputs || []).length) {
     return null;
@@ -243,6 +254,7 @@ function App() {
   const activeStep = mission.activeStep;
   const catalogErrors = catalog.errors || [];
   const activeChecks = buildChecks(activeStep, mission.steps, catalogErrors);
+  const runtime = mission.activity.runtime;
   const activeClusterId = useMemo(() => {
     if (!activeStep) return '';
     if (activeStep.state?.cluster_id) return activeStep.state.cluster_id;
@@ -615,6 +627,51 @@ function App() {
             </div>
 
             <section className="workspace-section">
+              <div className="runtime-strip">
+                <div className="section-header">
+                  <div>
+                    <p className="section-kicker">Live runtime</p>
+                    <h3>Current stage</h3>
+                  </div>
+                  <div className="runtime-strip-meta">
+                    {runtime.isLive ? <span className="runtime-pulse" aria-hidden="true" /> : null}
+                    <span className={`status-chip tone-${toneForStatus(runtime.runState)}`}>{statusLabel(runtime.runState)}</span>
+                  </div>
+                </div>
+
+                <div className="runtime-summary-grid">
+                  <article className="runtime-summary-card">
+                    <span className="metric-label">Current stage</span>
+                    <strong>{runtime.currentStage}</strong>
+                    <p>{runtime.isStale ? 'No new activity recently. Twinbox is still polling.' : 'Twinbox is translating worker activity into a step-by-step timeline.'}</p>
+                  </article>
+                  <article className="runtime-summary-card">
+                    <span className="metric-label">Updated</span>
+                    <strong>{runtime.lastUpdatedLabel}</strong>
+                    <p>{runtime.isLive ? 'Polling is active while the current job is running.' : 'Twinbox will refresh this timeline when the next job starts.'}</p>
+                  </article>
+                  <article className="runtime-summary-card">
+                    <span className="metric-label">Timeline</span>
+                    <strong>{`${runtime.eventCount} events`}</strong>
+                    <p>{runtime.timelineEvents.at(-1)?.detail || 'Run the selected step to generate visible progress events.'}</p>
+                  </article>
+                </div>
+
+                <div className="timeline-list">
+                  {runtime.timelineEvents.map((event) => (
+                    <article key={event.id} className={`timeline-card tone-${event.tone}`}>
+                      <div className="timeline-card-top">
+                        <strong>{event.title}</strong>
+                        <span className="status-chip tone-neutral">{formatRuntimeTimestamp(event.timestamp)}</span>
+                      </div>
+                      <p>{event.detail}</p>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <section className="workspace-section">
               <div className="section-header">
                 <div>
                   <p className="section-kicker">Checks</p>
@@ -702,18 +759,20 @@ function App() {
             <section className="panel-card">
               <div className="section-header">
                 <div>
-                  <p className="section-kicker">Live events</p>
-                  <h3>Worker output</h3>
+                  <p className="section-kicker">Live summary</p>
+                  <h3>Runtime snapshot</h3>
                 </div>
-                <span className="status-chip tone-neutral">{`${mission.activity.events.length} events`}</span>
+                <span className={`status-chip tone-${toneForStatus(runtime.runState)}`}>{statusLabel(runtime.runState)}</span>
               </div>
               <div className="event-list">
-                {mission.activity.events.map((event) => (
-                  <article key={event.id} className={`event-card tone-${event.tone}`}>
-                    <strong>{event.title}</strong>
-                    <p>{event.detail}</p>
-                  </article>
-                ))}
+                <article className={`event-card tone-${toneForStatus(runtime.runState)}`}>
+                  <strong>{runtime.currentStage}</strong>
+                  <p>{runtime.lastUpdatedLabel}</p>
+                </article>
+                <article className="event-card tone-neutral">
+                  <strong>Most recent event</strong>
+                  <p>{runtime.timelineEvents.at(-1)?.detail || 'No worker output yet.'}</p>
+                </article>
               </div>
             </section>
 
