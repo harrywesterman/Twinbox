@@ -61,6 +61,8 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     assert "      KUBECTL_VERSION=${KUBECTL_VERSION}" in text
     assert "      HELM_VERSION=${HELM_VERSION}" in text
     assert "      TWINBOX_HOST_REPO_ROOT=${TWINBOX_TARGET_DIR}" in text
+    assert "      TALOS_IMAGE_PRESET=${TALOS_IMAGE_PRESET}" in text
+    assert "      TALOS_IMAGE_SCHEMATIC=${TALOS_IMAGE_SCHEMATIC}" not in text
     assert "      TALOSCTL_VERSION=${TALOSCTL_VERSION}" not in text
     assert "      PROXMOX_ISO_STORAGE=${PROXMOX_ISO_STORAGE}" not in text
     assert "      TALOS_ISO_FILE=${TALOS_ISO_FILE}" not in text
@@ -322,7 +324,7 @@ def test_setup_wizard_creates_dedicated_limited_proxmox_api_user():
     assert 'apply_acl_with_retry()' in text
     assert 'pveum role add "$PROXMOX_ROLE"' in text
     assert 'VM.Audit,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use' in text
-    assert 'for acl_path in /vms /storage "/nodes/${PROXMOX_NODE}"; do' in text
+    assert 'for acl_path in /vms "/storage/${PROXMOX_STORAGE_POOL}" "/storage/${PROXMOX_FILE_DATASTORE}" "/nodes/${PROXMOX_NODE}"; do' in text
     assert 'pveum aclmod "$path" -user "$user" -role "$role" 2>&1' in text
     assert 'if ! apply_acl_with_retry "/sdn" "$PROXMOX_USER" "$PROXMOX_ROLE" 10 1; then' in text
 
@@ -337,6 +339,15 @@ def test_setup_wizard_supports_cluster_slug_selection_and_normalization():
     assert "set_cluster_naming_defaults()" in text
     assert 'MGT_NAME="${CLUSTER_VM_PREFIX}mgt"' in text
     assert 'PROXMOX_ROLE="TwinboxVMProvisioner-${CLUSTER_SLUG}"' in text
+
+
+def test_setup_wizard_asks_for_talos_image_preset():
+    text = _wizard_text()
+    assert "choose_talos_image_preset()" in text
+    assert 'whiptail --backtitle "$BACKTITLE" --title "Twinbox" --menu "Choose the Talos image preset."' in text
+    assert ' --default-item "$default_item" ' in text
+    assert '"qemu-guest-agent" "Recommended: Talos with the QEMU guest agent"' in text
+    assert '"vanilla" "Talos without extra extensions"' in text
 
 
 def test_setup_wizard_detects_and_cleans_up_existing_cluster_resources():

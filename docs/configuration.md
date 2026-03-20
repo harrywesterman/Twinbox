@@ -12,7 +12,6 @@ PROXMOX_PASSWORD=change-me
 PROXMOX_NODE=pve
 PROXMOX_STORAGE_POOL=local-lvm
 PROXMOX_FILE_DATASTORE=local
-TALOS_IMAGE_SCHEMATIC=default
 KUBECTL_VERSION=v1.30.0
 HELM_VERSION=v3.15.4
 TWINBOX_IMAGE_TAG=latest
@@ -21,8 +20,10 @@ TWINBOX_IMAGE_TAG=latest
 Tooling version notes:
 
 - `kubectl` and `helm` come from `.env`.
-- `tofu`, `talosctl`, and Talos image defaults are pinned in `config/pinned-defaults.sh`.
-- The management VM host install script and `manager-worker` both use that pinned Talos source of truth.
+- `tofu` and `talosctl` versions are pinned in `config/pinned-defaults.sh`.
+- The management VM host install script and `manager-worker` resolve Talos images through `scripts/get-talos-image-factory.sh`, then download the resulting disk image locally before handing it to OpenTofu.
+- To refresh a Talos Factory schematic or build a future-version URL, use `scripts/get-talos-image-factory.sh` with `--preset vanilla` or `--preset qemu-guest-agent`.
+- The wizard writes `TALOS_IMAGE_PRESET` into the management VM `.env`, and the provisioning flow defaults to `qemu-guest-agent` so Proxmox can keep `QEMU Guest Agent` enabled on the Talos VMs.
 
 ## Cluster Payload Validation
 

@@ -8,12 +8,15 @@ locals {
   }
 }
 
-resource "proxmox_virtual_environment_download_file" "talos_nocloud" {
-  content_type = "import"
+resource "proxmox_virtual_environment_file" "talos_nocloud" {
+  content_type = "iso"
   datastore_id = var.file_datastore
   node_name    = var.proxmox_node
-  file_name    = "talos-${var.talos_image_cache_key}.raw.xz"
-  url          = var.talos_image_url
+
+  source_file {
+    path      = var.talos_image_local_path
+    file_name = "talos-${var.talos_image_cache_key}.iso"
+  }
 }
 
 resource "proxmox_virtual_environment_vm" "node" {
@@ -23,7 +26,6 @@ resource "proxmox_virtual_environment_vm" "node" {
   node_name = var.proxmox_node
   started   = true
   on_boot   = true
-  machine   = "q35"
   bios      = "seabios"
   tags      = ["twinbox", "talos", each.value.type, "cluster-${var.cluster_slug}"]
 
@@ -32,6 +34,8 @@ resource "proxmox_virtual_environment_vm" "node" {
     type  = "x86-64-v2-AES"
   }
 
+  boot_order = ["ide2", "virtio0"]
+
   memory {
     dedicated = each.value.ram_mb
   }
@@ -39,10 +43,22 @@ resource "proxmox_virtual_environment_vm" "node" {
   disk {
     datastore_id = var.vm_datastore
     interface    = "virtio0"
-    import_from  = proxmox_virtual_environment_download_file.talos_nocloud.id
     size         = each.value.disk_gb
     iothread     = true
     discard      = "on"
+  }
+
+  cdrom {
+    interface = "ide2"
+    file_id   = proxmox_virtual_environment_file.talos_nocloud.id
+  }
+
+  agent {
+    enabled = true
+
+    wait_for_ip {
+      ipv4 = true
+    }
   }
 
   network_device {
@@ -58,6 +74,6 @@ resource "proxmox_virtual_environment_vm" "node" {
   serial_device {}
 
   vga {
-    type = "serial0"
+    type = "std"
   }
 }

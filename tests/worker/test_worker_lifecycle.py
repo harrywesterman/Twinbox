@@ -23,7 +23,7 @@ def _write_fake_tool(path: Path, body: str):
 def _prepare_fake_toolchain(bin_dir: Path):
     _write_fake_tool(
         bin_dir / "talosctl",
-        "#!/bin/bash\nif [[ \"$1\" == \"version\" ]]; then echo 'Client: v1.7.4'; exit 0; fi\nexit 0\n",
+        "#!/bin/bash\nif [[ \"$1\" == \"version\" ]]; then echo 'Client: v1.12.6'; exit 0; fi\nexit 0\n",
     )
     _write_fake_tool(
         bin_dir / "tofu",
@@ -39,7 +39,7 @@ def _prepare_fake_toolchain(bin_dir: Path):
     )
 
 
-def _write_pinned_defaults(workspace: Path, talos_version: str = "v1.7.4"):
+def _write_pinned_defaults(workspace: Path, talos_version: str = "v1.12.6"):
     config_dir = workspace / "config"
     config_dir.mkdir(parents=True, exist_ok=True)
     (config_dir / "pinned-defaults.sh").write_text(

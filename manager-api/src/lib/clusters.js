@@ -102,7 +102,7 @@ export function buildClusterFromRequest(body, env) {
         storage_pool: body.storage_pool || env.PROXMOX_STORAGE_POOL || "local-lvm",
         file_datastore: body.file_datastore || env.PROXMOX_FILE_DATASTORE || "local",
         cluster_slug: normalizedName.slug,
-        talos_image_schematic: env.TALOS_IMAGE_SCHEMATIC || "default",
+        talos_image_preset: env.TALOS_IMAGE_PRESET || "qemu-guest-agent",
         talos_image_platform: env.TALOS_IMAGE_PLATFORM || "cloud-server",
         talos_image_arch: env.TALOS_IMAGE_ARCH || "amd64",
       },

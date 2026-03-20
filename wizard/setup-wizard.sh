@@ -38,6 +38,7 @@ LIVE_LOG_MODE=0
 FINAL_COMPLETION_MESSAGE=""
 MANAGEMENT_WEB_URL=""
 DISCOVERED_MANAGEMENT_IP=""
+TALOS_IMAGE_PRESET=""
 
 gauge_emit() {
   local percent="$1"
@@ -250,6 +251,28 @@ choose_cluster_slug() {
 
     msg_box "Twinbox" "Use letters, numbers, and dashes only."
   done
+}
+
+choose_talos_image_preset() {
+  local selected=""
+  local default_item="${TALOS_IMAGE_PRESET:-qemu-guest-agent}"
+
+  selected=$(whiptail --backtitle "$BACKTITLE" --title "Twinbox" --menu "Choose the Talos image preset." 14 78 4 \
+    --default-item "$default_item" \
+    "qemu-guest-agent" "Recommended: Talos with the QEMU guest agent" \
+    "vanilla" "Talos without extra extensions" \
+    3>&1 1>&2 2>&3) || {
+      exit 0
+    }
+
+  case "$selected" in
+    vanilla|qemu-guest-agent)
+      TALOS_IMAGE_PRESET="$selected"
+      ;;
+    *)
+      TALOS_IMAGE_PRESET="qemu-guest-agent"
+      ;;
+  esac
 }
 
 add_detected_cluster_slug() {
@@ -923,7 +946,7 @@ create_proxmox_api_user() {
   fi
 
   log_event "Applying ACLs for ${PROXMOX_USER}"
-  for acl_path in /vms /storage "/nodes/${PROXMOX_NODE}"; do
+  for acl_path in /vms "/storage/${PROXMOX_STORAGE_POOL}" "/storage/${PROXMOX_FILE_DATASTORE}" "/nodes/${PROXMOX_NODE}"; do
     if ! apply_acl_with_retry "$acl_path" "$PROXMOX_USER" "$PROXMOX_ROLE" 10 1; then
       msg_error "Failed to apply ACL ${acl_path} for ${PROXMOX_USER}: ${last_err}"
       exit 1
@@ -1015,6 +1038,7 @@ start_wizard() {
   fi
 
   collect_management_vm_settings
+  choose_talos_image_preset
   CLOUD_INIT_CIDR=$(netmask_to_cidr "$CLOUD_INIT_NETMASK") || {
     msg_error "Invalid netmask: ${CLOUD_INIT_NETMASK}"
     exit 1
@@ -1085,6 +1109,7 @@ write_files:
       KUBECTL_VERSION=${KUBECTL_VERSION}
       HELM_VERSION=${HELM_VERSION}
       TWINBOX_IMAGE_TAG=${TWINBOX_IMAGE_TAG}
+      TALOS_IMAGE_PRESET=${TALOS_IMAGE_PRESET}
       TWINBOX_HOST_REPO_ROOT=${TWINBOX_TARGET_DIR}
       MANAGEMENT_VM_ID=${MGT_ID}
       MANAGEMENT_VM_IP=${CLOUD_INIT_IP}

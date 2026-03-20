@@ -59,7 +59,7 @@ variable "talos_version" {
   type = string
 }
 
-variable "talos_image_url" {
+variable "talos_image_local_path" {
   type = string
 }
 

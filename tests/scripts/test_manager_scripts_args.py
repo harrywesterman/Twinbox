@@ -77,17 +77,38 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert '"$TOFU_BIN" -chdir="$work_module_dir" init -input=false' in text
     assert '"$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve' in text
     assert 'command -v talosctl' in text
+    assert 'command -v curl' in text
+    assert 'resolve_talos_image_assets()' in text
+    assert 'scripts/get-talos-image-factory.sh' in text
+    assert 'PINNED_TALOS_IMAGE_SCHEMATIC' not in text
+    assert '--preset "${TALOS_IMAGE_PRESET:-qemu-guest-agent}"' not in text
+    assert 'TALOS_IMAGE_PRESET' in text
     assert 'talosctl gen secrets -o "$talos_dir/secrets.yaml"' in text
     assert 'talosctl apply-config' in text
     assert 'talosctl bootstrap' in text
     assert 'bootstrap_mode = "dhcp-first"' in text
+    assert '"/image/default/"' not in text
+    assert '!= "default"' not in text
+    assert 'TALOS_IMAGE_FACTORY_URL:-' not in text
+    assert 'TALOS_IMAGE_DOWNLOAD_URL=' in text
+    assert 'download_talos_image()' in text
+    assert 'talos_image_local_path="$talos_dir/talos-${image_cache_key}.iso"' in text
+    assert 'controlplane_ipv4_addresses.value' in text
+    assert 'worker_ipv4_addresses.value' in text
+    assert 'flatten_ipv4_candidates' in text or 'flatten | .[]' in text
 
 
 def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
     text = _apply_cluster_text()
-    assert 'image_url="${TALOS_IMAGE_FACTORY_URL:-https://factory.talos.dev/image/${image_schematic}/${PINNED_TALOS_VERSION}/nocloud-${image_arch}.raw.xz}"' in text
+    assert 'helper_output="$("$WORKSPACE_ROOT/scripts/get-talos-image-factory.sh"' in text
+    assert '--preset "$talos_image_preset"' in text
+    assert '--output shell' in text
+    assert 'while IFS= read -r line; do' in text
+    assert 'TALOS_IMAGE_DOWNLOAD_URL=' in text
     assert 'cp -R "$MODULE_SOURCE/." "$work_module_dir/"' in text
-    assert 'talos_image_cache_key: $talos_image_cache_key' in text
+    assert 'image_cache_key="${image_platform}-${image_arch}-${image_schematic}-${PINNED_TALOS_VERSION}"' in text
+    assert 'Downloading Talos ISO' in text
+    assert '--arg talos_image_local_path "$talos_image_local_path"' in text
     assert 'nodes: $nodes' in text
     assert 'planned_controlplane_ips' in text
     assert 'discovered_controlplane_ips' in text
@@ -122,9 +143,26 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     main_text = _module_text()
     outputs_text = _module_outputs_text()
     assert 'resource "proxmox_virtual_environment_vm" "node"' in main_text
+    assert 'resource "proxmox_virtual_environment_file" "talos_nocloud"' in main_text
+    assert 'content_type = "iso"' in main_text
+    assert 'source_file {' in main_text
+    assert 'path      = var.talos_image_local_path' in main_text
+    assert 'file_name = "talos-${var.talos_image_cache_key}.iso"' in main_text
+    assert 'machine   = "q35"' not in main_text
+    assert 'boot_order = ["ide2", "virtio0"]' in main_text
+    assert 'cdrom {' in main_text
+    assert 'file_id   = proxmox_virtual_environment_file.talos_nocloud.id' in main_text
+    assert 'file_id      = proxmox_virtual_environment_file.talos_nocloud.id' not in main_text
+    assert 'file_format  = "raw"' not in main_text
+    assert 'agent {' in main_text
+    assert 'wait_for_ip {' in main_text
+    assert 'ipv4 = true' in main_text
+    assert 'type = "std"' in main_text
     assert 'talos_machine_configuration_apply' not in main_text
     assert 'talos_machine_bootstrap' not in main_text
     assert 'talos_cluster_kubeconfig' not in main_text
     assert 'output "controlplane_vm_ids"' in outputs_text
     assert 'output "worker_vm_ids"' in outputs_text
+    assert 'output "controlplane_ipv4_addresses"' in outputs_text
+    assert 'output "worker_ipv4_addresses"' in outputs_text
     assert 'output "kubeconfig"' not in outputs_text

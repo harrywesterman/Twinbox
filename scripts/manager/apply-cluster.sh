@@ -22,6 +22,7 @@ for var in "${required_env[@]}"; do
 done
 
 command -v jq >/dev/null 2>&1 || fail "jq not found"
+command -v curl >/dev/null 2>&1 || fail "curl not found"
 TOFU_BIN="${TOFU_BIN:-tofu}"
 command -v "$TOFU_BIN" >/dev/null 2>&1 || fail "tofu not found"
 command -v talosctl >/dev/null 2>&1 || fail "talosctl not found"
@@ -85,11 +86,56 @@ on_error() {
 
 trap on_error ERR
 
-image_schematic="${TALOS_IMAGE_SCHEMATIC:-$PINNED_TALOS_IMAGE_SCHEMATIC}"
-image_arch="${TALOS_IMAGE_ARCH:-$PINNED_TALOS_IMAGE_ARCH}"
-image_platform="${TALOS_IMAGE_PLATFORM:-$PINNED_TALOS_IMAGE_PLATFORM}"
-image_url="${TALOS_IMAGE_FACTORY_URL:-https://factory.talos.dev/image/${image_schematic}/${PINNED_TALOS_VERSION}/nocloud-${image_arch}.raw.xz}"
-image_cache_key="${image_platform}-${image_arch}-${image_schematic}-${PINNED_TALOS_VERSION}"
+resolve_talos_image_assets() {
+  image_arch="${TALOS_IMAGE_ARCH:-$PINNED_TALOS_IMAGE_ARCH}"
+  image_platform="${TALOS_IMAGE_PLATFORM:-$PINNED_TALOS_IMAGE_PLATFORM}"
+
+  local talos_image_preset="${TALOS_IMAGE_PRESET:-qemu-guest-agent}"
+  local helper_output=""
+  local line=""
+  helper_output="$("$WORKSPACE_ROOT/scripts/get-talos-image-factory.sh" \
+    --preset "$talos_image_preset" \
+    --version "$PINNED_TALOS_VERSION" \
+    --arch "$image_arch" \
+    --platform "$image_platform" \
+    --output shell)"
+  while IFS= read -r line; do
+    case "$line" in
+      TALOS_IMAGE_SCHEMATIC=*)
+        image_schematic="${line#TALOS_IMAGE_SCHEMATIC=}"
+        ;;
+      TALOS_IMAGE_FACTORY_URL=*)
+        image_factory_url="${line#TALOS_IMAGE_FACTORY_URL=}"
+        ;;
+      TALOS_IMAGE_DOWNLOAD_URL=*)
+        image_download_url="${line#TALOS_IMAGE_DOWNLOAD_URL=}"
+        ;;
+    esac
+  done <<<"$helper_output"
+
+  image_cache_key="${image_platform}-${image_arch}-${image_schematic}-${PINNED_TALOS_VERSION}"
+}
+
+resolve_talos_image_assets
+
+download_talos_image() {
+  local target_path="$1"
+  local tmp_compressed=""
+
+  [[ -n "${image_download_url:-}" ]] || fail "Talos download URL not resolved"
+
+  if [[ -s "$target_path" ]]; then
+    log "Reusing cached Talos image at ${target_path}"
+    talos_image_local_path="$target_path"
+    return 0
+  fi
+
+  tmp_compressed="$(mktemp "$talos_dir/.talos-image.XXXXXX.iso")"
+  log "Downloading Talos ISO to ${target_path}"
+  curl -fsSL --retry 3 --retry-delay 2 --output "$tmp_compressed" "$image_download_url"
+  mv "$tmp_compressed" "$target_path"
+  talos_image_local_path="$target_path"
+}
 
 next_ip() {
   local base octet
@@ -168,6 +214,17 @@ json_array_from_args() {
   jq -nc --args "$@" '$ARGS.positional'
 }
 
+flatten_ipv4_candidates() {
+  jq -r '
+    flatten
+    | .[]
+    | select(type == "string")
+    | select(length > 0)
+    | select(startswith("127.") | not)
+    | select(startswith("169.254.") | not)
+  '
+}
+
 update_cluster_file() {
   local status="$1"
   local planned_controlplane_ips="$2"
@@ -216,14 +273,22 @@ update_cluster_file() {
 
 discover_node_ip() {
   local label="$1"
-  local candidate="$2"
+  shift
+  local candidates=("$@")
   local attempts=60
+  local candidate=""
 
   while [[ "$attempts" -gt 0 ]]; do
-    if talosctl version --insecure --nodes "$candidate" >/dev/null 2>&1; then
-      log "Discovered ${label} at ${candidate}"
-      printf '%s\n' "$candidate"
-      return 0
+    for candidate in "${candidates[@]}"; do
+      [[ -n "$candidate" ]] || continue
+      if talosctl version --insecure --nodes "$candidate" >/dev/null 2>&1; then
+        log "Discovered ${label} at ${candidate}"
+        printf '%s\n' "$candidate"
+        return 0
+      fi
+    done
+    if [[ ${#candidates[@]} -eq 0 ]]; then
+      break
     fi
     sleep 5
     attempts=$((attempts - 1))
@@ -357,6 +422,9 @@ bootstrap_cluster() {
     --force
 }
 
+talos_image_local_path="$talos_dir/talos-${image_cache_key}.iso"
+download_talos_image "$talos_image_local_path"
+
 nodes_json="$(generate_nodes_json)"
 planned_controlplane_ips_json="$(node_array "ip" "controlplane")"
 planned_worker_ips_json="$(node_array "ip" "worker")"
@@ -381,7 +449,7 @@ jq -n \
   --arg cluster_endpoint "https://${VIP_IP}:6443" \
   --arg vip_ip "$VIP_IP" \
   --arg talos_version "$PINNED_TALOS_VERSION" \
-  --arg talos_image_url "$image_url" \
+  --arg talos_image_local_path "$talos_image_local_path" \
   --arg talos_image_cache_key "$image_cache_key" \
   --argjson dns_servers "$(printf '%s' "$DNS_SERVERS" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))')" \
   --argjson prefix "$NODE_PREFIX_LENGTH" \
@@ -402,7 +470,7 @@ jq -n \
     cluster_endpoint: $cluster_endpoint,
     vip_ip: $vip_ip,
     talos_version: $talos_version,
-    talos_image_url: $talos_image_url,
+    talos_image_local_path: $talos_image_local_path,
     talos_image_cache_key: $talos_image_cache_key,
     install_disk: "'"$INSTALL_DISK"'",
     nodes: $nodes
@@ -413,6 +481,10 @@ log "Preparing OpenTofu module"
 log "Creating Proxmox VMs"
 "$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve -var-file="$tfvars_file"
 
+tf_outputs_json="$("$TOFU_BIN" -chdir="$work_module_dir" output -json)"
+controlplane_ipv4_candidates_json="$(jq -c '.controlplane_ipv4_addresses.value // []' <<<"$tf_outputs_json")"
+worker_ipv4_candidates_json="$(jq -c '.worker_ipv4_addresses.value // []' <<<"$tf_outputs_json")"
+
 update_cluster_file "provisioned" "$planned_controlplane_ips_json" "$planned_worker_ips_json" "[]" "[]" "$controlplane_vm_ids_json" "$worker_vm_ids_json" "$talos_dir" ""
 
 log "Discovering DHCP addresses"
@@ -420,13 +492,30 @@ discovered_controlplane_ips_json="[]"
 discovered_worker_ips_json="[]"
 discovered_controlplane_ips=()
 discovered_worker_ips=()
+mapfile -t controlplane_actual_candidates < <(jq -r 'flatten | .[] | select(type == "string") | select(length > 0) | select(startswith("127.") | not) | select(startswith("169.254.") | not)' <<<"$controlplane_ipv4_candidates_json")
+mapfile -t worker_actual_candidates < <(jq -r 'flatten | .[] | select(type == "string") | select(length > 0) | select(startswith("127.") | not) | select(startswith("169.254.") | not)' <<<"$worker_ipv4_candidates_json")
+controlplane_index=0
+worker_index=0
 
 while IFS=$'\t' read -r name type ip; do
   [[ -n "$name" ]] || continue
-  discovered_ip="$(discover_node_ip "$name" "$ip")"
   if [[ "$type" == "controlplane" ]]; then
+    candidates=()
+    if [[ -n "${controlplane_actual_candidates[$controlplane_index]:-}" ]]; then
+      candidates+=("${controlplane_actual_candidates[$controlplane_index]}")
+    fi
+    candidates+=("$ip")
+    discovered_ip="$(discover_node_ip "$name" "${candidates[@]}")"
+    controlplane_index=$((controlplane_index + 1))
     discovered_controlplane_ips+=("$discovered_ip")
   else
+    candidates=()
+    if [[ -n "${worker_actual_candidates[$worker_index]:-}" ]]; then
+      candidates+=("${worker_actual_candidates[$worker_index]}")
+    fi
+    candidates+=("$ip")
+    discovered_ip="$(discover_node_ip "$name" "${candidates[@]}")"
+    worker_index=$((worker_index + 1))
     discovered_worker_ips+=("$discovered_ip")
   fi
 done < <(jq -r '

@@ -8,7 +8,7 @@ ARG HELM_VERSION=v3.15.4
 WORKDIR /opt/twinbox
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends bash ca-certificates curl jq tar \
+  && apt-get install -y --no-install-recommends bash ca-certificates curl jq tar xz-utils \
   && curl -fsSL "https://github.com/siderolabs/talos/releases/download/${TALOSCTL_VERSION}/talosctl-linux-amd64" -o /tmp/talosctl \
   && curl -fsSL "https://github.com/opentofu/opentofu/releases/download/${OPENTOFU_VERSION}/tofu_${OPENTOFU_VERSION#v}_linux_amd64.tar.gz" -o /tmp/tofu.tar.gz \
   && curl -fsSL "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" -o /tmp/kubectl \
