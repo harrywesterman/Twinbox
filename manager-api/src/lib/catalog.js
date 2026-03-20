@@ -215,13 +215,33 @@ function deriveCategoryStatus(steps) {
   return "ready";
 }
 
+function findActiveClusterId(dirs) {
+  if (!fs.existsSync(dirs.clusters)) {
+    return null;
+  }
+
+  const clusterFiles = fs.readdirSync(dirs.clusters)
+    .filter((entry) => entry.endsWith(".json"))
+    .map((entry) => readJsonIfExists(path.join(dirs.clusters, entry)))
+    .filter(Boolean);
+
+  const inProgress = clusterFiles
+    .filter((cluster) => cluster?.id && cluster?.status && cluster.status !== "bootstrapped")
+    .sort((left, right) => String(right?.updated_at || "").localeCompare(String(left?.updated_at || "")));
+
+  return inProgress[0]?.id || null;
+}
+
 export function buildCatalogResponse({ workspaceRoot, dirs }) {
   const definitions = loadCatalogDefinitions({ workspaceRoot });
   const completedDependencies = new Set();
+  const activeClusterId = findActiveClusterId(dirs);
 
   const categories = definitions.categories.map((category) => {
     const steps = category.steps.map((step) => {
-      const state = readJsonIfExists(path.join(dirs.stepState, `${step.id}.json`));
+      const rawState = readJsonIfExists(path.join(dirs.stepState, `${step.id}.json`));
+      const isClusterScopedStep = step.category_id === "talos-cluster";
+      const state = isClusterScopedStep && rawState?.cluster_id !== activeClusterId ? null : rawState;
       const latestJob = state?.last_job_id
         ? readJsonIfExists(path.join(dirs.jobs, `${state.last_job_id}.json`))
         : null;

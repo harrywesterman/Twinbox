@@ -223,3 +223,59 @@ def test_catalog_endpoint_isolates_invalid_manifest_entries():
         finally:
             proc.terminate()
             proc.wait(timeout=5)
+
+
+def test_catalog_hides_finished_cluster_step_state_for_new_session():
+    with tempfile.TemporaryDirectory() as td:
+        data_dir = Path(td) / "data"
+        port = _find_free_port()
+
+        (data_dir / "clusters").mkdir(parents=True, exist_ok=True)
+        (data_dir / "step-state").mkdir(parents=True, exist_ok=True)
+        (data_dir / "jobs").mkdir(parents=True, exist_ok=True)
+
+        cluster_id = "cluster_old"
+        (data_dir / "clusters" / f"{cluster_id}.json").write_text(
+            json.dumps(
+                {
+                    "id": cluster_id,
+                    "name": "twinbox-old",
+                    "status": "bootstrapped",
+                    "created_at": "2026-03-20T10:00:00Z",
+                    "updated_at": "2026-03-20T10:10:00Z",
+                }
+            ),
+            encoding="utf-8",
+        )
+        (data_dir / "step-state" / "provision-nodes.json").write_text(
+            json.dumps(
+                {
+                    "step_id": "provision-nodes",
+                    "status": "succeeded",
+                    "inputs": {"name": "old"},
+                    "outputs": {"cluster_id": cluster_id},
+                    "cluster_id": cluster_id,
+                    "error": None,
+                    "updated_at": "2026-03-20T10:09:00Z",
+                    "last_job_id": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        proc = _start_api(data_dir, port)
+        try:
+            base = f"http://127.0.0.1:{port}"
+            _wait_for_health(base)
+
+            status, body = _get_json(f"{base}/api/catalog")
+            assert status == 200
+
+            talos = body["categories"][1]
+            assert talos["steps"][0]["id"] == "provision-nodes"
+            assert talos["steps"][0]["status"] == "ready"
+            assert talos["steps"][0]["state"]["cluster_id"] is None
+            assert talos["steps"][1]["status"] == "locked"
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
