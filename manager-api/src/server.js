@@ -83,13 +83,20 @@ function probeIpInUse(ip) {
 async function proxmoxApiRequest(pathname, { method = "GET", body, headers = {} } = {}) {
   const proxmoxHost = process.env.PROXMOX_HOST;
   const proxmoxPort = process.env.PROXMOX_PORT || "8006";
+  const payload = body ? body.toString() : "";
+  const requestHeaders = {
+    ...headers,
+  };
+  if (payload && requestHeaders["Content-Length"] === undefined) {
+    requestHeaders["Content-Length"] = Buffer.byteLength(payload);
+  }
   return new Promise((resolve, reject) => {
     const request = https.request({
       hostname: proxmoxHost,
       port: Number(proxmoxPort),
       path: pathname,
       method,
-      headers,
+      headers: requestHeaders,
       rejectUnauthorized: false,
     }, (response) => {
       let text = "";
@@ -117,7 +124,7 @@ async function proxmoxApiRequest(pathname, { method = "GET", body, headers = {} 
     request.on("error", reject);
 
     if (body) {
-      request.write(body.toString());
+      request.write(payload);
     }
     request.end();
   });
