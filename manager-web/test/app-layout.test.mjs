@@ -13,6 +13,8 @@ test('app source defines a guided setup shell with compact progress and visible 
   const manageSource = manageStart >= 0 ? source.slice(manageStart) : source;
 
   assert.match(source, /mission\.mode === 'setup'/, 'expected a setup branch in the app source');
+  assert.match(source, /Let's deploy a Twinbox cluster/, 'expected setup-oriented loading copy');
+  assert.match(source, /Follow the steps below to set up the cluster\./, 'expected setup-oriented loading guidance');
   assert.match(source, /className="setup-progress-rail"/, 'expected a compact setup progress rail');
   assert.match(source, /className="setup-workspace"/, 'expected a dominant setup workspace');
   assert.match(source, /Technical details/, 'expected technical details to remain visible');

@@ -1060,9 +1060,9 @@ function App() {
         <main className="app-main">
           <header className="global-header">
             <div className="global-header-copy">
-              <p className="eyebrow">Twinbox Mission Control</p>
-              <h1>Manifest-driven platform steps for the Management VM</h1>
-              <p className="hero-summary">Loading the step catalog from the backend.</p>
+              <p className="eyebrow">Twinbox Setup</p>
+              <h1>Let's deploy a Twinbox cluster</h1>
+              <p className="hero-summary">Follow the steps below to set up the cluster.</p>
             </div>
           </header>
         </main>
