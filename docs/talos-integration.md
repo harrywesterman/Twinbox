@@ -2,24 +2,19 @@
 
 Talos lifecycle operations are triggered through the manager stack.
 
-## Provisioning Flow
+## Deployment Flow
 
 1. UI submits `POST /api/clusters`.
 2. API validates payload and writes queue record.
-3. Worker executes `scripts/manager/create-talos-vms.sh`.
-4. Script generates Talos `nocloud` machine configs and uploads Proxmox snippets.
-5. Script calls Proxmox API to create/start Talos VMs with static `ipconfig0`, DNS defaults, and `cicustom` user-data snippets.
-6. Cluster record is updated with VM IDs, static node IPs, and Talos config directory metadata.
+3. Worker executes `scripts/manager/apply-cluster.sh`.
+4. Script renders a per-cluster OpenTofu workspace and tfvars payload.
+5. OpenTofu downloads the Talos Image Factory asset on demand, uploads NoCloud snippets, creates Proxmox VMs, applies Talos machine configs, bootstraps the first control plane, and fetches kubeconfig.
+6. Cluster record is updated with VM IDs, static node IPs, state/workdir paths, and kubeconfig metadata.
 
-## Bootstrap Flow
+## Compatibility Rerun
 
-1. UI submits `POST /api/clusters/{cluster_id}/bootstrap`.
-2. Worker executes `scripts/manager/bootstrap-talos.sh`.
-3. Script runs:
-   - `talosctl bootstrap`
-   - `talosctl kubeconfig`
-4. Script detaches the Talos install ISO from the provisioned VMs.
-5. Cluster record is updated with the Talos config directory path.
+- `POST /api/clusters/{cluster_id}/bootstrap` now queues the same `apply_cluster` job type as a compatibility resume hook.
+- The primary UI no longer exposes a separate bootstrap step.
 
 ## Input Fields
 
@@ -45,10 +40,11 @@ Provisioning request body includes:
 At runtime, worker scripts require:
 
 - Proxmox access env vars from `.env`
-- CLI tools expected by scripts (`bash`, `curl`, `jq`, and for bootstrap also `talosctl`)
+- CLI tools expected by scripts (`bash`, `jq`, `tofu`, `talosctl`)
 
 ## Outputs
 
 - Cluster metadata in `manager-data/clusters/`.
 - Job metadata in `manager-data/jobs/`.
 - Job logs in `manager-data/logs/`.
+- Per-cluster OpenTofu workdirs and state in `manager-data/clusters/<cluster_id>/iac/`.

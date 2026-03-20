@@ -6,7 +6,7 @@ set -euo pipefail
 
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 
-bash scripts/manager/create-talos-vms.sh \
+bash scripts/manager/apply-cluster.sh \
   --cluster-id "$(printf '%s' "$cluster_json" | jq -r '.id')" \
   --name "$(printf '%s' "$cluster_json" | jq -r '.name')" \
   --controlplane-count "$(printf '%s' "$cluster_json" | jq -r '.controlplane_count')" \
@@ -24,8 +24,16 @@ bash scripts/manager/create-talos-vms.sh \
   --dns-domain "$(printf '%s' "$cluster_json" | jq -r '.dns_domain')" \
   --proxmox-node "$(printf '%s' "$cluster_json" | jq -r '.metadata.proxmox_node')" \
   --storage-pool "$(printf '%s' "$cluster_json" | jq -r '.metadata.storage_pool')" \
+  --file-datastore "$(printf '%s' "$cluster_json" | jq -r '.metadata.file_datastore')" \
   --data-dir "$MANAGER_DATA_DIR"
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
-  printf '%s' "$cluster_json" | jq '{ cluster_id: .id }' >"$STEP_RESULT_FILE"
+  cluster_file="$MANAGER_DATA_DIR/clusters/$(printf '%s' "$cluster_json" | jq -r '.id').json"
+  jq '{
+    cluster_id: .id,
+    cluster_status: .status,
+    kubeconfig_path,
+    iac_workdir: .iac.workdir,
+    state_path: .iac.state_path
+  }' "$cluster_file" >"$STEP_RESULT_FILE"
 fi

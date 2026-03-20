@@ -1,5 +1,14 @@
 # Release Notes
 
+## 2026-03-20
+
+### OpenTofu Cluster Apply
+
+- Added `scripts/manager/apply-cluster.sh` as the primary Talos deployment runner.
+- Added `infra/opentofu/talos-proxmox/` with the OpenTofu-backed Proxmox + Talos module.
+- Moved the Talos setup flow to a single deployment step that creates VMs, applies Talos, bootstraps the cluster, and stores kubeconfig/state artifacts.
+- Added OpenTofu installation and version checks to the Management VM tooling path and worker image.
+
 ## 2026-02-28
 
 ### Manager-first Runtime

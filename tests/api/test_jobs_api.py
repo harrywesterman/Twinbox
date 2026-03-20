@@ -97,6 +97,10 @@ echo '[]'
                 "start_vmid": 200,
                 "vip_ip": "192.168.1.50",
                 "start_ip": "192.168.1.51",
+                "node_prefix_length": 24,
+                "gateway_ip": "192.168.1.1",
+                "dns_servers": "1.1.1.1,1.0.0.1",
+                "dns_domain": "lab.local",
             }
             status, created = _post_json(f"{base}/api/clusters", payload)
             assert status == 202
@@ -110,12 +114,12 @@ echo '[]'
             status, job = _get_json(f"{base}/api/jobs/{job_id}")
             assert status == 200
             assert job["status"] == "pending"
-            assert job["type"] == "create_cluster"
+            assert job["type"] == "apply_cluster"
 
             status, logs = _get_json(f"{base}/api/jobs/{job_id}/logs")
             assert status == 200
             assert isinstance(logs["lines"], list)
-            assert any("queued create_cluster" in l["line"] for l in logs["lines"])
+            assert any("queued apply_cluster" in l["line"] for l in logs["lines"])
 
             status, boot = _post_json(f"{base}/api/clusters/{cluster_id}/bootstrap", {})
             assert status == 202

@@ -4,23 +4,18 @@ import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CREATE_TALOS_SCRIPT = REPO_ROOT / "scripts" / "manager" / "create-talos-vms.sh"
-BOOTSTRAP_TALOS_SCRIPT = REPO_ROOT / "scripts" / "manager" / "bootstrap-talos.sh"
+APPLY_CLUSTER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "apply-cluster.sh"
 
 
-def _create_talos_text() -> str:
-    return CREATE_TALOS_SCRIPT.read_text(encoding="utf-8")
+def _apply_cluster_text() -> str:
+    return APPLY_CLUSTER_SCRIPT.read_text(encoding="utf-8")
 
 
-def _bootstrap_talos_text() -> str:
-    return BOOTSTRAP_TALOS_SCRIPT.read_text(encoding="utf-8")
-
-
-def test_create_talos_vms_requires_proxmox_env():
+def test_apply_cluster_requires_proxmox_env():
     with tempfile.TemporaryDirectory() as td:
         cmd = [
             "bash",
-            str(REPO_ROOT / "scripts/manager/create-talos-vms.sh"),
+            str(APPLY_CLUSTER_SCRIPT),
             "--cluster-id", "c1",
             "--name", "demo",
             "--controlplane-count", "1",
@@ -38,29 +33,13 @@ def test_create_talos_vms_requires_proxmox_env():
             "--dns-domain", "cluster.internal",
             "--proxmox-node", "pve",
             "--storage-pool", "local-lvm",
+            "--file-datastore", "local",
             "--data-dir", td,
         ]
         env = {"PATH": os.environ.get("PATH", "")}
         proc = subprocess.run(cmd, env=env, capture_output=True, text=True)
         assert proc.returncode != 0
         assert "Missing environment variable" in (proc.stdout + proc.stderr)
-
-
-def test_bootstrap_requires_controlplane_ips():
-    with tempfile.TemporaryDirectory() as td:
-        cmd = [
-            "bash",
-            str(REPO_ROOT / "scripts/manager/bootstrap-talos.sh"),
-            "--cluster-id", "c1",
-            "--name", "demo",
-            "--vip-ip", "192.168.1.50",
-            "--controlplane-ips", "",
-            "--worker-ips", "",
-            "--data-dir", td,
-        ]
-        proc = subprocess.run(cmd, env=os.environ.copy(), capture_output=True, text=True)
-        assert proc.returncode != 0
-        assert "At least one controlplane IP is required" in (proc.stdout + proc.stderr)
 
 
 def test_collect_state_missing_cluster_file_fails():
@@ -76,63 +55,32 @@ def test_collect_state_missing_cluster_file_fails():
         assert "cluster not found" in (proc.stdout + proc.stderr)
 
 
-def test_create_talos_vms_sets_colorful_proxmox_tags():
-    text = _create_talos_text()
-    assert 'local role_tag="$3"' in text
-    assert 'local cluster_scope_tag=""' in text
-    assert 'if [[ -n "${TWINBOX_CLUSTER_SLUG:-}" ]]; then' in text
-    assert 'cluster_scope_tag=";cluster-${TWINBOX_CLUSTER_SLUG}"' in text
-    assert '--data-urlencode "tags=twinbox;talos;${role_tag};cluster-${CLUSTER_ID}${cluster_scope_tag}"' in text
-    assert 'create_vm "$current_vmid" "$vm_name" "controlplane"' in text
-    assert 'create_vm "$current_vmid" "$vm_name" "worker"' in text
+def test_apply_cluster_uses_pinned_defaults_and_tofu():
+    text = _apply_cluster_text()
+    assert 'source "$WORKSPACE_ROOT/config/pinned-defaults.sh"' in text
+    assert 'command -v "$TOFU_BIN"' in text
+    assert '"$TOFU_BIN" init -input=false' in text
+    assert '"$TOFU_BIN" apply -input=false -auto-approve' in text
+    assert '"$TOFU_BIN" output -json > "$outputs_file"' in text
 
 
-def test_create_talos_vms_uses_pinned_talos_defaults():
-    text = _create_talos_text()
-    assert 'source "$SCRIPT_DIR/../../config/pinned-defaults.sh"' in text
-    assert 'talos_iso_file="talos-${PINNED_TALOS_VERSION}.iso"' in text
-    assert 'ide2=${PINNED_PROXMOX_ISO_STORAGE}:iso/${talos_iso_file},media=cdrom' in text
-    assert 'cloudinit' in text
-    assert 'cicustom=' in text
-    assert 'talosctl gen config' in text
-    assert "--iso-storage" not in text
-    assert "--talos-iso-file" not in text
+def test_apply_cluster_renders_nocloud_and_tracks_iac_paths():
+    text = _apply_cluster_text()
+    assert 'image_url="${TALOS_IMAGE_FACTORY_URL:-https://factory.talos.dev/image/${image_schematic}/${PINNED_TALOS_VERSION}/nocloud-${image_arch}.raw.xz}"' in text
+    assert 'cp -R "$MODULE_SOURCE/." "$work_module_dir/"' in text
+    assert '"talos_image_cache_key": ${image_cache_key@Q}' in text
+    assert '"nodes": ${nodes_json}' in text
+    assert '.iac = {' in text
+    assert 'kubeconfig_path = "$kubeconfig_file"' not in text
+    assert '.kubeconfig_path =' in text
+    assert 'jq -r \'.kubeconfig.value // empty\' "$outputs_file" > "$kubeconfig_file"' in text
 
 
-def test_create_talos_vms_fails_fast_on_proxmox_api_errors():
-    text = _create_talos_text()
-    assert "curl -k -sS -o \"$body_file\" -w '%{http_code}' -X POST" in text
-    assert '-b "PVEAuthCookie=${TOKEN}"' in text
-    assert 'fail "Proxmox API POST failed (${endpoint}) [HTTP ${http_code}]: ${response}"' in text
-    assert 'response_data=$(echo "$response" | jq -r \'.data // empty\')' in text
-    assert 'fail "Proxmox API POST returned empty data (${endpoint}): ${response}"' in text
-
-
-def test_create_talos_vms_waits_for_proxmox_tasks_to_finish():
-    text = _create_talos_text()
-    assert "wait_for_task_completion()" in text
-    assert 'curl -k -sS -b "PVEAuthCookie=${TOKEN}" "https://${PROXMOX_HOST}:${PROXMOX_PORT}/api2/json/nodes/${PROXMOX_NODE}/tasks/${upid}/status"' in text
-    assert '[[ "$exitstatus" == "OK" ]] || fail "Proxmox task failed (${upid}): ${exitstatus}"' in text
-    assert 'wait_for_task_completion "$create_upid"' in text
-    assert 'wait_for_task_completion "$start_upid"' in text
-
-
-def test_create_talos_vms_uses_twinbox_slugged_names():
-    text = _create_talos_text()
-    assert 'vm_base_name="${NAME}"' in text
-    assert 'if [[ "$vm_base_name" != twinbox-* ]]; then' in text
-    assert 'vm_base_name="twinbox-${vm_base_name}"' in text
-    assert 'vm_name="${vm_base_name}-cp-${i}"' in text
-    assert 'vm_name="${vm_base_name}-worker-${i}"' in text
-
-
-def test_bootstrap_talos_detaches_iso_after_enrollment():
-    text = _bootstrap_talos_text()
-    assert "detach_vm_iso()" in text
-    assert '--data-urlencode "delete=ide2"' in text
-    assert "for vmid in" in text
-    assert "detach_vm_iso \"$vmid\"" in text
-    assert "detach_all_vm_isos" in text
-    assert "talosctl apply-config --insecure" not in text
-    assert "talosctl bootstrap" in text
-    assert "talosctl kubeconfig" in text
+def test_apply_cluster_uses_deterministic_mac_addresses_and_node_inventory():
+    text = _apply_cluster_text()
+    assert 'deterministic_mac()' in text
+    assert "printf '52:54:%02x:%02x:%02x:%02x\\n'" in text
+    assert 'type: $type' in text
+    assert 'mac: $mac' in text
+    assert '--file-datastore) FILE_DATASTORE="$2"; shift 2 ;;' in text
+    assert '"file_datastore": ${FILE_DATASTORE@Q}' in text

@@ -104,11 +104,9 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             talos = body["categories"][1]
             assert [step["id"] for step in talos["steps"]] == [
                 "provision-nodes",
-                "bootstrap-cluster",
             ]
             assert talos["steps"][0]["journey_stage"] == "setup"
             assert talos["steps"][0]["status"] == "ready"
-            assert talos["steps"][1]["status"] == "locked"
         finally:
             proc.terminate()
             proc.wait(timeout=5)
@@ -277,7 +275,6 @@ def test_catalog_hides_finished_cluster_step_state_for_new_session():
             assert talos["steps"][0]["id"] == "provision-nodes"
             assert talos["steps"][0]["status"] == "ready"
             assert talos["steps"][0]["state"]["cluster_id"] is None
-            assert talos["steps"][1]["status"] == "locked"
         finally:
             proc.terminate()
             proc.wait(timeout=5)

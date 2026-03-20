@@ -11,7 +11,7 @@ Use this checklist after deployment or major changes.
 ## 2. Syntax Checks
 
 ```bash
-bash -n wizard/setup-wizard.sh scripts/manager/create-talos-vms.sh scripts/manager/bootstrap-talos.sh scripts/manager/collect-state.sh
+bash -n wizard/setup-wizard.sh scripts/manager/apply-cluster.sh scripts/manager/create-talos-vms.sh scripts/manager/bootstrap-talos.sh scripts/manager/collect-state.sh
 node --check manager-api/src/server.js
 node --check manager-worker/src/worker.js
 ```
@@ -43,7 +43,7 @@ Expected:
 ## 5. Worker Runtime Tools
 
 ```bash
-docker compose run --rm manager-worker bash -lc 'bash --version >/dev/null && curl --version >/dev/null && jq --version >/dev/null && talosctl version --client >/dev/null && kubectl version --client >/dev/null && helm version --short >/dev/null'
+docker compose run --rm manager-worker bash -lc 'bash --version >/dev/null && jq --version >/dev/null && tofu version >/dev/null && talosctl version --client >/dev/null && kubectl version --client >/dev/null && helm version --short >/dev/null'
 ```
 
 Expected: command exits with status 0.

@@ -150,6 +150,9 @@ export function loadCatalogDefinitions({ workspaceRoot }) {
 
         for (const stepDir of stepDirs) {
           const stepFile = path.join(stepsRoot, stepDir, "step.yaml");
+          if (!fs.existsSync(stepFile)) {
+            continue;
+          }
           const step = normalizeStepManifest(loadYaml(stepFile), stepFile, category.id);
           steps.push(step);
           response.stepsById.set(step.id, step);

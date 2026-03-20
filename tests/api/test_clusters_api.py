@@ -133,7 +133,9 @@ def test_create_cluster_enqueues_job_and_persists_files():
             assert cluster["status"] == "requested"
             assert cluster["metadata"]["proxmox_node"] == "pve"
             assert cluster["metadata"]["storage_pool"] == "local-lvm"
+            assert cluster["metadata"]["file_datastore"] == "local"
             assert cluster["metadata"]["cluster_slug"] == "demo"
+            assert cluster["spec_version"] == "iac-v1"
             assert cluster["node_prefix_length"] == 24
             assert cluster["gateway_ip"] == "192.168.1.1"
             assert cluster["dns_servers"] == ["1.1.1.1", "1.0.0.1"]

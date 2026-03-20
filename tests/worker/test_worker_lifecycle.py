@@ -26,6 +26,10 @@ def _prepare_fake_toolchain(bin_dir: Path):
         "#!/bin/bash\nif [[ \"$1\" == \"version\" ]]; then echo 'Client: v1.7.4'; exit 0; fi\nexit 0\n",
     )
     _write_fake_tool(
+        bin_dir / "tofu",
+        "#!/bin/bash\nif [[ \"$1\" == \"version\" ]]; then echo 'OpenTofu v1.8.8'; exit 0; fi\nexit 0\n",
+    )
+    _write_fake_tool(
         bin_dir / "kubectl",
         "#!/bin/bash\nif [[ \"$1\" == \"version\" ]]; then echo '{\"clientVersion\":{\"gitVersion\":\"v1.30.0\"}}'; exit 0; fi\nexit 0\n",
     )
@@ -39,7 +43,7 @@ def _write_pinned_defaults(workspace: Path, talos_version: str = "v1.7.4"):
     config_dir = workspace / "config"
     config_dir.mkdir(parents=True, exist_ok=True)
     (config_dir / "pinned-defaults.sh").write_text(
-        f"PINNED_TALOS_VERSION={talos_version}\nPINNED_PROXMOX_ISO_STORAGE=local\n",
+        f"PINNED_TALOS_VERSION={talos_version}\nPINNED_OPENTOFU_VERSION=v1.8.8\nPINNED_PROXMOX_ISO_STORAGE=local\n",
     )
 
 
@@ -62,14 +66,9 @@ def test_worker_processes_pending_job_to_completed():
         _write_pinned_defaults(workspace)
 
         # Minimal script to emulate successful VM provisioning.
-        create_script = script_dir / "create-talos-vms.sh"
+        create_script = script_dir / "apply-cluster.sh"
         create_script.write_text("#!/bin/bash\nset -euo pipefail\necho create-ok\n")
         create_script.chmod(0o755)
-
-        # Bootstrap script is not used in this test but kept for completeness.
-        bootstrap_script = script_dir / "bootstrap-talos.sh"
-        bootstrap_script.write_text("#!/bin/bash\nset -euo pipefail\necho bootstrap-ok\n")
-        bootstrap_script.chmod(0o755)
 
         cluster = {
             "id": "cluster_test",
@@ -90,12 +89,13 @@ def test_worker_processes_pending_job_to_completed():
             "metadata": {
                 "proxmox_node": "pve",
                 "storage_pool": "local-lvm",
+                "file_datastore": "local",
             },
         }
 
         job = {
             "id": "job_test",
-            "type": "create_cluster",
+            "type": "apply_cluster",
             "cluster_id": "cluster_test",
             "status": "pending",
             "step": "queued",
@@ -110,7 +110,7 @@ def test_worker_processes_pending_job_to_completed():
         (jobs / "job_test.json").write_text(json.dumps(job))
         (pending / "job_test.json").write_text(json.dumps({
             "id": "job_test",
-            "type": "create_cluster",
+            "type": "apply_cluster",
             "cluster_id": "cluster_test",
             "payload": cluster,
             "queued_at": "2026-01-01T00:00:00Z",
@@ -142,11 +142,12 @@ def test_worker_processes_pending_job_to_completed():
             assert updated_job["step"] == "completed"
 
             log_text = (logs / "job_test.log").read_text()
-            assert "running job type=create_cluster" in log_text
+            assert "running job type=apply_cluster" in log_text
             assert "--node-prefix-length 24" in log_text
             assert "--gateway-ip 192.168.1.1" in log_text
             assert "--dns-servers 1.1.1.1,1.0.0.1" in log_text
             assert "--dns-domain cluster.internal" in log_text
+            assert "--file-datastore local" in log_text
             assert "job completed" in log_text
         finally:
             proc.terminate()

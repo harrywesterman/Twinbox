@@ -148,6 +148,18 @@ function buildArtifacts(activeStep, cluster) {
     artifacts.push({ label: 'Talos config', value: cluster.talos_config_dir });
   }
 
+  if (cluster?.kubeconfig_path) {
+    artifacts.push({ label: 'Kubeconfig', value: cluster.kubeconfig_path });
+  }
+
+  if (cluster?.iac?.state_path) {
+    artifacts.push({ label: 'OpenTofu state', value: cluster.iac.state_path });
+  }
+
+  if (cluster?.iac?.workdir) {
+    artifacts.push({ label: 'OpenTofu workdir', value: cluster.iac.workdir });
+  }
+
   if (activeStep?.state?.outputs && typeof activeStep.state.outputs === 'object') {
     for (const [label, value] of Object.entries(activeStep.state.outputs)) {
       if (value === null || value === undefined || label === 'cluster_id') continue;
@@ -178,11 +190,23 @@ function stripLogTimestamp(line) {
 function summarizeStage(detail, activeStep) {
   const normalized = detail.toLowerCase();
 
-  if (normalized.includes('queued run_step') || normalized.includes('queued bootstrap_cluster') || normalized.includes('queued create_cluster')) {
+  if (normalized.includes('queued run_step') || normalized.includes('queued bootstrap_cluster') || normalized.includes('queued create_cluster') || normalized.includes('queued apply_cluster')) {
     return { title: 'Queued', tone: 'neutral' };
   }
   if (normalized.includes('running job type=')) {
     return { title: 'Starting step', tone: 'active' };
+  }
+  if (normalized.includes('resolving talos image')) {
+    return { title: 'Resolving image', tone: 'active' };
+  }
+  if (normalized.includes('preparing opentofu module')) {
+    return { title: 'Preparing OpenTofu', tone: 'active' };
+  }
+  if (normalized.includes('generating nocloud artifacts')) {
+    return { title: 'Preparing NoCloud', tone: 'active' };
+  }
+  if (normalized.includes('applying opentofu cluster plan')) {
+    return { title: 'Applying cluster plan', tone: 'active' };
   }
   if (normalized.includes('created controlplane vm') || normalized.includes('created worker vm')) {
     return { title: 'Creating VMs', tone: 'active' };
@@ -199,8 +223,14 @@ function summarizeStage(detail, activeStep) {
   if (normalized.includes('generating kubeconfig')) {
     return { title: 'Fetching kubeconfig', tone: 'active' };
   }
+  if (normalized.includes('collecting opentofu outputs')) {
+    return { title: 'Collecting outputs', tone: 'active' };
+  }
   if (normalized.includes('detaching talos iso')) {
     return { title: 'Cleaning up', tone: 'active' };
+  }
+  if (normalized.includes('cluster apply completed')) {
+    return { title: 'Done', tone: 'success' };
   }
   if (normalized.includes('job completed')) {
     return { title: 'Done', tone: 'success' };

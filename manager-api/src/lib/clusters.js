@@ -100,8 +100,13 @@ export function buildClusterFromRequest(body, env) {
       metadata: {
         proxmox_node: body.proxmox_node || env.PROXMOX_NODE || "pve",
         storage_pool: body.storage_pool || env.PROXMOX_STORAGE_POOL || "local-lvm",
+        file_datastore: body.file_datastore || env.PROXMOX_FILE_DATASTORE || "local",
         cluster_slug: normalizedName.slug,
+        talos_image_schematic: env.TALOS_IMAGE_SCHEMATIC || "default",
+        talos_image_platform: env.TALOS_IMAGE_PLATFORM || "cloud-server",
+        talos_image_arch: env.TALOS_IMAGE_ARCH || "amd64",
       },
+      spec_version: "iac-v1",
     },
   };
 }
@@ -116,7 +121,8 @@ export function loadCluster(dirs, clusterId) {
 
 export function buildBootstrapPayload(cluster, body = {}) {
   return {
-    cluster,
+    ...cluster,
+    bootstrap_resume: true,
     controlplane_ips: body.controlplane_ips || cluster.controlplane_ips || [],
     worker_ips: body.worker_ips || cluster.worker_ips || [],
     vip_ip: body.vip_ip || cluster.vip_ip,

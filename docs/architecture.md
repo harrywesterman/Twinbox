@@ -15,8 +15,7 @@ Twinbox uses a manager-first architecture centered on a Management VM.
    - `categories/` (manifest-driven catalog mounted into the API and worker).
 
 3. **Execution Layer (inside worker image)**
-   - `scripts/manager/create-talos-vms.sh`
-   - `scripts/manager/bootstrap-talos.sh`
+   - `scripts/manager/apply-cluster.sh`
    - `scripts/manager/collect-state.sh`
    - `categories/*/steps/*/*.sh`
 
@@ -39,7 +38,7 @@ Twinbox uses a manager-first architecture centered on a Management VM.
 ## API Contracts (Current)
 
 - `POST /api/clusters`
-- `POST /api/clusters/{cluster_id}/bootstrap`
+- `POST /api/clusters/{cluster_id}/bootstrap` (compatibility rerun hook)
 - `GET /api/catalog`
 - `POST /api/steps/{step_id}/execute`
 - `GET /api/jobs/{job_id}`

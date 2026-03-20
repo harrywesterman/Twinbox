@@ -6,7 +6,6 @@ import { spawnSync } from "child_process";
 import {
   buildBootstrapPayload,
   buildClusterFromRequest,
-  loadCluster,
   normalizeClusterName,
   persistCluster,
 } from "./lib/clusters.js";
@@ -535,7 +534,7 @@ app.post("/api/clusters", async (req, res) => {
   }
 
   persistCluster(dirs, built.cluster);
-  const job = queueJob(dirs, "create_cluster", built.cluster.id, built.cluster);
+  const job = queueJob(dirs, "apply_cluster", built.cluster.id, built.cluster);
   return res.status(202).json({ cluster_id: built.cluster.id, job_id: job.id });
 });
 
@@ -550,7 +549,7 @@ app.post("/api/clusters/:clusterId/bootstrap", (req, res) => {
   const cluster = readJson(clusterFile);
   const payload = buildBootstrapPayload(cluster, req.body || {});
 
-  const job = queueJob(dirs, "bootstrap_cluster", clusterId, payload);
+  const job = queueJob(dirs, "apply_cluster", clusterId, payload);
   return res.status(202).json({ cluster_id: clusterId, job_id: job.id });
 });
 
@@ -601,15 +600,6 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
     persistCluster(dirs, built.cluster);
     clusterId = built.cluster.id;
     context = { cluster: built.cluster };
-  } else if (stepId === "bootstrap-cluster") {
-    const provisionState = readStepState("provision-nodes");
-    clusterId = provisionState?.cluster_id || null;
-    if (!clusterId) {
-      return res.status(409).json({ error: "bootstrap-cluster requires a completed provision-nodes step" });
-    }
-
-    const cluster = loadCluster(dirs, clusterId);
-    context = buildBootstrapPayload(cluster, {});
   }
 
   const payload = {

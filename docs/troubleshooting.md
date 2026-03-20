@@ -49,9 +49,10 @@ ls -la manager-data/queue/running
 
 ## Worker Job Fails Immediately
 
-The worker image includes required runtime tools (`bash`, `curl`, `jq`, `talosctl`, `kubectl`, `helm`) and enforces tool versions at startup.
+The worker image includes required runtime tools (`bash`, `jq`, `tofu`, `talosctl`, `kubectl`, `helm`) and enforces tool versions at startup.
 
 - `talosctl` is checked against `config/pinned-defaults.sh`
+- `tofu` is checked against `config/pinned-defaults.sh`
 - `kubectl` and `helm` are checked against `.env`
 
 If jobs fail immediately, first check worker startup logs for a version mismatch:

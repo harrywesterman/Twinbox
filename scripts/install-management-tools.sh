@@ -145,6 +145,35 @@ install_talosctl() {
   install -m 0755 "$bin_path" /usr/local/bin/talosctl
 }
 
+install_tofu() {
+  local version
+  local archive_name
+  local archive_path
+  local checksum_url=""
+  local checksum_text=""
+  local expected_checksum=""
+
+  version="$(normalize_version "$PINNED_OPENTOFU_VERSION")"
+  archive_name="tofu_${version}_linux_amd64.tar.gz"
+  archive_path="$tmp_dir/$archive_name"
+
+  log "Installing OpenTofu v${version}"
+  download_to "https://github.com/opentofu/opentofu/releases/download/v${version}/${archive_name}" "$archive_path"
+
+  checksum_url="https://github.com/opentofu/opentofu/releases/download/v${version}/tofu_${version}_SHA256SUMS"
+  checksum_text="$(curl -fsSL "$checksum_url" 2>/dev/null || true)"
+  if [[ -n "$checksum_text" ]]; then
+    expected_checksum="$(printf '%s\n' "$checksum_text" | awk -v target="$archive_name" '$2 == target { print $1; exit }')"
+    [[ -n "$expected_checksum" ]] || fail "Could not parse OpenTofu checksum"
+    verify_checksum "$archive_path" "$expected_checksum"
+  else
+    log "OpenTofu checksum not available; skipping checksum verification"
+  fi
+
+  tar -xzf "$archive_path" -C "$tmp_dir"
+  install -m 0755 "$tmp_dir/tofu" /usr/local/bin/tofu
+}
+
 install_kubectl() {
   local version
   local base_url
@@ -203,34 +232,42 @@ verify_versions() {
   local talos_output=""
   local kubectl_output=""
   local helm_output=""
+  local tofu_output=""
   local talos_actual=""
+  local tofu_actual=""
   local kubectl_actual=""
   local helm_actual=""
   local talos_expected
+  local tofu_expected
   local kubectl_expected
   local helm_expected
 
   talos_output="$(/usr/local/bin/talosctl version --client 2>&1)" || fail "talosctl version check failed: ${talos_output}"
+  tofu_output="$(/usr/local/bin/tofu version 2>&1)" || fail "tofu version check failed: ${tofu_output}"
   kubectl_output="$(/usr/local/bin/kubectl version --client --output=yaml 2>&1)" || fail "kubectl version check failed: ${kubectl_output}"
   helm_output="$(/usr/local/bin/helm version --short 2>&1)" || fail "helm version check failed: ${helm_output}"
 
   talos_actual="$(extract_semver "$talos_output")"
+  tofu_actual="$(extract_semver "$tofu_output")"
   kubectl_actual="$(extract_semver "$kubectl_output")"
   helm_actual="$(extract_semver "$helm_output")"
 
   talos_expected="$(normalize_version "$PINNED_TALOS_VERSION")"
+  tofu_expected="$(normalize_version "$PINNED_OPENTOFU_VERSION")"
   kubectl_expected="$(normalize_version "$KUBECTL_VERSION")"
   helm_expected="$(normalize_version "$HELM_VERSION")"
 
   [[ "$talos_actual" == "$talos_expected" ]] || fail "talosctl version mismatch: expected v${talos_expected}, got v${talos_actual}"
+  [[ "$tofu_actual" == "$tofu_expected" ]] || fail "tofu version mismatch: expected v${tofu_expected}, got v${tofu_actual}"
   [[ "$kubectl_actual" == "$kubectl_expected" ]] || fail "kubectl version mismatch: expected v${kubectl_expected}, got v${kubectl_actual}"
   [[ "$helm_actual" == "$helm_expected" ]] || fail "helm version mismatch: expected v${helm_expected}, got v${helm_actual}"
 
-  log "Installed versions: talosctl=v${talos_actual}, kubectl=v${kubectl_actual}, helm=v${helm_actual}"
+  log "Installed versions: talosctl=v${talos_actual}, tofu=v${tofu_actual}, kubectl=v${kubectl_actual}, helm=v${helm_actual}"
 }
 
 ensure_talos_cpu_compatibility
 install_talosctl
+install_tofu
 install_kubectl
 install_helm
 verify_versions

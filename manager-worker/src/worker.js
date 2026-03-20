@@ -158,6 +158,9 @@ function loadPinnedDefaults() {
   if (!values.PINNED_TALOS_VERSION) {
     throw new Error(`missing PINNED_TALOS_VERSION in ${file}`);
   }
+  if (!values.PINNED_OPENTOFU_VERSION) {
+    throw new Error(`missing PINNED_OPENTOFU_VERSION in ${file}`);
+  }
 
   return values;
 }
@@ -190,20 +193,26 @@ function runVersionCommand(command, args) {
 function ensureToolVersionsMatchPolicy() {
   const pinnedDefaults = loadPinnedDefaults();
   const expectedTalosctl = normalizeVersion(pinnedDefaults.PINNED_TALOS_VERSION);
+  const expectedTofu = normalizeVersion(pinnedDefaults.PINNED_OPENTOFU_VERSION);
   const expectedKubectl = normalizeVersion(requireEnv("KUBECTL_VERSION"));
   const expectedHelm = normalizeVersion(requireEnv("HELM_VERSION"));
 
   const talosOutput = runVersionCommand("talosctl", ["version", "--client"]);
+  const tofuOutput = runVersionCommand("tofu", ["version"]);
   const kubectlOutput = runVersionCommand("kubectl", ["version", "--client", "--output=json"]);
   const helmOutput = runVersionCommand("helm", ["version", "--short"]);
 
   const talosActual = extractSemver(talosOutput, "talosctl");
+  const tofuActual = extractSemver(tofuOutput, "tofu");
   const kubectlActual = extractSemver(kubectlOutput, "kubectl");
   const helmActual = extractSemver(helmOutput, "helm");
 
   const mismatches = [];
   if (talosActual !== expectedTalosctl) {
     mismatches.push(`talosctl expected v${expectedTalosctl}, got v${talosActual}`);
+  }
+  if (tofuActual !== expectedTofu) {
+    mismatches.push(`tofu expected v${expectedTofu}, got v${tofuActual}`);
   }
   if (kubectlActual !== expectedKubectl) {
     mismatches.push(`kubectl expected v${expectedKubectl}, got v${kubectlActual}`);
@@ -217,14 +226,14 @@ function ensureToolVersionsMatchPolicy() {
   }
 }
 
-async function handleCreate(job) {
+async function handleApply(job) {
   const cluster = job.payload;
   const dnsServers = Array.isArray(cluster.dns_servers) ? cluster.dns_servers.join(",") : String(cluster.dns_servers || "");
   await runCommand(
     job.id,
     "bash",
     [
-      "scripts/manager/create-talos-vms.sh",
+      "scripts/manager/apply-cluster.sh",
       "--cluster-id", cluster.id,
       "--name", cluster.name,
       "--controlplane-count", String(cluster.controlplane_count),
@@ -242,30 +251,15 @@ async function handleCreate(job) {
       "--dns-domain", cluster.dns_domain,
       "--proxmox-node", cluster.metadata.proxmox_node,
       "--storage-pool", cluster.metadata.storage_pool,
+      "--file-datastore", cluster.metadata.file_datastore,
       "--data-dir", dataRoot,
     ],
   );
 }
 
 async function handleBootstrap(job) {
-  const payload = job.payload;
-  const cluster = payload.cluster;
-  const controlplaneIps = (payload.controlplane_ips || []).join(",");
-  const workerIps = (payload.worker_ips || []).join(",");
-
-  await runCommand(
-    job.id,
-    "bash",
-    [
-      "scripts/manager/bootstrap-talos.sh",
-      "--cluster-id", cluster.id,
-      "--name", cluster.name,
-      "--vip-ip", payload.vip_ip,
-      "--controlplane-ips", controlplaneIps,
-      "--worker-ips", workerIps,
-      "--data-dir", dataRoot,
-    ],
-  );
+  const cluster = job.payload.cluster || job.payload;
+  await handleApply({ id: job.id, payload: cluster });
 }
 
 async function handleRunStep(job) {
@@ -349,8 +343,10 @@ async function handleJob(queueFile) {
   appendLog(queued.id, `running job type=${queued.type}`);
 
   try {
-    if (queued.type === "create_cluster") {
-      await handleCreate({ id: queued.id, payload: queued.payload });
+    if (queued.type === "apply_cluster") {
+      await handleApply({ id: queued.id, payload: queued.payload });
+    } else if (queued.type === "create_cluster") {
+      await handleApply({ id: queued.id, payload: queued.payload });
     } else if (queued.type === "bootstrap_cluster") {
       await handleBootstrap({ id: queued.id, payload: queued.payload });
     } else if (queued.type === "run_step") {

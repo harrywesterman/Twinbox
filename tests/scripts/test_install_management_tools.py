@@ -23,5 +23,6 @@ def test_install_management_tools_fails_on_version_command_errors():
     assert 'required_vars=(KUBECTL_VERSION HELM_VERSION)' in text
     assert "TALOSCTL_VERSION" not in text.split("required_vars=", 1)[1].split("for var in", 1)[0]
     assert 'talos_output="$(/usr/local/bin/talosctl version --client 2>&1)" || fail "talosctl version check failed: ${talos_output}"' in text
+    assert 'tofu_output="$(/usr/local/bin/tofu version 2>&1)" || fail "tofu version check failed: ${tofu_output}"' in text
     assert 'kubectl_output="$(/usr/local/bin/kubectl version --client --output=yaml 2>&1)" || fail "kubectl version check failed: ${kubectl_output}"' in text
     assert 'helm_output="$(/usr/local/bin/helm version --short 2>&1)" || fail "helm version check failed: ${helm_output}"' in text

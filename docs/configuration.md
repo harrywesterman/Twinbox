@@ -11,6 +11,8 @@ PROXMOX_USER=root@pam
 PROXMOX_PASSWORD=change-me
 PROXMOX_NODE=pve
 PROXMOX_STORAGE_POOL=local-lvm
+PROXMOX_FILE_DATASTORE=local
+TALOS_IMAGE_SCHEMATIC=default
 KUBECTL_VERSION=v1.30.0
 HELM_VERSION=v3.15.4
 TWINBOX_IMAGE_TAG=latest
@@ -19,7 +21,7 @@ TWINBOX_IMAGE_TAG=latest
 Tooling version notes:
 
 - `kubectl` and `helm` come from `.env`.
-- `talosctl` and Talos ISO defaults are pinned in `config/pinned-defaults.sh`.
+- `tofu`, `talosctl`, and Talos image defaults are pinned in `config/pinned-defaults.sh`.
 - The management VM host install script and `manager-worker` both use that pinned Talos source of truth.
 
 ## Cluster Payload Validation
@@ -52,6 +54,7 @@ Tooling version notes:
 `manager-data/` stores job and cluster state.
 
 - `clusters/*.json`
+- `clusters/<cluster_id>/iac/*`
 - `jobs/*.json`
 - `logs/*.log`
 - `queue/pending/*.json`

@@ -5,7 +5,7 @@ This project currently relies on operational verification for the manager-first 
 ## 1. Static Checks
 
 ```bash
-bash -n wizard/setup-wizard.sh scripts/wizard-dev-run.sh scripts/manager/create-talos-vms.sh scripts/manager/bootstrap-talos.sh scripts/manager/collect-state.sh
+bash -n wizard/setup-wizard.sh scripts/wizard-dev-run.sh scripts/manager/apply-cluster.sh scripts/manager/create-talos-vms.sh scripts/manager/bootstrap-talos.sh scripts/manager/collect-state.sh
 node --check manager-api/src/server.js
 node --check manager-worker/src/worker.js
 python3 -m pytest -q tests/scripts/test_wizard_dev_run.py tests/scripts/test_setup_wizard_cleanup.py tests/scripts/test_manager_scripts_args.py
@@ -39,7 +39,7 @@ Expected:
 ## 4. Worker Runtime Tooling
 
 ```bash
-docker compose run --rm manager-worker bash -lc 'bash --version >/dev/null && curl --version >/dev/null && jq --version >/dev/null && talosctl version >/dev/null'
+docker compose run --rm manager-worker bash -lc 'bash --version >/dev/null && jq --version >/dev/null && tofu version >/dev/null && talosctl version >/dev/null'
 ```
 
 Expected: exit code 0.
@@ -47,7 +47,7 @@ Expected: exit code 0.
 ## 5. Job Lifecycle Check
 
 1. Open UI at `http://<management-vm-ip>:3000`.
-2. Submit a cluster provisioning request.
+2. Submit a cluster deployment request.
 3. Verify lifecycle: `pending -> running -> succeeded|failed`.
 4. Verify logs in `manager-data/logs/<job_id>.log`.
 
