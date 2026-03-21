@@ -75,7 +75,7 @@ export function buildClusterFromRequest(body, env) {
     return { ok: false, error: "name must contain letters or numbers" };
   }
 
-  const clusterId = id("cluster");
+  const clusterId = normalizedName.slug;
   return {
     ok: true,
     cluster: {

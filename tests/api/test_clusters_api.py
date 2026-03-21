@@ -118,7 +118,7 @@ def test_create_cluster_enqueues_job_and_persists_files():
             }
             status, body = _post_json(f"http://127.0.0.1:{port}/api/clusters", payload)
             assert status == 202
-            assert "cluster_id" in body
+            assert body["cluster_id"] == "demo"
             assert "job_id" in body
 
             cluster_file = data_dir / "clusters" / f"{body['cluster_id']}.json"
@@ -484,6 +484,7 @@ EOF
             }
             status, body = _post_json(f"{base}/api/clusters", valid_payload)
             assert status == 202
+            assert body["cluster_id"] == "development"
 
             cluster_file = data_dir / "clusters" / f"{body['cluster_id']}.json"
             cluster = json.loads(cluster_file.read_text(encoding="utf-8"))
