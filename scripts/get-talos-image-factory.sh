@@ -75,6 +75,8 @@ case "$preset" in
     ;;
   qemu-guest-agent)
     extensions+=("siderolabs/qemu-guest-agent")
+    extensions+=("siderolabs/iscsi-tools")
+    extensions+=("siderolabs/util-linux-tools")
     ;;
   *)
     fail "Unknown preset: $preset"

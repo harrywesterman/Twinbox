@@ -71,6 +71,8 @@ fi
         assert "https://factory.talos.dev/schematics" in curl_args_1
         assert "POST" in curl_args_1
         assert "siderolabs/qemu-guest-agent" in curl_stdin_1
+        assert "siderolabs/iscsi-tools" in curl_stdin_1
+        assert "siderolabs/util-linux-tools" in curl_stdin_1
         assert "https://factory.talos.dev/image/schematic123/v1.9.2/metal-amd64.iso" in curl_args_2
 
 
