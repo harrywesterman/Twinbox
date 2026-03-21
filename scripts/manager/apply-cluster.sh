@@ -544,11 +544,11 @@ jq -n \
   }' > "$tfvars_file"
 
 log "Preparing OpenTofu module"
-"$TOFU_BIN" -chdir="$work_module_dir" init -input=false
+"$TOFU_BIN" -chdir="$work_module_dir" init -input=false -no-color
 log "Creating Proxmox VMs"
-"$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve -var-file="$tfvars_file"
+"$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve -no-color -var-file="$tfvars_file"
 
-tf_outputs_json="$("$TOFU_BIN" -chdir="$work_module_dir" output -json)"
+tf_outputs_json="$("$TOFU_BIN" -chdir="$work_module_dir" output -json -no-color)"
 controlplane_ipv4_candidates_json="$(jq -c '.controlplane_ipv4_addresses.value // []' <<<"$tf_outputs_json")"
 worker_ipv4_candidates_json="$(jq -c '.worker_ipv4_addresses.value // []' <<<"$tf_outputs_json")"
 
