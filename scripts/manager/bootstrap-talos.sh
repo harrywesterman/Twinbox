@@ -101,4 +101,89 @@ jq \
   ' "$cluster_file" > "$tmp"
 mv "$tmp" "$cluster_file"
 
+sync_user_kubeconfig() {
+  local source_kubeconfig="$1"
+  local target_user="${2:-}"
+  local target_home=""
+
+  if [[ -z "$target_user" ]]; then
+    if [[ -d "/home/twinbox" ]]; then
+      target_home="/home/twinbox"
+    elif id "twinbox" >/dev/null 2>&1; then
+      target_user="twinbox"
+    elif [[ -n "${SUDO_USER:-}" ]]; then
+      target_user="${SUDO_USER}"
+    else
+      target_user="$(id -un)"
+    fi
+  fi
+
+  if [[ -z "$target_home" ]]; then
+    target_home="$(getent passwd "$target_user" | cut -d: -f6 || echo "/home/$target_user")"
+  fi
+
+  local target_kube_dir="${target_home}/.kube"
+  local target_kubeconfig="${target_kube_dir}/config"
+
+  [[ -d "$target_home" ]] || fail "home directory not found: ${target_home}"
+
+  local owner_uid
+  owner_uid=$(stat -c '%u' "$target_home")
+  local owner_gid
+  owner_gid=$(stat -c '%g' "$target_home")
+
+  install -d -m 700 -o "$owner_uid" -g "$owner_gid" "$target_kube_dir"
+  install -m 600 -o "$owner_uid" -g "$owner_gid" "$source_kubeconfig" "$target_kubeconfig"
+  log "Copied kubeconfig to ${target_kubeconfig}"
+}
+
+sync_user_talosconfig() {
+  local source_talosconfig="$1"
+  local default_node_ip="$2"
+  local target_user="${3:-}"
+  local target_home=""
+
+  if [[ -z "$target_user" ]]; then
+    if [[ -d "/home/twinbox" ]]; then
+      target_home="/home/twinbox"
+    elif id "twinbox" >/dev/null 2>&1; then
+      target_user="twinbox"
+    elif [[ -n "${SUDO_USER:-}" ]]; then
+      target_user="${SUDO_USER}"
+    else
+      target_user="$(id -un)"
+    fi
+  fi
+
+  if [[ -z "$target_home" ]]; then
+    target_home="$(getent passwd "$target_user" | cut -d: -f6 || echo "/home/$target_user")"
+  fi
+
+  local target_talos_dir="${target_home}/.talos"
+  local target_talosconfig="${target_talos_dir}/config"
+
+  [[ -d "$target_home" ]] || fail "home directory not found: ${target_home}"
+
+  local owner_uid
+  owner_uid=$(stat -c '%u' "$target_home")
+  local owner_gid
+  owner_gid=$(stat -c '%g' "$target_home")
+
+  install -d -m 700 -o "$owner_uid" -g "$owner_gid" "$target_talos_dir"
+  install -m 600 -o "$owner_uid" -g "$owner_gid" "$source_talosconfig" "$target_talosconfig"
+
+  # Update node/endpoint as the mapped user (using sudo if we are root)
+  if [[ "$(id -u)" -eq 0 ]]; then
+    sudo -u "#${owner_uid}" -g "#${owner_gid}" talosctl config node "$default_node_ip" --talosconfig "$target_talosconfig" >/dev/null
+    sudo -u "#${owner_uid}" -g "#${owner_gid}" talosctl config endpoint "$default_node_ip" --talosconfig "$target_talosconfig" >/dev/null
+  else
+    talosctl config node "$default_node_ip" --talosconfig "$target_talosconfig" >/dev/null
+    talosctl config endpoint "$default_node_ip" --talosconfig "$target_talosconfig" >/dev/null
+  fi
+  log "Copied talosconfig to ${target_talosconfig}"
+}
+
+sync_user_talosconfig "$talosconfig_file" "$first_cp_ip"
+sync_user_kubeconfig "$kubeconfig_file"
+
 log "Bootstrap finished"

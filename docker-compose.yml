@@ -31,6 +31,7 @@ services:
       - ./manager-data:/data
       - ./categories:/opt/twinbox/categories:ro
       - /etc/cron.d:/host/etc/cron.d
+      - /home/twinbox:/home/twinbox
     depends_on:
       - manager-api
 
