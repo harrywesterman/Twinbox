@@ -68,14 +68,14 @@ progress_update() {
     printf '\n[%s] %s\n' "$phase" "$message"
     return 0
   fi
-  whiptail --backtitle "$BACKTITLE" --title "Twinbox" --infobox "Phase: ${phase}\n\n${message}" 10 78
+  dialog --backtitle "$BACKTITLE" --title "Twinbox" --infobox "Phase: ${phase}\n\n${message}" 10 78
 }
 
 msg_info() { progress_update "$CURRENT_PROGRESS_PHASE" "$1"; }
 msg_ok() { progress_update "$CURRENT_PROGRESS_PHASE" "$1"; }
 msg_error() {
   log_event "ERROR: $1"
-  whiptail --backtitle "$BACKTITLE" --title "Twinbox" --msgbox "$1" 12 78
+  dialog --backtitle "$BACKTITLE" --title "Twinbox" --msgbox "$1" 12 78
 }
 status_update() { progress_update "$CURRENT_PROGRESS_PHASE" "$1"; }
 
@@ -108,7 +108,7 @@ yesno_box() {
   local height="${3:-12}"
   local width="${4:-78}"
 
-  whiptail --backtitle "$BACKTITLE" --title "$title" --yesno "$text" "$height" "$width"
+  dialog --backtitle "$BACKTITLE" --title "$title" --yesno "$text" "$height" "$width"
 }
 
 cleanup_after_run() {
@@ -160,8 +160,8 @@ input_box() {
   local var_name="$4"
 
   local value
-  value=$(whiptail --backtitle "$BACKTITLE" --title "$title" --inputbox "$text" 10 78 "$default_value" 3>&1 1>&2 2>&3) || {
-    exit 1
+  value=$(dialog --backtitle "$BACKTITLE" --title "$title" --inputbox "$text" 10 78 "$default_value" 3>&1 1>&2 2>&3) || {
+    return 1
   }
   eval "$var_name=\"$value\""
 }
@@ -172,25 +172,42 @@ password_box() {
   local var_name="$3"
 
   local value
-  value=$(whiptail --backtitle "$BACKTITLE" --title "$title" --passwordbox "$text" 10 78 3>&1 1>&2 2>&3) || {
-    exit 1
+  value=$(dialog --backtitle "$BACKTITLE" --title "$title" --insecure --passwordbox "$text" 10 78 3>&1 1>&2 2>&3) || {
+    return 1
   }
   eval "$var_name=\"$value\""
 }
 
 password_box_confirm() {
   local title="$1"
-  local text="$2"
+  local text="$2\n\nMust be at least 8 characters long, containing 1 uppercase, 1 lowercase, and 1 special character."
   local var_name="$3"
   local first=""
   local second=""
 
   while true; do
-    password_box "$title" "$text" first
-    password_box "$title" "Confirm cluster login password" second
+    password_box "$title" "$text" first || return 1
+    password_box "$title" "Confirm cluster login password" second || return 1
 
     if [[ -z "${first// }" ]]; then
       msg_box "$title" "Password is required."
+      continue
+    fi
+
+    if [[ ${#first} -lt 8 ]]; then
+      msg_box "$title" "Password must be at least 8 characters long."
+      continue
+    fi
+    if [[ ! "$first" =~ [A-Z] ]]; then
+      msg_box "$title" "Password must contain at least one uppercase letter."
+      continue
+    fi
+    if [[ ! "$first" =~ [a-z] ]]; then
+      msg_box "$title" "Password must contain at least one lowercase letter."
+      continue
+    fi
+    if [[ ! "$first" =~ [^a-zA-Z0-9] ]]; then
+      msg_box "$title" "Password must contain at least one special character."
       continue
     fi
 
@@ -205,7 +222,7 @@ password_box_confirm() {
 }
 
 msg_box() {
-  whiptail --backtitle "$BACKTITLE" --title "$1" --msgbox "$2" 12 78
+  dialog --backtitle "$BACKTITLE" --title "$1" --msgbox "$2" 12 78
 }
 
 sanitize_cluster_slug() {
@@ -225,30 +242,30 @@ choose_cluster_slug() {
   local sanitized=""
 
   while true; do
-    selected=$(whiptail --backtitle "$BACKTITLE" --title "Twinbox" --menu "Choose a cluster name." 16 78 5 \
-      "development" "Use Development" \
-      "test" "Use Test" \
-      "production" "Use Production" \
+    selected=$(dialog --backtitle "$BACKTITLE" --title "Twinbox" --menu "Choose a cluster name." 16 78 5 \
+      "prd" "Use Production (prd)" \
+      "dev" "Use Development (dev)" \
+      "tst" "Use Test (tst)" \
       "custom" "Enter a custom name" \
-      3>&1 1>&2 2>&3) || {
-      exit 0
-    }
+      3>&1 1>&2 2>&3) || return 1
 
     if [[ "$selected" == "custom" ]]; then
-      custom_name=$(whiptail --backtitle "$BACKTITLE" --title "Twinbox" --inputbox "Cluster name" 10 78 "" 3>&1 1>&2 2>&3) || {
-        exit 0
-      }
+      custom_name=$(dialog --backtitle "$BACKTITLE" --title "Twinbox" --inputbox "Cluster name (max 3 lowercase letters)" 10 78 "prd" 3>&1 1>&2 2>&3) || return 1
       sanitized=$(sanitize_cluster_slug "$custom_name")
     else
       sanitized=$(sanitize_cluster_slug "$selected")
     fi
 
     if [[ -n "$sanitized" ]]; then
+      if [[ ! "$sanitized" =~ ^[a-z]{1,3}$ ]]; then
+        msg_box "Twinbox" "Cluster name must be 1-3 lowercase letters only."
+        continue
+      fi
       CLUSTER_SLUG="$sanitized"
       return 0
     fi
 
-    msg_box "Twinbox" "Use letters, numbers, and dashes only."
+    msg_box "Twinbox" "Cluster name is required."
   done
 }
 
@@ -276,21 +293,34 @@ detect_cluster_slugs() {
   local user=""
   local role=""
   local slug=""
+  local cluster_vms=""
 
   DETECTED_CLUSTER_SLUGS=()
 
-  while read -r vmid; do
-    [[ -n "$vmid" ]] || continue
-    config=$(qm config "$vmid" 2>/dev/null || true)
-    tags=$(printf '%s\n' "$config" | awk -F': ' '/^tags:/ {print $2; exit}')
-    [[ -n "$tags" ]] || continue
-    IFS=';' read -r -a tag_parts <<<"$tags"
-    for tag in "${tag_parts[@]}"; do
-      if [[ "$tag" == cluster-* ]]; then
-        add_detected_cluster_slug "${tag#cluster-}"
-      fi
-    done
-  done < <(qm list 2>/dev/null | awk 'NR>1 {print $1}')
+  if cluster_vms=$(pvesh get /cluster/resources --type vm --output-format json 2>/dev/null); then
+    while read -r tags; do
+      [[ -n "$tags" ]] || continue
+      IFS=';' read -r -a tag_parts <<<"$tags"
+      for tag in "${tag_parts[@]}"; do
+        if [[ "$tag" == cluster-* ]]; then
+          add_detected_cluster_slug "${tag#cluster-}"
+        fi
+      done
+    done < <(printf '%s\n' "$cluster_vms" | grep -Eo '"tags"[[:space:]]*:[[:space:]]*"[^"]+"' | sed -E 's/.*"tags"[[:space:]]*:[[:space:]]*"([^"]+)"/\1/')
+  else
+    while read -r vmid; do
+      [[ -n "$vmid" ]] || continue
+      config=$(qm config "$vmid" 2>/dev/null || true)
+      tags=$(printf '%s\n' "$config" | awk -F': ' '/^tags:/ {print $2; exit}')
+      [[ -n "$tags" ]] || continue
+      IFS=';' read -r -a tag_parts <<<"$tags"
+      for tag in "${tag_parts[@]}"; do
+        if [[ "$tag" == cluster-* ]]; then
+          add_detected_cluster_slug "${tag#cluster-}"
+        fi
+      done
+    done < <(qm list 2>/dev/null | awk 'NR>1 {print $1}')
+  fi
 
   while read -r snippet; do
     [[ -n "$snippet" ]] || continue
@@ -330,47 +360,51 @@ render_cluster_overview() {
   printf '%s' "$summary"
 }
 
-choose_existing_cluster_for_removal() {
-  local prompt=""
+
+
+cluster_management_menu() {
+  local slug="$1"
+  local action=""
+
+  action=$(dialog --backtitle "$BACKTITLE" --title "Manage Cluster: $slug" \
+    --menu "What would you like to do with cluster '$slug'?" \
+    15 78 5 \
+    "remove" "Remove this cluster and all its resources" \
+    "back" "Return to main menu" \
+    3>&1 1>&2 2>&3) || return 2 # 2 means go back to main menu
+
+  if [[ "$action" == "remove" ]]; then
+    WIZARD_ACTION="remove"
+    CLUSTER_SLUG="$slug"
+    return 0
+  fi
+  return 2
+}
+
+main_menu() {
   local selected=""
   local -a menu_args=()
   local slug=""
 
-  if [[ "${#DETECTED_CLUSTER_SLUGS[@]}" -eq 0 ]]; then
-    msg_box "Twinbox" "No Twinbox clusters are available to remove."
-    exit 0
-  fi
+  detect_cluster_slugs
 
+  menu_args+=("create" "[+] Create a new Twinbox Cluster")
+  
   for slug in "${DETECTED_CLUSTER_SLUGS[@]}"; do
-    menu_args+=("$slug" "Remove ${slug}")
+    menu_args+=("manage:$slug" "[-] Manage Cluster: $slug")
   done
 
-  prompt="$(render_cluster_overview)"$'\n'$'\n'"Choose a cluster to remove."
-  selected=$(whiptail --backtitle "$BACKTITLE" --title "Twinbox" --menu "$prompt" 20 78 10 "${menu_args[@]}" 3>&1 1>&2 2>&3) || exit 0
-  CLUSTER_SLUG="$selected"
-}
+  selected=$(dialog --backtitle "$BACKTITLE" --title "Twinbox Management" \
+    --menu "Welcome to the Twinbox Setup Wizard.\n\nDetected Clusters: ${#DETECTED_CLUSTER_SLUGS[@]}\n\nChoose an action or a cluster to manage." \
+    20 78 10 "${menu_args[@]}" 3>&1 1>&2 2>&3) || return 1
 
-choose_cluster_action() {
-  local prompt=""
-  local action=""
-
-  detect_cluster_slugs
-  prompt="Twinbox"$'\n'$'\n'"Set up the VM"$'\n'$'\n'"$(render_cluster_overview)"$'\n'$'\n'"Choose an action."
-
-  if [[ "${#DETECTED_CLUSTER_SLUGS[@]}" -eq 0 ]]; then
-    action=$(whiptail --backtitle "$BACKTITLE" --title "Twinbox" --menu "$prompt" 18 78 6 \
-      "create" "Start a new cluster" \
-      3>&1 1>&2 2>&3) || exit 0
-  else
-    action=$(whiptail --backtitle "$BACKTITLE" --title "Twinbox" --menu "$prompt" 20 78 8 \
-      "create" "Start a new cluster" \
-      "remove" "Remove a cluster" \
-      3>&1 1>&2 2>&3) || exit 0
-  fi
-
-  WIZARD_ACTION="$action"
-  if [[ "$WIZARD_ACTION" == "remove" ]]; then
-    choose_existing_cluster_for_removal
+  if [[ "$selected" == "create" ]]; then
+    WIZARD_ACTION="create"
+    return 0
+  elif [[ "$selected" == manage:* ]]; then
+    CLUSTER_SLUG="${selected#manage:}"
+    cluster_management_menu "$CLUSTER_SLUG"
+    return $?
   fi
 }
 
@@ -509,16 +543,16 @@ handle_existing_cluster_conflict() {
   inventory=$(render_existing_cluster_inventory)
 
   if ! yesno_box "Twinbox" "A cluster named '${CLUSTER_SLUG}' already exists.\n\n${inventory}\n\nRemove it before starting again?" 18 78; then
-    exit 0
+    return 1
   fi
 
-  confirm_slug=$(whiptail --backtitle "$BACKTITLE" --title "Twinbox" --inputbox "Type the cluster name to remove it:\n\n${CLUSTER_SLUG}" 12 78 3>&1 1>&2 2>&3) || {
-    exit 0
+  confirm_slug=$(dialog --backtitle "$BACKTITLE" --title "Twinbox" --inputbox "Type the cluster name to remove it:\n\n${CLUSTER_SLUG}" 12 78 3>&1 1>&2 2>&3) || {
+    return 1
   }
 
   if [[ "$confirm_slug" != "$CLUSTER_SLUG" ]]; then
     msg_error "Cluster name did not match."
-    exit 1
+    return 1
   fi
 
   cleanup_existing_cluster_resources
@@ -815,7 +849,7 @@ management_ip=$(printf '%q' "${management_ip:-}")
 EOF
 
     gauge_emit 100 "Checking network and free addresses"
-  ) | whiptail --backtitle "$BACKTITLE" --title "Twinbox" --gauge "Checking network and free addresses" 10 78 0
+  ) | dialog --backtitle "$BACKTITLE" --title "Twinbox" --gauge "Checking network and free addresses" 10 78 0
 
   progress_update "Preparing" "Checking network and free addresses"
 
@@ -900,14 +934,14 @@ create_proxmox_api_user() {
       log_event "Proxmox API user ${PROXMOX_USER} already exists"
     else
       msg_error "Failed to create Proxmox API user ${PROXMOX_USER}: ${create_err}"
-      exit 1
+      return 1
     fi
   fi
 
   log_event "Setting password for ${PROXMOX_USER}"
   if ! set_proxmox_password_with_retry "$PROXMOX_USER" "$PROXMOX_PASSWORD" 15 1; then
     msg_error "Failed to set password for Proxmox API user ${PROXMOX_USER}: ${last_err}"
-    exit 1
+    return 1
   fi
 
   log_event "Ensuring least-privilege role ${PROXMOX_ROLE}"
@@ -917,11 +951,11 @@ create_proxmox_api_user() {
     if printf '%s' "$role_err" | grep -qi "already exists"; then
       if ! role_err=$(pveum role modify "$PROXMOX_ROLE" -privs "$proxmox_privs" 2>&1); then
         msg_error "Failed to update Proxmox role ${PROXMOX_ROLE}: ${role_err}"
-        exit 1
+        return 1
       fi
     else
       msg_error "Failed to create Proxmox role ${PROXMOX_ROLE}: ${role_err}"
-      exit 1
+      return 1
     fi
   fi
 
@@ -929,46 +963,57 @@ create_proxmox_api_user() {
   for acl_path in /vms "/storage/${PROXMOX_STORAGE_POOL}" "/storage/${file_datastore}" "/nodes/${PROXMOX_NODE}"; do
     if ! apply_acl_with_retry "$acl_path" "$PROXMOX_USER" "$PROXMOX_ROLE" 10 1; then
       msg_error "Failed to apply ACL ${acl_path} for ${PROXMOX_USER}: ${last_err}"
-      exit 1
+      return 1
     fi
   done
   if ! apply_acl_with_retry "/sdn" "$PROXMOX_USER" "$PROXMOX_ROLE" 10 1; then
     msg_error "Failed to apply ACL /sdn for ${PROXMOX_USER}: ${last_err}"
-    exit 1
+    return 1
   fi
 }
 
 collect_management_vm_settings() {
-  input_box "Management VM" "Name" "$MGT_NAME" MGT_NAME
-  input_box "Management VM" "IP address" "$CLOUD_INIT_IP" CLOUD_INIT_IP
-  input_box "Management VM" "Netmask" "$CLOUD_INIT_NETMASK" CLOUD_INIT_NETMASK
-  input_box "Management VM" "DNS server" "$CLOUD_INIT_DNS_IP" CLOUD_INIT_DNS_IP
-  input_box "Management VM" "Disk size (GB)" "$MGT_DISK" MGT_DISK
-  input_box "Management VM" "Memory (MB)" "$MGT_RAM" MGT_RAM
+  local result=""
+  result=$(dialog --backtitle "$BACKTITLE" --title "Management VM Settings" \
+    --form "Adjust the settings for the management VM:" 18 78 6 \
+    "Name:"           1 1 "$MGT_NAME"           1 20 30 0 \
+    "IP Address:"     2 1 "$CLOUD_INIT_IP"      2 20 30 0 \
+    "Netmask:"        3 1 "$CLOUD_INIT_NETMASK" 3 20 30 0 \
+    "DNS Server:"     4 1 "$CLOUD_INIT_DNS_IP"  4 20 30 0 \
+    "Disk Size (GB):" 5 1 "$MGT_DISK"           5 20 10 0 \
+    "Memory (MB):"    6 1 "$MGT_RAM"            6 20 10 0 \
+    3>&1 1>&2 2>&3) || return 1
+
+  MGT_NAME=$(echo "$result" | sed -n '1p')
+  CLOUD_INIT_IP=$(echo "$result" | sed -n '2p')
+  CLOUD_INIT_NETMASK=$(echo "$result" | sed -n '3p')
+  CLOUD_INIT_DNS_IP=$(echo "$result" | sed -n '4p')
+  MGT_DISK=$(echo "$result" | sed -n '5p')
+  MGT_RAM=$(echo "$result" | sed -n '6p')
 
   if [[ -z "${MGT_NAME:-}" ]]; then
     msg_error "VM name must not be empty"
-    exit 1
+    return 1
   fi
   if ! is_valid_ipv4 "${CLOUD_INIT_IP:-}"; then
     msg_error "Invalid VM IP: ${CLOUD_INIT_IP}"
-    exit 1
+    return 1
   fi
   if ! netmask_to_cidr "${CLOUD_INIT_NETMASK}" >/dev/null 2>&1; then
     msg_error "Invalid VM netmask: ${CLOUD_INIT_NETMASK}"
-    exit 1
+    return 1
   fi
   if ! is_valid_ipv4 "${CLOUD_INIT_DNS_IP:-}"; then
     msg_error "Invalid DNS server IP: ${CLOUD_INIT_DNS_IP}"
-    exit 1
+    return 1
   fi
   if [[ ! "${MGT_DISK}" =~ ^[0-9]+$ ]]; then
     msg_error "VM disk size must be a number"
-    exit 1
+    return 1
   fi
   if [[ ! "${MGT_RAM}" =~ ^[0-9]+$ ]]; then
     msg_error "VM memory must be a number"
-    exit 1
+    return 1
   fi
 }
 
@@ -977,56 +1022,96 @@ remove_cluster_flow() {
   detect_existing_cluster_resources
 
   if ! cluster_resources_exist; then
-    msg_box "Twinbox" "No resources were found for ${CLUSTER_SLUG}."
-    exit 0
+    msg_box "Twinbox" "No resources were found for '${CLUSTER_SLUG}'."
+    return 1
   fi
 
   if ! yesno_box "Twinbox" "$(render_existing_cluster_inventory)\n\nRemove this cluster?" 16 78; then
-    exit 0
+    return 1
   fi
 
   local confirm_slug=""
-  confirm_slug=$(whiptail --backtitle "$BACKTITLE" --title "Twinbox" --inputbox "Type the cluster name to remove it:\n\n${CLUSTER_SLUG}" 12 78 3>&1 1>&2 2>&3) || exit 0
+  confirm_slug=$(dialog --backtitle "$BACKTITLE" --title "Twinbox" --inputbox "Type the cluster name to remove it:\n\n${CLUSTER_SLUG}" 12 78 3>&1 1>&2 2>&3) || return 1
 
   if [[ "$confirm_slug" != "$CLUSTER_SLUG" ]]; then
     msg_error "Cluster name did not match."
-    exit 1
+    return 1
   fi
 
   cleanup_existing_cluster_resources
-  msg_box "Twinbox" "Cluster removed.\n\nThis script will now close."
+  msg_box "Twinbox" "Cluster removed."
 }
 
 start_wizard() {
-  choose_cluster_action
+  local step=1
+  local total_steps=6
 
-  if [[ "$WIZARD_ACTION" == "remove" ]]; then
-    remove_cluster_flow
-    return 0
-  fi
-
-  choose_cluster_slug
-  run_apply_educated_defaults_with_gauge
-  handle_existing_cluster_conflict
-
-  if [[ -z "${SSH_KEY:-}" ]]; then
-    input_box "Twinbox" "SSH public key" "$SSH_KEY" SSH_KEY
-  fi
-  if [[ -z "${SSH_KEY// }" ]]; then
-    msg_error "SSH public key is required for initial access"
-    exit 1
-  fi
-
-  collect_management_vm_settings
-  CLOUD_INIT_CIDR=$(netmask_to_cidr "$CLOUD_INIT_NETMASK") || {
-    msg_error "Invalid netmask: ${CLOUD_INIT_NETMASK}"
-    exit 1
-  }
-
-  password_box_confirm "Twinbox" "Cluster login password" CLOUD_INIT_PASSWORD
-
-  run_installation_flow
-  print_next_steps
+  WIZARD_ACTION="create"
+  
+  while [ "$step" -gt 0 ] && [ "$step" -le "$total_steps" ]; do
+    case $step in
+      1)
+        # Choose Cluster Slug
+        if ! choose_cluster_slug; then
+          return 1
+        fi
+        step=2
+        ;;
+      2)
+        # Apply Defaults and Handle Conflicts
+        run_apply_educated_defaults_with_gauge
+        if ! handle_existing_cluster_conflict; then
+          step=1
+          continue
+        fi
+        step=3
+        ;;
+      3)
+        # SSH Key
+        if [[ -z "${SSH_KEY:-}" ]]; then
+          if ! input_box "Twinbox" "SSH public key" "$SSH_KEY" SSH_KEY; then
+            step=1
+            continue
+          fi
+        fi
+        if [[ -z "${SSH_KEY// }" ]]; then
+          msg_error "SSH public key is required for initial access"
+          continue
+        fi
+        step=4
+        ;;
+      4)
+        # VM Settings
+        if ! collect_management_vm_settings; then
+          step=3
+          continue
+        fi
+        step=5
+        ;;
+      5)
+        # CIDR calculation and Password
+        CLOUD_INIT_CIDR=$(netmask_to_cidr "$CLOUD_INIT_NETMASK") || {
+          msg_error "Invalid netmask: ${CLOUD_INIT_NETMASK}"
+          step=4
+          continue
+        }
+        if ! password_box_confirm "Twinbox" "Cluster login password" CLOUD_INIT_PASSWORD; then
+          step=4
+          continue
+        fi
+        step=6
+        ;;
+      6)
+        # Installation
+        if run_installation_flow; then
+          print_next_steps
+          return 0
+        else
+          return 1
+        fi
+        ;;
+    esac
+  done
 }
 
 create_management_vm() {
@@ -1275,15 +1360,28 @@ run_installation_flow() {
 print_next_steps() {
   local message="${FINAL_COMPLETION_MESSAGE}"
 
-  clear
-  msg_box "Twinbox" "${message}\n\nOpen this in your browser:\n\n${MANAGEMENT_WEB_URL}\n\nThis script will now close."
+  msg_box "Twinbox" "${message}\n\nOpen this in your browser:\n\n${MANAGEMENT_WEB_URL}\n\nPress OK to return to the main menu."
 }
 
 main() {
   trap cleanup_after_run EXIT
   check_root
   check_deps
-  start_wizard
+
+  while true; do
+    WIZARD_ACTION=""
+    if main_menu; then
+      if [[ "$WIZARD_ACTION" == "create" ]]; then
+        start_wizard || true
+      elif [[ "$WIZARD_ACTION" == "remove" ]]; then
+        remove_cluster_flow || true
+      fi
+    else
+      # Exit script if Cancel on main menu
+      clear
+      exit 0
+    fi
+  done
 }
 
 main "$@"
