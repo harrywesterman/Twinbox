@@ -31,13 +31,14 @@ resource "proxmox_virtual_environment_vm" "node" {
 
   cpu {
     cores = each.value.cpu
-    type  = "x86-64-v2-AES"
+    type  = "host"
   }
 
-  boot_order = ["ide2", "virtio0"]
+  boot_order = var.boot_from_disk ? ["virtio0"] : ["ide2", "virtio0"]
 
   memory {
     dedicated = each.value.ram_mb
+    floating  = 2048
   }
 
   disk {
@@ -48,9 +49,12 @@ resource "proxmox_virtual_environment_vm" "node" {
     discard      = "on"
   }
 
-  cdrom {
-    interface = "ide2"
-    file_id   = proxmox_virtual_environment_file.talos_nocloud.id
+  dynamic "cdrom" {
+    for_each = var.boot_from_disk ? [] : [1]
+    content {
+      interface = "ide2"
+      file_id   = proxmox_virtual_environment_file.talos_nocloud.id
+    }
   }
 
   agent {

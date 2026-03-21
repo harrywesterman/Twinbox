@@ -83,3 +83,8 @@ variable "nodes" {
     mac     = string
   }))
 }
+
+variable "boot_from_disk" {
+  type    = bool
+  default = false
+}

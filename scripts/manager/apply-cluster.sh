@@ -684,6 +684,13 @@ bootstrap_cluster "$first_controlplane_ip"
 sync_user_talosconfig "$talos_dir/talosconfig" "$first_controlplane_ip"
 sync_user_kubeconfig "$kubeconfig_file"
 
+log "Switching to disk boot (removing CD-ROM)"
+sync
+tmp_tfvars="$(mktemp)"
+jq '. + {boot_from_disk: true}' "$tfvars_file" > "$tmp_tfvars"
+mv "$tmp_tfvars" "$tfvars_file"
+"$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve -no-color -var-file="$tfvars_file"
+
 tmp="$(mktemp)"
 jq \
   --arg status "bootstrapped" \
