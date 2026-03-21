@@ -18,7 +18,7 @@ SSH_CMD=()
 
 usage() {
   cat <<EOF
-Usage: $(basename "$0") [--target user@host] [--remote-dir /opt/twinbox-<cluster-slug>] [--image-tag latest]
+Usage: $(basename "$0") [--target user@host] [--remote-dir /opt/twinbox] [--image-tag latest]
 
 Preview the local manager-web on a running Management VM without committing or
 pushing first. The script syncs only ./manager-web to a temporary directory on

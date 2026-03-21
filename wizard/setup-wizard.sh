@@ -413,7 +413,7 @@ set_cluster_naming_defaults() {
   CLUSTER_VM_TAG="cluster-${CLUSTER_SLUG}"
   TWINBOX_TARGET_DIR="/opt/twinbox"
   MGT_NAME="${CLUSTER_VM_PREFIX}mgt"
-  CLOUD_INIT_USER="twinbox-${CLUSTER_SLUG}"
+  CLOUD_INIT_USER="twinbox"
   PROXMOX_USER="twinbox-${CLUSTER_SLUG}@pve"
   PROXMOX_ROLE="TwinboxVMProvisioner-${CLUSTER_SLUG}"
   PROXMOX_NODE="${PROXMOX_NODE:-$(hostname)}"
@@ -1159,7 +1159,7 @@ packages:
   - gnupg
   - qemu-guest-agent
 write_files:
-  - path: /tmp/twinbox-${CLUSTER_SLUG}.env.template
+  - path: /tmp/twinbox.env.template
     permissions: '0600'
     owner: root:root
     content: |
@@ -1192,7 +1192,7 @@ runcmd:
   - install -d -m 0755 ${TWINBOX_TARGET_DIR}
   - chown ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}
   - bash -lc 'sudo -u ${CLOUD_INIT_USER} -H bash -lc "git clone https://github.com/${GITHUB_REPO}.git ${TWINBOX_TARGET_DIR}"'
-  - install -m 0600 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /tmp/twinbox-${CLUSTER_SLUG}.env.template ${TWINBOX_TARGET_DIR}/.env
+  - install -m 0600 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /tmp/twinbox.env.template ${TWINBOX_TARGET_DIR}/.env
   - chown -R ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}
   - bash -lc 'cd ${TWINBOX_TARGET_DIR} && chmod +x scripts/install-management-tools.sh && ./scripts/install-management-tools.sh --env-file ${TWINBOX_TARGET_DIR}/.env'
   - bash -lc 'sudo -u ${CLOUD_INIT_USER} -H bash -lc "cd ${TWINBOX_TARGET_DIR} && docker compose pull && docker compose up -d"'

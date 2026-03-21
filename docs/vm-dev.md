@@ -17,21 +17,21 @@ Use this workflow when the Twinbox Management VM is your primary development mac
 ssh <management-vm-user>@<management-vm-ip>
 ```
 
-- You know the repo path on the VM. Current wizard installs use `/opt/twinbox-<cluster-slug>`. Older VMs may still use `/opt/twinbox`.
+- You know the repo path on the VM. Default installs use `/opt/twinbox`. Older VMs may still use `/opt/twinbox-<cluster-slug>`.
 
 ## One-Time Bootstrap on the VM
 
 Run this on the Management VM:
 
 ```bash
-cd /opt/twinbox-<cluster-slug>
+cd /opt/twinbox
 bash scripts/bootstrap-vm.sh
 ```
 
 What it does:
 
 - Ensures required tools exist (`git`, `docker`, `docker compose`).
-- Ensures the repo exists at `/opt/twinbox-<cluster-slug>` or `/opt/twinbox`.
+- Ensures the repo exists at `/opt/twinbox`.
 - Updates to latest `main`.
 - Ensures `.env` exists.
 - Starts the stack with `docker compose up -d --build`.
@@ -49,7 +49,7 @@ cp .env.vm-preview.local.example .env.vm-preview.local
 Set at least:
 
 - `TWINBOX_VM_PREVIEW_TARGET=<management-vm-user>@<management-vm-ip>`
-- `TWINBOX_VM_PREVIEW_REMOTE_DIR=/opt/twinbox-<cluster-slug>`
+- `TWINBOX_VM_PREVIEW_REMOTE_DIR=/opt/twinbox`
 
 Optional:
 
@@ -115,7 +115,7 @@ Once the change is merged or pushed and you want the VM to run from the repo che
 
 ```bash
 ssh <management-vm-user>@<management-vm-ip>
-cd /opt/twinbox-<cluster-slug>
+cd /opt/twinbox
 git pull --ff-only origin main
 
 image_tag="$(awk -F= '/^TWINBOX_IMAGE_TAG=/{print $2}' .env | tail -n1)"
@@ -134,7 +134,7 @@ If you really want to edit on the VM itself, you still can.
 On the VM:
 
 ```bash
-cd /opt/twinbox-<cluster-slug>
+cd /opt/twinbox
 git checkout main
 git pull --ff-only
 git checkout -b codex/<feature-name>
@@ -168,7 +168,7 @@ newgrp docker
 If services fail to start:
 
 ```bash
-cd /opt/twinbox-<cluster-slug>
+cd /opt/twinbox
 docker compose ps
 docker compose logs --tail=200 manager-api manager-web manager-worker
 ```

@@ -456,7 +456,7 @@ bootstrap_cluster() {
 
 sync_user_kubeconfig() {
   local source_kubeconfig="$1"
-  local target_user="${2:-$NAME}"
+  local target_user="${2:-twinbox}"
   local target_home="/home/${target_user}"
   local target_kube_dir="${target_home}/.kube"
   local target_kubeconfig="${target_kube_dir}/config"
@@ -470,7 +470,7 @@ sync_user_kubeconfig() {
 sync_user_talosconfig() {
   local source_talosconfig="$1"
   local default_node_ip="$2"
-  local target_user="${3:-$NAME}"
+  local target_user="${3:-twinbox}"
   local target_home="/home/${target_user}"
   local target_talos_dir="${target_home}/.talos"
   local target_talosconfig="${target_talos_dir}/config"
