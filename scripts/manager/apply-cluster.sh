@@ -525,13 +525,17 @@ sync_user_talosconfig() {
   install -d -m 700 -o "$owner_uid" -g "$owner_gid" "$target_talos_dir"
   install -m 600 -o "$owner_uid" -g "$owner_gid" "$source_talosconfig" "$target_talosconfig"
 
-  # Update node/endpoint as the mapped user (using sudo if we are root)
-  if [[ "$(id -u)" -eq 0 ]]; then
+  # Update node/endpoint as the mapped user (using sudo if we are root and sudo exists)
+  if command -v sudo >/dev/null 2>&1 && [[ "$(id -u)" -eq 0 ]]; then
     sudo -u "#${owner_uid}" -g "#${owner_gid}" talosctl config node "$default_node_ip" --talosconfig "$target_talosconfig" >/dev/null
     sudo -u "#${owner_uid}" -g "#${owner_gid}" talosctl config endpoint "$default_node_ip" --talosconfig "$target_talosconfig" >/dev/null
   else
     talosctl config node "$default_node_ip" --talosconfig "$target_talosconfig" >/dev/null
     talosctl config endpoint "$default_node_ip" --talosconfig "$target_talosconfig" >/dev/null
+    # Fix ownership if we ran as root and didn't use sudo
+    if [[ "$(id -u)" -eq 0 ]]; then
+      chown "$owner_uid:$owner_gid" "$target_talosconfig"
+    fi
   fi
   log "Copied talosconfig to ${target_talosconfig}"
 }
