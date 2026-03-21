@@ -112,6 +112,9 @@ resolve_talos_image_assets() {
       TALOS_IMAGE_DOWNLOAD_URL=*)
         image_download_url="${line#TALOS_IMAGE_DOWNLOAD_URL=}"
         ;;
+      TALOS_IMAGE_EXTENSIONS=*)
+        image_extensions="${line#TALOS_IMAGE_EXTENSIONS=}"
+        ;;
     esac
   done <<<"$helper_output"
 
@@ -361,6 +364,14 @@ write_node_patch() {
     if [[ "$type" == "controlplane" ]]; then
       echo "        vip:"
       echo "          ip: ${VIP_IP}"
+    fi
+    if [[ -n "${image_extensions:-}" ]]; then
+      echo "  install:"
+      echo "    extensions:"
+      IFS=' ' read -r -a ext_array <<< "$image_extensions"
+      for ext_image in "${ext_array[@]}"; do
+        echo "      - image: ${ext_image}"
+      done
     fi
   } > "$patch_file"
 }

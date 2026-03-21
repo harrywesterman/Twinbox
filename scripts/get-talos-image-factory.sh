@@ -128,6 +128,13 @@ case "$output" in
     printf 'TALOS_IMAGE_SCHEMATIC=%s\n' "$schematic_id"
     printf 'TALOS_IMAGE_FACTORY_URL=%s\n' "$image_url"
     printf 'TALOS_IMAGE_DOWNLOAD_URL=%s\n' "$download_url"
+    if [[ "${#extensions[@]}" -gt 0 ]]; then
+      ext_images=()
+      for ext in "${extensions[@]}"; do
+        ext_images+=("factory.talos.dev/extensions/${ext}/${schematic_id}")
+      done
+      printf 'TALOS_IMAGE_EXTENSIONS=%s\n' "${ext_images[*]}"
+    fi
     ;;
   json)
     jq -n \

@@ -63,6 +63,7 @@ fi
         assert "TALOS_IMAGE_SCHEMATIC=schematic123" in proc.stdout
         assert "TALOS_IMAGE_FACTORY_URL=https://factory.talos.dev/image/schematic123/v1.9.2/metal-amd64.iso" in proc.stdout
         assert "TALOS_IMAGE_DOWNLOAD_URL=https://assets.factory.talos.dev/assets/final.iso" in proc.stdout
+        assert "TALOS_IMAGE_EXTENSIONS=factory.talos.dev/extensions/siderolabs/qemu-guest-agent/schematic123" in proc.stdout
 
         curl_args_1 = args_file.with_name("curl-args.txt.1").read_text(encoding="utf-8")
         curl_stdin_1 = stdin_file.with_name("curl-stdin.txt.1").read_text(encoding="utf-8")
