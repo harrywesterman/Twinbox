@@ -456,12 +456,23 @@ bootstrap_cluster() {
 
 sync_user_kubeconfig() {
   local source_kubeconfig="$1"
-  local target_user="${2:-twinbox}"
-  local target_home="/home/${target_user}"
+  local target_user="${2:-}"
+  if [[ -z "$target_user" ]]; then
+    if id "twinbox" >/dev/null 2>&1; then
+      target_user="twinbox"
+    elif [[ -n "${SUDO_USER:-}" ]]; then
+      target_user="${SUDO_USER}"
+    else
+      target_user="$(id -un)"
+    fi
+  fi
+
+  local target_home
+  target_home="$(getent passwd "$target_user" | cut -d: -f6 || echo "/home/$target_user")"
   local target_kube_dir="${target_home}/.kube"
   local target_kubeconfig="${target_kube_dir}/config"
 
-  [[ -d "$target_home" ]] || fail "home directory not found: ${target_home}"
+  [[ -d "$target_home" ]] || fail "home directory not found for user ${target_user}: ${target_home}"
   install -d -m 700 -o "$target_user" -g "$target_user" "$target_kube_dir"
   install -m 600 -o "$target_user" -g "$target_user" "$source_kubeconfig" "$target_kubeconfig"
   log "Copied kubeconfig to ${target_kubeconfig}"
@@ -470,12 +481,23 @@ sync_user_kubeconfig() {
 sync_user_talosconfig() {
   local source_talosconfig="$1"
   local default_node_ip="$2"
-  local target_user="${3:-twinbox}"
-  local target_home="/home/${target_user}"
+  local target_user="${3:-}"
+  if [[ -z "$target_user" ]]; then
+    if id "twinbox" >/dev/null 2>&1; then
+      target_user="twinbox"
+    elif [[ -n "${SUDO_USER:-}" ]]; then
+      target_user="${SUDO_USER}"
+    else
+      target_user="$(id -un)"
+    fi
+  fi
+
+  local target_home
+  target_home="$(getent passwd "$target_user" | cut -d: -f6 || echo "/home/$target_user")"
   local target_talos_dir="${target_home}/.talos"
   local target_talosconfig="${target_talos_dir}/config"
 
-  [[ -d "$target_home" ]] || fail "home directory not found: ${target_home}"
+  [[ -d "$target_home" ]] || fail "home directory not found for user ${target_user}: ${target_home}"
   install -d -m 700 -o "$target_user" -g "$target_user" "$target_talos_dir"
   install -m 600 -o "$target_user" -g "$target_user" "$source_talosconfig" "$target_talosconfig"
   talosctl config node "$default_node_ip" \
