@@ -92,6 +92,7 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert '"/image/default/"' not in text
     assert '!= "default"' not in text
     assert 'TALOS_IMAGE_FACTORY_URL:-' not in text
+    assert 'TALOS_IMAGE_INSTALLER=' in text
     assert 'TALOS_IMAGE_DOWNLOAD_URL=' in text
     assert 'download_talos_image()' in text
     assert 'talos_image_local_path="$talos_dir/talos-${image_cache_key}.iso"' in text
@@ -106,6 +107,7 @@ def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
     assert '--preset "$talos_image_preset"' in text
     assert '--output shell' in text
     assert 'while IFS= read -r line; do' in text
+    assert 'TALOS_IMAGE_INSTALLER=' in text
     assert 'TALOS_IMAGE_DOWNLOAD_URL=' in text
     assert 'cp -R "$MODULE_SOURCE/." "$work_module_dir/"' in text
     assert 'image_cache_key="${image_platform}-${image_arch}-${image_schematic}-${PINNED_TALOS_VERSION}"' in text
@@ -127,6 +129,10 @@ def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
     assert 'talosctl config endpoint "$default_node_ip"' in text
     assert 'talos_config_dir' in text
     assert 'Reusing existing OpenTofu workspace at ${work_module_dir}' in text
+    assert 'echo "    image: ${image_installer}"' in text
+    assert 'image_installer="${line#TALOS_IMAGE_INSTALLER=}"' in text
+    assert 'image_extensions=' not in text
+    assert 'TALOS_IMAGE_EXTENSIONS=' not in text
 
 
 def test_manager_worker_image_includes_talos_image_factory_helper():

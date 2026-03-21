@@ -113,6 +113,7 @@ schematic_id="$(printf '%s' "$response" | jq -r '.id // empty')"
 [[ -n "$schematic_id" ]] || fail "Factory response did not include an id"
 
 image_url="https://factory.talos.dev/image/${schematic_id}/${version}/metal-${arch}.iso"
+installer_image="factory.talos.dev/metal-installer/${schematic_id}:${version}"
 download_url="$(
   curl -fsSL -o /dev/null -w '%{url_effective}' "$image_url"
 )"
@@ -127,14 +128,8 @@ case "$output" in
   shell)
     printf 'TALOS_IMAGE_SCHEMATIC=%s\n' "$schematic_id"
     printf 'TALOS_IMAGE_FACTORY_URL=%s\n' "$image_url"
+    printf 'TALOS_IMAGE_INSTALLER=%s\n' "$installer_image"
     printf 'TALOS_IMAGE_DOWNLOAD_URL=%s\n' "$download_url"
-    if [[ "${#extensions[@]}" -gt 0 ]]; then
-      ext_images=()
-      for ext in "${extensions[@]}"; do
-        ext_images+=("factory.talos.dev/extensions/${ext}/${schematic_id}")
-      done
-      printf 'TALOS_IMAGE_EXTENSIONS=%s\n' "${ext_images[*]}"
-    fi
     ;;
   json)
     jq -n \
@@ -143,6 +138,7 @@ case "$output" in
       --arg arch "$arch" \
       --arg platform "$platform" \
       --arg url "$image_url" \
+      --arg installer_image "$installer_image" \
       --arg download_url "$download_url" \
       '{
         schematic_id: $id,
@@ -150,6 +146,7 @@ case "$output" in
         arch: $arch,
         platform: $platform,
         image_url: $url,
+        installer_image: $installer_image,
         download_url: $download_url
       }'
     ;;

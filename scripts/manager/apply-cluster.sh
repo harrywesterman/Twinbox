@@ -109,11 +109,11 @@ resolve_talos_image_assets() {
       TALOS_IMAGE_FACTORY_URL=*)
         image_factory_url="${line#TALOS_IMAGE_FACTORY_URL=}"
         ;;
+      TALOS_IMAGE_INSTALLER=*)
+        image_installer="${line#TALOS_IMAGE_INSTALLER=}"
+        ;;
       TALOS_IMAGE_DOWNLOAD_URL=*)
         image_download_url="${line#TALOS_IMAGE_DOWNLOAD_URL=}"
-        ;;
-      TALOS_IMAGE_EXTENSIONS=*)
-        image_extensions="${line#TALOS_IMAGE_EXTENSIONS=}"
         ;;
     esac
   done <<<"$helper_output"
@@ -365,13 +365,9 @@ write_node_patch() {
       echo "        vip:"
       echo "          ip: ${VIP_IP}"
     fi
-    if [[ -n "${image_extensions:-}" ]]; then
+    if [[ -n "${image_installer:-}" ]]; then
       echo "  install:"
-      echo "    extensions:"
-      IFS=' ' read -r -a ext_array <<< "$image_extensions"
-      for ext_image in "${ext_array[@]}"; do
-        echo "      - image: ${ext_image}"
-      done
+      echo "    image: ${image_installer}"
     fi
   } > "$patch_file"
 }
