@@ -19,7 +19,7 @@ resource "hcloud_server" "wiredoor" {
 
   public_net {
     ipv4_enabled = true
-    ipv6_enabled = true
+    ipv6_enabled = false
   }
 
   labels = local.common_labels

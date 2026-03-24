@@ -1,10 +1,10 @@
-hcloud_token = "set-via-tfvars-or-env"
+hcloud_token = "get-via-console.hetzner.com"
 
 ssh_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI..."
 
-server_name = "wiredoor-1"
+server_name = "wiredoor"
 server_type = "cax11"
-image       = "debian-12"
+image       = "debian-13"
 location    = "fsn1"
 
 wiredoor_fqdn           = "wiredoor.example.com"
@@ -15,5 +15,5 @@ wiredoor_vpn_port               = 51820
 wiredoor_tcp_service_port_range = "32760-32767"
 
 allowed_ssh_cidrs = [
-  "104.16.0.0/12/24"
+  "0.0.0.0/32"
 ]

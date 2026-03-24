@@ -24,7 +24,7 @@ variable "server_type" {
 variable "image" {
   description = "Hetzner image"
   type        = string
-  default     = "debian-12"
+  default     = "debian-13"
 }
 
 variable "location" {
