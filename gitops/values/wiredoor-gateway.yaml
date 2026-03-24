@@ -11,3 +11,6 @@ securityContext:
       - NET_ADMIN
 
 podSecurityContext: {}
+
+livenessProbe: null
+readinessProbe: null
