@@ -11,7 +11,7 @@ spec:
       targetRevision: "8.10.2"
       helm:
         valueFiles:
-          - $values/values/grafana.yaml
+          - $values/gitops/values/grafana.yaml
     - repoURL: https://github.com/harrywesterman/Twinbox.git
       targetRevision: main
       ref: values

@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://github.com/harrywesterman/Twinbox.git
     targetRevision: main
-    path: apps/whoami
+    path: gitops/apps/whoami
   destination:
     server: https://kubernetes.default.svc
     namespace: default

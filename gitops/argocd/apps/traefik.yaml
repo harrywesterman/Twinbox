@@ -11,7 +11,7 @@ spec:
       targetRevision: "33.1.0"
       helm:
         valueFiles:
-          - $values/values/traefik.yaml
+          - $values/gitops/values/traefik.yaml
     - repoURL: https://github.com/harrywesterman/Twinbox.git
       targetRevision: main
       ref: values
