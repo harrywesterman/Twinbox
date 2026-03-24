@@ -11,7 +11,7 @@ spec:
       targetRevision: "0.40.1"
       helm:
         valueFiles:
-          - $values/values/headlamp.yaml
+          - $values/gitops/values/headlamp.yaml
     - repoURL: https://github.com/harrywesterman/Twinbox.git
       targetRevision: main
       ref: values
