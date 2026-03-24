@@ -6,6 +6,7 @@ metadata:
 spec:
   entryPoints:
     - websecure
+    - webwiredoor
   routes:
     - kind: Rule
       match: Host(`{{ .Values.hosts.grafana }}.{{ .Values.domain }}`)

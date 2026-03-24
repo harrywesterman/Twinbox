@@ -17,11 +17,27 @@ ingressClass:
 
 ports:
   web:
+    port: 8000
+    expose:
+      default: true
+    exposedPort: 80
     redirectTo:
       port: websecure
+
   websecure:
+    port: 8443
+    expose:
+      default: true
+    exposedPort: 443
     tls:
       enabled: true
+
+  webwiredoor:
+    port: 8081
+    expose:
+      default: true
+    exposedPort: 8081
+    protocol: TCP
 
 api:
   dashboard: true
@@ -40,4 +56,4 @@ accessLogs:
 
 metrics:
   prometheus:
-    enabled: true
+    enabled: trueß∑
