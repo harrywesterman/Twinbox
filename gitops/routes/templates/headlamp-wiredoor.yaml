@@ -11,5 +11,5 @@ spec:
       match: Host(`{{ .Values.hosts.headlamp }}.{{ .Values.domain }}`)
       services:
         - kind: Service
-          name: headlamp
+          name: my-headlamp
           port: 80
