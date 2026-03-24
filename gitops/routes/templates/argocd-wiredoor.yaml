@@ -1,11 +1,11 @@
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: argocd
+  name: argocd-wiredoor
   namespace: argocd
 spec:
   entryPoints:
-    - websecure
+    - webwiredoor
   routes:
     - kind: Rule
       match: Host(`{{ .Values.hosts.argocd }}.{{ .Values.domain }}`)
@@ -13,4 +13,3 @@ spec:
         - kind: Service
           name: argocd-server
           port: 80
-  tls: {}

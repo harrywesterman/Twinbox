@@ -1,11 +1,11 @@
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: whoami
+  name: whoami-wiredoor
   namespace: default
 spec:
   entryPoints:
-    - websecure
+    - webwiredoor
   routes:
     - kind: Rule
       match: Host(`{{ .Values.hosts.whoami }}.{{ .Values.domain }}`)
@@ -13,4 +13,3 @@ spec:
         - kind: Service
           name: whoami
           port: 80
-  tls: {}
