@@ -45,7 +45,7 @@ api:
 
 ingressRoute:
   dashboard:
-    enabled: true
+    enabled: false
 
 logs:
   general:
