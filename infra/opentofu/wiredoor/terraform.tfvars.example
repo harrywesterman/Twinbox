@@ -1,0 +1,19 @@
+hcloud_token = "set-via-tfvars-or-env"
+
+ssh_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI..."
+
+server_name = "wiredoor-1"
+server_type = "cax11"
+image       = "debian-12"
+location    = "fsn1"
+
+wiredoor_fqdn           = "wiredoor.bierineenweek.nl"
+wiredoor_admin_email    = "admin@bierineenweek.nl"
+wiredoor_admin_password = "replace-me"
+
+wiredoor_vpn_port               = 51820
+wiredoor_tcp_service_port_range = "32760-32767"
+
+allowed_ssh_cidrs = [
+  "192.168.2.0/24"
+]

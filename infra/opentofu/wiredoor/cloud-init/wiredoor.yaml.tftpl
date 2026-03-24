@@ -1,0 +1,90 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+
+packages:
+  - ca-certificates
+  - curl
+  - git
+  - jq
+  - python3
+  - ufw
+
+write_files:
+  - path: /root/bootstrap-wiredoor.sh
+    permissions: "0700"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      export DEBIAN_FRONTEND=noninteractive
+
+      if ! command -v docker >/dev/null 2>&1; then
+        curl -fsSL https://get.docker.com | sh
+      fi
+
+      systemctl enable docker
+      systemctl start docker
+
+      mkdir -p /opt
+      cd /opt
+
+      if [ ! -d /opt/wiredoor-docker-setup ]; then
+        git clone https://github.com/wiredoor/docker-setup.git /opt/wiredoor-docker-setup
+      fi
+
+      cd /opt/wiredoor-docker-setup
+
+      if [ ! -f .env.example ]; then
+        echo ".env.example not found in docker-setup repo"
+        exit 1
+      fi
+
+      cp -f .env.example .env
+
+      python3 - <<'PY'
+      from pathlib import Path
+
+      env_path = Path("/opt/wiredoor-docker-setup/.env")
+      content = env_path.read_text().splitlines()
+
+      updates = {
+          "ADMIN_EMAIL": "${wiredoor_admin_email}",
+          "ADMIN_PASSWORD": "${wiredoor_admin_password}",
+          "VPN_PUBLIC_HOST": "${wiredoor_fqdn}",
+          "VPN_PORT": "${wiredoor_vpn_port}",
+          "TCP_SERVICES_PORT_RANGE": "${wiredoor_tcp_service_port_range}",
+      }
+
+      existing_keys = set()
+      new_lines = []
+
+      for line in content:
+          if "=" in line and not line.lstrip().startswith("#"):
+              key = line.split("=", 1)[0].strip()
+              if key in updates:
+                  new_lines.append(f"{key}={updates[key]}")
+                  existing_keys.add(key)
+                  continue
+          new_lines.append(line)
+
+      for key, value in updates.items():
+          if key not in existing_keys:
+              new_lines.append(f"{key}={value}")
+
+      env_path.write_text("\n".join(new_lines) + "\n")
+      PY
+
+      chmod 600 .env
+
+      docker compose pull || true
+      docker compose up -d
+
+runcmd:
+  - ufw allow 22/tcp
+  - ufw allow 80/tcp
+  - ufw allow 443/tcp
+  - ufw allow ${wiredoor_vpn_port}/udp
+  - ufw allow ${wiredoor_tcp_service_port_range}/tcp
+  - ufw --force enable
+  - /root/bootstrap-wiredoor.sh

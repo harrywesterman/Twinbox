@@ -1,0 +1,10 @@
+cloudflare_api_token = "set-via-tfvars-or-env"
+cloudflare_zone_id   = "your-zone-id"
+
+zone_name            = "example.com"
+wiredoor_record_name = "wiredoor"
+
+target_ipv4 = "203.0.113.10"
+
+wiredoor_record_proxied = false
+wildcard_record_proxied = false
