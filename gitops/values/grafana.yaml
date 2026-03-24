@@ -1,0 +1,6 @@
+service:
+  type: ClusterIP
+
+grafana.ini:
+  server:
+    root_url: https://grafana.example.com

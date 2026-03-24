@@ -1,0 +1,12 @@
+domain: example.com
+
+hosts:
+  whoami: whoami
+  argocd: argocd
+  grafana: grafana
+  traefik: traefik
+  headlamp: headlamp
+
+basicAuth:
+  users: |
+    admin:$apr1$gKAUe1R9$ZozOA/pYY.Zn9MMVFRsOp.

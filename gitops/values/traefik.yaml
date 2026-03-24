@@ -1,0 +1,43 @@
+deployment:
+  replicas: 2
+
+service:
+  type: ClusterIP
+
+providers:
+  kubernetesCRD:
+    enabled: true
+  kubernetesIngress:
+    enabled: true
+
+ingressClass:
+  enabled: true
+  isDefaultClass: false
+  name: traefik-external
+
+ports:
+  web:
+    redirectTo:
+      port: websecure
+  websecure:
+    tls:
+      enabled: true
+
+api:
+  dashboard: true
+  insecure: false
+
+ingressRoute:
+  dashboard:
+    enabled: false
+
+logs:
+  general:
+    level: INFO
+
+accessLogs:
+  enabled: true
+
+metrics:
+  prometheus:
+    enabled: true
