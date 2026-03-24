@@ -4,3 +4,6 @@ service:
 grafana.ini:
   server:
     root_url: https://grafana.bierineenweek.nl
+
+adminUser: admin
+adminPassword: Welkom01!
