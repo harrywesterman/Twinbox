@@ -1,6 +1,6 @@
 wiredoor:
   server: https://wiredoor.bierineenweek.nl
-  token: eyJpZCI6MSwidHlwZSI6ImNsaWVudCIsImlhdCI6MTc3NDM3NDQ4MX0.aUJRkLQKSPVrkeL72F0OMuD8qyzfVReES7avMj1xhDk
+  existingSecret: wiredoor-gateway
 
 securityContext:
   runAsUser: 0
