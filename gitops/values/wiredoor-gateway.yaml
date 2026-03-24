@@ -1,0 +1,3 @@
+wiredoor:
+  server: https://wiredoor.example.com
+  token: REPLACE_WITH_GATEWAY_TOKEN
