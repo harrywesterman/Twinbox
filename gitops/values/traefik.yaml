@@ -41,11 +41,11 @@ ports:
 
 api:
   dashboard: true
-  insecure: false
+  insecure: true
 
 ingressRoute:
   dashboard:
-    enabled: false
+    enabled: true
 
 logs:
   general:
