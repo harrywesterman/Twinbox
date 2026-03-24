@@ -12,7 +12,7 @@ spec:
       helm:
         valueFiles:
           - $values/values/grafana.yaml
-    - repoURL: https://github.com/JOUWORG/JOUWREPO.git
+    - repoURL: https://github.com/harrywesterman/Twinbox.git
       targetRevision: main
       ref: values
   destination:

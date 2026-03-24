@@ -6,13 +6,13 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: https://github.com/JOUWORG/JOUWREPO.git
+    - repoURL: https://github.com/harrywesterman/Twinbox.git
       targetRevision: main
       path: routes
       helm:
         valueFiles:
           - $values/values/routes.yaml
-    - repoURL: https://github.com/JOUWORG/JOUWREPO.git
+    - repoURL: https://github.com/harrywesterman/Twinbox.git
       targetRevision: main
       ref: values
   destination:
