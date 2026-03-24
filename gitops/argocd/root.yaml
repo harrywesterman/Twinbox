@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://github.com/harrywesterman/Twinbox.git
     targetRevision: main
-    path: argocd/apps
+    path: gitops/argocd/apps
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
