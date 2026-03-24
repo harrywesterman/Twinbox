@@ -1,8 +1,3 @@
----
-
-## `infra/opentofu/wiredoor/versions.tf`
-
-```hcl
 terraform {
   required_version = ">= 1.6.0"
 
