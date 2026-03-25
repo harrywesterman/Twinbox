@@ -4,6 +4,7 @@ import path from "path";
 import { spawnSync } from "child_process";
 
 import {
+  buildApplyJobPayload,
   buildBootstrapPayload,
   buildClusterFromRequest,
   normalizeClusterName,
@@ -20,12 +21,15 @@ import {
   writeJson,
 } from "./lib/common.js";
 import { queueJob } from "./lib/jobs.js";
+import { createSecretBroker } from "../../lib/secrets/broker.mjs";
+import { buildProxmoxApiSecretBundle } from "../../lib/secrets/schema.mjs";
 
 const app = express();
 const port = Number(process.env.MANAGER_API_PORT || 8080);
 const dataRoot = process.env.MANAGER_DATA_DIR || "/data";
 const workspaceRoot = process.env.WORKSPACE_ROOT || process.cwd();
 const dirs = buildDataDirs(dataRoot);
+const secretBroker = createSecretBroker(process.env);
 
 Object.values(dirs).forEach((dir) => ensureDir(dir));
 
@@ -82,9 +86,9 @@ function probeIpInUse(ip) {
   return result.status === 0;
 }
 
-function proxmoxApiRequest(pathname, { method = "GET", body, headers = {} } = {}) {
-  const proxmoxHost = process.env.PROXMOX_HOST;
-  const proxmoxPort = process.env.PROXMOX_PORT || "8006";
+function proxmoxApiRequest(pathname, proxmoxEnv, { method = "GET", body, headers = {} } = {}) {
+  const proxmoxHost = proxmoxEnv.PROXMOX_HOST;
+  const proxmoxPort = proxmoxEnv.PROXMOX_PORT || "8006";
   const payload = body ? body.toString() : "";
   const args = ["-k", "-sS", "-X", method];
 
@@ -115,43 +119,49 @@ function proxmoxApiRequest(pathname, { method = "GET", body, headers = {} } = {}
 }
 
 async function listUsedVmidsViaProxmoxApi() {
-  const username = process.env.PROXMOX_USER;
-  const password = process.env.PROXMOX_PASSWORD;
-  const proxmoxHost = process.env.PROXMOX_HOST;
+  const resolved = secretBroker.resolveBundle(buildProxmoxApiSecretBundle());
 
-  if (!proxmoxHost || !username || !password) {
-    throw new Error("Unable to inspect cluster VMIDs: pvesh and qm are both unavailable");
+  try {
+    const username = resolved.env.PROXMOX_USER;
+    const password = resolved.env.PROXMOX_PASSWORD;
+    const proxmoxHost = resolved.env.PROXMOX_HOST;
+
+    if (!proxmoxHost || !username || !password) {
+      throw new Error("Unable to inspect cluster VMIDs: pvesh and qm are both unavailable");
+    }
+
+    const body = new URLSearchParams({
+      username,
+      password,
+    });
+    const auth = proxmoxApiRequest("/api2/json/access/ticket", resolved.env, {
+      method: "POST",
+      body,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    });
+    const ticket = auth?.data?.ticket;
+    if (!ticket) {
+      throw new Error("Proxmox auth failed while suggesting VMIDs");
+    }
+
+    const resources = proxmoxApiRequest("/api2/json/cluster/resources?type=vm", resolved.env, {
+      headers: {
+        Cookie: `PVEAuthCookie=${ticket}`,
+      },
+    });
+
+    return new Set(
+      Array.isArray(resources?.data)
+        ? resources.data
+          .map((entry) => Number(entry?.vmid))
+          .filter((value) => Number.isInteger(value) && value >= 100)
+        : [],
+    );
+  } finally {
+    resolved.cleanup();
   }
-
-  const body = new URLSearchParams({
-    username,
-    password,
-  });
-  const auth = proxmoxApiRequest("/api2/json/access/ticket", {
-    method: "POST",
-    body,
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-  });
-  const ticket = auth?.data?.ticket;
-  if (!ticket) {
-    throw new Error("Proxmox auth failed while suggesting VMIDs");
-  }
-
-  const resources = proxmoxApiRequest("/api2/json/cluster/resources?type=vm", {
-    headers: {
-      Cookie: `PVEAuthCookie=${ticket}`,
-    },
-  });
-
-  return new Set(
-    Array.isArray(resources?.data)
-      ? resources.data
-        .map((entry) => Number(entry?.vmid))
-        .filter((value) => Number.isInteger(value) && value >= 100)
-      : [],
-  );
 }
 
 async function listUsedVmids() {
@@ -534,7 +544,7 @@ app.post("/api/clusters", async (req, res) => {
   }
 
   persistCluster(dirs, built.cluster);
-  const job = queueJob(dirs, "apply_cluster", built.cluster.id, built.cluster);
+  const job = queueJob(dirs, "apply_cluster", built.cluster.id, buildApplyJobPayload(built.cluster));
   return res.status(202).json({ cluster_id: built.cluster.id, job_id: job.id });
 });
 
@@ -609,6 +619,9 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
     runner: step.runner,
     context,
   };
+  if (stepId === "provision-nodes" && context.cluster) {
+    payload.secret_bundle = buildApplyJobPayload(context.cluster).secret_bundle;
+  }
   const job = queueJob(dirs, "run_step", clusterId, payload);
 
   writeStepState(step.id, {

@@ -1,14 +1,24 @@
 # Configuration
 
-Runtime configuration is loaded from root `.env`.
+Runtime configuration is loaded from root `.env`, but runtime secrets are now resolved through Vaultwarden via the Twinbox secret broker. `.env` still carries bootstrap-only material and non-secret defaults.
 
-## Required Variables
+## Bootstrap-Only Secrets
 
 ```dotenv
 PROXMOX_HOST=192.168.1.10
 PROXMOX_PORT=8006
 PROXMOX_USER=root@pam
 PROXMOX_PASSWORD=change-me
+VAULTWARDEN_CLIENTID_FILE=/opt/twinbox/bootstrap/vaultwarden-client-id
+VAULTWARDEN_CLIENTSECRET_FILE=/opt/twinbox/bootstrap/vaultwarden-client-secret
+VAULTWARDEN_PASSWORD_FILE=/opt/twinbox/bootstrap/vaultwarden-password
+```
+
+`PROXMOX_PASSWORD` is used only to seed `twinbox/global/proxmox` during the initial Vaultwarden bootstrap. `manager-api` and `manager-worker` no longer receive it through Compose after the cutover.
+
+## Current Runtime Variables
+
+```dotenv
 PROXMOX_NODE=pve
 PROXMOX_STORAGE_POOL=local-lvm
 PROXMOX_FILE_DATASTORE=local
@@ -16,6 +26,29 @@ KUBECTL_VERSION=v1.30.0
 HELM_VERSION=v3.15.4
 TWINBOX_IMAGE_TAG=latest
 ```
+
+## Vaultwarden Bootstrap
+
+```dotenv
+TWINBOX_SECRET_BACKEND=vaultwarden
+VAULTWARDEN_IMAGE_TAG=1.35.4
+VAULTWARDEN_LOCAL_PORT=8222
+VAULTWARDEN_DOMAIN=http://localhost:8222
+VAULTWARDEN_SERVER_URL=http://vaultwarden:80
+VAULTWARDEN_VAULT_EMAIL=twinbox@local
+VAULTWARDEN_PASSWORD_FILE=/opt/twinbox/bootstrap/vaultwarden-password
+VAULTWARDEN_CLIENTID_FILE=/opt/twinbox/bootstrap/vaultwarden-client-id
+VAULTWARDEN_CLIENTSECRET_FILE=/opt/twinbox/bootstrap/vaultwarden-client-secret
+VAULTWARDEN_READY_FILE=/opt/twinbox/bootstrap/vaultwarden-ready
+VAULTWARDEN_SIGNUPS_ALLOWED=true
+VAULTWARDEN_BOOTSTRAP_APPDATA_DIR=/opt/twinbox/bootstrap/bw-host
+BITWARDENCLI_APPDATA_DIR=/opt/twinbox/bootstrap/bw-runtime
+VAULTWARDEN_ITEM_PREFIX=twinbox
+TWINBOX_SECRET_TEMP_DIR=/tmp/twinbox-secrets
+TWINBOX_SECRET_CACHE_TTL_SEC=60
+```
+
+The Management VM uses these values to bring up Vaultwarden locally, finish the first-user bootstrap over an SSH tunnel, and let the API/worker unlock Vaultwarden non-interactively with a personal API key plus password file.
 
 Tooling version notes:
 
@@ -66,5 +99,7 @@ Tooling version notes:
 ## Operational Recommendations
 
 - Keep `.env` private and never commit it.
-- Rotate Proxmox credentials regularly.
+- Rotate the Vaultwarden item fields and API key regularly.
 - Restrict access to manager host/network segment.
+- Treat `/opt/twinbox/bootstrap/*` as root/operator-only bootstrap material.
+- Runtime queue payloads and cluster state should contain refs only, never secret values.

@@ -48,5 +48,7 @@ Twinbox uses a manager-first architecture centered on a Management VM.
 ## Security Baseline
 
 - LAN-only operational assumption.
-- Credentials loaded from `.env`.
+- Vaultwarden runs locally on the Management VM and is the canonical runtime secret store.
+- `manager-api` and `manager-worker` resolve secret refs through the broker at runtime; queued jobs and cluster state persist refs only.
+- The first Vaultwarden user plus CLI API key remain a one-time bootstrap step over an SSH tunnel.
 - No built-in auth/RBAC yet.

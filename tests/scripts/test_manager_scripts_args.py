@@ -99,6 +99,11 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'controlplane_ipv4_addresses.value' in text
     assert 'worker_ipv4_addresses.value' in text
     assert 'flatten_ipv4_candidates' in text or 'flatten | .[]' in text
+    assert 'TF_VAR_proxmox_endpoint' in text
+    assert 'TF_VAR_proxmox_username' in text
+    assert 'TF_VAR_proxmox_password' in text
+    assert '--arg proxmox_password "$PROXMOX_PASSWORD"' not in text
+    assert 'proxmox_password: $proxmox_password' not in text
 
 
 def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
@@ -138,6 +143,9 @@ def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
 def test_manager_worker_image_includes_talos_image_factory_helper():
     text = (REPO_ROOT / "manager-worker" / "Dockerfile").read_text(encoding="utf-8")
     assert 'ARG TALOSCTL_VERSION=v1.12.6' in text
+    assert 'ARG BW_VERSION=v1.22.1' in text
+    assert 'COPY lib ./lib' in text
+    assert 'install -m 0755 /tmp/bw/bw /usr/local/bin/bw' in text
     assert 'COPY scripts/get-talos-image-factory.sh ./scripts/get-talos-image-factory.sh' in text
     assert 'RUN chmod +x ./scripts/get-talos-image-factory.sh' in text
 
@@ -173,8 +181,9 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     assert 'path      = var.talos_image_local_path' in main_text
     assert 'file_name = "talos-${var.talos_image_cache_key}.iso"' in main_text
     assert 'machine   = "q35"' not in main_text
-    assert 'boot_order = ["ide2", "virtio0"]' in main_text
-    assert 'cdrom {' in main_text
+    assert 'boot_order = var.boot_from_disk ? ["virtio0"] : ["ide2", "virtio0"]' in main_text
+    assert 'dynamic "cdrom"' in main_text
+    assert 'for_each = var.boot_from_disk ? [] : [1]' in main_text
     assert 'file_id   = proxmox_virtual_environment_file.talos_nocloud.id' in main_text
     assert 'file_id      = proxmox_virtual_environment_file.talos_nocloud.id' not in main_text
     assert 'file_format  = "raw"' not in main_text

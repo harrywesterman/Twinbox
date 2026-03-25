@@ -86,6 +86,19 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     assert 'git clone https://github.com/${GITHUB_REPO}.git ${TWINBOX_TARGET_DIR}' in text
 
 
+def test_setup_wizard_bootstraps_vaultwarden_before_starting_manager_stack():
+    text = _wizard_text()
+    assert 'install -d -m 0700 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}/bootstrap' in text
+    assert 'vaultwarden-password' in text
+    assert 'VAULTWARDEN_IMAGE_TAG=1.35.4' in text
+    assert 'VAULTWARDEN_LOCAL_PORT=8222' in text
+    assert 'VAULTWARDEN_PASSWORD_FILE=/opt/twinbox/bootstrap/vaultwarden-password' in text
+    assert 'VAULTWARDEN_READY_FILE=/opt/twinbox/bootstrap/vaultwarden-ready' in text
+    assert 'docker compose up -d vaultwarden' in text
+    assert 'scripts/bootstrap-vaultwarden.sh --check-only' in text
+    assert 'VAULTWARDEN_SIGNUPS_ALLOWED=true' in text
+
+
 def test_setup_wizard_discovers_management_vm_ip_via_guest_agent():
     text = _wizard_text()
     assert "discover_management_vm_ip()" in text

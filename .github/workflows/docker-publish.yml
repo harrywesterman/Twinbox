@@ -20,7 +20,7 @@ jobs:
       matrix:
         include:
           - image_name: twinbox-manager-api
-            context: ./manager-api
+            context: .
             dockerfile: ./manager-api/Dockerfile
           - image_name: twinbox-manager-worker
             context: .

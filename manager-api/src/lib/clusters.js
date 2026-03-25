@@ -1,7 +1,10 @@
 import path from "path";
+import {
+  buildProxmoxWorkerSecretBundle,
+  ensureClusterSecretRefs,
+} from "../../../lib/secrets/schema.mjs";
 
 import {
-  id,
   now,
   parseIPv4,
   parseIPv4List,
@@ -76,9 +79,19 @@ export function buildClusterFromRequest(body, env) {
   }
 
   const clusterId = normalizedName.slug;
+  const metadata = {
+    proxmox_node: body.proxmox_node || env.PROXMOX_NODE || "pve",
+    storage_pool: body.storage_pool || env.PROXMOX_STORAGE_POOL || "local-lvm",
+    file_datastore: body.file_datastore || env.PROXMOX_FILE_DATASTORE || "local",
+    cluster_slug: normalizedName.slug,
+    talos_image_preset: env.TALOS_IMAGE_PRESET || "qemu-guest-agent",
+    talos_image_platform: env.TALOS_IMAGE_PLATFORM || "cloud-server",
+    talos_image_arch: env.TALOS_IMAGE_ARCH || "amd64",
+  };
+
   return {
     ok: true,
-    cluster: {
+    cluster: ensureClusterSecretRefs({
       id: clusterId,
       name: normalizedName.name,
       controlplane_count: parsedControlplanes.value,
@@ -97,17 +110,9 @@ export function buildClusterFromRequest(body, env) {
       status: "requested",
       created_at: now(),
       updated_at: now(),
-      metadata: {
-        proxmox_node: body.proxmox_node || env.PROXMOX_NODE || "pve",
-        storage_pool: body.storage_pool || env.PROXMOX_STORAGE_POOL || "local-lvm",
-        file_datastore: body.file_datastore || env.PROXMOX_FILE_DATASTORE || "local",
-        cluster_slug: normalizedName.slug,
-        talos_image_preset: env.TALOS_IMAGE_PRESET || "qemu-guest-agent",
-        talos_image_platform: env.TALOS_IMAGE_PLATFORM || "cloud-server",
-        talos_image_arch: env.TALOS_IMAGE_ARCH || "amd64",
-      },
+      metadata,
       spec_version: "iac-v1",
-    },
+    }),
   };
 }
 
@@ -120,11 +125,24 @@ export function loadCluster(dirs, clusterId) {
 }
 
 export function buildBootstrapPayload(cluster, body = {}) {
-  return {
+  const normalized = ensureClusterSecretRefs({
     ...cluster,
     bootstrap_resume: true,
     controlplane_ips: body.controlplane_ips || cluster.controlplane_ips || [],
     worker_ips: body.worker_ips || cluster.worker_ips || [],
     vip_ip: body.vip_ip || cluster.vip_ip,
+  });
+
+  return {
+    ...normalized,
+    secret_bundle: buildProxmoxWorkerSecretBundle(normalized.metadata.secret_refs.proxmox),
+  };
+}
+
+export function buildApplyJobPayload(cluster) {
+  const normalized = ensureClusterSecretRefs(cluster);
+  return {
+    ...normalized,
+    secret_bundle: buildProxmoxWorkerSecretBundle(normalized.metadata.secret_refs.proxmox),
   };
 }

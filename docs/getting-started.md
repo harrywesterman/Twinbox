@@ -21,9 +21,31 @@ The wizard:
 - Detects existing resources for that cluster and can remove them after explicit confirmation.
 - Installs Docker CE on that VM from the official Docker repository.
 - Clones `https://github.com/harrywesterman/twinbox` into `/opt/twinbox`.
-- Writes `/opt/twinbox/.env` and starts the manager stack automatically.
+- Writes `/opt/twinbox/.env` and starts the manager stack automatically, including a local Vaultwarden instance on `127.0.0.1:8222`.
 
-## Step 2: Open UI
+## Step 2: Complete Vaultwarden bootstrap
+
+Before using the rest of the stack, finish the one-time Vaultwarden setup over an SSH tunnel:
+
+```bash
+ssh -L 8222:127.0.0.1:8222 root@<management-vm-ip>
+```
+
+Then open `http://localhost:8222` in your browser and create the first Vaultwarden user with the password that the wizard wrote to `/opt/twinbox/bootstrap/vaultwarden-password`.
+
+After the first user exists, finish the local seeding step on the Management VM:
+
+```bash
+cd /opt/twinbox
+bw config server http://127.0.0.1:8222
+bw login twinbox@local
+export BW_SESSION="$(bw unlock --passwordfile /opt/twinbox/bootstrap/vaultwarden-password --raw)"
+bash scripts/bootstrap-vaultwarden.sh
+```
+
+After that, the normal manager-first flow continues.
+
+## Step 3: Open UI
 
 - `http://<management-vm-ip>:3000`
 

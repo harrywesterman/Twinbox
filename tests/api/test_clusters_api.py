@@ -129,6 +129,8 @@ def test_create_cluster_enqueues_job_and_persists_files():
             assert queue_file.exists()
 
             cluster = json.loads(cluster_file.read_text())
+            job = json.loads(job_file.read_text())
+            queue_entry = json.loads(queue_file.read_text())
             assert cluster["name"] == "twinbox-demo"
             assert cluster["status"] == "requested"
             assert cluster["metadata"]["proxmox_node"] == "pve"
@@ -136,11 +138,17 @@ def test_create_cluster_enqueues_job_and_persists_files():
             assert cluster["metadata"]["file_datastore"] == "local"
             assert cluster["metadata"]["cluster_slug"] == "demo"
             assert cluster["metadata"]["talos_image_preset"] == "qemu-guest-agent"
+            assert cluster["metadata"]["secret_refs"]["proxmox"]["scope"] == "global"
+            assert cluster["metadata"]["secret_refs"]["proxmox"]["item"] == "proxmox"
             assert cluster["spec_version"] == "iac-v1"
             assert cluster["node_prefix_length"] == 24
             assert cluster["gateway_ip"] == "192.168.1.1"
             assert cluster["dns_servers"] == ["1.1.1.1", "1.0.0.1"]
             assert cluster["dns_domain"] == "lab.local"
+            assert "PROXMOX_PASSWORD" not in json.dumps(cluster)
+            assert job["payload"]["secret_bundle"]["env"]["TF_VAR_proxmox_password"]["field"] == "password"
+            assert job["payload"]["secret_bundle"]["env"]["TF_VAR_proxmox_password"]["item"] == "proxmox"
+            assert queue_entry["payload"]["secret_bundle"]["env"]["TF_VAR_proxmox_password"]["field"] == "password"
         finally:
             proc.terminate()
             proc.wait(timeout=5)
