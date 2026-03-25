@@ -27,6 +27,8 @@ done
 
 command -v jq >/dev/null 2>&1 || fail "jq not found"
 command -v talosctl >/dev/null 2>&1 || fail "talosctl not found"
+NODE_BIN="${NODE_BIN:-node}"
+command -v "$NODE_BIN" >/dev/null 2>&1 || fail "node not found"
 
 clusters_dir="$DATA_DIR/clusters"
 cluster_file="$clusters_dir/${CLUSTER_ID}.json"
@@ -50,11 +52,17 @@ on_error() {
 
 trap on_error ERR
 
-talos_dir="$DATA_DIR/clusters/$CLUSTER_ID/talos"
-talosconfig_file="$talos_dir/talosconfig"
-kubeconfig_file="$DATA_DIR/clusters/$CLUSTER_ID/kubeconfig"
+runtime_secret_root="${TWINBOX_SECRET_TEMP_DIR:-/tmp/twinbox-secrets}"
+mkdir -p "$runtime_secret_root"
+talos_runtime_root="$(mktemp -d "${runtime_secret_root%/}/bootstrap-${CLUSTER_ID}-XXXXXX")"
+talosconfig_file="${TWINBOX_TALOSCONFIG_FILE:-$talos_runtime_root/talosconfig}"
+kubeconfig_file="${TWINBOX_KUBECONFIG_FILE:-$talos_runtime_root/kubeconfig}"
 
-mkdir -p "$talos_dir"
+cleanup_runtime() {
+  rm -rf "$talos_runtime_root"
+}
+
+trap cleanup_runtime EXIT
 
 if [[ -n "${CONTROLPLANE_IPS:-}" ]]; then
   IFS=',' read -r -a cp_ips <<< "$CONTROLPLANE_IPS"
@@ -69,9 +77,24 @@ else
 fi
 
 [[ ${#cp_ips[@]} -gt 0 && -n "${cp_ips[0]}" ]] || fail "At least one control plane IP is required"
-[[ -f "$talosconfig_file" ]] || fail "talosconfig not found in ${talos_dir}"
+[[ -f "$talosconfig_file" ]] || fail "talosconfig not found at ${talosconfig_file}"
 
 first_cp_ip="${cp_ips[0]}"
+
+upsert_secret_artifact() {
+  local item="$1"
+  local attachment="$2"
+  local source_file="$3"
+
+  [[ -s "$source_file" ]] || return 0
+
+  "$NODE_BIN" "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/scripts/manager/upsert-secret-artifact.mjs" \
+    --scope cluster \
+    --cluster-id "$CLUSTER_ID" \
+    --item "$item" \
+    --attachment "$attachment" \
+    --source "$source_file"
+}
 
 log "Bootstrapping cluster from ${first_cp_ip}"
 talosctl bootstrap \
@@ -86,18 +109,18 @@ talosctl kubeconfig "$kubeconfig_file" \
   --talosconfig "$talosconfig_file" \
   --force
 
+upsert_secret_artifact "kubeconfig" "kubeconfig" "$kubeconfig_file"
+
 tmp="$(mktemp)"
 jq \
   --arg status "bootstrapped" \
   --arg updated_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
-  --arg kubeconfig_path "$kubeconfig_file" \
-  --arg talos_dir "$talos_dir" \
   '
     .status = $status
     | .updated_at = $updated_at
-    | .kubeconfig_path = $kubeconfig_path
-    | .talos_config_dir = $talos_dir
-    | .talosconfig_path = ($talos_dir + "/talosconfig")
+    | del(.kubeconfig_path)
+    | del(.talos_config_dir)
+    | del(.talosconfig_path)
   ' "$cluster_file" > "$tmp"
 mv "$tmp" "$cluster_file"
 
@@ -183,7 +206,9 @@ sync_user_talosconfig() {
   log "Copied talosconfig to ${target_talosconfig}"
 }
 
-sync_user_talosconfig "$talosconfig_file" "$first_cp_ip"
-sync_user_kubeconfig "$kubeconfig_file"
+if [[ "${TWINBOX_SYNC_LOCAL_CLIENT_CONFIGS:-false}" == "true" ]]; then
+  sync_user_talosconfig "$talosconfig_file" "$first_cp_ip"
+  sync_user_kubeconfig "$kubeconfig_file"
+fi
 
 log "Bootstrap finished"

@@ -15,6 +15,7 @@ VAULTWARDEN_PASSWORD_FILE=/opt/twinbox/bootstrap/vaultwarden-password
 ```
 
 `PROXMOX_PASSWORD` is used only to seed `twinbox/global/proxmox` during the initial Vaultwarden bootstrap. `manager-api` and `manager-worker` no longer receive it through Compose after the cutover.
+Talos access files are materialized at runtime from Vaultwarden-backed refs and are not kept as canonical files under `manager-data/`.
 
 ## Current Runtime Variables
 
@@ -95,6 +96,8 @@ Tooling version notes:
 - `queue/pending/*.json`
 - `queue/running/*.json`
 - `queue/completed/*.json`
+
+Talos configs and kubeconfig are transient runtime artifacts produced by the worker and cleaned up after use.
 
 ## Operational Recommendations
 

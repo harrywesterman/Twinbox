@@ -9,8 +9,8 @@ Talos lifecycle operations are triggered through the manager stack.
 3. Worker executes `scripts/manager/apply-cluster.sh`.
 4. Script renders a per-cluster OpenTofu workspace and tfvars payload.
 5. The worker downloads the Talos disk image locally, then OpenTofu uploads/imports it into Proxmox and creates the VMs.
-6. The worker discovers the DHCP addresses, generates per-node Talos configs, applies them with `talosctl`, bootstraps the first control plane, and fetches kubeconfig.
-7. Cluster record is updated with VM IDs, planned and discovered node IPs, state/workdir paths, and kubeconfig metadata.
+6. The worker discovers the DHCP addresses, generates per-node Talos configs, applies them with `talosctl`, bootstraps the first control plane, and materializes the runtime Talos access files from Vaultwarden-backed refs.
+7. Cluster record is updated with VM IDs, planned and discovered node IPs, state/workdir paths, and secret refs. Talos access files are materialized only for the duration of the job.
 
 ## Compatibility Rerun
 
@@ -40,7 +40,8 @@ Provisioning request body includes:
 
 At runtime, worker scripts require:
 
-- Proxmox access env vars from `.env`
+- Proxmox access env vars from `.env` for bootstrap and secret resolution
+- Vaultwarden access through the local secret broker for Talos file materialization
 - CLI tools expected by scripts (`bash`, `jq`, `tofu`, `talosctl`)
 
 ## Outputs
@@ -49,5 +50,5 @@ At runtime, worker scripts require:
 - Job metadata in `manager-data/jobs/`.
 - Job logs in `manager-data/logs/`.
 - Per-cluster OpenTofu workdirs and state in `manager-data/clusters/<cluster_id>/iac/`.
-- Talos configs and kubeconfig in `manager-data/clusters/<cluster_id>/talos/`.
-- Cluster state stores planned and discovered node IPs plus the kubeconfig path.
+- Talos access files are materialized into a temporary runtime directory and cleaned up after the job.
+- Cluster state stores planned and discovered node IPs plus secret refs, not Talos file paths.

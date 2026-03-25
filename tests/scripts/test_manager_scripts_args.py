@@ -6,6 +6,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 APPLY_CLUSTER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "apply-cluster.sh"
 BOOTSTRAP_SCRIPT = REPO_ROOT / "scripts" / "manager" / "bootstrap-talos.sh"
+PROVISION_NODES_SCRIPT = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "provision-nodes" / "run.sh"
 MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "main.tf"
 MODULE_OUTPUTS = REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "outputs.tf"
 
@@ -85,7 +86,6 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'PINNED_TALOS_IMAGE_SCHEMATIC' not in text
     assert '--preset "${TALOS_IMAGE_PRESET:-qemu-guest-agent}"' not in text
     assert 'TALOS_IMAGE_PRESET' in text
-    assert 'talosctl gen secrets -o "$talos_dir/secrets.yaml"' in text
     assert 'talosctl apply-config' in text
     assert 'talosctl bootstrap' in text
     assert 'bootstrap_mode = "dhcp-first"' in text
@@ -95,7 +95,7 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'TALOS_IMAGE_INSTALLER=' in text
     assert 'TALOS_IMAGE_DOWNLOAD_URL=' in text
     assert 'download_talos_image()' in text
-    assert 'talos_image_local_path="$talos_dir/talos-${image_cache_key}.iso"' in text
+    assert 'talos_image_local_path="$image_cache_dir/talos-${image_cache_key}.iso"' in text
     assert 'controlplane_ipv4_addresses.value' in text
     assert 'worker_ipv4_addresses.value' in text
     assert 'flatten_ipv4_candidates' in text or 'flatten | .[]' in text
@@ -128,16 +128,19 @@ def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
     assert 'bootstrap_cluster()' in text
     assert 'sync_user_kubeconfig()' in text
     assert 'sync_user_talosconfig()' in text
-    assert 'Copied kubeconfig to ${target_kubeconfig}' in text
-    assert 'Copied talosconfig to ${target_talosconfig}' in text
     assert 'talosctl config node "$default_node_ip"' in text
     assert 'talosctl config endpoint "$default_node_ip"' in text
-    assert 'talos_config_dir' in text
     assert 'Reusing existing OpenTofu workspace at ${work_module_dir}' in text
     assert 'echo "    image: ${image_installer}"' in text
     assert 'image_installer="${line#TALOS_IMAGE_INSTALLER=}"' in text
     assert 'image_extensions=' not in text
     assert 'TALOS_IMAGE_EXTENSIONS=' not in text
+
+
+def test_provision_nodes_step_returns_refs_not_kubeconfig_paths():
+    text = PROVISION_NODES_SCRIPT.read_text(encoding="utf-8")
+    assert 'secret_refs: .metadata.secret_refs' in text
+    assert 'kubeconfig_path' not in text
 
 
 def test_manager_worker_image_includes_talos_image_factory_helper():
@@ -160,13 +163,12 @@ def test_apply_cluster_uses_deterministic_mac_addresses_and_node_inventory():
     assert 'file_datastore: $file_datastore' in text
 
 
-def test_bootstrap_talos_uses_discovered_ips_and_persists_state():
+def test_bootstrap_talos_uses_discovered_ips_and_records_runtime_state():
     text = _bootstrap_text()
     assert '(.discovered_controlplane_ips // .controlplane_ips // [])[]' in text
     assert '(.discovered_worker_ips // .worker_ips // [])[]' in text
     assert 'talosctl bootstrap' in text
     assert 'talosctl kubeconfig' in text
-    assert '.kubeconfig_path = $kubeconfig_path' in text
     assert 'qm guest cmd' not in text
     assert 'detach_all_vm_isos' not in text
 

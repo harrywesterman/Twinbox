@@ -184,6 +184,120 @@ def test_worker_processes_pending_job_to_completed():
             proc.wait(timeout=5)
 
 
+def test_worker_materializes_secret_bundle_files_and_cleans_up():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        data = root / "data"
+        workspace = root / "workspace"
+        bin_dir = root / "bin"
+        pending = data / "queue" / "pending"
+        jobs = data / "jobs"
+        logs = data / "logs"
+        clusters = data / "clusters"
+        script_dir = workspace / "categories" / "management-vm" / "steps" / "secret-file-check"
+
+        for d in [pending, jobs, logs, clusters, script_dir, bin_dir]:
+            d.mkdir(parents=True, exist_ok=True)
+
+        _prepare_fake_toolchain(bin_dir)
+        _write_pinned_defaults(workspace)
+
+        secret_script = script_dir / "apply.sh"
+        secret_script.write_text(
+            "#!/bin/bash\n"
+            "set -euo pipefail\n"
+            "test -f \"$TALOS_SECRETS_FILE\"\n"
+            "printf '%s' \"$(cat \"$TALOS_SECRETS_FILE\")\" > \"$MANAGER_DATA_DIR/secret-file-content.txt\"\n"
+            "printf '%s' \"$TALOS_SECRETS_FILE\" > \"$MANAGER_DATA_DIR/secret-file-path.txt\"\n"
+            "printf '{\"materialized\":true}' > \"$STEP_RESULT_FILE\"\n",
+        )
+        secret_script.chmod(0o755)
+
+        job = {
+            "id": "job_secret_file",
+            "type": "run_step",
+            "cluster_id": "cluster_test",
+            "status": "pending",
+            "step": "queued",
+            "payload": {
+                "step_id": "secret-file-check",
+                "step_type": "config",
+                "inputs": {"enabled": True},
+                "runner": {
+                    "kind": "script",
+                    "script": "categories/management-vm/steps/secret-file-check/apply.sh",
+                },
+                "context": {
+                    "cluster": {
+                        "id": "cluster_test",
+                        "name": "demo",
+                    }
+                },
+                "secret_bundle": {
+                    "files": {
+                        "TALOS_SECRETS_FILE": {
+                            "scope": "global",
+                            "item": "proxmox",
+                            "field": "password",
+                            "format": "file",
+                        }
+                    }
+                },
+            },
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "started_at": None,
+            "finished_at": None,
+            "result": None,
+            "error": None,
+        }
+        (jobs / "job_secret_file.json").write_text(json.dumps(job))
+        (pending / "job_secret_file.json").write_text(json.dumps({
+            "id": "job_secret_file",
+            "type": "run_step",
+            "cluster_id": "cluster_test",
+            "payload": job["payload"],
+            "queued_at": "2026-01-01T00:00:00Z",
+        }))
+
+        env = os.environ.copy()
+        env["MANAGER_DATA_DIR"] = str(data)
+        env["WORKSPACE_ROOT"] = str(workspace)
+        env["WORKER_POLL_MS"] = "100"
+        env["KUBECTL_VERSION"] = "v1.30.0"
+        env["HELM_VERSION"] = "v3.15.4"
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+        env["TWINBOX_SECRET_BACKEND"] = "env"
+        env["PROXMOX_HOST"] = "192.168.1.10"
+        env["PROXMOX_PORT"] = "8006"
+        env["PROXMOX_USER"] = "root@pam"
+        env["PROXMOX_PASSWORD"] = "super-secret"
+
+        proc = subprocess.Popen(
+            ["node", "manager-worker/src/worker.js"],
+            cwd=Path(__file__).resolve().parents[2],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        try:
+            _wait_until(lambda: (data / "queue" / "completed" / "job_secret_file.json").exists())
+
+            updated_job = json.loads((jobs / "job_secret_file.json").read_text())
+            assert updated_job["status"] == "succeeded"
+
+            secret_content = (data / "secret-file-content.txt").read_text()
+            secret_path = (data / "secret-file-path.txt").read_text()
+            assert secret_content == "super-secret"
+            assert secret_path
+            assert not Path(secret_path).exists()
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
 def test_worker_exits_on_tool_version_mismatch():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)

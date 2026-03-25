@@ -4,8 +4,7 @@ import { spawn, spawnSync } from "child_process";
 import { createSecretBroker } from "../../lib/secrets/broker.mjs";
 import { buildRedactor } from "../../lib/secrets/redact.mjs";
 import {
-  buildProxmoxWorkerSecretBundle,
-  resolveProxmoxSecretRef,
+  buildClusterWorkerSecretBundle,
 } from "../../lib/secrets/schema.mjs";
 
 const dataRoot = process.env.MANAGER_DATA_DIR || "/data";
@@ -158,7 +157,7 @@ function emptySecretRuntime() {
 function resolveJobSecretRuntime(payload, clusterId = null) {
   const cluster = payload?.context?.cluster || payload;
   const secretBundle = payload?.secret_bundle
-    || (cluster?.metadata ? buildProxmoxWorkerSecretBundle(resolveProxmoxSecretRef(cluster)) : null);
+    || (cluster?.metadata ? buildClusterWorkerSecretBundle(cluster) : null);
 
   if (!secretBundle) {
     return emptySecretRuntime();
