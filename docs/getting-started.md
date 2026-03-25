@@ -23,25 +23,26 @@ The wizard:
 - Clones `https://github.com/harrywesterman/twinbox` into `/opt/twinbox`.
 - Writes `/opt/twinbox/.env` and starts the manager stack automatically, including a local Vaultwarden instance on `127.0.0.1:8222`.
 
-## Step 2: Complete Vaultwarden bootstrap
+## Step 2: Verify Vaultwarden bootstrap
 
-Before using the rest of the stack, finish the one-time Vaultwarden setup over an SSH tunnel:
-
-```bash
-ssh -L 8222:127.0.0.1:8222 root@<management-vm-ip>
-```
-
-Then open `http://localhost:8222` in your browser and create the first Vaultwarden user with the password that the wizard wrote to `/opt/twinbox/bootstrap/vaultwarden-password`.
-
-After the first user exists, finish the local seeding step on the Management VM:
+Before using the rest of the stack, verify that the one-time local Vaultwarden bootstrap completed on the Management VM:
 
 ```bash
-cd /opt/twinbox
-bw config server http://127.0.0.1:8222
-bw login twinbox@local
-export BW_SESSION="$(bw unlock --passwordfile /opt/twinbox/bootstrap/vaultwarden-password --raw)"
-bash scripts/bootstrap-vaultwarden.sh
+ssh root@<management-vm-ip> 'test -f /opt/twinbox/bootstrap/vaultwarden-ready && echo ready'
 ```
+
+You can also inspect the generated bootstrap files directly:
+
+```bash
+ssh root@<management-vm-ip> 'ls -l /opt/twinbox/bootstrap/'
+```
+
+Expected:
+
+- `/opt/twinbox/bootstrap/vaultwarden-password` exists
+- `/opt/twinbox/bootstrap/vaultwarden-client-id` exists
+- `/opt/twinbox/bootstrap/vaultwarden-client-secret` exists
+- `/opt/twinbox/bootstrap/vaultwarden-ready` exists
 
 After that, the normal manager-first flow continues.
 

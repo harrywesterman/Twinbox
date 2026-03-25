@@ -56,11 +56,18 @@ def test_bootstrap_vm_starts_vaultwarden_before_full_stack():
     text = (REPO_ROOT / "scripts" / "bootstrap-vm.sh").read_text(encoding="utf-8")
 
     assert "docker compose up -d vaultwarden" in text
-    assert "scripts/bootstrap-vaultwarden.sh --check-only" in text
+    assert "./scripts/bootstrap-vaultwarden.sh" in text
 
 
 def test_start_manager_bootstraps_vaultwarden_before_compose_up():
     text = (REPO_ROOT / "scripts" / "start-manager.sh").read_text(encoding="utf-8")
 
     assert "docker compose up -d vaultwarden" in text
-    assert "scripts/bootstrap-vaultwarden.sh --check-only" in text
+    assert "./scripts/bootstrap-vaultwarden.sh" in text
+
+
+def test_start_manager_uses_openssl_for_first_run_vaultwarden_password():
+    text = (REPO_ROOT / "scripts" / "start-manager.sh").read_text(encoding="utf-8")
+
+    assert "openssl rand -hex 24" in text
+    assert "tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 48" not in text

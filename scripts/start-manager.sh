@@ -36,7 +36,7 @@ ensure_bootstrap_material() {
   install -d -m 0700 "$BOOTSTRAP_DIR"
 
   if [[ ! -f "${BOOTSTRAP_DIR}/vaultwarden-password" ]]; then
-    LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 48 > "${BOOTSTRAP_DIR}/vaultwarden-password"
+    openssl rand -hex 24 > "${BOOTSTRAP_DIR}/vaultwarden-password"
     chmod 0600 "${BOOTSTRAP_DIR}/vaultwarden-password"
   fi
 }
@@ -60,7 +60,7 @@ fi
 docker compose up -d vaultwarden
 
 if [[ -x scripts/bootstrap-vaultwarden.sh ]]; then
-  ./scripts/bootstrap-vaultwarden.sh --check-only
+  ./scripts/bootstrap-vaultwarden.sh
 else
   echo "Missing scripts/bootstrap-vaultwarden.sh"
   exit 1

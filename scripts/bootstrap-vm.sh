@@ -112,8 +112,8 @@ log "Starting Vaultwarden"
 docker compose up -d vaultwarden
 
 if [[ -x scripts/bootstrap-vaultwarden.sh ]]; then
-  log "Checking Vaultwarden bootstrap readiness"
-  ./scripts/bootstrap-vaultwarden.sh --check-only
+  log "Bootstrapping Vaultwarden"
+  ./scripts/bootstrap-vaultwarden.sh
 else
   fail "Missing scripts/bootstrap-vaultwarden.sh"
 fi

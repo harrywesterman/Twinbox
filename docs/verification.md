@@ -34,15 +34,16 @@ docker compose up -d
 docker compose ps vaultwarden
 curl -fsS http://127.0.0.1:8222
 bw --version
-bash scripts/bootstrap-vaultwarden.sh --check-only
+bash scripts/bootstrap-vaultwarden.sh
 ```
 
 Expected:
 
 - Vaultwarden is running on the local Management VM only.
 - `bw` is installed on the host.
-- The bootstrap check exits cleanly or prints the one-time manual first-user instructions.
-- After the operator creates a personal API key, writes `vaultwarden-client-id` and `vaultwarden-client-secret`, and runs `bash scripts/bootstrap-vaultwarden.sh`, `/opt/twinbox/bootstrap/vaultwarden-ready` exists.
+- The bootstrap run exits cleanly without requiring a browser or SSH tunnel to the Vaultwarden web UI.
+- `/opt/twinbox/bootstrap/vaultwarden-client-id` and `/opt/twinbox/bootstrap/vaultwarden-client-secret` exist.
+- `/opt/twinbox/bootstrap/vaultwarden-ready` exists.
 
 ## 5. Runtime Health
 
