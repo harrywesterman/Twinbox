@@ -30,6 +30,8 @@ command -v curl >/dev/null 2>&1 || fail "curl not found"
 TOFU_BIN="${TOFU_BIN:-tofu}"
 command -v "$TOFU_BIN" >/dev/null 2>&1 || fail "tofu not found"
 command -v talosctl >/dev/null 2>&1 || fail "talosctl not found"
+NODE_BIN="${NODE_BIN:-node}"
+command -v "$NODE_BIN" >/dev/null 2>&1 || fail "node not found"
 export TF_IN_AUTOMATION=1
 export NO_COLOR=1
 
@@ -68,10 +70,16 @@ cluster_file="$clusters_dir/${CLUSTER_ID}.json"
 iac_dir="$cluster_dir/iac"
 work_module_dir="$iac_dir/module"
 tfvars_file="$work_module_dir/cluster.auto.tfvars.json"
-kubeconfig_file="$cluster_dir/kubeconfig"
-talos_dir="$cluster_dir/talos"
+image_cache_dir="$cluster_dir/cache"
+runtime_secret_root="${TWINBOX_SECRET_TEMP_DIR:-/tmp/twinbox-secrets}"
+mkdir -p "$runtime_secret_root"
+talos_runtime_root="$(mktemp -d "${runtime_secret_root%/}/talos-${CLUSTER_ID}-XXXXXX")"
+runtime_talos_dir="$talos_runtime_root/talos"
+talos_secrets_file="${TWINBOX_TALOS_SECRETS_FILE:-$runtime_talos_dir/secrets.yaml}"
+talosconfig_file="${TWINBOX_TALOSCONFIG_FILE:-$runtime_talos_dir/talosconfig}"
+kubeconfig_file="${TWINBOX_KUBECONFIG_FILE:-$runtime_talos_dir/kubeconfig}"
 
-mkdir -p "$clusters_dir" "$cluster_dir" "$iac_dir" "$talos_dir"
+mkdir -p "$clusters_dir" "$cluster_dir" "$iac_dir" "$image_cache_dir" "$runtime_talos_dir"
 [[ -f "$cluster_file" ]] || fail "cluster not found: ${CLUSTER_ID}"
 
 on_error() {
@@ -91,6 +99,12 @@ on_error() {
 }
 
 trap on_error ERR
+
+cleanup_runtime() {
+  rm -rf "$talos_runtime_root"
+}
+
+trap cleanup_runtime EXIT
 
 resolve_talos_image_assets() {
   image_arch="${TALOS_IMAGE_ARCH:-$PINNED_TALOS_IMAGE_ARCH}"
@@ -139,7 +153,7 @@ download_talos_image() {
     return 0
   fi
 
-  tmp_compressed="$(mktemp "$talos_dir/.talos-image.XXXXXX.iso")"
+  tmp_compressed="$(mktemp "${image_cache_dir%/}/.talos-image.XXXXXX.iso")"
   log "Downloading Talos ISO to ${target_path}"
   curl -fsSL --retry 3 --retry-delay 2 --output "$tmp_compressed" "$image_download_url"
   mv "$tmp_compressed" "$target_path"
@@ -242,8 +256,6 @@ update_cluster_file() {
   local discovered_worker_ips="$5"
   local controlplane_vm_ids="$6"
   local worker_vm_ids="$7"
-  local talos_dir_value="$8"
-  local kubeconfig_value="$9"
   local tmp=""
 
   tmp="$(mktemp)"
@@ -256,8 +268,6 @@ update_cluster_file() {
     --argjson discovered_worker_ips "$discovered_worker_ips" \
     --argjson controlplane_vm_ids "$controlplane_vm_ids" \
     --argjson worker_vm_ids "$worker_vm_ids" \
-    --arg talos_dir "$talos_dir_value" \
-    --arg kubeconfig_path "$kubeconfig_value" \
     --argjson controlplane_ips "$discovered_controlplane_ips" \
     --argjson worker_ips "$discovered_worker_ips" \
     '
@@ -272,9 +282,9 @@ update_cluster_file() {
       | .controlplane_vm_ids = $controlplane_vm_ids
       | .worker_vm_ids = $worker_vm_ids
       | .bootstrap_mode = "dhcp-first"
-      | .talos_config_dir = $talos_dir
-      | .talosconfig_path = ($talos_dir + "/talosconfig")
-      | .kubeconfig_path = $kubeconfig_path
+      | del(.talos_config_dir)
+      | del(.talosconfig_path)
+      | del(.kubeconfig_path)
       | del(.last_error)
     ' "$cluster_file" > "$tmp"
   mv "$tmp" "$cluster_file"
@@ -322,7 +332,7 @@ wait_for_talos_api() {
     if talosctl version \
       --nodes "$candidate" \
       --endpoints "$candidate" \
-      --talosconfig "$talos_dir/talosconfig" >/dev/null 2>&1; then
+      --talosconfig "$talosconfig_file" >/dev/null 2>&1; then
       return 0
     fi
     sleep 5
@@ -376,8 +386,23 @@ write_node_patch() {
   } > "$patch_file"
 }
 
+upsert_secret_artifact() {
+  local item="$1"
+  local attachment="$2"
+  local source_file="$3"
+
+  [[ -s "$source_file" ]] || return 0
+
+  "$NODE_BIN" "$WORKSPACE_ROOT/scripts/manager/upsert-secret-artifact.mjs" \
+    --scope cluster \
+    --cluster-id "$CLUSTER_ID" \
+    --item "$item" \
+    --attachment "$attachment" \
+    --source "$source_file"
+}
+
 generate_talos_configs() {
-  local base_dir="$talos_dir/base"
+  local base_dir="$runtime_talos_dir/base"
   local node_dir=""
   local patch_file=""
   local name=""
@@ -385,27 +410,29 @@ generate_talos_configs() {
   local mac=""
   local config_file=""
 
-  rm -rf "$talos_dir/base" "$talos_dir/generated"
-  mkdir -p "$base_dir" "$talos_dir/generated"
+  rm -rf "$runtime_talos_dir/base" "$runtime_talos_dir/generated"
+  mkdir -p "$base_dir" "$runtime_talos_dir/generated"
 
-  if [[ -s "$talos_dir/secrets.yaml" ]]; then
-    log "Reusing Talos secrets at ${talos_dir}/secrets.yaml"
+  if [[ -s "$talos_secrets_file" ]]; then
+    log "Reusing Talos secrets at ${talos_secrets_file}"
   else
     log "Generating Talos secrets"
-    talosctl gen secrets -o "$talos_dir/secrets.yaml"
+    talosctl gen secrets -o "$talos_secrets_file"
   fi
 
   log "Generating base Talos config"
   talosctl gen config "$NAME" "https://${VIP_IP}:6443" \
     --output-dir "$base_dir" \
-    --with-secrets "$talos_dir/secrets.yaml" \
+    --with-secrets "$talos_secrets_file" \
     --install-disk "$INSTALL_DISK"
 
-  cp "$base_dir/talosconfig" "$talos_dir/talosconfig"
+  cp "$base_dir/talosconfig" "$talosconfig_file"
+  upsert_secret_artifact "talos-secrets" "secrets.yaml" "$talos_secrets_file"
+  upsert_secret_artifact "talosconfig" "talosconfig" "$talosconfig_file"
 
   while IFS=$'\t' read -r name type mac; do
     [[ -n "$name" ]] || continue
-    node_dir="$talos_dir/generated/$name"
+    node_dir="$runtime_talos_dir/generated/$name"
     patch_file="$node_dir/patch.yaml"
     mkdir -p "$node_dir"
     write_node_patch "$name" "$type" "$mac" "$patch_file"
@@ -414,18 +441,18 @@ generate_talos_configs() {
     if [[ "$type" == "controlplane" ]]; then
       talosctl gen config "$NAME" "https://${VIP_IP}:6443" \
         --output-dir "$node_dir" \
-        --with-secrets "$talos_dir/secrets.yaml" \
+        --with-secrets "$talos_secrets_file" \
         --install-disk "$INSTALL_DISK" \
         --config-patch-control-plane "@${patch_file}"
-      config_file="$talos_dir/${name}-controlplane.yaml"
+      config_file="$runtime_talos_dir/${name}-controlplane.yaml"
       cp "$node_dir/controlplane.yaml" "$config_file"
     else
       talosctl gen config "$NAME" "https://${VIP_IP}:6443" \
         --output-dir "$node_dir" \
-        --with-secrets "$talos_dir/secrets.yaml" \
+        --with-secrets "$talos_secrets_file" \
         --install-disk "$INSTALL_DISK" \
         --config-patch-worker "@${patch_file}"
-      config_file="$talos_dir/${name}-worker.yaml"
+      config_file="$runtime_talos_dir/${name}-worker.yaml"
       cp "$node_dir/worker.yaml" "$config_file"
     fi
   done < <(jq -r '
@@ -444,7 +471,7 @@ apply_node_config() {
   talosctl apply-config \
     --insecure \
     --nodes "$ip" \
-    --talosconfig "$talos_dir/talosconfig" \
+    --talosconfig "$talosconfig_file" \
     --file "$config_file"
 }
 
@@ -455,14 +482,16 @@ bootstrap_cluster() {
   talosctl bootstrap \
     --nodes "$first_cp_ip" \
     --endpoints "$first_cp_ip" \
-    --talosconfig "$talos_dir/talosconfig"
+    --talosconfig "$talosconfig_file"
 
   log "Writing kubeconfig"
   talosctl kubeconfig "$kubeconfig_file" \
     --nodes "$first_cp_ip" \
     --endpoints "$first_cp_ip" \
-    --talosconfig "$talos_dir/talosconfig" \
+    --talosconfig "$talosconfig_file" \
     --force
+
+  upsert_secret_artifact "kubeconfig" "kubeconfig" "$kubeconfig_file"
 }
 
 sync_user_kubeconfig() {
@@ -547,7 +576,7 @@ sync_user_talosconfig() {
   log "Copied talosconfig to ${target_talosconfig}"
 }
 
-talos_image_local_path="$talos_dir/talos-${image_cache_key}.iso"
+talos_image_local_path="$image_cache_dir/talos-${image_cache_key}.iso"
 download_talos_image "$talos_image_local_path"
 
 nodes_json="$(generate_nodes_json)"
@@ -608,7 +637,7 @@ tf_outputs_json="$("$TOFU_BIN" -chdir="$work_module_dir" output -json -no-color)
 controlplane_ipv4_candidates_json="$(jq -c '.controlplane_ipv4_addresses.value // []' <<<"$tf_outputs_json")"
 worker_ipv4_candidates_json="$(jq -c '.worker_ipv4_addresses.value // []' <<<"$tf_outputs_json")"
 
-update_cluster_file "provisioned" "$planned_controlplane_ips_json" "$planned_worker_ips_json" "[]" "[]" "$controlplane_vm_ids_json" "$worker_vm_ids_json" "$talos_dir" ""
+update_cluster_file "provisioned" "$planned_controlplane_ips_json" "$planned_worker_ips_json" "[]" "[]" "$controlplane_vm_ids_json" "$worker_vm_ids_json"
 
 log "Discovering DHCP addresses"
 discovered_controlplane_ips_json="[]"
@@ -660,11 +689,11 @@ while IFS=$'\t' read -r name type ip; do
   [[ -n "$name" ]] || continue
   if [[ "$type" == "controlplane" ]]; then
     discovered_ip="${discovered_controlplane_ips[$controlplane_apply_index]:-$ip}"
-    apply_node_config "$discovered_ip" "$talos_dir/${name}-controlplane.yaml"
+    apply_node_config "$discovered_ip" "$runtime_talos_dir/${name}-controlplane.yaml"
     controlplane_apply_index=$((controlplane_apply_index + 1))
   else
     discovered_ip="${discovered_worker_ips[$worker_apply_index]:-$ip}"
-    apply_node_config "$discovered_ip" "$talos_dir/${name}-worker.yaml"
+    apply_node_config "$discovered_ip" "$runtime_talos_dir/${name}-worker.yaml"
     worker_apply_index=$((worker_apply_index + 1))
   fi
 done < <(jq -r '
@@ -679,8 +708,10 @@ first_controlplane_ip="${discovered_controlplane_ips[0]:-}"
 [[ -n "$first_controlplane_ip" ]] || fail "No control plane IP discovered"
 
 bootstrap_cluster "$first_controlplane_ip"
-sync_user_talosconfig "$talos_dir/talosconfig" "$first_controlplane_ip"
-sync_user_kubeconfig "$kubeconfig_file"
+if [[ "${TWINBOX_SYNC_LOCAL_CLIENT_CONFIGS:-false}" == "true" ]]; then
+  sync_user_talosconfig "$talosconfig_file" "$first_controlplane_ip"
+  sync_user_kubeconfig "$kubeconfig_file"
+fi
 
 log "Switching to disk boot (removing CD-ROM)"
 sync
@@ -699,8 +730,6 @@ jq \
   --argjson discovered_worker_ips "$discovered_worker_ips_json" \
   --argjson controlplane_vm_ids "$controlplane_vm_ids_json" \
   --argjson worker_vm_ids "$worker_vm_ids_json" \
-  --arg talos_dir "$talos_dir" \
-  --arg kubeconfig_path "$kubeconfig_file" \
   '
     .status = $status
     | .updated_at = $updated_at
@@ -713,9 +742,9 @@ jq \
     | .controlplane_vm_ids = $controlplane_vm_ids
     | .worker_vm_ids = $worker_vm_ids
     | .bootstrap_mode = "dhcp-first"
-    | .talos_config_dir = $talos_dir
-    | .talosconfig_path = ($talos_dir + "/talosconfig")
-    | .kubeconfig_path = $kubeconfig_path
+    | del(.talos_config_dir)
+    | del(.talosconfig_path)
+    | del(.kubeconfig_path)
     | del(.last_error)
   ' "$cluster_file" > "$tmp"
 mv "$tmp" "$cluster_file"

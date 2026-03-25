@@ -1,6 +1,6 @@
 import path from "path";
 import {
-  buildProxmoxWorkerSecretBundle,
+  buildClusterWorkerSecretBundle,
   ensureClusterSecretRefs,
 } from "../../../lib/secrets/schema.mjs";
 
@@ -135,7 +135,7 @@ export function buildBootstrapPayload(cluster, body = {}) {
 
   return {
     ...normalized,
-    secret_bundle: buildProxmoxWorkerSecretBundle(normalized.metadata.secret_refs.proxmox),
+    secret_bundle: buildClusterWorkerSecretBundle(normalized),
   };
 }
 
@@ -143,6 +143,6 @@ export function buildApplyJobPayload(cluster) {
   const normalized = ensureClusterSecretRefs(cluster);
   return {
     ...normalized,
-    secret_bundle: buildProxmoxWorkerSecretBundle(normalized.metadata.secret_refs.proxmox),
+    secret_bundle: buildClusterWorkerSecretBundle(normalized),
   };
 }

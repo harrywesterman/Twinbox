@@ -145,6 +145,9 @@ def test_create_cluster_enqueues_job_and_persists_files():
             assert cluster["gateway_ip"] == "192.168.1.1"
             assert cluster["dns_servers"] == ["1.1.1.1", "1.0.0.1"]
             assert cluster["dns_domain"] == "lab.local"
+            assert "talos_config_dir" not in json.dumps(cluster)
+            assert "talosconfig_path" not in json.dumps(cluster)
+            assert "kubeconfig_path" not in json.dumps(cluster)
             assert "PROXMOX_PASSWORD" not in json.dumps(cluster)
             assert job["payload"]["secret_bundle"]["env"]["TF_VAR_proxmox_password"]["field"] == "password"
             assert job["payload"]["secret_bundle"]["env"]["TF_VAR_proxmox_password"]["item"] == "proxmox"

@@ -32,7 +32,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq '{
     cluster_id: .id,
     cluster_status: .status,
-    kubeconfig_path,
+    secret_refs: .metadata.secret_refs,
     iac_workdir: .iac.workdir,
     state_path: .iac.state_path
   }' "$cluster_file" >"$STEP_RESULT_FILE"
