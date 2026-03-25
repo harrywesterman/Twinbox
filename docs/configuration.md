@@ -48,7 +48,7 @@ TWINBOX_SECRET_TEMP_DIR=/tmp/twinbox-secrets
 TWINBOX_SECRET_CACHE_TTL_SEC=60
 ```
 
-The Management VM uses these values to bring up Vaultwarden locally, finish the first-user bootstrap over an SSH tunnel, and let the API/worker unlock Vaultwarden non-interactively with a personal API key plus password file.
+The Management VM uses these values to bring up Vaultwarden locally, register the local Twinbox service account automatically, write the CLI API key files under `/opt/twinbox/bootstrap/`, and let the API/worker unlock Vaultwarden non-interactively with that personal API key plus password file.
 
 Tooling version notes:
 

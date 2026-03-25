@@ -95,7 +95,7 @@ def test_setup_wizard_bootstraps_vaultwarden_before_starting_manager_stack():
     assert 'VAULTWARDEN_PASSWORD_FILE=/opt/twinbox/bootstrap/vaultwarden-password' in text
     assert 'VAULTWARDEN_READY_FILE=/opt/twinbox/bootstrap/vaultwarden-ready' in text
     assert 'docker compose up -d vaultwarden' in text
-    assert 'scripts/bootstrap-vaultwarden.sh --check-only' in text
+    assert 'scripts/bootstrap-vaultwarden.sh' in text
     assert 'VAULTWARDEN_SIGNUPS_ALLOWED=true' in text
 
 

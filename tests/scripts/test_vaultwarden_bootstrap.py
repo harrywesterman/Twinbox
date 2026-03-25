@@ -18,16 +18,20 @@ def test_bootstrap_vaultwarden_script_has_check_only_mode_and_shell_safety():
     assert "VAULTWARDEN_READY_FILE" in text
     assert "http://127.0.0.1:8222" in text or "${VAULTWARDEN_LOCAL_PORT:-8222}" in text
     assert "curl -fsS" in text
-    assert 'bw login "$VAULTWARDEN_VAULT_EMAIL"' not in text
+    assert 'bw login "$VAULTWARDEN_VAULT_EMAIL" --passwordfile "$VAULTWARDEN_PASSWORD_FILE"' in text
+    assert 'bw login "$VAULTWARDEN_VAULT_EMAIL" "$' not in text
 
 
-def test_bootstrap_vaultwarden_script_uses_api_key_files_for_seeding():
+def test_bootstrap_vaultwarden_script_bootstraps_registration_and_api_key_headlessly():
     text = _script_text()
 
     assert "VAULTWARDEN_CLIENTID_FILE" in text
     assert "VAULTWARDEN_CLIENTSECRET_FILE" in text
     assert "bw login --apikey" in text
     assert "bw unlock --passwordfile" in text
+    assert "/identity/accounts/register/send-verification-email" in text
+    assert "/identity/accounts/register/finish" in text
+    assert "/api/accounts/api-key" in text
     assert "twinbox/global/proxmox" in text
     assert "seed" in text.lower()
     assert "vaultwarden-ready" in text
