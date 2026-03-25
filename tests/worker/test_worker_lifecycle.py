@@ -67,7 +67,20 @@ def test_worker_processes_pending_job_to_completed():
 
         # Minimal script to emulate successful VM provisioning.
         create_script = script_dir / "apply-cluster.sh"
-        create_script.write_text("#!/bin/bash\nset -euo pipefail\necho create-ok\n")
+        create_script.write_text(
+            "#!/bin/bash\n"
+            "set -euo pipefail\n"
+            "cat > \"$MANAGER_DATA_DIR/child-env.txt\" <<EOF\n"
+            "PROXMOX_HOST=${PROXMOX_HOST-}\n"
+            "PROXMOX_PORT=${PROXMOX_PORT-}\n"
+            "PROXMOX_USER=${PROXMOX_USER-}\n"
+            "PROXMOX_PASSWORD=${PROXMOX_PASSWORD-}\n"
+            "TF_VAR_proxmox_endpoint=${TF_VAR_proxmox_endpoint-}\n"
+            "TF_VAR_proxmox_username=${TF_VAR_proxmox_username-}\n"
+            "TF_VAR_proxmox_password=${TF_VAR_proxmox_password-}\n"
+            "EOF\n"
+            "echo create-ok\n",
+        )
         create_script.chmod(0o755)
 
         cluster = {
@@ -123,6 +136,11 @@ def test_worker_processes_pending_job_to_completed():
         env["KUBECTL_VERSION"] = "v1.30.0"
         env["HELM_VERSION"] = "v3.15.4"
         env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+        env["TWINBOX_SECRET_BACKEND"] = "env"
+        env["PROXMOX_HOST"] = "192.168.1.10"
+        env["PROXMOX_PORT"] = "8006"
+        env["PROXMOX_USER"] = "root@pam"
+        env["PROXMOX_PASSWORD"] = "super-secret"
 
         proc = subprocess.Popen(
             ["node", "manager-worker/src/worker.js"],
@@ -135,11 +153,23 @@ def test_worker_processes_pending_job_to_completed():
 
         try:
             completed_file = data / "queue" / "completed" / "job_test.json"
+            child_env_file = data / "child-env.txt"
             _wait_until(lambda: completed_file.exists())
+            _wait_until(lambda: child_env_file.exists())
 
             updated_job = json.loads((jobs / "job_test.json").read_text())
             assert updated_job["status"] == "succeeded"
             assert updated_job["step"] == "completed"
+
+            child_env = child_env_file.read_text()
+            assert "PROXMOX_HOST=192.168.1.10" in child_env
+            assert "PROXMOX_PORT=8006" in child_env
+            assert "PROXMOX_USER=root@pam" in child_env
+            assert "PROXMOX_PASSWORD=" in child_env
+            assert "PROXMOX_PASSWORD=super-secret" not in child_env
+            assert "TF_VAR_proxmox_endpoint=https://192.168.1.10:8006" in child_env
+            assert "TF_VAR_proxmox_username=root@pam" in child_env
+            assert "TF_VAR_proxmox_password=super-secret" in child_env
 
             log_text = (logs / "job_test.log").read_text()
             assert "running job type=apply_cluster" in log_text

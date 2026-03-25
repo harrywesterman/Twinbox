@@ -1164,6 +1164,22 @@ write_files:
     owner: root:root
     content: |
       TWINBOX_CLUSTER_SLUG=${CLUSTER_SLUG}
+      TWINBOX_SECRET_BACKEND=vaultwarden
+      VAULTWARDEN_IMAGE_TAG=1.35.4
+      VAULTWARDEN_LOCAL_PORT=8222
+      VAULTWARDEN_DOMAIN=http://localhost:8222
+      VAULTWARDEN_SERVER_URL=http://vaultwarden:80
+      VAULTWARDEN_VAULT_EMAIL=twinbox@local
+      VAULTWARDEN_PASSWORD_FILE=/opt/twinbox/bootstrap/vaultwarden-password
+      VAULTWARDEN_CLIENTID_FILE=/opt/twinbox/bootstrap/vaultwarden-client-id
+      VAULTWARDEN_CLIENTSECRET_FILE=/opt/twinbox/bootstrap/vaultwarden-client-secret
+      VAULTWARDEN_READY_FILE=/opt/twinbox/bootstrap/vaultwarden-ready
+      VAULTWARDEN_SIGNUPS_ALLOWED=true
+      VAULTWARDEN_BOOTSTRAP_APPDATA_DIR=/opt/twinbox/bootstrap/bw-host
+      BITWARDENCLI_APPDATA_DIR=/opt/twinbox/bootstrap/bw-runtime
+      VAULTWARDEN_ITEM_PREFIX=twinbox
+      TWINBOX_SECRET_TEMP_DIR=/tmp/twinbox-secrets
+      TWINBOX_SECRET_CACHE_TTL_SEC=60
       PROXMOX_HOST=${PROXMOX_HOST}
       PROXMOX_PORT=${PROXMOX_PORT}
       PROXMOX_USER=${PROXMOX_USER}
@@ -1192,9 +1208,15 @@ runcmd:
   - install -d -m 0755 ${TWINBOX_TARGET_DIR}
   - chown ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}
   - bash -lc 'sudo -u ${CLOUD_INIT_USER} -H bash -lc "git clone https://github.com/${GITHUB_REPO}.git ${TWINBOX_TARGET_DIR}"'
+  - install -d -m 0700 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}/bootstrap
+  - bash -lc 'openssl rand -hex 24 > ${TWINBOX_TARGET_DIR}/bootstrap/vaultwarden-password'
+  - chown ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}/bootstrap/vaultwarden-password
+  - chmod 0600 ${TWINBOX_TARGET_DIR}/bootstrap/vaultwarden-password
   - install -m 0600 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /tmp/twinbox.env.template ${TWINBOX_TARGET_DIR}/.env
   - chown -R ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}
   - bash -lc 'cd ${TWINBOX_TARGET_DIR} && chmod +x scripts/install-management-tools.sh && ./scripts/install-management-tools.sh --env-file ${TWINBOX_TARGET_DIR}/.env'
+  - bash -lc 'cd ${TWINBOX_TARGET_DIR} && docker compose up -d vaultwarden'
+  - bash -lc 'cd ${TWINBOX_TARGET_DIR} && chmod +x scripts/bootstrap-vaultwarden.sh && ./scripts/bootstrap-vaultwarden.sh --check-only'
   - bash -lc 'sudo -u ${CLOUD_INIT_USER} -H bash -lc "cd ${TWINBOX_TARGET_DIR} && docker compose pull && docker compose up -d"'
 CLOUDINIT
   chmod 600 "$snippet_file"

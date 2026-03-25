@@ -16,10 +16,14 @@ MODULE_SOURCE="$WORKSPACE_ROOT/infra/opentofu/talos-proxmox"
 # shellcheck disable=SC1091
 source "$WORKSPACE_ROOT/config/pinned-defaults.sh"
 
-required_env=(PROXMOX_HOST PROXMOX_PORT PROXMOX_USER PROXMOX_PASSWORD)
+required_env=(PROXMOX_HOST PROXMOX_PORT PROXMOX_USER)
 for var in "${required_env[@]}"; do
   [[ -n "${!var:-}" ]] || fail "Missing environment variable: $var"
 done
+
+export TF_VAR_proxmox_endpoint="${TF_VAR_proxmox_endpoint:-https://${PROXMOX_HOST}:${PROXMOX_PORT}}"
+export TF_VAR_proxmox_username="${TF_VAR_proxmox_username:-$PROXMOX_USER}"
+[[ -n "${TF_VAR_proxmox_password:-}" ]] || fail "Missing environment variable: TF_VAR_proxmox_password"
 
 command -v jq >/dev/null 2>&1 || fail "jq not found"
 command -v curl >/dev/null 2>&1 || fail "curl not found"
@@ -561,9 +565,6 @@ fi
 cp -R "$MODULE_SOURCE/." "$work_module_dir/"
 
 jq -n \
-  --arg proxmox_endpoint "https://${PROXMOX_HOST}:${PROXMOX_PORT}" \
-  --arg proxmox_username "$PROXMOX_USER" \
-  --arg proxmox_password "$PROXMOX_PASSWORD" \
   --arg proxmox_node "$PROXMOX_NODE" \
   --arg vm_datastore "$STORAGE_POOL" \
   --arg file_datastore "$FILE_DATASTORE" \
@@ -580,9 +581,6 @@ jq -n \
   --argjson prefix "$NODE_PREFIX_LENGTH" \
   --argjson nodes "$nodes_json" \
   '{
-    proxmox_endpoint: $proxmox_endpoint,
-    proxmox_username: $proxmox_username,
-    proxmox_password: $proxmox_password,
     proxmox_node: $proxmox_node,
     vm_datastore: $vm_datastore,
     file_datastore: $file_datastore,

@@ -29,3 +29,9 @@ def test_install_management_tools_fails_on_version_command_errors():
     assert 'install_wrappers()' in text
     assert 'install -m 0755 "$kubectl_wrapper" /usr/local/bin/k' in text
     assert 'install -m 0755 "$talosctl_wrapper" /usr/local/bin/t' in text
+
+
+def test_install_management_tools_installs_and_verifies_bw():
+    text = _script_text()
+    assert "bw" in text
+    assert 'bw_output="$(/usr/local/bin/bw --version 2>&1)" || fail "bw version check failed: ${bw_output}"' in text

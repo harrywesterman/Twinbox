@@ -6,8 +6,8 @@ Twinbox is a manager-first platform for provisioning and bootstrapping Talos Kub
 
 1. Run the Proxmox wizard: `wizard/setup-wizard.sh`.
 2. The wizard creates a Management VM only.
-3. Cloud-init on that VM installs Docker CE from the official Docker repo, clones this repository, installs `talosctl`/`kubectl`/`helm` from pinned `.env` versions, and starts the manager stack automatically.
-4. Open the web UI and run the single Talos deployment step from there.
+3. Cloud-init on that VM installs Docker CE from the official Docker repo, clones this repository, installs `talosctl`/`kubectl`/`helm` from pinned `.env` versions, and starts the manager stack automatically, including a local Vaultwarden instance on `127.0.0.1:8222`.
+4. Complete the one-time Vaultwarden bootstrap over an SSH tunnel, create the Vaultwarden CLI API key files under `/opt/twinbox/bootstrap/`, rerun `bash scripts/bootstrap-vaultwarden.sh`, then open the web UI and run the Talos deployment step from there.
 
 ## Quick Start
 
@@ -104,5 +104,6 @@ GitHub Actions workflow `.github/workflows/docker-publish.yml` publishes images 
 
 - Intended for trusted LAN environments.
 - No app-level auth yet.
-- Runtime secrets are loaded from `.env`.
+- Vaultwarden is the canonical runtime secret store for the manager stack.
+- `.env` now carries only bootstrap-only secret material plus non-secret defaults; API and worker resolve runtime secrets through the broker.
 - Wizard-generated cloud-init snippets on Proxmox are written with `0600` permissions.

@@ -1,10 +1,17 @@
 import fs from "fs";
 import path from "path";
 import { spawn, spawnSync } from "child_process";
+import { createSecretBroker } from "../../lib/secrets/broker.mjs";
+import { buildRedactor } from "../../lib/secrets/redact.mjs";
+import {
+  buildProxmoxWorkerSecretBundle,
+  resolveProxmoxSecretRef,
+} from "../../lib/secrets/schema.mjs";
 
 const dataRoot = process.env.MANAGER_DATA_DIR || "/data";
 const workspace = process.env.WORKSPACE_ROOT || "/opt/twinbox";
 const pollMs = Number(process.env.WORKER_POLL_MS || 2000);
+const secretBroker = createSecretBroker(process.env);
 
 const dirs = {
   clusters: path.join(dataRoot, "clusters"),
@@ -95,7 +102,7 @@ function updateStepState(stepId, patch) {
   return next;
 }
 
-function runCommand(jobId, command, args, env = {}) {
+function runCommand(jobId, command, args, env = {}, redactLine = (line) => String(line ?? ""), stripEnv = []) {
   return new Promise((resolve, reject) => {
     appendLog(jobId, `exec: ${command} ${args.join(" ")}`);
     const recentOutput = [];
@@ -104,17 +111,23 @@ function runCommand(jobId, command, args, env = {}) {
       for (const line of text.split(/\r?\n/)) {
         const trimmed = line.trimEnd();
         if (!trimmed) continue;
-        recentOutput.push(trimmed);
+        const redacted = redactLine(trimmed);
+        recentOutput.push(redacted);
         if (recentOutput.length > 20) {
           recentOutput.shift();
         }
-        appendLog(jobId, trimmed);
+        appendLog(jobId, redacted);
       }
     };
 
+    const childEnv = { ...process.env, ...env };
+    for (const name of stripEnv) {
+      delete childEnv[name];
+    }
+
     const child = spawn(command, args, {
       cwd: workspace,
-      env: { ...process.env, ...env },
+      env: childEnv,
       stdio: ["ignore", "pipe", "pipe"],
     });
 
@@ -130,6 +143,38 @@ function runCommand(jobId, command, args, env = {}) {
       }
     });
   });
+}
+
+function emptySecretRuntime() {
+  return {
+    env: {},
+    files: {},
+    redactions: [],
+    strip_env: [],
+    cleanup() {},
+  };
+}
+
+function resolveJobSecretRuntime(payload, clusterId = null) {
+  const cluster = payload?.context?.cluster || payload;
+  const secretBundle = payload?.secret_bundle
+    || (cluster?.metadata ? buildProxmoxWorkerSecretBundle(resolveProxmoxSecretRef(cluster)) : null);
+
+  if (!secretBundle) {
+    return emptySecretRuntime();
+  }
+
+  const runtime = secretBroker.resolveBundle(secretBundle, {
+    clusterId: clusterId || cluster?.id || payload?.cluster_id || null,
+  });
+  const envKeys = Object.keys(secretBundle.env || {});
+
+  return {
+    ...runtime,
+    strip_env: envKeys.includes("TF_VAR_proxmox_password") && !envKeys.includes("PROXMOX_PASSWORD")
+      ? ["PROXMOX_PASSWORD"]
+      : [],
+  };
 }
 
 function requireEnv(name) {
@@ -229,32 +274,42 @@ function ensureToolVersionsMatchPolicy() {
 async function handleApply(job) {
   const cluster = job.payload;
   const dnsServers = Array.isArray(cluster.dns_servers) ? cluster.dns_servers.join(",") : String(cluster.dns_servers || "");
-  await runCommand(
-    job.id,
-    "bash",
-    [
-      "scripts/manager/apply-cluster.sh",
-      "--cluster-id", cluster.id,
-      "--name", cluster.name,
-      "--controlplane-count", String(cluster.controlplane_count),
-      "--worker-count", String(cluster.worker_count),
-      "--cpu-cores", String(cluster.cpu_cores),
-      "--memory-mb", String(cluster.memory_mb),
-      "--disk-gb", String(cluster.disk_gb),
-      "--bridge", cluster.bridge,
-      "--start-vmid", String(cluster.start_vmid),
-      "--start-ip", cluster.start_ip,
-      "--vip-ip", cluster.vip_ip,
-      "--node-prefix-length", String(cluster.node_prefix_length),
-      "--gateway-ip", cluster.gateway_ip,
-      "--dns-servers", dnsServers,
-      "--dns-domain", cluster.dns_domain,
-      "--proxmox-node", cluster.metadata.proxmox_node,
-      "--storage-pool", cluster.metadata.storage_pool,
-      "--file-datastore", cluster.metadata.file_datastore,
-      "--data-dir", dataRoot,
-    ],
-  );
+  const secretRuntime = resolveJobSecretRuntime(cluster, cluster.id);
+  const redact = buildRedactor(secretRuntime.redactions);
+
+  try {
+    await runCommand(
+      job.id,
+      "bash",
+      [
+        "scripts/manager/apply-cluster.sh",
+        "--cluster-id", cluster.id,
+        "--name", cluster.name,
+        "--controlplane-count", String(cluster.controlplane_count),
+        "--worker-count", String(cluster.worker_count),
+        "--cpu-cores", String(cluster.cpu_cores),
+        "--memory-mb", String(cluster.memory_mb),
+        "--disk-gb", String(cluster.disk_gb),
+        "--bridge", cluster.bridge,
+        "--start-vmid", String(cluster.start_vmid),
+        "--start-ip", cluster.start_ip,
+        "--vip-ip", cluster.vip_ip,
+        "--node-prefix-length", String(cluster.node_prefix_length),
+        "--gateway-ip", cluster.gateway_ip,
+        "--dns-servers", dnsServers,
+        "--dns-domain", cluster.dns_domain,
+        "--proxmox-node", cluster.metadata.proxmox_node,
+        "--storage-pool", cluster.metadata.storage_pool,
+        "--file-datastore", cluster.metadata.file_datastore,
+        "--data-dir", dataRoot,
+      ],
+      secretRuntime.env,
+      redact,
+      secretRuntime.strip_env,
+    );
+  } finally {
+    secretRuntime.cleanup();
+  }
 }
 
 async function handleBootstrap(job) {
@@ -296,6 +351,9 @@ async function handleRunStep(job) {
     finished_at: null,
   });
 
+  const secretRuntime = resolveJobSecretRuntime(payload, clusterId);
+  const redact = buildRedactor(secretRuntime.redactions);
+
   try {
     await runCommand(
       job.id,
@@ -308,7 +366,10 @@ async function handleRunStep(job) {
         STEP_CONTEXT_JSON: JSON.stringify(context),
         STEP_RESULT_FILE: resultFile,
         TWINBOX_HOST_CRON_DIR: process.env.TWINBOX_HOST_CRON_DIR || "/host/etc/cron.d",
+        ...secretRuntime.env,
       },
+      redact,
+      secretRuntime.strip_env,
     );
 
     const outputs = readJsonIfExists(resultFile);
@@ -330,6 +391,7 @@ async function handleRunStep(job) {
     });
     throw err;
   } finally {
+    secretRuntime.cleanup();
     fs.rmSync(resultFile, { force: true });
   }
 }
