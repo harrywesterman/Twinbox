@@ -1,6 +1,6 @@
 FROM node:20-bookworm-slim
 
-ARG BW_VERSION=1.22.1
+ARG BW_VERSION=v1.22.1
 
 WORKDIR /opt/twinbox
 
