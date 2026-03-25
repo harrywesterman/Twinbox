@@ -1,14 +1,17 @@
-FROM node:20-alpine
+FROM node:20-bookworm-slim
 
 ARG BW_VERSION=1.22.1
 
 WORKDIR /opt/twinbox
 
-RUN apk add --no-cache iputils curl unzip \
-  && curl -fsSL "https://github.com/bitwarden/cli/releases/download/v${BW_VERSION}/bw-linux-${BW_VERSION}.zip" -o /tmp/bw.zip \
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates curl iputils-ping unzip \
+  && curl -fsSL "https://github.com/bitwarden/cli/releases/download/${BW_VERSION}/bw-linux-${BW_VERSION#v}.zip" -o /tmp/bw.zip \
   && unzip -q /tmp/bw.zip -d /tmp/bw \
   && install -m 0755 /tmp/bw/bw /usr/local/bin/bw \
-  && rm -rf /tmp/bw /tmp/bw.zip
+  && bw --version \
+  && rm -rf /tmp/bw /tmp/bw.zip \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY manager-api/package.json ./manager-api/package.json
 RUN cd /opt/twinbox/manager-api && npm install --omit=dev
