@@ -27,6 +27,7 @@ def test_bootstrap_vaultwarden_script_bootstraps_registration_and_api_key_headle
 
     assert "VAULTWARDEN_CLIENTID_FILE" in text
     assert "VAULTWARDEN_CLIENTSECRET_FILE" in text
+    assert ".apiKey // .ApiKey // empty" in text
     assert "bw login --apikey" in text
     assert "bw unlock --passwordfile" in text
     assert "/identity/accounts/register/send-verification-email" in text
@@ -43,3 +44,4 @@ def test_bootstrap_vaultwarden_script_disables_signups_and_restarts_vaultwarden(
     assert "VAULTWARDEN_SIGNUPS_ALLOWED=false" in text
     assert "docker compose up -d vaultwarden" in text
     assert "VAULTWARDEN_PASSWORD_FILE" in text
+    assert "disable_signups\n  restart_vaultwarden\n  write_ready_file" in text

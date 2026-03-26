@@ -29,7 +29,7 @@ services:
       - VAULTWARDEN_CLIENTSECRET_FILE=${VAULTWARDEN_CLIENTSECRET_FILE:-/opt/twinbox/bootstrap/vaultwarden-client-secret}
       - VAULTWARDEN_READY_FILE=${VAULTWARDEN_READY_FILE:-/opt/twinbox/bootstrap/vaultwarden-ready}
       - VAULTWARDEN_LOCAL_PORT=${VAULTWARDEN_LOCAL_PORT:-8222}
-      - BITWARDENCLI_APPDATA_DIR=${BITWARDENCLI_APPDATA_DIR:-/opt/twinbox/bootstrap/bw-runtime}
+      - BITWARDENCLI_APPDATA_DIR=${MANAGER_API_BITWARDENCLI_APPDATA_DIR:-/opt/twinbox/bootstrap/bw-runtime-api}
       - VAULTWARDEN_ITEM_PREFIX=${VAULTWARDEN_ITEM_PREFIX:-twinbox}
       - TWINBOX_SECRET_TEMP_DIR=${TWINBOX_SECRET_TEMP_DIR:-/tmp/twinbox-secrets}
       - TWINBOX_SECRET_CACHE_TTL_SEC=${TWINBOX_SECRET_CACHE_TTL_SEC:-60}
@@ -68,7 +68,7 @@ services:
       - VAULTWARDEN_CLIENTSECRET_FILE=${VAULTWARDEN_CLIENTSECRET_FILE:-/opt/twinbox/bootstrap/vaultwarden-client-secret}
       - VAULTWARDEN_READY_FILE=${VAULTWARDEN_READY_FILE:-/opt/twinbox/bootstrap/vaultwarden-ready}
       - VAULTWARDEN_LOCAL_PORT=${VAULTWARDEN_LOCAL_PORT:-8222}
-      - BITWARDENCLI_APPDATA_DIR=${BITWARDENCLI_APPDATA_DIR:-/opt/twinbox/bootstrap/bw-runtime}
+      - BITWARDENCLI_APPDATA_DIR=${MANAGER_WORKER_BITWARDENCLI_APPDATA_DIR:-/opt/twinbox/bootstrap/bw-runtime-worker}
       - VAULTWARDEN_ITEM_PREFIX=${VAULTWARDEN_ITEM_PREFIX:-twinbox}
       - TWINBOX_SECRET_TEMP_DIR=${TWINBOX_SECRET_TEMP_DIR:-/tmp/twinbox-secrets}
       - TWINBOX_SECRET_CACHE_TTL_SEC=${TWINBOX_SECRET_CACHE_TTL_SEC:-60}

@@ -22,7 +22,8 @@ def test_docker_compose_includes_vaultwarden_secret_contract():
     assert "TWINBOX_SECRET_BACKEND=${TWINBOX_SECRET_BACKEND:-vaultwarden}" in text
     assert "VAULTWARDEN_SERVER_URL=${VAULTWARDEN_SERVER_URL:-http://vaultwarden:80}" in text
     assert "VAULTWARDEN_CLIENTID_FILE=${VAULTWARDEN_CLIENTID_FILE:-/opt/twinbox/bootstrap/vaultwarden-client-id}" in text
-    assert "BITWARDENCLI_APPDATA_DIR=${BITWARDENCLI_APPDATA_DIR:-/opt/twinbox/bootstrap/bw-runtime}" in text
+    assert "BITWARDENCLI_APPDATA_DIR=${MANAGER_API_BITWARDENCLI_APPDATA_DIR:-/opt/twinbox/bootstrap/bw-runtime-api}" in text
+    assert "BITWARDENCLI_APPDATA_DIR=${MANAGER_WORKER_BITWARDENCLI_APPDATA_DIR:-/opt/twinbox/bootstrap/bw-runtime-worker}" in text
     assert "./bootstrap:/opt/twinbox/bootstrap" in text
 
 
