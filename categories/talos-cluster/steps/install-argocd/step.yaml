@@ -1,0 +1,21 @@
+id: install-argocd
+title: Install Argo CD
+type: action
+journey_stage: setup
+order: 30
+summary: Install Argo CD and bootstrap the safe application slice.
+explanation: Twinbox installs Argo CD after secret sync, then applies a bootstrap root Application that only manages safe workloads. Vaultwarden and ESO remain the source of truth for any secret-bearing manifests.
+side_help: The bootstrap root only owns whoami and headlamp. It intentionally excludes traefik, grafana, wiredoor-gateway, and secret-bearing manifests.
+depends_on:
+  - install-secret-sync
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/install-argocd/run.sh

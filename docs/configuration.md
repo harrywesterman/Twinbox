@@ -17,6 +17,7 @@ VAULTWARDEN_PASSWORD_FILE=/opt/twinbox/bootstrap/vaultwarden-password
 `PROXMOX_PASSWORD` is used only to seed `twinbox/global/proxmox` during the initial Vaultwarden bootstrap. `manager-api` and `manager-worker` no longer receive it through Compose after the cutover.
 Talos access files are materialized at runtime from Vaultwarden-backed refs and are not kept as canonical files under `manager-data/`.
 The post-bootstrap `install-secret-sync` step consumes `KUBECONFIG_FILE` from the worker secret bundle and the bootstrap Vaultwarden files already mounted under `/opt/twinbox/bootstrap/`.
+The separate `install-argocd` step also consumes `KUBECONFIG_FILE` so it can install Argo CD and apply the bootstrap root Application from `gitops/argocd/bootstrap/root.yaml` after ESO/Bitwarden is in place. The initial Argo root only manages safe non-secret workloads like `whoami` and `headlamp`.
 
 ## Current Runtime Variables
 
@@ -54,7 +55,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 ```
 
 The Management VM uses these values to bring up Vaultwarden on the trusted LAN address of the Management VM, register the local Twinbox service account automatically, write the CLI API key files under `/opt/twinbox/bootstrap/`, and let both the host bootstrap and the API/worker unlock Vaultwarden against the same reachable URL.
-Cluster-scoped follow-up steps such as `install-secret-sync` run against an explicit `cluster_id` supplied by the UI, so the manager runtime does not infer a target cluster from filesystem timestamps.
+Cluster-scoped follow-up steps such as `install-secret-sync` and `install-argocd` run against an explicit `cluster_id` supplied by the UI, so the manager runtime does not infer a target cluster from filesystem timestamps.
 
 Tooling version notes:
 

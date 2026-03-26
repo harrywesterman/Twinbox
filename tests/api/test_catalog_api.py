@@ -109,11 +109,15 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert [step["id"] for step in talos["steps"]] == [
                 "provision-nodes",
                 "install-secret-sync",
+                "install-argocd",
             ]
             assert talos["steps"][0]["journey_stage"] == "setup"
             assert talos["steps"][0]["status"] == "ready"
             assert talos["steps"][1]["status"] == "locked"
             assert talos["steps"][1]["secrets"]["files"]["KUBECONFIG_FILE"]["item"] == "kubeconfig"
+            assert talos["steps"][2]["status"] == "locked"
+            assert talos["steps"][2]["secrets"]["files"]["KUBECONFIG_FILE"]["item"] == "kubeconfig"
+            assert talos["steps"][2]["secrets"]["files"]["KUBECONFIG_FILE"]["attachment"] == "kubeconfig"
         finally:
             proc.terminate()
             proc.wait(timeout=5)
@@ -270,7 +274,21 @@ def test_catalog_keeps_latest_cluster_step_state_for_follow_up_steps():
             ),
             encoding="utf-8",
         )
-
+        (data_dir / "step-state" / "install-secret-sync.json").write_text(
+            json.dumps(
+                {
+                    "step_id": "install-secret-sync",
+                    "status": "succeeded",
+                    "inputs": {},
+                    "outputs": {"cluster_id": cluster_id},
+                    "cluster_id": cluster_id,
+                    "error": None,
+                    "updated_at": "2026-03-20T10:11:00Z",
+                    "last_job_id": None,
+                }
+            ),
+            encoding="utf-8",
+        )
         proc = _start_api(data_dir, port)
         try:
             base = f"http://127.0.0.1:{port}"
@@ -284,7 +302,9 @@ def test_catalog_keeps_latest_cluster_step_state_for_follow_up_steps():
             assert talos["steps"][0]["status"] == "done"
             assert talos["steps"][0]["state"]["cluster_id"] == cluster_id
             assert talos["steps"][1]["id"] == "install-secret-sync"
-            assert talos["steps"][1]["status"] == "ready"
+            assert talos["steps"][1]["status"] == "done"
+            assert talos["steps"][2]["id"] == "install-argocd"
+            assert talos["steps"][2]["status"] == "ready"
         finally:
             proc.terminate()
             proc.wait(timeout=5)
@@ -339,7 +359,6 @@ def test_catalog_cluster_id_query_scopes_follow_up_state_to_requested_cluster():
             ),
             encoding="utf-8",
         )
-
         proc = _start_api(data_dir, port)
         try:
             base = f"http://127.0.0.1:{port}"
@@ -354,6 +373,8 @@ def test_catalog_cluster_id_query_scopes_follow_up_state_to_requested_cluster():
             assert talos["steps"][0]["state"]["cluster_id"] == older_cluster_id
             assert talos["steps"][1]["id"] == "install-secret-sync"
             assert talos["steps"][1]["status"] == "ready"
+            assert talos["steps"][2]["id"] == "install-argocd"
+            assert talos["steps"][2]["status"] == "locked"
         finally:
             proc.terminate()
             proc.wait(timeout=5)
@@ -378,7 +399,6 @@ def test_catalog_synthesizes_provision_state_for_bootstrapped_cluster_without_st
             ),
             encoding="utf-8",
         )
-
         proc = _start_api(data_dir, port)
         try:
             base = f"http://127.0.0.1:{port}"
@@ -394,6 +414,8 @@ def test_catalog_synthesizes_provision_state_for_bootstrapped_cluster_without_st
             assert talos["steps"][0]["state"]["outputs"]["cluster_status"] == "bootstrapped"
             assert talos["steps"][1]["id"] == "install-secret-sync"
             assert talos["steps"][1]["status"] == "ready"
+            assert talos["steps"][2]["id"] == "install-argocd"
+            assert talos["steps"][2]["status"] == "locked"
         finally:
             proc.terminate()
             proc.wait(timeout=5)
@@ -444,7 +466,6 @@ def test_execute_follow_up_cluster_step_requires_explicit_cluster_context():
             ),
             encoding="utf-8",
         )
-
         proc = _start_api(data_dir, port)
         try:
             base = f"http://127.0.0.1:{port}"
@@ -527,6 +548,21 @@ def test_execute_follow_up_cluster_step_uses_requested_cluster_context_and_secre
             ),
             encoding="utf-8",
         )
+        (data_dir / "step-state" / "install-secret-sync.json").write_text(
+            json.dumps(
+                {
+                    "step_id": "install-secret-sync",
+                    "status": "succeeded",
+                    "inputs": {},
+                    "outputs": {"cluster_id": selected_cluster_id},
+                    "cluster_id": selected_cluster_id,
+                    "error": None,
+                    "updated_at": "2026-03-20T10:11:00Z",
+                    "last_job_id": None,
+                }
+            ),
+            encoding="utf-8",
+        )
 
         proc = _start_api(data_dir, port)
         try:
@@ -535,6 +571,110 @@ def test_execute_follow_up_cluster_step_uses_requested_cluster_context_and_secre
 
             status, body = _post_json(
                 f"{base}/api/steps/install-secret-sync/execute",
+                {"cluster_id": selected_cluster_id, "inputs": {}},
+            )
+            assert status == 202
+
+            job = json.loads((data_dir / "jobs" / f"{body['job_id']}.json").read_text())
+            assert job["type"] == "run_step"
+            assert job["cluster_id"] == selected_cluster_id
+            assert job["payload"]["context"]["cluster"]["id"] == selected_cluster_id
+            assert job["payload"]["secret_bundle"]["files"]["KUBECONFIG_FILE"]["item"] == "kubeconfig"
+            assert job["payload"]["secret_bundle"]["files"]["KUBECONFIG_FILE"]["attachment"] == "kubeconfig"
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
+def test_execute_argo_follow_up_cluster_step_uses_requested_cluster_context_and_secret_bundle():
+    with tempfile.TemporaryDirectory() as td:
+        data_dir = Path(td) / "data"
+        port = _find_free_port()
+
+        (data_dir / "clusters").mkdir(parents=True, exist_ok=True)
+        (data_dir / "step-state").mkdir(parents=True, exist_ok=True)
+        (data_dir / "jobs").mkdir(parents=True, exist_ok=True)
+
+        selected_cluster_id = "cluster_followup"
+        newer_cluster_id = "cluster_newer"
+        (data_dir / "clusters" / f"{selected_cluster_id}.json").write_text(
+            json.dumps(
+                {
+                    "id": selected_cluster_id,
+                    "name": "twinbox-followup",
+                    "status": "bootstrapped",
+                    "created_at": "2026-03-20T10:00:00Z",
+                    "updated_at": "2026-03-20T10:10:00Z",
+                    "metadata": {
+                        "secret_refs": {
+                            "proxmox": {"scope": "global", "item": "proxmox"},
+                            "talos_secrets": {"scope": "cluster", "item": "talos-secrets", "cluster_id": selected_cluster_id},
+                            "talosconfig": {"scope": "cluster", "item": "talosconfig", "cluster_id": selected_cluster_id},
+                            "kubeconfig": {"scope": "cluster", "item": "kubeconfig", "cluster_id": selected_cluster_id},
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        (data_dir / "clusters" / f"{newer_cluster_id}.json").write_text(
+            json.dumps(
+                {
+                    "id": newer_cluster_id,
+                    "name": "twinbox-newer",
+                    "status": "bootstrapped",
+                    "created_at": "2026-03-20T11:00:00Z",
+                    "updated_at": "2026-03-20T11:05:00Z",
+                    "metadata": {
+                        "secret_refs": {
+                            "proxmox": {"scope": "global", "item": "proxmox"},
+                            "talos_secrets": {"scope": "cluster", "item": "talos-secrets", "cluster_id": newer_cluster_id},
+                            "talosconfig": {"scope": "cluster", "item": "talosconfig", "cluster_id": newer_cluster_id},
+                            "kubeconfig": {"scope": "cluster", "item": "kubeconfig", "cluster_id": newer_cluster_id},
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        (data_dir / "step-state" / "provision-nodes.json").write_text(
+            json.dumps(
+                {
+                    "step_id": "provision-nodes",
+                    "status": "succeeded",
+                    "inputs": {"name": "followup"},
+                    "outputs": {"cluster_id": selected_cluster_id},
+                    "cluster_id": selected_cluster_id,
+                    "error": None,
+                    "updated_at": "2026-03-20T10:09:00Z",
+                    "last_job_id": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+        (data_dir / "step-state" / "install-secret-sync.json").write_text(
+            json.dumps(
+                {
+                    "step_id": "install-secret-sync",
+                    "status": "succeeded",
+                    "inputs": {},
+                    "outputs": {"cluster_id": selected_cluster_id},
+                    "cluster_id": selected_cluster_id,
+                    "error": None,
+                    "updated_at": "2026-03-20T10:11:00Z",
+                    "last_job_id": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        proc = _start_api(data_dir, port)
+        try:
+            base = f"http://127.0.0.1:{port}"
+            _wait_for_health(base)
+
+            status, body = _post_json(
+                f"{base}/api/steps/install-argocd/execute",
                 {"cluster_id": selected_cluster_id, "inputs": {}},
             )
             assert status == 202
