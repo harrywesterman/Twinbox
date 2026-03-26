@@ -235,6 +235,11 @@ def test_install_secret_sync_installs_eso_and_applies_secret_sync_manifests():
 
 def test_argo_manager_script_requires_kubeconfig_and_calls_gitops_bootstrap():
     text = _argo_manager_text()
+    assert 'Usage: $0 [--kube-api-server URL]' in text
+    assert 'KUBE_API_SERVER=""' in text
+    assert '--kube-api-server' in text
+    assert 'Rewriting kubeconfig cluster' in text
+    assert 'kubectl config set-cluster "$kube_cluster_name" --kubeconfig "$KUBECONFIG_FILE" --server "$KUBE_API_SERVER" >/dev/null' in text
     assert 'Bootstrapping Argo CD' in text
     assert 'bash "$WORKSPACE_ROOT/gitops/install.sh"' in text
     assert 'KUBECONFIG_FILE is required' in text
@@ -243,7 +248,8 @@ def test_argo_manager_script_requires_kubeconfig_and_calls_gitops_bootstrap():
 def test_argo_step_script_uses_workspace_root_for_manager_bootstrap():
     text = _argo_step_text()
     assert 'WORKSPACE_ROOT="${WORKSPACE_ROOT:-' in text
-    assert 'bash "$WORKSPACE_ROOT/scripts/manager/install-argocd.sh"' in text
+    assert 'discovered_controlplane_ips[0]' in text
+    assert 'bash "$WORKSPACE_ROOT/scripts/manager/install-argocd.sh" --kube-api-server "https://${controlplane_ip}:6443"' in text
 
 
 def test_argo_bootstrap_script_installs_argocd_and_applies_bootstrap_root_application():
