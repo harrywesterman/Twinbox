@@ -108,7 +108,6 @@ wait_for_argocd_workloads() {
     "deployment/argocd-redis"
     "deployment/argocd-repo-server"
     "deployment/argocd-server"
-    "statefulset/argocd-application-controller"
   )
 
   for resource in "${resources[@]}"; do
