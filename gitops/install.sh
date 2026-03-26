@@ -14,6 +14,26 @@ command -v kubectl >/dev/null 2>&1 || {
 }
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
+retry() {
+  local attempts="$1"
+  local delay_seconds="$2"
+  shift 2
+
+  local attempt=1
+  while true; do
+    if "$@"; then
+      return 0
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      return 1
+    fi
+
+    log "Retrying ${*} in ${delay_seconds}s (${attempt}/${attempts})"
+    sleep "$delay_seconds"
+    attempt=$((attempt + 1))
+  done
+}
 
 control_plane_tolerations='[{"key":"node-role.kubernetes.io/control-plane","operator":"Exists","effect":"NoSchedule"},{"key":"node-role.kubernetes.io/master","operator":"Exists","effect":"NoSchedule"}]'
 
@@ -93,7 +113,7 @@ log "Creating argocd namespace"
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply --validate=false -f -
 
 log "Installing Argo CD"
-kubectl apply --server-side --validate=false -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.3.4/manifests/install.yaml
+retry 3 10 kubectl apply --server-side --validate=false -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.3.4/manifests/install.yaml
 
 patch_argocd_workload_tolerations
 patch_argocd_workload_probes
@@ -101,4 +121,4 @@ patch_argocd_workload_probes
 wait_for_argocd_workloads
 
 log "Applying bootstrap root application"
-kubectl apply --validate=false -f "$WORKSPACE_ROOT/gitops/argocd/bootstrap/root.yaml"
+retry 3 10 kubectl apply --validate=false -f "$WORKSPACE_ROOT/gitops/argocd/bootstrap/root.yaml"
