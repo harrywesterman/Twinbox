@@ -80,14 +80,14 @@ wait_for_argocd_workloads() {
 }
 
 log "Creating argocd namespace"
-kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply --validate=false -f -
 
 log "Installing Argo CD"
-kubectl apply --server-side -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.3.4/manifests/install.yaml
+kubectl apply --server-side --validate=false -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.3.4/manifests/install.yaml
 
 patch_argocd_workload_tolerations
 
 wait_for_argocd_workloads
 
 log "Applying bootstrap root application"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/argocd/bootstrap/root.yaml"
+kubectl apply --validate=false -f "$WORKSPACE_ROOT/gitops/argocd/bootstrap/root.yaml"
