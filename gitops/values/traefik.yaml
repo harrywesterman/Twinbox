@@ -56,4 +56,4 @@ accessLogs:
 
 metrics:
   prometheus:
-    enabled: trueß∑
+    enabled: true

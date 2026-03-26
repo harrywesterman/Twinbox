@@ -15,6 +15,13 @@ ARGO_STEP_SCRIPT = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "insta
 ARGO_BOOTSTRAP_SCRIPT = REPO_ROOT / "gitops" / "install.sh"
 WHOAMI_DEPLOYMENT = REPO_ROOT / "gitops" / "apps" / "whoami" / "deployment.yaml"
 HEADLAMP_VALUES = REPO_ROOT / "gitops" / "values" / "headlamp.yaml"
+ROUTES_VALUES = REPO_ROOT / "gitops" / "values" / "routes.yaml"
+TRAEFIK_VALUES = REPO_ROOT / "gitops" / "values" / "traefik.yaml"
+WIREDOOR_GATEWAY_VALUES = REPO_ROOT / "gitops" / "values" / "wiredoor-gateway.yaml"
+TRAEFIK_DASHBOARD_SECRETSTORE = REPO_ROOT / "gitops" / "routes" / "templates" / "traefik-dashboard-secretstore.yaml"
+TRAEFIK_DASHBOARD_EXTERNALSECRET = REPO_ROOT / "gitops" / "routes" / "templates" / "traefik-dashboard-externalsecret.yaml"
+WIREDOOR_GATEWAY_SECRETSTORE = REPO_ROOT / "gitops" / "apps" / "wiredoor-gateway-secret" / "secretstore.yaml"
+WIREDOOR_GATEWAY_EXTERNALSECRET = REPO_ROOT / "gitops" / "apps" / "wiredoor-gateway-secret" / "externalsecret.yaml"
 
 
 def _apply_cluster_text() -> str:
@@ -55,6 +62,34 @@ def _whoami_deployment_text() -> str:
 
 def _headlamp_values_text() -> str:
     return HEADLAMP_VALUES.read_text(encoding="utf-8")
+
+
+def _routes_values_text() -> str:
+    return ROUTES_VALUES.read_text(encoding="utf-8")
+
+
+def _traefik_values_text() -> str:
+    return TRAEFIK_VALUES.read_text(encoding="utf-8")
+
+
+def _wiredoor_gateway_values_text() -> str:
+    return WIREDOOR_GATEWAY_VALUES.read_text(encoding="utf-8")
+
+
+def _traefik_dashboard_secretstore_text() -> str:
+    return TRAEFIK_DASHBOARD_SECRETSTORE.read_text(encoding="utf-8")
+
+
+def _traefik_dashboard_externalsecret_text() -> str:
+    return TRAEFIK_DASHBOARD_EXTERNALSECRET.read_text(encoding="utf-8")
+
+
+def _wiredoor_gateway_secretstore_text() -> str:
+    return WIREDOOR_GATEWAY_SECRETSTORE.read_text(encoding="utf-8")
+
+
+def _wiredoor_gateway_externalsecret_text() -> str:
+    return WIREDOOR_GATEWAY_EXTERNALSECRET.read_text(encoding="utf-8")
 
 
 def test_apply_cluster_requires_proxmox_env():
@@ -316,6 +351,34 @@ def test_bootstrap_apps_tolerate_single_node_control_plane():
     assert 'tolerations:' in headlamp_text
     assert 'node-role.kubernetes.io/control-plane' in headlamp_text
     assert 'node-role.kubernetes.io/master' in headlamp_text
+
+
+def test_routes_and_wiredoor_secrets_are_vaultwarden_backed():
+    routes_values_text = _routes_values_text()
+    traefik_values_text = _traefik_values_text()
+    wiredoor_gateway_values_text = _wiredoor_gateway_values_text()
+    traefik_secretstore_text = _traefik_dashboard_secretstore_text()
+    traefik_externalsecret_text = _traefik_dashboard_externalsecret_text()
+    wiredoor_secretstore_text = _wiredoor_gateway_secretstore_text()
+    wiredoor_externalsecret_text = _wiredoor_gateway_externalsecret_text()
+
+    assert 'basicAuth:' not in routes_values_text
+    assert 'users: |' not in routes_values_text
+    assert 'enabled: trueß∑' not in traefik_values_text
+    assert 'enabled: true' in traefik_values_text
+    assert 'token:' not in wiredoor_gateway_values_text
+    assert 'kind: SecretStore' in traefik_secretstore_text
+    assert 'name: traefik-dashboard-fields' in traefik_secretstore_text
+    assert 'twinbox/global/traefik-dashboard' in traefik_secretstore_text
+    assert 'kind: ExternalSecret' in traefik_externalsecret_text
+    assert 'name: traefik-dashboard-auth' in traefik_externalsecret_text
+    assert 'secretKey: users' in traefik_externalsecret_text
+    assert 'kind: SecretStore' in wiredoor_secretstore_text
+    assert 'name: wiredoor-gateway-fields' in wiredoor_secretstore_text
+    assert 'twinbox/global/wiredoor-gateway' in wiredoor_secretstore_text
+    assert 'kind: ExternalSecret' in wiredoor_externalsecret_text
+    assert 'name: wiredoor-gateway' in wiredoor_externalsecret_text
+    assert 'secretKey: token' in wiredoor_externalsecret_text
 
 
 def test_talos_module_is_vm_only_and_keeps_planned_outputs():
