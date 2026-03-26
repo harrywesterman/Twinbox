@@ -4,10 +4,11 @@ set -euo pipefail
 : "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"
 : "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"
 
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 
-bash scripts/manager/install-argocd.sh
+bash "$WORKSPACE_ROOT/scripts/manager/install-argocd.sh"
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \

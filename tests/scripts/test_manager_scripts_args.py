@@ -11,6 +11,7 @@ MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "main.tf"
 MODULE_OUTPUTS = REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "outputs.tf"
 INSTALL_SECRET_SYNC_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-secret-sync.sh"
 ARGO_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-argocd.sh"
+ARGO_STEP_SCRIPT = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
 ARGO_BOOTSTRAP_SCRIPT = REPO_ROOT / "gitops" / "install.sh"
 
 
@@ -36,6 +37,10 @@ def _install_secret_sync_text() -> str:
 
 def _argo_manager_text() -> str:
     return ARGO_MANAGER_SCRIPT.read_text(encoding="utf-8")
+
+
+def _argo_step_text() -> str:
+    return ARGO_STEP_SCRIPT.read_text(encoding="utf-8")
 
 
 def _argo_bootstrap_text() -> str:
@@ -233,6 +238,12 @@ def test_argo_manager_script_requires_kubeconfig_and_calls_gitops_bootstrap():
     assert 'Bootstrapping Argo CD' in text
     assert 'bash "$WORKSPACE_ROOT/gitops/install.sh"' in text
     assert 'KUBECONFIG_FILE is required' in text
+
+
+def test_argo_step_script_uses_workspace_root_for_manager_bootstrap():
+    text = _argo_step_text()
+    assert 'WORKSPACE_ROOT="${WORKSPACE_ROOT:-' in text
+    assert 'bash "$WORKSPACE_ROOT/scripts/manager/install-argocd.sh"' in text
 
 
 def test_argo_bootstrap_script_installs_argocd_and_applies_bootstrap_root_application():
