@@ -32,10 +32,13 @@ TWINBOX_IMAGE_TAG=latest
 
 ```dotenv
 TWINBOX_SECRET_BACKEND=vaultwarden
+MANAGEMENT_VM_IP=192.168.1.50
 VAULTWARDEN_IMAGE_TAG=1.35.4
+VAULTWARDEN_BIND_ADDRESS=0.0.0.0
 VAULTWARDEN_LOCAL_PORT=8222
-VAULTWARDEN_DOMAIN=http://localhost:8222
-VAULTWARDEN_SERVER_URL=http://vaultwarden:80
+VAULTWARDEN_PUBLIC_URL=http://192.168.1.50:8222
+VAULTWARDEN_DOMAIN=http://192.168.1.50:8222
+VAULTWARDEN_SERVER_URL=http://192.168.1.50:8222
 VAULTWARDEN_VAULT_EMAIL=twinbox@local
 VAULTWARDEN_PASSWORD_FILE=/opt/twinbox/bootstrap/vaultwarden-password
 VAULTWARDEN_CLIENTID_FILE=/opt/twinbox/bootstrap/vaultwarden-client-id
@@ -49,7 +52,7 @@ TWINBOX_SECRET_TEMP_DIR=/tmp/twinbox-secrets
 TWINBOX_SECRET_CACHE_TTL_SEC=60
 ```
 
-The Management VM uses these values to bring up Vaultwarden locally, register the local Twinbox service account automatically, write the CLI API key files under `/opt/twinbox/bootstrap/`, and let the API/worker unlock Vaultwarden non-interactively with that personal API key plus password file.
+The Management VM uses these values to bring up Vaultwarden on the trusted LAN address of the Management VM, register the local Twinbox service account automatically, write the CLI API key files under `/opt/twinbox/bootstrap/`, and let both the host bootstrap and the API/worker unlock Vaultwarden against the same reachable URL.
 
 Tooling version notes:
 
@@ -103,6 +106,6 @@ Talos configs and kubeconfig are transient runtime artifacts produced by the wor
 
 - Keep `.env` private and never commit it.
 - Rotate the Vaultwarden item fields and API key regularly.
-- Restrict access to manager host/network segment.
+- Restrict access to the Management VM network segment; Vaultwarden is now reachable on the Management VM LAN IP for manager-runtime compatibility.
 - Treat `/opt/twinbox/bootstrap/*` as root/operator-only bootstrap material.
 - Runtime queue payloads and cluster state should contain refs only, never secret values.

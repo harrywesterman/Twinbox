@@ -16,7 +16,7 @@ def test_bootstrap_vaultwarden_script_has_check_only_mode_and_shell_safety():
     assert "set -euo pipefail" in text
     assert "--check-only" in text
     assert "VAULTWARDEN_READY_FILE" in text
-    assert "http://127.0.0.1:8222" in text or "${VAULTWARDEN_LOCAL_PORT:-8222}" in text
+    assert "VAULTWARDEN_PUBLIC_URL" in text
     assert "curl -fsS" in text
     assert 'bw login "$VAULTWARDEN_VAULT_EMAIL" --passwordfile "$VAULTWARDEN_PASSWORD_FILE"' in text
     assert 'bw login "$VAULTWARDEN_VAULT_EMAIL" "$' not in text

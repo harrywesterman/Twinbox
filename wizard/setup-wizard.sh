@@ -1165,10 +1165,13 @@ write_files:
     content: |
       TWINBOX_CLUSTER_SLUG=${CLUSTER_SLUG}
       TWINBOX_SECRET_BACKEND=vaultwarden
+      MANAGEMENT_VM_IP=${CLOUD_INIT_IP}
       VAULTWARDEN_IMAGE_TAG=1.35.4
+      VAULTWARDEN_BIND_ADDRESS=0.0.0.0
       VAULTWARDEN_LOCAL_PORT=8222
-      VAULTWARDEN_DOMAIN=http://localhost:8222
-      VAULTWARDEN_SERVER_URL=http://vaultwarden:80
+      VAULTWARDEN_PUBLIC_URL=http://${CLOUD_INIT_IP}:8222
+      VAULTWARDEN_DOMAIN=http://${CLOUD_INIT_IP}:8222
+      VAULTWARDEN_SERVER_URL=http://${CLOUD_INIT_IP}:8222
       VAULTWARDEN_VAULT_EMAIL=twinbox@local
       VAULTWARDEN_PASSWORD_FILE=/opt/twinbox/bootstrap/vaultwarden-password
       VAULTWARDEN_CLIENTID_FILE=/opt/twinbox/bootstrap/vaultwarden-client-id
@@ -1192,7 +1195,6 @@ write_files:
       TWINBOX_IMAGE_TAG=${TWINBOX_IMAGE_TAG}
       TWINBOX_HOST_REPO_ROOT=${TWINBOX_TARGET_DIR}
       MANAGEMENT_VM_ID=${MGT_ID}
-      MANAGEMENT_VM_IP=${CLOUD_INIT_IP}
 runcmd:
   - install -m 0755 -d /etc/apt/keyrings
   - systemctl enable --now qemu-guest-agent
