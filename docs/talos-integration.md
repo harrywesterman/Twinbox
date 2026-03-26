@@ -53,4 +53,4 @@ At runtime, worker scripts require:
 - Per-cluster OpenTofu workdirs and state in `manager-data/clusters/<cluster_id>/iac/`.
 - Talos access files are materialized into a temporary runtime directory and cleaned up after the job.
 - Cluster state stores planned and discovered node IPs plus secret refs, not Talos file paths.
-- If `install-secret-sync` runs, the cluster gets `external-secrets`, a Bitwarden CLI bridge, and a first Vaultwarden-backed Kubernetes Secret projection.
+- If `install-secret-sync` runs, the cluster gets `external-secrets`, a network-isolated Bitwarden CLI bridge, and a first Vaultwarden-backed Kubernetes Secret projection.

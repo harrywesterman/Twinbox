@@ -260,10 +260,18 @@ export function findCurrentCluster(dirs) {
   return clusterFiles[0] || null;
 }
 
-export function buildCatalogResponse({ workspaceRoot, dirs }) {
+function findClusterById(dirs, clusterId) {
+  if (!clusterId || !fs.existsSync(dirs.clusters)) {
+    return null;
+  }
+
+  return readJsonIfExists(path.join(dirs.clusters, `${clusterId}.json`));
+}
+
+export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) {
   const definitions = loadCatalogDefinitions({ workspaceRoot });
   const completedDependencies = new Set();
-  const currentCluster = findCurrentCluster(dirs);
+  const currentCluster = clusterId ? findClusterById(dirs, clusterId) : findCurrentCluster(dirs);
   const activeClusterId = currentCluster?.id || null;
 
   const categories = definitions.categories.map((category) => {

@@ -783,6 +783,7 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [railOpen, setRailOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [sessionClusterId, setSessionClusterId] = useState('');
   const [ipSuggestion, setIpSuggestion] = useState('');
   const [provisionSuggestedInputs, setProvisionSuggestedInputs] = useState({});
   const dirtyInputsRef = useRef({});
@@ -818,9 +819,19 @@ function App() {
 
     return '';
   }, [activeStep, mission.steps]);
+  const effectiveClusterId = activeClusterId || sessionClusterId;
 
-  const fetchCatalogOnce = async () => {
-    const res = await fetch('/api/catalog');
+  const buildCatalogUrl = (clusterIdOverride = '') => {
+    const clusterId = clusterIdOverride || effectiveClusterId;
+    if (!clusterId) {
+      return '/api/catalog';
+    }
+
+    return `/api/catalog?cluster_id=${encodeURIComponent(clusterId)}`;
+  };
+
+  const fetchCatalogOnce = async (clusterIdOverride = '') => {
+    const res = await fetch(buildCatalogUrl(clusterIdOverride));
     const data = await res.json();
     if (!res.ok) {
       throw new Error(data.error || 'Catalog request failed');
@@ -842,11 +853,17 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (activeClusterId && activeClusterId !== sessionClusterId) {
+      setSessionClusterId(activeClusterId);
+    }
+  }, [activeClusterId, sessionClusterId]);
+
+  useEffect(() => {
     let cancelled = false;
 
     const loadCatalog = async () => {
       try {
-        const res = await fetch('/api/catalog');
+        const res = await fetch(buildCatalogUrl());
         const data = await res.json();
         if (!res.ok) {
           throw new Error(data.error || 'Catalog request failed');
@@ -873,7 +890,7 @@ function App() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [selectedStepId]);
+  }, [effectiveClusterId, selectedStepId]);
 
   useEffect(() => {
     const pollHealth = async () => {
@@ -924,14 +941,14 @@ function App() {
   }, [activeStep?.latest_job?.id]);
 
   useEffect(() => {
-    if (!activeClusterId) {
+    if (!effectiveClusterId) {
       setCluster(null);
       return undefined;
     }
 
     let cancelled = false;
     const loadCluster = async () => {
-      const res = await fetch(`/api/clusters/${activeClusterId}`);
+      const res = await fetch(`/api/clusters/${effectiveClusterId}`);
       if (!res.ok || cancelled) return;
       setCluster(await res.json());
     };
@@ -942,7 +959,7 @@ function App() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [activeClusterId]);
+  }, [effectiveClusterId]);
 
   const provisionDraft = draftInputs['provision-nodes'] || {};
 
@@ -1037,6 +1054,7 @@ function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          cluster_id: activeStep.id === 'provision-nodes' ? undefined : (effectiveClusterId || undefined),
           inputs: draftInputs[activeStep.id] || {},
         }),
       });
@@ -1045,7 +1063,11 @@ function App() {
         throw new Error(data.error || 'Step execution failed');
       }
 
-      await fetchCatalogOnce();
+      if (data.cluster_id) {
+        setSessionClusterId(data.cluster_id);
+      }
+
+      await fetchCatalogOnce(data.cluster_id || effectiveClusterId);
     } catch (requestError) {
       setError(requestError.message);
     } finally {

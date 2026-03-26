@@ -24,8 +24,10 @@ test('app source defines a guided setup shell with compact progress and visible 
   assert.match(manageSource, /className="activity-panel"/, 'expected the manage fallback to keep the legacy sidebar surface');
   assert.doesNotMatch(setupSource, /Previous/, 'setup mode should not show a Previous button');
   assert.match(source, /journey-rail-toggle/, 'expected a mobile rail toggle control');
-  assert.match(source, /fetch\('\/api\/catalog'\)/, 'expected catalog discovery from the backend');
+  assert.match(source, /fetch\(buildCatalogUrl\(\)\)/, 'expected catalog discovery from the backend');
   assert.match(source, /executeStep/, 'expected a catalog-driven step execution handler');
+  assert.match(source, /\/api\/catalog\?cluster_id=\$\{encodeURIComponent\(clusterId\)\}/, 'expected catalog polling to pin to the active cluster when known');
+  assert.match(source, /cluster_id:\s*activeStep\.id === 'provision-nodes' \? undefined : \(effectiveClusterId \|\| undefined\)/, 'expected follow-up step execution to send an explicit cluster_id');
 });
 
 test('styles define a setup-first shell and preserve the manage fallback styles', async () => {

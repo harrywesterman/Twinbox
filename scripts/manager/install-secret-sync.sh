@@ -111,6 +111,26 @@ kubectl create secret generic bitwarden-cli \
   --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: bitwarden-cli-allow-external-secrets
+  namespace: ${BITWARDEN_NAMESPACE}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: bitwarden-cli
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ${OPERATOR_NAMESPACE}
+      ports:
+        - protocol: TCP
+          port: 8087
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -133,6 +153,7 @@ spec:
         app.kubernetes.io/instance: bitwarden-cli
         app.kubernetes.io/name: bitwarden-cli
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: bitwarden-cli
           image: ${worker_image}

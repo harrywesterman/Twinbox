@@ -187,6 +187,10 @@ def test_install_secret_sync_installs_eso_and_applies_secret_sync_manifests():
     assert 'kubectl rollout status deployment/external-secrets' in text
     assert 'kind: SecretStore' in text
     assert 'kind: ExternalSecret' in text
+    assert 'kind: NetworkPolicy' in text
+    assert 'bitwarden-cli-allow-external-secrets' in text
+    assert 'kubernetes.io/metadata.name: ${OPERATOR_NAMESPACE}' in text
+    assert 'automountServiceAccountToken: false' in text
     assert 'bw serve --hostname 0.0.0.0' in text
     assert 'KUBECONFIG_FILE is required' in text
 

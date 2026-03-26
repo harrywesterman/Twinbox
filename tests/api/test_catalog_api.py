@@ -174,6 +174,7 @@ def test_execute_step_persists_state_and_enqueues_run_step_job():
             step_state = json.loads(
                 (data_dir / "step-state" / "provision-nodes.json").read_text()
             )
+            assert body["cluster_id"] == step_state["cluster_id"]
             assert step_state["step_id"] == "provision-nodes"
             assert step_state["inputs"]["name"] == "demo"
             assert step_state["status"] == "pending"
@@ -289,7 +290,76 @@ def test_catalog_keeps_latest_cluster_step_state_for_follow_up_steps():
             proc.wait(timeout=5)
 
 
-def test_execute_follow_up_cluster_step_uses_current_cluster_context_and_secret_bundle():
+def test_catalog_cluster_id_query_scopes_follow_up_state_to_requested_cluster():
+    with tempfile.TemporaryDirectory() as td:
+        data_dir = Path(td) / "data"
+        port = _find_free_port()
+
+        (data_dir / "clusters").mkdir(parents=True, exist_ok=True)
+        (data_dir / "step-state").mkdir(parents=True, exist_ok=True)
+
+        older_cluster_id = "cluster_a"
+        newer_cluster_id = "cluster_b"
+        (data_dir / "clusters" / f"{older_cluster_id}.json").write_text(
+            json.dumps(
+                {
+                    "id": older_cluster_id,
+                    "name": "twinbox-a",
+                    "status": "bootstrapped",
+                    "created_at": "2026-03-20T10:00:00Z",
+                    "updated_at": "2026-03-20T10:05:00Z",
+                }
+            ),
+            encoding="utf-8",
+        )
+        (data_dir / "clusters" / f"{newer_cluster_id}.json").write_text(
+            json.dumps(
+                {
+                    "id": newer_cluster_id,
+                    "name": "twinbox-b",
+                    "status": "bootstrapped",
+                    "created_at": "2026-03-20T11:00:00Z",
+                    "updated_at": "2026-03-20T11:05:00Z",
+                }
+            ),
+            encoding="utf-8",
+        )
+        (data_dir / "step-state" / "provision-nodes.json").write_text(
+            json.dumps(
+                {
+                    "step_id": "provision-nodes",
+                    "status": "succeeded",
+                    "inputs": {"name": "older"},
+                    "outputs": {"cluster_id": older_cluster_id},
+                    "cluster_id": older_cluster_id,
+                    "error": None,
+                    "updated_at": "2026-03-20T10:06:00Z",
+                    "last_job_id": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        proc = _start_api(data_dir, port)
+        try:
+            base = f"http://127.0.0.1:{port}"
+            _wait_for_health(base)
+
+            status, body = _get_json(f"{base}/api/catalog?cluster_id={older_cluster_id}")
+            assert status == 200
+
+            talos = body["categories"][1]
+            assert talos["steps"][0]["id"] == "provision-nodes"
+            assert talos["steps"][0]["status"] == "done"
+            assert talos["steps"][0]["state"]["cluster_id"] == older_cluster_id
+            assert talos["steps"][1]["id"] == "install-secret-sync"
+            assert talos["steps"][1]["status"] == "ready"
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
+def test_execute_follow_up_cluster_step_requires_explicit_cluster_context():
     with tempfile.TemporaryDirectory() as td:
         data_dir = Path(td) / "data"
         port = _find_free_port()
@@ -344,12 +414,95 @@ def test_execute_follow_up_cluster_step_uses_current_cluster_context_and_secret_
                 f"{base}/api/steps/install-secret-sync/execute",
                 {"inputs": {}},
             )
+            assert status == 400
+            assert body["error"] == "cluster_id is required for follow-up cluster steps"
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
+def test_execute_follow_up_cluster_step_uses_requested_cluster_context_and_secret_bundle():
+    with tempfile.TemporaryDirectory() as td:
+        data_dir = Path(td) / "data"
+        port = _find_free_port()
+
+        (data_dir / "clusters").mkdir(parents=True, exist_ok=True)
+        (data_dir / "step-state").mkdir(parents=True, exist_ok=True)
+        (data_dir / "jobs").mkdir(parents=True, exist_ok=True)
+
+        selected_cluster_id = "cluster_followup"
+        newer_cluster_id = "cluster_newer"
+        (data_dir / "clusters" / f"{selected_cluster_id}.json").write_text(
+            json.dumps(
+                {
+                    "id": selected_cluster_id,
+                    "name": "twinbox-followup",
+                    "status": "bootstrapped",
+                    "created_at": "2026-03-20T10:00:00Z",
+                    "updated_at": "2026-03-20T10:10:00Z",
+                    "metadata": {
+                        "secret_refs": {
+                            "proxmox": {"scope": "global", "item": "proxmox"},
+                            "talos_secrets": {"scope": "cluster", "item": "talos-secrets", "cluster_id": selected_cluster_id},
+                            "talosconfig": {"scope": "cluster", "item": "talosconfig", "cluster_id": selected_cluster_id},
+                            "kubeconfig": {"scope": "cluster", "item": "kubeconfig", "cluster_id": selected_cluster_id},
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        (data_dir / "clusters" / f"{newer_cluster_id}.json").write_text(
+            json.dumps(
+                {
+                    "id": newer_cluster_id,
+                    "name": "twinbox-newer",
+                    "status": "bootstrapped",
+                    "created_at": "2026-03-20T11:00:00Z",
+                    "updated_at": "2026-03-20T11:05:00Z",
+                    "metadata": {
+                        "secret_refs": {
+                            "proxmox": {"scope": "global", "item": "proxmox"},
+                            "talos_secrets": {"scope": "cluster", "item": "talos-secrets", "cluster_id": newer_cluster_id},
+                            "talosconfig": {"scope": "cluster", "item": "talosconfig", "cluster_id": newer_cluster_id},
+                            "kubeconfig": {"scope": "cluster", "item": "kubeconfig", "cluster_id": newer_cluster_id},
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        (data_dir / "step-state" / "provision-nodes.json").write_text(
+            json.dumps(
+                {
+                    "step_id": "provision-nodes",
+                    "status": "succeeded",
+                    "inputs": {"name": "followup"},
+                    "outputs": {"cluster_id": selected_cluster_id},
+                    "cluster_id": selected_cluster_id,
+                    "error": None,
+                    "updated_at": "2026-03-20T10:09:00Z",
+                    "last_job_id": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        proc = _start_api(data_dir, port)
+        try:
+            base = f"http://127.0.0.1:{port}"
+            _wait_for_health(base)
+
+            status, body = _post_json(
+                f"{base}/api/steps/install-secret-sync/execute",
+                {"cluster_id": selected_cluster_id, "inputs": {}},
+            )
             assert status == 202
 
             job = json.loads((data_dir / "jobs" / f"{body['job_id']}.json").read_text())
             assert job["type"] == "run_step"
-            assert job["cluster_id"] == cluster_id
-            assert job["payload"]["context"]["cluster"]["id"] == cluster_id
+            assert job["cluster_id"] == selected_cluster_id
+            assert job["payload"]["context"]["cluster"]["id"] == selected_cluster_id
             assert job["payload"]["secret_bundle"]["files"]["KUBECONFIG_FILE"]["item"] == "kubeconfig"
             assert job["payload"]["secret_bundle"]["files"]["KUBECONFIG_FILE"]["attachment"] == "kubeconfig"
         finally:

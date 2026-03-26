@@ -10,7 +10,7 @@ import {
   normalizeClusterName,
   persistCluster,
 } from "./lib/clusters.js";
-import { buildCatalogResponse, findCurrentCluster, validateStepInputs } from "./lib/catalog.js";
+import { buildCatalogResponse, validateStepInputs } from "./lib/catalog.js";
 import {
   buildDataDirs,
   ensureDir,
@@ -116,6 +116,20 @@ function proxmoxApiRequest(pathname, proxmoxEnv, { method = "GET", body, headers
   } catch (error) {
     throw new Error(`Failed to parse Proxmox API response: ${error instanceof Error ? error.message : "unknown error"}`);
   }
+}
+
+function resolveRequestedCluster(clusterId) {
+  if (typeof clusterId !== "string" || clusterId.trim() === "") {
+    return { ok: false, error: "cluster_id is required for follow-up cluster steps" };
+  }
+
+  const normalizedClusterId = clusterId.trim();
+  const clusterFile = path.join(dirs.clusters, `${normalizedClusterId}.json`);
+  if (!fs.existsSync(clusterFile)) {
+    return { ok: false, status: 404, error: "cluster not found" };
+  }
+
+  return { ok: true, cluster: readJson(clusterFile) };
 }
 
 async function listUsedVmidsViaProxmoxApi() {
@@ -490,8 +504,16 @@ app.get("/api/health", (_, res) => {
   res.json({ ok: true, time: now() });
 });
 
-app.get("/api/catalog", (_, res) => {
-  const catalog = buildCatalogResponse({ workspaceRoot, dirs });
+app.get("/api/catalog", (req, res) => {
+  const requestedClusterId = pickFirstString(req.query.cluster_id);
+  if (requestedClusterId) {
+    const requestedCluster = resolveRequestedCluster(requestedClusterId);
+    if (!requestedCluster.ok) {
+      return res.status(requestedCluster.status || 400).json({ error: requestedCluster.error });
+    }
+  }
+
+  const catalog = buildCatalogResponse({ workspaceRoot, dirs, clusterId: requestedClusterId || null });
   return res.json({
     categories: catalog.categories,
     errors: catalog.errors,
@@ -565,7 +587,8 @@ app.post("/api/clusters/:clusterId/bootstrap", (req, res) => {
 
 app.post("/api/steps/:stepId/execute", async (req, res) => {
   const stepId = req.params.stepId;
-  const catalog = buildCatalogResponse({ workspaceRoot, dirs });
+  const requestedClusterId = typeof req.body?.cluster_id === "string" ? req.body.cluster_id.trim() : "";
+  const catalog = buildCatalogResponse({ workspaceRoot, dirs, clusterId: requestedClusterId || null });
   const step = catalog.stepsById.get(stepId);
 
   if (!step) {
@@ -611,12 +634,12 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
     clusterId = built.cluster.id;
     context = { cluster: built.cluster };
   } else if (step.category_id === "talos-cluster") {
-    const currentCluster = findCurrentCluster(dirs);
-    if (!currentCluster) {
-      return res.status(409).json({ error: `${stepId} requires an existing cluster context` });
+    const requestedCluster = resolveRequestedCluster(req.body?.cluster_id);
+    if (!requestedCluster.ok) {
+      return res.status(requestedCluster.status || 400).json({ error: requestedCluster.error });
     }
-    clusterId = currentCluster.id;
-    context = { cluster: currentCluster };
+    clusterId = requestedCluster.cluster.id;
+    context = { cluster: requestedCluster.cluster };
   }
 
   const payload = {
@@ -644,6 +667,7 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
 
   return res.status(202).json({
     step_id: step.id,
+    cluster_id: clusterId,
     job_id: job.id,
     job_type: job.type,
   });

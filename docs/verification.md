@@ -78,6 +78,7 @@ For `install-secret-sync`:
 ```bash
 kubectl --kubeconfig <materialized-kubeconfig> get pods -n external-secrets
 kubectl --kubeconfig <materialized-kubeconfig> get pods -n bitwarden
+kubectl --kubeconfig <materialized-kubeconfig> get networkpolicy -n bitwarden
 kubectl --kubeconfig <materialized-kubeconfig> get secretstores,externalsecrets,secrets -n twinbox-system
 ```
 
@@ -85,6 +86,7 @@ Expected:
 
 - `external-secrets` deployment available.
 - `bitwarden-cli` deployment available.
+- `NetworkPolicy/bitwarden-cli-allow-external-secrets` present in `bitwarden`.
 - `SecretStore` resources present in `twinbox-system`.
 - `ExternalSecret/proxmox-bootstrap` ready.
 - `Secret/proxmox-bootstrap` present.

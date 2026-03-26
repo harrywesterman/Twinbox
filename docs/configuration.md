@@ -54,6 +54,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 ```
 
 The Management VM uses these values to bring up Vaultwarden on the trusted LAN address of the Management VM, register the local Twinbox service account automatically, write the CLI API key files under `/opt/twinbox/bootstrap/`, and let both the host bootstrap and the API/worker unlock Vaultwarden against the same reachable URL.
+Cluster-scoped follow-up steps such as `install-secret-sync` run against an explicit `cluster_id` supplied by the UI, so the manager runtime does not infer a target cluster from filesystem timestamps.
 
 Tooling version notes:
 
