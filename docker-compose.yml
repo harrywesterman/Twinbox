@@ -43,6 +43,7 @@ services:
       - ./manager-data:/data
       - ./categories:/opt/twinbox/categories:ro
       - ./scripts:/opt/twinbox/scripts:ro
+      - ./gitops:/opt/twinbox/gitops:ro
       - ./bootstrap:/opt/twinbox/bootstrap
     ports:
       - "8080:8080"
@@ -83,6 +84,7 @@ services:
       - ./manager-data:/data
       - ./categories:/opt/twinbox/categories:ro
       - ./scripts:/opt/twinbox/scripts:ro
+      - ./gitops:/opt/twinbox/gitops:ro
       - ./bootstrap:/opt/twinbox/bootstrap
       - /etc/cron.d:/host/etc/cron.d
       - /home/twinbox:/home/twinbox
