@@ -38,17 +38,21 @@ EOF
 }
 
 wait_for_argocd_workloads() {
-  local deployment
-  local deployments=()
+  local selector
+  local selectors=(
+    "app.kubernetes.io/name=argocd-applicationset-controller"
+    "app.kubernetes.io/name=argocd-dex-server"
+    "app.kubernetes.io/name=argocd-redis"
+    "app.kubernetes.io/name=argocd-repo-server"
+    "app.kubernetes.io/name=argocd-server"
+  )
 
-  mapfile -t deployments < <(kubectl -n argocd get deployment -o name 2>/dev/null | sort)
-
-  for deployment in "${deployments[@]}"; do
-    log "Waiting for ${deployment} to become available"
-    kubectl -n argocd wait --for=condition=Available "$deployment" --timeout=600s
+  for selector in "${selectors[@]}"; do
+    log "Waiting for pods with selector ${selector} to become ready"
+    kubectl -n argocd wait --for=condition=Ready pod -l "$selector" --timeout=600s
   done
 
-  log "Waiting for statefulset/argocd-application-controller pods to become ready"
+  log "Waiting for statefulset/argocd-application-controller pod to become ready"
   kubectl -n argocd wait --for=condition=Ready pod -l app.kubernetes.io/name=argocd-application-controller --timeout=600s
 }
 
