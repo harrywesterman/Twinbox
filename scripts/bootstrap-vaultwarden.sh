@@ -471,6 +471,35 @@ seed_proxmox_item() {
   log "Seeded ${item_name}"
 }
 
+seed_grafana_item() {
+  local item_name="${VAULTWARDEN_ITEM_PREFIX:-twinbox}/global/grafana"
+  local item_json=""
+  local template_json=""
+  local grafana_password=""
+
+  if bw list items --session "$BW_SESSION" --search "$item_name" | jq -e --arg name "$item_name" '.[] | select(.name == $name)' >/dev/null; then
+    log "Grafana item already exists"
+    return 0
+  fi
+
+  grafana_password="$(openssl rand -hex 16)"
+  template_json="$(bw get template item --session "$BW_SESSION")"
+  item_json="$(printf '%s\n' "$template_json" | jq \
+    --arg name "$item_name" \
+    --arg username "admin" \
+    --arg password "$grafana_password" \
+    '
+      .name = $name
+      | .type = 1
+      | .login.username = $username
+      | .login.password = $password
+      | .notes = "Seeded by Twinbox bootstrap"
+    ')"
+
+  printf '%s\n' "$item_json" | bw encode | bw create item --session "$BW_SESSION" >/dev/null
+  log "Seeded ${item_name}"
+}
+
 disable_signups() {
   if grep -q '^VAULTWARDEN_SIGNUPS_ALLOWED=' "$ENV_FILE"; then
     sed -i 's/^VAULTWARDEN_SIGNUPS_ALLOWED=.*/VAULTWARDEN_SIGNUPS_ALLOWED=false/' "$ENV_FILE"
@@ -515,6 +544,7 @@ main() {
   export BW_SESSION
   bw sync --session "$BW_SESSION" >/dev/null
   seed_proxmox_item
+  seed_grafana_item
   disable_signups
   restart_vaultwarden
   write_ready_file
