@@ -218,16 +218,14 @@ def test_install_secret_sync_installs_eso_and_applies_secret_sync_manifests():
     assert 'kind: SecretStore' in text
     assert 'kind: ExternalSecret' in text
     assert 'kind: NetworkPolicy' in text
-    assert 'name: bitwarden-webhook-auth' in text
-    assert 'external-secrets.io/type: webhook' in text
-    assert 'Authorization: "Bearer {{ .auth.session }}"' in text
-    assert '--from-literal=BW_SESSION="$cli_session"' in text
     assert 'bw login --apikey >/dev/null' in text
-    assert 'export BW_SESSION="\\${BW_SESSION}"' in text
+    assert 'export BW_SESSION="\\$(bw unlock --passwordenv BW_PASSWORD --raw)"' in text
     assert 'bw sync --session "\\${BW_SESSION}" >/dev/null' in text
-    assert 'key: BW_SESSION' in text
-    assert 'secretRef:' in text
-    assert 'name: bitwarden-webhook-auth' in text
+    assert '--from-literal=BW_SESSION="$cli_session"' not in text
+    assert 'Authorization: "Bearer {{ .auth.session }}"' not in text
+    assert 'external-secrets.io/type: webhook' not in text
+    assert 'bitwarden-webhook-auth' not in text
+    assert 'key: BW_SESSION' not in text
     assert 'bitwarden-cli-allow-external-secrets' in text
     assert 'kubernetes.io/metadata.name: ${OPERATOR_NAMESPACE}' in text
     assert 'automountServiceAccountToken: false' in text
