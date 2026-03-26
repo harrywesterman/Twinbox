@@ -16,6 +16,7 @@ Twinbox uses a manager-first architecture centered on a Management VM.
 
 3. **Execution Layer (inside worker image)**
    - `scripts/manager/apply-cluster.sh`
+   - `scripts/manager/install-secret-sync.sh`
    - `scripts/manager/collect-state.sh`
    - `categories/*/steps/*/*.sh`
 
@@ -52,5 +53,6 @@ Twinbox uses a manager-first architecture centered on a Management VM.
 - Vaultwarden runs on the Management VM and is exposed on the trusted LAN address of that VM so the host bootstrap and manager containers can resolve the same secret store.
 - `manager-api` and `manager-worker` resolve secret refs through the broker at runtime; queued jobs and cluster state persist refs only.
 - Talos file secrets are materialized into temporary runtime files and cleaned up after the job completes.
+- External Secrets Operator and the Bitwarden/Vaultwarden webhook bridge project Vaultwarden secrets into Kubernetes only as derived runtime artifacts.
 - The Management VM bootstraps the Vaultwarden service account and CLI API key automatically during first startup.
 - No built-in auth/RBAC yet.

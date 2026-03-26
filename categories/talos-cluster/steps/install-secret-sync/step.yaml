@@ -1,0 +1,21 @@
+id: install-secret-sync
+title: Install secret sync
+type: action
+journey_stage: setup
+order: 20
+summary: Install External Secrets Operator and sync the first Vaultwarden-backed Kubernetes Secret.
+explanation: Twinbox installs External Secrets Operator, deploys a Bitwarden CLI bridge that talks to Vaultwarden, and creates a namespaced SecretStore plus one ExternalSecret for the Proxmox bootstrap secret.
+side_help: Kubernetes Secrets remain derived artifacts. Vaultwarden stays the source of truth.
+depends_on:
+  - provision-nodes
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/install-secret-sync/run.sh

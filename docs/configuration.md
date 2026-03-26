@@ -16,6 +16,7 @@ VAULTWARDEN_PASSWORD_FILE=/opt/twinbox/bootstrap/vaultwarden-password
 
 `PROXMOX_PASSWORD` is used only to seed `twinbox/global/proxmox` during the initial Vaultwarden bootstrap. `manager-api` and `manager-worker` no longer receive it through Compose after the cutover.
 Talos access files are materialized at runtime from Vaultwarden-backed refs and are not kept as canonical files under `manager-data/`.
+The post-bootstrap `install-secret-sync` step consumes `KUBECONFIG_FILE` from the worker secret bundle and the bootstrap Vaultwarden files already mounted under `/opt/twinbox/bootstrap/`.
 
 ## Current Runtime Variables
 
@@ -58,6 +59,7 @@ Tooling version notes:
 
 - `kubectl` and `helm` come from `.env`.
 - `tofu` and `talosctl` versions are pinned in `config/pinned-defaults.sh`.
+- External Secrets Operator chart version is pinned in `config/pinned-defaults.sh`.
 - The management VM host install script and `manager-worker` resolve Talos images through `scripts/get-talos-image-factory.sh`, then download the resulting disk image locally before handing it to OpenTofu.
 - The same helper also resolves the matching Talos Image Factory installer image, and provisioning writes that into `machine.install.image` so boot-asset extensions persist after Talos installs to disk.
 - To refresh a Talos Factory schematic or build a future-version URL, use `scripts/get-talos-image-factory.sh` with `--preset vanilla` or `--preset qemu-guest-agent`.

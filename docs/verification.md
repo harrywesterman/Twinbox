@@ -73,6 +73,22 @@ Expected: command exits with status 0.
 2. Verify state transitions: `pending` -> `running` -> `succeeded|failed`.
 3. Confirm logs in `manager-data/logs/<job_id>.log`.
 
+For `install-secret-sync`:
+
+```bash
+kubectl --kubeconfig <materialized-kubeconfig> get pods -n external-secrets
+kubectl --kubeconfig <materialized-kubeconfig> get pods -n bitwarden
+kubectl --kubeconfig <materialized-kubeconfig> get secretstores,externalsecrets,secrets -n twinbox-system
+```
+
+Expected:
+
+- `external-secrets` deployment available.
+- `bitwarden-cli` deployment available.
+- `SecretStore` resources present in `twinbox-system`.
+- `ExternalSecret/proxmox-bootstrap` ready.
+- `Secret/proxmox-bootstrap` present.
+
 ## 8. Data Integrity
 
 - `manager-data/clusters/*.json` populated.

@@ -9,6 +9,7 @@ BOOTSTRAP_SCRIPT = REPO_ROOT / "scripts" / "manager" / "bootstrap-talos.sh"
 PROVISION_NODES_SCRIPT = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "provision-nodes" / "run.sh"
 MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "main.tf"
 MODULE_OUTPUTS = REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "outputs.tf"
+INSTALL_SECRET_SYNC_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-secret-sync.sh"
 
 
 def _apply_cluster_text() -> str:
@@ -25,6 +26,10 @@ def _module_text() -> str:
 
 def _module_outputs_text() -> str:
     return MODULE_OUTPUTS.read_text(encoding="utf-8")
+
+
+def _install_secret_sync_text() -> str:
+    return INSTALL_SECRET_SYNC_SCRIPT.read_text(encoding="utf-8")
 
 
 def test_apply_cluster_requires_proxmox_env():
@@ -171,6 +176,19 @@ def test_bootstrap_talos_uses_discovered_ips_and_records_runtime_state():
     assert 'talosctl kubeconfig' in text
     assert 'qm guest cmd' not in text
     assert 'detach_all_vm_isos' not in text
+
+
+def test_install_secret_sync_installs_eso_and_applies_secret_sync_manifests():
+    text = _install_secret_sync_text()
+    assert 'source "$WORKSPACE_ROOT/config/pinned-defaults.sh"' in text
+    assert 'PINNED_EXTERNAL_SECRETS_CHART_VERSION' in text
+    assert 'helm repo add external-secrets https://charts.external-secrets.io' in text
+    assert 'helm upgrade --install external-secrets external-secrets/external-secrets' in text
+    assert 'kubectl rollout status deployment/external-secrets' in text
+    assert 'kind: SecretStore' in text
+    assert 'kind: ExternalSecret' in text
+    assert 'bw serve --hostname 0.0.0.0' in text
+    assert 'KUBECONFIG_FILE is required' in text
 
 
 def test_talos_module_is_vm_only_and_keeps_planned_outputs():

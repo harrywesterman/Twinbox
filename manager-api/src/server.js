@@ -10,7 +10,7 @@ import {
   normalizeClusterName,
   persistCluster,
 } from "./lib/clusters.js";
-import { buildCatalogResponse, validateStepInputs } from "./lib/catalog.js";
+import { buildCatalogResponse, findCurrentCluster, validateStepInputs } from "./lib/catalog.js";
 import {
   buildDataDirs,
   ensureDir,
@@ -22,7 +22,7 @@ import {
 } from "./lib/common.js";
 import { queueJob } from "./lib/jobs.js";
 import { createSecretBroker } from "../../lib/secrets/broker.mjs";
-import { buildProxmoxApiSecretBundle } from "../../lib/secrets/schema.mjs";
+import { buildProxmoxApiSecretBundle, normalizeSecretBundle } from "../../lib/secrets/schema.mjs";
 
 const app = express();
 const port = Number(process.env.MANAGER_API_PORT || 8080);
@@ -610,6 +610,13 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
     persistCluster(dirs, built.cluster);
     clusterId = built.cluster.id;
     context = { cluster: built.cluster };
+  } else if (step.category_id === "talos-cluster") {
+    const currentCluster = findCurrentCluster(dirs);
+    if (!currentCluster) {
+      return res.status(409).json({ error: `${stepId} requires an existing cluster context` });
+    }
+    clusterId = currentCluster.id;
+    context = { cluster: currentCluster };
   }
 
   const payload = {
@@ -621,6 +628,8 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
   };
   if (stepId === "provision-nodes" && context.cluster) {
     payload.secret_bundle = buildApplyJobPayload(context.cluster).secret_bundle;
+  } else if (step.secrets && (Object.keys(step.secrets.env || {}).length > 0 || Object.keys(step.secrets.files || {}).length > 0)) {
+    payload.secret_bundle = normalizeSecretBundle(step.secrets);
   }
   const job = queueJob(dirs, "run_step", clusterId, payload);
 
