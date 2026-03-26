@@ -10,6 +10,8 @@ PROVISION_NODES_SCRIPT = REPO_ROOT / "categories" / "talos-cluster" / "steps" / 
 MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "main.tf"
 MODULE_OUTPUTS = REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "outputs.tf"
 INSTALL_SECRET_SYNC_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-secret-sync.sh"
+ARGO_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-argocd.sh"
+ARGO_BOOTSTRAP_SCRIPT = REPO_ROOT / "gitops" / "install.sh"
 
 
 def _apply_cluster_text() -> str:
@@ -30,6 +32,14 @@ def _module_outputs_text() -> str:
 
 def _install_secret_sync_text() -> str:
     return INSTALL_SECRET_SYNC_SCRIPT.read_text(encoding="utf-8")
+
+
+def _argo_manager_text() -> str:
+    return ARGO_MANAGER_SCRIPT.read_text(encoding="utf-8")
+
+
+def _argo_bootstrap_text() -> str:
+    return ARGO_BOOTSTRAP_SCRIPT.read_text(encoding="utf-8")
 
 
 def test_apply_cluster_requires_proxmox_env():
@@ -216,6 +226,22 @@ def test_install_secret_sync_installs_eso_and_applies_secret_sync_manifests():
     assert 'emptyDir: {}' in text
     assert 'bw serve --hostname 0.0.0.0' in text
     assert 'KUBECONFIG_FILE is required' in text
+
+
+def test_argo_manager_script_requires_kubeconfig_and_calls_gitops_bootstrap():
+    text = _argo_manager_text()
+    assert 'Bootstrapping Argo CD' in text
+    assert 'bash "$WORKSPACE_ROOT/gitops/install.sh"' in text
+    assert 'KUBECONFIG_FILE is required' in text
+
+
+def test_argo_bootstrap_script_installs_argocd_and_applies_bootstrap_root_application():
+    text = _argo_bootstrap_text()
+    assert 'Creating argocd namespace' in text
+    assert 'Installing Argo CD' in text
+    assert 'kubectl apply --server-side -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.3.4/manifests/install.yaml' in text
+    assert 'Applying bootstrap root application' in text
+    assert 'gitops/argocd/bootstrap/root.yaml' in text
 
 
 def test_talos_module_is_vm_only_and_keeps_planned_outputs():

@@ -96,6 +96,19 @@ Expected:
 - `ExternalSecret/proxmox-bootstrap` ready.
 - `Secret/proxmox-bootstrap` present.
 
+For `install-argocd`:
+
+```bash
+kubectl --kubeconfig <materialized-kubeconfig> get application root -n argocd -o yaml | grep -E 'gitops/argocd/bootstrap/apps|whoami|headlamp'
+kubectl --kubeconfig <materialized-kubeconfig> get namespace argocd
+```
+
+Expected:
+
+- `argocd` namespace exists.
+- `Application/root` exists in `argocd`.
+- The root Application points at `gitops/argocd/bootstrap/apps` and only covers the safe non-secret bootstrap workloads.
+
 ## 8. Data Integrity
 
 - `manager-data/clusters/*.json` populated.
