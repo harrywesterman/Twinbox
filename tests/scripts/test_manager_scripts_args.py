@@ -305,6 +305,8 @@ def test_install_secret_sync_installs_eso_and_applies_secret_sync_manifests():
     assert 'bw login --apikey >/dev/null' in text
     assert 'export BW_SESSION="\\$(bw unlock --passwordenv BW_PASSWORD --raw)"' in text
     assert 'bw sync --session "\\${BW_SESSION}" >/dev/null' in text
+    assert 'kubectl rollout status deployment/external-secrets-webhook -n "$OPERATOR_NAMESPACE" --timeout=180s' in text
+    assert 'kubectl rollout status deployment/external-secrets-cert-controller -n "$OPERATOR_NAMESPACE" --timeout=180s' in text
     assert '--from-literal=BW_SESSION="$cli_session"' not in text
     assert 'Authorization: "Bearer {{ .auth.session }}"' not in text
     assert 'external-secrets.io/type: webhook' not in text

@@ -99,6 +99,8 @@ helm upgrade --install external-secrets external-secrets/external-secrets \
   --set-json "certController.tolerations=${control_plane_tolerations}"
 
 kubectl rollout status deployment/external-secrets -n "$OPERATOR_NAMESPACE" --timeout=180s
+kubectl rollout status deployment/external-secrets-webhook -n "$OPERATOR_NAMESPACE" --timeout=180s
+kubectl rollout status deployment/external-secrets-cert-controller -n "$OPERATOR_NAMESPACE" --timeout=180s
 
 kubectl apply -f - <<EOF
 apiVersion: v1
