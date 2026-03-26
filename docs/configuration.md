@@ -61,7 +61,9 @@ When the worker finishes Talos bootstrap for a cluster, it also mirrors the gene
 
 Tooling version notes:
 
-- `kubectl`, `helm`, and `k9s` are installed by `scripts/install-management-tools.sh`.
+- `kubectl` and `helm` are installed by `scripts/install-management-tools.sh` in the `full` profile.
+- The initial wizard cloud-init uses the `bootstrap` profile, which keeps first boot focused on required host tools.
+- `k9s` stays part of the bootstrap host toolchain.
 - `tofu` and `talosctl` versions are pinned in `config/pinned-defaults.sh`.
 - External Secrets Operator chart version is pinned in `config/pinned-defaults.sh`.
 - The management VM host install script and `manager-worker` resolve Talos images through `scripts/get-talos-image-factory.sh`, then download the resulting disk image locally before handing it to OpenTofu.

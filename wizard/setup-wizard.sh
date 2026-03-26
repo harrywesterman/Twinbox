@@ -1216,7 +1216,7 @@ runcmd:
   - chmod 0600 ${TWINBOX_TARGET_DIR}/bootstrap/vaultwarden-password
   - install -m 0600 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /tmp/twinbox.env.template ${TWINBOX_TARGET_DIR}/.env
   - chown -R ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}
-  - bash -lc 'cd ${TWINBOX_TARGET_DIR} && chmod +x scripts/install-management-tools.sh && ./scripts/install-management-tools.sh --env-file ${TWINBOX_TARGET_DIR}/.env'
+  - bash -lc 'cd ${TWINBOX_TARGET_DIR} && chmod +x scripts/install-management-tools.sh && ./scripts/install-management-tools.sh --profile bootstrap --env-file ${TWINBOX_TARGET_DIR}/.env'
   - bash -lc 'cd ${TWINBOX_TARGET_DIR} && docker compose up -d vaultwarden'
   - bash -lc 'cd ${TWINBOX_TARGET_DIR} && chmod +x scripts/bootstrap-vaultwarden.sh && ./scripts/bootstrap-vaultwarden.sh'
   - bash -lc 'sudo -u ${CLOUD_INIT_USER} -H bash -lc "cd ${TWINBOX_TARGET_DIR} && docker compose pull && docker compose up -d"'

@@ -20,16 +20,27 @@ def test_install_management_tools_checks_x86_64_v2_flags_for_recent_talosctl():
 
 def test_install_management_tools_fails_on_version_command_errors():
     text = _script_text()
-    assert 'required_vars=(KUBECTL_VERSION HELM_VERSION)' in text
-    assert "TALOSCTL_VERSION" not in text.split("required_vars=", 1)[1].split("for var in", 1)[0]
+    assert 'Usage: install-management-tools.sh [--profile bootstrap|full] [--env-file /path/to/.env]' in text
+    assert 'PROFILE="${PROFILE:-full}"' in text
+    assert 'case "$PROFILE" in' in text
+    assert 'bootstrap|full' in text
+    assert 'required_vars=()' in text
+    assert 'required_vars+=(KUBECTL_VERSION HELM_VERSION)' in text
+    bootstrap_section = text.split('if [[ "$PROFILE" == "full" ]]; then', 1)[0]
+    assert 'KUBECTL_VERSION' not in bootstrap_section
+    assert 'HELM_VERSION' not in bootstrap_section
     assert 'talos_output="$(/usr/local/bin/talosctl version --client 2>&1)" || fail "talosctl version check failed: ${talos_output}"' in text
     assert 'tofu_output="$(/usr/local/bin/tofu version 2>&1)" || fail "tofu version check failed: ${tofu_output}"' in text
+    assert 'if [[ "$PROFILE" == "full" ]]; then' in text
     assert 'kubectl_output="$(/usr/local/bin/kubectl version --client --output=yaml 2>&1)" || fail "kubectl version check failed: ${kubectl_output}"' in text
     assert 'helm_output="$(/usr/local/bin/helm version --short 2>&1)" || fail "helm version check failed: ${helm_output}"' in text
     assert 'k9s_output="$(/usr/local/bin/k9s version --short 2>&1)" || fail "k9s version check failed: ${k9s_output}"' in text
     assert 'install_wrappers()' in text
     assert 'install -m 0755 "$kubectl_wrapper" /usr/local/bin/k' in text
     assert 'install -m 0755 "$talosctl_wrapper" /usr/local/bin/t' in text
+    assert 'if [[ "$PROFILE" == "full" ]]; then' in text
+    assert 'install_kubectl' in text
+    assert 'install_helm' in text
 
 
 def test_install_management_tools_installs_and_verifies_bw():
@@ -39,3 +50,7 @@ def test_install_management_tools_installs_and_verifies_bw():
     assert "install_k9s()" in text
     assert 'PINNED_K9S_VERSION' in text
     assert 'k9s version --short' in text
+    assert 'install_talosctl' in text
+    assert 'install_tofu' in text
+    assert 'install_k9s' in text
+    assert 'install_bw' in text

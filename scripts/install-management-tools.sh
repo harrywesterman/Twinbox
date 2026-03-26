@@ -8,7 +8,7 @@ source "$SCRIPT_DIR/../config/pinned-defaults.sh"
 
 usage() {
   cat <<'USAGE'
-Usage: install-management-tools.sh [--env-file /path/to/.env]
+Usage: install-management-tools.sh [--profile bootstrap|full] [--env-file /path/to/.env]
 USAGE
 }
 
@@ -23,6 +23,11 @@ fail() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --profile)
+      [[ $# -ge 2 ]] || fail "--profile requires a value"
+      PROFILE="$2"
+      shift 2
+      ;;
     --env-file)
       [[ $# -ge 2 ]] || fail "--env-file requires a value"
       ENV_FILE="$2"
@@ -39,6 +44,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+PROFILE="${PROFILE:-full}"
+case "$PROFILE" in
+  bootstrap|full) ;;
+  *)
+    fail "Unknown profile: ${PROFILE}"
+    ;;
+esac
+
 [[ -f "$ENV_FILE" ]] || fail "Environment file not found: $ENV_FILE"
 [[ "$(uname -s)" == "Linux" ]] || fail "Only Linux is supported"
 [[ "$(uname -m)" == "x86_64" ]] || fail "Only amd64/x86_64 is supported"
@@ -48,11 +61,16 @@ set -a
 source "$ENV_FILE"
 set +a
 
-required_vars=(KUBECTL_VERSION HELM_VERSION)
+required_vars=()
+[[ -n "${PINNED_K9S_VERSION:-}" ]] || fail "Missing required variable in ${ENV_FILE}: PINNED_K9S_VERSION"
+
+if [[ "$PROFILE" == "full" ]]; then
+  required_vars+=(KUBECTL_VERSION HELM_VERSION)
+fi
+
 for var in "${required_vars[@]}"; do
   [[ -n "${!var:-}" ]] || fail "Missing required variable in ${ENV_FILE}: ${var}"
 done
-[[ -n "${PINNED_K9S_VERSION:-}" ]] || fail "Missing required variable in ${ENV_FILE}: PINNED_K9S_VERSION"
 
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
@@ -326,63 +344,77 @@ extract_semver() {
 
 verify_versions() {
   local talos_output=""
-  local kubectl_output=""
-  local helm_output=""
   local tofu_output=""
   local bw_output=""
   local k9s_output=""
   local talos_actual=""
   local tofu_actual=""
-  local kubectl_actual=""
-  local helm_actual=""
   local bw_actual=""
   local k9s_actual=""
   local talos_expected
   local tofu_expected
-  local kubectl_expected
-  local helm_expected
   local bw_expected
   local k9s_expected
+  local kubectl_output=""
+  local helm_output=""
+  local kubectl_actual=""
+  local helm_actual=""
+  local kubectl_expected=""
+  local helm_expected=""
 
   talos_output="$(/usr/local/bin/talosctl version --client 2>&1)" || fail "talosctl version check failed: ${talos_output}"
   tofu_output="$(/usr/local/bin/tofu version 2>&1)" || fail "tofu version check failed: ${tofu_output}"
-  kubectl_output="$(/usr/local/bin/kubectl version --client --output=yaml 2>&1)" || fail "kubectl version check failed: ${kubectl_output}"
-  helm_output="$(/usr/local/bin/helm version --short 2>&1)" || fail "helm version check failed: ${helm_output}"
   bw_output="$(/usr/local/bin/bw --version 2>&1)" || fail "bw version check failed: ${bw_output}"
   k9s_output="$(/usr/local/bin/k9s version --short 2>&1)" || fail "k9s version check failed: ${k9s_output}"
+  if [[ "$PROFILE" == "full" ]]; then
+    kubectl_output="$(/usr/local/bin/kubectl version --client --output=yaml 2>&1)" || fail "kubectl version check failed: ${kubectl_output}"
+    helm_output="$(/usr/local/bin/helm version --short 2>&1)" || fail "helm version check failed: ${helm_output}"
+  fi
 
   talos_actual="$(extract_semver "$talos_output")"
   tofu_actual="$(extract_semver "$tofu_output")"
-  kubectl_actual="$(extract_semver "$kubectl_output")"
-  helm_actual="$(extract_semver "$helm_output")"
   bw_actual="$(extract_semver "$bw_output")"
   k9s_actual="$(extract_semver "$k9s_output")"
+  if [[ "$PROFILE" == "full" ]]; then
+    kubectl_actual="$(extract_semver "$kubectl_output")"
+    helm_actual="$(extract_semver "$helm_output")"
+  fi
 
   talos_expected="$(normalize_version "$PINNED_TALOS_VERSION")"
   tofu_expected="$(normalize_version "$PINNED_OPENTOFU_VERSION")"
-  kubectl_expected="$(normalize_version "$KUBECTL_VERSION")"
-  helm_expected="$(normalize_version "$HELM_VERSION")"
   k9s_expected="$(normalize_version "$PINNED_K9S_VERSION")"
   bw_expected="1.22.1"
+  if [[ "$PROFILE" == "full" ]]; then
+    kubectl_expected="$(normalize_version "$KUBECTL_VERSION")"
+    helm_expected="$(normalize_version "$HELM_VERSION")"
+  fi
 
   [[ "$talos_actual" == "$talos_expected" ]] || fail "talosctl version mismatch: expected v${talos_expected}, got v${talos_actual}"
   [[ "$tofu_actual" == "$tofu_expected" ]] || fail "tofu version mismatch: expected v${tofu_expected}, got v${tofu_actual}"
-  [[ "$kubectl_actual" == "$kubectl_expected" ]] || fail "kubectl version mismatch: expected v${kubectl_expected}, got v${kubectl_actual}"
-  [[ "$helm_actual" == "$helm_expected" ]] || fail "helm version mismatch: expected v${helm_expected}, got v${helm_actual}"
   [[ "$k9s_actual" == "$k9s_expected" ]] || fail "k9s version mismatch: expected v${k9s_expected}, got v${k9s_actual}"
   [[ "$bw_actual" == "$bw_expected" ]] || fail "bw version mismatch: expected v${bw_expected}, got v${bw_actual}"
+  if [[ "$PROFILE" == "full" ]]; then
+    [[ "$kubectl_actual" == "$kubectl_expected" ]] || fail "kubectl version mismatch: expected v${kubectl_expected}, got v${kubectl_actual}"
+    [[ "$helm_actual" == "$helm_expected" ]] || fail "helm version mismatch: expected v${helm_expected}, got v${helm_actual}"
+  fi
 
-  log "Installed versions: talosctl=v${talos_actual}, tofu=v${tofu_actual}, kubectl=v${kubectl_actual}, helm=v${helm_actual}, k9s=v${k9s_actual}, bw=v${bw_actual}"
+  if [[ "$PROFILE" == "full" ]]; then
+    log "Installed versions: talosctl=v${talos_actual}, tofu=v${tofu_actual}, kubectl=v${kubectl_actual}, helm=v${helm_actual}, k9s=v${k9s_actual}, bw=v${bw_actual}"
+  else
+    log "Installed versions: talosctl=v${talos_actual}, tofu=v${tofu_actual}, k9s=v${k9s_actual}, bw=v${bw_actual}"
+  fi
 }
 
 ensure_talos_cpu_compatibility
 install_talosctl
 install_tofu
-install_kubectl
-install_helm
 install_k9s
 install_bw
 install_wrappers
+if [[ "$PROFILE" == "full" ]]; then
+  install_kubectl
+  install_helm
+fi
 verify_versions
 
 log "Done"

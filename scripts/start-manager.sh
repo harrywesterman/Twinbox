@@ -58,7 +58,7 @@ append_vaultwarden_env_block
 ensure_bootstrap_material
 
 if [[ -x scripts/install-management-tools.sh ]]; then
-  sudo ./scripts/install-management-tools.sh --env-file .env
+  sudo ./scripts/install-management-tools.sh --profile full --env-file .env
 else
   echo "Missing scripts/install-management-tools.sh"
   exit 1
