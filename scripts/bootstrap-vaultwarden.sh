@@ -112,6 +112,42 @@ reset_bitwarden_state() {
   bw logout >/dev/null 2>&1 || true
 }
 
+probe_vaultwarden_access() {
+  local probe_dir=""
+  local client_id=""
+  local client_secret=""
+  local session=""
+
+  [[ -s "$VAULTWARDEN_PASSWORD_FILE" ]] || return 1
+  [[ -s "$VAULTWARDEN_CLIENTID_FILE" ]] || return 1
+  [[ -s "$VAULTWARDEN_CLIENTSECRET_FILE" ]] || return 1
+
+  probe_dir="$(mktemp -d)"
+  client_id="$(read_secret_file "$VAULTWARDEN_CLIENTID_FILE")"
+  client_secret="$(read_secret_file "$VAULTWARDEN_CLIENTSECRET_FILE")"
+
+  BITWARDENCLI_APPDATA_DIR="$probe_dir" bw config server "$VAULTWARDEN_PUBLIC_URL" >/dev/null
+  if ! BITWARDENCLI_APPDATA_DIR="$probe_dir" BW_CLIENTID="$client_id" BW_CLIENTSECRET="$client_secret" bw login --apikey >/dev/null 2>&1; then
+    rm -rf "$probe_dir"
+    return 1
+  fi
+
+  if ! session="$(BITWARDENCLI_APPDATA_DIR="$probe_dir" bw unlock --passwordfile "$VAULTWARDEN_PASSWORD_FILE" --raw 2>/dev/null)"; then
+    BITWARDENCLI_APPDATA_DIR="$probe_dir" bw logout >/dev/null 2>&1 || true
+    rm -rf "$probe_dir"
+    return 1
+  fi
+
+  [[ -n "$session" ]] || {
+    BITWARDENCLI_APPDATA_DIR="$probe_dir" bw logout >/dev/null 2>&1 || true
+    rm -rf "$probe_dir"
+    return 1
+  }
+
+  BITWARDENCLI_APPDATA_DIR="$probe_dir" bw logout >/dev/null 2>&1 || true
+  rm -rf "$probe_dir"
+}
+
 password_login() {
   bw login "$VAULTWARDEN_VAULT_EMAIL" --passwordfile "$VAULTWARDEN_PASSWORD_FILE" --raw >/dev/null
 }
@@ -297,11 +333,12 @@ create_personal_api_key_files() {
   password="$(read_secret_file "$VAULTWARDEN_PASSWORD_FILE")"
   email_lower="$(printf '%s' "$VAULTWARDEN_VAULT_EMAIL" | tr '[:upper:]' '[:lower:]')"
 
-  mapfile -t bw_context < <(read_bitwarden_access_context)
-  user_id="${bw_context[0]}"
-  access_token="${bw_context[1]}"
-  kdf_type="${bw_context[2]}"
-  kdf_iterations="${bw_context[3]}"
+  local bw_context=""
+  local client_id_tmp=""
+  local client_secret_tmp=""
+
+  bw_context="$(read_bitwarden_access_context)"
+  IFS=$'\n' read -r user_id access_token kdf_type kdf_iterations <<< "$bw_context"
 
   [[ "$kdf_type" == '0' ]] || fail "Unsupported Vaultwarden KDF type for automated bootstrap: ${kdf_type}"
 
@@ -312,19 +349,23 @@ create_personal_api_key_files() {
       -H "Authorization: Bearer ${access_token}" \
       -H 'Content-Type: application/json' \
       -d "$(jq -n --arg master_password_hash "$master_password_hash" '{masterPasswordHash: $master_password_hash}')" \
-      | jq -r '.ApiKey // empty'
+      | jq -r '.apiKey // .ApiKey // empty'
   )"
 
   [[ -n "$api_key" ]] || fail "Vaultwarden did not return an API key"
 
-  printf 'user.%s' "$user_id" > "$VAULTWARDEN_CLIENTID_FILE"
-  printf '%s' "$api_key" > "$VAULTWARDEN_CLIENTSECRET_FILE"
-  chmod 0600 "$VAULTWARDEN_CLIENTID_FILE" "$VAULTWARDEN_CLIENTSECRET_FILE"
+  client_id_tmp="$(mktemp "${VAULTWARDEN_CLIENTID_FILE}.tmp.XXXXXX")"
+  client_secret_tmp="$(mktemp "${VAULTWARDEN_CLIENTSECRET_FILE}.tmp.XXXXXX")"
+  printf 'user.%s' "$user_id" > "$client_id_tmp"
+  printf '%s' "$api_key" > "$client_secret_tmp"
+  chmod 0600 "$client_id_tmp" "$client_secret_tmp"
+  mv "$client_id_tmp" "$VAULTWARDEN_CLIENTID_FILE"
+  mv "$client_secret_tmp" "$VAULTWARDEN_CLIENTSECRET_FILE"
   log "Wrote Vaultwarden API key bootstrap files"
 }
 
 ensure_local_account_bootstrap() {
-  if [[ -s "$VAULTWARDEN_CLIENTID_FILE" && -s "$VAULTWARDEN_CLIENTSECRET_FILE" ]]; then
+  if probe_vaultwarden_access; then
     return 0
   fi
 
@@ -417,6 +458,7 @@ write_ready_file() {
 
 restart_vaultwarden() {
   docker compose up -d vaultwarden
+  wait_for_vaultwarden
 }
 
 main() {
@@ -424,7 +466,7 @@ main() {
   mkdir -p "$BW_APPDATA_DIR"
   chmod 0700 "$BW_APPDATA_DIR"
 
-  if [[ -f "$VAULTWARDEN_READY_FILE" && -s "$VAULTWARDEN_CLIENTID_FILE" && -s "$VAULTWARDEN_CLIENTSECRET_FILE" ]]; then
+  if [[ -f "$VAULTWARDEN_READY_FILE" ]] && probe_vaultwarden_access; then
     log "Vaultwarden bootstrap already completed"
     exit 0
   fi
@@ -443,8 +485,8 @@ main() {
   bw sync --session "$BW_SESSION" >/dev/null
   seed_proxmox_item
   disable_signups
-  write_ready_file
   restart_vaultwarden
+  write_ready_file
 }
 
 main "$@"
