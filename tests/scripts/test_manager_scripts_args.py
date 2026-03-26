@@ -184,8 +184,9 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     assert 'file_name = "talos-${var.talos_image_cache_key}.iso"' in main_text
     assert 'machine   = "q35"' not in main_text
     assert 'boot_order = var.boot_from_disk ? ["virtio0"] : ["ide2", "virtio0"]' in main_text
-    assert 'dynamic "cdrom"' in main_text
-    assert 'for_each = var.boot_from_disk ? [] : [1]' in main_text
+    assert 'cdrom {' in main_text
+    assert 'dynamic "cdrom"' not in main_text
+    assert 'for_each = var.boot_from_disk ? [] : [1]' not in main_text
     assert 'file_id   = proxmox_virtual_environment_file.talos_nocloud.id' in main_text
     assert 'file_id      = proxmox_virtual_environment_file.talos_nocloud.id' not in main_text
     assert 'file_format  = "raw"' not in main_text

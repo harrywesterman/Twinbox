@@ -49,12 +49,11 @@ resource "proxmox_virtual_environment_vm" "node" {
     discard      = "on"
   }
 
-  dynamic "cdrom" {
-    for_each = var.boot_from_disk ? [] : [1]
-    content {
-      interface = "ide2"
-      file_id   = proxmox_virtual_environment_file.talos_nocloud.id
-    }
+  # Keep the Talos ISO attached after bootstrap so the second apply only flips
+  # boot order and does not require the extra Proxmox privilege to change CD-ROM media.
+  cdrom {
+    interface = "ide2"
+    file_id   = proxmox_virtual_environment_file.talos_nocloud.id
   }
 
   agent {
