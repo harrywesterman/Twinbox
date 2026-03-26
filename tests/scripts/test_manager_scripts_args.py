@@ -184,6 +184,11 @@ def test_install_secret_sync_installs_eso_and_applies_secret_sync_manifests():
     assert 'PINNED_EXTERNAL_SECRETS_CHART_VERSION' in text
     assert 'helm repo add external-secrets https://charts.external-secrets.io' in text
     assert 'helm upgrade --install external-secrets external-secrets/external-secrets' in text
+    assert '--set-json "tolerations=${control_plane_tolerations}"' in text
+    assert '--set-json "webhook.tolerations=${control_plane_tolerations}"' in text
+    assert '--set-json "certController.tolerations=${control_plane_tolerations}"' in text
+    assert 'node-role.kubernetes.io/control-plane' in text
+    assert 'node-role.kubernetes.io/master' in text
     assert 'kubectl rollout status deployment/external-secrets' in text
     assert 'kind: SecretStore' in text
     assert 'kind: ExternalSecret' in text
