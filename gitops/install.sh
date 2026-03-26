@@ -85,6 +85,18 @@ EOF
   done
 }
 
+patch_argocd_repo_server_copyutil() {
+  local patch
+
+  patch=$(cat <<'EOF'
+{"spec":{"template":{"spec":{"initContainers":[{"name":"copyutil","args":["/bin/cp --update=none /usr/local/bin/argocd /var/run/argocd/argocd && /bin/ln -sfn /var/run/argocd/argocd /var/run/argocd/argocd-cmp-server"]}]}}}}
+EOF
+  )
+
+  log "Patching deployment/argocd-repo-server copyutil init container for idempotent startup"
+  kubectl -n argocd patch deployment/argocd-repo-server --type strategic -p "$patch"
+}
+
 wait_for_available() {
   local resource="$1"
 
@@ -125,6 +137,7 @@ retry 3 10 kubectl apply --server-side --force-conflicts --validate=false -n arg
 
 patch_argocd_workload_tolerations
 patch_argocd_workload_probes
+patch_argocd_repo_server_copyutil
 
 wait_for_argocd_workloads
 

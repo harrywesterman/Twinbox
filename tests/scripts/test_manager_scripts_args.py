@@ -380,6 +380,9 @@ def test_argo_bootstrap_script_installs_argocd_and_applies_full_root_application
     assert 'Patching ${resource} liveness probe for single-node bootstrap' in text
     assert '--type strategic -p' in text
     assert '"initialDelaySeconds":300' in text
+    assert 'patch_argocd_repo_server_copyutil()' in text
+    assert 'Patching deployment/argocd-repo-server copyutil init container for idempotent startup' in text
+    assert '/bin/ln -sfn /var/run/argocd/argocd /var/run/argocd/argocd-cmp-server' in text
     assert 'wait_for_available()' in text
     assert 'Waiting for ${resource} to become available' in text
     assert 'kubectl -n argocd wait --for=condition=Available "$resource" --timeout=900s' in text
