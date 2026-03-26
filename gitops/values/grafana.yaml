@@ -5,5 +5,7 @@ grafana.ini:
   server:
     root_url: https://grafana.bierineenweek.nl
 
-adminUser: admin
-adminPassword: Welkom01!
+admin:
+  existingSecret: grafana-admin
+  userKey: admin-user
+  passwordKey: admin-password

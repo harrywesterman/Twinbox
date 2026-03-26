@@ -57,7 +57,7 @@ Twinbox uses a manager-first architecture centered on a Management VM.
 - `manager-api` and `manager-worker` resolve secret refs through the broker at runtime; queued jobs and cluster state persist refs only.
 - Talos file secrets are materialized into temporary runtime files and cleaned up after the job completes.
 - External Secrets Operator and the Bitwarden/Vaultwarden webhook bridge project Vaultwarden secrets into Kubernetes only as derived runtime artifacts.
-- Route-layer secrets such as `traefik-dashboard-auth` and `wiredoor-gateway` are also projected from Vaultwarden via per-namespace `SecretStore`/`ExternalSecret` resources.
+- Route-layer secrets such as `traefik-dashboard-auth`, `wiredoor-gateway`, and the Grafana admin credentials are also projected from Vaultwarden via per-namespace `SecretStore`/`ExternalSecret` resources.
 - Argo CD bootstrap is a separate follow-up after ESO/Bitwarden; the initial `gitops/argocd/bootstrap/root.yaml` Application only syncs safe non-secret workloads like `whoami` and `headlamp`.
 - The in-cluster `bw serve` bridge is restricted by a `NetworkPolicy` so only the `external-secrets` namespace can reach it.
 - The Management VM bootstraps the Vaultwarden service account and CLI API key automatically during first startup.

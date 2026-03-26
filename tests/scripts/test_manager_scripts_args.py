@@ -18,10 +18,14 @@ HEADLAMP_VALUES = REPO_ROOT / "gitops" / "values" / "headlamp.yaml"
 ROUTES_VALUES = REPO_ROOT / "gitops" / "values" / "routes.yaml"
 TRAEFIK_VALUES = REPO_ROOT / "gitops" / "values" / "traefik.yaml"
 WIREDOOR_GATEWAY_VALUES = REPO_ROOT / "gitops" / "values" / "wiredoor-gateway.yaml"
+GRAFANA_VALUES = REPO_ROOT / "gitops" / "values" / "grafana.yaml"
 TRAEFIK_DASHBOARD_SECRETSTORE = REPO_ROOT / "gitops" / "routes" / "templates" / "traefik-dashboard-secretstore.yaml"
 TRAEFIK_DASHBOARD_EXTERNALSECRET = REPO_ROOT / "gitops" / "routes" / "templates" / "traefik-dashboard-externalsecret.yaml"
 WIREDOOR_GATEWAY_SECRETSTORE = REPO_ROOT / "gitops" / "apps" / "wiredoor-gateway-secret" / "secretstore.yaml"
 WIREDOOR_GATEWAY_EXTERNALSECRET = REPO_ROOT / "gitops" / "apps" / "wiredoor-gateway-secret" / "externalsecret.yaml"
+GRAFANA_SECRET_APP = REPO_ROOT / "gitops" / "argocd" / "apps" / "grafana-secret.yaml"
+GRAFANA_SECRETSTORE = REPO_ROOT / "gitops" / "apps" / "grafana-secret" / "secretstore.yaml"
+GRAFANA_EXTERNALSECRET = REPO_ROOT / "gitops" / "apps" / "grafana-secret" / "externalsecret.yaml"
 
 
 def _apply_cluster_text() -> str:
@@ -90,6 +94,22 @@ def _wiredoor_gateway_secretstore_text() -> str:
 
 def _wiredoor_gateway_externalsecret_text() -> str:
     return WIREDOOR_GATEWAY_EXTERNALSECRET.read_text(encoding="utf-8")
+
+
+def _grafana_values_text() -> str:
+    return GRAFANA_VALUES.read_text(encoding="utf-8")
+
+
+def _grafana_secret_app_text() -> str:
+    return GRAFANA_SECRET_APP.read_text(encoding="utf-8")
+
+
+def _grafana_secretstore_text() -> str:
+    return GRAFANA_SECRETSTORE.read_text(encoding="utf-8")
+
+
+def _grafana_externalsecret_text() -> str:
+    return GRAFANA_EXTERNALSECRET.read_text(encoding="utf-8")
 
 
 def test_apply_cluster_requires_proxmox_env():
@@ -379,6 +399,25 @@ def test_routes_and_wiredoor_secrets_are_vaultwarden_backed():
     assert 'kind: ExternalSecret' in wiredoor_externalsecret_text
     assert 'name: wiredoor-gateway' in wiredoor_externalsecret_text
     assert 'secretKey: token' in wiredoor_externalsecret_text
+
+
+def test_grafana_admin_credentials_are_vaultwarden_backed():
+    grafana_values_text = _grafana_values_text()
+    grafana_secret_app_text = _grafana_secret_app_text()
+    grafana_secretstore_text = _grafana_secretstore_text()
+    grafana_externalsecret_text = _grafana_externalsecret_text()
+
+    assert 'adminPassword:' not in grafana_values_text
+    assert 'existingSecret: grafana-admin' in grafana_values_text
+    assert 'userKey: admin-user' in grafana_values_text
+    assert 'passwordKey: admin-password' in grafana_values_text
+    assert 'kind: Application' in grafana_secret_app_text
+    assert 'grafana-secret' in grafana_secret_app_text
+    assert 'kind: SecretStore' in grafana_secretstore_text
+    assert 'twinbox/global/grafana' in grafana_secretstore_text
+    assert 'kind: ExternalSecret' in grafana_externalsecret_text
+    assert 'admin-user' in grafana_externalsecret_text
+    assert 'admin-password' in grafana_externalsecret_text
 
 
 def test_talos_module_is_vm_only_and_keeps_planned_outputs():

@@ -56,7 +56,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 
 The Management VM uses these values to bring up Vaultwarden on the trusted LAN address of the Management VM, register the local Twinbox service account automatically, write the CLI API key files under `/opt/twinbox/bootstrap/`, and let both the host bootstrap and the API/worker unlock Vaultwarden against the same reachable URL.
 Cluster-scoped follow-up steps such as `install-secret-sync` and `install-argocd` run against an explicit `cluster_id` supplied by the UI, so the manager runtime does not infer a target cluster from filesystem timestamps.
-Route-level secrets such as the Traefik dashboard basic-auth secret and the Wiredoor gateway token are also projected from Vaultwarden-backed refs before their Argo CD Applications are enabled.
+Route-level secrets such as the Traefik dashboard basic-auth secret, the Wiredoor gateway token, and the Grafana admin credentials are also projected from Vaultwarden-backed refs before their Argo CD Applications are enabled.
 
 Tooling version notes:
 

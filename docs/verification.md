@@ -112,6 +112,21 @@ Expected:
 - Argo CD controller pods are scheduled and Running on the control-plane node, not stuck Pending on the node taint.
 - The `whoami` and `headlamp` bootstrap workloads are Running on the control-plane node, not stuck Pending on the node taint.
 
+For Grafana admin credentials:
+
+```bash
+! grep -q 'adminPassword:' gitops/values/grafana.yaml
+test -f gitops/argocd/apps/grafana-secret.yaml
+test -f gitops/apps/grafana-secret/secretstore.yaml
+test -f gitops/apps/grafana-secret/externalsecret.yaml
+```
+
+Expected:
+
+- `gitops/values/grafana.yaml` no longer embeds a plaintext `adminPassword`.
+- The Grafana admin secret is managed through a Vaultwarden-backed `SecretStore`/`ExternalSecret` pair.
+- The Grafana secret Application exists alongside the other Argo CD app manifests.
+
 ## 8. Data Integrity
 
 - `manager-data/clusters/*.json` populated.
