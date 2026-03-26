@@ -53,9 +53,10 @@ require_cmd bw
 
 export KUBECONFIG="$KUBECONFIG_FILE"
 
-bitwarden_appdata_dir="$(mktemp -d)"
+bitwarden_appdata_dir="${BITWARDENCLI_APPDATA_DIR:-${WORKSPACE_ROOT}/bootstrap/bw-runtime}"
+mkdir -p "$bitwarden_appdata_dir"
 cleanup() {
-  rm -rf "$bitwarden_appdata_dir"
+  :
 }
 trap cleanup EXIT
 

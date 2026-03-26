@@ -233,6 +233,7 @@ def test_install_secret_sync_installs_eso_and_applies_secret_sync_manifests():
     assert 'bw_status="$(bw status | jq -r \'.status // "unauthenticated"\')"' in text
     assert 'if [[ "$bw_status" == "unauthenticated" ]]; then' in text
     assert 'bw sync --session "$session" >/dev/null' in text
+    assert 'mktemp -d' not in text
     assert 'livenessProbe:' in text
     assert 'tcpSocket:' in text
     assert 'port: 8087' in text
