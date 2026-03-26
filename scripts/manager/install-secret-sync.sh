@@ -79,6 +79,7 @@ cli_password="$(tr -d '\r\n' < "$VAULTWARDEN_PASSWORD_FILE")"
 cli_client_id="$(tr -d '\r\n' < "$VAULTWARDEN_CLIENTID_FILE")"
 cli_client_secret="$(tr -d '\r\n' < "$VAULTWARDEN_CLIENTSECRET_FILE")"
 worker_image="ghcr.io/harrywesterman/twinbox-manager-worker:${TWINBOX_IMAGE_TAG:-latest}"
+control_plane_tolerations='[{"key":"node-role.kubernetes.io/control-plane","operator":"Exists","effect":"NoSchedule"},{"key":"node-role.kubernetes.io/master","operator":"Exists","effect":"NoSchedule"}]'
 
 log "Installing External Secrets Operator ${chart_version}"
 helm repo add external-secrets https://charts.external-secrets.io >/dev/null 2>&1 || true
@@ -86,7 +87,10 @@ helm repo update external-secrets >/dev/null
 helm upgrade --install external-secrets external-secrets/external-secrets \
   --namespace "$OPERATOR_NAMESPACE" \
   --create-namespace \
-  --version "$chart_version"
+  --version "$chart_version" \
+  --set-json "tolerations=${control_plane_tolerations}" \
+  --set-json "webhook.tolerations=${control_plane_tolerations}" \
+  --set-json "certController.tolerations=${control_plane_tolerations}"
 
 kubectl rollout status deployment/external-secrets -n "$OPERATOR_NAMESPACE" --timeout=180s
 
@@ -154,6 +158,13 @@ spec:
         app.kubernetes.io/name: bitwarden-cli
     spec:
       automountServiceAccountToken: false
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
       containers:
         - name: bitwarden-cli
           image: ${worker_image}
