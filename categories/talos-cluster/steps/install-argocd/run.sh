@@ -19,11 +19,11 @@ bash "$WORKSPACE_ROOT/scripts/manager/install-argocd.sh" --kube-api-server "http
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \
     --arg cluster_id "$cluster_id" \
-    --arg bootstrap_root_application "root" \
-    --argjson bootstrap_applications '["whoami","headlamp"]' \
+    --arg root_application "root" \
+    --argjson root_applications '["whoami","headlamp","traefik","grafana-secret","routes","wiredoor-gateway-secret","grafana","wiredoor-gateway"]' \
     '{
       cluster_id: $cluster_id,
-      bootstrap_root_application: $bootstrap_root_application,
-      bootstrap_applications: $bootstrap_applications
+      root_application: $root_application,
+      root_applications: $root_applications
     }' >"$STEP_RESULT_FILE"
 fi

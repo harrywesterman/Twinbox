@@ -128,5 +128,5 @@ patch_argocd_workload_probes
 
 wait_for_argocd_workloads
 
-log "Applying bootstrap root application"
-retry 3 10 kubectl apply --validate=false -f "$WORKSPACE_ROOT/gitops/argocd/bootstrap/root.yaml"
+log "Applying full Argo root application"
+retry 3 10 kubectl apply --validate=false -f "$WORKSPACE_ROOT/gitops/argocd/root.yaml"

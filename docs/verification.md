@@ -99,18 +99,19 @@ Expected:
 For `install-argocd`:
 
 ```bash
-kubectl --kubeconfig <materialized-kubeconfig> get application root -n argocd -o yaml | grep -E 'gitops/argocd/bootstrap/apps|whoami|headlamp'
+kubectl --kubeconfig <materialized-kubeconfig> get application root -n argocd -o yaml | grep -E 'gitops/argocd/apps|whoami|headlamp|traefik|routes|wiredoor-gateway-secret|wiredoor-gateway|grafana-secret|grafana'
 kubectl --kubeconfig <materialized-kubeconfig> get namespace argocd
-kubectl --kubeconfig <materialized-kubeconfig> get pods -A | egrep 'headlamp|whoami'
+kubectl --kubeconfig <materialized-kubeconfig> get pods -A | egrep 'headlamp|whoami|traefik|grafana|wiredoor'
 ```
 
 Expected:
 
 - `argocd` namespace exists.
 - `Application/root` exists in `argocd`.
-- The root Application points at `gitops/argocd/bootstrap/apps` and only covers the safe non-secret bootstrap workloads.
+- The root Application points at `gitops/argocd/apps` and covers the full application tree.
 - Argo CD controller pods are scheduled and Running on the control-plane node, not stuck Pending on the node taint.
 - The `whoami` and `headlamp` bootstrap workloads are Running on the control-plane node, not stuck Pending on the node taint.
+- The `traefik`, `grafana`, and `wiredoor` workloads are also Running once the full root has synced.
 
 For Grafana admin credentials:
 

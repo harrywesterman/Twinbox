@@ -13,6 +13,7 @@ INSTALL_SECRET_SYNC_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-secret
 ARGO_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-argocd.sh"
 ARGO_STEP_SCRIPT = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
 ARGO_BOOTSTRAP_SCRIPT = REPO_ROOT / "gitops" / "install.sh"
+ARGO_ROOT = REPO_ROOT / "gitops" / "argocd" / "root.yaml"
 WHOAMI_DEPLOYMENT = REPO_ROOT / "gitops" / "apps" / "whoami" / "deployment.yaml"
 HEADLAMP_VALUES = REPO_ROOT / "gitops" / "values" / "headlamp.yaml"
 ROUTES_VALUES = REPO_ROOT / "gitops" / "values" / "routes.yaml"
@@ -62,6 +63,10 @@ def _argo_step_text() -> str:
 
 def _argo_bootstrap_text() -> str:
     return ARGO_BOOTSTRAP_SCRIPT.read_text(encoding="utf-8")
+
+
+def _argo_root_text() -> str:
+    return ARGO_ROOT.read_text(encoding="utf-8")
 
 
 def _whoami_deployment_text() -> str:
@@ -355,9 +360,11 @@ def test_argo_step_script_uses_workspace_root_for_manager_bootstrap():
     assert 'WORKSPACE_ROOT="${WORKSPACE_ROOT:-' in text
     assert 'discovered_controlplane_ips[0]' in text
     assert 'bash "$WORKSPACE_ROOT/scripts/manager/install-argocd.sh" --kube-api-server "https://${controlplane_ip}:6443"' in text
+    assert 'root_application: $root_application' in text
+    assert 'root_applications: $root_applications' in text
 
 
-def test_argo_bootstrap_script_installs_argocd_and_applies_bootstrap_root_application():
+def test_argo_bootstrap_script_installs_argocd_and_applies_full_root_application():
     text = _argo_bootstrap_text()
     wait_section = text.split('local resources=(')[1].split('for resource in "${resources[@]}"; do')[0]
     assert 'Creating argocd namespace' in text
@@ -381,8 +388,8 @@ def test_argo_bootstrap_script_installs_argocd_and_applies_bootstrap_root_applic
     assert 'deployment/argocd-applicationset-controller' in text
     assert 'deployment/argocd-repo-server' in text
     assert 'statefulset/argocd-application-controller' in text
-    assert 'Applying bootstrap root application' in text
-    assert 'kubectl apply --validate=false -f "$WORKSPACE_ROOT/gitops/argocd/bootstrap/root.yaml"' in text
+    assert 'Applying full Argo root application' in text
+    assert 'kubectl apply --validate=false -f "$WORKSPACE_ROOT/gitops/argocd/root.yaml"' in text
 
 
 def test_bootstrap_apps_tolerate_single_node_control_plane():
@@ -395,6 +402,15 @@ def test_bootstrap_apps_tolerate_single_node_control_plane():
     assert 'tolerations:' in headlamp_text
     assert 'node-role.kubernetes.io/control-plane' in headlamp_text
     assert 'node-role.kubernetes.io/master' in headlamp_text
+
+
+def test_argo_full_root_includes_full_tree():
+    text = _argo_root_text()
+
+    assert 'kind: Application' in text
+    assert 'name: root' in text
+    assert 'path: gitops/argocd/apps' in text
+    assert 'syncPolicy:' in text
 
 
 def test_routes_and_wiredoor_secrets_are_vaultwarden_backed():

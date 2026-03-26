@@ -17,7 +17,7 @@ VAULTWARDEN_PASSWORD_FILE=/opt/twinbox/bootstrap/vaultwarden-password
 `PROXMOX_PASSWORD` is used only to seed `twinbox/global/proxmox` during the initial Vaultwarden bootstrap. `manager-api` and `manager-worker` no longer receive it through Compose after the cutover.
 Talos access files are materialized at runtime from Vaultwarden-backed refs and are not kept as canonical files under `manager-data/`.
 The post-bootstrap `install-secret-sync` step consumes `KUBECONFIG_FILE` from the worker secret bundle and the bootstrap Vaultwarden files already mounted under `/opt/twinbox/bootstrap/`.
-The separate `install-argocd` step also consumes `KUBECONFIG_FILE` so it can install Argo CD and apply the bootstrap root Application from `gitops/argocd/bootstrap/root.yaml` after ESO/Bitwarden is in place. The initial Argo root only manages safe non-secret workloads like `whoami` and `headlamp`.
+The separate `install-argocd` step also consumes `KUBECONFIG_FILE` so it can install Argo CD and apply the root Application from `gitops/argocd/root.yaml` after ESO/Bitwarden is in place. The root tree now includes the Vaultwarden-backed route and Grafana apps, and sync waves keep the dependent apps ordered.
 
 ## Current Runtime Variables
 
