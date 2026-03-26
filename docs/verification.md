@@ -32,14 +32,14 @@ Expected: compose config renders successfully.
 docker compose pull
 docker compose up -d
 docker compose ps vaultwarden
-curl -fsS http://127.0.0.1:8222
+curl -fsS "http://${MANAGEMENT_VM_IP}:8222"
 bw --version
 bash scripts/bootstrap-vaultwarden.sh
 ```
 
 Expected:
 
-- Vaultwarden is running on the local Management VM only.
+- Vaultwarden is reachable on the Management VM LAN IP and the manager containers can resolve the same URL.
 - `bw` is installed on the host.
 - The bootstrap run exits cleanly without requiring a browser or SSH tunnel to the Vaultwarden web UI.
 - `/opt/twinbox/bootstrap/vaultwarden-client-id` and `/opt/twinbox/bootstrap/vaultwarden-client-secret` exist.

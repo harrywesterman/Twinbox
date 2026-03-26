@@ -90,8 +90,11 @@ def test_setup_wizard_bootstraps_vaultwarden_before_starting_manager_stack():
     text = _wizard_text()
     assert 'install -d -m 0700 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}/bootstrap' in text
     assert 'vaultwarden-password' in text
+    assert 'MANAGEMENT_VM_IP=${CLOUD_INIT_IP}' in text
     assert 'VAULTWARDEN_IMAGE_TAG=1.35.4' in text
+    assert 'VAULTWARDEN_BIND_ADDRESS=0.0.0.0' in text
     assert 'VAULTWARDEN_LOCAL_PORT=8222' in text
+    assert 'VAULTWARDEN_PUBLIC_URL=http://${CLOUD_INIT_IP}:8222' in text
     assert 'VAULTWARDEN_PASSWORD_FILE=/opt/twinbox/bootstrap/vaultwarden-password' in text
     assert 'VAULTWARDEN_READY_FILE=/opt/twinbox/bootstrap/vaultwarden-ready' in text
     assert 'docker compose up -d vaultwarden' in text

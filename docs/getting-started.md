@@ -21,7 +21,7 @@ The wizard:
 - Detects existing resources for that cluster and can remove them after explicit confirmation.
 - Installs Docker CE on that VM from the official Docker repository.
 - Clones `https://github.com/harrywesterman/twinbox` into `/opt/twinbox`.
-- Writes `/opt/twinbox/.env` and starts the manager stack automatically, including a local Vaultwarden instance on `127.0.0.1:8222`.
+- Writes `/opt/twinbox/.env` and starts the manager stack automatically, including a Vaultwarden instance on `http://<management-vm-ip>:8222`.
 
 ## Step 2: Verify Vaultwarden bootstrap
 

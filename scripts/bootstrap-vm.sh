@@ -7,17 +7,24 @@ BRANCH="${TWINBOX_BRANCH:-main}"
 BOOTSTRAP_DIR="${TARGET_DIR}/bootstrap"
 
 append_vaultwarden_env_block() {
+  local management_ip=""
+
   if grep -q '^VAULTWARDEN_IMAGE_TAG=' .env; then
     return 0
   fi
 
-  cat >> .env <<'EOF'
+  management_ip="${MANAGEMENT_VM_IP:-$(hostname -I | awk '{print $1}')}"
+
+  cat >> .env <<EOF
 
 TWINBOX_SECRET_BACKEND=vaultwarden
+MANAGEMENT_VM_IP=${management_ip}
 VAULTWARDEN_IMAGE_TAG=1.35.4
+VAULTWARDEN_BIND_ADDRESS=0.0.0.0
 VAULTWARDEN_LOCAL_PORT=8222
-VAULTWARDEN_DOMAIN=http://localhost:8222
-VAULTWARDEN_SERVER_URL=http://vaultwarden:80
+VAULTWARDEN_PUBLIC_URL=http://${management_ip}:8222
+VAULTWARDEN_DOMAIN=http://${management_ip}:8222
+VAULTWARDEN_SERVER_URL=http://${management_ip}:8222
 VAULTWARDEN_VAULT_EMAIL=twinbox@local
 VAULTWARDEN_PASSWORD_FILE=/opt/twinbox/bootstrap/vaultwarden-password
 VAULTWARDEN_CLIENTID_FILE=/opt/twinbox/bootstrap/vaultwarden-client-id
