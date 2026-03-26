@@ -57,6 +57,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 The Management VM uses these values to bring up Vaultwarden on the trusted LAN address of the Management VM, register the local Twinbox service account automatically, write the CLI API key files under `/opt/twinbox/bootstrap/`, and let both the host bootstrap and the API/worker unlock Vaultwarden against the same reachable URL.
 Cluster-scoped follow-up steps such as `install-secret-sync` and `install-argocd` run against an explicit `cluster_id` supplied by the UI, so the manager runtime does not infer a target cluster from filesystem timestamps.
 Route-level secrets such as the Traefik dashboard basic-auth secret, the Wiredoor gateway token, and the Grafana admin credentials are also projected from Vaultwarden-backed refs before their Argo CD Applications are enabled.
+When the worker finishes Talos bootstrap for a cluster, it also mirrors the generated client configs into `/home/twinbox/.kube/config` and `/home/twinbox/.talos/config` on the Management VM so the `twinbox` operator account can use `kubectl` and `talosctl` without a manual copy step.
 
 Tooling version notes:
 

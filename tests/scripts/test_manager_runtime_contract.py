@@ -8,6 +8,7 @@ def test_docker_compose_mounts_categories_and_host_cron_contract():
     text = (REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
 
     assert "WORKSPACE_ROOT=/opt/twinbox" in text
+    assert "TWINBOX_SYNC_LOCAL_CLIENT_CONFIGS=true" in text
     assert "./categories:/opt/twinbox/categories:ro" in text
     assert "./scripts:/opt/twinbox/scripts:ro" in text
     assert "./gitops:/opt/twinbox/gitops:ro" in text

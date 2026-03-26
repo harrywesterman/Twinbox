@@ -58,6 +58,7 @@ services:
       - MANAGER_DATA_DIR=/data
       - WORKER_POLL_MS=2000
       - WORKSPACE_ROOT=/opt/twinbox
+      - TWINBOX_SYNC_LOCAL_CLIENT_CONFIGS=true
       - TWINBOX_HOST_CRON_DIR=/host/etc/cron.d
       - TWINBOX_HOST_REPO_ROOT=${TWINBOX_HOST_REPO_ROOT}
       - KUBECTL_VERSION=${KUBECTL_VERSION}
