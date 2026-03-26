@@ -217,6 +217,44 @@ function summarizeStepState(state) {
   };
 }
 
+function synthesizeProvisionStateFromCluster(step, cluster, state) {
+  if (step.id !== "provision-nodes" || state || !cluster?.id) {
+    return state;
+  }
+
+  if (cluster.status === "bootstrapped" || cluster.status === "provisioned") {
+    return {
+      status: "succeeded",
+      inputs: {},
+      outputs: {
+        cluster_id: cluster.id,
+        cluster_status: cluster.status,
+      },
+      cluster_id: cluster.id,
+      error: null,
+      updated_at: cluster.updated_at || cluster.created_at || null,
+      last_job_id: null,
+    };
+  }
+
+  if (cluster.status === "failed") {
+    return {
+      status: "failed",
+      inputs: {},
+      outputs: {
+        cluster_id: cluster.id,
+        cluster_status: cluster.status,
+      },
+      cluster_id: cluster.id,
+      error: cluster.last_error || "cluster provisioning failed",
+      updated_at: cluster.updated_at || cluster.created_at || null,
+      last_job_id: null,
+    };
+  }
+
+  return state;
+}
+
 function deriveStepStatus(step, state, latestJob, completedDependencies) {
   const dependenciesMet = step.depends_on.every((dependency) => completedDependencies.has(dependency));
   if (!dependenciesMet) {
@@ -278,7 +316,8 @@ export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) 
     const steps = category.steps.map((step) => {
       const rawState = readJsonIfExists(path.join(dirs.stepState, `${step.id}.json`));
       const isClusterScopedStep = step.category_id === "talos-cluster";
-      const state = isClusterScopedStep && rawState?.cluster_id !== activeClusterId ? null : rawState;
+      const scopedState = isClusterScopedStep && rawState?.cluster_id !== activeClusterId ? null : rawState;
+      const state = isClusterScopedStep ? synthesizeProvisionStateFromCluster(step, currentCluster, scopedState) : scopedState;
       const latestJob = state?.last_job_id
         ? readJsonIfExists(path.join(dirs.jobs, `${state.last_job_id}.json`))
         : null;
