@@ -69,6 +69,7 @@ if [[ "$bw_status" == "unauthenticated" ]]; then
   bw login --apikey >/dev/null
 fi
 session="$(bw unlock --passwordfile "$VAULTWARDEN_PASSWORD_FILE" --raw)"
+bw sync --session "$session" >/dev/null
 
 item_name="${VAULTWARDEN_ITEM_PREFIX:-twinbox}/global/proxmox"
 item="$(bw list items --search "$item_name" --session "$session" | jq -c --arg name "$item_name" '.[] | select(.name == $name)')"
