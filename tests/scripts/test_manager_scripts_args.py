@@ -222,7 +222,8 @@ def test_install_secret_sync_installs_eso_and_applies_secret_sync_manifests():
     assert 'external-secrets.io/type: webhook' in text
     assert 'Authorization: "Bearer {{ .auth.session }}"' in text
     assert '--from-literal=BW_SESSION="$cli_session"' in text
-    assert 'bw unlock --passwordenv BW_PASSWORD >/dev/null' in text
+    assert 'export BW_SESSION="\\${BW_SESSION}"' in text
+    assert 'bw sync --session "\\${BW_SESSION}" >/dev/null' in text
     assert 'key: BW_SESSION' in text
     assert 'secretRef:' in text
     assert 'name: bitwarden-webhook-auth' in text
