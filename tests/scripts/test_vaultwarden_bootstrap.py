@@ -45,3 +45,34 @@ def test_bootstrap_vaultwarden_script_disables_signups_and_restarts_vaultwarden(
     assert "docker compose up -d vaultwarden" in text
     assert "VAULTWARDEN_PASSWORD_FILE" in text
     assert "disable_signups\n  restart_vaultwarden\n  write_ready_file" in text
+
+
+def test_bootstrap_vaultwarden_script_syncs_before_api_key_generation():
+    text = _script_text()
+    bootstrap_section = text.split("ensure_local_account_bootstrap() {", 1)[1].split("ensure_vaultwarden_login() {", 1)[0]
+
+    assert 'bootstrap_session="$(unlock_session)"' in bootstrap_section
+    assert 'bw sync --session "$bootstrap_session" >/dev/null' in bootstrap_section
+    assert bootstrap_section.index('bw sync --session "$bootstrap_session" >/dev/null') < bootstrap_section.index(
+        'create_personal_api_key_files'
+    )
+
+
+def test_bootstrap_vaultwarden_script_parses_multiline_bitwarden_context():
+    text = _script_text()
+    create_section = text.split("create_personal_api_key_files() {", 1)[1].split("ensure_local_account_bootstrap() {", 1)[0]
+
+    assert 'mapfile -t bw_context_lines <<< "$bw_context"' in create_section
+    assert 'user_id="${bw_context_lines[0]:-}"' in create_section
+    assert 'access_token="${bw_context_lines[1]:-}"' in create_section
+    assert 'kdf_type="${bw_context_lines[2]:-}"' in create_section
+    assert 'kdf_iterations="${bw_context_lines[3]:-}"' in create_section
+
+
+def test_bootstrap_vaultwarden_script_normalizes_bootstrap_directory_ownership():
+    text = _script_text()
+
+    assert "BOOTSTRAP_OWNER" in text
+    assert "ensure_bootstrap_ownership()" in text
+    assert 'chown -R "${BOOTSTRAP_OWNER}:${BOOTSTRAP_OWNER}" "$bootstrap_root"' in text
+    assert "ensure_bootstrap_ownership" in text

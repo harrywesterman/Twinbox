@@ -45,6 +45,8 @@ Expected:
 - `/opt/twinbox/bootstrap/vaultwarden-client-id` and `/opt/twinbox/bootstrap/vaultwarden-client-secret` exist.
 - `/opt/twinbox/bootstrap/vaultwarden-ready` exists.
 
+If the bootstrap stops after registering `twinbox@local` but before writing `vaultwarden-ready`, rerun it with `sudo bash scripts/bootstrap-vaultwarden.sh` from `/opt/twinbox` after Vaultwarden is healthy. That refreshes the Bitwarden CLI sync state and finishes the API-key bootstrap.
+
 ## 5. Runtime Health
 
 ```bash

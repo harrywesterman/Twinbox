@@ -6,6 +6,7 @@ cd "$REPO_ROOT"
 ENV_FILE="${ENV_FILE:-${REPO_ROOT}/.env}"
 BW_APPDATA_DIR="${VAULTWARDEN_BOOTSTRAP_APPDATA_DIR:-${REPO_ROOT}/bootstrap/bw-host}"
 CHECK_ONLY=0
+BOOTSTRAP_OWNER="${SUDO_USER:-$(stat -c '%U' "$REPO_ROOT" 2>/dev/null || id -un)}"
 
 usage() {
   cat <<'USAGE'
@@ -100,6 +101,14 @@ EOF
 
 ensure_vaultwarden_server_config() {
   bw config server "$VAULTWARDEN_PUBLIC_URL" >/dev/null
+}
+
+ensure_bootstrap_ownership() {
+  local bootstrap_root=""
+  bootstrap_root="$(dirname "$VAULTWARDEN_READY_FILE")"
+
+  install -d -m 0700 "$bootstrap_root"
+  chown -R "${BOOTSTRAP_OWNER}:${BOOTSTRAP_OWNER}" "$bootstrap_root"
 }
 
 read_secret_file() {
@@ -313,6 +322,8 @@ read_bitwarden_access_context() {
 
   [[ -n "$user_id" ]] || fail "Bitwarden CLI did not record an active user id"
   [[ -n "$access_token" ]] || fail "Bitwarden CLI did not record an access token"
+  kdf_type="${kdf_type:-0}"
+  kdf_iterations="${kdf_iterations:-600000}"
   [[ -n "$kdf_type" ]] || fail "Bitwarden CLI did not record a KDF type"
   [[ -n "$kdf_iterations" ]] || fail "Bitwarden CLI did not record KDF iterations"
 
@@ -336,9 +347,14 @@ create_personal_api_key_files() {
   local bw_context=""
   local client_id_tmp=""
   local client_secret_tmp=""
+  local -a bw_context_lines=()
 
   bw_context="$(read_bitwarden_access_context)"
-  IFS=$'\n' read -r user_id access_token kdf_type kdf_iterations <<< "$bw_context"
+  mapfile -t bw_context_lines <<< "$bw_context"
+  user_id="${bw_context_lines[0]:-}"
+  access_token="${bw_context_lines[1]:-}"
+  kdf_type="${bw_context_lines[2]:-}"
+  kdf_iterations="${bw_context_lines[3]:-}"
 
   [[ "$kdf_type" == '0' ]] || fail "Unsupported Vaultwarden KDF type for automated bootstrap: ${kdf_type}"
 
@@ -365,6 +381,8 @@ create_personal_api_key_files() {
 }
 
 ensure_local_account_bootstrap() {
+  local bootstrap_session=""
+
   if probe_vaultwarden_access; then
     return 0
   fi
@@ -377,6 +395,9 @@ ensure_local_account_bootstrap() {
     password_login >/dev/null 2>&1 || fail "Vaultwarden password login failed after account registration"
   fi
 
+  bootstrap_session="$(unlock_session)"
+  # Fresh Bitwarden logins can lag behind until the client syncs once.
+  bw sync --session "$bootstrap_session" >/dev/null
   create_personal_api_key_files
   reset_bitwarden_state
 }
@@ -463,6 +484,7 @@ restart_vaultwarden() {
 
 main() {
   wait_for_vaultwarden
+  ensure_bootstrap_ownership
   mkdir -p "$BW_APPDATA_DIR"
   chmod 0700 "$BW_APPDATA_DIR"
 

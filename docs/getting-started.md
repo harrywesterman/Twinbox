@@ -44,6 +44,14 @@ Expected:
 - `/opt/twinbox/bootstrap/vaultwarden-client-secret` exists
 - `/opt/twinbox/bootstrap/vaultwarden-ready` exists
 
+If `vaultwarden-ready` is missing after first boot, rerun the bootstrap on the Management VM:
+
+```bash
+ssh root@<management-vm-ip> 'cd /opt/twinbox && sudo bash scripts/bootstrap-vaultwarden.sh'
+```
+
+This re-syncs the Bitwarden CLI state, regenerates the API key files if needed, and writes the ready marker once the bootstrap completes.
+
 After that, the normal manager-first flow continues.
 
 ## Step 3: Open UI
