@@ -85,7 +85,14 @@ EOF
   done
 }
 
-wait_for_rollout() {
+wait_for_available() {
+  local resource="$1"
+
+  log "Waiting for ${resource} to become available"
+  kubectl -n argocd wait --for=condition=Available "$resource" --timeout=900s
+}
+
+wait_for_statefulset_rollout() {
   local resource="$1"
 
   log "Waiting for ${resource} rollout to become ready"
@@ -105,8 +112,10 @@ wait_for_argocd_workloads() {
   )
 
   for resource in "${resources[@]}"; do
-    wait_for_rollout "$resource"
+    wait_for_available "$resource"
   done
+
+  wait_for_statefulset_rollout "statefulset/argocd-application-controller"
 }
 
 log "Creating argocd namespace"

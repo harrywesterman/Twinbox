@@ -265,8 +265,10 @@ def test_argo_bootstrap_script_installs_argocd_and_applies_bootstrap_root_applic
     assert 'Patching ${resource} liveness probe for single-node bootstrap' in text
     assert '--type strategic -p' in text
     assert '"initialDelaySeconds":300' in text
-    assert 'wait_for_rollout()' in text
-    assert 'Waiting for ${resource} rollout to become ready' in text
+    assert 'wait_for_available()' in text
+    assert 'Waiting for ${resource} to become available' in text
+    assert 'kubectl -n argocd wait --for=condition=Available "$resource" --timeout=900s' in text
+    assert 'wait_for_statefulset_rollout()' in text
     assert 'kubectl -n argocd rollout status "$resource" --timeout=900s' in text
     assert 'deployment/argocd-applicationset-controller' in text
     assert 'deployment/argocd-repo-server' in text
