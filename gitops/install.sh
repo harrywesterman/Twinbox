@@ -37,6 +37,21 @@ EOF
   fi
 }
 
+patch_argocd_workload_probes() {
+  local resource
+  local patch
+
+  patch=$(cat <<EOF
+{"spec":{"template":{"spec":{"containers":[{"name":"argocd-repo-server","livenessProbe":{"initialDelaySeconds":300,"timeoutSeconds":5,"periodSeconds":30,"failureThreshold":10}},{"name":"argocd-server","livenessProbe":{"initialDelaySeconds":300,"timeoutSeconds":5,"periodSeconds":30,"failureThreshold":10}}]}}}}
+EOF
+  )
+
+  for resource in deployment/argocd-repo-server deployment/argocd-server; do
+    log "Patching ${resource} liveness probe for single-node bootstrap"
+    kubectl -n argocd patch "$resource" --type strategic -p "$patch"
+  done
+}
+
 wait_for_pod_selector() {
   local selector="$1"
   local attempt=0
@@ -86,6 +101,7 @@ log "Installing Argo CD"
 kubectl apply --server-side --validate=false -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.3.4/manifests/install.yaml
 
 patch_argocd_workload_tolerations
+patch_argocd_workload_probes
 
 wait_for_argocd_workloads
 

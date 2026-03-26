@@ -261,6 +261,10 @@ def test_argo_bootstrap_script_installs_argocd_and_applies_bootstrap_root_applic
     assert 'control_plane_tolerations' in text
     assert 'Patching statefulset/argocd-application-controller for control-plane tolerations' in text
     assert 'kubectl -n argocd patch' in text
+    assert 'patch_argocd_workload_probes()' in text
+    assert 'Patching ${resource} liveness probe for single-node bootstrap' in text
+    assert '--type strategic -p' in text
+    assert '"initialDelaySeconds":300' in text
     assert 'Waiting for pods with selector ${selector} to be created' in text
     assert 'jsonpath=\'{range .items[*]}{.metadata.name}{"\\n"}{end}\'' in text
     assert 'Waiting for pods with selector ${selector} to become ready: ${pods[*]}' in text
