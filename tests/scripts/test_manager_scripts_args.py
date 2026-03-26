@@ -19,6 +19,10 @@ ROUTES_VALUES = REPO_ROOT / "gitops" / "values" / "routes.yaml"
 TRAEFIK_VALUES = REPO_ROOT / "gitops" / "values" / "traefik.yaml"
 WIREDOOR_GATEWAY_VALUES = REPO_ROOT / "gitops" / "values" / "wiredoor-gateway.yaml"
 GRAFANA_VALUES = REPO_ROOT / "gitops" / "values" / "grafana.yaml"
+TRAEFIK_APP = REPO_ROOT / "gitops" / "argocd" / "apps" / "traefik.yaml"
+ROUTES_APP = REPO_ROOT / "gitops" / "argocd" / "apps" / "routes.yaml"
+WIREDOOR_GATEWAY_APP = REPO_ROOT / "gitops" / "argocd" / "apps" / "wiredoor-gateway.yaml"
+WIREDOOR_GATEWAY_SECRET_APP = REPO_ROOT / "gitops" / "argocd" / "apps" / "wiredoor-gateway-secret.yaml"
 TRAEFIK_DASHBOARD_SECRETSTORE = REPO_ROOT / "gitops" / "routes" / "templates" / "traefik-dashboard-secretstore.yaml"
 TRAEFIK_DASHBOARD_EXTERNALSECRET = REPO_ROOT / "gitops" / "routes" / "templates" / "traefik-dashboard-externalsecret.yaml"
 WIREDOOR_GATEWAY_SECRETSTORE = REPO_ROOT / "gitops" / "apps" / "wiredoor-gateway-secret" / "secretstore.yaml"
@@ -100,8 +104,28 @@ def _grafana_values_text() -> str:
     return GRAFANA_VALUES.read_text(encoding="utf-8")
 
 
+def _traefik_app_text() -> str:
+    return TRAEFIK_APP.read_text(encoding="utf-8")
+
+
+def _routes_app_text() -> str:
+    return ROUTES_APP.read_text(encoding="utf-8")
+
+
+def _wiredoor_gateway_app_text() -> str:
+    return WIREDOOR_GATEWAY_APP.read_text(encoding="utf-8")
+
+
+def _wiredoor_gateway_secret_app_text() -> str:
+    return WIREDOOR_GATEWAY_SECRET_APP.read_text(encoding="utf-8")
+
+
 def _grafana_secret_app_text() -> str:
     return GRAFANA_SECRET_APP.read_text(encoding="utf-8")
+
+
+def _grafana_app_text() -> str:
+    return (REPO_ROOT / "gitops" / "argocd" / "apps" / "grafana.yaml").read_text(encoding="utf-8")
 
 
 def _grafana_secretstore_text() -> str:
@@ -374,6 +398,10 @@ def test_bootstrap_apps_tolerate_single_node_control_plane():
 
 
 def test_routes_and_wiredoor_secrets_are_vaultwarden_backed():
+    traefik_app_text = _traefik_app_text()
+    routes_app_text = _routes_app_text()
+    wiredoor_gateway_app_text = _wiredoor_gateway_app_text()
+    wiredoor_gateway_secret_app_text = _wiredoor_gateway_secret_app_text()
     routes_values_text = _routes_values_text()
     traefik_values_text = _traefik_values_text()
     wiredoor_gateway_values_text = _wiredoor_gateway_values_text()
@@ -387,6 +415,10 @@ def test_routes_and_wiredoor_secrets_are_vaultwarden_backed():
     assert 'enabled: trueß∑' not in traefik_values_text
     assert 'enabled: true' in traefik_values_text
     assert 'token:' not in wiredoor_gateway_values_text
+    assert 'argocd.argoproj.io/sync-wave: "0"' in traefik_app_text
+    assert 'argocd.argoproj.io/sync-wave: "1"' in routes_app_text
+    assert 'argocd.argoproj.io/sync-wave: "0"' in wiredoor_gateway_secret_app_text
+    assert 'argocd.argoproj.io/sync-wave: "1"' in wiredoor_gateway_app_text
     assert 'kind: SecretStore' in traefik_secretstore_text
     assert 'name: traefik-dashboard-fields' in traefik_secretstore_text
     assert 'twinbox/global/traefik-dashboard' in traefik_secretstore_text
@@ -404,6 +436,7 @@ def test_routes_and_wiredoor_secrets_are_vaultwarden_backed():
 def test_grafana_admin_credentials_are_vaultwarden_backed():
     grafana_values_text = _grafana_values_text()
     grafana_secret_app_text = _grafana_secret_app_text()
+    grafana_app_text = _grafana_app_text()
     grafana_secretstore_text = _grafana_secretstore_text()
     grafana_externalsecret_text = _grafana_externalsecret_text()
 
@@ -411,6 +444,8 @@ def test_grafana_admin_credentials_are_vaultwarden_backed():
     assert 'existingSecret: grafana-admin' in grafana_values_text
     assert 'userKey: admin-user' in grafana_values_text
     assert 'passwordKey: admin-password' in grafana_values_text
+    assert 'argocd.argoproj.io/sync-wave: "0"' in grafana_secret_app_text
+    assert 'argocd.argoproj.io/sync-wave: "1"' in grafana_app_text
     assert 'kind: Application' in grafana_secret_app_text
     assert 'grafana-secret' in grafana_secret_app_text
     assert 'kind: SecretStore' in grafana_secretstore_text
