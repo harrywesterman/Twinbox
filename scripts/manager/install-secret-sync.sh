@@ -83,6 +83,7 @@ chart_version="${PINNED_EXTERNAL_SECRETS_CHART_VERSION:-0.20.1}"
 cli_password="$(tr -d '\r\n' < "$VAULTWARDEN_PASSWORD_FILE")"
 cli_client_id="$(tr -d '\r\n' < "$VAULTWARDEN_CLIENTID_FILE")"
 cli_client_secret="$(tr -d '\r\n' < "$VAULTWARDEN_CLIENTSECRET_FILE")"
+cli_session="$session"
 worker_image="ghcr.io/harrywesterman/twinbox-manager-worker:${TWINBOX_IMAGE_TAG:-latest}"
 control_plane_tolerations='[{"key":"node-role.kubernetes.io/control-plane","operator":"Exists","effect":"NoSchedule"},{"key":"node-role.kubernetes.io/master","operator":"Exists","effect":"NoSchedule"}]'
 
@@ -118,6 +119,19 @@ kubectl create secret generic bitwarden-cli \
   --from-literal=BW_CLIENTID="$cli_client_id" \
   --from-literal=BW_CLIENTSECRET="$cli_client_secret" \
   --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: bitwarden-webhook-auth
+  namespace: ${TARGET_NAMESPACE}
+  labels:
+    external-secrets.io/type: webhook
+type: Opaque
+stringData:
+  session: ${cli_session}
+EOF
 
 kubectl apply -f - <<EOF
 apiVersion: networking.k8s.io/v1
@@ -288,6 +302,11 @@ spec:
       url: "http://bitwarden-cli.${BITWARDEN_NAMESPACE}.svc.cluster.local:8087/object/item/{{ .remoteRef.key }}"
       headers:
         Content-Type: application/json
+        Authorization: "Bearer {{ .auth.session }}"
+      secrets:
+        - name: auth
+          secretRef:
+            name: bitwarden-webhook-auth
       result:
         jsonPath: "$.data.login.{{ .remoteRef.property }}"
 ---
@@ -300,6 +319,12 @@ spec:
   provider:
     webhook:
       url: "http://bitwarden-cli.${BITWARDEN_NAMESPACE}.svc.cluster.local:8087/object/item/{{ .remoteRef.key }}"
+      headers:
+        Authorization: "Bearer {{ .auth.session }}"
+      secrets:
+        - name: auth
+          secretRef:
+            name: bitwarden-webhook-auth
       result:
         jsonPath: "$.data.fields[?@.name==\"{{ .remoteRef.property }}\"].value"
 ---
