@@ -713,7 +713,7 @@ if [[ "${TWINBOX_SYNC_LOCAL_CLIENT_CONFIGS:-false}" == "true" ]]; then
   sync_user_kubeconfig "$kubeconfig_file"
 fi
 
-log "Switching to disk boot (removing CD-ROM)"
+log "Switching to disk-first boot order"
 sync
 tmp_tfvars="$(mktemp)"
 jq '. + {boot_from_disk: true}' "$tfvars_file" > "$tmp_tfvars"
