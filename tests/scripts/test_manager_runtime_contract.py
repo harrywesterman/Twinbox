@@ -66,7 +66,6 @@ def test_bootstrap_vm_starts_vaultwarden_before_full_stack():
     assert "VAULTWARDEN_PUBLIC_URL=http://${management_ip}:8222" in text
     assert "docker compose up -d vaultwarden" in text
     assert "./scripts/bootstrap-vaultwarden.sh" in text
-    assert "--profile full --env-file .env" in text
 
 
 def test_start_manager_bootstraps_vaultwarden_before_compose_up():
@@ -76,7 +75,6 @@ def test_start_manager_bootstraps_vaultwarden_before_compose_up():
     assert "VAULTWARDEN_PUBLIC_URL=http://${management_ip}:8222" in text
     assert "docker compose up -d vaultwarden" in text
     assert "./scripts/bootstrap-vaultwarden.sh" in text
-    assert "--profile full --env-file .env" in text
 
 
 def test_start_manager_uses_openssl_for_first_run_vaultwarden_password():

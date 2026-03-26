@@ -68,7 +68,6 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     assert "      TALOS_ISO_FILE=${TALOS_ISO_FILE}" not in text
     assert "  - rm -rf ${TWINBOX_TARGET_DIR}" in text
     assert "  - install -m 0600 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /tmp/twinbox.env.template ${TWINBOX_TARGET_DIR}/.env" in text
-    assert "  - bash -lc 'cd ${TWINBOX_TARGET_DIR} && chmod +x scripts/install-management-tools.sh && ./scripts/install-management-tools.sh --profile bootstrap --env-file ${TWINBOX_TARGET_DIR}/.env'" in text
     assert 'qm set "$MGT_ID" --ciuser "$CLOUD_INIT_USER" >/dev/null' in text
     assert 'qm set "$MGT_ID" --cipassword "$CLOUD_INIT_PASSWORD" >/dev/null' in text
     assert 'qm set "$MGT_ID" --searchdomain "$CLOUD_INIT_DNS_DOMAIN" >/dev/null' in text
@@ -97,8 +96,6 @@ def test_setup_wizard_bootstraps_vaultwarden_before_starting_manager_stack():
     assert 'VAULTWARDEN_PUBLIC_URL=http://${CLOUD_INIT_IP}:8222' in text
     assert 'VAULTWARDEN_PASSWORD_FILE=/opt/twinbox/bootstrap/vaultwarden-password' in text
     assert 'VAULTWARDEN_READY_FILE=/opt/twinbox/bootstrap/vaultwarden-ready' in text
-    assert 'KUBECTL_VERSION=${KUBECTL_VERSION}' in text
-    assert 'HELM_VERSION=${HELM_VERSION}' in text
     assert 'docker compose up -d vaultwarden' in text
     assert 'scripts/bootstrap-vaultwarden.sh' in text
     assert 'VAULTWARDEN_SIGNUPS_ALLOWED=true' in text

@@ -110,7 +110,7 @@ ensure_bootstrap_material
 
 if [[ -x scripts/install-management-tools.sh ]]; then
   log "Installing management host tools from .env versions"
-  sudo ./scripts/install-management-tools.sh --profile full --env-file .env
+  sudo ./scripts/install-management-tools.sh --env-file .env
 else
   fail "Missing scripts/install-management-tools.sh"
 fi
