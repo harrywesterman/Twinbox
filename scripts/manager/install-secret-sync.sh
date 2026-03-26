@@ -208,6 +208,7 @@ spec:
             - |
               set -euo pipefail
               bw config server "\${BW_HOST}"
+              bw login --apikey >/dev/null
               export BW_SESSION="\${BW_SESSION}"
               bw sync --session "\${BW_SESSION}" >/dev/null
               exec bw serve --hostname 0.0.0.0
