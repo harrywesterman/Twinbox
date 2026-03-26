@@ -118,21 +118,7 @@ kubectl create secret generic bitwarden-cli \
   --from-literal=BW_PASSWORD="$cli_password" \
   --from-literal=BW_CLIENTID="$cli_client_id" \
   --from-literal=BW_CLIENTSECRET="$cli_client_secret" \
-  --from-literal=BW_SESSION="$cli_session" \
   --dry-run=client -o yaml | kubectl apply -f -
-
-kubectl apply -f - <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: bitwarden-webhook-auth
-  namespace: ${TARGET_NAMESPACE}
-  labels:
-    external-secrets.io/type: webhook
-type: Opaque
-stringData:
-  session: ${cli_session}
-EOF
 
 kubectl apply -f - <<EOF
 apiVersion: networking.k8s.io/v1
@@ -209,7 +195,7 @@ spec:
               set -euo pipefail
               bw config server "\${BW_HOST}"
               bw login --apikey >/dev/null
-              export BW_SESSION="\${BW_SESSION}"
+              export BW_SESSION="\$(bw unlock --passwordenv BW_PASSWORD --raw)"
               bw sync --session "\${BW_SESSION}" >/dev/null
               exec bw serve --hostname 0.0.0.0
           env:
@@ -237,11 +223,6 @@ spec:
                 secretKeyRef:
                   name: bitwarden-cli
                   key: BW_CLIENTSECRET
-            - name: BW_SESSION
-              valueFrom:
-                secretKeyRef:
-                  name: bitwarden-cli
-                  key: BW_SESSION
           ports:
             - name: http
               containerPort: 8087
@@ -308,11 +289,6 @@ spec:
       url: "http://bitwarden-cli.${BITWARDEN_NAMESPACE}.svc.cluster.local:8087/object/item/{{ .remoteRef.key }}"
       headers:
         Content-Type: application/json
-        Authorization: "Bearer {{ .auth.session }}"
-      secrets:
-        - name: auth
-          secretRef:
-            name: bitwarden-webhook-auth
       result:
         jsonPath: "$.data.login.{{ .remoteRef.property }}"
 ---
@@ -325,12 +301,6 @@ spec:
   provider:
     webhook:
       url: "http://bitwarden-cli.${BITWARDEN_NAMESPACE}.svc.cluster.local:8087/object/item/{{ .remoteRef.key }}"
-      headers:
-        Authorization: "Bearer {{ .auth.session }}"
-      secrets:
-        - name: auth
-          secretRef:
-            name: bitwarden-webhook-auth
       result:
         jsonPath: "$.data.fields[?@.name==\"{{ .remoteRef.property }}\"].value"
 ---
