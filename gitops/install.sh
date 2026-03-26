@@ -39,14 +39,27 @@ EOF
 
 patch_argocd_workload_probes() {
   local resource
+  local container_name
   local patch
 
-  patch=$(cat <<EOF
-{"spec":{"template":{"spec":{"containers":[{"name":"argocd-repo-server","livenessProbe":{"initialDelaySeconds":300,"timeoutSeconds":5,"periodSeconds":30,"failureThreshold":10}},{"name":"argocd-server","livenessProbe":{"initialDelaySeconds":300,"timeoutSeconds":5,"periodSeconds":30,"failureThreshold":10}}]}}}}
-EOF
-  )
-
   for resource in deployment/argocd-repo-server deployment/argocd-server; do
+    case "$resource" in
+      deployment/argocd-repo-server)
+        container_name="argocd-repo-server"
+        ;;
+      deployment/argocd-server)
+        container_name="argocd-server"
+        ;;
+      *)
+        fail "Unexpected Argo CD resource: ${resource}"
+        ;;
+    esac
+
+    patch=$(cat <<EOF
+{"spec":{"template":{"spec":{"containers":[{"name":"${container_name}","livenessProbe":{"initialDelaySeconds":300,"timeoutSeconds":5,"periodSeconds":30,"failureThreshold":10}}]}}}}
+EOF
+    )
+
     log "Patching ${resource} liveness probe for single-node bootstrap"
     kubectl -n argocd patch "$resource" --type strategic -p "$patch"
   done
