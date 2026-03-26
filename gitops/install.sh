@@ -37,6 +37,27 @@ EOF
   fi
 }
 
+wait_for_pod_selector() {
+  local selector="$1"
+  local attempt=0
+
+  while true; do
+    if kubectl -n argocd get pod -l "$selector" -o name 2>/dev/null | grep -q .; then
+      log "Waiting for pods with selector ${selector} to become ready"
+      kubectl -n argocd wait --for=condition=Ready pod -l "$selector" --timeout=600s
+      return 0
+    fi
+
+    attempt=$((attempt + 1))
+    if [[ "$attempt" -ge 120 ]]; then
+      fail "Timed out waiting for pods with selector ${selector} to be created"
+    fi
+
+    log "Waiting for pods with selector ${selector} to be created"
+    sleep 5
+  done
+}
+
 wait_for_argocd_workloads() {
   local selector
   local selectors=(
@@ -48,8 +69,7 @@ wait_for_argocd_workloads() {
   )
 
   for selector in "${selectors[@]}"; do
-    log "Waiting for pods with selector ${selector} to become ready"
-    kubectl -n argocd wait --for=condition=Ready pod -l "$selector" --timeout=600s
+    wait_for_pod_selector "$selector"
   done
 
   log "Waiting for statefulset/argocd-application-controller pod to become ready"
