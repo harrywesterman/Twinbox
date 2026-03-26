@@ -254,6 +254,7 @@ def test_argo_step_script_uses_workspace_root_for_manager_bootstrap():
 
 def test_argo_bootstrap_script_installs_argocd_and_applies_bootstrap_root_application():
     text = _argo_bootstrap_text()
+    wait_section = text.split('local resources=(')[1].split('for resource in "${resources[@]}"; do')[0]
     assert 'Creating argocd namespace' in text
     assert 'Installing Argo CD' in text
     assert 'kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply --validate=false -f -' in text
@@ -270,6 +271,8 @@ def test_argo_bootstrap_script_installs_argocd_and_applies_bootstrap_root_applic
     assert 'kubectl -n argocd wait --for=condition=Available "$resource" --timeout=900s' in text
     assert 'wait_for_statefulset_rollout()' in text
     assert 'kubectl -n argocd rollout status "$resource" --timeout=900s' in text
+    assert 'wait_for_statefulset_rollout "statefulset/argocd-application-controller"' in text
+    assert 'statefulset/argocd-application-controller' not in wait_section
     assert 'deployment/argocd-applicationset-controller' in text
     assert 'deployment/argocd-repo-server' in text
     assert 'statefulset/argocd-application-controller' in text
