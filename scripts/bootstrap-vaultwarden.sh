@@ -126,6 +126,7 @@ probe_vaultwarden_access() {
   local client_id=""
   local client_secret=""
   local session=""
+  local item_name=""
 
   [[ -s "$VAULTWARDEN_PASSWORD_FILE" ]] || return 1
   [[ -s "$VAULTWARDEN_CLIENTID_FILE" ]] || return 1
@@ -152,6 +153,14 @@ probe_vaultwarden_access() {
     rm -rf "$probe_dir"
     return 1
   }
+
+  item_name="${VAULTWARDEN_ITEM_PREFIX:-twinbox}/global/proxmox"
+  if ! BITWARDENCLI_APPDATA_DIR="$probe_dir" bw list items --session "$session" --search "$item_name" \
+    | jq -e --arg name "$item_name" '.[] | select(.name == $name)' >/dev/null; then
+    BITWARDENCLI_APPDATA_DIR="$probe_dir" bw logout >/dev/null 2>&1 || true
+    rm -rf "$probe_dir"
+    return 1
+  fi
 
   BITWARDENCLI_APPDATA_DIR="$probe_dir" bw logout >/dev/null 2>&1 || true
   rm -rf "$probe_dir"
@@ -429,7 +438,7 @@ unlock_session() {
 }
 
 seed_proxmox_item() {
-  local item_name="twinbox/global/proxmox"
+  local item_name="${VAULTWARDEN_ITEM_PREFIX:-twinbox}/global/proxmox"
   local item_json=""
   local template_json=""
 

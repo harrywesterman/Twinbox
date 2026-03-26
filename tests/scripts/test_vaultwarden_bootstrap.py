@@ -33,7 +33,7 @@ def test_bootstrap_vaultwarden_script_bootstraps_registration_and_api_key_headle
     assert "/identity/accounts/register/send-verification-email" in text
     assert "/identity/accounts/register/finish" in text
     assert "/api/accounts/api-key" in text
-    assert "twinbox/global/proxmox" in text
+    assert 'item_name="${VAULTWARDEN_ITEM_PREFIX:-twinbox}/global/proxmox"' in text
     assert "seed" in text.lower()
     assert "vaultwarden-ready" in text
 
@@ -56,6 +56,17 @@ def test_bootstrap_vaultwarden_script_syncs_before_api_key_generation():
     assert bootstrap_section.index('bw sync --session "$bootstrap_session" >/dev/null') < bootstrap_section.index(
         'create_personal_api_key_files'
     )
+
+
+def test_bootstrap_vaultwarden_script_requires_seeded_proxmox_item_before_ready_shortcut():
+    text = _script_text()
+    probe_section = text.split("probe_vaultwarden_access() {", 1)[1].split("password_login() {", 1)[0]
+    seed_section = text.split("seed_proxmox_item() {", 1)[1].split("disable_signups() {", 1)[0]
+
+    assert 'item_name="${VAULTWARDEN_ITEM_PREFIX:-twinbox}/global/proxmox"' in probe_section
+    assert 'bw list items --session "$session" --search "$item_name"' in probe_section
+    assert 'jq -e --arg name "$item_name" \'.[] | select(.name == $name)\'' in probe_section
+    assert 'item_name="${VAULTWARDEN_ITEM_PREFIX:-twinbox}/global/proxmox"' in seed_section
 
 
 def test_bootstrap_vaultwarden_script_parses_multiline_bitwarden_context():
