@@ -40,11 +40,16 @@ EOF
 wait_for_pod_selector() {
   local selector="$1"
   local attempt=0
+  local pod_names
+  local pods
 
   while true; do
-    if kubectl -n argocd get pod -l "$selector" -o name 2>/dev/null | grep -q .; then
-      log "Waiting for pods with selector ${selector} to become ready"
-      kubectl -n argocd wait --for=condition=Ready pod -l "$selector" --timeout=600s
+    pod_names="$(kubectl -n argocd get pod -l "$selector" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)"
+
+    if [[ -n "${pod_names//[$'\n\r\t ']/}" ]]; then
+      mapfile -t pods <<<"$pod_names"
+      log "Waiting for pods with selector ${selector} to become ready: ${pods[*]}"
+      kubectl -n argocd wait --for=condition=Ready pod "${pods[@]}" --timeout=600s
       return 0
     fi
 
