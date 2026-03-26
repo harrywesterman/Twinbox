@@ -108,6 +108,7 @@ Expected:
 - `argocd` namespace exists.
 - `Application/root` exists in `argocd`.
 - The root Application points at `gitops/argocd/bootstrap/apps` and only covers the safe non-secret bootstrap workloads.
+- Argo CD controller pods are scheduled and Running on the control-plane node, not stuck Pending on the node taint.
 
 ## 8. Data Integrity
 

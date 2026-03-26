@@ -15,6 +15,28 @@ command -v kubectl >/dev/null 2>&1 || {
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
+control_plane_tolerations='[{"key":"node-role.kubernetes.io/control-plane","operator":"Exists","effect":"NoSchedule"},{"key":"node-role.kubernetes.io/master","operator":"Exists","effect":"NoSchedule"}]'
+
+patch_argocd_workload_tolerations() {
+  local resource
+  local patch
+
+  patch=$(cat <<EOF
+{"spec":{"template":{"spec":{"tolerations":${control_plane_tolerations}}}}}
+EOF
+  )
+
+  for resource in $(kubectl -n argocd get deployment -o name 2>/dev/null | sort); do
+    log "Patching ${resource} for control-plane tolerations"
+    kubectl -n argocd patch "$resource" --type merge -p "$patch"
+  done
+
+  if kubectl -n argocd get statefulset/argocd-application-controller >/dev/null 2>&1; then
+    log "Patching statefulset/argocd-application-controller for control-plane tolerations"
+    kubectl -n argocd patch statefulset/argocd-application-controller --type merge -p "$patch"
+  fi
+}
+
 wait_for_argocd_deployments() {
   local deployment
   local deployments=()
@@ -32,6 +54,8 @@ kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
 
 log "Installing Argo CD"
 kubectl apply --server-side -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.3.4/manifests/install.yaml
+
+patch_argocd_workload_tolerations
 
 wait_for_argocd_deployments
 

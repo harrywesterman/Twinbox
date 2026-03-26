@@ -251,6 +251,9 @@ def test_argo_bootstrap_script_installs_argocd_and_applies_bootstrap_root_applic
     assert 'Creating argocd namespace' in text
     assert 'Installing Argo CD' in text
     assert 'kubectl apply --server-side -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.3.4/manifests/install.yaml' in text
+    assert 'control_plane_tolerations' in text
+    assert 'Patching statefulset/argocd-application-controller for control-plane tolerations' in text
+    assert 'kubectl -n argocd patch' in text
     assert 'Applying bootstrap root application' in text
     assert 'gitops/argocd/bootstrap/root.yaml' in text
 
