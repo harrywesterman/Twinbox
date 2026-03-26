@@ -230,6 +230,8 @@ def test_install_secret_sync_installs_eso_and_applies_secret_sync_manifests():
     assert '/tmp/bitwarden-cli' in text
     assert 'emptyDir: {}' in text
     assert 'bw serve --hostname 0.0.0.0' in text
+    assert 'bw_status="$(bw status | jq -r \'.status // "unauthenticated"\')"' in text
+    assert 'if [[ "$bw_status" == "unauthenticated" ]]; then' in text
     assert 'livenessProbe:' in text
     assert 'tcpSocket:' in text
     assert 'port: 8087' in text

@@ -64,7 +64,10 @@ export BW_CLIENTID="$(tr -d '\r\n' < "$VAULTWARDEN_CLIENTID_FILE")"
 export BW_CLIENTSECRET="$(tr -d '\r\n' < "$VAULTWARDEN_CLIENTSECRET_FILE")"
 
 bw config server "$VAULTWARDEN_SERVER_URL" >/dev/null
-bw login --apikey >/dev/null
+bw_status="$(bw status | jq -r '.status // "unauthenticated"')"
+if [[ "$bw_status" == "unauthenticated" ]]; then
+  bw login --apikey >/dev/null
+fi
 session="$(bw unlock --passwordfile "$VAULTWARDEN_PASSWORD_FILE" --raw)"
 
 item_name="${VAULTWARDEN_ITEM_PREFIX:-twinbox}/global/proxmox"
