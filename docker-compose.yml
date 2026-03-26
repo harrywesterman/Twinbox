@@ -42,6 +42,7 @@ services:
     volumes:
       - ./manager-data:/data
       - ./categories:/opt/twinbox/categories:ro
+      - ./scripts:/opt/twinbox/scripts:ro
       - ./bootstrap:/opt/twinbox/bootstrap
     ports:
       - "8080:8080"
@@ -81,6 +82,7 @@ services:
     volumes:
       - ./manager-data:/data
       - ./categories:/opt/twinbox/categories:ro
+      - ./scripts:/opt/twinbox/scripts:ro
       - ./bootstrap:/opt/twinbox/bootstrap
       - /etc/cron.d:/host/etc/cron.d
       - /home/twinbox:/home/twinbox
