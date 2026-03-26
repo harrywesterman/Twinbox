@@ -101,6 +101,7 @@ For `install-argocd`:
 ```bash
 kubectl --kubeconfig <materialized-kubeconfig> get application root -n argocd -o yaml | grep -E 'gitops/argocd/bootstrap/apps|whoami|headlamp'
 kubectl --kubeconfig <materialized-kubeconfig> get namespace argocd
+kubectl --kubeconfig <materialized-kubeconfig> get pods -A | egrep 'headlamp|whoami'
 ```
 
 Expected:
@@ -109,6 +110,7 @@ Expected:
 - `Application/root` exists in `argocd`.
 - The root Application points at `gitops/argocd/bootstrap/apps` and only covers the safe non-secret bootstrap workloads.
 - Argo CD controller pods are scheduled and Running on the control-plane node, not stuck Pending on the node taint.
+- The `whoami` and `headlamp` bootstrap workloads are Running on the control-plane node, not stuck Pending on the node taint.
 
 ## 8. Data Integrity
 

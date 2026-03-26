@@ -13,6 +13,8 @@ INSTALL_SECRET_SYNC_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-secret
 ARGO_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-argocd.sh"
 ARGO_STEP_SCRIPT = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
 ARGO_BOOTSTRAP_SCRIPT = REPO_ROOT / "gitops" / "install.sh"
+WHOAMI_DEPLOYMENT = REPO_ROOT / "gitops" / "apps" / "whoami" / "deployment.yaml"
+HEADLAMP_VALUES = REPO_ROOT / "gitops" / "values" / "headlamp.yaml"
 
 
 def _apply_cluster_text() -> str:
@@ -45,6 +47,14 @@ def _argo_step_text() -> str:
 
 def _argo_bootstrap_text() -> str:
     return ARGO_BOOTSTRAP_SCRIPT.read_text(encoding="utf-8")
+
+
+def _whoami_deployment_text() -> str:
+    return WHOAMI_DEPLOYMENT.read_text(encoding="utf-8")
+
+
+def _headlamp_values_text() -> str:
+    return HEADLAMP_VALUES.read_text(encoding="utf-8")
 
 
 def test_apply_cluster_requires_proxmox_env():
@@ -286,6 +296,18 @@ def test_argo_bootstrap_script_installs_argocd_and_applies_bootstrap_root_applic
     assert 'statefulset/argocd-application-controller' in text
     assert 'Applying bootstrap root application' in text
     assert 'kubectl apply --validate=false -f "$WORKSPACE_ROOT/gitops/argocd/bootstrap/root.yaml"' in text
+
+
+def test_bootstrap_apps_tolerate_single_node_control_plane():
+    whoami_text = _whoami_deployment_text()
+    headlamp_text = _headlamp_values_text()
+
+    assert 'tolerations:' in whoami_text
+    assert 'node-role.kubernetes.io/control-plane' in whoami_text
+    assert 'node-role.kubernetes.io/master' in whoami_text
+    assert 'tolerations:' in headlamp_text
+    assert 'node-role.kubernetes.io/control-plane' in headlamp_text
+    assert 'node-role.kubernetes.io/master' in headlamp_text
 
 
 def test_talos_module_is_vm_only_and_keeps_planned_outputs():
