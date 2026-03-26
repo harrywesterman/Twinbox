@@ -265,13 +265,12 @@ def test_argo_bootstrap_script_installs_argocd_and_applies_bootstrap_root_applic
     assert 'Patching ${resource} liveness probe for single-node bootstrap' in text
     assert '--type strategic -p' in text
     assert '"initialDelaySeconds":300' in text
-    assert 'Waiting for pods with selector ${selector} to be created' in text
-    assert 'jsonpath=\'{range .items[*]}{.metadata.name}{"\\n"}{end}\'' in text
-    assert 'Waiting for pods with selector ${selector} to become ready: ${pods[*]}' in text
-    assert 'kubectl -n argocd wait --for=condition=Ready pod "${pods[@]}" --timeout=600s' in text
-    assert 'app.kubernetes.io/name=argocd-applicationset-controller' in text
-    assert 'app.kubernetes.io/name=argocd-repo-server' in text
-    assert 'app.kubernetes.io/name=argocd-application-controller' in text
+    assert 'wait_for_rollout()' in text
+    assert 'Waiting for ${resource} rollout to become ready' in text
+    assert 'kubectl -n argocd rollout status "$resource" --timeout=900s' in text
+    assert 'deployment/argocd-applicationset-controller' in text
+    assert 'deployment/argocd-repo-server' in text
+    assert 'statefulset/argocd-application-controller' in text
     assert 'Applying bootstrap root application' in text
     assert 'kubectl apply --validate=false -f "$WORKSPACE_ROOT/gitops/argocd/bootstrap/root.yaml"' in text
 

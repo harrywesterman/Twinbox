@@ -65,45 +65,27 @@ EOF
   done
 }
 
-wait_for_pod_selector() {
-  local selector="$1"
-  local attempt=0
-  local pod_names
-  local pods
+wait_for_rollout() {
+  local resource="$1"
 
-  while true; do
-    pod_names="$(kubectl -n argocd get pod -l "$selector" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)"
-
-    if [[ -n "${pod_names//[$'\n\r\t ']/}" ]]; then
-      mapfile -t pods <<<"$pod_names"
-      log "Waiting for pods with selector ${selector} to become ready: ${pods[*]}"
-      kubectl -n argocd wait --for=condition=Ready pod "${pods[@]}" --timeout=600s
-      return 0
-    fi
-
-    attempt=$((attempt + 1))
-    if [[ "$attempt" -ge 120 ]]; then
-      fail "Timed out waiting for pods with selector ${selector} to be created"
-    fi
-
-    log "Waiting for pods with selector ${selector} to be created"
-    sleep 5
-  done
+  log "Waiting for ${resource} rollout to become ready"
+  kubectl -n argocd rollout status "$resource" --timeout=900s
 }
 
 wait_for_argocd_workloads() {
-  local selector
-  local selectors=(
-    "app.kubernetes.io/name=argocd-applicationset-controller"
-    "app.kubernetes.io/name=argocd-dex-server"
-    "app.kubernetes.io/name=argocd-redis"
-    "app.kubernetes.io/name=argocd-repo-server"
-    "app.kubernetes.io/name=argocd-server"
-    "app.kubernetes.io/name=argocd-application-controller"
+  local resource
+  local resources=(
+    "deployment/argocd-applicationset-controller"
+    "deployment/argocd-dex-server"
+    "deployment/argocd-notifications-controller"
+    "deployment/argocd-redis"
+    "deployment/argocd-repo-server"
+    "deployment/argocd-server"
+    "statefulset/argocd-application-controller"
   )
 
-  for selector in "${selectors[@]}"; do
-    wait_for_pod_selector "$selector"
+  for resource in "${resources[@]}"; do
+    wait_for_rollout "$resource"
   done
 }
 
