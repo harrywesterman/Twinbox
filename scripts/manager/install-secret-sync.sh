@@ -158,6 +158,13 @@ spec:
         app.kubernetes.io/name: bitwarden-cli
     spec:
       automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
@@ -169,6 +176,11 @@ spec:
         - name: bitwarden-cli
           image: ${worker_image}
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           command:
             - /bin/bash
             - -lc
@@ -181,6 +193,10 @@ spec:
               bw unlock --check >/dev/null
               exec bw serve --hostname 0.0.0.0
           env:
+            - name: BITWARDENCLI_APPDATA_DIR
+              value: /tmp/bitwarden-cli
+            - name: HOME
+              value: /tmp/bitwarden-cli
             - name: BW_HOST
               valueFrom:
                 secretKeyRef:
@@ -230,6 +246,12 @@ spec:
             failureThreshold: 30
             timeoutSeconds: 1
             periodSeconds: 5
+          volumeMounts:
+            - name: bitwarden-cli-appdata
+              mountPath: /tmp/bitwarden-cli
+      volumes:
+        - name: bitwarden-cli-appdata
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

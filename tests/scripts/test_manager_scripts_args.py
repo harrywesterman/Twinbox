@@ -196,6 +196,24 @@ def test_install_secret_sync_installs_eso_and_applies_secret_sync_manifests():
     assert 'bitwarden-cli-allow-external-secrets' in text
     assert 'kubernetes.io/metadata.name: ${OPERATOR_NAMESPACE}' in text
     assert 'automountServiceAccountToken: false' in text
+    assert 'tolerations:' in text
+    assert 'node-role.kubernetes.io/control-plane' in text
+    assert 'node-role.kubernetes.io/master' in text
+    assert 'securityContext:' in text
+    assert 'runAsNonRoot: true' in text
+    assert 'runAsUser: 1000' in text
+    assert 'runAsGroup: 1000' in text
+    assert 'fsGroup: 1000' in text
+    assert 'seccompProfile:' in text
+    assert 'type: RuntimeDefault' in text
+    assert 'allowPrivilegeEscalation: false' in text
+    assert 'capabilities:' in text
+    assert 'drop:' in text
+    assert '- ALL' in text
+    assert 'BITWARDENCLI_APPDATA_DIR' in text
+    assert 'HOME' in text
+    assert '/tmp/bitwarden-cli' in text
+    assert 'emptyDir: {}' in text
     assert 'bw serve --hostname 0.0.0.0' in text
     assert 'KUBECONFIG_FILE is required' in text
 

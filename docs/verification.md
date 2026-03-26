@@ -79,6 +79,9 @@ For `install-secret-sync`:
 kubectl --kubeconfig <materialized-kubeconfig> get pods -n external-secrets
 kubectl --kubeconfig <materialized-kubeconfig> get pods -n bitwarden
 kubectl --kubeconfig <materialized-kubeconfig> get networkpolicy -n bitwarden
+kubectl --kubeconfig <materialized-kubeconfig> get deployment bitwarden-cli -n bitwarden -o yaml | grep -E 'runAsNonRoot|allowPrivilegeEscalation|capabilities|seccompProfile|BITWARDENCLI_APPDATA_DIR|emptyDir'
+kubectl --kubeconfig <materialized-kubeconfig> get pods -n external-secrets -o wide
+kubectl --kubeconfig <materialized-kubeconfig> get pods -n bitwarden -o wide
 kubectl --kubeconfig <materialized-kubeconfig> get secretstores,externalsecrets,secrets -n twinbox-system
 ```
 
@@ -87,6 +90,8 @@ Expected:
 - `external-secrets` deployment available.
 - `bitwarden-cli` deployment available.
 - `NetworkPolicy/bitwarden-cli-allow-external-secrets` present in `bitwarden`.
+- `bitwarden-cli` deployment shows restricted-compatible `securityContext` and writable appdata.
+- `external-secrets`, `external-secrets-webhook`, `external-secrets-cert-controller`, and `bitwarden-cli` all run on the control-plane node.
 - `SecretStore` resources present in `twinbox-system`.
 - `ExternalSecret/proxmox-bootstrap` ready.
 - `Secret/proxmox-bootstrap` present.
