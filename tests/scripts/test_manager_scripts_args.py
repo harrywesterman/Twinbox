@@ -260,7 +260,7 @@ def test_argo_bootstrap_script_installs_argocd_and_applies_bootstrap_root_applic
     assert 'kubectl -n argocd wait --for=condition=Ready pod "${pods[@]}" --timeout=600s' in text
     assert 'app.kubernetes.io/name=argocd-applicationset-controller' in text
     assert 'app.kubernetes.io/name=argocd-repo-server' in text
-    assert 'Waiting for statefulset/argocd-application-controller pod to become ready' in text
+    assert 'app.kubernetes.io/name=argocd-application-controller' in text
     assert 'Applying bootstrap root application' in text
     assert 'gitops/argocd/bootstrap/root.yaml' in text
 

@@ -71,14 +71,12 @@ wait_for_argocd_workloads() {
     "app.kubernetes.io/name=argocd-redis"
     "app.kubernetes.io/name=argocd-repo-server"
     "app.kubernetes.io/name=argocd-server"
+    "app.kubernetes.io/name=argocd-application-controller"
   )
 
   for selector in "${selectors[@]}"; do
     wait_for_pod_selector "$selector"
   done
-
-  log "Waiting for statefulset/argocd-application-controller pod to become ready"
-  kubectl -n argocd wait --for=condition=Ready pod -l app.kubernetes.io/name=argocd-application-controller --timeout=600s
 }
 
 log "Creating argocd namespace"
