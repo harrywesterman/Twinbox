@@ -16,6 +16,7 @@ Twinbox uses a manager-first architecture centered on a Management VM.
 
 3. **Execution Layer (inside worker image)**
    - `scripts/manager/apply-cluster.sh`
+   - `scripts/manager/install-secret-sync.sh`
    - `scripts/manager/collect-state.sh`
    - `categories/*/steps/*/*.sh`
 
@@ -29,8 +30,8 @@ Twinbox uses a manager-first architecture centered on a Management VM.
 
 ## Request Flow
 
-1. UI loads `/api/catalog` to discover categories, steps, saved inputs, and latest job state.
-2. UI sends a step execution request (`/api/steps/{step_id}/execute`) or uses the compatibility cluster endpoints.
+1. UI loads `/api/catalog` to discover categories, steps, saved inputs, and latest job state. Once a cluster is active, the UI pins catalog reads to that explicit `cluster_id`.
+2. UI sends a step execution request (`/api/steps/{step_id}/execute`) or uses the compatibility cluster endpoints. Follow-up cluster steps carry an explicit `cluster_id` instead of relying on a server-side "current cluster" guess.
 3. API validates inputs, persists step state, and writes the queue file.
 4. Worker picks the queued job and runs the project-owned script for that step.
 5. Worker streams command output to job logs and updates `manager-data/step-state`.
@@ -52,5 +53,7 @@ Twinbox uses a manager-first architecture centered on a Management VM.
 - Vaultwarden runs on the Management VM and is exposed on the trusted LAN address of that VM so the host bootstrap and manager containers can resolve the same secret store.
 - `manager-api` and `manager-worker` resolve secret refs through the broker at runtime; queued jobs and cluster state persist refs only.
 - Talos file secrets are materialized into temporary runtime files and cleaned up after the job completes.
+- External Secrets Operator and the Bitwarden/Vaultwarden webhook bridge project Vaultwarden secrets into Kubernetes only as derived runtime artifacts.
+- The in-cluster `bw serve` bridge is restricted by a `NetworkPolicy` so only the `external-secrets` namespace can reach it.
 - The Management VM bootstraps the Vaultwarden service account and CLI API key automatically during first startup.
 - No built-in auth/RBAC yet.

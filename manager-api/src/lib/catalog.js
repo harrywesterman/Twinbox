@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 
 import YAML from "yaml";
+import { normalizeSecretBundle } from "../../../lib/secrets/schema.mjs";
 
 import {
   parseIPv4,
@@ -50,6 +51,18 @@ function normalizeJourneyStage(value, file) {
   }
 
   throw new Error(`journey_stage must be setup or manage in ${file}`);
+}
+
+function normalizeStepSecrets(secrets, file) {
+  if (secrets === undefined || secrets === null) {
+    return { env: {}, files: {} };
+  }
+
+  if (typeof secrets !== "object" || Array.isArray(secrets)) {
+    throw new Error(`secrets must be an object in ${file}`);
+  }
+
+  return normalizeSecretBundle(secrets);
 }
 
 function normalizeCategoryManifest(manifest, file) {
@@ -110,6 +123,7 @@ function normalizeStepManifest(manifest, file, categoryId) {
     explanation: String(manifest.explanation),
     side_help: String(manifest.side_help),
     inputs: manifest.inputs.map((input) => normalizeInputDefinition(input, file)),
+    secrets: normalizeStepSecrets(manifest.secrets, file),
     depends_on: manifest.depends_on.map((dependency) => String(dependency)),
     runner: {
       kind: String(manifest.runner.kind),
@@ -232,7 +246,7 @@ function deriveCategoryStatus(steps) {
   return "ready";
 }
 
-function findActiveClusterId(dirs) {
+export function findCurrentCluster(dirs) {
   if (!fs.existsSync(dirs.clusters)) {
     return null;
   }
@@ -240,19 +254,25 @@ function findActiveClusterId(dirs) {
   const clusterFiles = fs.readdirSync(dirs.clusters)
     .filter((entry) => entry.endsWith(".json"))
     .map((entry) => readJsonIfExists(path.join(dirs.clusters, entry)))
-    .filter(Boolean);
+    .filter((cluster) => cluster?.id)
+    .sort((left, right) => String(right?.updated_at || right?.created_at || "").localeCompare(String(left?.updated_at || left?.created_at || "")));
 
-  const inProgress = clusterFiles
-    .filter((cluster) => cluster?.id && cluster?.status && cluster.status !== "bootstrapped")
-    .sort((left, right) => String(right?.updated_at || "").localeCompare(String(left?.updated_at || "")));
-
-  return inProgress[0]?.id || null;
+  return clusterFiles[0] || null;
 }
 
-export function buildCatalogResponse({ workspaceRoot, dirs }) {
+function findClusterById(dirs, clusterId) {
+  if (!clusterId || !fs.existsSync(dirs.clusters)) {
+    return null;
+  }
+
+  return readJsonIfExists(path.join(dirs.clusters, `${clusterId}.json`));
+}
+
+export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) {
   const definitions = loadCatalogDefinitions({ workspaceRoot });
   const completedDependencies = new Set();
-  const activeClusterId = findActiveClusterId(dirs);
+  const currentCluster = clusterId ? findClusterById(dirs, clusterId) : findCurrentCluster(dirs);
+  const activeClusterId = currentCluster?.id || null;
 
   const categories = definitions.categories.map((category) => {
     const steps = category.steps.map((step) => {
@@ -279,6 +299,7 @@ export function buildCatalogResponse({ workspaceRoot, dirs }) {
         explanation: step.explanation,
         side_help: step.side_help,
         inputs: step.inputs,
+        secrets: step.secrets,
         depends_on: step.depends_on,
         status,
         state: summarizeStepState(state),
