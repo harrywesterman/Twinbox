@@ -359,6 +359,46 @@ def test_catalog_cluster_id_query_scopes_follow_up_state_to_requested_cluster():
             proc.wait(timeout=5)
 
 
+def test_catalog_synthesizes_provision_state_for_bootstrapped_cluster_without_step_state():
+    with tempfile.TemporaryDirectory() as td:
+        data_dir = Path(td) / "data"
+        port = _find_free_port()
+
+        (data_dir / "clusters").mkdir(parents=True, exist_ok=True)
+        cluster_id = "compat-cluster"
+        (data_dir / "clusters" / f"{cluster_id}.json").write_text(
+            json.dumps(
+                {
+                    "id": cluster_id,
+                    "name": "compat-cluster",
+                    "status": "bootstrapped",
+                    "created_at": "2026-03-20T10:00:00Z",
+                    "updated_at": "2026-03-20T10:05:00Z",
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        proc = _start_api(data_dir, port)
+        try:
+            base = f"http://127.0.0.1:{port}"
+            _wait_for_health(base)
+
+            status, body = _get_json(f"{base}/api/catalog?cluster_id={cluster_id}")
+            assert status == 200
+
+            talos = body["categories"][1]
+            assert talos["steps"][0]["id"] == "provision-nodes"
+            assert talos["steps"][0]["status"] == "done"
+            assert talos["steps"][0]["state"]["cluster_id"] == cluster_id
+            assert talos["steps"][0]["state"]["outputs"]["cluster_status"] == "bootstrapped"
+            assert talos["steps"][1]["id"] == "install-secret-sync"
+            assert talos["steps"][1]["status"] == "ready"
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
 def test_execute_follow_up_cluster_step_requires_explicit_cluster_context():
     with tempfile.TemporaryDirectory() as td:
         data_dir = Path(td) / "data"
