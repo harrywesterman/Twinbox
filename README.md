@@ -2,6 +2,11 @@
 
 Twinbox is a manager-first platform for provisioning and bootstrapping Talos Kubernetes clusters on Proxmox.
 
+## Public Landing Page
+
+The public-facing Twinbox homepage is a static site in `manager-web/` and can be hosted on GitHub Pages through
+`.github/workflows/deploy-pages.yml`. The operational manager stack on the Management VM remains separate.
+
 ## Current Workflow
 
 1. Run the Proxmox wizard: `wizard/setup-wizard.sh`.
@@ -77,7 +82,7 @@ HELM_VERSION=v3.15.4
 ## Repository Layout
 
 - `wizard/`: Proxmox setup wizard.
-- `manager-web/`: React frontend.
+- `manager-web/`: Static marketing landingpage for GitHub Pages.
 - `manager-api/`: REST API and job metadata handling.
 - `manager-worker/`: Async job runner.
 - `categories/`: Manifest-driven category and step catalog mounted into the runtime.

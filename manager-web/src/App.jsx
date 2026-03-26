@@ -1,1153 +1,280 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
-import {
-  STORAGE_KEY,
-  formatState,
-  getMissionControlModel,
-  isIPv4,
-  restoreUiState,
-  serializeUiState,
-  toneForStatus,
-} from './journey.js';
-import { buildSuggestedProvisionInputs, mergeSuggestedProvisionDraft } from './provision-defaults.js';
-
-function inputValueFromStep(step, input, currentDraft) {
-  if (currentDraft && Object.prototype.hasOwnProperty.call(currentDraft, input.id)) {
-    return currentDraft[input.id];
-  }
-  if (step?.state?.inputs && Object.prototype.hasOwnProperty.call(step.state.inputs, input.id)) {
-    return step.state.inputs[input.id];
-  }
-  if (input.default !== undefined) {
-    return input.default;
-  }
-  return input.type === 'boolean' ? false : '';
-}
-
-function mergeDraftInputs(catalog, previousDrafts) {
-  const nextDrafts = { ...previousDrafts };
-
-  for (const category of catalog?.categories || []) {
-    for (const step of category.steps || []) {
-      const currentDraft = nextDrafts[step.id] || {};
-      const mergedDraft = { ...currentDraft };
-
-      for (const input of step.inputs || []) {
-        if (!Object.prototype.hasOwnProperty.call(mergedDraft, input.id)) {
-          mergedDraft[input.id] = inputValueFromStep(step, input, currentDraft);
-        }
-      }
-
-      nextDrafts[step.id] = mergedDraft;
-    }
-  }
-
-  return nextDrafts;
-}
-
-function inputTypeFor(input) {
-  if (input.type === 'boolean') return 'checkbox';
-  if (input.type === 'integer') return 'number';
-  return 'text';
-}
-
-function normalizeInputValue(input, event) {
-  if (input.type === 'boolean') {
-    return event.target.checked;
-  }
-  if (input.type === 'integer') {
-    return event.target.value === '' ? '' : Number(event.target.value);
-  }
-  return event.target.value;
-}
-
-function buildChecks(activeStep, steps, catalogErrors) {
-  const dependencyChecks = (activeStep?.depends_on || []).map((dependencyId) => {
-    const dependency = steps.find((step) => step.id === dependencyId);
-    return {
-      label: dependency?.title || dependencyId,
-      status: dependency?.status === 'done' ? 'done' : 'locked',
-      detail: dependency?.status === 'done'
-        ? 'Dependency complete.'
-        : 'This step stays locked until the dependency completes.',
-    };
-  });
-
-  const checks = [...dependencyChecks];
-
-  if (activeStep?.latest_job) {
-    checks.push({
-      label: 'Latest job',
-      status: activeStep.latest_job.status === 'succeeded' ? 'done' : activeStep.latest_job.status,
-      detail: activeStep.latest_job.error || `Latest worker job: ${activeStep.latest_job.id}`,
-    });
-  }
-
-  if (catalogErrors.length) {
-    checks.push({
-      label: 'Catalog validation',
-      status: 'warning',
-      detail: catalogErrors.join(' | '),
-    });
-  }
-
-  if (checks.length === 0) {
-    checks.push({
-      label: 'Ready to run',
-      status: activeStep?.status || 'ready',
-      detail: 'Twinbox has no additional blockers for this step.',
-    });
-  }
-
-  return checks;
-}
-
-function statusLabel(status) {
-  return formatState(status, 'Not started');
-}
-
-function formatRuntimeTimestamp(value) {
-  if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
-    return 'Waiting for updates';
-  }
-  return value.toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-}
-
-function StepFields({ activeStep, draftInputs, onChange, ipSuggestion }) {
-  if (!activeStep || !(activeStep.inputs || []).length) {
-    return null;
-  }
-
-  return (
-    <section className="workspace-section">
-      <div className="section-header">
-        <div>
-          <p className="section-kicker">Required input</p>
-          <h3>Provide only the values this step needs</h3>
-        </div>
-        <span className="status-chip tone-active">Manifest-driven</span>
-      </div>
-
-      <div className="field-grid">
-        {activeStep.inputs.map((input) => {
-          const type = inputTypeFor(input);
-          const value = inputValueFromStep(activeStep, input, draftInputs);
-
-          if (type === 'checkbox') {
-            return (
-              <label key={input.id} className="field field-checkbox">
-                <span>{input.label}</span>
-                <input
-                  type="checkbox"
-                  checked={Boolean(value)}
-                  onChange={(event) => onChange(input.id, normalizeInputValue(input, event))}
-                />
-                <small>{input.help}</small>
-              </label>
-            );
-          }
-
-          return (
-            <label key={input.id} className="field">
-              <span>{input.label}</span>
-              <input
-                type={type}
-                value={value}
-                min={input.min}
-                max={input.max}
-                onChange={(event) => onChange(input.id, normalizeInputValue(input, event))}
-              />
-              <small>{input.help}</small>
-            </label>
-          );
-        })}
-      </div>
-
-      {ipSuggestion ? (
-        <div className="callout callout-inline">
-          <span className="callout-label">IP suggestion</span>
-          <p>{ipSuggestion}</p>
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-function StepResults({ activeStep, cluster, artifacts }) {
-  if (!activeStep) return null;
-
-  const cards = [
-    activeStep.latest_job ? {
-      label: 'Worker job',
-      value: activeStep.latest_job.id,
-      detail: activeStep.latest_job.error || formatState(activeStep.latest_job.status, 'Pending'),
-    } : null,
-    cluster?.status ? {
-      label: 'Cluster state',
-      value: formatState(cluster.status, 'Unknown'),
-      detail: cluster.id || 'Cluster record not available yet.',
-    } : null,
-    ...artifacts.map((artifact) => ({
-      label: artifact.label,
-      value: artifact.value,
-      detail: activeStep.side_help,
-    })),
-  ].filter(Boolean);
-
-  if (!cards.length) {
-    return null;
-  }
-
-  return (
-    <section className="workspace-section">
-      <div className="section-header">
-        <div>
-          <p className="section-kicker">Result</p>
-          <h3>Visible outputs for this step</h3>
-        </div>
-        <span className={`status-chip tone-${toneForStatus(activeStep.status)}`}>{statusLabel(activeStep.status)}</span>
-      </div>
-
-      <div className="artifact-grid">
-        {cards.map((card) => (
-          <article key={card.label} className="artifact-card">
-            <span className="metric-label">{card.label}</span>
-            <strong>{card.value}</strong>
-            <p>{card.detail}</p>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function SetupRail({ mission, goToStep, railOpen }) {
-  return (
-    <aside className="setup-progress-rail" data-mobile-open={railOpen}>
-      <div className="rail-header">
-        <div>
-          <p className="section-kicker">Setup flow</p>
-          <h2>Cluster deployment steps</h2>
-        </div>
-        <span className="status-chip tone-neutral">{`${mission.progress.completedSteps}/${mission.progress.totalSteps} steps done`}</span>
-      </div>
-
-      <div className="phase-list">
-        {mission.stepRail.map((step) => {
-          const stepModel = mission.steps.find((candidate) => candidate.id === step.id);
-          return (
-            <button
-              key={step.id}
-              type="button"
-              className={`phase-card ${step.isCurrent ? 'is-active' : ''}`}
-              onClick={() => {
-                if (stepModel && stepModel.status !== 'locked') {
-                  goToStep(step.id);
-                }
-              }}
-            >
-              <div className="phase-card-top">
-                <span className="phase-index">{`Step ${step.index}`}</span>
-                <span className={`status-chip tone-${toneForStatus(step.status)}`}>{statusLabel(step.status)}</span>
-              </div>
-              <strong>{step.title}</strong>
-              <p>{stepModel?.summary}</p>
-              <small>{step.isCurrent ? 'Current step' : 'Open when ready'}</small>
-            </button>
-          );
-        })}
-      </div>
-    </aside>
-  );
-}
-
-function SetupShell({
-  mission,
-  activeStep,
-  activeChecks,
-  runtime,
-  draftInputs,
-  onInputChange,
-  ipSuggestion,
-  cluster,
-  error,
-  catalogErrors,
-  handlePrimaryAction,
-  fetchCatalogOnce,
-  goToStep,
-  railOpen,
-  setRailOpen,
-}) {
-  return (
-    <div className="setup-shell">
-      <button
-        type="button"
-        className="journey-rail-toggle"
-        onClick={() => setRailOpen((open) => !open)}
-      >
-        {railOpen ? 'Close setup steps' : 'Open setup steps'}
-      </button>
-
-      <section className="setup-grid">
-        <SetupRail mission={mission} goToStep={goToStep} railOpen={railOpen} />
-
-        <section className="setup-workspace">
-          <div className="workspace-header">
-            <div>
-              <p className="section-kicker">{mission.activeCategory.title}</p>
-              <h2>{activeStep.title}</h2>
-              <p>{mission.activity.summary}</p>
-            </div>
-            <span className={`status-chip tone-${toneForStatus(activeStep.status)}`}>{statusLabel(activeStep.status)}</span>
-          </div>
-
-          <div className="workspace-meta">
-            <article className="meta-card">
-              <span className="metric-label">Step role</span>
-              <strong>{activeStep.type === 'config' ? 'Configuration' : 'Execution'}</strong>
-              <p>{activeStep.explanation}</p>
-            </article>
-            <article className="meta-card">
-              <span className="metric-label">Next action</span>
-              <strong>{mission.primaryAction.label}</strong>
-              <p>{mission.primaryAction.helperText}</p>
-            </article>
-          </div>
-
-          <section className="workspace-section">
-            <div className="runtime-strip">
-              <div className="section-header">
-                <div>
-                  <p className="section-kicker">Live runtime</p>
-                  <h3>Current stage</h3>
-                </div>
-                <div className="runtime-strip-meta">
-                  {runtime.isLive ? <span className="runtime-pulse" aria-hidden="true" /> : null}
-                  <span className={`status-chip tone-${toneForStatus(runtime.runState)}`}>{statusLabel(runtime.runState)}</span>
-                </div>
-              </div>
-
-              <div className="runtime-summary-grid">
-                <article className="runtime-summary-card">
-                  <span className="metric-label">Current stage</span>
-                  <strong>{runtime.currentStage}</strong>
-                  <p>{runtime.isStale ? 'No new activity recently. Twinbox is still polling.' : 'Twinbox is translating worker activity into a step-by-step timeline.'}</p>
-                </article>
-                <article className="runtime-summary-card">
-                  <span className="metric-label">Updated</span>
-                  <strong>{runtime.lastUpdatedLabel}</strong>
-                  <p>{runtime.isLive ? 'Polling is active while the current job is running.' : 'Twinbox will refresh this timeline when the next job starts.'}</p>
-                </article>
-                <article className="runtime-summary-card">
-                  <span className="metric-label">Timeline</span>
-                  <strong>{`${runtime.eventCount} events`}</strong>
-                  <p>{runtime.timelineEvents.at(-1)?.detail || 'Run the selected step to generate visible progress events.'}</p>
-                </article>
-              </div>
-
-              <div className="timeline-list">
-                {runtime.timelineEvents.map((event) => (
-                  <article key={event.id} className={`timeline-card tone-${event.tone}`}>
-                    <div className="timeline-card-top">
-                      <strong>{event.title}</strong>
-                      <span className="status-chip tone-neutral">{formatRuntimeTimestamp(event.timestamp)}</span>
-                    </div>
-                    <p style={{ whiteSpace: 'pre-line' }}>{event.detail}</p>
-                  </article>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <section className="workspace-section">
-            <div className="section-header">
-              <div>
-                <p className="section-kicker">Checks</p>
-                <h3>What Twinbox verifies before or during this step</h3>
-              </div>
-              <span className="status-chip tone-neutral">{`${activeChecks.length} checks`}</span>
-            </div>
-
-            <div className="check-list">
-              {activeChecks.map((check) => (
-                <article key={`${check.label}-${check.detail}`} className={`check-card tone-${toneForStatus(check.status)}`}>
-                  <div className="check-card-top">
-                    <strong>{check.label}</strong>
-                    <span className={`status-chip tone-${toneForStatus(check.status)}`}>{statusLabel(check.status)}</span>
-                  </div>
-                  <p>{check.detail}</p>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <StepFields
-            activeStep={activeStep}
-            draftInputs={draftInputs[activeStep.id] || {}}
-            onChange={onInputChange}
-            ipSuggestion={ipSuggestion}
-          />
-          <StepResults
-            activeStep={activeStep}
-            cluster={cluster}
-            artifacts={mission.activity.artifacts}
-          />
-
-          {error ? (
-            <div className="callout callout-danger">
-              <span className="callout-label">Latest error</span>
-              <p>{error}</p>
-            </div>
-          ) : null}
-
-          {catalogErrors.length ? (
-            <div className="callout callout-inline">
-              <span className="callout-label">Catalog warnings</span>
-              <p>{catalogErrors.join(' | ')}</p>
-            </div>
-          ) : null}
-
-          <div className="bottom-actions">
-            <button type="button" className="ghost-action" onClick={fetchCatalogOnce}>
-              Refresh catalog
-            </button>
-            <button
-              type="button"
-              aria-label={mission.primaryAction.label}
-              onClick={handlePrimaryAction}
-              disabled={mission.primaryAction.disabled}
-            >
-              {mission.primaryAction.label}
-            </button>
-          </div>
-
-          {mission.primaryAction.helperText ? <p className="action-helper">{mission.primaryAction.helperText}</p> : null}
-
-          <details className="technical-panel" open>
-            <summary>Technical details</summary>
-            <pre>{mission.activity.rawLogOutput}</pre>
-          </details>
-        </section>
-      </section>
-    </div>
-  );
-}
-
-function ManageShell({
-  mission,
-  activeStep,
-  activeChecks,
-  runtime,
-  draftInputs,
-  onInputChange,
-  ipSuggestion,
-  cluster,
-  error,
-  catalogErrors,
-  handlePrimaryAction,
-  fetchCatalogOnce,
-  goToStep,
-  railOpen,
-  setRailOpen,
-}) {
-  return (
-    <div className="manage-shell">
-      <header className="global-header">
-        <div className="global-header-copy">
-          <p className="eyebrow">Twinbox Mission Control</p>
-          <h1>Manifest-driven platform steps for the Management VM</h1>
-          <p className="hero-summary">
-            Twinbox discovers project-owned categories and steps from the backend catalog, shows the exact inputs and explanations
-            for each step, and keeps execution logs and artifacts visible while the worker runs.
-          </p>
-        </div>
-
-        <div className="global-header-stats">
-          <article className="header-stat">
-            <span className="metric-label">Category</span>
-            <strong>{mission.activeCategory.title}</strong>
-            <span className={`status-chip tone-${toneForStatus(mission.activeCategory.status)}`}>{statusLabel(mission.activeCategory.status)}</span>
-          </article>
-          <article className="header-stat">
-            <span className="metric-label">Category progress</span>
-            <strong>{`${mission.progress.categoryIndex} / ${mission.progress.categoryCount}`}</strong>
-            <span className="status-chip tone-neutral">{mission.activeCategory.title}</span>
-          </article>
-          <article className="header-stat">
-            <span className="metric-label">Step</span>
-            <strong>{`${mission.progress.stepIndex} / ${mission.progress.totalSteps}`}</strong>
-            <span className={`status-chip tone-${toneForStatus(activeStep.status)}`}>{statusLabel(activeStep.status)}</span>
-          </article>
-          <article className="header-stat">
-            <span className="metric-label">Progress</span>
-            <strong>{`${mission.progress.percent}% complete`}</strong>
-            <span className="status-chip tone-active">{`${mission.progress.completedSteps}/${mission.progress.totalSteps} done`}</span>
-          </article>
-        </div>
-
-        <div className="health-strip">
-          {mission.healthBadges.map((badge) => (
-            <article key={badge.id} className="health-card">
-              <span className="metric-label">{badge.label}</span>
-              <strong>{badge.value}</strong>
-              <span className={`status-chip tone-${badge.tone}`}>{badge.chip}</span>
-            </article>
-          ))}
-        </div>
-      </header>
-
-      <button
-        type="button"
-        className="journey-rail-toggle"
-        onClick={() => setRailOpen((open) => !open)}
-      >
-        {railOpen ? 'Close catalog overview' : 'Open catalog overview'}
-      </button>
-
-      <section className="mission-grid">
-        <aside className="journey-rail" data-mobile-open={railOpen}>
-          <div className="rail-header">
-            <div>
-              <p className="section-kicker">Catalog</p>
-              <h2>Management VM steps</h2>
-            </div>
-            <span className="status-chip tone-neutral">{`${mission.progress.completedSteps}/${mission.progress.totalSteps} steps done`}</span>
-          </div>
-
-          <div className="phase-list">
-            {mission.categories.map((category, index) => (
-              <button
-                key={category.id}
-                type="button"
-                className={`phase-card ${category.id === mission.activeCategory.id ? 'is-active' : ''}`}
-                onClick={() => {
-                  const targetStep = category.steps.find((step) => step.status !== 'locked') || category.steps[0];
-                  if (targetStep) {
-                    goToStep(targetStep.id);
-                  }
-                }}
-              >
-                <div className="phase-card-top">
-                  <span className="phase-index">{`Category ${index + 1}`}</span>
-                  <span className={`status-chip tone-${toneForStatus(category.status)}`}>{statusLabel(category.status)}</span>
-                </div>
-                <strong>{category.title}</strong>
-                <p>{category.blocker}</p>
-                <div className="phase-progress">
-                  <span style={{ width: `${category.percent}%` }} />
-                </div>
-                <small>{`${category.completedSteps}/${category.totalSteps} steps done`}</small>
-              </button>
-            ))}
-          </div>
-        </aside>
-
-        <section className="workspace-panel manage-workspace">
-          <div className="workspace-header">
-            <div>
-              <p className="section-kicker">{mission.activeCategory.title}</p>
-              <h2>{activeStep.title}</h2>
-              <p>{mission.activity.summary}</p>
-            </div>
-            <span className={`status-chip tone-${toneForStatus(activeStep.status)}`}>{statusLabel(activeStep.status)}</span>
-          </div>
-
-          <div className="workspace-meta">
-            <article className="meta-card">
-              <span className="metric-label">What this step does</span>
-              <strong>{activeStep.type === 'config' ? 'Configuration' : 'Execution'}</strong>
-              <p>{activeStep.explanation}</p>
-            </article>
-            <article className="meta-card">
-              <span className="metric-label">Operator guidance</span>
-              <strong>{activeStep.title}</strong>
-              <p>{activeStep.side_help}</p>
-            </article>
-          </div>
-
-          <section className="workspace-section">
-            <div className="runtime-strip">
-              <div className="section-header">
-                <div>
-                  <p className="section-kicker">Live runtime</p>
-                  <h3>Current stage</h3>
-                </div>
-                <div className="runtime-strip-meta">
-                  {runtime.isLive ? <span className="runtime-pulse" aria-hidden="true" /> : null}
-                  <span className={`status-chip tone-${toneForStatus(runtime.runState)}`}>{statusLabel(runtime.runState)}</span>
-                </div>
-              </div>
-
-              <div className="runtime-summary-grid">
-                <article className="runtime-summary-card">
-                  <span className="metric-label">Current stage</span>
-                  <strong>{runtime.currentStage}</strong>
-                  <p>{runtime.isStale ? 'No new activity recently. Twinbox is still polling.' : 'Twinbox is translating worker activity into a step-by-step timeline.'}</p>
-                </article>
-                <article className="runtime-summary-card">
-                  <span className="metric-label">Updated</span>
-                  <strong>{runtime.lastUpdatedLabel}</strong>
-                  <p>{runtime.isLive ? 'Polling is active while the current job is running.' : 'Twinbox will refresh this timeline when the next job starts.'}</p>
-                </article>
-                <article className="runtime-summary-card">
-                  <span className="metric-label">Timeline</span>
-                  <strong>{`${runtime.eventCount} events`}</strong>
-                  <p>{runtime.timelineEvents.at(-1)?.detail || 'Run the selected step to generate visible progress events.'}</p>
-                </article>
-              </div>
-
-              <div className="timeline-list">
-              {runtime.timelineEvents.map((event) => (
-                <article key={event.id} className={`timeline-card tone-${event.tone}`}>
-                  <div className="timeline-card-top">
-                    <strong>{event.title}</strong>
-                    <span className="status-chip tone-neutral">{formatRuntimeTimestamp(event.timestamp)}</span>
-                  </div>
-                  <p style={{ whiteSpace: 'pre-line' }}>{event.detail}</p>
-                </article>
-              ))}
-              </div>
-            </div>
-          </section>
-
-          <section className="workspace-section">
-            <div className="section-header">
-              <div>
-                <p className="section-kicker">Checks</p>
-                <h3>What Twinbox verifies before or during this step</h3>
-              </div>
-              <span className="status-chip tone-neutral">{`${activeChecks.length} checks`}</span>
-            </div>
-
-            <div className="check-list">
-              {activeChecks.map((check) => (
-                <article key={`${check.label}-${check.detail}`} className={`check-card tone-${toneForStatus(check.status)}`}>
-                  <div className="check-card-top">
-                    <strong>{check.label}</strong>
-                    <span className={`status-chip tone-${toneForStatus(check.status)}`}>{statusLabel(check.status)}</span>
-                  </div>
-                  <p>{check.detail}</p>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <StepFields
-            activeStep={activeStep}
-            draftInputs={draftInputs[activeStep.id] || {}}
-            onChange={onInputChange}
-            ipSuggestion={ipSuggestion}
-          />
-          <StepResults
-            activeStep={activeStep}
-            cluster={cluster}
-            artifacts={mission.activity.artifacts}
-          />
-
-          {error ? (
-            <div className="callout callout-danger">
-              <span className="callout-label">Latest error</span>
-              <p>{error}</p>
-            </div>
-          ) : null}
-
-          {catalogErrors.length ? (
-            <div className="callout callout-inline">
-              <span className="callout-label">Catalog warnings</span>
-              <p>{catalogErrors.join(' | ')}</p>
-            </div>
-          ) : null}
-
-          <div className="bottom-actions">
-            <button
-              type="button"
-              className="secondary-action"
-              onClick={() => mission.previousStep && goToStep(mission.previousStep.id)}
-              disabled={!mission.previousStep}
-            >
-              Previous
-            </button>
-            <button type="button" className="ghost-action" onClick={fetchCatalogOnce}>
-              Refresh catalog
-            </button>
-            <button
-              type="button"
-              aria-label={mission.primaryAction.label}
-              onClick={handlePrimaryAction}
-              disabled={mission.primaryAction.disabled}
-            >
-              {mission.primaryAction.label}
-            </button>
-          </div>
-
-          {mission.primaryAction.helperText ? <p className="action-helper">{mission.primaryAction.helperText}</p> : null}
-
-          <details className="technical-panel">
-            <summary>Technical details</summary>
-            <pre>{mission.activity.rawLogOutput}</pre>
-          </details>
-        </section>
-
-        <aside className="activity-panel">
-          <section className="panel-card">
-            <div className="section-header">
-              <div>
-                <p className="section-kicker">Now active</p>
-                <h3>Step context</h3>
-              </div>
-              <span className={`status-chip tone-${toneForStatus(activeStep.status)}`}>{statusLabel(activeStep.status)}</span>
-            </div>
-            <p className="panel-summary">{mission.activity.summary}</p>
-          </section>
-
-          <section className="panel-card">
-            <div className="section-header">
-              <div>
-                <p className="section-kicker">Live summary</p>
-                <h3>Runtime snapshot</h3>
-              </div>
-              <span className={`status-chip tone-${toneForStatus(runtime.runState)}`}>{statusLabel(runtime.runState)}</span>
-            </div>
-            <div className="event-list">
-              <article className={`event-card tone-${toneForStatus(runtime.runState)}`}>
-                <strong>{runtime.currentStage}</strong>
-                <p>{runtime.lastUpdatedLabel}</p>
-              </article>
-              <article className="event-card tone-neutral">
-                <strong>Most recent event</strong>
-                <p>{runtime.timelineEvents.at(-1)?.detail || 'No worker output yet.'}</p>
-              </article>
-            </div>
-          </section>
-
-          <section className="panel-card">
-            <div className="section-header">
-              <div>
-                <p className="section-kicker">Artifacts</p>
-                <h3>Saved and discovered state</h3>
-              </div>
-              <span className="status-chip tone-neutral">{`${mission.activity.artifacts.length} items`}</span>
-            </div>
-            <dl className="artifact-list">
-              {mission.activity.artifacts.length ? (
-                mission.activity.artifacts.map((artifact) => (
-                  <div key={`${artifact.label}-${artifact.value}`} className="artifact-row">
-                    <dt>{artifact.label}</dt>
-                    <dd>{artifact.value}</dd>
-                  </div>
-                ))
-              ) : (
-                <div className="artifact-row">
-                  <dt>No artifacts yet</dt>
-                  <dd>Run the selected step to generate visible outputs.</dd>
-                </div>
-              )}
-            </dl>
-          </section>
-
-          <section className="panel-card">
-            <div className="section-header">
-              <div>
-                <p className="section-kicker">Risks / notes</p>
-                <h3>Operator context</h3>
-              </div>
-              <span className="status-chip tone-warning">{mission.activity.risks.length} notes</span>
-            </div>
-            <div className="risk-list">
-              {mission.activity.risks.map((risk) => (
-                <article key={`${risk.label}-${risk.detail}`} className={`risk-card tone-${risk.tone || 'neutral'}`}>
-                  <strong>{risk.label}</strong>
-                  <p>{risk.detail}</p>
-                </article>
-              ))}
-            </div>
-          </section>
-        </aside>
-      </section>
-    </div>
-  );
-}
+import heroIllustration from './assets/hero-illustration.svg';
+import hardwareIllustration from './assets/hardware-illustration.svg';
+
+const trustWords = ['Sovereign', 'Your data', 'In control', 'Always up to date'];
+
+const steps = [
+  {
+    number: '01',
+    title: 'Set up Twinbox on your own hardware',
+    text: 'Use an existing PC or server in your own environment. Twinbox is built for on-prem use, with no cloud dependency.',
+  },
+  {
+    number: '02',
+    title: 'Let Twinbox do the heavy lifting',
+    text: 'The setup takes care of the basics, updates, and initial configuration for you. You do not need to manage every step by hand.',
+  },
+  {
+    number: '03',
+    title: 'Keep working without extra stress',
+    text: 'Your data stays local, your environment stays current, and you need far less IT administration. That creates calm and clarity.',
+  },
+];
+
+const benefits = [
+  {
+    title: 'No cloud',
+    text: 'Keep your data and infrastructure close. That makes you less dependent on external platforms.',
+  },
+  {
+    title: 'Reuse existing hardware',
+    text: 'Twinbox is a practical layer on top of existing PCs or servers, so you do not have to buy new equipment first.',
+  },
+  {
+    title: 'Minimal administration',
+    text: 'The focus is on automatic updates and a clear baseline, not on endless manual maintenance.',
+  },
+  {
+    title: 'Open Source',
+    text: 'Transparent, modern, and easy to assess. No black box you need to trust blindly.',
+  },
+];
+
+const reasons = [
+  {
+    title: 'Calm for non-technical people',
+    text: 'Twinbox explains what is happening in plain language so the solution stays understandable for everyone.',
+  },
+  {
+    title: 'Sovereignty without drama',
+    text: 'Even when political winds shift in the United States, your data stays under your own control.',
+  },
+  {
+    title: 'Up to date without stress',
+    text: 'New techniques and security updates are part of the design, so the platform stays fresh without adding much work.',
+  },
+];
+
+const faqs = [
+  {
+    question: 'Do I need to replace my entire IT environment?',
+    answer: 'No. Twinbox is designed to reuse existing hardware and an existing base where that makes sense.',
+  },
+  {
+    question: 'Is this only for technical teams?',
+    answer: 'No. The goal is that you can understand it and explain it to colleagues without deep technical knowledge.',
+  },
+  {
+    question: 'Is everything in the cloud?',
+    answer: 'No. Twinbox is intended for on-prem use, so your data stays local and under your own control.',
+  },
+  {
+    question: 'Will the system stay current?',
+    answer: 'Yes. Automatic updates and a modern Open Source base help keep the platform up to date.',
+  },
+];
 
 function App() {
-  const [catalog, setCatalog] = useState({ categories: [], errors: [] });
-  const [selectedStepId, setSelectedStepId] = useState('');
-  const [draftInputs, setDraftInputs] = useState({});
-  const [health, setHealth] = useState(null);
-  const [cluster, setCluster] = useState(null);
-  const [logs, setLogs] = useState([]);
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [railOpen, setRailOpen] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
-  const [sessionClusterId, setSessionClusterId] = useState('');
-  const [ipSuggestion, setIpSuggestion] = useState('');
-  const [provisionSuggestedInputs, setProvisionSuggestedInputs] = useState({});
-  const dirtyInputsRef = useRef({});
-  const deferredLogs = useDeferredValue(logs);
-
-  const mission = useMemo(
-    () => getMissionControlModel({
-      catalog,
-      selectedStepId,
-      logs: deferredLogs,
-      cluster,
-      health,
-      error,
-      busy,
-    }),
-    [catalog, selectedStepId, deferredLogs, cluster, health, error, busy],
-  );
-
-  const activeStep = mission.activeStep;
-  const catalogErrors = catalog.errors || [];
-  const activeChecks = buildChecks(activeStep, mission.steps, catalogErrors);
-  const runtime = mission.activity.runtime;
-  const activeClusterId = useMemo(() => {
-    if (!activeStep) return '';
-    if (activeStep.state?.cluster_id) return activeStep.state.cluster_id;
-
-    for (const dependencyId of activeStep.depends_on || []) {
-      const dependency = mission.steps.find((step) => step.id === dependencyId);
-      if (dependency?.state?.cluster_id) {
-        return dependency.state.cluster_id;
-      }
-    }
-
-    return '';
-  }, [activeStep, mission.steps]);
-  const effectiveClusterId = activeClusterId || sessionClusterId;
-
-  const buildCatalogUrl = (clusterIdOverride = '') => {
-    const clusterId = clusterIdOverride || effectiveClusterId;
-    if (!clusterId) {
-      return '/api/catalog';
-    }
-
-    return `/api/catalog?cluster_id=${encodeURIComponent(clusterId)}`;
-  };
-
-  const fetchCatalogOnce = async (clusterIdOverride = '') => {
-    const res = await fetch(buildCatalogUrl(clusterIdOverride));
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Catalog request failed');
-    }
-    setCatalog(data);
-    setDraftInputs((prev) => mergeDraftInputs(data, prev));
-
-    const steps = (data.categories || []).flatMap((category) => category.steps || []);
-    const selectedExists = steps.some((step) => step.id === selectedStepId);
-    if (!selectedExists) {
-      setSelectedStepId(steps.find((step) => step.status !== 'locked')?.id || steps[0]?.id || '');
-    }
-  };
-
-  useEffect(() => {
-    const restored = restoreUiState(window.localStorage.getItem(STORAGE_KEY));
-    setSelectedStepId(restored.selectedStepId);
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (activeClusterId && activeClusterId !== sessionClusterId) {
-      setSessionClusterId(activeClusterId);
-    }
-  }, [activeClusterId, sessionClusterId]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadCatalog = async () => {
-      try {
-        const res = await fetch(buildCatalogUrl());
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.error || 'Catalog request failed');
-        }
-        if (cancelled) return;
-
-        setCatalog(data);
-        setDraftInputs((prev) => mergeDraftInputs(data, prev));
-
-        const steps = (data.categories || []).flatMap((category) => category.steps || []);
-        if (!steps.some((step) => step.id === selectedStepId)) {
-          setSelectedStepId(steps.find((step) => step.status !== 'locked')?.id || steps[0]?.id || '');
-        }
-      } catch (catalogError) {
-        if (!cancelled) {
-          setError(catalogError.message);
-        }
-      }
-    };
-
-    loadCatalog();
-    const timer = setInterval(loadCatalog, 3000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [effectiveClusterId, selectedStepId]);
-
-  useEffect(() => {
-    const pollHealth = async () => {
-      try {
-        const res = await fetch('/api/health');
-        if (!res.ok) {
-          throw new Error('manager API did not answer');
-        }
-        setHealth(await res.json());
-      } catch (healthError) {
-        setHealth({ ok: false, error: healthError.message });
-      }
-    };
-
-    pollHealth();
-    const timer = setInterval(pollHealth, 15000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      serializeUiState({ selectedStepId }),
-    );
-  }, [hydrated, selectedStepId]);
-
-  useEffect(() => {
-    if (!activeStep?.latest_job?.id) {
-      setLogs([]);
-      return undefined;
-    }
-
-    let cancelled = false;
-    const loadLogs = async () => {
-      const res = await fetch(`/api/jobs/${activeStep.latest_job.id}/logs`);
-      if (!res.ok || cancelled) return;
-      const data = await res.json();
-      setLogs(data.lines || []);
-    };
-
-    loadLogs();
-    const timer = setInterval(loadLogs, 2000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [activeStep?.latest_job?.id]);
-
-  useEffect(() => {
-    if (!effectiveClusterId) {
-      setCluster(null);
-      return undefined;
-    }
-
-    let cancelled = false;
-    const loadCluster = async () => {
-      const res = await fetch(`/api/clusters/${effectiveClusterId}`);
-      if (!res.ok || cancelled) return;
-      setCluster(await res.json());
-    };
-
-    loadCluster();
-    const timer = setInterval(loadCluster, 3000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [effectiveClusterId]);
-
-  const provisionDraft = draftInputs['provision-nodes'] || {};
-
-  useEffect(() => {
-    if (activeStep?.id !== 'provision-nodes') {
-      setIpSuggestion('');
-      setProvisionSuggestedInputs({});
-      return undefined;
-    }
-
-    const managementIp = window.location.hostname;
-    if (!isIPv4(managementIp)) return undefined;
-    const controlplaneCount = Number(provisionDraft.controlplane_count ?? activeStep.inputs.find((input) => input.id === 'controlplane_count')?.default ?? 1);
-    const workerCount = Number(provisionDraft.worker_count ?? activeStep.inputs.find((input) => input.id === 'worker_count')?.default ?? 0);
-    const nodeCount = controlplaneCount + workerCount;
-    if (!Number.isInteger(nodeCount) || nodeCount < 1) return undefined;
-
-    let cancelled = false;
-    const loadIpSuggestions = async () => {
-      try {
-        const res = await fetch(`/api/ip-suggestions?management_ip=${encodeURIComponent(managementIp)}&node_count=${encodeURIComponent(nodeCount)}`);
-        if (!res.ok || cancelled) return;
-
-        const data = await res.json();
-        const nextSuggestedInputs = buildSuggestedProvisionInputs(data);
-        setProvisionSuggestedInputs((previousSuggested) => {
-          setDraftInputs((prev) => {
-            const current = prev['provision-nodes'] || {};
-            return {
-              ...prev,
-              'provision-nodes': mergeSuggestedProvisionDraft({
-                currentDraft: current,
-                previousSuggested,
-                suggestionData: data,
-                stepInputs: activeStep.inputs,
-                dirtyFields: dirtyInputsRef.current['provision-nodes'] || {},
-              }),
-            };
-          });
-          return nextSuggestedInputs;
-        });
-
-        if (Array.isArray(data.start_ip_block) && data.start_ip_block.length === nodeCount) {
-          const vmidBlock = Array.isArray(data.vmid_block) && data.vmid_block.length > 0
-            ? `${data.vmid_block[0]}-${data.vmid_block[data.vmid_block.length - 1]}`
-            : data.start_vmid;
-          setIpSuggestion(`Free range found: VMIDs ${vmidBlock}, VIP ${data.vip_ip}, node block ${data.start_ip_block.join(', ')}`);
-        }
-      } catch {
-        setIpSuggestion('');
-      }
-    };
-
-    loadIpSuggestions();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeStep, provisionDraft.controlplane_count, provisionDraft.worker_count]);
-
-  const goToStep = (stepId) => {
-    const target = mission.steps.find((step) => step.id === stepId);
-    if (!target || target.status === 'locked') return;
-    setSelectedStepId(stepId);
-    setRailOpen(false);
-  };
-
-  const onInputChange = (inputId, value) => {
-    if (!activeStep) return;
-    dirtyInputsRef.current = {
-      ...dirtyInputsRef.current,
-      [activeStep.id]: {
-        ...(dirtyInputsRef.current[activeStep.id] || {}),
-        [inputId]: true,
-      },
-    };
-    setDraftInputs((prev) => ({
-      ...prev,
-      [activeStep.id]: {
-        ...(prev[activeStep.id] || {}),
-        [inputId]: value,
-      },
-    }));
-  };
-
-  const executeStep = async () => {
-    if (!activeStep) return;
-
-    setBusy(true);
-    setError('');
-    try {
-      const res = await fetch(`/api/steps/${activeStep.id}/execute`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cluster_id: activeStep.id === 'provision-nodes' ? undefined : (effectiveClusterId || undefined),
-          inputs: draftInputs[activeStep.id] || {},
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Step execution failed');
-      }
-
-      if (data.cluster_id) {
-        setSessionClusterId(data.cluster_id);
-      }
-
-      await fetchCatalogOnce(data.cluster_id || effectiveClusterId);
-    } catch (requestError) {
-      setError(requestError.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handlePrimaryAction = async () => {
-    if (mission.primaryAction.type === 'advance' && mission.nextStep) {
-      goToStep(mission.nextStep.id);
-      return;
-    }
-
-    if (mission.primaryAction.type === 'execute') {
-      await executeStep();
-    }
-  };
-
-  if (!activeStep || !mission.activeCategory) {
-    return (
-      <div className="app-shell">
-        <main className="app-main">
-          <header className="global-header">
-            <div className="global-header-copy">
-              <p className="eyebrow">Twinbox Setup</p>
-              <h1>Let's deploy a Twinbox cluster</h1>
-              <p className="hero-summary">Follow the steps below to set up the cluster.</p>
-            </div>
-          </header>
-        </main>
-      </div>
-    );
-  }
-
-  if (mission.mode === 'setup') {
-    return (
-      <div className="app-shell">
-        <main className="app-main">
-          <SetupShell
-            mission={mission}
-            activeStep={activeStep}
-            activeChecks={activeChecks}
-            runtime={runtime}
-            draftInputs={draftInputs}
-            onInputChange={onInputChange}
-            ipSuggestion={ipSuggestion}
-            cluster={cluster}
-            error={error}
-            catalogErrors={catalogErrors}
-            handlePrimaryAction={handlePrimaryAction}
-            fetchCatalogOnce={fetchCatalogOnce}
-            goToStep={goToStep}
-            railOpen={railOpen}
-            setRailOpen={setRailOpen}
-          />
-        </main>
-      </div>
-    );
-  }
-
   return (
-    <div className="app-shell">
-      <main className="app-main">
-        <ManageShell
-          mission={mission}
-          activeStep={activeStep}
-          activeChecks={activeChecks}
-          runtime={runtime}
-          draftInputs={draftInputs}
-          onInputChange={onInputChange}
-          ipSuggestion={ipSuggestion}
-          cluster={cluster}
-          error={error}
-          catalogErrors={catalogErrors}
-          handlePrimaryAction={handlePrimaryAction}
-          fetchCatalogOnce={fetchCatalogOnce}
-          goToStep={goToStep}
-          railOpen={railOpen}
-          setRailOpen={setRailOpen}
-        />
+    <div className="site-shell">
+      <main className="landing-page">
+        <header className="topbar" id="top">
+          <a className="brand" href="#top" aria-label="Twinbox start">
+            <span className="brand-mark" aria-hidden="true" />
+            <span>Twinbox</span>
+          </a>
+
+          <nav className="topnav" aria-label="Main navigation">
+            <a href="#how-it-works">How it works</a>
+            <a href="#benefits">Benefits</a>
+            <a href="#faq">FAQ</a>
+          </nav>
+
+          <a className="button button-small" href="#contact">
+            Explore
+          </a>
+        </header>
+
+        <section className="hero">
+          <div className="hero-copy">
+            <p className="eyebrow">Sovereign. Simple. On-prem.</p>
+            <h1>Your data stays yours. Twinbox keeps it calm and up to date.</h1>
+            <p className="hero-lead">
+              For organizations that want control without cloud dependency, with a solution that feels clear, calm, and easy
+              to explore.
+            </p>
+
+            <div className="hero-actions">
+              <a className="button button-primary" href="#contact">
+                Explore Twinbox
+              </a>
+              <a className="button button-secondary" href="#how-it-works">
+                See how it works
+              </a>
+            </div>
+
+            <dl className="hero-facts" aria-label="Key points">
+              <div>
+                <dt>Local</dt>
+                <dd>Data stays under your own control</dd>
+              </div>
+              <div>
+                <dt>Automatic</dt>
+                <dd>Updates without much manual work</dd>
+              </div>
+              <div>
+                <dt>Practical</dt>
+                <dd>Works on hardware you already own</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div className="hero-panel" aria-label="Twinbox illustration and highlights">
+            <figure className="art-frame art-frame-hero">
+              <img
+                className="art-image"
+                src={heroIllustration}
+                alt="Abstract illustration of local control, calm updates, and a connected on-prem environment"
+                loading="eager"
+              />
+            </figure>
+
+            <article className="hero-card hero-card-main">
+              <p className="card-kicker">What Twinbox promises</p>
+              <strong>Calm operations, control over your data</strong>
+              <p>
+                A straightforward on-prem foundation for teams that want to keep their data in-house instead of relying on a
+                public cloud.
+              </p>
+            </article>
+
+            <div className="hero-card-grid">
+              <article className="hero-card">
+                <span>No cloud</span>
+                <p>Everything stays local.</p>
+              </article>
+              <article className="hero-card">
+                <span>Open Source</span>
+                <p>Transparent and modern.</p>
+              </article>
+              <article className="hero-card">
+                <span>Low maintenance</span>
+                <p>Automatic where it matters.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section className="trust-band" aria-label="Core words">
+          {trustWords.map((word) => (
+            <span key={word} className="trust-pill">
+              {word}
+            </span>
+          ))}
+        </section>
+
+        <section className="content-section" id="how-it-works">
+          <div className="section-heading">
+            <p className="eyebrow">How it works</p>
+            <h2>Three simple steps, with no complicated explanation</h2>
+            <p>
+              The idea is intentionally easy to follow: Twinbox helps you move from existing hardware to a calm, manageable
+              environment.
+            </p>
+          </div>
+
+          <div className="step-grid">
+            {steps.map((step) => (
+              <article key={step.number} className="step-card">
+                <span className="step-number">{step.number}</span>
+                <h3>{step.title}</h3>
+                <p>{step.text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="content-section split-section" id="benefits">
+          <div className="section-heading section-heading-compact">
+            <p className="eyebrow">Benefits</p>
+            <h2>Why Twinbox feels right for teams and decision-makers</h2>
+            <p>
+              The page focuses on outcomes: less hassle, more control, and a platform that stays in step with modern
+              techniques.
+            </p>
+          </div>
+
+          <div className="benefit-grid">
+            {benefits.map((benefit) => (
+              <article key={benefit.title} className="benefit-card">
+                <h3>{benefit.title}</h3>
+                <p>{benefit.text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="content-section reasons-section" aria-label="Why Twinbox">
+          <div className="section-heading">
+            <p className="eyebrow">Why Twinbox</p>
+            <h2>Built for local control, modern techniques, and a calm explanation</h2>
+          </div>
+
+          <div className="reasons-grid">
+            {reasons.map((reason) => (
+              <article key={reason.title} className="reason-card">
+                <h3>{reason.title}</h3>
+                <p>{reason.text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="content-section faq-section" id="faq">
+          <div className="section-heading section-heading-compact">
+            <p className="eyebrow">FAQ</p>
+            <h2>Common questions in plain language</h2>
+          </div>
+
+          <div className="faq-list">
+            {faqs.map((faq) => (
+              <details key={faq.question} className="faq-item">
+                <summary>{faq.question}</summary>
+                <p>{faq.answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+
+        <section className="contact-band" id="contact">
+          <div className="contact-copy">
+            <p className="eyebrow">Ready for a first impression</p>
+            <h2>See whether Twinbox fits your environment.</h2>
+            <p>
+              This version is ready for GitHub Pages. The operational management environment can keep running separately on
+              the Management VM.
+            </p>
+
+            <div className="hero-actions">
+              <a className="button button-primary" href="https://github.com/harrywesterman/twinbox">
+                See the source code
+              </a>
+              <a className="button button-secondary" href="#top">
+                Back to top
+              </a>
+            </div>
+          </div>
+
+          <figure className="art-frame art-frame-contact">
+            <img
+              className="art-image"
+              src={hardwareIllustration}
+              alt="Friendly illustration of reusable hardware and a local, on-prem Twinbox stack"
+              loading="lazy"
+            />
+          </figure>
+        </section>
       </main>
     </div>
   );

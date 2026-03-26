@@ -1,13 +1,12 @@
 # manager-web
 
-React frontend for Twinbox manager runtime.
+Static Twinbox landing page for GitHub Pages.
 
 ## Purpose
 
-- Collect provisioning input.
-- Start Talos provisioning jobs.
-- Trigger bootstrap jobs.
-- Display job state and logs.
+- Explain Twinbox in plain language for non-technical visitors.
+- Highlight sovereign, on-prem, low-maintenance deployment.
+- Provide a public page with a calm, invitation-style tone.
 
 ## Local Development
 
@@ -16,30 +15,15 @@ npm ci
 npm run dev
 ```
 
-## Preferred Management VM Preview Flow
+## GitHub Pages
 
-Normal visual testing for `manager-web` happens on the Management VM before commit/push:
+The site builds with Vite and is configured for relative asset paths, so it can be hosted as a GitHub Pages site
+without extra routing setup.
 
-```bash
-# from the repository root
-cp .env.vm-preview.local.example .env.vm-preview.local
-# set TWINBOX_VM_PREVIEW_TARGET and TWINBOX_VM_PREVIEW_REMOTE_DIR
-bash scripts/manager-web-preview.sh
-```
+Deployment is handled by `.github/workflows/deploy-pages.yml`.
 
-This uploads only local `manager-web/` to a temporary directory on the VM, builds the `manager-web` image there, and recreates only the `manager-web` container. The remote git checkout is left alone. Full workflow: `docs/vm-dev.md`.
-
-## Runtime Integration
-
-In production, the frontend is served by prebuilt GHCR image and proxies `/api/*` to `manager-api`.
-
-Start full stack from repository root:
+Build locally:
 
 ```bash
-docker compose pull
-docker compose up -d
+npm run build
 ```
-
-Open:
-
-- `http://<management-vm-ip>:3000`
