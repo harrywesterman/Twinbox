@@ -254,6 +254,8 @@ def test_argo_bootstrap_script_installs_argocd_and_applies_bootstrap_root_applic
     assert 'control_plane_tolerations' in text
     assert 'Patching statefulset/argocd-application-controller for control-plane tolerations' in text
     assert 'kubectl -n argocd patch' in text
+    assert 'kubectl -n argocd wait --for=condition=Available' in text
+    assert 'kubectl -n argocd wait --for=condition=Ready pod -l app.kubernetes.io/name=argocd-application-controller --timeout=600s' in text
     assert 'Applying bootstrap root application' in text
     assert 'gitops/argocd/bootstrap/root.yaml' in text
 

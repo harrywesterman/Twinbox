@@ -37,16 +37,19 @@ EOF
   fi
 }
 
-wait_for_argocd_deployments() {
+wait_for_argocd_workloads() {
   local deployment
   local deployments=()
 
   mapfile -t deployments < <(kubectl -n argocd get deployment -o name 2>/dev/null | sort)
 
   for deployment in "${deployments[@]}"; do
-    log "Waiting for ${deployment} to become ready"
-    kubectl -n argocd rollout status "$deployment" --timeout=600s
+    log "Waiting for ${deployment} to become available"
+    kubectl -n argocd wait --for=condition=Available "$deployment" --timeout=600s
   done
+
+  log "Waiting for statefulset/argocd-application-controller pods to become ready"
+  kubectl -n argocd wait --for=condition=Ready pod -l app.kubernetes.io/name=argocd-application-controller --timeout=600s
 }
 
 log "Creating argocd namespace"
@@ -57,7 +60,7 @@ kubectl apply --server-side -n argocd -f https://raw.githubusercontent.com/argop
 
 patch_argocd_workload_tolerations
 
-wait_for_argocd_deployments
+wait_for_argocd_workloads
 
 log "Applying bootstrap root application"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/argocd/bootstrap/root.yaml"
