@@ -96,14 +96,10 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             management = body["categories"][0]
             assert [step["id"] for step in management["steps"]] == [
                 "configure-automatic-updates",
-                "install-k9s",
             ]
             assert management["steps"][0]["type"] == "config"
             assert management["steps"][0]["journey_stage"] == "manage"
             assert management["steps"][0]["status"] == "ready"
-            assert management["steps"][1]["type"] == "action"
-            assert management["steps"][1]["journey_stage"] == "manage"
-            assert management["steps"][1]["status"] == "ready"
 
             talos = body["categories"][1]
             assert [step["id"] for step in talos["steps"]] == [

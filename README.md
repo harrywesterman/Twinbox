@@ -6,7 +6,7 @@ Twinbox is a manager-first platform for provisioning and bootstrapping Talos Kub
 
 1. Run the Proxmox wizard: `wizard/setup-wizard.sh`.
 2. The wizard creates a Management VM only.
-3. Cloud-init on that VM installs Docker CE from the official Docker repo, clones this repository, installs `talosctl`/`kubectl`/`helm` from pinned `.env` versions, and starts the manager stack automatically, including a Vaultwarden instance exposed on the Management VM LAN IP at port `8222`.
+3. Cloud-init on that VM installs Docker CE from the official Docker repo, clones this repository, installs the management toolchain (`talosctl`/`kubectl`/`helm`/`k9s`) from pinned defaults, and starts the manager stack automatically, including a Vaultwarden instance exposed on the Management VM LAN IP at port `8222`.
 4. Twinbox then bootstraps the local Vaultwarden service account automatically, writes the CLI API key files under `/opt/twinbox/bootstrap/`, seeds the initial Proxmox item, and disables signups before the rest of the manager flow continues.
 
 ## Quick Start
@@ -65,8 +65,8 @@ TWINBOX_IMAGE_TAG=latest
 
 Management tool versions are configured as follows:
 
-- `talosctl` is pinned in `config/pinned-defaults.sh`
-- `tofu` and `talosctl` are pinned in `config/pinned-defaults.sh`
+- `talosctl` and `k9s` are pinned in `config/pinned-defaults.sh`
+- `tofu` is pinned in `config/pinned-defaults.sh`
 - `kubectl` and `helm` stay configurable in `.env`
 
 ```dotenv

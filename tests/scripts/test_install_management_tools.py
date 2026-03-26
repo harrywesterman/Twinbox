@@ -26,6 +26,7 @@ def test_install_management_tools_fails_on_version_command_errors():
     assert 'tofu_output="$(/usr/local/bin/tofu version 2>&1)" || fail "tofu version check failed: ${tofu_output}"' in text
     assert 'kubectl_output="$(/usr/local/bin/kubectl version --client --output=yaml 2>&1)" || fail "kubectl version check failed: ${kubectl_output}"' in text
     assert 'helm_output="$(/usr/local/bin/helm version --short 2>&1)" || fail "helm version check failed: ${helm_output}"' in text
+    assert 'k9s_output="$(/usr/local/bin/k9s version --short 2>&1)" || fail "k9s version check failed: ${k9s_output}"' in text
     assert 'install_wrappers()' in text
     assert 'install -m 0755 "$kubectl_wrapper" /usr/local/bin/k' in text
     assert 'install -m 0755 "$talosctl_wrapper" /usr/local/bin/t' in text
@@ -35,3 +36,6 @@ def test_install_management_tools_installs_and_verifies_bw():
     text = _script_text()
     assert "bw" in text
     assert 'bw_output="$(/usr/local/bin/bw --version 2>&1)" || fail "bw version check failed: ${bw_output}"' in text
+    assert "install_k9s()" in text
+    assert 'PINNED_K9S_VERSION' in text
+    assert 'k9s version --short' in text
