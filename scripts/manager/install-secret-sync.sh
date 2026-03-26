@@ -118,6 +118,7 @@ kubectl create secret generic bitwarden-cli \
   --from-literal=BW_PASSWORD="$cli_password" \
   --from-literal=BW_CLIENTID="$cli_client_id" \
   --from-literal=BW_CLIENTSECRET="$cli_client_secret" \
+  --from-literal=BW_SESSION="$cli_session" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl apply -f - <<EOF
@@ -208,8 +209,7 @@ spec:
               set -euo pipefail
               bw config server "\${BW_HOST}"
               bw login --apikey >/dev/null
-              export BW_SESSION=\$(bw unlock --passwordenv BW_PASSWORD --raw)
-              bw unlock --check >/dev/null
+              bw unlock --passwordenv BW_PASSWORD >/dev/null
               exec bw serve --hostname 0.0.0.0
           env:
             - name: BITWARDENCLI_APPDATA_DIR
@@ -236,6 +236,11 @@ spec:
                 secretKeyRef:
                   name: bitwarden-cli
                   key: BW_CLIENTSECRET
+            - name: BW_SESSION
+              valueFrom:
+                secretKeyRef:
+                  name: bitwarden-cli
+                  key: BW_SESSION
           ports:
             - name: http
               containerPort: 8087
