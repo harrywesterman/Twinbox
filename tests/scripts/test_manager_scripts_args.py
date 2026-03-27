@@ -85,7 +85,7 @@ def _longhorn_application_text() -> str:
 
 
 def _longhorn_values_text() -> str:
-    return (REPO_ROOT / "gitops" / "longhorn" / "values.yaml").read_text(encoding="utf-8")
+    return (REPO_ROOT / "gitops" / "longhorn" / "application.yaml").read_text(encoding="utf-8")
 
 
 def _whoami_deployment_text() -> str:
@@ -262,17 +262,16 @@ def test_longhorn_step_installs_pinned_chart_and_waits_for_health():
     assert 'wait_for_application_ready "$application_name"' in step_text
     assert 'application_name="longhorn"' in step_text
     assert 'chart_version="1.11.1"' in step_text
-    assert 'sources:' in manifest_text
+    assert 'source:' in manifest_text
     assert 'repoURL: https://charts.longhorn.io' in manifest_text
     assert 'chart: longhorn' in manifest_text
     assert 'targetRevision: "1.11.1"' in manifest_text
-    assert '$values/gitops/longhorn/values.yaml' in manifest_text
-    assert 'ref: values' in manifest_text
+    assert 'helm:' in manifest_text
+    assert 'preUpgradeChecker:' in manifest_text
+    assert 'defaultSetting:' in manifest_text
+    assert 'taintToleration:' in manifest_text
+    assert 'jobEnabled: false' in manifest_text
     assert 'longhorn-system' in manifest_text
-    assert 'defaultSettings:' in values_text
-    assert 'taintToleration:' in values_text
-    assert 'preUpgradeChecker:' in values_text
-    assert 'jobEnabled: false' in values_text
 
 
 def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
