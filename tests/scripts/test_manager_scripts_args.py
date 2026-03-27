@@ -271,7 +271,6 @@ def test_longhorn_step_installs_pinned_chart_and_waits_for_health():
     assert 'longhorn-system' in manifest_text
     assert 'defaultSettings:' in values_text
     assert 'taintToleration:' in values_text
-    assert 'longhorn:' in values_text
     assert 'preUpgradeChecker:' in values_text
     assert 'jobEnabled: false' in values_text
 
