@@ -514,7 +514,7 @@ cleanup_existing_cluster_resources() {
     rm -f "$snippet" || true
   done
 
-  for acl_path in /vms /storage "/nodes/${PROXMOX_NODE}" /sdn; do
+  for acl_path in /vms /storage /nodes "/nodes/${PROXMOX_NODE}" /sdn; do
     pveum aclmod "$acl_path" -user "$PROXMOX_USER" -delete 1 >/dev/null 2>&1 || true
   done
 
