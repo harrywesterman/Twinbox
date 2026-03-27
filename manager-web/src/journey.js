@@ -1,4 +1,4 @@
-export const STORAGE_KEY = 'twinbox.catalog-ui.v1';
+export const STORAGE_KEY = 'twinbox.installation-wizard.v1';
 
 function fallbackCatalog() {
   return {
@@ -7,19 +7,25 @@ function fallbackCatalog() {
   };
 }
 
-function flattenCategories(catalog) {
+function flattenSetupSteps(catalog) {
   return (catalog?.categories || []).flatMap((category) =>
-    (category.steps || []).map((step) => ({
-      ...step,
-      categoryId: category.id,
-      categoryTitle: category.title,
-      categorySummary: category.summary,
-    })),
+    (category.steps || [])
+      .filter((step) => step?.journey_stage !== 'manage')
+      .map((step) => ({
+        ...step,
+        categoryId: category.id,
+        categoryTitle: category.title,
+        categorySummary: category.summary,
+      })),
   );
 }
 
-function isSetupStep(step) {
-  return step?.journey_stage !== 'manage';
+function isComplete(step) {
+  return step?.status === 'done';
+}
+
+function isStepReady(step) {
+  return step?.status !== 'locked';
 }
 
 function pickActiveStep(steps, selectedStepId) {
@@ -28,50 +34,25 @@ function pickActiveStep(steps, selectedStepId) {
     if (selected) return selected;
   }
 
-  return steps.find((step) => step.status !== 'locked') || steps[0] || null;
+  return steps.find((step) => !isComplete(step) && isStepReady(step)) || steps[0] || null;
 }
 
-function buildCategorySummaries(categories) {
-  return categories.map((category) => {
-    const totalSteps = category.steps.length;
-    const completedSteps = category.steps.filter((step) => step.status === 'done').length;
-    const percent = totalSteps ? Math.round((completedSteps / totalSteps) * 100) : 0;
-    const blocker = category.steps.find((step) => step.status !== 'done')?.summary || category.summary;
-
-    return {
-      ...category,
-      totalSteps,
-      completedSteps,
-      percent,
-      blocker,
-    };
-  });
-}
-
-function buildProgress(steps, activeStep, categories) {
+function buildProgress(steps, activeStep) {
   const totalSteps = steps.length;
-  const completedSteps = steps.filter((step) => step.status === 'done').length;
+  const completedSteps = steps.filter(isComplete).length;
   const activeIndex = activeStep ? steps.findIndex((step) => step.id === activeStep.id) : -1;
-  const activeCategoryIndex = activeStep
-    ? categories.findIndex((category) => category.id === activeStep.categoryId)
-    : -1;
 
   return {
     totalSteps,
     completedSteps,
+    remainingSteps: Math.max(0, totalSteps - completedSteps),
     stepIndex: activeIndex >= 0 ? activeIndex + 1 : 0,
-    categoryIndex: activeCategoryIndex >= 0 ? activeCategoryIndex + 1 : 0,
-    categoryCount: categories.length,
     percent: totalSteps ? Math.round((completedSteps / totalSteps) * 100) : 0,
   };
 }
 
 function buildMode(steps) {
-  if (steps.length === 0) {
-    return 'manage';
-  }
-
-  return steps.every((step) => step.status === 'done') ? 'manage' : 'setup';
+  return steps.length > 0 && steps.every(isComplete) ? 'manage' : 'setup';
 }
 
 function buildStepRail(steps, activeStep) {
@@ -81,17 +62,26 @@ function buildStepRail(steps, activeStep) {
     index: index + 1,
     status: step.status,
     isCurrent: step.id === activeStep?.id,
+    isComplete: isComplete(step),
+    isLocked: step.status === 'locked',
   }));
 }
 
-function buildHealthBadges({ health, activeStep, catalogErrors, cluster }) {
+function buildHealthBadges({ health, activeStep, catalogErrors, cluster, mode }) {
   return [
     {
       id: 'health',
-      label: 'Manager API',
+      label: 'API health',
       value: health?.ok ? 'Online' : 'Unavailable',
       chip: health?.ok ? 'Healthy' : 'Check API',
       tone: health?.ok ? 'success' : 'danger',
+    },
+    {
+      id: 'mode',
+      label: 'Wizard mode',
+      value: mode === 'setup' ? 'Guided install' : 'Finished',
+      chip: mode === 'setup' ? 'Setup' : 'Complete',
+      tone: mode === 'setup' ? 'active' : 'success',
     },
     {
       id: 'step',
@@ -103,14 +93,14 @@ function buildHealthBadges({ health, activeStep, catalogErrors, cluster }) {
     {
       id: 'cluster',
       label: 'Cluster',
-      value: cluster?.id || activeStep?.state?.cluster_id || 'Not created',
-      chip: cluster?.status ? formatState(cluster.status, 'Pending') : 'Awaiting run',
+      value: cluster?.id || activeStep?.state?.cluster_id || 'Not created yet',
+      chip: cluster?.status ? formatState(cluster.status, 'Pending') : 'Waiting',
       tone: cluster?.status === 'bootstrapped' ? 'success' : cluster?.status ? 'active' : 'neutral',
     },
     {
       id: 'catalog',
       label: 'Catalog',
-      value: `${catalogErrors.length} issues`,
+      value: `${catalogErrors.length} issue${catalogErrors.length === 1 ? '' : 's'}`,
       chip: catalogErrors.length ? 'Needs review' : 'Validated',
       tone: catalogErrors.length ? 'warning' : 'success',
     },
@@ -119,54 +109,64 @@ function buildHealthBadges({ health, activeStep, catalogErrors, cluster }) {
 
 function buildArtifacts(activeStep, cluster) {
   const artifacts = [];
+  const seen = new Set();
+
+  const pushArtifact = (label, value) => {
+    const signature = `${label}:${value}`;
+    if (seen.has(signature)) {
+      return;
+    }
+    seen.add(signature);
+    artifacts.push({ label, value });
+  };
 
   if (cluster?.id) {
-    artifacts.push({ label: 'Cluster ID', value: cluster.id });
+    pushArtifact('Cluster ID', cluster.id);
   }
 
   if (activeStep?.state?.cluster_id) {
-    artifacts.push({ label: 'Cluster ID', value: activeStep.state.cluster_id });
+    pushArtifact('Cluster ID', activeStep.state.cluster_id);
   }
 
   if (cluster?.status) {
-    artifacts.push({ label: 'Cluster status', value: formatState(cluster.status, 'Unknown') });
+    pushArtifact('Cluster status', formatState(cluster.status, 'Unknown'));
   }
 
   if (cluster?.vip_ip) {
-    artifacts.push({ label: 'VIP', value: cluster.vip_ip });
+    pushArtifact('VIP', cluster.vip_ip);
   }
 
   if ((cluster?.controlplane_ips || []).length) {
-    artifacts.push({ label: 'Control planes', value: cluster.controlplane_ips.join(', ') });
+    pushArtifact('Control planes', cluster.controlplane_ips.join(', '));
   }
 
   if ((cluster?.worker_ips || []).length) {
-    artifacts.push({ label: 'Workers', value: cluster.worker_ips.join(', ') });
+    pushArtifact('Workers', cluster.worker_ips.join(', '));
   }
 
   if (cluster?.talos_config_dir) {
-    artifacts.push({ label: 'Talos config', value: cluster.talos_config_dir });
+    pushArtifact('Talos config', cluster.talos_config_dir);
   }
 
   if (cluster?.kubeconfig_path) {
-    artifacts.push({ label: 'Kubeconfig', value: cluster.kubeconfig_path });
+    pushArtifact('Kubeconfig', cluster.kubeconfig_path);
   }
 
   if (cluster?.iac?.state_path) {
-    artifacts.push({ label: 'OpenTofu state', value: cluster.iac.state_path });
+    pushArtifact('OpenTofu state', cluster.iac.state_path);
   }
 
   if (cluster?.iac?.workdir) {
-    artifacts.push({ label: 'OpenTofu workdir', value: cluster.iac.workdir });
+    pushArtifact('OpenTofu workdir', cluster.iac.workdir);
   }
 
   if (activeStep?.state?.outputs && typeof activeStep.state.outputs === 'object') {
     for (const [label, value] of Object.entries(activeStep.state.outputs)) {
       if (value === null || value === undefined || label === 'cluster_id') continue;
-      artifacts.push({
-        label: formatState(label, label),
-        value: typeof value === 'boolean' ? (value ? 'Enabled' : 'Disabled') : String(value),
-      });
+      pushArtifact(
+        formatState(label, label),
+        typeof value === 'boolean' ? (value ? 'Enabled' : 'Disabled') : String(value),
+      );
     }
   }
 
@@ -303,45 +303,6 @@ function fallbackRuntimeEvent(activeStep, latestJob) {
   };
 }
 
-function buildRuntime(logs, activeStep) {
-  const latestJob = activeStep?.latest_job || null;
-  const parsedEvents = (Array.isArray(logs) ? logs : [])
-    .filter((entry) => entry?.line)
-    .map((entry, index) => {
-      const detail = stripLogTimestamp(entry.line);
-      const stage = summarizeStage(detail, activeStep);
-      return {
-        id: `${activeStep?.id || 'step'}-${index}`,
-        title: stage.title,
-        detail,
-        tone: stage.tone,
-        timestamp: parseLoggedAt(entry.line),
-      };
-    });
-
-  const timelineEvents = parsedEvents.length > 0
-    ? groupTimelineEvents(parsedEvents)
-    : [fallbackRuntimeEvent(activeStep, latestJob)];
-  const currentEvent = timelineEvents.at(-1);
-  const currentStage = currentEvent?.title || formatState(latestJob?.status || activeStep?.status, 'Ready');
-  const runState = latestJob?.status || activeStep?.status || 'ready';
-  const latestTimestamp = currentEvent?.timestamp || (latestJob?.updated_at ? new Date(latestJob.updated_at) : null);
-  const lastUpdatedLabel = formatElapsedFrom(latestTimestamp);
-  const staleSeconds = latestTimestamp instanceof Date && !Number.isNaN(latestTimestamp.getTime())
-    ? Math.max(0, Math.round((Date.now() - latestTimestamp.getTime()) / 1000))
-    : 0;
-
-  return {
-    currentStage,
-    runState,
-    lastUpdatedLabel,
-    isLive: runState === 'running' || runState === 'pending',
-    isStale: (runState === 'running' || runState === 'pending') && staleSeconds >= 30,
-    eventCount: timelineEvents.length,
-    timelineEvents,
-  };
-}
-
 function groupTimelineEvents(events) {
   const grouped = [];
   let currentGroup = null;
@@ -388,6 +349,45 @@ function groupTimelineEvents(events) {
       ? `${group.detailLines[0]}\n… ${group.detailLines.length - 1} more line${group.detailLines.length === 2 ? '' : 's'}`
       : group.detailLines[0],
   }));
+}
+
+function buildRuntime(logs, activeStep) {
+  const latestJob = activeStep?.latest_job || null;
+  const parsedEvents = (Array.isArray(logs) ? logs : [])
+    .filter((entry) => entry?.line)
+    .map((entry, index) => {
+      const detail = stripLogTimestamp(entry.line);
+      const stage = summarizeStage(detail, activeStep);
+      return {
+        id: `${activeStep?.id || 'step'}-${index}`,
+        title: stage.title,
+        detail,
+        tone: stage.tone,
+        timestamp: parseLoggedAt(entry.line),
+      };
+    });
+
+  const timelineEvents = parsedEvents.length > 0
+    ? groupTimelineEvents(parsedEvents)
+    : [fallbackRuntimeEvent(activeStep, latestJob)];
+  const currentEvent = timelineEvents.at(-1);
+  const currentStage = currentEvent?.title || formatState(latestJob?.status || activeStep?.status, 'Ready');
+  const runState = latestJob?.status || activeStep?.status || 'ready';
+  const latestTimestamp = currentEvent?.timestamp || (latestJob?.updated_at ? new Date(latestJob.updated_at) : null);
+  const lastUpdatedLabel = formatElapsedFrom(latestTimestamp);
+  const staleSeconds = latestTimestamp instanceof Date && !Number.isNaN(latestTimestamp.getTime())
+    ? Math.max(0, Math.round((Date.now() - latestTimestamp.getTime()) / 1000))
+    : 0;
+
+  return {
+    currentStage,
+    runState,
+    lastUpdatedLabel,
+    isLive: runState === 'running' || runState === 'pending',
+    isStale: (runState === 'running' || runState === 'pending') && staleSeconds >= 30,
+    eventCount: timelineEvents.length,
+    timelineEvents,
+  };
 }
 
 function buildEvents(runtime) {
@@ -465,7 +465,7 @@ function buildPrimaryAction(activeStep, nextStep, busy, stepIndex, mode) {
   if (busy || activeStep.status === 'running') {
     return {
       type: 'execute',
-      label: 'Running…',
+      label: 'Installing…',
       disabled: true,
       helperText: 'Twinbox is waiting for the current worker job to finish.',
     };
@@ -483,22 +483,43 @@ function buildPrimaryAction(activeStep, nextStep, busy, stepIndex, mode) {
   if (activeStep.status === 'done' && nextStep) {
     return {
       type: 'advance',
-      label: mode === 'setup' ? `Continue to step ${stepIndex + 1}` : 'Next',
+      label: `Continue to step ${stepIndex + 1}`,
       disabled: false,
       helperText: 'This step is complete. Continue to the next unlocked step.',
     };
   }
 
-  const rerun = activeStep.status === 'failed' || activeStep.status === 'done';
+  if (activeStep.status === 'done' && !nextStep) {
+    return {
+      type: 'finish',
+      label: 'Finish setup',
+      disabled: false,
+      helperText: 'Everything is complete. Review the summary or export the answers file.',
+    };
+  }
+
+  const rerun = activeStep.status === 'failed';
   return {
     type: 'execute',
     label: mode === 'setup'
       ? (rerun ? `Retry step ${stepIndex}` : `Start step ${stepIndex}`)
-      : (rerun ? 'Run again' : 'Run step'),
+      : (rerun ? `Retry step ${stepIndex}` : 'Run step'),
     disabled: false,
     helperText: activeStep.type === 'config'
       ? 'Save the configuration and apply it on the Management VM.'
       : 'Execute the selected step and stream the worker output live.',
+  };
+}
+
+function buildCompletion(activeStep, progress, cluster) {
+  return {
+    title: cluster?.id ? 'Cluster bootstrap complete' : 'Setup complete',
+    summary: cluster?.id
+      ? 'The cluster is provisioned and the wizard answers are ready to export.'
+      : 'All setup steps are complete. Export the answers file or review the final output.',
+    stepTitle: activeStep?.title || 'Final step',
+    completedSteps: progress.completedSteps,
+    totalSteps: progress.totalSteps,
   };
 }
 
@@ -518,28 +539,49 @@ export function toneForStatus(value) {
   return 'neutral';
 }
 
-export function isIPv4(value) {
-  if (typeof value !== 'string') return false;
-  const parts = value.split('.');
-  if (parts.length !== 4) return false;
-  return parts.every((part) => /^\d+$/.test(part) && Number(part) >= 0 && Number(part) <= 255);
-}
-
-export function serializeUiState({ selectedStepId }) {
+export function serializeUiState({ selectedStepId = '', answers = {}, clusterId = '' } = {}) {
   return JSON.stringify({
+    version: 1,
     selectedStepId: typeof selectedStepId === 'string' ? selectedStepId : '',
+    clusterId: typeof clusterId === 'string' ? clusterId : '',
+    answers: answers && typeof answers === 'object' ? answers : {},
   });
 }
 
+function sanitizeFilenameSegment(value) {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  return normalized || '';
+}
+
+export function buildWizardExportFilename({ clusterName = '', clusterId = '', date = new Date() } = {}) {
+  const dateStamp = date instanceof Date && !Number.isNaN(date.getTime())
+    ? date.toISOString().slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
+  const clusterLabel = sanitizeFilenameSegment(clusterName) || sanitizeFilenameSegment(clusterId) || 'cluster';
+
+  return `twinbox-${clusterLabel}-${dateStamp}.json`;
+}
+
 export function restoreUiState(value) {
-  if (!value) return { selectedStepId: '' };
+  if (!value) {
+    return { selectedStepId: '', clusterId: '', answers: {} };
+  }
+
   try {
     const parsed = JSON.parse(value);
     return {
       selectedStepId: typeof parsed.selectedStepId === 'string' ? parsed.selectedStepId : '',
+      clusterId: typeof parsed.clusterId === 'string' ? parsed.clusterId : '',
+      answers: parsed.answers && typeof parsed.answers === 'object' ? parsed.answers : {},
     };
   } catch {
-    return { selectedStepId: '' };
+    return { selectedStepId: '', clusterId: '', answers: {} };
   }
 }
 
@@ -551,44 +593,45 @@ export function getMissionControlModel({
   health,
   error,
   busy,
+  answers = {},
 }) {
   const safeCatalog = catalog || fallbackCatalog();
-  const categories = buildCategorySummaries(safeCatalog.categories || []);
-  const allSteps = flattenCategories({ categories });
-  const setupSteps = allSteps.filter(isSetupStep);
-  const mode = buildMode(setupSteps);
-  const steps = mode === 'setup' ? setupSteps : allSteps;
+  const steps = flattenSetupSteps(safeCatalog);
+  const mode = buildMode(steps);
   const activeStep = pickActiveStep(steps, selectedStepId);
-  const activeCategory = activeStep
-    ? categories.find((category) => category.id === activeStep.categoryId)
-    : null;
   const activeIndex = activeStep ? steps.findIndex((step) => step.id === activeStep.id) : -1;
-  const previousStep = activeIndex > 0 ? steps[activeIndex - 1] : null;
   const nextStep = activeIndex >= 0 && activeIndex < steps.length - 1 ? steps[activeIndex + 1] : null;
-  const progress = buildProgress(steps, activeStep, categories);
+  const previousStep = activeIndex > 0 ? steps[activeIndex - 1] : null;
+  const progress = buildProgress(steps, activeStep);
   const catalogErrors = safeCatalog.errors || [];
   const runtime = buildRuntime(logs, activeStep);
   const stepRail = buildStepRail(steps, activeStep);
 
   return {
-    categories,
-    steps,
     mode,
+    steps,
     stepRail,
-    activeCategory,
     activeStep,
     previousStep,
     nextStep,
     progress,
-    healthBadges: buildHealthBadges({ health, activeStep, catalogErrors, cluster }),
+    healthBadges: buildHealthBadges({ health, activeStep, catalogErrors, cluster, mode }),
     primaryAction: buildPrimaryAction(activeStep, nextStep, busy, progress.stepIndex, mode),
     activity: {
       summary: activeStep?.summary || 'Catalog data is not available yet.',
+      explanation: activeStep?.explanation || '',
+      sideHelp: activeStep?.side_help || '',
       artifacts: buildArtifacts(activeStep, cluster),
       runtime,
       events: buildEvents(runtime),
       risks: buildRisks(activeStep, catalogErrors, error),
       rawLogOutput: Array.isArray(logs) && logs.length ? logs.map((entry) => entry.line).join('\n') : 'No worker output yet.',
     },
+    completion: mode === 'manage' ? buildCompletion(activeStep, progress, cluster) : null,
+    answers,
   };
+}
+
+export function getWizardSteps(catalog) {
+  return flattenSetupSteps(catalog || fallbackCatalog());
 }

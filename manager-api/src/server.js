@@ -178,6 +178,116 @@ async function listUsedVmidsViaProxmoxApi() {
   }
 }
 
+async function listClusterNodeResourcesViaProxmoxApi() {
+  const resolved = secretBroker.resolveBundle(buildProxmoxApiSecretBundle());
+
+  try {
+    const username = resolved.env.PROXMOX_USER;
+    const password = resolved.env.PROXMOX_PASSWORD;
+    const proxmoxHost = resolved.env.PROXMOX_HOST;
+
+    if (!proxmoxHost || !username || !password) {
+      throw new Error("Unable to inspect Proxmox resources: missing API credentials");
+    }
+
+    const body = new URLSearchParams({
+      username,
+      password,
+    });
+    const auth = proxmoxApiRequest("/api2/json/access/ticket", resolved.env, {
+      method: "POST",
+      body,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    });
+    const ticket = auth?.data?.ticket;
+    if (!ticket) {
+      throw new Error("Proxmox auth failed while reading cluster resources");
+    }
+
+    const resources = proxmoxApiRequest("/api2/json/cluster/resources?type=node", resolved.env, {
+      headers: {
+        Cookie: `PVEAuthCookie=${ticket}`,
+      },
+    });
+
+    return Array.isArray(resources?.data) ? resources.data : [];
+  } finally {
+    resolved.cleanup();
+  }
+}
+
+async function listClusterVmResourcesViaProxmoxApi() {
+  const resolved = secretBroker.resolveBundle(buildProxmoxApiSecretBundle());
+
+  try {
+    const username = resolved.env.PROXMOX_USER;
+    const password = resolved.env.PROXMOX_PASSWORD;
+    const proxmoxHost = resolved.env.PROXMOX_HOST;
+
+    if (!proxmoxHost || !username || !password) {
+      throw new Error("Unable to inspect Proxmox VM resources: missing API credentials");
+    }
+
+    const body = new URLSearchParams({
+      username,
+      password,
+    });
+    const auth = proxmoxApiRequest("/api2/json/access/ticket", resolved.env, {
+      method: "POST",
+      body,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    });
+    const ticket = auth?.data?.ticket;
+    if (!ticket) {
+      throw new Error("Proxmox auth failed while reading VM resources");
+    }
+
+    const resources = proxmoxApiRequest("/api2/json/cluster/resources?type=vm", resolved.env, {
+      headers: {
+        Cookie: `PVEAuthCookie=${ticket}`,
+      },
+    });
+
+    return Array.isArray(resources?.data) ? resources.data : [];
+  } finally {
+    resolved.cleanup();
+  }
+}
+
+async function listClusterVmResources() {
+  const resourcesBin = process.env.MANAGER_API_CLUSTER_RESOURCES_BIN || "pvesh";
+  const isDefaultResourcesBin = path.basename(resourcesBin) === "pvesh";
+  const args = isDefaultResourcesBin
+    ? ["get", "/cluster/resources", "--type", "vm", "--output-format", "json"]
+    : [];
+  const result = spawnSync(resourcesBin, args, {
+    encoding: "utf8",
+    timeout: 3000,
+  });
+
+  if (result.error?.code === "ENOENT") {
+    if (isDefaultResourcesBin) {
+      return listClusterVmResourcesViaProxmoxApi();
+    }
+    throw new Error(`Cluster resources command not found: ${resourcesBin}`);
+  }
+
+  if (result.status !== 0) {
+    throw new Error(`Cluster resources lookup failed: ${(result.stderr || result.stdout || "").trim()}`);
+  }
+
+  try {
+    const parsed = JSON.parse(result.stdout || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    throw new Error(`Failed to parse cluster VM resources: ${error instanceof Error ? error.message : "unknown error"}`);
+  }
+}
+
 async function listUsedVmids() {
   const resourcesBin = process.env.MANAGER_API_CLUSTER_RESOURCES_BIN || "pvesh";
   const isDefaultResourcesBin = path.basename(resourcesBin) === "pvesh";
@@ -227,6 +337,93 @@ async function listUsedVmids() {
   } catch (error) {
     throw new Error(`Failed to parse cluster VM resources: ${error instanceof Error ? error.message : "unknown error"}`);
   }
+}
+
+async function listClusterNodeResources() {
+  const resourcesBin = process.env.MANAGER_API_CLUSTER_RESOURCES_BIN || "pvesh";
+  const isDefaultResourcesBin = path.basename(resourcesBin) === "pvesh";
+  const args = isDefaultResourcesBin
+    ? ["get", "/cluster/resources", "--type", "node", "--output-format", "json"]
+    : [];
+  const result = spawnSync(resourcesBin, args, {
+    encoding: "utf8",
+    timeout: 3000,
+  });
+
+  if (result.error?.code === "ENOENT") {
+    if (isDefaultResourcesBin) {
+      return listClusterNodeResourcesViaProxmoxApi();
+    }
+    throw new Error(`Cluster resources command not found: ${resourcesBin}`);
+  }
+
+  if (result.status !== 0) {
+    throw new Error(`Cluster resources lookup failed: ${(result.stderr || result.stdout || "").trim()}`);
+  }
+
+  try {
+    const parsed = JSON.parse(result.stdout || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    throw new Error(`Failed to parse cluster node resources: ${error instanceof Error ? error.message : "unknown error"}`);
+  }
+}
+
+function summarizeClusterResources(resources, vmResources = []) {
+  const MB = 1024 * 1024;
+  const GB = 1024 * 1024 * 1024;
+  const nodes = Array.isArray(resources) ? resources : [];
+  const vms = Array.isArray(vmResources) ? vmResources : [];
+  const activeVmCounts = vms.reduce((accumulator, entry) => {
+    const node = String(entry?.node || "").trim();
+    const status = String(entry?.status || entry?.qmpstatus || "").trim().toLowerCase();
+    if (!node || (status && status !== "running")) {
+      return accumulator;
+    }
+    accumulator[node] = (accumulator[node] || 0) + 1;
+    return accumulator;
+  }, {});
+
+  const summary = nodes.reduce((accumulator, entry) => {
+    const maxMem = Number(entry?.maxmem || 0);
+    const usedMem = Number(entry?.mem || 0);
+    const maxDisk = Number(entry?.maxdisk || 0);
+    const usedDisk = Number(entry?.disk || 0);
+    const maxCpu = Number(entry?.maxcpu || 0);
+    const cpuLoad = Number(entry?.cpu || 0);
+
+    accumulator.nodeCount += 1;
+    accumulator.totalMemoryMb += maxMem > 0 ? maxMem / MB : 0;
+    accumulator.usedMemoryMb += usedMem > 0 ? usedMem / MB : 0;
+    accumulator.totalDiskGb += maxDisk > 0 ? maxDisk / GB : 0;
+    accumulator.usedDiskGb += usedDisk > 0 ? usedDisk / GB : 0;
+    accumulator.totalCpuCores += maxCpu > 0 ? maxCpu : 0;
+    accumulator.usedCpuCores += maxCpu > 0 ? maxCpu * Math.min(Math.max(cpuLoad, 0), 1) : 0;
+    return accumulator;
+  }, {
+    nodeCount: 0,
+    totalMemoryMb: 0,
+    usedMemoryMb: 0,
+    freeMemoryMb: 0,
+    totalDiskGb: 0,
+    usedDiskGb: 0,
+    freeDiskGb: 0,
+    totalCpuCores: 0,
+    usedCpuCores: 0,
+    freeCpuCores: 0,
+  });
+
+  summary.freeMemoryMb = Math.max(0, summary.totalMemoryMb - summary.usedMemoryMb);
+  summary.freeDiskGb = Math.max(0, summary.totalDiskGb - summary.usedDiskGb);
+  summary.freeCpuCores = Math.max(0, summary.totalCpuCores - summary.usedCpuCores);
+
+  return {
+    nodes: nodes.map((entry) => ({
+      ...entry,
+      activeVmCount: activeVmCounts[String(entry?.node || entry?.name || entry?.id || "").trim()] || 0,
+    })),
+    summary,
+  };
 }
 
 async function findFreeVmidBlock(nodeCount) {
@@ -504,6 +701,20 @@ app.get("/api/health", (_, res) => {
   res.json({ ok: true, time: now() });
 });
 
+app.get("/api/proxmox/cluster-resources", async (_, res) => {
+  try {
+    const [nodes, vms] = await Promise.all([
+      listClusterNodeResources(),
+      listClusterVmResources(),
+    ]);
+    return res.json(summarizeClusterResources(nodes, vms));
+  } catch (error) {
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : "failed to read cluster resources",
+    });
+  }
+});
+
 app.get("/api/catalog", (req, res) => {
   const requestedClusterId = pickFirstString(req.query.cluster_id);
   if (requestedClusterId) {
@@ -609,7 +820,10 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
   let context = {};
 
   if (stepId === "provision-nodes") {
-    const built = buildClusterFromRequest(validated.value, process.env);
+    const built = buildClusterFromRequest({
+      ...validated.value,
+      vm_node_map: req.body?.vm_node_map,
+    }, process.env);
     if (!built.ok) {
       return res.status(400).json({ error: built.error });
     }

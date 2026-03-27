@@ -22,6 +22,7 @@ bash scripts/manager/apply-cluster.sh \
   --gateway-ip "$(printf '%s' "$cluster_json" | jq -r '.gateway_ip')" \
   --dns-servers "$(printf '%s' "$cluster_json" | jq -r '.dns_servers | join(",")')" \
   --dns-domain "$(printf '%s' "$cluster_json" | jq -r '.dns_domain')" \
+  --vm-node-map "$(printf '%s' "$cluster_json" | jq -c '.vm_node_map // {}')" \
   --proxmox-node "$(printf '%s' "$cluster_json" | jq -r '.metadata.proxmox_node')" \
   --storage-pool "$(printf '%s' "$cluster_json" | jq -r '.metadata.storage_pool')" \
   --file-datastore "$(printf '%s' "$cluster_json" | jq -r '.metadata.file_datastore')" \

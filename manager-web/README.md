@@ -1,12 +1,13 @@
 # manager-web
 
-Static Twinbox landing page for GitHub Pages.
+Twinbox Web Installation Wizard for the Management VM.
 
 ## Purpose
 
-- Explain Twinbox in plain language for non-technical visitors.
-- Highlight sovereign, on-prem, low-maintenance deployment.
-- Provide a public page with a calm, invitation-style tone.
+- Guide first-run cluster bootstrap step by step.
+- Keep the current installer step dominant and visible.
+- Show live output, logs, and technical details without hiding the operator from the process.
+- Export and import the full answer set for repeat installs.
 
 ## Local Development
 
@@ -15,15 +16,9 @@ npm ci
 npm run dev
 ```
 
-## GitHub Pages
-
-The site builds with Vite and is configured for relative asset paths, so it can be hosted as a GitHub Pages site
-without extra routing setup.
-
-Deployment is handled by `.github/workflows/deploy-pages.yml`.
-
-Build locally:
+## Local Build
 
 ```bash
+npm ci
 npm run build
 ```

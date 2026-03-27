@@ -54,11 +54,11 @@ This re-syncs the Bitwarden CLI state, regenerates the API key files if needed, 
 
 After that, the normal manager-first flow continues.
 
-## Step 3: Open UI
+## Step 3: Open the Installation Wizard
 
 - `http://<management-vm-ip>:3000`
 
-From there you can submit provisioning and bootstrap jobs and monitor logs.
+From there you can walk through the cluster bootstrap wizard, export or import the answer set, and monitor live output while the steps run.
 
 ## API Endpoints
 

@@ -1,0 +1,14 @@
+id: install-velero-backup
+title: Install Velero backup
+type: action
+journey_stage: setup
+order: 101
+summary: Placeholder step for backup tooling.
+explanation: This wizard step is reserved for future Velero backup work and does not run a real cluster action yet.
+side_help: Backup tooling is staged late in the flow so recovery features remain visible but clearly separated.
+depends_on:
+  - install-management-consoles
+inputs: []
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/_placeholder/run.sh

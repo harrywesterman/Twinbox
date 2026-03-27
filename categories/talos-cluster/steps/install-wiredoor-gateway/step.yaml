@@ -1,0 +1,14 @@
+id: install-wiredoor-gateway
+title: Install Wiredoor gateway
+type: action
+journey_stage: setup
+order: 80
+summary: Placeholder step for gateway installation.
+explanation: This wizard step is reserved for future Wiredoor gateway work and does not run a real cluster action yet.
+side_help: Gateway setup is staged after DNS so the wizard reads like a real operational bootstrap sequence.
+depends_on:
+  - configure-cloudflare-dns
+inputs: []
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/_placeholder/run.sh

@@ -15,6 +15,11 @@ variable "proxmox_node" {
   type = string
 }
 
+variable "vm_node_map" {
+  type    = map(string)
+  default = {}
+}
+
 variable "vm_datastore" {
   type = string
 }

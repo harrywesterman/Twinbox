@@ -1,0 +1,14 @@
+id: install-longhorn-storage
+title: Install Longhorn storage
+type: action
+journey_stage: setup
+order: 40
+summary: Placeholder step for the Longhorn storage phase.
+explanation: This wizard step is reserved for future Longhorn storage work and does not run a real cluster action yet.
+side_help: Storage add-on planning is intentionally represented in the bootstrap rail before application rollout.
+depends_on:
+  - install-argocd
+inputs: []
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/_placeholder/run.sh

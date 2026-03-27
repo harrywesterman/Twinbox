@@ -1,0 +1,14 @@
+id: install-gitea
+title: Install Gitea
+type: action
+journey_stage: setup
+order: 109
+summary: Placeholder step for the Gitea app phase.
+explanation: This wizard step is reserved for future Gitea installation work and does not run a real cluster action yet.
+side_help: Source control services stay together in the app rollout sequence.
+depends_on:
+  - install-karakeep
+inputs: []
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/_placeholder/run.sh

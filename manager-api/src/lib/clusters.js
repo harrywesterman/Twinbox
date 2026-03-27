@@ -35,6 +35,37 @@ export function normalizeClusterName(rawName) {
   };
 }
 
+function normalizeVmNodeMap(rawMap) {
+  if (rawMap === null || rawMap === undefined || rawMap === '') {
+    return {};
+  }
+
+  let candidate = rawMap;
+  if (typeof candidate === 'string') {
+    try {
+      candidate = JSON.parse(candidate);
+    } catch {
+      return {};
+    }
+  }
+
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+    return {};
+  }
+
+  return Object.entries(candidate).reduce((accumulator, [vmName, hostName]) => {
+    if (typeof vmName !== 'string' || !vmName.trim()) {
+      return accumulator;
+    }
+    if (typeof hostName !== 'string' || !hostName.trim()) {
+      return accumulator;
+    }
+
+    accumulator[vmName.trim()] = hostName.trim();
+    return accumulator;
+  }, {});
+}
+
 export function buildClusterFromRequest(body, env) {
   const parsedName = parseRequiredString(body.name, "name");
   const parsedBridge = parseRequiredString(body.bridge, "bridge");
@@ -50,6 +81,7 @@ export function buildClusterFromRequest(body, env) {
   const parsedGatewayIp = parseIPv4(body.gateway_ip, "gateway_ip");
   const parsedDnsServers = parseIPv4List(body.dns_servers, "dns_servers");
   const parsedDnsDomain = parseOptionalString(body.dns_domain, "dns_domain");
+  const parsedVmNodeMap = normalizeVmNodeMap(body.vm_node_map);
 
   const validations = [
     parsedName,
@@ -107,6 +139,7 @@ export function buildClusterFromRequest(body, env) {
       gateway_ip: parsedGatewayIp.value,
       dns_servers: parsedDnsServers.value,
       dns_domain: parsedDnsDomain.value,
+      vm_node_map: parsedVmNodeMap,
       status: "requested",
       created_at: now(),
       updated_at: now(),

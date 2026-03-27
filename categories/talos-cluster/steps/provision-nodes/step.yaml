@@ -1,12 +1,20 @@
 id: provision-nodes
-title: Deploy cluster
+title: Deploy Talos Cluster
 type: action
 order: 10
-summary: Create the Proxmox VMs, discover their DHCP addresses, apply Talos, bootstrap the control plane, and materialize kubeconfig at runtime.
-explanation: Twinbox renders a per-cluster OpenTofu workspace, downloads the Talos image on demand, provisions the VMs, discovers the DHCP addresses, applies Talos machine configs, bootstraps the first control plane, and materializes the resulting Talos access files from Vaultwarden-backed refs.
-side_help: The Management VM keeps the OpenTofu state, rendered variables, outputs, and secret refs for this cluster. Talos access files are runtime artifacts only.
+summary: Scale the Proxmox VM footprint, discover DHCP addresses, apply Talos, bootstrap the control plane, and materialize kubeconfig at runtime.
+explanation: Twinbox renders a per-cluster OpenTofu workspace, downloads the Talos image on demand, lets you size the VM footprint first, then land the VMs on Proxmox hosts, discovers the DHCP addresses, applies Talos machine configs, bootstraps the first control plane, and materializes the resulting Talos access files from Vaultwarden-backed refs.
+side_help: The Management VM keeps the OpenTofu state, rendered variables, outputs, and secret refs for this cluster. The scale slider defaults to 30 percent, manual overrides stay editable, and VM landing happens after sizing. Talos access files are runtime artifacts only.
 depends_on: []
 inputs:
+  - id: scale_percent
+    label: Cluster scale
+    type: integer
+    required: true
+    min: 0
+    max: 100
+    default: 30
+    help: Scale the VM footprint from 0 to 100 percent.
   - id: name
     label: Cluster name
     type: string
@@ -99,12 +107,6 @@ inputs:
     required: true
     default: 1.1.1.1,1.0.0.1
     help: Comma-separated IPv4 DNS servers for Talos nodes.
-  - id: dns_domain
-    label: DNS domain
-    type: string
-    required: false
-    default: ""
-    help: Optional search domain for Talos nodes.
 runner:
   kind: script
   script: categories/talos-cluster/steps/provision-nodes/run.sh
