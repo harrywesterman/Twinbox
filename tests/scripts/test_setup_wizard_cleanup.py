@@ -336,8 +336,8 @@ def test_setup_wizard_creates_dedicated_limited_proxmox_api_user():
     assert 'role_err=$(pveum role modify "$PROXMOX_ROLE" -privs "$proxmox_privs" 2>&1)' in text
     assert 'apply_acl_with_retry()' in text
     assert 'pveum role add "$PROXMOX_ROLE"' in text
-    assert 'VM.Audit,VM.Monitor,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use' in text
-    assert 'for acl_path in /vms "/storage/${PROXMOX_STORAGE_POOL}" "/storage/${file_datastore}" "/nodes/${PROXMOX_NODE}"; do' in text
+    assert 'VM.Audit,VM.Monitor,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use,Sys.Audit' in text
+    assert 'for acl_path in /vms "/storage/${PROXMOX_STORAGE_POOL}" "/storage/${file_datastore}" /nodes "/nodes/${PROXMOX_NODE}"; do' in text
     assert 'pveum aclmod "$path" -user "$user" -role "$role" 2>&1' in text
     assert 'if ! apply_acl_with_retry "/sdn" "$PROXMOX_USER" "$PROXMOX_ROLE" 10 1; then' in text
 

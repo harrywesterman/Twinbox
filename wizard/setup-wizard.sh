@@ -884,7 +884,7 @@ EOF
 }
 
 create_proxmox_api_user() {
-  local proxmox_privs="VM.Audit,VM.Monitor,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use"
+  local proxmox_privs="VM.Audit,VM.Monitor,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use,Sys.Audit"
   local create_err=""
   local role_err=""
   local last_err=""
@@ -960,7 +960,7 @@ create_proxmox_api_user() {
   fi
 
   log_event "Applying ACLs for ${PROXMOX_USER}"
-  for acl_path in /vms "/storage/${PROXMOX_STORAGE_POOL}" "/storage/${file_datastore}" "/nodes/${PROXMOX_NODE}"; do
+  for acl_path in /vms "/storage/${PROXMOX_STORAGE_POOL}" "/storage/${file_datastore}" /nodes "/nodes/${PROXMOX_NODE}"; do
     if ! apply_acl_with_retry "$acl_path" "$PROXMOX_USER" "$PROXMOX_ROLE" 10 1; then
       msg_error "Failed to apply ACL ${acl_path} for ${PROXMOX_USER}: ${last_err}"
       return 1
