@@ -1,2 +1,5 @@
+longhorn:
+  preUpgradeChecker:
+    jobEnabled: false
 defaultSettings:
   taintToleration: node-role.kubernetes.io/control-plane:NoSchedule;node-role.kubernetes.io/master:NoSchedule
