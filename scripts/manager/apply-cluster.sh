@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 usage() {
   cat <<USAGE
-Usage: $0 --cluster-id ID --name NAME --controlplane-count N --worker-count N --cpu-cores N --memory-mb N --disk-gb N --bridge BR --start-vmid ID --start-ip IP --vip-ip IP --node-prefix-length N --gateway-ip IP --dns-servers CSV --dns-domain NAME --proxmox-node NODE --storage-pool POOL --file-datastore STORE --data-dir DIR
+Usage: $0 --cluster-id ID --name NAME --controlplane-count N --worker-count N --cpu-cores N --memory-mb N --disk-gb N --bridge BR --start-vmid ID --start-ip IP --vip-ip IP --node-prefix-length N --gateway-ip IP --dns-servers CSV --dns-domain NAME --vm-node-map JSON --proxmox-node NODE --storage-pool POOL --file-datastore STORE --data-dir DIR
 USAGE
 }
 
@@ -52,6 +52,7 @@ while [[ $# -gt 0 ]]; do
     --gateway-ip) GATEWAY_IP="$2"; shift 2 ;;
     --dns-servers) DNS_SERVERS="$2"; shift 2 ;;
     --dns-domain) DNS_DOMAIN="$2"; shift 2 ;;
+    --vm-node-map) VM_NODE_MAP="$2"; shift 2 ;;
     --proxmox-node) PROXMOX_NODE="$2"; shift 2 ;;
     --storage-pool) STORAGE_POOL="$2"; shift 2 ;;
     --file-datastore) FILE_DATASTORE="$2"; shift 2 ;;
@@ -606,6 +607,7 @@ jq -n \
   --arg talos_version "$PINNED_TALOS_VERSION" \
   --arg talos_image_local_path "$talos_image_local_path" \
   --arg talos_image_cache_key "$image_cache_key" \
+  --argjson vm_node_map "${VM_NODE_MAP:-{}}" \
   --argjson dns_servers "$(printf '%s' "$DNS_SERVERS" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))')" \
   --argjson prefix "$NODE_PREFIX_LENGTH" \
   --argjson nodes "$nodes_json" \
@@ -624,6 +626,7 @@ jq -n \
     talos_version: $talos_version,
     talos_image_local_path: $talos_image_local_path,
     talos_image_cache_key: $talos_image_cache_key,
+    vm_node_map: $vm_node_map,
     install_disk: "'"$INSTALL_DISK"'",
     nodes: $nodes
   }' > "$tfvars_file"

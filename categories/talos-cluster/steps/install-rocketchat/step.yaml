@@ -1,0 +1,14 @@
+id: install-rocketchat
+title: Install Rocketchat
+type: action
+journey_stage: setup
+order: 106
+summary: Placeholder step for the Rocketchat app phase.
+explanation: This wizard step is reserved for future Rocketchat installation work and does not run a real cluster action yet.
+side_help: Communication tools belong in the same user-facing app sequence.
+depends_on:
+  - install-vaultwarden-app
+inputs: []
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/_placeholder/run.sh

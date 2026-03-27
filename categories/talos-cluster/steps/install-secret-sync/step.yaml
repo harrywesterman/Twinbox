@@ -1,5 +1,5 @@
 id: install-secret-sync
-title: Install secret sync
+title: Install Vaultwarden
 type: action
 journey_stage: setup
 order: 20

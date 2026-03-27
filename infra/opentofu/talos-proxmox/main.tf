@@ -23,7 +23,7 @@ resource "proxmox_virtual_environment_vm" "node" {
   for_each  = var.nodes
   name      = "${var.cluster_name}-${each.key}"
   vm_id     = each.value.vmid
-  node_name = var.proxmox_node
+  node_name = lookup(var.vm_node_map, each.key, var.proxmox_node)
   started   = true
   on_boot   = true
   bios      = "seabios"

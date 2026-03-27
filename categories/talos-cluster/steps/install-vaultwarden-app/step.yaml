@@ -1,0 +1,14 @@
+id: install-vaultwarden-app
+title: Install Vaultwarden
+type: action
+journey_stage: setup
+order: 105
+summary: Placeholder step for the Vaultwarden app phase.
+explanation: This wizard step is reserved for future Vaultwarden app work and does not run a real cluster action yet.
+side_help: The app rail already uses Vaultwarden for secrets; this placeholder keeps the app list complete.
+depends_on:
+  - install-immich
+inputs: []
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/_placeholder/run.sh
