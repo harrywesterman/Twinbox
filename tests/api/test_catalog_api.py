@@ -128,6 +128,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-freshrss",
                 "install-jitsi",
             ]
+            assert talos["steps"][1]["title"] == "Connect Vaultwarden to Talos"
             assert talos["steps"][0]["journey_stage"] == "setup"
             assert talos["steps"][0]["status"] == "ready"
             assert talos["steps"][1]["status"] == "locked"

@@ -12,6 +12,10 @@ command -v kubectl >/dev/null 2>&1 || {
   echo "ERROR: kubectl not found" >&2
   exit 1
 }
+command -v jq >/dev/null 2>&1 || {
+  echo "ERROR: jq not found" >&2
+  exit 1
+}
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 retry() {
@@ -36,6 +40,16 @@ retry() {
 }
 
 control_plane_tolerations='[{"key":"node-role.kubernetes.io/control-plane","operator":"Exists","effect":"NoSchedule"},{"key":"node-role.kubernetes.io/master","operator":"Exists","effect":"NoSchedule"}]'
+root_applications=(
+  "whoami"
+  "headlamp"
+  "traefik"
+  "routes"
+  "grafana-secret"
+  "grafana"
+  "wiredoor-gateway-secret"
+  "wiredoor-gateway"
+)
 
 patch_argocd_workload_tolerations() {
   local resource
@@ -129,6 +143,48 @@ wait_for_argocd_workloads() {
   wait_for_statefulset_rollout "statefulset/argocd-application-controller"
 }
 
+wait_for_application_ready() {
+  local application="$1"
+  local status_json=""
+  local sync_status=""
+  local health_status=""
+  local operation_phase=""
+  local attempt=1
+  local attempts=180
+
+  while true; do
+    if status_json="$(kubectl -n argocd get application "$application" -o json 2>/dev/null)"; then
+      sync_status="$(jq -r '.status.sync.status // "Unknown"' <<<"$status_json")"
+      health_status="$(jq -r '.status.health.status // "Unknown"' <<<"$status_json")"
+      operation_phase="$(jq -r '.status.operationState.phase // "Unknown"' <<<"$status_json")"
+      log "Waiting for application/${application}: sync=${sync_status}, health=${health_status}, phase=${operation_phase}"
+
+      if [[ "$sync_status" == "Synced" && "$health_status" == "Healthy" && "$operation_phase" != "Running" && "$operation_phase" != "Terminating" ]]; then
+        log "Application/${application} is Synced and Healthy"
+        return 0
+      fi
+    else
+      log "Waiting for application/${application} to appear"
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      return 1
+    fi
+
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
+wait_for_root_applications() {
+  local application
+
+  log "Waiting for root applications to become Synced and Healthy"
+  for application in "${root_applications[@]}"; do
+    wait_for_application_ready "$application"
+  done
+}
+
 log "Creating argocd namespace"
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply --validate=false -f -
 
@@ -143,3 +199,4 @@ wait_for_argocd_workloads
 
 log "Applying full Argo root application"
 retry 3 10 kubectl apply --validate=false -f "$WORKSPACE_ROOT/gitops/argocd/root.yaml"
+wait_for_root_applications

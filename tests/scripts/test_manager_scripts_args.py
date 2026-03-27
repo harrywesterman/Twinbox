@@ -188,6 +188,7 @@ def test_collect_state_missing_cluster_file_fails():
 def test_apply_cluster_uses_pinned_defaults_and_tofu():
     text = _apply_cluster_text()
     assert 'source "$WORKSPACE_ROOT/config/pinned-defaults.sh"' in text
+    assert '--vm-node-map) shift 2 ;;' in text
     assert 'command -v "$TOFU_BIN"' in text
     assert '"$TOFU_BIN" -chdir="$work_module_dir" init -input=false' in text
     assert '"$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve' in text
@@ -218,6 +219,9 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'TF_VAR_proxmox_password' in text
     assert '--arg proxmox_password "$PROXMOX_PASSWORD"' not in text
     assert 'proxmox_password: $proxmox_password' not in text
+    assert 'json_array_from_csv()' in text
+    assert 'json_array_from_csv "${DNS_SERVERS:-1.1.1.1,1.0.0.1}"' in text
+    assert '--argjson prefix "${NODE_PREFIX_LENGTH:-24}"' in text
 
 
 def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
@@ -238,6 +242,10 @@ def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
     assert 'generate_talos_configs()' in text
     assert 'discover_node_ip()' in text
     assert 'Guest agent reported ${label} at ${candidate}' in text
+    assert 'jq -Rn --arg csv "$csv"' in text
+    assert 'split(",")' in text
+    assert 'map(gsub("^\\\\s+|\\\\s+$"; ""))' in text
+    assert 'map(select(length > 0))' in text
     assert 'wait_for_talos_api()' in text
     assert 'bootstrap_cluster()' in text
     assert 'sync_user_kubeconfig()' in text
@@ -390,6 +398,16 @@ def test_argo_bootstrap_script_installs_argocd_and_applies_full_root_application
     assert 'kubectl -n argocd rollout status "$resource" --timeout=900s' in text
     assert 'wait_for_statefulset_rollout "statefulset/argocd-application-controller"' in text
     assert 'statefulset/argocd-application-controller' not in wait_section
+    assert 'root_applications=(' in text
+    assert '"whoami"' in text
+    assert '"wiredoor-gateway"' in text
+    assert 'wait_for_application_ready()' in text
+    assert 'wait_for_root_applications()' in text
+    assert 'Waiting for root applications to become Synced and Healthy' in text
+    assert 'kubectl -n argocd get application "$application" -o json' in text
+    assert '.status.sync.status // "Unknown"' in text
+    assert '.status.health.status // "Unknown"' in text
+    assert 'Application/${application} is Synced and Healthy' in text
     assert 'deployment/argocd-applicationset-controller' in text
     assert 'deployment/argocd-repo-server' in text
     assert 'statefulset/argocd-application-controller' in text
@@ -416,6 +434,14 @@ def test_argo_full_root_includes_full_tree():
     assert 'name: root' in text
     assert 'path: gitops/argocd/apps' in text
     assert 'syncPolicy:' in text
+
+
+def test_install_argocd_step_waits_for_root_app_tree():
+    text = (REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "step.yaml").read_text(encoding="utf-8")
+
+    assert 'summary: Install Argo CD and wait for the full application tree to become healthy.' in text
+    assert 'report Synced and Healthy' in text
+    assert 'whoami, headlamp, traefik, routes, grafana-secret, grafana, wiredoor-gateway-secret, and wiredoor-gateway' in text
 
 
 def test_routes_and_wiredoor_secrets_are_vaultwarden_backed():
@@ -470,7 +496,7 @@ def test_grafana_admin_credentials_are_vaultwarden_backed():
     assert 'kind: Application' in grafana_secret_app_text
     assert 'grafana-secret' in grafana_secret_app_text
     assert 'kind: SecretStore' in grafana_secretstore_text
-    assert 'ddd2a44b-6f13-4c6f-84c0-e841edd35192' in grafana_secretstore_text
+    assert 'object/item/266a9922-e2a3-4ee0-a53f-7874d9b42ab4' in grafana_secretstore_text
     assert 'kind: ExternalSecret' in grafana_externalsecret_text
     assert 'admin-user' in grafana_externalsecret_text
     assert 'admin-password' in grafana_externalsecret_text

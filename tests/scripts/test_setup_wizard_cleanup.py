@@ -96,9 +96,18 @@ def test_setup_wizard_bootstraps_vaultwarden_before_starting_manager_stack():
     assert 'VAULTWARDEN_PUBLIC_URL=http://${CLOUD_INIT_IP}:8222' in text
     assert 'VAULTWARDEN_PASSWORD_FILE=/opt/twinbox/bootstrap/vaultwarden-password' in text
     assert 'VAULTWARDEN_READY_FILE=/opt/twinbox/bootstrap/vaultwarden-ready' in text
+    assert 'bash -lc \'cd ${TWINBOX_TARGET_DIR} && sudo ./scripts/install-management-tools.sh --env-file .env\'' in text
     assert 'docker compose up -d vaultwarden' in text
     assert 'scripts/bootstrap-vaultwarden.sh' in text
     assert 'VAULTWARDEN_SIGNUPS_ALLOWED=true' in text
+
+
+def test_setup_wizard_installs_management_tools_before_vaultwarden_bootstrap():
+    text = _wizard_text()
+    install_index = text.index("sudo ./scripts/install-management-tools.sh --env-file .env")
+    bootstrap_index = text.index("scripts/bootstrap-vaultwarden.sh")
+
+    assert install_index < bootstrap_index
 
 
 def test_setup_wizard_discovers_management_vm_ip_via_guest_agent():

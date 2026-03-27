@@ -57,6 +57,7 @@ while [[ $# -gt 0 ]]; do
     --storage-pool) STORAGE_POOL="$2"; shift 2 ;;
     --file-datastore) FILE_DATASTORE="$2"; shift 2 ;;
     --data-dir) DATA_DIR="$2"; shift 2 ;;
+    --vm-node-map) shift 2 ;;
     *) usage; fail "Unknown argument: $1" ;;
   esac
 done
@@ -236,6 +237,17 @@ node_array() {
 
 json_array_from_args() {
   jq -nc '$ARGS.positional' --args "$@"
+}
+
+json_array_from_csv() {
+  local csv="${1:-}"
+
+  jq -Rn --arg csv "$csv" '
+    $csv
+    | split(",")
+    | map(gsub("^\\s+|\\s+$"; ""))
+    | map(select(length > 0))
+  '
 }
 
 flatten_ipv4_candidates() {
@@ -608,8 +620,8 @@ jq -n \
   --arg talos_image_local_path "$talos_image_local_path" \
   --arg talos_image_cache_key "$image_cache_key" \
   --argjson vm_node_map "${VM_NODE_MAP:-{}}" \
-  --argjson dns_servers "$(printf '%s' "$DNS_SERVERS" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))')" \
-  --argjson prefix "$NODE_PREFIX_LENGTH" \
+  --argjson dns_servers "$(json_array_from_csv "${DNS_SERVERS:-1.1.1.1,1.0.0.1}")" \
+  --argjson prefix "${NODE_PREFIX_LENGTH:-24}" \
   --argjson nodes "$nodes_json" \
   '{
     proxmox_node: $proxmox_node,

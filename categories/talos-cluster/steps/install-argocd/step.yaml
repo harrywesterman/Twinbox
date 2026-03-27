@@ -3,9 +3,9 @@ title: Install Argo CD
 type: action
 journey_stage: setup
 order: 30
-summary: Install Argo CD and bootstrap the full application tree.
-explanation: Twinbox installs Argo CD after the secret sync phase, then applies the full root Application. Vaultwarden and ESO remain the source of truth for secret-bearing manifests, and sync waves keep dependent apps ordered.
-side_help: The root Application now covers whoami, headlamp, traefik, routes, grafana, and wiredoor-gateway. It intentionally relies on Vaultwarden-backed secret resources being present first.
+summary: Install Argo CD and wait for the full application tree to become healthy.
+explanation: Twinbox installs Argo CD after secret sync, then applies the full root Application and waits for the root apps to report Synced and Healthy. Vaultwarden and ESO remain the source of truth for secret-bearing manifests, and sync waves keep dependent apps ordered.
+side_help: The root Application now covers whoami, headlamp, traefik, routes, grafana-secret, grafana, wiredoor-gateway-secret, and wiredoor-gateway. It intentionally relies on Vaultwarden-backed secret resources being present first.
 depends_on:
   - install-secret-sync
 inputs: []
