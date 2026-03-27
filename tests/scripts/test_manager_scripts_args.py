@@ -12,8 +12,11 @@ MODULE_OUTPUTS = REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "outputs.t
 INSTALL_SECRET_SYNC_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-secret-sync.sh"
 ARGO_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-argocd.sh"
 ARGO_STEP_SCRIPT = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
+LONGHORN_STEP_SCRIPT = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-longhorn-storage" / "run.sh"
+LONGHORN_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-longhorn-storage" / "step.yaml"
 ARGO_BOOTSTRAP_SCRIPT = REPO_ROOT / "gitops" / "install.sh"
 ARGO_ROOT = REPO_ROOT / "gitops" / "argocd" / "root.yaml"
+LONGHORN_APPLICATION = REPO_ROOT / "gitops" / "longhorn" / "application.yaml"
 WHOAMI_DEPLOYMENT = REPO_ROOT / "gitops" / "apps" / "whoami" / "deployment.yaml"
 HEADLAMP_VALUES = REPO_ROOT / "gitops" / "values" / "headlamp.yaml"
 ROUTES_VALUES = REPO_ROOT / "gitops" / "values" / "routes.yaml"
@@ -61,12 +64,28 @@ def _argo_step_text() -> str:
     return ARGO_STEP_SCRIPT.read_text(encoding="utf-8")
 
 
+def _longhorn_step_text() -> str:
+    return LONGHORN_STEP_SCRIPT.read_text(encoding="utf-8")
+
+
+def _longhorn_step_manifest_text() -> str:
+    return LONGHORN_STEP_MANIFEST.read_text(encoding="utf-8")
+
+
 def _argo_bootstrap_text() -> str:
     return ARGO_BOOTSTRAP_SCRIPT.read_text(encoding="utf-8")
 
 
 def _argo_root_text() -> str:
     return ARGO_ROOT.read_text(encoding="utf-8")
+
+
+def _longhorn_application_text() -> str:
+    return LONGHORN_APPLICATION.read_text(encoding="utf-8")
+
+
+def _longhorn_values_text() -> str:
+    return (REPO_ROOT / "gitops" / "longhorn" / "values.yaml").read_text(encoding="utf-8")
 
 
 def _whoami_deployment_text() -> str:
@@ -219,9 +238,39 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'TF_VAR_proxmox_password' in text
     assert '--arg proxmox_password "$PROXMOX_PASSWORD"' not in text
     assert 'proxmox_password: $proxmox_password' not in text
+    assert '--argjson vm_node_map "${VM_NODE_MAP:-{}}"' in text
+    assert 'vm_node_map: $vm_node_map' in text
     assert 'json_array_from_csv()' in text
     assert 'json_array_from_csv "${DNS_SERVERS:-1.1.1.1,1.0.0.1}"' in text
     assert '--argjson prefix "${NODE_PREFIX_LENGTH:-24}"' in text
+
+
+def test_longhorn_step_installs_pinned_chart_and_waits_for_health():
+    step_text = _longhorn_step_text()
+    step_manifest_text = _longhorn_step_manifest_text()
+    manifest_text = _longhorn_application_text()
+    values_text = _longhorn_values_text()
+
+    assert 'title: Install Longhorn Storage' in step_manifest_text
+    assert 'summary: Install Longhorn storage with a pinned Helm chart version and wait for the app to become healthy.' in step_manifest_text
+    assert 'runner:' in step_manifest_text
+    assert 'KUBECONFIG_FILE:' in step_manifest_text
+    assert 'item: kubeconfig' in step_manifest_text
+    assert 'script: categories/talos-cluster/steps/install-longhorn-storage/run.sh' in step_manifest_text
+    assert 'export KUBECONFIG="$KUBECONFIG_FILE"' in step_text
+    assert 'kubectl apply --server-side --force-conflicts --validate=false -f "$application_manifest"' in step_text
+    assert 'wait_for_application_ready "$application_name"' in step_text
+    assert 'application_name="longhorn"' in step_text
+    assert 'chart_version="1.11.1"' in step_text
+    assert 'sources:' in manifest_text
+    assert 'repoURL: https://charts.longhorn.io' in manifest_text
+    assert 'chart: longhorn' in manifest_text
+    assert 'targetRevision: "1.11.1"' in manifest_text
+    assert '$values/gitops/longhorn/values.yaml' in manifest_text
+    assert 'ref: values' in manifest_text
+    assert 'longhorn-system' in manifest_text
+    assert 'defaultSettings:' in values_text
+    assert 'taintToleration:' in values_text
 
 
 def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
@@ -507,16 +556,18 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     outputs_text = _module_outputs_text()
     assert 'resource "proxmox_virtual_environment_vm" "node"' in main_text
     assert 'resource "proxmox_virtual_environment_file" "talos_nocloud"' in main_text
+    assert 'for_each     = local.talos_image_nodes' in main_text
     assert 'content_type = "iso"' in main_text
     assert 'source_file {' in main_text
     assert 'path      = var.talos_image_local_path' in main_text
     assert 'file_name = "talos-${var.talos_image_cache_key}.iso"' in main_text
+    assert 'node_name    = each.value' in main_text
     assert 'machine   = "q35"' not in main_text
     assert 'boot_order = var.boot_from_disk ? ["virtio0"] : ["ide2", "virtio0"]' in main_text
     assert 'cdrom {' in main_text
     assert 'dynamic "cdrom"' not in main_text
     assert 'for_each = var.boot_from_disk ? [] : [1]' not in main_text
-    assert 'file_id   = proxmox_virtual_environment_file.talos_nocloud.id' in main_text
+    assert 'file_id   = proxmox_virtual_environment_file.talos_nocloud[lookup(var.vm_node_map, each.key, var.proxmox_node)].id' in main_text
     assert 'file_id      = proxmox_virtual_environment_file.talos_nocloud.id' not in main_text
     assert 'file_format  = "raw"' not in main_text
     assert 'agent {' in main_text

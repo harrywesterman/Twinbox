@@ -8,7 +8,7 @@ Talos lifecycle operations are triggered through the manager stack.
 2. API validates payload and writes queue record.
 3. Worker executes `scripts/manager/apply-cluster.sh`.
 4. Script renders a per-cluster OpenTofu workspace and tfvars payload.
-5. The worker downloads the Talos disk image locally, then OpenTofu uploads/imports it into Proxmox and creates the VMs.
+5. The worker downloads the Talos disk image locally, then OpenTofu uploads/imports it into the Proxmox nodes that will host the VMs and creates them there.
 6. The worker discovers the DHCP addresses, generates per-node Talos configs, applies them with `talosctl`, bootstraps the first control plane, materializes the runtime Talos access files from Vaultwarden-backed refs, and mirrors the client configs into the `twinbox` home directory on the Management VM.
 7. The optional `install-secret-sync` follow-up step installs External Secrets Operator, deploys a Bitwarden CLI bridge against Vaultwarden, and creates the first SecretStore/ExternalSecret pair inside the cluster.
 8. The separate `install-argocd` follow-up installs Argo CD, patches the Argo workloads with the standard control-plane tolerations needed for a single-node Talos control plane, and applies the root Application from `gitops/argocd/root.yaml`. The root tree now includes the Vaultwarden-backed route and Grafana apps as well as the safe bootstrap workloads, and sync waves keep dependencies ordered.

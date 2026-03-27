@@ -75,7 +75,6 @@
 .wizard-rail-summary p,
 .wizard-banner p,
 .wizard-helper,
-.wizard-event p,
 .wizard-step-body small,
 .wizard-stack-label {
   margin: 0;
@@ -932,27 +931,6 @@
   font-weight: 600;
   line-height: 1.45;
   word-break: break-word;
-}
-
-.wizard-event-list {
-  display: grid;
-  gap: 10px;
-}
-
-.wizard-event {
-  padding: 14px 16px;
-  border-radius: 18px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  background: rgba(248, 250, 252, 0.92);
-}
-
-.wizard-event strong {
-  display: block;
-  margin-bottom: 6px;
-}
-
-.wizard-event p {
-  color: var(--ink-soft);
 }
 
 .technical-panel {

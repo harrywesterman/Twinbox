@@ -1,14 +1,21 @@
 id: install-longhorn-storage
-title: Install Longhorn storage
+title: Install Longhorn Storage
 type: action
 journey_stage: setup
 order: 40
-summary: Placeholder step for the Longhorn storage phase.
-explanation: This wizard step is reserved for future Longhorn storage work and does not run a real cluster action yet.
-side_help: Storage add-on planning is intentionally represented in the bootstrap rail before application rollout.
+summary: Install Longhorn storage with a pinned Helm chart version and wait for the app to become healthy.
+explanation: Twinbox installs Longhorn as a dedicated storage add-on after Argo CD, pins the chart to the newest stable release, and waits until the Longhorn application reports Synced and Healthy before the step completes.
+side_help: Storage remains a separate setup phase so later workload installers can depend on persistent volumes only after Longhorn is actually ready.
 depends_on:
   - install-argocd
 inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
 runner:
   kind: script
-  script: categories/talos-cluster/steps/_placeholder/run.sh
+  script: categories/talos-cluster/steps/install-longhorn-storage/run.sh
