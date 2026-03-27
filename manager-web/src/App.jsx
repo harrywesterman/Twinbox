@@ -61,6 +61,7 @@ async function refreshSnapshotNow({
   setProxmoxResources,
   setClusterId,
   setSelectedStepId,
+  setLogs,
   clusterIdOverride = '',
   clearError = true,
   setError,
@@ -106,6 +107,21 @@ async function refreshSnapshotNow({
     : selectedStepIdRef.current;
   if (nextStepId !== selectedStepIdRef.current) {
     setSelectedStepId(nextStepId);
+  }
+
+  if (catalogData.status === 'fulfilled') {
+    const selectedStep = getWizardSteps(catalogData.value).find((step) => step.id === nextStepId);
+    const latestJobId = selectedStep?.latest_job?.id;
+    if (latestJobId) {
+      try {
+        const logsData = await requestJson(`/api/jobs/${encodeURIComponent(latestJobId)}/logs`);
+        setLogs(Array.isArray(logsData?.lines) ? logsData.lines : []);
+      } catch {
+        setLogs([]);
+      }
+    } else {
+      setLogs([]);
+    }
   }
 
   if (clearError) {
@@ -557,6 +573,7 @@ function App() {
           setProxmoxResources,
           setClusterId,
           setSelectedStepId,
+          setLogs,
           setError,
         });
       } catch (refreshError) {
@@ -710,6 +727,7 @@ function App() {
         setProxmoxResources,
         setClusterId,
         setSelectedStepId,
+        setLogs,
         clusterIdOverride: nextClusterId,
         clearError: false,
         setError,
@@ -1332,18 +1350,6 @@ function App() {
                       items={model.activity.artifacts}
                       emptyLabel="Artifacts will appear after the first successful step."
                     />
-                  </section>
-
-                  <section>
-                    <p className="wizard-stack-label">Event timeline</p>
-                    <div className="wizard-event-list">
-                      {model.activity.events.map((event) => (
-                        <article key={event.id} className={`wizard-event tone-${event.tone}`}>
-                          <strong>{event.title}</strong>
-                          <p>{event.detail}</p>
-                        </article>
-                      ))}
-                    </div>
                   </section>
                 </div>
 

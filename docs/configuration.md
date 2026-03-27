@@ -66,6 +66,7 @@ Tooling version notes:
 - `tofu` and `talosctl` versions are pinned in `config/pinned-defaults.sh`.
 - External Secrets Operator chart version is pinned in `config/pinned-defaults.sh`.
 - The management VM host install script and `manager-worker` resolve Talos images through `scripts/get-talos-image-factory.sh`, then download the resulting disk image locally before handing it to OpenTofu.
+- The Talos ISO is uploaded to each target Proxmox node used by the cluster, so VM placement does not depend on a shared file datastore.
 - The same helper also resolves the matching Talos Image Factory installer image, and provisioning writes that into `machine.install.image` so boot-asset extensions persist after Talos installs to disk.
 - To refresh a Talos Factory schematic or build a future-version URL, use `scripts/get-talos-image-factory.sh` with `--preset vanilla` or `--preset qemu-guest-agent`.
 - The provisioning flow defaults to the `qemu-guest-agent` preset, which currently includes `siderolabs/qemu-guest-agent`, `siderolabs/iscsi-tools`, and `siderolabs/util-linux-tools` so Proxmox guest reporting and future Longhorn prerequisites are available on the Talos nodes.
