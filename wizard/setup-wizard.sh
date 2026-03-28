@@ -466,7 +466,7 @@ detect_existing_cluster_resources() {
     EXISTING_VM_NAMES+=("$name")
     EXISTING_VM_TAGS+=("$tags")
   done < <(printf '%s\n' "$cluster_vms" | jq -r --arg cluster_tag "$CLUSTER_VM_TAG" --arg cluster_prefix "$CLUSTER_VM_PREFIX" '
-    .[]
+    (.data // .)[]
     | select((.name // "" | startswith($cluster_prefix)) or (.tags // "" | split(";") | any(. == $cluster_tag)))
     | [.vmid, .node, .name, (.tags // "")] | @tsv
   ')

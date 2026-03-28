@@ -41,6 +41,7 @@ def test_setup_wizard_cleanup_uses_cluster_inventory_for_detect_and_remove():
     assert 'pvesh get /cluster/resources --type vm --output-format json' in text
     assert '--arg cluster_prefix "$CLUSTER_VM_PREFIX"' in text
     assert '--arg cluster_tag "$CLUSTER_VM_TAG"' in text
+    assert '(.data // .)[]' in text
     assert 'select((.name // "" | startswith($cluster_prefix)) or (.tags // "" | split(";") | any(. == $cluster_tag)))' in text
     assert 'declare -A seen_vm_names=()' in text
     assert 'declare -A seen_vmids=()' in text
