@@ -44,6 +44,28 @@ test('cluster builder preserves valid vm_node_map assignments', () => {
   });
 });
 
+test('cluster builder fills missing vm_node_map assignments with allowed hosts', () => {
+  const result = buildClusterFromRequest({
+    ...baseBody,
+    vm_node_map: {
+      'cp-1': 'pve-b',
+    },
+  }, {
+    PROXMOX_NODE: 'pve-a',
+    PROXMOX_STORAGE_POOL: 'local-lvm',
+    PROXMOX_FILE_DATASTORE: 'local',
+  }, {
+    allowedVmHosts: ['pve-a', 'pve-b'],
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.cluster.vm_node_map, {
+    'cp-1': 'pve-b',
+    'worker-1': 'pve-b',
+    'worker-2': 'pve-a',
+  });
+});
+
 test('cluster builder rejects stale vm_node_map host names', () => {
   const result = buildClusterFromRequest({
     ...baseBody,

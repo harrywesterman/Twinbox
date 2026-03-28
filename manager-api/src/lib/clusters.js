@@ -47,9 +47,40 @@ function buildAllowedHostLookup(allowedHosts = []) {
   return lookup;
 }
 
-function normalizeVmNodeMap(rawMap, allowedHosts = []) {
+function buildDefaultVmNodeMap(controlplaneCount, workerCount, allowedHosts = [], fallbackHost = "pve") {
+  const hostList = Array.isArray(allowedHosts)
+    ? allowedHosts.map((host) => String(host || "").trim()).filter(Boolean)
+    : [];
+  const placementHosts = hostList.length > 0
+    ? hostList
+    : [String(fallbackHost || "").trim() || "pve"];
+  const vmNodeMap = {};
+  const vmNames = [];
+
+  for (let index = 1; index <= Math.max(1, Number(controlplaneCount) || 0); index += 1) {
+    vmNames.push(`cp-${index}`);
+  }
+  for (let index = 1; index <= Math.max(0, Number(workerCount) || 0); index += 1) {
+    vmNames.push(`worker-${index}`);
+  }
+
+  for (let index = 0; index < vmNames.length; index += 1) {
+    vmNodeMap[vmNames[index]] = placementHosts[index % placementHosts.length];
+  }
+
+  return vmNodeMap;
+}
+
+function normalizeVmNodeMap(rawMap, allowedHosts = [], fallbackHost = "pve", vmNames = []) {
+  const defaultMap = buildDefaultVmNodeMap(
+    vmNames.filter((name) => String(name).startsWith("cp-")).length,
+    vmNames.filter((name) => String(name).startsWith("worker-")).length,
+    allowedHosts,
+    fallbackHost,
+  );
+
   if (rawMap === null || rawMap === undefined || rawMap === '') {
-    return { ok: true, value: {} };
+    return { ok: true, value: defaultMap };
   }
 
   let candidate = rawMap;
@@ -66,7 +97,7 @@ function normalizeVmNodeMap(rawMap, allowedHosts = []) {
   }
 
   const allowedHostLookup = buildAllowedHostLookup(allowedHosts);
-  const normalized = {};
+  const normalized = { ...defaultMap };
 
   for (const [vmName, hostName] of Object.entries(candidate)) {
     const normalizedVmName = String(vmName || "").trim();
@@ -90,6 +121,12 @@ function normalizeVmNodeMap(rawMap, allowedHosts = []) {
     normalized[normalizedVmName] = resolvedHost;
   }
 
+  for (const vmName of vmNames) {
+    if (!Object.prototype.hasOwnProperty.call(normalized, vmName)) {
+      normalized[vmName] = defaultMap[vmName];
+    }
+  }
+
   return { ok: true, value: normalized };
 }
 
@@ -108,7 +145,16 @@ export function buildClusterFromRequest(body, env, { allowedVmHosts = [] } = {})
   const parsedGatewayIp = parseIPv4(body.gateway_ip, "gateway_ip");
   const parsedDnsServers = parseIPv4List(body.dns_servers, "dns_servers");
   const parsedDnsDomain = parseOptionalString(body.dns_domain, "dns_domain");
-  const parsedVmNodeMap = normalizeVmNodeMap(body.vm_node_map, allowedVmHosts);
+  const vmNames = [
+    ...Array.from({ length: parsedControlplanes.value }, (_, index) => `cp-${index + 1}`),
+    ...Array.from({ length: parsedWorkers.value }, (_, index) => `worker-${index + 1}`),
+  ];
+  const parsedVmNodeMap = normalizeVmNodeMap(
+    body.vm_node_map,
+    allowedVmHosts,
+    body.proxmox_node || env.PROXMOX_NODE || "pve",
+    vmNames,
+  );
 
   const validations = [
     parsedName,

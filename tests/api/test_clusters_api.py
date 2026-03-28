@@ -163,6 +163,11 @@ EOF
             assert cluster["metadata"]["file_datastore"] == "local"
             assert cluster["metadata"]["cluster_slug"] == "demo"
             assert cluster["metadata"]["talos_image_preset"] == "qemu-guest-agent"
+            assert cluster["vm_node_map"] == {
+                "cp-1": "pve-a",
+                "worker-1": "pve-b",
+                "worker-2": "pve-a",
+            }
             assert cluster["metadata"]["secret_refs"]["proxmox"]["scope"] == "global"
             assert cluster["metadata"]["secret_refs"]["proxmox"]["item"] == "proxmox"
             assert cluster["spec_version"] == "iac-v1"
