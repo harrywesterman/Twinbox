@@ -306,7 +306,9 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'TF_VAR_proxmox_endpoint' in text
     assert 'TF_VAR_proxmox_username' in text
     assert 'TF_VAR_proxmox_password' in text
-    assert '--arg proxmox_password "$PROXMOX_PASSWORD"' not in text
+    assert 'PROXMOX_PASSWORD="${PROXMOX_PASSWORD:-${TF_VAR_proxmox_password:-}}" ' not in text
+    assert 'PROXMOX_PASSWORD="${PROXMOX_PASSWORD:-${TF_VAR_proxmox_password:-}}"' in text
+    assert 'Missing environment variable: PROXMOX_PASSWORD or TF_VAR_proxmox_password' in text
     assert 'proxmox_password: $proxmox_password' not in text
     assert 'normalize_json_object()' in text
     assert 'cluster_file="$clusters_dir/${CLUSTER_ID}.json"' in text

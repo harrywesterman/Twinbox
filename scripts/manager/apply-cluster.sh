@@ -23,7 +23,9 @@ done
 
 export TF_VAR_proxmox_endpoint="${TF_VAR_proxmox_endpoint:-https://${PROXMOX_HOST}:${PROXMOX_PORT}}"
 export TF_VAR_proxmox_username="${TF_VAR_proxmox_username:-$PROXMOX_USER}"
-[[ -n "${TF_VAR_proxmox_password:-}" ]] || fail "Missing environment variable: TF_VAR_proxmox_password"
+PROXMOX_PASSWORD="${PROXMOX_PASSWORD:-${TF_VAR_proxmox_password:-}}"
+[[ -n "${PROXMOX_PASSWORD:-}" ]] || fail "Missing environment variable: PROXMOX_PASSWORD or TF_VAR_proxmox_password"
+export PROXMOX_PASSWORD
 
 command -v jq >/dev/null 2>&1 || fail "jq not found"
 command -v curl >/dev/null 2>&1 || fail "curl not found"
