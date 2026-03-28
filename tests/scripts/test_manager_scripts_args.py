@@ -521,6 +521,8 @@ def test_refresh_bitwarden_cli_script_replays_login_and_sync_against_the_running
     assert 'app.kubernetes.io/name="$DEPLOYMENT_NAME"' in text
     assert 'Refreshing Bitwarden CLI sync state in pod' in text
     assert 'bw config server "${BW_HOST}"' in text
+    assert 'bw_status="$(bw status | jq -r' in text
+    assert 'if [[ "$bw_status" == "unauthenticated" ]]; then' in text
     assert 'bw login --apikey >/dev/null' in text
     assert 'export BW_SESSION="$(bw unlock --passwordenv BW_PASSWORD --raw)"' in text
     assert 'bw sync --session "${BW_SESSION}" >/dev/null' in text

@@ -54,7 +54,10 @@ log "Refreshing Bitwarden CLI sync state in pod ${pod_name}"
 kubectl -n "$BITWARDEN_NAMESPACE" exec "$pod_name" -- /bin/bash -lc '
   set -euo pipefail
   bw config server "${BW_HOST}"
-  bw login --apikey >/dev/null
+  bw_status="$(bw status | jq -r '"'"'.status // "unauthenticated"'"'"')"
+  if [[ "$bw_status" == "unauthenticated" ]]; then
+    bw login --apikey >/dev/null
+  fi
   export BW_SESSION="$(bw unlock --passwordenv BW_PASSWORD --raw)"
   bw sync --session "${BW_SESSION}" >/dev/null
 '
