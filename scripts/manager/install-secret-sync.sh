@@ -288,7 +288,7 @@ metadata:
 spec:
   provider:
     webhook:
-      url: "http://bitwarden-cli.${BITWARDEN_NAMESPACE}.svc.cluster.local:8087/object/item/{{ .remoteRef.key }}"
+      url: "http://bitwarden-cli.${BITWARDEN_NAMESPACE}.svc.cluster.local:8087/object/item/{{ .remoteRef.key | urlquery }}"
       headers:
         Content-Type: application/json
       result:
@@ -302,7 +302,7 @@ metadata:
 spec:
   provider:
     webhook:
-      url: "http://bitwarden-cli.${BITWARDEN_NAMESPACE}.svc.cluster.local:8087/object/item/{{ .remoteRef.key }}"
+      url: "http://bitwarden-cli.${BITWARDEN_NAMESPACE}.svc.cluster.local:8087/object/item/{{ .remoteRef.key | urlquery }}"
       result:
         jsonPath: "$.data.fields[?@.name==\"{{ .remoteRef.property }}\"].value"
 ---

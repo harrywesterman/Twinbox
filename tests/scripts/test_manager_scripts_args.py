@@ -658,7 +658,7 @@ def test_routes_and_wiredoor_secrets_are_vaultwarden_backed():
     assert 'Host(`argocd.bierineenweek.nl`)' in wiredoor_gateway_routes_values_text
     assert 'kind: SecretStore' in traefik_secretstore_text
     assert 'name: traefik-dashboard-fields' in traefik_secretstore_text
-    assert 'twinbox/global/traefik-dashboard' in traefik_secretstore_text
+    assert 'twinbox%2Fglobal%2Ftraefik-dashboard' in traefik_secretstore_text
     assert 'kind: ExternalSecret' in traefik_externalsecret_text
     assert 'name: traefik-dashboard-auth' in traefik_externalsecret_text
     assert 'secretKey: users' in traefik_externalsecret_text
