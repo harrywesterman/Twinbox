@@ -45,6 +45,7 @@ services:
       - TALOS_IMAGE_ARCH=${TALOS_IMAGE_ARCH:-amd64}
     volumes:
       - ./manager-data:/data
+      - ./infra:/opt/twinbox/infra:ro
       - ./categories:/opt/twinbox/categories:ro
       - ./scripts:/opt/twinbox/scripts:ro
       - ./gitops:/opt/twinbox/gitops:ro
@@ -87,6 +88,7 @@ services:
       - TALOS_IMAGE_ARCH=${TALOS_IMAGE_ARCH:-amd64}
     volumes:
       - ./manager-data:/data
+      - ./infra:/opt/twinbox/infra:ro
       - ./categories:/opt/twinbox/categories:ro
       - ./scripts:/opt/twinbox/scripts:ro
       - ./gitops:/opt/twinbox/gitops:ro
