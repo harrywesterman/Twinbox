@@ -555,8 +555,8 @@ esac
             """#!/bin/sh
 cat <<'EOF'
 [
-  {"node": "pve-a", "status": "online"},
-  {"node": "pve-b", "status": "online"}
+  {"node": "pve-a", "status": "online", "vmid": 200},
+  {"node": "pve-b", "status": "online", "vmid": 201}
 ]
 EOF
 """,
