@@ -502,13 +502,48 @@ seed_grafana_item() {
 
 seed_wiredoor_gateway_item() {
   local item_name="${VAULTWARDEN_ITEM_PREFIX:-twinbox}/global/wiredoor-gateway"
+  local item_id=""
   local item_json=""
   local template_json=""
   local wiredoor_url="https://wiredoor.bierineenweek.nl"
   local wiredoor_token=""
+  local current_username=""
+  local current_password=""
+  local current_item_json=""
 
   if bw list items --session "$BW_SESSION" --search "$item_name" | jq -e --arg name "$item_name" '.[] | select(.name == $name)' >/dev/null; then
-    log "Wiredoor gateway item already exists"
+    item_id="$(bw list items --session "$BW_SESSION" --search "$item_name" | jq -r --arg name "$item_name" '.[] | select(.name == $name) | .id' | head -n1)"
+    [[ -n "$item_id" ]] || fail "Wiredoor gateway item exists but id could not be resolved"
+
+    current_item_json="$(bw get item "$item_id" --session "$BW_SESSION")"
+    current_username="$(printf '%s\n' "$current_item_json" | jq -r '.login.username // ""')"
+    current_password="$(printf '%s\n' "$current_item_json" | jq -r '.login.password // ""')"
+    if [[ -z "$current_password" ]]; then
+      current_password="$(printf '%s\n' "$current_item_json" | jq -r '.fields[]? | select(.name == "token") | .value' | head -n1)"
+    fi
+    if [[ -z "$current_password" ]]; then
+      current_password="$(openssl rand -hex 16)"
+    fi
+
+    template_json="$(printf '%s\n' "$current_item_json" | jq \
+      --arg name "$item_name" \
+      --arg url "$wiredoor_url" \
+      --arg username "$wiredoor_url" \
+      --arg password "$current_password" \
+      --arg token "$current_password" \
+      '
+        .name = $name
+        | .type = 1
+        | .login.username = $username
+        | .login.password = $password
+        | .fields = [
+            {"name":"url","value":$url,"type":0},
+            {"name":"token","value":$token,"type":0}
+          ]
+        | .notes = "Seeded by Twinbox bootstrap"
+      ')"
+    printf '%s\n' "$template_json" | bw encode | bw edit item "$item_id" --session "$BW_SESSION" >/dev/null
+    log "Updated ${item_name}"
     return 0
   fi
 
@@ -517,7 +552,7 @@ seed_wiredoor_gateway_item() {
   item_json="$(printf '%s\n' "$template_json" | jq \
     --arg name "$item_name" \
     --arg url "$wiredoor_url" \
-    --arg username "wiredoor" \
+    --arg username "$wiredoor_url" \
     --arg password "$wiredoor_token" \
     --arg token "$wiredoor_token" \
     '

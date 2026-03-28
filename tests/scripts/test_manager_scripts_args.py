@@ -538,10 +538,13 @@ def test_routes_and_wiredoor_secrets_are_vaultwarden_backed():
     assert 'secretKey: users' in traefik_externalsecret_text
     assert 'kind: SecretStore' in wiredoor_secretstore_text
     assert 'name: wiredoor-gateway-fields' in wiredoor_secretstore_text
-    assert 'twinbox/global/wiredoor-gateway' in wiredoor_secretstore_text
+    assert 'object/item/d85aac09-6217-4aaa-8fff-dd7d7788cdf4' in wiredoor_secretstore_text
+    assert '$.data.login.{{ .remoteRef.property }}' in wiredoor_secretstore_text
     assert 'kind: ExternalSecret' in wiredoor_externalsecret_text
     assert 'name: wiredoor-gateway' in wiredoor_externalsecret_text
-    assert 'secretKey: token' in wiredoor_externalsecret_text
+    assert 'property: username' in wiredoor_externalsecret_text
+    assert 'property: password' in wiredoor_externalsecret_text
+    assert 'secretKey: TOKEN' in wiredoor_externalsecret_text
 
 
 def test_grafana_admin_credentials_are_vaultwarden_backed():
