@@ -9,6 +9,10 @@ import {
   formatMemoryMb,
 } from './provision-scale.js';
 import {
+  buildSuggestedProvisionInputs,
+  mergeSuggestedProvisionDraft,
+} from './provision-defaults.js';
+import {
   buildWizardExportFilename,
   getMissionControlModel,
   getWizardSteps,
@@ -490,6 +494,8 @@ function App() {
   const answersRef = useRef({});
   const hydratedRef = useRef(false);
   const provisionDirtyFieldsRef = useRef(new Set());
+  const provisionSuggestionKeyRef = useRef('');
+  const provisionSuggestionSnapshotRef = useRef({});
 
   const [catalog, setCatalog] = useState({ categories: [], errors: [] });
   const [health, setHealth] = useState({ ok: false });
@@ -949,6 +955,75 @@ function App() {
     : null;
 
   useEffect(() => {
+    if (model.activeStep?.id !== 'provision-nodes') {
+      return;
+    }
+
+    const managementIp = window.location.hostname;
+    const managementIpParts = managementIp.split('.').map((part) => Number(part));
+    const hasValidManagementIp = managementIpParts.length === 4
+      && managementIpParts.every((part) => Number.isInteger(part) && part >= 0 && part <= 255);
+
+    if (!hasValidManagementIp) {
+      return;
+    }
+
+    const controlplaneCount = Number.isFinite(Number(currentDraft.controlplane_count))
+      ? Number(currentDraft.controlplane_count)
+      : 1;
+    const workerCount = Number.isFinite(Number(currentDraft.worker_count))
+      ? Number(currentDraft.worker_count)
+      : 0;
+    const nodeCount = Math.max(1, controlplaneCount + workerCount);
+    const suggestionKey = `${managementIp}:${nodeCount}`;
+
+    if (provisionSuggestionKeyRef.current === suggestionKey) {
+      return;
+    }
+
+    provisionSuggestionKeyRef.current = suggestionKey;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const suggestionData = await requestJson(
+          `/api/ip-suggestions?management_ip=${encodeURIComponent(managementIp)}&node_count=${nodeCount}`,
+        );
+
+        if (cancelled) {
+          return;
+        }
+
+        setAnswers((current) => {
+          const currentStep = current[model.activeStep.id] || {};
+          const merged = mergeSuggestedProvisionDraft({
+            currentDraft: currentStep,
+            previousSuggested: buildSuggestedProvisionInputs(provisionSuggestionSnapshotRef.current),
+            suggestionData,
+            stepInputs: model.activeStep.inputs || [],
+            dirtyFields: Object.fromEntries([...provisionDirtyFieldsRef.current].map((fieldId) => [fieldId, true])),
+          });
+
+          return {
+            ...current,
+            [model.activeStep.id]: merged,
+          };
+        });
+
+        provisionSuggestionSnapshotRef.current = suggestionData;
+      } catch {
+        if (!cancelled) {
+          provisionSuggestionSnapshotRef.current = {};
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentDraft.controlplane_count, currentDraft.worker_count, model.activeStep?.id]);
+
+  useEffect(() => {
     if (!placementBoard || model.activeStep?.id !== 'provision-nodes') {
       return;
     }
@@ -1241,7 +1316,7 @@ function App() {
                           <h3>Keep VM scale separate from networking</h3>
                         </div>
                         <p className="wizard-input-block-note">
-                          These values stay manual so you can wire the cluster to the right Proxmox bridge and subnet.
+                          These values are suggested from the management VM network and stay editable so you can wire the cluster to the right Proxmox bridge and subnet.
                         </p>
                       </div>
 
