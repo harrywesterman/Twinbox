@@ -238,7 +238,9 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'TF_VAR_proxmox_password' in text
     assert '--arg proxmox_password "$PROXMOX_PASSWORD"' not in text
     assert 'proxmox_password: $proxmox_password' not in text
-    assert '--argjson vm_node_map "${VM_NODE_MAP:-{}}"' in text
+    assert 'normalize_json_object()' in text
+    assert 'vm_node_map_json="$(normalize_json_object "${VM_NODE_MAP:-{}}")"' in text
+    assert '--argjson vm_node_map "$vm_node_map_json"' in text
     assert 'vm_node_map: $vm_node_map' in text
     assert 'json_array_from_csv()' in text
     assert 'json_array_from_csv "${DNS_SERVERS:-1.1.1.1,1.0.0.1}"' in text
@@ -304,6 +306,9 @@ def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
     assert 'split(",")' in text
     assert 'map(gsub("^\\\\s+|\\\\s+$"; ""))' in text
     assert 'map(select(length > 0))' in text
+    assert 'normalize_json_object()' in text
+    assert 'vm_node_map_json="$(normalize_json_object "${VM_NODE_MAP:-{}}")"' in text
+    assert '--argjson vm_node_map "$vm_node_map_json"' in text
     assert 'wait_for_talos_api()' in text
     assert 'bootstrap_cluster()' in text
     assert 'sync_user_kubeconfig()' in text

@@ -250,6 +250,27 @@ json_array_from_csv() {
   '
 }
 
+normalize_json_object() {
+  local raw="${1:-}"
+
+  if [[ -z "$raw" ]]; then
+    printf '{}'
+    return 0
+  fi
+
+  if ! jq -e . >/dev/null 2>&1 <<<"$raw"; then
+    printf '{}'
+    return 0
+  fi
+
+  if [[ "$(jq -r 'type' <<<"$raw")" != "object" ]]; then
+    printf '{}'
+    return 0
+  fi
+
+  jq -c '.' <<<"$raw"
+}
+
 flatten_ipv4_candidates() {
   jq -r '
     flatten
@@ -597,6 +618,7 @@ planned_controlplane_ips_json="$(node_array "ip" "controlplane")"
 planned_worker_ips_json="$(node_array "ip" "worker")"
 controlplane_vm_ids_json="$(node_array "vmid" "controlplane")"
 worker_vm_ids_json="$(node_array "vmid" "worker")"
+vm_node_map_json="$(normalize_json_object "${VM_NODE_MAP:-{}}")"
 
 if [[ -f "$work_module_dir/terraform.tfstate" ]]; then
   log "Reusing existing OpenTofu workspace at ${work_module_dir}"
@@ -619,7 +641,7 @@ jq -n \
   --arg talos_version "$PINNED_TALOS_VERSION" \
   --arg talos_image_local_path "$talos_image_local_path" \
   --arg talos_image_cache_key "$image_cache_key" \
-  --argjson vm_node_map "${VM_NODE_MAP:-{}}" \
+  --argjson vm_node_map "$vm_node_map_json" \
   --argjson dns_servers "$(json_array_from_csv "${DNS_SERVERS:-1.1.1.1,1.0.0.1}")" \
   --argjson prefix "${NODE_PREFIX_LENGTH:-24}" \
   --argjson nodes "$nodes_json" \
