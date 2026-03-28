@@ -290,7 +290,8 @@ bitwarden_pod="$(
 [[ -n "$bitwarden_pod" ]] || fail "Unable to find the Bitwarden CLI pod in ${BITWARDEN_NAMESPACE}"
 
 bitwarden_session="$(
-  kubectl -n "$BITWARDEN_NAMESPACE" exec "$bitwarden_pod" -- /bin/bash -lc 'printf %s "$BW_SESSION"'
+  kubectl -n "$BITWARDEN_NAMESPACE" exec "$bitwarden_pod" -- /bin/bash -lc \
+    "tr '\0' '\n' < /proc/1/environ | sed -n 's/^BW_SESSION=//p' | tail -n 1"
 )"
 [[ -n "$bitwarden_session" ]] || fail "Unable to read BW_SESSION from the Bitwarden CLI pod"
 
