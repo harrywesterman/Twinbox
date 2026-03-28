@@ -476,6 +476,9 @@ def test_install_secret_sync_installs_eso_and_applies_secret_sync_manifests():
     assert '--bitwarden-namespace "$BITWARDEN_NAMESPACE"' in text
     assert '--from-literal=BW_SESSION="$cli_session"' not in text
     assert 'Authorization: "Bearer {{ .auth.session }}"' not in text
+    assert 'bitwarden_pod="$(' in text
+    assert 'bitwarden_session="$(' in text
+    assert 'Authorization: "Bearer ${bitwarden_session}"' in text
     assert 'external-secrets.io/type: webhook' not in text
     assert 'bitwarden-webhook-auth' not in text
     assert 'key: BW_SESSION' not in text

@@ -282,6 +282,18 @@ kubectl rollout status deployment/bitwarden-cli -n "$BITWARDEN_NAMESPACE" --time
 bash "$WORKSPACE_ROOT/scripts/manager/refresh-bitwarden-cli.sh" \
   --bitwarden-namespace "$BITWARDEN_NAMESPACE"
 
+bitwarden_pod="$(
+  kubectl -n "$BITWARDEN_NAMESPACE" get pod \
+    -l app.kubernetes.io/name=bitwarden-cli \
+    -o jsonpath='{.items[0].metadata.name}'
+)"
+[[ -n "$bitwarden_pod" ]] || fail "Unable to find the Bitwarden CLI pod in ${BITWARDEN_NAMESPACE}"
+
+bitwarden_session="$(
+  kubectl -n "$BITWARDEN_NAMESPACE" exec "$bitwarden_pod" -- /bin/bash -lc 'printf %s "$BW_SESSION"'
+)"
+[[ -n "$bitwarden_session" ]] || fail "Unable to read BW_SESSION from the Bitwarden CLI pod"
+
 kubectl apply -f - <<EOF
 apiVersion: external-secrets.io/v1
 kind: SecretStore
@@ -294,6 +306,7 @@ spec:
       url: "http://bitwarden-cli.${BITWARDEN_NAMESPACE}.svc.cluster.local:8087/object/item/{{ .remoteRef.key | urlquery }}"
       headers:
         Content-Type: application/json
+        Authorization: "Bearer ${bitwarden_session}"
       result:
         jsonPath: "$.data.login.{{ .remoteRef.property }}"
 ---
@@ -306,6 +319,8 @@ spec:
   provider:
     webhook:
       url: "http://bitwarden-cli.${BITWARDEN_NAMESPACE}.svc.cluster.local:8087/object/item/{{ .remoteRef.key | urlquery }}"
+      headers:
+        Authorization: "Bearer ${bitwarden_session}"
       result:
         jsonPath: "$.data.fields[?@.name==\"{{ .remoteRef.property }}\"].value"
 ---
