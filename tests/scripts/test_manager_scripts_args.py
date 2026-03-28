@@ -260,6 +260,7 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert '"$TOFU_BIN" -chdir="$work_module_dir" init -input=false' in text
     assert 'TOFU_PARALLELISM="${TOFU_PARALLELISM:-1}"' in text
     assert '"$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve -no-color -parallelism="$TOFU_PARALLELISM" -var-file="$tfvars_file"' in text
+    assert 'PROXMOX_UPLOAD_MAX_ATTEMPTS="${PROXMOX_UPLOAD_MAX_ATTEMPTS:-5}"' in text
     assert 'reboot_talos_node() {' in text
     assert 'talosctl reboot \\' in text
     assert 'Rebooting Talos nodes after disk-first switch' in text
@@ -285,6 +286,19 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'TALOS_IMAGE_DOWNLOAD_URL=' in text
     assert 'download_talos_image()' in text
     assert 'talos_image_local_path="$image_cache_dir/talos-${image_cache_key}.iso"' in text
+    assert 'talos_image_file_name="talos-${image_cache_key}.iso"' in text
+    assert 'proxmox_api_login()' in text
+    assert 'proxmox_upload_talos_image()' in text
+    assert 'proxmox_verify_talos_image()' in text
+    assert 'proxmox_talos_image_present()' in text
+    assert 'upload_talos_image_to_nodes()' in text
+    assert 'remove_legacy_talos_file_state()' in text
+    assert 'Uploading Talos ISO to Proxmox nodes:' in text
+    assert 'Uploaded Talos ISO to ${node}/${datastore}' in text
+    assert 'Talos ISO not visible after upload on ${node}/${datastore}' in text
+    assert 'Talos ISO already present on ${node}/${FILE_DATASTORE}: ${image_name}' in text
+    assert 'Removing legacy Talos ISO resources from OpenTofu state:' in text
+    assert 'state rm "${legacy_addresses[@]}"' in text
     assert 'controlplane_ipv4_addresses.value' in text
     assert 'worker_ipv4_addresses.value' in text
     assert 'flatten_ipv4_candidates' in text or 'flatten | .[]' in text
@@ -309,6 +323,17 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'json_array_from_csv()' in text
     assert 'json_array_from_csv "${DNS_SERVERS:-1.1.1.1,1.0.0.1}"' in text
     assert '--argjson prefix "${NODE_PREFIX_LENGTH:-24}"' in text
+    assert 'content=iso' in text
+    assert 'curl -ksS --show-error' in text
+    assert 'CSRFPreventionToken' in text
+    assert 'access/ticket' in text
+    assert 'storage/${datastore}/content' in text
+    assert 'Failed to obtain Proxmox API ticket' in text
+    assert 'retrying in ${delay}s' in text
+    assert 'failed permanently' in text
+    assert 'failed after ${PROXMOX_UPLOAD_MAX_ATTEMPTS} attempts' in text
+    assert 'expected_volid="${datastore}:iso/${image_name}"' in text
+    assert 'select(.volid == $volid and .content == "iso")' in text
 
 
 def test_longhorn_step_installs_pinned_chart_and_waits_for_health():
@@ -720,13 +745,12 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     main_text = _module_text()
     outputs_text = _module_outputs_text()
     assert 'resource "proxmox_virtual_environment_vm" "node"' in main_text
-    assert 'resource "proxmox_virtual_environment_file" "talos_nocloud"' in main_text
-    assert 'for_each     = local.talos_image_nodes' in main_text
-    assert 'content_type = "iso"' in main_text
-    assert 'source_file {' in main_text
-    assert 'path      = var.talos_image_local_path' in main_text
-    assert 'file_name = "talos-${var.talos_image_cache_key}.iso"' in main_text
-    assert 'node_name    = each.value' in main_text
+    assert 'resource "proxmox_virtual_environment_file" "talos_nocloud"' not in main_text
+    assert 'talos_image_nodes' not in main_text
+    assert 'content_type = "iso"' not in main_text
+    assert 'source_file {' not in main_text
+    assert 'path      = var.talos_image_local_path' not in main_text
+    assert 'node_name    = each.value' not in main_text
     assert 'machine   = "q35"' not in main_text
     assert 'boot_order = var.boot_from_disk ? ["virtio0"] : ["ide2", "virtio0"]' in main_text
     assert 'cdrom {' in main_text
@@ -734,10 +758,13 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     assert 'for_each = var.boot_from_disk ? [] : [1]' not in main_text
     assert 'validation {' not in _module_variables_text()
     assert 'vm_host_map = var.vm_node_map' in main_text
+    assert 'talos_image_file_name = "talos-${var.talos_image_cache_key}.iso"' in main_text
+    assert 'talos_image_file_id   = "${var.file_datastore}:iso/${local.talos_image_file_name}"' in main_text
     assert 'merge(' not in main_text
-    assert 'file_id   = proxmox_virtual_environment_file.talos_nocloud[local.vm_host_map[each.key]].id' in main_text
+    assert 'file_id   = local.talos_image_file_id' in main_text
     assert 'node_name = local.vm_host_map[each.key]' in main_text
     assert 'file_id      = proxmox_virtual_environment_file.talos_nocloud.id' not in main_text
+    assert 'remove_legacy_talos_file_state' not in main_text
     assert 'file_format  = "raw"' not in main_text
     assert 'agent {' in main_text
     assert 'wait_for_ip {' in main_text

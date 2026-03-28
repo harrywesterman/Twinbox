@@ -35,6 +35,7 @@ command -v "$NODE_BIN" >/dev/null 2>&1 || fail "node not found"
 export TF_IN_AUTOMATION=1
 export NO_COLOR=1
 TOFU_PARALLELISM="${TOFU_PARALLELISM:-1}"
+PROXMOX_UPLOAD_MAX_ATTEMPTS="${PROXMOX_UPLOAD_MAX_ATTEMPTS:-5}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -161,6 +162,170 @@ download_talos_image() {
   curl -fsSL --retry 3 --retry-delay 2 --output "$tmp_compressed" "$image_download_url"
   mv "$tmp_compressed" "$target_path"
   talos_image_local_path="$target_path"
+}
+
+proxmox_api_login() {
+  if [[ -n "${PROXMOX_TICKET_COOKIE:-}" && -n "${PROXMOX_CSRF_TOKEN:-}" ]]; then
+    return 0
+  fi
+
+  local auth_response=""
+  auth_response="$(
+    curl -ksS --fail \
+      --data-urlencode "username=${PROXMOX_USER}" \
+      --data-urlencode "password=${PROXMOX_PASSWORD}" \
+      "${TF_VAR_proxmox_endpoint}/api2/json/access/ticket"
+  )" || fail "Failed to obtain Proxmox API ticket from ${TF_VAR_proxmox_endpoint}"
+
+  PROXMOX_TICKET_COOKIE="PVEAuthCookie=$(jq -r '.data.ticket' <<<"$auth_response")"
+  PROXMOX_CSRF_TOKEN="$(jq -r '.data.CSRFPreventionToken' <<<"$auth_response")"
+
+  [[ -n "${PROXMOX_TICKET_COOKIE#PVEAuthCookie=}" ]] || fail "Proxmox API ticket response did not include a cookie"
+  [[ -n "$PROXMOX_CSRF_TOKEN" ]] || fail "Proxmox API ticket response did not include a CSRF token"
+}
+
+proxmox_get_storage_content() {
+  local node="$1"
+  local datastore="$2"
+
+  proxmox_api_login
+  curl -ksS --fail \
+    --cookie "$PROXMOX_TICKET_COOKIE" \
+    --header "CSRFPreventionToken: ${PROXMOX_CSRF_TOKEN}" \
+    "${TF_VAR_proxmox_endpoint}/api2/json/nodes/${node}/storage/${datastore}/content"
+}
+
+proxmox_upload_talos_image() {
+  local node="$1"
+  local datastore="$2"
+  local image_path="$3"
+  local image_name="$4"
+  local upload_url="${TF_VAR_proxmox_endpoint}/api2/json/nodes/${node}/storage/${datastore}/upload"
+  local attempt=1
+
+  while true; do
+    proxmox_api_login
+
+    local response_file=""
+    local response_body=""
+    local http_code=""
+    local curl_exit=0
+    response_file="$(mktemp)"
+
+    set +e
+    http_code="$(
+      curl -ksS --show-error \
+        --output "$response_file" \
+        --write-out '%{http_code}' \
+        --cookie "$PROXMOX_TICKET_COOKIE" \
+        --header "CSRFPreventionToken: ${PROXMOX_CSRF_TOKEN}" \
+        --form "content=iso" \
+        --form "filename=@${image_path};filename=${image_name}" \
+        "$upload_url"
+    )"
+    curl_exit=$?
+    set -e
+
+    response_body="$(tr -d '\r' <"$response_file" | head -c 500 || true)"
+    rm -f "$response_file"
+
+    if [[ "$curl_exit" -eq 0 && "$http_code" == 2* ]]; then
+      log "Uploaded Talos ISO to ${node}/${datastore}"
+      return 0
+    fi
+
+    local reason=""
+    if [[ "$curl_exit" -ne 0 ]]; then
+      reason="curl exit ${curl_exit}"
+    else
+      reason="HTTP ${http_code}"
+    fi
+
+    if [[ "$http_code" == 4* ]]; then
+      fail "Talos ISO upload to ${node}/${datastore} failed permanently (${reason}): ${response_body:-no response body}"
+    fi
+
+    if [[ "$attempt" -ge "$PROXMOX_UPLOAD_MAX_ATTEMPTS" ]]; then
+      fail "Talos ISO upload to ${node}/${datastore} failed after ${PROXMOX_UPLOAD_MAX_ATTEMPTS} attempts (${reason}): ${response_body:-no response body}"
+    fi
+
+    local delay=$((2 ** (attempt - 1)))
+    if [[ "$delay" -gt 30 ]]; then
+      delay=30
+    fi
+
+    log "Talos ISO upload to ${node}/${datastore} failed (${reason}); retrying in ${delay}s"
+    sleep "$delay"
+    attempt=$((attempt + 1))
+  done
+}
+
+proxmox_verify_talos_image() {
+  local node="$1"
+  local datastore="$2"
+  local image_name="$3"
+  local expected_volid="${datastore}:iso/${image_name}"
+  local content_json=""
+
+  content_json="$(proxmox_get_storage_content "$node" "$datastore")" || fail "Failed to read Proxmox storage content for ${node}/${datastore}"
+
+  if jq -e --arg volid "$expected_volid" '.data[]? | select(.volid == $volid and .content == "iso")' >/dev/null <<<"$content_json"; then
+    log "Verified Talos ISO on ${node}/${datastore}: ${expected_volid}"
+    return 0
+  fi
+
+  fail "Talos ISO not visible after upload on ${node}/${datastore}: ${expected_volid}"
+}
+
+proxmox_talos_image_present() {
+  local node="$1"
+  local datastore="$2"
+  local image_name="$3"
+  local expected_volid="${datastore}:iso/${image_name}"
+  local content_json=""
+
+  content_json="$(proxmox_get_storage_content "$node" "$datastore")" || return 1
+  jq -e --arg volid "$expected_volid" '.data[]? | select(.volid == $volid and .content == "iso")' >/dev/null <<<"$content_json"
+}
+
+upload_talos_image_to_nodes() {
+  local image_path="$1"
+  local image_name="$2"
+  local nodes_json="$3"
+  local node=""
+
+  while IFS= read -r node; do
+    [[ -n "$node" ]] || continue
+    if proxmox_talos_image_present "$node" "$FILE_DATASTORE" "$image_name"; then
+      log "Talos ISO already present on ${node}/${FILE_DATASTORE}: ${image_name}"
+      continue
+    fi
+    log "Uploading Talos ISO to ${node}"
+    proxmox_upload_talos_image "$node" "$FILE_DATASTORE" "$image_path" "$image_name"
+    proxmox_verify_talos_image "$node" "$FILE_DATASTORE" "$image_name"
+  done < <(jq -r '.[]' <<<"$nodes_json")
+}
+
+remove_legacy_talos_file_state() {
+  local workdir="$1"
+  local legacy_addresses=()
+  local address=""
+
+  while IFS= read -r address; do
+    [[ -n "$address" ]] || continue
+    legacy_addresses+=("$address")
+  done < <(
+    "$TOFU_BIN" -chdir="$workdir" state list 2>/dev/null \
+      | grep '^proxmox_virtual_environment_file.talos_nocloud' \
+      || true
+  )
+
+  if [[ ${#legacy_addresses[@]} -eq 0 ]]; then
+    return 0
+  fi
+
+  log "Removing legacy Talos ISO resources from OpenTofu state: ${legacy_addresses[*]}"
+  "$TOFU_BIN" -chdir="$workdir" state rm "${legacy_addresses[@]}"
 }
 
 next_ip() {
@@ -687,6 +852,7 @@ sync_user_talosconfig() {
 
 talos_image_local_path="$image_cache_dir/talos-${image_cache_key}.iso"
 download_talos_image "$talos_image_local_path"
+talos_image_file_name="talos-${image_cache_key}.iso"
 
 nodes_json="$(generate_nodes_json)"
 planned_controlplane_ips_json="$(node_array "ip" "controlplane")"
@@ -707,6 +873,10 @@ if [[ "$(jq -r 'length' <<<"$vm_node_map_json")" -eq 0 ]]; then
 fi
 validate_vm_node_map
 log_vm_node_map
+
+target_nodes_json="$(jq -nc --arg proxmox_node "$PROXMOX_NODE" --argjson vm_node_map "$vm_node_map_json" '([ $proxmox_node ] + ($vm_node_map | to_entries | map(.value))) | unique')"
+log "Uploading Talos ISO to Proxmox nodes: $(jq -r 'join(", ")' <<<"$target_nodes_json")"
+upload_talos_image_to_nodes "$talos_image_local_path" "$talos_image_file_name" "$target_nodes_json"
 
 if [[ -f "$work_module_dir/terraform.tfstate" ]]; then
   log "Reusing existing OpenTofu workspace at ${work_module_dir}"
@@ -757,10 +927,9 @@ log "Talos host map: $(jq -c '.vm_node_map' "$tfvars_file")"
 
 log "Preparing OpenTofu module"
 "$TOFU_BIN" -chdir="$work_module_dir" init -input=false -no-color
+remove_legacy_talos_file_state "$work_module_dir"
 log "Creating Proxmox VMs"
-# Serialize the Proxmox file uploads and VM creates. The Talos ISO upload to a
-# single target node has been observed to fail with EOF when the Proxmox
-# provider starts multiple node uploads in parallel.
+# File uploads are handled explicitly above so the provider only creates VMs.
 "$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve -no-color -parallelism="$TOFU_PARALLELISM" -var-file="$tfvars_file"
 
 tf_outputs_json="$("$TOFU_BIN" -chdir="$work_module_dir" output -json -no-color)"
