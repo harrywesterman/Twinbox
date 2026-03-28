@@ -140,6 +140,104 @@ def test_secret_broker_auto_seeds_missing_proxmox_item():
         assert '"password":"super-secret"' in item_json
 
 
+def test_secret_broker_refreshes_once_on_missing_item_before_failing():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        bin_dir = root / "bin"
+        state_dir = root / "state"
+        appdata_dir = root / "appdata"
+        bin_dir.mkdir(parents=True, exist_ok=True)
+        state_dir.mkdir(parents=True, exist_ok=True)
+        appdata_dir.mkdir(parents=True, exist_ok=True)
+
+        bw_script = bin_dir / "bw"
+        bw_script.write_text(
+            "#!/bin/sh\n"
+            "set -eu\n"
+            f"state_dir='{state_dir}'\n"
+            f"sync_count_file='{root / 'sync-count'}'\n"
+            "mkdir -p \"$state_dir\"\n"
+            "cmd=\"${1:-}\"\n"
+            "subcmd=\"${2:-}\"\n"
+            "sync_count='0'\n"
+            "if [ -f \"$sync_count_file\" ]; then\n"
+            "  sync_count=\"$(cat \"$sync_count_file\")\"\n"
+            "fi\n"
+            "case \"$cmd $subcmd\" in\n"
+            "  'config server')\n"
+            "    exit 0\n"
+            "    ;;\n"
+            "  'status ')\n"
+            "    printf '{\"status\":\"unauthenticated\"}'\n"
+            "    exit 0\n"
+            "    ;;\n"
+            "  'login --apikey')\n"
+            "    exit 0\n"
+            "    ;;\n"
+            "  'unlock --passwordfile')\n"
+            "    printf 'session-123'\n"
+            "    exit 0\n"
+            "    ;;\n"
+            "  'sync --session')\n"
+            "    sync_count=\"$((sync_count + 1))\"\n"
+            "    printf '%s' \"$sync_count\" > \"$sync_count_file\"\n"
+            "    exit 0\n"
+            "    ;;\n"
+            "  'list items')\n"
+            "    if [ \"$sync_count\" -lt 2 ]; then\n"
+            "      printf '[]'\n"
+            "    else\n"
+            "      printf '[{\"id\":\"item-1\",\"name\":\"twinbox/global/proxmox\",\"login\":{\"username\":\"root@pam\",\"password\":\"super-secret\"},\"fields\":[{\"name\":\"host\",\"value\":\"192.168.1.10\",\"type\":0},{\"name\":\"port\",\"value\":\"8006\",\"type\":0},{\"name\":\"endpoint\",\"value\":\"https://192.168.1.10:8006\",\"type\":0}]}]'\n"
+            "    fi\n"
+            "    exit 0\n"
+            "    ;;\n"
+            "esac\n"
+            "printf 'unexpected bw invocation: %s %s\\n' \"$cmd\" \"$subcmd\" >&2\n"
+            "exit 1\n",
+            encoding="utf-8",
+        )
+        bw_script.chmod(0o755)
+
+        for name, value in {
+            "vaultwarden-client-id": "client-id",
+            "vaultwarden-client-secret": "client-secret",
+            "vaultwarden-password": "vault-password",
+        }.items():
+            (root / name).write_text(value, encoding="utf-8")
+
+        env = os.environ.copy()
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+        env["BITWARDENCLI_APPDATA_DIR"] = str(appdata_dir)
+        env["TWINBOX_SECRET_BACKEND"] = "vaultwarden"
+        env["VAULTWARDEN_SERVER_URL"] = "http://vaultwarden:80"
+        env["VAULTWARDEN_CLIENTID_FILE"] = str(root / "vaultwarden-client-id")
+        env["VAULTWARDEN_CLIENTSECRET_FILE"] = str(root / "vaultwarden-client-secret")
+        env["VAULTWARDEN_PASSWORD_FILE"] = str(root / "vaultwarden-password")
+
+        proc = subprocess.run(
+            [
+                "node",
+                "--input-type=module",
+                "-e",
+                (
+                    "import { createSecretBroker } from './lib/secrets/broker.mjs';\n"
+                    "const broker = createSecretBroker(process.env);\n"
+                    "const value = broker.resolveTextRef({ scope: 'global', item: 'proxmox', field: 'endpoint' });\n"
+                    "console.log(value);\n"
+                ),
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert proc.returncode == 0, proc.stderr
+        assert proc.stdout.strip() == "https://192.168.1.10:8006"
+        assert (root / "sync-count").read_text(encoding="utf-8").strip() == "2"
+
+
 def test_secret_broker_materializes_file_secrets_under_manager_data_dir():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)

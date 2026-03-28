@@ -58,6 +58,7 @@ The Management VM uses these values to bring up Vaultwarden on the trusted LAN a
 Cluster-scoped follow-up steps such as `install-secret-sync` and `install-argocd` run against an explicit `cluster_id` supplied by the UI, so the manager runtime does not infer a target cluster from filesystem timestamps.
 Route-level secrets such as the Traefik dashboard basic-auth secret, the Wiredoor gateway token, and the Grafana admin credentials are also projected from Vaultwarden-backed refs before their Argo CD Applications are enabled.
 When the worker finishes Talos bootstrap for a cluster, it also mirrors the generated client configs into `/home/twinbox/.kube/config` and `/home/twinbox/.talos/config` on the Management VM so the `twinbox` operator account can use `kubectl` and `talosctl` without a manual copy step.
+When a new Vaultwarden-backed app or secret is introduced, `scripts/manager/refresh-bitwarden-cli.sh` can force the in-cluster Bitwarden CLI bridge to sync immediately instead of waiting for the next session refresh or TTL-based lookup.
 
 Tooling version notes:
 

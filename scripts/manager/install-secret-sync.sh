@@ -279,6 +279,9 @@ EOF
 
 kubectl rollout status deployment/bitwarden-cli -n "$BITWARDEN_NAMESPACE" --timeout=180s
 
+bash "$WORKSPACE_ROOT/scripts/manager/refresh-bitwarden-cli.sh" \
+  --bitwarden-namespace "$BITWARDEN_NAMESPACE"
+
 kubectl apply -f - <<EOF
 apiVersion: external-secrets.io/v1
 kind: SecretStore

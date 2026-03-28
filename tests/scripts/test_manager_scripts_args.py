@@ -10,6 +10,7 @@ PROVISION_NODES_SCRIPT = REPO_ROOT / "categories" / "talos-cluster" / "steps" / 
 MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "main.tf"
 MODULE_OUTPUTS = REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "outputs.tf"
 INSTALL_SECRET_SYNC_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-secret-sync.sh"
+REFRESH_BITWARDEN_CLI_SCRIPT = REPO_ROOT / "scripts" / "manager" / "refresh-bitwarden-cli.sh"
 ARGO_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-argocd.sh"
 ARGO_STEP_SCRIPT = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
 ENABLE_ARGOCD_APPS_SCRIPT = REPO_ROOT / "scripts" / "manager" / "enable-argocd-apps.sh"
@@ -73,6 +74,10 @@ def _module_variables_text() -> str:
 
 def _install_secret_sync_text() -> str:
     return INSTALL_SECRET_SYNC_SCRIPT.read_text(encoding="utf-8")
+
+
+def _refresh_bitwarden_cli_text() -> str:
+    return REFRESH_BITWARDEN_CLI_SCRIPT.read_text(encoding="utf-8")
 
 
 def _argo_manager_text() -> str:
@@ -439,6 +444,8 @@ def test_install_secret_sync_installs_eso_and_applies_secret_sync_manifests():
     assert 'bw sync --session "\\${BW_SESSION}" >/dev/null' in text
     assert 'kubectl rollout status deployment/external-secrets-webhook -n "$OPERATOR_NAMESPACE" --timeout=180s' in text
     assert 'kubectl rollout status deployment/external-secrets-cert-controller -n "$OPERATOR_NAMESPACE" --timeout=180s' in text
+    assert 'bash "$WORKSPACE_ROOT/scripts/manager/refresh-bitwarden-cli.sh" \\' in text
+    assert '--bitwarden-namespace "$BITWARDEN_NAMESPACE"' in text
     assert '--from-literal=BW_SESSION="$cli_session"' not in text
     assert 'Authorization: "Bearer {{ .auth.session }}"' not in text
     assert 'external-secrets.io/type: webhook' not in text
@@ -475,6 +482,20 @@ def test_install_secret_sync_installs_eso_and_applies_secret_sync_manifests():
     assert 'port: 8087' in text
     assert 'wget' not in text
     assert 'KUBECONFIG_FILE is required' in text
+
+
+def test_refresh_bitwarden_cli_script_replays_login_and_sync_against_the_running_pod():
+    text = _refresh_bitwarden_cli_text()
+    assert 'Usage: $0 [--bitwarden-namespace NAME] [--deployment NAME]' in text
+    assert 'BITWARDEN_NAMESPACE="bitwarden"' in text
+    assert 'DEPLOYMENT_NAME="bitwarden-cli"' in text
+    assert 'kubectl -n "$BITWARDEN_NAMESPACE" get pod' in text
+    assert 'app.kubernetes.io/name="$DEPLOYMENT_NAME"' in text
+    assert 'Refreshing Bitwarden CLI sync state in pod' in text
+    assert 'bw config server "${BW_HOST}"' in text
+    assert 'bw login --apikey >/dev/null' in text
+    assert 'export BW_SESSION="$(bw unlock --passwordenv BW_PASSWORD --raw)"' in text
+    assert 'bw sync --session "${BW_SESSION}" >/dev/null' in text
 
 
 def test_argo_manager_script_requires_kubeconfig_and_calls_gitops_bootstrap():

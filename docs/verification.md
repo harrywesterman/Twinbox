@@ -83,6 +83,7 @@ kubectl --kubeconfig <materialized-kubeconfig> get pods -n external-secrets
 kubectl --kubeconfig <materialized-kubeconfig> get pods -n bitwarden
 kubectl --kubeconfig <materialized-kubeconfig> get networkpolicy -n bitwarden
 kubectl --kubeconfig <materialized-kubeconfig> get deployment bitwarden-cli -n bitwarden -o yaml | grep -E 'runAsNonRoot|allowPrivilegeEscalation|capabilities|seccompProfile|BITWARDENCLI_APPDATA_DIR|emptyDir'
+KUBECONFIG_FILE=<materialized-kubeconfig> bash scripts/manager/refresh-bitwarden-cli.sh
 kubectl --kubeconfig <materialized-kubeconfig> get pods -n external-secrets -o wide
 kubectl --kubeconfig <materialized-kubeconfig> get pods -n bitwarden -o wide
 kubectl --kubeconfig <materialized-kubeconfig> get secretstores,externalsecrets,secrets -n twinbox-system
@@ -98,6 +99,7 @@ Expected:
 - `SecretStore` resources present in `twinbox-system`.
 - `ExternalSecret/proxmox-bootstrap` ready.
 - `Secret/proxmox-bootstrap` present.
+- Running the refresh helper immediately re-syncs the in-cluster Bitwarden CLI bridge when new Vaultwarden-backed items need to be picked up.
 
 For `install-argocd`:
 

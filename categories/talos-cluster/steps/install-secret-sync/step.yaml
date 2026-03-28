@@ -4,7 +4,7 @@ type: action
 journey_stage: setup
 order: 20
 summary: Connect Vaultwarden to Talos and sync the first Vaultwarden-backed Kubernetes Secret.
-explanation: Twinbox installs External Secrets Operator, deploys a Bitwarden CLI bridge that talks to Vaultwarden, and creates a namespaced SecretStore plus one ExternalSecret for the Proxmox bootstrap secret.
+explanation: Twinbox installs External Secrets Operator, deploys a Bitwarden CLI bridge that talks to Vaultwarden, and creates a namespaced SecretStore plus one ExternalSecret for the Proxmox bootstrap secret. The bridge can also be refreshed explicitly for new Vaultwarden-backed apps or secrets.
 side_help: Kubernetes Secrets remain derived artifacts. Vaultwarden stays the source of truth.
 depends_on:
   - provision-nodes
