@@ -479,6 +479,9 @@ def test_install_secret_sync_installs_eso_and_applies_secret_sync_manifests():
     assert 'bitwarden_pod="$(' in text
     assert 'bitwarden_session="$(' in text
     assert 'Authorization: "Bearer ${bitwarden_session}"' in text
+    assert 'bw get item "$proxmox_item_id" --session "$session"' in text
+    assert 'kubectl create secret generic "$TARGET_SECRET_NAME" \\' in text
+    assert 'ExternalSecret/${EXTERNAL_SECRET_NAME} configured; ${TARGET_SECRET_NAME} was materialized directly from Vaultwarden' in text
     assert 'external-secrets.io/type: webhook' not in text
     assert 'bitwarden-webhook-auth' not in text
     assert 'key: BW_SESSION' not in text

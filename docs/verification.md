@@ -97,8 +97,8 @@ Expected:
 - `bitwarden-cli` deployment shows restricted-compatible `securityContext` and writable appdata.
 - `external-secrets`, `external-secrets-webhook`, `external-secrets-cert-controller`, and `bitwarden-cli` all run on the control-plane node.
 - `SecretStore` resources present in `twinbox-system`.
-- `ExternalSecret/proxmox-bootstrap` ready.
 - `Secret/proxmox-bootstrap` present.
+- `ExternalSecret/proxmox-bootstrap` may still reconcile in the background, but the bootstrap secret itself must already exist.
 - Running the refresh helper immediately re-syncs the in-cluster Bitwarden CLI bridge when new Vaultwarden-backed items need to be picked up.
 
 For `install-argocd`:

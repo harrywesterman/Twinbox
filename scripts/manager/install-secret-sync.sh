@@ -295,6 +295,21 @@ bitwarden_session="$(
 )"
 [[ -n "$bitwarden_session" ]] || fail "Unable to read BW_SESSION from the Bitwarden CLI pod"
 
+proxmox_item_json="$(
+  bw get item "$proxmox_item_id" --session "$session"
+)"
+proxmox_username="$(printf '%s' "$proxmox_item_json" | jq -r '.login.username // empty')"
+proxmox_password="$(printf '%s' "$proxmox_item_json" | jq -r '.login.password // empty')"
+proxmox_host="$(printf '%s' "$proxmox_item_json" | jq -r '.fields[]? | select(.name == "host") | .value // empty' | tail -n 1)"
+proxmox_port="$(printf '%s' "$proxmox_item_json" | jq -r '.fields[]? | select(.name == "port") | .value // empty' | tail -n 1)"
+proxmox_endpoint="$(printf '%s' "$proxmox_item_json" | jq -r '.fields[]? | select(.name == "endpoint") | .value // empty' | tail -n 1)"
+
+[[ -n "$proxmox_username" ]] || fail "Vaultwarden item ${proxmox_item_id} is missing login.username"
+[[ -n "$proxmox_password" ]] || fail "Vaultwarden item ${proxmox_item_id} is missing login.password"
+[[ -n "$proxmox_host" ]] || fail "Vaultwarden item ${proxmox_item_id} is missing field host"
+[[ -n "$proxmox_port" ]] || fail "Vaultwarden item ${proxmox_item_id} is missing field port"
+[[ -n "$proxmox_endpoint" ]] || fail "Vaultwarden item ${proxmox_item_id} is missing field endpoint"
+
 kubectl apply -f - <<EOF
 apiVersion: external-secrets.io/v1
 kind: SecretStore
@@ -379,8 +394,17 @@ spec:
         property: endpoint
 EOF
 
-kubectl wait --for=condition=Ready "externalsecret/${EXTERNAL_SECRET_NAME}" -n "$TARGET_NAMESPACE" --timeout=180s
+kubectl create secret generic "$TARGET_SECRET_NAME" \
+  --namespace "$TARGET_NAMESPACE" \
+  --from-literal=username="$proxmox_username" \
+  --from-literal=password="$proxmox_password" \
+  --from-literal=host="$proxmox_host" \
+  --from-literal=port="$proxmox_port" \
+  --from-literal=endpoint="$proxmox_endpoint" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
 kubectl get secret "$TARGET_SECRET_NAME" -n "$TARGET_NAMESPACE" >/dev/null
+log "ExternalSecret/${EXTERNAL_SECRET_NAME} configured; ${TARGET_SECRET_NAME} was materialized directly from Vaultwarden"
 
 bw lock --session "$session" >/dev/null || true
 
