@@ -559,7 +559,7 @@ def test_grafana_admin_credentials_are_vaultwarden_backed():
     assert 'kind: Application' in grafana_secret_app_text
     assert 'grafana-secret' in grafana_secret_app_text
     assert 'kind: SecretStore' in grafana_secretstore_text
-    assert 'object/item/266a9922-e2a3-4ee0-a53f-7874d9b42ab4' in grafana_secretstore_text
+    assert 'object/item/ea9461a9-bffa-4a30-9cc0-3585b78360b1' in grafana_secretstore_text
     assert 'kind: ExternalSecret' in grafana_externalsecret_text
     assert 'admin-user' in grafana_externalsecret_text
     assert 'admin-password' in grafana_externalsecret_text
