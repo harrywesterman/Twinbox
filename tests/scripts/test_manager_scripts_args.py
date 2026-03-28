@@ -538,7 +538,7 @@ def test_routes_and_wiredoor_secrets_are_vaultwarden_backed():
     assert 'secretKey: users' in traefik_externalsecret_text
     assert 'kind: SecretStore' in wiredoor_secretstore_text
     assert 'name: wiredoor-gateway-fields' in wiredoor_secretstore_text
-    assert 'object/item/a9a65879-b67b-47e0-b0c2-5e9d30e978ca' in wiredoor_secretstore_text
+    assert 'http://192.168.2.54:8080/api/secrets/{{ .remoteRef.key }}' in wiredoor_secretstore_text
     assert '$.data.login.{{ .remoteRef.property }}' in wiredoor_secretstore_text
     assert 'kind: ExternalSecret' in wiredoor_externalsecret_text
     assert 'name: wiredoor-gateway' in wiredoor_externalsecret_text

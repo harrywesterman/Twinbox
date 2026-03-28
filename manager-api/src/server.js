@@ -22,7 +22,11 @@ import {
 } from "./lib/common.js";
 import { queueJob } from "./lib/jobs.js";
 import { createSecretBroker } from "../../lib/secrets/broker.mjs";
-import { buildProxmoxApiSecretBundle, normalizeSecretBundle } from "../../lib/secrets/schema.mjs";
+import {
+  buildProxmoxApiSecretBundle,
+  normalizeSecretBaseRef,
+  normalizeSecretBundle,
+} from "../../lib/secrets/schema.mjs";
 
 const app = express();
 const port = Number(process.env.MANAGER_API_PORT || 8080);
@@ -697,8 +701,61 @@ function writeStepState(stepId, patch) {
   return next;
 }
 
+function parseSecretKeyPath(secretKeyPath) {
+  const segments = String(secretKeyPath || "")
+    .split("/")
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  if (segments.length < 3) {
+    throw new Error("secret key must include a prefix, scope, and item");
+  }
+
+  const [, scope, ...rest] = segments;
+  if (!scope) {
+    throw new Error("secret scope is required");
+  }
+
+  if (scope === "cluster") {
+    const [clusterId, ...itemParts] = rest;
+    const item = itemParts.join("/");
+    if (!clusterId || !item) {
+      throw new Error("cluster secret key must include a cluster id and item");
+    }
+    return normalizeSecretBaseRef({
+      scope,
+      cluster_id: clusterId,
+      item,
+    });
+  }
+
+  const item = rest.join("/");
+  if (!item) {
+    throw new Error("secret item is required");
+  }
+
+  return normalizeSecretBaseRef({
+    scope,
+    item,
+  });
+}
+
 app.get("/api/health", (_, res) => {
   res.json({ ok: true, time: now() });
+});
+
+app.get("/api/secrets/*", (req, res) => {
+  const secretKeyPath = decodeURIComponent(String(req.originalUrl || "").split("/api/secrets/")[1] || "");
+
+  try {
+    const ref = parseSecretKeyPath(secretKeyPath);
+    const item = secretBroker.getItem(ref);
+    return res.json({ data: item });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "failed to resolve secret";
+    const status = message.includes("not found") ? 404 : 400;
+    return res.status(status).json({ error: message });
+  }
 });
 
 app.get("/api/proxmox/cluster-resources", async (_, res) => {
