@@ -524,6 +524,7 @@ def test_routes_and_wiredoor_secrets_are_vaultwarden_backed():
     assert 'users: |' not in routes_values_text
     assert 'enabled: trueß∑' not in traefik_values_text
     assert 'enabled: true' in traefik_values_text
+    assert 'existingSecret: wiredoor-gateway' in wiredoor_gateway_values_text
     assert 'token:' not in wiredoor_gateway_values_text
     assert 'argocd.argoproj.io/sync-wave: "0"' in traefik_app_text
     assert 'argocd.argoproj.io/sync-wave: "1"' in routes_app_text

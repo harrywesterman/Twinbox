@@ -35,6 +35,7 @@ def test_bootstrap_vaultwarden_script_bootstraps_registration_and_api_key_headle
     assert "/api/accounts/api-key" in text
     assert 'item_name="${VAULTWARDEN_ITEM_PREFIX:-twinbox}/global/proxmox"' in text
     assert 'item_name="${VAULTWARDEN_ITEM_PREFIX:-twinbox}/global/grafana"' in text
+    assert 'item_name="${VAULTWARDEN_ITEM_PREFIX:-twinbox}/global/wiredoor-gateway"' in text
     assert "seed" in text.lower()
     assert "vaultwarden-ready" in text
 
@@ -64,6 +65,7 @@ def test_bootstrap_vaultwarden_script_requires_seeded_proxmox_item_before_ready_
     probe_section = text.split("probe_vaultwarden_access() {", 1)[1].split("password_login() {", 1)[0]
     seed_section = text.split("seed_proxmox_item() {", 1)[1].split("disable_signups() {", 1)[0]
     grafana_seed_section = text.split("seed_grafana_item() {", 1)[1].split("disable_signups() {", 1)[0]
+    wiredoor_seed_section = text.split("seed_wiredoor_gateway_item() {", 1)[1].split("disable_signups() {", 1)[0]
 
     assert 'item_name="${VAULTWARDEN_ITEM_PREFIX:-twinbox}/global/proxmox"' in probe_section
     assert 'bw list items --session "$session" --search "$item_name"' in probe_section
@@ -71,6 +73,10 @@ def test_bootstrap_vaultwarden_script_requires_seeded_proxmox_item_before_ready_
     assert 'item_name="${VAULTWARDEN_ITEM_PREFIX:-twinbox}/global/proxmox"' in seed_section
     assert 'item_name="${VAULTWARDEN_ITEM_PREFIX:-twinbox}/global/grafana"' in grafana_seed_section
     assert 'grafana_password="$(openssl rand -hex 16)"' in grafana_seed_section
+    assert 'item_name="${VAULTWARDEN_ITEM_PREFIX:-twinbox}/global/wiredoor-gateway"' in wiredoor_seed_section
+    assert 'wiredoor_url="https://wiredoor.bierineenweek.nl"' in wiredoor_seed_section
+    assert 'wiredoor_token="$(openssl rand -hex 16)"' in wiredoor_seed_section
+    assert '"name":"url","value":$url,"type":0' in wiredoor_seed_section
 
 
 def test_bootstrap_vaultwarden_script_parses_multiline_bitwarden_context():

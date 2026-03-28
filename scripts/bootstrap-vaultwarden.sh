@@ -500,6 +500,42 @@ seed_grafana_item() {
   log "Seeded ${item_name}"
 }
 
+seed_wiredoor_gateway_item() {
+  local item_name="${VAULTWARDEN_ITEM_PREFIX:-twinbox}/global/wiredoor-gateway"
+  local item_json=""
+  local template_json=""
+  local wiredoor_url="https://wiredoor.bierineenweek.nl"
+  local wiredoor_token=""
+
+  if bw list items --session "$BW_SESSION" --search "$item_name" | jq -e --arg name "$item_name" '.[] | select(.name == $name)' >/dev/null; then
+    log "Wiredoor gateway item already exists"
+    return 0
+  fi
+
+  wiredoor_token="$(openssl rand -hex 16)"
+  template_json="$(bw get template item --session "$BW_SESSION")"
+  item_json="$(printf '%s\n' "$template_json" | jq \
+    --arg name "$item_name" \
+    --arg url "$wiredoor_url" \
+    --arg username "wiredoor" \
+    --arg password "$wiredoor_token" \
+    --arg token "$wiredoor_token" \
+    '
+      .name = $name
+      | .type = 1
+      | .login.username = $username
+      | .login.password = $password
+      | .fields = [
+          {"name":"url","value":$url,"type":0},
+          {"name":"token","value":$token,"type":0}
+        ]
+      | .notes = "Seeded by Twinbox bootstrap"
+    ')"
+
+  printf '%s\n' "$item_json" | bw encode | bw create item --session "$BW_SESSION" >/dev/null
+  log "Seeded ${item_name}"
+}
+
 disable_signups() {
   if grep -q '^VAULTWARDEN_SIGNUPS_ALLOWED=' "$ENV_FILE"; then
     sed -i 's/^VAULTWARDEN_SIGNUPS_ALLOWED=.*/VAULTWARDEN_SIGNUPS_ALLOWED=false/' "$ENV_FILE"
@@ -545,6 +581,7 @@ main() {
   bw sync --session "$BW_SESSION" >/dev/null
   seed_proxmox_item
   seed_grafana_item
+  seed_wiredoor_gateway_item
   disable_signups
   restart_vaultwarden
   write_ready_file
