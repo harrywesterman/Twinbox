@@ -465,11 +465,29 @@ detect_existing_cluster_resources() {
     EXISTING_VM_NODES+=("$node")
     EXISTING_VM_NAMES+=("$name")
     EXISTING_VM_TAGS+=("$tags")
-  done < <(printf '%s\n' "$cluster_vms" | jq -r --arg cluster_tag "$CLUSTER_VM_TAG" --arg cluster_prefix "$CLUSTER_VM_PREFIX" '
-    (.data // .)[]
-    | select((.name // "" | startswith($cluster_prefix)) or (.tags // "" | split(";") | any(. == $cluster_tag)))
-    | [.vmid, .node, .name, (.tags // "")] | @tsv
-  ')
+  done < <(
+    python3 -c '
+import json
+import sys
+
+cluster_tag = sys.argv[1]
+cluster_prefix = sys.argv[2]
+raw = sys.stdin.read().strip()
+if not raw:
+    sys.exit(0)
+
+payload = json.loads(raw)
+rows = payload.get("data", payload) if isinstance(payload, dict) else payload
+for item in rows:
+    if not isinstance(item, dict):
+        continue
+    name = str(item.get("name", "") or "")
+    tags = str(item.get("tags", "") or "")
+    if not (name.startswith(cluster_prefix) or cluster_tag in tags.split(";")):
+        continue
+    print("{}\t{}\t{}\t{}".format(item.get("vmid", ""), item.get("node", ""), name, tags))
+' "$CLUSTER_VM_TAG" "$CLUSTER_VM_PREFIX" <<<"$cluster_vms"
+  )
 
   progress_update "Checking cluster" "Checking cluster access"
   if pveum user list 2>/dev/null | awk 'NR>1 {print $1}' | grep -Fxq "$PROXMOX_USER"; then
