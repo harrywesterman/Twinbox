@@ -583,20 +583,6 @@ wait_for_talos_api() {
   fail "Timed out waiting for Talos API on ${label} at ${candidate}"
 }
 
-reboot_talos_node() {
-  local label="$1"
-  local ip="$2"
-
-  log "Rebooting Talos ${label} at ${ip}"
-  talosctl reboot \
-    --nodes "$ip" \
-    --endpoints "$ip" \
-    --talosconfig "$talosconfig_file" \
-    --timeout 15m \
-    --wait
-  wait_for_talos_api "$label" "$ip"
-}
-
 write_node_patch() {
   local name="$1"
   local type="$2"
@@ -1020,26 +1006,7 @@ tmp_tfvars="$(mktemp)"
 jq '. + {boot_from_disk: true}' "$tfvars_file" > "$tmp_tfvars"
 mv "$tmp_tfvars" "$tfvars_file"
 "$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve -no-color -parallelism="$TOFU_PARALLELISM" -var-file="$tfvars_file"
-
-log "Rebooting Talos nodes after disk-first switch"
-controlplane_apply_index=0
-worker_apply_index=0
-while IFS=$'\t' read -r name type ip; do
-  [[ -n "$name" ]] || continue
-  if [[ "$type" == "controlplane" ]]; then
-    reboot_talos_node "$name" "${discovered_controlplane_ips[$controlplane_apply_index]:-$ip}"
-    controlplane_apply_index=$((controlplane_apply_index + 1))
-  else
-    reboot_talos_node "$name" "${discovered_worker_ips[$worker_apply_index]:-$ip}"
-    worker_apply_index=$((worker_apply_index + 1))
-  fi
-done < <(jq -r '
-    to_entries
-    | sort_by(.key)
-    | .[]
-    | [.key, .value.type, .value.ip]
-    | @tsv
-  ' <<<"$nodes_json")
+log "Disk-first boot order applied; Talos nodes will boot from disk on the next cold VM restart"
 
 tmp="$(mktemp)"
 jq \

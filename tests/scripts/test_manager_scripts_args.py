@@ -261,9 +261,10 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'TOFU_PARALLELISM="${TOFU_PARALLELISM:-1}"' in text
     assert '"$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve -no-color -parallelism="$TOFU_PARALLELISM" -var-file="$tfvars_file"' in text
     assert 'PROXMOX_UPLOAD_MAX_ATTEMPTS="${PROXMOX_UPLOAD_MAX_ATTEMPTS:-5}"' in text
-    assert 'reboot_talos_node() {' in text
-    assert 'talosctl reboot \\' in text
-    assert 'Rebooting Talos nodes after disk-first switch' in text
+    assert 'reboot_talos_node() {' not in text
+    assert 'talosctl reboot \\' not in text
+    assert 'Rebooting Talos nodes after disk-first switch' not in text
+    assert 'Disk-first boot order applied; Talos nodes will boot from disk on the next cold VM restart' in text
     assert 'command -v talosctl' in text
     assert 'export TF_IN_AUTOMATION=1' in text
     assert 'export NO_COLOR=1' in text
