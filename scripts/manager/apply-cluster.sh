@@ -34,6 +34,7 @@ NODE_BIN="${NODE_BIN:-node}"
 command -v "$NODE_BIN" >/dev/null 2>&1 || fail "node not found"
 export TF_IN_AUTOMATION=1
 export NO_COLOR=1
+TOFU_PARALLELISM="${TOFU_PARALLELISM:-1}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -721,7 +722,10 @@ log "Talos host map: $(jq -c '.vm_node_map' "$tfvars_file")"
 log "Preparing OpenTofu module"
 "$TOFU_BIN" -chdir="$work_module_dir" init -input=false -no-color
 log "Creating Proxmox VMs"
-"$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve -no-color -var-file="$tfvars_file"
+# Serialize the Proxmox file uploads and VM creates. The Talos ISO upload to a
+# single target node has been observed to fail with EOF when the Proxmox
+# provider starts multiple node uploads in parallel.
+"$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve -no-color -parallelism="$TOFU_PARALLELISM" -var-file="$tfvars_file"
 
 tf_outputs_json="$("$TOFU_BIN" -chdir="$work_module_dir" output -json -no-color)"
 controlplane_ipv4_candidates_json="$(jq -c '.controlplane_ipv4_addresses.value // []' <<<"$tf_outputs_json")"
@@ -808,7 +812,7 @@ sync
 tmp_tfvars="$(mktemp)"
 jq '. + {boot_from_disk: true}' "$tfvars_file" > "$tmp_tfvars"
 mv "$tmp_tfvars" "$tfvars_file"
-"$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve -no-color -var-file="$tfvars_file"
+"$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve -no-color -parallelism="$TOFU_PARALLELISM" -var-file="$tfvars_file"
 
 tmp="$(mktemp)"
 jq \

@@ -964,20 +964,25 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
       return res.status(400).json({ error: built.error });
     }
 
-    try {
-      const allocation = await validateRequestedAllocation({
-        startVmid: built.cluster.start_vmid,
-        vipIp: built.cluster.vip_ip,
-        startIp: built.cluster.start_ip,
-        nodeCount: built.cluster.controlplane_count + built.cluster.worker_count,
-      });
-      if (!allocation.ok) {
-        return res.status(400).json({ error: allocation.error });
+    const clusterFile = path.join(dirs.clusters, `${built.cluster.id}.json`);
+    const isRetry = fs.existsSync(clusterFile);
+
+    if (!isRetry) {
+      try {
+        const allocation = await validateRequestedAllocation({
+          startVmid: built.cluster.start_vmid,
+          vipIp: built.cluster.vip_ip,
+          startIp: built.cluster.start_ip,
+          nodeCount: built.cluster.controlplane_count + built.cluster.worker_count,
+        });
+        if (!allocation.ok) {
+          return res.status(400).json({ error: allocation.error });
+        }
+      } catch (e) {
+        return res.status(500).json({
+          error: e instanceof Error ? e.message : "failed to validate allocation",
+        });
       }
-    } catch (e) {
-      return res.status(500).json({
-        error: e instanceof Error ? e.message : "failed to validate allocation",
-      });
     }
 
     persistCluster(dirs, built.cluster);
