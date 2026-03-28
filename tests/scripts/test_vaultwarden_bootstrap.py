@@ -75,10 +75,12 @@ def test_bootstrap_vaultwarden_script_requires_seeded_proxmox_item_before_ready_
     assert 'grafana_password="$(openssl rand -hex 16)"' in grafana_seed_section
     assert 'item_name="${VAULTWARDEN_ITEM_PREFIX:-twinbox}/global/wiredoor-gateway"' in wiredoor_seed_section
     assert 'wiredoor_url="https://wiredoor.bierineenweek.nl"' in wiredoor_seed_section
+    assert 'local wiredoor_token=""' in wiredoor_seed_section
     assert '.login.username = $username' in wiredoor_seed_section
     assert '.login.password = $password' in wiredoor_seed_section
     assert '"name":"url","value":$url,"type":0' in wiredoor_seed_section
     assert '"name":"token","value":$token,"type":0' in wiredoor_seed_section
+    assert 'wiredoor_token="$(openssl rand -hex 16)"' not in wiredoor_seed_section
 
 
 def test_bootstrap_vaultwarden_script_parses_multiline_bitwarden_context():

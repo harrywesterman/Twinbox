@@ -740,6 +740,35 @@ function parseSecretKeyPath(secretKeyPath) {
   });
 }
 
+function resolveSecretValue(item, source, property) {
+  const resolvedSource = String(source || "login").trim() || "login";
+  const resolvedProperty = String(property || "").trim();
+
+  if (!resolvedProperty) {
+    throw new Error("secret property is required");
+  }
+
+  if (resolvedSource === "login") {
+    const value = item?.login?.[resolvedProperty];
+    if (typeof value !== "string" || !value.trim()) {
+      throw new Error(`secret login property ${resolvedProperty} is not available`);
+    }
+    return value;
+  }
+
+  if (resolvedSource === "field") {
+    const fields = Array.isArray(item?.fields) ? item.fields : [];
+    const match = fields.find((field) => String(field?.name || "").trim() === resolvedProperty);
+    const value = match?.value;
+    if (typeof value !== "string" || !value.trim()) {
+      throw new Error(`secret field ${resolvedProperty} is not available`);
+    }
+    return value;
+  }
+
+  throw new Error(`unsupported secret source ${resolvedSource}`);
+}
+
 app.get("/api/health", (_, res) => {
   res.json({ ok: true, time: now() });
 });
@@ -754,6 +783,23 @@ app.get("/api/secrets/*", (req, res) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "failed to resolve secret";
     const status = message.includes("not found") ? 404 : 400;
+    return res.status(status).json({ error: message });
+  }
+});
+
+app.get("/api/secret-values/*", (req, res) => {
+  const secretKeyPath = decodeURIComponent(String(req.path || "").split("/api/secret-values/")[1] || "");
+  const source = pickFirstString(req.query.source) || "login";
+  const property = pickFirstString(req.query.property);
+
+  try {
+    const ref = parseSecretKeyPath(secretKeyPath);
+    const item = secretBroker.getItem(ref);
+    const value = resolveSecretValue(item, source, property);
+    return res.json({ value });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "failed to resolve secret value";
+    const status = message.includes("not found") || message.includes("not available") ? 404 : 400;
     return res.status(status).json({ error: message });
   }
 });

@@ -521,9 +521,6 @@ seed_wiredoor_gateway_item() {
     if [[ -z "$current_password" ]]; then
       current_password="$(printf '%s\n' "$current_item_json" | jq -r '.fields[]? | select(.name == "token") | .value' | head -n1)"
     fi
-    if [[ -z "$current_password" ]]; then
-      current_password="$(openssl rand -hex 16)"
-    fi
 
     template_json="$(printf '%s\n' "$current_item_json" | jq \
       --arg name "$item_name" \
@@ -547,7 +544,6 @@ seed_wiredoor_gateway_item() {
     return 0
   fi
 
-  wiredoor_token="$(openssl rand -hex 16)"
   template_json="$(bw get template item --session "$BW_SESSION")"
   item_json="$(printf '%s\n' "$template_json" | jq \
     --arg name "$item_name" \
