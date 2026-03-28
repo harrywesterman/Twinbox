@@ -7,7 +7,7 @@ summary: Install Longhorn storage with a pinned Helm chart version and wait for 
 explanation: Twinbox installs Longhorn as a dedicated storage add-on after Argo CD, pins the chart to the newest stable release, and waits until the Longhorn application reports Synced and Healthy before the step completes.
 side_help: Storage remains a separate setup phase so later workload installers can depend on persistent volumes only after Longhorn is actually ready.
 depends_on:
-  - install-argocd
+  - install-wiredoor-gateway
 inputs: []
 secrets:
   files:

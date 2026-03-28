@@ -1,0 +1,18 @@
+ingressRoutes:
+  - name: grafana
+    namespace: monitoring
+    entryPoints:
+      - websecure
+    match: "Host(`grafana.bierineenweek.nl`)"
+    service:
+      name: grafana
+      port: 80
+    tls: true
+  - name: grafana-wiredoor
+    namespace: monitoring
+    entryPoints:
+      - webwiredoor
+    match: "Host(`grafana.bierineenweek.nl`)"
+    service:
+      name: grafana
+      port: 80

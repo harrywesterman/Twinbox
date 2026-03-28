@@ -1,0 +1,21 @@
+id: install-whoami
+title: Install Whoami
+type: action
+journey_stage: setup
+order: 31
+summary: Enable the Whoami app and its routes as a separate Argo package.
+explanation: Twinbox keeps Whoami out of the initial root tree so Argo CD can first become healthy on core infrastructure. This step then enables the Whoami application and its route bundle and waits until both child applications report Synced and Healthy.
+side_help: Whoami is the first optional workload after Argo CD and serves as the smallest validation that the app-activation flow works.
+depends_on:
+  - install-argocd
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/install-whoami/run.sh

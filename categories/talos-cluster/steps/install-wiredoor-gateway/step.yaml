@@ -2,13 +2,13 @@ id: install-wiredoor-gateway
 title: Install Wiredoor gateway
 type: action
 journey_stage: setup
-order: 80
-summary: Placeholder step for gateway installation.
-explanation: This wizard step is reserved for future Wiredoor gateway work and does not run a real cluster action yet.
-side_help: Gateway setup is staged after DNS so the wizard reads like a real operational bootstrap sequence.
+order: 34
+summary: Enable the Wiredoor gateway, its secret bootstrap, and its route bundle.
+explanation: Wiredoor gateway now runs as a distinct optional step after Grafana so the bootstrap flow stays focused. This step activates the gateway secret application, the gateway chart itself, and the wiredoor route bundle, then waits for the child applications to report Synced and Healthy.
+side_help: The gateway is split out so Wiredoor no longer bloats the initial root sync tree and remains a clearly visible activation step.
 depends_on:
-  - configure-cloudflare-dns
+  - install-grafana
 inputs: []
 runner:
   kind: script
-  script: categories/talos-cluster/steps/_placeholder/run.sh
+  script: categories/talos-cluster/steps/install-wiredoor-gateway/run.sh

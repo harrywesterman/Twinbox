@@ -1,0 +1,26 @@
+ingressRoutes:
+  - name: whoami
+    namespace: default
+    entryPoints:
+      - websecure
+    match: "Host(`whoami.bierineenweek.nl`)"
+    service:
+      name: whoami
+      port: 80
+    tls: true
+  - name: whoami-wiredoor
+    namespace: default
+    entryPoints:
+      - webwiredoor
+    match: "Host(`whoami.bierineenweek.nl`)"
+    service:
+      name: whoami
+      port: 80
+  - name: wiredoor-validation
+    namespace: default
+    entryPoints:
+      - webwiredoor
+    match: "PathPrefix(`/`)"
+    service:
+      name: whoami
+      port: 80

@@ -1,8 +1,5 @@
 domain: bierineenweek.nl
 
 hosts:
-  whoami: whoami
   argocd: argocd
-  grafana: grafana
   traefik: traefik
-  headlamp: headlamp

@@ -44,11 +44,14 @@ function buildCatalog(stepStatuses = {}) {
     ['provision-nodes', 'Deploy Talos Cluster', { status: 'ready', dependsOn: [] }],
     ['install-secret-sync', 'Install Vaultwarden', { dependsOn: ['provision-nodes'] }],
     ['install-argocd', 'Install Argo CD', { dependsOn: ['install-secret-sync'] }],
-    ['install-longhorn-storage', 'Install Longhorn storage', { dependsOn: ['install-argocd'] }],
+    ['install-whoami', 'Install Whoami', { dependsOn: ['install-argocd'] }],
+    ['install-headlamp', 'Install Headlamp', { dependsOn: ['install-whoami'] }],
+    ['install-grafana', 'Install Grafana', { dependsOn: ['install-headlamp'] }],
+    ['install-wiredoor-gateway', 'Install Wiredoor gateway', { dependsOn: ['install-grafana'] }],
+    ['install-longhorn-storage', 'Install Longhorn storage', { dependsOn: ['install-wiredoor-gateway'] }],
     ['install-authentik-idp', 'Install Authentik IDP', { dependsOn: ['install-longhorn-storage'] }],
     ['create-users-and-groups', 'Create Users and Groups', { dependsOn: ['install-authentik-idp'] }],
     ['configure-cloudflare-dns', 'Configure Cloudflare DNS', { dependsOn: ['create-users-and-groups'] }],
-    ['install-wiredoor-gateway', 'Install Wiredoor gateway', { dependsOn: ['configure-cloudflare-dns'] }],
     ['install-homepage-dashboard', 'Install Homepage dashboard', { dependsOn: ['install-wiredoor-gateway'] }],
     ['install-management-consoles', 'Install Management consoles', { dependsOn: ['install-homepage-dashboard'] }],
     ['install-velero-backup', 'Install Velero backup', { dependsOn: ['install-management-consoles'] }],
@@ -111,11 +114,11 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   });
 
   assert.equal(model.mode, 'setup');
-  assert.equal(model.stepRail.length, 24);
+  assert.equal(model.stepRail.length, 27);
   assert.equal(model.stepRail[0].title, 'Deploy Talos Cluster');
   assert.equal(model.stepRail[0].isCurrent, true);
   assert.equal(model.primaryAction.label, 'Start step 1');
-  assert.equal(model.progress.totalSteps, 24);
+  assert.equal(model.progress.totalSteps, 27);
   assert.equal(model.progress.completedSteps, 0);
   assert.equal(model.activity.runtime.currentStage, 'Applying cluster plan');
 });
@@ -147,11 +150,14 @@ test('wizard model switches to manage mode when setup flow is complete', () => {
         'provision-nodes',
         'install-secret-sync',
         'install-argocd',
+        'install-whoami',
+        'install-headlamp',
+        'install-grafana',
+        'install-wiredoor-gateway',
         'install-longhorn-storage',
         'install-authentik-idp',
         'create-users-and-groups',
         'configure-cloudflare-dns',
-        'install-wiredoor-gateway',
         'install-homepage-dashboard',
         'install-management-consoles',
         'install-velero-backup',
@@ -198,16 +204,19 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     selectedStepId: '',
   });
 
-  assert.equal(model.stepRail.length, 24);
+  assert.equal(model.stepRail.length, 27);
   assert.deepEqual(model.stepRail.map((step) => step.id), [
     'provision-nodes',
     'install-secret-sync',
     'install-argocd',
+    'install-whoami',
+    'install-headlamp',
+    'install-grafana',
+    'install-wiredoor-gateway',
     'install-longhorn-storage',
     'install-authentik-idp',
     'create-users-and-groups',
     'configure-cloudflare-dns',
-    'install-wiredoor-gateway',
     'install-homepage-dashboard',
     'install-management-consoles',
     'install-velero-backup',

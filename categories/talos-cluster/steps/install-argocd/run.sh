@@ -20,7 +20,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \
     --arg cluster_id "$cluster_id" \
     --arg root_application "root" \
-    --argjson root_applications '["whoami","headlamp","traefik","grafana-secret","routes","wiredoor-gateway-secret","grafana","wiredoor-gateway"]' \
+    --argjson root_applications '["traefik","routes"]' \
     '{
       cluster_id: $cluster_id,
       root_application: $root_application,

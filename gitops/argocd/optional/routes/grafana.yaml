@@ -1,23 +1,25 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: headlamp
+  name: grafana-routes
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   project: default
   sources:
-    - repoURL: https://kubernetes-sigs.github.io/headlamp/
-      chart: headlamp
-      targetRevision: "0.29.1"
+    - repoURL: https://github.com/harrywesterman/Twinbox.git
+      targetRevision: main
+      path: gitops/optional-routes
       helm:
         valueFiles:
-          - $values/gitops/values/headlamp.yaml
+          - $values/gitops/values/optional-routes/grafana.yaml
     - repoURL: https://github.com/harrywesterman/Twinbox.git
       targetRevision: main
       ref: values
   destination:
     server: https://kubernetes.default.svc
-    namespace: kube-system
+    namespace: monitoring
   syncPolicy:
     automated:
       prune: true

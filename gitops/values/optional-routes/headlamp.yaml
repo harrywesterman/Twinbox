@@ -1,0 +1,18 @@
+ingressRoutes:
+  - name: headlamp
+    namespace: kube-system
+    entryPoints:
+      - websecure
+    match: "Host(`headlamp.bierineenweek.nl`)"
+    service:
+      name: my-headlamp
+      port: 80
+    tls: true
+  - name: headlamp-wiredoor
+    namespace: kube-system
+    entryPoints:
+      - webwiredoor
+    match: "Host(`headlamp.bierineenweek.nl`)"
+    service:
+      name: my-headlamp
+      port: 80

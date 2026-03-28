@@ -106,11 +106,14 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "provision-nodes",
                 "install-secret-sync",
                 "install-argocd",
+                "install-whoami",
+                "install-headlamp",
+                "install-grafana",
+                "install-wiredoor-gateway",
                 "install-longhorn-storage",
                 "install-authentik-idp",
                 "create-users-and-groups",
                 "configure-cloudflare-dns",
-                "install-wiredoor-gateway",
                 "install-homepage-dashboard",
                 "install-management-consoles",
                 "install-velero-backup",
@@ -129,7 +132,11 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-jitsi",
             ]
             assert talos["steps"][1]["title"] == "Connect Vaultwarden to Talos"
-            assert talos["steps"][3]["title"] == "Install Longhorn Storage"
+            assert talos["steps"][3]["title"] == "Install Whoami"
+            assert talos["steps"][4]["title"] == "Install Headlamp"
+            assert talos["steps"][5]["title"] == "Install Grafana"
+            assert talos["steps"][6]["title"] == "Install Wiredoor gateway"
+            assert talos["steps"][7]["title"] == "Install Longhorn Storage"
             assert talos["steps"][0]["journey_stage"] == "setup"
             assert talos["steps"][0]["status"] == "ready"
             assert talos["steps"][1]["status"] == "locked"

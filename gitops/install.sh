@@ -41,14 +41,8 @@ retry() {
 
 control_plane_tolerations='[{"key":"node-role.kubernetes.io/control-plane","operator":"Exists","effect":"NoSchedule"},{"key":"node-role.kubernetes.io/master","operator":"Exists","effect":"NoSchedule"}]'
 root_applications=(
-  "whoami"
-  "headlamp"
   "traefik"
   "routes"
-  "grafana-secret"
-  "grafana"
-  "wiredoor-gateway-secret"
-  "wiredoor-gateway"
 )
 
 patch_argocd_workload_tolerations() {
@@ -179,7 +173,7 @@ wait_for_application_ready() {
 wait_for_root_applications() {
   local application
 
-  log "Waiting for root applications to become Synced and Healthy"
+  log "Waiting for core root applications to become Synced and Healthy"
   for application in "${root_applications[@]}"; do
     wait_for_application_ready "$application"
   done
@@ -197,6 +191,6 @@ patch_argocd_repo_server_copyutil
 
 wait_for_argocd_workloads
 
-log "Applying full Argo root application"
+log "Applying core Argo root application"
 retry 3 10 kubectl apply --validate=false -f "$WORKSPACE_ROOT/gitops/argocd/root.yaml"
 wait_for_root_applications

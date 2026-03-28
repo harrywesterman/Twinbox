@@ -12,26 +12,41 @@ MODULE_OUTPUTS = REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "outputs.t
 INSTALL_SECRET_SYNC_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-secret-sync.sh"
 ARGO_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-argocd.sh"
 ARGO_STEP_SCRIPT = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
+ENABLE_ARGOCD_APPS_SCRIPT = REPO_ROOT / "scripts" / "manager" / "enable-argocd-apps.sh"
 LONGHORN_STEP_SCRIPT = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-longhorn-storage" / "run.sh"
 LONGHORN_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-longhorn-storage" / "step.yaml"
+WHOAMI_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-whoami" / "step.yaml"
+HEADLAMP_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-headlamp" / "step.yaml"
+GRAFANA_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-grafana" / "step.yaml"
+WIREDOOR_GATEWAY_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-wiredoor-gateway" / "step.yaml"
 ARGO_BOOTSTRAP_SCRIPT = REPO_ROOT / "gitops" / "install.sh"
 ARGO_ROOT = REPO_ROOT / "gitops" / "argocd" / "root.yaml"
 LONGHORN_APPLICATION = REPO_ROOT / "gitops" / "longhorn" / "application.yaml"
 WHOAMI_DEPLOYMENT = REPO_ROOT / "gitops" / "apps" / "whoami" / "deployment.yaml"
 HEADLAMP_VALUES = REPO_ROOT / "gitops" / "values" / "headlamp.yaml"
 ROUTES_VALUES = REPO_ROOT / "gitops" / "values" / "routes.yaml"
+OPTIONAL_ROUTES_CHART = REPO_ROOT / "gitops" / "optional-routes" / "templates" / "ingressroutes.yaml"
+WHOAMI_ROUTES_VALUES = REPO_ROOT / "gitops" / "values" / "optional-routes" / "whoami.yaml"
+HEADLAMP_ROUTES_VALUES = REPO_ROOT / "gitops" / "values" / "optional-routes" / "headlamp.yaml"
+GRAFANA_ROUTES_VALUES = REPO_ROOT / "gitops" / "values" / "optional-routes" / "grafana.yaml"
+WIREDOOR_GATEWAY_ROUTES_VALUES = REPO_ROOT / "gitops" / "values" / "optional-routes" / "wiredoor-gateway.yaml"
 TRAEFIK_VALUES = REPO_ROOT / "gitops" / "values" / "traefik.yaml"
 WIREDOOR_GATEWAY_VALUES = REPO_ROOT / "gitops" / "values" / "wiredoor-gateway.yaml"
 GRAFANA_VALUES = REPO_ROOT / "gitops" / "values" / "grafana.yaml"
 TRAEFIK_APP = REPO_ROOT / "gitops" / "argocd" / "apps" / "traefik.yaml"
 ROUTES_APP = REPO_ROOT / "gitops" / "argocd" / "apps" / "routes.yaml"
-WIREDOOR_GATEWAY_APP = REPO_ROOT / "gitops" / "argocd" / "apps" / "wiredoor-gateway.yaml"
-WIREDOOR_GATEWAY_SECRET_APP = REPO_ROOT / "gitops" / "argocd" / "apps" / "wiredoor-gateway-secret.yaml"
+WHOAMI_APP = REPO_ROOT / "gitops" / "argocd" / "optional" / "apps" / "whoami.yaml"
+WHOAMI_ROUTES_APP = REPO_ROOT / "gitops" / "argocd" / "optional" / "routes" / "whoami.yaml"
+HEADLAMP_APP = REPO_ROOT / "gitops" / "argocd" / "optional" / "apps" / "headlamp.yaml"
+HEADLAMP_ROUTES_APP = REPO_ROOT / "gitops" / "argocd" / "optional" / "routes" / "headlamp.yaml"
+WIREDOOR_GATEWAY_APP = REPO_ROOT / "gitops" / "argocd" / "optional" / "apps" / "wiredoor-gateway.yaml"
+WIREDOOR_GATEWAY_SECRET_APP = REPO_ROOT / "gitops" / "argocd" / "optional" / "apps" / "wiredoor-gateway-secret.yaml"
+WIREDOOR_GATEWAY_ROUTES_APP = REPO_ROOT / "gitops" / "argocd" / "optional" / "routes" / "wiredoor-gateway.yaml"
 TRAEFIK_DASHBOARD_SECRETSTORE = REPO_ROOT / "gitops" / "routes" / "templates" / "traefik-dashboard-secretstore.yaml"
 TRAEFIK_DASHBOARD_EXTERNALSECRET = REPO_ROOT / "gitops" / "routes" / "templates" / "traefik-dashboard-externalsecret.yaml"
 WIREDOOR_GATEWAY_SECRETSTORE = REPO_ROOT / "gitops" / "apps" / "wiredoor-gateway-secret" / "secretstore.yaml"
 WIREDOOR_GATEWAY_EXTERNALSECRET = REPO_ROOT / "gitops" / "apps" / "wiredoor-gateway-secret" / "externalsecret.yaml"
-GRAFANA_SECRET_APP = REPO_ROOT / "gitops" / "argocd" / "apps" / "grafana-secret.yaml"
+GRAFANA_SECRET_APP = REPO_ROOT / "gitops" / "argocd" / "optional" / "apps" / "grafana-secret.yaml"
 GRAFANA_SECRETSTORE = REPO_ROOT / "gitops" / "apps" / "grafana-secret" / "secretstore.yaml"
 GRAFANA_EXTERNALSECRET = REPO_ROOT / "gitops" / "apps" / "grafana-secret" / "externalsecret.yaml"
 
@@ -62,6 +77,10 @@ def _argo_manager_text() -> str:
 
 def _argo_step_text() -> str:
     return ARGO_STEP_SCRIPT.read_text(encoding="utf-8")
+
+
+def _enable_argocd_apps_text() -> str:
+    return ENABLE_ARGOCD_APPS_SCRIPT.read_text(encoding="utf-8")
 
 
 def _longhorn_step_text() -> str:
@@ -98,6 +117,26 @@ def _headlamp_values_text() -> str:
 
 def _routes_values_text() -> str:
     return ROUTES_VALUES.read_text(encoding="utf-8")
+
+
+def _optional_routes_chart_text() -> str:
+    return OPTIONAL_ROUTES_CHART.read_text(encoding="utf-8")
+
+
+def _whoami_routes_values_text() -> str:
+    return WHOAMI_ROUTES_VALUES.read_text(encoding="utf-8")
+
+
+def _headlamp_routes_values_text() -> str:
+    return HEADLAMP_ROUTES_VALUES.read_text(encoding="utf-8")
+
+
+def _grafana_routes_values_text() -> str:
+    return GRAFANA_ROUTES_VALUES.read_text(encoding="utf-8")
+
+
+def _wiredoor_gateway_routes_values_text() -> str:
+    return WIREDOOR_GATEWAY_ROUTES_VALUES.read_text(encoding="utf-8")
 
 
 def _traefik_values_text() -> str:
@@ -149,7 +188,7 @@ def _grafana_secret_app_text() -> str:
 
 
 def _grafana_app_text() -> str:
-    return (REPO_ROOT / "gitops" / "argocd" / "apps" / "grafana.yaml").read_text(encoding="utf-8")
+    return (REPO_ROOT / "gitops" / "argocd" / "optional" / "apps" / "grafana.yaml").read_text(encoding="utf-8")
 
 
 def _grafana_secretstore_text() -> str:
@@ -462,11 +501,13 @@ def test_argo_bootstrap_script_installs_argocd_and_applies_full_root_application
     assert 'wait_for_statefulset_rollout "statefulset/argocd-application-controller"' in text
     assert 'statefulset/argocd-application-controller' not in wait_section
     assert 'root_applications=(' in text
-    assert '"whoami"' in text
-    assert '"wiredoor-gateway"' in text
+    assert '"traefik"' in text
+    assert '"routes"' in text
+    assert '"whoami"' not in text
+    assert '"wiredoor-gateway"' not in text
     assert 'wait_for_application_ready()' in text
     assert 'wait_for_root_applications()' in text
-    assert 'Waiting for root applications to become Synced and Healthy' in text
+    assert 'Waiting for core root applications to become Synced and Healthy' in text
     assert 'kubectl -n argocd get application "$application" -o json' in text
     assert '.status.sync.status // "Unknown"' in text
     assert '.status.health.status // "Unknown"' in text
@@ -474,8 +515,24 @@ def test_argo_bootstrap_script_installs_argocd_and_applies_full_root_application
     assert 'deployment/argocd-applicationset-controller' in text
     assert 'deployment/argocd-repo-server' in text
     assert 'statefulset/argocd-application-controller' in text
-    assert 'Applying full Argo root application' in text
+    assert 'Applying core Argo root application' in text
     assert 'kubectl apply --validate=false -f "$WORKSPACE_ROOT/gitops/argocd/root.yaml"' in text
+
+
+def test_enable_argocd_apps_script_maps_optional_apps_and_waits_for_health():
+    text = _enable_argocd_apps_text()
+
+    assert 'Usage: $0 --cluster-id ID --enabled-apps CSV --applications CSV' in text
+    assert 'Applying optional Argo application ${application}' in text
+    assert 'Waiting for application/${application}: sync=${sync_status}, health=${health_status}, phase=${operation_phase}' in text
+    assert 'whoami-routes' in text
+    assert 'headlamp-routes' in text
+    assert 'grafana-secret' in text
+    assert 'grafana-routes' in text
+    assert 'wiredoor-gateway-secret' in text
+    assert 'wiredoor-gateway-routes' in text
+    assert 'enabled_optional_apps' in text
+    assert 'reduce $enabled_apps[] as $app' in text
 
 
 def test_bootstrap_apps_tolerate_single_node_control_plane():
@@ -502,17 +559,50 @@ def test_argo_full_root_includes_full_tree():
 def test_install_argocd_step_waits_for_root_app_tree():
     text = (REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "step.yaml").read_text(encoding="utf-8")
 
-    assert 'summary: Install Argo CD and wait for the full application tree to become healthy.' in text
+    assert 'summary: Install Argo CD and wait for the core root application tree to become healthy.' in text
     assert 'report Synced and Healthy' in text
-    assert 'whoami, headlamp, traefik, routes, grafana-secret, grafana, wiredoor-gateway-secret, and wiredoor-gateway' in text
+    assert 'traefik and routes' in text
+    assert 'Optional applications such as Whoami, Headlamp, Grafana, and Wiredoor are enabled later as separate wizard steps.' in text
+
+
+def test_optional_step_manifests_chain_the_enabled_apps_flow():
+    whoami_text = WHOAMI_STEP_MANIFEST.read_text(encoding="utf-8")
+    headlamp_text = HEADLAMP_STEP_MANIFEST.read_text(encoding="utf-8")
+    grafana_text = GRAFANA_STEP_MANIFEST.read_text(encoding="utf-8")
+    wiredoor_text = WIREDOOR_GATEWAY_STEP_MANIFEST.read_text(encoding="utf-8")
+
+    assert 'order: 31' in whoami_text
+    assert 'install-argocd' in whoami_text
+    assert 'script: categories/talos-cluster/steps/install-whoami/run.sh' in whoami_text
+
+    assert 'order: 32' in headlamp_text
+    assert 'install-whoami' in headlamp_text
+    assert 'script: categories/talos-cluster/steps/install-headlamp/run.sh' in headlamp_text
+
+    assert 'order: 33' in grafana_text
+    assert 'install-headlamp' in grafana_text
+    assert 'script: categories/talos-cluster/steps/install-grafana/run.sh' in grafana_text
+
+    assert 'order: 34' in wiredoor_text
+    assert 'install-grafana' in wiredoor_text
+    assert 'script: categories/talos-cluster/steps/install-wiredoor-gateway/run.sh' in wiredoor_text
 
 
 def test_routes_and_wiredoor_secrets_are_vaultwarden_backed():
     traefik_app_text = _traefik_app_text()
     routes_app_text = _routes_app_text()
+    whoami_app_text = WHOAMI_APP.read_text(encoding="utf-8")
+    whoami_routes_app_text = WHOAMI_ROUTES_APP.read_text(encoding="utf-8")
+    headlamp_app_text = HEADLAMP_APP.read_text(encoding="utf-8")
+    headlamp_routes_app_text = HEADLAMP_ROUTES_APP.read_text(encoding="utf-8")
     wiredoor_gateway_app_text = _wiredoor_gateway_app_text()
     wiredoor_gateway_secret_app_text = _wiredoor_gateway_secret_app_text()
     routes_values_text = _routes_values_text()
+    optional_routes_chart_text = _optional_routes_chart_text()
+    whoami_routes_values_text = _whoami_routes_values_text()
+    headlamp_routes_values_text = _headlamp_routes_values_text()
+    grafana_routes_values_text = _grafana_routes_values_text()
+    wiredoor_gateway_routes_values_text = _wiredoor_gateway_routes_values_text()
     traefik_values_text = _traefik_values_text()
     wiredoor_gateway_values_text = _wiredoor_gateway_values_text()
     traefik_secretstore_text = _traefik_dashboard_secretstore_text()
@@ -520,16 +610,30 @@ def test_routes_and_wiredoor_secrets_are_vaultwarden_backed():
     wiredoor_secretstore_text = _wiredoor_gateway_secretstore_text()
     wiredoor_externalsecret_text = _wiredoor_gateway_externalsecret_text()
 
-    assert 'basicAuth:' not in routes_values_text
-    assert 'users: |' not in routes_values_text
+    assert 'whoami:' not in routes_values_text
+    assert 'headlamp:' not in routes_values_text
+    assert 'grafana:' not in routes_values_text
     assert 'enabled: trueß∑' not in traefik_values_text
     assert 'enabled: true' in traefik_values_text
     assert 'existingSecret: wiredoor-gateway' in wiredoor_gateway_values_text
     assert 'token:' not in wiredoor_gateway_values_text
     assert 'argocd.argoproj.io/sync-wave: "0"' in traefik_app_text
     assert 'argocd.argoproj.io/sync-wave: "1"' in routes_app_text
+    assert 'kind: Application' in whoami_app_text
+    assert 'kind: Application' in headlamp_app_text
+    assert 'path: gitops/optional-routes' in whoami_routes_app_text
+    assert 'whoami-routes' in whoami_routes_app_text
+    assert 'path: gitops/optional-routes' in headlamp_routes_app_text
+    assert 'headlamp-routes' in headlamp_routes_app_text
     assert 'argocd.argoproj.io/sync-wave: "0"' in wiredoor_gateway_secret_app_text
     assert 'argocd.argoproj.io/sync-wave: "1"' in wiredoor_gateway_app_text
+    assert 'argocd.argoproj.io/sync-wave: "2"' in WIREDOOR_GATEWAY_ROUTES_APP.read_text(encoding="utf-8")
+    assert 'kind: IngressRoute' in optional_routes_chart_text
+    assert 'ingressRoutes:' in whoami_routes_values_text
+    assert 'Host(`whoami.bierineenweek.nl`)' in whoami_routes_values_text
+    assert 'Host(`headlamp.bierineenweek.nl`)' in headlamp_routes_values_text
+    assert 'Host(`grafana.bierineenweek.nl`)' in grafana_routes_values_text
+    assert 'Host(`argocd.bierineenweek.nl`)' in wiredoor_gateway_routes_values_text
     assert 'kind: SecretStore' in traefik_secretstore_text
     assert 'name: traefik-dashboard-fields' in traefik_secretstore_text
     assert 'twinbox/global/traefik-dashboard' in traefik_secretstore_text

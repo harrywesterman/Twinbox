@@ -101,25 +101,25 @@ Expected:
 For `install-argocd`:
 
 ```bash
-kubectl --kubeconfig <materialized-kubeconfig> get application root -n argocd -o yaml | grep -E 'gitops/argocd/apps|whoami|headlamp|traefik|routes|wiredoor-gateway-secret|wiredoor-gateway|grafana-secret|grafana'
+kubectl --kubeconfig <materialized-kubeconfig> get application root -n argocd -o yaml | grep -E 'gitops/argocd/apps|traefik|routes'
 kubectl --kubeconfig <materialized-kubeconfig> get namespace argocd
-kubectl --kubeconfig <materialized-kubeconfig> get pods -A | egrep 'headlamp|whoami|traefik|grafana|wiredoor'
+kubectl --kubeconfig <materialized-kubeconfig> get pods -A | egrep 'traefik'
 ```
 
 Expected:
 
 - `argocd` namespace exists.
 - `Application/root` exists in `argocd`.
-- The root Application points at `gitops/argocd/apps` and covers the full application tree.
+- The root Application points at `gitops/argocd/apps` and covers only the core bootstrap tree.
 - Argo CD controller pods are scheduled and Running on the control-plane node, not stuck Pending on the node taint.
-- The `whoami` and `headlamp` bootstrap workloads are Running on the control-plane node, not stuck Pending on the node taint.
-- The `traefik`, `grafana`, and `wiredoor` workloads are also Running once the full root has synced.
+- The `traefik` and `routes` workloads are Running on the control-plane node, not stuck Pending on the node taint.
+- `whoami`, `headlamp`, `grafana`, and `wiredoor` are enabled later through separate wizard steps.
 
 For Grafana admin credentials:
 
 ```bash
 ! grep -q 'adminPassword:' gitops/values/grafana.yaml
-test -f gitops/argocd/apps/grafana-secret.yaml
+test -f gitops/argocd/optional/apps/grafana-secret.yaml
 test -f gitops/apps/grafana-secret/secretstore.yaml
 test -f gitops/apps/grafana-secret/externalsecret.yaml
 ```
@@ -128,7 +128,7 @@ Expected:
 
 - `gitops/values/grafana.yaml` no longer embeds a plaintext `adminPassword`.
 - The Grafana admin secret is managed through a Vaultwarden-backed `SecretStore`/`ExternalSecret` pair.
-- The Grafana secret Application exists alongside the other Argo CD app manifests.
+- The Grafana secret Application exists in the optional Argo app manifests.
 
 ## 8. Data Integrity
 

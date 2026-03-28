@@ -1,0 +1,21 @@
+id: install-grafana
+title: Install Grafana
+type: action
+journey_stage: setup
+order: 33
+summary: Enable Grafana, its secret bootstrap, and its routes as a separate phase.
+explanation: Grafana remains split into a secret bootstrap application, the Grafana chart itself, and a route bundle. This step activates those child applications in order and waits until they report Synced and Healthy.
+side_help: Grafana is now a distinct wizard step so the dashboard stack is clearly separated from the core platform bootstrap.
+depends_on:
+  - install-headlamp
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/install-grafana/run.sh
