@@ -662,7 +662,7 @@ if [[ "$(jq -r 'length' <<<"$vm_node_map_json")" -eq 0 ]]; then
     --arg host "$PROXMOX_NODE" \
     --argjson nodes "$nodes_json" \
     '
-      reduce (nodes | keys[]) as $name ({}; .[$name] = $host)
+      reduce ($nodes | keys[]) as $name ({}; .[$name] = $host)
     ')"
 fi
 validate_vm_node_map
