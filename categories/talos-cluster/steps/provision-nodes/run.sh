@@ -5,9 +5,19 @@ set -euo pipefail
 : "${MANAGER_DATA_DIR:?missing MANAGER_DATA_DIR}"
 
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
+cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
+cluster_file="$MANAGER_DATA_DIR/clusters/${cluster_id}.json"
+
+if [[ -f "$cluster_file" ]]; then
+  persisted_vm_node_map="$(jq -c '.vm_node_map // {}' "$cluster_file")"
+  current_vm_node_map="$(printf '%s' "$cluster_json" | jq -c '.vm_node_map // {}')"
+  if [[ "$current_vm_node_map" == "{}" && "$persisted_vm_node_map" != "{}" ]]; then
+    cluster_json="$(printf '%s' "$cluster_json" | jq --argjson vm_node_map "$persisted_vm_node_map" -c '.vm_node_map = $vm_node_map')"
+  fi
+fi
 
 bash scripts/manager/apply-cluster.sh \
-  --cluster-id "$(printf '%s' "$cluster_json" | jq -r '.id')" \
+  --cluster-id "$cluster_id" \
   --name "$(printf '%s' "$cluster_json" | jq -r '.name')" \
   --controlplane-count "$(printf '%s' "$cluster_json" | jq -r '.controlplane_count')" \
   --worker-count "$(printf '%s' "$cluster_json" | jq -r '.worker_count')" \

@@ -282,6 +282,10 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert '--arg proxmox_password "$PROXMOX_PASSWORD"' not in text
     assert 'proxmox_password: $proxmox_password' not in text
     assert 'normalize_json_object()' in text
+    assert 'cluster_file="$MANAGER_DATA_DIR/clusters/${cluster_id}.json"' in text
+    assert 'persisted_vm_node_map="$(jq -c \'.vm_node_map // {}\' "$cluster_file")"' in text
+    assert 'current_vm_node_map="$(printf \'%s\' "$cluster_json" | jq -c \'.vm_node_map // {}\')"' in text
+    assert 'cluster_json="$(printf \'%s\' "$cluster_json" | jq --argjson vm_node_map "$persisted_vm_node_map" -c \'.vm_node_map = $vm_node_map\')"'
     assert 'vm_node_map_json="$(normalize_json_object "${VM_NODE_MAP:-{}}")"' in text
     assert 'validate_vm_node_map' in text
     assert 'log "Talos placement ${name} -> ${host}"' in text
