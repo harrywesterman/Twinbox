@@ -4,17 +4,35 @@ set -euo pipefail
 : "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"
 : "${MANAGER_DATA_DIR:?missing MANAGER_DATA_DIR}"
 
+fail() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
+  exit 1
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_file="$MANAGER_DATA_DIR/clusters/${cluster_id}.json"
 
+current_vm_node_map="$(printf '%s' "$cluster_json" | jq -c '.vm_node_map // {}')"
+effective_vm_node_map="$current_vm_node_map"
+effective_vm_node_map_source="step context"
+
 if [[ -f "$cluster_file" ]]; then
   persisted_vm_node_map="$(jq -c '.vm_node_map // {}' "$cluster_file")"
-  current_vm_node_map="$(printf '%s' "$cluster_json" | jq -c '.vm_node_map // {}')"
-  if [[ "$current_vm_node_map" == "{}" && "$persisted_vm_node_map" != "{}" ]]; then
-    cluster_json="$(printf '%s' "$cluster_json" | jq --argjson vm_node_map "$persisted_vm_node_map" -c '.vm_node_map = $vm_node_map')"
+  if [[ "$persisted_vm_node_map" != "{}" ]]; then
+    if [[ "$current_vm_node_map" != "{}" && "$current_vm_node_map" != "$persisted_vm_node_map" ]]; then
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: step context vm_node_map differs from persisted cluster file; using persisted cluster file" >&2
+    fi
+    effective_vm_node_map="$persisted_vm_node_map"
+    effective_vm_node_map_source="persisted cluster file"
   fi
 fi
+
+if [[ "$effective_vm_node_map" == "{}" ]]; then
+  fail "Missing vm_node_map for cluster ${cluster_id}"
+fi
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Using ${effective_vm_node_map_source} vm_node_map: $(printf '%s' "$effective_vm_node_map" | jq -c '.')" >&2
 
 bash scripts/manager/apply-cluster.sh \
   --cluster-id "$cluster_id" \
@@ -32,7 +50,7 @@ bash scripts/manager/apply-cluster.sh \
   --gateway-ip "$(printf '%s' "$cluster_json" | jq -r '.gateway_ip')" \
   --dns-servers "$(printf '%s' "$cluster_json" | jq -r '.dns_servers | join(",")')" \
   --dns-domain "$(printf '%s' "$cluster_json" | jq -r '.dns_domain')" \
-  --vm-node-map "$(printf '%s' "$cluster_json" | jq -c '.vm_node_map // {}')" \
+  --vm-node-map "$effective_vm_node_map" \
   --proxmox-node "$(printf '%s' "$cluster_json" | jq -r '.metadata.proxmox_node')" \
   --storage-pool "$(printf '%s' "$cluster_json" | jq -r '.metadata.storage_pool')" \
   --file-datastore "$(printf '%s' "$cluster_json" | jq -r '.metadata.file_datastore')" \

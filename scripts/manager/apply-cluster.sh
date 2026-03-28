@@ -657,13 +657,16 @@ planned_worker_ips_json="$(node_array "ip" "worker")"
 controlplane_vm_ids_json="$(node_array "vmid" "controlplane")"
 worker_vm_ids_json="$(node_array "vmid" "worker")"
 vm_node_map_json="$(normalize_json_object "${VM_NODE_MAP:-{}}")"
+if [[ "$(jq -r 'length' <<<"$vm_node_map_json")" -eq 0 ]] && [[ -f "$cluster_file" ]]; then
+  persisted_vm_node_map="$(jq -c '.vm_node_map // {}' "$cluster_file")"
+  if [[ "$(jq -r 'length' <<<"$persisted_vm_node_map")" -gt 0 ]]; then
+    vm_node_map_json="$persisted_vm_node_map"
+    log "Loaded vm_node_map from persisted cluster file ${cluster_file}"
+  fi
+fi
+
 if [[ "$(jq -r 'length' <<<"$vm_node_map_json")" -eq 0 ]]; then
-  vm_node_map_json="$(jq -nc \
-    --arg host "$PROXMOX_NODE" \
-    --argjson nodes "$nodes_json" \
-    '
-      reduce ($nodes | keys[]) as $name ({}; .[$name] = $host)
-    ')"
+  fail "Unable to resolve vm_node_map for cluster ${CLUSTER_ID}; persist it in ${cluster_file} or pass --vm-node-map"
 fi
 validate_vm_node_map
 log_vm_node_map

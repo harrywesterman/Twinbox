@@ -7,12 +7,9 @@ locals {
     for name, node in var.nodes : name => node if node.type == "worker"
   }
 
-  vm_host_map = merge(
-    { for name in keys(var.nodes) : name => var.proxmox_node },
-    var.vm_node_map,
-  )
+  vm_host_map = var.vm_node_map
 
-  talos_image_nodes = toset(concat([var.proxmox_node], values(local.vm_host_map)))
+  talos_image_nodes = toset(concat([var.proxmox_node], values(var.vm_node_map)))
 }
 
 resource "proxmox_virtual_environment_file" "talos_nocloud" {

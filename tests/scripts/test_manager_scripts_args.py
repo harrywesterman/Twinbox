@@ -285,9 +285,14 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'cluster_file="$MANAGER_DATA_DIR/clusters/${cluster_id}.json"' in text
     assert 'persisted_vm_node_map="$(jq -c \'.vm_node_map // {}\' "$cluster_file")"' in text
     assert 'current_vm_node_map="$(printf \'%s\' "$cluster_json" | jq -c \'.vm_node_map // {}\')"' in text
-    assert 'cluster_json="$(printf \'%s\' "$cluster_json" | jq --argjson vm_node_map "$persisted_vm_node_map" -c \'.vm_node_map = $vm_node_map\')"'
+    assert 'effective_vm_node_map="$current_vm_node_map"' in text
+    assert 'effective_vm_node_map_source="step context"' in text
+    assert 'WARNING: step context vm_node_map differs from persisted cluster file; using persisted cluster file' in text
+    assert 'effective_vm_node_map="$persisted_vm_node_map"' in text
+    assert 'effective_vm_node_map_source="persisted cluster file"' in text
     assert 'vm_node_map_json="$(normalize_json_object "${VM_NODE_MAP:-{}}")"' in text
-    assert 'reduce (nodes | keys[]) as $name ({}; .[$name] = $host)' in text
+    assert 'Loaded vm_node_map from persisted cluster file ${cluster_file}' in text
+    assert 'Unable to resolve vm_node_map for cluster ${CLUSTER_ID}; persist it in ${cluster_file} or pass --vm-node-map' in text
     assert 'validate_vm_node_map' in text
     assert 'log "Talos placement ${name} -> ${host}"' in text
     assert '--argjson vm_node_map "$vm_node_map_json"' in text
@@ -377,6 +382,8 @@ def test_provision_nodes_step_returns_refs_not_kubeconfig_paths():
     text = PROVISION_NODES_SCRIPT.read_text(encoding="utf-8")
     assert 'secret_refs: .metadata.secret_refs' in text
     assert 'kubeconfig_path' not in text
+    assert 'Using ${effective_vm_node_map_source} vm_node_map:' in text
+    assert '--vm-node-map "$effective_vm_node_map"' in text
 
 
 def test_manager_worker_image_includes_talos_image_factory_helper():
@@ -701,7 +708,9 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     assert 'cdrom {' in main_text
     assert 'dynamic "cdrom"' not in main_text
     assert 'for_each = var.boot_from_disk ? [] : [1]' not in main_text
-    assert 'validation {' in _module_variables_text()
+    assert 'validation {' not in _module_variables_text()
+    assert 'vm_host_map = var.vm_node_map' in main_text
+    assert 'merge(' not in main_text
     assert 'file_id   = proxmox_virtual_environment_file.talos_nocloud[local.vm_host_map[each.key]].id' in main_text
     assert 'node_name = local.vm_host_map[each.key]' in main_text
     assert 'file_id      = proxmox_virtual_environment_file.talos_nocloud.id' not in main_text
