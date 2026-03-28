@@ -7,6 +7,7 @@ Use this checklist after deployment or major changes.
 - `wizard/setup-wizard.sh` exists and passes syntax check.
 - `scripts/manager/*.sh` exist and are executable.
 - `docs/` contains current operational docs.
+- Wizard cleanup uses Proxmox cluster inventory and can remove cluster VMs even when they are spread across multiple Proxmox hosts.
 
 ## 2. Syntax Checks
 
