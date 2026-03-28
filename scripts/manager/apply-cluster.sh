@@ -318,6 +318,7 @@ flatten_ipv4_candidates() {
     | select(length > 0)
     | select(startswith("127.") | not)
     | select(startswith("169.254.") | not)
+    | select(startswith("10.244.") | not)
   '
 }
 
@@ -413,6 +414,20 @@ wait_for_talos_api() {
   done
 
   fail "Timed out waiting for Talos API on ${label} at ${candidate}"
+}
+
+reboot_talos_node() {
+  local label="$1"
+  local ip="$2"
+
+  log "Rebooting Talos ${label} at ${ip}"
+  talosctl reboot \
+    --nodes "$ip" \
+    --endpoints "$ip" \
+    --talosconfig "$talosconfig_file" \
+    --timeout 15m \
+    --wait
+  wait_for_talos_api "$label" "$ip"
 }
 
 write_node_patch() {
@@ -541,21 +556,42 @@ apply_node_config() {
   local ip="$1"
   local config_file="$2"
   log "Applying Talos config to ${ip}"
+  if talosctl apply-config \
+    --nodes "$ip" \
+    --endpoints "$ip" \
+    --talosconfig "$talosconfig_file" \
+    --file "$config_file"; then
+    return 0
+  fi
+
+  log "Secure Talos apply failed for ${ip}; retrying with --insecure"
   talosctl apply-config \
     --insecure \
     --nodes "$ip" \
+    --endpoints "$ip" \
     --talosconfig "$talosconfig_file" \
     --file "$config_file"
 }
 
 bootstrap_cluster() {
   local first_cp_ip="$1"
+  local bootstrap_output=""
   wait_for_talos_api "control plane" "$first_cp_ip"
   log "Bootstrapping cluster from ${first_cp_ip}"
-  talosctl bootstrap \
-    --nodes "$first_cp_ip" \
-    --endpoints "$first_cp_ip" \
-    --talosconfig "$talosconfig_file"
+  if ! bootstrap_output="$(
+    talosctl bootstrap \
+      --nodes "$first_cp_ip" \
+      --endpoints "$first_cp_ip" \
+      --talosconfig "$talosconfig_file" \
+      2>&1
+  )"; then
+    if grep -q 'AlreadyExists desc = etcd data directory is not empty' <<<"$bootstrap_output"; then
+      log "Talos bootstrap already completed on ${first_cp_ip}; continuing"
+    else
+      printf '%s\n' "$bootstrap_output" >&2
+      return 1
+    fi
+  fi
 
   log "Writing kubeconfig"
   talosctl kubeconfig "$kubeconfig_file" \
@@ -738,8 +774,8 @@ discovered_controlplane_ips_json="[]"
 discovered_worker_ips_json="[]"
 discovered_controlplane_ips=()
 discovered_worker_ips=()
-mapfile -t controlplane_actual_candidates < <(jq -r 'flatten | .[] | select(type == "string") | select(length > 0) | select(startswith("127.") | not) | select(startswith("169.254.") | not)' <<<"$controlplane_ipv4_candidates_json")
-mapfile -t worker_actual_candidates < <(jq -r 'flatten | .[] | select(type == "string") | select(length > 0) | select(startswith("127.") | not) | select(startswith("169.254.") | not)' <<<"$worker_ipv4_candidates_json")
+mapfile -t controlplane_actual_candidates < <(flatten_ipv4_candidates <<<"$controlplane_ipv4_candidates_json")
+mapfile -t worker_actual_candidates < <(flatten_ipv4_candidates <<<"$worker_ipv4_candidates_json")
 controlplane_index=0
 worker_index=0
 
@@ -813,6 +849,26 @@ tmp_tfvars="$(mktemp)"
 jq '. + {boot_from_disk: true}' "$tfvars_file" > "$tmp_tfvars"
 mv "$tmp_tfvars" "$tfvars_file"
 "$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve -no-color -parallelism="$TOFU_PARALLELISM" -var-file="$tfvars_file"
+
+log "Rebooting Talos nodes after disk-first switch"
+controlplane_apply_index=0
+worker_apply_index=0
+while IFS=$'\t' read -r name type ip; do
+  [[ -n "$name" ]] || continue
+  if [[ "$type" == "controlplane" ]]; then
+    reboot_talos_node "$name" "${discovered_controlplane_ips[$controlplane_apply_index]:-$ip}"
+    controlplane_apply_index=$((controlplane_apply_index + 1))
+  else
+    reboot_talos_node "$name" "${discovered_worker_ips[$worker_apply_index]:-$ip}"
+    worker_apply_index=$((worker_apply_index + 1))
+  fi
+done < <(jq -r '
+    to_entries
+    | sort_by(.key)
+    | .[]
+    | [.key, .value.type, .value.ip]
+    | @tsv
+  ' <<<"$nodes_json")
 
 tmp="$(mktemp)"
 jq \

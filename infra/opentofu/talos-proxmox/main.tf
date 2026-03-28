@@ -75,6 +75,11 @@ resource "proxmox_virtual_environment_vm" "node" {
     mac_address = each.value.mac
   }
 
+  # Talos nodes are rebooted explicitly from the provisioning script after the
+  # second apply. Keeping this false avoids waiting on long-running Proxmox
+  # reboot tasks that can time out on slower nodes.
+  reboot_after_update = false
+
   operating_system {
     type = "l26"
   }

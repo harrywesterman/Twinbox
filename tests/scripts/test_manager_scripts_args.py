@@ -255,6 +255,9 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert '"$TOFU_BIN" -chdir="$work_module_dir" init -input=false' in text
     assert 'TOFU_PARALLELISM="${TOFU_PARALLELISM:-1}"' in text
     assert '"$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve -no-color -parallelism="$TOFU_PARALLELISM" -var-file="$tfvars_file"' in text
+    assert 'reboot_talos_node() {' in text
+    assert 'talosctl reboot \\' in text
+    assert 'Rebooting Talos nodes after disk-first switch' in text
     assert 'command -v talosctl' in text
     assert 'export TF_IN_AUTOMATION=1' in text
     assert 'export NO_COLOR=1' in text
@@ -264,7 +267,10 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'PINNED_TALOS_IMAGE_SCHEMATIC' not in text
     assert '--preset "${TALOS_IMAGE_PRESET:-qemu-guest-agent}"' not in text
     assert 'TALOS_IMAGE_PRESET' in text
-    assert 'talosctl apply-config' in text
+    assert 'talosctl apply-config \\' in text
+    assert '--endpoints "$ip" \\' in text
+    assert 'Secure Talos apply failed for ${ip}; retrying with --insecure' in text
+    assert 'AlreadyExists desc = etcd data directory is not empty' in text
     assert 'talosctl bootstrap' in text
     assert 'bootstrap_mode = "dhcp-first"' in text
     assert '"/image/default/"' not in text
@@ -277,6 +283,7 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'controlplane_ipv4_addresses.value' in text
     assert 'worker_ipv4_addresses.value' in text
     assert 'flatten_ipv4_candidates' in text or 'flatten | .[]' in text
+    assert 'select(startswith("10.244.") | not)' in text
     assert 'TF_VAR_proxmox_endpoint' in text
     assert 'TF_VAR_proxmox_username' in text
     assert 'TF_VAR_proxmox_password' in text
@@ -714,6 +721,7 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     assert 'agent {' in main_text
     assert 'wait_for_ip {' in main_text
     assert 'ipv4 = true' in main_text
+    assert 'reboot_after_update = false' in main_text
     assert 'type = "std"' in main_text
     assert 'talos_machine_configuration_apply' not in main_text
     assert 'talos_machine_bootstrap' not in main_text
