@@ -287,6 +287,7 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'current_vm_node_map="$(printf \'%s\' "$cluster_json" | jq -c \'.vm_node_map // {}\')"' in text
     assert 'cluster_json="$(printf \'%s\' "$cluster_json" | jq --argjson vm_node_map "$persisted_vm_node_map" -c \'.vm_node_map = $vm_node_map\')"'
     assert 'vm_node_map_json="$(normalize_json_object "${VM_NODE_MAP:-{}}")"' in text
+    assert 'reduce (nodes | keys[]) as $name ({}; .[$name] = $host)' in text
     assert 'validate_vm_node_map' in text
     assert 'log "Talos placement ${name} -> ${host}"' in text
     assert '--argjson vm_node_map "$vm_node_map_json"' in text
