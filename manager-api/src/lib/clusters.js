@@ -35,9 +35,21 @@ export function normalizeClusterName(rawName) {
   };
 }
 
-function normalizeVmNodeMap(rawMap) {
+function buildAllowedHostLookup(allowedHosts = []) {
+  const lookup = new Map();
+
+  for (const host of Array.isArray(allowedHosts) ? allowedHosts : []) {
+    const normalized = String(host || "").trim();
+    if (!normalized) continue;
+    lookup.set(normalized.toLowerCase(), normalized);
+  }
+
+  return lookup;
+}
+
+function normalizeVmNodeMap(rawMap, allowedHosts = []) {
   if (rawMap === null || rawMap === undefined || rawMap === '') {
-    return {};
+    return { ok: true, value: {} };
   }
 
   let candidate = rawMap;
@@ -45,28 +57,43 @@ function normalizeVmNodeMap(rawMap) {
     try {
       candidate = JSON.parse(candidate);
     } catch {
-      return {};
+      return { ok: false, error: "vm_node_map must be valid JSON" };
     }
   }
 
   if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
-    return {};
+    return { ok: false, error: "vm_node_map must be an object" };
   }
 
-  return Object.entries(candidate).reduce((accumulator, [vmName, hostName]) => {
-    if (typeof vmName !== 'string' || !vmName.trim()) {
-      return accumulator;
-    }
-    if (typeof hostName !== 'string' || !hostName.trim()) {
-      return accumulator;
+  const allowedHostLookup = buildAllowedHostLookup(allowedHosts);
+  const normalized = {};
+
+  for (const [vmName, hostName] of Object.entries(candidate)) {
+    const normalizedVmName = String(vmName || "").trim();
+    if (!normalizedVmName) {
+      continue;
     }
 
-    accumulator[vmName.trim()] = hostName.trim();
-    return accumulator;
-  }, {});
+    const normalizedHostName = String(hostName || "").trim();
+    if (!normalizedHostName) {
+      return { ok: false, error: `vm_node_map entry ${normalizedVmName} must map to a host name` };
+    }
+
+    const resolvedHost = allowedHostLookup.size > 0
+      ? allowedHostLookup.get(normalizedHostName.toLowerCase())
+      : normalizedHostName;
+
+    if (allowedHostLookup.size > 0 && !resolvedHost) {
+      return { ok: false, error: `vm_node_map references unknown Proxmox host ${normalizedHostName}` };
+    }
+
+    normalized[normalizedVmName] = resolvedHost;
+  }
+
+  return { ok: true, value: normalized };
 }
 
-export function buildClusterFromRequest(body, env) {
+export function buildClusterFromRequest(body, env, { allowedVmHosts = [] } = {}) {
   const parsedName = parseRequiredString(body.name, "name");
   const parsedBridge = parseRequiredString(body.bridge, "bridge");
   const parsedControlplanes = parseIntInRange(body.controlplane_count, "controlplane_count", 1, 15);
@@ -81,7 +108,7 @@ export function buildClusterFromRequest(body, env) {
   const parsedGatewayIp = parseIPv4(body.gateway_ip, "gateway_ip");
   const parsedDnsServers = parseIPv4List(body.dns_servers, "dns_servers");
   const parsedDnsDomain = parseOptionalString(body.dns_domain, "dns_domain");
-  const parsedVmNodeMap = normalizeVmNodeMap(body.vm_node_map);
+  const parsedVmNodeMap = normalizeVmNodeMap(body.vm_node_map, allowedVmHosts);
 
   const validations = [
     parsedName,
@@ -98,6 +125,7 @@ export function buildClusterFromRequest(body, env) {
     parsedGatewayIp,
     parsedDnsServers,
     parsedDnsDomain,
+    parsedVmNodeMap.ok ? { ok: true } : { ok: false, error: parsedVmNodeMap.error },
   ];
 
   const failed = validations.find((value) => !value.ok);
@@ -139,7 +167,7 @@ export function buildClusterFromRequest(body, env) {
       gateway_ip: parsedGatewayIp.value,
       dns_servers: parsedDnsServers.value,
       dns_domain: parsedDnsDomain.value,
-      vm_node_map: parsedVmNodeMap,
+      vm_node_map: parsedVmNodeMap.value,
       status: "requested",
       created_at: now(),
       updated_at: now(),

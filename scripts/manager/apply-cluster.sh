@@ -271,6 +271,44 @@ normalize_json_object() {
   jq -c '.' <<<"$raw"
 }
 
+validate_vm_node_map() {
+  local missing=()
+  local name=""
+
+  while IFS=$'\t' read -r name _; do
+    [[ -n "$name" ]] || continue
+    if ! jq -e --arg key "$name" 'has($key)' <<<"$vm_node_map_json" >/dev/null; then
+      missing+=("$name")
+    fi
+  done < <(jq -r '
+      to_entries
+      | sort_by(.key)
+      | .[]
+      | [.key, .value.type]
+      | @tsv
+    ' <<<"$nodes_json")
+
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    fail "Missing vm_node_map entry for: ${missing[*]}"
+  fi
+}
+
+log_vm_node_map() {
+  local name=""
+  local host=""
+
+  while IFS=$'\t' read -r name host; do
+    [[ -n "$name" ]] || continue
+    log "Talos placement ${name} -> ${host}"
+  done < <(jq -r '
+      to_entries
+      | sort_by(.key)
+      | .[]
+      | [.key, .value]
+      | @tsv
+    ' <<<"$vm_node_map_json")
+}
+
 flatten_ipv4_candidates() {
   jq -r '
     flatten
@@ -619,6 +657,8 @@ planned_worker_ips_json="$(node_array "ip" "worker")"
 controlplane_vm_ids_json="$(node_array "vmid" "controlplane")"
 worker_vm_ids_json="$(node_array "vmid" "worker")"
 vm_node_map_json="$(normalize_json_object "${VM_NODE_MAP:-{}}")"
+validate_vm_node_map
+log_vm_node_map
 
 if [[ -f "$work_module_dir/terraform.tfstate" ]]; then
   log "Reusing existing OpenTofu workspace at ${work_module_dir}"
@@ -664,6 +704,8 @@ jq -n \
     install_disk: "'"$INSTALL_DISK"'",
     nodes: $nodes
   }' > "$tfvars_file"
+log "Talos host placement map written to tfvars"
+log "Talos host map: $(jq -c '.vm_node_map' "$tfvars_file")"
 
 log "Preparing OpenTofu module"
 "$TOFU_BIN" -chdir="$work_module_dir" init -input=false -no-color

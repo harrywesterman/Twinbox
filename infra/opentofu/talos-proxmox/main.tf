@@ -10,6 +10,10 @@ locals {
   talos_image_nodes = toset(concat([var.proxmox_node], values(var.vm_node_map)))
 }
 
+locals {
+  vm_host_map = var.vm_node_map
+}
+
 resource "proxmox_virtual_environment_file" "talos_nocloud" {
   for_each     = local.talos_image_nodes
   content_type = "iso"
@@ -26,7 +30,7 @@ resource "proxmox_virtual_environment_vm" "node" {
   for_each  = var.nodes
   name      = "${var.cluster_name}-${each.key}"
   vm_id     = each.value.vmid
-  node_name = lookup(var.vm_node_map, each.key, var.proxmox_node)
+  node_name = local.vm_host_map[each.key]
   started   = true
   on_boot   = true
   bios      = "seabios"
@@ -56,7 +60,7 @@ resource "proxmox_virtual_environment_vm" "node" {
   # boot order and does not require the extra Proxmox privilege to change CD-ROM media.
   cdrom {
     interface = "ide2"
-    file_id   = proxmox_virtual_environment_file.talos_nocloud[lookup(var.vm_node_map, each.key, var.proxmox_node)].id
+    file_id   = proxmox_virtual_environment_file.talos_nocloud[local.vm_host_map[each.key]].id
   }
 
   agent {

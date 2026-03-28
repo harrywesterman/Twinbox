@@ -761,11 +761,28 @@
   border-style: dashed;
 }
 
+.wizard-vm-card.is-user-selected {
+  border-color: rgba(20, 184, 166, 0.42);
+  box-shadow: 0 0 0 1px rgba(20, 184, 166, 0.12) inset;
+}
+
+.wizard-vm-card.is-suggested {
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
 .wizard-vm-card-title {
   color: #0f766e;
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
+}
+
+.wizard-vm-card.is-user-selected .wizard-vm-card-title {
+  color: #0f766e;
+}
+
+.wizard-vm-card.is-suggested .wizard-vm-card-title {
+  color: #2563eb;
 }
 
 .wizard-vm-card strong {

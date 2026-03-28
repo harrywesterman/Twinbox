@@ -418,19 +418,21 @@ function PlacementBoard({
               host.assignments.map((vm) => (
                 <button
                   key={vm.name}
-                  className={`wizard-vm-card ${draggingVmName === vm.name ? 'is-dragging' : ''}`}
-                    type="button"
-                    draggable
-                    onDragStart={(event) => onDragStart(event, vm.name)}
-                    onDragEnd={onDragEnd}
+                  className={`wizard-vm-card ${draggingVmName === vm.name ? 'is-dragging' : ''} ${vm.assignmentSource === 'user-selected' ? 'is-user-selected' : vm.assignmentSource === 'suggested' ? 'is-suggested' : 'is-unassigned'}`}
+                  type="button"
+                  draggable
+                  onDragStart={(event) => onDragStart(event, vm.name)}
+                  onDragEnd={onDragEnd}
                 >
                   <span className="wizard-vm-card-title">{vm.label}</span>
                   <strong>{vm.name}</strong>
                   <small>VMID {vm.vmid} | {vm.cpu} CPU | {formatMemoryMb(vm.memory_mb)} RAM | {vm.disk_gb} GB disk</small>
                   <em>
-                    {vm.assignedHostId === board.suggestedVmNodeMap?.[vm.name]
-                      ? 'Suggested here to balance CPU, memory, and disk across the cluster.'
-                      : `Manually placed on ${host.name}; suggested host was ${board.suggestedVmNodeMap?.[vm.name] || 'unassigned'}.`}
+                    {vm.assignmentSource === 'user-selected'
+                      ? `You placed this VM on ${host.name}.`
+                      : vm.assignmentSource === 'suggested'
+                        ? `Suggested here to balance CPU, memory, and disk across the cluster.`
+                        : 'This VM is not assigned yet.'}
                   </em>
                 </button>
               ))
@@ -454,7 +456,7 @@ function PlacementBoard({
             {board.unassigned.map((vm) => (
               <button
                 key={vm.name}
-                className={`wizard-vm-card ${draggingVmName === vm.name ? 'is-dragging' : ''}`}
+                className={`wizard-vm-card ${draggingVmName === vm.name ? 'is-dragging' : ''} ${vm.assignmentSource === 'user-selected' ? 'is-user-selected' : vm.assignmentSource === 'suggested' ? 'is-suggested' : 'is-unassigned'}`}
                 type="button"
                 draggable
                 onDragStart={(event) => onDragStart(event, vm.name)}
@@ -463,7 +465,7 @@ function PlacementBoard({
                 <span className="wizard-vm-card-title">{vm.label}</span>
                 <strong>{vm.name}</strong>
                 <small>VMID {vm.vmid} | {vm.cpu} CPU | {formatMemoryMb(vm.memory_mb)} RAM | {vm.disk_gb} GB disk</small>
-                <em>Drag this VM onto the host that has the most free CPU, memory, and disk.</em>
+                <em>Drag this VM onto a host to override the balanced suggestion.</em>
               </button>
             ))}
           </div>
@@ -674,12 +676,7 @@ function App() {
     if (step.id === 'provision-nodes') {
       const stepAnswers = answersRef.current?.[step.id] || {};
       const placement = buildProvisionPlacementBoard(step.inputs || [], stepAnswers, proxmoxResources);
-      const currentVmNodeMap = stepAnswers.vm_node_map && typeof stepAnswers.vm_node_map === 'object'
-        ? stepAnswers.vm_node_map
-        : {};
-      body.vm_node_map = Object.keys(currentVmNodeMap).length > 0
-        ? currentVmNodeMap
-        : placement.vmNodeMap;
+      body.vm_node_map = placement.vmNodeMap;
     }
 
     if (manageBusy) {

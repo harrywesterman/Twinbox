@@ -67,6 +67,10 @@ def _module_outputs_text() -> str:
     return MODULE_OUTPUTS.read_text(encoding="utf-8")
 
 
+def _module_variables_text() -> str:
+    return (REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "variables.tf").read_text(encoding="utf-8")
+
+
 def _install_secret_sync_text() -> str:
     return INSTALL_SECRET_SYNC_SCRIPT.read_text(encoding="utf-8")
 
@@ -279,7 +283,10 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'proxmox_password: $proxmox_password' not in text
     assert 'normalize_json_object()' in text
     assert 'vm_node_map_json="$(normalize_json_object "${VM_NODE_MAP:-{}}")"' in text
+    assert 'validate_vm_node_map' in text
+    assert 'log "Talos placement ${name} -> ${host}"' in text
     assert '--argjson vm_node_map "$vm_node_map_json"' in text
+    assert 'Talos host placement map written to tfvars' in text
     assert 'vm_node_map: $vm_node_map' in text
     assert 'json_array_from_csv()' in text
     assert 'json_array_from_csv "${DNS_SERVERS:-1.1.1.1,1.0.0.1}"' in text
@@ -689,7 +696,9 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     assert 'cdrom {' in main_text
     assert 'dynamic "cdrom"' not in main_text
     assert 'for_each = var.boot_from_disk ? [] : [1]' not in main_text
-    assert 'file_id   = proxmox_virtual_environment_file.talos_nocloud[lookup(var.vm_node_map, each.key, var.proxmox_node)].id' in main_text
+    assert 'validation {' in _module_variables_text()
+    assert 'file_id   = proxmox_virtual_environment_file.talos_nocloud[local.vm_host_map[each.key]].id' in main_text
+    assert 'node_name = local.vm_host_map[each.key]' in main_text
     assert 'file_id      = proxmox_virtual_environment_file.talos_nocloud.id' not in main_text
     assert 'file_format  = "raw"' not in main_text
     assert 'agent {' in main_text

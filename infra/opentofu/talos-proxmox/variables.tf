@@ -18,6 +18,13 @@ variable "proxmox_node" {
 variable "vm_node_map" {
   type    = map(string)
   default = {}
+
+  validation {
+    condition = alltrue([
+      for name in keys(var.nodes) : contains(keys(var.vm_node_map), name)
+    ])
+    error_message = "vm_node_map must include a host for every VM in nodes"
+  }
 }
 
 variable "vm_datastore" {

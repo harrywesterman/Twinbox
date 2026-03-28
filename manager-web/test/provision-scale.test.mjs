@@ -126,6 +126,7 @@ test('placement board suggests a host-aware Talos VM layout', () => {
   assert.equal(Object.keys(board.suggestedVmNodeMap).length, 3);
   assert.equal(board.unassigned.length, 0);
   assert.ok(new Set(Object.values(board.vmNodeMap)).size >= 2);
+  assert.equal(board.hostCards[0].assignments[0].assignmentSource, 'suggested');
 });
 
 test('placement board sorts hosts alphabetically by name', () => {
@@ -178,4 +179,21 @@ test('placement board preserves manual VM host assignments', () => {
 
   assert.equal(board.vmNodeMap['cp-1'], 'pve-b');
   assert.equal(board.vmNodeMap['worker-1'], 'pve-a');
+  assert.equal(board.hostCards.find((host) => host.id === 'pve-b').assignments[0].assignmentSource, 'user-selected');
+  assert.equal(board.hostCards.find((host) => host.id === 'pve-a').assignments[0].assignmentSource, 'user-selected');
+});
+
+test('placement board keeps manual placements while resuggesting the rest', () => {
+  const initialBoard = buildProvisionPlacementBoard(stepInputs, {}, balancedPlacementResources);
+  const remixedBoard = buildProvisionPlacementBoard(stepInputs, {
+    vm_node_map: {
+      'cp-1': 'pve-b',
+      'worker-1': initialBoard.vmNodeMap['worker-1'],
+    },
+  }, balancedPlacementResources);
+
+  assert.equal(remixedBoard.vmNodeMap['cp-1'], 'pve-b');
+  assert.equal(remixedBoard.hostCards.find((host) => host.id === 'pve-b').assignments.some((vm) => vm.name === 'cp-1'), true);
+  assert.equal(remixedBoard.hostCards.find((host) => host.id === 'pve-b').assignments.find((vm) => vm.name === 'cp-1').assignmentSource, 'user-selected');
+  assert.equal(remixedBoard.vmNodeMap['worker-2'], remixedBoard.suggestedVmNodeMap['worker-2']);
 });

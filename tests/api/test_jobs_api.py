@@ -61,7 +61,12 @@ exit 1
         ping_mock.chmod(0o755)
         vm_mock.write_text(
             """#!/bin/sh
-echo '[]'
+cat <<'EOF'
+[
+  {"node": "pve-a", "status": "online"},
+  {"node": "pve-b", "status": "online"}
+]
+EOF
 """,
             encoding="utf-8",
         )

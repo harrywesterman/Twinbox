@@ -426,14 +426,20 @@ export function buildProvisionPlacementBoard(stepInputs, currentValues = {}, res
     : {};
   const suggestedVmNodeMap = suggestVmNodeMap(vmPlan, hostCards, {});
   const vmNodeMap = suggestVmNodeMap(vmPlan, hostCards, currentMap);
+  const hostLookup = new Map(hostCards.map((host) => [host.id, host]));
   const placementsByHost = new Map(hostCards.map((host) => [host.id, []]));
 
   for (const vm of vmPlan) {
     const hostId = vmNodeMap[vm.name];
+    const selectedHostId = typeof currentMap?.[vm.name] === 'string' ? currentMap[vm.name] : '';
+    const isUserSelected = Boolean(selectedHostId) && selectedHostId === hostId && hostLookup.has(selectedHostId);
     const placement = {
       ...vm,
       assignedHostId: hostId,
-      assignedHostName: hostId || 'Unassigned',
+      assignedHostName: hostLookup.get(hostId)?.name || hostId || 'Unassigned',
+      assignmentSource: isUserSelected ? 'user-selected' : (hostId ? 'suggested' : 'unassigned'),
+      isUserSelected,
+      isSuggested: !isUserSelected && Boolean(hostId),
     };
     if (!placementsByHost.has(hostId)) {
       placementsByHost.set(hostId || 'Unassigned', []);

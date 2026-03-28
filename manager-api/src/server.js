@@ -373,6 +373,21 @@ async function listClusterNodeResources() {
   }
 }
 
+async function listClusterNodeNames() {
+  const resources = await listClusterNodeResources();
+  const names = Array.isArray(resources)
+    ? resources
+      .map((entry) => String(entry?.node || entry?.name || entry?.id || "").trim())
+      .filter(Boolean)
+    : [];
+
+  if (names.length === 0) {
+    throw new Error("No Proxmox nodes available to validate VM placement");
+  }
+
+  return names;
+}
+
 function summarizeClusterResources(resources, vmResources = []) {
   const MB = 1024 * 1024;
   const GB = 1024 * 1024 * 1024;
@@ -858,7 +873,16 @@ app.get("/api/ip-suggestions", async (req, res) => {
 
 app.post("/api/clusters", async (req, res) => {
   const body = req.body || {};
-  const built = buildClusterFromRequest(body, process.env);
+  let allowedVmHosts = [];
+  try {
+    allowedVmHosts = await listClusterNodeNames();
+  } catch (error) {
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : "failed to read Proxmox hosts",
+    });
+  }
+
+  const built = buildClusterFromRequest(body, process.env, { allowedVmHosts });
   if (!built.ok) {
     return res.status(400).json({ error: built.error });
   }
@@ -923,10 +947,19 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
   let context = {};
 
   if (stepId === "provision-nodes") {
+    let allowedVmHosts = [];
+    try {
+      allowedVmHosts = await listClusterNodeNames();
+    } catch (error) {
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : "failed to read Proxmox hosts",
+      });
+    }
+
     const built = buildClusterFromRequest({
       ...validated.value,
       vm_node_map: req.body?.vm_node_map,
-    }, process.env);
+    }, process.env, { allowedVmHosts });
     if (!built.ok) {
       return res.status(400).json({ error: built.error });
     }
