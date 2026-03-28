@@ -24,6 +24,19 @@ command -v jq >/dev/null 2>&1 || {
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
+ensure_longhorn_namespace() {
+  log "Ensuring longhorn-system namespace exists with privileged Pod Security labels"
+  kubectl create namespace longhorn-system --dry-run=client -o yaml | kubectl apply --validate=false -f - >/dev/null
+  kubectl label namespace longhorn-system \
+    pod-security.kubernetes.io/enforce=privileged \
+    pod-security.kubernetes.io/enforce-version=latest \
+    pod-security.kubernetes.io/audit=privileged \
+    pod-security.kubernetes.io/audit-version=latest \
+    pod-security.kubernetes.io/warn=privileged \
+    pod-security.kubernetes.io/warn-version=latest \
+    --overwrite >/dev/null
+}
+
 wait_for_application_ready() {
   local application="$1"
   local status_json=""
@@ -58,6 +71,7 @@ wait_for_application_ready() {
 }
 
 log "Applying Longhorn application manifest"
+ensure_longhorn_namespace
 kubectl apply --server-side --force-conflicts --validate=false -f "$application_manifest"
 
 log "Waiting for Longhorn application to report healthy"

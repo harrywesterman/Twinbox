@@ -258,6 +258,14 @@ def test_longhorn_step_installs_pinned_chart_and_waits_for_health():
     assert 'item: kubeconfig' in step_manifest_text
     assert 'script: categories/talos-cluster/steps/install-longhorn-storage/run.sh' in step_manifest_text
     assert 'export KUBECONFIG="$KUBECONFIG_FILE"' in step_text
+    assert 'Ensuring longhorn-system namespace exists with privileged Pod Security labels' in step_text
+    assert 'kubectl create namespace longhorn-system --dry-run=client -o yaml | kubectl apply --validate=false -f - >/dev/null' in step_text
+    assert 'pod-security.kubernetes.io/enforce=privileged' in step_text
+    assert 'pod-security.kubernetes.io/enforce-version=latest' in step_text
+    assert 'pod-security.kubernetes.io/audit=privileged' in step_text
+    assert 'pod-security.kubernetes.io/audit-version=latest' in step_text
+    assert 'pod-security.kubernetes.io/warn=privileged' in step_text
+    assert 'pod-security.kubernetes.io/warn-version=latest' in step_text
     assert 'kubectl apply --server-side --force-conflicts --validate=false -f "$application_manifest"' in step_text
     assert 'wait_for_application_ready "$application_name"' in step_text
     assert 'application_name="longhorn"' in step_text
