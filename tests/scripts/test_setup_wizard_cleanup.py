@@ -33,6 +33,32 @@ def test_setup_wizard_cleanup_rolls_back_created_vm_on_error():
     assert 'qm destroy "$MGT_ID" --purge 1 >/dev/null 2>&1 || true' in text
 
 
+def test_setup_wizard_cleanup_uses_cluster_inventory_for_detect_and_remove():
+    text = _wizard_text()
+    assert 'EXISTING_VM_NODES=()' in text
+    assert 'EXISTING_VM_TAGS=()' in text
+    assert 'cluster_vm_inventory()' in text
+    assert 'pvesh get /cluster/resources --type vm --output-format json' in text
+    assert '--arg cluster_tag "$CLUSTER_VM_TAG"' in text
+    assert 'select((.tags // "" | split(";") | any(. == $cluster_tag)))' in text
+    assert 'declare -A seen_vm_names=()' in text
+    assert 'declare -A seen_vmids=()' in text
+    assert 'WARNING: cluster VM ${name} appears on multiple Proxmox nodes' in text
+    assert 'WARNING: VMID ${vmid} appears on multiple Proxmox nodes' in text
+    assert 'EXISTING_VM_NODES+=("$node")' in text
+    assert 'EXISTING_VM_TAGS+=("$tags")' in text
+    assert 'VM inventory:' in text
+    assert '(vmid ${EXISTING_VM_IDS[$idx]}, node ${EXISTING_VM_NODES[$idx]}' in text
+    assert 'tags ${EXISTING_VM_TAGS[$idx]}' in text
+    assert 'Destroying VM ${vmid} (${vm_name}) on ${vm_node}' in text
+    assert 'VM ${vm_name} tags: ${vm_tags}' in text
+    assert 'pvesh create "/nodes/${vm_node}/qemu/${vmid}/status/stop"' in text
+    assert 'pvesh delete "/nodes/${vm_node}/qemu/${vmid}" --purge 1' in text
+    assert 'Removed Proxmox API user ${PROXMOX_USER}' in text
+    assert 'Removed Proxmox role ${PROXMOX_ROLE}' in text
+    assert 'Removed ${#EXISTING_SNIPPETS[@]} snippet(s)' in text
+
+
 def test_setup_wizard_enables_guest_agent_on_management_vm():
     text = _wizard_text()
     assert "  - qemu-guest-agent" in text

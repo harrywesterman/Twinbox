@@ -25,6 +25,8 @@ CLUSTER_VM_TAG=""
 TWINBOX_TARGET_DIR=""
 EXISTING_VM_IDS=()
 EXISTING_VM_NAMES=()
+EXISTING_VM_NODES=()
+EXISTING_VM_TAGS=()
 EXISTING_SNIPPETS=()
 EXISTING_USER_PRESENT=0
 EXISTING_ROLE_PRESENT=0
@@ -284,6 +286,10 @@ add_detected_cluster_slug() {
   DETECTED_CLUSTER_SLUGS+=("$slug")
 }
 
+cluster_vm_inventory() {
+  pvesh get /cluster/resources --type vm --output-format json 2>/dev/null
+}
+
 detect_cluster_slugs() {
   local vmid=""
   local config=""
@@ -421,32 +427,49 @@ set_cluster_naming_defaults() {
 
 detect_existing_cluster_resources() {
   local vmid=""
-  local config=""
+  local node=""
   local name=""
   local tags=""
   local snippet=""
+  local cluster_vms=""
+  declare -A seen_vm_names=()
+  declare -A seen_vmids=()
 
   EXISTING_VM_IDS=()
   EXISTING_VM_NAMES=()
+  EXISTING_VM_NODES=()
+  EXISTING_VM_TAGS=()
   EXISTING_SNIPPETS=()
   EXISTING_USER_PRESENT=0
   EXISTING_ROLE_PRESENT=0
 
   progress_update "Checking cluster" "Checking cluster resources"
-  while read -r vmid; do
-    [[ -n "$vmid" ]] || continue
-    config=$(qm config "$vmid" 2>/dev/null || true)
-    [[ -n "$config" ]] || continue
+  if ! cluster_vms=$(cluster_vm_inventory); then
+    msg_error "Unable to query Proxmox cluster inventory."
+    return 1
+  fi
 
-    name=$(printf '%s\n' "$config" | awk -F': ' '/^name:/ {print $2; exit}')
-    tags=$(printf '%s\n' "$config" | awk -F': ' '/^tags:/ {print $2; exit}')
-    [[ -n "$name" && -n "$tags" ]] || continue
+  while IFS=$'\t' read -r vmid node name tags; do
+    [[ -n "$vmid" && -n "$node" && -n "$name" ]] || continue
 
-    if [[ "$tags" =~ (^|;)${CLUSTER_VM_TAG}($|;) ]]; then
-      EXISTING_VM_IDS+=("$vmid")
-      EXISTING_VM_NAMES+=("$name")
+    if [[ -n "${seen_vm_names[$name]:-}" && "${seen_vm_names[$name]}" != "$node" ]]; then
+      log_event "WARNING: cluster VM ${name} appears on multiple Proxmox nodes (${seen_vm_names[$name]} and ${node})"
     fi
-  done < <(qm list 2>/dev/null | awk 'NR>1 {print $1}')
+    if [[ -n "${seen_vmids[$vmid]:-}" && "${seen_vmids[$vmid]}" != "$node" ]]; then
+      log_event "WARNING: VMID ${vmid} appears on multiple Proxmox nodes (${seen_vmids[$vmid]} and ${node})"
+    fi
+
+    seen_vm_names["$name"]="$node"
+    seen_vmids["$vmid"]="$node"
+    EXISTING_VM_IDS+=("$vmid")
+    EXISTING_VM_NODES+=("$node")
+    EXISTING_VM_NAMES+=("$name")
+    EXISTING_VM_TAGS+=("$tags")
+  done < <(printf '%s\n' "$cluster_vms" | jq -r --arg cluster_tag "$CLUSTER_VM_TAG" '
+    .[]
+    | select((.tags // "" | split(";") | any(. == $cluster_tag)))
+    | [.vmid, .node, .name, (.tags // "")] | @tsv
+  ')
 
   progress_update "Checking cluster" "Checking cluster access"
   if pveum user list 2>/dev/null | awk 'NR>1 {print $1}' | grep -Fxq "$PROXMOX_USER"; then
@@ -473,8 +496,19 @@ cluster_resources_exist() {
 
 render_existing_cluster_inventory() {
   local summary=""
+  local idx=""
   summary+="Cluster: ${CLUSTER_SLUG}"$'\n'
   summary+="VMs: ${#EXISTING_VM_IDS[@]}"$'\n'
+  if [[ "${#EXISTING_VM_IDS[@]}" -gt 0 ]]; then
+    summary+="VM inventory:"$'\n'
+    for idx in "${!EXISTING_VM_IDS[@]}"; do
+      summary+="- ${EXISTING_VM_NAMES[$idx]} (vmid ${EXISTING_VM_IDS[$idx]}, node ${EXISTING_VM_NODES[$idx]}"
+      if [[ -n "${EXISTING_VM_TAGS[$idx]:-}" ]]; then
+        summary+=", tags ${EXISTING_VM_TAGS[$idx]}"
+      fi
+      summary+=")"$'\n'
+    done
+  fi
   summary+="Snippets: ${#EXISTING_SNIPPETS[@]}"$'\n'
   summary+="API user: "
   if [[ "${EXISTING_USER_PRESENT}" -eq 1 ]]; then
@@ -496,6 +530,8 @@ cleanup_existing_cluster_resources() {
   local idx=0
   local vmid=""
   local vm_name=""
+  local vm_node=""
+  local vm_tags=""
   local snippet=""
   local acl_path=""
 
@@ -504,9 +540,14 @@ cleanup_existing_cluster_resources() {
   for idx in "${!EXISTING_VM_IDS[@]}"; do
     vmid="${EXISTING_VM_IDS[$idx]}"
     vm_name="${EXISTING_VM_NAMES[$idx]}"
-    log_event "Destroying VM ${vmid} (${vm_name})"
-    qm stop "$vmid" --skiplock 1 >/dev/null 2>&1 || true
-    qm destroy "$vmid" --purge 1 >/dev/null 2>&1 || true
+    vm_node="${EXISTING_VM_NODES[$idx]}"
+    vm_tags="${EXISTING_VM_TAGS[$idx]}"
+    log_event "Destroying VM ${vmid} (${vm_name}) on ${vm_node}"
+    if [[ -n "$vm_tags" ]]; then
+      log_event "VM ${vm_name} tags: ${vm_tags}"
+    fi
+    pvesh create "/nodes/${vm_node}/qemu/${vmid}/status/stop" >/dev/null 2>&1 || true
+    pvesh delete "/nodes/${vm_node}/qemu/${vmid}" --purge 1 >/dev/null 2>&1 || true
   done
 
   for snippet in "${EXISTING_SNIPPETS[@]}"; do
@@ -520,12 +561,24 @@ cleanup_existing_cluster_resources() {
 
   if [[ "${EXISTING_USER_PRESENT}" -eq 1 ]]; then
     log_event "Removing Proxmox API user ${PROXMOX_USER}"
-    pveum user delete "$PROXMOX_USER" >/dev/null 2>&1 || true
+    if pveum user delete "$PROXMOX_USER" >/dev/null 2>&1; then
+      log_event "Removed Proxmox API user ${PROXMOX_USER}"
+    else
+      log_event "WARNING: Failed to remove Proxmox API user ${PROXMOX_USER}"
+    fi
   fi
 
   if [[ "${EXISTING_ROLE_PRESENT}" -eq 1 ]]; then
     log_event "Removing Proxmox role ${PROXMOX_ROLE}"
-    pveum role delete "$PROXMOX_ROLE" >/dev/null 2>&1 || true
+    if pveum role delete "$PROXMOX_ROLE" >/dev/null 2>&1; then
+      log_event "Removed Proxmox role ${PROXMOX_ROLE}"
+    else
+      log_event "WARNING: Failed to remove Proxmox role ${PROXMOX_ROLE}"
+    fi
+  fi
+
+  if [[ "${#EXISTING_SNIPPETS[@]}" -gt 0 ]]; then
+    log_event "Removed ${#EXISTING_SNIPPETS[@]} snippet(s)"
   fi
 
   progress_update "Removing cluster" "Cluster removed"
