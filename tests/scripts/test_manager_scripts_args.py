@@ -265,11 +265,10 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'proxmox_password: $proxmox_password' not in text
     assert 'normalize_json_object()' in text
     assert 'cluster_file="$clusters_dir/${CLUSTER_ID}.json"' in text
-    assert 'persisted_vm_node_map="$(jq -c \'.vm_node_map // {}\' "$cluster_file")"' in text
     assert 'vm_node_map_json="$(normalize_json_object "${VM_NODE_MAP:-{}}")"' in text
-    assert 'if [[ "$(jq -r \'length\' <<<"$vm_node_map_json")" -eq 0 ]] && [[ -f "$cluster_file" ]]; then' in text
-    assert 'Loaded vm_node_map from persisted cluster file ${cluster_file}' in text
-    assert 'Unable to resolve vm_node_map for cluster ${CLUSTER_ID}; persist it in ${cluster_file} or pass --vm-node-map' in text
+    assert 'if [[ "$(jq -r \'length\' <<<"$vm_node_map_json")" -eq 0 ]]; then' in text
+    assert 'Loaded vm_node_map from persisted cluster file ${cluster_file}' not in text
+    assert 'Unable to resolve vm_node_map for cluster ${CLUSTER_ID}; pass --vm-node-map from the current run' in text
     assert 'validate_vm_node_map' in text
     assert 'log "Talos placement ${name} -> ${host}"' in text
     assert '--argjson vm_node_map "$vm_node_map_json"' in text

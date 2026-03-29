@@ -17,17 +17,6 @@ current_vm_node_map="$(printf '%s' "$cluster_json" | jq -c '.vm_node_map // {}')
 effective_vm_node_map="$current_vm_node_map"
 effective_vm_node_map_source="step context"
 
-if [[ -f "$cluster_file" ]]; then
-  persisted_vm_node_map="$(jq -c '.vm_node_map // {}' "$cluster_file")"
-  if [[ "$persisted_vm_node_map" != "{}" ]]; then
-    if [[ "$current_vm_node_map" != "{}" && "$current_vm_node_map" != "$persisted_vm_node_map" ]]; then
-      echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: step context vm_node_map differs from persisted cluster file; using persisted cluster file" >&2
-    fi
-    effective_vm_node_map="$persisted_vm_node_map"
-    effective_vm_node_map_source="persisted cluster file"
-  fi
-fi
-
 if [[ "$effective_vm_node_map" == "{}" ]]; then
   fail "Missing vm_node_map for cluster ${cluster_id}"
 fi
