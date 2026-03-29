@@ -314,7 +314,9 @@ def test_setup_wizard_shows_runtime_progress_feedback():
     text = _wizard_text()
     assert "LIVE_LOG_MODE=0" in text
     assert "run_installation_flow()" in text
-    assert '--programbox "Building the VM." 20 78' in text
+    assert "render_installation_banner()" in text
+    assert '--title "Twinbox Setup"' in text
+    assert '--programbox "Management VM bootstrap in progress." 24 86' in text
     assert 'whiptail --backtitle "$BACKTITLE" --title "Twinbox" --infobox' not in text
     assert 'while kill -0 "$install_pid" 2>/dev/null; do' not in text
     assert "progress_update()" in text
@@ -324,6 +326,11 @@ def test_setup_wizard_shows_runtime_progress_feedback():
     assert 'progress_update "Preparing" "Building the VM"' in text
     assert 'progress_update "Starting VM" "Starting the VM"' in text
     assert 'progress_update "Waiting for VM" "Waiting for an IP address"' in text
+    assert 'Twinbox setup' in text
+    assert 'Management VM bootstrap in progress.' in text
+    assert '- Provisioning Proxmox access' in text
+    assert '- Creating the management VM' in text
+    assert '- Waiting for the web UI to become reachable' in text
     assert 'wait_for_management_vm_ping()' in text
     assert 'log_event "The VM is responding on the network"' in text
     assert 'log_event "Twinbox services are starting. This usually takes a few minutes on the first run."' in text
@@ -353,6 +360,7 @@ def test_setup_wizard_waits_for_real_management_url_without_placeholder_fallback
     text = _wizard_text()
     assert 'FINAL_COMPLETION_MESSAGE="Twinbox URL: http://<management-vm-ip>:3000"' not in text
     assert 'local message="${FINAL_COMPLETION_MESSAGE:-Twinbox URL: http://<management-vm-ip>:3000}"' not in text
+    assert 'msg_box "Twinbox Setup Complete"' in text
 
 
 def test_setup_wizard_does_not_manage_talos_install_media():

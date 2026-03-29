@@ -48,6 +48,19 @@ gauge_emit() {
   printf 'XXX\n%s\n%s\nXXX\n' "$percent" "$message"
 }
 
+render_installation_banner() {
+  cat <<'EOF'
+Twinbox setup
+Management VM bootstrap in progress.
+
+Live status
+- Provisioning Proxmox access
+- Creating the management VM
+- Waiting for the web UI to become reachable
+
+EOF
+}
+
 log_event() {
   local message="$1"
 
@@ -533,7 +546,7 @@ render_existing_cluster_inventory() {
   summary+="Twinbox cluster cleanup preview"$'\n'
   summary+="Cluster: ${CLUSTER_SLUG}"$'\n'
   summary+=$'\n'
-  summary+="Resources to remove:"$'\n'
+  summary+="This will remove:"$'\n'
   summary+="  - VMs: ${#EXISTING_VM_IDS[@]}"$'\n'
   summary+="  - Snippet files: ${#EXISTING_SNIPPETS[@]}"$'\n'
   summary+="  - Proxmox API user: "
@@ -1439,14 +1452,15 @@ run_installation_flow() {
   set +e
   {
     LIVE_LOG_MODE=1
+    render_installation_banner
     log_event "Building the VM."
     create_proxmox_api_user
     create_management_vm
     prepare_completion_message
   } 2>&1 | dialog \
     --backtitle "$BACKTITLE" \
-    --title "Twinbox" \
-    --programbox "Building the VM." 20 78
+    --title "Twinbox Setup" \
+    --programbox "Management VM bootstrap in progress." 24 86
   install_exit=${PIPESTATUS[0]}
   LIVE_LOG_MODE=0
   set -e
@@ -1462,7 +1476,7 @@ run_installation_flow() {
 print_next_steps() {
   local message="${FINAL_COMPLETION_MESSAGE}"
 
-  msg_box "Twinbox" "${message}\n\nOpen this in your browser:\n\n${MANAGEMENT_WEB_URL}\n\nPress OK to return to the main menu."
+  msg_box "Twinbox Setup Complete" "${message}\n\nOpen this in your browser:\n\n${MANAGEMENT_WEB_URL}\n\nPress OK to return to the main menu."
 }
 
 main() {
