@@ -556,6 +556,8 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
 
     assert 'order: 35' in wiredoor_text
     assert 'install-grafana' in wiredoor_text
+    assert 'KUBECONFIG_FILE:' in wiredoor_text
+    assert 'item: kubeconfig' in wiredoor_text
     assert 'script: categories/talos-cluster/steps/install-wiredoor-gateway/run.sh' in wiredoor_text
 
 

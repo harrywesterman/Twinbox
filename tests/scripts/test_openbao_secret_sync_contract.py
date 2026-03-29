@@ -40,10 +40,12 @@ def test_grafana_step_generates_and_syncs_a_bootstrap_secret():
 def test_wiredoor_step_requires_url_generates_token_and_syncs_to_openbao():
     text = _read(WIREDOOR_STEP)
 
-    assert 'wiredoor_secret_file="$BOOTSTRAP_ROOT/secrets/global/wiredoor-gateway.json"' in text
-    assert 'Wiredoor bootstrap secret file missing:' in text
-    assert 'WIREDOOR_URL missing in $wiredoor_secret_file' in text
+    assert 'mkdir -p "$(dirname "$wiredoor_secret_file")"' in text
+    assert 'if [[ ! -f "$wiredoor_secret_file" ]]; then' in text
+    assert 'wiredoor_url="${WIREDOOR_URL:-${TWINBOX_WIREDOOR_URL:-https://argocd.bierineenweek.nl}}"' in text
     assert 'openssl rand -hex 24' in text
+    assert 'wiredoor_secret_file="$BOOTSTRAP_ROOT/secrets/global/wiredoor-gateway.json"' in text
+    assert 'WIREDOOR_URL missing in $wiredoor_secret_file' in text
     assert 'scripts/manager/sync-openbao-global-secret.sh' in text
     assert '--secret-name "wiredoor-gateway"' in text
     assert '--required-keys "WIREDOOR_URL,TOKEN"' in text

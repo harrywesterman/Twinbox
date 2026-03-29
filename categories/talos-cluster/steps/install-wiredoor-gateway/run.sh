@@ -9,10 +9,22 @@ BOOTSTRAP_ROOT="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
 wiredoor_secret_file="$BOOTSTRAP_ROOT/secrets/global/wiredoor-gateway.json"
 manifest_path="$WORKSPACE_ROOT/gitops/apps/wiredoor-gateway.yaml"
 
-[[ -f "$wiredoor_secret_file" ]] || {
-  echo "Wiredoor bootstrap secret file missing: $wiredoor_secret_file" >&2
-  exit 1
-}
+mkdir -p "$(dirname "$wiredoor_secret_file")"
+
+if [[ ! -f "$wiredoor_secret_file" ]]; then
+  wiredoor_url="${WIREDOOR_URL:-${TWINBOX_WIREDOOR_URL:-https://argocd.bierineenweek.nl}}"
+  wiredoor_token="$(openssl rand -hex 24)"
+  tmp_file="$(mktemp)"
+  jq -n \
+    --arg wiredoor_url "$wiredoor_url" \
+    --arg token "$wiredoor_token" \
+    '{
+      "WIREDOOR_URL": $wiredoor_url,
+      "TOKEN": $token
+    }' >"$tmp_file"
+  install -m 600 "$tmp_file" "$wiredoor_secret_file"
+  rm -f "$tmp_file"
+fi
 
 wiredoor_url="$(jq -r '."WIREDOOR_URL" // empty' "$wiredoor_secret_file")"
 [[ -n "$wiredoor_url" ]] || {
