@@ -218,8 +218,8 @@
 
 .wizard-step {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 10px 12px;
   align-items: start;
   padding: 14px 14px 14px 12px;
   border: 1px solid rgba(148, 163, 184, 0.12);
@@ -251,6 +251,10 @@
   background: linear-gradient(135deg, #14b8a6, #10b981);
 }
 
+.wizard-step.is-complete .wizard-step-icon {
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.24), rgba(16, 185, 129, 0.24));
+}
+
 .wizard-step-index {
   display: inline-flex;
   align-items: center;
@@ -262,6 +266,18 @@
   color: #fff;
   font-weight: 700;
   letter-spacing: 0.08em;
+}
+
+.wizard-step-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 1rem;
 }
 
 .wizard-step-body strong {
@@ -370,6 +386,41 @@
   gap: 16px;
 }
 
+.wizard-step-header-copy {
+  display: grid;
+  gap: 10px;
+  max-width: 66ch;
+}
+
+.wizard-step-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wizard-step-icon-large {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  font-size: 1.45rem;
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.18), rgba(96, 165, 250, 0.18));
+  color: #0f172a;
+}
+
+.wizard-step-pitch {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--ink-1);
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.wizard-step-meta {
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+}
+
 .wizard-step-heading h2,
 .wizard-output-header h2 {
   font-size: 1.45rem;
@@ -383,6 +434,34 @@
   font-size: 0.84rem;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.wizard-step-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.wizard-step-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(15, 23, 42, 0.03);
+  color: var(--ink-1);
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.wizard-step-links a:hover,
+.wizard-step-links a:focus-visible {
+  border-color: rgba(20, 184, 166, 0.48);
+  background: rgba(20, 184, 166, 0.08);
 }
 
 .wizard-step-summary {

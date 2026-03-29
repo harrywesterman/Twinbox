@@ -3,6 +3,7 @@ import path from "path";
 
 import YAML from "yaml";
 import { normalizeSecretBundle } from "../../../lib/secrets/schema.mjs";
+import { resolveStepPresentation } from "../../../lib/step-presentation.mjs";
 
 import {
   parseIPv4,
@@ -112,16 +113,30 @@ function normalizeStepManifest(manifest, file, categoryId) {
     throw new Error(`runner.kind and runner.script are required in ${file}`);
   }
 
+  const journeyStage = normalizeJourneyStage(manifest.journey_stage, file);
+  const presentation = resolveStepPresentation({
+    id: String(manifest.id),
+    title: String(manifest.title),
+    summary: String(manifest.summary),
+    journey_stage: journeyStage,
+    type: String(manifest.type),
+    icon: manifest.icon,
+    project_url: manifest.project_url,
+    github_url: manifest.github_url,
+    positive_summary: manifest.positive_summary,
+  });
+
   return {
     id: String(manifest.id),
     category_id: categoryId,
     title: String(manifest.title),
     type: String(manifest.type),
-    journey_stage: normalizeJourneyStage(manifest.journey_stage, file),
+    journey_stage: journeyStage,
     order: Number(manifest.order),
     summary: String(manifest.summary),
     explanation: String(manifest.explanation),
     side_help: String(manifest.side_help),
+    ...presentation,
     inputs: manifest.inputs.map((input) => normalizeInputDefinition(input, file)),
     secrets: normalizeStepSecrets(manifest.secrets, file),
     depends_on: manifest.depends_on.map((dependency) => String(dependency)),

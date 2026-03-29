@@ -27,6 +27,12 @@ test('app source defines a wizard shell with export, import, and technical outpu
   assert.match(source, /wizard-network-summary/, 'expected a compact network summary');
   assert.match(source, /className="technical-panel" open/, 'expected technical details to be visible by default');
   assert.match(source, /LIVE OUTPUT/, 'expected a visible output panel');
+  assert.match(source, /wizard-step-icon/, 'expected step icons in the rail');
+  assert.match(source, /wizard-step-icon-large/, 'expected a larger icon in the active step header');
+  assert.match(source, /wizard-step-pitch/, 'expected a positive step description');
+  assert.match(source, /Step resources/, 'expected external step links');
+  assert.match(source, /Project/, 'expected a project link label');
+  assert.match(source, /GitHub/, 'expected a GitHub link label');
   assert.match(source, /Deploy Talos Cluster/, 'expected the Talos bootstrap step label');
   assert.match(source, /CURRENT STEP/, 'expected the current step to be shown first');
   assert.doesNotMatch(source, /Explore Twinbox/, 'should no longer read like a landing page');
@@ -44,6 +50,8 @@ test('styles define a wizard-first, responsive installer layout', async () => {
   assert.match(css, /\.technical-panel\[open\]\s*\{/, 'expected technical details to stay open');
   assert.match(css, /\.technical-panel-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/, 'expected technical output to span the full width');
   assert.match(css, /\.wizard-log-output\s*\{[\s\S]*min-height:\s*420px;/, 'expected a wide script output panel');
+  assert.match(css, /\.wizard-step-icon-large\s*\{/, 'expected the active-step icon treatment');
+  assert.match(css, /\.wizard-step-links\s*\{/, 'expected the step links row');
   assert.match(css, /\.wizard-scale-panel\s*\{/, 'expected the cluster scale summary');
   assert.match(css, /\.wizard-field input\[type='range'\]\s*\{/, 'expected the range slider styling');
   assert.doesNotMatch(css, /\.wizard-risk-list\s*\{/, 'expected current risks to be removed');

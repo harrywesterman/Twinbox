@@ -1,3 +1,5 @@
+import { resolveStepPresentation } from '../../lib/step-presentation.mjs';
+
 export const STORAGE_KEY = 'twinbox.installation-wizard.v1';
 
 function fallbackCatalog() {
@@ -13,6 +15,7 @@ function flattenSetupSteps(catalog) {
       .filter((step) => step?.journey_stage !== 'manage')
       .map((step) => ({
         ...step,
+        ...resolveStepPresentation(step),
         categoryId: category.id,
         categoryTitle: category.title,
         categorySummary: category.summary,
@@ -59,11 +62,15 @@ function buildStepRail(steps, activeStep) {
   return steps.map((step, index) => ({
     id: step.id,
     title: step.title,
+    icon: step.icon,
     index: index + 1,
     status: step.status,
     isCurrent: step.id === activeStep?.id,
     isComplete: isComplete(step),
     isLocked: step.status === 'locked',
+    project_url: step.project_url,
+    github_url: step.github_url,
+    positive_summary: step.positive_summary,
   }));
 }
 

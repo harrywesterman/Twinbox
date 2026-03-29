@@ -118,6 +118,10 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   assert.equal(model.stepRail.length, 28);
   assert.equal(model.stepRail[0].title, 'Deploy Talos Cluster');
   assert.equal(model.stepRail[0].isCurrent, true);
+  assert.equal(model.stepRail[0].icon, '🖥️');
+  assert.equal(model.stepRail[0].project_url, 'https://www.talos.dev/');
+  assert.equal(model.stepRail[0].github_url, 'https://github.com/siderolabs/talos');
+  assert.match(model.stepRail[0].positive_summary, /Twinbox stages/);
   assert.equal(model.primaryAction.label, 'Start step 1');
   assert.equal(model.progress.totalSteps, 28);
   assert.equal(model.progress.completedSteps, 0);
@@ -142,6 +146,7 @@ test('wizard model advances to the next step when the active step is done', () =
   assert.equal(model.primaryAction.label, 'Continue to step 2');
   assert.equal(model.progress.completedSteps, 1);
   assert.equal(model.healthBadges.find((badge) => badge.id === 'cluster').value, 'cluster_demo');
+  assert.equal(model.stepRail[1].icon, '🕸️');
 });
 
 test('wizard model switches to manage mode when setup flow is complete', () => {

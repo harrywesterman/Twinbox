@@ -118,6 +118,9 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert management["steps"][0]["type"] == "config"
             assert management["steps"][0]["journey_stage"] == "manage"
             assert management["steps"][0]["status"] == "ready"
+            assert management["steps"][0]["icon"]
+            assert management["steps"][0]["project_url"].startswith("https://")
+            assert management["steps"][0]["github_url"].startswith("https://")
 
             talos = body["categories"][1]
             assert [step["id"] for step in talos["steps"]] == [
@@ -165,6 +168,8 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert talos["steps"][4]["status"] == "locked"
             assert talos["steps"][4]["secrets"]["files"]["KUBECONFIG_FILE"]["item"] == "kubeconfig"
             assert talos["steps"][4]["secrets"]["files"]["KUBECONFIG_FILE"]["attachment"] == "kubeconfig"
+            assert talos["steps"][0]["icon"] == "🖥️"
+            assert talos["steps"][5]["icon"] == "🧭"
         finally:
             proc.terminate()
             proc.wait(timeout=5)

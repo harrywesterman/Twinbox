@@ -236,6 +236,27 @@ function getDisplayStepTitle(step) {
   return step.title;
 }
 
+function getStepPresentation(step) {
+  return {
+    icon: step?.icon || '🚀',
+    projectUrl: step?.project_url || '',
+    githubUrl: step?.github_url || '',
+    positiveSummary: step?.positive_summary || step?.summary || '',
+  };
+}
+
+function getStepLinkItems(step) {
+  const presentation = getStepPresentation(step);
+  return [
+    presentation.projectUrl
+      ? { label: 'Project', href: presentation.projectUrl }
+      : null,
+    presentation.githubUrl
+      ? { label: 'GitHub', href: presentation.githubUrl }
+      : null,
+  ].filter(Boolean);
+}
+
 function InputField({ stepId, input, value, onChange }) {
   const controlId = `${stepId}-${input.id}`;
   const helpText = input.help || 'Use the value from your Proxmox and cluster plan.';
@@ -1047,6 +1068,8 @@ function App() {
   const canInstallAll = !busy && model.mode === 'setup' && model.progress.remainingSteps > 0;
 
   const activeStepTitle = getDisplayStepTitle(model.activeStep);
+  const activeStepPresentation = getStepPresentation(model.activeStep);
+  const activeStepLinks = getStepLinkItems(model.activeStep);
 
   return (
     <div className="wizard-shell">
@@ -1121,6 +1144,7 @@ function App() {
                 }}
               >
                 <span className="wizard-step-index">{String(step.index).padStart(2, '0')}</span>
+                <span className="wizard-step-icon" aria-hidden="true">{step.icon || '🚀'}</span>
                 <span className="wizard-step-body">
                   <strong>{getDisplayStepTitle(model.steps.find((candidate) => candidate.id === step.id) || step)}</strong>
                   <small>{formatState(step.status, 'Ready')}</small>
@@ -1188,12 +1212,31 @@ function App() {
             <div className="wizard-flow">
               <section className="wizard-card wizard-step-workspace">
                 <div className="wizard-step-heading">
-                  <div>
+                  <div className="wizard-step-header-copy">
                     <p className="eyebrow">CURRENT STEP</p>
-                    <h2>{activeStepTitle || 'No step selected'}</h2>
+                    <div className="wizard-step-title-row">
+                      <span className="wizard-step-icon wizard-step-icon-large" aria-hidden="true">
+                        {activeStepPresentation.icon}
+                      </span>
+                      <h2>{activeStepTitle || 'No step selected'}</h2>
+                    </div>
+                    <p className="wizard-step-pitch">
+                      {activeStepPresentation.positiveSummary}
+                    </p>
                   </div>
-                  <div className="wizard-step-chip">
-                    <span>{model.primaryAction.label}</span>
+                  <div className="wizard-step-meta">
+                    <div className="wizard-step-chip">
+                      <span>{model.primaryAction.label}</span>
+                    </div>
+                    {activeStepLinks.length ? (
+                      <div className="wizard-step-links" aria-label="Step resources">
+                        {activeStepLinks.map((item) => (
+                          <a key={item.label} href={item.href} target="_blank" rel="noreferrer">
+                            {item.label}
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
