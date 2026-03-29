@@ -3,7 +3,7 @@ title: Install Flannel
 type: action
 journey_stage: setup
 order: 12
-summary: Flannel gives the cluster pod networking so applications can talk before Argo CD starts.
+summary: Flannel gives the cluster pod networking so applications in their pods can talk to each other before Argo CD starts.
 explanation: Twinbox installs Flannel directly as the bootstrap CNI because Kubernetes applications need pod networking before Argo CD itself can run. Argo CD adopts Flannel in the next step so the networking layer stays in GitOps.
 side_help: Flannel is the bootstrap exception that makes the cluster usable before GitOps takes over.
 depends_on:

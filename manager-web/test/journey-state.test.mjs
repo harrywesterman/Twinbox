@@ -244,6 +244,22 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
   ]);
 });
 
+test('wizard model defaults to step 1 when nothing is selected', () => {
+  const model = getMissionControlModel({
+    catalog: buildCatalog({ 'provision-nodes': 'ready' }),
+    logs: [],
+    cluster: null,
+    health: { ok: true },
+    error: '',
+    busy: false,
+    selectedStepId: '',
+  });
+
+  assert.equal(model.activeStep.id, 'provision-nodes');
+  assert.equal(model.stepRail[0].isCurrent, true);
+  assert.equal(model.primaryAction.label, 'Start step 1');
+});
+
 test('wizard export and import helpers round-trip answers and cluster ids', () => {
   const serialized = serializeUiState({
     selectedStepId: 'install-secret-sync',

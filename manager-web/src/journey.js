@@ -27,17 +27,13 @@ function isComplete(step) {
   return step?.status === 'done';
 }
 
-function isStepReady(step) {
-  return step?.status !== 'locked';
-}
-
 function pickActiveStep(steps, selectedStepId) {
   if (selectedStepId) {
     const selected = steps.find((step) => step.id === selectedStepId);
     if (selected) return selected;
   }
 
-  return steps.find((step) => !isComplete(step) && isStepReady(step)) || steps[0] || null;
+  return steps[0] || null;
 }
 
 function buildProgress(steps, activeStep) {

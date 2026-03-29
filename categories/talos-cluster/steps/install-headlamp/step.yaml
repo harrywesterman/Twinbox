@@ -3,9 +3,9 @@ title: Install Headlamp
 type: action
 journey_stage: setup
 order: 33
-summary: Apply the Headlamp GitOps application.
+summary: Apply the Headlamp GitOps application. It is a nice web based Kubernetes client.
 explanation: Headlamp is installed through a single Argo CD application that combines the Helm chart and ingress routes. The step waits until Argo CD reports it Synced and Healthy.
-side_help: Headlamp stays separate from the other apps so the operator console can be validated before the heavier workloads start.
+side_help: Headlamp is nice to look at the current state of the cluster, but remember; we are using GitOps, so changing anything will not help, Argo CD wil sync it right back.
 depends_on:
   - install-whoami
 inputs: []

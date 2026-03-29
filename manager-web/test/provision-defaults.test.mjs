@@ -131,3 +131,35 @@ test('mergeSuggestedProvisionDraft never overwrites dirty fields', () => {
   assert.equal(merged.dns_domain, '');
   assert.equal(merged.gateway_ip, '192.168.2.1');
 });
+
+test('mergeSuggestedProvisionDraft replaces first-load defaults with a live suggestion', () => {
+  const merged = mergeSuggestedProvisionDraft({
+    currentDraft: {
+      name: 'twinbox-cluster',
+      start_vmid: 200,
+      vip_ip: '192.168.1.50',
+      start_ip: '192.168.1.51',
+      node_prefix_length: 24,
+      gateway_ip: '192.168.1.1',
+      dns_servers: '1.1.1.1,1.0.0.1',
+      dns_domain: '',
+    },
+    previousSuggested: {},
+    suggestionData: {
+      name_suggestion: 'twinbox-lab',
+      start_vmid: 212,
+      vip_ip: '192.168.2.54',
+      start_ip: '192.168.2.55',
+      node_prefix_length: 24,
+      gateway_ip: '192.168.2.1',
+      dns_servers: ['1.1.1.1', '1.0.0.1'],
+      dns_domain: '',
+    },
+    stepInputs,
+  });
+
+  assert.equal(merged.name, 'twinbox-lab');
+  assert.equal(merged.vip_ip, '192.168.2.54');
+  assert.equal(merged.start_ip, '192.168.2.55');
+  assert.equal(merged.gateway_ip, '192.168.2.1');
+});

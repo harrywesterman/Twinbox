@@ -183,9 +183,7 @@ function pickStepId(steps, preferredStepId) {
     return preferredStepId;
   }
 
-  return steps.find((step) => step.status !== 'done' && step.status !== 'locked')?.id
-    || steps[0]?.id
-    || '';
+  return steps[0]?.id || '';
 }
 
 function buildPayloadInputs(step, stepAnswers = {}) {
@@ -684,11 +682,59 @@ function App() {
     }
   }
 
+  async function ensureProvisionDraft(step, currentDraft = {}) {
+    const managementIp = window.location.hostname;
+    const managementIpParts = managementIp.split('.').map((part) => Number(part));
+    const hasValidManagementIp = managementIpParts.length === 4
+      && managementIpParts.every((part) => Number.isInteger(part) && part >= 0 && part <= 255);
+
+    if (!hasValidManagementIp) {
+      return currentDraft;
+    }
+
+    const controlplaneCount = Number.isFinite(Number(currentDraft.controlplane_count))
+      ? Number(currentDraft.controlplane_count)
+      : 1;
+    const workerCount = Number.isFinite(Number(currentDraft.worker_count))
+      ? Number(currentDraft.worker_count)
+      : 0;
+    const nodeCount = Math.max(1, controlplaneCount + workerCount);
+    const suggestionKey = `${managementIp}:${nodeCount}`;
+    const previousSuggested = buildSuggestedProvisionInputs(provisionSuggestionSnapshotRef.current);
+
+    let suggestionData = provisionSuggestionSnapshotRef.current;
+    if (provisionSuggestionKeyRef.current !== suggestionKey || !suggestionData || Object.keys(suggestionData).length === 0) {
+      suggestionData = await requestJson(
+        `/api/ip-suggestions?management_ip=${encodeURIComponent(managementIp)}&node_count=${nodeCount}`,
+      );
+      provisionSuggestionKeyRef.current = suggestionKey;
+      provisionSuggestionSnapshotRef.current = suggestionData;
+    }
+
+    const merged = mergeSuggestedProvisionDraft({
+      currentDraft,
+      previousSuggested,
+      suggestionData,
+      stepInputs: step.inputs || [],
+      dirtyFields: Object.fromEntries([...provisionDirtyFieldsRef.current].map((fieldId) => [fieldId, true])),
+    });
+
+    setAnswers((current) => ({
+      ...current,
+      [step.id]: merged,
+    }));
+
+    return merged;
+  }
+
   async function executeStep(step, clusterIdOverride = clusterIdRef.current, options = {}) {
     const { manageBusy = true } = options;
-    const draft = buildPayloadInputs(step, answersRef.current?.[step.id] || {});
+    const currentStepDraft = answersRef.current?.[step.id] || {};
+    const draft = step.id === 'provision-nodes'
+      ? await ensureProvisionDraft(step, currentStepDraft)
+      : currentStepDraft;
     const body = {
-      inputs: draft,
+      inputs: buildPayloadInputs(step, draft),
     };
 
     if (step.id !== 'provision-nodes' && clusterIdOverride) {
@@ -703,8 +749,7 @@ function App() {
         return { ok: false, error: message };
       }
 
-      const stepAnswers = answersRef.current?.[step.id] || {};
-      const placement = buildProvisionPlacementBoard(step.inputs || [], stepAnswers, proxmoxResources);
+      const placement = buildProvisionPlacementBoard(step.inputs || [], draft, proxmoxResources);
       body.vm_node_map = placement.vmNodeMap;
     }
 
