@@ -219,6 +219,7 @@ proxmox_upload_talos_image() {
       curl -ksS --show-error \
         --output "$response_file" \
         --write-out '%{http_code}' \
+        --header "Expect:" \
         --cookie "$PROXMOX_TICKET_COOKIE" \
         --header "CSRFPreventionToken: ${PROXMOX_CSRF_TOKEN}" \
         --form "content=iso" \
