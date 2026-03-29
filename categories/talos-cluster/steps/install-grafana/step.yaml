@@ -2,10 +2,10 @@ id: install-grafana
 title: Install Grafana
 type: action
 journey_stage: setup
-order: 33
-summary: Enable Grafana, its secret bootstrap, and its routes as a separate phase.
-explanation: Grafana remains split into a secret bootstrap application, the Grafana chart itself, and a route bundle. This step activates those child applications in order and waits until they report Synced and Healthy.
-side_help: Grafana is now a distinct wizard step so the dashboard stack is clearly separated from the core platform bootstrap.
+order: 34
+summary: Apply the Grafana GitOps application after seeding the admin secret in OpenBao.
+explanation: Twinbox prepares the Grafana bootstrap secret in OpenBao and then applies one Argo CD application that combines the ExternalSecret, Grafana chart, and ingress routes. The step waits for Argo CD health before continuing.
+side_help: Grafana remains explicit in the wizard because it is the first monitoring workload that depends on both secret sync and ingress.
 depends_on:
   - install-headlamp
 inputs: []

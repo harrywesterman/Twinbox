@@ -36,10 +36,11 @@ Expected early files:
 Use the UI to:
 
 1. Deploy the Talos cluster
-2. Install Longhorn
-3. Install OpenBao and sync bootstrap secrets
-4. Install Argo CD
-5. Enable optional applications
+2. Install Flannel
+3. Install Argo CD
+4. Install Longhorn
+5. Install OpenBao and sync bootstrap secrets
+6. Install Traefik and continue through the GitOps application steps
 
 ## Recovery
 

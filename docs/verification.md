@@ -10,6 +10,8 @@ bash -n wizard/setup-wizard.sh \
   scripts/start-manager.sh \
   scripts/install-management-tools.sh \
   scripts/manager/apply-cluster.sh \
+  scripts/manager/install-flannel.sh \
+  scripts/manager/apply-argocd-application.sh \
   scripts/manager/install-longhorn-storage.sh \
   scripts/manager/install-secret-sync.sh \
   scripts/manager/openbao-secret-sync.sh \
@@ -63,6 +65,18 @@ Expected:
 
 - Longhorn manager and CSI components are running
 - `StorageClass/longhorn` exists
+
+### `install-traefik`
+
+```bash
+kubectl --kubeconfig <kubeconfig> get application -n argocd traefik
+kubectl --kubeconfig <kubeconfig> get ingressroute -A
+```
+
+Expected:
+
+- `Application/traefik` is healthy
+- Argo CD and Traefik dashboard routes exist
 
 ### `install-secret-sync`
 

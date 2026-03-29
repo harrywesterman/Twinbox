@@ -42,10 +42,12 @@ function makeStep(id, title, {
 function buildCatalog(stepStatuses = {}) {
   const setupSteps = [
     ['provision-nodes', 'Deploy Talos Cluster', { status: 'ready', dependsOn: [] }],
-    ['install-longhorn-storage', 'Install Longhorn storage', { dependsOn: ['provision-nodes'] }],
+    ['install-flannel', 'Install Flannel', { dependsOn: ['provision-nodes'] }],
+    ['install-argocd', 'Install Argo CD', { dependsOn: ['install-flannel'] }],
+    ['install-longhorn-storage', 'Install Longhorn storage', { dependsOn: ['install-argocd'] }],
     ['install-secret-sync', 'Install OpenBao and sync bootstrap secrets', { dependsOn: ['install-longhorn-storage'] }],
-    ['install-argocd', 'Install Argo CD', { dependsOn: ['install-secret-sync'] }],
-    ['install-whoami', 'Install Whoami', { dependsOn: ['install-argocd'] }],
+    ['install-traefik', 'Install Traefik', { dependsOn: ['install-secret-sync'] }],
+    ['install-whoami', 'Install Whoami', { dependsOn: ['install-traefik'] }],
     ['install-headlamp', 'Install Headlamp', { dependsOn: ['install-whoami'] }],
     ['install-grafana', 'Install Grafana', { dependsOn: ['install-headlamp'] }],
     ['install-wiredoor-gateway', 'Install Wiredoor gateway', { dependsOn: ['install-grafana'] }],
@@ -113,11 +115,11 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   });
 
   assert.equal(model.mode, 'setup');
-  assert.equal(model.stepRail.length, 26);
+  assert.equal(model.stepRail.length, 28);
   assert.equal(model.stepRail[0].title, 'Deploy Talos Cluster');
   assert.equal(model.stepRail[0].isCurrent, true);
   assert.equal(model.primaryAction.label, 'Start step 1');
-  assert.equal(model.progress.totalSteps, 26);
+  assert.equal(model.progress.totalSteps, 28);
   assert.equal(model.progress.completedSteps, 0);
   assert.equal(model.activity.runtime.currentStage, 'Applying cluster plan');
 });
@@ -126,7 +128,7 @@ test('wizard model advances to the next step when the active step is done', () =
   const model = getMissionControlModel({
     catalog: buildCatalog({
       'provision-nodes': 'done',
-      'install-secret-sync': 'ready',
+      'install-flannel': 'ready',
     }),
     logs: [],
     cluster: { id: 'cluster_demo', status: 'provisioned' },
@@ -147,9 +149,11 @@ test('wizard model switches to manage mode when setup flow is complete', () => {
     Object.fromEntries(
       [
         'provision-nodes',
+        'install-flannel',
+        'install-argocd',
         'install-longhorn-storage',
         'install-secret-sync',
-        'install-argocd',
+        'install-traefik',
         'install-whoami',
         'install-headlamp',
         'install-grafana',
@@ -202,12 +206,14 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     selectedStepId: '',
   });
 
-  assert.equal(model.stepRail.length, 26);
+  assert.equal(model.stepRail.length, 28);
   assert.deepEqual(model.stepRail.map((step) => step.id), [
     'provision-nodes',
+    'install-flannel',
+    'install-argocd',
     'install-longhorn-storage',
     'install-secret-sync',
-    'install-argocd',
+    'install-traefik',
     'install-whoami',
     'install-headlamp',
     'install-grafana',

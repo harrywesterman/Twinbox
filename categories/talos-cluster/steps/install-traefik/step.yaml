@@ -1,0 +1,21 @@
+id: install-traefik
+title: Install Traefik
+type: action
+journey_stage: setup
+order: 31
+summary: Apply the Traefik GitOps application after secret sync is ready.
+explanation: Twinbox installs Traefik through a single Argo CD application that includes the chart, dashboard authentication resources, and ingress routes for the Traefik dashboard and Argo CD.
+side_help: Traefik stays visible as its own wizard step so you can verify ingress and dashboard routing before the later application wave starts.
+depends_on:
+  - install-secret-sync
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/install-traefik/run.sh

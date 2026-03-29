@@ -3,11 +3,11 @@ title: Install Longhorn Storage
 type: action
 journey_stage: setup
 order: 15
-summary: Install Longhorn storage directly with Helm and wait for the storage class to become available.
-explanation: Twinbox installs Longhorn as an early storage prerequisite directly from the manager runtime, waits for the Longhorn controllers to become ready, and only then continues to later cluster steps.
-side_help: Storage now comes before secret sync and application installs so later workloads can rely on persistent volumes only after Longhorn is actually ready.
+summary: Apply the Longhorn GitOps application and wait for the storage class to become available.
+explanation: Twinbox installs Longhorn through a dedicated Argo CD application after Argo CD is online. The step waits until Argo reports the application healthy and the Longhorn storage class is ready before continuing.
+side_help: Longhorn is the first stateful GitOps application after the Argo CD control plane. Secret sync and later workloads only run after Longhorn is really usable.
 depends_on:
-  - provision-nodes
+  - install-argocd
 inputs: []
 secrets:
   files:

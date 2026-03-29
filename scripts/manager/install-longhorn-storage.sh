@@ -1,50 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"
-
-export KUBECONFIG="$KUBECONFIG_FILE"
-
-cluster_id="$(printf '%s' "${STEP_CONTEXT_JSON:-{}}" | jq -r '.cluster.id // empty')"
-chart_version="${LONGHORN_CHART_VERSION:-1.11.1}"
-release_name="${LONGHORN_RELEASE_NAME:-longhorn}"
-namespace="${LONGHORN_NAMESPACE:-longhorn-system}"
-
-command -v kubectl >/dev/null 2>&1 || {
-  echo "kubectl not found" >&2
-  exit 1
-}
-command -v helm >/dev/null 2>&1 || {
-  echo "helm not found" >&2
-  exit 1
-}
-command -v jq >/dev/null 2>&1 || {
-  echo "jq not found" >&2
-  exit 1
-}
-
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
-
-ensure_namespace() {
-  log "Ensuring ${namespace} namespace exists with privileged Pod Security labels"
-  kubectl create namespace "$namespace" --dry-run=client -o yaml | kubectl apply --validate=false -f - >/dev/null
-  kubectl label namespace "$namespace" \
-    pod-security.kubernetes.io/enforce=privileged \
-    pod-security.kubernetes.io/enforce-version=latest \
-    pod-security.kubernetes.io/audit=privileged \
-    pod-security.kubernetes.io/audit-version=latest \
-    pod-security.kubernetes.io/warn=privileged \
-    pod-security.kubernetes.io/warn-version=latest \
-    --overwrite >/dev/null
-}
-
-wait_for_rollout() {
-  local kind="$1"
-  local name="$2"
-  log "Waiting for ${kind}/${name} in ${namespace}"
-  kubectl rollout status "${kind}/${name}" -n "$namespace" --timeout=600s
-}
 
 wait_for_storage_class() {
   local storage_class="${LONGHORN_STORAGE_CLASS:-longhorn}"
@@ -67,36 +25,35 @@ wait_for_storage_class() {
   done
 }
 
-log "Installing Longhorn ${chart_version} directly with Helm"
-ensure_namespace
-helm repo add longhorn https://charts.longhorn.io >/dev/null 2>&1 || true
-helm repo update longhorn >/dev/null
-helm upgrade --install "$release_name" longhorn/longhorn \
-  --namespace "$namespace" \
-  --create-namespace \
-  --version "$chart_version" \
-  --wait \
-  --timeout 10m \
-  --set preUpgradeChecker.jobEnabled=false \
-  --set-string defaultSetting.taintToleration='node-role.kubernetes.io/control-plane:NoSchedule;node-role.kubernetes.io/master:NoSchedule'
+[[ -n "${KUBECONFIG_FILE:-}" ]] || fail "KUBECONFIG_FILE is required"
+[[ -f "${KUBECONFIG_FILE:-}" ]] || fail "kubeconfig not found at ${KUBECONFIG_FILE:-}"
 
-wait_for_rollout deployment longhorn-driver-deployer
-wait_for_rollout daemonset longhorn-manager
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+manifest_path="$WORKSPACE_ROOT/gitops/apps/longhorn.yaml"
+cluster_id="${TWINBOX_CLUSTER_ID:-}"
+
+command -v kubectl >/dev/null 2>&1 || fail "kubectl not found"
+command -v jq >/dev/null 2>&1 || fail "jq not found"
+
+export KUBECONFIG="$KUBECONFIG_FILE"
+
+log "Installing Longhorn through Argo CD"
+bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+  --manifest "$manifest_path" \
+  --application "longhorn"
 wait_for_storage_class
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \
     --arg cluster_id "$cluster_id" \
-    --arg release_name "$release_name" \
-    --arg namespace "$namespace" \
-    --arg chart_version "$chart_version" \
+    --arg application "longhorn" \
+    --arg manifest_path "$manifest_path" \
     --arg storage_class "$(printf '%s' "${LONGHORN_STORAGE_CLASS:-longhorn}")" \
     '{
       cluster_id: $cluster_id,
-      release_name: $release_name,
-      namespace: $namespace,
-      chart_version: $chart_version,
+      application: $application,
+      manifest_path: $manifest_path,
       storage_class: $storage_class,
-      install_mode: "helm"
+      install_mode: "argocd"
     }' >"$STEP_RESULT_FILE"
 fi

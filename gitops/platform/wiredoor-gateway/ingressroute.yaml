@@ -1,0 +1,15 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: argocd-wiredoor
+  namespace: argocd
+spec:
+  entryPoints:
+    - webwiredoor
+  routes:
+    - kind: Rule
+      match: Host(`argocd.bierineenweek.nl`)
+      services:
+        - kind: Service
+          name: argocd-server
+          port: 80

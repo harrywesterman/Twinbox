@@ -6,9 +6,8 @@ set -euo pipefail
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 BOOTSTRAP_ROOT="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
-cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
-cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 wiredoor_secret_file="$BOOTSTRAP_ROOT/secrets/global/wiredoor-gateway.json"
+manifest_path="$WORKSPACE_ROOT/gitops/apps/wiredoor-gateway.yaml"
 
 [[ -f "$wiredoor_secret_file" ]] || {
   echo "Wiredoor bootstrap secret file missing: $wiredoor_secret_file" >&2
@@ -35,7 +34,6 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --json-file "$wiredoor_secret_file" \
   --required-keys "WIREDOOR_URL,TOKEN"
 
-bash "$WORKSPACE_ROOT/scripts/manager/enable-argocd-apps.sh" \
-  --cluster-id "$cluster_id" \
-  --enabled-apps "wiredoor-gateway" \
-  --applications "wiredoor-gateway-secret,wiredoor-gateway,wiredoor-gateway-routes"
+bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+  --manifest "$manifest_path" \
+  --application "wiredoor-gateway"

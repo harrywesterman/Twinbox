@@ -1,9 +1,0 @@
-ingressRoutes:
-  - name: argocd-wiredoor
-    namespace: argocd
-    entryPoints:
-      - webwiredoor
-    match: "Host(`argocd.bierineenweek.nl`)"
-    service:
-      name: argocd-server
-      port: 80

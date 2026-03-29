@@ -1,0 +1,32 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: headlamp
+  namespace: kube-system
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`headlamp.bierineenweek.nl`)
+      services:
+        - kind: Service
+          name: my-headlamp
+          port: 80
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: headlamp-wiredoor
+  namespace: kube-system
+spec:
+  entryPoints:
+    - webwiredoor
+  routes:
+    - kind: Rule
+      match: Host(`headlamp.bierineenweek.nl`)
+      services:
+        - kind: Service
+          name: my-headlamp
+          port: 80

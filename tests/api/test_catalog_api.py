@@ -122,9 +122,11 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             talos = body["categories"][1]
             assert [step["id"] for step in talos["steps"]] == [
                 "provision-nodes",
+                "install-flannel",
+                "install-argocd",
                 "install-longhorn-storage",
                 "install-secret-sync",
-                "install-argocd",
+                "install-traefik",
                 "install-whoami",
                 "install-headlamp",
                 "install-grafana",
@@ -148,18 +150,21 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-freshrss",
                 "install-jitsi",
             ]
-            assert talos["steps"][1]["title"] == "Install Longhorn Storage"
-            assert talos["steps"][2]["title"] == "Install OpenBao and sync bootstrap secrets"
-            assert talos["steps"][4]["title"] == "Install Whoami"
-            assert talos["steps"][5]["title"] == "Install Headlamp"
-            assert talos["steps"][6]["title"] == "Install Grafana"
-            assert talos["steps"][7]["title"] == "Install Wiredoor gateway"
+            assert talos["steps"][1]["title"] == "Install Flannel"
+            assert talos["steps"][2]["title"] == "Install Argo CD"
+            assert talos["steps"][3]["title"] == "Install Longhorn Storage"
+            assert talos["steps"][4]["title"] == "Install OpenBao and sync bootstrap secrets"
+            assert talos["steps"][5]["title"] == "Install Traefik"
+            assert talos["steps"][6]["title"] == "Install Whoami"
+            assert talos["steps"][7]["title"] == "Install Headlamp"
+            assert talos["steps"][8]["title"] == "Install Grafana"
+            assert talos["steps"][9]["title"] == "Install Wiredoor gateway"
             assert talos["steps"][0]["journey_stage"] == "setup"
             assert talos["steps"][0]["status"] == "ready"
             assert talos["steps"][1]["status"] == "locked"
-            assert talos["steps"][2]["status"] == "locked"
-            assert talos["steps"][2]["secrets"]["files"]["KUBECONFIG_FILE"]["item"] == "kubeconfig"
-            assert talos["steps"][2]["secrets"]["files"]["KUBECONFIG_FILE"]["attachment"] == "kubeconfig"
+            assert talos["steps"][4]["status"] == "locked"
+            assert talos["steps"][4]["secrets"]["files"]["KUBECONFIG_FILE"]["item"] == "kubeconfig"
+            assert talos["steps"][4]["secrets"]["files"]["KUBECONFIG_FILE"]["attachment"] == "kubeconfig"
         finally:
             proc.terminate()
             proc.wait(timeout=5)
@@ -400,10 +405,10 @@ def test_catalog_keeps_latest_cluster_step_state_for_follow_up_steps():
             ),
             encoding="utf-8",
         )
-        _cluster_step_state(data_dir, cluster_id, "install-longhorn-storage").write_text(
+        _cluster_step_state(data_dir, cluster_id, "install-flannel").write_text(
             json.dumps(
                 {
-                    "step_id": "install-longhorn-storage",
+                    "step_id": "install-flannel",
                     "status": "succeeded",
                     "inputs": {},
                     "outputs": {"cluster_id": cluster_id},
@@ -415,10 +420,10 @@ def test_catalog_keeps_latest_cluster_step_state_for_follow_up_steps():
             ),
             encoding="utf-8",
         )
-        _cluster_step_state(data_dir, cluster_id, "install-secret-sync").write_text(
+        _cluster_step_state(data_dir, cluster_id, "install-argocd").write_text(
             json.dumps(
                 {
-                    "step_id": "install-secret-sync",
+                    "step_id": "install-argocd",
                     "status": "succeeded",
                     "inputs": {},
                     "outputs": {"cluster_id": cluster_id},
@@ -442,11 +447,101 @@ def test_catalog_keeps_latest_cluster_step_state_for_follow_up_steps():
             assert talos["steps"][0]["id"] == "provision-nodes"
             assert talos["steps"][0]["status"] == "done"
             assert talos["steps"][0]["state"]["cluster_id"] == cluster_id
-            assert talos["steps"][1]["id"] == "install-longhorn-storage"
+            assert talos["steps"][1]["id"] == "install-flannel"
             assert talos["steps"][1]["status"] == "done"
-            assert talos["steps"][2]["id"] == "install-secret-sync"
+            assert talos["steps"][2]["id"] == "install-argocd"
             assert talos["steps"][2]["status"] == "done"
-            assert talos["steps"][3]["id"] == "install-argocd"
+            assert talos["steps"][3]["id"] == "install-longhorn-storage"
+            assert talos["steps"][3]["status"] == "ready"
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
+def test_catalog_keeps_latest_cluster_step_state_for_follow_up_steps_after_argocd_bootstrap():
+    with tempfile.TemporaryDirectory() as td:
+        data_dir = Path(td) / "data"
+        port = _find_free_port()
+
+        (data_dir / "clusters").mkdir(parents=True, exist_ok=True)
+        (data_dir / "step-state").mkdir(parents=True, exist_ok=True)
+        (data_dir / "jobs").mkdir(parents=True, exist_ok=True)
+
+        cluster_id = "cluster_old"
+        (data_dir / "clusters" / f"{cluster_id}.json").write_text(
+            json.dumps(
+                {
+                    "id": cluster_id,
+                    "name": "twinbox-old",
+                    "status": "bootstrapped",
+                    "created_at": "2026-03-20T10:00:00Z",
+                    "updated_at": "2026-03-20T10:10:00Z",
+                }
+            ),
+            encoding="utf-8",
+        )
+        (data_dir / "step-state" / "clusters" / cluster_id).mkdir(parents=True, exist_ok=True)
+        _cluster_step_state(data_dir, cluster_id, "provision-nodes").write_text(
+            json.dumps(
+                {
+                    "step_id": "provision-nodes",
+                    "status": "succeeded",
+                    "inputs": {"name": "old"},
+                    "outputs": {"cluster_id": cluster_id},
+                    "cluster_id": cluster_id,
+                    "error": None,
+                    "updated_at": "2026-03-20T10:09:00Z",
+                    "last_job_id": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+        _cluster_step_state(data_dir, cluster_id, "install-flannel").write_text(
+            json.dumps(
+                {
+                    "step_id": "install-flannel",
+                    "status": "succeeded",
+                    "inputs": {},
+                    "outputs": {"cluster_id": cluster_id},
+                    "cluster_id": cluster_id,
+                    "error": None,
+                    "updated_at": "2026-03-20T10:09:30Z",
+                    "last_job_id": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+        _cluster_step_state(data_dir, cluster_id, "install-argocd").write_text(
+            json.dumps(
+                {
+                    "step_id": "install-argocd",
+                    "status": "succeeded",
+                    "inputs": {},
+                    "outputs": {"cluster_id": cluster_id},
+                    "cluster_id": cluster_id,
+                    "error": None,
+                    "updated_at": "2026-03-20T10:10:00Z",
+                    "last_job_id": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+        proc = _start_api(data_dir, port)
+        try:
+            base = f"http://127.0.0.1:{port}"
+            _wait_for_health(base)
+
+            status, body = _get_json(f"{base}/api/catalog")
+            assert status == 200
+
+            talos = body["categories"][1]
+            assert talos["steps"][0]["id"] == "provision-nodes"
+            assert talos["steps"][0]["status"] == "done"
+            assert talos["steps"][1]["id"] == "install-flannel"
+            assert talos["steps"][1]["status"] == "done"
+            assert talos["steps"][2]["id"] == "install-argocd"
+            assert talos["steps"][2]["status"] == "done"
+            assert talos["steps"][3]["id"] == "install-longhorn-storage"
             assert talos["steps"][3]["status"] == "ready"
         finally:
             proc.terminate()
@@ -516,11 +611,11 @@ def test_catalog_cluster_id_query_scopes_follow_up_state_to_requested_cluster():
             assert talos["steps"][0]["id"] == "provision-nodes"
             assert talos["steps"][0]["status"] == "done"
             assert talos["steps"][0]["state"]["cluster_id"] == older_cluster_id
-            assert talos["steps"][1]["id"] == "install-longhorn-storage"
+            assert talos["steps"][1]["id"] == "install-flannel"
             assert talos["steps"][1]["status"] == "ready"
-            assert talos["steps"][2]["id"] == "install-secret-sync"
+            assert talos["steps"][2]["id"] == "install-argocd"
             assert talos["steps"][2]["status"] == "locked"
-            assert talos["steps"][3]["id"] == "install-argocd"
+            assert talos["steps"][3]["id"] == "install-longhorn-storage"
             assert talos["steps"][3]["status"] == "locked"
         finally:
             proc.terminate()
@@ -559,11 +654,11 @@ def test_catalog_synthesizes_provision_state_for_bootstrapped_cluster_without_st
             assert talos["steps"][0]["status"] == "done"
             assert talos["steps"][0]["state"]["cluster_id"] == cluster_id
             assert talos["steps"][0]["state"]["outputs"]["cluster_status"] == "bootstrapped"
-            assert talos["steps"][1]["id"] == "install-longhorn-storage"
+            assert talos["steps"][1]["id"] == "install-flannel"
             assert talos["steps"][1]["status"] == "ready"
-            assert talos["steps"][2]["id"] == "install-secret-sync"
+            assert talos["steps"][2]["id"] == "install-argocd"
             assert talos["steps"][2]["status"] == "locked"
-            assert talos["steps"][3]["id"] == "install-argocd"
+            assert talos["steps"][3]["id"] == "install-longhorn-storage"
             assert talos["steps"][3]["status"] == "locked"
         finally:
             proc.terminate()
@@ -611,6 +706,36 @@ def test_execute_follow_up_cluster_step_requires_explicit_cluster_context():
                     "cluster_id": cluster_id,
                     "error": None,
                     "updated_at": "2026-03-20T10:09:00Z",
+                    "last_job_id": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+        _cluster_step_state(data_dir, cluster_id, "install-flannel").write_text(
+            json.dumps(
+                {
+                    "step_id": "install-flannel",
+                    "status": "succeeded",
+                    "inputs": {},
+                    "outputs": {"cluster_id": cluster_id},
+                    "cluster_id": cluster_id,
+                    "error": None,
+                    "updated_at": "2026-03-20T10:09:30Z",
+                    "last_job_id": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+        _cluster_step_state(data_dir, cluster_id, "install-argocd").write_text(
+            json.dumps(
+                {
+                    "step_id": "install-argocd",
+                    "status": "succeeded",
+                    "inputs": {},
+                    "outputs": {"cluster_id": cluster_id},
+                    "cluster_id": cluster_id,
+                    "error": None,
+                    "updated_at": "2026-03-20T10:09:45Z",
                     "last_job_id": None,
                 }
             ),
@@ -709,6 +834,36 @@ def test_execute_follow_up_cluster_step_uses_requested_cluster_context_and_secre
                     "cluster_id": selected_cluster_id,
                     "error": None,
                     "updated_at": "2026-03-20T10:09:00Z",
+                    "last_job_id": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+        _cluster_step_state(data_dir, selected_cluster_id, "install-flannel").write_text(
+            json.dumps(
+                {
+                    "step_id": "install-flannel",
+                    "status": "succeeded",
+                    "inputs": {},
+                    "outputs": {"cluster_id": selected_cluster_id},
+                    "cluster_id": selected_cluster_id,
+                    "error": None,
+                    "updated_at": "2026-03-20T10:09:30Z",
+                    "last_job_id": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+        _cluster_step_state(data_dir, selected_cluster_id, "install-argocd").write_text(
+            json.dumps(
+                {
+                    "step_id": "install-argocd",
+                    "status": "succeeded",
+                    "inputs": {},
+                    "outputs": {"cluster_id": selected_cluster_id},
+                    "cluster_id": selected_cluster_id,
+                    "error": None,
+                    "updated_at": "2026-03-20T10:09:45Z",
                     "last_job_id": None,
                 }
             ),
@@ -835,10 +990,10 @@ def test_execute_argo_follow_up_cluster_step_uses_requested_cluster_context_and_
             ),
             encoding="utf-8",
         )
-        _cluster_step_state(data_dir, selected_cluster_id, "install-longhorn-storage").write_text(
+        _cluster_step_state(data_dir, selected_cluster_id, "install-flannel").write_text(
             json.dumps(
                 {
-                    "step_id": "install-longhorn-storage",
+                    "step_id": "install-flannel",
                     "status": "succeeded",
                     "inputs": {},
                     "outputs": {"cluster_id": selected_cluster_id},
@@ -850,10 +1005,10 @@ def test_execute_argo_follow_up_cluster_step_uses_requested_cluster_context_and_
             ),
             encoding="utf-8",
         )
-        _cluster_step_state(data_dir, selected_cluster_id, "install-secret-sync").write_text(
+        _cluster_step_state(data_dir, selected_cluster_id, "install-argocd").write_text(
             json.dumps(
                 {
-                    "step_id": "install-secret-sync",
+                    "step_id": "install-argocd",
                     "status": "succeeded",
                     "inputs": {},
                     "outputs": {"cluster_id": selected_cluster_id},

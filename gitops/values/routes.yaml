@@ -1,5 +1,0 @@
-domain: bierineenweek.nl
-
-hosts:
-  argocd: argocd
-  traefik: traefik

@@ -2,10 +2,10 @@ id: install-headlamp
 title: Install Headlamp
 type: action
 journey_stage: setup
-order: 32
-summary: Enable the Headlamp app and its route bundle.
-explanation: Headlamp is installed after the first optional app so the wizard keeps progressing through smaller, clearly separated platform tasks. This step enables the Headlamp application and route bundle, then waits for both to become Synced and Healthy.
-side_help: Headlamp is the operator console and is now activated as its own step instead of being bundled into the initial root sync.
+order: 33
+summary: Apply the Headlamp GitOps application.
+explanation: Headlamp is installed through a single Argo CD application that combines the Helm chart and ingress routes. The step waits until Argo CD reports it Synced and Healthy.
+side_help: Headlamp stays separate from the other apps so the operator console can be validated before the heavier workloads start.
 depends_on:
   - install-whoami
 inputs: []

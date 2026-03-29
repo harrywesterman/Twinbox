@@ -16,6 +16,8 @@ Twinbox is manager-first. The Management VM is the control point for bootstrap, 
 
 3. **Execution layer**
    - `scripts/manager/apply-cluster.sh`
+   - `scripts/manager/install-flannel.sh`
+   - `scripts/manager/apply-argocd-application.sh`
    - `scripts/manager/install-longhorn-storage.sh`
    - `scripts/manager/install-secret-sync.sh`
    - `scripts/manager/install-argocd.sh`
@@ -47,10 +49,12 @@ Twinbox is manager-first. The Management VM is the control point for bootstrap, 
 
 1. The Management VM bootstraps local JSON files under `/opt/twinbox/bootstrap/secrets/global/`.
 2. `provision-nodes` materializes Talos runtime files from the local bootstrap tree and cluster-scoped attachments.
-3. `install-longhorn-storage` runs before cluster secret sync so stateful workloads can use Longhorn PVCs immediately.
-4. `install-secret-sync` installs External Secrets Operator and OpenBao on Longhorn.
-5. `install-secret-sync` seeds OpenBao from the Management VM bootstrap files and creates `ClusterSecretStore/openbao`.
-6. GitOps apps consume secrets through `ExternalSecret` resources backed by `ClusterSecretStore/openbao`.
+3. `install-flannel` bootstraps pod networking so the cluster can run the Argo CD control plane.
+4. `install-argocd` installs Argo CD and starts tracking Flannel through a GitOps `Application`.
+5. `install-longhorn-storage` runs before cluster secret sync so stateful workloads can use Longhorn PVCs immediately.
+6. `install-secret-sync` installs External Secrets Operator and OpenBao on Longhorn.
+7. `install-secret-sync` seeds OpenBao from the Management VM bootstrap files and creates `ClusterSecretStore/openbao`.
+8. GitOps apps consume secrets through `ExternalSecret` resources backed by `ClusterSecretStore/openbao`.
 
 ## Runtime Guarantees
 

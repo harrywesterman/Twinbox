@@ -12,41 +12,41 @@ MODULE_OUTPUTS = REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "outputs.t
 INSTALL_SECRET_SYNC_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-secret-sync.sh"
 OPENBAO_SECRET_SYNC_HELPER = REPO_ROOT / "scripts" / "manager" / "sync-openbao-global-secret.sh"
 ARGO_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-argocd.sh"
+APPLY_ARGO_APP_SCRIPT = REPO_ROOT / "scripts" / "manager" / "apply-argocd-application.sh"
+FLANNEL_HELPER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-flannel.sh"
 ARGO_STEP_SCRIPT = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
-ENABLE_ARGOCD_APPS_SCRIPT = REPO_ROOT / "scripts" / "manager" / "enable-argocd-apps.sh"
+FLANNEL_STEP_SCRIPT = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-flannel" / "run.sh"
+FLANNEL_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-flannel" / "step.yaml"
 LONGHORN_STEP_SCRIPT = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-longhorn-storage" / "run.sh"
 LONGHORN_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-longhorn-storage" / "step.yaml"
 LONGHORN_HELPER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-longhorn-storage.sh"
+TRAEFIK_STEP_SCRIPT = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-traefik" / "run.sh"
+TRAEFIK_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-traefik" / "step.yaml"
 WHOAMI_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-whoami" / "step.yaml"
 HEADLAMP_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-headlamp" / "step.yaml"
 GRAFANA_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-grafana" / "step.yaml"
 WIREDOOR_GATEWAY_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-wiredoor-gateway" / "step.yaml"
 ARGO_BOOTSTRAP_SCRIPT = REPO_ROOT / "gitops" / "install.sh"
-ARGO_ROOT = REPO_ROOT / "gitops" / "argocd" / "root.yaml"
-WHOAMI_DEPLOYMENT = REPO_ROOT / "gitops" / "apps" / "whoami" / "deployment.yaml"
+FLANNEL_APP = REPO_ROOT / "gitops" / "apps" / "flannel.yaml"
+LONGHORN_APP = REPO_ROOT / "gitops" / "apps" / "longhorn.yaml"
+TRAEFIK_APP = REPO_ROOT / "gitops" / "apps" / "traefik.yaml"
+WHOAMI_APP = REPO_ROOT / "gitops" / "apps" / "whoami.yaml"
+HEADLAMP_APP = REPO_ROOT / "gitops" / "apps" / "headlamp.yaml"
+GRAFANA_APP = REPO_ROOT / "gitops" / "apps" / "grafana.yaml"
+WIREDOOR_GATEWAY_APP = REPO_ROOT / "gitops" / "apps" / "wiredoor-gateway.yaml"
+WHOAMI_DEPLOYMENT = REPO_ROOT / "gitops" / "platform" / "whoami" / "deployment.yaml"
 HEADLAMP_VALUES = REPO_ROOT / "gitops" / "values" / "headlamp.yaml"
-ROUTES_VALUES = REPO_ROOT / "gitops" / "values" / "routes.yaml"
-OPTIONAL_ROUTES_CHART = REPO_ROOT / "gitops" / "optional-routes" / "templates" / "ingressroutes.yaml"
-WHOAMI_ROUTES_VALUES = REPO_ROOT / "gitops" / "values" / "optional-routes" / "whoami.yaml"
-HEADLAMP_ROUTES_VALUES = REPO_ROOT / "gitops" / "values" / "optional-routes" / "headlamp.yaml"
-GRAFANA_ROUTES_VALUES = REPO_ROOT / "gitops" / "values" / "optional-routes" / "grafana.yaml"
-WIREDOOR_GATEWAY_ROUTES_VALUES = REPO_ROOT / "gitops" / "values" / "optional-routes" / "wiredoor-gateway.yaml"
+LONGHORN_VALUES = REPO_ROOT / "gitops" / "values" / "longhorn.yaml"
 TRAEFIK_VALUES = REPO_ROOT / "gitops" / "values" / "traefik.yaml"
 WIREDOOR_GATEWAY_VALUES = REPO_ROOT / "gitops" / "values" / "wiredoor-gateway.yaml"
 GRAFANA_VALUES = REPO_ROOT / "gitops" / "values" / "grafana.yaml"
-TRAEFIK_APP = REPO_ROOT / "gitops" / "argocd" / "apps" / "traefik.yaml"
-ROUTES_APP = REPO_ROOT / "gitops" / "argocd" / "apps" / "routes.yaml"
-WHOAMI_APP = REPO_ROOT / "gitops" / "argocd" / "optional" / "apps" / "whoami.yaml"
-WHOAMI_ROUTES_APP = REPO_ROOT / "gitops" / "argocd" / "optional" / "routes" / "whoami.yaml"
-HEADLAMP_APP = REPO_ROOT / "gitops" / "argocd" / "optional" / "apps" / "headlamp.yaml"
-HEADLAMP_ROUTES_APP = REPO_ROOT / "gitops" / "argocd" / "optional" / "routes" / "headlamp.yaml"
-WIREDOOR_GATEWAY_APP = REPO_ROOT / "gitops" / "argocd" / "optional" / "apps" / "wiredoor-gateway.yaml"
-WIREDOOR_GATEWAY_SECRET_APP = REPO_ROOT / "gitops" / "argocd" / "optional" / "apps" / "wiredoor-gateway-secret.yaml"
-WIREDOOR_GATEWAY_ROUTES_APP = REPO_ROOT / "gitops" / "argocd" / "optional" / "routes" / "wiredoor-gateway.yaml"
-TRAEFIK_DASHBOARD_EXTERNALSECRET = REPO_ROOT / "gitops" / "routes" / "templates" / "traefik-dashboard-externalsecret.yaml"
-WIREDOOR_GATEWAY_EXTERNALSECRET = REPO_ROOT / "gitops" / "apps" / "wiredoor-gateway-secret" / "externalsecret.yaml"
-GRAFANA_SECRET_APP = REPO_ROOT / "gitops" / "argocd" / "optional" / "apps" / "grafana-secret.yaml"
-GRAFANA_EXTERNALSECRET = REPO_ROOT / "gitops" / "apps" / "grafana-secret" / "externalsecret.yaml"
+TRAEFIK_DASHBOARD_EXTERNALSECRET = REPO_ROOT / "gitops" / "platform" / "traefik" / "traefik-dashboard-externalsecret.yaml"
+WHOAMI_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "whoami" / "ingressroute.yaml"
+HEADLAMP_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "headlamp" / "ingressroute.yaml"
+GRAFANA_EXTERNALSECRET = REPO_ROOT / "gitops" / "platform" / "grafana" / "externalsecret.yaml"
+GRAFANA_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "grafana" / "ingressroute.yaml"
+WIREDOOR_GATEWAY_EXTERNALSECRET = REPO_ROOT / "gitops" / "platform" / "wiredoor-gateway" / "externalsecret.yaml"
+WIREDOOR_GATEWAY_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "wiredoor-gateway" / "ingressroute.yaml"
 
 
 def _apply_cluster_text() -> str:
@@ -85,8 +85,20 @@ def _argo_step_text() -> str:
     return ARGO_STEP_SCRIPT.read_text(encoding="utf-8")
 
 
-def _enable_argocd_apps_text() -> str:
-    return ENABLE_ARGOCD_APPS_SCRIPT.read_text(encoding="utf-8")
+def _apply_argocd_application_text() -> str:
+    return APPLY_ARGO_APP_SCRIPT.read_text(encoding="utf-8")
+
+
+def _flannel_helper_text() -> str:
+    return FLANNEL_HELPER_SCRIPT.read_text(encoding="utf-8")
+
+
+def _flannel_step_text() -> str:
+    return FLANNEL_STEP_SCRIPT.read_text(encoding="utf-8")
+
+
+def _flannel_step_manifest_text() -> str:
+    return FLANNEL_STEP_MANIFEST.read_text(encoding="utf-8")
 
 
 def _longhorn_step_text() -> str:
@@ -105,10 +117,6 @@ def _argo_bootstrap_text() -> str:
     return ARGO_BOOTSTRAP_SCRIPT.read_text(encoding="utf-8")
 
 
-def _argo_root_text() -> str:
-    return ARGO_ROOT.read_text(encoding="utf-8")
-
-
 def _whoami_deployment_text() -> str:
     return WHOAMI_DEPLOYMENT.read_text(encoding="utf-8")
 
@@ -117,32 +125,12 @@ def _headlamp_values_text() -> str:
     return HEADLAMP_VALUES.read_text(encoding="utf-8")
 
 
-def _routes_values_text() -> str:
-    return ROUTES_VALUES.read_text(encoding="utf-8")
-
-
-def _optional_routes_chart_text() -> str:
-    return OPTIONAL_ROUTES_CHART.read_text(encoding="utf-8")
-
-
-def _whoami_routes_values_text() -> str:
-    return WHOAMI_ROUTES_VALUES.read_text(encoding="utf-8")
-
-
-def _headlamp_routes_values_text() -> str:
-    return HEADLAMP_ROUTES_VALUES.read_text(encoding="utf-8")
-
-
-def _grafana_routes_values_text() -> str:
-    return GRAFANA_ROUTES_VALUES.read_text(encoding="utf-8")
-
-
-def _wiredoor_gateway_routes_values_text() -> str:
-    return WIREDOOR_GATEWAY_ROUTES_VALUES.read_text(encoding="utf-8")
-
-
 def _traefik_values_text() -> str:
     return TRAEFIK_VALUES.read_text(encoding="utf-8")
+
+
+def _longhorn_values_text() -> str:
+    return LONGHORN_VALUES.read_text(encoding="utf-8")
 
 
 def _wiredoor_gateway_values_text() -> str:
@@ -164,24 +152,8 @@ def _traefik_app_text() -> str:
     return TRAEFIK_APP.read_text(encoding="utf-8")
 
 
-def _routes_app_text() -> str:
-    return ROUTES_APP.read_text(encoding="utf-8")
-
-
 def _wiredoor_gateway_app_text() -> str:
     return WIREDOOR_GATEWAY_APP.read_text(encoding="utf-8")
-
-
-def _wiredoor_gateway_secret_app_text() -> str:
-    return WIREDOOR_GATEWAY_SECRET_APP.read_text(encoding="utf-8")
-
-
-def _grafana_secret_app_text() -> str:
-    return GRAFANA_SECRET_APP.read_text(encoding="utf-8")
-
-
-def _grafana_app_text() -> str:
-    return (REPO_ROOT / "gitops" / "argocd" / "optional" / "apps" / "grafana.yaml").read_text(encoding="utf-8")
 
 
 def _grafana_externalsecret_text() -> str:
@@ -319,32 +291,48 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'select(.volid == $volid and .content == "iso")' in text
 
 
-def test_longhorn_step_installs_pinned_chart_and_waits_for_health():
+def test_flannel_step_bootstraps_network_before_argocd():
+    step_text = _flannel_step_text()
+    step_manifest_text = _flannel_step_manifest_text()
+    helper_text = _flannel_helper_text()
+
+    assert 'title: Install Flannel' in step_manifest_text
+    assert 'order: 12' in step_manifest_text
+    assert 'Bootstrap Flannel so the cluster has pod networking before Argo CD workloads start.' in step_manifest_text
+    assert '  - provision-nodes' in step_manifest_text
+    assert 'script: categories/talos-cluster/steps/install-flannel/run.sh' in step_manifest_text
+    assert 'bash "$WORKSPACE_ROOT/scripts/manager/install-flannel.sh"' in step_text
+    assert 'kubectl apply -k "$WORKSPACE_ROOT/gitops/platform/flannel"' in helper_text
+    assert 'rollout status "daemonset/kube-flannel-ds"' in helper_text
+
+
+def test_longhorn_step_installs_via_argocd_and_waits_for_health():
     step_text = _longhorn_step_text()
     step_manifest_text = _longhorn_step_manifest_text()
     helper_text = _longhorn_helper_text()
+    longhorn_values_text = _longhorn_values_text()
 
     assert 'title: Install Longhorn Storage' in step_manifest_text
     assert 'order: 15' in step_manifest_text
-    assert 'summary: Install Longhorn storage directly with Helm and wait for the storage class to become available.' in step_manifest_text
+    assert 'summary: Apply the Longhorn GitOps application and wait for the storage class to become available.' in step_manifest_text
     assert 'depends_on:' in step_manifest_text
-    assert '  - provision-nodes' in step_manifest_text
+    assert '  - install-argocd' in step_manifest_text
     assert 'runner:' in step_manifest_text
     assert 'KUBECONFIG_FILE:' in step_manifest_text
     assert 'item: kubeconfig' in step_manifest_text
     assert 'script: categories/talos-cluster/steps/install-longhorn-storage/run.sh' in step_manifest_text
+    assert 'cluster_json="$(printf \'%s\' "$STEP_CONTEXT_JSON" | jq -c \'.cluster\')"' in step_text
+    assert 'TWINBOX_CLUSTER_ID="$cluster_id" bash "$WORKSPACE_ROOT/scripts/manager/install-longhorn-storage.sh"' in step_text
     assert 'WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"' in step_text
-    assert 'bash "$WORKSPACE_ROOT/scripts/manager/install-longhorn-storage.sh"' in step_text
-    assert 'chart_version="${LONGHORN_CHART_VERSION:-1.11.1}"' in helper_text
-    assert 'helm repo add longhorn https://charts.longhorn.io' in helper_text
-    assert 'helm upgrade --install "$release_name" longhorn/longhorn \\' in helper_text
-    assert '--version "$chart_version"' in helper_text
-    assert '--set preUpgradeChecker.jobEnabled=false' in helper_text
-    assert '--set-string defaultSetting.taintToleration=' in helper_text
-    assert 'wait_for_rollout deployment longhorn-driver-deployer' in helper_text
-    assert 'wait_for_rollout daemonset longhorn-manager' in helper_text
+    assert 'manifest_path="$WORKSPACE_ROOT/gitops/apps/longhorn.yaml"' in helper_text
+    assert 'Installing Longhorn through Argo CD' in helper_text
+    assert 'bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \\' in helper_text
+    assert '--application "longhorn"' in helper_text
     assert 'wait_for_storage_class' in helper_text
     assert 'StorageClass/${storage_class} is available' in helper_text
+    assert 'preUpgradeChecker:' in longhorn_values_text
+    assert 'jobEnabled: false' in longhorn_values_text
+    assert 'taintToleration:' in longhorn_values_text
 
 
 def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
@@ -465,16 +453,27 @@ def test_argo_manager_script_requires_kubeconfig_and_calls_gitops_bootstrap():
     assert 'KUBECONFIG_FILE is required' in text
 
 
-def test_argo_step_script_uses_workspace_root_for_manager_bootstrap():
+def test_apply_argocd_application_helper_applies_and_waits_for_health():
+    text = _apply_argocd_application_text()
+
+    assert 'Usage: $0 --manifest PATH --application NAME' in text
+    assert 'kubectl apply --validate=false -f "$MANIFEST_PATH"' in text
+    assert 'kubectl -n argocd get application "$application" -o json' in text
+    assert 'Application/${application} is Synced and Healthy' in text
+
+
+def test_argo_step_script_bootstraps_argocd_and_adopts_flannel():
     text = _argo_step_text()
     assert 'WORKSPACE_ROOT="${WORKSPACE_ROOT:-' in text
     assert 'discovered_controlplane_ips[0]' in text
     assert 'bash "$WORKSPACE_ROOT/scripts/manager/install-argocd.sh" --kube-api-server "https://${controlplane_ip}:6443"' in text
-    assert 'root_application: $root_application' in text
-    assert 'root_applications: $root_applications' in text
+    assert 'flannel_manifest_path="$WORKSPACE_ROOT/gitops/apps/flannel.yaml"' in text
+    assert 'bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \\' in text
+    assert '--application "flannel"' in text
+    assert 'adopted_application: $adopted_application' in text
 
 
-def test_argo_bootstrap_script_installs_argocd_and_applies_full_root_application():
+def test_argo_bootstrap_script_installs_argocd_without_root_application_tree():
     text = _argo_bootstrap_text()
     wait_section = text.split('local resources=(')[1].split('for resource in "${resources[@]}"; do')[0]
     assert 'Creating argocd namespace' in text
@@ -498,39 +497,13 @@ def test_argo_bootstrap_script_installs_argocd_and_applies_full_root_application
     assert 'kubectl -n argocd rollout status "$resource" --timeout=900s' in text
     assert 'wait_for_statefulset_rollout "statefulset/argocd-application-controller"' in text
     assert 'statefulset/argocd-application-controller' not in wait_section
-    assert 'root_applications=(' in text
-    assert '"traefik"' in text
-    assert '"routes"' in text
-    assert '"whoami"' not in text
-    assert '"wiredoor-gateway"' not in text
-    assert 'wait_for_application_ready()' in text
-    assert 'wait_for_root_applications()' in text
-    assert 'Waiting for core root applications to become Synced and Healthy' in text
-    assert 'kubectl -n argocd get application "$application" -o json' in text
-    assert '.status.sync.status // "Unknown"' in text
-    assert '.status.health.status // "Unknown"' in text
-    assert 'Application/${application} is Synced and Healthy' in text
+    assert 'wait_for_application_ready()' not in text
+    assert 'wait_for_root_applications()' not in text
     assert 'deployment/argocd-applicationset-controller' in text
     assert 'deployment/argocd-repo-server' in text
     assert 'statefulset/argocd-application-controller' in text
-    assert 'Applying core Argo root application' in text
-    assert 'kubectl apply --validate=false -f "$WORKSPACE_ROOT/gitops/argocd/root.yaml"' in text
-
-
-def test_enable_argocd_apps_script_maps_optional_apps_and_waits_for_health():
-    text = _enable_argocd_apps_text()
-
-    assert 'Usage: $0 --cluster-id ID --enabled-apps CSV --applications CSV' in text
-    assert 'Applying optional Argo application ${application}' in text
-    assert 'Waiting for application/${application}: sync=${sync_status}, health=${health_status}, phase=${operation_phase}' in text
-    assert 'whoami-routes' in text
-    assert 'headlamp-routes' in text
-    assert 'grafana-secret' in text
-    assert 'grafana-routes' in text
-    assert 'wiredoor-gateway-secret' in text
-    assert 'wiredoor-gateway-routes' in text
-    assert 'enabled_optional_apps' in text
-    assert 'reduce $enabled_apps[] as $app' in text
+    assert 'Applying core Argo root application' not in text
+    assert 'gitops/argocd/root.yaml' not in text
 
 
 def test_bootstrap_apps_tolerate_single_node_control_plane():
@@ -545,91 +518,77 @@ def test_bootstrap_apps_tolerate_single_node_control_plane():
     assert 'node-role.kubernetes.io/master' in headlamp_text
 
 
-def test_argo_full_root_includes_full_tree():
-    text = _argo_root_text()
-
-    assert 'kind: Application' in text
-    assert 'name: root' in text
-    assert 'path: gitops/argocd/apps' in text
-    assert 'syncPolicy:' in text
-
-
-def test_install_argocd_step_waits_for_root_app_tree():
+def test_install_argocd_step_bootstraps_argocd_and_adopts_flannel():
     text = (REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "step.yaml").read_text(encoding="utf-8")
 
-    assert 'summary: Install Argo CD and wait for the core root application tree to become healthy.' in text
-    assert 'report Synced and Healthy' in text
-    assert 'traefik and routes' in text
-    assert 'Optional applications such as Whoami, Headlamp, Grafana, and Wiredoor are enabled later as separate wizard steps.' in text
+    assert 'summary: Install Argo CD and register Flannel as the first managed GitOps application.' in text
+    assert 'Flannel' in text
+    assert 'root application tree' not in text
 
 
-def test_optional_step_manifests_chain_the_enabled_apps_flow():
+def test_app_step_manifests_chain_the_linear_gitops_flow():
+    flannel_text = FLANNEL_STEP_MANIFEST.read_text(encoding="utf-8")
+    traefik_text = TRAEFIK_STEP_MANIFEST.read_text(encoding="utf-8")
     whoami_text = WHOAMI_STEP_MANIFEST.read_text(encoding="utf-8")
     headlamp_text = HEADLAMP_STEP_MANIFEST.read_text(encoding="utf-8")
     grafana_text = GRAFANA_STEP_MANIFEST.read_text(encoding="utf-8")
     wiredoor_text = WIREDOOR_GATEWAY_STEP_MANIFEST.read_text(encoding="utf-8")
 
-    assert 'order: 31' in whoami_text
-    assert 'install-argocd' in whoami_text
+    assert 'order: 12' in flannel_text
+    assert 'provision-nodes' in flannel_text
+
+    assert 'order: 31' in traefik_text
+    assert 'install-secret-sync' in traefik_text
+
+    assert 'order: 32' in whoami_text
+    assert 'install-traefik' in whoami_text
     assert 'script: categories/talos-cluster/steps/install-whoami/run.sh' in whoami_text
 
-    assert 'order: 32' in headlamp_text
+    assert 'order: 33' in headlamp_text
     assert 'install-whoami' in headlamp_text
     assert 'script: categories/talos-cluster/steps/install-headlamp/run.sh' in headlamp_text
 
-    assert 'order: 33' in grafana_text
+    assert 'order: 34' in grafana_text
     assert 'install-headlamp' in grafana_text
     assert 'script: categories/talos-cluster/steps/install-grafana/run.sh' in grafana_text
 
-    assert 'order: 34' in wiredoor_text
+    assert 'order: 35' in wiredoor_text
     assert 'install-grafana' in wiredoor_text
     assert 'script: categories/talos-cluster/steps/install-wiredoor-gateway/run.sh' in wiredoor_text
 
 
-def test_routes_and_wiredoor_secrets_are_openbao_backed():
+def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
+    flannel_app_text = FLANNEL_APP.read_text(encoding="utf-8")
+    longhorn_app_text = LONGHORN_APP.read_text(encoding="utf-8")
     traefik_app_text = _traefik_app_text()
-    routes_app_text = _routes_app_text()
     whoami_app_text = WHOAMI_APP.read_text(encoding="utf-8")
-    whoami_routes_app_text = WHOAMI_ROUTES_APP.read_text(encoding="utf-8")
     headlamp_app_text = HEADLAMP_APP.read_text(encoding="utf-8")
-    headlamp_routes_app_text = HEADLAMP_ROUTES_APP.read_text(encoding="utf-8")
     wiredoor_gateway_app_text = _wiredoor_gateway_app_text()
-    wiredoor_gateway_secret_app_text = _wiredoor_gateway_secret_app_text()
-    routes_values_text = _routes_values_text()
-    optional_routes_chart_text = _optional_routes_chart_text()
-    whoami_routes_values_text = _whoami_routes_values_text()
-    headlamp_routes_values_text = _headlamp_routes_values_text()
-    grafana_routes_values_text = _grafana_routes_values_text()
-    wiredoor_gateway_routes_values_text = _wiredoor_gateway_routes_values_text()
     traefik_values_text = _traefik_values_text()
     wiredoor_gateway_values_text = _wiredoor_gateway_values_text()
     traefik_externalsecret_text = _traefik_dashboard_externalsecret_text()
     wiredoor_externalsecret_text = _wiredoor_gateway_externalsecret_text()
+    whoami_ingressroute_text = WHOAMI_INGRESSROUTE.read_text(encoding="utf-8")
+    headlamp_ingressroute_text = HEADLAMP_INGRESSROUTE.read_text(encoding="utf-8")
+    grafana_ingressroute_text = GRAFANA_INGRESSROUTE.read_text(encoding="utf-8")
+    wiredoor_ingressroute_text = WIREDOOR_GATEWAY_INGRESSROUTE.read_text(encoding="utf-8")
 
-    assert 'whoami:' not in routes_values_text
-    assert 'headlamp:' not in routes_values_text
-    assert 'grafana:' not in routes_values_text
+    assert 'path: gitops/platform/flannel' in flannel_app_text
+    assert 'chart: longhorn' in longhorn_app_text
+    assert '$values/gitops/values/longhorn.yaml' in longhorn_app_text
     assert 'enabled: trueß∑' not in traefik_values_text
     assert 'enabled: true' in traefik_values_text
     assert 'existingSecret: wiredoor-gateway' in wiredoor_gateway_values_text
     assert 'token:' not in wiredoor_gateway_values_text
-    assert 'argocd.argoproj.io/sync-wave: "0"' in traefik_app_text
-    assert 'argocd.argoproj.io/sync-wave: "1"' in routes_app_text
     assert 'kind: Application' in whoami_app_text
     assert 'kind: Application' in headlamp_app_text
-    assert 'path: gitops/optional-routes' in whoami_routes_app_text
-    assert 'whoami-routes' in whoami_routes_app_text
-    assert 'path: gitops/optional-routes' in headlamp_routes_app_text
-    assert 'headlamp-routes' in headlamp_routes_app_text
-    assert 'argocd.argoproj.io/sync-wave: "0"' in wiredoor_gateway_secret_app_text
-    assert 'argocd.argoproj.io/sync-wave: "1"' in wiredoor_gateway_app_text
-    assert 'argocd.argoproj.io/sync-wave: "2"' in WIREDOOR_GATEWAY_ROUTES_APP.read_text(encoding="utf-8")
-    assert 'kind: IngressRoute' in optional_routes_chart_text
-    assert 'ingressRoutes:' in whoami_routes_values_text
-    assert 'Host(`whoami.bierineenweek.nl`)' in whoami_routes_values_text
-    assert 'Host(`headlamp.bierineenweek.nl`)' in headlamp_routes_values_text
-    assert 'Host(`grafana.bierineenweek.nl`)' in grafana_routes_values_text
-    assert 'Host(`argocd.bierineenweek.nl`)' in wiredoor_gateway_routes_values_text
+    assert 'path: gitops/platform/whoami' in whoami_app_text
+    assert 'path: gitops/platform/headlamp' in headlamp_app_text
+    assert 'path: gitops/platform/wiredoor-gateway' in wiredoor_gateway_app_text
+    assert 'Host(`whoami.bierineenweek.nl`)' in whoami_ingressroute_text
+    assert 'Host(`headlamp.bierineenweek.nl`)' in headlamp_ingressroute_text
+    assert 'Host(`grafana.bierineenweek.nl`)' in grafana_ingressroute_text
+    assert 'Host(`argocd.bierineenweek.nl`)' in wiredoor_ingressroute_text
     assert 'kind: ExternalSecret' in traefik_externalsecret_text
     assert 'kind: ClusterSecretStore' in traefik_externalsecret_text
     assert 'name: openbao' in traefik_externalsecret_text
@@ -646,18 +605,14 @@ def test_routes_and_wiredoor_secrets_are_openbao_backed():
 
 def test_grafana_admin_credentials_are_openbao_backed():
     grafana_values_text = _grafana_values_text()
-    grafana_secret_app_text = _grafana_secret_app_text()
-    grafana_app_text = _grafana_app_text()
+    grafana_app_text = GRAFANA_APP.read_text(encoding="utf-8")
     grafana_externalsecret_text = _grafana_externalsecret_text()
 
     assert 'adminPassword:' not in grafana_values_text
     assert 'existingSecret: grafana-admin' in grafana_values_text
     assert 'userKey: admin-user' in grafana_values_text
     assert 'passwordKey: admin-password' in grafana_values_text
-    assert 'argocd.argoproj.io/sync-wave: "0"' in grafana_secret_app_text
-    assert 'argocd.argoproj.io/sync-wave: "1"' in grafana_app_text
-    assert 'kind: Application' in grafana_secret_app_text
-    assert 'grafana-secret' in grafana_secret_app_text
+    assert 'path: gitops/platform/grafana' in grafana_app_text
     assert 'kind: ExternalSecret' in grafana_externalsecret_text
     assert 'kind: ClusterSecretStore' in grafana_externalsecret_text
     assert 'name: openbao' in grafana_externalsecret_text

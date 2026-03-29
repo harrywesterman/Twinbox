@@ -2,10 +2,10 @@ id: install-wiredoor-gateway
 title: Install Wiredoor gateway
 type: action
 journey_stage: setup
-order: 34
-summary: Enable the Wiredoor gateway, its secret bootstrap, and its route bundle.
-explanation: Wiredoor gateway now runs as a distinct optional step after Grafana so the bootstrap flow stays focused. This step activates the gateway secret application, the gateway chart itself, and the wiredoor route bundle, then waits for the child applications to report Synced and Healthy.
-side_help: The gateway is split out so Wiredoor no longer bloats the initial root sync tree and remains a clearly visible activation step.
+order: 35
+summary: Apply the Wiredoor gateway GitOps application after seeding its bootstrap secret.
+explanation: Twinbox prepares the Wiredoor gateway bootstrap secret in OpenBao and then applies one Argo CD application that combines the ExternalSecret, Wiredoor chart, and ingress route needed for the Wiredoor entrypoint.
+side_help: Wiredoor remains separate because it has its own network entrypoint and secret bootstrap requirements.
 depends_on:
   - install-grafana
 inputs: []

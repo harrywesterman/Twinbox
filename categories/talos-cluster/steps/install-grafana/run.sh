@@ -6,9 +6,8 @@ set -euo pipefail
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 BOOTSTRAP_ROOT="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
-cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
-cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 grafana_secret_file="$BOOTSTRAP_ROOT/secrets/global/grafana.json"
+manifest_path="$WORKSPACE_ROOT/gitops/apps/grafana.yaml"
 
 mkdir -p "$(dirname "$grafana_secret_file")"
 
@@ -31,7 +30,6 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --json-file "$grafana_secret_file" \
   --required-keys "admin-user,admin-password"
 
-bash "$WORKSPACE_ROOT/scripts/manager/enable-argocd-apps.sh" \
-  --cluster-id "$cluster_id" \
-  --enabled-apps "grafana" \
-  --applications "grafana-secret,grafana,grafana-routes"
+bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+  --manifest "$manifest_path" \
+  --application "grafana"

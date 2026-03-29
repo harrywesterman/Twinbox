@@ -1,0 +1,5 @@
+preUpgradeChecker:
+  jobEnabled: false
+
+defaultSetting:
+  taintToleration: node-role.kubernetes.io/control-plane:NoSchedule;node-role.kubernetes.io/master:NoSchedule

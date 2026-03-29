@@ -12,9 +12,11 @@ Talos lifecycle operations are triggered through the manager stack.
 6. OpenTofu creates the VMs and applies the requested VM placement map.
 7. The worker discovers DHCP addresses, generates Talos configs, applies them with `talosctl`, and bootstraps the first control plane.
 8. Talos access files are stored as cluster-scoped bootstrap artifacts under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/`.
-9. `install-longhorn-storage` installs Longhorn directly with Helm.
-10. `install-secret-sync` installs External Secrets Operator and OpenBao, seeds OpenBao from management-local bootstrap JSON, and creates `Secret/proxmox-bootstrap`.
-11. `install-argocd` installs Argo CD and applies the root application tree.
+9. `install-flannel` bootstraps the Flannel CNI directly so the cluster can run pods.
+10. `install-argocd` installs Argo CD and registers the Flannel `Application` so networking is tracked by GitOps.
+11. `install-longhorn-storage` applies the Longhorn Argo CD application and waits for `StorageClass/longhorn`.
+12. `install-secret-sync` installs External Secrets Operator and OpenBao, seeds OpenBao from management-local bootstrap JSON, and creates `Secret/proxmox-bootstrap`.
+13. Later wizard steps apply one Argo CD `Application` at a time for Traefik and the remaining workloads.
 
 ## Runtime Dependencies
 
