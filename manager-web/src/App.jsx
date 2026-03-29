@@ -696,6 +696,13 @@ function App() {
     }
 
     if (step.id === 'provision-nodes') {
+      if (!placementBoard?.hostCards?.length) {
+        const message = 'Waiting for Proxmox host data before starting Deploy Talos Cluster.';
+        setError(message);
+        setNotice(message);
+        return { ok: false, error: message };
+      }
+
       const stepAnswers = answersRef.current?.[step.id] || {};
       const placement = buildProvisionPlacementBoard(step.inputs || [], stepAnswers, proxmoxResources);
       body.vm_node_map = placement.vmNodeMap;
@@ -972,6 +979,14 @@ function App() {
       proxmoxResources,
     )
     : null;
+  const provisionPlacementReady = model.activeStep?.id !== 'provision-nodes' || Boolean(placementBoard?.hostCards?.length);
+  const primaryActionDisabled = model.primaryAction.disabled || !provisionPlacementReady;
+  const primaryActionLabel = !provisionPlacementReady && model.activeStep?.id === 'provision-nodes'
+    ? 'Loading placement data…'
+    : model.primaryAction.label;
+  const primaryActionHelperText = !provisionPlacementReady && model.activeStep?.id === 'provision-nodes'
+    ? 'Waiting for Proxmox host data before starting step 1.'
+    : model.primaryAction.helperText;
 
   useEffect(() => {
     if (model.activeStep?.id !== 'provision-nodes') {
@@ -1178,7 +1193,7 @@ function App() {
                 </span>
                 <div className="wizard-workspace-stepline-copy">
                   <h1>{model.completion ? model.completion.title : activeStepTitle || 'Choose a setup step'}</h1>
-                  <p className="wizard-intro">
+                  <p className="wizard-intro wizard-step-pitch">
                     {model.completion
                       ? model.completion.summary
                       : model.activity.summary}
@@ -1426,16 +1441,16 @@ function App() {
                     className="button button-primary"
                     type="button"
                     onClick={handlePrimaryAction}
-                    disabled={model.primaryAction.disabled}
+                    disabled={primaryActionDisabled}
                   >
-                    {model.primaryAction.label}
+                    {primaryActionLabel}
                   </button>
                   <button className="button button-secondary" type="button" onClick={handleImportClick}>
                     Import answers
                   </button>
                 </div>
 
-                <p className="wizard-helper">{model.primaryAction.helperText}</p>
+                <p className="wizard-helper">{primaryActionHelperText}</p>
               </section>
 
               <section
