@@ -227,6 +227,21 @@ msg_box() {
   dialog --backtitle "$BACKTITLE" --title "$1" --msgbox "$2" 12 78
 }
 
+textbox_box() {
+  local title="$1"
+  local text="$2"
+  local height="${3:-24}"
+  local width="${4:-90}"
+  local tmp_file=""
+
+  tmp_file=$(mktemp "/tmp/twinbox-dialog.XXXXXX")
+  printf '%s\n' "$text" >"$tmp_file"
+  dialog --backtitle "$BACKTITLE" --title "$title" --textbox "$tmp_file" "$height" "$width"
+  local dialog_status=$?
+  rm -f "$tmp_file"
+  return "$dialog_status"
+}
+
 sanitize_cluster_slug() {
   local raw="$1"
   local slug=""
@@ -515,18 +530,19 @@ cluster_resources_exist() {
 render_existing_cluster_inventory() {
   local summary=""
   local idx=""
+  summary+="Twinbox cluster cleanup preview"$'\n'
   summary+="Cluster: ${CLUSTER_SLUG}"$'\n'
   summary+=$'\n'
-  summary+="This will remove:"$'\n'
-  summary+="- VMs: ${#EXISTING_VM_IDS[@]}"$'\n'
-  summary+="- Snippet files: ${#EXISTING_SNIPPETS[@]}"$'\n'
-  summary+="- Proxmox API user: "
+  summary+="Resources to remove:"$'\n'
+  summary+="  - VMs: ${#EXISTING_VM_IDS[@]}"$'\n'
+  summary+="  - Snippet files: ${#EXISTING_SNIPPETS[@]}"$'\n'
+  summary+="  - Proxmox API user: "
   if [[ "${EXISTING_USER_PRESENT}" -eq 1 ]]; then
     summary+="present"$'\n'
   else
     summary+="not found"$'\n'
   fi
-  summary+="- Proxmox API role: "
+  summary+="  - Proxmox API role: "
   if [[ "${EXISTING_ROLE_PRESENT}" -eq 1 ]]; then
     summary+="present"$'\n'
   else
@@ -536,9 +552,12 @@ render_existing_cluster_inventory() {
     summary+=$'\n'
     summary+="VM inventory:"$'\n'
     for idx in "${!EXISTING_VM_IDS[@]}"; do
-      summary+="- ${EXISTING_VM_NAMES[$idx]} (VMID ${EXISTING_VM_IDS[$idx]} on ${EXISTING_VM_NODES[$idx]})"$'\n'
+      summary+="  - ${EXISTING_VM_NAMES[$idx]} (VMID ${EXISTING_VM_IDS[$idx]} on ${EXISTING_VM_NODES[$idx]})"$'\n'
     done
   fi
+
+  summary+=$'\n'
+  summary+="This cannot be undone."$'\n'
 
   printf '%s' "$summary"
 }
@@ -612,7 +631,11 @@ handle_existing_cluster_conflict() {
 
   inventory=$(render_existing_cluster_inventory)
 
-  if ! yesno_box "Twinbox" "A cluster named '${CLUSTER_SLUG}' already exists.\n\n${inventory}\n\nThis cannot be undone.\n\nRemove these resources before starting again?" 20 78; then
+  if ! textbox_box "Twinbox" "$inventory" 24 90; then
+    return 1
+  fi
+
+  if ! yesno_box "Twinbox" "Remove these resources before starting again?" 8 58; then
     return 1
   fi
 
@@ -1096,7 +1119,11 @@ remove_cluster_flow() {
     return 1
   fi
 
-  if ! yesno_box "Twinbox" "$(render_existing_cluster_inventory)\n\nThis cannot be undone.\n\nRemove these resources now?" 18 78; then
+  if ! textbox_box "Twinbox" "$(render_existing_cluster_inventory)" 24 90; then
+    return 1
+  fi
+
+  if ! yesno_box "Twinbox" "Remove these resources now?" 8 58; then
     return 1
   fi
 
