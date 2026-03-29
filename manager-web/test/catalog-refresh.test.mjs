@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   isMissingClusterError,
+  isProvisionSuggestionReady,
   recoverMissingClusterState,
   recoverRecreatedClusterState,
   shouldResetRecreatedClusterDraft,
@@ -65,6 +66,33 @@ test('shouldResetRecreatedClusterDraft detects a cluster generation mismatch', (
   assert.equal(shouldResetRecreatedClusterDraft({ previousCreatedAt: '2026-03-20T10:00:00Z', nextCreatedAt: '2026-03-30T00:00:00Z', hasProvisionDraft: true }), true);
   assert.equal(shouldResetRecreatedClusterDraft({ previousCreatedAt: '2026-03-30T00:00:00Z', nextCreatedAt: '2026-03-30T00:00:00Z', hasProvisionDraft: true }), false);
   assert.equal(shouldResetRecreatedClusterDraft({ previousCreatedAt: '2026-03-20T10:00:00Z', nextCreatedAt: '2026-03-30T00:00:00Z', hasProvisionDraft: false }), false);
+});
+
+test('isProvisionSuggestionReady only unlocks step 1 after the current suggestions are loaded', () => {
+  assert.equal(isProvisionSuggestionReady({
+    activeStepId: 'provision-nodes',
+    suggestionKey: '192.168.2.52:5',
+    currentSuggestionKey: '',
+    suggestionSnapshot: {},
+  }), false);
+
+  assert.equal(isProvisionSuggestionReady({
+    activeStepId: 'provision-nodes',
+    suggestionKey: '192.168.2.52:5',
+    currentSuggestionKey: '192.168.2.52:5',
+    suggestionSnapshot: { name: 'twinbox-tst' },
+  }), true);
+
+  assert.equal(isProvisionSuggestionReady({
+    activeStepId: 'provision-nodes',
+    suggestionKey: '192.168.2.52:5',
+    currentSuggestionKey: '192.168.2.52:3',
+    suggestionSnapshot: { name: 'twinbox-tst' },
+  }), false);
+
+  assert.equal(isProvisionSuggestionReady({
+    activeStepId: 'install-flannel',
+  }), true);
 });
 
 test('recoverMissingClusterState drops the step 1 draft and resets suggestion refs', () => {

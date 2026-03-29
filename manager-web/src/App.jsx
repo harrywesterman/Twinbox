@@ -23,6 +23,7 @@ import {
 } from './journey.js';
 import {
   isMissingClusterError,
+  isProvisionSuggestionReady,
   recoverMissingClusterState,
   recoverRecreatedClusterState,
   shouldResetRecreatedClusterDraft,
@@ -447,6 +448,7 @@ function App() {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [activeJob, setActiveJob] = useState(null);
+  const [provisionSuggestionsReadyState, setProvisionSuggestionsReadyState] = useState(false);
   const placementSuggestionKeyRef = useRef('');
 
   useEffect(() => {
@@ -536,6 +538,7 @@ function App() {
           setAnswers,
           setNotice,
           setError,
+          setProvisionSuggestionsReady: setProvisionSuggestionsReadyState,
         });
       } catch (refreshError) {
         if (!cancelled) {
@@ -587,11 +590,12 @@ function App() {
               clusterCreatedAtRef,
               selectedStepIdRef,
               answersRef,
-              provisionDirtyFieldsRef,
-              provisionSuggestionKeyRef,
-              provisionSuggestionSnapshotRef,
-              placementSuggestionKeyRef,
-            });
+            provisionDirtyFieldsRef,
+            provisionSuggestionKeyRef,
+            provisionSuggestionSnapshotRef,
+            placementSuggestionKeyRef,
+            setProvisionSuggestionsReady: setProvisionSuggestionsReadyState,
+          });
           }
 
           if (nextCreatedAt && nextCreatedAt !== clusterCreatedAtRef.current) {
@@ -625,6 +629,7 @@ function App() {
             provisionSuggestionKeyRef,
             provisionSuggestionSnapshotRef,
             placementSuggestionKeyRef,
+            setProvisionSuggestionsReady: setProvisionSuggestionsReadyState,
           });
           return;
         }
@@ -807,6 +812,7 @@ function App() {
         setActiveJob,
         setAnswers,
         setNotice,
+        setProvisionSuggestionsReady: setProvisionSuggestionsReadyState,
         clusterIdOverride: nextClusterId,
         clearError: false,
         setError,
@@ -996,6 +1002,7 @@ function App() {
       });
       placementSuggestionKeyRef.current = '';
       provisionDirtyFieldsRef.current = new Set();
+      setProvisionSuggestionsReadyState(false);
       setNotice('Imported saved wizard answers.');
     } catch (importError) {
       const message = importError instanceof Error ? importError.message : 'Could not import the answers file.';
@@ -1012,6 +1019,36 @@ function App() {
   const currentDraft = model.activeStep
     ? buildInitialAnswers([model.activeStep], answers)[model.activeStep.id]
     : {};
+  useEffect(() => {
+    if (model.activeStep?.id !== 'provision-nodes') {
+      setProvisionSuggestionsReadyState(false);
+      return;
+    }
+
+    const managementIp = window.location.hostname;
+    const managementIpParts = managementIp.split('.').map((part) => Number(part));
+    const hasValidManagementIp = managementIpParts.length === 4
+      && managementIpParts.every((part) => Number.isInteger(part) && part >= 0 && part <= 255);
+
+    if (!hasValidManagementIp) {
+      setProvisionSuggestionsReadyState(false);
+      return;
+    }
+
+    const controlplaneCount = Number.isFinite(Number(currentDraft.controlplane_count))
+      ? Number(currentDraft.controlplane_count)
+      : 1;
+    const workerCount = Number.isFinite(Number(currentDraft.worker_count))
+      ? Number(currentDraft.worker_count)
+      : 0;
+    const suggestionKey = `${managementIp}:${Math.max(1, controlplaneCount + workerCount)}`;
+
+    setProvisionSuggestionsReadyState(
+      provisionSuggestionKeyRef.current === suggestionKey
+      && Object.keys(provisionSuggestionSnapshotRef.current || {}).length > 0,
+    );
+  }, [currentDraft.controlplane_count, currentDraft.worker_count, model.activeStep?.id]);
+
   const placementBoard = model.activeStep?.id === 'provision-nodes'
     ? buildProvisionPlacementBoard(model.activeStep.inputs || [], currentDraft, proxmoxResources)
     : null;
@@ -1026,13 +1063,29 @@ function App() {
       proxmoxResources,
     )
     : null;
+  const provisionSuggestionKey = model.activeStep?.id === 'provision-nodes'
+    ? `${window.location.hostname}:${Math.max(
+      1,
+      (Number.isFinite(Number(currentDraft.controlplane_count)) ? Number(currentDraft.controlplane_count) : 1)
+      + (Number.isFinite(Number(currentDraft.worker_count)) ? Number(currentDraft.worker_count) : 0),
+    )}`
+    : '';
   const provisionPlacementReady = model.activeStep?.id !== 'provision-nodes' || Boolean(placementBoard?.hostCards?.length);
-  const primaryActionDisabled = model.primaryAction.disabled || !provisionPlacementReady;
-  const primaryActionLabel = !provisionPlacementReady && model.activeStep?.id === 'provision-nodes'
-    ? 'Loading placement data…'
+  const provisionSuggestionsReady = isProvisionSuggestionReady({
+    activeStepId: model.activeStep?.id || '',
+    suggestionKey: provisionSuggestionKey,
+    currentSuggestionKey: provisionSuggestionKeyRef.current,
+    suggestionSnapshot: provisionSuggestionSnapshotRef.current,
+  });
+  const provisionStepReady = provisionPlacementReady && provisionSuggestionsReady;
+  const primaryActionDisabled = model.primaryAction.disabled || !provisionStepReady;
+  const primaryActionLabel = !provisionStepReady && model.activeStep?.id === 'provision-nodes'
+    ? (!provisionPlacementReady ? 'Loading placement data…' : 'Loading step 1…')
     : model.primaryAction.label;
-  const primaryActionHelperText = !provisionPlacementReady && model.activeStep?.id === 'provision-nodes'
-    ? 'Waiting for Proxmox host data before starting step 1.'
+  const primaryActionHelperText = !provisionStepReady && model.activeStep?.id === 'provision-nodes'
+    ? !provisionPlacementReady
+      ? 'Waiting for Proxmox host data before starting step 1.'
+      : 'Waiting for step 1 suggestions to load.'
     : model.primaryAction.helperText;
 
   useEffect(() => {
@@ -1058,11 +1111,13 @@ function App() {
     const nodeCount = Math.max(1, controlplaneCount + workerCount);
     const suggestionKey = `${managementIp}:${nodeCount}`;
 
-    if (provisionSuggestionKeyRef.current === suggestionKey) {
+    if (provisionSuggestionKeyRef.current === suggestionKey
+      && Object.keys(provisionSuggestionSnapshotRef.current || {}).length > 0) {
       return;
     }
 
     provisionSuggestionKeyRef.current = suggestionKey;
+    provisionSuggestionSnapshotRef.current = {};
     let cancelled = false;
 
     (async () => {

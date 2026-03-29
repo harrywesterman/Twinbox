@@ -30,6 +30,21 @@ export function shouldResetRecreatedClusterDraft({
   return !previousCreatedAt || nextCreatedAt !== previousCreatedAt;
 }
 
+export function isProvisionSuggestionReady({
+  activeStepId = '',
+  suggestionKey = '',
+  currentSuggestionKey = '',
+  suggestionSnapshot = {},
+} = {}) {
+  if (activeStepId !== PROVISION_STEP_ID) {
+    return true;
+  }
+
+  return currentSuggestionKey === suggestionKey
+    && suggestionSnapshot
+    && Object.keys(suggestionSnapshot).length > 0;
+}
+
 function pickStepId(steps, preferredStepId) {
   if (preferredStepId && steps.some((step) => step.id === preferredStepId)) {
     return preferredStepId;
@@ -69,6 +84,7 @@ function clearStaleClusterState({
   provisionSuggestionKeyRef,
   provisionSuggestionSnapshotRef,
   placementSuggestionKeyRef,
+  setProvisionSuggestionsReady,
   notice = MISSING_CLUSTER_NOTICE,
   clearClusterId = true,
   clearClusterCreatedAt = true,
@@ -106,6 +122,7 @@ function clearStaleClusterState({
   if (placementSuggestionKeyRef) {
     placementSuggestionKeyRef.current = '';
   }
+  setProvisionSuggestionsReady?.(false);
 
   if (clearClusterId) {
     setClusterId?.('');
