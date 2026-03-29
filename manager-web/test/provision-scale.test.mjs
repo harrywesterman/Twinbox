@@ -5,6 +5,7 @@ import {
   buildProvisionPlacementBoard,
   buildProvisionScaleSummary,
   buildScaledProvisionInputs,
+  getProvisionNodeCount,
   formatMemoryMb,
 } from '../src/provision-scale.js';
 
@@ -83,6 +84,12 @@ test('scale 30 preserves the default VM footprint', () => {
   assert.equal(values.cpu_cores, 2);
   assert.equal(values.memory_mb, 4096);
   assert.equal(values.disk_gb, 20);
+});
+
+test('provision node count falls back to the wizard defaults when the draft is empty', () => {
+  assert.equal(getProvisionNodeCount(stepInputs, {}), 3);
+  assert.equal(getProvisionNodeCount(stepInputs, { controlplane_count: 2 }), 4);
+  assert.equal(getProvisionNodeCount(stepInputs, { controlplane_count: 0, worker_count: 0 }), 1);
 });
 
 test('higher scale percentages grow the VM footprint and totals', () => {

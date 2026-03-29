@@ -6,6 +6,7 @@ import {
   PROVISION_AUTOSCALED_FIELDS,
   buildProvisionScaleSummary,
   buildScaledProvisionInputs,
+  getProvisionNodeCount,
   formatMemoryMb,
 } from './provision-scale.js';
 import {
@@ -451,6 +452,7 @@ function App() {
   const [error, setError] = useState('');
   const [activeJob, setActiveJob] = useState(null);
   const [provisionSuggestionsReadyState, setProvisionSuggestionsReadyState] = useState(false);
+  const [provisionStepArmed, setProvisionStepArmed] = useState(false);
   const placementSuggestionKeyRef = useRef('');
 
   useEffect(() => {
@@ -710,13 +712,7 @@ function App() {
       return currentDraft;
     }
 
-    const controlplaneCount = Number.isFinite(Number(currentDraft.controlplane_count))
-      ? Number(currentDraft.controlplane_count)
-      : 1;
-    const workerCount = Number.isFinite(Number(currentDraft.worker_count))
-      ? Number(currentDraft.worker_count)
-      : 0;
-    const nodeCount = Math.max(1, controlplaneCount + workerCount);
+    const nodeCount = getProvisionNodeCount(step.inputs || [], currentDraft);
     const suggestionKey = `${managementIp}:${nodeCount}`;
     const previousSuggested = buildSuggestedProvisionInputs(provisionSuggestionSnapshotRef.current);
 
@@ -875,6 +871,12 @@ function App() {
 
   async function handlePrimaryAction() {
     if (!model.activeStep || model.primaryAction.disabled) {
+      return;
+    }
+
+    if (model.activeStep.id === 'provision-nodes' && !provisionStepArmed) {
+      const message = 'Step 1 is still preparing. Wait until the button says Start step 1.';
+      setNotice(message);
       return;
     }
 
@@ -1077,13 +1079,7 @@ function App() {
       return;
     }
 
-    const controlplaneCount = Number.isFinite(Number(currentDraft.controlplane_count))
-      ? Number(currentDraft.controlplane_count)
-      : 1;
-    const workerCount = Number.isFinite(Number(currentDraft.worker_count))
-      ? Number(currentDraft.worker_count)
-      : 0;
-    const suggestionKey = `${managementIp}:${Math.max(1, controlplaneCount + workerCount)}`;
+    const suggestionKey = `${managementIp}:${getProvisionNodeCount(model.activeStep.inputs || [], currentDraft)}`;
 
     setProvisionSuggestionsReadyState(
       provisionSuggestionKeyRef.current === suggestionKey
@@ -1106,11 +1102,7 @@ function App() {
     )
     : null;
   const provisionSuggestionKey = model.activeStep?.id === 'provision-nodes'
-    ? `${window.location.hostname}:${Math.max(
-      1,
-      (Number.isFinite(Number(currentDraft.controlplane_count)) ? Number(currentDraft.controlplane_count) : 1)
-      + (Number.isFinite(Number(currentDraft.worker_count)) ? Number(currentDraft.worker_count) : 0),
-    )}`
+    ? `${window.location.hostname}:${getProvisionNodeCount(model.activeStep.inputs || [], currentDraft)}`
     : '';
   const provisionPlacementReady = model.activeStep?.id !== 'provision-nodes' || Boolean(placementBoard?.hostCards?.length);
   const provisionSuggestionsReady = isProvisionSuggestionReady({
@@ -1120,11 +1112,25 @@ function App() {
     suggestionSnapshot: provisionSuggestionSnapshotRef.current,
   });
   const provisionStepReady = provisionPlacementReady && provisionSuggestionsReady;
-  const primaryActionDisabled = model.primaryAction.disabled || !provisionStepReady;
-  const primaryActionLabel = !provisionStepReady && model.activeStep?.id === 'provision-nodes'
+  useEffect(() => {
+    if (model.activeStep?.id !== 'provision-nodes' || !provisionStepReady || busy) {
+      setProvisionStepArmed(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setProvisionStepArmed(true);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [busy, model.activeStep?.id, provisionStepReady, clusterId, clusterInstanceId, currentDraft.controlplane_count, currentDraft.worker_count]);
+
+  const stepOnePending = model.activeStep?.id === 'provision-nodes' && !provisionStepArmed;
+  const primaryActionDisabled = model.primaryAction.disabled || stepOnePending;
+  const primaryActionLabel = stepOnePending
     ? (!provisionPlacementReady ? 'Loading placement data…' : 'Loading step 1…')
     : model.primaryAction.label;
-  const primaryActionHelperText = !provisionStepReady && model.activeStep?.id === 'provision-nodes'
+  const primaryActionHelperText = stepOnePending
     ? !provisionPlacementReady
       ? 'Waiting for Proxmox host data before starting step 1.'
       : 'Waiting for step 1 suggestions to load.'

@@ -157,6 +157,18 @@ function buildBaseline(stepInputs) {
   };
 }
 
+export function getProvisionNodeCount(stepInputs = [], currentValues = {}) {
+  const baseline = buildBaseline(stepInputs);
+  const controlplaneCount = Number.isFinite(Number(currentValues.controlplane_count))
+    ? Number(currentValues.controlplane_count)
+    : baseline.controlplaneCount;
+  const workerCount = Number.isFinite(Number(currentValues.worker_count))
+    ? Number(currentValues.worker_count)
+    : baseline.workerCount;
+
+  return Math.max(1, controlplaneCount + workerCount);
+}
+
 function deriveCapacityMultiplier(baseline, resources) {
   const summary = resources?.summary || null;
   if (!summary) {
