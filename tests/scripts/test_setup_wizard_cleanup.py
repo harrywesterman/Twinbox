@@ -48,9 +48,18 @@ def test_setup_wizard_cleanup_uses_cluster_inventory_for_detect_and_remove():
     assert 'WARNING: VMID ${vmid} appears on multiple Proxmox nodes' in text
     assert 'EXISTING_VM_NODES+=("$node")' in text
     assert 'EXISTING_VM_TAGS+=("$tags")' in text
+    assert 'This will remove:' in text
+    assert '- VMs: ${#EXISTING_VM_IDS[@]}' in text
+    assert '- Snippet files: ${#EXISTING_SNIPPETS[@]}' in text
+    assert '- Proxmox API user: ' in text
+    assert '- Proxmox API role: ' in text
+    assert 'present' in text
+    assert 'not found' in text
     assert 'VM inventory:' in text
-    assert '(vmid ${EXISTING_VM_IDS[$idx]}, node ${EXISTING_VM_NODES[$idx]}' in text
-    assert 'tags ${EXISTING_VM_TAGS[$idx]}' in text
+    assert '(VMID ${EXISTING_VM_IDS[$idx]} on ${EXISTING_VM_NODES[$idx]})' in text
+    assert 'Remove these resources now?' in text
+    assert 'Remove these resources before starting again?' in text
+    assert 'This cannot be undone.' in text
     assert 'Destroying VM ${vmid} (${vm_name}) on ${vm_node}' in text
     assert 'VM ${vm_name} tags: ${vm_tags}' in text
     assert 'pvesh create "/nodes/${vm_node}/qemu/${vmid}/status/stop"' in text

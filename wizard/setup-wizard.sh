@@ -516,29 +516,28 @@ render_existing_cluster_inventory() {
   local summary=""
   local idx=""
   summary+="Cluster: ${CLUSTER_SLUG}"$'\n'
-  summary+="VMs: ${#EXISTING_VM_IDS[@]}"$'\n'
+  summary+=$'\n'
+  summary+="This will remove:"$'\n'
+  summary+="- VMs: ${#EXISTING_VM_IDS[@]}"$'\n'
+  summary+="- Snippet files: ${#EXISTING_SNIPPETS[@]}"$'\n'
+  summary+="- Proxmox API user: "
+  if [[ "${EXISTING_USER_PRESENT}" -eq 1 ]]; then
+    summary+="present"$'\n'
+  else
+    summary+="not found"$'\n'
+  fi
+  summary+="- Proxmox API role: "
+  if [[ "${EXISTING_ROLE_PRESENT}" -eq 1 ]]; then
+    summary+="present"$'\n'
+  else
+    summary+="not found"$'\n'
+  fi
   if [[ "${#EXISTING_VM_IDS[@]}" -gt 0 ]]; then
+    summary+=$'\n'
     summary+="VM inventory:"$'\n'
     for idx in "${!EXISTING_VM_IDS[@]}"; do
-      summary+="- ${EXISTING_VM_NAMES[$idx]} (vmid ${EXISTING_VM_IDS[$idx]}, node ${EXISTING_VM_NODES[$idx]}"
-      if [[ -n "${EXISTING_VM_TAGS[$idx]:-}" ]]; then
-        summary+=", tags ${EXISTING_VM_TAGS[$idx]}"
-      fi
-      summary+=")"$'\n'
+      summary+="- ${EXISTING_VM_NAMES[$idx]} (VMID ${EXISTING_VM_IDS[$idx]} on ${EXISTING_VM_NODES[$idx]})"$'\n'
     done
-  fi
-  summary+="Snippets: ${#EXISTING_SNIPPETS[@]}"$'\n'
-  summary+="API user: "
-  if [[ "${EXISTING_USER_PRESENT}" -eq 1 ]]; then
-    summary+="yes"$'\n'
-  else
-    summary+="no"$'\n'
-  fi
-  summary+="API role: "
-  if [[ "${EXISTING_ROLE_PRESENT}" -eq 1 ]]; then
-    summary+="yes"
-  else
-    summary+="no"
   fi
 
   printf '%s' "$summary"
@@ -613,7 +612,7 @@ handle_existing_cluster_conflict() {
 
   inventory=$(render_existing_cluster_inventory)
 
-  if ! yesno_box "Twinbox" "A cluster named '${CLUSTER_SLUG}' already exists.\n\n${inventory}\n\nRemove it before starting again?" 18 78; then
+  if ! yesno_box "Twinbox" "A cluster named '${CLUSTER_SLUG}' already exists.\n\n${inventory}\n\nThis cannot be undone.\n\nRemove these resources before starting again?" 20 78; then
     return 1
   fi
 
@@ -1097,7 +1096,7 @@ remove_cluster_flow() {
     return 1
   fi
 
-  if ! yesno_box "Twinbox" "$(render_existing_cluster_inventory)\n\nRemove this cluster?" 16 78; then
+  if ! yesno_box "Twinbox" "$(render_existing_cluster_inventory)\n\nThis cannot be undone.\n\nRemove these resources now?" 18 78; then
     return 1
   fi
 
