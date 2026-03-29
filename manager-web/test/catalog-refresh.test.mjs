@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   isMissingClusterError,
+  recoverMissingClusterState,
   refreshWizardSnapshot,
 } from '../src/catalog-refresh.js';
 
@@ -57,6 +58,86 @@ test('isMissingClusterError only matches 404 cluster not found responses', () =>
   assert.equal(isMissingClusterError(null), false);
 });
 
+test('recoverMissingClusterState drops the step 1 draft and resets suggestion refs', () => {
+  const state = {
+    clusterId: 'tst',
+    selectedStepId: 'install-secret-sync',
+    cluster: { id: 'tst' },
+    logs: ['old log'],
+    activeJob: { id: 'job-1' },
+    answers: {
+      'provision-nodes': {
+        name: 'twinbox-tst',
+        start_vmid: 122,
+        vip_ip: '192.168.2.50',
+      },
+      'install-secret-sync': {
+        openbao_hostname: 'openbao.internal',
+      },
+    },
+    notice: '',
+    error: 'stale',
+  };
+  const clusterIdRef = { current: 'tst' };
+  const selectedStepIdRef = { current: 'install-secret-sync' };
+  const answersRef = {
+    current: state.answers,
+  };
+  const provisionDirtyFieldsRef = {
+    current: new Set(['start_vmid', 'vip_ip']),
+  };
+  const provisionSuggestionKeyRef = {
+    current: '192.168.2.52:5',
+  };
+  const provisionSuggestionSnapshotRef = {
+    current: {
+      start_vmid: 122,
+      vip_ip: '192.168.2.50',
+    },
+  };
+  const placementSuggestionKeyRef = {
+    current: 'tst:provision-nodes',
+  };
+
+  recoverMissingClusterState({
+    setClusterId: (value) => { state.clusterId = value; },
+    setSelectedStepId: (value) => { state.selectedStepId = value; },
+    setCluster: (value) => { state.cluster = value; },
+    setLogs: (value) => { state.logs = value; },
+    setActiveJob: (value) => { state.activeJob = value; },
+    setAnswers: (value) => { state.answers = value; },
+    setNotice: (value) => { state.notice = value; },
+    setError: (value) => { state.error = value; },
+    clusterIdRef,
+    selectedStepIdRef,
+    answersRef,
+    provisionDirtyFieldsRef,
+    provisionSuggestionKeyRef,
+    provisionSuggestionSnapshotRef,
+    placementSuggestionKeyRef,
+  });
+
+  assert.equal(clusterIdRef.current, '');
+  assert.equal(selectedStepIdRef.current, '');
+  assert.equal(state.clusterId, '');
+  assert.equal(state.selectedStepId, '');
+  assert.equal(state.cluster, null);
+  assert.deepEqual(state.logs, []);
+  assert.equal(state.activeJob, null);
+  assert.deepEqual(state.answers, {
+    'install-secret-sync': {
+      openbao_hostname: 'openbao.internal',
+    },
+  });
+  assert.deepEqual(answersRef.current, state.answers);
+  assert.deepEqual([...provisionDirtyFieldsRef.current], []);
+  assert.equal(provisionSuggestionKeyRef.current, '');
+  assert.deepEqual(provisionSuggestionSnapshotRef.current, {});
+  assert.equal(placementSuggestionKeyRef.current, '');
+  assert.equal(state.notice, 'The selected cluster was not found. Twinbox discarded the old step 1 draft and restarted the wizard at step 1.');
+  assert.equal(state.error, '');
+});
+
 test('refreshWizardSnapshot resets stale cluster state and retries without cluster filter', async () => {
   const calls = [];
   const state = {
@@ -68,6 +149,15 @@ test('refreshWizardSnapshot resets stale cluster state and retries without clust
     cluster: { id: 'tst' },
     logs: ['old log'],
     activeJob: { id: 'job-1' },
+    answers: {
+      'provision-nodes': {
+        name: 'twinbox-tst',
+        start_vmid: 122,
+      },
+      'install-secret-sync': {
+        openbao_hostname: 'openbao.internal',
+      },
+    },
     notice: '',
     error: 'stale',
   };
@@ -110,11 +200,21 @@ test('refreshWizardSnapshot resets stale cluster state and retries without clust
 
   const clusterIdRef = { current: 'tst' };
   const selectedStepIdRef = { current: 'install-secret-sync' };
+  const answersRef = { current: state.answers };
+  const provisionDirtyFieldsRef = { current: new Set(['start_vmid']) };
+  const provisionSuggestionKeyRef = { current: '192.168.2.52:5' };
+  const provisionSuggestionSnapshotRef = { current: { start_vmid: 122 } };
+  const placementSuggestionKeyRef = { current: 'tst:provision-nodes' };
 
   await refreshWizardSnapshot({
     requestJson,
     clusterIdRef,
     selectedStepIdRef,
+    answersRef,
+    provisionDirtyFieldsRef,
+    provisionSuggestionKeyRef,
+    provisionSuggestionSnapshotRef,
+    placementSuggestionKeyRef,
     setHealth: (value) => { state.health = value; },
     setCatalog: (value) => { state.catalog = value; },
     setProxmoxResources: (value) => { state.proxmoxResources = value; },
@@ -123,6 +223,7 @@ test('refreshWizardSnapshot resets stale cluster state and retries without clust
     setCluster: (value) => { state.cluster = value; },
     setLogs: (value) => { state.logs = value; },
     setActiveJob: (value) => { state.activeJob = value; },
+    setAnswers: (value) => { state.answers = value; },
     setNotice: (value) => { state.notice = value; },
     setError: (value) => { state.error = value; },
   });
@@ -140,7 +241,17 @@ test('refreshWizardSnapshot resets stale cluster state and retries without clust
   assert.equal(state.cluster, null);
   assert.deepEqual(state.logs, []);
   assert.equal(state.activeJob, null);
-  assert.equal(state.notice, 'The selected cluster was not found. Twinbox restarted the wizard at step 1.');
+  assert.deepEqual(state.answers, {
+    'install-secret-sync': {
+      openbao_hostname: 'openbao.internal',
+    },
+  });
+  assert.deepEqual(answersRef.current, state.answers);
+  assert.deepEqual([...provisionDirtyFieldsRef.current], []);
+  assert.equal(provisionSuggestionKeyRef.current, '');
+  assert.deepEqual(provisionSuggestionSnapshotRef.current, {});
+  assert.equal(placementSuggestionKeyRef.current, '');
+  assert.equal(state.notice, 'The selected cluster was not found. Twinbox discarded the old step 1 draft and restarted the wizard at step 1.');
   assert.equal(state.error, '');
   assert.equal(state.catalog.categories[0].steps[0].id, 'provision-nodes');
   assert.equal(state.health.ok, true);

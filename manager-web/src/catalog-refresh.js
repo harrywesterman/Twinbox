@@ -1,5 +1,8 @@
 import { getWizardSteps } from './journey.js';
 
+const PROVISION_STEP_ID = 'provision-nodes';
+const MISSING_CLUSTER_NOTICE = 'The selected cluster was not found. Twinbox discarded the old step 1 draft and restarted the wizard at step 1.';
+
 export function isMissingClusterError(error) {
   if (!error || typeof error !== 'object') {
     return false;
@@ -41,17 +44,47 @@ function clearMissingClusterState({
   setCluster,
   setLogs,
   setActiveJob,
+  setAnswers,
   setError,
   setNotice,
   clusterIdRef,
   selectedStepIdRef,
-  notice = 'The selected cluster was not found. Twinbox restarted the wizard at step 1.',
+  answersRef,
+  provisionDirtyFieldsRef,
+  provisionSuggestionKeyRef,
+  provisionSuggestionSnapshotRef,
+  placementSuggestionKeyRef,
+  notice = MISSING_CLUSTER_NOTICE,
 }) {
+  const currentAnswers = answersRef?.current && typeof answersRef.current === 'object'
+    ? answersRef.current
+    : {};
+  const hasProvisionDraft = Object.prototype.hasOwnProperty.call(currentAnswers, PROVISION_STEP_ID);
+
   if (clusterIdRef) {
     clusterIdRef.current = '';
   }
   if (selectedStepIdRef) {
     selectedStepIdRef.current = '';
+  }
+  if (answersRef) {
+    answersRef.current = hasProvisionDraft
+      ? Object.fromEntries(
+        Object.entries(currentAnswers).filter(([stepId]) => stepId !== PROVISION_STEP_ID),
+      )
+      : currentAnswers;
+  }
+  if (provisionDirtyFieldsRef) {
+    provisionDirtyFieldsRef.current = new Set();
+  }
+  if (provisionSuggestionKeyRef) {
+    provisionSuggestionKeyRef.current = '';
+  }
+  if (provisionSuggestionSnapshotRef) {
+    provisionSuggestionSnapshotRef.current = {};
+  }
+  if (placementSuggestionKeyRef) {
+    placementSuggestionKeyRef.current = '';
   }
 
   setClusterId?.('');
@@ -59,6 +92,9 @@ function clearMissingClusterState({
   setCluster?.(null);
   setLogs?.([]);
   setActiveJob?.(null);
+  if (setAnswers) {
+    setAnswers(hasProvisionDraft ? answersRef.current : currentAnswers);
+  }
   setError?.('');
   setNotice?.(notice);
 }
@@ -79,8 +115,14 @@ export async function refreshWizardSnapshot({
   setCluster,
   setLogs,
   setActiveJob,
+  setAnswers,
   setNotice,
   setError,
+  answersRef,
+  provisionDirtyFieldsRef,
+  provisionSuggestionKeyRef,
+  provisionSuggestionSnapshotRef,
+  placementSuggestionKeyRef,
   clusterIdOverride = '',
   clearError = true,
 }) {
@@ -117,10 +159,16 @@ export async function refreshWizardSnapshot({
       setCluster,
       setLogs,
       setActiveJob,
+      setAnswers,
       setError,
       setNotice,
       clusterIdRef,
       selectedStepIdRef,
+      answersRef,
+      provisionDirtyFieldsRef,
+      provisionSuggestionKeyRef,
+      provisionSuggestionSnapshotRef,
+      placementSuggestionKeyRef,
     });
 
     catalogValue = await requestJson('/api/catalog');
