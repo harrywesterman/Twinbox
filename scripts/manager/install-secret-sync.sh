@@ -61,6 +61,7 @@ done
 [[ -n "${CLUSTER_ID:-}" ]] || { usage; fail "cluster-id required"; }
 [[ -n "${KUBECONFIG_FILE:-}" ]] || fail "KUBECONFIG_FILE is required"
 [[ -f "${KUBECONFIG_FILE:-}" ]] || fail "kubeconfig not found at ${KUBECONFIG_FILE:-}"
+CLUSTER_INSTANCE_ID="${TWINBOX_CLUSTER_INSTANCE_ID:-}"
 
 require_cmd kubectl
 require_cmd helm
@@ -109,6 +110,7 @@ openbao_wait_for_secret "$TARGET_SECRET_NAME" "$TARGET_NAMESPACE"
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \
     --arg cluster_id "$CLUSTER_ID" \
+    --arg cluster_instance_id "$CLUSTER_INSTANCE_ID" \
     --arg operator_namespace "$OPERATOR_NAMESPACE" \
     --arg openbao_namespace "$OPENBAO_NAMESPACE" \
     --arg target_namespace "$TARGET_NAMESPACE" \
@@ -118,6 +120,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     --arg replicas "$OPENBAO_REPLICAS" \
     '{
       cluster_id: $cluster_id,
+      cluster_instance_id: $cluster_instance_id,
       operator_namespace: $operator_namespace,
       openbao_namespace: $openbao_namespace,
       target_namespace: $target_namespace,

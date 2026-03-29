@@ -78,23 +78,28 @@ function now() {
   return new Date().toISOString();
 }
 
-function stepStatePath(stepId, clusterId = null) {
-  const scope = clusterId ? path.join("clusters", clusterId) : "global";
+function clusterScopeId(cluster = null, fallback = null) {
+  return cluster?.cluster_instance_id || cluster?.instance_id || fallback || null;
+}
+
+function stepStatePath(stepId, clusterScope = null) {
+  const scope = clusterScope ? path.join("clusters", clusterScope) : "global";
   return path.join(dirs.stepState, scope, `${stepId}.json`);
 }
 
-function readStepState(stepId, clusterId = null) {
-  return readJsonIfExists(stepStatePath(stepId, clusterId));
+function readStepState(stepId, clusterScope = null) {
+  return readJsonIfExists(stepStatePath(stepId, clusterScope));
 }
 
-function updateStepState(stepId, patch, clusterId = null) {
-  const file = stepStatePath(stepId, clusterId);
-  const current = readStepState(stepId, clusterId) || {
+function updateStepState(stepId, patch, clusterScope = null) {
+  const file = stepStatePath(stepId, clusterScope);
+  const current = readStepState(stepId, clusterScope) || {
     step_id: stepId,
     status: "not_started",
     inputs: {},
     outputs: null,
-    cluster_id: clusterId || null,
+    cluster_id: clusterScope || null,
+    cluster_instance_id: patch.cluster_instance_id ?? clusterScope ?? null,
     error: null,
     last_job_id: null,
     created_at: now(),
@@ -103,7 +108,8 @@ function updateStepState(stepId, patch, clusterId = null) {
     ...current,
     ...patch,
     step_id: stepId,
-    cluster_id: patch.cluster_id ?? current.cluster_id ?? clusterId ?? null,
+    cluster_id: patch.cluster_id ?? current.cluster_id ?? clusterScope ?? null,
+    cluster_instance_id: patch.cluster_instance_id ?? current.cluster_instance_id ?? clusterScope ?? null,
     updated_at: now(),
   };
   writeJson(file, next);
@@ -159,13 +165,15 @@ function recoverOrphanedRunningJobs() {
 
       if (queued.type === "run_step" && queued.payload?.step_id) {
         const clusterId = queued.cluster_id || queued.payload?.cluster_id || queued.payload?.context?.cluster?.id || null;
+        const clusterInstanceId = queued.cluster_instance_id || queued.payload?.cluster_instance_id || queued.payload?.context?.cluster?.cluster_instance_id || queued.payload?.context?.cluster?.instance_id || null;
         updateStepState(queued.payload.step_id, {
           status: "failed",
           error: failureMessage,
           last_job_id: jobId,
           cluster_id: clusterId,
+          cluster_instance_id: clusterInstanceId,
           finished_at: now(),
-        }, clusterId);
+        }, clusterInstanceId || clusterId);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error || "unknown error");
@@ -575,6 +583,7 @@ async function handleRunStep(job) {
   }
 
   const clusterId = context?.cluster?.id || job.cluster_id || null;
+  const clusterInstanceId = clusterScopeId(context?.cluster, job.cluster_instance_id || null);
   const resultFile = path.join(dirs.stepResults, `${job.id}.json`);
   fs.rmSync(resultFile, { force: true });
 
@@ -585,9 +594,10 @@ async function handleRunStep(job) {
     error: null,
     last_job_id: job.id,
     cluster_id: clusterId,
+    cluster_instance_id: clusterInstanceId,
     started_at: now(),
     finished_at: null,
-  }, clusterId);
+  }, clusterInstanceId || clusterId);
 
   const secretRuntime = resolveJobSecretRuntime(payload, clusterId);
   const redact = buildRedactor(secretRuntime.redactions);
@@ -601,6 +611,7 @@ async function handleRunStep(job) {
         STEP_ID: stepId,
         STEP_TYPE: stepType,
         TWINBOX_CLUSTER_ID: clusterId || "",
+        TWINBOX_CLUSTER_INSTANCE_ID: clusterInstanceId || "",
         STEP_INPUTS_JSON: JSON.stringify(inputs),
         STEP_CONTEXT_JSON: JSON.stringify(context),
         STEP_RESULT_FILE: resultFile,
@@ -618,16 +629,18 @@ async function handleRunStep(job) {
       error: null,
       last_job_id: job.id,
       cluster_id: outputs?.cluster_id || clusterId,
+      cluster_instance_id: outputs?.cluster_instance_id || clusterInstanceId,
       finished_at: now(),
-    }, clusterId);
+    }, clusterInstanceId || clusterId);
   } catch (err) {
     updateStepState(stepId, {
       status: "failed",
       error: err.message,
       last_job_id: job.id,
       cluster_id: clusterId,
+      cluster_instance_id: clusterInstanceId,
       finished_at: now(),
-    }, clusterId);
+    }, clusterInstanceId || clusterId);
     throw err;
   } finally {
     secretRuntime.cleanup();
@@ -651,7 +664,12 @@ async function handleJob(queueFile) {
     } else if (queued.type === "bootstrap_cluster") {
       await handleBootstrap({ id: queued.id, payload: queued.payload });
     } else if (queued.type === "run_step") {
-      await handleRunStep({ id: queued.id, payload: queued.payload, cluster_id: queued.cluster_id });
+      await handleRunStep({
+        id: queued.id,
+        payload: queued.payload,
+        cluster_id: queued.cluster_id,
+        cluster_instance_id: queued.cluster_instance_id,
+      });
     } else {
       throw new Error(`unsupported job type: ${queued.type}`);
     }

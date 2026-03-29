@@ -542,12 +542,19 @@ export function toneForStatus(value) {
   return 'neutral';
 }
 
-export function serializeUiState({ selectedStepId = '', answers = {}, clusterId = '', clusterCreatedAt = '' } = {}) {
+export function serializeUiState({
+  selectedStepId = '',
+  answers = {},
+  clusterId = '',
+  clusterCreatedAt = '',
+  clusterInstanceId = '',
+} = {}) {
   return JSON.stringify({
     version: 1,
     selectedStepId: typeof selectedStepId === 'string' ? selectedStepId : '',
     clusterId: typeof clusterId === 'string' ? clusterId : '',
     clusterCreatedAt: typeof clusterCreatedAt === 'string' ? clusterCreatedAt : '',
+    clusterInstanceId: typeof clusterInstanceId === 'string' ? clusterInstanceId : '',
     answers: answers && typeof answers === 'object' ? answers : {},
   });
 }
@@ -574,7 +581,7 @@ export function buildWizardExportFilename({ clusterName = '', clusterId = '', da
 
 export function restoreUiState(value) {
   if (!value) {
-    return { selectedStepId: '', clusterId: '', clusterCreatedAt: '', answers: {} };
+    return { selectedStepId: '', clusterId: '', clusterCreatedAt: '', clusterInstanceId: '', answers: {} };
   }
 
   try {
@@ -583,10 +590,11 @@ export function restoreUiState(value) {
       selectedStepId: typeof parsed.selectedStepId === 'string' ? parsed.selectedStepId : '',
       clusterId: typeof parsed.clusterId === 'string' ? parsed.clusterId : '',
       clusterCreatedAt: typeof parsed.clusterCreatedAt === 'string' ? parsed.clusterCreatedAt : '',
+      clusterInstanceId: typeof parsed.clusterInstanceId === 'string' ? parsed.clusterInstanceId : '',
       answers: parsed.answers && typeof parsed.answers === 'object' ? parsed.answers : {},
     };
   } catch {
-    return { selectedStepId: '', clusterId: '', clusterCreatedAt: '', answers: {} };
+    return { selectedStepId: '', clusterId: '', clusterCreatedAt: '', clusterInstanceId: '', answers: {} };
   }
 }
 

@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import path from "path";
 import {
   buildClusterWorkerSecretBundle,
@@ -130,7 +131,7 @@ function normalizeVmNodeMap(rawMap, allowedHosts = [], fallbackHost = "pve", vmN
   return { ok: true, value: normalized };
 }
 
-export function buildClusterFromRequest(body, env, { allowedVmHosts = [] } = {}) {
+export function buildClusterFromRequest(body, env, { allowedVmHosts = [], clusterInstanceId = null } = {}) {
   const parsedName = parseRequiredString(body.name, "name");
   const parsedBridge = parseRequiredString(body.bridge, "bridge");
   const parsedControlplanes = parseIntInRange(body.controlplane_count, "controlplane_count", 1, 15);
@@ -199,6 +200,7 @@ export function buildClusterFromRequest(body, env, { allowedVmHosts = [] } = {})
     ok: true,
     cluster: ensureClusterSecretRefs({
       id: clusterId,
+      cluster_instance_id: clusterInstanceId || crypto.randomUUID(),
       name: normalizedName.name,
       controlplane_count: parsedControlplanes.value,
       worker_count: parsedWorkers.value,

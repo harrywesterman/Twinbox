@@ -7,6 +7,7 @@ set -euo pipefail
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
+cluster_instance_id="$(printf '%s' "$cluster_json" | jq -r '.cluster_instance_id // empty')"
 
 operator_namespace="external-secrets"
 openbao_namespace="openbao"
@@ -27,6 +28,7 @@ bash "$WORKSPACE_ROOT/scripts/manager/install-secret-sync.sh" \
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \
     --arg cluster_id "$cluster_id" \
+    --arg cluster_instance_id "$cluster_instance_id" \
     --arg operator_namespace "$operator_namespace" \
     --arg openbao_namespace "$openbao_namespace" \
     --arg target_namespace "$target_namespace" \
@@ -35,6 +37,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     --arg target_secret_name "$target_secret_name" \
     '{
       cluster_id: $cluster_id,
+      cluster_instance_id: $cluster_instance_id,
       operator_namespace: $operator_namespace,
       openbao_namespace: $openbao_namespace,
       target_namespace: $target_namespace,

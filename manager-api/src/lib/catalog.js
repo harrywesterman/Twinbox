@@ -215,6 +215,7 @@ function summarizeStepState(state) {
       inputs: {},
       outputs: null,
       cluster_id: null,
+      cluster_instance_id: null,
       error: null,
       updated_at: null,
       last_job_id: null,
@@ -226,19 +227,24 @@ function summarizeStepState(state) {
     inputs: state.inputs || {},
     outputs: state.outputs || null,
     cluster_id: state.cluster_id || null,
+    cluster_instance_id: state.cluster_instance_id || null,
     error: state.error || null,
     updated_at: state.updated_at || null,
     last_job_id: state.last_job_id || null,
   };
 }
 
-function stepStatePath(dirs, stepId, clusterId = null) {
-  const scope = clusterId ? path.join("clusters", clusterId) : "global";
+function clusterScopeId(cluster) {
+  return cluster?.cluster_instance_id || cluster?.instance_id || cluster?.id || null;
+}
+
+function stepStatePath(dirs, stepId, clusterScope = null) {
+  const scope = clusterScope ? path.join("clusters", clusterScope) : "global";
   return path.join(dirs.stepState, scope, `${stepId}.json`);
 }
 
-function readStepState(dirs, stepId, clusterId = null) {
-  return readJsonIfExists(stepStatePath(dirs, stepId, clusterId));
+function readStepState(dirs, stepId, clusterScope = null) {
+  return readJsonIfExists(stepStatePath(dirs, stepId, clusterScope));
 }
 
 function synthesizeProvisionStateFromCluster(step, cluster, state) {
@@ -246,15 +252,19 @@ function synthesizeProvisionStateFromCluster(step, cluster, state) {
     return state;
   }
 
+  const clusterInstanceId = clusterScopeId(cluster);
+
   if (cluster.status === "bootstrapped" || cluster.status === "provisioned") {
     return {
       status: "succeeded",
       inputs: {},
       outputs: {
         cluster_id: cluster.id,
+        cluster_instance_id: clusterInstanceId,
         cluster_status: cluster.status,
       },
       cluster_id: cluster.id,
+      cluster_instance_id: clusterInstanceId,
       error: null,
       updated_at: cluster.updated_at || cluster.created_at || null,
       last_job_id: null,
@@ -267,9 +277,11 @@ function synthesizeProvisionStateFromCluster(step, cluster, state) {
       inputs: {},
       outputs: {
         cluster_id: cluster.id,
+        cluster_instance_id: clusterInstanceId,
         cluster_status: cluster.status,
       },
       cluster_id: cluster.id,
+      cluster_instance_id: clusterInstanceId,
       error: cluster.last_error || "cluster provisioning failed",
       updated_at: cluster.updated_at || cluster.created_at || null,
       last_job_id: null,
@@ -334,12 +346,13 @@ export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) 
   const definitions = loadCatalogDefinitions({ workspaceRoot });
   const currentCluster = clusterId ? findClusterById(dirs, clusterId) : findCurrentCluster(dirs);
   const activeClusterId = currentCluster?.id || null;
+  const activeClusterScopeId = clusterScopeId(currentCluster);
   const stepStateById = new Map();
 
   for (const category of definitions.categories) {
     for (const step of category.steps) {
       const isClusterScopedStep = step.category_id === "talos-cluster";
-      const scopedClusterId = isClusterScopedStep ? activeClusterId : null;
+      const scopedClusterId = isClusterScopedStep ? activeClusterScopeId : null;
       const rawState = readStepState(dirs, step.id, scopedClusterId);
       const state = isClusterScopedStep ? synthesizeProvisionStateFromCluster(step, currentCluster, rawState) : rawState;
       const latestJob = state?.last_job_id
@@ -376,6 +389,11 @@ export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) 
         inputs: step.inputs,
         secrets: step.secrets,
         depends_on: step.depends_on,
+        icon: step.icon,
+        icon_artwork_url: step.icon_artwork_url,
+        project_url: step.project_url,
+        github_url: step.github_url,
+        positive_summary: step.positive_summary,
         status,
         state: summarizeStepState(state),
         latest_job: summarizeJob(latestJob),

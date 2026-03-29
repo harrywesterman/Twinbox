@@ -62,6 +62,18 @@ test('isMissingClusterError only matches 404 cluster not found responses', () =>
 });
 
 test('shouldResetRecreatedClusterDraft detects a cluster generation mismatch', () => {
+  assert.equal(shouldResetRecreatedClusterDraft({
+    previousClusterInstanceId: '11111111-1111-1111-1111-111111111111',
+    nextClusterInstanceId: '22222222-2222-2222-2222-222222222222',
+    nextCreatedAt: '2026-03-30T00:00:00Z',
+    hasProvisionDraft: true,
+  }), true);
+  assert.equal(shouldResetRecreatedClusterDraft({
+    previousClusterInstanceId: '11111111-1111-1111-1111-111111111111',
+    nextClusterInstanceId: '11111111-1111-1111-1111-111111111111',
+    nextCreatedAt: '2026-03-30T00:00:00Z',
+    hasProvisionDraft: true,
+  }), false);
   assert.equal(shouldResetRecreatedClusterDraft({ previousCreatedAt: '', nextCreatedAt: '2026-03-30T00:00:00Z', hasProvisionDraft: true }), true);
   assert.equal(shouldResetRecreatedClusterDraft({ previousCreatedAt: '2026-03-20T10:00:00Z', nextCreatedAt: '2026-03-30T00:00:00Z', hasProvisionDraft: true }), true);
   assert.equal(shouldResetRecreatedClusterDraft({ previousCreatedAt: '2026-03-30T00:00:00Z', nextCreatedAt: '2026-03-30T00:00:00Z', hasProvisionDraft: true }), false);
@@ -99,6 +111,7 @@ test('recoverMissingClusterState drops the step 1 draft and resets suggestion re
   const state = {
     clusterId: 'tst',
     clusterCreatedAt: '2026-03-20T10:00:00Z',
+    clusterInstanceId: '11111111-1111-1111-1111-111111111111',
     selectedStepId: 'install-secret-sync',
     cluster: { id: 'tst' },
     logs: ['old log'],
@@ -118,6 +131,7 @@ test('recoverMissingClusterState drops the step 1 draft and resets suggestion re
   };
   const clusterIdRef = { current: 'tst' };
   const clusterCreatedAtRef = { current: '2026-03-20T10:00:00Z' };
+  const clusterInstanceIdRef = { current: '11111111-1111-1111-1111-111111111111' };
   const selectedStepIdRef = { current: 'install-secret-sync' };
   const answersRef = {
     current: state.answers,
@@ -141,6 +155,7 @@ test('recoverMissingClusterState drops the step 1 draft and resets suggestion re
   recoverMissingClusterState({
     setClusterId: (value) => { state.clusterId = value; },
     setClusterCreatedAt: (value) => { state.clusterCreatedAt = value; },
+    setClusterInstanceId: (value) => { state.clusterInstanceId = value; },
     setSelectedStepId: (value) => { state.selectedStepId = value; },
     setCluster: (value) => { state.cluster = value; },
     setLogs: (value) => { state.logs = value; },
@@ -150,6 +165,7 @@ test('recoverMissingClusterState drops the step 1 draft and resets suggestion re
     setError: (value) => { state.error = value; },
     clusterIdRef,
     clusterCreatedAtRef,
+    clusterInstanceIdRef,
     selectedStepIdRef,
     answersRef,
     provisionDirtyFieldsRef,
@@ -160,9 +176,11 @@ test('recoverMissingClusterState drops the step 1 draft and resets suggestion re
 
   assert.equal(clusterIdRef.current, '');
   assert.equal(clusterCreatedAtRef.current, '');
+  assert.equal(clusterInstanceIdRef.current, '');
   assert.equal(selectedStepIdRef.current, '');
   assert.equal(state.clusterId, '');
   assert.equal(state.clusterCreatedAt, '');
+  assert.equal(state.clusterInstanceId, '');
   assert.equal(state.selectedStepId, '');
   assert.equal(state.cluster, null);
   assert.deepEqual(state.logs, []);
@@ -185,6 +203,7 @@ test('recoverRecreatedClusterState keeps the cluster id but clears the stale ste
   const state = {
     clusterId: 'tst',
     clusterCreatedAt: '2026-03-20T10:00:00Z',
+    clusterInstanceId: '11111111-1111-1111-1111-111111111111',
     selectedStepId: 'install-secret-sync',
     cluster: { id: 'tst' },
     logs: ['old log'],
@@ -204,6 +223,7 @@ test('recoverRecreatedClusterState keeps the cluster id but clears the stale ste
   };
   const clusterIdRef = { current: 'tst' };
   const clusterCreatedAtRef = { current: '2026-03-20T10:00:00Z' };
+  const clusterInstanceIdRef = { current: '11111111-1111-1111-1111-111111111111' };
   const selectedStepIdRef = { current: 'install-secret-sync' };
   const answersRef = {
     current: state.answers,
@@ -226,6 +246,7 @@ test('recoverRecreatedClusterState keeps the cluster id but clears the stale ste
 
   recoverRecreatedClusterState({
     setClusterCreatedAt: (value) => { state.clusterCreatedAt = value; },
+    setClusterInstanceId: (value) => { state.clusterInstanceId = value; },
     setSelectedStepId: (value) => { state.selectedStepId = value; },
     setCluster: (value) => { state.cluster = value; },
     setLogs: (value) => { state.logs = value; },
@@ -235,6 +256,7 @@ test('recoverRecreatedClusterState keeps the cluster id but clears the stale ste
     setError: (value) => { state.error = value; },
     clusterIdRef,
     clusterCreatedAtRef,
+    clusterInstanceIdRef,
     selectedStepIdRef,
     answersRef,
     provisionDirtyFieldsRef,
@@ -245,9 +267,11 @@ test('recoverRecreatedClusterState keeps the cluster id but clears the stale ste
 
   assert.equal(clusterIdRef.current, 'tst');
   assert.equal(clusterCreatedAtRef.current, '2026-03-20T10:00:00Z');
+  assert.equal(clusterInstanceIdRef.current, '');
   assert.equal(selectedStepIdRef.current, '');
   assert.equal(state.clusterId, 'tst');
   assert.equal(state.clusterCreatedAt, '2026-03-20T10:00:00Z');
+  assert.equal(state.clusterInstanceId, '');
   assert.equal(state.selectedStepId, '');
   assert.equal(state.cluster, null);
   assert.deepEqual(state.logs, []);
@@ -274,6 +298,7 @@ test('refreshWizardSnapshot resets stale cluster state and retries without clust
     proxmoxResources: null,
     clusterId: 'tst',
     clusterCreatedAt: '2026-03-20T10:00:00Z',
+    clusterInstanceId: '11111111-1111-1111-1111-111111111111',
     selectedStepId: 'install-secret-sync',
     cluster: { id: 'tst' },
     logs: ['old log'],
@@ -329,6 +354,7 @@ test('refreshWizardSnapshot resets stale cluster state and retries without clust
 
   const clusterIdRef = { current: 'tst' };
   const clusterCreatedAtRef = { current: '2026-03-20T10:00:00Z' };
+  const clusterInstanceIdRef = { current: '11111111-1111-1111-1111-111111111111' };
   const selectedStepIdRef = { current: 'install-secret-sync' };
   const answersRef = { current: state.answers };
   const provisionDirtyFieldsRef = { current: new Set(['start_vmid']) };
@@ -339,6 +365,7 @@ test('refreshWizardSnapshot resets stale cluster state and retries without clust
   await refreshWizardSnapshot({
     requestJson,
     clusterIdRef,
+    clusterInstanceIdRef,
     selectedStepIdRef,
     clusterCreatedAtRef,
     answersRef,
@@ -351,6 +378,7 @@ test('refreshWizardSnapshot resets stale cluster state and retries without clust
     setProxmoxResources: (value) => { state.proxmoxResources = value; },
     setClusterId: (value) => { state.clusterId = value; },
     setClusterCreatedAt: (value) => { state.clusterCreatedAt = value; },
+    setClusterInstanceId: (value) => { state.clusterInstanceId = value; },
     setSelectedStepId: (value) => { state.selectedStepId = value; },
     setCluster: (value) => { state.cluster = value; },
     setLogs: (value) => { state.logs = value; },
@@ -368,9 +396,11 @@ test('refreshWizardSnapshot resets stale cluster state and retries without clust
   ]);
   assert.equal(clusterIdRef.current, '');
   assert.equal(clusterCreatedAtRef.current, '');
+  assert.equal(clusterInstanceIdRef.current, '');
   assert.equal(selectedStepIdRef.current, 'provision-nodes');
   assert.equal(state.clusterId, '');
   assert.equal(state.clusterCreatedAt, '');
+  assert.equal(state.clusterInstanceId, '');
   assert.equal(state.selectedStepId, 'provision-nodes');
   assert.equal(state.cluster, null);
   assert.deepEqual(state.logs, []);

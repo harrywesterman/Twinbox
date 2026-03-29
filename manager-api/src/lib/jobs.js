@@ -3,12 +3,22 @@ import path from "path";
 
 import { id, now, writeJson } from "./common.js";
 
+function resolveClusterInstanceId(payload = {}) {
+  return payload?.cluster_instance_id
+    || payload?.context?.cluster?.cluster_instance_id
+    || payload?.context?.cluster?.instance_id
+    || payload?.cluster?.cluster_instance_id
+    || null;
+}
+
 export function queueJob(dirs, type, clusterId, payload) {
+  const clusterInstanceId = resolveClusterInstanceId(payload);
   const jobId = id("job");
   const job = {
     id: jobId,
     type,
     cluster_id: clusterId,
+    cluster_instance_id: clusterInstanceId,
     status: "pending",
     step: "queued",
     error: null,
@@ -25,6 +35,7 @@ export function queueJob(dirs, type, clusterId, payload) {
     id: jobId,
     type,
     cluster_id: clusterId,
+    cluster_instance_id: clusterInstanceId,
     payload,
     queued_at: now(),
   });

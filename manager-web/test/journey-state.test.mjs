@@ -280,6 +280,7 @@ test('wizard export and import helpers round-trip answers and cluster ids', () =
     selectedStepId: 'install-secret-sync',
     clusterId: 'cluster_demo',
     clusterCreatedAt: '2026-03-30T00:00:00Z',
+    clusterInstanceId: '11111111-1111-1111-1111-111111111111',
     answers: {
       'provision-nodes': {
         name: 'demo',
@@ -295,6 +296,7 @@ test('wizard export and import helpers round-trip answers and cluster ids', () =
   assert.equal(restored.selectedStepId, 'install-secret-sync');
   assert.equal(restored.clusterId, 'cluster_demo');
   assert.equal(restored.clusterCreatedAt, '2026-03-30T00:00:00Z');
+  assert.equal(restored.clusterInstanceId, '11111111-1111-1111-1111-111111111111');
   assert.equal(restored.answers['provision-nodes'].name, 'demo');
   assert.deepEqual(restored.answers['provision-nodes'].vm_node_map, {
     'cp-1': 'pve-a',
@@ -304,6 +306,7 @@ test('wizard export and import helpers round-trip answers and cluster ids', () =
   assert.equal(fallback.selectedStepId, '');
   assert.equal(fallback.clusterId, '');
   assert.equal(fallback.clusterCreatedAt, '');
+  assert.equal(fallback.clusterInstanceId, '');
   assert.deepEqual(fallback.answers, {});
 });
 

@@ -90,7 +90,14 @@ def _global_step_state(data_dir: Path, step_id: str) -> Path:
 
 
 def _cluster_step_state(data_dir: Path, cluster_id: str, step_id: str) -> Path:
-    return data_dir / "step-state" / "clusters" / cluster_id / f"{step_id}.json"
+    cluster_file = data_dir / "clusters" / f"{cluster_id}.json"
+    if cluster_file.exists():
+        cluster = json.loads(cluster_file.read_text())
+        scope_id = cluster.get("cluster_instance_id") or cluster.get("instance_id") or cluster.get("id") or cluster_id
+    else:
+        scope_id = cluster_id
+
+    return data_dir / "step-state" / "clusters" / scope_id / f"{step_id}.json"
 
 
 def test_catalog_endpoint_returns_manifest_categories_and_steps():
@@ -282,13 +289,15 @@ EOF
 
             cluster_dir = data_dir / "clusters"
             cluster_dir.mkdir(parents=True, exist_ok=True)
+            cluster_instance_id = "11111111-1111-1111-1111-111111111111"
             (cluster_dir / "demo.json").write_text(
-                json.dumps({"id": "demo", "status": "failed"}),
+                json.dumps({"id": "demo", "cluster_instance_id": cluster_instance_id, "status": "failed"}),
                 encoding="utf-8",
             )
 
             payload = {
                 "cluster_id": "demo",
+                "cluster_instance_id": cluster_instance_id,
                 "inputs": {
                     "name": "demo",
                     "controlplane_count": 1,

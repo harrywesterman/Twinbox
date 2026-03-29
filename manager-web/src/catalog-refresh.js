@@ -19,12 +19,18 @@ export function isMissingClusterError(error) {
 }
 
 export function shouldResetRecreatedClusterDraft({
+  previousClusterInstanceId = '',
+  nextClusterInstanceId = '',
   previousCreatedAt = '',
   nextCreatedAt = '',
   hasProvisionDraft = false,
 } = {}) {
   if (!hasProvisionDraft || !nextCreatedAt) {
     return false;
+  }
+
+  if (nextClusterInstanceId) {
+    return nextClusterInstanceId !== previousClusterInstanceId;
   }
 
   return !previousCreatedAt || nextCreatedAt !== previousCreatedAt;
@@ -66,9 +72,23 @@ function discoverClusterId(catalog) {
   return '';
 }
 
+function discoverClusterInstanceId(catalog) {
+  for (const category of catalog?.categories || []) {
+    for (const step of category.steps || []) {
+      const stateClusterInstanceId = step?.state?.cluster_instance_id;
+      const outputClusterInstanceId = step?.state?.outputs?.cluster_instance_id;
+      if (typeof stateClusterInstanceId === 'string' && stateClusterInstanceId) return stateClusterInstanceId;
+      if (typeof outputClusterInstanceId === 'string' && outputClusterInstanceId) return outputClusterInstanceId;
+    }
+  }
+
+  return '';
+}
+
 function clearStaleClusterState({
   setClusterId,
   setClusterCreatedAt,
+  setClusterInstanceId,
   setSelectedStepId,
   setCluster,
   setLogs,
@@ -79,6 +99,7 @@ function clearStaleClusterState({
   clusterIdRef,
   selectedStepIdRef,
   clusterCreatedAtRef,
+  clusterInstanceIdRef,
   answersRef,
   provisionDirtyFieldsRef,
   provisionSuggestionKeyRef,
@@ -99,6 +120,9 @@ function clearStaleClusterState({
   }
   if (clearClusterCreatedAt && clusterCreatedAtRef) {
     clusterCreatedAtRef.current = '';
+  }
+  if (clusterInstanceIdRef) {
+    clusterInstanceIdRef.current = '';
   }
   if (selectedStepIdRef) {
     selectedStepIdRef.current = '';
@@ -130,6 +154,7 @@ function clearStaleClusterState({
   if (clearClusterCreatedAt) {
     setClusterCreatedAt?.('');
   }
+  setClusterInstanceId?.('');
   setSelectedStepId?.('');
   setCluster?.(null);
   setLogs?.([]);
@@ -157,12 +182,14 @@ export function recoverRecreatedClusterState(options = {}) {
 export async function refreshWizardSnapshot({
   requestJson,
   clusterIdRef,
+  clusterInstanceIdRef,
   selectedStepIdRef,
   setHealth,
   setCatalog,
   setProxmoxResources,
   setClusterId,
   setClusterCreatedAt,
+  setClusterInstanceId,
   setSelectedStepId,
   setCluster,
   setLogs,
@@ -209,6 +236,7 @@ export async function refreshWizardSnapshot({
     clearStaleClusterState({
       setClusterId,
       setClusterCreatedAt,
+      setClusterInstanceId,
       setSelectedStepId,
       setCluster,
       setLogs,
@@ -217,6 +245,7 @@ export async function refreshWizardSnapshot({
       setError,
       setNotice,
       clusterIdRef,
+      clusterInstanceIdRef,
       selectedStepIdRef,
       clusterCreatedAtRef,
       answersRef,
@@ -240,6 +269,12 @@ export async function refreshWizardSnapshot({
   if (discoveredClusterId && discoveredClusterId !== clusterIdRef.current) {
     clusterIdRef.current = discoveredClusterId;
     setClusterId(discoveredClusterId);
+  }
+
+  const discoveredClusterInstanceId = discoverClusterInstanceId(catalogValue) || clusterInstanceIdRef.current || '';
+  if (discoveredClusterInstanceId && discoveredClusterInstanceId !== clusterInstanceIdRef.current) {
+    clusterInstanceIdRef.current = discoveredClusterInstanceId;
+    setClusterInstanceId?.(discoveredClusterInstanceId);
   }
 
   const nextStepId = pickStepId(getWizardSteps(catalogValue), selectedStepIdRef.current);

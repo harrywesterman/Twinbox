@@ -891,27 +891,32 @@ async function validateRequestedAllocation({ startVmid, vipIp, startIp, nodeCoun
   return { ok: true };
 }
 
-function stepStatePath(stepId, clusterId = null) {
-  const scope = clusterId ? path.join("clusters", clusterId) : "global";
+function clusterScopeId(cluster = null, fallback = null) {
+  return cluster?.cluster_instance_id || cluster?.instance_id || fallback || null;
+}
+
+function stepStatePath(stepId, clusterScope = null) {
+  const scope = clusterScope ? path.join("clusters", clusterScope) : "global";
   return path.join(dirs.stepState, scope, `${stepId}.json`);
 }
 
-function readStepState(stepId, clusterId = null) {
-  const file = stepStatePath(stepId, clusterId);
+function readStepState(stepId, clusterScope = null) {
+  const file = stepStatePath(stepId, clusterScope);
   if (!fs.existsSync(file)) {
     return null;
   }
   return readJson(file);
 }
 
-function writeStepState(stepId, patch, clusterId = null) {
-  const file = stepStatePath(stepId, clusterId);
-  const current = readStepState(stepId, clusterId) || {
+function writeStepState(stepId, patch, clusterScope = null) {
+  const file = stepStatePath(stepId, clusterScope);
+  const current = readStepState(stepId, clusterScope) || {
     step_id: stepId,
     status: "not_started",
     inputs: {},
     outputs: null,
-    cluster_id: clusterId || null,
+    cluster_id: clusterScope || null,
+    cluster_instance_id: patch.cluster_instance_id ?? clusterScope ?? null,
     error: null,
     last_job_id: null,
     created_at: now(),
@@ -921,7 +926,8 @@ function writeStepState(stepId, patch, clusterId = null) {
     ...current,
     ...patch,
     step_id: stepId,
-    cluster_id: patch.cluster_id ?? current.cluster_id ?? clusterId ?? null,
+    cluster_id: patch.cluster_id ?? current.cluster_id ?? clusterScope ?? null,
+    cluster_instance_id: patch.cluster_instance_id ?? current.cluster_instance_id ?? clusterScope ?? null,
     updated_at: now(),
   };
   writeJson(file, next);
@@ -1074,7 +1080,11 @@ app.post("/api/clusters", async (req, res) => {
 
   persistCluster(dirs, built.cluster);
   const job = queueJob(dirs, "apply_cluster", built.cluster.id, buildApplyJobPayload(built.cluster));
-  return res.status(202).json({ cluster_id: built.cluster.id, job_id: job.id });
+  return res.status(202).json({
+    cluster_id: built.cluster.id,
+    cluster_instance_id: built.cluster.cluster_instance_id,
+    job_id: job.id,
+  });
 });
 
 app.post("/api/clusters/:clusterId/bootstrap", (req, res) => {
@@ -1086,15 +1096,28 @@ app.post("/api/clusters/:clusterId/bootstrap", (req, res) => {
   }
 
   const cluster = readJson(clusterFile);
+  const requestedClusterInstanceId = typeof req.body?.cluster_instance_id === "string"
+    ? req.body.cluster_instance_id.trim()
+    : "";
+  if (requestedClusterInstanceId && requestedClusterInstanceId !== (cluster.cluster_instance_id || "")) {
+    return res.status(409).json({ error: "cluster instance mismatch" });
+  }
   const payload = buildBootstrapPayload(cluster, req.body || {});
 
   const job = queueJob(dirs, "apply_cluster", clusterId, payload);
-  return res.status(202).json({ cluster_id: clusterId, job_id: job.id });
+  return res.status(202).json({
+    cluster_id: clusterId,
+    cluster_instance_id: cluster.cluster_instance_id || null,
+    job_id: job.id,
+  });
 });
 
 app.post("/api/steps/:stepId/execute", async (req, res) => {
   const stepId = req.params.stepId;
   const requestedClusterId = typeof req.body?.cluster_id === "string" ? req.body.cluster_id.trim() : "";
+  const requestedClusterInstanceId = typeof req.body?.cluster_instance_id === "string"
+    ? req.body.cluster_instance_id.trim()
+    : "";
   const catalog = buildCatalogResponse({ workspaceRoot, dirs, clusterId: requestedClusterId || null });
   const step = catalog.stepsById.get(stepId);
 
@@ -1125,16 +1148,32 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
       });
     }
 
+    const requestedClusterFile = requestedClusterId ? path.join(dirs.clusters, `${requestedClusterId}.json`) : "";
+    const existingCluster = requestedClusterFile && fs.existsSync(requestedClusterFile)
+      ? readJson(requestedClusterFile)
+      : null;
+    if (requestedClusterInstanceId
+      && existingCluster?.cluster_instance_id
+      && requestedClusterInstanceId !== existingCluster.cluster_instance_id) {
+      return res.status(409).json({ error: "cluster instance mismatch" });
+    }
+
     const built = buildClusterFromRequest({
       ...validated.value,
       vm_node_map: req.body?.vm_node_map,
-    }, process.env, { allowedVmHosts });
+    }, process.env, {
+      allowedVmHosts,
+      clusterInstanceId: requestedClusterInstanceId && existingCluster?.cluster_instance_id === requestedClusterInstanceId
+        ? requestedClusterInstanceId
+        : null,
+    });
     if (!built.ok) {
       return res.status(400).json({ error: built.error });
     }
 
-    const clusterFile = path.join(dirs.clusters, `${built.cluster.id}.json`);
-    const isRetry = fs.existsSync(clusterFile);
+    const nextClusterFile = path.join(dirs.clusters, `${built.cluster.id}.json`);
+    const isRetry = fs.existsSync(nextClusterFile)
+      && readJson(nextClusterFile).cluster_instance_id === built.cluster.cluster_instance_id;
 
     if (!isRetry) {
       try {
@@ -1162,6 +1201,11 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
     if (!requestedCluster.ok) {
       return res.status(requestedCluster.status || 400).json({ error: requestedCluster.error });
     }
+    if (requestedClusterInstanceId
+      && requestedCluster.cluster.cluster_instance_id
+      && requestedClusterInstanceId !== requestedCluster.cluster.cluster_instance_id) {
+      return res.status(409).json({ error: "cluster instance mismatch" });
+    }
     clusterId = requestedCluster.cluster.id;
     context = { cluster: requestedCluster.cluster };
   }
@@ -1179,6 +1223,7 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
     payload.secret_bundle = normalizeSecretBundle(step.secrets);
   }
   const job = queueJob(dirs, "run_step", clusterId, payload);
+  const clusterInstanceId = context?.cluster?.cluster_instance_id || null;
 
   writeStepState(step.id, {
     status: "pending",
@@ -1187,11 +1232,13 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
     error: null,
     last_job_id: job.id,
     cluster_id: clusterId,
-  }, step.category_id === "talos-cluster" ? clusterId : null);
+    cluster_instance_id: clusterInstanceId,
+  }, step.category_id === "talos-cluster" ? (clusterInstanceId || clusterId) : null);
 
   return res.status(202).json({
     step_id: step.id,
     cluster_id: clusterId,
+    cluster_instance_id: context?.cluster?.cluster_instance_id || null,
     job_id: job.id,
     job_type: job.type,
   });

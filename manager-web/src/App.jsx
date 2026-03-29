@@ -427,6 +427,7 @@ function App() {
   const busyRef = useRef(false);
   const clusterIdRef = useRef('');
   const clusterCreatedAtRef = useRef('');
+  const clusterInstanceIdRef = useRef('');
   const selectedStepIdRef = useRef('');
   const answersRef = useRef({});
   const hydratedRef = useRef(false);
@@ -440,6 +441,7 @@ function App() {
   const [answers, setAnswers] = useState({});
   const [clusterId, setClusterId] = useState('');
   const [clusterCreatedAt, setClusterCreatedAt] = useState('');
+  const [clusterInstanceId, setClusterInstanceId] = useState('');
   const [cluster, setCluster] = useState(null);
   const [proxmoxResources, setProxmoxResources] = useState(null);
   const [logs, setLogs] = useState([]);
@@ -456,6 +458,7 @@ function App() {
     setSelectedStepId(restored.selectedStepId);
     setClusterId(restored.clusterId);
     setClusterCreatedAt(restored.clusterCreatedAt);
+    setClusterInstanceId(restored.clusterInstanceId);
     setAnswers(restored.answers);
     hydratedRef.current = true;
   }, []);
@@ -470,9 +473,10 @@ function App() {
         answers,
         clusterId,
         clusterCreatedAt,
+        clusterInstanceId,
       }),
     );
-  }, [selectedStepId, answers, clusterId, clusterCreatedAt]);
+  }, [selectedStepId, answers, clusterId, clusterCreatedAt, clusterInstanceId]);
 
   useEffect(() => {
     clusterIdRef.current = clusterId;
@@ -481,6 +485,10 @@ function App() {
   useEffect(() => {
     clusterCreatedAtRef.current = clusterCreatedAt;
   }, [clusterCreatedAt]);
+
+  useEffect(() => {
+    clusterInstanceIdRef.current = clusterInstanceId;
+  }, [clusterInstanceId]);
 
   useEffect(() => {
     selectedStepIdRef.current = selectedStepId;
@@ -519,6 +527,7 @@ function App() {
         await refreshWizardSnapshot({
           requestJson,
           clusterIdRef,
+          clusterInstanceIdRef,
           selectedStepIdRef,
           clusterCreatedAtRef,
           answersRef,
@@ -531,6 +540,7 @@ function App() {
           setProxmoxResources,
           setClusterId,
           setClusterCreatedAt,
+          setClusterInstanceId,
           setSelectedStepId,
           setCluster,
           setLogs,
@@ -570,16 +580,21 @@ function App() {
       try {
         const data = await requestJson(`/api/clusters/${encodeURIComponent(clusterId)}`);
         if (!cancelled) {
+          const nextClusterInstanceId = typeof data?.cluster_instance_id === 'string' ? data.cluster_instance_id : '';
           const nextCreatedAt = typeof data?.created_at === 'string' ? data.created_at : '';
           const previousCreatedAt = clusterCreatedAtRef.current || '';
+          const previousClusterInstanceId = clusterInstanceIdRef.current || '';
           const hasProvisionDraft = Boolean(answersRef.current && Object.prototype.hasOwnProperty.call(answersRef.current, 'provision-nodes'));
           if (shouldResetRecreatedClusterDraft({
+            previousClusterInstanceId,
+            nextClusterInstanceId,
             previousCreatedAt,
             nextCreatedAt,
             hasProvisionDraft,
           })) {
             recoverRecreatedClusterState({
               setClusterCreatedAt,
+              setClusterInstanceId,
               setSelectedStepId,
               setCluster,
               setLogs,
@@ -588,6 +603,7 @@ function App() {
               setError,
               setNotice,
               clusterCreatedAtRef,
+              clusterInstanceIdRef,
               selectedStepIdRef,
               answersRef,
             provisionDirtyFieldsRef,
@@ -603,6 +619,11 @@ function App() {
             setClusterCreatedAt(nextCreatedAt);
           }
 
+          if (nextClusterInstanceId && nextClusterInstanceId !== clusterInstanceIdRef.current) {
+            clusterInstanceIdRef.current = nextClusterInstanceId;
+            setClusterInstanceId(nextClusterInstanceId);
+          }
+
           setCluster(data);
         }
       } catch (error) {
@@ -614,6 +635,7 @@ function App() {
           recoverMissingClusterState({
             setClusterId,
             setClusterCreatedAt,
+            setClusterInstanceId,
             setSelectedStepId,
             setCluster,
             setLogs,
@@ -623,6 +645,7 @@ function App() {
             setNotice,
             clusterIdRef,
             clusterCreatedAtRef,
+            clusterInstanceIdRef,
             selectedStepIdRef,
             answersRef,
             provisionDirtyFieldsRef,
@@ -732,6 +755,10 @@ function App() {
       inputs: buildPayloadInputs(step, draft),
     };
 
+    if (clusterInstanceIdRef.current) {
+      body.cluster_instance_id = clusterInstanceIdRef.current;
+    }
+
     if (step.id !== 'provision-nodes' && clusterIdOverride) {
       body.cluster_id = clusterIdOverride;
     }
@@ -764,10 +791,12 @@ function App() {
       });
 
       const nextClusterId = response.cluster_id || clusterIdOverride || '';
+      const nextClusterInstanceId = response.cluster_instance_id || clusterInstanceIdRef.current || '';
       setActiveJob({
         id: response.job_id,
         stepId: step.id,
         clusterId: nextClusterId,
+        clusterInstanceId: nextClusterInstanceId,
         status: 'running',
       });
 
@@ -776,11 +805,16 @@ function App() {
         id: response.job_id,
         stepId: step.id,
         clusterId: nextClusterId,
+        clusterInstanceId: nextClusterInstanceId,
         status: terminal.job.status,
       });
 
       if (nextClusterId && nextClusterId !== clusterIdRef.current) {
         setClusterId(nextClusterId);
+      }
+      if (nextClusterInstanceId && nextClusterInstanceId !== clusterInstanceIdRef.current) {
+        clusterInstanceIdRef.current = nextClusterInstanceId;
+        setClusterInstanceId(nextClusterInstanceId);
       }
 
       if (terminal.job.status === 'failed') {
@@ -794,6 +828,7 @@ function App() {
       const refreshedCatalog = await refreshWizardSnapshot({
         requestJson,
         clusterIdRef,
+        clusterInstanceIdRef,
         selectedStepIdRef,
         clusterCreatedAtRef,
         answersRef,
@@ -806,6 +841,7 @@ function App() {
         setProxmoxResources,
         setClusterId,
         setClusterCreatedAt,
+        setClusterInstanceId,
         setSelectedStepId,
         setCluster,
         setLogs,
@@ -963,6 +999,8 @@ function App() {
       selectedStepId,
       answers: answersRef.current,
       clusterId: clusterIdRef.current,
+      clusterCreatedAt: clusterCreatedAtRef.current,
+      clusterInstanceId: clusterInstanceIdRef.current,
     });
     const filename = buildWizardExportFilename({
       clusterName: cluster?.name || '',
@@ -990,6 +1028,8 @@ function App() {
       const importedAnswers = imported.answers && typeof imported.answers === 'object' ? imported.answers : {};
       setSelectedStepId(imported.selectedStepId);
       setClusterId(imported.clusterId);
+      setClusterCreatedAt(imported.clusterCreatedAt);
+      setClusterInstanceId(imported.clusterInstanceId);
       setAnswers((current) => {
         const next = { ...current };
         for (const [stepId, stepAnswers] of Object.entries(importedAnswers)) {
@@ -1001,6 +1041,8 @@ function App() {
         return next;
       });
       placementSuggestionKeyRef.current = '';
+      provisionSuggestionKeyRef.current = '';
+      provisionSuggestionSnapshotRef.current = {};
       provisionDirtyFieldsRef.current = new Set();
       setProvisionSuggestionsReadyState(false);
       setNotice('Imported saved wizard answers.');
@@ -1047,7 +1089,7 @@ function App() {
       provisionSuggestionKeyRef.current === suggestionKey
       && Object.keys(provisionSuggestionSnapshotRef.current || {}).length > 0,
     );
-  }, [currentDraft.controlplane_count, currentDraft.worker_count, model.activeStep?.id]);
+  }, [clusterInstanceId, currentDraft.controlplane_count, currentDraft.worker_count, model.activeStep?.id]);
 
   const placementBoard = model.activeStep?.id === 'provision-nodes'
     ? buildProvisionPlacementBoard(model.activeStep.inputs || [], currentDraft, proxmoxResources)
@@ -1157,14 +1199,14 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [currentDraft.controlplane_count, currentDraft.worker_count, model.activeStep?.id]);
+  }, [clusterInstanceId, currentDraft.controlplane_count, currentDraft.worker_count, model.activeStep?.id]);
 
   useEffect(() => {
     if (!placementBoard || model.activeStep?.id !== 'provision-nodes') {
       return;
     }
 
-    const suggestionKey = `${clusterIdRef.current || ''}:${model.activeStep.id}`;
+    const suggestionKey = `${clusterInstanceIdRef.current || clusterIdRef.current || ''}:${model.activeStep.id}`;
     const currentMap = currentDraft.vm_node_map && typeof currentDraft.vm_node_map === 'object'
       ? currentDraft.vm_node_map
       : {};
@@ -1181,7 +1223,7 @@ function App() {
 
     placementSuggestionKeyRef.current = suggestionKey;
     updateAnswer(model.activeStep.id, 'vm_node_map', placementBoard.suggestedVmNodeMap || {});
-  }, [clusterId, currentDraft, model.activeStep, placementBoard]);
+  }, [clusterInstanceId, clusterId, currentDraft, model.activeStep, placementBoard]);
 
   const canInstallAll = !busy && model.mode === 'setup' && model.progress.remainingSteps > 0;
 

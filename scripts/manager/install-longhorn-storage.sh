@@ -31,6 +31,7 @@ wait_for_storage_class() {
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 manifest_path="$WORKSPACE_ROOT/gitops/apps/longhorn.yaml"
 cluster_id="${TWINBOX_CLUSTER_ID:-}"
+cluster_instance_id="${TWINBOX_CLUSTER_INSTANCE_ID:-}"
 
 command -v kubectl >/dev/null 2>&1 || fail "kubectl not found"
 command -v jq >/dev/null 2>&1 || fail "jq not found"
@@ -46,11 +47,13 @@ wait_for_storage_class
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \
     --arg cluster_id "$cluster_id" \
+    --arg cluster_instance_id "$cluster_instance_id" \
     --arg application "longhorn" \
     --arg manifest_path "$manifest_path" \
     --arg storage_class "$(printf '%s' "${LONGHORN_STORAGE_CLASS:-longhorn}")" \
     '{
       cluster_id: $cluster_id,
+      cluster_instance_id: $cluster_instance_id,
       application: $application,
       manifest_path: $manifest_path,
       storage_class: $storage_class,

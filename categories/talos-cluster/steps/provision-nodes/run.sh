@@ -49,6 +49,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   cluster_file="$MANAGER_DATA_DIR/clusters/$(printf '%s' "$cluster_json" | jq -r '.id').json"
   jq '{
     cluster_id: .id,
+    cluster_instance_id: .cluster_instance_id,
     cluster_status: .status,
     secret_refs: .metadata.secret_refs,
     iac_workdir: .iac.workdir,

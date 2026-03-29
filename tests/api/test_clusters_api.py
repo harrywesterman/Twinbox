@@ -156,6 +156,7 @@ EOF
             cluster = json.loads(cluster_file.read_text())
             job = json.loads(job_file.read_text())
             queue_entry = json.loads(queue_file.read_text())
+            assert cluster["cluster_instance_id"]
             assert cluster["name"] == "twinbox-demo"
             assert cluster["status"] == "requested"
             assert cluster["metadata"]["proxmox_node"] == "pve"
@@ -179,9 +180,76 @@ EOF
             assert "talosconfig_path" not in json.dumps(cluster)
             assert "kubeconfig_path" not in json.dumps(cluster)
             assert "PROXMOX_PASSWORD" not in json.dumps(cluster)
+            assert job["cluster_instance_id"] == cluster["cluster_instance_id"]
             assert job["payload"]["secret_bundle"]["env"]["TF_VAR_proxmox_password"]["field"] == "password"
             assert job["payload"]["secret_bundle"]["env"]["TF_VAR_proxmox_password"]["item"] == "proxmox"
             assert queue_entry["payload"]["secret_bundle"]["env"]["TF_VAR_proxmox_password"]["field"] == "password"
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
+def test_bootstrap_cluster_rejects_cluster_instance_mismatch():
+    with tempfile.TemporaryDirectory() as td:
+        data_dir = Path(td) / "data"
+        ping_mock = Path(td) / "mock-ping.sh"
+        vm_mock = Path(td) / "mock-vms.sh"
+        ping_mock.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+        ping_mock.chmod(0o755)
+        vm_mock.write_text(
+            """#!/bin/sh
+cat <<'EOF'
+[
+  {"node": "pve-a", "status": "online"},
+  {"node": "pve-b", "status": "online"}
+]
+EOF
+""",
+            encoding="utf-8",
+        )
+        vm_mock.chmod(0o755)
+        port = _find_free_port()
+        env = os.environ.copy()
+        env["MANAGER_DATA_DIR"] = str(data_dir)
+        env["MANAGER_API_PORT"] = str(port)
+        env["MANAGER_API_PING_BIN"] = str(ping_mock)
+        env["MANAGER_API_CLUSTER_RESOURCES_BIN"] = str(vm_mock)
+
+        proc = subprocess.Popen(
+            ["node", "manager-api/src/server.js"],
+            cwd=Path(__file__).resolve().parents[2],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            _wait_for_health(f"http://127.0.0.1:{port}")
+            payload = {
+                "name": "demo",
+                "controlplane_count": 1,
+                "worker_count": 1,
+                "cpu_cores": 2,
+                "memory_mb": 4096,
+                "disk_gb": 20,
+                "bridge": "vmbr0",
+                "start_vmid": 200,
+                "vip_ip": "192.168.1.50",
+                "start_ip": "192.168.1.51",
+                "node_prefix_length": 24,
+                "gateway_ip": "192.168.1.1",
+                "dns_servers": "1.1.1.1, 1.0.0.1",
+                "dns_domain": "lab.local",
+            }
+            status, body = _post_json(f"http://127.0.0.1:{port}/api/clusters", payload)
+            assert status == 202
+
+            status, body = _post_json(
+                f"http://127.0.0.1:{port}/api/clusters/{body['cluster_id']}/bootstrap",
+                {"cluster_instance_id": "22222222-2222-2222-2222-222222222222"},
+            )
+            assert status == 409
+            assert body["error"] == "cluster instance mismatch"
         finally:
             proc.terminate()
             proc.wait(timeout=5)
