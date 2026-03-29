@@ -20,6 +20,7 @@ import {
   readJson,
   writeJson,
 } from "./lib/common.js";
+import { buildIpBlock, selectSuggestedIpAllocation } from "./lib/ip-allocation.js";
 import { queueJob } from "./lib/jobs.js";
 import {
   buildProxmoxApiSecretBundle,
@@ -52,47 +53,34 @@ function parseNodeCount(value, fallback = 3) {
   return parsed;
 }
 
-function preferredVipOctets() {
-  const values = [];
-  for (let octet = 50; octet <= 240; octet += 1) values.push(octet);
-  for (let octet = 241; octet <= 254; octet += 1) values.push(octet);
-  for (let octet = 2; octet < 50; octet += 1) values.push(octet);
-  return values;
-}
-
-function preferredStartOctets() {
-  const values = [];
-  for (let octet = 50; octet <= 252; octet += 1) values.push(octet);
-  for (let octet = 2; octet < 50; octet += 1) values.push(octet);
-  return values;
-}
-
-function preferredStartOctetsForVip(vipOctet) {
-  const baseline = preferredStartOctets().filter((octet) => octet !== vipOctet + 1);
-  if (Number.isInteger(vipOctet + 1) && vipOctet + 1 <= 252) {
-    return [vipOctet + 1, ...baseline];
-  }
-  return baseline;
-}
-
-function probeIpInUse(ip) {
+function probeIpInUse(ip, options = {}) {
   const pingBin = process.env.MANAGER_API_PING_BIN || "ping";
+  const attempts = Number.isInteger(Number(options.attempts))
+    ? Math.max(1, Number(options.attempts))
+    : 2;
   const isDefaultPing = path.basename(pingBin) === "ping";
   const args = isDefaultPing
     ? (process.platform === "darwin"
-      ? ["-n", "-c", "1", "-W", "200", ip]
-      : ["-n", "-c", "1", "-W", "0.2", ip])
+      ? ["-n", "-c", "1", "-W", "1000", ip]
+      : ["-n", "-c", "1", "-W", "1", ip])
     : [ip];
-  const result = spawnSync(pingBin, args, {
-    stdio: "ignore",
-    timeout: 700,
-  });
 
-  if (result.error?.code === "ENOENT") {
-    throw new Error(`Ping command not found: ${pingBin}`);
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const result = spawnSync(pingBin, args, {
+      stdio: "ignore",
+      timeout: 1500,
+    });
+
+    if (result.error?.code === "ENOENT") {
+      throw new Error(`Ping command not found: ${pingBin}`);
+    }
+
+    if (result.status === 0) {
+      return true;
+    }
   }
 
-  return result.status === 0;
+  return false;
 }
 
 function proxmoxApiRequest(pathname, proxmoxEnv, { method = "GET", body, headers = {} } = {}) {
@@ -699,10 +687,6 @@ async function findFreeVmidBlock(nodeCount) {
   throw new Error(`No free consecutive ${nodeCount}-VMID block found`);
 }
 
-function buildIpBlock(prefix, startOctet, nodeCount) {
-  return Array.from({ length: nodeCount }, (_, offset) => `${prefix}.${startOctet + offset}`);
-}
-
 function readIpCommand(args) {
   const ipBin = process.env.MANAGER_API_IP_BIN || "ip";
   const result = spawnSync(ipBin, args, {
@@ -815,63 +799,41 @@ function suggestClusterName() {
 }
 
 async function suggestAllocation(managementIp, nodeCount) {
-  const octets = managementIp.split(".").map(Number);
-  const prefix = `${octets[0]}.${octets[1]}.${octets[2]}`;
-  const managementOctet = octets[3];
   const inUseCache = new Map();
-  const vipCandidates = preferredVipOctets();
   const networkDefaults = detectHostNetworkDefaults(managementIp);
 
-  const isIpInUse = (hostOctet) => {
-    if (inUseCache.has(hostOctet)) {
-      return inUseCache.get(hostOctet);
+  const isIpInUse = (ip) => {
+    if (inUseCache.has(ip)) {
+      return inUseCache.get(ip);
     }
-    const inUse = probeIpInUse(`${prefix}.${hostOctet}`);
-    inUseCache.set(hostOctet, inUse);
+    const inUse = probeIpInUse(ip);
+    inUseCache.set(ip, inUse);
     return inUse;
   };
 
   const vmidSuggestion = await findFreeVmidBlock(nodeCount);
-  let vipOctet = null;
-  for (const candidate of vipCandidates) {
-    if (candidate === managementOctet) continue;
-    if (!isIpInUse(candidate)) {
-      vipOctet = candidate;
-      break;
-    }
-  }
+  const ipSuggestion = await selectSuggestedIpAllocation({
+    managementIp,
+    nodeCount,
+    isIpInUse,
+    isAllocationValid: ({ vipIp, startIp, nodeCount: requestedNodeCount }) => validateRequestedAllocation({
+      startVmid: vmidSuggestion.start_vmid,
+      vipIp,
+      startIp,
+      nodeCount: requestedNodeCount,
+    }, {
+      skipVmidCheck: true,
+      probeIpInUseFn: (ip) => probeIpInUse(ip, { attempts: 3 }),
+    }),
+  });
 
-  if (vipOctet === null) {
-    throw new Error(`No free VIP address found in ${prefix}.0/24`);
-  }
-
-  let startOctet = null;
-  for (const candidate of preferredStartOctetsForVip(vipOctet)) {
-    const block = Array.from({ length: nodeCount }, (_, offset) => candidate + offset);
-    if (block.some((octet) => octet > 254 || octet === managementOctet || octet === vipOctet)) {
-      continue;
-    }
-    if (block.every((octet) => !isIpInUse(octet))) {
-      startOctet = candidate;
-      break;
-    }
-  }
-
-  if (startOctet === null) {
-    throw new Error(`No free consecutive ${nodeCount}-IP block found in ${prefix}.0/24`);
-  }
-
-  const ipBlock = buildIpBlock(prefix, startOctet, nodeCount);
   return {
     management_ip: managementIp,
-    subnet: `${prefix}.0/24`,
     node_count: nodeCount,
     name_suggestion: suggestClusterName(),
     start_vmid: vmidSuggestion.start_vmid,
     vmid_block: vmidSuggestion.vmid_block,
-    vip_ip: `${prefix}.${vipOctet}`,
-    start_ip: `${prefix}.${startOctet}`,
-    start_ip_block: ipBlock,
+    ...ipSuggestion,
     node_prefix_length: networkDefaults.node_prefix_length,
     gateway_ip: networkDefaults.gateway_ip,
     dns_servers: networkDefaults.dns_servers,
@@ -880,14 +842,22 @@ async function suggestAllocation(managementIp, nodeCount) {
   };
 }
 
-async function validateRequestedAllocation({ startVmid, vipIp, startIp, nodeCount }) {
-  const usedVmids = await listUsedVmids();
+async function validateRequestedAllocation({ startVmid, vipIp, startIp, nodeCount }, options = {}) {
+  const {
+    skipVmidCheck = false,
+    usedVmids = null,
+    probeIpInUseFn = probeIpInUse,
+  } = options;
   const requestedVmids = Array.from({ length: nodeCount }, (_, offset) => startVmid + offset);
-  if (!requestedVmids.every((vmid) => !usedVmids.has(vmid))) {
-    return {
-      ok: false,
-      error: `VMID range ${requestedVmids[0]}-${requestedVmids[requestedVmids.length - 1]} is not free`,
-    };
+
+  if (!skipVmidCheck) {
+    const vmidLookup = usedVmids || await listUsedVmids();
+    if (!requestedVmids.every((vmid) => !vmidLookup.has(vmid))) {
+      return {
+        ok: false,
+        error: `VMID range ${requestedVmids[0]}-${requestedVmids[requestedVmids.length - 1]} is not free`,
+      };
+    }
   }
 
   const vipParts = vipIp.split(".");
@@ -909,11 +879,11 @@ async function validateRequestedAllocation({ startVmid, vipIp, startIp, nodeCoun
     return { ok: false, error: "vip_ip must not overlap with the node IP range" };
   }
 
-  if (probeIpInUse(vipIp)) {
+  if (probeIpInUseFn(vipIp)) {
     return { ok: false, error: `VIP IP ${vipIp} is already in use` };
   }
 
-  const occupiedIp = ipBlock.find((ip) => probeIpInUse(ip));
+  const occupiedIp = ipBlock.find((ip) => probeIpInUseFn(ip));
   if (occupiedIp) {
     return { ok: false, error: `Node IP ${occupiedIp} is already in use` };
   }
