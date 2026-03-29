@@ -21,6 +21,11 @@ import {
   STORAGE_KEY,
   formatState,
 } from './journey.js';
+import {
+  isMissingClusterError,
+  recoverMissingClusterState,
+  refreshWizardSnapshot,
+} from './catalog-refresh.js';
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -51,100 +56,14 @@ async function requestJson(url, options = {}) {
   }
 
   if (!response.ok) {
-    throw new Error(body?.error || body?.message || text || `Request failed with ${response.status}`);
+    const error = new Error(body?.error || body?.message || text || `Request failed with ${response.status}`);
+    error.status = response.status;
+    error.body = body;
+    error.url = url;
+    throw error;
   }
 
   return body;
-}
-
-async function refreshSnapshotNow({
-  clusterIdRef,
-  selectedStepIdRef,
-  setHealth,
-  setCatalog,
-  setProxmoxResources,
-  setClusterId,
-  setSelectedStepId,
-  setLogs,
-  clusterIdOverride = '',
-  clearError = true,
-  setError,
-}) {
-  const effectiveClusterId = clusterIdOverride || clusterIdRef.current;
-  const clusterQuery = effectiveClusterId
-    ? `?cluster_id=${encodeURIComponent(effectiveClusterId)}`
-    : '';
-  const [healthData, catalogData, resourcesData] = await Promise.allSettled([
-    requestJson('/api/health'),
-    requestJson(`/api/catalog${clusterQuery}`),
-    requestJson('/api/proxmox/cluster-resources'),
-  ]);
-
-  if (healthData.status === 'fulfilled') {
-    setHealth(healthData.value);
-  }
-  if (catalogData.status === 'fulfilled') {
-    setCatalog(catalogData.value);
-  }
-  if (resourcesData.status === 'fulfilled') {
-    setProxmoxResources(resourcesData.value);
-  } else {
-    setProxmoxResources(null);
-  }
-
-  if (healthData.status === 'rejected') {
-    throw healthData.reason instanceof Error ? healthData.reason : new Error('Failed to refresh wizard health');
-  }
-  if (catalogData.status === 'rejected') {
-    throw catalogData.reason instanceof Error ? catalogData.reason : new Error('Failed to refresh wizard state');
-  }
-
-  const discoveredClusterId = catalogData.status === 'fulfilled'
-    ? (discoverClusterId(catalogData.value) || effectiveClusterId || '')
-    : effectiveClusterId || '';
-  if (discoveredClusterId && discoveredClusterId !== clusterIdRef.current) {
-    setClusterId(discoveredClusterId);
-  }
-
-  const nextStepId = catalogData.status === 'fulfilled'
-    ? pickStepId(getWizardSteps(catalogData.value), selectedStepIdRef.current)
-    : selectedStepIdRef.current;
-  if (nextStepId !== selectedStepIdRef.current) {
-    setSelectedStepId(nextStepId);
-  }
-
-  if (catalogData.status === 'fulfilled') {
-    const selectedStep = getWizardSteps(catalogData.value).find((step) => step.id === nextStepId);
-    const latestJobId = selectedStep?.latest_job?.id;
-    if (latestJobId) {
-      try {
-        const logsData = await requestJson(`/api/jobs/${encodeURIComponent(latestJobId)}/logs`);
-        setLogs(Array.isArray(logsData?.lines) ? logsData.lines : []);
-      } catch {
-        setLogs([]);
-      }
-    } else {
-      setLogs([]);
-    }
-  }
-
-  if (clearError) {
-    setError('');
-  }
-  return catalogData.status === 'fulfilled' ? catalogData.value : null;
-}
-
-function discoverClusterId(catalog) {
-  for (const category of catalog?.categories || []) {
-    for (const step of category.steps || []) {
-      const stateClusterId = step?.state?.cluster_id;
-      const outputClusterId = step?.state?.outputs?.cluster_id;
-      if (typeof stateClusterId === 'string' && stateClusterId) return stateClusterId;
-      if (typeof outputClusterId === 'string' && outputClusterId) return outputClusterId;
-    }
-  }
-
-  return '';
 }
 
 function buildInitialAnswers(steps, restoredAnswers = {}) {
@@ -176,14 +95,6 @@ function buildInitialAnswers(steps, restoredAnswers = {}) {
   }
 
   return nextAnswers;
-}
-
-function pickStepId(steps, preferredStepId) {
-  if (preferredStepId && steps.some((step) => step.id === preferredStepId)) {
-    return preferredStepId;
-  }
-
-  return steps[0]?.id || '';
 }
 
 function buildPayloadInputs(step, stepAnswers = {}) {
@@ -593,7 +504,8 @@ function App() {
       }
 
       try {
-        await refreshSnapshotNow({
+        await refreshWizardSnapshot({
+          requestJson,
           clusterIdRef,
           selectedStepIdRef,
           setHealth,
@@ -601,7 +513,10 @@ function App() {
           setProxmoxResources,
           setClusterId,
           setSelectedStepId,
+          setCluster,
           setLogs,
+          setActiveJob,
+          setNotice,
           setError,
         });
       } catch (refreshError) {
@@ -636,10 +551,27 @@ function App() {
         if (!cancelled) {
           setCluster(data);
         }
-      } catch {
-        if (!cancelled) {
-          setCluster(null);
+      } catch (error) {
+        if (cancelled) {
+          return;
         }
+
+        if (isMissingClusterError(error)) {
+          recoverMissingClusterState({
+            setClusterId,
+            setSelectedStepId,
+            setCluster,
+            setLogs,
+            setActiveJob,
+            setError,
+            setNotice,
+            clusterIdRef,
+            selectedStepIdRef,
+          });
+          return;
+        }
+
+        setCluster(null);
       }
     };
 
@@ -796,7 +728,8 @@ function App() {
         setNotice(`${step.title} completed successfully.`);
       }
 
-      const refreshedCatalog = await refreshSnapshotNow({
+      const refreshedCatalog = await refreshWizardSnapshot({
+        requestJson,
         clusterIdRef,
         selectedStepIdRef,
         setHealth,
@@ -804,7 +737,10 @@ function App() {
         setProxmoxResources,
         setClusterId,
         setSelectedStepId,
+        setCluster,
         setLogs,
+        setActiveJob,
+        setNotice,
         clusterIdOverride: nextClusterId,
         clearError: false,
         setError,

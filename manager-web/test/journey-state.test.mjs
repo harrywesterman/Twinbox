@@ -260,6 +260,21 @@ test('wizard model defaults to step 1 when nothing is selected', () => {
   assert.equal(model.primaryAction.label, 'Start step 1');
 });
 
+test('wizard model falls back to step 1 when a restored selection no longer exists', () => {
+  const model = getMissionControlModel({
+    catalog: buildCatalog({ 'provision-nodes': 'ready' }),
+    logs: [],
+    cluster: null,
+    health: { ok: true },
+    error: '',
+    busy: false,
+    selectedStepId: 'missing-step',
+  });
+
+  assert.equal(model.activeStep.id, 'provision-nodes');
+  assert.equal(model.primaryAction.label, 'Start step 1');
+});
+
 test('wizard export and import helpers round-trip answers and cluster ids', () => {
   const serialized = serializeUiState({
     selectedStepId: 'install-secret-sync',
