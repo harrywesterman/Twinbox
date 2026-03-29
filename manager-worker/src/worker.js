@@ -600,6 +600,7 @@ async function handleRunStep(job) {
       {
         STEP_ID: stepId,
         STEP_TYPE: stepType,
+        TWINBOX_CLUSTER_ID: clusterId || "",
         STEP_INPUTS_JSON: JSON.stringify(inputs),
         STEP_CONTEXT_JSON: JSON.stringify(context),
         STEP_RESULT_FILE: resultFile,

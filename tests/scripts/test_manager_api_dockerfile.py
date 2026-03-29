@@ -10,5 +10,6 @@ def test_manager_api_image_includes_shared_secret_runtime_without_bw():
     assert "FROM node:20-bookworm-slim" in text
     assert "COPY lib ./lib" in text
     assert "COPY manager-api/package.json ./manager-api/package.json" in text
+    assert "apt-get install -y --no-install-recommends ca-certificates curl iproute2 iputils-ping" in text
     assert "npm install --omit=dev" in text
     assert "bitwarden" not in text.lower()

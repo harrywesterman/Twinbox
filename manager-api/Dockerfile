@@ -3,7 +3,7 @@ FROM node:20-bookworm-slim
 WORKDIR /opt/twinbox
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates \
+  && apt-get install -y --no-install-recommends ca-certificates curl iproute2 iputils-ping \
   && rm -rf /var/lib/apt/lists/*
 
 COPY manager-api/package.json ./manager-api/package.json

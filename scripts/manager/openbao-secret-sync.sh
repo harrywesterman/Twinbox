@@ -106,16 +106,16 @@ openbao_seed_management_bootstrap_files() {
   fi
 
   if [[ ! -s "$OPENBAO_SEAL_KEY_FILE" ]]; then
-    openssl rand -hex 32 >"$OPENBAO_SEAL_KEY_FILE"
-    chmod 0600 "$OPENBAO_SEAL_KEY_FILE"
+    openssl rand -out "$OPENBAO_SEAL_KEY_FILE" 32
     openbao_log "Seeded ${OPENBAO_SEAL_KEY_FILE}"
   fi
+  chmod 0644 "$OPENBAO_SEAL_KEY_FILE"
 
   if [[ ! -s "$OPENBAO_SEAL_KEY_ID_FILE" ]]; then
     printf '%s\n' "${OPENBAO_SEAL_KEY_ID:-openbao-static-seal-v1}" >"$OPENBAO_SEAL_KEY_ID_FILE"
-    chmod 0600 "$OPENBAO_SEAL_KEY_ID_FILE"
     openbao_log "Seeded ${OPENBAO_SEAL_KEY_ID_FILE}"
   fi
+  chmod 0644 "$OPENBAO_SEAL_KEY_ID_FILE"
 }
 
 openbao_ensure_namespace() {
@@ -156,6 +156,8 @@ openbao_render_values_file() {
   values_file="$(mktemp "${TMPDIR:-/tmp}/openbao-values.XXXXXX.yaml")"
   local seal_key_id
   seal_key_id="$(tr -d '\r\n' <"$OPENBAO_SEAL_KEY_ID_FILE")"
+  local seal_key_hex
+  seal_key_hex="$(od -An -tx1 -v "$OPENBAO_SEAL_KEY_FILE" | tr -d ' \n')"
   local replicas="${OPENBAO_REPLICAS:-1}"
 
   cat >"$values_file" <<EOF
@@ -195,7 +197,7 @@ server:
 
         seal "static" {
           current_key_id = "${seal_key_id}"
-          current_key = "file:///openbao/secrets/current.key"
+          current_key = "${seal_key_hex}"
         }
 
         service_registration "kubernetes" {}
@@ -225,13 +227,51 @@ openbao_install_release() {
   openbao_log "Installing OpenBao ${PINNED_OPENBAO_CHART_VERSION} on Longhorn"
   helm repo add openbao https://openbao.github.io/openbao-helm >/dev/null 2>&1 || true
   helm repo update openbao >/dev/null
-  helm upgrade --install openbao openbao/openbao \
-    --namespace "$OPENBAO_NAMESPACE" \
-    --create-namespace \
-    --version "$PINNED_OPENBAO_CHART_VERSION" \
-    -f "$values_file"
+  local attempt=1
+  local attempts=5
+  local delay=5
 
-  kubectl rollout status statefulset/openbao -n "$OPENBAO_NAMESPACE" --timeout=600s
+  while [[ "$attempt" -le "$attempts" ]]; do
+    if helm upgrade --install openbao openbao/openbao \
+      --namespace "$OPENBAO_NAMESPACE" \
+      --create-namespace \
+      --version "$PINNED_OPENBAO_CHART_VERSION" \
+      -f "$values_file"; then
+      return 0
+    fi
+
+    openbao_log "OpenBao helm install attempt ${attempt}/${attempts} failed; retrying in ${delay}s"
+    sleep "$delay"
+    attempt=$((attempt + 1))
+    delay=$((delay * 2))
+  done
+
+  openbao_fail "OpenBao helm install failed after ${attempts} attempts"
+}
+
+openbao_wait_for_statefulset_ready() {
+  local attempt=1
+  local attempts=120
+
+  while [[ "$attempt" -le "$attempts" ]]; do
+    local statefulset_json ready_replicas replicas
+    statefulset_json="$(kubectl get statefulset openbao -n "$OPENBAO_NAMESPACE" -o json 2>/dev/null || true)"
+    ready_replicas="$(printf '%s' "$statefulset_json" | jq -r '.status.readyReplicas // 0' 2>/dev/null || printf '0')"
+    replicas="$(printf '%s' "$statefulset_json" | jq -r '.spec.replicas // 0' 2>/dev/null || printf '0')"
+
+    ready_replicas="${ready_replicas:-0}"
+    replicas="${replicas:-0}"
+
+    if [[ "$replicas" =~ ^[0-9]+$ ]] && [[ "$ready_replicas" =~ ^[0-9]+$ ]] && [[ "$replicas" -gt 0 ]] && [[ "$ready_replicas" -ge "$replicas" ]]; then
+      return 0
+    fi
+
+    openbao_log "Waiting for OpenBao StatefulSet to become ready (${ready_replicas}/${replicas})"
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+
+  openbao_fail "OpenBao StatefulSet never became ready"
 }
 
 openbao_wait_for_server_pod() {
@@ -299,7 +339,7 @@ openbao_initialize_if_needed() {
   local init_json=""
   init_json="$(
     openbao_exec "$pod" env BAO_ADDR=http://127.0.0.1:8200 sh -se <<'EOF'
-bao operator init -key-shares=1 -key-threshold=1 -format=json
+bao operator init -recovery-shares=0 -recovery-threshold=0 -format=json
 EOF
   )"
 
@@ -334,9 +374,10 @@ if ! bao secrets list -format=json | grep -q '"kv/"'; then
   bao secrets enable -path=kv kv-v2
 fi
 
-if ! bao auth list -format=json | grep -q '"auth/kubernetes/"'; then
-  bao auth enable -path=auth/kubernetes kubernetes
+if ! bao auth list -format=json | grep -q '"kubernetes/"'; then
+  bao auth enable -path=kubernetes kubernetes
 fi
+sleep 5
 
 cat <<'POLICY' | bao policy write eso-read -
 path "kv/data/twinbox/*" {
@@ -423,7 +464,7 @@ spec:
       version: v2
       auth:
         kubernetes:
-          mountPath: auth/kubernetes
+          mountPath: kubernetes
           role: external-secrets
           serviceAccountRef:
             name: external-secrets
