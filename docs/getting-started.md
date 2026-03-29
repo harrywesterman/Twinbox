@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide covers the manager-first Twinbox flow.
+This guide covers the current Twinbox flow.
 
 ## Prerequisites
 

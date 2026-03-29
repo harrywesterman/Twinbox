@@ -90,9 +90,10 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 
 ## Cluster Secret Runtime
 
+- `provision-nodes` bootstraps Talos and writes the Talos runtime artifacts for a cluster.
 - `install-flannel` bootstraps pod networking before Argo CD comes online.
-- `install-argocd` installs Argo CD and adopts the Flannel application for ongoing GitOps reconciliation.
-- `install-longhorn-storage` installs Longhorn through Argo CD before any stateful secret infrastructure.
+- `install-argocd` installs Argo CD and adopts Flannel for ongoing reconciliation.
+- `install-longhorn-storage` installs Longhorn before any stateful secret infrastructure.
 - `install-secret-sync` installs:
   - External Secrets Operator
   - OpenBao with Raft storage on Longhorn

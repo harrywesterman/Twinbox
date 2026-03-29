@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Twinbox is currently **manager-first**. Treat the repository docs below as the source of truth:
+Twinbox is a Talos Linux based configuration for a Kubernetes cluster. Treat these documents as the source of truth:
 
 - `README.md`
 - `docs/architecture.md`
@@ -8,13 +8,20 @@ Twinbox is currently **manager-first**. Treat the repository docs below as the s
 - `docs/configuration.md`
 - `docs/verification.md`
 
+## Current State
+
+- The repository’s active branch is `main`. Only big redesigned get their own branch.
+- `manager-data/` is runtime state only.
+
 ## Current Flow
 
 1. Run `wizard/setup-wizard.sh` on Proxmox.
 2. The wizard creates only the Management VM.
-3. The VM installs Docker CE, clones this repo, loads `.env`, and starts `docker compose`.
-4. The web UI on port `3000` queues jobs through the API on port `8080`.
+3. The Management VM installs Docker CE, clones Twinbox into `/opt/twinbox`, loads `.env`, and starts `docker compose`.
+4. `manager-web` on port `3000` queues work through `manager-api` on port `8080`.
 5. `manager-worker` polls the file queue under `manager-data/` and runs repo-owned scripts.
+6. `provision-nodes` starts the Talos journey, sizes the cluster, lands the VMs, and records the cluster state.
+7. `install-secret-sync` installs External Secrets Operator and OpenBao after Longhorn.
 
 ## Key Components
 
@@ -28,8 +35,9 @@ Twinbox is currently **manager-first**. Treat the repository docs below as the s
 
 ## Editing Rules
 
+- use the ssh connection skill to connect to the management VM for debugging.
+- Use the Playwright skill to look at the live web wizard.
 - Use `docker compose`, not legacy `docker-compose`.
-- Do not rely on historical TUI, PostgreSQL, Redis, or RQ docs.
 - Keep `manager-data/` as runtime state only.
 - Use `apply_patch` for manual file edits.
 - Prefer small, targeted changes in the relevant component:
@@ -50,6 +58,4 @@ Run the smallest useful checks for the area you changed:
 
 ## Operational Notes
 
-- This is intended for trusted LAN use.
-- Runtime secrets come from `.env`.
 - The worker writes job logs and step state to `manager-data/`.

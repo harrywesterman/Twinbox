@@ -1,6 +1,6 @@
 # Architecture
 
-Twinbox is manager-first. The Management VM is the control point for bootstrap, queueing, and long-lived bootstrap material.
+Twinbox is a complete K8s cluster based on Talos Linux, completely configured. The Management VM is the control point for bootstrap, queueing, and long-lived bootstrap material.
 
 ## Layers
 
@@ -62,3 +62,4 @@ Twinbox is manager-first. The Management VM is the control point for bootstrap, 
 - Step state is cluster-scoped for Talos cluster journeys.
 - Talos configs and kubeconfigs are runtime artifacts, not canonical files under `manager-data/`.
 - OpenBao uses static auto-unseal material stored on the Management VM for zero-touch restarts.
+- The first visible setup step in the UI is `Deploy Talos Cluster`.

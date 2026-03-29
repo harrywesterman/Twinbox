@@ -53,6 +53,7 @@ Expected:
 - queue and logs are written under `manager-data/`
 - cluster state exists under `manager-data/clusters/<cluster-id>.json`
 - Talos artifacts are materialized under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/`
+- the first step in a clean UI session remains `Deploy Talos Cluster`
 
 ### `install-longhorn-storage`
 
