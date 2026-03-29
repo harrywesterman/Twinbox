@@ -10,19 +10,19 @@ PROVISION_NODES_SCRIPT = REPO_ROOT / "categories" / "talos-cluster" / "steps" / 
 MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "main.tf"
 MODULE_OUTPUTS = REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "outputs.tf"
 INSTALL_SECRET_SYNC_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-secret-sync.sh"
-REFRESH_BITWARDEN_CLI_SCRIPT = REPO_ROOT / "scripts" / "manager" / "refresh-bitwarden-cli.sh"
+OPENBAO_SECRET_SYNC_HELPER = REPO_ROOT / "scripts" / "manager" / "sync-openbao-global-secret.sh"
 ARGO_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-argocd.sh"
 ARGO_STEP_SCRIPT = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
 ENABLE_ARGOCD_APPS_SCRIPT = REPO_ROOT / "scripts" / "manager" / "enable-argocd-apps.sh"
 LONGHORN_STEP_SCRIPT = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-longhorn-storage" / "run.sh"
 LONGHORN_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-longhorn-storage" / "step.yaml"
+LONGHORN_HELPER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-longhorn-storage.sh"
 WHOAMI_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-whoami" / "step.yaml"
 HEADLAMP_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-headlamp" / "step.yaml"
 GRAFANA_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-grafana" / "step.yaml"
 WIREDOOR_GATEWAY_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-wiredoor-gateway" / "step.yaml"
 ARGO_BOOTSTRAP_SCRIPT = REPO_ROOT / "gitops" / "install.sh"
 ARGO_ROOT = REPO_ROOT / "gitops" / "argocd" / "root.yaml"
-LONGHORN_APPLICATION = REPO_ROOT / "gitops" / "longhorn" / "application.yaml"
 WHOAMI_DEPLOYMENT = REPO_ROOT / "gitops" / "apps" / "whoami" / "deployment.yaml"
 HEADLAMP_VALUES = REPO_ROOT / "gitops" / "values" / "headlamp.yaml"
 ROUTES_VALUES = REPO_ROOT / "gitops" / "values" / "routes.yaml"
@@ -43,12 +43,9 @@ HEADLAMP_ROUTES_APP = REPO_ROOT / "gitops" / "argocd" / "optional" / "routes" / 
 WIREDOOR_GATEWAY_APP = REPO_ROOT / "gitops" / "argocd" / "optional" / "apps" / "wiredoor-gateway.yaml"
 WIREDOOR_GATEWAY_SECRET_APP = REPO_ROOT / "gitops" / "argocd" / "optional" / "apps" / "wiredoor-gateway-secret.yaml"
 WIREDOOR_GATEWAY_ROUTES_APP = REPO_ROOT / "gitops" / "argocd" / "optional" / "routes" / "wiredoor-gateway.yaml"
-TRAEFIK_DASHBOARD_SECRETSTORE = REPO_ROOT / "gitops" / "routes" / "templates" / "traefik-dashboard-secretstore.yaml"
 TRAEFIK_DASHBOARD_EXTERNALSECRET = REPO_ROOT / "gitops" / "routes" / "templates" / "traefik-dashboard-externalsecret.yaml"
-WIREDOOR_GATEWAY_SECRETSTORE = REPO_ROOT / "gitops" / "apps" / "wiredoor-gateway-secret" / "secretstore.yaml"
 WIREDOOR_GATEWAY_EXTERNALSECRET = REPO_ROOT / "gitops" / "apps" / "wiredoor-gateway-secret" / "externalsecret.yaml"
 GRAFANA_SECRET_APP = REPO_ROOT / "gitops" / "argocd" / "optional" / "apps" / "grafana-secret.yaml"
-GRAFANA_SECRETSTORE = REPO_ROOT / "gitops" / "apps" / "grafana-secret" / "secretstore.yaml"
 GRAFANA_EXTERNALSECRET = REPO_ROOT / "gitops" / "apps" / "grafana-secret" / "externalsecret.yaml"
 
 
@@ -76,8 +73,8 @@ def _install_secret_sync_text() -> str:
     return INSTALL_SECRET_SYNC_SCRIPT.read_text(encoding="utf-8")
 
 
-def _refresh_bitwarden_cli_text() -> str:
-    return REFRESH_BITWARDEN_CLI_SCRIPT.read_text(encoding="utf-8")
+def _openbao_secret_sync_helper_text() -> str:
+    return OPENBAO_SECRET_SYNC_HELPER.read_text(encoding="utf-8")
 
 
 def _argo_manager_text() -> str:
@@ -100,20 +97,16 @@ def _longhorn_step_manifest_text() -> str:
     return LONGHORN_STEP_MANIFEST.read_text(encoding="utf-8")
 
 
+def _longhorn_helper_text() -> str:
+    return LONGHORN_HELPER_SCRIPT.read_text(encoding="utf-8")
+
+
 def _argo_bootstrap_text() -> str:
     return ARGO_BOOTSTRAP_SCRIPT.read_text(encoding="utf-8")
 
 
 def _argo_root_text() -> str:
     return ARGO_ROOT.read_text(encoding="utf-8")
-
-
-def _longhorn_application_text() -> str:
-    return LONGHORN_APPLICATION.read_text(encoding="utf-8")
-
-
-def _longhorn_values_text() -> str:
-    return (REPO_ROOT / "gitops" / "longhorn" / "application.yaml").read_text(encoding="utf-8")
 
 
 def _whoami_deployment_text() -> str:
@@ -156,17 +149,8 @@ def _wiredoor_gateway_values_text() -> str:
     return WIREDOOR_GATEWAY_VALUES.read_text(encoding="utf-8")
 
 
-def _traefik_dashboard_secretstore_text() -> str:
-    return TRAEFIK_DASHBOARD_SECRETSTORE.read_text(encoding="utf-8")
-
-
 def _traefik_dashboard_externalsecret_text() -> str:
     return TRAEFIK_DASHBOARD_EXTERNALSECRET.read_text(encoding="utf-8")
-
-
-def _wiredoor_gateway_secretstore_text() -> str:
-    return WIREDOOR_GATEWAY_SECRETSTORE.read_text(encoding="utf-8")
-
 
 def _wiredoor_gateway_externalsecret_text() -> str:
     return WIREDOOR_GATEWAY_EXTERNALSECRET.read_text(encoding="utf-8")
@@ -198,10 +182,6 @@ def _grafana_secret_app_text() -> str:
 
 def _grafana_app_text() -> str:
     return (REPO_ROOT / "gitops" / "argocd" / "optional" / "apps" / "grafana.yaml").read_text(encoding="utf-8")
-
-
-def _grafana_secretstore_text() -> str:
-    return GRAFANA_SECRETSTORE.read_text(encoding="utf-8")
 
 
 def _grafana_externalsecret_text() -> str:
@@ -342,38 +322,29 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
 def test_longhorn_step_installs_pinned_chart_and_waits_for_health():
     step_text = _longhorn_step_text()
     step_manifest_text = _longhorn_step_manifest_text()
-    manifest_text = _longhorn_application_text()
-    values_text = _longhorn_values_text()
+    helper_text = _longhorn_helper_text()
 
     assert 'title: Install Longhorn Storage' in step_manifest_text
-    assert 'summary: Install Longhorn storage with a pinned Helm chart version and wait for the app to become healthy.' in step_manifest_text
+    assert 'order: 15' in step_manifest_text
+    assert 'summary: Install Longhorn storage directly with Helm and wait for the storage class to become available.' in step_manifest_text
+    assert 'depends_on:' in step_manifest_text
+    assert '  - provision-nodes' in step_manifest_text
     assert 'runner:' in step_manifest_text
     assert 'KUBECONFIG_FILE:' in step_manifest_text
     assert 'item: kubeconfig' in step_manifest_text
     assert 'script: categories/talos-cluster/steps/install-longhorn-storage/run.sh' in step_manifest_text
-    assert 'export KUBECONFIG="$KUBECONFIG_FILE"' in step_text
-    assert 'Ensuring longhorn-system namespace exists with privileged Pod Security labels' in step_text
-    assert 'kubectl create namespace longhorn-system --dry-run=client -o yaml | kubectl apply --validate=false -f - >/dev/null' in step_text
-    assert 'pod-security.kubernetes.io/enforce=privileged' in step_text
-    assert 'pod-security.kubernetes.io/enforce-version=latest' in step_text
-    assert 'pod-security.kubernetes.io/audit=privileged' in step_text
-    assert 'pod-security.kubernetes.io/audit-version=latest' in step_text
-    assert 'pod-security.kubernetes.io/warn=privileged' in step_text
-    assert 'pod-security.kubernetes.io/warn-version=latest' in step_text
-    assert 'kubectl apply --server-side --force-conflicts --validate=false -f "$application_manifest"' in step_text
-    assert 'wait_for_application_ready "$application_name"' in step_text
-    assert 'application_name="longhorn"' in step_text
-    assert 'chart_version="1.11.1"' in step_text
-    assert 'source:' in manifest_text
-    assert 'repoURL: https://charts.longhorn.io' in manifest_text
-    assert 'chart: longhorn' in manifest_text
-    assert 'targetRevision: "1.11.1"' in manifest_text
-    assert 'helm:' in manifest_text
-    assert 'preUpgradeChecker:' in manifest_text
-    assert 'defaultSetting:' in manifest_text
-    assert 'taintToleration:' in manifest_text
-    assert 'jobEnabled: false' in manifest_text
-    assert 'longhorn-system' in manifest_text
+    assert 'WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"' in step_text
+    assert 'bash "$WORKSPACE_ROOT/scripts/manager/install-longhorn-storage.sh"' in step_text
+    assert 'chart_version="${LONGHORN_CHART_VERSION:-1.11.1}"' in helper_text
+    assert 'helm repo add longhorn https://charts.longhorn.io' in helper_text
+    assert 'helm upgrade --install "$release_name" longhorn/longhorn \\' in helper_text
+    assert '--version "$chart_version"' in helper_text
+    assert '--set preUpgradeChecker.jobEnabled=false' in helper_text
+    assert '--set-string defaultSetting.taintToleration=' in helper_text
+    assert 'wait_for_rollout deployment longhorn-driver-deployer' in helper_text
+    assert 'wait_for_rollout daemonset longhorn-manager' in helper_text
+    assert 'wait_for_storage_class' in helper_text
+    assert 'StorageClass/${storage_class} is available' in helper_text
 
 
 def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
@@ -425,9 +396,8 @@ def test_provision_nodes_step_returns_refs_not_kubeconfig_paths():
 def test_manager_worker_image_includes_talos_image_factory_helper():
     text = (REPO_ROOT / "manager-worker" / "Dockerfile").read_text(encoding="utf-8")
     assert 'ARG TALOSCTL_VERSION=v1.12.6' in text
-    assert 'ARG BW_VERSION=v1.22.1' in text
     assert 'COPY lib ./lib' in text
-    assert 'install -m 0755 /tmp/bw/bw /usr/local/bin/bw' in text
+    assert 'apt-get install -y --no-install-recommends bash ca-certificates curl jq openssl tar xz-utils sudo' in text
     assert 'COPY scripts/get-talos-image-factory.sh ./scripts/get-talos-image-factory.sh' in text
     assert 'RUN chmod +x ./scripts/get-talos-image-factory.sh' in text
 
@@ -454,84 +424,33 @@ def test_bootstrap_talos_uses_discovered_ips_and_records_runtime_state():
 
 def test_install_secret_sync_installs_eso_and_applies_secret_sync_manifests():
     text = _install_secret_sync_text()
+    helper_text = (REPO_ROOT / "scripts" / "manager" / "openbao-secret-sync.sh").read_text(encoding="utf-8")
     assert 'source "$WORKSPACE_ROOT/config/pinned-defaults.sh"' in text
+    assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in text
     assert 'PINNED_EXTERNAL_SECRETS_CHART_VERSION' in text
-    assert 'helm repo add external-secrets https://charts.external-secrets.io' in text
-    assert 'helm upgrade --install external-secrets external-secrets/external-secrets' in text
-    assert '--set-json "tolerations=${control_plane_tolerations}"' in text
-    assert '--set-json "webhook.tolerations=${control_plane_tolerations}"' in text
-    assert '--set-json "certController.tolerations=${control_plane_tolerations}"' in text
-    assert 'node-role.kubernetes.io/control-plane' in text
-    assert 'node-role.kubernetes.io/master' in text
-    assert 'kubectl rollout status deployment/external-secrets' in text
-    assert 'kind: SecretStore' in text
-    assert 'kind: ExternalSecret' in text
-    assert 'kind: NetworkPolicy' in text
-    assert 'bw login --apikey >/dev/null' in text
-    assert 'export BW_SESSION="\\$(bw unlock --passwordenv BW_PASSWORD --raw)"' in text
-    assert 'bw sync --session "\\${BW_SESSION}" >/dev/null' in text
-    assert 'kubectl rollout status deployment/external-secrets-webhook -n "$OPERATOR_NAMESPACE" --timeout=180s' in text
-    assert 'kubectl rollout status deployment/external-secrets-cert-controller -n "$OPERATOR_NAMESPACE" --timeout=180s' in text
-    assert 'bash "$WORKSPACE_ROOT/scripts/manager/refresh-bitwarden-cli.sh" \\' in text
-    assert '--bitwarden-namespace "$BITWARDEN_NAMESPACE"' in text
-    assert '--from-literal=BW_SESSION="$cli_session"' not in text
-    assert 'Authorization: "Bearer {{ .auth.session }}"' not in text
-    assert 'bitwarden_pod="$(' in text
-    assert 'bitwarden_session="$(' in text
-    assert 'Authorization: "Bearer ${bitwarden_session}"' in text
-    assert 'bw get item "$proxmox_item_id" --session "$session"' in text
-    assert 'kubectl create secret generic "$TARGET_SECRET_NAME" \\' in text
-    assert 'ExternalSecret/${EXTERNAL_SECRET_NAME} configured; ${TARGET_SECRET_NAME} was materialized directly from Vaultwarden' in text
-    assert 'external-secrets.io/type: webhook' not in text
-    assert 'bitwarden-webhook-auth' not in text
-    assert 'key: BW_SESSION' not in text
-    assert 'bitwarden-cli-allow-external-secrets' in text
-    assert 'kubernetes.io/metadata.name: ${OPERATOR_NAMESPACE}' in text
-    assert 'automountServiceAccountToken: false' in text
-    assert 'tolerations:' in text
-    assert 'node-role.kubernetes.io/control-plane' in text
-    assert 'node-role.kubernetes.io/master' in text
-    assert 'securityContext:' in text
-    assert 'runAsNonRoot: true' in text
-    assert 'runAsUser: 1000' in text
-    assert 'runAsGroup: 1000' in text
-    assert 'fsGroup: 1000' in text
-    assert 'seccompProfile:' in text
-    assert 'type: RuntimeDefault' in text
-    assert 'allowPrivilegeEscalation: false' in text
-    assert 'capabilities:' in text
-    assert 'drop:' in text
-    assert '- ALL' in text
-    assert 'BITWARDENCLI_APPDATA_DIR' in text
-    assert 'HOME' in text
-    assert '/tmp/bitwarden-cli' in text
-    assert 'emptyDir: {}' in text
-    assert 'bw serve --hostname 0.0.0.0' in text
-    assert 'bw_status="$(bw status | jq -r \'.status // "unauthenticated"\')"' in text
-    assert 'if [[ "$bw_status" == "unauthenticated" ]]; then' in text
-    assert 'bw sync --session "$session" >/dev/null' in text
-    assert 'mktemp -d' not in text
-    assert 'livenessProbe:' in text
-    assert 'tcpSocket:' in text
-    assert 'port: 8087' in text
-    assert 'wget' not in text
+    assert 'PINNED_OPENBAO_CHART_VERSION' in text
+    assert 'helm repo add external-secrets https://charts.external-secrets.io' in helper_text
+    assert 'helm upgrade --install external-secrets external-secrets/external-secrets' in helper_text
+    assert 'openbao_seed_management_bootstrap_files' in text
+    assert 'openbao_install_external_secrets' in text
+    assert 'openbao_seed_release_secret' in text
+    assert 'openbao_install_release' in text
+    assert 'openbao_initialize_if_needed "$openbao_pod"' in text
+    assert 'openbao_configure_auth_and_policy "$openbao_pod"' in text
+    assert 'openbao_seed_secret_paths "$openbao_pod"' in text
+    assert 'openbao_apply_cluster_secret_store' in text
+    assert 'openbao_apply_bootstrap_external_secret' in text
+    assert 'openbao_wait_for_secret "$TARGET_SECRET_NAME" "$TARGET_NAMESPACE"' in text
+    assert 'kind: ClusterSecretStore' not in text
+    assert 'bw ' not in text
     assert 'KUBECONFIG_FILE is required' in text
 
 
-def test_refresh_bitwarden_cli_script_replays_login_and_sync_against_the_running_pod():
-    text = _refresh_bitwarden_cli_text()
-    assert 'Usage: $0 [--bitwarden-namespace NAME] [--deployment NAME]' in text
-    assert 'BITWARDEN_NAMESPACE="bitwarden"' in text
-    assert 'DEPLOYMENT_NAME="bitwarden-cli"' in text
-    assert 'kubectl -n "$BITWARDEN_NAMESPACE" get pod' in text
-    assert 'app.kubernetes.io/name="$DEPLOYMENT_NAME"' in text
-    assert 'Refreshing Bitwarden CLI sync state in pod' in text
-    assert 'bw config server "${BW_HOST}"' in text
-    assert 'bw_status="$(bw status | jq -r' in text
-    assert 'if [[ "$bw_status" == "unauthenticated" ]]; then' in text
-    assert 'bw login --apikey >/dev/null' in text
-    assert 'export BW_SESSION="$(bw unlock --passwordenv BW_PASSWORD --raw)"' in text
-    assert 'bw sync --session "${BW_SESSION}" >/dev/null' in text
+def test_openbao_secret_sync_helper_uses_shared_library_and_port_forward_writeback():
+    text = _openbao_secret_sync_helper_text()
+    assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in text
+    assert 'Usage: sync-openbao-global-secret.sh --secret-name NAME --json-file PATH' in text
+    assert 'openbao_sync_global_secret_file "$SECRET_NAME" "$JSON_FILE" "${required_key_list[@]}"' in text
 
 
 def test_argo_manager_script_requires_kubeconfig_and_calls_gitops_bootstrap():
@@ -667,7 +586,7 @@ def test_optional_step_manifests_chain_the_enabled_apps_flow():
     assert 'script: categories/talos-cluster/steps/install-wiredoor-gateway/run.sh' in wiredoor_text
 
 
-def test_routes_and_wiredoor_secrets_are_vaultwarden_backed():
+def test_routes_and_wiredoor_secrets_are_openbao_backed():
     traefik_app_text = _traefik_app_text()
     routes_app_text = _routes_app_text()
     whoami_app_text = WHOAMI_APP.read_text(encoding="utf-8")
@@ -684,9 +603,7 @@ def test_routes_and_wiredoor_secrets_are_vaultwarden_backed():
     wiredoor_gateway_routes_values_text = _wiredoor_gateway_routes_values_text()
     traefik_values_text = _traefik_values_text()
     wiredoor_gateway_values_text = _wiredoor_gateway_values_text()
-    traefik_secretstore_text = _traefik_dashboard_secretstore_text()
     traefik_externalsecret_text = _traefik_dashboard_externalsecret_text()
-    wiredoor_secretstore_text = _wiredoor_gateway_secretstore_text()
     wiredoor_externalsecret_text = _wiredoor_gateway_externalsecret_text()
 
     assert 'whoami:' not in routes_values_text
@@ -713,28 +630,24 @@ def test_routes_and_wiredoor_secrets_are_vaultwarden_backed():
     assert 'Host(`headlamp.bierineenweek.nl`)' in headlamp_routes_values_text
     assert 'Host(`grafana.bierineenweek.nl`)' in grafana_routes_values_text
     assert 'Host(`argocd.bierineenweek.nl`)' in wiredoor_gateway_routes_values_text
-    assert 'kind: SecretStore' in traefik_secretstore_text
-    assert 'name: traefik-dashboard-fields' in traefik_secretstore_text
-    assert 'twinbox%2Fglobal%2Ftraefik-dashboard' in traefik_secretstore_text
     assert 'kind: ExternalSecret' in traefik_externalsecret_text
+    assert 'kind: ClusterSecretStore' in traefik_externalsecret_text
+    assert 'name: openbao' in traefik_externalsecret_text
     assert 'name: traefik-dashboard-auth' in traefik_externalsecret_text
     assert 'secretKey: users' in traefik_externalsecret_text
-    assert 'kind: SecretStore' in wiredoor_secretstore_text
-    assert 'name: wiredoor-gateway-fields' in wiredoor_secretstore_text
-    assert 'http://192.168.2.54:8080/api/secret-values/{{ .remoteRef.key }}?source=login&property={{ .remoteRef.property }}' in wiredoor_secretstore_text
-    assert '$.value' in wiredoor_secretstore_text
     assert 'kind: ExternalSecret' in wiredoor_externalsecret_text
+    assert 'kind: ClusterSecretStore' in wiredoor_externalsecret_text
+    assert 'name: openbao' in wiredoor_externalsecret_text
     assert 'name: wiredoor-gateway' in wiredoor_externalsecret_text
-    assert 'property: username' in wiredoor_externalsecret_text
-    assert 'property: password' in wiredoor_externalsecret_text
+    assert 'property: WIREDOOR_URL' in wiredoor_externalsecret_text
+    assert 'property: TOKEN' in wiredoor_externalsecret_text
     assert 'secretKey: TOKEN' in wiredoor_externalsecret_text
 
 
-def test_grafana_admin_credentials_are_vaultwarden_backed():
+def test_grafana_admin_credentials_are_openbao_backed():
     grafana_values_text = _grafana_values_text()
     grafana_secret_app_text = _grafana_secret_app_text()
     grafana_app_text = _grafana_app_text()
-    grafana_secretstore_text = _grafana_secretstore_text()
     grafana_externalsecret_text = _grafana_externalsecret_text()
 
     assert 'adminPassword:' not in grafana_values_text
@@ -745,9 +658,9 @@ def test_grafana_admin_credentials_are_vaultwarden_backed():
     assert 'argocd.argoproj.io/sync-wave: "1"' in grafana_app_text
     assert 'kind: Application' in grafana_secret_app_text
     assert 'grafana-secret' in grafana_secret_app_text
-    assert 'kind: SecretStore' in grafana_secretstore_text
-    assert 'object/item/ea9461a9-bffa-4a30-9cc0-3585b78360b1' in grafana_secretstore_text
     assert 'kind: ExternalSecret' in grafana_externalsecret_text
+    assert 'kind: ClusterSecretStore' in grafana_externalsecret_text
+    assert 'name: openbao' in grafana_externalsecret_text
     assert 'admin-user' in grafana_externalsecret_text
     assert 'admin-password' in grafana_externalsecret_text
 

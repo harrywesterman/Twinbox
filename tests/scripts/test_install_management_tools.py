@@ -32,16 +32,16 @@ def test_install_management_tools_fails_on_version_command_errors():
     assert 'install -m 0755 "$talosctl_wrapper" /usr/local/bin/t' in text
 
 
-def test_install_management_tools_installs_and_verifies_bw():
+def test_install_management_tools_installs_core_cli_stack_without_bw():
     text = _script_text()
-    assert "bw" in text
-    assert 'bw_output="$(/usr/local/bin/bw --version 2>&1)" || fail "bw version check failed: ${bw_output}"' in text
+    assert "ensure_openssl()" in text
+    assert 'apt-get install -y openssl >/dev/null' in text
     assert "install_k9s()" in text
     assert 'PINNED_K9S_VERSION' in text
     assert 'k9s version --short' in text
     assert 'install_talosctl' in text
     assert 'install_tofu' in text
     assert 'install_k9s' in text
-    assert 'install_bw' in text
     assert 'install_kubectl' in text
     assert 'install_helm' in text
+    assert 'install_bw' not in text

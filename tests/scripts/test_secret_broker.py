@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import tempfile
@@ -7,293 +8,140 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _write_fake_bw(bin_dir: Path, state_dir: Path):
-    script = bin_dir / "bw"
-    script.write_text(
-        "#!/bin/sh\n"
-        "set -eu\n"
-        f"state_dir='{state_dir}'\n"
-        "mkdir -p \"$state_dir\"\n"
-        "cmd=\"${1:-}\"\n"
-        "subcmd=\"${2:-}\"\n"
-        "case \"$cmd $subcmd\" in\n"
-        "  'config server')\n"
-        "    exit 0\n"
-        "    ;;\n"
-        "  'status ') \n"
-        "    printf '{\"status\":\"unauthenticated\"}'\n"
-        "    exit 0\n"
-        "    ;;\n"
-        "  'login --apikey')\n"
-        "    exit 0\n"
-        "    ;;\n"
-        "  'unlock --passwordfile')\n"
-        "    printf 'session-123'\n"
-        "    exit 0\n"
-        "    ;;\n"
-        "  'sync --session')\n"
-        "    exit 0\n"
-        "    ;;\n"
-        "  'list items')\n"
-        "    if [ -f \"$state_dir/item.json\" ]; then\n"
-        "      printf '[%s]' \"$(cat \"$state_dir/item.json\")\"\n"
-        "    else\n"
-        "      printf '[]'\n"
-        "    fi\n"
-        "    exit 0\n"
-        "    ;;\n"
-        "  'get item')\n"
-        "    cat \"$state_dir/item.json\"\n"
-        "    exit 0\n"
-        "    ;;\n"
-        "  'get attachment')\n"
-        "    output=''\n"
-        "    while [ $# -gt 0 ]; do\n"
-        "      if [ \"$1\" = '--output' ]; then\n"
-        "        output=\"$2\"\n"
-        "        shift 2\n"
-        "        continue\n"
-        "      fi\n"
-        "      shift\n"
-        "    done\n"
-        "    printf 'kubeconfig-data' > \"$output\"\n"
-        "    exit 0\n"
-        "    ;;\n"
-        "  'get template')\n"
-        "    printf '{\"login\":{\"uris\":[]},\"fields\":[]}'\n"
-        "    exit 0\n"
-        "    ;;\n"
-        "  'encode ')\n"
-        "    cat\n"
-        "    exit 0\n"
-        "    ;;\n"
-        "  'create item')\n"
-        "    cat > \"$state_dir/item.json\"\n"
-        "    cat \"$state_dir/item.json\"\n"
-        "    exit 0\n"
-        "    ;;\n"
-        "esac\n"
-        "printf 'unexpected bw invocation: %s %s\\n' \"$cmd\" \"$subcmd\" >&2\n"
-        "exit 1\n",
-        encoding="utf-8",
+def _run_node(source: str, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["node", "--input-type=module", "-e", source],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
     )
-    script.chmod(0o755)
 
 
-def test_secret_broker_auto_seeds_missing_proxmox_item():
+def test_secret_broker_resolves_cluster_worker_bundle_from_filesystem_tree():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
-        bin_dir = root / "bin"
-        state_dir = root / "state"
-        appdata_dir = root / "appdata"
-        bin_dir.mkdir(parents=True, exist_ok=True)
-        state_dir.mkdir(parents=True, exist_ok=True)
-        appdata_dir.mkdir(parents=True, exist_ok=True)
+        bootstrap_root = root / "bootstrap"
+        global_secret_dir = bootstrap_root / "secrets" / "global"
+        cluster_secret_dir = bootstrap_root / "secrets" / "cluster" / "cluster-a"
+        tmp_dir = root / "tmp"
+        global_secret_dir.mkdir(parents=True, exist_ok=True)
+        cluster_secret_dir.mkdir(parents=True, exist_ok=True)
+        tmp_dir.mkdir(parents=True, exist_ok=True)
 
-        _write_fake_bw(bin_dir, state_dir)
-
-        for name, value in {
-            "vaultwarden-client-id": "client-id",
-            "vaultwarden-client-secret": "client-secret",
-            "vaultwarden-password": "vault-password",
-        }.items():
-            (root / name).write_text(value, encoding="utf-8")
-
-        env = os.environ.copy()
-        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
-        env["BITWARDENCLI_APPDATA_DIR"] = str(appdata_dir)
-        env["TWINBOX_SECRET_BACKEND"] = "vaultwarden"
-        env["VAULTWARDEN_SERVER_URL"] = "http://vaultwarden:80"
-        env["VAULTWARDEN_CLIENTID_FILE"] = str(root / "vaultwarden-client-id")
-        env["VAULTWARDEN_CLIENTSECRET_FILE"] = str(root / "vaultwarden-client-secret")
-        env["VAULTWARDEN_PASSWORD_FILE"] = str(root / "vaultwarden-password")
-        env["PROXMOX_HOST"] = "192.168.1.10"
-        env["PROXMOX_PORT"] = "8006"
-        env["PROXMOX_USER"] = "root@pam"
-        env["PROXMOX_PASSWORD"] = "super-secret"
-
-        proc = subprocess.run(
-            [
-                "node",
-                "--input-type=module",
-                "-e",
-                (
-                    "import { createSecretBroker } from './lib/secrets/broker.mjs';\n"
-                    "const broker = createSecretBroker(process.env);\n"
-                    "const value = broker.resolveTextRef({ scope: 'global', item: 'proxmox', field: 'endpoint' });\n"
-                    "console.log(value);\n"
-                ),
-            ],
-            cwd=REPO_ROOT,
-            env=env,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-
-        assert proc.returncode == 0, proc.stderr
-        assert proc.stdout.strip() == "https://192.168.1.10:8006"
-
-        item_json = (state_dir / "item.json").read_text(encoding="utf-8")
-        assert '"name":"twinbox/global/proxmox"' in item_json
-        assert '"username":"root@pam"' in item_json
-        assert '"password":"super-secret"' in item_json
-
-
-def test_secret_broker_refreshes_once_on_missing_item_before_failing():
-    with tempfile.TemporaryDirectory() as td:
-        root = Path(td)
-        bin_dir = root / "bin"
-        state_dir = root / "state"
-        appdata_dir = root / "appdata"
-        bin_dir.mkdir(parents=True, exist_ok=True)
-        state_dir.mkdir(parents=True, exist_ok=True)
-        appdata_dir.mkdir(parents=True, exist_ok=True)
-
-        bw_script = bin_dir / "bw"
-        bw_script.write_text(
-            "#!/bin/sh\n"
-            "set -eu\n"
-            f"state_dir='{state_dir}'\n"
-            f"sync_count_file='{root / 'sync-count'}'\n"
-            "mkdir -p \"$state_dir\"\n"
-            "cmd=\"${1:-}\"\n"
-            "subcmd=\"${2:-}\"\n"
-            "sync_count='0'\n"
-            "if [ -f \"$sync_count_file\" ]; then\n"
-            "  sync_count=\"$(cat \"$sync_count_file\")\"\n"
-            "fi\n"
-            "case \"$cmd $subcmd\" in\n"
-            "  'config server')\n"
-            "    exit 0\n"
-            "    ;;\n"
-            "  'status ')\n"
-            "    printf '{\"status\":\"unauthenticated\"}'\n"
-            "    exit 0\n"
-            "    ;;\n"
-            "  'login --apikey')\n"
-            "    exit 0\n"
-            "    ;;\n"
-            "  'unlock --passwordfile')\n"
-            "    printf 'session-123'\n"
-            "    exit 0\n"
-            "    ;;\n"
-            "  'sync --session')\n"
-            "    sync_count=\"$((sync_count + 1))\"\n"
-            "    printf '%s' \"$sync_count\" > \"$sync_count_file\"\n"
-            "    exit 0\n"
-            "    ;;\n"
-            "  'list items')\n"
-            "    if [ \"$sync_count\" -lt 2 ]; then\n"
-            "      printf '[]'\n"
-            "    else\n"
-            "      printf '[{\"id\":\"item-1\",\"name\":\"twinbox/global/proxmox\",\"login\":{\"username\":\"root@pam\",\"password\":\"super-secret\"},\"fields\":[{\"name\":\"host\",\"value\":\"192.168.1.10\",\"type\":0},{\"name\":\"port\",\"value\":\"8006\",\"type\":0},{\"name\":\"endpoint\",\"value\":\"https://192.168.1.10:8006\",\"type\":0}]}]'\n"
-            "    fi\n"
-            "    exit 0\n"
-            "    ;;\n"
-            "esac\n"
-            "printf 'unexpected bw invocation: %s %s\\n' \"$cmd\" \"$subcmd\" >&2\n"
-            "exit 1\n",
+        (global_secret_dir / "proxmox.json").write_text(
+            json.dumps(
+                {
+                    "username": "root@pam",
+                    "password": "super-secret",
+                    "host": "192.168.1.10",
+                    "port": "8006",
+                    "endpoint": "https://192.168.1.10:8006",
+                },
+                indent=2,
+            )
+            + "\n",
             encoding="utf-8",
         )
-        bw_script.chmod(0o755)
-
-        for name, value in {
-            "vaultwarden-client-id": "client-id",
-            "vaultwarden-client-secret": "client-secret",
-            "vaultwarden-password": "vault-password",
-        }.items():
-            (root / name).write_text(value, encoding="utf-8")
+        talos_secrets_dir = cluster_secret_dir / "talos-secrets"
+        talosconfig_dir = cluster_secret_dir / "talosconfig"
+        kubeconfig_dir = cluster_secret_dir / "kubeconfig"
+        talos_secrets_dir.mkdir(parents=True, exist_ok=True)
+        talosconfig_dir.mkdir(parents=True, exist_ok=True)
+        kubeconfig_dir.mkdir(parents=True, exist_ok=True)
+        (talos_secrets_dir / "secrets.yaml").write_text("cluster-secrets", encoding="utf-8")
+        (talosconfig_dir / "talosconfig").write_text("talosconfig-data", encoding="utf-8")
+        (kubeconfig_dir / "kubeconfig").write_text("kubeconfig-data", encoding="utf-8")
 
         env = os.environ.copy()
-        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
-        env["BITWARDENCLI_APPDATA_DIR"] = str(appdata_dir)
-        env["TWINBOX_SECRET_BACKEND"] = "vaultwarden"
-        env["VAULTWARDEN_SERVER_URL"] = "http://vaultwarden:80"
-        env["VAULTWARDEN_CLIENTID_FILE"] = str(root / "vaultwarden-client-id")
-        env["VAULTWARDEN_CLIENTSECRET_FILE"] = str(root / "vaultwarden-client-secret")
-        env["VAULTWARDEN_PASSWORD_FILE"] = str(root / "vaultwarden-password")
+        env["TWINBOX_BOOTSTRAP_DIR"] = str(bootstrap_root)
+        env["TWINBOX_SECRET_BACKEND"] = "filesystem"
+        env["TWINBOX_SECRET_ITEM_PREFIX"] = "twinbox"
+        env["TWINBOX_SECRET_TEMP_DIR"] = str(tmp_dir)
 
-        proc = subprocess.run(
-            [
-                "node",
-                "--input-type=module",
-                "-e",
-                (
-                    "import { createSecretBroker } from './lib/secrets/broker.mjs';\n"
-                    "const broker = createSecretBroker(process.env);\n"
-                    "const value = broker.resolveTextRef({ scope: 'global', item: 'proxmox', field: 'endpoint' });\n"
-                    "console.log(value);\n"
-                ),
-            ],
-            cwd=REPO_ROOT,
-            env=env,
-            capture_output=True,
-            text=True,
-            check=False,
+        result = _run_node(
+            """
+import fs from 'fs';
+import { createSecretBroker } from './lib/secrets/broker.mjs';
+import { buildClusterWorkerSecretBundle } from './lib/secrets/schema.mjs';
+
+const broker = createSecretBroker(process.env);
+const cluster = {
+  id: 'cluster-a',
+  metadata: {
+    secret_refs: {
+      proxmox: { scope: 'global', item: 'proxmox' },
+      talos_secrets: { scope: 'cluster', item: 'talos-secrets', cluster_id: 'cluster-a' },
+      talosconfig: { scope: 'cluster', item: 'talosconfig', cluster_id: 'cluster-a' },
+      kubeconfig: { scope: 'cluster', item: 'kubeconfig', cluster_id: 'cluster-a' },
+    },
+  },
+};
+
+const resolved = broker.resolveBundle(buildClusterWorkerSecretBundle(cluster), { clusterId: 'cluster-a' });
+console.log(JSON.stringify({
+  proxmoxHost: resolved.env.PROXMOX_HOST,
+  proxmoxEndpoint: resolved.env.TF_VAR_proxmox_endpoint,
+  tfVarProxmoxPassword: resolved.env.TF_VAR_proxmox_password,
+  kubeconfigPath: resolved.env.TWINBOX_KUBECONFIG_FILE,
+  kubeconfigText: fs.readFileSync(resolved.env.TWINBOX_KUBECONFIG_FILE, 'utf8'),
+  talosSecretsPath: resolved.env.TWINBOX_TALOS_SECRETS_FILE,
+  talosSecretsText: fs.readFileSync(resolved.env.TWINBOX_TALOS_SECRETS_FILE, 'utf8'),
+}));
+            """,
+            env,
         )
 
-        assert proc.returncode == 0, proc.stderr
-        assert proc.stdout.strip() == "https://192.168.1.10:8006"
-        assert (root / "sync-count").read_text(encoding="utf-8").strip() == "2"
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["proxmoxHost"] == "192.168.1.10"
+        assert payload["proxmoxEndpoint"] == "https://192.168.1.10:8006"
+        assert payload["tfVarProxmoxPassword"] == "super-secret"
+        assert Path(payload["kubeconfigPath"]).is_file()
+        assert payload["kubeconfigText"] == "kubeconfig-data"
+        assert Path(payload["talosSecretsPath"]).is_file()
+        assert payload["talosSecretsText"] == "cluster-secrets"
 
 
-def test_secret_broker_materializes_file_secrets_under_manager_data_dir():
+def test_secret_broker_upserts_cluster_attachment_into_bootstrap_tree():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
-        bin_dir = root / "bin"
-        state_dir = root / "state"
-        data_dir = root / "data"
-        bin_dir.mkdir(parents=True, exist_ok=True)
-        state_dir.mkdir(parents=True, exist_ok=True)
-        data_dir.mkdir(parents=True, exist_ok=True)
-
-        _write_fake_bw(bin_dir, state_dir)
-        (state_dir / "item.json").write_text(
-            '{"id":"item-1","name":"twinbox/cluster/tst/kubeconfig","attachments":[{"fileName":"kubeconfig","id":"att-1"}]}',
-            encoding="utf-8",
-        )
-
-        for name, value in {
-            "vaultwarden-client-id": "client-id",
-            "vaultwarden-client-secret": "client-secret",
-            "vaultwarden-password": "vault-password",
-        }.items():
-            (root / name).write_text(value, encoding="utf-8")
+        bootstrap_root = root / "bootstrap"
+        source_file = root / "source.txt"
+        tmp_dir = root / "tmp"
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        source_file.write_text("talosconfig-data", encoding="utf-8")
 
         env = os.environ.copy()
-        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
-        env["MANAGER_DATA_DIR"] = str(data_dir)
-        env["BITWARDENCLI_APPDATA_DIR"] = str(root / "appdata")
-        env["TWINBOX_SECRET_BACKEND"] = "vaultwarden"
-        env["VAULTWARDEN_SERVER_URL"] = "http://vaultwarden:80"
-        env["VAULTWARDEN_CLIENTID_FILE"] = str(root / "vaultwarden-client-id")
-        env["VAULTWARDEN_CLIENTSECRET_FILE"] = str(root / "vaultwarden-client-secret")
-        env["VAULTWARDEN_PASSWORD_FILE"] = str(root / "vaultwarden-password")
+        env["TWINBOX_BOOTSTRAP_DIR"] = str(bootstrap_root)
+        env["TWINBOX_SECRET_BACKEND"] = "filesystem"
+        env["TWINBOX_SECRET_ITEM_PREFIX"] = "twinbox"
+        env["TWINBOX_SECRET_TEMP_DIR"] = str(tmp_dir)
 
-        proc = subprocess.run(
-            [
-                "node",
-                "--input-type=module",
-                "-e",
-                (
-                    "import fs from 'fs';\n"
-                    "import { createSecretBroker } from './lib/secrets/broker.mjs';\n"
-                    "const broker = createSecretBroker(process.env);\n"
-                    "const runtime = broker.resolveBundle({ files: { KUBECONFIG_FILE: { scope: 'cluster', item: 'kubeconfig', attachment: 'kubeconfig', format: 'file' } } }, { clusterId: 'tst' });\n"
-                    "console.log(runtime.files.KUBECONFIG_FILE);\n"
-                    "console.log(fs.readFileSync(runtime.files.KUBECONFIG_FILE, 'utf8'));\n"
-                    "runtime.cleanup();\n"
-                ),
-            ],
-            cwd=REPO_ROOT,
-            env=env,
-            capture_output=True,
-            text=True,
-            check=False,
+        result = _run_node(
+            f"""
+import fs from 'fs';
+import {{ createSecretBroker }} from './lib/secrets/broker.mjs';
+
+const broker = createSecretBroker(process.env);
+const targetPath = broker.upsertAttachment({{
+  scope: 'cluster',
+  item: 'talosconfig',
+  cluster_id: 'cluster-a',
+  attachment: 'talosconfig',
+  format: 'file',
+}}, {json.dumps(str(source_file))}, {{ clusterId: 'cluster-a' }});
+console.log(JSON.stringify({{
+  targetPath,
+  copiedText: fs.readFileSync(targetPath, 'utf8'),
+}}));
+            """,
+            env,
         )
 
-        assert proc.returncode == 0, proc.stderr
-        output_lines = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
-        assert output_lines[0].startswith(str(data_dir / "secret-files"))
-        assert output_lines[1] == "kubeconfig-data"
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["copiedText"] == "talosconfig-data"
+        assert Path(payload["targetPath"]).is_file()
+        assert Path(payload["targetPath"]).read_text(encoding="utf-8") == "talosconfig-data"

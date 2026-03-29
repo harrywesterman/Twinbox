@@ -1,16 +1,19 @@
 import fs from "fs";
 import path from "path";
 import { spawn, spawnSync } from "child_process";
-import { createSecretBroker } from "../../lib/secrets/broker.mjs";
 import { buildRedactor } from "../../lib/secrets/redact.mjs";
 import {
   buildClusterWorkerSecretBundle,
+  normalizeSecretBundle,
 } from "../../lib/secrets/schema.mjs";
+import {
+  readItemRecord,
+  resolveAttachmentPath,
+} from "../../lib/secrets/filesystem-store.mjs";
 
 const dataRoot = process.env.MANAGER_DATA_DIR || "/data";
 const workspace = process.env.WORKSPACE_ROOT || "/opt/twinbox";
 const pollMs = Number(process.env.WORKER_POLL_MS || 2000);
-const secretBroker = createSecretBroker(process.env);
 
 const dirs = {
   clusters: path.join(dataRoot, "clusters"),
@@ -24,10 +27,6 @@ const dirs = {
 };
 
 Object.values(dirs).forEach((dir) => fs.mkdirSync(dir, { recursive: true }));
-
-function now() {
-  return new Date().toISOString();
-}
 
 function readJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
@@ -75,18 +74,27 @@ function readJsonIfExists(file) {
   return readJson(file);
 }
 
-function readStepState(stepId) {
-  return readJsonIfExists(path.join(dirs.stepState, `${stepId}.json`));
+function now() {
+  return new Date().toISOString();
 }
 
-function updateStepState(stepId, patch) {
-  const file = path.join(dirs.stepState, `${stepId}.json`);
-  const current = readStepState(stepId) || {
+function stepStatePath(stepId, clusterId = null) {
+  const scope = clusterId ? path.join("clusters", clusterId) : "global";
+  return path.join(dirs.stepState, scope, `${stepId}.json`);
+}
+
+function readStepState(stepId, clusterId = null) {
+  return readJsonIfExists(stepStatePath(stepId, clusterId));
+}
+
+function updateStepState(stepId, patch, clusterId = null) {
+  const file = stepStatePath(stepId, clusterId);
+  const current = readStepState(stepId, clusterId) || {
     step_id: stepId,
     status: "not_started",
     inputs: {},
     outputs: null,
-    cluster_id: null,
+    cluster_id: clusterId || null,
     error: null,
     last_job_id: null,
     created_at: now(),
@@ -95,10 +103,241 @@ function updateStepState(stepId, patch) {
     ...current,
     ...patch,
     step_id: stepId,
+    cluster_id: patch.cluster_id ?? current.cluster_id ?? clusterId ?? null,
     updated_at: now(),
   };
   writeJson(file, next);
   return next;
+}
+
+function queueMarkerPath(filePath) {
+  return path.join(dirs.completed, path.basename(filePath));
+}
+
+function finalizeQueueMarker(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return;
+  }
+
+  const completedFile = queueMarkerPath(filePath);
+  fs.rmSync(completedFile, { force: true });
+  fs.renameSync(filePath, completedFile);
+}
+
+function recoverOrphanedRunningJobs() {
+  const entries = fs.readdirSync(dirs.running).filter((f) => f.endsWith(".json"));
+  entries.sort();
+
+  for (const entry of entries) {
+    const runningFile = path.join(dirs.running, entry);
+    let queued = null;
+    try {
+      queued = readJson(runningFile);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error || "unknown error");
+      appendLog(entry.replace(/\.json$/, ""), `job recovery skipped: unable to read running marker: ${message}`);
+      finalizeQueueMarker(runningFile);
+      continue;
+    }
+
+    const jobId = String(queued?.id || "").trim();
+    const failureMessage = "worker restarted while job was running";
+    if (!jobId) {
+      appendLog(entry.replace(/\.json$/, ""), `job recovery skipped: running marker missing job id`);
+      finalizeQueueMarker(runningFile);
+      continue;
+    }
+
+    try {
+      updateJob(jobId, {
+        status: "failed",
+        step: "failed",
+        error: failureMessage,
+        finished_at: now(),
+      });
+      appendLog(jobId, `job failed: ${failureMessage}`);
+
+      if (queued.type === "run_step" && queued.payload?.step_id) {
+        const clusterId = queued.cluster_id || queued.payload?.cluster_id || queued.payload?.context?.cluster?.id || null;
+        updateStepState(queued.payload.step_id, {
+          status: "failed",
+          error: failureMessage,
+          last_job_id: jobId,
+          cluster_id: clusterId,
+          finished_at: now(),
+        }, clusterId);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error || "unknown error");
+      appendLog(jobId, `job recovery failed: ${message}`);
+    } finally {
+      finalizeQueueMarker(runningFile);
+    }
+  }
+}
+
+function trimString(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function resolveFieldValue(record, ref) {
+  if (!record || typeof record !== "object") {
+    return "";
+  }
+
+  const aliases = {
+    proxmox: {
+      host: ["host"],
+      port: ["port"],
+      username: ["username", "user"],
+      password: ["password"],
+      endpoint: ["endpoint"],
+    },
+    "wiredoor-gateway": {
+      WIREDOOR_URL: ["WIREDOOR_URL", "username", "url"],
+      TOKEN: ["TOKEN", "password", "token"],
+      username: ["WIREDOOR_URL", "username", "url"],
+      password: ["TOKEN", "password", "token"],
+    },
+    grafana: {
+      "admin-user": ["admin-user", "username"],
+      "admin-password": ["admin-password", "password"],
+    },
+    "traefik-dashboard": {
+      username: ["username"],
+      password: ["password"],
+      users: ["users"],
+    },
+  };
+
+  const fieldAliases = aliases[ref.item]?.[ref.field] || [ref.field];
+  for (const key of fieldAliases) {
+    const value = record[key];
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      return String(value);
+    }
+  }
+  return "";
+}
+
+function envFallbackRecord(ref) {
+  if (ref.scope !== "global" || ref.item !== "proxmox") {
+    return null;
+  }
+
+  const host = trimString(process.env.PROXMOX_HOST);
+  const port = trimString(process.env.PROXMOX_PORT);
+  const username = trimString(process.env.PROXMOX_USER || process.env.PROXMOX_USERNAME);
+  const password = trimString(process.env.PROXMOX_PASSWORD || process.env.TF_VAR_proxmox_password);
+  const endpoint = trimString(
+    process.env.TF_VAR_proxmox_endpoint
+    || (host && port ? `https://${host}:${port}` : ""),
+  );
+
+  const record = {};
+  if (host) record.host = host;
+  if (port) record.port = port;
+  if (username) record.username = username;
+  if (password) record.password = password;
+  if (endpoint) record.endpoint = endpoint;
+
+  return Object.keys(record).length > 0 ? record : null;
+}
+
+function readSecretRecord(ref, context = {}) {
+  return readItemRecord(process.env, ref, context) || envFallbackRecord(ref);
+}
+
+function resolveTextRef(rawRef, context = {}) {
+  const ref = rawRef;
+  const record = readSecretRecord(ref, context);
+  const value = resolveFieldValue(record, ref);
+
+  if (!value) {
+    throw new Error(`secret field not found: ${ref.field} on ${ref.scope === "cluster" ? `${ref.cluster_id || context.clusterId || context.cluster_id}/${ref.item}` : ref.item}`);
+  }
+
+  return value;
+}
+
+function materializeRef(rawRef, label, context = {}) {
+  const ref = rawRef;
+  if (ref.attachment) {
+    const attachmentPath = resolveAttachmentPath(process.env, ref, context);
+    if (!fs.existsSync(attachmentPath)) {
+      throw new Error(`secret attachment not found: ${attachmentPath}`);
+    }
+    return attachmentPath;
+  }
+
+  const value = resolveTextRef(ref, context);
+  const tempRoot = process.env.TWINBOX_SECRET_TEMP_DIR || path.join(process.env.MANAGER_DATA_DIR || "/tmp", "twinbox-secrets");
+  fs.mkdirSync(tempRoot, { recursive: true, mode: 0o700 });
+  const targetDir = fs.mkdtempSync(path.join(tempRoot, `${String(label || "secret").replace(/[^a-zA-Z0-9_.-]+/g, "-")}-`));
+  const targetFile = path.join(targetDir, "value");
+  fs.writeFileSync(targetFile, value, { mode: 0o600 });
+  return targetFile;
+}
+
+function resolveSecretBundle(bundleSpec = {}, context = {}) {
+  const bundle = normalizeSecretBundle(bundleSpec);
+  const env = {};
+  const files = {};
+  const redactions = [];
+  const cleanupDirs = new Set();
+
+  for (const [name, ref] of Object.entries(bundle.env)) {
+    try {
+      const fileLike = ref.format === "file" || ref.attachment;
+      if (fileLike) {
+        const filePath = materializeRef(ref, name, context);
+        env[name] = filePath;
+        files[name] = filePath;
+        if (!ref.attachment) {
+          cleanupDirs.add(path.dirname(filePath));
+        }
+        continue;
+      }
+
+      const value = resolveTextRef(ref, context);
+      env[name] = value;
+      if (name.includes("PASSWORD") || ref.field === "password") {
+        redactions.push(value);
+      }
+    } catch (error) {
+      if (ref.optional) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  for (const [name, ref] of Object.entries(bundle.files)) {
+    try {
+      const filePath = materializeRef(ref, name, context);
+      env[name] = filePath;
+      files[name] = filePath;
+      if (!ref.attachment) {
+        cleanupDirs.add(path.dirname(filePath));
+      }
+    } catch (error) {
+      if (ref.optional) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  return {
+    env,
+    files,
+    redactions,
+    cleanup() {
+      for (const dir of cleanupDirs) {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  };
 }
 
 function runCommand(jobId, command, args, env = {}, redactLine = (line) => String(line ?? ""), stripEnv = []) {
@@ -163,7 +402,7 @@ function resolveJobSecretRuntime(payload, clusterId = null) {
     return emptySecretRuntime();
   }
 
-  const runtime = secretBroker.resolveBundle(secretBundle, {
+  const runtime = resolveSecretBundle(secretBundle, {
     clusterId: clusterId || cluster?.id || payload?.cluster_id || null,
   });
   const envKeys = Object.keys(secretBundle.env || {});
@@ -348,7 +587,7 @@ async function handleRunStep(job) {
     cluster_id: clusterId,
     started_at: now(),
     finished_at: null,
-  });
+  }, clusterId);
 
   const secretRuntime = resolveJobSecretRuntime(payload, clusterId);
   const redact = buildRedactor(secretRuntime.redactions);
@@ -379,7 +618,7 @@ async function handleRunStep(job) {
       last_job_id: job.id,
       cluster_id: outputs?.cluster_id || clusterId,
       finished_at: now(),
-    });
+    }, clusterId);
   } catch (err) {
     updateStepState(stepId, {
       status: "failed",
@@ -387,7 +626,7 @@ async function handleRunStep(job) {
       last_job_id: job.id,
       cluster_id: clusterId,
       finished_at: now(),
-    });
+    }, clusterId);
     throw err;
   } finally {
     secretRuntime.cleanup();
@@ -444,6 +683,13 @@ async function loop() {
 }
 
 console.log("manager-worker started");
+try {
+  recoverOrphanedRunningJobs();
+  console.log("manager-worker recovered orphaned running jobs");
+} catch (err) {
+  console.error(`manager-worker startup recovery failed: ${err.message}`);
+  process.exit(1);
+}
 try {
   ensureToolVersionsMatchPolicy();
   console.log("manager-worker tool version check passed");

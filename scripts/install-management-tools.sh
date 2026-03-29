@@ -254,49 +254,15 @@ install_k9s() {
   install -m 0755 "$tmp_dir/k9s" /usr/local/bin/k9s
 }
 
-ensure_unzip() {
-  if command -v unzip >/dev/null 2>&1; then
+ensure_openssl() {
+  if command -v openssl >/dev/null 2>&1; then
     return 0
   fi
 
-  log "Installing unzip"
+  log "Installing openssl"
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -qq
-  apt-get install -y unzip >/dev/null
-}
-
-ensure_jq() {
-  if command -v jq >/dev/null 2>&1; then
-    return 0
-  fi
-
-  log "Installing jq"
-  export DEBIAN_FRONTEND=noninteractive
-  apt-get update -qq
-  apt-get install -y jq >/dev/null
-}
-
-install_bw() {
-  local version="1.22.1"
-  local base_url="https://github.com/bitwarden/cli/releases/download/v${version}"
-  local zip_path="$tmp_dir/bw-linux-${version}.zip"
-  local checksum_path="$tmp_dir/bw-linux-sha256-${version}.txt"
-  local expected_checksum=""
-  local actual_checksum=""
-
-  ensure_unzip
-  ensure_jq
-
-  log "Installing bw v${version}"
-  download_to "${base_url}/bw-linux-${version}.zip" "$zip_path"
-  download_to "${base_url}/bw-linux-sha256-${version}.txt" "$checksum_path"
-
-  expected_checksum="$(tr -d '[:space:]' < "$checksum_path" | tr '[:upper:]' '[:lower:]')"
-  actual_checksum="$(sha256sum "$zip_path" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')"
-  [[ "$actual_checksum" == "$expected_checksum" ]] || fail "bw checksum mismatch: expected ${expected_checksum}, got ${actual_checksum}"
-
-  unzip -q "$zip_path" -d "$tmp_dir/bw"
-  install -m 0755 "$tmp_dir/bw/bw" /usr/local/bin/bw
+  apt-get install -y openssl >/dev/null
 }
 
 install_wrappers() {
@@ -330,33 +296,28 @@ verify_versions() {
   local kubectl_output=""
   local helm_output=""
   local tofu_output=""
-  local bw_output=""
   local k9s_output=""
   local talos_actual=""
   local tofu_actual=""
   local kubectl_actual=""
   local helm_actual=""
-  local bw_actual=""
   local k9s_actual=""
   local talos_expected
   local tofu_expected
   local kubectl_expected
   local helm_expected
-  local bw_expected
   local k9s_expected
 
   talos_output="$(/usr/local/bin/talosctl version --client 2>&1)" || fail "talosctl version check failed: ${talos_output}"
   tofu_output="$(/usr/local/bin/tofu version 2>&1)" || fail "tofu version check failed: ${tofu_output}"
   kubectl_output="$(/usr/local/bin/kubectl version --client --output=yaml 2>&1)" || fail "kubectl version check failed: ${kubectl_output}"
   helm_output="$(/usr/local/bin/helm version --short 2>&1)" || fail "helm version check failed: ${helm_output}"
-  bw_output="$(/usr/local/bin/bw --version 2>&1)" || fail "bw version check failed: ${bw_output}"
   k9s_output="$(/usr/local/bin/k9s version --short 2>&1)" || fail "k9s version check failed: ${k9s_output}"
 
   talos_actual="$(extract_semver "$talos_output")"
   tofu_actual="$(extract_semver "$tofu_output")"
   kubectl_actual="$(extract_semver "$kubectl_output")"
   helm_actual="$(extract_semver "$helm_output")"
-  bw_actual="$(extract_semver "$bw_output")"
   k9s_actual="$(extract_semver "$k9s_output")"
 
   talos_expected="$(normalize_version "$PINNED_TALOS_VERSION")"
@@ -364,24 +325,22 @@ verify_versions() {
   kubectl_expected="$(normalize_version "$KUBECTL_VERSION")"
   helm_expected="$(normalize_version "$HELM_VERSION")"
   k9s_expected="$(normalize_version "$PINNED_K9S_VERSION")"
-  bw_expected="1.22.1"
 
   [[ "$talos_actual" == "$talos_expected" ]] || fail "talosctl version mismatch: expected v${talos_expected}, got v${talos_actual}"
   [[ "$tofu_actual" == "$tofu_expected" ]] || fail "tofu version mismatch: expected v${tofu_expected}, got v${tofu_actual}"
   [[ "$kubectl_actual" == "$kubectl_expected" ]] || fail "kubectl version mismatch: expected v${kubectl_expected}, got v${kubectl_actual}"
   [[ "$helm_actual" == "$helm_expected" ]] || fail "helm version mismatch: expected v${helm_expected}, got v${helm_actual}"
   [[ "$k9s_actual" == "$k9s_expected" ]] || fail "k9s version mismatch: expected v${k9s_expected}, got v${k9s_actual}"
-  [[ "$bw_actual" == "$bw_expected" ]] || fail "bw version mismatch: expected v${bw_expected}, got v${bw_actual}"
-  log "Installed versions: talosctl=v${talos_actual}, tofu=v${tofu_actual}, kubectl=v${kubectl_actual}, helm=v${helm_actual}, k9s=v${k9s_actual}, bw=v${bw_actual}"
+  log "Installed versions: talosctl=v${talos_actual}, tofu=v${tofu_actual}, kubectl=v${kubectl_actual}, helm=v${helm_actual}, k9s=v${k9s_actual}"
 }
 
 ensure_talos_cpu_compatibility
+ensure_openssl
 install_talosctl
 install_tofu
 install_k9s
 install_kubectl
 install_helm
-install_bw
 install_wrappers
 verify_versions
 

@@ -42,13 +42,13 @@ function makeStep(id, title, {
 function buildCatalog(stepStatuses = {}) {
   const setupSteps = [
     ['provision-nodes', 'Deploy Talos Cluster', { status: 'ready', dependsOn: [] }],
-    ['install-secret-sync', 'Install Vaultwarden', { dependsOn: ['provision-nodes'] }],
+    ['install-longhorn-storage', 'Install Longhorn storage', { dependsOn: ['provision-nodes'] }],
+    ['install-secret-sync', 'Install OpenBao and sync bootstrap secrets', { dependsOn: ['install-longhorn-storage'] }],
     ['install-argocd', 'Install Argo CD', { dependsOn: ['install-secret-sync'] }],
     ['install-whoami', 'Install Whoami', { dependsOn: ['install-argocd'] }],
     ['install-headlamp', 'Install Headlamp', { dependsOn: ['install-whoami'] }],
     ['install-grafana', 'Install Grafana', { dependsOn: ['install-headlamp'] }],
     ['install-wiredoor-gateway', 'Install Wiredoor gateway', { dependsOn: ['install-grafana'] }],
-    ['install-longhorn-storage', 'Install Longhorn storage', { dependsOn: ['install-wiredoor-gateway'] }],
     ['install-authentik-idp', 'Install Authentik IDP', { dependsOn: ['install-longhorn-storage'] }],
     ['create-users-and-groups', 'Create Users and Groups', { dependsOn: ['install-authentik-idp'] }],
     ['configure-cloudflare-dns', 'Configure Cloudflare DNS', { dependsOn: ['create-users-and-groups'] }],
@@ -58,8 +58,7 @@ function buildCatalog(stepStatuses = {}) {
     ['install-proxmox-backup-system', 'Install Proxmox Backup System', { dependsOn: ['install-velero-backup'] }],
     ['install-nextcloud', 'Install Nextcloud', { dependsOn: ['install-proxmox-backup-system'] }],
     ['install-immich', 'Install Immich', { dependsOn: ['install-nextcloud'] }],
-    ['install-vaultwarden-app', 'Install Vaultwarden', { dependsOn: ['install-immich'] }],
-    ['install-rocketchat', 'Install Rocketchat', { dependsOn: ['install-vaultwarden-app'] }],
+    ['install-rocketchat', 'Install Rocketchat', { dependsOn: ['install-immich'] }],
     ['install-paperless', 'Install Paperless', { dependsOn: ['install-rocketchat'] }],
     ['install-karakeep', 'Install Karakeep', { dependsOn: ['install-paperless'] }],
     ['install-gitea', 'Install Gitea', { dependsOn: ['install-karakeep'] }],
@@ -114,11 +113,11 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   });
 
   assert.equal(model.mode, 'setup');
-  assert.equal(model.stepRail.length, 27);
+  assert.equal(model.stepRail.length, 26);
   assert.equal(model.stepRail[0].title, 'Deploy Talos Cluster');
   assert.equal(model.stepRail[0].isCurrent, true);
   assert.equal(model.primaryAction.label, 'Start step 1');
-  assert.equal(model.progress.totalSteps, 27);
+  assert.equal(model.progress.totalSteps, 26);
   assert.equal(model.progress.completedSteps, 0);
   assert.equal(model.activity.runtime.currentStage, 'Applying cluster plan');
 });
@@ -148,13 +147,13 @@ test('wizard model switches to manage mode when setup flow is complete', () => {
     Object.fromEntries(
       [
         'provision-nodes',
+        'install-longhorn-storage',
         'install-secret-sync',
         'install-argocd',
         'install-whoami',
         'install-headlamp',
         'install-grafana',
         'install-wiredoor-gateway',
-        'install-longhorn-storage',
         'install-authentik-idp',
         'create-users-and-groups',
         'configure-cloudflare-dns',
@@ -164,7 +163,6 @@ test('wizard model switches to manage mode when setup flow is complete', () => {
         'install-proxmox-backup-system',
         'install-nextcloud',
         'install-immich',
-        'install-vaultwarden-app',
         'install-rocketchat',
         'install-paperless',
         'install-karakeep',
@@ -204,16 +202,16 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     selectedStepId: '',
   });
 
-  assert.equal(model.stepRail.length, 27);
+  assert.equal(model.stepRail.length, 26);
   assert.deepEqual(model.stepRail.map((step) => step.id), [
     'provision-nodes',
+    'install-longhorn-storage',
     'install-secret-sync',
     'install-argocd',
     'install-whoami',
     'install-headlamp',
     'install-grafana',
     'install-wiredoor-gateway',
-    'install-longhorn-storage',
     'install-authentik-idp',
     'create-users-and-groups',
     'configure-cloudflare-dns',
@@ -223,7 +221,6 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     'install-proxmox-backup-system',
     'install-nextcloud',
     'install-immich',
-    'install-vaultwarden-app',
     'install-rocketchat',
     'install-paperless',
     'install-karakeep',

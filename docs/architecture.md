@@ -1,64 +1,60 @@
 # Architecture
 
-Twinbox uses a manager-first architecture centered on a Management VM.
+Twinbox is manager-first. The Management VM is the control point for bootstrap, queueing, and long-lived bootstrap material.
 
-## Components
+## Layers
 
-1. **Wizard Layer**
-   - `wizard/setup-wizard.sh` on Proxmox.
-   - Creates and bootstraps only the Management VM.
+1. **Wizard layer**
+   - `wizard/setup-wizard.sh`
+   - Runs on Proxmox and creates only the Management VM.
 
-2. **Manager Runtime Layer**
-   - `manager-web` (UI, served via Nginx).
-   - `manager-api` (REST API and job metadata).
-   - `manager-worker` (queue polling + script execution).
-   - `categories/` (manifest-driven catalog mounted into the API and worker).
+2. **Manager runtime layer**
+   - `manager-web`
+   - `manager-api`
+   - `manager-worker`
+   - `categories/`
 
-3. **Execution Layer (inside worker image)**
+3. **Execution layer**
    - `scripts/manager/apply-cluster.sh`
+   - `scripts/manager/install-longhorn-storage.sh`
    - `scripts/manager/install-secret-sync.sh`
    - `scripts/manager/install-argocd.sh`
-   - `scripts/manager/collect-state.sh`
-   - `categories/*/steps/*/*.sh`
-   - `gitops/install.sh`
-   - `gitops/argocd/root.yaml`
+   - `categories/*/steps/*/run.sh`
 
-4. **State Layer**
+4. **State layer**
    - `manager-data/clusters/*.json`
    - `manager-data/jobs/*.json`
    - `manager-data/logs/*.log`
-   - `manager-data/step-state/*.json`
    - `manager-data/queue/{pending,running,completed}/*.json`
-   - Talos configs and kubeconfig are runtime artifacts only and are not stored canonically under `manager-data/`.
+   - `manager-data/step-state/global/*.json`
+   - `manager-data/step-state/clusters/<cluster-id>/*.json`
+
+5. **Bootstrap secret layer**
+   - `/opt/twinbox/bootstrap/secrets/global/*.json`
+   - `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/...`
+   - `/opt/twinbox/bootstrap/openbao/seal/*`
+   - `/opt/twinbox/bootstrap/openbao/init/*`
 
 ## Request Flow
 
-1. UI loads `/api/catalog` to discover categories, steps, saved inputs, and latest job state. Once a cluster is active, the UI pins catalog reads to that explicit `cluster_id`.
-2. UI sends a step execution request (`/api/steps/{step_id}/execute`) or uses the compatibility cluster endpoints. Follow-up cluster steps carry an explicit `cluster_id` instead of relying on a server-side "current cluster" guess.
-3. API validates inputs, persists step state, and writes the queue file.
-4. Worker picks the queued job and runs the project-owned script for that step.
-5. Worker streams command output to job logs and updates `manager-data/step-state`.
-6. UI polls catalog, cluster, and log state to keep the operator view current.
+1. `manager-web` loads `/api/catalog`.
+2. The UI executes a step through `POST /api/steps/{step_id}/execute`.
+3. `manager-api` validates inputs, persists state, and writes a queue file.
+4. `manager-worker` moves the job to `queue/running`, executes the repo-owned script, streams logs, and finalizes state.
+5. The UI polls job and catalog state.
 
-## API Contracts (Current)
+## Secret Flow
 
-- `POST /api/clusters`
-- `POST /api/clusters/{cluster_id}/bootstrap` (compatibility rerun hook)
-- `GET /api/catalog`
-- `POST /api/steps/{step_id}/execute`
-- `GET /api/jobs/{job_id}`
-- `GET /api/jobs/{job_id}/logs`
-- `GET /api/health`
+1. The Management VM bootstraps local JSON files under `/opt/twinbox/bootstrap/secrets/global/`.
+2. `provision-nodes` materializes Talos runtime files from the local bootstrap tree and cluster-scoped attachments.
+3. `install-longhorn-storage` runs before cluster secret sync so stateful workloads can use Longhorn PVCs immediately.
+4. `install-secret-sync` installs External Secrets Operator and OpenBao on Longhorn.
+5. `install-secret-sync` seeds OpenBao from the Management VM bootstrap files and creates `ClusterSecretStore/openbao`.
+6. GitOps apps consume secrets through `ExternalSecret` resources backed by `ClusterSecretStore/openbao`.
 
-## Security Baseline
+## Runtime Guarantees
 
-- LAN-only operational assumption.
-- Vaultwarden runs on the Management VM and is exposed on the trusted LAN address of that VM so the host bootstrap and manager containers can resolve the same secret store.
-- `manager-api` and `manager-worker` resolve secret refs through the broker at runtime; queued jobs and cluster state persist refs only.
-- Talos file secrets are materialized into temporary runtime files and cleaned up after the job completes.
-- External Secrets Operator and the Bitwarden/Vaultwarden webhook bridge project Vaultwarden secrets into Kubernetes only as derived runtime artifacts.
-- Route-layer secrets such as `traefik-dashboard-auth`, `wiredoor-gateway`, and the Grafana admin credentials are also projected from Vaultwarden via per-namespace `SecretStore`/`ExternalSecret` resources.
-- Argo CD bootstrap is a separate follow-up after ESO/Bitwarden; the initial `gitops/argocd/root.yaml` Application syncs the full app tree, with sync waves keeping dependent apps ordered and Vaultwarden-backed secret resources in place first.
-- The in-cluster `bw serve` bridge is restricted by a `NetworkPolicy` so only the `external-secrets` namespace can reach it.
-- The Management VM bootstraps the Vaultwarden service account and CLI API key automatically during first startup.
-- No built-in auth/RBAC yet.
+- Queue recovery marks orphaned `running` jobs as failed on worker startup.
+- Step state is cluster-scoped for Talos cluster journeys.
+- Talos configs and kubeconfigs are runtime artifacts, not canonical files under `manager-data/`.
+- OpenBao uses static auto-unseal material stored on the Management VM for zero-touch restarts.

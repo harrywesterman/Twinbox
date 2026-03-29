@@ -30,6 +30,8 @@ def test_ip_suggestions_can_use_secret_broker_for_proxmox_api_fallback():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         data_dir = root / "data"
+        bootstrap_root = root / "bootstrap"
+        secret_dir = bootstrap_root / "secrets" / "global"
         bin_dir = root / "bin"
         curl_log = root / "curl.log"
         ping_mock = bin_dir / "ping"
@@ -38,6 +40,21 @@ def test_ip_suggestions_can_use_secret_broker_for_proxmox_api_fallback():
         resolv_conf = root / "resolv.conf"
 
         bin_dir.mkdir(parents=True, exist_ok=True)
+        secret_dir.mkdir(parents=True, exist_ok=True)
+        (secret_dir / "proxmox.json").write_text(
+            json.dumps(
+                {
+                    "username": "root@pam",
+                    "password": "super-secret",
+                    "host": "192.168.1.10",
+                    "port": "8006",
+                    "endpoint": "https://192.168.1.10:8006",
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         ping_mock.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
         ping_mock.chmod(0o755)
         ip_mock.write_text(
@@ -71,11 +88,9 @@ def test_ip_suggestions_can_use_secret_broker_for_proxmox_api_fallback():
         env = os.environ.copy()
         env["MANAGER_DATA_DIR"] = str(data_dir)
         env["MANAGER_API_PORT"] = str(port)
-        env["TWINBOX_SECRET_BACKEND"] = "env"
-        env["PROXMOX_HOST"] = "192.168.1.10"
-        env["PROXMOX_PORT"] = "8006"
-        env["PROXMOX_USER"] = "root@pam"
-        env["PROXMOX_PASSWORD"] = "super-secret"
+        env["TWINBOX_SECRET_BACKEND"] = "filesystem"
+        env["TWINBOX_BOOTSTRAP_DIR"] = str(bootstrap_root)
+        env["TWINBOX_SECRET_ITEM_PREFIX"] = "twinbox"
         env["MANAGER_API_PING_BIN"] = str(ping_mock)
         env["MANAGER_API_IP_BIN"] = str(ip_mock)
         env["MANAGER_API_RESOLV_CONF"] = str(resolv_conf)

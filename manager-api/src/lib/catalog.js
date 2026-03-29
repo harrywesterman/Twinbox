@@ -217,6 +217,15 @@ function summarizeStepState(state) {
   };
 }
 
+function stepStatePath(dirs, stepId, clusterId = null) {
+  const scope = clusterId ? path.join("clusters", clusterId) : "global";
+  return path.join(dirs.stepState, scope, `${stepId}.json`);
+}
+
+function readStepState(dirs, stepId, clusterId = null) {
+  return readJsonIfExists(stepStatePath(dirs, stepId, clusterId));
+}
+
 function synthesizeProvisionStateFromCluster(step, cluster, state) {
   if (step.id !== "provision-nodes" || state || !cluster?.id) {
     return state;
@@ -314,10 +323,10 @@ export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) 
 
   const categories = definitions.categories.map((category) => {
     const steps = category.steps.map((step) => {
-      const rawState = readJsonIfExists(path.join(dirs.stepState, `${step.id}.json`));
       const isClusterScopedStep = step.category_id === "talos-cluster";
-      const scopedState = isClusterScopedStep && rawState?.cluster_id !== activeClusterId ? null : rawState;
-      const state = isClusterScopedStep ? synthesizeProvisionStateFromCluster(step, currentCluster, scopedState) : scopedState;
+      const scopedClusterId = isClusterScopedStep ? activeClusterId : null;
+      const rawState = readStepState(dirs, step.id, scopedClusterId);
+      const state = isClusterScopedStep ? synthesizeProvisionStateFromCluster(step, currentCluster, rawState) : rawState;
       const latestJob = state?.last_job_id
         ? readJsonIfExists(path.join(dirs.jobs, `${state.last_job_id}.json`))
         : null;

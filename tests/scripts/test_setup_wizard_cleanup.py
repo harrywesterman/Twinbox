@@ -89,6 +89,11 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     assert "      HELM_VERSION=${HELM_VERSION}" in text
     assert "      TWINBOX_HOST_REPO_ROOT=${TWINBOX_TARGET_DIR}" in text
     assert 'TWINBOX_TARGET_DIR="/opt/twinbox"' in text
+    assert "      TWINBOX_SECRET_BACKEND=filesystem" in text
+    assert "      TWINBOX_BOOTSTRAP_DIR=/opt/twinbox/bootstrap" in text
+    assert "      TWINBOX_SECRET_ITEM_PREFIX=twinbox" in text
+    assert "      TWINBOX_SECRET_TEMP_DIR=/tmp/twinbox-secrets" in text
+    assert "      TWINBOX_SECRET_CACHE_TTL_SEC=60" in text
     assert "      TALOS_IMAGE_SCHEMATIC=${TALOS_IMAGE_SCHEMATIC}" not in text
     assert "      TALOSCTL_VERSION=${TALOSCTL_VERSION}" not in text
     assert "      PROXMOX_ISO_STORAGE=${PROXMOX_ISO_STORAGE}" not in text
@@ -102,6 +107,7 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     assert 'qm set "$MGT_ID" --ipconfig0 "ip=${CLOUD_INIT_IP}/${CLOUD_INIT_CIDR},gw=${CLOUD_INIT_GATEWAY}" >/dev/null' in text
     assert "MANAGEMENT_VM_ID=${MGT_ID}" in text
     assert "MANAGEMENT_VM_IP=${CLOUD_INIT_IP}" in text
+    assert 'chmod +x scripts/start-manager.sh && ./scripts/start-manager.sh' in text
     assert "CLUSTER_NAME=${CLUSTER_NAME}" not in text
     assert "CLUSTER_CONTROLPLANE_COUNT=${CLUSTER_CONTROLPLANE_COUNT}" not in text
     assert "CLUSTER_WORKER_COUNT=${CLUSTER_WORKER_COUNT}" not in text
@@ -112,29 +118,27 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     assert 'git clone https://github.com/${GITHUB_REPO}.git ${TWINBOX_TARGET_DIR}' in text
 
 
-def test_setup_wizard_bootstraps_vaultwarden_before_starting_manager_stack():
+def test_setup_wizard_bootstraps_filesystem_secret_material_before_starting_manager_stack():
     text = _wizard_text()
     assert 'install -d -m 0700 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}/bootstrap' in text
-    assert 'vaultwarden-password' in text
     assert 'MANAGEMENT_VM_IP=${CLOUD_INIT_IP}' in text
-    assert 'VAULTWARDEN_IMAGE_TAG=1.35.4' in text
-    assert 'VAULTWARDEN_BIND_ADDRESS=0.0.0.0' in text
-    assert 'VAULTWARDEN_LOCAL_PORT=8222' in text
-    assert 'VAULTWARDEN_PUBLIC_URL=http://${CLOUD_INIT_IP}:8222' in text
-    assert 'VAULTWARDEN_PASSWORD_FILE=/opt/twinbox/bootstrap/vaultwarden-password' in text
-    assert 'VAULTWARDEN_READY_FILE=/opt/twinbox/bootstrap/vaultwarden-ready' in text
-    assert 'bash -lc \'cd ${TWINBOX_TARGET_DIR} && sudo ./scripts/install-management-tools.sh --env-file .env\'' in text
-    assert 'docker compose up -d vaultwarden' in text
-    assert 'scripts/bootstrap-vaultwarden.sh' in text
-    assert 'VAULTWARDEN_SIGNUPS_ALLOWED=true' in text
+    assert 'TWINBOX_SECRET_BACKEND=filesystem' in text
+    assert 'TWINBOX_BOOTSTRAP_DIR=/opt/twinbox/bootstrap' in text
+    assert 'TWINBOX_SECRET_ITEM_PREFIX=twinbox' in text
+    assert 'TWINBOX_SECRET_TEMP_DIR=/tmp/twinbox-secrets' in text
+    assert 'TWINBOX_SECRET_CACHE_TTL_SEC=60' in text
+    assert 'bash -lc \'cd ${TWINBOX_TARGET_DIR} && chmod +x scripts/start-manager.sh && ./scripts/start-manager.sh\'' in text
+    assert 'docker compose up -d vaultwarden' not in text
+    assert 'scripts/bootstrap-vaultwarden.sh' not in text
+    assert 'vaultwarden-password' not in text
 
 
-def test_setup_wizard_installs_management_tools_before_vaultwarden_bootstrap():
+def test_setup_wizard_starts_manager_script_after_bootstrap_directory_exists():
     text = _wizard_text()
-    install_index = text.index("sudo ./scripts/install-management-tools.sh --env-file .env")
-    bootstrap_index = text.index("scripts/bootstrap-vaultwarden.sh")
+    bootstrap_index = text.index('install -d -m 0700 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}/bootstrap')
+    bootstrap_script_index = text.index("scripts/start-manager.sh")
 
-    assert install_index < bootstrap_index
+    assert bootstrap_index < bootstrap_script_index
 
 
 def test_setup_wizard_discovers_management_vm_ip_via_guest_agent():

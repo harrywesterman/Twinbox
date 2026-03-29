@@ -2,12 +2,12 @@ id: install-longhorn-storage
 title: Install Longhorn Storage
 type: action
 journey_stage: setup
-order: 40
-summary: Install Longhorn storage with a pinned Helm chart version and wait for the app to become healthy.
-explanation: Twinbox installs Longhorn as a dedicated storage add-on after Argo CD, pins the chart to the newest stable release, and waits until the Longhorn application reports Synced and Healthy before the step completes.
-side_help: Storage remains a separate setup phase so later workload installers can depend on persistent volumes only after Longhorn is actually ready.
+order: 15
+summary: Install Longhorn storage directly with Helm and wait for the storage class to become available.
+explanation: Twinbox installs Longhorn as an early storage prerequisite directly from the manager runtime, waits for the Longhorn controllers to become ready, and only then continues to later cluster steps.
+side_help: Storage now comes before secret sync and application installs so later workloads can rely on persistent volumes only after Longhorn is actually ready.
 depends_on:
-  - install-wiredoor-gateway
+  - provision-nodes
 inputs: []
 secrets:
   files:

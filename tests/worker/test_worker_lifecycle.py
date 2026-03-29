@@ -47,6 +47,14 @@ def _write_pinned_defaults(workspace: Path, talos_version: str = "v1.12.6"):
     )
 
 
+def _global_step_state(data: Path, step_id: str) -> Path:
+    return data / "step-state" / "global" / f"{step_id}.json"
+
+
+def _cluster_step_state(data: Path, cluster_id: str, step_id: str) -> Path:
+    return data / "step-state" / "clusters" / cluster_id / f"{step_id}.json"
+
+
 def test_worker_processes_pending_job_to_completed():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
@@ -179,6 +187,108 @@ def test_worker_processes_pending_job_to_completed():
             assert "--dns-domain cluster.internal" in log_text
             assert "--file-datastore local" in log_text
             assert "job completed" in log_text
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
+def test_worker_recovers_orphaned_running_run_step_job_on_startup():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        data = root / "data"
+        workspace = root / "workspace"
+        bin_dir = root / "bin"
+
+        for d in [
+            data / "queue" / "running",
+            data / "queue" / "completed",
+            data / "jobs",
+            data / "logs",
+            data / "clusters",
+            workspace,
+            bin_dir,
+        ]:
+            d.mkdir(parents=True, exist_ok=True)
+
+        _prepare_fake_toolchain(bin_dir)
+        _write_pinned_defaults(workspace)
+
+        payload = {
+            "step_id": "provision-nodes",
+            "step_type": "action",
+            "inputs": {"name": "demo"},
+            "runner": {
+                "kind": "script",
+                "script": "categories/talos-cluster/steps/provision-nodes/run.sh",
+            },
+            "context": {
+                "cluster": {
+                    "id": "cluster_test",
+                    "name": "demo",
+                }
+            },
+        }
+        job = {
+            "id": "job_orphaned",
+            "type": "run_step",
+            "cluster_id": "cluster_test",
+            "status": "running",
+            "step": "started",
+            "payload": payload,
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "started_at": "2026-01-01T00:00:01Z",
+            "finished_at": None,
+            "result": None,
+            "error": None,
+        }
+        (data / "jobs" / "job_orphaned.json").write_text(json.dumps(job))
+        (data / "queue" / "running" / "job_orphaned.json").write_text(json.dumps({
+            "id": "job_orphaned",
+            "type": "run_step",
+            "cluster_id": "cluster_test",
+            "payload": payload,
+            "queued_at": "2026-01-01T00:00:00Z",
+        }))
+
+        env = os.environ.copy()
+        env["MANAGER_DATA_DIR"] = str(data)
+        env["WORKSPACE_ROOT"] = str(workspace)
+        env["WORKER_POLL_MS"] = "100"
+        env["KUBECTL_VERSION"] = "v1.30.0"
+        env["HELM_VERSION"] = "v3.15.4"
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+        env["TWINBOX_SECRET_BACKEND"] = "env"
+        env["PROXMOX_HOST"] = "192.168.1.10"
+        env["PROXMOX_PORT"] = "8006"
+        env["PROXMOX_USER"] = "root@pam"
+        env["PROXMOX_PASSWORD"] = "super-secret"
+
+        proc = subprocess.Popen(
+            ["node", "manager-worker/src/worker.js"],
+            cwd=Path(__file__).resolve().parents[2],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        try:
+            _wait_until(lambda: (data / "queue" / "completed" / "job_orphaned.json").exists())
+
+            updated_job = json.loads((data / "jobs" / "job_orphaned.json").read_text())
+            assert updated_job["status"] == "failed"
+            assert updated_job["step"] == "failed"
+            assert updated_job["error"] == "worker restarted while job was running"
+
+            step_state = json.loads(_cluster_step_state(data, "cluster_test", "provision-nodes").read_text())
+            assert step_state["status"] == "failed"
+            assert step_state["cluster_id"] == "cluster_test"
+            assert step_state["error"] == "worker restarted while job was running"
+            assert step_state["last_job_id"] == "job_orphaned"
+
+            log_text = (data / "logs" / "job_orphaned.log").read_text()
+            assert "job failed: worker restarted while job was running" in log_text
         finally:
             proc.terminate()
             proc.wait(timeout=5)
@@ -423,7 +533,7 @@ def test_worker_processes_run_step_config_job_and_persists_outputs():
             updated_job = json.loads((data / "jobs" / "job_config.json").read_text())
             assert updated_job["status"] == "succeeded"
 
-            step_state = json.loads((data / "step-state" / "configure-automatic-updates.json").read_text())
+            step_state = json.loads(_global_step_state(data, "configure-automatic-updates").read_text())
             assert step_state["status"] == "configured"
             assert step_state["inputs"]["enabled"] is True
             assert step_state["outputs"] == {"applied": True}
@@ -526,7 +636,7 @@ def test_worker_processes_run_step_action_job_and_records_cluster_context():
             updated_job = json.loads((data / "jobs" / "job_action.json").read_text())
             assert updated_job["status"] == "succeeded"
 
-            step_state = json.loads((data / "step-state" / "provision-nodes.json").read_text())
+            step_state = json.loads(_cluster_step_state(data, "cluster_test", "provision-nodes").read_text())
             assert step_state["status"] == "succeeded"
             assert step_state["cluster_id"] == "cluster_test"
             assert step_state["outputs"] == {"cluster_id": "cluster_test"}
@@ -616,7 +726,7 @@ def test_worker_marks_run_step_job_failed_when_script_fails():
             assert updated_job["status"] == "failed"
             assert updated_job["error"] == "command exited with code 42: boom"
 
-            step_state = json.loads((data / "step-state" / "configure-automatic-updates.json").read_text())
+            step_state = json.loads(_global_step_state(data, "configure-automatic-updates").read_text())
             assert step_state["status"] == "failed"
             assert step_state["error"] == "command exited with code 42: boom"
         finally:
@@ -712,7 +822,7 @@ def test_worker_includes_recent_script_output_in_failed_run_step_error():
             assert "command exited with code 7" in updated_job["error"]
             assert "second failure line" in updated_job["error"]
 
-            step_state = json.loads((data / "step-state" / "configure-automatic-updates.json").read_text())
+            step_state = json.loads(_global_step_state(data, "configure-automatic-updates").read_text())
             assert step_state["status"] == "failed"
             assert "second failure line" in step_state["error"]
         finally:

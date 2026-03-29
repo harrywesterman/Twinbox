@@ -21,19 +21,24 @@ import {
   writeJson,
 } from "./lib/common.js";
 import { queueJob } from "./lib/jobs.js";
-import { createSecretBroker } from "../../lib/secrets/broker.mjs";
 import {
   buildProxmoxApiSecretBundle,
   normalizeSecretBaseRef,
   normalizeSecretBundle,
 } from "../../lib/secrets/schema.mjs";
+import {
+  readItemRecord,
+  resolveAttachmentPath,
+  secretRoot,
+  clusterSecretDir,
+  itemPrefix,
+} from "../../lib/secrets/filesystem-store.mjs";
 
 const app = express();
 const port = Number(process.env.MANAGER_API_PORT || 8080);
 const dataRoot = process.env.MANAGER_DATA_DIR || "/data";
 const workspaceRoot = process.env.WORKSPACE_ROOT || process.cwd();
 const dirs = buildDataDirs(dataRoot);
-const secretBroker = createSecretBroker(process.env);
 
 Object.values(dirs).forEach((dir) => ensureDir(dir));
 
@@ -136,8 +141,239 @@ function resolveRequestedCluster(clusterId) {
   return { ok: true, cluster: readJson(clusterFile) };
 }
 
+function buildSecretItemName(ref, context = {}) {
+  const prefix = itemPrefix(process.env);
+  if (ref?.scope === "cluster") {
+    const clusterId = ref?.cluster_id || context.clusterId || context.cluster_id;
+    return `${prefix}/cluster/${clusterId}/${ref.item}`;
+  }
+  return `${prefix}/${ref?.scope || "global"}/${ref?.item || ""}`;
+}
+
+function trimString(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function resolveFieldValue(record, ref) {
+  if (!record || typeof record !== "object") {
+    return "";
+  }
+
+  const aliases = {
+    proxmox: {
+      host: ["host"],
+      port: ["port"],
+      username: ["username", "user"],
+      password: ["password"],
+      endpoint: ["endpoint"],
+    },
+    "wiredoor-gateway": {
+      WIREDOOR_URL: ["WIREDOOR_URL", "username", "url"],
+      TOKEN: ["TOKEN", "password", "token"],
+      username: ["WIREDOOR_URL", "username", "url"],
+      password: ["TOKEN", "password", "token"],
+    },
+    grafana: {
+      "admin-user": ["admin-user", "username"],
+      "admin-password": ["admin-password", "password"],
+    },
+    "traefik-dashboard": {
+      username: ["username"],
+      password: ["password"],
+      users: ["users"],
+    },
+  };
+
+  const fieldAliases = aliases[ref.item]?.[ref.field] || [ref.field];
+  for (const key of fieldAliases) {
+    const value = record[key];
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      return String(value);
+    }
+  }
+  return "";
+}
+
+function envFallbackRecord(ref) {
+  if (ref.scope !== "global" || ref.item !== "proxmox") {
+    return null;
+  }
+
+  const host = trimString(process.env.PROXMOX_HOST);
+  const port = trimString(process.env.PROXMOX_PORT);
+  const username = trimString(process.env.PROXMOX_USER || process.env.PROXMOX_USERNAME);
+  const password = trimString(process.env.PROXMOX_PASSWORD || process.env.TF_VAR_proxmox_password);
+  const endpoint = trimString(
+    process.env.TF_VAR_proxmox_endpoint
+    || (host && port ? `https://${host}:${port}` : ""),
+  );
+
+  const record = {};
+  if (host) record.host = host;
+  if (port) record.port = port;
+  if (username) record.username = username;
+  if (password) record.password = password;
+  if (endpoint) record.endpoint = endpoint;
+
+  return Object.keys(record).length > 0 ? record : null;
+}
+
+function readSecretRecord(ref, context = {}) {
+  return readItemRecord(process.env, ref, context) || envFallbackRecord(ref);
+}
+
+function resolveTextRef(rawRef, context = {}) {
+  const ref = rawRef;
+  const record = readSecretRecord(ref, context);
+  const value = resolveFieldValue(record, ref);
+
+  if (!value) {
+    throw new Error(`secret field not found: ${ref.field} on ${ref.item}`);
+  }
+
+  return value;
+}
+
+function materializeRef(rawRef, label, context = {}) {
+  const ref = rawRef;
+  if (ref.attachment) {
+    const attachmentPath = resolveAttachmentPath(process.env, ref, context);
+    if (!fs.existsSync(attachmentPath)) {
+      throw new Error(`secret attachment not found: ${attachmentPath}`);
+    }
+    return attachmentPath;
+  }
+
+  const value = resolveTextRef(ref, context);
+  const tempRoot = process.env.TWINBOX_SECRET_TEMP_DIR || path.join(process.env.MANAGER_DATA_DIR || "/tmp", "twinbox-secrets");
+  fs.mkdirSync(tempRoot, { recursive: true, mode: 0o700 });
+  const targetDir = fs.mkdtempSync(path.join(tempRoot, `${String(label || "secret").replace(/[^a-zA-Z0-9_.-]+/g, "-")}-`));
+  const targetFile = path.join(targetDir, "value");
+  fs.writeFileSync(targetFile, value, { mode: 0o600 });
+  return targetFile;
+}
+
+function resolveSecretBundle(bundleSpec = {}, context = {}) {
+  const bundle = normalizeSecretBundle(bundleSpec);
+  const env = {};
+  const files = {};
+  const redactions = [];
+  const cleanupDirs = new Set();
+
+  for (const [name, ref] of Object.entries(bundle.env)) {
+    try {
+      const fileLike = ref.format === "file" || ref.attachment;
+      if (fileLike) {
+        const filePath = materializeRef(ref, name, context);
+        env[name] = filePath;
+        files[name] = filePath;
+        if (!ref.attachment) {
+          cleanupDirs.add(path.dirname(filePath));
+        }
+        continue;
+      }
+
+      const value = resolveTextRef(ref, context);
+      env[name] = value;
+      if (name.includes("PASSWORD") || ref.field === "password") {
+        redactions.push(value);
+      }
+    } catch (error) {
+      if (ref.optional) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  for (const [name, ref] of Object.entries(bundle.files)) {
+    try {
+      const filePath = materializeRef(ref, name, context);
+      env[name] = filePath;
+      files[name] = filePath;
+      if (!ref.attachment) {
+        cleanupDirs.add(path.dirname(filePath));
+      }
+    } catch (error) {
+      if (ref.optional) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  return {
+    env,
+    files,
+    redactions,
+    cleanup() {
+      for (const dir of cleanupDirs) {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  };
+}
+
+function listAttachmentNames(ref, context = {}) {
+  const scope = String(ref?.scope || "global");
+  const item = String(ref?.item || "");
+  if (!item) {
+    return [];
+  }
+
+  const dir = scope === "cluster"
+    ? clusterSecretDir(process.env, ref?.cluster_id || context.clusterId || context.cluster_id, item)
+    : path.join(secretRoot(process.env), "global", item);
+
+  if (!fs.existsSync(dir)) {
+    return [];
+  }
+
+  return fs.readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => entry.name)
+    .sort();
+}
+
+function buildSecretItemObject(ref, context = {}) {
+  const record = readSecretRecord(ref, context);
+  if (!record || typeof record !== "object") {
+    return null;
+  }
+
+  const login = {};
+  if (record.username !== undefined) {
+    login.username = String(record.username);
+  }
+  if (record.password !== undefined) {
+    login.password = String(record.password);
+  }
+
+  const fields = Object.entries(record)
+    .filter(([key]) => key !== "username" && key !== "password" && key !== "notes")
+    .map(([key, value]) => ({ name: key, value: String(value), type: 0 }));
+
+  const attachments = listAttachmentNames(ref, context).map((name, index) => ({
+    id: `${buildSecretItemName(ref, context)}:${name}`,
+    fileName: name,
+    name,
+    type: 0,
+    order: index,
+  }));
+
+  return {
+    id: buildSecretItemName(ref, context),
+    name: buildSecretItemName(ref, context),
+    type: 1,
+    login: Object.keys(login).length > 0 ? login : undefined,
+    notes: record.notes ? String(record.notes) : undefined,
+    fields,
+    attachments,
+  };
+}
+
 async function listUsedVmidsViaProxmoxApi() {
-  const resolved = secretBroker.resolveBundle(buildProxmoxApiSecretBundle());
+  const resolved = resolveSecretBundle(buildProxmoxApiSecretBundle());
 
   try {
     const username = resolved.env.PROXMOX_USER;
@@ -183,7 +419,7 @@ async function listUsedVmidsViaProxmoxApi() {
 }
 
 async function listClusterNodeResourcesViaProxmoxApi() {
-  const resolved = secretBroker.resolveBundle(buildProxmoxApiSecretBundle());
+  const resolved = resolveSecretBundle(buildProxmoxApiSecretBundle());
 
   try {
     const username = resolved.env.PROXMOX_USER;
@@ -223,7 +459,7 @@ async function listClusterNodeResourcesViaProxmoxApi() {
 }
 
 async function listClusterVmResourcesViaProxmoxApi() {
-  const resolved = secretBroker.resolveBundle(buildProxmoxApiSecretBundle());
+  const resolved = resolveSecretBundle(buildProxmoxApiSecretBundle());
 
   try {
     const username = resolved.env.PROXMOX_USER;
@@ -685,22 +921,27 @@ async function validateRequestedAllocation({ startVmid, vipIp, startIp, nodeCoun
   return { ok: true };
 }
 
-function readStepState(stepId) {
-  const file = path.join(dirs.stepState, `${stepId}.json`);
+function stepStatePath(stepId, clusterId = null) {
+  const scope = clusterId ? path.join("clusters", clusterId) : "global";
+  return path.join(dirs.stepState, scope, `${stepId}.json`);
+}
+
+function readStepState(stepId, clusterId = null) {
+  const file = stepStatePath(stepId, clusterId);
   if (!fs.existsSync(file)) {
     return null;
   }
   return readJson(file);
 }
 
-function writeStepState(stepId, patch) {
-  const file = path.join(dirs.stepState, `${stepId}.json`);
-  const current = readStepState(stepId) || {
+function writeStepState(stepId, patch, clusterId = null) {
+  const file = stepStatePath(stepId, clusterId);
+  const current = readStepState(stepId, clusterId) || {
     step_id: stepId,
     status: "not_started",
     inputs: {},
     outputs: null,
-    cluster_id: null,
+    cluster_id: clusterId || null,
     error: null,
     last_job_id: null,
     created_at: now(),
@@ -710,6 +951,7 @@ function writeStepState(stepId, patch) {
     ...current,
     ...patch,
     step_id: stepId,
+    cluster_id: patch.cluster_id ?? current.cluster_id ?? clusterId ?? null,
     updated_at: now(),
   };
   writeJson(file, next);
@@ -755,35 +997,6 @@ function parseSecretKeyPath(secretKeyPath) {
   });
 }
 
-function resolveSecretValue(item, source, property) {
-  const resolvedSource = String(source || "login").trim() || "login";
-  const resolvedProperty = String(property || "").trim();
-
-  if (!resolvedProperty) {
-    throw new Error("secret property is required");
-  }
-
-  if (resolvedSource === "login") {
-    const value = item?.login?.[resolvedProperty];
-    if (typeof value !== "string" || !value.trim()) {
-      throw new Error(`secret login property ${resolvedProperty} is not available`);
-    }
-    return value;
-  }
-
-  if (resolvedSource === "field") {
-    const fields = Array.isArray(item?.fields) ? item.fields : [];
-    const match = fields.find((field) => String(field?.name || "").trim() === resolvedProperty);
-    const value = match?.value;
-    if (typeof value !== "string" || !value.trim()) {
-      throw new Error(`secret field ${resolvedProperty} is not available`);
-    }
-    return value;
-  }
-
-  throw new Error(`unsupported secret source ${resolvedSource}`);
-}
-
 app.get("/api/health", (_, res) => {
   res.json({ ok: true, time: now() });
 });
@@ -793,28 +1006,14 @@ app.get("/api/secrets/*", (req, res) => {
 
   try {
     const ref = parseSecretKeyPath(secretKeyPath);
-    const item = secretBroker.getItem(ref);
+    const item = buildSecretItemObject(ref);
+    if (!item) {
+      throw new Error(`secret item not found: ${ref.item}`);
+    }
     return res.json({ data: item });
   } catch (error) {
     const message = error instanceof Error ? error.message : "failed to resolve secret";
     const status = message.includes("not found") ? 404 : 400;
-    return res.status(status).json({ error: message });
-  }
-});
-
-app.get("/api/secret-values/*", (req, res) => {
-  const secretKeyPath = decodeURIComponent(String(req.path || "").split("/api/secret-values/")[1] || "");
-  const source = pickFirstString(req.query.source) || "login";
-  const property = pickFirstString(req.query.property);
-
-  try {
-    const ref = parseSecretKeyPath(secretKeyPath);
-    const item = secretBroker.getItem(ref);
-    const value = resolveSecretValue(item, source, property);
-    return res.json({ value });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "failed to resolve secret value";
-    const status = message.includes("not found") || message.includes("not available") ? 404 : 400;
     return res.status(status).json({ error: message });
   }
 });
@@ -1018,7 +1217,7 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
     error: null,
     last_job_id: job.id,
     cluster_id: clusterId,
-  });
+  }, step.category_id === "talos-cluster" ? clusterId : null);
 
   return res.status(202).json({
     step_id: step.id,

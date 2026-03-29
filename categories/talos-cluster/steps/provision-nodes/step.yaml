@@ -3,7 +3,7 @@ title: Deploy Talos Cluster
 type: action
 order: 10
 summary: Scale the Proxmox VM footprint, discover DHCP addresses, apply Talos, bootstrap the control plane, and materialize kubeconfig at runtime.
-explanation: Twinbox renders a per-cluster OpenTofu workspace, downloads the Talos image on demand, lets you size the VM footprint first, then land the VMs on Proxmox hosts, discovers the DHCP addresses, applies Talos machine configs, bootstraps the first control plane, and materializes the resulting Talos access files from Vaultwarden-backed refs.
+explanation: Twinbox renders a per-cluster OpenTofu workspace, downloads the Talos image on demand, lets you size the VM footprint first, then lands the VMs on Proxmox hosts, discovers the DHCP addresses, applies Talos machine configs, bootstraps the first control plane, and materializes the resulting Talos access files from the management-local bootstrap secret tree.
 side_help: The Management VM keeps the OpenTofu state, rendered variables, outputs, and secret refs for this cluster. The scale slider defaults to 30 percent, manual overrides stay editable, and VM landing happens after sizing. Talos access files are runtime artifacts only.
 depends_on: []
 inputs:
