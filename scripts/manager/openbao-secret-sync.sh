@@ -23,7 +23,7 @@ PINNED_EXTERNAL_SECRETS_CHART_VERSION="${PINNED_EXTERNAL_SECRETS_CHART_VERSION:-
 PINNED_OPENBAO_CHART_VERSION="${PINNED_OPENBAO_CHART_VERSION:-0.26.2}"
 
 openbao_log() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >&2
 }
 
 openbao_fail() {
@@ -124,9 +124,21 @@ openbao_ensure_namespace() {
 }
 
 openbao_seed_release_secret() {
+  local seal_key_source="$OPENBAO_SEAL_KEY_FILE"
+  local normalized tmp_key_file
+  normalized="$(tr -d '[:space:]' <"$OPENBAO_SEAL_KEY_FILE" | tr '[:upper:]' '[:lower:]')"
+
+  if [[ "$normalized" =~ ^[0-9a-f]{64}$ ]]; then
+    tmp_key_file="$(mktemp "${TMPDIR:-/tmp}/openbao-seal-key.XXXXXX.bin")"
+    trap 'rm -f "$tmp_key_file"' RETURN
+    printf '%b' "$(printf '%s' "$normalized" | sed 's/../\\x&/g')" >"$tmp_key_file"
+    chmod 0600 "$tmp_key_file"
+    seal_key_source="$tmp_key_file"
+  fi
+
   kubectl create secret generic openbao-static-seal \
     --namespace "$OPENBAO_NAMESPACE" \
-    --from-file=current.key="$OPENBAO_SEAL_KEY_FILE" \
+    --from-file=current.key="$seal_key_source" \
     --from-file=current-key-id="$OPENBAO_SEAL_KEY_ID_FILE" \
     --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 }
@@ -156,8 +168,6 @@ openbao_render_values_file() {
   values_file="$(mktemp "${TMPDIR:-/tmp}/openbao-values.XXXXXX.yaml")"
   local seal_key_id
   seal_key_id="$(tr -d '\r\n' <"$OPENBAO_SEAL_KEY_ID_FILE")"
-  local seal_key_hex
-  seal_key_hex="$(od -An -tx1 -v "$OPENBAO_SEAL_KEY_FILE" | tr -d ' \n')"
   local replicas="${OPENBAO_REPLICAS:-1}"
 
   cat >"$values_file" <<EOF
@@ -183,7 +193,6 @@ server:
       setNodeId: true
       config: |
         ui = false
-        disable_mlock = true
 
         listener "tcp" {
           tls_disable = 1
@@ -197,7 +206,7 @@ server:
 
         seal "static" {
           current_key_id = "${seal_key_id}"
-          current_key = "${seal_key_hex}"
+          current_key = "file:///openbao/secrets/current.key"
         }
 
         service_registration "kubernetes" {}
@@ -283,20 +292,24 @@ openbao_wait_for_server_pod() {
     pod="$(
       kubectl get pod -n "$OPENBAO_NAMESPACE" \
         -l app.kubernetes.io/instance=openbao,app.kubernetes.io/name=openbao \
-        -o jsonpath='{range .items[?(@.status.phase=="Running")]}{.metadata.name}{"\n"}{end}' \
-        2>/dev/null | head -n 1
+        -o json 2>/dev/null | jq -r '
+          .items[]
+          | select(.status.phase == "Running")
+          | select(any(.status.containerStatuses[]?; .name == "openbao" and .state.running != null))
+          | .metadata.name
+        ' | head -n 1
     )"
     if [[ -n "$pod" ]]; then
       printf '%s\n' "$pod"
       return 0
     fi
 
-    openbao_log "Waiting for OpenBao pod to reach Running"
+    openbao_log "Waiting for OpenBao pod to start running"
     sleep 5
     attempt=$((attempt + 1))
   done
 
-  openbao_fail "OpenBao pod never reached Running"
+  openbao_fail "OpenBao pod never started running"
 }
 
 openbao_exec() {

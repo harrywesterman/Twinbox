@@ -708,16 +708,7 @@ generate_talos_configs() {
 apply_node_config() {
   local ip="$1"
   local config_file="$2"
-  log "Applying Talos config to ${ip}"
-  if talosctl apply-config \
-    --nodes "$ip" \
-    --endpoints "$ip" \
-    --talosconfig "$talosconfig_file" \
-    --file "$config_file"; then
-    return 0
-  fi
-
-  log "Secure Talos apply failed for ${ip}; retrying with --insecure"
+  log "Applying Talos config to ${ip} with --insecure"
   talosctl apply-config \
     --insecure \
     --nodes "$ip" \

@@ -2,7 +2,7 @@ id: install-argocd
 title: Install Argo CD
 type: action
 journey_stage: setup
-order: 30
+order: 13
 summary: Install Argo CD and register Flannel as the first managed GitOps application.
 explanation: Twinbox installs Argo CD after the direct Flannel bootstrap, waits for the Argo CD control plane, and then applies the Flannel Application so networking is tracked by Argo CD from that point onward.
 side_help: Argo CD is bootstrap-only for itself, but it immediately takes ownership of Flannel so the rest of the platform can be installed through GitOps.

@@ -2,7 +2,7 @@ id: install-secret-sync
 title: Install OpenBao and sync bootstrap secrets
 type: action
 journey_stage: setup
-order: 20
+order: 15
 summary: Install External Secrets Operator and OpenBao on Longhorn, seed the first cluster secrets, and materialize the Proxmox bootstrap Secret.
 explanation: Twinbox installs External Secrets Operator, seeds management-local bootstrap JSON into OpenBao, deploys OpenBao with static auto-unseal on Longhorn, creates a ClusterSecretStore named openbao, and applies the first ExternalSecret for the Proxmox bootstrap secret.
 side_help: OpenBao is the source of truth for cluster runtime secrets, while Kubernetes Secrets remain derived artifacts synced through External Secrets Operator.

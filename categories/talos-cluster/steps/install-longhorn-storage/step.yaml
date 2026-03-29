@@ -2,7 +2,7 @@ id: install-longhorn-storage
 title: Install Longhorn Storage
 type: action
 journey_stage: setup
-order: 15
+order: 14
 summary: Apply the Longhorn GitOps application and wait for the storage class to become available.
 explanation: Twinbox installs Longhorn through a dedicated Argo CD application after Argo CD is online. The step waits until Argo reports the application healthy and the Longhorn storage class is ready before continuing.
 side_help: Longhorn is the first stateful GitOps application after the Argo CD control plane. Secret sync and later workloads only run after Longhorn is really usable.

@@ -317,12 +317,12 @@ function findClusterById(dirs, clusterId) {
 
 export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) {
   const definitions = loadCatalogDefinitions({ workspaceRoot });
-  const completedDependencies = new Set();
   const currentCluster = clusterId ? findClusterById(dirs, clusterId) : findCurrentCluster(dirs);
   const activeClusterId = currentCluster?.id || null;
+  const stepStateById = new Map();
 
-  const categories = definitions.categories.map((category) => {
-    const steps = category.steps.map((step) => {
+  for (const category of definitions.categories) {
+    for (const step of category.steps) {
       const isClusterScopedStep = step.category_id === "talos-cluster";
       const scopedClusterId = isClusterScopedStep ? activeClusterId : null;
       const rawState = readStepState(dirs, step.id, scopedClusterId);
@@ -330,11 +330,23 @@ export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) 
       const latestJob = state?.last_job_id
         ? readJsonIfExists(path.join(dirs.jobs, `${state.last_job_id}.json`))
         : null;
-      const status = deriveStepStatus(step, state, latestJob, completedDependencies);
+      stepStateById.set(step.id, { state, latestJob });
+    }
+  }
 
-      if (status === "done") {
-        completedDependencies.add(step.id);
-      }
+  const completedDependencies = new Set(
+    Array.from(stepStateById.entries())
+      .filter(([stepId, { state }]) => {
+        const step = definitions.stepsById.get(stepId);
+        return step && isDone(step, state);
+      })
+      .map(([stepId]) => stepId),
+  );
+
+  const categories = definitions.categories.map((category) => {
+    const steps = category.steps.map((step) => {
+      const { state, latestJob } = stepStateById.get(step.id) || { state: null, latestJob: null };
+      const status = deriveStepStatus(step, state, latestJob, completedDependencies);
 
       return {
         id: step.id,
