@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const appSourcePath = new URL('../src/App.jsx', import.meta.url);
+const helperSourcePath = new URL('../src/step-presentation.js', import.meta.url);
 const appStylesPath = new URL('../src/App.css', import.meta.url);
 const viteConfigPath = new URL('../vite.config.js', import.meta.url);
 const indexHtmlPath = new URL('../index.html', import.meta.url);
@@ -29,6 +30,8 @@ test('app source defines a wizard shell with export, import, and technical outpu
   assert.match(source, /LIVE OUTPUT/, 'expected a visible output panel');
   assert.match(source, /wizard-step-icon/, 'expected step icons in the rail');
   assert.match(source, /wizard-step-icon-large/, 'expected a larger icon in the active step header');
+  assert.match(source, /wizard-step-icon-artwork/, 'expected the active step icon to render image artwork');
+  assert.match(source, /iconArtworkUrl/, 'expected the active step artwork URL to be wired through');
   assert.match(source, /wizard-step-pitch/, 'expected a positive step description');
   assert.match(source, /Step resources/, 'expected external step links');
   assert.match(source, /Project/, 'expected a project link label');
@@ -36,6 +39,15 @@ test('app source defines a wizard shell with export, import, and technical outpu
   assert.match(source, /Deploy Talos Cluster/, 'expected the Talos bootstrap step label');
   assert.match(source, /CURRENT STEP/, 'expected the current step to be shown first');
   assert.doesNotMatch(source, /Explore Twinbox/, 'should no longer read like a landing page');
+});
+
+test('web helper maps real icon artwork from local assets', async () => {
+  const source = await readFile(helperSourcePath, 'utf8');
+
+  assert.match(source, /STEP_ICON_ASSETS/, 'expected a step-to-asset map for the downloaded app icons');
+  assert.match(source, /new URL\(\`\.\/assets\/step-icons\//, 'expected SVG artwork to be referenced through import.meta.url');
+  assert.match(source, /assets\/step-icons/, 'expected the icons to live inside the web repo');
+  assert.match(source, /icon_artwork_url/, 'expected the helper to expose artwork URLs to the UI');
 });
 
 test('styles define a wizard-first, responsive installer layout', async () => {

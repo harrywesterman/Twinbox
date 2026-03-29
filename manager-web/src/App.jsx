@@ -239,6 +239,7 @@ function getDisplayStepTitle(step) {
 function getStepPresentation(step) {
   return {
     icon: step?.icon || '🚀',
+    iconArtworkUrl: step?.icon_artwork_url || '',
     projectUrl: step?.project_url || '',
     githubUrl: step?.github_url || '',
     positiveSummary: step?.positive_summary || step?.summary || '',
@@ -1215,8 +1216,21 @@ function App() {
                   <div className="wizard-step-header-copy">
                     <p className="eyebrow">CURRENT STEP</p>
                     <div className="wizard-step-title-row">
-                      <span className="wizard-step-icon wizard-step-icon-large" aria-hidden="true">
-                        {activeStepPresentation.icon}
+                      <span
+                        className={`wizard-step-icon wizard-step-icon-large ${activeStepPresentation.iconArtworkUrl ? 'is-artwork' : ''}`}
+                        aria-hidden="true"
+                      >
+                        {activeStepPresentation.iconArtworkUrl ? (
+                          <img
+                            className="wizard-step-icon-artwork"
+                            src={activeStepPresentation.iconArtworkUrl}
+                            alt=""
+                            loading="eager"
+                            decoding="async"
+                          />
+                        ) : (
+                          activeStepPresentation.icon
+                        )}
                       </span>
                       <h2>{activeStepTitle || 'No step selected'}</h2>
                     </div>

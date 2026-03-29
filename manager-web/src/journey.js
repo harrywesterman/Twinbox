@@ -1,4 +1,4 @@
-import { resolveStepPresentation } from '../../lib/step-presentation.mjs';
+import { resolveStepPresentation } from './step-presentation.js';
 
 export const STORAGE_KEY = 'twinbox.installation-wizard.v1';
 
@@ -626,8 +626,8 @@ export function getMissionControlModel({
     primaryAction: buildPrimaryAction(activeStep, nextStep, busy, progress.stepIndex, mode),
     activity: {
       summary: activeStep?.summary || 'Catalog data is not available yet.',
-      explanation: activeStep?.explanation || '',
-      sideHelp: activeStep?.side_help || '',
+      explanation: activeStep?.side_help || '',
+      sideHelp: activeStep?.explanation || '',
       artifacts: buildArtifacts(activeStep, cluster),
       runtime,
       events: buildEvents(runtime),
