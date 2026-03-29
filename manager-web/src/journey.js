@@ -542,11 +542,12 @@ export function toneForStatus(value) {
   return 'neutral';
 }
 
-export function serializeUiState({ selectedStepId = '', answers = {}, clusterId = '' } = {}) {
+export function serializeUiState({ selectedStepId = '', answers = {}, clusterId = '', clusterCreatedAt = '' } = {}) {
   return JSON.stringify({
     version: 1,
     selectedStepId: typeof selectedStepId === 'string' ? selectedStepId : '',
     clusterId: typeof clusterId === 'string' ? clusterId : '',
+    clusterCreatedAt: typeof clusterCreatedAt === 'string' ? clusterCreatedAt : '',
     answers: answers && typeof answers === 'object' ? answers : {},
   });
 }
@@ -573,7 +574,7 @@ export function buildWizardExportFilename({ clusterName = '', clusterId = '', da
 
 export function restoreUiState(value) {
   if (!value) {
-    return { selectedStepId: '', clusterId: '', answers: {} };
+    return { selectedStepId: '', clusterId: '', clusterCreatedAt: '', answers: {} };
   }
 
   try {
@@ -581,10 +582,11 @@ export function restoreUiState(value) {
     return {
       selectedStepId: typeof parsed.selectedStepId === 'string' ? parsed.selectedStepId : '',
       clusterId: typeof parsed.clusterId === 'string' ? parsed.clusterId : '',
+      clusterCreatedAt: typeof parsed.clusterCreatedAt === 'string' ? parsed.clusterCreatedAt : '',
       answers: parsed.answers && typeof parsed.answers === 'object' ? parsed.answers : {},
     };
   } catch {
-    return { selectedStepId: '', clusterId: '', answers: {} };
+    return { selectedStepId: '', clusterId: '', clusterCreatedAt: '', answers: {} };
   }
 }
 

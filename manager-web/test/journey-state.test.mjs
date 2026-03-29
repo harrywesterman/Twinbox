@@ -279,6 +279,7 @@ test('wizard export and import helpers round-trip answers and cluster ids', () =
   const serialized = serializeUiState({
     selectedStepId: 'install-secret-sync',
     clusterId: 'cluster_demo',
+    clusterCreatedAt: '2026-03-30T00:00:00Z',
     answers: {
       'provision-nodes': {
         name: 'demo',
@@ -293,6 +294,7 @@ test('wizard export and import helpers round-trip answers and cluster ids', () =
   const restored = restoreUiState(serialized);
   assert.equal(restored.selectedStepId, 'install-secret-sync');
   assert.equal(restored.clusterId, 'cluster_demo');
+  assert.equal(restored.clusterCreatedAt, '2026-03-30T00:00:00Z');
   assert.equal(restored.answers['provision-nodes'].name, 'demo');
   assert.deepEqual(restored.answers['provision-nodes'].vm_node_map, {
     'cp-1': 'pve-a',
@@ -301,6 +303,7 @@ test('wizard export and import helpers round-trip answers and cluster ids', () =
   const fallback = restoreUiState('not-json');
   assert.equal(fallback.selectedStepId, '');
   assert.equal(fallback.clusterId, '');
+  assert.equal(fallback.clusterCreatedAt, '');
   assert.deepEqual(fallback.answers, {});
 });
 

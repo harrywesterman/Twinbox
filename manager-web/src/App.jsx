@@ -24,6 +24,8 @@ import {
 import {
   isMissingClusterError,
   recoverMissingClusterState,
+  recoverRecreatedClusterState,
+  shouldResetRecreatedClusterDraft,
   refreshWizardSnapshot,
 } from './catalog-refresh.js';
 
@@ -423,6 +425,7 @@ function App() {
   const liveOutputRef = useRef(null);
   const busyRef = useRef(false);
   const clusterIdRef = useRef('');
+  const clusterCreatedAtRef = useRef('');
   const selectedStepIdRef = useRef('');
   const answersRef = useRef({});
   const hydratedRef = useRef(false);
@@ -435,6 +438,7 @@ function App() {
   const [selectedStepId, setSelectedStepId] = useState('');
   const [answers, setAnswers] = useState({});
   const [clusterId, setClusterId] = useState('');
+  const [clusterCreatedAt, setClusterCreatedAt] = useState('');
   const [cluster, setCluster] = useState(null);
   const [proxmoxResources, setProxmoxResources] = useState(null);
   const [logs, setLogs] = useState([]);
@@ -449,6 +453,7 @@ function App() {
     const restored = restoreUiState(window.localStorage.getItem(STORAGE_KEY));
     setSelectedStepId(restored.selectedStepId);
     setClusterId(restored.clusterId);
+    setClusterCreatedAt(restored.clusterCreatedAt);
     setAnswers(restored.answers);
     hydratedRef.current = true;
   }, []);
@@ -462,13 +467,18 @@ function App() {
         selectedStepId,
         answers,
         clusterId,
+        clusterCreatedAt,
       }),
     );
-  }, [selectedStepId, answers, clusterId]);
+  }, [selectedStepId, answers, clusterId, clusterCreatedAt]);
 
   useEffect(() => {
     clusterIdRef.current = clusterId;
   }, [clusterId]);
+
+  useEffect(() => {
+    clusterCreatedAtRef.current = clusterCreatedAt;
+  }, [clusterCreatedAt]);
 
   useEffect(() => {
     selectedStepIdRef.current = selectedStepId;
@@ -508,6 +518,7 @@ function App() {
           requestJson,
           clusterIdRef,
           selectedStepIdRef,
+          clusterCreatedAtRef,
           answersRef,
           provisionDirtyFieldsRef,
           provisionSuggestionKeyRef,
@@ -517,6 +528,7 @@ function App() {
           setCatalog,
           setProxmoxResources,
           setClusterId,
+          setClusterCreatedAt,
           setSelectedStepId,
           setCluster,
           setLogs,
@@ -555,6 +567,38 @@ function App() {
       try {
         const data = await requestJson(`/api/clusters/${encodeURIComponent(clusterId)}`);
         if (!cancelled) {
+          const nextCreatedAt = typeof data?.created_at === 'string' ? data.created_at : '';
+          const previousCreatedAt = clusterCreatedAtRef.current || '';
+          const hasProvisionDraft = Boolean(answersRef.current && Object.prototype.hasOwnProperty.call(answersRef.current, 'provision-nodes'));
+          if (shouldResetRecreatedClusterDraft({
+            previousCreatedAt,
+            nextCreatedAt,
+            hasProvisionDraft,
+          })) {
+            recoverRecreatedClusterState({
+              setClusterCreatedAt,
+              setSelectedStepId,
+              setCluster,
+              setLogs,
+              setActiveJob,
+              setAnswers,
+              setError,
+              setNotice,
+              clusterCreatedAtRef,
+              selectedStepIdRef,
+              answersRef,
+              provisionDirtyFieldsRef,
+              provisionSuggestionKeyRef,
+              provisionSuggestionSnapshotRef,
+              placementSuggestionKeyRef,
+            });
+          }
+
+          if (nextCreatedAt && nextCreatedAt !== clusterCreatedAtRef.current) {
+            clusterCreatedAtRef.current = nextCreatedAt;
+            setClusterCreatedAt(nextCreatedAt);
+          }
+
           setCluster(data);
         }
       } catch (error) {
@@ -565,6 +609,7 @@ function App() {
         if (isMissingClusterError(error)) {
           recoverMissingClusterState({
             setClusterId,
+            setClusterCreatedAt,
             setSelectedStepId,
             setCluster,
             setLogs,
@@ -573,6 +618,7 @@ function App() {
             setError,
             setNotice,
             clusterIdRef,
+            clusterCreatedAtRef,
             selectedStepIdRef,
             answersRef,
             provisionDirtyFieldsRef,
@@ -744,6 +790,7 @@ function App() {
         requestJson,
         clusterIdRef,
         selectedStepIdRef,
+        clusterCreatedAtRef,
         answersRef,
         provisionDirtyFieldsRef,
         provisionSuggestionKeyRef,
@@ -753,6 +800,7 @@ function App() {
         setCatalog,
         setProxmoxResources,
         setClusterId,
+        setClusterCreatedAt,
         setSelectedStepId,
         setCluster,
         setLogs,

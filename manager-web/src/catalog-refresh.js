@@ -2,6 +2,7 @@ import { getWizardSteps } from './journey.js';
 
 const PROVISION_STEP_ID = 'provision-nodes';
 const MISSING_CLUSTER_NOTICE = 'The selected cluster was not found. Twinbox discarded the old step 1 draft and restarted the wizard at step 1.';
+const RECREATED_CLUSTER_NOTICE = 'Twinbox detected a new cluster session and reset the old step 1 draft.';
 
 export function isMissingClusterError(error) {
   if (!error || typeof error !== 'object') {
@@ -15,6 +16,18 @@ export function isMissingClusterError(error) {
 
   const message = String(error.message || error.body?.error || error.body || '');
   return /cluster not found/i.test(message);
+}
+
+export function shouldResetRecreatedClusterDraft({
+  previousCreatedAt = '',
+  nextCreatedAt = '',
+  hasProvisionDraft = false,
+} = {}) {
+  if (!hasProvisionDraft || !nextCreatedAt) {
+    return false;
+  }
+
+  return !previousCreatedAt || nextCreatedAt !== previousCreatedAt;
 }
 
 function pickStepId(steps, preferredStepId) {
@@ -38,8 +51,9 @@ function discoverClusterId(catalog) {
   return '';
 }
 
-function clearMissingClusterState({
+function clearStaleClusterState({
   setClusterId,
+  setClusterCreatedAt,
   setSelectedStepId,
   setCluster,
   setLogs,
@@ -49,20 +63,26 @@ function clearMissingClusterState({
   setNotice,
   clusterIdRef,
   selectedStepIdRef,
+  clusterCreatedAtRef,
   answersRef,
   provisionDirtyFieldsRef,
   provisionSuggestionKeyRef,
   provisionSuggestionSnapshotRef,
   placementSuggestionKeyRef,
   notice = MISSING_CLUSTER_NOTICE,
+  clearClusterId = true,
+  clearClusterCreatedAt = true,
 }) {
   const currentAnswers = answersRef?.current && typeof answersRef.current === 'object'
     ? answersRef.current
     : {};
   const hasProvisionDraft = Object.prototype.hasOwnProperty.call(currentAnswers, PROVISION_STEP_ID);
 
-  if (clusterIdRef) {
+  if (clearClusterId && clusterIdRef) {
     clusterIdRef.current = '';
+  }
+  if (clearClusterCreatedAt && clusterCreatedAtRef) {
+    clusterCreatedAtRef.current = '';
   }
   if (selectedStepIdRef) {
     selectedStepIdRef.current = '';
@@ -87,7 +107,12 @@ function clearMissingClusterState({
     placementSuggestionKeyRef.current = '';
   }
 
-  setClusterId?.('');
+  if (clearClusterId) {
+    setClusterId?.('');
+  }
+  if (clearClusterCreatedAt) {
+    setClusterCreatedAt?.('');
+  }
   setSelectedStepId?.('');
   setCluster?.(null);
   setLogs?.([]);
@@ -100,7 +125,16 @@ function clearMissingClusterState({
 }
 
 export function recoverMissingClusterState(options = {}) {
-  clearMissingClusterState(options);
+  clearStaleClusterState(options);
+}
+
+export function recoverRecreatedClusterState(options = {}) {
+  clearStaleClusterState({
+    ...options,
+    notice: RECREATED_CLUSTER_NOTICE,
+    clearClusterId: false,
+    clearClusterCreatedAt: false,
+  });
 }
 
 export async function refreshWizardSnapshot({
@@ -111,6 +145,7 @@ export async function refreshWizardSnapshot({
   setCatalog,
   setProxmoxResources,
   setClusterId,
+  setClusterCreatedAt,
   setSelectedStepId,
   setCluster,
   setLogs,
@@ -123,6 +158,7 @@ export async function refreshWizardSnapshot({
   provisionSuggestionKeyRef,
   provisionSuggestionSnapshotRef,
   placementSuggestionKeyRef,
+  clusterCreatedAtRef,
   clusterIdOverride = '',
   clearError = true,
 }) {
@@ -153,8 +189,9 @@ export async function refreshWizardSnapshot({
   if (catalogData.status === 'fulfilled') {
     catalogValue = catalogData.value;
   } else if (isMissingClusterError(catalogData.reason)) {
-    clearMissingClusterState({
+    clearStaleClusterState({
       setClusterId,
+      setClusterCreatedAt,
       setSelectedStepId,
       setCluster,
       setLogs,
@@ -164,6 +201,7 @@ export async function refreshWizardSnapshot({
       setNotice,
       clusterIdRef,
       selectedStepIdRef,
+      clusterCreatedAtRef,
       answersRef,
       provisionDirtyFieldsRef,
       provisionSuggestionKeyRef,
