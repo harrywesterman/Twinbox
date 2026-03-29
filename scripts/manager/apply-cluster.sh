@@ -839,10 +839,20 @@ planned_controlplane_ips_json="$(node_array "ip" "controlplane")"
 planned_worker_ips_json="$(node_array "ip" "worker")"
 controlplane_vm_ids_json="$(node_array "vmid" "controlplane")"
 worker_vm_ids_json="$(node_array "vmid" "worker")"
-vm_node_map_json="$(normalize_json_object "${VM_NODE_MAP:-{}}")"
+raw_vm_node_map="${VM_NODE_MAP:-}"
+
+if [[ -z "$raw_vm_node_map" ]]; then
+  fail "Missing vm_node_map for cluster ${CLUSTER_ID}; pass --vm-node-map from the current run"
+fi
+
+if ! jq -e . >/dev/null 2>&1 <<<"$raw_vm_node_map"; then
+  fail "vm_node_map for cluster ${CLUSTER_ID} is not valid JSON: ${raw_vm_node_map}"
+fi
+
+vm_node_map_json="$(normalize_json_object "$raw_vm_node_map")"
 
 if [[ "$(jq -r 'length' <<<"$vm_node_map_json")" -eq 0 ]]; then
-  fail "Unable to resolve vm_node_map for cluster ${CLUSTER_ID}; pass --vm-node-map from the current run"
+  fail "vm_node_map for cluster ${CLUSTER_ID} is empty; pass a non-empty --vm-node-map from the current run"
 fi
 validate_vm_node_map
 log_vm_node_map

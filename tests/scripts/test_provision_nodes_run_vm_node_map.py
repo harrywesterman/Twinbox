@@ -34,6 +34,7 @@ def test_provision_nodes_uses_current_step_context_vm_node_map():
         fake_apply.write_text(
             "#!/bin/bash\n"
             "set -euo pipefail\n"
+            "printf 'VM_NODE_MAP=%s\\n' \"${VM_NODE_MAP:-}\" >> \"$MANAGER_DATA_DIR/captured-env.txt\"\n"
             "printf '%s\\n' \"$@\" > \"$MANAGER_DATA_DIR/captured-args.txt\"\n",
             encoding="utf-8",
         )
@@ -84,6 +85,8 @@ def test_provision_nodes_uses_current_step_context_vm_node_map():
 
         assert proc.returncode == 0, proc.stderr
         assert capture_file.exists()
+        env_capture = (data_dir / "captured-env.txt").read_text(encoding="utf-8")
+        assert 'VM_NODE_MAP={"cp-1":"new-a","cp-2":"new-b","worker-1":"new-c"}' in env_capture
 
         args = capture_file.read_text(encoding="utf-8").splitlines()
         assert "--vm-node-map" in args

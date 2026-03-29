@@ -265,10 +265,12 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'proxmox_password: $proxmox_password' not in text
     assert 'normalize_json_object()' in text
     assert 'cluster_file="$clusters_dir/${CLUSTER_ID}.json"' in text
-    assert 'vm_node_map_json="$(normalize_json_object "${VM_NODE_MAP:-{}}")"' in text
-    assert 'if [[ "$(jq -r \'length\' <<<"$vm_node_map_json")" -eq 0 ]]; then' in text
+    assert 'raw_vm_node_map="${VM_NODE_MAP:-}"' in text
+    assert 'Missing vm_node_map for cluster ${CLUSTER_ID}; pass --vm-node-map from the current run' in text
+    assert 'vm_node_map for cluster ${CLUSTER_ID} is not valid JSON:' in text
+    assert 'vm_node_map_json="$(normalize_json_object "$raw_vm_node_map")"' in text
+    assert 'vm_node_map for cluster ${CLUSTER_ID} is empty; pass a non-empty --vm-node-map from the current run' in text
     assert 'Loaded vm_node_map from persisted cluster file ${cluster_file}' not in text
-    assert 'Unable to resolve vm_node_map for cluster ${CLUSTER_ID}; pass --vm-node-map from the current run' in text
     assert 'validate_vm_node_map' in text
     assert 'log "Talos placement ${name} -> ${host}"' in text
     assert '--argjson vm_node_map "$vm_node_map_json"' in text
@@ -377,6 +379,7 @@ def test_provision_nodes_step_returns_refs_not_kubeconfig_paths():
     assert 'secret_refs: .metadata.secret_refs' in text
     assert 'kubeconfig_path' not in text
     assert 'Using ${effective_vm_node_map_source} vm_node_map:' in text
+    assert 'VM_NODE_MAP="$effective_vm_node_map" bash scripts/manager/apply-cluster.sh \\' in text
     assert '--vm-node-map "$effective_vm_node_map"' in text
 
 

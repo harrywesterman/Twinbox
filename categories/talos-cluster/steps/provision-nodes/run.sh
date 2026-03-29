@@ -23,7 +23,7 @@ fi
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Using ${effective_vm_node_map_source} vm_node_map: $(printf '%s' "$effective_vm_node_map" | jq -c '.')" >&2
 
-bash scripts/manager/apply-cluster.sh \
+VM_NODE_MAP="$effective_vm_node_map" bash scripts/manager/apply-cluster.sh \
   --cluster-id "$cluster_id" \
   --name "$(printf '%s' "$cluster_json" | jq -r '.name')" \
   --controlplane-count "$(printf '%s' "$cluster_json" | jq -r '.controlplane_count')" \
