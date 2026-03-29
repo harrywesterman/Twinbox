@@ -1,8 +1,8 @@
 id: install-authentik-idp
-title: Install Authentik IDP
+title: Install Authentik
 type: action
 journey_stage: setup
-order: 50
+order: 7
 summary: Placeholder step for the identity provider phase.
 explanation: This wizard step is reserved for future Authentik installation work and does not run a real cluster action yet.
 side_help: Identity services are surfaced as their own setup step so the installation flow can stay linear.

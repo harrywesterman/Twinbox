@@ -41,6 +41,7 @@ function makeStep(id, title, {
 
 function buildCatalog(stepStatuses = {}) {
   const setupSteps = [
+    ['install-authentik-idp', 'Install Authentik', { dependsOn: ['install-longhorn-storage'] }],
     ['provision-nodes', 'Deploy Talos Cluster', { status: 'ready', dependsOn: [] }],
     ['install-flannel', 'Install Flannel', { dependsOn: ['provision-nodes'] }],
     ['install-argocd', 'Install Argo CD', { dependsOn: ['install-flannel'] }],
@@ -51,7 +52,6 @@ function buildCatalog(stepStatuses = {}) {
     ['install-headlamp', 'Install Headlamp', { dependsOn: ['install-whoami'] }],
     ['install-grafana', 'Install Grafana', { dependsOn: ['install-headlamp'] }],
     ['install-wiredoor-gateway', 'Install Wiredoor gateway', { dependsOn: ['install-grafana'] }],
-    ['install-authentik-idp', 'Install Authentik IDP', { dependsOn: ['install-longhorn-storage'] }],
     ['create-users-and-groups', 'Create Users and Groups', { dependsOn: ['install-authentik-idp'] }],
     ['configure-cloudflare-dns', 'Configure Cloudflare DNS', { dependsOn: ['create-users-and-groups'] }],
     ['install-homepage-dashboard', 'Install Homepage dashboard', { dependsOn: ['install-wiredoor-gateway'] }],
@@ -105,23 +105,23 @@ function buildCatalog(stepStatuses = {}) {
 
 test('wizard model exposes a linear setup rail and guided actions', () => {
   const model = getMissionControlModel({
-    catalog: buildCatalog({ 'provision-nodes': 'ready' }),
+    catalog: buildCatalog({ 'install-authentik-idp': 'ready' }),
     logs: [{ line: '[2026-03-20T10:10:00Z] Applying OpenTofu cluster plan' }],
     cluster: null,
     health: { ok: true },
     error: '',
     busy: false,
-    selectedStepId: 'provision-nodes',
+    selectedStepId: 'install-authentik-idp',
   });
 
   assert.equal(model.mode, 'setup');
   assert.equal(model.stepRail.length, 28);
-  assert.equal(model.stepRail[0].title, 'Deploy Talos Cluster');
+  assert.equal(model.stepRail[0].title, 'Install Authentik');
   assert.equal(model.stepRail[0].isCurrent, true);
-  assert.equal(model.stepRail[0].icon, '🖥️');
-  assert.equal(model.stepRail[0].project_url, 'https://www.talos.dev/');
-  assert.equal(model.stepRail[0].github_url, 'https://github.com/siderolabs/talos');
-  assert.match(model.stepRail[0].positive_summary, /Twinbox stages/);
+  assert.equal(model.stepRail[0].icon, '🪪');
+  assert.equal(model.stepRail[0].project_url, 'https://goauthentik.io/');
+  assert.equal(model.stepRail[0].github_url, 'https://github.com/goauthentik/authentik');
+  assert.equal(model.stepRail[0].positive_summary, 'Twinbox stages Authentik as part of the guided install flow and keeps the configuration explicit for the operator.');
   assert.equal(model.primaryAction.label, 'Start step 1');
   assert.equal(model.progress.totalSteps, 28);
   assert.equal(model.progress.completedSteps, 0);
@@ -131,28 +131,28 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
 test('wizard model advances to the next step when the active step is done', () => {
   const model = getMissionControlModel({
     catalog: buildCatalog({
-      'provision-nodes': 'done',
-      'install-flannel': 'ready',
+      'install-authentik-idp': 'done',
     }),
     logs: [],
     cluster: { id: 'cluster_demo', status: 'provisioned' },
     health: { ok: true },
     error: '',
     busy: false,
-    selectedStepId: 'provision-nodes',
+    selectedStepId: 'install-authentik-idp',
   });
 
   assert.equal(model.stepRail[0].isComplete, true);
   assert.equal(model.primaryAction.label, 'Continue to step 2');
   assert.equal(model.progress.completedSteps, 1);
   assert.equal(model.healthBadges.find((badge) => badge.id === 'cluster').value, 'cluster_demo');
-  assert.equal(model.stepRail[1].icon, '🕸️');
+  assert.equal(model.stepRail[1].icon, '🖥️');
 });
 
 test('wizard model switches to manage mode when setup flow is complete', () => {
   const completedCatalog = buildCatalog(
     Object.fromEntries(
       [
+        'install-authentik-idp',
         'provision-nodes',
         'install-flannel',
         'install-argocd',
@@ -163,7 +163,6 @@ test('wizard model switches to manage mode when setup flow is complete', () => {
         'install-headlamp',
         'install-grafana',
         'install-wiredoor-gateway',
-        'install-authentik-idp',
         'create-users-and-groups',
         'configure-cloudflare-dns',
         'install-homepage-dashboard',
@@ -213,6 +212,7 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
 
   assert.equal(model.stepRail.length, 28);
   assert.deepEqual(model.stepRail.map((step) => step.id), [
+    'install-authentik-idp',
     'provision-nodes',
     'install-flannel',
     'install-argocd',
@@ -223,7 +223,6 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     'install-headlamp',
     'install-grafana',
     'install-wiredoor-gateway',
-    'install-authentik-idp',
     'create-users-and-groups',
     'configure-cloudflare-dns',
     'install-homepage-dashboard',
@@ -246,7 +245,7 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
 
 test('wizard model defaults to step 1 when nothing is selected', () => {
   const model = getMissionControlModel({
-    catalog: buildCatalog({ 'provision-nodes': 'ready' }),
+    catalog: buildCatalog({ 'install-authentik-idp': 'ready' }),
     logs: [],
     cluster: null,
     health: { ok: true },
@@ -255,14 +254,14 @@ test('wizard model defaults to step 1 when nothing is selected', () => {
     selectedStepId: '',
   });
 
-  assert.equal(model.activeStep.id, 'provision-nodes');
+  assert.equal(model.activeStep.id, 'install-authentik-idp');
   assert.equal(model.stepRail[0].isCurrent, true);
   assert.equal(model.primaryAction.label, 'Start step 1');
 });
 
 test('wizard model falls back to step 1 when a restored selection no longer exists', () => {
   const model = getMissionControlModel({
-    catalog: buildCatalog({ 'provision-nodes': 'ready' }),
+    catalog: buildCatalog({ 'install-authentik-idp': 'ready' }),
     logs: [],
     cluster: null,
     health: { ok: true },
@@ -271,7 +270,7 @@ test('wizard model falls back to step 1 when a restored selection no longer exis
     selectedStepId: 'missing-step',
   });
 
-  assert.equal(model.activeStep.id, 'provision-nodes');
+  assert.equal(model.activeStep.id, 'install-authentik-idp');
   assert.equal(model.primaryAction.label, 'Start step 1');
 });
 

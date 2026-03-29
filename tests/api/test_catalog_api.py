@@ -131,6 +131,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
 
             talos = body["categories"][1]
             assert [step["id"] for step in talos["steps"]] == [
+                "install-authentik-idp",
                 "provision-nodes",
                 "install-flannel",
                 "install-argocd",
@@ -141,7 +142,6 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-headlamp",
                 "install-grafana",
                 "install-wiredoor-gateway",
-                "install-authentik-idp",
                 "create-users-and-groups",
                 "configure-cloudflare-dns",
                 "install-homepage-dashboard",
@@ -160,23 +160,25 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-freshrss",
                 "install-jitsi",
             ]
-            assert talos["steps"][1]["title"] == "Install Flannel"
-            assert talos["steps"][2]["title"] == "Install Argo CD"
-            assert talos["steps"][3]["title"] == "Install Longhorn Storage"
-            assert talos["steps"][4]["title"] == "Install OpenBao and sync bootstrap secrets"
-            assert talos["steps"][5]["title"] == "Install Traefik"
-            assert talos["steps"][6]["title"] == "Install Whoami"
-            assert talos["steps"][7]["title"] == "Install Headlamp"
-            assert talos["steps"][8]["title"] == "Install Grafana"
-            assert talos["steps"][9]["title"] == "Install Wiredoor gateway"
+            assert talos["steps"][0]["title"] == "Install Authentik"
+            assert talos["steps"][1]["title"] == "Deploy Talos Cluster"
+            assert talos["steps"][2]["title"] == "Install Flannel"
+            assert talos["steps"][3]["title"] == "Install Argo CD"
+            assert talos["steps"][4]["title"] == "Install Longhorn Storage"
+            assert talos["steps"][5]["title"] == "Install OpenBao and sync bootstrap secrets"
+            assert talos["steps"][6]["title"] == "Install Traefik"
+            assert talos["steps"][7]["title"] == "Install Whoami"
+            assert talos["steps"][8]["title"] == "Install Headlamp"
+            assert talos["steps"][9]["title"] == "Install Grafana"
+            assert talos["steps"][10]["title"] == "Install Wiredoor gateway"
             assert talos["steps"][0]["journey_stage"] == "setup"
-            assert talos["steps"][0]["status"] == "ready"
-            assert talos["steps"][1]["status"] == "locked"
+            assert talos["steps"][0]["status"] == "locked"
+            assert talos["steps"][1]["status"] == "ready"
             assert talos["steps"][4]["status"] == "locked"
             assert talos["steps"][4]["secrets"]["files"]["KUBECONFIG_FILE"]["item"] == "kubeconfig"
             assert talos["steps"][4]["secrets"]["files"]["KUBECONFIG_FILE"]["attachment"] == "kubeconfig"
-            assert talos["steps"][0]["icon"] == "🖥️"
-            assert talos["steps"][5]["icon"] == "🧭"
+            assert talos["steps"][0]["icon"] == "🪪"
+            assert talos["steps"][5]["icon"] == "🔐"
         finally:
             proc.terminate()
             proc.wait(timeout=5)
