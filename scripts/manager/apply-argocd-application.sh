@@ -19,6 +19,17 @@ wait_for_application_ready() {
   local attempt=1
   local attempts=180
 
+  has_unhealthy_resources() {
+    jq -e '
+      any(
+        .status.resources[]?;
+        (.health.status // "") == "Degraded"
+        or (.health.status // "") == "Missing"
+        or (.health.status // "") == "Progressing"
+      )
+    ' >/dev/null 2>&1
+  }
+
   while true; do
     if status_json="$(kubectl -n argocd get application "$application" -o json 2>/dev/null)"; then
       sync_status="$(jq -r '.status.sync.status // "Unknown"' <<<"$status_json")"
@@ -29,6 +40,13 @@ wait_for_application_ready() {
       if [[ "$sync_status" == "Synced" && "$health_status" == "Healthy" && "$operation_phase" != "Running" && "$operation_phase" != "Terminating" ]]; then
         log "Application/${application} is Synced and Healthy"
         return 0
+      fi
+
+      if [[ "$sync_status" == "Synced" && "$operation_phase" != "Running" && "$operation_phase" != "Terminating" && "$health_status" == "Degraded" ]]; then
+        if ! has_unhealthy_resources <<<"$status_json"; then
+          log "Application/${application} is Synced and has no unhealthy resources; accepting aggregate health=${health_status}"
+          return 0
+        fi
       fi
     else
       log "Waiting for application/${application} to appear"

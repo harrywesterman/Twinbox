@@ -460,6 +460,8 @@ def test_apply_argocd_application_helper_applies_and_waits_for_health():
     assert 'kubectl apply --validate=false -f "$MANIFEST_PATH"' in text
     assert 'kubectl -n argocd get application "$application" -o json' in text
     assert 'Application/${application} is Synced and Healthy' in text
+    assert 'Application/${application} is Synced and has no unhealthy resources' in text
+    assert 'has_unhealthy_resources()' in text
 
 
 def test_argo_step_script_bootstraps_argocd_and_adopts_flannel():
