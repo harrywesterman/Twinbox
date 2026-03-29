@@ -1157,14 +1157,43 @@ function App() {
 
         <section className="wizard-workspace">
           <div className="wizard-workspace-header">
-            <div>
+            <div className="wizard-workspace-copy">
               <p className="eyebrow">Twinbox installer</p>
-              <h1>{model.completion ? model.completion.title : activeStepTitle || 'Choose a setup step'}</h1>
-              <p className="wizard-intro">
-                {model.completion
-                  ? model.completion.summary
-                  : model.activity.summary}
-              </p>
+              <div className="wizard-workspace-stepline">
+                <span
+                  className={`wizard-step-icon wizard-step-icon-large ${activeStepPresentation.iconArtworkUrl ? 'is-artwork' : ''}`}
+                  aria-hidden="true"
+                >
+                  {activeStepPresentation.iconArtworkUrl ? (
+                    <img
+                      className="wizard-step-icon-artwork"
+                      src={activeStepPresentation.iconArtworkUrl}
+                      alt=""
+                      loading="eager"
+                      decoding="async"
+                    />
+                  ) : (
+                    activeStepPresentation.icon
+                  )}
+                </span>
+                <div className="wizard-workspace-stepline-copy">
+                  <h1>{model.completion ? model.completion.title : activeStepTitle || 'Choose a setup step'}</h1>
+                  <p className="wizard-intro">
+                    {model.completion
+                      ? model.completion.summary
+                      : model.activity.summary}
+                  </p>
+                  {activeStepLinks.length ? (
+                    <div className="wizard-step-links wizard-step-links-top" aria-label="Step resources">
+                      {activeStepLinks.map((item) => (
+                        <a key={item.label} href={item.href} target="_blank" rel="noreferrer">
+                          {item.label}
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
             </div>
 
             <div className="wizard-stage-meta">
@@ -1212,50 +1241,11 @@ function App() {
           ) : (
             <div className="wizard-flow">
               <section className="wizard-card wizard-step-workspace">
-                <div className="wizard-step-heading">
-                  <div className="wizard-step-header-copy">
-                    <p className="eyebrow">CURRENT STEP</p>
-                    <div className="wizard-step-title-row">
-                      <span
-                        className={`wizard-step-icon wizard-step-icon-large ${activeStepPresentation.iconArtworkUrl ? 'is-artwork' : ''}`}
-                        aria-hidden="true"
-                      >
-                        {activeStepPresentation.iconArtworkUrl ? (
-                          <img
-                            className="wizard-step-icon-artwork"
-                            src={activeStepPresentation.iconArtworkUrl}
-                            alt=""
-                            loading="eager"
-                            decoding="async"
-                          />
-                        ) : (
-                          activeStepPresentation.icon
-                        )}
-                      </span>
-                      <h2>{activeStepTitle || 'No step selected'}</h2>
-                    </div>
-                    <p className="wizard-step-pitch">
-                      {activeStepPresentation.positiveSummary}
-                    </p>
-                  </div>
-                  <div className="wizard-step-meta">
-                    <div className="wizard-step-chip">
-                      <span>{model.primaryAction.label}</span>
-                    </div>
-                    {activeStepLinks.length ? (
-                      <div className="wizard-step-links" aria-label="Step resources">
-                        {activeStepLinks.map((item) => (
-                          <a key={item.label} href={item.href} target="_blank" rel="noreferrer">
-                            {item.label}
-                          </a>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
+                <p className="eyebrow">CURRENT STEP</p>
+                <div className="wizard-step-context">
+                  <p className="wizard-step-summary">{model.activity.explanation}</p>
+                  <p className="wizard-step-sidehelp">{model.activity.sideHelp}</p>
                 </div>
-
-                <p className="wizard-step-summary">{model.activity.explanation}</p>
-                <p className="wizard-step-sidehelp">{model.activity.sideHelp}</p>
 
                 {provisionScaleSummary ? (
                   <section className="wizard-scale-panel" aria-label="Cluster scaling summary">
