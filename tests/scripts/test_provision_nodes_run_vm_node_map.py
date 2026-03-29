@@ -55,7 +55,7 @@ def test_provision_nodes_uses_current_step_context_vm_node_map():
                 "vip_ip": "192.168.1.50",
                 "node_prefix_length": 24,
                 "gateway_ip": "192.168.1.1",
-                "dns_servers": ["1.1.1.1", "1.0.0.1"],
+                "dns_servers": ["1.1.1.1", "8.8.8.8"],
                 "dns_domain": "cluster.internal",
                 "vm_node_map": {
                     "cp-1": "new-a",

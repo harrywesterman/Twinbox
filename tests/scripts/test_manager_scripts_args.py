@@ -178,7 +178,7 @@ def test_apply_cluster_requires_proxmox_env():
             "--vip-ip", "192.168.1.50",
             "--node-prefix-length", "24",
             "--gateway-ip", "192.168.1.1",
-            "--dns-servers", "1.1.1.1,1.0.0.1",
+            "--dns-servers", "1.1.1.1,8.8.8.8",
             "--dns-domain", "cluster.internal",
             "--proxmox-node", "pve",
             "--storage-pool", "local-lvm",
@@ -277,7 +277,7 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'Talos host placement map written to tfvars' in text
     assert 'vm_node_map: $vm_node_map' in text
     assert 'json_array_from_csv()' in text
-    assert 'json_array_from_csv "${DNS_SERVERS:-1.1.1.1,1.0.0.1}"' in text
+    assert 'json_array_from_csv "${DNS_SERVERS:-1.1.1.1,8.8.8.8}"' in text
     assert '--argjson prefix "${NODE_PREFIX_LENGTH:-24}"' in text
     assert 'content=iso' in text
     assert 'curl -ksS --show-error' in text

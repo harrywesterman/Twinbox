@@ -745,7 +745,7 @@ function detectDnsDefaults() {
   const resolvConf = process.env.MANAGER_API_RESOLV_CONF || "/etc/resolv.conf";
   if (!fs.existsSync(resolvConf)) {
     return {
-      dns_servers: ["1.1.1.1"],
+      dns_servers: ["1.1.1.1", "8.8.8.8"],
       dns_domain: "",
     };
   }
@@ -777,7 +777,7 @@ function detectDnsDefaults() {
   }
 
   return {
-    dns_servers: dnsServers.length > 0 ? dnsServers : ["1.1.1.1"],
+    dns_servers: dnsServers.length > 0 ? dnsServers : ["1.1.1.1", "8.8.8.8"],
     dns_domain: dnsDomain,
   };
 }

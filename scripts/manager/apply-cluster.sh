@@ -883,7 +883,7 @@ jq -n \
   --arg talos_image_local_path "$talos_image_local_path" \
   --arg talos_image_cache_key "$image_cache_key" \
   --argjson vm_node_map "$vm_node_map_json" \
-  --argjson dns_servers "$(json_array_from_csv "${DNS_SERVERS:-1.1.1.1,1.0.0.1}")" \
+  --argjson dns_servers "$(json_array_from_csv "${DNS_SERVERS:-1.1.1.1,8.8.8.8}")" \
   --argjson prefix "${NODE_PREFIX_LENGTH:-24}" \
   --argjson nodes "$nodes_json" \
   '{

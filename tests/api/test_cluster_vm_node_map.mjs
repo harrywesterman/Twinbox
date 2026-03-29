@@ -16,7 +16,7 @@ const baseBody = {
   start_ip: '192.168.1.51',
   node_prefix_length: 24,
   gateway_ip: '192.168.1.1',
-  dns_servers: ['1.1.1.1', '1.0.0.1'],
+  dns_servers: ['1.1.1.1', '8.8.8.8'],
   dns_domain: 'lab.local',
 };
 

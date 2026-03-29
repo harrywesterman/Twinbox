@@ -105,7 +105,7 @@ inputs:
     label: DNS servers
     type: string
     required: true
-    default: 1.1.1.1,1.0.0.1
+    default: 1.1.1.1,8.8.8.8
     help: Comma-separated IPv4 DNS servers for Talos nodes.
 runner:
   kind: script

@@ -1552,7 +1552,7 @@ function App() {
                         </div>
                         <div>
                           <dt>DNS</dt>
-                          <dd>{currentDraft.dns_servers || '1.1.1.1, 1.0.0.1'}</dd>
+                          <dd>{currentDraft.dns_servers || '1.1.1.1, 8.8.8.8'}</dd>
                         </div>
                       </dl>
 

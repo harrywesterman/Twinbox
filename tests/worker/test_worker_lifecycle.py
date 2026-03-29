@@ -105,7 +105,7 @@ def test_worker_processes_pending_job_to_completed():
             "vip_ip": "192.168.1.50",
             "node_prefix_length": 24,
             "gateway_ip": "192.168.1.1",
-            "dns_servers": ["1.1.1.1", "1.0.0.1"],
+            "dns_servers": ["1.1.1.1", "8.8.8.8"],
             "dns_domain": "cluster.internal",
             "metadata": {
                 "proxmox_node": "pve",
@@ -183,7 +183,7 @@ def test_worker_processes_pending_job_to_completed():
             assert "running job type=apply_cluster" in log_text
             assert "--node-prefix-length 24" in log_text
             assert "--gateway-ip 192.168.1.1" in log_text
-            assert "--dns-servers 1.1.1.1,1.0.0.1" in log_text
+            assert "--dns-servers 1.1.1.1,8.8.8.8" in log_text
             assert "--dns-domain cluster.internal" in log_text
             assert "--file-datastore local" in log_text
             assert "job completed" in log_text

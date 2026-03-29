@@ -13,7 +13,7 @@ const stepInputs = [
   { id: 'start_ip', default: '192.168.1.51' },
   { id: 'node_prefix_length', default: 24 },
   { id: 'gateway_ip', default: '192.168.1.1' },
-  { id: 'dns_servers', default: '1.1.1.1,1.0.0.1' },
+  { id: 'dns_servers', default: '1.1.1.1,8.8.8.8' },
   { id: 'dns_domain', default: 'localdomain' },
 ];
 
@@ -141,7 +141,7 @@ test('mergeSuggestedProvisionDraft replaces first-load defaults with a live sugg
       start_ip: '192.168.1.51',
       node_prefix_length: 24,
       gateway_ip: '192.168.1.1',
-      dns_servers: '1.1.1.1,1.0.0.1',
+      dns_servers: '1.1.1.1,8.8.8.8',
       dns_domain: '',
     },
     previousSuggested: {},
@@ -152,7 +152,7 @@ test('mergeSuggestedProvisionDraft replaces first-load defaults with a live sugg
       start_ip: '192.168.2.55',
       node_prefix_length: 24,
       gateway_ip: '192.168.2.1',
-      dns_servers: ['1.1.1.1', '1.0.0.1'],
+      dns_servers: ['1.1.1.1', '8.8.8.8'],
       dns_domain: '',
     },
     stepInputs,

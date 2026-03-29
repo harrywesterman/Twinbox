@@ -138,7 +138,7 @@ EOF
                 "start_ip": "192.168.1.51",
                 "node_prefix_length": 24,
                 "gateway_ip": "192.168.1.1",
-                "dns_servers": "1.1.1.1, 1.0.0.1",
+                "dns_servers": "1.1.1.1, 8.8.8.8",
                 "dns_domain": "lab.local",
             }
             status, body = _post_json(f"http://127.0.0.1:{port}/api/clusters", payload)
@@ -174,7 +174,7 @@ EOF
             assert cluster["spec_version"] == "iac-v1"
             assert cluster["node_prefix_length"] == 24
             assert cluster["gateway_ip"] == "192.168.1.1"
-            assert cluster["dns_servers"] == ["1.1.1.1", "1.0.0.1"]
+            assert cluster["dns_servers"] == ["1.1.1.1", "8.8.8.8"]
             assert cluster["dns_domain"] == "lab.local"
             assert "talos_config_dir" not in json.dumps(cluster)
             assert "talosconfig_path" not in json.dumps(cluster)
@@ -238,7 +238,7 @@ EOF
                 "start_ip": "192.168.1.51",
                 "node_prefix_length": 24,
                 "gateway_ip": "192.168.1.1",
-                "dns_servers": "1.1.1.1, 1.0.0.1",
+                "dns_servers": "1.1.1.1, 8.8.8.8",
                 "dns_domain": "lab.local",
             }
             status, body = _post_json(f"http://127.0.0.1:{port}/api/clusters", payload)
@@ -304,7 +304,7 @@ EOF
                 "start_ip": "192.168.1.51",
                 "node_prefix_length": 24,
                 "gateway_ip": "192.168.1.1",
-                "dns_servers": "1.1.1.1, 1.0.0.1",
+                "dns_servers": "1.1.1.1, 8.8.8.8",
                 "dns_domain": "lab.local",
                 "vm_node_map": {
                     "cp-1": "pve-a",
@@ -589,7 +589,7 @@ EOF
                 "start_ip": "192.168.1.51",
                 "node_prefix_length": 24,
                 "gateway_ip": "192.168.1.1",
-                "dns_servers": "1.1.1.1, 1.0.0.1",
+                "dns_servers": "1.1.1.1, 8.8.8.8",
                 "dns_domain": "",
             }
             status, body = _post_json(f"http://127.0.0.1:{port}/api/clusters", payload)
