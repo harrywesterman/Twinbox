@@ -905,6 +905,14 @@ function App() {
     await executeStep(model.activeStep);
   }
 
+  async function handleReinstallStep(step) {
+    if (!step || step.status !== 'done' || busy) {
+      return;
+    }
+
+    await executeStep(step);
+  }
+
   async function handleInstallAllSteps() {
     if (!setupSteps.length || busy) {
       return;
@@ -1310,24 +1318,44 @@ function App() {
           </div>
 
           <nav className="wizard-step-list">
-            {model.stepRail.map((step) => (
-              <button
-                key={step.id}
-                type="button"
-                className={`wizard-step ${step.isCurrent ? 'is-current' : ''} ${step.isComplete ? 'is-complete' : ''}`}
-                onClick={() => {
-                  setSelectedStepId(step.id);
-                  setNotice(`Viewing ${getDisplayStepTitle(step)}.`);
-                }}
-              >
-                <span className="wizard-step-index">{String(step.index).padStart(2, '0')}</span>
-                <span className="wizard-step-icon" aria-hidden="true">{step.icon || '🚀'}</span>
-                <span className="wizard-step-body">
-                  <strong>{getDisplayStepTitle(model.steps.find((candidate) => candidate.id === step.id) || step)}</strong>
-                  <small>{formatState(step.status, 'Ready')}</small>
-                </span>
-              </button>
-            ))}
+            {model.stepRail.map((step) => {
+              const stepModel = model.steps.find((candidate) => candidate.id === step.id) || step;
+              const stepTitle = getDisplayStepTitle(stepModel);
+
+              return (
+                <div
+                  key={step.id}
+                  className={`wizard-step ${step.isCurrent ? 'is-current' : ''} ${step.isComplete ? 'is-complete' : ''}`}
+                >
+                  <button
+                    type="button"
+                    className="wizard-step-select"
+                    onClick={() => {
+                      setSelectedStepId(step.id);
+                      setNotice(`Viewing ${stepTitle}.`);
+                    }}
+                  >
+                    <span className="wizard-step-index">{String(step.index).padStart(2, '0')}</span>
+                    <span className="wizard-step-icon" aria-hidden="true">{step.icon || '🚀'}</span>
+                    <span className="wizard-step-body">
+                      <strong>{stepTitle}</strong>
+                      <small>{formatState(step.status, 'Ready')}</small>
+                    </span>
+                  </button>
+
+                  {step.isComplete ? (
+                    <button
+                      type="button"
+                      className="button button-secondary wizard-step-reinstall"
+                      onClick={() => handleReinstallStep(stepModel)}
+                      disabled={busy || step.status === 'running'}
+                    >
+                      Reinstall
+                    </button>
+                  ) : null}
+                </div>
+              );
+            })}
           </nav>
         </aside>
 
@@ -1667,6 +1695,16 @@ function App() {
                   >
                     {primaryActionLabel}
                   </button>
+                  {model.activeStep?.status === 'done' ? (
+                    <button
+                      className="button button-secondary"
+                      type="button"
+                      onClick={() => handleReinstallStep(model.activeStep)}
+                      disabled={busy}
+                    >
+                      Reinstall step
+                    </button>
+                  ) : null}
                   <button className="button button-secondary" type="button" onClick={handleImportClick}>
                     Import answers
                   </button>

@@ -218,7 +218,7 @@
 
 .wizard-step {
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px 12px;
   align-items: start;
   padding: 14px 14px 14px 12px;
@@ -227,7 +227,6 @@
   background: rgba(255, 255, 255, 0.03);
   color: inherit;
   text-align: left;
-  cursor: pointer;
   transition:
     transform 160ms ease,
     border-color 160ms ease,
@@ -235,7 +234,7 @@
 }
 
 .wizard-step:hover,
-.wizard-step:focus-visible {
+.wizard-step:focus-within {
   transform: translateY(-1px);
   border-color: rgba(96, 165, 250, 0.34);
   background: rgba(255, 255, 255, 0.06);
@@ -253,6 +252,32 @@
 
 .wizard-step.is-complete .wizard-step-icon {
   background: linear-gradient(135deg, rgba(20, 184, 166, 0.24), rgba(16, 185, 129, 0.24));
+}
+
+.wizard-step-select {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 10px 12px;
+  align-items: start;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wizard-step-select:focus-visible {
+  outline: none;
+}
+
+.wizard-step-reinstall {
+  min-height: 38px;
+  padding: 0 14px;
+  align-self: center;
+  font-size: 0.82rem;
 }
 
 .wizard-step-index {
@@ -1369,6 +1394,14 @@
 
   .wizard-topbar-actions .button,
   .wizard-card-actions .button {
+    width: 100%;
+  }
+
+  .wizard-step {
+    grid-template-columns: 1fr;
+  }
+
+  .wizard-step-reinstall {
     width: 100%;
   }
 
