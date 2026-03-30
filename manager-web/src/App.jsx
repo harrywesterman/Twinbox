@@ -1325,7 +1325,7 @@ function App() {
               return (
                 <div
                   key={step.id}
-                  className={`wizard-step ${step.isCurrent ? 'is-current' : ''} ${step.isComplete ? 'is-complete' : ''}`}
+                  className={`wizard-step ${step.isCurrent ? 'is-current' : ''} ${step.status === 'done' ? 'is-complete' : ''}`}
                 >
                   <button
                     type="button"
@@ -1343,7 +1343,7 @@ function App() {
                     </span>
                   </button>
 
-                  {step.isComplete ? (
+                  {step.status === 'done' ? (
                     <button
                       type="button"
                       className="button button-secondary wizard-step-reinstall"
