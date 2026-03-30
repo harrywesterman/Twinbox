@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: garage
+  namespace: velero
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: garage
+  template:
+    metadata:
+      labels:
+        app: garage
+    spec:
+      containers:
+        - name: garage
+          image: ghcr.io/garagehq/garage:stable
+          args:
+            - server
+          env:
+            - name: GARAGE_CONFIG_FILE
+              value: /etc/garage/garage.toml
+            - name: GARAGE_RPC_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: garage-bootstrap
+                  key: GARAGE_RPC_SECRET
+            - name: GARAGE_ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: garage-bootstrap
+                  key: GARAGE_ADMIN_TOKEN
+            - name: GARAGE_METRICS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: garage-bootstrap
+                  key: GARAGE_METRICS_TOKEN
+          ports:
+            - name: s3
+              containerPort: 3900
+            - name: rpc
+              containerPort: 3901
+            - name: admin
+              containerPort: 3903
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: admin
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: admin
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          volumeMounts:
+            - name: config
+              mountPath: /etc/garage/garage.toml
+              subPath: garage.toml
+            - name: data
+              mountPath: /var/lib/garage
+      volumes:
+        - name: config
+          secret:
+            secretName: garage-bootstrap
+            items:
+              - key: garage.toml
+                path: garage.toml
+        - name: data
+          persistentVolumeClaim:
+            claimName: garage-data

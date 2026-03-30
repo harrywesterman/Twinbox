@@ -16,7 +16,8 @@ Talos lifecycle operations are triggered through the manager stack.
 10. `install-argocd` installs Argo CD and registers the Flannel `Application` so networking is tracked by GitOps.
 11. `install-longhorn-storage` applies the Longhorn Argo CD application and waits for `StorageClass/longhorn`.
 12. `install-secret-sync` installs External Secrets Operator and OpenBao, seeds OpenBao from management-local bootstrap JSON, and creates `Secret/proxmox-bootstrap`.
-13. Later wizard steps apply one Argo CD `Application` at a time for Traefik and the remaining workloads.
+13. `install-velero-backup` deploys Velero, a Twinbox-managed Garage bucket or an external S3-compatible target, and the default backup storage location used for cluster backups.
+14. Later wizard steps apply one Argo CD `Application` at a time for Traefik and the remaining workloads.
 
 ## Runtime Dependencies
 

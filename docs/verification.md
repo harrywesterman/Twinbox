@@ -14,6 +14,7 @@ bash -n wizard/setup-wizard.sh \
   scripts/manager/apply-argocd-application.sh \
   scripts/manager/install-longhorn-storage.sh \
   scripts/manager/install-secret-sync.sh \
+  scripts/manager/install-velero-backup.sh \
   scripts/manager/openbao-secret-sync.sh \
   scripts/manager/sync-openbao-global-secret.sh
 
@@ -95,6 +96,23 @@ Expected:
 - OpenBao is running on Longhorn
 - `ClusterSecretStore/openbao` exists
 - `Secret/proxmox-bootstrap` exists in `twinbox-system`
+
+### `install-velero-backup`
+
+```bash
+kubectl --kubeconfig <kubeconfig> get application -n argocd velero
+kubectl --kubeconfig <kubeconfig> get application -n argocd garage
+kubectl --kubeconfig <kubeconfig> get pods -n velero
+kubectl --kubeconfig <kubeconfig> get backupstoragelocation -n velero
+kubectl --kubeconfig <kubeconfig> get secret velero-credentials -n velero
+```
+
+Expected:
+
+- Velero server and node-agent are running
+- The Garage deployment is running and initialized
+- `BackupStorageLocation/default` is ready
+- The generated Velero credentials secret exists in the `velero` namespace
 
 ### OpenBao restart check
 

@@ -56,7 +56,7 @@ function buildCatalog(stepStatuses = {}) {
     ['create-users-and-groups', 'Create Users and Groups', { dependsOn: ['install-authentik-idp'] }],
     ['install-homepage-dashboard', 'Install Homepage dashboard', { dependsOn: ['install-wiredoor-gateway'] }],
     ['install-management-consoles', 'Install Management consoles', { dependsOn: ['install-homepage-dashboard'] }],
-    ['install-velero-backup', 'Install Velero backup', { dependsOn: ['install-management-consoles'] }],
+    ['install-velero-backup', 'Install Velero backup', { dependsOn: ['install-management-consoles', 'install-longhorn-storage', 'install-secret-sync'] }],
     ['install-proxmox-backup-system', 'Install Proxmox Backup System', { dependsOn: ['install-velero-backup'] }],
     ['install-nextcloud', 'Install Nextcloud', { dependsOn: ['install-proxmox-backup-system'] }],
     ['install-immich', 'Install Immich', { dependsOn: ['install-nextcloud'] }],

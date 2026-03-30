@@ -32,6 +32,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `/opt/twinbox/bootstrap/secrets/global/grafana.json`
 - `/opt/twinbox/bootstrap/secrets/global/authentik.json`
 - `/opt/twinbox/bootstrap/secrets/global/wiredoor-gateway.json`
+- `/opt/twinbox/bootstrap/secrets/global/velero.json`
 
 ### Cluster-scoped runtime artifacts
 
@@ -89,6 +90,19 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 }
 ```
 
+### `velero.json`
+
+```json
+{
+  "mode": "embedded-garage",
+  "endpoint": "http://garage.velero.svc.cluster.local:3900",
+  "bucket": "twinbox-velero",
+  "region": "garage",
+  "username": "velero",
+  "password": "generated-password"
+}
+```
+
 ## Cluster Secret Runtime
 
 - `provision-nodes` bootstraps Talos and writes the Talos runtime artifacts for a cluster.
@@ -100,6 +114,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
   - OpenBao with Raft storage on Longhorn
   - `ClusterSecretStore/openbao`
   - `ExternalSecret/proxmox-bootstrap`
+- `install-velero-backup` installs Velero together with either a Twinbox-managed Garage bucket or an external S3-compatible backup target.
 - Later application steps write bootstrap JSON into OpenBao before enabling their Argo CD applications.
 
 ## Tooling Versions

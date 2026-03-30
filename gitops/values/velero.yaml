@@ -1,0 +1,30 @@
+credentials:
+  useSecret: true
+  existingSecret: velero-credentials
+
+configuration:
+  defaultBackupStorageLocation: default
+  backupStorageLocation:
+    - name: default
+      provider: aws
+      bucket: twinbox-velero
+      default: true
+      credential:
+        name: velero-credentials
+        key: cloud
+      config:
+        region: garage
+        s3ForcePathStyle: true
+        s3Url: http://garage.velero.svc.cluster.local:3900
+
+snapshotsEnabled: false
+defaultVolumesToFsBackup: true
+deployNodeAgent: true
+
+initContainers:
+  - name: velero-plugin-for-aws
+    image: velero/velero-plugin-for-aws:v1.13.1
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+      - mountPath: /target
+        name: plugins
