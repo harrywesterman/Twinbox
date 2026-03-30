@@ -3,12 +3,19 @@ title: Install Homepage dashboard
 type: action
 journey_stage: setup
 order: 90
-summary: Placeholder step for the dashboard surface.
-explanation: This wizard step is reserved for future Homepage dashboard work and does not run a real cluster action yet.
-side_help: The dashboard step appears after gateway setup so the cluster tour matches the intended operator flow.
+summary: Install Homepage as the main dashboard surface for the cluster.
+explanation: Twinbox installs Homepage through GitOps, configures it for in-cluster service discovery, and exposes the dashboard through Traefik so operators get a single landing page for the core cluster tools and applications.
+side_help: Homepage gives the cluster a lightweight landing page with quick links to the main platform services.
 depends_on:
   - install-wiredoor-gateway
 inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
 runner:
   kind: script
-  script: categories/talos-cluster/steps/_placeholder/run.sh
+  script: categories/talos-cluster/steps/install-homepage-dashboard/run.sh
