@@ -38,7 +38,7 @@ Use the UI to:
 1. Deploy the Talos cluster
 2. Install Flannel
 3. Install Argo CD
-4. Install Longhorn
+4. Install Longhorn and make it the default storage class
 5. Install OpenBao and sync bootstrap secrets
 6. Install Traefik
 7. Install Velero backup

@@ -61,12 +61,14 @@ Expected:
 ```bash
 kubectl --kubeconfig <kubeconfig> get pods -n longhorn-system
 kubectl --kubeconfig <kubeconfig> get storageclass longhorn
+kubectl --kubeconfig <kubeconfig> get storageclass longhorn -o jsonpath='{.metadata.annotations.storageclass\.kubernetes\.io/is-default-class}'
 ```
 
 Expected:
 
 - Longhorn manager and CSI components are running
 - `StorageClass/longhorn` exists
+- `StorageClass/longhorn` is marked as the default storage class
 
 ### `install-traefik`
 

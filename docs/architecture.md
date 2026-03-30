@@ -51,7 +51,7 @@ Twinbox is a complete K8s cluster based on Talos Linux, completely configured. T
 2. `provision-nodes` materializes Talos runtime files from the local bootstrap tree and cluster-scoped attachments.
 3. `install-flannel` bootstraps pod networking so the cluster can run the Argo CD control plane.
 4. `install-argocd` installs Argo CD and starts tracking Flannel through a GitOps `Application`.
-5. `install-longhorn-storage` runs before cluster secret sync so stateful workloads and backup storage can use Longhorn PVCs immediately.
+5. `install-longhorn-storage` runs before cluster secret sync so stateful workloads and backup storage can use Longhorn PVCs immediately through the cluster default storage class.
 6. `install-secret-sync` installs External Secrets Operator and OpenBao on Longhorn.
 7. `install-secret-sync` seeds OpenBao from the Management VM bootstrap files and creates `ClusterSecretStore/openbao`.
 8. `install-velero-backup` deploys Velero together with a Twinbox-managed Garage bucket or an external S3-compatible backup target.

@@ -14,7 +14,7 @@ Talos lifecycle operations are triggered through the manager stack.
 8. Talos access files are stored as cluster-scoped bootstrap artifacts under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/`.
 9. `install-flannel` bootstraps the Flannel CNI directly so the cluster can run pods.
 10. `install-argocd` installs Argo CD and registers the Flannel `Application` so networking is tracked by GitOps.
-11. `install-longhorn-storage` applies the Longhorn Argo CD application and waits for `StorageClass/longhorn`.
+11. `install-longhorn-storage` applies the Longhorn Argo CD application, makes `StorageClass/longhorn` the default, and waits for it to be ready.
 12. `install-secret-sync` installs External Secrets Operator and OpenBao, seeds OpenBao from management-local bootstrap JSON, and creates `Secret/proxmox-bootstrap`.
 13. `install-velero-backup` deploys Velero, a Twinbox-managed Garage bucket or an external S3-compatible target, and the default backup storage location used for cluster backups.
 14. Later wizard steps apply one Argo CD `Application` at a time for Traefik and the remaining workloads.

@@ -315,8 +315,8 @@ def test_longhorn_step_installs_via_argocd_and_waits_for_health():
     longhorn_values_text = _longhorn_values_text()
 
     assert 'title: Install Longhorn Storage' in step_manifest_text
-    assert 'order: 15' in step_manifest_text
-    assert 'summary: Apply the Longhorn GitOps application and wait for the storage class to become available.' in step_manifest_text
+    assert 'order: 14' in step_manifest_text
+    assert 'summary: Apply the Longhorn GitOps application, make its storage class the cluster default, and wait for it to become available.' in step_manifest_text
     assert 'depends_on:' in step_manifest_text
     assert '  - install-argocd' in step_manifest_text
     assert 'runner:' in step_manifest_text
@@ -332,6 +332,11 @@ def test_longhorn_step_installs_via_argocd_and_waits_for_health():
     assert '--application "longhorn"' in helper_text
     assert 'wait_for_storage_class' in helper_text
     assert 'StorageClass/${storage_class} is available' in helper_text
+    assert 'make_storage_class_default' in helper_text
+    assert 'Marking StorageClass/${storage_class} as the default storage class' in helper_text
+    assert 'storageclass.kubernetes.io/is-default-class' in helper_text
+    assert 'storageclass.beta.kubernetes.io/is-default-class' in helper_text
+    assert 'is not the only default storage class' in helper_text
     assert 'preUpgradeChecker:' in longhorn_values_text
     assert 'jobEnabled: false' in longhorn_values_text
     assert 'taintToleration:' in longhorn_values_text
