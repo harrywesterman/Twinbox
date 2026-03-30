@@ -544,23 +544,23 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert 'order: 31' in traefik_text
     assert 'install-secret-sync' in traefik_text
 
-    assert 'order: 32' in whoami_text
-    assert 'install-traefik' in whoami_text
-    assert 'script: categories/talos-cluster/steps/install-whoami/run.sh' in whoami_text
-
-    assert 'order: 33' in headlamp_text
-    assert 'install-whoami' in headlamp_text
-    assert 'script: categories/talos-cluster/steps/install-headlamp/run.sh' in headlamp_text
-
-    assert 'order: 34' in grafana_text
-    assert 'install-headlamp' in grafana_text
-    assert 'script: categories/talos-cluster/steps/install-grafana/run.sh' in grafana_text
-
-    assert 'order: 35' in wiredoor_text
+    assert 'order: 32' in wiredoor_text
     assert 'install-grafana' in wiredoor_text
     assert 'KUBECONFIG_FILE:' in wiredoor_text
     assert 'item: kubeconfig' in wiredoor_text
     assert 'script: categories/talos-cluster/steps/install-wiredoor-gateway/run.sh' in wiredoor_text
+
+    assert 'order: 33' in whoami_text
+    assert 'install-traefik' in whoami_text
+    assert 'script: categories/talos-cluster/steps/install-whoami/run.sh' in whoami_text
+
+    assert 'order: 34' in headlamp_text
+    assert 'install-whoami' in headlamp_text
+    assert 'script: categories/talos-cluster/steps/install-headlamp/run.sh' in headlamp_text
+
+    assert 'order: 35' in grafana_text
+    assert 'install-headlamp' in grafana_text
+    assert 'script: categories/talos-cluster/steps/install-grafana/run.sh' in grafana_text
 
 
 def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
