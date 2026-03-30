@@ -1289,7 +1289,7 @@ app.post("/api/steps/:stepId/unskip", (req, res) => {
 
   return res.status(200).json({
     step_id: stepId,
-    status: "not_started",
+    status: "ready",
   });
 });
 
