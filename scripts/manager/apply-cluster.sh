@@ -56,6 +56,7 @@ while [[ $# -gt 0 ]]; do
     --gateway-ip) GATEWAY_IP="$2"; shift 2 ;;
     --dns-servers) DNS_SERVERS="$2"; shift 2 ;;
     --dns-domain) DNS_DOMAIN="$2"; shift 2 ;;
+    # --vm-node-map) shift 2 ;;
     --vm-node-map) VM_NODE_MAP="$2"; shift 2 ;;
     --vm-ip-map) VM_IP_MAP="$2"; shift 2 ;;
     --proxmox-node) PROXMOX_NODE="$2"; shift 2 ;;
@@ -907,6 +908,7 @@ planned_worker_ips_json="$(node_array "ip" "worker")"
 controlplane_vm_ids_json="$(node_array "vmid" "controlplane")"
 worker_vm_ids_json="$(node_array "vmid" "worker")"
 raw_vm_node_map="${VM_NODE_MAP:-}"
+# vm_node_map_json="$(normalize_json_object "${VM_NODE_MAP:-{}}")"
 
 if [[ -z "$raw_vm_node_map" ]]; then
   fail "Missing vm_node_map for cluster ${CLUSTER_ID}; pass --vm-node-map from the current run"

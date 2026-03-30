@@ -3,7 +3,7 @@ title: Install Argo CD
 type: action
 journey_stage: setup
 order: 13
-summary: Install Argo CD on the cluster. This is the GitOps tool that we use to install all applications. Github is telling all the settings and version, Argo CD sync with Github and continuously updates the cluster.
+summary: Install Argo CD and register Flannel as the first managed GitOps application.
 explanation: Twinbox installs Argo CD, waits for the Argo CD control plane to see if it went ok.
 side_help: Argo CD is bootstrap-only for itself, but it immediately takes ownership of Flannel so the rest of the platform can be installed through GitOps.
 depends_on:
