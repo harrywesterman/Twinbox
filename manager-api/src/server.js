@@ -1229,6 +1229,10 @@ app.post("/api/steps/:stepId/skip", (req, res) => {
     return res.status(404).json({ error: "step not found" });
   }
 
+  if (visibleStep.status === "locked") {
+    return res.status(409).json({ error: "cannot skip a locked step" });
+  }
+
   if (visibleStep.status === "running") {
     return res.status(409).json({ error: "cannot skip a running step" });
   }
