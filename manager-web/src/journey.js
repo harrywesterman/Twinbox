@@ -24,7 +24,7 @@ function flattenSetupSteps(catalog) {
 }
 
 function isComplete(step) {
-  return step?.status === 'done';
+  return step?.status === 'done' || step?.status === 'skipped';
 }
 
 function pickActiveStep(steps, selectedStepId) {
@@ -39,11 +39,13 @@ function pickActiveStep(steps, selectedStepId) {
 function buildProgress(steps, activeStep) {
   const totalSteps = steps.length;
   const completedSteps = steps.filter(isComplete).length;
+  const skippedSteps = steps.filter((step) => step.status === 'skipped').length;
   const activeIndex = activeStep ? steps.findIndex((step) => step.id === activeStep.id) : -1;
 
   return {
     totalSteps,
     completedSteps,
+    skippedSteps,
     remainingSteps: Math.max(0, totalSteps - completedSteps),
     stepIndex: activeIndex >= 0 ? activeIndex + 1 : 0,
     percent: totalSteps ? Math.round((completedSteps / totalSteps) * 100) : 0,
@@ -63,6 +65,7 @@ function buildStepRail(steps, activeStep) {
     status: step.status,
     isCurrent: step.id === activeStep?.id,
     isComplete: isComplete(step),
+    isSkipped: step.status === 'skipped',
     isLocked: step.status === 'locked',
     project_url: step.project_url,
     github_url: step.github_url,
@@ -483,6 +486,15 @@ function buildPrimaryAction(activeStep, nextStep, busy, stepIndex, mode) {
     };
   }
 
+  if (activeStep.status === 'skipped') {
+    return {
+      type: 'unskip',
+      label: 'Run this step',
+      disabled: false,
+      helperText: 'This step was skipped. Click to run it now.',
+    };
+  }
+
   if (activeStep.status === 'done' && nextStep) {
     return {
       type: 'advance',
@@ -536,6 +548,7 @@ export function formatState(value, fallback) {
 
 export function toneForStatus(value) {
   if (value === 'done' || value === 'success') return 'success';
+  if (value === 'skipped') return 'warning';
   if (value === 'running' || value === 'ready' || value === 'active') return 'active';
   if (value === 'failed' || value === 'danger') return 'danger';
   if (value === 'locked' || value === 'warning') return 'warning';
