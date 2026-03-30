@@ -176,18 +176,17 @@ def test_setup_wizard_persists_completion_message_across_programbox_install_flow
     assert 'install_exit=${PIPESTATUS[0]}' in flow_body
     assert 'if [[ "$install_exit" -ne 0 ]]; then' in flow_body
     assert 'MANAGEMENT_WEB_URL=$(tr -d \'\\r\' <"$completion_state_file")' in flow_body
-    assert 'FINAL_COMPLETION_MESSAGE="Twinbox URL: ${MANAGEMENT_WEB_URL}"' in flow_body
+    assert 'FINAL_COMPLETION_MESSAGE="Twinbox is ready."' in flow_body
 
 
 def test_setup_wizard_prints_resolved_urls_when_ip_is_available():
     text = _wizard_text()
-    assert 'Open this in your browser:' in text
-    assert 'Twinbox management website' not in text
+    assert 'Open the Twinbox web interface:' in text
     assert 'MANAGEMENT_WEB_URL="http://${management_ip}:3000"' in text
     assert 'printf \'%s\\n\' "$MANAGEMENT_WEB_URL" >"$completion_state_file"' in text
-    assert 'log_event "Twinbox URL: ${MANAGEMENT_WEB_URL}"' in text
-    assert 'FINAL_COMPLETION_MESSAGE="Twinbox URL: ${MANAGEMENT_WEB_URL}"' in text
-    assert 'Open this in your browser:\\n\\n${MANAGEMENT_WEB_URL}' in text
+    assert 'log_event "Twinbox is ready at ${MANAGEMENT_WEB_URL}"' in text
+    assert 'FINAL_COMPLETION_MESSAGE="Twinbox is ready."' in text
+    assert 'Open the Twinbox web interface:\\n\\n${MANAGEMENT_WEB_URL}' in text
 
 
 def test_setup_wizard_falls_back_to_cloud_init_ip_when_guest_agent_ip_is_empty():
@@ -323,18 +322,18 @@ def test_setup_wizard_shows_runtime_progress_feedback():
     assert "run_apply_educated_defaults_with_gauge()" in text
     assert '--gauge "Checking network and free addresses"' in text
     assert 'progress_update "Preparing" "Checking network and free addresses"' in text
-    assert 'progress_update "Preparing" "Building the VM"' in text
-    assert 'progress_update "Starting VM" "Starting the VM"' in text
-    assert 'progress_update "Waiting for VM" "Waiting for an IP address"' in text
+    assert 'progress_update "Preparing" "Preparing the management VM"' in text
+    assert 'progress_update "Starting VM" "Management VM is running"' in text
+    assert 'progress_update "Waiting for IP" "Waiting for the management VM to receive an IP address"' in text
     assert 'Twinbox setup' in text
     assert 'Management VM bootstrap in progress.' in text
-    assert '- Provisioning Proxmox access' in text
     assert '- Creating the management VM' in text
-    assert '- Waiting for the web UI to become reachable' in text
+    assert '- Waiting for an IP address' in text
+    assert '- Waiting for Twinbox to finish starting' in text
     assert 'wait_for_management_vm_ping()' in text
-    assert 'log_event "The VM is responding on the network"' in text
-    assert 'log_event "Twinbox services are starting. This usually takes a few minutes on the first run."' in text
-    assert 'log_event "Twinbox is starting. Usually ready in 2-5 minutes."' in text
+    assert 'log_event "The management VM is responding on the network."' in text
+    assert 'log_event "Twinbox services are starting inside the management VM. This usually takes a few minutes."' in text
+    assert 'log_event "Twinbox is still starting. Usually ready in 2-5 minutes."' in text
     assert 'log_event "Still starting. Usually another 1-3 minutes."' in text
     assert 'log_event "Still starting. Downloads may take a few more minutes."' in text
     assert 'log_event "Still starting. This host is taking longer than usual."' in text
@@ -342,7 +341,9 @@ def test_setup_wizard_shows_runtime_progress_feedback():
     assert 'Web interface did not become reachable within timeout' not in text
     assert 'Guest agent did not report an IP within timeout' not in text
     assert 'Management VM did not respond to ping within timeout' not in text
-    assert 'log_event "The operating system is still starting. This may take another minute."' in text
+    assert 'log_event "The management VM is still requesting an IP address."' in text
+    assert 'log_event "The management VM is still booting."' in text
+    assert 'log_event "The operating system is still starting."' in text
     assert 'This usually settles shortly.' not in text
     assert 'Cloud-init is still finishing and Docker images may still be downloading. Estimated time remaining: ${eta_text}' not in text
     assert 'Twinbox services are still starting. Estimated time remaining: ${eta_text}' not in text
@@ -449,7 +450,7 @@ def test_setup_wizard_requires_password_confirmation():
 def test_setup_wizard_uses_kickstart_positioning_and_minimal_handoff():
     text = _wizard_text()
     assert "Twinbox Management" in text
-    assert "Open this in your browser:" in text
+    assert "Open the Twinbox web interface:" in text
     assert "Press OK to return to the main menu." in text
     assert "Security Notice" not in text
 

@@ -53,10 +53,10 @@ render_installation_banner() {
 Twinbox setup
 Management VM bootstrap in progress.
 
-Live status
-- Provisioning Proxmox access
+Progress
 - Creating the management VM
-- Waiting for the web UI to become reachable
+- Waiting for an IP address
+- Waiting for Twinbox to finish starting
 
 EOF
 }
@@ -1032,7 +1032,7 @@ create_proxmox_api_user() {
     return 1
   }
 
-  progress_update "Preparing" "Building the VM"
+  progress_update "Preparing" "Preparing the management VM"
   if create_err=$(pveum user add "$PROXMOX_USER" --comment "Twinbox service account (${CLUSTER_SLUG})" 2>&1); then
     log_event "Created Proxmox API user ${PROXMOX_USER}"
   else
@@ -1234,7 +1234,7 @@ create_management_vm() {
 
   mkdir -p /var/lib/vz/template/cache /var/lib/vz/snippets
 
-  progress_update "Preparing" "Building the VM"
+  progress_update "Preparing" "Preparing the management VM"
   if [[ ! -f "$img_path" ]]; then
     log_event "Downloading Ubuntu 24.04 cloud image"
     curl -fsSL -o "$img_path" "$ubuntu_url"
@@ -1314,7 +1314,7 @@ runcmd:
 CLOUDINIT
   chmod 600 "$snippet_file"
 
-  progress_update "Starting VM" "Starting the VM"
+  progress_update "Starting VM" "Starting the management VM"
   run_qm_command "create VM" qm create "$MGT_ID" --name "$MGT_NAME" --memory "$MGT_RAM" --cores "$MGT_CORES" --cpu "$MGT_CPU_TYPE" --net0 "virtio,bridge=${BRIDGE_IF}" \
     --tags "twinbox;management;docker;bootstrap;${CLUSTER_VM_TAG}" \
     --scsihw virtio-scsi-pci --ide2 local-lvm:cloudinit --serial0 socket --vga serial0 --ostype l26 >/dev/null
@@ -1335,7 +1335,7 @@ CLOUDINIT
   log_event "Starting the management VM"
   qm start "$MGT_ID" >/dev/null
 
-  progress_update "Starting VM" "VM started"
+  progress_update "Starting VM" "Management VM is running"
 }
 
 discover_management_vm_ip() {
@@ -1344,7 +1344,7 @@ discover_management_vm_ip() {
   local polls=1
 
   DISCOVERED_MANAGEMENT_IP=""
-  progress_update "Waiting for VM" "Waiting for an IP address"
+  progress_update "Waiting for IP" "Waiting for the management VM to receive an IP address"
   while true; do
     output=$(qm guest cmd "$MGT_ID" network-get-interfaces 2>/dev/null || true)
     ip=$(
@@ -1357,14 +1357,14 @@ discover_management_vm_ip() {
 
     if [[ -n "$ip" ]]; then
       DISCOVERED_MANAGEMENT_IP="$ip"
-      log_event "VM received an IP address"
+      log_event "The management VM received an IP address."
       return 0
     fi
 
     if (( polls == 3 )); then
-      log_event "Waiting for the VM to request an address."
+      log_event "The management VM is still requesting an IP address."
     elif (( polls == 9 )); then
-      log_event "The VM is still booting. This can take a minute or two."
+      log_event "The management VM is still booting."
     fi
 
     sleep 5
@@ -1376,19 +1376,19 @@ wait_for_management_vm_ping() {
   local management_ip="$1"
   local polls=1
 
-  progress_update "Waiting for VM" "Waiting for the VM to come up"
-  log_event "The VM is starting on the network."
+  progress_update "Waiting for network" "Waiting for the management VM to respond on the network"
+  log_event "Waiting for the management VM to come online."
 
   while true; do
     if ping -c 1 -W 1 "$management_ip" >/dev/null 2>&1; then
-      log_event "The VM is responding on the network"
+      log_event "The management VM is responding on the network."
       return 0
     fi
 
     if (( polls == 3 )); then
-      log_event "Still waiting for the VM to respond to network checks."
+      log_event "Still waiting for the management VM to respond."
     elif (( polls == 9 )); then
-      log_event "The operating system is still starting. This may take another minute."
+      log_event "The operating system is still starting."
     fi
 
     sleep 5
@@ -1404,19 +1404,19 @@ wait_for_web_interface() {
   local http_code=""
   local wait_stage=0
 
-  progress_update "Waiting for VM" "Waiting for the web UI"
-  log_event "Twinbox services are starting. This usually takes a few minutes on the first run."
+  progress_update "Waiting for Twinbox" "Waiting for the Twinbox web interface"
+  log_event "Twinbox services are starting inside the management VM. This usually takes a few minutes."
   while true; do
     http_code=$(curl --silent --head --output /dev/null --write-out "%{http_code}" --connect-timeout 2 --max-time 10 "$web_url" || true)
     if [[ "${http_code}" != "000" ]]; then
-      log_event "Web interface is reachable on port 3000"
+      log_event "Twinbox is ready on port 3000."
       return 0
     fi
 
     elapsed_seconds=$(((polls - 1) * 5))
 
     if (( elapsed_seconds >= 30 && wait_stage == 0 )); then
-      log_event "Twinbox is starting. Usually ready in 2-5 minutes."
+      log_event "Twinbox is still starting. Usually ready in 2-5 minutes."
       wait_stage=1
     elif (( elapsed_seconds >= 120 && wait_stage == 1 )); then
       log_event "Still starting. Usually another 1-3 minutes."
@@ -1442,8 +1442,8 @@ prepare_completion_message() {
   wait_for_web_interface "$management_ip"
   MANAGEMENT_WEB_URL="http://${management_ip}:3000"
   printf '%s\n' "$MANAGEMENT_WEB_URL" >"$completion_state_file"
-  log_event "Twinbox URL: ${MANAGEMENT_WEB_URL}"
-  FINAL_COMPLETION_MESSAGE="Twinbox URL: ${MANAGEMENT_WEB_URL}"
+  log_event "Twinbox is ready at ${MANAGEMENT_WEB_URL}"
+  FINAL_COMPLETION_MESSAGE="Twinbox is ready."
 }
 
 run_installation_flow() {
@@ -1453,7 +1453,8 @@ run_installation_flow() {
   {
     LIVE_LOG_MODE=1
     render_installation_banner
-    log_event "Building the VM."
+    progress_update "Preparing" "Checking Proxmox access and VM settings"
+    log_event "Building the management VM."
     create_proxmox_api_user
     create_management_vm
     prepare_completion_message
@@ -1470,13 +1471,13 @@ run_installation_flow() {
   fi
 
   MANAGEMENT_WEB_URL=$(tr -d '\r' <"$completion_state_file")
-  FINAL_COMPLETION_MESSAGE="Twinbox URL: ${MANAGEMENT_WEB_URL}"
+  FINAL_COMPLETION_MESSAGE="Twinbox is ready."
 }
 
 print_next_steps() {
   local message="${FINAL_COMPLETION_MESSAGE}"
 
-  msg_box "Twinbox Setup Complete" "${message}\n\nOpen this in your browser:\n\n${MANAGEMENT_WEB_URL}\n\nPress OK to return to the main menu."
+  msg_box "Twinbox Setup Complete" "${message}\n\nOpen the Twinbox web interface:\n\n${MANAGEMENT_WEB_URL}\n\nPress OK to return to the main menu."
 }
 
 main() {
