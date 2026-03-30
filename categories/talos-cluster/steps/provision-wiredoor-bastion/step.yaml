@@ -1,7 +1,7 @@
 id: provision-wiredoor-bastion
 title: Deploy Wiredoor Bastion Host
 type: action
-order: 10
+order: 33
 journey_stage: setup
 summary: Provision a Wiredoor bastion host on Hetzner Cloud for external access.
 explanation: >
@@ -55,4 +55,4 @@ secrets:
       format: json
 runner:
   kind: script
-  script: categories/external-infra/steps/provision-wiredoor-bastion/run.sh
+  script: categories/talos-cluster/steps/provision-wiredoor-bastion/run.sh

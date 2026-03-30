@@ -1,4 +1,0 @@
-id: external-infra
-title: External Infrastructure
-summary: Provision external infrastructure components like bastion hosts and VPN gateways.
-order: 15
