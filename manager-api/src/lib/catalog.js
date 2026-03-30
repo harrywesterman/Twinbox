@@ -203,6 +203,7 @@ export function loadCatalogDefinitions({ workspaceRoot }) {
 }
 
 function isDone(step, state) {
+  if (state?.status === "skipped") return true;
   return step.type === "config"
     ? state?.status === "configured" || state?.status === "succeeded"
     : state?.status === "succeeded";
@@ -295,6 +296,10 @@ function deriveStepStatus(step, state, latestJob, completedDependencies) {
   const dependenciesMet = step.depends_on.every((dependency) => completedDependencies.has(dependency));
   if (!dependenciesMet) {
     return "locked";
+  }
+
+  if (state?.status === "skipped") {
+    return "skipped";
   }
 
   if (latestJob && (latestJob.status === "pending" || latestJob.status === "running")) {
