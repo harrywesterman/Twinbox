@@ -320,7 +320,7 @@ function deriveStepStatus(step, state, latestJob, completedDependencies) {
 function deriveCategoryStatus(steps) {
   if (steps.some((step) => step.status === "running")) return "running";
   if (steps.some((step) => step.status === "failed")) return "failed";
-  if (steps.length > 0 && steps.every((step) => step.status === "done")) return "done";
+  if (steps.length > 0 && steps.every((step) => step.status === "done" || step.status === "skipped")) return "done";
   if (steps.every((step) => step.status === "locked")) return "locked";
   return "ready";
 }
