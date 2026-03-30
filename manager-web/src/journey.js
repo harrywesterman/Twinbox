@@ -299,6 +299,15 @@ function fallbackRuntimeEvent(activeStep, latestJob) {
       timestamp: null,
     };
   }
+  if (status === 'skipped') {
+    return {
+      id: `${activeStep?.id || 'step'}-skipped`,
+      title: 'Skipped',
+      detail: 'This step was skipped.',
+      tone: 'warning',
+      timestamp: null,
+    };
+  }
 
   return {
     id: `${activeStep?.id || 'step'}-idle`,
@@ -419,6 +428,14 @@ function buildRisks(activeStep, catalogErrors, error) {
     risks.push({
       label: 'Dependencies incomplete',
       detail: 'Complete the prerequisite steps before this step can run.',
+      tone: 'warning',
+    });
+  }
+
+  if (activeStep?.status === 'skipped') {
+    risks.push({
+      label: 'Step skipped',
+      detail: 'This step was skipped. Use "Run this step" to execute it.',
       tone: 'warning',
     });
   }
