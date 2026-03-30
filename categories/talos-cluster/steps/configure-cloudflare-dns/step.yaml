@@ -2,13 +2,48 @@ id: configure-cloudflare-dns
 title: Configure Cloudflare DNS
 type: action
 journey_stage: setup
-order: 32
-summary: Placeholder step for DNS automation.
-explanation: This wizard step is reserved for future Cloudflare DNS work and does not run a real cluster action yet.
-side_help: DNS configuration is shown as a distinct phase so ingress and external access can be planned separately.
+order: 34
+summary: Configure DNS records in Cloudflare to point to the Wiredoor bastion host.
+explanation: >
+  This step configures DNS records in Cloudflare to route traffic to your Wiredoor
+  bastion host. It creates two A records: one for wiredoor.example.com and a wildcard
+  record for *.example.com, both pointing to the Hetzner VM's IP address.
+side_help: >
+  To configure Cloudflare DNS, you need:
+  1. A Cloudflare account (sign up at https://dash.cloudflare.com/)
+  2. A domain name (buy one through Cloudflare or add an existing domain)
+  3. An API token with "Zone DNS Edit" permissions:
+     - Go to https://dash.cloudflare.com/profile/api-tokens
+     - Click "Create Token"
+     - Use the "Edit zone DNS" template
+     - Select your zone (domain)
+     - Copy the generated token
+  4. Your domain name (e.g., example.com)
 depends_on:
-  - create-users-and-groups
-inputs: []
+  - provision-wiredoor-bastion
+inputs:
+  - id: cloudflare_api_token
+    label: Cloudflare API Token
+    type: string
+    required: true
+    help: >
+      API token with Zone DNS Edit permissions. Create one at:
+      https://dash.cloudflare.com/profile/api-tokens
+  - id: zone_name
+    label: Domain Name
+    type: string
+    required: true
+    help: Your domain name (e.g., example.com)
+secrets:
+  files:
+    WIREDORO_BASTION_SECRETS:
+      scope: global
+      item: wiredoor-bastion
+      format: json
+    CLOUDFLARE_SECRETS:
+      scope: global
+      item: cloudflare
+      format: json
 runner:
   kind: script
-  script: categories/talos-cluster/steps/_placeholder/run.sh
+  script: categories/talos-cluster/steps/configure-cloudflare-dns/run.sh
