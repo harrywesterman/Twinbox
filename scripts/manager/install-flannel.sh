@@ -21,6 +21,22 @@ command -v kubectl >/dev/null 2>&1 || fail "kubectl not found"
 
 export KUBECONFIG="$KUBECONFIG_FILE"
 
+wait_for_kube_api() {
+  local attempts=60
+  log "Waiting for Kubernetes API server to become ready"
+  while [[ "$attempts" -gt 0 ]]; do
+    if kubectl cluster-info >/dev/null 2>&1; then
+      log "Kubernetes API server is ready"
+      return 0
+    fi
+    sleep 5
+    attempts=$((attempts - 1))
+  done
+  fail "Timed out waiting for Kubernetes API server"
+}
+
+wait_for_kube_api
+
 log "Bootstrapping Flannel before Argo CD so the cluster has pod networking"
 kubectl apply -k "$WORKSPACE_ROOT/gitops/platform/flannel"
 wait_for_daemonset_rollout "kube-flannel" "kube-flannel-ds"
