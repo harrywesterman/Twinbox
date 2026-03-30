@@ -57,6 +57,11 @@ def test_provision_nodes_uses_current_step_context_vm_node_map():
                 "gateway_ip": "192.168.1.1",
                 "dns_servers": ["1.1.1.1", "8.8.8.8"],
                 "dns_domain": "cluster.internal",
+                "vm_ip_map": {
+                    "cp-1": "192.168.1.61",
+                    "cp-2": "192.168.1.62",
+                    "worker-1": "192.168.1.63",
+                },
                 "vm_node_map": {
                     "cp-1": "new-a",
                     "cp-2": "new-b",
@@ -95,6 +100,13 @@ def test_provision_nodes_uses_current_step_context_vm_node_map():
             "cp-1": "new-a",
             "cp-2": "new-b",
             "worker-1": "new-c",
+        }
+        assert "--vm-ip-map" in args
+        vm_ip_map_index = args.index("--vm-ip-map") + 1
+        assert json.loads(args[vm_ip_map_index]) == {
+            "cp-1": "192.168.1.61",
+            "cp-2": "192.168.1.62",
+            "worker-1": "192.168.1.63",
         }
         assert json.loads((data_dir / "clusters" / "tst.json").read_text(encoding="utf-8"))["vm_node_map"] == {
             "cp-1": "old-a",

@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 usage() {
   cat <<USAGE
-Usage: $0 --cluster-id ID --name NAME --controlplane-count N --worker-count N --cpu-cores N --memory-mb N --disk-gb N --bridge BR --start-vmid ID --start-ip IP --vip-ip IP --node-prefix-length N --gateway-ip IP --dns-servers CSV --dns-domain NAME --vm-node-map JSON --proxmox-node NODE --storage-pool POOL --file-datastore STORE --data-dir DIR
+Usage: $0 --cluster-id ID --name NAME --controlplane-count N --worker-count N --cpu-cores N --memory-mb N --disk-gb N --bridge BR --start-vmid ID --start-ip IP --vip-ip IP --node-prefix-length N --gateway-ip IP --dns-servers CSV --dns-domain NAME --vm-node-map JSON --vm-ip-map JSON --proxmox-node NODE --storage-pool POOL --file-datastore STORE --data-dir DIR
 USAGE
 }
 
@@ -57,11 +57,11 @@ while [[ $# -gt 0 ]]; do
     --dns-servers) DNS_SERVERS="$2"; shift 2 ;;
     --dns-domain) DNS_DOMAIN="$2"; shift 2 ;;
     --vm-node-map) VM_NODE_MAP="$2"; shift 2 ;;
+    --vm-ip-map) VM_IP_MAP="$2"; shift 2 ;;
     --proxmox-node) PROXMOX_NODE="$2"; shift 2 ;;
     --storage-pool) STORAGE_POOL="$2"; shift 2 ;;
     --file-datastore) FILE_DATASTORE="$2"; shift 2 ;;
     --data-dir) DATA_DIR="$2"; shift 2 ;;
-    --vm-node-map) shift 2 ;;
     *) usage; fail "Unknown argument: $1" ;;
   esac
 done
@@ -338,6 +338,65 @@ next_ip() {
   echo "$base.$((octet + $1))"
 }
 
+build_legacy_vm_ip_map() {
+  local start_ip="$1"
+  local cp_count="$2"
+  local worker_count="$3"
+  local base
+  local octet
+  local map='{}'
+  local i=""
+  local name=""
+  local ip=""
+
+  base="$(echo "$start_ip" | cut -d. -f1-3)"
+  octet="$(echo "$start_ip" | cut -d. -f4)"
+
+  if [[ "$cp_count" -gt 0 ]]; then
+    for i in $(seq 1 "$cp_count"); do
+      name="cp-${i}"
+      ip="${base}.$((octet + i - 1))"
+      map="$(jq --arg key "$name" --arg ip "$ip" '. + {($key): $ip}' <<<"$map")"
+    done
+  fi
+
+  if [[ "$worker_count" -gt 0 ]]; then
+    for i in $(seq 1 "$worker_count"); do
+      name="worker-${i}"
+      ip="${base}.$((octet + cp_count + i - 1))"
+      map="$(jq --arg key "$name" --arg ip "$ip" '. + {($key): $ip}' <<<"$map")"
+    done
+  fi
+
+  printf '%s\n' "$map"
+}
+
+resolve_vm_ip_map() {
+  local raw_vm_ip_map="${VM_IP_MAP:-}"
+
+  if [[ -n "$raw_vm_ip_map" ]]; then
+    if ! jq -e . >/dev/null 2>&1 <<<"$raw_vm_ip_map"; then
+      fail "vm_ip_map is not valid JSON: ${raw_vm_ip_map}"
+    fi
+
+    if [[ "$(jq -r 'type' <<<"$raw_vm_ip_map")" != "object" ]]; then
+      fail "vm_ip_map must be a JSON object"
+    fi
+
+    if [[ "$(jq -r 'length' <<<"$raw_vm_ip_map")" -eq 0 ]]; then
+      [[ -n "${START_IP:-}" ]] || fail "Missing vm_ip_map or start_ip for cluster ${CLUSTER_ID}"
+      build_legacy_vm_ip_map "$START_IP" "$CP_COUNT" "$WORKER_COUNT"
+      return 0
+    fi
+
+    printf '%s\n' "$(jq -c '.' <<<"$raw_vm_ip_map")"
+    return 0
+  fi
+
+  [[ -n "${START_IP:-}" ]] || fail "Missing vm_ip_map or start_ip for cluster ${CLUSTER_ID}"
+  build_legacy_vm_ip_map "$START_IP" "$CP_COUNT" "$WORKER_COUNT"
+}
+
 deterministic_mac() {
   local vmid="$1"
   printf '52:54:%02x:%02x:%02x:%02x\n' \
@@ -355,41 +414,47 @@ generate_nodes_json() {
   local name=""
   local mac=""
 
-  for i in $(seq 1 "$CP_COUNT"); do
-    name="cp-${i}"
-    ip="$(next_ip $((i - 1)))"
-    mac="$(deterministic_mac "$current_vmid")"
-    nodes_json="$(jq \
-      --arg key "$name" \
-      --arg ip "$ip" \
-      --arg type "controlplane" \
-      --arg mac "$mac" \
-      --argjson vmid "$current_vmid" \
-      --argjson cpu "$CPU_CORES" \
-      --argjson ram "$MEMORY_MB" \
-      --argjson disk "$DISK_GB" \
-      '. + {($key): {ip: $ip, type: $type, vmid: $vmid, cpu: $cpu, ram_mb: $ram, disk_gb: $disk, mac: $mac}}' \
-      <<<"$nodes_json")"
-    current_vmid=$((current_vmid + 1))
-  done
+  if [[ "$CP_COUNT" -gt 0 ]]; then
+    for i in $(seq 1 "$CP_COUNT"); do
+      name="cp-${i}"
+      ip="$(jq -r --arg key "$name" '.[$key] // empty' <<<"$vm_ip_map_json")"
+      [[ -n "$ip" ]] || fail "Missing vm_ip_map entry for ${name}"
+      mac="$(deterministic_mac "$current_vmid")"
+      nodes_json="$(jq \
+        --arg key "$name" \
+        --arg ip "$ip" \
+        --arg type "controlplane" \
+        --arg mac "$mac" \
+        --argjson vmid "$current_vmid" \
+        --argjson cpu "$CPU_CORES" \
+        --argjson ram "$MEMORY_MB" \
+        --argjson disk "$DISK_GB" \
+        '. + {($key): {ip: $ip, type: $type, vmid: $vmid, cpu: $cpu, ram_mb: $ram, disk_gb: $disk, mac: $mac}}' \
+        <<<"$nodes_json")"
+      current_vmid=$((current_vmid + 1))
+    done
+  fi
 
-  for i in $(seq 1 "$WORKER_COUNT"); do
-    name="worker-${i}"
-    ip="$(next_ip $((CP_COUNT + i - 1)))"
-    mac="$(deterministic_mac "$current_vmid")"
-    nodes_json="$(jq \
-      --arg key "$name" \
-      --arg ip "$ip" \
-      --arg type "worker" \
-      --arg mac "$mac" \
-      --argjson vmid "$current_vmid" \
-      --argjson cpu "$CPU_CORES" \
-      --argjson ram "$MEMORY_MB" \
-      --argjson disk "$DISK_GB" \
-      '. + {($key): {ip: $ip, type: $type, vmid: $vmid, cpu: $cpu, ram_mb: $ram, disk_gb: $disk, mac: $mac}}' \
-      <<<"$nodes_json")"
-    current_vmid=$((current_vmid + 1))
-  done
+  if [[ "$WORKER_COUNT" -gt 0 ]]; then
+    for i in $(seq 1 "$WORKER_COUNT"); do
+      name="worker-${i}"
+      ip="$(jq -r --arg key "$name" '.[$key] // empty' <<<"$vm_ip_map_json")"
+      [[ -n "$ip" ]] || fail "Missing vm_ip_map entry for ${name}"
+      mac="$(deterministic_mac "$current_vmid")"
+      nodes_json="$(jq \
+        --arg key "$name" \
+        --arg ip "$ip" \
+        --arg type "worker" \
+        --arg mac "$mac" \
+        --argjson vmid "$current_vmid" \
+        --argjson cpu "$CPU_CORES" \
+        --argjson ram "$MEMORY_MB" \
+        --argjson disk "$DISK_GB" \
+        '. + {($key): {ip: $ip, type: $type, vmid: $vmid, cpu: $cpu, ram_mb: $ram, disk_gb: $disk, mac: $mac}}' \
+        <<<"$nodes_json")"
+      current_vmid=$((current_vmid + 1))
+    done
+  fi
 
   printf '%s\n' "$nodes_json"
 }
@@ -833,6 +898,8 @@ sync_user_talosconfig() {
 talos_image_local_path="$image_cache_dir/talos-${image_cache_key}.iso"
 download_talos_image "$talos_image_local_path"
 talos_image_file_name="talos-${image_cache_key}.iso"
+
+vm_ip_map_json="$(resolve_vm_ip_map)"
 
 nodes_json="$(generate_nodes_json)"
 planned_controlplane_ips_json="$(node_array "ip" "controlplane")"

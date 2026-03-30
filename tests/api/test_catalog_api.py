@@ -228,8 +228,12 @@ def test_execute_step_persists_state_and_enqueues_run_step_job():
                         "bridge": "vmbr0",
                         "start_vmid": 200,
                         "vip_ip": "192.168.1.50",
-                        "start_ip": "192.168.1.51",
-                    }
+                    },
+                    "vm_ip_map": {
+                        "cp-1": "192.168.1.61",
+                        "worker-1": "192.168.1.62",
+                        "worker-2": "192.168.1.63",
+                    },
                 },
             )
             assert status == 202
@@ -247,6 +251,89 @@ def test_execute_step_persists_state_and_enqueues_run_step_job():
             job = json.loads((data_dir / "jobs" / f"{body['job_id']}.json").read_text())
             assert job["type"] == "run_step"
             assert job["payload"]["step_id"] == "provision-nodes"
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
+def test_execute_step_accepts_manual_vm_ip_map_without_allocation_recheck():
+    with tempfile.TemporaryDirectory() as td:
+        data_dir = Path(td) / "data"
+        ping_mock = Path(td) / "mock-ping.sh"
+        vm_mock = Path(td) / "mock-vms.sh"
+        ping_mock.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        ping_mock.chmod(0o755)
+        vm_mock.write_text(
+            """#!/bin/sh
+cat <<'EOF'
+[
+  {"node": "pve-a", "status": "online"},
+  {"node": "pve-b", "status": "online"}
+]
+EOF
+""",
+            encoding="utf-8",
+        )
+        vm_mock.chmod(0o755)
+
+        port = _find_free_port()
+        env = os.environ.copy()
+        env["MANAGER_DATA_DIR"] = str(data_dir)
+        env["MANAGER_API_PORT"] = str(port)
+        env["WORKSPACE_ROOT"] = str(REPO_ROOT)
+        env["MANAGER_API_PING_BIN"] = str(ping_mock)
+        env["MANAGER_API_CLUSTER_RESOURCES_BIN"] = str(vm_mock)
+
+        proc = subprocess.Popen(
+            ["node", "manager-api/src/server.js"],
+            cwd=REPO_ROOT,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        try:
+            base = f"http://127.0.0.1:{port}"
+            _wait_for_health(base)
+
+            status, body = _post_json(
+                f"{base}/api/steps/provision-nodes/execute",
+                {
+                    "inputs": {
+                        "name": "demo",
+                        "controlplane_count": 1,
+                        "worker_count": 1,
+                        "cpu_cores": 2,
+                        "memory_mb": 4096,
+                        "disk_gb": 20,
+                        "bridge": "vmbr0",
+                        "start_vmid": 200,
+                        "vip_ip": "192.168.1.50",
+                        "node_prefix_length": 24,
+                        "gateway_ip": "192.168.1.1",
+                        "dns_servers": "1.1.1.1,8.8.8.8",
+                        "dns_domain": "lab.local",
+                    },
+                    "vm_ip_map": {
+                        "cp-1": "192.168.1.61",
+                        "worker-1": "192.168.1.62",
+                    },
+                    "vm_node_map": {
+                        "cp-1": "pve-a",
+                        "worker-1": "pve-b",
+                    },
+                },
+            )
+
+            assert status == 202
+            assert body["step_id"] == "provision-nodes"
+
+            cluster = json.loads((data_dir / "clusters" / f"{body['cluster_id']}.json").read_text())
+            assert cluster["vm_ip_map"] == {
+                "cp-1": "192.168.1.61",
+                "worker-1": "192.168.1.62",
+            }
         finally:
             proc.terminate()
             proc.wait(timeout=5)
@@ -310,11 +397,15 @@ EOF
                     "bridge": "vmbr0",
                     "start_vmid": 200,
                     "vip_ip": "192.168.1.50",
-                    "start_ip": "192.168.1.51",
                     "node_prefix_length": 24,
                     "gateway_ip": "192.168.1.1",
                     "dns_servers": "1.1.1.1,8.8.8.8",
                     "dns_domain": "lab.local",
+                },
+                "vm_ip_map": {
+                    "cp-1": "192.168.1.61",
+                    "worker-1": "192.168.1.62",
+                    "worker-2": "192.168.1.63",
                 },
                 "vm_node_map": {
                     "cp-1": "pve-a",

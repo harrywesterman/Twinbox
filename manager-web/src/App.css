@@ -743,6 +743,119 @@
   word-break: break-word;
 }
 
+.wizard-network-vm-list {
+  display: grid;
+  gap: 12px;
+}
+
+.wizard-network-vm-list-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.wizard-network-vm-list-head h4 {
+  margin: 6px 0 0;
+  font-size: 0.98rem;
+  letter-spacing: -0.03em;
+}
+
+.wizard-network-vm-items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.wizard-network-vm-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(248, 250, 252, 0.94);
+}
+
+.wizard-network-vm-card.is-success {
+  border-color: rgba(16, 185, 129, 0.28);
+  background: rgba(236, 253, 245, 0.94);
+}
+
+.wizard-network-vm-card.is-warning {
+  border-color: rgba(245, 158, 11, 0.24);
+  background: rgba(255, 251, 235, 0.95);
+}
+
+.wizard-network-vm-card.is-danger {
+  border-color: rgba(248, 113, 113, 0.28);
+  background: rgba(254, 242, 242, 0.95);
+}
+
+.wizard-network-vm-card-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wizard-network-vm-card-head strong {
+  display: block;
+  font-size: 0.96rem;
+  letter-spacing: -0.03em;
+}
+
+.wizard-network-vm-card-head > div span {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+}
+
+.wizard-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.wizard-status-badge.is-success {
+  color: #047857;
+  background: rgba(16, 185, 129, 0.14);
+}
+
+.wizard-status-badge.is-warning {
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.16);
+}
+
+.wizard-status-badge.is-danger {
+  color: #b91c1c;
+  background: rgba(248, 113, 113, 0.14);
+}
+
+.wizard-field-inline {
+  display: grid;
+  gap: 8px;
+}
+
+.wizard-field-inline input {
+  width: 100%;
+}
+
+.wizard-network-error {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(254, 242, 242, 0.96);
+  border: 1px solid rgba(248, 113, 113, 0.22);
+  color: #b91c1c;
+  font-weight: 600;
+}
+
 .wizard-empty {
   margin: 0;
   padding: 18px;
@@ -1210,6 +1323,10 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .wizard-network-vm-items {
+    grid-template-columns: 1fr;
+  }
+
   .wizard-card-actions-inline {
     justify-content: flex-start;
   }
@@ -1271,6 +1388,11 @@
 
   .wizard-network-summary {
     grid-template-columns: 1fr;
+  }
+
+  .wizard-network-vm-list-head,
+  .wizard-network-vm-card-head {
+    flex-direction: column;
   }
 
   .wizard-placement-grid {

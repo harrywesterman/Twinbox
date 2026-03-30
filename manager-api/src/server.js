@@ -816,15 +816,6 @@ async function suggestAllocation(managementIp, nodeCount) {
     managementIp,
     nodeCount,
     isIpInUse,
-    isAllocationValid: ({ vipIp, startIp, nodeCount: requestedNodeCount }) => validateRequestedAllocation({
-      startVmid: vmidSuggestion.start_vmid,
-      vipIp,
-      startIp,
-      nodeCount: requestedNodeCount,
-    }, {
-      skipVmidCheck: true,
-      probeIpInUseFn: (ip) => probeIpInUse(ip, { attempts: 3 }),
-    }),
   });
 
   return {
@@ -1160,6 +1151,7 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
 
     const built = buildClusterFromRequest({
       ...validated.value,
+      vm_ip_map: req.body?.vm_ip_map,
       vm_node_map: req.body?.vm_node_map,
     }, process.env, {
       allowedVmHosts,
@@ -1169,28 +1161,6 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
     });
     if (!built.ok) {
       return res.status(400).json({ error: built.error });
-    }
-
-    const nextClusterFile = path.join(dirs.clusters, `${built.cluster.id}.json`);
-    const isRetry = fs.existsSync(nextClusterFile)
-      && readJson(nextClusterFile).cluster_instance_id === built.cluster.cluster_instance_id;
-
-    if (!isRetry) {
-      try {
-        const allocation = await validateRequestedAllocation({
-          startVmid: built.cluster.start_vmid,
-          vipIp: built.cluster.vip_ip,
-          startIp: built.cluster.start_ip,
-          nodeCount: built.cluster.controlplane_count + built.cluster.worker_count,
-        });
-        if (!allocation.ok) {
-          return res.status(400).json({ error: allocation.error });
-        }
-      } catch (e) {
-        return res.status(500).json({
-          error: e instanceof Error ? e.message : "failed to validate allocation",
-        });
-      }
     }
 
     persistCluster(dirs, built.cluster);

@@ -26,6 +26,11 @@ test('app source defines a wizard shell with export, import, and technical outpu
   assert.match(source, /live running VMs/, 'expected live VM-aware placement wording');
   assert.match(source, /3\. Network and addressing/, 'expected networking to come after placement');
   assert.match(source, /wizard-network-summary/, 'expected a compact network summary');
+  assert.match(source, /Per-VM IPs/, 'expected a per-VM IP list');
+  assert.match(source, /wizard-network-vm-list/, 'expected the VM IP list container');
+  assert.match(source, /wizard-status-badge/, 'expected status badges for each VM');
+  assert.match(source, /one-time free address suggestion/, 'expected the one-time IP allocation note');
+  assert.doesNotMatch(source, /Start IP/, 'expected the fixed start IP field to be removed from the wizard');
   assert.match(source, /className="technical-panel" open/, 'expected technical details to be visible by default');
   assert.match(source, /LIVE OUTPUT/, 'expected a visible output panel');
   assert.match(source, /wizard-step-icon/, 'expected step icons in the rail');

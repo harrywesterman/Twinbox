@@ -23,6 +23,11 @@ const baseBody = {
 test('cluster builder preserves valid vm_node_map assignments', () => {
   const result = buildClusterFromRequest({
     ...baseBody,
+    vm_ip_map: {
+      'cp-1': '192.168.1.61',
+      'worker-1': '192.168.1.62',
+      'worker-2': '192.168.1.63',
+    },
     vm_node_map: {
       'cp-1': 'pve-a',
       'worker-1': 'pve-b',
@@ -37,6 +42,12 @@ test('cluster builder preserves valid vm_node_map assignments', () => {
   });
 
   assert.equal(result.ok, true);
+  assert.deepEqual(result.cluster.vm_ip_map, {
+    'cp-1': '192.168.1.61',
+    'worker-1': '192.168.1.62',
+    'worker-2': '192.168.1.63',
+  });
+  assert.equal(result.cluster.start_ip, '192.168.1.61');
   assert.deepEqual(result.cluster.vm_node_map, {
     'cp-1': 'pve-a',
     'worker-1': 'pve-b',

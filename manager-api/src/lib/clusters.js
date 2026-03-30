@@ -131,6 +131,79 @@ function normalizeVmNodeMap(rawMap, allowedHosts = [], fallbackHost = "pve", vmN
   return { ok: true, value: normalized };
 }
 
+function buildLegacyVmIpMap(startIp, vmNames = []) {
+  const parsedStartIp = parseIPv4(startIp, "start_ip");
+  if (!parsedStartIp.ok) {
+    return parsedStartIp;
+  }
+
+  const [prefixA, prefixB, prefixC, startOctet] = parsedStartIp.value.split(".");
+  const prefix = `${prefixA}.${prefixB}.${prefixC}`;
+  const normalized = {};
+
+  for (const [index, vmName] of vmNames.entries()) {
+    normalized[vmName] = `${prefix}.${Number(startOctet) + index}`;
+  }
+
+  return { ok: true, value: normalized };
+}
+
+function normalizeVmIpMap(rawMap, vmNames = [], fallbackStartIp = "") {
+  const vmNameList = Array.isArray(vmNames) ? vmNames.map((name) => String(name || "").trim()).filter(Boolean) : [];
+  if (vmNameList.length === 0) {
+    return { ok: false, error: "vm_ip_map cannot be built without VM names" };
+  }
+
+  if (rawMap === null || rawMap === undefined || rawMap === "") {
+    if (fallbackStartIp) {
+      return buildLegacyVmIpMap(fallbackStartIp, vmNameList);
+    }
+    return { ok: false, error: "vm_ip_map is required" };
+  }
+
+  let candidate = rawMap;
+  if (typeof candidate === "string") {
+    try {
+      candidate = JSON.parse(candidate);
+    } catch {
+      return { ok: false, error: "vm_ip_map must be valid JSON" };
+    }
+  }
+
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+    return { ok: false, error: "vm_ip_map must be an object" };
+  }
+
+  const normalized = {};
+  const seenIps = new Set();
+
+  for (const vmName of vmNameList) {
+    if (!Object.prototype.hasOwnProperty.call(candidate, vmName)) {
+      return { ok: false, error: `vm_ip_map is missing an entry for ${vmName}` };
+    }
+
+    const ipValue = String(candidate[vmName] || "").trim();
+    const parsedIp = parseIPv4(ipValue, `vm_ip_map.${vmName}`);
+    if (!parsedIp.ok) {
+      return { ok: false, error: parsedIp.error };
+    }
+    if (seenIps.has(parsedIp.value)) {
+      return { ok: false, error: `vm_ip_map contains duplicate IP ${parsedIp.value}` };
+    }
+
+    normalized[vmName] = parsedIp.value;
+    seenIps.add(parsedIp.value);
+  }
+
+  for (const key of Object.keys(candidate)) {
+    if (!vmNameList.includes(String(key || "").trim())) {
+      return { ok: false, error: `vm_ip_map contains unknown VM ${String(key || "").trim()}` };
+    }
+  }
+
+  return { ok: true, value: normalized };
+}
+
 export function buildClusterFromRequest(body, env, { allowedVmHosts = [], clusterInstanceId = null } = {}) {
   const parsedName = parseRequiredString(body.name, "name");
   const parsedBridge = parseRequiredString(body.bridge, "bridge");
@@ -141,7 +214,6 @@ export function buildClusterFromRequest(body, env, { allowedVmHosts = [], cluste
   const parsedDisk = parseIntInRange(body.disk_gb, "disk_gb", 10, 8192);
   const parsedStartVmid = parseIntInRange(body.start_vmid, "start_vmid", 100, 999999);
   const parsedVipIp = parseIPv4(body.vip_ip, "vip_ip");
-  const parsedStartIp = parseIPv4(body.start_ip, "start_ip");
   const parsedNodePrefixLength = parseIntInRange(body.node_prefix_length, "node_prefix_length", 1, 32);
   const parsedGatewayIp = parseIPv4(body.gateway_ip, "gateway_ip");
   const parsedDnsServers = parseIPv4List(body.dns_servers, "dns_servers");
@@ -150,6 +222,7 @@ export function buildClusterFromRequest(body, env, { allowedVmHosts = [], cluste
     ...Array.from({ length: parsedControlplanes.value }, (_, index) => `cp-${index + 1}`),
     ...Array.from({ length: parsedWorkers.value }, (_, index) => `worker-${index + 1}`),
   ];
+  const parsedVmIpMap = normalizeVmIpMap(body.vm_ip_map, vmNames, String(body.start_ip || "").trim());
   const parsedVmNodeMap = normalizeVmNodeMap(
     body.vm_node_map,
     allowedVmHosts,
@@ -167,11 +240,11 @@ export function buildClusterFromRequest(body, env, { allowedVmHosts = [], cluste
     parsedDisk,
     parsedStartVmid,
     parsedVipIp,
-    parsedStartIp,
     parsedNodePrefixLength,
     parsedGatewayIp,
     parsedDnsServers,
     parsedDnsDomain,
+    parsedVmIpMap,
     parsedVmNodeMap.ok ? { ok: true } : { ok: false, error: parsedVmNodeMap.error },
   ];
 
@@ -210,11 +283,12 @@ export function buildClusterFromRequest(body, env, { allowedVmHosts = [], cluste
       bridge: parsedBridge.value,
       start_vmid: parsedStartVmid.value,
       vip_ip: parsedVipIp.value,
-      start_ip: parsedStartIp.value,
+      start_ip: Object.values(parsedVmIpMap.value || {})[0] || String(body.start_ip || ""),
       node_prefix_length: parsedNodePrefixLength.value,
       gateway_ip: parsedGatewayIp.value,
       dns_servers: parsedDnsServers.value,
       dns_domain: parsedDnsDomain.value,
+      vm_ip_map: parsedVmIpMap.value,
       vm_node_map: parsedVmNodeMap.value,
       status: "requested",
       created_at: now(),

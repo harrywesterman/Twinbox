@@ -10,7 +10,6 @@ const stepInputs = [
   { id: 'name', default: 'twinbox-cluster' },
   { id: 'start_vmid', default: 200 },
   { id: 'vip_ip', default: '192.168.1.50' },
-  { id: 'start_ip', default: '192.168.1.51' },
   { id: 'node_prefix_length', default: 24 },
   { id: 'gateway_ip', default: '192.168.1.1' },
   { id: 'dns_servers', default: '1.1.1.1,8.8.8.8' },
@@ -22,7 +21,6 @@ test('mergeSuggestedProvisionDraft refreshes auto-filled values when the suggest
     name_suggestion: 'twinbox-development',
     start_vmid: 119,
     vip_ip: '192.168.2.54',
-    start_ip: '192.168.2.57',
     node_prefix_length: 24,
     gateway_ip: '192.168.2.1',
     dns_servers: ['1.1.1.1'],
@@ -33,7 +31,6 @@ test('mergeSuggestedProvisionDraft refreshes auto-filled values when the suggest
     name: 'twinbox-development',
     start_vmid: 119,
     vip_ip: '192.168.2.54',
-    start_ip: '192.168.2.57',
     node_prefix_length: 24,
     gateway_ip: '192.168.2.1',
     dns_servers: '1.1.1.1',
@@ -44,7 +41,6 @@ test('mergeSuggestedProvisionDraft refreshes auto-filled values when the suggest
     name_suggestion: 'twinbox-development',
     start_vmid: 119,
     vip_ip: '192.168.2.54',
-    start_ip: '192.168.2.59',
     node_prefix_length: 24,
     gateway_ip: '192.168.2.1',
     dns_servers: ['1.1.1.1'],
@@ -58,7 +54,7 @@ test('mergeSuggestedProvisionDraft refreshes auto-filled values when the suggest
     stepInputs,
   });
 
-  assert.equal(merged.start_ip, '192.168.2.59');
+  assert.equal(merged.start_vmid, 119);
 });
 
 test('mergeSuggestedProvisionDraft preserves manual overrides while updating untouched fields', () => {
@@ -66,7 +62,6 @@ test('mergeSuggestedProvisionDraft preserves manual overrides while updating unt
     name_suggestion: 'twinbox-development',
     start_vmid: 119,
     vip_ip: '192.168.2.54',
-    start_ip: '192.168.2.57',
     node_prefix_length: 24,
     gateway_ip: '172.18.0.1',
     dns_servers: ['127.0.0.11'],
@@ -77,7 +72,6 @@ test('mergeSuggestedProvisionDraft preserves manual overrides while updating unt
     name: 'twinbox-development',
     start_vmid: 119,
     vip_ip: '192.168.2.54',
-    start_ip: '192.168.2.70',
     node_prefix_length: 24,
     gateway_ip: '192.168.2.1',
     dns_servers: '1.1.1.1',
@@ -88,7 +82,6 @@ test('mergeSuggestedProvisionDraft preserves manual overrides while updating unt
     name_suggestion: 'twinbox-development',
     start_vmid: 119,
     vip_ip: '192.168.2.54',
-    start_ip: '192.168.2.59',
     node_prefix_length: 24,
     gateway_ip: '192.168.2.1',
     dns_servers: ['1.1.1.1'],
@@ -102,7 +95,6 @@ test('mergeSuggestedProvisionDraft preserves manual overrides while updating unt
     stepInputs,
   });
 
-  assert.equal(merged.start_ip, '192.168.2.70');
   assert.equal(merged.gateway_ip, '192.168.2.1');
   assert.equal(merged.dns_servers, '1.1.1.1');
   assert.equal(merged.dns_domain, '');
@@ -138,7 +130,6 @@ test('mergeSuggestedProvisionDraft replaces first-load defaults with a live sugg
       name: 'twinbox-cluster',
       start_vmid: 200,
       vip_ip: '192.168.1.50',
-      start_ip: '192.168.1.51',
       node_prefix_length: 24,
       gateway_ip: '192.168.1.1',
       dns_servers: '1.1.1.1,8.8.8.8',
@@ -149,7 +140,6 @@ test('mergeSuggestedProvisionDraft replaces first-load defaults with a live sugg
       name_suggestion: 'twinbox-lab',
       start_vmid: 212,
       vip_ip: '192.168.2.54',
-      start_ip: '192.168.2.55',
       node_prefix_length: 24,
       gateway_ip: '192.168.2.1',
       dns_servers: ['1.1.1.1', '8.8.8.8'],
@@ -160,6 +150,5 @@ test('mergeSuggestedProvisionDraft replaces first-load defaults with a live sugg
 
   assert.equal(merged.name, 'twinbox-lab');
   assert.equal(merged.vip_ip, '192.168.2.54');
-  assert.equal(merged.start_ip, '192.168.2.55');
   assert.equal(merged.gateway_ip, '192.168.2.1');
 });

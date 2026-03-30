@@ -403,12 +403,11 @@ exit 1
             assert body["vmid_block"] == [106, 107, 108]
             assert body["name_suggestion"] == "twinbox-cluster"
             assert body["vip_ip"] == "192.168.2.50"
-            assert body["start_ip"] == "192.168.2.51"
             assert body["node_prefix_length"] == 24
             assert body["gateway_ip"] == "192.168.2.1"
             assert body["dns_servers"] == ["1.1.1.1", "9.9.9.9"]
             assert body["dns_domain"] == "westermanonline.internal"
-            assert body["start_ip_block"] == [
+            assert body["vm_ips"] == [
                 "192.168.2.51",
                 "192.168.2.52",
                 "192.168.2.53",

@@ -17,30 +17,20 @@ test("ip allocation skips partially occupied candidate blocks", async () => {
   });
 
   assert.equal(allocation.vip_ip, "192.168.2.51");
-  assert.equal(allocation.start_ip, "192.168.2.59");
-  assert.deepEqual(allocation.start_ip_block, [
-    "192.168.2.59",
-    "192.168.2.60",
-    "192.168.2.61",
+  assert.deepEqual(allocation.vm_ips, [
+    "192.168.2.52",
+    "192.168.2.54",
+    "192.168.2.55",
   ]);
 });
 
-test("ip allocation keeps scanning when validation rejects a free-looking block", async () => {
-  const validatedStarts = [];
-
+test("ip allocation returns a single free vm ip when only one node is requested", async () => {
   const allocation = await selectSuggestedIpAllocation({
     managementIp: "192.168.2.50",
     nodeCount: 1,
     isIpInUse: () => false,
-    isAllocationValid: ({ startIp }) => {
-      validatedStarts.push(startIp);
-      return { ok: startIp !== "192.168.2.52" };
-    },
   });
 
-  assert.deepEqual(validatedStarts.slice(0, 2), [
-    "192.168.2.52",
-    "192.168.2.53",
-  ]);
-  assert.equal(allocation.start_ip, "192.168.2.53");
+  assert.equal(allocation.vip_ip, "192.168.2.51");
+  assert.deepEqual(allocation.vm_ips, ["192.168.2.52"]);
 });

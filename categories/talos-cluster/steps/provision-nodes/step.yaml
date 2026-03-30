@@ -81,12 +81,6 @@ inputs:
     required: true
     default: 192.168.1.50
     help: Virtual IP for the Talos control plane.
-  - id: start_ip
-    label: Start IP
-    type: ipv4
-    required: true
-    default: 192.168.1.51
-    help: First node address in the reserved block.
   - id: node_prefix_length
     label: Prefix length
     type: integer

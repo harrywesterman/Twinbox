@@ -10,6 +10,11 @@ import {
   formatMemoryMb,
 } from './provision-scale.js';
 import {
+  buildProvisionVmIpMap,
+  buildProvisionVmIpRows,
+  validateProvisionVmIpRows,
+} from './provision-network.js';
+import {
   buildSuggestedProvisionInputs,
   mergeSuggestedProvisionDraft,
 } from './provision-defaults.js';
@@ -259,7 +264,6 @@ const PROVISION_VM_INPUT_IDS = [
 const PROVISION_NETWORK_INPUT_IDS = [
   'bridge',
   'vip_ip',
-  'start_ip',
   'node_prefix_length',
   'gateway_ip',
   'dns_servers',
@@ -452,7 +456,6 @@ function App() {
   const [error, setError] = useState('');
   const [activeJob, setActiveJob] = useState(null);
   const [provisionSuggestionsReadyState, setProvisionSuggestionsReadyState] = useState(false);
-  const [provisionStepArmed, setProvisionStepArmed] = useState(false);
   const placementSuggestionKeyRef = useRef('');
 
   useEffect(() => {
@@ -744,9 +747,7 @@ function App() {
   async function executeStep(step, clusterIdOverride = clusterIdRef.current, options = {}) {
     const { manageBusy = true } = options;
     const currentStepDraft = answersRef.current?.[step.id] || {};
-    const draft = step.id === 'provision-nodes'
-      ? await ensureProvisionDraft(step, currentStepDraft)
-      : currentStepDraft;
+    const draft = currentStepDraft;
     const body = {
       inputs: buildPayloadInputs(step, draft),
     };
@@ -768,7 +769,17 @@ function App() {
       }
 
       const placement = buildProvisionPlacementBoard(step.inputs || [], draft, proxmoxResources);
+      const vmIpRows = buildProvisionVmIpRows(placement.vmPlan, draft, provisionSuggestionSnapshotRef.current);
+      const vmIpValidation = validateProvisionVmIpRows(vmIpRows);
+      if (!vmIpValidation.ok) {
+        const message = vmIpValidation.error || 'VM IP addresses must be valid before starting step 1.';
+        setError(message);
+        setNotice(message);
+        return { ok: false, error: message };
+      }
+
       body.vm_node_map = placement.vmNodeMap;
+      body.vm_ip_map = buildProvisionVmIpMap(vmIpRows);
     }
 
     if (manageBusy) {
@@ -874,8 +885,8 @@ function App() {
       return;
     }
 
-    if (model.activeStep.id === 'provision-nodes' && !provisionStepArmed) {
-      const message = 'Step 1 is still preparing. Wait until the button says Start step 1.';
+    if (model.activeStep.id === 'provision-nodes' && !provisionStepValid) {
+      const message = provisionVmIpValidation.error || 'Step 1 is still preparing. Wait until the button says Start step 1.';
       setNotice(message);
       return;
     }
@@ -1090,6 +1101,16 @@ function App() {
   const placementBoard = model.activeStep?.id === 'provision-nodes'
     ? buildProvisionPlacementBoard(model.activeStep.inputs || [], currentDraft, proxmoxResources)
     : null;
+  const provisionVmIpRows = model.activeStep?.id === 'provision-nodes'
+    ? buildProvisionVmIpRows(placementBoard?.vmPlan || [], currentDraft, provisionSuggestionSnapshotRef.current)
+    : [];
+  const provisionVmIpValidation = model.activeStep?.id === 'provision-nodes'
+    ? validateProvisionVmIpRows(provisionVmIpRows)
+    : { ok: true, error: '', invalidRows: [], duplicateRows: [] };
+  const provisionSubnet = provisionSuggestionSnapshotRef.current?.subnet
+    || (currentDraft.vip_ip
+      ? `${String(currentDraft.vip_ip).split('.').slice(0, 3).join('.')}.0/24`
+      : '192.168.1.0/24');
   const provisionInputGroups = model.activeStep?.id === 'provision-nodes'
     ? getProvisionInputGroups(model.activeStep.inputs || [])
     : { vmInputs: [], networkInputs: [] };
@@ -1112,21 +1133,9 @@ function App() {
     suggestionSnapshot: provisionSuggestionSnapshotRef.current,
   });
   const provisionStepReady = provisionPlacementReady && provisionSuggestionsReady;
-  useEffect(() => {
-    if (model.activeStep?.id !== 'provision-nodes' || !provisionStepReady || busy) {
-      setProvisionStepArmed(false);
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      setProvisionStepArmed(true);
-    }, 0);
-
-    return () => window.clearTimeout(timer);
-  }, [busy, model.activeStep?.id, provisionStepReady, clusterId, clusterInstanceId, currentDraft.controlplane_count, currentDraft.worker_count]);
-
-  const stepOnePending = model.activeStep?.id === 'provision-nodes' && !provisionStepArmed;
-  const primaryActionDisabled = model.primaryAction.disabled || stepOnePending;
+  const provisionStepValid = provisionStepReady && provisionVmIpValidation.ok;
+  const stepOnePending = model.activeStep?.id === 'provision-nodes' && !provisionStepReady;
+  const primaryActionDisabled = model.primaryAction.disabled || !provisionStepValid;
   const primaryActionLabel = stepOnePending
     ? (!provisionPlacementReady ? 'Loading placement data…' : 'Loading step 1…')
     : model.primaryAction.label;
@@ -1134,7 +1143,9 @@ function App() {
     ? !provisionPlacementReady
       ? 'Waiting for Proxmox host data before starting step 1.'
       : 'Waiting for step 1 suggestions to load.'
-    : model.primaryAction.helperText;
+    : !provisionVmIpValidation.ok && model.activeStep?.id === 'provision-nodes'
+      ? provisionVmIpValidation.error
+      : model.primaryAction.helperText;
 
   useEffect(() => {
     if (model.activeStep?.id !== 'provision-nodes') {
@@ -1525,7 +1536,7 @@ function App() {
                           <h3>Keep VM scale separate from networking</h3>
                         </div>
                         <p className="wizard-input-block-note">
-                          These values are suggested from the management VM network and stay editable so you can wire the cluster to the right Proxmox bridge and subnet.
+                          The wizard probes the management VM network once, suggests free addresses for each VM, and then lets you edit them locally without another server check.
                         </p>
                       </div>
 
@@ -1539,12 +1550,12 @@ function App() {
                           <dd>{currentDraft.vip_ip || '192.168.1.50'}</dd>
                         </div>
                         <div>
-                          <dt>Start IP</dt>
-                          <dd>{currentDraft.start_ip || '192.168.1.51'}</dd>
+                          <dt>Subnet</dt>
+                          <dd>{provisionSubnet}</dd>
                         </div>
                         <div>
-                          <dt>Prefix</dt>
-                          <dd>{currentDraft.node_prefix_length || 24}</dd>
+                          <dt>VMs</dt>
+                          <dd>{provisionVmIpRows.length}</dd>
                         </div>
                         <div>
                           <dt>Gateway</dt>
@@ -1566,6 +1577,67 @@ function App() {
                             onChange={(inputId, value) => updateAnswer(model.activeStep.id, inputId, value)}
                           />
                         ))}
+                      </div>
+
+                      <div className="wizard-network-vm-list">
+                        <div className="wizard-network-vm-list-head">
+                          <div>
+                            <p className="eyebrow">Per-VM IPs</p>
+                            <h4>One address per VM, no fixed block</h4>
+                          </div>
+                          <p className="wizard-input-block-note">
+                            Green means the suggested address was checked once. Amber means you changed it locally. Red means the value is invalid or duplicated.
+                          </p>
+                        </div>
+
+                        <div className="wizard-network-vm-items">
+                          {provisionVmIpRows.map((vm) => {
+                            const currentVmIpMap = currentDraft.vm_ip_map && typeof currentDraft.vm_ip_map === 'object' && !Array.isArray(currentDraft.vm_ip_map)
+                              ? currentDraft.vm_ip_map
+                              : {};
+                            const onVmIpChange = (value) => {
+                              updateAnswer(model.activeStep.id, 'vm_ip_map', {
+                                ...currentVmIpMap,
+                                [vm.name]: value,
+                              });
+                            };
+
+                            return (
+                              <article key={vm.name} className={`wizard-network-vm-card is-${vm.status.tone}`}>
+                                <header className="wizard-network-vm-card-head">
+                                  <div>
+                                    <strong>{vm.label}</strong>
+                                    <span>VMID {vm.vmid} · {vm.assignedHostName || 'Unassigned'}</span>
+                                  </div>
+                                  <span className={`wizard-status-badge is-${vm.status.tone}`}>
+                                    {vm.status.icon} {vm.status.label}
+                                  </span>
+                                </header>
+
+                                <label className="wizard-field wizard-field-inline" htmlFor={`${model.activeStep.id}-${vm.name}-ip`}>
+                                  <span className="wizard-field-label">IP address</span>
+                                  <input
+                                    id={`${model.activeStep.id}-${vm.name}-ip`}
+                                    type="text"
+                                    value={vm.value}
+                                    onChange={(event) => onVmIpChange(event.target.value)}
+                                    inputMode="decimal"
+                                    placeholder={vm.suggestedIp || '192.168.1.60'}
+                                  />
+                                  <small>
+                                    {vm.isSuggested
+                                      ? 'This is the one-time free address suggestion from the server.'
+                                      : 'This value is not rechecked against the server before install.'}
+                                  </small>
+                                </label>
+                              </article>
+                            );
+                          })}
+                        </div>
+
+                        {provisionVmIpValidation.ok ? null : (
+                          <p className="wizard-network-error">{provisionVmIpValidation.error}</p>
+                        )}
                       </div>
                     </section>
                   </>
