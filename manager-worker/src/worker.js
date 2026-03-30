@@ -359,7 +359,7 @@ function runCommand(jobId, command, args, env = {}, redactLine = (line) => Strin
         if (!trimmed) continue;
         const redacted = redactLine(trimmed);
         recentOutput.push(redacted);
-        if (recentOutput.length > 20) {
+        if (recentOutput.length > 100) {
           recentOutput.shift();
         }
         appendLog(jobId, redacted);
