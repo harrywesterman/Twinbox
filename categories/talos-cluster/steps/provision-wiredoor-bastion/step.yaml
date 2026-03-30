@@ -12,7 +12,15 @@ explanation: >
 side_help: >
   You need a Hetzner Cloud account with an API token. The bastion host will be
   provisioned in your Hetzner project and configured automatically.
-depends_on: []
+
+  To set up Hetzner:
+  1. Create an account at https://console.hetzner.cloud/
+  2. Create a new project
+  3. Go to "Security" → "API Tokens"
+  4. Generate a new token with "Read & Write" permissions
+  5. Copy the token (it won't be shown again)
+depends_on:
+  - provision-nodes
 inputs:
   - id: hcloud_token
     label: Hetzner API Token
@@ -31,28 +39,22 @@ inputs:
     required: false
     default: cax11
     help: "Server size: cax11 (ARM64, 2vCPU/4GB), cx22 (x86, 2vCPU/4GB)"
-  - id: wiredoor_fqdn
-    label: Wiredoor Domain Name
-    type: string
-    required: true
-    help: Domain name for Wiredoor (e.g., wiredoor.example.com)
   - id: wiredoor_network
     label: WireGuard Network
     type: string
     required: false
     default: "10.200.0.0/24"
     help: Internal WireGuard subnet for the VPN tunnel
+  - id: zone_name
+    label: Domain Name
+    type: string
+    required: true
+    help: Your domain name (e.g., example.com). Used to generate the Wiredoor FQDN.
   - id: ssh_public_key
     label: SSH Public Key
     type: string
     required: false
     help: Optional: Your SSH public key for direct server access
-secrets:
-  files:
-    WIREDORO_BASTION_SECRETS:
-      scope: global
-      item: wiredoor-bastion
-      format: json
 runner:
   kind: script
   script: categories/talos-cluster/steps/provision-wiredoor-bastion/run.sh

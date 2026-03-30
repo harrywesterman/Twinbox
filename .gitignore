@@ -27,3 +27,4 @@ terraform.tfvars.json
 .DS_Store
 .idea/
 .vscode/
+.kilo/
