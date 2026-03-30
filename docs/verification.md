@@ -16,7 +16,8 @@ bash -n wizard/setup-wizard.sh \
   scripts/manager/install-secret-sync.sh \
   scripts/manager/install-velero-backup.sh \
   scripts/manager/openbao-secret-sync.sh \
-  scripts/manager/sync-openbao-global-secret.sh
+  scripts/manager/sync-openbao-global-secret.sh \
+  categories/talos-cluster/steps/install-cloudnativepg/run.sh
 
 node --check manager-api/src/server.js
 node --check manager-worker/src/worker.js
@@ -98,6 +99,18 @@ Expected:
 - OpenBao is running on Longhorn
 - `ClusterSecretStore/openbao` exists
 - `Secret/proxmox-bootstrap` exists in `twinbox-system`
+
+### `install-cloudnativepg`
+
+```bash
+kubectl --kubeconfig <kubeconfig> get application -n argocd cloudnativepg
+kubectl --kubeconfig <kubeconfig> get pods -n cnpg-system
+```
+
+Expected:
+
+- `Application/cloudnativepg` is healthy
+- The CloudNativePG operator pods are running in `cnpg-system`
 
 ### `install-velero-backup`
 

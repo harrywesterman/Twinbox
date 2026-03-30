@@ -47,6 +47,7 @@ function buildCatalog(stepStatuses = {}) {
     ['install-longhorn-storage', 'Install Longhorn storage', { dependsOn: ['install-argocd'] }],
     ['install-secret-sync', 'Install OpenBao and sync bootstrap secrets', { dependsOn: ['install-longhorn-storage'] }],
     ['install-traefik', 'Install Traefik', { dependsOn: ['install-secret-sync'] }],
+    ['install-cloudnativepg', 'Install CloudNativePG', { dependsOn: ['install-argocd', 'install-longhorn-storage'] }],
     ['install-authentik-idp', 'Install Authentik', { dependsOn: ['install-secret-sync', 'install-longhorn-storage', 'install-traefik'] }],
     ['configure-cloudflare-dns', 'Configure Cloudflare DNS', { dependsOn: ['create-users-and-groups'] }],
     ['install-wiredoor-gateway', 'Install Wiredoor gateway', { dependsOn: ['install-grafana'] }],
@@ -115,16 +116,17 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   });
 
   assert.equal(model.mode, 'setup');
-  assert.equal(model.stepRail.length, 28);
+  assert.equal(model.stepRail.length, 29);
   assert.equal(model.stepRail[0].title, 'Deploy Talos Cluster');
   assert.equal(model.stepRail[0].isCurrent, true);
   assert.equal(model.stepRail[0].icon, '🖥️');
   assert.equal(model.stepRail[0].project_url, 'https://www.talos.dev/');
   assert.equal(model.stepRail[0].github_url, 'https://github.com/siderolabs/talos');
   assert.match(model.stepRail[0].positive_summary, /Twinbox stages/);
-  assert.equal(model.stepRail[6].title, 'Install Authentik');
+  assert.equal(model.stepRail[6].title, 'Install CloudNativePG');
+  assert.equal(model.stepRail[6].icon, '🐘');
   assert.equal(model.primaryAction.label, 'Start step 1');
-  assert.equal(model.progress.totalSteps, 28);
+  assert.equal(model.progress.totalSteps, 29);
   assert.equal(model.progress.completedSteps, 0);
   assert.equal(model.activity.runtime.currentStage, 'Applying cluster plan');
 });
@@ -160,6 +162,7 @@ test('wizard model switches to manage mode when setup flow is complete', () => {
         'install-longhorn-storage',
         'install-secret-sync',
         'install-traefik',
+        'install-cloudnativepg',
         'install-whoami',
         'install-headlamp',
         'install-grafana',
@@ -211,7 +214,7 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     selectedStepId: '',
   });
 
-  assert.equal(model.stepRail.length, 28);
+  assert.equal(model.stepRail.length, 29);
   assert.deepEqual(model.stepRail.map((step) => step.id), [
     'provision-nodes',
     'install-flannel',
@@ -219,6 +222,7 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     'install-longhorn-storage',
     'install-secret-sync',
     'install-traefik',
+    'install-cloudnativepg',
     'install-authentik-idp',
     'configure-cloudflare-dns',
     'install-wiredoor-gateway',

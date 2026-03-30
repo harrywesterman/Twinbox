@@ -12,6 +12,7 @@ const STEP_ICON_ASSETS = {
   'install-argocd': assetHref('install-argocd.svg'),
   'install-longhorn-storage': assetHref('install-longhorn-storage.svg'),
   'install-secret-sync': assetHref('install-secret-sync.svg'),
+  'install-cloudnativepg': assetHref('install-cloudnativepg.svg'),
   'install-traefik': assetHref('install-traefik.svg'),
   'install-whoami': assetHref('install-whoami.svg'),
   'install-headlamp': assetHref('install-headlamp.svg'),
@@ -64,6 +65,11 @@ function buildProjectUrlMap() {
       icon: '🔐',
       project_url: 'https://openbao.org/',
       github_url: 'https://github.com/openbao/openbao',
+    },
+    'install-cloudnativepg': {
+      icon: '🐘',
+      project_url: 'https://cloudnative-pg.io/',
+      github_url: 'https://github.com/cloudnative-pg/cloudnative-pg',
     },
     'install-traefik': {
       icon: '🧭',

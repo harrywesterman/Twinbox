@@ -1,0 +1,22 @@
+id: install-cloudnativepg
+title: Install CloudNativePG
+type: action
+journey_stage: setup
+order: 17
+summary: Apply the CloudNativePG GitOps application after storage is ready.
+explanation: Twinbox installs the CloudNativePG operator through one Argo CD application. The step waits for the operator to become Synced and Healthy so later PostgreSQL-backed workloads can rely on a shared database platform.
+side_help: CloudNativePG provides the PostgreSQL operator that future stateful apps will use instead of bundling their own database layer.
+depends_on:
+  - install-argocd
+  - install-longhorn-storage
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/install-cloudnativepg/run.sh

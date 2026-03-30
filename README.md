@@ -10,7 +10,7 @@ Twinbox is a platform for provisioning and bootstrapping fully configured Talos 
 4. `manager-web` runs on port `3000` and queues jobs through `manager-api` on port `8080`.
 5. `manager-worker` polls the file queue under `manager-data/` and runs repo-owned scripts.
 6. The first visible wizard step is `Deploy Talos Cluster`.
-7. After the Talos cluster is up, the flow continues through Flannel, Argo CD, Longhorn, OpenBao secret sync, Traefik, Velero, and the remaining GitOps application steps.
+7. After the Talos cluster is up, the flow continues through Flannel, Argo CD, Longhorn, OpenBao secret sync, CloudNativePG, Traefik, Velero, and the remaining GitOps application steps.
 
 ## Secret Model
 

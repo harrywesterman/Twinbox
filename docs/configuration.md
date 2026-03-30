@@ -114,6 +114,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
   - OpenBao with Raft storage on Longhorn
   - `ClusterSecretStore/openbao`
   - `ExternalSecret/proxmox-bootstrap`
+- `install-cloudnativepg` installs the CloudNativePG operator on Longhorn so later PostgreSQL-backed applications can share one cluster-level database platform.
 - `install-velero-backup` installs Velero together with either a Twinbox-managed Garage bucket or an external S3-compatible backup target.
 - Later application steps write bootstrap JSON into OpenBao before enabling their Argo CD applications.
 

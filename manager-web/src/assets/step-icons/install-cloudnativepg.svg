@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="CloudNativePG">
+  <defs>
+    <linearGradient id="bg" x1="16" y1="16" x2="112" y2="112" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="32" y1="28" x2="96" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#60a5fa"/>
+    </linearGradient>
+  </defs>
+  <rect x="10" y="10" width="108" height="108" rx="24" fill="url(#bg)"/>
+  <ellipse cx="64" cy="38" rx="28" ry="12" fill="url(#accent)"/>
+  <path d="M36 38v34c0 6.6 12.5 12 28 12s28-5.4 28-12V38" fill="none" stroke="url(#accent)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M36 54c0 6.6 12.5 12 28 12s28-5.4 28-12" fill="none" stroke="#93c5fd" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity=".8"/>
+  <path d="M36 70c0 6.6 12.5 12 28 12s28-5.4 28-12" fill="none" stroke="#93c5fd" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity=".5"/>
+  <circle cx="52" cy="88" r="6" fill="#e2e8f0"/>
+  <circle cx="76" cy="88" r="6" fill="#e2e8f0"/>
+</svg>
