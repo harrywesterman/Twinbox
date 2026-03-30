@@ -20,7 +20,7 @@ inputs:
     label: External S3 endpoint URL
     type: string
     required: false
-    help: Required when external S3 storage is enabled. Example: https://s3.example.com
+    help: "Required when external S3 storage is enabled. Example: https://s3.example.com"
   - id: s3_bucket
     label: Backup bucket name
     type: string
