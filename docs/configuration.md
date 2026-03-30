@@ -30,6 +30,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `/opt/twinbox/bootstrap/secrets/global/proxmox.json`
 - `/opt/twinbox/bootstrap/secrets/global/traefik-dashboard.json`
 - `/opt/twinbox/bootstrap/secrets/global/grafana.json`
+- `/opt/twinbox/bootstrap/secrets/global/authentik.json`
 - `/opt/twinbox/bootstrap/secrets/global/wiredoor-gateway.json`
 
 ### Cluster-scoped runtime artifacts

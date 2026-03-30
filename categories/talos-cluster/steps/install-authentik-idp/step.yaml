@@ -3,12 +3,21 @@ title: Install Authentik
 type: action
 journey_stage: setup
 order: 31
-summary: Placeholder step for the identity provider phase.
-explanation: This wizard step is reserved for future Authentik installation work and does not run a real cluster action yet.
-side_help: Identity services are surfaced as their own setup step so the installation flow can stay linear.
+summary: Install Authentik through GitOps after the storage layer is ready.
+explanation: Twinbox seeds an Authentik bootstrap secret into OpenBao and then applies one Argo CD application that combines the Authentik Helm chart, the generated Kubernetes secret, and the ingress route for the identity provider.
+side_help: Authentik provides the identity and bootstrap admin flow that later user and group provisioning steps build on.
 depends_on:
+  - install-secret-sync
   - install-longhorn-storage
+  - install-traefik
 inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
 runner:
   kind: script
-  script: categories/talos-cluster/steps/_placeholder/run.sh
+  script: categories/talos-cluster/steps/install-authentik-idp/run.sh

@@ -1,0 +1,16 @@
+global:
+  envFrom:
+    - secretRef:
+        name: authentik-bootstrap
+
+authentik:
+  existingSecret:
+    secretName: authentik-bootstrap
+
+postgresql:
+  auth:
+    existingSecret: authentik-bootstrap
+    secretKeys:
+      adminPasswordKey: postgres-password
+      userPasswordKey: password
+      replicationPasswordKey: replication-password

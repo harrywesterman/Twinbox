@@ -47,7 +47,7 @@ function buildCatalog(stepStatuses = {}) {
     ['install-longhorn-storage', 'Install Longhorn storage', { dependsOn: ['install-argocd'] }],
     ['install-secret-sync', 'Install OpenBao and sync bootstrap secrets', { dependsOn: ['install-longhorn-storage'] }],
     ['install-traefik', 'Install Traefik', { dependsOn: ['install-secret-sync'] }],
-    ['install-authentik-idp', 'Install Authentik', { dependsOn: ['install-longhorn-storage'] }],
+    ['install-authentik-idp', 'Install Authentik', { dependsOn: ['install-secret-sync', 'install-longhorn-storage', 'install-traefik'] }],
     ['install-whoami', 'Install Whoami', { dependsOn: ['install-traefik'] }],
     ['install-headlamp', 'Install Headlamp', { dependsOn: ['install-whoami'] }],
     ['install-grafana', 'Install Grafana', { dependsOn: ['install-headlamp'] }],
