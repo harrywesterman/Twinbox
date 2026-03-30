@@ -1259,6 +1259,40 @@ app.post("/api/steps/:stepId/skip", (req, res) => {
   });
 });
 
+app.post("/api/steps/:stepId/unskip", (req, res) => {
+  const stepId = req.params.stepId;
+  const requestedClusterId = typeof req.body?.cluster_id === "string" ? req.body.cluster_id.trim() : "";
+  const catalog = buildCatalogResponse({ workspaceRoot, dirs, clusterId: requestedClusterId || null });
+  const step = catalog.stepsById.get(stepId);
+
+  if (!step) {
+    return res.status(404).json({ error: "step not found" });
+  }
+
+  const visibleStep = catalog.categories.flatMap((category) => category.steps).find((candidate) => candidate.id === stepId);
+  if (!visibleStep) {
+    return res.status(404).json({ error: "step not found" });
+  }
+
+  if (visibleStep.status !== "skipped") {
+    return res.status(409).json({ error: "step is not skipped" });
+  }
+
+  const clusterScopeId = visibleStep.category_id === "talos-cluster"
+    ? (requestedClusterId || catalog.activeClusterScopeId || null)
+    : null;
+
+  const file = stepStatePath(stepId, clusterScopeId);
+  if (fs.existsSync(file)) {
+    fs.unlinkSync(file);
+  }
+
+  return res.status(200).json({
+    step_id: stepId,
+    status: "not_started",
+  });
+});
+
 app.get("/api/clusters/:clusterId", (req, res) => {
   const file = path.join(dirs.clusters, `${req.params.clusterId}.json`);
   if (!fs.existsSync(file)) {
