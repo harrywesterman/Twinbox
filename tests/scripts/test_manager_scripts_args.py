@@ -22,6 +22,7 @@ LONGHORN_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / 
 LONGHORN_HELPER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-longhorn-storage.sh"
 TRAEFIK_STEP_SCRIPT = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-traefik" / "run.sh"
 TRAEFIK_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-traefik" / "step.yaml"
+CLOUDFLARE_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "configure-cloudflare-dns" / "step.yaml"
 WHOAMI_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-whoami" / "step.yaml"
 HEADLAMP_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-headlamp" / "step.yaml"
 GRAFANA_STEP_MANIFEST = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-grafana" / "step.yaml"
@@ -533,6 +534,7 @@ def test_install_argocd_step_bootstraps_argocd_and_adopts_flannel():
 def test_app_step_manifests_chain_the_linear_gitops_flow():
     flannel_text = FLANNEL_STEP_MANIFEST.read_text(encoding="utf-8")
     traefik_text = TRAEFIK_STEP_MANIFEST.read_text(encoding="utf-8")
+    cloudflare_text = CLOUDFLARE_STEP_MANIFEST.read_text(encoding="utf-8")
     whoami_text = WHOAMI_STEP_MANIFEST.read_text(encoding="utf-8")
     headlamp_text = HEADLAMP_STEP_MANIFEST.read_text(encoding="utf-8")
     grafana_text = GRAFANA_STEP_MANIFEST.read_text(encoding="utf-8")
@@ -544,21 +546,24 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert 'order: 31' in traefik_text
     assert 'install-secret-sync' in traefik_text
 
-    assert 'order: 32' in wiredoor_text
+    assert 'order: 32' in cloudflare_text
+    assert 'create-users-and-groups' in cloudflare_text
+
+    assert 'order: 33' in wiredoor_text
     assert 'install-grafana' in wiredoor_text
     assert 'KUBECONFIG_FILE:' in wiredoor_text
     assert 'item: kubeconfig' in wiredoor_text
     assert 'script: categories/talos-cluster/steps/install-wiredoor-gateway/run.sh' in wiredoor_text
 
-    assert 'order: 33' in whoami_text
+    assert 'order: 34' in whoami_text
     assert 'install-traefik' in whoami_text
     assert 'script: categories/talos-cluster/steps/install-whoami/run.sh' in whoami_text
 
-    assert 'order: 34' in headlamp_text
+    assert 'order: 35' in headlamp_text
     assert 'install-whoami' in headlamp_text
     assert 'script: categories/talos-cluster/steps/install-headlamp/run.sh' in headlamp_text
 
-    assert 'order: 35' in grafana_text
+    assert 'order: 36' in grafana_text
     assert 'install-headlamp' in grafana_text
     assert 'script: categories/talos-cluster/steps/install-grafana/run.sh' in grafana_text
 

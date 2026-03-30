@@ -138,12 +138,12 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-secret-sync",
                 "install-traefik",
                 "install-authentik-idp",
+                "configure-cloudflare-dns",
                 "install-wiredoor-gateway",
                 "install-whoami",
                 "install-headlamp",
                 "install-grafana",
                 "create-users-and-groups",
-                "configure-cloudflare-dns",
                 "install-homepage-dashboard",
                 "install-management-consoles",
                 "install-velero-backup",
@@ -167,10 +167,11 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert talos["steps"][4]["title"] == "Install OpenBao and sync bootstrap secrets"
             assert talos["steps"][5]["title"] == "Install Traefik"
             assert talos["steps"][6]["title"] == "Install Authentik"
-            assert talos["steps"][7]["title"] == "Install Wiredoor gateway"
-            assert talos["steps"][8]["title"] == "Install Whoami"
-            assert talos["steps"][9]["title"] == "Install Headlamp"
-            assert talos["steps"][10]["title"] == "Install Grafana"
+            assert talos["steps"][7]["title"] == "Configure Cloudflare DNS"
+            assert talos["steps"][8]["title"] == "Install Wiredoor gateway"
+            assert talos["steps"][9]["title"] == "Install Whoami"
+            assert talos["steps"][10]["title"] == "Install Headlamp"
+            assert talos["steps"][11]["title"] == "Install Grafana"
             assert talos["steps"][0]["journey_stage"] == "setup"
             assert talos["steps"][0]["status"] == "ready"
             assert talos["steps"][1]["status"] == "locked"

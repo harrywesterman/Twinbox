@@ -2,7 +2,7 @@ id: configure-cloudflare-dns
 title: Configure Cloudflare DNS
 type: action
 journey_stage: setup
-order: 70
+order: 32
 summary: Placeholder step for DNS automation.
 explanation: This wizard step is reserved for future Cloudflare DNS work and does not run a real cluster action yet.
 side_help: DNS configuration is shown as a distinct phase so ingress and external access can be planned separately.
