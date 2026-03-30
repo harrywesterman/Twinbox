@@ -1,0 +1,254 @@
+# Design: Wiredoor Bastion Host on Hetzner
+
+## Overview
+
+Implement a new wizard step to provision a Wiredoor bastion host on Hetzner Cloud. This external bastion serves as a secure entry point for the Kubernetes cluster, establishing a WireGuard tunnel and providing wildcard DNS routing via Traefik.
+
+## Architecture
+
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│  Web Wizard UI  │────▶│  manager-api     │────▶│  manager-worker │
+│  (React)        │     │  (Express)       │     │  (Node.js)      │
+└─────────────────┘     └──────────────────┘     └────────┬────────┘
+                                                          │
+                                                          ▼
+                                                ┌─────────────────┐
+                                                │  run.sh script  │
+                                                │  (Bash)         │
+                                                └────────┬────────┘
+                                                          │
+                                                          ▼
+                                                ┌─────────────────┐
+                                                │  OpenTofu       │
+                                                │  (Hetzner)      │
+                                                └────────┬────────┘
+                                                          │
+                                                          ▼
+                                                ┌─────────────────┐
+                                                │  Wiredoor VM    │
+                                                │  (Hetzner Cloud)│
+                                                └─────────────────┘
+```
+
+## Components
+
+### 1. New Category: External Infrastructure
+
+**Location**: `categories/external-infra/`
+
+**category.yaml**:
+```yaml
+id: external-infra
+title: External Infrastructure
+summary: Provision external infrastructure components like bastion hosts and VPN gateways.
+order: 15
+```
+
+**Order**: 15 (between Management VM [10] and Talos Cluster [20])
+
+### 2. New Step: provision-wiredoor-bastion
+
+**Location**: `categories/external-infra/steps/provision-wiredoor-bastion/`
+
+**step.yaml**:
+```yaml
+id: provision-wiredoor-bastion
+title: Deploy Wiredoor Bastion Host
+type: action
+order: 10
+journey_stage: setup
+summary: Provision a Wiredoor bastion host on Hetzner Cloud for external access.
+explanation: >
+  This step provisions a Virtual Machine on Hetzner Cloud with Wiredoor installed.
+  Wiredoor acts as a bastion host that establishes a secure WireGuard tunnel to your
+  Kubernetes cluster. It enables external access to your services through wildcard
+  DNS routing via Traefik.
+side_help: >
+  You need a Hetzner Cloud account with an API token. The bastion host will be
+  provisioned in your Hetzner project and configured automatically.
+depends_on: []
+inputs:
+  - id: hcloud_token
+    label: Hetzner API Token
+    type: string
+    required: true
+    help: Your Hetzner Cloud API token. Create one at https://console.hetzner.cloud/
+  - id: hcloud_location
+    label: Server Location
+    type: string
+    required: false
+    default: fsn1
+    help: "Datacenter location: fsn1 (Falkenstein), nbg1 (Nürnberg), or hel1 (Helsinki)"
+  - id: hcloud_server_type
+    label: Server Type
+    type: string
+    required: false
+    default: cax11
+    help: "Server size: cax11 (ARM64, 2vCPU/4GB), cx22 (x86, 2vCPU/4GB)"
+  - id: wiredoor_fqdn
+    label: Wiredoor Domain Name
+    type: string
+    required: true
+    help: Domain name for Wiredoor (e.g., wiredoor.example.com)
+  - id: wiredoor_network
+    label: WireGuard Network
+    type: string
+    required: false
+    default: "10.200.0.0/24"
+    help: Internal WireGuard subnet for the VPN tunnel
+  - id: ssh_public_key
+    label: SSH Public Key
+    type: string
+    required: false
+    help: Optional: Your SSH public key for direct server access
+secrets:
+  files:
+    WIREDORO_BASTION_SECRETS:
+      scope: global
+      item: wiredoor-bastion
+      format: json
+runner:
+  kind: script
+  script: categories/external-infra/steps/provision-wiredoor-bastion/run.sh
+```
+
+### 3. Input Fields and Defaults
+
+| Input ID | Label | Type | Required | Default | Description |
+|----------|-------|------|----------|---------|-------------|
+| `hcloud_token` | Hetzner API Token | string | yes | - | Hetzner Cloud API token |
+| `hcloud_location` | Server Location | string | no | `fsn1` | Datacenter: fsn1, nbg1, hel1 |
+| `hcloud_server_type` | Server Type | string | no | `cax11` | Server size: cax11 (ARM64) or cx22 (x86) |
+| `wiredoor_fqdn` | Wiredoor Domain Name | string | yes | - | Domain for Wiredoor |
+| `wiredoor_network` | WireGuard Network | string | no | `10.200.0.0/24` | Internal WireGuard subnet |
+| `ssh_public_key` | SSH Public Key | string | no | - | Optional SSH key for access |
+
+**Auto-generated values**:
+- `wiredoor_admin_password`: Generated by script (32 chars random)
+
+### 4. Run Script Implementation
+
+**Location**: `categories/external-infra/steps/provision-wiredoor-bastion/run.sh`
+
+**Workflow**:
+1. Parse `STEP_INPUTS_JSON` for all input values
+2. Generate random admin password (32 chars)
+3. Handle SSH key (generate if not provided)
+4. Execute OpenTofu with variables:
+   - State in `manager-data/opentofu/wiredoor/`
+   - `terraform init` and `terraform apply -auto-approve`
+5. Collect outputs (server IP, admin password, URL)
+6. Write secrets to `/opt/twinbox/bootstrap/secrets/global/wiredoor-bastion.json`
+7. Report result via `STEP_RESULT_FILE`
+
+### 5. Secret Storage
+
+**Path**: `/opt/twinbox/bootstrap/secrets/global/wiredoor-bastion.json`
+
+**Content**:
+```json
+{
+  "HCLOUD_TOKEN": "<hcloud_token>",
+  "WIREDOOR_IP": "<server_ipv4>",
+  "WIREDOOR_ADMIN_PASSWORD": "<generated_password>",
+  "WIREDOOR_URL": "https://<wiredoor_fqdn>",
+  "SSH_PRIVATE_KEY": "<optional_ssh_private_key>"
+}
+```
+
+**Scope**: Global (not cluster-specific)
+
+### 6. Integration with Existing Components
+
+**OpenTofu Stack**: Reuses existing `infra/opentofu/wiredoor/` configuration
+
+**Wiredoor Gateway Step**: The existing `install-wiredoor-gateway` step will read credentials from `wiredoor-bastion.json`
+
+**ArgoCD Application**: The existing `gitops/apps/wiredoor-gateway.yaml` can be configured to use bastion host IP
+
+### 7. OpenTofu State Management
+
+**State Location**: `manager-data/opentofu/wiredoor/`
+
+**Benefits**:
+- Enables updates to existing infrastructure
+- Allows cleanup/destroy operations
+- Persists between wizard runs
+
+### 8. Error Handling
+
+**Failure scenarios**:
+- Invalid Hetzner API token
+- Insufficient Hetzner account balance
+- DNS configuration errors
+- Network connectivity issues
+
+**Recovery**:
+- OpenTofu state preserved for manual cleanup
+- Clear error messages in job logs
+- Step can be retried after fixing issues
+
+### 9. Wizard UI Integration
+
+**Visibility**: Step appears in wizard (journey_stage: setup)
+
+**Form rendering**: Standard input fields based on step.yaml inputs
+
+**Validation**: Client-side validation for required fields, server-side for API token format
+
+## Data Flow
+
+```
+1. User fills wizard form with Hetzner API token and configuration
+   ↓
+2. UI POSTs to /api/steps/provision-wiredoor-bastion/execute
+   ↓
+3. manager-api validates inputs against step.yaml schema
+   ↓
+4. API queues job in manager-data/queue/pending/
+   ↓
+5. manager-worker picks up job, resolves secrets
+   ↓
+6. Worker executes run.sh with STEP_INPUTS_JSON and STEP_CONTEXT_JSON
+   ↓
+7. run.sh calls OpenTofu to provision Hetzner VM
+   ↓
+8. Cloud-init installs Docker and Wiredoor on VM
+   ↓
+9. run.sh collects outputs, writes secrets to bootstrap directory
+   ↓
+10. Worker updates job status, UI shows completion
+```
+
+## Dependencies
+
+**Step dependencies**: None (can run independently of cluster provisioning)
+
+**Infrastructure dependencies**:
+- Existing OpenTofu scripts in `infra/opentofu/wiredoor/`
+- Hetzner Cloud provider configured
+- Cloudflare DNS scripts (for domain configuration, separate step)
+
+## Security Considerations
+
+1. **API Token Storage**: Token stored in global secrets, not logged
+2. **Password Generation**: Cryptographically secure random generation
+3. **SSH Key Handling**: Private keys stored securely, not exposed in logs
+4. **Network Security**: Firewall rules limit access to necessary ports only
+5. **State Files**: OpenTofu state may contain sensitive data, access restricted
+
+## Testing Strategy
+
+1. **Unit Tests**: Validate input parsing and secret generation
+2. **Integration Tests**: Test OpenTofu execution with mock Hetzner API
+3. **End-to-End Tests**: Full provisioning in test Hetzner account
+4. **Manual Verification**: Check wizard UI, API responses, worker execution
+
+## Future Enhancements
+
+1. **Multi-cloud support**: Add AWS, GCP, Azure bastion options
+2. **High availability**: Multiple bastion hosts for redundancy
+3. **Automated DNS**: Integrate with Cloudflare for automatic DNS setup
+4. **Cost estimation**: Show estimated Hetzner costs before provisioning
+5. **Backup/restore**: Automated backups of Wiredoor configuration

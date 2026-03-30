@@ -1,0 +1,58 @@
+id: provision-wiredoor-bastion
+title: Deploy Wiredoor Bastion Host
+type: action
+order: 10
+journey_stage: setup
+summary: Provision a Wiredoor bastion host on Hetzner Cloud for external access.
+explanation: >
+  This step provisions a Virtual Machine on Hetzner Cloud with Wiredoor installed.
+  Wiredoor acts as a bastion host that establishes a secure WireGuard tunnel to your
+  Kubernetes cluster. It enables external access to your services through wildcard
+  DNS routing via Traefik.
+side_help: >
+  You need a Hetzner Cloud account with an API token. The bastion host will be
+  provisioned in your Hetzner project and configured automatically.
+depends_on: []
+inputs:
+  - id: hcloud_token
+    label: Hetzner API Token
+    type: string
+    required: true
+    help: Your Hetzner Cloud API token. Create one at https://console.hetzner.cloud/
+  - id: hcloud_location
+    label: Server Location
+    type: string
+    required: false
+    default: fsn1
+    help: "Datacenter location: fsn1 (Falkenstein), nbg1 (Nürnberg), or hel1 (Helsinki)"
+  - id: hcloud_server_type
+    label: Server Type
+    type: string
+    required: false
+    default: cax11
+    help: "Server size: cax11 (ARM64, 2vCPU/4GB), cx22 (x86, 2vCPU/4GB)"
+  - id: wiredoor_fqdn
+    label: Wiredoor Domain Name
+    type: string
+    required: true
+    help: Domain name for Wiredoor (e.g., wiredoor.example.com)
+  - id: wiredoor_network
+    label: WireGuard Network
+    type: string
+    required: false
+    default: "10.200.0.0/24"
+    help: Internal WireGuard subnet for the VPN tunnel
+  - id: ssh_public_key
+    label: SSH Public Key
+    type: string
+    required: false
+    help: Optional: Your SSH public key for direct server access
+secrets:
+  files:
+    WIREDORO_BASTION_SECRETS:
+      scope: global
+      item: wiredoor-bastion
+      format: json
+runner:
+  kind: script
+  script: categories/external-infra/steps/provision-wiredoor-bastion/run.sh
