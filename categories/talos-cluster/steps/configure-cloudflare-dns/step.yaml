@@ -35,14 +35,18 @@ inputs:
     required: true
     help: Your domain name (e.g., example.com)
 secrets:
+  env: {}
   files:
     WIREDORO_BASTION_SECRETS:
       scope: global
       item: wiredoor-bastion
+      attachment: wiredoor-bastion
       format: json
+      optional: true
     CLOUDFLARE_SECRETS:
       scope: global
       item: cloudflare
+      attachment: cloudflare
       format: json
 runner:
   kind: script

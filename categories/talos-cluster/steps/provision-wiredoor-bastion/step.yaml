@@ -54,7 +54,7 @@ inputs:
     label: SSH Public Key
     type: string
     required: false
-    help: Optional: Your SSH public key for direct server access
+    help: "Optional: Your SSH public key for direct server access"
 runner:
   kind: script
   script: categories/talos-cluster/steps/provision-wiredoor-bastion/run.sh
