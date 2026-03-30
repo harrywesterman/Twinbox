@@ -1214,6 +1214,47 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
   });
 });
 
+app.post("/api/steps/:stepId/skip", (req, res) => {
+  const stepId = req.params.stepId;
+  const requestedClusterId = typeof req.body?.cluster_id === "string" ? req.body.cluster_id.trim() : "";
+  const catalog = buildCatalogResponse({ workspaceRoot, dirs, clusterId: requestedClusterId || null });
+  const step = catalog.stepsById.get(stepId);
+
+  if (!step) {
+    return res.status(404).json({ error: "step not found" });
+  }
+
+  const visibleStep = catalog.categories.flatMap((category) => category.steps).find((candidate) => candidate.id === stepId);
+  if (!visibleStep) {
+    return res.status(404).json({ error: "step not found" });
+  }
+
+  if (visibleStep.status === "running") {
+    return res.status(409).json({ error: "cannot skip a running step" });
+  }
+
+  if (visibleStep.status === "done") {
+    return res.status(409).json({ error: "cannot skip a completed step" });
+  }
+
+  const clusterScopeId = visibleStep.category_id === "talos-cluster"
+    ? (requestedClusterId || catalog.activeClusterScopeId || null)
+    : null;
+
+  writeStepState(stepId, {
+    status: "skipped",
+    inputs: {},
+    outputs: null,
+    error: null,
+    last_job_id: null,
+  }, clusterScopeId);
+
+  return res.status(200).json({
+    step_id: stepId,
+    status: "skipped",
+  });
+});
+
 app.get("/api/clusters/:clusterId", (req, res) => {
   const file = path.join(dirs.clusters, `${req.params.clusterId}.json`);
   if (!fs.existsSync(file)) {
