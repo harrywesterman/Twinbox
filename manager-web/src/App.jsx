@@ -1568,7 +1568,7 @@ function App() {
                   <p className="wizard-step-sidehelp">{model.activity.sideHelp}</p>
                 </div>
 
-                {model.activeStep.status === 'skipped' && (
+                {model.activeStep?.status === 'skipped' && (
                   <div className="skipped-banner">
                     <p>This step was skipped.</p>
                     <button type="button" onClick={() => handleUnskipAndExecute(model.activeStep)} disabled={busy}>
@@ -1821,7 +1821,7 @@ function App() {
                   >
                     {primaryActionLabel}
                   </button>
-                  {(model.activeStep.status === 'ready' || model.activeStep.status === 'failed') && (
+                  {(model.activeStep?.status === 'ready' || model.activeStep?.status === 'failed') && (
                     <button
                       type="button"
                       onClick={() => handleSkipStep(model.activeStep)}

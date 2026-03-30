@@ -187,6 +187,73 @@ proxmox_api_login() {
   [[ -n "$PROXMOX_CSRF_TOKEN" ]] || fail "Proxmox API ticket response did not include a CSRF token"
 }
 
+proxmox_get_all_vm_ids() {
+  # Returns all VM IDs across all nodes in the cluster
+  proxmox_api_login
+  local cluster_status=""
+  cluster_status="$(curl -ksS --fail \
+    --cookie "$PROXMOX_TICKET_COOKIE" \
+    --header "CSRFPreventionToken: ${PROXMOX_CSRF_TOKEN}" \
+    "${TF_VAR_proxmox_endpoint}/api2/json/cluster/status?type=node")" || fail "Failed to fetch Proxmox cluster status"
+
+  local node_names=()
+  while IFS= read -r node_name; do
+    [[ -n "$node_name" ]] || continue
+    node_names+=("$node_name")
+  done < <(jq -r '.data[].node' <<<"$cluster_status" 2>/dev/null | sort -u)
+
+  local all_vm_ids=()
+  local node=""
+  for node in "${node_names[@]}"; do
+    local node_vms=""
+    node_vms="$(curl -ksS --fail \
+      --cookie "$PROXMOX_TICKET_COOKIE" \
+      --header "CSRFPreventionToken: ${PROXMOX_CSRF_TOKEN}" \
+      "${TF_VAR_proxmox_endpoint}/api2/json/nodes/${node}/qemu")" || continue
+
+    while IFS= read -r vmid; do
+      [[ -n "$vmid" ]] || continue
+      all_vm_ids+=("$vmid")
+    done < <(jq -r '.data[].vmid' <<<"$node_vms" 2>/dev/null)
+  done
+
+  printf '%s\n' "${all_vm_ids[@]}" | sort -n | uniq
+}
+
+validate_vm_ids_available() {
+  local planned_vms_json="$1"
+  local existing_vm_ids=()
+  local planned_vm_ids=()
+  local vmid=""
+  local conflicts=()
+
+  log "Checking for VM ID conflicts across the Proxmox cluster"
+
+  while IFS= read -r vmid; do
+    [[ -n "$vmid" ]] || continue
+    existing_vm_ids+=("$vmid")
+  done < <(proxmox_get_all_vm_ids)
+
+  while IFS= read -r vmid; do
+    [[ -n "$vmid" ]] || continue
+    planned_vm_ids+=("$vmid")
+  done < <(jq -r '.[].vmid' <<<"$planned_vms_json" | sort -n | uniq)
+
+  for vmid in "${planned_vm_ids[@]}"; do
+    if printf '%s\n' "${existing_vm_ids[@]}" | grep -qx "$vmid"; then
+      conflicts+=("$vmid")
+    fi
+  done
+
+  if [[ ${#conflicts[@]} -gt 0 ]]; then
+    local existing_list=""
+    existing_list="$(printf '%s\n' "${existing_vm_ids[@]}" | tr '\n' ' ')"
+    fail "VM ID conflict: the following VM IDs are already in use in the Proxmox cluster: ${conflicts[*]}. Existing VM IDs: ${existing_list}"
+  fi
+
+  log "All planned VM IDs are available: ${planned_vm_ids[*]}"
+}
+
 proxmox_get_storage_content() {
   local node="$1"
   local datastore="$2"
@@ -976,6 +1043,8 @@ jq -n \
   }' > "$tfvars_file"
 log "Talos host placement map written to tfvars"
 log "Talos host map: $(jq -c '.vm_node_map' "$tfvars_file")"
+
+validate_vm_ids_available "$nodes_json"
 
 log "Preparing OpenTofu module"
 "$TOFU_BIN" -chdir="$work_module_dir" init -input=false -no-color
