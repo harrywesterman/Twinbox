@@ -1367,6 +1367,100 @@
   .wizard-shell {
     padding: 14px;
   }
+  .wizard-topbar,
+  .wizard-workspace-header,
+  .wizard-card,
+  .wizard-rail,
+  .wizard-banner {
+    border-radius: 22px;
+  }
+  .wizard-step-heading,
+  .wizard-output-header,
+  .wizard-step-step {
+    grid-template-columns: 1fr;
+  }
+  .wizard-step-heading {
+    flex-direction: column;
+  }
+  .wizard-topbar-actions,
+  .wizard-card-actions,
+  .wizard-banner {
+    align-items: stretch;
+  }
+  .wizard-topbar-actions .button,
+  .wizard-card-actions .button {
+    width: 100%;
+  }
+  .wizard-step {
+    grid-template-columns: 1fr;
+  }
+  .wizard-step-reinstall {
+    width: 100%;
+  }
+  .wizard-health-strip {
+    grid-template-columns: 1fr;
+  }
+  .wizard-scale-head,
+  .wizard-field-range-head {
+    flex-direction: column;
+  }
+  .wizard-scale-grid {
+    grid-template-columns: 1fr;
+  }
+  .wizard-network-summary {
+    grid-template-columns: 1fr;
+  }
+  .wizard-network-vm-list-head,
+  .wizard-network-vm-card-head {
+    flex-direction: column;
+  }
+  .wizard-placement-grid {
+    grid-template-columns: 1fr;
+  }
+  .wizard-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* Skip button styling */
+.skip-step-button {
+  background: none;
+  border: 1px solid var(--color-border, #ccc);
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  color: var(--color-text-muted, #888);
+  font-size: 0.875rem;
+  font-weight: normal;
+}
+
+.skip-step-button:hover {
+  color: var(--color-warning, #e67e22);
+  border-color: var(--color-warning, #e67e22);
+  background: rgba(230, 126, 34, 0.05);
+}
+
+/* Skipped banner styling */
+.skipped-banner {
+  background: var(--color-warning-bg, #fef9e7);
+  border: 1px solid var(--color-warning, #e67e22);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  margin: 16px 0;
+}
+
+.skipped-banner p {
+  margin: 0 0 12px;
+  font-weight: 500;
+  color: var(--color-warning-dark, #b45309);
+}
+
+.skipped-banner button {
+  margin: 0 6px;
+  min-width: 80px;
+}
 
   .wizard-topbar,
   .wizard-workspace-header,
