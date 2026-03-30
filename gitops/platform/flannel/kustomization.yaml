@@ -7,3 +7,11 @@ patches:
       kind: Namespace
       name: kube-flannel
     path: namespace-labels.yaml
+  - target:
+      kind: ServiceAccount
+      name: flannel
+    path: kube-system-namespace.yaml
+  - target:
+      kind: ClusterRoleBinding
+      name: flannel
+    path: kube-system-rbac.yaml
