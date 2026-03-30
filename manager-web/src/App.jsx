@@ -891,6 +891,11 @@ function App() {
       return;
     }
 
+    if (model.primaryAction.type === 'unskip') {
+      await handleUnskipAndExecute(model.activeStep);
+      return;
+    }
+
     if (model.primaryAction.type === 'advance' && model.nextStep) {
       setSelectedStepId(model.nextStep.id);
       setNotice(`Moved to ${model.nextStep.title}.`);
@@ -913,12 +918,74 @@ function App() {
     await executeStep(step);
   }
 
+  async function handleSkipStep(step) {
+    if (!step || busy || step.status === 'running' || step.status === 'done') {
+      return;
+    }
+
+    const confirmed = window.confirm(`Are you sure you want to skip "${step.title}"? You can run this step later.`);
+    if (!confirmed) {
+      return;
+    }
+
+    setBusy(true);
+    setError('');
+    try {
+      const response = await fetch(`/api/steps/${step.id}/skip`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cluster_id: clusterIdRef.current }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || `Failed to skip ${step.title}`);
+      }
+      setNotice(`Skipped "${step.title}".`);
+      await refreshWizardSnapshot();
+    } catch (skipError) {
+      const message = skipError instanceof Error ? skipError.message : `Failed to skip ${step.title}`;
+      setError(message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleUnskipAndExecute(step) {
+    if (!step || busy || step.status !== 'skipped') {
+      return;
+    }
+
+    setBusy(true);
+    setError('');
+    try {
+      const response = await fetch(`/api/steps/${step.id}/unskip`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cluster_id: clusterIdRef.current }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || `Failed to unskip ${step.title}`);
+      }
+      await refreshWizardSnapshot();
+      const refreshedStep = { ...step, status: 'ready' };
+      await executeStep(refreshedStep);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : `Failed to run ${step.title}`;
+      setError(message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleInstallAllSteps() {
     if (!setupSteps.length || busy) {
       return;
     }
 
-    const pendingSteps = getWizardSteps(catalog).filter((step) => step.status !== 'done');
+    const pendingSteps = getWizardSteps(catalog).filter(
+      (step) => step.status !== 'done' && step.status !== 'skipped'
+    );
     if (!pendingSteps.length) {
       setNotice('Every setup step is already complete.');
       return;
@@ -1451,6 +1518,15 @@ function App() {
                   <p className="wizard-step-sidehelp">{model.activity.sideHelp}</p>
                 </div>
 
+                {model.activeStep.status === 'skipped' && (
+                  <div className="skipped-banner">
+                    <p>This step was skipped.</p>
+                    <button type="button" onClick={() => handleUnskipAndExecute(model.activeStep)} disabled={busy}>
+                      Run this step
+                    </button>
+                  </div>
+                )}
+
                 {provisionScaleSummary ? (
                   <section className="wizard-scale-panel" aria-label="Cluster scaling summary">
                     <div className="wizard-scale-head">
@@ -1695,6 +1771,16 @@ function App() {
                   >
                     {primaryActionLabel}
                   </button>
+                  {(model.activeStep.status === 'ready' || model.activeStep.status === 'failed') && (
+                    <button
+                      type="button"
+                      onClick={() => handleSkipStep(model.activeStep)}
+                      disabled={busy}
+                      className="skip-step-button"
+                    >
+                      Skip this step
+                    </button>
+                  )}
                   {model.activeStep?.status === 'done' ? (
                     <button
                       className="button button-secondary"
