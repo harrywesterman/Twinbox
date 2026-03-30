@@ -485,12 +485,12 @@ function buildPrimaryAction(activeStep, nextStep, busy, stepIndex, mode) {
     };
   }
 
-  if (busy || activeStep.status === 'running') {
+  if (activeStep.status === 'running') {
     return {
       type: 'execute',
       label: 'Installing…',
       disabled: true,
-      helperText: 'Twinbox is waiting for the current worker job to finish.',
+      helperText: 'This step is currently running. Monitor the live output below.',
     };
   }
 
@@ -502,6 +502,9 @@ function buildPrimaryAction(activeStep, nextStep, busy, stepIndex, mode) {
       helperText: 'Complete the dependency chain before running this step.',
     };
   }
+
+  // Allow browsing and configuring other steps even while something is running.
+  // Only disable the execute button if this specific step is busy.
 
   if (activeStep.status === 'skipped') {
     return {

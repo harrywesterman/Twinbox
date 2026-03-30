@@ -676,11 +676,8 @@ function App() {
     busyRef.current = busy;
   }, [busy]);
 
-  useEffect(() => {
-    if (activeJob?.status === 'running') {
-      liveOutputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, [activeJob?.status]);
+  // Auto-scroll disabled: users should control their own scroll position.
+  // The live output panel is visible in the layout without forced scrolling.
 
   async function pollJob(jobId) {
     let latestJob = null;
@@ -881,37 +878,42 @@ function App() {
   }
 
   async function handlePrimaryAction() {
-    if (!model.activeStep || model.primaryAction.disabled) {
+    if (!model.activeStep || model.primaryAction.disabled || busyRef.current) {
       return;
     }
 
-    if (model.activeStep.id === 'provision-nodes' && !provisionStepValid) {
-      const message = provisionVmIpValidation.error || 'Step 1 is still preparing. Wait until the button says Start step 1.';
-      setNotice(message);
-      return;
-    }
+    busyRef.current = true;
+    try {
+      if (model.activeStep.id === 'provision-nodes' && !provisionStepValid) {
+        const message = provisionVmIpValidation.error || 'Step 1 is still preparing. Wait until the button says Start step 1.';
+        setNotice(message);
+        return;
+      }
 
-    if (model.primaryAction.type === 'unskip') {
-      await handleUnskipAndExecute(model.activeStep);
-      return;
-    }
+      if (model.primaryAction.type === 'unskip') {
+        await handleUnskipAndExecute(model.activeStep);
+        return;
+      }
 
-    if (model.primaryAction.type === 'advance' && model.nextStep) {
-      setSelectedStepId(model.nextStep.id);
-      setNotice(`Moved to ${model.nextStep.title}.`);
-      return;
-    }
+      if (model.primaryAction.type === 'advance' && model.nextStep) {
+        setSelectedStepId(model.nextStep.id);
+        setNotice(`Moved to ${model.nextStep.title}.`);
+        return;
+      }
 
-    if (model.primaryAction.type === 'finish') {
-      setNotice('The cluster bootstrap is finished. Export the answers file to keep this configuration.');
-      return;
-    }
+      if (model.primaryAction.type === 'finish') {
+        setNotice('The cluster bootstrap is finished. Export the answers file to keep this configuration.');
+        return;
+      }
 
-    await executeStep(model.activeStep);
+      await executeStep(model.activeStep);
+    } finally {
+      busyRef.current = false;
+    }
   }
 
   async function handleReinstallStep(step) {
-    if (!step || step.status !== 'done' || busy) {
+    if (!step || step.status !== 'done') {
       return;
     }
 
@@ -919,7 +921,7 @@ function App() {
   }
 
   async function handleSkipStep(step) {
-    if (!step || busy || step.status === 'running' || step.status === 'done') {
+    if (!step || step.status === 'running' || step.status === 'done') {
       return;
     }
 
@@ -1029,7 +1031,7 @@ function App() {
   }
 
   async function handleInstallAllSteps() {
-    if (!setupSteps.length || busy) {
+    if (!setupSteps.length || busyRef.current) {
       return;
     }
 
@@ -1825,7 +1827,6 @@ function App() {
                     <button
                       type="button"
                       onClick={() => handleSkipStep(model.activeStep)}
-                      disabled={busy}
                       className="skip-step-button"
                     >
                       Skip this step
@@ -1836,7 +1837,6 @@ function App() {
                       className="button button-secondary"
                       type="button"
                       onClick={() => handleReinstallStep(model.activeStep)}
-                      disabled={busy}
                     >
                       Reinstall step
                     </button>

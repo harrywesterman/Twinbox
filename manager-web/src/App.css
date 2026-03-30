@@ -1281,9 +1281,14 @@
 }
 
 .button-secondary {
-  background: rgba(255, 255, 255, 0.88);
-  color: var(--ink-1);
-  border-color: rgba(148, 163, 184, 0.34);
+  background: rgba(30, 41, 59, 0.85);
+  color: #fff;
+  border-color: rgba(30, 41, 59, 0.6);
+}
+
+.button-secondary:hover,
+.button-secondary:focus-visible {
+  background: rgba(30, 41, 59, 1);
 }
 
 .eyebrow {
