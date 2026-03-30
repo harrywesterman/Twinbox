@@ -941,7 +941,32 @@ function App() {
         throw new Error(body.error || `Failed to skip ${step.title}`);
       }
       setNotice(`Skipped "${step.title}".`);
-      await refreshWizardSnapshot();
+      await refreshWizardSnapshot({
+        requestJson,
+        clusterIdRef,
+        clusterInstanceIdRef,
+        selectedStepIdRef,
+        clusterCreatedAtRef,
+        answersRef,
+        provisionDirtyFieldsRef,
+        provisionSuggestionKeyRef,
+        provisionSuggestionSnapshotRef,
+        placementSuggestionKeyRef,
+        setHealth,
+        setCatalog,
+        setProxmoxResources,
+        setClusterId,
+        setClusterCreatedAt,
+        setClusterInstanceId,
+        setSelectedStepId,
+        setCluster,
+        setLogs,
+        setActiveJob,
+        setAnswers,
+        setNotice,
+        setError,
+        setProvisionSuggestionsReady: setProvisionSuggestionsReadyState,
+      });
     } catch (skipError) {
       const message = skipError instanceof Error ? skipError.message : `Failed to skip ${step.title}`;
       setError(message);
@@ -967,7 +992,32 @@ function App() {
         const body = await response.json().catch(() => ({}));
         throw new Error(body.error || `Failed to unskip ${step.title}`);
       }
-      await refreshWizardSnapshot();
+      await refreshWizardSnapshot({
+        requestJson,
+        clusterIdRef,
+        clusterInstanceIdRef,
+        selectedStepIdRef,
+        clusterCreatedAtRef,
+        answersRef,
+        provisionDirtyFieldsRef,
+        provisionSuggestionKeyRef,
+        provisionSuggestionSnapshotRef,
+        placementSuggestionKeyRef,
+        setHealth,
+        setCatalog,
+        setProxmoxResources,
+        setClusterId,
+        setClusterCreatedAt,
+        setClusterInstanceId,
+        setSelectedStepId,
+        setCluster,
+        setLogs,
+        setActiveJob,
+        setAnswers,
+        setNotice,
+        setError,
+        setProvisionSuggestionsReady: setProvisionSuggestionsReadyState,
+      });
       const refreshedStep = { ...step, status: 'ready' };
       await executeStep(refreshedStep);
     } catch (err) {
