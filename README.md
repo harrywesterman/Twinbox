@@ -14,7 +14,7 @@ So you can transform this:
   <img src="screenshots/lab.jpg" alt="Web Wizard" width="800">
 </p>
 
-But startomg the Twinbox Wizard on a Proxmox console:
+By starting the Twinbox Wizard on a Proxmox console:
 
 <p align="center">
   <img src="screenshots/wizard.png" alt="Proxmox Wizard" width="800">
