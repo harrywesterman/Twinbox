@@ -6,7 +6,7 @@ Twinbox turns a Proxmox server into a fully configured Talos Linux cluster with 
 
 ## What you start with
 
-Bring any machine with [Proxmox](https://www.proxmox.com/en/products/proxmox-virtual-environment/get-started) installed. Old server, workstation, or a fresh build — anything with virtualization support works.
+Bring any machine with [Proxmox](https://www.proxmox.com/en/products/proxmox-virtual-environment/get-started) installed. Old servers, workstations, or a fresh build — anything with virtualization support works.
 
 <p align="center">
   <img src="screenshots/lab.jpg" alt="Homelab hardware" width="800">
@@ -46,5 +46,3 @@ Open your browser to continue the installation. The web UI guides you through cl
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/harrywesterman/twinbox/main/wizard/setup-wizard.sh)
 ```
-
-Then open `http://<management-vm-ip>:3000` in your browser.
