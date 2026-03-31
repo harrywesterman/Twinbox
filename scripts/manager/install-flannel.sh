@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+  cat <<USAGE
+Usage: $0
+USAGE
+}
+
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
 
@@ -40,4 +46,15 @@ wait_for_kube_api
 log "Bootstrapping Flannel before Argo CD so the cluster has pod networking"
 kubectl apply -k "$WORKSPACE_ROOT/gitops/platform/flannel"
 wait_for_daemonset_rollout "kube-flannel" "kube-flannel-ds"
-kubectl -n kube-flannel rollout status "daemonset/kube-flannel-ds" --timeout=900s
+
+if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
+  jq -n \
+    --arg cni "flannel" \
+    --arg version "v0.26.6" \
+    --arg namespace "kube-flannel" \
+    '{
+      cni: $cni,
+      version: $version,
+      namespace: $namespace
+    }' >"$STEP_RESULT_FILE"
+fi
