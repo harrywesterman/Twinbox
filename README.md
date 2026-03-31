@@ -29,7 +29,7 @@ Open your browser to continue the installation. The web UI guides you through cl
 ## What you get
 
 <p align="center">
-  <img src="screenshots/logos.png" alt="Talos, Argo CD, Longhorn, OpenBao, Traefik, Velero, and more" width="800">
+  <img src="screenshots/twinbox_app_logos.png" alt="Talos, Argo CD, Longhorn, OpenBao, Traefik, Velero, and more" width="800">
 </p>
 
 - **Talos Linux** — immutable, API-driven Kubernetes OS
