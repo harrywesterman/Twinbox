@@ -54,16 +54,24 @@ Installs Longhorn via Argo CD and sets `StorageClass/longhorn` as the default.
 
 ### `install-secret-sync.sh`
 
-Installs External Secrets Operator and OpenBao:
+Bootstraps the management secrets layer for GitOps:
 
-- Deploys External Secrets Operator
-- Deploys OpenBao with Raft storage on Longhorn
-- Seeds OpenBao from bootstrap JSON files
-- Creates `ClusterSecretStore/openbao`
+- Renders OpenBao values file to `gitops/values/openbao.yaml` (seal key ID, replicas, Raft config)
+- Seeds OpenBao static seal secret (`kubectl create secret`)
+- Bootstraps management JSON files (proxmox, traefik-dashboard, seal key)
+
+External Secrets Operator and OpenBao are deployed as Argo CD Applications (`gitops/apps/external-secrets.yaml` and `gitops/apps/openbao.yaml`).
 
 ### `openbao-secret-sync.sh`
 
-Synchronizes secrets from the Management VM bootstrap files into OpenBao.
+Shared library for OpenBao lifecycle operations. Provides functions for:
+
+- Rendering OpenBao Helm values to `gitops/values/openbao.yaml` (`openbao_render_values_file`)
+- Seeding management bootstrap files
+- Seeding the OpenBao static seal Kubernetes secret
+- Initializing OpenBao and configuring Kubernetes auth
+- Syncing global secrets from JSON files into OpenBao's KV store
+- Applying `ClusterSecretStore` and `ExternalSecret` resources
 
 ### `sync-openbao-global-secret.sh`
 

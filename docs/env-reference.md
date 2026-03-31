@@ -59,6 +59,13 @@ CLI tools pinned in `config/pinned-defaults.sh` (not configurable through `.env`
 | `talosctl` | `v1.12.6` |
 | `tofu` | `v1.8.8` |
 | `k9s` | `v0.50.18` |
-| External Secrets chart | `0.20.1` |
-| OpenBao chart | `0.26.2` |
 | Talos version | `v1.12.6` |
+
+## GitOps Chart Versions
+
+Helm chart versions are pinned in the Argo CD `Application` manifests under `gitops/apps/`:
+
+| Application | Chart Version | Manifest |
+|-------------|---------------|----------|
+| External Secrets | `0.20.1` | `gitops/apps/external-secrets.yaml` |
+| OpenBao | `0.26.2` | `gitops/apps/openbao.yaml` |

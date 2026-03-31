@@ -19,8 +19,8 @@ TARGET_NAMESPACE="${TARGET_NAMESPACE:-twinbox-system}"
 CLUSTER_SECRET_STORE_NAME="${CLUSTER_SECRET_STORE_NAME:-openbao}"
 EXTERNAL_SECRET_NAME="${EXTERNAL_SECRET_NAME:-proxmox-bootstrap}"
 TARGET_SECRET_NAME="${TARGET_SECRET_NAME:-proxmox-bootstrap}"
-PINNED_EXTERNAL_SECRETS_CHART_VERSION="${PINNED_EXTERNAL_SECRETS_CHART_VERSION:-0.20.1}"
-PINNED_OPENBAO_CHART_VERSION="${PINNED_OPENBAO_CHART_VERSION:-0.26.2}"
+OPENBAO_VALUES_FILE="${OPENBAO_VALUES_FILE:-${WORKSPACE_ROOT}/gitops/values/openbao.yaml}"
+OPENBAO_VALUES_TEMPLATE="${OPENBAO_VALUES_TEMPLATE:-${WORKSPACE_ROOT}/gitops/values/openbao.yaml.template}"
 
 openbao_log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >&2
@@ -143,34 +143,12 @@ openbao_seed_release_secret() {
     --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 }
 
-openbao_install_external_secrets() {
-  local chart_version="${PINNED_EXTERNAL_SECRETS_CHART_VERSION:-0.20.1}"
-  local tolerations='[{"key":"node-role.kubernetes.io/control-plane","operator":"Exists","effect":"NoSchedule"},{"key":"node-role.kubernetes.io/master","operator":"Exists","effect":"NoSchedule"}]'
-
-  openbao_log "Installing External Secrets Operator ${chart_version}"
-  helm repo add external-secrets https://charts.external-secrets.io >/dev/null 2>&1 || true
-  helm repo update external-secrets >/dev/null
-  helm upgrade --install external-secrets external-secrets/external-secrets \
-    --namespace "$OPERATOR_NAMESPACE" \
-    --create-namespace \
-    --version "$chart_version" \
-    --set-json "tolerations=${tolerations}" \
-    --set-json "webhook.tolerations=${tolerations}" \
-    --set-json "certController.tolerations=${tolerations}"
-
-  kubectl rollout status deployment/external-secrets -n "$OPERATOR_NAMESPACE" --timeout=180s
-  kubectl rollout status deployment/external-secrets-webhook -n "$OPERATOR_NAMESPACE" --timeout=180s
-  kubectl rollout status deployment/external-secrets-cert-controller -n "$OPERATOR_NAMESPACE" --timeout=180s
-}
-
 openbao_render_values_file() {
-  local values_file
-  values_file="$(mktemp "${TMPDIR:-/tmp}/openbao-values.XXXXXX.yaml")"
   local seal_key_id
   seal_key_id="$(tr -d '\r\n' <"$OPENBAO_SEAL_KEY_ID_FILE")"
   local replicas="${OPENBAO_REPLICAS:-1}"
 
-  cat >"$values_file" <<EOF
+  cat >"$OPENBAO_VALUES_FILE" <<EOF
 global:
   tlsDisable: true
 
@@ -225,37 +203,7 @@ server:
       readOnly: true
 EOF
 
-  printf '%s\n' "$values_file"
-}
-
-openbao_install_release() {
-  local values_file
-  values_file="$(openbao_render_values_file)"
-  trap 'rm -f "$values_file"' RETURN
-
-  openbao_log "Installing OpenBao ${PINNED_OPENBAO_CHART_VERSION} on Longhorn"
-  helm repo add openbao https://openbao.github.io/openbao-helm >/dev/null 2>&1 || true
-  helm repo update openbao >/dev/null
-  local attempt=1
-  local attempts=5
-  local delay=5
-
-  while [[ "$attempt" -le "$attempts" ]]; do
-    if helm upgrade --install openbao openbao/openbao \
-      --namespace "$OPENBAO_NAMESPACE" \
-      --create-namespace \
-      --version "$PINNED_OPENBAO_CHART_VERSION" \
-      -f "$values_file"; then
-      return 0
-    fi
-
-    openbao_log "OpenBao helm install attempt ${attempt}/${attempts} failed; retrying in ${delay}s"
-    sleep "$delay"
-    attempt=$((attempt + 1))
-    delay=$((delay * 2))
-  done
-
-  openbao_fail "OpenBao helm install failed after ${attempts} attempts"
+  openbao_log "Rendered OpenBao values to ${OPENBAO_VALUES_FILE}"
 }
 
 openbao_wait_for_statefulset_ready() {

@@ -13,8 +13,6 @@ require_cmd() { command -v "$1" >/dev/null 2>&1 || fail "Missing required comman
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 # shellcheck disable=SC1091
-source "$WORKSPACE_ROOT/config/pinned-defaults.sh"
-# shellcheck disable=SC1091
 source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
 
 OPENBAO_NAMESPACE="${OPENBAO_NAMESPACE:-openbao}"
@@ -64,7 +62,6 @@ done
 CLUSTER_INSTANCE_ID="${TWINBOX_CLUSTER_INSTANCE_ID:-}"
 
 require_cmd kubectl
-require_cmd helm
 require_cmd jq
 require_cmd openssl
 
@@ -98,14 +95,11 @@ openbao_ensure_namespace "$OPENBAO_NAMESPACE"
 kubectl create namespace "$OPERATOR_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 kubectl create namespace "$TARGET_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
-openbao_log "Installing External Secrets Operator ${PINNED_EXTERNAL_SECRETS_CHART_VERSION}"
-openbao_install_external_secrets
+openbao_log "Rendering ArgoCD values files"
+openbao_render_values_file
 
 openbao_log "Seeding OpenBao static seal secret"
 openbao_seed_release_secret
-
-openbao_log "Installing OpenBao ${PINNED_OPENBAO_CHART_VERSION} on Longhorn"
-openbao_install_release
 
 openbao_pod="$(openbao_wait_for_server_pod)"
 openbao_initialize_if_needed "$openbao_pod"

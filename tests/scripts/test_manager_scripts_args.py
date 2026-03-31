@@ -604,27 +604,15 @@ def test_bootstrap_talos_uses_discovered_ips_and_records_runtime_state():
     assert "detach_all_vm_isos" not in text
 
 
-def test_install_secret_sync_installs_eso_and_applies_secret_sync_manifests():
+def test_install_secret_sync_renders_argocd_values_and_applies_secret_sync_manifests():
     text = _install_secret_sync_text()
     helper_text = (
         REPO_ROOT / "scripts" / "manager" / "openbao-secret-sync.sh"
     ).read_text(encoding="utf-8")
-    assert 'source "$WORKSPACE_ROOT/config/pinned-defaults.sh"' in text
     assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in text
-    assert "PINNED_EXTERNAL_SECRETS_CHART_VERSION" in text
-    assert "PINNED_OPENBAO_CHART_VERSION" in text
-    assert (
-        "helm repo add external-secrets https://charts.external-secrets.io"
-        in helper_text
-    )
-    assert (
-        "helm upgrade --install external-secrets external-secrets/external-secrets"
-        in helper_text
-    )
+    assert "openbao_render_values_file" in text
     assert "openbao_seed_management_bootstrap_files" in text
-    assert "openbao_install_external_secrets" in text
     assert "openbao_seed_release_secret" in text
-    assert "openbao_install_release" in text
     assert 'openbao_initialize_if_needed "$openbao_pod"' in text
     assert 'openbao_configure_auth_and_policy "$openbao_pod"' in text
     assert 'openbao_seed_secret_paths "$openbao_pod"' in text
