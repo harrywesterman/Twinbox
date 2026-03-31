@@ -10,7 +10,7 @@ variable "cloudflare_zone_id" {
 }
 
 variable "zone_name" {
-  description = "Cloudflare zone name, e.g. bierineenweek.nl"
+  description = "Cloudflare zone name, e.g. example.com"
   type        = string
 }
 

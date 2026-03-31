@@ -8,7 +8,7 @@ spec:
     - websecure
   routes:
     - kind: Rule
-      match: Host(`argocd.bierineenweek.nl`)
+      match: Host(`argocd.__ZONE_NAME__`)
       services:
         - kind: Service
           name: argocd-server

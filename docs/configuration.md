@@ -35,6 +35,10 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `/opt/twinbox/bootstrap/secrets/global/authentik.json`
 - `/opt/twinbox/bootstrap/secrets/global/wiredoor-gateway.json`
 - `/opt/twinbox/bootstrap/secrets/global/velero.json`
+- `/opt/twinbox/bootstrap/secrets/global/wiredoor-bastion-<cluster-id>.json`
+- `/opt/twinbox/bootstrap/secrets/global/cloudflare-<cluster-id>.json`
+- `/opt/twinbox/bootstrap/secrets/global/wiredoor-bastion-<cluster-id>.json`
+- `/opt/twinbox/bootstrap/secrets/global/cloudflare-<cluster-id>.json`
 
 ### Cluster-scoped runtime artifacts
 
@@ -135,6 +139,69 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `install-postgres-clusters` deploys all database clusters defined under `gitops/databases/`. Each cluster gets a CloudNativePG `Cluster` (3 instances), PgBouncer `Pooler` (read-write and read-only), a `ScheduledBackup` for daily snapshots, and an `ExternalSecret` that pulls credentials from OpenBao. Applications connect through the pooler service (e.g. `authentik-db-pooler-rw.databases.svc.cluster.local`).
 - `install-velero-backup` installs Velero together with either a Twinbox-managed Garage bucket or an external S3-compatible backup target.
 - Later application steps write bootstrap JSON into OpenBao before enabling their Argo CD applications.
+
+## Dynamic Domain Configuration
+
+Twinbox uses a single domain name (`ZONE_NAME`) for all platform services. The domain is provided by the user during the **Configure Cloudflare DNS** step and flows through the system automatically.
+
+### How it works
+
+1. **User input** — The user enters their domain (e.g. `example.com`) in the web wizard during `configure-cloudflare-dns`.
+2. **OpenBao sync** — The step script syncs `ZONE_NAME`, `WIREDOOR_FQDN`, and `WILDCARD_FQDN` to OpenBao at `twinbox/global/cluster-hostnames`.
+3. **ExternalSecret** — The `cluster-config` ExternalSecret reads `ZONE_NAME` from OpenBao and creates a Kubernetes ConfigMap.
+4. **Kustomize replacements** — The `platform-ingress` Argo CD application uses Kustomize to replace `__ZONE_NAME__` placeholders in all IngressRoute `match` rules, the homepage configmap, and the homepage deployment.
+
+### Affected services
+
+All platform services use the domain through the `__ZONE_NAME__` placeholder:
+
+| Service | Hostname |
+|---------|----------|
+| Argo CD | `argocd.<ZONE_NAME>` |
+| Traefik dashboard | `traefik.<ZONE_NAME>` |
+| Authentik | `authentik.<ZONE_NAME>` |
+| Headlamp | `headlamp.<ZONE_NAME>` |
+| Grafana | `grafana.<ZONE_NAME>` |
+| Whoami | `whoami.<ZONE_NAME>` |
+| Homepage | `homepage.<ZONE_NAME>` |
+
+### GitOps structure
+
+```
+gitops/platform/
+├── kustomization.yaml          # Central Kustomize config with replacements
+├── cluster-config/
+│   ├── configmap.yaml          # ConfigMap target (populated by ExternalSecret)
+│   └── externalsecret.yaml     # Reads ZONE_NAME from OpenBao
+├── authentik/ingressroute.yaml # Host(`authentik.__ZONE_NAME__`)
+├── whoami/
+│   ├── ingressroute.yaml       # Host(`whoami.__ZONE_NAME__`)
+│   └── k8s.yaml                # Deployment + Service (no domain reference)
+├── grafana/
+│   ├── ingressroute.yaml       # Host(`grafana.__ZONE_NAME__`)
+│   └── externalsecret.yaml     # Admin credentials from OpenBao
+├── headlamp/ingressroute.yaml  # Host(`headlamp.__ZONE_NAME__`)
+├── traefik/
+│   ├── argocd-ingressroute.yaml
+│   └── traefik-dashboard-ingressroute.yaml
+├── wiredoor-gateway/
+│   ├── ingressroute.yaml
+│   └── externalsecret.yaml
+└── homepage/
+    ├── ingressroute.yaml
+    ├── configmap.yaml          # Bookmarks and services with __ZONE_NAME__
+    └── deployment.yaml         # HOMEPAGE_ALLOWED_HOSTS
+```
+
+### Argo CD application order
+
+The `cluster-config` application must sync before `platform-ingress` so that the ConfigMap exists when Kustomize performs replacements. Add `depends_on` in the wizard journey:
+
+```
+cluster-config → platform-ingress
+```
+
+The `platform-ingress` application deploys the entire `gitops/platform/` directory via Kustomize, which handles all replacements at sync time.
 
 ## Tooling Versions
 

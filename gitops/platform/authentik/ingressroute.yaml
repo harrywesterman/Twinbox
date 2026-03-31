@@ -8,7 +8,7 @@ spec:
     - websecure
   routes:
     - kind: Rule
-      match: Host(`authentik.bierineenweek.nl`)
+      match: Host(`authentik.__ZONE_NAME__`)
       services:
         - kind: Service
           name: authentik-server

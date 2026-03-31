@@ -1,19 +1,17 @@
-# IngressRoute managed by platform-ingress via Kustomize.
-# This app deploys only the whoami Deployment and Service.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: whoami
+  name: platform-ingress
   namespace: argocd
 spec:
   project: default
   source:
     repoURL: https://github.com/harrywesterman/Twinbox.git
     targetRevision: main
-    path: gitops/platform/whoami/k8s.yaml
+    path: gitops/platform
   destination:
     server: https://kubernetes.default.svc
-    namespace: default
+    namespace: argocd
   syncPolicy:
     automated:
       prune: true

@@ -11,7 +11,7 @@ manifest_path="$WORKSPACE_ROOT/gitops/apps/authentik.yaml"
 
 mkdir -p "$(dirname "$authentik_secret_file")"
 
-authentik_host="${TWINBOX_AUTHENTIK_HOST:-https://authentik.bierineenweek.nl}"
+authentik_host="${TWINBOX_AUTHENTIK_HOST:-}"
 authentik_secret_key=""
 authentik_bootstrap_password=""
 authentik_bootstrap_token=""

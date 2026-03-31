@@ -848,13 +848,13 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "token:" not in wiredoor_gateway_values_text
     assert "kind: Application" in whoami_app_text
     assert "kind: Application" in headlamp_app_text
-    assert "path: gitops/platform/whoami" in whoami_app_text
-    assert "path: gitops/platform/headlamp" in headlamp_app_text
-    assert "path: gitops/platform/wiredoor-gateway" in wiredoor_gateway_app_text
-    assert "Host(`whoami.bierineenweek.nl`)" in whoami_ingressroute_text
-    assert "Host(`headlamp.bierineenweek.nl`)" in headlamp_ingressroute_text
-    assert "Host(`grafana.bierineenweek.nl`)" in grafana_ingressroute_text
-    assert "Host(`argocd.bierineenweek.nl`)" in wiredoor_ingressroute_text
+    assert "path: gitops/platform/whoami/k8s.yaml" in whoami_app_text
+    assert "path: gitops/platform/whoami/k8s.yaml" not in headlamp_app_text
+    assert "path: gitops/platform/wiredoor-gateway" not in wiredoor_gateway_app_text
+    assert "Host(`whoami.__ZONE_NAME__`)" in whoami_ingressroute_text
+    assert "Host(`headlamp.__ZONE_NAME__`)" in headlamp_ingressroute_text
+    assert "Host(`grafana.__ZONE_NAME__`)" in grafana_ingressroute_text
+    assert "Host(`argocd.__ZONE_NAME__`)" in wiredoor_ingressroute_text
     assert "kind: ExternalSecret" in traefik_externalsecret_text
     assert "kind: ClusterSecretStore" in traefik_externalsecret_text
     assert "name: openbao" in traefik_externalsecret_text
@@ -878,7 +878,7 @@ def test_grafana_admin_credentials_are_openbao_backed():
     assert "existingSecret: grafana-admin" in grafana_values_text
     assert "userKey: admin-user" in grafana_values_text
     assert "passwordKey: admin-password" in grafana_values_text
-    assert "path: gitops/platform/grafana" in grafana_app_text
+    assert "path: gitops/platform/grafana" not in grafana_app_text
     assert "kind: ExternalSecret" in grafana_externalsecret_text
     assert "kind: ClusterSecretStore" in grafana_externalsecret_text
     assert "name: openbao" in grafana_externalsecret_text

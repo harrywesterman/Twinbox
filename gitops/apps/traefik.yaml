@@ -15,9 +15,6 @@ spec:
     - repoURL: https://github.com/harrywesterman/Twinbox.git
       targetRevision: main
       ref: values
-    - repoURL: https://github.com/harrywesterman/Twinbox.git
-      targetRevision: main
-      path: gitops/platform/traefik
   destination:
     server: https://kubernetes.default.svc
     namespace: traefik

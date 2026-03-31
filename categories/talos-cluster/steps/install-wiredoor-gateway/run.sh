@@ -12,7 +12,7 @@ manifest_path="$WORKSPACE_ROOT/gitops/apps/wiredoor-gateway.yaml"
 mkdir -p "$(dirname "$wiredoor_secret_file")"
 
 if [[ ! -f "$wiredoor_secret_file" ]]; then
-  wiredoor_url="${WIREDOOR_URL:-${TWINBOX_WIREDOOR_URL:-https://argocd.bierineenweek.nl}}"
+  wiredoor_url="${WIREDOOR_URL:-${TWINBOX_WIREDOOR_URL:-}}"
   wiredoor_token="$(openssl rand -hex 24)"
   tmp_file="$(mktemp)"
   jq -n \

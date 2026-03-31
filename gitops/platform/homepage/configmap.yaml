@@ -17,49 +17,49 @@ data:
   bookmarks.yaml: |
     - Platform:
         - Argo CD:
-            - href: https://argocd.bierineenweek.nl
+            - href: https://argocd.__ZONE_NAME__
               description: GitOps control plane
         - Traefik:
-            - href: https://traefik.bierineenweek.nl
+            - href: https://traefik.__ZONE_NAME__
               description: Ingress controller
         - Authentik:
-            - href: https://authentik.bierineenweek.nl
+            - href: https://authentik.__ZONE_NAME__
               description: Identity provider
         - Headlamp:
-            - href: https://headlamp.bierineenweek.nl
+            - href: https://headlamp.__ZONE_NAME__
               description: Kubernetes dashboard
         - Grafana:
-            - href: https://grafana.bierineenweek.nl
+            - href: https://grafana.__ZONE_NAME__
               description: Metrics and dashboards
         - Wiredoor:
-            - href: https://argocd.bierineenweek.nl
+            - href: https://argocd.__ZONE_NAME__
               description: Alternate operator entrypoint
   services.yaml: |
     - Platform:
         - Argo CD:
-            href: https://argocd.bierineenweek.nl
+            href: https://argocd.__ZONE_NAME__
             description: GitOps control plane
         - Traefik:
-            href: https://traefik.bierineenweek.nl
+            href: https://traefik.__ZONE_NAME__
             description: Ingress controller
         - Authentik:
-            href: https://authentik.bierineenweek.nl
+            href: https://authentik.__ZONE_NAME__
             description: Identity provider
         - Headlamp:
-            href: https://headlamp.bierineenweek.nl
+            href: https://headlamp.__ZONE_NAME__
             description: Kubernetes dashboard
         - Grafana:
-            href: https://grafana.bierineenweek.nl
+            href: https://grafana.__ZONE_NAME__
             description: Metrics and dashboards
         - Wiredoor:
-            href: https://argocd.bierineenweek.nl
+            href: https://argocd.__ZONE_NAME__
             description: Alternate operator entrypoint
     - Apps:
         - Whoami:
-            href: https://whoami.bierineenweek.nl
+            href: https://whoami.__ZONE_NAME__
             description: Minimal ingress check
         - Homepage:
-            href: https://homepage.bierineenweek.nl
+            href: https://homepage.__ZONE_NAME__
             description: Cluster landing page
   custom.css: ""
   custom.js: ""

@@ -112,6 +112,12 @@ EOF
 
 chmod 600 "$secrets_dir/cloudflare-${cluster_id}.json"
 
+# Sync hostnames to OpenBao so all platform apps can read ZONE_NAME
+bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+  --secret-name "cluster-hostnames" \
+  --json-file "$secrets_dir/cloudflare-${cluster_id}.json" \
+  --required-keys "ZONE_NAME,WIREDOOR_FQDN,WILDCARD_FQDN"
+
 # Write result
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   cat > "$STEP_RESULT_FILE" <<EOF

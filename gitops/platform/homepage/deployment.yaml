@@ -25,7 +25,7 @@ spec:
               containerPort: 3000
           env:
             - name: HOMEPAGE_ALLOWED_HOSTS
-              value: homepage.bierineenweek.nl
+              value: homepage.__ZONE_NAME__
           volumeMounts:
             - name: config
               mountPath: /app/config

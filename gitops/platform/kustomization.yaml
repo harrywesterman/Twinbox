@@ -1,0 +1,46 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - cluster-config/configmap.yaml
+  - cluster-config/externalsecret.yaml
+  - authentik/ingressroute.yaml
+  - whoami/ingressroute.yaml
+  - headlamp/ingressroute.yaml
+  - grafana/ingressroute.yaml
+  - grafana/externalsecret.yaml
+  - traefik/traefik-dashboard-ingressroute.yaml
+  - traefik/argocd-ingressroute.yaml
+  - wiredoor-gateway/ingressroute.yaml
+  - wiredoor-gateway/externalsecret.yaml
+  - homepage/ingressroute.yaml
+  - homepage/configmap.yaml
+  - homepage/deployment.yaml
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.ZONE_NAME
+    targets:
+      - select:
+          kind: IngressRoute
+        fieldPaths:
+          - spec.routes.*.match
+        options:
+          delimiter: "."
+          index: 1
+      - select:
+          kind: ConfigMap
+          name: homepage
+        fieldPaths:
+          - data["bookmarks.yaml"]
+          - data["services.yaml"]
+      - select:
+          kind: Deployment
+          name: homepage
+        fieldPaths:
+          - spec.template.spec.containers.0.env.0.value
+        options:
+          delimiter: "."
+          index: 1

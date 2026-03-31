@@ -3,7 +3,7 @@ service:
 
 grafana.ini:
   server:
-    root_url: https://grafana.bierineenweek.nl
+    root_url: https://grafana.__ZONE_NAME__
 
 admin:
   existingSecret: grafana-admin

@@ -8,7 +8,7 @@ spec:
     - websecure
   routes:
     - kind: Rule
-      match: Host(`homepage.bierineenweek.nl`)
+      match: Host(`homepage.__ZONE_NAME__`)
       services:
         - kind: Service
           name: homepage
@@ -26,7 +26,7 @@ spec:
     - webwiredoor
   routes:
     - kind: Rule
-      match: Host(`homepage.bierineenweek.nl`)
+      match: Host(`homepage.__ZONE_NAME__`)
       services:
         - kind: Service
           name: homepage

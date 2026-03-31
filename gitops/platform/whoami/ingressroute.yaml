@@ -8,7 +8,7 @@ spec:
     - websecure
   routes:
     - kind: Rule
-      match: Host(`whoami.bierineenweek.nl`)
+      match: Host(`whoami.__ZONE_NAME__`)
       services:
         - kind: Service
           name: whoami
@@ -25,7 +25,7 @@ spec:
     - webwiredoor
   routes:
     - kind: Rule
-      match: Host(`whoami.bierineenweek.nl`)
+      match: Host(`whoami.__ZONE_NAME__`)
       services:
         - kind: Service
           name: whoami
