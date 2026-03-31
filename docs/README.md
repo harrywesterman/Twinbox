@@ -20,4 +20,5 @@ Operational documentation for Twinbox.
 - `talos-integration.md` — Talos Linux integration details.
 - `vm-dev.md` — VM development workflow and frontend preview guide.
 - `wizard-guide.md` — Proxmox setup wizard usage walkthrough.
+- `app-pattern.md` — standardized app deployment pattern (Longhorn, Traefik, CloudNativePG, Authentik).
 - `plans/` — design and planning documents.
