@@ -1,6 +1,14 @@
 service:
   type: ClusterIP
 
+sidecar:
+  datasources:
+    enabled: true
+    label: grafana_datasource
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+
 grafana.ini:
   server:
     root_url: https://grafana.__ZONE_NAME__
@@ -9,3 +17,14 @@ admin:
   existingSecret: grafana-admin
   userKey: admin-user
   passwordKey: admin-password
+
+additionalDataSources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus-operated.monitoring.svc.cluster.local:9090
+    isDefault: true
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki.monitoring.svc.cluster.local:3100

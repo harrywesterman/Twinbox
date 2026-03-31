@@ -158,7 +158,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-proxmox-backup-system",
                 "install-nextcloud",
                 "install-immich",
-                "install-rocketchat",
+                "install-zulip",
                 "install-paperless",
                 "install-karakeep",
                 "install-gitea",

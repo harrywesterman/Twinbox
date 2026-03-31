@@ -1,0 +1,33 @@
+replicaCount: 1
+
+image:
+  repository: binwiederhier/ntfy
+  tag: "v2.11.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+
+resources:
+  requests:
+    memory: 64Mi
+    cpu: 50m
+  limits:
+    memory: 128Mi
+    cpu: 100m
+
+persistence:
+  enabled: true
+  storageClassName: longhorn
+  size: 1Gi
+  accessMode: ReadWriteOnce
+
+config:
+  base-url: "https://ntfy.__ZONE_NAME__"
+  cache-duration: "12h"
+  keepalive-interval: "45s"
+  behind-proxy: true

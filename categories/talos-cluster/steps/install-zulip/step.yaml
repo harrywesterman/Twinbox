@@ -1,10 +1,10 @@
-id: install-rocketchat
-title: Install Rocketchat
+id: install-zulip
+title: Install Zulip
 type: action
 journey_stage: setup
 order: 106
-summary: Placeholder step for the Rocketchat app phase.
-explanation: This wizard step is reserved for future Rocketchat installation work and does not run a real cluster action yet.
+summary: Placeholder step for the Zulip app phase.
+explanation: This wizard step is reserved for future Zulip installation work and does not run a real cluster action yet.
 side_help: Communication tools belong in the same user-facing app sequence.
 depends_on:
   - install-immich

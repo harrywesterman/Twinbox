@@ -925,3 +925,136 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     assert 'output "controlplane_ipv4_addresses"' in outputs_text
     assert 'output "worker_ipv4_addresses"' in outputs_text
     assert 'output "kubeconfig"' not in outputs_text
+
+
+PROMETHEUS_APP = REPO_ROOT / "gitops" / "apps" / "prometheus.yaml"
+PROMETHEUS_VALUES = REPO_ROOT / "gitops" / "values" / "prometheus.yaml"
+PROMETHEUS_INGRESSROUTE = (
+    REPO_ROOT / "gitops" / "platform" / "prometheus" / "ingressroute.yaml"
+)
+ALERTMANAGER_CONFIG = (
+    REPO_ROOT / "gitops" / "platform" / "prometheus" / "alertmanager-config.yaml"
+)
+LOKI_APP = REPO_ROOT / "gitops" / "apps" / "loki.yaml"
+LOKI_VALUES = REPO_ROOT / "gitops" / "values" / "loki.yaml"
+NTFY_APP = REPO_ROOT / "gitops" / "apps" / "ntfy.yaml"
+NTFY_VALUES = REPO_ROOT / "gitops" / "values" / "ntfy.yaml"
+NTFY_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "ntfy" / "ingressroute.yaml"
+HOMEPAGE_CONFIGMAP = REPO_ROOT / "gitops" / "platform" / "homepage" / "configmap.yaml"
+KUSTOMIZATION = REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
+
+
+def test_prometheus_argocd_app_uses_kube_prometheus_stack():
+    text = PROMETHEUS_APP.read_text(encoding="utf-8")
+    assert "kind: Application" in text
+    assert "name: prometheus" in text
+    assert "chart: kube-prometheus-stack" in text
+    assert "prometheus-community.github.io/helm-charts" in text
+    assert "$values/gitops/values/prometheus.yaml" in text
+    assert "namespace: monitoring" in text
+
+
+def test_prometheus_values_configures_alertmanager_and_storage():
+    text = PROMETHEUS_VALUES.read_text(encoding="utf-8")
+    assert "kube-prometheus-stack" not in text
+    assert "serviceMonitorSelectorNilUsesHelmValues: false" in text
+    assert "alertmanager:" in text
+    assert "enabled: true" in text
+    assert "configSecret: alertmanager-config" in text
+    assert "grafana:" in text
+    assert "enabled: false" in text
+    assert "storageClassName: longhorn" in text
+
+
+def test_prometheus_ingressroute_exposes_ui():
+    text = PROMETHEUS_INGRESSROUTE.read_text(encoding="utf-8")
+    assert "kind: IngressRoute" in text
+    assert "Host(`prometheus.__ZONE_NAME__`)" in text
+    assert "prometheus-operated" in text
+    assert "port: 9090" in text
+    assert "webwiredoor" in text
+
+
+def test_alertmanager_config_routes_to_ntfy():
+    text = ALERTMANAGER_CONFIG.read_text(encoding="utf-8")
+    assert "name: alertmanager-config" in text
+    assert "alertmanager.yaml:" in text
+    assert "receiver: 'ntfy'" in text
+    assert "name: 'ntfy'" in text
+    assert "webhook_configs:" in text
+    assert "ntfy.monitoring.svc.cluster.local" in text
+    assert "send_resolved: true" in text
+
+
+def test_loki_argocd_app_uses_loki_chart():
+    text = LOKI_APP.read_text(encoding="utf-8")
+    assert "kind: Application" in text
+    assert "name: loki" in text
+    assert "chart: loki" in text
+    assert "grafana.github.io/helm-charts" in text
+    assert "$values/gitops/values/loki.yaml" in text
+    assert "namespace: monitoring" in text
+
+
+def test_loki_values_configures_filesystem_storage():
+    text = LOKI_VALUES.read_text(encoding="utf-8")
+    assert "auth_enabled: false" in text
+    assert "replication_factor: 1" in text
+    assert "type: filesystem" in text
+    assert "storageClassName: longhorn" in text
+    assert "retention_period: 14d" in text
+
+
+def test_ntfy_argocd_app_uses_ntfy_chart():
+    text = NTFY_APP.read_text(encoding="utf-8")
+    assert "kind: Application" in text
+    assert "name: ntfy" in text
+    assert "chart: ntfy" in text
+    assert "$values/gitops/values/ntfy.yaml" in text
+    assert "namespace: monitoring" in text
+
+
+def test_ntfy_values_configures_persistence():
+    text = NTFY_VALUES.read_text(encoding="utf-8")
+    assert "binwiederhier/ntfy" in text
+    assert "storageClassName: longhorn" in text
+    assert "base-url:" in text
+    assert "ntfy.__ZONE_NAME__" in text
+
+
+def test_ntfy_ingressroute_exposes_ui():
+    text = NTFY_INGRESSROUTE.read_text(encoding="utf-8")
+    assert "kind: IngressRoute" in text
+    assert "Host(`ntfy.__ZONE_NAME__`)" in text
+    assert "name: ntfy" in text
+    assert "port: 80" in text
+    assert "webwiredoor" in text
+
+
+def test_grafana_values_includes_sidecar_and_datasources():
+    text = GRAFANA_VALUES.read_text(encoding="utf-8")
+    assert "sidecar:" in text
+    assert "datasources:" in text
+    assert "enabled: true" in text
+    assert "additionalDataSources:" in text
+    assert "name: Prometheus" in text
+    assert "name: Loki" in text
+    assert "type: prometheus" in text
+    assert "type: loki" in text
+
+
+def test_homepage_configmap_includes_monitoring_links():
+    text = HOMEPAGE_CONFIGMAP.read_text(encoding="utf-8")
+    assert "Prometheus:" in text
+    assert "https://prometheus.__ZONE_NAME__" in text
+    assert "ntfy:" in text
+    assert "https://ntfy.__ZONE_NAME__" in text
+    assert "Metrics collection and alerting" in text
+    assert "Push notification service" in text
+
+
+def test_kustomization_includes_monitoring_resources():
+    text = KUSTOMIZATION.read_text(encoding="utf-8")
+    assert "prometheus/ingressroute.yaml" in text
+    assert "prometheus/alertmanager-config.yaml" in text
+    assert "ntfy/ingressroute.yaml" in text

@@ -89,7 +89,7 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 - `install-jitsi` – Deploy Jitsi Meet.
 - `install-karakeep` – Deploy Karakeep.
 - `install-paperless` – Deploy Paperless-ngx.
-- `install-rocketchat` – Deploy Rocket.Chat.
+- `install-zulip` – Deploy Zulip.
 - `install-proxmox-backup-system` – Deploy Proxmox Backup Server integration.
 - `configure-cloudflare-dns` – Configure Cloudflare DNS records.
 - `create-users-and-groups` – Create Kubernetes RBAC users and groups.

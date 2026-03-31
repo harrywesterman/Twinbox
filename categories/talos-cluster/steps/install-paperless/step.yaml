@@ -7,7 +7,7 @@ summary: Placeholder step for the Paperless app phase.
 explanation: This wizard step is reserved for future Paperless installation work and does not run a real cluster action yet.
 side_help: Document management fits the same bootstrap rhythm as the other user services.
 depends_on:
-  - install-rocketchat
+  - install-zulip
 inputs: []
 runner:
   kind: script

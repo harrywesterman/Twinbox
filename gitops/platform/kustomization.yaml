@@ -16,6 +16,12 @@ resources:
   - homepage/ingressroute.yaml
   - homepage/configmap.yaml
   - homepage/deployment.yaml
+  - prometheus/ingressroute.yaml
+  - prometheus/alertmanager-config.yaml
+  - ntfy/ingressroute.yaml
+  - prometheus/ingressroute.yaml
+  - prometheus/alertmanager-config.yaml
+  - ntfy/ingressroute.yaml
 
 replacements:
   - source:

@@ -1,0 +1,32 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: ntfy
+  namespace: monitoring
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`ntfy.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: ntfy
+          port: 80
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: ntfy-wiredoor
+  namespace: monitoring
+spec:
+  entryPoints:
+    - webwiredoor
+  routes:
+    - kind: Rule
+      match: Host(`ntfy.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: ntfy
+          port: 80

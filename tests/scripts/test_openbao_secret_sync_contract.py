@@ -27,13 +27,8 @@ TRAEFIK_SECRET = (
     / "templates"
     / "traefik-dashboard-externalsecret.yaml"
 )
-ROCKETCHAT_STEP = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "install-rocketchat"
-    / "step.yaml"
+ZULIP_STEP = (
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-zulip" / "step.yaml"
 )
 REMOVED_PLACEHOLDER_STEP = (
     REPO_ROOT
@@ -112,4 +107,4 @@ def test_gitops_secret_consumers_now_reference_cluster_secret_store_openbao():
 
 def test_removed_placeholder_step_is_absent_from_the_journey():
     assert not REMOVED_PLACEHOLDER_STEP.exists()
-    assert "- install-immich" in _read(ROCKETCHAT_STEP)
+    assert "- install-immich" in _read(ZULIP_STEP)

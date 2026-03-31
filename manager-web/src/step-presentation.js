@@ -27,7 +27,7 @@ const STEP_ICON_ASSETS = {
   'install-proxmox-backup-system': assetHref('install-proxmox-backup-system.svg'),
   'install-nextcloud': assetHref('install-nextcloud.svg'),
   'install-immich': assetHref('install-immich.svg'),
-  'install-rocketchat': assetHref('install-rocketchat.svg'),
+  'install-zulip': assetHref('install-zulip.svg'),
   'install-paperless': assetHref('install-paperless.svg'),
   'install-karakeep': assetHref('install-karakeep.svg'),
   'install-gitea': assetHref('install-gitea.svg'),
@@ -141,10 +141,10 @@ function buildProjectUrlMap() {
       project_url: 'https://immich.app/',
       github_url: 'https://github.com/immich-app/immich',
     },
-    'install-rocketchat': {
+    'install-zulip': {
       icon: '💬',
-      project_url: 'https://www.rocket.chat/',
-      github_url: 'https://github.com/RocketChat/Rocket.Chat',
+      project_url: 'https://zulip.com/',
+      github_url: 'https://github.com/zulip/zulip',
     },
     'install-paperless': {
       icon: '📄',
