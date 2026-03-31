@@ -36,3 +36,5 @@ terraform.tfvars.json
 .ruffcache/
 skills/
 skills-lock.json
+.github
+.ruff_cache
