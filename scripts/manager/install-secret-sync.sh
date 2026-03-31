@@ -69,6 +69,14 @@ require_cmd jq
 require_cmd openssl
 
 export KUBECONFIG="$KUBECONFIG_FILE"
+
+if [[ -n "${KUBE_API_SERVER:-}" ]]; then
+  kube_cluster_name="$(kubectl config view --kubeconfig "$KUBECONFIG_FILE" -o jsonpath='{.clusters[0].name}')"
+  [[ -n "$kube_cluster_name" ]] || fail "Unable to read cluster name from kubeconfig"
+  log "Rewriting kubeconfig cluster ${kube_cluster_name} to ${KUBE_API_SERVER}"
+  kubectl config set-cluster "$kube_cluster_name" --kubeconfig "$KUBECONFIG_FILE" --server "$KUBE_API_SERVER" >/dev/null
+fi
+
 export OPENBAO_NAMESPACE
 export OPERATOR_NAMESPACE
 export TARGET_NAMESPACE
