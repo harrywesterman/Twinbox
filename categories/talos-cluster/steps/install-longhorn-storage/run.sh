@@ -7,5 +7,15 @@ set -euo pipefail
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
+cluster_instance_id="$(printf '%s' "$cluster_json" | jq -r '.cluster_instance_id // empty')"
+controlplane_ip="$(printf '%s' "$cluster_json" | jq -r '(.discovered_controlplane_ips[0] // .controlplane_ips[0] // empty)')"
 
-TWINBOX_CLUSTER_ID="$cluster_id" bash "$WORKSPACE_ROOT/scripts/manager/install-longhorn-storage.sh"
+[[ -n "$controlplane_ip" ]] || {
+  echo "Missing controlplane IP for cluster ${cluster_id}" >&2
+  exit 1
+}
+
+TWINBOX_CLUSTER_ID="$cluster_id" \
+TWINBOX_CLUSTER_INSTANCE_ID="$cluster_instance_id" \
+KUBE_API_SERVER="https://${controlplane_ip}:6443" \
+  bash "$WORKSPACE_ROOT/scripts/manager/install-longhorn-storage.sh"

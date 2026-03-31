@@ -96,6 +96,13 @@ command -v jq >/dev/null 2>&1 || fail "jq not found"
 
 export KUBECONFIG="$KUBECONFIG_FILE"
 
+if [[ -n "${KUBE_API_SERVER:-}" ]]; then
+  kube_cluster_name="$(kubectl config view --kubeconfig "$KUBECONFIG_FILE" -o jsonpath='{.clusters[0].name}')"
+  [[ -n "$kube_cluster_name" ]] || fail "Unable to read cluster name from kubeconfig"
+  log "Rewriting kubeconfig cluster ${kube_cluster_name} to ${KUBE_API_SERVER}"
+  kubectl config set-cluster "$kube_cluster_name" --kubeconfig "$KUBECONFIG_FILE" --server "$KUBE_API_SERVER" >/dev/null
+fi
+
 log "Installing Longhorn through Argo CD"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$manifest_path" \
