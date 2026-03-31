@@ -17,6 +17,12 @@ spec:
   storage:
     size: 10Gi
     storageClass: longhorn
+    # Longhorn supports online volume expansion without downtime.
+    # Resize with: kubectl patch cluster CHANGEME-db -n databases \
+    #   --type merge -p '{"spec":{"storage":{"size":"20Gi"}}}'
+    # Longhorn supports online volume expansion without downtime.
+    # Resize with: kubectl patch cluster CHANGEME-db -n databases \
+    #   --type merge -p '{"spec":{"storage":{"size":"20Gi"}}}'
 
   resources:
     requests:

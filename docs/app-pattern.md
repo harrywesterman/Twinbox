@@ -515,6 +515,102 @@ Daily backup at 02:00 UTC:
 - Backup owner reference: `self` (deleted with the Cluster)
 - Storage via the default Velero/Longhorn backup location
 
+## Volume Resize and Capacity Management
+
+### Initial Sizing
+
+The `size` field in a PVC or CloudNativePG Cluster spec defines the **initial capacity**. Start conservative — you can always grow later.
+
+```yaml
+storage:
+  size: 10Gi
+  storageClass: longhorn
+```
+
+### Online Resize (No Downtime)
+
+Longhorn supports online volume expansion. You can resize a PVC while the pod is running:
+
+```bash
+# Resize an app PVC
+kubectl patch pvc <app>-data -n <namespace> \
+  --type merge -p '{"spec":{"resources":{"requests":{"storage":"20Gi"}}}}'
+
+# Resize a CloudNativePG volume
+kubectl patch cluster <app>-db -n databases \
+  --type merge -p '{"spec":{"storage":{"size":"20Gi"}}}'
+```
+
+Longhorn automatically expands the underlying volume and the filesystem grows to fill the new space. No pod restart is needed.
+
+### Capacity Monitoring
+
+Prometheus and Grafana (already deployed) track PVC usage. Set up alerts for:
+
+- **Warning**: PVC usage > 70%
+- **Critical**: PVC usage > 85%
+- **Emergency**: PVC usage > 95%
+
+This gives you time to resize before the volume fills up.
+
+### Sizing Guidelines
+
+| App Type | Initial Size | Growth Pattern |
+|----------|-------------|----------------|
+| Stateless (Headlamp) | No PVC needed | N/A |
+| Light state (Ntfy) | 5Gi | Slow, predictable |
+| Monitoring data (Loki) | 20Gi | Steady, depends on retention |
+| Database (CloudNativePG) | 10Gi+ | Depends on app, monitor closely |
+| File storage (Grafana dashboards) | 5Gi | Very slow |
+
+## Volume Resize and Capacity Management
+
+### Initial Sizing
+
+The `size` field in a PVC or CloudNativePG Cluster spec defines the **initial capacity**. Start conservative — you can always grow later.
+
+```yaml
+storage:
+  size: 10Gi
+  storageClass: longhorn
+```
+
+### Online Resize (No Downtime)
+
+Longhorn supports online volume expansion. You can resize a PVC while the pod is running:
+
+```bash
+# Resize an app PVC
+kubectl patch pvc <app>-data -n <namespace> \
+  --type merge -p '{"spec":{"resources":{"requests":{"storage":"20Gi"}}}}'
+
+# Resize a CloudNativePG volume
+kubectl patch cluster <app>-db -n databases \
+  --type merge -p '{"spec":{"storage":{"size":"20Gi"}}}'
+```
+
+Longhorn automatically expands the underlying volume and the filesystem grows to fill the new space. No pod restart is needed.
+
+### Capacity Monitoring
+
+Prometheus and Grafana (already deployed) track PVC usage. Set up alerts for:
+
+- **Warning**: PVC usage > 70%
+- **Critical**: PVC usage > 85%
+- **Emergency**: PVC usage > 95%
+
+This gives you time to resize before the volume fills up.
+
+### Sizing Guidelines
+
+| App Type | Initial Size | Growth Pattern |
+|----------|-------------|----------------|
+| Stateless (Headlamp) | No PVC needed | N/A |
+| Light state (Ntfy) | 5Gi | Slow, predictable |
+| Monitoring data (Loki) | 20Gi | Steady, depends on retention |
+| Database (CloudNativePG) | 10Gi+ | Depends on app, monitor closely |
+| File storage (Grafana dashboards) | 5Gi | Very slow |
+
 ## Troubleshooting
 
 ### forwardAuth fails with 500
