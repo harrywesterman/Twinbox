@@ -93,7 +93,12 @@ def _cluster_step_state(data_dir: Path, cluster_id: str, step_id: str) -> Path:
     cluster_file = data_dir / "clusters" / f"{cluster_id}.json"
     if cluster_file.exists():
         cluster = json.loads(cluster_file.read_text())
-        scope_id = cluster.get("cluster_instance_id") or cluster.get("instance_id") or cluster.get("id") or cluster_id
+        scope_id = (
+            cluster.get("cluster_instance_id")
+            or cluster.get("instance_id")
+            or cluster.get("id")
+            or cluster_id
+        )
     else:
         scope_id = cluster_id
 
@@ -137,9 +142,12 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-longhorn-storage",
                 "install-secret-sync",
                 "install-traefik",
+                "install-cloudnativepg",
+                "install-postgres-clusters",
                 "install-authentik-idp",
                 "configure-cloudflare-dns",
                 "install-wiredoor-gateway",
+                "provision-wiredoor-bastion",
                 "install-whoami",
                 "install-headlamp",
                 "install-grafana",
@@ -164,22 +172,34 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert talos["steps"][1]["title"] == "Install Flannel"
             assert talos["steps"][2]["title"] == "Install Argo CD"
             assert talos["steps"][3]["title"] == "Install Longhorn Storage"
-            assert talos["steps"][4]["title"] == "Install OpenBao and sync bootstrap secrets"
+            assert (
+                talos["steps"][4]["title"]
+                == "Install OpenBao and sync bootstrap secrets"
+            )
             assert talos["steps"][5]["title"] == "Install Traefik"
-            assert talos["steps"][6]["title"] == "Install Authentik"
-            assert talos["steps"][7]["title"] == "Configure Cloudflare DNS"
-            assert talos["steps"][8]["title"] == "Install Wiredoor gateway"
-            assert talos["steps"][9]["title"] == "Install Whoami"
-            assert talos["steps"][10]["title"] == "Install Headlamp"
-            assert talos["steps"][11]["title"] == "Install Grafana"
+            assert talos["steps"][6]["title"] == "Install CloudNativePG"
+            assert talos["steps"][7]["title"] == "Install PostgreSQL Clusters"
+            assert talos["steps"][8]["title"] == "Install Authentik"
+            assert talos["steps"][9]["title"] == "Configure Cloudflare DNS"
+            assert talos["steps"][10]["title"] == "Install Wiredoor gateway"
+            assert talos["steps"][11]["title"] == "Deploy Wiredoor Bastion Host"
+            assert talos["steps"][12]["title"] == "Install Whoami"
+            assert talos["steps"][13]["title"] == "Install Headlamp"
+            assert talos["steps"][14]["title"] == "Install Grafana"
             assert talos["steps"][0]["journey_stage"] == "setup"
             assert talos["steps"][0]["status"] == "ready"
             assert talos["steps"][1]["status"] == "locked"
             assert talos["steps"][4]["status"] == "locked"
-            assert talos["steps"][4]["secrets"]["files"]["KUBECONFIG_FILE"]["item"] == "kubeconfig"
-            assert talos["steps"][4]["secrets"]["files"]["KUBECONFIG_FILE"]["attachment"] == "kubeconfig"
+            assert (
+                talos["steps"][4]["secrets"]["files"]["KUBECONFIG_FILE"]["item"]
+                == "kubeconfig"
+            )
+            assert (
+                talos["steps"][4]["secrets"]["files"]["KUBECONFIG_FILE"]["attachment"]
+                == "kubeconfig"
+            )
             assert talos["steps"][0]["icon"] == "🖥️"
-            assert talos["steps"][6]["icon"] == "🪪"
+            assert talos["steps"][8]["icon"] == "🪪"
         finally:
             proc.terminate()
             proc.wait(timeout=5)
@@ -242,7 +262,9 @@ def test_execute_step_persists_state_and_enqueues_run_step_job():
             assert body["step_id"] == "provision-nodes"
 
             step_state = json.loads(
-                _cluster_step_state(data_dir, body["cluster_id"], "provision-nodes").read_text()
+                _cluster_step_state(
+                    data_dir, body["cluster_id"], "provision-nodes"
+                ).read_text()
             )
             assert body["cluster_id"] == step_state["cluster_id"]
             assert step_state["step_id"] == "provision-nodes"
@@ -330,7 +352,9 @@ EOF
             assert status == 202
             assert body["step_id"] == "provision-nodes"
 
-            cluster = json.loads((data_dir / "clusters" / f"{body['cluster_id']}.json").read_text())
+            cluster = json.loads(
+                (data_dir / "clusters" / f"{body['cluster_id']}.json").read_text()
+            )
             assert cluster["vm_ip_map"] == {
                 "cp-1": "192.168.1.61",
                 "worker-1": "192.168.1.62",
@@ -381,7 +405,13 @@ EOF
             cluster_dir.mkdir(parents=True, exist_ok=True)
             cluster_instance_id = "11111111-1111-1111-1111-111111111111"
             (cluster_dir / "demo.json").write_text(
-                json.dumps({"id": "demo", "cluster_instance_id": cluster_instance_id, "status": "failed"}),
+                json.dumps(
+                    {
+                        "id": "demo",
+                        "cluster_instance_id": cluster_instance_id,
+                        "status": "failed",
+                    }
+                ),
                 encoding="utf-8",
             )
 
@@ -415,7 +445,9 @@ EOF
                 },
             }
 
-            status, body = _post_json(f"http://127.0.0.1:{port}/api/steps/provision-nodes/execute", payload)
+            status, body = _post_json(
+                f"http://127.0.0.1:{port}/api/steps/provision-nodes/execute", payload
+            )
             assert status == 202
             assert body["step_id"] == "provision-nodes"
             assert body["cluster_id"] == "demo"
@@ -439,9 +471,7 @@ def test_catalog_endpoint_isolates_invalid_manifest_entries():
         broken_category_dir = workspace_root / "categories" / "broken-category"
         broken_category_dir.mkdir(parents=True)
         (broken_category_dir / "category.yaml").write_text(
-            "id: broken-category\n"
-            "title: Broken Category\n"
-            "order: 99\n",
+            "id: broken-category\ntitle: Broken Category\norder: 99\n",
             encoding="utf-8",
         )
 
@@ -497,7 +527,9 @@ def test_catalog_keeps_latest_cluster_step_state_for_follow_up_steps():
             ),
             encoding="utf-8",
         )
-        (data_dir / "step-state" / "clusters" / cluster_id).mkdir(parents=True, exist_ok=True)
+        (data_dir / "step-state" / "clusters" / cluster_id).mkdir(
+            parents=True, exist_ok=True
+        )
         _cluster_step_state(data_dir, cluster_id, "provision-nodes").write_text(
             json.dumps(
                 {
@@ -588,7 +620,9 @@ def test_catalog_keeps_latest_cluster_step_state_for_follow_up_steps_after_argoc
             ),
             encoding="utf-8",
         )
-        (data_dir / "step-state" / "clusters" / cluster_id).mkdir(parents=True, exist_ok=True)
+        (data_dir / "step-state" / "clusters" / cluster_id).mkdir(
+            parents=True, exist_ok=True
+        )
         _cluster_step_state(data_dir, cluster_id, "provision-nodes").write_text(
             json.dumps(
                 {
@@ -690,8 +724,12 @@ def test_catalog_cluster_id_query_scopes_follow_up_state_to_requested_cluster():
             ),
             encoding="utf-8",
         )
-        (data_dir / "step-state" / "clusters" / older_cluster_id).mkdir(parents=True, exist_ok=True)
-        (data_dir / "step-state" / "clusters" / newer_cluster_id).mkdir(parents=True, exist_ok=True)
+        (data_dir / "step-state" / "clusters" / older_cluster_id).mkdir(
+            parents=True, exist_ok=True
+        )
+        (data_dir / "step-state" / "clusters" / newer_cluster_id).mkdir(
+            parents=True, exist_ok=True
+        )
         _cluster_step_state(data_dir, older_cluster_id, "provision-nodes").write_text(
             json.dumps(
                 {
@@ -712,7 +750,9 @@ def test_catalog_cluster_id_query_scopes_follow_up_state_to_requested_cluster():
             base = f"http://127.0.0.1:{port}"
             _wait_for_health(base)
 
-            status, body = _get_json(f"{base}/api/catalog?cluster_id={older_cluster_id}")
+            status, body = _get_json(
+                f"{base}/api/catalog?cluster_id={older_cluster_id}"
+            )
             assert status == 200
 
             talos = body["categories"][1]
@@ -761,7 +801,10 @@ def test_catalog_synthesizes_provision_state_for_bootstrapped_cluster_without_st
             assert talos["steps"][0]["id"] == "provision-nodes"
             assert talos["steps"][0]["status"] == "done"
             assert talos["steps"][0]["state"]["cluster_id"] == cluster_id
-            assert talos["steps"][0]["state"]["outputs"]["cluster_status"] == "bootstrapped"
+            assert (
+                talos["steps"][0]["state"]["outputs"]["cluster_status"]
+                == "bootstrapped"
+            )
             assert talos["steps"][1]["id"] == "install-flannel"
             assert talos["steps"][1]["status"] == "ready"
             assert talos["steps"][2]["id"] == "install-argocd"
@@ -794,16 +837,30 @@ def test_execute_follow_up_cluster_step_requires_explicit_cluster_context():
                     "metadata": {
                         "secret_refs": {
                             "proxmox": {"scope": "global", "item": "proxmox"},
-                            "talos_secrets": {"scope": "cluster", "item": "talos-secrets", "cluster_id": cluster_id},
-                            "talosconfig": {"scope": "cluster", "item": "talosconfig", "cluster_id": cluster_id},
-                            "kubeconfig": {"scope": "cluster", "item": "kubeconfig", "cluster_id": cluster_id},
+                            "talos_secrets": {
+                                "scope": "cluster",
+                                "item": "talos-secrets",
+                                "cluster_id": cluster_id,
+                            },
+                            "talosconfig": {
+                                "scope": "cluster",
+                                "item": "talosconfig",
+                                "cluster_id": cluster_id,
+                            },
+                            "kubeconfig": {
+                                "scope": "cluster",
+                                "item": "kubeconfig",
+                                "cluster_id": cluster_id,
+                            },
                         }
                     },
                 }
             ),
             encoding="utf-8",
         )
-        (data_dir / "step-state" / "clusters" / cluster_id).mkdir(parents=True, exist_ok=True)
+        (data_dir / "step-state" / "clusters" / cluster_id).mkdir(
+            parents=True, exist_ok=True
+        )
         _cluster_step_state(data_dir, cluster_id, "provision-nodes").write_text(
             json.dumps(
                 {
@@ -849,7 +906,9 @@ def test_execute_follow_up_cluster_step_requires_explicit_cluster_context():
             ),
             encoding="utf-8",
         )
-        _cluster_step_state(data_dir, cluster_id, "install-longhorn-storage").write_text(
+        _cluster_step_state(
+            data_dir, cluster_id, "install-longhorn-storage"
+        ).write_text(
             json.dumps(
                 {
                     "step_id": "install-longhorn-storage",
@@ -902,9 +961,21 @@ def test_execute_follow_up_cluster_step_uses_requested_cluster_context_and_secre
                     "metadata": {
                         "secret_refs": {
                             "proxmox": {"scope": "global", "item": "proxmox"},
-                            "talos_secrets": {"scope": "cluster", "item": "talos-secrets", "cluster_id": selected_cluster_id},
-                            "talosconfig": {"scope": "cluster", "item": "talosconfig", "cluster_id": selected_cluster_id},
-                            "kubeconfig": {"scope": "cluster", "item": "kubeconfig", "cluster_id": selected_cluster_id},
+                            "talos_secrets": {
+                                "scope": "cluster",
+                                "item": "talos-secrets",
+                                "cluster_id": selected_cluster_id,
+                            },
+                            "talosconfig": {
+                                "scope": "cluster",
+                                "item": "talosconfig",
+                                "cluster_id": selected_cluster_id,
+                            },
+                            "kubeconfig": {
+                                "scope": "cluster",
+                                "item": "kubeconfig",
+                                "cluster_id": selected_cluster_id,
+                            },
                         }
                     },
                 }
@@ -922,17 +993,33 @@ def test_execute_follow_up_cluster_step_uses_requested_cluster_context_and_secre
                     "metadata": {
                         "secret_refs": {
                             "proxmox": {"scope": "global", "item": "proxmox"},
-                            "talos_secrets": {"scope": "cluster", "item": "talos-secrets", "cluster_id": newer_cluster_id},
-                            "talosconfig": {"scope": "cluster", "item": "talosconfig", "cluster_id": newer_cluster_id},
-                            "kubeconfig": {"scope": "cluster", "item": "kubeconfig", "cluster_id": newer_cluster_id},
+                            "talos_secrets": {
+                                "scope": "cluster",
+                                "item": "talos-secrets",
+                                "cluster_id": newer_cluster_id,
+                            },
+                            "talosconfig": {
+                                "scope": "cluster",
+                                "item": "talosconfig",
+                                "cluster_id": newer_cluster_id,
+                            },
+                            "kubeconfig": {
+                                "scope": "cluster",
+                                "item": "kubeconfig",
+                                "cluster_id": newer_cluster_id,
+                            },
                         }
                     },
                 }
             ),
             encoding="utf-8",
         )
-        (data_dir / "step-state" / "clusters" / selected_cluster_id).mkdir(parents=True, exist_ok=True)
-        _cluster_step_state(data_dir, selected_cluster_id, "provision-nodes").write_text(
+        (data_dir / "step-state" / "clusters" / selected_cluster_id).mkdir(
+            parents=True, exist_ok=True
+        )
+        _cluster_step_state(
+            data_dir, selected_cluster_id, "provision-nodes"
+        ).write_text(
             json.dumps(
                 {
                     "step_id": "provision-nodes",
@@ -947,7 +1034,9 @@ def test_execute_follow_up_cluster_step_uses_requested_cluster_context_and_secre
             ),
             encoding="utf-8",
         )
-        _cluster_step_state(data_dir, selected_cluster_id, "install-flannel").write_text(
+        _cluster_step_state(
+            data_dir, selected_cluster_id, "install-flannel"
+        ).write_text(
             json.dumps(
                 {
                     "step_id": "install-flannel",
@@ -977,7 +1066,9 @@ def test_execute_follow_up_cluster_step_uses_requested_cluster_context_and_secre
             ),
             encoding="utf-8",
         )
-        _cluster_step_state(data_dir, selected_cluster_id, "install-longhorn-storage").write_text(
+        _cluster_step_state(
+            data_dir, selected_cluster_id, "install-longhorn-storage"
+        ).write_text(
             json.dumps(
                 {
                     "step_id": "install-longhorn-storage",
@@ -992,7 +1083,9 @@ def test_execute_follow_up_cluster_step_uses_requested_cluster_context_and_secre
             ),
             encoding="utf-8",
         )
-        _cluster_step_state(data_dir, selected_cluster_id, "install-secret-sync").write_text(
+        _cluster_step_state(
+            data_dir, selected_cluster_id, "install-secret-sync"
+        ).write_text(
             json.dumps(
                 {
                     "step_id": "install-secret-sync",
@@ -1023,8 +1116,16 @@ def test_execute_follow_up_cluster_step_uses_requested_cluster_context_and_secre
             assert job["type"] == "run_step"
             assert job["cluster_id"] == selected_cluster_id
             assert job["payload"]["context"]["cluster"]["id"] == selected_cluster_id
-            assert job["payload"]["secret_bundle"]["files"]["KUBECONFIG_FILE"]["item"] == "kubeconfig"
-            assert job["payload"]["secret_bundle"]["files"]["KUBECONFIG_FILE"]["attachment"] == "kubeconfig"
+            assert (
+                job["payload"]["secret_bundle"]["files"]["KUBECONFIG_FILE"]["item"]
+                == "kubeconfig"
+            )
+            assert (
+                job["payload"]["secret_bundle"]["files"]["KUBECONFIG_FILE"][
+                    "attachment"
+                ]
+                == "kubeconfig"
+            )
         finally:
             proc.terminate()
             proc.wait(timeout=5)
@@ -1052,9 +1153,21 @@ def test_execute_argo_follow_up_cluster_step_uses_requested_cluster_context_and_
                     "metadata": {
                         "secret_refs": {
                             "proxmox": {"scope": "global", "item": "proxmox"},
-                            "talos_secrets": {"scope": "cluster", "item": "talos-secrets", "cluster_id": selected_cluster_id},
-                            "talosconfig": {"scope": "cluster", "item": "talosconfig", "cluster_id": selected_cluster_id},
-                            "kubeconfig": {"scope": "cluster", "item": "kubeconfig", "cluster_id": selected_cluster_id},
+                            "talos_secrets": {
+                                "scope": "cluster",
+                                "item": "talos-secrets",
+                                "cluster_id": selected_cluster_id,
+                            },
+                            "talosconfig": {
+                                "scope": "cluster",
+                                "item": "talosconfig",
+                                "cluster_id": selected_cluster_id,
+                            },
+                            "kubeconfig": {
+                                "scope": "cluster",
+                                "item": "kubeconfig",
+                                "cluster_id": selected_cluster_id,
+                            },
                         }
                     },
                 }
@@ -1072,18 +1185,36 @@ def test_execute_argo_follow_up_cluster_step_uses_requested_cluster_context_and_
                     "metadata": {
                         "secret_refs": {
                             "proxmox": {"scope": "global", "item": "proxmox"},
-                            "talos_secrets": {"scope": "cluster", "item": "talos-secrets", "cluster_id": newer_cluster_id},
-                            "talosconfig": {"scope": "cluster", "item": "talosconfig", "cluster_id": newer_cluster_id},
-                            "kubeconfig": {"scope": "cluster", "item": "kubeconfig", "cluster_id": newer_cluster_id},
+                            "talos_secrets": {
+                                "scope": "cluster",
+                                "item": "talos-secrets",
+                                "cluster_id": newer_cluster_id,
+                            },
+                            "talosconfig": {
+                                "scope": "cluster",
+                                "item": "talosconfig",
+                                "cluster_id": newer_cluster_id,
+                            },
+                            "kubeconfig": {
+                                "scope": "cluster",
+                                "item": "kubeconfig",
+                                "cluster_id": newer_cluster_id,
+                            },
                         }
                     },
                 }
             ),
             encoding="utf-8",
         )
-        (data_dir / "step-state" / "clusters" / selected_cluster_id).mkdir(parents=True, exist_ok=True)
-        (data_dir / "step-state" / "clusters" / newer_cluster_id).mkdir(parents=True, exist_ok=True)
-        _cluster_step_state(data_dir, selected_cluster_id, "provision-nodes").write_text(
+        (data_dir / "step-state" / "clusters" / selected_cluster_id).mkdir(
+            parents=True, exist_ok=True
+        )
+        (data_dir / "step-state" / "clusters" / newer_cluster_id).mkdir(
+            parents=True, exist_ok=True
+        )
+        _cluster_step_state(
+            data_dir, selected_cluster_id, "provision-nodes"
+        ).write_text(
             json.dumps(
                 {
                     "step_id": "provision-nodes",
@@ -1098,7 +1229,9 @@ def test_execute_argo_follow_up_cluster_step_uses_requested_cluster_context_and_
             ),
             encoding="utf-8",
         )
-        _cluster_step_state(data_dir, selected_cluster_id, "install-flannel").write_text(
+        _cluster_step_state(
+            data_dir, selected_cluster_id, "install-flannel"
+        ).write_text(
             json.dumps(
                 {
                     "step_id": "install-flannel",
@@ -1144,8 +1277,16 @@ def test_execute_argo_follow_up_cluster_step_uses_requested_cluster_context_and_
             assert job["type"] == "run_step"
             assert job["cluster_id"] == selected_cluster_id
             assert job["payload"]["context"]["cluster"]["id"] == selected_cluster_id
-            assert job["payload"]["secret_bundle"]["files"]["KUBECONFIG_FILE"]["item"] == "kubeconfig"
-            assert job["payload"]["secret_bundle"]["files"]["KUBECONFIG_FILE"]["attachment"] == "kubeconfig"
+            assert (
+                job["payload"]["secret_bundle"]["files"]["KUBECONFIG_FILE"]["item"]
+                == "kubeconfig"
+            )
+            assert (
+                job["payload"]["secret_bundle"]["files"]["KUBECONFIG_FILE"][
+                    "attachment"
+                ]
+                == "kubeconfig"
+            )
         finally:
             proc.terminate()
             proc.wait(timeout=5)
