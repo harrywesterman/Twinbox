@@ -28,3 +28,11 @@ terraform.tfvars.json
 .idea/
 .vscode/
 .kilo/
+.qwen/
+.kiro/
+.continue/
+.agents/
+.claude/
+.ruffcache/
+skills/
+skills-lock.json
