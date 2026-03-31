@@ -16,11 +16,18 @@ Twinbox is a complete K8s cluster based on Talos Linux, completely configured. T
 
 3. **Execution layer**
    - `scripts/manager/apply-cluster.sh`
+   - `scripts/manager/bootstrap-talos.sh`
+   - `scripts/manager/create-talos-vms.sh`
+   - `scripts/manager/collect-state.sh`
    - `scripts/manager/install-flannel.sh`
    - `scripts/manager/apply-argocd-application.sh`
+   - `scripts/manager/install-argocd.sh`
    - `scripts/manager/install-longhorn-storage.sh`
    - `scripts/manager/install-secret-sync.sh`
-   - `scripts/manager/install-argocd.sh`
+   - `scripts/manager/install-velero-backup.sh`
+   - `scripts/manager/openbao-secret-sync.sh`
+   - `scripts/manager/sync-openbao-global-secret.sh`
+   - `scripts/manager/upsert-secret-artifact.mjs`
    - `categories/*/steps/*/run.sh`
 
 4. **State layer**

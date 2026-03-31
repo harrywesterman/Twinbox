@@ -40,9 +40,11 @@ Use the UI to:
 3. Install Argo CD
 4. Install Longhorn and make it the default storage class
 5. Install OpenBao and sync bootstrap secrets
-6. Install Traefik
-7. Install Velero backup
-8. Continue through the GitOps application steps
+6. Install CloudNativePG
+7. Install Postgres clusters
+8. Install Traefik
+9. Install Velero backup
+10. Continue through the GitOps application steps
 
 ## Recovery
 

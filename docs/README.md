@@ -6,10 +6,18 @@ Operational documentation for Twinbox.
 
 - `architecture.md` — system architecture and component overview.
 - `getting-started.md` — initial setup and deployment guide.
-- `configuration.md` — configuration reference.
+- `configuration.md` — bootstrap file layout and secret contracts.
+- `env-reference.md` — complete `.env` variable reference.
+- `api-reference.md` — `manager-api` REST endpoint reference.
+- `secrets-library.md` — shared secret library (`lib/secrets/`) internals.
+- `scripts-reference.md` — `scripts/manager/` script reference.
+- `ip-allocation.md` — IP and VMID allocation logic.
+- `garage-s3.md` — embedded Garage S3 storage for Velero.
+- `wiredoor-bastion.md` — Wiredoor bastion host provisioning.
+- `cloudflare-dns.md` — Cloudflare DNS configuration step.
 - `verification.md` — cluster verification procedures.
 - `troubleshooting.md` — common issues and fixes.
 - `talos-integration.md` — Talos Linux integration details.
-- `vm-dev.md` — VM development guide.
-- `wizard-guide.md` — wizard usage walkthrough.
+- `vm-dev.md` — VM development workflow and frontend preview guide.
+- `wizard-guide.md` — Proxmox setup wizard usage walkthrough.
 - `plans/` — design and planning documents.

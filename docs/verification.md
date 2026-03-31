@@ -10,8 +10,12 @@ bash -n wizard/setup-wizard.sh \
   scripts/start-manager.sh \
   scripts/install-management-tools.sh \
   scripts/manager/apply-cluster.sh \
+  scripts/manager/bootstrap-talos.sh \
+  scripts/manager/create-talos-vms.sh \
+  scripts/manager/collect-state.sh \
   scripts/manager/install-flannel.sh \
   scripts/manager/apply-argocd-application.sh \
+  scripts/manager/install-argocd.sh \
   scripts/manager/install-longhorn-storage.sh \
   scripts/manager/install-secret-sync.sh \
   scripts/manager/install-velero-backup.sh \
@@ -22,6 +26,7 @@ bash -n wizard/setup-wizard.sh \
 
 node --check manager-api/src/server.js
 node --check manager-worker/src/worker.js
+node --check scripts/manager/upsert-secret-artifact.mjs
 docker compose config
 ```
 

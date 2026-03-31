@@ -12,6 +12,7 @@ PROXMOX_PASSWORD=change-me
 PROXMOX_NODE=pve
 PROXMOX_STORAGE_POOL=local-lvm
 PROXMOX_FILE_DATASTORE=local
+TALOS_IMAGE_PRESET=qemu-guest-agent
 KUBECTL_VERSION=v1.30.0
 HELM_VERSION=v3.15.4
 TWINBOX_IMAGE_TAG=latest
@@ -19,6 +20,7 @@ TWINBOX_HOST_REPO_ROOT=/opt/twinbox
 TWINBOX_SECRET_BACKEND=filesystem
 TWINBOX_BOOTSTRAP_DIR=/opt/twinbox/bootstrap
 TWINBOX_SECRET_ITEM_PREFIX=twinbox
+MANAGEMENT_VM_IP=192.168.1.50
 TWINBOX_SECRET_TEMP_DIR=/tmp/twinbox-secrets
 TWINBOX_SECRET_CACHE_TTL_SEC=60
 ```
@@ -136,5 +138,4 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 
 ## Tooling Versions
 
-- `talosctl`, `tofu`, `k9s`, External Secrets chart, Longhorn chart, and OpenBao chart are pinned in `config/pinned-defaults.sh`
-- `kubectl` and `helm` stay configurable through `.env`
+See `env-reference.md` for the full list of pinned and configurable tool versions.
