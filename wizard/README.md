@@ -1,25 +1,15 @@
-# Twinbox Management Environment
+# Setup Wizard
 
-`wizard/setup-wizard.sh` runs on a Proxmox host and kickstarts the Twinbox Management Environment for a selected cluster name.
+`wizard/setup-wizard.sh` runs directly on a Proxmox host and bootstraps the Twinbox Management Environment.
 
-## Current Behavior
+## What It Does
 
-The wizard now does all of this automatically:
-
-1. Shows the Twinbox clusters already detected on the host.
-2. Lets you start a new cluster or remove an existing one.
-3. Builds a VMID/IP allocation for the Twinbox Management Environment, VIP, and future Talos nodes.
-4. Creates an Ubuntu 24.04 Twinbox Management Environment with cluster-specific names and tags.
-5. Creates a cluster-specific Proxmox API user and role.
-6. Installs Docker CE from the official Docker APT repo (`download.docker.com`).
-7. Clones `https://github.com/harrywesterman/twinbox` into `/opt/twinbox`.
-8. Writes `/opt/twinbox/.env` from wizard input values.
-9. Starts the manager stack with Docker Compose and hands off to the Twinbox web UI.
-
-After cloud-init completes, open the Twinbox Management Environment website:
-
-- UI: `http://<management-vm-ip>:3000`
-- API health: `http://<management-vm-ip>:8080/api/health`
+1. Detects existing Twinbox clusters on the host via VM tags, snippets, Proxmox users, and roles.
+2. Presents a menu to create a new cluster or manage (remove) an existing one.
+3. Auto-detects network settings (host IP, gateway, DNS, bridge, next free VMID).
+4. Creates an Ubuntu 24.04 Management VM with cloud-init (Docker CE, git clone, `.env`, `docker compose`).
+5. Creates a cluster-specific Proxmox API user and least-privilege role.
+6. Waits for the Management VM to boot and the Twinbox web interface to become available.
 
 ## Run
 
@@ -29,13 +19,13 @@ From Proxmox:
 bash <(curl -fsSL https://raw.githubusercontent.com/harrywesterman/twinbox/main/wizard/setup-wizard.sh)
 ```
 
-Or from a local clone:
+From a local clone:
 
 ```bash
 bash wizard/setup-wizard.sh
 ```
 
-For fast iteration from your local checkout without pushing first:
+For fast iteration without pushing:
 
 ```bash
 cp .env.wizard.local.example .env.wizard.local
@@ -43,27 +33,27 @@ cp .env.wizard.local.example .env.wizard.local
 make wizard-dev-run
 ```
 
-This uploads the local `wizard/setup-wizard.sh` to the configured Proxmox host, then runs that remote copy with `ssh -tt` so the interactive `whiptail` UI keeps working. It only changes the wizard feedback loop: the Twinbox Management Environment still clones the rest of the repo from GitHub.
-
 ## Prompts
 
-The wizard asks for:
+- **Cluster action**: create new or remove existing
+- **Cluster name**: preset (`prd`, `dev`, `tst`) or custom (1-3 lowercase letters)
+- **SSH public key**: auto-detected from `/root/.ssh/` or entered manually
+- **Cluster login password**: min 8 chars, upper + lower + special
+- **VM settings**: name, IP, netmask, DNS, disk size, memory (editable form)
+- **VMID/IP allocation**: auto-suggested, editable before proceeding
 
-- Cluster action: create or remove
-- Cluster name
-- SSH public key
-- Cluster login password
-- Optional manual infrastructure values if you do not use the recommended defaults
-- A proposed VMID/IP allocation grid that you can edit before continuing
+## After Completion
 
-## What It Does Not Do
+Open the Twinbox web interface at the URL shown in the wizard:
 
-- It does not create Talos VMs directly.
-- Talos provisioning and full cluster configuration continue later from the Twinbox management web UI.
+- UI: `http://<management-vm-ip>:3000`
+- API: `http://<management-vm-ip>:8080/api/health`
+
+Talos provisioning and cluster configuration continue from the web UI.
 
 ## Validation
 
-On the Twinbox Management Environment:
+On the Management VM:
 
 ```bash
 docker --version
@@ -72,8 +62,6 @@ curl -fsS http://localhost:8080/api/health
 ```
 
 ## Recovery
-
-If needed:
 
 ```bash
 cd /opt/twinbox
@@ -84,5 +72,7 @@ docker compose up -d
 
 ## Notes
 
-- Docker source is official Docker repo, not Ubuntu `docker.io`.
+- Docker is installed from the official Docker APT repo (`download.docker.com`), not Ubuntu's `docker.io`.
 - The wizard keeps passwords out of the completion screen.
+- VM cleanup on failure is automatic (stops and destroys the VM if the script exits before completion).
+- The wizard loops back to the main menu after each action, allowing multiple cluster operations in one session.
