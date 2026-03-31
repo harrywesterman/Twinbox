@@ -32,6 +32,16 @@ Twinbox is a platform for provisioning and bootstrapping fully configured Talos 
 - `gitops/`: Argo CD bootstrap and application manifests.
 - `docs/`: operational documentation.
 
+## Screenshots
+
+<p align="center">
+  <img src="screenshots/wizard.png" alt="Proxmox Wizard" width="800">
+</p>
+
+<p align="center">
+  <img src="screenshots/webwizard.png" alt="Web Wizard" width="600">
+</p>
+
 ## Quick Start
 
 ### Run the Twinbox Web Installation Wizard on a proxmox server console
