@@ -103,6 +103,21 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 }
 ```
 
+### `authentik.json` (database keys)
+
+```json
+{
+  "AUTHENTIK_SECRET_KEY": "generated-secret",
+  "AUTHENTIK_BOOTSTRAP_PASSWORD": "generated-password",
+  "AUTHENTIK_BOOTSTRAP_TOKEN": "generated-token",
+  "AUTHENTIK_BOOTSTRAP_EMAIL": "akadmin@twinbox.local",
+  "AUTHENTIK_HOST": "https://authentik.example.com",
+  "AUTHENTIK_HOST_BROWSER": "https://authentik.example.com",
+  "AUTHENTIK_POSTGRESQL__USERNAME": "authentik",
+  "AUTHENTIK_POSTGRESQL__PASSWORD": "generated-password"
+}
+```
+
 ## Cluster Secret Runtime
 
 - `provision-nodes` bootstraps Talos and writes the Talos runtime artifacts for a cluster.
@@ -114,7 +129,8 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
   - OpenBao with Raft storage on Longhorn
   - `ClusterSecretStore/openbao`
   - `ExternalSecret/proxmox-bootstrap`
-- `install-cloudnativepg` installs the CloudNativePG operator on Longhorn so later PostgreSQL-backed applications can share one cluster-level database platform.
+- `install-cloudnativepg` installs the CloudNativePG operator with two replicas on Longhorn. The operator uses ServerSideApply for its CRDs.
+- `install-postgres-clusters` deploys all database clusters defined under `gitops/databases/`. Each cluster gets a CloudNativePG `Cluster` (3 instances), PgBouncer `Pooler` (read-write and read-only), a `ScheduledBackup` for daily snapshots, and an `ExternalSecret` that pulls credentials from OpenBao. Applications connect through the pooler service (e.g. `authentik-db-pooler-rw.databases.svc.cluster.local`).
 - `install-velero-backup` installs Velero together with either a Twinbox-managed Garage bucket or an external S3-compatible backup target.
 - Later application steps write bootstrap JSON into OpenBao before enabling their Argo CD applications.
 

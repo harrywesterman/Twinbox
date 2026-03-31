@@ -17,7 +17,8 @@ bash -n wizard/setup-wizard.sh \
   scripts/manager/install-velero-backup.sh \
   scripts/manager/openbao-secret-sync.sh \
   scripts/manager/sync-openbao-global-secret.sh \
-  categories/talos-cluster/steps/install-cloudnativepg/run.sh
+  categories/talos-cluster/steps/install-cloudnativepg/run.sh \
+  categories/talos-cluster/steps/install-postgres-clusters/run.sh
 
 node --check manager-api/src/server.js
 node --check manager-worker/src/worker.js
@@ -110,7 +111,32 @@ kubectl --kubeconfig <kubeconfig> get pods -n cnpg-system
 Expected:
 
 - `Application/cloudnativepg` is healthy
-- The CloudNativePG operator pods are running in `cnpg-system`
+- Two CloudNativePG operator pods are running in `cnpg-system`
+- CRDs `clusters.postgresql.cnpg.io` and `poolers.postgresql.cnpg.io` exist
+
+### `install-postgres-clusters`
+
+```bash
+kubectl --kubeconfig <kubeconfig> get application -n argocd postgres-clusters
+kubectl --kubeconfig <kubeconfig> get cluster -n databases
+kubectl --kubeconfig <kubeconfig> get pooler -n databases
+kubectl --kubeconfig <kubeconfig> get scheduledbackup -n databases
+kubectl --kubeconfig <kubeconfig> get externalsecret -n databases
+```
+
+Expected:
+
+- `Application/postgres-clusters` is healthy
+- CloudNativePG Cluster resources are in `Cluster in healthy state` with 3 ready instances
+- PgBouncer Pooler resources exist for read-write and read-only traffic
+- ScheduledBackup resources exist for daily backups
+- ExternalSecret resources have synced database credentials from OpenBao
+
+Verify database connectivity:
+
+```bash
+kubectl --kubeconfig <kubeconfig> cnpg status authentik-db -n databases
+```
 
 ### `install-velero-backup`
 

@@ -7,10 +7,31 @@ authentik:
   existingSecret:
     secretName: authentik-bootstrap
 
+  env:
+    - name: AUTHENTIK_POSTGRESQL__HOST
+      value: "authentik-db-pooler-rw.databases.svc.cluster.local"
+    - name: AUTHENTIK_POSTGRESQL__PORT
+      value: "5432"
+    - name: AUTHENTIK_POSTGRESQL__USER
+      valueFrom:
+        secretKeyRef:
+          name: authentik-db-credentials
+          key: username
+    - name: AUTHENTIK_POSTGRESQL__PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: authentik-db-credentials
+          key: password
+    - name: AUTHENTIK_POSTGRESQL__NAME
+      value: "authentik"
+    - name: AUTHENTIK_POSTGRESQL__DISABLE_SERVER_SIDE_CURSORS
+      value: "true"
+    - name: AUTHENTIK_POSTGRESQL__CONN_MAX_AGE
+      value: "0"
+
+  envFrom:
+    - secretRef:
+        name: authentik-bootstrap
+
 postgresql:
-  auth:
-    existingSecret: authentik-bootstrap
-    secretKeys:
-      adminPasswordKey: postgres-password
-      userPasswordKey: password
-      replicationPasswordKey: replication-password
+  enabled: false

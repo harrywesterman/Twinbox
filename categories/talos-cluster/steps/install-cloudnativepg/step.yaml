@@ -3,12 +3,13 @@ title: Install CloudNativePG
 type: action
 journey_stage: setup
 order: 17
-summary: Apply the CloudNativePG GitOps application after storage is ready.
-explanation: Twinbox installs the CloudNativePG operator through one Argo CD application. The step waits for the operator to become Synced and Healthy so later PostgreSQL-backed workloads can rely on a shared database platform.
-side_help: CloudNativePG provides the PostgreSQL operator that future stateful apps will use instead of bundling their own database layer.
+summary: Install the CloudNativePG operator through GitOps.
+explanation: Twinbox installs the CloudNativePG operator through one Argo CD application. The operator uses ServerSideApply for its large CRDs and runs with two replicas for high availability. The step waits for the operator to become Synced and Healthy so PostgreSQL clusters can be provisioned next.
+side_help: CloudNativePG is the PostgreSQL operator that manages database clusters, connection pooling, and automated backups for all Twinbox workloads.
 depends_on:
   - install-argocd
   - install-longhorn-storage
+  - install-secret-sync
 inputs: []
 secrets:
   files:
