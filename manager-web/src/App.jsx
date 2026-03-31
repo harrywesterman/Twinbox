@@ -2,76 +2,80 @@ import './App.css';
 import heroIllustration from './assets/hero-illustration.svg';
 import hardwareIllustration from './assets/hardware-illustration.svg';
 
-const trustWords = ['Sovereign', 'Your data', 'In control', 'Always up to date'];
+const trustWords = ['On-prem', 'GitOps', 'Open Source', 'Data sovereignty'];
 
 const steps = [
   {
     number: '01',
-    title: 'Set up Twinbox on your own hardware',
-    text: 'Use an existing PC or server in your own environment. Twinbox is built for on-prem use, with no cloud dependency.',
+    title: 'Run the setup wizard on Proxmox',
+    text: 'A single command creates the Management VM, installs Docker, and boots the Twinbox stack. No cloud accounts, no external dependencies.',
   },
   {
     number: '02',
-    title: 'Let Twinbox do the heavy lifting',
-    text: 'The setup takes care of the basics, updates, and initial configuration for you. You do not need to manage every step by hand.',
+    title: 'Deploy your cluster through the web UI',
+    text: 'Open the browser-based installer to provision Talos Linux nodes, configure networking, and size your cluster — all from one guided interface.',
   },
   {
     number: '03',
-    title: 'Keep working without extra stress',
-    text: 'Your data stays local, your environment stays current, and you need far less IT administration. That creates calm and clarity.',
+    title: 'Install platform services step by step',
+    text: 'Flannel, Argo CD, Longhorn storage, OpenBao secrets, Traefik ingress, Velero backups — each component installs in order through the same UI, driven by GitOps.',
   },
 ];
 
 const benefits = [
   {
-    title: 'No cloud',
-    text: 'Keep your data and infrastructure close. That makes you less dependent on external platforms.',
+    title: 'Fully on-prem',
+    text: 'Everything runs on your own hardware. Your data never leaves your network, and you are not tied to any cloud provider.',
   },
   {
     title: 'Reuse existing hardware',
-    text: 'Twinbox is a practical layer on top of existing PCs or servers, so you do not have to buy new equipment first.',
+    text: 'Twinbox runs on Proxmox, so you can repurpose servers or PCs you already own. No new equipment required.',
   },
   {
-    title: 'Minimal administration',
-    text: 'The focus is on automatic updates and a clear baseline, not on endless manual maintenance.',
+    title: 'GitOps by default',
+    text: 'Argo CD manages every component declaratively. Changes are versioned, reviewable, and reproducible — not applied by hand.',
   },
   {
     title: 'Open Source',
-    text: 'Transparent, modern, and easy to assess. No black box you need to trust blindly.',
+    text: 'The full stack is transparent and auditable. No vendor lock-in, no hidden license fees, no black boxes.',
   },
 ];
 
 const reasons = [
   {
-    title: 'Calm for non-technical people',
-    text: 'Twinbox explains what is happening in plain language so the solution stays understandable for everyone.',
+    title: 'Production-grade Kubernetes',
+    text: 'Twinbox provisions Talos Linux clusters with Flannel networking, Longhorn storage, and CloudNativePG databases — a battle-tested stack you can rely on.',
   },
   {
-    title: 'Sovereignty without drama',
-    text: 'Even when political winds shift in the United States, your data stays under your own control.',
+    title: 'Secrets managed, not scattered',
+    text: 'OpenBao and External Secrets Operator centralize credentials and bootstrap material. Secrets are synced, audited, and never left in environment files.',
   },
   {
-    title: 'Up to date without stress',
-    text: 'New techniques and security updates are part of the design, so the platform stays fresh without adding much work.',
+    title: 'Automated backups',
+    text: 'Velero protects your workloads with scheduled snapshots to a Twinbox-managed Garage bucket or any S3-compatible target.',
   },
 ];
 
 const faqs = [
   {
-    question: 'Do I need to replace my entire IT environment?',
-    answer: 'No. Twinbox is designed to reuse existing hardware and an existing base where that makes sense.',
+    question: 'What is Talos Linux?',
+    answer: 'Talos is a minimal, immutable operating system designed specifically for Kubernetes. It has no shell, no SSH, and no package manager — just a hardened API surface that Twinbox configures for you.',
   },
   {
-    question: 'Is this only for technical teams?',
-    answer: 'No. The goal is that you can understand it and explain it to colleagues without deep technical knowledge.',
+    question: 'Do I need to replace my existing IT environment?',
+    answer: 'No. Twinbox deploys alongside your current setup on Proxmox. It provisions its own VMs and does not interfere with existing workloads.',
   },
   {
-    question: 'Is everything in the cloud?',
-    answer: 'No. Twinbox is intended for on-prem use, so your data stays local and under your own control.',
+    question: 'What does the Management VM do?',
+    answer: 'The Management VM runs the Twinbox web installer, the REST API, and a background worker that executes provisioning scripts. It is the control plane for your cluster lifecycle.',
   },
   {
-    question: 'Will the system stay current?',
-    answer: 'Yes. Automatic updates and a modern Open Source base help keep the platform up to date.',
+    question: 'Can I use this without deep Kubernetes experience?',
+    answer: 'Yes. The web UI walks you through each step with sensible defaults. You can also skip steps and install components later.',
+  },
+  {
+    question: 'How do backups work?',
+    answer: 'Twinbox installs Velero with a built-in Garage object store or connects to your own S3-compatible endpoint. Scheduled backups protect your persistent volumes automatically.',
   },
 ];
 
@@ -98,16 +102,16 @@ function App() {
 
         <section className="hero">
           <div className="hero-copy">
-            <p className="eyebrow">Sovereign. Simple. On-prem.</p>
-            <h1>Your data stays yours. Twinbox keeps it calm and up to date.</h1>
+            <p className="eyebrow">Self-hosted Kubernetes on Proxmox</p>
+            <h1>A fully configured Kubernetes cluster, running on your own hardware.</h1>
             <p className="hero-lead">
-              For organizations that want control without cloud dependency, with a solution that feels clear, calm, and easy
-              to explore.
+              Twinbox turns an existing Proxmox server into a production-grade Talos Kubernetes cluster with GitOps,
+              secret management, backups, and ingress — all set up through a guided web interface.
             </p>
 
             <div className="hero-actions">
               <a className="button button-primary" href="#contact">
-                Explore Twinbox
+                Get started
               </a>
               <a className="button button-secondary" href="#how-it-works">
                 See how it works
@@ -116,16 +120,16 @@ function App() {
 
             <dl className="hero-facts" aria-label="Key points">
               <div>
-                <dt>Local</dt>
-                <dd>Data stays under your own control</dd>
+                <dt>One command</dt>
+                <dd>From Proxmox to running cluster</dd>
               </div>
               <div>
-                <dt>Automatic</dt>
-                <dd>Updates without much manual work</dd>
+                <dt>GitOps</dt>
+                <dd>Everything managed by Argo CD</dd>
               </div>
               <div>
-                <dt>Practical</dt>
-                <dd>Works on hardware you already own</dd>
+                <dt>Zero cloud</dt>
+                <dd>Your data never leaves your network</dd>
               </div>
             </dl>
           </div>
@@ -135,32 +139,32 @@ function App() {
               <img
                 className="art-image"
                 src={heroIllustration}
-                alt="Abstract illustration of local control, calm updates, and a connected on-prem environment"
+                alt="Illustration of a self-hosted Kubernetes cluster on local Proxmox infrastructure"
                 loading="eager"
               />
             </figure>
 
             <article className="hero-card hero-card-main">
-              <p className="card-kicker">What Twinbox promises</p>
-              <strong>Calm operations, control over your data</strong>
+              <p className="card-kicker">What Twinbox provisions</p>
+              <strong>Talos Linux, Argo CD, Longhorn, OpenBao, and more</strong>
               <p>
-                A straightforward on-prem foundation for teams that want to keep their data in-house instead of relying on a
-                public cloud.
+                A complete platform stack — networking, storage, secrets, databases, ingress, and backups — installed
+                step by step through a single web interface.
               </p>
             </article>
 
             <div className="hero-card-grid">
               <article className="hero-card">
-                <span>No cloud</span>
-                <p>Everything stays local.</p>
+                <span>Talos Linux</span>
+                <p>Immutable, API-driven OS for Kubernetes.</p>
               </article>
               <article className="hero-card">
-                <span>Open Source</span>
-                <p>Transparent and modern.</p>
+                <span>Argo CD</span>
+                <p>GitOps for every component.</p>
               </article>
               <article className="hero-card">
-                <span>Low maintenance</span>
-                <p>Automatic where it matters.</p>
+                <span>OpenBao</span>
+                <p>Centralized secret management.</p>
               </article>
             </div>
           </div>
@@ -177,10 +181,10 @@ function App() {
         <section className="content-section" id="how-it-works">
           <div className="section-heading">
             <p className="eyebrow">How it works</p>
-            <h2>Three simple steps, with no complicated explanation</h2>
+            <h2>From Proxmox to production in three stages</h2>
             <p>
-              The idea is intentionally easy to follow: Twinbox helps you move from existing hardware to a calm, manageable
-              environment.
+              Twinbox automates the entire lifecycle: VM provisioning, cluster bootstrap, and platform service installation.
+              Every step runs through the same web UI.
             </p>
           </div>
 
@@ -198,10 +202,10 @@ function App() {
         <section className="content-section split-section" id="benefits">
           <div className="section-heading section-heading-compact">
             <p className="eyebrow">Benefits</p>
-            <h2>Why Twinbox feels right for teams and decision-makers</h2>
+            <h2>Why self-hosted Kubernetes with Twinbox</h2>
             <p>
-              The page focuses on outcomes: less hassle, more control, and a platform that stays in step with modern
-              techniques.
+              Twinbox combines proven open-source components into a single, opinionated stack — so you get
+              production-grade infrastructure without assembling it yourself.
             </p>
           </div>
 
@@ -215,10 +219,10 @@ function App() {
           </div>
         </section>
 
-        <section className="content-section reasons-section" aria-label="Why Twinbox">
+        <section className="content-section reasons-section" aria-label="Platform services">
           <div className="section-heading">
-            <p className="eyebrow">Why Twinbox</p>
-            <h2>Built for local control, modern techniques, and a calm explanation</h2>
+            <p className="eyebrow">Platform services</p>
+            <h2>Built on trusted open-source infrastructure</h2>
           </div>
 
           <div className="reasons-grid">
@@ -234,7 +238,7 @@ function App() {
         <section className="content-section faq-section" id="faq">
           <div className="section-heading section-heading-compact">
             <p className="eyebrow">FAQ</p>
-            <h2>Common questions in plain language</h2>
+            <h2>Frequently asked questions</h2>
           </div>
 
           <div className="faq-list">
@@ -249,16 +253,16 @@ function App() {
 
         <section className="contact-band" id="contact">
           <div className="contact-copy">
-            <p className="eyebrow">Ready for a first impression</p>
-            <h2>See whether Twinbox fits your environment.</h2>
+            <p className="eyebrow">Ready to get started</p>
+            <h2>Run one command on Proxmox. Open your browser. Build your cluster.</h2>
             <p>
-              This version is ready for GitHub Pages. The operational management environment can keep running separately on
-              the Management VM.
+              Twinbox is open source and runs entirely on your infrastructure. Clone the repository and follow the
+              quick-start guide to have a Management VM running in minutes.
             </p>
 
             <div className="hero-actions">
               <a className="button button-primary" href="https://github.com/harrywesterman/twinbox">
-                See the source code
+                View on GitHub
               </a>
               <a className="button button-secondary" href="#top">
                 Back to top
@@ -270,7 +274,7 @@ function App() {
             <img
               className="art-image"
               src={hardwareIllustration}
-              alt="Friendly illustration of reusable hardware and a local, on-prem Twinbox stack"
+              alt="Illustration of Proxmox server hardware running a Twinbox Kubernetes cluster"
               loading="lazy"
             />
           </figure>

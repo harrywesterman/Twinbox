@@ -7,7 +7,7 @@ const appStylesPath = new URL('../src/App.css', import.meta.url);
 const viteConfigPath = new URL('../vite.config.js', import.meta.url);
 const indexHtmlPath = new URL('../index.html', import.meta.url);
 
-test('landing page source defines a calm English homepage with illustrations', async () => {
+test('landing page source defines a clear English homepage with illustrations', async () => {
   const source = await readFile(appSourcePath, 'utf8');
 
   assert.match(source, /className="hero"/, 'expected a hero section');
@@ -15,9 +15,10 @@ test('landing page source defines a calm English homepage with illustrations', a
   assert.match(source, /className="art-frame art-frame-contact"/, 'expected a second illustration frame');
   assert.match(source, /hero-illustration\.svg/, 'expected a hero illustration asset');
   assert.match(source, /hardware-illustration\.svg/, 'expected a hardware illustration asset');
-  assert.match(source, /Explore Twinbox/, 'expected inviting but not salesy CTA copy');
-  assert.match(source, /See whether Twinbox fits your environment\./, 'expected calm closing copy');
-  assert.match(source, /Even when political winds shift in the United States/, 'expected a subtle geopolitical reference');
+  assert.match(source, /Get started/, 'expected a clear CTA');
+  assert.match(source, /Run one command on Proxmox/, 'expected the quick-start instruction');
+  assert.match(source, /Talos Linux, Argo CD, Longhorn, OpenBao/, 'expected the platform component list');
+  assert.match(source, /View on GitHub/, 'expected a GitHub link');
   assert.doesNotMatch(source, /Request a demo/, 'landing page should not sound sales-led');
   assert.doesNotMatch(source, /fetch\(/, 'landing page should not depend on backend API calls');
 });
@@ -43,5 +44,5 @@ test('vite is configured for GitHub Pages hosting', async () => {
 
   assert.match(viteConfig, /base:\s*'\.\/'/, 'expected relative asset paths for GitHub Pages');
   assert.match(indexHtml, /lang="en"/, 'expected English language metadata');
-  assert.match(indexHtml, /Twinbox \| Your data, in control/, 'expected landing page title');
+  assert.match(indexHtml, /Self-hosted Kubernetes on Proxmox/, 'expected the landing page title');
 });
