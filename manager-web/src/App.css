@@ -1,57 +1,621 @@
-/** 
- * @license
- * Copyright (c) 2025 The Twinbox Authors. All rights reserved.
- * Use of this source code is governed by the LICENSE file.
- */
+.site-shell {
+  min-height: 100vh;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top left, rgba(86, 163, 131, 0.18), transparent 28%),
+    radial-gradient(circle at top right, rgba(244, 164, 96, 0.18), transparent 24%),
+    linear-gradient(160deg, #f7faf6 0%, #f4efe2 44%, #eef4fb 100%);
+  color: var(--ink-1);
+}
 
-/**
- * This file contains modifications to increase the size of colored icons in the Twinbox installer UI.
- * The icons have been scaled up by a factor of 3x for better visibility.
- */
+.landing-page {
+  width: min(1200px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 24px;
+}
 
-/**
- * Wizard Step Icons - Regular Size (3x larger)
- */
-.wizard-step-icon {
+.topbar,
+.hero,
+.trust-band,
+.content-section,
+.contact-band {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 30px;
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: 0 26px 60px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(18px);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 22px;
+}
+
+.topbar::after,
+.hero::after,
+.content-section::after,
+.contact-band::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.38), transparent 60%);
+}
+
+.brand {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--ink-1);
+  text-decoration: none;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.brand-mark {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #1f8a70, #93c5fd);
+  box-shadow: 0 0 0 6px rgba(31, 138, 112, 0.12);
+}
+
+.topnav {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.topnav a {
+  color: var(--ink-soft);
+  text-decoration: none;
+}
+
+.topnav a:hover,
+.topnav a:focus-visible,
+.brand:hover,
+.brand:focus-visible {
+  color: var(--ink-1);
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 24px;
+  padding: 28px;
+}
+
+.hero-copy,
+.hero-panel,
+.content-section > *,
+.contact-band > * {
+  position: relative;
+  z-index: 1;
+}
+
+.eyebrow,
+.card-kicker,
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  color: var(--ink-muted);
+}
+
+.hero-copy h1,
+.section-heading h2,
+.contact-band h2 {
+  margin: 0;
+  letter-spacing: -0.05em;
+  line-height: 0.96;
+}
+
+.hero-copy h1 {
+  max-width: 11ch;
+  font-size: clamp(3.1rem, 6vw, 5.7rem);
+  margin-top: 16px;
+}
+
+.hero-lead,
+.section-heading p,
+.step-card p,
+.benefit-card p,
+.reason-card p,
+.faq-item p,
+.contact-band p {
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.65;
+}
+
+.hero-lead {
+  max-width: 60ch;
+  margin-top: 18px;
+  font-size: 1.05rem;
+}
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 102px;           /* 3x larger: 34px × 3 = 102px */
-  height: 102px;          /* 3x larger: 34px × 3 = 102px */
-  border-radius: 36px;    /* 3x larger: 12px × 3 = 36px */
-  background: rgba(255, 255, 255, 0.08);
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  text-decoration: none;
+  font-weight: 700;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.button:hover,
+.button:focus-visible {
+  transform: translateY(-1px);
+}
+
+.button-primary {
+  background: linear-gradient(135deg, #1f8a70, #2e6bd9);
   color: #fff;
-  font-size: 3rem;        /* 3x larger: 1rem × 3 = 3rem */
+  box-shadow: 0 16px 34px rgba(31, 138, 112, 0.22);
 }
 
-/**
- * Wizard Step Icons - Large Size (3x larger)
- */
-.wizard-step-icon-large {
+.button-secondary {
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--ink-1);
+  border-color: rgba(148, 163, 184, 0.32);
+}
+
+.button-small {
+  min-height: 40px;
+  padding-inline: 14px;
+  font-size: 0.95rem;
+}
+
+.hero-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 30px 0 0;
+}
+
+.hero-facts div,
+.hero-card,
+.step-card,
+.benefit-card,
+.reason-card,
+.faq-item,
+.contact-band {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.hero-facts div {
+  padding: 16px;
+}
+
+.hero-facts dt {
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+}
+
+.hero-facts dd {
+  margin: 10px 0 0;
+  color: var(--ink-1);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.hero-panel {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-height: 100%;
+}
+
+.art-frame {
+  margin: 0;
   overflow: hidden;
-  width: 144px;           /* 3x larger: 48px × 3 = 144px */
-  height: 144px;          /* 3x larger: 48px × 3 = 144px */
-  border-radius: 48px;    /* 3x larger: 16px × 3 = 48px */
-  font-size: 4.35rem;     /* 3x larger: 1.45rem × 3 = 4.35rem */
-  background: linear-gradient(135deg, rgba(20, 184, 166, 0.18), rgba(96, 165, 250, 0.18));
-  color: #0f172a;
-}
-
-/**
- * Wizard Step Icons - Artwork (3x larger)
- */
-.wizard-step-icon-large.is-artwork {
-  background: rgba(255, 255, 255, 0.94);
+  border-radius: 28px;
   border: 1px solid rgba(148, 163, 184, 0.18);
-  padding: 21px;          /* 3x larger: 7px × 3 = 21px */
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
 }
 
-/**
- * Wizard Step Artwork Icons (3x larger)
- */
-.wizard-step-icon-artwork {
+.art-frame-hero {
+  aspect-ratio: 1 / 1;
+}
+
+.art-frame-contact {
+  min-height: 280px;
+  align-self: stretch;
+}
+
+.art-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hero-card {
+  padding: 18px;
+}
+
+.hero-card-main strong {
   display: block;
-  width: 100%;            /* Maintains aspect ratio, now 3x larger */
-  height: 100%;           /* Maintains aspect ratio, now 3x larger */
-  object-fit: contain;
+  margin: 10px 0 12px;
+  font-size: 1.35rem;
+  line-height: 1.15;
+}
+
+.hero-card-main p,
+.hero-card p {
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+
+.hero-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.hero-card-grid .hero-card {
+  min-height: 118px;
+}
+
+.hero-card span {
+  display: inline-block;
+  margin-bottom: 10px;
+  font-weight: 700;
+  color: var(--ink-1);
+}
+
+.hero-orbit {
+  position: relative;
+  min-height: 170px;
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(46, 107, 217, 0.22), transparent 26%),
+    radial-gradient(circle at 70% 35%, rgba(31, 138, 112, 0.22), transparent 24%),
+    radial-gradient(circle at 55% 78%, rgba(244, 164, 96, 0.2), transparent 22%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.4));
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.hero-orbit span {
+  position: absolute;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.hero-orbit span:nth-child(1) {
+  inset: 28px auto auto 26px;
+  width: 64px;
+  height: 64px;
+}
+
+.hero-orbit span:nth-child(2) {
+  inset: 24px 28px auto auto;
+  width: 92px;
+  height: 92px;
+}
+
+.hero-orbit span:nth-child(3) {
+  inset: auto 34px 28px auto;
+  width: 54px;
+  height: 54px;
+}
+
+.trust-band {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 18px;
+  justify-content: center;
+}
+
+.trust-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  color: var(--ink-1);
+  font-weight: 700;
+}
+
+.content-section,
+.contact-band {
+  padding: 28px;
+}
+
+.content-section {
+  display: grid;
+  gap: 22px;
+}
+
+.section-heading {
+  max-width: 760px;
+  display: grid;
+  gap: 14px;
+}
+
+.section-heading h2,
+.contact-band h2 {
+  font-size: clamp(2rem, 4vw, 3.4rem);
+}
+
+.section-heading-compact {
+  max-width: 660px;
+}
+
+.step-grid,
+.benefit-grid,
+.reasons-grid,
+.faq-list {
+  display: grid;
+  gap: 14px;
+}
+
+.step-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.step-card,
+.benefit-card,
+.reason-card {
+  padding: 20px;
+}
+
+.step-number {
+  margin-bottom: 14px;
+  color: #1f8a70;
+  font-weight: 700;
+}
+
+.step-card h3,
+.benefit-card h3,
+.reason-card h3,
+.faq-item summary {
+  margin: 0;
+  color: var(--ink-1);
+  letter-spacing: -0.03em;
+}
+
+.step-card h3,
+.benefit-card h3,
+.reason-card h3 {
+  font-size: 1.15rem;
+  line-height: 1.25;
+}
+
+.step-card p,
+.benefit-card p,
+.reason-card p {
+  margin-top: 10px;
+}
+
+.split-section {
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  align-items: start;
+}
+
+.benefit-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.reasons-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.reason-card {
+  min-height: 100%;
+}
+
+.reason-card:nth-child(2) {
+  background:
+    linear-gradient(180deg, rgba(31, 138, 112, 0.08), rgba(255, 255, 255, 0.7)),
+    rgba(255, 255, 255, 0.7);
+}
+
+.faq-list {
+  max-width: 840px;
+}
+
+.faq-item {
+  padding: 0;
+  overflow: hidden;
+}
+
+.faq-item summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 18px 20px;
+  font-weight: 700;
+}
+
+.faq-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq-item[open] summary {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.faq-item p {
+  padding: 0 20px 18px;
+}
+
+.contact-band {
+  display: grid;
+  gap: 22px;
+  grid-template-columns: minmax(0, 1.08fr) minmax(280px, 0.72fr);
+  align-items: center;
+  background:
+    radial-gradient(circle at top left, rgba(31, 138, 112, 0.1), transparent 24%),
+    rgba(255, 255, 255, 0.82);
+}
+
+.contact-copy {
+  display: grid;
+  gap: 16px;
+}
+
+.contact-band p {
+  max-width: 64ch;
+}
+
+.contact-band .hero-actions {
+  margin-top: 6px;
+}
+
+.step-card,
+.benefit-card,
+.reason-card,
+.faq-item {
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+.step-card:hover,
+.benefit-card:hover,
+.reason-card:hover,
+.faq-item:hover {
+  transform: translateY(-2px);
+  border-color: rgba(31, 138, 112, 0.22);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.07);
+}
+
+.hero,
+.content-section,
+.contact-band,
+.trust-band {
+  animation: riseIn 800ms ease both;
+}
+
+.trust-band {
+  animation-delay: 80ms;
+}
+
+.content-section:nth-of-type(3) {
+  animation-delay: 140ms;
+}
+
+.content-section:nth-of-type(4) {
+  animation-delay: 200ms;
+}
+
+.content-section:nth-of-type(5) {
+  animation-delay: 260ms;
+}
+
+.content-section:nth-of-type(6) {
+  animation-delay: 320ms;
+}
+
+.contact-band {
+  animation-delay: 380ms;
+}
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 1080px) {
+  .hero,
+  .split-section,
+  .step-grid,
+  .reasons-grid,
+  .contact-band {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-copy h1 {
+    max-width: 13ch;
+  }
+
+  .hero-card-grid,
+  .benefit-grid,
+  .hero-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .site-shell {
+    padding: 14px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .topnav {
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .hero,
+  .content-section,
+  .contact-band {
+    padding: 20px;
+  }
+
+  .hero-copy h1 {
+    font-size: clamp(2.6rem, 14vw, 4rem);
+  }
+
+  .hero-card-grid,
+  .benefit-grid,
+  .hero-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .button {
+    width: 100%;
+  }
 }
