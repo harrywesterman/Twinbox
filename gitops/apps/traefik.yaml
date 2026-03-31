@@ -12,8 +12,8 @@ spec:
       helm:
         valueFiles:
           - $values/gitops/values/traefik.yaml
-    - repoURL: https://github.com/harrywesterman/Twinbox.git
-      targetRevision: main
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
       ref: values
   destination:
     server: https://kubernetes.default.svc

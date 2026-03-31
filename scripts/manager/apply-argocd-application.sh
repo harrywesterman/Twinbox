@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/config/pinned-defaults.sh"
+
 usage() {
   cat <<USAGE
 Usage: $0 --manifest PATH --application NAME
@@ -96,6 +101,11 @@ command -v jq >/dev/null 2>&1 || fail "jq not found"
 
 export KUBECONFIG="$KUBECONFIG_FILE"
 
+repo_url="${TWINBOX_GIT_REPO_URL:-https://github.com/harrywesterman/Twinbox.git}"
+target_rev="${TWINBOX_GIT_TARGET_REVISION:-main}"
+
+rendered_manifest="$(sed "s|__REPO_URL__|${repo_url}|g; s|__TARGET_REVISION__|${target_rev}|g" "$MANIFEST_PATH")"
+
 log "Applying Argo CD application manifest ${MANIFEST_PATH}"
-kubectl apply --validate=false -f "$MANIFEST_PATH"
+printf '%s\n' "$rendered_manifest" | kubectl apply --validate=false -f -
 wait_for_application_ready "$APPLICATION_NAME"
