@@ -1,55 +1,41 @@
 # Twinbox
 
-Twinbox is a platform for provisioning and bootstrapping fully configured Talos Kubernetes clusters on Proxmox.
+Twinbox creates a fully configured local cloud environment for your personal or business needs. 
 
-## Current Flow
+It is also a wonderfull way to kickstart the homelab that you allways wanted.
 
-1. Run `wizard/setup-wizard.sh` on Proxmox.
-2. The wizard creates the Management VM.
-3. The Management VM installs Docker CE, clones this repository into `/opt/twinbox`, loads `.env`, and starts `docker compose`.
-4. `manager-web` runs on port `3000` and queues jobs through `manager-api` on port `8080`.
-5. `manager-worker` polls the file queue under `manager-data/` and runs repo-owned scripts.
-6. The first visible wizard step is `Deploy Talos Cluster`.
-7. After the Talos cluster is up, the flow continues through Flannel, Argo CD, Longhorn, OpenBao secret sync, CloudNativePG, Traefik, Velero, and the remaining GitOps application steps.
+Just bring some hardware with the most excellent ProxMox installed. Any hardware will do, just follow https://www.proxmox.com/en/products/proxmox-virtual-environment/get-started.
 
-## Secret Model
+Create a Proxmox cluster of all your machines. See the excellent video of TechnoTim: https://technotim.com/posts/proxmox-setup/
 
-- Management-local bootstrap files live under `/opt/twinbox/bootstrap`.
-- Global bootstrap secrets live under `/opt/twinbox/bootstrap/secrets/global/*.json`.
-- Cluster-scoped file artifacts live under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/`.
-- OpenBao bootstrap state lives under `/opt/twinbox/bootstrap/openbao/`.
-- OpenBao becomes the source of truth for runtime secrets after `install-secret-sync`.
-- Kubernetes `Secret` objects remain derived artifacts synced by External Secrets Operator.
+So you can transform this:
 
-## Repository Layout
+<p align="center">
+  <img src="screenshots/lab.jpg" alt="Web Wizard" width="800">
+</p>
 
-- `wizard/`: Proxmox setup wizard.
-- `manager-web/`: web installation wizard for the Management VM.
-- `manager-api/`: REST API, validation, queueing, and state handling.
-- `manager-worker/`: queue polling and script execution.
-- `categories/`: manifest-driven category and step catalog.
-- `scripts/manager/`: provisioning and lifecycle scripts bundled into the worker image.
-- `gitops/`: Argo CD bootstrap and application manifests.
-- `docs/`: operational documentation.
-
-## Screenshots
+But startomg the Twinbox Wizard on a Proxmox console:
 
 <p align="center">
   <img src="screenshots/wizard.png" alt="Proxmox Wizard" width="800">
 </p>
 
+And follow the Twinbox Proxmox Wizard:
+
 <p align="center">
-  <img src="screenshots/webwizard.png" alt="Web Wizard" width="600">
+  <img src="screenshots/webwizard.png" alt="Web Wizard" width="800">
+</p>
+
+To get all this goodness:
+
+<p align="center">
+  <img src="screenshots/logos.png" alt="Proxmox Wizard" width="800">
 </p>
 
 ## Quick Start
 
-### Run the Twinbox Web Installation Wizard on a proxmox server console
+### Run the installation wizard on a proxmox server console
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/harrywesterman/twinbox/main/wizard/setup-wizard.sh)
 ```
-
-### Open the with a browser to continue installing the cluster
-
-- UI: `http://<management-vm-ip>:3000`
