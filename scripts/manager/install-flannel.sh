@@ -40,3 +40,4 @@ wait_for_kube_api
 log "Bootstrapping Flannel before Argo CD so the cluster has pod networking"
 kubectl apply -k "$WORKSPACE_ROOT/gitops/platform/flannel"
 wait_for_daemonset_rollout "kube-flannel" "kube-flannel-ds"
+kubectl -n kube-flannel rollout status "daemonset/kube-flannel-ds" --timeout=900s

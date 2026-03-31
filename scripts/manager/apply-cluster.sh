@@ -843,12 +843,19 @@ apply_node_config() {
   local ip="$1"
   local config_file="$2"
   log "Applying Talos config to ${ip} with --insecure"
-  talosctl apply-config \
+  if ! talosctl apply-config \
     --insecure \
     --nodes "$ip" \
     --endpoints "$ip" \
     --talosconfig "$talosconfig_file" \
-    --file "$config_file"
+    --file "$config_file" 2>&1; then
+    log "Insecure Talos apply failed for ${ip}; retrying without --insecure"
+    talosctl apply-config \
+      --nodes "$ip" \
+      --endpoints "$ip" \
+      --talosconfig "$talosconfig_file" \
+      --file "$config_file"
+  fi
 }
 
 bootstrap_cluster() {

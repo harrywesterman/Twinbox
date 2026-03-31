@@ -1405,7 +1405,7 @@ wait_for_web_interface() {
   local wait_stage=0
 
   progress_update "Waiting for Twinbox" "Waiting for the Twinbox web interface"
-  log_event "Twinbox services are starting inside the management VM."
+  log_event "Twinbox services are starting inside the management VM. This usually takes a few minutes."
   while true; do
     http_code=$(curl --silent --head --output /dev/null --write-out "%{http_code}" --connect-timeout 2 --max-time 10 "$web_url" || true)
     if [[ "${http_code}" != "000" ]]; then
