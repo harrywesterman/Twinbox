@@ -191,6 +191,26 @@ function buildProjectUrlMap() {
       project_url: 'https://github.com/harrywesterman/twinbox/blob/main/docs/wizard-guide.md',
       github_url: 'https://github.com/harrywesterman/twinbox',
     },
+    'configure-wiredoor-ingress': {
+      icon: '🚪',
+      project_url: 'https://wiredoor.net/',
+      github_url: 'https://github.com/wiredoor/wiredoor',
+    },
+    'configure-cloudflare-tunnel': {
+      icon: '🌐',
+      project_url: 'https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/',
+      github_url: 'https://github.com/cloudflare/cloudflared',
+    },
+    'configure-metallb-ingress': {
+      icon: '⚖️',
+      project_url: 'https://metallb.universe.tf/',
+      github_url: 'https://github.com/metallb/metallb',
+    },
+    'configure-tailscale-ingress': {
+      icon: '🔗',
+      project_url: 'https://tailscale.com/',
+      github_url: 'https://github.com/tailscale/tailscale',
+    },
   };
 }
 

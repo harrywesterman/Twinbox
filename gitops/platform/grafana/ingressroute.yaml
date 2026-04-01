@@ -30,3 +30,37 @@ spec:
         - kind: Service
           name: grafana
           port: 80
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: grafana-tailscale
+  namespace: monitoring
+spec:
+  entryPoints:
+    - webtailscale
+  routes:
+    - kind: Rule
+      match: Host(`grafana.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: grafana
+          port: 80
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: grafana-tailscale
+  namespace: monitoring
+spec:
+  entryPoints:
+    - webtailscale
+  routes:
+    - kind: Rule
+      match: Host(`grafana.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: grafana
+          port: 80
+  tls: {}

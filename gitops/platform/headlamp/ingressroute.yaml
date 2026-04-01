@@ -30,3 +30,37 @@ spec:
         - kind: Service
           name: my-headlamp
           port: 80
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: headlamp-tailscale
+  namespace: kube-system
+spec:
+  entryPoints:
+    - webtailscale
+  routes:
+    - kind: Rule
+      match: Host(`headlamp.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: my-headlamp
+          port: 80
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: headlamp-tailscale
+  namespace: kube-system
+spec:
+  entryPoints:
+    - webtailscale
+  routes:
+    - kind: Rule
+      match: Host(`headlamp.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: my-headlamp
+          port: 80
+  tls: {}

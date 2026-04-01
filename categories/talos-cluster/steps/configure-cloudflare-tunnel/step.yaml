@@ -1,0 +1,48 @@
+id: configure-cloudflare-tunnel
+title: Configure Cloudflare Tunnel
+type: action
+journey_stage: setup
+order: 30
+summary: Expose services through a Cloudflare Tunnel (cloudflared).
+explanation: >
+  This step installs and configures Cloudflare Tunnel (cloudflared) to securely
+  expose your cluster services to the internet without opening any ports. Traffic
+  flows through Cloudflare's global network, providing DDoS protection and
+  automatic HTTPS.
+side_help: >
+  To use Cloudflare Tunnel, you need:
+  1. A Cloudflare account with a domain managed through Cloudflare
+  2. An API token with "Account Cloudflare Tunnel" and "Zone DNS Edit" permissions
+  3. Your Cloudflare Account ID (found in the right sidebar of the dashboard)
+  4. Your Cloudflare Zone ID (found in the Overview tab of your domain)
+  Cloudflare Tunnel requires no public IP or port forwarding.
+depends_on:
+  - install-secret-sync
+inputs:
+  - id: cf_api_token
+    label: Cloudflare API Token
+    type: string
+    required: true
+    help: >
+      API token with "Account Cloudflare Tunnel" and "Zone DNS Edit" permissions.
+      Create one at: https://dash.cloudflare.com/profile/api-tokens
+  - id: cf_account_id
+    label: Cloudflare Account ID
+    type: string
+    required: true
+    help: Your Cloudflare Account ID, found in the right sidebar of the dashboard
+  - id: cf_zone_id
+    label: Cloudflare Zone ID
+    type: string
+    required: true
+    help: Your Cloudflare Zone ID, found in the Overview tab of your domain
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/configure-cloudflare-tunnel/run.sh

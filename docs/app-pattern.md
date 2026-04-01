@@ -26,13 +26,17 @@ CloudNativePG Clusters use Longhorn via `storageClass: longhorn` in the Cluster 
 
 Apps are exposed via **IngressRoute CRDs**, not via pod labels or annotations. Each app gets its own `IngressRoute` resource in `gitops/platform/<app>/ingressroute.yaml`.
 
-Two entryPoints:
-- `websecure` — public HTTPS route (port 443)
-- `webwiredoor` — internal route via the Wiredoor bastion (port 8081)
+Twinbox supports four ingress strategies, chosen by the user during setup:
 
-Domain names use the `__ZONE_NAME__` placeholder which is replaced by Kustomize with the actual domain name from the cluster-config ConfigMap.
+**Wiredoor** — A self-hosted WireGuard-based tunnel to an external server (e.g. Hetzner VM). All traffic flows through the `webwiredoor` entryPoint (port 8081). Let's Encrypt certificates are managed by the Wiredoor server. No third party sees your traffic, and there are no upload limits.
 
-TLS configuration is empty `{}` — certificates are managed by Traefik's resolver configuration.
+**Cloudflare Tunnel** — An outbound tunnel from the cluster to Cloudflare's edge using `cloudflared`. All traffic flows through the `websecure` entryPoint. Cloudflare handles TLS termination and DDoS protection, but can see HTTP traffic. The free plan has a 100MB upload limit.
+
+**MetalLB + Port Forwarding** — MetalLB assigns a real IP on the local network to Traefik. The user configures port forwarding on their router (80/443). Traefik manages Let's Encrypt certificates directly via HTTP-01 challenge. Full control, zero external dependencies, no third party sees traffic.
+
+**Tailscale** — The cluster joins a Tailscale tailnet. Users connect by enabling Tailscale on their device. No port forwarding, no external VM, no public DNS needed. Access control via Tailscale ACLs. Can be self-hosted with Headscale for full control.
+
+All strategies use the same IngressRoute structure — only the `entryPoints` and `tls` fields differ. Domain names use the `__ZONE_NAME__` placeholder which is replaced by Kustomize with the actual domain name from the cluster-config ConfigMap.
 
 ### CloudNativePG — PostgreSQL
 

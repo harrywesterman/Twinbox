@@ -1,0 +1,43 @@
+id: configure-wiredoor-ingress
+title: Configure Wiredoor Ingress
+type: action
+journey_stage: setup
+order: 25
+summary: Set up Wiredoor tunnel to an external server for ingress traffic.
+explanation: >
+  This step configures a Wiredoor tunnel that routes external traffic through
+  a Wiredoor server to your cluster. Use this when you want to expose services
+  without opening ports on your local network.
+side_help: >
+  To use Wiredoor ingress, you need:
+  1. Access to a Wiredoor server
+  2. An API token from the Wiredoor server
+  3. The Wiredoor server URL
+depends_on:
+  - install-secret-sync
+inputs:
+  - id: wiredoor_url
+    label: Wiredoor Server URL
+    type: string
+    required: true
+    help: The URL of the Wiredoor server (e.g., https://wiredoor.example.com)
+  - id: wiredoor_token
+    label: Wiredoor API Token
+    type: string
+    required: true
+    help: API token for authenticating with the Wiredoor server
+  - id: wiredoor_node_name
+    label: Wiredoor Node Name
+    type: string
+    required: false
+    help: Custom node name for the Wiredoor tunnel. Defaults to the cluster slug.
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/configure-wiredoor-ingress/run.sh

@@ -20,6 +20,7 @@ resources:
   - prometheus/alertmanager-config.yaml
   - prometheus/pvc-usage-alerts.yaml
   - ntfy/ingressroute.yaml
+  - tailscale/externalsecret.yaml
 
 replacements:
   - source:

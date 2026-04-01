@@ -39,6 +39,13 @@ ports:
     exposedPort: 8081
     protocol: TCP
 
+  webtailscale:
+    port: 8090
+    expose:
+      default: true
+    exposedPort: 8090
+    protocol: TCP
+
 api:
   dashboard: true
   insecure: true

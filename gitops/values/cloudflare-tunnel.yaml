@@ -1,0 +1,22 @@
+cloudflared:
+  replicaCount: 2
+
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+    - key: node-role.kubernetes.io/master
+      operator: Exists
+      effect: NoSchedule
+
+  env:
+    - name: TUNNEL_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: cloudflare-tunnel-secret
+          key: CF_TUNNEL_TOKEN
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
