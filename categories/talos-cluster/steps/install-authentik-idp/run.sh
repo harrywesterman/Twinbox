@@ -8,6 +8,8 @@ WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../
 BOOTSTRAP_ROOT="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
 authentik_secret_file="$BOOTSTRAP_ROOT/secrets/global/authentik.json"
 manifest_path="$WORKSPACE_ROOT/gitops/apps/authentik.yaml"
+authentik_externalsecret_manifest="$WORKSPACE_ROOT/gitops/platform/authentik/externalsecret.yaml"
+authentik_ingressroute_manifest="$WORKSPACE_ROOT/gitops/platform/authentik/ingressroute.yaml"
 
 mkdir -p "$(dirname "$authentik_secret_file")"
 
@@ -96,6 +98,21 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "authentik" \
   --json-file "$authentik_secret_file" \
   --required-keys "AUTHENTIK_SECRET_KEY,AUTHENTIK_BOOTSTRAP_PASSWORD,AUTHENTIK_BOOTSTRAP_TOKEN,AUTHENTIK_BOOTSTRAP_EMAIL,AUTHENTIK_HOST,AUTHENTIK_HOST_BROWSER,AUTHENTIK_POSTGRESQL__USERNAME,AUTHENTIK_POSTGRESQL__PASSWORD"
+
+export KUBECONFIG="$KUBECONFIG_FILE"
+
+kubectl create namespace authentik --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f "$authentik_externalsecret_manifest"
+kubectl apply -f "$authentik_ingressroute_manifest"
+
+for _attempt in $(seq 1 60); do
+  if kubectl -n authentik get secret authentik-bootstrap >/dev/null 2>&1; then
+    break
+  fi
+  sleep 5
+done
+
+kubectl -n authentik get secret authentik-bootstrap >/dev/null 2>&1 || fail "authentik-bootstrap secret did not appear after applying the ExternalSecret"
 
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$manifest_path" \

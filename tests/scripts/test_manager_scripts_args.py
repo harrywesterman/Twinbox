@@ -890,6 +890,9 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
 
     assert "cluster_dns_domain" in authentik_run_text
     assert "https://authentik.${cluster_dns_domain}" in authentik_run_text
+    assert "kubectl create namespace authentik --dry-run=client -o yaml | kubectl apply -f -" in authentik_run_text
+    assert "gitops/platform/authentik/externalsecret.yaml" in authentik_run_text
+    assert "gitops/platform/authentik/ingressroute.yaml" in authentik_run_text
     assert (
         "Could not determine Authentik host; set DNS domain in the ingress selection step"
         in authentik_run_text
@@ -1168,5 +1171,4 @@ def test_kustomization_includes_monitoring_resources():
     text = KUSTOMIZATION.read_text(encoding="utf-8")
     assert "prometheus/ingressroute.yaml" in text
     assert "prometheus/alertmanager-config.yaml" in text
-    assert "authentik/externalsecret.yaml" in text
     assert "ntfy/ingressroute.yaml" in text
