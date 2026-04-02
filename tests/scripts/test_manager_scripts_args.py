@@ -1237,3 +1237,17 @@ def test_authentik_db_storageclass_uses_single_replica():
     assert "name: longhorn-single" in text
     assert 'numberOfReplicas: "1"' in text
     assert "provisioner: driver.longhorn.io" in text
+
+
+def test_authentik_values_request_memory_for_server_and_worker():
+    text = (REPO_ROOT / "gitops" / "values" / "authentik.yaml").read_text(
+        encoding="utf-8"
+    )
+    assert "server:" in text
+    assert "worker:" in text
+    assert "requests:" in text
+    assert "cpu: 100m" in text
+    assert "memory: 512Mi" in text
+    assert "memory: 256Mi" in text
+    assert "memory: 1Gi" in text
+    assert "memory: 512Mi" in text

@@ -7,6 +7,22 @@ authentik:
   existingSecret:
     secretName: authentik-bootstrap
 
+  server:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        memory: 1Gi
+
+  worker:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
+
   env:
     - name: AUTHENTIK_POSTGRESQL__HOST
       value: "authentik-db-pooler-rw.databases.svc.cluster.local"
