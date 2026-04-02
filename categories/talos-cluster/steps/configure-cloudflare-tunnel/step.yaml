@@ -12,11 +12,10 @@ explanation: >
 side_help: >
   To use Cloudflare Tunnel, you need:
   1. A Cloudflare account with a domain managed through Cloudflare
-  2. An API token with "Account Cloudflare Tunnel" permissions
+  2. An API token with both "Account Cloudflare Tunnel" and "Zone DNS Edit"
+     permissions
   3. Your Cloudflare Account ID (found in the right sidebar of the dashboard)
   4. Your Cloudflare Zone ID (found in the Overview tab of your domain)
-  5. Optionally, a separate API token with "Zone DNS Edit" permissions for
-     automatic DNS record creation
   Cloudflare Tunnel requires no public IP or port forwarding.
 depends_on:
   - install-secret-sync
@@ -40,13 +39,6 @@ inputs:
     type: string
     required: true
     help: Your Cloudflare Zone ID, found in the Overview tab of your domain
-  - id: cf_dns_api_token
-    label: Cloudflare DNS API Token
-    type: string
-    required: false
-    help: >
-      Optional API token with "Zone DNS Edit" permissions for automatic DNS
-      record creation. If omitted, Twinbox reuses the tunnel API token.
 secrets:
   files:
     KUBECONFIG_FILE:
