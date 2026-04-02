@@ -413,39 +413,41 @@ function runCommand(jobId, command, args, env = {}, redactLine = (line) => Strin
       detached: true,
     });
 
+    const getProcessGroupId = (pid) => {
+      try {
+        const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+        const fields = stat.trim().split(/\s+/);
+        return Number.parseInt(fields[4], 10);
+      } catch {
+        return null;
+      }
+    };
+
+    const killProcessGroup = (signal) => {
+      const targets = new Set([child.pid]);
+      const pgid = getProcessGroupId(child.pid);
+      if (Number.isFinite(pgid) && pgid > 1) {
+        targets.add(-pgid);
+      }
+
+      for (const target of targets) {
+        try {
+          process.kill(target, signal);
+        } catch {
+          // Best effort only; try the next target.
+        }
+      }
+    };
+
     const terminateChild = (signal) => {
       if (cancelRequested) {
         return;
       }
       cancelRequested = true;
       appendLog(jobId, "cancel requested; stopping running process");
-      try {
-        child.kill(signal);
-      } catch {
-        try {
-          process.kill(child.pid, signal);
-        } catch {
-          try {
-            process.kill(-child.pid, signal);
-          } catch {
-            // Best effort only; the fallback SIGKILL below may still succeed.
-          }
-        }
-      }
+      killProcessGroup(signal);
       killTimer = setTimeout(() => {
-        try {
-          child.kill("SIGKILL");
-        } catch {
-          try {
-            process.kill(child.pid, "SIGKILL");
-          } catch {
-            try {
-              process.kill(-child.pid, "SIGKILL");
-            } catch {
-              // Best effort only; if this fails the worker will still observe the job state.
-            }
-          }
-        }
+        killProcessGroup("SIGKILL");
       }, 10000);
     };
 
