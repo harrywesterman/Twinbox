@@ -143,18 +143,12 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-traefik",
                 "install-cloudnativepg",
                 "install-postgres-clusters",
-                "configure-wiredoor-ingress",
-                "configure-cloudflare-tunnel",
-                "configure-metallb-ingress",
-                "configure-tailscale-ingress",
                 "install-authentik-idp",
-                "configure-cloudflare-dns",
-                "install-wiredoor-gateway",
-                "provision-wiredoor-bastion",
+                "create-users-and-groups",
+                "choose-ingress-route",
                 "install-whoami",
                 "install-headlamp",
                 "install-grafana",
-                "create-users-and-groups",
                 "install-homepage-dashboard",
                 "install-management-consoles",
                 "install-velero-backup",
@@ -181,13 +175,13 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert talos["steps"][4]["title"] == "Install Traefik"
             assert talos["steps"][5]["title"] == "Install CloudNativePG"
             assert talos["steps"][6]["title"] == "Install PostgreSQL Clusters"
-            assert talos["steps"][7]["title"] == "Configure Wiredoor Ingress"
-            assert talos["steps"][8]["title"] == "Configure Cloudflare Tunnel"
-            assert talos["steps"][9]["title"] == "Configure MetalLB Ingress"
-            assert talos["steps"][10]["title"] == "Configure Tailscale Ingress"
-            assert talos["steps"][11]["title"] == "Install Authentik"
-            assert talos["steps"][12]["title"] == "Configure Cloudflare DNS"
-            assert talos["steps"][13]["title"] == "Install Wiredoor gateway"
+            assert talos["steps"][7]["title"] == "Install Authentik"
+            assert talos["steps"][8]["title"] == "Create Users and Groups"
+            assert talos["steps"][9]["title"] == "Choose Ingress Route"
+            assert talos["steps"][10]["title"] == "Install Whoami"
+            assert talos["steps"][11]["title"] == "Install Headlamp"
+            assert talos["steps"][12]["title"] == "Install Grafana"
+            assert talos["steps"][13]["title"] == "Install Homepage dashboard"
             assert talos["steps"][0]["journey_stage"] == "setup"
             assert talos["steps"][0]["status"] == "ready"
             assert talos["steps"][1]["status"] == "locked"
@@ -201,7 +195,52 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 == "kubeconfig"
             )
             assert talos["steps"][0]["icon"] == "🖥️"
-            assert talos["steps"][8]["icon"] == "🚀"
+            assert talos["steps"][9]["type"] == "config"
+            assert [option["value"] for option in talos["steps"][9]["inputs"][0]["options"]] == [
+                "wiredoor",
+                "cloudflare-tunnel",
+                "metallb",
+                "tailscale",
+            ]
+            assert talos["steps"][12]["icon"] == "📈"
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
+def test_catalog_endpoint_filters_ingress_routes_after_choice():
+    with tempfile.TemporaryDirectory() as td:
+        data_dir = Path(td) / "data"
+        route_state = _global_step_state(data_dir, "choose-ingress-route")
+        route_state.parent.mkdir(parents=True, exist_ok=True)
+        route_state.write_text(
+            json.dumps(
+                {
+                    "status": "configured",
+                    "inputs": {"ingress_route": "wiredoor"},
+                    "outputs": {"selected_ingress_route": "wiredoor"},
+                }
+            ),
+            encoding="utf-8",
+        )
+        port = _find_free_port()
+
+        proc = _start_api(data_dir, port)
+        try:
+            base = f"http://127.0.0.1:{port}"
+            _wait_for_health(base)
+
+            status, body = _get_json(f"{base}/api/catalog")
+            assert status == 200
+            talos_step_ids = [step["id"] for step in body["categories"][1]["steps"]]
+            assert "choose-ingress-route" in talos_step_ids
+            assert "configure-wiredoor-ingress" in talos_step_ids
+            assert "provision-wiredoor-bastion" in talos_step_ids
+            assert "configure-cloudflare-dns" in talos_step_ids
+            assert "install-wiredoor-gateway" in talos_step_ids
+            assert "configure-cloudflare-tunnel" not in talos_step_ids
+            assert "configure-metallb-ingress" not in talos_step_ids
+            assert "configure-tailscale-ingress" not in talos_step_ids
         finally:
             proc.terminate()
             proc.wait(timeout=5)

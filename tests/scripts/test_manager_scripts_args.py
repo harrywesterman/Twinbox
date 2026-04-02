@@ -72,6 +72,30 @@ CLOUDFLARE_STEP_MANIFEST = (
     / "configure-cloudflare-dns"
     / "step.yaml"
 )
+AUTHENTIK_STEP_MANIFEST = (
+    REPO_ROOT
+    / "categories"
+    / "talos-cluster"
+    / "steps"
+    / "install-authentik-idp"
+    / "step.yaml"
+)
+CREATE_USERS_STEP_MANIFEST = (
+    REPO_ROOT
+    / "categories"
+    / "talos-cluster"
+    / "steps"
+    / "create-users-and-groups"
+    / "step.yaml"
+)
+CHOOSE_INGRESS_ROUTE_STEP_MANIFEST = (
+    REPO_ROOT
+    / "categories"
+    / "talos-cluster"
+    / "steps"
+    / "choose-ingress-route"
+    / "step.yaml"
+)
 WHOAMI_STEP_MANIFEST = (
     REPO_ROOT
     / "categories"
@@ -102,6 +126,14 @@ WIREDOOR_GATEWAY_STEP_MANIFEST = (
     / "talos-cluster"
     / "steps"
     / "install-wiredoor-gateway"
+    / "step.yaml"
+)
+WIREDOOR_BASTION_STEP_MANIFEST = (
+    REPO_ROOT
+    / "categories"
+    / "talos-cluster"
+    / "steps"
+    / "provision-wiredoor-bastion"
     / "step.yaml"
 )
 ARGO_BOOTSTRAP_SCRIPT = REPO_ROOT / "gitops" / "install.sh"
@@ -593,7 +625,8 @@ def test_provision_nodes_step_returns_refs_not_kubeconfig_paths():
 
 def test_manager_worker_image_includes_talos_image_factory_helper():
     text = (REPO_ROOT / "manager-worker" / "Dockerfile").read_text(encoding="utf-8")
-    assert "ARG TALOSCTL_VERSION=v1.12.6" in text
+    assert "PINNED_TALOS_VERSION" in text
+    assert "talosctl-linux-amd64" in text
     assert "COPY lib ./lib" in text
     assert (
         "apt-get install -y --no-install-recommends bash ca-certificates curl jq openssl tar xz-utils sudo"
@@ -795,29 +828,51 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     argocd_text = ARGO_STEP_MANIFEST.read_text(encoding="utf-8")
     traefik_text = TRAEFIK_STEP_MANIFEST.read_text(encoding="utf-8")
     cloudflare_text = CLOUDFLARE_STEP_MANIFEST.read_text(encoding="utf-8")
+    choose_ingress_text = CHOOSE_INGRESS_ROUTE_STEP_MANIFEST.read_text(
+        encoding="utf-8"
+    )
     whoami_text = WHOAMI_STEP_MANIFEST.read_text(encoding="utf-8")
     headlamp_text = HEADLAMP_STEP_MANIFEST.read_text(encoding="utf-8")
     grafana_text = GRAFANA_STEP_MANIFEST.read_text(encoding="utf-8")
     wiredoor_text = WIREDOOR_GATEWAY_STEP_MANIFEST.read_text(encoding="utf-8")
+    wiredoor_bastion_text = WIREDOOR_BASTION_STEP_MANIFEST.read_text(
+        encoding="utf-8"
+    )
 
     assert "order: 12" in argocd_text
     assert "provision-nodes" in argocd_text
     assert "install-flannel" not in argocd_text
 
-    assert "order: 31" in traefik_text
+    assert "order: 16" in traefik_text
     assert "install-secret-sync" in traefik_text
 
-    assert "order: 32" in cloudflare_text
-    assert "create-users-and-groups" in cloudflare_text
+    assert "order: 19" in AUTHENTIK_STEP_MANIFEST.read_text(encoding="utf-8")
+    assert "order: 20" in CREATE_USERS_STEP_MANIFEST.read_text(encoding="utf-8")
+    assert "order: 21" in choose_ingress_text
+    assert "type: config" in choose_ingress_text
+    assert "value: wiredoor" in choose_ingress_text
+    assert "value: metallb" in choose_ingress_text
+    assert "depends_on:" in choose_ingress_text
+    assert "create-users-and-groups" in choose_ingress_text
 
-    assert "order: 33" in wiredoor_text
+    assert "order: 24" in cloudflare_text
+    assert "choose-ingress-route" in cloudflare_text
+    assert "provision-wiredoor-bastion" in cloudflare_text
+
+    assert "order: 25" in wiredoor_text
     assert "install-grafana" in wiredoor_text
+    assert "choose-ingress-route" in wiredoor_text
+    assert "configure-wiredoor-ingress" in wiredoor_text
     assert "KUBECONFIG_FILE:" in wiredoor_text
     assert "item: kubeconfig" in wiredoor_text
     assert (
         "script: categories/talos-cluster/steps/install-wiredoor-gateway/run.sh"
         in wiredoor_text
     )
+
+    assert "order: 22" in wiredoor_bastion_text
+    assert "choose-ingress-route" in wiredoor_bastion_text
+    assert "ingress_route: wiredoor" in wiredoor_bastion_text
 
     assert "order: 34" in whoami_text
     assert "install-traefik" in whoami_text

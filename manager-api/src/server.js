@@ -1117,7 +1117,11 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
   }
 
   const visibleStep = catalog.categories.flatMap((category) => category.steps).find((candidate) => candidate.id === stepId);
-  if (visibleStep?.status === "locked") {
+  if (!visibleStep) {
+    return res.status(404).json({ error: "step not found" });
+  }
+
+  if (visibleStep.status === "locked") {
     return res.status(409).json({ error: `${stepId} is locked until its dependencies are complete` });
   }
 

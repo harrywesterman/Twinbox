@@ -18,6 +18,8 @@ side_help: >
   Cloudflare Tunnel requires no public IP or port forwarding.
 depends_on:
   - install-secret-sync
+  - choose-ingress-route
+ingress_route: cloudflare-tunnel
 inputs:
   - id: cf_api_token
     label: Cloudflare API Token

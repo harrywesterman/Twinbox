@@ -24,7 +24,7 @@ function flattenSetupSteps(catalog) {
 }
 
 function isComplete(step) {
-  return step?.status === 'done' || step?.status === 'skipped';
+  return step?.status === 'done' || step?.status === 'configured' || step?.status === 'skipped';
 }
 
 function pickActiveStep(steps, selectedStepId) {
@@ -290,7 +290,7 @@ function fallbackRuntimeEvent(activeStep, latestJob) {
       timestamp: null,
     };
   }
-  if (status === 'succeeded' || status === 'done') {
+  if (status === 'succeeded' || status === 'done' || status === 'configured') {
     return {
       id: `${activeStep?.id || 'step'}-done`,
       title: 'Done',
@@ -515,7 +515,7 @@ function buildPrimaryAction(activeStep, nextStep, busy, stepIndex, mode) {
     };
   }
 
-  if (activeStep.status === 'done' && nextStep) {
+  if (isComplete(activeStep) && nextStep) {
     return {
       type: 'advance',
       label: `Continue to step ${stepIndex + 1}`,
@@ -524,7 +524,7 @@ function buildPrimaryAction(activeStep, nextStep, busy, stepIndex, mode) {
     };
   }
 
-  if (activeStep.status === 'done' && !nextStep) {
+  if (isComplete(activeStep) && !nextStep) {
     return {
       type: 'finish',
       label: 'Finish setup',
@@ -567,7 +567,7 @@ export function formatState(value, fallback) {
 }
 
 export function toneForStatus(value) {
-  if (value === 'done' || value === 'success') return 'success';
+  if (value === 'done' || value === 'configured' || value === 'success') return 'success';
   if (value === 'skipped') return 'warning';
   if (value === 'running' || value === 'ready' || value === 'active') return 'active';
   if (value === 'canceled') return 'warning';

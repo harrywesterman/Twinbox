@@ -100,6 +100,11 @@ function buildProjectUrlMap() {
       project_url: 'https://github.com/harrywesterman/twinbox',
       github_url: 'https://github.com/harrywesterman/twinbox',
     },
+    'choose-ingress-route': {
+      icon: '🧭',
+      project_url: 'https://github.com/harrywesterman/twinbox/blob/main/docs/wizard-guide.md',
+      github_url: 'https://github.com/harrywesterman/twinbox',
+    },
     'configure-cloudflare-dns': {
       icon: '☁️',
       project_url: 'https://developers.cloudflare.com/dns/',

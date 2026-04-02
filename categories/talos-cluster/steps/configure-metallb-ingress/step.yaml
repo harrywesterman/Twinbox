@@ -16,6 +16,8 @@ side_help: >
   4. Optionally, a DynDNS provider for dynamic public IPs
 depends_on:
   - install-secret-sync
+  - choose-ingress-route
+ingress_route: metallb
 inputs:
   - id: metallb_ip_range
     label: MetalLB IP Range

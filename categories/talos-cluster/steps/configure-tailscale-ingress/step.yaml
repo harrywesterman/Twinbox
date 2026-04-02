@@ -17,6 +17,8 @@ side_help: >
   For self-hosted Headscale, you will also need your Headscale URL and API key.
 depends_on:
   - install-secret-sync
+  - choose-ingress-route
+ingress_route: tailscale
 inputs:
   - id: ts_authkey
     label: Tailscale Auth Key

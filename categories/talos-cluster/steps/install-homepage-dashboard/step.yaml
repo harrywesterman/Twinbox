@@ -7,7 +7,7 @@ summary: Install Homepage as the main dashboard surface for the cluster.
 explanation: Twinbox installs Homepage through GitOps, configures it for in-cluster service discovery, and exposes the dashboard through Traefik so operators get a single landing page for the core cluster tools and applications.
 side_help: Homepage gives the cluster a lightweight landing page with quick links to the main platform services.
 depends_on:
-  - install-wiredoor-gateway
+  - install-grafana
 inputs: []
 secrets:
   files:

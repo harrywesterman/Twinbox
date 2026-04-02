@@ -201,6 +201,29 @@ function InputField({ stepId, input, value, onChange }) {
     );
   }
 
+  if (Array.isArray(input.options) && input.options.length > 0) {
+    return (
+      <label className="wizard-field" htmlFor={controlId}>
+        <span className="wizard-field-label">{input.label}</span>
+        <select
+          id={controlId}
+          value={formatInputValue(input, value)}
+          required={input.required}
+          onChange={(event) => onChange(input.id, event.target.value)}
+        >
+          <option value="">Choose an option</option>
+          {input.options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <small>{helpText}</small>
+        <em>{defaultLabel}</em>
+      </label>
+    );
+  }
+
   if (stepId === 'provision-nodes' && input.id === 'scale_percent') {
     const numericValue = Number.isFinite(Number(value)) ? Number(value) : 30;
 

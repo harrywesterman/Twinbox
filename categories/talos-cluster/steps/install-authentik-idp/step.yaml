@@ -2,7 +2,7 @@ id: install-authentik-idp
 title: Install Authentik
 type: action
 journey_stage: setup
-order: 31
+order: 19
 summary: Install Authentik through GitOps after the database and storage layers are ready.
 explanation: Twinbox seeds an Authentik bootstrap secret into OpenBao and then applies one Argo CD application that combines the Authentik Helm chart, the generated Kubernetes secret, and the ingress route for the identity provider. Authentik connects to its dedicated CloudNativePG cluster through the PgBouncer connection pooler.
 side_help: Authentik provides the identity and bootstrap admin flow that later user and group provisioning steps build on. Its database is managed by CloudNativePG with automated backups.

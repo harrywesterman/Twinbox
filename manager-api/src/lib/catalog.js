@@ -29,7 +29,7 @@ function normalizeInputDefinition(input, file) {
     }
   }
 
-  return {
+  const normalized = {
     id: String(input.id),
     label: String(input.label),
     type: String(input.type),
@@ -38,6 +38,50 @@ function normalizeInputDefinition(input, file) {
     min: Number.isFinite(Number(input.min)) ? Number(input.min) : undefined,
     max: Number.isFinite(Number(input.max)) ? Number(input.max) : undefined,
     default: input.default,
+    options: Array.isArray(input.options)
+      ? input.options.map((option, index) => normalizeInputOption(option, file, input.id, index))
+      : undefined,
+  };
+
+  if (Array.isArray(normalized.options) && normalized.options.length > 0 && normalized.default !== undefined) {
+    const allowedValues = new Set(normalized.options.map((option) => String(option.value)));
+    if (!allowedValues.has(String(normalized.default))) {
+      throw new Error(`default for ${input.id} must match one of its options in ${file}`);
+    }
+  }
+
+  return normalized;
+}
+
+function normalizeInputOption(option, file, inputId, index) {
+  if (typeof option === "string" || typeof option === "number" || typeof option === "boolean") {
+    const value = String(option);
+    return {
+      label: value,
+      value,
+    };
+  }
+
+  if (!option || typeof option !== "object") {
+    throw new Error(`invalid option ${index + 1} for ${inputId} in ${file}`);
+  }
+
+  const value = option.value !== undefined && option.value !== null && option.value !== ""
+    ? String(option.value)
+    : (option.label !== undefined && option.label !== null && option.label !== ""
+      ? String(option.label)
+      : "");
+  const label = option.label !== undefined && option.label !== null && option.label !== ""
+    ? String(option.label)
+    : value;
+
+  if (!value) {
+    throw new Error(`missing option value ${index + 1} for ${inputId} in ${file}`);
+  }
+
+  return {
+    label: label || value,
+    value,
   };
 }
 
@@ -133,6 +177,7 @@ function normalizeStepManifest(manifest, file, categoryId) {
     type: String(manifest.type),
     journey_stage: journeyStage,
     order: Number(manifest.order),
+    ingress_route: typeof manifest.ingress_route === "string" ? manifest.ingress_route : "",
     summary: String(manifest.summary),
     explanation: String(manifest.explanation),
     side_help: String(manifest.side_help),
@@ -337,6 +382,83 @@ function deriveCategoryStatus(steps) {
   return "ready";
 }
 
+function normalizeChoiceValue(value) {
+  if (value === undefined || value === null) {
+    return "";
+  }
+  return String(value).trim();
+}
+
+function extractIngressRouteFromState(state) {
+  if (!state) {
+    return "";
+  }
+
+  const candidates = [
+    state?.outputs?.selected_ingress_route,
+    state?.outputs?.ingress_route,
+    state?.outputs?.ingress_strategy,
+    state?.inputs?.ingress_route,
+    state?.inputs?.selected_ingress_route,
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizeChoiceValue(candidate);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return "";
+}
+
+function determineIngressRoute({ currentCluster, stepStateById, definitions }) {
+  const clusterCandidates = [
+    currentCluster?.selected_ingress_route,
+    currentCluster?.ingress_route,
+    currentCluster?.ingress_strategy,
+  ];
+
+  for (const candidate of clusterCandidates) {
+    const normalized = normalizeChoiceValue(candidate);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  const preferredStep = definitions.stepsById.get("choose-ingress-route");
+  if (preferredStep) {
+    const entry = stepStateById.get("choose-ingress-route");
+    const selectedFromChoice = extractIngressRouteFromState(entry?.state);
+    if (selectedFromChoice) {
+      return selectedFromChoice;
+    }
+  }
+
+  for (const category of definitions.categories) {
+    for (const step of category.steps) {
+      const selectedFromStep = extractIngressRouteFromState(stepStateById.get(step.id)?.state);
+      if (selectedFromStep) {
+        return selectedFromStep;
+      }
+    }
+  }
+
+  return "";
+}
+
+function shouldExposeStep(step, activeIngressRoute) {
+  if (!step.ingress_route) {
+    return true;
+  }
+
+  if (!activeIngressRoute) {
+    return false;
+  }
+
+  return step.ingress_route === activeIngressRoute;
+}
+
 export function findCurrentCluster(dirs) {
   if (!fs.existsSync(dirs.clusters)) {
     return null;
@@ -379,6 +501,12 @@ export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) 
     }
   }
 
+  const activeIngressRoute = determineIngressRoute({
+    currentCluster,
+    stepStateById,
+    definitions,
+  });
+
   const completedDependencies = new Set(
     Array.from(stepStateById.entries())
       .filter(([stepId, { state }]) => {
@@ -389,7 +517,9 @@ export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) 
   );
 
   const categories = definitions.categories.map((category) => {
-    const steps = category.steps.map((step) => {
+    const steps = category.steps
+      .filter((step) => shouldExposeStep(step, activeIngressRoute))
+      .map((step) => {
       const { state, latestJob } = stepStateById.get(step.id) || { state: null, latestJob: null };
       const status = deriveStepStatus(step, state, latestJob, completedDependencies);
 
@@ -400,6 +530,7 @@ export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) 
         type: step.type,
         journey_stage: step.journey_stage,
         order: step.order,
+        ingress_route: step.ingress_route,
         summary: step.summary,
         explanation: step.explanation,
         side_help: step.side_help,
@@ -469,6 +600,12 @@ export function validateStepInputs(step, bodyInputs) {
         ? parseRequiredString(value, input.id)
         : { ok: true, value: String(value).trim() };
       if (!parsed.ok) return parsed;
+      if (Array.isArray(input.options) && input.options.length > 0) {
+        const allowedValues = new Set(input.options.map((option) => String(option.value)));
+        if (!allowedValues.has(parsed.value)) {
+          return { ok: false, error: `${input.id} must be one of: ${Array.from(allowedValues).join(", ")}` };
+        }
+      }
       normalized[input.id] = parsed.value;
       continue;
     }
