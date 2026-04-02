@@ -285,6 +285,17 @@ export async function refreshWizardSnapshot({
 
   const selectedStep = getWizardSteps(catalogValue).find((step) => step.id === nextStepId);
   const latestJobId = selectedStep?.latest_job?.id;
+  if (selectedStep?.latest_job && ['pending', 'running', 'cancel_requested'].includes(selectedStep.latest_job.status)) {
+    setActiveJob?.({
+      id: selectedStep.latest_job.id,
+      stepId: selectedStep.id,
+      clusterId: selectedStep.latest_job.cluster_id || discoveredClusterId || clusterIdRef.current || '',
+      clusterInstanceId: selectedStep.latest_job.cluster_instance_id || discoveredClusterInstanceId || clusterInstanceIdRef.current || '',
+      status: selectedStep.latest_job.status,
+    });
+  } else if (selectedStep?.latest_job?.status && ['canceled', 'failed', 'succeeded'].includes(selectedStep.latest_job.status)) {
+    setActiveJob?.(null);
+  }
   if (latestJobId) {
     try {
       const logsData = await requestJson(`/api/jobs/${encodeURIComponent(latestJobId)}/logs`);
