@@ -16,6 +16,7 @@ cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
 
 ingress_route="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.ingress_route')"
+dns_domain="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.dns_domain')"
 
 case "$ingress_route" in
   wiredoor|cloudflare-tunnel|metallb|tailscale) ;;
@@ -24,12 +25,19 @@ case "$ingress_route" in
     ;;
 esac
 
+[[ -n "$dns_domain" ]] || fail "DNS domain is required"
+
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Selected ingress route: $ingress_route"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] DNS domain: $dns_domain"
 
 cluster_file="$MANAGER_DATA_DIR/clusters/${cluster_id}.json"
 if [[ -f "$cluster_file" ]]; then
   tmp_file="$(mktemp)"
-  jq --arg ingress_route "$ingress_route" '.selected_ingress_route = $ingress_route' "$cluster_file" > "$tmp_file"
+  jq \
+    --arg ingress_route "$ingress_route" \
+    --arg dns_domain "$dns_domain" \
+    '.selected_ingress_route = $ingress_route | .dns_domain = $dns_domain' \
+    "$cluster_file" > "$tmp_file"
   mv "$tmp_file" "$cluster_file"
 fi
 
@@ -37,6 +45,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   cat > "$STEP_RESULT_FILE" <<EOF
 {
   "selected_ingress_route": "$ingress_route",
+  "dns_domain": "$dns_domain",
   "cluster_id": "$cluster_id"
 }
 EOF

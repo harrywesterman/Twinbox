@@ -80,6 +80,14 @@ AUTHENTIK_STEP_MANIFEST = (
     / "install-authentik-idp"
     / "step.yaml"
 )
+AUTHENTIK_STEP_SCRIPT = (
+    REPO_ROOT
+    / "categories"
+    / "talos-cluster"
+    / "steps"
+    / "install-authentik-idp"
+    / "run.sh"
+)
 CREATE_USERS_STEP_MANIFEST = (
     REPO_ROOT
     / "categories"
@@ -211,6 +219,10 @@ def _argo_manager_text() -> str:
 
 def _argo_step_text() -> str:
     return ARGO_STEP_SCRIPT.read_text(encoding="utf-8")
+
+
+def _authentik_step_text() -> str:
+    return AUTHENTIK_STEP_SCRIPT.read_text(encoding="utf-8")
 
 
 def _apply_argocd_application_text() -> str:
@@ -827,6 +839,7 @@ def test_install_argocd_step_bootstraps_argocd_without_cni_adoption():
 def test_app_step_manifests_chain_the_linear_gitops_flow():
     argocd_text = ARGO_STEP_MANIFEST.read_text(encoding="utf-8")
     traefik_text = TRAEFIK_STEP_MANIFEST.read_text(encoding="utf-8")
+    authentik_run_text = _authentik_step_text()
     cloudflare_text = CLOUDFLARE_STEP_MANIFEST.read_text(encoding="utf-8")
     choose_ingress_text = CHOOSE_INGRESS_ROUTE_STEP_MANIFEST.read_text(
         encoding="utf-8"
@@ -846,20 +859,21 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "order: 16" in traefik_text
     assert "install-secret-sync" in traefik_text
 
-    assert "order: 19" in AUTHENTIK_STEP_MANIFEST.read_text(encoding="utf-8")
-    assert "order: 20" in CREATE_USERS_STEP_MANIFEST.read_text(encoding="utf-8")
+    assert "order: 22" in AUTHENTIK_STEP_MANIFEST.read_text(encoding="utf-8")
+    assert "order: 23" in CREATE_USERS_STEP_MANIFEST.read_text(encoding="utf-8")
     assert "order: 21" in choose_ingress_text
     assert "type: config" in choose_ingress_text
     assert "value: wiredoor" in choose_ingress_text
     assert "value: metallb" in choose_ingress_text
     assert "depends_on:" in choose_ingress_text
-    assert "create-users-and-groups" in choose_ingress_text
+    assert "dns_domain" in choose_ingress_text
+    assert "DNS Domain" in choose_ingress_text
 
-    assert "order: 24" in cloudflare_text
+    assert "order: 31" in cloudflare_text
     assert "choose-ingress-route" in cloudflare_text
     assert "provision-wiredoor-bastion" in cloudflare_text
 
-    assert "order: 25" in wiredoor_text
+    assert "order: 32" in wiredoor_text
     assert "install-grafana" in wiredoor_text
     assert "choose-ingress-route" in wiredoor_text
     assert "configure-wiredoor-ingress" in wiredoor_text
@@ -870,9 +884,16 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
         in wiredoor_text
     )
 
-    assert "order: 22" in wiredoor_bastion_text
+    assert "order: 30" in wiredoor_bastion_text
     assert "choose-ingress-route" in wiredoor_bastion_text
     assert "ingress_route: wiredoor" in wiredoor_bastion_text
+
+    assert "cluster_dns_domain" in authentik_run_text
+    assert "https://authentik.${cluster_dns_domain}" in authentik_run_text
+    assert (
+        "Could not determine Authentik host; set DNS domain in the ingress selection step"
+        in authentik_run_text
+    )
 
     assert "order: 34" in whoami_text
     assert "install-traefik" in whoami_text

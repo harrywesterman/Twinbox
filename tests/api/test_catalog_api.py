@@ -143,9 +143,9 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-traefik",
                 "install-cloudnativepg",
                 "install-postgres-clusters",
+                "choose-ingress-route",
                 "install-authentik-idp",
                 "create-users-and-groups",
-                "choose-ingress-route",
                 "install-whoami",
                 "install-headlamp",
                 "install-grafana",
@@ -175,9 +175,9 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert talos["steps"][4]["title"] == "Install Traefik"
             assert talos["steps"][5]["title"] == "Install CloudNativePG"
             assert talos["steps"][6]["title"] == "Install PostgreSQL Clusters"
-            assert talos["steps"][7]["title"] == "Install Authentik"
-            assert talos["steps"][8]["title"] == "Create Users and Groups"
-            assert talos["steps"][9]["title"] == "Choose Ingress Route"
+            assert talos["steps"][7]["title"] == "Choose Ingress Route"
+            assert talos["steps"][8]["title"] == "Install Authentik"
+            assert talos["steps"][9]["title"] == "Create Users and Groups"
             assert talos["steps"][10]["title"] == "Install Whoami"
             assert talos["steps"][11]["title"] == "Install Headlamp"
             assert talos["steps"][12]["title"] == "Install Grafana"
@@ -195,13 +195,19 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 == "kubeconfig"
             )
             assert talos["steps"][0]["icon"] == "🖥️"
-            assert talos["steps"][9]["type"] == "config"
-            assert [option["value"] for option in talos["steps"][9]["inputs"][0]["options"]] == [
+            assert talos["steps"][7]["type"] == "config"
+            assert [input_def["id"] for input_def in talos["steps"][7]["inputs"]] == [
+                "ingress_route",
+                "dns_domain",
+            ]
+            assert [option["value"] for option in talos["steps"][7]["inputs"][0]["options"]] == [
                 "wiredoor",
                 "cloudflare-tunnel",
                 "metallb",
                 "tailscale",
             ]
+            assert talos["steps"][7]["inputs"][1]["id"] == "dns_domain"
+            assert talos["steps"][7]["inputs"][1]["required"] is True
             assert talos["steps"][12]["icon"] == "📈"
         finally:
             proc.terminate()

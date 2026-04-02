@@ -11,7 +11,21 @@ manifest_path="$WORKSPACE_ROOT/gitops/apps/authentik.yaml"
 
 mkdir -p "$(dirname "$authentik_secret_file")"
 
+fail() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
+  exit 1
+}
+
+cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
+cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
+cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty')"
+
+[[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
+
 authentik_host="${TWINBOX_AUTHENTIK_HOST:-}"
+if [[ -z "$authentik_host" && -n "$cluster_dns_domain" ]]; then
+  authentik_host="https://authentik.${cluster_dns_domain}"
+fi
 authentik_secret_key=""
 authentik_bootstrap_password=""
 authentik_bootstrap_token=""
@@ -50,6 +64,10 @@ fi
 
 if [[ -z "$authentik_postgresql_password" ]]; then
   authentik_postgresql_password="$(openssl rand -hex 16)"
+fi
+
+if [[ -z "$authentik_host" ]]; then
+  fail "Could not determine Authentik host; set DNS domain in the ingress selection step or override TWINBOX_AUTHENTIK_HOST"
 fi
 
 tmp_file="$(mktemp)"
