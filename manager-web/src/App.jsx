@@ -518,6 +518,25 @@ function App() {
     });
   }, [answers, busy, catalog, cluster, error, health, initialAnswers, logs, selectedStepId]);
 
+  const visibleActiveJob = useMemo(() => {
+    if (activeJob?.id) {
+      return activeJob;
+    }
+
+    const activeStep = model.steps.find((step) => step.latest_job && ['pending', 'running', 'cancel_requested'].includes(step.latest_job.status));
+    if (!activeStep?.latest_job) {
+      return null;
+    }
+
+    return {
+      id: activeStep.latest_job.id,
+      stepId: activeStep.id,
+      clusterId: activeStep.latest_job.cluster_id || clusterIdRef.current || '',
+      clusterInstanceId: activeStep.latest_job.cluster_instance_id || clusterInstanceIdRef.current || '',
+      status: activeStep.latest_job.status,
+    };
+  }, [activeJob, clusterIdRef, clusterInstanceIdRef, model.steps]);
+
   useEffect(() => {
     if (!hydratedRef.current) return;
 
@@ -703,11 +722,11 @@ function App() {
   }
 
   async function handleCancelActiveJob() {
-    if (!activeJob?.id || !['pending', 'running', 'cancel_requested'].includes(activeJob.status)) {
+    if (!visibleActiveJob?.id || !['pending', 'running', 'cancel_requested'].includes(visibleActiveJob.status)) {
       return;
     }
 
-    const jobId = activeJob.id;
+    const jobId = visibleActiveJob.id;
     setError('');
     setNotice(`Stopping job ${jobId}...`);
     setActiveJob((current) => (current?.id === jobId ? { ...current, status: 'cancel_requested' } : current));
@@ -1433,25 +1452,25 @@ function App() {
         </div>
       </header>
 
-      {(notice || error || activeJob?.id) && (
-      <section className={`wizard-banner ${error ? 'is-error' : activeJob?.id ? 'is-notice' : 'is-notice'}`} aria-live="polite">
+      {(notice || error || visibleActiveJob?.id) && (
+      <section className={`wizard-banner ${error ? 'is-error' : visibleActiveJob?.id ? 'is-notice' : 'is-notice'}`} aria-live="polite">
         <div>
-          <strong>{error ? 'Something needs attention' : activeJob?.id ? 'Job in progress' : 'Status update'}</strong>
-          <p>{error || notice || `Job ${activeJob.id} is ${activeJob.status.replace(/_/g, ' ')}`}</p>
+          <strong>{error ? 'Something needs attention' : visibleActiveJob?.id ? 'Job in progress' : 'Status update'}</strong>
+          <p>{error || notice || `Job ${visibleActiveJob.id} is ${visibleActiveJob.status.replace(/_/g, ' ')}`}</p>
         </div>
         <div className="wizard-banner-actions">
-          {activeJob?.id && ['pending', 'running', 'cancel_requested'].includes(activeJob.status) ? (
+          {visibleActiveJob?.id && ['pending', 'running', 'cancel_requested'].includes(visibleActiveJob.status) ? (
             <button
               className="button button-danger"
               type="button"
               onClick={handleCancelActiveJob}
-              disabled={activeJob.status === 'cancel_requested'}
+              disabled={visibleActiveJob.status === 'cancel_requested'}
             >
-              {activeJob.status === 'cancel_requested' ? 'Stopping...' : 'Stop job'}
+              {visibleActiveJob.status === 'cancel_requested' ? 'Stopping...' : 'Stop job'}
             </button>
           ) : null}
-          {activeJob?.id ? (
-            <span className="wizard-banner-job">Job {activeJob.id}</span>
+          {visibleActiveJob?.id ? (
+            <span className="wizard-banner-job">Job {visibleActiveJob.id}</span>
           ) : null}
         </div>
       </section>
