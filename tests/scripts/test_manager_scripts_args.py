@@ -1202,7 +1202,7 @@ def test_databases_kustomization_includes_authentik_resources():
 def test_authentik_db_cluster_is_scaled_for_lab_capacity():
     text = AUTHENTIK_DB_CLUSTER.read_text(encoding="utf-8")
     assert "instances: 1" in text
-    assert "size: 10Gi" in text
+    assert "size: 2Gi" in text
     assert "storageClass: longhorn-single" in text
 
 
