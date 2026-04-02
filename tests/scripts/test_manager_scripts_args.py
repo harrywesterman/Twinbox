@@ -830,6 +830,9 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
 
 def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     longhorn_app_text = LONGHORN_APP.read_text(encoding="utf-8")
+    external_secrets_app_text = (
+        REPO_ROOT / "gitops" / "apps" / "external-secrets.yaml"
+    ).read_text(encoding="utf-8")
     traefik_app_text = _traefik_app_text()
     whoami_app_text = WHOAMI_APP.read_text(encoding="utf-8")
     headlamp_app_text = HEADLAMP_APP.read_text(encoding="utf-8")
@@ -847,6 +850,7 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
 
     assert "chart: longhorn" in longhorn_app_text
     assert "$values/gitops/values/longhorn.yaml" in longhorn_app_text
+    assert "ServerSideApply=true" in external_secrets_app_text
     assert "enabled: trueß∑" not in traefik_values_text
     assert "enabled: true" in traefik_values_text
     assert "existingSecret: wiredoor-gateway" in wiredoor_gateway_values_text
