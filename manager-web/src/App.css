@@ -555,6 +555,34 @@
   outline: none;
 }
 
+.wizard-field select,
+.wizard-field-select {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 42px 0 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background:
+    linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.94)),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M5.25 7.5L10 12.25L14.75 7.5' stroke='%231e293b' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      no-repeat right 14px center / 18px 18px;
+  color: var(--ink-1);
+  outline: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.wizard-field select:focus,
+.wizard-field-select:focus {
+  border-color: rgba(20, 184, 166, 0.52);
+  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.12);
+}
+
+.wizard-field select:hover,
+.wizard-field-select:hover {
+  border-color: rgba(96, 165, 250, 0.4);
+}
+
 .wizard-field input[type='text']:focus,
 .wizard-field input[type='number']:focus {
   border-color: rgba(20, 184, 166, 0.52);

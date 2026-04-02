@@ -206,6 +206,7 @@ function InputField({ stepId, input, value, onChange }) {
       <label className="wizard-field" htmlFor={controlId}>
         <span className="wizard-field-label">{input.label}</span>
         <select
+          className="wizard-field-select"
           id={controlId}
           value={formatInputValue(input, value)}
           required={input.required}
