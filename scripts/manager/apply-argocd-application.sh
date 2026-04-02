@@ -15,6 +15,88 @@ USAGE
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
 
+cluster_resource_profile() {
+  local cluster_json="${STEP_CONTEXT_JSON:-}"
+  local node_count total_cpu total_memory
+
+  if [[ -z "$cluster_json" ]]; then
+    printf 'standard\n'
+    return 0
+  fi
+
+  cluster_json="$(jq -c '.cluster // empty' <<<"$cluster_json")"
+  if [[ -z "$cluster_json" || "$cluster_json" == "null" ]]; then
+    printf 'standard\n'
+    return 0
+  fi
+
+  node_count="$(jq -r '(.controlplane_count // 0) + (.worker_count // 0)' <<<"$cluster_json")"
+  total_cpu="$(jq -r '(.cpu_cores // 0) * ((.controlplane_count // 0) + (.worker_count // 0))' <<<"$cluster_json")"
+  total_memory="$(jq -r '(.memory_mb // 0) * ((.controlplane_count // 0) + (.worker_count // 0))' <<<"$cluster_json")"
+
+  if [[ "$node_count" -le 2 || "$total_cpu" -le 4 || "$total_memory" -le 8192 ]]; then
+    printf 'small\n'
+  elif [[ "$total_cpu" -le 12 || "$total_memory" -le 32768 ]]; then
+    printf 'standard\n'
+  else
+    printf 'large\n'
+  fi
+}
+
+namespace_resource_baseline() {
+  local namespace="$1"
+  local profile="$2"
+  local request_cpu request_memory limit_cpu limit_memory
+
+  case "$profile" in
+    small)
+      request_cpu="25m"
+      request_memory="64Mi"
+      limit_cpu="250m"
+      limit_memory="256Mi"
+      ;;
+    large)
+      request_cpu="100m"
+      request_memory="256Mi"
+      limit_cpu="1000m"
+      limit_memory="1Gi"
+      ;;
+    *)
+      request_cpu="50m"
+      request_memory="128Mi"
+      limit_cpu="500m"
+      limit_memory="512Mi"
+      ;;
+  esac
+
+  log "Applying namespace resource baseline to ${namespace} (${profile})"
+  kubectl create namespace "$namespace" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  kubectl apply -f - >/dev/null <<EOF
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: twinbox-default-resources
+  namespace: ${namespace}
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: ${request_cpu}
+        memory: ${request_memory}
+      default:
+        cpu: ${limit_cpu}
+        memory: ${limit_memory}
+EOF
+}
+
+extract_destination_namespace() {
+  awk '
+    $1 == "destination:" { in_destination = 1; next }
+    in_destination && $1 == "namespace:" { print $2; exit }
+    in_destination && $1 ~ /^[^[:space:]]/ { in_destination = 0 }
+  ' "$MANIFEST_PATH"
+}
+
 wait_for_application_ready() {
   local application="$1"
   local status_json=""
@@ -105,6 +187,12 @@ command -v kubectl >/dev/null 2>&1 || fail "kubectl not found"
 command -v jq >/dev/null 2>&1 || fail "jq not found"
 
 export KUBECONFIG="$KUBECONFIG_FILE"
+
+destination_namespace="$(extract_destination_namespace)"
+resource_profile="$(cluster_resource_profile)"
+if [[ -n "$destination_namespace" ]]; then
+  namespace_resource_baseline "$destination_namespace" "$resource_profile"
+fi
 
 repo_url="${TWINBOX_GIT_REPO_URL:-https://github.com/harrywesterman/Twinbox.git}"
 target_rev="${TWINBOX_GIT_TARGET_REVISION:-main}"

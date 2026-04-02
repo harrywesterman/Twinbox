@@ -736,6 +736,13 @@ def test_apply_argocd_application_helper_applies_and_waits_for_health():
     text = _apply_argocd_application_text()
 
     assert "Usage: $0 --manifest PATH --application NAME [--no-wait]" in text
+    assert "cluster_resource_profile()" in text
+    assert "namespace_resource_baseline()" in text
+    assert "extract_destination_namespace()" in text
+    assert "Applying namespace resource baseline to" in text
+    assert "kind: LimitRange" in text
+    assert "defaultRequest:" in text
+    assert "default:" in text
     assert "printf '%s\\n' \"$rendered_manifest\" | kubectl apply --validate=false -f -" in text
     assert 'kubectl -n argocd get application "$application" -o json' in text
     assert "Application/${application} is Synced and Healthy" in text
