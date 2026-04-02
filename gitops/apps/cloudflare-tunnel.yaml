@@ -6,8 +6,8 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: https://cloudflare.github.io/cloudflared-helm
-      chart: cloudflared
+    - repoURL: https://cloudflare.github.io/helm-charts
+      chart: cloudflare-tunnel
       targetRevision: "0.3.5"
       helm:
         valueFiles:
