@@ -8,7 +8,7 @@ source "$WORKSPACE_ROOT/config/pinned-defaults.sh"
 
 usage() {
   cat <<USAGE
-Usage: $0 --manifest PATH --application NAME
+Usage: $0 --manifest PATH --application NAME [--no-wait]
 USAGE
 }
 
@@ -68,6 +68,7 @@ wait_for_application_ready() {
 
 MANIFEST_PATH=""
 APPLICATION_NAME=""
+WAIT_FOR_READY=true
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -78,6 +79,10 @@ while [[ $# -gt 0 ]]; do
     --application)
       APPLICATION_NAME="$2"
       shift 2
+      ;;
+    --no-wait)
+      WAIT_FOR_READY=false
+      shift
       ;;
     -h|--help)
       usage
@@ -108,4 +113,8 @@ rendered_manifest="$(sed "s|__REPO_URL__|${repo_url}|g; s|__TARGET_REVISION__|${
 
 log "Applying Argo CD application manifest ${MANIFEST_PATH}"
 printf '%s\n' "$rendered_manifest" | kubectl apply --validate=false -f -
-wait_for_application_ready "$APPLICATION_NAME"
+if [[ "$WAIT_FOR_READY" == true ]]; then
+  wait_for_application_ready "$APPLICATION_NAME"
+else
+  log "Skipping wait for application/${APPLICATION_NAME} readiness"
+fi

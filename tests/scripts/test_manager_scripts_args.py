@@ -640,6 +640,7 @@ def test_install_secret_sync_renders_argocd_values_and_applies_secret_sync_manif
     assert "values: |" in text
     assert 'sed \'s/^/          /\' "$OPENBAO_VALUES_FILE"' in text
     assert '--application "openbao"' in text
+    assert '--no-wait' in text
     assert 'repoURL: https://openbao.github.io/openbao-helm' in text
     assert 'chart: openbao' in text
     assert 'targetRevision: "0.26.2"' in text
@@ -689,12 +690,13 @@ def test_argo_manager_script_requires_kubeconfig_and_calls_gitops_bootstrap():
 def test_apply_argocd_application_helper_applies_and_waits_for_health():
     text = _apply_argocd_application_text()
 
-    assert "Usage: $0 --manifest PATH --application NAME" in text
+    assert "Usage: $0 --manifest PATH --application NAME [--no-wait]" in text
     assert "printf '%s\\n' \"$rendered_manifest\" | kubectl apply --validate=false -f -" in text
     assert 'kubectl -n argocd get application "$application" -o json' in text
     assert "Application/${application} is Synced and Healthy" in text
     assert "Application/${application} is Synced and has no unhealthy resources" in text
     assert "has_unhealthy_resources()" in text
+    assert "--no-wait" in text
 
 
 def test_argo_step_script_bootstraps_argocd_without_cni_adoption():

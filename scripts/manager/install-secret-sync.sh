@@ -141,7 +141,8 @@ EOF
 
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$openbao_application_manifest" \
-  --application "openbao"
+  --application "openbao" \
+  --no-wait
 
 openbao_pod="$(openbao_wait_for_server_pod)"
 openbao_initialize_if_needed "$openbao_pod"
