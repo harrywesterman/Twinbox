@@ -8,7 +8,8 @@ explanation: >
   This step installs and configures Cloudflare Tunnel (cloudflared) to securely
   expose your cluster services to the internet without opening any ports. Traffic
   flows through Cloudflare's global network, providing DDoS protection and
-  automatic HTTPS.
+  automatic HTTPS. The step first checks that Cloudflare can actually see the
+  selected zone before it writes any DNS records.
 side_help: >
   To use Cloudflare Tunnel, you need:
   1. A Cloudflare account with a domain managed through Cloudflare

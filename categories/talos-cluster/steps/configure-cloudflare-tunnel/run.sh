@@ -88,6 +88,26 @@ fi
 cf_tunnel_token="$(echo "$token_response" | jq -r '.result // empty')"
 [[ -n "$cf_tunnel_token" ]] || fail "Could not generate tunnel token"
 
+# Step 3: Preflight the Cloudflare zone before writing DNS records
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Preflighting Cloudflare zone"
+zone_response="$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${cf_zone_id}" \
+  -H "Authorization: Bearer $cf_api_token" \
+  -H "Content-Type: application/json")"
+
+zone_success="$(echo "$zone_response" | jq -r '.success // false')"
+if [[ "$zone_success" != "true" ]]; then
+  zone_error="$(echo "$zone_response" | jq -r '.errors[0].message // "Unknown error"')"
+  fail "Could not read Cloudflare zone ${cf_zone_id}: $zone_error"
+fi
+
+cloudflare_zone_name="$(echo "$zone_response" | jq -r '.result.name // empty')"
+[[ -n "$cloudflare_zone_name" ]] || fail "Cloudflare zone lookup returned no zone name for ${cf_zone_id}"
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Cloudflare sees zone name: $cloudflare_zone_name"
+if [[ "$cloudflare_zone_name" != "$public_zone_name" ]]; then
+  fail "Cloudflare zone ${cf_zone_id} resolves to ${cloudflare_zone_name}, but the wizard selected ${public_zone_name}"
+fi
+
 cloudflare_tunnel_manifest="$MANAGER_DATA_DIR/tmp/cloudflare-tunnel-${cluster_id}.yaml"
 mkdir -p "$(dirname "$cloudflare_tunnel_manifest")"
 cat > "$cloudflare_tunnel_manifest" <<EOF
@@ -144,7 +164,7 @@ EOF
 trap 'rm -f "$cloudflare_tunnel_manifest"' EXIT
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Rendered cloudflare-tunnel application to $cloudflare_tunnel_manifest"
 
-# Step 3: Create DNS CNAME record pointing to the tunnel
+# Step 4: Create DNS CNAME record pointing to the tunnel
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating DNS CNAME record for tunnel"
 dns_response="$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${cf_zone_id}/dns_records" \
   -H "Authorization: Bearer $cf_api_token" \
@@ -164,7 +184,7 @@ if [[ "$dns_success" != "true" ]]; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] You may need a Cloudflare token with Zone DNS Edit permissions, or create the DNS record manually"
 fi
 
-# Step 4: Store credentials as global secret
+# Step 5: Store credentials as global secret
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Writing Cloudflare Tunnel credentials to secrets"
 secrets_dir="/opt/twinbox/bootstrap/secrets/global"
 mkdir -p "$secrets_dir"
@@ -206,7 +226,7 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --json-file "$cluster_hosts_secret" \
   --required-keys "ZONE_NAME"
 
-# Step 5: Deploy cloudflared in the cluster
+# Step 6: Deploy cloudflared in the cluster
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploying cloudflared in the cluster"
 if command -v kubectl &>/dev/null; then
   # Wait for Argo CD to be available
