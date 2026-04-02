@@ -27,7 +27,7 @@ inputs:
     label: DNS Domain
     type: string
     required: true
-    help: Base domain for platform hostnames, for example example.org or example.com. Twinbox derives the public zone name from it.
+    help: Base domain for platform hostnames. Twinbox derives the public zone name from it, but TST always uses app.tst.example.org and PRD always uses app.example.com.
 runner:
   kind: script
   script: categories/talos-cluster/steps/choose-ingress-route/run.sh

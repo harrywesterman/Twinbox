@@ -5,6 +5,9 @@ set -euo pipefail
 : "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"
 : "${MANAGER_DATA_DIR:?missing MANAGER_DATA_DIR}"
 
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
+source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
+
 fail() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
   exit 1
@@ -19,10 +22,13 @@ cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 # Parse inputs
 cloudflare_api_token="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.cloudflare_api_token')"
 zone_name="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.zone_name')"
+cluster_dns_domain="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -r '.cluster.dns_domain // empty')"
+public_zone_name="$(twinbox_public_zone_name "$cluster_id" "$cluster_dns_domain")"
 
 # Validate required inputs
 [[ -n "$cloudflare_api_token" ]] || fail "Cloudflare API token is required"
 [[ -n "$zone_name" ]] || fail "Domain name is required"
+[[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting Cloudflare DNS configuration for cluster: $cluster_id"
 
@@ -34,6 +40,7 @@ target_ipv4="$(jq -r '.WIREDOOR_IP' "$wiredoor_secrets")"
 [[ -n "$target_ipv4" && "$target_ipv4" != "null" ]] || fail "Could not read Wiredoor IP from secrets"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Wiredoor IP: $target_ipv4"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Public zone name: $public_zone_name"
 
 # Generate DNS record names based on cluster slug
 if [[ "$cluster_id" == "prd" ]]; then
@@ -102,7 +109,7 @@ cat > "$secrets_dir/cloudflare-${cluster_id}.json" <<EOF
 {
   "CLOUDFLARE_API_TOKEN": "$cloudflare_api_token",
   "CLOUDFLARE_ZONE_ID": "$cloudflare_zone_id",
-  "ZONE_NAME": "$zone_name",
+  "ZONE_NAME": "$public_zone_name",
   "WIREDOOR_FQDN": "$wiredoor_fqdn",
   "WILDCARD_FQDN": "$wildcard_fqdn",
   "TARGET_IPV4": "$target_ipv4",
@@ -118,6 +125,12 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --json-file "$secrets_dir/cloudflare-${cluster_id}.json" \
   --required-keys "ZONE_NAME,WIREDOOR_FQDN,WILDCARD_FQDN"
 
+if command -v kubectl &>/dev/null; then
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying cluster-config and platform-ingress applications"
+  kubectl apply -f "$WORKSPACE_ROOT/gitops/apps/cluster-config.yaml" 2>/dev/null || true
+  kubectl apply -f "$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml" 2>/dev/null || true
+fi
+
 # Write result
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   cat > "$STEP_RESULT_FILE" <<EOF
@@ -126,7 +139,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   "wiredoor_fqdn": "$wiredoor_fqdn",
   "wildcard_fqdn": "$wildcard_fqdn",
   "target_ipv4": "$target_ipv4",
-  "zone_name": "$zone_name",
+  "zone_name": "$public_zone_name",
   "cluster_id": "$cluster_id",
   "secrets_path": "$secrets_dir/cloudflare-${cluster_id}.json"
 }

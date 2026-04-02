@@ -6,6 +6,9 @@ set -euo pipefail
 : "${MANAGER_DATA_DIR:?missing MANAGER_DATA_DIR}"
 : "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"
 
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
+source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
+
 export KUBECONFIG="$KUBECONFIG_FILE"
 
 fail() {
@@ -13,12 +16,10 @@ fail() {
   exit 1
 }
 
-# Parse cluster context
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
 cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty')"
-cluster_id_lower="$(printf '%s' "$cluster_id" | tr '[:upper:]' '[:lower:]')"
 
 [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
 
@@ -33,13 +34,8 @@ cf_zone_id="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.cf_zone_id')"
 [[ -n "$cf_zone_id" ]] || fail "Cloudflare zone ID is required"
 [[ -n "$cluster_dns_domain" ]] || fail "DNS domain is required from the ingress selection step"
 
-if [[ "$cluster_dns_domain" == app.* ]]; then
-  public_zone_name="$cluster_dns_domain"
-elif [[ "$cluster_id_lower" == prd ]]; then
-  public_zone_name="app.${cluster_dns_domain}"
-else
-  public_zone_name="app.${cluster_id_lower}.${cluster_dns_domain}"
-fi
+public_zone_name="$(twinbox_public_zone_name "$cluster_id" "$cluster_dns_domain")"
+[[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting Cloudflare Tunnel configuration for cluster: $cluster_id"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Account ID: $cf_account_id"
@@ -139,6 +135,20 @@ if [[ -f "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" ]]; the
     --required-keys "CF_API_TOKEN,CF_ACCOUNT_ID,CF_ZONE_ID,CF_TUNNEL_ID,CF_TUNNEL_TOKEN"
 fi
 
+cluster_hosts_secret="$secrets_dir/cloudflare-hostnames-${cluster_id}.json"
+cat > "$cluster_hosts_secret" <<EOF
+{
+  "ZONE_NAME": "$public_zone_name"
+}
+EOF
+chmod 600 "$cluster_hosts_secret"
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Syncing cluster hostnames to OpenBao"
+bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+  --secret-name "cluster-hostnames" \
+  --json-file "$cluster_hosts_secret" \
+  --required-keys "ZONE_NAME"
+
 # Step 5: Deploy cloudflared in the cluster
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploying cloudflared in the cluster"
 if command -v kubectl &>/dev/null; then
@@ -155,6 +165,8 @@ if command -v kubectl &>/dev/null; then
   # Apply the cloudflare-tunnel application
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying cloudflare-tunnel application"
   kubectl apply -f "$WORKSPACE_ROOT/gitops/apps/cloudflare-tunnel.yaml" 2>/dev/null || true
+  kubectl apply -f "$WORKSPACE_ROOT/gitops/apps/cluster-config.yaml" 2>/dev/null || true
+  kubectl apply -f "$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml" 2>/dev/null || true
 fi
 
 # Store ingress strategy in cluster state

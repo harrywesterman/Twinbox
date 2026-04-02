@@ -875,6 +875,8 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "depends_on:" in choose_ingress_text
     assert "dns_domain" in choose_ingress_text
     assert "DNS Domain" in choose_ingress_text
+    assert "TST always uses app.tst.example.org" in choose_ingress_text
+    assert "PRD always uses app.example.com" in choose_ingress_text
 
     assert "order: 31" in cloudflare_text
     assert "choose-ingress-route" in cloudflare_text
@@ -897,6 +899,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
 
     assert "cluster_dns_domain" in authentik_run_text
     assert "public_zone_name" in authentik_run_text
+    assert "cluster-public-zone.sh" in authentik_run_text
     assert "https://authentik.${public_zone_name}" in authentik_run_text
     assert "kubectl create namespace authentik --dry-run=client -o yaml | kubectl apply -f -" in authentik_run_text
     assert "gitops/platform/authentik/externalsecret.yaml" in authentik_run_text
@@ -910,10 +913,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "AUTHENTIK_POSTGRESQL__CONN_MAX_AGE" in authentik_run_text
     assert "rollout restart deployment" in authentik_run_text
     assert "rollout status deployment" in authentik_run_text
-    assert (
-        'if [[ "$cluster_dns_domain" == app.* ]]; then' in authentik_run_text
-    )
-    assert 'elif [[ "$cluster_id_lower" == prd ]]; then' in authentik_run_text
+    assert "twinbox_public_zone_name" in authentik_run_text
     assert 'authentik_host="https://authentik.${public_zone_name}"' in authentik_run_text
     assert (
         "Could not determine Authentik host; set DNS domain in the ingress selection step"
@@ -932,12 +932,29 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "jq -r '.success // false'" in cloudflare_tunnel_run_text
     assert "jq -r '.result // empty'" in cloudflare_tunnel_run_text
     assert "cluster_dns_domain" in cloudflare_tunnel_run_text
-    assert 'if [[ "$cluster_dns_domain" == app.* ]]; then' in cloudflare_tunnel_run_text
-    assert 'elif [[ "$cluster_id_lower" == prd ]]; then' in cloudflare_tunnel_run_text
+    assert "cluster-public-zone.sh" in cloudflare_tunnel_run_text
+    assert "twinbox_public_zone_name" in cloudflare_tunnel_run_text
     assert 'echo "[$(date \'+%Y-%m-%d %H:%M:%S\')] Public zone name: $public_zone_name"' in cloudflare_tunnel_run_text
     assert '\\"name\\":\\"*.${public_zone_name}\\"' in cloudflare_tunnel_run_text
     assert "already have a tunnel with this name" in cloudflare_tunnel_run_text
     assert ".result.Token" not in cloudflare_tunnel_run_text
+    assert "cluster-hostnames" in cloudflare_tunnel_run_text
+    assert "platform-ingress.yaml" in cloudflare_tunnel_run_text
+    assert "cluster-config.yaml" in cloudflare_tunnel_run_text
+
+    cloudflare_dns_run_text = (
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "configure-cloudflare-dns"
+        / "run.sh"
+    ).read_text(encoding="utf-8")
+    assert "cluster-public-zone.sh" in cloudflare_dns_run_text
+    assert "twinbox_public_zone_name" in cloudflare_dns_run_text
+    assert "Public zone name:" in cloudflare_dns_run_text
+    assert "ZONE_NAME" in cloudflare_dns_run_text
+    assert "cluster-hostnames" in cloudflare_dns_run_text
 
     assert "order: 34" in whoami_text
     assert "install-traefik" in whoami_text
@@ -999,6 +1016,8 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "Host(`headlamp.__ZONE_NAME__`)" in headlamp_ingressroute_text
     assert "Host(`grafana.__ZONE_NAME__`)" in grafana_ingressroute_text
     assert "Host(`argocd.__ZONE_NAME__`)" in wiredoor_ingressroute_text
+    assert "kind: Application" in (REPO_ROOT / "gitops" / "apps" / "platform-ingress.yaml").read_text(encoding="utf-8")
+    assert "kind: Application" in (REPO_ROOT / "gitops" / "apps" / "cluster-config.yaml").read_text(encoding="utf-8")
     assert "kind: ExternalSecret" in traefik_externalsecret_text
     assert "kind: ClusterSecretStore" in traefik_externalsecret_text
     assert "name: openbao" in traefik_externalsecret_text
@@ -1210,6 +1229,7 @@ def test_homepage_configmap_includes_monitoring_links():
     assert "https://prometheus.__ZONE_NAME__" in text
     assert "ntfy:" in text
     assert "https://ntfy.__ZONE_NAME__" in text
+    assert "services.yaml" in text
     assert "Metrics collection and alerting" in text
     assert "Push notification service" in text
 

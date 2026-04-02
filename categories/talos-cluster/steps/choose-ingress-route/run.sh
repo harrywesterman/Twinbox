@@ -5,6 +5,9 @@ set -euo pipefail
 : "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"
 : "${MANAGER_DATA_DIR:?missing MANAGER_DATA_DIR}"
 
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
+source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
+
 fail() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
   exit 1
@@ -17,6 +20,7 @@ cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 
 ingress_route="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.ingress_route')"
 dns_domain="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.dns_domain')"
+public_zone_name="$(twinbox_public_zone_name "$cluster_id" "$dns_domain")"
 
 case "$ingress_route" in
   wiredoor|cloudflare-tunnel|metallb|tailscale) ;;
@@ -26,16 +30,18 @@ case "$ingress_route" in
 esac
 
 [[ -n "$dns_domain" ]] || fail "DNS domain is required"
+[[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Selected ingress route: $ingress_route"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] DNS domain: $dns_domain"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Public zone name: $public_zone_name"
 
 cluster_file="$MANAGER_DATA_DIR/clusters/${cluster_id}.json"
 if [[ -f "$cluster_file" ]]; then
   tmp_file="$(mktemp)"
   jq \
     --arg ingress_route "$ingress_route" \
-    --arg dns_domain "$dns_domain" \
+    --arg dns_domain "$public_zone_name" \
     '.selected_ingress_route = $ingress_route | .dns_domain = $dns_domain' \
     "$cluster_file" > "$tmp_file"
   mv "$tmp_file" "$cluster_file"
@@ -45,7 +51,8 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   cat > "$STEP_RESULT_FILE" <<EOF
 {
   "selected_ingress_route": "$ingress_route",
-  "dns_domain": "$dns_domain",
+  "dns_domain": "$public_zone_name",
+  "public_zone_name": "$public_zone_name",
   "cluster_id": "$cluster_id"
 }
 EOF

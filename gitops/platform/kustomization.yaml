@@ -39,8 +39,8 @@ replacements:
           kind: ConfigMap
           name: homepage
         fieldPaths:
-          - data["bookmarks.yaml"]
-          - data["services.yaml"]
+          - data.bookmarks\.yaml
+          - data.services\.yaml
       - select:
           kind: Deployment
           name: homepage
