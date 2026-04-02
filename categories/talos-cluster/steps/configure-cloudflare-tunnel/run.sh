@@ -164,9 +164,13 @@ if command -v kubectl &>/dev/null; then
 
   # Apply the cloudflare-tunnel application
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying cloudflare-tunnel application"
-  kubectl apply -f "$WORKSPACE_ROOT/gitops/apps/cloudflare-tunnel.yaml" 2>/dev/null || true
-  kubectl apply -f "$WORKSPACE_ROOT/gitops/apps/cluster-config.yaml" 2>/dev/null || true
-  kubectl apply -f "$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml" 2>/dev/null || true
+  bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+    --manifest "$WORKSPACE_ROOT/gitops/apps/cloudflare-tunnel.yaml" \
+    --application "cloudflare-tunnel"
+  kubectl delete application cluster-config -n argocd --ignore-not-found=true 2>/dev/null || true
+  bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+    --manifest "$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml" \
+    --application "platform-ingress"
 fi
 
 # Store ingress strategy in cluster state

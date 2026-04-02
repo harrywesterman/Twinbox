@@ -940,7 +940,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert ".result.Token" not in cloudflare_tunnel_run_text
     assert "cluster-hostnames" in cloudflare_tunnel_run_text
     assert "platform-ingress.yaml" in cloudflare_tunnel_run_text
-    assert "cluster-config.yaml" in cloudflare_tunnel_run_text
+    assert "kubectl delete application cluster-config -n argocd --ignore-not-found=true" in cloudflare_tunnel_run_text
 
     cloudflare_dns_run_text = (
         REPO_ROOT
@@ -955,6 +955,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "Public zone name:" in cloudflare_dns_run_text
     assert "ZONE_NAME" in cloudflare_dns_run_text
     assert "cluster-hostnames" in cloudflare_dns_run_text
+    assert "kubectl delete application cluster-config -n argocd --ignore-not-found=true" in cloudflare_dns_run_text
 
     assert "order: 34" in whoami_text
     assert "install-traefik" in whoami_text

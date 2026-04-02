@@ -126,9 +126,11 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --required-keys "ZONE_NAME,WIREDOOR_FQDN,WILDCARD_FQDN"
 
 if command -v kubectl &>/dev/null; then
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying cluster-config and platform-ingress applications"
-  kubectl apply -f "$WORKSPACE_ROOT/gitops/apps/cluster-config.yaml" 2>/dev/null || true
-  kubectl apply -f "$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml" 2>/dev/null || true
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying platform-ingress application"
+  kubectl delete application cluster-config -n argocd --ignore-not-found=true 2>/dev/null || true
+  bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+    --manifest "$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml" \
+    --application "platform-ingress"
 fi
 
 # Write result
