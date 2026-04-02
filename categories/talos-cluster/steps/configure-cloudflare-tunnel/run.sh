@@ -47,7 +47,7 @@ tunnel_success="$(echo "$tunnel_response" | jq -r '.success')"
 if [[ "$tunnel_success" != "true" ]]; then
   # Check if tunnel already exists
   tunnel_exists="$(echo "$tunnel_response" | jq -r '.errors[0].message // ""')"
-  if [[ "$tunnel_exists" == *"already exists"* ]]; then
+  if [[ "$tunnel_exists" == *"already exists"* || "$tunnel_exists" == *"already have a tunnel with this name"* ]]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Tunnel already exists, fetching existing tunnel"
     tunnels_list="$(curl -s -X GET "https://api.cloudflare.com/client/v4/accounts/${cf_account_id}/cfd_tunnel?name=${tunnel_name}" \
       -H "Authorization: Bearer $cf_api_token" \

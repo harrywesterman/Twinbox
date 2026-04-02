@@ -918,6 +918,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert 'curl -s -X GET "https://api.cloudflare.com/client/v4/accounts/${cf_account_id}/cfd_tunnel/${cf_tunnel_id}/token"' in cloudflare_tunnel_run_text
     assert "jq -r '.success // false'" in cloudflare_tunnel_run_text
     assert "jq -r '.result // empty'" in cloudflare_tunnel_run_text
+    assert "already have a tunnel with this name" in cloudflare_tunnel_run_text
     assert ".result.Token" not in cloudflare_tunnel_run_text
 
     assert "order: 34" in whoami_text
