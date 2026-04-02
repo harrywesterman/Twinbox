@@ -570,6 +570,7 @@ export function toneForStatus(value) {
   if (value === 'done' || value === 'success') return 'success';
   if (value === 'skipped') return 'warning';
   if (value === 'running' || value === 'ready' || value === 'active') return 'active';
+  if (value === 'canceled') return 'warning';
   if (value === 'failed' || value === 'danger') return 'danger';
   if (value === 'locked' || value === 'warning') return 'warning';
   return 'neutral';

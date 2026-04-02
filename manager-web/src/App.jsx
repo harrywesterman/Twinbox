@@ -693,12 +693,32 @@ function App() {
       latestLogs = logsData?.lines || [];
       setLogs(latestLogs);
 
-      if (jobData.status === 'pending' || jobData.status === 'running') {
+      if (jobData.status === 'pending' || jobData.status === 'running' || jobData.status === 'cancel_requested') {
         await sleep(1600);
         continue;
       }
 
       return { job: latestJob, logs: latestLogs };
+    }
+  }
+
+  async function handleCancelActiveJob() {
+    if (!activeJob?.id || !['pending', 'running', 'cancel_requested'].includes(activeJob.status)) {
+      return;
+    }
+
+    const jobId = activeJob.id;
+    setError('');
+    setNotice(`Stopping job ${jobId}...`);
+    setActiveJob((current) => (current?.id === jobId ? { ...current, status: 'cancel_requested' } : current));
+
+    try {
+      await requestJson(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, { method: 'POST' });
+    } catch (cancelError) {
+      const message = cancelError instanceof Error ? cancelError.message : `Failed to stop job ${jobId}`;
+      setError(message);
+      setNotice(`Could not stop job ${jobId}.`);
+      setActiveJob((current) => (current?.id === jobId ? { ...current, status: 'running' } : current));
     }
   }
 
@@ -825,6 +845,8 @@ function App() {
         const failure = terminal.job.error || step.state?.error || `${step.title} failed`;
         setError(failure);
         setNotice(`Failed to finish ${step.title}.`);
+      } else if (terminal.job.status === 'canceled') {
+        setNotice(`${step.title} was stopped.`);
       } else {
         setNotice(`${step.title} completed successfully.`);
       }
@@ -1412,15 +1434,27 @@ function App() {
       </header>
 
       {(notice || error) && (
-        <section className={`wizard-banner ${error ? 'is-error' : 'is-notice'}`} aria-live="polite">
-          <div>
-            <strong>{error ? 'Something needs attention' : 'Status update'}</strong>
-            <p>{error || notice}</p>
-          </div>
+      <section className={`wizard-banner ${error ? 'is-error' : 'is-notice'}`} aria-live="polite">
+        <div>
+          <strong>{error ? 'Something needs attention' : 'Status update'}</strong>
+          <p>{error || notice}</p>
+        </div>
+        <div className="wizard-banner-actions">
+          {activeJob?.id && ['pending', 'running', 'cancel_requested'].includes(activeJob.status) ? (
+            <button
+              className="button button-danger"
+              type="button"
+              onClick={handleCancelActiveJob}
+              disabled={activeJob.status === 'cancel_requested'}
+            >
+              {activeJob.status === 'cancel_requested' ? 'Stopping...' : 'Stop job'}
+            </button>
+          ) : null}
           {activeJob?.id ? (
             <span className="wizard-banner-job">Job {activeJob.id}</span>
           ) : null}
-        </section>
+        </div>
+      </section>
       )}
 
       <main className="wizard-layout">

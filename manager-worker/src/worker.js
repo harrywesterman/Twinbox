@@ -352,6 +352,38 @@ function runCommand(jobId, command, args, env = {}, redactLine = (line) => Strin
   return new Promise((resolve, reject) => {
     appendLog(jobId, `exec: ${command} ${args.join(" ")}`);
     const recentOutput = [];
+    let settled = false;
+    let cancelRequested = false;
+    let cancelTimer = null;
+    let killTimer = null;
+
+    const jobFile = path.join(dirs.jobs, `${jobId}.json`);
+
+    const clearTimers = () => {
+      if (cancelTimer) {
+        clearInterval(cancelTimer);
+        cancelTimer = null;
+      }
+      if (killTimer) {
+        clearTimeout(killTimer);
+        killTimer = null;
+      }
+    };
+
+    const finishResolve = () => {
+      if (settled) return;
+      settled = true;
+      clearTimers();
+      resolve();
+    };
+
+    const finishReject = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimers();
+      reject(error);
+    };
+
     const recordChunk = (chunk) => {
       const text = chunk.toString();
       for (const line of text.split(/\r?\n/)) {
@@ -375,20 +407,58 @@ function runCommand(jobId, command, args, env = {}, redactLine = (line) => Strin
       cwd: workspace,
       env: childEnv,
       stdio: ["ignore", "pipe", "pipe"],
+      detached: true,
     });
+
+    const terminateChild = (signal) => {
+      if (cancelRequested) {
+        return;
+      }
+      cancelRequested = true;
+      appendLog(jobId, "cancel requested; stopping running process");
+      try {
+        process.kill(-child.pid, signal);
+      } catch {
+        child.kill(signal);
+      }
+      killTimer = setTimeout(() => {
+        try {
+          process.kill(-child.pid, "SIGKILL");
+        } catch {
+          child.kill("SIGKILL");
+        }
+      }, 10000);
+    };
+
+    cancelTimer = setInterval(() => {
+      const job = readJsonIfExists(jobFile);
+      if (job?.status === "cancel_requested" || job?.status === "canceled") {
+        terminateChild("SIGTERM");
+      }
+    }, 500);
 
     child.stdout.on("data", recordChunk);
     child.stderr.on("data", recordChunk);
 
-    child.on("error", (err) => reject(err));
+    child.on("error", (err) => finishReject(err));
     child.on("close", (code) => {
+      if (cancelRequested) {
+        finishReject(new Error("job canceled"));
+        return;
+      }
+
       if (code === 0) {
-        resolve();
+        finishResolve();
       } else {
-        reject(new Error(summarizeFailureOutput(recentOutput, `command exited with code ${code}`)));
+        finishReject(new Error(summarizeFailureOutput(recentOutput, `command exited with code ${code}`)));
       }
     });
   });
+}
+
+function isJobCanceled(jobId) {
+  const job = readJsonIfExists(path.join(dirs.jobs, `${jobId}.json`));
+  return job?.status === "cancel_requested" || job?.status === "canceled";
 }
 
 function emptySecretRuntime() {
@@ -631,6 +701,17 @@ async function handleRunStep(job) {
       finished_at: now(),
     }, clusterInstanceId || clusterId);
   } catch (err) {
+    if (String(err?.message || "") === "job canceled") {
+      updateStepState(stepId, {
+        status: "canceled",
+        error: null,
+        last_job_id: job.id,
+        cluster_id: clusterId,
+        cluster_instance_id: clusterInstanceId,
+        finished_at: now(),
+      }, clusterInstanceId || clusterId);
+      throw err;
+    }
     updateStepState(stepId, {
       status: "failed",
       error: err.message,
@@ -672,13 +753,24 @@ async function handleJob(queueFile) {
       throw new Error(`unsupported job type: ${queued.type}`);
     }
 
+    if (isJobCanceled(queued.id)) {
+      updateJob(queued.id, { status: "canceled", step: "canceled", error: null, finished_at: now() });
+      appendLog(queued.id, "job canceled");
+      return;
+    }
+
     updateJob(queued.id, { status: "succeeded", step: "completed", finished_at: now() });
     appendLog(queued.id, "job completed");
   } catch (err) {
-    updateJob(queued.id, { status: "failed", step: "failed", error: err.message, finished_at: now() });
-    appendLog(queued.id, `job failed: ${err.message}`);
+    if (String(err?.message || "") === "job canceled") {
+      updateJob(queued.id, { status: "canceled", step: "canceled", error: null, finished_at: now() });
+      appendLog(queued.id, "job canceled");
+    } else {
+      updateJob(queued.id, { status: "failed", step: "failed", error: err.message, finished_at: now() });
+      appendLog(queued.id, `job failed: ${err.message}`);
+    }
   } finally {
-    fs.renameSync(runningFile, path.join(dirs.completed, path.basename(runningFile)));
+    finalizeQueueMarker(runningFile);
   }
 }
 

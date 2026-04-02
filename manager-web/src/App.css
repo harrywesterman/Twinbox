@@ -136,6 +136,14 @@
   box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
 }
 
+.wizard-banner-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .wizard-banner.is-error {
   border-color: rgba(248, 113, 113, 0.28);
   background: rgba(254, 242, 242, 0.92);
@@ -1289,6 +1297,17 @@
 .button-secondary:hover,
 .button-secondary:focus-visible {
   background: rgba(30, 41, 59, 1);
+}
+
+.button-danger {
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  color: #fff;
+  box-shadow: 0 16px 34px rgba(185, 28, 28, 0.2);
+}
+
+.button-danger:hover,
+.button-danger:focus-visible {
+  background: linear-gradient(135deg, #f87171, #dc2626);
 }
 
 .eyebrow {

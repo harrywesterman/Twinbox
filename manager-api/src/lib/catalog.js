@@ -302,6 +302,18 @@ function deriveStepStatus(step, state, latestJob, completedDependencies) {
     return "skipped";
   }
 
+  if (state?.status === "canceled") {
+    return "canceled";
+  }
+
+  if (latestJob && latestJob.status === "cancel_requested") {
+    return "running";
+  }
+
+  if (latestJob && latestJob.status === "canceled") {
+    return "canceled";
+  }
+
   if (latestJob && (latestJob.status === "pending" || latestJob.status === "running")) {
     return "running";
   }

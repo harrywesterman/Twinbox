@@ -3,6 +3,8 @@ import path from "path";
 
 import { id, now, writeJson } from "./common.js";
 
+export const CANCELABLE_JOB_STATUSES = new Set(["pending", "running", "cancel_requested"]);
+
 function resolveClusterInstanceId(payload = {}) {
   return payload?.cluster_instance_id
     || payload?.context?.cluster?.cluster_instance_id
@@ -42,4 +44,50 @@ export function queueJob(dirs, type, clusterId, payload) {
 
   fs.appendFileSync(path.join(dirs.logs, `${jobId}.log`), `[${now()}] queued ${type}\n`);
   return job;
+}
+
+export function cancelJob(dirs, jobId) {
+  const jobFile = path.join(dirs.jobs, `${jobId}.json`);
+  if (!fs.existsSync(jobFile)) {
+    return null;
+  }
+
+  const job = JSON.parse(fs.readFileSync(jobFile, "utf8"));
+  if (!CANCELABLE_JOB_STATUSES.has(job.status)) {
+    const error = new Error(`job cannot be canceled from status ${job.status}`);
+    error.code = "JOB_NOT_CANCELABLE";
+    throw error;
+  }
+
+  const nextJob = {
+    ...job,
+    status: job.status === "pending" ? "canceled" : "cancel_requested",
+    step: job.status === "pending" ? "canceled" : "cancel_requested",
+    error: null,
+    updated_at: now(),
+    finished_at: job.status === "pending" ? now() : job.finished_at || null,
+  };
+
+  writeJson(jobFile, nextJob);
+
+  if (job.status === "pending") {
+    if (dirs.pending) {
+      fs.rmSync(path.join(dirs.pending, `${jobId}.json`), { force: true });
+    }
+    if (dirs.running) {
+      fs.rmSync(path.join(dirs.running, `${jobId}.json`), { force: true });
+    }
+    if (dirs.completed) {
+      fs.rmSync(path.join(dirs.completed, `${jobId}.json`), { force: true });
+    }
+    if (dirs.logs) {
+      fs.appendFileSync(path.join(dirs.logs, `${jobId}.log`), `[${now()}] job canceled before start\n`);
+    }
+  } else {
+    if (dirs.logs) {
+      fs.appendFileSync(path.join(dirs.logs, `${jobId}.log`), `[${now()}] cancel requested\n`);
+    }
+  }
+
+  return nextJob;
 }

@@ -848,3 +848,113 @@ def test_worker_includes_recent_script_output_in_failed_run_step_error():
         finally:
             proc.terminate()
             proc.wait(timeout=5)
+
+
+def test_worker_cancels_running_run_step_job_when_job_status_changes():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        data = root / "data"
+        workspace = root / "workspace"
+        bin_dir = root / "bin"
+        marker_file = data / "started.txt"
+
+        for d in [
+            data / "queue" / "pending",
+            data / "queue" / "running",
+            data / "queue" / "completed",
+            data / "jobs",
+            data / "logs",
+            data / "clusters",
+            data / "step-state",
+            workspace / "categories" / "management-vm" / "steps" / "configure-automatic-updates",
+            bin_dir,
+        ]:
+            d.mkdir(parents=True, exist_ok=True)
+
+        _prepare_fake_toolchain(bin_dir)
+        _write_pinned_defaults(workspace)
+
+        script = workspace / "categories" / "management-vm" / "steps" / "configure-automatic-updates" / "apply.sh"
+        script.write_text(
+            "#!/bin/bash\n"
+            "set -euo pipefail\n"
+            f"touch \"{marker_file}\"\n"
+            "trap 'echo stopping >&2' TERM\n"
+            "while true; do sleep 1; done\n",
+        )
+        script.chmod(0o755)
+
+        job = {
+            "id": "job_cancel_running",
+            "type": "run_step",
+            "cluster_id": None,
+            "status": "pending",
+            "step": "queued",
+            "payload": {
+                "step_id": "configure-automatic-updates",
+                "step_type": "config",
+                "inputs": {"enabled": True},
+                "runner": {
+                    "kind": "script",
+                    "script": "categories/management-vm/steps/configure-automatic-updates/apply.sh",
+                },
+                "context": {},
+            },
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "started_at": None,
+            "finished_at": None,
+            "result": None,
+            "error": None,
+        }
+        (data / "jobs" / "job_cancel_running.json").write_text(json.dumps(job))
+        (data / "queue" / "pending" / "job_cancel_running.json").write_text(json.dumps({
+            "id": "job_cancel_running",
+            "type": "run_step",
+            "cluster_id": None,
+            "payload": job["payload"],
+            "queued_at": "2026-01-01T00:00:00Z",
+        }))
+
+        env = os.environ.copy()
+        env["MANAGER_DATA_DIR"] = str(data)
+        env["WORKSPACE_ROOT"] = str(workspace)
+        env["WORKER_POLL_MS"] = "100"
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+        env["TWINBOX_SECRET_BACKEND"] = "env"
+
+        proc = subprocess.Popen(
+            ["node", "manager-worker/src/worker.js"],
+            cwd=Path(__file__).resolve().parents[2],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        try:
+            _wait_until(lambda: marker_file.exists())
+            _wait_until(lambda: json.loads((data / "jobs" / "job_cancel_running.json").read_text())["status"] == "running")
+
+            job_data = json.loads((data / "jobs" / "job_cancel_running.json").read_text())
+            job_data["status"] = "cancel_requested"
+            job_data["step"] = "cancel_requested"
+            job_data["updated_at"] = "2026-01-01T00:00:05Z"
+            (data / "jobs" / "job_cancel_running.json").write_text(json.dumps(job_data))
+
+            _wait_until(lambda: (data / "queue" / "completed" / "job_cancel_running.json").exists())
+
+            updated_job = json.loads((data / "jobs" / "job_cancel_running.json").read_text())
+            assert updated_job["status"] == "canceled"
+            assert updated_job["step"] == "canceled"
+
+            step_state = json.loads(_global_step_state(data, "configure-automatic-updates").read_text())
+            assert step_state["status"] == "canceled"
+            assert step_state["last_job_id"] == "job_cancel_running"
+
+            log_text = (data / "logs" / "job_cancel_running.log").read_text()
+            assert "cancel requested" in log_text
+            assert "job canceled" in log_text
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)

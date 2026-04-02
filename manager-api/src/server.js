@@ -21,7 +21,7 @@ import {
   writeJson,
 } from "./lib/common.js";
 import { buildIpBlock, selectSuggestedIpAllocation } from "./lib/ip-allocation.js";
-import { queueJob } from "./lib/jobs.js";
+import { cancelJob, queueJob } from "./lib/jobs.js";
 import {
   buildProxmoxApiSecretBundle,
   normalizeSecretBaseRef,
@@ -1317,6 +1317,21 @@ app.get("/api/jobs/:jobId/logs", (req, res) => {
 
   const lines = fs.readFileSync(file, "utf8").split("\n").filter(Boolean).map((line) => ({ line }));
   return res.json({ lines });
+});
+
+app.post("/api/jobs/:jobId/cancel", (req, res) => {
+  try {
+    const job = cancelJob(dirs, req.params.jobId);
+    if (!job) {
+      return res.status(404).json({ error: "job not found" });
+    }
+    return res.json({ job_id: job.id, status: job.status });
+  } catch (error) {
+    if (error?.code === "JOB_NOT_CANCELABLE") {
+      return res.status(409).json({ error: error.message });
+    }
+    return res.status(500).json({ error: error?.message || "failed to cancel job" });
+  }
 });
 
 app.listen(port, () => {
