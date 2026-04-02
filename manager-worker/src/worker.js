@@ -155,20 +155,23 @@ function recoverOrphanedRunningJobs() {
     }
 
     try {
+      const currentJob = readJson(path.join(dirs.jobs, `${jobId}.json`));
+      const wasCancelRequested = currentJob?.status === "cancel_requested" || currentJob?.status === "canceled";
+
       updateJob(jobId, {
-        status: "failed",
-        step: "failed",
-        error: failureMessage,
+        status: wasCancelRequested ? "canceled" : "failed",
+        step: wasCancelRequested ? "canceled" : "failed",
+        error: wasCancelRequested ? null : failureMessage,
         finished_at: now(),
       });
-      appendLog(jobId, `job failed: ${failureMessage}`);
+      appendLog(jobId, wasCancelRequested ? "job canceled" : `job failed: ${failureMessage}`);
 
       if (queued.type === "run_step" && queued.payload?.step_id) {
         const clusterId = queued.cluster_id || queued.payload?.cluster_id || queued.payload?.context?.cluster?.id || null;
         const clusterInstanceId = queued.cluster_instance_id || queued.payload?.cluster_instance_id || queued.payload?.context?.cluster?.cluster_instance_id || queued.payload?.context?.cluster?.instance_id || null;
         updateStepState(queued.payload.step_id, {
-          status: "failed",
-          error: failureMessage,
+          status: wasCancelRequested ? "canceled" : "failed",
+          error: wasCancelRequested ? null : failureMessage,
           last_job_id: jobId,
           cluster_id: clusterId,
           cluster_instance_id: clusterInstanceId,
@@ -417,15 +420,31 @@ function runCommand(jobId, command, args, env = {}, redactLine = (line) => Strin
       cancelRequested = true;
       appendLog(jobId, "cancel requested; stopping running process");
       try {
-        process.kill(-child.pid, signal);
-      } catch {
         child.kill(signal);
+      } catch {
+        try {
+          process.kill(child.pid, signal);
+        } catch {
+          try {
+            process.kill(-child.pid, signal);
+          } catch {
+            // Best effort only; the fallback SIGKILL below may still succeed.
+          }
+        }
       }
       killTimer = setTimeout(() => {
         try {
-          process.kill(-child.pid, "SIGKILL");
-        } catch {
           child.kill("SIGKILL");
+        } catch {
+          try {
+            process.kill(child.pid, "SIGKILL");
+          } catch {
+            try {
+              process.kill(-child.pid, "SIGKILL");
+            } catch {
+              // Best effort only; if this fails the worker will still observe the job state.
+            }
+          }
         }
       }, 10000);
     };
