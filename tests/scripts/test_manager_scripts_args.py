@@ -947,7 +947,8 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "cluster-hostnames" in cloudflare_tunnel_run_text
     assert "Rendered cloudflare-tunnel application to" in cloudflare_tunnel_run_text
     assert "helm:" in cloudflare_tunnel_run_text
-    assert "cloudflare:" in cloudflare_tunnel_run_text
+    assert "cloudflare-tunnel-remote" in cloudflare_tunnel_run_text
+    assert "tunnel_token" in cloudflare_tunnel_run_text
     assert "platform-ingress.yaml" in cloudflare_tunnel_run_text
     assert "kubectl delete application cluster-config -n argocd --ignore-not-found=true" in cloudflare_tunnel_run_text
     assert "Zone DNS Edit permissions" in cloudflare_tunnel_run_text

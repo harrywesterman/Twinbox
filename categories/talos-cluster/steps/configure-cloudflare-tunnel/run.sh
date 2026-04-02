@@ -124,17 +124,12 @@ spec:
   project: default
   source:
     repoURL: https://cloudflare.github.io/helm-charts
-    chart: cloudflare-tunnel
-    targetRevision: "0.3.2"
+    chart: cloudflare-tunnel-remote
+    targetRevision: "0.1.2"
     helm:
       values: |
         cloudflare:
-          account: "$cf_account_id"
-          tunnelName: "$tunnel_name"
-          tunnelId: "$cf_tunnel_id"
-          secret: "$cf_tunnel_token"
-          enableWarp: false
-          ingress: []
+          tunnel_token: "$cf_tunnel_token"
 
         replicaCount: 2
 
