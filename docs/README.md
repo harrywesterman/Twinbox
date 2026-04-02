@@ -14,6 +14,7 @@ Operational documentation for Twinbox.
 - `ip-allocation.md` — IP and VMID allocation logic.
 - `garage-s3.md` — embedded Garage S3 storage for Velero.
 - `wiredoor-bastion.md` — Wiredoor bastion host provisioning.
+- `cloudflare-tunnel.md` — Cloudflare Tunnel configuration and token setup.
 - `cloudflare-dns.md` — Cloudflare DNS configuration step.
 - `verification.md` — cluster verification procedures.
 - `troubleshooting.md` — common issues and fixes.

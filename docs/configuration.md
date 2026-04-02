@@ -144,14 +144,15 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 
 ## Dynamic Domain Configuration
 
-Twinbox uses a single domain name (`ZONE_NAME`) for all platform services. The domain is provided by the user during the **Configure Cloudflare DNS** step and flows through the system automatically.
+Twinbox uses a single domain name (`ZONE_NAME`) for all platform services. The domain is provided by the user during the **Choose Ingress Route** step and flows through the system automatically.
 
 ### How it works
 
-1. **User input** — The user enters their domain (e.g. `example.com`) in the web wizard during `configure-cloudflare-dns`.
-2. **OpenBao sync** — The step script syncs `ZONE_NAME`, `WIREDOOR_FQDN`, and `WILDCARD_FQDN` to OpenBao at `twinbox/global/cluster-hostnames`.
+1. **User input** — The user enters their domain (e.g. `example.com`) in the web wizard during `choose-ingress-route`.
+2. **OpenBao sync** — The ingress selection step syncs `ZONE_NAME`, `WIREDOOR_FQDN`, and `WILDCARD_FQDN` to OpenBao at `twinbox/global/cluster-hostnames`.
 3. **ExternalSecret** — The `cluster-config` ExternalSecret reads `ZONE_NAME` from OpenBao and creates a Kubernetes ConfigMap.
 4. **Kustomize replacements** — The `platform-ingress` Argo CD application uses Kustomize to replace `__ZONE_NAME__` placeholders in all IngressRoute `match` rules, the homepage configmap, and the homepage deployment.
+5. **Ingress-specific apps** — Cloudflare Tunnel, Wiredoor, MetalLB, and Tailscale all reuse the same selected domain when they render route-specific configuration.
 
 ### Affected services
 

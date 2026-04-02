@@ -70,22 +70,10 @@ Twinbox is a complete K8s cluster based on Talos Linux, completely configured. T
 
 ## Domain Flow
 
-All platform services share a single domain name (`ZONE_NAME`) provided by the user during the **Configure Cloudflare DNS** wizard step. The domain flows through the system as follows:
+All platform services share a single domain name (`ZONE_NAME`) provided by the user during the **Choose Ingress Route** wizard step. The domain flows through the system as follows:
 
 1. **User input** — The user enters their domain (e.g. `example.com`) in the web wizard.
-2. **Filesystem storage** — `configure-cloudflare-dns/run.sh` writes `ZONE_NAME`, `WIREDOOR_FQDN`, and `WILDCARD_FQDN` to `/opt/twinbox/bootstrap/secrets/global/cloudflare-<cluster-id>.json`.
-3. **OpenBao sync** — The same script calls `sync-openbao-global-secret.sh` to push these values to OpenBao at `twinbox/global/cluster-hostnames`.
-4. **ExternalSecret** — The `cluster-config` ExternalSecret reads `ZONE_NAME` from OpenBao and creates a Kubernetes ConfigMap in the `argocd` namespace.
-5. **Kustomize replacements** — The `platform-ingress` Argo CD application deploys `gitops/platform/` via Kustomize, which replaces `__ZONE_NAME__` placeholders in all IngressRoute `match` rules, the homepage configmap, and the homepage deployment.
-
-The `cluster-config` application must sync before `platform-ingress` so the ConfigMap exists when Kustomize performs replacements.
-
-## Domain Flow
-
-All platform services share a single domain name (`ZONE_NAME`) provided by the user during the **Configure Cloudflare DNS** wizard step. The domain flows through the system as follows:
-
-1. **User input** — The user enters their domain (e.g. `example.com`) in the web wizard.
-2. **Filesystem storage** — `configure-cloudflare-dns/run.sh` writes `ZONE_NAME`, `WIREDOOR_FQDN`, and `WILDCARD_FQDN` to `/opt/twinbox/bootstrap/secrets/global/cloudflare-<cluster-id>.json`.
+2. **Filesystem storage** — `choose-ingress-route/run.sh` writes `ZONE_NAME`, `WIREDOOR_FQDN`, and `WILDCARD_FQDN` to `/opt/twinbox/bootstrap/secrets/global/cloudflare-<cluster-id>.json`.
 3. **OpenBao sync** — The same script calls `sync-openbao-global-secret.sh` to push these values to OpenBao at `twinbox/global/cluster-hostnames`.
 4. **ExternalSecret** — The `cluster-config` ExternalSecret reads `ZONE_NAME` from OpenBao and creates a Kubernetes ConfigMap in the `argocd` namespace.
 5. **Kustomize replacements** — The `platform-ingress` Argo CD application deploys `gitops/platform/` via Kustomize, which replaces `__ZONE_NAME__` placeholders in all IngressRoute `match` rules, the homepage configmap, and the homepage deployment.
