@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: __REPO_URL__
     targetRevision: __TARGET_REVISION__
-    path: gitops/platform/whoami/k8s.yaml
+    path: gitops/platform/whoami
   destination:
     server: https://kubernetes.default.svc
     namespace: default

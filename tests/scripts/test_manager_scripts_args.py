@@ -984,7 +984,8 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "token:" not in wiredoor_gateway_values_text
     assert "kind: Application" in whoami_app_text
     assert "kind: Application" in headlamp_app_text
-    assert "path: gitops/platform/whoami/k8s.yaml" in whoami_app_text
+    assert "path: gitops/platform/whoami" in whoami_app_text
+    assert "path: gitops/platform/whoami/k8s.yaml" not in whoami_app_text
     assert "path: gitops/platform/whoami/k8s.yaml" not in headlamp_app_text
     assert "path: gitops/platform/wiredoor-gateway" not in wiredoor_gateway_app_text
     assert "Host(`whoami.__ZONE_NAME__`)" in whoami_ingressroute_text
