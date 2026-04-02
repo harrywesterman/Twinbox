@@ -283,15 +283,18 @@ export async function refreshWizardSnapshot({
     setSelectedStepId(nextStepId);
   }
 
-  const selectedStep = getWizardSteps(catalogValue).find((step) => step.id === nextStepId);
+  const steps = getWizardSteps(catalogValue);
+  const selectedStep = steps.find((step) => step.id === nextStepId);
+  const activeJobStep = steps.find((step) => step.latest_job && ['pending', 'running', 'cancel_requested'].includes(step.latest_job.status));
+  const activeJob = activeJobStep?.latest_job || null;
   const latestJobId = selectedStep?.latest_job?.id;
-  if (selectedStep?.latest_job && ['pending', 'running', 'cancel_requested'].includes(selectedStep.latest_job.status)) {
+  if (activeJob) {
     setActiveJob?.({
-      id: selectedStep.latest_job.id,
-      stepId: selectedStep.id,
-      clusterId: selectedStep.latest_job.cluster_id || discoveredClusterId || clusterIdRef.current || '',
-      clusterInstanceId: selectedStep.latest_job.cluster_instance_id || discoveredClusterInstanceId || clusterInstanceIdRef.current || '',
-      status: selectedStep.latest_job.status,
+      id: activeJob.id,
+      stepId: activeJobStep.id,
+      clusterId: activeJob.cluster_id || discoveredClusterId || clusterIdRef.current || '',
+      clusterInstanceId: activeJob.cluster_instance_id || discoveredClusterInstanceId || clusterInstanceIdRef.current || '',
+      status: activeJob.status,
     });
   } else if (selectedStep?.latest_job?.status && ['canceled', 'failed', 'succeeded'].includes(selectedStep.latest_job.status)) {
     setActiveJob?.(null);
