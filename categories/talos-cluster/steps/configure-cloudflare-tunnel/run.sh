@@ -66,11 +66,17 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Tunnel ID: $cf_tunnel_id"
 
 # Step 2: Generate tunnel token
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Generating tunnel token"
-token_response="$(curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/${cf_account_id}/cfd_tunnel/${cf_tunnel_id}/token" \
+token_response="$(curl -s -X GET "https://api.cloudflare.com/client/v4/accounts/${cf_account_id}/cfd_tunnel/${cf_tunnel_id}/token" \
   -H "Authorization: Bearer $cf_api_token" \
   -H "Content-Type: application/json")"
 
-cf_tunnel_token="$(echo "$token_response" | jq -r '.result.Token // empty')"
+token_success="$(echo "$token_response" | jq -r '.success // false')"
+if [[ "$token_success" != "true" ]]; then
+  token_error="$(echo "$token_response" | jq -r '.errors[0].message // "Unknown error"')"
+  fail "Could not generate tunnel token: $token_error"
+fi
+
+cf_tunnel_token="$(echo "$token_response" | jq -r '.result // empty')"
 [[ -n "$cf_tunnel_token" ]] || fail "Could not generate tunnel token"
 
 # Step 3: Create DNS CNAME record pointing to the tunnel
