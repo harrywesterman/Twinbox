@@ -150,9 +150,10 @@ Twinbox uses a single domain name (`ZONE_NAME`) for all platform services. The d
 
 1. **User input** — The user enters their domain (e.g. `example.com`) in the web wizard during `choose-ingress-route`.
 2. **OpenBao sync** — The ingress selection step syncs `ZONE_NAME`, `WIREDOOR_FQDN`, and `WILDCARD_FQDN` to OpenBao at `twinbox/global/cluster-hostnames`.
-3. **ExternalSecret** — The `cluster-config` ExternalSecret reads `ZONE_NAME` from OpenBao and creates a Kubernetes ConfigMap.
-4. **Kustomize replacements** — The `platform-ingress` Argo CD application uses Kustomize to replace `__ZONE_NAME__` placeholders in all IngressRoute `match` rules, the homepage configmap, and the homepage deployment.
-5. **Ingress-specific apps** — Cloudflare Tunnel, Wiredoor, MetalLB, and Tailscale all reuse the same selected domain when they render route-specific configuration.
+3. **ExternalSecret** — The `cluster-config` ExternalSecret reads `ZONE_NAME` from OpenBao and creates a Kubernetes Secret in the `argocd` namespace.
+4. **Rendered ConfigMap** — The ingress/domain step renders `gitops/platform/cluster-config/configmap.yaml` with the selected domain so Kustomize can use it as a plain-text replacement source.
+5. **Kustomize replacements** — The `platform-ingress` Argo CD application uses Kustomize to replace `__ZONE_NAME__` placeholders in all IngressRoute `match` rules, the homepage configmap, and the homepage deployment.
+6. **Ingress-specific apps** — Cloudflare Tunnel, Wiredoor, MetalLB, and Tailscale all reuse the same selected domain when they render route-specific configuration.
 
 ### Affected services
 
@@ -174,7 +175,7 @@ All platform services use the domain through the `__ZONE_NAME__` placeholder:
 gitops/platform/
 ├── kustomization.yaml          # Central Kustomize config with replacements
 ├── cluster-config/
-│   ├── configmap.yaml          # ConfigMap target (populated by ExternalSecret)
+│   ├── configmap.yaml          # Rendered plain-text source for Kustomize replacements
 │   └── externalsecret.yaml     # Reads ZONE_NAME from OpenBao
 ├── authentik/ingressroute.yaml # Host(`authentik.__ZONE_NAME__`)
 ├── whoami/
@@ -198,7 +199,7 @@ gitops/platform/
 
 ### Argo CD application order
 
-The `cluster-config` application must sync before `platform-ingress` so that the ConfigMap exists when Kustomize performs replacements. Add `depends_on` in the wizard journey:
+The `cluster-config` application must sync before `platform-ingress` so that the rendered ConfigMap exists when Kustomize performs replacements. Add `depends_on` in the wizard journey:
 
 ```
 cluster-config → platform-ingress

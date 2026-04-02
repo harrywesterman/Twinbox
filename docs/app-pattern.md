@@ -36,7 +36,7 @@ Twinbox supports four ingress strategies, chosen by the user during setup:
 
 **Tailscale** — The cluster joins a Tailscale tailnet. Users connect by enabling Tailscale on their device. No port forwarding, no external VM, no public DNS needed. Access control via Tailscale ACLs. Can be self-hosted with Headscale for full control.
 
-All strategies use the same IngressRoute structure — only the `entryPoints` and `tls` fields differ. Domain names use the `__ZONE_NAME__` placeholder which is replaced by Kustomize with the actual domain name from the cluster-config ConfigMap.
+All strategies use the same IngressRoute structure — only the `entryPoints` and `tls` fields differ. Domain names use the `__ZONE_NAME__` placeholder which is replaced by Kustomize with the actual domain name from the rendered `cluster-config` ConfigMap.
 
 ### CloudNativePG — PostgreSQL
 

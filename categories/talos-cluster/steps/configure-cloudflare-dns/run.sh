@@ -119,6 +119,9 @@ EOF
 
 chmod 600 "$secrets_dir/cloudflare-${cluster_id}.json"
 
+bash "$WORKSPACE_ROOT/scripts/manager/render-cluster-config-map.sh" \
+  --zone-name "$public_zone_name"
+
 # Sync hostnames to OpenBao so all platform apps can read ZONE_NAME
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "cluster-hostnames" \

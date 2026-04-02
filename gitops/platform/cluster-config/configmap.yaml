@@ -4,4 +4,4 @@ metadata:
   name: cluster-config
   namespace: argocd
 data:
-  ZONE_NAME: ""
+  ZONE_NAME: "bierineenweek.nl"

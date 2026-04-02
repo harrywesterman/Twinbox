@@ -6,6 +6,9 @@ set -euo pipefail
 : "${MANAGER_DATA_DIR:?missing MANAGER_DATA_DIR}"
 : "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"
 
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
+source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
+
 export KUBECONFIG="$KUBECONFIG_FILE"
 
 fail() {
@@ -17,8 +20,17 @@ fail() {
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
+cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty')"
 
 [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
+
+if [[ -n "$cluster_dns_domain" ]]; then
+  public_zone_name="$(twinbox_public_zone_name "$cluster_id" "$cluster_dns_domain")"
+  if [[ -n "$public_zone_name" ]]; then
+    bash "$WORKSPACE_ROOT/scripts/manager/render-cluster-config-map.sh" \
+      --zone-name "$public_zone_name"
+  fi
+fi
 
 # Parse inputs
 wiredoor_url="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.wiredoor_url')"

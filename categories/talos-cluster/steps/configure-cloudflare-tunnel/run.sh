@@ -258,6 +258,9 @@ cat > "$cluster_hosts_secret" <<EOF
 EOF
 chmod 600 "$cluster_hosts_secret"
 
+bash "$WORKSPACE_ROOT/scripts/manager/render-cluster-config-map.sh" \
+  --zone-name "$public_zone_name"
+
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Syncing cluster hostnames to OpenBao"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "cluster-hostnames" \
