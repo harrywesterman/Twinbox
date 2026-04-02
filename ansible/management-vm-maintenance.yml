@@ -14,9 +14,11 @@
       - python3-apt
 
     twinbox_ssh_dropin: /etc/ssh/sshd_config.d/99-twinbox-management.conf
+    twinbox_timesyncd_dropin: /etc/systemd/timesyncd.conf.d/99-twinbox.conf
     twinbox_apt_periodic: /etc/apt/apt.conf.d/20auto-upgrades
     twinbox_unattended_upgrades: /etc/apt/apt.conf.d/52-twinbox-unattended-upgrades
     twinbox_fail2ban_jail: /etc/fail2ban/jail.d/twinbox-sshd.local
+    twinbox_time_server: "{{ lookup('env', 'TWINBOX_TIME_SERVER') | default('time.cloudflare.com', true) }}"
 
   tasks:
     - name: Refresh apt package metadata and patch installed packages
@@ -72,6 +74,18 @@
           AllowAgentForwarding yes
       notify: Restart ssh
 
+    - name: Configure management VM time synchronization
+      ansible.builtin.copy:
+        dest: "{{ twinbox_timesyncd_dropin }}"
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Time]
+          NTP={{ twinbox_time_server }}
+          FallbackNTP=
+      notify: Restart timesyncd
+
     - name: Configure fail2ban for SSH
       ansible.builtin.copy:
         dest: "{{ twinbox_fail2ban_jail }}"
@@ -113,6 +127,12 @@
         enabled: true
         state: started
 
+    - name: Enable and start systemd-timesyncd
+      ansible.builtin.service:
+        name: systemd-timesyncd
+        enabled: true
+        state: started
+
   handlers:
     - name: Restart ssh
       ansible.builtin.service:
@@ -122,4 +142,9 @@
     - name: Restart fail2ban
       ansible.builtin.service:
         name: fail2ban
+        state: restarted
+
+    - name: Restart timesyncd
+      ansible.builtin.service:
+        name: systemd-timesyncd
         state: restarted

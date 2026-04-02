@@ -3,8 +3,8 @@ title: Configure Management VM maintenance
 type: config
 journey_stage: manage
 order: 10
-summary: Keep the Ubuntu Management VM patched and hardened on a nightly schedule.
-explanation: Save the host maintenance schedule and apply a managed cron entry on the Management VM host. The job patches Ubuntu, applies baseline hardening, and keeps SSH password authentication enabled.
+summary: Keep the Ubuntu Management VM patched, hardened, and time-synced on a nightly schedule.
+explanation: Save the host maintenance schedule and apply a managed cron entry on the Management VM host. The job patches Ubuntu, applies baseline hardening, keeps SSH password authentication enabled, and pins system time to the configured NTP server.
 side_help: Twinbox writes one guarded cron file for this step and can remove it again when the setting is disabled. It does not update the Twinbox checkout.
 depends_on: []
 inputs:

@@ -18,6 +18,7 @@ TWINBOX_HOST_REPO_ROOT=/opt/twinbox
 TWINBOX_SECRET_BACKEND=filesystem
 TWINBOX_BOOTSTRAP_DIR=/opt/twinbox/bootstrap
 TWINBOX_SECRET_ITEM_PREFIX=twinbox
+TWINBOX_TIME_SERVER=time.cloudflare.com
 MANAGEMENT_VM_IP=192.168.1.50
 TWINBOX_SECRET_TEMP_DIR=/tmp/twinbox-secrets
 TWINBOX_SECRET_CACHE_TTL_SEC=60
@@ -127,7 +128,8 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 
 - `provision-nodes` bootstraps Talos and writes the Talos runtime artifacts for a cluster.
 - `provision-nodes` renders the Talos-owned Cilium bootstrap manifest and injects it into the control-plane machine configs.
-- `provision-nodes` configures Talos for kube-proxy-free Cilium with `cni: none`, `proxy.disabled: true`, KubePrism, and the host DNS workaround.
+- `provision-nodes` configures Talos for kube-proxy-free Cilium with `cni: none`, `proxy.disabled: true`, KubePrism, the host DNS workaround, and an explicit `machine.time.servers` entry.
+- Management VM bootstrap and maintenance use `TWINBOX_TIME_SERVER` to pin Ubuntu's `systemd-timesyncd` to the same timeserver.
 - `install-argocd` installs Argo CD after the cluster networking layer is already available.
 - `install-longhorn-storage` installs Longhorn, makes it the default storage class, and runs before any stateful secret infrastructure.
 - `install-secret-sync` installs:

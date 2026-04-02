@@ -14,13 +14,14 @@ Talos lifecycle operations are triggered through the manager stack.
 8. Talos access files are stored as cluster-scoped bootstrap artifacts under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/`.
 9. `provision-nodes` renders the pinned Cilium Helm chart and stores it under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/cilium/cilium-bootstrap.yaml`.
 10. `provision-nodes` injects the rendered Cilium manifest into the control-plane Talos machine configs as inline manifests, while leaving worker configs CNI-free.
-11. `provision-nodes` also sets `cluster.network.cni.name: none`, `cluster.proxy.disabled: true`, `machine.features.kubePrism.enabled: true`, `machine.features.kubePrism.port: 7445`, and `machine.features.hostDNS.forwardKubeDNSToHost: false`.
-12. The worker waits for `cilium`, `cilium-operator`, and `coredns` to become healthy and verifies that `kube-proxy` is not deployed.
-13. `install-argocd` installs Argo CD after the cluster networking layer is already available.
-14. `install-longhorn-storage` applies the Longhorn Argo CD application, makes `StorageClass/longhorn` the default, and waits for it to be ready.
-15. `install-secret-sync` installs External Secrets Operator and OpenBao, seeds OpenBao from management-local bootstrap JSON, and creates `Secret/proxmox-bootstrap`.
-16. `install-velero-backup` deploys Velero, a Twinbox-managed Garage bucket or an external S3-compatible target, and the default backup storage location used for cluster backups.
-17. Later wizard steps apply one Argo CD `Application` at a time for Traefik and the remaining workloads.
+11. `provision-nodes` also sets `cluster.network.cni.name: none`, `cluster.proxy.disabled: true`, `machine.features.kubePrism.enabled: true`, `machine.features.kubePrism.port: 7445`, `machine.features.hostDNS.forwardKubeDNSToHost: false`, and `machine.time.servers: [TWINBOX_TIME_SERVER]`.
+12. The management VM bootstrap and maintenance flow pin Ubuntu's `systemd-timesyncd` to the same `TWINBOX_TIME_SERVER` value.
+13. The worker waits for `cilium`, `cilium-operator`, and `coredns` to become healthy and verifies that `kube-proxy` is not deployed.
+14. `install-argocd` installs Argo CD after the cluster networking layer is already available.
+15. `install-longhorn-storage` applies the Longhorn Argo CD application, makes `StorageClass/longhorn` the default, and waits for it to be ready.
+16. `install-secret-sync` installs External Secrets Operator and OpenBao, seeds OpenBao from management-local bootstrap JSON, and creates `Secret/proxmox-bootstrap`.
+17. `install-velero-backup` deploys Velero, a Twinbox-managed Garage bucket or an external S3-compatible target, and the default backup storage location used for cluster backups.
+18. Later wizard steps apply one Argo CD `Application` at a time for Traefik and the remaining workloads.
 
 ## Runtime Dependencies
 

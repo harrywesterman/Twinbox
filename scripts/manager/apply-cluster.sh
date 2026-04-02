@@ -770,6 +770,7 @@ write_node_patch() {
   local patch_file="$4"
   local nameserver_block=""
   local search_domain_block=""
+  local time_server="${TWINBOX_TIME_SERVER:-time.cloudflare.com}"
 
   if [[ -n "${DNS_SERVERS:-}" ]]; then
     IFS=',' read -r -a dns_servers_array <<< "$DNS_SERVERS"
@@ -804,6 +805,9 @@ write_node_patch() {
       echo "  install:"
       echo "    image: ${image_installer}"
     fi
+    echo "  time:"
+    echo "    servers:"
+    echo "      - ${time_server}"
     echo "  features:"
     echo "    kubePrism:"
     echo "      enabled: true"

@@ -20,10 +20,32 @@ append_secret_env_block() {
 TWINBOX_SECRET_BACKEND=filesystem
 MANAGEMENT_VM_IP=${management_ip}
 TWINBOX_SECRET_ITEM_PREFIX=twinbox
+TWINBOX_TIME_SERVER=time.cloudflare.com
 TWINBOX_BOOTSTRAP_DIR=/opt/twinbox/bootstrap
 TWINBOX_SECRET_TEMP_DIR=/tmp/twinbox-secrets
 TWINBOX_SECRET_CACHE_TTL_SEC=60
 EOF
+}
+
+ensure_time_server_env() {
+  if ! grep -q '^TWINBOX_TIME_SERVER=' .env; then
+    printf '\nTWINBOX_TIME_SERVER=%s\n' "${TWINBOX_TIME_SERVER:-time.cloudflare.com}" >> .env
+  fi
+}
+
+configure_management_time_sync() {
+  local time_server="${TWINBOX_TIME_SERVER:-time.cloudflare.com}"
+  local timesyncd_dropin="/etc/systemd/timesyncd.conf.d/99-twinbox.conf"
+
+  log "Configuring management VM time synchronization"
+  sudo install -d -m 0755 "$(dirname "$timesyncd_dropin")"
+  sudo tee "$timesyncd_dropin" >/dev/null <<EOF
+[Time]
+NTP=${time_server}
+FallbackNTP=
+EOF
+  sudo systemctl enable --now systemd-timesyncd.service
+  sudo systemctl restart systemd-timesyncd.service
 }
 
 ensure_bootstrap_material() {
@@ -153,11 +175,13 @@ else
 fi
 
 append_secret_env_block
+ensure_time_server_env
 set -a
 # shellcheck disable=SC1091
 source .env
 set +a
 ensure_bootstrap_material
+configure_management_time_sync
 
 log "Starting development stack"
 docker compose up -d --build

@@ -12,6 +12,13 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exec sudo -E "$0" "$@"
 fi
 
+if [[ -f "${REPO_ROOT}/.env" ]]; then
+  # shellcheck disable=SC1091
+  set -a
+  source "${REPO_ROOT}/.env"
+  set +a
+fi
+
 missing_packages=()
 
 if ! command -v ansible-playbook >/dev/null 2>&1; then

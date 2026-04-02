@@ -35,12 +35,12 @@ scripts/
 
 | Script | Purpose |
 |--------|---------|
-| `bootstrap-vm.sh` | First-run script for the Management VM: clones Twinbox, installs Docker CE, creates `.env`, starts `docker compose`. |
+| `bootstrap-vm.sh` | First-run script for the Management VM: clones Twinbox, installs Docker CE, configures time sync, creates `.env`, starts `docker compose`. |
 | `install-management-vm-maintenance.sh` | Installs and enables the systemd timer that runs the Management VM maintenance playbook. |
 | `start-manager.sh` | Loads `.env` and starts the manager stack via `docker compose`. |
 | `get-talos-image-factory.sh` | Queries the Talos Image Factory for a schematic ID, download URL, or shell command. Supports `--preset`, `--version`, `--arch`, `--platform`, `--output`. |
 | `install-management-tools.sh` | Installs `talosctl`, `tofu`, `kubectl`, and `helm` with versions pinned from `config/pinned-defaults.sh`. |
-| `management-vm-maintenance.sh` | Installs `ansible-core` if needed and runs the Management VM maintenance playbook locally. |
+| `management-vm-maintenance.sh` | Installs `ansible-core` if needed and runs the Management VM maintenance playbook locally. The playbook also keeps the VM on the pinned NTP server. |
 | `manager-web-preview.sh` | Dev helper for previewing `manager-web`. |
 | `wizard-dev-run.sh` | Dev helper for running the setup wizard locally. |
 

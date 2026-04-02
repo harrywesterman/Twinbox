@@ -7,6 +7,7 @@ set -euo pipefail
 
 GITHUB_REPO="harrywesterman/twinbox"
 BACKTITLE="Twinbox"
+TWINBOX_TIME_SERVER="${TWINBOX_TIME_SERVER:-time.cloudflare.com}"
 
 RD="\033[01;31m"
 YW="\033[33m"
@@ -1276,6 +1277,7 @@ write_files:
       TWINBOX_SECRET_ITEM_PREFIX=twinbox
       TWINBOX_SECRET_TEMP_DIR=/tmp/twinbox-secrets
       TWINBOX_SECRET_CACHE_TTL_SEC=60
+      TWINBOX_TIME_SERVER=${TWINBOX_TIME_SERVER}
       PROXMOX_HOST=${PROXMOX_HOST}
       PROXMOX_PORT=${PROXMOX_PORT}
       PROXMOX_USER=${PROXMOX_USER}
@@ -1286,9 +1288,18 @@ write_files:
       TWINBOX_IMAGE_TAG=${TWINBOX_IMAGE_TAG}
       TWINBOX_HOST_REPO_ROOT=${TWINBOX_TARGET_DIR}
       MANAGEMENT_VM_ID=${MGT_ID}
+  - path: /etc/systemd/timesyncd.conf.d/99-twinbox.conf
+    permissions: '0644'
+    owner: root:root
+    content: |
+      [Time]
+      NTP=${TWINBOX_TIME_SERVER}
+      FallbackNTP=
 runcmd:
   - install -m 0755 -d /etc/apt/keyrings
+  - install -m 0755 -d /etc/systemd/timesyncd.conf.d
   - systemctl enable --now qemu-guest-agent
+  - systemctl enable --now systemd-timesyncd.service
   - bash -lc 'apt-get remove -y docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc || true'
   - bash -lc 'curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc'
   - chmod a+r /etc/apt/keyrings/docker.asc
@@ -1297,6 +1308,7 @@ runcmd:
   - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   - bash -lc 'docker --version'
   - bash -lc 'docker compose version'
+  - systemctl restart systemd-timesyncd.service
   - rm -rf ${TWINBOX_TARGET_DIR}
   - install -d -m 0755 ${TWINBOX_TARGET_DIR}
   - chown ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}

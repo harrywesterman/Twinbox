@@ -12,6 +12,7 @@ Main provisioning entry point. Creates Talos VMs on Proxmox using OpenTofu.
 - Downloads the pinned Talos ISO and uploads it to Proxmox storage
 - Renders VM configuration from the cluster JSON
 - Renders the pinned Cilium Helm chart and injects it into Talos control-plane inline manifests
+- Adds an explicit `machine.time.servers` entry to the generated Talos machine configs
 - Stores the Cilium bootstrap manifest under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/cilium/cilium-bootstrap.yaml`
 - Runs `tofu init` and `tofu apply`
 - Discovers DHCP addresses for created VMs
@@ -105,3 +106,4 @@ All scripts expect:
 | `MANAGER_DATA_DIR` | Root of the `manager-data/` tree |
 | `WORKSPACE_ROOT` | Path to the Twinbox checkout (`/opt/twinbox`) |
 | `TWINBOX_BOOTSTRAP_DIR` | Root of the bootstrap secrets tree |
+| `TWINBOX_TIME_SERVER` | NTP server pinned by the management VM and Talos configs |

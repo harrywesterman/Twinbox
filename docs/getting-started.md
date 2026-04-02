@@ -15,6 +15,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/harrywesterman/twinbox/main/
 ```
 
 The wizard creates the Management VM, installs Docker CE, clones Twinbox into `/opt/twinbox`, writes `.env`, and starts the manager stack.
+The generated VM and the later Talos cluster both use the same `TWINBOX_TIME_SERVER` value for NTP.
 
 ## Step 2: Verify bootstrap material on the Management VM
 

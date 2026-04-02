@@ -42,6 +42,32 @@ Expected:
 - `manager-web`, `manager-api`, and `manager-worker` are running
 - API health returns success
 
+## Time sync checks
+
+### Management VM
+
+```bash
+timedatectl timesync-status
+systemctl status systemd-timesyncd --no-pager
+```
+
+Expected:
+
+- `systemd-timesyncd` is active
+- the configured NTP server matches `TWINBOX_TIME_SERVER`
+
+### Talos cluster
+
+```bash
+talosctl get timeservers
+talosctl get timestatus
+```
+
+Expected:
+
+- each node reports the pinned timeserver in `timeservers`
+- each node reports `SYNCED=true` once the cluster is up
+
 ## Bootstrap tree
 
 ```bash
