@@ -1,19 +1,19 @@
 id: configure-automatic-updates
-title: Configure automatic updates
+title: Configure Management VM maintenance
 type: config
 journey_stage: manage
 order: 10
-summary: Configure the Management VM to refresh the Twinbox checkout each night.
-explanation: Save the nightly update policy and apply a managed cron entry on the Management VM host.
-side_help: Twinbox writes one guarded cron file for this step and can remove it again when the setting is disabled.
+summary: Keep the Ubuntu Management VM patched and hardened on a nightly schedule.
+explanation: Save the host maintenance schedule and apply a managed cron entry on the Management VM host. The job patches Ubuntu, applies baseline hardening, and keeps SSH password authentication enabled.
+side_help: Twinbox writes one guarded cron file for this step and can remove it again when the setting is disabled. It does not update the Twinbox checkout.
 depends_on: []
 inputs:
   - id: enabled
-    label: Enable nightly updates
+    label: Enable nightly maintenance
     type: boolean
     required: true
     default: true
-    help: Keep the Management VM synced to the latest Twinbox checkout each day.
+    help: Run the Management VM maintenance job each day.
   - id: schedule_hour
     label: Hour
     type: integer
@@ -21,7 +21,7 @@ inputs:
     min: 0
     max: 23
     default: 3
-    help: 24-hour clock hour for the nightly update.
+    help: 24-hour clock hour for the nightly maintenance job.
   - id: schedule_minute
     label: Minute
     type: integer

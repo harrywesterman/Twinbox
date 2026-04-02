@@ -1,0 +1,125 @@
+- name: Maintain the Twinbox Management VM
+  hosts: localhost
+  connection: local
+  become: true
+  gather_facts: true
+
+  vars:
+    twinbox_mgmt_packages:
+      - ansible-core
+      - fail2ban
+      - openssh-server
+      - unattended-upgrades
+      - ufw
+      - python3-apt
+
+    twinbox_ssh_dropin: /etc/ssh/sshd_config.d/99-twinbox-management.conf
+    twinbox_apt_periodic: /etc/apt/apt.conf.d/20auto-upgrades
+    twinbox_unattended_upgrades: /etc/apt/apt.conf.d/52-twinbox-unattended-upgrades
+    twinbox_fail2ban_jail: /etc/fail2ban/jail.d/twinbox-sshd.local
+
+  tasks:
+    - name: Refresh apt package metadata and patch installed packages
+      ansible.builtin.apt:
+        update_cache: true
+        upgrade: safe
+        lock_timeout: 300
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+
+    - name: Ensure management host packages are present
+      ansible.builtin.apt:
+        name: "{{ twinbox_mgmt_packages }}"
+        state: present
+        lock_timeout: 300
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+
+    - name: Configure periodic apt updates
+      ansible.builtin.copy:
+        dest: "{{ twinbox_apt_periodic }}"
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          APT::Periodic::Update-Package-Lists "1";
+          APT::Periodic::Unattended-Upgrade "1";
+          APT::Periodic::AutocleanInterval "7";
+
+    - name: Configure unattended upgrades
+      ansible.builtin.copy:
+        dest: "{{ twinbox_unattended_upgrades }}"
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          Unattended-Upgrade::Remove-Unused-Dependencies "true";
+          Unattended-Upgrade::Automatic-Reboot "false";
+          Unattended-Upgrade::Automatic-Reboot-WithUsers "false";
+          Unattended-Upgrade::Automatic-Reboot-Time "02:30";
+
+    - name: Keep SSH password authentication enabled
+      ansible.builtin.copy:
+        dest: "{{ twinbox_ssh_dropin }}"
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          PasswordAuthentication yes
+          KbdInteractiveAuthentication yes
+          PubkeyAuthentication yes
+          X11Forwarding no
+          AllowAgentForwarding yes
+      notify: Restart ssh
+
+    - name: Configure fail2ban for SSH
+      ansible.builtin.copy:
+        dest: "{{ twinbox_fail2ban_jail }}"
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [sshd]
+          enabled = true
+          backend = systemd
+          mode = aggressive
+          maxretry = 5
+          findtime = 10m
+          bantime = 1h
+      notify: Restart fail2ban
+
+    - name: Set UFW defaults and allow management ports
+      ansible.builtin.shell: |
+        set -euo pipefail
+        ufw default deny incoming
+        ufw default allow outgoing
+        ufw allow 22/tcp
+        ufw allow 3000/tcp
+        ufw allow 8080/tcp
+        ufw --force enable
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Enable and start fail2ban
+      ansible.builtin.service:
+        name: fail2ban
+        enabled: true
+        state: started
+
+    - name: Enable and start SSH
+      ansible.builtin.service:
+        name: ssh
+        enabled: true
+        state: started
+
+  handlers:
+    - name: Restart ssh
+      ansible.builtin.service:
+        name: ssh
+        state: restarted
+
+    - name: Restart fail2ban
+      ansible.builtin.service:
+        name: fail2ban
+        state: restarted

@@ -1,0 +1,13 @@
+[Unit]
+Description=Run Twinbox Management VM maintenance daily
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=1d
+RandomizedDelaySec=45min
+Persistent=true
+Unit=twinbox-management-maintenance.service
+
+[Install]
+WantedBy=timers.target
+

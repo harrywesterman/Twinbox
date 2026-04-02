@@ -3,7 +3,6 @@ set -euo pipefail
 
 : "${STEP_INPUTS_JSON:?missing STEP_INPUTS_JSON}"
 : "${TWINBOX_HOST_CRON_DIR:?missing TWINBOX_HOST_CRON_DIR}"
-: "${TWINBOX_HOST_REPO_ROOT:?missing TWINBOX_HOST_REPO_ROOT}"
 
 cron_file="${TWINBOX_HOST_CRON_DIR}/twinbox-management-updates"
 enabled="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.enabled')"
@@ -13,12 +12,11 @@ minute="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.schedule_minute')"
 mkdir -p "$TWINBOX_HOST_CRON_DIR"
 
 if [[ "$enabled" == "true" ]]; then
-  quoted_repo_root="$(printf '%q' "$TWINBOX_HOST_REPO_ROOT")"
   quoted_cron_file="$(printf '%q' "$cron_file")"
   cat >"$cron_file" <<EOF
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-${minute} ${hour} * * * root cd ${quoted_repo_root} && git fetch --all --prune && git pull --ff-only origin main && docker compose pull && docker compose up -d >> ${quoted_cron_file}.log 2>&1
+${minute} ${hour} * * * root cd /opt/twinbox && /bin/bash scripts/management-vm-maintenance.sh >> ${quoted_cron_file}.log 2>&1
 EOF
   chmod 0644 "$cron_file"
 else

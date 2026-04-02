@@ -56,7 +56,7 @@ Each step directory contains a `step.yaml` manifest and a runner script.
 
 Steps for configuring the Management VM itself.
 
-- `configure-automatic-updates` – Nightly Twinbox checkout sync via cron.
+- `configure-automatic-updates` – Nightly Ubuntu patching and hardening via cron.
 - `install-k9s` – Install the K9s terminal UI.
 
 ### talos-cluster (order: 20)
