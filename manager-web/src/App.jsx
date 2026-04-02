@@ -1433,11 +1433,11 @@ function App() {
         </div>
       </header>
 
-      {(notice || error) && (
-      <section className={`wizard-banner ${error ? 'is-error' : 'is-notice'}`} aria-live="polite">
+      {(notice || error || activeJob?.id) && (
+      <section className={`wizard-banner ${error ? 'is-error' : activeJob?.id ? 'is-notice' : 'is-notice'}`} aria-live="polite">
         <div>
-          <strong>{error ? 'Something needs attention' : 'Status update'}</strong>
-          <p>{error || notice}</p>
+          <strong>{error ? 'Something needs attention' : activeJob?.id ? 'Job in progress' : 'Status update'}</strong>
+          <p>{error || notice || `Job ${activeJob.id} is ${activeJob.status.replace(/_/g, ' ')}`}</p>
         </div>
         <div className="wizard-banner-actions">
           {activeJob?.id && ['pending', 'running', 'cancel_requested'].includes(activeJob.status) ? (
