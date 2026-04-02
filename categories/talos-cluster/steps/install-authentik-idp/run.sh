@@ -32,16 +32,26 @@ authentik_secret_key=""
 authentik_bootstrap_password=""
 authentik_bootstrap_token=""
 authentik_bootstrap_email=""
-authentik_postgresql_username=""
+authentik_postgresql_host=""
+authentik_postgresql_port=""
+authentik_postgresql_name=""
+authentik_postgresql_user=""
 authentik_postgresql_password=""
+authentik_postgresql_disable_server_side_cursors=""
+authentik_postgresql_conn_max_age=""
 
 if [[ -f "$authentik_secret_file" ]]; then
   authentik_secret_key="$(jq -r '."AUTHENTIK_SECRET_KEY" // empty' "$authentik_secret_file")"
   authentik_bootstrap_password="$(jq -r '."AUTHENTIK_BOOTSTRAP_PASSWORD" // empty' "$authentik_secret_file")"
   authentik_bootstrap_token="$(jq -r '."AUTHENTIK_BOOTSTRAP_TOKEN" // empty' "$authentik_secret_file")"
   authentik_bootstrap_email="$(jq -r '."AUTHENTIK_BOOTSTRAP_EMAIL" // empty' "$authentik_secret_file")"
-  authentik_postgresql_username="$(jq -r '."AUTHENTIK_POSTGRESQL__USERNAME" // empty' "$authentik_secret_file")"
+  authentik_postgresql_host="$(jq -r '."AUTHENTIK_POSTGRESQL__HOST" // empty' "$authentik_secret_file")"
+  authentik_postgresql_port="$(jq -r '."AUTHENTIK_POSTGRESQL__PORT" // empty' "$authentik_secret_file")"
+  authentik_postgresql_name="$(jq -r '."AUTHENTIK_POSTGRESQL__NAME" // empty' "$authentik_secret_file")"
+  authentik_postgresql_user="$(jq -r '."AUTHENTIK_POSTGRESQL__USER" // ."AUTHENTIK_POSTGRESQL__USERNAME" // empty' "$authentik_secret_file")"
   authentik_postgresql_password="$(jq -r '."AUTHENTIK_POSTGRESQL__PASSWORD" // empty' "$authentik_secret_file")"
+  authentik_postgresql_disable_server_side_cursors="$(jq -r '."AUTHENTIK_POSTGRESQL__DISABLE_SERVER_SIDE_CURSORS" // empty' "$authentik_secret_file")"
+  authentik_postgresql_conn_max_age="$(jq -r '."AUTHENTIK_POSTGRESQL__CONN_MAX_AGE" // empty' "$authentik_secret_file")"
 fi
 
 if [[ -z "$authentik_secret_key" ]]; then
@@ -60,12 +70,32 @@ if [[ -z "$authentik_bootstrap_email" ]]; then
   authentik_bootstrap_email="akadmin@twinbox.local"
 fi
 
-if [[ -z "$authentik_postgresql_username" ]]; then
-  authentik_postgresql_username="authentik"
+if [[ -z "$authentik_postgresql_host" ]]; then
+  authentik_postgresql_host="authentik-db-pooler-rw.databases.svc.cluster.local"
+fi
+
+if [[ -z "$authentik_postgresql_port" ]]; then
+  authentik_postgresql_port="5432"
+fi
+
+if [[ -z "$authentik_postgresql_name" ]]; then
+  authentik_postgresql_name="authentik"
+fi
+
+if [[ -z "$authentik_postgresql_user" ]]; then
+  authentik_postgresql_user="authentik"
 fi
 
 if [[ -z "$authentik_postgresql_password" ]]; then
   authentik_postgresql_password="$(openssl rand -hex 16)"
+fi
+
+if [[ -z "$authentik_postgresql_disable_server_side_cursors" ]]; then
+  authentik_postgresql_disable_server_side_cursors="true"
+fi
+
+if [[ -z "$authentik_postgresql_conn_max_age" ]]; then
+  authentik_postgresql_conn_max_age="0"
 fi
 
 if [[ -z "$authentik_host" ]]; then
@@ -79,8 +109,13 @@ jq -n \
   --arg authentik_bootstrap_token "$authentik_bootstrap_token" \
   --arg authentik_bootstrap_email "$authentik_bootstrap_email" \
   --arg authentik_host "$authentik_host" \
-  --arg authentik_postgresql_username "$authentik_postgresql_username" \
+  --arg authentik_postgresql_host "$authentik_postgresql_host" \
+  --arg authentik_postgresql_port "$authentik_postgresql_port" \
+  --arg authentik_postgresql_name "$authentik_postgresql_name" \
+  --arg authentik_postgresql_user "$authentik_postgresql_user" \
   --arg authentik_postgresql_password "$authentik_postgresql_password" \
+  --arg authentik_postgresql_disable_server_side_cursors "$authentik_postgresql_disable_server_side_cursors" \
+  --arg authentik_postgresql_conn_max_age "$authentik_postgresql_conn_max_age" \
   '{
     "AUTHENTIK_SECRET_KEY": $authentik_secret_key,
     "AUTHENTIK_BOOTSTRAP_PASSWORD": $authentik_bootstrap_password,
@@ -88,8 +123,14 @@ jq -n \
     "AUTHENTIK_BOOTSTRAP_EMAIL": $authentik_bootstrap_email,
     "AUTHENTIK_HOST": $authentik_host,
     "AUTHENTIK_HOST_BROWSER": $authentik_host,
-    "AUTHENTIK_POSTGRESQL__USERNAME": $authentik_postgresql_username,
-    "AUTHENTIK_POSTGRESQL__PASSWORD": $authentik_postgresql_password
+    "AUTHENTIK_POSTGRESQL__HOST": $authentik_postgresql_host,
+    "AUTHENTIK_POSTGRESQL__PORT": $authentik_postgresql_port,
+    "AUTHENTIK_POSTGRESQL__NAME": $authentik_postgresql_name,
+    "AUTHENTIK_POSTGRESQL__USER": $authentik_postgresql_user,
+    "AUTHENTIK_POSTGRESQL__USERNAME": $authentik_postgresql_user,
+    "AUTHENTIK_POSTGRESQL__PASSWORD": $authentik_postgresql_password,
+    "AUTHENTIK_POSTGRESQL__DISABLE_SERVER_SIDE_CURSORS": $authentik_postgresql_disable_server_side_cursors,
+    "AUTHENTIK_POSTGRESQL__CONN_MAX_AGE": $authentik_postgresql_conn_max_age
   }' >"$tmp_file"
 install -m 600 "$tmp_file" "$authentik_secret_file"
 rm -f "$tmp_file"
@@ -97,7 +138,7 @@ rm -f "$tmp_file"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "authentik" \
   --json-file "$authentik_secret_file" \
-  --required-keys "AUTHENTIK_SECRET_KEY,AUTHENTIK_BOOTSTRAP_PASSWORD,AUTHENTIK_BOOTSTRAP_TOKEN,AUTHENTIK_BOOTSTRAP_EMAIL,AUTHENTIK_HOST,AUTHENTIK_HOST_BROWSER,AUTHENTIK_POSTGRESQL__USERNAME,AUTHENTIK_POSTGRESQL__PASSWORD"
+  --required-keys "AUTHENTIK_SECRET_KEY,AUTHENTIK_BOOTSTRAP_PASSWORD,AUTHENTIK_BOOTSTRAP_TOKEN,AUTHENTIK_BOOTSTRAP_EMAIL,AUTHENTIK_HOST,AUTHENTIK_HOST_BROWSER,AUTHENTIK_POSTGRESQL__HOST,AUTHENTIK_POSTGRESQL__PORT,AUTHENTIK_POSTGRESQL__NAME,AUTHENTIK_POSTGRESQL__USER,AUTHENTIK_POSTGRESQL__USERNAME,AUTHENTIK_POSTGRESQL__PASSWORD,AUTHENTIK_POSTGRESQL__DISABLE_SERVER_SIDE_CURSORS,AUTHENTIK_POSTGRESQL__CONN_MAX_AGE"
 
 export KUBECONFIG="$KUBECONFIG_FILE"
 
@@ -117,3 +158,16 @@ kubectl -n authentik get secret authentik-bootstrap >/dev/null 2>&1 || fail "aut
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$manifest_path" \
   --application "authentik"
+
+for deployment in authentik-server authentik-worker; do
+  for _attempt in $(seq 1 60); do
+    if kubectl -n authentik get deployment "$deployment" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 5
+  done
+
+  kubectl -n authentik get deployment "$deployment" >/dev/null 2>&1 || fail "deployment/${deployment} did not appear after applying Authentik"
+  kubectl -n authentik rollout restart deployment "$deployment"
+  kubectl -n authentik rollout status deployment "$deployment" --timeout=10m
+done

@@ -893,6 +893,15 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "kubectl create namespace authentik --dry-run=client -o yaml | kubectl apply -f -" in authentik_run_text
     assert "gitops/platform/authentik/externalsecret.yaml" in authentik_run_text
     assert "gitops/platform/authentik/ingressroute.yaml" in authentik_run_text
+    assert "AUTHENTIK_POSTGRESQL__HOST" in authentik_run_text
+    assert "AUTHENTIK_POSTGRESQL__PORT" in authentik_run_text
+    assert "AUTHENTIK_POSTGRESQL__NAME" in authentik_run_text
+    assert "AUTHENTIK_POSTGRESQL__USER" in authentik_run_text
+    assert "AUTHENTIK_POSTGRESQL__USERNAME" in authentik_run_text
+    assert "AUTHENTIK_POSTGRESQL__DISABLE_SERVER_SIDE_CURSORS" in authentik_run_text
+    assert "AUTHENTIK_POSTGRESQL__CONN_MAX_AGE" in authentik_run_text
+    assert "rollout restart deployment" in authentik_run_text
+    assert "rollout status deployment" in authentik_run_text
     assert (
         "Could not determine Authentik host; set DNS domain in the ingress selection step"
         in authentik_run_text
@@ -1056,6 +1065,7 @@ NTFY_VALUES = REPO_ROOT / "gitops" / "values" / "ntfy.yaml"
 NTFY_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "ntfy" / "ingressroute.yaml"
 HOMEPAGE_CONFIGMAP = REPO_ROOT / "gitops" / "platform" / "homepage" / "configmap.yaml"
 KUSTOMIZATION = REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
+DATABASES_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "kustomization.yaml"
 
 
 def test_prometheus_argocd_app_uses_kube_prometheus_stack():
@@ -1172,3 +1182,13 @@ def test_kustomization_includes_monitoring_resources():
     assert "prometheus/ingressroute.yaml" in text
     assert "prometheus/alertmanager-config.yaml" in text
     assert "ntfy/ingressroute.yaml" in text
+
+
+def test_databases_kustomization_includes_authentik_resources():
+    text = DATABASES_KUSTOMIZATION.read_text(encoding="utf-8")
+    assert "namespace.yaml" in text
+    assert "authentik/cluster.yaml" in text
+    assert "authentik/externalsecret.yaml" in text
+    assert "authentik/pooler-ro.yaml" in text
+    assert "authentik/pooler-rw.yaml" in text
+    assert "authentik/scheduled-backup.yaml" in text
