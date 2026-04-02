@@ -9,10 +9,6 @@ twinbox_public_zone_name() {
   cluster_id_lower="$(printf '%s' "$cluster_id" | tr '[:upper:]' '[:lower:]')"
 
   case "$cluster_id_lower" in
-    tst)
-      printf 'app.tst.example.org\n'
-      return 0
-      ;;
     prd)
       printf 'app.example.com\n'
       return 0
@@ -20,11 +16,7 @@ twinbox_public_zone_name() {
   esac
 
   if [[ -n "$cluster_dns_domain" ]]; then
-    if [[ "$cluster_dns_domain" == app.* ]]; then
-      printf '%s\n' "$cluster_dns_domain"
-    else
-      printf 'app.%s.%s\n' "$cluster_id_lower" "$cluster_dns_domain"
-    fi
+    printf '%s\n' "$cluster_dns_domain"
     return 0
   fi
 

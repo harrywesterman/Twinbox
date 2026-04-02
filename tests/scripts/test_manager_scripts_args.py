@@ -875,8 +875,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "depends_on:" in choose_ingress_text
     assert "dns_domain" in choose_ingress_text
     assert "DNS Domain" in choose_ingress_text
-    assert "TST always uses app.tst.example.org" in choose_ingress_text
-    assert "PRD always uses app.example.com" in choose_ingress_text
+    assert "Twinbox uses the domain you enter here, except PRD which keeps app.example.com." in choose_ingress_text
 
     assert "order: 31" in cloudflare_text
     assert "choose-ingress-route" in cloudflare_text
