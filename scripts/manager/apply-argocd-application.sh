@@ -201,6 +201,7 @@ rendered_manifest="$(sed "s|__REPO_URL__|${repo_url}|g; s|__TARGET_REVISION__|${
 
 log "Applying Argo CD application manifest ${MANIFEST_PATH}"
 printf '%s\n' "$rendered_manifest" | kubectl apply --validate=false -f -
+kubectl annotate application "$APPLICATION_NAME" -n argocd argocd.argoproj.io/refresh=hard --overwrite >/dev/null 2>&1 || true
 if [[ "$WAIT_FOR_READY" == true ]]; then
   wait_for_application_ready "$APPLICATION_NAME"
 else
