@@ -635,8 +635,15 @@ def test_install_secret_sync_renders_argocd_values_and_applies_secret_sync_manif
     assert "scripts/manager/apply-argocd-application.sh" in text
     assert '--manifest "$WORKSPACE_ROOT/gitops/apps/external-secrets.yaml"' in text
     assert '--application "external-secrets"' in text
-    assert '--manifest "$WORKSPACE_ROOT/gitops/apps/openbao.yaml"' in text
+    assert "mktemp" in text
+    assert "helm:" in text
+    assert "values: |" in text
+    assert 'sed \'s/^/          /\' "$OPENBAO_VALUES_FILE"' in text
     assert '--application "openbao"' in text
+    assert 'repoURL: https://openbao.github.io/openbao-helm' in text
+    assert 'chart: openbao' in text
+    assert 'targetRevision: "0.26.2"' in text
+    assert "gitops/apps/openbao.yaml" not in text
     assert "openbao_render_values_file" in text
     assert "openbao_seed_management_bootstrap_files" in text
     assert "openbao_seed_release_secret" in text

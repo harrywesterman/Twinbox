@@ -63,7 +63,7 @@ Bootstraps the management secrets layer for GitOps:
 - Seeds OpenBao static seal secret (`kubectl create secret`)
 - Bootstraps management JSON files (proxmox, traefik-dashboard, seal key)
 
-External Secrets Operator and OpenBao are deployed as Argo CD Applications (`gitops/apps/external-secrets.yaml` and `gitops/apps/openbao.yaml`).
+External Secrets Operator is deployed from `gitops/apps/external-secrets.yaml`. OpenBao is applied from a generated Argo CD `Application` manifest that inlines the rendered Helm values so the local bootstrap output is authoritative during install.
 
 ### `openbao-secret-sync.sh`
 

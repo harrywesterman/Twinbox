@@ -63,4 +63,4 @@ Helm chart versions are pinned in the Argo CD `Application` manifests under `git
 | Application | Chart Version | Manifest |
 |-------------|---------------|----------|
 | External Secrets | `0.20.1` | `gitops/apps/external-secrets.yaml` |
-| OpenBao | `0.26.2` | `gitops/apps/openbao.yaml` |
+| OpenBao | `0.26.2` | Generated `install-secret-sync.sh` Application manifest |

@@ -107,8 +107,40 @@ openbao_log "Seeding OpenBao static seal secret"
 openbao_seed_release_secret
 
 openbao_log "Applying OpenBao application"
+openbao_application_manifest="$(mktemp "${TMPDIR:-/tmp}/openbao-application.XXXXXX.yaml")"
+trap 'rm -f "$openbao_application_manifest"' RETURN
+{
+  cat <<EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openbao
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://openbao.github.io/openbao-helm
+      chart: openbao
+      targetRevision: "0.26.2"
+      helm:
+        values: |
+EOF
+  sed 's/^/          /' "$OPENBAO_VALUES_FILE"
+  cat <<EOF
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openbao
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+EOF
+} >"$openbao_application_manifest"
+
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
-  --manifest "$WORKSPACE_ROOT/gitops/apps/openbao.yaml" \
+  --manifest "$openbao_application_manifest" \
   --application "openbao"
 
 openbao_pod="$(openbao_wait_for_server_pod)"
