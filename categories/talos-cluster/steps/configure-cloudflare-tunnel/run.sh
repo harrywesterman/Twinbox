@@ -87,6 +87,34 @@ fi
 cf_tunnel_token="$(echo "$token_response" | jq -r '.result // empty')"
 [[ -n "$cf_tunnel_token" ]] || fail "Could not generate tunnel token"
 
+tunnel_values_file="$WORKSPACE_ROOT/gitops/values/cloudflare-tunnel.yaml"
+cat > "$tunnel_values_file" <<EOF
+cloudflare:
+  account: "$cf_account_id"
+  tunnelName: "$tunnel_name"
+  tunnelId: "$cf_tunnel_id"
+  secret: "$cf_tunnel_token"
+  enableWarp: false
+  ingress: []
+
+replicaCount: 2
+
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+  - key: node-role.kubernetes.io/master
+    operator: Exists
+    effect: NoSchedule
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+EOF
+chmod 600 "$tunnel_values_file"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Rendered cloudflare-tunnel values to $tunnel_values_file"
+
 # Step 3: Create DNS CNAME record pointing to the tunnel
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating DNS CNAME record for tunnel"
 dns_response="$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${cf_zone_id}/dns_records" \

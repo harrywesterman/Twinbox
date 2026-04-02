@@ -1,22 +1,22 @@
-cloudflared:
-  replicaCount: 2
+cloudflare:
+  account: ""
+  tunnelName: ""
+  tunnelId: ""
+  secret: ""
+  enableWarp: false
+  ingress: []
 
-  tolerations:
-    - key: node-role.kubernetes.io/control-plane
-      operator: Exists
-      effect: NoSchedule
-    - key: node-role.kubernetes.io/master
-      operator: Exists
-      effect: NoSchedule
+replicaCount: 2
 
-  env:
-    - name: TUNNEL_TOKEN
-      valueFrom:
-        secretKeyRef:
-          name: cloudflare-tunnel-secret
-          key: CF_TUNNEL_TOKEN
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+  - key: node-role.kubernetes.io/master
+    operator: Exists
+    effect: NoSchedule
 
-  metrics:
+metrics:
+  enabled: true
+  serviceMonitor:
     enabled: true
-    serviceMonitor:
-      enabled: true
