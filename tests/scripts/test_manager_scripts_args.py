@@ -140,6 +140,7 @@ WIREDOOR_GATEWAY_EXTERNALSECRET = (
 WIREDOOR_GATEWAY_INGRESSROUTE = (
     REPO_ROOT / "gitops" / "platform" / "wiredoor-gateway" / "ingressroute.yaml"
 )
+PINNED_DEFAULTS = REPO_ROOT / "config" / "pinned-defaults.sh"
 
 
 def _apply_cluster_text() -> str:
@@ -190,6 +191,10 @@ def _cilium_render_text() -> str:
 
 def _cilium_values_text() -> str:
     return CILIUM_VALUES_FILE.read_text(encoding="utf-8")
+
+
+def _pinned_defaults_text() -> str:
+    return PINNED_DEFAULTS.read_text(encoding="utf-8")
 
 
 def _argo_step_manifest_text() -> str:
@@ -439,6 +444,7 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     text = _apply_cluster_text()
     helper_text = _cilium_render_text()
     values_text = _cilium_values_text()
+    pinned_defaults_text = _pinned_defaults_text()
 
     assert "command -v kubectl" in text
     assert "command -v helm" in text
@@ -461,6 +467,7 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert "--repo https://helm.cilium.io" in helper_text
     assert "--include-crds" in helper_text
     assert "PINNED_CILIUM_CHART_VERSION" in helper_text
+    assert "PINNED_CILIUM_CHART_VERSION=1.18.8" in pinned_defaults_text
     assert "ipam:" in values_text
     assert "mode: kubernetes" in values_text
     assert "kubeProxyReplacement: true" in values_text
