@@ -69,10 +69,14 @@ if command -v kubectl &>/dev/null; then
   # Wait for Argo CD to be available
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for Argo CD to be ready"
   for i in $(seq 1 30); do
-    if kubectl get application argocd -n argocd &>/dev/null; then
-      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Argo CD is ready"
-      break
+    if kubectl get deployment argocd-server -n argocd &>/dev/null; then
+      ready="$(kubectl get deployment argocd-server -n argocd -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")"
+      if [[ "$ready" -gt 0 ]]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Argo CD server is ready"
+        break
+      fi
     fi
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Argo CD server not ready yet (attempt ${i}/30)"
     sleep 5
   done
 

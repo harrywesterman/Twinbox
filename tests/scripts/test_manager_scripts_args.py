@@ -951,8 +951,9 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "platform-ingress.yaml" in cloudflare_tunnel_run_text
     assert "kubectl delete application cluster-config -n argocd --ignore-not-found=true" in cloudflare_tunnel_run_text
     assert "Zone DNS Edit permissions" in cloudflare_tunnel_run_text
-    assert "Argo CD not ready yet (attempt ${i}/30)" in cloudflare_tunnel_run_text
-    assert "Timed out waiting for Argo CD application argocd to become ready" in cloudflare_tunnel_run_text
+    assert "argocd-server" in cloudflare_tunnel_run_text
+    assert "Argo CD server not ready yet (attempt ${i}/30)" in cloudflare_tunnel_run_text
+    assert "Timed out waiting for the Argo CD server deployment to become ready" in cloudflare_tunnel_run_text
     assert (
         cloudflare_tunnel_run_text.index("platform-ingress.yaml")
         < cloudflare_tunnel_run_text.index("Applying cloudflare-tunnel application")

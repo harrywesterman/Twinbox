@@ -244,16 +244,19 @@ if command -v kubectl &>/dev/null; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for Argo CD to be ready"
   argo_cd_ready=false
   for i in $(seq 1 30); do
-    if kubectl get application argocd -n argocd &>/dev/null; then
-      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Argo CD is ready"
-      argo_cd_ready=true
-      break
+    if kubectl get deployment argocd-server -n argocd &>/dev/null; then
+      ready_replicas="$(kubectl get deployment argocd-server -n argocd -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")"
+      if [[ "$ready_replicas" -gt 0 ]]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Argo CD server is ready"
+        argo_cd_ready=true
+        break
+      fi
     fi
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Argo CD not ready yet (attempt ${i}/30)"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Argo CD server not ready yet (attempt ${i}/30)"
     sleep 5
   done
   if [[ "$argo_cd_ready" != "true" ]]; then
-    fail "Timed out waiting for Argo CD application argocd to become ready"
+    fail "Timed out waiting for the Argo CD server deployment to become ready"
   fi
 
   # Refresh the parent ingress app first, then apply the runtime Cloudflare app.
