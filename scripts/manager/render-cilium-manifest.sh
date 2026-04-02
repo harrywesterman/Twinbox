@@ -39,9 +39,18 @@ command -v helm >/dev/null 2>&1 || fail "helm not found"
 values_file="$WORKSPACE_ROOT/config/cilium-values.yaml"
 [[ -f "$values_file" ]] || fail "Cilium values file not found: ${values_file}"
 
+ensure_cilium_repo() {
+  if ! helm repo list 2>/dev/null | awk '$1 == "cilium" { found = 1 } END { exit found ? 0 : 1 }'; then
+    helm repo add cilium https://helm.cilium.io >/dev/null
+  fi
+
+  helm repo update >/dev/null
+}
+
 render_manifest() {
+  ensure_cilium_repo
+
   helm template cilium cilium/cilium \
-    --repo https://helm.cilium.io \
     --version "$PINNED_CILIUM_CHART_VERSION" \
     --namespace kube-system \
     --include-crds \

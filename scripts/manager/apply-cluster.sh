@@ -725,10 +725,14 @@ render_cilium_manifest() {
 
   [[ -f "$values_file" ]] || fail "Cilium values file not found: ${values_file}"
 
+  if ! helm repo list 2>/dev/null | awk '$1 == "cilium" { found = 1 } END { exit found ? 0 : 1 }'; then
+    helm repo add cilium https://helm.cilium.io >/dev/null
+  fi
+  helm repo update >/dev/null
+
   mkdir -p "$(dirname "$output_file")"
   log "Rendering Cilium bootstrap manifest to ${output_file}"
   helm template cilium cilium/cilium \
-    --repo https://helm.cilium.io \
     --version "$PINNED_CILIUM_CHART_VERSION" \
     --namespace kube-system \
     --include-crds \

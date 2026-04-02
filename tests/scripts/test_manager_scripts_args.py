@@ -464,7 +464,8 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert 'wait_for_kubernetes_rollout "deployment/cilium-operator" "kube-system" "Cilium operator"' in text
     assert 'wait_for_kubernetes_rollout "deployment/coredns" "kube-system" "CoreDNS"' in text
     assert "kube-proxy daemonset should not exist in kube-proxy-free mode" in text
-    assert "--repo https://helm.cilium.io" in helper_text
+    assert "helm repo add cilium https://helm.cilium.io" in helper_text
+    assert "helm repo update" in helper_text
     assert "--include-crds" in helper_text
     assert "PINNED_CILIUM_CHART_VERSION" in helper_text
     assert "PINNED_CILIUM_CHART_VERSION=1.18.8" in pinned_defaults_text
