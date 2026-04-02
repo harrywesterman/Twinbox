@@ -1243,11 +1243,8 @@ def test_authentik_values_request_memory_for_server_and_worker():
     text = (REPO_ROOT / "gitops" / "values" / "authentik.yaml").read_text(
         encoding="utf-8"
     )
-    assert "server:" in text
-    assert "worker:" in text
-    assert "requests:" in text
-    assert "cpu: 100m" in text
-    assert "memory: 512Mi" in text
-    assert "memory: 256Mi" in text
-    assert "memory: 1Gi" in text
-    assert "memory: 512Mi" in text
+    assert "server:\n  resources:\n    requests:\n      cpu: 100m\n      memory: 512Mi" in text
+    assert "limits:\n      memory: 1Gi" in text
+    assert "worker:\n  resources:\n    requests:\n      cpu: 100m\n      memory: 256Mi" in text
+    assert "limits:\n      memory: 512Mi" in text
+    assert "authentik:\n  existingSecret:" in text
