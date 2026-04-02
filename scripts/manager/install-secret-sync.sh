@@ -95,11 +95,21 @@ openbao_ensure_namespace "$OPENBAO_NAMESPACE"
 kubectl create namespace "$OPERATOR_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 kubectl create namespace "$TARGET_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
+openbao_log "Applying External Secrets Operator application"
+bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+  --manifest "$WORKSPACE_ROOT/gitops/apps/external-secrets.yaml" \
+  --application "external-secrets"
+
 openbao_log "Rendering ArgoCD values files"
 openbao_render_values_file
 
 openbao_log "Seeding OpenBao static seal secret"
 openbao_seed_release_secret
+
+openbao_log "Applying OpenBao application"
+bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+  --manifest "$WORKSPACE_ROOT/gitops/apps/openbao.yaml" \
+  --application "openbao"
 
 openbao_pod="$(openbao_wait_for_server_pod)"
 openbao_initialize_if_needed "$openbao_pod"

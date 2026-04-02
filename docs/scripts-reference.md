@@ -58,6 +58,7 @@ Installs Longhorn via Argo CD and sets `StorageClass/longhorn` as the default.
 
 Bootstraps the management secrets layer for GitOps:
 
+- Applies the `external-secrets` and `openbao` Argo CD Applications
 - Renders OpenBao values file to `gitops/values/openbao.yaml` (seal key ID, replicas, Raft config)
 - Seeds OpenBao static seal secret (`kubectl create secret`)
 - Bootstraps management JSON files (proxmox, traefik-dashboard, seal key)

@@ -632,6 +632,11 @@ def test_install_secret_sync_renders_argocd_values_and_applies_secret_sync_manif
         REPO_ROOT / "scripts" / "manager" / "openbao-secret-sync.sh"
     ).read_text(encoding="utf-8")
     assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in text
+    assert "scripts/manager/apply-argocd-application.sh" in text
+    assert '--manifest "$WORKSPACE_ROOT/gitops/apps/external-secrets.yaml"' in text
+    assert '--application "external-secrets"' in text
+    assert '--manifest "$WORKSPACE_ROOT/gitops/apps/openbao.yaml"' in text
+    assert '--application "openbao"' in text
     assert "openbao_render_values_file" in text
     assert "openbao_seed_management_bootstrap_files" in text
     assert "openbao_seed_release_secret" in text
