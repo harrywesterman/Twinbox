@@ -13,7 +13,7 @@ bash -n wizard/setup-wizard.sh \
   scripts/manager/bootstrap-talos.sh \
   scripts/manager/create-talos-vms.sh \
   scripts/manager/collect-state.sh \
-  scripts/manager/install-flannel.sh \
+  scripts/manager/render-cilium-manifest.sh \
   scripts/manager/apply-argocd-application.sh \
   scripts/manager/install-argocd.sh \
   scripts/manager/install-longhorn-storage.sh \
@@ -61,7 +61,25 @@ Expected:
 - queue and logs are written under `manager-data/`
 - cluster state exists under `manager-data/clusters/<cluster-id>.json`
 - Talos artifacts are materialized under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/`
+- Cilium bootstrap manifest exists under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/cilium/cilium-bootstrap.yaml`
+- the Talos configs include inline Cilium manifests on all control-plane nodes
 - the first step in a clean UI session remains `Deploy Talos Cluster`
+
+### `provision-nodes` runtime network checks
+
+```bash
+kubectl --kubeconfig <kubeconfig> get ds cilium -n kube-system
+kubectl --kubeconfig <kubeconfig> get deploy cilium-operator -n kube-system
+kubectl --kubeconfig <kubeconfig> get deploy coredns -n kube-system
+kubectl --kubeconfig <kubeconfig> get ds kube-proxy -n kube-system
+```
+
+Expected:
+
+- `daemonset/cilium` is ready
+- `deployment/cilium-operator` is ready
+- `deployment/coredns` is ready
+- `daemonset/kube-proxy` does not exist
 
 ### `install-longhorn-storage`
 

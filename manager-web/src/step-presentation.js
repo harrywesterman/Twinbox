@@ -8,7 +8,6 @@ function assetHref(filename) {
 
 const STEP_ICON_ASSETS = {
   'provision-nodes': assetHref('provision-nodes.svg'),
-  'install-flannel': assetHref('install-flannel.svg'),
   'install-argocd': assetHref('install-argocd.svg'),
   'install-longhorn-storage': assetHref('install-longhorn-storage.svg'),
   'install-secret-sync': assetHref('install-secret-sync.svg'),
@@ -45,11 +44,6 @@ function buildProjectUrlMap() {
       icon: '🖥️',
       project_url: 'https://www.talos.dev/',
       github_url: 'https://github.com/siderolabs/talos',
-    },
-    'install-flannel': {
-      icon: '🕸️',
-      project_url: 'https://github.com/flannel-io/flannel',
-      github_url: 'https://github.com/flannel-io/flannel',
     },
     'install-argocd': {
       icon: '🔁',

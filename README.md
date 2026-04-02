@@ -33,6 +33,7 @@ Open your browser to continue the installation. The web UI guides you through cl
 </p>
 
 - **Talos Linux** — immutable, API-driven Kubernetes OS
+- **Cilium** — kube-proxy-free networking and policy-ready datapath
 - **Argo CD** — GitOps for every component
 - **Longhorn** — distributed block storage
 - **OpenBao + External Secrets Operator** — centralized secret management

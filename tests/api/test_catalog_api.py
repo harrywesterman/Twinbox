@@ -137,13 +137,16 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             talos = body["categories"][1]
             assert [step["id"] for step in talos["steps"]] == [
                 "provision-nodes",
-                "install-flannel",
                 "install-argocd",
                 "install-longhorn-storage",
                 "install-secret-sync",
                 "install-traefik",
                 "install-cloudnativepg",
                 "install-postgres-clusters",
+                "configure-wiredoor-ingress",
+                "configure-cloudflare-tunnel",
+                "configure-metallb-ingress",
+                "configure-tailscale-ingress",
                 "install-authentik-idp",
                 "configure-cloudflare-dns",
                 "install-wiredoor-gateway",
@@ -169,23 +172,22 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-jitsi",
             ]
             assert talos["steps"][0]["title"] == "Deploy Talos Cluster"
-            assert talos["steps"][1]["title"] == "Install Flannel"
-            assert talos["steps"][2]["title"] == "Install Argo CD"
-            assert talos["steps"][3]["title"] == "Install Longhorn Storage"
+            assert talos["steps"][1]["title"] == "Install Argo CD"
+            assert talos["steps"][2]["title"] == "Install Longhorn Storage"
             assert (
-                talos["steps"][4]["title"]
+                talos["steps"][3]["title"]
                 == "Install OpenBao and sync bootstrap secrets"
             )
-            assert talos["steps"][5]["title"] == "Install Traefik"
-            assert talos["steps"][6]["title"] == "Install CloudNativePG"
-            assert talos["steps"][7]["title"] == "Install PostgreSQL Clusters"
-            assert talos["steps"][8]["title"] == "Install Authentik"
-            assert talos["steps"][9]["title"] == "Configure Cloudflare DNS"
-            assert talos["steps"][10]["title"] == "Install Wiredoor gateway"
-            assert talos["steps"][11]["title"] == "Deploy Wiredoor Bastion Host"
-            assert talos["steps"][12]["title"] == "Install Whoami"
-            assert talos["steps"][13]["title"] == "Install Headlamp"
-            assert talos["steps"][14]["title"] == "Install Grafana"
+            assert talos["steps"][4]["title"] == "Install Traefik"
+            assert talos["steps"][5]["title"] == "Install CloudNativePG"
+            assert talos["steps"][6]["title"] == "Install PostgreSQL Clusters"
+            assert talos["steps"][7]["title"] == "Configure Wiredoor Ingress"
+            assert talos["steps"][8]["title"] == "Configure Cloudflare Tunnel"
+            assert talos["steps"][9]["title"] == "Configure MetalLB Ingress"
+            assert talos["steps"][10]["title"] == "Configure Tailscale Ingress"
+            assert talos["steps"][11]["title"] == "Install Authentik"
+            assert talos["steps"][12]["title"] == "Configure Cloudflare DNS"
+            assert talos["steps"][13]["title"] == "Install Wiredoor gateway"
             assert talos["steps"][0]["journey_stage"] == "setup"
             assert talos["steps"][0]["status"] == "ready"
             assert talos["steps"][1]["status"] == "locked"
@@ -199,7 +201,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 == "kubeconfig"
             )
             assert talos["steps"][0]["icon"] == "🖥️"
-            assert talos["steps"][8]["icon"] == "🪪"
+            assert talos["steps"][8]["icon"] == "🚀"
         finally:
             proc.terminate()
             proc.wait(timeout=5)
@@ -545,21 +547,6 @@ def test_catalog_keeps_latest_cluster_step_state_for_follow_up_steps():
             ),
             encoding="utf-8",
         )
-        _cluster_step_state(data_dir, cluster_id, "install-flannel").write_text(
-            json.dumps(
-                {
-                    "step_id": "install-flannel",
-                    "status": "succeeded",
-                    "inputs": {},
-                    "outputs": {"cluster_id": cluster_id},
-                    "cluster_id": cluster_id,
-                    "error": None,
-                    "updated_at": "2026-03-20T10:10:00Z",
-                    "last_job_id": None,
-                }
-            ),
-            encoding="utf-8",
-        )
         _cluster_step_state(data_dir, cluster_id, "install-argocd").write_text(
             json.dumps(
                 {
@@ -587,12 +574,10 @@ def test_catalog_keeps_latest_cluster_step_state_for_follow_up_steps():
             assert talos["steps"][0]["id"] == "provision-nodes"
             assert talos["steps"][0]["status"] == "done"
             assert talos["steps"][0]["state"]["cluster_id"] == cluster_id
-            assert talos["steps"][1]["id"] == "install-flannel"
+            assert talos["steps"][1]["id"] == "install-argocd"
             assert talos["steps"][1]["status"] == "done"
-            assert talos["steps"][2]["id"] == "install-argocd"
-            assert talos["steps"][2]["status"] == "done"
-            assert talos["steps"][3]["id"] == "install-longhorn-storage"
-            assert talos["steps"][3]["status"] == "ready"
+            assert talos["steps"][2]["id"] == "install-longhorn-storage"
+            assert talos["steps"][2]["status"] == "ready"
         finally:
             proc.terminate()
             proc.wait(timeout=5)
@@ -638,21 +623,6 @@ def test_catalog_keeps_latest_cluster_step_state_for_follow_up_steps_after_argoc
             ),
             encoding="utf-8",
         )
-        _cluster_step_state(data_dir, cluster_id, "install-flannel").write_text(
-            json.dumps(
-                {
-                    "step_id": "install-flannel",
-                    "status": "succeeded",
-                    "inputs": {},
-                    "outputs": {"cluster_id": cluster_id},
-                    "cluster_id": cluster_id,
-                    "error": None,
-                    "updated_at": "2026-03-20T10:09:30Z",
-                    "last_job_id": None,
-                }
-            ),
-            encoding="utf-8",
-        )
         _cluster_step_state(data_dir, cluster_id, "install-argocd").write_text(
             json.dumps(
                 {
@@ -679,12 +649,10 @@ def test_catalog_keeps_latest_cluster_step_state_for_follow_up_steps_after_argoc
             talos = body["categories"][1]
             assert talos["steps"][0]["id"] == "provision-nodes"
             assert talos["steps"][0]["status"] == "done"
-            assert talos["steps"][1]["id"] == "install-flannel"
+            assert talos["steps"][1]["id"] == "install-argocd"
             assert talos["steps"][1]["status"] == "done"
-            assert talos["steps"][2]["id"] == "install-argocd"
-            assert talos["steps"][2]["status"] == "done"
-            assert talos["steps"][3]["id"] == "install-longhorn-storage"
-            assert talos["steps"][3]["status"] == "ready"
+            assert talos["steps"][2]["id"] == "install-longhorn-storage"
+            assert talos["steps"][2]["status"] == "ready"
         finally:
             proc.terminate()
             proc.wait(timeout=5)
@@ -759,12 +727,10 @@ def test_catalog_cluster_id_query_scopes_follow_up_state_to_requested_cluster():
             assert talos["steps"][0]["id"] == "provision-nodes"
             assert talos["steps"][0]["status"] == "done"
             assert talos["steps"][0]["state"]["cluster_id"] == older_cluster_id
-            assert talos["steps"][1]["id"] == "install-flannel"
+            assert talos["steps"][1]["id"] == "install-argocd"
             assert talos["steps"][1]["status"] == "ready"
-            assert talos["steps"][2]["id"] == "install-argocd"
+            assert talos["steps"][2]["id"] == "install-longhorn-storage"
             assert talos["steps"][2]["status"] == "locked"
-            assert talos["steps"][3]["id"] == "install-longhorn-storage"
-            assert talos["steps"][3]["status"] == "locked"
         finally:
             proc.terminate()
             proc.wait(timeout=5)
@@ -805,12 +771,10 @@ def test_catalog_synthesizes_provision_state_for_bootstrapped_cluster_without_st
                 talos["steps"][0]["state"]["outputs"]["cluster_status"]
                 == "bootstrapped"
             )
-            assert talos["steps"][1]["id"] == "install-flannel"
+            assert talos["steps"][1]["id"] == "install-argocd"
             assert talos["steps"][1]["status"] == "ready"
-            assert talos["steps"][2]["id"] == "install-argocd"
+            assert talos["steps"][2]["id"] == "install-longhorn-storage"
             assert talos["steps"][2]["status"] == "locked"
-            assert talos["steps"][3]["id"] == "install-longhorn-storage"
-            assert talos["steps"][3]["status"] == "locked"
         finally:
             proc.terminate()
             proc.wait(timeout=5)
@@ -871,21 +835,6 @@ def test_execute_follow_up_cluster_step_requires_explicit_cluster_context():
                     "cluster_id": cluster_id,
                     "error": None,
                     "updated_at": "2026-03-20T10:09:00Z",
-                    "last_job_id": None,
-                }
-            ),
-            encoding="utf-8",
-        )
-        _cluster_step_state(data_dir, cluster_id, "install-flannel").write_text(
-            json.dumps(
-                {
-                    "step_id": "install-flannel",
-                    "status": "succeeded",
-                    "inputs": {},
-                    "outputs": {"cluster_id": cluster_id},
-                    "cluster_id": cluster_id,
-                    "error": None,
-                    "updated_at": "2026-03-20T10:09:30Z",
                     "last_job_id": None,
                 }
             ),
@@ -1029,23 +978,6 @@ def test_execute_follow_up_cluster_step_uses_requested_cluster_context_and_secre
                     "cluster_id": selected_cluster_id,
                     "error": None,
                     "updated_at": "2026-03-20T10:09:00Z",
-                    "last_job_id": None,
-                }
-            ),
-            encoding="utf-8",
-        )
-        _cluster_step_state(
-            data_dir, selected_cluster_id, "install-flannel"
-        ).write_text(
-            json.dumps(
-                {
-                    "step_id": "install-flannel",
-                    "status": "succeeded",
-                    "inputs": {},
-                    "outputs": {"cluster_id": selected_cluster_id},
-                    "cluster_id": selected_cluster_id,
-                    "error": None,
-                    "updated_at": "2026-03-20T10:09:30Z",
                     "last_job_id": None,
                 }
             ),
@@ -1224,23 +1156,6 @@ def test_execute_argo_follow_up_cluster_step_uses_requested_cluster_context_and_
                     "cluster_id": selected_cluster_id,
                     "error": None,
                     "updated_at": "2026-03-20T10:09:00Z",
-                    "last_job_id": None,
-                }
-            ),
-            encoding="utf-8",
-        )
-        _cluster_step_state(
-            data_dir, selected_cluster_id, "install-flannel"
-        ).write_text(
-            json.dumps(
-                {
-                    "step_id": "install-flannel",
-                    "status": "succeeded",
-                    "inputs": {},
-                    "outputs": {"cluster_id": selected_cluster_id},
-                    "cluster_id": selected_cluster_id,
-                    "error": None,
-                    "updated_at": "2026-03-20T10:10:00Z",
                     "last_job_id": None,
                 }
             ),

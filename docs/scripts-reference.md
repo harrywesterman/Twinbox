@@ -11,6 +11,8 @@ Main provisioning entry point. Creates Talos VMs on Proxmox using OpenTofu.
 - Creates a per-cluster OpenTofu workspace under `manager-data/clusters/<cluster-id>/iac/`
 - Downloads the pinned Talos ISO and uploads it to Proxmox storage
 - Renders VM configuration from the cluster JSON
+- Renders the pinned Cilium Helm chart and injects it into Talos control-plane inline manifests
+- Stores the Cilium bootstrap manifest under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/cilium/cilium-bootstrap.yaml`
 - Runs `tofu init` and `tofu apply`
 - Discovers DHCP addresses for created VMs
 
@@ -34,13 +36,13 @@ Reads and outputs the cluster JSON file from `manager-data/clusters/<cluster-id>
 
 ## Networking
 
-### `install-flannel.sh`
+### `render-cilium-manifest.sh`
 
-Bootstraps Flannel CNI directly on the cluster so pods can run before Argo CD is installed.
+Renders the Talos-owned Cilium bootstrap manifest from the pinned Helm chart and repo-owned values file.
 
 ### `install-argocd.sh`
 
-Installs Argo CD on the cluster and registers the Flannel Application for GitOps tracking.
+Installs Argo CD on the cluster after the Talos/Cilium bootstrap has completed.
 
 ### `apply-argocd-application.sh`
 

@@ -21,21 +21,19 @@ ARGO_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-argocd.sh"
 APPLY_ARGO_APP_SCRIPT = (
     REPO_ROOT / "scripts" / "manager" / "apply-argocd-application.sh"
 )
-FLANNEL_HELPER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-flannel.sh"
+RENDER_CILIUM_SCRIPT = REPO_ROOT / "scripts" / "manager" / "render-cilium-manifest.sh"
 ARGO_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
 )
-FLANNEL_STEP_SCRIPT = (
-    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-flannel" / "run.sh"
-)
-FLANNEL_STEP_MANIFEST = (
+ARGO_STEP_MANIFEST = (
     REPO_ROOT
     / "categories"
     / "talos-cluster"
     / "steps"
-    / "install-flannel"
+    / "install-argocd"
     / "step.yaml"
 )
+CILIUM_VALUES_FILE = REPO_ROOT / "config" / "cilium-values.yaml"
 LONGHORN_STEP_SCRIPT = (
     REPO_ROOT
     / "categories"
@@ -107,7 +105,6 @@ WIREDOOR_GATEWAY_STEP_MANIFEST = (
     / "step.yaml"
 )
 ARGO_BOOTSTRAP_SCRIPT = REPO_ROOT / "gitops" / "install.sh"
-FLANNEL_APP = REPO_ROOT / "gitops" / "apps" / "flannel.yaml"
 LONGHORN_APP = REPO_ROOT / "gitops" / "apps" / "longhorn.yaml"
 TRAEFIK_APP = REPO_ROOT / "gitops" / "apps" / "traefik.yaml"
 WHOAMI_APP = REPO_ROOT / "gitops" / "apps" / "whoami.yaml"
@@ -187,16 +184,16 @@ def _apply_argocd_application_text() -> str:
     return APPLY_ARGO_APP_SCRIPT.read_text(encoding="utf-8")
 
 
-def _flannel_helper_text() -> str:
-    return FLANNEL_HELPER_SCRIPT.read_text(encoding="utf-8")
+def _cilium_render_text() -> str:
+    return RENDER_CILIUM_SCRIPT.read_text(encoding="utf-8")
 
 
-def _flannel_step_text() -> str:
-    return FLANNEL_STEP_SCRIPT.read_text(encoding="utf-8")
+def _cilium_values_text() -> str:
+    return CILIUM_VALUES_FILE.read_text(encoding="utf-8")
 
 
-def _flannel_step_manifest_text() -> str:
-    return FLANNEL_STEP_MANIFEST.read_text(encoding="utf-8")
+def _argo_step_manifest_text() -> str:
+    return ARGO_STEP_MANIFEST.read_text(encoding="utf-8")
 
 
 def _longhorn_step_text() -> str:
@@ -438,25 +435,42 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'select(.volid == $volid and .content == "iso")' in text
 
 
-def test_flannel_step_bootstraps_network_before_argocd():
-    step_text = _flannel_step_text()
-    step_manifest_text = _flannel_step_manifest_text()
-    helper_text = _flannel_helper_text()
+def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
+    text = _apply_cluster_text()
+    helper_text = _cilium_render_text()
+    values_text = _cilium_values_text()
 
-    assert "title: Install Flannel" in step_manifest_text
-    assert "order: 12" in step_manifest_text
-    assert (
-        "Bootstrap Flannel so the cluster has pod networking before Argo CD workloads start."
-        in step_manifest_text
-    )
-    assert "  - provision-nodes" in step_manifest_text
-    assert (
-        "script: categories/talos-cluster/steps/install-flannel/run.sh"
-        in step_manifest_text
-    )
-    assert 'bash "$WORKSPACE_ROOT/scripts/manager/install-flannel.sh"' in step_text
-    assert 'kubectl apply -k "$WORKSPACE_ROOT/gitops/platform/flannel"' in helper_text
-    assert 'rollout status "daemonset/kube-flannel-ds"' in helper_text
+    assert "command -v kubectl" in text
+    assert "command -v helm" in text
+    assert "render_cilium_manifest()" in text
+    assert 'render_cilium_manifest "$cilium_manifest_file"' in text
+    assert 'upsert_secret_artifact "cilium" "cilium-bootstrap.yaml"' in text
+    assert "kubePrism:" in text
+    assert "port: 7445" in text
+    assert "forwardKubeDNSToHost: false" in text
+    assert "cni:" in text
+    assert "name: none" in text
+    assert "proxy:" in text
+    assert "disabled: true" in text
+    assert "inlineManifests:" in text
+    assert 'sed \'s/^/        /\' "$cilium_manifest_file"' in text
+    assert 'wait_for_kubernetes_rollout "daemonset/cilium" "kube-system" "Cilium DaemonSet"' in text
+    assert 'wait_for_kubernetes_rollout "deployment/cilium-operator" "kube-system" "Cilium operator"' in text
+    assert 'wait_for_kubernetes_rollout "deployment/coredns" "kube-system" "CoreDNS"' in text
+    assert "kube-proxy daemonset should not exist in kube-proxy-free mode" in text
+    assert "--repo https://helm.cilium.io" in helper_text
+    assert "--include-crds" in helper_text
+    assert "PINNED_CILIUM_CHART_VERSION" in helper_text
+    assert "ipam:" in values_text
+    assert "mode: kubernetes" in values_text
+    assert "kubeProxyReplacement: true" in values_text
+    assert "k8sServiceHost: localhost" in values_text
+    assert "k8sServicePort: 7445" in values_text
+    assert "cgroup:" in values_text
+    assert "hostRoot: /sys/fs/cgroup" in values_text
+    assert "operator:" in values_text
+    assert "replicas: 1" in values_text
+    assert "SYS_MODULE" not in values_text
 
 
 def test_longhorn_step_installs_via_argocd_and_waits_for_health():
@@ -484,10 +498,10 @@ def test_longhorn_step_installs_via_argocd_and_waits_for_health():
         "cluster_json=\"$(printf '%s' \"$STEP_CONTEXT_JSON\" | jq -c '.cluster')\""
         in step_text
     )
-    assert (
-        'TWINBOX_CLUSTER_ID="$cluster_id" bash "$WORKSPACE_ROOT/scripts/manager/install-longhorn-storage.sh"'
-        in step_text
-    )
+    assert 'TWINBOX_CLUSTER_ID="$cluster_id"' in step_text
+    assert 'TWINBOX_CLUSTER_INSTANCE_ID="$cluster_instance_id"' in step_text
+    assert 'KUBE_API_SERVER="https://${controlplane_ip}:6443"' in step_text
+    assert 'bash "$WORKSPACE_ROOT/scripts/manager/install-longhorn-storage.sh"' in step_text
     assert (
         'WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"'
         in step_text
@@ -656,14 +670,14 @@ def test_apply_argocd_application_helper_applies_and_waits_for_health():
     text = _apply_argocd_application_text()
 
     assert "Usage: $0 --manifest PATH --application NAME" in text
-    assert 'kubectl apply --validate=false -f "$MANIFEST_PATH"' in text
+    assert "printf '%s\\n' \"$rendered_manifest\" | kubectl apply --validate=false -f -" in text
     assert 'kubectl -n argocd get application "$application" -o json' in text
     assert "Application/${application} is Synced and Healthy" in text
     assert "Application/${application} is Synced and has no unhealthy resources" in text
     assert "has_unhealthy_resources()" in text
 
 
-def test_argo_step_script_bootstraps_argocd_and_adopts_flannel():
+def test_argo_step_script_bootstraps_argocd_without_cni_adoption():
     text = _argo_step_text()
     assert 'WORKSPACE_ROOT="${WORKSPACE_ROOT:-' in text
     assert "discovered_controlplane_ips[0]" in text
@@ -671,12 +685,9 @@ def test_argo_step_script_bootstraps_argocd_and_adopts_flannel():
         'bash "$WORKSPACE_ROOT/scripts/manager/install-argocd.sh" --kube-api-server "https://${controlplane_ip}:6443"'
         in text
     )
-    assert 'flannel_manifest_path="$WORKSPACE_ROOT/gitops/apps/flannel.yaml"' in text
-    assert (
-        'bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \\' in text
-    )
-    assert '--application "flannel"' in text
-    assert "adopted_application: $adopted_application" in text
+    assert "apply-argocd-application.sh" not in text
+    assert '--arg application "argocd"' in text
+    assert 'application: $application' in text
 
 
 def test_argo_bootstrap_script_installs_argocd_without_root_application_tree():
@@ -746,26 +757,20 @@ def test_bootstrap_apps_tolerate_single_node_control_plane():
     assert "node-role.kubernetes.io/master" in headlamp_text
 
 
-def test_install_argocd_step_bootstraps_argocd_and_adopts_flannel():
-    text = (
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "install-argocd"
-        / "step.yaml"
-    ).read_text(encoding="utf-8")
+def test_install_argocd_step_bootstraps_argocd_without_cni_adoption():
+    text = _argo_step_manifest_text()
 
-    assert (
-        "summary: Install Argo CD and register Flannel as the first managed GitOps application."
-        in text
-    )
-    assert "Flannel" in text
+    assert "summary: Install Argo CD so the remaining platform services can be managed declaratively." in text
+    assert "order: 12" in text
+    assert "depends_on:" in text
+    assert "  - provision-nodes" in text
+    assert "Talos/Cilium bootstrap" in text
+    assert "Talos networking layer" not in text
     assert "root application tree" not in text
 
 
 def test_app_step_manifests_chain_the_linear_gitops_flow():
-    flannel_text = FLANNEL_STEP_MANIFEST.read_text(encoding="utf-8")
+    argocd_text = ARGO_STEP_MANIFEST.read_text(encoding="utf-8")
     traefik_text = TRAEFIK_STEP_MANIFEST.read_text(encoding="utf-8")
     cloudflare_text = CLOUDFLARE_STEP_MANIFEST.read_text(encoding="utf-8")
     whoami_text = WHOAMI_STEP_MANIFEST.read_text(encoding="utf-8")
@@ -773,8 +778,9 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     grafana_text = GRAFANA_STEP_MANIFEST.read_text(encoding="utf-8")
     wiredoor_text = WIREDOOR_GATEWAY_STEP_MANIFEST.read_text(encoding="utf-8")
 
-    assert "order: 12" in flannel_text
-    assert "provision-nodes" in flannel_text
+    assert "order: 12" in argocd_text
+    assert "provision-nodes" in argocd_text
+    assert "install-flannel" not in argocd_text
 
     assert "order: 31" in traefik_text
     assert "install-secret-sync" in traefik_text
@@ -810,7 +816,6 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
 
 
 def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
-    flannel_app_text = FLANNEL_APP.read_text(encoding="utf-8")
     longhorn_app_text = LONGHORN_APP.read_text(encoding="utf-8")
     traefik_app_text = _traefik_app_text()
     whoami_app_text = WHOAMI_APP.read_text(encoding="utf-8")
@@ -827,7 +832,6 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
         encoding="utf-8"
     )
 
-    assert "path: gitops/platform/flannel" in flannel_app_text
     assert "chart: longhorn" in longhorn_app_text
     assert "$values/gitops/values/longhorn.yaml" in longhorn_app_text
     assert "enabled: trueß∑" not in traefik_values_text

@@ -34,6 +34,8 @@ command -v "$TOFU_BIN" >/dev/null 2>&1 || fail "tofu not found"
 command -v talosctl >/dev/null 2>&1 || fail "talosctl not found"
 NODE_BIN="${NODE_BIN:-node}"
 command -v "$NODE_BIN" >/dev/null 2>&1 || fail "node not found"
+command -v kubectl >/dev/null 2>&1 || fail "kubectl not found"
+command -v helm >/dev/null 2>&1 || fail "helm not found"
 export TF_IN_AUTOMATION=1
 export NO_COLOR=1
 TOFU_PARALLELISM="${TOFU_PARALLELISM:-1}"
@@ -717,6 +719,46 @@ wait_for_talos_api() {
   fail "Timed out waiting for Talos API on ${label} at ${candidate}"
 }
 
+render_cilium_manifest() {
+  local output_file="$1"
+  local values_file="$WORKSPACE_ROOT/config/cilium-values.yaml"
+
+  [[ -f "$values_file" ]] || fail "Cilium values file not found: ${values_file}"
+
+  mkdir -p "$(dirname "$output_file")"
+  log "Rendering Cilium bootstrap manifest to ${output_file}"
+  helm template cilium cilium/cilium \
+    --repo https://helm.cilium.io \
+    --version "$PINNED_CILIUM_CHART_VERSION" \
+    --namespace kube-system \
+    --include-crds \
+    --values "$values_file" \
+    > "$output_file"
+}
+
+wait_for_kubernetes_rollout() {
+  local resource="$1"
+  local namespace="$2"
+  local label="${3:-$resource}"
+  local attempts=120
+  local attempt=1
+
+  while true; do
+    if kubectl --kubeconfig "$kubeconfig_file" -n "$namespace" rollout status "$resource" --timeout=15s >/dev/null 2>&1; then
+      log "${label} is ready"
+      return 0
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      fail "Timed out waiting for ${label}"
+    fi
+
+    log "Waiting for ${label}"
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
 write_node_patch() {
   local name="$1"
   local type="$2"
@@ -758,6 +800,18 @@ write_node_patch() {
       echo "  install:"
       echo "    image: ${image_installer}"
     fi
+    echo "  features:"
+    echo "    kubePrism:"
+    echo "      enabled: true"
+    echo "      port: 7445"
+    echo "    hostDNS:"
+    echo "      forwardKubeDNSToHost: false"
+    echo "cluster:"
+    echo "  network:"
+    echo "    cni:"
+    echo "      name: none"
+    echo "  proxy:"
+    echo "    disabled: true"
   } > "$patch_file"
 }
 
@@ -780,6 +834,7 @@ generate_talos_configs() {
   local base_dir="$runtime_talos_dir/base"
   local node_dir=""
   local patch_file=""
+  local controlplane_patch_file=""
   local name=""
   local type=""
   local mac=""
@@ -814,11 +869,19 @@ generate_talos_configs() {
 
     log "Generating Talos config for ${name}"
     if [[ "$type" == "controlplane" ]]; then
+      controlplane_patch_file="$node_dir/controlplane-patch.yaml"
+      cp "$patch_file" "$controlplane_patch_file"
+      {
+        echo "  inlineManifests:"
+        echo "    - name: cilium"
+        echo "      contents: |"
+        sed 's/^/        /' "$cilium_manifest_file"
+      } >> "$controlplane_patch_file"
       talosctl gen config "$NAME" "https://${VIP_IP}:6443" \
         --output-dir "$node_dir" \
         --with-secrets "$talos_secrets_file" \
         --install-disk "$INSTALL_DISK" \
-        --config-patch-control-plane "@${patch_file}"
+        --config-patch-control-plane "@${controlplane_patch_file}"
       config_file="$runtime_talos_dir/${name}-controlplane.yaml"
       cp "$node_dir/controlplane.yaml" "$config_file"
     else
@@ -973,6 +1036,10 @@ sync_user_talosconfig() {
 talos_image_local_path="$image_cache_dir/talos-${image_cache_key}.iso"
 download_talos_image "$talos_image_local_path"
 talos_image_file_name="talos-${image_cache_key}.iso"
+cilium_bootstrap_dir="$runtime_talos_dir/cilium"
+cilium_manifest_file="$cilium_bootstrap_dir/cilium-bootstrap.yaml"
+render_cilium_manifest "$cilium_manifest_file"
+upsert_secret_artifact "cilium" "cilium-bootstrap.yaml" "$cilium_manifest_file"
 
 vm_ip_map_json="$(resolve_vm_ip_map)"
 
@@ -1135,6 +1202,12 @@ first_controlplane_ip="${discovered_controlplane_ips[0]:-}"
 [[ -n "$first_controlplane_ip" ]] || fail "No control plane IP discovered"
 
 bootstrap_cluster "$first_controlplane_ip"
+wait_for_kubernetes_rollout "daemonset/cilium" "kube-system" "Cilium DaemonSet"
+wait_for_kubernetes_rollout "deployment/cilium-operator" "kube-system" "Cilium operator"
+wait_for_kubernetes_rollout "deployment/coredns" "kube-system" "CoreDNS"
+if kubectl --kubeconfig "$kubeconfig_file" -n kube-system get ds kube-proxy >/dev/null 2>&1; then
+  fail "kube-proxy daemonset should not exist in kube-proxy-free mode"
+fi
 if [[ "${TWINBOX_SYNC_LOCAL_CLIENT_CONFIGS:-false}" == "true" ]]; then
   sync_user_talosconfig "$talosconfig_file" "$first_controlplane_ip"
   sync_user_kubeconfig "$kubeconfig_file"

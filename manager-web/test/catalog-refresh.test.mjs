@@ -103,7 +103,7 @@ test('isProvisionSuggestionReady only unlocks step 1 after the current suggestio
   }), false);
 
   assert.equal(isProvisionSuggestionReady({
-    activeStepId: 'install-flannel',
+    activeStepId: 'install-argocd',
   }), true);
 });
 

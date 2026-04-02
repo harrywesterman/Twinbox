@@ -13,12 +13,12 @@ const steps = [
   {
     number: '02',
     title: 'Deploy your cluster through the web UI',
-    text: 'Open the browser-based installer to provision Talos Linux nodes, configure networking, and size your cluster — all from one guided interface.',
+    text: 'Open the browser-based installer to provision Talos Linux nodes, configure Cilium networking, and size your cluster — all from one guided interface.',
   },
   {
     number: '03',
     title: 'Install platform services step by step',
-    text: 'Flannel, Argo CD, Longhorn storage, OpenBao secrets, Traefik ingress, Velero backups — each component installs in order through the same UI, driven by GitOps.',
+    text: 'Cilium networking, Argo CD, Longhorn storage, OpenBao secrets, Traefik ingress, Velero backups — each component installs in order through the same UI, driven by GitOps.',
   },
 ];
 
@@ -44,7 +44,7 @@ const benefits = [
 const reasons = [
   {
     title: 'Production-grade Kubernetes',
-    text: 'Twinbox provisions Talos Linux clusters with Flannel networking, Longhorn storage, and CloudNativePG databases — a battle-tested stack you can rely on.',
+    text: 'Twinbox provisions Talos Linux clusters with Cilium networking, Longhorn storage, and CloudNativePG databases — a battle-tested stack you can rely on.',
   },
   {
     title: 'Secrets managed, not scattered',
@@ -146,7 +146,7 @@ function App() {
 
             <article className="hero-card hero-card-main">
               <p className="card-kicker">What Twinbox provisions</p>
-              <strong>Talos Linux, Argo CD, Longhorn, OpenBao, and more</strong>
+              <strong>Talos Linux, Cilium, Argo CD, Longhorn, OpenBao, and more</strong>
               <p>
                 A complete platform stack — networking, storage, secrets, databases, ingress, and backups — installed
                 step by step through a single web interface.

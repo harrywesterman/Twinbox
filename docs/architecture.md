@@ -19,7 +19,7 @@ Twinbox is a complete K8s cluster based on Talos Linux, completely configured. T
    - `scripts/manager/bootstrap-talos.sh`
    - `scripts/manager/create-talos-vms.sh`
    - `scripts/manager/collect-state.sh`
-   - `scripts/manager/install-flannel.sh`
+   - `scripts/manager/render-cilium-manifest.sh`
    - `scripts/manager/apply-argocd-application.sh`
    - `scripts/manager/install-argocd.sh`
    - `scripts/manager/install-longhorn-storage.sh`
@@ -56,15 +56,17 @@ Twinbox is a complete K8s cluster based on Talos Linux, completely configured. T
 
 1. The Management VM bootstraps local JSON files under `/opt/twinbox/bootstrap/secrets/global/`.
 2. `provision-nodes` materializes Talos runtime files from the local bootstrap tree and cluster-scoped attachments.
-3. `install-flannel` bootstraps pod networking so the cluster can run the Argo CD control plane.
-4. `install-argocd` installs Argo CD and starts tracking Flannel through a GitOps `Application`.
-5. `install-longhorn-storage` runs before cluster secret sync so stateful workloads and backup storage can use Longhorn PVCs immediately through the cluster default storage class.
-6. `install-secret-sync` installs External Secrets Operator and OpenBao on Longhorn.
-7. `install-secret-sync` seeds OpenBao from the Management VM bootstrap files and creates `ClusterSecretStore/openbao`.
-8. `install-velero-backup` deploys Velero together with a Twinbox-managed Garage bucket or an external S3-compatible backup target.
-9. `install-cloudnativepg` installs the CloudNativePG operator on top of Longhorn so PostgreSQL-backed workloads can share one database platform.
-10. `install-postgres-clusters` deploys the CloudNativePG Cluster, Pooler, ScheduledBackup, and ExternalSecret resources for each application database.
-11. GitOps apps consume secrets through `ExternalSecret` resources backed by `ClusterSecretStore/openbao`.
+3. `provision-nodes` renders the pinned Cilium Helm chart, stores the bootstrap manifest under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/cilium/`, and injects it as an inline manifest into every control-plane Talos config.
+4. `provision-nodes` sets `cluster.network.cni.name: none`, `cluster.proxy.disabled: true`, `machine.features.kubePrism.enabled: true`, and `machine.features.hostDNS.forwardKubeDNSToHost: false` so Talos boots with kube-proxy-free Cilium from the start.
+5. `provision-nodes` waits for `cilium`, `cilium-operator`, and `coredns` to become ready before the step completes.
+6. `install-argocd` installs Argo CD after the Talos/Cilium bootstrap has completed.
+7. `install-longhorn-storage` runs before cluster secret sync so stateful workloads and backup storage can use Longhorn PVCs immediately through the cluster default storage class.
+8. `install-secret-sync` installs External Secrets Operator and OpenBao on Longhorn.
+9. `install-secret-sync` seeds OpenBao from the Management VM bootstrap files and creates `ClusterSecretStore/openbao`.
+10. `install-velero-backup` deploys Velero together with a Twinbox-managed Garage bucket or an external S3-compatible backup target.
+11. `install-cloudnativepg` installs the CloudNativePG operator on top of Longhorn so PostgreSQL-backed workloads can share one database platform.
+12. `install-postgres-clusters` deploys the CloudNativePG Cluster, Pooler, ScheduledBackup, and ExternalSecret resources for each application database.
+13. GitOps apps consume secrets through `ExternalSecret` resources backed by `ClusterSecretStore/openbao`.
 
 ## Domain Flow
 

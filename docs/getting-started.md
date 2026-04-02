@@ -36,15 +36,16 @@ Expected early files:
 Use the UI to:
 
 1. Deploy the Talos cluster
-2. Install Flannel
-3. Install Argo CD
-4. Install Longhorn and make it the default storage class
-5. Install OpenBao and sync bootstrap secrets
-6. Install CloudNativePG
-7. Install Postgres clusters
-8. Install Traefik
-9. Install Velero backup
-10. Continue through the GitOps application steps
+2. Install Argo CD
+3. Install Longhorn and make it the default storage class
+4. Install OpenBao and sync bootstrap secrets
+5. Install CloudNativePG
+6. Install Postgres clusters
+7. Install Traefik
+8. Install Velero backup
+9. Continue through the GitOps application steps
+
+Cilium is installed during the Talos provisioning step, so there is no separate networking step in the wizard.
 
 ## Recovery
 

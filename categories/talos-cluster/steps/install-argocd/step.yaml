@@ -2,12 +2,12 @@ id: install-argocd
 title: Install Argo CD
 type: action
 journey_stage: setup
-order: 13
-summary: Install Argo CD and register Flannel as the first managed GitOps application.
-explanation: Twinbox installs Argo CD, waits for the Argo CD control plane to see if it went ok.
-side_help: Argo CD is bootstrap-only for itself, but it immediately takes ownership of Flannel so the rest of the platform can be installed through GitOps.
+order: 12
+summary: Install Argo CD so the remaining platform services can be managed declaratively.
+explanation: Twinbox installs Argo CD after the Talos/Cilium bootstrap has completed, then waits for the Argo CD control plane to become healthy before continuing.
+side_help: Argo CD manages the GitOps layer; the core Cilium networking stack stays Talos-owned.
 depends_on:
-  - install-flannel
+  - provision-nodes
 inputs: []
 secrets:
   files:

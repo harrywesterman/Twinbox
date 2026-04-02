@@ -108,3 +108,19 @@ docker compose logs manager-worker --tail=200
 - Verify control-plane IP list passed to bootstrap endpoint.
 - Ensure Talos nodes are reachable from Management VM.
 - Validate `talosctl` version compatibility with target Talos release.
+
+## Cilium Bootstrap or CoreDNS Failures
+
+Symptoms:
+
+- `provision-nodes` hangs waiting for Cilium or CoreDNS
+- `kubectl -n kube-system rollout status daemonset/cilium` never completes
+- CoreDNS starts but does not resolve external names
+
+Fix:
+
+- Verify the Talos machine config includes `cluster.network.cni.name: none` and `cluster.proxy.disabled: true`
+- Verify `machine.features.kubePrism.enabled: true` and `machine.features.kubePrism.port: 7445`
+- Verify `machine.features.hostDNS.forwardKubeDNSToHost: false`
+- Inspect the rendered manifest under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/cilium/cilium-bootstrap.yaml`
+- Check `kubectl -n kube-system logs daemonset/cilium` and `kubectl -n kube-system logs deployment/cilium-operator`
