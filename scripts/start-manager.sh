@@ -26,6 +26,14 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 EOF
 }
 
+remove_tool_version_envs() {
+  local tmp_file=""
+
+  tmp_file="$(mktemp)"
+  awk '!/^(KUBECTL_VERSION|HELM_VERSION)=/' .env >"$tmp_file"
+  mv "$tmp_file" .env
+}
+
 ensure_bootstrap_material() {
   local secret_dir="${BOOTSTRAP_DIR}/secrets/global"
   local openbao_seal_dir="${BOOTSTRAP_DIR}/openbao/seal"
@@ -103,6 +111,7 @@ else
 fi
 
 append_secret_env_block
+remove_tool_version_envs
 set -a
 # shellcheck disable=SC1091
 source .env

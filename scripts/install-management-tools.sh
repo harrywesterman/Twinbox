@@ -48,12 +48,13 @@ set -a
 source "$ENV_FILE"
 set +a
 
-required_vars=(KUBECTL_VERSION HELM_VERSION)
-[[ -n "${PINNED_K9S_VERSION:-}" ]] || fail "Missing required variable in ${ENV_FILE}: PINNED_K9S_VERSION"
+# Re-load the repo pins so stale values in .env cannot override the canonical versions.
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/../config/pinned-defaults.sh"
 
-for var in "${required_vars[@]}"; do
-  [[ -n "${!var:-}" ]] || fail "Missing required variable in ${ENV_FILE}: ${var}"
-done
+[[ -n "${PINNED_K9S_VERSION:-}" ]] || fail "Missing required variable in ${ENV_FILE}: PINNED_K9S_VERSION"
+[[ -n "${PINNED_KUBECTL_VERSION:-}" ]] || fail "Missing required variable in ${SCRIPT_DIR}/../config/pinned-defaults.sh: PINNED_KUBECTL_VERSION"
+[[ -n "${PINNED_HELM_VERSION:-}" ]] || fail "Missing required variable in ${SCRIPT_DIR}/../config/pinned-defaults.sh: PINNED_HELM_VERSION"
 
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
@@ -184,7 +185,7 @@ install_kubectl() {
   local checksum_path="$tmp_dir/kubectl.sha256"
   local expected_checksum=""
 
-  version="$(normalize_version "$KUBECTL_VERSION")"
+  version="$(normalize_version "$PINNED_KUBECTL_VERSION")"
   base_url="https://dl.k8s.io/release/v${version}/bin/linux/amd64"
 
   log "Installing kubectl v${version}"
@@ -206,7 +207,7 @@ install_helm() {
   local checksum_line
   local expected_checksum
 
-  version="$(normalize_version "$HELM_VERSION")"
+  version="$(normalize_version "$PINNED_HELM_VERSION")"
   tar_name="helm-v${version}-linux-amd64.tar.gz"
   tar_path="$tmp_dir/$tar_name"
   checksum_path="$tmp_dir/${tar_name}.sha256"
@@ -322,8 +323,8 @@ verify_versions() {
 
   talos_expected="$(normalize_version "$PINNED_TALOS_VERSION")"
   tofu_expected="$(normalize_version "$PINNED_OPENTOFU_VERSION")"
-  kubectl_expected="$(normalize_version "$KUBECTL_VERSION")"
-  helm_expected="$(normalize_version "$HELM_VERSION")"
+  kubectl_expected="$(normalize_version "$PINNED_KUBECTL_VERSION")"
+  helm_expected="$(normalize_version "$PINNED_HELM_VERSION")"
   k9s_expected="$(normalize_version "$PINNED_K9S_VERSION")"
 
   [[ "$talos_actual" == "$talos_expected" ]] || fail "talosctl version mismatch: expected v${talos_expected}, got v${talos_actual}"

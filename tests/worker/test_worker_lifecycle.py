@@ -6,6 +6,27 @@ import time
 from pathlib import Path
 
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _read_repo_pinned_defaults():
+    values = {}
+    for raw_line in (REPO_ROOT / "config" / "pinned-defaults.sh").read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key] = value
+    return values
+
+
+PINNED_DEFAULTS = _read_repo_pinned_defaults()
+PINNED_TALOS_VERSION = PINNED_DEFAULTS["PINNED_TALOS_VERSION"]
+PINNED_OPENTOFU_VERSION = PINNED_DEFAULTS["PINNED_OPENTOFU_VERSION"]
+PINNED_KUBECTL_VERSION = PINNED_DEFAULTS["PINNED_KUBECTL_VERSION"]
+PINNED_HELM_VERSION = PINNED_DEFAULTS["PINNED_HELM_VERSION"]
+
+
 def _wait_until(predicate, timeout=10):
     start = time.time()
     while time.time() - start < timeout:
@@ -23,27 +44,42 @@ def _write_fake_tool(path: Path, body: str):
 def _prepare_fake_toolchain(bin_dir: Path):
     _write_fake_tool(
         bin_dir / "talosctl",
-        "#!/bin/bash\nif [[ \"$1\" == \"version\" ]]; then echo 'Client: v1.12.6'; exit 0; fi\nexit 0\n",
+        f"#!/bin/bash\nif [[ \"$1\" == \"version\" ]]; then echo 'Client: {PINNED_TALOS_VERSION}'; exit 0; fi\nexit 0\n",
     )
     _write_fake_tool(
         bin_dir / "tofu",
-        "#!/bin/bash\nif [[ \"$1\" == \"version\" ]]; then echo 'OpenTofu v1.8.8'; exit 0; fi\nexit 0\n",
+        f"#!/bin/bash\nif [[ \"$1\" == \"version\" ]]; then echo 'OpenTofu {PINNED_OPENTOFU_VERSION}'; exit 0; fi\nexit 0\n",
     )
     _write_fake_tool(
         bin_dir / "kubectl",
-        "#!/bin/bash\nif [[ \"$1\" == \"version\" ]]; then echo '{\"clientVersion\":{\"gitVersion\":\"v1.30.0\"}}'; exit 0; fi\nexit 0\n",
+        f"#!/bin/bash\nif [[ \"$1\" == \"version\" ]]; then echo '{{\"clientVersion\":{{\"gitVersion\":\"{PINNED_KUBECTL_VERSION}\"}}}}'; exit 0; fi\nexit 0\n",
     )
     _write_fake_tool(
         bin_dir / "helm",
-        "#!/bin/bash\nif [[ \"$1\" == \"version\" ]]; then echo 'v3.15.4+gabcdef'; exit 0; fi\nexit 0\n",
+        f"#!/bin/bash\nif [[ \"$1\" == \"version\" ]]; then echo '{PINNED_HELM_VERSION}+gabcdef'; exit 0; fi\nexit 0\n",
     )
 
 
-def _write_pinned_defaults(workspace: Path, talos_version: str = "v1.12.6"):
+def _write_pinned_defaults(
+    workspace: Path,
+    talos_version: str = PINNED_TALOS_VERSION,
+    opentofu_version: str = PINNED_OPENTOFU_VERSION,
+    kubectl_version: str = PINNED_KUBECTL_VERSION,
+    helm_version: str = PINNED_HELM_VERSION,
+):
     config_dir = workspace / "config"
     config_dir.mkdir(parents=True, exist_ok=True)
     (config_dir / "pinned-defaults.sh").write_text(
-        f"PINNED_TALOS_VERSION={talos_version}\nPINNED_OPENTOFU_VERSION=v1.8.8\nPINNED_PROXMOX_ISO_STORAGE=local\n",
+        "\n".join(
+            [
+                f"PINNED_TALOS_VERSION={talos_version}",
+                f"PINNED_OPENTOFU_VERSION={opentofu_version}",
+                f"PINNED_KUBECTL_VERSION={kubectl_version}",
+                f"PINNED_HELM_VERSION={helm_version}",
+                "PINNED_PROXMOX_ISO_STORAGE=local",
+                "",
+            ],
+        ),
     )
 
 
@@ -141,8 +177,6 @@ def test_worker_processes_pending_job_to_completed():
         env["MANAGER_DATA_DIR"] = str(data)
         env["WORKSPACE_ROOT"] = str(workspace)
         env["WORKER_POLL_MS"] = "100"
-        env["KUBECTL_VERSION"] = "v1.30.0"
-        env["HELM_VERSION"] = "v3.15.4"
         env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
         env["TWINBOX_SECRET_BACKEND"] = "env"
         env["PROXMOX_HOST"] = "192.168.1.10"
@@ -255,8 +289,6 @@ def test_worker_recovers_orphaned_running_run_step_job_on_startup():
         env["MANAGER_DATA_DIR"] = str(data)
         env["WORKSPACE_ROOT"] = str(workspace)
         env["WORKER_POLL_MS"] = "100"
-        env["KUBECTL_VERSION"] = "v1.30.0"
-        env["HELM_VERSION"] = "v3.15.4"
         env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
         env["TWINBOX_SECRET_BACKEND"] = "env"
         env["PROXMOX_HOST"] = "192.168.1.10"
@@ -374,8 +406,6 @@ def test_worker_materializes_secret_bundle_files_and_cleans_up():
         env["MANAGER_DATA_DIR"] = str(data)
         env["WORKSPACE_ROOT"] = str(workspace)
         env["WORKER_POLL_MS"] = "100"
-        env["KUBECTL_VERSION"] = "v1.30.0"
-        env["HELM_VERSION"] = "v3.15.4"
         env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
         env["TWINBOX_SECRET_BACKEND"] = "env"
         env["PROXMOX_HOST"] = "192.168.1.10"
@@ -419,14 +449,12 @@ def test_worker_exits_on_tool_version_mismatch():
             d.mkdir(parents=True, exist_ok=True)
 
         _prepare_fake_toolchain(bin_dir)
-        _write_pinned_defaults(workspace)
+        _write_pinned_defaults(workspace, kubectl_version="v1.31.0")
 
         env = os.environ.copy()
         env["MANAGER_DATA_DIR"] = str(data)
         env["WORKSPACE_ROOT"] = str(workspace)
         env["WORKER_POLL_MS"] = "100"
-        env["KUBECTL_VERSION"] = "v1.31.0"
-        env["HELM_VERSION"] = "v3.15.4"
         env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
 
         proc = subprocess.Popen(
@@ -512,8 +540,6 @@ def test_worker_processes_run_step_config_job_and_persists_outputs():
         env["MANAGER_DATA_DIR"] = str(data)
         env["WORKSPACE_ROOT"] = str(workspace)
         env["WORKER_POLL_MS"] = "100"
-        env["KUBECTL_VERSION"] = "v1.30.0"
-        env["HELM_VERSION"] = "v3.15.4"
         env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
         env["TWINBOX_HOST_CRON_DIR"] = str(host_cron_dir)
         env["TWINBOX_HOST_REPO_ROOT"] = "/opt/twinbox-demo"
@@ -617,8 +643,6 @@ def test_worker_processes_run_step_action_job_and_records_cluster_context():
         env["MANAGER_DATA_DIR"] = str(data)
         env["WORKSPACE_ROOT"] = str(workspace)
         env["WORKER_POLL_MS"] = "100"
-        env["KUBECTL_VERSION"] = "v1.30.0"
-        env["HELM_VERSION"] = "v3.15.4"
         env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
 
         proc = subprocess.Popen(
@@ -706,8 +730,6 @@ def test_worker_marks_run_step_job_failed_when_script_fails():
         env["MANAGER_DATA_DIR"] = str(data)
         env["WORKSPACE_ROOT"] = str(workspace)
         env["WORKER_POLL_MS"] = "100"
-        env["KUBECTL_VERSION"] = "v1.30.0"
-        env["HELM_VERSION"] = "v3.15.4"
         env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
 
         proc = subprocess.Popen(
@@ -801,8 +823,6 @@ def test_worker_includes_recent_script_output_in_failed_run_step_error():
         env["MANAGER_DATA_DIR"] = str(data)
         env["WORKSPACE_ROOT"] = str(workspace)
         env["WORKER_POLL_MS"] = "100"
-        env["KUBECTL_VERSION"] = "v1.30.0"
-        env["HELM_VERSION"] = "v3.15.4"
         env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
 
         proc = subprocess.Popen(

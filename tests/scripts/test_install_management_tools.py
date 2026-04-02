@@ -21,7 +21,8 @@ def test_install_management_tools_checks_x86_64_v2_flags_for_recent_talosctl():
 def test_install_management_tools_fails_on_version_command_errors():
     text = _script_text()
     assert 'Usage: install-management-tools.sh [--env-file /path/to/.env]' in text
-    assert 'required_vars=(KUBECTL_VERSION HELM_VERSION)' in text
+    assert 'PINNED_KUBECTL_VERSION' in text
+    assert 'PINNED_HELM_VERSION' in text
     assert 'talos_output="$(/usr/local/bin/talosctl version --client 2>&1)" || fail "talosctl version check failed: ${talos_output}"' in text
     assert 'tofu_output="$(/usr/local/bin/tofu version 2>&1)" || fail "tofu version check failed: ${tofu_output}"' in text
     assert 'kubectl_output="$(/usr/local/bin/kubectl version --client --output=yaml 2>&1)" || fail "kubectl version check failed: ${kubectl_output}"' in text

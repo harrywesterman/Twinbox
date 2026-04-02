@@ -94,8 +94,6 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     assert "  - path: /tmp/twinbox.env.template" in text
     assert "    owner: root:root" in text
     assert "      TWINBOX_CLUSTER_SLUG=${CLUSTER_SLUG}" in text
-    assert "      KUBECTL_VERSION=${KUBECTL_VERSION}" in text
-    assert "      HELM_VERSION=${HELM_VERSION}" in text
     assert "      TWINBOX_HOST_REPO_ROOT=${TWINBOX_TARGET_DIR}" in text
     assert 'TWINBOX_TARGET_DIR="/opt/twinbox"' in text
     assert "      TWINBOX_SECRET_BACKEND=filesystem" in text

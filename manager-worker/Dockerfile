@@ -1,18 +1,16 @@
 FROM node:20-bookworm-slim
 
-ARG TALOSCTL_VERSION=v1.12.6
-ARG OPENTOFU_VERSION=v1.8.8
-ARG KUBECTL_VERSION=v1.30.0
-ARG HELM_VERSION=v3.15.4
-
 WORKDIR /opt/twinbox
+
+COPY config ./config
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends bash ca-certificates curl jq openssl tar xz-utils sudo \
-  && curl -fsSL "https://github.com/siderolabs/talos/releases/download/${TALOSCTL_VERSION}/talosctl-linux-amd64" -o /tmp/talosctl \
-  && curl -fsSL "https://github.com/opentofu/opentofu/releases/download/${OPENTOFU_VERSION}/tofu_${OPENTOFU_VERSION#v}_linux_amd64.tar.gz" -o /tmp/tofu.tar.gz \
-  && curl -fsSL "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" -o /tmp/kubectl \
-  && curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" -o /tmp/helm.tar.gz \
+  && . /opt/twinbox/config/pinned-defaults.sh \
+  && curl -fsSL "https://github.com/siderolabs/talos/releases/download/${PINNED_TALOS_VERSION}/talosctl-linux-amd64" -o /tmp/talosctl \
+  && curl -fsSL "https://github.com/opentofu/opentofu/releases/download/${PINNED_OPENTOFU_VERSION}/tofu_${PINNED_OPENTOFU_VERSION#v}_linux_amd64.tar.gz" -o /tmp/tofu.tar.gz \
+  && curl -fsSL "https://dl.k8s.io/release/${PINNED_KUBECTL_VERSION}/bin/linux/amd64/kubectl" -o /tmp/kubectl \
+  && curl -fsSL "https://get.helm.sh/helm-${PINNED_HELM_VERSION}-linux-amd64.tar.gz" -o /tmp/helm.tar.gz \
   && tar -xzf /tmp/tofu.tar.gz -C /tmp \
   && tar -xzf /tmp/helm.tar.gz -C /tmp \
   && install -m 0755 /tmp/talosctl /usr/local/bin/talosctl \
@@ -29,7 +27,6 @@ RUN apt-get update \
 COPY manager-worker/package.json ./manager-worker/package.json
 COPY manager-worker/src ./manager-worker/src
 COPY lib ./lib
-COPY config ./config
 COPY infra ./infra
 COPY scripts/manager ./scripts/manager
 COPY scripts/get-talos-image-factory.sh ./scripts/get-talos-image-factory.sh

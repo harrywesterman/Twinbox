@@ -423,14 +423,6 @@ function resolveJobSecretRuntime(payload, clusterId = null) {
   };
 }
 
-function requireEnv(name) {
-  const value = process.env[name];
-  if (!value || value.trim() === "") {
-    throw new Error(`missing required environment variable: ${name}`);
-  }
-  return value.trim();
-}
-
 function loadPinnedDefaults() {
   const file = path.join(workspace, "config", "pinned-defaults.sh");
   if (!fs.existsSync(file)) {
@@ -451,6 +443,12 @@ function loadPinnedDefaults() {
   }
   if (!values.PINNED_OPENTOFU_VERSION) {
     throw new Error(`missing PINNED_OPENTOFU_VERSION in ${file}`);
+  }
+  if (!values.PINNED_KUBECTL_VERSION) {
+    throw new Error(`missing PINNED_KUBECTL_VERSION in ${file}`);
+  }
+  if (!values.PINNED_HELM_VERSION) {
+    throw new Error(`missing PINNED_HELM_VERSION in ${file}`);
   }
 
   return values;
@@ -485,8 +483,8 @@ function ensureToolVersionsMatchPolicy() {
   const pinnedDefaults = loadPinnedDefaults();
   const expectedTalosctl = normalizeVersion(pinnedDefaults.PINNED_TALOS_VERSION);
   const expectedTofu = normalizeVersion(pinnedDefaults.PINNED_OPENTOFU_VERSION);
-  const expectedKubectl = normalizeVersion(requireEnv("KUBECTL_VERSION"));
-  const expectedHelm = normalizeVersion(requireEnv("HELM_VERSION"));
+  const expectedKubectl = normalizeVersion(pinnedDefaults.PINNED_KUBECTL_VERSION);
+  const expectedHelm = normalizeVersion(pinnedDefaults.PINNED_HELM_VERSION);
 
   const talosOutput = runVersionCommand("talosctl", ["version", "--client"]);
   const tofuOutput = runVersionCommand("tofu", ["version"]);

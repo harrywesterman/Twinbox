@@ -13,8 +13,6 @@ PROXMOX_NODE=pve
 PROXMOX_STORAGE_POOL=local-lvm
 PROXMOX_FILE_DATASTORE=local
 TALOS_IMAGE_PRESET=qemu-guest-agent
-KUBECTL_VERSION=v1.30.0
-HELM_VERSION=v3.15.4
 TWINBOX_IMAGE_TAG=latest
 TWINBOX_HOST_REPO_ROOT=/opt/twinbox
 TWINBOX_SECRET_BACKEND=filesystem
@@ -207,4 +205,6 @@ The `platform-ingress` application deploys the entire `gitops/platform/` directo
 
 ## Tooling Versions
 
-See `env-reference.md` for the full list of pinned and configurable tool versions.
+Tool versions are pinned in [`config/pinned-defaults.sh`](../config/pinned-defaults.sh) and are not meant to be edited through `.env`.
+
+The runtime `.env` only carries per-installation settings such as Proxmox access, image tags, and secret backend selection.

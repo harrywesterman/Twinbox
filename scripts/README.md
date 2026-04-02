@@ -7,9 +7,11 @@ Shell and Node.js scripts for provisioning, bootstrapping, and managing the Twin
 ```
 scripts/
 ├── bootstrap-vm.sh                 # Bootstrap the Management VM (clone repo, install Docker, start compose)
+├── install-management-vm-maintenance.sh # Install the Management VM maintenance systemd timer
 ├── start-manager.sh                # Start the manager stack (load .env, start docker compose)
 ├── get-talos-image-factory.sh      # Fetch or resolve Talos image from the Image Factory
 ├── install-management-tools.sh     # Install talosctl, tofu, kubectl, helm on the Management VM
+├── management-vm-maintenance.sh     # Run apt patching and host hardening through Ansible
 ├── manager-web-preview.sh          # Local dev helper for manager-web
 ├── wizard-dev-run.sh               # Local dev helper for the wizard
 ├── ssh-connection/                 # SSH connection helpers (empty, placeholder)
@@ -34,9 +36,11 @@ scripts/
 | Script | Purpose |
 |--------|---------|
 | `bootstrap-vm.sh` | First-run script for the Management VM: clones Twinbox, installs Docker CE, creates `.env`, starts `docker compose`. |
+| `install-management-vm-maintenance.sh` | Installs and enables the systemd timer that runs the Management VM maintenance playbook. |
 | `start-manager.sh` | Loads `.env` and starts the manager stack via `docker compose`. |
 | `get-talos-image-factory.sh` | Queries the Talos Image Factory for a schematic ID, download URL, or shell command. Supports `--preset`, `--version`, `--arch`, `--platform`, `--output`. |
 | `install-management-tools.sh` | Installs `talosctl`, `tofu`, `kubectl`, and `helm` with versions pinned from `config/pinned-defaults.sh`. |
+| `management-vm-maintenance.sh` | Installs `ansible-core` if needed and runs the Management VM maintenance playbook locally. |
 | `manager-web-preview.sh` | Dev helper for previewing `manager-web`. |
 | `wizard-dev-run.sh` | Dev helper for running the setup wizard locally. |
 
