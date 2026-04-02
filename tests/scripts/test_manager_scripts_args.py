@@ -944,6 +944,10 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "cloudflare:" in cloudflare_tunnel_run_text
     assert "platform-ingress.yaml" in cloudflare_tunnel_run_text
     assert "kubectl delete application cluster-config -n argocd --ignore-not-found=true" in cloudflare_tunnel_run_text
+    assert (
+        cloudflare_tunnel_run_text.index("platform-ingress.yaml")
+        < cloudflare_tunnel_run_text.index("Applying cloudflare-tunnel application")
+    )
 
     cloudflare_dns_run_text = (
         REPO_ROOT

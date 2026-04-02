@@ -218,15 +218,20 @@ if command -v kubectl &>/dev/null; then
     sleep 5
   done
 
-  # Apply the cloudflare-tunnel application
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying cloudflare-tunnel application"
-  bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
-    --manifest "$cloudflare_tunnel_manifest" \
-    --application "cloudflare-tunnel"
+  # Refresh the parent ingress app first, then apply the runtime Cloudflare app.
+  # The parent app manifests still come from Git, so applying it after the
+  # runtime app would overwrite the inline tunnel values we need for this run.
   kubectl delete application cluster-config -n argocd --ignore-not-found=true 2>/dev/null || true
   bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
     --manifest "$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml" \
     --application "platform-ingress"
+
+  # Apply the cloudflare-tunnel application last so the inline runtime values
+  # remain the active desired state when Argo reconciles the deployment.
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying cloudflare-tunnel application"
+  bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+    --manifest "$cloudflare_tunnel_manifest" \
+    --application "cloudflare-tunnel"
 fi
 
 # Store ingress strategy in cluster state
