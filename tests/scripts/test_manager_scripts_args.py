@@ -1067,6 +1067,9 @@ HOMEPAGE_CONFIGMAP = REPO_ROOT / "gitops" / "platform" / "homepage" / "configmap
 KUSTOMIZATION = REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
 DATABASES_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "kustomization.yaml"
 AUTHENTIK_DB_CLUSTER = REPO_ROOT / "gitops" / "databases" / "authentik" / "cluster.yaml"
+AUTHENTIK_DB_STORAGECLASS = (
+    REPO_ROOT / "gitops" / "databases" / "longhorn-single-storageclass.yaml"
+)
 
 
 def test_prometheus_argocd_app_uses_kube_prometheus_stack():
@@ -1188,6 +1191,7 @@ def test_kustomization_includes_monitoring_resources():
 def test_databases_kustomization_includes_authentik_resources():
     text = DATABASES_KUSTOMIZATION.read_text(encoding="utf-8")
     assert "namespace.yaml" in text
+    assert "longhorn-single-storageclass.yaml" in text
     assert "authentik/cluster.yaml" in text
     assert "authentik/externalsecret.yaml" in text
     assert "authentik/pooler-ro.yaml" in text
@@ -1199,4 +1203,11 @@ def test_authentik_db_cluster_is_scaled_for_lab_capacity():
     text = AUTHENTIK_DB_CLUSTER.read_text(encoding="utf-8")
     assert "instances: 1" in text
     assert "size: 10Gi" in text
-    assert "storageClass: longhorn" in text
+    assert "storageClass: longhorn-single" in text
+
+
+def test_authentik_db_storageclass_uses_single_replica():
+    text = AUTHENTIK_DB_STORAGECLASS.read_text(encoding="utf-8")
+    assert "name: longhorn-single" in text
+    assert 'numberOfReplicas: "1"' in text
+    assert "provisioner: driver.longhorn.io" in text

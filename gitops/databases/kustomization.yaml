@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
+  - longhorn-single-storageclass.yaml
   - authentik/cluster.yaml
   - authentik/externalsecret.yaml
   - authentik/pooler-ro.yaml
