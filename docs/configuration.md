@@ -151,13 +151,13 @@ Twinbox uses a single domain name (`ZONE_NAME`) for all platform services. The d
 1. **User input** — The user enters their domain (e.g. `example.com`) in the web wizard during `choose-ingress-route`.
 2. **OpenBao sync** — The ingress selection step syncs `ZONE_NAME`, `WIREDOOR_FQDN`, and `WILDCARD_FQDN` to OpenBao at `twinbox/global/cluster-hostnames`.
 3. **ExternalSecret** — The `cluster-config` ExternalSecret reads `ZONE_NAME` from OpenBao and creates a Kubernetes Secret in the `argocd` namespace.
-4. **Rendered ConfigMap** — The ingress/domain step renders `gitops/platform/cluster-config/configmap.yaml` with the selected domain so Kustomize can use it as a plain-text replacement source.
-5. **Kustomize replacements** — The `platform-ingress` Argo CD application uses Kustomize to replace `__ZONE_NAME__` placeholders in all IngressRoute `match` rules, the homepage configmap, and the homepage deployment.
+4. **Rendered ConfigMap** — The ingress/domain step renders `gitops/platform/cluster-config/configmap.yaml` with the selected domain and prebuilt route strings.
+5. **Kustomize replacements** — The `platform-ingress` Argo CD application uses Kustomize to copy the rendered match expressions and homepage strings into the live platform manifests.
 6. **Ingress-specific apps** — Cloudflare Tunnel, Wiredoor, MetalLB, and Tailscale all reuse the same selected domain when they render route-specific configuration.
 
 ### Affected services
 
-All platform services use the domain through the `__ZONE_NAME__` placeholder:
+All platform services use the rendered `cluster-config` values:
 
 | Service | Hostname |
 |---------|----------|
@@ -177,14 +177,14 @@ gitops/platform/
 ├── cluster-config/
 │   ├── configmap.yaml          # Rendered plain-text source for Kustomize replacements
 │   └── externalsecret.yaml     # Reads ZONE_NAME from OpenBao
-├── authentik/ingressroute.yaml # Host(`authentik.__ZONE_NAME__`)
+├── authentik/ingressroute.yaml # Host match rendered from cluster-config
 ├── whoami/
-│   ├── ingressroute.yaml       # Host(`whoami.__ZONE_NAME__`)
+│   ├── ingressroute.yaml       # Host match rendered from cluster-config
 │   └── k8s.yaml                # Deployment + Service (no domain reference)
 ├── grafana/
-│   ├── ingressroute.yaml       # Host(`grafana.__ZONE_NAME__`)
+│   ├── ingressroute.yaml       # Host match rendered from cluster-config
 │   └── externalsecret.yaml     # Admin credentials from OpenBao
-├── headlamp/ingressroute.yaml  # Host(`headlamp.__ZONE_NAME__`)
+├── headlamp/ingressroute.yaml  # Host match rendered from cluster-config
 ├── traefik/
 │   ├── argocd-ingressroute.yaml
 │   └── traefik-dashboard-ingressroute.yaml
@@ -193,7 +193,7 @@ gitops/platform/
 │   └── externalsecret.yaml
 └── homepage/
     ├── ingressroute.yaml
-    ├── configmap.yaml          # Bookmarks and services with __ZONE_NAME__
+    ├── configmap.yaml          # Bookmarks and services rendered with the selected domain
     └── deployment.yaml         # HOMEPAGE_ALLOWED_HOSTS
 ```
 

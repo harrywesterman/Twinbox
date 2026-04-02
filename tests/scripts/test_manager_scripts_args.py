@@ -1259,6 +1259,25 @@ def test_kustomization_includes_monitoring_resources():
     assert "prometheus/ingressroute.yaml" in text
     assert "prometheus/alertmanager-config.yaml" in text
     assert "ntfy/ingressroute.yaml" in text
+    assert "data.ARGOCD_MATCH" in text
+    assert "data.HEADLAMP_MATCH" in text
+    assert "data.HOMEPAGE_BOOKMARKS_YAML" in text
+    assert 'delimiter: "."' not in text
+    assert "index: 1" not in text
+
+
+def test_cluster_config_render_script_emits_full_route_values():
+    text = (REPO_ROOT / "scripts" / "manager" / "render-cluster-config-map.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert "ARGOCD_MATCH" in text
+    assert "AUTHENTIK_MATCH" in text
+    assert "HEADLAMP_MATCH" in text
+    assert "TRAEFIK_DASHBOARD_MATCH" in text
+    assert "HOMEPAGE_BOOKMARKS_YAML" in text
+    assert "HOMEPAGE_SERVICES_YAML" in text
+    assert "HOMEPAGE_ALLOWED_HOSTS" in text
 
 
 def test_databases_kustomization_includes_authentik_resources():

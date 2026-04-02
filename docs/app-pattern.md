@@ -36,7 +36,7 @@ Twinbox supports four ingress strategies, chosen by the user during setup:
 
 **Tailscale** — The cluster joins a Tailscale tailnet. Users connect by enabling Tailscale on their device. No port forwarding, no external VM, no public DNS needed. Access control via Tailscale ACLs. Can be self-hosted with Headscale for full control.
 
-All strategies use the same IngressRoute structure — only the `entryPoints` and `tls` fields differ. Domain names use the `__ZONE_NAME__` placeholder which is replaced by Kustomize with the actual domain name from the rendered `cluster-config` ConfigMap.
+All strategies use the same IngressRoute structure — only the `entryPoints` and `tls` fields differ. Domain names are rendered from the `cluster-config` ConfigMap into the final Traefik match expressions.
 
 ### CloudNativePG — PostgreSQL
 
@@ -261,7 +261,7 @@ spec:
     - websecure
   routes:
     - kind: Rule
-      match: Host(`<app>.__ZONE_NAME__`)
+      match: Host(`<app>.<selected-domain>`)
       middlewares:
         - name: authentik-forwardauth
           namespace: authentik
@@ -281,7 +281,7 @@ spec:
     - webwiredoor
   routes:
     - kind: Rule
-      match: Host(`<app>.__ZONE_NAME__`)
+      match: Host(`<app>.<selected-domain>`)
       middlewares:
         - name: authentik-forwardauth
           namespace: authentik
@@ -411,7 +411,7 @@ spec:
     - websecure
   routes:
     - kind: Rule
-      match: Host(`headlamp.__ZONE_NAME__`)
+      match: Host(`headlamp.<selected-domain>`)
       middlewares:
         - name: authentik-forwardauth
           namespace: authentik
@@ -431,7 +431,7 @@ spec:
     - webwiredoor
   routes:
     - kind: Rule
-      match: Host(`headlamp.__ZONE_NAME__`)
+      match: Host(`headlamp.<selected-domain>`)
       middlewares:
         - name: authentik-forwardauth
           namespace: authentik
@@ -688,7 +688,7 @@ kubectl get externalsecret -n databases
 **Symptom**: Visiting `app.domain.com` returns 404.
 
 **Causes**:
-- `__ZONE_NAME__` was not replaced by Kustomize
+- The rendered route strings were missing or stale in `cluster-config`
 - DNS record does not point to the cluster
 - Service name does not match the Helm chart output
 
