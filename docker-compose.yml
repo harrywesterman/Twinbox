@@ -60,7 +60,7 @@ services:
       - ./infra:/opt/twinbox/infra:ro
       - ./categories:/opt/twinbox/categories:ro
       - ./scripts:/opt/twinbox/scripts:ro
-      - ./gitops:/opt/twinbox/gitops:ro
+      - ./gitops:/opt/twinbox/gitops
       - ./bootstrap:/opt/twinbox/bootstrap
       - /etc/cron.d:/host/etc/cron.d
       - /home/twinbox:/home/twinbox

@@ -6,12 +6,14 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 def test_docker_compose_mounts_categories_and_host_cron_contract():
     text = (REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    lines = text.splitlines()
 
     assert "WORKSPACE_ROOT=/opt/twinbox" in text
     assert "TWINBOX_SYNC_LOCAL_CLIENT_CONFIGS=true" in text
     assert "./categories:/opt/twinbox/categories:ro" in text
     assert "./scripts:/opt/twinbox/scripts:ro" in text
-    assert "./gitops:/opt/twinbox/gitops:ro" in text
+    assert lines.count("      - ./gitops:/opt/twinbox/gitops:ro") == 1
+    assert lines.count("      - ./gitops:/opt/twinbox/gitops") == 1
     assert "TWINBOX_HOST_REPO_ROOT=${TWINBOX_HOST_REPO_ROOT}" in text
     assert "/etc/cron.d:/host/etc/cron.d" in text
 
