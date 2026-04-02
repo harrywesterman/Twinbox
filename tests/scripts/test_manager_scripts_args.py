@@ -939,6 +939,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert 'curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${cf_zone_id}"' in cloudflare_tunnel_run_text
     assert "Cloudflare sees zone name: $cloudflare_zone_name" in cloudflare_tunnel_run_text
     assert "resolves to ${cloudflare_zone_name}, but the wizard selected ${public_zone_name}" in cloudflare_tunnel_run_text
+    assert "continuing without a zone-name preflight" in cloudflare_tunnel_run_text
     assert '\\"name\\":\\"*.${public_zone_name}\\"' in cloudflare_tunnel_run_text
     assert "already have a tunnel with this name" in cloudflare_tunnel_run_text
     assert ".result.Token" not in cloudflare_tunnel_run_text

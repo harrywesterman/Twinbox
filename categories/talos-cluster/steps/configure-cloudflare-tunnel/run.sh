@@ -97,15 +97,19 @@ zone_response="$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${cf
 zone_success="$(echo "$zone_response" | jq -r '.success // false')"
 if [[ "$zone_success" != "true" ]]; then
   zone_error="$(echo "$zone_response" | jq -r '.errors[0].message // "Unknown error"')"
-  fail "Could not read Cloudflare zone ${cf_zone_id}: $zone_error"
-fi
+  if [[ "$zone_error" == *"Unauthorized to access requested resource"* ]]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: Cloudflare token cannot read zone metadata for ${cf_zone_id}; continuing without a zone-name preflight"
+  else
+    fail "Could not read Cloudflare zone ${cf_zone_id}: $zone_error"
+  fi
+else
+  cloudflare_zone_name="$(echo "$zone_response" | jq -r '.result.name // empty')"
+  [[ -n "$cloudflare_zone_name" ]] || fail "Cloudflare zone lookup returned no zone name for ${cf_zone_id}"
 
-cloudflare_zone_name="$(echo "$zone_response" | jq -r '.result.name // empty')"
-[[ -n "$cloudflare_zone_name" ]] || fail "Cloudflare zone lookup returned no zone name for ${cf_zone_id}"
-
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Cloudflare sees zone name: $cloudflare_zone_name"
-if [[ "$cloudflare_zone_name" != "$public_zone_name" ]]; then
-  fail "Cloudflare zone ${cf_zone_id} resolves to ${cloudflare_zone_name}, but the wizard selected ${public_zone_name}"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Cloudflare sees zone name: $cloudflare_zone_name"
+  if [[ "$cloudflare_zone_name" != "$public_zone_name" ]]; then
+    fail "Cloudflare zone ${cf_zone_id} resolves to ${cloudflare_zone_name}, but the wizard selected ${public_zone_name}"
+  fi
 fi
 
 cloudflare_tunnel_manifest="$MANAGER_DATA_DIR/tmp/cloudflare-tunnel-${cluster_id}.yaml"
