@@ -889,7 +889,8 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "ingress_route: wiredoor" in wiredoor_bastion_text
 
     assert "cluster_dns_domain" in authentik_run_text
-    assert "https://authentik.${cluster_dns_domain}" in authentik_run_text
+    assert "public_zone_name" in authentik_run_text
+    assert "https://authentik.${public_zone_name}" in authentik_run_text
     assert "kubectl create namespace authentik --dry-run=client -o yaml | kubectl apply -f -" in authentik_run_text
     assert "gitops/platform/authentik/externalsecret.yaml" in authentik_run_text
     assert "gitops/platform/authentik/ingressroute.yaml" in authentik_run_text
@@ -902,6 +903,11 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "AUTHENTIK_POSTGRESQL__CONN_MAX_AGE" in authentik_run_text
     assert "rollout restart deployment" in authentik_run_text
     assert "rollout status deployment" in authentik_run_text
+    assert (
+        'if [[ "$cluster_dns_domain" == app.* ]]; then' in authentik_run_text
+    )
+    assert 'elif [[ "$cluster_id_lower" == prd ]]; then' in authentik_run_text
+    assert 'authentik_host="https://authentik.${public_zone_name}"' in authentik_run_text
     assert (
         "Could not determine Authentik host; set DNS domain in the ingress selection step"
         in authentik_run_text
@@ -919,7 +925,10 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "jq -r '.success // false'" in cloudflare_tunnel_run_text
     assert "jq -r '.result // empty'" in cloudflare_tunnel_run_text
     assert "cluster_dns_domain" in cloudflare_tunnel_run_text
-    assert '*.${cluster_dns_domain}' in cloudflare_tunnel_run_text
+    assert 'if [[ "$cluster_dns_domain" == app.* ]]; then' in cloudflare_tunnel_run_text
+    assert 'elif [[ "$cluster_id_lower" == prd ]]; then' in cloudflare_tunnel_run_text
+    assert 'echo "[$(date \'+%Y-%m-%d %H:%M:%S\')] Public zone name: $public_zone_name"' in cloudflare_tunnel_run_text
+    assert '\\"name\\":\\"*.${public_zone_name}\\"' in cloudflare_tunnel_run_text
     assert "already have a tunnel with this name" in cloudflare_tunnel_run_text
     assert ".result.Token" not in cloudflare_tunnel_run_text
 

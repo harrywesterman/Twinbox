@@ -27,7 +27,7 @@ inputs:
     label: DNS Domain
     type: string
     required: true
-    help: Domain name for platform hostnames, for example example.com.
+    help: Base domain for platform hostnames, for example example.org or example.com. Twinbox derives the public zone name from it.
 runner:
   kind: script
   script: categories/talos-cluster/steps/choose-ingress-route/run.sh

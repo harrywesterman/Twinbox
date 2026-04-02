@@ -21,12 +21,21 @@ fail() {
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty')"
+cluster_id_lower="$(printf '%s' "$cluster_id" | tr '[:upper:]' '[:lower:]')"
 
 [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
 
 authentik_host="${TWINBOX_AUTHENTIK_HOST:-}"
 if [[ -z "$authentik_host" && -n "$cluster_dns_domain" ]]; then
-  authentik_host="https://authentik.${cluster_dns_domain}"
+  if [[ "$cluster_dns_domain" == app.* ]]; then
+    public_zone_name="$cluster_dns_domain"
+  elif [[ "$cluster_id_lower" == prd ]]; then
+    public_zone_name="app.${cluster_dns_domain}"
+  else
+    public_zone_name="app.${cluster_id_lower}.${cluster_dns_domain}"
+  fi
+
+  authentik_host="https://authentik.${public_zone_name}"
 fi
 authentik_secret_key=""
 authentik_bootstrap_password=""

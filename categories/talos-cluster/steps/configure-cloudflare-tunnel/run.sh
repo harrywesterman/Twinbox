@@ -18,6 +18,7 @@ cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
 cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty')"
+cluster_id_lower="$(printf '%s' "$cluster_id" | tr '[:upper:]' '[:lower:]')"
 
 [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
 
@@ -32,9 +33,18 @@ cf_zone_id="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.cf_zone_id')"
 [[ -n "$cf_zone_id" ]] || fail "Cloudflare zone ID is required"
 [[ -n "$cluster_dns_domain" ]] || fail "DNS domain is required from the ingress selection step"
 
+if [[ "$cluster_dns_domain" == app.* ]]; then
+  public_zone_name="$cluster_dns_domain"
+elif [[ "$cluster_id_lower" == prd ]]; then
+  public_zone_name="app.${cluster_dns_domain}"
+else
+  public_zone_name="app.${cluster_id_lower}.${cluster_dns_domain}"
+fi
+
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting Cloudflare Tunnel configuration for cluster: $cluster_id"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Account ID: $cf_account_id"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Zone ID: $cf_zone_id"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Public zone name: $public_zone_name"
 
 # Step 1: Create Cloudflare Tunnel
 tunnel_name="twinbox-${cluster_id}"
@@ -88,7 +98,7 @@ dns_response="$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${cf
   -H "Content-Type: application/json" \
   -d "{
     \"type\":\"CNAME\",
-    \"name\":\"*.${cluster_dns_domain}\",
+    \"name\":\"*.${public_zone_name}\",
     \"content\":\"${cf_tunnel_id}.cfargotunnel.com\",
     \"proxied\":true,
     \"ttl\":1
