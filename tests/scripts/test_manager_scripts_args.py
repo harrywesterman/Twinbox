@@ -1168,4 +1168,5 @@ def test_kustomization_includes_monitoring_resources():
     text = KUSTOMIZATION.read_text(encoding="utf-8")
     assert "prometheus/ingressroute.yaml" in text
     assert "prometheus/alertmanager-config.yaml" in text
+    assert "authentik/externalsecret.yaml" in text
     assert "ntfy/ingressroute.yaml" in text

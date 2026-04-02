@@ -4,6 +4,7 @@ kind: Kustomization
 resources:
   - cluster-config/configmap.yaml
   - cluster-config/externalsecret.yaml
+  - authentik/externalsecret.yaml
   - authentik/ingressroute.yaml
   - whoami/ingressroute.yaml
   - headlamp/ingressroute.yaml
