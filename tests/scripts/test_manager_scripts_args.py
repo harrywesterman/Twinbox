@@ -939,8 +939,9 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "already have a tunnel with this name" in cloudflare_tunnel_run_text
     assert ".result.Token" not in cloudflare_tunnel_run_text
     assert "cluster-hostnames" in cloudflare_tunnel_run_text
-    assert "Rendered cloudflare-tunnel values to" in cloudflare_tunnel_run_text
-    assert 'cloudflare:\n  account:' in cloudflare_tunnel_run_text or "cloudflare:" in cloudflare_tunnel_run_text
+    assert "Rendered cloudflare-tunnel application to" in cloudflare_tunnel_run_text
+    assert "helm:" in cloudflare_tunnel_run_text
+    assert "cloudflare:" in cloudflare_tunnel_run_text
     assert "platform-ingress.yaml" in cloudflare_tunnel_run_text
     assert "kubectl delete application cluster-config -n argocd --ignore-not-found=true" in cloudflare_tunnel_run_text
 

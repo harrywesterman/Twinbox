@@ -87,33 +87,61 @@ fi
 cf_tunnel_token="$(echo "$token_response" | jq -r '.result // empty')"
 [[ -n "$cf_tunnel_token" ]] || fail "Could not generate tunnel token"
 
-tunnel_values_file="$WORKSPACE_ROOT/gitops/values/cloudflare-tunnel.yaml"
-cat > "$tunnel_values_file" <<EOF
-cloudflare:
-  account: "$cf_account_id"
-  tunnelName: "$tunnel_name"
-  tunnelId: "$cf_tunnel_id"
-  secret: "$cf_tunnel_token"
-  enableWarp: false
-  ingress: []
+cloudflare_tunnel_manifest="$MANAGER_DATA_DIR/tmp/cloudflare-tunnel-${cluster_id}.yaml"
+mkdir -p "$(dirname "$cloudflare_tunnel_manifest")"
+cat > "$cloudflare_tunnel_manifest" <<EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cloudflare-tunnel
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://cloudflare.github.io/helm-charts
+    chart: cloudflare-tunnel
+    targetRevision: "0.3.2"
+    helm:
+      values: |
+        cloudflare:
+          account: "$cf_account_id"
+          tunnelName: "$tunnel_name"
+          tunnelId: "$cf_tunnel_id"
+          secret: "$cf_tunnel_token"
+          enableWarp: false
+          ingress: []
 
-replicaCount: 2
+        replicaCount: 2
 
-tolerations:
-  - key: node-role.kubernetes.io/control-plane
-    operator: Exists
-    effect: NoSchedule
-  - key: node-role.kubernetes.io/master
-    operator: Exists
-    effect: NoSchedule
+        tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
+          - key: node-role.kubernetes.io/master
+            operator: Exists
+            effect: NoSchedule
 
-metrics:
-  enabled: true
-  serviceMonitor:
-    enabled: true
+        metrics:
+          enabled: true
+          serviceMonitor:
+            enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cloudflare-tunnel
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: privileged
+        pod-security.kubernetes.io/audit: privileged
+        pod-security.kubernetes.io/warn: privileged
+    syncOptions:
+      - CreateNamespace=true
 EOF
-chmod 600 "$tunnel_values_file"
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Rendered cloudflare-tunnel values to $tunnel_values_file"
+trap 'rm -f "$cloudflare_tunnel_manifest"' EXIT
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Rendered cloudflare-tunnel application to $cloudflare_tunnel_manifest"
 
 # Step 3: Create DNS CNAME record pointing to the tunnel
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating DNS CNAME record for tunnel"
@@ -193,7 +221,7 @@ if command -v kubectl &>/dev/null; then
   # Apply the cloudflare-tunnel application
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying cloudflare-tunnel application"
   bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
-    --manifest "$WORKSPACE_ROOT/gitops/apps/cloudflare-tunnel.yaml" \
+    --manifest "$cloudflare_tunnel_manifest" \
     --application "cloudflare-tunnel"
   kubectl delete application cluster-config -n argocd --ignore-not-found=true 2>/dev/null || true
   bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
