@@ -934,6 +934,9 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "cluster_dns_domain" in cloudflare_tunnel_run_text
     assert "cluster-public-zone.sh" in cloudflare_tunnel_run_text
     assert "twinbox_public_zone_name" in cloudflare_tunnel_run_text
+    assert "cf_dns_api_token" in cloudflare_tunnel_run_text
+    assert "Using bootstrap Cloudflare DNS token for record creation" in cloudflare_tunnel_run_text
+    assert "Using tunnel API token for DNS record creation" in cloudflare_tunnel_run_text
     assert 'echo "[$(date \'+%Y-%m-%d %H:%M:%S\')] Public zone name: $public_zone_name"' in cloudflare_tunnel_run_text
     assert '\\"name\\":\\"*.${public_zone_name}\\"' in cloudflare_tunnel_run_text
     assert "already have a tunnel with this name" in cloudflare_tunnel_run_text
@@ -944,6 +947,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "cloudflare:" in cloudflare_tunnel_run_text
     assert "platform-ingress.yaml" in cloudflare_tunnel_run_text
     assert "kubectl delete application cluster-config -n argocd --ignore-not-found=true" in cloudflare_tunnel_run_text
+    assert "Zone DNS Edit permissions" in cloudflare_tunnel_run_text
     assert (
         cloudflare_tunnel_run_text.index("platform-ingress.yaml")
         < cloudflare_tunnel_run_text.index("Applying cloudflare-tunnel application")

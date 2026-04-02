@@ -25,6 +25,7 @@ cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty'
 
 # Parse inputs
 cf_api_token="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.cf_api_token')"
+cf_dns_api_token="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.cf_dns_api_token // empty')"
 cf_account_id="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.cf_account_id')"
 cf_zone_id="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.cf_zone_id')"
 
@@ -41,6 +42,22 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting Cloudflare Tunnel configuration fo
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Account ID: $cf_account_id"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Zone ID: $cf_zone_id"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Public zone name: $public_zone_name"
+
+dns_api_token="$cf_dns_api_token"
+if [[ -z "$dns_api_token" ]]; then
+  dns_bootstrap_secret="/opt/twinbox/bootstrap/secrets/global/cloudflare-${cluster_id}.json"
+  if [[ -f "$dns_bootstrap_secret" ]]; then
+    dns_api_token="$(jq -r '.CLOUDFLARE_API_TOKEN // empty' "$dns_bootstrap_secret")"
+    if [[ -n "$dns_api_token" ]]; then
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Using bootstrap Cloudflare DNS token for record creation"
+    fi
+  fi
+fi
+
+if [[ -z "$dns_api_token" ]]; then
+  dns_api_token="$cf_api_token"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Using tunnel API token for DNS record creation"
+fi
 
 # Step 1: Create Cloudflare Tunnel
 tunnel_name="twinbox-${cluster_id}"
@@ -146,7 +163,7 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Rendered cloudflare-tunnel application to $
 # Step 3: Create DNS CNAME record pointing to the tunnel
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating DNS CNAME record for tunnel"
 dns_response="$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${cf_zone_id}/dns_records" \
-  -H "Authorization: Bearer $cf_api_token" \
+  -H "Authorization: Bearer $dns_api_token" \
   -H "Content-Type: application/json" \
   -d "{
     \"type\":\"CNAME\",
@@ -160,7 +177,7 @@ dns_success="$(echo "$dns_response" | jq -r '.success')"
 if [[ "$dns_success" != "true" ]]; then
   dns_error="$(echo "$dns_response" | jq -r '.errors[0].message // "Unknown error"')"
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: DNS record creation failed: $dns_error"
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] You may need to create the DNS record manually"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] You may need a Cloudflare token with Zone DNS Edit permissions, or create the DNS record manually"
 fi
 
 # Step 4: Store credentials as global secret
