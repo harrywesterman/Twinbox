@@ -186,6 +186,13 @@ if [[ "$dns_success" != "true" ]]; then
   dns_error="$(echo "$dns_response" | jq -r '.errors[0].message // "Unknown error"')"
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: DNS record creation failed: $dns_error"
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] You may need a Cloudflare token with Zone DNS Edit permissions, or create the DNS record manually"
+else
+  dns_record_id="$(echo "$dns_response" | jq -r '.result.id // empty')"
+  if [[ -n "$dns_record_id" ]]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] DNS record created: $dns_record_id"
+  else
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] DNS record created"
+  fi
 fi
 
 # Step 5: Store credentials as global secret
@@ -235,13 +242,19 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploying cloudflared in the cluster"
 if command -v kubectl &>/dev/null; then
   # Wait for Argo CD to be available
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for Argo CD to be ready"
+  argo_cd_ready=false
   for i in $(seq 1 30); do
     if kubectl get application argocd -n argocd &>/dev/null; then
       echo "[$(date '+%Y-%m-%d %H:%M:%S')] Argo CD is ready"
+      argo_cd_ready=true
       break
     fi
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Argo CD not ready yet (attempt ${i}/30)"
     sleep 5
   done
+  if [[ "$argo_cd_ready" != "true" ]]; then
+    fail "Timed out waiting for Argo CD application argocd to become ready"
+  fi
 
   # Refresh the parent ingress app first, then apply the runtime Cloudflare app.
   # The parent app manifests still come from Git, so applying it after the

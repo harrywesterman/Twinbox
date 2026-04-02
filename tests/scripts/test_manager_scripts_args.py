@@ -940,6 +940,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "Cloudflare sees zone name: $cloudflare_zone_name" in cloudflare_tunnel_run_text
     assert "resolves to ${cloudflare_zone_name}, but the wizard selected ${public_zone_name}" in cloudflare_tunnel_run_text
     assert "continuing without a zone-name preflight" in cloudflare_tunnel_run_text
+    assert "DNS record created" in cloudflare_tunnel_run_text
     assert '\\"name\\":\\"*.${public_zone_name}\\"' in cloudflare_tunnel_run_text
     assert "already have a tunnel with this name" in cloudflare_tunnel_run_text
     assert ".result.Token" not in cloudflare_tunnel_run_text
@@ -950,6 +951,8 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "platform-ingress.yaml" in cloudflare_tunnel_run_text
     assert "kubectl delete application cluster-config -n argocd --ignore-not-found=true" in cloudflare_tunnel_run_text
     assert "Zone DNS Edit permissions" in cloudflare_tunnel_run_text
+    assert "Argo CD not ready yet (attempt ${i}/30)" in cloudflare_tunnel_run_text
+    assert "Timed out waiting for Argo CD application argocd to become ready" in cloudflare_tunnel_run_text
     assert (
         cloudflare_tunnel_run_text.index("platform-ingress.yaml")
         < cloudflare_tunnel_run_text.index("Applying cloudflare-tunnel application")
