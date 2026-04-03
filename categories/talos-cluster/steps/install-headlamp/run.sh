@@ -67,6 +67,10 @@ mkdir -p "$secrets_dir"
 headlamp_secret_file="$secrets_dir/headlamp-oidc-${cluster_id}.json"
 cat >"$headlamp_secret_file" <<EOF
 {
+  "OIDC_CLIENT_ID": "$headlamp_client_id",
+  "OIDC_CLIENT_SECRET": "$headlamp_client_secret",
+  "OIDC_ISSUER_URL": "$headlamp_issuer_url",
+  "OIDC_SCOPES": "openid profile email",
   "HEADLAMP_CONFIG_OIDC_CLIENT_ID": "$headlamp_client_id",
   "HEADLAMP_CONFIG_OIDC_CLIENT_SECRET": "$headlamp_client_secret",
   "HEADLAMP_CONFIG_OIDC_IDP_ISSUER_URL": "$headlamp_issuer_url",
@@ -81,7 +85,7 @@ chmod 600 "$headlamp_secret_file"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "headlamp-oidc" \
   --json-file "$headlamp_secret_file" \
-  --required-keys "HEADLAMP_CONFIG_OIDC_CLIENT_ID,HEADLAMP_CONFIG_OIDC_CLIENT_SECRET,HEADLAMP_CONFIG_OIDC_IDP_ISSUER_URL,HEADLAMP_CONFIG_OIDC_SCOPES"
+  --required-keys "OIDC_CLIENT_ID,OIDC_CLIENT_SECRET,OIDC_ISSUER_URL,OIDC_SCOPES,HEADLAMP_CONFIG_OIDC_CLIENT_ID,HEADLAMP_CONFIG_OIDC_CLIENT_SECRET,HEADLAMP_CONFIG_OIDC_IDP_ISSUER_URL,HEADLAMP_CONFIG_OIDC_SCOPES"
 
 if command -v kubectl &>/dev/null; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying Headlamp ExternalSecret"
@@ -91,6 +95,12 @@ if command -v kubectl &>/dev/null; then
   bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
     --manifest "$WORKSPACE_ROOT/gitops/apps/headlamp.yaml" \
     --application "headlamp"
+
+  if kubectl -n kube-system get deployment/headlamp >/dev/null 2>&1; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restarting Headlamp to pick up Authentik OIDC settings"
+    kubectl -n kube-system rollout restart deployment/headlamp
+    kubectl -n kube-system rollout status deployment/headlamp --timeout=10m
+  fi
 fi
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Headlamp Authentik configuration complete"
