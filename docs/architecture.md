@@ -65,7 +65,7 @@ Twinbox is a complete K8s cluster based on Talos Linux, completely configured. T
 9. `install-secret-sync` seeds OpenBao from the Management VM bootstrap files and creates `ClusterSecretStore/openbao`.
 10. `install-velero-backup` deploys Velero together with a Twinbox-managed Garage bucket or an external S3-compatible backup target.
 11. `install-cloudnativepg` installs the CloudNativePG operator on top of Longhorn so PostgreSQL-backed workloads can share one database platform.
-12. `install-postgres-clusters` deploys the CloudNativePG Cluster, Pooler, ScheduledBackup, and ExternalSecret resources for each application database.
+12. `install-postgres-clusters` deploys the CloudNativePG Cluster, Pooler, ScheduledBackup, and ExternalSecret resources for each application database and seeds the Authentik database credentials into OpenBao early so the cluster can bootstrap before the Authentik app step runs.
 13. GitOps apps consume secrets through `ExternalSecret` resources backed by `ClusterSecretStore/openbao`.
 
 ## Domain Flow
