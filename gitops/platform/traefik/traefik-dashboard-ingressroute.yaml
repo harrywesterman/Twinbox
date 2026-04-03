@@ -10,7 +10,8 @@ spec:
     - match: Host(`traefik.__ZONE_NAME__`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))
       kind: Rule
       middlewares:
-        - name: traefik-dashboard-auth
+        - name: authentik-forwardauth
+          namespace: authentik
       services:
         - name: api@internal
           kind: TraefikService

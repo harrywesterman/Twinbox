@@ -5,6 +5,7 @@ resources:
   - namespaces.yaml
   - authentik/ingressroute.yaml
   - authentik/cors-middleware.yaml
+  - authentik/forwardauth-middleware.yaml
   - whoami/ingressroute.yaml
   - headlamp/ingressroute.yaml
   - headlamp/externalsecret.yaml
