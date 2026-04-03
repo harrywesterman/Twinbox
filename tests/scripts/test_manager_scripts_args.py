@@ -204,6 +204,10 @@ TRAEFIK_DASHBOARD_EXTERNALSECRET = (
     / "traefik"
     / "traefik-dashboard-externalsecret.yaml"
 )
+ARGOCD_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "traefik" / "argocd-ingressroute.yaml"
+ARGOCD_WIREDOOR_INGRESSROUTE = (
+    REPO_ROOT / "gitops" / "platform" / "wiredoor-gateway" / "ingressroute.yaml"
+)
 WHOAMI_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "whoami" / "ingressroute.yaml"
 HEADLAMP_INGRESSROUTE = (
     REPO_ROOT / "gitops" / "platform" / "headlamp" / "ingressroute.yaml"
@@ -1426,6 +1430,26 @@ def test_ntfy_ingressroute_exposes_ui():
     assert "Host(`ntfy.__ZONE_NAME__`)" in text
     assert "name: ntfy" in text
     assert "port: 80" in text
+    assert "webwiredoor" in text
+
+
+def test_argocd_ingressroute_uses_https_backend():
+    text = ARGOCD_INGRESSROUTE.read_text(encoding="utf-8")
+    assert "kind: IngressRoute" in text
+    assert "Host(`argocd.__ZONE_NAME__`)" in text
+    assert "name: argocd-server" in text
+    assert "port: 443" in text
+    assert "scheme: https" in text
+    assert "websecure" in text
+
+
+def test_argocd_wiredoor_ingressroute_uses_https_backend():
+    text = ARGOCD_WIREDOOR_INGRESSROUTE.read_text(encoding="utf-8")
+    assert "kind: IngressRoute" in text
+    assert "Host(`argocd.__ZONE_NAME__`)" in text
+    assert "name: argocd-server" in text
+    assert "port: 443" in text
+    assert "scheme: https" in text
     assert "webwiredoor" in text
 
 
