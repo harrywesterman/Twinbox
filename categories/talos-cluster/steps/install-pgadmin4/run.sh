@@ -31,6 +31,7 @@ resolve_kubeconfig_file() {
 }
 
 KUBECONFIG_FILE="$(resolve_kubeconfig_file)"
+export KUBECONFIG_FILE
 export KUBECONFIG="$KUBECONFIG_FILE"
 
 resolve_authentik_secret_file() {
