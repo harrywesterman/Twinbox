@@ -330,7 +330,7 @@ def test_setup_wizard_shows_runtime_progress_feedback():
     assert '- Waiting for Twinbox to finish starting' in text
     assert 'wait_for_management_vm_ping()' in text
     assert 'log_event "The management VM is responding on the network."' in text
-    assert 'log_event "Twinbox services are starting inside the management VM. This usually takes a few minutes."' in text
+    assert 'log_event "Twinbox is starting in the management VM."' in text
     assert 'log_event "Twinbox is still starting. Usually ready in 2-5 minutes."' in text
     assert 'log_event "Still starting. Usually another 1-3 minutes."' in text
     assert 'log_event "Still starting. Downloads may take a few more minutes."' in text
