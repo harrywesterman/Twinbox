@@ -118,6 +118,13 @@ AUTHENTIK_HEADLAMP_MODULE_OUTPUTS = (
     / "authentik-headlamp"
     / "outputs.tf"
 )
+AUTHENTIK_DASHY_MODULE_PROVIDERS = (
+    REPO_ROOT
+    / "infra"
+    / "opentofu"
+    / "authentik-dashy"
+    / "providers.tf"
+)
 HEADLAMP_OIDC_EXTERNALSECRET = (
     REPO_ROOT / "gitops" / "platform" / "headlamp" / "externalsecret.yaml"
 )
@@ -268,6 +275,10 @@ def _authentik_headlamp_module_vars_text() -> str:
 
 def _authentik_headlamp_module_outputs_text() -> str:
     return AUTHENTIK_HEADLAMP_MODULE_OUTPUTS.read_text(encoding="utf-8")
+
+
+def _authentik_dashy_module_providers_text() -> str:
+    return AUTHENTIK_DASHY_MODULE_PROVIDERS.read_text(encoding="utf-8")
 
 
 def _apply_argocd_application_text() -> str:
@@ -985,6 +996,13 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "--application \"authentik\"" in authentik_run_text
     assert "twinbox_public_zone_name" in authentik_run_text
     assert 'authentik_host="https://authentik.${public_zone_name}"' in authentik_run_text
+    assert "wait_for_secret()" in authentik_run_text
+    assert "Authentik bootstrap secret is ready" in authentik_run_text
+    assert "Waiting for Authentik server" not in authentik_run_text
+    assert "Waiting for Authentik worker" not in authentik_run_text
+    assert "desired=${desired_replicas}, updated=${updated_replicas}, ready=${ready_replicas}, available=${available_replicas}" in authentik_run_text
+    assert "progressing=${progressing_status}" in authentik_run_text
+    assert "available=${available_status}" in authentik_run_text
     assert (
         "Could not determine Authentik host; set DNS domain in the ingress selection step"
         in authentik_run_text
@@ -1017,6 +1035,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     headlamp_module_text = _authentik_headlamp_module_text()
     headlamp_module_vars_text = _authentik_headlamp_module_vars_text()
     headlamp_module_outputs_text = _authentik_headlamp_module_outputs_text()
+    dashy_module_providers_text = _authentik_dashy_module_providers_text()
     assert "resource \"authentik_provider_oauth2\" \"headlamp\"" in headlamp_module_text
     assert "resource \"authentik_application\" \"headlamp\"" in headlamp_module_text
     assert "random_string" in headlamp_module_text
@@ -1028,6 +1047,8 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "client_id" in headlamp_module_outputs_text
     assert "client_secret" in headlamp_module_outputs_text
     assert "issuer_url" in headlamp_module_outputs_text
+    assert 'provider "authentik"' in dashy_module_providers_text
+    assert "url = var.authentik_url" in dashy_module_providers_text
 
     headlamp_external_secret_text = _headlamp_oidc_externalsecret_text()
     assert "kind: ExternalSecret" in headlamp_external_secret_text

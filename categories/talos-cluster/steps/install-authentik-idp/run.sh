@@ -157,12 +157,29 @@ kubectl create namespace authentik --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply -f "$authentik_externalsecret_manifest"
 kubectl apply -f "$authentik_ingressroute_manifest"
 
-for _attempt in $(seq 1 60); do
-  if kubectl -n authentik get secret authentik-bootstrap >/dev/null 2>&1; then
-    break
-  fi
-  sleep 5
-done
+wait_for_secret() {
+  local secret_name="$1"
+  local label="${2:-$secret_name}"
+  local attempts=60
+  local attempt=1
+
+  while true; do
+    if kubectl -n authentik get secret "$secret_name" >/dev/null 2>&1; then
+      log "${label} secret is ready"
+      return 0
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      return 1
+    fi
+
+    log "Waiting for ${label} secret (${attempt}/${attempts})"
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
+wait_for_secret "authentik-bootstrap" "Authentik bootstrap"
 
 kubectl -n authentik get secret authentik-bootstrap >/dev/null 2>&1 || fail "authentik-bootstrap secret did not appear after applying the ExternalSecret"
 
@@ -175,18 +192,43 @@ wait_for_deployment_rollout() {
   local label="${2:-$deployment}"
   local attempts=120
   local attempt=1
+  local status_json=""
+  local desired_replicas=""
+  local updated_replicas=""
+  local ready_replicas=""
+  local available_replicas=""
+  local progressing_status=""
+  local progressing_reason=""
+  local available_status=""
+  local available_reason=""
+  local message=""
 
   while true; do
-    if kubectl -n authentik rollout status "deployment/${deployment}" --timeout=15s >/dev/null 2>&1; then
-      log "${label} is ready"
-      return 0
+    if status_json="$(kubectl -n authentik get deployment "$deployment" -o json 2>/dev/null)"; then
+      desired_replicas="$(jq -r '.spec.replicas // 0' <<<"$status_json")"
+      updated_replicas="$(jq -r '.status.updatedReplicas // 0' <<<"$status_json")"
+      ready_replicas="$(jq -r '.status.readyReplicas // 0' <<<"$status_json")"
+      available_replicas="$(jq -r '.status.availableReplicas // 0' <<<"$status_json")"
+      progressing_status="$(jq -r '.status.conditions[]? | select(.type == "Progressing") | .status // "Unknown"' <<<"$status_json")"
+      progressing_reason="$(jq -r '.status.conditions[]? | select(.type == "Progressing") | .reason // empty' <<<"$status_json")"
+      available_status="$(jq -r '.status.conditions[]? | select(.type == "Available") | .status // "Unknown"' <<<"$status_json")"
+      available_reason="$(jq -r '.status.conditions[]? | select(.type == "Available") | .reason // empty' <<<"$status_json")"
+      message="$(jq -r '.status.conditions[]? | select(.type == "Progressing" or .type == "Available") | .message // empty' <<<"$status_json" | awk 'NF { if (out) out = out " | "; out = out $0 } END { print out }')"
+
+      if [[ "$updated_replicas" == "$desired_replicas" && "$ready_replicas" == "$desired_replicas" && "$available_replicas" == "$desired_replicas" ]]; then
+        log "${label} is ready"
+        return 0
+      fi
+
+      log "Waiting for ${label} (${attempt}/${attempts}): desired=${desired_replicas}, updated=${updated_replicas}, ready=${ready_replicas}, available=${available_replicas}, progressing=${progressing_status}${progressing_reason:+/${progressing_reason}}, available=${available_status}${available_reason:+/${available_reason}}${message:+, message=${message}}"
+    else
+      log "Waiting for ${label} deployment to appear (${attempt}/${attempts})"
     fi
 
     if [[ "$attempt" -ge "$attempts" ]]; then
       fail "Timed out waiting for ${label}"
     fi
 
-    log "Waiting for ${label}"
     sleep 5
     attempt=$((attempt + 1))
   done
