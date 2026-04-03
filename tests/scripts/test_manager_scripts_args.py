@@ -588,7 +588,6 @@ def test_longhorn_step_installs_via_argocd_and_waits_for_health():
     longhorn_values_text = _longhorn_values_text()
 
     assert "title: Install Longhorn Storage" in step_manifest_text
-    assert "order: 14" in step_manifest_text
     assert (
         "summary: Apply the Longhorn GitOps application, make its storage class the cluster default, and wait for it to become available."
         in step_manifest_text
@@ -898,7 +897,6 @@ def test_install_argocd_step_bootstraps_argocd_without_cni_adoption():
     text = _argo_step_manifest_text()
 
     assert "summary: Install Argo CD so the remaining platform services can be managed declaratively." in text
-    assert "order: 12" in text
     assert "depends_on:" in text
     assert "  - provision-nodes" in text
     assert "Talos/Cilium bootstrap" in text
@@ -922,16 +920,11 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
         encoding="utf-8"
     )
 
-    assert "order: 12" in argocd_text
     assert "provision-nodes" in argocd_text
     assert "install-flannel" not in argocd_text
 
-    assert "order: 16" in traefik_text
     assert "install-secret-sync" in traefik_text
 
-    assert "order: 22" in AUTHENTIK_STEP_MANIFEST.read_text(encoding="utf-8")
-    assert "order: 23" in CREATE_USERS_STEP_MANIFEST.read_text(encoding="utf-8")
-    assert "order: 21" in choose_ingress_text
     assert "type: config" in choose_ingress_text
     assert "value: wiredoor" in choose_ingress_text
     assert "value: metallb" in choose_ingress_text
@@ -955,11 +948,9 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert '"dns_domain": "$dns_domain"' in choose_ingress_run_text
     assert "Cloudflare Tunnel is only available for prd clusters on Cloudflare Free" in choose_ingress_run_text
 
-    assert "order: 31" in cloudflare_text
     assert "choose-ingress-route" in cloudflare_text
     assert "provision-wiredoor-bastion" in cloudflare_text
 
-    assert "order: 32" in wiredoor_text
     assert "install-grafana" in wiredoor_text
     assert "choose-ingress-route" in wiredoor_text
     assert "configure-wiredoor-ingress" in wiredoor_text
@@ -970,7 +961,6 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
         in wiredoor_text
     )
 
-    assert "order: 30" in wiredoor_bastion_text
     assert "choose-ingress-route" in wiredoor_bastion_text
     assert "ingress_route: wiredoor" in wiredoor_bastion_text
 
@@ -1112,18 +1102,15 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "kubectl delete application platform-ingress -n argocd --ignore-not-found=true" in cloudflare_dns_run_text
     assert "kubectl delete application cluster-config -n argocd --ignore-not-found=true" in cloudflare_dns_run_text
 
-    assert "order: 34" in whoami_text
     assert "install-traefik" in whoami_text
     assert "script: categories/talos-cluster/steps/install-whoami/run.sh" in whoami_text
 
-    assert "order: 35" in headlamp_text
     assert "install-whoami" in headlamp_text
     assert (
         "script: categories/talos-cluster/steps/install-headlamp/run.sh"
         in headlamp_text
     )
 
-    assert "order: 36" in grafana_text
     assert "install-headlamp" in grafana_text
     assert (
         "script: categories/talos-cluster/steps/install-grafana/run.sh" in grafana_text

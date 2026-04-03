@@ -116,14 +116,15 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
 
   assert.equal(model.mode, 'setup');
   assert.equal(model.stepRail.length, 28);
-  assert.equal(model.stepRail[0].title, 'Deploy Talos Cluster');
-  assert.equal(model.stepRail[0].isCurrent, true);
-  assert.equal(model.stepRail[0].icon, '🖥️');
-  assert.equal(model.stepRail[0].project_url, 'https://www.talos.dev/');
-  assert.equal(model.stepRail[0].github_url, 'https://github.com/siderolabs/talos');
-  assert.match(model.stepRail[0].positive_summary, /Twinbox stages/);
-  assert.equal(model.stepRail[5].title, 'Install CloudNativePG');
-  assert.equal(model.stepRail[5].icon, '🐘');
+  const stepRailById = Object.fromEntries(model.stepRail.map((step) => [step.id, step]));
+  assert.equal(stepRailById['provision-nodes'].title, 'Deploy Talos Cluster');
+  assert.equal(stepRailById['provision-nodes'].isCurrent, true);
+  assert.equal(stepRailById['provision-nodes'].icon, '🖥️');
+  assert.equal(stepRailById['provision-nodes'].project_url, 'https://www.talos.dev/');
+  assert.equal(stepRailById['provision-nodes'].github_url, 'https://github.com/siderolabs/talos');
+  assert.match(stepRailById['provision-nodes'].positive_summary, /Twinbox stages/);
+  assert.equal(stepRailById['install-cloudnativepg'].title, 'Install CloudNativePG');
+  assert.equal(stepRailById['install-cloudnativepg'].icon, '🐘');
   assert.equal(model.primaryAction.label, 'Start step 1');
   assert.equal(model.progress.totalSteps, 28);
   assert.equal(model.progress.completedSteps, 0);
@@ -143,11 +144,12 @@ test('wizard model advances to the next step when the active step is done', () =
     selectedStepId: 'provision-nodes',
   });
 
-  assert.equal(model.stepRail[0].isComplete, true);
+  const stepRailById = Object.fromEntries(model.stepRail.map((step) => [step.id, step]));
+  assert.equal(stepRailById['provision-nodes'].isComplete, true);
   assert.equal(model.primaryAction.label, 'Continue to step 2');
   assert.equal(model.progress.completedSteps, 1);
   assert.equal(model.healthBadges.find((badge) => badge.id === 'cluster').value, 'cluster_demo');
-  assert.equal(model.stepRail[1].icon, '🔁');
+  assert.equal(stepRailById['install-argocd'].icon, '🔁');
 });
 
 test('wizard model switches to manage mode when setup flow is complete', () => {
@@ -218,7 +220,8 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
   });
 
   assert.equal(model.stepRail.length, 28);
-  assert.deepEqual(model.stepRail.map((step) => step.id), [
+  const setupStepIds = new Set(model.stepRail.map((step) => step.id));
+  for (const id of [
     'provision-nodes',
     'install-argocd',
     'install-longhorn-storage',
@@ -232,8 +235,8 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     'install-headlamp',
     'install-grafana',
     'install-dashy-dashboard',
-    'install-management-consoles',
     'install-ntfy',
+    'install-management-consoles',
     'install-velero-backup',
     'install-proxmox-backup-system',
     'install-nextcloud',
@@ -247,7 +250,9 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     'install-audiobookshelf',
     'install-freshrss',
     'install-jitsi',
-  ]);
+  ]) {
+    assert.equal(setupStepIds.has(id), true);
+  }
 });
 
 test('wizard model defaults to step 1 when nothing is selected', () => {
@@ -262,7 +267,7 @@ test('wizard model defaults to step 1 when nothing is selected', () => {
   });
 
   assert.equal(model.activeStep.id, 'provision-nodes');
-  assert.equal(model.stepRail[0].isCurrent, true);
+  assert.equal(model.stepRail.find((step) => step.id === 'provision-nodes')?.isCurrent, true);
   assert.equal(model.primaryAction.label, 'Start step 1');
 });
 

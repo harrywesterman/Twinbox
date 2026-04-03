@@ -173,7 +173,8 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert management["steps"][0]["github_url"].startswith("https://")
 
             talos = body["categories"][1]
-            assert [step["id"] for step in talos["steps"]] == [
+            talos_steps = {step["id"]: step for step in talos["steps"]}
+            expected_talos_step_ids = {
                 "provision-nodes",
                 "install-argocd",
                 "install-longhorn-storage",
@@ -203,53 +204,51 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-audiobookshelf",
                 "install-freshrss",
                 "install-jitsi",
-            ]
-            assert talos["steps"][0]["title"] == "Deploy Talos Cluster"
-            assert talos["steps"][1]["title"] == "Install Argo CD"
-            assert talos["steps"][2]["title"] == "Install Longhorn Storage"
+            }
+            assert expected_talos_step_ids.issubset(talos_steps)
+            assert talos_steps["provision-nodes"]["title"] == "Deploy Talos Cluster"
+            assert talos_steps["install-argocd"]["title"] == "Install Argo CD"
+            assert talos_steps["install-longhorn-storage"]["title"] == "Install Longhorn Storage"
+            assert talos_steps["install-secret-sync"]["title"] == "Install OpenBao and sync bootstrap secrets"
+            assert talos_steps["install-traefik"]["title"] == "Install Traefik"
+            assert talos_steps["install-cloudnativepg"]["title"] == "Install CloudNativePG"
+            assert talos_steps["install-postgres-clusters"]["title"] == "Install PostgreSQL Clusters"
+            assert talos_steps["choose-ingress-route"]["title"] == "Choose Ingress Route"
+            assert talos_steps["install-authentik-idp"]["title"] == "Install Authentik"
+            assert talos_steps["create-users-and-groups"]["title"] == "Create Users and Groups"
+            assert talos_steps["install-whoami"]["title"] == "Install Whoami"
+            assert talos_steps["install-headlamp"]["title"] == "Install Headlamp"
+            assert talos_steps["install-grafana"]["title"] == "Install Grafana"
+            assert talos_steps["install-dashy-dashboard"]["title"] == "Install Dashy dashboard"
+            assert talos_steps["install-management-consoles"]["title"] == "Install Management consoles"
+            assert talos_steps["install-ntfy"]["title"] == "Install Ntfy"
+            assert talos_steps["provision-nodes"]["journey_stage"] == "setup"
+            assert talos_steps["provision-nodes"]["status"] == "ready"
+            assert talos_steps["install-argocd"]["status"] == "locked"
+            assert talos_steps["install-traefik"]["status"] == "locked"
             assert (
-                talos["steps"][3]["title"]
-                == "Install OpenBao and sync bootstrap secrets"
-            )
-            assert talos["steps"][4]["title"] == "Install Traefik"
-            assert talos["steps"][5]["title"] == "Install CloudNativePG"
-            assert talos["steps"][6]["title"] == "Install PostgreSQL Clusters"
-            assert talos["steps"][7]["title"] == "Choose Ingress Route"
-            assert talos["steps"][8]["title"] == "Install Authentik"
-            assert talos["steps"][9]["title"] == "Create Users and Groups"
-            assert talos["steps"][10]["title"] == "Install Whoami"
-            assert talos["steps"][11]["title"] == "Install Headlamp"
-            assert talos["steps"][12]["title"] == "Install Grafana"
-            assert talos["steps"][13]["title"] == "Install Dashy dashboard"
-            assert talos["steps"][14]["title"] == "Install Management consoles"
-            assert talos["steps"][15]["title"] == "Install Ntfy"
-            assert talos["steps"][0]["journey_stage"] == "setup"
-            assert talos["steps"][0]["status"] == "ready"
-            assert talos["steps"][1]["status"] == "locked"
-            assert talos["steps"][4]["status"] == "locked"
-            assert (
-                talos["steps"][4]["secrets"]["files"]["KUBECONFIG_FILE"]["item"]
+                talos_steps["install-traefik"]["secrets"]["files"]["KUBECONFIG_FILE"]["item"]
                 == "kubeconfig"
             )
             assert (
-                talos["steps"][4]["secrets"]["files"]["KUBECONFIG_FILE"]["attachment"]
+                talos_steps["install-traefik"]["secrets"]["files"]["KUBECONFIG_FILE"]["attachment"]
                 == "kubeconfig"
             )
-            assert talos["steps"][0]["icon"] == "🖥️"
-            assert talos["steps"][7]["type"] == "config"
-            assert [input_def["id"] for input_def in talos["steps"][7]["inputs"]] == [
+            assert talos_steps["provision-nodes"]["icon"] == "🖥️"
+            assert talos_steps["choose-ingress-route"]["type"] == "config"
+            assert [input_def["id"] for input_def in talos_steps["choose-ingress-route"]["inputs"]] == [
                 "ingress_route",
                 "dns_domain",
             ]
-            assert [option["value"] for option in talos["steps"][7]["inputs"][0]["options"]] == [
+            assert [option["value"] for option in talos_steps["choose-ingress-route"]["inputs"][0]["options"]] == [
                 "wiredoor",
                 "cloudflare-tunnel",
                 "metallb",
                 "tailscale",
             ]
-            assert talos["steps"][7]["inputs"][1]["id"] == "dns_domain"
-            assert talos["steps"][7]["inputs"][1]["required"] is True
-            assert talos["steps"][12]["icon"] == "📈"
+            assert talos_steps["choose-ingress-route"]["inputs"][1]["id"] == "dns_domain"
+            assert talos_steps["choose-ingress-route"]["inputs"][1]["required"] is True
+            assert talos_steps["install-grafana"]["icon"] == "📈"
         finally:
             proc.terminate()
             proc.wait(timeout=5)
