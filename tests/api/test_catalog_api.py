@@ -112,6 +112,7 @@ def _write_cluster_file(
     slug: str | None = None,
     dns_domain: str = "bierineenweek.nl",
     selected_ingress_route: str | None = None,
+    updated_at: str | None = None,
 ):
     cluster_file = data_dir / "clusters" / f"{cluster_id}.json"
     cluster_file.parent.mkdir(parents=True, exist_ok=True)
@@ -122,6 +123,8 @@ def _write_cluster_file(
     }
     if selected_ingress_route is not None:
         cluster["selected_ingress_route"] = selected_ingress_route
+    if updated_at is not None:
+        cluster["updated_at"] = updated_at
     cluster_file.write_text(json.dumps(cluster), encoding="utf-8")
 
 
@@ -290,16 +293,42 @@ def test_catalog_endpoint_filters_ingress_routes_after_choice():
 def test_catalog_endpoint_shows_cloudflare_only_for_prd_clusters():
     with tempfile.TemporaryDirectory() as td:
         data_dir = Path(td) / "data"
-        _write_cluster_file(data_dir, "prd", slug="prd", selected_ingress_route="cloudflare-tunnel")
-        _write_cluster_file(data_dir, "tst", slug="tst", selected_ingress_route="cloudflare-tunnel")
+        _write_cluster_file(data_dir, "prd", slug="prd", selected_ingress_route="cloudflare-tunnel", updated_at="2026-04-02T00:00:00Z")
+        _write_cluster_file(data_dir, "tst", slug="tst", selected_ingress_route="cloudflare-tunnel", updated_at="2026-04-03T00:00:00Z")
         _write_choose_ingress_state(data_dir, "prd", "cloudflare-tunnel")
         _write_choose_ingress_state(data_dir, "tst", "cloudflare-tunnel")
+        global_state = _global_step_state(data_dir, "choose-ingress-route")
+        global_state.parent.mkdir(parents=True, exist_ok=True)
+        global_state.write_text(
+            json.dumps(
+                {
+                    "status": "configured",
+                    "inputs": {"ingress_route": "cloudflare-tunnel"},
+                    "outputs": {
+                        "selected_ingress_route": "cloudflare-tunnel",
+                        "cluster_id": "tst",
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
 
         port = _find_free_port()
         proc = _start_api(data_dir, port)
         try:
             base = f"http://127.0.0.1:{port}"
             _wait_for_health(base)
+
+            status, body = _get_json(f"{base}/api/catalog")
+            assert status == 200
+            talos = body["categories"][1]
+            choose_step = next(step for step in talos["steps"] if step["id"] == "choose-ingress-route")
+            assert [option["value"] for option in choose_step["inputs"][0]["options"]] == [
+                "wiredoor",
+                "metallb",
+                "tailscale",
+            ]
+            assert "configure-cloudflare-tunnel" not in [step["id"] for step in talos["steps"]]
 
             status, body = _get_json(f"{base}/api/catalog?cluster_id=prd")
             assert status == 200

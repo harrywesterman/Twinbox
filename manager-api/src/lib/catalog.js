@@ -288,22 +288,100 @@ function clusterSlug(cluster) {
   return normalizeChoiceValue(cluster?.slug || cluster?.id).toLowerCase();
 }
 
-function isPrdCluster(cluster) {
-  return clusterSlug(cluster) === "prd";
+function isPrdCluster(clusterOrSlug) {
+  if (typeof clusterOrSlug === "string") {
+    return normalizeChoiceValue(clusterOrSlug).toLowerCase() === "prd";
+  }
+
+  return clusterSlug(clusterOrSlug) === "prd";
 }
 
-function isAllowedIngressRoute(route, currentCluster) {
+function inferClusterSlug(currentCluster, stepStateById, dirs) {
+  const directSlug = clusterSlug(currentCluster);
+  if (directSlug) {
+    return directSlug;
+  }
+
+  const candidateStates = [
+    stepStateById.get("choose-ingress-route")?.state,
+    stepStateById.get("provision-nodes")?.state,
+  ];
+
+  for (const state of candidateStates) {
+    const candidates = [
+      state?.outputs?.cluster_id,
+      state?.cluster_id,
+      state?.outputs?.cluster_slug,
+      state?.cluster_slug,
+    ];
+
+    for (const candidate of candidates) {
+      const normalized = normalizeChoiceValue(candidate).toLowerCase();
+      if (normalized) {
+        return normalized;
+      }
+    }
+  }
+
+  const clusterStatesRoot = path.join(dirs.stepState, "clusters");
+  if (fs.existsSync(clusterStatesRoot)) {
+    const clusterStateDirs = fs.readdirSync(clusterStatesRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => path.join(clusterStatesRoot, entry.name))
+      .sort((left, right) => {
+        const leftStat = fs.statSync(left);
+        const rightStat = fs.statSync(right);
+        return rightStat.mtimeMs - leftStat.mtimeMs;
+      });
+
+    for (const clusterStateDir of clusterStateDirs) {
+      const routeState = readJsonIfExists(path.join(clusterStateDir, "choose-ingress-route.json"));
+      const candidates = [
+        routeState?.outputs?.cluster_id,
+        routeState?.cluster_id,
+        routeState?.outputs?.cluster_slug,
+        routeState?.cluster_slug,
+      ];
+
+      for (const candidate of candidates) {
+        const normalized = normalizeChoiceValue(candidate).toLowerCase();
+        if (normalized) {
+          return normalized;
+        }
+      }
+
+      const provisionState = readJsonIfExists(path.join(clusterStateDir, "provision-nodes.json"));
+      const provisionCandidates = [
+        provisionState?.outputs?.cluster_id,
+        provisionState?.cluster_id,
+        provisionState?.outputs?.cluster_slug,
+        provisionState?.cluster_slug,
+      ];
+
+      for (const candidate of provisionCandidates) {
+        const normalized = normalizeChoiceValue(candidate).toLowerCase();
+        if (normalized) {
+          return normalized;
+        }
+      }
+    }
+  }
+
+  return "";
+}
+
+function isAllowedIngressRoute(route, currentClusterOrSlug) {
   const normalizedRoute = normalizeChoiceValue(route);
   if (!normalizedRoute) {
     return false;
   }
 
-  if (!currentCluster) {
+  if (!currentClusterOrSlug) {
     return true;
   }
 
   if (normalizedRoute === "cloudflare-tunnel") {
-    return isPrdCluster(currentCluster);
+    return isPrdCluster(currentClusterOrSlug);
   }
 
   return normalizedRoute === "wiredoor"
@@ -311,8 +389,8 @@ function isAllowedIngressRoute(route, currentCluster) {
     || normalizedRoute === "tailscale";
 }
 
-function renderStepForCluster(step, currentCluster) {
-  if (step.id !== "choose-ingress-route" || !currentCluster || isPrdCluster(currentCluster)) {
+function renderStepForCluster(step, clusterSlugHint) {
+  if (step.id !== "choose-ingress-route" || !clusterSlugHint || isPrdCluster(clusterSlugHint)) {
     return step;
   }
 
@@ -459,7 +537,8 @@ function extractIngressRouteFromState(state) {
   return "";
 }
 
-function determineIngressRoute({ currentCluster, stepStateById, definitions }) {
+function determineIngressRoute({ currentCluster, clusterSlugHint, stepStateById, definitions }) {
+  const allowedCluster = clusterSlugHint || currentCluster;
   const clusterCandidates = [
     currentCluster?.selected_ingress_route,
     currentCluster?.ingress_route,
@@ -468,7 +547,7 @@ function determineIngressRoute({ currentCluster, stepStateById, definitions }) {
 
   for (const candidate of clusterCandidates) {
     const normalized = normalizeChoiceValue(candidate);
-    if (normalized && isAllowedIngressRoute(normalized, currentCluster)) {
+    if (normalized && isAllowedIngressRoute(normalized, allowedCluster)) {
       return normalized;
     }
   }
@@ -477,7 +556,7 @@ function determineIngressRoute({ currentCluster, stepStateById, definitions }) {
   if (preferredStep) {
     const entry = stepStateById.get("choose-ingress-route");
     const selectedFromChoice = extractIngressRouteFromState(entry?.state);
-    if (selectedFromChoice && isAllowedIngressRoute(selectedFromChoice, currentCluster)) {
+    if (selectedFromChoice && isAllowedIngressRoute(selectedFromChoice, allowedCluster)) {
       return selectedFromChoice;
     }
   }
@@ -485,7 +564,7 @@ function determineIngressRoute({ currentCluster, stepStateById, definitions }) {
   for (const category of definitions.categories) {
     for (const step of category.steps) {
       const selectedFromStep = extractIngressRouteFromState(stepStateById.get(step.id)?.state);
-      if (selectedFromStep && isAllowedIngressRoute(selectedFromStep, currentCluster)) {
+      if (selectedFromStep && isAllowedIngressRoute(selectedFromStep, allowedCluster)) {
         return selectedFromStep;
       }
     }
@@ -546,12 +625,20 @@ export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) 
         ? readJsonIfExists(path.join(dirs.jobs, `${state.last_job_id}.json`))
         : null;
       stepStateById.set(step.id, { state, latestJob });
-      renderedStepsById.set(step.id, renderStepForCluster(step, currentCluster));
+      renderedStepsById.set(step.id, renderStepForCluster(step, ""));
+    }
+  }
+
+  const clusterSlugHint = inferClusterSlug(currentCluster, stepStateById, dirs);
+  for (const [stepId, step] of definitions.stepsById.entries()) {
+    if (stepId === "choose-ingress-route") {
+      renderedStepsById.set(stepId, renderStepForCluster(step, clusterSlugHint));
     }
   }
 
   const activeIngressRoute = determineIngressRoute({
     currentCluster,
+    clusterSlugHint,
     stepStateById,
     definitions,
   });
