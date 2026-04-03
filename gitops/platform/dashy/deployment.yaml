@@ -48,7 +48,7 @@ spec:
               mountPath: /app/user-data
       containers:
         - name: dashy
-          image: ghcr.io/lissy93/dashy:v3.2.3
+          image: ghcr.io/lissy93/dashy@sha256:be489008a0ea4f60030ca3e25e55007425d3dfa8ecf48b5722ad9c4f3a12bff6
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
