@@ -4,71 +4,71 @@ metadata:
   name: cluster-config
   namespace: argocd
 data:
-  ZONE_NAME: "tst.bierineenweek.nl"
-  ARGOCD_MATCH: "Host(`argocd.tst.bierineenweek.nl`)"
-  AUTHENTIK_MATCH: "Host(`authentik.tst.bierineenweek.nl`)"
-  HEADLAMP_MATCH: "Host(`headlamp.tst.bierineenweek.nl`)"
-  GRAFANA_MATCH: "Host(`grafana.tst.bierineenweek.nl`)"
-  PROMETHEUS_MATCH: "Host(`prometheus.tst.bierineenweek.nl`)"
-  NTFY_MATCH: "Host(`ntfy.tst.bierineenweek.nl`)"
-  HOMEPAGE_MATCH: "Host(`homepage.tst.bierineenweek.nl`)"
-  WHOAMI_MATCH: "Host(`whoami.tst.bierineenweek.nl`)"
-  TRAEFIK_DASHBOARD_MATCH: "Host(`traefik.tst.bierineenweek.nl`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
-  HOMEPAGE_ALLOWED_HOSTS: "homepage.tst.bierineenweek.nl"
+  ZONE_NAME: "bierineenweek.nl"
+  ARGOCD_MATCH: "Host(`argocd.bierineenweek.nl`)"
+  AUTHENTIK_MATCH: "Host(`authentik.bierineenweek.nl`)"
+  HEADLAMP_MATCH: "Host(`headlamp.bierineenweek.nl`)"
+  GRAFANA_MATCH: "Host(`grafana.bierineenweek.nl`)"
+  PROMETHEUS_MATCH: "Host(`prometheus.bierineenweek.nl`)"
+  NTFY_MATCH: "Host(`ntfy.bierineenweek.nl`)"
+  HOMEPAGE_MATCH: "Host(`homepage.bierineenweek.nl`)"
+  WHOAMI_MATCH: "Host(`whoami.bierineenweek.nl`)"
+  TRAEFIK_DASHBOARD_MATCH: "Host(`traefik.bierineenweek.nl`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
+  HOMEPAGE_ALLOWED_HOSTS: "homepage.bierineenweek.nl"
   HOMEPAGE_BOOKMARKS_YAML: |
     - Platform:
         - Argo CD:
-            - href: https://argocd.tst.bierineenweek.nl
+            - href: https://argocd.bierineenweek.nl
               description: GitOps control plane
         - Traefik:
-            - href: https://traefik.tst.bierineenweek.nl
+            - href: https://traefik.bierineenweek.nl
               description: Ingress controller
         - Authentik:
-            - href: https://authentik.tst.bierineenweek.nl
+            - href: https://authentik.bierineenweek.nl
               description: Identity provider
         - Headlamp:
-            - href: https://headlamp.tst.bierineenweek.nl
+            - href: https://headlamp.bierineenweek.nl
               description: Kubernetes dashboard
         - Grafana:
-            - href: https://grafana.tst.bierineenweek.nl
+            - href: https://grafana.bierineenweek.nl
               description: Metrics and dashboards
         - Prometheus:
-            - href: https://prometheus.tst.bierineenweek.nl
+            - href: https://prometheus.bierineenweek.nl
               description: Metrics collection and alerting
         - ntfy:
-            - href: https://ntfy.tst.bierineenweek.nl
+            - href: https://ntfy.bierineenweek.nl
               description: Push notification service
         - Wiredoor:
-            href: https://argocd.tst.bierineenweek.nl
+            href: https://argocd.bierineenweek.nl
             description: Alternate operator entrypoint
     - Apps:
         - Whoami:
-            href: https://whoami.tst.bierineenweek.nl
+            href: https://whoami.bierineenweek.nl
             description: Minimal ingress check
         - Homepage:
-            href: https://homepage.tst.bierineenweek.nl
+            href: https://homepage.bierineenweek.nl
             description: Cluster landing page
   HOMEPAGE_SERVICES_YAML: |
     - Platform:
         - Argo CD:
-            href: https://argocd.tst.bierineenweek.nl
+            href: https://argocd.bierineenweek.nl
             description: GitOps control plane
         - Traefik:
-            href: https://traefik.tst.bierineenweek.nl
+            href: https://traefik.bierineenweek.nl
             description: Ingress controller
         - Authentik:
-            href: https://authentik.tst.bierineenweek.nl
+            href: https://authentik.bierineenweek.nl
             description: Identity provider
         - Headlamp:
-            href: https://headlamp.tst.bierineenweek.nl
+            href: https://headlamp.bierineenweek.nl
             description: Kubernetes dashboard
         - Grafana:
-            href: https://grafana.tst.bierineenweek.nl
+            href: https://grafana.bierineenweek.nl
             description: Metrics and dashboards
     - Apps:
         - Whoami:
-            href: https://whoami.tst.bierineenweek.nl
+            href: https://whoami.bierineenweek.nl
             description: Minimal ingress check
         - Homepage:
-            href: https://homepage.tst.bierineenweek.nl
+            href: https://homepage.bierineenweek.nl
             description: Cluster landing page
