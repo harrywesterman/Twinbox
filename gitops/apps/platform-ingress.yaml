@@ -228,10 +228,13 @@ spec:
                             url: https://argocd.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
                           - title: Traefik
                             description: Ingress controller
-                            url: https://traefik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                            url: https://traefik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/dashboard/
                           - title: Authentik
                             description: Identity provider
                             url: https://authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                          - title: Longhorn
+                            description: Storage management
+                            url: https://longhorn.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
                           - title: Headlamp
                             description: Kubernetes dashboard
                             url: https://headlamp.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
