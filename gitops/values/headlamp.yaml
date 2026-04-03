@@ -11,11 +11,53 @@ tolerations:
 service:
   type: ClusterIP
 
+env:
+  - name: KUBECONFIG
+    value: /home/headlamp/.config/Headlamp/kubeconfigs/config
+
+volumes:
+  - name: headlamp-kubeconfig
+    configMap:
+      name: headlamp-kubeconfig
+
+volumeMounts:
+  - name: headlamp-kubeconfig
+    mountPath: /home/headlamp/.config/Headlamp/kubeconfigs/config
+    subPath: config
+    readOnly: true
+
 config:
   inCluster: true
+  inClusterContextName: main
   oidc:
     secret:
       create: false
     externalSecret:
       enabled: true
       name: headlamp-oidc
+
+extraManifests:
+  - |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: headlamp-kubeconfig
+    data:
+      config: |
+        apiVersion: v1
+        kind: Config
+        clusters:
+          - name: in-cluster
+            cluster:
+              server: https://kubernetes.default.svc
+              certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        users:
+          - name: headlamp
+            user:
+              tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+        contexts:
+          - name: main
+            context:
+              cluster: in-cluster
+              user: headlamp
+        current-context: main
