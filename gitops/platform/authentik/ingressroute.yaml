@@ -9,6 +9,8 @@ spec:
   routes:
     - kind: Rule
       match: Host(`authentik.__ZONE_NAME__`)
+      middlewares:
+        - name: authentik-cors
       services:
         - kind: Service
           name: authentik-server

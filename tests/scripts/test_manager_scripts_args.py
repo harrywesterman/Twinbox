@@ -1158,6 +1158,12 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     wiredoor_externalsecret_text = _wiredoor_gateway_externalsecret_text()
     whoami_ingressroute_text = WHOAMI_INGRESSROUTE.read_text(encoding="utf-8")
     headlamp_ingressroute_text = HEADLAMP_INGRESSROUTE.read_text(encoding="utf-8")
+    authentik_ingressroute_text = (
+        REPO_ROOT / "gitops" / "platform" / "authentik" / "ingressroute.yaml"
+    ).read_text(encoding="utf-8")
+    authentik_cors_text = (
+        REPO_ROOT / "gitops" / "platform" / "authentik" / "cors-middleware.yaml"
+    ).read_text(encoding="utf-8")
     grafana_ingressroute_text = GRAFANA_INGRESSROUTE.read_text(encoding="utf-8")
     wiredoor_ingressroute_text = WIREDOOR_GATEWAY_INGRESSROUTE.read_text(
         encoding="utf-8"
@@ -1178,6 +1184,11 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "path: gitops/platform/whoami/k8s.yaml" not in whoami_app_text
     assert "path: gitops/platform/whoami/k8s.yaml" not in headlamp_app_text
     assert "path: gitops/platform/wiredoor-gateway" not in wiredoor_gateway_app_text
+    assert "middlewares:" in authentik_ingressroute_text
+    assert "name: authentik-cors" in authentik_ingressroute_text
+    assert "kind: Middleware" in authentik_cors_text
+    assert "accessControlAllowOriginList" in authentik_cors_text
+    assert "https://start.__ZONE_NAME__" in authentik_cors_text
     assert "Host(`whoami.__ZONE_NAME__`)" in whoami_ingressroute_text
     assert "Host(`headlamp.__ZONE_NAME__`)" in headlamp_ingressroute_text
     assert "Host(`grafana.__ZONE_NAME__`)" in grafana_ingressroute_text
@@ -1197,6 +1208,9 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     ntfy_appset_text = NTFY_APP.read_text(encoding="utf-8")
     assert "kind: ApplicationSet" in platform_ingress_app_text
     assert "name: platform-ingress-set" in platform_ingress_app_text
+    assert "name: authentik-cors" in platform_ingress_app_text
+    assert "accessControlAllowOriginList/0" in platform_ingress_app_text
+    assert "start.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in platform_ingress_app_text
     assert "kind: ApplicationSet" in grafana_appset_text
     assert "name: grafana-set" in grafana_appset_text
     assert "kind: ApplicationSet" in ntfy_appset_text

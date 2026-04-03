@@ -45,6 +45,13 @@ spec:
                   path: /spec/routes/0/match
                   value: Host(`authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
+                kind: Middleware
+                name: authentik-cors
+              patch: |-
+                - op: replace
+                  path: /spec/headers/accessControlAllowOriginList/0
+                  value: https://start.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+            - target:
                 kind: IngressRoute
                 name: headlamp
               patch: |-

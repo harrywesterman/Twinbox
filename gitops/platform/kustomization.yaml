@@ -4,6 +4,7 @@ kind: Kustomization
 resources:
   - namespaces.yaml
   - authentik/ingressroute.yaml
+  - authentik/cors-middleware.yaml
   - whoami/ingressroute.yaml
   - headlamp/ingressroute.yaml
   - headlamp/externalsecret.yaml

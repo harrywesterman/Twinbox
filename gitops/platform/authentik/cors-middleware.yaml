@@ -1,0 +1,19 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: authentik-cors
+  namespace: authentik
+  annotations:
+    twinbox.io/description: Allow Dashy browser-side OIDC discovery and token requests from the start page origin.
+spec:
+  headers:
+    accessControlAllowMethods:
+      - GET
+      - OPTIONS
+      - POST
+    accessControlAllowHeaders:
+      - "*"
+    accessControlAllowOriginList:
+      - https://start.__ZONE_NAME__
+    accessControlMaxAge: 100
+    addVaryHeader: true
