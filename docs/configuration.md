@@ -167,7 +167,7 @@ All platform services use the runtime domain projection from the local Argo clus
 | Argo CD | `argocd.<ZONE_NAME>` |
 | Traefik dashboard | `traefik.<ZONE_NAME>` |
 | Authentik | `authentik.<ZONE_NAME>` |
-| Headlamp | `headlamp.<public-zone-name>` |
+| Headlamp | `headlamp.<public-zone-name>` with Authentik OIDC login |
 | Grafana | `grafana.<ZONE_NAME>` |
 | Whoami | `whoami.<ZONE_NAME>` |
 | Homepage | `homepage.<ZONE_NAME>` |
@@ -185,6 +185,7 @@ gitops/platform/
 │   ├── ingressroute.yaml       # Host match patched by the platform-ingress ApplicationSet
 │   └── externalsecret.yaml     # Admin credentials from OpenBao
 ├── headlamp/ingressroute.yaml  # Host match patched by the platform-ingress ApplicationSet
+├── headlamp/externalsecret.yaml # Headlamp OIDC client credentials from OpenBao
 ├── traefik/
 │   ├── argocd-ingressroute.yaml
 │   └── traefik-dashboard-ingressroute.yaml

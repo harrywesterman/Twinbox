@@ -19,13 +19,13 @@ This policy is designed to work with the Cloudflare Free plan.
 ## Hostname Rules
 
 - `prd` uses the base DNS domain directly:
-  - `authentik.bierineenweek.nl`
-  - `argocd.bierineenweek.nl`
-  - `grafana.bierineenweek.nl`
+  - `authentik.example.com`
+  - `argocd.example.com`
+  - `grafana.example.com`
 - non-`prd` clusters use the slug-prefixed hostname model:
-  - `headlamp.tst.bierineenweek.nl`
-  - `whoami.dev.bierineenweek.nl`
-  - `homepage.tst.bierineenweek.nl`
+  - `headlamp.tst.example.com`
+  - `whoami.dev.example.com`
+  - `homepage.tst.example.com`
 
 ## Wizard Behavior
 

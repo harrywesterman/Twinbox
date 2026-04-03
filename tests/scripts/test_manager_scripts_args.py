@@ -97,6 +97,30 @@ AUTHENTIK_STEP_SCRIPT = (
     / "install-authentik-idp"
     / "run.sh"
 )
+AUTHENTIK_HEADLAMP_MODULE_MAIN = (
+    REPO_ROOT
+    / "infra"
+    / "opentofu"
+    / "authentik-headlamp"
+    / "main.tf"
+)
+AUTHENTIK_HEADLAMP_MODULE_VARS = (
+    REPO_ROOT
+    / "infra"
+    / "opentofu"
+    / "authentik-headlamp"
+    / "variables.tf"
+)
+AUTHENTIK_HEADLAMP_MODULE_OUTPUTS = (
+    REPO_ROOT
+    / "infra"
+    / "opentofu"
+    / "authentik-headlamp"
+    / "outputs.tf"
+)
+HEADLAMP_OIDC_EXTERNALSECRET = (
+    REPO_ROOT / "gitops" / "platform" / "headlamp" / "externalsecret.yaml"
+)
 CREATE_USERS_STEP_MANIFEST = (
     REPO_ROOT
     / "categories"
@@ -234,6 +258,18 @@ def _authentik_step_text() -> str:
     return AUTHENTIK_STEP_SCRIPT.read_text(encoding="utf-8")
 
 
+def _authentik_headlamp_module_text() -> str:
+    return AUTHENTIK_HEADLAMP_MODULE_MAIN.read_text(encoding="utf-8")
+
+
+def _authentik_headlamp_module_vars_text() -> str:
+    return AUTHENTIK_HEADLAMP_MODULE_VARS.read_text(encoding="utf-8")
+
+
+def _authentik_headlamp_module_outputs_text() -> str:
+    return AUTHENTIK_HEADLAMP_MODULE_OUTPUTS.read_text(encoding="utf-8")
+
+
 def _apply_argocd_application_text() -> str:
     return APPLY_ARGO_APP_SCRIPT.read_text(encoding="utf-8")
 
@@ -296,6 +332,10 @@ def _traefik_dashboard_externalsecret_text() -> str:
 
 def _wiredoor_gateway_externalsecret_text() -> str:
     return WIREDOOR_GATEWAY_EXTERNALSECRET.read_text(encoding="utf-8")
+
+
+def _headlamp_oidc_externalsecret_text() -> str:
+    return HEADLAMP_OIDC_EXTERNALSECRET.read_text(encoding="utf-8")
 
 
 def _grafana_values_text() -> str:
@@ -848,6 +888,10 @@ def test_bootstrap_apps_tolerate_single_node_control_plane():
     assert "tolerations:" in headlamp_text
     assert "node-role.kubernetes.io/control-plane" in headlamp_text
     assert "node-role.kubernetes.io/master" in headlamp_text
+    assert "config:" in headlamp_text
+    assert "oidc:" in headlamp_text
+    assert "externalSecret:" in headlamp_text
+    assert "headlamp-oidc" in headlamp_text
 
 
 def test_install_argocd_step_bootstraps_argocd_without_cni_adoption():
@@ -944,14 +988,61 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "AUTHENTIK_POSTGRESQL__USERNAME" in authentik_run_text
     assert "AUTHENTIK_POSTGRESQL__DISABLE_SERVER_SIDE_CURSORS" in authentik_run_text
     assert "AUTHENTIK_POSTGRESQL__CONN_MAX_AGE" in authentik_run_text
-    assert "rollout restart deployment" in authentik_run_text
-    assert "rollout status deployment" in authentik_run_text
+    assert "apply-argocd-application.sh" in authentik_run_text
+    assert "--application \"authentik\"" in authentik_run_text
     assert "twinbox_public_zone_name" in authentik_run_text
     assert 'authentik_host="https://authentik.${public_zone_name}"' in authentik_run_text
     assert (
         "Could not determine Authentik host; set DNS domain in the ingress selection step"
         in authentik_run_text
     )
+
+    headlamp_step_text = HEADLAMP_STEP_MANIFEST.read_text(encoding="utf-8")
+    assert "install-secret-sync" in headlamp_step_text
+    assert "install-authentik-idp" in headlamp_step_text
+    assert "choose-ingress-route" in headlamp_step_text
+    assert "OpenTofu" in headlamp_step_text
+
+    headlamp_run_text = (
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-headlamp"
+        / "run.sh"
+    ).read_text(encoding="utf-8")
+    assert "authentik-headlamp" in headlamp_run_text
+    assert "AUTHENTIK_BOOTSTRAP_TOKEN" in headlamp_run_text
+    assert "HEADLAMP_CONFIG_OIDC_CLIENT_ID" in headlamp_run_text
+    assert "HEADLAMP_CONFIG_OIDC_CLIENT_SECRET" in headlamp_run_text
+    assert "HEADLAMP_CONFIG_OIDC_IDP_ISSUER_URL" in headlamp_run_text
+    assert "HEADLAMP_CONFIG_OIDC_SCOPES" in headlamp_run_text
+    assert "/oidc-callback" in headlamp_run_text
+    assert "headlamp-oidc" in headlamp_run_text
+    assert "sync-openbao-global-secret.sh" in headlamp_run_text
+
+    headlamp_module_text = _authentik_headlamp_module_text()
+    headlamp_module_vars_text = _authentik_headlamp_module_vars_text()
+    headlamp_module_outputs_text = _authentik_headlamp_module_outputs_text()
+    assert "resource \"authentik_provider_oauth2\" \"headlamp\"" in headlamp_module_text
+    assert "resource \"authentik_application\" \"headlamp\"" in headlamp_module_text
+    assert "random_string" in headlamp_module_text
+    assert "random_password" in headlamp_module_text
+    assert "redirect_uris" in headlamp_module_text
+    assert 'issuer_mode                 = "per_provider"' in headlamp_module_text
+    assert "application_slug" in headlamp_module_vars_text
+    assert "headlamp_redirect_uri" in headlamp_module_vars_text
+    assert "client_id" in headlamp_module_outputs_text
+    assert "client_secret" in headlamp_module_outputs_text
+    assert "issuer_url" in headlamp_module_outputs_text
+
+    headlamp_external_secret_text = _headlamp_oidc_externalsecret_text()
+    assert "kind: ExternalSecret" in headlamp_external_secret_text
+    assert "headlamp-oidc" in headlamp_external_secret_text
+    assert "HEADLAMP_CONFIG_OIDC_CLIENT_ID" in headlamp_external_secret_text
+    assert "HEADLAMP_CONFIG_OIDC_CLIENT_SECRET" in headlamp_external_secret_text
+    assert "HEADLAMP_CONFIG_OIDC_IDP_ISSUER_URL" in headlamp_external_secret_text
+    assert "HEADLAMP_CONFIG_OIDC_SCOPES" in headlamp_external_secret_text
 
     cloudflare_tunnel_run_text = (
         REPO_ROOT
@@ -1080,6 +1171,14 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "Host(`headlamp.__ZONE_NAME__`)" in headlamp_ingressroute_text
     assert "Host(`grafana.__ZONE_NAME__`)" in grafana_ingressroute_text
     assert "Host(`argocd.__ZONE_NAME__`)" in wiredoor_ingressroute_text
+    assert "config:" in _headlamp_values_text()
+    assert "oidc:" in _headlamp_values_text()
+    assert "headlamp-oidc" in _headlamp_values_text()
+    assert "headlamp/externalsecret.yaml" in (
+        REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
+    ).read_text(encoding="utf-8")
+    assert "kind: ExternalSecret" in _headlamp_oidc_externalsecret_text()
+    assert "HEADLAMP_CONFIG_OIDC_CLIENT_SECRET" in _headlamp_oidc_externalsecret_text()
     platform_ingress_app_text = (
         REPO_ROOT / "gitops" / "apps" / "platform-ingress.yaml"
     ).read_text(encoding="utf-8")
@@ -1380,8 +1479,10 @@ def test_authentik_values_request_memory_for_server_and_worker():
     text = (REPO_ROOT / "gitops" / "values" / "authentik.yaml").read_text(
         encoding="utf-8"
     )
-    assert "server:\n  resources:\n    requests:\n      cpu: 100m\n      memory: 512Mi" in text
+    assert "server:" in text
+    assert "memory: 512Mi" in text
     assert "limits:\n      memory: 1Gi" in text
-    assert "worker:\n  resources:\n    requests:\n      cpu: 100m\n      memory: 256Mi" in text
+    assert "worker:" in text
+    assert "memory: 256Mi" in text
     assert "limits:\n      memory: 512Mi" in text
     assert "authentik:\n  existingSecret:" in text

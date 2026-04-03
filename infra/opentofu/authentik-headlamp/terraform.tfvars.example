@@ -1,0 +1,4 @@
+application_name       = "Headlamp"
+application_slug       = "headlamp"
+authentik_url          = "https://authentik.example.com"
+headlamp_redirect_uri  = "https://headlamp.example.com/oidc-callback"

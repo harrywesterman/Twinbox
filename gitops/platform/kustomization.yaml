@@ -6,6 +6,7 @@ resources:
   - authentik/ingressroute.yaml
   - whoami/ingressroute.yaml
   - headlamp/ingressroute.yaml
+  - headlamp/externalsecret.yaml
   - grafana/ingressroute.yaml
   - grafana/externalsecret.yaml
   - traefik/traefik-dashboard-ingressroute.yaml

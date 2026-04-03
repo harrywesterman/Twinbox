@@ -110,7 +110,7 @@ def _write_cluster_file(
     cluster_id: str,
     *,
     slug: str | None = None,
-    dns_domain: str = "bierineenweek.nl",
+    dns_domain: str = "example.com",
     selected_ingress_route: str | None = None,
     updated_at: str | None = None,
 ):

@@ -341,7 +341,7 @@ Configure in the Authentik UI:
 
 ## Headlamp Example
 
-Headlamp is the blueprint for all subsequent apps. Here is the complete implementation:
+Headlamp uses native OIDC login with Authentik rather than Traefik forwardAuth. The Helm chart reads its OIDC settings from an OpenBao-backed secret, and Headlamp handles the browser redirect itself.
 
 ### Argo CD Application
 
@@ -394,9 +394,35 @@ service:
 
 config:
   inCluster: true
+  oidc:
+    secret:
+      create: false
+    externalSecret:
+      enabled: true
+      name: headlamp-oidc
 ```
 
 Headlamp is stateless and does not need a database.
+
+### OpenBao Secret
+
+`gitops/platform/headlamp/externalsecret.yaml`:
+```yaml
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: headlamp-oidc
+  namespace: kube-system
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: headlamp-oidc
+    creationPolicy: Owner
+    deletionPolicy: Delete
+```
 
 ### IngressRoute
 
@@ -413,12 +439,9 @@ spec:
   routes:
     - kind: Rule
       match: Host(`headlamp.<public-zone-name>`)
-      middlewares:
-        - name: authentik-forwardauth
-          namespace: authentik
       services:
         - kind: Service
-          name: my-headlamp
+          name: headlamp
           port: 80
   tls: {}
 ---
@@ -433,58 +456,33 @@ spec:
   routes:
     - kind: Rule
       match: Host(`headlamp.<public-zone-name>`)
-      middlewares:
-        - name: authentik-forwardauth
-          namespace: authentik
       services:
         - kind: Service
-          name: my-headlamp
+          name: headlamp
           port: 80
 ```
 
-## Authentik forwardAuth Integration
+## Authentik OIDC Integration
 
-### How forwardAuth Works
+### How Headlamp Login Works
 
 1. User visits `headlamp.<public-zone-name>` such as `headlamp.tst.example.com`
-2. Traefik intercepts the request and sends a sub-request to:
-   ```
-   http://authentik-server.authentik.svc.cluster.local:9000/outpost.goauthentik.io/auth/traefik
-   ```
-3. Authentik checks:
-   - Does a valid session cookie exist?
-   - Is the user a member of the required group (e.g. `admins`)?
-4. On success:
-   - Authentik returns HTTP 200
-   - Headers are added: `X-authentik-username`, `X-authentik-groups`, `X-authentik-email`
-   - Traefik forwards the original request to Headlamp
-5. On failure:
-   - Authentik returns HTTP 401 or 403
-   - Traefik redirects the user to the Authentik login page
+2. Headlamp reads `HEADLAMP_CONFIG_OIDC_CLIENT_ID`, `HEADLAMP_CONFIG_OIDC_CLIENT_SECRET`, `HEADLAMP_CONFIG_OIDC_IDP_ISSUER_URL`, and `HEADLAMP_CONFIG_OIDC_SCOPES` from the mounted secret
+3. Headlamp sends the browser to Authentik's OIDC authorization endpoint
+4. Authentik validates the user session and returns the browser to `https://headlamp.<public-zone-name>/oidc-callback`
+5. Headlamp exchanges the authorization code for tokens and opens the dashboard
 
-### Headers
+### Authentik Provider
 
-The forwardAuth configuration passes these headers to the app:
+Twinbox creates a dedicated Authentik OAuth2/OIDC application for Headlamp using OpenTofu:
 
-| Header | Contents |
-|--------|----------|
-| `X-authentik-username` | Username |
-| `X-authentik-groups` | Comma-separated list of groups |
-| `X-authentik-email` | Email address |
-| `X-authentik-name` | Full name |
-| `X-authentik-uid` | Unique user ID |
+1. `authentik_provider_oauth2.headlamp` creates a confidential OIDC client
+2. `authentik_application.headlamp` binds the provider to the Headlamp application entry
+3. The provider uses the redirect URI `https://headlamp.<public-zone-name>/oidc-callback`
+4. The issuer URL is `https://authentik.<public-zone-name>/application/o/headlamp/`
+5. Headlamp requests the default `openid profile email` scopes
 
-Apps can use these headers for audit logging or personalized greetings, but **not** for authorization — Authentik already handles that.
-
-### Group Filtering
-
-Group restriction happens **in Authentik**, not in Traefik:
-
-1. Create a **Policy** in Authentik: `Group is admins`
-2. Bind this policy to the Headlamp Application
-3. Users outside the `admins` group receive a 403 directly from Authentik
-
-This keeps the Traefik configuration simple and the authorization logic centrally managed in Authentik.
+Because Headlamp uses its own OIDC flow, it does not need the shared Traefik forwardAuth middleware that other apps use.
 
 ## Database Template Structure
 

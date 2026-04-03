@@ -13,3 +13,9 @@ service:
 
 config:
   inCluster: true
+  oidc:
+    secret:
+      create: false
+    externalSecret:
+      enabled: true
+      name: headlamp-oidc

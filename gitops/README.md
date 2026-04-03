@@ -16,11 +16,13 @@ gitops/
 
 ## `apps/`
 
-ArgoCD `Application` resources. Each app deploys a Helm chart with:
+ArgoCD `Application` resources. Most apps deploy a Helm chart with:
 
 - Multi-source spec: chart repo, `ref: values` from this repo, optional platform overlay.
 - Automated sync with `prune` and `selfHeal` enabled.
 - `CreateNamespace=true` in sync options.
+
+Some apps use a repo-controlled Kustomize overlay under `gitops/apps/<app>/` so chart output can be patched deterministically before Argo CD applies it.
 
 Subdirectories like `grafana-secret/` and `wiredoor-gateway-secret/` contain `ExternalSecret` resources that pull credentials from OpenBao via the `openbao` ClusterSecretStore.
 

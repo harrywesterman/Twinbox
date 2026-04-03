@@ -6,6 +6,7 @@ OpenTofu modules for provisioning external infrastructure components used by Twi
 
 | Module | Provider | Purpose |
 |--------|----------|---------|
+| `authentik-headlamp/` | Authentik + Random | Headlamp OIDC application/client in Authentik |
 | `cloudflare/` | Cloudflare | DNS records (wiredoor + wildcard A records) |
 | `talos-proxmox/` | Proxmox (bpg) | Talos Linux VMs on Proxmox VE |
 | `wiredoor/` | Hetzner Cloud | Wiredoor bastion VM with cloud-init bootstrap |

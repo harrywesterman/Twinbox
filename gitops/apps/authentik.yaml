@@ -5,16 +5,12 @@ metadata:
   namespace: argocd
 spec:
   project: default
-  sources:
-    - repoURL: https://charts.goauthentik.io
-      chart: authentik
-      targetRevision: "2026.2.1"
-      helm:
-        valueFiles:
-          - $values/gitops/values/authentik.yaml
-    - repoURL: __REPO_URL__
-      targetRevision: __TARGET_REVISION__
-      ref: values
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __TARGET_REVISION__
+    path: gitops/apps/authentik
+    kustomize:
+      buildOptions: --enable-helm
   destination:
     server: https://kubernetes.default.svc
     namespace: authentik

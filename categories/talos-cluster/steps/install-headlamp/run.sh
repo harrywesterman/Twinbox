@@ -3,10 +3,94 @@ set -euo pipefail
 
 : "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"
 : "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"
+: "${MANAGER_DATA_DIR:?missing MANAGER_DATA_DIR}"
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
-manifest_path="$WORKSPACE_ROOT/gitops/apps/headlamp.yaml"
+source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
 
-bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
-  --manifest "$manifest_path" \
-  --application "headlamp"
+export KUBECONFIG="$KUBECONFIG_FILE"
+
+fail() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
+  exit 1
+}
+
+cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
+cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
+cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
+cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty')"
+
+[[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
+[[ -n "$cluster_dns_domain" ]] || fail "Could not determine cluster DNS domain; run choose-ingress-route first"
+
+public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
+[[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
+
+authentik_secret_file="/opt/twinbox/bootstrap/secrets/global/authentik.json"
+[[ -f "$authentik_secret_file" ]] || fail "Authentik bootstrap secret not found at $authentik_secret_file"
+
+authentik_host="$(jq -r '.AUTHENTIK_HOST // empty' "$authentik_secret_file")"
+authentik_token="$(jq -r '.AUTHENTIK_BOOTSTRAP_TOKEN // empty' "$authentik_secret_file")"
+
+if [[ -z "$authentik_host" ]]; then
+  authentik_host="https://authentik.${public_zone_name}"
+fi
+
+[[ -n "$authentik_token" ]] || fail "Could not read AUTHENTIK_BOOTSTRAP_TOKEN from $authentik_secret_file"
+
+headlamp_host="https://headlamp.${public_zone_name}"
+headlamp_redirect_uri="${headlamp_host}/oidc-callback"
+
+tf_workdir="$MANAGER_DATA_DIR/opentofu/authentik-headlamp-${cluster_id}"
+mkdir -p "$tf_workdir"
+cp -r "$WORKSPACE_ROOT/infra/opentofu/authentik-headlamp/"* "$tf_workdir/"
+
+cat >"$tf_workdir/terraform.tfvars" <<EOF
+application_name = "Headlamp"
+application_slug = "headlamp"
+authentik_url = "${authentik_host}"
+headlamp_redirect_uri = "${headlamp_redirect_uri}"
+EOF
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Provisioning Authentik OIDC client for Headlamp"
+cd "$tf_workdir"
+AUTHENTIK_TOKEN="$authentik_token" tofu init -input=false
+AUTHENTIK_TOKEN="$authentik_token" tofu apply -auto-approve -input=false
+
+headlamp_client_id="$(AUTHENTIK_TOKEN="$authentik_token" tofu output -raw client_id)"
+headlamp_client_secret="$(AUTHENTIK_TOKEN="$authentik_token" tofu output -raw client_secret)"
+headlamp_issuer_url="$(AUTHENTIK_TOKEN="$authentik_token" tofu output -raw issuer_url)"
+
+secrets_dir="/opt/twinbox/bootstrap/secrets/global"
+mkdir -p "$secrets_dir"
+
+headlamp_secret_file="$secrets_dir/headlamp-oidc-${cluster_id}.json"
+cat >"$headlamp_secret_file" <<EOF
+{
+  "HEADLAMP_CONFIG_OIDC_CLIENT_ID": "$headlamp_client_id",
+  "HEADLAMP_CONFIG_OIDC_CLIENT_SECRET": "$headlamp_client_secret",
+  "HEADLAMP_CONFIG_OIDC_IDP_ISSUER_URL": "$headlamp_issuer_url",
+  "HEADLAMP_CONFIG_OIDC_SCOPES": "openid profile email",
+  "CLUSTER_ID": "$cluster_id",
+  "HEADLAMP_HOST": "$headlamp_host"
+}
+EOF
+
+chmod 600 "$headlamp_secret_file"
+
+bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+  --secret-name "headlamp-oidc" \
+  --json-file "$headlamp_secret_file" \
+  --required-keys "HEADLAMP_CONFIG_OIDC_CLIENT_ID,HEADLAMP_CONFIG_OIDC_CLIENT_SECRET,HEADLAMP_CONFIG_OIDC_IDP_ISSUER_URL,HEADLAMP_CONFIG_OIDC_SCOPES"
+
+if command -v kubectl &>/dev/null; then
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying Headlamp ExternalSecret"
+  kubectl apply -f "$WORKSPACE_ROOT/gitops/platform/headlamp/externalsecret.yaml"
+
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying Headlamp Argo CD application"
+  bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+    --manifest "$WORKSPACE_ROOT/gitops/apps/headlamp.yaml" \
+    --application "headlamp"
+fi
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Headlamp Authentik configuration complete"
