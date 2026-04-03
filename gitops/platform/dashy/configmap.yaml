@@ -26,10 +26,13 @@ data:
             url: https://argocd.__ZONE_NAME__
           - title: Traefik
             description: Ingress controller
-            url: https://traefik.__ZONE_NAME__
+            url: https://traefik.__ZONE_NAME__/dashboard/
           - title: Authentik
             description: Identity provider
             url: https://authentik.__ZONE_NAME__
+          - title: Longhorn
+            description: Storage management
+            url: https://longhorn.__ZONE_NAME__
           - title: Headlamp
             description: Kubernetes dashboard
             url: https://headlamp.__ZONE_NAME__
