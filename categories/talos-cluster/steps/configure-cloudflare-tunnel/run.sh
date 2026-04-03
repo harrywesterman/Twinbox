@@ -95,7 +95,33 @@ fi
 cf_tunnel_token="$(echo "$token_response" | jq -r '.result // empty')"
 [[ -n "$cf_tunnel_token" ]] || fail "Could not generate tunnel token"
 
-# Step 3: Preflight the Cloudflare zone before writing DNS records
+# Step 3: Publish the public hostnames in the tunnel config so Cloudflare can
+# forward the wildcard domain to Traefik inside the cluster.
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Publishing tunnel ingress routes"
+tunnel_service_url="http://traefik.traefik.svc.cluster.local:80"
+tunnel_config_payload="$(jq -nc \
+  --arg tunnel_service_url "$tunnel_service_url" \
+  '{
+    config: {
+      ingress: [
+        {service: $tunnel_service_url},
+        {service: "http_status:404"}
+      ]
+    }
+  }')"
+
+tunnel_config_response="$(curl -s -X PUT "https://api.cloudflare.com/client/v4/accounts/${cf_account_id}/cfd_tunnel/${cf_tunnel_id}/configurations" \
+  -H "Authorization: Bearer $cf_api_token" \
+  -H "Content-Type: application/json" \
+  -d "$tunnel_config_payload")"
+
+tunnel_config_success="$(echo "$tunnel_config_response" | jq -r '.success // false')"
+if [[ "$tunnel_config_success" != "true" ]]; then
+  tunnel_config_error="$(echo "$tunnel_config_response" | jq -r '.errors[0].message // "Unknown error"')"
+  fail "Could not publish tunnel ingress routes: $tunnel_config_error"
+fi
+
+# Step 4: Preflight the Cloudflare zone before writing DNS records
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Preflighting Cloudflare zone"
 zone_response="$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${cf_zone_id}" \
   -H "Authorization: Bearer $cf_api_token" \

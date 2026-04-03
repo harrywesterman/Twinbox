@@ -40,14 +40,20 @@ If the cluster is not `prd`, the wizard will not show this step on Cloudflare Fr
 2. Requests a tunnel token from Cloudflare.
 3. Verifies the selected Cloudflare zone when the token allows zone reads.
 4. Creates or updates the wildcard CNAME that points to the tunnel.
-5. Syncs the tunnel credentials into OpenBao.
-6. Deploys the `cloudflare-tunnel-remote` Argo CD application.
+5. Configures the tunnel to forward `bierineenweek.nl` hostnames to Traefik inside the cluster over HTTP.
+6. Syncs the tunnel credentials into OpenBao.
+7. Deploys the `cloudflare-tunnel-remote` Argo CD application.
 
 ## Troubleshooting
 
 - If DNS record creation fails with an authorization error, check that the token
   has `Zone` → `DNS` → `Edit` on the correct zone.
-- If the tunnel is healthy but the hostname does not resolve, confirm that the
-  wildcard CNAME exists for the selected public domain.
+- If the tunnel is healthy but the hostname returns HTTP 503, confirm that the
+  tunnel has an ingress rule pointing to Traefik and that the wildcard CNAME
+  exists for the selected public domain.
+- If the browser reports too many redirects, check whether Traefik is still
+  forcing `web -> websecure`. Cloudflare already terminates client TLS for the
+  tunnel, so the origin path should stay HTTP unless you explicitly preserve
+  host headers and trust the origin certificate.
 - If Cloudflare reports an existing record with the same name, Twinbox now
   updates the record instead of failing.
