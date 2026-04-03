@@ -50,11 +50,20 @@ ensure_cilium_repo() {
 render_manifest() {
   ensure_cilium_repo
 
+  local helm_args=()
+  if [[ -n "${CILIUM_K8S_SERVICE_HOST:-}" ]]; then
+    helm_args+=(--set-string "k8sServiceHost=${CILIUM_K8S_SERVICE_HOST}")
+  fi
+  if [[ -n "${CILIUM_K8S_SERVICE_PORT:-}" ]]; then
+    helm_args+=(--set-string "k8sServicePort=${CILIUM_K8S_SERVICE_PORT}")
+  fi
+
   helm template cilium cilium/cilium \
     --version "$PINNED_CILIUM_CHART_VERSION" \
     --namespace kube-system \
     --include-crds \
-    --values "$values_file"
+    --values "$values_file" \
+    "${helm_args[@]}"
 }
 
 if [[ -n "$OUTPUT_FILE" ]]; then

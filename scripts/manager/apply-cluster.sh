@@ -722,8 +722,12 @@ wait_for_talos_api() {
 render_cilium_manifest() {
   local output_file="$1"
   local values_file="$WORKSPACE_ROOT/config/cilium-values.yaml"
+  local helm_args=()
 
   [[ -f "$values_file" ]] || fail "Cilium values file not found: ${values_file}"
+
+  helm_args+=(--set-string "k8sServiceHost=${VIP_IP}")
+  helm_args+=(--set-string "k8sServicePort=6443")
 
   if ! helm repo list 2>/dev/null | awk '$1 == "cilium" { found = 1 } END { exit found ? 0 : 1 }'; then
     helm repo add cilium https://helm.cilium.io >/dev/null
@@ -737,6 +741,7 @@ render_cilium_manifest() {
     --namespace kube-system \
     --include-crds \
     --values "$values_file" \
+    "${helm_args[@]}" \
     > "$output_file"
 }
 
