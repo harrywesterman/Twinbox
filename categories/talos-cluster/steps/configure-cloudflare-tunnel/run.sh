@@ -98,14 +98,14 @@ cf_tunnel_token="$(echo "$token_response" | jq -r '.result // empty')"
 # Step 3: Publish the public hostnames in the tunnel config so Cloudflare can
 # forward the wildcard domain to Traefik inside the cluster.
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Publishing tunnel ingress routes"
-tunnel_service_url="http://traefik.traefik.svc.cluster.local:80"
+tunnel_service_url="https://traefik.traefik.svc.cluster.local:443"
 tunnel_config_payload="$(jq -nc \
   --arg hostname "*.${public_zone_name}" \
   --arg tunnel_service_url "$tunnel_service_url" \
   '{
     config: {
       ingress: [
-        {hostname: $hostname, service: $tunnel_service_url},
+        {hostname: $hostname, service: $tunnel_service_url, originRequest: {noTLSVerify: true}},
         {service: "http_status:404"}
       ]
     }
