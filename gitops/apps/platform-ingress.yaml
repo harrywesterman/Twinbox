@@ -1,18 +1,240 @@
 apiVersion: argoproj.io/v1alpha1
-kind: Application
+kind: ApplicationSet
 metadata:
-  name: platform-ingress
+  name: platform-ingress-set
   namespace: argocd
 spec:
-  project: default
-  source:
-    repoURL: __REPO_URL__
-    targetRevision: __TARGET_REVISION__
-    path: gitops/platform
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: argocd
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            twinbox.io/domain-ready: "true"
+  template:
+    metadata:
+      name: platform-ingress
+    spec:
+      project: default
+      source:
+        repoURL: __REPO_URL__
+        targetRevision: __TARGET_REVISION__
+        path: gitops/platform
+        kustomize:
+          patches:
+            - target:
+                kind: IngressRoute
+                name: argocd
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`argocd.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: argocd-wiredoor
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`argocd.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: authentik
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: headlamp
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`headlamp.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: headlamp-wiredoor
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`headlamp.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: headlamp-tailscale
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`headlamp.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: grafana
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`grafana.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: grafana-wiredoor
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`grafana.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: grafana-tailscale
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`grafana.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: prometheus
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`prometheus.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: prometheus-wiredoor
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`prometheus.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: ntfy
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`ntfy.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: ntfy-wiredoor
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`ntfy.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: homepage
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`homepage.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: homepage-wiredoor
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`homepage.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: whoami
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`whoami.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: whoami-wiredoor
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`whoami.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: traefik-dashboard
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`traefik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))
+            - target:
+                kind: ConfigMap
+                name: homepage
+              patch: |-
+                apiVersion: v1
+                kind: ConfigMap
+                metadata:
+                  name: homepage
+                data:
+                  bookmarks.yaml: |
+                    - Platform:
+                        - Argo CD:
+                            - href: https://argocd.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                              description: GitOps control plane
+                        - Traefik:
+                            - href: https://traefik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                              description: Ingress controller
+                        - Authentik:
+                            - href: https://authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                              description: Identity provider
+                        - Headlamp:
+                            - href: https://headlamp.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                              description: Kubernetes dashboard
+                        - Grafana:
+                            - href: https://grafana.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                              description: Metrics and dashboards
+                        - Prometheus:
+                            - href: https://prometheus.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                              description: Metrics collection and alerting
+                        - ntfy:
+                            - href: https://ntfy.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                              description: Push notification service
+                        - Wiredoor:
+                            href: https://argocd.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                            description: Alternate operator entrypoint
+                    - Apps:
+                        - Whoami:
+                            href: https://whoami.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                            description: Minimal ingress check
+                        - Homepage:
+                            href: https://homepage.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                            description: Cluster landing page
+                  services.yaml: |
+                    - Platform:
+                        - Argo CD:
+                            href: https://argocd.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                            description: GitOps control plane
+                        - Traefik:
+                            href: https://traefik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                            description: Ingress controller
+                        - Authentik:
+                            href: https://authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                            description: Identity provider
+                        - Headlamp:
+                            href: https://headlamp.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                            description: Kubernetes dashboard
+                        - Grafana:
+                            href: https://grafana.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                            description: Metrics and dashboards
+                    - Apps:
+                        - Whoami:
+                            href: https://whoami.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                            description: Minimal ingress check
+                        - Homepage:
+                            href: https://homepage.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                            description: Cluster landing page
+            - target:
+                kind: Deployment
+                name: homepage
+              patch: |-
+                apiVersion: apps/v1
+                kind: Deployment
+                metadata:
+                  name: homepage
+                spec:
+                  template:
+                    spec:
+                      containers:
+                        - name: homepage
+                          env:
+                            - name: HOMEPAGE_ALLOWED_HOSTS
+                              value: homepage.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true

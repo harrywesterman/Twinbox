@@ -37,7 +37,7 @@ On Cloudflare Free, Twinbox only offers this route for `prd` clusters. See [`doc
 
 **Tailscale** — The cluster joins a Tailscale tailnet. Users connect by enabling Tailscale on their device. No port forwarding, no external VM, no public DNS needed. Access control via Tailscale ACLs. Can be self-hosted with Headscale for full control.
 
-All strategies use the same IngressRoute structure — only the `entryPoints` and `tls` fields differ. Domain names are rendered from the `cluster-config` ConfigMap into the final Traefik match expressions.
+All strategies use the same IngressRoute structure — only the `entryPoints` and `tls` fields differ. Domain names are projected at Argo render time from the local cluster secret annotation into the final Traefik match expressions.
 
 ### CloudNativePG — PostgreSQL
 
@@ -689,7 +689,7 @@ kubectl get externalsecret -n databases
 **Symptom**: Visiting `app.domain.com` returns 404.
 
 **Causes**:
-- The rendered route strings were missing or stale in `cluster-config`
+- The local Argo cluster secret annotation was missing or stale
 - DNS record does not point to the cluster
 - Service name does not match the Helm chart output
 

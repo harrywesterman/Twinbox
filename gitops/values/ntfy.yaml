@@ -27,7 +27,6 @@ persistence:
   accessMode: ReadWriteOnce
 
 config:
-  base-url: "https://ntfy.__ZONE_NAME__"
   cache-duration: "12h"
   keepalive-interval: "45s"
   behind-proxy: true

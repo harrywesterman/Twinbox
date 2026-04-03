@@ -1,31 +1,47 @@
 apiVersion: argoproj.io/v1alpha1
-kind: Application
+kind: ApplicationSet
 metadata:
-  name: grafana
+  name: grafana-set
   namespace: argocd
 spec:
-  project: default
-  sources:
-    - repoURL: https://grafana.github.io/helm-charts
-      chart: grafana
-      targetRevision: "8.10.2"
-      helm:
-        valueFiles:
-          - $values/gitops/values/grafana.yaml
-    - repoURL: __REPO_URL__
-      targetRevision: __TARGET_REVISION__
-      ref: values
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: monitoring
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    managedNamespaceMetadata:
-      labels:
-        pod-security.kubernetes.io/enforce: privileged
-        pod-security.kubernetes.io/audit: privileged
-        pod-security.kubernetes.io/warn: privileged
-    syncOptions:
-      - CreateNamespace=true
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            twinbox.io/domain-ready: "true"
+  template:
+    metadata:
+      name: grafana
+    spec:
+      project: default
+      sources:
+        - repoURL: https://grafana.github.io/helm-charts
+          chart: grafana
+          targetRevision: "8.10.2"
+          helm:
+            valueFiles:
+              - $values/gitops/values/grafana.yaml
+            values: |
+              grafana.ini:
+                server:
+                  root_url: https://grafana.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+        - repoURL: __REPO_URL__
+          targetRevision: __TARGET_REVISION__
+          ref: values
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: monitoring
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        managedNamespaceMetadata:
+          labels:
+            pod-security.kubernetes.io/enforce: privileged
+            pod-security.kubernetes.io/audit: privileged
+            pod-security.kubernetes.io/warn: privileged
+        syncOptions:
+          - CreateNamespace=true

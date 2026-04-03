@@ -9,10 +9,6 @@ sidecar:
     enabled: true
     label: grafana_dashboard
 
-grafana.ini:
-  server:
-    root_url: https://grafana.__ZONE_NAME__
-
 admin:
   existingSecret: grafana-admin
   userKey: admin-user

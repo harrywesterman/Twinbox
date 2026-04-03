@@ -76,6 +76,7 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 - `install-grafana` – Deploy Grafana monitoring stack.
 - `install-headlamp` – Deploy Headlamp Kubernetes dashboard.
 - `install-homepage-dashboard` – Deploy Homepage dashboard.
+- `install-ntfy` – Deploy ntfy push notifications.
 - `install-velero-backup` – Deploy Velero backup solution.
 - `install-whoami` – Deploy whoami test service.
 - `install-wiredoor-gateway` – Deploy Wiredoor gateway.

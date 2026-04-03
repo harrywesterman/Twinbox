@@ -188,6 +188,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-headlamp",
                 "install-grafana",
                 "install-homepage-dashboard",
+                "install-ntfy",
                 "install-management-consoles",
                 "install-velero-backup",
                 "install-proxmox-backup-system",
@@ -220,6 +221,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert talos["steps"][11]["title"] == "Install Headlamp"
             assert talos["steps"][12]["title"] == "Install Grafana"
             assert talos["steps"][13]["title"] == "Install Homepage dashboard"
+            assert talos["steps"][14]["title"] == "Install Ntfy"
             assert talos["steps"][0]["journey_stage"] == "setup"
             assert talos["steps"][0]["status"] == "ready"
             assert talos["steps"][1]["status"] == "locked"

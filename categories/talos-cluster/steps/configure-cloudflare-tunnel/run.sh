@@ -291,8 +291,8 @@ cat > "$cluster_hosts_secret" <<EOF
 EOF
 chmod 600 "$cluster_hosts_secret"
 
-bash "$WORKSPACE_ROOT/scripts/manager/render-cluster-config-map.sh" \
-  --zone-name "$public_zone_name"
+bash "$WORKSPACE_ROOT/scripts/manager/upsert-argocd-cluster-secret.sh" \
+  --public-zone-name "$public_zone_name"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Syncing cluster hostnames to OpenBao"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
@@ -325,10 +325,12 @@ if command -v kubectl &>/dev/null; then
   # Refresh the parent ingress app first, then apply the runtime Cloudflare app.
   # The parent app manifests still come from Git, so applying it after the
   # runtime app would overwrite the inline tunnel values we need for this run.
+  kubectl delete application platform-ingress -n argocd --ignore-not-found=true 2>/dev/null || true
   kubectl delete application cluster-config -n argocd --ignore-not-found=true 2>/dev/null || true
   bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
     --manifest "$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml" \
-    --application "platform-ingress"
+    --application "platform-ingress" \
+    --destination-namespace "argocd"
 
   # Apply the cloudflare-tunnel application last so the inline runtime values
   # remain the active desired state when Argo reconciles the deployment.

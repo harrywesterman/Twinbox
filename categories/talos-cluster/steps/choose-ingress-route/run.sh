@@ -42,9 +42,6 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Selected ingress route: $ingress_route"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Base DNS domain: $dns_domain"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Public zone name: $public_zone_name"
 
-bash "$WORKSPACE_ROOT/scripts/manager/render-cluster-config-map.sh" \
-  --zone-name "$public_zone_name"
-
 cluster_file="$MANAGER_DATA_DIR/clusters/${cluster_id}.json"
 if [[ -f "$cluster_file" ]]; then
   tmp_file="$(mktemp)"

@@ -153,14 +153,14 @@ Twinbox uses one base domain (`dns_domain`) for the cluster and derives a public
 1. **User input** — The user enters the base domain in the web wizard during `choose-ingress-route`.
 2. **Policy split** — The wizard stores the base domain and derives the public zone name as the base domain for `prd` or `slug.<dns_domain>` for other clusters.
 3. **OpenBao sync** — The ingress selection step syncs `ZONE_NAME`, `WIREDOOR_FQDN`, and `WILDCARD_FQDN` to OpenBao at `twinbox/global/cluster-hostnames`.
-4. **ExternalSecret** — The `cluster-config` ExternalSecret reads `ZONE_NAME` from OpenBao and creates a Kubernetes Secret in the `argocd` namespace.
-5. **Rendered ConfigMap** — The ingress/domain step renders `gitops/platform/cluster-config/configmap.yaml` with the derived public zone name and prebuilt route strings.
-6. **Kustomize replacements** — The `platform-ingress` Argo CD application uses Kustomize to copy the rendered match expressions and homepage strings into the live platform manifests.
+4. **Argo cluster secret** — The ingress/domain step upserts a local Argo CD cluster secret in the `argocd` namespace and stores the derived public zone name as an annotation.
+5. **ApplicationSets** — The `platform-ingress`, `grafana`, and `ntfy` ApplicationSets read that annotation at render time and inject the derived hostnames into Kustomize patches or Helm values.
+6. **Kustomize render** — The `platform-ingress` ApplicationSet uses Kustomize to patch the live match expressions and homepage strings before sync.
 7. **Ingress-specific apps** — Wiredoor, MetalLB, and Tailscale reuse the slug-prefixed hostname model. Cloudflare Tunnel is only offered for `prd` on Cloudflare Free.
 
 ### Affected services
 
-All platform services use the rendered `cluster-config` values:
+All platform services use the runtime domain projection from the local Argo cluster secret:
 
 | Service | Hostname |
 |---------|----------|
@@ -176,18 +176,15 @@ All platform services use the rendered `cluster-config` values:
 
 ```
 gitops/platform/
-├── kustomization.yaml          # Central Kustomize config with replacements
-├── cluster-config/
-│   ├── configmap.yaml          # Rendered plain-text source for Kustomize replacements
-│   └── externalsecret.yaml     # Reads ZONE_NAME from OpenBao
-├── authentik/ingressroute.yaml # Host match rendered from cluster-config
+├── kustomization.yaml          # Central Kustomize config for the shared platform shape
+├── authentik/ingressroute.yaml # Host match patched by the platform-ingress ApplicationSet
 ├── whoami/
-│   ├── ingressroute.yaml       # Host match rendered from cluster-config
+│   ├── ingressroute.yaml       # Host match patched by the platform-ingress ApplicationSet
 │   └── k8s.yaml                # Deployment + Service (no domain reference)
 ├── grafana/
-│   ├── ingressroute.yaml       # Host match rendered from cluster-config
+│   ├── ingressroute.yaml       # Host match patched by the platform-ingress ApplicationSet
 │   └── externalsecret.yaml     # Admin credentials from OpenBao
-├── headlamp/ingressroute.yaml  # Host match rendered from cluster-config
+├── headlamp/ingressroute.yaml  # Host match patched by the platform-ingress ApplicationSet
 ├── traefik/
 │   ├── argocd-ingressroute.yaml
 │   └── traefik-dashboard-ingressroute.yaml
@@ -196,19 +193,19 @@ gitops/platform/
 │   └── externalsecret.yaml
 └── homepage/
     ├── ingressroute.yaml
-    ├── configmap.yaml          # Bookmarks and services rendered with the selected domain
+    ├── configmap.yaml          # Bookmarks and services patched with the selected domain
     └── deployment.yaml         # HOMEPAGE_ALLOWED_HOSTS
 ```
 
 ### Argo CD application order
 
-The `cluster-config` application must sync before `platform-ingress` so that the rendered ConfigMap exists when Kustomize performs replacements. Add `depends_on` in the wizard journey:
+The local Argo cluster secret must exist before the domain-aware ApplicationSets are applied. Add `depends_on` in the wizard journey:
 
 ```
-cluster-config → platform-ingress
+ingress selection → Argo cluster secret projection → platform-ingress
 ```
 
-The `platform-ingress` application deploys the entire `gitops/platform/` directory via Kustomize, which handles all replacements at sync time.
+The `platform-ingress` ApplicationSet deploys the entire `gitops/platform/` directory via Kustomize and patches the live resources at sync time.
 
 ## Tooling Versions
 

@@ -8,6 +8,8 @@ set -euo pipefail
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
 
+export KUBECONFIG="$KUBECONFIG_FILE"
+
 fail() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
   exit 1
@@ -120,8 +122,8 @@ EOF
 
 chmod 600 "$secrets_dir/cloudflare-${cluster_id}.json"
 
-bash "$WORKSPACE_ROOT/scripts/manager/render-cluster-config-map.sh" \
-  --zone-name "$public_zone_name"
+bash "$WORKSPACE_ROOT/scripts/manager/upsert-argocd-cluster-secret.sh" \
+  --public-zone-name "$public_zone_name"
 
 # Sync hostnames to OpenBao so all platform apps can read ZONE_NAME
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
@@ -131,10 +133,12 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
 
 if command -v kubectl &>/dev/null; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying platform-ingress application"
+  kubectl delete application platform-ingress -n argocd --ignore-not-found=true 2>/dev/null || true
   kubectl delete application cluster-config -n argocd --ignore-not-found=true 2>/dev/null || true
   bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
     --manifest "$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml" \
-    --application "platform-ingress"
+    --application "platform-ingress" \
+    --destination-namespace "argocd"
 fi
 
 # Write result

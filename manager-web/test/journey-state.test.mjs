@@ -54,6 +54,7 @@ function buildCatalog(stepStatuses = {}) {
     ['install-headlamp', 'Install Headlamp', { dependsOn: ['install-whoami'] }],
     ['install-grafana', 'Install Grafana', { dependsOn: ['install-headlamp'] }],
     ['install-homepage-dashboard', 'Install Homepage dashboard', { dependsOn: ['install-grafana'] }],
+    ['install-ntfy', 'Install Ntfy', { dependsOn: ['install-homepage-dashboard'] }],
     ['install-management-consoles', 'Install Management consoles', { dependsOn: ['install-homepage-dashboard'] }],
     ['install-velero-backup', 'Install Velero backup', { dependsOn: ['install-management-consoles', 'install-longhorn-storage', 'install-secret-sync'] }],
     ['install-proxmox-backup-system', 'Install Proxmox Backup System', { dependsOn: ['install-velero-backup'] }],
@@ -114,7 +115,7 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   });
 
   assert.equal(model.mode, 'setup');
-  assert.equal(model.stepRail.length, 27);
+  assert.equal(model.stepRail.length, 28);
   assert.equal(model.stepRail[0].title, 'Deploy Talos Cluster');
   assert.equal(model.stepRail[0].isCurrent, true);
   assert.equal(model.stepRail[0].icon, '🖥️');
@@ -124,7 +125,7 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   assert.equal(model.stepRail[5].title, 'Install CloudNativePG');
   assert.equal(model.stepRail[5].icon, '🐘');
   assert.equal(model.primaryAction.label, 'Start step 1');
-  assert.equal(model.progress.totalSteps, 27);
+  assert.equal(model.progress.totalSteps, 28);
   assert.equal(model.progress.completedSteps, 0);
   assert.equal(model.activity.runtime.currentStage, 'Applying cluster plan');
 });
@@ -165,6 +166,7 @@ test('wizard model switches to manage mode when setup flow is complete', () => {
         'install-headlamp',
         'install-grafana',
         'install-homepage-dashboard',
+        'install-ntfy',
         'install-management-consoles',
         'install-velero-backup',
         'install-proxmox-backup-system',
@@ -215,7 +217,7 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     selectedStepId: '',
   });
 
-  assert.equal(model.stepRail.length, 27);
+  assert.equal(model.stepRail.length, 28);
   assert.deepEqual(model.stepRail.map((step) => step.id), [
     'provision-nodes',
     'install-argocd',
@@ -230,6 +232,7 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     'install-headlamp',
     'install-grafana',
     'install-homepage-dashboard',
+    'install-ntfy',
     'install-management-consoles',
     'install-velero-backup',
     'install-proxmox-backup-system',

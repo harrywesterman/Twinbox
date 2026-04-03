@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<USAGE
+Usage: $0 --public-zone-name NAME [--secret-name NAME]
+USAGE
+}
+
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
+fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+PUBLIC_ZONE_NAME=""
+SECRET_NAME="in-cluster-local"
+SERVER_URL="https://kubernetes.default.svc"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --public-zone-name)
+      PUBLIC_ZONE_NAME="$2"
+      shift 2
+      ;;
+    --secret-name)
+      SECRET_NAME="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      usage
+      fail "Unknown argument: $1"
+      ;;
+  esac
+done
+
+[[ -n "${KUBECONFIG_FILE:-}" ]] || fail "KUBECONFIG_FILE is required"
+[[ -f "${KUBECONFIG_FILE:-}" ]] || fail "kubeconfig not found at ${KUBECONFIG_FILE:-}"
+[[ -n "$PUBLIC_ZONE_NAME" ]] || fail "--public-zone-name is required"
+
+command -v kubectl >/dev/null 2>&1 || fail "kubectl not found"
+command -v jq >/dev/null 2>&1 || fail "jq not found"
+
+export KUBECONFIG="$KUBECONFIG_FILE"
+
+log "Ensuring Argo CD manager credentials exist"
+kubectl apply -f - >/dev/null <<'EOF'
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argocd-manager
+  namespace: argocd
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argocd-manager-cluster-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: argocd-manager
+    namespace: argocd
+EOF
+
+ca_data="$(kubectl config view --raw --minify -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' 2>/dev/null || true)"
+[[ -n "$ca_data" ]] || fail "Could not read cluster CA data from kubeconfig"
+
+bearer_token="$(kubectl -n argocd create token argocd-manager --duration=24h)"
+[[ -n "$bearer_token" ]] || fail "Could not create token for argocd-manager"
+
+cluster_config="$(jq -nc \
+  --arg bearerToken "$bearer_token" \
+  --arg caData "$ca_data" \
+  '{
+    bearerToken: $bearerToken,
+    tlsClientConfig: {
+      insecure: false,
+      caData: $caData
+    }
+  }')"
+
+log "Upserting Argo CD cluster secret ${SECRET_NAME}"
+kubectl apply -f - >/dev/null <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${SECRET_NAME}
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: cluster
+    twinbox.io/domain-ready: "true"
+  annotations:
+    twinbox.io/public-zone-name: "${PUBLIC_ZONE_NAME}"
+type: Opaque
+stringData:
+  name: ${SECRET_NAME}
+  server: ${SERVER_URL}
+  config: '${cluster_config}'
+EOF
+
+log "Argo CD cluster secret ${SECRET_NAME} updated for ${PUBLIC_ZONE_NAME}"

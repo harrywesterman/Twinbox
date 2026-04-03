@@ -1,0 +1,21 @@
+id: install-ntfy
+title: Install Ntfy
+type: action
+journey_stage: setup
+order: 95
+summary: Apply the ntfy GitOps application after the dashboard stack is ready.
+explanation: Twinbox applies the ntfy ApplicationSet after the dashboard stack so notifications can use the same public zone projection as the rest of the platform. The step waits for Argo CD health before continuing.
+side_help: Ntfy provides simple push notifications for cluster alerts and operator workflows.
+depends_on:
+  - install-homepage-dashboard
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/install-ntfy/run.sh

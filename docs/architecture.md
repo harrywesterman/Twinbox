@@ -76,11 +76,11 @@ All platform services share a single base domain (`ZONE_NAME`) provided by the u
 1. **User input** — The user enters the base domain (e.g. `example.com`) in the web wizard.
 2. **Filesystem storage** — `choose-ingress-route/run.sh` writes `ZONE_NAME`, `WIREDOOR_FQDN`, and `WILDCARD_FQDN` to `/opt/twinbox/bootstrap/secrets/global/cloudflare-<cluster-id>.json`.
 3. **OpenBao sync** — The same script calls `sync-openbao-global-secret.sh` to push these values to OpenBao at `twinbox/global/cluster-hostnames`.
-4. **ExternalSecret** — The `cluster-config` ExternalSecret reads `ZONE_NAME` from OpenBao and creates a Kubernetes Secret in the `argocd` namespace.
-5. **Rendered ConfigMap** — The ingress/domain step renders `gitops/platform/cluster-config/configmap.yaml` with the derived public zone name and the full route strings needed by the platform manifests.
-6. **Kustomize replacements** — The `platform-ingress` Argo CD application deploys `gitops/platform/` via Kustomize, which copies the rendered route expressions and homepage strings into the live manifests.
+4. **Argo cluster secret** — The ingress/domain step upserts a local Argo CD cluster secret in the `argocd` namespace with the derived public zone name as an annotation.
+5. **ApplicationSets** — The `platform-ingress`, `grafana`, and `ntfy` ApplicationSets read the cluster annotation at render time and project the domain into Kustomize patches or Helm values.
+6. **Kustomize render** — The `platform-ingress` ApplicationSet deploys `gitops/platform/` via Kustomize, which patches the live route expressions and homepage strings before sync.
 
-The `cluster-config` application must sync before `platform-ingress` so the rendered ConfigMap exists when Kustomize performs replacements.
+The local Argo cluster secret must exist before the domain-aware ApplicationSets are applied.
 
 ## Runtime Guarantees
 

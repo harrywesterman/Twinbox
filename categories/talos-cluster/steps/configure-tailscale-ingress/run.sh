@@ -11,6 +11,8 @@ source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
 
 export KUBECONFIG="$KUBECONFIG_FILE"
 
+export KUBECONFIG="$KUBECONFIG_FILE"
+
 fail() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
   exit 1
@@ -27,8 +29,8 @@ cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty'
 if [[ -n "$cluster_dns_domain" ]]; then
   public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
   if [[ -n "$public_zone_name" ]]; then
-    bash "$WORKSPACE_ROOT/scripts/manager/render-cluster-config-map.sh" \
-      --zone-name "$public_zone_name"
+    bash "$WORKSPACE_ROOT/scripts/manager/upsert-argocd-cluster-secret.sh" \
+      --public-zone-name "$public_zone_name"
   fi
 fi
 

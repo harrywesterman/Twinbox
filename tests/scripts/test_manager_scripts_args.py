@@ -751,7 +751,10 @@ def test_argo_manager_script_requires_kubeconfig_and_calls_gitops_bootstrap():
 def test_apply_argocd_application_helper_applies_and_waits_for_health():
     text = _apply_argocd_application_text()
 
-    assert "Usage: $0 --manifest PATH --application NAME [--no-wait]" in text
+    assert (
+        "Usage: $0 --manifest PATH --application NAME [--destination-namespace NAMESPACE] [--no-wait]"
+        in text
+    )
     assert "cluster_resource_profile()" in text
     assert "namespace_resource_baseline()" in text
     assert "extract_destination_namespace()" in text
@@ -986,6 +989,8 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "cloudflare-tunnel-remote" in cloudflare_tunnel_run_text
     assert "tunnel_token" in cloudflare_tunnel_run_text
     assert "platform-ingress.yaml" in cloudflare_tunnel_run_text
+    assert "upsert-argocd-cluster-secret.sh" in cloudflare_tunnel_run_text
+    assert "kubectl delete application platform-ingress -n argocd --ignore-not-found=true" in cloudflare_tunnel_run_text
     assert "kubectl delete application cluster-config -n argocd --ignore-not-found=true" in cloudflare_tunnel_run_text
     assert "Zone DNS Edit permissions" in cloudflare_tunnel_run_text
     assert "argocd-server" in cloudflare_tunnel_run_text
@@ -1011,6 +1016,8 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "Public zone name:" in cloudflare_dns_run_text
     assert "ZONE_NAME" in cloudflare_dns_run_text
     assert "cluster-hostnames" in cloudflare_dns_run_text
+    assert "upsert-argocd-cluster-secret.sh" in cloudflare_dns_run_text
+    assert "kubectl delete application platform-ingress -n argocd --ignore-not-found=true" in cloudflare_dns_run_text
     assert "kubectl delete application cluster-config -n argocd --ignore-not-found=true" in cloudflare_dns_run_text
 
     assert "order: 34" in whoami_text
@@ -1058,7 +1065,7 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "$values/gitops/values/longhorn.yaml" in longhorn_app_text
     assert "ServerSideApply=true" in external_secrets_app_text
     assert "certController:" in external_secrets_values_text
-    assert "create: false" in external_secrets_values_text
+    assert "create: true" in external_secrets_values_text
     assert "enabled: trueß∑" not in traefik_values_text
     assert "enabled: true" in traefik_values_text
     assert "existingSecret: wiredoor-gateway" in wiredoor_gateway_values_text
@@ -1073,8 +1080,18 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "Host(`headlamp.__ZONE_NAME__`)" in headlamp_ingressroute_text
     assert "Host(`grafana.__ZONE_NAME__`)" in grafana_ingressroute_text
     assert "Host(`argocd.__ZONE_NAME__`)" in wiredoor_ingressroute_text
-    assert "kind: Application" in (REPO_ROOT / "gitops" / "apps" / "platform-ingress.yaml").read_text(encoding="utf-8")
-    assert "kind: Application" in (REPO_ROOT / "gitops" / "apps" / "cluster-config.yaml").read_text(encoding="utf-8")
+    platform_ingress_app_text = (
+        REPO_ROOT / "gitops" / "apps" / "platform-ingress.yaml"
+    ).read_text(encoding="utf-8")
+    grafana_appset_text = GRAFANA_APP.read_text(encoding="utf-8")
+    ntfy_appset_text = NTFY_APP.read_text(encoding="utf-8")
+    assert "kind: ApplicationSet" in platform_ingress_app_text
+    assert "name: platform-ingress-set" in platform_ingress_app_text
+    assert "kind: ApplicationSet" in grafana_appset_text
+    assert "name: grafana-set" in grafana_appset_text
+    assert "kind: ApplicationSet" in ntfy_appset_text
+    assert "name: ntfy-set" in ntfy_appset_text
+    assert not (REPO_ROOT / "gitops" / "apps" / "cluster-config.yaml").exists()
     assert "kind: ExternalSecret" in traefik_externalsecret_text
     assert "kind: ClusterSecretStore" in traefik_externalsecret_text
     assert "name: openbao" in traefik_externalsecret_text
@@ -1255,8 +1272,16 @@ def test_ntfy_values_configures_persistence():
     text = NTFY_VALUES.read_text(encoding="utf-8")
     assert "binwiederhier/ntfy" in text
     assert "storageClassName: longhorn" in text
+    assert "base-url:" not in text
+    assert "ntfy.__ZONE_NAME__" not in text
+
+
+def test_ntfy_argocd_app_is_an_applicationset():
+    text = NTFY_APP.read_text(encoding="utf-8")
+    assert "kind: ApplicationSet" in text
+    assert "name: ntfy-set" in text
     assert "base-url:" in text
-    assert "ntfy.__ZONE_NAME__" in text
+    assert "ntfy.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in text
 
 
 def test_ntfy_ingressroute_exposes_ui():
@@ -1278,6 +1303,15 @@ def test_grafana_values_includes_sidecar_and_datasources():
     assert "name: Loki" in text
     assert "type: prometheus" in text
     assert "type: loki" in text
+    assert "root_url:" not in text
+
+
+def test_grafana_argocd_app_is_an_applicationset():
+    text = GRAFANA_APP.read_text(encoding="utf-8")
+    assert "kind: ApplicationSet" in text
+    assert "name: grafana-set" in text
+    assert "root_url:" in text
+    assert "grafana.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in text
 
 
 def test_homepage_configmap_includes_monitoring_links():
@@ -1296,25 +1330,25 @@ def test_kustomization_includes_monitoring_resources():
     assert "prometheus/ingressroute.yaml" in text
     assert "prometheus/alertmanager-config.yaml" in text
     assert "ntfy/ingressroute.yaml" in text
-    assert "data.ARGOCD_MATCH" in text
-    assert "data.HEADLAMP_MATCH" in text
-    assert "data.HOMEPAGE_BOOKMARKS_YAML" in text
-    assert 'delimiter: "."' not in text
-    assert "index: 1" not in text
+    assert "cluster-config/configmap.yaml" not in text
+    assert "cluster-config/externalsecret.yaml" not in text
+    assert "replacements:" not in text
+    assert "data.ARGOCD_MATCH" not in text
+    assert "data.HEADLAMP_MATCH" not in text
+    assert "data.HOMEPAGE_BOOKMARKS_YAML" not in text
 
 
-def test_cluster_config_render_script_emits_full_route_values():
-    text = (REPO_ROOT / "scripts" / "manager" / "render-cluster-config-map.sh").read_text(
-        encoding="utf-8"
-    )
+def test_argocd_cluster_secret_helper_writes_runtime_projection():
+    text = (
+        REPO_ROOT / "scripts" / "manager" / "upsert-argocd-cluster-secret.sh"
+    ).read_text(encoding="utf-8")
 
-    assert "ARGOCD_MATCH" in text
-    assert "AUTHENTIK_MATCH" in text
-    assert "HEADLAMP_MATCH" in text
-    assert "TRAEFIK_DASHBOARD_MATCH" in text
-    assert "HOMEPAGE_BOOKMARKS_YAML" in text
-    assert "HOMEPAGE_SERVICES_YAML" in text
-    assert "HOMEPAGE_ALLOWED_HOSTS" in text
+    assert "argocd-manager-cluster-admin" in text
+    assert "twinbox.io/domain-ready" in text
+    assert "twinbox.io/public-zone-name" in text
+    assert "argocd.argoproj.io/secret-type: cluster" in text
+    assert "create token argocd-manager" in text
+    assert "tlsClientConfig" in text
 
 
 def test_databases_kustomization_includes_authentik_resources():

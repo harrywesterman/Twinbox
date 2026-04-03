@@ -8,7 +8,7 @@ source "$WORKSPACE_ROOT/config/pinned-defaults.sh"
 
 usage() {
   cat <<USAGE
-Usage: $0 --manifest PATH --application NAME [--no-wait]
+Usage: $0 --manifest PATH --application NAME [--destination-namespace NAMESPACE] [--no-wait]
 USAGE
 }
 
@@ -150,6 +150,7 @@ wait_for_application_ready() {
 
 MANIFEST_PATH=""
 APPLICATION_NAME=""
+DESTINATION_NAMESPACE=""
 WAIT_FOR_READY=true
 
 while [[ $# -gt 0 ]]; do
@@ -160,6 +161,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --application)
       APPLICATION_NAME="$2"
+      shift 2
+      ;;
+    --destination-namespace)
+      DESTINATION_NAMESPACE="$2"
       shift 2
       ;;
     --no-wait)
@@ -188,7 +193,11 @@ command -v jq >/dev/null 2>&1 || fail "jq not found"
 
 export KUBECONFIG="$KUBECONFIG_FILE"
 
-destination_namespace="$(extract_destination_namespace)"
+if [[ -z "$DESTINATION_NAMESPACE" ]]; then
+  destination_namespace="$(extract_destination_namespace)"
+else
+  destination_namespace="$DESTINATION_NAMESPACE"
+fi
 resource_profile="$(cluster_resource_profile)"
 if [[ -n "$destination_namespace" ]]; then
   namespace_resource_baseline "$destination_namespace" "$resource_profile"

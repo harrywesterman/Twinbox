@@ -21,6 +21,7 @@ const STEP_ICON_ASSETS = {
   'create-users-and-groups': assetHref('create-users-and-groups.svg'),
   'configure-cloudflare-dns': assetHref('configure-cloudflare-dns.svg'),
   'install-homepage-dashboard': assetHref('install-homepage-dashboard.svg'),
+  'install-ntfy': assetHref('install-homepage-dashboard.svg'),
   'install-management-consoles': assetHref('install-management-consoles.svg'),
   'install-velero-backup': assetHref('install-velero-backup.svg'),
   'install-proxmox-backup-system': assetHref('install-proxmox-backup-system.svg'),
@@ -114,6 +115,11 @@ function buildProjectUrlMap() {
       icon: '🏠',
       project_url: 'https://gethomepage.dev/',
       github_url: 'https://github.com/gethomepage/homepage',
+    },
+    'install-ntfy': {
+      icon: '🔔',
+      project_url: 'https://ntfy.sh/',
+      github_url: 'https://github.com/binwiederhier/ntfy',
     },
     'install-management-consoles': {
       icon: '🧰',

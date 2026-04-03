@@ -6,6 +6,7 @@ set -euo pipefail
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 BOOTSTRAP_ROOT="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
+export KUBECONFIG="$KUBECONFIG_FILE"
 grafana_secret_file="$BOOTSTRAP_ROOT/secrets/global/grafana.json"
 manifest_path="$WORKSPACE_ROOT/gitops/apps/grafana.yaml"
 
@@ -30,6 +31,8 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --json-file "$grafana_secret_file" \
   --required-keys "admin-user,admin-password"
 
+kubectl delete application grafana -n argocd --ignore-not-found=true 2>/dev/null || true
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$manifest_path" \
-  --application "grafana"
+  --application "grafana" \
+  --destination-namespace "monitoring"
