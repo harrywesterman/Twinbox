@@ -473,6 +473,36 @@ spec:
 EOF
 }
 
+openbao_wait_for_external_secrets_webhook() {
+  local attempt=1
+  local attempts=60
+
+  while [[ "$attempt" -le "$attempts" ]]; do
+    local deployment_ready webhook_ready
+    local deployment_json endpoint_json
+    deployment_json="$(kubectl get deployment external-secrets-webhook -n "$OPERATOR_NAMESPACE" -o json 2>/dev/null || true)"
+    endpoint_json="$(kubectl get endpoints external-secrets-webhook -n "$OPERATOR_NAMESPACE" -o json 2>/dev/null || true)"
+
+    deployment_ready="$(
+      printf '%s' "$deployment_json" | jq -r '((.status.availableReplicas // 0) > 0) and ((.status.readyReplicas // 0) > 0)' 2>/dev/null || true
+    )"
+
+    webhook_ready="$(
+      printf '%s' "$endpoint_json" | jq -r '((.subsets // []) | map(.addresses // []) | add | length) > 0' 2>/dev/null || true
+    )"
+
+    if [[ "$deployment_ready" == "true" && "$webhook_ready" == "true" ]]; then
+      return 0
+    fi
+
+    openbao_log "Waiting for External Secrets webhook to become ready"
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+
+  openbao_fail "External Secrets webhook never became ready"
+}
+
 openbao_wait_for_secret() {
   local secret_name="$1"
   local namespace="$2"

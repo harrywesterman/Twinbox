@@ -66,6 +66,7 @@ Bootstraps the management secrets layer for GitOps:
 - Bootstraps management JSON files (proxmox, traefik-dashboard, seal key)
 
 External Secrets Operator is deployed from `gitops/apps/external-secrets.yaml`. OpenBao is applied from a generated Argo CD `Application` manifest that inlines the rendered Helm values so the local bootstrap output is authoritative during install.
+ESO’s webhook TLS bootstrap is handled internally by its `certController`; Twinbox does not provide ingress-style certificates for this step.
 
 ### `openbao-secret-sync.sh`
 

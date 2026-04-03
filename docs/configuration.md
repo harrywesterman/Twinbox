@@ -137,6 +137,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
   - OpenBao with Raft storage on Longhorn
   - `ClusterSecretStore/openbao`
   - `ExternalSecret/proxmox-bootstrap`
+- External Secrets Operator uses its own internal TLS bootstrap for the webhook via `certController`; this is separate from the ingress TLS stack and does not require a user-managed CA.
 - `install-cloudnativepg` installs the CloudNativePG operator with two replicas on Longhorn. The operator uses ServerSideApply for its CRDs.
 - `install-postgres-clusters` deploys all database clusters defined under `gitops/databases/`. Each cluster gets a CloudNativePG `Cluster` (3 instances), PgBouncer `Pooler` (read-write and read-only), a `ScheduledBackup` for daily snapshots, and an `ExternalSecret` that pulls credentials from OpenBao. Applications connect through the pooler service (e.g. `authentik-db-pooler-rw.databases.svc.cluster.local`).
 - `install-velero-backup` installs Velero together with either a Twinbox-managed Garage bucket or an external S3-compatible backup target.

@@ -100,6 +100,9 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$WORKSPACE_ROOT/gitops/apps/external-secrets.yaml" \
   --application "external-secrets"
 
+openbao_log "Waiting for External Secrets webhook"
+openbao_wait_for_external_secrets_webhook
+
 openbao_log "Rendering ArgoCD values files"
 openbao_render_values_file
 
