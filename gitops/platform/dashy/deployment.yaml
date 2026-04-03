@@ -23,9 +23,9 @@ spec:
             nodeSelectorTerms:
               - matchExpressions:
                   - key: kubernetes.io/hostname
-                    operator: NotIn
+                    operator: In
                     values:
-                      - talos-ay6-nel
+                      - talos-zq3-glf
       initContainers:
         - name: render-config
           image: python:3.12-alpine
