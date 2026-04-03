@@ -12,6 +12,7 @@ resources:
   - grafana/externalsecret.yaml
   - traefik/traefik-dashboard-ingressroute.yaml
   - traefik/argocd-server-transport.yaml
+  - traefik/argocd-login-returnurl-redirect.yaml
   - traefik/argocd-ingressroute.yaml
   - argocd/externalsecret.yaml
   - argocd/argocd-cm.yaml

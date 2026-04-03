@@ -1,0 +1,10 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: argocd-login-returnurl-redirect
+  namespace: argocd
+spec:
+  redirectRegex:
+    regex: ^https?://argocd\.__ZONE_NAME__/auth/login\?return_url=%2F([^&]+)$
+    replacement: https://argocd.__ZONE_NAME__/auth/login?return_url=https%3A%2F%2Fargocd.__ZONE_NAME__%2F$1
+    permanent: false
