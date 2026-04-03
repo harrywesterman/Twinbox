@@ -196,7 +196,7 @@ proxmox_get_all_vm_ids() {
   cluster_status="$(curl -ksS --fail \
     --cookie "$PROXMOX_TICKET_COOKIE" \
     --header "CSRFPreventionToken: ${PROXMOX_CSRF_TOKEN}" \
-    "${TF_VAR_proxmox_endpoint}/api2/json/cluster/status?type=node")" || fail "Failed to fetch Proxmox cluster status"
+    "${TF_VAR_proxmox_endpoint}/api2/json/cluster/resources?type=node")" || fail "Failed to fetch Proxmox cluster status"
 
   local node_names=()
   while IFS= read -r node_name; do
@@ -228,13 +228,18 @@ validate_vm_ids_available() {
   local planned_vm_ids=()
   local vmid=""
   local conflicts=()
+  local existing_vm_ids_output=""
 
   log "Checking for VM ID conflicts across the Proxmox cluster"
+
+  if ! existing_vm_ids_output="$(proxmox_get_all_vm_ids)"; then
+    fail "Failed to fetch Proxmox cluster status"
+  fi
 
   while IFS= read -r vmid; do
     [[ -n "$vmid" ]] || continue
     existing_vm_ids+=("$vmid")
-  done < <(proxmox_get_all_vm_ids)
+  done <<<"$existing_vm_ids_output"
 
   while IFS= read -r vmid; do
     [[ -n "$vmid" ]] || continue
