@@ -88,4 +88,5 @@ spec:
           configMap:
             name: dashy-config
         - name: data
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: dashy-data

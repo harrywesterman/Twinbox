@@ -17,6 +17,7 @@ resources:
   - dashy/ingressroute.yaml
   - dashy/configmap.yaml
   - dashy/externalsecret.yaml
+  - dashy/pvc.yaml
   - dashy/service.yaml
   - dashy/deployment.yaml
   - prometheus/ingressroute.yaml

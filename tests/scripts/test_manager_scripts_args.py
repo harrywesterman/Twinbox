@@ -1507,8 +1507,9 @@ def test_dashy_deployment_uses_a_published_image_tag():
     assert "strategy:" in text
     assert "type: Recreate" in text
     assert "kubernetes.io/hostname" not in text
-    assert "emptyDir: {}" in text
-    assert "claimName: dashy-data" not in text
+    assert "persistentVolumeClaim:" in text
+    assert "claimName: dashy-data" in text
+    assert "emptyDir: {}" not in text
     assert 'target = Path("/app/user-data/config.yml")' in text
     assert "requests:" in text
     assert "cpu: 500m" in text
@@ -1522,8 +1523,8 @@ def test_dashy_deployment_uses_a_published_image_tag():
     assert "ghcr.io/lissy93/dashy:v3.2.3" not in text
 
 
-def test_dashy_kustomization_does_not_include_a_pvc():
+def test_dashy_kustomization_includes_a_pvc():
     text = (REPO_ROOT / "gitops" / "platform" / "kustomization.yaml").read_text(
         encoding="utf-8"
     )
-    assert "dashy/pvc.yaml" not in text
+    assert "dashy/pvc.yaml" in text

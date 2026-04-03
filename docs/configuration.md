@@ -209,9 +209,9 @@ gitops/platform/
     ├── ingressroute.yaml
     ├── configmap.yaml          # Start page config template patched with the selected domain
     ├── externalsecret.yaml     # Dashy OIDC client credentials from OpenBao
-    ├── deployment.yaml         # Dashy deployment with ephemeral user-data storage
+    ├── pvc.yaml                # Longhorn-backed persistent user-data volume
+    ├── deployment.yaml         # Dashy deployment mounts the PVC for user-data
     ├── service.yaml
-    └── deployment.yaml
 ```
 
 ### Argo CD application order
