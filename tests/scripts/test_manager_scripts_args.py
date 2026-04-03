@@ -471,8 +471,10 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert "proxmox_talos_image_present()" in text
     assert "upload_talos_image_to_nodes()" in text
     assert "remove_legacy_talos_file_state()" in text
+    assert 'PROXMOX_VERIFY_MAX_ATTEMPTS="${PROXMOX_VERIFY_MAX_ATTEMPTS:-5}"' in text
     assert "Uploading Talos ISO to Proxmox nodes:" in text
     assert "Uploaded Talos ISO to ${node}/${datastore}" in text
+    assert "Talos ISO not visible yet on ${node}/${datastore}; retrying in ${delay}s" in text
     assert "Talos ISO not visible after upload on ${node}/${datastore}" in text
     assert (
         "Talos ISO already present on ${node}/${FILE_DATASTORE}: ${image_name}" in text

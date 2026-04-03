@@ -40,6 +40,7 @@ export TF_IN_AUTOMATION=1
 export NO_COLOR=1
 TOFU_PARALLELISM="${TOFU_PARALLELISM:-1}"
 PROXMOX_UPLOAD_MAX_ATTEMPTS="${PROXMOX_UPLOAD_MAX_ATTEMPTS:-5}"
+PROXMOX_VERIFY_MAX_ATTEMPTS="${PROXMOX_VERIFY_MAX_ATTEMPTS:-5}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -289,8 +290,7 @@ proxmox_upload_talos_image() {
     local curl_exit=0
     response_file="$(mktemp)"
 
-    set +e
-    http_code="$(
+    if http_code="$(
       curl -ksS --show-error \
         --output "$response_file" \
         --write-out '%{http_code}' \
@@ -300,9 +300,11 @@ proxmox_upload_talos_image() {
         --form "content=iso" \
         --form "filename=@${image_path};filename=${image_name}" \
         "$upload_url"
-    )"
-    curl_exit=$?
-    set -e
+    )"; then
+      curl_exit=0
+    else
+      curl_exit=$?
+    fi
 
     response_body="$(tr -d '\r' <"$response_file" | head -c 500 || true)"
     rm -f "$response_file"
@@ -343,16 +345,31 @@ proxmox_verify_talos_image() {
   local datastore="$2"
   local image_name="$3"
   local expected_volid="${datastore}:iso/${image_name}"
-  local content_json=""
+  local attempt=1
 
-  content_json="$(proxmox_get_storage_content "$node" "$datastore")" || fail "Failed to read Proxmox storage content for ${node}/${datastore}"
+  while true; do
+    local content_json=""
 
-  if jq -e --arg volid "$expected_volid" '.data[]? | select(.volid == $volid and .content == "iso")' >/dev/null <<<"$content_json"; then
-    log "Verified Talos ISO on ${node}/${datastore}: ${expected_volid}"
-    return 0
-  fi
+    content_json="$(proxmox_get_storage_content "$node" "$datastore")" || fail "Failed to read Proxmox storage content for ${node}/${datastore}"
 
-  fail "Talos ISO not visible after upload on ${node}/${datastore}: ${expected_volid}"
+    if jq -e --arg volid "$expected_volid" '.data[]? | select(.volid == $volid and .content == "iso")' >/dev/null <<<"$content_json"; then
+      log "Verified Talos ISO on ${node}/${datastore}: ${expected_volid}"
+      return 0
+    fi
+
+    if [[ "$attempt" -ge "$PROXMOX_VERIFY_MAX_ATTEMPTS" ]]; then
+      fail "Talos ISO not visible after upload on ${node}/${datastore}: ${expected_volid}"
+    fi
+
+    local delay=$((2 ** (attempt - 1)))
+    if [[ "$delay" -gt 10 ]]; then
+      delay=10
+    fi
+
+    log "Talos ISO not visible yet on ${node}/${datastore}; retrying in ${delay}s"
+    sleep "$delay"
+    attempt=$((attempt + 1))
+  done
 }
 
 proxmox_talos_image_present() {
