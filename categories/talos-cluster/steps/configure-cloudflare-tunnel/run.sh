@@ -100,11 +100,12 @@ cf_tunnel_token="$(echo "$token_response" | jq -r '.result // empty')"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Publishing tunnel ingress routes"
 tunnel_service_url="http://traefik.traefik.svc.cluster.local:80"
 tunnel_config_payload="$(jq -nc \
+  --arg hostname "*.${public_zone_name}" \
   --arg tunnel_service_url "$tunnel_service_url" \
   '{
     config: {
       ingress: [
-        {service: $tunnel_service_url},
+        {hostname: $hostname, service: $tunnel_service_url},
         {service: "http_status:404"}
       ]
     }
