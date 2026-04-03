@@ -1504,6 +1504,8 @@ def test_dashy_deployment_uses_a_published_image_tag():
     text = (REPO_ROOT / "gitops" / "platform" / "dashy" / "deployment.yaml").read_text(
         encoding="utf-8"
     )
+    assert "strategy:" in text
+    assert "type: Recreate" in text
     assert "ghcr.io/lissy93/dashy:v3.2.3" in text
     assert "ghcr.io/lissy93/dashy:latest" not in text
     assert "ghcr.io/lissy93/dashy:v3.1.1" not in text
