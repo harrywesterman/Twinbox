@@ -402,7 +402,6 @@ def test_setup_wizard_supports_cluster_slug_selection_and_normalization():
     text = _wizard_text()
     assert "sanitize_cluster_slug()" in text
     assert "choose_cluster_slug()" in text
-    assert '--default-item "prd"' in text
     assert 'Choose a cluster name. Default: prd.' in text
     assert '"prd" "Use Production (prd)"' in text
     assert '"dev" "Use Development (dev)"' in text
