@@ -189,15 +189,35 @@ spec:
                 kind: IngressRoute
                 name: traefik-dashboard
               patch: |-
+                - op: add
+                  path: /spec/routes/0
+                  value:
+                    kind: Rule
+                    match: Host(`traefik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)
+                    services:
+                      - kind: Service
+                        name: authentik-server
+                        namespace: authentik
+                        port: 80
                 - op: replace
-                  path: /spec/routes/0/match
+                  path: /spec/routes/1/match
                   value: Host(`traefik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))
             - target:
                 kind: IngressRoute
                 name: longhorn
               patch: |-
+                - op: add
+                  path: /spec/routes/0
+                  value:
+                    kind: Rule
+                    match: Host(`longhorn.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)
+                    services:
+                      - kind: Service
+                        name: authentik-server
+                        namespace: authentik
+                        port: 80
                 - op: replace
-                  path: /spec/routes/0/match
+                  path: /spec/routes/1/match
                   value: Host(`longhorn.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: ConfigMap

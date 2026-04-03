@@ -7,6 +7,13 @@ spec:
   entryPoints:
     - websecure
   routes:
+    - match: Host(`longhorn.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
+      kind: Rule
+      services:
+        - kind: Service
+          name: authentik-server
+          namespace: authentik
+          port: 80
     - kind: Rule
       match: Host(`longhorn.__ZONE_NAME__`)
       middlewares:
