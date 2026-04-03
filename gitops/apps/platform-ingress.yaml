@@ -38,6 +38,22 @@ spec:
                   path: /spec/routes/0/match
                   value: Host(`argocd.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
+                kind: ConfigMap
+                name: argocd-cm
+              patch: |-
+                - op: replace
+                  path: /data/url
+                  value: https://argocd.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                - op: replace
+                  path: /data/oidc.config
+                  value: |-
+                    name: Authentik
+                    issuer: https://authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/application/o/argocd/
+                    clientID: $argocd-oidc:oidc.authentik.clientID
+                    clientSecret: $argocd-oidc:oidc.authentik.clientSecret
+                    requestedScopes: ["openid", "profile", "email"]
+                    requestedIDTokenClaims: {"groups": {"essential": true}}
+            - target:
                 kind: IngressRoute
                 name: authentik
               patch: |-

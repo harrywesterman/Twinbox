@@ -1,0 +1,2 @@
+authentik_url      = "https://authentik.example.com"
+argocd_redirect_uri = "https://argocd.example.com/auth/callback"

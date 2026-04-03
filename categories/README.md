@@ -73,6 +73,7 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 - `install-authentik-idp` – Deploy Authentik identity provider.
 - `create-users-and-groups` – Create the first Authentik user and `admins` group.
 - `choose-ingress-route` – Choose the ingress branch for this cluster.
+- `configure-argocd-oidc` – Connect Argo CD to Authentik for OIDC login.
 - `install-grafana` – Deploy Grafana monitoring stack.
 - `install-headlamp` – Deploy Headlamp Kubernetes dashboard.
 - `install-dashy-dashboard` – Deploy Dashy as the cluster start page.

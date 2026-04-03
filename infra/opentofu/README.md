@@ -6,6 +6,7 @@ OpenTofu modules for provisioning external infrastructure components used by Twi
 
 | Module | Provider | Purpose |
 |--------|----------|---------|
+| `authentik-argocd/` | Authentik + Random | Argo CD OIDC application/client in Authentik |
 | `authentik-headlamp/` | Authentik + Random | Headlamp OIDC application/client in Authentik |
 | `cloudflare/` | Cloudflare | DNS records (wiredoor + wildcard A records) |
 | `talos-proxmox/` | Proxmox (bpg) | Talos Linux VMs on Proxmox VE |

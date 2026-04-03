@@ -13,6 +13,9 @@ resources:
   - traefik/traefik-dashboard-ingressroute.yaml
   - traefik/argocd-server-transport.yaml
   - traefik/argocd-ingressroute.yaml
+  - argocd/externalsecret.yaml
+  - argocd/argocd-cm.yaml
+  - argocd/argocd-rbac-cm.yaml
   - management-consoles/longhorn-ingressroute.yaml
   - wiredoor-gateway/ingressroute.yaml
   - wiredoor-gateway/externalsecret.yaml
