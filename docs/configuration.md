@@ -144,16 +144,17 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 
 ## Dynamic Domain Configuration
 
-Twinbox uses a single base domain (`ZONE_NAME`) for all platform services, then prefixes the cluster slug for non-PRD hostnames. The user provides the base domain during the **Choose Ingress Route** step and Twinbox derives the public hostname from it.
+Twinbox uses one base domain (`dns_domain`) for the cluster and derives a public zone name from it. The canonical policy is documented in [docs/ingress-policy.md](./ingress-policy.md): `prd` keeps the special `app.example.com` exception, while non-`prd` clusters use the slug-prefixed hostname model. Cloudflare Tunnel is only offered for `prd` on Cloudflare Free.
 
 ### How it works
 
-1. **User input** — The user enters the base domain (e.g. `example.com`) in the web wizard during `choose-ingress-route`.
-2. **OpenBao sync** — The ingress selection step syncs `ZONE_NAME`, `WIREDOOR_FQDN`, and `WILDCARD_FQDN` to OpenBao at `twinbox/global/cluster-hostnames`.
-3. **ExternalSecret** — The `cluster-config` ExternalSecret reads `ZONE_NAME` from OpenBao and creates a Kubernetes Secret in the `argocd` namespace.
-4. **Rendered ConfigMap** — The ingress/domain step renders `gitops/platform/cluster-config/configmap.yaml` with the cluster-prefixed public zone name and prebuilt route strings.
-5. **Kustomize replacements** — The `platform-ingress` Argo CD application uses Kustomize to copy the rendered match expressions and homepage strings into the live platform manifests.
-6. **Ingress-specific apps** — Cloudflare Tunnel, Wiredoor, MetalLB, and Tailscale all reuse the same selected domain when they render route-specific configuration.
+1. **User input** — The user enters the base domain in the web wizard during `choose-ingress-route`.
+2. **Policy split** — The wizard stores the base domain and derives the public zone name from the cluster slug.
+3. **OpenBao sync** — The ingress selection step syncs `ZONE_NAME`, `WIREDOOR_FQDN`, and `WILDCARD_FQDN` to OpenBao at `twinbox/global/cluster-hostnames`.
+4. **ExternalSecret** — The `cluster-config` ExternalSecret reads `ZONE_NAME` from OpenBao and creates a Kubernetes Secret in the `argocd` namespace.
+5. **Rendered ConfigMap** — The ingress/domain step renders `gitops/platform/cluster-config/configmap.yaml` with the cluster-prefixed public zone name and prebuilt route strings.
+6. **Kustomize replacements** — The `platform-ingress` Argo CD application uses Kustomize to copy the rendered match expressions and homepage strings into the live platform manifests.
+7. **Ingress-specific apps** — Wiredoor, MetalLB, and Tailscale reuse the slug-prefixed hostname model. Cloudflare Tunnel is only offered for `prd` on Cloudflare Free.
 
 ### Affected services
 

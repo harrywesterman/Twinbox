@@ -72,6 +72,7 @@ CLOUDFLARE_STEP_MANIFEST = (
     / "configure-cloudflare-dns"
     / "step.yaml"
 )
+INGRESS_POLICY_DOC = REPO_ROOT / "docs" / "ingress-policy.md"
 CHOOSE_INGRESS_ROUTE_RUN_SCRIPT = (
     REPO_ROOT
     / "categories"
@@ -883,18 +884,22 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "depends_on:" in choose_ingress_text
     assert "dns_domain" in choose_ingress_text
     assert "DNS Domain" in choose_ingress_text
-    assert "Twinbox will prefix the cluster slug for non-PRD hostnames" in choose_ingress_text
+    assert "Cloudflare Tunnel is shown only for prd clusters" in choose_ingress_text
+    assert "Non-prd clusters keep the slug-prefixed hostname model" in choose_ingress_text
+    assert "Cloudflare Tunnel is available only for prd clusters on Cloudflare Free." in choose_ingress_text
     assert "Base zone for platform hostnames." in choose_ingress_text
 
     choose_ingress_run_text = CHOOSE_INGRESS_ROUTE_RUN_SCRIPT.read_text(
         encoding="utf-8"
     )
     assert "cluster_slug" in choose_ingress_run_text
+    assert "cluster_slug_lower" in choose_ingress_run_text
     assert "Base DNS domain:" in choose_ingress_run_text
     assert "public_zone_name" in choose_ingress_run_text
     assert ".dns_domain = $dns_domain" in choose_ingress_run_text
     assert ".public_zone_name = $public_zone_name" in choose_ingress_run_text
     assert '"dns_domain": "$dns_domain"' in choose_ingress_run_text
+    assert "Cloudflare Tunnel is only available for prd clusters on Cloudflare Free" in choose_ingress_run_text
 
     assert "order: 31" in cloudflare_text
     assert "choose-ingress-route" in cloudflare_text
@@ -953,6 +958,8 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "cluster-public-zone.sh" in cloudflare_tunnel_run_text
     assert "twinbox_public_zone_name" in cloudflare_tunnel_run_text
     assert "twinbox_cluster_dns_zone_name" in cloudflare_tunnel_run_text
+    assert "cluster_slug_lower" in cloudflare_tunnel_run_text
+    assert "Cloudflare Tunnel is only available for prd clusters on Cloudflare Free" in cloudflare_tunnel_run_text
     assert "Using the provided Cloudflare token for DNS record creation" in cloudflare_tunnel_run_text
     assert "DNS zone name: $cloudflare_dns_zone_name" in cloudflare_tunnel_run_text
     assert 'echo "[$(date \'+%Y-%m-%d %H:%M:%S\')] Public zone name: $public_zone_name"' in cloudflare_tunnel_run_text
@@ -981,6 +988,8 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
         cloudflare_tunnel_run_text.index("platform-ingress.yaml")
         < cloudflare_tunnel_run_text.index("Applying cloudflare-tunnel application")
     )
+
+    assert "Cloudflare Tunnel is **prd-only** on Cloudflare Free" in INGRESS_POLICY_DOC.read_text(encoding="utf-8")
 
     cloudflare_dns_run_text = (
         REPO_ROOT

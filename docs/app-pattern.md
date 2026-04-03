@@ -31,6 +31,7 @@ Twinbox supports four ingress strategies, chosen by the user during setup:
 **Wiredoor** — A self-hosted WireGuard-based tunnel to an external server (e.g. Hetzner VM). All traffic flows through the `webwiredoor` entryPoint (port 8081). Let's Encrypt certificates are managed by the Wiredoor server. No third party sees your traffic, and there are no upload limits.
 
 **Cloudflare Tunnel** — An outbound tunnel from the cluster to Cloudflare's edge using `cloudflared`. All traffic flows through the `websecure` entryPoint. Cloudflare handles TLS termination and DDoS protection, but can see HTTP traffic. The free plan has a 100MB upload limit.
+On Cloudflare Free, Twinbox only offers this route for `prd` clusters. See [`docs/ingress-policy.md`](./ingress-policy.md) for the canonical ingress and hostname rules.
 
 **MetalLB + Port Forwarding** — MetalLB assigns a real IP on the local network to Traefik. The user configures port forwarding on their router (80/443). Traefik manages Let's Encrypt certificates directly via HTTP-01 challenge. Full control, zero external dependencies, no third party sees traffic.
 

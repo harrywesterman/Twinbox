@@ -70,7 +70,7 @@ Twinbox is a complete K8s cluster based on Talos Linux, completely configured. T
 
 ## Domain Flow
 
-All platform services share a single base domain (`ZONE_NAME`) provided by the user during the **Choose Ingress Route** wizard step. Twinbox prefixes the cluster slug for non-PRD public hostnames, then the derived public zone name flows through the system as follows:
+All platform services share a single base domain (`ZONE_NAME`) provided by the user during the **Choose Ingress Route** wizard step. Twinbox prefixes the cluster slug for non-`prd` public hostnames, keeps the special `app.example.com` exception for `prd`, and follows the canonical policy in [docs/ingress-policy.md](./ingress-policy.md). Cloudflare Tunnel is only offered for `prd` on Cloudflare Free.
 
 1. **User input** — The user enters the base domain (e.g. `example.com`) in the web wizard.
 2. **Filesystem storage** — `choose-ingress-route/run.sh` writes `ZONE_NAME`, `WIREDOOR_FQDN`, and `WILDCARD_FQDN` to `/opt/twinbox/bootstrap/secrets/global/cloudflare-<cluster-id>.json`.

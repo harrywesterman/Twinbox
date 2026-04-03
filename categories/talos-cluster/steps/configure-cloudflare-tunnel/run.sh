@@ -19,9 +19,13 @@ fail() {
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
+cluster_slug_lower="$(printf '%s' "$cluster_slug" | tr '[:upper:]' '[:lower:]')"
 cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty')"
 
 [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
+if [[ "$cluster_slug_lower" != "prd" ]]; then
+  fail "Cloudflare Tunnel is only available for prd clusters on Cloudflare Free"
+fi
 
 # Parse inputs
 cf_api_token="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.cf_api_token')"

@@ -284,6 +284,53 @@ function clusterScopeId(cluster) {
   return cluster?.cluster_instance_id || cluster?.instance_id || cluster?.id || null;
 }
 
+function clusterSlug(cluster) {
+  return normalizeChoiceValue(cluster?.slug || cluster?.id).toLowerCase();
+}
+
+function isPrdCluster(cluster) {
+  return clusterSlug(cluster) === "prd";
+}
+
+function isAllowedIngressRoute(route, currentCluster) {
+  const normalizedRoute = normalizeChoiceValue(route);
+  if (!normalizedRoute) {
+    return false;
+  }
+
+  if (!currentCluster) {
+    return true;
+  }
+
+  if (normalizedRoute === "cloudflare-tunnel") {
+    return isPrdCluster(currentCluster);
+  }
+
+  return normalizedRoute === "wiredoor"
+    || normalizedRoute === "metallb"
+    || normalizedRoute === "tailscale";
+}
+
+function renderStepForCluster(step, currentCluster) {
+  if (step.id !== "choose-ingress-route" || !currentCluster || isPrdCluster(currentCluster)) {
+    return step;
+  }
+
+  return {
+    ...step,
+    inputs: step.inputs.map((input) => {
+      if (input.id !== "ingress_route" || !Array.isArray(input.options)) {
+        return input;
+      }
+
+      return {
+        ...input,
+        options: input.options.filter((option) => option.value !== "cloudflare-tunnel"),
+      };
+    }),
+  };
+}
+
 function stepStatePath(dirs, stepId, clusterScope = null) {
   const scope = clusterScope ? path.join("clusters", clusterScope) : "global";
   return path.join(dirs.stepState, scope, `${stepId}.json`);
@@ -421,7 +468,7 @@ function determineIngressRoute({ currentCluster, stepStateById, definitions }) {
 
   for (const candidate of clusterCandidates) {
     const normalized = normalizeChoiceValue(candidate);
-    if (normalized) {
+    if (normalized && isAllowedIngressRoute(normalized, currentCluster)) {
       return normalized;
     }
   }
@@ -430,7 +477,7 @@ function determineIngressRoute({ currentCluster, stepStateById, definitions }) {
   if (preferredStep) {
     const entry = stepStateById.get("choose-ingress-route");
     const selectedFromChoice = extractIngressRouteFromState(entry?.state);
-    if (selectedFromChoice) {
+    if (selectedFromChoice && isAllowedIngressRoute(selectedFromChoice, currentCluster)) {
       return selectedFromChoice;
     }
   }
@@ -438,7 +485,7 @@ function determineIngressRoute({ currentCluster, stepStateById, definitions }) {
   for (const category of definitions.categories) {
     for (const step of category.steps) {
       const selectedFromStep = extractIngressRouteFromState(stepStateById.get(step.id)?.state);
-      if (selectedFromStep) {
+      if (selectedFromStep && isAllowedIngressRoute(selectedFromStep, currentCluster)) {
         return selectedFromStep;
       }
     }
@@ -487,6 +534,7 @@ export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) 
   const activeClusterId = currentCluster?.id || null;
   const activeClusterScopeId = clusterScopeId(currentCluster);
   const stepStateById = new Map();
+  const renderedStepsById = new Map();
 
   for (const category of definitions.categories) {
     for (const step of category.steps) {
@@ -498,6 +546,7 @@ export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) 
         ? readJsonIfExists(path.join(dirs.jobs, `${state.last_job_id}.json`))
         : null;
       stepStateById.set(step.id, { state, latestJob });
+      renderedStepsById.set(step.id, renderStepForCluster(step, currentCluster));
     }
   }
 
@@ -520,28 +569,29 @@ export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) 
     const steps = category.steps
       .filter((step) => shouldExposeStep(step, activeIngressRoute))
       .map((step) => {
+      const renderedStep = renderedStepsById.get(step.id) || step;
       const { state, latestJob } = stepStateById.get(step.id) || { state: null, latestJob: null };
-      const status = deriveStepStatus(step, state, latestJob, completedDependencies);
+      const status = deriveStepStatus(renderedStep, state, latestJob, completedDependencies);
 
       return {
-        id: step.id,
-        category_id: step.category_id,
-        title: step.title,
-        type: step.type,
-        journey_stage: step.journey_stage,
-        order: step.order,
-        ingress_route: step.ingress_route,
-        summary: step.summary,
-        explanation: step.explanation,
-        side_help: step.side_help,
-        inputs: step.inputs,
-        secrets: step.secrets,
-        depends_on: step.depends_on,
-        icon: step.icon,
-        icon_artwork_url: step.icon_artwork_url,
-        project_url: step.project_url,
-        github_url: step.github_url,
-        positive_summary: step.positive_summary,
+        id: renderedStep.id,
+        category_id: renderedStep.category_id,
+        title: renderedStep.title,
+        type: renderedStep.type,
+        journey_stage: renderedStep.journey_stage,
+        order: renderedStep.order,
+        ingress_route: renderedStep.ingress_route,
+        summary: renderedStep.summary,
+        explanation: renderedStep.explanation,
+        side_help: renderedStep.side_help,
+        inputs: renderedStep.inputs,
+        secrets: renderedStep.secrets,
+        depends_on: renderedStep.depends_on,
+        icon: renderedStep.icon,
+        icon_artwork_url: renderedStep.icon_artwork_url,
+        project_url: renderedStep.project_url,
+        github_url: renderedStep.github_url,
+        positive_summary: renderedStep.positive_summary,
         status,
         state: summarizeStepState(state),
         latest_job: summarizeJob(latestJob),
@@ -561,7 +611,7 @@ export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) 
   return {
     categories,
     errors: definitions.errors,
-    stepsById: definitions.stepsById,
+    stepsById: renderedStepsById,
   };
 }
 

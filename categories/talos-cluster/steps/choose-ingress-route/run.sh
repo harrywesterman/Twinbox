@@ -16,6 +16,7 @@ fail() {
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
+cluster_slug_lower="$(printf '%s' "$cluster_slug" | tr '[:upper:]' '[:lower:]')"
 
 [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
 
@@ -29,6 +30,10 @@ case "$ingress_route" in
     fail "Unsupported ingress route: $ingress_route"
     ;;
 esac
+
+if [[ "$ingress_route" == "cloudflare-tunnel" && "$cluster_slug_lower" != "prd" ]]; then
+  fail "Cloudflare Tunnel is only available for prd clusters on Cloudflare Free"
+fi
 
 [[ -n "$dns_domain" ]] || fail "DNS domain is required"
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"

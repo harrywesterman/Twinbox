@@ -2,6 +2,8 @@
 
 The `configure-cloudflare-tunnel` step creates or reuses a Cloudflare Tunnel for
 the selected cluster and publishes the public hostname through Cloudflare DNS.
+On Cloudflare Free, Twinbox only shows this step for `prd` clusters. The
+canonical ingress policy lives in [docs/ingress-policy.md](./ingress-policy.md).
 
 ## Prerequisites
 
@@ -14,6 +16,7 @@ the selected cluster and publishes the public hostname through Cloudflare DNS.
 - The Cloudflare Account ID for the account that owns the tunnel
 - The Cloudflare Zone ID for the zone that should receive the DNS record
 - The DNS domain selected in the ingress step
+- The cluster must be `prd` when using Cloudflare Free
 
 ## How to Create the Token
 
@@ -29,6 +32,7 @@ the selected cluster and publishes the public hostname through Cloudflare DNS.
 
 Twinbox uses that single token for both tunnel creation and DNS record updates.
 Do not create a second DNS-only token for this step.
+If the cluster is not `prd`, the wizard will not show this step on Cloudflare Free.
 
 ## What the Step Does
 
@@ -47,4 +51,3 @@ Do not create a second DNS-only token for this step.
   wildcard CNAME exists for the selected public domain.
 - If Cloudflare reports an existing record with the same name, Twinbox now
   updates the record instead of failing.
-

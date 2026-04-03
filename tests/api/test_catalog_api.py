@@ -105,6 +105,41 @@ def _cluster_step_state(data_dir: Path, cluster_id: str, step_id: str) -> Path:
     return data_dir / "step-state" / "clusters" / scope_id / f"{step_id}.json"
 
 
+def _write_cluster_file(
+    data_dir: Path,
+    cluster_id: str,
+    *,
+    slug: str | None = None,
+    dns_domain: str = "bierineenweek.nl",
+    selected_ingress_route: str | None = None,
+):
+    cluster_file = data_dir / "clusters" / f"{cluster_id}.json"
+    cluster_file.parent.mkdir(parents=True, exist_ok=True)
+    cluster = {
+        "id": cluster_id,
+        "slug": slug or cluster_id,
+        "dns_domain": dns_domain,
+    }
+    if selected_ingress_route is not None:
+        cluster["selected_ingress_route"] = selected_ingress_route
+    cluster_file.write_text(json.dumps(cluster), encoding="utf-8")
+
+
+def _write_choose_ingress_state(data_dir: Path, cluster_id: str, route: str):
+    state_file = data_dir / "step-state" / "clusters" / cluster_id / "choose-ingress-route.json"
+    state_file.parent.mkdir(parents=True, exist_ok=True)
+    state_file.write_text(
+        json.dumps(
+            {
+                "status": "configured",
+                "inputs": {"ingress_route": route},
+                "outputs": {"selected_ingress_route": route},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_catalog_endpoint_returns_manifest_categories_and_steps():
     with tempfile.TemporaryDirectory() as td:
         data_dir = Path(td) / "data"
@@ -247,6 +282,47 @@ def test_catalog_endpoint_filters_ingress_routes_after_choice():
             assert "configure-cloudflare-tunnel" not in talos_step_ids
             assert "configure-metallb-ingress" not in talos_step_ids
             assert "configure-tailscale-ingress" not in talos_step_ids
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
+def test_catalog_endpoint_shows_cloudflare_only_for_prd_clusters():
+    with tempfile.TemporaryDirectory() as td:
+        data_dir = Path(td) / "data"
+        _write_cluster_file(data_dir, "prd", slug="prd", selected_ingress_route="cloudflare-tunnel")
+        _write_cluster_file(data_dir, "tst", slug="tst", selected_ingress_route="cloudflare-tunnel")
+        _write_choose_ingress_state(data_dir, "prd", "cloudflare-tunnel")
+        _write_choose_ingress_state(data_dir, "tst", "cloudflare-tunnel")
+
+        port = _find_free_port()
+        proc = _start_api(data_dir, port)
+        try:
+            base = f"http://127.0.0.1:{port}"
+            _wait_for_health(base)
+
+            status, body = _get_json(f"{base}/api/catalog?cluster_id=prd")
+            assert status == 200
+            talos = body["categories"][1]
+            choose_step = next(step for step in talos["steps"] if step["id"] == "choose-ingress-route")
+            assert [option["value"] for option in choose_step["inputs"][0]["options"]] == [
+                "wiredoor",
+                "cloudflare-tunnel",
+                "metallb",
+                "tailscale",
+            ]
+            assert "configure-cloudflare-tunnel" in [step["id"] for step in talos["steps"]]
+
+            status, body = _get_json(f"{base}/api/catalog?cluster_id=tst")
+            assert status == 200
+            talos = body["categories"][1]
+            choose_step = next(step for step in talos["steps"] if step["id"] == "choose-ingress-route")
+            assert [option["value"] for option in choose_step["inputs"][0]["options"]] == [
+                "wiredoor",
+                "metallb",
+                "tailscale",
+            ]
+            assert "configure-cloudflare-tunnel" not in [step["id"] for step in talos["steps"]]
         finally:
             proc.terminate()
             proc.wait(timeout=5)

@@ -16,6 +16,7 @@ Operational documentation for Twinbox.
 - `wiredoor-bastion.md` — Wiredoor bastion host provisioning.
 - `cloudflare-tunnel.md` — Cloudflare Tunnel configuration and token setup.
 - `cloudflare-dns.md` — Cloudflare DNS configuration step.
+- `ingress-policy.md` — Canonical ingress and hostname policy for `prd` vs non-`prd`.
 - `verification.md` — cluster verification procedures.
 - `troubleshooting.md` — common issues and fixes.
 - `talos-integration.md` — Talos Linux integration details.
