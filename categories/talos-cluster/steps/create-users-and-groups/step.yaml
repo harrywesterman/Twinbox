@@ -3,12 +3,27 @@ title: Create Users and Groups
 type: action
 journey_stage: setup
 order: 23
-summary: Configure Authentik users and groups after the identity provider is installed.
-explanation: This wizard step is reserved for the Authentik user and group provisioning flow. It stays separate so identity data can be created after the Authentik provider is live.
-side_help: Authentik user and group provisioning remains a discrete bootstrap step so access control can be bootstrapped in order.
+summary: Create the first Authentik user, reuse the wizard login password, and add the user to `admins` after Authentik is installed.
+explanation: Twinbox provisions the first Authentik user from the wizard inputs, reuses the Management VM login password from the bootstrap secret tree, creates the `admins` group as a superuser group, and adds the first user to that group so later applications can be restricted through Authentik policies.
+side_help: Use this step to create the account you will use to log in to Authentik and later to protected apps. Twinbox reuses the Management VM password you already chose, and the group name is fixed to `admins` because Twinbox uses that group for management-only access policies.
 depends_on:
   - install-authentik-idp
-inputs: []
+inputs:
+  - id: full_name
+    label: Full name
+    type: string
+    required: true
+    help: Display name for the first Authentik user.
+  - id: username
+    label: Login name
+    type: string
+    required: true
+    help: Authentik username for the first user.
+  - id: email
+    label: Email address
+    type: string
+    required: false
+    help: Optional email address for account recovery and profile completeness.
 runner:
   kind: script
-  script: categories/talos-cluster/steps/_placeholder/run.sh
+  script: categories/talos-cluster/steps/create-users-and-groups/run.sh

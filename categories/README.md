@@ -71,7 +71,7 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 - `install-traefik` – Deploy Traefik ingress controller.
 - `install-secret-sync` – Deploy External Secrets Operator and OpenBao.
 - `install-authentik-idp` – Deploy Authentik identity provider.
-- `create-users-and-groups` – Create Authentik users and groups.
+- `create-users-and-groups` – Create the first Authentik user and `admins` group.
 - `choose-ingress-route` – Choose the ingress branch for this cluster.
 - `install-grafana` – Deploy Grafana monitoring stack.
 - `install-headlamp` – Deploy Headlamp Kubernetes dashboard.

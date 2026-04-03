@@ -343,16 +343,21 @@ middlewares:
 
 Configure in the Authentik UI:
 
-1. **Provider** — OIDC/OAuth2 Provider for the app:
+1. **Bootstrap user** — Run the Twinbox `create-users-and-groups` step first:
+   - Create the first Authentik user with your name and login name
+   - Reuse the Management VM cluster login password as that user's password
+   - Place the user in the `admins` group so later applications can authorize against it
+
+2. **Provider** — OIDC/OAuth2 Provider for the app:
    - Authorization URL: `https://authentik.domain.com/application/o/authorize/`
    - Token URL: `https://authentik.domain.com/application/o/token/`
    - Redirect URI: `https://app.domain.com/` (forwardAuth does not use a callback, the outpost handles this)
 
-2. **Application** — Link the Provider to an Application:
+3. **Application** — Link the Provider to an Application:
    - Back-ends: `http://<app>.<namespace>.svc.cluster.local:<port>` (for forwardAuth)
    - Policy Engine: Attach a Group Policy that only allows the `admins` group
 
-3. **Policy Binding** — Group restriction:
+4. **Policy Binding** — Group restriction:
    - Create a `Group Policy` that checks if the user is a member of `admins`
    - Bind this policy to the Application
    - Users outside the group receive a 403 from Authentik

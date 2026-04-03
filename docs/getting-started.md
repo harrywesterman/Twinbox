@@ -16,6 +16,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/harrywesterman/twinbox/main/
 
 The wizard creates the Management VM, installs Docker CE, clones Twinbox into `/opt/twinbox`, writes `.env`, and starts the manager stack.
 The generated VM and the later Talos cluster both use the same `TWINBOX_TIME_SERVER` value for NTP.
+The wizard also stores the cluster login password in `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` so later Authentik onboarding can reuse it.
 
 ## Step 2: Verify bootstrap material on the Management VM
 
@@ -27,6 +28,7 @@ Expected early files:
 
 - `/opt/twinbox/bootstrap/secrets/global/proxmox.json`
 - `/opt/twinbox/bootstrap/secrets/global/traefik-dashboard.json`
+- `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json`
 - `/opt/twinbox/bootstrap/openbao/seal/current.key`
 - `/opt/twinbox/bootstrap/openbao/seal/current-key-id`
 
@@ -43,8 +45,10 @@ Use the UI to:
 5. Install CloudNativePG
 6. Install Postgres clusters
 7. Install Traefik
-8. Install Velero backup
-9. Continue through the GitOps application steps
+8. Install Authentik
+9. Create the first Authentik user and `admins` group
+10. Install Velero backup
+11. Continue through the GitOps application steps
 
 Cilium is installed during the Talos provisioning step, so there is no separate networking step in the wizard.
 

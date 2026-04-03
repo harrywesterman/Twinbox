@@ -1226,8 +1226,10 @@ create_management_vm() {
   local img_name="noble-server-cloudimg-amd64.img"
   local img_path="/var/lib/vz/template/cache/${img_name}"
   local CLOUD_INIT_PASSWORD_HASH=""
+  local CLOUD_INIT_PASSWORD_B64=""
 
   CLOUD_INIT_PASSWORD_HASH=$(openssl passwd -6 "$CLOUD_INIT_PASSWORD")
+  CLOUD_INIT_PASSWORD_B64=$(printf '%s' "$CLOUD_INIT_PASSWORD" | base64 -w0)
 
   mkdir -p /var/lib/vz/template/cache /var/lib/vz/snippets
 
@@ -1288,6 +1290,28 @@ write_files:
       TWINBOX_IMAGE_TAG=${TWINBOX_IMAGE_TAG}
       TWINBOX_HOST_REPO_ROOT=${TWINBOX_TARGET_DIR}
       MANAGEMENT_VM_ID=${MGT_ID}
+  - path: /tmp/twinbox.cluster-login-password.b64
+    permissions: '0600'
+    owner: root:root
+    content: |
+      ${CLOUD_INIT_PASSWORD_B64}
+  - path: /tmp/twinbox-write-cluster-login-secret.py
+    permissions: '0755'
+    owner: root:root
+    content: |
+      #!/usr/bin/env python3
+      import base64
+      import json
+      import pathlib
+
+      password_b64 = pathlib.Path("/tmp/twinbox.cluster-login-password.b64").read_text(encoding="utf-8").strip()
+      password = base64.b64decode(password_b64).decode("utf-8")
+      target = pathlib.Path("/opt/twinbox/bootstrap/secrets/global/twinbox-login.json")
+      target.write_text(
+          json.dumps({"username": "twinbox", "password": password}, indent=2) + "\n",
+          encoding="utf-8",
+      )
+      target.chmod(0o600)
   - path: /etc/systemd/timesyncd.conf.d/99-twinbox.conf
     permissions: '0644'
     owner: root:root
@@ -1314,6 +1338,8 @@ runcmd:
   - chown ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}
   - bash -lc 'sudo -u ${CLOUD_INIT_USER} -H bash -lc "git clone https://github.com/${GITHUB_REPO}.git ${TWINBOX_TARGET_DIR}"'
   - install -d -m 0700 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}/bootstrap
+  - install -d -m 0700 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}/bootstrap/secrets/global
+  - python3 /tmp/twinbox-write-cluster-login-secret.py
   - install -m 0600 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /tmp/twinbox.env.template ${TWINBOX_TARGET_DIR}/.env
   - chown -R ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}
   - bash -lc 'cd ${TWINBOX_TARGET_DIR} && chmod +x scripts/start-manager.sh && ./scripts/start-manager.sh'

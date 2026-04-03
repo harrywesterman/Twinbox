@@ -7,7 +7,6 @@ The `configure-cloudflare-dns` step creates DNS records in Cloudflare to route t
 - A Cloudflare account with a domain added to the zone
 - An API token with **Zone DNS Edit** permissions (create at https://dash.cloudflare.com/profile/api-tokens)
 - The `provision-wiredoor-bastion` step must be completed first (it provides the target IP)
-- The `create-users-and-groups` step must be completed first
 
 ## Inputs
 
