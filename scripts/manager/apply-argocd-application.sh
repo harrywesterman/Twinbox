@@ -17,7 +17,7 @@ fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
 
 cluster_resource_profile() {
   local cluster_json="${STEP_CONTEXT_JSON:-}"
-  local node_count total_cpu total_memory
+  local node_count per_node_cpu per_node_memory total_cpu total_memory
 
   if [[ -z "$cluster_json" ]]; then
     printf 'standard\n'
@@ -31,45 +31,79 @@ cluster_resource_profile() {
   fi
 
   node_count="$(jq -r '(.controlplane_count // 0) + (.worker_count // 0)' <<<"$cluster_json")"
-  total_cpu="$(jq -r '(.cpu_cores // 0) * ((.controlplane_count // 0) + (.worker_count // 0))' <<<"$cluster_json")"
-  total_memory="$(jq -r '(.memory_mb // 0) * ((.controlplane_count // 0) + (.worker_count // 0))' <<<"$cluster_json")"
+  per_node_cpu="$(jq -r '(.cpu_cores // 0)' <<<"$cluster_json")"
+  per_node_memory="$(jq -r '(.memory_mb // 0)' <<<"$cluster_json")"
+  total_cpu="$(( per_node_cpu * node_count ))"
+  total_memory="$(( per_node_memory * node_count ))"
 
-  if [[ "$node_count" -le 2 || "$total_cpu" -le 4 || "$total_memory" -le 8192 ]]; then
+  if [[ "$node_count" -le 2 || "$per_node_cpu" -lt 4 || "$per_node_memory" -lt 8192 || "$total_memory" -lt 24576 ]]; then
     printf 'small\n'
-  elif [[ "$total_cpu" -le 12 || "$total_memory" -le 32768 ]]; then
+  elif [[ "$total_cpu" -le 24 || "$total_memory" -le 65536 ]]; then
     printf 'standard\n'
   else
     printf 'large\n'
   fi
 }
 
+namespace_resource_tier() {
+  local namespace="$1"
+
+  case "$namespace" in
+    argocd|authentik|databases|external-secrets|longhorn-system|openbao|traefik)
+      printf 'infrastructure\n'
+      ;;
+    *)
+      printf 'application\n'
+      ;;
+  esac
+}
+
 namespace_resource_baseline() {
   local namespace="$1"
   local profile="$2"
-  local request_cpu request_memory limit_cpu limit_memory
+  local tier request_cpu request_memory limit_cpu
 
-  case "$profile" in
-    small)
-      request_cpu="25m"
-      request_memory="64Mi"
-      limit_cpu="250m"
-      limit_memory="256Mi"
-      ;;
-    large)
-      request_cpu="100m"
-      request_memory="256Mi"
-      limit_cpu="1000m"
-      limit_memory="1Gi"
-      ;;
-    *)
-      request_cpu="50m"
-      request_memory="128Mi"
-      limit_cpu="500m"
-      limit_memory="512Mi"
-      ;;
-  esac
+  tier="$(namespace_resource_tier "$namespace")"
 
-  log "Applying namespace resource baseline to ${namespace} (${profile})"
+  if [[ "$tier" == "infrastructure" ]]; then
+    case "$profile" in
+      small)
+        request_cpu="100m"
+        request_memory="192Mi"
+        limit_cpu="500m"
+        ;;
+      large)
+        request_cpu="250m"
+        request_memory="512Mi"
+        limit_cpu="2000m"
+        ;;
+      *)
+        request_cpu="150m"
+        request_memory="256Mi"
+        limit_cpu="1000m"
+        ;;
+    esac
+  else
+    case "$profile" in
+      small)
+        request_cpu="25m"
+        request_memory="64Mi"
+        limit_cpu="250m"
+        ;;
+      large)
+        request_cpu="100m"
+        request_memory="256Mi"
+        limit_cpu="1000m"
+        ;;
+      *)
+        request_cpu="50m"
+        request_memory="128Mi"
+        limit_cpu="500m"
+        ;;
+    esac
+  fi
+
+  log "Applying namespace resource baseline to ${namespace} (${profile}/${tier})"
   kubectl create namespace "$namespace" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
   kubectl apply -f - >/dev/null <<EOF
 apiVersion: v1
@@ -85,7 +119,6 @@ spec:
         memory: ${request_memory}
       default:
         cpu: ${limit_cpu}
-        memory: ${limit_memory}
 EOF
 }
 

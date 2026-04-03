@@ -43,16 +43,16 @@ inputs:
     required: true
     min: 1
     max: 64
-    default: 2
-    help: Per-node CPU request.
+    default: 4
+    help: Per-node CPU allocation. Use 4 vCPU or more for the standard Twinbox baseline; 2 vCPU is only realistic for a reduced dev/test cluster.
   - id: memory_mb
     label: Memory MB
     type: integer
     required: true
     min: 512
     max: 1048576
-    default: 4096
-    help: Per-node memory allocation.
+    default: 8192
+    help: Per-node memory allocation. The standard Twinbox baseline expects at least 8192 MB per node; 4096 MB is only suitable for a reduced dev/test cluster.
   - id: disk_gb
     label: Disk GB
     type: integer
