@@ -11,7 +11,6 @@ spec:
       kind: Rule
       middlewares:
         - name: authentik-forwardauth
-          namespace: authentik
       services:
         - name: api@internal
           kind: TraefikService
