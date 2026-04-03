@@ -24,6 +24,13 @@ inputs:
     type: string
     required: false
     help: Optional email address for account recovery and profile completeness.
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
 runner:
   kind: script
   script: categories/talos-cluster/steps/create-users-and-groups/run.sh
