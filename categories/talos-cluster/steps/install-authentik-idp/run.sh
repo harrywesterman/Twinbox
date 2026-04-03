@@ -19,6 +19,10 @@ fail() {
   exit 1
 }
 
+log() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
@@ -164,16 +168,29 @@ kubectl -n authentik get secret authentik-bootstrap >/dev/null 2>&1 || fail "aut
 
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$manifest_path" \
-  --application "authentik" \
-  --no-wait
+  --application "authentik"
 
-for deployment in authentik-server authentik-worker; do
-  for _attempt in $(seq 1 60); do
-    if kubectl -n authentik get deployment "$deployment" >/dev/null 2>&1; then
-      break
+wait_for_deployment_rollout() {
+  local deployment="$1"
+  local label="${2:-$deployment}"
+  local attempts=120
+  local attempt=1
+
+  while true; do
+    if kubectl -n authentik rollout status "deployment/${deployment}" --timeout=15s >/dev/null 2>&1; then
+      log "${label} is ready"
+      return 0
     fi
-    sleep 5
-  done
 
-  kubectl -n authentik get deployment "$deployment" >/dev/null 2>&1 || fail "deployment/${deployment} did not appear after applying Authentik"
-done
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      fail "Timed out waiting for ${label}"
+    fi
+
+    log "Waiting for ${label}"
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
+wait_for_deployment_rollout "authentik-server" "Authentik server"
+wait_for_deployment_rollout "authentik-worker" "Authentik worker"
