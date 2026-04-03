@@ -1108,11 +1108,13 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "create-users-and-groups" in pgadmin_step_text
     assert "choose-ingress-route" in pgadmin_step_text
     assert "script: categories/talos-cluster/steps/install-pgadmin4/run.sh" in pgadmin_step_text
+    assert "optional: true" in pgadmin_step_text
     assert "authentik-pgadmin4" in pgadmin_run_text
     assert "pgadmin4-oidc" in pgadmin_run_text
     assert "PGADMIN_OAUTH2_SERVER_METADATA_URL" in pgadmin_run_text
     assert "PGADMIN_MASTER_PASSWORD" in pgadmin_run_text
     assert "PGADMIN_DEFAULT_EMAIL" in pgadmin_run_text
+    assert "Could not find a usable kubeconfig" in pgadmin_run_text
     assert "kubectl create namespace pgadmin4 --dry-run=client -o yaml | kubectl apply -f -" in pgadmin_run_text
     assert "gitops/platform/pgadmin4/externalsecret.yaml" in pgadmin_run_text
     assert "gitops/apps/pgadmin4.yaml" in pgadmin_run_text

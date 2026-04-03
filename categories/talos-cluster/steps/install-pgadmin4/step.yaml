@@ -19,6 +19,7 @@ secrets:
       scope: cluster
       item: kubeconfig
       attachment: kubeconfig
+      optional: true
       format: file
 runner:
   kind: script

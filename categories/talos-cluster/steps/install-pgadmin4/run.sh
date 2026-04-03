@@ -2,18 +2,36 @@
 set -euo pipefail
 
 : "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"
-: "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"
 : "${MANAGER_DATA_DIR:?missing MANAGER_DATA_DIR}"
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
 
-export KUBECONFIG="$KUBECONFIG_FILE"
-
 fail() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
   exit 1
 }
+
+resolve_kubeconfig_file() {
+  local candidate=""
+
+  if [[ -n "${KUBECONFIG_FILE:-}" && -f "${KUBECONFIG_FILE:-}" ]]; then
+    printf '%s\n' "$KUBECONFIG_FILE"
+    return 0
+  fi
+
+  for candidate in /home/twinbox/.kube/config "${HOME:-}/.kube/config"; do
+    if [[ -f "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  fail "Could not find a usable kubeconfig; expected cluster attachment or /home/twinbox/.kube/config"
+}
+
+KUBECONFIG_FILE="$(resolve_kubeconfig_file)"
+export KUBECONFIG="$KUBECONFIG_FILE"
 
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
