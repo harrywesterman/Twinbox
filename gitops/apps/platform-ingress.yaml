@@ -213,6 +213,13 @@ spec:
                   path: /spec/routes/0/match
                   value: Host(`twinboxwizard.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
+                kind: IngressRoute
+                name: proxmox
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`proxmox.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
                 kind: ConfigMap
                 name: dashy-config
               patch: |-
@@ -254,7 +261,8 @@ spec:
                             url: https://dash.cloudflare.com/
                           - title: Proxmox
                             description: Virtualization host
-                            url: https://192.168.2.105:8006/
+                            url: https://proxmox.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                            icon: si-proxmox
                           - title: Longhorn
                             description: Storage management
                             url: https://longhorn.{{index .metadata.annotations "twinbox.io/public-zone-name"}}

@@ -24,6 +24,12 @@ locals {
       external_host = var.longhorn_external_host
       launch_url    = var.longhorn_external_host
     }
+    proxmox = {
+      name          = "Proxmox"
+      slug          = "proxmox"
+      external_host = var.proxmox_external_host
+      launch_url    = var.proxmox_external_host
+    }
     twinboxwizard = {
       name          = "Twinbox Wizard"
       slug          = "twinboxwizard"

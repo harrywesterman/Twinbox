@@ -27,6 +27,10 @@ resources:
   - management-consoles/authentik-callback-service.yaml
   - management-consoles/authentik-callback-endpoints.yaml
   - management-consoles/authentik-forwardauth-middleware.yaml
+  - management-consoles/proxmox-ingressroute.yaml
+  - management-consoles/proxmox-service.yaml
+  - management-consoles/proxmox-endpoints.yaml
+  - management-consoles/proxmox-server-transport.yaml
   - management-consoles/twinboxwizard-ingressroute.yaml
   - management-consoles/twinboxwizard-service.yaml
   - management-consoles/twinboxwizard-endpoints.yaml

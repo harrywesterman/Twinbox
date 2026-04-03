@@ -1,4 +1,5 @@
 authentik_url                    = "https://authentik.example.com"
 traefik_dashboard_external_host   = "https://traefik.example.com"
 longhorn_external_host            = "https://longhorn.example.com"
+proxmox_external_host             = "https://proxmox.example.com"
 twinboxwizard_external_host       = "https://twinboxwizard.example.com"
