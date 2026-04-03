@@ -18,3 +18,8 @@ variable "longhorn_external_host" {
   description = "Public URL that Authentik should associate with Longhorn traffic"
   type        = string
 }
+
+variable "twinboxwizard_external_host" {
+  description = "Public URL that Authentik should associate with the Twinbox wizard traffic"
+  type        = string
+}

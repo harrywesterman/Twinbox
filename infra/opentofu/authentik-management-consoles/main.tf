@@ -24,6 +24,12 @@ locals {
       external_host = var.longhorn_external_host
       launch_url    = var.longhorn_external_host
     }
+    twinboxwizard = {
+      name          = "Twinbox Wizard"
+      slug          = "twinboxwizard"
+      external_host = var.twinboxwizard_external_host
+      launch_url    = var.twinboxwizard_external_host
+    }
   }
 }
 
