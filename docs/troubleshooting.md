@@ -120,6 +120,7 @@ Symptoms:
 
 Fix:
 
+- Check the Cilium/Kubernetes compatibility matrix before chasing lower-level datapath bugs; `1.18.x` is not a safe fit for Kubernetes `v1.35.x`
 - Check whether the rendered Cilium manifest was built with the cluster VIP/API endpoint rather than `localhost:7445`
 - Verify the Talos machine config includes `cluster.network.cni.name: none` and `cluster.proxy.disabled: true`
 - Verify `machine.features.kubePrism.enabled: true` and `machine.features.kubePrism.port: 7445`

@@ -523,7 +523,7 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert "PINNED_CILIUM_CHART_VERSION" in helper_text
     assert 'if [[ -n "${CILIUM_K8S_SERVICE_HOST:-}" ]]; then' in helper_text
     assert 'if [[ -n "${CILIUM_K8S_SERVICE_PORT:-}" ]]; then' in helper_text
-    assert "PINNED_CILIUM_CHART_VERSION=1.18.8" in pinned_defaults_text
+    assert "PINNED_CILIUM_CHART_VERSION=1.19.2" in pinned_defaults_text
     assert "ipam:" in values_text
     assert "mode: kubernetes" in values_text
     assert "kubeProxyReplacement: true" in values_text
