@@ -54,12 +54,12 @@ EOF
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Provisioning Authentik OIDC client for Headlamp"
 cd "$tf_workdir"
-AUTHENTIK_TOKEN="$authentik_token" tofu init -input=false
-AUTHENTIK_TOKEN="$authentik_token" tofu apply -auto-approve -input=false
+TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$authentik_token" tofu init -no-color -input=false
+TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$authentik_token" tofu apply -no-color -auto-approve -input=false
 
-headlamp_client_id="$(AUTHENTIK_TOKEN="$authentik_token" tofu output -raw client_id)"
-headlamp_client_secret="$(AUTHENTIK_TOKEN="$authentik_token" tofu output -raw client_secret)"
-headlamp_issuer_url="$(AUTHENTIK_TOKEN="$authentik_token" tofu output -raw issuer_url)"
+headlamp_client_id="$(TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$authentik_token" tofu output -no-color -raw client_id)"
+headlamp_client_secret="$(TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$authentik_token" tofu output -no-color -raw client_secret)"
+headlamp_issuer_url="$(TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$authentik_token" tofu output -no-color -raw issuer_url)"
 
 secrets_dir="/opt/twinbox/bootstrap/secrets/global"
 mkdir -p "$secrets_dir"
