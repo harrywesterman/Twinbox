@@ -605,7 +605,7 @@ cleanup_existing_cluster_resources() {
     rm -f "$snippet" || true
   done
 
-  for acl_path in /vms /storage /nodes "/nodes/${PROXMOX_NODE}" /sdn; do
+  for acl_path in / /vms /storage /nodes "/nodes/${PROXMOX_NODE}" /sdn; do
     pveum aclmod "$acl_path" -user "$PROXMOX_USER" -delete 1 >/dev/null 2>&1 || true
   done
 
@@ -1063,7 +1063,7 @@ create_proxmox_api_user() {
   fi
 
   log_event "Applying ACLs for ${PROXMOX_USER}"
-  for acl_path in /vms "/storage/${PROXMOX_STORAGE_POOL}" "/storage/${file_datastore}" /nodes "/nodes/${PROXMOX_NODE}"; do
+  for acl_path in / /vms "/storage/${PROXMOX_STORAGE_POOL}" "/storage/${file_datastore}" /nodes "/nodes/${PROXMOX_NODE}"; do
     if ! apply_acl_with_retry "$acl_path" "$PROXMOX_USER" "$PROXMOX_ROLE" 10 1; then
       msg_error "Failed to apply ACL ${acl_path} for ${PROXMOX_USER}: ${last_err}"
       return 1

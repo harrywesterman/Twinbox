@@ -100,6 +100,7 @@ docker compose logs manager-worker --tail=200
 
 - Validate `.env`: `PROXMOX_HOST`, `PROXMOX_PORT`, `PROXMOX_USER`, `PROXMOX_PASSWORD`.
 - Verify Management VM network path to `https://<proxmox-host>:8006`.
+- If `provision-nodes` fails on `cluster/status` with 403, the Proxmox service account needs `Sys.Audit` on `/` in addition to the node and storage ACLs.
 
 ## Talos Bootstrap Failures
 
