@@ -33,6 +33,29 @@ resolve_kubeconfig_file() {
 KUBECONFIG_FILE="$(resolve_kubeconfig_file)"
 export KUBECONFIG="$KUBECONFIG_FILE"
 
+resolve_authentik_secret_file() {
+  local candidate="/opt/twinbox/bootstrap/secrets/global/authentik.json"
+  if [[ -f "$candidate" ]]; then
+    printf '%s\n' "$candidate"
+    return 0
+  fi
+
+  return 1
+}
+
+resolve_authentik_field() {
+  local field="$1"
+  local auth_secret_file=""
+
+  if auth_secret_file="$(resolve_authentik_secret_file)"; then
+    jq -r ".$field // empty" "$auth_secret_file"
+    return 0
+  fi
+
+  kubectl -n authentik get secret authentik-bootstrap -o json \
+    | jq -r --arg field "$field" '.data[$field] // empty | @base64d'
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
@@ -44,17 +67,14 @@ cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty'
 public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
 
-authentik_secret_file="/opt/twinbox/bootstrap/secrets/global/authentik.json"
-[[ -f "$authentik_secret_file" ]] || fail "Authentik bootstrap secret not found at $authentik_secret_file"
-
-authentik_host="$(jq -r '.AUTHENTIK_HOST // empty' "$authentik_secret_file")"
-authentik_token="$(jq -r '.AUTHENTIK_BOOTSTRAP_TOKEN // empty' "$authentik_secret_file")"
+authentik_host="$(resolve_authentik_field 'AUTHENTIK_HOST')"
+authentik_token="$(resolve_authentik_field 'AUTHENTIK_BOOTSTRAP_TOKEN')"
 
 if [[ -z "$authentik_host" ]]; then
   authentik_host="https://authentik.${public_zone_name}"
 fi
 
-[[ -n "$authentik_token" ]] || fail "Could not read AUTHENTIK_BOOTSTRAP_TOKEN from $authentik_secret_file"
+[[ -n "$authentik_token" ]] || fail "Could not read AUTHENTIK_BOOTSTRAP_TOKEN from /opt/twinbox/bootstrap/secrets/global/authentik.json or authentik-bootstrap"
 
 pgadmin_host="https://pgadmin4.${public_zone_name}"
 pgadmin_redirect_uri="${pgadmin_host}/oauth2/authorize"
