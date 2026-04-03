@@ -71,6 +71,16 @@ spec:
                   path: /spec/headers/customResponseHeaders/Access-Control-Allow-Origin
                   value: https://start.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
             - target:
+                kind: Middleware
+                name: argocd-login-returnurl-redirect
+              patch: |-
+                - op: replace
+                  path: /spec/redirectRegex/regex
+                  value: ^https?://argocd.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/auth/login\?return_url=%2F([^&]+)$
+                - op: replace
+                  path: /spec/redirectRegex/replacement
+                  value: https://argocd.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/auth/login?return_url=https%3A%2F%2Fargocd.{{index .metadata.annotations "twinbox.io/public-zone-name"}}%2F$1
+            - target:
                 kind: IngressRoute
                 name: headlamp
               patch: |-
