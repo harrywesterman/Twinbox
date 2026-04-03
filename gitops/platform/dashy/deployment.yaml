@@ -17,6 +17,15 @@ spec:
       labels:
         app.kubernetes.io/name: dashy
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: NotIn
+                    values:
+                      - talos-ay6-nel
       initContainers:
         - name: render-config
           image: python:3.12-alpine
@@ -86,5 +95,4 @@ spec:
           configMap:
             name: dashy-config
         - name: data
-          persistentVolumeClaim:
-            claimName: dashy-data
+          emptyDir: {}

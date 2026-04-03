@@ -209,7 +209,7 @@ gitops/platform/
     ├── ingressroute.yaml
     ├── configmap.yaml          # Start page config template patched with the selected domain
     ├── externalsecret.yaml     # Dashy OIDC client credentials from OpenBao
-    ├── pvc.yaml                # Longhorn-backed writable user-data path
+    ├── deployment.yaml         # Dashy deployment with ephemeral user-data storage
     ├── service.yaml
     └── deployment.yaml
 ```
