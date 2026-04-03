@@ -274,6 +274,7 @@ choose_cluster_slug() {
 
   while true; do
     selected=$(dialog --backtitle "$BACKTITLE" --title "Twinbox" --menu "Choose a cluster name." 16 78 5 \
+      --default-item "prd" \
       "prd" "Use Production (prd)" \
       "dev" "Use Development (dev)" \
       "tst" "Use Test (tst)" \
