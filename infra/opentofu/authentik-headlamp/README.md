@@ -7,6 +7,7 @@ OpenTofu module that creates an Authentik OAuth2/OIDC application for Headlamp.
 - An Authentik OAuth2 provider
 - An Authentik application bound to that provider
 - A generated client ID and client secret stored in OpenTofu state
+- An RSA signing certificate-key pair for Authentik to issue RS256 ID tokens
 
 ## Usage
 
