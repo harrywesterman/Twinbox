@@ -4,71 +4,71 @@ metadata:
   name: cluster-config
   namespace: argocd
 data:
-  ZONE_NAME: "bierineenweek.nl"
-  ARGOCD_MATCH: "Host(`argocd.bierineenweek.nl`)"
-  AUTHENTIK_MATCH: "Host(`authentik.bierineenweek.nl`)"
-  HEADLAMP_MATCH: "Host(`headlamp.bierineenweek.nl`)"
-  GRAFANA_MATCH: "Host(`grafana.bierineenweek.nl`)"
-  PROMETHEUS_MATCH: "Host(`prometheus.bierineenweek.nl`)"
-  NTFY_MATCH: "Host(`ntfy.bierineenweek.nl`)"
-  HOMEPAGE_MATCH: "Host(`homepage.bierineenweek.nl`)"
-  WHOAMI_MATCH: "Host(`whoami.bierineenweek.nl`)"
-  TRAEFIK_DASHBOARD_MATCH: "Host(`traefik.bierineenweek.nl`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
-  HOMEPAGE_ALLOWED_HOSTS: "homepage.bierineenweek.nl"
+  ZONE_NAME: "__ZONE_NAME__"
+  ARGOCD_MATCH: "Host(`argocd.__ZONE_NAME__`)"
+  AUTHENTIK_MATCH: "Host(`authentik.__ZONE_NAME__`)"
+  HEADLAMP_MATCH: "Host(`headlamp.__ZONE_NAME__`)"
+  GRAFANA_MATCH: "Host(`grafana.__ZONE_NAME__`)"
+  PROMETHEUS_MATCH: "Host(`prometheus.__ZONE_NAME__`)"
+  NTFY_MATCH: "Host(`ntfy.__ZONE_NAME__`)"
+  HOMEPAGE_MATCH: "Host(`homepage.__ZONE_NAME__`)"
+  WHOAMI_MATCH: "Host(`whoami.__ZONE_NAME__`)"
+  TRAEFIK_DASHBOARD_MATCH: "Host(`traefik.__ZONE_NAME__`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
+  HOMEPAGE_ALLOWED_HOSTS: "homepage.__ZONE_NAME__"
   HOMEPAGE_BOOKMARKS_YAML: |
     - Platform:
         - Argo CD:
-            - href: https://argocd.bierineenweek.nl
+            - href: https://argocd.__ZONE_NAME__
               description: GitOps control plane
         - Traefik:
-            - href: https://traefik.bierineenweek.nl
+            - href: https://traefik.__ZONE_NAME__
               description: Ingress controller
         - Authentik:
-            - href: https://authentik.bierineenweek.nl
+            - href: https://authentik.__ZONE_NAME__
               description: Identity provider
         - Headlamp:
-            - href: https://headlamp.bierineenweek.nl
+            - href: https://headlamp.__ZONE_NAME__
               description: Kubernetes dashboard
         - Grafana:
-            - href: https://grafana.bierineenweek.nl
+            - href: https://grafana.__ZONE_NAME__
               description: Metrics and dashboards
         - Prometheus:
-            - href: https://prometheus.bierineenweek.nl
+            - href: https://prometheus.__ZONE_NAME__
               description: Metrics collection and alerting
         - ntfy:
-            - href: https://ntfy.bierineenweek.nl
+            - href: https://ntfy.__ZONE_NAME__
               description: Push notification service
         - Wiredoor:
-            href: https://argocd.bierineenweek.nl
+            href: https://argocd.__ZONE_NAME__
             description: Alternate operator entrypoint
     - Apps:
         - Whoami:
-            href: https://whoami.bierineenweek.nl
+            href: https://whoami.__ZONE_NAME__
             description: Minimal ingress check
         - Homepage:
-            href: https://homepage.bierineenweek.nl
+            href: https://homepage.__ZONE_NAME__
             description: Cluster landing page
   HOMEPAGE_SERVICES_YAML: |
     - Platform:
         - Argo CD:
-            href: https://argocd.bierineenweek.nl
+            href: https://argocd.__ZONE_NAME__
             description: GitOps control plane
         - Traefik:
-            href: https://traefik.bierineenweek.nl
+            href: https://traefik.__ZONE_NAME__
             description: Ingress controller
         - Authentik:
-            href: https://authentik.bierineenweek.nl
+            href: https://authentik.__ZONE_NAME__
             description: Identity provider
         - Headlamp:
-            href: https://headlamp.bierineenweek.nl
+            href: https://headlamp.__ZONE_NAME__
             description: Kubernetes dashboard
         - Grafana:
-            href: https://grafana.bierineenweek.nl
+            href: https://grafana.__ZONE_NAME__
             description: Metrics and dashboards
     - Apps:
         - Whoami:
-            href: https://whoami.bierineenweek.nl
+            href: https://whoami.__ZONE_NAME__
             description: Minimal ingress check
         - Homepage:
-            href: https://homepage.bierineenweek.nl
+            href: https://homepage.__ZONE_NAME__
             description: Cluster landing page

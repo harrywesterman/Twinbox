@@ -40,7 +40,7 @@ If the cluster is not `prd`, the wizard will not show this step on Cloudflare Fr
 2. Requests a tunnel token from Cloudflare.
 3. Verifies the selected Cloudflare zone when the token allows zone reads.
 4. Creates or updates the wildcard CNAME that points to the tunnel.
-5. Configures the tunnel to forward `bierineenweek.nl` hostnames to Traefik inside the cluster over HTTP.
+5. Configures the tunnel to forward the selected public hostnames to Traefik inside the cluster over HTTP.
 6. Syncs the tunnel credentials into OpenBao.
 7. Deploys the `cloudflare-tunnel-remote` Argo CD application.
 
