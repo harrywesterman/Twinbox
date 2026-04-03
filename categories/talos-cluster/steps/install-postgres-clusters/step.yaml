@@ -4,7 +4,7 @@ type: action
 journey_stage: setup
 order: 18
 summary: Deploy CloudNativePG-managed PostgreSQL clusters for Twinbox applications.
-explanation: This step applies the postgres-clusters Argo CD application which provisions the shared databases namespace and all CloudNativePG Cluster, Pooler, ScheduledBackup, and ExternalSecret resources defined under gitops/databases/. It also seeds the Authentik database credentials into OpenBao early so the Authentik cluster can bootstrap before the full Authentik application step runs. The CloudNativePG operator must already be running before this step executes.
+explanation: This step applies the postgres-clusters Argo CD application which provisions the shared databases namespace and all CloudNativePG Cluster, Pooler, ScheduledBackup, and ExternalSecret resources defined under gitops/databases/. It then waits for the concrete Cluster, ExternalSecret, and pooler Deployment resources to become ready instead of blocking on Argo CD aggregate app health. It also seeds the Authentik database credentials into OpenBao early so the Authentik cluster can bootstrap before the full Authentik application step runs. The CloudNativePG operator must already be running before this step executes.
 side_help: Every application that needs a database gets its own CloudNativePG cluster with connection pooling and daily backups. Secrets are pulled from OpenBao through External Secrets.
 depends_on:
   - install-cloudnativepg

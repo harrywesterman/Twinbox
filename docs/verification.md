@@ -176,11 +176,11 @@ kubectl --kubeconfig <kubeconfig> get externalsecret -n databases
 
 Expected:
 
-- `Application/postgres-clusters` is healthy
-- CloudNativePG Cluster resources are in `Cluster in healthy state` with 3 ready instances
-- PgBouncer Pooler resources exist for read-write and read-only traffic
+- `Application/postgres-clusters` is synced
+- CloudNativePG Cluster resources report `Cluster is Ready` with the ready instance count from the manifest
+- PgBouncer Pooler deployments are available for read-write and read-only traffic
 - ScheduledBackup resources exist for daily backups
-- ExternalSecret resources have synced database credentials from OpenBao
+- ExternalSecret resources report `Ready=True` after syncing database credentials from OpenBao
 
 Verify database connectivity:
 

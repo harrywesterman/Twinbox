@@ -47,8 +47,42 @@ seed_authentik_db_secret() {
     --required-keys "AUTHENTIK_POSTGRESQL__USER,AUTHENTIK_POSTGRESQL__USERNAME,AUTHENTIK_POSTGRESQL__PASSWORD"
 }
 
+wait_for_resources_ready() {
+  local namespace="$1"
+  local kind="$2"
+  local condition="$3"
+  local label="$4"
+  local attempts=120
+  local attempt=1
+
+  while true; do
+    if kubectl -n "$namespace" get "$kind" -o name 2>/dev/null | grep -q .; then
+      if kubectl -n "$namespace" wait --for="condition=${condition}" "$kind" --all --timeout=5s >/dev/null 2>&1; then
+        log "${label} resources are ready"
+        return 0
+      fi
+
+      log "Waiting for ${label} resources to become ready"
+    else
+      log "Waiting for ${label} resources to appear"
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      fail "${label} resources did not become ready after ${attempts} attempts"
+    fi
+
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
 seed_authentik_db_secret
 
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$manifest_path" \
-  --application "postgres-clusters"
+  --application "postgres-clusters" \
+  --no-wait
+
+wait_for_resources_ready "databases" "cluster" "Ready" "CloudNativePG cluster"
+wait_for_resources_ready "databases" "externalsecret" "Ready" "ExternalSecret"
+wait_for_resources_ready "databases" "deployment" "Available" "Pooler deployment"
