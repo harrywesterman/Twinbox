@@ -162,7 +162,8 @@ kubectl -n authentik get secret authentik-bootstrap >/dev/null 2>&1 || fail "aut
 
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$manifest_path" \
-  --application "authentik"
+  --application "authentik" \
+  --no-wait
 
 for deployment in authentik-server authentik-worker; do
   for _attempt in $(seq 1 60); do
@@ -173,6 +174,4 @@ for deployment in authentik-server authentik-worker; do
   done
 
   kubectl -n authentik get deployment "$deployment" >/dev/null 2>&1 || fail "deployment/${deployment} did not appear after applying Authentik"
-  kubectl -n authentik rollout restart deployment "$deployment"
-  kubectl -n authentik rollout status deployment "$deployment" --timeout=10m
 done
