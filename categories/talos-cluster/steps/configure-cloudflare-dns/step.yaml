@@ -2,7 +2,7 @@ id: configure-cloudflare-dns
 title: Configure Cloudflare DNS
 type: action
 journey_stage: setup
-order: 31
+order: 32
 summary: Configure DNS records in Cloudflare to point to the Wiredoor bastion host.
 explanation: >
   This step configures DNS records in Cloudflare to route traffic to your Wiredoor

@@ -2,7 +2,7 @@ id: install-jitsi
 title: Install Jitsi
 type: action
 journey_stage: setup
-order: 114
+order: 115
 summary: Placeholder step for the Jitsi app phase.
 explanation: This wizard step is reserved for future Jitsi installation work and does not run a real cluster action yet.
 side_help: Collaboration tools are staged after the other user apps in the installer flow.

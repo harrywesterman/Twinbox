@@ -2,7 +2,7 @@ id: install-immich
 title: Install Immich
 type: action
 journey_stage: setup
-order: 104
+order: 105
 summary: Placeholder step for the Immich app phase.
 explanation: This wizard step is reserved for future Immich installation work and does not run a real cluster action yet.
 side_help: Media apps are grouped with the other user services in the bootstrap rail.

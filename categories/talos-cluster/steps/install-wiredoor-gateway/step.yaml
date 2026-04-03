@@ -2,7 +2,7 @@ id: install-wiredoor-gateway
 title: Install Wiredoor gateway
 type: action
 journey_stage: setup
-order: 32
+order: 33
 summary: Apply the Wiredoor gateway GitOps application after seeding its bootstrap secret.
 explanation: Twinbox prepares the Wiredoor gateway bootstrap secret in OpenBao and then applies one Argo CD application that combines the ExternalSecret, Wiredoor chart, and ingress route needed for the Wiredoor entrypoint.
 side_help: Wiredoor remains separate because it has its own network entrypoint and secret bootstrap requirements.

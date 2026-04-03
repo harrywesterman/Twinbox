@@ -2,7 +2,7 @@ id: install-velero-backup
 title: Install Velero backup
 type: action
 journey_stage: setup
-order: 101
+order: 102
 summary: Install Velero with either the built-in Garage target or an external S3-compatible backup target.
 explanation: Twinbox deploys Velero through Argo CD and lets the operator choose between the built-in Garage stack or a user-supplied S3-compatible endpoint, bucket, and credentials.
 side_help: Velero gives the cluster a day-2 backup path for Kubernetes resources and filesystem-backed volume data.

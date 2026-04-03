@@ -2,7 +2,7 @@ id: install-management-consoles
 title: Install Management consoles
 type: action
 journey_stage: setup
-order: 100
+order: 101
 summary: Placeholder step for management console rollout.
 explanation: This wizard step is reserved for future management console work and does not run a real cluster action yet.
 side_help: Management consoles are grouped as a dedicated phase so the wizard can keep operator tools separate from core infra.

@@ -2,12 +2,12 @@ id: install-homepage-dashboard
 title: Install Homepage dashboard
 type: action
 journey_stage: setup
-order: 90
+order: 35
 summary: Install Homepage as the main dashboard surface for the cluster.
 explanation: Twinbox installs Homepage through GitOps, configures it for in-cluster service discovery, and exposes the dashboard through Traefik so operators get a single landing page for the core cluster tools and applications.
 side_help: Homepage gives the cluster a lightweight landing page with quick links to the main platform services.
 depends_on:
-  - install-grafana
+  - choose-ingress-route
 inputs: []
 secrets:
   files:

@@ -2,7 +2,7 @@ id: install-karakeep
 title: Install Karakeep
 type: action
 journey_stage: setup
-order: 108
+order: 109
 summary: Placeholder step for the Karakeep app phase.
 explanation: This wizard step is reserved for future Karakeep installation work and does not run a real cluster action yet.
 side_help: Bookmark-style apps are shown with the rest of the user services.

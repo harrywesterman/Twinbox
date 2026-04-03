@@ -2,7 +2,7 @@ id: install-nextcloud
 title: Install Nextcloud
 type: action
 journey_stage: setup
-order: 103
+order: 104
 summary: Placeholder step for the Nextcloud app phase.
 explanation: This wizard step is reserved for future Nextcloud installation work and does not run a real cluster action yet.
 side_help: User apps are staged after the core management layer so the wizard can stay linear.
