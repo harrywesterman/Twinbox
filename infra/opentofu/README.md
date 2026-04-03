@@ -8,6 +8,7 @@ OpenTofu modules for provisioning external infrastructure components used by Twi
 |--------|----------|---------|
 | `authentik-argocd/` | Authentik + Random | Argo CD OIDC application/client in Authentik |
 | `authentik-headlamp/` | Authentik + Random | Headlamp OIDC application/client in Authentik |
+| `authentik-pgadmin4/` | Authentik + Random | pgAdmin 4 OIDC application/client in Authentik |
 | `authentik-management-consoles/` | Authentik | Proxy applications for Traefik Dashboard and Longhorn in Authentik |
 | `cloudflare/` | Cloudflare | DNS records (wiredoor + wildcard A records) |
 | `talos-proxmox/` | Proxmox (bpg) | Talos Linux VMs on Proxmox VE |

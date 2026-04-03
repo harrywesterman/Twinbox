@@ -48,7 +48,8 @@ Use the UI to:
 8. Install Authentik
 9. Create the first Authentik user and `admins` group
 10. Install Velero backup
-11. Continue through the GitOps application steps
+11. Install pgAdmin 4
+12. Continue through the GitOps application steps
 
 Cilium is installed during the Talos provisioning step, so there is no separate networking step in the wizard.
 

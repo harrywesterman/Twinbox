@@ -44,6 +44,10 @@ data:
           - title: Longhorn
             description: Storage management
             url: https://longhorn.__ZONE_NAME__
+          - title: pgAdmin 4
+            description: PostgreSQL admin console
+            url: https://pgadmin4.__ZONE_NAME__
+            icon: fas fa-database
           - title: Headlamp
             description: Kubernetes dashboard
             url: https://headlamp.__ZONE_NAME__

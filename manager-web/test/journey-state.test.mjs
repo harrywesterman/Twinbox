@@ -55,6 +55,15 @@ function buildCatalog(stepStatuses = {}) {
     ['install-grafana', 'Install Grafana', { dependsOn: ['install-headlamp'] }],
     ['install-dashy-dashboard', 'Install Dashy dashboard', { dependsOn: ['install-grafana'] }],
     ['install-management-consoles', 'Install Management consoles', { dependsOn: ['install-dashy-dashboard'] }],
+    ['install-pgadmin4', 'Install pgAdmin 4', {
+      dependsOn: [
+        'install-postgres-clusters',
+        'install-secret-sync',
+        'install-authentik-idp',
+        'create-users-and-groups',
+        'choose-ingress-route',
+      ],
+    }],
     ['install-ntfy', 'Install Ntfy', { dependsOn: ['install-dashy-dashboard'] }],
     ['install-velero-backup', 'Install Velero backup', { dependsOn: ['install-management-consoles', 'install-longhorn-storage', 'install-secret-sync'] }],
     ['install-proxmox-backup-system', 'Install Proxmox Backup System', { dependsOn: ['install-velero-backup'] }],
@@ -115,7 +124,7 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   });
 
   assert.equal(model.mode, 'setup');
-  assert.equal(model.stepRail.length, 28);
+  assert.equal(model.stepRail.length, 29);
   const stepRailById = Object.fromEntries(model.stepRail.map((step) => [step.id, step]));
   assert.equal(stepRailById['provision-nodes'].title, 'Deploy Talos Cluster');
   assert.equal(stepRailById['provision-nodes'].isCurrent, true);
@@ -125,8 +134,10 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   assert.match(stepRailById['provision-nodes'].positive_summary, /Twinbox stages/);
   assert.equal(stepRailById['install-cloudnativepg'].title, 'Install CloudNativePG');
   assert.equal(stepRailById['install-cloudnativepg'].icon, '🐘');
+  assert.equal(stepRailById['install-pgadmin4'].title, 'Install pgAdmin 4');
+  assert.equal(stepRailById['install-pgadmin4'].icon, '🗃️');
   assert.equal(model.primaryAction.label, 'Start step 1');
-  assert.equal(model.progress.totalSteps, 28);
+  assert.equal(model.progress.totalSteps, 29);
   assert.equal(model.progress.completedSteps, 0);
   assert.equal(model.activity.runtime.currentStage, 'Applying cluster plan');
 });
@@ -167,6 +178,7 @@ test('wizard model switches to manage mode when setup flow is complete', () => {
         'install-whoami',
         'install-headlamp',
         'install-grafana',
+        'install-pgadmin4',
         'install-dashy-dashboard',
         'install-management-consoles',
         'install-ntfy',
@@ -219,7 +231,7 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     selectedStepId: '',
   });
 
-  assert.equal(model.stepRail.length, 28);
+  assert.equal(model.stepRail.length, 29);
   const setupStepIds = new Set(model.stepRail.map((step) => step.id));
   for (const id of [
     'provision-nodes',

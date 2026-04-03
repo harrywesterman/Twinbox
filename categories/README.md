@@ -76,6 +76,7 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 - `configure-argocd-oidc` – Connect Argo CD to Authentik for OIDC login.
 - `install-grafana` – Deploy Grafana monitoring stack.
 - `install-headlamp` – Deploy Headlamp Kubernetes dashboard.
+- `install-pgadmin4` – Deploy pgAdmin 4 for PostgreSQL administration.
 - `install-dashy-dashboard` – Deploy Dashy as the cluster start page.
 - `install-management-consoles` – Deploy the operator web consoles after the start page.
 - `install-ntfy` – Deploy ntfy push notifications.

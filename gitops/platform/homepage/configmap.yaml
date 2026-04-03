@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homepage-services
+  namespace: homepage
+data:
+  services.yaml: |
+    - Monitoring:
+        - Prometheus:
+            href: https://prometheus.__ZONE_NAME__
+            description: Metrics collection and alerting
+        - ntfy:
+            href: https://ntfy.__ZONE_NAME__
+            description: Push notification service

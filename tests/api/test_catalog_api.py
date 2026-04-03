@@ -188,6 +188,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-whoami",
                 "install-headlamp",
                 "install-grafana",
+                "install-pgadmin4",
                 "install-dashy-dashboard",
                 "install-management-consoles",
                 "install-ntfy",
@@ -219,6 +220,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert talos_steps["install-whoami"]["title"] == "Install Whoami"
             assert talos_steps["install-headlamp"]["title"] == "Install Headlamp"
             assert talos_steps["install-grafana"]["title"] == "Install Grafana"
+            assert talos_steps["install-pgadmin4"]["title"] == "Install pgAdmin 4"
             assert talos_steps["install-dashy-dashboard"]["title"] == "Install Dashy dashboard"
             assert talos_steps["install-management-consoles"]["title"] == "Install Management consoles"
             assert talos_steps["install-ntfy"]["title"] == "Install Ntfy"

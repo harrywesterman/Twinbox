@@ -188,6 +188,22 @@ Verify database connectivity:
 kubectl --kubeconfig <kubeconfig> cnpg status authentik-db -n databases
 ```
 
+### `install-pgadmin4`
+
+```bash
+kubectl --kubeconfig <kubeconfig> get application -n argocd pgadmin4
+kubectl --kubeconfig <kubeconfig> get pods -n pgadmin4
+kubectl --kubeconfig <kubeconfig> get externalsecret -n pgadmin4
+kubectl --kubeconfig <kubeconfig> get ingressroute -n pgadmin4
+```
+
+Expected:
+
+- `Application/pgadmin4` is synced
+- The pgAdmin 4 pod is running with its Longhorn-backed PVC mounted
+- `ExternalSecret/pgadmin4-oidc` reports `Ready=True`
+- Traefik publishes `pgadmin4.<ZONE_NAME>` through the configured ingress route
+
 ### `install-velero-backup`
 
 ```bash

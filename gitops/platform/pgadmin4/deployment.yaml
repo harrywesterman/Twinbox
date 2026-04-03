@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pgadmin4
+  namespace: pgadmin4
+  labels:
+    app.kubernetes.io/name: pgadmin4
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pgadmin4
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: pgadmin4
+    spec:
+      securityContext:
+        fsGroup: 5050
+      initContainers:
+        - name: render-config
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              cat > /work/config_local.py <<'EOF'
+              import os
+
+              AUTHENTICATION_SOURCES = ['oauth2']
+              SERVER_MODE = True
+              OAUTH2_CONFIG = [{
+                  'OAUTH2_NAME': 'authentik',
+                  'OAUTH2_DISPLAY_NAME': 'Authentik',
+                  'OAUTH2_CLIENT_ID': os.environ['PGADMIN_OAUTH2_CLIENT_ID'],
+                  'OAUTH2_CLIENT_SECRET': os.environ['PGADMIN_OAUTH2_CLIENT_SECRET'],
+                  'OAUTH2_SERVER_METADATA_URL': os.environ['PGADMIN_OAUTH2_SERVER_METADATA_URL'],
+                  'OAUTH2_SCOPE': os.environ.get('PGADMIN_OAUTH2_SCOPE', 'openid email profile'),
+                  'OAUTH2_AUTO_CREATE_USER': True,
+                  'OAUTH2_USERNAME_CLAIM': 'email',
+              }]
+              MASTER_PASSWORD_REQUIRED = True
+              MASTER_PASSWORD_HOOK = '/pgadmin4/master-password-hook.sh %u'
+              ENHANCED_COOKIE_PROTECTION = False
+              PROXY_X_FOR_COUNT = 1
+              PROXY_X_PROTO_COUNT = 1
+              PROXY_X_HOST_COUNT = 1
+              PROXY_X_PORT_COUNT = 1
+              PROXY_X_PREFIX_COUNT = 0
+              EOF
+              cat > /work/master-password-hook.sh <<'EOF'
+              #!/bin/sh
+              set -eu
+              printf '%s' "${PGADMIN_MASTER_PASSWORD}"
+              EOF
+              chmod 0644 /work/config_local.py
+              chmod 0755 /work/master-password-hook.sh
+          envFrom:
+            - secretRef:
+                name: pgadmin4-bootstrap
+          volumeMounts:
+            - name: pgadmin-config
+              mountPath: /work
+      containers:
+        - name: pgadmin4
+          image: dpage/pgadmin4:9.14
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+              name: http
+          envFrom:
+            - secretRef:
+                name: pgadmin4-bootstrap
+          readinessProbe:
+            httpGet:
+              path: /misc/ping
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /misc/ping
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 3
+          volumeMounts:
+            - name: pgadmin-data
+              mountPath: /var/lib/pgadmin
+            - name: pgadmin-config
+              mountPath: /pgadmin4/config_local.py
+              subPath: config_local.py
+              readOnly: true
+            - name: pgadmin-config
+              mountPath: /pgadmin4/master-password-hook.sh
+              subPath: master-password-hook.sh
+              readOnly: true
+      volumes:
+        - name: pgadmin-data
+          persistentVolumeClaim:
+            claimName: pgadmin4-data
+        - name: pgadmin-config
+          emptyDir: {}

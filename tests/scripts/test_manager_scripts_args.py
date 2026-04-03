@@ -125,6 +125,63 @@ AUTHENTIK_DASHY_MODULE_PROVIDERS = (
     / "authentik-dashy"
     / "providers.tf"
 )
+AUTHENTIK_DASHY_MODULE_MAIN = (
+    REPO_ROOT
+    / "infra"
+    / "opentofu"
+    / "authentik-dashy"
+    / "main.tf"
+)
+AUTHENTIK_PGADMIN4_MODULE_MAIN = (
+    REPO_ROOT
+    / "infra"
+    / "opentofu"
+    / "authentik-pgadmin4"
+    / "main.tf"
+)
+AUTHENTIK_PGADMIN4_MODULE_VARS = (
+    REPO_ROOT
+    / "infra"
+    / "opentofu"
+    / "authentik-pgadmin4"
+    / "variables.tf"
+)
+AUTHENTIK_PGADMIN4_MODULE_OUTPUTS = (
+    REPO_ROOT
+    / "infra"
+    / "opentofu"
+    / "authentik-pgadmin4"
+    / "outputs.tf"
+)
+AUTHENTIK_PGADMIN4_MODULE_PROVIDERS = (
+    REPO_ROOT
+    / "infra"
+    / "opentofu"
+    / "authentik-pgadmin4"
+    / "providers.tf"
+)
+PGADMIN_STEP_MANIFEST = (
+    REPO_ROOT
+    / "categories"
+    / "talos-cluster"
+    / "steps"
+    / "install-pgadmin4"
+    / "step.yaml"
+)
+PGADMIN_STEP_SCRIPT = (
+    REPO_ROOT
+    / "categories"
+    / "talos-cluster"
+    / "steps"
+    / "install-pgadmin4"
+    / "run.sh"
+)
+PGADMIN_APP = REPO_ROOT / "gitops" / "apps" / "pgadmin4.yaml"
+PGADMIN_EXTERNALSECRET = REPO_ROOT / "gitops" / "platform" / "pgadmin4" / "externalsecret.yaml"
+PGADMIN_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "pgadmin4" / "ingressroute.yaml"
+PGADMIN_DEPLOYMENT = REPO_ROOT / "gitops" / "platform" / "pgadmin4" / "deployment.yaml"
+PGADMIN_PVC = REPO_ROOT / "gitops" / "platform" / "pgadmin4" / "pvc.yaml"
+PGADMIN_SERVICE = REPO_ROOT / "gitops" / "platform" / "pgadmin4" / "service.yaml"
 HEADLAMP_OIDC_EXTERNALSECRET = (
     REPO_ROOT / "gitops" / "platform" / "headlamp" / "externalsecret.yaml"
 )
@@ -288,6 +345,26 @@ def _authentik_headlamp_module_outputs_text() -> str:
 
 def _authentik_dashy_module_providers_text() -> str:
     return AUTHENTIK_DASHY_MODULE_PROVIDERS.read_text(encoding="utf-8")
+
+
+def _authentik_dashy_module_text() -> str:
+    return AUTHENTIK_DASHY_MODULE_MAIN.read_text(encoding="utf-8")
+
+
+def _authentik_pgadmin4_module_text() -> str:
+    return AUTHENTIK_PGADMIN4_MODULE_MAIN.read_text(encoding="utf-8")
+
+
+def _authentik_pgadmin4_module_vars_text() -> str:
+    return AUTHENTIK_PGADMIN4_MODULE_VARS.read_text(encoding="utf-8")
+
+
+def _authentik_pgadmin4_module_outputs_text() -> str:
+    return AUTHENTIK_PGADMIN4_MODULE_OUTPUTS.read_text(encoding="utf-8")
+
+
+def _authentik_pgadmin4_module_providers_text() -> str:
+    return AUTHENTIK_PGADMIN4_MODULE_PROVIDERS.read_text(encoding="utf-8")
 
 
 def _apply_argocd_application_text() -> str:
@@ -1006,7 +1083,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "twinbox_public_zone_name" in authentik_run_text
     assert 'authentik_host="https://authentik.${public_zone_name}"' in authentik_run_text
     assert "wait_for_secret()" in authentik_run_text
-    assert "Authentik bootstrap secret is ready" in authentik_run_text
+    assert 'wait_for_secret "authentik-bootstrap" "Authentik bootstrap"' in authentik_run_text
     assert "Waiting for Authentik server" not in authentik_run_text
     assert "Waiting for Authentik worker" not in authentik_run_text
     assert "desired=${desired_replicas}, updated=${updated_replicas}, ready=${ready_replicas}, available=${available_replicas}" in authentik_run_text
@@ -1022,6 +1099,24 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "install-authentik-idp" in headlamp_step_text
     assert "choose-ingress-route" in headlamp_step_text
     assert "OpenTofu" in headlamp_step_text
+
+    pgadmin_step_text = PGADMIN_STEP_MANIFEST.read_text(encoding="utf-8")
+    pgadmin_run_text = PGADMIN_STEP_SCRIPT.read_text(encoding="utf-8")
+    assert "title: Install pgAdmin 4" in pgadmin_step_text
+    assert "install-postgres-clusters" in pgadmin_step_text
+    assert "install-authentik-idp" in pgadmin_step_text
+    assert "create-users-and-groups" in pgadmin_step_text
+    assert "choose-ingress-route" in pgadmin_step_text
+    assert "script: categories/talos-cluster/steps/install-pgadmin4/run.sh" in pgadmin_step_text
+    assert "authentik-pgadmin4" in pgadmin_run_text
+    assert "pgadmin4-oidc" in pgadmin_run_text
+    assert "PGADMIN_OAUTH2_SERVER_METADATA_URL" in pgadmin_run_text
+    assert "PGADMIN_MASTER_PASSWORD" in pgadmin_run_text
+    assert "PGADMIN_DEFAULT_EMAIL" in pgadmin_run_text
+    assert "kubectl create namespace pgadmin4 --dry-run=client -o yaml | kubectl apply -f -" in pgadmin_run_text
+    assert "gitops/platform/pgadmin4/externalsecret.yaml" in pgadmin_run_text
+    assert "gitops/apps/pgadmin4.yaml" in pgadmin_run_text
+    assert "wait --for=condition=Ready externalsecret/pgadmin4-oidc" in pgadmin_run_text
 
     headlamp_run_text = (
         REPO_ROOT
@@ -1053,12 +1148,18 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     headlamp_module_vars_text = _authentik_headlamp_module_vars_text()
     headlamp_module_outputs_text = _authentik_headlamp_module_outputs_text()
     dashy_module_providers_text = _authentik_dashy_module_providers_text()
+    dashy_module_text = _authentik_dashy_module_text()
+    pgadmin_module_text = _authentik_pgadmin4_module_text()
+    pgadmin_module_vars_text = _authentik_pgadmin4_module_vars_text()
+    pgadmin_module_outputs_text = _authentik_pgadmin4_module_outputs_text()
+    pgadmin_module_providers_text = _authentik_pgadmin4_module_providers_text()
     assert "resource \"authentik_provider_oauth2\" \"headlamp\"" in headlamp_module_text
     assert "resource \"authentik_application\" \"headlamp\"" in headlamp_module_text
     assert "random_string" in headlamp_module_text
     assert "random_password" in headlamp_module_text
     assert "redirect_uris" in headlamp_module_text
-    assert 'issuer_mode                 = "per_provider"' in headlamp_module_text
+    assert 'issuer_mode' in headlamp_module_text
+    assert '"per_provider"' in headlamp_module_text
     assert "application_slug" in headlamp_module_vars_text
     assert "headlamp_redirect_uri" in headlamp_module_vars_text
     assert "client_id" in headlamp_module_outputs_text
@@ -1066,7 +1167,18 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "issuer_url" in headlamp_module_outputs_text
     assert 'provider "authentik"' in dashy_module_providers_text
     assert "url = var.authentik_url" in dashy_module_providers_text
-    assert 'trim(var.dashy_redirect_uri, "/")' in dashy_module_providers_text
+    assert 'trim(var.dashy_redirect_uri, "/")' in dashy_module_text
+    assert "resource \"authentik_provider_oauth2\" \"pgadmin4\"" in pgadmin_module_text
+    assert "resource \"authentik_application\" \"pgadmin4\"" in pgadmin_module_text
+    assert "authentik_group" in pgadmin_module_text
+    assert "authentik_policy_binding" in pgadmin_module_text
+    assert "pgadmin4_redirect_uri" in pgadmin_module_vars_text
+    assert "client_id" in pgadmin_module_outputs_text
+    assert "client_secret" in pgadmin_module_outputs_text
+    assert "issuer_url" in pgadmin_module_outputs_text
+    assert "redirect_uri" in pgadmin_module_outputs_text
+    assert 'provider "authentik"' in pgadmin_module_providers_text
+    assert "url = var.authentik_url" in pgadmin_module_providers_text
 
     headlamp_external_secret_text = _headlamp_oidc_externalsecret_text()
     assert "kind: ExternalSecret" in headlamp_external_secret_text
@@ -1075,6 +1187,16 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "HEADLAMP_CONFIG_OIDC_CLIENT_SECRET" in headlamp_external_secret_text
     assert "HEADLAMP_CONFIG_OIDC_IDP_ISSUER_URL" in headlamp_external_secret_text
     assert "HEADLAMP_CONFIG_OIDC_SCOPES" in headlamp_external_secret_text
+    pgadmin_external_secret_text = PGADMIN_EXTERNALSECRET.read_text(encoding="utf-8")
+    assert "kind: ExternalSecret" in pgadmin_external_secret_text
+    assert "pgadmin4-oidc" in pgadmin_external_secret_text
+    assert "PGADMIN_DEFAULT_EMAIL" in pgadmin_external_secret_text
+    assert "PGADMIN_DEFAULT_PASSWORD" in pgadmin_external_secret_text
+    assert "PGADMIN_MASTER_PASSWORD" in pgadmin_external_secret_text
+    assert "PGADMIN_OAUTH2_CLIENT_ID" in pgadmin_external_secret_text
+    assert "PGADMIN_OAUTH2_CLIENT_SECRET" in pgadmin_external_secret_text
+    assert "PGADMIN_OAUTH2_SERVER_METADATA_URL" in pgadmin_external_secret_text
+    assert "PGADMIN_OAUTH2_SCOPE" in pgadmin_external_secret_text
 
     cloudflare_tunnel_run_text = (
         REPO_ROOT
@@ -1213,10 +1335,21 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "Host(`headlamp.__ZONE_NAME__`)" in headlamp_ingressroute_text
     assert "Host(`grafana.__ZONE_NAME__`)" in grafana_ingressroute_text
     assert "Host(`argocd.__ZONE_NAME__`)" in wiredoor_ingressroute_text
+    assert "Host(`pgadmin4.__ZONE_NAME__`)" in PGADMIN_INGRESSROUTE.read_text(encoding="utf-8")
+    assert "pgadmin4-data" in PGADMIN_PVC.read_text(encoding="utf-8")
+    assert "pgadmin4-bootstrap" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
+    assert "dpage/pgadmin4:9.14" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
+    assert "master-password-hook.sh" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
+    assert "readinessProbe" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
+    assert "pgadmin4" in PGADMIN_SERVICE.read_text(encoding="utf-8")
+    assert "path: gitops/platform/pgadmin4" in PGADMIN_APP.read_text(encoding="utf-8")
     assert "config:" in _headlamp_values_text()
     assert "oidc:" in _headlamp_values_text()
     assert "headlamp-oidc" in _headlamp_values_text()
     assert "headlamp/externalsecret.yaml" in (
+        REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
+    ).read_text(encoding="utf-8")
+    assert "pgadmin4/externalsecret.yaml" in (
         REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
     assert "kind: ExternalSecret" in _headlamp_oidc_externalsecret_text()
@@ -1231,6 +1364,7 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "name: authentik-cors" in platform_ingress_app_text
     assert "accessControlAllowOriginList/0" in platform_ingress_app_text
     assert "customResponseHeaders/Access-Control-Allow-Origin" in platform_ingress_app_text
+    assert "pgadmin4.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in platform_ingress_app_text
     assert "start.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in platform_ingress_app_text
     assert "kind: ApplicationSet" in grafana_appset_text
     assert "name: grafana-set" in grafana_appset_text

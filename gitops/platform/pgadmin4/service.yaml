@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgadmin4
+  namespace: pgadmin4
+  labels:
+    app.kubernetes.io/name: pgadmin4
+spec:
+  selector:
+    app.kubernetes.io/name: pgadmin4
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+  type: ClusterIP

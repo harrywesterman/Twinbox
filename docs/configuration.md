@@ -33,6 +33,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json`
 - `/opt/twinbox/bootstrap/secrets/global/grafana.json`
 - `/opt/twinbox/bootstrap/secrets/global/authentik.json`
+- `/opt/twinbox/bootstrap/secrets/global/pgadmin4-oidc-<cluster-id>.json`
 - `/opt/twinbox/bootstrap/secrets/global/wiredoor-gateway.json`
 - `/opt/twinbox/bootstrap/secrets/global/velero.json`
 - `/opt/twinbox/bootstrap/secrets/global/dashy-oidc-<cluster-id>.json`
@@ -95,6 +96,22 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 {
   "admin-user": "admin",
   "admin-password": "generated-password"
+}
+```
+
+### `pgadmin4-oidc.json`
+
+```json
+{
+  "PGADMIN_DEFAULT_EMAIL": "pgadmin@cluster.example.local",
+  "PGADMIN_DEFAULT_PASSWORD": "generated-password",
+  "PGADMIN_MASTER_PASSWORD": "generated-password",
+  "PGADMIN_OAUTH2_CLIENT_ID": "generated-client-id",
+  "PGADMIN_OAUTH2_CLIENT_SECRET": "generated-client-secret",
+  "PGADMIN_OAUTH2_SERVER_METADATA_URL": "https://authentik.example.com/application/o/pgadmin4/.well-known/openid-configuration",
+  "PGADMIN_OAUTH2_SCOPE": "openid email profile",
+  "PGADMIN_HOST": "https://pgadmin4.example.com",
+  "PGADMIN_OAUTH2_REDIRECT_URI": "https://pgadmin4.example.com/oauth2/authorize"
 }
 ```
 
@@ -180,6 +197,7 @@ All platform services use the runtime domain projection from the local Argo clus
 | Argo CD | `argocd.<ZONE_NAME>` |
 | Traefik dashboard | `traefik.<ZONE_NAME>` |
 | Authentik | `authentik.<ZONE_NAME>` |
+| pgAdmin 4 | `pgadmin4.<ZONE_NAME>` |
 | Headlamp | `headlamp.<public-zone-name>` with Authentik OIDC login |
 | Grafana | `grafana.<ZONE_NAME>` |
 | Whoami | `whoami.<ZONE_NAME>` |

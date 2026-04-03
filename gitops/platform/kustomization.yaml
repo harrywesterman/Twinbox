@@ -9,6 +9,11 @@ resources:
   - whoami/ingressroute.yaml
   - headlamp/ingressroute.yaml
   - headlamp/externalsecret.yaml
+  - pgadmin4/ingressroute.yaml
+  - pgadmin4/externalsecret.yaml
+  - pgadmin4/pvc.yaml
+  - pgadmin4/service.yaml
+  - pgadmin4/deployment.yaml
   - grafana/ingressroute.yaml
   - grafana/externalsecret.yaml
   - traefik/traefik-dashboard-ingressroute.yaml

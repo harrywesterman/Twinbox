@@ -16,6 +16,7 @@ const STEP_ICON_ASSETS = {
   'install-whoami': assetHref('install-whoami.svg'),
   'install-headlamp': assetHref('install-headlamp.svg'),
   'install-grafana': assetHref('install-grafana.svg'),
+  'install-pgadmin4': assetHref('install-pgadmin4.svg'),
   'install-wiredoor-gateway': assetHref('install-wiredoor-gateway.svg'),
   'install-authentik-idp': assetHref('install-authentik-idp.svg'),
   'create-users-and-groups': assetHref('create-users-and-groups.svg'),
@@ -85,6 +86,11 @@ function buildProjectUrlMap() {
       icon: '📈',
       project_url: 'https://grafana.com/oss/grafana/',
       github_url: 'https://github.com/grafana/grafana',
+    },
+    'install-pgadmin4': {
+      icon: '🗃️',
+      project_url: 'https://www.pgadmin.org/',
+      github_url: 'https://github.com/pgadmin-org/pgadmin4',
     },
     'install-wiredoor-gateway': {
       icon: '🚪',
