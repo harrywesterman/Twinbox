@@ -1,0 +1,55 @@
+data "authentik_flow" "authorization" {
+  slug = "default-provider-authorization-implicit-consent"
+}
+
+data "authentik_flow" "invalidation" {
+  slug = "default-provider-invalidation-flow"
+}
+
+data "authentik_group" "admins" {
+  name = var.admins_group_name
+}
+
+locals {
+  apps = {
+    traefik_dashboard = {
+      name          = "Traefik Dashboard"
+      slug          = "traefik-dashboard"
+      external_host = var.traefik_dashboard_external_host
+      launch_url    = "${trim(var.traefik_dashboard_external_host, "/")}/dashboard/"
+    }
+    longhorn = {
+      name          = "Longhorn"
+      slug          = "longhorn"
+      external_host = var.longhorn_external_host
+      launch_url    = var.longhorn_external_host
+    }
+  }
+}
+
+resource "authentik_provider_proxy" "management_console" {
+  for_each = local.apps
+
+  name               = each.value.name
+  external_host      = each.value.external_host
+  authorization_flow = data.authentik_flow.authorization.id
+  invalidation_flow  = data.authentik_flow.invalidation.id
+  mode               = "forward_single"
+}
+
+resource "authentik_application" "management_console" {
+  for_each = local.apps
+
+  name              = each.value.name
+  slug              = each.value.slug
+  meta_launch_url   = each.value.launch_url
+  protocol_provider = authentik_provider_proxy.management_console[each.key].id
+}
+
+resource "authentik_policy_binding" "management_console_admins" {
+  for_each = local.apps
+
+  target = authentik_application.management_console[each.key].uuid
+  group  = data.authentik_group.admins.id
+  order  = 1
+}
