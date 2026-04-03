@@ -71,13 +71,13 @@ Twinbox is a complete K8s cluster based on Talos Linux, completely configured. T
 
 ## Domain Flow
 
-All platform services share a single base domain (`ZONE_NAME`) provided by the user during the **Choose Ingress Route** wizard step. Twinbox prefixes the cluster slug for non-`prd` public hostnames, keeps the special `app.example.com` exception for `prd`, and follows the canonical policy in [docs/ingress-policy.md](./ingress-policy.md). Cloudflare Tunnel is only offered for `prd` on Cloudflare Free.
+All platform services share a single base domain (`ZONE_NAME`) provided by the user during the **Choose Ingress Route** wizard step. Twinbox prefixes the cluster slug for non-`prd` public hostnames, uses the base DNS domain directly for `prd`, and follows the canonical policy in [docs/ingress-policy.md](./ingress-policy.md). Cloudflare Tunnel is only offered for `prd` on Cloudflare Free.
 
 1. **User input** — The user enters the base domain (e.g. `example.com`) in the web wizard.
 2. **Filesystem storage** — `choose-ingress-route/run.sh` writes `ZONE_NAME`, `WIREDOOR_FQDN`, and `WILDCARD_FQDN` to `/opt/twinbox/bootstrap/secrets/global/cloudflare-<cluster-id>.json`.
 3. **OpenBao sync** — The same script calls `sync-openbao-global-secret.sh` to push these values to OpenBao at `twinbox/global/cluster-hostnames`.
 4. **ExternalSecret** — The `cluster-config` ExternalSecret reads `ZONE_NAME` from OpenBao and creates a Kubernetes Secret in the `argocd` namespace.
-5. **Rendered ConfigMap** — The ingress/domain step renders `gitops/platform/cluster-config/configmap.yaml` with the cluster-prefixed public zone name and the full route strings needed by the platform manifests.
+5. **Rendered ConfigMap** — The ingress/domain step renders `gitops/platform/cluster-config/configmap.yaml` with the derived public zone name and the full route strings needed by the platform manifests.
 6. **Kustomize replacements** — The `platform-ingress` Argo CD application deploys `gitops/platform/` via Kustomize, which copies the rendered route expressions and homepage strings into the live manifests.
 
 The `cluster-config` application must sync before `platform-ingress` so the rendered ConfigMap exists when Kustomize performs replacements.

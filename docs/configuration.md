@@ -146,15 +146,15 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 
 ## Dynamic Domain Configuration
 
-Twinbox uses one base domain (`dns_domain`) for the cluster and derives a public zone name from it. The canonical policy is documented in [docs/ingress-policy.md](./ingress-policy.md): `prd` keeps the special `app.example.com` exception, while non-`prd` clusters use the slug-prefixed hostname model. Cloudflare Tunnel is only offered for `prd` on Cloudflare Free.
+Twinbox uses one base domain (`dns_domain`) for the cluster and derives a public zone name from it. The canonical policy is documented in [docs/ingress-policy.md](./ingress-policy.md): `prd` uses the base DNS domain directly, while non-`prd` clusters use the slug-prefixed hostname model. Cloudflare Tunnel is only offered for `prd` on Cloudflare Free.
 
 ### How it works
 
 1. **User input** — The user enters the base domain in the web wizard during `choose-ingress-route`.
-2. **Policy split** — The wizard stores the base domain and derives the public zone name from the cluster slug.
+2. **Policy split** — The wizard stores the base domain and derives the public zone name as the base domain for `prd` or `slug.<dns_domain>` for other clusters.
 3. **OpenBao sync** — The ingress selection step syncs `ZONE_NAME`, `WIREDOOR_FQDN`, and `WILDCARD_FQDN` to OpenBao at `twinbox/global/cluster-hostnames`.
 4. **ExternalSecret** — The `cluster-config` ExternalSecret reads `ZONE_NAME` from OpenBao and creates a Kubernetes Secret in the `argocd` namespace.
-5. **Rendered ConfigMap** — The ingress/domain step renders `gitops/platform/cluster-config/configmap.yaml` with the cluster-prefixed public zone name and prebuilt route strings.
+5. **Rendered ConfigMap** — The ingress/domain step renders `gitops/platform/cluster-config/configmap.yaml` with the derived public zone name and prebuilt route strings.
 6. **Kustomize replacements** — The `platform-ingress` Argo CD application uses Kustomize to copy the rendered match expressions and homepage strings into the live platform manifests.
 7. **Ingress-specific apps** — Wiredoor, MetalLB, and Tailscale reuse the slug-prefixed hostname model. Cloudflare Tunnel is only offered for `prd` on Cloudflare Free.
 

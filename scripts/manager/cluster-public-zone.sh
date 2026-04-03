@@ -10,8 +10,10 @@ twinbox_public_zone_name() {
 
   case "$cluster_id_lower" in
     prd)
-      printf 'app.example.com\n'
-      return 0
+      if [[ -n "$cluster_dns_domain" ]]; then
+        printf '%s\n' "$cluster_dns_domain"
+        return 0
+      fi
       ;;
   esac
 

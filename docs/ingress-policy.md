@@ -18,7 +18,10 @@ This policy is designed to work with the Cloudflare Free plan.
 
 ## Hostname Rules
 
-- `prd` keeps the special `app.example.com` exception.
+- `prd` uses the base DNS domain directly:
+  - `authentik.bierineenweek.nl`
+  - `argocd.bierineenweek.nl`
+  - `grafana.bierineenweek.nl`
 - non-`prd` clusters use the slug-prefixed hostname model:
   - `headlamp.tst.bierineenweek.nl`
   - `whoami.dev.bierineenweek.nl`
