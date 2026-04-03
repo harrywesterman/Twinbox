@@ -5,15 +5,19 @@ set -euo pipefail
 : "${STEP_INPUTS_JSON:?missing STEP_INPUTS_JSON}"
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
-source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
 
 BOOTSTRAP_ROOT="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
 AUTHENTIK_SECRET_FILE="$BOOTSTRAP_ROOT/secrets/global/authentik.json"
 LOGIN_SECRET_FILE="$BOOTSTRAP_ROOT/secrets/global/twinbox-login.json"
+AUTHENTIK_LOCAL_FORWARD_PORT="${AUTHENTIK_LOCAL_FORWARD_PORT:-18299}"
 
 fail() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
   exit 1
+}
+
+log() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
 }
 
 json_list_items() {
@@ -83,6 +87,36 @@ authentik_request() {
   fi
 
   printf '%s' "$body"
+}
+
+authentik_wait_for_local_forward() {
+  local forward_port="$1"
+  local forward_pid="$2"
+  local forward_log="$3"
+  local attempt=1
+  local attempts=60
+
+  while [[ "$attempt" -le "$attempts" ]]; do
+    if curl -fsS "http://127.0.0.1:${forward_port}/-/health/live/" >/dev/null 2>&1; then
+      return 0
+    fi
+    if ! kill -0 "$forward_pid" >/dev/null 2>&1; then
+      if [[ -s "$forward_log" ]]; then
+        log "Authentik port-forward exited early; last log lines:"
+        tail -n 20 "$forward_log" >&2
+      fi
+      fail "Authentik port-forward on 127.0.0.1:${forward_port} exited before it became ready"
+    fi
+    sleep 1
+    attempt=$((attempt + 1))
+  done
+
+  if [[ -s "$forward_log" ]]; then
+    log "Authentik port-forward log:"
+    tail -n 20 "$forward_log" >&2
+  fi
+
+  fail "Authentik port-forward on 127.0.0.1:${forward_port} did not become ready"
 }
 
 authentik_find_user() {
@@ -201,28 +235,17 @@ authentik_add_user_to_group() {
 
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
-cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
-cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty')"
-
 [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
 [[ -f "$AUTHENTIK_SECRET_FILE" ]] || fail "Authentik bootstrap secret not found at $AUTHENTIK_SECRET_FILE"
 [[ -f "$LOGIN_SECRET_FILE" ]] || fail "Wizard login secret not found at $LOGIN_SECRET_FILE"
 
-AUTHENTIK_HOST="$(jq -r '.AUTHENTIK_HOST // empty' "$AUTHENTIK_SECRET_FILE")"
 AUTHENTIK_TOKEN="$(jq -r '.AUTHENTIK_BOOTSTRAP_TOKEN // empty' "$AUTHENTIK_SECRET_FILE")"
 LOGIN_PASSWORD="$(jq -r '.password // .PASSWORD // empty' "$LOGIN_SECRET_FILE")"
 
-if [[ -z "$AUTHENTIK_HOST" && -n "$cluster_dns_domain" ]]; then
-  public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
-  [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
-  AUTHENTIK_HOST="https://authentik.${public_zone_name}"
-fi
-
-[[ -n "$AUTHENTIK_HOST" ]] || fail "Could not determine Authentik host"
 [[ -n "$AUTHENTIK_TOKEN" ]] || fail "Could not read AUTHENTIK_BOOTSTRAP_TOKEN from $AUTHENTIK_SECRET_FILE"
 [[ -n "$LOGIN_PASSWORD" ]] || fail "Could not read password from $LOGIN_SECRET_FILE"
 
-AUTHENTIK_API_BASE="${AUTHENTIK_HOST%/}/api/v3"
+AUTHENTIK_API_BASE="http://127.0.0.1:${AUTHENTIK_LOCAL_FORWARD_PORT}/api/v3"
 FULL_NAME="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.full_name // empty')"
 USERNAME="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.username // empty')"
 EMAIL="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.email // empty')"
@@ -230,6 +253,25 @@ ADMIN_GROUP_NAME="admins"
 
 [[ -n "$FULL_NAME" ]] || fail "full_name is required"
 [[ -n "$USERNAME" ]] || fail "username is required"
+
+forward_log="$(mktemp "${TMPDIR:-/tmp}/authentik-port-forward.XXXXXX.log")"
+port_forward_pid=""
+
+cleanup_port_forward() {
+  if [[ -n "$port_forward_pid" ]]; then
+    kill "$port_forward_pid" >/dev/null 2>&1 || true
+    wait "$port_forward_pid" >/dev/null 2>&1 || true
+  fi
+  rm -f "$forward_log"
+}
+
+trap cleanup_port_forward EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+kubectl -n authentik port-forward "svc/authentik-server" "${AUTHENTIK_LOCAL_FORWARD_PORT}:80" >"$forward_log" 2>&1 &
+port_forward_pid="$!"
+authentik_wait_for_local_forward "$AUTHENTIK_LOCAL_FORWARD_PORT" "$port_forward_pid" "$forward_log"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating Authentik user ${USERNAME}"
 USER_ID="$(authentik_upsert_user "$USERNAME" "$FULL_NAME" "$EMAIL")"
