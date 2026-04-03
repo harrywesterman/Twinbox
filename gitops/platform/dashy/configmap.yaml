@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashy-config
+  namespace: dashy
+  labels:
+    app.kubernetes.io/name: dashy
+data:
+  conf.yml.tpl: |
+    pageInfo:
+      title: Start
+      description: Twinbox cluster start page
+    appConfig:
+      preventWriteToDisk: true
+      auth:
+        enableOidc: true
+        oidc:
+          clientId: __DASHY_OIDC_CLIENT_ID__
+          endpoint: __DASHY_OIDC_ENDPOINT__
+          scope: __DASHY_OIDC_SCOPE__
+    sections:
+      - name: Platform
+        items:
+          - title: Argo CD
+            description: GitOps control plane
+            url: https://argocd.__ZONE_NAME__
+          - title: Traefik
+            description: Ingress controller
+            url: https://traefik.__ZONE_NAME__
+          - title: Authentik
+            description: Identity provider
+            url: https://authentik.__ZONE_NAME__
+          - title: Headlamp
+            description: Kubernetes dashboard
+            url: https://headlamp.__ZONE_NAME__
+          - title: Grafana
+            description: Metrics and dashboards
+            url: https://grafana.__ZONE_NAME__
+          - title: Prometheus
+            description: Metrics collection and alerting
+            url: https://prometheus.__ZONE_NAME__
+          - title: ntfy
+            description: Push notification service
+            url: https://ntfy.__ZONE_NAME__
+          - title: Wiredoor
+            description: Alternate operator entrypoint
+            url: https://argocd.__ZONE_NAME__
+      - name: Apps
+        items:
+          - title: Whoami
+            description: Minimal ingress check
+            url: https://whoami.__ZONE_NAME__

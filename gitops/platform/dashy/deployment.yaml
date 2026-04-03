@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashy
+  namespace: dashy
+  labels:
+    app.kubernetes.io/name: dashy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dashy
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dashy
+    spec:
+      initContainers:
+        - name: render-config
+          image: python:3.12-alpine
+          command:
+            - python
+            - -c
+            - |
+              from pathlib import Path
+              import os
+
+              template = Path("/config-template/conf.yml.tpl").read_text(encoding="utf-8")
+              for key in (
+                  "DASHY_OIDC_CLIENT_ID",
+                  "DASHY_OIDC_ENDPOINT",
+                  "DASHY_OIDC_SCOPE",
+              ):
+                  template = template.replace(f"__{key}__", os.environ[key])
+
+              target = Path("/app/user-data/conf.yml")
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_text(template, encoding="utf-8")
+          envFrom:
+            - secretRef:
+                name: dashy-oidc
+          volumeMounts:
+            - name: config-template
+              mountPath: /config-template
+            - name: data
+              mountPath: /app/user-data
+      containers:
+        - name: dashy
+          image: ghcr.io/lissy93/dashy:v3.2.3
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            failureThreshold: 60
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /app/user-data
+      volumes:
+        - name: config-template
+          configMap:
+            name: dashy-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: dashy-data

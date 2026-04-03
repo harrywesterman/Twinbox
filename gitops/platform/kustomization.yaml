@@ -11,11 +11,15 @@ resources:
   - grafana/externalsecret.yaml
   - traefik/traefik-dashboard-ingressroute.yaml
   - traefik/argocd-ingressroute.yaml
+  - management-consoles/longhorn-ingressroute.yaml
   - wiredoor-gateway/ingressroute.yaml
   - wiredoor-gateway/externalsecret.yaml
-  - homepage/ingressroute.yaml
-  - homepage/configmap.yaml
-  - homepage/deployment.yaml
+  - dashy/ingressroute.yaml
+  - dashy/configmap.yaml
+  - dashy/externalsecret.yaml
+  - dashy/pvc.yaml
+  - dashy/service.yaml
+  - dashy/deployment.yaml
   - prometheus/ingressroute.yaml
   - prometheus/alertmanager-config.yaml
   - ntfy/ingressroute.yaml

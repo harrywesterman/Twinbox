@@ -7,7 +7,7 @@ summary: Apply the ntfy GitOps application after the dashboard stack is ready.
 explanation: Twinbox applies the ntfy ApplicationSet after the dashboard stack so notifications can use the same public zone projection as the rest of the platform. The step waits for Argo CD health before continuing.
 side_help: Ntfy provides simple push notifications for cluster alerts and operator workflows.
 depends_on:
-  - install-homepage-dashboard
+  - install-dashy-dashboard
 inputs: []
 secrets:
   files:

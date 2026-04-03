@@ -25,7 +25,7 @@ This policy is designed to work with the Cloudflare Free plan.
 - non-`prd` clusters use the slug-prefixed hostname model:
   - `headlamp.tst.example.com`
   - `whoami.dev.example.com`
-  - `homepage.tst.example.com`
+  - `start.tst.example.com`
 
 ## Wizard Behavior
 

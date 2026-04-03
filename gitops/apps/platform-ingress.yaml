@@ -116,18 +116,25 @@ spec:
                   value: Host(`ntfy.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
-                name: homepage
+                name: dashy
               patch: |-
                 - op: replace
                   path: /spec/routes/0/match
-                  value: Host(`homepage.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+                  value: Host(`start.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
-                name: homepage-wiredoor
+                name: dashy-wiredoor
               patch: |-
                 - op: replace
                   path: /spec/routes/0/match
-                  value: Host(`homepage.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+                  value: Host(`start.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: dashy-tailscale
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`start.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
                 name: whoami
@@ -150,87 +157,65 @@ spec:
                   path: /spec/routes/0/match
                   value: Host(`traefik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))
             - target:
+                kind: IngressRoute
+                name: longhorn
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`longhorn.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
                 kind: ConfigMap
-                name: homepage
+                name: dashy-config
               patch: |-
                 apiVersion: v1
                 kind: ConfigMap
                 metadata:
-                  name: homepage
+                  name: dashy-config
                 data:
-                  bookmarks.yaml: |
-                    - Platform:
-                        - Argo CD:
-                            - href: https://argocd.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
-                              description: GitOps control plane
-                        - Traefik:
-                            - href: https://traefik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
-                              description: Ingress controller
-                        - Authentik:
-                            - href: https://authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
-                              description: Identity provider
-                        - Headlamp:
-                            - href: https://headlamp.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
-                              description: Kubernetes dashboard
-                        - Grafana:
-                            - href: https://grafana.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
-                              description: Metrics and dashboards
-                        - Prometheus:
-                            - href: https://prometheus.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
-                              description: Metrics collection and alerting
-                        - ntfy:
-                            - href: https://ntfy.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
-                              description: Push notification service
-                        - Wiredoor:
-                            href: https://argocd.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
-                            description: Alternate operator entrypoint
-                    - Apps:
-                        - Whoami:
-                            href: https://whoami.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
-                            description: Minimal ingress check
-                        - Homepage:
-                            href: https://homepage.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
-                            description: Cluster landing page
-                  services.yaml: |
-                    - Platform:
-                        - Argo CD:
-                            href: https://argocd.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                  conf.yml.tpl: |
+                    pageInfo:
+                      title: Start
+                      description: Twinbox cluster start page
+                    appConfig:
+                      preventWriteToDisk: true
+                      auth:
+                        enableOidc: true
+                        oidc:
+                          clientId: __DASHY_OIDC_CLIENT_ID__
+                          endpoint: __DASHY_OIDC_ENDPOINT__
+                          scope: __DASHY_OIDC_SCOPE__
+                    sections:
+                      - name: Platform
+                        items:
+                          - title: Argo CD
                             description: GitOps control plane
-                        - Traefik:
-                            href: https://traefik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                            url: https://argocd.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                          - title: Traefik
                             description: Ingress controller
-                        - Authentik:
-                            href: https://authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                            url: https://traefik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                          - title: Authentik
                             description: Identity provider
-                        - Headlamp:
-                            href: https://headlamp.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                            url: https://authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                          - title: Headlamp
                             description: Kubernetes dashboard
-                        - Grafana:
-                            href: https://grafana.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                            url: https://headlamp.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                          - title: Grafana
                             description: Metrics and dashboards
-                    - Apps:
-                        - Whoami:
-                            href: https://whoami.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                            url: https://grafana.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                          - title: Prometheus
+                            description: Metrics collection and alerting
+                            url: https://prometheus.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                          - title: ntfy
+                            description: Push notification service
+                            url: https://ntfy.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                          - title: Wiredoor
+                            description: Alternate operator entrypoint
+                            url: https://argocd.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                      - name: Apps
+                        items:
+                          - title: Whoami
                             description: Minimal ingress check
-                        - Homepage:
-                            href: https://homepage.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
-                            description: Cluster landing page
-            - target:
-                kind: Deployment
-                name: homepage
-              patch: |-
-                apiVersion: apps/v1
-                kind: Deployment
-                metadata:
-                  name: homepage
-                spec:
-                  template:
-                    spec:
-                      containers:
-                        - name: homepage
-                          env:
-                            - name: HOMEPAGE_ALLOWED_HOSTS
-                              value: homepage.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                            url: https://whoami.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
       destination:
         server: https://kubernetes.default.svc
         namespace: argocd

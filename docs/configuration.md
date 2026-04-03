@@ -35,6 +35,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `/opt/twinbox/bootstrap/secrets/global/authentik.json`
 - `/opt/twinbox/bootstrap/secrets/global/wiredoor-gateway.json`
 - `/opt/twinbox/bootstrap/secrets/global/velero.json`
+- `/opt/twinbox/bootstrap/secrets/global/dashy-oidc-<cluster-id>.json`
 - `/opt/twinbox/bootstrap/secrets/global/wiredoor-bastion-<cluster-id>.json`
 - `/opt/twinbox/bootstrap/secrets/global/cloudflare-<cluster-id>.json`
 - `/opt/twinbox/bootstrap/secrets/global/wiredoor-bastion-<cluster-id>.json`
@@ -167,7 +168,7 @@ Twinbox uses one base domain (`dns_domain`) for the cluster and derives a public
 3. **OpenBao sync** — The ingress selection step syncs `ZONE_NAME`, `WIREDOOR_FQDN`, and `WILDCARD_FQDN` to OpenBao at `twinbox/global/cluster-hostnames`.
 4. **Argo cluster secret** — The ingress/domain step upserts a local Argo CD cluster secret in the `argocd` namespace and stores the derived public zone name as an annotation.
 5. **ApplicationSets** — The `platform-ingress`, `grafana`, and `ntfy` ApplicationSets read that annotation at render time and inject the derived hostnames into Kustomize patches or Helm values.
-6. **Kustomize render** — The `platform-ingress` ApplicationSet uses Kustomize to patch the live match expressions and homepage strings before sync.
+6. **Kustomize render** — The `platform-ingress` ApplicationSet uses Kustomize to patch the live match expressions and start-page strings before sync.
 7. **Ingress-specific apps** — Wiredoor, MetalLB, and Tailscale reuse the slug-prefixed hostname model. Cloudflare Tunnel is only offered for `prd` on Cloudflare Free.
 
 ### Affected services
@@ -182,7 +183,7 @@ All platform services use the runtime domain projection from the local Argo clus
 | Headlamp | `headlamp.<public-zone-name>` with Authentik OIDC login |
 | Grafana | `grafana.<ZONE_NAME>` |
 | Whoami | `whoami.<ZONE_NAME>` |
-| Homepage | `homepage.<ZONE_NAME>` |
+| Dashy start page | `start.<ZONE_NAME>` |
 
 ### GitOps structure
 
@@ -204,10 +205,13 @@ gitops/platform/
 ├── wiredoor-gateway/
 │   ├── ingressroute.yaml
 │   └── externalsecret.yaml
-└── homepage/
+└── dashy/
     ├── ingressroute.yaml
-    ├── configmap.yaml          # Bookmarks and services patched with the selected domain
-    └── deployment.yaml         # HOMEPAGE_ALLOWED_HOSTS
+    ├── configmap.yaml          # Start page config template patched with the selected domain
+    ├── externalsecret.yaml     # Dashy OIDC client credentials from OpenBao
+    ├── pvc.yaml                # Longhorn-backed writable user-data path
+    ├── service.yaml
+    └── deployment.yaml
 ```
 
 ### Argo CD application order

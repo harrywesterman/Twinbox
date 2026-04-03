@@ -187,9 +187,9 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-whoami",
                 "install-headlamp",
                 "install-grafana",
-                "install-homepage-dashboard",
-                "install-ntfy",
+                "install-dashy-dashboard",
                 "install-management-consoles",
+                "install-ntfy",
                 "install-velero-backup",
                 "install-proxmox-backup-system",
                 "install-nextcloud",
@@ -220,8 +220,9 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert talos["steps"][10]["title"] == "Install Whoami"
             assert talos["steps"][11]["title"] == "Install Headlamp"
             assert talos["steps"][12]["title"] == "Install Grafana"
-            assert talos["steps"][13]["title"] == "Install Homepage dashboard"
-            assert talos["steps"][14]["title"] == "Install Ntfy"
+            assert talos["steps"][13]["title"] == "Install Dashy dashboard"
+            assert talos["steps"][14]["title"] == "Install Management consoles"
+            assert talos["steps"][15]["title"] == "Install Ntfy"
             assert talos["steps"][0]["journey_stage"] == "setup"
             assert talos["steps"][0]["status"] == "ready"
             assert talos["steps"][1]["status"] == "locked"

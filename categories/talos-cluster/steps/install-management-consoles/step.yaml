@@ -2,13 +2,20 @@ id: install-management-consoles
 title: Install Management consoles
 type: action
 journey_stage: setup
-order: 101
-summary: Placeholder step for management console rollout.
-explanation: This wizard step is reserved for future management console work and does not run a real cluster action yet.
+order: 40
+summary: Publish the operator web consoles after Dashy is online.
+explanation: Twinbox groups the operator consoles directly after the cluster start page so the Traefik and Longhorn web UIs can be published as part of the same post-ingress operator phase.
 side_help: Management consoles are grouped as a dedicated phase so the wizard can keep operator tools separate from core infra.
 depends_on:
-  - install-homepage-dashboard
+  - install-dashy-dashboard
 inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
 runner:
   kind: script
-  script: categories/talos-cluster/steps/_placeholder/run.sh
+  script: categories/talos-cluster/steps/install-management-consoles/run.sh

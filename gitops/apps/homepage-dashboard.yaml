@@ -1,6 +1,0 @@
-# Homepage resources managed by platform-ingress via Kustomize.
-# This app is disabled.
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: homepage

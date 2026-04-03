@@ -20,8 +20,8 @@ const STEP_ICON_ASSETS = {
   'install-authentik-idp': assetHref('install-authentik-idp.svg'),
   'create-users-and-groups': assetHref('create-users-and-groups.svg'),
   'configure-cloudflare-dns': assetHref('configure-cloudflare-dns.svg'),
-  'install-homepage-dashboard': assetHref('install-homepage-dashboard.svg'),
-  'install-ntfy': assetHref('install-homepage-dashboard.svg'),
+  'install-dashy-dashboard': assetHref('install-dashy-dashboard.svg'),
+  'install-ntfy': assetHref('install-ntfy.svg'),
   'install-management-consoles': assetHref('install-management-consoles.svg'),
   'install-velero-backup': assetHref('install-velero-backup.svg'),
   'install-proxmox-backup-system': assetHref('install-proxmox-backup-system.svg'),
@@ -111,10 +111,10 @@ function buildProjectUrlMap() {
       project_url: 'https://developers.cloudflare.com/dns/',
       github_url: 'https://github.com/cloudflare/cloudflare-docs',
     },
-    'install-homepage-dashboard': {
-      icon: '🏠',
-      project_url: 'https://gethomepage.dev/',
-      github_url: 'https://github.com/gethomepage/homepage',
+    'install-dashy-dashboard': {
+      icon: '🏁',
+      project_url: 'https://dashy.to/',
+      github_url: 'https://github.com/Lissy93/dashy',
     },
     'install-ntfy': {
       icon: '🔔',
