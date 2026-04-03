@@ -1,18 +1,17 @@
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: longhorn
+  name: longhorn-authentik-callback
   namespace: longhorn-system
 spec:
   entryPoints:
     - websecure
   routes:
     - kind: Rule
-      match: Host(`longhorn.__ZONE_NAME__`)
-      middlewares:
-        - name: authentik-forwardauth
+      match: Host(`longhorn.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
       services:
         - kind: Service
-          name: longhorn-frontend
+          name: authentik-server
+          namespace: authentik
           port: 80
   tls: {}
