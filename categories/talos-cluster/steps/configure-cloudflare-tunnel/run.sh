@@ -331,14 +331,16 @@ if command -v kubectl &>/dev/null; then
   bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
     --manifest "$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml" \
     --application "platform-ingress" \
-    --destination-namespace "argocd"
+    --destination-namespace "argocd" \
+    --no-wait
 
   # Apply the cloudflare-tunnel application last so the inline runtime values
   # remain the active desired state when Argo reconciles the deployment.
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying cloudflare-tunnel application"
   bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
     --manifest "$cloudflare_tunnel_manifest" \
-    --application "cloudflare-tunnel"
+    --application "cloudflare-tunnel" \
+    --no-wait
 fi
 
 # Store ingress strategy in cluster state
