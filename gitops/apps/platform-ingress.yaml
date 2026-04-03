@@ -238,6 +238,12 @@ spec:
                           - title: Authentik
                             description: Identity provider
                             url: https://authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                          - title: Cloudflare
+                            description: DNS and security dashboard
+                            url: https://dash.cloudflare.com/
+                          - title: Proxmox
+                            description: Virtualization host
+                            url: https://192.168.2.105:8006/
                           - title: Longhorn
                             description: Storage management
                             url: https://longhorn.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
@@ -256,6 +262,9 @@ spec:
                           - title: Wiredoor
                             description: Alternate operator entrypoint
                             url: https://argocd.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                          - title: GitHub
+                            description: Twinbox source repository
+                            url: https://github.com/harrywesterman/Twinbox
                       - name: Apps
                         items:
                           - title: Whoami

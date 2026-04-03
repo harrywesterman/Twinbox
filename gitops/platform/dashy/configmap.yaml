@@ -30,6 +30,12 @@ data:
           - title: Authentik
             description: Identity provider
             url: https://authentik.__ZONE_NAME__
+          - title: Cloudflare
+            description: DNS and security dashboard
+            url: https://dash.cloudflare.com/
+          - title: Proxmox
+            description: Virtualization host
+            url: https://192.168.2.105:8006/
           - title: Longhorn
             description: Storage management
             url: https://longhorn.__ZONE_NAME__
@@ -48,6 +54,9 @@ data:
           - title: Wiredoor
             description: Alternate operator entrypoint
             url: https://argocd.__ZONE_NAME__
+          - title: GitHub
+            description: Twinbox source repository
+            url: https://github.com/harrywesterman/Twinbox
       - name: Apps
         items:
           - title: Whoami
