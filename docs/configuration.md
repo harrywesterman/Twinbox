@@ -185,6 +185,9 @@ All platform services use the runtime domain projection from the local Argo clus
 | Whoami | `whoami.<ZONE_NAME>` |
 | Dashy start page | `start.<ZONE_NAME>` |
 
+Dashy's browser-side OIDC flow depends on Authentik answering the discovery and token requests with CORS headers for `https://start.<ZONE_NAME>`. The platform IngressRoute applies a Traefik headers middleware for that response path.
+Dashy registers the root start-page URL as its callback (`https://start.<ZONE_NAME>`), so the Authentik provider needs to accept that form without a trailing slash.
+
 ### GitOps structure
 
 ```

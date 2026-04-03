@@ -39,7 +39,7 @@ fi
 [[ -n "$authentik_token" ]] || fail "Could not read AUTHENTIK_BOOTSTRAP_TOKEN from $authentik_secret_file"
 
 dashy_host="https://start.${public_zone_name}"
-dashy_redirect_uri="${dashy_host}/"
+dashy_redirect_uri="${dashy_host}"
 
 tf_workdir="$MANAGER_DATA_DIR/opentofu/authentik-dashy-${cluster_id}"
 mkdir -p "$tf_workdir"

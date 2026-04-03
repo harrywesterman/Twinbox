@@ -1031,6 +1031,14 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "/oidc-callback" in headlamp_run_text
     assert "headlamp-oidc" in headlamp_run_text
     assert "sync-openbao-global-secret.sh" in headlamp_run_text
+    assert 'dashy_redirect_uri="${dashy_host}"' in (
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-dashy-dashboard"
+        / "run.sh"
+    ).read_text(encoding="utf-8")
 
     headlamp_module_text = _authentik_headlamp_module_text()
     headlamp_module_vars_text = _authentik_headlamp_module_vars_text()
@@ -1049,6 +1057,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "issuer_url" in headlamp_module_outputs_text
     assert 'provider "authentik"' in dashy_module_providers_text
     assert "url = var.authentik_url" in dashy_module_providers_text
+    assert 'trim(var.dashy_redirect_uri, "/")' in dashy_module_providers_text
 
     headlamp_external_secret_text = _headlamp_oidc_externalsecret_text()
     assert "kind: ExternalSecret" in headlamp_external_secret_text
@@ -1188,6 +1197,8 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "name: authentik-cors" in authentik_ingressroute_text
     assert "kind: Middleware" in authentik_cors_text
     assert "accessControlAllowOriginList" in authentik_cors_text
+    assert "customResponseHeaders" in authentik_cors_text
+    assert "Access-Control-Allow-Origin" in authentik_cors_text
     assert "https://start.__ZONE_NAME__" in authentik_cors_text
     assert "Host(`whoami.__ZONE_NAME__`)" in whoami_ingressroute_text
     assert "Host(`headlamp.__ZONE_NAME__`)" in headlamp_ingressroute_text
@@ -1210,6 +1221,7 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "name: platform-ingress-set" in platform_ingress_app_text
     assert "name: authentik-cors" in platform_ingress_app_text
     assert "accessControlAllowOriginList/0" in platform_ingress_app_text
+    assert "customResponseHeaders/Access-Control-Allow-Origin" in platform_ingress_app_text
     assert "start.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in platform_ingress_app_text
     assert "kind: ApplicationSet" in grafana_appset_text
     assert "name: grafana-set" in grafana_appset_text
