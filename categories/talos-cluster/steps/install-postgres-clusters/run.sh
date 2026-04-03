@@ -9,6 +9,9 @@ BOOTSTRAP_ROOT="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
 authentik_secret_file="$BOOTSTRAP_ROOT/secrets/global/authentik.json"
 manifest_path="$WORKSPACE_ROOT/gitops/apps/postgres-clusters.yaml"
 
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
+fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
+
 mkdir -p "$(dirname "$authentik_secret_file")"
 
 seed_authentik_db_secret() {
