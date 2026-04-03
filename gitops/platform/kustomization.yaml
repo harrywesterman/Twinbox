@@ -27,6 +27,9 @@ resources:
   - management-consoles/authentik-callback-service.yaml
   - management-consoles/authentik-callback-endpoints.yaml
   - management-consoles/authentik-forwardauth-middleware.yaml
+  - management-consoles/twinboxwizard-ingressroute.yaml
+  - management-consoles/twinboxwizard-service.yaml
+  - management-consoles/twinboxwizard-endpoints.yaml
   - wiredoor-gateway/ingressroute.yaml
   - wiredoor-gateway/externalsecret.yaml
   - dashy/ingressroute.yaml

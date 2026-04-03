@@ -206,6 +206,13 @@ spec:
                 kind: IngressRoute
                 name: longhorn-authentik-callback
             - target:
+                kind: IngressRoute
+                name: twinboxwizard
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`twinboxwizard.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
                 kind: ConfigMap
                 name: dashy-config
               patch: |-
@@ -238,6 +245,10 @@ spec:
                           - title: Authentik
                             description: Identity provider
                             url: https://authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                          - title: Twinbox Wizard
+                            description: Web wizard on the management VM
+                            url: https://twinboxwizard.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                            icon: fas fa-hat-wizard
                           - title: Cloudflare
                             description: DNS and security dashboard
                             url: https://dash.cloudflare.com/

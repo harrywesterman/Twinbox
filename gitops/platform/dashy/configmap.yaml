@@ -30,6 +30,10 @@ data:
           - title: Authentik
             description: Identity provider
             url: https://authentik.__ZONE_NAME__
+          - title: Twinbox Wizard
+            description: Web wizard on the management VM
+            url: https://twinboxwizard.__ZONE_NAME__
+            icon: fas fa-hat-wizard
           - title: Cloudflare
             description: DNS and security dashboard
             url: https://dash.cloudflare.com/
