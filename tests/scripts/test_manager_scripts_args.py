@@ -1506,8 +1506,7 @@ def test_dashy_deployment_uses_a_published_image_tag():
     )
     assert "strategy:" in text
     assert "type: Recreate" in text
-    assert "nodeAffinity:" in text
-    assert "talos-zq3-glf" in text
+    assert "kubernetes.io/hostname" not in text
     assert "emptyDir: {}" in text
     assert "claimName: dashy-data" not in text
     assert 'target = Path("/app/user-data/config.yml")' in text
