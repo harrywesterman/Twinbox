@@ -2,6 +2,8 @@ global:
   envFrom:
     - secretRef:
         name: authentik-bootstrap
+  deploymentStrategy:
+    type: Recreate
 
 server:
   resources:
