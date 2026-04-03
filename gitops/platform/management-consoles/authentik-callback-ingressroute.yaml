@@ -8,7 +8,7 @@ spec:
     - websecure
   routes:
     - kind: Rule
-      match: Host(`longhorn.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
+      match: Host(`longhorn.bierineenweek.nl`) && PathPrefix(`/outpost.goauthentik.io`)
       services:
         - kind: Service
           name: authentik-server
