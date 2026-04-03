@@ -12,6 +12,5 @@ spec:
       services:
         - kind: Service
           name: authentik-server
-          namespace: authentik
           port: 80
   tls: {}

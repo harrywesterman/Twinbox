@@ -13,6 +13,7 @@ resources:
   - grafana/externalsecret.yaml
   - traefik/traefik-dashboard-ingressroute.yaml
   - traefik/authentik-callback-ingressroute.yaml
+  - traefik/authentik-callback-service.yaml
   - traefik/authentik-forwardauth-middleware.yaml
   - traefik/argocd-server-transport.yaml
   - traefik/argocd-login-returnurl-redirect.yaml
@@ -22,6 +23,7 @@ resources:
   - argocd/argocd-rbac-cm.yaml
   - management-consoles/longhorn-ingressroute.yaml
   - management-consoles/authentik-callback-ingressroute.yaml
+  - management-consoles/authentik-callback-service.yaml
   - management-consoles/authentik-forwardauth-middleware.yaml
   - wiredoor-gateway/ingressroute.yaml
   - wiredoor-gateway/externalsecret.yaml
