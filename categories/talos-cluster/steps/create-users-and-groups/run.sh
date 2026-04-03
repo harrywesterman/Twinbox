@@ -3,8 +3,10 @@ set -euo pipefail
 
 : "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"
 : "${STEP_INPUTS_JSON:?missing STEP_INPUTS_JSON}"
+: "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
+export KUBECONFIG="$KUBECONFIG_FILE"
 
 BOOTSTRAP_ROOT="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
 AUTHENTIK_SECRET_FILE="$BOOTSTRAP_ROOT/secrets/global/authentik.json"
