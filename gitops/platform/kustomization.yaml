@@ -11,6 +11,7 @@ resources:
   - grafana/ingressroute.yaml
   - grafana/externalsecret.yaml
   - traefik/traefik-dashboard-ingressroute.yaml
+  - traefik/argocd-server-transport.yaml
   - traefik/argocd-ingressroute.yaml
   - management-consoles/longhorn-ingressroute.yaml
   - wiredoor-gateway/ingressroute.yaml

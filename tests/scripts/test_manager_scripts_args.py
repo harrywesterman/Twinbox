@@ -204,7 +204,12 @@ TRAEFIK_DASHBOARD_EXTERNALSECRET = (
     / "traefik"
     / "traefik-dashboard-externalsecret.yaml"
 )
-ARGOCD_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "traefik" / "argocd-ingressroute.yaml"
+ARGOCD_SERVER_TRANSPORT = (
+    REPO_ROOT / "gitops" / "platform" / "traefik" / "argocd-server-transport.yaml"
+)
+ARGOCD_INGRESSROUTE = (
+    REPO_ROOT / "gitops" / "platform" / "traefik" / "argocd-ingressroute.yaml"
+)
 ARGOCD_WIREDOOR_INGRESSROUTE = (
     REPO_ROOT / "gitops" / "platform" / "wiredoor-gateway" / "ingressroute.yaml"
 )
@@ -1440,6 +1445,7 @@ def test_argocd_ingressroute_uses_https_backend():
     assert "name: argocd-server" in text
     assert "port: 443" in text
     assert "scheme: https" in text
+    assert "serversTransport: argocd-server-transport" in text
     assert "websecure" in text
 
 
@@ -1450,7 +1456,16 @@ def test_argocd_wiredoor_ingressroute_uses_https_backend():
     assert "name: argocd-server" in text
     assert "port: 443" in text
     assert "scheme: https" in text
+    assert "serversTransport: argocd-server-transport" in text
     assert "webwiredoor" in text
+
+
+def test_argocd_servers_transport_disables_backend_cert_verification():
+    text = ARGOCD_SERVER_TRANSPORT.read_text(encoding="utf-8")
+    assert "kind: ServersTransport" in text
+    assert "name: argocd-server-transport" in text
+    assert "namespace: argocd" in text
+    assert "insecureSkipVerify: true" in text
 
 
 def test_grafana_values_includes_sidecar_and_datasources():
