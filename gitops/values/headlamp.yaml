@@ -13,7 +13,7 @@ service:
 
 env:
   - name: KUBECONFIG
-    value: /home/headlamp/.config/Headlamp/config
+    value: /home/headlamp/.config/Headlamp/kubeconfigs/config
 
 volumes:
   - name: headlamp-config
@@ -26,8 +26,7 @@ volumeMounts:
   - name: headlamp-config
     mountPath: /home/headlamp/.config/Headlamp
   - name: headlamp-kubeconfig
-    mountPath: /home/headlamp/.config/Headlamp/config
-    subPath: config
+    mountPath: /home/headlamp/.config/Headlamp/kubeconfigs
     readOnly: true
 
 config:
