@@ -2,6 +2,8 @@
 
 Twinbox is a complete K8s cluster based on Talos Linux, completely configured. The Management VM is the control point for bootstrap, queueing, and long-lived bootstrap material.
 
+GitHub `main` is the source of truth for both the management stack and the GitOps manifests. The Management VM is a runtime host that runs the repo checkout, but Argo CD reconciles cluster state from the GitHub-backed repo content, not from ad hoc live edits on the VM.
+
 ## Layers
 
 1. **Wizard layer**
@@ -88,5 +90,6 @@ The local Argo cluster secret must exist before the domain-aware ApplicationSets
 - Queue recovery marks orphaned `running` jobs as failed on worker startup.
 - Step state is cluster-scoped for Talos cluster journeys.
 - Talos configs and kubeconfigs are runtime artifacts, not canonical files under `manager-data/`.
+- Management VM edits under `/opt/twinbox` are temporary unless they are committed and pushed back to GitHub `main`.
 - OpenBao uses static auto-unseal material stored on the Management VM for zero-touch restarts.
 - The first visible setup step in the UI is `Deploy Talos Cluster`.

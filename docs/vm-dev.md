@@ -8,6 +8,21 @@ Use this workflow when the Twinbox Management VM is your primary development mac
 - Docker/runtime stay on the Management VM.
 - Normal frontend preview happens by syncing only `manager-web/` to the VM and rebuilding `manager-web` there before commit or push.
 
+## Source Of Truth
+
+- GitHub `main` is the canonical source for Twinbox configuration.
+- Argo CD reconciles from the GitHub repo, not from the Management VM checkout.
+- The Management VM is a runtime and debugging host. It may contain generated files, bootstrap material, and temporary edits, but those are not authoritative.
+- If a fix on the VM proves useful, move it into the repo, commit it, and push it. Do not leave the VM edit as the real solution.
+
+## Debugging Rule
+
+- Use the Management VM to inspect live behavior and reproduce failures.
+- Use the repo to make permanent fixes.
+- After pushing a change, let Argo CD or the relevant step re-sync from GitHub.
+- If the live VM still looks stale, verify the deployed revision and pod spec first.
+- Avoid treating `/opt/twinbox` edits as canonical unless they are the exact same changes that have already been committed and pushed.
+
 ## Prerequisites
 
 - Management VM is created by `wizard/setup-wizard.sh`.
@@ -149,6 +164,11 @@ docker compose logs -f manager-api manager-web
 git add .
 git commit -m "feat: <summary>"
 ```
+
+Important:
+
+- This flow is for temporary remote editing only.
+- Anything you want the cluster or Argo CD to keep must land in GitHub `main`.
 
 ## Recommended Editor Setup
 
