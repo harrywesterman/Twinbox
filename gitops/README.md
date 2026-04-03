@@ -41,7 +41,7 @@ Per-app overlays applied alongside the Helm chart. Common contents:
 
 ## `values/`
 
-Helm values files referenced by the ArgoCD Applications via `ref: values`. Named after their app (`authentik.yaml`, `grafana.yaml`, etc.).
+Helm values files referenced by the ArgoCD Applications via `ref: values`. Named after their app (`grafana.yaml`, etc.). Special-case apps can keep their values next to a repo-controlled Kustomize overlay under `gitops/apps/<app>/` so chart output can be patched deterministically before Argo CD applies it. Authentik uses that pattern.
 
 ## `routes/templates/`
 

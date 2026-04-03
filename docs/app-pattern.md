@@ -198,7 +198,7 @@ spec:
         property: <APP>_POSTGRESQL__PASSWORD
 ```
 
-**poolers.yaml** — rw and ro poolers:
+**poolers.yaml** — rw, optional rw-session, and ro poolers:
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Pooler
@@ -219,6 +219,22 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: Pooler
 metadata:
+  name: <app>-db-pooler-rw-session
+  namespace: databases
+spec:
+  cluster:
+    name: <app>-db
+  instances: 2
+  type: rw
+  pgbouncer:
+    poolMode: session
+    parameters:
+      max_client_conn: "200"
+      default_pool_size: "20"
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
   name: <app>-db-pooler-ro
   namespace: databases
 spec:
@@ -232,6 +248,8 @@ spec:
       max_client_conn: "200"
       default_pool_size: "20"
 ```
+
+Use the `-rw-session` service only for apps that depend on session-bound PostgreSQL behavior such as advisory locks or long-lived server-side coordination. Authentik is the first cluster app that needs this exception.
 
 **scheduled-backup.yaml** — Daily backup:
 ```yaml

@@ -982,6 +982,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "gitops/platform/authentik/externalsecret.yaml" in authentik_run_text
     assert "gitops/platform/authentik/ingressroute.yaml" in authentik_run_text
     assert "AUTHENTIK_POSTGRESQL__HOST" in authentik_run_text
+    assert "authentik-db-pooler-rw-session.databases.svc.cluster.local" in authentik_run_text
     assert "AUTHENTIK_POSTGRESQL__PORT" in authentik_run_text
     assert "AUTHENTIK_POSTGRESQL__NAME" in authentik_run_text
     assert "AUTHENTIK_POSTGRESQL__USER" in authentik_run_text
@@ -1476,7 +1477,7 @@ def test_authentik_db_storageclass_uses_single_replica():
 
 
 def test_authentik_values_request_memory_for_server_and_worker():
-    text = (REPO_ROOT / "gitops" / "values" / "authentik.yaml").read_text(
+    text = (REPO_ROOT / "gitops" / "apps" / "authentik" / "values.yaml").read_text(
         encoding="utf-8"
     )
     assert "server:" in text
@@ -1486,3 +1487,4 @@ def test_authentik_values_request_memory_for_server_and_worker():
     assert "memory: 256Mi" in text
     assert "limits:\n      memory: 512Mi" in text
     assert "authentik:\n  existingSecret:" in text
+    assert "authentik-db-pooler-rw-session.databases.svc.cluster.local" in text

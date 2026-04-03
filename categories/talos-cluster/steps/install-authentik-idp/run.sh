@@ -76,7 +76,9 @@ if [[ -z "$authentik_bootstrap_email" ]]; then
 fi
 
 if [[ -z "$authentik_postgresql_host" ]]; then
-  authentik_postgresql_host="authentik-db-pooler-rw.databases.svc.cluster.local"
+  authentik_postgresql_host="authentik-db-pooler-rw-session.databases.svc.cluster.local"
+elif [[ "$authentik_postgresql_host" == "authentik-db-pooler-rw.databases.svc.cluster.local" ]]; then
+  authentik_postgresql_host="authentik-db-pooler-rw-session.databases.svc.cluster.local"
 fi
 
 if [[ -z "$authentik_postgresql_port" ]]; then

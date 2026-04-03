@@ -8,4 +8,5 @@ resources:
   - authentik/externalsecret.yaml
   - authentik/pooler-ro.yaml
   - authentik/pooler-rw.yaml
+  - authentik/pooler-rw-session.yaml
   - authentik/scheduled-backup.yaml

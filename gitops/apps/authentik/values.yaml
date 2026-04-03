@@ -33,7 +33,7 @@ authentik:
 
   env:
     - name: AUTHENTIK_POSTGRESQL__HOST
-      value: "authentik-db-pooler-rw.databases.svc.cluster.local"
+      value: "authentik-db-pooler-rw-session.databases.svc.cluster.local"
     - name: AUTHENTIK_POSTGRESQL__PORT
       value: "5432"
     - name: AUTHENTIK_POSTGRESQL__USER
