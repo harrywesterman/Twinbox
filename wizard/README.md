@@ -36,7 +36,7 @@ make wizard-dev-run
 ## Prompts
 
 - **Cluster action**: create new or remove existing
-- **Cluster name**: preset (`prd`, `dev`, `tst`) or custom (1-3 lowercase letters)
+- **Cluster name**: preset (`prd`, `dev`, `tst`) or custom (1-3 lowercase letters); `prd` is preselected by default
 - **SSH public key**: auto-detected from `/root/.ssh/` or entered manually
 - **Cluster login password**: min 8 chars, upper + lower + special
 - **VM settings**: name, IP, netmask, DNS, disk size, memory (editable form)
