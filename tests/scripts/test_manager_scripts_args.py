@@ -521,17 +521,22 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert "helm repo update" in helper_text
     assert "--include-crds" in helper_text
     assert "PINNED_CILIUM_CHART_VERSION" in helper_text
+    assert 'if [[ -n "${CILIUM_K8S_SERVICE_HOST:-}" ]]; then' in helper_text
+    assert 'if [[ -n "${CILIUM_K8S_SERVICE_PORT:-}" ]]; then' in helper_text
     assert "PINNED_CILIUM_CHART_VERSION=1.18.8" in pinned_defaults_text
     assert "ipam:" in values_text
     assert "mode: kubernetes" in values_text
     assert "kubeProxyReplacement: true" in values_text
-    assert "k8sServiceHost: localhost" in values_text
-    assert "k8sServicePort: 7445" in values_text
+    assert "The bootstrap scripts override these values with the cluster VIP/API endpoint." in values_text
+    assert "localhost during bootstrap" in values_text
     assert "cgroup:" in values_text
     assert "hostRoot: /sys/fs/cgroup" in values_text
     assert "operator:" in values_text
     assert "replicas: 1" in values_text
     assert "SYS_MODULE" not in values_text
+
+    assert '--set-string "k8sServiceHost=${VIP_IP}"' in text
+    assert '--set-string "k8sServicePort=6443"' in text
 
 
 def test_longhorn_step_installs_via_argocd_and_waits_for_health():

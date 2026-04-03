@@ -40,6 +40,7 @@ Reads and outputs the cluster JSON file from `manager-data/clusters/<cluster-id>
 ### `render-cilium-manifest.sh`
 
 Renders the Talos-owned Cilium bootstrap manifest from the pinned Helm chart and repo-owned values file.
+When `CILIUM_K8S_SERVICE_HOST` and `CILIUM_K8S_SERVICE_PORT` are set, the helper uses them as the API endpoint override.
 
 ### `install-argocd.sh`
 

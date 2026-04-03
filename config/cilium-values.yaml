@@ -2,6 +2,8 @@ ipam:
   mode: kubernetes
 
 kubeProxyReplacement: true
+# The bootstrap scripts override these values with the cluster VIP/API endpoint.
+# Keep a renderable fallback here, but do not rely on localhost during bootstrap.
 k8sServiceHost: localhost
 k8sServicePort: 7445
 

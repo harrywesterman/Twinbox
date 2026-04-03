@@ -22,7 +22,7 @@ scripts/
     ├── collect-state.sh            # Collect cluster state after provisioning
     ├── install-argocd.sh           # Install Argo CD
     ├── apply-argocd-application.sh # Apply an ArgoCD Application manifest
-    ├── render-cilium-manifest.sh    # Render the inline Cilium bootstrap manifest
+    ├── render-cilium-manifest.sh    # Render the inline Cilium bootstrap manifest with optional API endpoint overrides
     ├── install-longhorn-storage.sh # Install Longhorn storage
     ├── install-secret-sync.sh      # Install External Secrets Operator + OpenBao
     ├── install-velero-backup.sh    # Install Velero backup

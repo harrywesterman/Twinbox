@@ -102,6 +102,7 @@ kubectl --kubeconfig <kubeconfig> get ds kube-proxy -n kube-system
 
 Expected:
 
+- the rendered Cilium manifest uses the cluster VIP/API endpoint rather than `localhost:7445`
 - `daemonset/cilium` is ready
 - `deployment/cilium-operator` is ready
 - `deployment/coredns` is ready

@@ -114,12 +114,16 @@ Symptoms:
 
 - `provision-nodes` hangs waiting for Cilium or CoreDNS
 - `kubectl -n kube-system rollout status daemonset/cilium` never completes
-- CoreDNS starts but does not resolve external names
+- CoreDNS remains `ContainerCreating`
+- CoreDNS events report `FailedCreatePodSandBox`
+- Cilium agent logs show `panic: Start or stop failed to finish on time`
 
 Fix:
 
+- Check whether the rendered Cilium manifest was built with the cluster VIP/API endpoint rather than `localhost:7445`
 - Verify the Talos machine config includes `cluster.network.cni.name: none` and `cluster.proxy.disabled: true`
 - Verify `machine.features.kubePrism.enabled: true` and `machine.features.kubePrism.port: 7445`
 - Verify `machine.features.hostDNS.forwardKubeDNSToHost: false`
 - Inspect the rendered manifest under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/cilium/cilium-bootstrap.yaml`
 - Check `kubectl -n kube-system logs daemonset/cilium` and `kubectl -n kube-system logs deployment/cilium-operator`
+- If Cilium still crashes after the endpoint is corrected, compare the pinned chart version against the next supported Cilium release before considering a cluster rebuild

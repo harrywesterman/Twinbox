@@ -56,7 +56,7 @@ Twinbox is a complete K8s cluster based on Talos Linux, completely configured. T
 
 1. The Management VM bootstraps local JSON files under `/opt/twinbox/bootstrap/secrets/global/`.
 2. `provision-nodes` materializes Talos runtime files from the local bootstrap tree and cluster-scoped attachments.
-3. `provision-nodes` renders the pinned Cilium Helm chart, stores the bootstrap manifest under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/cilium/`, and injects it as an inline manifest into every control-plane Talos config.
+3. `provision-nodes` renders the pinned Cilium Helm chart against the cluster VIP/API endpoint, stores the bootstrap manifest under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/cilium/`, and injects it as an inline manifest into every control-plane Talos config.
 4. `provision-nodes` sets `cluster.network.cni.name: none`, `cluster.proxy.disabled: true`, `machine.features.kubePrism.enabled: true`, and `machine.features.hostDNS.forwardKubeDNSToHost: false` so Talos boots with kube-proxy-free Cilium from the start.
 5. `provision-nodes` waits for `cilium`, `cilium-operator`, and `coredns` to become ready before the step completes.
 6. `install-argocd` installs Argo CD after the Talos/Cilium bootstrap has completed.
