@@ -104,7 +104,7 @@ data:
   oidc.config: |
     name: Authentik
     issuer: https://authentik.__ZONE_NAME__/application/o/argocd/
-    clientID: $argocd-oidc:oidc.authentik.clientID
-    clientSecret: $argocd-oidc:oidc.authentik.clientSecret
+    clientID: $oidc.authentik.clientID
+    clientSecret: $oidc.authentik.clientSecret
     requestedScopes: ["openid", "profile", "email"]
     requestedIDTokenClaims: {"groups": {"essential": true}}
