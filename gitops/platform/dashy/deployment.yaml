@@ -44,9 +44,11 @@ spec:
               ):
                   template = template.replace(f"__{key}__", os.environ[key])
 
-              target = Path("/app/user-data/conf.yml")
+              target = Path("/app/user-data/config.yml")
               target.parent.mkdir(parents=True, exist_ok=True)
               target.write_text(template, encoding="utf-8")
+              legacy = Path("/app/user-data/conf.yml")
+              legacy.write_text(template, encoding="utf-8")
           envFrom:
             - secretRef:
                 name: dashy-oidc

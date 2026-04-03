@@ -1510,6 +1510,7 @@ def test_dashy_deployment_uses_a_published_image_tag():
     assert "talos-zq3-glf" in text
     assert "emptyDir: {}" in text
     assert "claimName: dashy-data" not in text
+    assert 'target = Path("/app/user-data/config.yml")' in text
     assert "requests:" in text
     assert "cpu: 500m" in text
     assert "memory: 512Mi" in text
