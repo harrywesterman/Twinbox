@@ -1498,3 +1498,11 @@ def test_authentik_values_request_memory_for_server_and_worker():
     assert "limits:\n      memory: 512Mi" in text
     assert "authentik:\n  existingSecret:" in text
     assert "authentik-db-pooler-rw-session.databases.svc.cluster.local" in text
+
+
+def test_dashy_deployment_uses_a_published_image_tag():
+    text = (REPO_ROOT / "gitops" / "platform" / "dashy" / "deployment.yaml").read_text(
+        encoding="utf-8"
+    )
+    assert "ghcr.io/lissy93/dashy:latest" in text
+    assert "ghcr.io/lissy93/dashy:v3.2.3" not in text
