@@ -10,8 +10,8 @@ spec:
     - kind: Rule
       match: Host(`longhorn.__ZONE_NAME__`)
       middlewares:
-        - name: traefik-dashboard-auth
-          namespace: traefik
+        - name: authentik-forwardauth
+          namespace: authentik
       services:
         - kind: Service
           name: longhorn-frontend
