@@ -72,6 +72,14 @@ CLOUDFLARE_STEP_MANIFEST = (
     / "configure-cloudflare-dns"
     / "step.yaml"
 )
+CHOOSE_INGRESS_ROUTE_RUN_SCRIPT = (
+    REPO_ROOT
+    / "categories"
+    / "talos-cluster"
+    / "steps"
+    / "choose-ingress-route"
+    / "run.sh"
+)
 AUTHENTIK_STEP_MANIFEST = (
     REPO_ROOT
     / "categories"
@@ -875,7 +883,18 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "depends_on:" in choose_ingress_text
     assert "dns_domain" in choose_ingress_text
     assert "DNS Domain" in choose_ingress_text
-    assert "Twinbox uses the domain you enter here, except PRD which keeps app.example.com." in choose_ingress_text
+    assert "Twinbox will prefix the cluster slug for non-PRD hostnames" in choose_ingress_text
+    assert "Base zone for platform hostnames." in choose_ingress_text
+
+    choose_ingress_run_text = CHOOSE_INGRESS_ROUTE_RUN_SCRIPT.read_text(
+        encoding="utf-8"
+    )
+    assert "cluster_slug" in choose_ingress_run_text
+    assert "Base DNS domain:" in choose_ingress_run_text
+    assert "public_zone_name" in choose_ingress_run_text
+    assert ".dns_domain = $dns_domain" in choose_ingress_run_text
+    assert ".public_zone_name = $public_zone_name" in choose_ingress_run_text
+    assert '"dns_domain": "$dns_domain"' in choose_ingress_run_text
 
     assert "order: 31" in cloudflare_text
     assert "choose-ingress-route" in cloudflare_text
@@ -933,12 +952,14 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "cluster_dns_domain" in cloudflare_tunnel_run_text
     assert "cluster-public-zone.sh" in cloudflare_tunnel_run_text
     assert "twinbox_public_zone_name" in cloudflare_tunnel_run_text
+    assert "twinbox_cluster_dns_zone_name" in cloudflare_tunnel_run_text
     assert "Using the provided Cloudflare token for DNS record creation" in cloudflare_tunnel_run_text
+    assert "DNS zone name: $cloudflare_dns_zone_name" in cloudflare_tunnel_run_text
     assert 'echo "[$(date \'+%Y-%m-%d %H:%M:%S\')] Public zone name: $public_zone_name"' in cloudflare_tunnel_run_text
     assert "Preflighting Cloudflare zone" in cloudflare_tunnel_run_text
     assert 'curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${cf_zone_id}"' in cloudflare_tunnel_run_text
     assert "Cloudflare sees zone name: $cloudflare_zone_name" in cloudflare_tunnel_run_text
-    assert "resolves to ${cloudflare_zone_name}, but the wizard selected ${public_zone_name}" in cloudflare_tunnel_run_text
+    assert "resolves to ${cloudflare_zone_name}, but the wizard selected ${cloudflare_dns_zone_name}" in cloudflare_tunnel_run_text
     assert "continuing without a zone-name preflight" in cloudflare_tunnel_run_text
     assert "dns_record_name=\"*.${public_zone_name}\"" in cloudflare_tunnel_run_text
     assert "Updating DNS CNAME record for tunnel" in cloudflare_tunnel_run_text

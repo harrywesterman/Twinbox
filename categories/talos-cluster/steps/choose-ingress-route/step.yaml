@@ -5,7 +5,7 @@ journey_stage: setup
 order: 21
 summary: Choose which ingress branch Twinbox should expose for this cluster.
 explanation: This step records the ingress strategy you want to use and the DNS domain that will back the platform hostnames. It does not change the apps themselves, only which branch of ingress-specific infrastructure the wizard shows next.
-side_help: Pick one ingress route and enter the DNS domain you want to use. The apps remain available regardless of the choice, but the follow-up ingress steps will match the route you pick here. The PRD cluster keeps the special app.example.com exception.
+side_help: Pick one ingress route and enter the base DNS domain you want to use. Twinbox will prefix the cluster slug for non-PRD hostnames, so tst with bierineenweek.nl becomes tst.bierineenweek.nl. PRD keeps the special app.example.com exception.
 depends_on:
   - install-postgres-clusters
 inputs:
@@ -27,7 +27,7 @@ inputs:
     label: DNS Domain
     type: string
     required: true
-    help: Base domain for platform hostnames. Twinbox uses the domain you enter here, except PRD which keeps app.example.com.
+    help: Base zone for platform hostnames. Twinbox prefixes the cluster slug for non-PRD clusters, so tst with bierineenweek.nl becomes tst.bierineenweek.nl. PRD keeps app.example.com.
 runner:
   kind: script
   script: categories/talos-cluster/steps/choose-ingress-route/run.sh

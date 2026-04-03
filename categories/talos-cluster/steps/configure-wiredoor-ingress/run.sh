@@ -25,7 +25,7 @@ cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty'
 [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
 
 if [[ -n "$cluster_dns_domain" ]]; then
-  public_zone_name="$(twinbox_public_zone_name "$cluster_id" "$cluster_dns_domain")"
+  public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
   if [[ -n "$public_zone_name" ]]; then
     bash "$WORKSPACE_ROOT/scripts/manager/render-cluster-config-map.sh" \
       --zone-name "$public_zone_name"

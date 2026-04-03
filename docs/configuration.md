@@ -144,14 +144,14 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 
 ## Dynamic Domain Configuration
 
-Twinbox uses a single domain name (`ZONE_NAME`) for all platform services. The domain is provided by the user during the **Choose Ingress Route** step and flows through the system automatically.
+Twinbox uses a single base domain (`ZONE_NAME`) for all platform services, then prefixes the cluster slug for non-PRD hostnames. The user provides the base domain during the **Choose Ingress Route** step and Twinbox derives the public hostname from it.
 
 ### How it works
 
-1. **User input** — The user enters their domain (e.g. `example.com`) in the web wizard during `choose-ingress-route`.
+1. **User input** — The user enters the base domain (e.g. `example.com`) in the web wizard during `choose-ingress-route`.
 2. **OpenBao sync** — The ingress selection step syncs `ZONE_NAME`, `WIREDOOR_FQDN`, and `WILDCARD_FQDN` to OpenBao at `twinbox/global/cluster-hostnames`.
 3. **ExternalSecret** — The `cluster-config` ExternalSecret reads `ZONE_NAME` from OpenBao and creates a Kubernetes Secret in the `argocd` namespace.
-4. **Rendered ConfigMap** — The ingress/domain step renders `gitops/platform/cluster-config/configmap.yaml` with the selected domain and prebuilt route strings.
+4. **Rendered ConfigMap** — The ingress/domain step renders `gitops/platform/cluster-config/configmap.yaml` with the cluster-prefixed public zone name and prebuilt route strings.
 5. **Kustomize replacements** — The `platform-ingress` Argo CD application uses Kustomize to copy the rendered match expressions and homepage strings into the live platform manifests.
 6. **Ingress-specific apps** — Cloudflare Tunnel, Wiredoor, MetalLB, and Tailscale all reuse the same selected domain when they render route-specific configuration.
 
@@ -164,7 +164,7 @@ All platform services use the rendered `cluster-config` values:
 | Argo CD | `argocd.<ZONE_NAME>` |
 | Traefik dashboard | `traefik.<ZONE_NAME>` |
 | Authentik | `authentik.<ZONE_NAME>` |
-| Headlamp | `headlamp.<ZONE_NAME>` |
+| Headlamp | `headlamp.<public-zone-name>` |
 | Grafana | `grafana.<ZONE_NAME>` |
 | Whoami | `whoami.<ZONE_NAME>` |
 | Homepage | `homepage.<ZONE_NAME>` |

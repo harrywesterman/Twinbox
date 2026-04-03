@@ -411,7 +411,7 @@ spec:
     - websecure
   routes:
     - kind: Rule
-      match: Host(`headlamp.<selected-domain>`)
+      match: Host(`headlamp.<public-zone-name>`)
       middlewares:
         - name: authentik-forwardauth
           namespace: authentik
@@ -431,7 +431,7 @@ spec:
     - webwiredoor
   routes:
     - kind: Rule
-      match: Host(`headlamp.<selected-domain>`)
+      match: Host(`headlamp.<public-zone-name>`)
       middlewares:
         - name: authentik-forwardauth
           namespace: authentik
@@ -445,7 +445,7 @@ spec:
 
 ### How forwardAuth Works
 
-1. User visits `headlamp.domain.com`
+1. User visits `headlamp.<public-zone-name>` such as `headlamp.tst.example.com`
 2. Traefik intercepts the request and sends a sub-request to:
    ```
    http://authentik-server.authentik.svc.cluster.local:9000/outpost.goauthentik.io/auth/traefik

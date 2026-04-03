@@ -34,12 +34,15 @@ cf_zone_id="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.cf_zone_id')"
 [[ -n "$cf_zone_id" ]] || fail "Cloudflare zone ID is required"
 [[ -n "$cluster_dns_domain" ]] || fail "DNS domain is required from the ingress selection step"
 
-public_zone_name="$(twinbox_public_zone_name "$cluster_id" "$cluster_dns_domain")"
+public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
+cloudflare_dns_zone_name="$(twinbox_cluster_dns_zone_name "$cluster_slug" "$cluster_dns_domain")"
+[[ -n "$cloudflare_dns_zone_name" ]] || fail "Could not determine Cloudflare DNS zone name"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting Cloudflare Tunnel configuration for cluster: $cluster_id"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Account ID: $cf_account_id"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Zone ID: $cf_zone_id"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] DNS zone name: $cloudflare_dns_zone_name"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Public zone name: $public_zone_name"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Using the provided Cloudflare token for DNS record creation"
 
@@ -107,8 +110,8 @@ else
   [[ -n "$cloudflare_zone_name" ]] || fail "Cloudflare zone lookup returned no zone name for ${cf_zone_id}"
 
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Cloudflare sees zone name: $cloudflare_zone_name"
-  if [[ "$cloudflare_zone_name" != "$public_zone_name" ]]; then
-    fail "Cloudflare zone ${cf_zone_id} resolves to ${cloudflare_zone_name}, but the wizard selected ${public_zone_name}"
+  if [[ "$cloudflare_zone_name" != "$cloudflare_dns_zone_name" ]]; then
+    fail "Cloudflare zone ${cf_zone_id} resolves to ${cloudflare_zone_name}, but the wizard selected ${cloudflare_dns_zone_name}"
   fi
 fi
 
