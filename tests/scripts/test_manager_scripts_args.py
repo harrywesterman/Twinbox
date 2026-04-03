@@ -1506,6 +1506,12 @@ def test_dashy_deployment_uses_a_published_image_tag():
     )
     assert "strategy:" in text
     assert "type: Recreate" in text
+    assert "requests:" in text
+    assert "cpu: 500m" in text
+    assert "memory: 512Mi" in text
+    assert 'cpu: "2"' in text
+    assert "memory: 2Gi" in text
+    assert "failureThreshold: 120" in text
     assert "ghcr.io/lissy93/dashy@sha256:be489008a0ea4f60030ca3e25e55007425d3dfa8ecf48b5722ad9c4f3a12bff6" in text
     assert "ghcr.io/lissy93/dashy:latest" not in text
     assert "ghcr.io/lissy93/dashy:v3.1.1" not in text
