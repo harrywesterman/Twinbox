@@ -1078,6 +1078,8 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "AUTHENTIK_POSTGRESQL__USERNAME" in authentik_run_text
     assert "AUTHENTIK_POSTGRESQL__DISABLE_SERVER_SIDE_CURSORS" in authentik_run_text
     assert "AUTHENTIK_POSTGRESQL__CONN_MAX_AGE" in authentik_run_text
+    assert "openbao_read_global_secret_json authentik" in authentik_run_text
+    assert 'rm -f "$bootstrap_secret_file" "$authentik_secret_file"' in authentik_run_text
     assert "apply-argocd-application.sh" in authentik_run_text
     assert "--application \"authentik\"" in authentik_run_text
     assert "twinbox_public_zone_name" in authentik_run_text
@@ -1729,3 +1731,49 @@ def test_dashy_kustomization_includes_a_pvc():
         encoding="utf-8"
     )
     assert "dashy/pvc.yaml" in text
+
+
+def test_authentik_consumer_scripts_read_from_openbao():
+    consumer_paths = [
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "configure-argocd-oidc"
+        / "run.sh",
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-headlamp"
+        / "run.sh",
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-dashy-dashboard"
+        / "run.sh",
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-management-consoles"
+        / "run.sh",
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "create-users-and-groups"
+        / "run.sh",
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-pgadmin4"
+        / "run.sh",
+    ]
+
+    for path in consumer_paths:
+        text = path.read_text(encoding="utf-8")
+        assert "openbao_read_global_secret_json authentik" in text
+        assert "authentik.json" not in text

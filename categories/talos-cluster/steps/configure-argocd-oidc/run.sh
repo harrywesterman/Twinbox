@@ -7,6 +7,8 @@ set -euo pipefail
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
 
 export KUBECONFIG="$KUBECONFIG_FILE"
 
@@ -26,20 +28,20 @@ cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty'
 public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
 
-authentik_secret_file="/opt/twinbox/bootstrap/secrets/global/authentik.json"
-[[ -f "$authentik_secret_file" ]] || fail "Authentik bootstrap secret not found at $authentik_secret_file"
-
-authentik_host="$(jq -r '.AUTHENTIK_HOST // empty' "$authentik_secret_file")"
-authentik_token="$(jq -r '.AUTHENTIK_BOOTSTRAP_TOKEN // empty' "$authentik_secret_file")"
+authentik_secret_json="$(openbao_read_global_secret_json authentik)"
+authentik_host="$(jq -r '.AUTHENTIK_HOST // empty' <<<"$authentik_secret_json")"
+authentik_token="$(jq -r '.AUTHENTIK_BOOTSTRAP_TOKEN // empty' <<<"$authentik_secret_json")"
 
 if [[ -z "$authentik_host" ]]; then
   authentik_host="https://authentik.${public_zone_name}"
 fi
 
-[[ -n "$authentik_token" ]] || fail "Could not read AUTHENTIK_BOOTSTRAP_TOKEN from $authentik_secret_file"
+[[ -n "$authentik_token" ]] || fail "Could not read AUTHENTIK_BOOTSTRAP_TOKEN from OpenBao"
 
 argocd_host="https://argocd.${public_zone_name}"
 argocd_redirect_uri="${argocd_host}/auth/callback"
+secrets_dir="/opt/twinbox/bootstrap/secrets/global"
+mkdir -p "$secrets_dir"
 
 tf_workdir="$MANAGER_DATA_DIR/opentofu/authentik-argocd-${cluster_id}"
 mkdir -p "$tf_workdir"
@@ -61,9 +63,6 @@ argocd_client_id="$(TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$authentik_token" tofu o
 argocd_client_secret="$(TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$authentik_token" tofu output -no-color -raw client_secret)"
 argocd_issuer_url="$(TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$authentik_token" tofu output -no-color -raw issuer_url)"
 
-secrets_dir="/opt/twinbox/bootstrap/secrets/global"
-mkdir -p "$secrets_dir"
-
 argocd_secret_file="$secrets_dir/argocd-oidc-${cluster_id}.json"
 cat >"$argocd_secret_file" <<EOF
 {
@@ -82,6 +81,7 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "argocd-oidc" \
   --json-file "$argocd_secret_file" \
   --required-keys "ARGOCD_OIDC_CLIENT_ID,ARGOCD_OIDC_CLIENT_SECRET,ARGOCD_OIDC_ISSUER_URL,ARGOCD_REDIRECT_URI,ARGOCD_HOST"
+rm -f "$argocd_secret_file"
 
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform/argocd/externalsecret.yaml"
 kubectl -n argocd wait --for=condition=Ready externalsecret/argocd-oidc --timeout=10m

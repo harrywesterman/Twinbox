@@ -66,7 +66,7 @@ bootstrap/secrets/
 │   ├── grafana.json
 │   ├── wiredoor-gateway.json
 │   ├── velero.json
-│   └── authentik.json
+│   └── authentik.json  # seed-only; deleted after sync into OpenBao
 └── cluster/
     └── <cluster-id>/
         ├── talos-secrets/secrets.yaml
