@@ -182,6 +182,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-traefik",
                 "install-cloudnativepg",
                 "install-cloudtty",
+                "install-traefik-manager",
                 "install-postgres-clusters",
                 "choose-ingress-route",
                 "install-authentik-idp",
@@ -216,6 +217,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert talos_steps["install-traefik"]["title"] == "Install Traefik"
             assert talos_steps["install-cloudnativepg"]["title"] == "Install CloudNativePG"
             assert talos_steps["install-cloudtty"]["title"] == "Install Cloudtty"
+            assert talos_steps["install-traefik-manager"]["title"] == "Install Traefik Manager"
             assert talos_steps["install-postgres-clusters"]["title"] == "Install PostgreSQL Clusters"
             assert talos_steps["choose-ingress-route"]["title"] == "Choose Ingress Route"
             assert talos_steps["install-authentik-idp"]["title"] == "Install Authentik"

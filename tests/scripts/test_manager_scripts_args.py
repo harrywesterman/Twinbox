@@ -24,6 +24,7 @@ APPLY_ARGO_APP_SCRIPT = (
 RENDER_CILIUM_SCRIPT = REPO_ROOT / "scripts" / "manager" / "render-cilium-manifest.sh"
 CLOUDTTY_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-cloudtty.sh"
 PROMETHEUS_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-prometheus.sh"
+TRAEFIK_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-traefik-manager.sh"
 ARGO_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
 )
@@ -84,6 +85,22 @@ PROMETHEUS_STEP_SCRIPT = (
     / "talos-cluster"
     / "steps"
     / "install-prometheus"
+    / "run.sh"
+)
+TRAEFIK_MANAGER_STEP_MANIFEST = (
+    REPO_ROOT
+    / "categories"
+    / "talos-cluster"
+    / "steps"
+    / "install-traefik-manager"
+    / "step.yaml"
+)
+TRAEFIK_MANAGER_STEP_SCRIPT = (
+    REPO_ROOT
+    / "categories"
+    / "talos-cluster"
+    / "steps"
+    / "install-traefik-manager"
     / "run.sh"
 )
 CLOUDFLARE_STEP_MANIFEST = (
@@ -409,6 +426,10 @@ def _prometheus_script_text() -> str:
     return PROMETHEUS_SCRIPT.read_text(encoding="utf-8")
 
 
+def _traefik_manager_script_text() -> str:
+    return TRAEFIK_MANAGER_SCRIPT.read_text(encoding="utf-8")
+
+
 def _pinned_defaults_text() -> str:
     return PINNED_DEFAULTS.read_text(encoding="utf-8")
 
@@ -696,6 +717,7 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert 'if [[ -n "${CILIUM_K8S_SERVICE_PORT:-}" ]]; then' in helper_text
     assert "PINNED_CILIUM_CHART_VERSION=1.19.2" in pinned_defaults_text
     assert "PINNED_CLOUDTTY_CHART_VERSION=0.8.9" in pinned_defaults_text
+    assert "PINNED_TRAEFIK_MANAGER_IMAGE_TAG=v0.8.0" in pinned_defaults_text
     assert "ipam:" in values_text
     assert "mode: kubernetes" in values_text
     assert "kubeProxyReplacement: true" in values_text
@@ -1056,6 +1078,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     headlamp_text = HEADLAMP_STEP_MANIFEST.read_text(encoding="utf-8")
     grafana_text = GRAFANA_STEP_MANIFEST.read_text(encoding="utf-8")
     prometheus_text = PROMETHEUS_STEP_MANIFEST.read_text(encoding="utf-8")
+    traefik_manager_text = TRAEFIK_MANAGER_STEP_MANIFEST.read_text(encoding="utf-8")
     wiredoor_text = WIREDOOR_GATEWAY_STEP_MANIFEST.read_text(encoding="utf-8")
     wiredoor_bastion_text = WIREDOOR_BASTION_STEP_MANIFEST.read_text(
         encoding="utf-8"
@@ -1328,6 +1351,14 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "install-longhorn-storage" in prometheus_text
     assert "choose-ingress-route" in prometheus_text
     assert "script: categories/talos-cluster/steps/install-prometheus/run.sh" in prometheus_text
+    assert "install-traefik" in traefik_manager_text
+    assert "install-authentik-idp" in traefik_manager_text
+    assert "install-longhorn-storage" in traefik_manager_text
+    assert "choose-ingress-route" in traefik_manager_text
+    assert (
+        "script: categories/talos-cluster/steps/install-traefik-manager/run.sh"
+        in traefik_manager_text
+    )
 
 
 def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
@@ -1430,6 +1461,8 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "name: grafana-set" in grafana_appset_text
     assert "kind: ApplicationSet" in ntfy_appset_text
     assert "name: ntfy-set" in ntfy_appset_text
+    assert "name: traefik-manager" in platform_ingress_app_text
+    assert "traefik-manager.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in platform_ingress_app_text
     assert not (REPO_ROOT / "gitops" / "apps" / "cluster-config.yaml").exists()
     assert "kind: ExternalSecret" in traefik_externalsecret_text
     assert "kind: ClusterSecretStore" in traefik_externalsecret_text
@@ -1699,6 +1732,8 @@ def test_kustomization_includes_monitoring_resources():
     assert "prometheus/ingressroute.yaml" in text
     assert "prometheus/alertmanager-config.yaml" in text
     assert "prometheus/pvc-usage-alerts.yaml" in text
+    assert "traefik-manager/ingressroute.yaml" in text
+    assert "traefik-manager/deployment.yaml" in text
     assert "ntfy/ingressroute.yaml" in text
     assert "cluster-config/configmap.yaml" not in text
     assert "cluster-config/externalsecret.yaml" not in text
@@ -1727,6 +1762,54 @@ def test_prometheus_step_applies_kube_prometheus_stack():
     assert "--application \"prometheus\"" in script_text
     assert "--destination-namespace \"monitoring\"" in script_text
     assert "gitops/apps/prometheus.yaml" in script_text
+
+
+def test_traefik_manager_step_deploys_browser_ui():
+    text = TRAEFIK_MANAGER_STEP_MANIFEST.read_text(encoding="utf-8")
+    run_text = TRAEFIK_MANAGER_STEP_SCRIPT.read_text(encoding="utf-8")
+    script_text = _traefik_manager_script_text()
+    deployment_text = (
+        REPO_ROOT / "gitops" / "platform" / "traefik-manager" / "deployment.yaml"
+    ).read_text(encoding="utf-8")
+    ingress_text = (
+        REPO_ROOT / "gitops" / "platform" / "traefik-manager" / "ingressroute.yaml"
+    ).read_text(encoding="utf-8")
+    app_text = (
+        REPO_ROOT / "gitops" / "apps" / "traefik-manager.yaml"
+    ).read_text(encoding="utf-8")
+
+    assert "id: install-traefik-manager" in text
+    assert "title: Install Traefik Manager" in text
+    assert "order: 34" in text
+    assert "browser-based reverse-proxy management" in text
+    assert "install-traefik" in text
+    assert "install-authentik-idp" in text
+    assert "install-longhorn-storage" in text
+    assert "choose-ingress-route" in text
+    assert (
+        "script: categories/talos-cluster/steps/install-traefik-manager/run.sh"
+        in text
+    )
+    assert ": \"${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}\"" in run_text
+    assert "install-traefik-manager.sh" in run_text
+    assert "ghcr.io/chr0nzz/traefik-manager:v0.8.0" in deployment_text
+    assert 'AUTH_ENABLED' in deployment_text
+    assert '"false"' in deployment_text
+    assert "COOKIE_SECURE" in deployment_text
+    assert "DOMAINS" in deployment_text
+    assert "traefik-manager.__ZONE_NAME__" in deployment_text
+    assert "TRAEFIK_API_URL" in deployment_text
+    assert "traefik.traefik.svc.cluster.local:8080" in deployment_text
+    assert "persistentVolumeClaim" in deployment_text
+    assert "livenessProbe" in deployment_text
+    assert "readinessProbe" in deployment_text
+    assert "authentik-forwardauth" in ingress_text
+    assert "namespace: traefik" in ingress_text
+    assert "Host(`traefik-manager.__ZONE_NAME__`)" in ingress_text
+    assert "namespace: traefik-manager" in app_text
+    assert "path: gitops/platform/traefik-manager" in app_text
+    assert "--destination-namespace \"traefik-manager\"" in script_text
+    assert "gitops/apps/traefik-manager.yaml" in script_text
 
 
 def test_argocd_cluster_secret_helper_writes_runtime_projection():

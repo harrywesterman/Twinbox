@@ -162,6 +162,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - Management VM bootstrap and maintenance use `TWINBOX_TIME_SERVER` to pin Ubuntu's `systemd-timesyncd` to the same timeserver.
 - `install-argocd` installs Argo CD after the cluster networking layer is already available.
 - `install-cloudtty` installs Cloudtty and creates a default browser shell on the cluster.
+- `install-traefik-manager` deploys the Traefik Manager UI, stores its config on Longhorn, and exposes it behind the same domain-aware ingress flow.
 - `install-prometheus` installs the kube-prometheus-stack app so Prometheus, Alertmanager, node-exporter, and kube-state-metrics are available on Longhorn-backed storage.
 - `install-longhorn-storage` installs Longhorn, makes it the default storage class, and runs before any stateful secret infrastructure. Longhorn is configured to run only on worker nodes so storage and CSI components stay off control planes.
 - `install-secret-sync` installs:

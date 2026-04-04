@@ -18,6 +18,11 @@ resources:
   - pgadmin4/deployment.yaml
   - grafana/ingressroute.yaml
   - grafana/externalsecret.yaml
+  - traefik-manager/namespace.yaml
+  - traefik-manager/pvc.yaml
+  - traefik-manager/service.yaml
+  - traefik-manager/deployment.yaml
+  - traefik-manager/ingressroute.yaml
   - traefik/traefik-dashboard-ingressroute.yaml
   - traefik/authentik-callback-ingressroute.yaml
   - traefik/authentik-callback-service.yaml

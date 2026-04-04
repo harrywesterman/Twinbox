@@ -166,6 +166,34 @@ spec:
                   value: Host(`grafana.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
+                name: traefik-manager
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`traefik-manager.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: Deployment
+                name: traefik-manager
+              patch: |-
+                - op: replace
+                  path: /spec/template/spec/containers/0/env/2/value
+                  value: traefik-manager.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+            - target:
+                kind: IngressRoute
+                name: traefik-manager-wiredoor
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`traefik-manager.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: traefik-manager-tailscale
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`traefik-manager.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
                 name: prometheus
               patch: |-
                 - op: replace

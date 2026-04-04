@@ -53,6 +53,10 @@ Installs Argo CD on the cluster after the Talos/Cilium bootstrap has completed.
 
 Installs the Cloudtty operator with Helm and creates a default CloudShell instance exposed through NodePort so operators can open a browser terminal on the cluster.
 
+### `install-traefik-manager.sh`
+
+Installs the Traefik Manager GitOps app, which exposes a browser UI for Traefik route and service management behind Authentik.
+
 ### `install-prometheus.sh`
 
 Installs the kube-prometheus-stack GitOps app, which enables Prometheus, Alertmanager, node-exporter, and kube-state-metrics on Longhorn-backed storage.

@@ -42,6 +42,7 @@ Open your browser to continue the installation. The web UI guides you through cl
 - **Grafana** — dashboarding on top of the Prometheus stack
 - **OpenBao + External Secrets Operator** — centralized secret management
 - **Traefik** — ingress and routing
+- **Traefik Manager** — browser UI for managing Traefik routes and services
 - **SeaweedFS** — S3-compatible backup target on the Management VM
 - **Velero** — automated cluster backups to SeaweedFS
 - **CloudNativePG** — managed PostgreSQL clusters
