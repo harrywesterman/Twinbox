@@ -102,8 +102,12 @@ Expected:
 ```bash
 kubectl --kubeconfig <kubeconfig> get ds cilium -n kube-system
 kubectl --kubeconfig <kubeconfig> get deploy cilium-operator -n kube-system
+kubectl --kubeconfig <kubeconfig> get deploy hubble-relay -n kube-system
+kubectl --kubeconfig <kubeconfig> get deploy hubble-ui -n kube-system
+kubectl --kubeconfig <kubeconfig> get svc hubble-ui -n kube-system
 kubectl --kubeconfig <kubeconfig> get deploy coredns -n kube-system
 kubectl --kubeconfig <kubeconfig> get ds kube-proxy -n kube-system
+kubectl --kubeconfig <kubeconfig> get ingressroute hubble -n kube-system
 ```
 
 Expected:
@@ -111,8 +115,12 @@ Expected:
 - the rendered Cilium manifest uses the cluster VIP/API endpoint rather than `localhost:7445`
 - `daemonset/cilium` is ready
 - `deployment/cilium-operator` is ready
+- `deployment/hubble-relay` is ready
+- `deployment/hubble-ui` is ready
+- `service/hubble-ui` exists and serves the UI
 - `deployment/coredns` is ready
 - `daemonset/kube-proxy` does not exist
+- `IngressRoute/hubble` is present in `kube-system`
 
 ### `install-longhorn-storage`
 

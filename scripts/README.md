@@ -22,7 +22,7 @@ scripts/
     ├── collect-state.sh            # Collect cluster state after provisioning
     ├── install-argocd.sh           # Install Argo CD
     ├── apply-argocd-application.sh # Apply an ArgoCD Application manifest
-    ├── render-cilium-manifest.sh    # Render the inline Cilium bootstrap manifest with optional API endpoint overrides
+    ├── render-cilium-manifest.sh    # Render the inline Cilium/Hubble bootstrap manifest with optional API endpoint overrides
     ├── install-longhorn-storage.sh # Install Longhorn storage
     ├── install-secret-sync.sh      # Install External Secrets Operator + OpenBao
     ├── install-velero-backup.sh    # Install Velero backup
@@ -56,7 +56,7 @@ These scripts are executed by `manager-worker` during job processing. They are c
 | `collect-state.sh` | Collects kubeconfig and Talos config after provisioning. |
 | `install-argocd.sh` | Installs Argo CD into the cluster. |
 | `apply-argocd-application.sh` | Applies a single ArgoCD Application YAML. |
-| `render-cilium-manifest.sh` | Renders the Talos-owned Cilium bootstrap manifest from the pinned Helm chart. |
+| `render-cilium-manifest.sh` | Renders the Talos-owned Cilium bootstrap manifest, including Hubble Relay and Hubble UI, from the pinned Helm chart. |
 | `install-longhorn-storage.sh` | Deploys Longhorn and sets the default StorageClass. |
 | `install-secret-sync.sh` | Deploys External Secrets Operator and OpenBao. |
 | `install-velero-backup.sh` | Deploys Velero for cluster backups. |

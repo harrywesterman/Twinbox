@@ -61,10 +61,11 @@ GitHub `main` is the source of truth for both the management stack and the GitOp
 2. `provision-nodes` sizes control-plane VMs at `2 GB RAM / 10 GB disk`, sizes workers separately with a storage-oriented disk budget derived from host free space, and labels Talos nodes with `twinbox.io/role`.
 3. `provision-nodes` materializes Talos runtime files from the local bootstrap tree and cluster-scoped attachments.
 4. `provision-nodes` renders the pinned Cilium Helm chart against the cluster VIP/API endpoint, stores the bootstrap manifest under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/cilium/`, and injects it as an inline manifest into every control-plane Talos config.
-5. `provision-nodes` sets `cluster.network.cni.name: none`, `cluster.proxy.disabled: true`, `machine.features.kubePrism.enabled: true`, and `machine.features.hostDNS.forwardKubeDNSToHost: false` so Talos boots with kube-proxy-free Cilium from the start.
-6. `provision-nodes` waits for `cilium`, `cilium-operator`, and `coredns` to become ready before the step completes.
-7. `install-argocd` installs Argo CD after the Talos/Cilium bootstrap has completed.
-8. `install-longhorn-storage` runs before cluster secret sync so stateful workloads and backup storage can use Longhorn PVCs immediately through the cluster default storage class, and Longhorn stays on worker nodes through the `twinbox.io/role=worker` selector.
+5. The Cilium bootstrap enables Hubble Relay and the Hubble UI so network flows are visible from the first cluster boot.
+6. `provision-nodes` sets `cluster.network.cni.name: none`, `cluster.proxy.disabled: true`, `machine.features.kubePrism.enabled: true`, and `machine.features.hostDNS.forwardKubeDNSToHost: false` so Talos boots with kube-proxy-free Cilium from the start.
+7. `provision-nodes` waits for `cilium`, `cilium-operator`, and `coredns` to become ready before the step completes.
+8. `install-argocd` installs Argo CD after the Talos/Cilium bootstrap has completed.
+9. `install-longhorn-storage` runs before cluster secret sync so stateful workloads and backup storage can use Longhorn PVCs immediately through the cluster default storage class, and Longhorn stays on worker nodes through the `twinbox.io/role=worker` selector.
 9. `install-secret-sync` installs External Secrets Operator and OpenBao on Longhorn.
 10. `install-secret-sync` seeds OpenBao from the Management VM bootstrap files and creates `ClusterSecretStore/openbao`.
 11. `install-velero-backup` deploys Velero together with a Twinbox-managed Garage bucket or an external S3-compatible backup target.

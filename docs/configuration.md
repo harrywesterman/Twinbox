@@ -156,8 +156,9 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 
 - `provision-nodes` bootstraps Talos and writes the Talos runtime artifacts for a cluster.
 - `provision-nodes` keeps control-plane VMs small and fixed at `2 GB RAM / 10 GB disk`, sizes workers separately from the node placement budget, and applies the `twinbox.io/role=worker` label to the nodes that should host Longhorn.
-- `provision-nodes` renders the Talos-owned Cilium bootstrap manifest and injects it into the control-plane machine configs.
+- `provision-nodes` renders the Talos-owned Cilium bootstrap manifest, enables Hubble Relay and Hubble UI, and injects it into the control-plane machine configs.
 - `provision-nodes` configures Talos for kube-proxy-free Cilium with `cni: none`, `proxy.disabled: true`, KubePrism, the host DNS workaround, and an explicit `machine.time.servers` entry.
+- The Hubble UI ingress route lives under `gitops/platform/hubble/` and is synced later by the `platform-ingress` ApplicationSet once the cluster domain is ready.
 - Management VM bootstrap and maintenance use `TWINBOX_TIME_SERVER` to pin Ubuntu's `systemd-timesyncd` to the same timeserver.
 - `install-argocd` installs Argo CD after the cluster networking layer is already available.
 - `install-longhorn-storage` installs Longhorn, makes it the default storage class, and runs before any stateful secret infrastructure. Longhorn is configured to run only on worker nodes so storage and CSI components stay off control planes.

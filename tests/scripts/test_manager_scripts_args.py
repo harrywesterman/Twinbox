@@ -34,6 +34,10 @@ ARGO_STEP_MANIFEST = (
     / "step.yaml"
 )
 CILIUM_VALUES_FILE = REPO_ROOT / "config" / "cilium-values.yaml"
+HUBBLE_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "hubble" / "ingressroute.yaml"
+HUBBLE_AUTHENTIK_FORWARDAUTH_MIDDLEWARE = (
+    REPO_ROOT / "gitops" / "platform" / "hubble" / "authentik-forwardauth-middleware.yaml"
+)
 LONGHORN_STEP_SCRIPT = (
     REPO_ROOT
     / "categories"
@@ -674,6 +678,7 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert "hostRoot: /sys/fs/cgroup" in values_text
     assert "operator:" in values_text
     assert "replicas: 1" in values_text
+    assert "hubble:\n  relay:\n    enabled: true\n  ui:\n    enabled: true" in values_text
     assert "SYS_MODULE" not in values_text
 
     assert '--set-string "k8sServiceHost=${VIP_IP}"' in text
@@ -1338,6 +1343,8 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "Host(`whoami.__ZONE_NAME__`)" in whoami_ingressroute_text
     assert "Host(`headlamp.__ZONE_NAME__`)" in headlamp_ingressroute_text
     assert "Host(`grafana.__ZONE_NAME__`)" in grafana_ingressroute_text
+    assert "Host(`hubble.__ZONE_NAME__`)" in HUBBLE_INGRESSROUTE.read_text(encoding="utf-8")
+    assert "kind: Middleware" in HUBBLE_AUTHENTIK_FORWARDAUTH_MIDDLEWARE.read_text(encoding="utf-8")
     assert "Host(`argocd.__ZONE_NAME__`)" in wiredoor_ingressroute_text
     assert "Host(`pgadmin4.__ZONE_NAME__`)" in PGADMIN_INGRESSROUTE.read_text(encoding="utf-8")
     assert "pgadmin4-data" in PGADMIN_PVC.read_text(encoding="utf-8")
@@ -1353,6 +1360,12 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "headlamp/externalsecret.yaml" in (
         REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
+    assert "hubble/authentik-forwardauth-middleware.yaml" in (
+        REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
+    ).read_text(encoding="utf-8")
+    assert "hubble/ingressroute.yaml" in (
+        REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
+    ).read_text(encoding="utf-8")
     assert "pgadmin4/externalsecret.yaml" in (
         REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
@@ -1366,9 +1379,11 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "kind: ApplicationSet" in platform_ingress_app_text
     assert "name: platform-ingress-set" in platform_ingress_app_text
     assert "name: authentik-cors" in platform_ingress_app_text
+    assert "name: hubble" in platform_ingress_app_text
     assert "accessControlAllowOriginList/0" in platform_ingress_app_text
     assert "customResponseHeaders/Access-Control-Allow-Origin" in platform_ingress_app_text
     assert "pgadmin4.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in platform_ingress_app_text
+    assert "hubble.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in platform_ingress_app_text
     assert "start.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in platform_ingress_app_text
     assert "kind: ApplicationSet" in grafana_appset_text
     assert "name: grafana-set" in grafana_appset_text

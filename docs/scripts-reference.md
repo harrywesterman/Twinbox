@@ -14,6 +14,7 @@ Main provisioning entry point. Creates Talos VMs on Proxmox using OpenTofu.
 - Labels Talos nodes with `twinbox.io/role` so worker-only storage components can target the right machines
 - Renders VM configuration from the cluster JSON
 - Renders the pinned Cilium Helm chart and injects it into Talos control-plane inline manifests
+- Enables Hubble Relay and the Hubble UI in the bootstrap Cilium release
 - Adds an explicit `machine.time.servers` entry to the generated Talos machine configs
 - Stores the Cilium bootstrap manifest under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/cilium/cilium-bootstrap.yaml`
 - Runs `tofu init` and `tofu apply`
