@@ -18,6 +18,7 @@ bash -n wizard/setup-wizard.sh \
   scripts/manager/install-argocd.sh \
   scripts/manager/install-cloudtty.sh \
   scripts/manager/install-longhorn-storage.sh \
+  scripts/manager/install-prometheus.sh \
   scripts/manager/install-secret-sync.sh \
   scripts/manager/install-velero-backup.sh \
   scripts/manager/openbao-secret-sync.sh \
@@ -136,6 +137,20 @@ Expected:
 - the cloudtty operator deployment is ready
 - `CloudShell/cloudtty-shell` reports `Ready`
 - the shell status exposes a browser-accessible `accessUrl`
+
+### `install-prometheus`
+
+```bash
+kubectl --kubeconfig <kubeconfig> get application -n argocd prometheus
+kubectl --kubeconfig <kubeconfig> get pods -n monitoring
+kubectl --kubeconfig <kubeconfig> get ingressroute -n monitoring
+```
+
+Expected:
+
+- `Application/prometheus` is synced and healthy
+- Prometheus, Alertmanager, node-exporter, and kube-state-metrics pods are running in `monitoring`
+- Prometheus ingress routes exist once the domain-aware platform ingress is applied
 
 ### `install-longhorn-storage`
 

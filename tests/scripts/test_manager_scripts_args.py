@@ -23,6 +23,7 @@ APPLY_ARGO_APP_SCRIPT = (
 )
 RENDER_CILIUM_SCRIPT = REPO_ROOT / "scripts" / "manager" / "render-cilium-manifest.sh"
 CLOUDTTY_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-cloudtty.sh"
+PROMETHEUS_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-prometheus.sh"
 ARGO_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
 )
@@ -68,6 +69,22 @@ TRAEFIK_STEP_MANIFEST = (
     / "steps"
     / "install-traefik"
     / "step.yaml"
+)
+PROMETHEUS_STEP_MANIFEST = (
+    REPO_ROOT
+    / "categories"
+    / "talos-cluster"
+    / "steps"
+    / "install-prometheus"
+    / "step.yaml"
+)
+PROMETHEUS_STEP_SCRIPT = (
+    REPO_ROOT
+    / "categories"
+    / "talos-cluster"
+    / "steps"
+    / "install-prometheus"
+    / "run.sh"
 )
 CLOUDFLARE_STEP_MANIFEST = (
     REPO_ROOT
@@ -386,6 +403,10 @@ def _cilium_values_text() -> str:
 
 def _cloudtty_script_text() -> str:
     return CLOUDTTY_SCRIPT.read_text(encoding="utf-8")
+
+
+def _prometheus_script_text() -> str:
+    return PROMETHEUS_SCRIPT.read_text(encoding="utf-8")
 
 
 def _pinned_defaults_text() -> str:
@@ -1034,6 +1055,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     whoami_text = WHOAMI_STEP_MANIFEST.read_text(encoding="utf-8")
     headlamp_text = HEADLAMP_STEP_MANIFEST.read_text(encoding="utf-8")
     grafana_text = GRAFANA_STEP_MANIFEST.read_text(encoding="utf-8")
+    prometheus_text = PROMETHEUS_STEP_MANIFEST.read_text(encoding="utf-8")
     wiredoor_text = WIREDOOR_GATEWAY_STEP_MANIFEST.read_text(encoding="utf-8")
     wiredoor_bastion_text = WIREDOOR_BASTION_STEP_MANIFEST.read_text(
         encoding="utf-8"
@@ -1299,9 +1321,13 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     )
 
     assert "install-headlamp" in grafana_text
+    assert "install-prometheus" in grafana_text
     assert (
         "script: categories/talos-cluster/steps/install-grafana/run.sh" in grafana_text
     )
+    assert "install-longhorn-storage" in prometheus_text
+    assert "choose-ingress-route" in prometheus_text
+    assert "script: categories/talos-cluster/steps/install-prometheus/run.sh" in prometheus_text
 
 
 def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
@@ -1672,6 +1698,7 @@ def test_kustomization_includes_monitoring_resources():
     text = KUSTOMIZATION.read_text(encoding="utf-8")
     assert "prometheus/ingressroute.yaml" in text
     assert "prometheus/alertmanager-config.yaml" in text
+    assert "prometheus/pvc-usage-alerts.yaml" in text
     assert "ntfy/ingressroute.yaml" in text
     assert "cluster-config/configmap.yaml" not in text
     assert "cluster-config/externalsecret.yaml" not in text
@@ -1679,6 +1706,27 @@ def test_kustomization_includes_monitoring_resources():
     assert "data.ARGOCD_MATCH" not in text
     assert "data.HEADLAMP_MATCH" not in text
     assert "data.HOMEPAGE_BOOKMARKS_YAML" not in text
+
+
+def test_prometheus_step_applies_kube_prometheus_stack():
+    text = PROMETHEUS_STEP_MANIFEST.read_text(encoding="utf-8")
+    run_text = PROMETHEUS_STEP_SCRIPT.read_text(encoding="utf-8")
+    script_text = _prometheus_script_text()
+
+    assert "id: install-prometheus" in text
+    assert "title: Install Prometheus" in text
+    assert "order: 35" in text
+    assert "kube-prometheus-stack" in text
+    assert "Prometheus, Alertmanager, node-exporter, and kube-state-metrics" in text
+    assert "depends_on:" in text
+    assert "install-longhorn-storage" in text
+    assert "choose-ingress-route" in text
+    assert "script: categories/talos-cluster/steps/install-prometheus/run.sh" in text
+    assert ": \"${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}\"" in run_text
+    assert "install-prometheus.sh" in run_text
+    assert "--application \"prometheus\"" in script_text
+    assert "--destination-namespace \"monitoring\"" in script_text
+    assert "gitops/apps/prometheus.yaml" in script_text
 
 
 def test_argocd_cluster_secret_helper_writes_runtime_projection():

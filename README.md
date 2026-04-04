@@ -38,6 +38,8 @@ Open your browser to continue the installation. The web UI guides you through cl
 - **Cloudtty** — browser-based Kubernetes shell on the cluster itself
 - **Argo CD** — GitOps for every component
 - **Longhorn** — distributed block storage
+- **Prometheus** — cluster metrics, Alertmanager, node-exporter, and kube-state-metrics
+- **Grafana** — dashboarding on top of the Prometheus stack
 - **OpenBao + External Secrets Operator** — centralized secret management
 - **Traefik** — ingress and routing
 - **SeaweedFS** — S3-compatible backup target on the Management VM

@@ -68,6 +68,7 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 - `install-longhorn-storage` – Deploy Longhorn and set default StorageClass.
 - `install-cloudnativepg` – Deploy CloudNativePG operator.
 - `install-cloudtty` – Deploy Cloudtty and open a browser shell on the cluster.
+- `install-prometheus` – Deploy Prometheus, Alertmanager, node-exporter, and kube-state-metrics.
 - `install-postgres-clusters` – Create Postgres clusters from templates.
 - `install-traefik` – Deploy Traefik ingress controller.
 - `install-secret-sync` – Deploy External Secrets Operator and OpenBao.
@@ -75,7 +76,7 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 - `create-users-and-groups` – Create the first Authentik user and `admins` group.
 - `choose-ingress-route` – Choose the ingress branch for this cluster.
 - `configure-argocd-oidc` – Connect Argo CD to Authentik for OIDC login.
-- `install-grafana` – Deploy Grafana monitoring stack.
+- `install-grafana` – Deploy Grafana monitoring dashboard.
 - `install-headlamp` – Deploy Headlamp Kubernetes dashboard.
 - `install-pgadmin4` – Deploy pgAdmin 4 for PostgreSQL administration.
 - `install-dashy-dashboard` – Deploy Dashy as the cluster start page.
