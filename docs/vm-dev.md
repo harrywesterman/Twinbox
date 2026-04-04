@@ -46,10 +46,9 @@ bash scripts/bootstrap-vm.sh
 What it does:
 
 - Ensures required tools exist (`git`, `docker`, `docker compose`).
-- Ensures the repo exists at `/opt/twinbox`.
-- Updates to latest `main`.
+- Ensures runtime directories exist at `/opt/twinbox`.
 - Ensures `.env` exists.
-- Starts the stack with `docker compose up -d --build`.
+- Starts the stack with `docker compose up -d`.
 
 ## Default Frontend Preview Flow
 
@@ -130,14 +129,8 @@ Once the change is merged or pushed and you want the VM to run from the repo che
 
 ```bash
 ssh <management-vm-user>@<management-vm-ip>
-cd /opt/twinbox
-git pull --ff-only origin main
-
-image_tag="$(awk -F= '/^TWINBOX_IMAGE_TAG=/{print $2}' .env | tail -n1)"
-image_tag="${image_tag:-latest}"
-
-docker build -t "ghcr.io/harrywesterman/twinbox-manager-web:${image_tag}" manager-web
-docker compose up -d --no-deps --force-recreate manager-web
+docker compose pull
+docker compose up -d
 ```
 
 That makes the running `manager-web` container come from the repo-backed code on the VM instead of the temporary preview upload.
@@ -150,19 +143,7 @@ On the VM:
 
 ```bash
 cd /opt/twinbox
-git checkout main
-git pull --ff-only
-git checkout -b codex/<feature-name>
 docker compose up -d
-```
-
-After changes:
-
-```bash
-docker compose logs -f manager-api manager-web
-# run tests for changed parts
-git add .
-git commit -m "feat: <summary>"
 ```
 
 Important:

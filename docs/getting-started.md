@@ -14,7 +14,7 @@ This guide covers the current Twinbox flow.
 bash <(curl -fsSL https://raw.githubusercontent.com/harrywesterman/twinbox/main/wizard/setup-wizard.sh)
 ```
 
-The wizard creates the Management VM, installs Docker CE, clones Twinbox into `/opt/twinbox`, writes `.env`, and starts the manager stack.
+The wizard creates the Management VM, installs Docker CE, creates runtime directories in `/opt/twinbox`, writes `.env`, and starts the manager stack.
 The generated VM and the later Talos cluster both use the same `TWINBOX_TIME_SERVER` value for NTP.
 The wizard also stores the cluster login password in `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` so later Authentik onboarding can reuse it.
 
@@ -70,11 +70,11 @@ ssh root@<management-vm-ip> 'cd /opt/twinbox && sudo bash scripts/install-manage
 If the manager stack needs a restart:
 
 ```bash
-ssh root@<management-vm-ip> 'cd /opt/twinbox && docker compose pull && docker compose up -d'
+ssh root@<management-vm-ip> 'docker compose pull && docker compose up -d'
 ```
 
 If bootstrap files are missing, rerun the host bootstrap logic:
 
 ```bash
-ssh root@<management-vm-ip> 'cd /opt/twinbox && sudo bash scripts/bootstrap-vm.sh'
+ssh root@<management-vm-ip> 'sudo bash scripts/bootstrap-vm.sh'
 ```

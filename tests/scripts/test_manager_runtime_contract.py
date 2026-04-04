@@ -10,10 +10,7 @@ def test_docker_compose_mounts_categories_and_host_cron_contract():
 
     assert "WORKSPACE_ROOT=/opt/twinbox" in text
     assert "TWINBOX_SYNC_LOCAL_CLIENT_CONFIGS=true" in text
-    assert "./categories:/opt/twinbox/categories:ro" in text
-    assert "./scripts:/opt/twinbox/scripts:ro" in text
-    assert lines.count("      - ./gitops:/opt/twinbox/gitops:ro") == 1
-    assert lines.count("      - ./gitops:/opt/twinbox/gitops") == 1
+    assert "/opt/twinbox/manager-data:/data" in text
     assert "TWINBOX_HOST_REPO_ROOT=${TWINBOX_HOST_REPO_ROOT}" in text
     assert "/etc/cron.d:/host/etc/cron.d" in text
 

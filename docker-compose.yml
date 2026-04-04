@@ -25,12 +25,8 @@ services:
       - TALOS_IMAGE_PLATFORM=${TALOS_IMAGE_PLATFORM:-cloud-server}
       - TALOS_IMAGE_ARCH=${TALOS_IMAGE_ARCH:-amd64}
     volumes:
-      - ./manager-data:/data
-      - ./infra:/opt/twinbox/infra:ro
-      - ./categories:/opt/twinbox/categories:ro
-      - ./scripts:/opt/twinbox/scripts:ro
-      - ./gitops:/opt/twinbox/gitops:ro
-      - ./bootstrap:/opt/twinbox/bootstrap
+      - /opt/twinbox/manager-data:/data
+      - /opt/twinbox/bootstrap:/opt/twinbox/bootstrap
     ports:
       - "8080:8080"
 
@@ -58,12 +54,8 @@ services:
       - TALOS_IMAGE_PLATFORM=${TALOS_IMAGE_PLATFORM:-cloud-server}
       - TALOS_IMAGE_ARCH=${TALOS_IMAGE_ARCH:-amd64}
     volumes:
-      - ./manager-data:/data
-      - ./infra:/opt/twinbox/infra:ro
-      - ./categories:/opt/twinbox/categories:ro
-      - ./scripts:/opt/twinbox/scripts:ro
-      - ./gitops:/opt/twinbox/gitops
-      - ./bootstrap:/opt/twinbox/bootstrap
+      - /opt/twinbox/manager-data:/data
+      - /opt/twinbox/bootstrap:/opt/twinbox/bootstrap
       - /etc/cron.d:/host/etc/cron.d
       - /home/twinbox:/home/twinbox
     depends_on:

@@ -133,9 +133,19 @@ if ! docker compose version >/dev/null 2>&1; then
 fi
 
 if [[ ! -d "$TARGET_DIR/.git" ]]; then
-  log "Cloning repository into $TARGET_DIR"
-  sudo install -d -m 0755 "$(dirname "$TARGET_DIR")"
-  sudo git clone "$REPO_URL" "$TARGET_DIR"
+  log "No git repository in TARGET_DIR (expected for runtime-only mode)"
+fi
+
+if [[ ! -d "$TARGET_DIR/manager-data" ]]; then
+  sudo install -d -m 0755 "$TARGET_DIR/manager-data"
+fi
+
+if [[ ! -d "$TARGET_DIR/bootstrap" ]]; then
+  sudo install -d -m 0755 "$TARGET_DIR/bootstrap/secrets/global"
+fi
+
+if [[ ! -d "$TARGET_DIR/gitops" ]]; then
+  sudo install -d -m 0755 "$TARGET_DIR/gitops"
 fi
 
 if [[ ! -w "$TARGET_DIR" ]]; then
@@ -144,11 +154,6 @@ if [[ ! -w "$TARGET_DIR" ]]; then
 fi
 
 cd "$TARGET_DIR"
-
-log "Fetching latest changes"
-git fetch --all --prune
-git checkout "$BRANCH"
-git pull --ff-only origin "$BRANCH"
 
 if [[ ! -f .env ]]; then
   if [[ -f /opt/twinbox/.env ]]; then

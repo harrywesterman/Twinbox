@@ -6,6 +6,7 @@
 set -euo pipefail
 
 GITHUB_REPO="harrywesterman/twinbox"
+GITHUB_BRANCH="main"
 BACKTITLE="Twinbox"
 TWINBOX_TIME_SERVER="${TWINBOX_TIME_SERVER:-time.cloudflare.com}"
 
@@ -1336,13 +1337,16 @@ runcmd:
   - rm -rf ${TWINBOX_TARGET_DIR}
   - install -d -m 0755 ${TWINBOX_TARGET_DIR}
   - chown ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}
-  - bash -lc 'sudo -u ${CLOUD_INIT_USER} -H bash -lc "git clone https://github.com/${GITHUB_REPO}.git ${TWINBOX_TARGET_DIR}"'
-  - install -d -m 0700 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}/bootstrap
-  - install -d -m 0700 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}/bootstrap/secrets/global
+  - bash -lc : # git clone Removed
+  - install -d -m 0755 ${TWINBOX_TARGET_DIR}/manager-data
+  - install -d -m 0755 ${TWINBOX_TARGET_DIR}/bootstrap/secrets/global
+  - install -d -m 0755 ${TWINBOX_TARGET_DIR}/bootstrap/openbao/seal
+  - install -d -m 0755 ${TWINBOX_TARGET_DIR}/bootstrap/openbao/init
   - python3 /tmp/twinbox-write-cluster-login-secret.py
   - install -m 0600 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /tmp/twinbox.env.template ${TWINBOX_TARGET_DIR}/.env
   - chown -R ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}
-  - bash -lc 'cd ${TWINBOX_TARGET_DIR} && chmod +x scripts/start-manager.sh && ./scripts/start-manager.sh'
+  - bash -lc 'curl -fsSL "https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH:-main}/docker-compose.yml" -o ${TWINBOX_TARGET_DIR}/docker-compose.yml'
+  - bash -lc 'cd ${TWINBOX_TARGET_DIR} && docker compose pull && docker compose up -d'
 CLOUDINIT
   chmod 600 "$snippet_file"
 
