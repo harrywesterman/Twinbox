@@ -35,6 +35,7 @@ Open your browser to continue the installation. The web UI guides you through cl
 - **Talos Linux** — immutable, API-driven Kubernetes OS
 - **Cilium** — kube-proxy-free networking and policy-ready datapath
 - **Hubble** — network flow visibility and the Hubble UI dashboard
+- **Cloudtty** — browser-based Kubernetes shell on the cluster itself
 - **Argo CD** — GitOps for every component
 - **Longhorn** — distributed block storage
 - **OpenBao + External Secrets Operator** — centralized secret management

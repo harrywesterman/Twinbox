@@ -16,6 +16,7 @@ bash -n wizard/setup-wizard.sh \
   scripts/manager/render-cilium-manifest.sh \
   scripts/manager/apply-argocd-application.sh \
   scripts/manager/install-argocd.sh \
+  scripts/manager/install-cloudtty.sh \
   scripts/manager/install-longhorn-storage.sh \
   scripts/manager/install-secret-sync.sh \
   scripts/manager/install-velero-backup.sh \
@@ -121,6 +122,20 @@ Expected:
 - `deployment/coredns` is ready
 - `daemonset/kube-proxy` does not exist
 - `IngressRoute/hubble` is present in `kube-system`
+
+### `install-cloudtty`
+
+```bash
+kubectl --kubeconfig <kubeconfig> get deployment cloudtty-operator-controller-manager -n cloudtty-system
+kubectl --kubeconfig <kubeconfig> get cloudshell cloudtty-shell -n cloudtty-system
+kubectl --kubeconfig <kubeconfig> get cloudshell cloudtty-shell -n cloudtty-system -o jsonpath='{.status.accessUrl}'
+```
+
+Expected:
+
+- the cloudtty operator deployment is ready
+- `CloudShell/cloudtty-shell` reports `Ready`
+- the shell status exposes a browser-accessible `accessUrl`
 
 ### `install-longhorn-storage`
 

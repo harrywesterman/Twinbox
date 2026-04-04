@@ -21,6 +21,7 @@ scripts/
     ├── bootstrap-talos.sh          # Bootstrap Talos control plane
     ├── collect-state.sh            # Collect cluster state after provisioning
     ├── install-argocd.sh           # Install Argo CD
+    ├── install-cloudtty.sh         # Install Cloudtty and create a shell instance
     ├── apply-argocd-application.sh # Apply an ArgoCD Application manifest
     ├── render-cilium-manifest.sh    # Render the inline Cilium/Hubble bootstrap manifest with optional API endpoint overrides
     ├── install-longhorn-storage.sh # Install Longhorn storage
@@ -55,6 +56,7 @@ These scripts are executed by `manager-worker` during job processing. They are c
 | `bootstrap-talos.sh` | Applies Talos machine configs and bootstraps the first control plane node. |
 | `collect-state.sh` | Collects kubeconfig and Talos config after provisioning. |
 | `install-argocd.sh` | Installs Argo CD into the cluster. |
+| `install-cloudtty.sh` | Installs Cloudtty and creates a browser-accessible cluster shell. |
 | `apply-argocd-application.sh` | Applies a single ArgoCD Application YAML. |
 | `render-cilium-manifest.sh` | Renders the Talos-owned Cilium bootstrap manifest, including Hubble Relay and Hubble UI, from the pinned Helm chart. |
 | `install-longhorn-storage.sh` | Deploys Longhorn and sets the default StorageClass. |

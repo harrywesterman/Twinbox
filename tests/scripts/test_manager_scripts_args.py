@@ -22,6 +22,7 @@ APPLY_ARGO_APP_SCRIPT = (
     REPO_ROOT / "scripts" / "manager" / "apply-argocd-application.sh"
 )
 RENDER_CILIUM_SCRIPT = REPO_ROOT / "scripts" / "manager" / "render-cilium-manifest.sh"
+CLOUDTTY_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-cloudtty.sh"
 ARGO_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
 )
@@ -383,6 +384,10 @@ def _cilium_values_text() -> str:
     return CILIUM_VALUES_FILE.read_text(encoding="utf-8")
 
 
+def _cloudtty_script_text() -> str:
+    return CLOUDTTY_SCRIPT.read_text(encoding="utf-8")
+
+
 def _pinned_defaults_text() -> str:
     return PINNED_DEFAULTS.read_text(encoding="utf-8")
 
@@ -669,6 +674,7 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert 'if [[ -n "${CILIUM_K8S_SERVICE_HOST:-}" ]]; then' in helper_text
     assert 'if [[ -n "${CILIUM_K8S_SERVICE_PORT:-}" ]]; then' in helper_text
     assert "PINNED_CILIUM_CHART_VERSION=1.19.2" in pinned_defaults_text
+    assert "PINNED_CLOUDTTY_CHART_VERSION=0.8.9" in pinned_defaults_text
     assert "ipam:" in values_text
     assert "mode: kubernetes" in values_text
     assert "kubeProxyReplacement: true" in values_text
@@ -680,6 +686,14 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert "replicas: 1" in values_text
     assert "hubble:\n  relay:\n    enabled: true\n  ui:\n    enabled: true" in values_text
     assert "SYS_MODULE" not in values_text
+
+    cloudtty_text = _cloudtty_script_text()
+    assert 'helm upgrade --install "$RELEASE_NAME" "$CHART_NAME"' in cloudtty_text
+    assert '--version "$PINNED_CLOUDTTY_CHART_VERSION"' in cloudtty_text
+    assert "exposureMode: NodePort" in cloudtty_text
+    assert "commandAction: bash" in cloudtty_text
+    assert 'CONTROLLER_DEPLOYMENT_NAME="${RELEASE_NAME}-controller-manager"' in cloudtty_text
+    assert 'wait_for_deployment "$NAMESPACE" "$CONTROLLER_DEPLOYMENT_NAME"' in cloudtty_text
 
     assert '--set-string "k8sServiceHost=${VIP_IP}"' in text
     assert '--set-string "k8sServicePort=6443"' in text
@@ -736,7 +750,8 @@ def test_longhorn_step_installs_via_argocd_and_waits_for_health():
     assert "is not the only default storage class" in helper_text
     assert "preUpgradeChecker:" in longhorn_values_text
     assert "jobEnabled: false" in longhorn_values_text
-    assert "taintToleration:" in longhorn_values_text
+    assert "global:" in longhorn_values_text
+    assert "twinbox.io/role: worker" in longhorn_values_text
 
 
 def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():

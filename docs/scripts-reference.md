@@ -49,6 +49,10 @@ When `CILIUM_K8S_SERVICE_HOST` and `CILIUM_K8S_SERVICE_PORT` are set, the helper
 
 Installs Argo CD on the cluster after the Talos/Cilium bootstrap has completed.
 
+### `install-cloudtty.sh`
+
+Installs the Cloudtty operator with Helm and creates a default CloudShell instance exposed through NodePort so operators can open a browser terminal on the cluster.
+
 ### `apply-argocd-application.sh`
 
 Applies a single Argo CD `Application` manifest to the cluster. Used by step scripts that deploy through GitOps.
