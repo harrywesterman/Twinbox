@@ -32,7 +32,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `/opt/twinbox/bootstrap/secrets/global/traefik-dashboard.json`
 - `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json`
 - `/opt/twinbox/bootstrap/secrets/global/grafana.json`
-- `/opt/twinbox/bootstrap/secrets/global/authentik.json`
+- `/opt/twinbox/bootstrap/secrets/global/authentik.json` - seed-only; deleted after Authentik syncs into OpenBao
 - `/opt/twinbox/bootstrap/secrets/global/pgadmin4-oidc-<cluster-id>.json`
 - `/opt/twinbox/bootstrap/secrets/global/wiredoor-gateway.json`
 - `/opt/twinbox/bootstrap/secrets/global/velero.json`
@@ -137,7 +137,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 }
 ```
 
-### `authentik.json` (database keys)
+### `authentik.json` (seed-only bootstrap database keys)
 
 ```json
 {
@@ -170,7 +170,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `install-postgres-clusters` deploys all database clusters defined under `gitops/databases/`. Each cluster gets a CloudNativePG `Cluster`, PgBouncer `Pooler` resources (read-write, optional session-pooled read-write, and read-only), a `ScheduledBackup` for daily snapshots, and an `ExternalSecret` that pulls credentials from OpenBao. The current `authentik-db` manifest runs a single instance; the reusable template under `gitops/databases/_template/` keeps three instances for future application databases. The step also seeds the Authentik database credentials into OpenBao early so the Authentik database can bootstrap before `install-authentik-idp` renders the rest of the Authentik secret. Most applications connect through the transaction pooler service (e.g. `authentik-db-pooler-rw.databases.svc.cluster.local`), while Authentik uses the session-pooled write service (`authentik-db-pooler-rw-session.databases.svc.cluster.local`) because it relies on session-bound PostgreSQL behavior.
 - Authentik uses a `Recreate` deployment strategy so its bootstrap lock is held by only one pod at a time during rollouts. That avoids overlapping startup attempts from old and new pods.
 - `wizard/setup-wizard.sh` writes the chosen cluster login password to `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` inside the Management VM so later bootstrap steps can reuse it without prompting again.
-- `create-users-and-groups` reads `authentik.json` and `twinbox-login.json`, creates the first Authentik user, creates the `admins` group as a superuser group, and adds the user to that group.
+- `create-users-and-groups` reads the Authentik bootstrap secret from OpenBao and `twinbox-login.json` from the Management VM bootstrap tree, creates the first Authentik user, creates the `admins` group as a superuser group, and adds the user to that group.
 - `install-velero-backup` installs Velero together with either a Twinbox-managed Garage bucket or an external S3-compatible backup target.
 - Later application steps write bootstrap JSON into OpenBao before enabling their Argo CD applications.
 

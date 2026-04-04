@@ -6,8 +6,11 @@ set -euo pipefail
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
 BOOTSTRAP_ROOT="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
 authentik_secret_file="$BOOTSTRAP_ROOT/secrets/global/authentik.json"
+openbao_initialized_file="$BOOTSTRAP_ROOT/openbao/init/initialized.json"
 manifest_path="$WORKSPACE_ROOT/gitops/apps/authentik.yaml"
 authentik_externalsecret_manifest="$WORKSPACE_ROOT/gitops/platform/authentik/externalsecret.yaml"
 authentik_ingressroute_manifest="$WORKSPACE_ROOT/gitops/platform/authentik/ingressroute.yaml"
@@ -49,18 +52,30 @@ authentik_postgresql_password=""
 authentik_postgresql_disable_server_side_cursors=""
 authentik_postgresql_conn_max_age=""
 
+load_authentik_secret_json() {
+  local secret_json="$1"
+
+  authentik_secret_key="$(jq -r '.AUTHENTIK_SECRET_KEY // empty' <<<"$secret_json")"
+  authentik_bootstrap_password="$(jq -r '.AUTHENTIK_BOOTSTRAP_PASSWORD // empty' <<<"$secret_json")"
+  authentik_bootstrap_token="$(jq -r '.AUTHENTIK_BOOTSTRAP_TOKEN // empty' <<<"$secret_json")"
+  authentik_bootstrap_email="$(jq -r '.AUTHENTIK_BOOTSTRAP_EMAIL // empty' <<<"$secret_json")"
+  authentik_postgresql_host="$(jq -r '.AUTHENTIK_POSTGRESQL__HOST // empty' <<<"$secret_json")"
+  authentik_postgresql_port="$(jq -r '.AUTHENTIK_POSTGRESQL__PORT // empty' <<<"$secret_json")"
+  authentik_postgresql_name="$(jq -r '.AUTHENTIK_POSTGRESQL__NAME // empty' <<<"$secret_json")"
+  authentik_postgresql_user="$(jq -r '.AUTHENTIK_POSTGRESQL__USER // .AUTHENTIK_POSTGRESQL__USERNAME // empty' <<<"$secret_json")"
+  authentik_postgresql_password="$(jq -r '.AUTHENTIK_POSTGRESQL__PASSWORD // empty' <<<"$secret_json")"
+  authentik_postgresql_disable_server_side_cursors="$(jq -r '.AUTHENTIK_POSTGRESQL__DISABLE_SERVER_SIDE_CURSORS // empty' <<<"$secret_json")"
+  authentik_postgresql_conn_max_age="$(jq -r '.AUTHENTIK_POSTGRESQL__CONN_MAX_AGE // empty' <<<"$secret_json")"
+}
+
 if [[ -f "$authentik_secret_file" ]]; then
-  authentik_secret_key="$(jq -r '."AUTHENTIK_SECRET_KEY" // empty' "$authentik_secret_file")"
-  authentik_bootstrap_password="$(jq -r '."AUTHENTIK_BOOTSTRAP_PASSWORD" // empty' "$authentik_secret_file")"
-  authentik_bootstrap_token="$(jq -r '."AUTHENTIK_BOOTSTRAP_TOKEN" // empty' "$authentik_secret_file")"
-  authentik_bootstrap_email="$(jq -r '."AUTHENTIK_BOOTSTRAP_EMAIL" // empty' "$authentik_secret_file")"
-  authentik_postgresql_host="$(jq -r '."AUTHENTIK_POSTGRESQL__HOST" // empty' "$authentik_secret_file")"
-  authentik_postgresql_port="$(jq -r '."AUTHENTIK_POSTGRESQL__PORT" // empty' "$authentik_secret_file")"
-  authentik_postgresql_name="$(jq -r '."AUTHENTIK_POSTGRESQL__NAME" // empty' "$authentik_secret_file")"
-  authentik_postgresql_user="$(jq -r '."AUTHENTIK_POSTGRESQL__USER" // ."AUTHENTIK_POSTGRESQL__USERNAME" // empty' "$authentik_secret_file")"
-  authentik_postgresql_password="$(jq -r '."AUTHENTIK_POSTGRESQL__PASSWORD" // empty' "$authentik_secret_file")"
-  authentik_postgresql_disable_server_side_cursors="$(jq -r '."AUTHENTIK_POSTGRESQL__DISABLE_SERVER_SIDE_CURSORS" // empty' "$authentik_secret_file")"
-  authentik_postgresql_conn_max_age="$(jq -r '."AUTHENTIK_POSTGRESQL__CONN_MAX_AGE" // empty' "$authentik_secret_file")"
+  load_authentik_secret_json "$(jq -c '.' "$authentik_secret_file")"
+elif [[ -f "$openbao_initialized_file" ]]; then
+  if authentik_secret_json="$(openbao_read_global_secret_json authentik)"; then
+    load_authentik_secret_json "$authentik_secret_json"
+  else
+    fail "OpenBao is initialized but the Authentik secret could not be read"
+  fi
 fi
 
 if [[ -z "$authentik_secret_key" ]]; then
@@ -113,7 +128,8 @@ if [[ -z "$authentik_host" ]]; then
   fail "Could not determine Authentik host; set DNS domain in the ingress selection step or override TWINBOX_AUTHENTIK_HOST"
 fi
 
-tmp_file="$(mktemp)"
+bootstrap_secret_file="$(mktemp)"
+trap 'rm -f "$bootstrap_secret_file"' EXIT
 jq -n \
   --arg authentik_secret_key "$authentik_secret_key" \
   --arg authentik_bootstrap_password "$authentik_bootstrap_password" \
@@ -142,14 +158,14 @@ jq -n \
     "AUTHENTIK_POSTGRESQL__PASSWORD": $authentik_postgresql_password,
     "AUTHENTIK_POSTGRESQL__DISABLE_SERVER_SIDE_CURSORS": $authentik_postgresql_disable_server_side_cursors,
     "AUTHENTIK_POSTGRESQL__CONN_MAX_AGE": $authentik_postgresql_conn_max_age
-  }' >"$tmp_file"
-install -m 600 "$tmp_file" "$authentik_secret_file"
-rm -f "$tmp_file"
+  }' >"$bootstrap_secret_file"
 
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "authentik" \
-  --json-file "$authentik_secret_file" \
+  --json-file "$bootstrap_secret_file" \
   --required-keys "AUTHENTIK_SECRET_KEY,AUTHENTIK_BOOTSTRAP_PASSWORD,AUTHENTIK_BOOTSTRAP_TOKEN,AUTHENTIK_BOOTSTRAP_EMAIL,AUTHENTIK_HOST,AUTHENTIK_HOST_BROWSER,AUTHENTIK_POSTGRESQL__HOST,AUTHENTIK_POSTGRESQL__PORT,AUTHENTIK_POSTGRESQL__NAME,AUTHENTIK_POSTGRESQL__USER,AUTHENTIK_POSTGRESQL__USERNAME,AUTHENTIK_POSTGRESQL__PASSWORD,AUTHENTIK_POSTGRESQL__DISABLE_SERVER_SIDE_CURSORS,AUTHENTIK_POSTGRESQL__CONN_MAX_AGE"
+rm -f "$bootstrap_secret_file" "$authentik_secret_file"
+trap - EXIT
 
 export KUBECONFIG="$KUBECONFIG_FILE"
 

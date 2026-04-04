@@ -606,3 +606,29 @@ openbao_sync_global_secret_file() {
 
   openbao_log "Synced OpenBao secret twinbox/global/${secret_name} from ${json_file}"
 }
+
+openbao_read_global_secret_json() {
+  local secret_name="$1"
+  [[ -n "$secret_name" ]] || openbao_fail "secret name is required"
+  [[ -f "$OPENBAO_ROOT_TOKEN_FILE" ]] || openbao_fail "OpenBao root token file not found: ${OPENBAO_ROOT_TOKEN_FILE}"
+
+  local openbao_pod=""
+  openbao_pod="$(openbao_wait_for_server_pod)"
+
+  local root_token=""
+  root_token="$(tr -d '\r\n' <"$OPENBAO_ROOT_TOKEN_FILE")"
+  [[ -n "$root_token" ]] || openbao_fail "OpenBao root token file is empty: ${OPENBAO_ROOT_TOKEN_FILE}"
+
+  openbao_exec "$openbao_pod" \
+    env BAO_ADDR=http://127.0.0.1:8200 BAO_TOKEN="$root_token" sh -se <<EOF | jq -c '.data.data'
+bao kv get -format=json kv/twinbox/global/${secret_name}
+EOF
+}
+
+openbao_read_global_secret_field() {
+  local secret_name="$1"
+  local field="$2"
+  [[ -n "$field" ]] || openbao_fail "field name is required"
+
+  openbao_read_global_secret_json "$secret_name" | jq -r --arg field "$field" '.[$field] // empty'
+}

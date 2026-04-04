@@ -7,9 +7,10 @@ set -euo pipefail
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 export KUBECONFIG="$KUBECONFIG_FILE"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
 
 BOOTSTRAP_ROOT="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
-AUTHENTIK_SECRET_FILE="$BOOTSTRAP_ROOT/secrets/global/authentik.json"
 LOGIN_SECRET_FILE="$BOOTSTRAP_ROOT/secrets/global/twinbox-login.json"
 AUTHENTIK_LOCAL_FORWARD_PORT="${AUTHENTIK_LOCAL_FORWARD_PORT:-18299}"
 
@@ -238,13 +239,13 @@ authentik_add_user_to_group() {
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
-[[ -f "$AUTHENTIK_SECRET_FILE" ]] || fail "Authentik bootstrap secret not found at $AUTHENTIK_SECRET_FILE"
 [[ -f "$LOGIN_SECRET_FILE" ]] || fail "Wizard login secret not found at $LOGIN_SECRET_FILE"
 
-AUTHENTIK_TOKEN="$(jq -r '.AUTHENTIK_BOOTSTRAP_TOKEN // empty' "$AUTHENTIK_SECRET_FILE")"
+authentik_secret_json="$(openbao_read_global_secret_json authentik)"
+AUTHENTIK_TOKEN="$(jq -r '.AUTHENTIK_BOOTSTRAP_TOKEN // empty' <<<"$authentik_secret_json")"
 LOGIN_PASSWORD="$(jq -r '.password // .PASSWORD // empty' "$LOGIN_SECRET_FILE")"
 
-[[ -n "$AUTHENTIK_TOKEN" ]] || fail "Could not read AUTHENTIK_BOOTSTRAP_TOKEN from $AUTHENTIK_SECRET_FILE"
+[[ -n "$AUTHENTIK_TOKEN" ]] || fail "Could not read AUTHENTIK_BOOTSTRAP_TOKEN from OpenBao"
 [[ -n "$LOGIN_PASSWORD" ]] || fail "Could not read password from $LOGIN_SECRET_FILE"
 
 AUTHENTIK_API_BASE="http://127.0.0.1:${AUTHENTIK_LOCAL_FORWARD_PORT}/api/v3"

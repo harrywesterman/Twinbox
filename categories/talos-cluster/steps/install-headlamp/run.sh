@@ -7,6 +7,8 @@ set -euo pipefail
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
 
 export KUBECONFIG="$KUBECONFIG_FILE"
 
@@ -26,17 +28,15 @@ cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty'
 public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
 
-authentik_secret_file="/opt/twinbox/bootstrap/secrets/global/authentik.json"
-[[ -f "$authentik_secret_file" ]] || fail "Authentik bootstrap secret not found at $authentik_secret_file"
-
-authentik_host="$(jq -r '.AUTHENTIK_HOST // empty' "$authentik_secret_file")"
-authentik_token="$(jq -r '.AUTHENTIK_BOOTSTRAP_TOKEN // empty' "$authentik_secret_file")"
+authentik_secret_json="$(openbao_read_global_secret_json authentik)"
+authentik_host="$(jq -r '.AUTHENTIK_HOST // empty' <<<"$authentik_secret_json")"
+authentik_token="$(jq -r '.AUTHENTIK_BOOTSTRAP_TOKEN // empty' <<<"$authentik_secret_json")"
 
 if [[ -z "$authentik_host" ]]; then
   authentik_host="https://authentik.${public_zone_name}"
 fi
 
-[[ -n "$authentik_token" ]] || fail "Could not read AUTHENTIK_BOOTSTRAP_TOKEN from $authentik_secret_file"
+[[ -n "$authentik_token" ]] || fail "Could not read AUTHENTIK_BOOTSTRAP_TOKEN from OpenBao"
 
 headlamp_host="https://headlamp.${public_zone_name}"
 headlamp_redirect_uri="${headlamp_host}/oidc-callback"
@@ -86,6 +86,7 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "headlamp-oidc" \
   --json-file "$headlamp_secret_file" \
   --required-keys "OIDC_CLIENT_ID,OIDC_CLIENT_SECRET,OIDC_ISSUER_URL,OIDC_SCOPES,HEADLAMP_CONFIG_OIDC_CLIENT_ID,HEADLAMP_CONFIG_OIDC_CLIENT_SECRET,HEADLAMP_CONFIG_OIDC_IDP_ISSUER_URL,HEADLAMP_CONFIG_OIDC_SCOPES"
+rm -f "$headlamp_secret_file"
 
 if command -v kubectl &>/dev/null; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying Headlamp ExternalSecret"

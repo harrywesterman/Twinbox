@@ -6,6 +6,8 @@ set -euo pipefail
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
 
 fail() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
@@ -34,27 +36,12 @@ KUBECONFIG_FILE="$(resolve_kubeconfig_file)"
 export KUBECONFIG_FILE
 export KUBECONFIG="$KUBECONFIG_FILE"
 
-resolve_authentik_secret_file() {
-  local candidate="/opt/twinbox/bootstrap/secrets/global/authentik.json"
-  if [[ -f "$candidate" ]]; then
-    printf '%s\n' "$candidate"
-    return 0
-  fi
-
-  return 1
-}
-
 resolve_authentik_field() {
   local field="$1"
-  local auth_secret_file=""
+  local authentik_secret_json
 
-  if auth_secret_file="$(resolve_authentik_secret_file)"; then
-    jq -r ".$field // empty" "$auth_secret_file"
-    return 0
-  fi
-
-  kubectl -n authentik get secret authentik-bootstrap -o json \
-    | jq -r --arg field "$field" '.data[$field] // empty | @base64d'
+  authentik_secret_json="$(openbao_read_global_secret_json authentik)"
+  jq -r --arg field "$field" '.[$field] // empty' <<<"$authentik_secret_json"
 }
 
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
@@ -75,7 +62,7 @@ if [[ -z "$authentik_host" ]]; then
   authentik_host="https://authentik.${public_zone_name}"
 fi
 
-[[ -n "$authentik_token" ]] || fail "Could not read AUTHENTIK_BOOTSTRAP_TOKEN from /opt/twinbox/bootstrap/secrets/global/authentik.json or authentik-bootstrap"
+[[ -n "$authentik_token" ]] || fail "Could not read AUTHENTIK_BOOTSTRAP_TOKEN from OpenBao"
 
 pgadmin_host="https://pgadmin4.${public_zone_name}"
 pgadmin_redirect_uri="${pgadmin_host}/oauth2/authorize"
@@ -137,6 +124,7 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "pgadmin4-oidc" \
   --json-file "$pgadmin_secret_file" \
   --required-keys "PGADMIN_DEFAULT_EMAIL,PGADMIN_DEFAULT_PASSWORD,PGADMIN_MASTER_PASSWORD,PGADMIN_OAUTH2_CLIENT_ID,PGADMIN_OAUTH2_CLIENT_SECRET,PGADMIN_OAUTH2_SERVER_METADATA_URL,PGADMIN_OAUTH2_SCOPE"
+rm -f "$pgadmin_secret_file"
 
 kubectl create namespace pgadmin4 --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 

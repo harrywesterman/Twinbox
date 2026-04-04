@@ -8,22 +8,27 @@ export KUBECONFIG="$KUBECONFIG_FILE"
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 BOOTSTRAP_ROOT="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
-authentik_secret_file="$BOOTSTRAP_ROOT/secrets/global/authentik.json"
 manifest_path="$WORKSPACE_ROOT/gitops/apps/postgres-clusters.yaml"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
 
-mkdir -p "$(dirname "$authentik_secret_file")"
-
 seed_authentik_db_secret() {
   local authentik_postgresql_user=""
   local authentik_postgresql_password=""
+  local authentik_secret_json=""
   local tmp_file
+  local secret_file
 
-  if [[ -f "$authentik_secret_file" ]]; then
-    authentik_postgresql_user="$(jq -r '."AUTHENTIK_POSTGRESQL__USER" // ."AUTHENTIK_POSTGRESQL__USERNAME" // empty' "$authentik_secret_file")"
-    authentik_postgresql_password="$(jq -r '."AUTHENTIK_POSTGRESQL__PASSWORD" // empty' "$authentik_secret_file")"
+  if [[ -f "$BOOTSTRAP_ROOT/openbao/init/initialized.json" ]]; then
+    if authentik_secret_json="$(openbao_read_global_secret_json authentik)"; then
+      authentik_postgresql_user="$(jq -r '.AUTHENTIK_POSTGRESQL__USER // .AUTHENTIK_POSTGRESQL__USERNAME // empty' <<<"$authentik_secret_json")"
+      authentik_postgresql_password="$(jq -r '.AUTHENTIK_POSTGRESQL__PASSWORD // empty' <<<"$authentik_secret_json")"
+    else
+      fail "OpenBao is initialized but the Authentik secret could not be read"
+    fi
   fi
 
   if [[ -z "$authentik_postgresql_user" ]]; then
@@ -43,13 +48,16 @@ seed_authentik_db_secret() {
       "AUTHENTIK_POSTGRESQL__USERNAME": $authentik_postgresql_user,
       "AUTHENTIK_POSTGRESQL__PASSWORD": $authentik_postgresql_password
     }' >"$tmp_file"
-  install -m 600 "$tmp_file" "$authentik_secret_file"
+  secret_file="$BOOTSTRAP_ROOT/secrets/global/authentik.json"
+  install -d -m 0700 "$(dirname "$secret_file")"
+  install -m 600 "$tmp_file" "$secret_file"
   rm -f "$tmp_file"
 
   bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
     --secret-name "authentik" \
-    --json-file "$authentik_secret_file" \
+    --json-file "$secret_file" \
     --required-keys "AUTHENTIK_POSTGRESQL__USER,AUTHENTIK_POSTGRESQL__USERNAME,AUTHENTIK_POSTGRESQL__PASSWORD"
+  rm -f "$secret_file"
 }
 
 wait_for_resources_ready() {
