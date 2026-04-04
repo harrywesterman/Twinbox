@@ -281,7 +281,6 @@ const PROVISION_VM_INPUT_IDS = [
   'worker_count',
   'cpu_cores',
   'memory_mb',
-  'disk_gb',
   'start_vmid',
 ];
 
@@ -839,6 +838,7 @@ function App() {
       }
 
       body.vm_node_map = placement.vmNodeMap;
+      body.vm_size_map = placement.vmSizeMap;
       body.vm_ip_map = buildProvisionVmIpMap(vmIpRows);
     }
 
@@ -1682,12 +1682,20 @@ function App() {
                         <strong>{provisionScaleSummary.cpu_cores}</strong>
                       </article>
                       <article>
-                        <span>Memory / VM</span>
-                        <strong>{formatMemoryMb(provisionScaleSummary.memory_mb)}</strong>
+                        <span>Worker memory / VM</span>
+                        <strong>{formatMemoryMb(provisionScaleSummary.worker_memory_mb)}</strong>
                       </article>
                       <article>
-                        <span>Disk / VM</span>
-                        <strong>{provisionScaleSummary.disk_gb} GB</strong>
+                        <span>Control plane memory</span>
+                        <strong>{formatMemoryMb(provisionScaleSummary.controlplane_memory_mb)}</strong>
+                      </article>
+                      <article>
+                        <span>Control plane disk</span>
+                        <strong>{provisionScaleSummary.controlplane_disk_gb} GB</strong>
+                      </article>
+                      <article>
+                        <span>Worker disk / VM</span>
+                        <strong>{provisionScaleSummary.worker_disk_gb} GB</strong>
                       </article>
                       <article>
                         <span>Total CPU</span>
@@ -1742,6 +1750,9 @@ function App() {
                           />
                         ))}
                       </div>
+                      <p className="wizard-input-block-note">
+                        Control plane nodes are fixed at 2 GB RAM and 10 GB disk. Worker disks scale from the selected host&apos;s free space and the slider percentage.
+                      </p>
                     </section>
 
                     <PlacementBoard

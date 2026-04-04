@@ -15,7 +15,6 @@ const stepInputs = [
   { id: 'worker_count', default: 2, min: 0, max: 200 },
   { id: 'cpu_cores', default: 2, min: 1, max: 64 },
   { id: 'memory_mb', default: 4096, min: 512, max: 1048576 },
-  { id: 'disk_gb', default: 20, min: 10, max: 8192 },
 ];
 
 const largeClusterResources = {
@@ -83,7 +82,6 @@ test('scale 30 preserves the default VM footprint', () => {
   assert.equal(values.worker_count, 2);
   assert.equal(values.cpu_cores, 2);
   assert.equal(values.memory_mb, 4096);
-  assert.equal(values.disk_gb, 20);
 });
 
 test('provision node count falls back to the wizard defaults when the draft is empty', () => {
@@ -100,10 +98,10 @@ test('higher scale percentages grow the VM footprint and totals', () => {
   assert.ok(values.worker_count >= 2);
   assert.ok(values.cpu_cores >= 2);
   assert.ok(values.memory_mb >= 4096);
-  assert.ok(values.disk_gb >= 20);
   assert.ok(summary.total_nodes >= 3);
   assert.ok(summary.total_memory_mb >= 12288);
-  assert.ok(summary.total_disk_gb >= 60);
+  assert.equal(summary.controlplane_disk_gb, 10);
+  assert.ok(summary.worker_disk_gb >= 40);
 });
 
 test('manual overrides stay in place when the scale slider changes', () => {
@@ -134,6 +132,8 @@ test('placement board suggests a host-aware Talos VM layout', () => {
   assert.equal(board.unassigned.length, 0);
   assert.ok(new Set(Object.values(board.vmNodeMap)).size >= 2);
   assert.equal(board.hostCards[0].assignments[0].assignmentSource, 'suggested');
+  assert.equal(board.vmSizeMap['cp-1'].disk_gb, 10);
+  assert.ok(board.vmSizeMap['worker-1'].disk_gb >= 40);
 });
 
 test('placement board sorts hosts alphabetically by name', () => {
@@ -203,4 +203,28 @@ test('placement board keeps manual placements while resuggesting the rest', () =
   assert.equal(remixedBoard.hostCards.find((host) => host.id === 'pve-b').assignments.some((vm) => vm.name === 'cp-1'), true);
   assert.equal(remixedBoard.hostCards.find((host) => host.id === 'pve-b').assignments.find((vm) => vm.name === 'cp-1').assignmentSource, 'user-selected');
   assert.equal(remixedBoard.vmNodeMap['worker-2'], remixedBoard.suggestedVmNodeMap['worker-2']);
+});
+
+test('worker disk scales from host free space and scale percent', () => {
+  const board = buildProvisionPlacementBoard(stepInputs, {
+    scale_percent: 75,
+    worker_count: 1,
+  }, {
+    nodes: [
+      {
+        node: 'pve-a',
+        status: 'online',
+        maxmem: 17179869184,
+        mem: 0,
+        maxdisk: 214748364800,
+        disk: 0,
+        maxcpu: 8,
+        cpu: 0,
+      },
+    ],
+    vms: [],
+  });
+
+  assert.equal(board.vmSizeMap['worker-1'].disk_gb, 143);
+  assert.equal(board.vmSizeMap['cp-1'].disk_gb, 10);
 });

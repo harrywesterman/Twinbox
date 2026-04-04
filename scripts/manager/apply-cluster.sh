@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 usage() {
   cat <<USAGE
-Usage: $0 --cluster-id ID --name NAME --controlplane-count N --worker-count N --cpu-cores N --memory-mb N --disk-gb N --bridge BR --start-vmid ID --start-ip IP --vip-ip IP --node-prefix-length N --gateway-ip IP --dns-servers CSV --dns-domain NAME --vm-node-map JSON --vm-ip-map JSON --proxmox-node NODE --storage-pool POOL --file-datastore STORE --data-dir DIR
+Usage: $0 --cluster-id ID --name NAME --controlplane-count N --worker-count N --cpu-cores N --memory-mb N --bridge BR --start-vmid ID --start-ip IP --vip-ip IP --node-prefix-length N --gateway-ip IP --dns-servers CSV --dns-domain NAME --vm-node-map JSON --vm-size-map JSON --vm-ip-map JSON --proxmox-node NODE --storage-pool POOL --file-datastore STORE --data-dir DIR
 USAGE
 }
 
@@ -50,7 +50,6 @@ while [[ $# -gt 0 ]]; do
     --worker-count) WORKER_COUNT="$2"; shift 2 ;;
     --cpu-cores) CPU_CORES="$2"; shift 2 ;;
     --memory-mb) MEMORY_MB="$2"; shift 2 ;;
-    --disk-gb) DISK_GB="$2"; shift 2 ;;
     --bridge) BRIDGE="$2"; shift 2 ;;
     --start-vmid) START_VMID="$2"; shift 2 ;;
     --start-ip) START_IP="$2"; shift 2 ;;
@@ -61,6 +60,7 @@ while [[ $# -gt 0 ]]; do
     --dns-domain) DNS_DOMAIN="$2"; shift 2 ;;
     # --vm-node-map) shift 2 ;;
     --vm-node-map) VM_NODE_MAP="$2"; shift 2 ;;
+    --vm-size-map) VM_SIZE_MAP="$2"; shift 2 ;;
     --vm-ip-map) VM_IP_MAP="$2"; shift 2 ;;
     --proxmox-node) PROXMOX_NODE="$2"; shift 2 ;;
     --storage-pool) STORAGE_POOL="$2"; shift 2 ;;
@@ -505,12 +505,19 @@ generate_nodes_json() {
   local ip=""
   local name=""
   local mac=""
+  local cpu=""
+  local ram=""
+  local disk=""
 
   if [[ "$CP_COUNT" -gt 0 ]]; then
     for i in $(seq 1 "$CP_COUNT"); do
       name="cp-${i}"
       ip="$(jq -r --arg key "$name" '.[$key] // empty' <<<"$vm_ip_map_json")"
       [[ -n "$ip" ]] || fail "Missing vm_ip_map entry for ${name}"
+      cpu="$(jq -r --arg key "$name" '.[$key].cpu // empty' <<<"$vm_size_map_json")"
+      ram="$(jq -r --arg key "$name" '.[$key].memory_mb // empty' <<<"$vm_size_map_json")"
+      disk="$(jq -r --arg key "$name" '.[$key].disk_gb // empty' <<<"$vm_size_map_json")"
+      [[ -n "$cpu" && -n "$ram" && -n "$disk" ]] || fail "Missing vm_size_map entry for ${name}"
       mac="$(deterministic_mac "$current_vmid")"
       nodes_json="$(jq \
         --arg key "$name" \
@@ -518,9 +525,9 @@ generate_nodes_json() {
         --arg type "controlplane" \
         --arg mac "$mac" \
         --argjson vmid "$current_vmid" \
-        --argjson cpu "$CPU_CORES" \
-        --argjson ram "$MEMORY_MB" \
-        --argjson disk "$DISK_GB" \
+        --argjson cpu "$cpu" \
+        --argjson ram "$ram" \
+        --argjson disk "$disk" \
         '. + {($key): {ip: $ip, type: $type, vmid: $vmid, cpu: $cpu, ram_mb: $ram, disk_gb: $disk, mac: $mac}}' \
         <<<"$nodes_json")"
       current_vmid=$((current_vmid + 1))
@@ -532,6 +539,10 @@ generate_nodes_json() {
       name="worker-${i}"
       ip="$(jq -r --arg key "$name" '.[$key] // empty' <<<"$vm_ip_map_json")"
       [[ -n "$ip" ]] || fail "Missing vm_ip_map entry for ${name}"
+      cpu="$(jq -r --arg key "$name" '.[$key].cpu // empty' <<<"$vm_size_map_json")"
+      ram="$(jq -r --arg key "$name" '.[$key].memory_mb // empty' <<<"$vm_size_map_json")"
+      disk="$(jq -r --arg key "$name" '.[$key].disk_gb // empty' <<<"$vm_size_map_json")"
+      [[ -n "$cpu" && -n "$ram" && -n "$disk" ]] || fail "Missing vm_size_map entry for ${name}"
       mac="$(deterministic_mac "$current_vmid")"
       nodes_json="$(jq \
         --arg key "$name" \
@@ -539,9 +550,9 @@ generate_nodes_json() {
         --arg type "worker" \
         --arg mac "$mac" \
         --argjson vmid "$current_vmid" \
-        --argjson cpu "$CPU_CORES" \
-        --argjson ram "$MEMORY_MB" \
-        --argjson disk "$DISK_GB" \
+        --argjson cpu "$cpu" \
+        --argjson ram "$ram" \
+        --argjson disk "$disk" \
         '. + {($key): {ip: $ip, type: $type, vmid: $vmid, cpu: $cpu, ram_mb: $ram, disk_gb: $disk, mac: $mac}}' \
         <<<"$nodes_json")"
       current_vmid=$((current_vmid + 1))
@@ -798,6 +809,11 @@ write_node_patch() {
   local nameserver_block=""
   local search_domain_block=""
   local time_server="${TWINBOX_TIME_SERVER:-time.cloudflare.com}"
+  local role_label="$type"
+
+  if [[ "$type" == "controlplane" ]]; then
+    role_label="control-plane"
+  fi
 
   if [[ -n "${DNS_SERVERS:-}" ]]; then
     IFS=',' read -r -a dns_servers_array <<< "$DNS_SERVERS"
@@ -817,6 +833,11 @@ write_node_patch() {
 
   {
     echo "machine:"
+    echo "  nodeLabels:"
+    echo "    twinbox.io/role: ${role_label}"
+    if [[ "$type" == "worker" ]]; then
+      echo "    node.longhorn.io/create-default-disk: \"true\""
+    fi
     echo "  network:"
     [[ -n "$nameserver_block" ]] && printf '%s' "$nameserver_block"
     [[ -n "$search_domain_block" ]] && printf '%s' "$search_domain_block"
@@ -1077,6 +1098,16 @@ render_cilium_manifest "$cilium_manifest_file"
 upsert_secret_artifact "cilium" "cilium-bootstrap.yaml" "$cilium_manifest_file"
 
 vm_ip_map_json="$(resolve_vm_ip_map)"
+if [[ -z "${VM_SIZE_MAP:-}" ]]; then
+  fail "Missing vm_size_map for cluster ${CLUSTER_ID}; pass --vm-size-map from the current run"
+fi
+if ! jq -e . >/dev/null 2>&1 <<<"$VM_SIZE_MAP"; then
+  fail "vm_size_map for cluster ${CLUSTER_ID} is not valid JSON: ${VM_SIZE_MAP}"
+fi
+vm_size_map_json="$(normalize_json_object "$VM_SIZE_MAP")"
+if [[ "$(jq -r 'length' <<<"$vm_size_map_json")" -eq 0 ]]; then
+  fail "vm_size_map for cluster ${CLUSTER_ID} is empty; pass a non-empty --vm-size-map from the current run"
+fi
 
 nodes_json="$(generate_nodes_json)"
 planned_controlplane_ips_json="$(node_array "ip" "controlplane")"

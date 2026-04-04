@@ -3,7 +3,7 @@ title: Deploy Talos Cluster
 type: action
 order: 10
 summary: Install Talos Linux on separate VM's on the cluster.
-explanation: Talos Linux is the immutable, Kubernetes-focused operating system that Twinbox uses. We use OpenTofu, download the Talos image on demand, lets you size the VM footprint first, then lands the VMs on Proxmox hosts, discovers the DHCP addresses, applies Talos machine configs, bootstraps the first control plane, and materializes the resulting Talos access files from the management-local bootstrap secret tree.
+explanation: Talos Linux is the immutable, Kubernetes-focused operating system that Twinbox uses. We use OpenTofu, download the Talos image on demand, size the control plane and worker roles separately, land the VMs on Proxmox hosts, discover the DHCP addresses, apply Talos machine configs, bootstrap the first control plane, and materialize the resulting Talos access files from the management-local bootstrap secret tree.
 side_help: Talos Linux is a minimal, secure, API-driven operating system built specifically for running Kubernetes.
 depends_on: []
 inputs:
@@ -52,15 +52,7 @@ inputs:
     min: 512
     max: 1048576
     default: 8192
-    help: Per-node memory allocation. The standard Twinbox baseline expects at least 8192 MB per node; 4096 MB is only suitable for a reduced dev/test cluster.
-  - id: disk_gb
-    label: Disk GB
-    type: integer
-    required: true
-    min: 10
-    max: 8192
-    default: 20
-    help: System disk size per VM.
+    help: Worker memory allocation. Control planes stay fixed at 2048 MB, while workers keep this slider-driven memory size.
   - id: bridge
     label: Bridge
     type: string

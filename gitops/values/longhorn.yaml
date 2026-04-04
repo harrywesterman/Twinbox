@@ -1,8 +1,13 @@
 preUpgradeChecker:
   jobEnabled: false
 
-defaultSetting:
-  taintToleration: node-role.kubernetes.io/control-plane:NoSchedule;node-role.kubernetes.io/master:NoSchedule
+global:
+  nodeSelector:
+    twinbox.io/role: worker
+
+defaultSettings:
+  createDefaultDiskLabeledNodes: true
+  systemManagedComponentsNodeSelector: twinbox.io/role=worker
   systemManagedCSIComponentsResourceLimits: >-
     {
       "csi-attacher":{"requests":{"cpu":"20m","memory":"64Mi"},"limits":{"cpu":"200m","memory":"128Mi"}},
@@ -15,6 +20,9 @@ defaultSetting:
     }
 
 longhornManager:
+  nodeSelector:
+    twinbox.io/role: worker
+  tolerations: []
   resources:
     requests:
       cpu: 200m
@@ -22,3 +30,15 @@ longhornManager:
     limits:
       cpu: 1000m
       memory: 512Mi
+
+longhornUI:
+  nodeSelector:
+    twinbox.io/role: worker
+  tolerations: []
+
+longhornDriver:
+  nodeSelector:
+    twinbox.io/role: worker
+
+persistence:
+  defaultNodeSelector: twinbox.io/role=worker

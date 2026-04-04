@@ -92,6 +92,9 @@ Expected:
 - Talos artifacts are materialized under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/`
 - Cilium bootstrap manifest exists under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/cilium/cilium-bootstrap.yaml`
 - the Talos configs include inline Cilium manifests on all control-plane nodes
+- the generated Talos nodes carry `twinbox.io/role=control-plane` and `twinbox.io/role=worker` labels as appropriate
+- control-plane VMs are provisioned at `2 GB RAM / 10 GB disk`
+- worker VMs keep a larger storage budget that is derived from the selected Proxmox host's free disk space
 - the first step in a clean UI session remains `Deploy Talos Cluster`
 
 ### `provision-nodes` runtime network checks
@@ -115,15 +118,20 @@ Expected:
 
 ```bash
 kubectl --kubeconfig <kubeconfig> get pods -n longhorn-system
+kubectl --kubeconfig <kubeconfig> get pods -n longhorn-system -o wide
 kubectl --kubeconfig <kubeconfig> get storageclass longhorn
 kubectl --kubeconfig <kubeconfig> get storageclass longhorn -o jsonpath='{.metadata.annotations.storageclass\.kubernetes\.io/is-default-class}'
+kubectl --kubeconfig <kubeconfig> get nodes -L twinbox.io/role
 ```
 
 Expected:
 
 - Longhorn manager and CSI components are running
+- Longhorn manager and CSI pods run on worker nodes
 - `StorageClass/longhorn` exists
 - `StorageClass/longhorn` is marked as the default storage class
+- worker nodes are labeled `twinbox.io/role=worker`
+- control-plane nodes are labeled `twinbox.io/role=control-plane`
 
 ### `install-traefik`
 

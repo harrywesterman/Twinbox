@@ -58,23 +58,24 @@ GitHub `main` is the source of truth for both the management stack and the GitOp
 ## Secret Flow
 
 1. The Management VM bootstraps local JSON files under `/opt/twinbox/bootstrap/secrets/global/`.
-2. `provision-nodes` materializes Talos runtime files from the local bootstrap tree and cluster-scoped attachments.
-3. `provision-nodes` renders the pinned Cilium Helm chart against the cluster VIP/API endpoint, stores the bootstrap manifest under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/cilium/`, and injects it as an inline manifest into every control-plane Talos config.
-4. `provision-nodes` sets `cluster.network.cni.name: none`, `cluster.proxy.disabled: true`, `machine.features.kubePrism.enabled: true`, and `machine.features.hostDNS.forwardKubeDNSToHost: false` so Talos boots with kube-proxy-free Cilium from the start.
-5. `provision-nodes` waits for `cilium`, `cilium-operator`, and `coredns` to become ready before the step completes.
-6. `install-argocd` installs Argo CD after the Talos/Cilium bootstrap has completed.
-7. `install-longhorn-storage` runs before cluster secret sync so stateful workloads and backup storage can use Longhorn PVCs immediately through the cluster default storage class.
-8. `install-secret-sync` installs External Secrets Operator and OpenBao on Longhorn.
-9. `install-secret-sync` seeds OpenBao from the Management VM bootstrap files and creates `ClusterSecretStore/openbao`.
-10. `install-velero-backup` deploys Velero together with the SeaweedFS S3 target that runs on the Management VM.
-11. `install-cloudnativepg` installs the CloudNativePG operator on top of Longhorn so PostgreSQL-backed workloads can share one database platform.
-12. `install-postgres-clusters` deploys the CloudNativePG Cluster, Pooler, ScheduledBackup, and ExternalSecret resources for each application database, then waits on the concrete database resources instead of Argo CD aggregate app health before the Authentik app step runs.
-13. Authentik uses a `Recreate` rollout strategy so its bootstrap lock is only held by one pod at a time during upgrades and restarts.
-14. The Proxmox wizard stores the cluster login password in `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` inside the Management VM so the Authentik onboarding step can reuse it.
-15. `install-authentik-idp` seeds the Authentik bootstrap secret into OpenBao and removes the temporary local seed file after sync.
-16. Later Authentik consumers read the bootstrap data from OpenBao instead of reopening `/opt/twinbox/bootstrap/secrets/global/authentik.json`.
-17. `install-pgadmin4` provisions the pgAdmin 4 Authentik OIDC application, seeds the pgAdmin bootstrap secret into OpenBao, and deploys pgAdmin with Longhorn-backed persistence and Traefik ingress.
-18. GitOps apps consume secrets through `ExternalSecret` resources backed by `ClusterSecretStore/openbao`.
+2. `provision-nodes` sizes control-plane VMs at `2 GB RAM / 10 GB disk`, sizes workers separately with a storage-oriented disk budget derived from host free space, and labels Talos nodes with `twinbox.io/role`.
+3. `provision-nodes` materializes Talos runtime files from the local bootstrap tree and cluster-scoped attachments.
+4. `provision-nodes` renders the pinned Cilium Helm chart against the cluster VIP/API endpoint, stores the bootstrap manifest under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/cilium/`, and injects it as an inline manifest into every control-plane Talos config.
+5. `provision-nodes` sets `cluster.network.cni.name: none`, `cluster.proxy.disabled: true`, `machine.features.kubePrism.enabled: true`, and `machine.features.hostDNS.forwardKubeDNSToHost: false` so Talos boots with kube-proxy-free Cilium from the start.
+6. `provision-nodes` waits for `cilium`, `cilium-operator`, and `coredns` to become ready before the step completes.
+7. `install-argocd` installs Argo CD after the Talos/Cilium bootstrap has completed.
+8. `install-longhorn-storage` runs before cluster secret sync so stateful workloads and backup storage can use Longhorn PVCs immediately through the cluster default storage class, and Longhorn stays on worker nodes through the `twinbox.io/role=worker` selector.
+9. `install-secret-sync` installs External Secrets Operator and OpenBao on Longhorn.
+10. `install-secret-sync` seeds OpenBao from the Management VM bootstrap files and creates `ClusterSecretStore/openbao`.
+11. `install-velero-backup` deploys Velero together with a Twinbox-managed Garage bucket or an external S3-compatible backup target.
+12. `install-cloudnativepg` installs the CloudNativePG operator on top of Longhorn so PostgreSQL-backed workloads can share one database platform.
+13. `install-postgres-clusters` deploys the CloudNativePG Cluster, Pooler, ScheduledBackup, and ExternalSecret resources for each application database, then waits on the concrete database resources instead of Argo CD aggregate app health before the Authentik app step runs.
+14. Authentik uses a `Recreate` rollout strategy so its bootstrap lock is only held by one pod at a time during upgrades and restarts.
+15. The Proxmox wizard stores the cluster login password in `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` inside the Management VM so the Authentik onboarding step can reuse it.
+16. `install-authentik-idp` seeds the Authentik bootstrap secret into OpenBao and removes the temporary local seed file after sync.
+17. Later Authentik consumers read the bootstrap data from OpenBao instead of reopening `/opt/twinbox/bootstrap/secrets/global/authentik.json`.
+18. `install-pgadmin4` provisions the pgAdmin 4 Authentik OIDC application, seeds the pgAdmin bootstrap secret into OpenBao, and deploys pgAdmin with Longhorn-backed persistence and Traefik ingress.
+19. GitOps apps consume secrets through `ExternalSecret` resources backed by `ClusterSecretStore/openbao`.
 
 ## Domain Flow
 

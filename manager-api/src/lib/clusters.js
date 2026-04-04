@@ -72,6 +72,28 @@ function buildDefaultVmNodeMap(controlplaneCount, workerCount, allowedHosts = []
   return vmNodeMap;
 }
 
+function buildDefaultVmSizeMap(controlplaneCount, workerCount, cpuCores, workerMemoryMb) {
+  const vmSizeMap = {};
+
+  for (let index = 1; index <= Math.max(1, Number(controlplaneCount) || 0); index += 1) {
+    vmSizeMap[`cp-${index}`] = {
+      cpu: cpuCores,
+      memory_mb: 2048,
+      disk_gb: 10,
+    };
+  }
+
+  for (let index = 1; index <= Math.max(0, Number(workerCount) || 0); index += 1) {
+    vmSizeMap[`worker-${index}`] = {
+      cpu: cpuCores,
+      memory_mb: workerMemoryMb,
+      disk_gb: 40,
+    };
+  }
+
+  return vmSizeMap;
+}
+
 function normalizeVmNodeMap(rawMap, allowedHosts = [], fallbackHost = "pve", vmNames = []) {
   const defaultMap = buildDefaultVmNodeMap(
     vmNames.filter((name) => String(name).startsWith("cp-")).length,
@@ -204,6 +226,75 @@ function normalizeVmIpMap(rawMap, vmNames = [], fallbackStartIp = "") {
   return { ok: true, value: normalized };
 }
 
+function normalizeVmSizeMap(rawMap, vmNames = [], cpuCores = 2, workerMemoryMb = 8192) {
+  const vmNameList = Array.isArray(vmNames) ? vmNames.map((name) => String(name || "").trim()).filter(Boolean) : [];
+  if (vmNameList.length === 0) {
+    return { ok: false, error: "vm_size_map cannot be built without VM names" };
+  }
+
+  const defaultMap = buildDefaultVmSizeMap(
+    vmNameList.filter((name) => name.startsWith("cp-")).length,
+    vmNameList.filter((name) => name.startsWith("worker-")).length,
+    cpuCores,
+    workerMemoryMb,
+  );
+
+  if (rawMap === null || rawMap === undefined || rawMap === "") {
+    return { ok: true, value: defaultMap };
+  }
+
+  let candidate = rawMap;
+  if (typeof candidate === "string") {
+    try {
+      candidate = JSON.parse(candidate);
+    } catch {
+      return { ok: false, error: "vm_size_map must be valid JSON" };
+    }
+  }
+
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+    return { ok: false, error: "vm_size_map must be an object" };
+  }
+
+  const normalized = { ...defaultMap };
+  const seenKeys = new Set();
+
+  for (const [vmName, value] of Object.entries(candidate)) {
+    const normalizedVmName = String(vmName || "").trim();
+    if (!normalizedVmName) {
+      continue;
+    }
+    if (!vmNameList.includes(normalizedVmName)) {
+      return { ok: false, error: `vm_size_map contains unknown VM ${normalizedVmName}` };
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return { ok: false, error: `vm_size_map entry ${normalizedVmName} must be an object` };
+    }
+
+    const parsedCpu = parseIntInRange(value.cpu, `vm_size_map.${normalizedVmName}.cpu`, 1, 64);
+    const parsedMemory = parseIntInRange(value.memory_mb, `vm_size_map.${normalizedVmName}.memory_mb`, 512, 1048576);
+    const parsedDisk = parseIntInRange(value.disk_gb, `vm_size_map.${normalizedVmName}.disk_gb`, 10, 8192);
+    if (!parsedCpu.ok) return { ok: false, error: parsedCpu.error };
+    if (!parsedMemory.ok) return { ok: false, error: parsedMemory.error };
+    if (!parsedDisk.ok) return { ok: false, error: parsedDisk.error };
+
+    normalized[normalizedVmName] = {
+      cpu: parsedCpu.value,
+      memory_mb: parsedMemory.value,
+      disk_gb: parsedDisk.value,
+    };
+    seenKeys.add(normalizedVmName);
+  }
+
+  for (const vmName of vmNameList) {
+    if (!seenKeys.has(vmName)) {
+      normalized[vmName] = defaultMap[vmName];
+    }
+  }
+
+  return { ok: true, value: normalized };
+}
+
 export function buildClusterFromRequest(body, env, { allowedVmHosts = [], clusterInstanceId = null } = {}) {
   const parsedName = parseRequiredString(body.name, "name");
   const parsedBridge = parseRequiredString(body.bridge, "bridge");
@@ -211,7 +302,6 @@ export function buildClusterFromRequest(body, env, { allowedVmHosts = [], cluste
   const parsedWorkers = parseIntInRange(body.worker_count, "worker_count", 0, 200);
   const parsedCpu = parseIntInRange(body.cpu_cores, "cpu_cores", 1, 64);
   const parsedMemory = parseIntInRange(body.memory_mb, "memory_mb", 512, 1048576);
-  const parsedDisk = parseIntInRange(body.disk_gb, "disk_gb", 10, 8192);
   const parsedStartVmid = parseIntInRange(body.start_vmid, "start_vmid", 100, 999999);
   const parsedVipIp = parseIPv4(body.vip_ip, "vip_ip");
   const parsedNodePrefixLength = parseIntInRange(body.node_prefix_length, "node_prefix_length", 1, 32);
@@ -223,6 +313,7 @@ export function buildClusterFromRequest(body, env, { allowedVmHosts = [], cluste
     ...Array.from({ length: parsedWorkers.value }, (_, index) => `worker-${index + 1}`),
   ];
   const parsedVmIpMap = normalizeVmIpMap(body.vm_ip_map, vmNames, String(body.start_ip || "").trim());
+  const parsedVmSizeMap = normalizeVmSizeMap(body.vm_size_map, vmNames, parsedCpu.value, parsedMemory.value);
   const parsedVmNodeMap = normalizeVmNodeMap(
     body.vm_node_map,
     allowedVmHosts,
@@ -237,7 +328,6 @@ export function buildClusterFromRequest(body, env, { allowedVmHosts = [], cluste
     parsedWorkers,
     parsedCpu,
     parsedMemory,
-    parsedDisk,
     parsedStartVmid,
     parsedVipIp,
     parsedNodePrefixLength,
@@ -245,6 +335,7 @@ export function buildClusterFromRequest(body, env, { allowedVmHosts = [], cluste
     parsedDnsServers,
     parsedDnsDomain,
     parsedVmIpMap,
+    parsedVmSizeMap,
     parsedVmNodeMap.ok ? { ok: true } : { ok: false, error: parsedVmNodeMap.error },
   ];
 
@@ -279,7 +370,10 @@ export function buildClusterFromRequest(body, env, { allowedVmHosts = [], cluste
       worker_count: parsedWorkers.value,
       cpu_cores: parsedCpu.value,
       memory_mb: parsedMemory.value,
-      disk_gb: parsedDisk.value,
+      controlplane_memory_mb: 2048,
+      controlplane_disk_gb: 10,
+      worker_memory_mb: parsedMemory.value,
+      worker_disk_gb: 40,
       bridge: parsedBridge.value,
       start_vmid: parsedStartVmid.value,
       vip_ip: parsedVipIp.value,
@@ -289,6 +383,7 @@ export function buildClusterFromRequest(body, env, { allowedVmHosts = [], cluste
       dns_servers: parsedDnsServers.value,
       dns_domain: parsedDnsDomain.value,
       vm_ip_map: parsedVmIpMap.value,
+      vm_size_map: parsedVmSizeMap.value,
       vm_node_map: parsedVmNodeMap.value,
       status: "requested",
       created_at: now(),
