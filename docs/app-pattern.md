@@ -539,7 +539,7 @@ Two PgBouncer poolers:
 
 Daily backup at 02:00 UTC:
 - Backup owner reference: `self` (deleted with the Cluster)
-- Storage via the default Velero/Longhorn backup location
+- Storage via the default Velero backup location backed by SeaweedFS on the Management VM
 
 ## Volume Resize and Capacity Management
 

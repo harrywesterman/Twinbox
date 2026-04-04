@@ -21,8 +21,11 @@ bash -n wizard/setup-wizard.sh \
   scripts/manager/install-velero-backup.sh \
   scripts/manager/openbao-secret-sync.sh \
   scripts/manager/sync-openbao-global-secret.sh \
+  ansible/management-vm-maintenance.yml \
   categories/talos-cluster/steps/install-cloudnativepg/run.sh \
   categories/talos-cluster/steps/install-postgres-clusters/run.sh
+
+ansible-playbook --syntax-check -i localhost, -c local ansible/management-vm-maintenance.yml
 
 node --check manager-api/src/server.js
 node --check manager-worker/src/worker.js
@@ -208,16 +211,16 @@ Expected:
 
 ```bash
 kubectl --kubeconfig <kubeconfig> get application -n argocd velero
-kubectl --kubeconfig <kubeconfig> get application -n argocd garage
 kubectl --kubeconfig <kubeconfig> get pods -n velero
 kubectl --kubeconfig <kubeconfig> get backupstoragelocation -n velero
 kubectl --kubeconfig <kubeconfig> get secret velero-credentials -n velero
+kubectl --kubeconfig <kubeconfig> get ingressroute -n longhorn-system seaweedfs seaweedfs-admin
 ```
 
 Expected:
 
 - Velero server and node-agent are running
-- The Garage deployment is running and initialized
+- SeaweedFS is running on the Management VM and exposed through Traefik
 - `BackupStorageLocation/default` is ready
 - The generated Velero credentials secret exists in the `velero` namespace
 

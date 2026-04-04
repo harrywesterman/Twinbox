@@ -3,44 +3,14 @@ title: Install Velero backup
 type: action
 journey_stage: setup
 order: 102
-summary: Install Velero with either the built-in Garage target or an external S3-compatible backup target.
-explanation: Twinbox deploys Velero through Argo CD and lets the operator choose between the built-in Garage stack or a user-supplied S3-compatible endpoint, bucket, and credentials.
+summary: Install Velero with the default SeaweedFS S3 target on the Management VM.
+explanation: Twinbox deploys Velero through Argo CD and points it at the SeaweedFS S3 service running on the Management VM with no setup-time choice between backup targets.
 side_help: Velero gives the cluster a day-2 backup path for Kubernetes resources and filesystem-backed volume data.
 depends_on:
   - install-management-consoles
   - install-longhorn-storage
   - install-secret-sync
-inputs:
-  - id: use_external_s3
-    label: Use external S3-compatible storage instead of Garage
-    type: boolean
-    default: false
-    help: Leave this disabled to use Twinbox-managed Garage in the wizard. Enable it to point Velero at an existing S3-compatible backup target and enter the endpoint, bucket, and credentials below.
-  - id: s3_endpoint
-    label: External S3 endpoint URL
-    type: string
-    required: false
-    help: "Required when external S3 storage is enabled. Example: https://s3.example.com"
-  - id: s3_bucket
-    label: Backup bucket name
-    type: string
-    default: twinbox-velero
-    help: Bucket Velero should use for backup metadata.
-  - id: s3_region
-    label: S3 region
-    type: string
-    default: garage
-    help: Region or compatibility label required by the S3-compatible target.
-  - id: s3_access_key_id
-    label: S3 access key ID
-    type: string
-    required: false
-    help: Required when external S3 storage is enabled.
-  - id: s3_secret_access_key
-    label: S3 secret access key
-    type: string
-    required: false
-    help: Required when external S3 storage is enabled.
+inputs: []
 secrets:
   files:
     KUBECONFIG_FILE:

@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_URL="${TWINBOX_REPO_URL:-https://github.com/harrywesterman/twinbox.git}"
 TARGET_DIR="${TWINBOX_TARGET_DIR:-/opt/twinbox}"
-BRANCH="${TWINBOX_BRANCH:-main}"
-BOOTSTRAP_DIR="${TARGET_DIR}/bootstrap"
+BOOTSTRAP_DIR="${TWINBOX_BOOTSTRAP_DIR:-${TARGET_DIR}/bootstrap}"
+RAW_BASE_URL="${TWINBOX_RAW_BASE_URL:-https://raw.githubusercontent.com/harrywesterman/twinbox/main}"
 
 append_secret_env_block() {
   local management_ip=""
@@ -54,6 +53,7 @@ ensure_bootstrap_material() {
   local openbao_init_dir="${BOOTSTRAP_DIR}/openbao/init"
   local proxmox_file="${secret_dir}/proxmox.json"
   local traefik_file="${secret_dir}/traefik-dashboard.json"
+  local velero_file="${secret_dir}/velero.json"
   local seal_key_file="${openbao_seal_dir}/current.key"
   local seal_key_id_file="${openbao_seal_dir}/current-key-id"
 
@@ -100,6 +100,28 @@ target.chmod(0o600)
 PY
   fi
 
+  if [[ ! -f "$velero_file" ]]; then
+    local seaweedfs_password=""
+    seaweedfs_password="$(openssl rand -hex 16)"
+    python3 - "$velero_file" "$seaweedfs_password" <<'PY'
+import json
+import pathlib
+import sys
+
+target = pathlib.Path(sys.argv[1])
+payload = {
+    "mode": "seaweedfs",
+    "endpoint": "http://192.168.1.50:8333",
+    "bucket": "twinbox-velero",
+    "region": "seaweedfs",
+    "username": "velero",
+    "password": sys.argv[2],
+}
+target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+target.chmod(0o600)
+PY
+  fi
+
   if [[ ! -f "$seal_key_file" ]]; then
     openssl rand -hex 32 > "$seal_key_file"
     chmod 0600 "$seal_key_file"
@@ -125,23 +147,18 @@ require_cmd() {
 }
 
 log "Validating required tools"
-require_cmd git
 require_cmd docker
 
 if ! docker compose version >/dev/null 2>&1; then
   fail "Docker Compose plugin is missing (docker compose ...)"
 fi
 
-if [[ ! -d "$TARGET_DIR/.git" ]]; then
-  log "No git repository in TARGET_DIR (expected for runtime-only mode)"
-fi
-
 if [[ ! -d "$TARGET_DIR/manager-data" ]]; then
   sudo install -d -m 0755 "$TARGET_DIR/manager-data"
 fi
 
-if [[ ! -d "$TARGET_DIR/bootstrap" ]]; then
-  sudo install -d -m 0755 "$TARGET_DIR/bootstrap/secrets/global"
+if [[ ! -d "$BOOTSTRAP_DIR" ]]; then
+  sudo install -d -m 0755 "$BOOTSTRAP_DIR/secrets/global" "$BOOTSTRAP_DIR/ansible" "$BOOTSTRAP_DIR/config" "$BOOTSTRAP_DIR/bin"
 fi
 
 if [[ ! -d "$TARGET_DIR/gitops" ]]; then
@@ -172,11 +189,30 @@ if ! grep -q "^TWINBOX_HOST_REPO_ROOT=" .env; then
   printf '\nTWINBOX_HOST_REPO_ROOT=%s\n' "$TARGET_DIR" >> .env
 fi
 
-if [[ -x scripts/install-management-tools.sh ]]; then
+if [[ ! -f "${BOOTSTRAP_DIR}/ansible/management-vm-maintenance.yml" ]]; then
+  log "Fetching maintenance playbook into bootstrap tree"
+  sudo install -d -m 0755 "${BOOTSTRAP_DIR}/ansible"
+  curl -fsSL "${RAW_BASE_URL}/ansible/management-vm-maintenance.yml" -o "${BOOTSTRAP_DIR}/ansible/management-vm-maintenance.yml"
+fi
+
+if [[ ! -f "${BOOTSTRAP_DIR}/config/pinned-defaults.sh" ]]; then
+  log "Fetching pinned defaults into bootstrap tree"
+  sudo install -d -m 0755 "${BOOTSTRAP_DIR}/config"
+  curl -fsSL "${RAW_BASE_URL}/config/pinned-defaults.sh" -o "${BOOTSTRAP_DIR}/config/pinned-defaults.sh"
+fi
+
+if [[ ! -f "${BOOTSTRAP_DIR}/bin/install-management-tools.sh" ]]; then
+  log "Fetching management tools installer into bootstrap tree"
+  sudo install -d -m 0755 "${BOOTSTRAP_DIR}/bin"
+  curl -fsSL "${RAW_BASE_URL}/scripts/install-management-tools.sh" -o "${BOOTSTRAP_DIR}/bin/install-management-tools.sh"
+  chmod 0755 "${BOOTSTRAP_DIR}/bin/install-management-tools.sh"
+fi
+
+if [[ -x "${BOOTSTRAP_DIR}/bin/install-management-tools.sh" ]]; then
   log "Installing management host tools from .env versions"
-  sudo ./scripts/install-management-tools.sh --env-file .env
+  sudo "${BOOTSTRAP_DIR}/bin/install-management-tools.sh" --env-file .env
 else
-  fail "Missing scripts/install-management-tools.sh"
+  fail "Missing install-management-tools.sh in bootstrap tree"
 fi
 
 append_secret_env_block
@@ -187,6 +223,11 @@ source .env
 set +a
 ensure_bootstrap_material
 configure_management_time_sync
+
+if [[ ! -f docker-compose.yml ]]; then
+  log "Fetching docker-compose.yml into runtime root"
+  curl -fsSL "${RAW_BASE_URL}/docker-compose.yml" -o docker-compose.yml
+fi
 
 log "Starting development stack"
 docker compose up -d --build

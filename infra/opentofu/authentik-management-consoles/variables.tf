@@ -28,3 +28,13 @@ variable "twinboxwizard_external_host" {
   description = "Public URL that Authentik should associate with the Twinbox wizard traffic"
   type        = string
 }
+
+variable "seaweedfs_external_host" {
+  description = "Public URL that Authentik should associate with the SeaweedFS filer traffic"
+  type        = string
+}
+
+variable "seaweedfs_admin_external_host" {
+  description = "Public URL that Authentik should associate with the SeaweedFS admin traffic"
+  type        = string
+}

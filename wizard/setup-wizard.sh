@@ -9,6 +9,7 @@ GITHUB_REPO="harrywesterman/twinbox"
 GITHUB_BRANCH="main"
 BACKTITLE="Twinbox"
 TWINBOX_TIME_SERVER="${TWINBOX_TIME_SERVER:-time.cloudflare.com}"
+TWINBOX_RAW_BASE_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}"
 
 RD="\033[01;31m"
 YW="\033[33m"
@@ -1228,9 +1229,15 @@ create_management_vm() {
   local img_path="/var/lib/vz/template/cache/${img_name}"
   local CLOUD_INIT_PASSWORD_HASH=""
   local CLOUD_INIT_PASSWORD_B64=""
+  local SEAWEEDFS_ACCESS_KEY_ID=""
+  local SEAWEEDFS_SECRET_ACCESS_KEY=""
+  local SEAWEEDFS_BUCKET="twinbox-velero"
+  local SEAWEEDFS_REGION="seaweedfs"
 
   CLOUD_INIT_PASSWORD_HASH=$(openssl passwd -6 "$CLOUD_INIT_PASSWORD")
   CLOUD_INIT_PASSWORD_B64=$(printf '%s' "$CLOUD_INIT_PASSWORD" | base64 -w0)
+  SEAWEEDFS_ACCESS_KEY_ID="velero"
+  SEAWEEDFS_SECRET_ACCESS_KEY="$(openssl rand -hex 16)"
 
   mkdir -p /var/lib/vz/template/cache /var/lib/vz/snippets
 
@@ -1264,9 +1271,10 @@ users:
 package_update: true
 packages:
   - curl
-  - git
   - ca-certificates
-  - gnupg
+  - jq
+  - python3-apt
+  - ansible-core
   - qemu-guest-agent
 write_files:
   - path: /tmp/twinbox.env.template
@@ -1291,6 +1299,10 @@ write_files:
       TWINBOX_IMAGE_TAG=${TWINBOX_IMAGE_TAG}
       TWINBOX_HOST_REPO_ROOT=${TWINBOX_TARGET_DIR}
       MANAGEMENT_VM_ID=${MGT_ID}
+      SEAWEEDFS_ACCESS_KEY_ID=${SEAWEEDFS_ACCESS_KEY_ID}
+      SEAWEEDFS_SECRET_ACCESS_KEY=${SEAWEEDFS_SECRET_ACCESS_KEY}
+      SEAWEEDFS_BUCKET=${SEAWEEDFS_BUCKET}
+      SEAWEEDFS_REGION=${SEAWEEDFS_REGION}
   - path: /tmp/twinbox.cluster-login-password.b64
     permissions: '0600'
     owner: root:root
@@ -1313,40 +1325,51 @@ write_files:
           encoding="utf-8",
       )
       target.chmod(0o600)
-  - path: /etc/systemd/timesyncd.conf.d/99-twinbox.conf
-    permissions: '0644'
+  - path: /tmp/twinbox-write-velero-secret.py
+    permissions: '0755'
     owner: root:root
     content: |
-      [Time]
-      NTP=${TWINBOX_TIME_SERVER}
-      FallbackNTP=
+      #!/usr/bin/env python3
+      import json
+      import pathlib
+
+      env_file = pathlib.Path("/tmp/twinbox.env.template")
+      env = {}
+      for line in env_file.read_text(encoding="utf-8").splitlines():
+          if "=" not in line or line.lstrip().startswith("#"):
+              continue
+          key, value = line.split("=", 1)
+          env[key] = value
+
+      target = pathlib.Path("/opt/twinbox/bootstrap/secrets/global/velero.json")
+      payload = {
+          "mode": "seaweedfs",
+          "endpoint": f"http://{env['MANAGEMENT_VM_IP']}:8333",
+          "bucket": env["SEAWEEDFS_BUCKET"],
+          "region": env["SEAWEEDFS_REGION"],
+          "username": env["SEAWEEDFS_ACCESS_KEY_ID"],
+          "password": env["SEAWEEDFS_SECRET_ACCESS_KEY"],
+      }
+      target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+      target.chmod(0o600)
 runcmd:
-  - install -m 0755 -d /etc/apt/keyrings
-  - install -m 0755 -d /etc/systemd/timesyncd.conf.d
-  - systemctl enable --now qemu-guest-agent
-  - systemctl enable --now systemd-timesyncd.service
-  - bash -lc 'apt-get remove -y docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc || true'
-  - bash -lc 'curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc'
-  - chmod a+r /etc/apt/keyrings/docker.asc
-  - bash -lc 'echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu noble stable" > /etc/apt/sources.list.d/docker.list'
-  - apt-get update
-  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-  - bash -lc 'docker --version'
-  - bash -lc 'docker compose version'
-  - systemctl restart systemd-timesyncd.service
-  - rm -rf ${TWINBOX_TARGET_DIR}
-  - install -d -m 0755 ${TWINBOX_TARGET_DIR}
-  - chown ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}
-  - bash -lc : # git clone Removed
-  - install -d -m 0755 ${TWINBOX_TARGET_DIR}/manager-data
-  - install -d -m 0755 ${TWINBOX_TARGET_DIR}/bootstrap/secrets/global
-  - install -d -m 0755 ${TWINBOX_TARGET_DIR}/bootstrap/openbao/seal
-  - install -d -m 0755 ${TWINBOX_TARGET_DIR}/bootstrap/openbao/init
+  - install -m 0755 -d /opt/twinbox/bootstrap/ansible
+  - install -m 0755 -d /opt/twinbox/bootstrap/config
+  - install -m 0755 -d /opt/twinbox/bootstrap/bin
+  - install -m 0755 -d /opt/twinbox/bootstrap/secrets/global
+  - install -m 0755 -d /opt/twinbox/bootstrap/openbao/seal
+  - install -m 0755 -d /opt/twinbox/bootstrap/openbao/init
+  - install -m 0755 -d /opt/twinbox/manager-data
+  - install -m 0755 -d /opt/twinbox/seaweedfs/data
   - python3 /tmp/twinbox-write-cluster-login-secret.py
+  - python3 /tmp/twinbox-write-velero-secret.py
   - install -m 0600 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /tmp/twinbox.env.template ${TWINBOX_TARGET_DIR}/.env
+  - bash -lc 'curl -fsSL "${TWINBOX_RAW_BASE_URL}/ansible/management-vm-maintenance.yml" -o /opt/twinbox/bootstrap/ansible/management-vm-maintenance.yml'
+  - bash -lc 'curl -fsSL "${TWINBOX_RAW_BASE_URL}/config/pinned-defaults.sh" -o /opt/twinbox/bootstrap/config/pinned-defaults.sh'
+  - bash -lc 'curl -fsSL "${TWINBOX_RAW_BASE_URL}/scripts/install-management-tools.sh" -o /opt/twinbox/bootstrap/bin/install-management-tools.sh'
+  - chmod 0755 /opt/twinbox/bootstrap/bin/install-management-tools.sh
   - chown -R ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}
-  - bash -lc 'curl -fsSL "https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH:-main}/docker-compose.yml" -o ${TWINBOX_TARGET_DIR}/docker-compose.yml'
-  - bash -lc 'cd ${TWINBOX_TARGET_DIR} && docker compose pull && docker compose up -d'
+  - bash -lc 'set -a; source ${TWINBOX_TARGET_DIR}/.env; set +a; cd ${TWINBOX_TARGET_DIR} && ansible-playbook -i localhost, -c local /opt/twinbox/bootstrap/ansible/management-vm-maintenance.yml'
 CLOUDINIT
   chmod 600 "$snippet_file"
 

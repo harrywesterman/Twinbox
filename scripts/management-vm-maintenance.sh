@@ -2,7 +2,12 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PLAYBOOK="${REPO_ROOT}/ansible/management-vm-maintenance.yml"
+BOOTSTRAP_DIR="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
+PLAYBOOK="${BOOTSTRAP_DIR}/ansible/management-vm-maintenance.yml"
+
+if [[ ! -f "$PLAYBOOK" ]]; then
+  PLAYBOOK="${REPO_ROOT}/ansible/management-vm-maintenance.yml"
+fi
 
 log() {
   printf '[management-vm-maintenance] %s\n' "$1"
@@ -16,6 +21,13 @@ if [[ -f "${REPO_ROOT}/.env" ]]; then
   # shellcheck disable=SC1091
   set -a
   source "${REPO_ROOT}/.env"
+  set +a
+fi
+
+if [[ -f "${BOOTSTRAP_DIR}/ansible/runtime.env" ]]; then
+  # shellcheck disable=SC1091
+  set -a
+  source "${BOOTSTRAP_DIR}/ansible/runtime.env"
   set +a
 fi
 

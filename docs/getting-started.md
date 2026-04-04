@@ -14,7 +14,8 @@ This guide covers the current Twinbox flow.
 bash <(curl -fsSL https://raw.githubusercontent.com/harrywesterman/twinbox/main/wizard/setup-wizard.sh)
 ```
 
-The wizard creates the Management VM, installs Docker CE, creates runtime directories in `/opt/twinbox`, writes `.env`, and starts the manager stack.
+The wizard creates the Management VM, seeds runtime directories in `/opt/twinbox`, writes `.env`, and kicks off the Ansible-driven bootstrap.
+The Management VM now boots through a thin cloud-init layer that installs Ansible and lets the Ansible baseline install Docker, the management tools, and the runtime stack.
 The generated VM and the later Talos cluster both use the same `TWINBOX_TIME_SERVER` value for NTP.
 The wizard also stores the cluster login password in `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` so later Authentik onboarding can reuse it.
 
@@ -29,6 +30,7 @@ Expected early files:
 - `/opt/twinbox/bootstrap/secrets/global/proxmox.json`
 - `/opt/twinbox/bootstrap/secrets/global/traefik-dashboard.json`
 - `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json`
+- `/opt/twinbox/bootstrap/secrets/global/velero.json`
 - `/opt/twinbox/bootstrap/openbao/seal/current.key`
 - `/opt/twinbox/bootstrap/openbao/seal/current-key-id`
 
@@ -76,5 +78,5 @@ ssh root@<management-vm-ip> 'docker compose pull && docker compose up -d'
 If bootstrap files are missing, rerun the host bootstrap logic:
 
 ```bash
-ssh root@<management-vm-ip> 'sudo bash scripts/bootstrap-vm.sh'
+ssh root@<management-vm-ip> 'sudo ansible-playbook -i localhost, -c local /opt/twinbox/bootstrap/ansible/management-vm-maintenance.yml'
 ```

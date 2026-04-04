@@ -10,9 +10,9 @@
 - Detects existing resources for the same cluster through Proxmox cluster inventory and supports cleanup with explicit confirmation.
 - Cleanup is cluster-wide and node-aware, so clusters with VMs spread across multiple Proxmox hosts can still be removed safely.
 - Creates the Management VM from Ubuntu 24.04 cloud image.
-- Installs Docker CE on Management VM using official Docker apt repo (`download.docker.com`).
-- Clones `https://github.com/harrywesterman/twinbox` into `/opt/twinbox`.
-- Starts the manager stack with `docker compose pull && docker compose up -d`.
+- Seeds a thin cloud-init that installs Ansible and hands the Management VM baseline to an Ansible playbook.
+- Creates the `/opt/twinbox` runtime tree without cloning the Twinbox repository onto the VM.
+- Starts the manager stack with `docker compose pull && docker compose up -d` after the Ansible baseline has installed Docker and the management tools.
 
 ## Run
 
@@ -36,13 +36,14 @@ The dev runner uploads only the current local `wizard/setup-wizard.sh` to the Pr
 ssh ubuntu@<management-vm-ip>
 docker --version
 docker compose version
+ansible-playbook --version
 curl -fsS http://localhost:8080/api/health
 ```
 
 ## Notes
 
 - Twinbox compose uses prebuilt public GHCR images.
-- Docker source is official Docker repository, not Ubuntu `docker.io`.
+- The host baseline is now managed through Ansible, not by a repository checkout on the VM.
 - Keep deployment in trusted LAN scope for phase 1.
 - The wizard writes a cloud-init snippet under `/var/lib/vz/snippets/` with mode `0600`.
 - Talos VM provisioning remains in the management stack/UI and is not created directly by the wizard.

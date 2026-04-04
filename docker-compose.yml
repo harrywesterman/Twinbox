@@ -69,3 +69,21 @@ services:
       - manager-api
     ports:
       - "3000:80"
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
+    container_name: twinbox-seaweedfs
+    restart: unless-stopped
+    environment:
+      - AWS_ACCESS_KEY_ID=${SEAWEEDFS_ACCESS_KEY_ID:-velero}
+      - AWS_SECRET_ACCESS_KEY=${SEAWEEDFS_SECRET_ACCESS_KEY:-change-me}
+    command:
+      - server
+      - -dir=/data
+      - -s3
+    volumes:
+      - /opt/twinbox/seaweedfs/data:/data
+    ports:
+      - "8333:8333"
+      - "8888:8888"
+      - "23646:23646"

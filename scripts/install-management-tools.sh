@@ -3,8 +3,25 @@ set -euo pipefail
 
 ENV_FILE="/opt/twinbox/.env"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck disable=SC1091
-source "$SCRIPT_DIR/../config/pinned-defaults.sh"
+
+source_pinned_defaults() {
+  local candidate=""
+  local candidates=(
+    "$SCRIPT_DIR/../config/pinned-defaults.sh"
+    "$SCRIPT_DIR/../../config/pinned-defaults.sh"
+    "${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}/config/pinned-defaults.sh"
+  )
+
+  for candidate in "${candidates[@]}"; do
+    if [[ -f "$candidate" ]]; then
+      # shellcheck disable=SC1090
+      source "$candidate"
+      return 0
+    fi
+  done
+
+  fail "Unable to locate config/pinned-defaults.sh"
+}
 
 usage() {
   cat <<'USAGE'
@@ -49,8 +66,7 @@ source "$ENV_FILE"
 set +a
 
 # Re-load the repo pins so stale values in .env cannot override the canonical versions.
-# shellcheck disable=SC1091
-source "$SCRIPT_DIR/../config/pinned-defaults.sh"
+source_pinned_defaults
 
 [[ -n "${PINNED_K9S_VERSION:-}" ]] || fail "Missing required variable in ${ENV_FILE}: PINNED_K9S_VERSION"
 [[ -n "${PINNED_KUBECTL_VERSION:-}" ]] || fail "Missing required variable in ${SCRIPT_DIR}/../config/pinned-defaults.sh: PINNED_KUBECTL_VERSION"

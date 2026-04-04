@@ -128,10 +128,10 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 
 ```json
 {
-  "mode": "embedded-garage",
-  "endpoint": "http://garage.velero.svc.cluster.local:3900",
+  "mode": "seaweedfs",
+  "endpoint": "http://192.168.1.50:8333",
   "bucket": "twinbox-velero",
-  "region": "garage",
+  "region": "seaweedfs",
   "username": "velero",
   "password": "generated-password"
 }
@@ -171,7 +171,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - Authentik uses a `Recreate` deployment strategy so its bootstrap lock is held by only one pod at a time during rollouts. That avoids overlapping startup attempts from old and new pods.
 - `wizard/setup-wizard.sh` writes the chosen cluster login password to `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` inside the Management VM so later bootstrap steps can reuse it without prompting again.
 - `create-users-and-groups` reads the Authentik bootstrap secret from OpenBao and `twinbox-login.json` from the Management VM bootstrap tree, creates the first Authentik user, creates the `admins` group as a superuser group, and adds the user to that group.
-- `install-velero-backup` installs Velero together with either a Twinbox-managed Garage bucket or an external S3-compatible backup target.
+- `install-velero-backup` installs Velero together with the SeaweedFS S3 target that runs on the Management VM.
 - Later application steps write bootstrap JSON into OpenBao before enabling their Argo CD applications.
 
 ## Dynamic Domain Configuration

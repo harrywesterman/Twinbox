@@ -4,7 +4,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-BOOTSTRAP_DIR="${REPO_ROOT}/bootstrap"
+BOOTSTRAP_DIR="${TWINBOX_BOOTSTRAP_DIR:-${REPO_ROOT}/bootstrap}"
+RAW_BASE_URL="${TWINBOX_RAW_BASE_URL:-https://raw.githubusercontent.com/harrywesterman/twinbox/main}"
 
 append_secret_env_block() {
   local management_ip=""
@@ -40,6 +41,7 @@ ensure_bootstrap_material() {
   local openbao_init_dir="${BOOTSTRAP_DIR}/openbao/init"
   local proxmox_file="${secret_dir}/proxmox.json"
   local traefik_file="${secret_dir}/traefik-dashboard.json"
+  local velero_file="${secret_dir}/velero.json"
   local seal_key_file="${openbao_seal_dir}/current.key"
   local seal_key_id_file="${openbao_seal_dir}/current-key-id"
 
@@ -86,6 +88,28 @@ target.chmod(0o600)
 PY
   fi
 
+  if [[ ! -f "$velero_file" ]]; then
+    local seaweedfs_password=""
+    seaweedfs_password="$(openssl rand -hex 16)"
+    python3 - "$velero_file" "$seaweedfs_password" <<'PY'
+import json
+import pathlib
+import sys
+
+target = pathlib.Path(sys.argv[1])
+payload = {
+    "mode": "seaweedfs",
+    "endpoint": "http://192.168.1.50:8333",
+    "bucket": "twinbox-velero",
+    "region": "seaweedfs",
+    "username": "velero",
+    "password": sys.argv[2],
+}
+target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+target.chmod(0o600)
+PY
+  fi
+
   if [[ ! -f "$seal_key_file" ]]; then
     openssl rand -hex 32 > "$seal_key_file"
     chmod 0600 "$seal_key_file"
@@ -103,10 +127,27 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
-if [[ -x scripts/install-management-tools.sh ]]; then
-  sudo ./scripts/install-management-tools.sh --env-file .env
+if [[ ! -d "$BOOTSTRAP_DIR" ]]; then
+  install -d -m 0755 "$BOOTSTRAP_DIR/secrets/global" "$BOOTSTRAP_DIR/ansible" "$BOOTSTRAP_DIR/config" "$BOOTSTRAP_DIR/bin"
+fi
+
+if [[ ! -f "${BOOTSTRAP_DIR}/ansible/management-vm-maintenance.yml" ]]; then
+  curl -fsSL "${RAW_BASE_URL}/ansible/management-vm-maintenance.yml" -o "${BOOTSTRAP_DIR}/ansible/management-vm-maintenance.yml"
+fi
+
+if [[ ! -f "${BOOTSTRAP_DIR}/config/pinned-defaults.sh" ]]; then
+  curl -fsSL "${RAW_BASE_URL}/config/pinned-defaults.sh" -o "${BOOTSTRAP_DIR}/config/pinned-defaults.sh"
+fi
+
+if [[ ! -f "${BOOTSTRAP_DIR}/bin/install-management-tools.sh" ]]; then
+  curl -fsSL "${RAW_BASE_URL}/scripts/install-management-tools.sh" -o "${BOOTSTRAP_DIR}/bin/install-management-tools.sh"
+  chmod 0755 "${BOOTSTRAP_DIR}/bin/install-management-tools.sh"
+fi
+
+if [[ -x "${BOOTSTRAP_DIR}/bin/install-management-tools.sh" ]]; then
+  sudo "${BOOTSTRAP_DIR}/bin/install-management-tools.sh" --env-file .env
 else
-  echo "Missing scripts/install-management-tools.sh"
+  echo "Missing install-management-tools.sh in bootstrap tree"
   exit 1
 fi
 
@@ -117,6 +158,10 @@ set -a
 source .env
 set +a
 ensure_bootstrap_material
+
+if [[ ! -f docker-compose.yml ]]; then
+  curl -fsSL "${RAW_BASE_URL}/docker-compose.yml" -o docker-compose.yml
+fi
 
 docker compose pull
 docker compose up -d

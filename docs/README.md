@@ -12,7 +12,7 @@ Operational documentation for Twinbox.
 - `secrets-library.md` — shared secret library (`lib/secrets/`) internals.
 - `scripts-reference.md` — `scripts/manager/` script reference.
 - `ip-allocation.md` — IP and VMID allocation logic.
-- `garage-s3.md` — embedded Garage S3 storage for Velero.
+- `seaweedfs-s3.md` — SeaweedFS S3 storage for Velero backups.
 - `wiredoor-bastion.md` — Wiredoor bastion host provisioning.
 - `cloudflare-tunnel.md` — Cloudflare Tunnel configuration and token setup.
 - `cloudflare-dns.md` — Cloudflare DNS configuration step.

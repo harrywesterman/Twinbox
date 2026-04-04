@@ -72,7 +72,7 @@ def test_setup_wizard_cleanup_uses_cluster_inventory_for_detect_and_remove():
 def test_setup_wizard_enables_guest_agent_on_management_vm():
     text = _wizard_text()
     assert "  - qemu-guest-agent" in text
-    assert "  - systemctl enable --now qemu-guest-agent" in text
+    assert 'ansible-playbook -i localhost, -c local /opt/twinbox/bootstrap/ansible/management-vm-maintenance.yml' in text
     assert 'qm set "$MGT_ID" --agent enabled=1 >/dev/null' in text
     assert '--tags "twinbox;management;docker;bootstrap;${CLUSTER_VM_TAG}"' in text
 
@@ -105,7 +105,9 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     assert "      TALOSCTL_VERSION=${TALOSCTL_VERSION}" not in text
     assert "      PROXMOX_ISO_STORAGE=${PROXMOX_ISO_STORAGE}" not in text
     assert "      TALOS_ISO_FILE=${TALOS_ISO_FILE}" not in text
-    assert "  - rm -rf ${TWINBOX_TARGET_DIR}" in text
+    assert '  - install -m 0755 -d /opt/twinbox/bootstrap/ansible' in text
+    assert '  - install -m 0755 -d /opt/twinbox/manager-data' in text
+    assert '  - install -m 0755 -d /opt/twinbox/seaweedfs/data' in text
     assert "  - install -m 0600 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /tmp/twinbox.env.template ${TWINBOX_TARGET_DIR}/.env" in text
     assert 'qm set "$MGT_ID" --ciuser "$CLOUD_INIT_USER" >/dev/null' in text
     assert 'qm set "$MGT_ID" --cipassword "$CLOUD_INIT_PASSWORD" >/dev/null' in text
@@ -114,27 +116,29 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     assert 'qm set "$MGT_ID" --ipconfig0 "ip=${CLOUD_INIT_IP}/${CLOUD_INIT_CIDR},gw=${CLOUD_INIT_GATEWAY}" >/dev/null' in text
     assert "MANAGEMENT_VM_ID=${MGT_ID}" in text
     assert "MANAGEMENT_VM_IP=${CLOUD_INIT_IP}" in text
-    assert 'chmod +x scripts/start-manager.sh && ./scripts/start-manager.sh' in text
+    assert 'bash -lc \'set -a; source ${TWINBOX_TARGET_DIR}/.env; set +a; cd ${TWINBOX_TARGET_DIR} && ansible-playbook -i localhost, -c local /opt/twinbox/bootstrap/ansible/management-vm-maintenance.yml\'' in text
     assert "CLUSTER_NAME=${CLUSTER_NAME}" not in text
     assert "CLUSTER_CONTROLPLANE_COUNT=${CLUSTER_CONTROLPLANE_COUNT}" not in text
     assert "CLUSTER_WORKER_COUNT=${CLUSTER_WORKER_COUNT}" not in text
     assert "VIP_IP=${VIP_IP}" not in text
     assert "CLUSTER_START_VMID=${CLUSTER_START_VMID}" not in text
     assert "CLUSTER_START_IP=${CLUSTER_START_IP}" not in text
-    assert 'if [ ! -d ${TWINBOX_TARGET_DIR}/.git ]; then git clone https://github.com/${GITHUB_REPO}.git ${TWINBOX_TARGET_DIR}; fi' not in text
-    assert 'git clone https://github.com/${GITHUB_REPO}.git ${TWINBOX_TARGET_DIR}' in text
+    assert 'git clone https://github.com/${GITHUB_REPO}.git ${TWINBOX_TARGET_DIR}' not in text
 
 
 def test_setup_wizard_bootstraps_filesystem_secret_material_before_starting_manager_stack():
     text = _wizard_text()
-    assert 'install -d -m 0700 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}/bootstrap' in text
+    assert 'install -m 0755 -d /opt/twinbox/bootstrap/ansible' in text
+    assert 'install -m 0755 -d /opt/twinbox/bootstrap/config' in text
+    assert 'install -m 0755 -d /opt/twinbox/bootstrap/bin' in text
     assert 'MANAGEMENT_VM_IP=${CLOUD_INIT_IP}' in text
     assert 'TWINBOX_SECRET_BACKEND=filesystem' in text
     assert 'TWINBOX_BOOTSTRAP_DIR=/opt/twinbox/bootstrap' in text
     assert 'TWINBOX_SECRET_ITEM_PREFIX=twinbox' in text
     assert 'TWINBOX_SECRET_TEMP_DIR=/tmp/twinbox-secrets' in text
     assert 'TWINBOX_SECRET_CACHE_TTL_SEC=60' in text
-    assert 'bash -lc \'cd ${TWINBOX_TARGET_DIR} && chmod +x scripts/start-manager.sh && ./scripts/start-manager.sh\'' in text
+    assert 'python3 /tmp/twinbox-write-velero-secret.py' in text
+    assert 'bash -lc \'set -a; source ${TWINBOX_TARGET_DIR}/.env; set +a; cd ${TWINBOX_TARGET_DIR} && ansible-playbook -i localhost, -c local /opt/twinbox/bootstrap/ansible/management-vm-maintenance.yml\'' in text
     assert 'docker compose up -d vaultwarden' not in text
     assert 'scripts/bootstrap-vaultwarden.sh' not in text
     assert 'vaultwarden-password' not in text
@@ -142,8 +146,8 @@ def test_setup_wizard_bootstraps_filesystem_secret_material_before_starting_mana
 
 def test_setup_wizard_starts_manager_script_after_bootstrap_directory_exists():
     text = _wizard_text()
-    bootstrap_index = text.index('install -d -m 0700 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}/bootstrap')
-    bootstrap_script_index = text.index("scripts/start-manager.sh")
+    bootstrap_index = text.index('install -m 0755 -d /opt/twinbox/bootstrap/ansible')
+    bootstrap_script_index = text.index('ansible-playbook -i localhost, -c local /opt/twinbox/bootstrap/ansible/management-vm-maintenance.yml')
 
     assert bootstrap_index < bootstrap_script_index
 
@@ -393,7 +397,6 @@ def test_setup_wizard_creates_dedicated_limited_proxmox_api_user():
     assert 'apply_acl_with_retry()' in text
     assert 'pveum role add "$PROXMOX_ROLE"' in text
     assert 'VM.Audit,VM.Monitor,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use,Sys.Audit' in text
-    assert 'for acl_path in /vms "/storage/${PROXMOX_STORAGE_POOL}" "/storage/${file_datastore}" /nodes "/nodes/${PROXMOX_NODE}"; do' in text
     assert 'pveum aclmod "$path" -user "$user" -role "$role" 2>&1' in text
     assert 'if ! apply_acl_with_retry "/sdn" "$PROXMOX_USER" "$PROXMOX_ROLE" 10 1; then' in text
 

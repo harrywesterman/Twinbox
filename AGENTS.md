@@ -17,7 +17,7 @@ Twinbox is a Talos Linux based configuration for a Kubernetes cluster. Treat the
 
 1. Run `wizard/setup-wizard.sh` on Proxmox.
 2. The wizard creates only the Management VM.
-3. The Management VM installs Docker CE, clones Twinbox into `/opt/twinbox`, loads `.env`, and starts `docker compose`.
+3. The Management VM gets a thin cloud-init bootstrap, Ansible installs Docker CE and the management tools, and the host runs the runtime stack from `/opt/twinbox` without a repo checkout.
 4. `manager-web` on port `3000` queues work through `manager-api` on port `8080`.
 5. `manager-worker` polls the file queue under `manager-data/` and runs repo-owned scripts.
 6. `provision-nodes` starts the Talos journey, sizes the cluster, lands the VMs, and records the cluster state.

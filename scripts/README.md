@@ -6,7 +6,7 @@ Shell and Node.js scripts for provisioning, bootstrapping, and managing the Twin
 
 ```
 scripts/
-├── bootstrap-vm.sh                 # Bootstrap the Management VM (clone repo, install Docker, start compose)
+├── bootstrap-vm.sh                 # Bootstrap the Management VM (thin cloud-init / Ansible flow)
 ├── install-management-vm-maintenance.sh # Install the Management VM maintenance systemd timer
 ├── start-manager.sh                # Start the manager stack (load .env, start docker compose)
 ├── get-talos-image-factory.sh      # Fetch or resolve Talos image from the Image Factory
@@ -35,12 +35,12 @@ scripts/
 
 | Script | Purpose |
 |--------|---------|
-| `bootstrap-vm.sh` | First-run script for the Management VM: clones Twinbox, installs Docker CE, configures time sync, creates `.env`, starts `docker compose`. |
+| `bootstrap-vm.sh` | First-run script for the Management VM: seeds runtime files, fetches the bootstrap playbook tree when needed, installs the Ansible-driven host baseline, creates `.env`, and starts `docker compose`. |
 | `install-management-vm-maintenance.sh` | Installs and enables the systemd timer that runs the Management VM maintenance playbook. |
-| `start-manager.sh` | Loads `.env` and starts the manager stack via `docker compose`. |
+| `start-manager.sh` | Loads `.env`, materializes bootstrap files if needed, and starts the manager stack via `docker compose`. |
 | `get-talos-image-factory.sh` | Queries the Talos Image Factory for a schematic ID, download URL, or shell command. Supports `--preset`, `--version`, `--arch`, `--platform`, `--output`. |
 | `install-management-tools.sh` | Installs `talosctl`, `tofu`, `kubectl`, and `helm` with versions pinned from `config/pinned-defaults.sh`. |
-| `management-vm-maintenance.sh` | Installs `ansible-core` if needed and runs the Management VM maintenance playbook locally. The playbook also keeps the VM on the pinned NTP server. |
+| `management-vm-maintenance.sh` | Installs `ansible-core` if needed and runs the Management VM maintenance playbook from the bootstrap tree. The playbook keeps the VM on the pinned NTP server, Docker, and the management tools. |
 | `manager-web-preview.sh` | Dev helper for previewing `manager-web`. |
 | `wizard-dev-run.sh` | Dev helper for running the setup wizard locally. |
 

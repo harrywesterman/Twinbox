@@ -7,7 +7,7 @@
 1. Detects existing Twinbox clusters on the host via VM tags, snippets, Proxmox users, and roles.
 2. Presents a menu to create a new cluster or manage (remove) an existing one.
 3. Auto-detects network settings (host IP, gateway, DNS, bridge, next free VMID).
-4. Creates an Ubuntu 24.04 Management VM with cloud-init (Docker CE, runtime directories, `.env`, `docker compose`).
+4. Creates an Ubuntu 24.04 Management VM with cloud-init plus an Ansible baseline (runtime directories, `.env`, Docker CE, management tools, `docker compose`).
 5. Creates a cluster-specific Proxmox API user and least-privilege role.
 6. Waits for the Management VM to boot and the Twinbox web interface to become available.
 
@@ -72,7 +72,7 @@ docker compose up -d
 
 ## Notes
 
-- Docker is installed from the official Docker APT repo (`download.docker.com`), not Ubuntu's `docker.io`.
+- The VM baseline is installed through Ansible after cloud-init seeds the bootstrap tree.
 - The wizard keeps passwords out of the completion screen.
 - VM cleanup on failure is automatic (stops and destroys the VM if the script exits before completion).
 - The wizard loops back to the main menu after each action, allowing multiple cluster operations in one session.

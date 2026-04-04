@@ -42,7 +42,9 @@ for attempt in $(seq 1 120); do
   if kubectl -n traefik get ingressroute/traefik-dashboard >/dev/null 2>&1 && \
      kubectl -n longhorn-system get ingressroute/longhorn >/dev/null 2>&1 && \
      kubectl -n longhorn-system get ingressroute/proxmox >/dev/null 2>&1 && \
-     kubectl -n longhorn-system get ingressroute/twinboxwizard >/dev/null 2>&1; then
+     kubectl -n longhorn-system get ingressroute/twinboxwizard >/dev/null 2>&1 && \
+     kubectl -n longhorn-system get ingressroute/seaweedfs >/dev/null 2>&1 && \
+     kubectl -n longhorn-system get ingressroute/seaweedfs-admin >/dev/null 2>&1; then
     break
   fi
   if [[ "$attempt" -eq 120 ]]; then
@@ -73,11 +75,15 @@ provider_ids_json="$(TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$authentik_token" tofu 
 traefik_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.traefik_dashboard')"
 longhorn_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.longhorn')"
 proxmox_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.proxmox')"
-twinboxwizard_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.twinboxwizard')"
-[[ "$traefik_provider_id" != "null" && -n "$traefik_provider_id" ]] || fail "Could not read Traefik provider ID from tofu output"
-[[ "$longhorn_provider_id" != "null" && -n "$longhorn_provider_id" ]] || fail "Could not read Longhorn provider ID from tofu output"
-[[ "$proxmox_provider_id" != "null" && -n "$proxmox_provider_id" ]] || fail "Could not read Proxmox provider ID from tofu output"
-[[ "$twinboxwizard_provider_id" != "null" && -n "$twinboxwizard_provider_id" ]] || fail "Could not read Twinbox Wizard provider ID from tofu output"
+  twinboxwizard_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.twinboxwizard')"
+  seaweedfs_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.seaweedfs')"
+  seaweedfs_admin_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.seaweedfs_admin')"
+  [[ "$traefik_provider_id" != "null" && -n "$traefik_provider_id" ]] || fail "Could not read Traefik provider ID from tofu output"
+  [[ "$longhorn_provider_id" != "null" && -n "$longhorn_provider_id" ]] || fail "Could not read Longhorn provider ID from tofu output"
+  [[ "$proxmox_provider_id" != "null" && -n "$proxmox_provider_id" ]] || fail "Could not read Proxmox provider ID from tofu output"
+  [[ "$twinboxwizard_provider_id" != "null" && -n "$twinboxwizard_provider_id" ]] || fail "Could not read Twinbox Wizard provider ID from tofu output"
+  [[ "$seaweedfs_provider_id" != "null" && -n "$seaweedfs_provider_id" ]] || fail "Could not read SeaweedFS provider ID from tofu output"
+  [[ "$seaweedfs_admin_provider_id" != "null" && -n "$seaweedfs_admin_provider_id" ]] || fail "Could not read SeaweedFS admin provider ID from tofu output"
 
 AUTHENTIK_LOCAL_FORWARD_PORT="${AUTHENTIK_LOCAL_FORWARD_PORT:-18299}"
 AUTHENTIK_API_BASE="http://127.0.0.1:${AUTHENTIK_LOCAL_FORWARD_PORT}/api/v3"
@@ -178,8 +184,9 @@ outpost_id="$(printf '%s' "$outpost_json" | jq -r '.results[] | select(.name == 
 current_providers="$(printf '%s' "$outpost_json" | jq -c '.results[] | select(.pk == "'"$outpost_id"'") | .providers // []')"
 updated_providers="$(
   printf '%s\n' "$current_providers" \
-    | jq --arg traefik "$traefik_provider_id" --arg longhorn "$longhorn_provider_id" --arg proxmox "$proxmox_provider_id" --arg twinboxwizard "$twinboxwizard_provider_id" '
+    | jq --arg traefik "$traefik_provider_id" --arg longhorn "$longhorn_provider_id" --arg proxmox "$proxmox_provider_id" --arg twinboxwizard "$twinboxwizard_provider_id" --arg seaweedfs "$seaweedfs_provider_id" --arg seaweedfs_admin "$seaweedfs_admin_provider_id" '
         . + [$traefik, $longhorn, $proxmox, $twinboxwizard]
+        + [$seaweedfs, $seaweedfs_admin]
         | map(tostring)
         | unique
       '
@@ -214,6 +221,22 @@ if ! printf '%s' "$final_outpost_json" | jq -e --arg twinboxwizard "$twinboxwiza
       | index($twinboxwizard) != null
     ' >/dev/null; then
   fail "Embedded Authentik outpost did not retain the Twinbox Wizard provider ID"
+fi
+
+if ! printf '%s' "$final_outpost_json" | jq -e --arg seaweedfs "$seaweedfs_provider_id" '
+      (.providers // [])
+      | map(tostring)
+      | index($seaweedfs) != null
+    ' >/dev/null; then
+  fail "Embedded Authentik outpost did not retain the SeaweedFS provider ID"
+fi
+
+if ! printf '%s' "$final_outpost_json" | jq -e --arg seaweedfs_admin "$seaweedfs_admin_provider_id" '
+      (.providers // [])
+      | map(tostring)
+      | index($seaweedfs_admin) != null
+    ' >/dev/null; then
+  fail "Embedded Authentik outpost did not retain the SeaweedFS admin provider ID"
 fi
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Embedded Authentik outpost now has ${final_provider_count} proxy provider(s)"

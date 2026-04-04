@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs
+  namespace: longhorn-system
+spec:
+  ports:
+    - name: s3
+      port: 8333
+      protocol: TCP
+      targetPort: 8333
+    - name: filer
+      port: 8888
+      protocol: TCP
+      targetPort: 8888
+    - name: admin
+      port: 23646
+      protocol: TCP
+      targetPort: 23646
+  type: ClusterIP

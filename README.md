@@ -38,7 +38,8 @@ Open your browser to continue the installation. The web UI guides you through cl
 - **Longhorn** — distributed block storage
 - **OpenBao + External Secrets Operator** — centralized secret management
 - **Traefik** — ingress and routing
-- **Velero** — automated backups to S3 or embedded Garage
+- **SeaweedFS** — S3-compatible backup target on the Management VM
+- **Velero** — automated cluster backups to SeaweedFS
 - **CloudNativePG** — managed PostgreSQL clusters
 - **Authentik** — single sign-on and identity provider
 

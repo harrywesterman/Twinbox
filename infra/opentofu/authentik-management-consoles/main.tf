@@ -36,6 +36,18 @@ locals {
       external_host = var.twinboxwizard_external_host
       launch_url    = var.twinboxwizard_external_host
     }
+    seaweedfs = {
+      name          = "SeaweedFS"
+      slug          = "seaweedfs"
+      external_host = var.seaweedfs_external_host
+      launch_url    = var.seaweedfs_external_host
+    }
+    seaweedfs_admin = {
+      name          = "SeaweedFS Admin"
+      slug          = "seaweedfs-admin"
+      external_host = var.seaweedfs_admin_external_host
+      launch_url    = var.seaweedfs_admin_external_host
+    }
   }
 }
 

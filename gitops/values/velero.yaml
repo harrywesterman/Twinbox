@@ -13,9 +13,9 @@ configuration:
         name: velero-credentials
         key: cloud
       config:
-        region: garage
+        region: seaweedfs
         s3ForcePathStyle: true
-        s3Url: http://garage.velero.svc.cluster.local:3900
+        s3Url: http://seaweedfs.longhorn-system.svc.cluster.local:8333
 
 snapshotsEnabled: false
 defaultVolumesToFsBackup: true

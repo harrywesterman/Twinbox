@@ -39,6 +39,10 @@ resources:
   - management-consoles/twinboxwizard-ingressroute.yaml
   - management-consoles/twinboxwizard-service.yaml
   - management-consoles/twinboxwizard-endpoints.yaml
+  - management-consoles/seaweedfs-ingressroute.yaml
+  - management-consoles/seaweedfs-admin-ingressroute.yaml
+  - management-consoles/seaweedfs-service.yaml
+  - management-consoles/seaweedfs-endpoints.yaml
   - wiredoor-gateway/ingressroute.yaml
   - wiredoor-gateway/externalsecret.yaml
   - dashy/ingressroute.yaml

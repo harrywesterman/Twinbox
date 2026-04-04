@@ -2,11 +2,10 @@
 Description=Twinbox Management VM maintenance
 Wants=network-online.target
 After=network-online.target
-ConditionPathExists=/opt/twinbox/scripts/management-vm-maintenance.sh
+ConditionPathExists=/opt/twinbox/bootstrap/ansible/management-vm-maintenance.yml
 
 [Service]
 Type=oneshot
 User=root
 Group=root
 ExecStart=/opt/twinbox/scripts/management-vm-maintenance.sh
-

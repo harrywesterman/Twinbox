@@ -5,22 +5,60 @@
   gather_facts: true
 
   vars:
-    twinbox_mgmt_packages:
+    twinbox_raw_base_url: https://raw.githubusercontent.com/harrywesterman/Twinbox/main
+    twinbox_runtime_root: "{{ lookup('env', 'TWINBOX_HOST_REPO_ROOT') | default('/opt/twinbox', true) }}"
+    twinbox_bootstrap_root: "{{ lookup('env', 'TWINBOX_BOOTSTRAP_DIR') | default('/opt/twinbox/bootstrap', true) }}"
+    twinbox_management_time_server: "{{ lookup('env', 'TWINBOX_TIME_SERVER') | default('time.cloudflare.com', true) }}"
+    twinbox_management_vm_ip: "{{ lookup('env', 'MANAGEMENT_VM_IP') | default('127.0.0.1', true) }}"
+    twinbox_management_env_file: "{{ twinbox_runtime_root }}/.env"
+    twinbox_compose_file: "{{ twinbox_runtime_root }}/docker-compose.yml"
+    twinbox_bootstrap_ansible_dir: "{{ twinbox_bootstrap_root }}/ansible"
+    twinbox_bootstrap_config_dir: "{{ twinbox_bootstrap_root }}/config"
+    twinbox_bootstrap_bin_dir: "{{ twinbox_bootstrap_root }}/bin"
+    twinbox_management_packages:
       - ansible-core
+      - ca-certificates
+      - curl
       - fail2ban
+      - gnupg
+      - jq
       - openssh-server
+      - python3-apt
+      - software-properties-common
       - unattended-upgrades
       - ufw
-      - python3-apt
-
-    twinbox_ssh_dropin: /etc/ssh/sshd_config.d/99-twinbox-management.conf
-    twinbox_timesyncd_dropin: /etc/systemd/timesyncd.conf.d/99-twinbox.conf
-    twinbox_apt_periodic: /etc/apt/apt.conf.d/20auto-upgrades
-    twinbox_unattended_upgrades: /etc/apt/apt.conf.d/52-twinbox-unattended-upgrades
-    twinbox_fail2ban_jail: /etc/fail2ban/jail.d/twinbox-sshd.local
-    twinbox_time_server: "{{ lookup('env', 'TWINBOX_TIME_SERVER') | default('time.cloudflare.com', true) }}"
+    twinbox_docker_packages:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    twinbox_tool_script: "{{ twinbox_bootstrap_bin_dir }}/install-management-tools.sh"
+    twinbox_pinned_defaults: "{{ twinbox_bootstrap_config_dir }}/pinned-defaults.sh"
 
   tasks:
+    - name: Ensure management VM runtime directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      loop:
+        - "{{ twinbox_runtime_root }}"
+        - "{{ twinbox_runtime_root }}/manager-data"
+        - "{{ twinbox_runtime_root }}/seaweedfs"
+        - "{{ twinbox_runtime_root }}/seaweedfs/data"
+        - "{{ twinbox_bootstrap_root }}"
+        - "{{ twinbox_bootstrap_root }}/secrets"
+        - "{{ twinbox_bootstrap_root }}/secrets/global"
+        - "{{ twinbox_bootstrap_root }}/openbao"
+        - "{{ twinbox_bootstrap_root }}/openbao/seal"
+        - "{{ twinbox_bootstrap_root }}/openbao/init"
+        - "{{ twinbox_bootstrap_ansible_dir }}"
+        - "{{ twinbox_bootstrap_config_dir }}"
+        - "{{ twinbox_bootstrap_bin_dir }}"
+
     - name: Refresh apt package metadata and patch installed packages
       ansible.builtin.apt:
         update_cache: true
@@ -31,7 +69,7 @@
 
     - name: Ensure management host packages are present
       ansible.builtin.apt:
-        name: "{{ twinbox_mgmt_packages }}"
+        name: "{{ twinbox_management_packages }}"
         state: present
         lock_timeout: 300
       environment:
@@ -39,7 +77,7 @@
 
     - name: Configure periodic apt updates
       ansible.builtin.copy:
-        dest: "{{ twinbox_apt_periodic }}"
+        dest: /etc/apt/apt.conf.d/20auto-upgrades
         owner: root
         group: root
         mode: "0644"
@@ -50,7 +88,7 @@
 
     - name: Configure unattended upgrades
       ansible.builtin.copy:
-        dest: "{{ twinbox_unattended_upgrades }}"
+        dest: /etc/apt/apt.conf.d/52-twinbox-unattended-upgrades
         owner: root
         group: root
         mode: "0644"
@@ -62,7 +100,7 @@
 
     - name: Keep SSH password authentication enabled
       ansible.builtin.copy:
-        dest: "{{ twinbox_ssh_dropin }}"
+        dest: /etc/ssh/sshd_config.d/99-twinbox-management.conf
         owner: root
         group: root
         mode: "0644"
@@ -76,19 +114,31 @@
 
     - name: Configure management VM time synchronization
       ansible.builtin.copy:
-        dest: "{{ twinbox_timesyncd_dropin }}"
+        dest: /etc/systemd/timesyncd.conf.d/99-twinbox.conf
         owner: root
         group: root
         mode: "0644"
-        content: |
+      content: |
           [Time]
-          NTP={{ twinbox_time_server }}
+          NTP={{ twinbox_management_time_server }}
           FallbackNTP=
       notify: Restart timesyncd
 
+    - name: Enable and start QEMU guest agent
+      ansible.builtin.service:
+        name: qemu-guest-agent
+        enabled: true
+        state: started
+
+    - name: Enable and start systemd-timesyncd
+      ansible.builtin.service:
+        name: systemd-timesyncd
+        enabled: true
+        state: started
+
     - name: Configure fail2ban for SSH
       ansible.builtin.copy:
-        dest: "{{ twinbox_fail2ban_jail }}"
+        dest: /etc/fail2ban/jail.d/twinbox-sshd.local
         owner: root
         group: root
         mode: "0644"
@@ -110,28 +160,192 @@
         ufw allow 22/tcp
         ufw allow 3000/tcp
         ufw allow 8080/tcp
+        ufw allow 8333/tcp
+        ufw allow 8888/tcp
+        ufw allow 23646/tcp
         ufw --force enable
       args:
         executable: /bin/bash
       changed_when: false
 
-    - name: Enable and start fail2ban
+    - name: Add Docker apt keyring directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Remove conflicting container packages
+      ansible.builtin.apt:
+        name:
+          - docker.io
+          - docker-doc
+          - docker-compose
+          - docker-compose-v2
+          - podman-docker
+          - containerd
+          - runc
+        state: absent
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+
+    - name: Fetch Docker apt key
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
+
+    - name: Add Docker apt repository
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu noble stable"
+        filename: docker
+        state: present
+
+    - name: Install Docker CE and compose plugin
+      ansible.builtin.apt:
+        name: "{{ twinbox_docker_packages }}"
+        state: present
+        update_cache: true
+        lock_timeout: 300
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+
+    - name: Enable and start Docker
       ansible.builtin.service:
-        name: fail2ban
+        name: docker
         enabled: true
         state: started
 
-    - name: Enable and start SSH
-      ansible.builtin.service:
-        name: ssh
-        enabled: true
-        state: started
+    - name: Download the pinned defaults for local tool installation
+      ansible.builtin.get_url:
+        url: "{{ twinbox_raw_base_url }}/config/pinned-defaults.sh"
+        dest: "{{ twinbox_pinned_defaults }}"
+        mode: "0644"
 
-    - name: Enable and start systemd-timesyncd
-      ansible.builtin.service:
-        name: systemd-timesyncd
+    - name: Download the management tool installer
+      ansible.builtin.get_url:
+        url: "{{ twinbox_raw_base_url }}/scripts/install-management-tools.sh"
+        dest: "{{ twinbox_tool_script }}"
+        mode: "0755"
+
+    - name: Install management CLI tools
+      ansible.builtin.command:
+        argv:
+          - "{{ twinbox_tool_script }}"
+          - --env-file
+          - "{{ twinbox_management_env_file }}"
+      environment:
+        TWINBOX_BOOTSTRAP_DIR: "{{ twinbox_bootstrap_root }}"
+
+    - name: Download the Docker Compose stack definition
+      ansible.builtin.get_url:
+        url: "{{ twinbox_raw_base_url }}/docker-compose.yml"
+        dest: "{{ twinbox_compose_file }}"
+        mode: "0644"
+
+    - name: Ensure the SeaweedFS data directory exists
+      ansible.builtin.file:
+        path: "{{ twinbox_runtime_root }}/seaweedfs/data"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Start the management stack with Docker Compose
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - pull
+      args:
+        chdir: "{{ twinbox_runtime_root }}"
+
+    - name: Bring the management stack up
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - up
+          - -d
+      args:
+        chdir: "{{ twinbox_runtime_root }}"
+
+    - name: Install the management VM maintenance wrapper
+      ansible.builtin.copy:
+        dest: /usr/local/bin/twinbox-management-vm-maintenance
+        owner: root
+        group: root
+        mode: "0755"
+        content: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          if [[ "$(id -u)" -ne 0 ]]; then
+            exec sudo -E "$0" "$@"
+          fi
+
+          if [[ -f "{{ twinbox_management_env_file }}" ]]; then
+            # shellcheck disable=SC1090
+            set -a
+            source "{{ twinbox_management_env_file }}"
+            set +a
+          fi
+
+          if [[ -f "{{ twinbox_bootstrap_ansible_dir }}/runtime.env" ]]; then
+            # shellcheck disable=SC1090
+            set -a
+            source "{{ twinbox_bootstrap_ansible_dir }}/runtime.env"
+            set +a
+          fi
+
+          exec ansible-playbook -i localhost, -c local "{{ twinbox_bootstrap_ansible_dir }}/management-vm-maintenance.yml"
+
+    - name: Install the management VM systemd service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/twinbox-management-maintenance.service
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Twinbox Management VM maintenance
+          Wants=network-online.target
+          After=network-online.target
+          ConditionPathExists={{ twinbox_bootstrap_ansible_dir }}/management-vm-maintenance.yml
+
+          [Service]
+          Type=oneshot
+          User=root
+          Group=root
+          ExecStart=/usr/local/bin/twinbox-management-vm-maintenance
+
+    - name: Install the management VM systemd timer
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/twinbox-management-maintenance.timer
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Run Twinbox Management VM maintenance daily
+
+          [Timer]
+          OnBootSec=15min
+          OnUnitActiveSec=1d
+          RandomizedDelaySec=45min
+          Persistent=true
+          Unit=twinbox-management-maintenance.service
+
+          [Install]
+          WantedBy=timers.target
+
+    - name: Reload systemd and enable the maintenance timer
+      ansible.builtin.systemd:
+        name: twinbox-management-maintenance.timer
         enabled: true
         state: started
+        daemon_reload: true
 
   handlers:
     - name: Restart ssh

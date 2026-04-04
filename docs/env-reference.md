@@ -43,9 +43,18 @@ CLI tools pinned in `config/pinned-defaults.sh`:
 
 | Variable | Example | Description |
 |----------|---------|-------------|
-| `TWINBOX_HOST_REPO_ROOT` | `/opt/twinbox` | Path to the Twinbox checkout on the Management VM |
+| `TWINBOX_HOST_REPO_ROOT` | `/opt/twinbox` | Path to the Twinbox runtime root on the Management VM |
 | `TWINBOX_BOOTSTRAP_DIR` | `/opt/twinbox/bootstrap` | Root of the bootstrap secrets tree |
 | `MANAGEMENT_VM_IP` | `192.168.1.50` | The Management VM's own IP address. Used as the anchor for IP allocation scanning (`/api/ip-suggestions`) and for detecting network defaults (gateway, DNS, prefix length). |
+
+## SeaweedFS
+
+| Variable | Example | Description |
+|----------|---------|-------------|
+| `SEAWEEDFS_ACCESS_KEY_ID` | `velero` | S3 access key used by SeaweedFS and Velero |
+| `SEAWEEDFS_SECRET_ACCESS_KEY` | `generated-secret` | S3 secret key used by SeaweedFS and Velero |
+| `SEAWEEDFS_BUCKET` | `twinbox-velero` | Default bucket for Velero backups |
+| `SEAWEEDFS_REGION` | `seaweedfs` | Compatibility region label for the SeaweedFS S3 endpoint |
 
 ## Secrets
 

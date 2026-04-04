@@ -87,7 +87,7 @@ Syncs a specific global secret item from the filesystem into OpenBao.
 
 ### `install-velero-backup.sh`
 
-Installs Velero with either the embedded Garage bucket or an external S3-compatible target.
+Installs Velero with the SeaweedFS S3 target running on the Management VM.
 
 ## Utility
 

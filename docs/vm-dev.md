@@ -32,23 +32,22 @@ Use this workflow when the Twinbox Management VM is your primary development mac
 ssh <management-vm-user>@<management-vm-ip>
 ```
 
-- You know the repo path on the VM. Default installs use `/opt/twinbox`. Older VMs may still use `/opt/twinbox-<cluster-slug>`.
+- You know the runtime path on the VM. Default installs use `/opt/twinbox`.
 
 ## One-Time Bootstrap on the VM
 
 Run this on the Management VM:
 
 ```bash
-cd /opt/twinbox
-bash scripts/bootstrap-vm.sh
+sudo ansible-playbook -i localhost, -c local /opt/twinbox/bootstrap/ansible/management-vm-maintenance.yml
 ```
 
 What it does:
 
-- Ensures required tools exist (`git`, `docker`, `docker compose`).
+- Ensures the management host baseline is installed through Ansible.
 - Ensures runtime directories exist at `/opt/twinbox`.
-- Ensures `.env` exists.
-- Starts the stack with `docker compose up -d`.
+- Installs Docker, the management tools, and host hardening.
+- Starts the stack with `docker compose up -d` after the bootstrap tree is present.
 
 ## Default Frontend Preview Flow
 
@@ -123,9 +122,9 @@ Then open:
 
 Use normal local browser DevTools for frontend inspection.
 
-## Move the VM Back to Repo State After Push
+## Refresh the VM Runtime
 
-Once the change is merged or pushed and you want the VM to run from the repo checkout again:
+If you want the VM to refresh its runtime files after a change is merged or pushed:
 
 ```bash
 ssh <management-vm-user>@<management-vm-ip>
@@ -133,7 +132,7 @@ docker compose pull
 docker compose up -d
 ```
 
-That makes the running `manager-web` container come from the repo-backed code on the VM instead of the temporary preview upload.
+That refreshes the running `manager-web` container from the current runtime images and compose state on the VM.
 
 ## Optional Full Remote Editing Flow
 
@@ -142,7 +141,6 @@ If you really want to edit on the VM itself, you still can.
 On the VM:
 
 ```bash
-cd /opt/twinbox
 docker compose up -d
 ```
 

@@ -2,7 +2,7 @@
 
 Twinbox is a complete K8s cluster based on Talos Linux, completely configured. The Management VM is the control point for bootstrap, queueing, and long-lived bootstrap material.
 
-GitHub `main` is the source of truth for both the management stack and the GitOps manifests. The Management VM is a runtime host that runs the repo checkout, but Argo CD reconciles cluster state from the GitHub-backed repo content, not from ad hoc live edits on the VM.
+GitHub `main` is the source of truth for both the management stack and the GitOps manifests. The Management VM is a runtime host that keeps only runtime data under `/opt/twinbox`; the host no longer depends on a persistent repo checkout.
 
 ## Layers
 
@@ -11,10 +11,11 @@ GitHub `main` is the source of truth for both the management stack and the GitOp
    - Runs on Proxmox and creates only the Management VM.
 
 2. **Manager runtime layer**
-   - `manager-web`
-   - `manager-api`
-   - `manager-worker`
-   - `categories/`
+  - `manager-web`
+  - `manager-api`
+  - `manager-worker`
+  - `categories/`
+  - Management VM runtime files under `/opt/twinbox`
 
 3. **Execution layer**
    - `scripts/manager/apply-cluster.sh`
@@ -65,7 +66,7 @@ GitHub `main` is the source of truth for both the management stack and the GitOp
 7. `install-longhorn-storage` runs before cluster secret sync so stateful workloads and backup storage can use Longhorn PVCs immediately through the cluster default storage class.
 8. `install-secret-sync` installs External Secrets Operator and OpenBao on Longhorn.
 9. `install-secret-sync` seeds OpenBao from the Management VM bootstrap files and creates `ClusterSecretStore/openbao`.
-10. `install-velero-backup` deploys Velero together with a Twinbox-managed Garage bucket or an external S3-compatible backup target.
+10. `install-velero-backup` deploys Velero together with the SeaweedFS S3 target that runs on the Management VM.
 11. `install-cloudnativepg` installs the CloudNativePG operator on top of Longhorn so PostgreSQL-backed workloads can share one database platform.
 12. `install-postgres-clusters` deploys the CloudNativePG Cluster, Pooler, ScheduledBackup, and ExternalSecret resources for each application database, then waits on the concrete database resources instead of Argo CD aggregate app health before the Authentik app step runs.
 13. Authentik uses a `Recreate` rollout strategy so its bootstrap lock is only held by one pod at a time during upgrades and restarts.
@@ -95,4 +96,6 @@ The local Argo cluster secret must exist before the domain-aware ApplicationSets
 - Talos configs and kubeconfigs are runtime artifacts, not canonical files under `manager-data/`.
 - Management VM edits under `/opt/twinbox` are temporary unless they are committed and pushed back to GitHub `main`.
 - OpenBao uses static auto-unseal material stored on the Management VM for zero-touch restarts.
+- The Management VM runs SeaweedFS in Docker as the default S3 target for Velero backups.
+- The Management VM does not need a Twinbox repository checkout; cloud-init seeds `/opt/twinbox` and Ansible maintains the host from there.
 - The first visible setup step in the UI is `Deploy Talos Cluster`.
