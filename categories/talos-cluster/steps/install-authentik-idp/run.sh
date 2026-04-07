@@ -102,10 +102,10 @@ load_authentik_secret_json() {
 if [[ -f "$authentik_secret_file" ]]; then
   load_authentik_secret_json "$(jq -c '.' "$authentik_secret_file")"
 elif [[ -f "$openbao_initialized_file" ]]; then
-  if authentik_secret_json="$(openbao_read_global_secret_json authentik)"; then
-    load_authentik_secret_json "$authentik_secret_json"
-  else
-    fail "OpenBao is initialized but the Authentik secret could not be read"
+  if authentik_secret_json="$(openbao_read_global_secret_json authentik 2>/dev/null || true)"; then
+    if [[ -n "$authentik_secret_json" && "$authentik_secret_json" != "null" ]]; then
+      load_authentik_secret_json "$authentik_secret_json"
+    fi
   fi
 fi
 
