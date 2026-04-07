@@ -88,7 +88,8 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     text = _wizard_text()
     assert "  - name: ${CLOUD_INIT_USER}" in text
     assert "    lock_passwd: false" in text
-    assert "    passwd: ${CLOUD_INIT_PASSWORD_HASH}" in text
+    assert '      password: "${CLOUD_INIT_PASSWORD}"' in text
+    assert "      type: text" in text
     assert "ssh_pwauth: true" in text
     assert "    sudo: ['ALL=(ALL) NOPASSWD:ALL']" in text
     assert "  - path: /tmp/twinbox.env.template" in text

@@ -770,7 +770,7 @@ def test_catalog_endpoint_isolates_invalid_manifest_entries():
             )
             assert talos["steps"][1]["id"] == "install-argocd"
             assert talos["steps"][1]["status"] == "ready"
-            assert talos["steps"][2]["id"] == "install-secret-sync"
+            assert talos["steps"][2]["id"] == "install-longhorn-storage"
             assert talos["steps"][2]["status"] == "locked"
         finally:
             proc.terminate()

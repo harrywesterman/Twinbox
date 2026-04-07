@@ -1183,7 +1183,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     )
 
     headlamp_step_text = HEADLAMP_STEP_MANIFEST.read_text(encoding="utf-8")
-    assert "install-secret-sync" in headlamp_step_text
+    assert "install-cloudnativepg" in headlamp_step_text
     assert "install-authentik-idp" in headlamp_step_text
     assert "choose-ingress-route" in headlamp_step_text
     assert "OpenTofu" in headlamp_step_text
@@ -1409,7 +1409,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
         in headlamp_text
     )
 
-    assert "install-headlamp" in grafana_text
+    assert "install-secret-sync" in grafana_text
     assert "install-prometheus" in grafana_text
     assert (
         "script: categories/talos-cluster/steps/install-grafana/run.sh" in grafana_text
