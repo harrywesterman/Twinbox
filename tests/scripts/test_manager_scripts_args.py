@@ -2032,6 +2032,8 @@ def test_authentik_consumer_scripts_read_from_openbao():
     idp_text = idp_path.read_text(encoding="utf-8")
     assert "authentik-auth.sh" in idp_text
     assert "authentik_ensure_token" in idp_text or "authentik_load_bootstrap_secret" in idp_text
+    # Flow creation should use AUTHENTIK_TOKEN from the helper, not the raw bootstrap token
+    assert "Authorization: Bearer ${AUTHENTIK_TOKEN}" in idp_text
 
     for path in consumer_paths:
         text = path.read_text(encoding="utf-8")

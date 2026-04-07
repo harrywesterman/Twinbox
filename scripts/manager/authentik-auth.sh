@@ -52,19 +52,131 @@ authentik_load_bootstrap_secret() {
 }
 
 # ---------------------------------------------------------------------------
+# Create an API token for akadmin via kubectl exec in the Authentik pod.
+# This bypasses the need for flow-based authentication entirely.
+# The token is persisted in OpenBao so subsequent runs reuse it.
+# ---------------------------------------------------------------------------
+authentik_create_api_token() {
+  local identifier="${1:-twinbox-automation}"
+  local pod=""
+
+  pod="$(kubectl get pod -n authentik -l app.kubernetes.io/name=authentik,app.kubernetes.io/instance=authentik -o json 2>/dev/null | \
+    jq -r '.items[] | select(.status.phase == "Running") | select(.metadata.labels["app.kubernetes.io/component"] == "server") | .metadata.name' | head -n1)" || true
+
+  if [[ -z "$pod" ]]; then
+    _authentik_log "No running Authentik server pod found for API token creation"
+    return 1
+  fi
+
+  _authentik_log "Creating API token for akadmin via pod exec"
+
+  local token_key
+  token_key="$(kubectl exec -n authentik "$pod" -- ak shell 2>/dev/null <<'PYEOF'
+from authentik.core.models import User, Token
+from django.utils import timezone
+user = User.objects.filter(username="akadmin").first()
+if not user:
+    print("ERROR: akadmin user not found", flush=True)
+    exit(1)
+# Delete any existing twinbox automation token (idempotent)
+Token.objects.filter(identifier="twinbox-automation", user=user, intent="api").delete()
+token = Token.objects.create(
+    identifier="twinbox-automation",
+    user=user,
+    intent="api",
+    expiring=False,
+)
+print(token.token_key, flush=True)
+PYEOF
+)" || true
+
+  if [[ -z "$token_key" || "$token_key" == *"ERROR"* || "$token_key" == *"Traceback"* ]]; then
+    _authentik_log "Failed to create API token via pod exec"
+    return 1
+  fi
+
+  # Store the token in OpenBao so subsequent steps can use it directly
+  local openbao_pod=""
+  openbao_pod="$(kubectl get pod -n openbao -l app.kubernetes.io/name=openbao -o json 2>/dev/null | \
+    jq -r '.items[] | select(.status.phase == "Running") | .metadata.name' | head -n1)" || true
+
+  if [[ -n "$openbao_pod" ]]; then
+    local root_token=""
+    local bootstrap_root="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
+    if [[ -f "$bootstrap_root/openbao/init/root-token" ]]; then
+      root_token="$(tr -d '\r\n' <"$bootstrap_root/openbao/init/root-token")"
+    fi
+
+    if [[ -n "$root_token" ]]; then
+      local forward_port="${OPENBAO_LOCAL_FORWARD_PORT:-18200}"
+      local forward_log
+      forward_log="$(mktemp "${TMPDIR:-/tmp}/openbao-port-forward.XXXXXX.log")"
+      local forward_pid=""
+
+      kubectl -n openbao port-forward "pod/${openbao_pod}" "${forward_port}:8200" >"$forward_log" 2>&1 &
+      forward_pid="$!"
+
+      local attempt=1
+      while [[ "$attempt" -le 20 ]]; do
+        if curl -fsS "http://127.0.0.1:${forward_port}/v1/sys/health" >/dev/null 2>&1; then
+          break
+        fi
+        sleep 1
+        attempt=$((attempt + 1))
+      done
+
+      if [[ "$attempt" -le 20 ]]; then
+        # Read current secret and update with the API token
+        local current
+        current="$(curl -fsS -H "X-Vault-Token: ${root_token}" \
+          "http://127.0.0.1:${forward_port}/v1/kv/data/twinbox/global/authentik" 2>/dev/null | jq -c '.data.data // {}')" || current="{}"
+
+        curl -fsS -X POST \
+          -H "Content-Type: application/json" \
+          -H "X-Vault-Token: ${root_token}" \
+          --data-binary "$(jq -n --argjson current "$current" --arg api_token "$token_key" \
+            '{data: ($current + {AUTHENTIK_API_TOKEN: $api_token})}')" \
+          "http://127.0.0.1:${forward_port}/v1/kv/data/twinbox/global/authentik" >/dev/null 2>&1 || true
+
+        _authentik_log "Stored AUTHENTIK_API_TOKEN in OpenBao"
+      fi
+
+      kill "$forward_pid" >/dev/null 2>&1 || true
+      wait "$forward_pid" >/dev/null 2>&1 || true
+      rm -f "$forward_log"
+    fi
+  fi
+
+  AUTHENTIK_TOKEN="$token_key"
+  AUTHENTIK_USE_COOKIE="false"
+  _authentik_log "API token created successfully"
+  return 0
+}
+
+# ---------------------------------------------------------------------------
 # Authenticate to Authentik and populate AUTHENTIK_TOKEN
 #
 # Strategy:
-#   1. Try the bootstrap token directly (works during initial provisioning).
-#   2. If 403, authenticate as akadmin via flow executor and create/reuse an API token.
-#   3. Fallback to session cookie if token creation fails.
+#   1. Check for existing AUTHENTIK_API_TOKEN in OpenBao (persisted token).
+#   2. Try the bootstrap token directly (works during initial provisioning).
+#   3. Create a new API token via kubectl exec in the Authentik pod.
 # ---------------------------------------------------------------------------
 authentik_ensure_token() {
   authentik_load_bootstrap_secret
 
+  # Strategy 1: Check for a persisted API token in OpenBao
+  local persisted_token=""
+  persisted_token="$(openbao_read_global_secret_json authentik | jq -r '.AUTHENTIK_API_TOKEN // empty' 2>/dev/null)" || persisted_token=""
+
+  if [[ -n "$persisted_token" && "$persisted_token" != "null" ]]; then
+    AUTHENTIK_TOKEN="$persisted_token"
+    _authentik_log "Using persisted AUTHENTIK_API_TOKEN from OpenBao"
+    return 0
+  fi
+
+  # Strategy 2: Try the bootstrap token directly (may work on fresh installs)
   AUTHENTIK_TOKEN="$AUTHENTIK_BOOTSTRAP_TOKEN"
 
-  # Quick test: is the bootstrap token still valid?
   local test_url="${AUTHENTIK_HOST:+${AUTHENTIK_HOST}/api/v3}"
   if [[ -n "$test_url" ]]; then
     local test_status
@@ -79,91 +191,13 @@ authentik_ensure_token() {
     fi
   fi
 
-  # Bootstrap token is invalid or host not set – try flow-based auth
-  _authentik_log "Bootstrap token invalid or host unknown; attempting flow-based authentication"
-  _authentik_auth_via_flow || true
-
-  # If we still have nothing useful, keep the bootstrap token and let the caller fail loudly
-  if [[ -z "${AUTHENTIK_TOKEN:-}" ]]; then
-    AUTHENTIK_TOKEN="$AUTHENTIK_BOOTSTRAP_TOKEN"
-    _authentik_log "WARNING: falling back to bootstrap token (may fail if expired)"
-  fi
-}
-
-# Internal: authenticate via flow executor and obtain a reusable API token.
-_authentik_auth_via_flow() {
-  local username="akadmin"
-  local password="$AUTHENTIK_BOOTSTRAP_PASSWORD"
-
-  # Determine the API base URL
-  local api_base=""
-  if [[ -n "${AUTHENTIK_LOCAL_FORWARD_PORT:-}" ]]; then
-    api_base="http://127.0.0.1:${AUTHENTIK_LOCAL_FORWARD_PORT}/api/v3"
-  elif [[ -n "${AUTHENTIK_HOST:-}" ]]; then
-    api_base="${AUTHENTIK_HOST}/api/v3"
-  else
-    return 1
-  fi
-
-  local cookie_jar
-  cookie_jar="$(mktemp)"
-  trap "rm -f '$cookie_jar'" RETURN
-
-  # Authenticate via the flow executor and capture session cookies
-  curl -sS -X POST \
-    "${api_base%/api/v3}/-/flow/executor/default-authentication-flow/" \
-    -H "Accept: application/json" \
-    -H "Content-Type: application/json" \
-    -d "$(jq -n --arg username "$username" --arg password "$password" '{username: $username, password: $password}')" \
-    -c "$cookie_jar" \
-    -o /dev/null 2>/dev/null || true
-
-  # Try to create a permanent API token
-  local token_response
-  token_response="$(curl -sS -X POST \
-    "${api_base}/core/tokens/" \
-    -H "Accept: application/json" \
-    -H "Content-Type: application/json" \
-    -b "$cookie_jar" \
-    -d '{"identifier":"twinbox-automation","intent":"api","expiring":false}' 2>/dev/null)" || token_response=""
-
-  local api_token
-  api_token="$(jq -r '.key // empty' <<<"$token_response" 2>/dev/null)" || api_token=""
-
-  if [[ -n "$api_token" && "$api_token" != "null" ]]; then
-    AUTHENTIK_TOKEN="$api_token"
-    _authentik_log "Created API token for twinbox automation"
+  # Strategy 3: Create a new API token via pod exec
+  if authentik_create_api_token "twinbox-automation"; then
     return 0
   fi
 
-  # Try to reuse an existing API token
-  local existing_tokens
-  existing_tokens="$(curl -sS \
-    "${api_base}/core/tokens/" \
-    -H "Accept: application/json" \
-    -b "$cookie_jar" 2>/dev/null)" || existing_tokens=""
-
-  local existing_token
-  existing_token="$(jq -r '.results[]? | select(.intent == "api") | .key // empty' <<<"$existing_tokens" 2>/dev/null | head -n1)" || existing_token=""
-
-  if [[ -n "$existing_token" && "$existing_token" != "null" ]]; then
-    AUTHENTIK_TOKEN="$existing_token"
-    _authentik_log "Reusing existing API token"
-    return 0
-  fi
-
-  # Fallback to session cookie
-  local session_id
-  session_id="$(grep -oE 'session=[^;]+' "$cookie_jar" 2>/dev/null | head -n1)" || session_id=""
-
-  if [[ -n "$session_id" ]]; then
-    AUTHENTIK_TOKEN="$session_id"
-    AUTHENTIK_USE_COOKIE="true"
-    _authentik_log "Using session cookie for authentication"
-    return 0
-  fi
-
-  return 1
+  # Last resort: keep the bootstrap token and let the caller fail with a clear error
+  _authentik_fail "Could not obtain a valid Authentik API token. Bootstrap token is invalid and API token creation failed."
 }
 
 # ---------------------------------------------------------------------------
