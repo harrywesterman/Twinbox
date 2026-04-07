@@ -1262,7 +1262,7 @@ ssh_pwauth: true
 users:
   - name: ${CLOUD_INIT_USER}
     lock_passwd: false
-    password: ${CLOUD_INIT_PASSWORD}
+    password: "${CLOUD_INIT_PASSWORD}"
     groups: sudo,docker
     shell: /bin/bash
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
