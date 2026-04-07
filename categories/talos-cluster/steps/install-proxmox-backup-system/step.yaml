@@ -2,7 +2,7 @@ id: install-proxmox-backup-system
 title: Install Proxmox Backup System
 type: action
 journey_stage: setup
-order: 103
+order: 66
 summary: Placeholder step for Proxmox backup integration.
 explanation: This wizard step is reserved for future Proxmox Backup System work and does not run a real cluster action yet.
 side_help: The final backup step keeps the wizard focused on bootstrap and recovery as a separate phase.

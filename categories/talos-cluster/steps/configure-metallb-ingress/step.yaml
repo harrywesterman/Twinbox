@@ -2,7 +2,7 @@ id: configure-metallb-ingress
 title: Configure MetalLB Ingress
 type: action
 journey_stage: setup
-order: 30
+order: 28
 summary: Expose services using MetalLB load balancer with port forwarding.
 explanation: >
   This step configures MetalLB to provide LoadBalancer-type services on bare metal

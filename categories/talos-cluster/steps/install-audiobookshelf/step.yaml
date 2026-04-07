@@ -2,7 +2,7 @@ id: install-audiobookshelf
 title: Install Audiobookshelf
 type: action
 journey_stage: setup
-order: 113
+order: 84
 summary: Placeholder step for the Audiobookshelf app phase.
 explanation: This wizard step is reserved for future Audiobookshelf installation work and does not run a real cluster action yet.
 side_help: Media libraries belong in the same user-services segment of the wizard.

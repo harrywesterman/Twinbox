@@ -2,7 +2,7 @@ id: install-longhorn-storage
 title: Install Longhorn Storage
 type: action
 journey_stage: setup
-order: 14
+order: 13
 summary: Apply the Longhorn GitOps application, make its storage class the cluster default, and wait for it to become available.
 explanation: Twinbox installs Longhorn through a dedicated Argo CD application. The step waits until Argo reports the application healthy, marks StorageClass/longhorn as the cluster default, and then continues once the storage class is ready.
 side_help: Longhorn is an open-source distributed block storage system for Kubernetes that makes persistent volumes easy to deploy and manage.

@@ -1234,7 +1234,7 @@ create_management_vm() {
   local SEAWEEDFS_BUCKET="twinbox-velero"
   local SEAWEEDFS_REGION="seaweedfs"
 
-  CLOUD_INIT_PASSWORD_HASH=$(openssl passwd -6 "$CLOUD_INIT_PASSWORD")
+
   CLOUD_INIT_PASSWORD_B64=$(printf '%s' "$CLOUD_INIT_PASSWORD" | base64 -w0)
   SEAWEEDFS_ACCESS_KEY_ID="velero"
   SEAWEEDFS_SECRET_ACCESS_KEY="$(openssl rand -hex 16)"
@@ -1262,7 +1262,7 @@ ssh_pwauth: true
 users:
   - name: ${CLOUD_INIT_USER}
     lock_passwd: false
-    passwd: ${CLOUD_INIT_PASSWORD_HASH}
+    password: ${CLOUD_INIT_PASSWORD}
     groups: sudo,docker
     shell: /bin/bash
     sudo: ['ALL=(ALL) NOPASSWD:ALL']

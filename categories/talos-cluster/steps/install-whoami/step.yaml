@@ -2,7 +2,7 @@ id: install-whoami
 title: Install Whoami
 type: action
 journey_stage: setup
-order: 37
+order: 50
 summary: Apply the Whoami GitOps application.
 explanation: Twinbox installs Whoami through one Argo CD application that includes the workload and its ingress routes. The step waits for the application to become Synced and Healthy before continuing.
 side_help: Whoami is the first lightweight app after the core platform and is the smallest possible check that the post-platform GitOps flow works.

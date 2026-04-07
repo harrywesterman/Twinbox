@@ -76,13 +76,12 @@ GitHub `main` is the source of truth for both the management stack and the GitOp
 14. `install-secret-sync` seeds OpenBao from the Management VM bootstrap files and creates `ClusterSecretStore/openbao`.
 15. `install-velero-backup` deploys Velero together with a Twinbox-managed Garage bucket or an external S3-compatible backup target.
 16. `install-cloudnativepg` installs the CloudNativePG operator on top of Longhorn so PostgreSQL-backed workloads can share one database platform.
-17. `install-postgres-clusters` deploys the CloudNativePG Cluster, Pooler, ScheduledBackup, and ExternalSecret resources for each application database, then waits on the concrete database resources instead of Argo CD aggregate app health before the Authentik app step runs.
-18. Authentik uses a `Recreate` rollout strategy so its bootstrap lock is only held by one pod at a time during upgrades and restarts.
-19. The Proxmox wizard stores the cluster login password in `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` inside the Management VM so the Authentik onboarding step can reuse it.
-20. `install-authentik-idp` seeds the Authentik bootstrap secret into OpenBao and removes the temporary local seed file after sync.
-21. Later Authentik consumers read the bootstrap data from OpenBao instead of reopening `/opt/twinbox/bootstrap/secrets/global/authentik.json`.
-22. `install-pgadmin4` provisions the pgAdmin 4 Authentik OIDC application, seeds the pgAdmin bootstrap secret into OpenBao, and deploys pgAdmin with Longhorn-backed persistence and Traefik ingress.
-23. GitOps apps consume secrets through `ExternalSecret` resources backed by `ClusterSecretStore/openbao`.
+17. Authentik uses a `Recreate` rollout strategy so its bootstrap lock is only held by one pod at a time during upgrades and restarts.
+18. The Proxmox wizard stores the cluster login password in `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` inside the Management VM so the Authentik onboarding step can reuse it.
+19. `install-authentik-idp` provisions the PostgreSQL cluster for Authentik and seeds the Authentik bootstrap secret into OpenBao, then removes the temporary local seed file after sync.
+20. Later Authentik consumers read the bootstrap data from OpenBao instead of reopening `/opt/twinbox/bootstrap/secrets/global/authentik.json`.
+21. `install-pgadmin4` provisions the pgAdmin 4 Authentik OIDC application, seeds the pgAdmin bootstrap secret into OpenBao, and deploys pgAdmin with Longhorn-backed persistence and Traefik ingress.
+22. GitOps apps consume secrets through `ExternalSecret` resources backed by `ClusterSecretStore/openbao`.
 
 ## Domain Flow
 

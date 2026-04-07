@@ -2,7 +2,7 @@ id: create-users-and-groups
 title: Create Users and Groups
 type: action
 journey_stage: setup
-order: 23
+order: 40
 summary: Create the first Authentik user, reuse the wizard login password, and add the user to `admins` after Authentik is installed.
 explanation: Twinbox provisions the first Authentik user from the wizard inputs, reuses the Management VM login password from the bootstrap secret tree, creates the `admins` group as a superuser group, and adds the first user to that group so later applications can be restricted through Authentik policies.
 side_help: Use this step to create the account you will use to log in to Authentik and later to protected apps. Twinbox reuses the Management VM password you already chose, and the group name is fixed to `admins` because Twinbox uses that group for management-only access policies.

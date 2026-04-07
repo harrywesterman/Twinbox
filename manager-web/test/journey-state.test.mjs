@@ -47,7 +47,7 @@ function buildCatalog(stepStatuses = {}) {
     ['install-secret-sync', 'Install OpenBao and sync bootstrap secrets', { dependsOn: ['install-longhorn-storage'] }],
     ['install-traefik', 'Install Traefik', { dependsOn: ['install-secret-sync'] }],
     ['install-cloudnativepg', 'Install CloudNativePG', { dependsOn: ['install-argocd', 'install-longhorn-storage'] }],
-    ['install-authentik-idp', 'Install Authentik', { dependsOn: ['install-secret-sync', 'install-longhorn-storage', 'install-traefik'] }],
+    ['install-authentik-idp', 'Install Authentik', { dependsOn: ['install-secret-sync', 'install-longhorn-storage', 'install-cloudnativepg', 'install-traefik', 'choose-ingress-route'] }],
     ['create-users-and-groups', 'Create Users and Groups', { dependsOn: ['install-authentik-idp'] }],
     ['choose-ingress-route', 'Choose Ingress Route', { dependsOn: ['create-users-and-groups'] }],
     ['install-whoami', 'Install Whoami', { dependsOn: ['install-traefik'] }],
@@ -57,7 +57,6 @@ function buildCatalog(stepStatuses = {}) {
     ['install-management-consoles', 'Install Management consoles', { dependsOn: ['install-dashy-dashboard'] }],
     ['install-pgadmin4', 'Install pgAdmin 4', {
       dependsOn: [
-        'install-postgres-clusters',
         'install-secret-sync',
         'install-authentik-idp',
         'create-users-and-groups',

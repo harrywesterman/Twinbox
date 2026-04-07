@@ -22,7 +22,7 @@ Talos lifecycle operations are triggered through the manager stack.
 16. `install-cloudtty` installs Cloudtty and creates a browser shell on the cluster so operators can open an interactive terminal from the same environment.
 17. `install-longhorn-storage` applies the Longhorn Argo CD application, makes `StorageClass/longhorn` the default, and waits for it to be ready. Longhorn is configured to run on worker nodes only, so its managers, UI, and CSI components stay off control planes.
 18. `install-secret-sync` installs External Secrets Operator and OpenBao, seeds OpenBao from management-local bootstrap JSON, and creates `Secret/proxmox-bootstrap`.
-19. `install-authentik-idp` installs Authentik, seeds the Authentik bootstrap secret into OpenBao, and deletes the temporary local seed file after sync.
+ 19. `install-authentik-idp` provisions the PostgreSQL cluster for Authentik, installs Authentik, seeds the Authentik bootstrap secret into OpenBao, and deletes the temporary local seed file after sync.
 20. `create-users-and-groups` creates the first Authentik user, creates the `admins` group, and adds the user to that group using the Authentik bootstrap secret from OpenBao and the Management VM login password stored under `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json`.
 21. `install-velero-backup` deploys Velero and points it at the SeaweedFS S3 target running on the Management VM as the default backup storage location for cluster backups.
 22. Later wizard steps apply one Argo CD `Application` at a time for Traefik and the remaining workloads.

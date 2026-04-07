@@ -2,7 +2,7 @@ id: configure-argocd-oidc
 title: Configure Argo CD OIDC
 type: action
 journey_stage: setup
-order: 24
+order: 42
 summary: Connect Argo CD to Authentik for OIDC login and map the admins group to Argo CD admin access.
 explanation: Twinbox provisions a dedicated Authentik OAuth2/OIDC client for Argo CD, syncs the generated credentials into OpenBao, exposes them to Argo CD through an ExternalSecret, and updates the Argo CD RBAC ConfigMap so members of the Authentik `admins` group receive the built-in `role:admin` access.
 side_help: This step turns the Argo CD login page into an Authentik-backed login flow while keeping the local Argo CD admin account available as a fallback.

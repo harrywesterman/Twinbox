@@ -24,7 +24,9 @@ APPLY_ARGO_APP_SCRIPT = (
 RENDER_CILIUM_SCRIPT = REPO_ROOT / "scripts" / "manager" / "render-cilium-manifest.sh"
 CLOUDTTY_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-cloudtty.sh"
 PROMETHEUS_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-prometheus.sh"
-TRAEFIK_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-traefik-manager.sh"
+TRAEFIK_MANAGER_SCRIPT = (
+    REPO_ROOT / "scripts" / "manager" / "install-traefik-manager.sh"
+)
 ARGO_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
 )
@@ -39,7 +41,11 @@ ARGO_STEP_MANIFEST = (
 CILIUM_VALUES_FILE = REPO_ROOT / "config" / "cilium-values.yaml"
 HUBBLE_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "hubble" / "ingressroute.yaml"
 HUBBLE_AUTHENTIK_FORWARDAUTH_MIDDLEWARE = (
-    REPO_ROOT / "gitops" / "platform" / "hubble" / "authentik-forwardauth-middleware.yaml"
+    REPO_ROOT
+    / "gitops"
+    / "platform"
+    / "hubble"
+    / "authentik-forwardauth-middleware.yaml"
 )
 LONGHORN_STEP_SCRIPT = (
     REPO_ROOT
@@ -137,67 +143,31 @@ AUTHENTIK_STEP_SCRIPT = (
     / "run.sh"
 )
 AUTHENTIK_HEADLAMP_MODULE_MAIN = (
-    REPO_ROOT
-    / "infra"
-    / "opentofu"
-    / "authentik-headlamp"
-    / "main.tf"
+    REPO_ROOT / "infra" / "opentofu" / "authentik-headlamp" / "main.tf"
 )
 AUTHENTIK_HEADLAMP_MODULE_VARS = (
-    REPO_ROOT
-    / "infra"
-    / "opentofu"
-    / "authentik-headlamp"
-    / "variables.tf"
+    REPO_ROOT / "infra" / "opentofu" / "authentik-headlamp" / "variables.tf"
 )
 AUTHENTIK_HEADLAMP_MODULE_OUTPUTS = (
-    REPO_ROOT
-    / "infra"
-    / "opentofu"
-    / "authentik-headlamp"
-    / "outputs.tf"
+    REPO_ROOT / "infra" / "opentofu" / "authentik-headlamp" / "outputs.tf"
 )
 AUTHENTIK_DASHY_MODULE_PROVIDERS = (
-    REPO_ROOT
-    / "infra"
-    / "opentofu"
-    / "authentik-dashy"
-    / "providers.tf"
+    REPO_ROOT / "infra" / "opentofu" / "authentik-dashy" / "providers.tf"
 )
 AUTHENTIK_DASHY_MODULE_MAIN = (
-    REPO_ROOT
-    / "infra"
-    / "opentofu"
-    / "authentik-dashy"
-    / "main.tf"
+    REPO_ROOT / "infra" / "opentofu" / "authentik-dashy" / "main.tf"
 )
 AUTHENTIK_PGADMIN4_MODULE_MAIN = (
-    REPO_ROOT
-    / "infra"
-    / "opentofu"
-    / "authentik-pgadmin4"
-    / "main.tf"
+    REPO_ROOT / "infra" / "opentofu" / "authentik-pgadmin4" / "main.tf"
 )
 AUTHENTIK_PGADMIN4_MODULE_VARS = (
-    REPO_ROOT
-    / "infra"
-    / "opentofu"
-    / "authentik-pgadmin4"
-    / "variables.tf"
+    REPO_ROOT / "infra" / "opentofu" / "authentik-pgadmin4" / "variables.tf"
 )
 AUTHENTIK_PGADMIN4_MODULE_OUTPUTS = (
-    REPO_ROOT
-    / "infra"
-    / "opentofu"
-    / "authentik-pgadmin4"
-    / "outputs.tf"
+    REPO_ROOT / "infra" / "opentofu" / "authentik-pgadmin4" / "outputs.tf"
 )
 AUTHENTIK_PGADMIN4_MODULE_PROVIDERS = (
-    REPO_ROOT
-    / "infra"
-    / "opentofu"
-    / "authentik-pgadmin4"
-    / "providers.tf"
+    REPO_ROOT / "infra" / "opentofu" / "authentik-pgadmin4" / "providers.tf"
 )
 PGADMIN_STEP_MANIFEST = (
     REPO_ROOT
@@ -208,16 +178,15 @@ PGADMIN_STEP_MANIFEST = (
     / "step.yaml"
 )
 PGADMIN_STEP_SCRIPT = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "install-pgadmin4"
-    / "run.sh"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-pgadmin4" / "run.sh"
 )
 PGADMIN_APP = REPO_ROOT / "gitops" / "apps" / "pgadmin4.yaml"
-PGADMIN_EXTERNALSECRET = REPO_ROOT / "gitops" / "platform" / "pgadmin4" / "externalsecret.yaml"
-PGADMIN_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "pgadmin4" / "ingressroute.yaml"
+PGADMIN_EXTERNALSECRET = (
+    REPO_ROOT / "gitops" / "platform" / "pgadmin4" / "externalsecret.yaml"
+)
+PGADMIN_INGRESSROUTE = (
+    REPO_ROOT / "gitops" / "platform" / "pgadmin4" / "ingressroute.yaml"
+)
 PGADMIN_DEPLOYMENT = REPO_ROOT / "gitops" / "platform" / "pgadmin4" / "deployment.yaml"
 PGADMIN_PVC = REPO_ROOT / "gitops" / "platform" / "pgadmin4" / "pvc.yaml"
 PGADMIN_SERVICE = REPO_ROOT / "gitops" / "platform" / "pgadmin4" / "service.yaml"
@@ -622,7 +591,10 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'PROXMOX_VERIFY_MAX_ATTEMPTS="${PROXMOX_VERIFY_MAX_ATTEMPTS:-5}"' in text
     assert "Uploading Talos ISO to Proxmox nodes:" in text
     assert "Uploaded Talos ISO to ${node}/${datastore}" in text
-    assert "Talos ISO not visible yet on ${node}/${datastore}; retrying in ${delay}s" in text
+    assert (
+        "Talos ISO not visible yet on ${node}/${datastore}; retrying in ${delay}s"
+        in text
+    )
     assert "Talos ISO not visible after upload on ${node}/${datastore}" in text
     assert (
         "Talos ISO already present on ${node}/${FILE_DATASTORE}: ${image_name}" in text
@@ -704,10 +676,19 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert "proxy:" in text
     assert "disabled: true" in text
     assert "inlineManifests:" in text
-    assert 'sed \'s/^/        /\' "$cilium_manifest_file"' in text
-    assert 'wait_for_kubernetes_rollout "daemonset/cilium" "kube-system" "Cilium DaemonSet"' in text
-    assert 'wait_for_kubernetes_rollout "deployment/cilium-operator" "kube-system" "Cilium operator"' in text
-    assert 'wait_for_kubernetes_rollout "deployment/coredns" "kube-system" "CoreDNS"' in text
+    assert "sed 's/^/        /' \"$cilium_manifest_file\"" in text
+    assert (
+        'wait_for_kubernetes_rollout "daemonset/cilium" "kube-system" "Cilium DaemonSet"'
+        in text
+    )
+    assert (
+        'wait_for_kubernetes_rollout "deployment/cilium-operator" "kube-system" "Cilium operator"'
+        in text
+    )
+    assert (
+        'wait_for_kubernetes_rollout "deployment/coredns" "kube-system" "CoreDNS"'
+        in text
+    )
     assert "kube-proxy daemonset should not exist in kube-proxy-free mode" in text
     assert "helm repo add cilium https://helm.cilium.io" in helper_text
     assert "helm repo update" in helper_text
@@ -721,13 +702,18 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert "ipam:" in values_text
     assert "mode: kubernetes" in values_text
     assert "kubeProxyReplacement: true" in values_text
-    assert "The bootstrap scripts override these values with the cluster VIP/API endpoint." in values_text
+    assert (
+        "The bootstrap scripts override these values with the cluster VIP/API endpoint."
+        in values_text
+    )
     assert "localhost during bootstrap" in values_text
     assert "cgroup:" in values_text
     assert "hostRoot: /sys/fs/cgroup" in values_text
     assert "operator:" in values_text
     assert "replicas: 1" in values_text
-    assert "hubble:\n  relay:\n    enabled: true\n  ui:\n    enabled: true" in values_text
+    assert (
+        "hubble:\n  relay:\n    enabled: true\n  ui:\n    enabled: true" in values_text
+    )
     assert "SYS_MODULE" not in values_text
 
     cloudtty_text = _cloudtty_script_text()
@@ -735,8 +721,14 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert '--version "$PINNED_CLOUDTTY_CHART_VERSION"' in cloudtty_text
     assert "exposureMode: NodePort" in cloudtty_text
     assert "commandAction: bash" in cloudtty_text
-    assert 'CONTROLLER_DEPLOYMENT_NAME="${RELEASE_NAME}-controller-manager"' in cloudtty_text
-    assert 'wait_for_deployment "$NAMESPACE" "$CONTROLLER_DEPLOYMENT_NAME"' in cloudtty_text
+    assert (
+        'CONTROLLER_DEPLOYMENT_NAME="${RELEASE_NAME}-controller-manager"'
+        in cloudtty_text
+    )
+    assert (
+        'wait_for_deployment "$NAMESPACE" "$CONTROLLER_DEPLOYMENT_NAME"'
+        in cloudtty_text
+    )
 
     assert '--set-string "k8sServiceHost=${VIP_IP}"' in text
     assert '--set-string "k8sServicePort=6443"' in text
@@ -769,7 +761,10 @@ def test_longhorn_step_installs_via_argocd_and_waits_for_health():
     assert 'TWINBOX_CLUSTER_ID="$cluster_id"' in step_text
     assert 'TWINBOX_CLUSTER_INSTANCE_ID="$cluster_instance_id"' in step_text
     assert 'KUBE_API_SERVER="https://${controlplane_ip}:6443"' in step_text
-    assert 'bash "$WORKSPACE_ROOT/scripts/manager/install-longhorn-storage.sh"' in step_text
+    assert (
+        'bash "$WORKSPACE_ROOT/scripts/manager/install-longhorn-storage.sh"'
+        in step_text
+    )
     assert (
         'WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"'
         in step_text
@@ -900,11 +895,11 @@ def test_install_secret_sync_renders_argocd_values_and_applies_secret_sync_manif
     assert "mktemp" in text
     assert "helm:" in text
     assert "values: |" in text
-    assert 'sed \'s/^/          /\' "$OPENBAO_VALUES_FILE"' in text
+    assert "sed 's/^/          /' \"$OPENBAO_VALUES_FILE\"" in text
     assert '--application "openbao"' in text
-    assert '--no-wait' in text
-    assert 'repoURL: https://openbao.github.io/openbao-helm' in text
-    assert 'chart: openbao' in text
+    assert "--no-wait" in text
+    assert "repoURL: https://openbao.github.io/openbao-helm" in text
+    assert "chart: openbao" in text
     assert 'targetRevision: "0.26.2"' in text
     assert "gitops/apps/openbao.yaml" not in text
     assert "openbao_render_values_file" in text
@@ -963,7 +958,10 @@ def test_apply_argocd_application_helper_applies_and_waits_for_health():
     assert "kind: LimitRange" in text
     assert "defaultRequest:" in text
     assert "default:" in text
-    assert "printf '%s\\n' \"$rendered_manifest\" | kubectl apply --validate=false -f -" in text
+    assert (
+        "printf '%s\\n' \"$rendered_manifest\" | kubectl apply --validate=false -f -"
+        in text
+    )
     assert 'kubectl -n argocd get application "$application" -o json' in text
     assert "Application/${application} is Synced and Healthy" in text
     assert "Application/${application} is Synced and has no unhealthy resources" in text
@@ -981,7 +979,7 @@ def test_argo_step_script_bootstraps_argocd_without_cni_adoption():
     )
     assert "apply-argocd-application.sh" not in text
     assert '--arg application "argocd"' in text
-    assert 'application: $application' in text
+    assert "application: $application" in text
 
 
 def test_argo_bootstrap_script_installs_argocd_without_root_application_tree():
@@ -1058,7 +1056,10 @@ def test_bootstrap_apps_tolerate_single_node_control_plane():
 def test_install_argocd_step_bootstraps_argocd_without_cni_adoption():
     text = _argo_step_manifest_text()
 
-    assert "summary: Install Argo CD so the remaining platform services can be managed declaratively." in text
+    assert (
+        "summary: Install Argo CD so the remaining platform services can be managed declaratively."
+        in text
+    )
     assert "depends_on:" in text
     assert "  - provision-nodes" in text
     assert "Talos/Cilium bootstrap" in text
@@ -1071,18 +1072,14 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     traefik_text = TRAEFIK_STEP_MANIFEST.read_text(encoding="utf-8")
     authentik_run_text = _authentik_step_text()
     cloudflare_text = CLOUDFLARE_STEP_MANIFEST.read_text(encoding="utf-8")
-    choose_ingress_text = CHOOSE_INGRESS_ROUTE_STEP_MANIFEST.read_text(
-        encoding="utf-8"
-    )
+    choose_ingress_text = CHOOSE_INGRESS_ROUTE_STEP_MANIFEST.read_text(encoding="utf-8")
     whoami_text = WHOAMI_STEP_MANIFEST.read_text(encoding="utf-8")
     headlamp_text = HEADLAMP_STEP_MANIFEST.read_text(encoding="utf-8")
     grafana_text = GRAFANA_STEP_MANIFEST.read_text(encoding="utf-8")
     prometheus_text = PROMETHEUS_STEP_MANIFEST.read_text(encoding="utf-8")
     traefik_manager_text = TRAEFIK_MANAGER_STEP_MANIFEST.read_text(encoding="utf-8")
     wiredoor_text = WIREDOOR_GATEWAY_STEP_MANIFEST.read_text(encoding="utf-8")
-    wiredoor_bastion_text = WIREDOOR_BASTION_STEP_MANIFEST.read_text(
-        encoding="utf-8"
-    )
+    wiredoor_bastion_text = WIREDOOR_BASTION_STEP_MANIFEST.read_text(encoding="utf-8")
 
     assert "provision-nodes" in argocd_text
     assert "install-flannel" not in argocd_text
@@ -1096,8 +1093,13 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "dns_domain" in choose_ingress_text
     assert "DNS Domain" in choose_ingress_text
     assert "Cloudflare Tunnel is shown only for prd clusters" in choose_ingress_text
-    assert "Non-prd clusters keep the slug-prefixed hostname model" in choose_ingress_text
-    assert "Cloudflare Tunnel is available only for prd clusters on Cloudflare Free." in choose_ingress_text
+    assert (
+        "Non-prd clusters keep the slug-prefixed hostname model" in choose_ingress_text
+    )
+    assert (
+        "Cloudflare Tunnel is available only for prd clusters on Cloudflare Free."
+        in choose_ingress_text
+    )
     assert "Base zone for platform hostnames." in choose_ingress_text
 
     choose_ingress_run_text = CHOOSE_INGRESS_ROUTE_RUN_SCRIPT.read_text(
@@ -1110,7 +1112,10 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert ".dns_domain = $dns_domain" in choose_ingress_run_text
     assert ".public_zone_name = $public_zone_name" in choose_ingress_run_text
     assert '"dns_domain": "$dns_domain"' in choose_ingress_run_text
-    assert "Cloudflare Tunnel is only available for prd clusters on Cloudflare Free" in choose_ingress_run_text
+    assert (
+        "Cloudflare Tunnel is only available for prd clusters on Cloudflare Free"
+        in choose_ingress_run_text
+    )
 
     assert "choose-ingress-route" in cloudflare_text
     assert "provision-wiredoor-bastion" in cloudflare_text
@@ -1132,11 +1137,17 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "public_zone_name" in authentik_run_text
     assert "cluster-public-zone.sh" in authentik_run_text
     assert "https://authentik.${public_zone_name}" in authentik_run_text
-    assert "kubectl create namespace authentik --dry-run=client -o yaml | kubectl apply -f -" in authentik_run_text
+    assert (
+        "kubectl create namespace authentik --dry-run=client -o yaml | kubectl apply -f -"
+        in authentik_run_text
+    )
     assert "gitops/platform/authentik/externalsecret.yaml" in authentik_run_text
     assert "gitops/platform/authentik/ingressroute.yaml" in authentik_run_text
     assert "AUTHENTIK_POSTGRESQL__HOST" in authentik_run_text
-    assert "authentik-db-pooler-rw-session.databases.svc.cluster.local" in authentik_run_text
+    assert (
+        "authentik-db-pooler-rw-session.databases.svc.cluster.local"
+        in authentik_run_text
+    )
     assert "AUTHENTIK_POSTGRESQL__PORT" in authentik_run_text
     assert "AUTHENTIK_POSTGRESQL__NAME" in authentik_run_text
     assert "AUTHENTIK_POSTGRESQL__USER" in authentik_run_text
@@ -1144,16 +1155,26 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "AUTHENTIK_POSTGRESQL__DISABLE_SERVER_SIDE_CURSORS" in authentik_run_text
     assert "AUTHENTIK_POSTGRESQL__CONN_MAX_AGE" in authentik_run_text
     assert "openbao_read_global_secret_json authentik" in authentik_run_text
-    assert 'rm -f "$bootstrap_secret_file" "$authentik_secret_file"' in authentik_run_text
+    assert (
+        'rm -f "$bootstrap_secret_file" "$authentik_secret_file"' in authentik_run_text
+    )
     assert "apply-argocd-application.sh" in authentik_run_text
-    assert "--application \"authentik\"" in authentik_run_text
+    assert '--application "authentik"' in authentik_run_text
     assert "twinbox_public_zone_name" in authentik_run_text
-    assert 'authentik_host="https://authentik.${public_zone_name}"' in authentik_run_text
+    assert (
+        'authentik_host="https://authentik.${public_zone_name}"' in authentik_run_text
+    )
     assert "wait_for_secret()" in authentik_run_text
-    assert 'wait_for_secret "authentik-bootstrap" "Authentik bootstrap"' in authentik_run_text
+    assert (
+        'wait_for_secret "authentik-bootstrap" "Authentik bootstrap"'
+        in authentik_run_text
+    )
     assert "Waiting for Authentik server" not in authentik_run_text
     assert "Waiting for Authentik worker" not in authentik_run_text
-    assert "desired=${desired_replicas}, updated=${updated_replicas}, ready=${ready_replicas}, available=${available_replicas}" in authentik_run_text
+    assert (
+        "desired=${desired_replicas}, updated=${updated_replicas}, ready=${ready_replicas}, available=${available_replicas}"
+        in authentik_run_text
+    )
     assert "progressing=${progressing_status}" in authentik_run_text
     assert "available=${available_status}" in authentik_run_text
     assert (
@@ -1170,11 +1191,13 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     pgadmin_step_text = PGADMIN_STEP_MANIFEST.read_text(encoding="utf-8")
     pgadmin_run_text = PGADMIN_STEP_SCRIPT.read_text(encoding="utf-8")
     assert "title: Install pgAdmin 4" in pgadmin_step_text
-    assert "install-postgres-clusters" in pgadmin_step_text
     assert "install-authentik-idp" in pgadmin_step_text
     assert "create-users-and-groups" in pgadmin_step_text
     assert "choose-ingress-route" in pgadmin_step_text
-    assert "script: categories/talos-cluster/steps/install-pgadmin4/run.sh" in pgadmin_step_text
+    assert (
+        "script: categories/talos-cluster/steps/install-pgadmin4/run.sh"
+        in pgadmin_step_text
+    )
     assert "optional: true" in pgadmin_step_text
     assert "authentik-pgadmin4" in pgadmin_run_text
     assert "pgadmin4-oidc" in pgadmin_run_text
@@ -1182,7 +1205,10 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "PGADMIN_MASTER_PASSWORD" in pgadmin_run_text
     assert "PGADMIN_DEFAULT_EMAIL" in pgadmin_run_text
     assert "Could not find a usable kubeconfig" in pgadmin_run_text
-    assert "kubectl create namespace pgadmin4 --dry-run=client -o yaml | kubectl apply -f -" in pgadmin_run_text
+    assert (
+        "kubectl create namespace pgadmin4 --dry-run=client -o yaml | kubectl apply -f -"
+        in pgadmin_run_text
+    )
     assert "gitops/platform/pgadmin4/externalsecret.yaml" in pgadmin_run_text
     assert "gitops/apps/pgadmin4.yaml" in pgadmin_run_text
     assert "wait --for=condition=Ready externalsecret/pgadmin4-oidc" in pgadmin_run_text
@@ -1222,12 +1248,12 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     pgadmin_module_vars_text = _authentik_pgadmin4_module_vars_text()
     pgadmin_module_outputs_text = _authentik_pgadmin4_module_outputs_text()
     pgadmin_module_providers_text = _authentik_pgadmin4_module_providers_text()
-    assert "resource \"authentik_provider_oauth2\" \"headlamp\"" in headlamp_module_text
-    assert "resource \"authentik_application\" \"headlamp\"" in headlamp_module_text
+    assert 'resource "authentik_provider_oauth2" "headlamp"' in headlamp_module_text
+    assert 'resource "authentik_application" "headlamp"' in headlamp_module_text
     assert "random_string" in headlamp_module_text
     assert "random_password" in headlamp_module_text
     assert "redirect_uris" in headlamp_module_text
-    assert 'issuer_mode' in headlamp_module_text
+    assert "issuer_mode" in headlamp_module_text
     assert '"per_provider"' in headlamp_module_text
     assert "application_slug" in headlamp_module_vars_text
     assert "headlamp_redirect_uri" in headlamp_module_vars_text
@@ -1237,8 +1263,8 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert 'provider "authentik"' in dashy_module_providers_text
     assert "url = var.authentik_url" in dashy_module_providers_text
     assert 'trim(var.dashy_redirect_uri, "/")' in dashy_module_text
-    assert "resource \"authentik_provider_oauth2\" \"pgadmin4\"" in pgadmin_module_text
-    assert "resource \"authentik_application\" \"pgadmin4\"" in pgadmin_module_text
+    assert 'resource "authentik_provider_oauth2" "pgadmin4"' in pgadmin_module_text
+    assert 'resource "authentik_application" "pgadmin4"' in pgadmin_module_text
     assert "authentik_group" in pgadmin_module_text
     assert "authentik_policy_binding" in pgadmin_module_text
     assert "pgadmin4_redirect_uri" in pgadmin_module_vars_text
@@ -1275,7 +1301,10 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
         / "configure-cloudflare-tunnel"
         / "run.sh"
     ).read_text(encoding="utf-8")
-    assert 'curl -s -X GET "https://api.cloudflare.com/client/v4/accounts/${cf_account_id}/cfd_tunnel/${cf_tunnel_id}/token"' in cloudflare_tunnel_run_text
+    assert (
+        'curl -s -X GET "https://api.cloudflare.com/client/v4/accounts/${cf_account_id}/cfd_tunnel/${cf_tunnel_id}/token"'
+        in cloudflare_tunnel_run_text
+    )
     assert "jq -r '.success // false'" in cloudflare_tunnel_run_text
     assert "jq -r '.result // empty'" in cloudflare_tunnel_run_text
     assert "cluster_dns_domain" in cloudflare_tunnel_run_text
@@ -1283,16 +1312,33 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "twinbox_public_zone_name" in cloudflare_tunnel_run_text
     assert "twinbox_cluster_dns_zone_name" in cloudflare_tunnel_run_text
     assert "cluster_slug_lower" in cloudflare_tunnel_run_text
-    assert "Cloudflare Tunnel is only available for prd clusters on Cloudflare Free" in cloudflare_tunnel_run_text
-    assert "Using the provided Cloudflare token for DNS record creation" in cloudflare_tunnel_run_text
+    assert (
+        "Cloudflare Tunnel is only available for prd clusters on Cloudflare Free"
+        in cloudflare_tunnel_run_text
+    )
+    assert (
+        "Using the provided Cloudflare token for DNS record creation"
+        in cloudflare_tunnel_run_text
+    )
     assert "DNS zone name: $cloudflare_dns_zone_name" in cloudflare_tunnel_run_text
-    assert 'echo "[$(date \'+%Y-%m-%d %H:%M:%S\')] Public zone name: $public_zone_name"' in cloudflare_tunnel_run_text
+    assert (
+        "echo \"[$(date '+%Y-%m-%d %H:%M:%S')] Public zone name: $public_zone_name\""
+        in cloudflare_tunnel_run_text
+    )
     assert "Preflighting Cloudflare zone" in cloudflare_tunnel_run_text
-    assert 'curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${cf_zone_id}"' in cloudflare_tunnel_run_text
-    assert "Cloudflare sees zone name: $cloudflare_zone_name" in cloudflare_tunnel_run_text
-    assert "resolves to ${cloudflare_zone_name}, but the wizard selected ${cloudflare_dns_zone_name}" in cloudflare_tunnel_run_text
+    assert (
+        'curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${cf_zone_id}"'
+        in cloudflare_tunnel_run_text
+    )
+    assert (
+        "Cloudflare sees zone name: $cloudflare_zone_name" in cloudflare_tunnel_run_text
+    )
+    assert (
+        "resolves to ${cloudflare_zone_name}, but the wizard selected ${cloudflare_dns_zone_name}"
+        in cloudflare_tunnel_run_text
+    )
     assert "continuing without a zone-name preflight" in cloudflare_tunnel_run_text
-    assert "dns_record_name=\"*.${public_zone_name}\"" in cloudflare_tunnel_run_text
+    assert 'dns_record_name="*.${public_zone_name}"' in cloudflare_tunnel_run_text
     assert "Updating DNS CNAME record for tunnel" in cloudflare_tunnel_run_text
     assert "DNS record upserted" in cloudflare_tunnel_run_text
     assert "already have a tunnel with this name" in cloudflare_tunnel_run_text
@@ -1304,18 +1350,31 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "tunnel_token" in cloudflare_tunnel_run_text
     assert "platform-ingress.yaml" in cloudflare_tunnel_run_text
     assert "upsert-argocd-cluster-secret.sh" in cloudflare_tunnel_run_text
-    assert "kubectl delete application platform-ingress -n argocd --ignore-not-found=true" in cloudflare_tunnel_run_text
-    assert "kubectl delete application cluster-config -n argocd --ignore-not-found=true" in cloudflare_tunnel_run_text
+    assert (
+        "kubectl delete application platform-ingress -n argocd --ignore-not-found=true"
+        in cloudflare_tunnel_run_text
+    )
+    assert (
+        "kubectl delete application cluster-config -n argocd --ignore-not-found=true"
+        in cloudflare_tunnel_run_text
+    )
     assert "Zone DNS Edit permissions" in cloudflare_tunnel_run_text
     assert "argocd-server" in cloudflare_tunnel_run_text
-    assert "Argo CD server not ready yet (attempt ${i}/30)" in cloudflare_tunnel_run_text
-    assert "Timed out waiting for the Argo CD server deployment to become ready" in cloudflare_tunnel_run_text
     assert (
-        cloudflare_tunnel_run_text.index("platform-ingress.yaml")
-        < cloudflare_tunnel_run_text.index("Applying cloudflare-tunnel application")
+        "Argo CD server not ready yet (attempt ${i}/30)" in cloudflare_tunnel_run_text
     )
+    assert (
+        "Timed out waiting for the Argo CD server deployment to become ready"
+        in cloudflare_tunnel_run_text
+    )
+    assert cloudflare_tunnel_run_text.index(
+        "platform-ingress.yaml"
+    ) < cloudflare_tunnel_run_text.index("Applying cloudflare-tunnel application")
 
-    assert "Cloudflare Tunnel is **prd-only** on Cloudflare Free" in INGRESS_POLICY_DOC.read_text(encoding="utf-8")
+    assert (
+        "Cloudflare Tunnel is **prd-only** on Cloudflare Free"
+        in INGRESS_POLICY_DOC.read_text(encoding="utf-8")
+    )
 
     cloudflare_dns_run_text = (
         REPO_ROOT
@@ -1331,13 +1390,19 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "ZONE_NAME" in cloudflare_dns_run_text
     assert "cluster-hostnames" in cloudflare_dns_run_text
     assert "upsert-argocd-cluster-secret.sh" in cloudflare_dns_run_text
-    assert "kubectl delete application platform-ingress -n argocd --ignore-not-found=true" in cloudflare_dns_run_text
-    assert "kubectl delete application cluster-config -n argocd --ignore-not-found=true" in cloudflare_dns_run_text
+    assert (
+        "kubectl delete application platform-ingress -n argocd --ignore-not-found=true"
+        in cloudflare_dns_run_text
+    )
+    assert (
+        "kubectl delete application cluster-config -n argocd --ignore-not-found=true"
+        in cloudflare_dns_run_text
+    )
 
     assert "install-traefik" in whoami_text
     assert "script: categories/talos-cluster/steps/install-whoami/run.sh" in whoami_text
 
-    assert "install-whoami" in headlamp_text
+    assert "install-cloudnativepg" in headlamp_text
     assert (
         "script: categories/talos-cluster/steps/install-headlamp/run.sh"
         in headlamp_text
@@ -1350,7 +1415,10 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     )
     assert "install-longhorn-storage" in prometheus_text
     assert "choose-ingress-route" in prometheus_text
-    assert "script: categories/talos-cluster/steps/install-prometheus/run.sh" in prometheus_text
+    assert (
+        "script: categories/talos-cluster/steps/install-prometheus/run.sh"
+        in prometheus_text
+    )
     assert "install-traefik" in traefik_manager_text
     assert "install-authentik-idp" in traefik_manager_text
     assert "install-longhorn-storage" in traefik_manager_text
@@ -1415,10 +1483,16 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "Host(`whoami.__ZONE_NAME__`)" in whoami_ingressroute_text
     assert "Host(`headlamp.__ZONE_NAME__`)" in headlamp_ingressroute_text
     assert "Host(`grafana.__ZONE_NAME__`)" in grafana_ingressroute_text
-    assert "Host(`hubble.__ZONE_NAME__`)" in HUBBLE_INGRESSROUTE.read_text(encoding="utf-8")
-    assert "kind: Middleware" in HUBBLE_AUTHENTIK_FORWARDAUTH_MIDDLEWARE.read_text(encoding="utf-8")
+    assert "Host(`hubble.__ZONE_NAME__`)" in HUBBLE_INGRESSROUTE.read_text(
+        encoding="utf-8"
+    )
+    assert "kind: Middleware" in HUBBLE_AUTHENTIK_FORWARDAUTH_MIDDLEWARE.read_text(
+        encoding="utf-8"
+    )
     assert "Host(`argocd.__ZONE_NAME__`)" in wiredoor_ingressroute_text
-    assert "Host(`pgadmin4.__ZONE_NAME__`)" in PGADMIN_INGRESSROUTE.read_text(encoding="utf-8")
+    assert "Host(`pgadmin4.__ZONE_NAME__`)" in PGADMIN_INGRESSROUTE.read_text(
+        encoding="utf-8"
+    )
     assert "pgadmin4-data" in PGADMIN_PVC.read_text(encoding="utf-8")
     assert "pgadmin4-bootstrap" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
     assert "dpage/pgadmin4:9.14" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
@@ -1453,16 +1527,30 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "name: authentik-cors" in platform_ingress_app_text
     assert "name: hubble" in platform_ingress_app_text
     assert "accessControlAllowOriginList/0" in platform_ingress_app_text
-    assert "customResponseHeaders/Access-Control-Allow-Origin" in platform_ingress_app_text
-    assert "pgadmin4.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in platform_ingress_app_text
-    assert "hubble.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in platform_ingress_app_text
-    assert "start.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in platform_ingress_app_text
+    assert (
+        "customResponseHeaders/Access-Control-Allow-Origin" in platform_ingress_app_text
+    )
+    assert (
+        'pgadmin4.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
+        in platform_ingress_app_text
+    )
+    assert (
+        'hubble.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
+        in platform_ingress_app_text
+    )
+    assert (
+        'start.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
+        in platform_ingress_app_text
+    )
     assert "kind: ApplicationSet" in grafana_appset_text
     assert "name: grafana-set" in grafana_appset_text
     assert "kind: ApplicationSet" in ntfy_appset_text
     assert "name: ntfy-set" in ntfy_appset_text
     assert "name: traefik-manager" in platform_ingress_app_text
-    assert "traefik-manager.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in platform_ingress_app_text
+    assert (
+        'traefik-manager.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
+        in platform_ingress_app_text
+    )
     assert not (REPO_ROOT / "gitops" / "apps" / "cluster-config.yaml").exists()
     assert "kind: ExternalSecret" in traefik_externalsecret_text
     assert "kind: ClusterSecretStore" in traefik_externalsecret_text
@@ -1653,7 +1741,7 @@ def test_ntfy_argocd_app_is_an_applicationset():
     assert "kind: ApplicationSet" in text
     assert "name: ntfy-set" in text
     assert "base-url:" in text
-    assert "ntfy.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in text
+    assert 'ntfy.{{index .metadata.annotations "twinbox.io/public-zone-name"}}' in text
 
 
 def test_ntfy_ingressroute_exposes_ui():
@@ -1713,7 +1801,9 @@ def test_grafana_argocd_app_is_an_applicationset():
     assert "kind: ApplicationSet" in text
     assert "name: grafana-set" in text
     assert "root_url:" in text
-    assert "grafana.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in text
+    assert (
+        'grafana.{{index .metadata.annotations "twinbox.io/public-zone-name"}}' in text
+    )
 
 
 def test_homepage_configmap_includes_monitoring_links():
@@ -1750,17 +1840,17 @@ def test_prometheus_step_applies_kube_prometheus_stack():
 
     assert "id: install-prometheus" in text
     assert "title: Install Prometheus" in text
-    assert "order: 35" in text
+    assert "order: 52" in text
     assert "kube-prometheus-stack" in text
     assert "Prometheus, Alertmanager, node-exporter, and kube-state-metrics" in text
     assert "depends_on:" in text
     assert "install-longhorn-storage" in text
     assert "choose-ingress-route" in text
     assert "script: categories/talos-cluster/steps/install-prometheus/run.sh" in text
-    assert ": \"${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}\"" in run_text
+    assert ': "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"' in run_text
     assert "install-prometheus.sh" in run_text
-    assert "--application \"prometheus\"" in script_text
-    assert "--destination-namespace \"monitoring\"" in script_text
+    assert '--application "prometheus"' in script_text
+    assert '--destination-namespace "monitoring"' in script_text
     assert "gitops/apps/prometheus.yaml" in script_text
 
 
@@ -1774,26 +1864,25 @@ def test_traefik_manager_step_deploys_browser_ui():
     ingress_text = (
         REPO_ROOT / "gitops" / "platform" / "traefik-manager" / "ingressroute.yaml"
     ).read_text(encoding="utf-8")
-    app_text = (
-        REPO_ROOT / "gitops" / "apps" / "traefik-manager.yaml"
-    ).read_text(encoding="utf-8")
+    app_text = (REPO_ROOT / "gitops" / "apps" / "traefik-manager.yaml").read_text(
+        encoding="utf-8"
+    )
 
     assert "id: install-traefik-manager" in text
     assert "title: Install Traefik Manager" in text
-    assert "order: 34" in text
+    assert "order: 44" in text
     assert "browser-based reverse-proxy management" in text
     assert "install-traefik" in text
     assert "install-authentik-idp" in text
     assert "install-longhorn-storage" in text
     assert "choose-ingress-route" in text
     assert (
-        "script: categories/talos-cluster/steps/install-traefik-manager/run.sh"
-        in text
+        "script: categories/talos-cluster/steps/install-traefik-manager/run.sh" in text
     )
-    assert ": \"${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}\"" in run_text
+    assert ': "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"' in run_text
     assert "install-traefik-manager.sh" in run_text
     assert "ghcr.io/chr0nzz/traefik-manager:v0.8.0" in deployment_text
-    assert 'AUTH_ENABLED' in deployment_text
+    assert "AUTH_ENABLED" in deployment_text
     assert '"false"' in deployment_text
     assert "COOKIE_SECURE" in deployment_text
     assert "DOMAINS" in deployment_text
@@ -1808,7 +1897,7 @@ def test_traefik_manager_step_deploys_browser_ui():
     assert "Host(`traefik-manager.__ZONE_NAME__`)" in ingress_text
     assert "namespace: traefik-manager" in app_text
     assert "path: gitops/platform/traefik-manager" in app_text
-    assert "--destination-namespace \"traefik-manager\"" in script_text
+    assert '--destination-namespace "traefik-manager"' in script_text
     assert "gitops/apps/traefik-manager.yaml" in script_text
 
 
@@ -1881,7 +1970,10 @@ def test_dashy_deployment_uses_a_published_image_tag():
     assert 'cpu: "2"' in text
     assert "memory: 2Gi" in text
     assert "failureThreshold: 120" in text
-    assert "ghcr.io/lissy93/dashy@sha256:be489008a0ea4f60030ca3e25e55007425d3dfa8ecf48b5722ad9c4f3a12bff6" in text
+    assert (
+        "ghcr.io/lissy93/dashy@sha256:be489008a0ea4f60030ca3e25e55007425d3dfa8ecf48b5722ad9c4f3a12bff6"
+        in text
+    )
     assert "ghcr.io/lissy93/dashy:latest" not in text
     assert "ghcr.io/lissy93/dashy:v3.1.1" not in text
     assert "ghcr.io/lissy93/dashy:v3.2.3" not in text

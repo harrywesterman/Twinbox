@@ -1,7 +1,7 @@
 id: provision-wiredoor-bastion
 title: Deploy Wiredoor Bastion Host
 type: action
-order: 30
+order: 32
 journey_stage: setup
 summary: Provision a Wiredoor bastion host on Hetzner Cloud for external access.
 explanation: >

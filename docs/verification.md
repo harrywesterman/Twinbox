@@ -25,8 +25,7 @@ bash -n wizard/setup-wizard.sh \
   scripts/manager/openbao-secret-sync.sh \
   scripts/manager/sync-openbao-global-secret.sh \
   ansible/management-vm-maintenance.yml \
-  categories/talos-cluster/steps/install-cloudnativepg/run.sh \
-  categories/talos-cluster/steps/install-postgres-clusters/run.sh
+   categories/talos-cluster/steps/install-cloudnativepg/run.sh
 
 ansible-playbook --syntax-check -i localhost, -c local ansible/management-vm-maintenance.yml
 

@@ -2,7 +2,7 @@ id: configure-cloudflare-tunnel
 title: Configure Cloudflare Tunnel
 type: action
 journey_stage: setup
-order: 30
+order: 26
 summary: Expose services through a Cloudflare Tunnel (cloudflared).
 explanation: >
   This step creates or reuses the Cloudflare tunnel, asks Cloudflare for a

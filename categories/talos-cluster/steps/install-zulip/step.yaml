@@ -2,7 +2,7 @@ id: install-zulip
 title: Install Zulip
 type: action
 journey_stage: setup
-order: 107
+order: 72
 summary: Placeholder step for the Zulip app phase.
 explanation: This wizard step is reserved for future Zulip installation work and does not run a real cluster action yet.
 side_help: Communication tools belong in the same user-facing app sequence.
