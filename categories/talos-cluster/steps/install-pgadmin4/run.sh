@@ -8,6 +8,8 @@ WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
 # shellcheck disable=SC1091
 source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"
 
 fail() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
@@ -55,14 +57,12 @@ cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty'
 public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
 
-authentik_host="$(resolve_authentik_field 'AUTHENTIK_HOST')"
-authentik_token="$(resolve_authentik_field 'AUTHENTIK_BOOTSTRAP_TOKEN')"
+authentik_load_bootstrap_secret
+authentik_ensure_token
 
-if [[ -z "$authentik_host" ]]; then
-  authentik_host="https://authentik.${public_zone_name}"
+if [[ -z "$AUTHENTIK_HOST" ]]; then
+  AUTHENTIK_HOST="https://authentik.${public_zone_name}"
 fi
-
-[[ -n "$authentik_token" ]] || fail "Could not read AUTHENTIK_BOOTSTRAP_TOKEN from OpenBao"
 
 pgadmin_host="https://pgadmin4.${public_zone_name}"
 pgadmin_redirect_uri="${pgadmin_host}/oauth2/authorize"
@@ -74,18 +74,18 @@ cp -r "$WORKSPACE_ROOT/infra/opentofu/authentik-pgadmin4/"* "$tf_workdir/"
 cat >"$tf_workdir/terraform.tfvars" <<EOF
 application_name = "pgAdmin 4"
 application_slug = "pgadmin4"
-authentik_url = "${authentik_host}"
+authentik_url = "${AUTHENTIK_HOST}"
 pgadmin4_redirect_uri = "${pgadmin_redirect_uri}"
 EOF
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Provisioning Authentik OIDC client for pgAdmin 4"
 cd "$tf_workdir"
-TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$authentik_token" tofu init -no-color -input=false
-TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$authentik_token" tofu apply -no-color -auto-approve -input=false
+TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$AUTHENTIK_TOKEN" tofu init -no-color -input=false
+TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$AUTHENTIK_TOKEN" tofu apply -no-color -auto-approve -input=false
 
-pgadmin_client_id="$(TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$authentik_token" tofu output -no-color -raw client_id)"
-pgadmin_client_secret="$(TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$authentik_token" tofu output -no-color -raw client_secret)"
-pgadmin_issuer_url="$(TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$authentik_token" tofu output -no-color -raw issuer_url)"
+pgadmin_client_id="$(TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$AUTHENTIK_TOKEN" tofu output -no-color -raw client_id)"
+pgadmin_client_secret="$(TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$AUTHENTIK_TOKEN" tofu output -no-color -raw client_secret)"
+pgadmin_issuer_url="$(TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$AUTHENTIK_TOKEN" tofu output -no-color -raw issuer_url)"
 
 secrets_dir="/opt/twinbox/bootstrap/secrets/global"
 mkdir -p "$secrets_dir"

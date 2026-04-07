@@ -9,6 +9,8 @@ WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
 # shellcheck disable=SC1091
 source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"
 
 export KUBECONFIG="$KUBECONFIG_FILE"
 
@@ -28,15 +30,12 @@ cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty'
 public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
 
-authentik_secret_json="$(openbao_read_global_secret_json authentik)"
-authentik_host="$(jq -r '.AUTHENTIK_HOST // empty' <<<"$authentik_secret_json")"
-authentik_token="$(jq -r '.AUTHENTIK_BOOTSTRAP_TOKEN // empty' <<<"$authentik_secret_json")"
+authentik_load_bootstrap_secret
+authentik_ensure_token
 
-if [[ -z "$authentik_host" ]]; then
-  authentik_host="https://authentik.${public_zone_name}"
+if [[ -z "$AUTHENTIK_HOST" ]]; then
+  AUTHENTIK_HOST="https://authentik.${public_zone_name}"
 fi
-
-[[ -n "$authentik_token" ]] || fail "Could not read AUTHENTIK_BOOTSTRAP_TOKEN from OpenBao"
 
 for attempt in $(seq 1 120); do
   if kubectl -n traefik get ingressroute/traefik-dashboard >/dev/null 2>&1 && \
@@ -59,7 +58,7 @@ mkdir -p "$tf_workdir"
 cp -r "$WORKSPACE_ROOT/infra/opentofu/authentik-management-consoles/"* "$tf_workdir/"
 
 cat >"$tf_workdir/terraform.tfvars" <<EOF
-authentik_url = "${authentik_host}"
+authentik_url = "${AUTHENTIK_HOST}"
 traefik_dashboard_external_host = "https://traefik.${public_zone_name}"
 longhorn_external_host = "https://longhorn.${public_zone_name}"
 proxmox_external_host = "https://proxmox.${public_zone_name}"
@@ -68,10 +67,10 @@ EOF
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Provisioning Authentik proxy applications for Traefik, Longhorn, Proxmox, and Twinbox Wizard"
 cd "$tf_workdir"
-TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$authentik_token" tofu init -no-color -input=false
-TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$authentik_token" tofu apply -no-color -auto-approve -input=false
+TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$AUTHENTIK_TOKEN" tofu init -no-color -input=false
+TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$AUTHENTIK_TOKEN" tofu apply -no-color -auto-approve -input=false
 
-provider_ids_json="$(TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$authentik_token" tofu output -no-color -json provider_ids)"
+provider_ids_json="$(TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$AUTHENTIK_TOKEN" tofu output -no-color -json provider_ids)"
 traefik_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.traefik_dashboard')"
 longhorn_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.longhorn')"
 proxmox_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.proxmox')"
@@ -86,7 +85,8 @@ proxmox_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.proxmox')"
   [[ "$seaweedfs_admin_provider_id" != "null" && -n "$seaweedfs_admin_provider_id" ]] || fail "Could not read SeaweedFS admin provider ID from tofu output"
 
 AUTHENTIK_LOCAL_FORWARD_PORT="${AUTHENTIK_LOCAL_FORWARD_PORT:-18299}"
-AUTHENTIK_API_BASE="http://127.0.0.1:${AUTHENTIK_LOCAL_FORWARD_PORT}/api/v3"
+
+authentik_setup_forward
 
 authentik_request() {
   local method="$1"
@@ -97,13 +97,19 @@ authentik_request() {
 
   response_file="$(mktemp)"
 
+  local auth_headers=(-H "Accept: application/json")
+  if [[ "${AUTHENTIK_USE_COOKIE:-false}" == "true" ]]; then
+    auth_headers+=(-H "Cookie: ${AUTHENTIK_TOKEN}")
+  else
+    auth_headers+=(-H "Authorization: Bearer ${AUTHENTIK_TOKEN}")
+  fi
+
   if [[ -n "$data" ]]; then
+    auth_headers+=(-H "Content-Type: application/json")
     status="$(
       curl -sS \
         -X "$method" \
-        -H "Accept: application/json" \
-        -H "Authorization: Bearer ${authentik_token}" \
-        -H "Content-Type: application/json" \
+        "${auth_headers[@]}" \
         --data-binary "$data" \
         -o "$response_file" \
         -w '%{http_code}' \
@@ -116,8 +122,7 @@ authentik_request() {
     status="$(
       curl -sS \
         -X "$method" \
-        -H "Accept: application/json" \
-        -H "Authorization: Bearer ${authentik_token}" \
+        "${auth_headers[@]}" \
         -o "$response_file" \
         -w '%{http_code}' \
         "${AUTHENTIK_API_BASE}${path}"
@@ -140,42 +145,6 @@ authentik_request() {
 
   printf '%s' "$body"
 }
-
-authentik_wait_for_local_forward() {
-  local forward_port="$1"
-  local forward_pid="$2"
-  local forward_log="$3"
-  local attempt=1
-  local attempts=60
-
-  while [[ "$attempt" -le "$attempts" ]]; do
-    if curl -fsS "http://127.0.0.1:${forward_port}/-/health/live/" >/dev/null 2>&1; then
-      return 0
-    fi
-    if ! kill -0 "$forward_pid" >/dev/null 2>&1; then
-      if [[ -s "$forward_log" ]]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Authentik port-forward exited early; last log lines:" >&2
-        tail -n 20 "$forward_log" >&2
-      fi
-      fail "Authentik port-forward on 127.0.0.1:${forward_port} exited before it became ready"
-    fi
-    sleep 1
-    attempt=$((attempt + 1))
-  done
-
-  if [[ -s "$forward_log" ]]; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Authentik port-forward log:" >&2
-    tail -n 20 "$forward_log" >&2
-  fi
-
-  fail "Authentik port-forward on 127.0.0.1:${forward_port} did not become ready"
-}
-
-forward_log="$(mktemp "${TMPDIR:-/tmp}/authentik-port-forward.XXXXXX.log")"
-kubectl -n authentik port-forward svc/authentik-server "${AUTHENTIK_LOCAL_FORWARD_PORT}:80" >"$forward_log" 2>&1 &
-port_forward_pid="$!"
-trap 'kill "$port_forward_pid" >/dev/null 2>&1 || true; rm -f "$forward_log"' EXIT
-authentik_wait_for_local_forward "$AUTHENTIK_LOCAL_FORWARD_PORT" "$port_forward_pid" "$forward_log"
 
 outpost_json="$(authentik_request GET "/outposts/instances/?page_size=100")"
 outpost_id="$(printf '%s' "$outpost_json" | jq -r '.results[] | select(.name == "authentik Embedded Outpost") | .pk' | head -n1)"

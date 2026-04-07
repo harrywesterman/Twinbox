@@ -1222,7 +1222,8 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
         / "run.sh"
     ).read_text(encoding="utf-8")
     assert "authentik-headlamp" in headlamp_run_text
-    assert "AUTHENTIK_BOOTSTRAP_TOKEN" in headlamp_run_text
+    assert "authentik-auth.sh" in headlamp_run_text
+    assert "authentik_ensure_token" in headlamp_run_text
     assert "HEADLAMP_CONFIG_OIDC_CLIENT_ID" in headlamp_run_text
     assert "HEADLAMP_CONFIG_OIDC_CLIENT_SECRET" in headlamp_run_text
     assert "HEADLAMP_CONFIG_OIDC_IDP_ISSUER_URL" in headlamp_run_text
@@ -2028,5 +2029,6 @@ def test_authentik_consumer_scripts_read_from_openbao():
 
     for path in consumer_paths:
         text = path.read_text(encoding="utf-8")
-        assert "openbao_read_global_secret_json authentik" in text
+        assert "authentik-auth.sh" in text
+        assert "authentik_ensure_token" in text or "authentik_load_bootstrap_secret" in text
         assert "authentik.json" not in text

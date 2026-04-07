@@ -9,6 +9,8 @@ WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../
 export KUBECONFIG="$KUBECONFIG_FILE"
 # shellcheck disable=SC1091
 source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"
 
 BOOTSTRAP_ROOT="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
 LOGIN_SECRET_FILE="$BOOTSTRAP_ROOT/secrets/global/twinbox-login.json"
@@ -48,13 +50,19 @@ authentik_request() {
 
   response_file="$(mktemp)"
 
+  local auth_headers=(-H "Accept: application/json")
+  if [[ "${AUTHENTIK_USE_COOKIE:-false}" == "true" ]]; then
+    auth_headers+=(-H "Cookie: ${AUTHENTIK_TOKEN}")
+  else
+    auth_headers+=(-H "Authorization: Bearer ${AUTHENTIK_TOKEN}")
+  fi
+
   if [[ -n "$data" ]]; then
+    auth_headers+=(-H "Content-Type: application/json")
     status="$(
       curl -sS \
         -X "$method" \
-        -H "Accept: application/json" \
-        -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" \
-        -H "Content-Type: application/json" \
+        "${auth_headers[@]}" \
         --data-binary "$data" \
         -o "$response_file" \
         -w '%{http_code}' \
@@ -67,8 +75,7 @@ authentik_request() {
     status="$(
       curl -sS \
         -X "$method" \
-        -H "Accept: application/json" \
-        -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" \
+        "${auth_headers[@]}" \
         -o "$response_file" \
         -w '%{http_code}' \
         "${AUTHENTIK_API_BASE}${path}"
@@ -241,14 +248,9 @@ cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
 [[ -f "$LOGIN_SECRET_FILE" ]] || fail "Wizard login secret not found at $LOGIN_SECRET_FILE"
 
-authentik_secret_json="$(openbao_read_global_secret_json authentik)"
-AUTHENTIK_TOKEN="$(jq -r '.AUTHENTIK_BOOTSTRAP_TOKEN // empty' <<<"$authentik_secret_json")"
 LOGIN_PASSWORD="$(jq -r '.password // .PASSWORD // empty' "$LOGIN_SECRET_FILE")"
-
-[[ -n "$AUTHENTIK_TOKEN" ]] || fail "Could not read AUTHENTIK_BOOTSTRAP_TOKEN from OpenBao"
 [[ -n "$LOGIN_PASSWORD" ]] || fail "Could not read password from $LOGIN_SECRET_FILE"
 
-AUTHENTIK_API_BASE="http://127.0.0.1:${AUTHENTIK_LOCAL_FORWARD_PORT}/api/v3"
 FULL_NAME="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.full_name // empty')"
 USERNAME="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.username // empty')"
 EMAIL="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.email // empty')"
@@ -257,24 +259,10 @@ ADMIN_GROUP_NAME="admins"
 [[ -n "$FULL_NAME" ]] || fail "full_name is required"
 [[ -n "$USERNAME" ]] || fail "username is required"
 
-forward_log="$(mktemp "${TMPDIR:-/tmp}/authentik-port-forward.XXXXXX.log")"
-port_forward_pid=""
-
-cleanup_port_forward() {
-  if [[ -n "$port_forward_pid" ]]; then
-    kill "$port_forward_pid" >/dev/null 2>&1 || true
-    wait "$port_forward_pid" >/dev/null 2>&1 || true
-  fi
-  rm -f "$forward_log"
-}
-
-trap cleanup_port_forward EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
-
-kubectl -n authentik port-forward "svc/authentik-server" "${AUTHENTIK_LOCAL_FORWARD_PORT}:80" >"$forward_log" 2>&1 &
-port_forward_pid="$!"
-authentik_wait_for_local_forward "$AUTHENTIK_LOCAL_FORWARD_PORT" "$port_forward_pid" "$forward_log"
+AUTHENTIK_LOCAL_FORWARD_PORT="${AUTHENTIK_LOCAL_FORWARD_PORT:-18299}"
+authentik_load_bootstrap_secret
+authentik_ensure_token
+authentik_setup_forward
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating Authentik user ${USERNAME}"
 USER_ID="$(authentik_upsert_user "$USERNAME" "$FULL_NAME" "$EMAIL")"

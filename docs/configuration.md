@@ -175,7 +175,8 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 
 - Authentik uses a `Recreate` deployment strategy so its bootstrap lock is held by only one pod at a time during rollouts. That avoids overlapping startup attempts from old and new pods.
 - `wizard/setup-wizard.sh` writes the chosen cluster login password to `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` inside the Management VM so later bootstrap steps can reuse it without prompting again.
-- `create-users-and-groups` reads the Authentik bootstrap secret from OpenBao and `twinbox-login.json` from the Management VM bootstrap tree, creates the first Authentik user, creates the `admins` group as a superuser group, and adds the user to that group.
+- `create-users-and-groups` reads the Authentik bootstrap secret from OpenBao via the shared `authentik-auth.sh` helper, authenticates as `akadmin` using the bootstrap password, creates a reusable API token (or falls back to session cookie), creates the first Authentik user, creates the `admins` group as a superuser group, and adds the user to that group.
+- All downstream steps that talk to the Authentik API (`install-headlamp`, `install-dashy-dashboard`, `configure-argocd-oidc`, `install-pgadmin4`, `install-management-consoles`) source `scripts/manager/authentik-auth.sh` and call `authentik_ensure_token`. The helper tries the bootstrap token first, then falls back to authenticating as `akadmin` via the flow executor to create or reuse a permanent API token.
 - `install-velero-backup` installs Velero together with the SeaweedFS S3 target that runs on the Management VM.
 - Later application steps write bootstrap JSON into OpenBao before enabling their Argo CD applications.
 
