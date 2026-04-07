@@ -70,26 +70,27 @@ authentik_create_api_token() {
 
   _authentik_log "Creating API token for akadmin via pod exec"
 
-  local token_raw
-  token_raw="$(kubectl exec -n authentik "$pod" -- ak shell -c "
+  # Use a temp file in the pod to avoid log noise entirely
+  local tmp_file="/tmp/_twinbox_token_$$.txt"
+  kubectl exec -n authentik "$pod" -- sh -c "
+    ak shell -c \"
 from authentik.core.models import User, Token
+import sys
 user = User.objects.filter(username='akadmin').first()
 if not user:
-    print('ERROR: akadmin user not found')
-    exit(1)
+    sys.exit(1)
 Token.objects.filter(identifier='${identifier}', user=user, intent='api').delete()
-token = Token.objects.create(
-    identifier='${identifier}',
-    user=user,
-    intent='api',
-    expiring=False,
-)
-print('TOKEN_START' + token.key + 'TOKEN_END')
-" 2>/dev/null)" || true
+token = Token.objects.create(identifier='${identifier}', user=user, intent='api', expiring=False)
+with open('${tmp_file}', 'w') as f:
+    f.write(token.key)
+\" 2>/dev/null
+  " 2>/dev/null || true
 
-  # Extract just the token from the log-heavy output
-  local token_key
-  token_key="$(echo "$token_raw" | grep -oE 'TOKEN_START[a-zA-Z0-9]+TOKEN_END' | sed 's/TOKEN_START//;s/TOKEN_END//')" || true
+  local token_key=""
+  token_key="$(kubectl exec -n authentik "$pod" -- cat "$tmp_file" 2>/dev/null)" || true
+  kubectl exec -n authentik "$pod" -- rm -f "$tmp_file" 2>/dev/null || true
+  # Sanitize: only alphanumeric, strip any whitespace or control characters
+  token_key="$(printf '%s' "$token_key" | tr -dc 'a-zA-Z0-9' | head -c 128)"
 
   if [[ -z "$token_key" || "$token_key" == *"ERROR"* || "$token_key" == *"Traceback"* ]]; then
     _authentik_log "Failed to create API token via pod exec"
