@@ -300,6 +300,10 @@ authentik_load_bootstrap_secret
 authentik_ensure_token
 authentik_setup_forward
 
+# Create a dedicated service account + persistent API token on first boot,
+# while the bootstrap token is still valid.
+authentik_create_service_account_token
+
 create_flow_if_missing() {
   local flow_slug="$1"
   local flow_name="$2"
