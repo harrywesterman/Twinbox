@@ -10,8 +10,8 @@ depends_on:
   - install-secret-sync
   - install-longhorn-storage
   - install-traefik
-  - install-postgres-clusters
   - choose-ingress-route
+  - install-cloudnativepg
 inputs: []
 secrets:
   files:

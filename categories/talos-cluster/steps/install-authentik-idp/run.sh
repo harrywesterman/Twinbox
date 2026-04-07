@@ -4,6 +4,8 @@ set -euo pipefail
 : "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"
 : "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"
 
+export KUBECONFIG="$KUBECONFIG_FILE"
+
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
 # shellcheck disable=SC1091
@@ -20,6 +22,35 @@ mkdir -p "$(dirname "$authentik_secret_file")"
 fail() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
   exit 1
+}
+
+wait_for_resources_ready() {
+  local namespace="$1"
+  local kind="$2"
+  local condition="$3"
+  local label="$4"
+  local attempts=120
+  local attempt=1
+
+  while true; do
+    if kubectl -n "$namespace" get "$kind" -o name 2>/dev/null | grep -q .; then
+      if kubectl -n "$namespace" wait --for="condition=${condition}" "$kind" --all --timeout=5s >/dev/null 2>&1; then
+        log "${label} resources are ready"
+        return 0
+      fi
+
+      log "Waiting for ${label} resources to become ready"
+    else
+      log "Waiting for ${label} resources to appear"
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      fail "${label} resources did not become ready after ${attempts} attempts"
+    fi
+
+    sleep 5
+    attempt=$((attempt + 1))
+  done
 }
 
 log() {
@@ -167,7 +198,13 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
 rm -f "$bootstrap_secret_file" "$authentik_secret_file"
 trap - EXIT
 
-export KUBECONFIG="$KUBECONFIG_FILE"
+# Provision the PostgreSQL database cluster for Authentik
+log "Creating database cluster and resources"
+kubectl apply -k "$WORKSPACE_ROOT/gitops/databases"
+
+wait_for_resources_ready "databases" "cluster" "Ready" "CloudNativePG cluster"
+wait_for_resources_ready "databases" "externalsecret" "Ready" "ExternalSecret"
+wait_for_resources_ready "databases" "deployment" "Available" "Pooler deployment"
 
 kubectl create namespace authentik --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply -f "$authentik_externalsecret_manifest"

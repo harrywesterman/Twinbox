@@ -70,7 +70,6 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 - `install-cloudtty` – Deploy Cloudtty and open a browser shell on the cluster.
 - `install-traefik-manager` – Deploy Traefik Manager for browser-based reverse-proxy management.
 - `install-prometheus` – Deploy Prometheus, Alertmanager, node-exporter, and kube-state-metrics.
-- `install-postgres-clusters` – Create Postgres clusters from templates.
 - `install-traefik` – Deploy Traefik ingress controller.
 - `install-secret-sync` – Deploy External Secrets Operator and OpenBao.
 - `install-authentik-idp` – Deploy Authentik identity provider.
