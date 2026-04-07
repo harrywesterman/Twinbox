@@ -7,8 +7,8 @@ summary: Apply the Prometheus GitOps application that enables alerting and clust
 explanation: Twinbox installs the kube-prometheus-stack through Argo CD. That gives the cluster Prometheus, Alertmanager, node-exporter, and kube-state-metrics while keeping Grafana as a separate dashboard step. The stack uses Longhorn-backed storage and waits for Argo CD health before continuing.
 side_help: Prometheus collects cluster metrics, Alertmanager routes alerts, node-exporter exposes node metrics, and kube-state-metrics exposes Kubernetes object state.
 depends_on:
+  - install-traefik
   - install-longhorn-storage
-  - choose-ingress-route
 inputs: []
 secrets:
   files:

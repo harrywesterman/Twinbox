@@ -2,7 +2,7 @@ id: install-cloudtty
 title: Install Cloudtty
 type: action
 journey_stage: setup
-order: 19
+order: 18
 summary: Install Cloudtty and create a browser-accessible cluster shell.
 explanation: Cloudtty provides a browser-based Kubernetes shell that runs as a cluster workload. Twinbox installs the cloudtty operator through Helm, waits for the controller to become available, and then creates a default CloudShell instance exposed by NodePort so the operator can open a live shell against the same cluster.
 side_help: Cloudtty is useful when you want a quick web terminal on the cluster itself without leaving the Twinbox flow.
