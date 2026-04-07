@@ -41,4 +41,6 @@ longhornDriver:
     twinbox.io/role: worker
 
 persistence:
-  defaultNodeSelector: twinbox.io/role=worker
+  defaultNodeSelector:
+    enable: false
+    selector: ""
