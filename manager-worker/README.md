@@ -39,6 +39,7 @@ manager-worker/
 The Dockerfile bundles:
 
 - `talosctl`, `tofu` (OpenTofu), `kubectl`, `helm` — installed at build time with pinned versions from `config/pinned-defaults.sh`.
+- `categories/` — step manifests and step runner scripts executed by the worker.
 - `scripts/manager/`, `scripts/get-talos-image-factory.sh` — provisioning scripts.
 - `config/pinned-defaults.sh` — version pin definitions.
 - `infra/`, `lib/` — OpenTofu modules and shared libraries.

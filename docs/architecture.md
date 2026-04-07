@@ -14,7 +14,7 @@ GitHub `main` is the source of truth for both the management stack and the GitOp
   - `manager-web`
   - `manager-api`
   - `manager-worker`
-  - `categories/`
+  - `categories/` bundled into the `manager-api` and `manager-worker` images
   - Management VM runtime files under `/opt/twinbox`
 
 3. **Execution layer**

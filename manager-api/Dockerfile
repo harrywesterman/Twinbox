@@ -10,6 +10,7 @@ COPY manager-api/package.json ./manager-api/package.json
 RUN cd /opt/twinbox/manager-api && npm install --omit=dev
 
 COPY lib ./lib
+COPY categories ./categories
 COPY manager-api/src ./manager-api/src
 
 WORKDIR /opt/twinbox/manager-api

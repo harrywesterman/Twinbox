@@ -27,6 +27,7 @@ RUN apt-get update \
 COPY manager-worker/package.json ./manager-worker/package.json
 COPY manager-worker/src ./manager-worker/src
 COPY lib ./lib
+COPY categories ./categories
 COPY infra ./infra
 COPY gitops ./gitops
 COPY scripts/manager ./scripts/manager
