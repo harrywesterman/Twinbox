@@ -98,6 +98,14 @@
           Unattended-Upgrade::Automatic-Reboot-WithUsers "false";
           Unattended-Upgrade::Automatic-Reboot-Time "02:30";
 
+    - name: Ensure systemd-timesyncd drop-in directory exists
+      ansible.builtin.file:
+        path: /etc/systemd/timesyncd.conf.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
     - name: Keep SSH password authentication enabled
       ansible.builtin.copy:
         dest: /etc/ssh/sshd_config.d/99-twinbox-management.conf
@@ -118,7 +126,7 @@
         owner: root
         group: root
         mode: "0644"
-      content: |
+        content: |
           [Time]
           NTP={{ twinbox_management_time_server }}
           FallbackNTP=
