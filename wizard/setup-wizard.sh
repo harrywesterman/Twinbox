@@ -1262,12 +1262,17 @@ ssh_pwauth: true
 users:
   - name: ${CLOUD_INIT_USER}
     lock_passwd: false
-    password: "${CLOUD_INIT_PASSWORD}"
     groups: sudo,docker
     shell: /bin/bash
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
     ssh_authorized_keys:
       - ${SSH_KEY}
+chpasswd:
+  expire: false
+  users:
+    - name: ${CLOUD_INIT_USER}
+      password: "${CLOUD_INIT_PASSWORD}"
+      type: text
 package_update: true
 packages:
   - curl
