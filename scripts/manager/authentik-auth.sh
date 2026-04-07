@@ -116,7 +116,7 @@ authentik_create_service_account_token() {
       "${AUTHENTIK_API_BASE}/core/users/service_account/" \
     )" || _authentik_fail "Failed to create service account '${AUTHENTIK_SA_NAME}'"
 
-    sa_pk="$(printf '%s' "$sa_json" | jq -r '.pk // .id // empty')"
+    sa_pk="$(printf '%s' "$sa_json" | jq -r '.pk // .id // .user_pk // empty')"
     [[ -n "$sa_pk" ]] || _authentik_fail "Could not determine service account pk from response: $sa_json"
     _authentik_log "Created service account '${AUTHENTIK_SA_NAME}' (pk=${sa_pk})"
   fi
