@@ -2,7 +2,7 @@ id: install-headlamp
 title: Install Headlamp
 type: action
 journey_stage: setup
-order: 17
+order: 21
 summary: Apply the Headlamp GitOps application and connect it to Authentik login.
 explanation: Headlamp is installed through a single Argo CD application that combines the Helm chart and ingress routes. Before syncing the app, Twinbox provisions a dedicated Authentik OAuth2/OIDC client with OpenTofu, syncs the resulting credentials into OpenBao, and exposes them to Headlamp through an ExternalSecret. The step waits until Argo CD reports it Synced and Healthy.
 side_help: Headlamp is nice to look at the current state of the cluster, but remember; we are using GitOps, so changing anything will not help, Argo CD wil sync it right back.

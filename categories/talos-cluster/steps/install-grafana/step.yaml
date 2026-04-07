@@ -2,7 +2,7 @@ id: install-grafana
 title: Install Grafana
 type: action
 journey_stage: setup
-order: 19
+order: 20
 summary: Apply the Grafana GitOps application after seeding the admin secret in OpenBao.
 explanation: Twinbox prepares the Grafana bootstrap secret in OpenBao and then applies one Argo CD application that combines the ExternalSecret, Grafana chart, and ingress routes. The step is intended to run after the Prometheus stack so the dashboard can point at a live metrics backend. It waits for Argo CD health before continuing.
 side_help: Grafana is an open-source observability platform for visualizing, querying, and alerting on metrics, logs, and traces.
