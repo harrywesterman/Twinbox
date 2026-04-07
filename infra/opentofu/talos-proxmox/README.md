@@ -6,6 +6,8 @@ OpenTofu module for provisioning Talos Linux VMs on Proxmox VE.
 
 This module creates Talos Linux virtual machines on Proxmox, supporting both control plane and worker node types. It handles VM creation with the Talos ISO attached for initial bootstrap and disk-based boot after installation.
 
+Control plane nodes are provisioned with fixed RAM equal to their assigned memory so Proxmox ballooning cannot pull them below their configured size. Worker nodes still keep a balloon floor for flexibility.
+
 ## Resources
 
 - `proxmox_virtual_environment_vm.node` – VMs for each node defined in the `nodes` map

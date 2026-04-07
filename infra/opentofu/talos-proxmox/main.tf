@@ -31,7 +31,7 @@ resource "proxmox_virtual_environment_vm" "node" {
 
   memory {
     dedicated = each.value.ram_mb
-    floating  = 2048
+    floating  = each.value.type == "controlplane" ? each.value.ram_mb : 2048
   }
 
   disk {
