@@ -10,6 +10,8 @@ WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
 # shellcheck disable=SC1091
 source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"
 BOOTSTRAP_ROOT="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
 authentik_secret_file="$BOOTSTRAP_ROOT/secrets/global/authentik.json"
 openbao_initialized_file="$BOOTSTRAP_ROOT/openbao/init/initialized.json"
@@ -293,8 +295,10 @@ wait_for_deployment_rollout "authentik-worker" "Authentik worker"
 # Create default OAuth2 provider flows if they don't exist
 log "Ensuring default OAuth2 provider flows exist"
 
-authentik_admin_token="$authentik_bootstrap_token"
-authentik_api_base="$authentik_host/api/v3"
+AUTHENTIK_LOCAL_FORWARD_PORT="${AUTHENTIK_LOCAL_FORWARD_PORT:-18299}"
+authentik_load_bootstrap_secret
+authentik_ensure_token
+authentik_setup_forward
 
 create_flow_if_missing() {
   local flow_slug="$1"
@@ -306,8 +310,9 @@ create_flow_if_missing() {
   local flow_compatible_providers="$7"
 
   local existing
-  existing="$(curl -sf "${authentik_api_base}/core/flows/?slug=${flow_slug}" \
-    -H "Authorization: Bearer ${authentik_admin_token}" \
+  existing="$(curl -sf "${AUTHENTIK_API_BASE}/core/flows/?slug=${flow_slug}" \
+    -H "Accept: application/json" \
+    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" \
     -H "Content-Type: application/json" 2>/dev/null || true)"
 
   if echo "$existing" | jq -e '.results | length > 0' >/dev/null 2>&1; then
@@ -317,8 +322,9 @@ create_flow_if_missing() {
 
   log "Creating flow '${flow_slug}'"
   local response
-  response="$(curl -sf -X POST "${authentik_api_base}/core/flows/" \
-    -H "Authorization: Bearer ${authentik_admin_token}" \
+  response="$(curl -sS -X POST "${AUTHENTIK_API_BASE}/core/flows/" \
+    -H "Accept: application/json" \
+    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" \
     -H "Content-Type: application/json" \
     -d "$(jq -n \
       --arg name "$flow_name" \
@@ -336,11 +342,10 @@ create_flow_if_missing() {
         authentication: $authentication,
         policy_engine_mode: $policy_engine_mode,
         compatible_providers: $compatible_providers
-      }')" 2>/dev/null || true)"
+      }')" 2>/dev/null)" || fail "Failed to create flow '${flow_slug}'"
 
   if [ -z "$response" ]; then
-    log "WARNING: Failed to create flow '${flow_slug}'"
-    return 1
+    fail "Failed to create flow '${flow_slug}'"
   fi
 
   log "Created flow '${flow_slug}'"

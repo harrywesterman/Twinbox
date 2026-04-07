@@ -2027,6 +2027,12 @@ def test_authentik_consumer_scripts_read_from_openbao():
         / "run.sh",
     ]
 
+    # install-authentik-idp seeds the authentik.json file, so it legitimately references it
+    idp_path = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-authentik-idp" / "run.sh"
+    idp_text = idp_path.read_text(encoding="utf-8")
+    assert "authentik-auth.sh" in idp_text
+    assert "authentik_ensure_token" in idp_text or "authentik_load_bootstrap_secret" in idp_text
+
     for path in consumer_paths:
         text = path.read_text(encoding="utf-8")
         assert "authentik-auth.sh" in text
