@@ -289,3 +289,81 @@ wait_for_deployment_rollout() {
 
 wait_for_deployment_rollout "authentik-server" "Authentik server"
 wait_for_deployment_rollout "authentik-worker" "Authentik worker"
+
+# Create default OAuth2 provider flows if they don't exist
+log "Ensuring default OAuth2 provider flows exist"
+
+authentik_admin_token="$authentik_bootstrap_token"
+authentik_api_base="$authentik_host/api/v3"
+
+create_flow_if_missing() {
+  local flow_slug="$1"
+  local flow_name="$2"
+  local flow_title="$3"
+  local flow_designation="$4"
+  local flow_authentication="$5"
+  local flow_policy_engine_mode="$6"
+  local flow_compatible_providers="$7"
+
+  local existing
+  existing="$(curl -sf "${authentik_api_base}/core/flows/?slug=${flow_slug}" \
+    -H "Authorization: Bearer ${authentik_admin_token}" \
+    -H "Content-Type: application/json" 2>/dev/null || true)"
+
+  if echo "$existing" | jq -e '.results | length > 0' >/dev/null 2>&1; then
+    log "Flow '${flow_slug}' already exists"
+    return 0
+  fi
+
+  log "Creating flow '${flow_slug}'"
+  local response
+  response="$(curl -sf -X POST "${authentik_api_base}/core/flows/" \
+    -H "Authorization: Bearer ${authentik_admin_token}" \
+    -H "Content-Type: application/json" \
+    -d "$(jq -n \
+      --arg name "$flow_name" \
+      --arg slug "$flow_slug" \
+      --arg title "$flow_title" \
+      --arg designation "$flow_designation" \
+      --arg authentication "$flow_authentication" \
+      --arg policy_engine_mode "$flow_policy_engine_mode" \
+      --argjson compatible_providers "$flow_compatible_providers" \
+      '{
+        name: $name,
+        slug: $slug,
+        title: $title,
+        designation: $designation,
+        authentication: $authentication,
+        policy_engine_mode: $policy_engine_mode,
+        compatible_providers: $compatible_providers
+      }')" 2>/dev/null || true)"
+
+  if [ -z "$response" ]; then
+    log "WARNING: Failed to create flow '${flow_slug}'"
+    return 1
+  fi
+
+  log "Created flow '${flow_slug}'"
+}
+
+# Create authorization flow
+create_flow_if_missing \
+  "default-provider-authorization-implicit-consent" \
+  "Default Provider Authorization Implicit Consent" \
+  "Default Provider Authorization Implicit Consent" \
+  "authorization" \
+  "required" \
+  "any" \
+  "[1, 2]"
+
+# Create invalidation flow
+create_flow_if_missing \
+  "default-provider-invalidation-flow" \
+  "Default Provider Invalidation Flow" \
+  "Default Provider Invalidation Flow" \
+  "invalidation" \
+  "required" \
+  "any" \
+  "[]"
+
+log "Authentik installation complete"
