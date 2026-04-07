@@ -52,7 +52,7 @@ inputs:
     min: 512
     max: 1048576
     default: 8192
-    help: Worker memory allocation. Control planes stay fixed at 2048 MB, while workers keep this slider-driven memory size.
+    help: Worker memory allocation. Control planes stay fixed at 4096 MB, while workers keep this slider-driven memory size.
   - id: bridge
     label: Bridge
     type: string

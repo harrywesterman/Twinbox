@@ -54,7 +54,7 @@ Use the UI to:
 12. Continue through the GitOps application steps
 
 Cilium is installed during the Talos provisioning step, so there is no separate networking step in the wizard.
-Talos control planes stay at `2 GB RAM / 10 GB disk`, while worker disks scale from the Proxmox host's free space and Longhorn is scheduled onto workers through the Talos role label.
+Talos control planes stay at `4 GB RAM / 10 GB disk`, while worker disks scale from the Proxmox host's free space and Longhorn is scheduled onto workers through the Talos role label.
 
 ## Management VM maintenance
 

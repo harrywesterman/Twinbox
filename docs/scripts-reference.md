@@ -10,7 +10,7 @@ Main provisioning entry point. Creates Talos VMs on Proxmox using OpenTofu.
 
 - Creates a per-cluster OpenTofu workspace under `manager-data/clusters/<cluster-id>/iac/`
 - Downloads the pinned Talos ISO and uploads it to Proxmox storage
-- Sizes control-plane VMs at `2 GB RAM / 10 GB disk` and gives workers a separate disk budget derived from the selected host's free space
+- Sizes control-plane VMs at `4 GB RAM / 10 GB disk` and gives workers a separate disk budget derived from the selected host's free space
 - Labels Talos nodes with `twinbox.io/role` so worker-only storage components can target the right machines
 - Renders VM configuration from the cluster JSON
 - Renders the pinned Cilium Helm chart and injects it into Talos control-plane inline manifests

@@ -1751,7 +1751,7 @@ function App() {
                         ))}
                       </div>
                       <p className="wizard-input-block-note">
-                        Control plane nodes are fixed at 2 GB RAM and 10 GB disk. Worker disks scale from the selected host&apos;s free space and the slider percentage.
+                        Control plane nodes are fixed at 4 GB RAM and 10 GB disk. Worker disks scale from the selected host&apos;s free space and the slider percentage.
                       </p>
                     </section>
 
