@@ -6,8 +6,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 source_pinned_defaults() {
   local candidate=""
+  if [[ -f "$SCRIPT_DIR/../config/pinned-defaults.sh" ]]; then
+    # shellcheck disable=SC1090
+    source "$SCRIPT_DIR/../config/pinned-defaults.sh"
+    return 0
+  fi
+
   local candidates=(
-    "$SCRIPT_DIR/../config/pinned-defaults.sh"
     "$SCRIPT_DIR/../../config/pinned-defaults.sh"
     "${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}/config/pinned-defaults.sh"
   )
