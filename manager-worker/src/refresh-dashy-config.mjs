@@ -109,8 +109,12 @@ function loadCatalogDefinitions(workspaceRoot) {
         .sort()
         .map((stepDir) => {
           const stepFile = path.join(stepsRoot, stepDir, "step.yaml");
+          if (!fs.existsSync(stepFile)) {
+            return null;
+          }
           return normalizeStepManifest(loadYaml(stepFile), stepFile, category.id);
         })
+        .filter(Boolean)
         .sort((left, right) => left.order - right.order)
       : [];
 
@@ -211,16 +215,6 @@ function applyConfigMap(namespace, configMapName, renderedConfig) {
   fs.writeFileSync(configFile, renderedConfig, "utf8");
 
   try {
-    runKubectl([
-      "-n",
-      namespace,
-      "delete",
-      "configmap",
-      configMapName,
-      "--ignore-not-found=true",
-      "--wait=true",
-    ]);
-
     const createResult = runKubectl([
       "-n",
       namespace,
