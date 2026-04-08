@@ -57,8 +57,8 @@ resource "random_string" "client_id" {
 resource "authentik_provider_oauth2" "dashy" {
   name                  = var.application_name
   client_id             = random_string.client_id.result
-  authorization_flow    = data.authentik_flow.authorization.id
-  invalidation_flow     = data.authentik_flow.invalidation.id
+  authorization_flow    = data.authentik_flow.authorization.slug
+  invalidation_flow     = data.authentik_flow.invalidation.slug
   # Dashy sends the root start-page URL without a trailing slash.
   # Normalize the configured callback so the provider accepts both forms.
   allowed_redirect_uris = [

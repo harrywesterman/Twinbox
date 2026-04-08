@@ -58,8 +58,8 @@ resource "authentik_provider_proxy" "management_console" {
 
   name               = each.value.name
   external_host      = each.value.external_host
-  authorization_flow = data.authentik_flow.authorization.id
-  invalidation_flow  = data.authentik_flow.invalidation.id
+  authorization_flow = data.authentik_flow.authorization.slug
+  invalidation_flow  = data.authentik_flow.invalidation.slug
   mode               = "forward_single"
 }
 
