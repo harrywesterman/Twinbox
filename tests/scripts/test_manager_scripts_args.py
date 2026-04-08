@@ -1210,6 +1210,9 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "PGADMIN_MASTER_PASSWORD" in pgadmin_run_text
     assert "PGADMIN_DEFAULT_EMAIL" in pgadmin_run_text
     assert "Could not find a usable kubeconfig" in pgadmin_run_text
+    assert 'manifest_path="$WORKSPACE_ROOT/gitops/apps/pgadmin4.yaml"' in pgadmin_run_text
+    assert 'rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-application.XXXXXX.yaml")"' in pgadmin_run_text
+    assert 'sed "s/__ZONE_NAME__/${public_zone_name}/g" "$manifest_path" >"$rendered_manifest"' in pgadmin_run_text
     assert (
         "kubectl create namespace pgadmin4 --dry-run=client -o yaml | kubectl apply -f -"
         in pgadmin_run_text
@@ -1217,6 +1220,14 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "gitops/platform/pgadmin4/externalsecret.yaml" in pgadmin_run_text
     assert "gitops/apps/pgadmin4.yaml" in pgadmin_run_text
     assert "wait --for=condition=Ready externalsecret/pgadmin4-oidc" in pgadmin_run_text
+    assert "--manifest \"$rendered_manifest\"" in pgadmin_run_text
+
+    pgadmin_app_text = PGADMIN_APP.read_text(encoding="utf-8")
+    assert "kind: Application" in pgadmin_app_text
+    assert "kustomize:" in pgadmin_app_text
+    assert "pgadmin4-wiredoor" in pgadmin_app_text
+    assert "pgadmin4-tailscale" in pgadmin_app_text
+    assert 'Host(`pgadmin4.__ZONE_NAME__`)' in pgadmin_app_text
 
     headlamp_run_text = (
         REPO_ROOT

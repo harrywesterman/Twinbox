@@ -9,6 +9,29 @@ spec:
     repoURL: __REPO_URL__
     targetRevision: __TARGET_REVISION__
     path: gitops/platform/pgadmin4
+    kustomize:
+      patches:
+        - target:
+            kind: IngressRoute
+            name: pgadmin4
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`pgadmin4.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: pgadmin4-wiredoor
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`pgadmin4.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: pgadmin4-tailscale
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`pgadmin4.__ZONE_NAME__`)
   destination:
     server: https://kubernetes.default.svc
     namespace: pgadmin4

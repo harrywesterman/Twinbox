@@ -66,6 +66,9 @@ pgadmin_host="https://pgadmin4.${public_zone_name}"
 pgadmin_redirect_uri="${pgadmin_host}/oauth2/authorize"
 secrets_dir="/opt/twinbox/bootstrap/secrets/global"
 mkdir -p "$secrets_dir"
+manifest_path="$WORKSPACE_ROOT/gitops/apps/pgadmin4.yaml"
+rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-application.XXXXXX.yaml")"
+trap 'rm -f "$rendered_manifest"' EXIT
 pgadmin_application_slug="pgadmin4"
 pgadmin_issuer_url="${AUTHENTIK_HOST%/}/application/o/${pgadmin_application_slug}/"
 pgadmin_client_id="$(openssl rand -hex 16)"
@@ -312,8 +315,9 @@ kubectl apply -f "$WORKSPACE_ROOT/gitops/platform/pgadmin4/externalsecret.yaml"
 kubectl -n pgadmin4 wait --for=condition=Ready externalsecret/pgadmin4-oidc --timeout=10m
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying pgAdmin 4 Argo CD application"
+sed "s/__ZONE_NAME__/${public_zone_name}/g" "$manifest_path" >"$rendered_manifest"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
-  --manifest "$WORKSPACE_ROOT/gitops/apps/pgadmin4.yaml" \
+  --manifest "$rendered_manifest" \
   --application "pgadmin4" \
   --destination-namespace "pgadmin4"
 
