@@ -1799,6 +1799,8 @@ def test_ntfy_argocd_app_uses_ntfy_chart():
 def test_ntfy_values_configures_persistence():
     text = NTFY_VALUES.read_text(encoding="utf-8")
     assert "binwiederhier/ntfy" in text
+    assert "strategy:" in text
+    assert "type: Recreate" in text
     assert "storageClassName: longhorn" in text
     assert "volumeClaimSpec:" in text
     assert "config:" in text

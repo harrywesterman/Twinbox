@@ -1,5 +1,8 @@
 replicaCount: 1
 
+strategy:
+  type: Recreate
+
 image:
   repository: binwiederhier/ntfy
   tag: "v2.11.0"
