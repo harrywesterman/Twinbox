@@ -32,9 +32,7 @@ public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domai
 
 authentik_ensure_token
 
-if [[ -z "$AUTHENTIK_HOST" ]]; then
-  AUTHENTIK_HOST="https://authentik.${public_zone_name}"
-fi
+AUTHENTIK_HOST="${AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
 
 argocd_host="https://argocd.${public_zone_name}"
 argocd_redirect_uri="${argocd_host}/auth/callback"

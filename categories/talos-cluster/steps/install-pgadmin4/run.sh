@@ -59,9 +59,7 @@ public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domai
 
 authentik_ensure_token
 
-if [[ -z "$AUTHENTIK_HOST" ]]; then
-  AUTHENTIK_HOST="https://authentik.${public_zone_name}"
-fi
+AUTHENTIK_HOST="${AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
 
 pgadmin_host="https://pgadmin4.${public_zone_name}"
 pgadmin_redirect_uri="${pgadmin_host}/oauth2/authorize"
