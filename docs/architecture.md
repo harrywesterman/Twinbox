@@ -80,7 +80,7 @@ GitHub `main` is the source of truth for both the management stack and the GitOp
 18. The Proxmox wizard stores the cluster login password in `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` inside the Management VM so the Authentik onboarding step can reuse it.
 19. `install-authentik-idp` provisions the PostgreSQL cluster for Authentik and seeds the Authentik bootstrap secret into OpenBao, then removes the temporary local seed file after sync.
 20. Later Authentik consumers read the bootstrap data from OpenBao instead of reopening `/opt/twinbox/bootstrap/secrets/global/authentik.json`.
-21. `install-pgadmin4` provisions the pgAdmin 4 Authentik OIDC application, seeds the pgAdmin bootstrap secret into OpenBao, and deploys pgAdmin with Longhorn-backed persistence and Traefik ingress.
+21. `install-pgadmin4` refreshes the shared `platform-ingress` application so pgAdmin 4 is deployed behind Traefik with Longhorn-backed persistence, and it seeds the pgAdmin bootstrap secret into OpenBao while provisioning the Authentik OIDC application.
 22. GitOps apps consume secrets through `ExternalSecret` resources backed by `ClusterSecretStore/openbao`.
 23. Dashy link tiles are rendered on the Management VM from step metadata plus the current step-state, then written into the in-cluster `ConfigMap/dashy-config` so the start page reflects the installed browser UIs without a static list in Git.
 

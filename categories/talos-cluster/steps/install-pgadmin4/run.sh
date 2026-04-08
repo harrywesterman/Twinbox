@@ -70,7 +70,7 @@ pgadmin_host="https://pgadmin4.${public_zone_name}"
 pgadmin_redirect_uri="${pgadmin_host}/oauth2/authorize"
 secrets_dir="/opt/twinbox/bootstrap/secrets/global"
 mkdir -p "$secrets_dir"
-manifest_path="$WORKSPACE_ROOT/gitops/apps/pgadmin4.yaml"
+manifest_path="$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml"
 rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-application.XXXXXX.yaml")"
 trap 'rm -f "$rendered_manifest"' EXIT
 pgadmin_servers_file="$secrets_dir/pgadmin4-servers-${cluster_id}.json"
@@ -326,12 +326,13 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying pgAdmin 4 ExternalSecret"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform/pgadmin4/externalsecret.yaml"
 kubectl -n pgadmin4 wait --for=condition=Ready externalsecret/pgadmin4-oidc --timeout=10m
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying pgAdmin 4 Argo CD application"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying shared platform-ingress Argo CD application"
+kubectl delete application pgadmin4 -n argocd --ignore-not-found=true >/dev/null 2>&1 || true
 sed "s/__ZONE_NAME__/${public_zone_name}/g" "$manifest_path" >"$rendered_manifest"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$rendered_manifest" \
-  --application "pgadmin4" \
-  --destination-namespace "pgadmin4"
+  --application "platform-ingress" \
+  --destination-namespace "argocd"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 rollout"
 kubectl -n pgadmin4 rollout status deploy/pgadmin4 --timeout=10m
