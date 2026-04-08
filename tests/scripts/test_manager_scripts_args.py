@@ -1820,6 +1820,7 @@ def test_homepage_configmap_includes_monitoring_links():
 
 def test_kustomization_includes_monitoring_resources():
     text = KUSTOMIZATION.read_text(encoding="utf-8")
+    assert "pgadmin4/namespace.yaml" in text
     assert "prometheus/ingressroute.yaml" in text
     assert "prometheus/alertmanager-config.yaml" in text
     assert "prometheus/pvc-usage-alerts.yaml" not in text

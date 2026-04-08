@@ -11,6 +11,7 @@ resources:
   - headlamp/externalsecret.yaml
   - hubble/authentik-forwardauth-middleware.yaml
   - hubble/ingressroute.yaml
+  - pgadmin4/namespace.yaml
   - pgadmin4/ingressroute.yaml
   - pgadmin4/externalsecret.yaml
   - pgadmin4/pvc.yaml
