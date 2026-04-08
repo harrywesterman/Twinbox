@@ -62,12 +62,19 @@ def test_grafana_step_generates_and_syncs_an_oidc_secret():
     assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in text
     assert 'grafana_secret_file="$BOOTSTRAP_ROOT/secrets/global/grafana-oidc-${cluster_id}.json"' in text
     assert "openssl rand -hex 16" in text
+    assert "openssl rand -hex 24" in text
     assert "Provisioning Authentik OIDC client for Grafana" in text
     assert '"GF_AUTH_GENERIC_OAUTH_CLIENT_ID": $oauth_client_id' in text
     assert '"GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET": $oauth_client_secret' in text
+    assert '"GF_SECURITY_ADMIN_USER": $admin_user' in text
+    assert '"GF_SECURITY_ADMIN_PASSWORD": $admin_password' in text
     assert "scripts/manager/sync-openbao-global-secret.sh" in text
     assert '--secret-name "grafana-oidc"' in text
-    assert 'kubectl -n monitoring wait --for=condition=Ready externalsecret/grafana-oidc --timeout=10m' in text
+    assert '--required-keys "GF_AUTH_DISABLE_LOGIN_FORM,GF_AUTH_OAUTH_AUTO_LOGIN,GF_AUTH_BASIC_ENABLED,GF_USERS_AUTO_ASSIGN_ORG_ROLE,GF_AUTH_GENERIC_OAUTH_ENABLED,GF_AUTH_GENERIC_OAUTH_NAME,GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP,GF_AUTH_GENERIC_OAUTH_CLIENT_ID,GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET,GF_AUTH_GENERIC_OAUTH_SCOPES,GF_AUTH_GENERIC_OAUTH_AUTH_URL,GF_AUTH_GENERIC_OAUTH_TOKEN_URL,GF_AUTH_GENERIC_OAUTH_API_URL,GF_SECURITY_ADMIN_USER,GF_SECURITY_ADMIN_PASSWORD"' in text
+    assert (
+        'kubectl -n monitoring wait --for=condition=Ready externalsecret/grafana-oidc --timeout=10m'
+        in text
+    )
 
 
 def test_wiredoor_step_requires_url_generates_token_and_syncs_to_openbao():
@@ -97,6 +104,8 @@ def test_gitops_secret_consumers_now_reference_cluster_secret_store_openbao():
     assert "name: grafana-oidc" in grafana_text
     assert "property: GF_AUTH_GENERIC_OAUTH_CLIENT_ID" in grafana_text
     assert "property: GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET" in grafana_text
+    assert "property: GF_SECURITY_ADMIN_USER" in grafana_text
+    assert "property: GF_SECURITY_ADMIN_PASSWORD" in grafana_text
 
     assert "name: openbao" in wiredoor_text
     assert "kind: ClusterSecretStore" in wiredoor_text

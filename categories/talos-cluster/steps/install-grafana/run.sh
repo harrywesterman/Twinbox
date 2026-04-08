@@ -41,6 +41,8 @@ grafana_redirect_uri="${grafana_host}/login/generic_oauth"
 grafana_application_slug="grafana"
 grafana_client_id="$(openssl rand -hex 16)"
 grafana_client_secret="$(openssl rand -hex 24)"
+grafana_admin_user="admin"
+grafana_admin_password="$(openssl rand -hex 24)"
 grafana_secret_file="$BOOTSTRAP_ROOT/secrets/global/grafana-oidc-${cluster_id}.json"
 dashboard_temp_files=()
 
@@ -249,6 +251,8 @@ jq -n \
   --arg oauth_auth_url "$auth_url" \
   --arg oauth_token_url "$token_url" \
   --arg oauth_api_url "$api_url" \
+  --arg admin_user "$grafana_admin_user" \
+  --arg admin_password "$grafana_admin_password" \
   '{
     "GF_AUTH_DISABLE_LOGIN_FORM": $auth_disable_login_form,
     "GF_AUTH_OAUTH_AUTO_LOGIN": $auth_oauth_auto_login,
@@ -262,7 +266,9 @@ jq -n \
     "GF_AUTH_GENERIC_OAUTH_SCOPES": $oauth_scopes,
     "GF_AUTH_GENERIC_OAUTH_AUTH_URL": $oauth_auth_url,
     "GF_AUTH_GENERIC_OAUTH_TOKEN_URL": $oauth_token_url,
-    "GF_AUTH_GENERIC_OAUTH_API_URL": $oauth_api_url
+    "GF_AUTH_GENERIC_OAUTH_API_URL": $oauth_api_url,
+    "GF_SECURITY_ADMIN_USER": $admin_user,
+    "GF_SECURITY_ADMIN_PASSWORD": $admin_password
   }' >"$grafana_secret_file"
 
 chmod 600 "$grafana_secret_file"
@@ -270,7 +276,7 @@ chmod 600 "$grafana_secret_file"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "grafana-oidc" \
   --json-file "$grafana_secret_file" \
-  --required-keys "GF_AUTH_DISABLE_LOGIN_FORM,GF_AUTH_OAUTH_AUTO_LOGIN,GF_AUTH_BASIC_ENABLED,GF_USERS_AUTO_ASSIGN_ORG_ROLE,GF_AUTH_GENERIC_OAUTH_ENABLED,GF_AUTH_GENERIC_OAUTH_NAME,GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP,GF_AUTH_GENERIC_OAUTH_CLIENT_ID,GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET,GF_AUTH_GENERIC_OAUTH_SCOPES,GF_AUTH_GENERIC_OAUTH_AUTH_URL,GF_AUTH_GENERIC_OAUTH_TOKEN_URL,GF_AUTH_GENERIC_OAUTH_API_URL"
+  --required-keys "GF_AUTH_DISABLE_LOGIN_FORM,GF_AUTH_OAUTH_AUTO_LOGIN,GF_AUTH_BASIC_ENABLED,GF_USERS_AUTO_ASSIGN_ORG_ROLE,GF_AUTH_GENERIC_OAUTH_ENABLED,GF_AUTH_GENERIC_OAUTH_NAME,GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP,GF_AUTH_GENERIC_OAUTH_CLIENT_ID,GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET,GF_AUTH_GENERIC_OAUTH_SCOPES,GF_AUTH_GENERIC_OAUTH_AUTH_URL,GF_AUTH_GENERIC_OAUTH_TOKEN_URL,GF_AUTH_GENERIC_OAUTH_API_URL,GF_SECURITY_ADMIN_USER,GF_SECURITY_ADMIN_PASSWORD"
 rm -f "$grafana_secret_file"
 
 kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f - >/dev/null

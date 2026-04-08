@@ -1636,7 +1636,7 @@ def test_grafana_oidc_is_openbao_backed():
     grafana_step_yaml = GRAFANA_STEP_MANIFEST.read_text(encoding="utf-8")
 
     assert "adminPassword:" not in grafana_values_text
-    assert "existingSecret: grafana-admin" not in grafana_values_text
+    assert "existingSecret: grafana-oidc" in grafana_values_text
     assert "envFromSecret: grafana-oidc" in grafana_values_text
     assert "path: gitops/platform/grafana" not in grafana_app_text
     assert "kind: ExternalSecret" in grafana_externalsecret_text
@@ -1645,8 +1645,12 @@ def test_grafana_oidc_is_openbao_backed():
     assert "name: grafana-oidc" in grafana_externalsecret_text
     assert "GF_AUTH_GENERIC_OAUTH_CLIENT_ID" in grafana_externalsecret_text
     assert "GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET" in grafana_externalsecret_text
+    assert "secretKey: admin-user" in grafana_externalsecret_text
+    assert "secretKey: admin-password" in grafana_externalsecret_text
     assert "Provisioning Authentik OIDC client for Grafana" in grafana_step_text
     assert '--secret-name "grafana-oidc"' in grafana_step_text
+    assert "GF_SECURITY_ADMIN_USER" in grafana_step_text
+    assert "GF_SECURITY_ADMIN_PASSWORD" in grafana_step_text
     assert "- install-authentik-idp" in grafana_step_yaml
 
 
@@ -1873,10 +1877,10 @@ def test_argocd_servers_transport_disables_backend_cert_verification():
 
 def test_grafana_values_includes_sidecar_and_datasources():
     text = GRAFANA_VALUES.read_text(encoding="utf-8")
+    assert "existingSecret: grafana-oidc" in text
     assert "sidecar:" in text
     assert "datasources:" in text
     assert "enabled: true" in text
-    assert "additionalDataSources:" in text
     assert "name: Prometheus" in text
     assert "name: Loki" in text
     assert "type: prometheus" in text

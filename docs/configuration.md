@@ -106,7 +106,9 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
   "GF_AUTH_GENERIC_OAUTH_SCOPES": "openid profile email",
   "GF_AUTH_GENERIC_OAUTH_AUTH_URL": "https://authentik.example.com/application/o/authorize/",
   "GF_AUTH_GENERIC_OAUTH_TOKEN_URL": "https://authentik.example.com/application/o/token/",
-  "GF_AUTH_GENERIC_OAUTH_API_URL": "https://authentik.example.com/application/o/userinfo/"
+  "GF_AUTH_GENERIC_OAUTH_API_URL": "https://authentik.example.com/application/o/userinfo/",
+  "GF_SECURITY_ADMIN_USER": "admin",
+  "GF_SECURITY_ADMIN_PASSWORD": "generated-admin-password"
 }
 ```
 
@@ -177,7 +179,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `install-traefik-manager` deploys the Traefik Manager UI, stores its config on Longhorn, and exposes it behind the same domain-aware ingress flow.
 - `install-prometheus` installs the kube-prometheus-stack app so Prometheus, Alertmanager, node-exporter, and kube-state-metrics are available on Longhorn-backed storage.
 - Twinbox also seeds a small default alert set for Cilium and Longhorn so cluster network and storage health surface in Alertmanager and ntfy automatically.
-- `install-grafana` installs Grafana, provisions the Prometheus and Loki datasources automatically, and seeds the default Kubernetes Overview, Node Exporter Full, Longhorn, Cilium Metrics, and Hubble Metrics dashboards so imported dashboards can bind to cluster metrics without manual UI setup.
+- `install-grafana` installs Grafana, provisions the Prometheus and Loki datasources automatically, seeds the default Kubernetes Overview, Node Exporter Full, Longhorn, Cilium Metrics, and Hubble Metrics dashboards so imported dashboards can bind to cluster metrics without manual UI setup, and stores Grafana's admin credentials alongside the OIDC client secret in OpenBao so Argo CD does not keep regenerating its admin Secret.
 - `install-longhorn-storage` installs Longhorn, makes it the default storage class, and runs before any stateful secret infrastructure. Longhorn is configured to run only on worker nodes so storage and CSI components stay off control planes.
 - `install-secret-sync` installs:
   - External Secrets Operator
