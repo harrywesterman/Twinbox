@@ -1822,7 +1822,7 @@ def test_kustomization_includes_monitoring_resources():
     text = KUSTOMIZATION.read_text(encoding="utf-8")
     assert "prometheus/ingressroute.yaml" in text
     assert "prometheus/alertmanager-config.yaml" in text
-    assert "prometheus/pvc-usage-alerts.yaml" in text
+    assert "prometheus/pvc-usage-alerts.yaml" not in text
     assert "traefik-manager/ingressroute.yaml" in text
     assert "traefik-manager/deployment.yaml" in text
     assert "ntfy/ingressroute.yaml" in text
