@@ -5,6 +5,10 @@ global:
   deploymentStrategy:
     type: Recreate
 
+blueprints:
+  configMaps:
+    - authentik-blueprint-twinbox-automation
+
 server:
   startupProbe:
     failureThreshold: 180
@@ -26,6 +30,10 @@ worker:
       memory: 256Mi
     limits:
       memory: 512Mi
+
+  envFrom:
+    - secretRef:
+        name: authentik-automation-secret
 
 authentik:
   existingSecret:

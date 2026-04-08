@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authentik-blueprint-twinbox-automation
+  namespace: authentik
+data:
+  twinbox-automation.yaml: |
+    version: 1
+    metadata:
+      name: twinbox-automation-service-account
+      labels:
+        blueprints.goauthentik.io/description: |
+          Creates the twinbox-automation service account, RBAC role, and non-expiring API token
+          for use by Twinbox automation scripts (OIDC configuration, Headlamp, PgAdmin, etc.).
+    entries:
+      - id: twinbox-automation-role
+        model: authentik_rbac.role
+        state: present
+        identifiers:
+          name: twinbox-automation
+        attrs:
+          permissions:
+            - authentik_core.add_application
+            - authentik_core.change_application
+            - authentik_core.view_application
+            - authentik_providers_oauth2.add_oauth2provider
+            - authentik_providers_oauth2.change_oauth2provider
+            - authentik_providers_oauth2.view_oauth2provider
+            - authentik_policies.add_policybinding
+            - authentik_policies.change_policybinding
+            - authentik_policies.view_policybinding
+            - authentik_flows.add_flow
+            - authentik_flows.change_flow
+            - authentik_flows.view_flow
+            - authentik_core.add_user
+            - authentik_core.change_user
+            - authentik_core.view_user
+            - authentik_core.add_group
+            - authentik_core.change_group
+            - authentik_core.view_group
+
+      - id: twinbox-automation-user
+        model: authentik_core.user
+        state: present
+        identifiers:
+          username: twinbox-automation
+        attrs:
+          name: Twinbox Automation
+          is_active: true
+          path: users
+          type: service_account
+          roles:
+            - !KeyOf twinbox-automation-role
+
+      - id: twinbox-automation-token
+        model: authentik_core.token
+        state: present
+        identifiers:
+          identifier: twinbox-automation-api-token
+        attrs:
+          user: !KeyOf twinbox-automation-user
+          intent: api
+          expiring: false
+          key: !Env AUTHENTIK_AUTOMATION_TOKEN

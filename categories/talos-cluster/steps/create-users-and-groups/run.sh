@@ -260,7 +260,6 @@ ADMIN_GROUP_NAME="admins"
 [[ -n "$USERNAME" ]] || fail "username is required"
 
 AUTHENTIK_LOCAL_FORWARD_PORT="${AUTHENTIK_LOCAL_FORWARD_PORT:-18299}"
-authentik_load_bootstrap_secret
 authentik_ensure_token
 authentik_setup_forward
 

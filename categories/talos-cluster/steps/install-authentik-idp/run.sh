@@ -77,6 +77,7 @@ authentik_secret_key=""
 authentik_bootstrap_password=""
 authentik_bootstrap_token=""
 authentik_bootstrap_email=""
+authentik_automation_token_key=""
 authentik_postgresql_host=""
 authentik_postgresql_port=""
 authentik_postgresql_name=""
@@ -92,6 +93,7 @@ load_authentik_secret_json() {
   authentik_bootstrap_password="$(jq -r '.AUTHENTIK_BOOTSTRAP_PASSWORD // empty' <<<"$secret_json")"
   authentik_bootstrap_token="$(jq -r '.AUTHENTIK_BOOTSTRAP_TOKEN // empty' <<<"$secret_json")"
   authentik_bootstrap_email="$(jq -r '.AUTHENTIK_BOOTSTRAP_EMAIL // empty' <<<"$secret_json")"
+  authentik_automation_token_key="$(jq -r '.AUTHENTIK_AUTOMATION_TOKEN_KEY // empty' <<<"$secret_json")"
   authentik_postgresql_host="$(jq -r '.AUTHENTIK_POSTGRESQL__HOST // empty' <<<"$secret_json")"
   authentik_postgresql_port="$(jq -r '.AUTHENTIK_POSTGRESQL__PORT // empty' <<<"$secret_json")"
   authentik_postgresql_name="$(jq -r '.AUTHENTIK_POSTGRESQL__NAME // empty' <<<"$secret_json")"
@@ -125,6 +127,10 @@ fi
 
 if [[ -z "$authentik_bootstrap_email" ]]; then
   authentik_bootstrap_email="akadmin@twinbox.local"
+fi
+
+if [[ -z "$authentik_automation_token_key" ]]; then
+  authentik_automation_token_key="$(openssl rand -hex 32)"
 fi
 
 if [[ -z "$authentik_postgresql_host" ]]; then
@@ -168,6 +174,7 @@ jq -n \
   --arg authentik_bootstrap_password "$authentik_bootstrap_password" \
   --arg authentik_bootstrap_token "$authentik_bootstrap_token" \
   --arg authentik_bootstrap_email "$authentik_bootstrap_email" \
+  --arg authentik_automation_token_key "$authentik_automation_token_key" \
   --arg authentik_host "$authentik_host" \
   --arg authentik_postgresql_host "$authentik_postgresql_host" \
   --arg authentik_postgresql_port "$authentik_postgresql_port" \
@@ -181,6 +188,7 @@ jq -n \
     "AUTHENTIK_BOOTSTRAP_PASSWORD": $authentik_bootstrap_password,
     "AUTHENTIK_BOOTSTRAP_TOKEN": $authentik_bootstrap_token,
     "AUTHENTIK_BOOTSTRAP_EMAIL": $authentik_bootstrap_email,
+    "AUTHENTIK_AUTOMATION_TOKEN_KEY": $authentik_automation_token_key,
     "AUTHENTIK_HOST": $authentik_host,
     "AUTHENTIK_HOST_BROWSER": $authentik_host,
     "AUTHENTIK_POSTGRESQL__HOST": $authentik_postgresql_host,
@@ -196,7 +204,7 @@ jq -n \
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "authentik" \
   --json-file "$bootstrap_secret_file" \
-  --required-keys "AUTHENTIK_SECRET_KEY,AUTHENTIK_BOOTSTRAP_PASSWORD,AUTHENTIK_BOOTSTRAP_TOKEN,AUTHENTIK_BOOTSTRAP_EMAIL,AUTHENTIK_HOST,AUTHENTIK_HOST_BROWSER,AUTHENTIK_POSTGRESQL__HOST,AUTHENTIK_POSTGRESQL__PORT,AUTHENTIK_POSTGRESQL__NAME,AUTHENTIK_POSTGRESQL__USER,AUTHENTIK_POSTGRESQL__USERNAME,AUTHENTIK_POSTGRESQL__PASSWORD,AUTHENTIK_POSTGRESQL__DISABLE_SERVER_SIDE_CURSORS,AUTHENTIK_POSTGRESQL__CONN_MAX_AGE"
+  --required-keys "AUTHENTIK_SECRET_KEY,AUTHENTIK_BOOTSTRAP_PASSWORD,AUTHENTIK_BOOTSTRAP_TOKEN,AUTHENTIK_BOOTSTRAP_EMAIL,AUTHENTIK_AUTOMATION_TOKEN_KEY,AUTHENTIK_HOST,AUTHENTIK_HOST_BROWSER,AUTHENTIK_POSTGRESQL__HOST,AUTHENTIK_POSTGRESQL__PORT,AUTHENTIK_POSTGRESQL__NAME,AUTHENTIK_POSTGRESQL__USER,AUTHENTIK_POSTGRESQL__USERNAME,AUTHENTIK_POSTGRESQL__PASSWORD,AUTHENTIK_POSTGRESQL__DISABLE_SERVER_SIDE_CURSORS,AUTHENTIK_POSTGRESQL__CONN_MAX_AGE"
 rm -f "$bootstrap_secret_file" "$authentik_secret_file"
 trap - EXIT
 
@@ -237,6 +245,14 @@ wait_for_secret() {
 wait_for_secret "authentik-bootstrap" "Authentik bootstrap"
 
 kubectl -n authentik get secret authentik-bootstrap >/dev/null 2>&1 || fail "authentik-bootstrap secret did not appear after applying the ExternalSecret"
+
+# Create the automation token Secret so the worker can read it via envFrom.
+if [[ -n "$authentik_automation_token_key" ]]; then
+  log "Creating authentik-automation-secret"
+  kubectl -n authentik create secret generic authentik-automation-secret \
+    --from-literal="AUTHENTIK_AUTOMATION_TOKEN=${authentik_automation_token_key}" \
+    --dry-run=client -o yaml | kubectl apply -f -
+fi
 
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$manifest_path" \
@@ -292,17 +308,111 @@ wait_for_deployment_rollout() {
 wait_for_deployment_rollout "authentik-server" "Authentik server"
 wait_for_deployment_rollout "authentik-worker" "Authentik worker"
 
+# Apply the blueprint ConfigMap so Authentik can create the service account/token.
+authentik_blueprint_manifest="$WORKSPACE_ROOT/gitops/platform/authentik/blueprint-twinbox-automation.yaml"
+kubectl apply -f "$authentik_blueprint_manifest"
+
+# Persist the automation token key into OpenBao as AUTHENTIK_API_TOKEN
+# so downstream steps can use it via authentik_ensure_token().
+if command -v openbao_read_global_secret_json >/dev/null 2>&1 && [[ -n "$authentik_automation_token_key" ]]; then
+  current_secret="$(openbao_read_global_secret_json authentik)"
+  updated_secret="$(printf '%s' "$current_secret" | jq \
+    --arg api_token "$authentik_automation_token_key" \
+    '. + {AUTHENTIK_API_TOKEN: $api_token}' \
+  )"
+
+  tmp_file="$(mktemp)"
+  printf '%s' "$updated_secret" >"$tmp_file"
+
+  log "Persisting AUTHENTIK_API_TOKEN in OpenBao from blueprint token key"
+  bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+    --secret-name "authentik" \
+    --json-file "$tmp_file" \
+    --required-keys "AUTHENTIK_API_TOKEN"
+
+  rm -f "$tmp_file"
+fi
+
+# Wait for the blueprint to be applied (service account appears via reconciliation).
+# Uses the automation token directly (not the bootstrap token) since the blueprint
+# already set the key on the token object.
+wait_for_blueprint_service_account() {
+  local attempts=60
+  local attempt=1
+
+  AUTHENTIK_LOCAL_FORWARD_PORT="${AUTHENTIK_LOCAL_FORWARD_PORT:-18299}"
+
+  AUTHENTIK_API_BASE="http://127.0.0.1:${AUTHENTIK_LOCAL_FORWARD_PORT}/api/v3"
+  AUTHENTIK_FORWARD_PID=""
+  AUTHENTIK_FORWARD_LOG=""
+
+  AUTHENTIK_FORWARD_LOG="$(mktemp "${TMPDIR:-/tmp}/authentik-port-forward.XXXXXX.log")"
+  kubectl -n authentik port-forward "svc/authentik-server" "${AUTHENTIK_LOCAL_FORWARD_PORT}:80" >"$AUTHENTIK_FORWARD_LOG" 2>&1 &
+  AUTHENTIK_FORWARD_PID="$!"
+
+  local fwd_attempt=1
+  local fwd_max=60
+  while [[ "$fwd_attempt" -le "$fwd_max" ]]; do
+    if curl -fsS "http://127.0.0.1:${AUTHENTIK_LOCAL_FORWARD_PORT}/-/health/live/" >/dev/null 2>&1; then
+      break
+    fi
+    if ! kill -0 "$AUTHENTIK_FORWARD_PID" >/dev/null 2>&1; then
+      if [[ -s "$AUTHENTIK_FORWARD_LOG" ]]; then
+        tail -n 20 "$AUTHENTIK_FORWARD_LOG" >&2
+      fi
+      fail "Authentik port-forward did not become ready"
+    fi
+    sleep 1
+    fwd_attempt=$((fwd_attempt + 1))
+  done
+
+  # Use the automation token directly (not the bootstrap token).
+  local auth_token="$authentik_automation_token_key"
+
+  while [[ "$attempt" -le "$attempts" ]]; do
+    local sa_json
+    sa_json="$(curl -sS \
+      -H "Accept: application/json" \
+      -H "Authorization: Bearer ${auth_token}" \
+      "${AUTHENTIK_API_BASE}/core/users/?type=service_account&search=twinbox-automation" \
+    2>/dev/null || true)"
+
+    if [[ -n "$sa_json" ]] && printf '%s' "$sa_json" | jq -e '.results // [] | map(select(.username == "twinbox-automation")) | length > 0' >/dev/null 2>&1; then
+      log "Blueprint service account 'twinbox-automation' detected – blueprint applied successfully"
+      return 0
+    fi
+
+    if ! kill -0 "$AUTHENTIK_FORWARD_PID" >/dev/null 2>&1; then
+      kill "$AUTHENTIK_FORWARD_PID" >/dev/null 2>&1 || true
+      wait "$AUTHENTIK_FORWARD_PID" >/dev/null 2>&1 || true
+      AUTHENTIK_FORWARD_LOG="$(mktemp "${TMPDIR:-/tmp}/authentik-port-forward.XXXXXX.log")"
+      kubectl -n authentik port-forward "svc/authentik-server" "${AUTHENTIK_LOCAL_FORWARD_PORT}:80" >"$AUTHENTIK_FORWARD_LOG" 2>&1 &
+      AUTHENTIK_FORWARD_PID="$!"
+    fi
+
+    log "Waiting for blueprint to create service account 'twinbox-automation' (${attempt}/${attempts})"
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+
+  fail "Blueprint service account 'twinbox-automation' did not appear within expected time"
+}
+
+wait_for_blueprint_service_account
+
+# Clean up the port-forward from the wait function.
+if [[ -n "${AUTHENTIK_FORWARD_PID:-}" ]]; then
+  kill "$AUTHENTIK_FORWARD_PID" >/dev/null 2>&1 || true
+  wait "$AUTHENTIK_FORWARD_PID" >/dev/null 2>&1 || true
+fi
+rm -f "${AUTHENTIK_FORWARD_LOG:-}"
+
 # Create default OAuth2 provider flows if they don't exist
 log "Ensuring default OAuth2 provider flows exist"
 
 AUTHENTIK_LOCAL_FORWARD_PORT="${AUTHENTIK_LOCAL_FORWARD_PORT:-18299}"
-authentik_load_bootstrap_secret
 authentik_ensure_token
 authentik_setup_forward
-
-# Create a dedicated service account + persistent API token on first boot,
-# while the bootstrap token is still valid.
-authentik_create_service_account_token
 
 create_flow_if_missing() {
   local flow_slug="$1"

@@ -145,6 +145,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
   "AUTHENTIK_BOOTSTRAP_PASSWORD": "generated-password",
   "AUTHENTIK_BOOTSTRAP_TOKEN": "generated-token",
   "AUTHENTIK_BOOTSTRAP_EMAIL": "akadmin@twinbox.local",
+  "AUTHENTIK_AUTOMATION_TOKEN_KEY": "generated-hex-token",
   "AUTHENTIK_HOST": "https://authentik.example.com",
   "AUTHENTIK_HOST_BROWSER": "https://authentik.example.com",
   "AUTHENTIK_POSTGRESQL__USERNAME": "authentik",
@@ -174,9 +175,11 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `install-cloudnativepg` installs the CloudNativePG operator with two replicas on Longhorn. The operator uses ServerSideApply for its CRDs.
 
 - Authentik uses a `Recreate` deployment strategy so its bootstrap lock is held by only one pod at a time during rollouts. That avoids overlapping startup attempts from old and new pods.
+- The `twinbox-automation` service account and its non-expiring API token are created declaratively by an Authentik blueprint (`gitops/platform/authentik/blueprint-twinbox-automation.yaml`). The blueprint is mounted as a ConfigMap into the Authentik worker and applied during reconciliation, using `AUTHENTIK_AUTOMATION_TOKEN_KEY` (exposed as an env var via the bootstrap secret) as the token key. This avoids the brittle pattern of calling the Authentik API with the ephemeral bootstrap token after pods become ready.
+- `install-authentik-idp` generates `AUTHENTIK_AUTOMATION_TOKEN_KEY`, stores it in OpenBao, and waits for the blueprint to create the service account before proceeding. The token key is persisted to OpenBao as `AUTHENTIK_API_TOKEN`.
 - `wizard/setup-wizard.sh` writes the chosen cluster login password to `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` inside the Management VM so later bootstrap steps can reuse it without prompting again.
-- `create-users-and-groups` reads the Authentik bootstrap secret from OpenBao via the shared `authentik-auth.sh` helper, authenticates as `akadmin` using the bootstrap password, creates a reusable API token (or falls back to session cookie), creates the first Authentik user, creates the `admins` group as a superuser group, and adds the user to that group.
-- All downstream steps that talk to the Authentik API (`install-headlamp`, `install-dashy-dashboard`, `configure-argocd-oidc`, `install-pgadmin4`, `install-management-consoles`) source `scripts/manager/authentik-auth.sh` and call `authentik_ensure_token`. The helper tries the bootstrap token first, then falls back to authenticating as `akadmin` via the flow executor to create or reuse a permanent API token.
+- `create-users-and-groups` reads the Authentik bootstrap secret from OpenBao via the shared `authentik-auth.sh` helper, which loads the persistent `AUTHENTIK_API_TOKEN` (created by the blueprint) and uses it for all API calls. It creates the first Authentik user, creates the `admins` group as a superuser group, and adds the user to that group.
+- All downstream steps that talk to the Authentik API (`install-headlamp`, `install-dashy-dashboard`, `configure-argocd-oidc`, `install-pgadmin4`, `install-management-consoles`) source `scripts/manager/authentik-auth.sh` and call `authentik_ensure_token`. The helper reads the persistent `AUTHENTIK_API_TOKEN` from OpenBao and uses it for all API calls.
 - `install-velero-backup` installs Velero together with the SeaweedFS S3 target that runs on the Management VM.
 - Later application steps write bootstrap JSON into OpenBao before enabling their Argo CD applications.
 
