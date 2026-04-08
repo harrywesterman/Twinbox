@@ -46,6 +46,10 @@ resolve_authentik_field() {
   jq -r --arg field "$field" '.[$field] // empty' <<<"$authentik_secret_json"
 }
 
+resolve_authentik_db_password() {
+  kubectl -n databases get secret authentik-db-credentials -o jsonpath='{.data.password}' | base64 -d
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
@@ -70,6 +74,7 @@ manifest_path="$WORKSPACE_ROOT/gitops/apps/pgadmin4.yaml"
 rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-application.XXXXXX.yaml")"
 trap 'rm -f "$rendered_manifest"' EXIT
 pgadmin_servers_file="$secrets_dir/pgadmin4-servers-${cluster_id}.json"
+pgadmin_db_password_secret_name="pgadmin4-db-password"
 pgadmin_application_slug="pgadmin4"
 pgadmin_issuer_url="${AUTHENTIK_HOST%/}/application/o/${pgadmin_application_slug}/"
 pgadmin_client_id="$(openssl rand -hex 16)"
@@ -78,6 +83,7 @@ authentik_oidc_state_key="authentik-pgadmin4"
 pgadmin_default_email="pgadmin@${public_zone_name}"
 pgadmin_default_password="$(openssl rand -hex 24)"
 pgadmin_master_password="$(openssl rand -hex 32)"
+pgadmin_authentik_db_password="$(resolve_authentik_db_password)"
 
 existing_pgadmin_secret_json=""
 if command -v openbao_read_global_secret_json >/dev/null 2>&1; then
@@ -311,6 +317,11 @@ rm -f "$pgadmin_secret_file"
 
 kubectl create namespace pgadmin4 --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating pgAdmin 4 database password secret"
+kubectl -n pgadmin4 create secret generic "$pgadmin_db_password_secret_name" \
+  --from-literal=PGADMIN_AUTHENTIK_DB_PASSWORD="$pgadmin_authentik_db_password" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying pgAdmin 4 ExternalSecret"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform/pgadmin4/externalsecret.yaml"
 kubectl -n pgadmin4 wait --for=condition=Ready externalsecret/pgadmin4-oidc --timeout=10m
@@ -325,6 +336,10 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 rollout"
 kubectl -n pgadmin4 rollout status deploy/pgadmin4 --timeout=10m
 
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restarting pgAdmin 4 to pick up secret-backed env vars"
+kubectl -n pgadmin4 rollout restart deploy/pgadmin4
+kubectl -n pgadmin4 rollout status deploy/pgadmin4 --timeout=10m
+
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Loading pgAdmin 4 shared server entry"
 jq -n \
   --arg server_name "Authentik Database" \
@@ -333,6 +348,8 @@ jq -n \
   --argjson server_port 5432 \
   --arg maintenance_db "postgres" \
   --arg username "authentik" \
+  --arg shared_username "authentik" \
+  --arg password_exec_cmd 'printf %s "$PGADMIN_AUTHENTIK_DB_PASSWORD"' \
   '{
     Servers: {
       "1": {
@@ -342,6 +359,8 @@ jq -n \
         Port: $server_port,
         MaintenanceDB: $maintenance_db,
         Username: $username,
+        SharedUsername: $shared_username,
+        PasswordExecCommand: $password_exec_cmd,
         Shared: true,
         ConnectionParameters: {
           sslmode: "prefer"

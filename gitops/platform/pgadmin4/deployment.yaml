@@ -59,6 +59,8 @@ spec:
           envFrom:
             - secretRef:
                 name: pgadmin4-bootstrap
+            - secretRef:
+                name: pgadmin4-db-password
           volumeMounts:
             - name: pgadmin-config
               mountPath: /work

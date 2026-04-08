@@ -1221,7 +1221,10 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "gitops/apps/pgadmin4.yaml" in pgadmin_run_text
     assert "wait --for=condition=Ready externalsecret/pgadmin4-oidc" in pgadmin_run_text
     assert "--manifest \"$rendered_manifest\"" in pgadmin_run_text
+    assert "Creating pgAdmin 4 database password secret" in pgadmin_run_text
+    assert 'pgadmin4-db-password' in pgadmin_run_text
     assert "kubectl -n pgadmin4 rollout status deploy/pgadmin4 --timeout=10m" in pgadmin_run_text
+    assert "kubectl -n pgadmin4 rollout restart deploy/pgadmin4" in pgadmin_run_text
     assert "Loading pgAdmin 4 shared server entry" in pgadmin_run_text
     assert "Authentik Database" in pgadmin_run_text
     assert "Shared Servers" in pgadmin_run_text
@@ -1231,6 +1234,10 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert 'sslmode: "prefer"' in pgadmin_run_text
     assert "--arg maintenance_db \"postgres\"" in pgadmin_run_text
     assert "--arg username \"authentik\"" in pgadmin_run_text
+    assert "--arg shared_username \"authentik\"" in pgadmin_run_text
+    assert "SharedUsername: $shared_username" in pgadmin_run_text
+    assert 'PasswordExecCommand: $password_exec_cmd' in pgadmin_run_text
+    assert 'printf %s "$PGADMIN_AUTHENTIK_DB_PASSWORD"' in pgadmin_run_text
     assert '/venv/bin/python /pgadmin4/setup.py load-servers /tmp/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace' in pgadmin_run_text
 
     pgadmin_app_text = PGADMIN_APP.read_text(encoding="utf-8")
@@ -1320,6 +1327,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "PGADMIN_OAUTH2_CLIENT_SECRET" in pgadmin_external_secret_text
     assert "PGADMIN_OAUTH2_SERVER_METADATA_URL" in pgadmin_external_secret_text
     assert "PGADMIN_OAUTH2_SCOPE" in pgadmin_external_secret_text
+    assert "pgadmin4-db-password" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
 
     cloudflare_tunnel_run_text = (
         REPO_ROOT
