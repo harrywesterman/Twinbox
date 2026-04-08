@@ -40,6 +40,7 @@ Open your browser to continue the installation. The web UI guides you through cl
 - **Longhorn** — distributed block storage
 - **Prometheus** — cluster metrics, Alertmanager, node-exporter, and kube-state-metrics
 - **Grafana** — dashboarding on top of the Prometheus stack
+- **Loki** — log aggregation and log querying for Grafana
 - **OpenBao + External Secrets Operator** — centralized secret management
 - **Traefik** — ingress and routing
 - **Traefik Manager** — browser UI for managing Traefik routes and services

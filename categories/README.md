@@ -77,6 +77,7 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 - `choose-ingress-route` – Choose the ingress branch for this cluster.
 - `configure-argocd-oidc` – Connect Argo CD to Authentik for OIDC login.
 - `install-grafana` – Deploy Grafana monitoring dashboard.
+- `install-loki` – Deploy Loki log aggregation backend for Grafana.
 - `install-headlamp` – Deploy Headlamp Kubernetes dashboard.
 - `install-pgadmin4` – Deploy pgAdmin 4 for PostgreSQL administration.
 - `install-dashy-dashboard` – Deploy Dashy as the cluster start page.

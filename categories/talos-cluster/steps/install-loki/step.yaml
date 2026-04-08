@@ -1,0 +1,29 @@
+id: install-loki
+title: Install Loki
+type: action
+journey_stage: setup
+order: 55
+summary: Apply the Loki GitOps application so Grafana can query cluster logs.
+explanation: Twinbox installs Loki through Argo CD as the log backend for Grafana. The step uses the existing monitoring namespace, Longhorn-backed persistence, and the pinned Helm values in the repository so log retention stays reproducible with the rest of the cluster stack. It waits for Argo CD health before continuing.
+side_help: Loki stores and indexes logs so Grafana can query them alongside metrics.
+depends_on:
+  - install-prometheus
+  - install-longhorn-storage
+dashy:
+  items:
+    - section: Platform
+      title: Loki
+      description: Log aggregation backend
+      icon: fas fa-file-alt
+      url_template: https://loki.__ZONE_NAME__
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/install-loki/run.sh

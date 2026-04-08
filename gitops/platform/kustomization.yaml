@@ -21,6 +21,8 @@ resources:
   - pgadmin4/deployment.yaml
   - grafana/ingressroute.yaml
   - grafana/externalsecret.yaml
+  - loki/authentik-forwardauth-middleware.yaml
+  - loki/ingressroute.yaml
   - traefik-manager/namespace.yaml
   - traefik-manager/pvc.yaml
   - traefik-manager/service.yaml

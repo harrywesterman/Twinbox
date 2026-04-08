@@ -31,6 +31,8 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   const steps = [
     loadStep("provision-nodes"),
     loadStep("install-authentik-idp"),
+    loadStep("install-grafana"),
+    loadStep("install-loki"),
     loadStep("install-management-consoles"),
     loadStep("install-cloudtty"),
     loadStep("install-whoami"),
@@ -39,6 +41,8 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   const stepStateById = new Map([
     ["provision-nodes", { status: "succeeded", outputs: {} }],
     ["install-authentik-idp", { status: "succeeded", outputs: {} }],
+    ["install-grafana", { status: "succeeded", outputs: {} }],
+    ["install-loki", { status: "succeeded", outputs: {} }],
     ["install-management-consoles", { status: "succeeded", outputs: {} }],
     ["install-cloudtty", { status: "succeeded", outputs: { access_url: "https://shell.example.net" } }],
     ["install-whoami", { status: "configured", outputs: {} }],
@@ -62,6 +66,8 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
 
   assert(platformSection.items.some((item) => item.title === "Hubble" && item.url === "https://hubble.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "Authentik" && item.url === "https://authentik.tst.example.com"));
+  assert(platformSection.items.some((item) => item.title === "Grafana" && item.url === "https://grafana.tst.example.com"));
+  assert(platformSection.items.some((item) => item.title === "Loki" && item.url === "https://loki.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "Twinbox Wizard" && item.url === "https://twinboxwizard.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "SeaweedFS Admin" && item.url === "https://seaweedfs-admin.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "Cloudtty" && item.url === "https://shell.example.net"));
@@ -69,9 +75,12 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   assert(platformSection.items.some((item) => item.title === "GitHub" && item.url === "https://github.com/harrywesterman/Twinbox"));
   assert(appsSection.items.some((item) => item.title === "Whoami" && item.url === "https://whoami.tst.example.com"));
 
+  assert.equal(config.appConfig.faviconApi, "local");
+  assert.equal(config.appConfig.iconSize, "large");
+
   for (const section of config.sections) {
     for (const item of section.items) {
-      assert.notEqual(item.icon, "");
+      assert.equal(item.icon, "favicon");
     }
   }
 });

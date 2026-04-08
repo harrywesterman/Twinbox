@@ -53,6 +53,7 @@ function buildCatalog(stepStatuses = {}) {
     ['install-whoami', 'Install Whoami', { dependsOn: ['install-traefik'] }],
     ['install-headlamp', 'Install Headlamp', { dependsOn: ['install-whoami'] }],
     ['install-grafana', 'Install Grafana', { dependsOn: ['install-headlamp'] }],
+    ['install-loki', 'Install Loki', { dependsOn: ['install-prometheus', 'install-longhorn-storage'] }],
     ['install-dashy-dashboard', 'Install Dashy dashboard', { dependsOn: ['install-grafana'] }],
     ['install-management-consoles', 'Install Management consoles', { dependsOn: ['install-dashy-dashboard'] }],
     ['install-pgadmin4', 'Install pgAdmin 4', {
@@ -123,7 +124,7 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   });
 
   assert.equal(model.mode, 'setup');
-  assert.equal(model.stepRail.length, 29);
+  assert.equal(model.stepRail.length, 30);
   const stepRailById = Object.fromEntries(model.stepRail.map((step) => [step.id, step]));
   assert.equal(stepRailById['provision-nodes'].title, 'Deploy Talos Cluster');
   assert.equal(stepRailById['provision-nodes'].isCurrent, true);
@@ -136,7 +137,7 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   assert.equal(stepRailById['install-pgadmin4'].title, 'Install pgAdmin 4');
   assert.equal(stepRailById['install-pgadmin4'].icon, '🗃️');
   assert.equal(model.primaryAction.label, 'Start step 1');
-  assert.equal(model.progress.totalSteps, 29);
+  assert.equal(model.progress.totalSteps, 30);
   assert.equal(model.progress.completedSteps, 0);
   assert.equal(model.activity.runtime.currentStage, 'Applying cluster plan');
 });
@@ -177,6 +178,7 @@ test('wizard model switches to manage mode when setup flow is complete', () => {
         'install-whoami',
         'install-headlamp',
         'install-grafana',
+        'install-loki',
         'install-pgadmin4',
         'install-dashy-dashboard',
         'install-management-consoles',
@@ -230,7 +232,7 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     selectedStepId: '',
   });
 
-  assert.equal(model.stepRail.length, 29);
+  assert.equal(model.stepRail.length, 30);
   const setupStepIds = new Set(model.stepRail.map((step) => step.id));
   for (const id of [
     'provision-nodes',
