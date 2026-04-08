@@ -58,12 +58,20 @@ render_manifest() {
     helm_args+=(--set-string "k8sServicePort=${CILIUM_K8S_SERVICE_PORT}")
   fi
 
-  helm template cilium cilium/cilium \
-    --version "$PINNED_CILIUM_CHART_VERSION" \
-    --namespace kube-system \
-    --include-crds \
-    --values "$values_file" \
-    "${helm_args[@]}"
+  if ((${#helm_args[@]})); then
+    helm template cilium cilium/cilium \
+      --version "$PINNED_CILIUM_CHART_VERSION" \
+      --namespace kube-system \
+      --include-crds \
+      --values "$values_file" \
+      "${helm_args[@]}"
+  else
+    helm template cilium cilium/cilium \
+      --version "$PINNED_CILIUM_CHART_VERSION" \
+      --namespace kube-system \
+      --include-crds \
+      --values "$values_file"
+  fi
 }
 
 if [[ -n "$OUTPUT_FILE" ]]; then

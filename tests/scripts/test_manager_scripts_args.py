@@ -699,6 +699,7 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert "PINNED_CILIUM_CHART_VERSION" in helper_text
     assert 'if [[ -n "${CILIUM_K8S_SERVICE_HOST:-}" ]]; then' in helper_text
     assert 'if [[ -n "${CILIUM_K8S_SERVICE_PORT:-}" ]]; then' in helper_text
+    assert "if ((${#helm_args[@]})); then" in helper_text
     assert "PINNED_CILIUM_CHART_VERSION=1.19.2" in pinned_defaults_text
     assert "PINNED_CLOUDTTY_CHART_VERSION=0.8.9" in pinned_defaults_text
     assert "PINNED_TRAEFIK_MANAGER_IMAGE_TAG=v0.8.0" in pinned_defaults_text
