@@ -2203,6 +2203,26 @@ def test_management_console_endpoints_target_the_right_hosts():
     assert "ip: 192.168.2.70" in twinboxwizard_text
 
 
+def test_authentik_callback_endpoints_target_the_authentik_service_ip():
+    longhorn_callback_text = (
+        REPO_ROOT
+        / "gitops"
+        / "platform"
+        / "management-consoles"
+        / "authentik-callback-endpoints.yaml"
+    ).read_text(encoding="utf-8")
+    traefik_callback_text = (
+        REPO_ROOT
+        / "gitops"
+        / "platform"
+        / "traefik"
+        / "authentik-callback-endpoints.yaml"
+    ).read_text(encoding="utf-8")
+
+    assert "ip: 10.97.155.74" in longhorn_callback_text
+    assert "ip: 10.97.155.74" in traefik_callback_text
+
+
 def test_bootstrap_scripts_use_the_management_vm_ip_for_seaweedfs():
     start_manager_text = START_MANAGER_SCRIPT.read_text(encoding="utf-8")
     bootstrap_vm_text = BOOTSTRAP_VM_SCRIPT.read_text(encoding="utf-8")
