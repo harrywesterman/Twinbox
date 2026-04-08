@@ -1221,6 +1221,17 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "gitops/apps/pgadmin4.yaml" in pgadmin_run_text
     assert "wait --for=condition=Ready externalsecret/pgadmin4-oidc" in pgadmin_run_text
     assert "--manifest \"$rendered_manifest\"" in pgadmin_run_text
+    assert "kubectl -n pgadmin4 rollout status deploy/pgadmin4 --timeout=10m" in pgadmin_run_text
+    assert "Loading pgAdmin 4 shared server entry" in pgadmin_run_text
+    assert "Authentik Database" in pgadmin_run_text
+    assert "Shared Servers" in pgadmin_run_text
+    assert "authentik-db-pooler-rw-session.databases.svc.cluster.local" in pgadmin_run_text
+    assert "Shared: true" in pgadmin_run_text
+    assert "ConnectionParameters" in pgadmin_run_text
+    assert 'sslmode: "prefer"' in pgadmin_run_text
+    assert "--arg maintenance_db \"postgres\"" in pgadmin_run_text
+    assert "--arg username \"authentik\"" in pgadmin_run_text
+    assert '/venv/bin/python /pgadmin4/setup.py load-servers /tmp/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace' in pgadmin_run_text
 
     pgadmin_app_text = PGADMIN_APP.read_text(encoding="utf-8")
     assert "kind: Application" in pgadmin_app_text

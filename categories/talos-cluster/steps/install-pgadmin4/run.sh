@@ -69,6 +69,7 @@ mkdir -p "$secrets_dir"
 manifest_path="$WORKSPACE_ROOT/gitops/apps/pgadmin4.yaml"
 rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-application.XXXXXX.yaml")"
 trap 'rm -f "$rendered_manifest"' EXIT
+pgadmin_servers_file="$secrets_dir/pgadmin4-servers-${cluster_id}.json"
 pgadmin_application_slug="pgadmin4"
 pgadmin_issuer_url="${AUTHENTIK_HOST%/}/application/o/${pgadmin_application_slug}/"
 pgadmin_client_id="$(openssl rand -hex 16)"
@@ -320,5 +321,39 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$rendered_manifest" \
   --application "pgadmin4" \
   --destination-namespace "pgadmin4"
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 rollout"
+kubectl -n pgadmin4 rollout status deploy/pgadmin4 --timeout=10m
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Loading pgAdmin 4 shared server entry"
+jq -n \
+  --arg server_name "Authentik Database" \
+  --arg server_group "Shared Servers" \
+  --arg server_host "authentik-db-pooler-rw-session.databases.svc.cluster.local" \
+  --argjson server_port 5432 \
+  --arg maintenance_db "postgres" \
+  --arg username "authentik" \
+  '{
+    Servers: {
+      "1": {
+        Name: $server_name,
+        Group: $server_group,
+        Host: $server_host,
+        Port: $server_port,
+        MaintenanceDB: $maintenance_db,
+        Username: $username,
+        Shared: true,
+        ConnectionParameters: {
+          sslmode: "prefer"
+        },
+        Comment: "CloudNativePG pooler for the Authentik cluster"
+      }
+    }
+  }' >"$pgadmin_servers_file"
+
+kubectl -n pgadmin4 exec deploy/pgadmin4 -c pgadmin4 -- /bin/sh -ec \
+  "cat >/tmp/pgadmin4-servers.json && /venv/bin/python /pgadmin4/setup.py load-servers /tmp/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace" \
+  <"$pgadmin_servers_file"
+rm -f "$pgadmin_servers_file"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] pgAdmin 4 Authentik configuration complete"
