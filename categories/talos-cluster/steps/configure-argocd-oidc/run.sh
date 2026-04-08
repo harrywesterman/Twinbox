@@ -256,7 +256,8 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Refreshing platform-ingress so Argo CD pick
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml" \
   --application "platform-ingress" \
-  --destination-namespace "argocd"
+  --destination-namespace "argocd" \
+  --no-wait
 
 if kubectl -n argocd get deployment/argocd-server >/dev/null 2>&1; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restarting Argo CD server to load OIDC settings"
