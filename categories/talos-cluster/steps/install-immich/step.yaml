@@ -3,12 +3,19 @@ title: Install Immich
 type: action
 journey_stage: setup
 order: 70
-summary: Placeholder step for the Immich app phase.
-explanation: This wizard step is reserved for future Immich installation work and does not run a real cluster action yet.
-side_help: Media apps are grouped with the other user services in the bootstrap rail.
+summary: Install Immich with Longhorn storage, CloudNativePG, and Authentik OIDC.
+explanation: Twinbox provisions Immich as a GitOps application with a Longhorn-backed library volume, a dedicated CloudNativePG database, Authentik OIDC login, and Traefik routes for the selected ingress path.
+side_help: Immich is grouped with the other user services after Nextcloud so the photo stack lands after the core platform pieces and the login flow stays aligned with the rest of the app stack.
 depends_on:
   - install-nextcloud
+dashy:
+  items:
+    - section: Platform
+      title: Immich
+      description: Photo and video library
+      icon: fas fa-images
+      url_template: https://immich.__ZONE_NAME__
 inputs: []
 runner:
   kind: script
-  script: categories/talos-cluster/steps/_placeholder/run.sh
+  script: categories/talos-cluster/steps/install-immich/run.sh

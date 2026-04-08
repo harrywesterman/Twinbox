@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: immich
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: oci://ghcr.io/immich-app/immich-charts
+      chart: immich
+      targetRevision: "0.11.1"
+      helm:
+        valueFiles:
+          - $values/gitops/values/immich.yaml
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: immich
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

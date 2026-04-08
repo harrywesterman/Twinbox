@@ -1,0 +1,48 @@
+controllers:
+  main:
+    containers:
+      main:
+        env:
+          DB_HOSTNAME: immich-db-pooler-rw.databases.svc.cluster.local
+          DB_PORT: "5432"
+          DB_USERNAME:
+            valueFrom:
+              secretKeyRef:
+                name: immich-db-credentials
+                key: username
+          DB_PASSWORD:
+            valueFrom:
+              secretKeyRef:
+                name: immich-db-credentials
+                key: password
+          DB_DATABASE_NAME: immich
+          DB_VECTOR_EXTENSION: vchord
+          REDIS_HOSTNAME: immich-valkey
+          IMMICH_MACHINE_LEARNING_URL: http://immich-machine-learning:3003
+
+immich:
+  metrics:
+    enabled: false
+  existingConfiguration: immich-config
+  persistence:
+    library:
+      existingClaim: immich-library
+
+valkey:
+  enabled: true
+  persistence:
+    data:
+      enabled: true
+      type: persistentVolumeClaim
+      accessMode: ReadWriteOnce
+      size: 1Gi
+      storageClass: longhorn
+
+server:
+  enabled: true
+  ingress:
+    main:
+      enabled: false
+
+machine-learning:
+  enabled: true
