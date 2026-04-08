@@ -30,7 +30,7 @@ spec:
               mountPath: /data
       containers:
         - name: traefik-manager
-          image: ghcr.io/chr0nzz/traefik-manager:v0.8.0
+          image: ghcr.io/chr0nzz/traefik-manager:0.8.0
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

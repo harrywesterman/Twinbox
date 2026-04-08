@@ -1882,7 +1882,7 @@ def test_traefik_manager_step_deploys_browser_ui():
     )
     assert ': "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"' in run_text
     assert "install-traefik-manager.sh" in run_text
-    assert "ghcr.io/chr0nzz/traefik-manager:v0.8.0" in deployment_text
+    assert "ghcr.io/chr0nzz/traefik-manager:0.8.0" in deployment_text
     assert "AUTH_ENABLED" in deployment_text
     assert '"false"' in deployment_text
     assert "COOKIE_SECURE" in deployment_text
