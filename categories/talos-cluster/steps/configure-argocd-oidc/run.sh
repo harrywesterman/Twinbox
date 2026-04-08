@@ -19,6 +19,54 @@ fail() {
   exit 1
 }
 
+wait_for_argocd_secret_key() {
+  local secret_key="$1"
+  local attempts=120
+  local attempt=1
+  local value=""
+
+  while true; do
+    value="$(
+      kubectl -n argocd get secret argocd-secret -o json 2>/dev/null \
+        | jq -r --arg secret_key "$secret_key" '.data[$secret_key] // empty'
+    )"
+    if [[ -n "$value" ]]; then
+      return 0
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      fail "Timed out waiting for argocd-secret key '${secret_key}'"
+    fi
+
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
+wait_for_argocd_oidc_config() {
+  local expected_issuer="$1"
+  local attempts=120
+  local attempt=1
+  local oidc_config=""
+
+  while true; do
+    oidc_config="$(
+      kubectl -n argocd get configmap argocd-cm -o json 2>/dev/null \
+        | jq -r '.data["oidc.config"] // empty'
+    )"
+    if [[ "$oidc_config" == *"issuer: ${expected_issuer}"* ]]; then
+      return 0
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      fail "Timed out waiting for argocd-cm oidc.config to contain issuer '${expected_issuer}'"
+    fi
+
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
@@ -251,13 +299,16 @@ rm -f "$argocd_secret_file"
 
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform/argocd/externalsecret.yaml"
 kubectl -n argocd wait --for=condition=Ready externalsecret/argocd-oidc --timeout=10m
+wait_for_argocd_secret_key "oidc.authentik.clientID"
+wait_for_argocd_secret_key "oidc.authentik.clientSecret"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Refreshing platform-ingress so Argo CD picks up OIDC config"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml" \
   --application "platform-ingress" \
-  --destination-namespace "argocd" \
-  --no-wait
+  --destination-namespace "argocd"
+
+wait_for_argocd_oidc_config "$argocd_issuer_url"
 
 if kubectl -n argocd get deployment/argocd-server >/dev/null 2>&1; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restarting Argo CD server to load OIDC settings"
