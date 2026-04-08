@@ -93,13 +93,15 @@ PY
     seaweedfs_password="$(openssl rand -hex 16)"
     python3 - "$velero_file" "$seaweedfs_password" <<'PY'
 import json
+import os
 import pathlib
 import sys
 
 target = pathlib.Path(sys.argv[1])
+management_ip = os.environ["MANAGEMENT_VM_IP"]
 payload = {
     "mode": "seaweedfs",
-    "endpoint": "http://192.168.1.50:8333",
+    "endpoint": f"http://{management_ip}:8333",
     "bucket": "twinbox-velero",
     "region": "seaweedfs",
     "username": "velero",

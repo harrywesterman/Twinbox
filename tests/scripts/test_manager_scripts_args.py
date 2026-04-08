@@ -48,6 +48,8 @@ HUBBLE_AUTHENTIK_FORWARDAUTH_MIDDLEWARE = (
     / "authentik-forwardauth-middleware.yaml"
 )
 ARGOCD_CM = REPO_ROOT / "gitops" / "platform" / "argocd" / "argocd-cm.yaml"
+START_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "start-manager.sh"
+BOOTSTRAP_VM_SCRIPT = REPO_ROOT / "scripts" / "bootstrap-vm.sh"
 LONGHORN_STEP_SCRIPT = (
     REPO_ROOT
     / "categories"
@@ -2171,6 +2173,44 @@ def test_argocd_config_does_not_exclude_managed_endpoints():
     assert "kind: Endpoints" not in text.split("resource.exclusions: |", 1)[1]
     assert "resource.customizations.ignoreResourceUpdates.Endpoints" not in text
     assert "- EndpointSlice" in text
+
+
+def test_management_console_endpoints_target_the_right_hosts():
+    proxmox_text = (
+        REPO_ROOT
+        / "gitops"
+        / "platform"
+        / "management-consoles"
+        / "proxmox-endpoints.yaml"
+    ).read_text(encoding="utf-8")
+    seaweedfs_text = (
+        REPO_ROOT
+        / "gitops"
+        / "platform"
+        / "management-consoles"
+        / "seaweedfs-endpoints.yaml"
+    ).read_text(encoding="utf-8")
+    twinboxwizard_text = (
+        REPO_ROOT
+        / "gitops"
+        / "platform"
+        / "management-consoles"
+        / "twinboxwizard-endpoints.yaml"
+    ).read_text(encoding="utf-8")
+
+    assert "ip: 192.168.2.105" in proxmox_text
+    assert "ip: 192.168.2.70" in seaweedfs_text
+    assert "ip: 192.168.2.70" in twinboxwizard_text
+
+
+def test_bootstrap_scripts_use_the_management_vm_ip_for_seaweedfs():
+    start_manager_text = START_MANAGER_SCRIPT.read_text(encoding="utf-8")
+    bootstrap_vm_text = BOOTSTRAP_VM_SCRIPT.read_text(encoding="utf-8")
+
+    assert "os.environ[\"MANAGEMENT_VM_IP\"]" in start_manager_text
+    assert "os.environ[\"MANAGEMENT_VM_IP\"]" in bootstrap_vm_text
+    assert "192.168.1.50:8333" not in start_manager_text
+    assert "192.168.1.50:8333" not in bootstrap_vm_text
 
 
 def test_authentik_consumer_scripts_read_from_openbao():
