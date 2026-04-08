@@ -55,7 +55,7 @@ Installs the Cloudtty operator with Helm and creates a default CloudShell instan
 
 ### `install-traefik-manager.sh`
 
-Installs the Traefik Manager GitOps app, which exposes a browser UI for Traefik route and service management behind Authentik.
+Refreshes the shared `platform-ingress` Argo CD application so Traefik Manager is deployed as part of the shared platform overlay behind Authentik.
 
 ### `install-prometheus.sh`
 

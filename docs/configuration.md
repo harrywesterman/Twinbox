@@ -176,7 +176,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - Management VM bootstrap and maintenance use `TWINBOX_TIME_SERVER` to pin Ubuntu's `systemd-timesyncd` to the same timeserver.
 - `install-argocd` installs Argo CD after the cluster networking layer is already available.
 - `install-cloudtty` installs Cloudtty and creates a default browser shell on the cluster.
-- `install-traefik-manager` deploys the Traefik Manager UI, stores its config on Longhorn, and exposes it behind the same domain-aware ingress flow.
+- `install-traefik-manager` refreshes the shared `platform-ingress` application so Traefik Manager is deployed through the common platform overlay, with its config stored on Longhorn and its routes exposed through the same domain-aware ingress flow.
 - `install-prometheus` installs the kube-prometheus-stack app so Prometheus, Alertmanager, node-exporter, and kube-state-metrics are available on Longhorn-backed storage.
 - Twinbox also seeds a small default alert set for Cilium and Longhorn so cluster network and storage health surface in Alertmanager and ntfy automatically.
 - `install-grafana` installs Grafana, provisions the Prometheus and Loki datasources automatically, seeds the default Kubernetes Overview, Node Exporter Full, Longhorn, Cilium Metrics, and Hubble Metrics dashboards so imported dashboards can bind to cluster metrics without manual UI setup, and stores Grafana's admin credentials alongside the OIDC client secret in OpenBao so Argo CD does not keep regenerating its admin Secret.

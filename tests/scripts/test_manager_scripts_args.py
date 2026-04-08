@@ -1601,10 +1601,10 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "name: grafana-set" in grafana_appset_text
     assert "kind: ApplicationSet" in ntfy_appset_text
     assert "name: ntfy-set" in ntfy_appset_text
-    assert "name: traefik-manager" in platform_ingress_app_text
+    assert "name: traefik-manager" not in platform_ingress_app_text
     assert (
         'traefik-manager.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
-        in platform_ingress_app_text
+        not in platform_ingress_app_text
     )
     assert not (REPO_ROOT / "gitops" / "apps" / "cluster-config.yaml").exists()
     assert "kind: ExternalSecret" in traefik_externalsecret_text
@@ -1957,9 +1957,9 @@ def test_traefik_manager_step_deploys_browser_ui():
     ingress_text = (
         REPO_ROOT / "gitops" / "platform" / "traefik-manager" / "ingressroute.yaml"
     ).read_text(encoding="utf-8")
-    app_text = (REPO_ROOT / "gitops" / "apps" / "traefik-manager.yaml").read_text(
-        encoding="utf-8"
-    )
+    platform_kustomization_text = (
+        REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
+    ).read_text(encoding="utf-8")
 
     assert "id: install-traefik-manager" in text
     assert "title: Install Traefik Manager" in text
@@ -1988,20 +1988,25 @@ def test_traefik_manager_step_deploys_browser_ui():
     assert "authentik-forwardauth" in ingress_text
     assert "namespace: traefik" in ingress_text
     assert "Host(`traefik-manager.__ZONE_NAME__`)" in ingress_text
-    assert "namespace: traefik-manager" in app_text
-    assert "path: gitops/platform/traefik-manager" in app_text
-    assert "kustomize:" in app_text
-    assert "name: traefik-manager-wiredoor" in app_text
-    assert "name: traefik-manager-tailscale" in app_text
-    assert '--destination-namespace "traefik-manager"' in script_text
+    assert "traefik-manager/namespace.yaml" in platform_kustomization_text
+    assert "traefik-manager/pvc.yaml" in platform_kustomization_text
+    assert "traefik-manager/service.yaml" in platform_kustomization_text
+    assert "traefik-manager/deployment.yaml" in platform_kustomization_text
+    assert "traefik-manager/ingressroute.yaml" in platform_kustomization_text
+    assert "name: traefik-manager-wiredoor" not in platform_kustomization_text
+    assert "name: traefik-manager-tailscale" not in platform_kustomization_text
+    assert 'kubectl delete application traefik-manager -n argocd --ignore-not-found=true' in script_text
+    assert '--application "platform-ingress"' in script_text
+    assert '--destination-namespace "argocd"' in script_text
     assert "--no-wait" in script_text
-    assert "gitops/apps/traefik-manager.yaml" in script_text
+    assert "gitops/apps/platform-ingress.yaml" in script_text
     assert "cluster-public-zone.sh" in script_text
     assert 'sed "s/__ZONE_NAME__/${public_zone_name}/g"' in script_text
     assert 'mktemp "${TMPDIR:-/tmp}/traefik-manager-application.XXXXXX.yaml"' in script_text
     assert "--manifest \"$rendered_manifest\"" in script_text
     assert ': "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"' in script_text
     assert "twinbox_public_zone_name" in script_text
+    assert not (REPO_ROOT / "gitops" / "apps" / "traefik-manager.yaml").exists()
 
 
 def test_argocd_cluster_secret_helper_writes_runtime_projection():
