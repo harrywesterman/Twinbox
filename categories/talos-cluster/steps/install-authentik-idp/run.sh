@@ -308,12 +308,8 @@ wait_for_deployment_rollout() {
 wait_for_deployment_rollout "authentik-server" "Authentik server"
 wait_for_deployment_rollout "authentik-worker" "Authentik worker"
 
-# Apply the blueprint ConfigMap so Authentik can create the service account/token.
-authentik_blueprint_manifest="$WORKSPACE_ROOT/gitops/platform/authentik/blueprint-twinbox-automation.yaml"
-kubectl apply -f "$authentik_blueprint_manifest"
-
-# Persist the automation token key into OpenBao as AUTHENTIK_API_TOKEN
-# so downstream steps can use it via authentik_ensure_token().
+# Argo CD syncs the blueprint ConfigMap via the third source in the Application manifest.
+# Wait for the blueprint to be applied (service account appears via reconciliation).
 if command -v openbao_read_global_secret_json >/dev/null 2>&1 && [[ -n "$authentik_automation_token_key" ]]; then
   current_secret="$(openbao_read_global_secret_json authentik)"
   updated_secret="$(printf '%s' "$current_secret" | jq \
