@@ -31,34 +31,153 @@ public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domai
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
 
 authentik_ensure_token
+authentik_setup_forward
 
 AUTHENTIK_HOST="${AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
 
 headlamp_host="https://headlamp.${public_zone_name}"
 headlamp_redirect_uri="${headlamp_host}/oidc-callback"
-
-tf_workdir="$MANAGER_DATA_DIR/opentofu/authentik-headlamp-${cluster_id}"
-mkdir -p "$tf_workdir"
-cp -r "$WORKSPACE_ROOT/infra/opentofu/authentik-headlamp/"* "$tf_workdir/"
-
-cat >"$tf_workdir/terraform.tfvars" <<EOF
-application_name = "Headlamp"
-application_slug = "headlamp"
-authentik_url = "${AUTHENTIK_HOST}"
-headlamp_redirect_uri = "${headlamp_redirect_uri}"
-EOF
-
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Provisioning Authentik OIDC client for Headlamp"
-cd "$tf_workdir"
-TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$AUTHENTIK_TOKEN" tofu init -no-color -input=false
-TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$AUTHENTIK_TOKEN" tofu apply -no-color -auto-approve -input=false
-
-headlamp_client_id="$(TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$AUTHENTIK_TOKEN" tofu output -no-color -raw client_id)"
-headlamp_client_secret="$(TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$AUTHENTIK_TOKEN" tofu output -no-color -raw client_secret)"
-headlamp_issuer_url="$(TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$AUTHENTIK_TOKEN" tofu output -no-color -raw issuer_url)"
-
 secrets_dir="/opt/twinbox/bootstrap/secrets/global"
 mkdir -p "$secrets_dir"
+headlamp_application_slug="headlamp"
+headlamp_issuer_url="${AUTHENTIK_HOST%/}/application/o/${headlamp_application_slug}/"
+headlamp_client_id="$(openssl rand -hex 16)"
+headlamp_client_secret="$(openssl rand -hex 24)"
+authentik_oidc_state_key="authentik-headlamp"
+
+existing_headlamp_secret_json=""
+if command -v openbao_read_global_secret_json >/dev/null 2>&1; then
+  existing_headlamp_secret_json="$(openbao_read_global_secret_json headlamp-oidc 2>/dev/null || true)"
+fi
+
+if [[ -n "$existing_headlamp_secret_json" ]]; then
+  existing_client_id="$(jq -r '.HEADLAMP_CONFIG_OIDC_CLIENT_ID // .OIDC_CLIENT_ID // empty' <<<"$existing_headlamp_secret_json")"
+  existing_client_secret="$(jq -r '.HEADLAMP_CONFIG_OIDC_CLIENT_SECRET // .OIDC_CLIENT_SECRET // empty' <<<"$existing_headlamp_secret_json")"
+  if [[ -n "$existing_client_id" && -n "$existing_client_secret" ]]; then
+    headlamp_client_id="$existing_client_id"
+    headlamp_client_secret="$existing_client_secret"
+  fi
+fi
+
+find_oauth2_provider_pk_by_name() {
+  local provider_name="$1"
+  local response
+
+  response="$(authentik_api_get "/providers/oauth2/?page_size=100")"
+  jq -r \
+    --arg provider_name "$provider_name" \
+    '.results[]?
+      | select((.name // "") == $provider_name)
+      | .pk // .id // empty' <<<"$response" | head -n1
+}
+
+find_application_json_by_slug() {
+  local application_slug="$1"
+  local response
+
+  response="$(authentik_api_get "/core/applications/?page_size=100")"
+  jq -c \
+    --arg application_slug "$application_slug" \
+    '.results[]?
+      | select((.slug // "") == $application_slug)' <<<"$response" | head -n1
+}
+
+create_or_update_provider() {
+  local provider_payload="$1"
+  local existing_pk
+
+  existing_pk="$(find_oauth2_provider_pk_by_name "Headlamp")"
+  if [[ -n "$existing_pk" ]]; then
+    authentik_api_write PATCH "/providers/oauth2/${existing_pk}/" "$provider_payload" >/dev/null
+    printf '%s\n' "$existing_pk"
+    return 0
+  fi
+
+  authentik_api_write POST "/providers/oauth2/" "$provider_payload" | jq -r '.pk // .id // empty'
+}
+
+create_or_update_application() {
+  local application_payload="$1"
+  local existing_json existing_pk
+
+  existing_json="$(find_application_json_by_slug "$headlamp_application_slug" || true)"
+  existing_pk="$(jq -r '.pk // .id // empty' <<<"$existing_json")"
+  if [[ -n "$existing_pk" ]]; then
+    authentik_api_write PATCH "/core/applications/${headlamp_application_slug}/" "$application_payload" >/dev/null
+    printf '%s\n' "$existing_pk"
+    return 0
+  fi
+
+  authentik_api_write POST "/core/applications/" "$application_payload" | jq -r '.pk // .id // empty'
+}
+
+authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
+invalidation_flow_id="$(authentik_resolve_flow_id "default-provider-invalidation-flow" "invalidation")"
+openid_mapping_id="$(authentik_resolve_scope_mapping_id "openid")"
+email_mapping_id="$(authentik_resolve_scope_mapping_id "email")"
+profile_mapping_id="$(authentik_resolve_scope_mapping_id "profile")"
+
+[[ -n "$authorization_flow_id" ]] || fail "Could not resolve Authentik authorization flow ID"
+[[ -n "$invalidation_flow_id" ]] || fail "Could not resolve Authentik invalidation flow ID"
+[[ -n "$openid_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for openid"
+[[ -n "$email_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for email"
+[[ -n "$profile_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for profile"
+
+property_mapping_ids_json="$(
+  jq -cn \
+    --arg openid "$openid_mapping_id" \
+    --arg email "$email_mapping_id" \
+    --arg profile "$profile_mapping_id" \
+    '[$openid, $email, $profile]'
+)"
+
+provider_payload="$(
+  jq -n \
+    --arg name "Headlamp" \
+    --arg client_id "$headlamp_client_id" \
+    --arg client_secret "$headlamp_client_secret" \
+    --arg authorization_flow "$authorization_flow_id" \
+    --arg invalidation_flow "$invalidation_flow_id" \
+    --arg redirect_uri "$headlamp_redirect_uri" \
+    --argjson property_mappings "$property_mapping_ids_json" \
+    '{
+      name: $name,
+      client_id: $client_id,
+      client_secret: $client_secret,
+      authorization_flow: $authorization_flow,
+      invalidation_flow: $invalidation_flow,
+      redirect_uris: [
+        {
+          matching_mode: "strict",
+          url: $redirect_uri
+        }
+      ],
+      property_mappings: $property_mappings,
+      include_claims_in_id_token: true,
+      client_type: "confidential",
+      issuer_mode: "per_provider"
+    }'
+)"
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Provisioning Authentik OIDC client for Headlamp"
+provider_pk="$(create_or_update_provider "$provider_payload")"
+[[ -n "$provider_pk" ]] || fail "Authentik did not return a provider ID for Headlamp"
+
+application_payload="$(
+  jq -n \
+    --arg name "Headlamp" \
+    --arg slug "$headlamp_application_slug" \
+    --arg provider_pk "$provider_pk" \
+    '{
+      name: $name,
+      slug: $slug,
+      provider: ($provider_pk | tonumber)
+    }'
+)"
+application_pk="$(create_or_update_application "$application_payload")"
+[[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for Headlamp"
+
+secrets_dir="/opt/twinbox/bootstrap/secrets/global"
 
 headlamp_secret_file="$secrets_dir/headlamp-oidc-${cluster_id}.json"
 cat >"$headlamp_secret_file" <<EOF

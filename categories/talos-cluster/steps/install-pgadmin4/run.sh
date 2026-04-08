@@ -58,39 +58,213 @@ public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domai
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
 
 authentik_ensure_token
+authentik_setup_forward
 
 AUTHENTIK_HOST="${AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
 
 pgadmin_host="https://pgadmin4.${public_zone_name}"
 pgadmin_redirect_uri="${pgadmin_host}/oauth2/authorize"
-
-tf_workdir="$MANAGER_DATA_DIR/opentofu/authentik-pgadmin4-${cluster_id}"
-mkdir -p "$tf_workdir"
-cp -r "$WORKSPACE_ROOT/infra/opentofu/authentik-pgadmin4/"* "$tf_workdir/"
-
-cat >"$tf_workdir/terraform.tfvars" <<EOF
-application_name = "pgAdmin 4"
-application_slug = "pgadmin4"
-authentik_url = "${AUTHENTIK_HOST}"
-pgadmin4_redirect_uri = "${pgadmin_redirect_uri}"
-EOF
-
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Provisioning Authentik OIDC client for pgAdmin 4"
-cd "$tf_workdir"
-TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$AUTHENTIK_TOKEN" tofu init -no-color -input=false
-TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$AUTHENTIK_TOKEN" tofu apply -no-color -auto-approve -input=false
-
-pgadmin_client_id="$(TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$AUTHENTIK_TOKEN" tofu output -no-color -raw client_id)"
-pgadmin_client_secret="$(TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$AUTHENTIK_TOKEN" tofu output -no-color -raw client_secret)"
-pgadmin_issuer_url="$(TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$AUTHENTIK_TOKEN" tofu output -no-color -raw issuer_url)"
-
 secrets_dir="/opt/twinbox/bootstrap/secrets/global"
 mkdir -p "$secrets_dir"
-
-pgadmin_secret_file="$secrets_dir/pgadmin4-oidc-${cluster_id}.json"
+pgadmin_application_slug="pgadmin4"
+pgadmin_issuer_url="${AUTHENTIK_HOST%/}/application/o/${pgadmin_application_slug}/"
+pgadmin_client_id="$(openssl rand -hex 16)"
+pgadmin_client_secret="$(openssl rand -hex 24)"
+authentik_oidc_state_key="authentik-pgadmin4"
 pgadmin_default_email="pgadmin@${cluster_slug}.twinbox.local"
 pgadmin_default_password="$(openssl rand -hex 24)"
 pgadmin_master_password="$(openssl rand -hex 32)"
+
+existing_pgadmin_secret_json=""
+if command -v openbao_read_global_secret_json >/dev/null 2>&1; then
+  existing_pgadmin_secret_json="$(openbao_read_global_secret_json pgadmin4-oidc 2>/dev/null || true)"
+fi
+
+if [[ -n "$existing_pgadmin_secret_json" ]]; then
+  existing_client_id="$(jq -r '.PGADMIN_OAUTH2_CLIENT_ID // empty' <<<"$existing_pgadmin_secret_json")"
+  existing_client_secret="$(jq -r '.PGADMIN_OAUTH2_CLIENT_SECRET // empty' <<<"$existing_pgadmin_secret_json")"
+  existing_default_email="$(jq -r '.PGADMIN_DEFAULT_EMAIL // empty' <<<"$existing_pgadmin_secret_json")"
+  existing_default_password="$(jq -r '.PGADMIN_DEFAULT_PASSWORD // empty' <<<"$existing_pgadmin_secret_json")"
+  existing_master_password="$(jq -r '.PGADMIN_MASTER_PASSWORD // empty' <<<"$existing_pgadmin_secret_json")"
+
+  if [[ -n "$existing_client_id" && -n "$existing_client_secret" ]]; then
+    pgadmin_client_id="$existing_client_id"
+    pgadmin_client_secret="$existing_client_secret"
+  fi
+  if [[ -n "$existing_default_email" ]]; then
+    pgadmin_default_email="$existing_default_email"
+  fi
+  if [[ -n "$existing_default_password" ]]; then
+    pgadmin_default_password="$existing_default_password"
+  fi
+  if [[ -n "$existing_master_password" ]]; then
+    pgadmin_master_password="$existing_master_password"
+  fi
+fi
+
+find_oauth2_provider_pk_by_name() {
+  local provider_name="$1"
+  local response
+
+  response="$(authentik_api_get "/providers/oauth2/?page_size=100")"
+  jq -r \
+    --arg provider_name "$provider_name" \
+    '.results[]?
+      | select((.name // "") == $provider_name)
+      | .pk // .id // empty' <<<"$response" | head -n1
+}
+
+find_application_json_by_slug() {
+  local application_slug="$1"
+  local response
+
+  response="$(authentik_api_get "/core/applications/?page_size=100")"
+  jq -c \
+    --arg application_slug "$application_slug" \
+    '.results[]?
+      | select((.slug // "") == $application_slug)' <<<"$response" | head -n1
+}
+
+find_policy_binding_pk() {
+  local target_uuid="$1"
+  local group_id="$2"
+  local response
+
+  response="$(authentik_api_get "/policies/bindings/?page_size=200")"
+  jq -r \
+    --arg target_uuid "$target_uuid" \
+    --arg group_id "$group_id" \
+    '.results[]?
+      | select((.target // "") == $target_uuid and (.group // "") == $group_id)
+      | .pk // .id // empty' <<<"$response" | head -n1
+}
+
+create_or_update_provider() {
+  local provider_payload="$1"
+  local existing_pk
+
+  existing_pk="$(find_oauth2_provider_pk_by_name "pgAdmin 4")"
+  if [[ -n "$existing_pk" ]]; then
+    authentik_api_write PATCH "/providers/oauth2/${existing_pk}/" "$provider_payload" >/dev/null
+    printf '%s\n' "$existing_pk"
+    return 0
+  fi
+
+  authentik_api_write POST "/providers/oauth2/" "$provider_payload" | jq -r '.pk // .id // empty'
+}
+
+create_or_update_application() {
+  local application_payload="$1"
+  local existing_json existing_pk
+
+  existing_json="$(find_application_json_by_slug "$pgadmin_application_slug" || true)"
+  existing_pk="$(jq -r '.pk // .id // empty' <<<"$existing_json")"
+  if [[ -n "$existing_pk" ]]; then
+    authentik_api_write PATCH "/core/applications/${pgadmin_application_slug}/" "$application_payload" >/dev/null
+    printf '%s\n' "$existing_pk"
+    return 0
+  fi
+
+  authentik_api_write POST "/core/applications/" "$application_payload" | jq -r '.pk // .id // empty'
+}
+
+ensure_group_binding() {
+  local target_uuid="$1"
+  local group_id="$2"
+  local binding_payload existing_pk
+
+  binding_payload="$(
+    jq -n \
+      --arg target_uuid "$target_uuid" \
+      --arg group_id "$group_id" \
+      '{target: $target_uuid, group: $group_id, order: 1}'
+  )"
+
+  existing_pk="$(find_policy_binding_pk "$target_uuid" "$group_id")"
+  if [[ -n "$existing_pk" ]]; then
+    authentik_api_write PATCH "/policies/bindings/${existing_pk}/" "$binding_payload" >/dev/null
+    return 0
+  fi
+
+  authentik_api_write POST "/policies/bindings/" "$binding_payload" >/dev/null
+}
+
+authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
+invalidation_flow_id="$(authentik_resolve_flow_id "default-provider-invalidation-flow" "invalidation")"
+openid_mapping_id="$(authentik_resolve_scope_mapping_id "openid")"
+email_mapping_id="$(authentik_resolve_scope_mapping_id "email")"
+profile_mapping_id="$(authentik_resolve_scope_mapping_id "profile")"
+admins_group_id="$(authentik_find_group_id "admins")"
+
+[[ -n "$authorization_flow_id" ]] || fail "Could not resolve Authentik authorization flow ID"
+[[ -n "$invalidation_flow_id" ]] || fail "Could not resolve Authentik invalidation flow ID"
+[[ -n "$openid_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for openid"
+[[ -n "$email_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for email"
+[[ -n "$profile_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for profile"
+[[ -n "$admins_group_id" ]] || fail "Could not resolve Authentik admins group ID"
+
+property_mapping_ids_json="$(
+  jq -cn \
+    --arg openid "$openid_mapping_id" \
+    --arg email "$email_mapping_id" \
+    --arg profile "$profile_mapping_id" \
+    '[$openid, $email, $profile]'
+)"
+
+provider_payload="$(
+  jq -n \
+    --arg name "pgAdmin 4" \
+    --arg client_id "$pgadmin_client_id" \
+    --arg client_secret "$pgadmin_client_secret" \
+    --arg authorization_flow "$authorization_flow_id" \
+    --arg invalidation_flow "$invalidation_flow_id" \
+    --arg redirect_uri "$pgadmin_redirect_uri" \
+    --argjson property_mappings "$property_mapping_ids_json" \
+    '{
+      name: $name,
+      client_id: $client_id,
+      client_secret: $client_secret,
+      authorization_flow: $authorization_flow,
+      invalidation_flow: $invalidation_flow,
+      redirect_uris: [
+        {
+          matching_mode: "strict",
+          url: $redirect_uri
+        }
+      ],
+      property_mappings: $property_mappings,
+      include_claims_in_id_token: true,
+      client_type: "confidential",
+      issuer_mode: "per_provider"
+    }'
+)"
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Provisioning Authentik OIDC client for pgAdmin 4"
+provider_pk="$(create_or_update_provider "$provider_payload")"
+[[ -n "$provider_pk" ]] || fail "Authentik did not return a provider ID for pgAdmin 4"
+
+application_payload="$(
+  jq -n \
+    --arg name "pgAdmin 4" \
+    --arg slug "$pgadmin_application_slug" \
+    --arg launch_url "$pgadmin_host" \
+    --arg provider_pk "$provider_pk" \
+    '{
+      name: $name,
+      slug: $slug,
+      meta_launch_url: $launch_url,
+      provider: ($provider_pk | tonumber)
+    }'
+)"
+application_pk="$(create_or_update_application "$application_payload")"
+[[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for pgAdmin 4"
+
+application_json="$(find_application_json_by_slug "$pgadmin_application_slug")"
+application_uuid="$(jq -r '.pk // .uuid // .id // empty' <<<"$application_json")"
+[[ -n "$application_uuid" ]] || fail "Could not determine Authentik application UUID for pgAdmin 4"
+ensure_group_binding "$application_uuid" "$admins_group_id"
+
+pgadmin_secret_file="$secrets_dir/pgadmin4-oidc-${cluster_id}.json"
 pgadmin_server_metadata_url="${pgadmin_issuer_url}.well-known/openid-configuration"
 
 jq -n \

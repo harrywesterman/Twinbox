@@ -2041,3 +2041,43 @@ def test_authentik_consumer_scripts_read_from_openbao():
         assert "authentik-auth.sh" in text
         assert "authentik_ensure_token" in text or "authentik_load_bootstrap_secret" in text
         assert "authentik.json" not in text
+
+
+def test_authentik_api_provisioning_steps_bypass_tofu_apply():
+    api_paths = [
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "configure-argocd-oidc"
+        / "run.sh",
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-dashy-dashboard"
+        / "run.sh",
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-headlamp"
+        / "run.sh",
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-management-consoles"
+        / "run.sh",
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-pgadmin4"
+        / "run.sh",
+    ]
+
+    for path in api_paths:
+        text = path.read_text(encoding="utf-8")
+        assert "authentik_setup_forward" in text
+        assert 'tofu apply -no-color -auto-approve -input=false' not in text

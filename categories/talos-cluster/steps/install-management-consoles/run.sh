@@ -31,6 +31,7 @@ public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domai
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
 
 authentik_ensure_token
+authentik_setup_forward
 
 AUTHENTIK_HOST="${AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
 
@@ -50,100 +51,218 @@ for attempt in $(seq 1 120); do
   sleep 5
 done
 
-tf_workdir="$MANAGER_DATA_DIR/opentofu/authentik-management-consoles-${cluster_id}"
-mkdir -p "$tf_workdir"
-cp -r "$WORKSPACE_ROOT/infra/opentofu/authentik-management-consoles/"* "$tf_workdir/"
+find_proxy_provider_pk_by_name() {
+  local provider_name="$1"
+  local response
 
-cat >"$tf_workdir/terraform.tfvars" <<EOF
-authentik_url = "${AUTHENTIK_HOST}"
-traefik_dashboard_external_host = "https://traefik.${public_zone_name}"
-longhorn_external_host = "https://longhorn.${public_zone_name}"
-proxmox_external_host = "https://proxmox.${public_zone_name}"
-twinboxwizard_external_host = "https://twinboxwizard.${public_zone_name}"
-EOF
+  response="$(authentik_api_get "/providers/proxy/?page_size=100")"
+  jq -r \
+    --arg provider_name "$provider_name" \
+    '.results[]?
+      | select((.name // "") == $provider_name)
+      | .pk // .id // empty' <<<"$response" | head -n1
+}
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Provisioning Authentik proxy applications for Traefik, Longhorn, Proxmox, and Twinbox Wizard"
-cd "$tf_workdir"
-TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$AUTHENTIK_TOKEN" tofu init -no-color -input=false
-TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$AUTHENTIK_TOKEN" tofu apply -no-color -auto-approve -input=false
+find_application_json_by_slug() {
+  local application_slug="$1"
+  local response
 
-provider_ids_json="$(TF_IN_AUTOMATION=1 AUTHENTIK_TOKEN="$AUTHENTIK_TOKEN" tofu output -no-color -json provider_ids)"
+  response="$(authentik_api_get "/core/applications/?page_size=100")"
+  jq -c \
+    --arg application_slug "$application_slug" \
+    '.results[]?
+      | select((.slug // "") == $application_slug)' <<<"$response" | head -n1
+}
+
+find_policy_binding_pk() {
+  local target_uuid="$1"
+  local group_id="$2"
+  local response
+
+  response="$(authentik_api_get "/policies/bindings/?page_size=200")"
+  jq -r \
+    --arg target_uuid "$target_uuid" \
+    --arg group_id "$group_id" \
+    '.results[]?
+      | select((.target // "") == $target_uuid and (.group // "") == $group_id)
+      | .pk // .id // empty' <<<"$response" | head -n1
+}
+
+create_or_update_proxy_provider() {
+  local provider_name="$1"
+  local provider_payload="$2"
+  local existing_pk
+
+  existing_pk="$(find_proxy_provider_pk_by_name "$provider_name")"
+  if [[ -n "$existing_pk" ]]; then
+    authentik_api_write PATCH "/providers/proxy/${existing_pk}/" "$provider_payload" >/dev/null
+    printf '%s\n' "$existing_pk"
+    return 0
+  fi
+
+  authentik_api_write POST "/providers/proxy/" "$provider_payload" | jq -r '.pk // .id // empty'
+}
+
+create_or_update_application() {
+  local application_slug="$1"
+  local application_payload="$2"
+  local existing_json existing_pk
+
+  existing_json="$(find_application_json_by_slug "$application_slug" || true)"
+  existing_pk="$(jq -r '.pk // .id // empty' <<<"$existing_json")"
+  if [[ -n "$existing_pk" ]]; then
+    authentik_api_write PATCH "/core/applications/${application_slug}/" "$application_payload" >/dev/null
+    printf '%s\n' "$existing_pk"
+    return 0
+  fi
+
+  authentik_api_write POST "/core/applications/" "$application_payload" | jq -r '.pk // .id // empty'
+}
+
+ensure_group_binding() {
+  local target_uuid="$1"
+  local group_id="$2"
+  local binding_payload existing_pk
+
+  binding_payload="$(
+    jq -n \
+      --arg target_uuid "$target_uuid" \
+      --arg group_id "$group_id" \
+      '{target: $target_uuid, group: $group_id, order: 1}'
+  )"
+
+  existing_pk="$(find_policy_binding_pk "$target_uuid" "$group_id")"
+  if [[ -n "$existing_pk" ]]; then
+    authentik_api_write PATCH "/policies/bindings/${existing_pk}/" "$binding_payload" >/dev/null
+    return 0
+  fi
+
+  authentik_api_write POST "/policies/bindings/" "$binding_payload" >/dev/null
+}
+
+authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
+invalidation_flow_id="$(authentik_resolve_flow_id "default-provider-invalidation-flow" "invalidation")"
+admins_group_id="$(authentik_find_group_id "admins")"
+
+[[ -n "$authorization_flow_id" ]] || fail "Could not resolve Authentik authorization flow ID"
+[[ -n "$invalidation_flow_id" ]] || fail "Could not resolve Authentik invalidation flow ID"
+[[ -n "$admins_group_id" ]] || fail "Could not resolve Authentik admins group ID"
+
+management_apps_json="$(
+  jq -nc \
+    --arg public_zone_name "$public_zone_name" \
+    '[
+      {
+        key: "traefik_dashboard",
+        name: "Traefik Dashboard",
+        slug: "traefik-dashboard",
+        external_host: "https://traefik.\($public_zone_name)",
+        launch_url: "https://traefik.\($public_zone_name)/dashboard/"
+      },
+      {
+        key: "longhorn",
+        name: "Longhorn",
+        slug: "longhorn",
+        external_host: "https://longhorn.\($public_zone_name)",
+        launch_url: "https://longhorn.\($public_zone_name)"
+      },
+      {
+        key: "proxmox",
+        name: "Proxmox",
+        slug: "proxmox",
+        external_host: "https://proxmox.\($public_zone_name)",
+        launch_url: "https://proxmox.\($public_zone_name)"
+      },
+      {
+        key: "twinboxwizard",
+        name: "Twinbox Wizard",
+        slug: "twinboxwizard",
+        external_host: "https://twinboxwizard.\($public_zone_name)",
+        launch_url: "https://twinboxwizard.\($public_zone_name)"
+      },
+      {
+        key: "seaweedfs",
+        name: "SeaweedFS",
+        slug: "seaweedfs",
+        external_host: "https://seaweedfs.\($public_zone_name)",
+        launch_url: "https://seaweedfs.\($public_zone_name)"
+      },
+      {
+        key: "seaweedfs_admin",
+        name: "SeaweedFS Admin",
+        slug: "seaweedfs-admin",
+        external_host: "https://seaweedfs-admin.\($public_zone_name)",
+        launch_url: "https://seaweedfs-admin.\($public_zone_name)"
+      }
+    ]'
+)"
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Provisioning Authentik proxy applications for Traefik, Longhorn, Proxmox, Twinbox Wizard, and SeaweedFS"
+
+provider_ids_json='{}'
+while IFS= read -r app_json; do
+  app_key="$(jq -r '.key' <<<"$app_json")"
+  app_name="$(jq -r '.name' <<<"$app_json")"
+  app_slug="$(jq -r '.slug' <<<"$app_json")"
+  app_external_host="$(jq -r '.external_host' <<<"$app_json")"
+  app_launch_url="$(jq -r '.launch_url' <<<"$app_json")"
+
+  provider_payload="$(
+    jq -n \
+      --arg name "$app_name" \
+      --arg external_host "$app_external_host" \
+      --arg authorization_flow "$authorization_flow_id" \
+      --arg invalidation_flow "$invalidation_flow_id" \
+      '{
+        name: $name,
+        external_host: $external_host,
+        authorization_flow: $authorization_flow,
+        invalidation_flow: $invalidation_flow,
+        mode: "forward_single"
+      }'
+  )"
+  provider_pk="$(create_or_update_proxy_provider "$app_name" "$provider_payload")"
+  [[ -n "$provider_pk" ]] || fail "Authentik did not return a proxy provider ID for ${app_name}"
+
+  application_payload="$(
+    jq -n \
+      --arg name "$app_name" \
+      --arg slug "$app_slug" \
+      --arg launch_url "$app_launch_url" \
+      --arg provider_pk "$provider_pk" \
+      '{
+        name: $name,
+        slug: $slug,
+        meta_launch_url: $launch_url,
+        provider: ($provider_pk | tonumber)
+      }'
+  )"
+  application_pk="$(create_or_update_application "$app_slug" "$application_payload")"
+  [[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for ${app_name}"
+
+  application_json="$(find_application_json_by_slug "$app_slug")"
+  application_uuid="$(jq -r '.pk // .uuid // .id // empty' <<<"$application_json")"
+  [[ -n "$application_uuid" ]] || fail "Could not determine Authentik application UUID for ${app_name}"
+  ensure_group_binding "$application_uuid" "$admins_group_id"
+
+  provider_ids_json="$(jq -c --arg app_key "$app_key" --arg provider_pk "$provider_pk" '. + {($app_key): $provider_pk}' <<<"$provider_ids_json")"
+done < <(jq -c '.[]' <<<"$management_apps_json")
+
 traefik_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.traefik_dashboard')"
 longhorn_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.longhorn')"
 proxmox_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.proxmox')"
-  twinboxwizard_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.twinboxwizard')"
-  seaweedfs_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.seaweedfs')"
-  seaweedfs_admin_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.seaweedfs_admin')"
-  [[ "$traefik_provider_id" != "null" && -n "$traefik_provider_id" ]] || fail "Could not read Traefik provider ID from tofu output"
-  [[ "$longhorn_provider_id" != "null" && -n "$longhorn_provider_id" ]] || fail "Could not read Longhorn provider ID from tofu output"
-  [[ "$proxmox_provider_id" != "null" && -n "$proxmox_provider_id" ]] || fail "Could not read Proxmox provider ID from tofu output"
-  [[ "$twinboxwizard_provider_id" != "null" && -n "$twinboxwizard_provider_id" ]] || fail "Could not read Twinbox Wizard provider ID from tofu output"
-  [[ "$seaweedfs_provider_id" != "null" && -n "$seaweedfs_provider_id" ]] || fail "Could not read SeaweedFS provider ID from tofu output"
-  [[ "$seaweedfs_admin_provider_id" != "null" && -n "$seaweedfs_admin_provider_id" ]] || fail "Could not read SeaweedFS admin provider ID from tofu output"
+twinboxwizard_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.twinboxwizard')"
+seaweedfs_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.seaweedfs')"
+seaweedfs_admin_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.seaweedfs_admin')"
 
-AUTHENTIK_LOCAL_FORWARD_PORT="${AUTHENTIK_LOCAL_FORWARD_PORT:-18299}"
+[[ "$traefik_provider_id" != "null" && -n "$traefik_provider_id" ]] || fail "Could not determine Traefik provider ID"
+[[ "$longhorn_provider_id" != "null" && -n "$longhorn_provider_id" ]] || fail "Could not determine Longhorn provider ID"
+[[ "$proxmox_provider_id" != "null" && -n "$proxmox_provider_id" ]] || fail "Could not determine Proxmox provider ID"
+[[ "$twinboxwizard_provider_id" != "null" && -n "$twinboxwizard_provider_id" ]] || fail "Could not determine Twinbox Wizard provider ID"
+[[ "$seaweedfs_provider_id" != "null" && -n "$seaweedfs_provider_id" ]] || fail "Could not determine SeaweedFS provider ID"
+[[ "$seaweedfs_admin_provider_id" != "null" && -n "$seaweedfs_admin_provider_id" ]] || fail "Could not determine SeaweedFS admin provider ID"
 
-authentik_setup_forward
-
-authentik_request() {
-  local method="$1"
-  local path="$2"
-  local data="${3:-}"
-  local response_file
-  local status
-
-  response_file="$(mktemp)"
-
-  local auth_headers=(-H "Accept: application/json")
-  if [[ "${AUTHENTIK_USE_COOKIE:-false}" == "true" ]]; then
-    auth_headers+=(-H "Cookie: ${AUTHENTIK_TOKEN}")
-  else
-    auth_headers+=(-H "Authorization: Bearer ${AUTHENTIK_TOKEN}")
-  fi
-
-  if [[ -n "$data" ]]; then
-    auth_headers+=(-H "Content-Type: application/json")
-    status="$(
-      curl -sS \
-        -X "$method" \
-        "${auth_headers[@]}" \
-        --data-binary "$data" \
-        -o "$response_file" \
-        -w '%{http_code}' \
-        "${AUTHENTIK_API_BASE}${path}"
-    )" || {
-      rm -f "$response_file"
-      fail "Authentik API request failed: ${method} ${path}"
-    }
-  else
-    status="$(
-      curl -sS \
-        -X "$method" \
-        "${auth_headers[@]}" \
-        -o "$response_file" \
-        -w '%{http_code}' \
-        "${AUTHENTIK_API_BASE}${path}"
-    )" || {
-      rm -f "$response_file"
-      fail "Authentik API request failed: ${method} ${path}"
-    }
-  fi
-
-  local body
-  body="$(cat "$response_file")"
-  rm -f "$response_file"
-
-  if [[ ! "$status" =~ ^2 ]]; then
-    if [[ -n "$body" ]]; then
-      fail "Authentik API ${method} ${path} failed with HTTP ${status}: ${body}"
-    fi
-    fail "Authentik API ${method} ${path} failed with HTTP ${status}"
-  fi
-
-  printf '%s' "$body"
-}
-
-outpost_json="$(authentik_request GET "/outposts/instances/?page_size=100")"
+outpost_json="$(authentik_api_get "/outposts/instances/?page_size=100")"
 outpost_id="$(printf '%s' "$outpost_json" | jq -r '.results[] | select(.name == "authentik Embedded Outpost") | .pk' | head -n1)"
 [[ -n "$outpost_id" && "$outpost_id" != "null" ]] || fail "Could not find the embedded Authentik outpost"
 
@@ -159,11 +278,11 @@ updated_providers="$(
 )"
 
 if [[ "$current_providers" != "$updated_providers" ]]; then
-  authentik_request PATCH "/outposts/instances/${outpost_id}/" \
+  authentik_api_write PATCH "/outposts/instances/${outpost_id}/" \
     "$(jq -n --argjson providers "$updated_providers" '{providers: $providers}')" >/dev/null
 fi
 
-final_outpost_json="$(authentik_request GET "/outposts/instances/${outpost_id}/")"
+final_outpost_json="$(authentik_api_get "/outposts/instances/${outpost_id}/")"
 final_provider_count="$(printf '%s' "$final_outpost_json" | jq -r '.providers | length')"
 if ! printf '%s' "$final_outpost_json" | jq -e --arg traefik "$traefik_provider_id" --arg longhorn "$longhorn_provider_id" '
       (.providers // [])
@@ -213,10 +332,14 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     --arg longhorn_route "longhorn" \
     --arg proxmox_route "proxmox" \
     --arg twinboxwizard_route "twinboxwizard" \
+    --arg seaweedfs_route "seaweedfs" \
+    --arg seaweedfs_admin_route "seaweedfs-admin" \
     '{
       traefik_route: $traefik_route,
       longhorn_route: $longhorn_route,
       proxmox_route: $proxmox_route,
-      twinboxwizard_route: $twinboxwizard_route
+      twinboxwizard_route: $twinboxwizard_route,
+      seaweedfs_route: $seaweedfs_route,
+      seaweedfs_admin_route: $seaweedfs_admin_route
     }' >"$STEP_RESULT_FILE"
 fi

@@ -173,6 +173,128 @@ authentik_setup_forward() {
   _authentik_fail "Authentik port-forward on 127.0.0.1:${port} did not become ready"
 }
 
+authentik_api_request() {
+  local method="$1"
+  local path="$2"
+  local data="${3:-}"
+  local response_file
+  local status
+  local body
+  local auth_headers=(-H "Accept: application/json")
+
+  [[ -n "${AUTHENTIK_API_BASE:-}" ]] || _authentik_fail "AUTHENTIK_API_BASE is not set; call authentik_setup_forward first"
+  [[ -n "${AUTHENTIK_TOKEN:-}" ]] || _authentik_fail "AUTHENTIK_TOKEN is not set; call authentik_ensure_token first"
+
+  response_file="$(mktemp)"
+
+  if [[ "${AUTHENTIK_USE_COOKIE:-false}" == "true" ]]; then
+    auth_headers+=(-H "Cookie: ${AUTHENTIK_TOKEN}")
+  else
+    auth_headers+=(-H "Authorization: Bearer ${AUTHENTIK_TOKEN}")
+  fi
+
+  if [[ -n "$data" ]]; then
+    auth_headers+=(-H "Content-Type: application/json")
+    status="$(
+      curl -sS \
+        -X "$method" \
+        "${auth_headers[@]}" \
+        --data-binary "$data" \
+        -o "$response_file" \
+        -w '%{http_code}' \
+        "${AUTHENTIK_API_BASE}${path}"
+    )" || {
+      rm -f "$response_file"
+      _authentik_fail "Authentik API request failed: ${method} ${path}"
+    }
+  else
+    status="$(
+      curl -sS \
+        -X "$method" \
+        "${auth_headers[@]}" \
+        -o "$response_file" \
+        -w '%{http_code}' \
+        "${AUTHENTIK_API_BASE}${path}"
+    )" || {
+      rm -f "$response_file"
+      _authentik_fail "Authentik API request failed: ${method} ${path}"
+    }
+  fi
+
+  body="$(cat "$response_file")"
+  rm -f "$response_file"
+
+  if [[ ! "$status" =~ ^2 ]]; then
+    if [[ -n "$body" ]]; then
+      _authentik_fail "Authentik API ${method} ${path} failed with HTTP ${status}: ${body}"
+    fi
+    _authentik_fail "Authentik API ${method} ${path} failed with HTTP ${status}"
+  fi
+
+  printf '%s' "$body"
+}
+
+authentik_api_get() {
+  authentik_api_request GET "$1"
+}
+
+authentik_api_write() {
+  authentik_api_request "$1" "$2" "$3"
+}
+
+authentik_resolve_flow_id() {
+  local slug="$1"
+  local designation="$2"
+  local response
+
+  response="$(authentik_api_get "/flows/instances/?slug=${slug}&designation=${designation}")"
+  jq -r \
+    --arg slug "$slug" \
+    --arg designation "$designation" \
+    '.results[]?
+      | select((.slug // "") == $slug and (.designation // "") == $designation)
+      | .pk // empty' <<<"$response" | head -n1
+}
+
+authentik_resolve_scope_mapping_id() {
+  local scope_name="$1"
+  local response managed_pk fallback_pk
+
+  response="$(authentik_api_get "/propertymappings/provider/scope/?scope_name=${scope_name}&page_size=20")"
+  managed_pk="$(
+    jq -r \
+      --arg scope_name "$scope_name" \
+      '.results[]?
+        | select((.scope_name // "") == $scope_name and ((.managed // "") | length > 0))
+        | .pk // empty' <<<"$response" | head -n1
+  )"
+  if [[ -n "$managed_pk" ]]; then
+    printf '%s\n' "$managed_pk"
+    return 0
+  fi
+
+  fallback_pk="$(
+    jq -r \
+      --arg scope_name "$scope_name" \
+      '.results[]?
+        | select((.scope_name // "") == $scope_name)
+        | .pk // empty' <<<"$response" | head -n1
+  )"
+  printf '%s\n' "$fallback_pk"
+}
+
+authentik_find_group_id() {
+  local group_name="$1"
+  local response
+
+  response="$(authentik_api_get "/core/groups/?page_size=200")"
+  jq -r \
+    --arg group_name "$group_name" \
+    '.results[]?
+      | select((.name // "") == $group_name)
+      | .pk // .id // .uuid // empty' <<<"$response" | head -n1
+}
+
 authentik_teardown_forward() {
   if [[ -n "${AUTHENTIK_FORWARD_PID:-}" ]]; then
     kill "$AUTHENTIK_FORWARD_PID" >/dev/null 2>&1 || true
