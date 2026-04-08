@@ -157,6 +157,11 @@ wait_for_application_ready() {
       operation_phase="$(jq -r '.status.operationState.phase // "Unknown"' <<<"$status_json")"
       log "Waiting for application/${application}: sync=${sync_status}, health=${health_status}, phase=${operation_phase}"
 
+      if [[ "$operation_phase" == "Failed" || "$operation_phase" == "Error" ]]; then
+        log "Application/${application} failed: $(jq -r '.status.operationState.message // "no failure message"' <<<"$status_json")"
+        return 1
+      fi
+
       if [[ "$sync_status" == "Synced" && "$health_status" == "Healthy" && "$operation_phase" != "Running" && "$operation_phase" != "Terminating" ]]; then
         log "Application/${application} is Synced and Healthy"
         return 0
