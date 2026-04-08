@@ -1988,6 +1988,25 @@ def test_dashy_kustomization_includes_a_pvc():
     assert "dashy/pvc.yaml" in text
 
 
+def test_install_dashy_step_refreshes_platform_ingress_before_restart():
+    text = (
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-dashy-dashboard"
+        / "run.sh"
+    ).read_text(encoding="utf-8")
+    assert "Applying Dashy ExternalSecret" in text
+    assert "Waiting for Dashy OIDC secret" in text
+    assert "Refreshing platform-ingress so Dashy resources are applied" in text
+    assert "apply-argocd-application.sh" in text
+    assert 'gitops/apps/platform-ingress.yaml' in text
+    assert '--application "platform-ingress"' in text
+    assert "--no-wait" in text
+    assert 'kubectl -n dashy get deployment/dashy' in text
+
+
 def test_authentik_consumer_scripts_read_from_openbao():
     consumer_paths = [
         REPO_ROOT

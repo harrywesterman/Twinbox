@@ -251,6 +251,13 @@ kubectl apply -f "$WORKSPACE_ROOT/gitops/platform/dashy/externalsecret.yaml"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for Dashy OIDC secret"
 kubectl -n dashy wait --for=condition=Ready externalsecret/dashy-oidc --timeout=10m
 
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Refreshing platform-ingress so Dashy resources are applied"
+bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+  --manifest "$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml" \
+  --application "platform-ingress" \
+  --destination-namespace "argocd" \
+  --no-wait
+
 for attempt in $(seq 1 120); do
   if kubectl -n dashy get deployment/dashy >/dev/null 2>&1; then
     break
