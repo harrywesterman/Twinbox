@@ -47,6 +47,7 @@ HUBBLE_AUTHENTIK_FORWARDAUTH_MIDDLEWARE = (
     / "hubble"
     / "authentik-forwardauth-middleware.yaml"
 )
+ARGOCD_CM = REPO_ROOT / "gitops" / "platform" / "argocd" / "argocd-cm.yaml"
 LONGHORN_STEP_SCRIPT = (
     REPO_ROOT
     / "categories"
@@ -2163,6 +2164,13 @@ def test_platform_ingress_manifest_patches_authentik_callback_routes():
     assert "name: longhorn-authentik-callback" in text
     assert 'Host(`traefik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)' in text
     assert 'Host(`longhorn.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)' in text
+
+
+def test_argocd_config_does_not_exclude_managed_endpoints():
+    text = ARGOCD_CM.read_text(encoding="utf-8")
+    assert "kind: Endpoints" not in text.split("resource.exclusions: |", 1)[1]
+    assert "resource.customizations.ignoreResourceUpdates.Endpoints" not in text
+    assert "- EndpointSlice" in text
 
 
 def test_authentik_consumer_scripts_read_from_openbao():
