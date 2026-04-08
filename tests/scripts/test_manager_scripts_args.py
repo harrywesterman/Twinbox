@@ -2007,6 +2007,16 @@ def test_install_dashy_step_refreshes_platform_ingress_before_restart():
     assert 'kubectl -n dashy get deployment/dashy' in text
 
 
+def test_platform_ingress_manifest_patches_authentik_callback_routes():
+    text = (REPO_ROOT / "gitops" / "apps" / "platform-ingress.yaml").read_text(
+        encoding="utf-8"
+    )
+    assert "name: traefik-authentik-callback" in text
+    assert "name: longhorn-authentik-callback" in text
+    assert 'Host(`traefik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)' in text
+    assert 'Host(`longhorn.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)' in text
+
+
 def test_authentik_consumer_scripts_read_from_openbao():
     consumer_paths = [
         REPO_ROOT

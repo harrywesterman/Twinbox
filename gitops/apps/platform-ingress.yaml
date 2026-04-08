@@ -265,6 +265,10 @@ spec:
             - target:
                 kind: IngressRoute
                 name: traefik-authentik-callback
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`traefik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)
             - target:
                 kind: IngressRoute
                 name: longhorn
@@ -275,6 +279,10 @@ spec:
             - target:
                 kind: IngressRoute
                 name: longhorn-authentik-callback
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`longhorn.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)
             - target:
                 kind: IngressRoute
                 name: twinboxwizard
