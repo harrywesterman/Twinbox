@@ -160,6 +160,12 @@ Expected:
 kubectl --kubeconfig <kubeconfig> get application -n argocd prometheus
 kubectl --kubeconfig <kubeconfig> get pods -n monitoring
 kubectl --kubeconfig <kubeconfig> get ingressroute -n monitoring
+kubectl --kubeconfig <kubeconfig> get prometheusrule -n monitoring cluster-health-alerts pvc-usage-alerts
+kubectl --kubeconfig <kubeconfig> get configmap -n monitoring kubernetes-overview-dashboard -o jsonpath='{.metadata.labels.grafana_dashboard}'
+kubectl --kubeconfig <kubeconfig> get configmap -n monitoring node-exporter-full-dashboard -o jsonpath='{.metadata.labels.grafana_dashboard}'
+kubectl --kubeconfig <kubeconfig> get configmap -n monitoring longhorn-dashboard -o jsonpath='{.metadata.labels.grafana_dashboard}'
+kubectl --kubeconfig <kubeconfig> get configmap -n monitoring cilium-metrics-dashboard -o jsonpath='{.metadata.labels.grafana_dashboard}'
+kubectl --kubeconfig <kubeconfig> get configmap -n monitoring hubble-metrics-dashboard -o jsonpath='{.metadata.labels.grafana_dashboard}'
 ```
 
 Expected:
@@ -167,6 +173,12 @@ Expected:
 - `Application/prometheus` is synced and healthy
 - Prometheus, Alertmanager, node-exporter, and kube-state-metrics pods are running in `monitoring`
 - Prometheus ingress routes exist once the domain-aware platform ingress is applied
+- `PrometheusRule/cluster-health-alerts` and `PrometheusRule/pvc-usage-alerts` exist in `monitoring`
+- `ConfigMap/kubernetes-overview-dashboard` exists and is labeled for Grafana dashboard sidecar discovery
+- `ConfigMap/node-exporter-full-dashboard` exists and is labeled for Grafana dashboard sidecar discovery
+- `ConfigMap/longhorn-dashboard` exists and is labeled for Grafana dashboard sidecar discovery
+- `ConfigMap/cilium-metrics-dashboard` exists and is labeled for Grafana dashboard sidecar discovery
+- `ConfigMap/hubble-metrics-dashboard` exists and is labeled for Grafana dashboard sidecar discovery
 
 ### `install-longhorn-storage`
 

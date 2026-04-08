@@ -1,0 +1,64 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cluster-health-alerts
+  namespace: monitoring
+spec:
+  groups:
+    - name: cilium-health
+      rules:
+        - alert: CiliumAgentUnavailable
+          expr: |
+            kube_daemonset_status_number_ready{namespace="kube-system", daemonset="cilium"}
+              < kube_daemonset_status_desired_number_scheduled{namespace="kube-system", daemonset="cilium"}
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Cilium is not ready on all scheduled nodes"
+            description: "Cilium ready pods in kube-system are below the number of scheduled daemonset pods. Network policy and datapath coverage may be degraded."
+
+        - alert: CiliumOperatorUnavailable
+          expr: |
+            kube_deployment_status_replicas_available{namespace="kube-system", deployment="cilium-operator"}
+              < kube_deployment_spec_replicas{namespace="kube-system", deployment="cilium-operator"}
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Cilium operator is not fully available"
+            description: "The cilium-operator deployment in kube-system has fewer available replicas than desired."
+
+        - alert: HubbleRelayUnavailable
+          expr: |
+            kube_deployment_status_replicas_available{namespace="kube-system", deployment="hubble-relay"}
+              < kube_deployment_spec_replicas{namespace="kube-system", deployment="hubble-relay"}
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Hubble relay is not fully available"
+            description: "The hubble-relay deployment in kube-system has fewer available replicas than desired."
+
+    - name: longhorn-health
+      rules:
+        - alert: LonghornManagerUnavailable
+          expr: |
+            sum(kube_pod_status_ready{namespace="longhorn-system", condition="true", pod=~"longhorn-manager.*"}) < 1
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Longhorn manager is unavailable"
+            description: "No ready longhorn-manager pod is reported in the longhorn-system namespace."
+
+        - alert: LonghornCSIPluginUnavailable
+          expr: |
+            sum(kube_pod_status_ready{namespace="longhorn-system", condition="true", pod=~"longhorn-csi-plugin.*"})
+              < count(count by (node) (kube_node_labels{label_twinbox_io_role="worker"}))
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Longhorn CSI coverage is incomplete"
+            description: "The number of ready longhorn-csi-plugin pods is below the number of worker nodes, so volume attach/detach coverage may be incomplete."

@@ -42,6 +42,12 @@ grafana_application_slug="grafana"
 grafana_client_id="$(openssl rand -hex 16)"
 grafana_client_secret="$(openssl rand -hex 24)"
 grafana_secret_file="$BOOTSTRAP_ROOT/secrets/global/grafana-oidc-${cluster_id}.json"
+dashboard_temp_files=()
+
+cleanup() {
+  rm -f "$grafana_secret_file" "${dashboard_temp_files[@]:-}"
+}
+trap cleanup EXIT
 
 mkdir -p "$(dirname "$grafana_secret_file")"
 
@@ -268,6 +274,88 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
 rm -f "$grafana_secret_file"
 
 kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
+seed_dashboard() {
+  local configmap_name="$1"
+  local dashboard_url="$2"
+  local dashboard_file_key="$3"
+  local replacements_json="${4:-{}}"
+  local templating_names_json="${5:-[]}"
+  local dashboard_file dashboard_patched_file
+
+  dashboard_file="$(mktemp /tmp/${configmap_name}.XXXXXX.json)"
+  dashboard_patched_file="$(mktemp /tmp/${configmap_name}-patched.XXXXXX.json)"
+  dashboard_temp_files+=("$dashboard_file" "$dashboard_patched_file")
+
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Downloading ${configmap_name}"
+  curl -fsSL "$dashboard_url" -o "$dashboard_file"
+  jq \
+    --argjson replacements "$replacements_json" \
+    --argjson templating_names "$templating_names_json" \
+    '
+      walk(
+        if type == "string" then
+          ($replacements[.] // .)
+        else
+          .
+        end
+      )
+      | if ($templating_names | length) > 0 then
+          (.templating.list // []) |= map(
+            if ($templating_names | index(.name)) != null then
+              .current = {
+                selected: true,
+                text: "Prometheus",
+                value: "Prometheus"
+              }
+            else
+              .
+            end
+          )
+        else
+          .
+        end
+    ' "$dashboard_file" > "$dashboard_patched_file"
+
+  kubectl -n monitoring create configmap "$configmap_name" \
+    --from-file="${dashboard_file_key}=${dashboard_patched_file}" \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  kubectl -n monitoring label configmap "$configmap_name" \
+    grafana_dashboard=1 \
+    app.kubernetes.io/name=grafana \
+    --overwrite >/dev/null
+}
+
+seed_dashboard \
+  "kubernetes-overview-dashboard" \
+  "https://grafana.com/api/dashboards/21410/revisions/1/download" \
+  "kubernetes-overview.json" \
+  '{"${DATASOURCE}":"Prometheus"}' \
+  '["DATASOURCE"]'
+
+seed_dashboard \
+  "node-exporter-full-dashboard" \
+  "https://grafana.com/api/dashboards/1860/revisions/1/download" \
+  "node-exporter-full.json" \
+  '{"${DS_LOCALHOST}":"Prometheus"}'
+
+seed_dashboard \
+  "longhorn-dashboard" \
+  "https://grafana.com/api/dashboards/22705/revisions/1/download" \
+  "longhorn-dashboard.json" \
+  '{"${DS_PROMETHEUS}":"Prometheus"}'
+
+seed_dashboard \
+  "cilium-metrics-dashboard" \
+  "https://grafana.com/api/dashboards/21431/revisions/1/download" \
+  "cilium-metrics.json" \
+  '{"${DS_PROMETHEUS}":"Prometheus","${DS_VICTORIAMETRICS}":"Prometheus","victoriametrics-datasource":"prometheus","P4169E866C3094E38":"Prometheus"}'
+
+seed_dashboard \
+  "hubble-metrics-dashboard" \
+  "https://grafana.com/api/dashboards/13542/revisions/1/download" \
+  "hubble-metrics.json" \
+  '{"${DS_PROMETHEUS}":"Prometheus"}'
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying Grafana ExternalSecret"
 kubectl apply -f "$grafana_externalsecret_manifest"

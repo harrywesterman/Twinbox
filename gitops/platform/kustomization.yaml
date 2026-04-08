@@ -64,5 +64,6 @@ resources:
   - dashy/deployment.yaml
   - prometheus/ingressroute.yaml
   - prometheus/alertmanager-config.yaml
+  - prometheus/cluster-health-alerts.yaml
   - ntfy/ingressroute.yaml
   - tailscale/externalsecret.yaml
