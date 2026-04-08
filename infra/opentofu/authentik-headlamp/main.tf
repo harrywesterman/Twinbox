@@ -8,6 +8,11 @@ data "authentik_flow" "invalidation" {
   designation = "invalidation"
 }
 
+locals {
+  authentik_authorization_flow_id = "00585727-06b0-48a1-8ba3-892994c47e12"
+  authentik_invalidation_flow_id  = "cc1ce8ed-a537-4b02-8558-8b16f17a2328"
+}
+
 data "authentik_property_mapping_provider_scope" "email" {
   name = "authentik default OAuth Mapping: OpenID 'email'"
 }
@@ -63,8 +68,8 @@ resource "authentik_provider_oauth2" "headlamp" {
   name                = var.application_name
   client_id           = random_string.client_id.result
   client_secret       = random_password.client_secret.result
-  authorization_flow  = data.authentik_flow.authorization.slug
-  invalidation_flow   = data.authentik_flow.invalidation.slug
+  authorization_flow  = local.authentik_authorization_flow_id
+  invalidation_flow   = local.authentik_invalidation_flow_id
   allowed_redirect_uris = [
     {
       matching_mode = "strict"

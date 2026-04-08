@@ -8,6 +8,11 @@ data "authentik_flow" "invalidation" {
   designation = "invalidation"
 }
 
+locals {
+  authentik_authorization_flow_id = "00585727-06b0-48a1-8ba3-892994c47e12"
+  authentik_invalidation_flow_id  = "cc1ce8ed-a537-4b02-8558-8b16f17a2328"
+}
+
 data "authentik_group" "admins" {
   name = var.admins_group_name
 }
@@ -58,8 +63,8 @@ resource "authentik_provider_proxy" "management_console" {
 
   name               = each.value.name
   external_host      = each.value.external_host
-  authorization_flow = data.authentik_flow.authorization.slug
-  invalidation_flow  = data.authentik_flow.invalidation.slug
+  authorization_flow = local.authentik_authorization_flow_id
+  invalidation_flow  = local.authentik_invalidation_flow_id
   mode               = "forward_single"
 }
 
