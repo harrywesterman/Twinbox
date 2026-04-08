@@ -40,86 +40,7 @@ argocd_redirect_uri="${argocd_host}/auth/callback"
 secrets_dir="/opt/twinbox/bootstrap/secrets/global"
 mkdir -p "$secrets_dir"
 
-tf_workdir="$MANAGER_DATA_DIR/opentofu/authentik-argocd-read-${cluster_id}"
-mkdir -p "$tf_workdir"
-cat >"$tf_workdir/main.tf" <<'EOF'
-terraform {
-  required_version = ">= 1.7"
-
-  required_providers {
-    authentik = {
-      source  = "goauthentik/authentik"
-      version = "~> 2025.12"
-    }
-  }
-}
-
-variable "authentik_url" {
-  type = string
-}
-
-provider "authentik" {
-  url   = var.authentik_url
-  token = var.authentik_token
-}
-
-variable "authentik_token" {
-  type      = string
-  sensitive = true
-}
-
-data "authentik_flow" "authorization" {
-  slug        = "default-provider-authorization-implicit-consent"
-  designation = "authorization"
-}
-
-data "authentik_flow" "invalidation" {
-  slug        = "default-provider-invalidation-flow"
-  designation = "invalidation"
-}
-
-data "authentik_property_mapping_provider_scope" "scopes" {
-  managed_list = ["openid", "email", "profile"]
-}
-
-data "authentik_certificate_key_pair" "authentik_signing_key" {
-  name = "authentik Self-signed Certificate"
-}
-
-output "authorization_flow_id" {
-  value = data.authentik_flow.authorization.id
-}
-
-output "invalidation_flow_id" {
-  value = data.authentik_flow.invalidation.id
-}
-
-output "property_mapping_ids" {
-  value = data.authentik_property_mapping_provider_scope.scopes.ids
-}
-
-output "signing_key_id" {
-  value = data.authentik_certificate_key_pair.authentik_signing_key.id
-}
-EOF
-
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Reading Authentik OIDC lookup data for Argo CD"
-cd "$tf_workdir"
-TF_IN_AUTOMATION=1 tofu init -no-color -backend=false -input=false >/dev/null
-lookup_json="$(TF_IN_AUTOMATION=1 tofu output -no-color -json 2>/dev/null || true)"
-if [[ -z "$lookup_json" ]]; then
-  lookup_json="$(TF_IN_AUTOMATION=1 tofu apply -no-color -auto-approve -input=false >/dev/null && TF_IN_AUTOMATION=1 tofu output -no-color -json)"
-fi
-
-authorization_flow_id="$(jq -r '.authorization_flow_id.value // empty' <<<"$lookup_json")"
-invalidation_flow_id="$(jq -r '.invalidation_flow_id.value // empty' <<<"$lookup_json")"
-property_mapping_ids_json="$(jq -c '.property_mapping_ids.value // []' <<<"$lookup_json")"
-signing_key_id="$(jq -r '.signing_key_id.value // empty' <<<"$lookup_json")"
-
-[[ -n "$authorization_flow_id" ]] || fail "Could not resolve Authentik authorization flow ID"
-[[ -n "$invalidation_flow_id" ]] || fail "Could not resolve Authentik invalidation flow ID"
-[[ -n "$signing_key_id" ]] || fail "Could not resolve Authentik signing key ID"
-
 argocd_client_id="$(openssl rand -hex 16)"
 argocd_client_secret="$(openssl rand -hex 24)"
 argocd_application_slug="argocd"
@@ -159,6 +80,67 @@ api_write() {
     --data "$payload" \
     "${AUTHENTIK_API_BASE}${path}"
 }
+
+resolve_flow_id() {
+  local slug="$1"
+  local designation="$2"
+  local response
+
+  response="$(api_get "/flows/instances/?slug=${slug}&designation=${designation}")"
+  jq -r \
+    --arg slug "$slug" \
+    --arg designation "$designation" \
+    '.results[]?
+      | select((.slug // "") == $slug and (.designation // "") == $designation)
+      | .pk // empty' <<<"$response" | head -n1
+}
+
+resolve_scope_mapping_id() {
+  local scope_name="$1"
+  local response managed_pk fallback_pk
+
+  response="$(api_get "/propertymappings/provider/scope/?scope_name=${scope_name}&page_size=20")"
+  managed_pk="$(
+    jq -r \
+      --arg scope_name "$scope_name" \
+      '.results[]?
+        | select((.scope_name // "") == $scope_name and ((.managed // "") | length > 0))
+        | .pk // empty' <<<"$response" | head -n1
+  )"
+  if [[ -n "$managed_pk" ]]; then
+    printf '%s\n' "$managed_pk"
+    return 0
+  fi
+
+  fallback_pk="$(
+    jq -r \
+      --arg scope_name "$scope_name" \
+      '.results[]?
+        | select((.scope_name // "") == $scope_name)
+        | .pk // empty' <<<"$response" | head -n1
+  )"
+  printf '%s\n' "$fallback_pk"
+}
+
+authorization_flow_id="$(resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
+invalidation_flow_id="$(resolve_flow_id "default-provider-invalidation-flow" "invalidation")"
+openid_mapping_id="$(resolve_scope_mapping_id "openid")"
+email_mapping_id="$(resolve_scope_mapping_id "email")"
+profile_mapping_id="$(resolve_scope_mapping_id "profile")"
+
+[[ -n "$authorization_flow_id" ]] || fail "Could not resolve Authentik authorization flow ID"
+[[ -n "$invalidation_flow_id" ]] || fail "Could not resolve Authentik invalidation flow ID"
+[[ -n "$openid_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for openid"
+[[ -n "$email_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for email"
+[[ -n "$profile_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for profile"
+
+property_mapping_ids_json="$(
+  jq -cn \
+    --arg openid "$openid_mapping_id" \
+    --arg email "$email_mapping_id" \
+    --arg profile "$profile_mapping_id" \
+    '[$openid, $email, $profile]'
+)"
 
 create_or_update_provider() {
   local provider_payload="$1"
@@ -210,7 +192,6 @@ provider_payload="$(
     --arg client_secret "$argocd_client_secret" \
     --arg authorization_flow "$authorization_flow_id" \
     --arg invalidation_flow "$invalidation_flow_id" \
-    --arg signing_key "$signing_key_id" \
     --arg redirect_uri "$argocd_redirect_uri" \
     --argjson property_mappings "$property_mapping_ids_json" \
     '{
@@ -226,7 +207,6 @@ provider_payload="$(
         }
       ],
       property_mappings: $property_mappings,
-      signing_key: $signing_key,
       include_claims_in_id_token: true,
       client_type: "confidential",
       issuer_mode: "per_provider"
