@@ -963,6 +963,8 @@ def test_apply_argocd_application_helper_applies_and_waits_for_health():
         in text
     )
     assert 'kubectl -n argocd get application "$application" -o json' in text
+    assert 'select((.type // "") == "ComparisonError" or (.type // "" | test("Error$")))' in text
+    assert 'Application/${application} compare/spec error:' in text
     assert "Application/${application} is Synced and Healthy" in text
     assert "Application/${application} is Synced and has no unhealthy resources" in text
     assert "has_unhealthy_resources()" in text
@@ -1737,6 +1739,7 @@ def test_ntfy_argocd_app_uses_ntfy_chart():
     assert "kind: Application" in text
     assert "name: ntfy" in text
     assert "chart: ntfy" in text
+    assert "helm-charts.rm3l.org" in text
     assert "$values/gitops/values/ntfy.yaml" in text
     assert "namespace: monitoring" in text
 
@@ -1745,6 +1748,9 @@ def test_ntfy_values_configures_persistence():
     text = NTFY_VALUES.read_text(encoding="utf-8")
     assert "binwiederhier/ntfy" in text
     assert "storageClassName: longhorn" in text
+    assert "volumeClaimSpec:" in text
+    assert "config:" in text
+    assert "sample:" in text
     assert "base-url:" not in text
     assert "ntfy.__ZONE_NAME__" not in text
 
@@ -1753,8 +1759,23 @@ def test_ntfy_argocd_app_is_an_applicationset():
     text = NTFY_APP.read_text(encoding="utf-8")
     assert "kind: ApplicationSet" in text
     assert "name: ntfy-set" in text
+    assert "sample:" in text
     assert "base-url:" in text
     assert 'ntfy.{{index .metadata.annotations "twinbox.io/public-zone-name"}}' in text
+
+
+def test_ntfy_step_replaces_existing_applicationset_before_apply():
+    text = (
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-ntfy"
+        / "run.sh"
+    ).read_text(encoding="utf-8")
+    assert 'kubectl delete application ntfy -n argocd --ignore-not-found=true' in text
+    assert 'kubectl delete applicationset ntfy-set -n argocd --ignore-not-found=true' in text
+    assert '--application "ntfy"' in text
 
 
 def test_ntfy_ingressroute_exposes_ui():

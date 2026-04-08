@@ -20,13 +20,18 @@ resources:
     memory: 128Mi
     cpu: 100m
 
-persistence:
+cache:
   enabled: true
-  storageClassName: longhorn
-  size: 1Gi
-  accessMode: ReadWriteOnce
+  volumeClaimSpec:
+    storageClassName: longhorn
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1Gi
 
 config:
-  cache-duration: "12h"
-  keepalive-interval: "45s"
-  behind-proxy: true
+  sample:
+    cache-duration: "12h"
+    keepalive-interval: "45s"
+    behind-proxy: true

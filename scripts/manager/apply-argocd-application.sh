@@ -136,6 +136,7 @@ wait_for_application_ready() {
   local sync_status=""
   local health_status=""
   local operation_phase=""
+  local comparison_error=""
   local attempt=1
   local attempts=180
 
@@ -155,7 +156,21 @@ wait_for_application_ready() {
       sync_status="$(jq -r '.status.sync.status // "Unknown"' <<<"$status_json")"
       health_status="$(jq -r '.status.health.status // "Unknown"' <<<"$status_json")"
       operation_phase="$(jq -r '.status.operationState.phase // "Unknown"' <<<"$status_json")"
+      comparison_error="$(
+        jq -r '
+          [
+            .status.conditions[]?
+            | select((.type // "") == "ComparisonError" or (.type // "" | test("Error$")))
+            | .message // empty
+          ] | join("; ")
+        ' <<<"$status_json"
+      )"
       log "Waiting for application/${application}: sync=${sync_status}, health=${health_status}, phase=${operation_phase}"
+
+      if [[ -n "$comparison_error" ]]; then
+        log "Application/${application} compare/spec error: ${comparison_error}"
+        return 1
+      fi
 
       if [[ "$operation_phase" == "Failed" || "$operation_phase" == "Error" ]]; then
         log "Application/${application} failed: $(jq -r '.status.operationState.message // "no failure message"' <<<"$status_json")"

@@ -9,9 +9,9 @@ export KUBECONFIG="$KUBECONFIG_FILE"
 manifest_path="$WORKSPACE_ROOT/gitops/apps/ntfy.yaml"
 
 kubectl delete application ntfy -n argocd --ignore-not-found=true 2>/dev/null || true
+kubectl delete applicationset ntfy-set -n argocd --ignore-not-found=true 2>/dev/null || true
 
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$manifest_path" \
   --application "ntfy" \
   --destination-namespace "monitoring"
-

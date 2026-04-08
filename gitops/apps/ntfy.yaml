@@ -18,15 +18,16 @@ spec:
     spec:
       project: default
       sources:
-        - repoURL: https://kubereboot.github.io/charts/
+        - repoURL: https://helm-charts.rm3l.org
           chart: ntfy
-          targetRevision: "1.0.0"
+          targetRevision: "0.1.1"
           helm:
             valueFiles:
               - $values/gitops/values/ntfy.yaml
             values: |
               config:
-                base-url: "https://ntfy.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+                sample:
+                  base-url: "https://ntfy.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
         - repoURL: __REPO_URL__
           targetRevision: __TARGET_REVISION__
           ref: values
