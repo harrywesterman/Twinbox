@@ -56,6 +56,7 @@ authentik_ensure_token() {
 # ---------------------------------------------------------------------------
 AUTHENTIK_SA_NAME="${AUTHENTIK_SA_NAME:-twinbox-automation}"
 AUTHENTIK_SA_TOKEN_IDENTIFIER="${AUTHENTIK_SA_TOKEN_IDENTIFIER:-twinbox-automation-api-token}"
+AUTHENTIK_SIGNING_KEY_NAME="${AUTHENTIK_SIGNING_KEY_NAME:-authentik Self-signed Certificate}"
 
 authentik_create_service_account_token() {
   if [[ -n "${AUTHENTIK_API_TOKEN:-}" ]]; then
@@ -281,6 +282,18 @@ authentik_resolve_scope_mapping_id() {
         | .pk // empty' <<<"$response" | head -n1
   )"
   printf '%s\n' "$fallback_pk"
+}
+
+authentik_resolve_signing_key_id() {
+  local signing_key_name="${1:-$AUTHENTIK_SIGNING_KEY_NAME}"
+  local response
+
+  response="$(authentik_api_get "/crypto/certificatekeypairs/?page_size=200")"
+  jq -r \
+    --arg name "$signing_key_name" \
+    '.results[]?
+      | select((.name // "") == $name)
+      | .pk // .id // .uuid // empty' <<<"$response" | head -n1
 }
 
 authentik_find_group_id() {

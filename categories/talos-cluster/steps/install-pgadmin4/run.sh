@@ -71,7 +71,7 @@ pgadmin_issuer_url="${AUTHENTIK_HOST%/}/application/o/${pgadmin_application_slug
 pgadmin_client_id="$(openssl rand -hex 16)"
 pgadmin_client_secret="$(openssl rand -hex 24)"
 authentik_oidc_state_key="authentik-pgadmin4"
-pgadmin_default_email="pgadmin@${cluster_slug}.twinbox.local"
+pgadmin_default_email="pgadmin@${public_zone_name}"
 pgadmin_default_password="$(openssl rand -hex 24)"
 pgadmin_master_password="$(openssl rand -hex 32)"
 
@@ -100,6 +100,10 @@ if [[ -n "$existing_pgadmin_secret_json" ]]; then
   if [[ -n "$existing_master_password" ]]; then
     pgadmin_master_password="$existing_master_password"
   fi
+fi
+
+if [[ "$pgadmin_default_email" == *".twinbox.local" ]]; then
+  pgadmin_default_email="pgadmin@${public_zone_name}"
 fi
 
 find_oauth2_provider_pk_by_name() {
@@ -195,6 +199,7 @@ openid_mapping_id="$(authentik_resolve_scope_mapping_id "openid")"
 email_mapping_id="$(authentik_resolve_scope_mapping_id "email")"
 profile_mapping_id="$(authentik_resolve_scope_mapping_id "profile")"
 admins_group_id="$(authentik_find_group_id "admins")"
+signing_key_id="$(authentik_resolve_signing_key_id)"
 
 [[ -n "$authorization_flow_id" ]] || fail "Could not resolve Authentik authorization flow ID"
 [[ -n "$invalidation_flow_id" ]] || fail "Could not resolve Authentik invalidation flow ID"
@@ -202,6 +207,7 @@ admins_group_id="$(authentik_find_group_id "admins")"
 [[ -n "$email_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for email"
 [[ -n "$profile_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for profile"
 [[ -n "$admins_group_id" ]] || fail "Could not resolve Authentik admins group ID"
+[[ -n "$signing_key_id" ]] || fail "Could not resolve Authentik signing key ID for ${AUTHENTIK_SIGNING_KEY_NAME}"
 
 property_mapping_ids_json="$(
   jq -cn \
@@ -218,6 +224,7 @@ provider_payload="$(
     --arg client_secret "$pgadmin_client_secret" \
     --arg authorization_flow "$authorization_flow_id" \
     --arg invalidation_flow "$invalidation_flow_id" \
+    --arg signing_key "$signing_key_id" \
     --arg redirect_uri "$pgadmin_redirect_uri" \
     --argjson property_mappings "$property_mapping_ids_json" \
     '{
@@ -226,6 +233,7 @@ provider_payload="$(
       client_secret: $client_secret,
       authorization_flow: $authorization_flow,
       invalidation_flow: $invalidation_flow,
+      signing_key: $signing_key,
       redirect_uris: [
         {
           matching_mode: "strict",

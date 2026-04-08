@@ -152,6 +152,7 @@ openid_mapping_id="$(authentik_resolve_scope_mapping_id "openid")"
 email_mapping_id="$(authentik_resolve_scope_mapping_id "email")"
 profile_mapping_id="$(authentik_resolve_scope_mapping_id "profile")"
 admins_group_id="$(authentik_find_group_id "admins")"
+signing_key_id="$(authentik_resolve_signing_key_id)"
 
 [[ -n "$authorization_flow_id" ]] || fail "Could not resolve Authentik authorization flow ID"
 [[ -n "$invalidation_flow_id" ]] || fail "Could not resolve Authentik invalidation flow ID"
@@ -159,6 +160,7 @@ admins_group_id="$(authentik_find_group_id "admins")"
 [[ -n "$email_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for email"
 [[ -n "$profile_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for profile"
 [[ -n "$admins_group_id" ]] || fail "Could not resolve Authentik admins group ID"
+[[ -n "$signing_key_id" ]] || fail "Could not resolve Authentik signing key ID for ${AUTHENTIK_SIGNING_KEY_NAME}"
 
 property_mapping_ids_json="$(
   jq -cn \
@@ -175,6 +177,7 @@ provider_payload="$(
     --arg client_secret "$grafana_client_secret" \
     --arg authorization_flow "$authorization_flow_id" \
     --arg invalidation_flow "$invalidation_flow_id" \
+    --arg signing_key "$signing_key_id" \
     --arg redirect_uri "$grafana_redirect_uri" \
     --argjson property_mappings "$property_mapping_ids_json" \
     '{
@@ -183,6 +186,7 @@ provider_payload="$(
       client_secret: $client_secret,
       authorization_flow: $authorization_flow,
       invalidation_flow: $invalidation_flow,
+      signing_key: $signing_key,
       redirect_uris: [
         {
           matching_mode: "strict",

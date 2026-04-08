@@ -175,12 +175,14 @@ invalidation_flow_id="$(resolve_flow_id "default-provider-invalidation-flow" "in
 openid_mapping_id="$(resolve_scope_mapping_id "openid")"
 email_mapping_id="$(resolve_scope_mapping_id "email")"
 profile_mapping_id="$(resolve_scope_mapping_id "profile")"
+signing_key_id="$(authentik_resolve_signing_key_id)"
 
 [[ -n "$authorization_flow_id" ]] || fail "Could not resolve Authentik authorization flow ID"
 [[ -n "$invalidation_flow_id" ]] || fail "Could not resolve Authentik invalidation flow ID"
 [[ -n "$openid_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for openid"
 [[ -n "$email_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for email"
 [[ -n "$profile_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for profile"
+[[ -n "$signing_key_id" ]] || fail "Could not resolve Authentik signing key ID for ${AUTHENTIK_SIGNING_KEY_NAME}"
 
 property_mapping_ids_json="$(
   jq -cn \
@@ -240,6 +242,7 @@ provider_payload="$(
     --arg client_secret "$argocd_client_secret" \
     --arg authorization_flow "$authorization_flow_id" \
     --arg invalidation_flow "$invalidation_flow_id" \
+    --arg signing_key "$signing_key_id" \
     --arg redirect_uri "$argocd_redirect_uri" \
     --argjson property_mappings "$property_mapping_ids_json" \
     '{
@@ -248,6 +251,7 @@ provider_payload="$(
       client_secret: $client_secret,
       authorization_flow: $authorization_flow,
       invalidation_flow: $invalidation_flow,
+      signing_key: $signing_key,
       redirect_uris: [
         {
           matching_mode: "strict",

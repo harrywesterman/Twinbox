@@ -1542,7 +1542,19 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
         in platform_ingress_app_text
     )
     assert (
+        'cloudtty.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
+        in platform_ingress_app_text
+    )
+    assert (
         'start.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
+        in platform_ingress_app_text
+    )
+    assert (
+        'seaweedfs.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
+        in platform_ingress_app_text
+    )
+    assert (
+        'seaweedfs-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
         in platform_ingress_app_text
     )
     assert "kind: ApplicationSet" in grafana_appset_text
@@ -1692,7 +1704,7 @@ def test_prometheus_values_configures_alertmanager_and_storage():
     assert "configSecret: alertmanager-config" in text
     assert "grafana:" in text
     assert "enabled: false" in text
-    assert "storageClassName: longhorn" in text
+    assert "storageClassName: longhorn-single" in text
 
 
 def test_prometheus_ingressroute_exposes_ui():
@@ -1932,9 +1944,18 @@ def test_traefik_manager_step_deploys_browser_ui():
     assert "Host(`traefik-manager.__ZONE_NAME__`)" in ingress_text
     assert "namespace: traefik-manager" in app_text
     assert "path: gitops/platform/traefik-manager" in app_text
+    assert "kustomize:" in app_text
+    assert "name: traefik-manager-wiredoor" in app_text
+    assert "name: traefik-manager-tailscale" in app_text
     assert '--destination-namespace "traefik-manager"' in script_text
     assert "--no-wait" in script_text
     assert "gitops/apps/traefik-manager.yaml" in script_text
+    assert "cluster-public-zone.sh" in script_text
+    assert 'sed "s/__ZONE_NAME__/${public_zone_name}/g"' in script_text
+    assert 'mktemp "${TMPDIR:-/tmp}/traefik-manager-application.XXXXXX.yaml"' in script_text
+    assert "--manifest \"$rendered_manifest\"" in script_text
+    assert ': "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"' in script_text
+    assert "twinbox_public_zone_name" in script_text
 
 
 def test_argocd_cluster_secret_helper_writes_runtime_projection():
@@ -2039,6 +2060,99 @@ def test_install_dashy_step_refreshes_platform_ingress_before_restart():
     assert '--application "platform-ingress"' in text
     assert "--no-wait" in text
     assert 'kubectl -n dashy get deployment/dashy' in text
+
+
+def test_install_dashy_step_sets_explicit_authentik_signing_key():
+    text = (
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-dashy-dashboard"
+        / "run.sh"
+    ).read_text(encoding="utf-8")
+    assert (
+        'AUTHENTIK_SIGNING_KEY_NAME="${AUTHENTIK_SIGNING_KEY_NAME:-authentik Self-signed Certificate}"'
+        in (REPO_ROOT / "scripts" / "manager" / "authentik-auth.sh").read_text(encoding="utf-8")
+    )
+    assert "authentik_resolve_signing_key_id" in text
+    assert '--arg signing_key "$signing_key_id"' in text
+    assert "signing_key: $signing_key" in text
+    assert (
+        'Could not resolve Authentik signing key ID for ${AUTHENTIK_SIGNING_KEY_NAME}'
+        in text
+    )
+
+
+def test_authentik_helper_resolves_signing_key():
+    text = (REPO_ROOT / "scripts" / "manager" / "authentik-auth.sh").read_text(
+        encoding="utf-8"
+    )
+    assert (
+        'AUTHENTIK_SIGNING_KEY_NAME="${AUTHENTIK_SIGNING_KEY_NAME:-authentik Self-signed Certificate}"'
+        in text
+    )
+    assert "authentik_resolve_signing_key_id()" in text
+    assert '/crypto/certificatekeypairs/?page_size=200' in text
+    assert '.pk // .id // .uuid // empty' in text
+
+
+def test_authentik_oidc_consumer_scripts_set_explicit_signing_key():
+    consumer_paths = [
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "configure-argocd-oidc"
+        / "run.sh",
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-dashy-dashboard"
+        / "run.sh",
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-grafana"
+        / "run.sh",
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-headlamp"
+        / "run.sh",
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-pgadmin4"
+        / "run.sh",
+    ]
+
+    for path in consumer_paths:
+        text = path.read_text(encoding="utf-8")
+        assert 'signing_key_id="$(authentik_resolve_signing_key_id)"' in text
+        assert (
+            'Could not resolve Authentik signing key ID for ${AUTHENTIK_SIGNING_KEY_NAME}'
+            in text
+        )
+        assert '--arg signing_key "$signing_key_id"' in text
+        assert "signing_key: $signing_key" in text
+
+
+def test_cloudtty_platform_ingress_is_committed_to_gitops():
+    kustomization_text = (
+        REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
+    ).read_text(encoding="utf-8")
+    ingress_text = (
+        REPO_ROOT / "gitops" / "platform" / "cloudtty" / "ingressroute.yaml"
+    ).read_text(encoding="utf-8")
+
+    assert "cloudtty/ingressroute.yaml" in kustomization_text
+    assert "cloudtty/authentik-forwardauth-middleware.yaml" in kustomization_text
+    assert "Host(`cloudtty.__ZONE_NAME__`)" in ingress_text
 
 
 def test_platform_ingress_manifest_patches_authentik_callback_routes():

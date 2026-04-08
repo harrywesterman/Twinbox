@@ -124,6 +124,13 @@ spec:
                   value: Host(`hubble.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
+                name: cloudtty
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`cloudtty.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
                 name: pgadmin4
               patch: |-
                 - op: replace
@@ -290,6 +297,20 @@ spec:
                 - op: replace
                   path: /spec/routes/0/match
                   value: Host(`twinboxwizard.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: seaweedfs
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`seaweedfs.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: seaweedfs-admin
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`seaweedfs-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
                 name: proxmox
