@@ -17,30 +17,8 @@ data "authentik_property_mapping_provider_scope" "scopes" {
   managed_list = ["openid", "email", "profile"]
 }
 
-resource "tls_private_key" "headlamp_signing" {
-  algorithm = "RSA"
-  rsa_bits  = 4096
-}
-
-resource "tls_self_signed_cert" "headlamp_signing" {
-  private_key_pem       = tls_private_key.headlamp_signing.private_key_pem
-  is_ca_certificate     = false
-  validity_period_hours = 87600
-  allowed_uses = [
-    "digital_signature",
-    "key_encipherment",
-  ]
-
-  subject {
-    common_name  = "${var.application_slug}.oidc-signing"
-    organization = "Twinbox"
-  }
-}
-
-resource "authentik_certificate_key_pair" "headlamp_signing" {
-  name             = "${var.application_slug}-oidc-signing"
-  certificate_data = tls_self_signed_cert.headlamp_signing.cert_pem
-  key_data         = tls_private_key.headlamp_signing.private_key_pem
+data "authentik_certificate_key_pair" "authentik_signing_key" {
+  name = "authentik Self-signed Certificate"
 }
 
 resource "random_string" "client_id" {
@@ -69,7 +47,7 @@ resource "authentik_provider_oauth2" "headlamp" {
     },
   ]
   property_mappings = data.authentik_property_mapping_provider_scope.scopes.ids
-  signing_key                = authentik_certificate_key_pair.headlamp_signing.id
+  signing_key                = data.authentik_certificate_key_pair.authentik_signing_key.id
   include_claims_in_id_token = true
   client_type                = "confidential"
   issuer_mode                = "per_provider"
