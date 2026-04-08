@@ -17,16 +17,8 @@ data "authentik_group" "admins" {
   name = "admins"
 }
 
-data "authentik_property_mapping_provider_scope" "email" {
-  name = "authentik default OAuth Mapping: OpenID 'email'"
-}
-
-data "authentik_property_mapping_provider_scope" "openid" {
-  name = "authentik default OAuth Mapping: OpenID 'openid'"
-}
-
-data "authentik_property_mapping_provider_scope" "profile" {
-  name = "authentik default OAuth Mapping: OpenID 'profile'"
+data "authentik_property_mapping_provider_scope" "scopes" {
+  managed_list = ["openid", "email", "profile"]
 }
 
 resource "tls_private_key" "pgadmin4_signing" {
@@ -80,11 +72,7 @@ resource "authentik_provider_oauth2" "pgadmin4" {
       url           = var.pgadmin4_redirect_uri
     },
   ]
-  property_mappings = [
-    data.authentik_property_mapping_provider_scope.email.id,
-    data.authentik_property_mapping_provider_scope.openid.id,
-    data.authentik_property_mapping_provider_scope.profile.id,
-  ]
+  property_mappings = data.authentik_property_mapping_provider_scope.scopes.ids
   signing_key               = authentik_certificate_key_pair.pgadmin4_signing.id
   include_claims_in_id_token = true
   client_type               = "confidential"
