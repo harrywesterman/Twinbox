@@ -74,16 +74,22 @@ spec:
           envFrom:
             - secretRef:
                 name: pgadmin4-bootstrap
+            - secretRef:
+                name: pgadmin4-db-password
+          startupProbe:
+            tcpSocket:
+              port: http
+            failureThreshold: 36
+            periodSeconds: 5
+            timeoutSeconds: 3
           readinessProbe:
-            httpGet:
-              path: /misc/ping
+            tcpSocket:
               port: http
             initialDelaySeconds: 20
             periodSeconds: 10
             timeoutSeconds: 3
           livenessProbe:
-            httpGet:
-              path: /misc/ping
+            tcpSocket:
               port: http
             initialDelaySeconds: 30
             periodSeconds: 20

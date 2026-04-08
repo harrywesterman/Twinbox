@@ -1327,7 +1327,13 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "PGADMIN_OAUTH2_CLIENT_SECRET" in pgadmin_external_secret_text
     assert "PGADMIN_OAUTH2_SERVER_METADATA_URL" in pgadmin_external_secret_text
     assert "PGADMIN_OAUTH2_SCOPE" in pgadmin_external_secret_text
-    assert "pgadmin4-db-password" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
+    pgadmin_deployment_text = PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
+    assert "pgadmin4-db-password" in pgadmin_deployment_text
+    assert "name: pgadmin4-bootstrap" in pgadmin_deployment_text
+    assert "name: pgadmin4-db-password" in pgadmin_deployment_text
+    assert "startupProbe" in pgadmin_deployment_text
+    assert "failureThreshold: 36" in pgadmin_deployment_text
+    assert "tcpSocket" in pgadmin_deployment_text
 
     cloudflare_tunnel_run_text = (
         REPO_ROOT
