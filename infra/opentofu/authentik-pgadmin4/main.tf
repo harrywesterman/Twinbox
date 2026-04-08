@@ -1,9 +1,11 @@
 data "authentik_flow" "authorization" {
   slug = "default-provider-authorization-implicit-consent"
+  designation = "authorization"
 }
 
 data "authentik_flow" "invalidation" {
   slug = "default-provider-invalidation-flow"
+  designation = "invalidation"
 }
 
 data "authentik_group" "admins" {
