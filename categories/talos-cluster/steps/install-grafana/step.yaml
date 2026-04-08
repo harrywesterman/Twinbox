@@ -3,13 +3,14 @@ title: Install Grafana
 type: action
 journey_stage: setup
 order: 54
-summary: Apply the Grafana GitOps application after seeding the admin secret in OpenBao.
-explanation: Twinbox prepares the Grafana bootstrap secret in OpenBao and then applies one Argo CD application that combines the ExternalSecret, Grafana chart, and ingress routes. The step is intended to run after the Prometheus stack so the dashboard can point at a live metrics backend. It waits for Argo CD health before continuing.
+summary: Apply the Grafana GitOps application after wiring Authentik OIDC and syncing the Grafana OIDC secret through OpenBao.
+explanation: Twinbox provisions a dedicated Authentik OIDC client for Grafana, stores only the technical client credentials in OpenBao, waits for the Grafana OIDC ExternalSecret to become ready, and then applies the Grafana Argo CD application. The step is intended to run after the Prometheus stack so the dashboard can point at a live metrics backend. It waits for Argo CD health before continuing.
 side_help: Grafana is an open-source observability platform for visualizing, querying, and alerting on metrics, logs, and traces.
 depends_on:
   - install-prometheus
   - install-cloudnativepg
   - install-secret-sync
+  - install-authentik-idp
 inputs: []
 secrets:
   files:

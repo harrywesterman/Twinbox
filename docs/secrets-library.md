@@ -63,7 +63,7 @@ bootstrap/secrets/
 ├── global/
 │   ├── proxmox.json
 │   ├── traefik-dashboard.json
-│   ├── grafana.json
+│   ├── grafana-oidc-<cluster-id>.json
 │   ├── wiredoor-gateway.json
 │   ├── velero.json
 │   └── authentik.json  # seed-only; deleted after sync into OpenBao
@@ -79,7 +79,6 @@ bootstrap/secrets/
 The API server resolves field values with aliases for known items:
 
 - **proxmox**: `host`, `port`, `username`/`user`, `password`, `endpoint`
-- **grafana**: `admin-user`/`username`, `admin-password`/`password`
 - **traefik-dashboard**: `username`, `password`, `users`
 - **wiredoor-gateway**: `WIREDOOR_URL`/`url`, `TOKEN`/`token`
 

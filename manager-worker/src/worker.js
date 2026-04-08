@@ -210,10 +210,6 @@ function resolveFieldValue(record, ref) {
       username: ["WIREDOOR_URL", "username", "url"],
       password: ["TOKEN", "password", "token"],
     },
-    grafana: {
-      "admin-user": ["admin-user", "username"],
-      "admin-password": ["admin-password", "password"],
-    },
     "traefik-dashboard": {
       username: ["username"],
       password: ["password"],

@@ -31,7 +31,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `/opt/twinbox/bootstrap/secrets/global/proxmox.json`
 - `/opt/twinbox/bootstrap/secrets/global/traefik-dashboard.json`
 - `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json`
-- `/opt/twinbox/bootstrap/secrets/global/grafana.json`
+- `/opt/twinbox/bootstrap/secrets/global/grafana-oidc-<cluster-id>.json`
 - `/opt/twinbox/bootstrap/secrets/global/authentik.json` - seed-only; deleted after Authentik syncs into OpenBao
 - `/opt/twinbox/bootstrap/secrets/global/pgadmin4-oidc-<cluster-id>.json`
 - `/opt/twinbox/bootstrap/secrets/global/wiredoor-gateway.json`
@@ -90,12 +90,23 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 }
 ```
 
-### `grafana.json`
+### `grafana-oidc.json`
 
 ```json
 {
-  "admin-user": "admin",
-  "admin-password": "generated-password"
+  "GF_AUTH_DISABLE_LOGIN_FORM": "true",
+  "GF_AUTH_OAUTH_AUTO_LOGIN": "true",
+  "GF_AUTH_BASIC_ENABLED": "false",
+  "GF_USERS_AUTO_ASSIGN_ORG_ROLE": "Admin",
+  "GF_AUTH_GENERIC_OAUTH_ENABLED": "true",
+  "GF_AUTH_GENERIC_OAUTH_NAME": "Authentik",
+  "GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP": "true",
+  "GF_AUTH_GENERIC_OAUTH_CLIENT_ID": "generated-client-id",
+  "GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET": "generated-client-secret",
+  "GF_AUTH_GENERIC_OAUTH_SCOPES": "openid profile email",
+  "GF_AUTH_GENERIC_OAUTH_AUTH_URL": "https://authentik.example.com/application/o/authorize/",
+  "GF_AUTH_GENERIC_OAUTH_TOKEN_URL": "https://authentik.example.com/application/o/token/",
+  "GF_AUTH_GENERIC_OAUTH_API_URL": "https://authentik.example.com/application/o/userinfo/"
 }
 ```
 

@@ -1567,21 +1567,33 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "secretKey: TOKEN" in wiredoor_externalsecret_text
 
 
-def test_grafana_admin_credentials_are_openbao_backed():
+def test_grafana_oidc_is_openbao_backed():
     grafana_values_text = _grafana_values_text()
     grafana_app_text = GRAFANA_APP.read_text(encoding="utf-8")
     grafana_externalsecret_text = _grafana_externalsecret_text()
+    grafana_step_text = (
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-grafana"
+        / "run.sh"
+    ).read_text(encoding="utf-8")
+    grafana_step_yaml = GRAFANA_STEP_MANIFEST.read_text(encoding="utf-8")
 
     assert "adminPassword:" not in grafana_values_text
-    assert "existingSecret: grafana-admin" in grafana_values_text
-    assert "userKey: admin-user" in grafana_values_text
-    assert "passwordKey: admin-password" in grafana_values_text
+    assert "existingSecret: grafana-admin" not in grafana_values_text
+    assert "envFromSecret: grafana-oidc" in grafana_values_text
     assert "path: gitops/platform/grafana" not in grafana_app_text
     assert "kind: ExternalSecret" in grafana_externalsecret_text
     assert "kind: ClusterSecretStore" in grafana_externalsecret_text
     assert "name: openbao" in grafana_externalsecret_text
-    assert "admin-user" in grafana_externalsecret_text
-    assert "admin-password" in grafana_externalsecret_text
+    assert "name: grafana-oidc" in grafana_externalsecret_text
+    assert "GF_AUTH_GENERIC_OAUTH_CLIENT_ID" in grafana_externalsecret_text
+    assert "GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET" in grafana_externalsecret_text
+    assert "Provisioning Authentik OIDC client for Grafana" in grafana_step_text
+    assert '--secret-name "grafana-oidc"' in grafana_step_text
+    assert "- install-authentik-idp" in grafana_step_yaml
 
 
 def test_talos_module_is_vm_only_and_keeps_planned_outputs():

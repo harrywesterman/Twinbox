@@ -1,6 +1,8 @@
 service:
   type: ClusterIP
 
+envFromSecret: grafana-oidc
+
 sidecar:
   datasources:
     enabled: true
@@ -8,11 +10,6 @@ sidecar:
   dashboards:
     enabled: true
     label: grafana_dashboard
-
-admin:
-  existingSecret: grafana-admin
-  userKey: admin-user
-  passwordKey: admin-password
 
 additionalDataSources:
   - name: Prometheus
