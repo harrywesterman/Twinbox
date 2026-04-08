@@ -35,9 +35,11 @@ data:
             - authentik_core.add_user
             - authentik_core.change_user
             - authentik_core.view_user
+            - authentik_core.set_password_user
             - authentik_core.add_group
             - authentik_core.change_group
             - authentik_core.view_group
+            - authentik_core.add_group_user
 
       - id: twinbox-automation-user
         model: authentik_core.user
