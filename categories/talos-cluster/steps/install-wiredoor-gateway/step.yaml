@@ -12,6 +12,13 @@ depends_on:
   - configure-wiredoor-ingress
   - install-secret-sync
 ingress_route: wiredoor
+dashy:
+  items:
+    - section: Platform
+      title: Wiredoor
+      description: External operator entrypoint
+      icon: fas fa-door-open
+      output_url_key: wiredoor_url
 inputs: []
 secrets:
   files:

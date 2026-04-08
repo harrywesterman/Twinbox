@@ -49,3 +49,11 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$manifest_path" \
   --application "wiredoor-gateway"
+
+if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
+  jq -n \
+    --arg wiredoor_url "$wiredoor_url" \
+    '{
+      wiredoor_url: $wiredoor_url
+    }' >"$STEP_RESULT_FILE"
+fi

@@ -12,6 +12,13 @@ depends_on:
   - install-traefik
   - choose-ingress-route
   - install-cloudnativepg
+dashy:
+  items:
+    - section: Platform
+      title: Authentik
+      description: Identity provider
+      icon: fas fa-id-card
+      url_template: https://authentik.__ZONE_NAME__
 inputs: []
 secrets:
   files:

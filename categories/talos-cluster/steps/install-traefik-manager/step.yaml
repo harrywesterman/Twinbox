@@ -11,6 +11,13 @@ depends_on:
   - install-authentik-idp
   - install-longhorn-storage
   - choose-ingress-route
+dashy:
+  items:
+    - section: Platform
+      title: Traefik Manager
+      description: Browser UI for Traefik routes and services
+      icon: fas fa-sitemap
+      url_template: https://traefik-manager.__ZONE_NAME__
 inputs: []
 secrets:
   files:

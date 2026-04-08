@@ -8,6 +8,13 @@ explanation: Twinbox applies the ntfy ApplicationSet after the dashboard stack s
 side_help: Ntfy provides simple push notifications for cluster alerts and operator workflows.
 depends_on:
   - install-dashy-dashboard
+dashy:
+  items:
+    - section: Platform
+      title: ntfy
+      description: Push notification service
+      icon: fas fa-bell
+      url_template: https://ntfy.__ZONE_NAME__
 inputs: []
 secrets:
   files:

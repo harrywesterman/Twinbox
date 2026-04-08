@@ -8,6 +8,28 @@ explanation: Twinbox groups the operator consoles directly after the cluster sta
 side_help: Management consoles are grouped as a dedicated phase so the wizard can keep operator tools separate from core infra.
 depends_on:
   - install-dashy-dashboard
+dashy:
+  items:
+    - section: Platform
+      title: Twinbox Wizard
+      description: Web wizard on the management VM
+      icon: fas fa-hat-wizard
+      url_template: https://twinboxwizard.__ZONE_NAME__
+    - section: Platform
+      title: Proxmox
+      description: Virtualization host
+      icon: si-proxmox
+      url_template: https://proxmox.__ZONE_NAME__
+    - section: Platform
+      title: SeaweedFS
+      description: S3-compatible backup storage
+      icon: fas fa-box-archive
+      url_template: https://seaweedfs.__ZONE_NAME__
+    - section: Platform
+      title: SeaweedFS Admin
+      description: SeaweedFS administration console
+      icon: fas fa-sliders
+      url_template: https://seaweedfs-admin.__ZONE_NAME__
 inputs: []
 secrets:
   files:

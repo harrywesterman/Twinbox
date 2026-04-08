@@ -225,6 +225,7 @@ All platform services use the runtime domain projection from the local Argo clus
 
 Dashy's browser-side OIDC flow depends on Authentik answering the discovery and token requests with CORS headers for `https://start.<ZONE_NAME>`. The platform IngressRoute applies a Traefik headers middleware for that response path.
 Dashy registers the root start-page URL as its callback (`https://start.<ZONE_NAME>`), so the Authentik provider needs to accept that form without a trailing slash.
+The Dashy tile list itself is not GitOps-static: Twinbox renders it from step metadata plus the cluster step-state on the Management VM and applies the resulting `ConfigMap/dashy-config` at runtime.
 
 ### GitOps structure
 
@@ -248,10 +249,9 @@ gitops/platform/
 │   └── externalsecret.yaml
 └── dashy/
     ├── ingressroute.yaml
-    ├── configmap.yaml          # Start page config template patched with the selected domain
     ├── externalsecret.yaml     # Dashy OIDC client credentials from OpenBao
     ├── pvc.yaml                # Longhorn-backed persistent user-data volume
-    ├── deployment.yaml         # Dashy deployment mounts the PVC for user-data
+    ├── deployment.yaml         # Dashy deployment mounts the PVC for user-data and reads the runtime-generated ConfigMap
     ├── service.yaml
 ```
 

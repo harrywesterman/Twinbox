@@ -11,6 +11,13 @@ depends_on:
   - install-authentik-idp
   - create-users-and-groups
   - choose-ingress-route
+dashy:
+  items:
+    - section: Platform
+      title: pgAdmin 4
+      description: PostgreSQL admin console
+      icon: fas fa-database
+      url_template: https://pgadmin4.__ZONE_NAME__
 inputs: []
 secrets:
   files:

@@ -54,7 +54,6 @@ resources:
   - wiredoor-gateway/ingressroute.yaml
   - wiredoor-gateway/externalsecret.yaml
   - dashy/ingressroute.yaml
-  - dashy/configmap.yaml
   - dashy/externalsecret.yaml
   - dashy/pvc.yaml
   - dashy/service.yaml

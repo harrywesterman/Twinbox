@@ -11,6 +11,13 @@ depends_on:
   - install-cloudnativepg
   - install-secret-sync
   - install-authentik-idp
+dashy:
+  items:
+    - section: Platform
+      title: Grafana
+      description: Metrics and dashboards
+      icon: fas fa-chart-area
+      url_template: https://grafana.__ZONE_NAME__
 inputs: []
 secrets:
   files:

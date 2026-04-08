@@ -8,6 +8,13 @@ explanation: Twinbox installs Argo CD after the Talos/Cilium bootstrap has compl
 side_help: Argo CD manages the GitOps layer; the core Cilium networking stack stays Talos-owned.
 depends_on:
   - provision-nodes
+dashy:
+  items:
+    - section: Platform
+      title: Argo CD
+      description: GitOps control plane
+      icon: fas fa-code-branch
+      url_template: https://argocd.__ZONE_NAME__
 inputs: []
 secrets:
   files:

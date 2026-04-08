@@ -8,6 +8,13 @@ explanation: Twinbox installs Longhorn through a dedicated Argo CD application. 
 side_help: Longhorn is an open-source distributed block storage system for Kubernetes that makes persistent volumes easy to deploy and manage.
 depends_on:
   - install-argocd
+dashy:
+  items:
+    - section: Platform
+      title: Longhorn
+      description: Storage management
+      icon: fas fa-hard-drive
+      url_template: https://longhorn.__ZONE_NAME__
 inputs: []
 secrets:
   files:

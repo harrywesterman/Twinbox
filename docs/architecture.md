@@ -82,6 +82,7 @@ GitHub `main` is the source of truth for both the management stack and the GitOp
 20. Later Authentik consumers read the bootstrap data from OpenBao instead of reopening `/opt/twinbox/bootstrap/secrets/global/authentik.json`.
 21. `install-pgadmin4` provisions the pgAdmin 4 Authentik OIDC application, seeds the pgAdmin bootstrap secret into OpenBao, and deploys pgAdmin with Longhorn-backed persistence and Traefik ingress.
 22. GitOps apps consume secrets through `ExternalSecret` resources backed by `ClusterSecretStore/openbao`.
+23. Dashy link tiles are rendered on the Management VM from step metadata plus the current step-state, then written into the in-cluster `ConfigMap/dashy-config` so the start page reflects the installed browser UIs without a static list in Git.
 
 ## Domain Flow
 
@@ -92,7 +93,7 @@ All platform services share a single base domain (`ZONE_NAME`) provided by the u
 3. **OpenBao sync** — The same script calls `sync-openbao-global-secret.sh` to push these values to OpenBao at `twinbox/global/cluster-hostnames`.
 4. **Argo cluster secret** — The ingress/domain step upserts a local Argo CD cluster secret in the `argocd` namespace with the derived public zone name as an annotation.
 5. **ApplicationSets** — The `platform-ingress`, `grafana`, and `ntfy` ApplicationSets read the cluster annotation at render time and project the domain into Kustomize patches or Helm values.
-6. **Kustomize render** — The `platform-ingress` ApplicationSet deploys `gitops/platform/` via Kustomize, which patches the live route expressions and homepage strings before sync.
+6. **Kustomize render** — The `platform-ingress` ApplicationSet deploys `gitops/platform/` via Kustomize, which patches the live route expressions before sync.
 
 The local Argo cluster secret must exist before the domain-aware ApplicationSets are applied.
 

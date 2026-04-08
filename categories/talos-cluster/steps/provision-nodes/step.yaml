@@ -6,6 +6,13 @@ summary: Install Talos Linux on separate VM's on the cluster.
 explanation: Talos Linux is the immutable, Kubernetes-focused operating system that Twinbox uses. We use OpenTofu, download the Talos image on demand, size the control plane and worker roles separately, land the VMs on Proxmox hosts, discover the DHCP addresses, apply Talos machine configs, bootstrap the first control plane, and materialize the resulting Talos access files from the management-local bootstrap secret tree.
 side_help: Talos Linux is a minimal, secure, API-driven operating system built specifically for running Kubernetes.
 depends_on: []
+dashy:
+  items:
+    - section: Platform
+      title: Hubble
+      description: Network flow visibility
+      icon: fas fa-network-wired
+      url_template: https://hubble.__ZONE_NAME__
 inputs:
   - id: scale_percent
     label: Cluster scale

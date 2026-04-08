@@ -8,6 +8,13 @@ explanation: Cloudtty provides a browser-based Kubernetes shell that runs as a c
 side_help: Cloudtty is useful when you want a quick web terminal on the cluster itself without leaving the Twinbox flow.
 depends_on:
   - install-argocd
+dashy:
+  items:
+    - section: Platform
+      title: Cloudtty
+      description: Browser-accessible cluster shell
+      icon: fas fa-terminal
+      output_url_key: access_url
 inputs: []
 secrets:
   files:

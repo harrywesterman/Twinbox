@@ -8,6 +8,13 @@ explanation: Twinbox installs Whoami through one Argo CD application that includ
 side_help: Whoami is the first lightweight app after the core platform and is the smallest possible check that the post-platform GitOps flow works.
 depends_on:
   - install-traefik
+dashy:
+  items:
+    - section: Apps
+      title: Whoami
+      description: Minimal ingress check
+      icon: fas fa-user
+      url_template: https://whoami.__ZONE_NAME__
 inputs: []
 secrets:
   files:

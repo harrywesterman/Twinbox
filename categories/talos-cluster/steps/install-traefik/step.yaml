@@ -8,6 +8,13 @@ explanation: Twinbox installs Traefik through a single Argo CD application that 
 side_help: Traefik is a modern cloud-native reverse proxy and ingress controller that automatically routes traffic to your applications and services.
 depends_on:
   - install-secret-sync
+dashy:
+  items:
+    - section: Platform
+      title: Traefik
+      description: Ingress controller
+      icon: fas fa-route
+      url_template: https://traefik.__ZONE_NAME__/dashboard/
 inputs: []
 secrets:
   files:

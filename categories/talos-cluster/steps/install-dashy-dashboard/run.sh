@@ -268,8 +268,10 @@ for attempt in $(seq 1 120); do
   sleep 5
 done
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restarting Dashy to pick up Authentik OIDC settings"
-kubectl -n dashy rollout restart deployment/dashy
-kubectl -n dashy rollout status deployment/dashy --timeout=10m
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Rendering and applying Dashy start page config"
+node "$WORKSPACE_ROOT/manager-worker/src/refresh-dashy-config.mjs" \
+  --workspace-root "$WORKSPACE_ROOT" \
+  --manager-data-dir "$MANAGER_DATA_DIR" \
+  --cluster-id "$cluster_id"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Dashy Authentik configuration complete"

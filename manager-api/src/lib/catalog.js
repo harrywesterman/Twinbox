@@ -2,8 +2,10 @@ import fs from "fs";
 import path from "path";
 
 import YAML from "yaml";
-import { normalizeSecretBundle } from "../../../lib/secrets/schema.mjs";
-import { resolveStepPresentation } from "../../../lib/step-presentation.mjs";
+import {
+  normalizeCategoryManifest,
+  normalizeStepManifest,
+} from "../../../lib/step-manifest.mjs";
 
 import {
   parseIPv4,
@@ -15,181 +17,6 @@ import {
 
 function loadYaml(file) {
   return YAML.parse(fs.readFileSync(file, "utf8"));
-}
-
-function normalizeInputDefinition(input, file) {
-  if (!input || typeof input !== "object") {
-    throw new Error(`invalid input definition in ${file}`);
-  }
-
-  const requiredFields = ["id", "label", "type"];
-  for (const field of requiredFields) {
-    if (!input[field]) {
-      throw new Error(`missing ${field} in ${file}`);
-    }
-  }
-
-  const normalized = {
-    id: String(input.id),
-    label: String(input.label),
-    type: String(input.type),
-    help: typeof input.help === "string" ? input.help : "",
-    required: input.required !== false,
-    min: Number.isFinite(Number(input.min)) ? Number(input.min) : undefined,
-    max: Number.isFinite(Number(input.max)) ? Number(input.max) : undefined,
-    default: input.default,
-    options: Array.isArray(input.options)
-      ? input.options.map((option, index) => normalizeInputOption(option, file, input.id, index))
-      : undefined,
-  };
-
-  if (Array.isArray(normalized.options) && normalized.options.length > 0 && normalized.default !== undefined) {
-    const allowedValues = new Set(normalized.options.map((option) => String(option.value)));
-    if (!allowedValues.has(String(normalized.default))) {
-      throw new Error(`default for ${input.id} must match one of its options in ${file}`);
-    }
-  }
-
-  return normalized;
-}
-
-function normalizeInputOption(option, file, inputId, index) {
-  if (typeof option === "string" || typeof option === "number" || typeof option === "boolean") {
-    const value = String(option);
-    return {
-      label: value,
-      value,
-    };
-  }
-
-  if (!option || typeof option !== "object") {
-    throw new Error(`invalid option ${index + 1} for ${inputId} in ${file}`);
-  }
-
-  const value = option.value !== undefined && option.value !== null && option.value !== ""
-    ? String(option.value)
-    : (option.label !== undefined && option.label !== null && option.label !== ""
-      ? String(option.label)
-      : "");
-  const label = option.label !== undefined && option.label !== null && option.label !== ""
-    ? String(option.label)
-    : value;
-
-  if (!value) {
-    throw new Error(`missing option value ${index + 1} for ${inputId} in ${file}`);
-  }
-
-  return {
-    label: label || value,
-    value,
-  };
-}
-
-function normalizeJourneyStage(value, file) {
-  if (value === undefined || value === null || value === "") {
-    return "setup";
-  }
-
-  const normalized = String(value);
-  if (normalized === "setup" || normalized === "manage") {
-    return normalized;
-  }
-
-  throw new Error(`journey_stage must be setup or manage in ${file}`);
-}
-
-function normalizeStepSecrets(secrets, file) {
-  if (secrets === undefined || secrets === null) {
-    return { env: {}, files: {} };
-  }
-
-  if (typeof secrets !== "object" || Array.isArray(secrets)) {
-    throw new Error(`secrets must be an object in ${file}`);
-  }
-
-  return normalizeSecretBundle(secrets);
-}
-
-function normalizeCategoryManifest(manifest, file) {
-  const requiredFields = ["id", "title", "summary", "order"];
-  for (const field of requiredFields) {
-    if (manifest?.[field] === undefined || manifest?.[field] === null || manifest?.[field] === "") {
-      throw new Error(`missing ${field} in ${file}`);
-    }
-  }
-
-  return {
-    id: String(manifest.id),
-    title: String(manifest.title),
-    summary: String(manifest.summary),
-    order: Number(manifest.order),
-  };
-}
-
-function normalizeStepManifest(manifest, file, categoryId) {
-  const requiredFields = [
-    "id",
-    "title",
-    "type",
-    "order",
-    "summary",
-    "explanation",
-    "side_help",
-    "inputs",
-    "depends_on",
-    "runner",
-  ];
-  for (const field of requiredFields) {
-    if (manifest?.[field] === undefined || manifest?.[field] === null) {
-      throw new Error(`missing ${field} in ${file}`);
-    }
-  }
-
-  if (!Array.isArray(manifest.inputs)) {
-    throw new Error(`inputs must be an array in ${file}`);
-  }
-
-  if (!Array.isArray(manifest.depends_on)) {
-    throw new Error(`depends_on must be an array in ${file}`);
-  }
-
-  if (!manifest.runner?.kind || !manifest.runner?.script) {
-    throw new Error(`runner.kind and runner.script are required in ${file}`);
-  }
-
-  const journeyStage = normalizeJourneyStage(manifest.journey_stage, file);
-  const presentation = resolveStepPresentation({
-    id: String(manifest.id),
-    title: String(manifest.title),
-    summary: String(manifest.summary),
-    journey_stage: journeyStage,
-    type: String(manifest.type),
-    icon: manifest.icon,
-    project_url: manifest.project_url,
-    github_url: manifest.github_url,
-    positive_summary: manifest.positive_summary,
-  });
-
-  return {
-    id: String(manifest.id),
-    category_id: categoryId,
-    title: String(manifest.title),
-    type: String(manifest.type),
-    journey_stage: journeyStage,
-    order: Number(manifest.order),
-    ingress_route: typeof manifest.ingress_route === "string" ? manifest.ingress_route : "",
-    summary: String(manifest.summary),
-    explanation: String(manifest.explanation),
-    side_help: String(manifest.side_help),
-    ...presentation,
-    inputs: manifest.inputs.map((input) => normalizeInputDefinition(input, file)),
-    secrets: normalizeStepSecrets(manifest.secrets, file),
-    depends_on: manifest.depends_on.map((dependency) => String(dependency)),
-    runner: {
-      kind: String(manifest.runner.kind),
-      script: String(manifest.runner.script),
-    },
-  };
 }
 
 export function loadCatalogDefinitions({ workspaceRoot }) {
@@ -671,6 +498,7 @@ export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) 
         summary: renderedStep.summary,
         explanation: renderedStep.explanation,
         side_help: renderedStep.side_help,
+        dashy: renderedStep.dashy,
         inputs: renderedStep.inputs,
         secrets: renderedStep.secrets,
         depends_on: renderedStep.depends_on,

@@ -10,6 +10,13 @@ depends_on:
   - install-cloudnativepg
   - install-authentik-idp
   - choose-ingress-route
+dashy:
+  items:
+    - section: Platform
+      title: Headlamp
+      description: Kubernetes dashboard
+      icon: fas fa-binoculars
+      url_template: https://headlamp.__ZONE_NAME__
 inputs: []
 secrets:
   files:
