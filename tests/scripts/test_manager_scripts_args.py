@@ -1899,6 +1899,7 @@ def test_traefik_manager_step_deploys_browser_ui():
     assert "namespace: traefik-manager" in app_text
     assert "path: gitops/platform/traefik-manager" in app_text
     assert '--destination-namespace "traefik-manager"' in script_text
+    assert "--no-wait" in script_text
     assert "gitops/apps/traefik-manager.yaml" in script_text
 
 

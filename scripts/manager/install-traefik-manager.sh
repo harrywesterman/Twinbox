@@ -11,4 +11,5 @@ manifest_path="$WORKSPACE_ROOT/gitops/apps/traefik-manager.yaml"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$manifest_path" \
   --application "traefik-manager" \
-  --destination-namespace "traefik-manager"
+  --destination-namespace "traefik-manager" \
+  --no-wait
