@@ -4,7 +4,7 @@ prometheus:
     podMonitorSelectorNilUsesHelmValues: false
     ruleSelectorNilUsesHelmValues: false
     retention: 14d
-    retentionSize: 20GB
+    retentionSize: 10GB
     resources:
       requests:
         memory: 512Mi
@@ -20,7 +20,7 @@ prometheus:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 20Gi
+              storage: 10Gi
 
 alertmanager:
   enabled: true
