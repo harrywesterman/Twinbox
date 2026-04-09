@@ -1222,6 +1222,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert 'kubectl delete application pgadmin4 -n argocd --ignore-not-found=true' in pgadmin_run_text
     assert '--application "platform-ingress"' in pgadmin_run_text
     assert '--destination-namespace "argocd"' in pgadmin_run_text
+    assert "--no-wait" in pgadmin_run_text
     assert "gitops/apps/platform-ingress.yaml" in pgadmin_run_text
     assert "wait --for=condition=Ready externalsecret/pgadmin4-oidc" in pgadmin_run_text
     assert "--manifest \"$rendered_manifest\"" in pgadmin_run_text
@@ -1445,6 +1446,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
         "kubectl delete application cluster-config -n argocd --ignore-not-found=true"
         in cloudflare_dns_run_text
     )
+    assert "--no-wait" in cloudflare_dns_run_text
 
     assert "install-traefik" in whoami_text
     assert "script: categories/talos-cluster/steps/install-whoami/run.sh" in whoami_text
@@ -1460,6 +1462,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert (
         "script: categories/talos-cluster/steps/install-grafana/run.sh" in grafana_text
     )
+    assert "--no-wait" in (REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-grafana" / "run.sh").read_text(encoding="utf-8")
     assert "install-longhorn-storage" in prometheus_text
     assert "choose-ingress-route" in prometheus_text
     assert (
@@ -2215,6 +2218,24 @@ def test_authentik_oidc_consumer_scripts_set_explicit_signing_key():
         )
         assert '--arg signing_key "$signing_key_id"' in text
         assert "signing_key: $signing_key" in text
+
+
+def test_configure_argocd_oidc_refreshes_platform_ingress_without_waiting():
+    text = (
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "configure-argocd-oidc"
+        / "run.sh"
+    ).read_text(encoding="utf-8")
+
+    assert "Refreshing platform-ingress so Argo CD picks up OIDC config" in text
+    assert 'gitops/apps/platform-ingress.yaml' in text
+    assert '--application "platform-ingress"' in text
+    assert '--destination-namespace "argocd"' in text
+    assert "--no-wait" in text
+    assert "wait_for_argocd_oidc_config" in text
 
 
 def test_cloudtty_platform_ingress_is_committed_to_gitops():

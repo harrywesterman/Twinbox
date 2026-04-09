@@ -332,7 +332,8 @@ sed "s/__ZONE_NAME__/${public_zone_name}/g" "$manifest_path" >"$rendered_manifes
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$rendered_manifest" \
   --application "platform-ingress" \
-  --destination-namespace "argocd"
+  --destination-namespace "argocd" \
+  --no-wait
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 rollout"
 kubectl -n pgadmin4 rollout status deploy/pgadmin4 --timeout=10m

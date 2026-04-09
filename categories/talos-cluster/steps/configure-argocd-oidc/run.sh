@@ -310,7 +310,8 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Refreshing platform-ingress so Argo CD pick
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml" \
   --application "platform-ingress" \
-  --destination-namespace "argocd"
+  --destination-namespace "argocd" \
+  --no-wait
 
 wait_for_argocd_oidc_config "$argocd_issuer_url"
 

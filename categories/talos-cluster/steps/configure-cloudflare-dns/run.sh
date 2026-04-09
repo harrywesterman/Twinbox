@@ -138,7 +138,8 @@ if command -v kubectl &>/dev/null; then
   bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
     --manifest "$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml" \
     --application "platform-ingress" \
-    --destination-namespace "argocd"
+    --destination-namespace "argocd" \
+    --no-wait
 fi
 
 # Write result
