@@ -185,6 +185,18 @@ function formatInputValue(input, value) {
   return value ?? '';
 }
 
+function readStoredWizardState() {
+  if (typeof window === 'undefined') {
+    return restoreUiState(null);
+  }
+
+  try {
+    return restoreUiState(window.localStorage.getItem(STORAGE_KEY));
+  } catch {
+    return restoreUiState(null);
+  }
+}
+
 function buildProvisionIpCheckTargets(vipIp, vmIpRows = []) {
   const targets = [];
   const seen = new Set();
@@ -842,6 +854,7 @@ function renderTopBar({ onImportClick, showImportButton = true } = {}) {
 }
 
 function App() {
+  const storedWizardState = useMemo(() => readStoredWizardState(), []);
   const importInputRef = useRef(null);
   const liveOutputRef = useRef(null);
   const liveLogViewportRef = useRef(null);
@@ -860,11 +873,11 @@ function App() {
 
   const [catalog, setCatalog] = useState({ categories: [], errors: [] });
   const [health, setHealth] = useState({ ok: false });
-  const [selectedStepId, setSelectedStepId] = useState('');
-  const [answers, setAnswers] = useState({});
-  const [clusterId, setClusterId] = useState('');
-  const [clusterCreatedAt, setClusterCreatedAt] = useState('');
-  const [clusterInstanceId, setClusterInstanceId] = useState('');
+  const [selectedStepId, setSelectedStepId] = useState(storedWizardState.selectedStepId || '');
+  const [answers, setAnswers] = useState(storedWizardState.answers || {});
+  const [clusterId, setClusterId] = useState(storedWizardState.clusterId || '');
+  const [clusterCreatedAt, setClusterCreatedAt] = useState(storedWizardState.clusterCreatedAt || '');
+  const [clusterInstanceId, setClusterInstanceId] = useState(storedWizardState.clusterInstanceId || '');
   const [cluster, setCluster] = useState(null);
   const [proxmoxResources, setProxmoxResources] = useState(null);
   const [logs, setLogs] = useState([]);
@@ -880,19 +893,26 @@ function App() {
     results: {},
   });
   const [provisionIpChecking, setProvisionIpChecking] = useState(false);
-  const [hasStarted, setHasStarted] = useState(false);
-  const [wizardPhase, setWizardPhase] = useState('questions');
+  const [hasStarted, setHasStarted] = useState(Boolean(
+    storedWizardState.selectedStepId
+    || storedWizardState.clusterId
+    || storedWizardState.clusterCreatedAt
+    || storedWizardState.clusterInstanceId
+    || (storedWizardState.answers && Object.keys(storedWizardState.answers).length > 0),
+  ));
+  const [wizardPhase, setWizardPhase] = useState(() => {
+    const storedQuestionStepIds = new Set(getQuestionSteps(storedWizardState.answers).map((step) => step.id));
+    if (storedWizardState.selectedStepId && !storedQuestionStepIds.has(storedWizardState.selectedStepId)) {
+      return 'install';
+    }
+
+    return 'questions';
+  });
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
   const placementSuggestionKeyRef = useRef('');
   const wizardPhaseRef = useRef('questions');
 
   useEffect(() => {
-    setSelectedStepId('');
-    setClusterId('');
-    setClusterCreatedAt('');
-    setClusterInstanceId('');
-    setAnswers({});
-    setHasStarted(false);
-    setWizardPhase('questions');
     hydratedRef.current = true;
   }, []);
 
@@ -1041,7 +1061,15 @@ function App() {
       }
     };
 
-    refreshSnapshot();
+    (async () => {
+      try {
+        await refreshSnapshot();
+      } finally {
+        if (!cancelled) {
+          setIsBootstrapping(false);
+        }
+      }
+    })();
     const timer = window.setInterval(refreshSnapshot, POLL_INTERVAL_MS);
 
     return () => {
@@ -2209,6 +2237,20 @@ function App() {
     return (
       <div className="wizard-shell wizard-shell-start">
         {renderTopBar({ onImportClick: handleImportClick, showImportButton: false })}
+        {isBootstrapping || error || notice ? (
+          <div className={`wizard-banner ${error ? 'is-error' : 'is-notice'}`}>
+            <div>
+              <strong>{error ? 'Something needs attention.' : isBootstrapping ? 'Loading cluster data and IP suggestions…' : 'Status'}</strong>
+              <p>
+                {error
+                  ? error
+                  : isBootstrapping
+                    ? 'Twinbox is checking the current cluster state and building the next step suggestions. This can take a moment.'
+                    : notice}
+              </p>
+            </div>
+          </div>
+        ) : null}
         <div className="wizard-start-screen">
           <section className="wizard-start-card">
             <div className="wizard-start-hero">
@@ -2242,6 +2284,20 @@ function App() {
   return (
     <div className="wizard-shell">
       {renderTopBar({ onImportClick: handleImportClick, showImportButton })}
+      {isBootstrapping || error || notice ? (
+        <div className={`wizard-banner ${error ? 'is-error' : 'is-notice'}`}>
+          <div>
+            <strong>{error ? 'Something needs attention.' : isBootstrapping ? 'Loading cluster data and IP suggestions…' : 'Status'}</strong>
+            <p>
+              {error
+                ? error
+                : isBootstrapping
+                  ? 'Twinbox is checking the current cluster state and building the next step suggestions. This can take a moment.'
+                  : notice}
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <main className="wizard-layout wizard-layout-minimal">
         <section className={`wizard-workspace wizard-workspace-minimal ${isInstallPhase ? 'wizard-workspace-install' : ''}`}>

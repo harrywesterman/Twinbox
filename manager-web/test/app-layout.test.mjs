@@ -47,6 +47,8 @@ test('app source defines a minimal wizard shell with guided input and step-by-st
   assert.match(source, /wizard-step-pitch/, 'expected a positive step description');
   assert.match(source, /Deploy Talos Cluster/, 'expected the Talos bootstrap step label');
   assert.match(source, /Load saved answers/, 'expected saved answers to live in the top bar');
+  assert.match(source, /readStoredWizardState/, 'expected startup state to hydrate from localStorage');
+  assert.match(source, /Loading cluster data and IP suggestions/, 'expected a visible loading banner while refreshing');
   assert.match(source, /Check for free IP addresses/, 'expected an explicit IP availability check action');
   assert.match(source, /Management VM/, 'expected the placement board to show the management VM host');
   assert.match(source, /wizard-placement-management-card/, 'expected a fixed management VM placement card');
