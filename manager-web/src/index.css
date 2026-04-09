@@ -43,7 +43,7 @@ body {
     radial-gradient(circle at top left, rgba(20, 184, 166, 0.14), transparent 26%),
     radial-gradient(circle at top right, rgba(245, 158, 11, 0.12), transparent 22%),
     #eef4fb;
-  z-index: 0;
+  z-index: 20;
 }
 
 .boot-splash-card {
@@ -105,7 +105,5 @@ svg {
 }
 
 #root {
-  position: relative;
-  z-index: 1;
   min-height: 100vh;
 }

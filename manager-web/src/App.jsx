@@ -966,6 +966,22 @@ function App() {
       answers: initialAnswers,
     });
   }, [answers, busy, catalog, cluster, error, health, initialAnswers, logs, selectedStepId]);
+  const isInstallPhase = hasStarted && wizardPhase === 'install' && !model.completion;
+  const questionStepIndex = questionSteps.findIndex((step) => step.id === selectedStepId);
+  const currentQuestionStep = questionStepIndex >= 0 ? questionSteps[questionStepIndex] : (questionSteps[0] || null);
+  const previousQuestionStep = questionStepIndex > 0 ? questionSteps[questionStepIndex - 1] : null;
+  const nextQuestionStep = questionStepIndex >= 0 && questionStepIndex < questionSteps.length - 1
+    ? questionSteps[questionStepIndex + 1]
+    : null;
+  const installStepIndex = setupSteps.findIndex((step) => step.id === selectedStepId);
+  const safeInstallStepIndex = installStepIndex >= 0 ? installStepIndex : 0;
+  const currentInstallStep = installStepIndex >= 0 ? setupSteps[installStepIndex] : (setupSteps[0] || null);
+  const previousInstallStep = installStepIndex > 0 ? setupSteps[installStepIndex - 1] : null;
+  const nextInstallStep = installStepIndex >= 0 && installStepIndex < setupSteps.length - 1
+    ? setupSteps[installStepIndex + 1]
+    : null;
+  const isQuestionPhase = hasStarted && wizardPhase === 'questions';
+  const currentStep = isQuestionPhase ? currentQuestionStep : (currentInstallStep || model.activeStep);
 
   useEffect(() => {
     if (!hasStarted || wizardPhase !== 'questions') {
@@ -1971,22 +1987,6 @@ function App() {
     }
   }
 
-  const questionStepIndex = questionSteps.findIndex((step) => step.id === selectedStepId);
-  const currentQuestionStep = questionStepIndex >= 0 ? questionSteps[questionStepIndex] : (questionSteps[0] || null);
-  const previousQuestionStep = questionStepIndex > 0 ? questionSteps[questionStepIndex - 1] : null;
-  const nextQuestionStep = questionStepIndex >= 0 && questionStepIndex < questionSteps.length - 1
-    ? questionSteps[questionStepIndex + 1]
-    : null;
-  const installStepIndex = setupSteps.findIndex((step) => step.id === selectedStepId);
-  const safeInstallStepIndex = installStepIndex >= 0 ? installStepIndex : 0;
-  const currentInstallStep = installStepIndex >= 0 ? setupSteps[installStepIndex] : (setupSteps[0] || null);
-  const previousInstallStep = installStepIndex > 0 ? setupSteps[installStepIndex - 1] : null;
-  const nextInstallStep = installStepIndex >= 0 && installStepIndex < setupSteps.length - 1
-    ? setupSteps[installStepIndex + 1]
-    : null;
-  const isQuestionPhase = hasStarted && wizardPhase === 'questions';
-  const currentStep = isQuestionPhase ? currentQuestionStep : (currentInstallStep || model.activeStep);
-
   useEffect(() => {
     if (wizardPhase !== 'install') {
       return;
@@ -2247,7 +2247,6 @@ function App() {
   const activeStepTitle = getDisplayStepTitle(currentStep);
   const activeStepPresentation = getStepPresentation(currentStep);
   const questionStepCount = questionSteps.length;
-  const isInstallPhase = hasStarted && wizardPhase === 'install' && !model.completion;
   const showImportButton = !isInstallPhase && !model.completion;
 
   if (!hasStarted) {
