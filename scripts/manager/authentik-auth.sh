@@ -181,12 +181,13 @@ authentik_api_request() {
   local response_file
   local status
   local body
+  local attempt=1
+  local max_attempts=3
+  local retry_delay=1
   local auth_headers=(-H "Accept: application/json")
 
   [[ -n "${AUTHENTIK_API_BASE:-}" ]] || _authentik_fail "AUTHENTIK_API_BASE is not set; call authentik_setup_forward first"
   [[ -n "${AUTHENTIK_TOKEN:-}" ]] || _authentik_fail "AUTHENTIK_TOKEN is not set; call authentik_ensure_token first"
-
-  response_file="$(mktemp)"
 
   if [[ "${AUTHENTIK_USE_COOKIE:-false}" == "true" ]]; then
     auth_headers+=(-H "Cookie: ${AUTHENTIK_TOKEN}")
@@ -194,45 +195,54 @@ authentik_api_request() {
     auth_headers+=(-H "Authorization: Bearer ${AUTHENTIK_TOKEN}")
   fi
 
-  if [[ -n "$data" ]]; then
-    auth_headers+=(-H "Content-Type: application/json")
-    status="$(
-      curl -sS \
-        -X "$method" \
-        "${auth_headers[@]}" \
-        --data-binary "$data" \
-        -o "$response_file" \
-        -w '%{http_code}' \
-        "${AUTHENTIK_API_BASE}${path}"
-    )" || {
-      rm -f "$response_file"
-      _authentik_fail "Authentik API request failed: ${method} ${path}"
-    }
-  else
-    status="$(
-      curl -sS \
-        -X "$method" \
-        "${auth_headers[@]}" \
-        -o "$response_file" \
-        -w '%{http_code}' \
-        "${AUTHENTIK_API_BASE}${path}"
-    )" || {
-      rm -f "$response_file"
-      _authentik_fail "Authentik API request failed: ${method} ${path}"
-    }
-  fi
+  while true; do
+    response_file="$(mktemp)"
 
-  body="$(cat "$response_file")"
-  rm -f "$response_file"
+    if [[ -n "$data" ]]; then
+      auth_headers_with_content=("${auth_headers[@]}" -H "Content-Type: application/json")
+      status="$(
+        curl -sS \
+          -X "$method" \
+          "${auth_headers_with_content[@]}" \
+          --data-binary "$data" \
+          -o "$response_file" \
+          -w '%{http_code}' \
+          "${AUTHENTIK_API_BASE}${path}"
+      )" || status="000"
+    else
+      status="$(
+        curl -sS \
+          -X "$method" \
+          "${auth_headers[@]}" \
+          -o "$response_file" \
+          -w '%{http_code}' \
+          "${AUTHENTIK_API_BASE}${path}"
+      )" || status="000"
+    fi
 
-  if [[ ! "$status" =~ ^2 ]]; then
+    body="$(cat "$response_file" 2>/dev/null || true)"
+    rm -f "$response_file"
+
+    if [[ "$status" =~ ^2 ]]; then
+      printf '%s' "$body"
+      return 0
+    fi
+
+    if [[ "$status" == "000" || "$status" =~ ^5 ]]; then
+      if [[ "$attempt" -lt "$max_attempts" ]]; then
+        _authentik_log "Retrying ${method} ${path} after transient HTTP ${status}"
+        sleep "$retry_delay"
+        attempt=$((attempt + 1))
+        retry_delay=$((retry_delay * 2))
+        continue
+      fi
+    fi
+
     if [[ -n "$body" ]]; then
       _authentik_fail "Authentik API ${method} ${path} failed with HTTP ${status}: ${body}"
     fi
     _authentik_fail "Authentik API ${method} ${path} failed with HTTP ${status}"
-  fi
-
-  printf '%s' "$body"
+  done
 }
 
 authentik_api_get() {

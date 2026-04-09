@@ -65,13 +65,7 @@ find_proxy_provider_pk_by_name() {
 
 find_application_json_by_slug() {
   local application_slug="$1"
-  local response
-
-  response="$(authentik_api_get "/core/applications/?page_size=100")"
-  jq -c \
-    --arg application_slug "$application_slug" \
-    '.results[]?
-      | select((.slug // "") == $application_slug)' <<<"$response" | head -n1
+  authentik_api_get "/core/applications/${application_slug}/" 2>/dev/null || true
 }
 
 find_policy_binding_pk() {
@@ -106,7 +100,7 @@ create_or_update_proxy_provider() {
 create_or_update_application() {
   local application_slug="$1"
   local application_payload="$2"
-  local existing_json existing_pk
+  local existing_json existing_pk response_file http_status
 
   existing_json="$(find_application_json_by_slug "$application_slug" || true)"
   existing_pk="$(jq -r '.pk // .id // empty' <<<"$existing_json")"
@@ -116,7 +110,32 @@ create_or_update_application() {
     return 0
   fi
 
-  authentik_api_write POST "/core/applications/" "$application_payload" | jq -r '.pk // .id // empty'
+  response_file="$(mktemp)"
+  http_status="$(
+    curl -sS \
+      -X POST \
+      -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" \
+      -H "Accept: application/json" \
+      -H "Content-Type: application/json" \
+      --data "$application_payload" \
+      -o "$response_file" \
+      -w '%{http_code}' \
+      "${AUTHENTIK_API_BASE}/core/applications/"
+  )" || http_status="000"
+
+  if [[ "$http_status" =~ ^2 ]]; then
+    jq -r '.pk // .id // empty' <"$response_file"
+    rm -f "$response_file"
+    return 0
+  fi
+
+  existing_json="$(find_application_json_by_slug "$application_slug" || true)"
+  existing_pk="$(jq -r '.pk // .id // empty' <<<"$existing_json")"
+  [[ -n "$existing_pk" ]] || fail "Authentik did not return or expose an application ID for ${application_slug}"
+
+  authentik_api_write PATCH "/core/applications/${application_slug}/" "$application_payload" >/dev/null
+  rm -f "$response_file"
+  printf '%s\n' "$existing_pk"
 }
 
 ensure_group_binding() {
