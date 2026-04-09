@@ -248,7 +248,7 @@ authentik_resolve_flow_id() {
   local designation="$2"
   local response
 
-  response="$(authentik_api_get "/core/flows/?slug=${slug}")"
+  response="$(authentik_api_get "/flows/instances/?slug=${slug}&page_size=100")"
   jq -r \
     --arg slug "$slug" \
     --arg designation "$designation" \

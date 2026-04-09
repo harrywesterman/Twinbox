@@ -31,6 +31,9 @@ cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty'
 public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
 
+bash "$WORKSPACE_ROOT/scripts/manager/upsert-argocd-cluster-secret.sh" \
+  --public-zone-name "$public_zone_name"
+
 authentik_ensure_token
 authentik_setup_forward
 
@@ -320,7 +323,7 @@ seed_dashboard() {
     '
       ($replacements_json | fromjson? // {}) as $replacements
       | ($templating_names_json | fromjson? // []) as $templating_names
-      walk(
+      | walk(
         if type == "string" then
           ($replacements[.] // .)
         else
@@ -346,7 +349,7 @@ seed_dashboard() {
 
   kubectl -n monitoring create configmap "$configmap_name" \
     --from-file="${dashboard_file_key}=${dashboard_patched_file}" \
-    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+    --dry-run=client -o yaml | kubectl apply --server-side --field-manager=grafana-dashboard -f - >/dev/null
   kubectl -n monitoring label configmap "$configmap_name" \
     grafana_dashboard=1 \
     app.kubernetes.io/name=grafana \
