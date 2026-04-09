@@ -1199,11 +1199,14 @@ function App() {
 
     const handleScroll = () => {
       const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
-      liveLogAutoScrollRef.current = distanceFromBottom < 72;
+      if (distanceFromBottom < 72) {
+        liveLogAutoScrollRef.current = true;
+      } else if (viewport.scrollTop > 0) {
+        liveLogAutoScrollRef.current = false;
+      }
     };
 
     viewport.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
 
     return () => {
       viewport.removeEventListener('scroll', handleScroll);
@@ -1211,15 +1214,29 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!isInstallPhase) {
+      return;
+    }
+
+    liveLogAutoScrollRef.current = true;
+  }, [isInstallPhase, currentStep?.id]);
+
+  useEffect(() => {
     if (!liveLogAutoScrollRef.current) {
       return;
     }
 
     const viewport = liveLogViewportRef.current;
-    if (viewport) {
-      viewport.scrollTop = viewport.scrollHeight;
+    if (!viewport) {
+      return;
     }
-  }, [logs, activeJob?.id, model?.activity?.runtime?.currentStage]);
+
+    const raf = window.requestAnimationFrame(() => {
+      viewport.scrollTop = viewport.scrollHeight;
+    });
+
+    return () => window.cancelAnimationFrame(raf);
+  }, [logs, activeJob?.id, currentStep?.id, isInstallPhase, model?.activity?.runtime?.currentStage]);
 
   async function pollJob(jobId) {
     let latestJob = null;
