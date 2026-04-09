@@ -189,9 +189,14 @@ function runKubectl(args, { input = undefined, allowFailure = false } = {}) {
   return result;
 }
 
-function namespaceExists(namespace) {
-  const result = runKubectl(["get", "namespace", namespace], { allowFailure: true });
-  return result.status === 0;
+function ensureNamespace(namespace) {
+  const namespaceManifest = `apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${namespace}
+`;
+
+  runKubectl(["apply", "-f", "-"], { input: namespaceManifest });
 }
 
 function deploymentExists(namespace, deploymentName) {
@@ -267,10 +272,7 @@ function main() {
   });
   const renderedConfig = YAML.stringify(dashyConfig);
 
-  if (!namespaceExists(options.namespace)) {
-    console.log(`Dashy refresh skipped: namespace ${options.namespace} does not exist`);
-    return;
-  }
+  ensureNamespace(options.namespace);
 
   const currentRenderedConfig = readCurrentConfigMap(options.namespace, options.configMapName);
   if (currentRenderedConfig === renderedConfig) {
