@@ -13,27 +13,34 @@ VELERO_SECRET_FILE="${BOOTSTRAP_ROOT}/secrets/global/velero.json"
 VELERO_SECRET_NAME="${VELERO_SECRET_NAME:-velero-credentials}"
 VELERO_NAMESPACE="${VELERO_NAMESPACE:-velero}"
 VELERO_APP_MANIFEST_PATH="${WORKSPACE_ROOT}/gitops/apps/velero.yaml"
-SEAWEEDFS_SERVICE_URL="${SEAWEEDFS_SERVICE_URL:-http://seaweedfs.longhorn-system.svc.cluster.local:8333}"
+VELERO_VALUES_TEMPLATE_PATH="${WORKSPACE_ROOT}/gitops/values/velero.yaml"
+SEAWEEDFS_ENDPOINT="${SEAWEEDFS_ENDPOINT:-}"
 SEAWEEDFS_BUCKET="${SEAWEEDFS_BUCKET:-twinbox-velero}"
 SEAWEEDFS_REGION="${SEAWEEDFS_REGION:-seaweedfs}"
+
+export VELERO_SECRET_NAME
 
 command -v kubectl >/dev/null 2>&1 || fail "kubectl not found"
 command -v jq >/dev/null 2>&1 || fail "jq not found"
 command -v openssl >/dev/null 2>&1 || fail "openssl not found"
+command -v python3 >/dev/null 2>&1 || fail "python3 not found"
 
 export KUBECONFIG="$KUBECONFIG_FILE"
 
 mkdir -p "$(dirname "$VELERO_SECRET_FILE")"
 
 render_secret_file() {
-  local username="$1"
-  local password="$2"
+  local endpoint="$1"
+  local bucket="$2"
+  local region="$3"
+  local username="$4"
+  local password="$5"
 
   jq -n \
     --arg mode "seaweedfs" \
-    --arg endpoint "$SEAWEEDFS_SERVICE_URL" \
-    --arg bucket "$SEAWEEDFS_BUCKET" \
-    --arg region "$SEAWEEDFS_REGION" \
+    --arg endpoint "$endpoint" \
+    --arg bucket "$bucket" \
+    --arg region "$region" \
     --arg username "$username" \
     --arg password "$password" \
     '{
@@ -45,6 +52,53 @@ render_secret_file() {
       password: $password
     }' >"$VELERO_SECRET_FILE"
   chmod 0600 "$VELERO_SECRET_FILE"
+}
+
+load_velero_settings() {
+  local management_ip="${MANAGEMENT_VM_IP:-$(hostname -I | awk '{print $1}')}"
+  local endpoint="http://${management_ip}:8333"
+  local username="${SEAWEEDFS_ACCESS_KEY_ID:-velero}"
+  local password="${SEAWEEDFS_SECRET_ACCESS_KEY:-}"
+  local bucket="${SEAWEEDFS_BUCKET:-twinbox-velero}"
+  local region="${SEAWEEDFS_REGION:-seaweedfs}"
+
+  if [[ -f "$VELERO_SECRET_FILE" ]]; then
+    local file_endpoint=""
+    local file_bucket=""
+    local file_region=""
+    local file_username=""
+    local file_password=""
+
+    file_endpoint="$(jq -r '.endpoint // empty' "$VELERO_SECRET_FILE")"
+    file_bucket="$(jq -r '.bucket // empty' "$VELERO_SECRET_FILE")"
+    file_region="$(jq -r '.region // empty' "$VELERO_SECRET_FILE")"
+    file_username="$(jq -r '.username // empty' "$VELERO_SECRET_FILE")"
+    file_password="$(jq -r '.password // empty' "$VELERO_SECRET_FILE")"
+
+    if [[ -n "$file_endpoint" && "$file_endpoint" != *"seaweedfs.longhorn-system.svc.cluster.local"* ]]; then
+      endpoint="$file_endpoint"
+    fi
+    [[ -n "$file_bucket" ]] && bucket="$file_bucket"
+    [[ -n "$file_region" ]] && region="$file_region"
+    [[ -n "$file_username" ]] && username="$file_username"
+    [[ -n "$file_password" ]] && password="$file_password"
+  fi
+
+  if [[ -z "$password" ]]; then
+    password="$(openssl rand -hex 16)"
+  fi
+
+  SEAWEEDFS_ENDPOINT="$endpoint"
+  SEAWEEDFS_BUCKET="$bucket"
+  SEAWEEDFS_REGION="$region"
+  VELERO_USERNAME="$username"
+  VELERO_PASSWORD="$password"
+
+  export MANAGEMENT_VM_IP="$management_ip"
+  export SEAWEEDFS_ENDPOINT SEAWEEDFS_BUCKET SEAWEEDFS_REGION
+  export VELERO_USERNAME VELERO_PASSWORD
+
+  render_secret_file "$SEAWEEDFS_ENDPOINT" "$SEAWEEDFS_BUCKET" "$SEAWEEDFS_REGION" "$VELERO_USERNAME" "$VELERO_PASSWORD"
 }
 
 create_or_update_secret() {
@@ -69,32 +123,56 @@ EOF
   rm -f "$cloud_credentials_file"
 }
 
+render_velero_application_manifest() {
+  local rendered_manifest="$1"
+
+  python3 - "$VELERO_APP_MANIFEST_PATH" "$VELERO_VALUES_TEMPLATE_PATH" "$rendered_manifest" <<'PY'
+from pathlib import Path
+import os
+import sys
+import textwrap
+
+manifest_template = Path(sys.argv[1]).read_text(encoding="utf-8")
+values_template = Path(sys.argv[2]).read_text(encoding="utf-8")
+
+endpoint = os.environ["SEAWEEDFS_ENDPOINT"]
+bucket = os.environ["SEAWEEDFS_BUCKET"]
+region = os.environ["SEAWEEDFS_REGION"]
+secret_name = os.environ["VELERO_SECRET_NAME"]
+
+values_rendered = (
+    values_template
+    .replace("__SEAWEEDFS_ENDPOINT__", endpoint)
+    .replace("__SEAWEEDFS_BUCKET__", bucket)
+    .replace("__SEAWEEDFS_REGION__", region)
+    .replace("__VELERO_SECRET_NAME__", secret_name)
+).rstrip("\n")
+
+values_rendered = textwrap.indent(values_rendered + "\n", "          ").rstrip("\n")
+manifest_rendered = manifest_template.replace("__VELERO_VALUES__", values_rendered)
+Path(sys.argv[3]).write_text(manifest_rendered.rstrip("\n") + "\n", encoding="utf-8")
+PY
+}
+
 log "Initializing Velero backup installation"
 
-existing_username=""
-existing_password=""
-if [[ -f "$VELERO_SECRET_FILE" ]]; then
-  existing_username="$(jq -r '.username // empty' "$VELERO_SECRET_FILE")"
-  existing_password="$(jq -r '.password // empty' "$VELERO_SECRET_FILE")"
-fi
+load_velero_settings
 
-if [[ -z "$existing_username" || -z "$existing_password" ]]; then
-  existing_username="${SEAWEEDFS_ACCESS_KEY_ID:-velero}"
-  existing_password="${SEAWEEDFS_SECRET_ACCESS_KEY:-$(openssl rand -hex 16)}"
-fi
-
-render_secret_file "$existing_username" "$existing_password"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "velero" \
   --json-file "$VELERO_SECRET_FILE" \
   --required-keys "mode,endpoint,bucket,region,username,password"
 
 kubectl create namespace "$VELERO_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-create_or_update_secret "$VELERO_SECRET_NAME" "$VELERO_NAMESPACE" "$existing_username" "$existing_password"
+create_or_update_secret "$VELERO_SECRET_NAME" "$VELERO_NAMESPACE" "$VELERO_USERNAME" "$VELERO_PASSWORD"
 
-log "Applying Velero against SeaweedFS at ${SEAWEEDFS_SERVICE_URL}"
+rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/velero-application.XXXXXX.yaml")"
+trap 'rm -f "$rendered_manifest"' EXIT
+render_velero_application_manifest "$rendered_manifest"
+
+log "Applying Velero against SeaweedFS at ${SEAWEEDFS_ENDPOINT}"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
-  --manifest "$VELERO_APP_MANIFEST_PATH" \
+  --manifest "$rendered_manifest" \
   --application "velero"
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
@@ -105,7 +183,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     --arg secret_name "$VELERO_SECRET_NAME" \
     --arg namespace "$VELERO_NAMESPACE" \
     --arg mode "seaweedfs" \
-    --arg endpoint "$SEAWEEDFS_SERVICE_URL" \
+    --arg endpoint "$SEAWEEDFS_ENDPOINT" \
     '{
       application: $application,
       manifest_path: $manifest_path,

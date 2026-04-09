@@ -44,6 +44,11 @@ ensure_bootstrap_material() {
   local velero_file="${secret_dir}/velero.json"
   local seal_key_file="${openbao_seal_dir}/current.key"
   local seal_key_id_file="${openbao_seal_dir}/current-key-id"
+  local management_ip="${MANAGEMENT_VM_IP:-$(hostname -I | awk '{print $1}')}"
+  local username="${SEAWEEDFS_ACCESS_KEY_ID:-velero}"
+  local password="${SEAWEEDFS_SECRET_ACCESS_KEY:-}"
+  local bucket="${SEAWEEDFS_BUCKET:-twinbox-velero}"
+  local region="${SEAWEEDFS_REGION:-seaweedfs}"
 
   install -d -m 0700 "$secret_dir" "$openbao_seal_dir" "$openbao_init_dir"
 
@@ -88,10 +93,33 @@ target.chmod(0o600)
 PY
   fi
 
-  if [[ ! -f "$velero_file" ]]; then
-    local seaweedfs_password=""
-    seaweedfs_password="$(openssl rand -hex 16)"
-    python3 - "$velero_file" "$seaweedfs_password" <<'PY'
+  if [[ -f "$velero_file" ]]; then
+    local file_value=""
+
+    file_value="$(jq -r '.username // empty' "$velero_file" 2>/dev/null || printf '')"
+    [[ -n "$file_value" ]] && username="$file_value"
+
+    file_value="$(jq -r '.password // empty' "$velero_file" 2>/dev/null || printf '')"
+    [[ -n "$file_value" ]] && password="$file_value"
+
+    file_value="$(jq -r '.bucket // empty' "$velero_file" 2>/dev/null || printf '')"
+    [[ -n "$file_value" ]] && bucket="$file_value"
+
+    file_value="$(jq -r '.region // empty' "$velero_file" 2>/dev/null || printf '')"
+    [[ -n "$file_value" ]] && region="$file_value"
+  fi
+
+  if [[ -z "$password" ]]; then
+    password="$(openssl rand -hex 16)"
+  fi
+
+  export MANAGEMENT_VM_IP="$management_ip"
+  export SEAWEEDFS_ACCESS_KEY_ID="$username"
+  export SEAWEEDFS_SECRET_ACCESS_KEY="$password"
+  export SEAWEEDFS_BUCKET="$bucket"
+  export SEAWEEDFS_REGION="$region"
+
+  python3 - "$velero_file" <<'PY'
 import json
 import os
 import pathlib
@@ -102,15 +130,14 @@ management_ip = os.environ["MANAGEMENT_VM_IP"]
 payload = {
     "mode": "seaweedfs",
     "endpoint": f"http://{management_ip}:8333",
-    "bucket": "twinbox-velero",
-    "region": "seaweedfs",
-    "username": "velero",
-    "password": sys.argv[2],
+    "bucket": os.environ["SEAWEEDFS_BUCKET"],
+    "region": os.environ["SEAWEEDFS_REGION"],
+    "username": os.environ["SEAWEEDFS_ACCESS_KEY_ID"],
+    "password": os.environ["SEAWEEDFS_SECRET_ACCESS_KEY"],
 }
 target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 target.chmod(0o600)
 PY
-  fi
 
   if [[ ! -f "$seal_key_file" ]]; then
     openssl rand -hex 32 > "$seal_key_file"
@@ -121,6 +148,41 @@ PY
     openssl rand -hex 16 > "$seal_key_id_file"
     chmod 0600 "$seal_key_id_file"
   fi
+}
+
+ensure_seaweedfs_bootstrap() {
+  local attempt=1
+  local attempts=60
+  local bucket_list=""
+
+  while [[ "$attempt" -le "$attempts" ]]; do
+    if docker exec -i twinbox-seaweedfs sh -lc 'printf "s3.config.show\n" | weed shell' >/dev/null 2>&1; then
+      break
+    fi
+
+    log "Waiting for SeaweedFS S3 shell to become ready"
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+
+  if [[ "$attempt" -gt "$attempts" ]]; then
+    log "SeaweedFS S3 shell never became ready"
+    return 1
+  fi
+
+  bucket_list="$(
+    docker exec -i twinbox-seaweedfs sh -lc 'printf "s3.bucket.list\n" | weed shell'
+  )"
+
+  if ! grep -Eq "^[[:space:]]+${SEAWEEDFS_BUCKET}[[:space:]]" <<<"$bucket_list"; then
+    log "Creating SeaweedFS bucket ${SEAWEEDFS_BUCKET}"
+    docker exec -i twinbox-seaweedfs sh -lc \
+      "printf 's3.bucket.create -name ${SEAWEEDFS_BUCKET} -owner ${SEAWEEDFS_ACCESS_KEY_ID}\n' | weed shell" >/dev/null
+  fi
+
+  log "Reconciling SeaweedFS IAM config for ${SEAWEEDFS_ACCESS_KEY_ID}"
+  docker exec -i twinbox-seaweedfs sh -lc \
+    "printf 's3.configure --user ${SEAWEEDFS_ACCESS_KEY_ID} --access_key ${SEAWEEDFS_ACCESS_KEY_ID} --secret_key ${SEAWEEDFS_SECRET_ACCESS_KEY} --buckets ${SEAWEEDFS_BUCKET} --actions Read,Write,List,Tagging,Admin --apply true\n' | weed shell" >/dev/null
 }
 
 if [[ ! -f .env ]]; then
@@ -167,6 +229,7 @@ fi
 
 docker compose pull
 docker compose up -d
+ensure_seaweedfs_bootstrap
 
 echo "Manager stack started"
 echo "Web: http://localhost:3000"

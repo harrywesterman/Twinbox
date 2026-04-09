@@ -5,6 +5,7 @@ Twinbox deploys [SeaweedFS](https://github.com/seaweedfs/seaweedfs) in a Docker 
 ## Architecture
 
 SeaweedFS runs on the Management VM alongside the Twinbox manager stack.
+`scripts/start-manager.sh` keeps the SeaweedFS bootstrap idempotent by ensuring the Velero bucket and IAM config exist after the container comes up.
 
 ### Components
 
@@ -18,13 +19,13 @@ SeaweedFS runs on the Management VM alongside the Twinbox manager stack.
 
 ## S3 Endpoint
 
-Velero targets the SeaweedFS S3 endpoint through the cluster service:
+Velero targets the SeaweedFS S3 endpoint on the Management VM directly:
 
 ```text
-http://seaweedfs.longhorn-system.svc.cluster.local:8333
+http://<MANAGEMENT_VM_IP>:8333
 ```
 
-The same credentials and bucket name are stored in `velero.json` and mirrored into the management VM `.env` file for the SeaweedFS container.
+The same credentials, bucket name, and endpoint are stored in `/opt/twinbox/bootstrap/secrets/global/velero.json` and mirrored into the Management VM runtime when the stack starts.
 
 ## Web UIs
 
@@ -37,7 +38,7 @@ Both routes use the shared Authentik forward-auth middleware.
 
 ## Velero Integration
 
-`install-velero-backup` configures Velero to use SeaweedFS by default.
+`install-velero-backup` configures Velero to use SeaweedFS by default and renders the Helm values from `velero.json`.
 
 The `velero.json` bootstrap secret now looks like this:
 

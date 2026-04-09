@@ -5,16 +5,13 @@ metadata:
   namespace: argocd
 spec:
   project: default
-  sources:
-    - repoURL: https://vmware-tanzu.github.io/helm-charts
-      chart: velero
-      targetRevision: "12.0.0"
-      helm:
-        valueFiles:
-          - $values/gitops/values/velero.yaml
-    - repoURL: __REPO_URL__
-      targetRevision: __TARGET_REVISION__
-      ref: values
+  source:
+    repoURL: https://vmware-tanzu.github.io/helm-charts
+    chart: velero
+    targetRevision: "12.0.0"
+    helm:
+      values: |
+        __VELERO_VALUES__
   destination:
     server: https://kubernetes.default.svc
     namespace: velero

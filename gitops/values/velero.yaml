@@ -1,21 +1,24 @@
+# Rendered into the Velero Argo CD Application by
+# scripts/manager/install-velero-backup.sh from /opt/twinbox/bootstrap/secrets/global/velero.json.
+
 credentials:
   useSecret: true
-  existingSecret: velero-credentials
+  existingSecret: __VELERO_SECRET_NAME__
 
 configuration:
   defaultBackupStorageLocation: default
   backupStorageLocation:
     - name: default
       provider: aws
-      bucket: twinbox-velero
+      bucket: __SEAWEEDFS_BUCKET__
       default: true
       credential:
-        name: velero-credentials
+        name: __VELERO_SECRET_NAME__
         key: cloud
       config:
-        region: seaweedfs
+        region: __SEAWEEDFS_REGION__
         s3ForcePathStyle: true
-        s3Url: http://seaweedfs.longhorn-system.svc.cluster.local:8333
+        s3Url: __SEAWEEDFS_ENDPOINT__
 
 snapshotsEnabled: false
 defaultVolumesToFsBackup: true
