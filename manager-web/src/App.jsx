@@ -856,13 +856,12 @@ function App() {
   const wizardPhaseRef = useRef('questions');
 
   useEffect(() => {
-    const restored = restoreUiState(window.localStorage.getItem(STORAGE_KEY));
-    setSelectedStepId(restored.selectedStepId);
-    setClusterId(restored.clusterId);
-    setClusterCreatedAt(restored.clusterCreatedAt);
-    setClusterInstanceId(restored.clusterInstanceId);
-    setAnswers(restored.answers);
-    setHasStarted(Boolean(restored.selectedStepId || Object.keys(restored.answers || {}).length));
+    setSelectedStepId('');
+    setClusterId('');
+    setClusterCreatedAt('');
+    setClusterInstanceId('');
+    setAnswers({});
+    setHasStarted(false);
     setWizardPhase('questions');
     hydratedRef.current = true;
   }, []);
