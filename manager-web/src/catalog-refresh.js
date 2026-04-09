@@ -80,6 +80,7 @@ function discoverClusterInstanceId(catalog) {
 function clearStaleClusterState({
   setCluster,
   setLogs,
+  clearInstallLogs,
   setActiveJob,
   setError,
   setNotice,
@@ -106,6 +107,7 @@ function clearStaleClusterState({
 
   setCluster?.(null);
   setLogs?.([]);
+  clearInstallLogs?.();
   setActiveJob?.(null);
   setError?.('');
   setNotice?.(notice);
@@ -138,6 +140,7 @@ export async function refreshWizardSnapshot({
   setSelectedStepId,
   setCluster,
   setLogs,
+  setInstallStepLogs,
   setActiveJob,
   setAnswers,
   setNotice,
@@ -256,9 +259,10 @@ export async function refreshWizardSnapshot({
       const lines = Array.isArray(logsData?.lines) ? logsData.lines : [];
       if (lines.length > 0) {
         setLogs(lines);
+        setInstallStepLogs?.(selectedStep?.id || currentSelectedStepId, lines);
       }
     } catch {
-      // Keep the previous log buffer visible until fresh output is available.
+      // Keep the cached output for this step until fresh output is available.
     }
   }
 

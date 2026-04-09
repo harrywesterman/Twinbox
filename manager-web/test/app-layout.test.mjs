@@ -49,7 +49,7 @@ test('app source defines a minimal wizard shell with guided input and step-by-st
   assert.match(source, /readStoredWizardState/, 'expected startup state to hydrate from localStorage');
   assert.match(source, /setWizardPhase\('questions'\)/, 'expected a recreated cluster to restart in the question flow');
   assert.match(source, /getQuestionSteps\(answersRef\.current\)\[0\]\?\.id \|\| 'provision-nodes'/, 'expected a recreated cluster to restart at the first question');
-  assert.match(source, /installLogSnapshotRef\.current = \{ stepId: '', output: '' \}/, 'expected recreation to clear stale install logs');
+  assert.match(source, /clearInstallStepLogs\(\)/, 'expected recreation to clear stale install logs');
   assert.match(source, /Loading cluster data and IP suggestions/, 'expected a visible loading banner while refreshing');
   assert.match(source, /Check for free IP addresses/, 'expected an explicit IP availability check action');
   assert.match(source, /Management VM/, 'expected the placement board to show the management VM host');
@@ -67,8 +67,11 @@ test('app source defines a minimal wizard shell with guided input and step-by-st
   assert.match(source, /wizard-install-stage/, 'expected a centered install stage');
   assert.match(source, /wizard-install-output/, 'expected a dedicated output window for install mode');
   assert.match(source, /wizard-install-actions-row/, 'expected the install controls below the output window');
-  assert.match(source, /installLogSnapshotRef/, 'expected the install view to retain the latest non-empty log snapshot');
-  assert.match(source, /visibleInstallLogOutput/, 'expected the install pane to render a stable log fallback');
+  assert.match(source, /installLogsByStepRef/, 'expected the install view to cache logs per step');
+  assert.match(source, /setInstallStepLogs\(/, 'expected the install pane to write per-step logs');
+  assert.match(source, /model\.activity\.rawLogOutput \|\| ''/, 'expected the install pane to render only the current step output');
+  assert.doesNotMatch(source, /visibleInstallLogOutput/, 'expected the old log fallback to be removed');
+  assert.doesNotMatch(source, /No worker output yet/, 'expected the placeholder log copy to be removed');
   assert.doesNotMatch(source, /CURRENT STEP/, 'expected the install phase to hide step context');
   assert.doesNotMatch(source, /wizard-step-context/, 'expected the install phase to stay blank apart from output');
   assert.match(source, /wizard-log-viewport/, 'expected the live output to be scrollable');

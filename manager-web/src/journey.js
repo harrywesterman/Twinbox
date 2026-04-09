@@ -756,7 +756,7 @@ export function getMissionControlModel({
       runtime,
       events: buildEvents(runtime),
       risks: buildRisks(activeStep, catalogErrors, error),
-      rawLogOutput: Array.isArray(logs) && logs.length ? logs.map((entry) => entry.line).join('\n') : 'No worker output yet.',
+      rawLogOutput: Array.isArray(logs) && logs.length ? logs.map((entry) => entry.line).join('\n') : '',
     },
     completion: mode === 'manage' ? buildCompletion(activeStep, progress, cluster) : null,
     answers,

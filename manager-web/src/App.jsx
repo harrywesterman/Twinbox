@@ -886,10 +886,7 @@ function App() {
   const provisionDirtyFieldsRef = useRef(new Set());
   const provisionSuggestionKeyRef = useRef('');
   const provisionSuggestionSnapshotRef = useRef({});
-  const initialInstallLogSnapshot = storedWizardState.installLogSnapshot || { stepId: '', output: '' };
-  const installLogSnapshotRef = useRef(initialInstallLogSnapshot);
-  const previousInstallStepIdRef = useRef(storedWizardState.selectedStepId || '');
-  const [installLogSnapshot, setInstallLogSnapshot] = useState(initialInstallLogSnapshot);
+  const installLogsByStepRef = useRef({});
 
   const [catalog, setCatalog] = useState({ categories: [], errors: [] });
   const [health, setHealth] = useState({ ok: false });
@@ -947,10 +944,9 @@ function App() {
         clusterId,
         clusterCreatedAt,
         clusterInstanceId,
-        installLogSnapshot,
       }),
     );
-  }, [selectedStepId, answers, clusterId, clusterCreatedAt, clusterInstanceId, installLogSnapshot]);
+  }, [selectedStepId, answers, clusterId, clusterCreatedAt, clusterInstanceId]);
 
   useEffect(() => {
     clusterIdRef.current = clusterId;
@@ -1003,6 +999,39 @@ function App() {
     : null;
   const isQuestionPhase = hasStarted && wizardPhase === 'questions';
   const currentStep = isQuestionPhase ? currentQuestionStep : (currentInstallStep || model.activeStep);
+
+  function normalizeLogLines(lines = []) {
+    return (Array.isArray(lines) ? lines : [])
+      .filter((line) => typeof line === 'string' && line.length > 0);
+  }
+
+  function setInstallStepLogs(stepId, lines = []) {
+    if (!stepId) {
+      return;
+    }
+
+    const nextLines = normalizeLogLines(lines);
+    installLogsByStepRef.current = {
+      ...installLogsByStepRef.current,
+      [stepId]: nextLines,
+    };
+    setLogs(nextLines);
+  }
+
+  function clearInstallStepLogs() {
+    installLogsByStepRef.current = {};
+    setLogs([]);
+  }
+
+  function selectInstallStep(stepId) {
+    if (!stepId) {
+      return;
+    }
+
+    selectedStepIdRef.current = stepId;
+    setSelectedStepId(stepId);
+    setLogs(Array.isArray(installLogsByStepRef.current[stepId]) ? installLogsByStepRef.current[stepId] : []);
+  }
 
   useEffect(() => {
     if (!hasStarted || wizardPhase !== 'questions') {
@@ -1084,6 +1113,7 @@ function App() {
           setSelectedStepId,
           setCluster,
           setLogs,
+          setInstallStepLogs,
           setActiveJob,
           setAnswers,
           setNotice,
@@ -1141,12 +1171,13 @@ function App() {
             nextCreatedAt,
             hasProvisionDraft,
           })) {
-            recoverRecreatedClusterState({
-              setCluster,
-              setLogs,
-              setActiveJob,
-              setError,
-              setNotice,
+          recoverRecreatedClusterState({
+            setCluster,
+            setLogs,
+            clearInstallLogs: clearInstallStepLogs,
+            setActiveJob,
+            setError,
+            setNotice,
               provisionDirtyFieldsRef,
               provisionSuggestionKeyRef,
               provisionSuggestionSnapshotRef,
@@ -1158,9 +1189,7 @@ function App() {
             setWizardPhase('questions');
             setSelectedStepId(nextQuestionStepId);
             selectedStepIdRef.current = nextQuestionStepId;
-            installLogSnapshotRef.current = { stepId: '', output: '' };
-            setInstallLogSnapshot({ stepId: '', output: '' });
-            previousInstallStepIdRef.current = nextQuestionStepId;
+            clearInstallStepLogs();
           }
 
           if (nextCreatedAt && nextCreatedAt !== clusterCreatedAtRef.current) {
@@ -1184,6 +1213,7 @@ function App() {
           recoverMissingClusterState({
             setCluster,
             setLogs,
+            clearInstallLogs: clearInstallStepLogs,
             setActiveJob,
             setError,
             setNotice,
@@ -1253,46 +1283,9 @@ function App() {
       return;
     }
 
-    const previousStepId = previousInstallStepIdRef.current || '';
-    if (previousStepId && previousStepId !== currentStep.id) {
-      setLogs([]);
-      installLogSnapshotRef.current = { stepId: '', output: '' };
-      setInstallLogSnapshot({ stepId: '', output: '' });
-    }
-
-    previousInstallStepIdRef.current = currentStep.id;
+    const cachedLogs = installLogsByStepRef.current[currentStep.id];
+    setLogs(Array.isArray(cachedLogs) ? cachedLogs : []);
   }, [currentStep?.id, isInstallPhase]);
-
-  useEffect(() => {
-    if (!isInstallPhase || !currentStep?.id) {
-      return;
-    }
-
-    const rawOutput = model.activity.rawLogOutput || '';
-    if (rawOutput && rawOutput !== 'No worker output yet.') {
-      const nextSnapshot = {
-        stepId: currentStep.id,
-        output: rawOutput,
-      };
-      installLogSnapshotRef.current = nextSnapshot;
-      setInstallLogSnapshot(nextSnapshot);
-    }
-  }, [currentStep?.id, isInstallPhase, model.activity.rawLogOutput]);
-
-  const visibleInstallLogOutput = useMemo(() => {
-    const rawOutput = model.activity.rawLogOutput || '';
-    if (
-      isInstallPhase
-      && currentStep?.id
-      && (!rawOutput || rawOutput === 'No worker output yet.')
-      && installLogSnapshot.stepId === currentStep.id
-      && installLogSnapshot.output
-    ) {
-      return installLogSnapshot.output;
-    }
-
-    return rawOutput;
-  }, [currentStep?.id, isInstallPhase, installLogSnapshot.output, installLogSnapshot.stepId, model.activity.rawLogOutput]);
 
   useLayoutEffect(() => {
     if (!liveLogAutoScrollRef.current) {
@@ -1312,7 +1305,7 @@ function App() {
     return () => window.cancelAnimationFrame(raf);
   }, [logs, activeJob?.id, currentStep?.id, isInstallPhase, model?.activity?.runtime?.currentStage]);
 
-  async function pollJob(jobId) {
+  async function pollJob(jobId, stepId) {
     let latestJob = null;
     let latestLogs = [];
 
@@ -1324,7 +1317,9 @@ function App() {
 
       latestJob = jobData;
       latestLogs = logsData?.lines || [];
-      setLogs(latestLogs);
+      if (stepId && latestLogs.length > 0) {
+        setInstallStepLogs(stepId, latestLogs);
+      }
 
       if (jobData.status === 'pending' || jobData.status === 'running' || jobData.status === 'cancel_requested') {
         await sleep(1600);
@@ -1446,9 +1441,9 @@ function App() {
     }
     setError('');
     setNotice(`Queued ${step.title}.`);
-    setSelectedStepId(step.id);
+    selectInstallStep(step.id);
     setActiveJob({ id: null, stepId: step.id, status: 'starting' });
-    setLogs([]);
+    setInstallStepLogs(step.id, []);
 
     try {
       const response = await requestJson(`/api/steps/${encodeURIComponent(step.id)}/execute`, {
@@ -1466,7 +1461,7 @@ function App() {
         status: 'running',
       });
 
-      const terminal = await pollJob(response.job_id);
+      const terminal = await pollJob(response.job_id, step.id);
       setActiveJob({
         id: response.job_id,
         stepId: step.id,
@@ -1494,7 +1489,7 @@ function App() {
         const currentInstallIndex = setupSteps.findIndex((candidate) => candidate.id === step.id);
         const nextInstallStep = currentInstallIndex >= 0 ? setupSteps[currentInstallIndex + 1] : null;
         if (nextInstallStep?.id) {
-          setSelectedStepId(nextInstallStep.id);
+          selectInstallStep(nextInstallStep.id);
         }
       }
 
@@ -1518,6 +1513,7 @@ function App() {
         setSelectedStepId,
         setCluster,
         setLogs,
+        setInstallStepLogs,
         setActiveJob,
         setAnswers,
         setNotice,
@@ -1614,6 +1610,7 @@ function App() {
         setSelectedStepId,
         setCluster,
         setLogs,
+        setInstallStepLogs,
         setActiveJob,
         setAnswers,
         setNotice,
@@ -1668,6 +1665,7 @@ function App() {
         setSelectedStepId,
         setCluster,
         setLogs,
+        setInstallStepLogs,
         setActiveJob,
         setAnswers,
         setNotice,
@@ -1971,9 +1969,7 @@ function App() {
     provisionSuggestionKeyRef.current = '';
     provisionSuggestionSnapshotRef.current = {};
     placementSuggestionKeyRef.current = '';
-    installLogSnapshotRef.current = { stepId: '', output: '' };
-    setInstallLogSnapshot({ stepId: '', output: '' });
-    previousInstallStepIdRef.current = firstStepId;
+    clearInstallStepLogs();
   }
 
   async function handleImportFile(event) {
@@ -1989,6 +1985,7 @@ function App() {
       const imported = restoreUiState(content);
       const importedAnswers = imported.answers && typeof imported.answers === 'object' ? imported.answers : {};
       setSelectedStepId(imported.selectedStepId);
+      selectedStepIdRef.current = imported.selectedStepId || '';
       setClusterId(imported.clusterId);
       setClusterCreatedAt(imported.clusterCreatedAt);
       setClusterInstanceId(imported.clusterInstanceId);
@@ -2010,15 +2007,7 @@ function App() {
       provisionDirtyFieldsRef.current = new Set();
       setProvisionSuggestionsReadyState(false);
       setProvisionSuggestionRevision(0);
-      const importedInstallSnapshot = imported.installLogSnapshot && typeof imported.installLogSnapshot === 'object'
-        ? {
-          stepId: typeof imported.installLogSnapshot.stepId === 'string' ? imported.installLogSnapshot.stepId : '',
-          output: typeof imported.installLogSnapshot.output === 'string' ? imported.installLogSnapshot.output : '',
-        }
-        : { stepId: '', output: '' };
-      installLogSnapshotRef.current = importedInstallSnapshot;
-      setInstallLogSnapshot(importedInstallSnapshot);
-      previousInstallStepIdRef.current = imported.selectedStepId || '';
+      clearInstallStepLogs();
       setNotice('Imported saved wizard answers.');
     } catch (importError) {
       const message = importError instanceof Error ? importError.message : 'Could not import the answers file.';
@@ -2044,11 +2033,11 @@ function App() {
         if (!cancelled) {
           const lines = Array.isArray(logsData?.lines) ? logsData.lines : [];
           if (lines.length > 0) {
-            setLogs(lines);
+            setInstallStepLogs(currentInstallStep.id, lines);
           }
         }
       } catch {
-        // Keep the previous log buffer visible until fresh output is available.
+        // Keep the cached output for this step until fresh output is available.
       }
     })();
 
@@ -2448,7 +2437,7 @@ function App() {
                 </div>
 
                 <div className="wizard-log-viewport wizard-log-viewport-install" ref={liveLogViewportRef}>
-                  <pre className="wizard-log-output">{visibleInstallLogOutput}</pre>
+                  <pre className="wizard-log-output">{model.activity.rawLogOutput || ''}</pre>
                 </div>
               </section>
 
@@ -2457,11 +2446,11 @@ function App() {
                   <button
                     className="button button-secondary"
                     type="button"
-                    onClick={() => {
-                      if (previousInstallStep?.id) {
-                        setSelectedStepId(previousInstallStep.id);
-                      }
-                    }}
+                      onClick={() => {
+                        if (previousInstallStep?.id) {
+                          selectInstallStep(previousInstallStep.id);
+                        }
+                      }}
                     disabled={!previousInstallStep || installInProgress}
                   >
                     Previous
@@ -2469,12 +2458,12 @@ function App() {
                   <button
                     className="button button-secondary"
                     type="button"
-                    onClick={() => {
-                      if (nextInstallStep?.id) {
-                        setSelectedStepId(nextInstallStep.id);
-                        setNotice(`Moved to ${nextInstallStep.title}.`);
-                      }
-                    }}
+                      onClick={() => {
+                        if (nextInstallStep?.id) {
+                          selectInstallStep(nextInstallStep.id);
+                          setNotice(`Moved to ${nextInstallStep.title}.`);
+                        }
+                      }}
                     disabled={!nextInstallStep || installInProgress}
                   >
                     Next

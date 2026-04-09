@@ -140,6 +140,21 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   assert.equal(model.progress.totalSteps, 30);
   assert.equal(model.progress.completedSteps, 0);
   assert.equal(model.activity.runtime.currentStage, 'Applying cluster plan');
+  assert.equal(model.activity.rawLogOutput, '[2026-03-20T10:10:00Z] Applying OpenTofu cluster plan');
+});
+
+test('wizard model keeps raw log output empty until the step has logs', () => {
+  const model = getMissionControlModel({
+    catalog: buildCatalog({ 'provision-nodes': 'ready' }),
+    logs: [],
+    cluster: null,
+    health: { ok: true },
+    error: '',
+    busy: false,
+    selectedStepId: 'provision-nodes',
+  });
+
+  assert.equal(model.activity.rawLogOutput, '');
 });
 
 test('wizard model advances to the next step when the active step is done', () => {

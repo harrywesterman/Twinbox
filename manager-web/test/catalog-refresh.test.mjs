@@ -148,6 +148,7 @@ test('recoverMissingClusterState keeps the current browser draft intact while cl
   const placementSuggestionKeyRef = {
     current: 'tst:provision-nodes',
   };
+  let clearInstallLogsCalls = 0;
 
   recoverMissingClusterState({
     setClusterId: (value) => { state.clusterId = value; },
@@ -160,6 +161,7 @@ test('recoverMissingClusterState keeps the current browser draft intact while cl
     setAnswers: (value) => { state.answers = value; },
     setNotice: (value) => { state.notice = value; },
     setError: (value) => { state.error = value; },
+    clearInstallLogs: () => { clearInstallLogsCalls += 1; },
     clusterIdRef,
     clusterCreatedAtRef,
     clusterInstanceIdRef,
@@ -194,6 +196,7 @@ test('recoverMissingClusterState keeps the current browser draft intact while cl
   assert.equal(provisionSuggestionKeyRef.current, '');
   assert.deepEqual(provisionSuggestionSnapshotRef.current, {});
   assert.equal(placementSuggestionKeyRef.current, '');
+  assert.equal(clearInstallLogsCalls, 1);
   assert.equal(state.notice, 'Twinbox is waiting for the cluster catalog. Your saved answers and current step are still preserved.');
   assert.equal(state.error, '');
 });
@@ -242,6 +245,7 @@ test('recoverRecreatedClusterState keeps the current browser draft intact while 
   const placementSuggestionKeyRef = {
     current: 'tst:provision-nodes',
   };
+  let clearInstallLogsCalls = 0;
 
   recoverRecreatedClusterState({
     setClusterCreatedAt: (value) => { state.clusterCreatedAt = value; },
@@ -253,6 +257,7 @@ test('recoverRecreatedClusterState keeps the current browser draft intact while 
     setAnswers: (value) => { state.answers = value; },
     setNotice: (value) => { state.notice = value; },
     setError: (value) => { state.error = value; },
+    clearInstallLogs: () => { clearInstallLogsCalls += 1; },
     clusterIdRef,
     clusterCreatedAtRef,
     clusterInstanceIdRef,
@@ -290,6 +295,7 @@ test('recoverRecreatedClusterState keeps the current browser draft intact while 
   assert.equal(provisionSuggestionKeyRef.current, '');
   assert.deepEqual(provisionSuggestionSnapshotRef.current, {});
   assert.equal(placementSuggestionKeyRef.current, '');
+  assert.equal(clearInstallLogsCalls, 1);
   assert.equal(state.notice, 'Twinbox detected a new cluster session and restarted from the first question while keeping your saved answers.');
   assert.equal(state.error, '');
 });
@@ -432,6 +438,7 @@ test('refreshWizardSnapshot preserves the draft on a temporary catalog 404 and r
 
 test('refreshWizardSnapshot keeps the previous logs visible when a job has no fresh log lines yet', async () => {
   const calls = [];
+  const installLogUpdates = [];
   const state = {
     health: null,
     catalog: null,
@@ -557,6 +564,7 @@ test('refreshWizardSnapshot keeps the previous logs visible when a job has no fr
     setSelectedStepId: (value) => { state.selectedStepId = value; },
     setCluster: (value) => { state.cluster = value; },
     setLogs: (value) => { state.logs = value; },
+    setInstallStepLogs: (stepId, lines) => { installLogUpdates.push({ stepId, lines }); },
     setActiveJob: (value) => { state.activeJob = value; },
     setAnswers: (value) => { state.answers = value; },
     setNotice: (value) => { state.notice = value; },
@@ -570,4 +578,146 @@ test('refreshWizardSnapshot keeps the previous logs visible when a job has no fr
     '/api/jobs/job-1/logs',
   ]);
   assert.deepEqual(state.logs, ['[2026-03-29T19:13:11.858Z] old log line']);
+  assert.deepEqual(installLogUpdates, []);
+});
+
+test('refreshWizardSnapshot records fresh logs for the currently selected step', async () => {
+  const installLogUpdates = [];
+  const state = {
+    health: null,
+    catalog: null,
+    proxmoxResources: null,
+    clusterId: 'tst',
+    clusterCreatedAt: '2026-03-20T10:00:00Z',
+    clusterInstanceId: '11111111-1111-1111-1111-111111111111',
+    selectedStepId: 'install-secret-sync',
+    cluster: { id: 'tst' },
+    logs: [],
+    activeJob: { id: 'job-1' },
+    answers: {
+      'install-secret-sync': {
+        openbao_hostname: 'openbao.internal',
+      },
+    },
+    notice: '',
+    error: 'stale',
+  };
+  const catalog = {
+    categories: [
+      {
+        id: 'talos-cluster',
+        title: 'Talos Cluster',
+        summary: 'Deploy the cluster end to end.',
+        status: 'ready',
+        steps: [
+          {
+            id: 'install-secret-sync',
+            title: 'Install Secret Sync',
+            journey_stage: 'install',
+            status: 'running',
+            summary: 'Install External Secrets Operator and OpenBao.',
+            explanation: 'Install the secret layer.',
+            side_help: 'Keep the current output visible until new lines arrive.',
+            inputs: [],
+            depends_on: [],
+            state: {
+              status: 'running',
+              inputs: {},
+              outputs: null,
+              cluster_id: 'tst',
+              error: null,
+              updated_at: null,
+              last_job_id: 'job-1',
+            },
+            latest_job: {
+              id: 'job-1',
+              status: 'running',
+              cluster_id: 'tst',
+              cluster_instance_id: '11111111-1111-1111-1111-111111111111',
+            },
+          },
+        ],
+      },
+    ],
+    errors: [],
+  };
+
+  const requestJson = async (url) => {
+    if (url === '/api/health') {
+      return { ok: true, time: '2026-03-29T19:13:11.858Z' };
+    }
+
+    if (url === '/api/proxmox/cluster-resources') {
+      return {
+        nodes: [],
+        summary: {
+          nodeCount: 0,
+          totalMemoryMb: 0,
+          usedMemoryMb: 0,
+          freeMemoryMb: 0,
+          totalDiskGb: 0,
+          usedDiskGb: 0,
+          freeDiskGb: 0,
+          totalCpuCores: 0,
+          usedCpuCores: 0,
+          freeCpuCores: 0,
+        },
+      };
+    }
+
+    if (url === '/api/catalog?cluster_id=tst') {
+      return catalog;
+    }
+
+    if (url === '/api/jobs/job-1/logs') {
+      return { lines: ['[2026-03-29T19:13:11.858Z] fresh log line'] };
+    }
+
+    throw new Error(`unexpected request: ${url}`);
+  };
+
+  const clusterIdRef = { current: 'tst' };
+  const clusterCreatedAtRef = { current: '2026-03-20T10:00:00Z' };
+  const clusterInstanceIdRef = { current: '11111111-1111-1111-1111-111111111111' };
+  const selectedStepIdRef = { current: 'install-secret-sync' };
+  const answersRef = { current: state.answers };
+  const provisionDirtyFieldsRef = { current: new Set(['start_vmid']) };
+  const provisionSuggestionKeyRef = { current: '192.168.2.52:5' };
+  const provisionSuggestionSnapshotRef = { current: { start_vmid: 122 } };
+  const placementSuggestionKeyRef = { current: 'tst:provision-nodes' };
+
+  await refreshWizardSnapshot({
+    requestJson,
+    clusterIdRef,
+    clusterInstanceIdRef,
+    selectedStepIdRef,
+    clusterCreatedAtRef,
+    answersRef,
+    provisionDirtyFieldsRef,
+    provisionSuggestionKeyRef,
+    provisionSuggestionSnapshotRef,
+    placementSuggestionKeyRef,
+    setHealth: (value) => { state.health = value; },
+    setCatalog: (value) => { state.catalog = value; },
+    setProxmoxResources: (value) => { state.proxmoxResources = value; },
+    setClusterId: (value) => { state.clusterId = value; },
+    setClusterCreatedAt: (value) => { state.clusterCreatedAt = value; },
+    setClusterInstanceId: (value) => { state.clusterInstanceId = value; },
+    setSelectedStepId: (value) => { state.selectedStepId = value; },
+    setCluster: (value) => { state.cluster = value; },
+    setLogs: (value) => { state.logs = value; },
+    setInstallStepLogs: (stepId, lines) => { installLogUpdates.push({ stepId, lines }); },
+    setActiveJob: (value) => { state.activeJob = value; },
+    setAnswers: (value) => { state.answers = value; },
+    setNotice: (value) => { state.notice = value; },
+    setError: (value) => { state.error = value; },
+  });
+
+  assert.deepEqual(state.logs, ['[2026-03-29T19:13:11.858Z] fresh log line']);
+  assert.deepEqual(installLogUpdates, [
+    {
+      stepId: 'install-secret-sync',
+      lines: ['[2026-03-29T19:13:11.858Z] fresh log line'],
+    },
+  ]);
 });
