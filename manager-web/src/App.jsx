@@ -25,7 +25,6 @@ import {
   getWizardSteps,
   restoreUiState,
   serializeUiState,
-  STORAGE_KEY,
   formatState,
 } from './journey.js';
 import { getQuestionSteps } from './question-flow.js';
@@ -186,15 +185,7 @@ function formatInputValue(input, value) {
 }
 
 function readStoredWizardState() {
-  if (typeof window === 'undefined') {
-    return restoreUiState(null);
-  }
-
-  try {
-    return restoreUiState(window.localStorage.getItem(STORAGE_KEY));
-  } catch {
-    return restoreUiState(null);
-  }
+  return restoreUiState(null);
 }
 
 function buildProvisionIpCheckTargets(vipIp, vmIpRows = []) {
@@ -932,21 +923,6 @@ function App() {
   useEffect(() => {
     hydratedRef.current = true;
   }, []);
-
-  useEffect(() => {
-    if (!hydratedRef.current) return;
-
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      serializeUiState({
-        selectedStepId,
-        answers,
-        clusterId,
-        clusterCreatedAt,
-        clusterInstanceId,
-      }),
-    );
-  }, [selectedStepId, answers, clusterId, clusterCreatedAt, clusterInstanceId]);
 
   useEffect(() => {
     clusterIdRef.current = clusterId;

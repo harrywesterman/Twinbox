@@ -46,7 +46,7 @@ test('app source defines a minimal wizard shell with guided input and step-by-st
   assert.match(source, /wizard-step-pitch/, 'expected a positive step description');
   assert.match(source, /Deploy Talos Cluster/, 'expected the Talos bootstrap step label');
   assert.match(source, /Load saved answers/, 'expected saved answers to live in the top bar');
-  assert.match(source, /readStoredWizardState/, 'expected startup state to hydrate from localStorage');
+  assert.match(source, /readStoredWizardState/, 'expected startup state to use the clean default wizard state');
   assert.match(source, /setWizardPhase\('questions'\)/, 'expected a recreated cluster to restart in the question flow');
   assert.match(source, /getQuestionSteps\(answersRef\.current\)\[0\]\?\.id \|\| 'provision-nodes'/, 'expected a recreated cluster to restart at the first question');
   assert.match(source, /clearInstallStepLogs\(\)/, 'expected recreation to clear stale install logs');

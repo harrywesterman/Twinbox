@@ -349,6 +349,17 @@ test('wizard export and import helpers round-trip answers and cluster ids', () =
   assert.deepEqual(fallback.answers, {});
 });
 
+test('wizard restore helper defaults to a clean state when no storage is provided', () => {
+  const restored = restoreUiState(null);
+
+  assert.equal(restored.selectedStepId, '');
+  assert.equal(restored.clusterId, '');
+  assert.equal(restored.clusterCreatedAt, '');
+  assert.equal(restored.clusterInstanceId, '');
+  assert.deepEqual(restored.answers, {});
+  assert.deepEqual(restored.installLogSnapshot, { stepId: '', output: '' });
+});
+
 test('wizard export filename uses the cluster name and date', () => {
   const filename = buildWizardExportFilename({
     clusterName: 'Demo Cluster',
