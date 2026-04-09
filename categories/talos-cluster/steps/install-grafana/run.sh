@@ -81,13 +81,7 @@ find_oauth2_provider_pk_by_name() {
 
 find_application_json_by_slug() {
   local application_slug="$1"
-  local response
-
-  response="$(authentik_api_get "/core/applications/?page_size=100")"
-  jq -c \
-    --arg application_slug "$application_slug" \
-    '.results[]?
-      | select((.slug // "") == $application_slug)' <<<"$response" | head -n1
+  authentik_api_get "/core/applications/${application_slug}/" 2>/dev/null || true
 }
 
 find_policy_binding_pk() {
@@ -130,7 +124,17 @@ create_or_update_application() {
     return 0
   fi
 
-  authentik_api_write POST "/core/applications/" "$application_payload" | jq -r '.pk // .id // empty'
+  if application_response="$(authentik_api_write POST "/core/applications/" "$application_payload" 2>/dev/null)"; then
+    jq -r '.pk // .id // empty' <<<"$application_response"
+    return 0
+  fi
+
+  existing_json="$(find_application_json_by_slug "$grafana_application_slug" || true)"
+  existing_pk="$(jq -r '.pk // .id // empty' <<<"$existing_json")"
+  [[ -n "$existing_pk" ]] || fail "Authentik did not return or expose an application ID for Grafana"
+
+  authentik_api_write PATCH "/core/applications/${grafana_application_slug}/" "$application_payload" >/dev/null
+  printf '%s\n' "$existing_pk"
 }
 
 ensure_group_binding() {
