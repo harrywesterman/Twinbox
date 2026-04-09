@@ -117,6 +117,30 @@ test("buildDashyConfig hides steps that are not completed", () => {
   assert(titles.includes("GitHub"));
 });
 
+test("buildDashyConfig skips zone-based URLs until the public zone is known", () => {
+  const steps = [loadStep("provision-nodes")];
+  const stepStateById = new Map([
+    ["provision-nodes", { status: "succeeded", outputs: {} }],
+  ]);
+
+  const config = buildDashyConfig({
+    steps,
+    stepStateById,
+    cluster: {
+      id: "tst",
+      slug: "tst",
+      dns_domain: "",
+      cluster_instance_id: "tst-1",
+    },
+  });
+
+  const platformSection = config.sections.find((section) => section.name === "Platform");
+  assert(platformSection, "expected Platform section");
+  assert(!platformSection.items.some((item) => item.title === "Hubble"));
+  assert(platformSection.items.some((item) => item.title === "Cloudflare"));
+  assert(platformSection.items.some((item) => item.title === "GitHub"));
+});
+
 test("normalizeStepManifest rejects Dashy items with conflicting URL sources", () => {
   const file = path.join(repoRoot, "categories", "talos-cluster", "steps", "install-whoami", "step.yaml");
   const manifest = YAML.parse(fs.readFileSync(file, "utf8"));
