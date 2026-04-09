@@ -247,17 +247,6 @@ function main() {
   const options = parseArgs(process.argv.slice(2));
   const { steps } = loadCatalogDefinitions(options.workspaceRoot);
 
-  if (options.triggerStepId) {
-    const triggerStep = steps.find((step) => step.id === options.triggerStepId);
-    if (!triggerStep) {
-      throw new Error(`unknown step: ${options.triggerStepId}`);
-    }
-    if (!stepHasDashyItems(triggerStep)) {
-      console.log(`Dashy refresh skipped: ${options.triggerStepId} does not declare Dashy items`);
-      return;
-    }
-  }
-
   const currentCluster = findCurrentCluster(options.managerDataDir, options.clusterId);
   if (!currentCluster?.id) {
     throw new Error("could not determine current cluster for Dashy config generation");
@@ -265,6 +254,28 @@ function main() {
 
   const clusterScopeId = options.clusterInstanceId || currentCluster.cluster_instance_id || currentCluster.instance_id || currentCluster.id;
   const stepStateById = readStepStates(options.managerDataDir, steps, clusterScopeId);
+
+  if (options.triggerStepId) {
+    const triggerStep = steps.find((step) => step.id === options.triggerStepId);
+    if (!triggerStep) {
+      throw new Error(`unknown step: ${options.triggerStepId}`);
+    }
+
+    const isDashyBootstrapStep = triggerStep.id === "install-dashy-dashboard";
+    const dashyBootstrapState = stepStateById.get("install-dashy-dashboard") || null;
+    const dashyBootstrapReady = dashyBootstrapState?.status === "succeeded" || dashyBootstrapState?.status === "configured";
+
+    if (!isDashyBootstrapStep && !dashyBootstrapReady) {
+      console.log(`Dashy refresh skipped: ${options.triggerStepId} ran before Dashy was installed`);
+      return;
+    }
+
+    if (!isDashyBootstrapStep && !stepHasDashyItems(triggerStep)) {
+      console.log(`Dashy refresh skipped: ${options.triggerStepId} does not declare Dashy items`);
+      return;
+    }
+  }
+
   const dashyConfig = buildDashyConfig({
     steps,
     stepStateById,
