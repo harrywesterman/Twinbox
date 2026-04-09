@@ -639,6 +639,7 @@ export function serializeUiState({
   clusterId = '',
   clusterCreatedAt = '',
   clusterInstanceId = '',
+  installLogSnapshot = { stepId: '', output: '' },
 } = {}) {
   return JSON.stringify({
     version: 1,
@@ -647,6 +648,12 @@ export function serializeUiState({
     clusterCreatedAt: typeof clusterCreatedAt === 'string' ? clusterCreatedAt : '',
     clusterInstanceId: typeof clusterInstanceId === 'string' ? clusterInstanceId : '',
     answers: answers && typeof answers === 'object' ? answers : {},
+    installLogSnapshot: installLogSnapshot && typeof installLogSnapshot === 'object'
+      ? {
+        stepId: typeof installLogSnapshot.stepId === 'string' ? installLogSnapshot.stepId : '',
+        output: typeof installLogSnapshot.output === 'string' ? installLogSnapshot.output : '',
+      }
+      : { stepId: '', output: '' },
   });
 }
 
@@ -672,7 +679,14 @@ export function buildWizardExportFilename({ clusterName = '', clusterId = '', da
 
 export function restoreUiState(value) {
   if (!value) {
-    return { selectedStepId: '', clusterId: '', clusterCreatedAt: '', clusterInstanceId: '', answers: {} };
+    return {
+      selectedStepId: '',
+      clusterId: '',
+      clusterCreatedAt: '',
+      clusterInstanceId: '',
+      answers: {},
+      installLogSnapshot: { stepId: '', output: '' },
+    };
   }
 
   try {
@@ -683,9 +697,22 @@ export function restoreUiState(value) {
       clusterCreatedAt: typeof parsed.clusterCreatedAt === 'string' ? parsed.clusterCreatedAt : '',
       clusterInstanceId: typeof parsed.clusterInstanceId === 'string' ? parsed.clusterInstanceId : '',
       answers: parsed.answers && typeof parsed.answers === 'object' ? parsed.answers : {},
+      installLogSnapshot: parsed.installLogSnapshot && typeof parsed.installLogSnapshot === 'object'
+        ? {
+          stepId: typeof parsed.installLogSnapshot.stepId === 'string' ? parsed.installLogSnapshot.stepId : '',
+          output: typeof parsed.installLogSnapshot.output === 'string' ? parsed.installLogSnapshot.output : '',
+        }
+        : { stepId: '', output: '' },
     };
   } catch {
-    return { selectedStepId: '', clusterId: '', clusterCreatedAt: '', clusterInstanceId: '', answers: {} };
+    return {
+      selectedStepId: '',
+      clusterId: '',
+      clusterCreatedAt: '',
+      clusterInstanceId: '',
+      answers: {},
+      installLogSnapshot: { stepId: '', output: '' },
+    };
   }
 }
 

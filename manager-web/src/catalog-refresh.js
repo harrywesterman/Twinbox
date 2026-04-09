@@ -1,8 +1,8 @@
 import { getWizardSteps } from './journey.js';
 
 const PROVISION_STEP_ID = 'provision-nodes';
-const MISSING_CLUSTER_NOTICE = 'The selected cluster was not found. Twinbox discarded the old step 1 draft and restarted the wizard at step 1.';
-const RECREATED_CLUSTER_NOTICE = 'Twinbox detected a new cluster session and reset the old step 1 draft.';
+const MISSING_CLUSTER_NOTICE = 'Twinbox is waiting for the cluster catalog. Your saved answers and current step are still preserved.';
+const RECREATED_CLUSTER_NOTICE = 'Twinbox detected a new cluster session and restarted from the first question while keeping your saved answers.';
 
 export function isMissingClusterError(error) {
   if (!error || typeof error !== 'object') {
@@ -51,14 +51,6 @@ export function isProvisionSuggestionReady({
     && Object.keys(suggestionSnapshot).length > 0;
 }
 
-function pickStepId(steps, preferredStepId) {
-  if (preferredStepId && steps.some((step) => step.id === preferredStepId)) {
-    return preferredStepId;
-  }
-
-  return steps[0]?.id || '';
-}
-
 function discoverClusterId(catalog) {
   for (const category of catalog?.categories || []) {
     for (const step of category.steps || []) {
@@ -86,54 +78,18 @@ function discoverClusterInstanceId(catalog) {
 }
 
 function clearStaleClusterState({
-  setClusterId,
-  setClusterCreatedAt,
-  setClusterInstanceId,
-  setSelectedStepId,
   setCluster,
   setLogs,
   setActiveJob,
-  setAnswers,
   setError,
   setNotice,
-  clusterIdRef,
-  selectedStepIdRef,
-  clusterCreatedAtRef,
-  clusterInstanceIdRef,
-  answersRef,
   provisionDirtyFieldsRef,
   provisionSuggestionKeyRef,
   provisionSuggestionSnapshotRef,
   placementSuggestionKeyRef,
   setProvisionSuggestionsReady,
   notice = MISSING_CLUSTER_NOTICE,
-  clearClusterId = true,
-  clearClusterCreatedAt = true,
 }) {
-  const currentAnswers = answersRef?.current && typeof answersRef.current === 'object'
-    ? answersRef.current
-    : {};
-  const hasProvisionDraft = Object.prototype.hasOwnProperty.call(currentAnswers, PROVISION_STEP_ID);
-
-  if (clearClusterId && clusterIdRef) {
-    clusterIdRef.current = '';
-  }
-  if (clearClusterCreatedAt && clusterCreatedAtRef) {
-    clusterCreatedAtRef.current = '';
-  }
-  if (clusterInstanceIdRef) {
-    clusterInstanceIdRef.current = '';
-  }
-  if (selectedStepIdRef) {
-    selectedStepIdRef.current = '';
-  }
-  if (answersRef) {
-    answersRef.current = hasProvisionDraft
-      ? Object.fromEntries(
-        Object.entries(currentAnswers).filter(([stepId]) => stepId !== PROVISION_STEP_ID),
-      )
-      : currentAnswers;
-  }
   if (provisionDirtyFieldsRef) {
     provisionDirtyFieldsRef.current = new Set();
   }
@@ -148,20 +104,9 @@ function clearStaleClusterState({
   }
   setProvisionSuggestionsReady?.(false);
 
-  if (clearClusterId) {
-    setClusterId?.('');
-  }
-  if (clearClusterCreatedAt) {
-    setClusterCreatedAt?.('');
-  }
-  setClusterInstanceId?.('');
-  setSelectedStepId?.('');
   setCluster?.(null);
   setLogs?.([]);
   setActiveJob?.(null);
-  if (setAnswers) {
-    setAnswers(hasProvisionDraft ? answersRef.current : currentAnswers);
-  }
   setError?.('');
   setNotice?.(notice);
 }
@@ -278,14 +223,17 @@ export async function refreshWizardSnapshot({
     setClusterInstanceId?.(discoveredClusterInstanceId);
   }
 
-  const nextStepId = pickStepId(getWizardSteps(catalogValue, answersRef.current), selectedStepIdRef.current);
-  const effectiveSelectedStepId = allowAutoSelectStep ? nextStepId : selectedStepIdRef.current;
-  if (allowAutoSelectStep && nextStepId !== selectedStepIdRef.current) {
+  const steps = getWizardSteps(catalogValue, answersRef.current);
+  const currentSelectedStepId = selectedStepIdRef.current || '';
+  const nextStepId = !currentSelectedStepId && allowAutoSelectStep
+    ? steps[0]?.id || ''
+    : currentSelectedStepId;
+  const effectiveSelectedStepId = currentSelectedStepId || nextStepId;
+  if (allowAutoSelectStep && !currentSelectedStepId && nextStepId) {
     selectedStepIdRef.current = nextStepId;
     setSelectedStepId(nextStepId);
   }
 
-  const steps = getWizardSteps(catalogValue, answersRef.current);
   const selectedStep = steps.find((step) => step.id === effectiveSelectedStepId);
   const activeJobStep = steps.find((step) => step.status === 'running' || (step.latest_job && ['pending', 'running', 'cancel_requested'].includes(step.latest_job.status)));
   const activeJob = activeJobStep?.latest_job || null;
@@ -305,12 +253,13 @@ export async function refreshWizardSnapshot({
   if (latestJobId) {
     try {
       const logsData = await requestJson(`/api/jobs/${encodeURIComponent(latestJobId)}/logs`);
-      setLogs(Array.isArray(logsData?.lines) ? logsData.lines : []);
+      const lines = Array.isArray(logsData?.lines) ? logsData.lines : [];
+      if (lines.length > 0) {
+        setLogs(lines);
+      }
     } catch {
-      setLogs([]);
+      // Keep the previous log buffer visible until fresh output is available.
     }
-  } else {
-    setLogs([]);
   }
 
   if (clearError) {

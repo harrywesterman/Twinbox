@@ -870,6 +870,9 @@ function App() {
   const provisionDirtyFieldsRef = useRef(new Set());
   const provisionSuggestionKeyRef = useRef('');
   const provisionSuggestionSnapshotRef = useRef({});
+  const initialInstallLogSnapshot = storedWizardState.installLogSnapshot || { stepId: '', output: '' };
+  const installLogSnapshotRef = useRef(initialInstallLogSnapshot);
+  const [installLogSnapshot, setInstallLogSnapshot] = useState(initialInstallLogSnapshot);
 
   const [catalog, setCatalog] = useState({ categories: [], errors: [] });
   const [health, setHealth] = useState({ ok: false });
@@ -927,9 +930,10 @@ function App() {
         clusterId,
         clusterCreatedAt,
         clusterInstanceId,
+        installLogSnapshot,
       }),
     );
-  }, [selectedStepId, answers, clusterId, clusterCreatedAt, clusterInstanceId]);
+  }, [selectedStepId, answers, clusterId, clusterCreatedAt, clusterInstanceId, installLogSnapshot]);
 
   useEffect(() => {
     clusterIdRef.current = clusterId;
@@ -993,7 +997,7 @@ function App() {
       return;
     }
 
-    if (!selectedStepId || !questionSteps.some((step) => step.id === selectedStepId)) {
+    if (!selectedStepId) {
       setSelectedStepId(firstQuestionId);
     }
   }, [hasStarted, wizardPhase, questionSteps, selectedStepId]);
@@ -1008,7 +1012,7 @@ function App() {
       return;
     }
 
-    if (!selectedStepId || !setupSteps.some((step) => step.id === selectedStepId)) {
+    if (!selectedStepId) {
       setSelectedStepId(firstInstallStepId);
     }
   }, [hasStarted, wizardPhase, setupSteps, selectedStepId]);
@@ -1121,25 +1125,24 @@ function App() {
             hasProvisionDraft,
           })) {
             recoverRecreatedClusterState({
-              setClusterCreatedAt,
-              setClusterInstanceId,
-              setSelectedStepId,
               setCluster,
               setLogs,
               setActiveJob,
-              setAnswers,
               setError,
               setNotice,
-              clusterCreatedAtRef,
-              clusterInstanceIdRef,
-              selectedStepIdRef,
-              answersRef,
-            provisionDirtyFieldsRef,
-            provisionSuggestionKeyRef,
-            provisionSuggestionSnapshotRef,
-            placementSuggestionKeyRef,
-            setProvisionSuggestionsReady: setProvisionSuggestionsReadyState,
-          });
+              provisionDirtyFieldsRef,
+              provisionSuggestionKeyRef,
+              provisionSuggestionSnapshotRef,
+              placementSuggestionKeyRef,
+              setProvisionSuggestionsReady: setProvisionSuggestionsReadyState,
+            });
+
+            const nextQuestionStepId = getQuestionSteps(answersRef.current)[0]?.id || 'provision-nodes';
+            setWizardPhase('questions');
+            setSelectedStepId(nextQuestionStepId);
+            selectedStepIdRef.current = nextQuestionStepId;
+            installLogSnapshotRef.current = { stepId: '', output: '' };
+            setInstallLogSnapshot({ stepId: '', output: '' });
           }
 
           if (nextCreatedAt && nextCreatedAt !== clusterCreatedAtRef.current) {
@@ -1161,21 +1164,11 @@ function App() {
 
         if (isMissingClusterError(error)) {
           recoverMissingClusterState({
-            setClusterId,
-            setClusterCreatedAt,
-            setClusterInstanceId,
-            setSelectedStepId,
             setCluster,
             setLogs,
             setActiveJob,
-            setAnswers,
             setError,
             setNotice,
-            clusterIdRef,
-            clusterCreatedAtRef,
-            clusterInstanceIdRef,
-            selectedStepIdRef,
-            answersRef,
             provisionDirtyFieldsRef,
             provisionSuggestionKeyRef,
             provisionSuggestionSnapshotRef,
@@ -1236,6 +1229,37 @@ function App() {
 
     liveLogAutoScrollRef.current = true;
   }, [isInstallPhase, currentStep?.id]);
+
+  useEffect(() => {
+    if (!isInstallPhase || !currentStep?.id) {
+      return;
+    }
+
+    const rawOutput = model.activity.rawLogOutput || '';
+    if (rawOutput && rawOutput !== 'No worker output yet.') {
+      const nextSnapshot = {
+        stepId: currentStep.id,
+        output: rawOutput,
+      };
+      installLogSnapshotRef.current = nextSnapshot;
+      setInstallLogSnapshot(nextSnapshot);
+    }
+  }, [currentStep?.id, isInstallPhase, model.activity.rawLogOutput]);
+
+  const visibleInstallLogOutput = useMemo(() => {
+    const rawOutput = model.activity.rawLogOutput || '';
+    if (
+      isInstallPhase
+      && currentStep?.id
+      && (!rawOutput || rawOutput === 'No worker output yet.')
+      && installLogSnapshot.stepId === currentStep.id
+      && installLogSnapshot.output
+    ) {
+      return installLogSnapshot.output;
+    }
+
+    return rawOutput;
+  }, [currentStep?.id, isInstallPhase, installLogSnapshot.output, installLogSnapshot.stepId, model.activity.rawLogOutput]);
 
   useLayoutEffect(() => {
     if (!liveLogAutoScrollRef.current) {
@@ -1444,6 +1468,11 @@ function App() {
         setNotice(`${step.title} was stopped.`);
       } else {
         setNotice(`${step.title} completed successfully.`);
+        const currentInstallIndex = setupSteps.findIndex((candidate) => candidate.id === step.id);
+        const nextInstallStep = currentInstallIndex >= 0 ? setupSteps[currentInstallIndex + 1] : null;
+        if (nextInstallStep?.id) {
+          setSelectedStepId(nextInstallStep.id);
+        }
       }
 
       const refreshedCatalog = await refreshWizardSnapshot({
@@ -1524,25 +1553,6 @@ function App() {
       setNotice('Review each install step, run them one by one, or use Install all.');
       return;
     }
-  }
-
-  async function handleReinstallStep(step) {
-    if (!step || busyRef.current || step.status === 'running' || step.status === 'locked') {
-      return;
-    }
-
-    if (step.id === 'provision-nodes' && !provisionStepValid) {
-      const message = provisionVmIpValidation.error || 'Step 1 is still preparing. Wait until the placement and IP suggestions are ready.';
-      setNotice(message);
-      return;
-    }
-
-    if (step.status === 'skipped') {
-      await handleUnskipAndExecute(step);
-      return;
-    }
-
-    await executeStep(step);
   }
 
   async function handleSkipStep(step) {
@@ -1945,6 +1955,8 @@ function App() {
     provisionSuggestionKeyRef.current = '';
     provisionSuggestionSnapshotRef.current = {};
     placementSuggestionKeyRef.current = '';
+    installLogSnapshotRef.current = { stepId: '', output: '' };
+    setInstallLogSnapshot({ stepId: '', output: '' });
   }
 
   async function handleImportFile(event) {
@@ -1981,6 +1993,14 @@ function App() {
       provisionDirtyFieldsRef.current = new Set();
       setProvisionSuggestionsReadyState(false);
       setProvisionSuggestionRevision(0);
+      const importedInstallSnapshot = imported.installLogSnapshot && typeof imported.installLogSnapshot === 'object'
+        ? {
+          stepId: typeof imported.installLogSnapshot.stepId === 'string' ? imported.installLogSnapshot.stepId : '',
+          output: typeof imported.installLogSnapshot.output === 'string' ? imported.installLogSnapshot.output : '',
+        }
+        : { stepId: '', output: '' };
+      installLogSnapshotRef.current = importedInstallSnapshot;
+      setInstallLogSnapshot(importedInstallSnapshot);
       setNotice('Imported saved wizard answers.');
     } catch (importError) {
       const message = importError instanceof Error ? importError.message : 'Could not import the answers file.';
@@ -1995,7 +2015,6 @@ function App() {
 
     const latestJobId = currentInstallStep?.latest_job?.id;
     if (!latestJobId) {
-      setLogs([]);
       return;
     }
 
@@ -2005,12 +2024,13 @@ function App() {
       try {
         const logsData = await requestJson(`/api/jobs/${encodeURIComponent(latestJobId)}/logs`);
         if (!cancelled) {
-          setLogs(Array.isArray(logsData?.lines) ? logsData.lines : []);
+          const lines = Array.isArray(logsData?.lines) ? logsData.lines : [];
+          if (lines.length > 0) {
+            setLogs(lines);
+          }
         }
       } catch {
-        if (!cancelled) {
-          setLogs([]);
-        }
+        // Keep the previous log buffer visible until fresh output is available.
       }
     })();
 
@@ -2129,12 +2149,6 @@ function App() {
     || installInProgress
     || installStepBlocked
     || isCurrentStepComplete
-    || (currentStep?.id === 'provision-nodes' && !provisionStepValid);
-  const reinstallButtonDisabled = !currentStep
-    || busy
-    || installInProgress
-    || installStepBlocked
-    || !stepHasRunBefore
     || (currentStep?.id === 'provision-nodes' && !provisionStepValid);
   const remainingInstallableSteps = setupSteps
     .slice(safeInstallStepIndex)
@@ -2435,7 +2449,7 @@ function App() {
                 </div>
 
                 <div className="wizard-log-viewport wizard-log-viewport-install" ref={liveLogViewportRef}>
-                  <pre className="wizard-log-output">{model.activity.rawLogOutput}</pre>
+                  <pre className="wizard-log-output">{visibleInstallLogOutput}</pre>
                 </div>
               </section>
 
@@ -2473,14 +2487,6 @@ function App() {
                     disabled={installButtonDisabled}
                   >
                     Install
-                  </button>
-                  <button
-                    className="button button-secondary"
-                    type="button"
-                    onClick={() => handleReinstallStep(currentStep)}
-                    disabled={reinstallButtonDisabled}
-                  >
-                    Reinstall
                   </button>
                   <button
                     className="button button-primary"
