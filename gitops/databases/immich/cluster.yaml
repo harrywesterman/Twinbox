@@ -35,7 +35,7 @@ spec:
       shared_buffers: "256MB"
       effective_cache_size: "768MB"
       work_mem: "4MB"
-      shared_preload_libraries: "vchord.so"
+      # The vectorchord image already ships with the required preload config.
 
   affinity:
     enablePodAntiAffinity: true
