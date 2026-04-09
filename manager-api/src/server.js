@@ -704,7 +704,11 @@ function detectNodePrefixLength(managementIp) {
   const output = readIpCommand(["-o", "-f", "inet", "addr", "show", "scope", "global"]);
   const lines = output.split("\n").map((line) => line.trim()).filter(Boolean);
   const exact = lines.find((line) => line.includes(` inet ${managementIp}/`));
-  const match = (exact || lines[0] || "").match(/\binet\s+\d+\.\d+\.\d+\.\d+\/(\d+)/);
+  if (!exact) {
+    return 24;
+  }
+
+  const match = exact.match(/\binet\s+\d+\.\d+\.\d+\.\d+\/(\d+)/);
   const parsed = Number(match?.[1] || 24);
   return Number.isInteger(parsed) && parsed >= 1 && parsed <= 32 ? parsed : 24;
 }

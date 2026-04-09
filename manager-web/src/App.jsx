@@ -2072,16 +2072,7 @@ function App() {
     }
 
     const managementIp = window.location.hostname;
-    const managementIpParts = managementIp.split('.').map((part) => Number(part));
-    const hasValidManagementIp = managementIpParts.length === 4
-      && managementIpParts.every((part) => Number.isInteger(part) && part >= 0 && part <= 255);
-
-    if (!hasValidManagementIp) {
-      setProvisionSuggestionsReadyState(false);
-      return;
-    }
-
-    const suggestionKey = `${managementIp}:${getProvisionNodeCount(currentStep.inputs || [], currentDraft)}`;
+    const suggestionKey = `${managementIp || 'auto'}:${getProvisionNodeCount(currentStep.inputs || [], currentDraft)}`;
 
     setProvisionSuggestionsReadyState(
       provisionSuggestionKeyRef.current === suggestionKey
@@ -2658,7 +2649,7 @@ function App() {
                                     value={vm.value}
                                     onChange={(event) => onVmIpChange(event.target.value)}
                                     inputMode="decimal"
-                                    placeholder={vm.suggestedIp || '192.168.1.60'}
+                                    placeholder={vm.suggestedIp || 'Waiting for server suggestion'}
                                   />
                                   <small>
                                     {vm.isSuggested
