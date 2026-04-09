@@ -50,6 +50,40 @@ resolve_authentik_db_password() {
   kubectl -n databases get secret authentik-db-credentials -o jsonpath='{.data.password}' | base64 -d
 }
 
+wait_for_secret() {
+  local namespace="$1"
+  local secret_name="$2"
+  local timeout_seconds="${3:-600}"
+  local elapsed=0
+
+  while (( elapsed < timeout_seconds )); do
+    if kubectl -n "$namespace" get secret "$secret_name" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 5
+    elapsed=$((elapsed + 5))
+  done
+
+  fail "Timed out waiting for secret ${namespace}/${secret_name}"
+}
+
+wait_for_deployment() {
+  local namespace="$1"
+  local deployment_name="$2"
+  local timeout_seconds="${3:-600}"
+  local elapsed=0
+
+  while (( elapsed < timeout_seconds )); do
+    if kubectl -n "$namespace" get deployment "$deployment_name" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 5
+    elapsed=$((elapsed + 5))
+  done
+
+  fail "Timed out waiting for deployment ${namespace}/${deployment_name}"
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
@@ -130,13 +164,7 @@ find_oauth2_provider_pk_by_name() {
 
 find_application_json_by_slug() {
   local application_slug="$1"
-  local response
-
-  response="$(authentik_api_get "/core/applications/?page_size=100")"
-  jq -c \
-    --arg application_slug "$application_slug" \
-    '.results[]?
-      | select((.slug // "") == $application_slug)' <<<"$response" | head -n1
+  authentik_api_get "/core/applications/${application_slug}/" 2>/dev/null || true
 }
 
 find_policy_binding_pk() {
@@ -169,7 +197,7 @@ create_or_update_provider() {
 
 create_or_update_application() {
   local application_payload="$1"
-  local existing_json existing_pk
+  local existing_json existing_pk response_file http_status
 
   existing_json="$(find_application_json_by_slug "$pgadmin_application_slug" || true)"
   existing_pk="$(jq -r '.pk // .id // empty' <<<"$existing_json")"
@@ -179,7 +207,32 @@ create_or_update_application() {
     return 0
   fi
 
-  authentik_api_write POST "/core/applications/" "$application_payload" | jq -r '.pk // .id // empty'
+  response_file="$(mktemp)"
+  http_status="$(
+    curl -sS \
+      -X POST \
+      -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" \
+      -H "Accept: application/json" \
+      -H "Content-Type: application/json" \
+      --data "$application_payload" \
+      -o "$response_file" \
+      -w '%{http_code}' \
+      "${AUTHENTIK_API_BASE}/core/applications/"
+  )" || http_status="000"
+
+  if [[ "$http_status" =~ ^2 ]]; then
+    jq -r '.pk // .id // empty' <"$response_file"
+    rm -f "$response_file"
+    return 0
+  fi
+
+  existing_json="$(find_application_json_by_slug "$pgadmin_application_slug" || true)"
+  existing_pk="$(jq -r '.pk // .id // empty' <<<"$existing_json")"
+  [[ -n "$existing_pk" ]] || fail "Authentik did not return or expose an application ID for pgAdmin 4"
+
+  authentik_api_write PATCH "/core/applications/${pgadmin_application_slug}/" "$application_payload" >/dev/null
+  rm -f "$response_file"
+  printf '%s\n' "$existing_pk"
 }
 
 ensure_group_binding() {
@@ -325,6 +378,7 @@ kubectl -n pgadmin4 create secret generic "$pgadmin_db_password_secret_name" \
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying pgAdmin 4 ExternalSecret"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform/pgadmin4/externalsecret.yaml"
 kubectl -n pgadmin4 wait --for=condition=Ready externalsecret/pgadmin4-oidc --timeout=10m
+wait_for_secret pgadmin4 pgadmin4-bootstrap
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying shared platform-ingress Argo CD application"
 kubectl delete application pgadmin4 -n argocd --ignore-not-found=true >/dev/null 2>&1 || true
@@ -335,11 +389,10 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --destination-namespace "argocd" \
   --no-wait
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 rollout"
-kubectl -n pgadmin4 rollout status deploy/pgadmin4 --timeout=10m
-
+wait_for_deployment pgadmin4 pgadmin4
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restarting pgAdmin 4 to pick up secret-backed env vars"
 kubectl -n pgadmin4 rollout restart deploy/pgadmin4
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 rollout"
 kubectl -n pgadmin4 rollout status deploy/pgadmin4 --timeout=10m
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Loading pgAdmin 4 shared server entry"
@@ -372,7 +425,7 @@ jq -n \
     }
   }' >"$pgadmin_servers_file"
 
-kubectl -n pgadmin4 exec deploy/pgadmin4 -c pgadmin4 -- /bin/sh -ec \
+kubectl -n pgadmin4 exec -i deploy/pgadmin4 -c pgadmin4 -- /bin/sh -ec \
   "cat >/tmp/pgadmin4-servers.json && /venv/bin/python /pgadmin4/setup.py load-servers /tmp/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace" \
   <"$pgadmin_servers_file"
 rm -f "$pgadmin_servers_file"
