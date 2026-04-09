@@ -81,7 +81,7 @@ resolve_flow_id() {
   local designation="$2"
   local response
 
-  response="$(api_get "/flows/instances/?slug=${slug}&designation=${designation}")"
+  response="$(api_get "/core/flows/?slug=${slug}")"
   jq -r \
     --arg slug "$slug" \
     --arg designation "$designation" \
