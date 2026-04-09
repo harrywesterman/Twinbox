@@ -296,9 +296,11 @@ seed_dashboard() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Downloading ${configmap_name}"
   curl -fsSL "$dashboard_url" -o "$dashboard_file"
   jq \
-    --argjson replacements "$replacements_json" \
-    --argjson templating_names "$templating_names_json" \
+    --arg replacements_json "$replacements_json" \
+    --arg templating_names_json "$templating_names_json" \
     '
+      ($replacements_json | fromjson? // {}) as $replacements
+      | ($templating_names_json | fromjson? // []) as $templating_names
       walk(
         if type == "string" then
           ($replacements[.] // .)
