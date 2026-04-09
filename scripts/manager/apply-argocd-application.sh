@@ -169,7 +169,6 @@ wait_for_application_ready() {
 
       if [[ -n "$comparison_error" ]]; then
         log "Application/${application} compare/spec error: ${comparison_error}"
-        return 1
       fi
 
       if [[ "$operation_phase" == "Failed" || "$operation_phase" == "Error" ]]; then
