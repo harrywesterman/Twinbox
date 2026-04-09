@@ -482,20 +482,55 @@
   margin: 0 auto;
 }
 
+.wizard-install-stage-head {
+  display: grid;
+  gap: 8px;
+  width: min(820px, 100%);
+  justify-self: center;
+  padding: 0 4px;
+  text-align: center;
+}
+
+.wizard-install-stage-head h2 {
+  margin: 0;
+  font-size: clamp(1.7rem, 2.4vw, 2.5rem);
+  letter-spacing: -0.05em;
+}
+
+.wizard-install-stage-head .wizard-step-summary {
+  max-width: 64ch;
+  margin: 0 auto;
+}
+
 .wizard-install-output {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   width: 100%;
-  min-height: min(68vh, 760px);
+  height: 80vh;
+  min-height: 80vh;
+  max-height: 80vh;
+  overflow: hidden;
 }
 
 .wizard-output-header-install {
   align-items: center;
 }
 
+.wizard-output-step-label {
+  display: grid;
+  gap: 4px;
+}
+
+.wizard-output-step-label strong {
+  color: var(--ink-1);
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
 .wizard-install-output .wizard-log-viewport {
-  max-height: none;
+  min-height: 0;
   height: 100%;
+  max-height: none;
 }
 
 .wizard-install-output .wizard-log-output {

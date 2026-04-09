@@ -4,7 +4,6 @@ import './App.css';
 import heroIllustrationUrl from './assets/hero-illustration.svg';
 import {
   buildProvisionPlacementBoard,
-  PROVISION_AUTOSCALED_FIELDS,
   buildProvisionScaleSummary,
   buildScaledProvisionInputs,
   getProvisionNodeCount,
@@ -40,6 +39,7 @@ import {
 } from './catalog-refresh.js';
 
 const POLL_INTERVAL_MS = 5000;
+const PROVISION_STEP_ID = 'provision-nodes';
 
 function sleep(ms) {
   return new Promise((resolve) => {
@@ -121,6 +121,30 @@ function buildPayloadInputs(step, stepAnswers = {}) {
   }
 
   return payload;
+}
+
+function buildProvisionQuestionDraft({
+  step,
+  answers = {},
+  suggestionSnapshot = {},
+  dirtyFields = new Set(),
+}) {
+  if (!step) {
+    return {};
+  }
+
+  const baseDraft = buildInitialAnswers([step], answers)[step.id] || {};
+  if (step.id !== PROVISION_STEP_ID) {
+    return baseDraft;
+  }
+
+  return mergeSuggestedProvisionDraft({
+    currentDraft: baseDraft,
+    previousSuggested: buildSuggestedProvisionInputs(suggestionSnapshot),
+    suggestionData: suggestionSnapshot,
+    stepInputs: step.inputs || [],
+    dirtyFields: Object.fromEntries([...dirtyFields].map((fieldId) => [fieldId, true])),
+  });
 }
 
 function hasRequiredValue(input, value) {
@@ -850,6 +874,7 @@ function App() {
   const [error, setError] = useState('');
   const [activeJob, setActiveJob] = useState(null);
   const [provisionSuggestionsReadyState, setProvisionSuggestionsReadyState] = useState(false);
+  const [provisionSuggestionRevision, setProvisionSuggestionRevision] = useState(0);
   const [provisionIpCheckState, setProvisionIpCheckState] = useState({
     checkedAt: '',
     results: {},
@@ -1232,6 +1257,7 @@ function App() {
       );
       provisionSuggestionKeyRef.current = suggestionKey;
       provisionSuggestionSnapshotRef.current = suggestionData;
+      setProvisionSuggestionRevision((current) => current + 1);
     }
 
     const merged = mergeSuggestedProvisionDraft({
@@ -1657,7 +1683,7 @@ function App() {
   }
 
   function updateAnswer(stepId, inputId, value) {
-    if (stepId === 'provision-nodes' && inputId !== 'scale_percent' && PROVISION_AUTOSCALED_FIELDS.includes(inputId)) {
+    if (stepId === 'provision-nodes' && inputId !== 'scale_percent') {
       provisionDirtyFieldsRef.current.add(inputId);
     }
 
@@ -1848,6 +1874,7 @@ function App() {
     setError('');
     setNotice('Starting a new setup.');
     setProvisionSuggestionsReadyState(false);
+    setProvisionSuggestionRevision(0);
     clusterIdRef.current = '';
     clusterCreatedAtRef.current = '';
     clusterInstanceIdRef.current = '';
@@ -1891,6 +1918,7 @@ function App() {
       provisionSuggestionSnapshotRef.current = {};
       provisionDirtyFieldsRef.current = new Set();
       setProvisionSuggestionsReadyState(false);
+      setProvisionSuggestionRevision(0);
       setNotice('Imported saved wizard answers.');
     } catch (importError) {
       const message = importError instanceof Error ? importError.message : 'Could not import the answers file.';
@@ -1946,7 +1974,12 @@ function App() {
   }, [currentInstallStep?.latest_job?.id, selectedStepId, wizardPhase]);
 
   const currentDraft = currentStep
-    ? buildInitialAnswers([currentStep], answers)[currentStep.id]
+    ? buildProvisionQuestionDraft({
+      step: currentStep,
+      answers,
+      suggestionSnapshot: provisionSuggestionSnapshotRef.current,
+      dirtyFields: provisionDirtyFieldsRef.current,
+    })
     : {};
   useEffect(() => {
     if (currentStep?.id !== 'provision-nodes') {
@@ -1970,7 +2003,7 @@ function App() {
       provisionSuggestionKeyRef.current === suggestionKey
       && Object.keys(provisionSuggestionSnapshotRef.current || {}).length > 0,
     );
-  }, [clusterInstanceId, currentDraft.controlplane_count, currentDraft.worker_count, currentStep?.id]);
+  }, [clusterInstanceId, currentDraft.controlplane_count, currentDraft.worker_count, currentStep?.id, provisionSuggestionRevision]);
 
   const placementBoard = currentStep?.id === 'provision-nodes'
     ? buildProvisionPlacementBoard(currentStep.inputs || [], currentDraft, proxmoxResources)
@@ -2043,15 +2076,17 @@ function App() {
   const isCurrentStepComplete = currentStep?.status === 'done' || currentStep?.status === 'configured';
   const stepHasRunBefore = Boolean(currentStep?.latest_job) || ['done', 'configured', 'failed', 'canceled', 'skipped'].includes(currentStep?.status || '');
   const installStepBlocked = currentStep?.status === 'locked';
+  const installInProgress = Boolean(visibleActiveJob?.id && ['pending', 'running', 'cancel_requested'].includes(visibleActiveJob.status))
+    || currentStep?.status === 'running';
   const installButtonDisabled = !currentStep
     || busy
-    || currentStep?.status === 'running'
+    || installInProgress
     || installStepBlocked
     || isCurrentStepComplete
     || (currentStep?.id === 'provision-nodes' && !provisionStepValid);
   const reinstallButtonDisabled = !currentStep
     || busy
-    || currentStep?.status === 'running'
+    || installInProgress
     || installStepBlocked
     || !stepHasRunBefore
     || (currentStep?.id === 'provision-nodes' && !provisionStepValid);
@@ -2060,6 +2095,7 @@ function App() {
     .filter((step) => step.status !== 'done' && step.status !== 'configured');
   const installAllDisabled = !currentStep
     || busy
+    || installInProgress
     || installStepBlocked
     || remainingInstallableSteps.length === 0
     || (currentStep?.id === 'provision-nodes' && !provisionStepValid);
@@ -2123,6 +2159,7 @@ function App() {
         });
 
         provisionSuggestionSnapshotRef.current = suggestionData;
+        setProvisionSuggestionRevision((current) => current + 1);
       } catch {
         if (!cancelled) {
           provisionSuggestionSnapshotRef.current = {};
@@ -2166,6 +2203,7 @@ function App() {
   const activeStepPresentation = getStepPresentation(currentStep);
   const questionStepCount = questionSteps.length;
   const isInstallPhase = hasStarted && wizardPhase === 'install' && !model.completion;
+  const showImportButton = !isInstallPhase && !model.completion;
 
   if (!hasStarted) {
     return (
@@ -2203,7 +2241,7 @@ function App() {
 
   return (
     <div className="wizard-shell">
-      {renderTopBar({ onImportClick: handleImportClick, showImportButton: true })}
+      {renderTopBar({ onImportClick: handleImportClick, showImportButton })}
 
       <main className="wizard-layout wizard-layout-minimal">
         <section className={`wizard-workspace wizard-workspace-minimal ${isInstallPhase ? 'wizard-workspace-install' : ''}`}>
@@ -2297,13 +2335,27 @@ function App() {
             </section>
           ) : isInstallPhase ? (
             <section className="wizard-install-stage" aria-label="Installation output and controls">
+              <div className="wizard-install-stage-head">
+                <p className="eyebrow">
+                  {currentStep?.status === 'running'
+                    ? `Now installing step ${safeInstallStepIndex + 1} of ${installStepCount}`
+                    : `Install step ${safeInstallStepIndex + 1} of ${installStepCount}`}
+                </p>
+                <h2>{currentStep?.title || 'Installation output'}</h2>
+                <p className="wizard-step-summary">
+                  {currentStep?.summary || 'Watch the output below while Twinbox runs the scripts for this step.'}
+                </p>
+              </div>
               <section
                 ref={liveOutputRef}
                 className={`wizard-card wizard-output-panel wizard-output-panel-minimal wizard-install-output ${model.activity.runtime.isLive ? 'is-live' : ''}`}
                 aria-label={`Installation output for ${currentStep?.title || 'the current install step'}`}
               >
                 <div className="wizard-output-header wizard-output-header-install">
-                  <p className="eyebrow">Output</p>
+                  <div className="wizard-output-step-label">
+                    <p className="eyebrow">Output</p>
+                    <strong>{currentStep?.title || 'Current install step'}</strong>
+                  </div>
                   <span className={`wizard-status ${model.activity.runtime.isLive ? 'is-live' : ''}`}>
                     {model.activity.runtime.runState}
                   </span>
@@ -2324,7 +2376,7 @@ function App() {
                         setSelectedStepId(previousInstallStep.id);
                       }
                     }}
-                    disabled={!previousInstallStep}
+                    disabled={!previousInstallStep || installInProgress}
                   >
                     Previous
                   </button>
@@ -2337,7 +2389,7 @@ function App() {
                         setNotice(`Moved to ${nextInstallStep.title}.`);
                       }
                     }}
-                    disabled={!nextInstallStep}
+                    disabled={!nextInstallStep || installInProgress}
                   >
                     Next
                   </button>
@@ -2365,6 +2417,15 @@ function App() {
                   >
                     Install all
                   </button>
+                  {installInProgress ? (
+                    <button
+                      className="button button-danger"
+                      type="button"
+                      onClick={handleCancelActiveJob}
+                    >
+                      Stop
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </section>
