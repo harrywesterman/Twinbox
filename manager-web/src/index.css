@@ -33,6 +33,54 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+#boot-splash {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top left, rgba(20, 184, 166, 0.14), transparent 26%),
+    radial-gradient(circle at top right, rgba(245, 158, 11, 0.12), transparent 22%),
+    #eef4fb;
+  z-index: 0;
+}
+
+.boot-splash-card {
+  width: min(560px, 100%);
+  padding: 32px 34px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+  text-align: center;
+}
+
+.boot-splash-kicker {
+  margin: 0 0 10px;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.boot-splash-card h1 {
+  margin: 0;
+  letter-spacing: -0.05em;
+  font-size: clamp(1.8rem, 3vw, 2.8rem);
+}
+
+.boot-splash-card p {
+  margin: 12px 0 0;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+html.app-ready #boot-splash {
+  display: none;
+}
+
 body,
 button,
 input {
@@ -57,5 +105,7 @@ svg {
 }
 
 #root {
+  position: relative;
+  z-index: 1;
   min-height: 100vh;
 }

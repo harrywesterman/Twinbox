@@ -120,4 +120,5 @@ test('vite and document metadata still support relative hosting', async () => {
   assert.match(viteConfig, /base:\s*'\.\/'/, 'expected relative asset paths');
   assert.match(indexHtml, /lang="en"/, 'expected English language metadata');
   assert.match(indexHtml, /Twinbox Web Installation Wizard/, 'expected the wizard title');
+  assert.match(indexHtml, /Loading Twinbox cluster setup/, 'expected a boot splash while React starts');
 });

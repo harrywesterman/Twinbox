@@ -8,3 +8,5 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <App />
   </React.StrictMode>,
 );
+
+document.documentElement.classList.add("app-ready");
