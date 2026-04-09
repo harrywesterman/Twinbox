@@ -25,6 +25,9 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 COPY manager-worker/package.json ./manager-worker/package.json
+COPY manager-worker/package-lock.json ./manager-worker/package-lock.json
+RUN cd /opt/twinbox/manager-worker && npm ci --omit=dev
+
 COPY manager-worker/src ./manager-worker/src
 COPY lib ./lib
 COPY categories ./categories
