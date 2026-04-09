@@ -219,6 +219,22 @@ function buildProvisionIpCheckTargets(vipIp, vmIpRows = []) {
   return targets;
 }
 
+function buildProvisionIpSuggestionsUrl(nodeCount) {
+  const managementIp = typeof window !== 'undefined' ? String(window.location.hostname || '').trim() : '';
+  const params = new URLSearchParams({
+    node_count: String(nodeCount),
+  });
+
+  if (isValidIpv4(managementIp)) {
+    params.set('management_ip', managementIp);
+  }
+
+  return {
+    managementIp,
+    url: `/api/ip-suggestions?${params.toString()}`,
+  };
+}
+
 function summarizeProvisionIpCheckResults(results = []) {
   const entries = Array.isArray(results) ? results : [];
   const total = entries.length;
@@ -872,6 +888,7 @@ function App() {
   const provisionSuggestionSnapshotRef = useRef({});
   const initialInstallLogSnapshot = storedWizardState.installLogSnapshot || { stepId: '', output: '' };
   const installLogSnapshotRef = useRef(initialInstallLogSnapshot);
+  const previousInstallStepIdRef = useRef(storedWizardState.selectedStepId || '');
   const [installLogSnapshot, setInstallLogSnapshot] = useState(initialInstallLogSnapshot);
 
   const [catalog, setCatalog] = useState({ categories: [], errors: [] });
@@ -1143,6 +1160,7 @@ function App() {
             selectedStepIdRef.current = nextQuestionStepId;
             installLogSnapshotRef.current = { stepId: '', output: '' };
             setInstallLogSnapshot({ stepId: '', output: '' });
+            previousInstallStepIdRef.current = nextQuestionStepId;
           }
 
           if (nextCreatedAt && nextCreatedAt !== clusterCreatedAtRef.current) {
@@ -1229,6 +1247,21 @@ function App() {
 
     liveLogAutoScrollRef.current = true;
   }, [isInstallPhase, currentStep?.id]);
+
+  useEffect(() => {
+    if (!isInstallPhase || !currentStep?.id) {
+      return;
+    }
+
+    const previousStepId = previousInstallStepIdRef.current || '';
+    if (previousStepId && previousStepId !== currentStep.id) {
+      setLogs([]);
+      installLogSnapshotRef.current = { stepId: '', output: '' };
+      setInstallLogSnapshot({ stepId: '', output: '' });
+    }
+
+    previousInstallStepIdRef.current = currentStep.id;
+  }, [currentStep?.id, isInstallPhase]);
 
   useEffect(() => {
     if (!isInstallPhase || !currentStep?.id) {
@@ -1323,24 +1356,14 @@ function App() {
   }
 
   async function ensureProvisionDraft(step, currentDraft = {}) {
-    const managementIp = window.location.hostname;
-    const managementIpParts = managementIp.split('.').map((part) => Number(part));
-    const hasValidManagementIp = managementIpParts.length === 4
-      && managementIpParts.every((part) => Number.isInteger(part) && part >= 0 && part <= 255);
-
-    if (!hasValidManagementIp) {
-      return currentDraft;
-    }
-
     const nodeCount = getProvisionNodeCount(step.inputs || [], currentDraft);
-    const suggestionKey = `${managementIp}:${nodeCount}`;
+    const { managementIp, url } = buildProvisionIpSuggestionsUrl(nodeCount);
+    const suggestionKey = `${managementIp || 'unknown'}:${nodeCount}`;
     const previousSuggested = buildSuggestedProvisionInputs(provisionSuggestionSnapshotRef.current);
 
     let suggestionData = provisionSuggestionSnapshotRef.current;
     if (provisionSuggestionKeyRef.current !== suggestionKey || !suggestionData || Object.keys(suggestionData).length === 0) {
-      suggestionData = await requestJson(
-        `/api/ip-suggestions?management_ip=${encodeURIComponent(managementIp)}&node_count=${nodeCount}`,
-      );
+      suggestionData = await requestJson(url);
       provisionSuggestionKeyRef.current = suggestionKey;
       provisionSuggestionSnapshotRef.current = suggestionData;
       setProvisionSuggestionRevision((current) => current + 1);
@@ -1532,13 +1555,6 @@ function App() {
       const message = provisionVmIpValidation.error || 'Step 1 is still preparing. Wait until the button says Next.';
       setNotice(message);
       return;
-    }
-
-    if (currentStep?.id === 'provision-nodes') {
-      const availabilityCheck = await checkProvisionIpAvailability();
-      if (!availabilityCheck.ok) {
-        return;
-      }
     }
 
     if (isQuestionPhase) {
@@ -1957,6 +1973,7 @@ function App() {
     placementSuggestionKeyRef.current = '';
     installLogSnapshotRef.current = { stepId: '', output: '' };
     setInstallLogSnapshot({ stepId: '', output: '' });
+    previousInstallStepIdRef.current = firstStepId;
   }
 
   async function handleImportFile(event) {
@@ -2001,6 +2018,7 @@ function App() {
         : { stepId: '', output: '' };
       installLogSnapshotRef.current = importedInstallSnapshot;
       setInstallLogSnapshot(importedInstallSnapshot);
+      previousInstallStepIdRef.current = imported.selectedStepId || '';
       setNotice('Imported saved wizard answers.');
     } catch (importError) {
       const message = importError instanceof Error ? importError.message : 'Could not import the answers file.';
@@ -2129,11 +2147,11 @@ function App() {
     : '';
   const primaryActionHelperText = isQuestionPhase
     ? (currentStep?.id === 'provision-nodes' && provisionIpChecking
-      ? 'Checking IP addresses again before moving forward.'
+      ? 'Checking IP addresses.'
       : !questionInputsValid
       ? 'Fill in the required values before continuing.'
       : stepOnePending
-        ? (!provisionPlacementReady ? 'Waiting for Proxmox host data before continuing.' : 'Preparing IP suggestions before continuing.')
+        ? 'Waiting for Proxmox host data before continuing.'
         : questionStepIndex === questionSteps.length - 1
           ? 'The questions are complete. Continue to the installation steps.'
           : 'Review the values on this page and continue to the next question.')
@@ -2165,15 +2183,6 @@ function App() {
       return;
     }
 
-    const managementIp = window.location.hostname;
-    const managementIpParts = managementIp.split('.').map((part) => Number(part));
-    const hasValidManagementIp = managementIpParts.length === 4
-      && managementIpParts.every((part) => Number.isInteger(part) && part >= 0 && part <= 255);
-
-    if (!hasValidManagementIp) {
-      return;
-    }
-
     const controlplaneCount = Number.isFinite(Number(currentDraft.controlplane_count))
       ? Number(currentDraft.controlplane_count)
       : 1;
@@ -2181,7 +2190,8 @@ function App() {
       ? Number(currentDraft.worker_count)
       : 0;
     const nodeCount = Math.max(1, controlplaneCount + workerCount);
-    const suggestionKey = `${managementIp}:${nodeCount}`;
+    const { managementIp, url } = buildProvisionIpSuggestionsUrl(nodeCount);
+    const suggestionKey = `${managementIp || 'unknown'}:${nodeCount}`;
 
     if (provisionSuggestionKeyRef.current === suggestionKey
       && Object.keys(provisionSuggestionSnapshotRef.current || {}).length > 0) {
@@ -2194,9 +2204,7 @@ function App() {
 
     (async () => {
       try {
-        const suggestionData = await requestJson(
-          `/api/ip-suggestions?management_ip=${encodeURIComponent(managementIp)}&node_count=${nodeCount}`,
-        );
+        const suggestionData = await requestJson(url);
 
         if (cancelled) {
           return;

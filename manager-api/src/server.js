@@ -1014,8 +1014,9 @@ app.get("/api/catalog", (req, res) => {
 
 app.get("/api/ip-suggestions", async (req, res) => {
   const queryIp = pickFirstString(req.query.management_ip);
+  const envManagementIp = pickFirstString(process.env.MANAGEMENT_VM_IP);
   const fallbackHostIp = typeof req.hostname === "string" ? req.hostname : "";
-  const managementIp = queryIp || fallbackHostIp;
+  const managementIp = queryIp || envManagementIp || fallbackHostIp;
   const nodeCount = parseNodeCount(pickFirstString(req.query.node_count));
   const parsedManagementIp = parseIPv4(managementIp, "management_ip");
 
