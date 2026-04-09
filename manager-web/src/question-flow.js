@@ -66,7 +66,7 @@ const QUESTION_STEP_DEFS = [
         label: 'DNS Domain',
         type: 'string',
         required: true,
-        help: 'Base zone for platform hostnames. Non-prd clusters use a slug prefix such as tst.example.com.',
+        help: 'Enter the DNS domain for your cluster.',
       },
     ],
   },

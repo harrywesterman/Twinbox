@@ -250,7 +250,8 @@ function InputField({ stepId, input, value, onChange }) {
   const helpText = input.help || 'Use the value from your Proxmox and cluster plan.';
   const defaultLabel = Object.prototype.hasOwnProperty.call(input, 'default') && input.default !== ''
     ? `Default: ${String(input.default)}`
-    : 'No preset default';
+    : '';
+  const isDnsDomainField = stepId === 'choose-ingress-route' && input.id === 'dns_domain';
 
   if (input.type === 'boolean') {
     return (
@@ -353,13 +354,16 @@ function InputField({ stepId, input, value, onChange }) {
 
   const inputType = input.type === 'integer' ? 'number' : 'text';
 
-  const fieldClassName = input.id === 'dns_servers'
-    ? 'wizard-field wizard-field-compact'
-    : 'wizard-field';
+  const fieldClassName = isDnsDomainField
+    ? 'wizard-field wizard-field-compact wizard-field-dns'
+    : input.id === 'dns_servers'
+      ? 'wizard-field wizard-field-compact'
+      : 'wizard-field';
 
   return (
     <label className={fieldClassName} htmlFor={controlId}>
       <span className="wizard-field-label">{input.label}</span>
+      {isDnsDomainField ? <p className="wizard-field-prelude">{helpText}</p> : null}
       <input
         id={controlId}
         type={inputType}
@@ -370,8 +374,8 @@ function InputField({ stepId, input, value, onChange }) {
         placeholder={input.help || input.label}
         inputMode={input.type === 'integer' ? 'numeric' : input.type === 'ipv4' ? 'decimal' : 'text'}
       />
-      <small>{helpText}</small>
-      <em>{defaultLabel}</em>
+      {isDnsDomainField ? null : <small>{helpText}</small>}
+      {isDnsDomainField || !defaultLabel ? null : <em>{defaultLabel}</em>}
     </label>
   );
 }
@@ -2059,17 +2063,6 @@ function App() {
     || installStepBlocked
     || remainingInstallableSteps.length === 0
     || (currentStep?.id === 'provision-nodes' && !provisionStepValid);
-  const installActionHelperText = stepOnePending
-    ? (!provisionPlacementReady
-      ? 'Waiting for Proxmox host data before installing step 1.'
-      : 'Preparing IP suggestions before installing.')
-    : !provisionVmIpValidation.ok && currentStep?.id === 'provision-nodes'
-      ? provisionVmIpValidation.error
-      : installStepBlocked
-        ? 'This step is still waiting for earlier steps to finish.'
-        : isCurrentStepComplete
-          ? 'This step is complete. Use Reinstall to run it again, or move to the next step.'
-          : 'Use Install to run only this step, or Install all to continue automatically from here.';
 
   useEffect(() => {
     if (currentStep?.id !== 'provision-nodes') {
@@ -2172,12 +2165,7 @@ function App() {
   const activeStepTitle = getDisplayStepTitle(currentStep);
   const activeStepPresentation = getStepPresentation(currentStep);
   const questionStepCount = questionSteps.length;
-  const stepContextSummary = isQuestionPhase
-    ? currentStep?.summary || currentStep?.explanation || ''
-    : model.activity.explanation;
-  const stepContextSideHelp = isQuestionPhase
-    ? currentStep?.explanation || currentStep?.side_help || ''
-    : model.activity.sideHelp;
+  const isInstallPhase = hasStarted && wizardPhase === 'install' && !model.completion;
 
   if (!hasStarted) {
     return (
@@ -2218,71 +2206,73 @@ function App() {
       {renderTopBar({ onImportClick: handleImportClick, showImportButton: true })}
 
       <main className="wizard-layout wizard-layout-minimal">
-        <section className="wizard-workspace wizard-workspace-minimal">
-          <div className="wizard-workspace-header wizard-workspace-header-minimal">
-            <div className="wizard-workspace-copy">
-              <p className="eyebrow">
-                {isQuestionPhase && currentStep
-                  ? `Question ${questionStepIndex + 1} of ${questionStepCount}`
-                  : currentStep
-                    ? `Install step ${safeInstallStepIndex + 1} of ${installStepCount}`
-                    : 'Twinbox installer'}
-              </p>
-              <div className="wizard-workspace-stepline">
-                <span
-                  className={`wizard-step-icon wizard-step-icon-large ${activeStepPresentation.iconArtworkUrl ? 'is-artwork' : ''}`}
-                  aria-hidden="true"
-                >
-                  {activeStepPresentation.iconArtworkUrl ? (
-                    <img
-                      className="wizard-step-icon-artwork"
-                      src={activeStepPresentation.iconArtworkUrl}
-                      alt=""
-                      loading="eager"
-                      decoding="async"
-                    />
-                  ) : (
-                    activeStepPresentation.icon
-                  )}
-                </span>
-                <div className="wizard-workspace-stepline-copy">
-                  <h1>{model.completion ? model.completion.title : activeStepTitle || 'Question'}</h1>
-                  <p className="wizard-intro wizard-step-pitch">
-                    {model.completion
-                      ? model.completion.summary
-                      : isQuestionPhase
-                        ? currentStep?.summary || model.activity.summary
-                        : model.activity.summary}
-                  </p>
-                  {isQuestionPhase && activeStepIsQuestion ? (
-                    <div className="wizard-guide-panel">
-                      <div className="wizard-guide-copy">
-                        <p className="eyebrow">{wizardGuide.eyebrow}</p>
-                        <h2>{wizardGuide.title}</h2>
-                        <p>{wizardGuide.intro}</p>
-                        <ul className="wizard-guide-list">
-                          {wizardGuide.checklist.map((item) => (
-                            <li key={item}>{item}</li>
+        <section className={`wizard-workspace wizard-workspace-minimal ${isInstallPhase ? 'wizard-workspace-install' : ''}`}>
+          {!isInstallPhase ? (
+            <div className="wizard-workspace-header wizard-workspace-header-minimal">
+              <div className="wizard-workspace-copy">
+                <p className="eyebrow">
+                  {isQuestionPhase && currentStep
+                    ? `Question ${questionStepIndex + 1} of ${questionStepCount}`
+                    : currentStep
+                      ? `Install step ${safeInstallStepIndex + 1} of ${installStepCount}`
+                      : 'Twinbox installer'}
+                </p>
+                <div className="wizard-workspace-stepline">
+                  <span
+                    className={`wizard-step-icon wizard-step-icon-large ${activeStepPresentation.iconArtworkUrl ? 'is-artwork' : ''}`}
+                    aria-hidden="true"
+                  >
+                    {activeStepPresentation.iconArtworkUrl ? (
+                      <img
+                        className="wizard-step-icon-artwork"
+                        src={activeStepPresentation.iconArtworkUrl}
+                        alt=""
+                        loading="eager"
+                        decoding="async"
+                      />
+                    ) : (
+                      activeStepPresentation.icon
+                    )}
+                  </span>
+                  <div className="wizard-workspace-stepline-copy">
+                    <h1>{model.completion ? model.completion.title : activeStepTitle || 'Question'}</h1>
+                    <p className="wizard-intro wizard-step-pitch">
+                      {model.completion
+                        ? model.completion.summary
+                        : isQuestionPhase
+                          ? currentStep?.summary || model.activity.summary
+                          : model.activity.summary}
+                    </p>
+                    {isQuestionPhase && activeStepIsQuestion ? (
+                      <div className="wizard-guide-panel">
+                        <div className="wizard-guide-copy">
+                          <p className="eyebrow">{wizardGuide.eyebrow}</p>
+                          <h2>{wizardGuide.title}</h2>
+                          <p>{wizardGuide.intro}</p>
+                          <ul className="wizard-guide-list">
+                            {wizardGuide.checklist.map((item) => (
+                              <li key={item}>{item}</li>
+                            ))}
+                          </ul>
+                          {wizardGuide.helpLink ? (
+                            <a className="wizard-guide-link" href={wizardGuide.helpLink.href} target="_blank" rel="noreferrer">
+                              {wizardGuide.helpLink.label}
+                            </a>
+                          ) : null}
+                        </div>
+                        <div className="wizard-screenshot-card">
+                          <span className="wizard-screenshot-label">{wizardGuide.screenshotTitle}</span>
+                          {wizardGuide.screenshotLines.map((line) => (
+                            <strong key={line}>{line}</strong>
                           ))}
-                        </ul>
-                        {wizardGuide.helpLink ? (
-                          <a className="wizard-guide-link" href={wizardGuide.helpLink.href} target="_blank" rel="noreferrer">
-                            {wizardGuide.helpLink.label}
-                          </a>
-                        ) : null}
+                        </div>
                       </div>
-                      <div className="wizard-screenshot-card">
-                        <span className="wizard-screenshot-label">{wizardGuide.screenshotTitle}</span>
-                        {wizardGuide.screenshotLines.map((line) => (
-                          <strong key={line}>{line}</strong>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
+                    ) : null}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          ) : null}
 
           {model.completion ? (
             <section className="wizard-finish-grid">
@@ -2305,15 +2295,82 @@ function App() {
                 />
               </article>
             </section>
+          ) : isInstallPhase ? (
+            <section className="wizard-install-stage" aria-label="Installation output and controls">
+              <section
+                ref={liveOutputRef}
+                className={`wizard-card wizard-output-panel wizard-output-panel-minimal wizard-install-output ${model.activity.runtime.isLive ? 'is-live' : ''}`}
+                aria-label={`Installation output for ${currentStep?.title || 'the current install step'}`}
+              >
+                <div className="wizard-output-header wizard-output-header-install">
+                  <p className="eyebrow">Output</p>
+                  <span className={`wizard-status ${model.activity.runtime.isLive ? 'is-live' : ''}`}>
+                    {model.activity.runtime.runState}
+                  </span>
+                </div>
+
+                <div className="wizard-log-viewport wizard-log-viewport-install" ref={liveLogViewportRef}>
+                  <pre className="wizard-log-output">{model.activity.rawLogOutput}</pre>
+                </div>
+              </section>
+
+              <div className="wizard-install-actions">
+                <div className="wizard-card-actions wizard-install-actions-row">
+                  <button
+                    className="button button-secondary"
+                    type="button"
+                    onClick={() => {
+                      if (previousInstallStep?.id) {
+                        setSelectedStepId(previousInstallStep.id);
+                      }
+                    }}
+                    disabled={!previousInstallStep}
+                  >
+                    Previous
+                  </button>
+                  <button
+                    className="button button-secondary"
+                    type="button"
+                    onClick={() => {
+                      if (nextInstallStep?.id) {
+                        setSelectedStepId(nextInstallStep.id);
+                        setNotice(`Moved to ${nextInstallStep.title}.`);
+                      }
+                    }}
+                    disabled={!nextInstallStep}
+                  >
+                    Next
+                  </button>
+                  <button
+                    className="button button-primary"
+                    type="button"
+                    onClick={() => handleInstallCurrentStep(currentStep)}
+                    disabled={installButtonDisabled}
+                  >
+                    Install
+                  </button>
+                  <button
+                    className="button button-secondary"
+                    type="button"
+                    onClick={() => handleReinstallStep(currentStep)}
+                    disabled={reinstallButtonDisabled}
+                  >
+                    Reinstall
+                  </button>
+                  <button
+                    className="button button-primary"
+                    type="button"
+                    onClick={() => handleInstallAllSteps(currentStep?.id)}
+                    disabled={installAllDisabled}
+                  >
+                    Install all
+                  </button>
+                </div>
+              </div>
+            </section>
           ) : (
             <div className="wizard-flow wizard-flow-minimal">
               <section className="wizard-card wizard-step-workspace wizard-step-workspace-minimal">
-                <p className="eyebrow">CURRENT STEP</p>
-                <div className="wizard-step-context">
-                  <p className="wizard-step-summary">{stepContextSummary}</p>
-                  <p className="wizard-step-sidehelp">{stepContextSideHelp}</p>
-                </div>
-
                 {currentStep?.id === 'provision-nodes' ? (
                   <>
                     <section className="wizard-input-block" aria-label="VM sizing">
@@ -2482,11 +2539,11 @@ function App() {
                         )}
                       </div>
                     </section>
-                  </>
-                ) : (
-                  <div className="wizard-input-grid">
-                    {(currentStep?.inputs || []).map((input) => (
-                      <InputField
+                    </>
+                  ) : (
+                    <div className="wizard-input-grid">
+                      {(currentStep?.inputs || []).map((input) => (
+                        <InputField
                         key={input.id}
                         stepId={currentStep.id}
                         input={input}
@@ -2514,20 +2571,6 @@ function App() {
                       Previous
                     </button>
                   ) : null}
-                  {!isQuestionPhase ? (
-                    <button
-                      className="button button-secondary"
-                      type="button"
-                      onClick={() => {
-                        if (previousInstallStep?.id) {
-                          setSelectedStepId(previousInstallStep.id);
-                        }
-                      }}
-                      disabled={!previousInstallStep}
-                    >
-                      Previous
-                    </button>
-                  ) : null}
                   {isQuestionPhase ? (
                     <button
                       className="button button-primary"
@@ -2537,74 +2580,13 @@ function App() {
                     >
                       {primaryActionLabel}
                     </button>
-                  ) : (
-                    <>
-                      <button
-                        className="button button-secondary"
-                        type="button"
-                        onClick={() => {
-                          if (nextInstallStep?.id) {
-                            setSelectedStepId(nextInstallStep.id);
-                            setNotice(`Moved to ${nextInstallStep.title}.`);
-                          }
-                        }}
-                        disabled={!nextInstallStep}
-                      >
-                        Next
-                      </button>
-                      <button
-                        className="button button-primary"
-                        type="button"
-                        onClick={() => handleInstallCurrentStep(currentStep)}
-                        disabled={installButtonDisabled}
-                      >
-                        Install
-                      </button>
-                      <button
-                        className="button button-secondary"
-                        type="button"
-                        onClick={() => handleReinstallStep(currentStep)}
-                        disabled={reinstallButtonDisabled}
-                      >
-                        Reinstall
-                      </button>
-                      <button
-                        className="button button-primary"
-                        type="button"
-                        onClick={() => handleInstallAllSteps(currentStep?.id)}
-                        disabled={installAllDisabled}
-                      >
-                        Install all
-                      </button>
-                    </>
-                  )}
+                  ) : null}
                 </div>
 
-                <p className="wizard-helper">
-                  {isQuestionPhase ? primaryActionHelperText : installActionHelperText}
-                </p>
+                {isQuestionPhase ? (
+                  <p className="wizard-helper">{primaryActionHelperText}</p>
+                ) : null}
               </section>
-
-              {!isQuestionPhase ? (
-                <section
-                  ref={liveOutputRef}
-                  className={`wizard-card wizard-output-panel wizard-output-panel-minimal ${model.activity.runtime.isLive ? 'is-live' : ''}`}
-                >
-                  <div className="wizard-output-header">
-                    <div>
-                      <p className="eyebrow">Output</p>
-                      <h2>{model.activity.runtime.currentStage}</h2>
-                    </div>
-                    <span className={`wizard-status ${model.activity.runtime.isLive ? 'is-live' : ''}`}>
-                      {model.activity.runtime.runState}
-                    </span>
-                  </div>
-
-                  <div className="wizard-log-viewport" ref={liveLogViewportRef}>
-                    <pre className="wizard-log-output">{model.activity.rawLogOutput}</pre>
-                  </div>
-                </section>
-              ) : null}
             </div>
           )}
         </section>

@@ -338,6 +338,12 @@
   margin: 0 auto;
 }
 
+.wizard-workspace-install {
+  min-height: calc(100vh - 220px);
+  align-content: center;
+  gap: 0;
+}
+
 .wizard-workspace-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -467,6 +473,45 @@
 
 .wizard-step-workspace-minimal {
   gap: 16px;
+}
+
+.wizard-install-stage {
+  display: grid;
+  gap: 18px;
+  width: min(1180px, 100%);
+  margin: 0 auto;
+}
+
+.wizard-install-output {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100%;
+  min-height: min(68vh, 760px);
+}
+
+.wizard-output-header-install {
+  align-items: center;
+}
+
+.wizard-install-output .wizard-log-viewport {
+  max-height: none;
+  height: 100%;
+}
+
+.wizard-install-output .wizard-log-output {
+  min-height: 0;
+  height: 100%;
+}
+
+.wizard-install-actions {
+  display: grid;
+  justify-items: center;
+  width: 100%;
+}
+
+.wizard-install-actions-row {
+  width: 100%;
+  justify-content: center;
 }
 
 .wizard-step-context {
@@ -677,6 +722,12 @@
   color: var(--ink-soft);
 }
 
+.wizard-field-prelude {
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.45;
+}
+
 .wizard-field em {
   font-style: normal;
   font-size: 0.76rem;
@@ -689,6 +740,17 @@
 
 .wizard-field-compact input[type='text'] {
   min-height: 42px;
+}
+
+.wizard-field-dns {
+  gap: 6px;
+  padding: 12px 14px;
+}
+
+.wizard-field-dns input[type='text'] {
+  min-height: 40px;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .wizard-field-boolean {
