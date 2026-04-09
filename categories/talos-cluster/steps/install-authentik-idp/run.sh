@@ -16,6 +16,13 @@ BOOTSTRAP_ROOT="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
 authentik_secret_file="$BOOTSTRAP_ROOT/secrets/global/authentik.json"
 openbao_initialized_file="$BOOTSTRAP_ROOT/openbao/init/initialized.json"
 manifest_path="$WORKSPACE_ROOT/gitops/apps/authentik.yaml"
+databases_namespace_manifest="$WORKSPACE_ROOT/gitops/databases/namespace.yaml"
+authentik_db_cluster_manifest="$WORKSPACE_ROOT/gitops/databases/authentik/cluster.yaml"
+authentik_db_externalsecret_manifest="$WORKSPACE_ROOT/gitops/databases/authentik/externalsecret.yaml"
+authentik_db_pooler_ro_manifest="$WORKSPACE_ROOT/gitops/databases/authentik/pooler-ro.yaml"
+authentik_db_pooler_rw_manifest="$WORKSPACE_ROOT/gitops/databases/authentik/pooler-rw.yaml"
+authentik_db_pooler_rw_session_manifest="$WORKSPACE_ROOT/gitops/databases/authentik/pooler-rw-session.yaml"
+authentik_db_backup_manifest="$WORKSPACE_ROOT/gitops/databases/authentik/scheduled-backup.yaml"
 authentik_externalsecret_manifest="$WORKSPACE_ROOT/gitops/platform/authentik/externalsecret.yaml"
 authentik_ingressroute_manifest="$WORKSPACE_ROOT/gitops/platform/authentik/ingressroute.yaml"
 
@@ -210,7 +217,13 @@ trap - EXIT
 
 # Provision the PostgreSQL database cluster for Authentik
 log "Creating database cluster and resources"
-kubectl apply -k "$WORKSPACE_ROOT/gitops/databases"
+kubectl apply -f "$databases_namespace_manifest"
+kubectl apply -f "$authentik_db_cluster_manifest"
+kubectl apply -f "$authentik_db_externalsecret_manifest"
+kubectl apply -f "$authentik_db_pooler_ro_manifest"
+kubectl apply -f "$authentik_db_pooler_rw_manifest"
+kubectl apply -f "$authentik_db_pooler_rw_session_manifest"
+kubectl apply -f "$authentik_db_backup_manifest"
 
 wait_for_resources_ready "databases" "cluster" "Ready" "CloudNativePG cluster"
 wait_for_resources_ready "databases" "externalsecret" "Ready" "ExternalSecret"

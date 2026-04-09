@@ -2052,6 +2052,25 @@ def test_authentik_db_storageclass_uses_single_replica():
     assert "provisioner: driver.longhorn.io" in text
 
 
+def test_install_immich_step_uses_only_its_own_database_manifests():
+    text = (
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-immich"
+        / "run.sh"
+    ).read_text(encoding="utf-8")
+    assert "gitops/databases/namespace.yaml" in text
+    assert "gitops/databases/immich/cluster.yaml" in text
+    assert "gitops/databases/immich/externalsecret.yaml" in text
+    assert "gitops/databases/immich/pooler-ro.yaml" in text
+    assert "gitops/databases/immich/pooler-rw.yaml" in text
+    assert "gitops/databases/immich/scheduled-backup.yaml" in text
+    assert "gitops/databases/kustomization.yaml" not in text
+    assert "gitops/databases/authentik/" not in text
+
+
 def test_authentik_values_request_memory_for_server_and_worker():
     text = (REPO_ROOT / "gitops" / "apps" / "authentik" / "values.yaml").read_text(
         encoding="utf-8"
@@ -2347,6 +2366,9 @@ def test_authentik_consumer_scripts_read_from_openbao():
     assert "authentik_ensure_token" in idp_text or "authentik_load_bootstrap_secret" in idp_text
     # Flow creation should use AUTHENTIK_TOKEN from the helper, not the raw bootstrap token
     assert "Authorization: Bearer ${AUTHENTIK_TOKEN}" in idp_text
+    assert "gitops/databases/immich" not in idp_text
+    assert "immich-db" not in idp_text
+    assert "immich-db-credentials" not in idp_text
 
     for path in consumer_paths:
         text = path.read_text(encoding="utf-8")
