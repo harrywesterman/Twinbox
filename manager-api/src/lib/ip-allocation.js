@@ -89,3 +89,40 @@ export async function selectSuggestedIpAllocation({
 
   throw new Error(`No free ${nodeCount}-IP allocation found in ${prefix}.0/24`);
 }
+
+export async function checkIpAvailability({
+  ips = [],
+  isIpInUse,
+}) {
+  if (typeof isIpInUse !== "function") {
+    throw new TypeError("isIpInUse must be a function");
+  }
+
+  const normalizedIps = [];
+  const seen = new Set();
+  for (const ip of Array.isArray(ips) ? ips : []) {
+    const normalized = String(ip || "").trim();
+    if (!normalized || seen.has(normalized)) {
+      continue;
+    }
+    seen.add(normalized);
+    normalizedIps.push(normalized);
+  }
+
+  const results = [];
+  let probedAddresses = 0;
+  for (const ip of normalizedIps) {
+    probedAddresses += 1;
+    const inUse = Boolean(await isIpInUse(ip));
+    results.push({
+      ip,
+      in_use: inUse,
+      free: !inUse,
+    });
+  }
+
+  return {
+    results,
+    probed_addresses: probedAddresses,
+  };
+}

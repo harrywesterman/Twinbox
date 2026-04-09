@@ -136,7 +136,7 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   assert.equal(stepRailById['install-cloudnativepg'].icon, '🐘');
   assert.equal(stepRailById['install-pgadmin4'].title, 'Install pgAdmin 4');
   assert.equal(stepRailById['install-pgadmin4'].icon, '🗃️');
-  assert.equal(model.primaryAction.label, 'Start step 1');
+  assert.equal(model.primaryAction.label, 'Next');
   assert.equal(model.progress.totalSteps, 30);
   assert.equal(model.progress.completedSteps, 0);
   assert.equal(model.activity.runtime.currentStage, 'Applying cluster plan');
@@ -157,7 +157,7 @@ test('wizard model advances to the next step when the active step is done', () =
 
   const stepRailById = Object.fromEntries(model.stepRail.map((step) => [step.id, step]));
   assert.equal(stepRailById['provision-nodes'].isComplete, true);
-  assert.equal(model.primaryAction.label, 'Continue to step 2');
+  assert.equal(model.primaryAction.label, 'Next');
   assert.equal(model.progress.completedSteps, 1);
   assert.equal(model.healthBadges.find((badge) => badge.id === 'cluster').value, 'cluster_demo');
   assert.equal(stepRailById['install-argocd'].icon, '🔁');
@@ -217,7 +217,7 @@ test('wizard model switches to manage mode when setup flow is complete', () => {
   });
 
   assert.equal(model.mode, 'manage');
-  assert.equal(model.primaryAction.label, 'Finish setup');
+  assert.equal(model.primaryAction.label, 'Finish');
   assert.equal(model.completion.title, 'Cluster bootstrap complete');
 });
 
@@ -281,7 +281,7 @@ test('wizard model defaults to step 1 when nothing is selected', () => {
 
   assert.equal(model.activeStep.id, 'provision-nodes');
   assert.equal(model.stepRail.find((step) => step.id === 'provision-nodes')?.isCurrent, true);
-  assert.equal(model.primaryAction.label, 'Start step 1');
+  assert.equal(model.primaryAction.label, 'Next');
 });
 
 test('wizard model falls back to step 1 when a restored selection no longer exists', () => {
@@ -296,7 +296,7 @@ test('wizard model falls back to step 1 when a restored selection no longer exis
   });
 
   assert.equal(model.activeStep.id, 'provision-nodes');
-  assert.equal(model.primaryAction.label, 'Start step 1');
+  assert.equal(model.primaryAction.label, 'Next');
 });
 
 test('wizard export and import helpers round-trip answers and cluster ids', () => {

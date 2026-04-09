@@ -25,7 +25,7 @@ export function isValidIpv4(value) {
   });
 }
 
-export function buildProvisionVmIpRows(vmPlan = [], currentValues = {}, suggestionSnapshot = {}) {
+export function buildProvisionVmIpRows(vmPlan = [], currentValues = {}, suggestionSnapshot = {}, availabilityMap = {}) {
   const plan = Array.isArray(vmPlan) ? vmPlan : [];
   const currentVmIpMap = currentValues && typeof currentValues.vm_ip_map === 'object' && !Array.isArray(currentValues.vm_ip_map)
     ? currentValues.vm_ip_map
@@ -67,6 +67,13 @@ export function buildProvisionVmIpRows(vmPlan = [], currentValues = {}, suggesti
         tone: 'danger',
         label: 'Invalid IP',
         icon: '!',
+      };
+    } else if (availabilityMap && Object.prototype.hasOwnProperty.call(availabilityMap, row.value)) {
+      const isFree = Boolean(availabilityMap[row.value]);
+      status = {
+        tone: isFree ? 'success' : 'danger',
+        label: isFree ? 'Checked free' : 'Already in use',
+        icon: isFree ? '✓' : '!',
       };
     } else if (isDuplicate) {
       status = {

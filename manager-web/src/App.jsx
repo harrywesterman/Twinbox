@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import './App.css';
+import heroIllustrationUrl from './assets/hero-illustration.svg';
 import {
   buildProvisionPlacementBoard,
   PROVISION_AUTOSCALED_FIELDS,
@@ -12,6 +13,7 @@ import {
 import {
   buildProvisionVmIpMap,
   buildProvisionVmIpRows,
+  isValidIpv4,
   validateProvisionVmIpRows,
 } from './provision-network.js';
 import {
@@ -27,6 +29,7 @@ import {
   STORAGE_KEY,
   formatState,
 } from './journey.js';
+import { getQuestionSteps } from './question-flow.js';
 import {
   isMissingClusterError,
   isProvisionSuggestionReady,
@@ -120,6 +123,22 @@ function buildPayloadInputs(step, stepAnswers = {}) {
   return payload;
 }
 
+function hasRequiredValue(input, value) {
+  if (!input?.required) {
+    return true;
+  }
+
+  if (input.type === 'boolean') {
+    return typeof value === 'boolean';
+  }
+
+  if (input.type === 'integer') {
+    return Number.isFinite(Number(value));
+  }
+
+  return String(value ?? '').trim().length > 0;
+}
+
 function downloadText(filename, content) {
   const blob = new Blob([content], { type: 'application/json;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -140,6 +159,56 @@ function formatInputValue(input, value) {
   }
 
   return value ?? '';
+}
+
+function buildProvisionIpCheckTargets(vipIp, vmIpRows = []) {
+  const targets = [];
+  const seen = new Set();
+
+  const addIp = (ip) => {
+    const normalized = String(ip ?? '').trim();
+    if (!normalized || seen.has(normalized)) {
+      return;
+    }
+
+    seen.add(normalized);
+    targets.push(normalized);
+  };
+
+  addIp(vipIp);
+  for (const row of Array.isArray(vmIpRows) ? vmIpRows : []) {
+    addIp(row?.value);
+  }
+
+  return targets;
+}
+
+function summarizeProvisionIpCheckResults(results = []) {
+  const entries = Array.isArray(results) ? results : [];
+  const total = entries.length;
+  const usedIps = entries
+    .filter((entry) => entry?.in_use)
+    .map((entry) => entry.ip)
+    .filter(Boolean);
+
+  if (total === 0) {
+    return {
+      label: 'No IP addresses were checked.',
+      tone: 'neutral',
+    };
+  }
+
+  if (usedIps.length === 0) {
+    return {
+      label: `Checked ${total} address${total === 1 ? '' : 'es'}. All are free.`,
+      tone: 'success',
+    };
+  }
+
+  return {
+    label: `Checked ${total} address${total === 1 ? '' : 'es'}. ${usedIps.length} ${usedIps.length === 1 ? 'is' : 'are'} already in use: ${usedIps.slice(0, 3).join(', ')}${usedIps.length > 3 ? '…' : ''}`,
+    tone: 'danger',
+  };
 }
 
 function getDisplayStepTitle(step) {
@@ -202,6 +271,39 @@ function InputField({ stepId, input, value, onChange }) {
   }
 
   if (Array.isArray(input.options) && input.options.length > 0) {
+    if (stepId === 'choose-ingress-route' && input.id === 'ingress_route') {
+      return (
+        <div className="wizard-field wizard-field-choice-grid" aria-label={input.label}>
+          <span className="wizard-field-label">{input.label}</span>
+          <div className="wizard-choice-grid">
+            {input.options.map((option, index) => {
+              const checked = formatInputValue(input, value) === option.value;
+              return (
+                <button
+                  key={option.value}
+                  className={`wizard-choice-card ${checked ? 'is-selected' : ''}`}
+                  type="button"
+                  onClick={() => onChange(input.id, option.value)}
+                >
+                  <span className="wizard-choice-card-index">{index + 1}</span>
+                  <strong>{option.label}</strong>
+                  <small>{option.value === 'wiredoor'
+                    ? 'Use your own Wiredoor bastion host.'
+                    : option.value === 'cloudflare-tunnel'
+                      ? 'No public IP or router forwarding.'
+                      : option.value === 'metallb'
+                        ? 'Use your LAN and router port forwarding.'
+                        : 'Use Tailscale or Headscale to reach the cluster.'}</small>
+                </button>
+              );
+            })}
+          </div>
+          <small>{helpText}</small>
+          <em>{defaultLabel}</em>
+        </div>
+      );
+    }
+
     return (
       <label className="wizard-field" htmlFor={controlId}>
         <span className="wizard-field-label">{input.label}</span>
@@ -352,6 +454,19 @@ function PlacementBoard({
         </div>
       </div>
 
+      {board.managementVm ? (
+        <div className="wizard-placement-management">
+          <div>
+            <p className="eyebrow">Management VM</p>
+            <strong>{board.managementVm.name || 'Twinbox management VM'}</strong>
+            <span>
+              Currently on {board.managementVm.node || 'an unknown Proxmox host'}. It stays fixed and does not move with the cluster VMs.
+            </span>
+          </div>
+          <span className="wizard-status-badge is-warning">Fixed</span>
+        </div>
+      ) : null}
+
       <div className="wizard-placement-grid">
         {board.hostCards.map((host) => (
           <article
@@ -449,10 +564,261 @@ function buildPlacementRationale(vm, currentHostName, suggestedHostName) {
   return `Manually moved from ${suggestedHostName || 'the suggested host'} to ${currentHostName}.`;
 }
 
+const INGRESS_ROUTE_LABELS = {
+  wiredoor: '1. Wiredoor',
+  'cloudflare-tunnel': '2. Cloudflare Tunnel',
+  metallb: '3. MetalLB',
+  tailscale: '4. Tailscale',
+};
+
+const WIZARD_GUIDES = {
+  'provision-nodes': {
+    eyebrow: 'Step 1',
+    title: 'Create the Talos cluster',
+    intro: 'This is the point where Twinbox actually creates the Kubernetes cluster. You choose how many machines to make, how large they should be, and which network values Talos should use.',
+    checklist: [
+      'Pick the cluster name you want to see in Twinbox.',
+      'Choose the number of control planes and worker nodes.',
+      'Confirm the VM size, gateway, and DNS values.',
+      'Review the placement board before you continue.',
+    ],
+    screenshotTitle: 'What this step looks like',
+    screenshotLines: [
+      'Talos cluster sizing',
+      'Control plane and worker counts',
+      'Network values and VM placement',
+    ],
+    helpLink: {
+      label: 'Talos documentation',
+      href: 'https://www.talos.dev/',
+    },
+  },
+  'choose-ingress-route': {
+    eyebrow: 'Routing',
+    title: 'Choose how users will reach the cluster',
+    intro: 'Pick the ingress route that matches your network. The wizard will only show the follow-up questions for the path you choose.',
+    checklist: [
+      'Read the short explanation for each route.',
+      'Pick option 1, 2, 3, or 4.',
+      'Continue only with the follow-up questions for that route.',
+    ],
+    screenshotTitle: 'Route choice',
+    screenshotLines: [
+      '1. Wiredoor',
+      '2. Cloudflare Tunnel',
+      '3. MetalLB',
+      '4. Tailscale',
+    ],
+    helpLink: {
+      label: 'Wizard guide',
+      href: 'https://github.com/harrywesterman/twinbox/blob/main/docs/wizard-guide.md',
+    },
+  },
+  'provision-wiredoor-bastion': {
+    eyebrow: 'Wiredoor setup',
+    title: 'Create the Wiredoor bastion host',
+    intro: 'Twinbox needs a Hetzner Cloud VM that will run Wiredoor. This step asks for the Hetzner token and a few placement values, then it provisions the bastion automatically.',
+    checklist: [
+      'Create a Hetzner Cloud project.',
+      'Generate a Read & Write API token.',
+      'Choose the location and server type.',
+      'Paste your domain name and optional SSH key.',
+    ],
+    screenshotTitle: 'How to get the token',
+    screenshotLines: [
+      'Open Hetzner Cloud',
+      'Go to Security → API Tokens',
+      'Create a Read & Write token',
+      'Copy the token once and save it safely',
+    ],
+    helpLink: {
+      label: 'Hetzner Cloud',
+      href: 'https://console.hetzner.cloud/',
+    },
+  },
+  'configure-wiredoor-ingress': {
+    eyebrow: 'Wiredoor setup',
+    title: 'Connect Twinbox to Wiredoor',
+    intro: 'This step connects your cluster to the bastion host you just created. You need the Wiredoor server URL, the API token, and an optional node name.',
+    checklist: [
+      'Open the Wiredoor admin screen.',
+      'Copy the server URL exactly as shown.',
+      'Create or reuse an API token.',
+      'Leave the node name blank if you want the default.',
+    ],
+    screenshotTitle: 'Where to find it',
+    screenshotLines: [
+      'Wiredoor server URL',
+      'API token field',
+      'Optional node name',
+      'All values are pasted into Twinbox once',
+    ],
+    helpLink: {
+      label: 'Wiredoor',
+      href: 'https://wiredoor.net/',
+    },
+  },
+  'configure-cloudflare-tunnel': {
+    eyebrow: 'Cloudflare setup',
+    title: 'Prepare the Cloudflare Tunnel connection',
+    intro: 'Use one custom Cloudflare API token that can edit both the tunnel and the DNS zone. Twinbox also needs your account ID and zone ID.',
+    checklist: [
+      'Open the Cloudflare dashboard.',
+      'Create one custom token with the right permissions.',
+      'Copy the account ID and zone ID from the dashboard.',
+      'Paste those values into Twinbox.',
+    ],
+    screenshotTitle: 'Create one custom token',
+    screenshotLines: [
+      'My Profile → API Tokens',
+      'Create Custom Token',
+      'Add Tunnel Edit and DNS Edit permissions',
+      'Copy the Account ID and Zone ID',
+    ],
+    helpLink: {
+      label: 'Cloudflare API tokens',
+      href: 'https://dash.cloudflare.com/profile/api-tokens',
+    },
+  },
+  'configure-cloudflare-dns': {
+    eyebrow: 'Cloudflare setup',
+    title: 'Create the DNS records in Cloudflare',
+    intro: 'This step creates the DNS records that point your public hostnames to the Wiredoor bastion host. You only need a Cloudflare API token and your domain name.',
+    checklist: [
+      'Create a Cloudflare token with DNS edit permission.',
+      'Pick the domain you already own or added to Cloudflare.',
+      'Paste the token and domain name into Twinbox.',
+      'Let Twinbox create the A and wildcard records for you.',
+    ],
+    screenshotTitle: 'DNS token checklist',
+    screenshotLines: [
+      'Zone DNS Edit permission',
+      'Your domain name',
+      'Twinbox writes the required records automatically',
+      'No manual zone editing after this',
+    ],
+    helpLink: {
+      label: 'Cloudflare DNS',
+      href: 'https://developers.cloudflare.com/dns/',
+    },
+  },
+  'configure-metallb-ingress': {
+    eyebrow: 'MetalLB setup',
+    title: 'Prepare the local network exposure',
+    intro: 'MetalLB needs an IP range, a public host name, and optional DynDNS details if your home IP changes. Twinbox uses those values to make the cluster reachable.',
+    checklist: [
+      'Reserve a free IP range on your local network.',
+      'Decide which public host name should point to the router.',
+      'Add DynDNS details only if your IP address changes over time.',
+      'Forward ports 80 and 443 on your router.',
+    ],
+    screenshotTitle: 'What to prepare',
+    screenshotLines: [
+      'IP range for load balancers',
+      'Router public hostname',
+      'Optional DynDNS token',
+      'Port forwarding on the router',
+    ],
+    helpLink: {
+      label: 'MetalLB',
+      href: 'https://metallb.universe.tf/',
+    },
+  },
+  'configure-tailscale-ingress': {
+    eyebrow: 'Tailscale setup',
+    title: 'Connect the cluster to your tailnet',
+    intro: 'This step joins the cluster to Tailscale or Headscale. You need an auth key, and optionally a tag plus Headscale details.',
+    checklist: [
+      'Create a Tailscale auth key.',
+      'Add an ACL tag if you use one.',
+      'Only fill in Headscale if you self-host it.',
+      'Copy the values into Twinbox once.',
+    ],
+    screenshotTitle: 'Tailscale admin screen',
+    screenshotLines: [
+      'Auth keys page',
+      'Optional tag field',
+      'Headscale URL and API key only when self-hosted',
+      'No public port forwarding required',
+    ],
+    helpLink: {
+      label: 'Tailscale auth keys',
+      href: 'https://login.tailscale.com/admin/settings/keys',
+    },
+  },
+  'create-users-and-groups': {
+    eyebrow: 'Identity',
+    title: 'Create the first user account',
+    intro: 'Twinbox creates the first Authentik user and adds it to the admin group. This is the account you will use to log in to the platform later.',
+    checklist: [
+      'Enter the full name you want to see in the UI.',
+      'Choose a login name you will remember.',
+      'Add an email address if you want recovery support.',
+    ],
+    screenshotTitle: 'User account details',
+    screenshotLines: [
+      'Full name',
+      'Login name',
+      'Optional email address',
+      'This becomes the first admin account',
+    ],
+    helpLink: {
+      label: 'Authentik',
+      href: 'https://goauthentik.io/',
+    },
+  },
+};
+
+function getWizardGuide(stepId) {
+  return WIZARD_GUIDES[stepId] || {
+    eyebrow: 'Step details',
+    title: 'Review this step carefully',
+    intro: 'Twinbox will use the values from this page to continue the install.',
+    checklist: [
+      'Read the short explanation.',
+      'Fill in the fields on the page.',
+      'Continue when the values are correct.',
+    ],
+    screenshotTitle: 'Example layout',
+    screenshotLines: [
+      'Guidance on the left',
+      'Fields on the right',
+      'One clear action at the bottom',
+    ],
+  };
+}
+
+function renderTopBar({ onImportClick, showImportButton = true } = {}) {
+  return (
+    <header className="wizard-topbar">
+      <div className="wizard-brand-lockup">
+        <a className="brand" href="#top" aria-label="Twinbox installation wizard">
+          <span className="brand-mark" aria-hidden="true" />
+          <span>
+            Twinbox
+            <strong>Web Installation Wizard</strong>
+          </span>
+        </a>
+        <p className="wizard-kicker">Guided cluster bootstrap</p>
+      </div>
+      <div className="wizard-topbar-actions">
+        {showImportButton ? (
+          <button className="button button-secondary" type="button" onClick={onImportClick}>
+            Load saved answers
+          </button>
+        ) : null}
+      </div>
+    </header>
+  );
+}
+
 function App() {
   const importInputRef = useRef(null);
   const liveOutputRef = useRef(null);
+  const liveLogViewportRef = useRef(null);
+  const liveLogAutoScrollRef = useRef(true);
   const busyRef = useRef(false);
+  const hasStartedRef = useRef(false);
   const clusterIdRef = useRef('');
   const clusterCreatedAtRef = useRef('');
   const clusterInstanceIdRef = useRef('');
@@ -479,7 +845,15 @@ function App() {
   const [error, setError] = useState('');
   const [activeJob, setActiveJob] = useState(null);
   const [provisionSuggestionsReadyState, setProvisionSuggestionsReadyState] = useState(false);
+  const [provisionIpCheckState, setProvisionIpCheckState] = useState({
+    checkedAt: '',
+    results: {},
+  });
+  const [provisionIpChecking, setProvisionIpChecking] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
+  const [wizardPhase, setWizardPhase] = useState('questions');
   const placementSuggestionKeyRef = useRef('');
+  const wizardPhaseRef = useRef('questions');
 
   useEffect(() => {
     const restored = restoreUiState(window.localStorage.getItem(STORAGE_KEY));
@@ -488,6 +862,8 @@ function App() {
     setClusterCreatedAt(restored.clusterCreatedAt);
     setClusterInstanceId(restored.clusterInstanceId);
     setAnswers(restored.answers);
+    setHasStarted(Boolean(restored.selectedStepId || Object.keys(restored.answers || {}).length));
+    setWizardPhase('questions');
     hydratedRef.current = true;
   }, []);
 
@@ -526,8 +902,9 @@ function App() {
     answersRef.current = answers;
   }, [answers]);
 
-  const setupSteps = useMemo(() => getWizardSteps(catalog), [catalog]);
-  const initialAnswers = useMemo(() => buildInitialAnswers(setupSteps, answers), [setupSteps, answers]);
+  const questionSteps = useMemo(() => getQuestionSteps(answers), [answers]);
+  const setupSteps = useMemo(() => getWizardSteps(catalog, answers), [catalog, answers]);
+  const initialAnswers = useMemo(() => buildInitialAnswers([...setupSteps, ...questionSteps], answers), [questionSteps, setupSteps, answers]);
   const model = useMemo(() => {
     return getMissionControlModel({
       catalog,
@@ -540,6 +917,36 @@ function App() {
       answers: initialAnswers,
     });
   }, [answers, busy, catalog, cluster, error, health, initialAnswers, logs, selectedStepId]);
+
+  useEffect(() => {
+    if (!hasStarted || wizardPhase !== 'questions') {
+      return;
+    }
+
+    const firstQuestionId = questionSteps[0]?.id || '';
+    if (!firstQuestionId) {
+      return;
+    }
+
+    if (!selectedStepId || !questionSteps.some((step) => step.id === selectedStepId)) {
+      setSelectedStepId(firstQuestionId);
+    }
+  }, [hasStarted, wizardPhase, questionSteps, selectedStepId]);
+
+  useEffect(() => {
+    if (!hasStarted || wizardPhase !== 'install') {
+      return;
+    }
+
+    const firstInstallStepId = setupSteps[0]?.id || '';
+    if (!firstInstallStepId) {
+      return;
+    }
+
+    if (!selectedStepId || !setupSteps.some((step) => step.id === selectedStepId)) {
+      setSelectedStepId(firstInstallStepId);
+    }
+  }, [hasStarted, wizardPhase, setupSteps, selectedStepId]);
 
   const visibleActiveJob = useMemo(() => {
     if (activeJob?.id) {
@@ -596,6 +1003,7 @@ function App() {
           setNotice,
           setError,
           setProvisionSuggestionsReady: setProvisionSuggestionsReadyState,
+          allowAutoSelectStep: hasStartedRef.current && wizardPhaseRef.current === 'install',
         });
       } catch (refreshError) {
         if (!cancelled) {
@@ -718,8 +1126,43 @@ function App() {
     busyRef.current = busy;
   }, [busy]);
 
-  // Auto-scroll disabled: users should control their own scroll position.
-  // The live output panel is visible in the layout without forced scrolling.
+  useEffect(() => {
+    hasStartedRef.current = hasStarted;
+  }, [hasStarted]);
+
+  useEffect(() => {
+    wizardPhaseRef.current = wizardPhase;
+  }, [wizardPhase]);
+
+  useEffect(() => {
+    const viewport = liveLogViewportRef.current;
+    if (!viewport) {
+      return undefined;
+    }
+
+    const handleScroll = () => {
+      const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+      liveLogAutoScrollRef.current = distanceFromBottom < 72;
+    };
+
+    viewport.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+
+    return () => {
+      viewport.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!liveLogAutoScrollRef.current) {
+      return;
+    }
+
+    const viewport = liveLogViewportRef.current;
+    if (viewport) {
+      viewport.scrollTop = viewport.scrollHeight;
+    }
+  }, [logs, activeJob?.id, model?.activity?.runtime?.currentStage]);
 
   async function pollJob(jobId) {
     let latestJob = null;
@@ -810,6 +1253,23 @@ function App() {
     const body = {
       inputs: buildPayloadInputs(step, draft),
     };
+
+    if (step.id === 'provision-nodes') {
+      const ipAvailability = await fetchProvisionIpAvailability();
+      if (ipAvailability.checkedAt) {
+        setProvisionIpCheckState({
+          checkedAt: ipAvailability.checkedAt,
+          results: ipAvailability.results || {},
+        });
+      }
+
+      if (!ipAvailability.ok) {
+        const message = ipAvailability.error || ipAvailability.summary?.label || 'IP addresses must be free before starting step 1.';
+        setError(message);
+        setNotice(message);
+        return { ok: false, error: message };
+      }
+    }
 
     if (clusterInstanceIdRef.current) {
       body.cluster_instance_id = clusterInstanceIdRef.current;
@@ -943,42 +1403,50 @@ function App() {
   }
 
   async function handlePrimaryAction() {
-    if (!model.activeStep || model.primaryAction.disabled || busyRef.current) {
+    if (!isQuestionPhase || !currentStep || busyRef.current) {
       return;
     }
 
-    busyRef.current = true;
-    try {
-      if (model.activeStep.id === 'provision-nodes' && !provisionStepValid) {
-        const message = provisionVmIpValidation.error || 'Step 1 is still preparing. Wait until the button says Start step 1.';
-        setNotice(message);
+    if (currentStep?.id === 'provision-nodes' && !provisionStepValid) {
+      const message = provisionVmIpValidation.error || 'Step 1 is still preparing. Wait until the button says Next.';
+      setNotice(message);
+      return;
+    }
+
+    if (currentStep?.id === 'provision-nodes') {
+      const availabilityCheck = await checkProvisionIpAvailability();
+      if (!availabilityCheck.ok) {
+        return;
+      }
+    }
+
+    if (isQuestionPhase) {
+      if (nextQuestionStep) {
+        setSelectedStepId(nextQuestionStep.id);
         return;
       }
 
-      if (model.primaryAction.type === 'unskip') {
-        await handleUnskipAndExecute(model.activeStep);
-        return;
-      }
-
-      if (model.primaryAction.type === 'advance' && model.nextStep) {
-        setSelectedStepId(model.nextStep.id);
-        setNotice(`Moved to ${model.nextStep.title}.`);
-        return;
-      }
-
-      if (model.primaryAction.type === 'finish') {
-        setNotice('The cluster bootstrap is finished. Export the answers file to keep this configuration.');
-        return;
-      }
-
-      await executeStep(model.activeStep);
-    } finally {
-      busyRef.current = false;
+      const firstInstallStepId = setupSteps[0]?.id || 'provision-nodes';
+      setWizardPhase('install');
+      setSelectedStepId(firstInstallStepId);
+      setNotice('Review each install step, run them one by one, or use Install all.');
+      return;
     }
   }
 
   async function handleReinstallStep(step) {
-    if (!step || step.status !== 'done') {
+    if (!step || busyRef.current || step.status === 'running' || step.status === 'locked') {
+      return;
+    }
+
+    if (step.id === 'provision-nodes' && !provisionStepValid) {
+      const message = provisionVmIpValidation.error || 'Step 1 is still preparing. Wait until the placement and IP suggestions are ready.';
+      setNotice(message);
+      return;
+    }
+
+    if (step.status === 'skipped') {
+      await handleUnskipAndExecute(step);
       return;
     }
 
@@ -1042,12 +1510,15 @@ function App() {
     }
   }
 
-  async function handleUnskipAndExecute(step) {
-    if (!step || busy || step.status !== 'skipped') {
+  async function handleUnskipAndExecute(step, options = {}) {
+    const { manageBusy = true } = options;
+    if (!step || (manageBusy && busy) || step.status !== 'skipped') {
       return;
     }
 
-    setBusy(true);
+    if (manageBusy) {
+      setBusy(true);
+    }
     setError('');
     try {
       const response = await fetch(`/api/steps/${step.id}/unskip`, {
@@ -1086,41 +1557,77 @@ function App() {
         setProvisionSuggestionsReady: setProvisionSuggestionsReadyState,
       });
       const refreshedStep = { ...step, status: 'ready' };
-      await executeStep(refreshedStep);
+      return await executeStep(refreshedStep, clusterIdRef.current, { manageBusy });
     } catch (err) {
       const message = err instanceof Error ? err.message : `Failed to run ${step.title}`;
       setError(message);
+      return { ok: false, error: message };
     } finally {
-      setBusy(false);
+      if (manageBusy) {
+        setBusy(false);
+      }
     }
   }
 
-  async function handleInstallAllSteps() {
+  async function handleInstallCurrentStep(step) {
+    if (!step || busyRef.current) {
+      return;
+    }
+
+    if (step.id === 'provision-nodes' && !provisionStepValid) {
+      const message = provisionVmIpValidation.error || 'Step 1 is still preparing. Wait until the placement and IP suggestions are ready.';
+      setNotice(message);
+      return;
+    }
+
+    if (step.status === 'locked') {
+      setNotice(`Run the earlier steps first before installing ${step.title}.`);
+      return;
+    }
+
+    if (step.status === 'skipped') {
+      await handleUnskipAndExecute(step);
+      return;
+    }
+
+    await executeStep(step);
+  }
+
+  async function handleInstallAllSteps(fromStepId = selectedStepId) {
     if (!setupSteps.length || busyRef.current) {
       return;
     }
 
-    const pendingSteps = getWizardSteps(catalog).filter(
-      (step) => step.status !== 'done' && step.status !== 'skipped'
-    );
+    const currentSteps = getWizardSteps(catalog, answersRef.current);
+    const startIndex = Math.max(0, currentSteps.findIndex((step) => step.id === fromStepId));
+    const pendingSteps = currentSteps
+      .slice(startIndex)
+      .filter((step) => step.status !== 'done' && step.status !== 'configured');
     if (!pendingSteps.length) {
-      setNotice('Every setup step is already complete.');
+      setNotice('Every remaining setup step is already complete.');
       return;
     }
 
     setBusy(true);
     setError('');
-    setNotice('Installing all setup steps in order.');
+    setNotice('Installing all remaining setup steps in order.');
+    setWizardPhase('install');
 
     try {
       let nextClusterId = clusterIdRef.current;
       let currentCatalogData = catalog;
 
       for (const step of pendingSteps) {
-        const currentCatalog = getWizardSteps(currentCatalogData);
+        const currentCatalog = getWizardSteps(currentCatalogData, answersRef.current);
         const currentStep = currentCatalog.find((candidate) => candidate.id === step.id) || step;
 
+        setSelectedStepId(currentStep.id);
+
         if (currentStep.status === 'done') {
+          continue;
+        }
+
+        if (currentStep.status === 'configured') {
           continue;
         }
 
@@ -1128,7 +1635,9 @@ function App() {
           throw new Error(`${currentStep.title} is locked until its dependencies are complete.`);
         }
 
-        const result = await executeStep(currentStep, nextClusterId, { manageBusy: false });
+        const result = currentStep.status === 'skipped'
+          ? await handleUnskipAndExecute(currentStep, { manageBusy: false })
+          : await executeStep(currentStep, nextClusterId, { manageBusy: false });
         nextClusterId = result.clusterId || nextClusterId;
 
         if (!result.ok) {
@@ -1161,7 +1670,7 @@ function App() {
           ...current,
           [stepId]: buildScaledProvisionInputs(
             currentScale,
-            model.activeStep?.inputs || [],
+            currentStep?.inputs || [],
             nextStep,
             provisionDirtyFieldsRef.current,
             proxmoxResources,
@@ -1177,7 +1686,7 @@ function App() {
   }
 
   function updatePlacement(vmName, hostName) {
-    if (!vmName || !hostName || model.activeStep?.id !== 'provision-nodes') {
+    if (!vmName || !hostName || currentStep?.id !== 'provision-nodes') {
       return;
     }
 
@@ -1185,18 +1694,18 @@ function App() {
       ? currentDraft.vm_node_map
       : {};
 
-    updateAnswer(model.activeStep.id, 'vm_node_map', {
+    updateAnswer(currentStep.id, 'vm_node_map', {
       ...currentMap,
       [vmName]: hostName,
     });
   }
 
   function resetPlacementToSuggested() {
-    if (!placementBoard || model.activeStep?.id !== 'provision-nodes') {
+    if (!placementBoard || currentStep?.id !== 'provision-nodes') {
       return;
     }
 
-    updateAnswer(model.activeStep.id, 'vm_node_map', placementBoard.suggestedVmNodeMap || {});
+    updateAnswer(currentStep.id, 'vm_node_map', placementBoard.suggestedVmNodeMap || {});
   }
 
   function handleExportAnswers() {
@@ -1219,6 +1728,132 @@ function App() {
     importInputRef.current?.click();
   }
 
+  async function fetchProvisionIpAvailability() {
+    if (currentStep?.id !== 'provision-nodes') {
+      return {
+        ok: false,
+        error: 'IP checks are only available on Deploy Talos Cluster.',
+      };
+    }
+
+    if (!provisionVmIpRows.length) {
+      return {
+        ok: false,
+        error: 'Enter the Talos IP values before checking availability.',
+      };
+    }
+
+    const vipIp = String(currentDraft.vip_ip || '').trim();
+    if (vipIp && !isValidIpv4(vipIp)) {
+      return {
+        ok: false,
+        error: 'VIP IP must be a valid IPv4 address.',
+      };
+    }
+
+    const invalidVmRow = provisionVmIpRows.find((row) => !row.isValid);
+    if (invalidVmRow) {
+      return {
+        ok: false,
+        error: provisionVmIpValidation.error || `Invalid IP address for ${invalidVmRow.label || invalidVmRow.name}`,
+      };
+    }
+
+    const targets = buildProvisionIpCheckTargets(vipIp, provisionVmIpRows);
+    if (!targets.length) {
+      return {
+        ok: false,
+        error: 'Enter at least one IP address before checking them.',
+      };
+    }
+
+    const response = await requestJson('/api/ip-availability', {
+      method: 'POST',
+      body: JSON.stringify({ ips: targets }),
+    });
+
+    const results = Array.isArray(response?.results) ? response.results : [];
+    const availabilityResults = results.reduce((accumulator, item) => {
+      if (item?.ip) {
+        accumulator[item.ip] = !item.in_use;
+      }
+      return accumulator;
+    }, {});
+    const summary = summarizeProvisionIpCheckResults(results);
+
+    return {
+      ok: summary.tone !== 'danger',
+      checkedAt: new Date().toISOString(),
+      results: availabilityResults,
+      summary,
+    };
+  }
+
+  async function checkProvisionIpAvailability() {
+    if (currentStep?.id !== 'provision-nodes' || busyRef.current || provisionIpChecking) {
+      return {
+        ok: false,
+        error: 'Wait until the current action finishes before checking IPs again.',
+      };
+    }
+
+    setProvisionIpChecking(true);
+    setError('');
+    setNotice('Checking IP addresses...');
+
+    try {
+      const result = await fetchProvisionIpAvailability();
+      if (result.checkedAt) {
+        setProvisionIpCheckState({
+          checkedAt: result.checkedAt,
+          results: result.results || {},
+        });
+      }
+
+      if (result.ok) {
+        setNotice(result.summary?.label || 'IP addresses are free.');
+        return result;
+      }
+
+      const message = result.error || result.summary?.label || 'One or more IP addresses are already in use.';
+      setError(message);
+      setNotice(message);
+      return result;
+    } catch (availabilityError) {
+      const message = availabilityError instanceof Error ? availabilityError.message : 'Failed to check IP availability.';
+      setError(message);
+      setNotice(message);
+      return { ok: false, error: message };
+    } finally {
+      setProvisionIpChecking(false);
+    }
+  }
+
+  function handleStartNewSetup() {
+    const firstStepId = questionSteps[0]?.id || 'provision-nodes';
+    setHasStarted(true);
+    setWizardPhase('questions');
+    setSelectedStepId(firstStepId);
+    setAnswers({});
+    setClusterId('');
+    setClusterCreatedAt('');
+    setClusterInstanceId('');
+    setCluster(null);
+    setLogs([]);
+    setActiveJob(null);
+    setError('');
+    setNotice('Starting a new setup.');
+    setProvisionSuggestionsReadyState(false);
+    clusterIdRef.current = '';
+    clusterCreatedAtRef.current = '';
+    clusterInstanceIdRef.current = '';
+    selectedStepIdRef.current = firstStepId;
+    provisionDirtyFieldsRef.current = new Set();
+    provisionSuggestionKeyRef.current = '';
+    provisionSuggestionSnapshotRef.current = {};
+    placementSuggestionKeyRef.current = '';
+  }
+
   async function handleImportFile(event) {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -1235,6 +1870,8 @@ function App() {
       setClusterId(imported.clusterId);
       setClusterCreatedAt(imported.clusterCreatedAt);
       setClusterInstanceId(imported.clusterInstanceId);
+      setHasStarted(true);
+      setWizardPhase('questions');
       setAnswers((current) => {
         const next = { ...current };
         for (const [stepId, stepAnswers] of Object.entries(importedAnswers)) {
@@ -1257,17 +1894,58 @@ function App() {
     }
   }
 
-  const topMetrics = [
-    { label: 'Progress', value: `${model.progress.completedSteps}/${model.progress.totalSteps}` },
-    { label: 'Current step', value: model.activeStep ? `${model.progress.stepIndex}` : '0' },
-    { label: 'Cluster', value: cluster?.id || clusterId || 'Not created' },
-  ];
+  const questionStepIndex = questionSteps.findIndex((step) => step.id === selectedStepId);
+  const currentQuestionStep = questionStepIndex >= 0 ? questionSteps[questionStepIndex] : (questionSteps[0] || null);
+  const previousQuestionStep = questionStepIndex > 0 ? questionSteps[questionStepIndex - 1] : null;
+  const nextQuestionStep = questionStepIndex >= 0 && questionStepIndex < questionSteps.length - 1
+    ? questionSteps[questionStepIndex + 1]
+    : null;
+  const installStepIndex = setupSteps.findIndex((step) => step.id === selectedStepId);
+  const safeInstallStepIndex = installStepIndex >= 0 ? installStepIndex : 0;
+  const currentInstallStep = installStepIndex >= 0 ? setupSteps[installStepIndex] : (setupSteps[0] || null);
+  const previousInstallStep = installStepIndex > 0 ? setupSteps[installStepIndex - 1] : null;
+  const nextInstallStep = installStepIndex >= 0 && installStepIndex < setupSteps.length - 1
+    ? setupSteps[installStepIndex + 1]
+    : null;
+  const isQuestionPhase = hasStarted && wizardPhase === 'questions';
+  const currentStep = isQuestionPhase ? currentQuestionStep : (currentInstallStep || model.activeStep);
 
-  const currentDraft = model.activeStep
-    ? buildInitialAnswers([model.activeStep], answers)[model.activeStep.id]
+  useEffect(() => {
+    if (wizardPhase !== 'install') {
+      return;
+    }
+
+    const latestJobId = currentInstallStep?.latest_job?.id;
+    if (!latestJobId) {
+      setLogs([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const logsData = await requestJson(`/api/jobs/${encodeURIComponent(latestJobId)}/logs`);
+        if (!cancelled) {
+          setLogs(Array.isArray(logsData?.lines) ? logsData.lines : []);
+        }
+      } catch {
+        if (!cancelled) {
+          setLogs([]);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentInstallStep?.latest_job?.id, selectedStepId, wizardPhase]);
+
+  const currentDraft = currentStep
+    ? buildInitialAnswers([currentStep], answers)[currentStep.id]
     : {};
   useEffect(() => {
-    if (model.activeStep?.id !== 'provision-nodes') {
+    if (currentStep?.id !== 'provision-nodes') {
       setProvisionSuggestionsReadyState(false);
       return;
     }
@@ -1282,65 +1960,119 @@ function App() {
       return;
     }
 
-    const suggestionKey = `${managementIp}:${getProvisionNodeCount(model.activeStep.inputs || [], currentDraft)}`;
+    const suggestionKey = `${managementIp}:${getProvisionNodeCount(currentStep.inputs || [], currentDraft)}`;
 
     setProvisionSuggestionsReadyState(
       provisionSuggestionKeyRef.current === suggestionKey
       && Object.keys(provisionSuggestionSnapshotRef.current || {}).length > 0,
     );
-  }, [clusterInstanceId, currentDraft.controlplane_count, currentDraft.worker_count, model.activeStep?.id]);
+  }, [clusterInstanceId, currentDraft.controlplane_count, currentDraft.worker_count, currentStep?.id]);
 
-  const placementBoard = model.activeStep?.id === 'provision-nodes'
-    ? buildProvisionPlacementBoard(model.activeStep.inputs || [], currentDraft, proxmoxResources)
+  const placementBoard = currentStep?.id === 'provision-nodes'
+    ? buildProvisionPlacementBoard(currentStep.inputs || [], currentDraft, proxmoxResources)
     : null;
-  const provisionVmIpRows = model.activeStep?.id === 'provision-nodes'
-    ? buildProvisionVmIpRows(placementBoard?.vmPlan || [], currentDraft, provisionSuggestionSnapshotRef.current)
+  const provisionVmIpRows = currentStep?.id === 'provision-nodes'
+    ? buildProvisionVmIpRows(
+      placementBoard?.vmPlan || [],
+      currentDraft,
+      provisionSuggestionSnapshotRef.current,
+      provisionIpCheckState.results,
+    )
     : [];
-  const provisionVmIpValidation = model.activeStep?.id === 'provision-nodes'
+  const provisionVmIpValidation = currentStep?.id === 'provision-nodes'
     ? validateProvisionVmIpRows(provisionVmIpRows)
     : { ok: true, error: '', invalidRows: [], duplicateRows: [] };
+  const provisionIpCheckSummary = currentStep?.id === 'provision-nodes' && provisionIpCheckState.checkedAt
+    ? summarizeProvisionIpCheckResults(
+      Object.entries(provisionIpCheckState.results || {}).map(([ip, free]) => ({ ip, in_use: !free })),
+    )
+    : null;
   const provisionSubnet = provisionSuggestionSnapshotRef.current?.subnet
     || (currentDraft.vip_ip
       ? `${String(currentDraft.vip_ip).split('.').slice(0, 3).join('.')}.0/24`
       : '192.168.1.0/24');
-  const provisionInputGroups = model.activeStep?.id === 'provision-nodes'
-    ? getProvisionInputGroups(model.activeStep.inputs || [])
+  const provisionInputGroups = currentStep?.id === 'provision-nodes'
+    ? getProvisionInputGroups(currentStep.inputs || [])
     : { vmInputs: [], networkInputs: [] };
-  const provisionScaleSummary = model.activeStep?.id === 'provision-nodes'
+  const provisionScaleSummary = currentStep?.id === 'provision-nodes'
     ? buildProvisionScaleSummary(
       currentDraft.scale_percent ?? 30,
-      model.activeStep.inputs || [],
+      currentStep.inputs || [],
       currentDraft,
       proxmoxResources,
     )
     : null;
-  const provisionSuggestionKey = model.activeStep?.id === 'provision-nodes'
-    ? `${window.location.hostname}:${getProvisionNodeCount(model.activeStep.inputs || [], currentDraft)}`
+  const provisionSuggestionKey = currentStep?.id === 'provision-nodes'
+    ? `${window.location.hostname}:${getProvisionNodeCount(currentStep.inputs || [], currentDraft)}`
     : '';
-  const provisionPlacementReady = model.activeStep?.id !== 'provision-nodes' || Boolean(placementBoard?.hostCards?.length);
+  const provisionPlacementReady = currentStep?.id !== 'provision-nodes' || Boolean(placementBoard?.hostCards?.length);
   const provisionSuggestionsReady = isProvisionSuggestionReady({
-    activeStepId: model.activeStep?.id || '',
+    activeStepId: currentStep?.id || '',
     suggestionKey: provisionSuggestionKey,
     currentSuggestionKey: provisionSuggestionKeyRef.current,
     suggestionSnapshot: provisionSuggestionSnapshotRef.current,
   });
   const provisionStepReady = provisionPlacementReady && provisionSuggestionsReady;
   const provisionStepValid = provisionStepReady && provisionVmIpValidation.ok;
-  const stepOnePending = model.activeStep?.id === 'provision-nodes' && !provisionStepReady;
-  const primaryActionDisabled = model.primaryAction.disabled || !provisionStepValid;
-  const primaryActionLabel = stepOnePending
-    ? (!provisionPlacementReady ? 'Loading placement data…' : 'Loading step 1…')
-    : model.primaryAction.label;
-  const primaryActionHelperText = stepOnePending
-    ? !provisionPlacementReady
-      ? 'Waiting for Proxmox host data before starting step 1.'
-      : 'Waiting for step 1 suggestions to load.'
-    : !provisionVmIpValidation.ok && model.activeStep?.id === 'provision-nodes'
+  const stepOnePending = currentStep?.id === 'provision-nodes' && !provisionStepReady;
+  const questionInputsValid = currentStep
+    ? (currentStep.inputs || []).every((input) => hasRequiredValue(input, currentDraft[input.id]))
+    : false;
+  const primaryActionDisabled = stepOnePending || !provisionStepValid || !questionInputsValid || busy || provisionIpChecking;
+  const primaryActionLabel = isQuestionPhase
+    ? ((currentStep?.id === 'provision-nodes' && provisionIpChecking)
+      ? 'Checking...'
+      : (questionStepIndex === questionSteps.length - 1 ? 'Continue to installation' : 'Next'))
+    : '';
+  const primaryActionHelperText = isQuestionPhase
+    ? (currentStep?.id === 'provision-nodes' && provisionIpChecking
+      ? 'Checking IP addresses again before moving forward.'
+      : !questionInputsValid
+      ? 'Fill in the required values before continuing.'
+      : stepOnePending
+        ? (!provisionPlacementReady ? 'Waiting for Proxmox host data before continuing.' : 'Waiting for step 1 suggestions to load.')
+        : questionStepIndex === questionSteps.length - 1
+          ? 'The questions are complete. Continue to the installation steps.'
+          : 'Review the values on this page and continue to the next question.')
+    : '';
+  const installStepCount = setupSteps.length;
+  const isCurrentStepComplete = currentStep?.status === 'done' || currentStep?.status === 'configured';
+  const stepHasRunBefore = Boolean(currentStep?.latest_job) || ['done', 'configured', 'failed', 'canceled', 'skipped'].includes(currentStep?.status || '');
+  const installStepBlocked = currentStep?.status === 'locked';
+  const installButtonDisabled = !currentStep
+    || busy
+    || currentStep?.status === 'running'
+    || installStepBlocked
+    || isCurrentStepComplete
+    || (currentStep?.id === 'provision-nodes' && !provisionStepValid);
+  const reinstallButtonDisabled = !currentStep
+    || busy
+    || currentStep?.status === 'running'
+    || installStepBlocked
+    || !stepHasRunBefore
+    || (currentStep?.id === 'provision-nodes' && !provisionStepValid);
+  const remainingInstallableSteps = setupSteps
+    .slice(safeInstallStepIndex)
+    .filter((step) => step.status !== 'done' && step.status !== 'configured');
+  const installAllDisabled = !currentStep
+    || busy
+    || installStepBlocked
+    || remainingInstallableSteps.length === 0
+    || (currentStep?.id === 'provision-nodes' && !provisionStepValid);
+  const installActionHelperText = stepOnePending
+    ? (!provisionPlacementReady
+      ? 'Waiting for Proxmox host data before installing step 1.'
+      : 'Waiting for step 1 suggestions to load before installing.')
+    : !provisionVmIpValidation.ok && currentStep?.id === 'provision-nodes'
       ? provisionVmIpValidation.error
-      : model.primaryAction.helperText;
+      : installStepBlocked
+        ? 'This step is still waiting for earlier steps to finish.'
+        : isCurrentStepComplete
+          ? 'This step is complete. Use Reinstall to run it again, or move to the next step.'
+          : 'Use Install to run only this step, or Install all to continue automatically from here.';
 
   useEffect(() => {
-    if (model.activeStep?.id !== 'provision-nodes') {
+    if (currentStep?.id !== 'provision-nodes') {
       return;
     }
 
@@ -1382,18 +2114,18 @@ function App() {
         }
 
         setAnswers((current) => {
-          const currentStep = current[model.activeStep.id] || {};
+          const activeProvisionDraft = current[currentStep.id] || {};
           const merged = mergeSuggestedProvisionDraft({
-            currentDraft: currentStep,
+            currentDraft: activeProvisionDraft,
             previousSuggested: buildSuggestedProvisionInputs(provisionSuggestionSnapshotRef.current),
             suggestionData,
-            stepInputs: model.activeStep.inputs || [],
+            stepInputs: currentStep.inputs || [],
             dirtyFields: Object.fromEntries([...provisionDirtyFieldsRef.current].map((fieldId) => [fieldId, true])),
           });
 
           return {
             ...current,
-            [model.activeStep.id]: merged,
+            [currentStep.id]: merged,
           };
         });
 
@@ -1408,14 +2140,14 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [clusterInstanceId, currentDraft.controlplane_count, currentDraft.worker_count, model.activeStep?.id]);
+  }, [clusterInstanceId, currentDraft.controlplane_count, currentDraft.worker_count, currentStep?.id]);
 
   useEffect(() => {
-    if (!placementBoard || model.activeStep?.id !== 'provision-nodes') {
+    if (!placementBoard || currentStep?.id !== 'provision-nodes') {
       return;
     }
 
-    const suggestionKey = `${clusterInstanceIdRef.current || clusterIdRef.current || ''}:${model.activeStep.id}`;
+    const suggestionKey = `${clusterInstanceIdRef.current || clusterIdRef.current || ''}:${currentStep.id}`;
     const currentMap = currentDraft.vm_node_map && typeof currentDraft.vm_node_map === 'object'
       ? currentDraft.vm_node_map
       : {};
@@ -1431,134 +2163,71 @@ function App() {
     }
 
     placementSuggestionKeyRef.current = suggestionKey;
-    updateAnswer(model.activeStep.id, 'vm_node_map', placementBoard.suggestedVmNodeMap || {});
-  }, [clusterInstanceId, clusterId, currentDraft, model.activeStep, placementBoard]);
+    updateAnswer(currentStep.id, 'vm_node_map', placementBoard.suggestedVmNodeMap || {});
+  }, [clusterInstanceId, clusterId, currentDraft, currentStep, placementBoard]);
 
-  const canInstallAll = !busy && model.mode === 'setup' && model.progress.remainingSteps > 0;
+  const wizardGuide = getWizardGuide(currentStep?.id);
+  const activeStepIsChoice = currentStep?.id === 'choose-ingress-route';
+  const activeStepIsQuestion = Boolean(currentStep?.inputs?.length) || activeStepIsChoice || currentStep?.id === 'provision-nodes';
+  const activeStepTitle = getDisplayStepTitle(currentStep);
+  const activeStepPresentation = getStepPresentation(currentStep);
+  const questionStepCount = questionSteps.length;
+  const stepContextSummary = isQuestionPhase
+    ? currentStep?.summary || currentStep?.explanation || ''
+    : model.activity.explanation;
+  const stepContextSideHelp = isQuestionPhase
+    ? currentStep?.explanation || currentStep?.side_help || ''
+    : model.activity.sideHelp;
 
-  const activeStepTitle = getDisplayStepTitle(model.activeStep);
-  const activeStepPresentation = getStepPresentation(model.activeStep);
-  const activeStepLinks = getStepLinkItems(model.activeStep);
+  if (!hasStarted) {
+    return (
+      <div className="wizard-shell wizard-shell-start">
+        {renderTopBar({ onImportClick: handleImportClick, showImportButton: false })}
+        <div className="wizard-start-screen">
+          <section className="wizard-start-card">
+            <div className="wizard-start-hero">
+              <img src={heroIllustrationUrl} alt="" aria-hidden="true" />
+            </div>
+            <p className="eyebrow">Twinbox setup wizard</p>
+            <h1>Install a Twinbox cluster</h1>
+            <p className="wizard-start-copy">
+              This wizard collects the setup values Twinbox needs, and then installs the cluster in one long automatic run.
+            </p>
+
+            <div className="wizard-start-actions">
+              <button className="button button-primary" type="button" onClick={handleStartNewSetup}>
+                Start a new setup
+              </button>
+            </div>
+          </section>
+        </div>
+
+        <input
+          ref={importInputRef}
+          type="file"
+          accept="application/json"
+          className="wizard-file-input"
+          onChange={handleImportFile}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="wizard-shell">
-      <header className="wizard-topbar">
-        <div className="wizard-brand-lockup">
-          <a className="brand" href="#top" aria-label="Twinbox installation wizard">
-            <span className="brand-mark" aria-hidden="true" />
-            <span>
-              Twinbox
-              <strong>Web Installation Wizard</strong>
-            </span>
-          </a>
-          <p className="wizard-kicker">Guided cluster bootstrap</p>
-        </div>
+      {renderTopBar({ onImportClick: handleImportClick, showImportButton: true })}
 
-        <div className="wizard-topbar-metrics" aria-label="Wizard summary">
-          {topMetrics.map((metric) => (
-            <div key={metric.label} className="wizard-metric">
-              <span>{metric.label}</span>
-              <strong>{metric.value}</strong>
-            </div>
-          ))}
-        </div>
-
-        <div className="wizard-topbar-actions">
-          <button className="button button-secondary" type="button" onClick={handleExportAnswers}>
-            Export all answers
-          </button>
-          <button className="button button-secondary" type="button" onClick={handleImportClick}>
-            Import all answers
-          </button>
-          <button className="button button-primary" type="button" onClick={handleInstallAllSteps} disabled={!canInstallAll}>
-            Install all steps
-          </button>
-        </div>
-      </header>
-
-      {(notice || error || visibleActiveJob?.id) && (
-      <section className={`wizard-banner ${error ? 'is-error' : visibleActiveJob?.id ? 'is-notice' : 'is-notice'}`} aria-live="polite">
-        <div>
-          <strong>{error ? 'Something needs attention' : visibleActiveJob?.id ? 'Job in progress' : 'Status update'}</strong>
-          <p>{error || notice || `Job ${visibleActiveJob.id} is ${visibleActiveJob.status.replace(/_/g, ' ')}`}</p>
-        </div>
-        <div className="wizard-banner-actions">
-          {visibleActiveJob?.id && ['pending', 'running', 'cancel_requested'].includes(visibleActiveJob.status) ? (
-            <button
-              className="button button-danger"
-              type="button"
-              onClick={handleCancelActiveJob}
-              disabled={visibleActiveJob.status === 'cancel_requested'}
-            >
-              {visibleActiveJob.status === 'cancel_requested' ? 'Stopping...' : 'Stop job'}
-            </button>
-          ) : null}
-          {visibleActiveJob?.id ? (
-            <span className="wizard-banner-job">Job {visibleActiveJob.id}</span>
-          ) : null}
-        </div>
-      </section>
-      )}
-
-      <main className="wizard-layout">
-        <aside className="wizard-rail" aria-label="Installation steps">
-          <div className="wizard-rail-summary">
-            <p className="eyebrow">Step rail</p>
-            <h2>One step at a time</h2>
-            <p>
-              The wizard keeps the current step in focus and moves linearly from provisioning to bootstrap.
-            </p>
-            <div className="wizard-progress-bar" aria-hidden="true">
-              <span style={{ width: `${model.progress.percent}%` }} />
-            </div>
-          </div>
-
-          <nav className="wizard-step-list">
-            {model.stepRail.map((step) => {
-              const stepModel = model.steps.find((candidate) => candidate.id === step.id) || step;
-              const stepTitle = getDisplayStepTitle(stepModel);
-
-              return (
-                <div
-                  key={step.id}
-                  className={`wizard-step ${step.isCurrent ? 'is-current' : ''} ${step.status === 'done' ? 'is-complete' : ''}`}
-                >
-                  <button
-                    type="button"
-                    className="wizard-step-select"
-                    onClick={() => {
-                      setSelectedStepId(step.id);
-                      setNotice(`Viewing ${stepTitle}.`);
-                    }}
-                  >
-                    <span className="wizard-step-index">{String(step.index).padStart(2, '0')}</span>
-                    <span className="wizard-step-icon" aria-hidden="true">{step.icon || '🚀'}</span>
-                    <span className="wizard-step-body">
-                      <strong>{stepTitle}</strong>
-                      <small>{formatState(step.status, 'Ready')}</small>
-                    </span>
-                  </button>
-
-                  {step.status === 'done' ? (
-                    <button
-                      type="button"
-                      className="button button-secondary wizard-step-reinstall"
-                      onClick={() => handleReinstallStep(stepModel)}
-                      disabled={busy || step.status === 'running'}
-                    >
-                      Reinstall
-                    </button>
-                  ) : null}
-                </div>
-              );
-            })}
-          </nav>
-        </aside>
-
-        <section className="wizard-workspace">
-          <div className="wizard-workspace-header">
+      <main className="wizard-layout wizard-layout-minimal">
+        <section className="wizard-workspace wizard-workspace-minimal">
+          <div className="wizard-workspace-header wizard-workspace-header-minimal">
             <div className="wizard-workspace-copy">
-              <p className="eyebrow">Twinbox installer</p>
+              <p className="eyebrow">
+                {isQuestionPhase && currentStep
+                  ? `Question ${questionStepIndex + 1} of ${questionStepCount}`
+                  : currentStep
+                    ? `Install step ${safeInstallStepIndex + 1} of ${installStepCount}`
+                    : 'Twinbox installer'}
+              </p>
               <div className="wizard-workspace-stepline">
                 <span
                   className={`wizard-step-icon wizard-step-icon-large ${activeStepPresentation.iconArtworkUrl ? 'is-artwork' : ''}`}
@@ -1577,37 +2246,40 @@ function App() {
                   )}
                 </span>
                 <div className="wizard-workspace-stepline-copy">
-                  <h1>{model.completion ? model.completion.title : activeStepTitle || 'Choose a setup step'}</h1>
+                  <h1>{model.completion ? model.completion.title : activeStepTitle || 'Question'}</h1>
                   <p className="wizard-intro wizard-step-pitch">
                     {model.completion
                       ? model.completion.summary
-                      : model.activity.summary}
+                      : isQuestionPhase
+                        ? currentStep?.summary || model.activity.summary
+                        : model.activity.summary}
                   </p>
-                  {activeStepLinks.length ? (
-                    <div className="wizard-step-links wizard-step-links-top" aria-label="Step resources">
-                      {activeStepLinks.map((item) => (
-                        <a key={item.label} href={item.href} target="_blank" rel="noreferrer">
-                          {item.label}
-                        </a>
-                      ))}
+                  {isQuestionPhase && activeStepIsQuestion ? (
+                    <div className="wizard-guide-panel">
+                      <div className="wizard-guide-copy">
+                        <p className="eyebrow">{wizardGuide.eyebrow}</p>
+                        <h2>{wizardGuide.title}</h2>
+                        <p>{wizardGuide.intro}</p>
+                        <ul className="wizard-guide-list">
+                          {wizardGuide.checklist.map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                        {wizardGuide.helpLink ? (
+                          <a className="wizard-guide-link" href={wizardGuide.helpLink.href} target="_blank" rel="noreferrer">
+                            {wizardGuide.helpLink.label}
+                          </a>
+                        ) : null}
+                      </div>
+                      <div className="wizard-screenshot-card">
+                        <span className="wizard-screenshot-label">{wizardGuide.screenshotTitle}</span>
+                        {wizardGuide.screenshotLines.map((line) => (
+                          <strong key={line}>{line}</strong>
+                        ))}
+                      </div>
                     </div>
                   ) : null}
                 </div>
-              </div>
-            </div>
-
-            <div className="wizard-stage-meta">
-              <div>
-                <span>Stage</span>
-                <strong>{model.activity.runtime.currentStage}</strong>
-              </div>
-              <div>
-                <span>Last updated</span>
-                <strong>{model.activity.runtime.lastUpdatedLabel}</strong>
-              </div>
-              <div>
-                <span>Live state</span>
-                <strong>{model.activity.runtime.runState}</strong>
               </div>
             </div>
           </div>
@@ -1617,15 +2289,10 @@ function App() {
               <article className="wizard-card wizard-card-accent">
                 <p className="eyebrow">Installation complete</p>
                 <h2>{model.completion.stepTitle}</h2>
-                <p>
-                  {model.completion.summary}
-                </p>
+                <p>{model.completion.summary}</p>
                 <div className="wizard-card-actions">
                   <button className="button button-primary" type="button" onClick={handleExportAnswers}>
                     Export all answers
-                  </button>
-                  <button className="button button-secondary" type="button" onClick={handleImportClick}>
-                    Import all answers
                   </button>
                 </div>
               </article>
@@ -1639,95 +2306,15 @@ function App() {
               </article>
             </section>
           ) : (
-            <div className="wizard-flow">
-              <section className="wizard-card wizard-step-workspace">
+            <div className="wizard-flow wizard-flow-minimal">
+              <section className="wizard-card wizard-step-workspace wizard-step-workspace-minimal">
                 <p className="eyebrow">CURRENT STEP</p>
                 <div className="wizard-step-context">
-                  <p className="wizard-step-summary">{model.activity.explanation}</p>
-                  <p className="wizard-step-sidehelp">{model.activity.sideHelp}</p>
+                  <p className="wizard-step-summary">{stepContextSummary}</p>
+                  <p className="wizard-step-sidehelp">{stepContextSideHelp}</p>
                 </div>
 
-                {model.activeStep?.status === 'skipped' && (
-                  <div className="skipped-banner">
-                    <p>This step was skipped.</p>
-                    <button type="button" onClick={() => handleUnskipAndExecute(model.activeStep)} disabled={busy}>
-                      Run this step
-                    </button>
-                  </div>
-                )}
-
-                {provisionScaleSummary ? (
-                  <section className="wizard-scale-panel" aria-label="Cluster scaling summary">
-                    <div className="wizard-scale-head">
-                      <div>
-                        <p className="eyebrow">Cluster scale</p>
-                        <h3>{provisionScaleSummary.scale_percent}% footprint</h3>
-                      </div>
-                      <span className="wizard-scale-pill">
-                        {provisionScaleSummary.total_nodes} VMs
-                      </span>
-                    </div>
-
-                    <div className="wizard-scale-grid">
-                      <article>
-                        <span>Control planes</span>
-                        <strong>{provisionScaleSummary.controlplane_count}</strong>
-                      </article>
-                      <article>
-                        <span>Workers</span>
-                        <strong>{provisionScaleSummary.worker_count}</strong>
-                      </article>
-                      <article>
-                        <span>CPU / VM</span>
-                        <strong>{provisionScaleSummary.cpu_cores}</strong>
-                      </article>
-                      <article>
-                        <span>Worker memory / VM</span>
-                        <strong>{formatMemoryMb(provisionScaleSummary.worker_memory_mb)}</strong>
-                      </article>
-                      <article>
-                        <span>Control plane memory</span>
-                        <strong>{formatMemoryMb(provisionScaleSummary.controlplane_memory_mb)}</strong>
-                      </article>
-                      <article>
-                        <span>Control plane disk</span>
-                        <strong>{provisionScaleSummary.controlplane_disk_gb} GB</strong>
-                      </article>
-                      <article>
-                        <span>Worker disk / VM</span>
-                        <strong>{provisionScaleSummary.worker_disk_gb} GB</strong>
-                      </article>
-                      <article>
-                        <span>Total CPU</span>
-                        <strong>{provisionScaleSummary.total_cpu_cores}</strong>
-                      </article>
-                      <article>
-                        <span>Total memory</span>
-                        <strong>{formatMemoryMb(provisionScaleSummary.total_memory_mb)}</strong>
-                      </article>
-                      <article>
-                        <span>Total disk</span>
-                        <strong>{provisionScaleSummary.total_disk_gb} GB</strong>
-                      </article>
-                    </div>
-
-                    {proxmoxResources?.summary ? (
-                      <p className="wizard-scale-footnote">
-                        Detected Proxmox free space: {formatMemoryMb(proxmoxResources.summary.freeMemoryMb)} RAM,
-                        {' '}
-                        {Math.round(proxmoxResources.summary.freeDiskGb)} GB disk,
-                        {' '}
-                        {Math.round(proxmoxResources.summary.freeCpuCores)} CPU cores.
-                      </p>
-                    ) : (
-                      <p className="wizard-scale-footnote">
-                        Cluster capacity data is unavailable right now, so the scale uses the step defaults.
-                      </p>
-                    )}
-                  </section>
-                ) : null}
-
-                {model.activeStep?.id === 'provision-nodes' ? (
+                {currentStep?.id === 'provision-nodes' ? (
                   <>
                     <section className="wizard-input-block" aria-label="VM sizing">
                       <div className="wizard-input-block-head">
@@ -1743,10 +2330,10 @@ function App() {
                         {provisionInputGroups.vmInputs.map((input) => (
                           <InputField
                             key={input.id}
-                            stepId={model.activeStep.id}
+                            stepId={currentStep.id}
                             input={input}
                             value={currentDraft[input.id]}
-                            onChange={(inputId, value) => updateAnswer(model.activeStep.id, inputId, value)}
+                            onChange={(inputId, value) => updateAnswer(currentStep.id, inputId, value)}
                           />
                         ))}
                       </div>
@@ -1815,13 +2402,33 @@ function App() {
                         {provisionInputGroups.networkInputs.map((input) => (
                           <InputField
                             key={input.id}
-                            stepId={model.activeStep.id}
+                            stepId={currentStep.id}
                             input={input}
                             value={currentDraft[input.id]}
-                            onChange={(inputId, value) => updateAnswer(model.activeStep.id, inputId, value)}
+                            onChange={(inputId, value) => updateAnswer(currentStep.id, inputId, value)}
                           />
                         ))}
                       </div>
+
+                      <div className="wizard-card-actions wizard-card-actions-inline">
+                        <button
+                          className="button button-secondary"
+                          type="button"
+                          onClick={() => checkProvisionIpAvailability()}
+                          disabled={busy || provisionIpChecking || !provisionStepReady}
+                        >
+                          {provisionIpChecking ? 'Checking...' : 'Check if IP addresses are free'}
+                        </button>
+                        <p className="wizard-input-block-note">
+                          Twinbox repeats the same check automatically when you click Next.
+                        </p>
+                      </div>
+
+                      {provisionIpCheckSummary ? (
+                        <p className={`wizard-network-check-summary is-${provisionIpCheckSummary.tone}`}>
+                          {provisionIpCheckSummary.label}
+                        </p>
+                      ) : null}
 
                       <div className="wizard-network-vm-list">
                         <div className="wizard-network-vm-list-head">
@@ -1840,7 +2447,7 @@ function App() {
                               ? currentDraft.vm_ip_map
                               : {};
                             const onVmIpChange = (value) => {
-                              updateAnswer(model.activeStep.id, 'vm_ip_map', {
+                              updateAnswer(currentStep.id, 'vm_ip_map', {
                                 ...currentVmIpMap,
                                 [vm.name]: value,
                               });
@@ -1858,10 +2465,10 @@ function App() {
                                   </span>
                                 </header>
 
-                                <label className="wizard-field wizard-field-inline" htmlFor={`${model.activeStep.id}-${vm.name}-ip`}>
+                                <label className="wizard-field wizard-field-inline" htmlFor={`${currentStep.id}-${vm.name}-ip`}>
                                   <span className="wizard-field-label">IP address</span>
                                   <input
-                                    id={`${model.activeStep.id}-${vm.name}-ip`}
+                                    id={`${currentStep.id}-${vm.name}-ip`}
                                     type="text"
                                     value={vm.value}
                                     onChange={(event) => onVmIpChange(event.target.value)}
@@ -1887,102 +2494,126 @@ function App() {
                   </>
                 ) : (
                   <div className="wizard-input-grid">
-                    {(model.activeStep?.inputs || []).map((input) => (
+                    {(currentStep?.inputs || []).map((input) => (
                       <InputField
                         key={input.id}
-                        stepId={model.activeStep.id}
+                        stepId={currentStep.id}
                         input={input}
                         value={currentDraft[input.id]}
-                        onChange={(inputId, value) => updateAnswer(model.activeStep.id, inputId, value)}
+                        onChange={(inputId, value) => updateAnswer(currentStep.id, inputId, value)}
                       />
                     ))}
-                    {(!model.activeStep?.inputs || model.activeStep.inputs.length === 0) && (
-                      <p className="wizard-empty">This step does not need extra inputs. Review the output and continue.</p>
+                    {(!currentStep?.inputs || currentStep.inputs.length === 0) && (
+                      <p className="wizard-empty">
+                        {isQuestionPhase
+                          ? 'This step does not need extra inputs. Review the page and continue.'
+                          : 'This install step does not need extra inputs. Use Install to run it and watch the output below.'}
+                      </p>
                     )}
                   </div>
                 )}
 
                 <div className="wizard-card-actions">
-                  <button
-                    className="button button-primary"
-                    type="button"
-                    onClick={handlePrimaryAction}
-                    disabled={primaryActionDisabled}
-                  >
-                    {primaryActionLabel}
-                  </button>
-                  {(model.activeStep?.status === 'ready' || model.activeStep?.status === 'failed') && (
-                    <button
-                      type="button"
-                      onClick={() => handleSkipStep(model.activeStep)}
-                      className="skip-step-button"
-                    >
-                      Skip this step
-                    </button>
-                  )}
-                  {model.activeStep?.status === 'done' ? (
+                  {isQuestionPhase && previousQuestionStep ? (
                     <button
                       className="button button-secondary"
                       type="button"
-                      onClick={() => handleReinstallStep(model.activeStep)}
+                      onClick={() => setSelectedStepId(previousQuestionStep.id)}
                     >
-                      Reinstall step
+                      Previous
                     </button>
                   ) : null}
-                  <button className="button button-secondary" type="button" onClick={handleImportClick}>
-                    Import answers
-                  </button>
+                  {!isQuestionPhase ? (
+                    <button
+                      className="button button-secondary"
+                      type="button"
+                      onClick={() => {
+                        if (previousInstallStep?.id) {
+                          setSelectedStepId(previousInstallStep.id);
+                        }
+                      }}
+                      disabled={!previousInstallStep}
+                    >
+                      Previous
+                    </button>
+                  ) : null}
+                  {isQuestionPhase ? (
+                    <button
+                      className="button button-primary"
+                      type="button"
+                      onClick={handlePrimaryAction}
+                      disabled={primaryActionDisabled}
+                    >
+                      {primaryActionLabel}
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        className="button button-secondary"
+                        type="button"
+                        onClick={() => {
+                          if (nextInstallStep?.id) {
+                            setSelectedStepId(nextInstallStep.id);
+                            setNotice(`Moved to ${nextInstallStep.title}.`);
+                          }
+                        }}
+                        disabled={!nextInstallStep}
+                      >
+                        Next
+                      </button>
+                      <button
+                        className="button button-primary"
+                        type="button"
+                        onClick={() => handleInstallCurrentStep(currentStep)}
+                        disabled={installButtonDisabled}
+                      >
+                        Install
+                      </button>
+                      <button
+                        className="button button-secondary"
+                        type="button"
+                        onClick={() => handleReinstallStep(currentStep)}
+                        disabled={reinstallButtonDisabled}
+                      >
+                        Reinstall
+                      </button>
+                      <button
+                        className="button button-primary"
+                        type="button"
+                        onClick={() => handleInstallAllSteps(currentStep?.id)}
+                        disabled={installAllDisabled}
+                      >
+                        Install all
+                      </button>
+                    </>
+                  )}
                 </div>
 
-                <p className="wizard-helper">{primaryActionHelperText}</p>
+                <p className="wizard-helper">
+                  {isQuestionPhase ? primaryActionHelperText : installActionHelperText}
+                </p>
               </section>
 
-              <section
-                ref={liveOutputRef}
-                className={`wizard-card wizard-output-panel ${model.activity.runtime.isLive ? 'is-live' : ''}`}
-              >
-                <div className="wizard-output-header">
-                  <div>
-                    <p className="eyebrow">LIVE OUTPUT</p>
-                    <h2>{model.activity.runtime.currentStage}</h2>
-                  </div>
-                  <span className={`wizard-status ${model.activity.runtime.isLive ? 'is-live' : ''}`}>
-                    {model.activity.runtime.runState}
-                  </span>
-                </div>
-
-                <div className="wizard-health-strip">
-                  {model.healthBadges.map((badge) => (
-                    <article key={badge.id} className={`wizard-badge tone-${badge.tone}`}>
-                      <span>{badge.label}</span>
-                      <strong>{badge.value}</strong>
-                      <small>{badge.chip}</small>
-                    </article>
-                  ))}
-                </div>
-
-                <div className="wizard-output-stack">
-                  <section>
-                    <p className="wizard-stack-label">Artifacts</p>
-                    <KeyValueList
-                      items={model.activity.artifacts}
-                      emptyLabel="Artifacts will appear after the first successful step."
-                    />
-                  </section>
-                </div>
-
-                <details className="technical-panel" open>
-                  <summary>Technical details</summary>
-                  <div className="technical-panel-body">
-                    <div className="technical-panel-grid">
-                      <div>
-                        <p className="wizard-stack-label">Worker output</p>
-                        <pre className="wizard-log-output">{model.activity.rawLogOutput}</pre>
-                      </div>
+              {!isQuestionPhase ? (
+                <section
+                  ref={liveOutputRef}
+                  className={`wizard-card wizard-output-panel wizard-output-panel-minimal ${model.activity.runtime.isLive ? 'is-live' : ''}`}
+                >
+                  <div className="wizard-output-header">
+                    <div>
+                      <p className="eyebrow">Output</p>
+                      <h2>{model.activity.runtime.currentStage}</h2>
                     </div>
+                    <span className={`wizard-status ${model.activity.runtime.isLive ? 'is-live' : ''}`}>
+                      {model.activity.runtime.runState}
+                    </span>
                   </div>
-                </details>
-              </section>
+
+                  <div className="wizard-log-viewport" ref={liveLogViewportRef}>
+                    <pre className="wizard-log-output">{model.activity.rawLogOutput}</pre>
+                  </div>
+                </section>
+              ) : null}
             </div>
           )}
         </section>

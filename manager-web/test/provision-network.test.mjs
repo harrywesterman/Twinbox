@@ -50,6 +50,29 @@ test('buildProvisionVmIpRows and validation flag duplicates and invalid values',
   assert.equal(rows[2].status.label, 'Invalid IP');
 });
 
+test('buildProvisionVmIpRows uses explicit availability checks when provided', () => {
+  const rows = buildProvisionVmIpRows(vmPlan, {
+    vm_ip_map: {
+      'cp-1': '192.168.2.61',
+      'worker-1': '192.168.2.72',
+      'worker-2': '192.168.2.63',
+    },
+  }, {
+    vm_ips: ['192.168.2.61', '192.168.2.62', '192.168.2.63'],
+  }, {
+    '192.168.2.61': true,
+    '192.168.2.72': false,
+    '192.168.2.63': true,
+  });
+
+  assert.equal(rows[0].status.tone, 'success');
+  assert.equal(rows[0].status.label, 'Checked free');
+  assert.equal(rows[1].status.tone, 'danger');
+  assert.equal(rows[1].status.label, 'Already in use');
+  assert.equal(rows[2].status.tone, 'success');
+  assert.equal(rows[2].status.label, 'Checked free');
+});
+
 test('buildProvisionVmIpMap returns the edited per-vm map', () => {
   const rows = buildProvisionVmIpRows(vmPlan, {}, {
     vm_ips: ['192.168.2.61', '192.168.2.62', '192.168.2.63'],

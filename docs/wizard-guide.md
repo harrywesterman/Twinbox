@@ -7,12 +7,14 @@
 - Prompts for one Management VM form with name, IP, netmask, DNS, disk size, and memory.
 - Prompts for cluster name (`ontwikkel`, `test`, `productie`, or custom).
 - Uses the cluster slug in VM name, Proxmox API user/role, and tags.
+- Lets users load saved answers again on the question pages instead of only on the first screen.
 - Detects existing resources for the same cluster through Proxmox cluster inventory and supports cleanup with explicit confirmation.
 - Cleanup is cluster-wide and node-aware, so clusters with VMs spread across multiple Proxmox hosts can still be removed safely.
 - Creates the Management VM from Ubuntu 24.04 cloud image.
 - Seeds a thin cloud-init that installs Ansible and hands the Management VM baseline to an Ansible playbook.
 - Creates the `/opt/twinbox` runtime tree without cloning the Twinbox repository onto the VM.
 - Starts the manager stack with `docker compose pull && docker compose up -d` after the Ansible baseline has installed Docker and the management tools.
+- Management VM maintenance is now handled by Ansible and no longer appears as a user-facing wizard step.
 
 ## Run
 

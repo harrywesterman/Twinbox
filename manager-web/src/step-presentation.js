@@ -37,7 +37,6 @@ const STEP_ICON_ASSETS = {
   'install-audiobookshelf': assetHref('install-audiobookshelf.svg'),
   'install-freshrss': assetHref('install-freshrss.svg'),
   'install-jitsi': assetHref('install-jitsi.svg'),
-  'configure-automatic-updates': assetHref('configure-automatic-updates.svg'),
 };
 
 function buildProjectUrlMap() {
@@ -201,11 +200,6 @@ function buildProjectUrlMap() {
       icon: '🎥',
       project_url: 'https://jitsi.org/',
       github_url: 'https://github.com/jitsi/jitsi-meet',
-    },
-    'configure-automatic-updates': {
-      icon: '♻️',
-      project_url: 'https://github.com/harrywesterman/twinbox/blob/main/docs/wizard-guide.md',
-      github_url: 'https://github.com/harrywesterman/twinbox',
     },
     'configure-wiredoor-ingress': {
       icon: '🚪',

@@ -58,15 +58,7 @@ Talos control planes stay at `4 GB RAM / 10 GB disk`, while worker disks scale f
 
 ## Management VM maintenance
 
-Use the `Configure Management VM maintenance` step in the UI to keep Ubuntu patched and baseline hardening applied without touching `/opt/twinbox`.
-
-The step installs a daily host cron entry that runs the local maintenance playbook on the Management VM. Password authentication stays enabled.
-
-If you prefer a manual host-side setup, you can still run:
-
-```bash
-ssh root@<management-vm-ip> 'cd /opt/twinbox && sudo bash scripts/install-management-vm-maintenance.sh'
-```
+Management VM maintenance is now handled by Ansible during the host bootstrap. There is no separate wizard step for it anymore.
 
 ## Recovery
 

@@ -495,6 +495,13 @@ export function buildProvisionPlacementBoard(stepInputs, currentValues = {}, res
   const placement = buildVmSizeMap(vmPlan, hostCards, currentMap, scalePercent);
   const hostLookup = new Map(hostCards.map((host) => [host.id, host]));
   const placementsByHost = new Map(hostCards.map((host) => [host.id, []]));
+  const managementVmResource = Array.isArray(resources?.vms)
+    ? resources.vms.find((entry) => {
+      const name = normalizeHostName(entry?.name || entry?.vm_name || entry?.id);
+      const tags = String(entry?.tags || '').toLowerCase();
+      return tags.includes('management') || name.endsWith('-mgt') || name.endsWith('mgt');
+    })
+    : null;
 
   for (const vm of vmPlan) {
     const hostId = placement.vmNodeMap[vm.name];
@@ -525,6 +532,13 @@ export function buildProvisionPlacementBoard(stepInputs, currentValues = {}, res
 
   return {
     vmPlan,
+    managementVm: managementVmResource
+      ? {
+        name: normalizeHostName(managementVmResource?.name || managementVmResource?.vm_name || managementVmResource?.id),
+        node: normalizeHostName(managementVmResource?.node || managementVmResource?.statusnode || ''),
+        vmid: managementVmResource?.vmid ?? null,
+      }
+      : null,
     hostCards: hostCards.map((host) => ({
       ...host,
       assignments: placementsByHost.get(host.id) || [],

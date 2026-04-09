@@ -9,18 +9,77 @@ function fallbackCatalog() {
   };
 }
 
-function flattenSetupSteps(catalog) {
-  return (catalog?.categories || []).flatMap((category) =>
-    (category.steps || [])
-      .filter((step) => step?.journey_stage !== 'manage')
-      .map((step) => ({
-        ...step,
-        ...resolveStepPresentation(step),
-        categoryId: category.id,
-        categoryTitle: category.title,
-        categorySummary: category.summary,
-      })),
-  );
+const FIXED_SETUP_STEP_IDS = [
+  'provision-nodes',
+  'install-argocd',
+  'install-longhorn-storage',
+  'install-secret-sync',
+  'install-traefik',
+  'install-cloudnativepg',
+  'choose-ingress-route',
+  'provision-wiredoor-bastion',
+  'configure-wiredoor-ingress',
+  'configure-cloudflare-tunnel',
+  'configure-metallb-ingress',
+  'configure-tailscale-ingress',
+  'configure-cloudflare-dns',
+  'install-authentik-idp',
+  'create-users-and-groups',
+  'configure-argocd-oidc',
+  'install-whoami',
+  'install-headlamp',
+  'install-prometheus',
+  'install-grafana',
+  'install-loki',
+  'install-wiredoor-gateway',
+  'install-dashy-dashboard',
+  'install-management-consoles',
+  'install-traefik-manager',
+  'install-cloudtty',
+  'install-pgadmin4',
+  'install-ntfy',
+  'install-velero-backup',
+  'install-proxmox-backup-system',
+  'install-nextcloud',
+  'install-immich',
+  'install-zulip',
+  'install-paperless',
+  'install-karakeep',
+  'install-gitea',
+  'install-uptimekuma',
+  'install-n8n',
+  'install-audiobookshelf',
+  'install-freshrss',
+  'install-jitsi',
+];
+
+const FIXED_SETUP_ORDER = new Map(FIXED_SETUP_STEP_IDS.map((id, index) => [id, index]));
+
+function matchesSelectedIngressRoute(step, answers = {}) {
+  if (!step?.ingress_route) {
+    return true;
+  }
+
+  const selectedRoute = answers?.['choose-ingress-route']?.ingress_route || '';
+  return step.ingress_route === selectedRoute;
+}
+
+function flattenSetupSteps(catalog, answers = {}) {
+  return (catalog?.categories || [])
+    .flatMap((category) =>
+      (category.steps || [])
+        .filter((step) => step?.journey_stage !== 'manage')
+        .filter((step) => FIXED_SETUP_ORDER.has(step?.id))
+        .filter((step) => matchesSelectedIngressRoute(step, answers))
+        .map((step) => ({
+          ...step,
+          ...resolveStepPresentation(step),
+          categoryId: category.id,
+          categoryTitle: category.title,
+          categorySummary: category.summary,
+        })),
+    )
+    .sort((left, right) => FIXED_SETUP_ORDER.get(left.id) - FIXED_SETUP_ORDER.get(right.id));
 }
 
 function isComplete(step) {
@@ -488,7 +547,7 @@ function buildPrimaryAction(activeStep, nextStep, busy, stepIndex, mode) {
   if (activeStep.status === 'running') {
     return {
       type: 'execute',
-      label: 'Installing…',
+      label: 'Working…',
       disabled: true,
       helperText: 'This step is currently running. Monitor the live output below.',
     };
@@ -497,7 +556,7 @@ function buildPrimaryAction(activeStep, nextStep, busy, stepIndex, mode) {
   if (activeStep.status === 'locked') {
     return {
       type: 'execute',
-      label: 'Blocked',
+      label: 'Waiting…',
       disabled: true,
       helperText: 'Complete the dependency chain before running this step.',
     };
@@ -518,16 +577,16 @@ function buildPrimaryAction(activeStep, nextStep, busy, stepIndex, mode) {
   if (isComplete(activeStep) && nextStep) {
     return {
       type: 'advance',
-      label: `Continue to step ${stepIndex + 1}`,
+      label: 'Next',
       disabled: false,
-      helperText: 'This step is complete. Continue to the next unlocked step.',
+      helperText: 'This step is complete. Continue to the next step.',
     };
   }
 
   if (isComplete(activeStep) && !nextStep) {
     return {
       type: 'finish',
-      label: 'Finish setup',
+      label: 'Finish',
       disabled: false,
       helperText: 'Everything is complete. Review the summary or export the answers file.',
     };
@@ -536,9 +595,7 @@ function buildPrimaryAction(activeStep, nextStep, busy, stepIndex, mode) {
   const rerun = activeStep.status === 'failed';
   return {
     type: 'execute',
-    label: mode === 'setup'
-      ? (rerun ? `Retry step ${stepIndex}` : `Start step ${stepIndex}`)
-      : (rerun ? `Retry step ${stepIndex}` : 'Run step'),
+    label: rerun ? 'Retry' : 'Next',
     disabled: false,
     helperText: activeStep.type === 'config'
       ? 'Save the configuration and apply it on the Management VM.'
@@ -643,7 +700,7 @@ export function getMissionControlModel({
   answers = {},
 }) {
   const safeCatalog = catalog || fallbackCatalog();
-  const steps = flattenSetupSteps(safeCatalog);
+  const steps = flattenSetupSteps(safeCatalog, answers);
   const mode = buildMode(steps);
   const activeStep = pickActiveStep(steps, selectedStepId);
   const activeIndex = activeStep ? steps.findIndex((step) => step.id === activeStep.id) : -1;
@@ -679,6 +736,6 @@ export function getMissionControlModel({
   };
 }
 
-export function getWizardSteps(catalog) {
-  return flattenSetupSteps(catalog || fallbackCatalog());
+export function getWizardSteps(catalog, answers = {}) {
+  return flattenSetupSteps(catalog || fallbackCatalog(), answers);
 }

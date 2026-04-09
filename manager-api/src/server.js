@@ -20,7 +20,7 @@ import {
   readJson,
   writeJson,
 } from "./lib/common.js";
-import { buildIpBlock, selectSuggestedIpAllocation } from "./lib/ip-allocation.js";
+import { buildIpBlock, checkIpAvailability, selectSuggestedIpAllocation } from "./lib/ip-allocation.js";
 import { cancelJob, queueJob } from "./lib/jobs.js";
 import {
   buildProxmoxApiSecretBundle,
@@ -661,6 +661,7 @@ function summarizeClusterResources(resources, vmResources = []) {
       ...entry,
       activeVmCount: activeVmCounts[String(entry?.node || entry?.name || entry?.id || "").trim()] || 0,
     })),
+    vms,
     summary,
   };
 }
@@ -1029,6 +1030,38 @@ app.get("/api/ip-suggestions", async (req, res) => {
   } catch (e) {
     return res.status(500).json({
       error: e instanceof Error ? e.message : "failed to suggest IP addresses",
+    });
+  }
+});
+
+app.post("/api/ip-availability", async (req, res) => {
+  const ips = Array.isArray(req.body?.ips) ? req.body.ips : [];
+  const normalizedIps = [];
+
+  for (const candidate of ips) {
+    const parsed = parseIPv4(candidate, "ips");
+    if (!parsed.ok) {
+      return res.status(400).json({
+        error: "ips must contain only valid IPv4 addresses",
+      });
+    }
+    normalizedIps.push(parsed.value);
+  }
+
+  if (normalizedIps.length === 0) {
+    return res.status(400).json({
+      error: "ips is required",
+    });
+  }
+
+  try {
+    return res.json(await checkIpAvailability({
+      ips: normalizedIps,
+      isIpInUse: probeIpInUse,
+    }));
+  } catch (error) {
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : "failed to check IP availability",
     });
   }
 });

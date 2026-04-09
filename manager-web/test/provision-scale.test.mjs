@@ -136,6 +136,28 @@ test('placement board suggests a host-aware Talos VM layout', () => {
   assert.ok(board.vmSizeMap['worker-1'].disk_gb >= 40);
 });
 
+test('placement board exposes the management VM host when Proxmox resources include it', () => {
+  const board = buildProvisionPlacementBoard(stepInputs, {}, {
+    ...balancedPlacementResources,
+    vms: [
+      ...balancedPlacementResources.vms,
+      {
+        node: 'pve-b',
+        name: 'twinbox-demo-mgt',
+        tags: 'twinbox;management;bootstrap',
+        status: 'running',
+        vmid: 190,
+      },
+    ],
+  });
+
+  assert.deepEqual(board.managementVm, {
+    name: 'twinbox-demo-mgt',
+    node: 'pve-b',
+    vmid: 190,
+  });
+});
+
 test('placement board sorts hosts alphabetically by name', () => {
   const board = buildProvisionPlacementBoard(stepInputs, {}, {
     nodes: [

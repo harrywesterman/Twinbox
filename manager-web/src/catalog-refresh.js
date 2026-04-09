@@ -205,6 +205,7 @@ export async function refreshWizardSnapshot({
   clusterCreatedAtRef,
   clusterIdOverride = '',
   clearError = true,
+  allowAutoSelectStep = true,
 }) {
   const effectiveClusterId = clusterIdOverride || clusterIdRef.current;
   const clusterQuery = effectiveClusterId
@@ -277,14 +278,15 @@ export async function refreshWizardSnapshot({
     setClusterInstanceId?.(discoveredClusterInstanceId);
   }
 
-  const nextStepId = pickStepId(getWizardSteps(catalogValue), selectedStepIdRef.current);
-  if (nextStepId !== selectedStepIdRef.current) {
+  const nextStepId = pickStepId(getWizardSteps(catalogValue, answersRef.current), selectedStepIdRef.current);
+  const effectiveSelectedStepId = allowAutoSelectStep ? nextStepId : selectedStepIdRef.current;
+  if (allowAutoSelectStep && nextStepId !== selectedStepIdRef.current) {
     selectedStepIdRef.current = nextStepId;
     setSelectedStepId(nextStepId);
   }
 
-  const steps = getWizardSteps(catalogValue);
-  const selectedStep = steps.find((step) => step.id === nextStepId);
+  const steps = getWizardSteps(catalogValue, answersRef.current);
+  const selectedStep = steps.find((step) => step.id === effectiveSelectedStepId);
   const activeJobStep = steps.find((step) => step.status === 'running' || (step.latest_job && ['pending', 'running', 'cancel_requested'].includes(step.latest_job.status)));
   const activeJob = activeJobStep?.latest_job || null;
   const activeJobId = activeJob?.id || activeJobStep?.state?.last_job_id || null;
