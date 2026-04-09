@@ -443,31 +443,32 @@ function PlacementBoard({
           <h3>Drag Talos VMs between Proxmox hosts</h3>
         </div>
         <div className="wizard-card-actions wizard-card-actions-inline">
-          <p className="wizard-input-block-note">
-            Sizing comes first. After that, drag cards to land each VM on the right Proxmox host.
-            {' '}
-            The board keeps refreshing so the suggestion stays aligned with live running VMs, but your placements stay fixed until you retry.
-          </p>
           <button className="button button-secondary" type="button" onClick={onReset}>
-            Retry balanced suggestion
+            Automatic placement
           </button>
         </div>
       </div>
 
-      {board.managementVm ? (
-        <div className="wizard-placement-management">
-          <div>
-            <p className="eyebrow">Management VM</p>
-            <strong>{board.managementVm.name || 'Twinbox management VM'}</strong>
-            <span>
-              Currently on {board.managementVm.node || 'an unknown Proxmox host'}. It stays fixed and does not move with the cluster VMs.
-            </span>
-          </div>
-          <span className="wizard-status-badge is-warning">Fixed</span>
-        </div>
-      ) : null}
-
       <div className="wizard-placement-grid">
+        {board.managementVm ? (
+          <article className="wizard-placement-host wizard-placement-management-card" aria-label="Management VM">
+            <header className="wizard-placement-host-head">
+              <div>
+                <strong>Management VM</strong>
+                <span>{board.managementVm.name || 'Twinbox management VM'} · VMID {board.managementVm.vmid ?? '—'}</span>
+              </div>
+              <span className="wizard-status-badge is-neutral">Fixed</span>
+            </header>
+
+            <div className="wizard-placement-host-body">
+              <div className="wizard-placement-fixed-details">
+                <span>Currently on {board.managementVm.node || 'an unknown Proxmox host'}</span>
+                <p>It stays fixed and does not move with the cluster VMs.</p>
+              </div>
+            </div>
+          </article>
+        ) : null}
+
         {board.hostCards.map((host) => (
           <article
             key={host.id}
@@ -491,11 +492,11 @@ function PlacementBoard({
             </header>
 
             <div className="wizard-placement-host-body">
-            {host.assignments.length > 0 ? (
-              host.assignments.map((vm) => (
-                <button
-                  key={vm.name}
-                  className={`wizard-vm-card ${draggingVmName === vm.name ? 'is-dragging' : ''} ${vm.assignmentSource === 'user-selected' ? 'is-user-selected' : vm.assignmentSource === 'suggested' ? 'is-suggested' : 'is-unassigned'}`}
+              {host.assignments.length > 0 ? (
+                host.assignments.map((vm) => (
+                  <button
+                    key={vm.name}
+                    className={`wizard-vm-card ${draggingVmName === vm.name ? 'is-dragging' : ''} ${vm.assignmentSource === 'user-selected' ? 'is-user-selected' : vm.assignmentSource === 'suggested' ? 'is-suggested' : 'is-unassigned'}`}
                   type="button"
                   draggable
                   onDragStart={(event) => onDragStart(event, vm.name)}
@@ -2029,7 +2030,7 @@ function App() {
       : !questionInputsValid
       ? 'Fill in the required values before continuing.'
       : stepOnePending
-        ? (!provisionPlacementReady ? 'Waiting for Proxmox host data before continuing.' : 'Waiting for step 1 suggestions to load.')
+        ? (!provisionPlacementReady ? 'Waiting for Proxmox host data before continuing.' : 'Preparing IP suggestions before continuing.')
         : questionStepIndex === questionSteps.length - 1
           ? 'The questions are complete. Continue to the installation steps.'
           : 'Review the values on this page and continue to the next question.')
@@ -2061,7 +2062,7 @@ function App() {
   const installActionHelperText = stepOnePending
     ? (!provisionPlacementReady
       ? 'Waiting for Proxmox host data before installing step 1.'
-      : 'Waiting for step 1 suggestions to load before installing.')
+      : 'Preparing IP suggestions before installing.')
     : !provisionVmIpValidation.ok && currentStep?.id === 'provision-nodes'
       ? provisionVmIpValidation.error
       : installStepBlocked
@@ -2365,9 +2366,6 @@ function App() {
                           <p className="eyebrow">3. Network and addressing</p>
                           <h3>Keep VM scale separate from networking</h3>
                         </div>
-                        <p className="wizard-input-block-note">
-                          The wizard probes the management VM network once, suggests free addresses for each VM, and then lets you edit them locally without another server check.
-                        </p>
                       </div>
 
                       <dl className="wizard-network-summary">
@@ -2409,20 +2407,6 @@ function App() {
                         ))}
                       </div>
 
-                      <div className="wizard-card-actions wizard-card-actions-inline">
-                        <button
-                          className="button button-secondary"
-                          type="button"
-                          onClick={() => checkProvisionIpAvailability()}
-                          disabled={busy || provisionIpChecking || !provisionStepReady}
-                        >
-                          {provisionIpChecking ? 'Checking...' : 'Check if IP addresses are free'}
-                        </button>
-                        <p className="wizard-input-block-note">
-                          Twinbox repeats the same check automatically when you click Next.
-                        </p>
-                      </div>
-
                       {provisionIpCheckSummary ? (
                         <p className={`wizard-network-check-summary is-${provisionIpCheckSummary.tone}`}>
                           {provisionIpCheckSummary.label}
@@ -2433,11 +2417,8 @@ function App() {
                         <div className="wizard-network-vm-list-head">
                           <div>
                             <p className="eyebrow">Per-VM IPs</p>
-                            <h4>One address per VM, no fixed block</h4>
+                            <h4>Assign addresses to each VM</h4>
                           </div>
-                          <p className="wizard-input-block-note">
-                            Green means the suggested address was checked once. Amber means you changed it locally. Red means the value is invalid or duplicated.
-                          </p>
                         </div>
 
                         <div className="wizard-network-vm-items">
@@ -2483,6 +2464,17 @@ function App() {
                               </article>
                             );
                           })}
+                        </div>
+
+                        <div className="wizard-card-actions wizard-card-actions-inline wizard-network-check-row">
+                          <button
+                            className="button button-secondary"
+                            type="button"
+                            onClick={() => checkProvisionIpAvailability()}
+                            disabled={busy || provisionIpChecking || !provisionStepReady}
+                          >
+                            {provisionIpChecking ? 'Checking...' : 'Check for free IP addresses'}
+                          </button>
                         </div>
 
                         {provisionVmIpValidation.ok ? null : (
