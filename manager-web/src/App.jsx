@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import './App.css';
 import heroIllustrationUrl from './assets/hero-illustration.svg';
@@ -1237,7 +1237,7 @@ function App() {
     liveLogAutoScrollRef.current = true;
   }, [isInstallPhase, currentStep?.id]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!liveLogAutoScrollRef.current) {
       return;
     }
@@ -1247,6 +1247,7 @@ function App() {
       return;
     }
 
+    viewport.scrollTop = viewport.scrollHeight;
     const raf = window.requestAnimationFrame(() => {
       viewport.scrollTop = viewport.scrollHeight;
     });

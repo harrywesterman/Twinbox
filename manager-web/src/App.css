@@ -1445,7 +1445,7 @@
   border-radius: 18px;
   background: #07111f;
   color: #cbd5e1;
-  overflow: auto;
+  overflow: visible;
   font-size: 0.9rem;
   line-height: 1.6;
   white-space: pre-wrap;
@@ -1455,6 +1455,7 @@
 .wizard-log-viewport {
   max-height: 420px;
   overflow: auto;
+  overscroll-behavior: contain;
   border-radius: 18px;
   border: 1px solid rgba(15, 23, 42, 0.08);
   background: #07111f;
@@ -1462,8 +1463,10 @@
 
 .wizard-log-viewport .wizard-log-output {
   min-height: 0;
+  height: auto;
   border-radius: 0;
   border: 0;
+  overflow: visible;
 }
 
 .wizard-shell-start {
