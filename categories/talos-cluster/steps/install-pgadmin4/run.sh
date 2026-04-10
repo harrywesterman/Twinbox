@@ -392,8 +392,8 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
 wait_for_deployment pgadmin4 pgadmin4
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restarting pgAdmin 4 to pick up secret-backed env vars"
 kubectl -n pgadmin4 rollout restart deploy/pgadmin4
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 rollout"
-kubectl -n pgadmin4 rollout status deploy/pgadmin4 --timeout=10m
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 pod readiness"
+kubectl -n pgadmin4 wait --for=condition=Ready pod -l app.kubernetes.io/name=pgadmin4 --timeout=10m
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Loading pgAdmin 4 shared server entry"
 jq -n \

@@ -1228,8 +1228,11 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "--manifest \"$rendered_manifest\"" in pgadmin_run_text
     assert "Creating pgAdmin 4 database password secret" in pgadmin_run_text
     assert 'pgadmin4-db-password' in pgadmin_run_text
-    assert "kubectl -n pgadmin4 rollout status deploy/pgadmin4 --timeout=10m" in pgadmin_run_text
     assert "kubectl -n pgadmin4 rollout restart deploy/pgadmin4" in pgadmin_run_text
+    assert (
+        "kubectl -n pgadmin4 wait --for=condition=Ready pod -l app.kubernetes.io/name=pgadmin4 --timeout=10m"
+        in pgadmin_run_text
+    )
     assert "Loading pgAdmin 4 shared server entry" in pgadmin_run_text
     assert "Authentik Database" in pgadmin_run_text
     assert "Shared Servers" in pgadmin_run_text
