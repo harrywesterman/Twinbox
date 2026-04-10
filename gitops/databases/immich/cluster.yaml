@@ -30,12 +30,13 @@ spec:
       memory: 2Gi
 
   postgresql:
+    shared_preload_libraries:
+      - vchord.so
     parameters:
       max_connections: "100"
       shared_buffers: "256MB"
       effective_cache_size: "768MB"
       work_mem: "4MB"
-      # The vectorchord image already ships with the required preload config.
 
   affinity:
     enablePodAntiAffinity: true
