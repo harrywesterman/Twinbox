@@ -513,8 +513,12 @@ spec:
             - /bin/sh
             - -ec
             - |
-              . /venv/bin/activate
-              exec python3 /pgadmin4/setup.py load-servers /config/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace
+              # Copy the capability-bearing interpreter so it remains executable under the hardened pod
+              # security context, and point Python at the pgAdmin venv packages explicitly.
+              cp /usr/local/bin/python3.14 /tmp/python3.14.no-cap
+              chmod 0755 /tmp/python3.14.no-cap
+              export PYTHONPATH=/venv/lib/python3.14/site-packages:/usr/local/lib/python3.14/site-packages
+              exec /tmp/python3.14.no-cap /pgadmin4/setup.py load-servers /config/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace
           envFrom:
             - secretRef:
                 name: pgadmin4-bootstrap
