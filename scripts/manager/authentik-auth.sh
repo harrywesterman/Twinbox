@@ -256,7 +256,21 @@ authentik_api_write() {
 authentik_resolve_flow_id() {
   local slug="$1"
   local designation="$2"
-  local response
+  local response match_pk
+
+  response="$(authentik_api_get "/core/flows/?slug=${slug}&page_size=100")"
+  match_pk="$(
+    jq -r \
+      --arg slug "$slug" \
+      --arg designation "$designation" \
+      '.results[]?
+        | select((.slug // "") == $slug and (.designation // "") == $designation)
+        | .pk // .id // empty' <<<"$response" | head -n1
+  )"
+  if [[ -n "$match_pk" ]]; then
+    printf '%s\n' "$match_pk"
+    return 0
+  fi
 
   response="$(authentik_api_get "/flows/instances/?slug=${slug}&page_size=100")"
   jq -r \
@@ -264,7 +278,7 @@ authentik_resolve_flow_id() {
     --arg designation "$designation" \
     '.results[]?
       | select((.slug // "") == $slug and (.designation // "") == $designation)
-      | .pk // empty' <<<"$response" | head -n1
+      | .pk // .id // empty' <<<"$response" | head -n1
 }
 
 authentik_resolve_scope_mapping_id() {
