@@ -1360,13 +1360,18 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "tcpSocket" in pgadmin_deployment_text
     assert "runAsNonRoot: true" in pgadmin_deployment_text
     assert "runAsUser: 5050" in pgadmin_deployment_text
-    assert "runAsGroup: 5050" in pgadmin_deployment_text
+    assert "runAsGroup: 0" in pgadmin_deployment_text
     assert "runAsUser: 65534" in pgadmin_deployment_text
     assert "runAsGroup: 65534" in pgadmin_deployment_text
+    assert "fsGroup: 0" in pgadmin_deployment_text
+    assert "PGADMIN_DISABLE_POSTFIX" in pgadmin_deployment_text
     assert "allowPrivilegeEscalation: false" in pgadmin_deployment_text
     assert "type: RuntimeDefault" in pgadmin_deployment_text
     assert "drop:" in pgadmin_deployment_text
     assert "- ALL" in pgadmin_deployment_text
+    assert "cd /pgadmin4" in pgadmin_deployment_text
+    assert "exec /venv/bin/gunicorn" in pgadmin_deployment_text
+    assert "--timeout \"${GUNICORN_TIMEOUT:-86400}\"" in pgadmin_deployment_text
 
     cloudflare_tunnel_run_text = (
         REPO_ROOT

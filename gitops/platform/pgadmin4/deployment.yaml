@@ -20,8 +20,8 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 5050
-        runAsGroup: 5050
-        fsGroup: 5050
+        runAsGroup: 0
+        fsGroup: 0
         seccompProfile:
           type: RuntimeDefault
       initContainers:
@@ -87,6 +87,22 @@ spec:
             capabilities:
               drop:
                 - ALL
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              cd /pgadmin4
+              exec /venv/bin/gunicorn \
+                --limit-request-line "${GUNICORN_LIMIT_REQUEST_LINE:-8190}" \
+                --limit-request-fields "${GUNICORN_LIMIT_REQUEST_FIELDS:-100}" \
+                --limit-request-field_size "${GUNICORN_LIMIT_REQUEST_FIELD_SIZE:-8190}" \
+                --timeout "${GUNICORN_TIMEOUT:-86400}" \
+                --bind "${PGADMIN_LISTEN_ADDRESS:-[::]}:${PGADMIN_LISTEN_PORT:-80}" \
+                -w 1 \
+                --threads "${GUNICORN_THREADS:-25}" \
+                --access-logfile "${GUNICORN_ACCESS_LOGFILE:--}" \
+                -c gunicorn_config.py \
+                run_pgadmin:app
           ports:
             - containerPort: 80
               name: http
@@ -95,6 +111,9 @@ spec:
                 name: pgadmin4-bootstrap
             - secretRef:
                 name: pgadmin4-db-password
+          env:
+            - name: PGADMIN_DISABLE_POSTFIX
+              value: "1"
           startupProbe:
             tcpSocket:
               port: http
