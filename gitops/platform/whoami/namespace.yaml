@@ -1,6 +1,0 @@
-# IngressRoute managed by platform-ingress via Kustomize.
-# This app only ensures the namespace exists.
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: default

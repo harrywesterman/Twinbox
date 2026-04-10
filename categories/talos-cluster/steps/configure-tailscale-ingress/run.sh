@@ -97,7 +97,7 @@ if command -v kubectl &>/dev/null; then
   # Apply the Tailscale application
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying Tailscale application"
   kubectl apply -f "$WORKSPACE_ROOT/gitops/apps/tailscale.yaml" 2>/dev/null || true
-  kubectl apply -f "$WORKSPACE_ROOT/gitops/platform/tailscale/externalsecret.yaml" 2>/dev/null || true
+  kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/tailscale/externalsecret.yaml" 2>/dev/null || true
 
   # Wait for Tailscale operator to be ready
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for Tailscale operator"
@@ -135,7 +135,7 @@ EOF
 
   # Step 4: Create IngressRoutes for webtailscale entryPoint
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Ensuring webtailscale IngressRoutes exist"
-  # The IngressRoutes are already defined in gitops/platform/*/ingressroute.yaml
+  # The IngressRoutes are owned by each app and applied with that app's manifests.
   # They include the webtailscale entryPoint which will be used when Tailscale is active
 fi
 

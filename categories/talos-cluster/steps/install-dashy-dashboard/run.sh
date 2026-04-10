@@ -243,19 +243,21 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
 rm -f "$dashy_secret_file"
 
 kubectl create namespace dashy --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+dashy_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/dashy-ingressroute.XXXXXX.yaml")"
+trap 'rm -f "$dashy_rendered_ingressroute"' EXIT
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying Dashy ExternalSecret"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform/dashy/externalsecret.yaml"
+kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/dashy/externalsecret.yaml"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for Dashy OIDC secret"
 kubectl -n dashy wait --for=condition=Ready externalsecret/dashy-oidc --timeout=10m
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Refreshing platform-ingress so Dashy resources are applied"
-bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
-  --manifest "$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml" \
-  --application "platform-ingress" \
-  --destination-namespace "argocd" \
-  --no-wait
+sed "s/__ZONE_NAME__/${public_zone_name}/g" \
+  "$WORKSPACE_ROOT/gitops/platform-apps/dashy/ingressroute.yaml" >"$dashy_rendered_ingressroute"
+kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/dashy/pvc.yaml"
+kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/dashy/service.yaml"
+kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/dashy/deployment.yaml"
+kubectl apply -f "$dashy_rendered_ingressroute"
 
 for attempt in $(seq 1 120); do
   if kubectl -n dashy get deployment/dashy >/dev/null 2>&1; then

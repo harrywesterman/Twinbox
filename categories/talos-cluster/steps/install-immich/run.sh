@@ -282,7 +282,7 @@ fi
 [[ -n "$immich_server_external_domain" ]] || immich_server_external_domain="$IMMICH_HOST"
 
 immich_secret_file="$(mktemp)"
-trap 'rm -f "$immich_secret_file" "${immich_rendered_ingressroute_file:-}" "${immich_rendered_ingressroute_file:-}"' EXIT
+trap 'rm -f "$immich_secret_file" "${immich_rendered_ingressroute_file:-}"' EXIT
 jq -n \
   --arg immich_postgresql_username "$immich_db_username" \
   --arg immich_postgresql_password "$immich_db_password" \
@@ -402,13 +402,13 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --required-keys "IMMICH_POSTGRESQL__USERNAME,IMMICH_POSTGRESQL__PASSWORD,IMMICH_OAUTH_ENABLED,IMMICH_OAUTH_ISSUER_URL,IMMICH_OAUTH_CLIENT_ID,IMMICH_OAUTH_CLIENT_SECRET,IMMICH_OAUTH_SCOPE,IMMICH_OAUTH_BUTTON_TEXT,IMMICH_OAUTH_AUTO_REGISTER,IMMICH_OAUTH_AUTO_LAUNCH,IMMICH_OAUTH_SIGNING_ALGORITHM,IMMICH_OAUTH_PROFILE_SIGNING_ALGORITHM,IMMICH_OAUTH_TOKEN_ENDPOINT_AUTH_METHOD,IMMICH_OAUTH_STORAGE_LABEL_CLAIM,IMMICH_OAUTH_STORAGE_QUOTA_CLAIM,IMMICH_OAUTH_ROLE_CLAIM,IMMICH_OAUTH_MOBILE_OVERRIDE_ENABLED,IMMICH_OAUTH_MOBILE_REDIRECT_URI,IMMICH_SERVER_EXTERNAL_DOMAIN"
 
 log "Applying Immich namespace, storage, and OAuth secret resources"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform/immich/namespace.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform/immich/pvc.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform/immich/externalsecret.yaml"
+kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/immich/namespace.yaml"
+kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/immich/pvc.yaml"
+kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/immich/externalsecret.yaml"
 
 immich_rendered_ingressroute_file="$(mktemp "${TMPDIR:-/tmp}/immich-ingressroute.XXXXXX.yaml")"
 sed "s/__ZONE_NAME__/${public_zone_name}/g" \
-  "$WORKSPACE_ROOT/gitops/platform/immich/ingressroute.yaml" >"$immich_rendered_ingressroute_file"
+  "$WORKSPACE_ROOT/gitops/platform-apps/immich/ingressroute.yaml" >"$immich_rendered_ingressroute_file"
 kubectl apply -f "$immich_rendered_ingressroute_file"
 
 wait_for_resources_ready "immich" "externalsecret" "Ready" "Immich ExternalSecret"

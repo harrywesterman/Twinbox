@@ -9,9 +9,10 @@ export KUBECONFIG="$KUBECONFIG_FILE"
 # shellcheck disable=SC1091
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
 
-manifest_path="$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml"
-rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/traefik-manager-application.XXXXXX.yaml")"
-trap 'rm -f "$rendered_manifest"' EXIT
+platform_dir="$WORKSPACE_ROOT/gitops/platform-apps/traefik-manager"
+rendered_deployment="$(mktemp "${TMPDIR:-/tmp}/traefik-manager-deployment.XXXXXX.yaml")"
+rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/traefik-manager-ingressroute.XXXXXX.yaml")"
+trap 'rm -f "$rendered_deployment" "$rendered_ingressroute"' EXIT
 
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id // empty')"
@@ -32,12 +33,11 @@ public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domai
   exit 1
 }
 
-kubectl delete application traefik-manager -n argocd --ignore-not-found=true >/dev/null 2>&1 || true
-
-sed "s/__ZONE_NAME__/${public_zone_name}/g" "$manifest_path" >"$rendered_manifest"
-
-bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
-  --manifest "$rendered_manifest" \
-  --application "platform-ingress" \
-  --destination-namespace "argocd" \
-  --no-wait
+kubectl apply -f "$platform_dir/namespace.yaml"
+kubectl apply -f "$platform_dir/serviceaccount.yaml"
+kubectl apply -f "$platform_dir/pvc.yaml"
+kubectl apply -f "$platform_dir/service.yaml"
+sed "s/__ZONE_NAME__/${public_zone_name}/g" "$platform_dir/deployment.yaml" >"$rendered_deployment"
+sed "s/__ZONE_NAME__/${public_zone_name}/g" "$platform_dir/ingressroute.yaml" >"$rendered_ingressroute"
+kubectl apply -f "$rendered_deployment"
+kubectl apply -f "$rendered_ingressroute"

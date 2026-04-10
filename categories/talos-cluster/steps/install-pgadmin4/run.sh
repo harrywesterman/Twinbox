@@ -145,6 +145,8 @@ cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty'
 
 public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
+pgadmin_platform_dir="$WORKSPACE_ROOT/gitops/platform-apps/pgadmin4"
+pgadmin_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-ingressroute.XXXXXX.yaml")"
 
 authentik_ensure_token
 authentik_setup_forward
@@ -155,10 +157,8 @@ pgadmin_host="https://pgadmin4.${public_zone_name}"
 pgadmin_redirect_uri="${pgadmin_host}/oauth2/authorize"
 secrets_dir="/opt/twinbox/bootstrap/secrets/global"
 mkdir -p "$secrets_dir"
-manifest_path="$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml"
-rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-application.XXXXXX.yaml")"
 pgadmin_servers_file="$secrets_dir/pgadmin4-servers-${cluster_id}.json"
-trap 'rm -f "$rendered_manifest" "${pgadmin_servers_file:-}"' EXIT
+trap 'rm -f "$pgadmin_rendered_ingressroute" "${pgadmin_servers_file:-}"' EXIT
 pgadmin_db_password_secret_name="pgadmin4-db-password"
 pgadmin_application_slug="pgadmin4"
 pgadmin_issuer_url="${AUTHENTIK_HOST%/}/application/o/${pgadmin_application_slug}/"
@@ -427,14 +427,14 @@ kubectl -n pgadmin4 create secret generic "$pgadmin_db_password_secret_name" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying pgAdmin 4 ExternalSecret"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform/pgadmin4/externalsecret.yaml"
+kubectl apply -f "$pgadmin_platform_dir/externalsecret.yaml"
 kubectl -n pgadmin4 wait --for=condition=Ready externalsecret/pgadmin4-oidc --timeout=10m
 wait_for_secret pgadmin4 pgadmin4-bootstrap
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Removing stale pgAdmin 4 import resources"
 kubectl -n pgadmin4 delete job pgadmin4-load-servers configmap/pgadmin4-servers --ignore-not-found=true >/dev/null 2>&1 || true
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying pgAdmin 4 PVC bootstrap resource"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform/pgadmin4/pvc.yaml"
+kubectl apply -f "$pgadmin_platform_dir/pvc.yaml"
 wait_for_pvc_bound pgadmin4 pgadmin4-data
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Loading pgAdmin 4 shared server entry"
@@ -534,14 +534,11 @@ if ! kubectl -n pgadmin4 wait --for=condition=complete job/pgadmin4-load-servers
   kubectl -n pgadmin4 describe job pgadmin4-load-servers || true
 fi
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying shared platform-ingress Argo CD application"
-kubectl delete application pgadmin4 -n argocd --ignore-not-found=true >/dev/null 2>&1 || true
-sed "s/__ZONE_NAME__/${public_zone_name}/g" "$manifest_path" >"$rendered_manifest"
-bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
-  --manifest "$rendered_manifest" \
-  --application "platform-ingress" \
-  --destination-namespace "argocd" \
-  --no-wait
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying pgAdmin 4 service, deployment, and ingress"
+sed "s/__ZONE_NAME__/${public_zone_name}/g" "$pgadmin_platform_dir/ingressroute.yaml" >"$pgadmin_rendered_ingressroute"
+kubectl apply -f "$pgadmin_platform_dir/service.yaml"
+kubectl apply -f "$pgadmin_platform_dir/deployment.yaml"
+kubectl apply -f "$pgadmin_rendered_ingressroute"
 
 wait_for_deployment pgadmin4 pgadmin4
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 deployment availability"

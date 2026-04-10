@@ -2,36 +2,15 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - namespaces.yaml
+  - argocd/argocd-cm.yaml
+  - argocd/argocd-rbac-cm.yaml
+  - argocd/argocd-wiredoor.yaml
+  - argocd/externalsecret.yaml
   - authentik/ingressroute.yaml
   - authentik/cors-middleware.yaml
   - authentik/forwardauth-middleware.yaml
-  - whoami/ingressroute.yaml
-  - headlamp/ingressroute.yaml
-  - headlamp/externalsecret.yaml
   - hubble/authentik-forwardauth-middleware.yaml
   - hubble/ingressroute.yaml
-  - cloudtty/authentik-forwardauth-middleware.yaml
-  - cloudtty/ingressroute.yaml
-  - pgadmin4/namespace.yaml
-  - pgadmin4/ingressroute.yaml
-  - pgadmin4/externalsecret.yaml
-  - pgadmin4/pvc.yaml
-  - pgadmin4/service.yaml
-  - pgadmin4/deployment.yaml
-  - immich/namespace.yaml
-  - immich/pvc.yaml
-  - immich/externalsecret.yaml
-  - immich/ingressroute.yaml
-  - grafana/ingressroute.yaml
-  - grafana/externalsecret.yaml
-  - loki/authentik-forwardauth-middleware.yaml
-  - loki/ingressroute.yaml
-  - traefik-manager/namespace.yaml
-  - traefik-manager/pvc.yaml
-  - traefik-manager/service.yaml
-  - traefik-manager/deployment.yaml
-  - traefik-manager/ingressroute.yaml
   - traefik/traefik-dashboard-ingressroute.yaml
   - traefik/authentik-callback-ingressroute.yaml
   - traefik/authentik-callback-service.yaml
@@ -40,9 +19,6 @@ resources:
   - traefik/argocd-server-transport.yaml
   - traefik/argocd-login-returnurl-redirect.yaml
   - traefik/argocd-ingressroute.yaml
-  - argocd/externalsecret.yaml
-  - argocd/argocd-cm.yaml
-  - argocd/argocd-rbac-cm.yaml
   - management-consoles/longhorn-ingressroute.yaml
   - management-consoles/authentik-callback-ingressroute.yaml
   - management-consoles/authentik-callback-service.yaml
@@ -59,14 +35,3 @@ resources:
   - management-consoles/seaweedfs-admin-ingressroute.yaml
   - management-consoles/seaweedfs-service.yaml
   - management-consoles/seaweedfs-endpoints.yaml
-  - wiredoor-gateway/ingressroute.yaml
-  - wiredoor-gateway/externalsecret.yaml
-  - dashy/ingressroute.yaml
-  - dashy/externalsecret.yaml
-  - dashy/pvc.yaml
-  - dashy/service.yaml
-  - dashy/deployment.yaml
-  - prometheus/ingressroute.yaml
-  - prometheus/alertmanager-config.yaml
-  - ntfy/ingressroute.yaml
-  - tailscale/externalsecret.yaml

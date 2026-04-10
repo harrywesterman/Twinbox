@@ -185,16 +185,20 @@ PGADMIN_STEP_SCRIPT = (
 )
 PLATFORM_INGRESS_APP = REPO_ROOT / "gitops" / "apps" / "platform-ingress.yaml"
 PGADMIN_EXTERNALSECRET = (
-    REPO_ROOT / "gitops" / "platform" / "pgadmin4" / "externalsecret.yaml"
+    REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "externalsecret.yaml"
 )
 PGADMIN_INGRESSROUTE = (
-    REPO_ROOT / "gitops" / "platform" / "pgadmin4" / "ingressroute.yaml"
+    REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "ingressroute.yaml"
 )
-PGADMIN_DEPLOYMENT = REPO_ROOT / "gitops" / "platform" / "pgadmin4" / "deployment.yaml"
-PGADMIN_PVC = REPO_ROOT / "gitops" / "platform" / "pgadmin4" / "pvc.yaml"
-PGADMIN_SERVICE = REPO_ROOT / "gitops" / "platform" / "pgadmin4" / "service.yaml"
+PGADMIN_DEPLOYMENT = (
+    REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "deployment.yaml"
+)
+PGADMIN_PVC = REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "pvc.yaml"
+PGADMIN_SERVICE = (
+    REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "service.yaml"
+)
 HEADLAMP_OIDC_EXTERNALSECRET = (
-    REPO_ROOT / "gitops" / "platform" / "headlamp" / "externalsecret.yaml"
+    REPO_ROOT / "gitops" / "platform-apps" / "headlamp" / "externalsecret.yaml"
 )
 CREATE_USERS_STEP_MANIFEST = (
     REPO_ROOT
@@ -259,7 +263,9 @@ WHOAMI_APP = REPO_ROOT / "gitops" / "apps" / "whoami.yaml"
 HEADLAMP_APP = REPO_ROOT / "gitops" / "apps" / "headlamp.yaml"
 GRAFANA_APP = REPO_ROOT / "gitops" / "apps" / "grafana.yaml"
 WIREDOOR_GATEWAY_APP = REPO_ROOT / "gitops" / "apps" / "wiredoor-gateway.yaml"
-WHOAMI_DEPLOYMENT = REPO_ROOT / "gitops" / "platform" / "whoami" / "deployment.yaml"
+WHOAMI_DEPLOYMENT = (
+    REPO_ROOT / "gitops" / "platform-apps" / "whoami" / "deployment.yaml"
+)
 HEADLAMP_VALUES = REPO_ROOT / "gitops" / "values" / "headlamp.yaml"
 LONGHORN_VALUES = REPO_ROOT / "gitops" / "values" / "longhorn.yaml"
 TRAEFIK_VALUES = REPO_ROOT / "gitops" / "values" / "traefik.yaml"
@@ -279,23 +285,25 @@ ARGOCD_INGRESSROUTE = (
     REPO_ROOT / "gitops" / "platform" / "traefik" / "argocd-ingressroute.yaml"
 )
 ARGOCD_WIREDOOR_INGRESSROUTE = (
-    REPO_ROOT / "gitops" / "platform" / "wiredoor-gateway" / "ingressroute.yaml"
+    REPO_ROOT / "gitops" / "platform" / "argocd" / "argocd-wiredoor.yaml"
 )
-WHOAMI_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "whoami" / "ingressroute.yaml"
+WHOAMI_INGRESSROUTE = (
+    REPO_ROOT / "gitops" / "platform-apps" / "whoami" / "ingressroute.yaml"
+)
 HEADLAMP_INGRESSROUTE = (
-    REPO_ROOT / "gitops" / "platform" / "headlamp" / "ingressroute.yaml"
+    REPO_ROOT / "gitops" / "platform-apps" / "headlamp" / "ingressroute.yaml"
 )
 GRAFANA_EXTERNALSECRET = (
-    REPO_ROOT / "gitops" / "platform" / "grafana" / "externalsecret.yaml"
+    REPO_ROOT / "gitops" / "platform-apps" / "grafana" / "externalsecret.yaml"
 )
 GRAFANA_INGRESSROUTE = (
-    REPO_ROOT / "gitops" / "platform" / "grafana" / "ingressroute.yaml"
+    REPO_ROOT / "gitops" / "platform-apps" / "grafana" / "ingressroute.yaml"
 )
 WIREDOOR_GATEWAY_EXTERNALSECRET = (
-    REPO_ROOT / "gitops" / "platform" / "wiredoor-gateway" / "externalsecret.yaml"
+    REPO_ROOT / "gitops" / "platform-apps" / "wiredoor-gateway" / "externalsecret.yaml"
 )
 WIREDOOR_GATEWAY_INGRESSROUTE = (
-    REPO_ROOT / "gitops" / "platform" / "wiredoor-gateway" / "ingressroute.yaml"
+    REPO_ROOT / "gitops" / "platform" / "argocd" / "argocd-wiredoor.yaml"
 )
 PINNED_DEFAULTS = REPO_ROOT / "config" / "pinned-defaults.sh"
 
@@ -1211,29 +1219,22 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "PGADMIN_MASTER_PASSWORD" in pgadmin_run_text
     assert "PGADMIN_DEFAULT_EMAIL" in pgadmin_run_text
     assert "Could not find a usable kubeconfig" in pgadmin_run_text
-    assert 'manifest_path="$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml"' in pgadmin_run_text
-    assert 'rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-application.XXXXXX.yaml")"' in pgadmin_run_text
-    assert 'sed "s/__ZONE_NAME__/${public_zone_name}/g" "$manifest_path" >"$rendered_manifest"' in pgadmin_run_text
+    assert 'pgadmin_platform_dir="$WORKSPACE_ROOT/gitops/platform-apps/pgadmin4"' in pgadmin_run_text
+    assert 'pgadmin_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-ingressroute.XXXXXX.yaml")"' in pgadmin_run_text
     assert (
         "kubectl create namespace pgadmin4 --dry-run=client -o yaml | kubectl apply -f -"
         in pgadmin_run_text
     )
-    assert "gitops/platform/pgadmin4/externalsecret.yaml" in pgadmin_run_text
-    assert 'kubectl delete application pgadmin4 -n argocd --ignore-not-found=true' in pgadmin_run_text
-    assert '--application "platform-ingress"' in pgadmin_run_text
-    assert '--destination-namespace "argocd"' in pgadmin_run_text
-    assert "--no-wait" in pgadmin_run_text
-    assert "gitops/apps/platform-ingress.yaml" in pgadmin_run_text
+    assert "gitops/platform-apps/pgadmin4/externalsecret.yaml" not in pgadmin_run_text
+    assert '$pgadmin_platform_dir/externalsecret.yaml' in pgadmin_run_text
+    assert 'kubectl delete application pgadmin4 -n argocd --ignore-not-found=true' not in pgadmin_run_text
+    assert '--application "platform-ingress"' not in pgadmin_run_text
+    assert "gitops/apps/platform-ingress.yaml" not in pgadmin_run_text
     assert "wait --for=condition=Ready externalsecret/pgadmin4-oidc" in pgadmin_run_text
-    assert "--manifest \"$rendered_manifest\"" in pgadmin_run_text
     assert "Creating pgAdmin 4 database password secret" in pgadmin_run_text
     assert 'pgadmin4-db-password' in pgadmin_run_text
     assert "Removing stale pgAdmin 4 import resources" in pgadmin_run_text
     assert 'kubectl -n pgadmin4 delete job pgadmin4-load-servers configmap/pgadmin4-servers --ignore-not-found=true' in pgadmin_run_text
-    assert "Scaling pgAdmin 4 down for deterministic server import" in pgadmin_run_text
-    assert "kubectl -n pgadmin4 scale deployment/pgadmin4 --replicas=0" in pgadmin_run_text
-    assert "Waiting for pgAdmin 4 pods to terminate" in pgadmin_run_text
-    assert "wait_for_zero_pods pgadmin4 app.kubernetes.io/name=pgadmin4" in pgadmin_run_text
     assert (
         "wait_for_ready_pod pgadmin4 app.kubernetes.io/name=pgadmin4"
         in pgadmin_run_text
@@ -1257,8 +1258,10 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert '/venv/bin/python /pgadmin4/setup.py load-servers /config/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace' in pgadmin_run_text
     assert 'kubectl -n pgadmin4 wait --for=condition=complete job/pgadmin4-load-servers --timeout=10m' in pgadmin_run_text
     assert 'kubectl -n pgadmin4 describe job pgadmin4-load-servers || true' in pgadmin_run_text
-    assert "Scaling pgAdmin 4 back up" in pgadmin_run_text
-    assert "kubectl -n pgadmin4 scale deployment/pgadmin4 --replicas=1" in pgadmin_run_text
+    assert "Applying pgAdmin 4 service, deployment, and ingress" in pgadmin_run_text
+    assert 'kubectl apply -f "$pgadmin_platform_dir/service.yaml"' in pgadmin_run_text
+    assert 'kubectl apply -f "$pgadmin_platform_dir/deployment.yaml"' in pgadmin_run_text
+    assert 'kubectl apply -f "$pgadmin_rendered_ingressroute"' in pgadmin_run_text
     assert 'kubectl -n pgadmin4 wait --for=condition=Available deployment/pgadmin4 --timeout=10m' in pgadmin_run_text
     assert 'pgAdmin 4 server import job failed' in pgadmin_run_text
     assert 'kubectl -n pgadmin4 delete job pgadmin4-load-servers configmap/pgadmin4-servers --ignore-not-found=true' in pgadmin_run_text
@@ -1267,9 +1270,9 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "kind: ApplicationSet" in pgadmin_app_text
     assert "name: platform-ingress-set" in pgadmin_app_text
     assert "kustomize:" in pgadmin_app_text
-    assert "pgadmin4-wiredoor" in pgadmin_app_text
-    assert "pgadmin4-tailscale" in pgadmin_app_text
-    assert 'Host(`pgadmin4.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)' in pgadmin_app_text
+    assert "pgadmin4-wiredoor" not in pgadmin_app_text
+    assert "pgadmin4-tailscale" not in pgadmin_app_text
+    assert 'pgadmin4.{{index .metadata.annotations "twinbox.io/public-zone-name"}}' not in pgadmin_app_text
 
     headlamp_run_text = (
         REPO_ROOT
@@ -1289,6 +1292,9 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "/oidc-callback" in headlamp_run_text
     assert "headlamp-oidc" in headlamp_run_text
     assert "sync-openbao-global-secret.sh" in headlamp_run_text
+    assert "gitops/platform-apps/headlamp/externalsecret.yaml" in headlamp_run_text
+    assert 'headlamp_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/headlamp-application.XXXXXX.yaml")"' in headlamp_run_text
+    assert 'sed "s/__ZONE_NAME__/${public_zone_name}/g" "$headlamp_manifest_path" >"$headlamp_rendered_manifest"' in headlamp_run_text
     assert 'dashy_redirect_uri="${dashy_host}"' in (
         REPO_ROOT
         / "categories"
@@ -1498,7 +1504,9 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert (
         "script: categories/talos-cluster/steps/install-grafana/run.sh" in grafana_text
     )
-    assert "--no-wait" in (REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-grafana" / "run.sh").read_text(encoding="utf-8")
+    assert "--no-wait" not in (
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-grafana" / "run.sh"
+    ).read_text(encoding="utf-8")
     assert "install-longhorn-storage" in prometheus_text
     assert "choose-ingress-route" in prometheus_text
     assert (
@@ -1555,10 +1563,9 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "token:" not in wiredoor_gateway_values_text
     assert "kind: Application" in whoami_app_text
     assert "kind: Application" in headlamp_app_text
-    assert "path: gitops/platform/whoami" in whoami_app_text
-    assert "path: gitops/platform/whoami/k8s.yaml" not in whoami_app_text
-    assert "path: gitops/platform/whoami/k8s.yaml" not in headlamp_app_text
-    assert "path: gitops/platform/wiredoor-gateway" not in wiredoor_gateway_app_text
+    assert "path: gitops/platform-apps/whoami" in whoami_app_text
+    assert "path: gitops/platform-apps/headlamp" in headlamp_app_text
+    assert "path: gitops/platform-apps/wiredoor-gateway" in wiredoor_gateway_app_text
     assert "middlewares:" in authentik_ingressroute_text
     assert "name: authentik-cors" in authentik_ingressroute_text
     assert "kind: Middleware" in authentik_cors_text
@@ -1585,12 +1592,12 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "master-password-hook.sh" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
     assert "readinessProbe" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
     assert "pgadmin4" in PGADMIN_SERVICE.read_text(encoding="utf-8")
-    assert "name: pgadmin4" in PLATFORM_INGRESS_APP.read_text(encoding="utf-8")
-    assert "pgadmin4" in PLATFORM_INGRESS_APP.read_text(encoding="utf-8")
+    assert "name: pgadmin4" not in PLATFORM_INGRESS_APP.read_text(encoding="utf-8")
+    assert "pgadmin4" not in PLATFORM_INGRESS_APP.read_text(encoding="utf-8")
     assert "config:" in _headlamp_values_text()
     assert "oidc:" in _headlamp_values_text()
     assert "headlamp-oidc" in _headlamp_values_text()
-    assert "headlamp/externalsecret.yaml" in (
+    assert "headlamp/externalsecret.yaml" not in (
         REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
     assert "hubble/authentik-forwardauth-middleware.yaml" in (
@@ -1599,7 +1606,7 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "hubble/ingressroute.yaml" in (
         REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
-    assert "pgadmin4/externalsecret.yaml" in (
+    assert "pgadmin4/externalsecret.yaml" not in (
         REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
     assert "kind: ExternalSecret" in _headlamp_oidc_externalsecret_text()
@@ -1618,21 +1625,12 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
         "customResponseHeaders/Access-Control-Allow-Origin" in platform_ingress_app_text
     )
     assert (
-        'pgadmin4.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
-        in platform_ingress_app_text
-    )
-    assert (
         'hubble.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
         in platform_ingress_app_text
     )
-    assert (
-        'cloudtty.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
-        in platform_ingress_app_text
-    )
-    assert (
-        'start.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
-        in platform_ingress_app_text
-    )
+    assert 'pgadmin4.{{index .metadata.annotations "twinbox.io/public-zone-name"}}' not in platform_ingress_app_text
+    assert 'cloudtty.{{index .metadata.annotations "twinbox.io/public-zone-name"}}' not in platform_ingress_app_text
+    assert 'Host(`start.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)' not in platform_ingress_app_text
     assert (
         'seaweedfs.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
         in platform_ingress_app_text
@@ -1643,8 +1641,10 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     )
     assert "kind: ApplicationSet" in grafana_appset_text
     assert "name: grafana-set" in grafana_appset_text
+    assert "path: gitops/platform-apps/grafana" in grafana_appset_text
     assert "kind: ApplicationSet" in ntfy_appset_text
     assert "name: ntfy-set" in ntfy_appset_text
+    assert "path: gitops/platform-apps/ntfy" in ntfy_appset_text
     assert "name: traefik-manager" not in platform_ingress_app_text
     assert (
         'traefik-manager.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
@@ -1682,7 +1682,7 @@ def test_grafana_oidc_is_openbao_backed():
     assert "adminPassword:" not in grafana_values_text
     assert "existingSecret: grafana-oidc" in grafana_values_text
     assert "envFromSecret: grafana-oidc" in grafana_values_text
-    assert "path: gitops/platform/grafana" not in grafana_app_text
+    assert "path: gitops/platform-apps/grafana" in grafana_app_text
     assert "kind: ExternalSecret" in grafana_externalsecret_text
     assert "kind: ClusterSecretStore" in grafana_externalsecret_text
     assert "name: openbao" in grafana_externalsecret_text
@@ -1754,17 +1754,18 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
 PROMETHEUS_APP = REPO_ROOT / "gitops" / "apps" / "prometheus.yaml"
 PROMETHEUS_VALUES = REPO_ROOT / "gitops" / "values" / "prometheus.yaml"
 PROMETHEUS_INGRESSROUTE = (
-    REPO_ROOT / "gitops" / "platform" / "prometheus" / "ingressroute.yaml"
+    REPO_ROOT / "gitops" / "platform-apps" / "prometheus" / "ingressroute.yaml"
 )
 ALERTMANAGER_CONFIG = (
-    REPO_ROOT / "gitops" / "platform" / "prometheus" / "alertmanager-config.yaml"
+    REPO_ROOT / "gitops" / "platform-apps" / "prometheus" / "alertmanager-config.yaml"
 )
 LOKI_APP = REPO_ROOT / "gitops" / "apps" / "loki.yaml"
 LOKI_VALUES = REPO_ROOT / "gitops" / "values" / "loki.yaml"
 NTFY_APP = REPO_ROOT / "gitops" / "apps" / "ntfy.yaml"
 NTFY_VALUES = REPO_ROOT / "gitops" / "values" / "ntfy.yaml"
-NTFY_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "ntfy" / "ingressroute.yaml"
-HOMEPAGE_CONFIGMAP = REPO_ROOT / "gitops" / "platform" / "homepage" / "configmap.yaml"
+NTFY_INGRESSROUTE = (
+    REPO_ROOT / "gitops" / "platform-apps" / "ntfy" / "ingressroute.yaml"
+)
 KUSTOMIZATION = REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
 DATABASES_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "kustomization.yaml"
 AUTHENTIK_DB_CLUSTER = REPO_ROOT / "gitops" / "databases" / "authentik" / "cluster.yaml"
@@ -1942,27 +1943,25 @@ def test_grafana_argocd_app_is_an_applicationset():
     )
 
 
-def test_homepage_configmap_includes_monitoring_links():
-    text = HOMEPAGE_CONFIGMAP.read_text(encoding="utf-8")
-    assert "Prometheus:" in text
-    assert "https://prometheus.__ZONE_NAME__" in text
-    assert "ntfy:" in text
-    assert "https://ntfy.__ZONE_NAME__" in text
-    assert "services.yaml" in text
-    assert "Metrics collection and alerting" in text
-    assert "Push notification service" in text
+def test_homepage_configmap_is_not_part_of_the_core_platform_overlay():
+    assert not (REPO_ROOT / "gitops" / "platform" / "homepage").exists()
 
 
 def test_kustomization_includes_monitoring_resources():
     text = KUSTOMIZATION.read_text(encoding="utf-8")
-    assert "pgadmin4/namespace.yaml" in text
-    assert "prometheus/ingressroute.yaml" in text
-    assert "prometheus/alertmanager-config.yaml" in text
+    assert "argocd/argocd-cm.yaml" in text
+    assert "argocd/argocd-wiredoor.yaml" in text
+    assert "authentik/ingressroute.yaml" in text
+    assert "hubble/ingressroute.yaml" in text
+    assert "management-consoles/proxmox-ingressroute.yaml" in text
+    assert "pgadmin4/namespace.yaml" not in text
+    assert "prometheus/ingressroute.yaml" not in text
+    assert "prometheus/alertmanager-config.yaml" not in text
     assert "prometheus/cluster-health-alerts.yaml" not in text
     assert "prometheus/pvc-usage-alerts.yaml" not in text
-    assert "traefik-manager/ingressroute.yaml" in text
-    assert "traefik-manager/deployment.yaml" in text
-    assert "ntfy/ingressroute.yaml" in text
+    assert "traefik-manager/ingressroute.yaml" not in text
+    assert "traefik-manager/deployment.yaml" not in text
+    assert "ntfy/ingressroute.yaml" not in text
     assert "cluster-config/configmap.yaml" not in text
     assert "cluster-config/externalsecret.yaml" not in text
     assert "replacements:" not in text
@@ -2011,10 +2010,10 @@ def test_traefik_manager_step_deploys_browser_ui():
     run_text = TRAEFIK_MANAGER_STEP_SCRIPT.read_text(encoding="utf-8")
     script_text = _traefik_manager_script_text()
     deployment_text = (
-        REPO_ROOT / "gitops" / "platform" / "traefik-manager" / "deployment.yaml"
+        REPO_ROOT / "gitops" / "platform-apps" / "traefik-manager" / "deployment.yaml"
     ).read_text(encoding="utf-8")
     ingress_text = (
-        REPO_ROOT / "gitops" / "platform" / "traefik-manager" / "ingressroute.yaml"
+        REPO_ROOT / "gitops" / "platform-apps" / "traefik-manager" / "ingressroute.yaml"
     ).read_text(encoding="utf-8")
     platform_kustomization_text = (
         REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
@@ -2047,22 +2046,25 @@ def test_traefik_manager_step_deploys_browser_ui():
     assert "authentik-forwardauth" in ingress_text
     assert "namespace: traefik" in ingress_text
     assert "Host(`traefik-manager.__ZONE_NAME__`)" in ingress_text
-    assert "traefik-manager/namespace.yaml" in platform_kustomization_text
-    assert "traefik-manager/pvc.yaml" in platform_kustomization_text
-    assert "traefik-manager/service.yaml" in platform_kustomization_text
-    assert "traefik-manager/deployment.yaml" in platform_kustomization_text
-    assert "traefik-manager/ingressroute.yaml" in platform_kustomization_text
+    assert "traefik-manager/namespace.yaml" not in platform_kustomization_text
+    assert "traefik-manager/pvc.yaml" not in platform_kustomization_text
+    assert "traefik-manager/service.yaml" not in platform_kustomization_text
+    assert "traefik-manager/deployment.yaml" not in platform_kustomization_text
+    assert "traefik-manager/ingressroute.yaml" not in platform_kustomization_text
     assert "name: traefik-manager-wiredoor" not in platform_kustomization_text
     assert "name: traefik-manager-tailscale" not in platform_kustomization_text
-    assert 'kubectl delete application traefik-manager -n argocd --ignore-not-found=true' in script_text
-    assert '--application "platform-ingress"' in script_text
-    assert '--destination-namespace "argocd"' in script_text
-    assert "--no-wait" in script_text
-    assert "gitops/apps/platform-ingress.yaml" in script_text
+    assert 'kubectl delete application traefik-manager -n argocd --ignore-not-found=true' not in script_text
+    assert '--application "platform-ingress"' not in script_text
+    assert "gitops/apps/platform-ingress.yaml" not in script_text
+    assert 'platform_dir="$WORKSPACE_ROOT/gitops/platform-apps/traefik-manager"' in script_text
+    assert 'kubectl apply -f "$platform_dir/namespace.yaml"' in script_text
+    assert 'kubectl apply -f "$platform_dir/serviceaccount.yaml"' in script_text
+    assert 'kubectl apply -f "$platform_dir/pvc.yaml"' in script_text
+    assert 'kubectl apply -f "$platform_dir/service.yaml"' in script_text
     assert "cluster-public-zone.sh" in script_text
     assert 'sed "s/__ZONE_NAME__/${public_zone_name}/g"' in script_text
-    assert 'mktemp "${TMPDIR:-/tmp}/traefik-manager-application.XXXXXX.yaml"' in script_text
-    assert "--manifest \"$rendered_manifest\"" in script_text
+    assert 'mktemp "${TMPDIR:-/tmp}/traefik-manager-deployment.XXXXXX.yaml"' in script_text
+    assert 'mktemp "${TMPDIR:-/tmp}/traefik-manager-ingressroute.XXXXXX.yaml"' in script_text
     assert ': "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"' in script_text
     assert "twinbox_public_zone_name" in script_text
     assert not (REPO_ROOT / "gitops" / "apps" / "traefik-manager.yaml").exists()
@@ -2140,9 +2142,9 @@ def test_authentik_values_request_memory_for_server_and_worker():
 
 
 def test_dashy_deployment_uses_a_published_image_tag():
-    text = (REPO_ROOT / "gitops" / "platform" / "dashy" / "deployment.yaml").read_text(
-        encoding="utf-8"
-    )
+    text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "dashy" / "deployment.yaml"
+    ).read_text(encoding="utf-8")
     assert "strategy:" in text
     assert "type: Recreate" in text
     assert "kubernetes.io/hostname" not in text
@@ -2166,10 +2168,12 @@ def test_dashy_deployment_uses_a_published_image_tag():
 
 
 def test_dashy_kustomization_includes_a_pvc():
-    text = (REPO_ROOT / "gitops" / "platform" / "kustomization.yaml").read_text(
-        encoding="utf-8"
-    )
-    assert "dashy/pvc.yaml" in text
+    text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "dashy" / "kustomization.yaml"
+    ).read_text(encoding="utf-8")
+    assert "pvc.yaml" in text
+    assert "deployment.yaml" in text
+    assert "ingressroute.yaml" in text
 
 
 def test_install_dashy_step_refreshes_platform_ingress_before_restart():
@@ -2183,11 +2187,13 @@ def test_install_dashy_step_refreshes_platform_ingress_before_restart():
     ).read_text(encoding="utf-8")
     assert "Applying Dashy ExternalSecret" in text
     assert "Waiting for Dashy OIDC secret" in text
-    assert "Refreshing platform-ingress so Dashy resources are applied" in text
-    assert "apply-argocd-application.sh" in text
-    assert 'gitops/apps/platform-ingress.yaml' in text
-    assert '--application "platform-ingress"' in text
-    assert "--no-wait" in text
+    assert "Refreshing platform-ingress so Dashy resources are applied" not in text
+    assert 'gitops/platform-apps/dashy/externalsecret.yaml' in text
+    assert 'gitops/platform-apps/dashy/pvc.yaml' in text
+    assert 'gitops/platform-apps/dashy/service.yaml' in text
+    assert 'gitops/platform-apps/dashy/deployment.yaml' in text
+    assert 'gitops/platform-apps/dashy/ingressroute.yaml' in text
+    assert 'kubectl apply -f "$dashy_rendered_ingressroute"' in text
     assert 'kubectl -n dashy get deployment/dashy' in text
 
 
@@ -2285,7 +2291,7 @@ def test_configure_argocd_oidc_refreshes_platform_ingress_without_waiting():
     assert 'gitops/apps/platform-ingress.yaml' in text
     assert '--application "platform-ingress"' in text
     assert '--destination-namespace "argocd"' in text
-    assert "--no-wait" in text
+    assert "--no-wait" not in text
     assert "wait_for_argocd_oidc_config" in text
     assert "patch_live_argocd_config" not in text
     assert "platform-ingress did not refresh argocd-cm in time" not in text
@@ -2293,41 +2299,37 @@ def test_configure_argocd_oidc_refreshes_platform_ingress_without_waiting():
 
 def test_cloudtty_platform_ingress_is_committed_to_gitops():
     kustomization_text = (
-        REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
-    ).read_text(encoding="utf-8")
-    namespaces_text = (
-        REPO_ROOT / "gitops" / "platform" / "namespaces.yaml"
+        REPO_ROOT / "gitops" / "platform-apps" / "cloudtty" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
     ingress_text = (
-        REPO_ROOT / "gitops" / "platform" / "cloudtty" / "ingressroute.yaml"
+        REPO_ROOT / "gitops" / "platform-apps" / "cloudtty" / "ingressroute.yaml"
     ).read_text(encoding="utf-8")
+    script_text = _cloudtty_script_text()
 
-    assert "cloudtty/ingressroute.yaml" in kustomization_text
-    assert "cloudtty/authentik-forwardauth-middleware.yaml" in kustomization_text
-    assert "name: cloudtty-system" in namespaces_text
+    assert "authentik-forwardauth-middleware.yaml" in kustomization_text
+    assert "ingressroute.yaml" in kustomization_text
     assert "Host(`cloudtty.__ZONE_NAME__`)" in ingress_text
+    assert 'PLATFORM_DIR="$WORKSPACE_ROOT/gitops/platform-apps/cloudtty"' in script_text
+    assert 'kubectl apply -f "$PLATFORM_DIR/authentik-forwardauth-middleware.yaml"' in script_text
+    assert 'kubectl apply -f "$rendered_ingressroute"' in script_text
 
 
 def test_platform_namespace_baseline_covers_shared_overlay_resources():
-    namespaces_text = (
-        REPO_ROOT / "gitops" / "platform" / "namespaces.yaml"
+    assert not (REPO_ROOT / "gitops" / "platform" / "namespaces.yaml").exists()
+    assert "namespace.yaml" in (
+        REPO_ROOT / "gitops" / "platform-apps" / "traefik-manager" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
-
-    for namespace in (
-        "authentik",
-        "cloudtty-system",
-        "dashy",
-        "homepage",
-        "immich",
-        "longhorn-system",
-        "monitoring",
-        "pgadmin4",
-        "tailscale",
-        "traefik",
-        "traefik-manager",
-        "wiredoor",
-    ):
-        assert f"name: {namespace}" in namespaces_text
+    assert "namespace.yaml" in (
+        REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "kustomization.yaml"
+    ).read_text(encoding="utf-8")
+    assert "kubectl create namespace dashy" in (
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-dashy-dashboard"
+        / "run.sh"
+    ).read_text(encoding="utf-8")
 
 
 def test_platform_ingress_manifest_patches_authentik_callback_routes():

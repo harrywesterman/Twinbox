@@ -13,7 +13,7 @@ source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"
 BOOTSTRAP_ROOT="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
 export KUBECONFIG="$KUBECONFIG_FILE"
 manifest_path="$WORKSPACE_ROOT/gitops/apps/grafana.yaml"
-grafana_externalsecret_manifest="$WORKSPACE_ROOT/gitops/platform/grafana/externalsecret.yaml"
+grafana_externalsecret_manifest="$WORKSPACE_ROOT/gitops/platform-apps/grafana/externalsecret.yaml"
 
 fail() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
@@ -390,13 +390,6 @@ seed_dashboard \
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying Grafana ExternalSecret"
 kubectl apply -f "$grafana_externalsecret_manifest"
 kubectl -n monitoring wait --for=condition=Ready externalsecret/grafana-oidc --timeout=10m
-
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Refreshing platform-ingress so Grafana platform resources match the repo"
-bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
-  --manifest "$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml" \
-  --application "platform-ingress" \
-  --destination-namespace "argocd" \
-  --no-wait
 
 kubectl delete application grafana -n argocd --ignore-not-found=true 2>/dev/null || true
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \

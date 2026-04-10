@@ -18,6 +18,25 @@ spec:
     - repoURL: __REPO_URL__
       targetRevision: __TARGET_REVISION__
       path: gitops/apps/prometheus/manifests
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      path: gitops/platform-apps/prometheus
+      kustomize:
+        patches:
+          - target:
+              kind: IngressRoute
+              name: prometheus
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`prometheus.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: prometheus-wiredoor
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`prometheus.__ZONE_NAME__`)
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring

@@ -31,6 +31,25 @@ spec:
         - repoURL: __REPO_URL__
           targetRevision: __TARGET_REVISION__
           ref: values
+        - repoURL: __REPO_URL__
+          targetRevision: __TARGET_REVISION__
+          path: gitops/platform-apps/ntfy
+          kustomize:
+            patches:
+              - target:
+                  kind: IngressRoute
+                  name: ntfy
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`ntfy.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: ntfy-wiredoor
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`ntfy.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
       destination:
         server: https://kubernetes.default.svc
         namespace: monitoring

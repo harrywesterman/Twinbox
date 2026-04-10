@@ -34,6 +34,9 @@ authentik_ensure_token
 authentik_setup_forward
 
 AUTHENTIK_HOST="${AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
+headlamp_manifest_path="$WORKSPACE_ROOT/gitops/apps/headlamp.yaml"
+headlamp_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/headlamp-application.XXXXXX.yaml")"
+trap 'rm -f "$headlamp_rendered_manifest"' EXIT
 
 headlamp_host="https://headlamp.${public_zone_name}"
 headlamp_redirect_uri="${headlamp_host}/oidc-callback"
@@ -209,11 +212,12 @@ rm -f "$headlamp_secret_file"
 
 if command -v kubectl &>/dev/null; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying Headlamp ExternalSecret"
-  kubectl apply -f "$WORKSPACE_ROOT/gitops/platform/headlamp/externalsecret.yaml"
+  kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/headlamp/externalsecret.yaml"
 
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying Headlamp Argo CD application"
+  sed "s/__ZONE_NAME__/${public_zone_name}/g" "$headlamp_manifest_path" >"$headlamp_rendered_manifest"
   bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
-    --manifest "$WORKSPACE_ROOT/gitops/apps/headlamp.yaml" \
+    --manifest "$headlamp_rendered_manifest" \
     --application "headlamp"
 
   if kubectl -n kube-system get deployment/headlamp >/dev/null 2>&1; then

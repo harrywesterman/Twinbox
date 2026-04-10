@@ -1,5 +1,3 @@
-# IngressRoute managed by platform-ingress via Kustomize.
-# This app deploys only the whoami Deployment and Service.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -10,7 +8,23 @@ spec:
   source:
     repoURL: __REPO_URL__
     targetRevision: __TARGET_REVISION__
-    path: gitops/platform/whoami
+    path: gitops/platform-apps/whoami
+    kustomize:
+      patches:
+        - target:
+            kind: IngressRoute
+            name: whoami
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`whoami.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: whoami-wiredoor
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`whoami.__ZONE_NAME__`)
   destination:
     server: https://kubernetes.default.svc
     namespace: default
