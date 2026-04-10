@@ -119,7 +119,13 @@ wait_for_ready_pod() {
           .items[]
           | select(
               (.status.phase // "") == "Running"
-              and any((.status.conditions // []); .type == "Ready" and .status == "True")
+              and (
+                [
+                  (.status.conditions // [])[]?
+                  | select(.type == "Ready" and .status == "True")
+                ]
+                | length
+              ) > 0
             )
         ]
         | length
@@ -133,6 +139,27 @@ wait_for_ready_pod() {
   done
 
   fail "Timed out waiting for a ready pod matching ${namespace}/${selector}"
+}
+
+wait_for_no_pods() {
+  local namespace="$1"
+  local selector="$2"
+  local timeout_seconds="${3:-600}"
+  local elapsed=0
+  local pod_count=0
+
+  while (( elapsed < timeout_seconds )); do
+    pod_count="$(
+      kubectl -n "$namespace" get pods -l "$selector" -o json | jq -r '.items | length'
+    )"
+    if [[ "$pod_count" == "0" ]]; then
+      return 0
+    fi
+    sleep 5
+    elapsed=$((elapsed + 5))
+  done
+
+  fail "Timed out waiting for pods matching ${namespace}/${selector} to terminate"
 }
 
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
@@ -431,6 +458,12 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying pgAdmin 4 ExternalSecret"
 kubectl apply -f "$pgadmin_platform_dir/externalsecret.yaml"
 kubectl -n pgadmin4 wait --for=condition=Ready externalsecret/pgadmin4-oidc --timeout=10m
 wait_for_secret pgadmin4 pgadmin4-bootstrap
+
+if kubectl -n pgadmin4 get deployment pgadmin4 >/dev/null 2>&1; then
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Scaling down existing pgAdmin 4 deployment for PVC-safe server import"
+  kubectl -n pgadmin4 scale deployment/pgadmin4 --replicas=0 >/dev/null
+  wait_for_no_pods pgadmin4 app.kubernetes.io/name=pgadmin4
+fi
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Removing stale pgAdmin 4 import resources"
 kubectl -n pgadmin4 delete job pgadmin4-load-servers configmap/pgadmin4-servers --ignore-not-found=true >/dev/null 2>&1 || true
