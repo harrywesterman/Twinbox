@@ -2236,6 +2236,8 @@ def test_configure_argocd_oidc_refreshes_platform_ingress_without_waiting():
     assert '--destination-namespace "argocd"' in text
     assert "--no-wait" in text
     assert "wait_for_argocd_oidc_config" in text
+    assert "patch_live_argocd_config" in text
+    assert "platform-ingress did not refresh argocd-cm in time" in text
 
 
 def test_cloudtty_platform_ingress_is_committed_to_gitops():

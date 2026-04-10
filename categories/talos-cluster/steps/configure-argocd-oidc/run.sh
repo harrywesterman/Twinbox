@@ -45,7 +45,7 @@ wait_for_argocd_secret_key() {
 
 wait_for_argocd_oidc_config() {
   local expected_issuer="$1"
-  local attempts=120
+  local attempts="${2:-12}"
   local attempt=1
   local oidc_config=""
 
@@ -65,6 +65,25 @@ wait_for_argocd_oidc_config() {
     sleep 5
     attempt=$((attempt + 1))
   done
+}
+
+patch_live_argocd_config() {
+  local patch_json
+
+  patch_json="$(
+    jq -cn \
+      --arg url "$argocd_host" \
+      --arg issuer "$argocd_issuer_url" \
+      '{
+        data: {
+          url: $url,
+          "oidc.config": ("name: Authentik\nissuer: " + $issuer + "\nclientID: $oidc.authentik.clientID\nclientSecret: $oidc.authentik.clientSecret\nrequestedScopes: [\"openid\", \"profile\", \"email\"]\nrequestedIDTokenClaims: {\"groups\": {\"essential\": true}}")
+        }
+      }'
+  )"
+
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying live argocd-cm fallback patch"
+  kubectl -n argocd patch configmap argocd-cm --type merge --patch "$patch_json" >/dev/null
 }
 
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
@@ -308,7 +327,11 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --destination-namespace "argocd" \
   --no-wait
 
-wait_for_argocd_oidc_config "$argocd_issuer_url"
+if ! wait_for_argocd_oidc_config "$argocd_issuer_url" 12; then
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] platform-ingress did not refresh argocd-cm in time; using live fallback patch"
+  patch_live_argocd_config
+  wait_for_argocd_oidc_config "$argocd_issuer_url" 12
+fi
 
 if kubectl -n argocd get deployment/argocd-server >/dev/null 2>&1; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restarting Argo CD server to load OIDC settings"
