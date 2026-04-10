@@ -101,7 +101,7 @@ test('higher scale percentages grow the VM footprint and totals', () => {
   assert.ok(summary.total_nodes >= 3);
   assert.ok(summary.total_memory_mb >= 12288);
   assert.equal(summary.controlplane_disk_gb, 10);
-  assert.ok(summary.worker_disk_gb >= 40);
+  assert.ok(summary.worker_disk_gb >= 100);
 });
 
 test('manual overrides stay in place when the scale slider changes', () => {
@@ -132,7 +132,7 @@ test('placement board suggests a host-aware Talos VM layout', () => {
   assert.equal(board.unassigned.length, 3);
   assert.equal(board.hostCards[0].assignments.length, 0);
   assert.equal(board.vmSizeMap['cp-1'].disk_gb, 10);
-  assert.ok(board.vmSizeMap['worker-1'].disk_gb >= 40);
+  assert.ok(board.vmSizeMap['worker-1'].disk_gb >= 100);
 });
 
 test('placement board exposes the management VM host when Proxmox resources include it', () => {
@@ -251,6 +251,6 @@ test('worker disk scales from host free space and scale percent', () => {
     vms: [],
   });
 
-  assert.ok(board.vmSizeMap['worker-1'].disk_gb > 40);
+  assert.ok(board.vmSizeMap['worker-1'].disk_gb > 100);
   assert.equal(board.vmSizeMap['cp-1'].disk_gb, 10);
 });

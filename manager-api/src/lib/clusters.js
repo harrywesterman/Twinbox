@@ -74,6 +74,7 @@ function buildDefaultVmNodeMap(controlplaneCount, workerCount, allowedHosts = []
 
 function buildDefaultVmSizeMap(controlplaneCount, workerCount, cpuCores, workerMemoryMb) {
   const vmSizeMap = {};
+  const workerDiskGb = 100;
 
   for (let index = 1; index <= Math.max(1, Number(controlplaneCount) || 0); index += 1) {
     vmSizeMap[`cp-${index}`] = {
@@ -87,7 +88,7 @@ function buildDefaultVmSizeMap(controlplaneCount, workerCount, cpuCores, workerM
     vmSizeMap[`worker-${index}`] = {
       cpu: cpuCores,
       memory_mb: workerMemoryMb,
-      disk_gb: 40,
+      disk_gb: workerDiskGb,
     };
   }
 
@@ -374,7 +375,7 @@ export function buildClusterFromRequest(body, env, { allowedVmHosts = [], cluste
       controlplane_memory_mb: 4096,
       controlplane_disk_gb: 10,
       worker_memory_mb: parsedMemory.value,
-      worker_disk_gb: 40,
+      worker_disk_gb: 100,
       bridge: parsedBridge.value,
       start_vmid: parsedStartVmid.value,
       vip_ip: parsedVipIp.value,
