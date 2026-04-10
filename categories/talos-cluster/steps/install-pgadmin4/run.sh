@@ -513,10 +513,9 @@ spec:
             - /bin/sh
             - -ec
             - |
-              python_bin="${pgadmin_job_python_bin}"
-              cp /usr/local/bin/python3.14 "${python_bin}"
-              chmod 0755 "${python_bin}"
-              exec "${python_bin}" /pgadmin4/setup.py load-servers /config/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace
+              cp /usr/local/bin/python3.14 "${pgadmin_job_python_bin}"
+              chmod 0755 "${pgadmin_job_python_bin}"
+              exec "${pgadmin_job_python_bin}" /pgadmin4/setup.py load-servers /config/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace
           envFrom:
             - secretRef:
                 name: pgadmin4-bootstrap
