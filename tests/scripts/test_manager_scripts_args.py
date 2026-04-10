@@ -2295,12 +2295,16 @@ def test_cloudtty_platform_ingress_is_committed_to_gitops():
     kustomization_text = (
         REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
+    namespaces_text = (
+        REPO_ROOT / "gitops" / "platform" / "namespaces.yaml"
+    ).read_text(encoding="utf-8")
     ingress_text = (
         REPO_ROOT / "gitops" / "platform" / "cloudtty" / "ingressroute.yaml"
     ).read_text(encoding="utf-8")
 
     assert "cloudtty/ingressroute.yaml" in kustomization_text
     assert "cloudtty/authentik-forwardauth-middleware.yaml" in kustomization_text
+    assert "name: cloudtty-system" in namespaces_text
     assert "Host(`cloudtty.__ZONE_NAME__`)" in ingress_text
 
 
