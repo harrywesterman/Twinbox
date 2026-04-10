@@ -17,9 +17,9 @@ Twinbox is a Talos Linux based configuration for a Kubernetes cluster. Treat the
 
 1. Run `wizard/setup-wizard.sh` on Proxmox.
 2. The wizard creates only the Management VM.
-3. The Management VM gets a thin cloud-init bootstrap, Ansible installs Docker CE and the management tools, and the host runs the runtime stack from `/opt/twinbox` without a repo checkout.
+3. The Management VM gets a thin cloud-init bootstrap, Ansible installs Docker CE and the management tools, and the host keeps runtime/bootstrap state under `/opt/twinbox`; the step and manager scripts are bundled in the manager container images.
 4. `manager-web` on port `3000` queues work through `manager-api` on port `8080`.
-5. `manager-worker` polls the file queue under `manager-data/` and runs repo-owned scripts.
+5. `manager-worker` polls the file queue under `manager-data/` and executes bundled step and manager scripts inside the container image.
 6. `provision-nodes` starts the Talos journey, sizes the cluster, lands the VMs, and records the cluster state.
 7. `install-secret-sync` installs External Secrets Operator and OpenBao after Longhorn.
 
@@ -39,6 +39,7 @@ Twinbox is a Talos Linux based configuration for a Kubernetes cluster. Treat the
 - Use the Playwright skill to look at the live web wizard.
 - Use `docker compose`, not legacy `docker-compose`.
 - Keep `manager-data/` as runtime state only.
+- The host does not carry a full repo checkout; `/opt/twinbox/categories` and `/opt/twinbox/scripts` exist inside the manager containers.
 - Use `apply_patch` for manual file edits.
 - Prefer small, targeted changes in the relevant component:
   - UI: `manager-web/src/*`

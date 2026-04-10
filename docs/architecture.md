@@ -2,7 +2,7 @@
 
 Twinbox is a complete K8s cluster based on Talos Linux, completely configured. The Management VM is the control point for bootstrap, queueing, and long-lived bootstrap material.
 
-GitHub `main` is the source of truth for both the management stack and the GitOps manifests. The Management VM is a runtime host that keeps only runtime data under `/opt/twinbox`; the host no longer depends on a persistent repo checkout.
+GitHub `main` is the source of truth for both the management stack and the GitOps manifests. The Management VM is a runtime host that keeps only runtime, config, and bootstrap data under `/opt/twinbox`; the host does not carry a repo checkout.
 
 ## Layers
 
@@ -14,7 +14,7 @@ GitHub `main` is the source of truth for both the management stack and the GitOp
   - `manager-web`
   - `manager-api`
   - `manager-worker`
-  - `categories/` bundled into the `manager-api` and `manager-worker` images
+  - `categories/` and `scripts/manager/` bundled into the `manager-api` and `manager-worker` images
   - Management VM runtime files under `/opt/twinbox`
 
 3. **Execution layer**
@@ -55,7 +55,7 @@ GitHub `main` is the source of truth for both the management stack and the GitOp
 1. `manager-web` loads `/api/catalog`.
 2. The UI executes a step through `POST /api/steps/{step_id}/execute`.
 3. `manager-api` validates inputs, persists state, and writes a queue file.
-4. `manager-worker` moves the job to `queue/running`, executes the repo-owned script, streams logs, and finalizes state.
+4. `manager-worker` moves the job to `queue/running`, executes the bundled step script from the manager image, streams logs, and finalizes state.
 5. The UI polls job and catalog state.
 
 ## Secret Flow
@@ -102,8 +102,11 @@ The local Argo cluster secret must exist before the domain-aware ApplicationSets
 - Queue recovery marks orphaned `running` jobs as failed on worker startup.
 - Step state is cluster-scoped for Talos cluster journeys.
 - Talos configs and kubeconfigs are runtime artifacts, not canonical files under `manager-data/`.
-- Management VM edits under `/opt/twinbox` are temporary unless they are committed and pushed back to GitHub `main`.
+- Management VM edits under `/opt/twinbox` are temporary runtime changes unless they are committed and pushed back to GitHub `main`.
 - OpenBao uses static auto-unseal material stored on the Management VM for zero-touch restarts.
 - The Management VM runs SeaweedFS in Docker as the default S3 target for Velero backups.
-- The Management VM does not need a Twinbox repository checkout; cloud-init seeds `/opt/twinbox` and Ansible maintains the host from there.
+- The Management VM does not need a Twinbox repository checkout; cloud-init seeds `/opt/twinbox` runtime and bootstrap data, while the manager images carry the executable step catalog.
+- Debugging follows the layer split:
+  - host: `/opt/twinbox/bootstrap`, `.env`, compose files, runtime state
+  - container: `/opt/twinbox/categories`, `/opt/twinbox/scripts`
 - The first visible setup step in the UI is `Deploy Talos Cluster`.

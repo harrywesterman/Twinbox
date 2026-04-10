@@ -24,6 +24,8 @@ TWINBOX_SECRET_TEMP_DIR=/tmp/twinbox-secrets
 TWINBOX_SECRET_CACHE_TTL_SEC=60
 ```
 
+`TWINBOX_HOST_REPO_ROOT` is the host runtime root used by the manager stack on the Management VM. The name is historical; it does not mean the host keeps a full repo checkout.
+
 ## Bootstrap File Layout
 
 ### Global bootstrap secrets
@@ -196,7 +198,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `install-authentik-idp` generates `AUTHENTIK_AUTOMATION_TOKEN_KEY`, stores it in OpenBao, and waits for the blueprint to create the service account before proceeding. The token key is persisted to OpenBao as `AUTHENTIK_API_TOKEN`.
 - `wizard/setup-wizard.sh` writes the chosen cluster login password to `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` inside the Management VM so later bootstrap steps can reuse it without prompting again.
 - `create-users-and-groups` reads the Authentik bootstrap secret from OpenBao via the shared `authentik-auth.sh` helper, which loads the persistent `AUTHENTIK_API_TOKEN` (created by the blueprint) and uses it for all API calls. It creates the first Authentik user, creates the `admins` group as a superuser group, and adds the user to that group. The automation service account itself is also placed in a dedicated superuser group so it can set passwords and manage group membership during bootstrap.
-- All downstream steps that talk to the Authentik API (`install-headlamp`, `install-dashy-dashboard`, `configure-argocd-oidc`, `install-pgadmin4`, `install-management-consoles`) source `scripts/manager/authentik-auth.sh` and call `authentik_ensure_token`. The helper reads the persistent `AUTHENTIK_API_TOKEN` from OpenBao and uses it for all API calls.
+- All downstream steps that talk to the Authentik API (`install-headlamp`, `install-dashy-dashboard`, `configure-argocd-oidc`, `install-pgadmin4`, `install-management-consoles`) source the bundled `scripts/manager/authentik-auth.sh` helper and call `authentik_ensure_token`. The helper reads the persistent `AUTHENTIK_API_TOKEN` from OpenBao and uses it for all API calls.
 - `install-velero-backup` installs Velero together with the SeaweedFS S3 target that runs on the Management VM, syncs `/opt/twinbox/bootstrap/secrets/global/velero.json` into OpenBao, and renders the Argo CD values inline from that bootstrap file.
 - Later application steps write bootstrap JSON into OpenBao before enabling their Argo CD applications.
 

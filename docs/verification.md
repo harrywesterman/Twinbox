@@ -85,6 +85,19 @@ Expected:
 - OpenBao seal files exist
 - OpenBao init files appear after `install-secret-sync`
 
+## Manager image assets
+
+```bash
+docker exec twinbox-manager-worker find /opt/twinbox/categories -maxdepth 4 -type f -name run.sh | sort
+docker exec twinbox-manager-worker find /opt/twinbox/scripts/manager -maxdepth 2 -type f | sort
+```
+
+Expected:
+
+- the worker image carries the step catalog under `/opt/twinbox/categories`
+- the manager images carry the shared manager helpers under `/opt/twinbox/scripts/manager`
+- step debugging happens against container paths, not a host-side repo checkout
+
 ## Step checks
 
 ### `provision-nodes`

@@ -43,7 +43,7 @@ CLI tools pinned in `config/pinned-defaults.sh`:
 
 | Variable | Example | Description |
 |----------|---------|-------------|
-| `TWINBOX_HOST_REPO_ROOT` | `/opt/twinbox` | Path to the Twinbox runtime root on the Management VM |
+| `TWINBOX_HOST_REPO_ROOT` | `/opt/twinbox` | Runtime root used by the manager stack on the Management VM; not a full repo checkout on the host |
 | `TWINBOX_BOOTSTRAP_DIR` | `/opt/twinbox/bootstrap` | Root of the bootstrap secrets tree |
 | `MANAGEMENT_VM_IP` | `192.168.1.50` | The Management VM's own IP address. Used as the anchor for IP allocation scanning (`/api/ip-suggestions`) and for detecting network defaults (gateway, DNS, prefix length). |
 

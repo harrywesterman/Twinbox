@@ -15,6 +15,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/harrywesterman/twinbox/main/
 ```
 
 The wizard creates the Management VM, seeds runtime directories in `/opt/twinbox`, writes `.env`, and kicks off the Ansible-driven bootstrap.
+That host-side tree is runtime state, not a full repo checkout. The management images carry the executable step catalog and manager scripts.
 The Management VM now boots through a thin cloud-init layer that installs Ansible and lets the Ansible baseline install Docker, the management tools, and the runtime stack.
 The generated VM and the later Talos cluster both use the same `TWINBOX_TIME_SERVER` value for NTP.
 The wizard also stores the cluster login password in `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` so later Authentik onboarding can reuse it.
@@ -72,4 +73,10 @@ If bootstrap files are missing, rerun the host bootstrap logic:
 
 ```bash
 ssh root@<management-vm-ip> 'sudo ansible-playbook -i localhost, -c local /opt/twinbox/bootstrap/ansible/management-vm-maintenance.yml'
+```
+
+If you need to inspect a step script, do it inside the worker container:
+
+```bash
+ssh root@<management-vm-ip> 'docker exec twinbox-manager-worker sh -lc "sed -n \"1,80p\" /opt/twinbox/categories/talos-cluster/steps/install-pgadmin4/run.sh"'
 ```
