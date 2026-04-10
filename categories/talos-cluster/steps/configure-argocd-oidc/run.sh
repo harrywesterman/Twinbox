@@ -85,6 +85,10 @@ AUTHENTIK_HOST="${AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
 
 argocd_host="https://argocd.${public_zone_name}"
 argocd_redirect_uri="${argocd_host}/auth/callback"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Ensuring Argo CD cluster secret is annotated for ${public_zone_name}"
+bash "$WORKSPACE_ROOT/scripts/manager/upsert-argocd-cluster-secret.sh" \
+  --public-zone-name "$public_zone_name"
+
 secrets_dir="/opt/twinbox/bootstrap/secrets/global"
 mkdir -p "$secrets_dir"
 
@@ -305,8 +309,7 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Refreshing platform-ingress so Argo CD pick
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml" \
   --application "platform-ingress" \
-  --destination-namespace "argocd" \
-  --no-wait
+  --destination-namespace "argocd"
 
 wait_for_argocd_oidc_config "$argocd_issuer_url" 12
 
