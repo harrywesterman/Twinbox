@@ -75,6 +75,7 @@ test('app source defines a minimal wizard shell with guided input and step-by-st
   assert.match(source, /wizard-install-stage/, 'expected a centered install stage');
   assert.match(source, /wizard-install-output/, 'expected a dedicated output window for install mode');
   assert.match(source, /wizard-install-actions-row/, 'expected the install controls below the output window');
+  assert.doesNotMatch(source, /\|\| isCurrentStepComplete/, 'expected the install action to stay available even after a step is complete');
   assert.match(source, /installLogsByStepRef/, 'expected the install view to cache logs per step');
   assert.match(source, /setInstallStepLogs\(/, 'expected the install pane to write per-step logs');
   assert.match(source, /model\.activity\.rawLogOutput \|\| ''/, 'expected the install pane to render only the current step output');

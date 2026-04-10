@@ -2163,8 +2163,6 @@ function App() {
         : 'Review the values on this page and continue to the next question.')
     : '';
   const installStepCount = setupSteps.length;
-  const isCurrentStepComplete = currentStep?.status === 'done' || currentStep?.status === 'configured';
-  const stepHasRunBefore = Boolean(currentStep?.latest_job) || ['done', 'configured', 'failed', 'canceled', 'skipped'].includes(currentStep?.status || '');
   const installStepBlocked = currentStep?.status === 'locked';
   const installInProgress = Boolean(visibleActiveJob?.id && ['pending', 'running', 'cancel_requested'].includes(visibleActiveJob.status))
     || currentStep?.status === 'running';
@@ -2172,7 +2170,6 @@ function App() {
     || busy
     || installInProgress
     || installStepBlocked
-    || isCurrentStepComplete
     || (currentStep?.id === 'provision-nodes' && !provisionStepValid);
   const remainingInstallableSteps = setupSteps
     .slice(safeInstallStepIndex)
