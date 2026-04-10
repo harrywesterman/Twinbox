@@ -1228,13 +1228,16 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "--manifest \"$rendered_manifest\"" in pgadmin_run_text
     assert "Creating pgAdmin 4 database password secret" in pgadmin_run_text
     assert 'pgadmin4-db-password' in pgadmin_run_text
-    assert "kubectl -n pgadmin4 rollout restart deploy/pgadmin4" in pgadmin_run_text
+    assert "Removing stale pgAdmin 4 import resources" in pgadmin_run_text
+    assert 'kubectl -n pgadmin4 delete job pgadmin4-load-servers configmap/pgadmin4-servers --ignore-not-found=true' in pgadmin_run_text
+    assert "Scaling pgAdmin 4 down for deterministic server import" in pgadmin_run_text
+    assert "kubectl -n pgadmin4 scale deployment/pgadmin4 --replicas=0" in pgadmin_run_text
+    assert "Waiting for pgAdmin 4 pods to terminate" in pgadmin_run_text
+    assert "wait_for_zero_pods pgadmin4 app.kubernetes.io/name=pgadmin4" in pgadmin_run_text
     assert (
         "kubectl -n pgadmin4 wait --for=condition=Ready pod -l app.kubernetes.io/name=pgadmin4 --timeout=10m"
         in pgadmin_run_text
     )
-    assert 'pgadmin_pod="$(resolve_ready_pod pgadmin4 app.kubernetes.io/name=pgadmin4)"' in pgadmin_run_text
-    assert 'kubectl -n pgadmin4 wait --for=condition=Ready "pod/$pgadmin_pod" --timeout=10m' in pgadmin_run_text
     assert "Loading pgAdmin 4 shared server entry" in pgadmin_run_text
     assert "Authentik Database" in pgadmin_run_text
     assert "Shared Servers" in pgadmin_run_text
@@ -1253,6 +1256,11 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert 'name: pgadmin4-load-servers' in pgadmin_run_text
     assert '/venv/bin/python /pgadmin4/setup.py load-servers /config/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace' in pgadmin_run_text
     assert 'kubectl -n pgadmin4 wait --for=condition=complete job/pgadmin4-load-servers --timeout=10m' in pgadmin_run_text
+    assert 'kubectl -n pgadmin4 describe job pgadmin4-load-servers || true' in pgadmin_run_text
+    assert "Scaling pgAdmin 4 back up" in pgadmin_run_text
+    assert "kubectl -n pgadmin4 scale deployment/pgadmin4 --replicas=1" in pgadmin_run_text
+    assert 'kubectl -n pgadmin4 wait --for=condition=Available deployment/pgadmin4 --timeout=10m' in pgadmin_run_text
+    assert 'pgAdmin 4 server import job failed' in pgadmin_run_text
     assert 'kubectl -n pgadmin4 delete job pgadmin4-load-servers configmap/pgadmin4-servers --ignore-not-found=true' in pgadmin_run_text
 
     pgadmin_app_text = PLATFORM_INGRESS_APP.read_text(encoding="utf-8")
@@ -1350,6 +1358,15 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "startupProbe" in pgadmin_deployment_text
     assert "failureThreshold: 36" in pgadmin_deployment_text
     assert "tcpSocket" in pgadmin_deployment_text
+    assert "runAsNonRoot: true" in pgadmin_deployment_text
+    assert "runAsUser: 5050" in pgadmin_deployment_text
+    assert "runAsGroup: 5050" in pgadmin_deployment_text
+    assert "runAsUser: 65534" in pgadmin_deployment_text
+    assert "runAsGroup: 65534" in pgadmin_deployment_text
+    assert "allowPrivilegeEscalation: false" in pgadmin_deployment_text
+    assert "type: RuntimeDefault" in pgadmin_deployment_text
+    assert "drop:" in pgadmin_deployment_text
+    assert "- ALL" in pgadmin_deployment_text
 
     cloudflare_tunnel_run_text = (
         REPO_ROOT

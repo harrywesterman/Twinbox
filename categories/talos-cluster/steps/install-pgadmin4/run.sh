@@ -84,19 +84,25 @@ wait_for_deployment() {
   fail "Timed out waiting for deployment ${namespace}/${deployment_name}"
 }
 
-resolve_ready_pod() {
+wait_for_zero_pods() {
   local namespace="$1"
   local selector="$2"
+  local timeout_seconds="${3:-600}"
+  local elapsed=0
+  local pod_count=0
 
-  kubectl -n "$namespace" get pods -l "$selector" -o json | jq -r '
-    .items
-    | map(select(
-        any(.status.conditions[]?; .type == "Ready" and .status == "True")
-      ))
-    | sort_by(.metadata.creationTimestamp)
-    | last
-    | .metadata.name // empty
-  '
+  while (( elapsed < timeout_seconds )); do
+    pod_count="$(
+      kubectl -n "$namespace" get pods -l "$selector" -o json | jq -r '.items | length'
+    )"
+    if [[ "$pod_count" == "0" ]]; then
+      return 0
+    fi
+    sleep 5
+    elapsed=$((elapsed + 5))
+  done
+
+  fail "Timed out waiting for pods matching ${namespace}/${selector} to terminate"
 }
 
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
@@ -121,8 +127,8 @@ secrets_dir="/opt/twinbox/bootstrap/secrets/global"
 mkdir -p "$secrets_dir"
 manifest_path="$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml"
 rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-application.XXXXXX.yaml")"
-trap 'rm -f "$rendered_manifest"' EXIT
 pgadmin_servers_file="$secrets_dir/pgadmin4-servers-${cluster_id}.json"
+trap 'rm -f "$rendered_manifest" "${pgadmin_servers_file:-}"' EXIT
 pgadmin_db_password_secret_name="pgadmin4-db-password"
 pgadmin_application_slug="pgadmin4"
 pgadmin_issuer_url="${AUTHENTIK_HOST%/}/application/o/${pgadmin_application_slug}/"
@@ -405,14 +411,12 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --no-wait
 
 wait_for_deployment pgadmin4 pgadmin4
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restarting pgAdmin 4 to pick up secret-backed env vars"
-kubectl -n pgadmin4 rollout restart deploy/pgadmin4
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 pod readiness"
-kubectl -n pgadmin4 wait --for=condition=Ready pod -l app.kubernetes.io/name=pgadmin4 --timeout=10m
-pgadmin_pod="$(resolve_ready_pod pgadmin4 app.kubernetes.io/name=pgadmin4)"
-[[ -n "$pgadmin_pod" ]] || fail "Could not resolve a ready pgAdmin 4 pod after restart"
-sleep 5
-kubectl -n pgadmin4 wait --for=condition=Ready "pod/$pgadmin_pod" --timeout=10m
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Removing stale pgAdmin 4 import resources"
+kubectl -n pgadmin4 delete job pgadmin4-load-servers configmap/pgadmin4-servers --ignore-not-found=true >/dev/null 2>&1 || true
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Scaling pgAdmin 4 down for deterministic server import"
+kubectl -n pgadmin4 scale deployment/pgadmin4 --replicas=0 >/dev/null
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 pods to terminate"
+wait_for_zero_pods pgadmin4 app.kubernetes.io/name=pgadmin4
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Loading pgAdmin 4 shared server entry"
 jq -n \
@@ -448,7 +452,6 @@ kubectl -n pgadmin4 create configmap pgadmin4-servers \
   --from-file=pgadmin4-servers.json="$pgadmin_servers_file" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
-kubectl -n pgadmin4 delete job pgadmin4-load-servers --ignore-not-found=true >/dev/null 2>&1 || true
 kubectl apply -f - >/dev/null <<EOF
 apiVersion: batch/v1
 kind: Job
@@ -463,6 +466,13 @@ spec:
         app.kubernetes.io/name: pgadmin4-load-servers
     spec:
       restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 5050
+        runAsGroup: 5050
+        fsGroup: 5050
+        seccompProfile:
+          type: RuntimeDefault
       volumes:
         - name: pgadmin-data
           persistentVolumeClaim:
@@ -474,6 +484,11 @@ spec:
         - name: pgadmin4-load-servers
           image: dpage/pgadmin4:9.14
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           command:
             - /bin/sh
             - -ec
@@ -493,12 +508,24 @@ spec:
 EOF
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 server import job"
+job_failed=0
 if ! kubectl -n pgadmin4 wait --for=condition=complete job/pgadmin4-load-servers --timeout=10m; then
+  job_failed=1
   kubectl -n pgadmin4 logs job/pgadmin4-load-servers --tail=200 || true
-  fail "Timed out or failed waiting for pgAdmin 4 server import job"
+  kubectl -n pgadmin4 describe job pgadmin4-load-servers || true
+fi
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Scaling pgAdmin 4 back up"
+kubectl -n pgadmin4 scale deployment/pgadmin4 --replicas=1 >/dev/null
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 deployment availability"
+kubectl -n pgadmin4 wait --for=condition=Available deployment/pgadmin4 --timeout=10m
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 pod readiness"
+kubectl -n pgadmin4 wait --for=condition=Ready pod -l app.kubernetes.io/name=pgadmin4 --timeout=10m
+
+if (( job_failed )); then
+  fail "pgAdmin 4 server import job failed"
 fi
 
 kubectl -n pgadmin4 delete job pgadmin4-load-servers configmap/pgadmin4-servers --ignore-not-found=true >/dev/null 2>&1 || true
-rm -f "$pgadmin_servers_file"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] pgAdmin 4 Authentik configuration complete"
