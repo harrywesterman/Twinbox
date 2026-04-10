@@ -93,7 +93,10 @@ spec:
             - -ec
             - |
               cd /pgadmin4
-              exec /usr/local/bin/python3.14 -m gunicorn \
+              python_bin=/tmp/python3.14.no-cap
+              cp /usr/local/bin/python3.14 "${python_bin}"
+              chmod 0755 "${python_bin}"
+              exec "${python_bin}" -m gunicorn \
                 --limit-request-line "${GUNICORN_LIMIT_REQUEST_LINE:-8190}" \
                 --limit-request-fields "${GUNICORN_LIMIT_REQUEST_FIELDS:-100}" \
                 --limit-request-field_size "${GUNICORN_LIMIT_REQUEST_FIELD_SIZE:-8190}" \

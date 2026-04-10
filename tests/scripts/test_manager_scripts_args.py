@@ -1372,7 +1372,9 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "drop:" in pgadmin_deployment_text
     assert "- ALL" in pgadmin_deployment_text
     assert "cd /pgadmin4" in pgadmin_deployment_text
-    assert "exec /usr/local/bin/python3.14 -m gunicorn" in pgadmin_deployment_text
+    assert "python_bin=/tmp/python3.14.no-cap" in pgadmin_deployment_text
+    assert "cp /usr/local/bin/python3.14" in pgadmin_deployment_text
+    assert "exec \"${python_bin}\" -m gunicorn" in pgadmin_deployment_text
     assert "--timeout \"${GUNICORN_TIMEOUT:-86400}\"" in pgadmin_deployment_text
 
     cloudflare_tunnel_run_text = (
