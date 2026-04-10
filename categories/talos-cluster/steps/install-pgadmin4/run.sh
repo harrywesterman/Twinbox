@@ -148,6 +148,7 @@ public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domai
 pgadmin_platform_dir="$WORKSPACE_ROOT/gitops/platform-apps/pgadmin4"
 pgadmin_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-ingressroute.XXXXXX.yaml")"
 pgadmin_job_python_bin="/venv/bin/python3.14"
+pgadmin_load_servers_job_name="pgadmin4-load-servers-$(openssl rand -hex 4)"
 
 authentik_ensure_token
 authentik_setup_forward
@@ -434,9 +435,6 @@ wait_for_secret pgadmin4 pgadmin4-bootstrap
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Removing stale pgAdmin 4 import resources"
 kubectl -n pgadmin4 delete job pgadmin4-load-servers configmap/pgadmin4-servers --ignore-not-found=true >/dev/null 2>&1 || true
-while kubectl -n pgadmin4 get job pgadmin4-load-servers >/dev/null 2>&1; do
-  sleep 2
-done
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying pgAdmin 4 PVC bootstrap resource"
 kubectl apply -f "$pgadmin_platform_dir/pvc.yaml"
 wait_for_pvc_bound pgadmin4 pgadmin4-data
@@ -479,7 +477,7 @@ kubectl apply -f - >/dev/null <<EOF
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: pgadmin4-load-servers
+  name: ${pgadmin_load_servers_job_name}
   namespace: pgadmin4
 spec:
   backoffLimit: 0
@@ -535,7 +533,7 @@ job_status="unknown"
 job_timeout_seconds=600
 job_elapsed=0
 while (( job_elapsed < job_timeout_seconds )); do
-  if kubectl -n pgadmin4 get job pgadmin4-load-servers -o json | jq -e '
+  if kubectl -n pgadmin4 get job "${pgadmin_load_servers_job_name}" -o json | jq -e '
     (
       [.status.conditions[]? | select(.type == "Complete" and .status == "True")] | length
     ) > 0
@@ -544,7 +542,7 @@ while (( job_elapsed < job_timeout_seconds )); do
     break
   fi
 
-  if kubectl -n pgadmin4 get job pgadmin4-load-servers -o json | jq -e '
+  if kubectl -n pgadmin4 get job "${pgadmin_load_servers_job_name}" -o json | jq -e '
     (
       [.status.conditions[]? | select(.type == "Failed" and .status == "True")] | length
     ) > 0
@@ -559,8 +557,8 @@ while (( job_elapsed < job_timeout_seconds )); do
 done
 
 if [[ "$job_status" != "complete" ]]; then
-  kubectl -n pgadmin4 logs job/pgadmin4-load-servers --tail=200 || true
-  kubectl -n pgadmin4 describe job pgadmin4-load-servers || true
+  kubectl -n pgadmin4 logs "job/${pgadmin_load_servers_job_name}" --tail=200 || true
+  kubectl -n pgadmin4 describe job "${pgadmin_load_servers_job_name}" || true
   if [[ "$job_status" == "failed" ]]; then
     fail "pgAdmin 4 server import job failed"
   fi
@@ -582,5 +580,6 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 pod readiness"
 wait_for_ready_pod pgadmin4 app.kubernetes.io/name=pgadmin4
 
 kubectl -n pgadmin4 delete job pgadmin4-load-servers configmap/pgadmin4-servers --ignore-not-found=true >/dev/null 2>&1 || true
+kubectl -n pgadmin4 delete job "${pgadmin_load_servers_job_name}" --ignore-not-found=true >/dev/null 2>&1 || true
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] pgAdmin 4 Authentik configuration complete"
