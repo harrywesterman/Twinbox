@@ -23,7 +23,7 @@ export VELERO_SECRET_NAME
 command -v kubectl >/dev/null 2>&1 || fail "kubectl not found"
 command -v jq >/dev/null 2>&1 || fail "jq not found"
 command -v openssl >/dev/null 2>&1 || fail "openssl not found"
-command -v python3 >/dev/null 2>&1 || fail "python3 not found"
+command -v node >/dev/null 2>&1 || fail "node not found"
 
 export KUBECONFIG="$KUBECONFIG_FILE"
 
@@ -126,32 +126,33 @@ EOF
 render_velero_application_manifest() {
   local rendered_manifest="$1"
 
-  python3 - "$VELERO_APP_MANIFEST_PATH" "$VELERO_VALUES_TEMPLATE_PATH" "$rendered_manifest" <<'PY'
-from pathlib import Path
-import os
-import sys
-import textwrap
+  node - "$VELERO_APP_MANIFEST_PATH" "$VELERO_VALUES_TEMPLATE_PATH" "$rendered_manifest" <<'NODE'
+const fs = require('fs');
 
-manifest_template = Path(sys.argv[1]).read_text(encoding="utf-8")
-values_template = Path(sys.argv[2]).read_text(encoding="utf-8")
+const [manifestPath, valuesTemplatePath, outputPath] = process.argv.slice(2);
+const manifestTemplate = fs.readFileSync(manifestPath, 'utf8');
+const valuesTemplate = fs.readFileSync(valuesTemplatePath, 'utf8');
 
-endpoint = os.environ["SEAWEEDFS_ENDPOINT"]
-bucket = os.environ["SEAWEEDFS_BUCKET"]
-region = os.environ["SEAWEEDFS_REGION"]
-secret_name = os.environ["VELERO_SECRET_NAME"]
+const replacements = {
+  '__SEAWEEDFS_ENDPOINT__': process.env.SEAWEEDFS_ENDPOINT,
+  '__SEAWEEDFS_BUCKET__': process.env.SEAWEEDFS_BUCKET,
+  '__SEAWEEDFS_REGION__': process.env.SEAWEEDFS_REGION,
+  '__VELERO_SECRET_NAME__': process.env.VELERO_SECRET_NAME,
+};
 
-values_rendered = (
-    values_template
-    .replace("__SEAWEEDFS_ENDPOINT__", endpoint)
-    .replace("__SEAWEEDFS_BUCKET__", bucket)
-    .replace("__SEAWEEDFS_REGION__", region)
-    .replace("__VELERO_SECRET_NAME__", secret_name)
-).rstrip("\n")
+let valuesRendered = valuesTemplate;
+for (const [needle, value] of Object.entries(replacements)) {
+  valuesRendered = valuesRendered.replaceAll(needle, value);
+}
+valuesRendered = valuesRendered.replace(/\n+$/, '');
+valuesRendered = valuesRendered
+  .split('\n')
+  .map((line) => `          ${line}`)
+  .join('\n');
 
-values_rendered = textwrap.indent(values_rendered + "\n", "          ").rstrip("\n")
-manifest_rendered = manifest_template.replace("__VELERO_VALUES__", values_rendered)
-Path(sys.argv[3]).write_text(manifest_rendered.rstrip("\n") + "\n", encoding="utf-8")
-PY
+const manifestRendered = manifestTemplate.replace('__VELERO_VALUES__', valuesRendered);
+fs.writeFileSync(outputPath, `${manifestRendered.replace(/\n+$/, '')}\n`, 'utf8');
+NODE
 }
 
 log "Initializing Velero backup installation"
