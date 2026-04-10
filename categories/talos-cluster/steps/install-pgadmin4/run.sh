@@ -84,6 +84,21 @@ wait_for_deployment() {
   fail "Timed out waiting for deployment ${namespace}/${deployment_name}"
 }
 
+resolve_ready_pod() {
+  local namespace="$1"
+  local selector="$2"
+
+  kubectl -n "$namespace" get pods -l "$selector" -o json | jq -r '
+    .items
+    | map(select(
+        any(.status.conditions[]?; .type == "Ready" and .status == "True")
+      ))
+    | sort_by(.metadata.creationTimestamp)
+    | last
+    | .metadata.name // empty
+  '
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
@@ -394,6 +409,10 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restarting pgAdmin 4 to pick up secret-back
 kubectl -n pgadmin4 rollout restart deploy/pgadmin4
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 pod readiness"
 kubectl -n pgadmin4 wait --for=condition=Ready pod -l app.kubernetes.io/name=pgadmin4 --timeout=10m
+pgadmin_pod="$(resolve_ready_pod pgadmin4 app.kubernetes.io/name=pgadmin4)"
+[[ -n "$pgadmin_pod" ]] || fail "Could not resolve a ready pgAdmin 4 pod after restart"
+sleep 5
+kubectl -n pgadmin4 wait --for=condition=Ready "pod/$pgadmin_pod" --timeout=10m
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Loading pgAdmin 4 shared server entry"
 jq -n \
@@ -425,7 +444,7 @@ jq -n \
     }
   }' >"$pgadmin_servers_file"
 
-kubectl -n pgadmin4 exec -i deploy/pgadmin4 -c pgadmin4 -- /bin/sh -ec \
+kubectl -n pgadmin4 exec -i "pod/$pgadmin_pod" -c pgadmin4 -- /bin/sh -ec \
   "cat >/tmp/pgadmin4-servers.json && /venv/bin/python /pgadmin4/setup.py load-servers /tmp/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace" \
   <"$pgadmin_servers_file"
 rm -f "$pgadmin_servers_file"

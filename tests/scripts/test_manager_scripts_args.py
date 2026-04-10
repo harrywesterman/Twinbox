@@ -1233,6 +1233,8 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
         "kubectl -n pgadmin4 wait --for=condition=Ready pod -l app.kubernetes.io/name=pgadmin4 --timeout=10m"
         in pgadmin_run_text
     )
+    assert 'pgadmin_pod="$(resolve_ready_pod pgadmin4 app.kubernetes.io/name=pgadmin4)"' in pgadmin_run_text
+    assert 'kubectl -n pgadmin4 wait --for=condition=Ready "pod/$pgadmin_pod" --timeout=10m' in pgadmin_run_text
     assert "Loading pgAdmin 4 shared server entry" in pgadmin_run_text
     assert "Authentik Database" in pgadmin_run_text
     assert "Shared Servers" in pgadmin_run_text
@@ -1247,6 +1249,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert 'PasswordExecCommand: $password_exec_cmd' in pgadmin_run_text
     assert 'printf %s "$PGADMIN_AUTHENTIK_DB_PASSWORD"' in pgadmin_run_text
     assert '/venv/bin/python /pgadmin4/setup.py load-servers /tmp/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace' in pgadmin_run_text
+    assert 'kubectl -n pgadmin4 exec -i "pod/$pgadmin_pod" -c pgadmin4 -- /bin/sh -ec' in pgadmin_run_text
 
     pgadmin_app_text = PLATFORM_INGRESS_APP.read_text(encoding="utf-8")
     assert "kind: ApplicationSet" in pgadmin_app_text
