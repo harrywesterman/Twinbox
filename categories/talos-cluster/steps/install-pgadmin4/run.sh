@@ -147,6 +147,7 @@ public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domai
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
 pgadmin_platform_dir="$WORKSPACE_ROOT/gitops/platform-apps/pgadmin4"
 pgadmin_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-ingressroute.XXXXXX.yaml")"
+pgadmin_job_python_bin="/tmp/python3.14.no-cap"
 
 authentik_ensure_token
 authentik_setup_forward
@@ -512,7 +513,10 @@ spec:
             - /bin/sh
             - -ec
             - |
-              /venv/bin/python /pgadmin4/setup.py load-servers /config/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace
+              python_bin="${pgadmin_job_python_bin}"
+              cp /usr/local/bin/python3.14 "${python_bin}"
+              chmod 0755 "${python_bin}"
+              exec "${python_bin}" /pgadmin4/setup.py load-servers /config/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace
           envFrom:
             - secretRef:
                 name: pgadmin4-bootstrap
@@ -527,11 +531,42 @@ spec:
 EOF
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 server import job"
-job_failed=0
-if ! kubectl -n pgadmin4 wait --for=condition=complete job/pgadmin4-load-servers --timeout=10m; then
-  job_failed=1
+job_status="unknown"
+job_timeout_seconds=600
+job_elapsed=0
+while (( job_elapsed < job_timeout_seconds )); do
+  if kubectl -n pgadmin4 get job pgadmin4-load-servers -o json | jq -e '
+    (
+      [.status.conditions[]? | select(.type == "Complete" and .status == "True")] | length
+    ) > 0
+  ' >/dev/null 2>&1; then
+    job_status="complete"
+    break
+  fi
+
+  if kubectl -n pgadmin4 get job pgadmin4-load-servers -o json | jq -e '
+    (
+      [.status.conditions[]? | select(.type == "Failed" and .status == "True")] | length
+    ) > 0
+    or ((.status.failed // 0) > 0)
+  ' >/dev/null 2>&1; then
+    job_status="failed"
+    break
+  fi
+
+  sleep 5
+  job_elapsed=$((job_elapsed + 5))
+done
+
+if [[ "$job_status" != "complete" ]]; then
   kubectl -n pgadmin4 logs job/pgadmin4-load-servers --tail=200 || true
   kubectl -n pgadmin4 describe job pgadmin4-load-servers || true
+  if [[ "$job_status" == "failed" ]]; then
+    fail "pgAdmin 4 server import job failed"
+  fi
+  if [[ "$job_status" == "unknown" ]]; then
+    fail "Timed out waiting for pgAdmin 4 server import job"
+  fi
 fi
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying pgAdmin 4 service, deployment, and ingress"
@@ -545,10 +580,6 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 deployment availabili
 kubectl -n pgadmin4 wait --for=condition=Available deployment/pgadmin4 --timeout=10m
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 pod readiness"
 wait_for_ready_pod pgadmin4 app.kubernetes.io/name=pgadmin4
-
-if (( job_failed )); then
-  fail "pgAdmin 4 server import job failed"
-fi
 
 kubectl -n pgadmin4 delete job pgadmin4-load-servers configmap/pgadmin4-servers --ignore-not-found=true >/dev/null 2>&1 || true
 

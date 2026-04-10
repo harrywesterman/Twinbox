@@ -1255,9 +1255,17 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert 'kubectl -n pgadmin4 create configmap pgadmin4-servers' in pgadmin_run_text
     assert 'kind: Job' in pgadmin_run_text
     assert 'name: pgadmin4-load-servers' in pgadmin_run_text
-    assert '/venv/bin/python /pgadmin4/setup.py load-servers /config/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace' in pgadmin_run_text
-    assert 'kubectl -n pgadmin4 wait --for=condition=complete job/pgadmin4-load-servers --timeout=10m' in pgadmin_run_text
+    assert 'python_bin="/tmp/python3.14.no-cap"' in pgadmin_run_text
+    assert 'cp /usr/local/bin/python3.14 "${python_bin}"' in pgadmin_run_text
+    assert 'exec "${python_bin}" /pgadmin4/setup.py load-servers /config/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace' in pgadmin_run_text
+    assert 'job_status="unknown"' in pgadmin_run_text
+    assert 'job_timeout_seconds=600' in pgadmin_run_text
+    assert 'kubectl -n pgadmin4 get job pgadmin4-load-servers -o json | jq -e' in pgadmin_run_text
+    assert 'select(.type == "Complete" and .status == "True")' in pgadmin_run_text
+    assert 'select(.type == "Failed" and .status == "True")' in pgadmin_run_text
+    assert 'Timed out waiting for pgAdmin 4 server import job' in pgadmin_run_text
     assert 'kubectl -n pgadmin4 describe job pgadmin4-load-servers || true' in pgadmin_run_text
+    assert 'if [[ "$job_status" == "failed" ]]; then' in pgadmin_run_text
     assert "Applying pgAdmin 4 service, deployment, and ingress" in pgadmin_run_text
     assert 'kubectl apply -f "$pgadmin_platform_dir/service.yaml"' in pgadmin_run_text
     assert 'kubectl apply -f "$pgadmin_platform_dir/deployment.yaml"' in pgadmin_run_text
