@@ -105,6 +105,36 @@ wait_for_zero_pods() {
   fail "Timed out waiting for pods matching ${namespace}/${selector} to terminate"
 }
 
+wait_for_ready_pod() {
+  local namespace="$1"
+  local selector="$2"
+  local timeout_seconds="${3:-600}"
+  local elapsed=0
+  local ready_pod_count=0
+
+  while (( elapsed < timeout_seconds )); do
+    ready_pod_count="$(
+      kubectl -n "$namespace" get pods -l "$selector" -o json | jq -r '
+        [
+          .items[]
+          | select(
+              (.status.phase // "") == "Running"
+              and any((.status.conditions // []); .type == "Ready" and .status == "True")
+            )
+        ]
+        | length
+      '
+    )"
+    if [[ "$ready_pod_count" != "0" ]]; then
+      return 0
+    fi
+    sleep 5
+    elapsed=$((elapsed + 5))
+  done
+
+  fail "Timed out waiting for a ready pod matching ${namespace}/${selector}"
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
@@ -520,7 +550,7 @@ kubectl -n pgadmin4 scale deployment/pgadmin4 --replicas=1 >/dev/null
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 deployment availability"
 kubectl -n pgadmin4 wait --for=condition=Available deployment/pgadmin4 --timeout=10m
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 pod readiness"
-kubectl -n pgadmin4 wait --for=condition=Ready pod -l app.kubernetes.io/name=pgadmin4 --timeout=10m
+wait_for_ready_pod pgadmin4 app.kubernetes.io/name=pgadmin4
 
 if (( job_failed )); then
   fail "pgAdmin 4 server import job failed"

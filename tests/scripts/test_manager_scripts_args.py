@@ -1235,7 +1235,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "Waiting for pgAdmin 4 pods to terminate" in pgadmin_run_text
     assert "wait_for_zero_pods pgadmin4 app.kubernetes.io/name=pgadmin4" in pgadmin_run_text
     assert (
-        "kubectl -n pgadmin4 wait --for=condition=Ready pod -l app.kubernetes.io/name=pgadmin4 --timeout=10m"
+        "wait_for_ready_pod pgadmin4 app.kubernetes.io/name=pgadmin4"
         in pgadmin_run_text
     )
     assert "Loading pgAdmin 4 shared server entry" in pgadmin_run_text
