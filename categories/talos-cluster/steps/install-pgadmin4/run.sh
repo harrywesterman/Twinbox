@@ -434,6 +434,9 @@ wait_for_secret pgadmin4 pgadmin4-bootstrap
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Removing stale pgAdmin 4 import resources"
 kubectl -n pgadmin4 delete job pgadmin4-load-servers configmap/pgadmin4-servers --ignore-not-found=true >/dev/null 2>&1 || true
+while kubectl -n pgadmin4 get job pgadmin4-load-servers >/dev/null 2>&1; do
+  sleep 2
+done
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying pgAdmin 4 PVC bootstrap resource"
 kubectl apply -f "$pgadmin_platform_dir/pvc.yaml"
 wait_for_pvc_bound pgadmin4 pgadmin4-data
