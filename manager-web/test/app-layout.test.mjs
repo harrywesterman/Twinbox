@@ -108,6 +108,7 @@ test('styles define a wizard-first, responsive installer layout', async () => {
   assert.match(css, /\.wizard-output-panel-minimal\s*\{/, 'expected output to stay visible on the page');
   assert.match(css, /\.wizard-install-stage\s*\{/, 'expected a dedicated install stage wrapper');
   assert.match(css, /\.wizard-install-output\s*\{/, 'expected a large output window for install mode');
+  assert.match(css, /\.wizard-install-output[\s\S]*height:\s*clamp\(300px,\s*46dvh,\s*560px\);/, 'expected the install output to scale with the viewport');
   assert.match(css, /\.wizard-install-actions-row\s*\{/, 'expected the install buttons to sit under the output window');
   assert.match(css, /\.wizard-log-output\s*\{[\s\S]*min-height:\s*360px;/, 'expected the default script output panel');
   assert.match(css, /\.wizard-step-icon-large\s*\{/, 'expected the active-step icon treatment');
