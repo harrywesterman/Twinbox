@@ -93,7 +93,7 @@ spec:
             - -ec
             - |
               cd /pgadmin4
-              exec /venv/bin/python3 -m gunicorn \
+              exec /usr/local/bin/python3.14 -m gunicorn \
                 --limit-request-line "${GUNICORN_LIMIT_REQUEST_LINE:-8190}" \
                 --limit-request-fields "${GUNICORN_LIMIT_REQUEST_FIELDS:-100}" \
                 --limit-request-field_size "${GUNICORN_LIMIT_REQUEST_FIELD_SIZE:-8190}" \
@@ -115,6 +115,8 @@ spec:
           env:
             - name: PGADMIN_DISABLE_POSTFIX
               value: "1"
+            - name: PYTHONPATH
+              value: /venv/lib/python3.14/site-packages:/venv/lib/python3.14/dist-packages
           startupProbe:
             tcpSocket:
               port: http

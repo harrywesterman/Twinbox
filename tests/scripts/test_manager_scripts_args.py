@@ -1365,13 +1365,14 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "runAsGroup: 65534" in pgadmin_deployment_text
     assert "fsGroup: 0" in pgadmin_deployment_text
     assert "PGADMIN_DISABLE_POSTFIX" in pgadmin_deployment_text
+    assert "PYTHONPATH" in pgadmin_deployment_text
     assert "LOG_FILE = '/dev/null'" in pgadmin_deployment_text
     assert "allowPrivilegeEscalation: false" in pgadmin_deployment_text
     assert "type: RuntimeDefault" in pgadmin_deployment_text
     assert "drop:" in pgadmin_deployment_text
     assert "- ALL" in pgadmin_deployment_text
     assert "cd /pgadmin4" in pgadmin_deployment_text
-    assert "exec /venv/bin/python3 -m gunicorn" in pgadmin_deployment_text
+    assert "exec /usr/local/bin/python3.14 -m gunicorn" in pgadmin_deployment_text
     assert "--timeout \"${GUNICORN_TIMEOUT:-86400}\"" in pgadmin_deployment_text
 
     cloudflare_tunnel_run_text = (
