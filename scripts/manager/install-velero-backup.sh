@@ -147,7 +147,7 @@ for (const [needle, value] of Object.entries(replacements)) {
 valuesRendered = valuesRendered.replace(/\n+$/, '');
 valuesRendered = valuesRendered
   .split('\n')
-  .map((line) => `          ${line}`)
+  .map((line) => `        ${line}`)
   .join('\n');
 
 const manifestRendered = manifestTemplate.replace('__VELERO_VALUES__', valuesRendered);
