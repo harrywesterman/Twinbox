@@ -84,25 +84,25 @@ wait_for_deployment() {
   fail "Timed out waiting for deployment ${namespace}/${deployment_name}"
 }
 
-wait_for_zero_pods() {
+wait_for_pvc_bound() {
   local namespace="$1"
-  local selector="$2"
+  local pvc_name="$2"
   local timeout_seconds="${3:-600}"
   local elapsed=0
-  local pod_count=0
+  local phase=""
 
   while (( elapsed < timeout_seconds )); do
-    pod_count="$(
-      kubectl -n "$namespace" get pods -l "$selector" -o json | jq -r '.items | length'
+    phase="$(
+      kubectl -n "$namespace" get pvc "$pvc_name" -o json | jq -r '.status.phase // empty'
     )"
-    if [[ "$pod_count" == "0" ]]; then
+    if [[ "$phase" == "Bound" ]]; then
       return 0
     fi
     sleep 5
     elapsed=$((elapsed + 5))
   done
 
-  fail "Timed out waiting for pods matching ${namespace}/${selector} to terminate"
+  fail "Timed out waiting for PVC ${namespace}/${pvc_name} to bind"
 }
 
 wait_for_ready_pod() {
@@ -431,22 +431,11 @@ kubectl apply -f "$WORKSPACE_ROOT/gitops/platform/pgadmin4/externalsecret.yaml"
 kubectl -n pgadmin4 wait --for=condition=Ready externalsecret/pgadmin4-oidc --timeout=10m
 wait_for_secret pgadmin4 pgadmin4-bootstrap
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying shared platform-ingress Argo CD application"
-kubectl delete application pgadmin4 -n argocd --ignore-not-found=true >/dev/null 2>&1 || true
-sed "s/__ZONE_NAME__/${public_zone_name}/g" "$manifest_path" >"$rendered_manifest"
-bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
-  --manifest "$rendered_manifest" \
-  --application "platform-ingress" \
-  --destination-namespace "argocd" \
-  --no-wait
-
-wait_for_deployment pgadmin4 pgadmin4
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Removing stale pgAdmin 4 import resources"
 kubectl -n pgadmin4 delete job pgadmin4-load-servers configmap/pgadmin4-servers --ignore-not-found=true >/dev/null 2>&1 || true
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Scaling pgAdmin 4 down for deterministic server import"
-kubectl -n pgadmin4 scale deployment/pgadmin4 --replicas=0 >/dev/null
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 pods to terminate"
-wait_for_zero_pods pgadmin4 app.kubernetes.io/name=pgadmin4
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying pgAdmin 4 PVC bootstrap resource"
+kubectl apply -f "$WORKSPACE_ROOT/gitops/platform/pgadmin4/pvc.yaml"
+wait_for_pvc_bound pgadmin4 pgadmin4-data
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Loading pgAdmin 4 shared server entry"
 jq -n \
@@ -545,8 +534,16 @@ if ! kubectl -n pgadmin4 wait --for=condition=complete job/pgadmin4-load-servers
   kubectl -n pgadmin4 describe job pgadmin4-load-servers || true
 fi
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Scaling pgAdmin 4 back up"
-kubectl -n pgadmin4 scale deployment/pgadmin4 --replicas=1 >/dev/null
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying shared platform-ingress Argo CD application"
+kubectl delete application pgadmin4 -n argocd --ignore-not-found=true >/dev/null 2>&1 || true
+sed "s/__ZONE_NAME__/${public_zone_name}/g" "$manifest_path" >"$rendered_manifest"
+bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+  --manifest "$rendered_manifest" \
+  --application "platform-ingress" \
+  --destination-namespace "argocd" \
+  --no-wait
+
+wait_for_deployment pgadmin4 pgadmin4
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 deployment availability"
 kubectl -n pgadmin4 wait --for=condition=Available deployment/pgadmin4 --timeout=10m
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 pod readiness"
