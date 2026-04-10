@@ -1365,6 +1365,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "runAsGroup: 65534" in pgadmin_deployment_text
     assert "fsGroup: 0" in pgadmin_deployment_text
     assert "PGADMIN_DISABLE_POSTFIX" in pgadmin_deployment_text
+    assert "LOG_FILE = '/dev/null'" in pgadmin_deployment_text
     assert "allowPrivilegeEscalation: false" in pgadmin_deployment_text
     assert "type: RuntimeDefault" in pgadmin_deployment_text
     assert "drop:" in pgadmin_deployment_text
