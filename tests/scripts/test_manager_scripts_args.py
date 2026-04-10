@@ -1248,8 +1248,12 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "SharedUsername: $shared_username" in pgadmin_run_text
     assert 'PasswordExecCommand: $password_exec_cmd' in pgadmin_run_text
     assert 'printf %s "$PGADMIN_AUTHENTIK_DB_PASSWORD"' in pgadmin_run_text
-    assert '/venv/bin/python /pgadmin4/setup.py load-servers /tmp/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace' in pgadmin_run_text
-    assert 'kubectl -n pgadmin4 exec -i "pod/$pgadmin_pod" -c pgadmin4 -- /bin/sh -ec' in pgadmin_run_text
+    assert 'kubectl -n pgadmin4 create configmap pgadmin4-servers' in pgadmin_run_text
+    assert 'kind: Job' in pgadmin_run_text
+    assert 'name: pgadmin4-load-servers' in pgadmin_run_text
+    assert '/venv/bin/python /pgadmin4/setup.py load-servers /config/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace' in pgadmin_run_text
+    assert 'kubectl -n pgadmin4 wait --for=condition=complete job/pgadmin4-load-servers --timeout=10m' in pgadmin_run_text
+    assert 'kubectl -n pgadmin4 delete job pgadmin4-load-servers configmap/pgadmin4-servers --ignore-not-found=true' in pgadmin_run_text
 
     pgadmin_app_text = PLATFORM_INGRESS_APP.read_text(encoding="utf-8")
     assert "kind: ApplicationSet" in pgadmin_app_text

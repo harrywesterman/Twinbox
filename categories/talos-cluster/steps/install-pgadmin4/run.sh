@@ -444,9 +444,61 @@ jq -n \
     }
   }' >"$pgadmin_servers_file"
 
-kubectl -n pgadmin4 exec -i "pod/$pgadmin_pod" -c pgadmin4 -- /bin/sh -ec \
-  "cat >/tmp/pgadmin4-servers.json && /venv/bin/python /pgadmin4/setup.py load-servers /tmp/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace" \
-  <"$pgadmin_servers_file"
+kubectl -n pgadmin4 create configmap pgadmin4-servers \
+  --from-file=pgadmin4-servers.json="$pgadmin_servers_file" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
+kubectl -n pgadmin4 delete job pgadmin4-load-servers --ignore-not-found=true >/dev/null 2>&1 || true
+kubectl apply -f - >/dev/null <<EOF
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pgadmin4-load-servers
+  namespace: pgadmin4
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: pgadmin4-load-servers
+    spec:
+      restartPolicy: Never
+      volumes:
+        - name: pgadmin-data
+          persistentVolumeClaim:
+            claimName: pgadmin4-data
+        - name: pgadmin-servers
+          configMap:
+            name: pgadmin4-servers
+      containers:
+        - name: pgadmin4-load-servers
+          image: dpage/pgadmin4:9.14
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              /venv/bin/python /pgadmin4/setup.py load-servers /config/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace
+          envFrom:
+            - secretRef:
+                name: pgadmin4-bootstrap
+            - secretRef:
+                name: pgadmin4-db-password
+          volumeMounts:
+            - name: pgadmin-data
+              mountPath: /var/lib/pgadmin
+            - name: pgadmin-servers
+              mountPath: /config
+              readOnly: true
+EOF
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 server import job"
+if ! kubectl -n pgadmin4 wait --for=condition=complete job/pgadmin4-load-servers --timeout=10m; then
+  kubectl -n pgadmin4 logs job/pgadmin4-load-servers --tail=200 || true
+  fail "Timed out or failed waiting for pgAdmin 4 server import job"
+fi
+
+kubectl -n pgadmin4 delete job pgadmin4-load-servers configmap/pgadmin4-servers --ignore-not-found=true >/dev/null 2>&1 || true
 rm -f "$pgadmin_servers_file"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] pgAdmin 4 Authentik configuration complete"
