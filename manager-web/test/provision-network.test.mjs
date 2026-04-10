@@ -31,6 +31,17 @@ test('buildProvisionVmIpRows marks suggestion hits as verified and manual edits 
   assert.equal(rows[2].status.tone, 'success');
 });
 
+test('buildProvisionVmIpRows keeps blank rows neutral until the user fills them', () => {
+  const rows = buildProvisionVmIpRows(vmPlan, {}, {
+    vm_ips: [],
+  });
+
+  assert.equal(rows[0].status.tone, 'neutral');
+  assert.equal(rows[0].status.label, 'Awaiting IP');
+  assert.equal(rows[1].status.tone, 'neutral');
+  assert.equal(rows[2].status.icon, '·');
+});
+
 test('buildProvisionVmIpRows and validation flag duplicates and invalid values', () => {
   const rows = buildProvisionVmIpRows(vmPlan, {
     vm_ip_map: {

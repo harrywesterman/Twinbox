@@ -24,6 +24,11 @@ test('app source defines a minimal wizard shell with guided input and step-by-st
   assert.match(source, /Continue to installation/, 'expected the last question to lead into the install phase');
   assert.match(source, /Install all/, 'expected an install-all action in the install phase');
   assert.match(source, /type="range"/, 'expected the scale slider');
+  assert.match(source, /wizard-step-actions-panel/, 'expected a dedicated step 1 helper bar');
+  assert.match(source, /Help me with VM size/, 'expected the VM sizing helper button');
+  assert.match(source, /Help me with placement/, 'expected the placement helper button');
+  assert.match(source, /Help me with free IPs/, 'expected the IP helper button');
+  assert.match(source, /showImportButton = !isInstallPhase && !model\.completion && currentStep\?\.id !== 'provision-nodes'/, 'expected the topbar import button to hide on step 1');
   assert.match(source, /1\. VM sizing/, 'expected sizing to come first');
   assert.match(source, /VM landing/, 'expected the VM placement block to be explicit');
   assert.match(source, /wizard-placement-board/, 'expected the host placement board');
@@ -35,7 +40,7 @@ test('app source defines a minimal wizard shell with guided input and step-by-st
   assert.match(source, /wizard-status-badge/, 'expected status badges for each VM');
   assert.match(source, /Check for free IP addresses/, 'expected the IP check button under the VM list');
   assert.match(source, /wizard-field-dns/, 'expected a compact DNS field variant');
-  assert.match(source, /one-time free address suggestion/, 'expected the one-time IP allocation note');
+  assert.doesNotMatch(source, /one-time free address suggestion/, 'expected the one-time IP allocation note to be removed');
   assert.doesNotMatch(source, /Start IP/, 'expected the fixed start IP field to be removed from the wizard');
   assert.doesNotMatch(source, /className="technical-panel"/, 'expected technical details to be removed');
   assert.match(source, /Output/, 'expected a visible output panel');
@@ -50,7 +55,7 @@ test('app source defines a minimal wizard shell with guided input and step-by-st
   assert.match(source, /setWizardPhase\('questions'\)/, 'expected a recreated cluster to restart in the question flow');
   assert.match(source, /getQuestionSteps\(answersRef\.current\)\[0\]\?\.id \|\| 'provision-nodes'/, 'expected a recreated cluster to restart at the first question');
   assert.match(source, /clearInstallStepLogs\(\)/, 'expected recreation to clear stale install logs');
-  assert.match(source, /Loading cluster data and IP suggestions/, 'expected a visible loading banner while refreshing');
+  assert.match(source, /Loading cluster data…/, 'expected a visible loading banner while refreshing');
   assert.match(source, /Check for free IP addresses/, 'expected an explicit IP availability check action');
   assert.match(source, /Management VM/, 'expected the placement board to show the management VM host');
   assert.match(source, /wizard-placement-management-card/, 'expected a fixed management VM placement card');
@@ -102,6 +107,8 @@ test('styles define a wizard-first, responsive installer layout', async () => {
   assert.match(css, /\.wizard-start-screen\s*\{/, 'expected the start screen layout');
   assert.match(css, /\.wizard-guide-panel\s*\{/, 'expected the educational guide surface');
   assert.match(css, /\.wizard-choice-grid\s*\{/, 'expected numbered choice cards');
+  assert.match(css, /\.wizard-step-actions-panel\s*\{/, 'expected the step 1 helper panel');
+  assert.match(css, /\.wizard-step-actions-panel-actions\s*\{/, 'expected the helper button grid');
   assert.match(css, /\.wizard-log-viewport\s*\{/, 'expected a scrolling live-log viewport');
   assert.match(css, /\.wizard-output-panel\.is-live\s*\{/, 'expected live output emphasis');
   assert.doesNotMatch(css, /\.technical-panel\[open\]\s*\{/, 'expected technical details to be removed');

@@ -55,14 +55,21 @@ export function buildProvisionVmIpRows(vmPlan = [], currentValues = {}, suggesti
     const isValid = isValidIpv4(row.value);
     const isDuplicate = isValid && duplicateCounts[row.value] > 1;
     const isSuggested = Boolean(isValid && row.suggestedIp && row.value === row.suggestedIp);
+    const isEmpty = String(row.value || '').trim().length === 0;
 
     let status = {
-      tone: 'warning',
-      label: 'Locally edited',
-      icon: '◌',
+      tone: isEmpty ? 'neutral' : 'warning',
+      label: isEmpty ? 'Awaiting IP' : 'Locally edited',
+      icon: isEmpty ? '·' : '◌',
     };
 
-    if (!isValid) {
+    if (isEmpty) {
+      status = {
+        tone: 'neutral',
+        label: 'Awaiting IP',
+        icon: '·',
+      };
+    } else if (!isValid) {
       status = {
         tone: 'danger',
         label: 'Invalid IP',

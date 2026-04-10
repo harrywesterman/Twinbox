@@ -31,7 +31,6 @@ import { normalizeLogEntries } from './install-logs.js';
 import { getQuestionSteps } from './question-flow.js';
 import {
   isMissingClusterError,
-  isProvisionSuggestionReady,
   recoverMissingClusterState,
   recoverRecreatedClusterState,
   shouldResetRecreatedClusterDraft,
@@ -1322,34 +1321,117 @@ function App() {
     }
   }
 
-  async function ensureProvisionDraft(step, currentDraft = {}) {
-    const nodeCount = getProvisionNodeCount(step.inputs || [], currentDraft);
-    const { managementIp, url } = buildProvisionIpSuggestionsUrl(nodeCount);
-    const suggestionKey = `${managementIp || 'unknown'}:${nodeCount}`;
-    const previousSuggested = buildSuggestedProvisionInputs(provisionSuggestionSnapshotRef.current);
+  function updateProvisionDraft(stepId, updater) {
+    setAnswers((current) => {
+      const currentStepDraft = current[stepId] || {};
+      const nextDraft = typeof updater === 'function'
+        ? updater(currentStepDraft)
+        : { ...currentStepDraft, ...(updater || {}) };
 
-    let suggestionData = provisionSuggestionSnapshotRef.current;
-    if (provisionSuggestionKeyRef.current !== suggestionKey || !suggestionData || Object.keys(suggestionData).length === 0) {
-      suggestionData = await requestJson(url);
+      return {
+        ...current,
+        [stepId]: nextDraft,
+      };
+    });
+  }
+
+  function clearProvisionDirtyFields(fieldIds = []) {
+    for (const fieldId of fieldIds) {
+      provisionDirtyFieldsRef.current.delete(fieldId);
+    }
+  }
+
+  async function applyProvisionVmSizeHelp() {
+    if (currentStep?.id !== 'provision-nodes') {
+      return;
+    }
+
+    try {
+      const draft = answersRef.current?.[currentStep.id] || {};
+      const suggested = buildScaledProvisionInputs(
+        draft.scale_percent ?? 30,
+        currentStep.inputs || [],
+        draft,
+        new Set(),
+        proxmoxResources,
+      );
+
+      updateProvisionDraft(currentStep.id, {
+        controlplane_count: suggested.controlplane_count,
+        worker_count: suggested.worker_count,
+        cpu_cores: suggested.cpu_cores,
+        memory_mb: suggested.memory_mb,
+      });
+      clearProvisionDirtyFields(['controlplane_count', 'worker_count', 'cpu_cores', 'memory_mb']);
+      setNotice('Filled the VM sizing defaults from the current cluster scale.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to fill VM sizing defaults.';
+      setError(message);
+      setNotice(message);
+    }
+  }
+
+  async function applyProvisionPlacementHelp() {
+    if (currentStep?.id !== 'provision-nodes') {
+      return;
+    }
+
+    try {
+      const draft = answersRef.current?.[currentStep.id] || {};
+      const board = buildProvisionPlacementBoard(currentStep.inputs || [], draft, proxmoxResources);
+      if (!board?.hostCards?.length) {
+        throw new Error('No Proxmox host resources are available yet.');
+      }
+
+      const suggestedMap = board?.suggestedVmNodeMap || {};
+      const suggestedSizeMap = board?.suggestedVmSizeMap || {};
+
+      updateProvisionDraft(currentStep.id, {
+        vm_node_map: suggestedMap,
+        vm_size_map: suggestedSizeMap,
+      });
+      setNotice('Filled the placement board from the current Proxmox host resources.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to fill placement defaults.';
+      setError(message);
+      setNotice(message);
+    }
+  }
+
+  async function applyProvisionIpHelp() {
+    if (currentStep?.id !== 'provision-nodes') {
+      return;
+    }
+
+    try {
+      const draft = answersRef.current?.[currentStep.id] || {};
+      const nodeCount = getProvisionNodeCount(currentStep.inputs || [], draft);
+      const { managementIp, url } = buildProvisionIpSuggestionsUrl(nodeCount);
+      const suggestionKey = `${managementIp || 'unknown'}:${nodeCount}`;
+      const suggestionData = await requestJson(url);
+      const board = buildProvisionPlacementBoard(currentStep.inputs || [], draft, proxmoxResources);
+      const vmIpRows = buildProvisionVmIpRows(board?.vmPlan || [], draft, suggestionData, {});
+
       provisionSuggestionKeyRef.current = suggestionKey;
       provisionSuggestionSnapshotRef.current = suggestionData;
       setProvisionSuggestionRevision((current) => current + 1);
+
+      updateProvisionDraft(currentStep.id, {
+        vip_ip: suggestionData.vip_ip || draft.vip_ip,
+        node_prefix_length: suggestionData.node_prefix_length ?? draft.node_prefix_length,
+        gateway_ip: suggestionData.gateway_ip || draft.gateway_ip,
+        dns_servers: Array.isArray(suggestionData.dns_servers)
+          ? suggestionData.dns_servers.join(',')
+          : (suggestionData.dns_servers || draft.dns_servers),
+        dns_domain: suggestionData.dns_domain ?? draft.dns_domain,
+        vm_ip_map: buildProvisionVmIpMap(vmIpRows),
+      });
+      setNotice('Filled the network and free-IP defaults from the current Proxmox subnet.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to fill free IP defaults.';
+      setError(message);
+      setNotice(message);
     }
-
-    const merged = mergeSuggestedProvisionDraft({
-      currentDraft,
-      previousSuggested,
-      suggestionData,
-      stepInputs: step.inputs || [],
-      dirtyFields: Object.fromEntries([...provisionDirtyFieldsRef.current].map((fieldId) => [fieldId, true])),
-    });
-
-    setAnswers((current) => ({
-      ...current,
-      [step.id]: merged,
-    }));
-
-    return merged;
   }
 
   async function executeStep(step, clusterIdOverride = clusterIdRef.current, options = {}) {
@@ -1386,13 +1468,6 @@ function App() {
     }
 
     if (step.id === 'provision-nodes') {
-      if (!placementBoard?.hostCards?.length) {
-        const message = 'Waiting for Proxmox host data before starting Deploy Talos Cluster.';
-        setError(message);
-        setNotice(message);
-        return { ok: false, error: message };
-      }
-
       const placement = buildProvisionPlacementBoard(step.inputs || [], draft, proxmoxResources);
       const vmIpRows = buildProvisionVmIpRows(placement.vmPlan, draft, provisionSuggestionSnapshotRef.current);
       const vmIpValidation = validateProvisionVmIpRows(vmIpRows);
@@ -1403,8 +1478,13 @@ function App() {
         return { ok: false, error: message };
       }
 
-      body.vm_node_map = placement.vmNodeMap;
-      body.vm_size_map = placement.vmSizeMap;
+      const explicitPlacementMap = draft.vm_node_map && typeof draft.vm_node_map === 'object'
+        ? draft.vm_node_map
+        : {};
+      if (Object.values(explicitPlacementMap).some((hostName) => String(hostName || '').trim().length > 0)) {
+        body.vm_node_map = placement.vmNodeMap;
+        body.vm_size_map = placement.vmSizeMap;
+      }
       body.vm_ip_map = buildProvisionVmIpMap(vmIpRows);
     }
 
@@ -1520,7 +1600,7 @@ function App() {
     }
 
     if (currentStep?.id === 'provision-nodes' && !provisionStepValid) {
-      const message = provisionVmIpValidation.error || 'Step 1 is still preparing. Wait until the button says Next.';
+      const message = provisionVmIpValidation.error || 'Fill in the Talos IP addresses before continuing.';
       setNotice(message);
       return;
     }
@@ -1663,7 +1743,7 @@ function App() {
     }
 
     if (step.id === 'provision-nodes' && !provisionStepValid) {
-      const message = provisionVmIpValidation.error || 'Step 1 is still preparing. Wait until the placement and IP suggestions are ready.';
+      const message = provisionVmIpValidation.error || 'Fill in the Talos IP addresses before starting step 1.';
       setNotice(message);
       return;
     }
@@ -2026,21 +2106,6 @@ function App() {
       dirtyFields: provisionDirtyFieldsRef.current,
     })
     : {};
-  useEffect(() => {
-    if (currentStep?.id !== 'provision-nodes') {
-      setProvisionSuggestionsReadyState(false);
-      return;
-    }
-
-    const managementIp = window.location.hostname;
-    const suggestionKey = `${managementIp || 'auto'}:${getProvisionNodeCount(currentStep.inputs || [], currentDraft)}`;
-
-    setProvisionSuggestionsReadyState(
-      provisionSuggestionKeyRef.current === suggestionKey
-      && Object.keys(provisionSuggestionSnapshotRef.current || {}).length > 0,
-    );
-  }, [clusterInstanceId, currentDraft.controlplane_count, currentDraft.worker_count, currentStep?.id, provisionSuggestionRevision]);
-
   const placementBoard = currentStep?.id === 'provision-nodes'
     ? buildProvisionPlacementBoard(currentStep.inputs || [], currentDraft, proxmoxResources)
     : null;
@@ -2075,23 +2140,13 @@ function App() {
       proxmoxResources,
     )
     : null;
-  const provisionSuggestionKey = currentStep?.id === 'provision-nodes'
-    ? `${window.location.hostname}:${getProvisionNodeCount(currentStep.inputs || [], currentDraft)}`
-    : '';
-  const provisionPlacementReady = currentStep?.id !== 'provision-nodes' || Boolean(placementBoard?.hostCards?.length);
-  const provisionSuggestionsReady = isProvisionSuggestionReady({
-    activeStepId: currentStep?.id || '',
-    suggestionKey: provisionSuggestionKey,
-    currentSuggestionKey: provisionSuggestionKeyRef.current,
-    suggestionSnapshot: provisionSuggestionSnapshotRef.current,
-  });
-  const provisionStepReady = provisionPlacementReady && provisionSuggestionsReady;
-  const provisionStepValid = provisionStepReady && provisionVmIpValidation.ok;
-  const stepOnePending = currentStep?.id === 'provision-nodes' && !provisionStepReady;
+  const provisionStepValid = currentStep?.id === 'provision-nodes'
+    ? provisionVmIpValidation.ok
+    : true;
   const questionInputsValid = currentStep
     ? (currentStep.inputs || []).every((input) => hasRequiredValue(input, currentDraft[input.id]))
     : false;
-  const primaryActionDisabled = stepOnePending || !provisionStepValid || !questionInputsValid || busy || provisionIpChecking;
+  const primaryActionDisabled = !provisionStepValid || !questionInputsValid || busy || provisionIpChecking;
   const primaryActionLabel = isQuestionPhase
     ? ((currentStep?.id === 'provision-nodes' && provisionIpChecking)
       ? 'Checking...'
@@ -2100,13 +2155,13 @@ function App() {
   const primaryActionHelperText = isQuestionPhase
     ? (currentStep?.id === 'provision-nodes' && provisionIpChecking
       ? 'Checking IP addresses.'
+      : currentStep?.id === 'provision-nodes' && !provisionVmIpValidation.ok
+      ? 'Fill in the Talos IP addresses before continuing.'
       : !questionInputsValid
       ? 'Fill in the required values before continuing.'
-      : stepOnePending
-        ? 'Waiting for Proxmox host data before continuing.'
-        : questionStepIndex === questionSteps.length - 1
-          ? 'The questions are complete. Continue to the installation steps.'
-          : 'Review the values on this page and continue to the next question.')
+      : questionStepIndex === questionSteps.length - 1
+        ? 'The questions are complete. Continue to the installation steps.'
+        : 'Review the values on this page and continue to the next question.')
     : '';
   const installStepCount = setupSteps.length;
   const isCurrentStepComplete = currentStep?.status === 'done' || currentStep?.status === 'configured';
@@ -2130,99 +2185,13 @@ function App() {
     || remainingInstallableSteps.length === 0
     || (currentStep?.id === 'provision-nodes' && !provisionStepValid);
 
-  useEffect(() => {
-    if (currentStep?.id !== 'provision-nodes') {
-      return;
-    }
-
-    const controlplaneCount = Number.isFinite(Number(currentDraft.controlplane_count))
-      ? Number(currentDraft.controlplane_count)
-      : 1;
-    const workerCount = Number.isFinite(Number(currentDraft.worker_count))
-      ? Number(currentDraft.worker_count)
-      : 0;
-    const nodeCount = Math.max(1, controlplaneCount + workerCount);
-    const { managementIp, url } = buildProvisionIpSuggestionsUrl(nodeCount);
-    const suggestionKey = `${managementIp || 'unknown'}:${nodeCount}`;
-
-    if (provisionSuggestionKeyRef.current === suggestionKey
-      && Object.keys(provisionSuggestionSnapshotRef.current || {}).length > 0) {
-      return;
-    }
-
-    provisionSuggestionKeyRef.current = suggestionKey;
-    provisionSuggestionSnapshotRef.current = {};
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const suggestionData = await requestJson(url);
-
-        if (cancelled) {
-          return;
-        }
-
-        setAnswers((current) => {
-          const activeProvisionDraft = current[currentStep.id] || {};
-          const merged = mergeSuggestedProvisionDraft({
-            currentDraft: activeProvisionDraft,
-            previousSuggested: buildSuggestedProvisionInputs(provisionSuggestionSnapshotRef.current),
-            suggestionData,
-            stepInputs: currentStep.inputs || [],
-            dirtyFields: Object.fromEntries([...provisionDirtyFieldsRef.current].map((fieldId) => [fieldId, true])),
-          });
-
-          return {
-            ...current,
-            [currentStep.id]: merged,
-          };
-        });
-
-        provisionSuggestionSnapshotRef.current = suggestionData;
-        setProvisionSuggestionRevision((current) => current + 1);
-      } catch {
-        if (!cancelled) {
-          provisionSuggestionSnapshotRef.current = {};
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [clusterInstanceId, currentDraft.controlplane_count, currentDraft.worker_count, currentStep?.id]);
-
-  useEffect(() => {
-    if (!placementBoard || currentStep?.id !== 'provision-nodes') {
-      return;
-    }
-
-    const suggestionKey = `${clusterInstanceIdRef.current || clusterIdRef.current || ''}:${currentStep.id}`;
-    const currentMap = currentDraft.vm_node_map && typeof currentDraft.vm_node_map === 'object'
-      ? currentDraft.vm_node_map
-      : {};
-    const hasPlacement = Object.keys(currentMap).length > 0;
-
-    if (hasPlacement) {
-      placementSuggestionKeyRef.current = suggestionKey;
-      return;
-    }
-
-    if (placementSuggestionKeyRef.current === suggestionKey) {
-      return;
-    }
-
-    placementSuggestionKeyRef.current = suggestionKey;
-    updateAnswer(currentStep.id, 'vm_node_map', placementBoard.suggestedVmNodeMap || {});
-  }, [clusterInstanceId, clusterId, currentDraft, currentStep, placementBoard]);
-
   const wizardGuide = getWizardGuide(currentStep?.id);
   const activeStepIsChoice = currentStep?.id === 'choose-ingress-route';
   const activeStepIsQuestion = Boolean(currentStep?.inputs?.length) || activeStepIsChoice || currentStep?.id === 'provision-nodes';
   const activeStepTitle = getDisplayStepTitle(currentStep);
   const activeStepPresentation = getStepPresentation(currentStep);
   const questionStepCount = questionSteps.length;
-  const showImportButton = !isInstallPhase && !model.completion;
+  const showImportButton = !isInstallPhase && !model.completion && currentStep?.id !== 'provision-nodes';
 
   if (!hasStarted) {
     return (
@@ -2231,12 +2200,12 @@ function App() {
         {isBootstrapping || error || notice ? (
           <div className={`wizard-banner ${error ? 'is-error' : 'is-notice'}`}>
             <div>
-              <strong>{error ? 'Something needs attention.' : isBootstrapping ? 'Loading cluster data and IP suggestions…' : 'Status'}</strong>
+              <strong>{error ? 'Something needs attention.' : isBootstrapping ? 'Loading cluster data…' : 'Status'}</strong>
               <p>
                 {error
                   ? error
                   : isBootstrapping
-                    ? 'Twinbox is checking the current cluster state and building the next step suggestions. This can take a moment.'
+                    ? 'Twinbox is checking the current cluster state. This can take a moment.'
                     : notice}
               </p>
             </div>
@@ -2278,12 +2247,12 @@ function App() {
       {isBootstrapping || error || notice ? (
         <div className={`wizard-banner ${error ? 'is-error' : 'is-notice'}`}>
           <div>
-            <strong>{error ? 'Something needs attention.' : isBootstrapping ? 'Loading cluster data and IP suggestions…' : 'Status'}</strong>
+            <strong>{error ? 'Something needs attention.' : isBootstrapping ? 'Loading cluster data…' : 'Status'}</strong>
             <p>
               {error
                 ? error
                 : isBootstrapping
-                  ? 'Twinbox is checking the current cluster state and building the next step suggestions. This can take a moment.'
+                  ? 'Twinbox is checking the current cluster state. This can take a moment.'
                   : notice}
             </p>
           </div>
@@ -2473,6 +2442,32 @@ function App() {
               <section className="wizard-card wizard-step-workspace wizard-step-workspace-minimal">
                 {currentStep?.id === 'provision-nodes' ? (
                   <>
+                    <section className="wizard-step-actions-panel" aria-label="Step 1 helpers">
+                      <div className="wizard-step-actions-panel-head">
+                        <div>
+                          <p className="eyebrow">Quick actions</p>
+                          <h3>Optional help for Talos sizing, placement, and IPs</h3>
+                        </div>
+                        <p className="wizard-input-block-note">
+                          You can skip these and fill every field by hand. Next stays available when the required values are valid.
+                        </p>
+                      </div>
+                      <div className="wizard-step-actions-panel-actions">
+                        <button className="button button-secondary" type="button" onClick={handleImportClick} disabled={busy || provisionIpChecking}>
+                          Load saved answers
+                        </button>
+                        <button className="button button-secondary" type="button" onClick={applyProvisionVmSizeHelp} disabled={busy || provisionIpChecking}>
+                          Help me with VM size
+                        </button>
+                        <button className="button button-secondary" type="button" onClick={applyProvisionPlacementHelp} disabled={busy || provisionIpChecking}>
+                          Help me with placement
+                        </button>
+                        <button className="button button-secondary" type="button" onClick={applyProvisionIpHelp} disabled={busy || provisionIpChecking}>
+                          Help me with free IPs
+                        </button>
+                      </div>
+                    </section>
+
                     <section className="wizard-input-block" aria-label="VM sizing">
                       <div className="wizard-input-block-head">
                         <div>
@@ -2495,7 +2490,7 @@ function App() {
                         ))}
                       </div>
                       <p className="wizard-input-block-note">
-                        Control plane nodes are fixed at 4 GB RAM and 10 GB disk. Worker disks scale from the selected host&apos;s free space and the slider percentage.
+                        Control plane nodes are fixed at 4 GB RAM and 10 GB disk. Worker disks scale from the selected host&apos;s free space once placement is set.
                       </p>
                     </section>
 
@@ -2610,12 +2605,12 @@ function App() {
                                     value={vm.value}
                                     onChange={(event) => onVmIpChange(event.target.value)}
                                     inputMode="decimal"
-                                    placeholder={vm.suggestedIp || 'Waiting for server suggestion'}
+                                    placeholder="Enter IP address"
                                   />
                                   <small>
                                     {vm.isSuggested
-                                      ? 'This is the one-time free address suggestion from the server.'
-                                      : 'This value is not rechecked against the server before install.'}
+                                      ? 'This IP was filled by the free-IP helper.'
+                                      : 'This value is checked again when you click Check for free IP addresses.'}
                                   </small>
                                 </label>
                               </article>
@@ -2628,7 +2623,7 @@ function App() {
                             className="button button-secondary"
                             type="button"
                             onClick={() => checkProvisionIpAvailability()}
-                            disabled={busy || provisionIpChecking || !provisionStepReady}
+                            disabled={busy || provisionIpChecking || !provisionVmIpValidation.ok}
                           >
                             {provisionIpChecking ? 'Checking...' : 'Check for free IP addresses'}
                           </button>

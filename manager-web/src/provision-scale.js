@@ -434,7 +434,7 @@ export function suggestVmNodeMap(vmPlan, hostCards, currentMap = {}) {
   return assignments;
 }
 
-function buildVmSizeMap(vmPlan, hostCards, currentMap = {}, scalePercent = DEFAULT_SCALE_PERCENT) {
+function buildVmSizeMap(vmPlan, hostCards, currentMap = {}, scalePercent = DEFAULT_SCALE_PERCENT, allowSuggestedPlacement = true) {
   const plan = Array.isArray(vmPlan) ? vmPlan : [];
   const hosts = Array.isArray(hostCards) ? hostCards.map((host) => ({ ...host })) : [];
   const hostLookup = new Map(hosts.map((host) => [host.id, host]));
@@ -446,10 +446,11 @@ function buildVmSizeMap(vmPlan, hostCards, currentMap = {}, scalePercent = DEFAU
     const preservedHost = typeof currentMap?.[vm.name] === 'string' ? normalizeHostName(currentMap[vm.name]) : '';
     const host = preservedHost && hostLookup.has(preservedHost)
       ? hostLookup.get(preservedHost)
-      : chooseBestHostForVm(vm, hosts);
+      : allowSuggestedPlacement
+        ? chooseBestHostForVm(vm, hosts)
+        : null;
 
     if (!host) {
-      assignments[vm.name] = preservedHost || '';
       sizeMap[vm.name] = {
         cpu: vm.cpu,
         memory_mb: vm.memory_mb,
@@ -492,7 +493,7 @@ export function buildProvisionPlacementBoard(stepInputs, currentValues = {}, res
   const scalePercent = currentValues?.scale_percent ?? DEFAULT_SCALE_PERCENT;
   const suggestedVmNodeMap = suggestVmNodeMap(vmPlan, hostCards, {});
   const suggestedPlacement = buildVmSizeMap(vmPlan, hostCards, suggestedVmNodeMap, scalePercent);
-  const placement = buildVmSizeMap(vmPlan, hostCards, currentMap, scalePercent);
+  const placement = buildVmSizeMap(vmPlan, hostCards, currentMap, scalePercent, false);
   const hostLookup = new Map(hostCards.map((host) => [host.id, host]));
   const placementsByHost = new Map(hostCards.map((host) => [host.id, []]));
   const managementVmResource = Array.isArray(resources?.vms)
@@ -524,10 +525,11 @@ export function buildProvisionPlacementBoard(stepInputs, currentValues = {}, res
       isSuggested: !isUserSelected && Boolean(hostId),
     };
 
-    if (!placementsByHost.has(hostId)) {
-      placementsByHost.set(hostId || 'Unassigned', []);
+    const bucketId = hostId || 'Unassigned';
+    if (!placementsByHost.has(bucketId)) {
+      placementsByHost.set(bucketId, []);
     }
-    placementsByHost.get(hostId || 'Unassigned').push(entry);
+    placementsByHost.get(bucketId).push(entry);
   }
 
   return {
