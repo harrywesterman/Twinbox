@@ -85,6 +85,7 @@ spec:
           image: dpage/pgadmin4:9.14
           imagePullPolicy: IfNotPresent
           securityContext:
+            allowPrivilegeEscalation: false
             capabilities:
               drop:
                 - ALL
@@ -96,6 +97,9 @@ spec:
               python_bin=/tmp/python3.14.no-cap
               cp /usr/local/bin/python3.14 "${python_bin}"
               chmod 0755 "${python_bin}"
+              # Mirror the vendor entrypoint setup env so SQLite migrations stay non-interactive.
+              export PGADMIN_SETUP_EMAIL="${PGADMIN_SETUP_EMAIL:-${PGADMIN_DEFAULT_EMAIL:-}}"
+              export PGADMIN_SETUP_PASSWORD="${PGADMIN_SETUP_PASSWORD:-${PGADMIN_DEFAULT_PASSWORD:-}}"
               exec "${python_bin}" -m gunicorn \
                 --limit-request-line "${GUNICORN_LIMIT_REQUEST_LINE:-8190}" \
                 --limit-request-fields "${GUNICORN_LIMIT_REQUEST_FIELDS:-100}" \
