@@ -1,4 +1,5 @@
 import { resolveStepPresentation } from './step-presentation.js';
+import { normalizeLogEntries } from './install-logs.js';
 
 export const STORAGE_KEY = 'twinbox.installation-wizard.v1';
 
@@ -427,17 +428,17 @@ function groupTimelineEvents(events) {
 
 function buildRuntime(logs, activeStep) {
   const latestJob = activeStep?.latest_job || null;
-  const parsedEvents = (Array.isArray(logs) ? logs : [])
-    .filter((entry) => entry?.line)
-    .map((entry, index) => {
-      const detail = stripLogTimestamp(entry.line);
+  const normalizedLogs = normalizeLogEntries(logs);
+  const parsedEvents = normalizedLogs
+    .map((line, index) => {
+      const detail = stripLogTimestamp(line);
       const stage = summarizeStage(detail, activeStep);
       return {
         id: `${activeStep?.id || 'step'}-${index}`,
         title: stage.title,
         detail,
         tone: stage.tone,
-        timestamp: parseLoggedAt(entry.line),
+        timestamp: parseLoggedAt(line),
       };
     });
 
@@ -756,7 +757,7 @@ export function getMissionControlModel({
       runtime,
       events: buildEvents(runtime),
       risks: buildRisks(activeStep, catalogErrors, error),
-      rawLogOutput: Array.isArray(logs) && logs.length ? logs.map((entry) => entry.line).join('\n') : '',
+      rawLogOutput: normalizeLogEntries(logs).join('\n'),
     },
     completion: mode === 'manage' ? buildCompletion(activeStep, progress, cluster) : null,
     answers,

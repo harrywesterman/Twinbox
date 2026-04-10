@@ -670,7 +670,7 @@ test('refreshWizardSnapshot records fresh logs for the currently selected step',
     }
 
     if (url === '/api/jobs/job-1/logs') {
-      return { lines: ['[2026-03-29T19:13:11.858Z] fresh log line'] };
+      return { lines: [{ line: '[2026-03-29T19:13:11.858Z] fresh log line' }] };
     }
 
     throw new Error(`unexpected request: ${url}`);

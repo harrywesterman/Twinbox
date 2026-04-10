@@ -1,4 +1,5 @@
 import { getWizardSteps } from './journey.js';
+import { normalizeLogEntries } from './install-logs.js';
 
 const PROVISION_STEP_ID = 'provision-nodes';
 const MISSING_CLUSTER_NOTICE = 'Twinbox is waiting for the cluster catalog. Your saved answers and current step are still preserved.';
@@ -256,7 +257,7 @@ export async function refreshWizardSnapshot({
   if (latestJobId) {
     try {
       const logsData = await requestJson(`/api/jobs/${encodeURIComponent(latestJobId)}/logs`);
-      const lines = Array.isArray(logsData?.lines) ? logsData.lines : [];
+      const lines = normalizeLogEntries(logsData?.lines);
       if (lines.length > 0) {
         setLogs(lines);
         setInstallStepLogs?.(selectedStep?.id || currentSelectedStepId, lines);

@@ -27,6 +27,7 @@ import {
   serializeUiState,
   formatState,
 } from './journey.js';
+import { normalizeLogEntries } from './install-logs.js';
 import { getQuestionSteps } from './question-flow.js';
 import {
   isMissingClusterError,
@@ -976,17 +977,12 @@ function App() {
   const isQuestionPhase = hasStarted && wizardPhase === 'questions';
   const currentStep = isQuestionPhase ? currentQuestionStep : (currentInstallStep || model.activeStep);
 
-  function normalizeLogLines(lines = []) {
-    return (Array.isArray(lines) ? lines : [])
-      .filter((line) => typeof line === 'string' && line.length > 0);
-  }
-
   function setInstallStepLogs(stepId, lines = []) {
     if (!stepId) {
       return;
     }
 
-    const nextLines = normalizeLogLines(lines);
+    const nextLines = normalizeLogEntries(lines);
     installLogsByStepRef.current = {
       ...installLogsByStepRef.current,
       [stepId]: nextLines,
@@ -1006,7 +1002,7 @@ function App() {
 
     selectedStepIdRef.current = stepId;
     setSelectedStepId(stepId);
-    setLogs(Array.isArray(installLogsByStepRef.current[stepId]) ? installLogsByStepRef.current[stepId] : []);
+    setLogs(normalizeLogEntries(installLogsByStepRef.current[stepId] || []));
   }
 
   useEffect(() => {
@@ -1260,7 +1256,7 @@ function App() {
     }
 
     const cachedLogs = installLogsByStepRef.current[currentStep.id];
-    setLogs(Array.isArray(cachedLogs) ? cachedLogs : []);
+    setLogs(normalizeLogEntries(cachedLogs || []));
   }, [currentStep?.id, isInstallPhase]);
 
   useLayoutEffect(() => {

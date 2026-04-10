@@ -7,6 +7,7 @@ import {
   restoreUiState,
   serializeUiState,
 } from '../src/journey.js';
+import { normalizeLogEntries } from '../src/install-logs.js';
 
 function makeStep(id, title, {
   journeyStage = 'setup',
@@ -155,6 +156,34 @@ test('wizard model keeps raw log output empty until the step has logs', () => {
   });
 
   assert.equal(model.activity.rawLogOutput, '');
+});
+
+test('wizard model renders log lines from both string and object log entries', () => {
+  const model = getMissionControlModel({
+    catalog: buildCatalog({ 'provision-nodes': 'ready' }),
+    logs: [
+      '[2026-03-20T10:10:00Z] raw string line ',
+      { line: '[2026-03-20T10:11:00Z] object line ' },
+      { message: 'ignored' },
+    ],
+    cluster: null,
+    health: { ok: true },
+    error: '',
+    busy: false,
+    selectedStepId: 'provision-nodes',
+  });
+
+  assert.equal(model.activity.rawLogOutput, '[2026-03-20T10:10:00Z] raw string line \n[2026-03-20T10:11:00Z] object line ');
+});
+
+test('normalizeLogEntries keeps the install log shape stable', () => {
+  assert.deepEqual(normalizeLogEntries([
+    '[ts] first ',
+    { line: '[ts] second ' },
+    { line: '' },
+    null,
+    { message: 'ignored' },
+  ]), ['[ts] first ', '[ts] second ']);
 });
 
 test('wizard model advances to the next step when the active step is done', () => {
