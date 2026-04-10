@@ -133,13 +133,10 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
 
 if command -v kubectl &>/dev/null; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying platform-ingress application"
-  kubectl delete application platform-ingress -n argocd --ignore-not-found=true 2>/dev/null || true
-  kubectl delete application cluster-config -n argocd --ignore-not-found=true 2>/dev/null || true
   bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
     --manifest "$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml" \
     --application "platform-ingress" \
-    --destination-namespace "argocd" \
-    --no-wait
+    --destination-namespace "argocd"
 fi
 
 # Write result

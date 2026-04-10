@@ -323,16 +323,14 @@ if command -v kubectl &>/dev/null; then
     fail "Timed out waiting for the Argo CD server deployment to become ready"
   fi
 
-  # Refresh the parent ingress app first, then apply the runtime Cloudflare app.
-  # The parent app manifests still come from Git, so applying it after the
-  # runtime app would overwrite the inline tunnel values we need for this run.
-  kubectl delete application platform-ingress -n argocd --ignore-not-found=true 2>/dev/null || true
-  kubectl delete application cluster-config -n argocd --ignore-not-found=true 2>/dev/null || true
+  # Refresh the parent ingress app first, then wait for it to settle before
+  # creating the runtime Cloudflare app. Deleting the Application objects can
+  # briefly remove shared Argo CD config such as argocd-cm, which races the
+  # follow-up cloudflare-tunnel apply.
   bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
     --manifest "$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml" \
     --application "platform-ingress" \
-    --destination-namespace "argocd" \
-    --no-wait
+    --destination-namespace "argocd"
 
   # Apply the cloudflare-tunnel application last so the inline runtime values
   # remain the active desired state when Argo reconciles the deployment.
