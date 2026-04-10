@@ -1922,6 +1922,7 @@ def test_kustomization_includes_monitoring_resources():
     assert "pgadmin4/namespace.yaml" in text
     assert "prometheus/ingressroute.yaml" in text
     assert "prometheus/alertmanager-config.yaml" in text
+    assert "prometheus/cluster-health-alerts.yaml" not in text
     assert "prometheus/pvc-usage-alerts.yaml" not in text
     assert "traefik-manager/ingressroute.yaml" in text
     assert "traefik-manager/deployment.yaml" in text
@@ -1938,6 +1939,17 @@ def test_prometheus_step_applies_kube_prometheus_stack():
     text = PROMETHEUS_STEP_MANIFEST.read_text(encoding="utf-8")
     run_text = PROMETHEUS_STEP_SCRIPT.read_text(encoding="utf-8")
     script_text = _prometheus_script_text()
+    app_text = (REPO_ROOT / "gitops" / "apps" / "prometheus.yaml").read_text(
+        encoding="utf-8"
+    )
+    manifests_text = (
+        REPO_ROOT
+        / "gitops"
+        / "apps"
+        / "prometheus"
+        / "manifests"
+        / "kustomization.yaml"
+    ).read_text(encoding="utf-8")
 
     assert "id: install-prometheus" in text
     assert "title: Install Prometheus" in text
@@ -1953,6 +1965,9 @@ def test_prometheus_step_applies_kube_prometheus_stack():
     assert '--application "prometheus"' in script_text
     assert '--destination-namespace "monitoring"' in script_text
     assert "gitops/apps/prometheus.yaml" in script_text
+    assert "path: gitops/apps/prometheus/manifests" in app_text
+    assert "cluster-health-alerts.yaml" in manifests_text
+    assert "pvc-usage-alerts.yaml" in manifests_text
 
 
 def test_traefik_manager_step_deploys_browser_ui():
@@ -2236,8 +2251,8 @@ def test_configure_argocd_oidc_refreshes_platform_ingress_without_waiting():
     assert '--destination-namespace "argocd"' in text
     assert "--no-wait" in text
     assert "wait_for_argocd_oidc_config" in text
-    assert "patch_live_argocd_config" in text
-    assert "platform-ingress did not refresh argocd-cm in time" in text
+    assert "patch_live_argocd_config" not in text
+    assert "platform-ingress did not refresh argocd-cm in time" not in text
 
 
 def test_cloudtty_platform_ingress_is_committed_to_gitops():
