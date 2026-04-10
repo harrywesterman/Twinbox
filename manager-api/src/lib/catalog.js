@@ -117,6 +117,11 @@ function clusterSlug(cluster) {
     return explicitSlug;
   }
 
+  const persistedClusterId = normalizeChoiceValue(cluster?.id).toLowerCase();
+  if (persistedClusterId) {
+    return persistedClusterId;
+  }
+
   return normalizeChoiceValue(process.env.TWINBOX_CLUSTER_SLUG).toLowerCase();
 }
 

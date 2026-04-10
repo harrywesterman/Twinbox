@@ -339,8 +339,7 @@ if command -v kubectl &>/dev/null; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying cloudflare-tunnel application"
   bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
     --manifest "$cloudflare_tunnel_manifest" \
-    --application "cloudflare-tunnel" \
-    --no-wait
+    --application "cloudflare-tunnel"
 fi
 
 # Store ingress strategy in cluster state
