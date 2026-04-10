@@ -17,7 +17,7 @@ Twinbox is a Talos Linux based configuration for a Kubernetes cluster. Treat the
 
 1. Run `wizard/setup-wizard.sh` on Proxmox.
 2. The wizard creates only the Management VM.
-3. The Management VM gets a thin cloud-init bootstrap, Ansible installs Docker CE and the management tools, and the host keeps runtime/bootstrap state under `/opt/twinbox`; the step and manager scripts are bundled in the manager container images.
+3. The Management VM gets a thin cloud-init bootstrap, Ansible installs Docker CE and the management tools, and the host keeps runtime/bootstrap state under `/opt/twinbox`; the step and manager scripts run from the manager container images, not from a host-side Twinbox checkout.
 4. `manager-web` on port `3000` queues work through `manager-api` on port `8080`.
 5. `manager-worker` polls the file queue under `manager-data/` and executes bundled step and manager scripts inside the container image.
 6. `provision-nodes` starts the Talos journey, sizes the cluster, lands the VMs, and records the cluster state.
@@ -32,6 +32,7 @@ Twinbox is a Talos Linux based configuration for a Kubernetes cluster. Treat the
 - `scripts/manager/` - cluster provisioning and management scripts.
 - `categories/` - manifest-driven step catalog and step scripts.
 - `docker-compose.yml` - local/runtime service wiring.
+- Code changes land in GitHub `main`, are built into container images by GitHub Actions, and are pulled onto the Management VM with `docker compose pull && docker compose up -d`.
 
 ## Editing Rules
 
@@ -39,7 +40,7 @@ Twinbox is a Talos Linux based configuration for a Kubernetes cluster. Treat the
 - Use the Playwright skill to look at the live web wizard.
 - Use `docker compose`, not legacy `docker-compose`.
 - Keep `manager-data/` as runtime state only.
-- The host does not carry a full repo checkout; `/opt/twinbox/categories` and `/opt/twinbox/scripts` exist inside the manager containers.
+- The host does not carry a full repo checkout; the executable Twinbox code lives in the manager container images, while `/opt/twinbox` stores runtime and bootstrap state.
 - Use `apply_patch` for manual file edits.
 - Prefer small, targeted changes in the relevant component:
   - UI: `manager-web/src/*`

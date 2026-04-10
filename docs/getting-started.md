@@ -15,7 +15,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/harrywesterman/twinbox/main/
 ```
 
 The wizard creates the Management VM, seeds runtime directories in `/opt/twinbox`, writes `.env`, and kicks off the Ansible-driven bootstrap.
-That host-side tree is runtime state, not a full repo checkout. The management images carry the executable step catalog and manager scripts.
+That host-side tree is runtime state, not a full repo checkout. The management images carry the executable step catalog and manager scripts, so the code you change must be committed, pushed to `main`, rebuilt by GitHub Actions, and then pulled on the VM.
 The Management VM now boots through a thin cloud-init layer that installs Ansible and lets the Ansible baseline install Docker, the management tools, and the runtime stack.
 The generated VM and the later Talos cluster both use the same `TWINBOX_TIME_SERVER` value for NTP.
 The wizard also stores the cluster login password in `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` so later Authentik onboarding can reuse it.
@@ -68,6 +68,8 @@ If the manager stack needs a restart:
 ```bash
 ssh root@<management-vm-ip> 'docker compose pull && docker compose up -d'
 ```
+
+Use this after the `Publish Docker Images` workflow finishes for the commit you want to run.
 
 If bootstrap files are missing, rerun the host bootstrap logic:
 
