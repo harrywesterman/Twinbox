@@ -147,7 +147,6 @@ public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domai
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
 pgadmin_platform_dir="$WORKSPACE_ROOT/gitops/platform-apps/pgadmin4"
 pgadmin_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-ingressroute.XXXXXX.yaml")"
-pgadmin_job_python_bin="/venv/bin/python3.14"
 pgadmin_load_servers_job_name="pgadmin4-load-servers-$(openssl rand -hex 4)"
 
 authentik_ensure_token
@@ -514,7 +513,8 @@ spec:
             - /bin/sh
             - -ec
             - |
-              exec "${pgadmin_job_python_bin}" /pgadmin4/setup.py load-servers /config/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace
+              . /venv/bin/activate
+              exec python3 /pgadmin4/setup.py load-servers /config/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace
           envFrom:
             - secretRef:
                 name: pgadmin4-bootstrap
