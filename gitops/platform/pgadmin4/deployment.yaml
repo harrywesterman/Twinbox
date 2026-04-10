@@ -84,7 +84,6 @@ spec:
           image: dpage/pgadmin4:9.14
           imagePullPolicy: IfNotPresent
           securityContext:
-            allowPrivilegeEscalation: false
             capabilities:
               drop:
                 - ALL
