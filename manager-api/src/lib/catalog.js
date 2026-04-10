@@ -112,7 +112,12 @@ function clusterScopeId(cluster) {
 }
 
 function clusterSlug(cluster) {
-  return normalizeChoiceValue(cluster?.slug || cluster?.id).toLowerCase();
+  const explicitSlug = normalizeChoiceValue(cluster?.slug).toLowerCase();
+  if (explicitSlug) {
+    return explicitSlug;
+  }
+
+  return normalizeChoiceValue(process.env.TWINBOX_CLUSTER_SLUG).toLowerCase();
 }
 
 function isPrdCluster(clusterOrSlug) {
@@ -217,23 +222,43 @@ function isAllowedIngressRoute(route, currentClusterOrSlug) {
 }
 
 function renderStepForCluster(step, clusterSlugHint) {
-  if (step.id !== "choose-ingress-route" || !clusterSlugHint || isPrdCluster(clusterSlugHint)) {
+  if (!clusterSlugHint) {
     return step;
   }
 
-  return {
-    ...step,
-    inputs: step.inputs.map((input) => {
-      if (input.id !== "ingress_route" || !Array.isArray(input.options)) {
-        return input;
-      }
+  if (step.id === "choose-ingress-route" && !isPrdCluster(clusterSlugHint)) {
+    return {
+      ...step,
+      inputs: step.inputs.map((input) => {
+        if (input.id !== "ingress_route" || !Array.isArray(input.options)) {
+          return input;
+        }
 
-      return {
-        ...input,
-        options: input.options.filter((option) => option.value !== "cloudflare-tunnel"),
-      };
-    }),
-  };
+        return {
+          ...input,
+          options: input.options.filter((option) => option.value !== "cloudflare-tunnel"),
+        };
+      }),
+    };
+  }
+
+  if (step.id === "provision-nodes") {
+    return {
+      ...step,
+      inputs: step.inputs.map((input) => {
+        if (input.id !== "name") {
+          return input;
+        }
+
+        return {
+          ...input,
+          default: clusterSlugHint,
+        };
+      }),
+    };
+  }
+
+  return step;
 }
 
 function stepStatePath(dirs, stepId, clusterScope = null) {
@@ -458,7 +483,7 @@ export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) 
 
   const clusterSlugHint = inferClusterSlug(currentCluster, stepStateById, dirs);
   for (const [stepId, step] of definitions.stepsById.entries()) {
-    if (stepId === "choose-ingress-route") {
+    if (stepId === "choose-ingress-route" || stepId === "provision-nodes") {
       renderedStepsById.set(stepId, renderStepForCluster(step, clusterSlugHint));
     }
   }
@@ -527,6 +552,7 @@ export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) 
     categories,
     errors: definitions.errors,
     stepsById: renderedStepsById,
+    cluster_slug: clusterSlugHint,
   };
 }
 

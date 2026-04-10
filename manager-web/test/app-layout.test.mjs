@@ -28,6 +28,9 @@ test('app source defines a minimal wizard shell with guided input and step-by-st
   assert.match(source, /Help me with VM size/, 'expected the VM sizing helper button');
   assert.match(source, /Help me with placement/, 'expected the placement helper button');
   assert.match(source, /Help me with free IPs/, 'expected the IP helper button');
+  assert.match(source, /Cluster identity/, 'expected the Talos cluster name to be shown as a derived summary');
+  assert.match(source, /Twinbox saves this name automatically from the wizard choice/, 'expected the cluster name to be auto-saved from the earlier choice');
+  assert.doesNotMatch(questionFlow, /Cluster name/, 'expected the Talos questions to stop asking for the cluster name');
   assert.match(source, /showImportButton = !isInstallPhase && !model\.completion && currentStep\?\.id !== 'provision-nodes'/, 'expected the topbar import button to hide on step 1');
   assert.match(source, /1\. VM sizing/, 'expected sizing to come first');
   assert.match(source, /VM landing/, 'expected the VM placement block to be explicit');

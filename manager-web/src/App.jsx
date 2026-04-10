@@ -425,7 +425,6 @@ function InputField({ stepId, input, value, onChange }) {
 
 const PROVISION_VM_INPUT_IDS = [
   'scale_percent',
-  'name',
   'controlplane_count',
   'worker_count',
   'cpu_cores',
@@ -2466,6 +2465,26 @@ function App() {
                           Help me with free IPs
                         </button>
                       </div>
+                    </section>
+
+                    <section className="wizard-input-block is-cluster" aria-label="Cluster identity">
+                      <div className="wizard-input-block-head">
+                        <div>
+                          <p className="eyebrow">0. Cluster identity</p>
+                          <h3>Use the cluster name from the wizard selection</h3>
+                        </div>
+                      </div>
+
+                      <dl className="wizard-network-summary">
+                        <div>
+                          <dt>Cluster name</dt>
+                          <dd>{catalog.cluster_slug || 'prd'}</dd>
+                        </div>
+                      </dl>
+
+                      <p className="wizard-input-block-note">
+                        Twinbox saves this name automatically from the wizard choice, so you do not need to enter it again here.
+                      </p>
                     </section>
 
                     <section className="wizard-input-block" aria-label="VM sizing">

@@ -364,6 +364,7 @@ export function buildClusterFromRequest(body, env, { allowedVmHosts = [], cluste
     ok: true,
     cluster: ensureClusterSecretRefs({
       id: clusterId,
+      slug: normalizedName.slug,
       cluster_instance_id: clusterInstanceId || crypto.randomUUID(),
       name: normalizedName.name,
       controlplane_count: parsedControlplanes.value,

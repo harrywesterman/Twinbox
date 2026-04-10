@@ -25,7 +25,6 @@ const QUESTION_STEP_DEFS = [
     side_help: 'Talos Linux is a minimal, secure, API-driven operating system built specifically for running Kubernetes.',
     inputs: [
       { id: 'scale_percent', label: 'Cluster scale', type: 'integer', required: true, min: 0, max: 100, default: 30, help: 'Scale the VM footprint from 0 to 100 percent.' },
-      { id: 'name', label: 'Cluster name', type: 'string', required: true, default: 'twinbox-cluster', help: 'Readable Twinbox cluster name.' },
       { id: 'controlplane_count', label: 'Control planes', type: 'integer', required: true, min: 1, max: 15, default: 1, help: 'Current API range is 1 to 15.' },
       { id: 'worker_count', label: 'Workers', type: 'integer', required: true, min: 0, max: 200, default: 2, help: 'Current API range is 0 to 200.' },
       { id: 'cpu_cores', label: 'CPU cores', type: 'integer', required: true, min: 1, max: 64, default: 4, help: 'Per-node CPU allocation. Use 4 vCPU or more for the standard Twinbox baseline; 2 vCPU is only realistic for a reduced dev/test cluster.' },
