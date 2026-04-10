@@ -132,15 +132,10 @@ api_write() {
 resolve_flow_id() {
   local slug="$1"
   local designation="$2"
-  local response
 
-  response="$(api_get "/core/flows/?slug=${slug}")"
-  jq -r \
-    --arg slug "$slug" \
-    --arg designation "$designation" \
-    '.results[]?
-      | select((.slug // "") == $slug and (.designation // "") == $designation)
-      | .pk // empty' <<<"$response" | head -n1
+  # Reuse the shared Authentik resolver because it already targets the API
+  # shape used by the management VM's Authentik deployment.
+  authentik_resolve_flow_id "$slug" "$designation"
 }
 
 resolve_scope_mapping_id() {

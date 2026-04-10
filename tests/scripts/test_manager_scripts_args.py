@@ -2398,6 +2398,28 @@ def test_authentik_consumer_scripts_read_from_openbao():
         assert "authentik.json" not in text
 
 
+def test_authentik_consumer_scripts_use_shared_flow_resolver():
+    consumer_paths = [
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "configure-argocd-oidc"
+        / "run.sh",
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-dashy-dashboard"
+        / "run.sh",
+    ]
+
+    for path in consumer_paths:
+        text = path.read_text(encoding="utf-8")
+        assert "authentik_resolve_flow_id" in text
+        assert 'api_get "/core/flows/?slug=' not in text
+
+
 def test_authentik_api_provisioning_steps_bypass_tofu_apply():
     api_paths = [
         REPO_ROOT
