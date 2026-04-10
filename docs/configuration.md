@@ -216,6 +216,27 @@ Twinbox uses one base domain (`dns_domain`) for the cluster and derives a public
 6. **Kustomize render** — The `platform-ingress` ApplicationSet uses Kustomize to patch the live match expressions and start-page strings before sync.
 7. **Ingress-specific apps** — Wiredoor, MetalLB, and Tailscale reuse the slug-prefixed hostname model. Cloudflare Tunnel is only offered for `prd` on Cloudflare Free.
 
+### Namespace baseline
+
+`gitops/platform/namespaces.yaml` is the pre-created namespace baseline for the shared platform overlay. When you add a new app or a new platform manifest that targets a namespace, add that namespace here first.
+
+This avoids Argo CD sync failures like `namespaces "..." not found` when `platform-ingress` or another shared overlay renders a manifest before the app-specific chart has created its own namespace.
+
+Current baseline namespaces:
+
+- `authentik`
+- `cloudtty-system`
+- `dashy`
+- `homepage`
+- `immich`
+- `longhorn-system`
+- `monitoring`
+- `pgadmin4`
+- `tailscale`
+- `traefik`
+- `traefik-manager`
+- `wiredoor`
+
 ### Affected services
 
 All platform services use the runtime domain projection from the local Argo cluster secret:

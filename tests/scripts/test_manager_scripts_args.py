@@ -2308,6 +2308,28 @@ def test_cloudtty_platform_ingress_is_committed_to_gitops():
     assert "Host(`cloudtty.__ZONE_NAME__`)" in ingress_text
 
 
+def test_platform_namespace_baseline_covers_shared_overlay_resources():
+    namespaces_text = (
+        REPO_ROOT / "gitops" / "platform" / "namespaces.yaml"
+    ).read_text(encoding="utf-8")
+
+    for namespace in (
+        "authentik",
+        "cloudtty-system",
+        "dashy",
+        "homepage",
+        "immich",
+        "longhorn-system",
+        "monitoring",
+        "pgadmin4",
+        "tailscale",
+        "traefik",
+        "traefik-manager",
+        "wiredoor",
+    ):
+        assert f"name: {namespace}" in namespaces_text
+
+
 def test_platform_ingress_manifest_patches_authentik_callback_routes():
     text = (REPO_ROOT / "gitops" / "apps" / "platform-ingress.yaml").read_text(
         encoding="utf-8"
