@@ -6,6 +6,7 @@ resources:
   - argocd/argocd-rbac-cm.yaml
   - argocd/argocd-wiredoor.yaml
   - argocd/externalsecret.yaml
+  - authentik/namespace.yaml
   - authentik/ingressroute.yaml
   - authentik/cors-middleware.yaml
   - authentik/forwardauth-middleware.yaml
