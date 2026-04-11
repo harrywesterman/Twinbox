@@ -33,6 +33,7 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
     loadStep("install-argocd"),
     loadStep("install-authentik-idp"),
     loadStep("install-grafana"),
+    loadStep("install-prometheus"),
     loadStep("install-loki"),
     loadStep("install-management-consoles"),
     loadStep("install-cloudtty"),
@@ -47,6 +48,7 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
     ["install-argocd", { status: "succeeded", outputs: {} }],
     ["install-authentik-idp", { status: "succeeded", outputs: {} }],
     ["install-grafana", { status: "succeeded", outputs: {} }],
+    ["install-prometheus", { status: "succeeded", outputs: {} }],
     ["install-loki", { status: "succeeded", outputs: {} }],
     ["install-management-consoles", { status: "succeeded", outputs: {} }],
     ["install-cloudtty", { status: "succeeded", outputs: { access_url: "https://shell.example.net" } }],
@@ -92,6 +94,7 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   assert.equal(iconByTitle.get("Argo CD"), "si-argo");
   assert.equal(iconByTitle.get("Authentik"), "si-authentik");
   assert.equal(iconByTitle.get("Grafana"), "si-grafana");
+  assert.equal(iconByTitle.get("Prometheus"), "si-prometheus");
   assert.equal(iconByTitle.get("Loki"), "https://raw.githubusercontent.com/grafana/loki/main/docs/sources/logo.png");
   assert.equal(iconByTitle.get("Twinbox Wizard"), "https://twinboxwizard.tst.example.com/favicon.svg");
   assert.equal(iconByTitle.get("Proxmox"), "si-proxmox");

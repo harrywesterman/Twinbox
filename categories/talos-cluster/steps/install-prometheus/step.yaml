@@ -15,7 +15,7 @@ dashy:
     - section: Platform
       title: Prometheus
       description: Metrics collection and alerting
-      icon: fas fa-chart-line
+      icon: si-prometheus
       url_template: https://prometheus.__ZONE_NAME__
 inputs: []
 secrets:
