@@ -1,43 +1,15 @@
+import { STEP_ICON_MANIFEST } from './assets/step-icons/manifest.js';
+
 function trimString(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-function assetHref(filename) {
-  return new URL(`./assets/step-icons/${filename}`, import.meta.url).href;
-}
-
-const STEP_ICON_ASSETS = {
-  'provision-nodes': assetHref('provision-nodes.svg'),
-  'install-argocd': assetHref('install-argocd.svg'),
-  'install-longhorn-storage': assetHref('install-longhorn-storage.svg'),
-  'install-secret-sync': assetHref('install-secret-sync.svg'),
-  'install-cloudnativepg': assetHref('install-cloudnativepg.svg'),
-  'install-traefik': assetHref('install-traefik.svg'),
-  'install-whoami': assetHref('install-whoami.svg'),
-  'install-headlamp': assetHref('install-headlamp.svg'),
-  'install-grafana': assetHref('install-grafana.svg'),
-  'install-pgadmin4': assetHref('install-pgadmin4.svg'),
-  'install-wiredoor-gateway': assetHref('install-wiredoor-gateway.svg'),
-  'install-authentik-idp': assetHref('install-authentik-idp.svg'),
-  'create-users-and-groups': assetHref('create-users-and-groups.svg'),
-  'configure-cloudflare-dns': assetHref('configure-cloudflare-dns.svg'),
-  'install-dashy-dashboard': assetHref('install-dashy-dashboard.svg'),
-  'install-ntfy': assetHref('install-ntfy.svg'),
-  'install-management-consoles': assetHref('install-management-consoles.svg'),
-  'install-velero-backup': assetHref('install-velero-backup.svg'),
-  'install-proxmox-backup-system': assetHref('install-proxmox-backup-system.svg'),
-  'install-nextcloud': assetHref('install-nextcloud.svg'),
-  'install-immich': assetHref('install-immich.svg'),
-  'install-zulip': assetHref('install-zulip.svg'),
-  'install-paperless': assetHref('install-paperless.svg'),
-  'install-karakeep': assetHref('install-karakeep.svg'),
-  'install-gitea': assetHref('install-gitea.svg'),
-  'install-uptimekuma': assetHref('install-uptimekuma.svg'),
-  'install-n8n': assetHref('install-n8n.svg'),
-  'install-audiobookshelf': assetHref('install-audiobookshelf.svg'),
-  'install-freshrss': assetHref('install-freshrss.svg'),
-  'install-jitsi': assetHref('install-jitsi.svg'),
-};
+const STEP_ICON_ASSETS = Object.fromEntries(
+  STEP_ICON_MANIFEST.map((entry) => [
+    entry.stepId,
+    new URL(`./assets/step-icons/${entry.fileBase}.svg`, import.meta.url).href,
+  ]),
+);
 
 function buildProjectUrlMap() {
   return {
