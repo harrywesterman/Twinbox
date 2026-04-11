@@ -66,10 +66,10 @@ spec:
               patch: |-
                 - op: replace
                   path: /spec/headers/accessControlAllowOriginList/0
-                  value: https://start.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                  value: https://admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
                 - op: replace
                   path: /spec/headers/customResponseHeaders/Access-Control-Allow-Origin
-                  value: https://start.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                  value: https://admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
             - target:
                 kind: Middleware
                 name: argocd-login-returnurl-redirect

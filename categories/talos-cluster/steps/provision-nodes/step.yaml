@@ -20,8 +20,8 @@ inputs:
     required: true
     min: 0
     max: 100
-    default: 30
-    help: Scale the VM footprint from 0 to 100 percent.
+    default: 90
+    help: Scale the VM footprint from 0 to 100 percent. The default reserves room on all three Proxmox hosts.
   - id: name
     label: Cluster name
     type: string
@@ -34,16 +34,16 @@ inputs:
     required: true
     min: 1
     max: 15
-    default: 1
-    help: Current API range is 1 to 15.
+    default: 3
+    help: Current API range is 1 to 15. The default gives each Proxmox host one control plane.
   - id: worker_count
     label: Workers
     type: integer
     required: true
     min: 0
     max: 200
-    default: 2
-    help: Current API range is 0 to 200.
+    default: 3
+    help: Current API range is 0 to 200. The default gives each Proxmox host one worker.
   - id: cpu_cores
     label: CPU cores
     type: integer

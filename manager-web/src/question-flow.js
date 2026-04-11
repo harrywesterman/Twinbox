@@ -24,9 +24,9 @@ const QUESTION_STEP_DEFS = [
     explanation: 'Talos Linux is the immutable, Kubernetes-focused operating system that Twinbox uses. This page collects the cluster sizing, placement, and network values before the long installation starts.',
     side_help: 'Talos Linux is a minimal, secure, API-driven operating system built specifically for running Kubernetes.',
     inputs: [
-      { id: 'scale_percent', label: 'Cluster scale', type: 'integer', required: true, min: 0, max: 100, default: 30, help: 'Scale the VM footprint from 0 to 100 percent.' },
-      { id: 'controlplane_count', label: 'Control planes', type: 'integer', required: true, min: 1, max: 15, default: 1, help: 'Current API range is 1 to 15.' },
-      { id: 'worker_count', label: 'Workers', type: 'integer', required: true, min: 0, max: 200, default: 2, help: 'Current API range is 0 to 200.' },
+      { id: 'scale_percent', label: 'Cluster scale', type: 'integer', required: true, min: 0, max: 100, default: 90, help: 'Scale the VM footprint from 0 to 100 percent. The default reserves room on all three Proxmox hosts.' },
+      { id: 'controlplane_count', label: 'Control planes', type: 'integer', required: true, min: 1, max: 15, default: 3, help: 'Current API range is 1 to 15. The default gives each Proxmox host one control plane.' },
+      { id: 'worker_count', label: 'Workers', type: 'integer', required: true, min: 0, max: 200, default: 3, help: 'Current API range is 0 to 200. The default gives each Proxmox host one worker.' },
       { id: 'cpu_cores', label: 'CPU cores', type: 'integer', required: true, min: 1, max: 64, default: 4, help: 'Per-node CPU allocation. Use 4 vCPU or more for the standard Twinbox baseline; 2 vCPU is only realistic for a reduced dev/test cluster.' },
       { id: 'memory_mb', label: 'Memory MB', type: 'integer', required: true, min: 512, max: 1048576, default: 8192, help: 'Worker memory allocation. Control planes stay fixed at 4096 MB, while workers keep this slider-driven memory size.' },
       { id: 'bridge', label: 'Bridge', type: 'string', required: true, default: 'vmbr0', help: 'Proxmox bridge for Talos node traffic.' },

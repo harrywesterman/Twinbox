@@ -35,7 +35,7 @@ authentik_setup_forward
 
 AUTHENTIK_HOST="${AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
 
-dashy_host="https://start.${public_zone_name}"
+dashy_host="https://admin.${public_zone_name}"
 dashy_redirect_uri="${dashy_host}"
 secrets_dir="/opt/twinbox/bootstrap/secrets/global"
 mkdir -p "$secrets_dir"

@@ -37,7 +37,6 @@
 
 ### Repository Cleanup
 
-- Removed historical plans under `docs/plans/`.
 - Removed legacy `twinbox/` directory tree.
 - Migrated active docs and metadata to root locations.
 

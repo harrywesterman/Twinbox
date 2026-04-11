@@ -10,9 +10,9 @@ import {
 } from '../src/provision-scale.js';
 
 const stepInputs = [
-  { id: 'scale_percent', default: 30, min: 0, max: 100 },
-  { id: 'controlplane_count', default: 1, min: 1, max: 15 },
-  { id: 'worker_count', default: 2, min: 0, max: 200 },
+  { id: 'scale_percent', default: 90, min: 0, max: 100 },
+  { id: 'controlplane_count', default: 3, min: 1, max: 15 },
+  { id: 'worker_count', default: 3, min: 0, max: 200 },
   { id: 'cpu_cores', default: 2, min: 1, max: 64 },
   { id: 'memory_mb', default: 4096, min: 512, max: 1048576 },
 ];
@@ -74,19 +74,19 @@ const balancedPlacementResources = {
   ],
 };
 
-test('scale 30 preserves the default VM footprint', () => {
-  const values = buildScaledProvisionInputs(30, stepInputs, {}, new Set(), largeClusterResources);
+test('scale 90 preserves the default VM footprint', () => {
+  const values = buildScaledProvisionInputs(90, stepInputs, {}, new Set(), largeClusterResources);
 
-  assert.equal(values.scale_percent, 30);
-  assert.equal(values.controlplane_count, 1);
-  assert.equal(values.worker_count, 2);
+  assert.equal(values.scale_percent, 90);
+  assert.equal(values.controlplane_count, 3);
+  assert.equal(values.worker_count, 3);
   assert.equal(values.cpu_cores, 2);
   assert.equal(values.memory_mb, 4096);
 });
 
 test('provision node count falls back to the wizard defaults when the draft is empty', () => {
-  assert.equal(getProvisionNodeCount(stepInputs, {}), 3);
-  assert.equal(getProvisionNodeCount(stepInputs, { controlplane_count: 2 }), 4);
+  assert.equal(getProvisionNodeCount(stepInputs, {}), 6);
+  assert.equal(getProvisionNodeCount(stepInputs, { controlplane_count: 2 }), 5);
   assert.equal(getProvisionNodeCount(stepInputs, { controlplane_count: 0, worker_count: 0 }), 1);
 });
 
@@ -123,13 +123,13 @@ test('memory formatter prefers gigabytes for larger values', () => {
 test('placement board suggests a host-aware Talos VM layout', () => {
   const board = buildProvisionPlacementBoard(stepInputs, {}, balancedPlacementResources);
 
-  assert.equal(board.vmPlan.length, 3);
+  assert.equal(board.vmPlan.length, 6);
   assert.equal(board.hostCards.length, 2);
   assert.equal(board.hostCards[0].activeVmCount, 1);
   assert.equal(board.hostCards[1].activeVmCount, 1);
   assert.equal(Object.keys(board.vmNodeMap).length, 0);
-  assert.equal(Object.keys(board.suggestedVmNodeMap).length, 3);
-  assert.equal(board.unassigned.length, 3);
+  assert.equal(Object.keys(board.suggestedVmNodeMap).length, 6);
+  assert.equal(board.unassigned.length, 6);
   assert.equal(board.hostCards[0].assignments.length, 0);
   assert.equal(board.vmSizeMap['cp-1'].disk_gb, 10);
   assert.ok(board.vmSizeMap['worker-1'].disk_gb >= 100);
@@ -253,4 +253,56 @@ test('worker disk scales from host free space and scale percent', () => {
 
   assert.ok(board.vmSizeMap['worker-1'].disk_gb > 100);
   assert.equal(board.vmSizeMap['cp-1'].disk_gb, 10);
+});
+
+test('default placement spreads one control plane and one worker across each host', () => {
+  const board = buildProvisionPlacementBoard(stepInputs, {}, {
+    nodes: [
+      {
+        node: 'pve-a',
+        status: 'online',
+        maxmem: 17179869184,
+        mem: 2147483648,
+        maxdisk: 549755813888,
+        disk: 107374182400,
+        maxcpu: 8,
+        cpu: 0.1,
+      },
+      {
+        node: 'pve-b',
+        status: 'online',
+        maxmem: 17179869184,
+        mem: 2147483648,
+        maxdisk: 549755813888,
+        disk: 107374182400,
+        maxcpu: 8,
+        cpu: 0.1,
+      },
+      {
+        node: 'pve-c',
+        status: 'online',
+        maxmem: 17179869184,
+        mem: 2147483648,
+        maxdisk: 549755813888,
+        disk: 107374182400,
+        maxcpu: 8,
+        cpu: 0.1,
+      },
+    ],
+    vms: [],
+  });
+
+  const hostCounts = new Map(board.hostCards.map((host) => [host.id, 0]));
+  for (const hostId of Object.values(board.suggestedVmNodeMap)) {
+    hostCounts.set(hostId, (hostCounts.get(hostId) || 0) + 1);
+  }
+
+  assert.equal(board.hostCards.length, 3);
+  assert.deepEqual([...hostCounts.values()], [2, 2, 2]);
+  assert.equal(board.suggestedVmNodeMap['cp-1'], 'pve-a');
+  assert.equal(board.suggestedVmNodeMap['worker-1'], 'pve-a');
+  assert.equal(board.suggestedVmNodeMap['cp-2'], 'pve-b');
+  assert.equal(board.suggestedVmNodeMap['worker-2'], 'pve-b');
+  assert.equal(board.suggestedVmNodeMap['cp-3'], 'pve-c');
+  assert.equal(board.suggestedVmNodeMap['worker-3'], 'pve-c');
 });

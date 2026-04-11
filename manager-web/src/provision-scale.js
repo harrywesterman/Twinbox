@@ -1,6 +1,6 @@
 const MB_PER_GB = 1024;
 const MIN_SCALE_PERCENT = 0;
-const DEFAULT_SCALE_PERCENT = 30;
+const DEFAULT_SCALE_PERCENT = 90;
 const MAX_SCALE_PERCENT = 100;
 const MAX_FOOTPRINT_MULTIPLIER = 4;
 
@@ -136,8 +136,8 @@ export function summarizeProxmoxClusterResources(resources) {
 }
 
 function buildBaseline(stepInputs) {
-  const controlplaneCount = Math.max(1, roundToInteger(getInputDefault(stepInputs, 'controlplane_count', 1)));
-  const workerCount = Math.max(0, roundToInteger(getInputDefault(stepInputs, 'worker_count', 0)));
+  const controlplaneCount = Math.max(1, roundToInteger(getInputDefault(stepInputs, 'controlplane_count', 3)));
+  const workerCount = Math.max(0, roundToInteger(getInputDefault(stepInputs, 'worker_count', 3)));
   const nodeCount = Math.max(1, controlplaneCount + workerCount);
   const cpuCores = Math.max(1, roundToInteger(getInputDefault(stepInputs, 'cpu_cores', 2)));
   const workerMemoryMb = Math.max(512, roundToStep(getInputDefault(stepInputs, 'memory_mb', WORKER_MEMORY_DEFAULT_MB), 512));

@@ -90,6 +90,9 @@ test('app source defines a minimal wizard shell with guided input and step-by-st
 
   assert.match(questionFlow, /Enter the DNS domain for your cluster\./, 'expected the DNS helper sentence in the question flow');
   assert.doesNotMatch(questionFlow, /Base zone for platform hostnames/, 'expected the old DNS helper copy to be removed from the question flow');
+  assert.match(questionFlow, /default:\s*90/, 'expected the step 1 scale default to start at 90 percent');
+  assert.match(questionFlow, /controlplane_count[\s\S]*default:\s*3/, 'expected the step 1 control-plane default to be 3');
+  assert.match(questionFlow, /worker_count[\s\S]*default:\s*3/, 'expected the step 1 worker default to be 3');
 });
 
 test('web helper maps real icon artwork from local assets', async () => {

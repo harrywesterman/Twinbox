@@ -396,7 +396,7 @@ function InputField({ stepId, input, value, onChange }) {
   }
 
   if (stepId === 'provision-nodes' && input.id === 'scale_percent') {
-    const numericValue = Number.isFinite(Number(value)) ? Number(value) : 30;
+    const numericValue = Number.isFinite(Number(value)) ? Number(value) : 90;
 
     return (
       <label className="wizard-field wizard-field-range" htmlFor={controlId}>
@@ -1372,7 +1372,7 @@ function App() {
     try {
       const draft = answersRef.current?.[currentStep.id] || {};
       const suggested = buildScaledProvisionInputs(
-        draft.scale_percent ?? 30,
+        draft.scale_percent ?? 90,
         currentStep.inputs || [],
         draft,
         new Set(),
@@ -1857,7 +1857,7 @@ function App() {
       };
 
       if (stepId === 'provision-nodes' && inputId === 'scale_percent') {
-        const currentScale = Number.isFinite(Number(value)) ? Number(value) : 30;
+        const currentScale = Number.isFinite(Number(value)) ? Number(value) : 90;
         return {
           ...current,
           [stepId]: buildScaledProvisionInputs(
@@ -2158,7 +2158,7 @@ function App() {
     : { vmInputs: [], networkInputs: [] };
   const provisionScaleSummary = currentStep?.id === 'provision-nodes'
     ? buildProvisionScaleSummary(
-      currentDraft.scale_percent ?? 30,
+      currentDraft.scale_percent ?? 90,
       currentStep.inputs || [],
       currentDraft,
       proxmoxResources,
@@ -2517,7 +2517,7 @@ function App() {
                         ))}
                       </div>
                       <p className="wizard-input-block-note">
-                        Control plane nodes are fixed at 4 GB RAM and 10 GB disk. Worker disks scale from the selected host&apos;s free space once placement is set.
+                        Control plane nodes are fixed at 4 GB RAM and 10 GB disk. Worker disks scale from the selected host&apos;s free space once placement is set across the three Proxmox hosts.
                       </p>
                     </section>
 

@@ -8,7 +8,7 @@ spec:
     - websecure
   routes:
     - kind: Rule
-      match: Host(`start.__ZONE_NAME__`)
+      match: Host(`admin.__ZONE_NAME__`)
       services:
         - kind: Service
           name: dashy
@@ -25,7 +25,7 @@ spec:
     - webwiredoor
   routes:
     - kind: Rule
-      match: Host(`start.__ZONE_NAME__`)
+      match: Host(`admin.__ZONE_NAME__`)
       services:
         - kind: Service
           name: dashy
@@ -41,7 +41,7 @@ spec:
     - webtailscale
   routes:
     - kind: Rule
-      match: Host(`start.__ZONE_NAME__`)
+      match: Host(`admin.__ZONE_NAME__`)
       services:
         - kind: Service
           name: dashy

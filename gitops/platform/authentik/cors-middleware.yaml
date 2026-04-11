@@ -14,8 +14,8 @@ spec:
     accessControlAllowHeaders:
       - "*"
     accessControlAllowOriginList:
-      - https://start.__ZONE_NAME__
+      - https://admin.__ZONE_NAME__
     accessControlMaxAge: 100
     addVaryHeader: true
     customResponseHeaders:
-      Access-Control-Allow-Origin: https://start.__ZONE_NAME__
+      Access-Control-Allow-Origin: https://admin.__ZONE_NAME__

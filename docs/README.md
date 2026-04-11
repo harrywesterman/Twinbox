@@ -23,4 +23,3 @@ Operational documentation for Twinbox.
 - `vm-dev.md` — VM development workflow and frontend preview guide.
 - `wizard-guide.md` — Proxmox setup wizard usage walkthrough.
 - `app-pattern.md` — standardized app deployment pattern (Longhorn, Traefik, CloudNativePG, Authentik).
-- `plans/` — design and planning documents.
