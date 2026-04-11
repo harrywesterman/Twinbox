@@ -192,6 +192,7 @@ IMMICH_MOBILE_REDIRECT_URI="${IMMICH_MOBILE_REDIRECT_URI:-app.immich:///oauth-ca
 databases_namespace_manifest="$WORKSPACE_ROOT/gitops/databases/namespace.yaml"
 immich_db_cluster_manifest="$WORKSPACE_ROOT/gitops/databases/immich/cluster.yaml"
 immich_db_externalsecret_manifest="$WORKSPACE_ROOT/gitops/databases/immich/externalsecret.yaml"
+immich_app_db_externalsecret_manifest="$WORKSPACE_ROOT/gitops/platform-apps/immich/db-externalsecret.yaml"
 immich_db_pooler_ro_manifest="$WORKSPACE_ROOT/gitops/databases/immich/pooler-ro.yaml"
 immich_db_pooler_rw_manifest="$WORKSPACE_ROOT/gitops/databases/immich/pooler-rw.yaml"
 immich_db_backup_manifest="$WORKSPACE_ROOT/gitops/databases/immich/scheduled-backup.yaml"
@@ -405,6 +406,7 @@ log "Applying Immich namespace, storage, and OAuth secret resources"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/immich/namespace.yaml"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/immich/pvc.yaml"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/immich/externalsecret.yaml"
+kubectl apply -f "$immich_app_db_externalsecret_manifest"
 
 immich_rendered_ingressroute_file="$(mktemp "${TMPDIR:-/tmp}/immich-ingressroute.XXXXXX.yaml")"
 sed "s/__ZONE_NAME__/${public_zone_name}/g" \

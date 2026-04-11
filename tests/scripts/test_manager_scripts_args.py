@@ -2127,11 +2127,21 @@ def test_install_immich_step_uses_only_its_own_database_manifests():
     assert "gitops/databases/namespace.yaml" in text
     assert "gitops/databases/immich/cluster.yaml" in text
     assert "gitops/databases/immich/externalsecret.yaml" in text
+    assert 'immich_app_db_externalsecret_manifest="$WORKSPACE_ROOT/gitops/platform-apps/immich/db-externalsecret.yaml"' in text
+    assert 'kubectl apply -f "$immich_app_db_externalsecret_manifest"' in text
     assert "gitops/databases/immich/pooler-ro.yaml" in text
     assert "gitops/databases/immich/pooler-rw.yaml" in text
     assert "gitops/databases/immich/scheduled-backup.yaml" in text
     assert "gitops/databases/kustomization.yaml" not in text
     assert "gitops/databases/authentik/" not in text
+    db_externalsecret_text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "immich" / "db-externalsecret.yaml"
+    ).read_text(encoding="utf-8")
+    assert "name: immich-db-credentials" in db_externalsecret_text
+    assert "namespace: immich" in db_externalsecret_text
+    assert "secretStoreRef:" in db_externalsecret_text
+    assert "name: openbao" in db_externalsecret_text
+    assert "twinbox/global/immich" in db_externalsecret_text
 
 
 def test_authentik_values_request_memory_for_server_and_worker():
