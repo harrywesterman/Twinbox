@@ -938,6 +938,7 @@ def test_install_secret_sync_renders_argocd_values_and_applies_secret_sync_manif
     assert "openbao_apply_bootstrap_external_secret" in text
     assert 'openbao_wait_for_secret "$TARGET_SECRET_NAME" "$TARGET_NAMESPACE"' in text
     assert "kind: ClusterSecretStore" not in text
+    assert "openbao-active.${OPENBAO_NAMESPACE}.svc.cluster.local" in helper_text
     assert "bw " not in text
     assert "KUBECONFIG_FILE is required" in text
 

@@ -420,7 +420,9 @@ metadata:
 spec:
   provider:
     vault:
-      server: http://openbao.${OPENBAO_NAMESPACE}.svc.cluster.local:8200
+      # External Secrets must talk to the active OpenBao endpoint so sealed
+      # standby pods never receive login traffic.
+      server: http://openbao-active.${OPENBAO_NAMESPACE}.svc.cluster.local:8200
       path: kv
       version: v2
       auth:
