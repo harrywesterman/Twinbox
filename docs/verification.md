@@ -157,6 +157,7 @@ Expected:
 kubectl --kubeconfig <kubeconfig> get application -n argocd platform-ingress
 kubectl --kubeconfig <kubeconfig> get pods -n traefik-manager
 kubectl --kubeconfig <kubeconfig> get ingressroute -n traefik-manager
+kubectl --kubeconfig <kubeconfig> get service,endpoints -n traefik-manager authentik-server
 kubectl --kubeconfig <kubeconfig> get pvc -n traefik-manager
 ```
 
@@ -165,6 +166,7 @@ Expected:
 - `Application/platform-ingress` is synced and healthy
 - the Traefik Manager pod is running in its own namespace
 - the ingress routes exist for each enabled entrypoint
+- the Authentik callback service and endpoints exist in `traefik-manager`
 - the Longhorn-backed PVC is bound
 
 ### `install-prometheus`

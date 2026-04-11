@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: authentik-server
+  namespace: traefik-manager
+subsets:
+  - addresses:
+      - ip: 10.96.148.155
+    ports:
+      - name: http
+        port: 80
+        protocol: TCP

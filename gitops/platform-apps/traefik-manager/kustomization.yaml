@@ -8,3 +8,6 @@ resources:
   - service.yaml
   - deployment.yaml
   - ingressroute.yaml
+  - authentik-callback-service.yaml
+  - authentik-callback-endpoints.yaml
+  - authentik-callback-ingressroute.yaml

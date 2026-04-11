@@ -2022,8 +2022,36 @@ def test_traefik_manager_step_deploys_browser_ui():
     ingress_text = (
         REPO_ROOT / "gitops" / "platform-apps" / "traefik-manager" / "ingressroute.yaml"
     ).read_text(encoding="utf-8")
+    callback_ingress_text = (
+        REPO_ROOT
+        / "gitops"
+        / "platform-apps"
+        / "traefik-manager"
+        / "authentik-callback-ingressroute.yaml"
+    ).read_text(encoding="utf-8")
+    callback_service_text = (
+        REPO_ROOT
+        / "gitops"
+        / "platform-apps"
+        / "traefik-manager"
+        / "authentik-callback-service.yaml"
+    ).read_text(encoding="utf-8")
+    callback_endpoints_text = (
+        REPO_ROOT
+        / "gitops"
+        / "platform-apps"
+        / "traefik-manager"
+        / "authentik-callback-endpoints.yaml"
+    ).read_text(encoding="utf-8")
     platform_kustomization_text = (
         REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
+    ).read_text(encoding="utf-8")
+    platform_apps_kustomization_text = (
+        REPO_ROOT
+        / "gitops"
+        / "platform-apps"
+        / "traefik-manager"
+        / "kustomization.yaml"
     ).read_text(encoding="utf-8")
 
     assert "id: install-traefik-manager" in text
@@ -2050,9 +2078,23 @@ def test_traefik_manager_step_deploys_browser_ui():
     assert "persistentVolumeClaim" in deployment_text
     assert "livenessProbe" in deployment_text
     assert "readinessProbe" in deployment_text
+    assert "authentik-auth.sh" in script_text
+    assert "openbao-secret-sync.sh" in script_text
+    assert "Provisioning Authentik proxy application for Traefik Manager" in script_text
+    assert "Traefik Manager" in script_text
+    assert "outpost.goauthentik.io/auth/traefik" not in script_text
     assert "authentik-forwardauth" in ingress_text
     assert "namespace: traefik" in ingress_text
     assert "Host(`traefik-manager.__ZONE_NAME__`)" in ingress_text
+    assert "traefik-manager-authentik-callback" in callback_ingress_text
+    assert "PathPrefix(`/outpost.goauthentik.io`)" in callback_ingress_text
+    assert "namespace: traefik-manager" in callback_service_text
+    assert "name: authentik-server" in callback_service_text
+    assert "namespace: traefik-manager" in callback_endpoints_text
+    assert "ip: 10.96.148.155" in callback_endpoints_text
+    assert "authentik-callback-service.yaml" in platform_apps_kustomization_text
+    assert "authentik-callback-endpoints.yaml" in platform_apps_kustomization_text
+    assert "authentik-callback-ingressroute.yaml" in platform_apps_kustomization_text
     assert "traefik-manager/namespace.yaml" not in platform_kustomization_text
     assert "traefik-manager/pvc.yaml" not in platform_kustomization_text
     assert "traefik-manager/service.yaml" not in platform_kustomization_text
@@ -2068,10 +2110,13 @@ def test_traefik_manager_step_deploys_browser_ui():
     assert 'kubectl apply -f "$platform_dir/serviceaccount.yaml"' in script_text
     assert 'kubectl apply -f "$platform_dir/pvc.yaml"' in script_text
     assert 'kubectl apply -f "$platform_dir/service.yaml"' in script_text
+    assert 'kubectl apply -f "$platform_dir/authentik-callback-service.yaml"' in script_text
+    assert 'kubectl apply -f "$platform_dir/authentik-callback-endpoints.yaml"' in script_text
     assert "cluster-public-zone.sh" in script_text
     assert 'sed "s/__ZONE_NAME__/${public_zone_name}/g"' in script_text
     assert 'mktemp "${TMPDIR:-/tmp}/traefik-manager-deployment.XXXXXX.yaml"' in script_text
     assert 'mktemp "${TMPDIR:-/tmp}/traefik-manager-ingressroute.XXXXXX.yaml"' in script_text
+    assert 'mktemp "${TMPDIR:-/tmp}/traefik-manager-authentik-callback.XXXXXX.yaml"' in script_text
     assert ': "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"' in script_text
     assert "twinbox_public_zone_name" in script_text
     assert not (REPO_ROOT / "gitops" / "apps" / "traefik-manager.yaml").exists()

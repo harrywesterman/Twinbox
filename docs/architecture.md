@@ -71,7 +71,7 @@ When you change Twinbox code, commit it to `main`, wait for the GitHub Actions i
 8. `install-argocd` installs Argo CD after the Talos/Cilium bootstrap has completed.
 9. `install-cloudtty` installs the Cloudtty operator with Helm and creates a default browser shell against the same cluster.
 10. `install-longhorn-storage` runs before cluster secret sync so stateful workloads and backup storage can use Longhorn PVCs immediately through the cluster default storage class, and Longhorn stays on worker nodes through the `twinbox.io/role=worker` selector.
-11. `install-traefik-manager` refreshes the shared `platform-ingress` application so the Traefik Manager UI is deployed behind Authentik, stores its settings and backups on Longhorn, and points it at the live Traefik API.
+11. `install-traefik-manager` refreshes the shared `platform-ingress` application and provisions the Traefik Manager Authentik proxy application so the UI is deployed behind Authentik, stores its settings and backups on Longhorn, and points it at the live Traefik API.
 12. `install-prometheus` installs the kube-prometheus-stack through Argo CD, enabling Prometheus, Alertmanager, node-exporter, and kube-state-metrics on Longhorn-backed storage.
 13. `install-secret-sync` installs External Secrets Operator and OpenBao on Longhorn.
 14. `install-secret-sync` seeds OpenBao from the Management VM bootstrap files and creates `ClusterSecretStore/openbao`.
