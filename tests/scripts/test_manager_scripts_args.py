@@ -40,6 +40,13 @@ ARGO_STEP_MANIFEST = (
 )
 CILIUM_VALUES_FILE = REPO_ROOT / "config" / "cilium-values.yaml"
 HUBBLE_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "hubble" / "ingressroute.yaml"
+HUBBLE_AUTHENTIK_CALLBACK_INGRESSROUTE = (
+    REPO_ROOT
+    / "gitops"
+    / "platform"
+    / "hubble"
+    / "authentik-callback-ingressroute.yaml"
+)
 HUBBLE_AUTHENTIK_FORWARDAUTH_MIDDLEWARE = (
     REPO_ROOT
     / "gitops"
@@ -2406,8 +2413,17 @@ def test_authentik_callback_endpoints_target_the_authentik_service_ip():
         / "authentik-callback-endpoints.yaml"
     ).read_text(encoding="utf-8")
 
-    assert "ip: 10.97.155.74" in longhorn_callback_text
-    assert "ip: 10.97.155.74" in traefik_callback_text
+    assert "ip: 10.96.148.155" in longhorn_callback_text
+    assert "ip: 10.96.148.155" in traefik_callback_text
+
+
+def test_hubble_authentik_callback_ingressroute_uses_the_real_host():
+    hubble_callback_text = HUBBLE_AUTHENTIK_CALLBACK_INGRESSROUTE.read_text(
+        encoding="utf-8"
+    )
+
+    assert "Host(`hubble.bierineenweek.nl`)" in hubble_callback_text
+    assert "__ZONE_NAME__" not in hubble_callback_text
 
 
 def test_bootstrap_scripts_use_the_management_vm_ip_for_seaweedfs():

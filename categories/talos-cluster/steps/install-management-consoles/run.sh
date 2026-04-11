@@ -186,6 +186,13 @@ management_apps_json="$(
         launch_url: "https://longhorn.\($public_zone_name)"
       },
       {
+        key: "hubble",
+        name: "Hubble",
+        slug: "hubble",
+        external_host: "https://hubble.\($public_zone_name)",
+        launch_url: "https://hubble.\($public_zone_name)"
+      },
+      {
         key: "proxmox",
         name: "Proxmox",
         slug: "proxmox",
@@ -216,7 +223,7 @@ management_apps_json="$(
     ]'
 )"
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Provisioning Authentik proxy applications for Traefik, Longhorn, Proxmox, Twinbox Wizard, and SeaweedFS"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Provisioning Authentik proxy applications for Traefik, Longhorn, Hubble, Proxmox, Twinbox Wizard, and SeaweedFS"
 
 provider_ids_json='{}'
 while IFS= read -r app_json; do
@@ -269,6 +276,7 @@ done < <(jq -c '.[]' <<<"$management_apps_json")
 
 traefik_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.traefik_dashboard')"
 longhorn_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.longhorn')"
+hubble_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.hubble')"
 proxmox_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.proxmox')"
 twinboxwizard_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.twinboxwizard')"
 seaweedfs_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.seaweedfs')"
@@ -276,6 +284,7 @@ seaweedfs_admin_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.seawee
 
 [[ "$traefik_provider_id" != "null" && -n "$traefik_provider_id" ]] || fail "Could not determine Traefik provider ID"
 [[ "$longhorn_provider_id" != "null" && -n "$longhorn_provider_id" ]] || fail "Could not determine Longhorn provider ID"
+[[ "$hubble_provider_id" != "null" && -n "$hubble_provider_id" ]] || fail "Could not determine Hubble provider ID"
 [[ "$proxmox_provider_id" != "null" && -n "$proxmox_provider_id" ]] || fail "Could not determine Proxmox provider ID"
 [[ "$twinboxwizard_provider_id" != "null" && -n "$twinboxwizard_provider_id" ]] || fail "Could not determine Twinbox Wizard provider ID"
 [[ "$seaweedfs_provider_id" != "null" && -n "$seaweedfs_provider_id" ]] || fail "Could not determine SeaweedFS provider ID"
@@ -288,8 +297,8 @@ outpost_id="$(printf '%s' "$outpost_json" | jq -r '.results[] | select(.name == 
 current_providers="$(printf '%s' "$outpost_json" | jq -c '.results[] | select(.pk == "'"$outpost_id"'") | .providers // []')"
 updated_providers="$(
   printf '%s\n' "$current_providers" \
-    | jq --arg traefik "$traefik_provider_id" --arg longhorn "$longhorn_provider_id" --arg proxmox "$proxmox_provider_id" --arg twinboxwizard "$twinboxwizard_provider_id" --arg seaweedfs "$seaweedfs_provider_id" --arg seaweedfs_admin "$seaweedfs_admin_provider_id" '
-        . + [$traefik, $longhorn, $proxmox, $twinboxwizard]
+    | jq --arg traefik "$traefik_provider_id" --arg longhorn "$longhorn_provider_id" --arg hubble "$hubble_provider_id" --arg proxmox "$proxmox_provider_id" --arg twinboxwizard "$twinboxwizard_provider_id" --arg seaweedfs "$seaweedfs_provider_id" --arg seaweedfs_admin "$seaweedfs_admin_provider_id" '
+        . + [$traefik, $longhorn, $hubble, $proxmox, $twinboxwizard]
         + [$seaweedfs, $seaweedfs_admin]
         | map(tostring)
         | unique
@@ -309,6 +318,14 @@ if ! printf '%s' "$final_outpost_json" | jq -e --arg traefik "$traefik_provider_
       | index($traefik) != null and index($longhorn) != null
     ' >/dev/null; then
   fail "Embedded Authentik outpost did not retain both provider IDs"
+fi
+
+if ! printf '%s' "$final_outpost_json" | jq -e --arg hubble "$hubble_provider_id" '
+      (.providers // [])
+      | map(tostring)
+      | index($hubble) != null
+    ' >/dev/null; then
+  fail "Embedded Authentik outpost did not retain the Hubble provider ID"
 fi
 
 if ! printf '%s' "$final_outpost_json" | jq -e --arg proxmox "$proxmox_provider_id" '
@@ -349,6 +366,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \
     --arg traefik_route "traefik-dashboard" \
     --arg longhorn_route "longhorn" \
+    --arg hubble_route "hubble" \
     --arg proxmox_route "proxmox" \
     --arg twinboxwizard_route "twinboxwizard" \
     --arg seaweedfs_route "seaweedfs" \
@@ -356,6 +374,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     '{
       traefik_route: $traefik_route,
       longhorn_route: $longhorn_route,
+      hubble_route: $hubble_route,
       proxmox_route: $proxmox_route,
       twinboxwizard_route: $twinboxwizard_route,
       seaweedfs_route: $seaweedfs_route,
