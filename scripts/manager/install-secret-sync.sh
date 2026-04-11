@@ -21,6 +21,8 @@ TARGET_NAMESPACE="${TARGET_NAMESPACE:-twinbox-system}"
 CLUSTER_SECRET_STORE_NAME="${CLUSTER_SECRET_STORE_NAME:-openbao}"
 EXTERNAL_SECRET_NAME="${EXTERNAL_SECRET_NAME:-proxmox-bootstrap}"
 TARGET_SECRET_NAME="${TARGET_SECRET_NAME:-proxmox-bootstrap}"
+VELERO_SECRET_NAME="${VELERO_SECRET_NAME:-velero}"
+VELERO_SECRET_FILE="${VELERO_SECRET_FILE:-/opt/twinbox/bootstrap/secrets/global/velero.json}"
 
 detect_openbao_replicas() {
   local control_plane_count
@@ -155,6 +157,14 @@ openbao_apply_cluster_secret_store
 openbao_apply_bootstrap_external_secret
 openbao_wait_for_secret "$TARGET_SECRET_NAME" "$TARGET_NAMESPACE"
 
+if [[ -f "$VELERO_SECRET_FILE" ]]; then
+  openbao_log "Syncing SeaweedFS/Velero credentials to OpenBao"
+  openbao_sync_global_secret_file "$VELERO_SECRET_NAME" "$VELERO_SECRET_FILE" \
+    "mode" "endpoint" "bucket" "region" "username" "password"
+else
+  openbao_log "SeaweedFS/Velero secret file not found at ${VELERO_SECRET_FILE}; skipping sync"
+fi
+
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \
     --arg cluster_id "$CLUSTER_ID" \
@@ -166,6 +176,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     --arg external_secret_name "$EXTERNAL_SECRET_NAME" \
     --arg target_secret_name "$TARGET_SECRET_NAME" \
     --arg replicas "$OPENBAO_REPLICAS" \
+    --arg velero_secret_name "$VELERO_SECRET_NAME" \
     '{
       cluster_id: $cluster_id,
       cluster_instance_id: $cluster_instance_id,
@@ -175,7 +186,8 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
       cluster_secret_store_name: $cluster_secret_store_name,
       external_secret_name: $external_secret_name,
       target_secret_name: $target_secret_name,
-      openbao_replicas: ($replicas | tonumber)
+      openbao_replicas: ($replicas | tonumber),
+      velero_secret_name: $velero_secret_name
     }' >"$STEP_RESULT_FILE"
 fi
 

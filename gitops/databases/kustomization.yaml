@@ -15,3 +15,4 @@ resources:
   - immich/pooler-ro.yaml
   - immich/pooler-rw.yaml
   - immich/scheduled-backup.yaml
+  - seaweedfs-backup-credentials.yaml

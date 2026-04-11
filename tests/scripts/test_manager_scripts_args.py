@@ -2099,6 +2099,54 @@ def test_databases_kustomization_includes_authentik_resources():
     assert "authentik/pooler-ro.yaml" in text
     assert "authentik/pooler-rw.yaml" in text
     assert "authentik/scheduled-backup.yaml" in text
+    assert "seaweedfs-backup-credentials.yaml" in text
+
+
+def test_cnpg_database_clusters_have_seaweedfs_backups():
+    authentik_cluster_text = (
+        REPO_ROOT / "gitops" / "databases" / "authentik" / "cluster.yaml"
+    ).read_text(encoding="utf-8")
+    immich_cluster_text = (
+        REPO_ROOT / "gitops" / "databases" / "immich" / "cluster.yaml"
+    ).read_text(encoding="utf-8")
+    backup_secret_text = (
+        REPO_ROOT / "gitops" / "databases" / "seaweedfs-backup-credentials.yaml"
+    ).read_text(encoding="utf-8")
+
+    assert "backup:" in authentik_cluster_text
+    assert "destinationPath: s3://twinbox-velero/authentik-db/" in authentik_cluster_text
+    assert (
+        "endpointURL: http://seaweedfs.longhorn-system.svc.cluster.local:8333"
+        in authentik_cluster_text
+    )
+    assert "name: seaweedfs-backup-credentials" in authentik_cluster_text
+    assert "key: AWS_ACCESS_KEY_ID" in authentik_cluster_text
+    assert "key: AWS_SECRET_ACCESS_KEY" in authentik_cluster_text
+
+    assert "backup:" in immich_cluster_text
+    assert "destinationPath: s3://twinbox-velero/immich-db/" in immich_cluster_text
+    assert (
+        "endpointURL: http://seaweedfs.longhorn-system.svc.cluster.local:8333"
+        in immich_cluster_text
+    )
+    assert "name: seaweedfs-backup-credentials" in immich_cluster_text
+    assert "key: AWS_ACCESS_KEY_ID" in immich_cluster_text
+    assert "key: AWS_SECRET_ACCESS_KEY" in immich_cluster_text
+
+    assert "name: seaweedfs-backup-credentials" in backup_secret_text
+    assert "twinbox/global/velero" in backup_secret_text
+    assert "property: username" in backup_secret_text
+    assert "property: password" in backup_secret_text
+
+
+def test_install_secret_sync_also_populates_seaweedfs_backup_credentials():
+    text = INSTALL_SECRET_SYNC_SCRIPT.read_text(encoding="utf-8")
+
+    assert "velero.json" in text
+    assert "Syncing SeaweedFS/Velero credentials to OpenBao" in text
+    assert "openbao_sync_global_secret_file \"$VELERO_SECRET_NAME\"" in text
+    assert '"mode" "endpoint" "bucket" "region" "username" "password"' in text
+    assert "velero_secret_name" in text
 
 
 def test_loki_and_openbao_longhorn_sizes_are_right_sized():
