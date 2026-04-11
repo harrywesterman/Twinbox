@@ -73,6 +73,8 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   const appsSection = config.sections.find((section) => section.name === "Apps");
   assert(platformSection, "expected Platform section");
   assert(appsSection, "expected Apps section");
+  assert.deepEqual(platformSection.displayData, { sortBy: "alphabetical" });
+  assert.deepEqual(appsSection.displayData, { sortBy: "alphabetical" });
 
   assert(platformSection.items.some((item) => item.title === "Hubble" && item.url === "https://hubble.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "Argo CD" && item.url === "https://argocd.tst.example.com"));
@@ -110,6 +112,10 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
 
   assert.equal(config.appConfig.faviconApi, "local");
   assert.equal(config.appConfig.iconSize, "large");
+  assert.equal(config.appConfig.layout, "vertical");
+  assert.equal(config.appConfig.theme, "nord-frost");
+  assert.equal(config.pageInfo.title, "Admin");
+  assert.equal(config.pageInfo.description, "Twinbox Admin start pagina");
 });
 
 test("buildDashyConfig hides steps that are not completed", () => {
