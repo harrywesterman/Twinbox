@@ -6,7 +6,9 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: oci://ghcr.io/immich-app/immich-charts
+    # Immich still publishes the chart through the legacy Helm repository.
+    # Argo CD in this environment cannot authenticate to the GHCR OCI source.
+    - repoURL: https://immich-app.github.io/immich-charts/
       chart: immich
       targetRevision: "0.11.1"
       helm:
