@@ -1199,37 +1199,25 @@ worker_ipv4_candidates_json="$(jq -c '.worker_ipv4_addresses.value // []' <<<"$t
 
 update_cluster_file "provisioned" "$planned_controlplane_ips_json" "$planned_worker_ips_json" "[]" "[]" "$controlplane_vm_ids_json" "$worker_vm_ids_json"
 
-log "Discovering DHCP addresses"
+generate_talos_configs
+
+log "Discovering control plane DHCP addresses"
 discovered_controlplane_ips_json="[]"
-discovered_worker_ips_json="[]"
 discovered_controlplane_ips=()
-discovered_worker_ips=()
 mapfile -t controlplane_actual_candidates < <(flatten_ipv4_candidates <<<"$controlplane_ipv4_candidates_json")
-mapfile -t worker_actual_candidates < <(flatten_ipv4_candidates <<<"$worker_ipv4_candidates_json")
 controlplane_index=0
-worker_index=0
 
 while IFS=$'\t' read -r name type ip; do
   [[ -n "$name" ]] || continue
-  if [[ "$type" == "controlplane" ]]; then
-    candidates=()
-    if [[ -n "${controlplane_actual_candidates[$controlplane_index]:-}" ]]; then
-      candidates+=("${controlplane_actual_candidates[$controlplane_index]}")
-    fi
-    candidates+=("$ip")
-    discovered_ip="$(discover_node_ip "$name" "${candidates[@]}")"
-    controlplane_index=$((controlplane_index + 1))
-    discovered_controlplane_ips+=("$discovered_ip")
-  else
-    candidates=()
-    if [[ -n "${worker_actual_candidates[$worker_index]:-}" ]]; then
-      candidates+=("${worker_actual_candidates[$worker_index]}")
-    fi
-    candidates+=("$ip")
-    discovered_ip="$(discover_node_ip "$name" "${candidates[@]}")"
-    worker_index=$((worker_index + 1))
-    discovered_worker_ips+=("$discovered_ip")
+  [[ "$type" == "controlplane" ]] || continue
+  candidates=()
+  if [[ -n "${controlplane_actual_candidates[$controlplane_index]:-}" ]]; then
+    candidates+=("${controlplane_actual_candidates[$controlplane_index]}")
   fi
+  candidates+=("$ip")
+  discovered_ip="$(discover_node_ip "$name" "${candidates[@]}")"
+  controlplane_index=$((controlplane_index + 1))
+  discovered_controlplane_ips+=("$discovered_ip")
 done < <(jq -r '
     to_entries
     | sort_by(.key)
@@ -1239,23 +1227,16 @@ done < <(jq -r '
   ' <<<"$nodes_json")
 
 discovered_controlplane_ips_json="$(json_array_from_args "${discovered_controlplane_ips[@]}")"
-discovered_worker_ips_json="$(json_array_from_args "${discovered_worker_ips[@]}")"
+update_cluster_file "provisioned" "$planned_controlplane_ips_json" "$planned_worker_ips_json" "$discovered_controlplane_ips_json" "[]" "$controlplane_vm_ids_json" "$worker_vm_ids_json"
 
-generate_talos_configs
-
+log "Applying control plane Talos configs"
 controlplane_apply_index=0
-worker_apply_index=0
 while IFS=$'\t' read -r name type ip; do
   [[ -n "$name" ]] || continue
-  if [[ "$type" == "controlplane" ]]; then
-    discovered_ip="${discovered_controlplane_ips[$controlplane_apply_index]:-$ip}"
-    apply_node_config "$discovered_ip" "$runtime_talos_dir/${name}-controlplane.yaml"
-    controlplane_apply_index=$((controlplane_apply_index + 1))
-  else
-    discovered_ip="${discovered_worker_ips[$worker_apply_index]:-$ip}"
-    apply_node_config "$discovered_ip" "$runtime_talos_dir/${name}-worker.yaml"
-    worker_apply_index=$((worker_apply_index + 1))
-  fi
+  [[ "$type" == "controlplane" ]] || continue
+  discovered_ip="${discovered_controlplane_ips[$controlplane_apply_index]:-$ip}"
+  apply_node_config "$discovered_ip" "$runtime_talos_dir/${name}-controlplane.yaml"
+  controlplane_apply_index=$((controlplane_apply_index + 1))
 done < <(jq -r '
     to_entries
     | sort_by(.key)
@@ -1278,6 +1259,49 @@ if [[ "${TWINBOX_SYNC_LOCAL_CLIENT_CONFIGS:-false}" == "true" ]]; then
   sync_user_talosconfig "$talosconfig_file" "$first_controlplane_ip"
   sync_user_kubeconfig "$kubeconfig_file"
 fi
+
+log "Control planes are healthy; discovering worker DHCP addresses"
+discovered_worker_ips_json="[]"
+discovered_worker_ips=()
+mapfile -t worker_actual_candidates < <(flatten_ipv4_candidates <<<"$worker_ipv4_candidates_json")
+worker_index=0
+
+while IFS=$'\t' read -r name type ip; do
+  [[ -n "$name" ]] || continue
+  [[ "$type" == "worker" ]] || continue
+  candidates=()
+  if [[ -n "${worker_actual_candidates[$worker_index]:-}" ]]; then
+    candidates+=("${worker_actual_candidates[$worker_index]}")
+  fi
+  candidates+=("$ip")
+  discovered_ip="$(discover_node_ip "$name" "${candidates[@]}")"
+  worker_index=$((worker_index + 1))
+  discovered_worker_ips+=("$discovered_ip")
+done < <(jq -r '
+    to_entries
+    | sort_by(.key)
+    | .[]
+    | [.key, .value.type, .value.ip]
+    | @tsv
+  ' <<<"$nodes_json")
+
+discovered_worker_ips_json="$(json_array_from_args "${discovered_worker_ips[@]}")"
+
+log "Applying worker Talos configs"
+worker_apply_index=0
+while IFS=$'\t' read -r name type ip; do
+  [[ -n "$name" ]] || continue
+  [[ "$type" == "worker" ]] || continue
+  discovered_ip="${discovered_worker_ips[$worker_apply_index]:-$ip}"
+  apply_node_config "$discovered_ip" "$runtime_talos_dir/${name}-worker.yaml"
+  worker_apply_index=$((worker_apply_index + 1))
+done < <(jq -r '
+    to_entries
+    | sort_by(.key)
+    | .[]
+    | [.key, .value.type, .value.ip]
+    | @tsv
+  ' <<<"$nodes_json")
 
 log "Switching to disk-first boot order"
 sync

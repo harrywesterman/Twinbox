@@ -51,7 +51,7 @@ These scripts are executed by `manager-worker` during job processing. They are c
 
 | Script | Purpose |
 |--------|---------|
-| `apply-cluster.sh` | Orchestrates the full cluster lifecycle: runs OpenTofu, discovers IPs, applies Talos machine configs, bootstraps. |
+| `apply-cluster.sh` | Orchestrates the full cluster lifecycle: runs OpenTofu, applies control planes first, bootstraps, then applies workers. |
 | `create-talos-vms.sh` | Runs `tofu apply` to create Talos VMs on Proxmox. |
 | `bootstrap-talos.sh` | Applies Talos machine configs and bootstraps the first control plane node. |
 | `collect-state.sh` | Collects kubeconfig and Talos config after provisioning. |

@@ -827,6 +827,10 @@ def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
     assert "generate_talos_configs()" in text
     assert "discover_node_ip()" in text
     assert "Guest agent reported ${label} at ${candidate}" in text
+    assert "Discovering control plane DHCP addresses" in text
+    assert "Applying control plane Talos configs" in text
+    assert "Control planes are healthy; discovering worker DHCP addresses" in text
+    assert "Applying worker Talos configs" in text
     assert 'jq -Rn --arg csv "$csv"' in text
     assert 'split(",")' in text
     assert 'map(gsub("^\\\\s+|\\\\s+$"; ""))' in text
@@ -845,6 +849,9 @@ def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
     assert 'image_installer="${line#TALOS_IMAGE_INSTALLER=}"' in text
     assert "image_extensions=" not in text
     assert "TALOS_IMAGE_EXTENSIONS=" not in text
+    assert text.index("Applying control plane Talos configs") < text.index("bootstrap_cluster \"$first_controlplane_ip\"")
+    assert text.index("bootstrap_cluster \"$first_controlplane_ip\"") < text.index("Control planes are healthy; discovering worker DHCP addresses")
+    assert text.index("Control planes are healthy; discovering worker DHCP addresses") < text.index("Applying worker Talos configs")
 
 
 def test_provision_nodes_step_returns_refs_not_kubeconfig_paths():
@@ -1255,16 +1262,16 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert 'kubectl -n pgadmin4 create configmap pgadmin4-servers' in pgadmin_run_text
     assert 'kind: Job' in pgadmin_run_text
     assert 'name: pgadmin4-load-servers' in pgadmin_run_text
-    assert 'python_bin="/tmp/python3.14.no-cap"' in pgadmin_run_text
-    assert 'cp /usr/local/bin/python3.14 "${python_bin}"' in pgadmin_run_text
-    assert 'exec "${python_bin}" /pgadmin4/setup.py load-servers /config/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace' in pgadmin_run_text
+    assert 'cp /usr/local/bin/python3.14 /tmp/python3.14.no-cap' in pgadmin_run_text
+    assert 'chmod 0755 /tmp/python3.14.no-cap' in pgadmin_run_text
+    assert 'exec /tmp/python3.14.no-cap /pgadmin4/setup.py load-servers /config/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace' in pgadmin_run_text
     assert 'job_status="unknown"' in pgadmin_run_text
     assert 'job_timeout_seconds=600' in pgadmin_run_text
-    assert 'kubectl -n pgadmin4 get job pgadmin4-load-servers -o json | jq -e' in pgadmin_run_text
+    assert 'kubectl -n pgadmin4 get job "${pgadmin_load_servers_job_name}" -o json | jq -e' in pgadmin_run_text
     assert 'select(.type == "Complete" and .status == "True")' in pgadmin_run_text
     assert 'select(.type == "Failed" and .status == "True")' in pgadmin_run_text
     assert 'Timed out waiting for pgAdmin 4 server import job' in pgadmin_run_text
-    assert 'kubectl -n pgadmin4 describe job pgadmin4-load-servers || true' in pgadmin_run_text
+    assert 'kubectl -n pgadmin4 describe job "${pgadmin_load_servers_job_name}" || true' in pgadmin_run_text
     assert 'if [[ "$job_status" == "failed" ]]; then' in pgadmin_run_text
     assert "Applying pgAdmin 4 service, deployment, and ingress" in pgadmin_run_text
     assert 'kubectl apply -f "$pgadmin_platform_dir/service.yaml"' in pgadmin_run_text
@@ -1386,9 +1393,6 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "drop:" in pgadmin_deployment_text
     assert "- ALL" in pgadmin_deployment_text
     assert "cd /pgadmin4" in pgadmin_deployment_text
-    assert "python_bin=/tmp/python3.14.no-cap" in pgadmin_deployment_text
-    assert "cp /usr/local/bin/python3.14" in pgadmin_deployment_text
-    assert "exec \"${python_bin}\" -m gunicorn" in pgadmin_deployment_text
     assert "--timeout \"${GUNICORN_TIMEOUT:-86400}\"" in pgadmin_deployment_text
 
     cloudflare_tunnel_run_text = (
@@ -1448,14 +1452,6 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "tunnel_token" in cloudflare_tunnel_run_text
     assert "platform-ingress.yaml" in cloudflare_tunnel_run_text
     assert "upsert-argocd-cluster-secret.sh" in cloudflare_tunnel_run_text
-    assert (
-        "kubectl delete application platform-ingress -n argocd --ignore-not-found=true"
-        in cloudflare_tunnel_run_text
-    )
-    assert (
-        "kubectl delete application cluster-config -n argocd --ignore-not-found=true"
-        in cloudflare_tunnel_run_text
-    )
     assert "Zone DNS Edit permissions" in cloudflare_tunnel_run_text
     assert "argocd-server" in cloudflare_tunnel_run_text
     assert (
@@ -1488,15 +1484,10 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "ZONE_NAME" in cloudflare_dns_run_text
     assert "cluster-hostnames" in cloudflare_dns_run_text
     assert "upsert-argocd-cluster-secret.sh" in cloudflare_dns_run_text
-    assert (
-        "kubectl delete application platform-ingress -n argocd --ignore-not-found=true"
-        in cloudflare_dns_run_text
-    )
-    assert (
-        "kubectl delete application cluster-config -n argocd --ignore-not-found=true"
-        in cloudflare_dns_run_text
-    )
-    assert "--no-wait" in cloudflare_dns_run_text
+    assert "Applying platform-ingress application" in cloudflare_dns_run_text
+    assert "apply-argocd-application.sh" in cloudflare_dns_run_text
+    assert 'gitops/apps/platform-ingress.yaml' in cloudflare_dns_run_text
+    assert "apply-argocd-application.sh" in cloudflare_dns_run_text
 
     assert "install-traefik" in whoami_text
     assert "script: categories/talos-cluster/steps/install-whoami/run.sh" in whoami_text
@@ -1580,7 +1571,7 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "accessControlAllowOriginList" in authentik_cors_text
     assert "customResponseHeaders" in authentik_cors_text
     assert "Access-Control-Allow-Origin" in authentik_cors_text
-    assert "https://start.__ZONE_NAME__" in authentik_cors_text
+    assert "https://admin.__ZONE_NAME__" in authentik_cors_text
     assert "Host(`whoami.__ZONE_NAME__`)" in whoami_ingressroute_text
     assert "Host(`headlamp.__ZONE_NAME__`)" in headlamp_ingressroute_text
     assert "Host(`grafana.__ZONE_NAME__`)" in grafana_ingressroute_text
@@ -2120,7 +2111,7 @@ def test_install_immich_step_uses_only_its_own_database_manifests():
     text = (
         REPO_ROOT
         / "categories"
-        / "talos-cluster"
+        / "apps"
         / "steps"
         / "install-immich"
         / "run.sh"
