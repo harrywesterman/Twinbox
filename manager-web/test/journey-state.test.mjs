@@ -124,7 +124,7 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   });
 
   assert.equal(model.mode, 'setup');
-  assert.equal(model.stepRail.length, 30);
+  assert.equal(model.stepRail.length, 18);
   const stepRailById = Object.fromEntries(model.stepRail.map((step) => [step.id, step]));
   assert.equal(stepRailById['provision-nodes'].title, 'Deploy Talos Cluster');
   assert.equal(stepRailById['provision-nodes'].isCurrent, true);
@@ -137,7 +137,7 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   assert.equal(stepRailById['install-pgadmin4'].title, 'Install pgAdmin 4');
   assert.equal(stepRailById['install-pgadmin4'].icon, '🗃️');
   assert.equal(model.primaryAction.label, 'Next');
-  assert.equal(model.progress.totalSteps, 30);
+  assert.equal(model.progress.totalSteps, 18);
   assert.equal(model.progress.completedSteps, 0);
   assert.equal(model.activity.runtime.currentStage, 'Applying cluster plan');
   assert.equal(model.activity.rawLogOutput, '[2026-03-20T10:10:00Z] Applying OpenTofu cluster plan');
@@ -227,18 +227,6 @@ test('wizard model switches to manage mode when setup flow is complete', () => {
         'install-management-consoles',
         'install-ntfy',
         'install-velero-backup',
-        'install-proxmox-backup-system',
-        'install-nextcloud',
-        'install-immich',
-        'install-zulip',
-        'install-paperless',
-        'install-karakeep',
-        'install-gitea',
-        'install-uptimekuma',
-        'install-n8n',
-        'install-audiobookshelf',
-        'install-freshrss',
-        'install-jitsi',
       ].map((id) => [id, 'done']),
     ),
   );
@@ -265,7 +253,7 @@ test('wizard model switches to manage mode when setup flow is complete', () => {
     health: { ok: true },
     error: '',
     busy: false,
-    selectedStepId: 'install-jitsi',
+    selectedStepId: 'install-velero-backup',
   });
 
   assert.equal(model.mode, 'manage');
@@ -284,7 +272,7 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     selectedStepId: '',
   });
 
-  assert.equal(model.stepRail.length, 30);
+  assert.equal(model.stepRail.length, 18);
   const setupStepIds = new Set(model.stepRail.map((step) => step.id));
   for (const id of [
     'provision-nodes',
@@ -303,18 +291,6 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     'install-ntfy',
     'install-management-consoles',
     'install-velero-backup',
-    'install-proxmox-backup-system',
-    'install-nextcloud',
-    'install-immich',
-    'install-zulip',
-    'install-paperless',
-    'install-karakeep',
-    'install-gitea',
-    'install-uptimekuma',
-    'install-n8n',
-    'install-audiobookshelf',
-    'install-freshrss',
-    'install-jitsi',
   ]) {
     assert.equal(setupStepIds.has(id), true);
   }

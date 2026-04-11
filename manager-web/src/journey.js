@@ -40,18 +40,6 @@ const FIXED_SETUP_STEP_IDS = [
   'install-pgadmin4',
   'install-ntfy',
   'install-velero-backup',
-  'install-proxmox-backup-system',
-  'install-nextcloud',
-  'install-immich',
-  'install-zulip',
-  'install-paperless',
-  'install-karakeep',
-  'install-gitea',
-  'install-uptimekuma',
-  'install-n8n',
-  'install-audiobookshelf',
-  'install-freshrss',
-  'install-jitsi',
 ];
 
 const FIXED_SETUP_ORDER = new Map(FIXED_SETUP_STEP_IDS.map((id, index) => [id, index]));
