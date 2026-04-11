@@ -323,6 +323,42 @@ wait_for_deployment_rollout() {
 wait_for_deployment_rollout "authentik-server" "Authentik server"
 wait_for_deployment_rollout "authentik-worker" "Authentik worker"
 
+ensure_embedded_outpost_browser_host() {
+  local outpost_json outpost_id current_config updated_config
+
+  outpost_json="$(authentik_api_get "/outposts/instances/?page_size=100")"
+  outpost_id="$(
+    jq -r '
+      .results[]?
+      | select(.name == "authentik Embedded Outpost")
+      | .pk // .id // empty
+    ' <<<"$outpost_json" | head -n1
+  )"
+  [[ -n "$outpost_id" ]] || fail "Could not find the embedded Authentik outpost"
+
+  current_config="$(
+    jq -c --arg outpost_id "$outpost_id" '
+      .results[]?
+      | select((.pk // .id // "") == $outpost_id)
+      | .config // {}
+    ' <<<"$outpost_json" | head -n1
+  )"
+  [[ -n "$current_config" && "$current_config" != "null" ]] || current_config='{}'
+
+  updated_config="$(
+    jq -cn \
+      --arg authentik_host "$authentik_host" \
+      --argjson current_config "$current_config" \
+      '$current_config + {authentik_host: $authentik_host, authentik_host_browser: $authentik_host}'
+  )"
+
+  log "Updating embedded Authentik outpost browser host to ${authentik_host}"
+  authentik_api_write PATCH "/outposts/instances/${outpost_id}/" \
+    "$(jq -n --argjson config "$updated_config" '{config: $config}')" >/dev/null
+}
+
+ensure_embedded_outpost_browser_host
+
 # Argo CD syncs the blueprint ConfigMap via the third source in the Application manifest.
 # Wait for the blueprint to be applied (service account appears via reconciliation).
 if command -v openbao_read_global_secret_json >/dev/null 2>&1 && [[ -n "$authentik_automation_token_key" ]]; then

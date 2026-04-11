@@ -1,14 +1,14 @@
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: longhorn-authentik-callback
-  namespace: longhorn-system
+  name: hubble-authentik-callback
+  namespace: kube-system
 spec:
   entryPoints:
     - websecure
   routes:
     - kind: Rule
-      match: Host(`longhorn.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
+      match: Host(`hubble.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
       services:
         - kind: Service
           name: authentik-server

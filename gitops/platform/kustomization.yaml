@@ -12,6 +12,9 @@ resources:
   - authentik/forwardauth-middleware.yaml
   - hubble/authentik-forwardauth-middleware.yaml
   - hubble/ingressroute.yaml
+  - hubble/authentik-callback-service.yaml
+  - hubble/authentik-callback-endpoints.yaml
+  - hubble/authentik-callback-ingressroute.yaml
   - traefik/traefik-dashboard-ingressroute.yaml
   - traefik/authentik-callback-ingressroute.yaml
   - traefik/authentik-callback-service.yaml

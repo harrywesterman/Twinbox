@@ -89,6 +89,13 @@ spec:
                   value: Host(`hubble.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
+                name: hubble-authentik-callback
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`hubble.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)
+            - target:
+                kind: IngressRoute
                 name: hubble-wiredoor
               patch: |-
                 - op: replace
