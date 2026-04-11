@@ -2101,6 +2101,20 @@ def test_databases_kustomization_includes_authentik_resources():
     assert "authentik/scheduled-backup.yaml" in text
 
 
+def test_loki_and_openbao_longhorn_sizes_are_right_sized():
+    loki_values_text = (REPO_ROOT / "gitops" / "values" / "loki.yaml").read_text(
+        encoding="utf-8"
+    )
+    openbao_values_text = (REPO_ROOT / "gitops" / "values" / "openbao.yaml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "size: 5Gi" in loki_values_text
+    assert "size: 20Gi" not in loki_values_text
+    assert "size: 3Gi" in openbao_values_text
+    assert "size: 10Gi" not in openbao_values_text
+
+
 def test_authentik_db_cluster_is_scaled_for_lab_capacity():
     text = AUTHENTIK_DB_CLUSTER.read_text(encoding="utf-8")
     assert "instances: 1" in text
