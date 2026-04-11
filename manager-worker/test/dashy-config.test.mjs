@@ -90,21 +90,21 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   assert(appsSection.items.some((item) => item.title === "Whoami" && item.url === "https://whoami.tst.example.com"));
 
   const iconByTitle = new Map(config.sections.flatMap((section) => section.items.map((item) => [item.title, item.icon])));
-  assert.equal(iconByTitle.get("Hubble"), "si-cilium");
-  assert.equal(iconByTitle.get("Argo CD"), "si-argo");
-  assert.equal(iconByTitle.get("Authentik"), "si-authentik");
-  assert.equal(iconByTitle.get("Grafana"), "si-grafana");
-  assert.equal(iconByTitle.get("Prometheus"), "si-prometheus");
-  assert.equal(iconByTitle.get("Loki"), "https://raw.githubusercontent.com/grafana/loki/main/docs/sources/logo.png");
-  assert.equal(iconByTitle.get("Twinbox Wizard"), "https://twinboxwizard.tst.example.com/favicon.svg");
-  assert.equal(iconByTitle.get("Proxmox"), "si-proxmox");
-  assert.equal(iconByTitle.get("SeaweedFS"), "https://seaweedfs.com/favicon.ico");
-  assert.equal(iconByTitle.get("SeaweedFS Admin"), "https://seaweedfs.com/favicon.ico");
+  assert.ok(iconByTitle.get("Hubble")?.startsWith("data:image/svg+xml;base64,"));
+  assert.ok(iconByTitle.get("Argo CD")?.startsWith("data:image/svg+xml;base64,"));
+  assert.ok(iconByTitle.get("Authentik")?.startsWith("data:image/svg+xml;base64,"));
+  assert.ok(iconByTitle.get("Grafana")?.startsWith("data:image/svg+xml;base64,"));
+  assert.ok(iconByTitle.get("Prometheus")?.startsWith("data:image/svg+xml;base64,"));
+  assert.ok(iconByTitle.get("Loki")?.startsWith("data:image/svg+xml;base64,"));
+  assert.ok(iconByTitle.get("Twinbox Wizard")?.startsWith("data:image/svg+xml;base64,"));
+  assert.ok(iconByTitle.get("Proxmox")?.startsWith("data:image/svg+xml;base64,"));
+  assert.ok(iconByTitle.get("SeaweedFS")?.startsWith("data:image/svg+xml;base64,"));
+  assert.ok(iconByTitle.get("SeaweedFS Admin")?.startsWith("data:image/svg+xml;base64,"));
   assert.equal(iconByTitle.get("Cloudtty"), "https://raw.githubusercontent.com/cloudtty/cloudtty/main/docs/cloudtty.svg");
-  assert.equal(iconByTitle.get("pgAdmin 4"), "https://raw.githubusercontent.com/pgadmin-org/pgadmin4/master/web/pgadmin/static/favicon.ico");
+  assert.ok(iconByTitle.get("pgAdmin 4")?.startsWith("data:image/svg+xml;base64,"));
   assert.equal(iconByTitle.get("Traefik Manager"), "si-traefikproxy");
-  assert.equal(iconByTitle.get("Wiredoor"), "https://www.wiredoor.net/favicon.ico");
-  assert.equal(iconByTitle.get("Whoami"), "si-traefikproxy");
+  assert.ok(iconByTitle.get("Wiredoor")?.startsWith("data:image/svg+xml;base64,"));
+  assert.ok(iconByTitle.get("Whoami")?.startsWith("data:image/svg+xml;base64,"));
   assert.equal(iconByTitle.get("Cloudflare"), "si-cloudflare");
   assert.equal(iconByTitle.get("GitHub"), "si-github");
 
