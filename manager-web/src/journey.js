@@ -767,3 +767,14 @@ export function getMissionControlModel({
 export function getWizardSteps(catalog, answers = {}) {
   return flattenSetupSteps(catalog || fallbackCatalog(), answers);
 }
+
+export function getNextInstallableSetupStep(catalog, answers = {}, fromStepId = '', excludedStepIds = new Set()) {
+  const steps = getWizardSteps(catalog, answers);
+  const startIndex = fromStepId
+    ? Math.max(0, steps.findIndex((step) => step.id === fromStepId))
+    : 0;
+
+  return steps
+    .slice(startIndex)
+    .find((step) => step.status !== 'done' && step.status !== 'configured' && !excludedStepIds.has(step.id)) || null;
+}

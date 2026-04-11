@@ -230,6 +230,10 @@ authentik_api_request() {
 
     if [[ "$status" == "000" || "$status" =~ ^5 ]]; then
       if [[ "$attempt" -lt "$max_attempts" ]]; then
+        if [[ -n "${AUTHENTIK_FORWARD_PID:-}" ]] && ! kill -0 "$AUTHENTIK_FORWARD_PID" >/dev/null 2>&1; then
+          _authentik_log "Authentik port-forward died while calling ${method} ${path}; re-establishing"
+          authentik_setup_forward
+        fi
         _authentik_log "Retrying ${method} ${path} after transient HTTP ${status}"
         sleep "$retry_delay"
         attempt=$((attempt + 1))
@@ -258,7 +262,7 @@ authentik_resolve_flow_id() {
   local designation="$2"
   local response match_pk
 
-  response="$(authentik_api_get "/core/flows/?slug=${slug}&page_size=100")"
+  response="$(authentik_api_get "/flows/instances/?slug=${slug}&page_size=100")"
   match_pk="$(
     jq -r \
       --arg slug "$slug" \
@@ -272,12 +276,11 @@ authentik_resolve_flow_id() {
     return 0
   fi
 
-  response="$(authentik_api_get "/flows/instances/?slug=${slug}&page_size=100")"
+  response="$(authentik_api_get "/flows/instances/${slug}/")"
   jq -r \
     --arg slug "$slug" \
     --arg designation "$designation" \
-    '.results[]?
-      | select((.slug // "") == $slug and (.designation // "") == $designation)
+    'select((.slug // "") == $slug and (.designation // "") == $designation)
       | .pk // .id // empty' <<<"$response" | head -n1
 }
 

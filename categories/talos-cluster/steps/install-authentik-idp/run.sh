@@ -435,7 +435,7 @@ create_flow_if_missing() {
   local flow_compatible_providers="$7"
 
   local existing
-  existing="$(curl -sf "${AUTHENTIK_API_BASE}/core/flows/?slug=${flow_slug}" \
+  existing="$(curl -sf "${AUTHENTIK_API_BASE}/flows/instances/?slug=${flow_slug}" \
     -H "Accept: application/json" \
     -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" \
     -H "Content-Type: application/json" 2>/dev/null || true)"
@@ -447,7 +447,7 @@ create_flow_if_missing() {
 
   log "Creating flow '${flow_slug}'"
   local response
-  response="$(curl -sS -X POST "${AUTHENTIK_API_BASE}/core/flows/" \
+  response="$(curl -sS -X POST "${AUTHENTIK_API_BASE}/flows/instances/" \
     -H "Accept: application/json" \
     -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" \
     -H "Content-Type: application/json" \

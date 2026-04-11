@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   buildWizardExportFilename,
+  getNextInstallableSetupStep,
   getMissionControlModel,
   restoreUiState,
   serializeUiState,
@@ -310,6 +311,53 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
   ]) {
     assert.equal(setupStepIds.has(id), true);
   }
+});
+
+test('next installable step recomputes visibility after the ingress choice changes', () => {
+  const catalog = {
+    categories: [
+      {
+        id: 'talos-cluster',
+        title: 'Talos Cluster',
+        summary: 'Deploy the cluster end to end.',
+        status: 'ready',
+        steps: [
+          {
+            ...makeStep('choose-ingress-route', 'Choose Ingress Route', {
+              status: 'configured',
+            }),
+          },
+          {
+            ...makeStep('configure-cloudflare-tunnel', 'Configure Cloudflare Tunnel', {
+              dependsOn: ['choose-ingress-route'],
+            }),
+            ingress_route: 'cloudflare-tunnel',
+          },
+        ],
+      },
+    ],
+    errors: [],
+  };
+
+  const initialNextStep = getNextInstallableSetupStep(
+    catalog,
+    {},
+    'choose-ingress-route',
+    new Set(['choose-ingress-route']),
+  );
+  assert.equal(initialNextStep, null);
+
+  const updatedNextStep = getNextInstallableSetupStep(
+    catalog,
+    {
+      'choose-ingress-route': {
+        ingress_route: 'cloudflare-tunnel',
+      },
+    },
+    'choose-ingress-route',
+    new Set(['choose-ingress-route']),
+  );
+  assert.equal(updatedNextStep?.id, 'configure-cloudflare-tunnel');
 });
 
 test('wizard model defaults to step 1 when nothing is selected', () => {

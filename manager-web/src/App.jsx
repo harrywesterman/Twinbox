@@ -22,6 +22,7 @@ import {
 import {
   buildWizardExportFilename,
   getMissionControlModel,
+  getNextInstallableSetupStep,
   getWizardSteps,
   restoreUiState,
   serializeUiState,
@@ -1765,12 +1766,8 @@ function App() {
       return;
     }
 
-    const currentSteps = getWizardSteps(catalog, answersRef.current);
-    const startIndex = Math.max(0, currentSteps.findIndex((step) => step.id === fromStepId));
-    const pendingSteps = currentSteps
-      .slice(startIndex)
-      .filter((step) => step.status !== 'done' && step.status !== 'configured');
-    if (!pendingSteps.length) {
+    const firstPendingStep = getNextInstallableSetupStep(catalog, answersRef.current, fromStepId);
+    if (!firstPendingStep) {
       setNotice('Every remaining setup step is already complete.');
       return;
     }
@@ -1783,20 +1780,22 @@ function App() {
     try {
       let nextClusterId = clusterIdRef.current;
       let currentCatalogData = catalog;
+      const processedStepIds = new Set();
+      let cursorStepId = fromStepId;
 
-      for (const step of pendingSteps) {
-        const currentCatalog = getWizardSteps(currentCatalogData, answersRef.current);
-        const currentStep = currentCatalog.find((candidate) => candidate.id === step.id) || step;
+      while (true) {
+        const currentStep = getNextInstallableSetupStep(
+          currentCatalogData,
+          answersRef.current,
+          cursorStepId,
+          processedStepIds,
+        );
+
+        if (!currentStep) {
+          break;
+        }
 
         setSelectedStepId(currentStep.id);
-
-        if (currentStep.status === 'done') {
-          continue;
-        }
-
-        if (currentStep.status === 'configured') {
-          continue;
-        }
 
         if (currentStep.status === 'locked') {
           throw new Error(`${currentStep.title} is locked until its dependencies are complete.`);
@@ -1805,6 +1804,8 @@ function App() {
         const result = currentStep.status === 'skipped'
           ? await handleUnskipAndExecute(currentStep, { manageBusy: false })
           : await executeStep(currentStep, nextClusterId, { manageBusy: false });
+
+        processedStepIds.add(currentStep.id);
         nextClusterId = result.clusterId || nextClusterId;
 
         if (!result.ok) {
@@ -1812,6 +1813,7 @@ function App() {
         }
 
         currentCatalogData = result.catalog || currentCatalogData;
+        cursorStepId = currentStep.id;
       }
     } finally {
       setBusy(false);
