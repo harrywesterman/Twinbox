@@ -159,22 +159,10 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert status == 200
             assert body["errors"] == []
             assert [category["id"] for category in body["categories"]] == [
-                "management-vm",
                 "talos-cluster",
             ]
 
-            management = body["categories"][0]
-            assert [step["id"] for step in management["steps"]] == [
-                "configure-automatic-updates",
-            ]
-            assert management["steps"][0]["type"] == "config"
-            assert management["steps"][0]["journey_stage"] == "manage"
-            assert management["steps"][0]["status"] == "ready"
-            assert management["steps"][0]["icon"]
-            assert management["steps"][0]["project_url"].startswith("https://")
-            assert management["steps"][0]["github_url"].startswith("https://")
-
-            talos = body["categories"][1]
+            talos = body["categories"][0]
             talos_steps = {step["id"]: step for step in talos["steps"]}
             expected_talos_step_ids = {
                 "provision-nodes",
@@ -323,7 +311,7 @@ def test_catalog_endpoint_filters_ingress_routes_after_choice():
 
             status, body = _get_json(f"{base}/api/catalog")
             assert status == 200
-            talos_step_ids = [step["id"] for step in body["categories"][1]["steps"]]
+            talos_step_ids = [step["id"] for step in body["categories"][0]["steps"]]
             assert "choose-ingress-route" in talos_step_ids
             assert "configure-wiredoor-ingress" in talos_step_ids
             assert "provision-wiredoor-bastion" in talos_step_ids
@@ -380,7 +368,7 @@ def test_catalog_endpoint_shows_cloudflare_only_for_prd_clusters():
 
             status, body = _get_json(f"{base}/api/catalog")
             assert status == 200
-            talos = body["categories"][1]
+            talos = body["categories"][0]
             choose_step = next(
                 step for step in talos["steps"] if step["id"] == "choose-ingress-route"
             )
@@ -397,7 +385,7 @@ def test_catalog_endpoint_shows_cloudflare_only_for_prd_clusters():
 
             status, body = _get_json(f"{base}/api/catalog?cluster_id=prd")
             assert status == 200
-            talos = body["categories"][1]
+            talos = body["categories"][0]
             choose_step = next(
                 step for step in talos["steps"] if step["id"] == "choose-ingress-route"
             )
@@ -415,7 +403,7 @@ def test_catalog_endpoint_shows_cloudflare_only_for_prd_clusters():
 
             status, body = _get_json(f"{base}/api/catalog?cluster_id=tst")
             assert status == 200
-            talos = body["categories"][1]
+            talos = body["categories"][0]
             choose_step = next(
                 step for step in talos["steps"] if step["id"] == "choose-ingress-route"
             )
@@ -725,7 +713,6 @@ def test_catalog_endpoint_isolates_invalid_manifest_entries():
             status, body = _get_json(f"{base}/api/catalog")
             assert status == 200
             assert [category["id"] for category in body["categories"]] == [
-                "management-vm",
                 "talos-cluster",
             ]
             assert any("broken-category" in error for error in body["errors"])
@@ -760,7 +747,7 @@ def test_catalog_endpoint_isolates_invalid_manifest_entries():
             status, body = _get_json(f"{base}/api/catalog?cluster_id={cluster_id}")
             assert status == 200
 
-            talos = body["categories"][1]
+            talos = body["categories"][0]
             assert talos["steps"][0]["id"] == "provision-nodes"
             assert talos["steps"][0]["status"] == "done"
             assert talos["steps"][0]["state"]["cluster_id"] == cluster_id

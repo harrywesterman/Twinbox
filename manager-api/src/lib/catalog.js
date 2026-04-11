@@ -41,6 +41,9 @@ export function loadCatalogDefinitions({ workspaceRoot }) {
     const categoryFile = path.join(categoriesRoot, categoryDir, "category.yaml");
     try {
       const category = normalizeCategoryManifest(loadYaml(categoryFile), categoryFile);
+      if (category.id === "apps") {
+        continue;
+      }
       const stepsRoot = path.join(categoriesRoot, categoryDir, "steps");
       const steps = [];
 

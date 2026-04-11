@@ -485,7 +485,7 @@ def test_worker_processes_run_step_config_job_and_persists_outputs():
             data / "logs",
             data / "clusters",
             data / "step-state",
-            workspace / "categories" / "management-vm" / "steps" / "configure-automatic-updates",
+            workspace / "categories" / "talos-cluster" / "steps" / "choose-ingress-route",
             host_cron_dir,
             bin_dir,
         ]:
@@ -494,7 +494,7 @@ def test_worker_processes_run_step_config_job_and_persists_outputs():
         _prepare_fake_toolchain(bin_dir)
         _write_pinned_defaults(workspace)
 
-        script = workspace / "categories" / "management-vm" / "steps" / "configure-automatic-updates" / "apply.sh"
+        script = workspace / "categories" / "talos-cluster" / "steps" / "choose-ingress-route" / "run.sh"
         script.write_text(
             "#!/bin/bash\n"
             "set -euo pipefail\n"
@@ -511,12 +511,12 @@ def test_worker_processes_run_step_config_job_and_persists_outputs():
             "status": "pending",
             "step": "queued",
             "payload": {
-                "step_id": "configure-automatic-updates",
+                "step_id": "choose-ingress-route",
                 "step_type": "config",
                 "inputs": {"enabled": True, "schedule_hour": 3, "schedule_minute": 17},
                 "runner": {
                     "kind": "script",
-                    "script": "categories/management-vm/steps/configure-automatic-updates/apply.sh",
+                    "script": "categories/talos-cluster/steps/choose-ingress-route/run.sh",
                 },
                 "context": {},
             },
@@ -559,7 +559,7 @@ def test_worker_processes_run_step_config_job_and_persists_outputs():
             updated_job = json.loads((data / "jobs" / "job_config.json").read_text())
             assert updated_job["status"] == "succeeded"
 
-            step_state = json.loads(_global_step_state(data, "configure-automatic-updates").read_text())
+            step_state = json.loads(_global_step_state(data, "choose-ingress-route").read_text())
             assert step_state["status"] == "configured"
             assert step_state["inputs"]["enabled"] is True
             assert step_state["outputs"] == {"applied": True}
@@ -682,7 +682,7 @@ def test_worker_marks_run_step_job_failed_when_script_fails():
             data / "logs",
             data / "clusters",
             data / "step-state",
-            workspace / "categories" / "management-vm" / "steps" / "configure-automatic-updates",
+            workspace / "categories" / "talos-cluster" / "steps" / "choose-ingress-route",
             bin_dir,
         ]:
             d.mkdir(parents=True, exist_ok=True)
@@ -690,7 +690,7 @@ def test_worker_marks_run_step_job_failed_when_script_fails():
         _prepare_fake_toolchain(bin_dir)
         _write_pinned_defaults(workspace)
 
-        script = workspace / "categories" / "management-vm" / "steps" / "configure-automatic-updates" / "apply.sh"
+        script = workspace / "categories" / "talos-cluster" / "steps" / "choose-ingress-route" / "run.sh"
         script.write_text("#!/bin/bash\nset -euo pipefail\necho boom >&2\nexit 42\n")
         script.chmod(0o755)
 
@@ -701,12 +701,12 @@ def test_worker_marks_run_step_job_failed_when_script_fails():
             "status": "pending",
             "step": "queued",
             "payload": {
-                "step_id": "configure-automatic-updates",
+                "step_id": "choose-ingress-route",
                 "step_type": "config",
                 "inputs": {"enabled": True},
                 "runner": {
                     "kind": "script",
-                    "script": "categories/management-vm/steps/configure-automatic-updates/apply.sh",
+                    "script": "categories/talos-cluster/steps/choose-ingress-route/run.sh",
                 },
                 "context": {},
             },
@@ -748,7 +748,7 @@ def test_worker_marks_run_step_job_failed_when_script_fails():
             assert updated_job["status"] == "failed"
             assert updated_job["error"] == "command exited with code 42: boom"
 
-            step_state = json.loads(_global_step_state(data, "configure-automatic-updates").read_text())
+            step_state = json.loads(_global_step_state(data, "choose-ingress-route").read_text())
             assert step_state["status"] == "failed"
             assert step_state["error"] == "command exited with code 42: boom"
         finally:
@@ -769,7 +769,7 @@ def test_worker_includes_recent_script_output_in_failed_run_step_error():
             data / "logs",
             data / "clusters",
             data / "step-state",
-            workspace / "categories" / "management-vm" / "steps" / "configure-automatic-updates",
+            workspace / "categories" / "talos-cluster" / "steps" / "choose-ingress-route",
             bin_dir,
         ]:
             d.mkdir(parents=True, exist_ok=True)
@@ -777,7 +777,7 @@ def test_worker_includes_recent_script_output_in_failed_run_step_error():
         _prepare_fake_toolchain(bin_dir)
         _write_pinned_defaults(workspace)
 
-        script = workspace / "categories" / "management-vm" / "steps" / "configure-automatic-updates" / "apply.sh"
+        script = workspace / "categories" / "talos-cluster" / "steps" / "choose-ingress-route" / "run.sh"
         script.write_text(
             "#!/bin/bash\n"
             "set -euo pipefail\n"
@@ -794,12 +794,12 @@ def test_worker_includes_recent_script_output_in_failed_run_step_error():
             "status": "pending",
             "step": "queued",
             "payload": {
-                "step_id": "configure-automatic-updates",
+                "step_id": "choose-ingress-route",
                 "step_type": "config",
                 "inputs": {"enabled": True},
                 "runner": {
                     "kind": "script",
-                    "script": "categories/management-vm/steps/configure-automatic-updates/apply.sh",
+                    "script": "categories/talos-cluster/steps/choose-ingress-route/run.sh",
                 },
                 "context": {},
             },
@@ -842,7 +842,7 @@ def test_worker_includes_recent_script_output_in_failed_run_step_error():
             assert "command exited with code 7" in updated_job["error"]
             assert "second failure line" in updated_job["error"]
 
-            step_state = json.loads(_global_step_state(data, "configure-automatic-updates").read_text())
+            step_state = json.loads(_global_step_state(data, "choose-ingress-route").read_text())
             assert step_state["status"] == "failed"
             assert "second failure line" in step_state["error"]
         finally:
@@ -866,7 +866,7 @@ def test_worker_cancels_running_run_step_job_when_job_status_changes():
             data / "logs",
             data / "clusters",
             data / "step-state",
-            workspace / "categories" / "management-vm" / "steps" / "configure-automatic-updates",
+            workspace / "categories" / "talos-cluster" / "steps" / "choose-ingress-route",
             bin_dir,
         ]:
             d.mkdir(parents=True, exist_ok=True)
@@ -874,12 +874,12 @@ def test_worker_cancels_running_run_step_job_when_job_status_changes():
         _prepare_fake_toolchain(bin_dir)
         _write_pinned_defaults(workspace)
 
-        script = workspace / "categories" / "management-vm" / "steps" / "configure-automatic-updates" / "apply.sh"
+        script = workspace / "categories" / "talos-cluster" / "steps" / "choose-ingress-route" / "run.sh"
         script.write_text(
             "#!/bin/bash\n"
             "set -euo pipefail\n"
             f"touch \"{marker_file}\"\n"
-            "trap 'echo stopping >&2' TERM\n"
+            "trap 'echo stopping >&2; exit 0' TERM\n"
             "while true; do sleep 1; done\n",
         )
         script.chmod(0o755)
@@ -891,12 +891,12 @@ def test_worker_cancels_running_run_step_job_when_job_status_changes():
             "status": "pending",
             "step": "queued",
             "payload": {
-                "step_id": "configure-automatic-updates",
+                "step_id": "choose-ingress-route",
                 "step_type": "config",
                 "inputs": {"enabled": True},
                 "runner": {
                     "kind": "script",
-                    "script": "categories/management-vm/steps/configure-automatic-updates/apply.sh",
+                    "script": "categories/talos-cluster/steps/choose-ingress-route/run.sh",
                 },
                 "context": {},
             },
@@ -948,7 +948,7 @@ def test_worker_cancels_running_run_step_job_when_job_status_changes():
             assert updated_job["status"] == "canceled"
             assert updated_job["step"] == "canceled"
 
-            step_state = json.loads(_global_step_state(data, "configure-automatic-updates").read_text())
+            step_state = json.loads(_global_step_state(data, "choose-ingress-route").read_text())
             assert step_state["status"] == "canceled"
             assert step_state["last_job_id"] == "job_cancel_running"
 

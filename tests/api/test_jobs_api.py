@@ -155,7 +155,7 @@ def test_job_cancel_endpoint_marks_pending_job_canceled():
             "status": "pending",
             "step": "queued",
             "payload": {
-                "step_id": "configure-automatic-updates",
+                "step_id": "choose-ingress-route",
                 "step_type": "config",
                 "inputs": {},
                 "runner": {"kind": "script", "script": "scripts/mock.sh"},

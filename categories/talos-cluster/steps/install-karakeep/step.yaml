@@ -1,0 +1,14 @@
+id: install-karakeep
+title: Install Karakeep
+type: action
+journey_stage: setup
+order: 76
+summary: Placeholder step for the Karakeep app phase.
+explanation: This wizard step is reserved for future Karakeep installation work and does not run a real cluster action yet.
+side_help: Bookmark-style apps are shown with the rest of the user services.
+depends_on:
+  - install-paperless
+inputs: []
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/_placeholder/run.sh
