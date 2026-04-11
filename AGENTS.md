@@ -10,7 +10,7 @@ Twinbox is a Talos Linux based configuration for a Kubernetes cluster. Treat the
 
 ## Current State
 
-- The repository’s active branch is `main`. Only big redesigned get their own branch.
+- The repository’s active branch is `main`.
 - `manager-data/` is runtime state only.
 
 ## Current Flow
@@ -31,13 +31,14 @@ Twinbox is a Talos Linux based configuration for a Kubernetes cluster. Treat the
 - `manager-worker/` - queue polling and script execution.
 - `scripts/manager/` - cluster provisioning and management scripts.
 - `categories/` - manifest-driven step catalog and step scripts.
-- `docker-compose.yml` - local/runtime service wiring.
+- `docker-compose.yml` - Docker configuration for on the management VM, running the web wizard
 - Code changes land in GitHub `main`, are built into container images by GitHub Actions, and are pulled onto the Management VM with `docker compose pull && docker compose up -d`.
 
 ## Editing Rules
 
-- use the ssh connection skill to connect to the management VM for debugging.
+- use the ssh connection skill to connect to the management VM for debugging. Ask the user for the IP address. Login with twinbox@ipadres
 - Use the Playwright skill to look at the live web wizard.
+- Try python3 first, especially when working on a mac
 - Use `docker compose`, not legacy `docker-compose`.
 - Keep `manager-data/` as runtime state only.
 - The host does not carry a full repo checkout; the executable Twinbox code lives in the manager container images, while `/opt/twinbox` stores runtime and bootstrap state.
@@ -48,6 +49,7 @@ Twinbox is a Talos Linux based configuration for a Kubernetes cluster. Treat the
   - Worker: `manager-worker/src/*`
   - Provisioning scripts: `scripts/manager/*`
   - Step manifests/scripts: `categories/*`
+  - After you made a change, alway commit and push to main on github.com. The look at the github action that builds a new version of the docker containers, and wait until it is done. Connect with the ssh connection skill to twinbox@<ipofthemanagementvm> and do a docker pull and restart the containers. Only then you can retest.
 
 ## Verification
 
