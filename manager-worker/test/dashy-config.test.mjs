@@ -30,21 +30,29 @@ test("real step manifests normalize Dashy metadata", () => {
 test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", () => {
   const steps = [
     loadStep("provision-nodes"),
+    loadStep("install-argocd"),
     loadStep("install-authentik-idp"),
     loadStep("install-grafana"),
     loadStep("install-loki"),
     loadStep("install-management-consoles"),
     loadStep("install-cloudtty"),
+    loadStep("install-pgadmin4"),
+    loadStep("install-traefik-manager"),
+    loadStep("install-wiredoor-gateway"),
     loadStep("install-whoami"),
   ];
 
   const stepStateById = new Map([
     ["provision-nodes", { status: "succeeded", outputs: {} }],
+    ["install-argocd", { status: "succeeded", outputs: {} }],
     ["install-authentik-idp", { status: "succeeded", outputs: {} }],
     ["install-grafana", { status: "succeeded", outputs: {} }],
     ["install-loki", { status: "succeeded", outputs: {} }],
     ["install-management-consoles", { status: "succeeded", outputs: {} }],
     ["install-cloudtty", { status: "succeeded", outputs: { access_url: "https://shell.example.net" } }],
+    ["install-pgadmin4", { status: "succeeded", outputs: {} }],
+    ["install-traefik-manager", { status: "succeeded", outputs: {} }],
+    ["install-wiredoor-gateway", { status: "succeeded", outputs: { wiredoor_url: "https://wiredoor.example.net" } }],
     ["install-whoami", { status: "configured", outputs: {} }],
   ]);
 
@@ -65,24 +73,40 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   assert(appsSection, "expected Apps section");
 
   assert(platformSection.items.some((item) => item.title === "Hubble" && item.url === "https://hubble.tst.example.com"));
+  assert(platformSection.items.some((item) => item.title === "Argo CD" && item.url === "https://argocd.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "Authentik" && item.url === "https://authentik.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "Grafana" && item.url === "https://grafana.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "Loki" && item.url === "https://loki.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "Twinbox Wizard" && item.url === "https://twinboxwizard.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "SeaweedFS Admin" && item.url === "https://seaweedfs-admin.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "Cloudtty" && item.url === "https://shell.example.net"));
+  assert(platformSection.items.some((item) => item.title === "pgAdmin 4" && item.url === "https://pgadmin4.tst.example.com"));
+  assert(platformSection.items.some((item) => item.title === "Traefik Manager" && item.url === "https://traefik-manager.tst.example.com"));
+  assert(platformSection.items.some((item) => item.title === "Wiredoor" && item.url === "https://wiredoor.example.net"));
   assert(platformSection.items.some((item) => item.title === "Cloudflare" && item.url === "https://dash.cloudflare.com/"));
   assert(platformSection.items.some((item) => item.title === "GitHub" && item.url === "https://github.com/harrywesterman/Twinbox"));
   assert(appsSection.items.some((item) => item.title === "Whoami" && item.url === "https://whoami.tst.example.com"));
 
+  const iconByTitle = new Map(config.sections.flatMap((section) => section.items.map((item) => [item.title, item.icon])));
+  assert.equal(iconByTitle.get("Hubble"), "si-cilium");
+  assert.equal(iconByTitle.get("Argo CD"), "si-argo");
+  assert.equal(iconByTitle.get("Authentik"), "si-authentik");
+  assert.equal(iconByTitle.get("Grafana"), "si-grafana");
+  assert.equal(iconByTitle.get("Loki"), "https://raw.githubusercontent.com/grafana/loki/main/docs/sources/logo.png");
+  assert.equal(iconByTitle.get("Twinbox Wizard"), "https://twinboxwizard.tst.example.com/favicon.svg");
+  assert.equal(iconByTitle.get("Proxmox"), "si-proxmox");
+  assert.equal(iconByTitle.get("SeaweedFS"), "https://seaweedfs.com/favicon.ico");
+  assert.equal(iconByTitle.get("SeaweedFS Admin"), "https://seaweedfs.com/favicon.ico");
+  assert.equal(iconByTitle.get("Cloudtty"), "https://raw.githubusercontent.com/cloudtty/cloudtty/main/docs/cloudtty.svg");
+  assert.equal(iconByTitle.get("pgAdmin 4"), "https://raw.githubusercontent.com/pgadmin-org/pgadmin4/master/web/pgadmin/static/favicon.ico");
+  assert.equal(iconByTitle.get("Traefik Manager"), "si-traefikproxy");
+  assert.equal(iconByTitle.get("Wiredoor"), "https://www.wiredoor.net/favicon.ico");
+  assert.equal(iconByTitle.get("Whoami"), "si-traefikproxy");
+  assert.equal(iconByTitle.get("Cloudflare"), "si-cloudflare");
+  assert.equal(iconByTitle.get("GitHub"), "si-github");
+
   assert.equal(config.appConfig.faviconApi, "local");
   assert.equal(config.appConfig.iconSize, "large");
-
-  for (const section of config.sections) {
-    for (const item of section.items) {
-      assert.equal(item.icon, "favicon");
-    }
-  }
 });
 
 test("buildDashyConfig hides steps that are not completed", () => {

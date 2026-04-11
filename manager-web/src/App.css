@@ -484,7 +484,8 @@
 
 .wizard-install-stage-head {
   display: grid;
-  gap: 8px;
+  justify-items: center;
+  gap: 12px;
   width: min(820px, 100%);
   justify-self: center;
   padding: 0 4px;
@@ -500,6 +501,14 @@
 .wizard-install-stage-head .wizard-step-summary {
   max-width: 64ch;
   margin: 0 auto;
+}
+
+.wizard-install-stage-icon {
+  width: 72px;
+  height: 72px;
+  padding: 12px;
+  border-radius: 24px;
+  font-size: 1.9rem;
 }
 
 .wizard-install-output {

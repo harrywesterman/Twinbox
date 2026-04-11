@@ -73,11 +73,13 @@ test('app source defines a minimal wizard shell with guided input and step-by-st
   assert.doesNotMatch(source, /Base zone for platform hostnames/, 'expected the old DNS helper copy to be removed');
   assert.doesNotMatch(source, /No preset default/, 'expected the DNS field to hide the default copy');
   assert.match(source, /wizard-install-stage/, 'expected a centered install stage');
+  assert.match(source, /wizard-install-stage-icon/, 'expected the install header to reserve space for a large icon');
   assert.match(source, /wizard-install-output/, 'expected a dedicated output window for install mode');
   assert.match(source, /wizard-install-actions-row/, 'expected the install controls below the output window');
   assert.doesNotMatch(source, /\|\| isCurrentStepComplete/, 'expected the install action to stay available even after a step is complete');
   assert.match(source, /installLogsByStepRef/, 'expected the install view to cache logs per step');
   assert.match(source, /setInstallStepLogs\(/, 'expected the install pane to write per-step logs');
+  assert.match(source, /renderStepIcon\(activeStepPresentation, 'wizard-step-icon wizard-step-icon-large wizard-install-stage-icon'\)/, 'expected the install stage to render the large icon artwork above the title');
   assert.match(source, /model\.activity\.rawLogOutput \|\| ''/, 'expected the install pane to render only the current step output');
   assert.doesNotMatch(source, /visibleInstallLogOutput/, 'expected the old log fallback to be removed');
   assert.doesNotMatch(source, /No worker output yet/, 'expected the placeholder log copy to be removed');
@@ -118,6 +120,7 @@ test('styles define a wizard-first, responsive installer layout', async () => {
   assert.doesNotMatch(css, /\.technical-panel\[open\]\s*\{/, 'expected technical details to be removed');
   assert.match(css, /\.wizard-output-panel-minimal\s*\{/, 'expected output to stay visible on the page');
   assert.match(css, /\.wizard-install-stage\s*\{/, 'expected a dedicated install stage wrapper');
+  assert.match(css, /\.wizard-install-stage-icon\s*\{/, 'expected the install-stage icon treatment');
   assert.match(css, /\.wizard-install-output\s*\{/, 'expected a large output window for install mode');
   assert.match(css, /\.wizard-install-output[\s\S]*height:\s*clamp\(300px,\s*46dvh,\s*560px\);/, 'expected the install output to scale with the viewport');
   assert.match(css, /\.wizard-install-actions-row\s*\{/, 'expected the install buttons to sit under the output window');

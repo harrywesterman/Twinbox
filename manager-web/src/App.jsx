@@ -277,6 +277,29 @@ function getStepPresentation(step) {
   };
 }
 
+function renderStepIcon(presentation, className) {
+  const hasArtwork = Boolean(presentation?.iconArtworkUrl);
+
+  return (
+    <span
+      className={`${className} ${hasArtwork ? 'is-artwork' : ''}`}
+      aria-hidden="true"
+    >
+      {hasArtwork ? (
+        <img
+          className="wizard-step-icon-artwork"
+          src={presentation.iconArtworkUrl}
+          alt=""
+          loading="eager"
+          decoding="async"
+        />
+      ) : (
+        presentation?.icon || '🚀'
+      )}
+    </span>
+  );
+}
+
 function getStepLinkItems(step) {
   const presentation = getStepPresentation(step);
   return [
@@ -2270,22 +2293,7 @@ function App() {
                       : 'Twinbox installer'}
                 </p>
                 <div className="wizard-workspace-stepline">
-                  <span
-                    className={`wizard-step-icon wizard-step-icon-large ${activeStepPresentation.iconArtworkUrl ? 'is-artwork' : ''}`}
-                    aria-hidden="true"
-                  >
-                    {activeStepPresentation.iconArtworkUrl ? (
-                      <img
-                        className="wizard-step-icon-artwork"
-                        src={activeStepPresentation.iconArtworkUrl}
-                        alt=""
-                        loading="eager"
-                        decoding="async"
-                      />
-                    ) : (
-                      activeStepPresentation.icon
-                    )}
-                  </span>
+                  {renderStepIcon(activeStepPresentation, 'wizard-step-icon wizard-step-icon-large')}
                   <div className="wizard-workspace-stepline-copy">
                     <h1>{model.completion ? model.completion.title : activeStepTitle || 'Question'}</h1>
                     <p className="wizard-intro wizard-step-pitch">
@@ -2350,6 +2358,7 @@ function App() {
           ) : isInstallPhase ? (
             <section className="wizard-install-stage" aria-label="Installation output and controls">
               <div className="wizard-install-stage-head">
+                {renderStepIcon(activeStepPresentation, 'wizard-step-icon wizard-step-icon-large wizard-install-stage-icon')}
                 <p className="eyebrow">
                   {currentStep?.status === 'running'
                     ? `Now installing step ${safeInstallStepIndex + 1} of ${installStepCount}`
