@@ -18,4 +18,4 @@ dashy:
 inputs: []
 runner:
   kind: script
-  script: categories/talos-cluster/steps/install-immich/run.sh
+  script: categories/apps/steps/install-immich/run.sh

@@ -1,4 +1,0 @@
-id: management-vm
-title: Management VM
-summary: Keep the Ubuntu Management VM patched, hardened, and explicit in the wizard.
-order: 10

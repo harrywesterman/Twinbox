@@ -42,7 +42,7 @@ function makeStep(id, title, {
 }
 
 function buildCatalog(stepStatuses = {}) {
-  const setupSteps = [
+  const coreSetupSteps = [
     ['provision-nodes', 'Deploy Talos Cluster', { status: 'ready', dependsOn: [] }],
     ['install-argocd', 'Install Argo CD', { dependsOn: ['provision-nodes'] }],
     ['install-longhorn-storage', 'Install Longhorn storage', { dependsOn: ['install-argocd'] }],
@@ -69,6 +69,12 @@ function buildCatalog(stepStatuses = {}) {
     ['install-ntfy', 'Install Ntfy', { dependsOn: ['install-dashy-dashboard'] }],
     ['install-velero-backup', 'Install Velero backup', { dependsOn: ['install-management-consoles', 'install-longhorn-storage', 'install-secret-sync'] }],
     ['install-proxmox-backup-system', 'Install Proxmox Backup System', { dependsOn: ['install-velero-backup'] }],
+  ].map(([id, title, options]) => ({
+    ...makeStep(id, title, options),
+    status: stepStatuses[id] ?? options.status ?? 'locked',
+  }));
+
+  const appSteps = [
     ['install-nextcloud', 'Install Nextcloud', { dependsOn: ['install-proxmox-backup-system'] }],
     ['install-immich', 'Install Immich', { dependsOn: ['install-nextcloud'] }],
     ['install-zulip', 'Install Zulip', { dependsOn: ['install-immich'] }],
@@ -88,26 +94,18 @@ function buildCatalog(stepStatuses = {}) {
   return {
     categories: [
       {
-        id: 'management-vm',
-        title: 'Management VM',
-        summary: 'Keep the management plane configured.',
-        status: 'ready',
-        steps: [
-          makeStep('configure-automatic-updates', 'Configure automatic updates', {
-            journeyStage: 'manage',
-            status: 'ready',
-            summary: 'Configure nightly updates.',
-            explanation: 'Persist and apply the nightly policy.',
-            sideHelp: 'Twinbox writes one managed cron file.',
-          }),
-        ],
-      },
-      {
         id: 'talos-cluster',
         title: 'Talos Cluster',
         summary: 'Deploy the cluster end to end.',
         status: 'ready',
-        steps: setupSteps,
+        steps: coreSetupSteps,
+      },
+      {
+        id: 'apps',
+        title: 'Apps',
+        summary: 'Install user-facing applications and collaboration tools.',
+        status: 'ready',
+        steps: appSteps,
       },
     ],
     errors: [],
@@ -245,10 +243,19 @@ test('wizard model switches to manage mode when setup flow is complete', () => {
     ),
   );
 
-  completedCatalog.categories[1].steps = completedCatalog.categories[1].steps.map((step) =>
+  completedCatalog.categories[0].steps = completedCatalog.categories[0].steps.map((step) =>
     step.id === 'choose-ingress-route'
       ? { ...step, status: 'configured' }
       : step,
+  );
+  completedCatalog.categories[0].steps.push(
+    makeStep('manage-host-maintenance', 'Manage host maintenance', {
+      journeyStage: 'manage',
+      status: 'ready',
+      summary: 'Configure nightly updates.',
+      explanation: 'Persist and apply the nightly policy.',
+      sideHelp: 'Twinbox writes one managed cron file.',
+    }),
   );
 
   const model = getMissionControlModel({
