@@ -73,7 +73,7 @@ find_policy_binding_pk() {
   local group_id="$2"
   local response
 
-  response="$(authentik_api_get "/flows/bindings/?page_size=200")"
+  response="$(authentik_api_get "/policies/bindings/?page_size=200")"
   jq -r \
     --arg target_uuid "$target_uuid" \
     --arg group_id "$group_id" \
@@ -147,16 +147,16 @@ ensure_group_binding() {
     jq -n \
       --arg target_uuid "$target_uuid" \
       --arg group_id "$group_id" \
-      '{target: $target_uuid, group: $group_id, order: 1}'
+      '{target: $target_uuid, group: $group_id, order: 1, enabled: true}'
   )"
 
   existing_pk="$(find_policy_binding_pk "$target_uuid" "$group_id")"
   if [[ -n "$existing_pk" ]]; then
-    authentik_api_write PATCH "/flows/bindings/${existing_pk}/" "$binding_payload" >/dev/null
+    authentik_api_write PATCH "/policies/bindings/${existing_pk}/" "$binding_payload" >/dev/null
     return 0
   fi
 
-  authentik_api_write POST "/flows/bindings/" "$binding_payload" >/dev/null
+  authentik_api_write POST "/policies/bindings/" "$binding_payload" >/dev/null
 }
 
 authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
