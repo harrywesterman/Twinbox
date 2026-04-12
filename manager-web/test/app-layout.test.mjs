@@ -25,8 +25,6 @@ test('app source defines a minimal wizard shell with guided input and step-by-st
   assert.match(source, /Install all/, 'expected an install-all action in the install phase');
   assert.match(source, /type="range"/, 'expected the scale slider');
   assert.match(source, /wizard-step-actions-panel/, 'expected a dedicated step 1 helper bar');
-  assert.match(source, /Help me with VM size/, 'expected the VM sizing helper button');
-  assert.match(source, /Help me with placement/, 'expected the placement helper button');
   assert.match(source, /Help me with free IPs/, 'expected the IP helper button');
   assert.match(source, /Cluster identity/, 'expected the Talos cluster name to be shown as a derived summary');
   assert.match(source, /Twinbox saves this name automatically from the wizard choice/, 'expected the cluster name to be auto-saved from the earlier choice');
@@ -36,12 +34,10 @@ test('app source defines a minimal wizard shell with guided input and step-by-st
   assert.match(source, /VM landing/, 'expected the VM placement block to be explicit');
   assert.match(source, /wizard-placement-board/, 'expected the host placement board');
   assert.match(source, /Automatic placement/, 'expected automatic placement controls');
-  assert.match(source, /3\. Network and addressing/, 'expected networking to come after placement');
-  assert.match(source, /wizard-network-summary/, 'expected a compact network summary');
+  assert.doesNotMatch(source, /Keep VM scale separate from networking/, 'expected the old network summary heading to be removed');
   assert.match(source, /Per-VM IPs/, 'expected a per-VM IP list');
   assert.match(source, /wizard-network-vm-list/, 'expected the VM IP list container');
   assert.match(source, /wizard-status-badge/, 'expected status badges for each VM');
-  assert.match(source, /Check for free IP addresses/, 'expected the IP check button under the VM list');
   assert.match(source, /wizard-field-dns/, 'expected a compact DNS field variant');
   assert.doesNotMatch(source, /one-time free address suggestion/, 'expected the one-time IP allocation note to be removed');
   assert.doesNotMatch(source, /Start IP/, 'expected the fixed start IP field to be removed from the wizard');
@@ -59,7 +55,6 @@ test('app source defines a minimal wizard shell with guided input and step-by-st
   assert.match(source, /getQuestionSteps\(answersRef\.current\)\[0\]\?\.id \|\| 'provision-nodes'/, 'expected a recreated cluster to restart at the first question');
   assert.match(source, /clearInstallStepLogs\(\)/, 'expected recreation to clear stale install logs');
   assert.match(source, /Loading cluster data…/, 'expected a visible loading banner while refreshing');
-  assert.match(source, /Check for free IP addresses/, 'expected an explicit IP availability check action');
   assert.match(source, /wizard-vm-card is-fixed/, 'expected the management VM to render as a fixed VM card');
   assert.match(source, /Fixed on this host and included in the resource budget\./, 'expected the fixed management VM copy');
   assert.doesNotMatch(source, /wizard-placement-management-card/, 'expected the old standalone management card to be removed');

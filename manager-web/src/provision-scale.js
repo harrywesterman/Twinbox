@@ -463,6 +463,44 @@ function clonePlacementState(sourceState = new Map()) {
   return nextState;
 }
 
+function hostCanFitVm(host, vm) {
+  return host.freeCpuCores >= vm.cpu
+    && host.freeMemoryMb >= vm.memory_mb
+    && host.freeDiskGb >= vm.disk_gb;
+}
+
+function compareHostCapacity(leftHost, rightHost) {
+  if (leftHost.totalMemoryMb !== rightHost.totalMemoryMb) {
+    return rightHost.totalMemoryMb - leftHost.totalMemoryMb;
+  }
+
+  if (leftHost.totalDiskGb !== rightHost.totalDiskGb) {
+    return rightHost.totalDiskGb - leftHost.totalDiskGb;
+  }
+
+  if (leftHost.totalCpuCores !== rightHost.totalCpuCores) {
+    return rightHost.totalCpuCores - leftHost.totalCpuCores;
+  }
+
+  if (leftHost.freeMemoryMb !== rightHost.freeMemoryMb) {
+    return leftHost.freeMemoryMb - rightHost.freeMemoryMb;
+  }
+
+  if (leftHost.freeDiskGb !== rightHost.freeDiskGb) {
+    return leftHost.freeDiskGb - rightHost.freeDiskGb;
+  }
+
+  if (leftHost.freeCpuCores !== rightHost.freeCpuCores) {
+    return leftHost.freeCpuCores - rightHost.freeCpuCores;
+  }
+
+  if (leftHost.activeVmCount !== rightHost.activeVmCount) {
+    return leftHost.activeVmCount - rightHost.activeVmCount;
+  }
+
+  return 0;
+}
+
 function compareHostCandidates(leftHost, rightHost, vm, placementState) {
   const leftState = placementState.get(leftHost.id) || {
     controlplaneCount: 0,
@@ -475,24 +513,20 @@ function compareHostCandidates(leftHost, rightHost, vm, placementState) {
     totalCount: 0,
   };
 
+  const leftFits = hostCanFitVm(leftHost, vm);
+  const rightFits = hostCanFitVm(rightHost, vm);
+  if (leftFits !== rightFits) {
+    return leftFits ? -1 : 1;
+  }
+
   const occupancyComparison = compareVmPlacementState(leftState, rightState, vm.type);
   if (occupancyComparison !== 0) {
     return occupancyComparison;
   }
 
-  const leftResourceScore = (
-    (leftHost.freeDiskGb / Math.max(1, vm.disk_gb)) * 3
-    + (leftHost.freeCpuCores / Math.max(1, vm.cpu))
-    + (leftHost.freeMemoryMb / Math.max(1, vm.memory_mb))
-  );
-  const rightResourceScore = (
-    (rightHost.freeDiskGb / Math.max(1, vm.disk_gb)) * 3
-    + (rightHost.freeCpuCores / Math.max(1, vm.cpu))
-    + (rightHost.freeMemoryMb / Math.max(1, vm.memory_mb))
-  );
-
-  if (leftResourceScore !== rightResourceScore) {
-    return rightResourceScore - leftResourceScore;
+  const capacityComparison = compareHostCapacity(leftHost, rightHost);
+  if (capacityComparison !== 0) {
+    return capacityComparison;
   }
 
   return normalizeHostName(leftHost?.name || leftHost?.id).localeCompare(
@@ -503,9 +537,14 @@ function compareHostCandidates(leftHost, rightHost, vm, placementState) {
 }
 
 function chooseBestHostForVm(vm, hostCards, placementState = new Map()) {
+  const eligibleHosts = hostCards.filter((host) => hostCanFitVm(host, vm));
+  if (eligibleHosts.length === 0) {
+    return null;
+  }
+
   let bestHost = null;
 
-  for (const host of hostCards) {
+  for (const host of eligibleHosts) {
     if (!bestHost || compareHostCandidates(host, bestHost, vm, placementState) < 0) {
       bestHost = host;
     }

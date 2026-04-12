@@ -2467,15 +2467,6 @@ function App() {
                         <button className="button button-secondary" type="button" onClick={handleImportClick} disabled={busy || provisionIpChecking}>
                           Load saved answers
                         </button>
-                        <button className="button button-secondary" type="button" onClick={applyProvisionVmSizeHelp} disabled={busy || provisionIpChecking}>
-                          Help me with VM size
-                        </button>
-                        <button className="button button-secondary" type="button" onClick={applyProvisionPlacementHelp} disabled={busy || provisionIpChecking}>
-                          Help me with placement
-                        </button>
-                        <button className="button button-secondary" type="button" onClick={applyProvisionIpHelp} disabled={busy || provisionIpChecking}>
-                          Help me with free IPs
-                        </button>
                       </div>
                     </section>
 
@@ -2544,40 +2535,6 @@ function App() {
                     />
 
                     <section className="wizard-input-block is-network" aria-label="Network and addressing">
-                      <div className="wizard-input-block-head">
-                        <div>
-                          <p className="eyebrow">3. Network and addressing</p>
-                          <h3>Keep VM scale separate from networking</h3>
-                        </div>
-                      </div>
-
-                      <dl className="wizard-network-summary">
-                        <div>
-                          <dt>Bridge</dt>
-                          <dd>{currentDraft.bridge || 'vmbr0'}</dd>
-                        </div>
-                        <div>
-                          <dt>VIP</dt>
-                          <dd>{currentDraft.vip_ip || '192.168.1.50'}</dd>
-                        </div>
-                        <div>
-                          <dt>Subnet</dt>
-                          <dd>{provisionSubnet}</dd>
-                        </div>
-                        <div>
-                          <dt>VMs</dt>
-                          <dd>{provisionVmIpRows.length}</dd>
-                        </div>
-                        <div>
-                          <dt>Gateway</dt>
-                          <dd>{currentDraft.gateway_ip || '192.168.1.1'}</dd>
-                        </div>
-                        <div>
-                          <dt>DNS</dt>
-                          <dd>{currentDraft.dns_servers || '1.1.1.1, 8.8.8.8'}</dd>
-                        </div>
-                      </dl>
-
                       <div className="wizard-input-grid">
                         {provisionInputGroups.networkInputs.map((input) => (
                           <InputField
@@ -2588,6 +2545,12 @@ function App() {
                             onChange={(inputId, value) => updateAnswer(currentStep.id, inputId, value)}
                           />
                         ))}
+                      </div>
+
+                      <div className="wizard-card-actions wizard-card-actions-inline wizard-network-help-row">
+                        <button className="button button-secondary" type="button" onClick={applyProvisionIpHelp} disabled={busy || provisionIpChecking}>
+                          Help me with free IPs
+                        </button>
                       </div>
 
                       {provisionIpCheckSummary ? (
@@ -2641,23 +2604,12 @@ function App() {
                                   <small>
                                     {vm.isSuggested
                                       ? 'This IP was filled by the free-IP helper.'
-                                      : 'This value is checked again when you click Check for free IP addresses.'}
+                                      : 'This value is validated when you continue to the next step.'}
                                   </small>
                                 </label>
                               </article>
                             );
                           })}
-                        </div>
-
-                        <div className="wizard-card-actions wizard-card-actions-inline wizard-network-check-row">
-                          <button
-                            className="button button-secondary"
-                            type="button"
-                            onClick={() => checkProvisionIpAvailability()}
-                            disabled={busy || provisionIpChecking || !provisionVmIpValidation.ok}
-                          >
-                            {provisionIpChecking ? 'Checking...' : 'Check for free IP addresses'}
-                          </button>
                         </div>
 
                         {provisionVmIpValidation.ok ? null : (
