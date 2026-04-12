@@ -42,6 +42,7 @@ Twinbox is a Talos Linux based configuration for a Kubernetes cluster. Treat the
 - Use `docker compose`, not legacy `docker-compose`.
 - Keep `manager-data/` as runtime state only.
 - The host does not carry a full repo checkout; the executable Twinbox code lives in the manager container images, while `/opt/twinbox` stores runtime and bootstrap state.
+- docker-compose.yml on the management vm is in /opt/twinbox
 - Use `apply_patch` for manual file edits.
 - Prefer small, targeted changes in the relevant component:
   - UI: `manager-web/src/*`
