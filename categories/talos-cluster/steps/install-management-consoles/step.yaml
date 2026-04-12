@@ -11,11 +11,6 @@ depends_on:
 dashy:
   items:
     - section: Platform
-      title: Twinbox Wizard
-      description: Web wizard on the management VM
-      icon: fas fa-hat-wizard
-      url_template: https://twinboxwizard.__ZONE_NAME__
-    - section: Platform
       title: Proxmox
       description: Virtualization host
       icon: si-proxmox
