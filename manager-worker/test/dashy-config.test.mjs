@@ -80,7 +80,7 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   assert(platformSection.items.some((item) => item.title === "Argo CD" && item.url === "https://argocd.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "Authentik" && item.url === "https://authentik.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "Grafana" && item.url === "https://grafana.tst.example.com"));
-  assert(platformSection.items.some((item) => item.title === "Loki" && item.url === "https://loki.tst.example.com"));
+  assert(platformSection.items.some((item) => item.title === "Loki" && item.url === "https://grafana.tst.example.com/explore"));
   assert(platformSection.items.some((item) => item.title === "Twinbox Wizard" && item.url === "https://twinboxwizard.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "SeaweedFS Admin" && item.url === "https://seaweedfs-admin.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "Cloudtty" && item.url === "https://shell.example.net"));

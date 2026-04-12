@@ -13,9 +13,9 @@ dashy:
   items:
     - section: Platform
       title: Loki
-      description: Log aggregation backend
+      description: Open logs in Grafana Explore
       icon: fas fa-file-alt
-      url_template: https://loki.__ZONE_NAME__
+      url_template: https://grafana.__ZONE_NAME__/explore
 inputs: []
 secrets:
   files:
