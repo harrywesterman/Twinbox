@@ -1203,13 +1203,6 @@
   background: rgba(248, 250, 252, 0.92);
 }
 
-.wizard-placement-management-card {
-  border-color: rgba(96, 165, 250, 0.24);
-  background:
-    radial-gradient(circle at top right, rgba(96, 165, 250, 0.08), transparent 24%),
-    rgba(255, 255, 255, 0.96);
-}
-
 .wizard-placement-host.is-droppable {
   border-color: rgba(20, 184, 166, 0.36);
   box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.08) inset;
@@ -1280,6 +1273,15 @@
   border-color: rgba(96, 165, 250, 0.3);
 }
 
+.wizard-vm-card.is-fixed {
+  cursor: default;
+  border-style: dashed;
+  border-color: rgba(96, 165, 250, 0.34);
+  background:
+    radial-gradient(circle at top right, rgba(96, 165, 250, 0.08), transparent 22%),
+    rgba(255, 255, 255, 0.98);
+}
+
 .wizard-vm-card-title {
   color: #0f766e;
   font-size: 0.72rem;
@@ -1293,6 +1295,10 @@
 
 .wizard-vm-card.is-suggested .wizard-vm-card-title {
   color: #2563eb;
+}
+
+.wizard-vm-card.is-fixed .wizard-vm-card-title {
+  color: #1d4ed8;
 }
 
 .wizard-vm-card strong {
@@ -1313,23 +1319,6 @@
 .wizard-empty-inline {
   padding: 12px 14px;
   border-radius: 16px;
-}
-
-.wizard-placement-fixed-details {
-  display: grid;
-  gap: 6px;
-  padding: 2px 2px 0;
-}
-
-.wizard-placement-fixed-details span {
-  color: var(--ink-soft);
-  font-size: 0.84rem;
-}
-
-.wizard-placement-fixed-details p {
-  margin: 0;
-  color: var(--ink-1);
-  line-height: 1.5;
 }
 
 .wizard-vm-card em {

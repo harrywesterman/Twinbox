@@ -520,25 +520,6 @@ function PlacementBoard({
       </div>
 
       <div className="wizard-placement-grid">
-        {board.managementVm ? (
-          <article className="wizard-placement-host wizard-placement-management-card" aria-label="Management VM">
-            <header className="wizard-placement-host-head">
-              <div>
-                <strong>Management VM</strong>
-                <span>{board.managementVm.name || 'Twinbox management VM'} · VMID {board.managementVm.vmid ?? '—'}</span>
-              </div>
-              <span className="wizard-status-badge is-neutral">Fixed</span>
-            </header>
-
-            <div className="wizard-placement-host-body">
-              <div className="wizard-placement-fixed-details">
-                <span>Currently on {board.managementVm.node || 'an unknown Proxmox host'}</span>
-                <p>It stays fixed and does not move with the cluster VMs.</p>
-              </div>
-            </div>
-          </article>
-        ) : null}
-
         {board.hostCards.map((host) => (
           <article
             key={host.id}
@@ -563,28 +544,51 @@ function PlacementBoard({
 
             <div className="wizard-placement-host-body">
               {host.assignments.length > 0 ? (
-                host.assignments.map((vm) => (
-                  <button
-                    key={vm.name}
-                    className={`wizard-vm-card ${draggingVmName === vm.name ? 'is-dragging' : ''} ${vm.assignmentSource === 'user-selected' ? 'is-user-selected' : vm.assignmentSource === 'suggested' ? 'is-suggested' : 'is-unassigned'}`}
-                  type="button"
-                  draggable
-                  onDragStart={(event) => onDragStart(event, vm.name)}
-                  onDragEnd={onDragEnd}
-                >
-                  <span className="wizard-vm-card-title">{vm.label}</span>
-                  <strong>{vm.name}</strong>
-                  <small>VMID {vm.vmid} | {vm.cpu} CPU | {formatMemoryMb(vm.memory_mb)} RAM | {vm.disk_gb} GB disk</small>
-                  <em>
-                    {vm.assignmentSource === 'user-selected'
-                      ? `You placed this VM on ${host.name}.`
-                      : vm.assignmentSource === 'suggested'
-                        ? `Suggested here to balance CPU, memory, and disk across the cluster.`
-                        : 'This VM is not assigned yet.'}
-                  </em>
-                </button>
-              ))
-            ) : (
+                host.assignments.map((vm) => {
+                  if (vm.isFixed) {
+                    return (
+                      <div
+                        key={vm.id || vm.name}
+                        className="wizard-vm-card is-fixed"
+                        role="group"
+                        aria-label={`${vm.label} on ${host.name}`}
+                      >
+                        <span className="wizard-vm-card-title">{vm.label}</span>
+                        <strong>{vm.name}</strong>
+                        <small>
+                          {vm.vmid != null ? `VMID ${vm.vmid}` : 'VMID —'}
+                          {vm.cpu ? ` | ${vm.cpu} CPU` : ''}
+                          {vm.memory_mb != null ? ` | ${formatMemoryMb(vm.memory_mb)} RAM` : ''}
+                          {vm.disk_gb != null ? ` | ${vm.disk_gb} GB disk` : ''}
+                        </small>
+                        <em>Fixed on this host and included in the resource budget.</em>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <button
+                      key={vm.name}
+                      className={`wizard-vm-card ${draggingVmName === vm.name ? 'is-dragging' : ''} ${vm.assignmentSource === 'user-selected' ? 'is-user-selected' : vm.assignmentSource === 'suggested' ? 'is-suggested' : 'is-unassigned'}`}
+                      type="button"
+                      draggable
+                      onDragStart={(event) => onDragStart(event, vm.name)}
+                      onDragEnd={onDragEnd}
+                    >
+                      <span className="wizard-vm-card-title">{vm.label}</span>
+                      <strong>{vm.name}</strong>
+                      <small>VMID {vm.vmid} | {vm.cpu} CPU | {formatMemoryMb(vm.memory_mb)} RAM | {vm.disk_gb} GB disk</small>
+                      <em>
+                        {vm.assignmentSource === 'user-selected'
+                          ? `You placed this VM on ${host.name}.`
+                          : vm.assignmentSource === 'suggested'
+                            ? 'Suggested here to balance CPU, memory, and disk across the cluster.'
+                            : 'This VM is not assigned yet.'}
+                      </em>
+                    </button>
+                  );
+                })
+              ) : (
                 <p className="wizard-empty wizard-empty-inline">Drop a VM here.</p>
               )}
             </div>

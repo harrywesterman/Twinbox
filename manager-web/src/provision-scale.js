@@ -58,6 +58,11 @@ function normalizeHostName(value) {
   return String(value || '').trim();
 }
 
+function getVmResourceNumber(value, divisor) {
+  const resolved = toNumber(value, 0);
+  return resolved > 0 ? resolved / divisor : 0;
+}
+
 export function formatMemoryMb(value) {
   const mb = Math.max(0, roundToInteger(toNumber(value, 0)));
   if (mb >= MB_PER_GB) {
@@ -346,6 +351,45 @@ export function buildProvisionHostCards(resources) {
   ));
 }
 
+function buildManagementVmResource(vmResources, hostLookup) {
+  if (!Array.isArray(vmResources) || !hostLookup) {
+    return null;
+  }
+
+  const resource = vmResources.find((entry) => {
+    const name = normalizeHostName(entry?.name || entry?.vm_name || entry?.id);
+    const tags = String(entry?.tags || '').toLowerCase();
+    return tags.includes('management') || name.endsWith('-mgt') || name.endsWith('mgt');
+  });
+
+  if (!resource) {
+    return null;
+  }
+
+  const node = normalizeHostName(resource?.node || resource?.statusnode || '');
+  const host = hostLookup.get(node) || null;
+  const memoryMb = getVmResourceNumber(resource?.maxmem || resource?.mem, 1024 * 1024);
+  const diskGb = getVmResourceNumber(resource?.maxdisk || resource?.disk, 1024 * 1024 * 1024);
+
+  return {
+    id: `management-${normalizeHostName(resource?.name || resource?.vm_name || resource?.vmid || 'vm')}`,
+    name: normalizeHostName(resource?.name || resource?.vm_name || resource?.id || 'Twinbox management VM'),
+    label: 'Management VM',
+    type: 'management',
+    vmid: resource?.vmid ?? null,
+    hostId: node,
+    hostName: host?.name || node,
+    cpu: Math.max(0, roundToInteger(toNumber(resource?.maxcpu, 0))),
+    memory_mb: memoryMb > 0 ? memoryMb : null,
+    disk_gb: diskGb > 0 ? diskGb : null,
+    status: String(resource?.status || resource?.qmpstatus || 'unknown'),
+    assignmentSource: 'fixed',
+    isFixed: true,
+    isSuggested: false,
+    isUserSelected: false,
+  };
+}
+
 export function buildProvisionVmPlan(stepInputs, currentValues = {}) {
   const baseline = buildBaseline(stepInputs);
   const values = currentValues && typeof currentValues === 'object' ? currentValues : {};
@@ -389,18 +433,80 @@ export function buildProvisionVmPlan(stepInputs, currentValues = {}) {
   return plan;
 }
 
-function chooseBestHostForVm(vm, hostCards) {
+function compareVmPlacementState(leftState, rightState, vmType) {
+  if (vmType === 'controlplane') {
+    if (leftState.controlplaneCount !== rightState.controlplaneCount) {
+      return leftState.controlplaneCount - rightState.controlplaneCount;
+    }
+  } else if (vmType === 'worker') {
+    if (leftState.workerCount !== rightState.workerCount) {
+      return leftState.workerCount - rightState.workerCount;
+    }
+  }
+
+  if (leftState.totalCount !== rightState.totalCount) {
+    return leftState.totalCount - rightState.totalCount;
+  }
+
+  return 0;
+}
+
+function clonePlacementState(sourceState = new Map()) {
+  const nextState = new Map();
+  for (const [hostId, state] of sourceState.entries()) {
+    nextState.set(hostId, {
+      controlplaneCount: state?.controlplaneCount || 0,
+      workerCount: state?.workerCount || 0,
+      totalCount: state?.totalCount || 0,
+    });
+  }
+  return nextState;
+}
+
+function compareHostCandidates(leftHost, rightHost, vm, placementState) {
+  const leftState = placementState.get(leftHost.id) || {
+    controlplaneCount: 0,
+    workerCount: 0,
+    totalCount: 0,
+  };
+  const rightState = placementState.get(rightHost.id) || {
+    controlplaneCount: 0,
+    workerCount: 0,
+    totalCount: 0,
+  };
+
+  const occupancyComparison = compareVmPlacementState(leftState, rightState, vm.type);
+  if (occupancyComparison !== 0) {
+    return occupancyComparison;
+  }
+
+  const leftResourceScore = (
+    (leftHost.freeDiskGb / Math.max(1, vm.disk_gb)) * 3
+    + (leftHost.freeCpuCores / Math.max(1, vm.cpu))
+    + (leftHost.freeMemoryMb / Math.max(1, vm.memory_mb))
+  );
+  const rightResourceScore = (
+    (rightHost.freeDiskGb / Math.max(1, vm.disk_gb)) * 3
+    + (rightHost.freeCpuCores / Math.max(1, vm.cpu))
+    + (rightHost.freeMemoryMb / Math.max(1, vm.memory_mb))
+  );
+
+  if (leftResourceScore !== rightResourceScore) {
+    return rightResourceScore - leftResourceScore;
+  }
+
+  return normalizeHostName(leftHost?.name || leftHost?.id).localeCompare(
+    normalizeHostName(rightHost?.name || rightHost?.id),
+    undefined,
+    { sensitivity: 'base' },
+  );
+}
+
+function chooseBestHostForVm(vm, hostCards, placementState = new Map()) {
   let bestHost = null;
-  let bestScore = -1;
 
   for (const host of hostCards) {
-    const cpuScore = host.freeCpuCores > 0 ? host.freeCpuCores / Math.max(1, vm.cpu) : 0;
-    const memoryScore = host.freeMemoryMb > 0 ? host.freeMemoryMb / Math.max(1, vm.memory_mb) : 0;
-    const diskScore = host.freeDiskGb > 0 ? host.freeDiskGb / Math.max(1, vm.disk_gb) : 0;
-    const score = (diskScore * 3) + cpuScore + memoryScore;
-
-    if (score > bestScore) {
-      bestScore = score;
+    if (!bestHost || compareHostCandidates(host, bestHost, vm, placementState) < 0) {
       bestHost = host;
     }
   }
@@ -408,7 +514,7 @@ function chooseBestHostForVm(vm, hostCards) {
   return bestHost;
 }
 
-export function suggestVmNodeMap(vmPlan, hostCards, currentMap = {}) {
+export function suggestVmNodeMap(vmPlan, hostCards, currentMap = {}, placementState = new Map()) {
   const plan = Array.isArray(vmPlan) ? vmPlan : [];
   const hosts = Array.isArray(hostCards) ? hostCards.map((host) => ({ ...host })) : [];
   const assignments = {};
@@ -418,7 +524,7 @@ export function suggestVmNodeMap(vmPlan, hostCards, currentMap = {}) {
     const preservedHost = typeof currentMap?.[vm.name] === 'string' ? normalizeHostName(currentMap[vm.name]) : '';
     const host = preservedHost && hostLookup.has(preservedHost)
       ? hostLookup.get(preservedHost)
-      : chooseBestHostForVm(vm, hosts);
+      : chooseBestHostForVm(vm, hosts, placementState);
 
     if (!host) {
       assignments[vm.name] = preservedHost || '';
@@ -426,6 +532,16 @@ export function suggestVmNodeMap(vmPlan, hostCards, currentMap = {}) {
     }
 
     assignments[vm.name] = host.id;
+    const state = placementState.get(host.id);
+    if (state) {
+      state.totalCount += 1;
+      if (vm.type === 'controlplane') {
+        state.controlplaneCount += 1;
+      } else if (vm.type === 'worker') {
+        state.workerCount += 1;
+      }
+    }
+
     host.freeCpuCores = Math.max(0, host.freeCpuCores - vm.cpu);
     host.freeMemoryMb = Math.max(0, host.freeMemoryMb - vm.memory_mb);
     host.freeDiskGb = Math.max(0, host.freeDiskGb - vm.disk_gb);
@@ -434,7 +550,7 @@ export function suggestVmNodeMap(vmPlan, hostCards, currentMap = {}) {
   return assignments;
 }
 
-function buildVmSizeMap(vmPlan, hostCards, currentMap = {}, scalePercent = DEFAULT_SCALE_PERCENT, allowSuggestedPlacement = true) {
+function buildVmSizeMap(vmPlan, hostCards, currentMap = {}, scalePercent = DEFAULT_SCALE_PERCENT, allowSuggestedPlacement = true, placementState = new Map()) {
   const plan = Array.isArray(vmPlan) ? vmPlan : [];
   const hosts = Array.isArray(hostCards) ? hostCards.map((host) => ({ ...host })) : [];
   const hostLookup = new Map(hosts.map((host) => [host.id, host]));
@@ -447,7 +563,7 @@ function buildVmSizeMap(vmPlan, hostCards, currentMap = {}, scalePercent = DEFAU
     const host = preservedHost && hostLookup.has(preservedHost)
       ? hostLookup.get(preservedHost)
       : allowSuggestedPlacement
-        ? chooseBestHostForVm(vm, hosts)
+        ? chooseBestHostForVm(vm, hosts, placementState)
         : null;
 
     if (!host) {
@@ -473,6 +589,16 @@ function buildVmSizeMap(vmPlan, hostCards, currentMap = {}, scalePercent = DEFAU
     };
 
     assignments[vm.name] = host.id;
+    const state = placementState.get(host.id);
+    if (state) {
+      state.totalCount += 1;
+      if (vm.type === 'controlplane') {
+        state.controlplaneCount += 1;
+      } else if (vm.type === 'worker') {
+        state.workerCount += 1;
+      }
+    }
+
     host.freeCpuCores = Math.max(0, host.freeCpuCores - sizeMap[vm.name].cpu);
     host.freeMemoryMb = Math.max(0, host.freeMemoryMb - sizeMap[vm.name].memory_mb);
     host.freeDiskGb = Math.max(0, host.freeDiskGb - sizeMap[vm.name].disk_gb);
@@ -491,18 +617,31 @@ export function buildProvisionPlacementBoard(stepInputs, currentValues = {}, res
     ? currentValues.vm_node_map
     : {};
   const scalePercent = currentValues?.scale_percent ?? DEFAULT_SCALE_PERCENT;
-  const suggestedVmNodeMap = suggestVmNodeMap(vmPlan, hostCards, {});
-  const suggestedPlacement = buildVmSizeMap(vmPlan, hostCards, suggestedVmNodeMap, scalePercent);
-  const placement = buildVmSizeMap(vmPlan, hostCards, currentMap, scalePercent, false);
   const hostLookup = new Map(hostCards.map((host) => [host.id, host]));
   const placementsByHost = new Map(hostCards.map((host) => [host.id, []]));
-  const managementVmResource = Array.isArray(resources?.vms)
-    ? resources.vms.find((entry) => {
-      const name = normalizeHostName(entry?.name || entry?.vm_name || entry?.id);
-      const tags = String(entry?.tags || '').toLowerCase();
-      return tags.includes('management') || name.endsWith('-mgt') || name.endsWith('mgt');
-    })
-    : null;
+  const managementVm = buildManagementVmResource(resources?.vms, hostLookup);
+  const basePlacementState = new Map(hostCards.map((host) => [host.id, {
+    controlplaneCount: 0,
+    workerCount: 0,
+    totalCount: 0,
+  }]));
+
+  if (managementVm?.hostId && basePlacementState.has(managementVm.hostId)) {
+    const state = basePlacementState.get(managementVm.hostId);
+    state.totalCount += 1;
+    const fixedEntry = {
+      ...managementVm,
+      assignedHostId: managementVm.hostId,
+      assignedHostName: managementVm.hostName || managementVm.hostId,
+    };
+    placementsByHost.get(managementVm.hostId).push(fixedEntry);
+  }
+
+  const suggestedPlacementState = clonePlacementState(basePlacementState);
+  const currentPlacementState = clonePlacementState(basePlacementState);
+  const suggestedVmNodeMap = suggestVmNodeMap(vmPlan, hostCards, {}, suggestedPlacementState);
+  const suggestedPlacement = buildVmSizeMap(vmPlan, hostCards, suggestedVmNodeMap, scalePercent, true, clonePlacementState(basePlacementState));
+  const placement = buildVmSizeMap(vmPlan, hostCards, currentMap, scalePercent, false, currentPlacementState);
 
   for (const vm of vmPlan) {
     const hostId = placement.vmNodeMap[vm.name];
@@ -534,13 +673,7 @@ export function buildProvisionPlacementBoard(stepInputs, currentValues = {}, res
 
   return {
     vmPlan,
-    managementVm: managementVmResource
-      ? {
-        name: normalizeHostName(managementVmResource?.name || managementVmResource?.vm_name || managementVmResource?.id),
-        node: normalizeHostName(managementVmResource?.node || managementVmResource?.statusnode || ''),
-        vmid: managementVmResource?.vmid ?? null,
-      }
-      : null,
+    managementVm,
     hostCards: hostCards.map((host) => ({
       ...host,
       assignments: placementsByHost.get(host.id) || [],

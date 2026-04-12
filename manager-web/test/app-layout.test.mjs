@@ -60,10 +60,10 @@ test('app source defines a minimal wizard shell with guided input and step-by-st
   assert.match(source, /clearInstallStepLogs\(\)/, 'expected recreation to clear stale install logs');
   assert.match(source, /Loading cluster data…/, 'expected a visible loading banner while refreshing');
   assert.match(source, /Check for free IP addresses/, 'expected an explicit IP availability check action');
-  assert.match(source, /Management VM/, 'expected the placement board to show the management VM host');
-  assert.match(source, /wizard-placement-management-card/, 'expected a fixed management VM placement card');
-  assert.match(source, /wizard-placement-fixed-details/, 'expected management VM details inside the fixed card');
-  assert.match(source, /is-neutral/, 'expected the management VM badge to use a neutral tone');
+  assert.match(source, /wizard-vm-card is-fixed/, 'expected the management VM to render as a fixed VM card');
+  assert.match(source, /Fixed on this host and included in the resource budget\./, 'expected the fixed management VM copy');
+  assert.doesNotMatch(source, /wizard-placement-management-card/, 'expected the old standalone management card to be removed');
+  assert.doesNotMatch(source, /wizard-placement-fixed-details/, 'expected the old fixed-details block to be removed');
   assert.doesNotMatch(source, /Sizing comes first/, 'expected the old explanatory placement note to be removed');
   assert.doesNotMatch(source, /Retry balanced suggestion/, 'expected the old placement button label to be removed');
   assert.doesNotMatch(source, /Waiting for step 1 suggestions to load/, 'expected the old loading copy to be removed');
@@ -122,6 +122,7 @@ test('styles define a wizard-first, responsive installer layout', async () => {
   assert.match(css, /\.wizard-output-panel\.is-live\s*\{/, 'expected live output emphasis');
   assert.doesNotMatch(css, /\.technical-panel\[open\]\s*\{/, 'expected technical details to be removed');
   assert.match(css, /\.wizard-output-panel-minimal\s*\{/, 'expected output to stay visible on the page');
+  assert.match(css, /\.wizard-vm-card\.is-fixed\s*\{/, 'expected a fixed VM card style');
   assert.match(css, /\.wizard-install-stage\s*\{/, 'expected a dedicated install stage wrapper');
   assert.match(css, /\.wizard-install-stage-icon\s*\{/, 'expected the install-stage icon treatment');
   assert.match(css, /\.wizard-install-output\s*\{/, 'expected a large output window for install mode');
@@ -131,8 +132,6 @@ test('styles define a wizard-first, responsive installer layout', async () => {
   assert.match(css, /\.wizard-step-icon-large\s*\{/, 'expected the active-step icon treatment');
   assert.match(css, /\.wizard-field input\[type='range'\]\s*\{/, 'expected the range slider styling');
   assert.match(css, /\.wizard-field-dns\s*\{/, 'expected a compact DNS field style');
-  assert.match(css, /\.wizard-placement-management-card\s*\{/, 'expected the fixed management VM card styling');
-  assert.match(css, /\.wizard-status-badge\.is-neutral\s*\{/, 'expected a neutral status badge tone');
   assert.doesNotMatch(css, /\.wizard-risk-list\s*\{/, 'expected current risks to be removed');
   assert.match(css, /@media \(max-width:\s*1200px\)/, 'expected large-tablet responsiveness');
   assert.match(css, /@media \(max-width:\s*720px\)/, 'expected mobile responsiveness');

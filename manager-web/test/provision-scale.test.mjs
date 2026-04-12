@@ -135,7 +135,7 @@ test('placement board suggests a host-aware Talos VM layout', () => {
   assert.ok(board.vmSizeMap['worker-1'].disk_gb >= 100);
 });
 
-test('placement board exposes the management VM host when Proxmox resources include it', () => {
+test('placement board keeps the management VM fixed on its host and exposes its size', () => {
   const board = buildProvisionPlacementBoard(stepInputs, {}, {
     ...balancedPlacementResources,
     vms: [
@@ -146,15 +146,34 @@ test('placement board exposes the management VM host when Proxmox resources incl
         tags: 'twinbox;management;bootstrap',
         status: 'running',
         vmid: 190,
+        maxmem: 8589934592,
+        maxdisk: 64424509440,
       },
     ],
   });
 
   assert.deepEqual(board.managementVm, {
+    id: 'management-twinbox-demo-mgt',
     name: 'twinbox-demo-mgt',
-    node: 'pve-b',
+    label: 'Management VM',
+    type: 'management',
     vmid: 190,
+    hostId: 'pve-b',
+    hostName: 'pve-b',
+    cpu: 0,
+    memory_mb: 8192,
+    disk_gb: 60,
+    status: 'running',
+    assignmentSource: 'fixed',
+    isFixed: true,
+    isSuggested: false,
+    isUserSelected: false,
   });
+
+  const host = board.hostCards.find((entry) => entry.id === 'pve-b');
+  assert.ok(host.assignments.some((vm) => vm.isFixed && vm.name === 'twinbox-demo-mgt'));
+  assert.equal(host.assignments.find((vm) => vm.isFixed && vm.name === 'twinbox-demo-mgt').disk_gb, 60);
+  assert.equal(host.assignments.find((vm) => vm.isFixed && vm.name === 'twinbox-demo-mgt').memory_mb, 8192);
 });
 
 test('placement board sorts hosts alphabetically by name', () => {
@@ -305,4 +324,73 @@ test('default placement spreads one control plane and one worker across each hos
   assert.equal(board.suggestedVmNodeMap['worker-2'], 'pve-b');
   assert.equal(board.suggestedVmNodeMap['cp-3'], 'pve-c');
   assert.equal(board.suggestedVmNodeMap['worker-3'], 'pve-c');
+});
+
+test('automatic placement prefers separate hosts for control planes and one worker per host before stacking', () => {
+  const board = buildProvisionPlacementBoard(stepInputs, {}, {
+    nodes: [
+      {
+        node: 'pve-a',
+        status: 'online',
+        maxmem: 34359738368,
+        mem: 0,
+        maxdisk: 1099511627776,
+        disk: 0,
+        maxcpu: 16,
+        cpu: 0,
+      },
+      {
+        node: 'pve-b',
+        status: 'online',
+        maxmem: 17179869184,
+        mem: 0,
+        maxdisk: 549755813888,
+        disk: 0,
+        maxcpu: 8,
+        cpu: 0,
+      },
+      {
+        node: 'pve-c',
+        status: 'online',
+        maxmem: 17179869184,
+        mem: 0,
+        maxdisk: 549755813888,
+        disk: 0,
+        maxcpu: 8,
+        cpu: 0,
+      },
+    ],
+    vms: [
+      {
+        node: 'pve-b',
+        name: 'twinbox-demo-mgt',
+        tags: 'management',
+        status: 'running',
+        vmid: 190,
+        maxmem: 4294967296,
+        maxdisk: 32212254720,
+      },
+    ],
+  });
+
+  const cpHosts = new Set([
+    board.suggestedVmNodeMap['cp-1'],
+    board.suggestedVmNodeMap['cp-2'],
+    board.suggestedVmNodeMap['cp-3'],
+  ]);
+  const workerHosts = new Set([
+    board.suggestedVmNodeMap['worker-1'],
+    board.suggestedVmNodeMap['worker-2'],
+    board.suggestedVmNodeMap['worker-3'],
+  ]);
+
+  assert.equal(cpHosts.size, 3);
+  assert.equal(workerHosts.size, 3);
+  assert.equal(board.suggestedVmNodeMap['cp-1'], 'pve-a');
+  assert.equal(board.suggestedVmNodeMap['cp-2'], 'pve-c');
+  assert.equal(board.suggestedVmNodeMap['cp-3'], 'pve-b');
+  assert.equal(board.suggestedVmNodeMap['worker-1'], 'pve-a');
+  assert.equal(board.suggestedVmNodeMap['worker-2'], 'pve-c');
+  assert.equal(board.suggestedVmNodeMap['worker-3'], 'pve-b');
+  assert.equal(board.hostCards.find((host) => host.id === 'pve-b').assignments[0].isFixed, true);
 });
