@@ -969,7 +969,7 @@ app.get("/api/health", (_, res) => {
   res.json({ ok: true, time: now() });
 });
 
-app.get("/api/secrets/*", (req, res) => {
+app.get(/^\/api\/secrets\/.*$/, (req, res) => {
   const secretKeyPath = decodeURIComponent(String(req.originalUrl || "").split("/api/secrets/")[1] || "");
 
   try {
