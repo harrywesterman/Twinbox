@@ -7,6 +7,7 @@ import { STEP_ICON_MANIFEST } from '../src/assets/step-icons/manifest.js';
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(scriptDir, '..');
 const iconsDir = path.join(webRoot, 'src/assets/step-icons');
+const publicIconsDir = path.join(webRoot, 'public/assets/step-icons');
 const pngSize = 256;
 
 function asHexChannel(value) {
@@ -168,6 +169,8 @@ async function main() {
     deviceScaleFactor: 2,
   });
 
+  await fs.mkdir(publicIconsDir, { recursive: true });
+
   const generated = [];
 
   for (const entry of STEP_ICON_MANIFEST) {
@@ -196,6 +199,8 @@ async function main() {
 
     await fs.writeFile(svgPath, finalSvg);
     await renderPng(page, finalSvg, pngPath);
+    await fs.writeFile(path.join(publicIconsDir, `${entry.fileBase}.svg`), finalSvg);
+    await renderPng(page, finalSvg, path.join(publicIconsDir, `${entry.fileBase}.png`));
     generated.push(entry.fileBase);
   }
 
