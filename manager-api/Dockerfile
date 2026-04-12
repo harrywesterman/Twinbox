@@ -11,6 +11,7 @@ RUN cd /opt/twinbox/manager-api && npm install --omit=dev
 
 COPY lib ./lib
 COPY categories ./categories
+COPY manager-web/src/assets/step-icons ./manager-web/src/assets/step-icons
 COPY manager-api/src ./manager-api/src
 
 WORKDIR /opt/twinbox/manager-api

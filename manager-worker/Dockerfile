@@ -35,6 +35,7 @@ COPY infra ./infra
 COPY gitops ./gitops
 COPY scripts/manager ./scripts/manager
 COPY scripts/get-talos-image-factory.sh ./scripts/get-talos-image-factory.sh
+COPY manager-web/src/assets/step-icons ./manager-web/src/assets/step-icons
 
 RUN chmod +x ./scripts/manager/*.sh
 RUN chmod +x ./scripts/get-talos-image-factory.sh
