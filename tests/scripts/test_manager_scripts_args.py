@@ -1067,12 +1067,8 @@ def test_argo_bootstrap_script_installs_argocd_without_root_application_tree():
 
 
 def test_bootstrap_apps_tolerate_single_node_control_plane():
-    whoami_text = _whoami_deployment_text()
     headlamp_text = _headlamp_values_text()
 
-    assert "tolerations:" in whoami_text
-    assert "node-role.kubernetes.io/control-plane" in whoami_text
-    assert "node-role.kubernetes.io/master" in whoami_text
     assert "tolerations:" in headlamp_text
     assert "node-role.kubernetes.io/control-plane" in headlamp_text
     assert "node-role.kubernetes.io/master" in headlamp_text
@@ -1102,11 +1098,9 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     authentik_run_text = _authentik_step_text()
     cloudflare_text = CLOUDFLARE_STEP_MANIFEST.read_text(encoding="utf-8")
     choose_ingress_text = CHOOSE_INGRESS_ROUTE_STEP_MANIFEST.read_text(encoding="utf-8")
-    whoami_text = WHOAMI_STEP_MANIFEST.read_text(encoding="utf-8")
     headlamp_text = HEADLAMP_STEP_MANIFEST.read_text(encoding="utf-8")
     grafana_text = GRAFANA_STEP_MANIFEST.read_text(encoding="utf-8")
     prometheus_text = PROMETHEUS_STEP_MANIFEST.read_text(encoding="utf-8")
-    traefik_manager_text = TRAEFIK_MANAGER_STEP_MANIFEST.read_text(encoding="utf-8")
     wiredoor_text = WIREDOOR_GATEWAY_STEP_MANIFEST.read_text(encoding="utf-8")
     wiredoor_bastion_text = WIREDOOR_BASTION_STEP_MANIFEST.read_text(encoding="utf-8")
 
@@ -1497,9 +1491,6 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert 'gitops/apps/platform-ingress.yaml' in cloudflare_dns_run_text
     assert "apply-argocd-application.sh" in cloudflare_dns_run_text
 
-    assert "install-traefik" in whoami_text
-    assert "script: categories/talos-cluster/steps/install-whoami/run.sh" in whoami_text
-
     assert "install-cloudnativepg" in headlamp_text
     assert (
         "script: categories/talos-cluster/steps/install-headlamp/run.sh"
@@ -1520,16 +1511,6 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
         "script: categories/talos-cluster/steps/install-prometheus/run.sh"
         in prometheus_text
     )
-    assert "install-traefik" in traefik_manager_text
-    assert "install-authentik-idp" in traefik_manager_text
-    assert "install-longhorn-storage" in traefik_manager_text
-    assert "choose-ingress-route" in traefik_manager_text
-    assert (
-        "script: categories/talos-cluster/steps/install-traefik-manager/run.sh"
-        in traefik_manager_text
-    )
-
-
 def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     longhorn_app_text = LONGHORN_APP.read_text(encoding="utf-8")
     external_secrets_app_text = (
@@ -1539,14 +1520,12 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
         REPO_ROOT / "gitops" / "values" / "external-secrets.yaml"
     ).read_text(encoding="utf-8")
     traefik_app_text = _traefik_app_text()
-    whoami_app_text = WHOAMI_APP.read_text(encoding="utf-8")
     headlamp_app_text = HEADLAMP_APP.read_text(encoding="utf-8")
     wiredoor_gateway_app_text = _wiredoor_gateway_app_text()
     traefik_values_text = _traefik_values_text()
     wiredoor_gateway_values_text = _wiredoor_gateway_values_text()
     traefik_externalsecret_text = _traefik_dashboard_externalsecret_text()
     wiredoor_externalsecret_text = _wiredoor_gateway_externalsecret_text()
-    whoami_ingressroute_text = WHOAMI_INGRESSROUTE.read_text(encoding="utf-8")
     headlamp_ingressroute_text = HEADLAMP_INGRESSROUTE.read_text(encoding="utf-8")
     authentik_ingressroute_text = (
         REPO_ROOT / "gitops" / "platform" / "authentik" / "ingressroute.yaml"
@@ -1568,9 +1547,7 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "enabled: true" in traefik_values_text
     assert "existingSecret: wiredoor-gateway" in wiredoor_gateway_values_text
     assert "token:" not in wiredoor_gateway_values_text
-    assert "kind: Application" in whoami_app_text
     assert "kind: Application" in headlamp_app_text
-    assert "path: gitops/platform-apps/whoami" in whoami_app_text
     assert "path: gitops/platform-apps/headlamp" in headlamp_app_text
     assert "path: gitops/platform-apps/wiredoor-gateway" in wiredoor_gateway_app_text
     assert "middlewares:" in authentik_ingressroute_text
@@ -1580,7 +1557,6 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "customResponseHeaders" in authentik_cors_text
     assert "Access-Control-Allow-Origin" in authentik_cors_text
     assert "https://admin.__ZONE_NAME__" in authentik_cors_text
-    assert "Host(`whoami.__ZONE_NAME__`)" in whoami_ingressroute_text
     assert "Host(`headlamp.__ZONE_NAME__`)" in headlamp_ingressroute_text
     assert "Host(`grafana.__ZONE_NAME__`)" in grafana_ingressroute_text
     assert "Host(`hubble.__ZONE_NAME__`)" in HUBBLE_INGRESSROUTE.read_text(
@@ -2013,77 +1989,15 @@ def test_prometheus_step_applies_kube_prometheus_stack():
 
 
 def test_traefik_manager_step_deploys_browser_ui():
-    text = TRAEFIK_MANAGER_STEP_MANIFEST.read_text(encoding="utf-8")
-    run_text = TRAEFIK_MANAGER_STEP_SCRIPT.read_text(encoding="utf-8")
+    assert not TRAEFIK_MANAGER_STEP_MANIFEST.exists()
+    assert not TRAEFIK_MANAGER_STEP_SCRIPT.exists()
     script_text = _traefik_manager_script_text()
-    deployment_text = (
-        REPO_ROOT / "gitops" / "platform-apps" / "traefik-manager" / "deployment.yaml"
-    ).read_text(encoding="utf-8")
-    ingress_text = (
-        REPO_ROOT / "gitops" / "platform-apps" / "traefik-manager" / "ingressroute.yaml"
-    ).read_text(encoding="utf-8")
-    callback_ingress_text = (
-        REPO_ROOT
-        / "gitops"
-        / "platform-apps"
-        / "traefik-manager"
-        / "authentik-callback-ingressroute.yaml"
-    ).read_text(encoding="utf-8")
-    platform_kustomization_text = (
-        REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
-    ).read_text(encoding="utf-8")
-    platform_apps_kustomization_text = (
-        REPO_ROOT
-        / "gitops"
-        / "platform-apps"
-        / "traefik-manager"
-        / "kustomization.yaml"
-    ).read_text(encoding="utf-8")
 
-    assert "id: install-traefik-manager" in text
-    assert "title: Install Traefik Manager" in text
-    assert "order: 44" in text
-    assert "browser-based reverse-proxy management" in text
-    assert "install-traefik" in text
-    assert "install-authentik-idp" in text
-    assert "install-longhorn-storage" in text
-    assert "choose-ingress-route" in text
-    assert (
-        "script: categories/talos-cluster/steps/install-traefik-manager/run.sh" in text
-    )
-    assert ': "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"' in run_text
-    assert "install-traefik-manager.sh" in run_text
-    assert "ghcr.io/chr0nzz/traefik-manager:0.8.0" in deployment_text
-    assert "AUTH_ENABLED" in deployment_text
-    assert '"false"' in deployment_text
-    assert "COOKIE_SECURE" in deployment_text
-    assert "DOMAINS" in deployment_text
-    assert "traefik-manager.__ZONE_NAME__" in deployment_text
-    assert "TRAEFIK_API_URL" in deployment_text
-    assert "traefik.traefik.svc.cluster.local:8080" in deployment_text
-    assert "persistentVolumeClaim" in deployment_text
-    assert "livenessProbe" in deployment_text
-    assert "readinessProbe" in deployment_text
     assert "authentik-auth.sh" in script_text
     assert "openbao-secret-sync.sh" in script_text
     assert "Provisioning Authentik proxy application for Traefik Manager" in script_text
     assert "Traefik Manager" in script_text
     assert "outpost.goauthentik.io/auth/traefik" not in script_text
-    assert "authentik-forwardauth" in ingress_text
-    assert "namespace: traefik" in ingress_text
-    assert "Host(`traefik-manager.__ZONE_NAME__`)" in ingress_text
-    assert "traefik-manager-authentik-callback" in callback_ingress_text
-    assert "PathPrefix(`/outpost.goauthentik.io`)" in callback_ingress_text
-    assert "name: authentik-server" in callback_ingress_text
-    assert "namespace: authentik" in callback_ingress_text
-    assert "authentik-callback-ingressroute.yaml" in platform_apps_kustomization_text
-    assert "traefik-manager/namespace.yaml" not in platform_kustomization_text
-    assert "traefik-manager/pvc.yaml" not in platform_kustomization_text
-    assert "traefik-manager/service.yaml" not in platform_kustomization_text
-    assert "traefik-manager/deployment.yaml" not in platform_kustomization_text
-    assert "traefik-manager/ingressroute.yaml" not in platform_kustomization_text
-    assert "name: traefik-manager-wiredoor" not in platform_kustomization_text
-    assert "name: traefik-manager-tailscale" not in platform_kustomization_text
     assert 'kubectl delete application traefik-manager -n argocd --ignore-not-found=true' not in script_text
     assert '--application "platform-ingress"' not in script_text
     assert "gitops/apps/platform-ingress.yaml" not in script_text
@@ -2100,7 +2014,6 @@ def test_traefik_manager_step_deploys_browser_ui():
     assert 'mktemp "${TMPDIR:-/tmp}/traefik-manager-authentik-callback.XXXXXX.yaml"' in script_text
     assert ': "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"' in script_text
     assert "twinbox_public_zone_name" in script_text
-    assert not (REPO_ROOT / "gitops" / "apps" / "traefik-manager.yaml").exists()
 
 
 def test_argocd_cluster_secret_helper_writes_runtime_projection():
@@ -2185,7 +2098,7 @@ def test_loki_and_openbao_longhorn_sizes_are_right_sized():
 
     assert "size: 5Gi" in loki_values_text
     assert "size: 20Gi" not in loki_values_text
-    assert "size: 3Gi" in openbao_values_text
+    assert "size: 2Gi" in openbao_values_text
     assert "size: 10Gi" not in openbao_values_text
 
 
@@ -2403,17 +2316,8 @@ def test_configure_argocd_oidc_refreshes_platform_ingress_without_waiting():
 
 
 def test_cloudtty_platform_ingress_is_committed_to_gitops():
-    kustomization_text = (
-        REPO_ROOT / "gitops" / "platform-apps" / "cloudtty" / "kustomization.yaml"
-    ).read_text(encoding="utf-8")
-    ingress_text = (
-        REPO_ROOT / "gitops" / "platform-apps" / "cloudtty" / "ingressroute.yaml"
-    ).read_text(encoding="utf-8")
     script_text = _cloudtty_script_text()
 
-    assert "authentik-forwardauth-middleware.yaml" in kustomization_text
-    assert "ingressroute.yaml" in kustomization_text
-    assert "Host(`cloudtty.__ZONE_NAME__`)" in ingress_text
     assert 'PLATFORM_DIR="$WORKSPACE_ROOT/gitops/platform-apps/cloudtty"' in script_text
     assert 'kubectl apply -f "$PLATFORM_DIR/authentik-forwardauth-middleware.yaml"' in script_text
     assert 'kubectl apply -f "$rendered_ingressroute"' in script_text
@@ -2421,9 +2325,6 @@ def test_cloudtty_platform_ingress_is_committed_to_gitops():
 
 def test_platform_namespace_baseline_covers_shared_overlay_resources():
     assert not (REPO_ROOT / "gitops" / "platform" / "namespaces.yaml").exists()
-    assert "namespace.yaml" in (
-        REPO_ROOT / "gitops" / "platform-apps" / "traefik-manager" / "kustomization.yaml"
-    ).read_text(encoding="utf-8")
     assert "namespace.yaml" in (
         REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
@@ -2518,19 +2419,11 @@ def test_authentik_callback_ingressroutes_reference_the_authentik_namespace():
         / "traefik"
         / "authentik-callback-ingressroute.yaml"
     ).read_text(encoding="utf-8")
-    traefik_manager_callback_text = (
-        REPO_ROOT
-        / "gitops"
-        / "platform-apps"
-        / "traefik-manager"
-        / "authentik-callback-ingressroute.yaml"
-    ).read_text(encoding="utf-8")
 
     for callback_text in (
         hubble_callback_text,
         longhorn_callback_text,
         traefik_callback_text,
-        traefik_manager_callback_text,
     ):
         assert "name: authentik-server" in callback_text
         assert "namespace: authentik" in callback_text

@@ -171,12 +171,9 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-secret-sync",
                 "install-traefik",
                 "install-cloudnativepg",
-                "install-cloudtty",
-                "install-traefik-manager",
                 "choose-ingress-route",
                 "install-authentik-idp",
                 "create-users-and-groups",
-                "install-whoami",
                 "install-headlamp",
                 "install-grafana",
                 "install-prometheus",
@@ -213,11 +210,6 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert (
                 talos_steps["install-cloudnativepg"]["title"] == "Install CloudNativePG"
             )
-            assert talos_steps["install-cloudtty"]["title"] == "Install Cloudtty"
-            assert (
-                talos_steps["install-traefik-manager"]["title"]
-                == "Install Traefik Manager"
-            )
 
             assert (
                 talos_steps["choose-ingress-route"]["title"] == "Choose Ingress Route"
@@ -227,7 +219,6 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 talos_steps["create-users-and-groups"]["title"]
                 == "Create Users and Groups"
             )
-            assert talos_steps["install-whoami"]["title"] == "Install Whoami"
             assert talos_steps["install-headlamp"]["title"] == "Install Headlamp"
             assert talos_steps["install-grafana"]["title"] == "Install Grafana"
             assert talos_steps["install-prometheus"]["title"] == "Install Prometheus"
