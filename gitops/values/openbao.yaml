@@ -36,6 +36,10 @@ server:
 
         storage "raft" {
           path = "/openbao/data"
+
+          retry_join {
+            leader_api_addr = "http://openbao-active:8200"
+          }
         }
 
         seal "static" {
