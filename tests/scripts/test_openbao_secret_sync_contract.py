@@ -21,11 +21,7 @@ WIREDOOR_SECRET = (
     REPO_ROOT / "gitops" / "apps" / "wiredoor-gateway-secret" / "externalsecret.yaml"
 )
 TRAEFIK_SECRET = (
-    REPO_ROOT
-    / "gitops"
-    / "routes"
-    / "templates"
-    / "traefik-dashboard-externalsecret.yaml"
+    REPO_ROOT / "gitops" / "platform" / "traefik" / "traefik-dashboard-externalsecret.yaml"
 )
 ZULIP_STEP = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-zulip" / "step.yaml"
