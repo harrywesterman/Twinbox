@@ -157,7 +157,7 @@ function hasRequiredValue(input, value) {
   }
 
   if (input.type === 'integer') {
-    return Number.isFinite(Number(value));
+    return String(value ?? '').trim().length > 0 && Number.isFinite(Number(value));
   }
 
   return String(value ?? '').trim().length > 0;

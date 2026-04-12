@@ -9,9 +9,9 @@ import {
 const stepInputs = [
   { id: 'name', default: 'twinbox-cluster' },
   { id: 'start_vmid', default: 200 },
-  { id: 'vip_ip', default: '192.168.1.50' },
-  { id: 'node_prefix_length', default: 24 },
-  { id: 'gateway_ip', default: '192.168.1.1' },
+  { id: 'vip_ip', default: '' },
+  { id: 'node_prefix_length', default: '' },
+  { id: 'gateway_ip', default: '' },
   { id: 'dns_servers', default: '1.1.1.1,8.8.8.8' },
   { id: 'dns_domain', default: 'localdomain' },
 ];
@@ -129,9 +129,9 @@ test('mergeSuggestedProvisionDraft replaces first-load defaults with a live sugg
     currentDraft: {
       name: 'twinbox-cluster',
       start_vmid: 200,
-      vip_ip: '192.168.1.50',
-      node_prefix_length: 24,
-      gateway_ip: '192.168.1.1',
+      vip_ip: '',
+      node_prefix_length: '',
+      gateway_ip: '',
       dns_servers: '1.1.1.1,8.8.8.8',
       dns_domain: '',
     },
