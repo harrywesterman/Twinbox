@@ -2368,20 +2368,19 @@ function App() {
                   <button className="button button-primary" type="button" onClick={handleExportAnswers}>
                     Export all answers
                   </button>
-                  <a
+                  <button
                     className="button button-secondary"
-                    href={adminDashboardUrl || '#'}
-                    target="_blank"
-                    rel="noreferrer noopener"
+                    type="button"
+                    disabled={!adminDashboardUrl}
                     onClick={(event) => {
                       if (!adminDashboardUrl) {
-                        event.preventDefault();
+                        return;
                       }
+                      window.open(adminDashboardUrl, '_blank', 'noopener,noreferrer');
                     }}
-                    aria-disabled={!adminDashboardUrl}
                   >
-                    Open Admin dashboard
-                  </a>
+                    Open Admin Dashboard
+                  </button>
                 </div>
               </article>
             </section>
