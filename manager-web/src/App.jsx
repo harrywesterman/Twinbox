@@ -173,6 +173,25 @@ function downloadText(filename, content) {
   URL.revokeObjectURL(url);
 }
 
+function buildAdminDashboardUrl(cluster) {
+  const rawDomain = String(cluster?.dns_domain || '').trim();
+  if (!rawDomain) {
+    return '';
+  }
+
+  const host = rawDomain
+    .replace(/^https?:\/\//i, '')
+    .replace(/^\/+/, '')
+    .split('/')[0]
+    .replace(/^\.+/, '');
+
+  if (!host) {
+    return '';
+  }
+
+  return `https://admin.${host}`;
+}
+
 function formatInputValue(input, value) {
   if (input.type === 'boolean') {
     return Boolean(value);
@@ -986,6 +1005,7 @@ function App() {
       answers: initialAnswers,
     });
   }, [answers, busy, catalog, cluster, error, health, initialAnswers, logs, selectedStepId]);
+  const adminDashboardUrl = useMemo(() => buildAdminDashboardUrl(cluster), [cluster]);
   const isInstallPhase = hasStarted && wizardPhase === 'install' && !model.completion;
   const questionStepIndex = questionSteps.findIndex((step) => step.id === selectedStepId);
   const currentQuestionStep = questionStepIndex >= 0 ? questionSteps[questionStepIndex] : (questionSteps[0] || null);
@@ -2339,24 +2359,30 @@ function App() {
           ) : null}
 
           {model.completion ? (
-            <section className="wizard-finish-grid">
-              <article className="wizard-card wizard-card-accent">
+            <section className="wizard-completion-panel">
+              <article className="wizard-card wizard-card-accent wizard-completion-card">
                 <p className="eyebrow">Installation complete</p>
-                <h2>{model.completion.stepTitle}</h2>
+                <h2>{model.completion.title}</h2>
                 <p>{model.completion.summary}</p>
-                <div className="wizard-card-actions">
+                <div className="wizard-completion-actions">
                   <button className="button button-primary" type="button" onClick={handleExportAnswers}>
                     Export all answers
                   </button>
+                  <a
+                    className="button button-secondary"
+                    href={adminDashboardUrl || '#'}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    onClick={(event) => {
+                      if (!adminDashboardUrl) {
+                        event.preventDefault();
+                      }
+                    }}
+                    aria-disabled={!adminDashboardUrl}
+                  >
+                    Open Admin dashboard
+                  </a>
                 </div>
-              </article>
-
-              <article className="wizard-card">
-                <p className="eyebrow">Artifacts</p>
-                <KeyValueList
-                  items={model.activity.artifacts}
-                  emptyLabel="No cluster artifacts have been published yet."
-                />
               </article>
             </section>
           ) : isInstallPhase ? (

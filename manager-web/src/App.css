@@ -444,10 +444,11 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
-.wizard-finish-grid {
+.wizard-completion-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(340px, 0.75fr);
   gap: 18px;
+  width: min(1180px, 100%);
+  margin: 0 auto;
 }
 
 .wizard-card {
@@ -461,9 +462,38 @@
 
 .wizard-card-accent {
   background:
-    radial-gradient(circle at top right, rgba(20, 184, 166, 0.18), transparent 28%),
-    radial-gradient(circle at bottom left, rgba(96, 165, 250, 0.16), transparent 32%),
-    rgba(255, 255, 255, 0.88);
+    radial-gradient(circle at top right, rgba(245, 158, 11, 0.28), transparent 26%),
+    radial-gradient(circle at bottom left, rgba(251, 191, 36, 0.22), transparent 30%),
+    linear-gradient(180deg, rgba(255, 251, 235, 0.98), rgba(255, 249, 230, 0.94));
+  border-color: rgba(251, 191, 36, 0.28);
+  box-shadow: 0 24px 54px rgba(120, 53, 15, 0.08);
+}
+
+.wizard-completion-card {
+  padding: 24px 26px;
+  display: grid;
+  gap: 12px;
+}
+
+.wizard-completion-card h2 {
+  font-size: clamp(2rem, 3vw, 3.1rem);
+}
+
+.wizard-completion-card p {
+  max-width: 58ch;
+  margin: 0;
+}
+
+.wizard-completion-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.wizard-completion-actions .button {
+  min-width: 0;
 }
 
 .wizard-step-workspace {
