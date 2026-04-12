@@ -357,8 +357,6 @@ ensure_embedded_outpost_browser_host() {
     "$(jq -n --argjson config "$updated_config" '{config: $config}')" >/dev/null
 }
 
-ensure_embedded_outpost_browser_host
-
 # Argo CD syncs the blueprint ConfigMap via the third source in the Application manifest.
 # Wait for the blueprint to be applied (service account appears via reconciliation).
 if command -v openbao_read_global_secret_json >/dev/null 2>&1 && [[ -n "$authentik_automation_token_key" ]]; then
@@ -460,6 +458,8 @@ log "Ensuring default OAuth2 provider flows exist"
 AUTHENTIK_LOCAL_FORWARD_PORT="${AUTHENTIK_LOCAL_FORWARD_PORT:-18299}"
 authentik_ensure_token
 authentik_setup_forward
+
+ensure_embedded_outpost_browser_host
 
 create_flow_if_missing() {
   local flow_slug="$1"
