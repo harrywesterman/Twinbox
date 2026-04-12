@@ -7,7 +7,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 def test_manager_api_image_includes_shared_secret_runtime_without_bw():
     text = (REPO_ROOT / "manager-api" / "Dockerfile").read_text(encoding="utf-8")
 
-    assert "FROM node:20-bookworm-slim" in text
+    assert "FROM node:24-bookworm-slim" in text
     assert "COPY lib ./lib" in text
     assert "COPY manager-api/package.json ./manager-api/package.json" in text
     assert "apt-get install -y --no-install-recommends ca-certificates curl iproute2 iputils-ping" in text

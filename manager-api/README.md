@@ -20,7 +20,7 @@ manager-api/
 
 ## Runtime
 
-- Node 20, ESM (`"type": "module"`)
+- Node 24, ESM (`"type": "module"`)
 - Listens on port `8080` (configurable via `MANAGER_API_PORT`)
 - Reads/writes runtime state under `MANAGER_DATA_DIR` (default `/data`)
 - Bundles the repo catalog under `categories/` so `/api/catalog` can serve the wizard from inside the container
