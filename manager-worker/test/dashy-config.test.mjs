@@ -92,23 +92,24 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   assert(appsSection.items.some((item) => item.title === "Whoami" && item.url === "https://whoami.tst.example.com"));
 
   const iconByTitle = new Map(config.sections.flatMap((section) => section.items.map((item) => [item.title, item.icon])));
-  assert.equal(iconByTitle.get("Hubble"), "si-cilium");
-  assert.equal(iconByTitle.get("Argo CD"), "si-argo");
-  assert.equal(iconByTitle.get("Authentik"), "si-authentik");
-  assert.equal(iconByTitle.get("Grafana"), "si-grafana");
-  assert.equal(iconByTitle.get("Prometheus"), "si-prometheus");
-  assert.equal(iconByTitle.get("Loki"), "https://raw.githubusercontent.com/grafana/loki/main/docs/sources/logo.png");
-  assert.equal(iconByTitle.get("Twinbox Wizard"), "https://twinboxwizard.tst.example.com/favicon.svg");
-  assert.equal(iconByTitle.get("Proxmox"), "si-proxmox");
+  const wizardIconBase = "https://twinboxwizard.tst.example.com/assets/step-icons";
+  assert.equal(iconByTitle.get("Hubble"), "https://cdn.simpleicons.org/cilium");
+  assert.equal(iconByTitle.get("Argo CD"), `${wizardIconBase}/install-argocd.svg`);
+  assert.equal(iconByTitle.get("Authentik"), `${wizardIconBase}/install-authentik-idp.svg`);
+  assert.equal(iconByTitle.get("Grafana"), `${wizardIconBase}/install-grafana.svg`);
+  assert.equal(iconByTitle.get("Prometheus"), `${wizardIconBase}/install-prometheus.svg`);
+  assert.equal(iconByTitle.get("Loki"), `${wizardIconBase}/install-loki.svg`);
+  assert.equal(iconByTitle.get("Twinbox Wizard"), `${wizardIconBase}/install-management-consoles.svg`);
+  assert.equal(iconByTitle.get("Proxmox"), `${wizardIconBase}/install-proxmox-backup-system.svg`);
   assert.equal(iconByTitle.get("SeaweedFS"), "https://seaweedfs.com/favicon.ico");
   assert.equal(iconByTitle.get("SeaweedFS Admin"), "https://seaweedfs.com/favicon.ico");
-  assert.equal(iconByTitle.get("Cloudtty"), "https://cloudtty.tst.example.com");
+  assert.equal(iconByTitle.get("Cloudtty"), `${wizardIconBase}/install-cloudtty.svg`);
   assert.equal(iconByTitle.get("pgAdmin 4"), "https://raw.githubusercontent.com/pgadmin-org/pgadmin4/master/web/pgadmin/static/favicon.ico");
-  assert.equal(iconByTitle.get("Traefik Manager"), "si-traefikproxy");
+  assert.equal(iconByTitle.get("Traefik Manager"), `${wizardIconBase}/install-traefik-manager.svg`);
   assert.equal(iconByTitle.get("Wiredoor"), "https://www.wiredoor.net/favicon.ico");
-  assert.equal(iconByTitle.get("Whoami"), "si-traefikproxy");
-  assert.equal(iconByTitle.get("Cloudflare"), "si-cloudflare");
-  assert.equal(iconByTitle.get("GitHub"), "si-github");
+  assert.equal(iconByTitle.get("Whoami"), `${wizardIconBase}/install-whoami.svg`);
+  assert.equal(iconByTitle.get("Cloudflare"), `${wizardIconBase}/configure-cloudflare-dns.svg`);
+  assert.equal(iconByTitle.get("GitHub"), "https://cdn.simpleicons.org/github");
 
   assert.equal(config.appConfig.faviconApi, "local");
   assert.equal(config.appConfig.iconSize, "large");
