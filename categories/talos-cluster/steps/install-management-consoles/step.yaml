@@ -4,7 +4,7 @@ type: action
 journey_stage: setup
 order: 48
 summary: Publish the operator web consoles and wire them into Authentik after Dashy is online.
-explanation: Twinbox groups the operator consoles directly after the cluster start page so the Traefik, Longhorn, Proxmox, Twinbox Wizard, and SeaweedFS web UIs can be published, registered as Authentik proxy applications, and protected with the shared admin policy in the same post-ingress operator phase.
+explanation: Twinbox groups the operator consoles directly after the cluster start page so the Traefik, Longhorn, Proxmox, and SeaweedFS web UIs can be published, registered as Authentik proxy applications, and protected with the shared admin policy in the same post-ingress operator phase.
 side_help: Management consoles are grouped as a dedicated phase so the wizard can keep operator tools separate from core infra.
 depends_on:
   - install-dashy-dashboard

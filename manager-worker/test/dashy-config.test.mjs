@@ -20,10 +20,10 @@ function loadStep(stepId) {
 test("real step manifests normalize Dashy metadata", () => {
   const step = loadStep("install-management-consoles");
 
-  assert.equal(step.dashy.items.length, 4);
+  assert.equal(step.dashy.items.length, 3);
   assert.deepEqual(
     step.dashy.items.map((item) => item.title),
-    ["Twinbox Wizard", "Proxmox", "SeaweedFS", "SeaweedFS Admin"],
+    ["Proxmox", "SeaweedFS", "SeaweedFS Admin"],
   );
 });
 
@@ -81,7 +81,6 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   assert(platformSection.items.some((item) => item.title === "Authentik" && item.url === "https://authentik.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "Grafana" && item.url === "https://grafana.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "Loki" && item.url === "https://grafana.tst.example.com/explore"));
-  assert(platformSection.items.some((item) => item.title === "Twinbox Wizard" && item.url === "https://twinboxwizard.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "SeaweedFS Admin" && item.url === "https://seaweedfs-admin.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "Cloudtty" && item.url === "https://shell.example.net"));
   assert(platformSection.items.some((item) => item.title === "pgAdmin 4" && item.url === "https://pgadmin4.tst.example.com"));
@@ -99,7 +98,6 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   assert.equal(iconByTitle.get("Grafana"), `${wizardIconBase}/install-grafana.svg`);
   assert.equal(iconByTitle.get("Prometheus"), `${wizardIconBase}/install-prometheus.svg`);
   assert.equal(iconByTitle.get("Loki"), `${wizardIconBase}/install-loki.svg`);
-  assert.equal(iconByTitle.get("Twinbox Wizard"), `${wizardIconBase}/install-management-consoles.svg`);
   assert.equal(iconByTitle.get("Proxmox"), `${wizardIconBase}/install-proxmox-backup-system.svg`);
   assert.equal(iconByTitle.get("SeaweedFS"), "https://seaweedfs.com/favicon.ico");
   assert.equal(iconByTitle.get("SeaweedFS Admin"), "https://seaweedfs.com/favicon.ico");
