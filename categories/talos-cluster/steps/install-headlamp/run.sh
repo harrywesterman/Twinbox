@@ -154,6 +154,7 @@ invalidation_flow_id="$(authentik_resolve_flow_id "default-provider-invalidation
 openid_mapping_id="$(authentik_resolve_scope_mapping_id "openid")"
 email_mapping_id="$(authentik_resolve_scope_mapping_id "email")"
 profile_mapping_id="$(authentik_resolve_scope_mapping_id "profile")"
+admins_group_id="$(authentik_find_group_id "admins")"
 signing_key_id="$(authentik_resolve_signing_key_id)"
 
 [[ -n "$authorization_flow_id" ]] || fail "Could not resolve Authentik authorization flow ID"
@@ -161,6 +162,7 @@ signing_key_id="$(authentik_resolve_signing_key_id)"
 [[ -n "$openid_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for openid"
 [[ -n "$email_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for email"
 [[ -n "$profile_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for profile"
+[[ -n "$admins_group_id" ]] || fail "Could not resolve Authentik admins group ID"
 [[ -n "$signing_key_id" ]] || fail "Could not resolve Authentik signing key ID for ${AUTHENTIK_SIGNING_KEY_NAME}"
 
 property_mapping_ids_json="$(
@@ -218,7 +220,11 @@ application_payload="$(
 )"
 application_pk="$(create_or_update_application "$application_payload")"
 [[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for Headlamp"
-ensure_group_binding "$application_pk" "$admins_group_id"
+
+application_json="$(find_application_json_by_slug "$headlamp_application_slug")"
+application_uuid="$(jq -r '.pk // .uuid // .id // empty' <<<"$application_json")"
+[[ -n "$application_uuid" ]] || fail "Could not determine Authentik application UUID for Headlamp"
+ensure_group_binding "$application_uuid" "$admins_group_id"
 
 secrets_dir="/opt/twinbox/bootstrap/secrets/global"
 
