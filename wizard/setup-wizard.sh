@@ -321,6 +321,66 @@ cluster_vm_inventory() {
   pvesh get /cluster/resources --type vm --output-format json 2>/dev/null
 }
 
+proxmox_user_exists() {
+  local username="$1"
+  local inventory=""
+
+  inventory=$(pvesh get /access/users --output-format json 2>/dev/null || true)
+  if [[ -n "$inventory" ]]; then
+    python3 -c '
+import json
+import sys
+
+username = sys.argv[1]
+raw = sys.stdin.read().strip()
+if not raw:
+    sys.exit(1)
+
+payload = json.loads(raw)
+rows = payload.get("data", payload) if isinstance(payload, dict) else payload
+for item in rows:
+    if not isinstance(item, dict):
+        continue
+    if item.get("userid") == username or item.get("user") == username:
+        sys.exit(0)
+sys.exit(1)
+' "$username" <<<"$inventory"
+    return $?
+  fi
+
+  pveum user list 2>/dev/null | awk 'NR>1 {print $1}' | grep -Fxq "$username"
+}
+
+proxmox_role_exists() {
+  local role="$1"
+  local inventory=""
+
+  inventory=$(pvesh get /access/roles --output-format json 2>/dev/null || true)
+  if [[ -n "$inventory" ]]; then
+    python3 -c '
+import json
+import sys
+
+role = sys.argv[1]
+raw = sys.stdin.read().strip()
+if not raw:
+    sys.exit(1)
+
+payload = json.loads(raw)
+rows = payload.get("data", payload) if isinstance(payload, dict) else payload
+for item in rows:
+    if not isinstance(item, dict):
+        continue
+    if item.get("roleid") == role or item.get("role") == role:
+        sys.exit(0)
+sys.exit(1)
+' "$role" <<<"$inventory"
+    return $?
+  fi
+
+  pveum role list 2>/dev/null | awk 'NR>1 {print $1}' | grep -Fxq "$role"
+}
+
 detect_cluster_slugs() {
   local vmid=""
   local config=""
@@ -371,13 +431,51 @@ detect_cluster_slugs() {
     slug="${user#twinbox-}"
     slug="${slug%@pve}"
     add_detected_cluster_slug "$slug"
-  done < <(pveum user list 2>/dev/null | awk 'NR>1 {print $1}')
+  done < <(
+    pvesh get /access/users --output-format json 2>/dev/null \
+      | python3 -c '
+import json
+import sys
+
+raw = sys.stdin.read().strip()
+if not raw:
+    sys.exit(0)
+
+payload = json.loads(raw)
+rows = payload.get("data", payload) if isinstance(payload, dict) else payload
+for item in rows:
+    if not isinstance(item, dict):
+        continue
+    user = str(item.get("userid", item.get("user", "")) or "")
+    if user:
+        print(user)
+'
+  )
 
   while read -r role; do
     [[ "$role" == TwinboxVMProvisioner-* ]] || continue
     slug="${role#TwinboxVMProvisioner-}"
     add_detected_cluster_slug "$slug"
-  done < <(pveum role list 2>/dev/null | awk 'NR>1 {print $1}')
+  done < <(
+    pvesh get /access/roles --output-format json 2>/dev/null \
+      | python3 -c '
+import json
+import sys
+
+raw = sys.stdin.read().strip()
+if not raw:
+    sys.exit(0)
+
+payload = json.loads(raw)
+rows = payload.get("data", payload) if isinstance(payload, dict) else payload
+for item in rows:
+    if not isinstance(item, dict):
+        continue
+    role = str(item.get("roleid", item.get("role", "")) or "")
+    if role:
+        print(role)
+'
+  )
 }
 
 render_cluster_overview() {
@@ -521,11 +619,11 @@ for item in rows:
   )
 
   progress_update "Checking cluster" "Checking cluster access"
-  if pveum user list 2>/dev/null | awk 'NR>1 {print $1}' | grep -Fxq "$PROXMOX_USER"; then
+  if proxmox_user_exists "$PROXMOX_USER"; then
     EXISTING_USER_PRESENT=1
   fi
 
-  if pveum role list 2>/dev/null | awk 'NR>1 {print $1}' | grep -Fxq "$PROXMOX_ROLE"; then
+  if proxmox_role_exists "$PROXMOX_ROLE"; then
     EXISTING_ROLE_PRESENT=1
   fi
 

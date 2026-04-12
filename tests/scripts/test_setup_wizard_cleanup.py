@@ -39,6 +39,10 @@ def test_setup_wizard_cleanup_uses_cluster_inventory_for_detect_and_remove():
     assert 'EXISTING_VM_TAGS=()' in text
     assert 'cluster_vm_inventory()' in text
     assert 'pvesh get /cluster/resources --type vm --output-format json' in text
+    assert 'proxmox_user_exists()' in text
+    assert 'proxmox_role_exists()' in text
+    assert 'pvesh get /access/users --output-format json' in text
+    assert 'pvesh get /access/roles --output-format json' in text
     assert 'python3 -c' in text
     assert 'rows = payload.get("data", payload) if isinstance(payload, dict) else payload' in text
     assert 'name.startswith(cluster_prefix) or cluster_tag in tags.split(";")' in text
@@ -430,6 +434,8 @@ def test_setup_wizard_detects_and_cleans_up_existing_cluster_resources():
     assert "cleanup_existing_cluster_resources()" in text
     assert "cluster_management_menu()" in text
     assert 'name.startswith(cluster_prefix)' in text
+    assert 'proxmox_user_exists "$PROXMOX_USER"' in text
+    assert 'proxmox_role_exists "$PROXMOX_ROLE"' in text
     assert 'pveum aclmod "$acl_path" -user "$PROXMOX_USER" -delete 1 >/dev/null 2>&1 || true' in text
     assert 'if pveum user delete "$PROXMOX_USER" >/dev/null 2>&1; then' in text
     assert 'if pveum role delete "$PROXMOX_ROLE" >/dev/null 2>&1; then' in text
