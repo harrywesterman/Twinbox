@@ -36,7 +36,7 @@ Twinbox is a Talos Linux based configuration for a Kubernetes cluster. Treat the
 
 ## Editing Rules
 
-- use the ssh connection skill to connect to the management VM for debugging. Ask the user for the IP address. Login with twinbox@ipadres
+- Use the SSH remote-connection skill to connect to the management VM for debugging. Ask the user for the IP address when needed. Connect as `twinbox@<management-vm-ip>`.
 - Use the Playwright skill to look at the live web wizard.
 - Try python3 first, especially when working on a mac
 - Use `docker compose`, not legacy `docker-compose`.
