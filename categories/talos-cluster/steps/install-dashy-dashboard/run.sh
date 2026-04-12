@@ -55,27 +55,6 @@ if [[ -n "$existing_dashy_secret_json" ]]; then
   fi
 fi
 
-api_get() {
-  local path="$1"
-  curl -fsS \
-    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" \
-    -H "Accept: application/json" \
-    "${AUTHENTIK_API_BASE}${path}"
-}
-
-api_write() {
-  local method="$1"
-  local path="$2"
-  local payload="$3"
-  curl -fsS \
-    -X "$method" \
-    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" \
-    -H "Accept: application/json" \
-    -H "Content-Type: application/json" \
-    --data "$payload" \
-    "${AUTHENTIK_API_BASE}${path}"
-}
-
 resolve_flow_id() {
   local slug="$1"
   local designation="$2"
@@ -89,7 +68,7 @@ resolve_scope_mapping_id() {
   local scope_name="$1"
   local response managed_pk fallback_pk
 
-  response="$(api_get "/propertymappings/provider/scope/?scope_name=${scope_name}&page_size=20")"
+  response="$(authentik_api_get "/propertymappings/provider/scope/?scope_name=${scope_name}&page_size=20")"
   managed_pk="$(
     jq -r \
       --arg scope_name "$scope_name" \
@@ -116,7 +95,7 @@ create_or_update_provider() {
   local provider_payload="$1"
   local search_response provider_pk existing_pk
 
-  search_response="$(api_get "/providers/oauth2/?search=Dashy")"
+  search_response="$(authentik_api_get "/providers/oauth2/?search=Dashy")"
   existing_pk="$(
     jq -r '
       .results[]?
@@ -126,13 +105,13 @@ create_or_update_provider() {
   )"
 
   if [[ -n "$existing_pk" ]]; then
-    api_write PATCH "/providers/oauth2/${existing_pk}/" "$provider_payload" >/dev/null
+    authentik_api_write PATCH "/providers/oauth2/${existing_pk}/" "$provider_payload" >/dev/null
     printf '%s\n' "$existing_pk"
     return 0
   fi
 
   provider_pk="$(
-    api_write POST "/providers/oauth2/" "$provider_payload" | jq -r '.pk // .id // empty'
+    authentik_api_write POST "/providers/oauth2/" "$provider_payload" | jq -r '.pk // .id // empty'
   )"
 
   [[ -n "$provider_pk" ]] || fail "Authentik did not return a provider ID for Dashy"
@@ -143,23 +122,23 @@ create_or_update_application() {
   local app_payload="$1"
   local existing_json existing_pk
 
-  existing_json="$(api_get "/core/applications/${dashy_application_slug}/" 2>/dev/null || true)"
+  existing_json="$(authentik_api_get "/core/applications/${dashy_application_slug}/" 2>/dev/null || true)"
   existing_pk="$(jq -r '.pk // .id // empty' <<<"$existing_json")"
 
   if [[ -n "$existing_pk" ]]; then
-    api_write PATCH "/core/applications/${dashy_application_slug}/" "$app_payload" >/dev/null
+    authentik_api_write PATCH "/core/applications/${dashy_application_slug}/" "$app_payload" >/dev/null
     printf '%s\n' "$existing_pk"
     return 0
   fi
 
-  api_write POST "/core/applications/" "$app_payload" | jq -r '.pk // .id // empty'
+  authentik_api_write POST "/core/applications/" "$app_payload" | jq -r '.pk // .id // empty'
 }
 
 find_application_json_by_slug() {
   local application_slug="$1"
   local response
 
-  response="$(api_get "/core/applications/?page_size=100")"
+  response="$(authentik_api_get "/core/applications/?page_size=100")"
   jq -c \
     --arg application_slug "$application_slug" \
     '.results[]?
@@ -171,7 +150,7 @@ find_policy_binding_pk() {
   local group_id="$2"
   local response
 
-  response="$(api_get "/policies/bindings/?page_size=200")"
+  response="$(authentik_api_get "/policies/bindings/?page_size=200")"
   jq -r \
     --arg target_uuid "$target_uuid" \
     --arg group_id "$group_id" \
@@ -194,11 +173,11 @@ ensure_group_binding() {
 
   existing_pk="$(find_policy_binding_pk "$target_uuid" "$group_id")"
   if [[ -n "$existing_pk" ]]; then
-    api_write PATCH "/policies/bindings/${existing_pk}/" "$binding_payload" >/dev/null
+    authentik_api_write PATCH "/policies/bindings/${existing_pk}/" "$binding_payload" >/dev/null
     return 0
   fi
 
-  api_write POST "/policies/bindings/" "$binding_payload" >/dev/null
+  authentik_api_write POST "/policies/bindings/" "$binding_payload" >/dev/null
 }
 
 authorization_flow_id="$(resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
