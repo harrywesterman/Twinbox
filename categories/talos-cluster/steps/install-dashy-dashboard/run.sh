@@ -155,6 +155,17 @@ create_or_update_application() {
   api_write POST "/core/applications/" "$app_payload" | jq -r '.pk // .id // empty'
 }
 
+find_application_json_by_slug() {
+  local application_slug="$1"
+  local response
+
+  response="$(api_get "/core/applications/?page_size=100")"
+  jq -c \
+    --arg application_slug "$application_slug" \
+    '.results[]?
+      | select((.slug // "") == $application_slug)' <<<"$response" | head -n1
+}
+
 find_policy_binding_pk() {
   local target_uuid="$1"
   local group_id="$2"
