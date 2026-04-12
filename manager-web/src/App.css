@@ -1,6 +1,6 @@
 .wizard-shell {
-  min-height: 100vh;
-  padding: 18px;
+  min-height: 100dvh;
+  padding: 16px 18px 14px;
   background:
     radial-gradient(circle at top left, rgba(20, 184, 166, 0.22), transparent 28%),
     radial-gradient(circle at top right, rgba(245, 158, 11, 0.18), transparent 24%),
@@ -339,7 +339,7 @@
 }
 
 .wizard-workspace-install {
-  min-height: calc(100vh - 220px);
+  min-height: calc(100dvh - 220px);
   align-content: center;
   gap: 0;
 }
@@ -507,7 +507,7 @@
 
 .wizard-install-stage {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   width: min(1180px, 100%);
   margin: 0 auto;
 }
@@ -545,9 +545,9 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   width: 100%;
-  height: clamp(320px, 49dvh, 620px);
-  min-height: clamp(320px, 49dvh, 620px);
-  max-height: min(49dvh, 620px);
+  height: clamp(300px, 46dvh, 600px);
+  min-height: clamp(300px, 46dvh, 600px);
+  max-height: min(46dvh, 600px);
   overflow: hidden;
 }
 
@@ -591,9 +591,9 @@
 
 @media (max-height: 920px) {
   .wizard-install-output {
-    height: clamp(300px, 44dvh, 540px);
-    min-height: clamp(300px, 44dvh, 540px);
-    max-height: min(44dvh, 540px);
+    height: clamp(290px, 42dvh, 520px);
+    min-height: clamp(290px, 42dvh, 520px);
+    max-height: min(42dvh, 520px);
   }
 }
 
@@ -607,9 +607,9 @@
   }
 
   .wizard-install-output {
-    height: clamp(260px, 38dvh, 420px);
-    min-height: clamp(260px, 38dvh, 420px);
-    max-height: min(38dvh, 420px);
+    height: clamp(250px, 36dvh, 400px);
+    min-height: clamp(250px, 36dvh, 400px);
+    max-height: min(36dvh, 400px);
   }
 }
 

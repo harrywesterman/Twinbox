@@ -23,7 +23,7 @@ html {
 
 body {
   margin: 0;
-  min-height: 100vh;
+  min-height: 100dvh;
   background:
     radial-gradient(circle at top left, rgba(20, 184, 166, 0.14), transparent 26%),
     radial-gradient(circle at top right, rgba(245, 158, 11, 0.12), transparent 22%),
@@ -105,5 +105,5 @@ svg {
 }
 
 #root {
-  min-height: 100vh;
+  min-height: 100dvh;
 }
