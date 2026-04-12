@@ -1,6 +1,6 @@
 .wizard-shell {
   min-height: 100vh;
-  padding: 24px;
+  padding: 18px;
   background:
     radial-gradient(circle at top left, rgba(20, 184, 166, 0.22), transparent 28%),
     radial-gradient(circle at top right, rgba(245, 158, 11, 0.18), transparent 24%),
@@ -20,7 +20,7 @@
   grid-template-columns: 1fr;
   gap: 8px;
   align-items: start;
-  padding: 16px 20px;
+  padding: 12px 16px;
   border: 1px solid rgba(148, 163, 184, 0.22);
   border-radius: 28px;
   background: rgba(7, 15, 30, 0.9);
@@ -127,8 +127,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-top: 16px;
-  padding: 16px 18px;
+  margin-top: 12px;
+  padding: 12px 14px;
   border: 1px solid rgba(148, 163, 184, 0.22);
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.78);
@@ -171,10 +171,10 @@
 }
 
 .wizard-layout {
-  margin-top: 16px;
+  margin-top: 12px;
   display: grid;
   grid-template-columns: 308px minmax(0, 1fr);
-  gap: 18px;
+  gap: 14px;
   align-items: start;
 }
 
@@ -330,7 +330,7 @@
 
 .wizard-workspace {
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .wizard-workspace-minimal {
@@ -468,16 +468,16 @@
 
 .wizard-step-workspace {
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .wizard-step-workspace-minimal {
-  gap: 16px;
+  gap: 12px;
 }
 
 .wizard-install-stage {
   display: grid;
-  gap: 14px;
+  gap: 10px;
   width: min(1180px, 100%);
   margin: 0 auto;
 }
@@ -485,7 +485,7 @@
 .wizard-install-stage-head {
   display: grid;
   justify-items: center;
-  gap: 12px;
+  gap: 8px;
   width: min(820px, 100%);
   justify-self: center;
   padding: 0 4px;
@@ -504,20 +504,20 @@
 }
 
 .wizard-install-stage-icon {
-  width: 72px;
-  height: 72px;
-  padding: 12px;
-  border-radius: 24px;
-  font-size: 1.9rem;
+  width: 120px;
+  height: 120px;
+  padding: 16px;
+  border-radius: 32px;
+  font-size: 3rem;
 }
 
 .wizard-install-output {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   width: 100%;
-  height: clamp(300px, 46dvh, 560px);
-  min-height: clamp(300px, 46dvh, 560px);
-  max-height: min(46dvh, 560px);
+  height: clamp(320px, 49dvh, 620px);
+  min-height: clamp(320px, 49dvh, 620px);
+  max-height: min(49dvh, 620px);
   overflow: hidden;
 }
 
@@ -561,15 +561,15 @@
 
 @media (max-height: 920px) {
   .wizard-install-output {
-    height: clamp(260px, 40dvh, 480px);
-    min-height: clamp(260px, 40dvh, 480px);
-    max-height: min(40dvh, 480px);
+    height: clamp(300px, 44dvh, 540px);
+    min-height: clamp(300px, 44dvh, 540px);
+    max-height: min(44dvh, 540px);
   }
 }
 
 @media (max-height: 760px) {
   .wizard-install-stage {
-    gap: 12px;
+    gap: 8px;
   }
 
   .wizard-install-stage-head h2 {
@@ -577,9 +577,9 @@
   }
 
   .wizard-install-output {
-    height: clamp(220px, 34dvh, 360px);
-    min-height: clamp(220px, 34dvh, 360px);
-    max-height: min(34dvh, 360px);
+    height: clamp(260px, 38dvh, 420px);
+    min-height: clamp(260px, 38dvh, 420px);
+    max-height: min(38dvh, 420px);
   }
 }
 
@@ -590,10 +590,10 @@
 
 .wizard-step-icon-large {
   overflow: hidden;
-  width: 48px;
-  height: 48px;
-  border-radius: 16px;
-  font-size: 1.45rem;
+  width: 96px;
+  height: 96px;
+  border-radius: 28px;
+  font-size: 2.8rem;
   background: linear-gradient(135deg, rgba(20, 184, 166, 0.18), rgba(96, 165, 250, 0.18));
   color: #0f172a;
 }
@@ -601,7 +601,7 @@
 .wizard-step-icon-large.is-artwork {
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(148, 163, 184, 0.18);
-  padding: 7px;
+  padding: 12px;
 }
 
 .wizard-step-icon-artwork {
@@ -1334,13 +1334,13 @@
 
 .wizard-output-panel {
   display: grid;
-  gap: 18px;
+  gap: 14px;
   align-content: start;
   width: 100%;
 }
 
 .wizard-output-panel-minimal {
-  gap: 14px;
+  gap: 12px;
 }
 
 .wizard-output-panel.is-live {
@@ -1515,7 +1515,7 @@
 }
 
 .wizard-log-viewport {
-  max-height: 420px;
+  max-height: 480px;
   overflow: auto;
   overscroll-behavior: contain;
   border-radius: 18px;
