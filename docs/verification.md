@@ -16,9 +16,7 @@ bash -n wizard/setup-wizard.sh \
   scripts/manager/render-cilium-manifest.sh \
   scripts/manager/apply-argocd-application.sh \
   scripts/manager/install-argocd.sh \
-  scripts/manager/install-cloudtty.sh \
   scripts/manager/install-longhorn-storage.sh \
-  scripts/manager/install-traefik-manager.sh \
   scripts/manager/install-prometheus.sh \
   scripts/manager/install-secret-sync.sh \
   scripts/manager/install-velero-backup.sh \
@@ -111,63 +109,6 @@ Expected:
 - control-plane VMs are provisioned at `4 GB RAM / 10 GB disk`
 - worker VMs keep a larger storage budget that is derived from the selected Proxmox host's free disk space
 - the first step in a clean UI session remains `Deploy Talos Cluster`
-
-### `provision-nodes` runtime network checks
-
-```bash
-kubectl --kubeconfig <kubeconfig> get ds cilium -n kube-system
-kubectl --kubeconfig <kubeconfig> get deploy cilium-operator -n kube-system
-kubectl --kubeconfig <kubeconfig> get deploy hubble-relay -n kube-system
-kubectl --kubeconfig <kubeconfig> get deploy hubble-ui -n kube-system
-kubectl --kubeconfig <kubeconfig> get svc hubble-ui -n kube-system
-kubectl --kubeconfig <kubeconfig> get deploy coredns -n kube-system
-kubectl --kubeconfig <kubeconfig> get ds kube-proxy -n kube-system
-kubectl --kubeconfig <kubeconfig> get ingressroute hubble -n kube-system
-```
-
-Expected:
-
-- the rendered Cilium manifest uses the cluster VIP/API endpoint rather than `localhost:7445`
-- `daemonset/cilium` is ready
-- `deployment/cilium-operator` is ready
-- `deployment/hubble-relay` is ready
-- `deployment/hubble-ui` is ready
-- `service/hubble-ui` exists and serves the UI
-- `deployment/coredns` is ready
-- `daemonset/kube-proxy` does not exist
-- `IngressRoute/hubble` is present in `kube-system`
-
-### `install-cloudtty`
-
-```bash
-kubectl --kubeconfig <kubeconfig> get deployment cloudtty-operator-controller-manager -n cloudtty-system
-kubectl --kubeconfig <kubeconfig> get cloudshell cloudtty-shell -n cloudtty-system
-kubectl --kubeconfig <kubeconfig> get cloudshell cloudtty-shell -n cloudtty-system -o jsonpath='{.status.accessUrl}'
-```
-
-Expected:
-
-- the cloudtty operator deployment is ready
-- `CloudShell/cloudtty-shell` reports `Ready`
-- the shell status exposes a browser-accessible `accessUrl`
-
-### `install-traefik-manager`
-
-```bash
-kubectl --kubeconfig <kubeconfig> get application -n argocd platform-ingress
-kubectl --kubeconfig <kubeconfig> get pods -n traefik-manager
-kubectl --kubeconfig <kubeconfig> get ingressroute -n traefik-manager
-kubectl --kubeconfig <kubeconfig> get service,endpoints -n traefik-manager authentik-server
-kubectl --kubeconfig <kubeconfig> get pvc -n traefik-manager
-```
-
-Expected:
-
-- `Application/platform-ingress` is synced and healthy
-- the Traefik Manager pod is running in its own namespace
-- the ingress routes exist for each enabled entrypoint
-- the Authentik callback service and endpoints exist in `traefik-manager`
-- the Longhorn-backed PVC is bound
 
 ### `install-prometheus`
 

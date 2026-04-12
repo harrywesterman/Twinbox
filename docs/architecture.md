@@ -26,9 +26,7 @@ When you change Twinbox code, commit it to `main`, wait for the GitHub Actions i
    - `scripts/manager/render-cilium-manifest.sh`
    - `scripts/manager/apply-argocd-application.sh`
    - `scripts/manager/install-argocd.sh`
-   - `scripts/manager/install-cloudtty.sh`
    - `scripts/manager/install-longhorn-storage.sh`
-   - `scripts/manager/install-traefik-manager.sh`
    - `scripts/manager/install-prometheus.sh`
    - `scripts/manager/install-secret-sync.sh`
    - `scripts/manager/install-velero-backup.sh`
@@ -69,21 +67,19 @@ When you change Twinbox code, commit it to `main`, wait for the GitHub Actions i
 6. `provision-nodes` sets `cluster.network.cni.name: none`, `cluster.proxy.disabled: true`, `machine.features.kubePrism.enabled: true`, and `machine.features.hostDNS.forwardKubeDNSToHost: false` so Talos boots with kube-proxy-free Cilium from the start.
 7. `provision-nodes` waits for `cilium`, `cilium-operator`, and `coredns` to become ready before the step completes.
 8. `install-argocd` installs Argo CD after the Talos/Cilium bootstrap has completed.
-9. `install-cloudtty` installs the Cloudtty operator with Helm and creates a default browser shell against the same cluster.
-10. `install-longhorn-storage` runs before cluster secret sync so stateful workloads and backup storage can use Longhorn PVCs immediately through the cluster default storage class, and Longhorn stays on worker nodes through the `twinbox.io/role=worker` selector.
-11. `install-traefik-manager` refreshes the shared `platform-ingress` application and provisions the Traefik Manager Authentik proxy application so the UI is deployed behind Authentik, stores its settings and backups on Longhorn, and points it at the live Traefik API.
-12. `install-prometheus` installs the kube-prometheus-stack through Argo CD, enabling Prometheus, Alertmanager, node-exporter, and kube-state-metrics on Longhorn-backed storage.
-13. `install-secret-sync` installs External Secrets Operator and OpenBao on Longhorn.
-14. `install-secret-sync` seeds OpenBao from the Management VM bootstrap files and creates `ClusterSecretStore/openbao`.
-15. `install-velero-backup` deploys Velero together with a Twinbox-managed Garage bucket or an external S3-compatible backup target.
-16. `install-cloudnativepg` installs the CloudNativePG operator on top of Longhorn so PostgreSQL-backed workloads can share one database platform.
-17. Authentik uses a `Recreate` rollout strategy so its bootstrap lock is only held by one pod at a time during upgrades and restarts.
-18. The Proxmox wizard stores the cluster login password in `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` inside the Management VM so the Authentik onboarding step can reuse it.
-19. `install-authentik-idp` provisions the PostgreSQL cluster for Authentik and seeds the Authentik bootstrap secret into OpenBao, then removes the temporary local seed file after sync.
-20. Later Authentik consumers read the bootstrap data from OpenBao instead of reopening `/opt/twinbox/bootstrap/secrets/global/authentik.json`.
-21. `install-pgadmin4` refreshes the shared `platform-ingress` application so pgAdmin 4 is deployed behind Traefik with Longhorn-backed persistence, and it seeds the pgAdmin bootstrap secret into OpenBao while provisioning the Authentik OIDC application.
-22. GitOps apps consume secrets through `ExternalSecret` resources backed by `ClusterSecretStore/openbao`.
-23. Dashy link tiles are rendered on the Management VM from step metadata plus the current step-state, then written into the in-cluster `ConfigMap/dashy-config` so the start page reflects the installed browser UIs without a static list in Git.
+ 9. `install-longhorn-storage` runs before cluster secret sync so stateful workloads and backup storage can use Longhorn PVCs immediately through the cluster default storage class, and Longhorn stays on worker nodes through the `twinbox.io/role=worker` selector.
+10. `install-prometheus` installs the kube-prometheus-stack through Argo CD, enabling Prometheus, Alertmanager, node-exporter, and kube-state-metrics on Longhorn-backed storage.
+11. `install-secret-sync` installs External Secrets Operator and OpenBao on Longhorn.
+12. `install-secret-sync` seeds OpenBao from the Management VM bootstrap files and creates `ClusterSecretStore/openbao`.
+13. `install-velero-backup` deploys Velero together with a Twinbox-managed Garage bucket or an external S3-compatible backup target.
+14. `install-cloudnativepg` installs the CloudNativePG operator on top of Longhorn so PostgreSQL-backed workloads can share one database platform.
+15. Authentik uses a `Recreate` rollout strategy so its bootstrap lock is only held by one pod at a time during upgrades and restarts.
+16. The Proxmox wizard stores the cluster login password in `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` inside the Management VM so the Authentik onboarding step can reuse it.
+17. `install-authentik-idp` provisions the PostgreSQL cluster for Authentik and seeds the Authentik bootstrap secret into OpenBao, then removes the temporary local seed file after sync.
+18. Later Authentik consumers read the bootstrap data from OpenBao instead of reopening `/opt/twinbox/bootstrap/secrets/global/authentik.json`.
+19. `install-pgadmin4` refreshes the shared `platform-ingress` application so pgAdmin 4 is deployed behind Traefik with Longhorn-backed persistence, and it seeds the pgAdmin bootstrap secret into OpenBao while provisioning the Authentik OIDC application.
+20. GitOps apps consume secrets through `ExternalSecret` resources backed by `ClusterSecretStore/openbao`.
+21. Dashy link tiles are rendered on the Management VM from step metadata plus the current step-state, then written into the in-cluster `ConfigMap/dashy-config` so the start page reflects the installed browser UIs without a static list in Git.
 
 ## Domain Flow
 

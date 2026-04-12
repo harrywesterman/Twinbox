@@ -179,8 +179,6 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - The Hubble UI ingress route lives under `gitops/platform/hubble/` and is synced later by the `platform-ingress` ApplicationSet once the cluster domain is ready.
 - Management VM bootstrap and maintenance use `TWINBOX_TIME_SERVER` to pin Ubuntu's `systemd-timesyncd` to the same timeserver.
 - `install-argocd` installs Argo CD after the cluster networking layer is already available.
-- `install-cloudtty` installs Cloudtty and creates a default browser shell on the cluster.
-- `install-traefik-manager` refreshes the shared `platform-ingress` application and provisions the Traefik Manager Authentik proxy app so Traefik Manager is deployed through the common platform overlay, with its config stored on Longhorn and its routes exposed through the same domain-aware ingress flow.
 - `install-prometheus` installs the kube-prometheus-stack app so Prometheus, Alertmanager, node-exporter, and kube-state-metrics are available on Longhorn-backed storage.
 - Twinbox also seeds a small default alert set for Cilium and Longhorn so cluster network and storage health surface in Alertmanager and ntfy automatically.
 - `install-grafana` installs Grafana, provisions the Prometheus and Loki datasources automatically, seeds the default Kubernetes Overview, Node Exporter Full, Longhorn, Cilium Metrics, and Hubble Metrics dashboards so imported dashboards can bind to cluster metrics without manual UI setup, and stores Grafana's admin credentials alongside the OIDC client secret in OpenBao so Argo CD does not keep regenerating its admin Secret.
@@ -225,7 +223,6 @@ This avoids Argo CD sync failures like `namespaces "..." not found` when `platfo
 Current baseline namespaces:
 
 - `authentik`
-- `cloudtty-system`
 - `dashy`
 - `homepage`
 - `immich`
@@ -234,7 +231,6 @@ Current baseline namespaces:
 - `pgadmin4`
 - `tailscale`
 - `traefik`
-- `traefik-manager`
 - `wiredoor`
 
 ### Affected services
@@ -249,7 +245,6 @@ All platform services use the runtime domain projection from the local Argo clus
 | pgAdmin 4 | `pgadmin4.<ZONE_NAME>` |
 | Headlamp | `headlamp.<public-zone-name>` with Authentik OIDC login |
 | Grafana | `grafana.<ZONE_NAME>` |
-| Whoami | `whoami.<ZONE_NAME>` |
 | Dashy start page | `start.<ZONE_NAME>` |
 
 Dashy's browser-side OIDC flow depends on Authentik answering the discovery and token requests with CORS headers for `https://start.<ZONE_NAME>`. The platform IngressRoute applies a Traefik headers middleware for that response path.
@@ -258,6 +253,16 @@ The Dashy tile list itself is not GitOps-static: Twinbox renders it from step me
 
 ### GitOps structure
 
+```
+gitops/platform/
+├── kustomization.yaml          # Central Kustomize config for the shared platform shape
+├── authentik/ingressroute.yaml # Host match patched by the platform-ingress ApplicationSet
+├── grafana/
+├── headlamp/ingressroute.yaml  # Host match patched by the platform-ingress ApplicationSet
+├── headlamp/externalsecret.yaml # Headlamp OIDC client credentials from OpenBao
+├── traefik/
+├── wiredoor-gateway/
+└── dashy/
 ```
 gitops/platform/
 ├── kustomization.yaml          # Central Kustomize config for the shared platform shape

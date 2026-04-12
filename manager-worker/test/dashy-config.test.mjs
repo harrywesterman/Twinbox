@@ -36,11 +36,8 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
     loadStep("install-prometheus"),
     loadStep("install-loki"),
     loadStep("install-management-consoles"),
-    loadStep("install-cloudtty"),
     loadStep("install-pgadmin4"),
-    loadStep("install-traefik-manager"),
     loadStep("install-wiredoor-gateway"),
-    loadStep("install-whoami"),
   ];
 
   const stepStateById = new Map([
@@ -51,11 +48,8 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
     ["install-prometheus", { status: "succeeded", outputs: {} }],
     ["install-loki", { status: "succeeded", outputs: {} }],
     ["install-management-consoles", { status: "succeeded", outputs: {} }],
-    ["install-cloudtty", { status: "succeeded", outputs: { access_url: "https://shell.example.net" } }],
     ["install-pgadmin4", { status: "succeeded", outputs: {} }],
-    ["install-traefik-manager", { status: "succeeded", outputs: {} }],
     ["install-wiredoor-gateway", { status: "succeeded", outputs: { wiredoor_url: "https://wiredoor.example.net" } }],
-    ["install-whoami", { status: "configured", outputs: {} }],
   ]);
 
   const config = buildDashyConfig({
@@ -82,13 +76,10 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   assert(platformSection.items.some((item) => item.title === "Grafana" && item.url === "https://grafana.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "Loki" && item.url === "https://grafana.tst.example.com/explore"));
   assert(platformSection.items.some((item) => item.title === "SeaweedFS Admin" && item.url === "https://seaweedfs-admin.tst.example.com"));
-  assert(platformSection.items.some((item) => item.title === "Cloudtty" && item.url === "https://shell.example.net"));
   assert(platformSection.items.some((item) => item.title === "pgAdmin 4" && item.url === "https://pgadmin4.tst.example.com"));
-  assert(platformSection.items.some((item) => item.title === "Traefik Manager" && item.url === "https://traefik-manager.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "Wiredoor" && item.url === "https://wiredoor.example.net"));
   assert(platformSection.items.some((item) => item.title === "Cloudflare" && item.url === "https://dash.cloudflare.com/"));
   assert(platformSection.items.some((item) => item.title === "GitHub" && item.url === "https://github.com/harrywesterman/Twinbox"));
-  assert(appsSection.items.some((item) => item.title === "Whoami" && item.url === "https://whoami.tst.example.com"));
 
   const iconByTitle = new Map(config.sections.flatMap((section) => section.items.map((item) => [item.title, item.icon])));
   const wizardIconBase = "https://twinboxwizard.tst.example.com/assets/step-icons";
@@ -101,11 +92,8 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   assert.equal(iconByTitle.get("Proxmox"), `${wizardIconBase}/install-proxmox-backup-system.svg`);
   assert.equal(iconByTitle.get("SeaweedFS"), "https://seaweedfs.com/favicon.ico");
   assert.equal(iconByTitle.get("SeaweedFS Admin"), "https://seaweedfs.com/favicon.ico");
-  assert.equal(iconByTitle.get("Cloudtty"), `${wizardIconBase}/install-cloudtty.svg`);
   assert.equal(iconByTitle.get("pgAdmin 4"), "https://raw.githubusercontent.com/pgadmin-org/pgadmin4/master/web/pgadmin/static/favicon.ico");
-  assert.equal(iconByTitle.get("Traefik Manager"), `${wizardIconBase}/install-traefik-manager.svg`);
   assert.equal(iconByTitle.get("Wiredoor"), "https://www.wiredoor.net/favicon.ico");
-  assert.equal(iconByTitle.get("Whoami"), `${wizardIconBase}/install-whoami.svg`);
   assert.equal(iconByTitle.get("Cloudflare"), `${wizardIconBase}/configure-cloudflare-dns.svg`);
   assert.equal(iconByTitle.get("GitHub"), "https://cdn.simpleicons.org/github");
 
@@ -120,14 +108,12 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
 test("buildDashyConfig hides steps that are not completed", () => {
   const steps = [
     loadStep("provision-nodes"),
-    loadStep("install-cloudtty"),
-    loadStep("install-whoami"),
+    loadStep("install-pgadmin4"),
   ];
 
   const stepStateById = new Map([
     ["provision-nodes", { status: "failed", outputs: {} }],
-    ["install-cloudtty", { status: "skipped", outputs: { access_url: "https://shell.example.net" } }],
-    ["install-whoami", { status: "not_started", outputs: {} }],
+    ["install-pgadmin4", { status: "skipped", outputs: {} }],
   ]);
 
   const config = buildDashyConfig({
@@ -143,8 +129,7 @@ test("buildDashyConfig hides steps that are not completed", () => {
 
   const titles = config.sections.flatMap((section) => section.items.map((item) => item.title));
   assert(!titles.includes("Hubble"));
-  assert(!titles.includes("Cloudtty"));
-  assert(!titles.includes("Whoami"));
+  assert(!titles.includes("pgAdmin 4"));
   assert(titles.includes("Cloudflare"));
   assert(titles.includes("GitHub"));
 });
@@ -174,7 +159,7 @@ test("buildDashyConfig skips zone-based URLs until the public zone is known", ()
 });
 
 test("normalizeStepManifest rejects Dashy items with conflicting URL sources", () => {
-  const file = path.join(repoRoot, "categories", "talos-cluster", "steps", "install-whoami", "step.yaml");
+  const file = path.join(repoRoot, "categories", "talos-cluster", "steps", "install-pgadmin4", "step.yaml");
   const manifest = YAML.parse(fs.readFileSync(file, "utf8"));
   manifest.dashy.items[0].output_url_key = "access_url";
 

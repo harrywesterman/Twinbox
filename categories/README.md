@@ -67,8 +67,6 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 - `install-argocd` – Deploy Argo CD.
 - `install-longhorn-storage` – Deploy Longhorn and set default StorageClass.
 - `install-cloudnativepg` – Deploy CloudNativePG operator.
-- `install-cloudtty` – Deploy Cloudtty and open a browser shell on the cluster.
-- `install-traefik-manager` – Deploy Traefik Manager for browser-based reverse-proxy management.
 - `install-prometheus` – Deploy Prometheus, Alertmanager, node-exporter, and kube-state-metrics.
 - `install-traefik` – Deploy Traefik ingress controller.
 - `install-secret-sync` – Deploy External Secrets Operator and OpenBao.
@@ -84,7 +82,6 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 - `install-management-consoles` – Deploy the operator web consoles, including SeaweedFS, after the start page.
 - `install-ntfy` – Deploy ntfy push notifications.
 - `install-velero-backup` – Deploy Velero with the default SeaweedFS backup target.
-- `install-whoami` – Deploy whoami test service.
 - `install-wiredoor-gateway` – Deploy Wiredoor gateway.
 - `install-uptimekuma` – Deploy Uptime Kuma monitoring.
 - `install-nextcloud` – Deploy Nextcloud.

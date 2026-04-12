@@ -52,8 +52,7 @@ function buildCatalog(stepStatuses = {}) {
     ['install-authentik-idp', 'Install Authentik', { dependsOn: ['install-secret-sync', 'install-longhorn-storage', 'install-cloudnativepg', 'install-traefik', 'choose-ingress-route'] }],
     ['create-users-and-groups', 'Create Users and Groups', { dependsOn: ['install-authentik-idp'] }],
     ['choose-ingress-route', 'Choose Ingress Route', { dependsOn: ['create-users-and-groups'] }],
-    ['install-whoami', 'Install Whoami', { dependsOn: ['install-traefik'] }],
-    ['install-headlamp', 'Install Headlamp', { dependsOn: ['install-whoami'] }],
+    ['install-headlamp', 'Install Headlamp', { dependsOn: ['install-traefik'] }],
     ['install-grafana', 'Install Grafana', { dependsOn: ['install-headlamp'] }],
     ['install-loki', 'Install Loki', { dependsOn: ['install-prometheus', 'install-longhorn-storage'] }],
     ['install-dashy-dashboard', 'Install Dashy dashboard', { dependsOn: ['install-grafana'] }],
@@ -124,7 +123,7 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   });
 
   assert.equal(model.mode, 'setup');
-  assert.equal(model.stepRail.length, 18);
+  assert.equal(model.stepRail.length, 16);
   const stepRailById = Object.fromEntries(model.stepRail.map((step) => [step.id, step]));
   assert.equal(stepRailById['provision-nodes'].title, 'Deploy Talos Cluster');
   assert.equal(stepRailById['provision-nodes'].isCurrent, true);
@@ -137,7 +136,7 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   assert.equal(stepRailById['install-pgadmin4'].title, 'Install pgAdmin 4');
   assert.equal(stepRailById['install-pgadmin4'].icon, '🗃️');
   assert.equal(model.primaryAction.label, 'Next');
-  assert.equal(model.progress.totalSteps, 18);
+  assert.equal(model.progress.totalSteps, 16);
   assert.equal(model.progress.completedSteps, 0);
   assert.equal(model.activity.runtime.currentStage, 'Applying cluster plan');
   assert.equal(model.activity.rawLogOutput, '[2026-03-20T10:10:00Z] Applying OpenTofu cluster plan');
@@ -218,7 +217,6 @@ test('wizard model switches to manage mode when setup flow is complete', () => {
         'install-traefik',
         'install-cloudnativepg',
         'create-users-and-groups',
-        'install-whoami',
         'install-headlamp',
         'install-grafana',
         'install-loki',
@@ -272,7 +270,7 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     selectedStepId: '',
   });
 
-  assert.equal(model.stepRail.length, 18);
+  assert.equal(model.stepRail.length, 16);
   const setupStepIds = new Set(model.stepRail.map((step) => step.id));
   for (const id of [
     'provision-nodes',
@@ -284,7 +282,6 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     'install-authentik-idp',
     'create-users-and-groups',
     'choose-ingress-route',
-    'install-whoami',
     'install-headlamp',
     'install-grafana',
     'install-dashy-dashboard',
