@@ -234,6 +234,41 @@ create_or_update_application() {
   api_write POST "/core/applications/" "$app_payload" | jq -r '.pk // .id // empty'
 }
 
+find_policy_binding_pk() {
+  local target_uuid="$1"
+  local group_id="$2"
+  local response
+
+  response="$(api_get "/policies/bindings/?page_size=200")"
+  jq -r \
+    --arg target_uuid "$target_uuid" \
+    --arg group_id "$group_id" \
+    '.results[]?
+      | select((.target // "") == $target_uuid and (.group // "") == $group_id)
+      | .pk // .id // empty' <<<"$response" | head -n1
+}
+
+ensure_group_binding() {
+  local target_uuid="$1"
+  local group_id="$2"
+  local binding_payload existing_pk
+
+  binding_payload="$(
+    jq -n \
+      --arg target_uuid "$target_uuid" \
+      --arg group_id "$group_id" \
+      '{target: $target_uuid, group: $group_id, order: 1, enabled: true}'
+  )"
+
+  existing_pk="$(find_policy_binding_pk "$target_uuid" "$group_id")"
+  if [[ -n "$existing_pk" ]]; then
+    api_write PATCH "/policies/bindings/${existing_pk}/" "$binding_payload" >/dev/null
+    return 0
+  fi
+
+  api_write POST "/policies/bindings/" "$binding_payload" >/dev/null
+}
+
 provider_payload="$(
   jq -n \
     --arg name "Argo CD" \
@@ -279,6 +314,7 @@ application_payload="$(
 )"
 application_pk="$(create_or_update_application "$application_payload")"
 [[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for Argo CD"
+ensure_group_binding "$application_pk" "$admins_group_id"
 
 argocd_secret_file="$secrets_dir/argocd-oidc-${cluster_id}.json"
 cat >"$argocd_secret_file" <<EOF

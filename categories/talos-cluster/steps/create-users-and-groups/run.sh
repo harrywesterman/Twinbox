@@ -274,6 +274,10 @@ GROUP_ID="$(printf '%s' "$GROUP_JSON" | jq -r '.pk // .id // .uuid // empty')"
 if ! authentik_group_has_user "$GROUP_JSON" "$USER_ID"; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Adding ${USERNAME} to ${ADMIN_GROUP_NAME}"
   authentik_add_user_to_group "$GROUP_ID" "$USER_ID"
+  GROUP_JSON="$(authentik_request GET "/core/groups/${GROUP_ID}/")"
+  if ! authentik_group_has_user "$GROUP_JSON" "$USER_ID"; then
+    fail "Could not verify that ${USERNAME} was added to ${ADMIN_GROUP_NAME}"
+  fi
 fi
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then

@@ -114,6 +114,41 @@ create_or_update_application() {
   authentik_api_write POST "/core/applications/" "$application_payload" | jq -r '.pk // .id // empty'
 }
 
+find_policy_binding_pk() {
+  local target_uuid="$1"
+  local group_id="$2"
+  local response
+
+  response="$(authentik_api_get "/policies/bindings/?page_size=200")"
+  jq -r \
+    --arg target_uuid "$target_uuid" \
+    --arg group_id "$group_id" \
+    '.results[]?
+      | select((.target // "") == $target_uuid and (.group // "") == $group_id)
+      | .pk // .id // empty' <<<"$response" | head -n1
+}
+
+ensure_group_binding() {
+  local target_uuid="$1"
+  local group_id="$2"
+  local binding_payload existing_pk
+
+  binding_payload="$(
+    jq -n \
+      --arg target_uuid "$target_uuid" \
+      --arg group_id "$group_id" \
+      '{target: $target_uuid, group: $group_id, order: 1, enabled: true}'
+  )"
+
+  existing_pk="$(find_policy_binding_pk "$target_uuid" "$group_id")"
+  if [[ -n "$existing_pk" ]]; then
+    authentik_api_write PATCH "/policies/bindings/${existing_pk}/" "$binding_payload" >/dev/null
+    return 0
+  fi
+
+  authentik_api_write POST "/policies/bindings/" "$binding_payload" >/dev/null
+}
+
 authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
 invalidation_flow_id="$(authentik_resolve_flow_id "default-provider-invalidation-flow" "invalidation")"
 openid_mapping_id="$(authentik_resolve_scope_mapping_id "openid")"
@@ -183,6 +218,7 @@ application_payload="$(
 )"
 application_pk="$(create_or_update_application "$application_payload")"
 [[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for Headlamp"
+ensure_group_binding "$application_pk" "$admins_group_id"
 
 secrets_dir="/opt/twinbox/bootstrap/secrets/global"
 
