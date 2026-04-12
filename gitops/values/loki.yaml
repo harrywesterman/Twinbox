@@ -24,6 +24,11 @@ singleBinary:
     enabled: true
     storageClassName: longhorn
     size: 5Gi
+  resources:
+    limits:
+      memory: 2Gi
+    requests:
+      memory: 1Gi
 
 read:
   replicas: 0
