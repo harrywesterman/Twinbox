@@ -2029,20 +2029,6 @@ def test_traefik_manager_step_deploys_browser_ui():
         / "traefik-manager"
         / "authentik-callback-ingressroute.yaml"
     ).read_text(encoding="utf-8")
-    callback_service_text = (
-        REPO_ROOT
-        / "gitops"
-        / "platform-apps"
-        / "traefik-manager"
-        / "authentik-callback-service.yaml"
-    ).read_text(encoding="utf-8")
-    callback_endpoints_text = (
-        REPO_ROOT
-        / "gitops"
-        / "platform-apps"
-        / "traefik-manager"
-        / "authentik-callback-endpoints.yaml"
-    ).read_text(encoding="utf-8")
     platform_kustomization_text = (
         REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
@@ -2088,12 +2074,8 @@ def test_traefik_manager_step_deploys_browser_ui():
     assert "Host(`traefik-manager.__ZONE_NAME__`)" in ingress_text
     assert "traefik-manager-authentik-callback" in callback_ingress_text
     assert "PathPrefix(`/outpost.goauthentik.io`)" in callback_ingress_text
-    assert "namespace: traefik-manager" in callback_service_text
-    assert "name: authentik-server" in callback_service_text
-    assert "namespace: traefik-manager" in callback_endpoints_text
-    assert "ip: 10.96.148.155" in callback_endpoints_text
-    assert "authentik-callback-service.yaml" in platform_apps_kustomization_text
-    assert "authentik-callback-endpoints.yaml" in platform_apps_kustomization_text
+    assert "name: authentik-server" in callback_ingress_text
+    assert "namespace: authentik" in callback_ingress_text
     assert "authentik-callback-ingressroute.yaml" in platform_apps_kustomization_text
     assert "traefik-manager/namespace.yaml" not in platform_kustomization_text
     assert "traefik-manager/pvc.yaml" not in platform_kustomization_text
@@ -2110,8 +2092,7 @@ def test_traefik_manager_step_deploys_browser_ui():
     assert 'kubectl apply -f "$platform_dir/serviceaccount.yaml"' in script_text
     assert 'kubectl apply -f "$platform_dir/pvc.yaml"' in script_text
     assert 'kubectl apply -f "$platform_dir/service.yaml"' in script_text
-    assert 'kubectl apply -f "$platform_dir/authentik-callback-service.yaml"' in script_text
-    assert 'kubectl apply -f "$platform_dir/authentik-callback-endpoints.yaml"' in script_text
+    assert 'kubectl apply -f "$rendered_callback_ingressroute"' in script_text
     assert "cluster-public-zone.sh" in script_text
     assert 'sed "s/__ZONE_NAME__/${public_zone_name}/g"' in script_text
     assert 'mktemp "${TMPDIR:-/tmp}/traefik-manager-deployment.XXXXXX.yaml"' in script_text
@@ -2515,24 +2496,44 @@ def test_seaweedfs_admin_routes_to_the_filer_web_port():
     assert "port: 23646" not in text
 
 
-def test_authentik_callback_endpoints_target_the_authentik_service_ip():
+def test_authentik_callback_ingressroutes_reference_the_authentik_namespace():
+    hubble_callback_text = (
+        REPO_ROOT
+        / "gitops"
+        / "platform"
+        / "hubble"
+        / "authentik-callback-ingressroute.yaml"
+    ).read_text(encoding="utf-8")
     longhorn_callback_text = (
         REPO_ROOT
         / "gitops"
         / "platform"
         / "management-consoles"
-        / "authentik-callback-endpoints.yaml"
+        / "authentik-callback-ingressroute.yaml"
     ).read_text(encoding="utf-8")
     traefik_callback_text = (
         REPO_ROOT
         / "gitops"
         / "platform"
         / "traefik"
-        / "authentik-callback-endpoints.yaml"
+        / "authentik-callback-ingressroute.yaml"
+    ).read_text(encoding="utf-8")
+    traefik_manager_callback_text = (
+        REPO_ROOT
+        / "gitops"
+        / "platform-apps"
+        / "traefik-manager"
+        / "authentik-callback-ingressroute.yaml"
     ).read_text(encoding="utf-8")
 
-    assert "ip: 10.96.148.155" in longhorn_callback_text
-    assert "ip: 10.96.148.155" in traefik_callback_text
+    for callback_text in (
+        hubble_callback_text,
+        longhorn_callback_text,
+        traefik_callback_text,
+        traefik_manager_callback_text,
+    ):
+        assert "name: authentik-server" in callback_text
+        assert "namespace: authentik" in callback_text
 
 
 def test_hubble_authentik_callback_ingressroute_uses_the_real_host():
