@@ -41,6 +41,9 @@ valkey:
 
 server:
   enabled: true
+  controllers:
+    main:
+      strategy: Recreate
   ingress:
     main:
       enabled: false
