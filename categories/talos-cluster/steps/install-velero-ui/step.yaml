@@ -16,7 +16,7 @@ dashy:
     - section: Platform
       title: Velero UI
       description: Backup dashboard
-      icon: fas fa-life-ring
+      icon: install-velero-ui
       url_template: https://velero-ui.__ZONE_NAME__
 inputs: []
 secrets:

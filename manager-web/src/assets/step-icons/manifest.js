@@ -114,6 +114,12 @@ export const STEP_ICON_MANIFEST = [
     tintColor: '#0f172a',
   },
   {
+    stepId: 'install-twinbox-portal',
+    fileBase: 'install-twinbox-portal',
+    sourceKind: 'local-svg',
+    sourceFile: './install-twinbox-portal.svg',
+  },
+  {
     stepId: 'install-ntfy',
     fileBase: 'install-ntfy',
     sourceKind: 'simple-icons',
@@ -133,6 +139,12 @@ export const STEP_ICON_MANIFEST = [
     sourceKind: 'local-svg',
     sourceFile: './install-velero-backup.svg',
     tintFromPng: './install-velero-backup.png',
+  },
+  {
+    stepId: 'install-velero-ui',
+    fileBase: 'install-velero-ui',
+    sourceKind: 'local-svg',
+    sourceFile: './install-velero-ui.svg',
   },
   {
     stepId: 'install-proxmox-backup-system',

@@ -438,3 +438,8 @@ test("login requests the reduced Authentik scope set", async () => {
   const location = new URL(response.headers.get("location"));
   assert.equal(location.searchParams.get("scope"), "openid profile email");
 });
+
+test("portal image copies the Authentik admin helper into the runtime image", async () => {
+  const dockerfile = await fs.promises.readFile(path.join(repoRoot, "portal", "Dockerfile"), "utf8");
+  assert.match(dockerfile, /COPY authentik-admin\.mjs \.\/[\s\S]*CMD \["node", "server\.mjs"\]/, 'expected the runtime image to include the portal helper module');
+});

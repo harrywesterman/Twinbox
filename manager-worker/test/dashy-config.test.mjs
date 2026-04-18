@@ -37,6 +37,8 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
     loadStep("install-loki"),
     loadStep("install-management-consoles"),
     loadStep("install-pgadmin4"),
+    loadStep("install-twinbox-portal"),
+    loadStep("install-velero-ui"),
     loadStep("install-wiredoor-gateway"),
   ];
 
@@ -49,6 +51,8 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
     ["install-loki", { status: "succeeded", outputs: {} }],
     ["install-management-consoles", { status: "succeeded", outputs: {} }],
     ["install-pgadmin4", { status: "succeeded", outputs: {} }],
+    ["install-twinbox-portal", { status: "succeeded", outputs: {} }],
+    ["install-velero-ui", { status: "succeeded", outputs: {} }],
     ["install-wiredoor-gateway", { status: "succeeded", outputs: { wiredoor_url: "https://wiredoor.example.net" } }],
   ]);
 
@@ -73,6 +77,8 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   assert(platformSection.items.some((item) => item.title === "Grafana" && item.url === "https://grafana.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "Loki" && item.url === "https://grafana.tst.example.com/explore"));
   assert(platformSection.items.some((item) => item.title === "SeaweedFS Admin" && item.url === "https://seaweedfs-admin.tst.example.com"));
+  assert(platformSection.items.some((item) => item.title === "Twinbox Portal" && item.url === "https://portal.tst.example.com"));
+  assert(platformSection.items.some((item) => item.title === "Velero UI" && item.url === "https://velero-ui.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "pgAdmin 4" && item.url === "https://pgadmin4.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "Wiredoor" && item.url === "https://wiredoor.example.net"));
   assert(platformSection.items.some((item) => item.title === "Cloudflare" && item.url === "https://dash.cloudflare.com/"));
@@ -89,6 +95,8 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   assert.equal(iconByTitle.get("Proxmox"), `${wizardIconBase}/install-proxmox-backup-system.svg`);
   assert.equal(iconByTitle.get("SeaweedFS"), "https://seaweedfs.com/favicon.ico");
   assert.equal(iconByTitle.get("SeaweedFS Admin"), "https://seaweedfs.com/favicon.ico");
+  assert.equal(iconByTitle.get("Twinbox Portal"), `${wizardIconBase}/install-twinbox-portal.svg`);
+  assert.equal(iconByTitle.get("Velero UI"), `${wizardIconBase}/install-velero-ui.svg`);
   assert.equal(iconByTitle.get("pgAdmin 4"), "https://raw.githubusercontent.com/pgadmin-org/pgadmin4/master/web/pgadmin/static/favicon.ico");
   assert.equal(iconByTitle.get("Wiredoor"), "https://www.wiredoor.net/favicon.ico");
   assert.equal(iconByTitle.get("Cloudflare"), `${wizardIconBase}/configure-cloudflare-dns.svg`);

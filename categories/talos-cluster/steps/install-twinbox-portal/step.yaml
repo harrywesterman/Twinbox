@@ -15,7 +15,7 @@ dashy:
     - section: Platform
       title: Twinbox Portal
       description: User portal
-      icon: fas fa-compass
+      icon: install-twinbox-portal
       url_template: https://portal.__ZONE_NAME__
 inputs: []
 secrets:
