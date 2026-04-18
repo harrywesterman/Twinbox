@@ -53,16 +53,15 @@ function setupWorkspace() {
 set -euo pipefail
 echo "kubectl $*" >> "${logFile}"
 
-if [[ "$*" == *" create configmap "* ]]; then
+if [[ "$*" == *" create secret generic "* ]]; then
   cat <<'YAML'
 apiVersion: v1
-kind: ConfigMap
+kind: Secret
 metadata:
   name: portal-config
   namespace: twinbox-portal
-data:
-  portal-config.json: |
-    {}
+type: Opaque
+data: {}
 YAML
   exit 0
 fi
@@ -79,7 +78,7 @@ exit 0
   return { root, dataDir, binDir, logFile };
 }
 
-test("refresh-portal-config renders the portal configmap after install", () => {
+test("refresh-portal-config renders the portal secret after install", () => {
   const { dataDir, binDir, logFile } = setupWorkspace();
   const env = {
     ...process.env,
@@ -104,5 +103,5 @@ test("refresh-portal-config renders the portal configmap after install", () => {
   assert.equal(result.status, 0, result.stderr);
   assert.equal(fs.existsSync(logFile), true);
   const logText = fs.readFileSync(logFile, "utf8");
-  assert.match(logText, /kubectl -n twinbox-portal create configmap portal-config/);
+  assert.match(logText, /kubectl -n twinbox-portal create secret generic portal-config/);
 });

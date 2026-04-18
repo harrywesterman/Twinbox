@@ -69,8 +69,8 @@ spec:
               mountPath: /data
       volumes:
         - name: portal-config
-          configMap:
-            name: portal-config
+          secret:
+            secretName: portal-config
         - name: portal-data
           persistentVolumeClaim:
             claimName: portal-data

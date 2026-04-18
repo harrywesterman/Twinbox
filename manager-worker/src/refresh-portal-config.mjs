@@ -17,7 +17,7 @@ function parseArgs(argv) {
     workspaceRoot: process.env.WORKSPACE_ROOT || "/opt/twinbox",
     managerDataDir: process.env.MANAGER_DATA_DIR || "/data",
     namespace: "twinbox-portal",
-    configMapName: "portal-config",
+    secretName: "portal-config",
     triggerStepId: "",
     clusterId: "",
     clusterInstanceId: "",
@@ -41,7 +41,7 @@ function parseArgs(argv) {
         index += 1;
         break;
       case "--configmap-name":
-        options.configMapName = nextValue;
+        options.secretName = nextValue;
         index += 1;
         break;
       case "--trigger-step-id":
@@ -174,7 +174,7 @@ function runKubectl(args, { input = undefined, allowFailure = false } = {}) {
   return result;
 }
 
-function applyConfigMap(namespace, configMapName, renderedConfig) {
+function applySecret(namespace, secretName, renderedConfig) {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "portal-config-"));
   const configFile = path.join(tempDir, "portal-config.json");
   fs.writeFileSync(configFile, renderedConfig, "utf8");
@@ -184,8 +184,9 @@ function applyConfigMap(namespace, configMapName, renderedConfig) {
       "-n",
       namespace,
       "create",
-      "configmap",
-      configMapName,
+      "secret",
+      "generic",
+      secretName,
       `--from-file=portal-config.json=${configFile}`,
       "--dry-run=client",
       "-o",
@@ -227,7 +228,7 @@ function main() {
     content,
   }), null, 2);
 
-  applyConfigMap(options.namespace, options.configMapName, renderedConfig);
+  applySecret(options.namespace, options.secretName, renderedConfig);
   console.log(`Portal config refreshed for ${currentCluster.id}`);
 }
 
