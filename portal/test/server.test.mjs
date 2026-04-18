@@ -124,13 +124,24 @@ function cloneGroup(group) {
 }
 
 const authentikServer = http.createServer(async (req, res) => {
+  const url = new URL(req.url || "/", "http://127.0.0.1");
+  const pathname = url.pathname;
+
+  if (req.method === "GET" && pathname === "/api/v3/.well-known/openid-configuration") {
+    sendJson(res, 200, {
+      authorization_endpoint: `${authentikServerOrigin}/authorize`,
+      token_endpoint: `${authentikServerOrigin}/token`,
+      userinfo_endpoint: `${authentikServerOrigin}/userinfo`,
+      jwks_uri: `${authentikServerOrigin}/jwks`,
+      issuer: `${authentikServerOrigin}/api/v3`,
+    });
+    return;
+  }
+
   if (req.headers.authorization !== "Bearer portal-token") {
     sendJson(res, 401, { error: "missing token" });
     return;
   }
-
-  const url = new URL(req.url || "/", "http://127.0.0.1");
-  const pathname = url.pathname;
 
   if (req.method === "GET" && pathname === "/api/v3/core/users/") {
     sendJson(res, 200, { results: fakeState.users.map((user) => cloneUser(user)) });
@@ -239,6 +250,7 @@ const authentikServer = http.createServer(async (req, res) => {
 
 let portalServer;
 let portalOrigin = "";
+let authentikServerOrigin = "";
 
 async function startServer(server) {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -283,13 +295,15 @@ test.before(async () => {
     },
   });
 
-  const authentikOrigin = await startServer(authentikServer);
+  authentikServerOrigin = await startServer(authentikServer);
   process.env.NODE_ENV = "test";
   process.env.PORTAL_CONFIG_PATH = configPath;
   process.env.PORTAL_DATA_DIR = dataDir;
   process.env.PORTAL_SESSION_SECRET = sessionSecret;
+  process.env.PORTAL_OIDC_CLIENT_ID = "portal-client";
+  process.env.PORTAL_OIDC_ISSUER = `${authentikServerOrigin}/api/v3`;
   process.env.AUTHENTIK_API_TOKEN = "portal-token";
-  process.env.AUTHENTIK_API_BASE = `${authentikOrigin}/api/v3`;
+  process.env.AUTHENTIK_API_BASE = `${authentikServerOrigin}/api/v3`;
 
   const moduleUrl = `${pathToFileURL(path.join(repoRoot, "portal", "server.mjs")).href}?test=${Date.now()}`;
   const { app } = await import(moduleUrl);
@@ -413,4 +427,14 @@ test("group updates block privileged groups and allow approved memberships", asy
   });
   assert.equal(updated.status, 200);
   assert.deepEqual(updated.payload.user.groupNames, ["family"]);
+});
+
+test("login requests the reduced Authentik scope set", async () => {
+  const response = await fetch(`${portalOrigin}/auth/login`, {
+    redirect: "manual",
+  });
+
+  assert.equal(response.status, 302);
+  const location = new URL(response.headers.get("location"));
+  assert.equal(location.searchParams.get("scope"), "openid profile email");
 });

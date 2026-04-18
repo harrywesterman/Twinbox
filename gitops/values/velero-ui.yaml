@@ -31,7 +31,7 @@ env:
   - name: OAUTH_NAME
     value: Authentik
   - name: OAUTH_OAUTH_SCOPE
-    value: openid profile email groups
+    value: openid profile email
   - name: OAUTH_GROUP_CLAIM
     value: groups
   - name: POLICY_FILE_PATH

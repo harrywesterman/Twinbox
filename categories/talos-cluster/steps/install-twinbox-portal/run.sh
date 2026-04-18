@@ -104,7 +104,6 @@ invalidation_flow_id="$(resolve_flow_id "default-provider-invalidation-flow" "in
 openid_mapping_id="$(resolve_scope_mapping_id "openid")"
 email_mapping_id="$(resolve_scope_mapping_id "email")"
 profile_mapping_id="$(resolve_scope_mapping_id "profile")"
-groups_mapping_id="$(resolve_scope_mapping_id "groups")"
 signing_key_id="$(authentik_resolve_signing_key_id)"
 
 [[ -n "$authorization_flow_id" ]] || fail "Could not resolve Authentik authorization flow ID"
@@ -112,7 +111,6 @@ signing_key_id="$(authentik_resolve_signing_key_id)"
 [[ -n "$openid_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for openid"
 [[ -n "$email_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for email"
 [[ -n "$profile_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for profile"
-[[ -n "$groups_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for groups"
 [[ -n "$signing_key_id" ]] || fail "Could not resolve Authentik signing key ID"
 
 property_mapping_ids_json="$(
@@ -120,8 +118,7 @@ property_mapping_ids_json="$(
     --arg openid "$openid_mapping_id" \
     --arg email "$email_mapping_id" \
     --arg profile "$profile_mapping_id" \
-    --arg groups "$groups_mapping_id" \
-    '[$openid, $email, $profile, $groups]'
+    '[$openid, $email, $profile]'
 )"
 
 portal_redirect_regex="$(printf '%s' "$portal_host/auth/callback" | sed 's/[.[\*^$()+?{|]/\\&/g; s/\//\\\//g')"

@@ -203,20 +203,17 @@ admins_group_id="$(authentik_find_group_id "admins")"
 openid_mapping_id="$(resolve_scope_mapping_id "openid")"
 email_mapping_id="$(resolve_scope_mapping_id "email")"
 profile_mapping_id="$(resolve_scope_mapping_id "profile")"
-groups_mapping_id="$(resolve_scope_mapping_id "groups")"
 
 [[ -n "$openid_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for openid"
 [[ -n "$email_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for email"
 [[ -n "$profile_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for profile"
-[[ -n "$groups_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for groups"
 
 property_mapping_ids_json="$(
   jq -cn \
     --arg openid "$openid_mapping_id" \
     --arg email "$email_mapping_id" \
     --arg profile "$profile_mapping_id" \
-    --arg groups "$groups_mapping_id" \
-    '[$openid, $email, $profile, $groups]'
+    '[$openid, $email, $profile]'
 )"
 
 existing_secret_json=""
