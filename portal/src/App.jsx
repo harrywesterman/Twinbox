@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+
+import { buildAdminNavigationItems, buildUserAdminViewModel } from './user-admin-model.js';
 
 function requestJson(url, options = {}) {
   return fetch(url, {
@@ -138,6 +140,67 @@ function usePortalData() {
   };
 }
 
+function useUserAdminData(enabled) {
+  const [state, setState] = useState({
+    loading: false,
+    refreshing: false,
+    error: '',
+    users: [],
+    groups: [],
+  });
+
+  const load = useCallback(async ({ silent = false } = {}) => {
+    if (!enabled) {
+      setState({
+        loading: false,
+        refreshing: false,
+        error: '',
+        users: [],
+        groups: [],
+      });
+      return;
+    }
+
+    setState((current) => ({
+      ...current,
+      loading: current.users.length === 0 && !silent,
+      refreshing: current.users.length > 0 || silent,
+      error: '',
+    }));
+
+    try {
+      const [usersPayload, groupsPayload] = await Promise.all([
+        requestJson('/api/admin/users'),
+        requestJson('/api/admin/groups'),
+      ]);
+
+      setState({
+        loading: false,
+        refreshing: false,
+        error: '',
+        users: Array.isArray(usersPayload?.users) ? usersPayload.users : [],
+        groups: Array.isArray(groupsPayload?.groups) ? groupsPayload.groups : [],
+      });
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        loading: false,
+        refreshing: false,
+        error: error instanceof Error ? error.message : 'Failed to load users and groups.',
+      }));
+    }
+  }, [enabled]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return {
+    ...state,
+    reload: useCallback(() => load({ silent: true }), [load]),
+  };
+}
+
 function SectionTitle({ eyebrow, title, description }) {
   return (
     <header className="section-title">
@@ -174,10 +237,16 @@ function MenuPopover({ visible, onNavigate, onLogout, onClose, isAdmin }) {
     return null;
   }
 
+  const adminItems = buildAdminNavigationItems({ isAdmin });
+
   return (
     <div className="menu-popover" role="menu">
       <button type="button" onClick={() => { onNavigate('/settings'); onClose(); }}>Settings</button>
-      {isAdmin ? <button type="button" onClick={() => { onNavigate('/admin'); onClose(); }}>Admin apps</button> : null}
+      {adminItems.map((item) => (
+        <button key={item.id} type="button" onClick={() => { onNavigate(item.path); onClose(); }}>
+          {item.label}
+        </button>
+      ))}
       <button type="button" onClick={() => { onNavigate('/intranet'); onClose(); }}>Intranet</button>
       <button type="button" onClick={() => { onNavigate('/status'); onClose(); }}>Cluster status</button>
       <button type="button" onClick={() => { onLogout(); onClose(); }}>Log out</button>
@@ -485,6 +554,12 @@ function AdminPage({ adminApps, onNavigate }) {
         title="Management apps"
         description="Operators and admins get their own screen, separate from the normal launcher."
       />
+      <div className="admin-actions">
+        <button type="button" className="primary-button" onClick={() => onNavigate('/admin/users')}>
+          Open user admin
+        </button>
+        <span>Give non-technical admins one safe place to add, disable, and group users.</span>
+      </div>
       <div className="card-grid">
         {adminApps.map((card) => (
           <AppTile key={card.id} card={card} onOpen={() => window.location.assign(card.liveUrl || card.url)} />
@@ -492,6 +567,416 @@ function AdminPage({ adminApps, onNavigate }) {
       </div>
       <button type="button" className="secondary-button" onClick={() => onNavigate('/')}>Back home</button>
     </Panel>
+  );
+}
+
+function UserAdminPage({ config, directoryState, onNavigate }) {
+  const [query, setQuery] = useState('');
+  const deferredQuery = useDeferredValue(query);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [groupDraft, setGroupDraft] = useState([]);
+  const [createDraft, setCreateDraft] = useState({
+    username: '',
+    name: '',
+    email: '',
+    groupNames: [],
+  });
+  const [createBusy, setCreateBusy] = useState(false);
+  const [groupBusy, setGroupBusy] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [temporaryPassword, setTemporaryPassword] = useState(null);
+
+  const viewModel = useMemo(() => buildUserAdminViewModel({
+    config,
+    users: directoryState.users,
+    groups: directoryState.groups,
+    query: deferredQuery,
+    selectedUserId,
+  }), [config, directoryState.groups, directoryState.users, deferredQuery, selectedUserId]);
+
+  useEffect(() => {
+    if (viewModel.selectedUser?.id && viewModel.selectedUser.id !== selectedUserId) {
+      startTransition(() => {
+        setSelectedUserId(viewModel.selectedUser.id);
+      });
+    }
+  }, [selectedUserId, viewModel.selectedUser]);
+
+  useEffect(() => {
+    setGroupDraft(viewModel.selectedUser?.groupNames || []);
+  }, [viewModel.selectedUser?.groupNames, viewModel.selectedUser?.id]);
+
+  useEffect(() => {
+    setCreateDraft((current) => {
+      const nextGroupNames = current.groupNames.filter((groupName) => (
+        viewModel.groups.some((group) => group.name === groupName)
+      ));
+      if (nextGroupNames.length === current.groupNames.length) {
+        return current;
+      }
+      return {
+        ...current,
+        groupNames: nextGroupNames,
+      };
+    });
+  }, [viewModel.groups]);
+
+  const toggleCreateGroup = (groupName) => {
+    setCreateDraft((current) => ({
+      ...current,
+      groupNames: current.groupNames.includes(groupName)
+        ? current.groupNames.filter((value) => value !== groupName)
+        : [...current.groupNames, groupName].sort((left, right) => left.localeCompare(right)),
+    }));
+  };
+
+  const toggleSelectedGroup = (groupName) => {
+    setGroupDraft((current) => (
+      current.includes(groupName)
+        ? current.filter((value) => value !== groupName)
+        : [...current, groupName].sort((left, right) => left.localeCompare(right))
+    ));
+  };
+
+  const refreshDirectory = async () => {
+    setFormError('');
+    await directoryState.reload();
+  };
+
+  const submitCreate = async (event) => {
+    event.preventDefault();
+    setCreateBusy(true);
+    setFormError('');
+
+    try {
+      const payload = await requestJson('/api/admin/users', {
+        method: 'POST',
+        body: JSON.stringify(createDraft),
+      });
+
+      setTemporaryPassword({
+        password: payload.temporaryPassword,
+        user: payload.user,
+      });
+      setCreateDraft({
+        username: '',
+        name: '',
+        email: '',
+        groupNames: [],
+      });
+      startTransition(() => {
+        setSelectedUserId(payload?.user?.id || '');
+      });
+      await directoryState.reload();
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Failed to create user.');
+    } finally {
+      setCreateBusy(false);
+    }
+  };
+
+  const saveGroups = async () => {
+    if (!viewModel.selectedUser) {
+      return;
+    }
+
+    setGroupBusy(true);
+    setFormError('');
+    try {
+      await requestJson(`/api/admin/users/${encodeURIComponent(viewModel.selectedUser.id)}/groups`, {
+        method: 'PUT',
+        body: JSON.stringify({ groupNames: groupDraft }),
+      });
+      await directoryState.reload();
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Failed to save groups.');
+    } finally {
+      setGroupBusy(false);
+    }
+  };
+
+  const toggleUserStatus = async () => {
+    if (!viewModel.selectedUser) {
+      return;
+    }
+
+    setStatusBusy(true);
+    setFormError('');
+    try {
+      const endpoint = viewModel.selectedUser.isActive ? 'disable' : 'enable';
+      await requestJson(`/api/admin/users/${encodeURIComponent(viewModel.selectedUser.id)}/${endpoint}`, {
+        method: 'POST',
+      });
+      await directoryState.reload();
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Failed to update account status.');
+    } finally {
+      setStatusBusy(false);
+    }
+  };
+
+  if (directoryState.loading) {
+    return (
+      <Panel>
+        <SectionTitle
+          eyebrow={config?.userAdmin?.eyebrow || 'Admin'}
+          title={config?.userAdmin?.title || 'Gebruikers en groepen'}
+          description="Loading the current Authentik directory."
+        />
+        <p className="muted-copy">Twinbox is reading users and groups from Authentik.</p>
+      </Panel>
+    );
+  }
+
+  return (
+    <div className="user-admin-layout">
+      <Panel className="user-admin-overview">
+        <SectionTitle
+          eyebrow={config?.userAdmin?.eyebrow || 'Admin'}
+          title={viewModel.title}
+          description={viewModel.description}
+        />
+        <div className="user-admin-stats">
+          <article>
+            <strong>{viewModel.stats.totalUsers}</strong>
+            <span>Total users</span>
+          </article>
+          <article>
+            <strong>{viewModel.stats.activeUsers}</strong>
+            <span>Active</span>
+          </article>
+          <article>
+            <strong>{viewModel.stats.inactiveUsers}</strong>
+            <span>Disabled</span>
+          </article>
+          <article>
+            <strong>{viewModel.stats.manageableGroups}</strong>
+            <span>Manageable groups</span>
+          </article>
+        </div>
+        <div className="hero-actions">
+          <button type="button" className="secondary-button" onClick={refreshDirectory} disabled={directoryState.refreshing}>
+            {directoryState.refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+          <button type="button" className="secondary-button" onClick={() => onNavigate('/admin')}>
+            Back to admin apps
+          </button>
+        </div>
+        {directoryState.error || formError ? (
+          <div className="inline-notice is-danger">
+            <strong>Something needs attention.</strong>
+            <span>{formError || directoryState.error}</span>
+          </div>
+        ) : null}
+        {temporaryPassword ? (
+          <div className="inline-notice is-accent">
+            <strong>Temporary password for {temporaryPassword.user?.name || temporaryPassword.user?.username}</strong>
+            <code>{temporaryPassword.password}</code>
+            <span>Show this once to the user. The portal does not keep a readable copy.</span>
+            <button type="button" className="secondary-button" onClick={() => setTemporaryPassword(null)}>
+              Hide password
+            </button>
+          </div>
+        ) : null}
+      </Panel>
+
+      <div className="user-admin-columns">
+        <div className="stack">
+          <Panel>
+            <SectionTitle
+              eyebrow="Create"
+              title="Add user"
+              description="Create a normal Authentik user and optionally place them in the approved business groups."
+            />
+            <form className="user-admin-form" onSubmit={submitCreate}>
+              <label>
+                <span>Full name</span>
+                <input
+                  type="text"
+                  value={createDraft.name}
+                  onChange={(event) => setCreateDraft((current) => ({ ...current, name: event.target.value }))}
+                  placeholder="Jane Example"
+                  required
+                />
+              </label>
+              <label>
+                <span>Username</span>
+                <input
+                  type="text"
+                  value={createDraft.username}
+                  onChange={(event) => setCreateDraft((current) => ({ ...current, username: event.target.value }))}
+                  placeholder="jane"
+                  required
+                />
+              </label>
+              <label>
+                <span>Email address</span>
+                <input
+                  type="email"
+                  value={createDraft.email}
+                  onChange={(event) => setCreateDraft((current) => ({ ...current, email: event.target.value }))}
+                  placeholder="jane@example.com"
+                />
+              </label>
+              <div className="user-admin-group-picker">
+                <span>Approved groups</span>
+                {viewModel.emptyState ? (
+                  <p className="muted-copy">{viewModel.emptyState.description}</p>
+                ) : (
+                  <div className="user-admin-checkboxes">
+                    {viewModel.groups.map((group) => (
+                      <label key={group.id} className="checkbox-card">
+                        <input
+                          type="checkbox"
+                          checked={createDraft.groupNames.includes(group.name)}
+                          onChange={() => toggleCreateGroup(group.name)}
+                        />
+                        <span>
+                          <strong>{group.label}</strong>
+                          {group.description ? <small>{group.description}</small> : null}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="hero-actions">
+                <button type="submit" className="primary-button" disabled={createBusy}>
+                  {createBusy ? 'Creating…' : 'Create user'}
+                </button>
+                <span className="muted-copy">Twinbox will generate a temporary password and show it once.</span>
+              </div>
+            </form>
+          </Panel>
+
+          <Panel>
+            <SectionTitle
+              eyebrow="Directory"
+              title="Users"
+              description="Search by name, username, email, or visible group."
+            />
+            <div className="user-admin-search">
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search users"
+              />
+            </div>
+            <div className="user-admin-list">
+              {viewModel.filteredUsers.length === 0 ? (
+                <div className="empty-card">
+                  <strong>No matching users</strong>
+                  <span>Adjust the search or create a new user.</span>
+                </div>
+              ) : (
+                viewModel.filteredUsers.map((user) => (
+                  <button
+                    key={user.id}
+                    type="button"
+                    className={`user-list-row ${user.id === viewModel.selectedUser?.id ? 'is-selected' : ''}`}
+                    onClick={() => startTransition(() => setSelectedUserId(user.id))}
+                  >
+                    <span className="user-list-copy">
+                      <strong>{user.name}</strong>
+                      <span>{user.username}{user.email ? ` · ${user.email}` : ''}</span>
+                    </span>
+                    <span className="user-list-meta">
+                      <span className={`status-chip ${user.isActive ? 'is-live' : ''}`}>
+                        {user.isActive ? 'active' : 'disabled'}
+                      </span>
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          </Panel>
+        </div>
+
+        <Panel className="user-admin-detail">
+          {viewModel.selectedUser ? (
+            <>
+              <SectionTitle
+                eyebrow="Selected user"
+                title={viewModel.selectedUser.name}
+                description="Review the current account status and adjust only the approved group memberships."
+              />
+              <div className="user-admin-profile">
+                <div>
+                  <span>Username</span>
+                  <strong>{viewModel.selectedUser.username}</strong>
+                </div>
+                <div>
+                  <span>Email</span>
+                  <strong>{viewModel.selectedUser.email || 'No email set'}</strong>
+                </div>
+                <div>
+                  <span>Status</span>
+                  <strong>{viewModel.selectedUser.isActive ? 'Active' : 'Disabled'}</strong>
+                </div>
+                <div>
+                  <span>Hidden memberships</span>
+                  <strong>{viewModel.selectedUser.hiddenGroupCount || 0}</strong>
+                </div>
+              </div>
+
+              {viewModel.emptyState ? (
+                <div className="empty-card">
+                  <strong>{viewModel.emptyState.title}</strong>
+                  <span>{viewModel.emptyState.description}</span>
+                </div>
+              ) : (
+                <>
+                  <div className="user-admin-group-picker">
+                    <span>Visible group memberships</span>
+                    <div className="user-admin-checkboxes">
+                      {viewModel.groups.map((group) => (
+                        <label key={group.id} className="checkbox-card">
+                          <input
+                            type="checkbox"
+                            checked={groupDraft.includes(group.name)}
+                            onChange={() => toggleSelectedGroup(group.name)}
+                          />
+                          <span>
+                            <strong>{group.label}</strong>
+                            {group.description ? <small>{group.description}</small> : null}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="hero-actions">
+                    <button type="button" className="primary-button" onClick={saveGroups} disabled={groupBusy}>
+                      {groupBusy ? 'Saving…' : 'Save groups'}
+                    </button>
+                    <span className="muted-copy">Only the approved groups above are editable here.</span>
+                  </div>
+                </>
+              )}
+
+              <div className="hero-actions user-admin-status-actions">
+                <button type="button" className="secondary-button" onClick={toggleUserStatus} disabled={statusBusy}>
+                  {statusBusy
+                    ? 'Updating…'
+                    : viewModel.selectedUser.isActive
+                      ? 'Disable account'
+                      : 'Reactivate account'}
+                </button>
+                <span className="muted-copy">
+                  Disabling keeps the account history intact and blocks new sign-ins.
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className="empty-card">
+              <strong>No user selected</strong>
+              <span>Pick a user from the directory to review details.</span>
+            </div>
+          )}
+        </Panel>
+      </div>
+    </div>
   );
 }
 
@@ -533,6 +1018,8 @@ function StatusPage({ statusState, onRefresh, onNavigate }) {
 export default function App() {
   const [route, navigate] = useRoute();
   const { sessionState, configState, preferences, setPreferences, statusState, refreshStatus } = usePortalData();
+  const userAdminEnabled = Boolean(sessionState.session?.isAdmin) && route === '/admin/users';
+  const userAdminState = useUserAdminData(userAdminEnabled);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -644,9 +1131,18 @@ export default function App() {
         {route === '/intranet' ? <IntranetPage links={config?.intranetLinks || []} onNavigate={navigate} /> : null}
         {route === '/status' ? <StatusPage statusState={statusState} onRefresh={refreshStatus} onNavigate={navigate} /> : null}
         {route === '/admin' && isAdmin ? <AdminPage adminApps={config?.adminApps || []} onNavigate={navigate} /> : null}
+        {route === '/admin/users' && isAdmin ? (
+          <UserAdminPage config={config} directoryState={userAdminState} onNavigate={navigate} />
+        ) : null}
         {route === '/admin' && !isAdmin ? (
           <Panel>
             <SectionTitle eyebrow="Access denied" title="Admins only" description="This part of Twinbox is reserved for the admins group." />
+            <button type="button" className="secondary-button" onClick={() => navigate('/')}>Back home</button>
+          </Panel>
+        ) : null}
+        {route === '/admin/users' && !isAdmin ? (
+          <Panel>
+            <SectionTitle eyebrow="Access denied" title="Admins only" description="User administration is only available to the admins group." />
             <button type="button" className="secondary-button" onClick={() => navigate('/')}>Back home</button>
           </Panel>
         ) : null}

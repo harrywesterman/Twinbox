@@ -23,6 +23,12 @@ WIREDOOR_SECRET = (
 TRAEFIK_SECRET = (
     REPO_ROOT / "gitops" / "platform" / "traefik" / "traefik-dashboard-externalsecret.yaml"
 )
+PORTAL_SECRET = (
+    REPO_ROOT / "gitops" / "platform-apps" / "twinbox-portal" / "externalsecret.yaml"
+)
+PORTAL_STEP = (
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-twinbox-portal" / "run.sh"
+)
 ZULIP_STEP = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-zulip" / "step.yaml"
 )
@@ -88,6 +94,21 @@ def test_wiredoor_step_requires_url_generates_token_and_syncs_to_openbao():
     assert "scripts/manager/sync-openbao-global-secret.sh" in text
     assert '--secret-name "wiredoor-gateway"' in text
     assert '--required-keys "WIREDOOR_URL,TOKEN"' in text
+
+
+def test_portal_step_and_secret_project_authentik_management_env():
+    step_text = _read(PORTAL_STEP)
+    secret_text = _read(PORTAL_SECRET)
+
+    assert '"AUTHENTIK_API_BASE": "$authentik_api_base"' in step_text
+    assert '--required-keys "PORTAL_BASE_URL,PORTAL_OIDC_CLIENT_ID,PORTAL_OIDC_ISSUER,PORTAL_SESSION_SECRET,AUTHENTIK_API_BASE"' in step_text
+
+    assert "name: portal-bootstrap" in secret_text
+    assert "secretKey: AUTHENTIK_API_BASE" in secret_text
+    assert "property: AUTHENTIK_API_BASE" in secret_text
+    assert "secretKey: AUTHENTIK_API_TOKEN" in secret_text
+    assert "key: twinbox/global/authentik" in secret_text
+    assert "property: AUTHENTIK_API_TOKEN" in secret_text
 
 
 def test_gitops_secret_consumers_now_reference_cluster_secret_store_openbao():

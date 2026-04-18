@@ -3,6 +3,16 @@ import fs from "fs";
 import path from "path";
 import express from "express";
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import {
+  buildDirectory,
+  createAuthentikAdminClient,
+  createTemporaryPassword,
+  DEFAULT_AUTHENTIK_API_BASE,
+  ensureRequestedGroupsAreManageable,
+  isServiceAccountUser,
+  normalizeManageableGroupsConfig,
+  normalizeRequestedGroupNames,
+} from "./authentik-admin.mjs";
 
 const app = express();
 const port = Number(process.env.PORT || 8080);
@@ -13,6 +23,8 @@ const sessionCookieName = process.env.PORTAL_SESSION_COOKIE || "twinbox_portal_s
 const oauthCookieName = process.env.PORTAL_OAUTH_COOKIE || "twinbox_portal_oauth";
 const issuer = String(process.env.PORTAL_OIDC_ISSUER || process.env.AUTHENTIK_ISSUER || "").trim();
 const clientId = String(process.env.PORTAL_OIDC_CLIENT_ID || "").trim();
+const authentikApiBase = String(process.env.AUTHENTIK_API_BASE || DEFAULT_AUTHENTIK_API_BASE).trim();
+const authentikApiToken = String(process.env.AUTHENTIK_API_TOKEN || "").trim();
 
 fs.mkdirSync(dataDir, { recursive: true });
 
@@ -23,6 +35,29 @@ app.use(express.json({ limit: "1mb" }));
 const distDir = path.join(process.cwd(), "dist");
 const indexHtmlPath = path.join(distDir, "index.html");
 const preferencesPath = path.join(dataDir, "preferences.json");
+const defaultPortalConfig = {
+  portal: {
+    brand: "Twinbox",
+    hero: {
+      eyebrow: "User portal",
+      title: "Twinbox",
+      description: "Log in to open your cluster apps.",
+    },
+  },
+  settings: {},
+  userAdmin: {
+    eyebrow: "Admin",
+    title: "Gebruikers en groepen",
+    description: "Beheer gebruikers en zakelijke groepen vanuit het portal.",
+    emptyStateTitle: "Nog geen beheerbare groepen ingesteld",
+    emptyStateDescription: "Voeg eerst beheerbare groepen toe aan de portal-config.",
+    manageableGroups: [],
+  },
+  apps: [],
+  adminApps: [],
+  intranetLinks: [],
+  statusChecks: [],
+};
 
 let cachedDiscovery = null;
 let cachedJwks = null;
@@ -137,21 +172,24 @@ async function writeJsonFile(filePath, value) {
 }
 
 async function loadPortalConfig() {
-  return readJsonFile(configPath, {
+  const config = await readJsonFile(configPath, defaultPortalConfig);
+  return {
+    ...defaultPortalConfig,
+    ...config,
     portal: {
-      brand: "Twinbox",
-      hero: {
-        eyebrow: "User portal",
-        title: "Twinbox",
-        description: "Log in to open your cluster apps.",
-      },
+      ...defaultPortalConfig.portal,
+      ...(config?.portal || {}),
     },
-    settings: {},
-    apps: [],
-    adminApps: [],
-    intranetLinks: [],
-    statusChecks: [],
-  });
+    settings: {
+      ...defaultPortalConfig.settings,
+      ...(config?.settings || {}),
+    },
+    userAdmin: {
+      ...defaultPortalConfig.userAdmin,
+      ...(config?.userAdmin || {}),
+      manageableGroups: normalizeManageableGroupsConfig(config?.userAdmin?.manageableGroups),
+    },
+  };
 }
 
 async function loadPreferences() {
@@ -185,6 +223,141 @@ function requireSession(req, res) {
     return null;
   }
   return session;
+}
+
+function requireAdminSession(req, res) {
+  const session = requireSession(req, res);
+  if (!session) {
+    return null;
+  }
+
+  if (!session.isAdmin) {
+    res.status(403).json({ error: "admin access required" });
+    return null;
+  }
+
+  return session;
+}
+
+function resolveRecordId(record) {
+  return String(record?.pk || record?.id || record?.uuid || "").trim();
+}
+
+function readListPayload(payload) {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  if (Array.isArray(payload?.results)) {
+    return payload.results;
+  }
+
+  if (Array.isArray(payload?.items)) {
+    return payload.items;
+  }
+
+  if (Array.isArray(payload?.data)) {
+    return payload.data;
+  }
+
+  return [];
+}
+
+function getAuthentikAdminClient() {
+  return createAuthentikAdminClient({
+    baseUrl: authentikApiBase,
+    token: authentikApiToken,
+  });
+}
+
+async function listAuthentikGroupsWithMembers(client) {
+  const groups = readListPayload(await client.listGroups());
+
+  return Promise.all(groups.map(async (group) => {
+    const groupId = resolveRecordId(group);
+    if (!groupId) {
+      return group;
+    }
+
+    try {
+      return await client.getGroup(groupId);
+    } catch {
+      return group;
+    }
+  }));
+}
+
+async function loadUserAdminDirectory(config) {
+  const client = getAuthentikAdminClient();
+  const [usersPayload, groupsWithMembers] = await Promise.all([
+    client.listUsers(),
+    listAuthentikGroupsWithMembers(client),
+  ]);
+
+  return buildDirectory({
+    users: readListPayload(usersPayload),
+    groups: groupsWithMembers,
+    manageableGroupsConfig: config?.userAdmin?.manageableGroups,
+  });
+}
+
+async function getEligibleUserOrThrow(client, userId) {
+  const user = await client.getUser(userId);
+  if (!resolveRecordId(user)) {
+    const error = new Error("user not found");
+    error.status = 404;
+    throw error;
+  }
+
+  if (isServiceAccountUser(user)) {
+    const error = new Error("service accounts cannot be managed from the portal");
+    error.status = 400;
+    throw error;
+  }
+
+  return user;
+}
+
+function buildUserResponse(directory, userId) {
+  const user = (directory?.users || []).find((entry) => entry.id === String(userId).trim());
+  if (!user) {
+    const error = new Error("user not found");
+    error.status = 404;
+    throw error;
+  }
+  return user;
+}
+
+function normalizeUserDraft(body = {}) {
+  const username = String(body.username || "").trim();
+  const name = String(body.name || body.fullName || "").trim();
+  const email = String(body.email || "").trim();
+  const groupNames = normalizeRequestedGroupNames(body.groupNames);
+
+  if (!username) {
+    const error = new Error("username is required");
+    error.status = 400;
+    throw error;
+  }
+
+  if (!name) {
+    const error = new Error("name is required");
+    error.status = 400;
+    throw error;
+  }
+
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    const error = new Error("email address is invalid");
+    error.status = 400;
+    throw error;
+  }
+
+  return {
+    username,
+    name,
+    email,
+    groupNames,
+  };
 }
 
 async function discoverIssuer() {
@@ -486,6 +659,167 @@ app.put("/api/preferences", async (req, res) => {
   }
 });
 
+app.get("/api/admin/groups", async (req, res) => {
+  const session = requireAdminSession(req, res);
+  if (!session) {
+    return;
+  }
+
+  try {
+    const config = await loadPortalConfig();
+    const directory = await loadUserAdminDirectory(config);
+    res.json({
+      groups: directory.groups,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to load groups" });
+  }
+});
+
+app.get("/api/admin/users", async (req, res) => {
+  const session = requireAdminSession(req, res);
+  if (!session) {
+    return;
+  }
+
+  try {
+    const config = await loadPortalConfig();
+    const directory = await loadUserAdminDirectory(config);
+    res.json({
+      users: directory.users,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to load users" });
+  }
+});
+
+app.post("/api/admin/users", async (req, res) => {
+  const session = requireAdminSession(req, res);
+  if (!session) {
+    return;
+  }
+
+  try {
+    const config = await loadPortalConfig();
+    const directoryBefore = await loadUserAdminDirectory(config);
+    const draft = normalizeUserDraft(req.body || {});
+
+    ensureRequestedGroupsAreManageable(draft.groupNames, directoryBefore.groups);
+
+    const client = getAuthentikAdminClient();
+    const createdUser = await client.createUser({
+      username: draft.username,
+      name: draft.name,
+      ...(draft.email ? { email: draft.email } : {}),
+      is_active: true,
+    });
+
+    const createdUserId = resolveRecordId(createdUser);
+    if (!createdUserId) {
+      throw new Error("Authentik did not return a user ID");
+    }
+
+    const temporaryPassword = createTemporaryPassword();
+    await client.setPassword(createdUserId, temporaryPassword);
+
+    for (const group of directoryBefore.groups) {
+      if (draft.groupNames.includes(group.name)) {
+        await client.addUserToGroup(group.id, createdUserId);
+      }
+    }
+
+    const directoryAfter = await loadUserAdminDirectory(config);
+    res.status(201).json({
+      user: buildUserResponse(directoryAfter, createdUserId),
+      temporaryPassword,
+    });
+  } catch (error) {
+    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to create user" });
+  }
+});
+
+app.post("/api/admin/users/:userId/disable", async (req, res) => {
+  const session = requireAdminSession(req, res);
+  if (!session) {
+    return;
+  }
+
+  try {
+    const client = getAuthentikAdminClient();
+    const userId = String(req.params.userId || "").trim();
+    await getEligibleUserOrThrow(client, userId);
+    await client.updateUser(userId, { is_active: false });
+
+    const config = await loadPortalConfig();
+    const directory = await loadUserAdminDirectory(config);
+    res.json({ user: buildUserResponse(directory, userId) });
+  } catch (error) {
+    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to disable user" });
+  }
+});
+
+app.post("/api/admin/users/:userId/enable", async (req, res) => {
+  const session = requireAdminSession(req, res);
+  if (!session) {
+    return;
+  }
+
+  try {
+    const client = getAuthentikAdminClient();
+    const userId = String(req.params.userId || "").trim();
+    await getEligibleUserOrThrow(client, userId);
+    await client.updateUser(userId, { is_active: true });
+
+    const config = await loadPortalConfig();
+    const directory = await loadUserAdminDirectory(config);
+    res.json({ user: buildUserResponse(directory, userId) });
+  } catch (error) {
+    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to reactivate user" });
+  }
+});
+
+app.put("/api/admin/users/:userId/groups", async (req, res) => {
+  const session = requireAdminSession(req, res);
+  if (!session) {
+    return;
+  }
+
+  try {
+    const config = await loadPortalConfig();
+    const directoryBefore = await loadUserAdminDirectory(config);
+    const client = getAuthentikAdminClient();
+    const userId = String(req.params.userId || "").trim();
+    await getEligibleUserOrThrow(client, userId);
+
+    const requestedGroupNames = normalizeRequestedGroupNames(req.body?.groupNames);
+    ensureRequestedGroupsAreManageable(requestedGroupNames, directoryBefore.groups);
+
+    const currentUser = buildUserResponse(directoryBefore, userId);
+    const currentGroupNames = new Set(currentUser.groupNames);
+    const requestedGroupSet = new Set(requestedGroupNames);
+
+    for (const group of directoryBefore.groups) {
+      const shouldHaveGroup = requestedGroupSet.has(group.name);
+      const alreadyHasGroup = currentGroupNames.has(group.name);
+
+      if (shouldHaveGroup && !alreadyHasGroup) {
+        await client.addUserToGroup(group.id, userId);
+      }
+
+      if (!shouldHaveGroup && alreadyHasGroup) {
+        await client.removeUserFromGroup(group.id, userId);
+      }
+    }
+
+    const directoryAfter = await loadUserAdminDirectory(config);
+    res.json({ user: buildUserResponse(directoryAfter, userId) });
+  } catch (error) {
+    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to update groups" });
+  }
+});
+
 function normalizeUrlForProbe(rawUrl, origin) {
   const value = String(rawUrl || "").trim();
   if (!value) {
@@ -590,6 +924,10 @@ app.use((error, req, res, _next) => {
   res.status(500).json({ error: error instanceof Error ? error.message : "unexpected server error" });
 });
 
-app.listen(port, () => {
-  console.log(`Twinbox portal listening on ${port}`);
-});
+if (process.env.NODE_ENV !== "test") {
+  app.listen(port, () => {
+    console.log(`Twinbox portal listening on ${port}`);
+  });
+}
+
+export { app };

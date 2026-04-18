@@ -285,6 +285,7 @@ a {
 .auth-hero p,
 .detail-copy p,
 .status-summary span,
+.muted-copy,
 .link-card span,
 .intranet-card span,
 .status-card p,
@@ -524,6 +525,8 @@ a {
 }
 
 .settings-form select {
+.user-admin-search input,
+.user-admin-form input {
   width: 100%;
   min-height: 48px;
   padding: 0 14px;
@@ -554,6 +557,246 @@ a {
 .segmented-control .is-active {
   background: linear-gradient(135deg, #2dd4bf, #60a5fa);
   color: #08101d;
+}
+
+.admin-actions,
+.inline-notice,
+.user-admin-stats,
+.user-admin-profile,
+.user-admin-columns,
+.user-admin-layout,
+.user-admin-group-picker,
+.user-admin-checkboxes,
+.user-admin-list,
+.empty-card {
+  display: grid;
+}
+
+.admin-actions {
+  gap: 10px;
+  margin: 0 0 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.admin-actions span {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.inline-notice {
+  gap: 8px;
+  margin-top: 16px;
+  padding: 16px 18px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.inline-notice strong,
+.empty-card strong,
+.checkbox-card strong,
+.user-list-copy strong,
+.user-admin-profile strong {
+  color: var(--text);
+}
+
+.inline-notice span,
+.empty-card span,
+.checkbox-card small,
+.user-list-copy span,
+.user-admin-profile span {
+  color: var(--muted);
+}
+
+.inline-notice code {
+  display: inline-flex;
+  width: fit-content;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(8, 16, 29, 0.64);
+  color: color-mix(in srgb, var(--accent) 82%, white);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.inline-notice.is-accent {
+  border-color: rgba(45, 212, 191, 0.28);
+  background: linear-gradient(135deg, rgba(45, 212, 191, 0.12), rgba(37, 99, 235, 0.08));
+}
+
+.inline-notice.is-danger {
+  border-color: rgba(248, 113, 113, 0.28);
+  background: rgba(127, 29, 29, 0.18);
+}
+
+.user-admin-layout {
+  gap: 18px;
+}
+
+.user-admin-columns {
+  grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.95fr);
+  gap: 18px;
+}
+
+.user-admin-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.user-admin-stats article,
+.user-admin-profile div,
+.checkbox-card,
+.user-list-row,
+.empty-card {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.user-admin-stats article {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+}
+
+.user-admin-stats strong {
+  font-size: 1.65rem;
+  font-family: var(--display-font);
+}
+
+.user-admin-stats span {
+  color: var(--muted);
+  font-size: 0.86rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.user-admin-form,
+.user-admin-group-picker,
+.user-admin-list {
+  gap: 14px;
+}
+
+.user-admin-form {
+  display: grid;
+}
+
+.user-admin-form label,
+.user-admin-group-picker {
+  display: grid;
+  gap: 8px;
+}
+
+.user-admin-group-picker > span {
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+.user-admin-checkboxes {
+  gap: 10px;
+}
+
+.checkbox-card {
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 14px 16px;
+}
+
+.checkbox-card input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+}
+
+.checkbox-card span {
+  display: grid;
+  gap: 4px;
+}
+
+.checkbox-card small {
+  font-size: 0.84rem;
+}
+
+.user-admin-search {
+  margin-bottom: 12px;
+}
+
+.user-admin-list {
+  max-height: 480px;
+  overflow: auto;
+}
+
+.user-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.user-list-row:hover,
+.user-list-row.is-selected {
+  border-color: rgba(45, 212, 191, 0.34);
+  background: rgba(45, 212, 191, 0.08);
+}
+
+.user-list-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.user-list-copy span {
+  font-size: 0.9rem;
+}
+
+.user-list-meta {
+  display: flex;
+  align-items: center;
+}
+
+.user-admin-detail {
+  align-content: start;
+}
+
+.user-admin-profile {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.user-admin-profile div {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+}
+
+.user-admin-profile span {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.user-admin-profile strong {
+  font-size: 1rem;
+}
+
+.user-admin-status-actions {
+  margin-top: 18px;
+}
+
+.empty-card {
+  gap: 8px;
+  padding: 16px;
 }
 
 .settings-links {
@@ -678,14 +921,17 @@ a {
 @media (max-width: 1180px) {
   .page-grid,
   .detail-layout,
-  .auth-shell {
+  .auth-shell,
+  .user-admin-columns {
     grid-template-columns: 1fr;
   }
 
   .settings-links,
   .status-grid,
   .card-grid,
-  .intranet-grid {
+  .intranet-grid,
+  .user-admin-stats,
+  .user-admin-profile {
     grid-template-columns: 1fr;
   }
 
@@ -730,5 +976,9 @@ a {
 
   .settings-actions {
     align-items: flex-start;
+  }
+
+  .user-admin-list {
+    max-height: none;
   }
 }

@@ -10,6 +10,14 @@
     "authentikUserUrl": "__AUTHENTIK_USER_URL__",
     "authentikOtpUrl": "__AUTHENTIK_USER_URL__"
   },
+  "userAdmin": {
+    "eyebrow": "Admin",
+    "title": "Gebruikers en groepen",
+    "description": "Voeg gebruikers toe, zet accounts uit, en koppel mensen aan vooraf goedgekeurde groepen zonder in de volledige Authentik-beheeromgeving te hoeven werken.",
+    "emptyStateTitle": "Nog geen beheerbare groepen ingesteld",
+    "emptyStateDescription": "Voeg in config/portal/content.json expliciet de zakelijke groepen toe die deze eenvoudige beheerpagina mag tonen en beheren.",
+    "manageableGroups": []
+  },
   "links": [
     {
       "title": "Wizard",

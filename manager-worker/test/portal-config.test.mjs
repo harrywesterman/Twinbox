@@ -47,6 +47,8 @@ test("buildPortalConfig renders user and admin portals from the runtime catalog"
 
   assert.equal(config.portal.brand, "Twinbox");
   assert.equal(config.settings.issueUrl, "https://github.com/harrywesterman/Twinbox/issues/new/choose");
+  assert.equal(config.userAdmin.title, "Gebruikers en groepen");
+  assert.deepEqual(config.userAdmin.manageableGroups, []);
   assert(config.apps.some((card) => card.title === "Grafana"));
   assert(config.apps.some((card) => card.title === "Headlamp"));
   assert(config.apps.some((card) => card.title === "Velero UI"));

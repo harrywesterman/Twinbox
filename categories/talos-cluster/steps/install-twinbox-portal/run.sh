@@ -37,6 +37,7 @@ AUTHENTIK_HOST="${AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
 portal_host="https://portal.${public_zone_name}"
 portal_application_slug="twinbox-portal"
 portal_issuer_url="${AUTHENTIK_HOST%/}/application/o/${portal_application_slug}/"
+authentik_api_base="http://authentik-server.authentik.svc.cluster.local/api/v3"
 portal_client_id="$(openssl rand -hex 16)"
 portal_session_secret="$(openssl rand -hex 32)"
 
@@ -179,7 +180,8 @@ cat >"$secret_file" <<EOF
   "PORTAL_BASE_URL": "$portal_host",
   "PORTAL_OIDC_CLIENT_ID": "$portal_client_id",
   "PORTAL_OIDC_ISSUER": "$portal_issuer_url",
-  "PORTAL_SESSION_SECRET": "$portal_session_secret"
+  "PORTAL_SESSION_SECRET": "$portal_session_secret",
+  "AUTHENTIK_API_BASE": "$authentik_api_base"
 }
 EOF
 
@@ -187,7 +189,7 @@ chmod 600 "$secret_file"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "twinbox-portal" \
   --json-file "$secret_file" \
-  --required-keys "PORTAL_BASE_URL,PORTAL_OIDC_CLIENT_ID,PORTAL_OIDC_ISSUER,PORTAL_SESSION_SECRET"
+  --required-keys "PORTAL_BASE_URL,PORTAL_OIDC_CLIENT_ID,PORTAL_OIDC_ISSUER,PORTAL_SESSION_SECRET,AUTHENTIK_API_BASE"
 
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/namespace.yaml"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/configmap.yaml"
