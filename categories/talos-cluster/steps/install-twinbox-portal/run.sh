@@ -65,7 +65,7 @@ create_or_update_provider() {
   local provider_payload="$1"
   local search_response existing_pk
 
-  search_response="$(authentik_api_get "/providers/oauth2/?search=$(authentik_urlencode "Twinbox Portal")")"
+  search_response="$(authentik_api_get "/providers/oauth2/?page_size=100")"
   existing_pk="$(
     jq -r '
       .results[]?

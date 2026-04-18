@@ -257,16 +257,12 @@ authentik_api_write() {
   authentik_api_request "$1" "$2" "$3"
 }
 
-authentik_urlencode() {
-  python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$1"
-}
-
 authentik_resolve_flow_id() {
   local slug="$1"
   local designation="$2"
   local response match_pk
 
-  response="$(authentik_api_get "/flows/instances/?slug=$(authentik_urlencode "$slug")&page_size=100")"
+  response="$(authentik_api_get "/flows/instances/?slug=${slug}&page_size=100")"
   match_pk="$(
     jq -r \
       --arg slug "$slug" \
@@ -292,7 +288,7 @@ authentik_resolve_scope_mapping_id() {
   local scope_name="$1"
   local response managed_pk fallback_pk
 
-  response="$(authentik_api_get "/propertymappings/provider/scope/?scope_name=$(authentik_urlencode "$scope_name")&page_size=20")"
+  response="$(authentik_api_get "/propertymappings/provider/scope/?scope_name=${scope_name}&page_size=20")"
   managed_pk="$(
     jq -r \
       --arg scope_name "$scope_name" \
