@@ -35,12 +35,18 @@ jobs:
         run: |
           python -m pip install -r requirements-test.txt
           npm ci --prefix manager-api
+          npm ci --prefix portal
 
       - name: Static checks
         run: |
-          bash -n wizard/setup-wizard.sh scripts/manager/create-talos-vms.sh scripts/manager/bootstrap-talos.sh scripts/manager/collect-state.sh
+          bash -n wizard/setup-wizard.sh scripts/manager/create-talos-vms.sh scripts/manager/bootstrap-talos.sh scripts/manager/collect-state.sh categories/talos-cluster/steps/install-twinbox-portal/run.sh
           node --check manager-api/src/server.js
           node --check manager-worker/src/worker.js
+          node --check manager-worker/src/refresh-portal-config.mjs
+          node --check portal/server.mjs
+
+      - name: Portal build
+        run: npm run build --prefix portal
 
       - name: Compose config check
         run: |
@@ -49,4 +55,6 @@ jobs:
           rm .env
 
       - name: Runtime tests
-        run: python -m pytest -q tests
+        run: |
+          node --test manager-worker/test/*.mjs
+          python -m pytest -q tests

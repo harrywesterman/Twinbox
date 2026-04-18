@@ -3,9 +3,9 @@ title: Install Dashy dashboard
 type: action
 journey_stage: setup
 order: 46
-summary: Install Dashy as the cluster start page and configure Authentik OIDC.
-explanation: Twinbox provisions Dashy as the cluster start page through GitOps, configures native OIDC against Authentik with an OpenTofu bootstrap flow, and exposes the dashboard through Traefik at the start page hostname.
-side_help: Dashy gives the cluster a branded start page that can be extended with app links and widgets.
+summary: Install Dashy as the legacy admin launcher and configure Authentik OIDC.
+explanation: Twinbox provisions Dashy as the legacy admin launcher through GitOps, configures native OIDC against Authentik with an OpenTofu bootstrap flow, and exposes the dashboard through Traefik at the admin hostname.
+side_help: Dashy gives admins a branded fallback launcher for operator tools while the user portal becomes the default front door.
 depends_on:
   - install-secret-sync
   - install-authentik-idp

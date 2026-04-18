@@ -1,0 +1,16 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: twinbox-portal
+  namespace: twinbox-portal
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`portal.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: twinbox-portal
+          port: 80
+  tls: {}

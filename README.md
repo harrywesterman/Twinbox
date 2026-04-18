@@ -48,6 +48,8 @@ Open your browser to continue the installation. The web UI guides you through cl
 - **Velero** — automated cluster backups to SeaweedFS
 - **CloudNativePG** — managed PostgreSQL clusters
 - **Authentik** — single sign-on and identity provider
+- **Twinbox Portal** — the default user-facing launcher with settings, intranet links, and cluster status
+- **Dashy** — legacy admin launcher for operator tools on `admin.<domain>`
 
 ## Quick start
 

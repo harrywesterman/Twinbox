@@ -62,6 +62,7 @@ App-specific Kubernetes manifests that are rendered or applied directly by the m
 - `loki/` - Loki ingress and auth middleware.
 - `ntfy/` - ntfy ingress and kustomization.
 - `pgadmin4/` - pgAdmin 4 namespace, deployment, service, PVC, ingress, and secret wiring.
+- `twinbox-portal/` - Twinbox Portal deployment, service, ingress, config, and per-user preference storage.
 - `velero-ui/` - Velero UI namespace, ingress, and secret wiring.
 - `prometheus/` - Prometheus ingress and alert rules.
 - `tailscale/` - Tailscale secret wiring.

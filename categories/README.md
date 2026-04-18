@@ -78,8 +78,9 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 - `install-loki` – Deploy Loki log aggregation backend for Grafana.
 - `install-headlamp` – Deploy Headlamp Kubernetes dashboard.
 - `install-pgadmin4` – Deploy pgAdmin 4 for PostgreSQL administration.
-- `install-dashy-dashboard` – Deploy Dashy as the cluster start page.
-- `install-management-consoles` – Deploy the operator web consoles, including SeaweedFS, after the start page.
+- `install-twinbox-portal` – Deploy the main Twinbox user portal with apps, settings, intranet, and status.
+- `install-dashy-dashboard` – Deploy Dashy as the legacy admin launcher.
+- `install-management-consoles` – Deploy the operator web consoles, including SeaweedFS, after the user portal.
 - `install-ntfy` – Deploy ntfy push notifications.
 - `install-velero-backup` – Deploy Velero with the default SeaweedFS backup target.
 - `install-velero-ui` – Deploy the Velero UI dashboard for backup operations.

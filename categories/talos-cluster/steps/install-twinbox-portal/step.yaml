@@ -1,0 +1,30 @@
+id: install-twinbox-portal
+title: Install Twinbox Portal
+type: action
+journey_stage: setup
+order: 47
+summary: Install the user portal as the main place for apps, settings, intranet links, and cluster status.
+explanation: Twinbox provisions the user portal as a dedicated Kubernetes app with Authentik OIDC, a Longhorn-backed persistence volume for per-user preferences, and a runtime-generated configmap that mirrors the currently installed apps. The portal is meant to become the default users landing page on portal.__ZONE_NAME__.
+side_help: The portal is separate from the admin launcher and shows normal user apps first. It updates its app catalog from the step state after each provisioning step.
+depends_on:
+  - install-secret-sync
+  - install-authentik-idp
+  - choose-ingress-route
+dashy:
+  items:
+    - section: Platform
+      title: Twinbox Portal
+      description: User portal
+      icon: fas fa-compass
+      url_template: https://portal.__ZONE_NAME__
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/install-twinbox-portal/run.sh

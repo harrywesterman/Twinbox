@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: twinbox-portal
+  namespace: twinbox-portal
+spec:
+  selector:
+    app.kubernetes.io/name: twinbox-portal
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

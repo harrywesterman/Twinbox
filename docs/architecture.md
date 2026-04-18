@@ -81,7 +81,8 @@ When you change Twinbox code, commit it to `main`, wait for the GitHub Actions i
 18. Later Authentik consumers read the bootstrap data from OpenBao instead of reopening `/opt/twinbox/bootstrap/secrets/global/authentik.json`.
 19. `install-pgadmin4` refreshes the shared `platform-ingress` application so pgAdmin 4 is deployed behind Traefik with Longhorn-backed persistence, and it seeds the pgAdmin bootstrap secret into OpenBao while provisioning the Authentik OIDC application.
 20. GitOps apps consume secrets through `ExternalSecret` resources backed by `ClusterSecretStore/openbao`.
-21. Dashy link tiles are rendered on the Management VM from step metadata plus the current step-state, then written into the in-cluster `ConfigMap/dashy-config` so the start page reflects the installed browser UIs without a static list in Git.
+21. `install-twinbox-portal` renders the user portal config on the Management VM from step metadata, the current step-state, and portal content, then writes the result into the in-cluster `ConfigMap/portal-config` so the default user launcher reflects the installed browser UIs without a static list in Git.
+22. Dashy link tiles are still rendered on the Management VM from step metadata plus the current step-state, then written into the in-cluster `ConfigMap/dashy-config` so the legacy admin launcher reflects the installed operator UIs without a static list in Git.
 
 ## Domain Flow
 

@@ -675,6 +675,33 @@ async function refreshDashyConfig(jobId, stepId, clusterId, clusterInstanceId, e
   }
 }
 
+async function refreshPortalConfig(jobId, stepId, clusterId, clusterInstanceId, env, redact, stripEnv) {
+  if (!clusterId) {
+    return;
+  }
+
+  try {
+    await runCommand(
+      jobId,
+      "node",
+      [
+        "manager-worker/src/refresh-portal-config.mjs",
+        "--workspace-root", workspace,
+        "--manager-data-dir", dataRoot,
+        "--cluster-id", clusterId,
+        "--trigger-step-id", stepId,
+        ...(clusterInstanceId ? ["--cluster-instance-id", clusterInstanceId] : []),
+      ],
+      env,
+      redact,
+      stripEnv,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error || "unknown error");
+    appendLog(jobId, `portal refresh warning: ${message}`);
+  }
+}
+
 async function handleRunStep(job) {
   const payload = job.payload;
   const stepId = payload.step_id;
@@ -746,6 +773,15 @@ async function handleRunStep(job) {
     }, clusterInstanceId || clusterId);
 
     await refreshDashyConfig(
+      job.id,
+      stepId,
+      outputs?.cluster_id || clusterId,
+      outputs?.cluster_instance_id || clusterInstanceId,
+      secretRuntime.env,
+      redact,
+      secretRuntime.strip_env,
+    );
+    await refreshPortalConfig(
       job.id,
       stepId,
       outputs?.cluster_id || clusterId,

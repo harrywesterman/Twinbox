@@ -28,6 +28,9 @@ jobs:
           - image_name: twinbox-manager-web
             context: ./manager-web
             dockerfile: ./manager-web/Dockerfile
+          - image_name: twinbox-portal
+            context: ./portal
+            dockerfile: ./portal/Dockerfile
 
     steps:
       - name: Checkout

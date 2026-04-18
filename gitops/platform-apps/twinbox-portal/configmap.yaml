@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: portal-config
+  namespace: twinbox-portal
+data:
+  portal-config.json: |
+    {
+      "portal": {
+        "brand": "Twinbox",
+        "hero": {
+          "eyebrow": "User portal",
+          "title": "Twinbox Portal",
+          "description": "Loading portal content..."
+        }
+      },
+      "settings": {},
+      "apps": [],
+      "adminApps": [],
+      "intranetLinks": [],
+      "statusChecks": []
+    }

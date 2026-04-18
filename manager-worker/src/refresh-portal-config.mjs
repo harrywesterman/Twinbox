@@ -1,0 +1,240 @@
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { spawnSync } from "child_process";
+
+import YAML from "yaml";
+
+import {
+  normalizeCategoryManifest,
+  normalizeStepManifest,
+} from "../../lib/step-manifest.mjs";
+import { buildPortalConfig } from "../../lib/portal-config.mjs";
+
+function parseArgs(argv) {
+  const options = {
+    workspaceRoot: process.env.WORKSPACE_ROOT || "/opt/twinbox",
+    managerDataDir: process.env.MANAGER_DATA_DIR || "/data",
+    namespace: "twinbox-portal",
+    configMapName: "portal-config",
+    triggerStepId: "",
+    clusterId: "",
+    clusterInstanceId: "",
+  };
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    const nextValue = argv[index + 1];
+
+    switch (arg) {
+      case "--workspace-root":
+        options.workspaceRoot = nextValue;
+        index += 1;
+        break;
+      case "--manager-data-dir":
+        options.managerDataDir = nextValue;
+        index += 1;
+        break;
+      case "--namespace":
+        options.namespace = nextValue;
+        index += 1;
+        break;
+      case "--configmap-name":
+        options.configMapName = nextValue;
+        index += 1;
+        break;
+      case "--trigger-step-id":
+        options.triggerStepId = nextValue;
+        index += 1;
+        break;
+      case "--cluster-id":
+        options.clusterId = nextValue;
+        index += 1;
+        break;
+      case "--cluster-instance-id":
+        options.clusterInstanceId = nextValue;
+        index += 1;
+        break;
+      default:
+        throw new Error(`unsupported argument: ${arg}`);
+    }
+  }
+
+  return options;
+}
+
+function readJsonIfExists(file) {
+  if (!fs.existsSync(file)) {
+    return null;
+  }
+  return JSON.parse(fs.readFileSync(file, "utf8"));
+}
+
+function loadJson(file) {
+  return JSON.parse(fs.readFileSync(file, "utf8"));
+}
+
+function loadCatalogDefinitions(workspaceRoot) {
+  const categoriesRoot = process.env.TWINBOX_CATEGORIES_DIR || path.join(workspaceRoot, "categories");
+  const categories = [];
+  const steps = [];
+
+  if (!fs.existsSync(categoriesRoot)) {
+    throw new Error(`categories directory not found: ${categoriesRoot}`);
+  }
+
+  const categoryDirs = fs.readdirSync(categoriesRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+
+  for (const categoryDir of categoryDirs) {
+    const categoryFile = path.join(categoriesRoot, categoryDir, "category.yaml");
+    const category = normalizeCategoryManifest(YAML.parse(fs.readFileSync(categoryFile, "utf8")), categoryFile);
+    const stepsRoot = path.join(categoriesRoot, categoryDir, "steps");
+
+    const normalizedSteps = fs.existsSync(stepsRoot)
+      ? fs.readdirSync(stepsRoot, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name)
+        .sort()
+        .map((stepDir) => {
+          const stepFile = path.join(stepsRoot, stepDir, "step.yaml");
+          if (!fs.existsSync(stepFile)) {
+            return null;
+          }
+          return normalizeStepManifest(YAML.parse(fs.readFileSync(stepFile, "utf8")), stepFile, category.id);
+        })
+        .filter(Boolean)
+        .sort((left, right) => left.order - right.order)
+      : [];
+
+    categories.push({
+      ...category,
+      steps: normalizedSteps,
+    });
+    steps.push(...normalizedSteps);
+  }
+
+  categories.sort((left, right) => left.order - right.order);
+  steps.sort((left, right) => left.order - right.order);
+
+  return { categories, steps };
+}
+
+function findCurrentCluster(dataRoot, clusterId) {
+  const clustersRoot = path.join(dataRoot, "clusters");
+  if (!fs.existsSync(clustersRoot)) {
+    return null;
+  }
+
+  if (clusterId) {
+    return readJsonIfExists(path.join(clustersRoot, `${clusterId}.json`));
+  }
+
+  return fs.readdirSync(clustersRoot)
+    .filter((entry) => entry.endsWith(".json"))
+    .map((entry) => readJsonIfExists(path.join(clustersRoot, entry)))
+    .filter((cluster) => cluster?.id)
+    .sort((left, right) => String(right?.updated_at || right?.created_at || "").localeCompare(String(left?.updated_at || left?.created_at || "")))[0] || null;
+}
+
+function readStepStates(dataRoot, steps, clusterScopeId) {
+  const stepStateById = new Map();
+
+  for (const step of steps) {
+    const scope = step.category_id === "talos-cluster" ? path.join("clusters", clusterScopeId || "") : "global";
+    const file = step.category_id === "talos-cluster"
+      ? path.join(dataRoot, "step-state", scope, `${step.id}.json`)
+      : path.join(dataRoot, "step-state", scope, `${step.id}.json`);
+    stepStateById.set(step.id, readJsonIfExists(file));
+  }
+
+  return stepStateById;
+}
+
+function runKubectl(args, { input = undefined, allowFailure = false } = {}) {
+  const result = spawnSync("kubectl", args, {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      KUBECONFIG: process.env.KUBECONFIG_FILE || process.env.KUBECONFIG,
+    },
+    input,
+  });
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  if (result.status !== 0 && !allowFailure) {
+    const stderr = (result.stderr || "").trim();
+    throw new Error(`kubectl ${args.join(" ")} failed${stderr ? `: ${stderr}` : ""}`);
+  }
+
+  return result;
+}
+
+function applyConfigMap(namespace, configMapName, renderedConfig) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "portal-config-"));
+  const configFile = path.join(tempDir, "portal-config.json");
+  fs.writeFileSync(configFile, renderedConfig, "utf8");
+
+  try {
+    const createResult = runKubectl([
+      "-n",
+      namespace,
+      "create",
+      "configmap",
+      configMapName,
+      `--from-file=portal-config.json=${configFile}`,
+      "--dry-run=client",
+      "-o",
+      "yaml",
+    ]);
+
+    runKubectl(["apply", "-f", "-"], { input: createResult.stdout });
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
+function main() {
+  const options = parseArgs(process.argv.slice(2));
+  const { steps } = loadCatalogDefinitions(options.workspaceRoot);
+  const currentCluster = findCurrentCluster(options.managerDataDir, options.clusterId);
+  if (!currentCluster?.id) {
+    throw new Error("could not determine current cluster for portal config generation");
+  }
+
+  const clusterScopeId = options.clusterInstanceId || currentCluster.cluster_instance_id || currentCluster.instance_id || currentCluster.id;
+  const stepStateById = readStepStates(options.managerDataDir, steps, clusterScopeId);
+  const portalStepState = stepStateById.get("install-twinbox-portal");
+  if (portalStepState && !["succeeded", "configured"].includes(String(portalStepState.status || ""))) {
+    console.log("Portal refresh skipped: install-twinbox-portal is not complete yet");
+    return;
+  }
+  if (!portalStepState && options.triggerStepId !== "install-twinbox-portal") {
+    console.log("Portal refresh skipped: install-twinbox-portal is not installed yet");
+    return;
+  }
+
+  const contentPath = path.join(options.workspaceRoot, "config", "portal", "content.json");
+  const content = loadJson(contentPath);
+  const renderedConfig = JSON.stringify(buildPortalConfig({
+    steps,
+    stepStateById,
+    cluster: currentCluster,
+    content,
+  }), null, 2);
+
+  applyConfigMap(options.namespace, options.configMapName, renderedConfig);
+  console.log(`Portal config refreshed for ${currentCluster.id}`);
+}
+
+try {
+  main();
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+}

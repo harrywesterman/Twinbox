@@ -39,6 +39,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `/opt/twinbox/bootstrap/secrets/global/wiredoor-gateway.json`
 - `/opt/twinbox/bootstrap/secrets/global/velero.json`
 - `/opt/twinbox/bootstrap/secrets/global/velero-ui.json`
+- `/opt/twinbox/bootstrap/secrets/global/twinbox-portal.json`
 - `/opt/twinbox/bootstrap/secrets/global/dashy-oidc-<cluster-id>.json`
 - `/opt/twinbox/bootstrap/secrets/global/wiredoor-bastion-<cluster-id>.json`
 - `/opt/twinbox/bootstrap/secrets/global/cloudflare-<cluster-id>.json`
@@ -216,7 +217,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `install-authentik-idp` generates `AUTHENTIK_AUTOMATION_TOKEN_KEY`, stores it in OpenBao, and waits for the blueprint to create the service account before proceeding. The token key is persisted to OpenBao as `AUTHENTIK_API_TOKEN`.
 - `wizard/setup-wizard.sh` writes the chosen cluster login password to `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` inside the Management VM so later bootstrap steps can reuse it without prompting again.
 - `create-users-and-groups` reads the Authentik bootstrap secret from OpenBao via the shared `authentik-auth.sh` helper, which loads the persistent `AUTHENTIK_API_TOKEN` (created by the blueprint) and uses it for all API calls. It creates the first Authentik user, creates the `admins` group as a superuser group, and adds the user to that group. The automation service account itself is also placed in a dedicated superuser group so it can set passwords and manage group membership during bootstrap.
-- All downstream steps that talk to the Authentik API (`install-headlamp`, `install-dashy-dashboard`, `configure-argocd-oidc`, `install-pgadmin4`, `install-management-consoles`) source the bundled `scripts/manager/authentik-auth.sh` helper and call `authentik_ensure_token`. The helper reads the persistent `AUTHENTIK_API_TOKEN` from OpenBao and uses it for all API calls.
+- All downstream steps that talk to the Authentik API (`install-headlamp`, `install-twinbox-portal`, `install-dashy-dashboard`, `configure-argocd-oidc`, `install-pgadmin4`, `install-management-consoles`) source the bundled `scripts/manager/authentik-auth.sh` helper and call `authentik_ensure_token`. The helper reads the persistent `AUTHENTIK_API_TOKEN` from OpenBao and uses it for all API calls.
 - `install-velero-backup` installs Velero together with the SeaweedFS S3 target that runs on the Management VM, syncs `/opt/twinbox/bootstrap/secrets/global/velero.json` into OpenBao, and renders the Argo CD values inline from that bootstrap file.
 - Later application steps write bootstrap JSON into OpenBao before enabling their Argo CD applications.
 
@@ -265,11 +266,12 @@ All platform services use the runtime domain projection from the local Argo clus
 | pgAdmin 4 | `pgadmin4.<ZONE_NAME>` |
 | Headlamp | `headlamp.<public-zone-name>` with Authentik OIDC login |
 | Grafana | `grafana.<ZONE_NAME>` |
-| Dashy start page | `start.<ZONE_NAME>` |
+| Twinbox Portal | `portal.<ZONE_NAME>` |
+| Dashy admin launcher | `admin.<ZONE_NAME>` |
 
-Dashy's browser-side OIDC flow depends on Authentik answering the discovery and token requests with CORS headers for `https://start.<ZONE_NAME>`. The platform IngressRoute applies a Traefik headers middleware for that response path.
-Dashy registers the root start-page URL as its callback (`https://start.<ZONE_NAME>`), so the Authentik provider needs to accept that form without a trailing slash.
-The Dashy tile list itself is not GitOps-static: Twinbox renders it from step metadata plus the cluster step-state on the Management VM and applies the resulting `ConfigMap/dashy-config` at runtime.
+Twinbox Portal is the default user landing page. It uses Authentik OIDC in the portal backend, stores per-user preferences in its own PVC-backed store, and renders the app catalog from step metadata plus the cluster step-state into `ConfigMap/portal-config` at runtime.
+Dashy remains the legacy admin launcher at `admin.<ZONE_NAME>` for operator tools while the new portal becomes the normal front door for users.
+The Dashy tile list itself is still not GitOps-static: Twinbox renders it from step metadata plus the cluster step-state on the Management VM and applies the resulting `ConfigMap/dashy-config` at runtime.
 
 ### GitOps structure
 
@@ -282,31 +284,15 @@ gitops/platform/
 ├── headlamp/externalsecret.yaml # Headlamp OIDC client credentials from OpenBao
 ├── traefik/
 ├── wiredoor-gateway/
-└── dashy/
-```
-gitops/platform/
-├── kustomization.yaml          # Central Kustomize config for the shared platform shape
-├── authentik/ingressroute.yaml # Host match patched by the platform-ingress ApplicationSet
-├── whoami/
-│   ├── ingressroute.yaml       # Host match patched by the platform-ingress ApplicationSet
-│   └── k8s.yaml                # Deployment + Service (no domain reference)
-├── grafana/
-│   ├── ingressroute.yaml       # Host match patched by the platform-ingress ApplicationSet
-│   └── externalsecret.yaml     # Admin credentials from OpenBao
-├── headlamp/ingressroute.yaml  # Host match patched by the platform-ingress ApplicationSet
-├── headlamp/externalsecret.yaml # Headlamp OIDC client credentials from OpenBao
-├── traefik/
-│   ├── argocd-ingressroute.yaml
-│   └── traefik-dashboard-ingressroute.yaml
-├── wiredoor-gateway/
-│   ├── ingressroute.yaml
-│   └── externalsecret.yaml
-└── dashy/
-    ├── ingressroute.yaml
-    ├── externalsecret.yaml     # Dashy OIDC client credentials from OpenBao
-    ├── pvc.yaml                # Longhorn-backed persistent user-data volume
-    ├── deployment.yaml         # Dashy deployment mounts the PVC for user-data and reads the runtime-generated ConfigMap
-    ├── service.yaml
+├── dashy/
+└── twinbox-portal/
+    ├── configmap.yaml          # Runtime-generated portal configuration
+    ├── deployment.yaml         # Portal app + API
+    ├── externalsecret.yaml     # Portal OIDC + session bootstrap credentials from OpenBao
+    ├── ingressroute.yaml       # Host match for portal.<ZONE_NAME>
+    ├── namespace.yaml
+    ├── pvc.yaml                # Per-user preference storage
+    └── service.yaml
 ```
 
 ### Argo CD application order
