@@ -15,21 +15,15 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
 
 resolve_kubeconfig_file() {
-  local candidate=""
-
-  if [[ -n "${KUBECONFIG_FILE:-}" && -f "${KUBECONFIG_FILE:-}" ]]; then
-    printf '%s\n' "$KUBECONFIG_FILE"
-    return 0
+  if [[ -z "${KUBECONFIG_FILE:-}" ]]; then
+    fail "KUBECONFIG_FILE is required"
   fi
 
-  for candidate in /home/twinbox/.kube/config "${HOME:-}/.kube/config"; do
-    if [[ -f "$candidate" ]]; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
+  if [[ ! -f "${KUBECONFIG_FILE:-}" ]]; then
+    fail "KUBECONFIG_FILE does not exist at ${KUBECONFIG_FILE:-}"
+  fi
 
-  fail "Could not find a usable kubeconfig; expected cluster attachment or /home/twinbox/.kube/config"
+  printf '%s\n' "$KUBECONFIG_FILE"
 }
 
 wait_for_resources_ready() {

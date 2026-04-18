@@ -1,0 +1,6 @@
+id: media
+title: Media
+summary: Photo and video tools for the family library.
+order: 10
+apps:
+  - install-immich

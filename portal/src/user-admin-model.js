@@ -18,6 +18,11 @@ export function buildAdminNavigationItems({ isAdmin = false } = {}) {
       label: 'Admin apps',
     },
     {
+      id: 'admin-app-installs',
+      path: '/admin/apps',
+      label: 'App installs',
+    },
+    {
       id: 'admin-users',
       path: '/admin/users',
       label: 'Users & groups',

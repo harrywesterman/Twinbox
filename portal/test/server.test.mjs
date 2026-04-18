@@ -17,6 +17,10 @@ const fakeState = {
   groups: [],
   nextUserId: 10,
 };
+const managerState = {
+  jobs: new Map(),
+  nextJobId: 1,
+};
 
 function writePortalConfig(config) {
   fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
@@ -121,6 +125,10 @@ function cloneUser(user) {
 
 function cloneGroup(group) {
   return JSON.parse(JSON.stringify(group));
+}
+
+function cloneJob(job) {
+  return JSON.parse(JSON.stringify(job));
 }
 
 const authentikServer = http.createServer(async (req, res) => {
@@ -248,9 +256,143 @@ const authentikServer = http.createServer(async (req, res) => {
   sendJson(res, 404, { error: `Unhandled fake Authentik route: ${req.method} ${pathname}` });
 });
 
+const managerServer = http.createServer(async (req, res) => {
+  const url = new URL(req.url || "/", "http://127.0.0.1");
+  const pathname = url.pathname;
+
+  if (req.method === "GET" && pathname === "/api/apps/catalog") {
+    sendJson(res, 200, {
+      active_cluster: {
+        id: "cluster-test",
+        cluster_instance_id: "cluster-test-instance",
+        slug: "tst",
+        dns_domain: "example.com",
+      },
+      categories: [
+        {
+          id: "apps",
+          title: "Apps",
+          summary: "Install user-facing applications and collaboration tools.",
+          order: 30,
+          status: "ready",
+          steps: [
+            {
+              id: "install-immich",
+              title: "Install Immich",
+              summary: "Photo and video library",
+              description: "Immich is our first app test target.",
+              app_state: "ready",
+              placeholder: false,
+              accent: "#ec4899",
+              iconText: "I",
+              latest_job: null,
+              dependencies: [
+                { id: "install-longhorn-storage", title: "Install Longhorn Storage", state: "done" },
+              ],
+            },
+            {
+              id: "install-paperless",
+              title: "Install Paperless",
+              summary: "Document archive",
+              description: "Placeholder app.",
+              app_state: "planned",
+              placeholder: true,
+              accent: "#84cc16",
+              iconText: "IP",
+              latest_job: null,
+              dependencies: [],
+            },
+          ],
+        },
+      ],
+      bundles: [
+        {
+          id: "media",
+          title: "Media",
+          summary: "Photo and video tools",
+          order: 10,
+          apps: ["install-immich"],
+        },
+      ],
+      errors: [],
+    });
+    return;
+  }
+
+  if (req.method === "POST" && /^\/api\/apps\/[^/]+\/install$/.test(pathname)) {
+    const stepId = pathname.split("/").filter(Boolean).at(-2);
+    const body = await readRequestBody(req);
+    const jobId = `job-${managerState.nextJobId}`;
+    managerState.nextJobId += 1;
+    const job = {
+      id: jobId,
+      type: "run_step",
+      status: "running",
+      step: "started",
+      cluster_id: body.cluster_id || "cluster-test",
+      cluster_instance_id: body.cluster_instance_id || "cluster-test-instance",
+      payload: {
+        step_id: stepId,
+      },
+    };
+    managerState.jobs.set(jobId, job);
+    sendJson(res, 202, {
+      step_id: stepId,
+      cluster_id: job.cluster_id,
+      cluster_instance_id: job.cluster_instance_id,
+      job_id: jobId,
+      job_type: "run_step",
+    });
+    return;
+  }
+
+  if (req.method === "GET" && /^\/api\/jobs\/[^/]+$/.test(pathname)) {
+    const jobId = pathname.split("/").filter(Boolean).at(-1);
+    const job = managerState.jobs.get(jobId);
+    if (!job) {
+      sendJson(res, 404, { error: "job not found" });
+      return;
+    }
+    sendJson(res, 200, cloneJob(job));
+    return;
+  }
+
+  if (req.method === "GET" && /^\/api\/jobs\/[^/]+\/logs$/.test(pathname)) {
+    const jobId = pathname.split("/").filter(Boolean).at(-2);
+    const job = managerState.jobs.get(jobId);
+    if (!job) {
+      sendJson(res, 404, { error: "job not found" });
+      return;
+    }
+    sendJson(res, 200, {
+      lines: [
+        { line: `[2026-04-18 12:00:00] queued run_step` },
+        { line: `[2026-04-18 12:00:01] running job type=run_step` },
+      ],
+    });
+    return;
+  }
+
+  if (req.method === "POST" && /^\/api\/jobs\/[^/]+\/cancel$/.test(pathname)) {
+    const jobId = pathname.split("/").filter(Boolean).at(-2);
+    const job = managerState.jobs.get(jobId);
+    if (!job) {
+      sendJson(res, 404, { error: "job not found" });
+      return;
+    }
+    job.status = "canceled";
+    job.step = "canceled";
+    sendJson(res, 200, cloneJob(job));
+    return;
+  }
+
+  sendJson(res, 404, { error: `Unhandled fake manager route: ${req.method} ${pathname}` });
+});
+
 let portalServer;
 let portalOrigin = "";
 let authentikServerOrigin = "";
+let managerServerOrigin = "";
 
 async function startServer(server) {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -296,6 +438,7 @@ test.before(async () => {
   });
 
   authentikServerOrigin = await startServer(authentikServer);
+  managerServerOrigin = await startServer(managerServer);
   process.env.NODE_ENV = "test";
   process.env.PORTAL_CONFIG_PATH = configPath;
   process.env.PORTAL_DATA_DIR = dataDir;
@@ -304,6 +447,7 @@ test.before(async () => {
   process.env.PORTAL_OIDC_ISSUER = `${authentikServerOrigin}/api/v3`;
   process.env.AUTHENTIK_API_TOKEN = "portal-token";
   process.env.AUTHENTIK_API_BASE = `${authentikServerOrigin}/api/v3`;
+  process.env.PORTAL_MANAGER_BASE_URL = managerServerOrigin;
 
   const moduleUrl = `${pathToFileURL(path.join(repoRoot, "portal", "server.mjs")).href}?test=${Date.now()}`;
   const { app } = await import(moduleUrl);
@@ -314,6 +458,7 @@ test.before(async () => {
 test.after(async () => {
   await new Promise((resolve) => portalServer.close(resolve));
   await new Promise((resolve) => authentikServer.close(resolve));
+  await new Promise((resolve) => managerServer.close(resolve));
   fs.rmSync(workspaceRoot, { recursive: true, force: true });
 });
 
@@ -322,6 +467,9 @@ test("admin endpoints require an authenticated admin session", async () => {
 
   const unauthenticated = await requestPortal("/api/admin/users");
   assert.equal(unauthenticated.status, 401);
+
+  const unauthenticatedApps = await requestPortal("/api/admin/apps/catalog");
+  assert.equal(unauthenticatedApps.status, 401);
 
   const memberCookie = createSignedSessionCookie({
     sub: "member-1",
@@ -334,6 +482,9 @@ test("admin endpoints require an authenticated admin session", async () => {
 
   const forbidden = await requestPortal("/api/admin/users", { cookie: memberCookie });
   assert.equal(forbidden.status, 403);
+
+  const forbiddenApps = await requestPortal("/api/admin/apps/catalog", { cookie: memberCookie });
+  assert.equal(forbiddenApps.status, 403);
 });
 
 test("admin can create a user with a temporary password and approved groups", async () => {
@@ -427,6 +578,38 @@ test("group updates block privileged groups and allow approved memberships", asy
   });
   assert.equal(updated.status, 200);
   assert.deepEqual(updated.payload.user.groupNames, ["family"]);
+});
+
+test("admin can load the app catalog and queue an install job", async () => {
+  seedAuthentikState();
+
+  const adminCookie = createSignedSessionCookie({
+    sub: "admin-1",
+    name: "Portal Admin",
+    email: "admin@example.com",
+    preferredUsername: "portal-admin",
+    groups: ["admins"],
+    isAdmin: true,
+  });
+
+  const catalog = await requestPortal("/api/admin/apps/catalog", { cookie: adminCookie });
+  assert.equal(catalog.status, 200);
+  assert.equal(catalog.payload.categories[0].steps[0].title, "Install Immich");
+  assert.equal(catalog.payload.bundles[0].title, "Media");
+
+  const queued = await requestPortal("/api/admin/apps/install-immich/install", {
+    method: "POST",
+    cookie: adminCookie,
+  });
+  assert.equal(queued.status, 202);
+  assert.match(queued.payload.job_id, /^job-/);
+
+  const logs = await requestPortal(`/api/admin/apps/jobs/${queued.payload.job_id}/logs`, {
+    cookie: adminCookie,
+  });
+  assert.equal(logs.status, 200);
+  assert.ok(Array.isArray(logs.payload.lines));
+  assert(logs.payload.lines.length > 0);
 });
 
 test("login requests the reduced Authentik scope set", async () => {

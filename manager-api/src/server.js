@@ -10,7 +10,7 @@ import {
   normalizeClusterName,
   persistCluster,
 } from "./lib/clusters.js";
-import { buildCatalogResponse, validateStepInputs } from "./lib/catalog.js";
+import { buildAppCatalogResponse, buildCatalogResponse, validateStepInputs } from "./lib/catalog.js";
 import {
   buildDataDirs,
   ensureDir,
@@ -27,6 +27,7 @@ import {
   normalizeSecretBaseRef,
   normalizeSecretBundle,
 } from "../../lib/secrets/schema.mjs";
+import { isClusterScopedStep } from "../../lib/step-scope.mjs";
 import {
   readItemRecord,
   resolveAttachmentPath,
@@ -127,6 +128,20 @@ function resolveRequestedCluster(clusterId) {
   }
 
   return { ok: true, cluster: readJson(clusterFile) };
+}
+
+function resolveLatestCluster() {
+  if (!fs.existsSync(dirs.clusters)) {
+    return null;
+  }
+
+  const clusterFiles = fs.readdirSync(dirs.clusters)
+    .filter((entry) => entry.endsWith(".json"))
+    .map((entry) => readJson(path.join(dirs.clusters, entry)))
+    .filter((cluster) => cluster?.id)
+    .sort((left, right) => String(right?.updated_at || right?.created_at || "").localeCompare(String(left?.updated_at || left?.created_at || "")));
+
+  return clusterFiles[0] || null;
 }
 
 function buildSecretItemName(ref, context = {}) {
@@ -1016,6 +1031,114 @@ app.get("/api/catalog", (req, res) => {
   });
 });
 
+app.get("/api/apps/catalog", (req, res) => {
+  const requestedClusterId = pickFirstString(req.query.cluster_id);
+  if (requestedClusterId) {
+    const requestedCluster = resolveRequestedCluster(requestedClusterId);
+    if (!requestedCluster.ok) {
+      return res.status(requestedCluster.status || 400).json({ error: requestedCluster.error });
+    }
+  }
+
+  const catalog = buildAppCatalogResponse({ workspaceRoot, dirs, clusterId: requestedClusterId || null });
+  if (!catalog.active_cluster?.id) {
+    return res.status(404).json({ error: "cluster not found" });
+  }
+
+  return res.json(catalog);
+});
+
+app.post("/api/apps/:stepId/install", async (req, res) => {
+  const stepId = req.params.stepId;
+  const requestedClusterId = typeof req.body?.cluster_id === "string" ? req.body.cluster_id.trim() : "";
+  const requestedClusterInstanceId = typeof req.body?.cluster_instance_id === "string"
+    ? req.body.cluster_instance_id.trim()
+    : "";
+  const catalog = buildAppCatalogResponse({ workspaceRoot, dirs, clusterId: requestedClusterId || null });
+  const step = catalog.stepsById.get(stepId);
+
+  if (!step || step.category_id !== "apps") {
+    return res.status(404).json({ error: "app not found" });
+  }
+
+  const visibleStep = catalog.categories.flatMap((category) => category.steps).find((candidate) => candidate.id === stepId);
+  if (!visibleStep) {
+    return res.status(404).json({ error: "app not found" });
+  }
+
+  if (visibleStep.app_state === "blocked") {
+    return res.status(409).json({ error: `${stepId} is blocked until its dependencies are complete` });
+  }
+
+  if (visibleStep.app_state === "planned") {
+    return res.status(409).json({ error: `${stepId} is not installable yet` });
+  }
+
+  if (visibleStep.app_state === "installing") {
+    return res.status(409).json({ error: `${stepId} is already installing` });
+  }
+
+  if (visibleStep.app_state === "installed") {
+    return res.status(409).json({ error: `${stepId} is already installed` });
+  }
+
+  if (requestedClusterId && catalog.active_cluster?.id && requestedClusterId !== catalog.active_cluster.id) {
+    return res.status(409).json({ error: "cluster mismatch" });
+  }
+
+  const activeClusterId = catalog.active_cluster?.id;
+  if (!activeClusterId) {
+    return res.status(404).json({ error: "cluster not found" });
+  }
+
+  const resolvedCluster = resolveRequestedCluster(activeClusterId);
+  if (!resolvedCluster.ok || !resolvedCluster.cluster?.id) {
+    return res.status(resolvedCluster.status || 404).json({ error: resolvedCluster.error || "cluster not found" });
+  }
+  const activeCluster = resolvedCluster.cluster;
+
+  const activeClusterInstanceId = activeCluster.cluster_instance_id || activeCluster.instance_id || null;
+  if (requestedClusterInstanceId && activeClusterInstanceId && requestedClusterInstanceId !== activeClusterInstanceId) {
+    return res.status(409).json({ error: "cluster instance mismatch" });
+  }
+
+  const validated = validateStepInputs(step, req.body?.inputs);
+  if (!validated.ok) {
+    return res.status(400).json({ error: validated.error });
+  }
+
+  const payload = {
+    step_id: step.id,
+    step_type: step.type,
+    inputs: validated.value,
+    runner: step.runner,
+    context: { cluster: activeCluster },
+  };
+
+  if (step.secrets && (Object.keys(step.secrets.env || {}).length > 0 || Object.keys(step.secrets.files || {}).length > 0)) {
+    payload.secret_bundle = normalizeSecretBundle(step.secrets);
+  }
+
+  const job = queueJob(dirs, "run_step", activeCluster.id, payload);
+  writeStepState(step.id, {
+    status: "pending",
+    inputs: validated.value,
+    outputs: null,
+    error: null,
+    last_job_id: job.id,
+    cluster_id: activeCluster.id,
+    cluster_instance_id: activeClusterInstanceId,
+  }, activeClusterInstanceId || activeCluster.id);
+
+  return res.status(202).json({
+    step_id: step.id,
+    cluster_id: activeCluster.id,
+    cluster_instance_id: activeClusterInstanceId,
+    job_id: job.id,
+    job_type: job.type,
+  });
+});
+
 app.get("/api/ip-suggestions", async (req, res) => {
   const queryIp = pickFirstString(req.query.management_ip);
   const envManagementIp = pickFirstString(process.env.MANAGEMENT_VM_IP);
@@ -1204,7 +1327,7 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
     persistCluster(dirs, built.cluster);
     clusterId = built.cluster.id;
     context = { cluster: built.cluster };
-  } else if (step.category_id === "talos-cluster") {
+  } else if (isClusterScopedStep(step)) {
     const requestedCluster = resolveRequestedCluster(req.body?.cluster_id);
     if (!requestedCluster.ok) {
       return res.status(requestedCluster.status || 400).json({ error: requestedCluster.error });
@@ -1241,7 +1364,7 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
     last_job_id: job.id,
     cluster_id: clusterId,
     cluster_instance_id: clusterInstanceId,
-  }, step.category_id === "talos-cluster" ? (clusterInstanceId || clusterId) : null);
+  }, isClusterScopedStep(step) ? (clusterInstanceId || clusterId) : null);
 
   return res.status(202).json({
     step_id: step.id,
@@ -1279,7 +1402,7 @@ app.post("/api/steps/:stepId/skip", (req, res) => {
     return res.status(409).json({ error: "cannot skip a completed step" });
   }
 
-  const clusterScopeId = visibleStep.category_id === "talos-cluster"
+  const clusterScopeId = isClusterScopedStep(visibleStep)
     ? (requestedClusterId || catalog.activeClusterScopeId || null)
     : null;
 
@@ -1316,7 +1439,7 @@ app.post("/api/steps/:stepId/unskip", (req, res) => {
     return res.status(409).json({ error: "step is not skipped" });
   }
 
-  const clusterScopeId = visibleStep.category_id === "talos-cluster"
+  const clusterScopeId = isClusterScopedStep(visibleStep)
     ? (requestedClusterId || catalog.activeClusterScopeId || null)
     : null;
 

@@ -6,6 +6,7 @@ import {
   normalizeCategoryManifest,
   normalizeStepManifest,
 } from "../../../lib/step-manifest.mjs";
+import { isClusterScopedStep } from "../../../lib/step-scope.mjs";
 
 import {
   parseIPv4,
@@ -19,12 +20,37 @@ function loadYaml(file) {
   return YAML.parse(fs.readFileSync(file, "utf8"));
 }
 
-export function loadCatalogDefinitions({ workspaceRoot }) {
+function normalizeAppBundleManifest(manifest, file) {
+  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
+    throw new Error(`bundle manifest must be an object in ${file}`);
+  }
+
+  for (const field of ["id", "title", "summary", "order"]) {
+    if (manifest?.[field] === undefined || manifest?.[field] === null || manifest?.[field] === "") {
+      throw new Error(`missing ${field} in ${file}`);
+    }
+  }
+
+  if (!Array.isArray(manifest.apps)) {
+    throw new Error(`apps must be an array in ${file}`);
+  }
+
+  return {
+    id: String(manifest.id),
+    title: String(manifest.title),
+    summary: String(manifest.summary),
+    order: Number(manifest.order),
+    apps: manifest.apps.map((appId) => String(appId)),
+  };
+}
+
+export function loadCatalogDefinitions({ workspaceRoot, includeApps = false, includeBundles = false } = {}) {
   const categoriesRoot = process.env.TWINBOX_CATEGORIES_DIR || path.join(workspaceRoot, "categories");
   const response = {
     categoriesRoot,
     categories: [],
     stepsById: new Map(),
+    bundles: [],
     errors: [],
   };
 
@@ -41,7 +67,7 @@ export function loadCatalogDefinitions({ workspaceRoot }) {
     const categoryFile = path.join(categoriesRoot, categoryDir, "category.yaml");
     try {
       const category = normalizeCategoryManifest(loadYaml(categoryFile), categoryFile);
-      if (category.id === "apps") {
+      if (category.id === "apps" && !includeApps) {
         continue;
       }
       const stepsRoot = path.join(categoriesRoot, categoryDir, "steps");
@@ -74,6 +100,26 @@ export function loadCatalogDefinitions({ workspaceRoot }) {
   }
 
   response.categories.sort((left, right) => left.order - right.order);
+
+  if (includeBundles) {
+    const bundlesRoot = path.join(categoriesRoot, "apps", "bundles");
+    if (fs.existsSync(bundlesRoot)) {
+      const bundleFiles = fs.readdirSync(bundlesRoot, { withFileTypes: true })
+        .filter((entry) => entry.isFile() && entry.name.endsWith(".yaml"))
+        .map((entry) => path.join(bundlesRoot, entry.name));
+
+      for (const bundleFile of bundleFiles) {
+        try {
+          const bundle = normalizeAppBundleManifest(loadYaml(bundleFile), bundleFile);
+          response.bundles.push(bundle);
+        } catch (error) {
+          response.errors.push(error instanceof Error ? error.message : `failed to load ${bundleFile}`);
+        }
+      }
+
+      response.bundles.sort((left, right) => left.order - right.order);
+    }
+  }
   return response;
 }
 
@@ -367,6 +413,79 @@ function deriveCategoryStatus(steps) {
   return "ready";
 }
 
+function isPlaceholderAppStep(step) {
+  return String(step?.runner?.script || "").includes("/_placeholder/");
+}
+
+const APP_PALETTE = [
+  "#2563eb",
+  "#0ea5e9",
+  "#14b8a6",
+  "#22c55e",
+  "#f59e0b",
+  "#f97316",
+  "#ef4444",
+  "#ec4899",
+  "#7c3aed",
+  "#a855f7",
+];
+
+function stableHash(input) {
+  const text = String(input || "").trim();
+  let hash = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash * 31 + text.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+}
+
+function pickPalette(value) {
+  return APP_PALETTE[stableHash(value) % APP_PALETTE.length];
+}
+
+function buildIconText(title) {
+  return String(title || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() || "TB";
+}
+
+function deriveAppStepStatus(step, state, latestJob, completedDependencies) {
+  if (state?.status === "failed") {
+    return "failed";
+  }
+
+  if (state?.status === "canceled") {
+    return "failed";
+  }
+
+  if (latestJob && latestJob.status === "cancel_requested") {
+    return "installing";
+  }
+
+  if (latestJob && (latestJob.status === "pending" || latestJob.status === "running")) {
+    return "installing";
+  }
+
+  if (state?.status === "succeeded" || state?.status === "configured") {
+    return "installed";
+  }
+
+  if (isPlaceholderAppStep(step)) {
+    return "planned";
+  }
+
+  const dependenciesMet = step.depends_on.every((dependency) => completedDependencies.has(dependency));
+  if (!dependenciesMet) {
+    return "blocked";
+  }
+
+  return "ready";
+}
+
 function normalizeChoiceValue(value) {
   if (value === undefined || value === null) {
     return "";
@@ -477,10 +596,9 @@ export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) 
 
   for (const category of definitions.categories) {
     for (const step of category.steps) {
-      const isClusterScopedStep = step.category_id === "talos-cluster";
-      const scopedClusterId = isClusterScopedStep ? activeClusterScopeId : null;
+      const scopedClusterId = isClusterScopedStep(step) ? activeClusterScopeId : null;
       const rawState = readStepState(dirs, step.id, scopedClusterId);
-      const state = isClusterScopedStep ? synthesizeProvisionStateFromCluster(step, currentCluster, rawState) : rawState;
+      const state = step.id === "provision-nodes" ? synthesizeProvisionStateFromCluster(step, currentCluster, rawState) : rawState;
       const latestJob = state?.last_job_id
         ? readJsonIfExists(path.join(dirs.jobs, `${state.last_job_id}.json`))
         : null;
@@ -561,6 +679,149 @@ export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) 
     errors: definitions.errors,
     stepsById: renderedStepsById,
     cluster_slug: clusterSlugHint,
+  };
+}
+
+function normalizeAppStepState(state) {
+  if (!state) {
+    return {
+      status: "not_started",
+      inputs: {},
+      outputs: null,
+      cluster_id: null,
+      cluster_instance_id: null,
+      error: null,
+      updated_at: null,
+      last_job_id: null,
+    };
+  }
+
+  return {
+    status: state.status || "not_started",
+    inputs: state.inputs || {},
+    outputs: state.outputs || null,
+    cluster_id: state.cluster_id || null,
+    cluster_instance_id: state.cluster_instance_id || null,
+    error: state.error || null,
+    updated_at: state.updated_at || null,
+    last_job_id: state.last_job_id || null,
+  };
+}
+
+function summarizeAppStep(step, state, latestJob, completedDependencies, stepLookup) {
+  const status = deriveAppStepStatus(step, state, latestJob, completedDependencies);
+  const placeholder = isPlaceholderAppStep(step);
+  const dependencies = step.depends_on.map((dependencyId) => ({
+    id: dependencyId,
+    title: stepLookup.get(dependencyId)?.title || dependencyId,
+    state: completedDependencies.has(dependencyId) ? "done" : "pending",
+  }));
+
+  return {
+    id: step.id,
+    category_id: step.category_id,
+    title: step.title,
+    type: step.type,
+    journey_stage: step.journey_stage,
+    order: step.order,
+    ingress_route: step.ingress_route,
+    summary: step.summary,
+    explanation: step.explanation,
+    side_help: step.side_help,
+    dashy: step.dashy,
+    inputs: step.inputs,
+    secrets: step.secrets,
+    depends_on: step.depends_on,
+    icon: step.icon,
+    icon_artwork_url: step.icon_artwork_url,
+    project_url: step.project_url,
+    github_url: step.github_url,
+    positive_summary: step.positive_summary,
+    accent: pickPalette(step.title),
+    iconText: buildIconText(step.title),
+    status,
+    app_state: status,
+    placeholder,
+    installable: !placeholder,
+    dependencies,
+    state: summarizeStepState(state),
+    latest_job: summarizeJob(latestJob),
+  };
+}
+
+function buildActiveClusterSummary(cluster) {
+  if (!cluster) {
+    return null;
+  }
+
+  return {
+    id: cluster.id || null,
+    cluster_instance_id: cluster.cluster_instance_id || cluster.instance_id || null,
+    slug: cluster.slug || cluster.id || null,
+    dns_domain: cluster.dns_domain || null,
+    name: cluster.name || null,
+    status: cluster.status || null,
+    updated_at: cluster.updated_at || cluster.created_at || null,
+  };
+}
+
+export function buildAppCatalogResponse({ workspaceRoot, dirs, clusterId = null }) {
+  const definitions = loadCatalogDefinitions({ workspaceRoot, includeApps: true, includeBundles: true });
+  const currentCluster = clusterId ? findClusterById(dirs, clusterId) : findCurrentCluster(dirs);
+  const activeClusterId = currentCluster?.id || null;
+  const activeClusterScopeId = clusterScopeId(currentCluster);
+  const stepStateById = new Map();
+  const renderedStepsById = new Map();
+
+  for (const category of definitions.categories) {
+    for (const step of category.steps) {
+      const scopedClusterId = isClusterScopedStep(step) ? activeClusterScopeId : null;
+      const rawState = readStepState(dirs, step.id, scopedClusterId);
+      const state = step.id === "provision-nodes" ? synthesizeProvisionStateFromCluster(step, currentCluster, rawState) : rawState;
+      const latestJob = state?.last_job_id
+        ? readJsonIfExists(path.join(dirs.jobs, `${state.last_job_id}.json`))
+        : null;
+      stepStateById.set(step.id, { state, latestJob });
+      renderedStepsById.set(step.id, step);
+    }
+  }
+
+  const completedDependencies = new Set(
+    Array.from(stepStateById.entries())
+      .filter(([stepId, { state }]) => {
+        const step = definitions.stepsById.get(stepId);
+        return step && isDone(step, state);
+      })
+      .map(([stepId]) => stepId),
+  );
+
+  const appCategory = definitions.categories.find((category) => category.id === "apps") || {
+    id: "apps",
+    title: "Apps",
+    summary: "Install user-facing applications and collaboration tools.",
+    order: 30,
+    steps: [],
+  };
+
+  const appSteps = appCategory.steps
+    .map((step) => {
+      const { state, latestJob } = stepStateById.get(step.id) || { state: null, latestJob: null };
+      return summarizeAppStep(step, normalizeAppStepState(state), latestJob, completedDependencies, definitions.stepsById);
+    })
+    .sort((left, right) => left.order - right.order);
+
+  return {
+    active_cluster: buildActiveClusterSummary(currentCluster),
+    categories: [{
+      id: appCategory.id,
+      title: appCategory.title,
+      summary: appCategory.summary,
+      order: appCategory.order,
+      status: deriveCategoryStatus(appSteps),
+      steps: appSteps,
+    }],
+    bundles: definitions.bundles,
+    errors: definitions.errors,
   };
 }
 

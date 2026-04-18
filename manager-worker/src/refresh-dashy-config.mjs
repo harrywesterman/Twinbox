@@ -9,6 +9,7 @@ import {
   normalizeCategoryManifest,
   normalizeStepManifest,
 } from "../../lib/step-manifest.mjs";
+import { isClusterScopedStep } from "../../lib/step-scope.mjs";
 import {
   buildDashyConfig,
   stepHasDashyItems,
@@ -152,10 +153,8 @@ function readStepStates(dataRoot, steps, clusterScopeId) {
   const stepStateById = new Map();
 
   for (const step of steps) {
-    const scope = step.category_id === "talos-cluster" ? path.join("clusters", clusterScopeId || "") : "global";
-    const file = step.category_id === "talos-cluster"
-      ? path.join(dataRoot, "step-state", scope, `${step.id}.json`)
-      : path.join(dataRoot, "step-state", scope, `${step.id}.json`);
+    const scope = isClusterScopedStep(step) ? path.join("clusters", clusterScopeId || "") : "global";
+    const file = path.join(dataRoot, "step-state", scope, `${step.id}.json`);
     stepStateById.set(step.id, readJsonIfExists(file));
   }
 

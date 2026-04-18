@@ -7,7 +7,7 @@ test("buildAdminNavigationItems shows the user admin route only for admins", () 
   assert.equal(buildAdminNavigationItems({ isAdmin: false }).length, 0);
   assert.deepEqual(
     buildAdminNavigationItems({ isAdmin: true }).map((item) => item.path),
-    ["/admin", "/admin/users"],
+    ["/admin", "/admin/apps", "/admin/users"],
   );
 });
 

@@ -21,6 +21,7 @@ const configPath = process.env.PORTAL_CONFIG_PATH || "/config/portal-config.json
 const sessionSecret = process.env.PORTAL_SESSION_SECRET || "twinbox-portal-dev-secret";
 const sessionCookieName = process.env.PORTAL_SESSION_COOKIE || "twinbox_portal_session";
 const oauthCookieName = process.env.PORTAL_OAUTH_COOKIE || "twinbox_portal_oauth";
+const managerBaseUrl = String(process.env.PORTAL_MANAGER_BASE_URL || "http://manager-api:8080").trim().replace(/\/+$/, "");
 const issuer = String(process.env.PORTAL_OIDC_ISSUER || process.env.AUTHENTIK_ISSUER || "").trim();
 const clientId = String(process.env.PORTAL_OIDC_CLIENT_ID || "").trim();
 const authentikApiBase = String(process.env.AUTHENTIK_API_BASE || DEFAULT_AUTHENTIK_API_BASE).trim();
@@ -199,6 +200,46 @@ async function loadPreferences() {
 async function savePreferences(nextPreferences) {
   await fs.promises.mkdir(path.dirname(preferencesPath), { recursive: true });
   await writeJsonFile(preferencesPath, nextPreferences);
+}
+
+function managerUrl(pathname) {
+  const normalizedPath = String(pathname || "").startsWith("/") ? String(pathname || "") : `/${String(pathname || "")}`;
+  return new URL(normalizedPath, `${managerBaseUrl}/`).toString();
+}
+
+async function requestManagerJson(pathname, { method = "GET", body = undefined, headers = {} } = {}) {
+  const init = {
+    method,
+    headers: {
+      ...headers,
+    },
+  };
+
+  if (body !== undefined) {
+    init.body = typeof body === "string" ? body : JSON.stringify(body);
+    if (!init.headers["Content-Type"]) {
+      init.headers["Content-Type"] = "application/json";
+    }
+  }
+
+  const response = await fetch(managerUrl(pathname), init);
+  const text = await response.text();
+  let parsed = null;
+  if (text) {
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      parsed = text;
+    }
+  }
+
+  if (!response.ok) {
+    const error = new Error(parsed?.error || parsed?.message || text || `Manager request failed with ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+
+  return parsed;
 }
 
 function getOrigin(req) {
@@ -674,6 +715,92 @@ app.get("/api/admin/groups", async (req, res) => {
     });
   } catch (error) {
     res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to load groups" });
+  }
+});
+
+app.get("/api/admin/apps/catalog", async (req, res) => {
+  const session = requireAdminSession(req, res);
+  if (!session) {
+    return;
+  }
+
+  try {
+    const catalog = await requestManagerJson("/api/apps/catalog");
+    res.json(catalog);
+  } catch (error) {
+    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to load apps" });
+  }
+});
+
+app.post("/api/admin/apps/:stepId/install", async (req, res) => {
+  const session = requireAdminSession(req, res);
+  if (!session) {
+    return;
+  }
+
+  try {
+    const catalog = await requestManagerJson("/api/apps/catalog");
+    const activeCluster = catalog?.active_cluster;
+    if (!activeCluster?.id) {
+      return res.status(404).json({ error: "cluster not found" });
+    }
+
+    const result = await requestManagerJson(`/api/apps/${encodeURIComponent(req.params.stepId)}/install`, {
+      method: "POST",
+      body: {
+        ...(req.body || {}),
+        cluster_id: activeCluster.id,
+        cluster_instance_id: activeCluster.cluster_instance_id || activeCluster.instance_id || null,
+      },
+    });
+    res.status(202).json(result);
+  } catch (error) {
+    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to install app" });
+  }
+});
+
+app.get("/api/admin/apps/jobs/:jobId", async (req, res) => {
+  const session = requireAdminSession(req, res);
+  if (!session) {
+    return;
+  }
+
+  try {
+    const job = await requestManagerJson(`/api/jobs/${encodeURIComponent(req.params.jobId)}`);
+    res.json(job);
+  } catch (error) {
+    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to load job" });
+  }
+});
+
+app.get("/api/admin/apps/jobs/:jobId/logs", async (req, res) => {
+  const session = requireAdminSession(req, res);
+  if (!session) {
+    return;
+  }
+
+  try {
+    const logs = await requestManagerJson(`/api/jobs/${encodeURIComponent(req.params.jobId)}/logs`);
+    res.json(logs);
+  } catch (error) {
+    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to load job logs" });
+  }
+});
+
+app.post("/api/admin/apps/jobs/:jobId/cancel", async (req, res) => {
+  const session = requireAdminSession(req, res);
+  if (!session) {
+    return;
+  }
+
+  try {
+    const result = await requestManagerJson(`/api/jobs/${encodeURIComponent(req.params.jobId)}/cancel`, {
+      method: "POST",
+      body: {},
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to cancel job" });
   }
 });
 

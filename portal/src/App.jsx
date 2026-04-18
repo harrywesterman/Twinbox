@@ -1,5 +1,6 @@
 import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 
+import { buildAdminAppsViewModel } from './admin-apps-model.js';
 import { buildAdminNavigationItems, buildUserAdminViewModel } from './user-admin-model.js';
 
 function requestJson(url, options = {}) {
@@ -198,6 +199,60 @@ function useUserAdminData(enabled) {
   return {
     ...state,
     reload: useCallback(() => load({ silent: true }), [load]),
+  };
+}
+
+function useAdminAppsData(enabled) {
+  const [state, setState] = useState({
+    loading: false,
+    refreshing: false,
+    error: '',
+    catalog: null,
+  });
+
+  const load = useCallback(async ({ silent = false } = {}) => {
+    if (!enabled) {
+      setState({
+        loading: false,
+        refreshing: false,
+        error: '',
+        catalog: null,
+      });
+      return;
+    }
+
+    setState((current) => ({
+      ...current,
+      loading: current.catalog === null && !silent,
+      refreshing: current.catalog !== null || silent,
+      error: '',
+    }));
+
+    try {
+      const catalog = await requestJson('/api/admin/apps/catalog');
+      setState({
+        loading: false,
+        refreshing: false,
+        error: '',
+        catalog,
+      });
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        loading: false,
+        refreshing: false,
+        error: error instanceof Error ? error.message : 'Failed to load app catalog.',
+      }));
+    }
+  }, [enabled]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return {
+    ...state,
+    reload: useCallback((options) => load(options), [load]),
   };
 }
 
@@ -555,6 +610,9 @@ function AdminPage({ adminApps, onNavigate }) {
         description="Operators and admins get their own screen, separate from the normal launcher."
       />
       <div className="admin-actions">
+        <button type="button" className="primary-button" onClick={() => onNavigate('/admin/apps')}>
+          Open app installs
+        </button>
         <button type="button" className="primary-button" onClick={() => onNavigate('/admin/users')}>
           Open user admin
         </button>
@@ -567,6 +625,432 @@ function AdminPage({ adminApps, onNavigate }) {
       </div>
       <button type="button" className="secondary-button" onClick={() => onNavigate('/')}>Back home</button>
     </Panel>
+  );
+}
+
+function statusTone(state) {
+  switch (state) {
+    case 'installed':
+      return 'is-live';
+    case 'ready':
+      return 'is-ok';
+    case 'installing':
+      return 'is-warning';
+    case 'blocked':
+    case 'planned':
+      return 'is-neutral';
+    case 'failed':
+      return 'is-bad';
+    default:
+      return 'is-neutral';
+  }
+}
+
+function statusLabel(state) {
+  switch (state) {
+    case 'installed':
+      return 'installed';
+    case 'ready':
+      return 'ready';
+    case 'installing':
+      return 'installing';
+    case 'blocked':
+      return 'blocked';
+    case 'planned':
+      return 'coming soon';
+    case 'failed':
+      return 'failed';
+    default:
+      return 'planned';
+  }
+}
+
+function LogViewport({ lines = [], emptyLabel = 'Waiting for output...' }) {
+  return (
+    <div className="admin-log-viewport">
+      {lines.length === 0 ? (
+        <p className="muted-copy">{emptyLabel}</p>
+      ) : (
+        <pre className="admin-log-output">{lines.map((line) => (typeof line === 'string' ? line : line.line)).join('\n')}</pre>
+      )}
+    </div>
+  );
+}
+
+function AdminAppCard({ card, selected, onSelect }) {
+  return (
+    <button
+      type="button"
+      className={`admin-app-card ${selected ? 'is-selected' : ''}`}
+      onClick={onSelect}
+    >
+      <span className="app-tile-badge" style={{ '--accent': card.accent || '#2dd4bf' }}>
+        <span>{card.iconText || 'TB'}</span>
+      </span>
+      <span className="admin-app-card-copy">
+        <strong>{card.title}</strong>
+        <span>{card.summary}</span>
+      </span>
+      <span className="admin-app-card-meta">
+        <span className={`status-chip ${statusTone(card.app_state)}`}>{statusLabel(card.app_state)}</span>
+        {card.placeholder ? <small>Placeholder</small> : null}
+      </span>
+    </button>
+  );
+}
+
+function AdminAppsPage({ onNavigate, adminAppsState }) {
+  const [query, setQuery] = useState('');
+  const deferredQuery = useDeferredValue(query);
+  const [selectedAppId, setSelectedAppId] = useState('');
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [jobLines, setJobLines] = useState([]);
+  const [installBusy, setInstallBusy] = useState(false);
+  const [pageError, setPageError] = useState('');
+  const [pageNotice, setPageNotice] = useState('');
+  const appsState = adminAppsState || useAdminAppsData(true);
+
+  const viewModel = useMemo(() => buildAdminAppsViewModel({
+    catalog: appsState.catalog,
+    query: deferredQuery,
+    selectedAppId,
+  }), [appsState.catalog, deferredQuery, selectedAppId]);
+
+  useEffect(() => {
+    if (!selectedAppId && viewModel.selectedApp) {
+      startTransition(() => setSelectedAppId(viewModel.selectedApp.id));
+    }
+  }, [selectedAppId, viewModel.selectedApp]);
+
+  useEffect(() => {
+    if (!viewModel.selectedApp?.id) {
+      return;
+    }
+
+    const currentSelected = viewModel.selectedApp.id;
+    if (selectedAppId !== currentSelected) {
+      return;
+    }
+
+    const selectedJobStepId = selectedJob?.payload?.step_id || selectedJob?.step_id;
+    if (selectedJob?.id && selectedJobStepId === currentSelected) {
+      return;
+    }
+
+    if (viewModel.selectedApp.latest_job?.id && ['pending', 'running', 'cancel_requested'].includes(viewModel.selectedApp.latest_job.status)) {
+      setSelectedJob(viewModel.selectedApp.latest_job);
+      return;
+    }
+
+    if (viewModel.selectedApp.latest_job?.id) {
+      setSelectedJob(viewModel.selectedApp.latest_job);
+      if (viewModel.selectedApp.latest_job.status !== 'failed') {
+        setJobLines([]);
+      }
+      return;
+    }
+
+    setSelectedJob(null);
+    setJobLines([]);
+  }, [selectedAppId, selectedJob?.id, viewModel.selectedApp]);
+
+  useEffect(() => {
+    if (!selectedJob?.id) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let timeoutId = null;
+
+    const poll = async () => {
+      try {
+        const [jobPayload, logsPayload] = await Promise.all([
+          requestJson(`/api/admin/apps/jobs/${encodeURIComponent(selectedJob.id)}`),
+          requestJson(`/api/admin/apps/jobs/${encodeURIComponent(selectedJob.id)}/logs`),
+        ]);
+
+        if (cancelled) {
+          return;
+        }
+
+        setSelectedJob(jobPayload);
+        setJobLines(Array.isArray(logsPayload?.lines) ? logsPayload.lines : []);
+
+        if (['pending', 'running', 'cancel_requested'].includes(jobPayload.status)) {
+          timeoutId = window.setTimeout(poll, 2000);
+        } else {
+          setInstallBusy(false);
+          await appsState.reload({ silent: true });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setPageError(error instanceof Error ? error.message : 'Failed to load job progress.');
+          setInstallBusy(false);
+        }
+      }
+    };
+
+    poll();
+
+    return () => {
+      cancelled = true;
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [appsState, selectedJob?.id]);
+
+  const installSelectedApp = async () => {
+    if (!viewModel.selectedApp) {
+      return;
+    }
+
+    setInstallBusy(true);
+    setPageError('');
+    setPageNotice('');
+
+    try {
+      const response = await requestJson(`/api/admin/apps/${encodeURIComponent(viewModel.selectedApp.id)}/install`, {
+        method: 'POST',
+      });
+
+      setPageNotice(`${viewModel.selectedApp.title} is queued for installation.`);
+      setJobLines([{ line: `queued ${response.job_type || 'run_step'} for ${viewModel.selectedApp.title}` }]);
+      setSelectedJob({
+        id: response.job_id,
+        status: 'pending',
+        step_id: viewModel.selectedApp.id,
+      });
+      await appsState.reload({ silent: true });
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : 'Failed to install the selected app.');
+      setInstallBusy(false);
+    }
+  };
+
+  const cancelSelectedJob = async () => {
+    if (!selectedJob?.id) {
+      return;
+    }
+
+    setPageError('');
+    try {
+      await requestJson(`/api/admin/apps/jobs/${encodeURIComponent(selectedJob.id)}/cancel`, {
+        method: 'POST',
+      });
+      setPageNotice(`Cancellation requested for ${selectedJob.id}.`);
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : 'Failed to cancel the current job.');
+    }
+  };
+
+  const selectedApp = viewModel.selectedApp;
+  const selectedState = selectedApp?.app_state || 'planned';
+  const canInstall = selectedApp && ['ready', 'failed'].includes(selectedState);
+  const isPlaceholder = Boolean(selectedApp?.placeholder);
+
+  return (
+    <div className="admin-apps-layout">
+      <Panel className="admin-apps-overview">
+        <SectionTitle
+          eyebrow="Admin"
+          title="App installs"
+          description="Install cluster apps one at a time and watch the live job output here."
+        />
+        <div className="admin-apps-cluster">
+          <div>
+            <span>Active cluster</span>
+            <strong>{viewModel.activeCluster?.slug || viewModel.activeCluster?.id || 'No cluster'}</strong>
+          </div>
+          <div>
+            <span>Instance</span>
+            <strong>{viewModel.activeCluster?.cluster_instance_id || 'n/a'}</strong>
+          </div>
+          <div>
+            <span>Installed</span>
+            <strong>{viewModel.stateCounts.installed}</strong>
+          </div>
+          <div>
+            <span>Ready</span>
+            <strong>{viewModel.stateCounts.ready}</strong>
+          </div>
+        </div>
+        <div className="hero-actions">
+          <button type="button" className="secondary-button" onClick={() => appsState.reload()} disabled={appsState.refreshing}>
+            {appsState.refreshing ? 'Refreshing…' : 'Refresh catalog'}
+          </button>
+          <button type="button" className="secondary-button" onClick={() => onNavigate('/admin')}>
+            Back to admin apps
+          </button>
+        </div>
+        {appsState.error || pageError ? (
+          <div className="inline-notice is-danger">
+            <strong>Something needs attention.</strong>
+            <span>{pageError || appsState.error}</span>
+          </div>
+        ) : null}
+        {pageNotice ? (
+          <div className="inline-notice is-accent">
+            <strong>{pageNotice}</strong>
+            <span>When the job completes, the portal refresh will expose the app to users.</span>
+          </div>
+        ) : null}
+        {viewModel.errors.length > 0 ? (
+          <div className="inline-notice is-warning">
+            <strong>Catalog warnings</strong>
+            <span>{viewModel.errors.join(' | ')}</span>
+          </div>
+        ) : null}
+      </Panel>
+
+      <div className="admin-apps-columns">
+        <Panel className="admin-apps-catalog">
+          <SectionTitle
+            eyebrow="Apps"
+            title={viewModel.title}
+            description={viewModel.description}
+          />
+          <div className="user-admin-search admin-app-search">
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search apps"
+            />
+          </div>
+          <div className="admin-app-grid">
+            {viewModel.filteredCards.length === 0 ? (
+              <div className="empty-card">
+                <strong>No apps match the search</strong>
+                <span>Try a different term or clear the filter.</span>
+              </div>
+            ) : (
+              viewModel.filteredCards.map((card) => (
+                <AdminAppCard
+                  key={card.id}
+                  card={card}
+                  selected={card.id === selectedApp?.id}
+                  onSelect={() => startTransition(() => setSelectedAppId(card.id))}
+                />
+              ))
+            )}
+          </div>
+
+          <div className="bundle-list">
+            <SectionTitle
+              eyebrow="Bundles"
+              title="Future install groups"
+              description="Metadata for grouped installs is loaded now, but the one-click bundle UI comes later."
+            />
+            <div className="bundle-grid">
+              {viewModel.bundles.length === 0 ? (
+                <div className="empty-card">
+                  <strong>No bundles defined yet</strong>
+                  <span>Add bundle manifests under `categories/apps/bundles/`.</span>
+                </div>
+              ) : viewModel.bundles.map((bundle) => (
+                <article key={bundle.id} className="bundle-card">
+                  <strong>{bundle.title}</strong>
+                  <span>{bundle.summary}</span>
+                  <small>{Array.isArray(bundle.apps) ? bundle.apps.length : 0} app{Array.isArray(bundle.apps) && bundle.apps.length === 1 ? '' : 's'}</small>
+                </article>
+              ))}
+            </div>
+          </div>
+        </Panel>
+
+        <Panel className="admin-apps-detail">
+          {selectedApp ? (
+            <>
+              <SectionTitle
+                eyebrow="Selected app"
+                title={selectedApp.title}
+                description={selectedApp.description || selectedApp.summary}
+              />
+              <div className="admin-app-detail-head">
+                <span className="app-tile-badge" style={{ '--accent': selectedApp.accent || '#2dd4bf' }}>
+                  <span>{selectedApp.iconText || 'TB'}</span>
+                </span>
+                <div>
+                  <span className={`status-chip ${statusTone(selectedState)}`}>{statusLabel(selectedState)}</span>
+                  {isPlaceholder ? <small>Placeholder app, not installable yet</small> : null}
+                </div>
+              </div>
+
+              <div className="admin-app-stat-grid">
+                <article>
+                  <strong>{selectedApp.state?.updated_at ? 'Updated' : 'Ready'}</strong>
+                  <span>{selectedApp.state?.updated_at || 'Waiting for the first install'}</span>
+                </article>
+                <article>
+                  <strong>{selectedApp.latest_job?.status || 'none'}</strong>
+                  <span>Latest job</span>
+                </article>
+                <article>
+                  <strong>{selectedApp.dependencies.length}</strong>
+                  <span>Dependencies</span>
+                </article>
+              </div>
+
+              <div className="admin-app-dependencies">
+                <span>Prerequisites</span>
+                <div className="dependency-grid">
+                  {selectedApp.dependencies.length === 0 ? (
+                    <p className="muted-copy">No dependencies were declared for this app.</p>
+                  ) : selectedApp.dependencies.map((dependency) => (
+                    <span key={dependency.id} className={`dependency-pill ${dependency.state === 'done' ? 'is-done' : 'is-pending'}`}>
+                      {dependency.title}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="hero-actions">
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={installSelectedApp}
+                  disabled={!canInstall || installBusy}
+                >
+                  {installBusy
+                    ? 'Installing…'
+                    : selectedState === 'failed'
+                      ? 'Retry install'
+                      : isPlaceholder
+                        ? 'Coming soon'
+                        : selectedState === 'blocked'
+                          ? 'Blocked'
+                          : selectedState === 'installed'
+                            ? 'Installed'
+                            : 'Install app'}
+                </button>
+                {selectedJob?.id && ['pending', 'running', 'cancel_requested'].includes(selectedJob.status) ? (
+                  <button type="button" className="secondary-button" onClick={cancelSelectedJob}>
+                    Cancel job
+                  </button>
+                ) : null}
+                <button type="button" className="secondary-button" onClick={() => onNavigate('/')}>
+                  Back home
+                </button>
+              </div>
+
+              <div className="admin-app-progress">
+                <SectionTitle eyebrow="Logs" title="Live output" description="This window follows the current install job." />
+                <LogViewport
+                  lines={jobLines}
+                  emptyLabel={selectedJob?.id ? 'Waiting for the first log line...' : 'Start an install to see live logs here.'}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="empty-card">
+              <strong>No app selected</strong>
+              <span>Pick an application from the catalog to view its install status.</span>
+            </div>
+          )}
+        </Panel>
+      </div>
+    </div>
   );
 }
 
@@ -1019,7 +1503,9 @@ export default function App() {
   const [route, navigate] = useRoute();
   const { sessionState, configState, preferences, setPreferences, statusState, refreshStatus } = usePortalData();
   const userAdminEnabled = Boolean(sessionState.session?.isAdmin) && route === '/admin/users';
+  const adminAppsEnabled = Boolean(sessionState.session?.isAdmin) && route === '/admin/apps';
   const userAdminState = useUserAdminData(userAdminEnabled);
+  const adminAppsState = useAdminAppsData(adminAppsEnabled);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -1131,6 +1617,7 @@ export default function App() {
         {route === '/intranet' ? <IntranetPage links={config?.intranetLinks || []} onNavigate={navigate} /> : null}
         {route === '/status' ? <StatusPage statusState={statusState} onRefresh={refreshStatus} onNavigate={navigate} /> : null}
         {route === '/admin' && isAdmin ? <AdminPage adminApps={config?.adminApps || []} onNavigate={navigate} /> : null}
+        {route === '/admin/apps' && isAdmin ? <AdminAppsPage onNavigate={navigate} adminAppsState={adminAppsState} /> : null}
         {route === '/admin/users' && isAdmin ? (
           <UserAdminPage config={config} directoryState={userAdminState} onNavigate={navigate} />
         ) : null}
@@ -1143,6 +1630,12 @@ export default function App() {
         {route === '/admin/users' && !isAdmin ? (
           <Panel>
             <SectionTitle eyebrow="Access denied" title="Admins only" description="User administration is only available to the admins group." />
+            <button type="button" className="secondary-button" onClick={() => navigate('/')}>Back home</button>
+          </Panel>
+        ) : null}
+        {route === '/admin/apps' && !isAdmin ? (
+          <Panel>
+            <SectionTitle eyebrow="Access denied" title="Admins only" description="App installs are only available to the admins group." />
             <button type="button" className="secondary-button" onClick={() => navigate('/')}>Back home</button>
           </Panel>
         ) : null}

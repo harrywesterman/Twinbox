@@ -415,7 +415,27 @@ a {
   color: color-mix(in srgb, var(--accent) 80%, white);
 }
 
+.status-chip.is-ok {
+  background: rgba(45, 212, 191, 0.14);
+  color: color-mix(in srgb, var(--accent) 80%, white);
+}
+
+.status-chip.is-warning {
+  background: rgba(245, 158, 11, 0.14);
+  color: #fbbf24;
+}
+
+.status-chip.is-neutral {
+  background: rgba(148, 163, 184, 0.14);
+  color: var(--muted-strong);
+}
+
 .status-card.is-bad .status-chip {
+  background: rgba(239, 68, 68, 0.14);
+  color: #fb7185;
+}
+
+.status-chip.is-bad {
   background: rgba(239, 68, 68, 0.14);
   color: #fb7185;
 }
@@ -632,6 +652,213 @@ a {
 .inline-notice.is-danger {
   border-color: rgba(248, 113, 113, 0.28);
   background: rgba(127, 29, 29, 0.18);
+}
+
+.admin-apps-layout {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-apps-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
+  gap: 18px;
+}
+
+.admin-apps-overview,
+.admin-apps-catalog,
+.admin-apps-detail {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-apps-cluster,
+.admin-app-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-apps-cluster div,
+.admin-app-stat-grid article,
+.bundle-card,
+.dependency-pill,
+.admin-app-card {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.admin-apps-cluster div,
+.admin-app-stat-grid article {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+}
+
+.admin-apps-cluster span,
+.admin-app-stat-grid span,
+.bundle-card span,
+.admin-app-card-copy span,
+.admin-app-detail-head small,
+.admin-app-dependencies > span,
+.admin-app-search {
+  color: var(--muted);
+}
+
+.admin-apps-cluster strong,
+.admin-app-stat-grid strong,
+.bundle-card strong {
+  color: var(--text);
+  font-family: var(--display-font);
+}
+
+.admin-apps-cluster strong,
+.admin-app-stat-grid strong {
+  font-size: 1.35rem;
+}
+
+.admin-app-search {
+  margin-bottom: 12px;
+}
+
+.admin-app-grid,
+.bundle-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-app-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-app-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  width: 100%;
+  padding: 16px;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.admin-app-card:hover,
+.admin-app-card.is-selected {
+  transform: translateY(-1px);
+  border-color: rgba(45, 212, 191, 0.34);
+  background: rgba(45, 212, 191, 0.08);
+}
+
+.admin-app-card-meta {
+  display: grid;
+  align-content: center;
+  justify-items: end;
+  gap: 6px;
+}
+
+.admin-app-card-meta small {
+  color: var(--muted);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.admin-app-card-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-app-card-copy strong,
+.admin-app-card-copy span {
+  min-width: 0;
+}
+
+.admin-app-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.admin-app-detail-head > div {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-app-detail-head small {
+  display: block;
+}
+
+.admin-app-dependencies {
+  display: grid;
+  gap: 10px;
+}
+
+.dependency-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.dependency-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  color: var(--text);
+  font-size: 0.84rem;
+}
+
+.dependency-pill.is-done {
+  border-color: rgba(45, 212, 191, 0.28);
+  background: rgba(45, 212, 191, 0.12);
+}
+
+.dependency-pill.is-pending {
+  border-color: rgba(148, 163, 184, 0.24);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.bundle-list {
+  display: grid;
+  gap: 12px;
+}
+
+.bundle-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.bundle-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+}
+
+.bundle-card small {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+}
+
+.admin-log-viewport {
+  min-height: 320px;
+  max-height: 520px;
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: rgba(3, 9, 18, 0.72);
+}
+
+.admin-log-output {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: color-mix(in srgb, var(--accent) 82%, white);
+  font-size: 0.9rem;
+  line-height: 1.55;
 }
 
 .user-admin-layout {
@@ -924,7 +1151,8 @@ a {
   .page-grid,
   .detail-layout,
   .auth-shell,
-  .user-admin-columns {
+  .user-admin-columns,
+  .admin-apps-columns {
     grid-template-columns: 1fr;
   }
 
@@ -933,7 +1161,11 @@ a {
   .card-grid,
   .intranet-grid,
   .user-admin-stats,
-  .user-admin-profile {
+  .user-admin-profile,
+  .admin-apps-cluster,
+  .admin-app-stat-grid,
+  .admin-app-grid,
+  .bundle-grid {
     grid-template-columns: 1fr;
   }
 
@@ -982,5 +1214,9 @@ a {
 
   .user-admin-list {
     max-height: none;
+  }
+
+  .admin-apps-cluster {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
