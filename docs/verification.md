@@ -253,6 +253,25 @@ Expected:
 - SeaweedFS is running on the Management VM and exposed through Traefik
 - `BackupStorageLocation/default` is ready
 - The generated Velero credentials secret exists in the `velero` namespace
+- The Velero backup storage location points at the configured SeaweedFS endpoint
+
+### `install-velero-ui`
+
+```bash
+kubectl --kubeconfig <kubeconfig> get application -n argocd velero-ui
+kubectl --kubeconfig <kubeconfig> get pods -n velero-ui
+kubectl --kubeconfig <kubeconfig> get externalsecret -n velero-ui velero-ui-bootstrap
+kubectl --kubeconfig <kubeconfig> get secret velero-ui-bootstrap -n velero-ui
+kubectl --kubeconfig <kubeconfig> get ingressroute -n velero-ui
+```
+
+Expected:
+
+- `Application/velero-ui` is synced and healthy
+- the Velero UI deployment is running in the `velero-ui` namespace
+- the generated Velero UI bootstrap secret exists in the `velero-ui` namespace
+- the Velero UI ingress route points at `velero-ui.__ZONE_NAME__`
+- only members of the `admins` group can authorize the Authentik application
 
 ### OpenBao restart check
 

@@ -51,8 +51,9 @@ Use the UI to:
 8. Install Authentik
 9. Create the first Authentik user and `admins` group
 10. Install Velero backup
-11. Install pgAdmin 4
-12. Continue through the GitOps application steps
+11. Install Velero UI
+12. Install pgAdmin 4
+13. Continue through the GitOps application steps
 
 Cilium is installed during the Talos provisioning step, so there is no separate networking step in the wizard.
 Talos control planes stay at `4 GB RAM / 10 GB disk`, while worker disks start at `90%` of the free space on each Proxmox host and scale from the selected host during placement; Longhorn is scheduled onto workers through the Talos role label.

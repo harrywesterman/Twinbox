@@ -113,6 +113,11 @@ function buildProjectUrlMap() {
       project_url: 'https://velero.io/',
       github_url: 'https://github.com/vmware-tanzu/velero',
     },
+    'install-velero-ui': {
+      icon: '🖥️',
+      project_url: 'https://velero-ui.docs.otwld.com/',
+      github_url: 'https://github.com/otwld/velero-ui',
+    },
     'install-proxmox-backup-system': {
       icon: '🗄️',
       project_url: 'https://www.proxmox.com/en/products/proxmox-backup-server',

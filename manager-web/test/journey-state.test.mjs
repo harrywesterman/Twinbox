@@ -67,7 +67,8 @@ function buildCatalog(stepStatuses = {}) {
     }],
     ['install-ntfy', 'Install Ntfy', { dependsOn: ['install-dashy-dashboard'] }],
     ['install-velero-backup', 'Install Velero backup', { dependsOn: ['install-management-consoles', 'install-longhorn-storage', 'install-secret-sync'] }],
-    ['install-proxmox-backup-system', 'Install Proxmox Backup System', { dependsOn: ['install-velero-backup'] }],
+    ['install-velero-ui', 'Install Velero UI', { dependsOn: ['install-velero-backup', 'install-authentik-idp', 'create-users-and-groups', 'choose-ingress-route'] }],
+    ['install-proxmox-backup-system', 'Install Proxmox Backup System', { dependsOn: ['install-velero-ui'] }],
   ].map(([id, title, options]) => ({
     ...makeStep(id, title, options),
     status: stepStatuses[id] ?? options.status ?? 'locked',
@@ -123,7 +124,7 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   });
 
   assert.equal(model.mode, 'setup');
-  assert.equal(model.stepRail.length, 16);
+  assert.equal(model.stepRail.length, 18);
   const stepRailById = Object.fromEntries(model.stepRail.map((step) => [step.id, step]));
   assert.equal(stepRailById['provision-nodes'].title, 'Deploy Talos Cluster');
   assert.equal(stepRailById['provision-nodes'].isCurrent, true);
@@ -135,8 +136,10 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   assert.equal(stepRailById['install-cloudnativepg'].icon, '🐘');
   assert.equal(stepRailById['install-pgadmin4'].title, 'Install pgAdmin 4');
   assert.equal(stepRailById['install-pgadmin4'].icon, '🗃️');
+  assert.equal(stepRailById['install-velero-ui'].title, 'Install Velero UI');
+  assert.equal(stepRailById['install-velero-ui'].icon, '🖥️');
   assert.equal(model.primaryAction.label, 'Next');
-  assert.equal(model.progress.totalSteps, 16);
+  assert.equal(model.progress.totalSteps, 18);
   assert.equal(model.progress.completedSteps, 0);
   assert.equal(model.activity.runtime.currentStage, 'Applying cluster plan');
   assert.equal(model.activity.rawLogOutput, '[2026-03-20T10:10:00Z] Applying OpenTofu cluster plan');
@@ -225,6 +228,8 @@ test('wizard model switches to manage mode when setup flow is complete', () => {
         'install-management-consoles',
         'install-ntfy',
         'install-velero-backup',
+        'install-velero-ui',
+        'install-proxmox-backup-system',
       ].map((id) => [id, 'done']),
     ),
   );
@@ -251,7 +256,7 @@ test('wizard model switches to manage mode when setup flow is complete', () => {
     health: { ok: true },
     error: '',
     busy: false,
-    selectedStepId: 'install-velero-backup',
+    selectedStepId: 'install-velero-ui',
   });
 
   assert.equal(model.mode, 'manage');
@@ -270,7 +275,7 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     selectedStepId: '',
   });
 
-  assert.equal(model.stepRail.length, 16);
+  assert.equal(model.stepRail.length, 18);
   const setupStepIds = new Set(model.stepRail.map((step) => step.id));
   for (const id of [
     'provision-nodes',
@@ -288,6 +293,7 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     'install-ntfy',
     'install-management-consoles',
     'install-velero-backup',
+    'install-velero-ui',
   ]) {
     assert.equal(setupStepIds.has(id), true);
   }

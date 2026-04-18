@@ -104,6 +104,10 @@ Syncs a specific global secret item from the filesystem into OpenBao.
 
 Installs Velero with the SeaweedFS S3 target running on the Management VM.
 
+### `install-velero-ui.sh`
+
+Installs Velero UI, provisions its Authentik OIDC application, syncs the bootstrap secret into OpenBao, and applies the Velero UI Argo CD application and Traefik ingress route.
+
 ## Utility
 
 ### `upsert-secret-artifact.mjs`

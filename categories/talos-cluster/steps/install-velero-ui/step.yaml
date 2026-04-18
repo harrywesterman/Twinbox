@@ -1,0 +1,31 @@
+id: install-velero-ui
+title: Install Velero UI
+type: action
+journey_stage: setup
+order: 65
+summary: Install Velero UI for browsing and managing Velero resources.
+explanation: Twinbox deploys Velero UI through Argo CD, exposes it on its own hostname, and gates access through an Authentik OIDC application that is limited to the admins group. The step keeps basic auth disabled and consumes a bootstrap secret for the Velero UI pass phrase and OIDC client settings.
+side_help: Velero UI gives operators a browser view into backup, restore, and schedule resources without reaching for the CLI.
+depends_on:
+  - install-velero-backup
+  - install-authentik-idp
+  - create-users-and-groups
+  - choose-ingress-route
+dashy:
+  items:
+    - section: Platform
+      title: Velero UI
+      description: Backup dashboard
+      icon: fas fa-life-ring
+      url_template: https://velero-ui.__ZONE_NAME__
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/install-velero-ui/run.sh

@@ -1,0 +1,52 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: velero-ui
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://helm.otwld.com/
+      chart: velero-ui
+      targetRevision: "0.14.0"
+      helm:
+        valueFiles:
+          - $values/gitops/values/velero-ui.yaml
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      ref: values
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      path: gitops/platform-apps/velero-ui
+      kustomize:
+        patches:
+          - target:
+              kind: IngressRoute
+              name: velero-ui
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`velero-ui.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: velero-ui-wiredoor
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`velero-ui.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: velero-ui-tailscale
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`velero-ui.__ZONE_NAME__`)
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: velero-ui
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

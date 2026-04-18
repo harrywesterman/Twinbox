@@ -30,6 +30,7 @@ When you change Twinbox code, commit it to `main`, wait for the GitHub Actions i
    - `scripts/manager/install-prometheus.sh`
    - `scripts/manager/install-secret-sync.sh`
    - `scripts/manager/install-velero-backup.sh`
+   - `scripts/manager/install-velero-ui.sh`
    - `scripts/manager/openbao-secret-sync.sh`
    - `scripts/manager/sync-openbao-global-secret.sh`
    - `scripts/manager/upsert-secret-artifact.mjs`
@@ -72,8 +73,9 @@ When you change Twinbox code, commit it to `main`, wait for the GitHub Actions i
 11. `install-secret-sync` installs External Secrets Operator and OpenBao on Longhorn.
 12. `install-secret-sync` seeds OpenBao from the Management VM bootstrap files and creates `ClusterSecretStore/openbao`.
 13. `install-velero-backup` deploys Velero together with a Twinbox-managed Garage bucket or an external S3-compatible backup target.
-14. `install-cloudnativepg` installs the CloudNativePG operator on top of Longhorn so PostgreSQL-backed workloads can share one database platform.
-15. Authentik uses a `Recreate` rollout strategy so its bootstrap lock is only held by one pod at a time during upgrades and restarts.
+14. `install-velero-ui` deploys the Velero UI dashboard with OIDC login and admins-group authorization on top of the Velero install.
+15. `install-cloudnativepg` installs the CloudNativePG operator on top of Longhorn so PostgreSQL-backed workloads can share one database platform.
+16. Authentik uses a `Recreate` rollout strategy so its bootstrap lock is only held by one pod at a time during upgrades and restarts.
 16. The Proxmox wizard stores the cluster login password in `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` inside the Management VM so the Authentik onboarding step can reuse it.
 17. `install-authentik-idp` provisions the PostgreSQL cluster for Authentik and seeds the Authentik bootstrap secret into OpenBao, then removes the temporary local seed file after sync.
 18. Later Authentik consumers read the bootstrap data from OpenBao instead of reopening `/opt/twinbox/bootstrap/secrets/global/authentik.json`.

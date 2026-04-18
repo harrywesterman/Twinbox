@@ -8,6 +8,7 @@ explanation: This wizard step is reserved for future Proxmox Backup System work 
 side_help: The final backup step keeps the wizard focused on bootstrap and recovery as a separate phase.
 depends_on:
   - install-velero-backup
+  - install-velero-ui
 inputs: []
 runner:
   kind: script

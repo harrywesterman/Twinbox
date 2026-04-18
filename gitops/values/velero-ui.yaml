@@ -1,0 +1,42 @@
+replicaCount: 1
+
+image:
+  repository: otwld/velero-ui
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 3000
+
+ingress:
+  enabled: false
+
+configuration:
+  general:
+    veleroNamespace: velero
+    secretPassPhrase:
+      useSecret: false
+      existingSecret: velero-ui-bootstrap
+      key: pass_phrase
+  policies:
+    enabled: true
+    value: |
+      g,admins,manage,all
+
+env:
+  - name: BASIC_AUTH_ENABLED
+    value: "false"
+  - name: OAUTH_AUTH_ENABLED
+    value: "true"
+  - name: OAUTH_NAME
+    value: Authentik
+  - name: OAUTH_OAUTH_SCOPE
+    value: openid profile email groups
+  - name: OAUTH_GROUP_CLAIM
+    value: groups
+  - name: POLICY_FILE_PATH
+    value: /policies/policies.csv
+
+envFrom:
+  - secretRef:
+      name: velero-ui-bootstrap

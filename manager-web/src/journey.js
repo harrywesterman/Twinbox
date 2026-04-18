@@ -40,6 +40,7 @@ const FIXED_SETUP_STEP_IDS = [
   'install-pgadmin4',
   'install-ntfy',
   'install-velero-backup',
+  'install-velero-ui',
 ];
 
 const FIXED_SETUP_ORDER = new Map(FIXED_SETUP_STEP_IDS.map((id, index) => [id, index]));

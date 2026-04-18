@@ -82,6 +82,7 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 - `install-management-consoles` – Deploy the operator web consoles, including SeaweedFS, after the start page.
 - `install-ntfy` – Deploy ntfy push notifications.
 - `install-velero-backup` – Deploy Velero with the default SeaweedFS backup target.
+- `install-velero-ui` – Deploy the Velero UI dashboard for backup operations.
 - `install-wiredoor-gateway` – Deploy Wiredoor gateway.
 - `install-uptimekuma` – Deploy Uptime Kuma monitoring.
 - `install-nextcloud` – Deploy Nextcloud.

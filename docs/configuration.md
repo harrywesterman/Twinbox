@@ -38,6 +38,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `/opt/twinbox/bootstrap/secrets/global/pgadmin4-oidc-<cluster-id>.json`
 - `/opt/twinbox/bootstrap/secrets/global/wiredoor-gateway.json`
 - `/opt/twinbox/bootstrap/secrets/global/velero.json`
+- `/opt/twinbox/bootstrap/secrets/global/velero-ui.json`
 - `/opt/twinbox/bootstrap/secrets/global/dashy-oidc-<cluster-id>.json`
 - `/opt/twinbox/bootstrap/secrets/global/wiredoor-bastion-<cluster-id>.json`
 - `/opt/twinbox/bootstrap/secrets/global/cloudflare-<cluster-id>.json`
@@ -138,6 +139,25 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
   "TOKEN": "generated-token"
 }
 ```
+
+### `velero-ui.json`
+
+```json
+{
+  "pass_phrase": "generated-passphrase",
+  "AUTH_SECRET_PASSPHRASE": "generated-passphrase",
+  "BASIC_AUTH_ENABLED": "false",
+  "OAUTH_AUTH_ENABLED": "true",
+  "OAUTH_CLIENT_ID": "generated-client-id",
+  "OAUTH_CLIENT_SECRET": "generated-client-secret",
+  "OAUTH_AUTHORIZATION_URL": "https://authentik.example.com/application/o/authorize/",
+  "OAUTH_TOKEN_URL": "https://authentik.example.com/application/o/token/",
+  "OAUTH_USER_INFO_URL": "https://authentik.example.com/application/o/userinfo/",
+  "OAUTH_REDIRECT_URI": "https://velero-ui.example.com/login"
+}
+```
+
+`install-velero-ui` syncs this JSON into OpenBao, reuses it as the Velero UI bootstrap secret, and renders the Velero UI Helm chart with OIDC enabled and the admins-only policy file.
 
 ### `velero.json`
 
