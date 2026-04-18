@@ -1055,13 +1055,14 @@ app.post("/api/apps/:stepId/install", async (req, res) => {
     ? req.body.cluster_instance_id.trim()
     : "";
   const catalog = buildAppCatalogResponse({ workspaceRoot, dirs, clusterId: requestedClusterId || null });
-  const step = catalog.stepsById.get(stepId);
+  const appCategory = catalog.categories.find((category) => category.id === "apps");
+  const step = appCategory?.steps.find((candidate) => candidate.id === stepId);
 
   if (!step || step.category_id !== "apps") {
     return res.status(404).json({ error: "app not found" });
   }
 
-  const visibleStep = catalog.categories.flatMap((category) => category.steps).find((candidate) => candidate.id === stepId);
+  const visibleStep = appCategory?.steps.find((candidate) => candidate.id === stepId);
   if (!visibleStep) {
     return res.status(404).json({ error: "app not found" });
   }
