@@ -78,6 +78,7 @@ a {
 
 .topbar {
   position: relative;
+  z-index: 30;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -154,6 +155,7 @@ a {
   align-items: center;
   gap: 10px;
   position: relative;
+  z-index: 40;
 }
 
 .topbar-session {
@@ -204,7 +206,7 @@ a {
   position: absolute;
   top: 56px;
   right: 56px;
-  z-index: 20;
+  z-index: 50;
   display: grid;
   min-width: 200px;
   padding: 8px;

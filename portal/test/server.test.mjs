@@ -443,3 +443,10 @@ test("portal image copies the Authentik admin helper into the runtime image", as
   const dockerfile = await fs.promises.readFile(path.join(repoRoot, "portal", "Dockerfile"), "utf8");
   assert.match(dockerfile, /COPY authentik-admin\.mjs \.\/[\s\S]*CMD \["node", "server\.mjs"\]/, 'expected the runtime image to include the portal helper module');
 });
+
+test("portal menu popover sits above the page content", async () => {
+  const css = await fs.promises.readFile(path.join(repoRoot, "portal", "src", "App.css"), "utf8");
+  assert.match(css, /\.topbar\s*\{[\s\S]*z-index:\s*30;[\s\S]*\}/, 'expected the header to establish a stacking layer');
+  assert.match(css, /\.topbar-actions\s*\{[\s\S]*z-index:\s*40;[\s\S]*\}/, 'expected the action cluster to sit above the page content');
+  assert.match(css, /\.menu-popover\s*\{[\s\S]*z-index:\s*50;[\s\S]*\}/, 'expected the menu popover to render on top of cards');
+});
