@@ -576,9 +576,6 @@ openbao_sync_global_secret_file() {
   export KUBECONFIG="$KUBECONFIG_FILE"
   openbao_validate_json_keys "$json_file" "${required_keys[@]}"
 
-  local openbao_pod=""
-  openbao_pod="$(openbao_wait_for_server_pod)"
-
   local root_token=""
   root_token="$(tr -d '\r\n' <"$OPENBAO_ROOT_TOKEN_FILE")"
   [[ -n "$root_token" ]] || openbao_fail "OpenBao root token file is empty: ${OPENBAO_ROOT_TOKEN_FILE}"
@@ -599,7 +596,11 @@ openbao_sync_global_secret_file() {
   }
 
   trap cleanup_openbao_port_forward RETURN
-  kubectl -n "$OPENBAO_NAMESPACE" port-forward "pod/${openbao_pod}" "${forward_port}:8200" >"$forward_log" 2>&1 &
+  # Always forward through the active service rather than a single pod. OpenBao
+  # pods in HA mode can answer `/v1/sys/health` with 429 when they are standby,
+  # which would make a pod-specific readiness probe flaky even though the
+  # cluster is healthy.
+  kubectl -n "$OPENBAO_NAMESPACE" port-forward "svc/openbao-active" "${forward_port}:8200" >"$forward_log" 2>&1 &
   port_forward_pid="$!"
   openbao_wait_for_local_forward "$forward_port"
 
