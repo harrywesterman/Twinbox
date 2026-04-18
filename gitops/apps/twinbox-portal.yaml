@@ -5,6 +5,13 @@ metadata:
   namespace: argocd
 spec:
   project: default
+  ignoreDifferences:
+    - group: ""
+      kind: ConfigMap
+      name: portal-config
+      namespace: twinbox-portal
+      jsonPointers:
+        - /data
   source:
     repoURL: __REPO_URL__
     targetRevision: __TARGET_REVISION__
