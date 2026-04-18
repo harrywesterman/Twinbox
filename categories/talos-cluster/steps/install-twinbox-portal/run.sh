@@ -196,10 +196,18 @@ kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/service.ya
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/deployment.yaml"
 
 rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/twinbox-portal-ingressroute.XXXXXX.yaml")"
-trap 'rm -f "$secret_file" "$rendered_ingressroute"' EXIT
+rendered_application="$(mktemp "${TMPDIR:-/tmp}/twinbox-portal-application.XXXXXX.yaml")"
+trap 'rm -f "$secret_file" "$rendered_ingressroute" "$rendered_application"' EXIT
 sed "s/__ZONE_NAME__/${public_zone_name}/g" \
   "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/ingressroute.yaml" >"$rendered_ingressroute"
 kubectl apply -f "$rendered_ingressroute"
+
+sed "s/__ZONE_NAME__/${public_zone_name}/g" \
+  "$WORKSPACE_ROOT/gitops/apps/twinbox-portal.yaml" >"$rendered_application"
+bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+  --manifest "$rendered_application" \
+  --application "twinbox-portal" \
+  --destination-namespace "twinbox-portal"
 
 node "$WORKSPACE_ROOT/manager-worker/src/refresh-portal-config.mjs" \
   --workspace-root "$WORKSPACE_ROOT" \
