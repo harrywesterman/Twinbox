@@ -2383,7 +2383,7 @@ def test_management_console_endpoints_target_the_right_hosts():
     assert "ip: 192.168.2.70" in twinboxwizard_text
 
 
-def test_seaweedfs_admin_routes_to_the_filer_web_port():
+def test_seaweedfs_admin_routes_to_the_admin_web_port():
     text = (
         REPO_ROOT
         / "gitops"
@@ -2393,8 +2393,8 @@ def test_seaweedfs_admin_routes_to_the_filer_web_port():
     ).read_text(encoding="utf-8")
 
     assert "name: seaweedfs" in text
-    assert "port: 8888" in text
-    assert "port: 23646" not in text
+    assert "port: 23646" in text
+    assert "port: 8888" not in text
 
 
 def test_authentik_callback_ingressroutes_reference_the_authentik_namespace():
