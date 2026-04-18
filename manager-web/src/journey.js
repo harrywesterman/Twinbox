@@ -34,6 +34,7 @@ const FIXED_SETUP_STEP_IDS = [
   'install-loki',
   'install-wiredoor-gateway',
   'install-dashy-dashboard',
+  'install-twinbox-portal',
   'install-management-consoles',
   'install-traefik-manager',
   'install-cloudtty',

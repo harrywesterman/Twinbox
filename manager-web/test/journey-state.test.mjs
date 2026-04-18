@@ -56,7 +56,8 @@ function buildCatalog(stepStatuses = {}) {
     ['install-grafana', 'Install Grafana', { dependsOn: ['install-headlamp'] }],
     ['install-loki', 'Install Loki', { dependsOn: ['install-prometheus', 'install-longhorn-storage'] }],
     ['install-dashy-dashboard', 'Install Dashy dashboard', { dependsOn: ['install-grafana'] }],
-    ['install-management-consoles', 'Install Management consoles', { dependsOn: ['install-dashy-dashboard'] }],
+    ['install-twinbox-portal', 'Install Twinbox Portal', { dependsOn: ['install-dashy-dashboard'] }],
+    ['install-management-consoles', 'Install Management consoles', { dependsOn: ['install-dashy-dashboard', 'install-twinbox-portal'] }],
     ['install-pgadmin4', 'Install pgAdmin 4', {
       dependsOn: [
         'install-secret-sync',
@@ -124,7 +125,7 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   });
 
   assert.equal(model.mode, 'setup');
-  assert.equal(model.stepRail.length, 18);
+  assert.equal(model.stepRail.length, 19);
   const stepRailById = Object.fromEntries(model.stepRail.map((step) => [step.id, step]));
   assert.equal(stepRailById['provision-nodes'].title, 'Deploy Talos Cluster');
   assert.equal(stepRailById['provision-nodes'].isCurrent, true);
@@ -139,7 +140,7 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   assert.equal(stepRailById['install-velero-ui'].title, 'Install Velero UI');
   assert.equal(stepRailById['install-velero-ui'].icon, '🖥️');
   assert.equal(model.primaryAction.label, 'Next');
-  assert.equal(model.progress.totalSteps, 18);
+  assert.equal(model.progress.totalSteps, 19);
   assert.equal(model.progress.completedSteps, 0);
   assert.equal(model.activity.runtime.currentStage, 'Applying cluster plan');
   assert.equal(model.activity.rawLogOutput, '[2026-03-20T10:10:00Z] Applying OpenTofu cluster plan');
@@ -225,6 +226,7 @@ test('wizard model switches to manage mode when setup flow is complete', () => {
         'install-loki',
         'install-pgadmin4',
         'install-dashy-dashboard',
+        'install-twinbox-portal',
         'install-management-consoles',
         'install-ntfy',
         'install-velero-backup',
@@ -275,7 +277,7 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     selectedStepId: '',
   });
 
-  assert.equal(model.stepRail.length, 18);
+  assert.equal(model.stepRail.length, 19);
   const setupStepIds = new Set(model.stepRail.map((step) => step.id));
   for (const id of [
     'provision-nodes',
@@ -290,6 +292,7 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     'install-headlamp',
     'install-grafana',
     'install-dashy-dashboard',
+    'install-twinbox-portal',
     'install-ntfy',
     'install-management-consoles',
     'install-velero-backup',

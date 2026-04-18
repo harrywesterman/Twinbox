@@ -98,6 +98,11 @@ function buildProjectUrlMap() {
       project_url: 'https://dashy.to/',
       github_url: 'https://github.com/Lissy93/dashy',
     },
+    'install-twinbox-portal': {
+      icon: '🏠',
+      project_url: 'https://github.com/harrywesterman/twinbox/blob/main/docs/configuration.md',
+      github_url: 'https://github.com/harrywesterman/twinbox',
+    },
     'install-ntfy': {
       icon: '🔔',
       project_url: 'https://ntfy.sh/',
