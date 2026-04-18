@@ -16,7 +16,7 @@ controllers:
                 name: immich-db-credentials
                 key: password
           DB_DATABASE_NAME: immich
-          DB_VECTOR_EXTENSION: vchord
+          DB_VECTOR_EXTENSION: vectorchord
           REDIS_HOSTNAME: immich-valkey
           IMMICH_MACHINE_LEARNING_URL: http://immich-machine-learning:3003
 
