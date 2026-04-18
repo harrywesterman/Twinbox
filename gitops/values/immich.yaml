@@ -23,6 +23,7 @@ controllers:
 immich:
   metrics:
     enabled: false
+  configurationKind: Secret
   existingConfiguration: immich-config
   persistence:
     library:
