@@ -136,13 +136,21 @@ create_or_update_application() {
 
 find_application_json_by_slug() {
   local application_slug="$1"
-  local response
+  local direct_json list_response
 
-  response="$(authentik_api_get "/core/applications/?page_size=100")"
+  # Prefer the slug-specific endpoint because the list endpoint can lag just
+  # enough after a create/patch for the next lookup to miss the fresh object.
+  direct_json="$(authentik_api_get "/core/applications/${application_slug}/" 2>/dev/null || true)"
+  if [[ -n "$direct_json" ]]; then
+    printf '%s\n' "$direct_json"
+    return 0
+  fi
+
+  list_response="$(authentik_api_get "/core/applications/?page_size=100")"
   jq -c \
     --arg application_slug "$application_slug" \
     '.results[]?
-      | select((.slug // "") == $application_slug)' <<<"$response" | head -n1
+      | select((.slug // "") == $application_slug)' <<<"$list_response" | head -n1
 }
 
 find_policy_binding_pk() {
