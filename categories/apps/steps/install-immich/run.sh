@@ -158,6 +158,52 @@ create_or_update_application() {
   authentik_api_write POST "/core/applications/" "$application_payload" | jq -r '.pk // .id // empty'
 }
 
+find_scope_mapping_json_by_name_and_scope() {
+  local mapping_name="$1"
+  local scope_name="$2"
+  local response
+
+  response="$(authentik_api_get "/propertymappings/provider/scope/?page_size=200")"
+  jq -c \
+    --arg mapping_name "$mapping_name" \
+    --arg scope_name "$scope_name" \
+    '.results[]?
+      | select((.name // "") == $mapping_name and (.scope_name // "") == $scope_name)' <<<"$response" | head -n1
+}
+
+upsert_scope_mapping() {
+  local mapping_name="$1"
+  local scope_name="$2"
+  local description="$3"
+  local expression="$4"
+  local existing_json existing_pk payload
+
+  payload="$(
+    jq -n \
+      --arg name "$mapping_name" \
+      --arg scope_name "$scope_name" \
+      --arg description "$description" \
+      --arg expression "$expression" \
+      '{
+        name: $name,
+        scope_name: $scope_name,
+        description: $description,
+        expression: $expression
+      }'
+  )"
+
+  existing_json="$(find_scope_mapping_json_by_name_and_scope "$mapping_name" "$scope_name" || true)"
+  if [[ -n "$existing_json" ]]; then
+    existing_pk="$(jq -r '.pk // .id // empty' <<<"$existing_json")"
+    [[ -n "$existing_pk" ]] || fail "Could not determine Authentik scope mapping ID for ${mapping_name}"
+    authentik_api_write PATCH "/propertymappings/provider/scope/${existing_pk}/" "$payload" >/dev/null
+    printf '%s\n' "$existing_pk"
+    return 0
+  fi
+
+  authentik_api_write POST "/propertymappings/provider/scope/" "$payload" | jq -r '.pk // .id // empty'
+}
+
 find_policy_binding_pk() {
   local target_uuid="$1"
   local group_id="$2"
@@ -241,14 +287,6 @@ admins_group_id="$(authentik_find_group_id "admins")"
 [[ -n "$signing_key_id" ]] || fail "Could not resolve Authentik signing key ID for ${AUTHENTIK_SIGNING_KEY_NAME}"
 [[ -n "$admins_group_id" ]] || fail "Could not resolve Authentik admins group ID"
 
-property_mapping_ids_json="$(
-  jq -cn \
-    --arg openid "$openid_mapping_id" \
-    --arg email "$email_mapping_id" \
-    --arg profile "$profile_mapping_id" \
-    '[$openid, $email, $profile]'
-)"
-
 existing_immich_secret_json=""
 if command -v openbao_read_global_secret_json >/dev/null 2>&1; then
   existing_immich_secret_json="$(openbao_read_global_secret_json immich 2>/dev/null || true)"
@@ -262,7 +300,7 @@ immich_oauth_enabled="true"
 immich_oauth_scope="openid email profile"
 immich_oauth_button_text="Sign in with Authentik"
 immich_oauth_auto_register="true"
-immich_oauth_auto_launch="false"
+immich_oauth_auto_launch="true"
 immich_oauth_signing_algorithm="RS256"
 immich_oauth_profile_signing_algorithm="none"
 immich_oauth_token_endpoint_auth_method="client_secret_post"
@@ -312,6 +350,7 @@ fi
 [[ -n "$immich_oauth_mobile_override_enabled" ]] || immich_oauth_mobile_override_enabled="false"
 [[ -n "$immich_oauth_mobile_redirect_uri" ]] || immich_oauth_mobile_redirect_uri="$IMMICH_MOBILE_REDIRECT_URI"
 [[ -n "$immich_server_external_domain" ]] || immich_server_external_domain="$IMMICH_HOST"
+[[ "$immich_oauth_auto_launch" == "true" ]] || immich_oauth_auto_launch="true"
 
 immich_secret_file="$(mktemp)"
 trap 'rm -f "$immich_secret_file" "${immich_rendered_ingressroute_file:-}"' EXIT
@@ -369,6 +408,20 @@ profile_mapping_id="$(authentik_resolve_scope_mapping_id "profile")"
 [[ -n "$email_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for email"
 [[ -n "$profile_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for profile"
 
+immich_role_mapping_id="$(upsert_scope_mapping \
+  "Immich role" \
+  "profile" \
+  "Expose the Immich admin role for the Twinbox admins group" \
+  'if ak_is_group_member(request.user, name="admins"):
+    return {
+        "immich_role": "admin"
+    }
+return {
+    "immich_role": "user"
+}' \
+)"
+[[ -n "$immich_role_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for Immich role"
+
 provider_payload="$(
   jq -n \
     --arg name "Immich" \
@@ -377,7 +430,13 @@ provider_payload="$(
     --arg authorization_flow "$authorization_flow_id" \
     --arg invalidation_flow "$invalidation_flow_id" \
     --arg signing_key "$signing_key_id" \
-    --argjson property_mappings "$property_mapping_ids_json" \
+    --argjson property_mappings "$(jq -cn \
+      --arg openid "$openid_mapping_id" \
+      --arg email "$email_mapping_id" \
+      --arg profile "$profile_mapping_id" \
+      --arg immich_role "$immich_role_mapping_id" \
+      '[$openid, $email, $profile, $immich_role]'
+    )" \
     --arg redirect_login "${IMMICH_HOST}/auth/login" \
     --arg redirect_settings "${IMMICH_HOST}/user-settings" \
     --arg redirect_mobile "app.immich:///oauth-callback" \
