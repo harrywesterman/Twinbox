@@ -2368,19 +2368,20 @@ function App() {
                   <button className="button button-primary" type="button" onClick={handleExportAnswers}>
                     Export all answers
                   </button>
-                  <button
-                    className="button button-secondary"
-                    type="button"
-                    disabled={!adminDashboardUrl}
-                    onClick={(event) => {
-                      if (!adminDashboardUrl) {
-                        return;
-                      }
-                      window.open(adminDashboardUrl, '_blank', 'noopener,noreferrer');
-                    }}
-                  >
-                    Open Admin Dashboard
-                  </button>
+                  {adminDashboardUrl ? (
+                    <a
+                      className="button button-secondary"
+                      href={adminDashboardUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Open Admin Dashboard
+                    </a>
+                  ) : (
+                    <button className="button button-secondary" type="button" disabled>
+                      Open Admin Dashboard
+                    </button>
+                  )}
                 </div>
               </article>
             </section>

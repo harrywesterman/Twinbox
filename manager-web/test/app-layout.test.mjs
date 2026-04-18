@@ -72,6 +72,9 @@ test('app source defines a minimal wizard shell with guided input and step-by-st
   assert.match(source, /wizard-install-output/, 'expected a dedicated output window for install mode');
   assert.match(source, /wizard-install-actions-row/, 'expected the install controls below the output window');
   assert.doesNotMatch(source, /\|\| isCurrentStepComplete/, 'expected the install action to stay available even after a step is complete');
+  assert.match(source, /href=\{adminDashboardUrl\}/, 'expected the admin dashboard action to use a direct link');
+  assert.match(source, /target="_blank"/, 'expected the admin dashboard action to open in a new tab');
+  assert.doesNotMatch(source, /window\.open\(adminDashboardUrl/, 'expected the admin dashboard action to avoid popup-based navigation');
   assert.match(source, /installLogsByStepRef/, 'expected the install view to cache logs per step');
   assert.match(source, /setInstallStepLogs\(/, 'expected the install pane to write per-step logs');
   assert.match(source, /renderStepIcon\(activeStepPresentation, 'wizard-step-icon wizard-step-icon-large wizard-install-stage-icon'\)/, 'expected the install stage to render the large icon artwork above the title');
