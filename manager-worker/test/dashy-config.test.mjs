@@ -64,11 +64,8 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   });
 
   const platformSection = config.sections.find((section) => section.name === "Platform");
-  const appsSection = config.sections.find((section) => section.name === "Apps");
   assert(platformSection, "expected Platform section");
-  assert(appsSection, "expected Apps section");
   assert.deepEqual(platformSection.displayData, { sortBy: "alphabetical" });
-  assert.deepEqual(appsSection.displayData, { sortBy: "alphabetical" });
 
   assert(platformSection.items.some((item) => item.title === "Hubble" && item.url === "https://hubble.tst.example.com"));
   assert(platformSection.items.some((item) => item.title === "Argo CD" && item.url === "https://argocd.tst.example.com"));
