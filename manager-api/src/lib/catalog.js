@@ -731,6 +731,7 @@ function summarizeAppStep(step, state, latestJob, completedDependencies, stepLoo
     dashy: step.dashy,
     inputs: step.inputs,
     secrets: step.secrets,
+    runner: step.runner,
     depends_on: step.depends_on,
     icon: step.icon,
     icon_artwork_url: step.icon_artwork_url,

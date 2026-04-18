@@ -186,6 +186,7 @@ test('app catalog exposes apps while the wizard catalog keeps them out of sight'
     const immichCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-immich');
     assert.equal(immichCard?.title, 'Install Immich');
     assert.equal(immichCard?.app_state, 'ready');
+    assert.equal(immichCard?.runner?.script, 'categories/apps/steps/install-immich/run.sh');
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
