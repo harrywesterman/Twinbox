@@ -35,9 +35,15 @@ extraCommonEnvs:
   XMPP_MODULES: "persistent_lobby,frozen_nick"
   XMPP_MUC_MODULES: "muc_wait_for_host,token_affiliation,token_no_wildcard"
 
+jicofo:
+  xmpp:
+    existingSecretName: jitsi-auth
+
 jvb:
   useHostPort: true
   useNodeIP: true
+  xmpp:
+    existingSecretName: jitsi-auth
   nodeSelector:
     twinbox.io/role: worker
   livenessProbe:

@@ -71,9 +71,16 @@ def test_install_jitsi_runner_provisions_authentik_groups_scope_mapping_and_open
     assert 'response="$(authentik_api_get "/policies/bindings/?page_size=200")" || return 1' in run_text
     assert 'existing_pk="$(find_policy_binding_pk "$target_uuid" "$group_id")"' in run_text
     assert 'authentik_api_write PATCH "/policies/bindings/${existing_pk}/"' not in run_text
+    assert 'jicofo_auth_password="$(openssl rand -hex 16)"' in run_text
+    assert 'jvb_auth_user="jvb"' in run_text
+    assert 'jvb_auth_password="$(openssl rand -hex 16)"' in run_text
+    assert 'JICOFO_AUTH_PASSWORD: $jicofo_auth_password' in run_text
+    assert 'JVB_AUTH_USER: $jvb_auth_user' in run_text
+    assert 'JVB_AUTH_PASSWORD: $jvb_auth_password' in run_text
     assert 'sync-openbao-global-secret.sh' in run_text
     assert '--secret-name "jitsi-auth"' in run_text
     assert 'jitsi_secret_file="${secrets_dir}/jitsi-auth-${cluster_id}.json"' in run_text
+    assert 'JICOFO_AUTH_PASSWORD,JVB_AUTH_USER,JVB_AUTH_PASSWORD' in run_text
     assert 'kubectl apply -f "$jitsi_namespace_manifest"' in run_text
     assert 'kubectl apply -f "$jitsi_externalsecret_manifest"' in run_text
     assert 'kubectl -n jitsi wait --for=condition=Ready externalsecret/jitsi-auth --timeout=10m' in run_text
@@ -99,6 +106,8 @@ def test_jitsi_gitops_application_and_values_enable_token_auth_guests_and_broker
     assert "enableAuth: true" in values_text
     assert "enableGuests: true" in values_text
     assert "existingSecretName: jitsi-auth" in values_text
+    assert "jicofo:" in values_text
+    assert "xmpp:" in values_text
     assert "WAIT_FOR_HOST_DISABLE_AUTO_OWNERS" in values_text
     assert "ENABLE_AUTO_OWNER" in values_text
     assert "XMPP_MODULES" in values_text
@@ -133,6 +142,7 @@ def test_jitsi_platform_overlay_provides_broker_secret_sync_service_and_ingress(
 
     assert "kind: Namespace" in namespace_text
     assert "name: jitsi" in namespace_text
+    assert "kubernetes.io/metadata.name: jitsi" in namespace_text
     assert "pod-security.kubernetes.io/enforce: privileged" in namespace_text
     assert "pod-security.kubernetes.io/audit: privileged" in namespace_text
     assert "pod-security.kubernetes.io/warn: privileged" in namespace_text
@@ -149,6 +159,12 @@ def test_jitsi_platform_overlay_provides_broker_secret_sync_service_and_ingress(
     assert "secretKey: CLIENT_ID" in external_secret_text
     assert "secretKey: CLIENT_SECRET" in external_secret_text
     assert "secretKey: BASE_URL" in external_secret_text
+    assert "secretKey: JICOFO_AUTH_PASSWORD" in external_secret_text
+    assert "secretKey: JVB_AUTH_USER" in external_secret_text
+    assert "secretKey: JVB_AUTH_PASSWORD" in external_secret_text
+    assert "conversionStrategy: Default" in external_secret_text
+    assert "decodingStrategy: None" in external_secret_text
+    assert "metadataPolicy: None" in external_secret_text
 
     assert "kind: Deployment" in deployment_text
     assert "name: auth-jitsi" in deployment_text

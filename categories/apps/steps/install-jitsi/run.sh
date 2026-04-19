@@ -199,6 +199,9 @@ jwt_app_id="jitsi"
 jwt_app_secret="$(openssl rand -hex 32)"
 jitsi_sub="jitsi.${public_zone_name}"
 broker_session_secret="$(openssl rand -hex 32)"
+jicofo_auth_password="$(openssl rand -hex 16)"
+jvb_auth_user="jvb"
+jvb_auth_password="$(openssl rand -hex 16)"
 jitsi_hosts_group_name="jitsi-hosts"
 secrets_dir="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}/secrets/global"
 jitsi_secret_file="${secrets_dir}/jitsi-auth-${cluster_id}.json"
@@ -220,6 +223,9 @@ if [[ -n "$existing_jitsi_secret_json" ]]; then
   existing_client_secret="$(jq -r '.CLIENT_SECRET // .AUTHENTIK_CLIENT_SECRET // empty' <<<"$existing_jitsi_secret_json")"
   existing_jwt_app_secret="$(jq -r '.JWT_APP_SECRET // empty' <<<"$existing_jitsi_secret_json")"
   existing_broker_session_secret="$(jq -r '.BROKER_SESSION_SECRET // empty' <<<"$existing_jitsi_secret_json")"
+  existing_jicofo_auth_password="$(jq -r '.JICOFO_AUTH_PASSWORD // empty' <<<"$existing_jitsi_secret_json")"
+  existing_jvb_auth_user="$(jq -r '.JVB_AUTH_USER // empty' <<<"$existing_jitsi_secret_json")"
+  existing_jvb_auth_password="$(jq -r '.JVB_AUTH_PASSWORD // empty' <<<"$existing_jitsi_secret_json")"
 
   if [[ -n "$existing_client_id" && -n "$existing_client_secret" ]]; then
     jitsi_client_id="$existing_client_id"
@@ -230,6 +236,15 @@ if [[ -n "$existing_jitsi_secret_json" ]]; then
   fi
   if [[ -n "$existing_broker_session_secret" ]]; then
     broker_session_secret="$existing_broker_session_secret"
+  fi
+  if [[ -n "$existing_jicofo_auth_password" ]]; then
+    jicofo_auth_password="$existing_jicofo_auth_password"
+  fi
+  if [[ -n "$existing_jvb_auth_user" ]]; then
+    jvb_auth_user="$existing_jvb_auth_user"
+  fi
+  if [[ -n "$existing_jvb_auth_password" ]]; then
+    jvb_auth_password="$existing_jvb_auth_password"
   fi
 fi
 
@@ -353,6 +368,9 @@ jq -n \
   --arg base_url "$broker_host" \
   --arg broker_base_url "$broker_host" \
   --arg broker_session_secret "$broker_session_secret" \
+  --arg jicofo_auth_password "$jicofo_auth_password" \
+  --arg jvb_auth_user "$jvb_auth_user" \
+  --arg jvb_auth_password "$jvb_auth_password" \
   '{
     JWT_APP_ID: $jwt_app_id,
     JWT_APP_SECRET: $jwt_app_secret,
@@ -367,14 +385,17 @@ jq -n \
     AUTHENTIK_CLIENT_SECRET: $authentik_client_secret,
     BASE_URL: $base_url,
     BROKER_BASE_URL: $broker_base_url,
-    BROKER_SESSION_SECRET: $broker_session_secret
+    BROKER_SESSION_SECRET: $broker_session_secret,
+    JICOFO_AUTH_PASSWORD: $jicofo_auth_password,
+    JVB_AUTH_USER: $jvb_auth_user,
+    JVB_AUTH_PASSWORD: $jvb_auth_password
   }' >"$jitsi_secret_file"
 chmod 600 "$jitsi_secret_file"
 
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "jitsi-auth" \
   --json-file "$jitsi_secret_file" \
-  --required-keys "JWT_APP_ID,JWT_APP_SECRET,JITSI_SECRET,JITSI_URL,JITSI_SUB,ISSUER_URL,AUTHENTIK_ISSUER_URL,CLIENT_ID,AUTHENTIK_CLIENT_ID,CLIENT_SECRET,AUTHENTIK_CLIENT_SECRET,BASE_URL,BROKER_BASE_URL,BROKER_SESSION_SECRET"
+  --required-keys "JWT_APP_ID,JWT_APP_SECRET,JITSI_SECRET,JITSI_URL,JITSI_SUB,ISSUER_URL,AUTHENTIK_ISSUER_URL,CLIENT_ID,AUTHENTIK_CLIENT_ID,CLIENT_SECRET,AUTHENTIK_CLIENT_SECRET,BASE_URL,BROKER_BASE_URL,BROKER_SESSION_SECRET,JICOFO_AUTH_PASSWORD,JVB_AUTH_USER,JVB_AUTH_PASSWORD"
 
 log "Applying Jitsi namespace baseline"
 kubectl apply -f "$jitsi_namespace_manifest"
