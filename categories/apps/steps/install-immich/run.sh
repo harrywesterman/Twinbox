@@ -270,6 +270,7 @@ immich_db_externalsecret_manifest="$WORKSPACE_ROOT/gitops/databases/immich/exter
 immich_app_db_externalsecret_manifest="$WORKSPACE_ROOT/gitops/platform-apps/immich/db-externalsecret.yaml"
 immich_db_pooler_ro_manifest="$WORKSPACE_ROOT/gitops/databases/immich/pooler-ro.yaml"
 immich_db_pooler_rw_manifest="$WORKSPACE_ROOT/gitops/databases/immich/pooler-rw.yaml"
+immich_db_pooler_rw_session_manifest="$WORKSPACE_ROOT/gitops/databases/immich/pooler-rw-session.yaml"
 immich_db_backup_manifest="$WORKSPACE_ROOT/gitops/databases/immich/scheduled-backup.yaml"
 
 authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
@@ -516,6 +517,7 @@ kubectl apply -f "$immich_db_cluster_manifest"
 kubectl apply -f "$immich_db_externalsecret_manifest"
 kubectl apply -f "$immich_db_pooler_ro_manifest"
 kubectl apply -f "$immich_db_pooler_rw_manifest"
+kubectl apply -f "$immich_db_pooler_rw_session_manifest"
 kubectl apply -f "$immich_db_backup_manifest"
 
 wait_for_resources_ready "databases" "cluster" "Ready" "CloudNativePG cluster"

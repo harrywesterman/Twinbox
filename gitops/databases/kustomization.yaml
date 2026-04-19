@@ -14,5 +14,6 @@ resources:
   - immich/externalsecret.yaml
   - immich/pooler-ro.yaml
   - immich/pooler-rw.yaml
+  - immich/pooler-rw-session.yaml
   - immich/scheduled-backup.yaml
   - seaweedfs-backup-credentials.yaml
