@@ -69,6 +69,25 @@ def _cluster_step_state(data_dir: Path, cluster_id: str, step_id: str) -> Path:
     return data_dir / "step-state" / "clusters" / cluster_id / f"{step_id}.json"
 
 
+def _write_succeeded_step_state(data_dir: Path, cluster_id: str, step_id: str):
+    _cluster_step_state(data_dir, cluster_id, step_id).parent.mkdir(parents=True, exist_ok=True)
+    _cluster_step_state(data_dir, cluster_id, step_id).write_text(
+        json.dumps(
+            {
+                "status": "succeeded",
+                "inputs": {},
+                "outputs": {},
+                "cluster_id": cluster_id,
+                "cluster_instance_id": cluster_id,
+                "error": None,
+                "updated_at": "2026-04-19T00:00:00Z",
+                "last_job_id": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 def _copy_categories_without_opencloud(destination: Path):
     shutil.copytree(REPO_ROOT / "categories", destination)
     shutil.rmtree(destination / "apps" / "steps" / "install-opencloud", ignore_errors=True)
@@ -126,24 +145,13 @@ def test_apps_catalog_exposes_jitsi_as_installable():
             selected_ingress_route="wiredoor",
             updated_at="2026-04-19T00:00:00Z",
         )
-        _cluster_step_state(
-            data_dir, "cluster-demo", "install-freshrss"
-        ).parent.mkdir(parents=True, exist_ok=True)
-        _cluster_step_state(data_dir, "cluster-demo", "install-freshrss").write_text(
-            json.dumps(
-                {
-                    "status": "succeeded",
-                    "inputs": {},
-                    "outputs": {},
-                    "cluster_id": "cluster-demo",
-                    "cluster_instance_id": "cluster-demo",
-                    "error": None,
-                    "updated_at": "2026-04-19T00:00:00Z",
-                    "last_job_id": None,
-                }
-            ),
-            encoding="utf-8",
-        )
+        for step_id in (
+            "install-secret-sync",
+            "install-authentik-idp",
+            "create-users-and-groups",
+            "choose-ingress-route",
+        ):
+            _write_succeeded_step_state(data_dir, "cluster-demo", step_id)
 
         port = _find_free_port()
         proc = _start_api(data_dir, port, categories_dir)

@@ -36,6 +36,16 @@ def test_install_jitsi_steps_are_backed_by_a_real_runner_and_cluster_secret_inje
     assert "categories/apps/steps/install-jitsi/run.sh" in journey_step_text
     assert "summary: Install Jitsi" in app_step_text
     assert "summary: Install Jitsi" in journey_step_text
+    assert "install-secret-sync" in app_step_text
+    assert "install-authentik-idp" in app_step_text
+    assert "create-users-and-groups" in app_step_text
+    assert "choose-ingress-route" in app_step_text
+    assert "install-freshrss" not in app_step_text
+    assert "install-secret-sync" in journey_step_text
+    assert "install-authentik-idp" in journey_step_text
+    assert "create-users-and-groups" in journey_step_text
+    assert "choose-ingress-route" in journey_step_text
+    assert "install-freshrss" not in journey_step_text
     assert "KUBECONFIG_FILE:" in app_step_text
     assert "scope: cluster" in app_step_text
     assert "item: kubeconfig" in app_step_text

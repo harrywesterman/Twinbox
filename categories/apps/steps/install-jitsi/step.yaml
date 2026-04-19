@@ -7,7 +7,10 @@ summary: Install Jitsi Meet with Authentik-backed host login and guest access.
 explanation: Twinbox provisions Jitsi Meet as a GitOps application with native JWT auth, an Authentik-backed Jitsi OpenID broker, Traefik routes for the web UI and login broker, and direct worker-node media transport for meetings.
 side_help: Video meetings stay in the collaboration app rollout after the other personal tools.
 depends_on:
-  - install-freshrss
+  - install-secret-sync
+  - install-authentik-idp
+  - create-users-and-groups
+  - choose-ingress-route
 dashy:
   items:
     - section: Apps
