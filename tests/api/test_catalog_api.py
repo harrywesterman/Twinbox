@@ -232,6 +232,9 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 == "Install Management consoles"
             )
             assert talos_steps["install-ntfy"]["title"] == "Install Ntfy"
+            assert talos_steps["install-freshrss"]["title"] == "Install FreshRSS"
+            assert "placeholder" not in talos_steps["install-freshrss"]["summary"].lower()
+            assert "placeholder" not in talos_steps["install-freshrss"]["explanation"].lower()
             assert talos_steps["install-audiobookshelf"]["title"] == "Install Audiobookshelf"
             assert "placeholder" not in talos_steps["install-audiobookshelf"]["summary"].lower()
             assert "placeholder" not in talos_steps["install-audiobookshelf"]["explanation"].lower()

@@ -1,14 +1,28 @@
 id: install-freshrss
-title: Install FreshRss
+title: Install FreshRSS
 type: action
 journey_stage: setup
 order: 86
-summary: Placeholder step for the FreshRss app phase.
-explanation: This wizard step is reserved for future FreshRss installation work and does not run a real cluster action yet.
+summary: Install FreshRSS with persistent storage and a Traefik route.
+explanation: Twinbox provisions FreshRSS as a small self-hosted feed reader backed by Longhorn storage and exposed through Traefik on the selected cluster domain.
 side_help: Feed readers stay in the app rollout after the core management tools.
 depends_on:
   - install-audiobookshelf
+dashy:
+  items:
+    - section: Apps
+      title: FreshRSS
+      description: Feed reader and inbox
+      icon: fas fa-rss
+      url_template: https://freshrss.__ZONE_NAME__
 inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
 runner:
   kind: script
-  script: categories/talos-cluster/steps/_placeholder/run.sh
+  script: categories/apps/steps/install-freshrss/run.sh

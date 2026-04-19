@@ -184,9 +184,17 @@ test('app catalog exposes apps while the wizard catalog keeps them out of sight'
     assert.equal(appCatalog.active_cluster.id, 'cluster-1');
     assert.equal(appCatalog.categories[0].id, 'apps');
     const immichCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-immich');
+    const freshrssCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-freshrss');
+    const karakeepCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-karakeep');
     assert.equal(immichCard?.title, 'Install Immich');
     assert.equal(immichCard?.app_state, 'ready');
     assert.equal(immichCard?.runner?.script, 'categories/apps/steps/install-immich/run.sh');
+    assert.equal(freshrssCard?.title, 'Install FreshRSS');
+    assert.equal(freshrssCard?.placeholder, false);
+    assert.equal(freshrssCard?.installable, true);
+    assert.equal(freshrssCard?.runner?.script, 'categories/apps/steps/install-freshrss/run.sh');
+    assert.equal(karakeepCard?.title, 'Install Karakeep');
+    assert.equal(karakeepCard?.runner?.script, 'categories/apps/steps/install-karakeep/run.sh');
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

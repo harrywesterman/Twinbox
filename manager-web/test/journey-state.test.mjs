@@ -85,7 +85,7 @@ function buildCatalog(stepStatuses = {}) {
     ['install-uptimekuma', 'Install Uptimekuma', { dependsOn: ['install-gitea'] }],
     ['install-n8n', 'Install N8N', { dependsOn: ['install-uptimekuma'] }],
     ['install-audiobookshelf', 'Install Audiobookshelf', { dependsOn: ['install-n8n'] }],
-    ['install-freshrss', 'Install FreshRss', { dependsOn: ['install-audiobookshelf'] }],
+    ['install-freshrss', 'Install FreshRSS', { dependsOn: ['install-audiobookshelf'] }],
     ['install-jitsi', 'Install Jitsi', { dependsOn: ['install-freshrss'] }],
   ].map(([id, title, options]) => ({
     ...makeStep(id, title, options),

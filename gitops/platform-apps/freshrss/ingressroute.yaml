@@ -1,0 +1,49 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: freshrss
+  namespace: freshrss
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`freshrss.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: freshrss
+          port: 80
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: freshrss-wiredoor
+  namespace: freshrss
+spec:
+  entryPoints:
+    - webwiredoor
+  routes:
+    - kind: Rule
+      match: Host(`freshrss.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: freshrss
+          port: 80
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: freshrss-tailscale
+  namespace: freshrss
+spec:
+  entryPoints:
+    - webtailscale
+  routes:
+    - kind: Rule
+      match: Host(`freshrss.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: freshrss
+          port: 80
+  tls: {}
