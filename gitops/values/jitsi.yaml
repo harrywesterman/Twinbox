@@ -38,6 +38,20 @@ extraCommonEnvs:
 jicofo:
   xmpp:
     existingSecretName: jitsi-auth
+  livenessProbe:
+    tcpSocket:
+      port: 8888
+    initialDelaySeconds: 45
+    timeoutSeconds: 5
+    periodSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    tcpSocket:
+      port: 8888
+    initialDelaySeconds: 20
+    timeoutSeconds: 5
+    periodSeconds: 10
+    failureThreshold: 3
 
 jvb:
   useHostPort: true

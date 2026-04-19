@@ -108,6 +108,7 @@ def test_jitsi_gitops_application_and_values_enable_token_auth_guests_and_broker
     assert "existingSecretName: jitsi-auth" in values_text
     assert "jicofo:" in values_text
     assert "xmpp:" in values_text
+    assert "port: 8888" in values_text
     assert "WAIT_FOR_HOST_DISABLE_AUTO_OWNERS" in values_text
     assert "ENABLE_AUTO_OWNER" in values_text
     assert "XMPP_MODULES" in values_text
