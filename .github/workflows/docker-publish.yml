@@ -20,20 +20,45 @@ jobs:
       matrix:
         include:
           - image_name: twinbox-manager-api
+            package_name: twinbox-manager-api
             context: .
             dockerfile: ./manager-api/Dockerfile
+            tags: |
+              type=raw,value=latest,enable={{is_default_branch}}
+              type=ref,event=tag
+              type=sha
           - image_name: twinbox-manager-worker
+            package_name: twinbox-manager-worker
             context: .
             dockerfile: ./manager-worker/Dockerfile
+            tags: |
+              type=raw,value=latest,enable={{is_default_branch}}
+              type=ref,event=tag
+              type=sha
           - image_name: twinbox-manager-web
+            package_name: twinbox-manager-web
             context: ./manager-web
             dockerfile: ./manager-web/Dockerfile
+            tags: |
+              type=raw,value=latest,enable={{is_default_branch}}
+              type=ref,event=tag
+              type=sha
           - image_name: twinbox-portal
+            package_name: twinbox-portal
             context: ./portal
             dockerfile: ./portal/Dockerfile
+            tags: |
+              type=raw,value=latest,enable={{is_default_branch}}
+              type=ref,event=tag
+              type=sha
           - image_name: twinbox-jitsi-openid
+            package_name: twinbox-manager-worker
             context: ./images/jitsi-openid
             dockerfile: ./images/jitsi-openid/Dockerfile
+            tags: |
+              type=raw,value=jitsi-openid-latest,enable={{is_default_branch}}
+              type=ref,event=tag,prefix=jitsi-openid-
+              type=sha,prefix=jitsi-openid-
 
     steps:
       - name: Checkout
@@ -53,11 +78,8 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ghcr.io/harrywesterman/${{ matrix.image_name }}
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=ref,event=tag
-            type=sha
+          images: ghcr.io/harrywesterman/${{ matrix.package_name }}
+          tags: ${{ matrix.tags }}
 
       - name: Build and push
         uses: docker/build-push-action@v7
