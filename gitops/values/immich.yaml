@@ -46,6 +46,12 @@ server:
   controllers:
     main:
       strategy: Recreate
+      containers:
+        main:
+          probes:
+            startup:
+              spec:
+                failureThreshold: 60
   ingress:
     main:
       enabled: false
