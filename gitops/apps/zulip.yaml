@@ -1,0 +1,71 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: zulip-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            twinbox.io/domain-ready: "true"
+  template:
+    metadata:
+      name: zulip
+    spec:
+      project: default
+      sources:
+        - repoURL: oci://ghcr.io/zulip/helm-charts
+          chart: zulip
+          targetRevision: "1.11.61"
+          helm:
+            valueFiles:
+              - $values/gitops/values/zulip.yaml
+            values: |
+              zulip:
+                environment:
+                  SETTING_EXTERNAL_HOST: zulip.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                  SETTING_ZULIP_ADMINISTRATOR: admin@{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                  SETTING_SOCIAL_AUTH_OIDC_FULL_NAME_VALIDATED: "True"
+                  ZULIP_AUTH_BACKENDS: GenericOpenIdConnectBackend
+        - repoURL: __REPO_URL__
+          targetRevision: __TARGET_REVISION__
+          ref: values
+        - repoURL: __REPO_URL__
+          targetRevision: __TARGET_REVISION__
+          path: gitops/platform-apps/zulip
+          kustomize:
+            patches:
+              - target:
+                  kind: IngressRoute
+                  name: zulip
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`zulip.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: zulip-wiredoor
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`zulip.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: zulip-tailscale
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`zulip.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: zulip
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

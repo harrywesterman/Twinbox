@@ -32,6 +32,12 @@ PORTAL_STEP = (
 ZULIP_STEP = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-zulip" / "step.yaml"
 )
+ZULIP_RUN = (
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-zulip" / "run.sh"
+)
+ZULIP_APP = REPO_ROOT / "gitops" / "apps" / "zulip.yaml"
+ZULIP_PLATFORM_DIR = REPO_ROOT / "gitops" / "platform-apps" / "zulip"
+ZULIP_VALUES = REPO_ROOT / "gitops" / "values" / "zulip.yaml"
 REMOVED_PLACEHOLDER_STEP = (
     REPO_ROOT
     / "categories"
@@ -136,4 +142,31 @@ def test_gitops_secret_consumers_now_reference_cluster_secret_store_openbao():
 
 def test_removed_placeholder_step_is_absent_from_the_journey():
     assert not REMOVED_PLACEHOLDER_STEP.exists()
-    assert "- install-immich" in _read(ZULIP_STEP)
+
+
+def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
+    step_text = _read(ZULIP_STEP)
+    run_text = _read(ZULIP_RUN)
+    app_text = _read(ZULIP_APP)
+    values_text = _read(ZULIP_VALUES)
+
+    assert "Placeholder step" not in step_text
+    assert "categories/talos-cluster/steps/install-zulip/run.sh" in step_text
+    assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in run_text
+    assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in run_text
+    assert 'mkdir -p "$secrets_dir"' in run_text
+    assert 'sync-openbao-global-secret.sh' in run_text
+    assert 'zulip_config_secret_json' in run_text
+
+    assert "kind: ApplicationSet" in app_text
+    assert "name: zulip-set" in app_text
+    assert "chart: zulip" in app_text
+    assert 'targetRevision: "1.11.61"' in app_text
+    assert "path: gitops/platform-apps/zulip" in app_text
+    assert "SETTING_EXTERNAL_HOST: zulip.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in app_text
+    assert "SETTING_ZULIP_ADMINISTRATOR: admin@{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in app_text
+    assert "ZULIP_AUTH_BACKENDS: GenericOpenIdConnectBackend" in app_text
+
+    assert "SECRETS_secret_key:" in values_text
+    assert "SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS:" in values_text
+    assert "persistence:" in values_text
