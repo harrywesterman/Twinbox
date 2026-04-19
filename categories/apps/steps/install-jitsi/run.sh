@@ -27,7 +27,7 @@ find_oauth2_provider_pk_by_name() {
   local provider_name="$1"
   local response
 
-  response="$(authentik_api_get "/providers/oauth2/?page_size=100")"
+  response="$(authentik_api_get "/providers/oauth2/?page_size=100")" || return 1
   jq -r \
     --arg provider_name "$provider_name" \
     '.results[]?
@@ -45,7 +45,7 @@ find_scope_mapping_pk_by_name() {
   local scope_name="$2"
   local response
 
-  response="$(authentik_api_get "/propertymappings/provider/scope/?page_size=200")"
+  response="$(authentik_api_get "/propertymappings/provider/scope/?page_size=200")" || return 1
   jq -r \
     --arg mapping_name "$mapping_name" \
     --arg scope_name "$scope_name" \
@@ -123,7 +123,7 @@ find_policy_binding_pk() {
   local group_id="$2"
   local response
 
-  response="$(authentik_api_get "/policies/bindings/?page_size=200")"
+  response="$(authentik_api_get "/policies/bindings/?page_size=200")" || return 1
   jq -r \
     --arg target_uuid "$target_uuid" \
     --arg group_id "$group_id" \

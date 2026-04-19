@@ -182,7 +182,7 @@ authentik_api_request() {
   local status
   local body
   local attempt=1
-  local max_attempts=3
+  local max_attempts=5
   local retry_delay=1
   local auth_headers=(-H "Accept: application/json")
 
@@ -262,7 +262,7 @@ authentik_resolve_flow_id() {
   local designation="$2"
   local response match_pk
 
-  response="$(authentik_api_get "/flows/instances/?slug=${slug}&page_size=100")"
+  response="$(authentik_api_get "/flows/instances/?slug=${slug}&page_size=100")" || return 1
   match_pk="$(
     jq -r \
       --arg slug "$slug" \
@@ -276,7 +276,7 @@ authentik_resolve_flow_id() {
     return 0
   fi
 
-  response="$(authentik_api_get "/flows/instances/${slug}/")"
+  response="$(authentik_api_get "/flows/instances/${slug}/")" || return 1
   jq -r \
     --arg slug "$slug" \
     --arg designation "$designation" \
@@ -288,7 +288,7 @@ authentik_resolve_scope_mapping_id() {
   local scope_name="$1"
   local response managed_pk fallback_pk
 
-  response="$(authentik_api_get "/propertymappings/provider/scope/?scope_name=${scope_name}&page_size=20")"
+  response="$(authentik_api_get "/propertymappings/provider/scope/?scope_name=${scope_name}&page_size=20")" || return 1
   managed_pk="$(
     jq -r \
       --arg scope_name "$scope_name" \
@@ -315,7 +315,7 @@ authentik_resolve_signing_key_id() {
   local signing_key_name="${1:-$AUTHENTIK_SIGNING_KEY_NAME}"
   local response
 
-  response="$(authentik_api_get "/crypto/certificatekeypairs/?page_size=200")"
+  response="$(authentik_api_get "/crypto/certificatekeypairs/?page_size=200")" || return 1
   jq -r \
     --arg name "$signing_key_name" \
     '.results[]?
@@ -327,7 +327,7 @@ authentik_find_group_id() {
   local group_name="$1"
   local response
 
-  response="$(authentik_api_get "/core/groups/?page_size=200")"
+  response="$(authentik_api_get "/core/groups/?page_size=200")" || return 1
   jq -r \
     --arg group_name "$group_name" \
     '.results[]?

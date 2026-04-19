@@ -2256,6 +2256,15 @@ def test_authentik_helper_resolves_signing_key():
     assert "authentik_resolve_signing_key_id()" in text
     assert '/crypto/certificatekeypairs/?page_size=200' in text
     assert '.pk // .id // .uuid // empty' in text
+    assert 'local max_attempts=5' in text
+    assert (
+        'response="$(authentik_api_get "/flows/instances/?slug=${slug}&page_size=100")" || return 1'
+        in text
+    )
+    assert (
+        'response="$(authentik_api_get "/core/groups/?page_size=200")" || return 1'
+        in text
+    )
 
 
 def test_authentik_oidc_consumer_scripts_set_explicit_signing_key():
