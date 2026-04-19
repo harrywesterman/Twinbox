@@ -21,6 +21,12 @@ def test_docker_compose_exposes_filesystem_secret_contract():
     assert "TWINBOX_SECRET_BACKEND=${TWINBOX_SECRET_BACKEND:-filesystem}" in text
     assert "TWINBOX_BOOTSTRAP_DIR=${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}" in text
     assert "TWINBOX_SECRET_ITEM_PREFIX=${TWINBOX_SECRET_ITEM_PREFIX:-twinbox}" in text
+    assert "container_name: twinbox-seaweedfs-admin" in text
+    assert "- admin" in text
+    assert "- -masters=seaweedfs:9333" in text
+    assert "- -port=23646" in text
+    assert text.count('"23646:23646"') == 1
+    assert 'seaweedfs:\n    image: chrislusf/seaweedfs:latest' in text
     assert "vaultwarden" not in text
     assert "bitwarden" not in text
 

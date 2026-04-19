@@ -90,4 +90,16 @@ services:
     ports:
       - "8333:8333"
       - "8888:8888"
+
+  seaweedfs-admin:
+    image: chrislusf/seaweedfs:latest
+    container_name: twinbox-seaweedfs-admin
+    restart: unless-stopped
+    command:
+      - admin
+      - -masters=seaweedfs:9333
+      - -port=23646
+    depends_on:
+      - seaweedfs
+    ports:
       - "23646:23646"
