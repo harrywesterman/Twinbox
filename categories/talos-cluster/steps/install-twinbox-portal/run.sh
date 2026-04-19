@@ -189,7 +189,6 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --required-keys "PORTAL_BASE_URL,PORTAL_OIDC_CLIENT_ID,PORTAL_OIDC_ISSUER,PORTAL_SESSION_SECRET,AUTHENTIK_API_BASE"
 
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/namespace.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/configmap.yaml"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/externalsecret.yaml"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/pvc.yaml"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/service.yaml"

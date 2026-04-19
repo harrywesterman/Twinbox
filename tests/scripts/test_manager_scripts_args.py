@@ -103,6 +103,14 @@ PROMETHEUS_STEP_SCRIPT = (
     / "install-prometheus"
     / "run.sh"
 )
+TWINBOX_PORTAL_STEP_SCRIPT = (
+    REPO_ROOT
+    / "categories"
+    / "talos-cluster"
+    / "steps"
+    / "install-twinbox-portal"
+    / "run.sh"
+)
 TRAEFIK_MANAGER_STEP_MANIFEST = (
     REPO_ROOT
     / "categories"
@@ -2566,3 +2574,10 @@ def test_authentik_api_provisioning_steps_bypass_tofu_apply():
         text = path.read_text(encoding="utf-8")
         assert "authentik_setup_forward" in text
         assert 'tofu apply -no-color -auto-approve -input=false' not in text
+
+
+def test_twinbox_portal_step_does_not_apply_missing_configmap_manifest():
+    text = TWINBOX_PORTAL_STEP_SCRIPT.read_text(encoding="utf-8")
+
+    assert "gitops/platform-apps/twinbox-portal/configmap.yaml" not in text
+    assert "refresh-portal-config.mjs" in text

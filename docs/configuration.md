@@ -269,7 +269,7 @@ All platform services use the runtime domain projection from the local Argo clus
 | Twinbox Portal | `portal.<ZONE_NAME>` |
 | Dashy admin launcher | `admin.<ZONE_NAME>` |
 
-Twinbox Portal is the default user landing page. It uses Authentik OIDC in the portal backend, stores per-user preferences in its own PVC-backed store, and renders the app catalog from step metadata plus the cluster step-state into `ConfigMap/portal-config` at runtime.
+Twinbox Portal is the default user landing page. It uses Authentik OIDC in the portal backend, stores per-user preferences in its own PVC-backed store, and renders the app catalog from step metadata plus the cluster step-state into `Secret/portal-config` at runtime.
 Dashy remains the legacy admin launcher at `admin.<ZONE_NAME>` for operator tools while the new portal becomes the normal front door for users.
 The Dashy tile list itself is still not GitOps-static: Twinbox renders it from step metadata plus the cluster step-state on the Management VM and applies the resulting `ConfigMap/dashy-config` at runtime.
 
@@ -286,7 +286,7 @@ gitops/platform/
 ├── wiredoor-gateway/
 ├── dashy/
 └── twinbox-portal/
-    ├── configmap.yaml          # Runtime-generated portal configuration
+    ├── portal-config (Secret)   # Runtime-generated portal configuration
     ├── deployment.yaml         # Portal app + API
     ├── externalsecret.yaml     # Portal OIDC + session bootstrap credentials from OpenBao
     ├── ingressroute.yaml       # Host match for portal.<ZONE_NAME>
