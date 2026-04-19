@@ -1,0 +1,23 @@
+zulip:
+  environment:
+    SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS:
+      valueFrom:
+        secretKeyRef:
+          name: zulip-config
+          key: SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS
+    SECRETS_secret_key:
+      valueFrom:
+        secretKeyRef:
+          name: zulip-config
+          key: SECRETS_secret_key
+  persistence:
+    enabled: true
+    accessMode: ReadWriteOnce
+    size: 10Gi
+    storageClass: longhorn
+
+ingress:
+  enabled: false
+
+service:
+  type: ClusterIP

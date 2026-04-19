@@ -3,12 +3,12 @@ title: Install Zulip
 type: action
 journey_stage: setup
 order: 72
-summary: Placeholder step for the Zulip app phase.
-explanation: This wizard step is reserved for future Zulip installation work and does not run a real cluster action yet.
-side_help: Communication tools belong in the same user-facing app sequence.
+summary: Install Zulip with Longhorn persistence, Authentik OIDC, and Traefik ingress.
+explanation: Twinbox provisions Zulip as a GitOps application with a Longhorn-backed persistent volume, an Authentik OIDC provider for login, and Traefik ingress routes for the selected cluster entrypoint. The step also seeds Zulip's secret key and OIDC configuration into OpenBao so the chart can read them through External Secrets instead of storing bootstrap material in the repository.
+side_help: Communication tools belong in the same user-facing app sequence, and Zulip follows the same OIDC bootstrap pattern as the other user-facing apps.
 depends_on:
   - install-immich
 inputs: []
 runner:
   kind: script
-  script: categories/talos-cluster/steps/_placeholder/run.sh
+  script: categories/talos-cluster/steps/install-zulip/run.sh
