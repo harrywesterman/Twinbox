@@ -170,3 +170,14 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "SECRETS_secret_key:" in values_text
     assert "SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS:" in values_text
     assert "persistence:" in values_text
+
+
+def test_zulip_step_requests_kubeconfig_secret_injection():
+    step_text = _read(ZULIP_STEP)
+
+    assert "secrets:" in step_text
+    assert "KUBECONFIG_FILE:" in step_text
+    assert "scope: cluster" in step_text
+    assert "item: kubeconfig" in step_text
+    assert "attachment: kubeconfig" in step_text
+    assert "format: file" in step_text

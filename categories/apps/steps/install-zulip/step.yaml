@@ -9,6 +9,13 @@ side_help: Communication tools belong in the same user-facing app sequence, and 
 depends_on:
   - install-immich
 inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
 runner:
   kind: script
   script: categories/apps/steps/install-zulip/run.sh
