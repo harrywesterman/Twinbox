@@ -173,6 +173,8 @@ def test_jitsi_platform_overlay_provides_broker_secret_sync_service_and_ingress(
     assert "name: jitsi-auth" in deployment_text
     assert 'value: "0.0.0.0:3000"' in deployment_text
     assert 'value: "openid profile email jitsi"' in deployment_text
+    assert 'name: VERIFY_ACCESS_TOKEN_HASH' in deployment_text
+    assert 'value: "false"' in deployment_text
 
     assert "kind: Service" in service_text
     assert "name: auth-jitsi" in service_text

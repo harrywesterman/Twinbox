@@ -27,6 +27,8 @@ spec:
               value: "0.0.0.0:3000"
             - name: SCOPES
               value: "openid profile email jitsi"
+            - name: VERIFY_ACCESS_TOKEN_HASH
+              value: "false"
           ports:
             - name: http
               containerPort: 3000
