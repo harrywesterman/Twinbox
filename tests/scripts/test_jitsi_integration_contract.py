@@ -11,6 +11,7 @@ JITSI_APP = REPO_ROOT / "gitops" / "apps" / "jitsi.yaml"
 JITSI_VALUES = REPO_ROOT / "gitops" / "values" / "jitsi.yaml"
 JITSI_PLATFORM_DIR = REPO_ROOT / "gitops" / "platform-apps" / "jitsi"
 JITSI_KUSTOMIZATION = JITSI_PLATFORM_DIR / "kustomization.yaml"
+JITSI_NAMESPACE = JITSI_PLATFORM_DIR / "namespace.yaml"
 JITSI_EXTERNAL_SECRET = JITSI_PLATFORM_DIR / "externalsecret.yaml"
 JITSI_BROKER_DEPLOYMENT = JITSI_PLATFORM_DIR / "auth-deployment.yaml"
 JITSI_BROKER_SERVICE = JITSI_PLATFORM_DIR / "auth-service.yaml"
@@ -109,15 +110,23 @@ def test_jitsi_gitops_application_and_values_enable_token_auth_guests_and_broker
 
 def test_jitsi_platform_overlay_provides_broker_secret_sync_service_and_ingress():
     kustomization_text = _read(JITSI_KUSTOMIZATION)
+    namespace_text = _read(JITSI_NAMESPACE)
     external_secret_text = _read(JITSI_EXTERNAL_SECRET)
     deployment_text = _read(JITSI_BROKER_DEPLOYMENT)
     service_text = _read(JITSI_BROKER_SERVICE)
     ingress_text = _read(JITSI_INGRESS)
 
+    assert "namespace.yaml" in kustomization_text
     assert "externalsecret.yaml" in kustomization_text
     assert "auth-deployment.yaml" in kustomization_text
     assert "auth-service.yaml" in kustomization_text
     assert "ingressroute.yaml" in kustomization_text
+
+    assert "kind: Namespace" in namespace_text
+    assert "name: jitsi" in namespace_text
+    assert "pod-security.kubernetes.io/enforce: privileged" in namespace_text
+    assert "pod-security.kubernetes.io/audit: privileged" in namespace_text
+    assert "pod-security.kubernetes.io/warn: privileged" in namespace_text
 
     assert "kind: ExternalSecret" in external_secret_text
     assert "name: jitsi-auth" in external_secret_text
