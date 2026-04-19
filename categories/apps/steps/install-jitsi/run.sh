@@ -37,13 +37,7 @@ find_oauth2_provider_pk_by_name() {
 
 find_application_json_by_slug() {
   local application_slug="$1"
-  local response
-
-  response="$(authentik_api_get "/core/applications/?page_size=100")"
-  jq -c \
-    --arg application_slug "$application_slug" \
-    '.results[]?
-      | select((.slug // "") == $application_slug)' <<<"$response" | head -n1
+  authentik_api_get "/core/applications/${application_slug}/" 2>/dev/null || true
 }
 
 find_scope_mapping_pk_by_name() {
@@ -106,16 +100,17 @@ create_or_update_provider() {
 }
 
 create_or_update_application() {
-  local application_payload="$1"
+  local application_slug="$1"
+  local application_payload="$2"
   local existing_json existing_pk
 
-  existing_json="$(find_application_json_by_slug "jitsi-openid" || true)"
+  existing_json="$(find_application_json_by_slug "$application_slug")"
   existing_pk=""
   if [[ -n "$existing_json" ]]; then
     existing_pk="$(jq -r '.pk // .id // empty' <<<"$existing_json")"
   fi
   if [[ -n "$existing_pk" ]]; then
-    authentik_api_write PATCH "/core/applications/jitsi-openid/" "$application_payload" >/dev/null
+    authentik_api_write PATCH "/core/applications/${application_slug}/" "$application_payload" >/dev/null
     printf '%s\n' "$existing_pk"
     return 0
   fi
@@ -335,7 +330,7 @@ application_payload="$(
       provider: ($provider_pk | tonumber)
     }'
 )"
-application_pk="$(create_or_update_application "$application_payload")"
+application_pk="$(create_or_update_application "$jitsi_application_slug" "$application_payload")"
 [[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for Jitsi"
 
 application_json="$(find_application_json_by_slug "$jitsi_application_slug")"

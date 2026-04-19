@@ -65,6 +65,8 @@ def test_install_jitsi_runner_provisions_authentik_groups_scope_mapping_and_open
     assert 'create_or_update_scope_mapping()' in run_text
     assert 'ensure_group()' in run_text
     assert 'ensure_group_binding()' in run_text
+    assert 'authentik_api_get "/core/applications/${application_slug}/"' in run_text
+    assert 'authentik_api_write PATCH "/core/applications/${application_slug}/"' in run_text
     assert 'sync-openbao-global-secret.sh' in run_text
     assert '--secret-name "jitsi-auth"' in run_text
     assert 'jitsi_secret_file="${secrets_dir}/jitsi-auth-${cluster_id}.json"' in run_text
