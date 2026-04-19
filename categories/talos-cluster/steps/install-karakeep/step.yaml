@@ -3,12 +3,30 @@ title: Install Karakeep
 type: action
 journey_stage: setup
 order: 76
-summary: Placeholder step for the Karakeep app phase.
-explanation: This wizard step is reserved for future Karakeep installation work and does not run a real cluster action yet.
-side_help: Bookmark-style apps are shown with the rest of the user services.
+summary: Install Karakeep with Longhorn storage, Authentik OIDC, and Traefik routes.
+explanation: Twinbox provisions Karakeep as a GitOps application with persistent Longhorn storage, a dedicated Meilisearch master key, Authentik OIDC login, and Traefik routes for the selected ingress path. The step keeps the Karakeep bootstrap secret in OpenBao so reruns stay idempotent.
+side_help: Bookmark-style apps are shown with the rest of the user services so the launchers stay aligned with the rest of the app stack.
 depends_on:
   - install-paperless
+  - install-longhorn-storage
+  - install-secret-sync
+  - install-authentik-idp
+  - choose-ingress-route
+dashy:
+  items:
+    - section: Platform
+      title: Karakeep
+      description: Bookmark archive and knowledge capture
+      icon: fas fa-bookmark
+      url_template: https://karakeep.__ZONE_NAME__
 inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
 runner:
   kind: script
-  script: categories/talos-cluster/steps/_placeholder/run.sh
+  script: categories/apps/steps/install-karakeep/run.sh
