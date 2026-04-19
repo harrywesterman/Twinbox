@@ -104,6 +104,9 @@ def test_jitsi_gitops_application_and_values_enable_token_auth_guests_and_broker
     assert "token_no_wildcard" in values_text
     assert "useHostPort: true" in values_text
     assert "useNodeIP: true" in values_text
+    assert "initialDelaySeconds: 45" in values_text
+    assert "initialDelaySeconds: 20" in values_text
+    assert "timeoutSeconds: 5" in values_text
     assert "enabled: false" in values_text
     assert "enableUserRolesBasedOnToken = true;" in values_text
 

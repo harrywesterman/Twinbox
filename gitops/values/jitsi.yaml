@@ -40,5 +40,21 @@ jvb:
   useNodeIP: true
   nodeSelector:
     twinbox.io/role: worker
+  livenessProbe:
+    httpGet:
+      path: /about/health
+      port: 8080
+    initialDelaySeconds: 45
+    timeoutSeconds: 5
+    periodSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /about/health
+      port: 8080
+    initialDelaySeconds: 20
+    timeoutSeconds: 5
+    periodSeconds: 10
+    failureThreshold: 3
   service:
     enabled: false
