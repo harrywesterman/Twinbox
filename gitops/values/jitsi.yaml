@@ -1,0 +1,44 @@
+fullnameOverride: jitsi
+
+enableAuth: true
+enableGuests: true
+
+web:
+  ingress:
+    enabled: false
+  gateway:
+    enabled: false
+  custom:
+    configs:
+      _custom_config_js: |
+        config.enableUserRolesBasedOnToken = true;
+
+websockets:
+  colibri:
+    enabled: true
+  xmpp:
+    enabled: true
+
+prosody:
+  jwt:
+    existingSecretName: jitsi-auth
+
+extraCommonEnvs:
+  AUTH_TYPE: "jwt"
+  ENABLE_AUTO_OWNER: "0"
+  ENABLE_LOBBY: "1"
+  JWT_ACCEPTED_AUDIENCES: "jitsi"
+  JWT_ACCEPTED_ISSUERS: "jitsi"
+  JWT_ALLOW_EMPTY: "1"
+  JWT_APP_ID: "jitsi"
+  WAIT_FOR_HOST_DISABLE_AUTO_OWNERS: "1"
+  XMPP_MODULES: "persistent_lobby,frozen_nick"
+  XMPP_MUC_MODULES: "muc_wait_for_host,token_affiliation,token_no_wildcard"
+
+jvb:
+  useHostPort: true
+  useNodeIP: true
+  nodeSelector:
+    twinbox.io/role: worker
+  service:
+    enabled: false

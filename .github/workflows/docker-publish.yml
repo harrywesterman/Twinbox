@@ -31,6 +31,9 @@ jobs:
           - image_name: twinbox-portal
             context: ./portal
             dockerfile: ./portal/Dockerfile
+          - image_name: twinbox-jitsi-openid
+            context: ./images/jitsi-openid
+            dockerfile: ./images/jitsi-openid/Dockerfile
 
     steps:
       - name: Checkout

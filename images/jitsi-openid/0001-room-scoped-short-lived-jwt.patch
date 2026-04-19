@@ -1,0 +1,22 @@
+diff --git a/src/routes.rs b/src/routes.rs
+index 2f93f0a..79eb953 100644
+--- a/src/routes.rs
++++ b/src/routes.rs
+@@ -156,7 +156,7 @@ async fn callback(
+     "jitsi".to_string(),
+     "jitsi".to_string(),
+     state.config.jitsi_sub,
+-    "*".to_string(),
++    session.room.clone(),
+     state.jitsi_secret.0,
+     state.config.group,
+   )
+@@ -340,7 +340,7 @@ fn create_jitsi_jwt(
+   group: String,
+ ) -> anyhow::Result<String> {
+   let iat = OffsetDateTime::now_utc();
+-  let exp = iat + Duration::days(1);
++  let exp = iat + Duration::minutes(15);
+ 
+   let context = JitsiContext {
+     user,

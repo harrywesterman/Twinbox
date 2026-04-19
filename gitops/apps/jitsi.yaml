@@ -1,0 +1,80 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: jitsi
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://jitsi-contrib.github.io/jitsi-helm/
+      chart: jitsi-meet
+      targetRevision: "2.15.0"
+      helm:
+        valueFiles:
+          - $values/gitops/values/jitsi.yaml
+        values: |
+          publicURL: https://jitsi.__ZONE_NAME__
+          xmpp:
+            domain: jitsi.__ZONE_NAME__
+            guestDomain: guest.jitsi.__ZONE_NAME__
+          extraCommonEnvs:
+            TOKEN_AUTH_URL: https://auth-jitsi.__ZONE_NAME__/room/{room}
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      ref: values
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      path: gitops/platform-apps/jitsi
+      kustomize:
+        patches:
+          - target:
+              kind: IngressRoute
+              name: jitsi
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`jitsi.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: jitsi-wiredoor
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`jitsi.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: jitsi-tailscale
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`jitsi.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: auth-jitsi
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`auth-jitsi.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: auth-jitsi-wiredoor
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`auth-jitsi.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: auth-jitsi-tailscale
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`auth-jitsi.__ZONE_NAME__`)
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: jitsi
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
