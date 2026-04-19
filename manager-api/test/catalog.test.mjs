@@ -154,6 +154,7 @@ test('app catalog exposes apps while the wizard catalog keeps them out of sight'
     'install-cloudnativepg',
     'install-secret-sync',
     'install-authentik-idp',
+    'install-opencloud',
   ]) {
       fs.writeFileSync(
         path.join(dirs.stepState, 'clusters', 'cluster-1-instance', `${dependency}.json`),
@@ -184,8 +185,12 @@ test('app catalog exposes apps while the wizard catalog keeps them out of sight'
     assert.equal(appCatalog.active_cluster.id, 'cluster-1');
     assert.equal(appCatalog.categories[0].id, 'apps');
     const immichCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-immich');
+    const opencloudCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-opencloud');
     const freshrssCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-freshrss');
     const karakeepCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-karakeep');
+    assert.equal(opencloudCard?.title, 'Install OpenCloud');
+    assert.equal(opencloudCard?.app_state, 'installed');
+    assert.equal(opencloudCard?.runner?.script, 'categories/apps/steps/install-opencloud/run.sh');
     assert.equal(immichCard?.title, 'Install Immich');
     assert.equal(immichCard?.app_state, 'ready');
     assert.equal(immichCard?.runner?.script, 'categories/apps/steps/install-immich/run.sh');

@@ -1,0 +1,104 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: opencloud
+  namespace: opencloud
+  labels:
+    app.kubernetes.io/name: opencloud
+spec:
+  selector:
+    app.kubernetes.io/name: opencloud
+  ports:
+    - name: http
+      port: 9200
+      targetPort: 9200
+    - name: gateway
+      port: 9142
+      targetPort: 9142
+    - name: registry
+      port: 9233
+      targetPort: 9233
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opencloud-collaboration
+  namespace: opencloud
+  labels:
+    app.kubernetes.io/name: opencloud-collaboration
+spec:
+  selector:
+    app.kubernetes.io/name: opencloud-collaboration
+  ports:
+    - name: http
+      port: 9300
+      targetPort: 9300
+    - name: grpc
+      port: 9301
+      targetPort: 9300
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opencloud-collabora
+  namespace: opencloud
+  labels:
+    app.kubernetes.io/name: opencloud-collabora
+spec:
+  selector:
+    app.kubernetes.io/name: opencloud-collabora
+  ports:
+    - name: http
+      port: 9980
+      targetPort: 9980
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opencloud-ldap
+  namespace: opencloud
+  labels:
+    app.kubernetes.io/name: opencloud-ldap
+spec:
+  selector:
+    app.kubernetes.io/name: opencloud-ldap
+  ports:
+    - name: ldaps
+      port: 1636
+      targetPort: 1636
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opencloud-radicale
+  namespace: opencloud
+  labels:
+    app.kubernetes.io/name: opencloud-radicale
+spec:
+  selector:
+    app.kubernetes.io/name: opencloud-radicale
+  ports:
+    - name: http
+      port: 5232
+      targetPort: 5232
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opencloud-tika
+  namespace: opencloud
+  labels:
+    app.kubernetes.io/name: opencloud-tika
+spec:
+  selector:
+    app.kubernetes.io/name: opencloud-tika
+  ports:
+    - name: http
+      port: 9998
+      targetPort: 9998
+  type: ClusterIP

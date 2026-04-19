@@ -87,6 +87,7 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 - `install-wiredoor-gateway` – Deploy Wiredoor gateway.
 - `install-uptimekuma` – Deploy Uptime Kuma monitoring.
 - `install-nextcloud` – Deploy Nextcloud.
+- `install-opencloud` – Deploy OpenCloud with collaboration, search, and calendar support.
 - `install-immich` – Deploy Immich photo management.
 - `install-gitea` – Deploy Gitea.
 - `install-n8n` – Deploy n8n automation.

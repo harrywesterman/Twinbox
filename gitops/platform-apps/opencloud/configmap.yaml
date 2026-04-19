@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opencloud-config
+  namespace: opencloud
+  labels:
+    app.kubernetes.io/name: opencloud
+data:
+  csp.yaml: |
+    headers:
+      content-security-policy:
+        frame-ancestors:
+          - "https://opencloud.__ZONE_NAME__"
+          - "https://collabora.__ZONE_NAME__"
+          - "https://wopiserver.__ZONE_NAME__"
+    origins:
+      - "https://opencloud.__ZONE_NAME__"
+      - "https://collabora.__ZONE_NAME__"
+      - "https://wopiserver.__ZONE_NAME__"
+  proxy.yaml: |
+    role_assignment:
+      driver: oidc
+      oidc_role_mapper:
+        role_claim: roles
+        role_mapping:
+          - role_name: admin
+            claim_value: opencloudAdmin
+          - role_name: user
+            claim_value: opencloudUser
+  radicale.conf: |
+    [server]
+    hosts = 0.0.0.0:5232
+
+    [auth]
+    type = http_x_remote_user
+
+    [storage]
+    filesystem_folder = /data/collections
+
+    [web]
+    type = internal
+
+    [rights]
+    type = owner_only
+  app-registry.yaml: |
+    mime_registry:
+      application/pdf:
+        view: collabora
+      application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+        view: collabora
+      application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+        view: collabora
+      application/vnd.openxmlformats-officedocument.presentationml.presentation:
+        view: collabora

@@ -161,6 +161,12 @@ export const STEP_ICON_MANIFEST = [
     sourceColor: '#0082C9',
   },
   {
+    stepId: 'install-opencloud',
+    fileBase: 'install-opencloud',
+    sourceKind: 'local-svg',
+    sourceFile: './install-opencloud.svg',
+  },
+  {
     stepId: 'install-immich',
     fileBase: 'install-immich',
     sourceKind: 'simple-icons',

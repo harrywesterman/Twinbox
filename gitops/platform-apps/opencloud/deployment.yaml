@@ -1,0 +1,375 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opencloud
+  namespace: opencloud
+  labels:
+    app.kubernetes.io/name: opencloud
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opencloud
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: opencloud
+    spec:
+      initContainers:
+        - name: prepare-storage
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              mkdir -p /opencloud/config /opencloud/data /opencloud/apps
+              chown -R 1000:1000 /opencloud || true
+          volumeMounts:
+            - name: config
+              mountPath: /opencloud/config
+            - name: data
+              mountPath: /opencloud/data
+            - name: apps
+              mountPath: /opencloud/apps
+      containers:
+        - name: opencloud
+          image: opencloudeu/opencloud-rolling:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              opencloud init || true
+              exec opencloud server
+          ports:
+            - containerPort: 9200
+              name: http
+            - containerPort: 9142
+              name: gateway
+            - containerPort: 9233
+              name: registry
+          envFrom:
+            - secretRef:
+                name: opencloud-bootstrap
+          env:
+            - name: OC_CONFIG_DIR
+              value: /opencloud/config
+            - name: OC_DATA_DIR
+              value: /opencloud/data
+            - name: PROXY_CSP_CONFIG_FILE_LOCATION
+              value: /etc/opencloud/csp.yaml
+            - name: PROXY_CONFIG_FILE_LOCATION
+              value: /etc/opencloud/proxy.yaml
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /opencloud/config
+            - name: data
+              mountPath: /opencloud/data
+            - name: apps
+              mountPath: /opencloud/apps
+            - name: configmap
+              mountPath: /etc/opencloud/csp.yaml
+              subPath: csp.yaml
+              readOnly: true
+            - name: configmap
+              mountPath: /etc/opencloud/proxy.yaml
+              subPath: proxy.yaml
+              readOnly: true
+            - name: configmap
+              mountPath: /etc/opencloud/apps.yaml
+              subPath: app-registry.yaml
+              readOnly: true
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: opencloud-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: opencloud-data
+        - name: apps
+          persistentVolumeClaim:
+            claimName: opencloud-apps
+        - name: configmap
+          configMap:
+            name: opencloud-config
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opencloud-collaboration
+  namespace: opencloud
+  labels:
+    app.kubernetes.io/name: opencloud-collaboration
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opencloud-collaboration
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: opencloud-collaboration
+    spec:
+      containers:
+        - name: collaboration
+          image: opencloudeu/opencloud-rolling:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - exec opencloud collaboration server
+          ports:
+            - containerPort: 9300
+              name: http
+            - containerPort: 9301
+              name: grpc
+          envFrom:
+            - secretRef:
+                name: opencloud-bootstrap
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+          env:
+            - name: OC_URL
+              valueFrom:
+                secretKeyRef:
+                  name: opencloud-bootstrap
+                  key: OC_URL
+            - name: OC_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: opencloud-bootstrap
+                  key: OC_JWT_SECRET
+            - name: OC_REVA_GATEWAY
+              valueFrom:
+                secretKeyRef:
+                  name: opencloud-bootstrap
+                  key: OC_REVA_GATEWAY
+            - name: MICRO_REGISTRY_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: opencloud-bootstrap
+                  key: MICRO_REGISTRY_ADDRESS
+            - name: COLLABORATION_WOPI_SRC
+              valueFrom:
+                secretKeyRef:
+                  name: opencloud-bootstrap
+                  key: COLLABORATION_WOPI_SRC
+            - name: COLLABORATION_WOPI_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: opencloud-bootstrap
+                  key: COLLABORATION_WOPI_SECRET
+            - name: COLLABORATION_APP_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: opencloud-bootstrap
+                  key: COLLABORATION_APP_NAME
+            - name: COLLABORATION_APP_PRODUCT
+              valueFrom:
+                secretKeyRef:
+                  name: opencloud-bootstrap
+                  key: COLLABORATION_APP_PRODUCT
+            - name: COLLABORATION_APP_ADDR
+              valueFrom:
+                secretKeyRef:
+                  name: opencloud-bootstrap
+                  key: COLLABORATION_APP_ADDR
+            - name: COLLABORATION_APP_ICON
+              valueFrom:
+                secretKeyRef:
+                  name: opencloud-bootstrap
+                  key: COLLABORATION_APP_ICON
+            - name: COLLABORATION_APP_INSECURE
+              valueFrom:
+                secretKeyRef:
+                  name: opencloud-bootstrap
+                  key: COLLABORATION_APP_INSECURE
+            - name: COLLABORATION_CS3API_DATAGATEWAY_INSECURE
+              valueFrom:
+                secretKeyRef:
+                  name: opencloud-bootstrap
+                  key: COLLABORATION_CS3API_DATAGATEWAY_INSECURE
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opencloud-collabora
+  namespace: opencloud
+  labels:
+    app.kubernetes.io/name: opencloud-collabora
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opencloud-collabora
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: opencloud-collabora
+    spec:
+      containers:
+        - name: collabora
+          image: collabora/code:24.04.11.2.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9980
+              name: http
+          envFrom:
+            - secretRef:
+                name: opencloud-bootstrap
+          env:
+            - name: username
+              valueFrom:
+                secretKeyRef:
+                  name: opencloud-bootstrap
+                  key: COLLABORA_ADMIN_USER
+            - name: password
+              valueFrom:
+                secretKeyRef:
+                  name: opencloud-bootstrap
+                  key: COLLABORA_ADMIN_PASSWORD
+            - name: aliasgroup1
+              value: https://opencloud.__ZONE_NAME__
+            - name: domain
+              value: opencloud.__ZONE_NAME__|wopiserver.__ZONE_NAME__
+            - name: DONT_GEN_SSL_CERT
+              value: "YES"
+            - name: extra_params
+              value: --o:ssl.enable=false --o:ssl.termination=true --o:net.frame_ancestors=https://opencloud.__ZONE_NAME__ https://collabora.__ZONE_NAME__ https://wopiserver.__ZONE_NAME__
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opencloud-radicale
+  namespace: opencloud
+  labels:
+    app.kubernetes.io/name: opencloud-radicale
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opencloud-radicale
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: opencloud-radicale
+    spec:
+      containers:
+        - name: radicale
+          image: radicale/radicale:3.3.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - radicale --config /config/radicale.conf
+          ports:
+            - containerPort: 5232
+              name: http
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /config/radicale.conf
+              subPath: radicale.conf
+              readOnly: true
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: config
+          configMap:
+            name: opencloud-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: opencloud-radicale-data
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opencloud-tika
+  namespace: opencloud
+  labels:
+    app.kubernetes.io/name: opencloud-tika
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opencloud-tika
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: opencloud-tika
+    spec:
+      containers:
+        - name: tika
+          image: apache/tika:2.9.2.1-full
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9998
+              name: http
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5

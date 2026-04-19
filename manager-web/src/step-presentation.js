@@ -133,6 +133,11 @@ function buildProjectUrlMap() {
       project_url: 'https://nextcloud.com/',
       github_url: 'https://github.com/nextcloud/server',
     },
+    'install-opencloud': {
+      icon: '☁️',
+      project_url: 'https://opencloud.eu/',
+      github_url: 'https://github.com/opencloud-eu/opencloud',
+    },
     'install-immich': {
       icon: '🖼️',
       project_url: 'https://immich.app/',
