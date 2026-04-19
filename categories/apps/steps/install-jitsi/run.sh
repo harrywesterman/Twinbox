@@ -146,7 +146,6 @@ ensure_group_binding() {
 
   existing_pk="$(find_policy_binding_pk "$target_uuid" "$group_id")"
   if [[ -n "$existing_pk" ]]; then
-    authentik_api_write PATCH "/policies/bindings/${existing_pk}/" "$binding_payload" >/dev/null
     return 0
   fi
 

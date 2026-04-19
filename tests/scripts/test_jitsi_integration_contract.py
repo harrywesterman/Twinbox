@@ -69,6 +69,8 @@ def test_install_jitsi_runner_provisions_authentik_groups_scope_mapping_and_open
     assert 'authentik_api_write PATCH "/core/applications/${application_slug}/"' in run_text
     assert 'response="$(authentik_api_get "/providers/oauth2/?page_size=100")" || return 1' in run_text
     assert 'response="$(authentik_api_get "/policies/bindings/?page_size=200")" || return 1' in run_text
+    assert 'existing_pk="$(find_policy_binding_pk "$target_uuid" "$group_id")"' in run_text
+    assert 'authentik_api_write PATCH "/policies/bindings/${existing_pk}/"' not in run_text
     assert 'sync-openbao-global-secret.sh' in run_text
     assert '--secret-name "jitsi-auth"' in run_text
     assert 'jitsi_secret_file="${secrets_dir}/jitsi-auth-${cluster_id}.json"' in run_text
