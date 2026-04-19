@@ -2,6 +2,8 @@ controllers:
   main:
     containers:
       main:
+        image:
+          tag: v2.7.5
         env:
           DB_HOSTNAME: immich-db-pooler-rw.databases.svc.cluster.local
           DB_PORT: "5432"
