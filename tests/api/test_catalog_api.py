@@ -232,6 +232,9 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 == "Install Management consoles"
             )
             assert talos_steps["install-ntfy"]["title"] == "Install Ntfy"
+            assert talos_steps["install-audiobookshelf"]["title"] == "Install Audiobookshelf"
+            assert "placeholder" not in talos_steps["install-audiobookshelf"]["summary"].lower()
+            assert "placeholder" not in talos_steps["install-audiobookshelf"]["explanation"].lower()
             assert talos_steps["provision-nodes"]["journey_stage"] == "setup"
             assert talos_steps["provision-nodes"]["status"] == "ready"
             assert talos_steps["install-argocd"]["status"] == "locked"
@@ -273,6 +276,54 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             )
             assert talos_steps["choose-ingress-route"]["inputs"][1]["required"] is True
             assert talos_steps["install-grafana"]["icon"] == "📈"
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
+def test_apps_catalog_exposes_audiobookshelf_as_installable():
+    with tempfile.TemporaryDirectory() as td:
+        data_dir = Path(td) / "data"
+        _write_cluster_file(
+            data_dir,
+            "cluster-demo",
+            slug="cluster-demo",
+            dns_domain="example.com",
+            selected_ingress_route="wiredoor",
+            updated_at="2026-04-19T00:00:00Z",
+        )
+        _cluster_step_state(data_dir, "cluster-demo", "install-n8n").parent.mkdir(parents=True, exist_ok=True)
+        _cluster_step_state(data_dir, "cluster-demo", "install-n8n").write_text(
+            json.dumps(
+                {
+                    "status": "succeeded",
+                    "inputs": {},
+                    "outputs": {},
+                    "cluster_id": "cluster-demo",
+                    "cluster_instance_id": "cluster-demo",
+                    "error": None,
+                    "updated_at": "2026-04-19T00:00:00Z",
+                    "last_job_id": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        port = _find_free_port()
+        proc = _start_api(data_dir, port)
+        try:
+            base = f"http://127.0.0.1:{port}"
+            _wait_for_health(base)
+
+            status, body = _get_json(f"{base}/api/apps/catalog?cluster_id=cluster-demo")
+            assert status == 200
+            assert body["errors"] == []
+            apps = body["categories"][0]["steps"]
+            audiobookshelf = next(step for step in apps if step["id"] == "install-audiobookshelf")
+            assert audiobookshelf["placeholder"] is False
+            assert audiobookshelf["installable"] is True
+            assert audiobookshelf["app_state"] == "ready"
+            assert audiobookshelf["runner"]["script"] == "categories/apps/steps/install-audiobookshelf/run.sh"
         finally:
             proc.terminate()
             proc.wait(timeout=5)

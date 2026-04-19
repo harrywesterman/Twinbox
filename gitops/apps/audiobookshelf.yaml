@@ -1,0 +1,43 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: audiobookshelf
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __TARGET_REVISION__
+    path: gitops/platform-apps/audiobookshelf
+    kustomize:
+      patches:
+        - target:
+            kind: IngressRoute
+            name: audiobookshelf
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`audiobookshelf.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: audiobookshelf-wiredoor
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`audiobookshelf.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: audiobookshelf-tailscale
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`audiobookshelf.__ZONE_NAME__`)
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: audiobookshelf
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

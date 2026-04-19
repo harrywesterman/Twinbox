@@ -3,12 +3,26 @@ title: Install Audiobookshelf
 type: action
 journey_stage: setup
 order: 84
-summary: Placeholder step for the Audiobookshelf app phase.
-explanation: This wizard step is reserved for future Audiobookshelf installation work and does not run a real cluster action yet.
+summary: Install Audiobookshelf with Longhorn storage and Traefik ingress.
+explanation: Twinbox provisions Audiobookshelf as a GitOps application with a Longhorn-backed data volume and Traefik routes for the selected ingress path so the media server is available from the wizard and the app catalog.
 side_help: Media libraries belong in the same user-services segment of the wizard.
 depends_on:
   - install-n8n
+dashy:
+  items:
+    - section: Platform
+      title: Audiobookshelf
+      description: Personal audiobooks and podcasts
+      icon: fas fa-headphones
+      url_template: https://audiobookshelf.__ZONE_NAME__
 inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
 runner:
   kind: script
-  script: categories/talos-cluster/steps/_placeholder/run.sh
+  script: categories/apps/steps/install-audiobookshelf/run.sh
