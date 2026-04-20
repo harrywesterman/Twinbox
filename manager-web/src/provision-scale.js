@@ -12,7 +12,7 @@ const CONTROLPLANE_DISK_GB = 10;
 const WORKER_DISK_MIN_GB = 10;
 const WORKER_DISK_FALLBACK_GB = 100;
 const WORKER_PLACEMENT_DISK_GB = 10;
-const WORKER_MEMORY_DEFAULT_MB = 8192;
+const WORKER_MEMORY_DEFAULT_MB = 10240;
 
 export const PROVISION_AUTOSCALED_FIELDS = [
   'controlplane_count',
@@ -224,31 +224,21 @@ function calculateFootprintMultiplier(scalePercent, baseline, resources) {
 function deriveWorkerDiskGb(hostCards, workerCount, workerDiskPercent = DEFAULT_WORKER_DISK_PERCENT, fallbackGb = WORKER_DISK_FALLBACK_GB) {
   const hosts = Array.isArray(hostCards) ? hostCards : [];
   const resolvedPercent = normalizeWorkerDiskPercent(workerDiskPercent);
-  const totalFreeDiskGb = hosts.reduce((sum, host) => sum + Math.max(0, toNumber(host.freeDiskGb, 0)), 0);
+  const freeDiskShares = hosts
+    .map((host) => Math.max(0, toNumber(host.freeDiskGb, 0)))
+    .filter((value) => value > 0);
 
-  if (totalFreeDiskGb <= 0 || workerCount <= 0) {
+  if (freeDiskShares.length === 0 || workerCount <= 0) {
     return fallbackGb;
   }
 
   return Math.max(
     WORKER_DISK_MIN_GB,
-    Math.floor((totalFreeDiskGb / Math.max(1, workerCount)) * (resolvedPercent / 100)),
+    Math.floor(Math.min(...freeDiskShares) * (resolvedPercent / 100)),
   );
 }
 
-function getWorkerPlacementDiskGbForHost(host, workerDiskPercent = DEFAULT_WORKER_DISK_PERCENT, fallbackGb = WORKER_DISK_FALLBACK_GB) {
-  const freeDiskGb = Math.max(0, toNumber(host?.freeDiskGb, 0));
-  if (freeDiskGb <= 0) {
-    return Math.max(WORKER_DISK_MIN_GB, roundToInteger(toNumber(fallbackGb, WORKER_DISK_FALLBACK_GB)));
-  }
-
-  return Math.max(
-    WORKER_DISK_MIN_GB,
-    Math.floor(freeDiskGb * (normalizeWorkerDiskPercent(workerDiskPercent) / 100)),
-  );
-}
-
-function getPlacementVmSize(vm, host = null, workerDiskPercent = DEFAULT_WORKER_DISK_PERCENT, fallbackWorkerDiskGb = WORKER_DISK_FALLBACK_GB) {
+function getPlacementVmSize(vm, workerDiskGb = WORKER_DISK_FALLBACK_GB) {
   if (vm.type === 'controlplane') {
     return {
       cpu: vm.cpu,
@@ -260,53 +250,36 @@ function getPlacementVmSize(vm, host = null, workerDiskPercent = DEFAULT_WORKER_
   return {
     cpu: vm.cpu,
     memory_mb: vm.memory_mb,
-    disk_gb: getWorkerPlacementDiskGbForHost(host, workerDiskPercent, fallbackWorkerDiskGb),
+    disk_gb: Math.max(WORKER_DISK_MIN_GB, roundToInteger(toNumber(workerDiskGb, WORKER_DISK_FALLBACK_GB))),
   };
 }
 
-function calculateWorkerDiskGb(vmPlan, hostCards, vmNodeMap, workerDiskPercent = DEFAULT_WORKER_DISK_PERCENT, fallbackGb = WORKER_DISK_FALLBACK_GB) {
-  const plan = Array.isArray(vmPlan) ? vmPlan : [];
+function getPreferredHostIndex(vm, hostCount) {
+  const name = normalizeHostName(vm?.name || vm?.id);
+  const match = name.match(/^(?:cp|worker)-(\d+)$/i);
+  if (!match) {
+    return 0;
+  }
+
+  const parsed = Math.max(1, roundToInteger(toNumber(match[1], 1))) - 1;
+  if (hostCount <= 0) {
+    return 0;
+  }
+
+  return clamp(parsed, 0, hostCount - 1);
+}
+
+function getOrderedHostsForVm(vm, hostCards) {
   const hosts = Array.isArray(hostCards) ? hostCards : [];
-  const hostLookup = new Map(hosts.map((host) => [host.id, {
-    freeDiskGb: toNumber(host.freeDiskGb, 0),
-    controlplaneCount: 0,
-    workerCount: 0,
-  }]));
-
-  if (hostLookup.size === 0) {
-    return fallbackGb;
+  if (hosts.length <= 1) {
+    return hosts;
   }
 
-  for (const vm of plan) {
-    const hostId = typeof vmNodeMap?.[vm.name] === 'string' ? normalizeHostName(vmNodeMap[vm.name]) : '';
-    const state = hostId ? hostLookup.get(hostId) : null;
-    if (!state) {
-      continue;
-    }
-
-    if (vm.type === 'controlplane') {
-      state.controlplaneCount += 1;
-    } else if (vm.type === 'worker') {
-      state.workerCount += 1;
-    }
-  }
-
-  const workerShares = [];
-  for (const state of hostLookup.values()) {
-    if (state.workerCount <= 0) {
-      continue;
-    }
-
-    const availableDiskGb = Math.max(0, state.freeDiskGb - (state.controlplaneCount * CONTROLPLANE_DISK_GB));
-    workerShares.push(availableDiskGb / state.workerCount);
-  }
-
-  if (workerShares.length === 0) {
-    return deriveWorkerDiskGb(hosts, plan.filter((vm) => vm.type === 'worker').length, workerDiskPercent, fallbackGb);
-  }
-
-  const rawDiskGb = Math.min(...workerShares);
-  return Math.max(WORKER_DISK_MIN_GB, Math.floor(rawDiskGb * (normalizeWorkerDiskPercent(workerDiskPercent) / 100)));
+  const preferredIndex = getPreferredHostIndex(vm, hosts.length);
+  return [
+    ...hosts.slice(preferredIndex),
+    ...hosts.slice(0, preferredIndex),
+  ];
 }
 
 export function getProvisionNodeCount(stepInputs = [], currentValues = {}) {
@@ -579,10 +552,7 @@ function clonePlacementState(sourceState = new Map()) {
 }
 
 function hostCanFitVm(host, vm) {
-  const visibleFreeCpuCores = Math.max(0, roundToInteger(toNumber(host?.freeCpuCores, 0)));
-  return visibleFreeCpuCores >= vm.cpu
-    && host.freeMemoryMb >= vm.memory_mb
-    && host.freeDiskGb >= vm.disk_gb;
+  return Math.max(0, toNumber(host?.freeDiskGb, 0)) >= Math.max(0, toNumber(vm?.disk_gb, 0));
 }
 
 function compareHostCapacity(leftHost, rightHost) {
@@ -655,20 +625,14 @@ function compareHostCandidates(leftHost, rightHost, vm, placementState, resolveV
 }
 
 function chooseBestHostForVm(vm, hostCards, placementState = new Map(), resolveVmSize = null) {
-  const eligibleHosts = hostCards.filter((host) => hostCanFitVm(host, typeof resolveVmSize === 'function' ? resolveVmSize(vm, host) : vm));
-  if (eligibleHosts.length === 0) {
-    return null;
-  }
-
-  let bestHost = null;
-
-  for (const host of eligibleHosts) {
-    if (!bestHost || compareHostCandidates(host, bestHost, vm, placementState, resolveVmSize) < 0) {
-      bestHost = host;
+  const orderedHosts = getOrderedHostsForVm(vm, hostCards);
+  for (const host of orderedHosts) {
+    const candidateVm = typeof resolveVmSize === 'function' ? resolveVmSize(vm, host) : vm;
+    if (hostCanFitVm(host, candidateVm)) {
+      return host;
     }
   }
-
-  return bestHost;
+  return null;
 }
 
 export function suggestVmNodeMap(
@@ -683,7 +647,7 @@ export function suggestVmNodeMap(
   const hosts = Array.isArray(hostCards) ? hostCards.map((host) => ({ ...host })) : [];
   const assignments = {};
   const hostLookup = new Map(hosts.map((host) => [host.id, host]));
-  const resolveVmSize = (vm, host) => getPlacementVmSize(vm, host, workerDiskPercent, fallbackWorkerDiskGb);
+  const resolveVmSize = (vm) => getPlacementVmSize(vm, fallbackWorkerDiskGb);
 
   for (const vm of plan) {
     const preservedHost = typeof currentMap?.[vm.name] === 'string' ? normalizeHostName(currentMap[vm.name]) : '';
@@ -726,7 +690,7 @@ function buildVmSizeMap(vmPlan, hostCards, currentMap = {}, workerDiskPercent = 
     WORKER_DISK_MIN_GB,
     roundToInteger(toNumber(placementWorkerDiskGb, WORKER_PLACEMENT_DISK_GB)),
   );
-  const resolveVmSize = (vm, host) => getPlacementVmSize(vm, host, workerDiskPercent, resolvedWorkerDiskGb);
+  const resolveVmSize = (vm) => getPlacementVmSize(vm, resolvedWorkerDiskGb);
 
   for (const vm of plan) {
     const preservedHost = typeof currentMap?.[vm.name] === 'string' ? normalizeHostName(currentMap[vm.name]) : '';

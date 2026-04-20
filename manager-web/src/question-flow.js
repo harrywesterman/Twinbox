@@ -29,7 +29,7 @@ const QUESTION_STEP_DEFS = [
       { id: 'controlplane_count', label: 'Control planes', type: 'integer', required: true, min: 1, max: 15, default: 3, help: 'Current API range is 1 to 15. The default gives each Proxmox host one control plane.' },
       { id: 'worker_count', label: 'Workers', type: 'integer', required: true, min: 0, max: 200, default: 3, help: 'Current API range is 0 to 200. The default gives each Proxmox host one worker.' },
       { id: 'cpu_cores', label: 'CPU cores', type: 'integer', required: true, min: 1, max: 64, default: 4, help: 'Per-node CPU allocation. Use 4 vCPU or more for the standard Twinbox baseline; 2 vCPU is only realistic for a reduced dev/test cluster.' },
-      { id: 'memory_mb', label: 'Memory MB', type: 'integer', required: true, min: 512, max: 1048576, default: 8192, help: 'Worker memory allocation. Control planes stay fixed at 4096 MB, while workers keep this slider-driven memory size.' },
+      { id: 'memory_mb', label: 'Memory MB', type: 'integer', required: true, min: 512, max: 1048576, default: 10240, help: 'Worker memory allocation. Control planes stay fixed at 4096 MB, while workers default to 10240 MB unless you change the slider.' },
       { id: 'bridge', label: 'Bridge', type: 'string', required: true, default: 'vmbr0', help: 'Proxmox bridge for Talos node traffic.' },
       { id: 'start_vmid', label: 'Start VMID', type: 'integer', required: true, min: 100, max: 999999, default: 200, help: 'Seed VMID for the cluster inventory.' },
       { id: 'vip_ip', label: 'VIP IP', type: 'ipv4', required: true, default: '', help: 'Virtual IP for the Talos control plane.' },

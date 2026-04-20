@@ -227,7 +227,7 @@ function normalizeVmIpMap(rawMap, vmNames = [], fallbackStartIp = "") {
   return { ok: true, value: normalized };
 }
 
-function normalizeVmSizeMap(rawMap, vmNames = [], cpuCores = 2, workerMemoryMb = 8192) {
+function normalizeVmSizeMap(rawMap, vmNames = [], cpuCores = 2, workerMemoryMb = 10240) {
   const vmNameList = Array.isArray(vmNames) ? vmNames.map((name) => String(name || "").trim()).filter(Boolean) : [];
   if (vmNameList.length === 0) {
     return { ok: false, error: "vm_size_map cannot be built without VM names" };

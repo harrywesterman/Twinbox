@@ -251,72 +251,91 @@ test('placement board keeps manual placements while resuggesting the rest', () =
   assert.equal(remixedBoard.suggestedVmNodeMap['worker-2'], initialBoard.suggestedVmNodeMap['worker-2']);
 });
 
-test('automatic placement assigns every Talos VM when the hosts can fit them', () => {
+test('automatic placement fills pve1, pve2, and pve3 in host order when they can fit them', () => {
   const result = buildAutomaticProvisionPlacementResult(stepInputs, {}, {
     nodes: [
       {
-        node: 'pve-a',
+        node: 'pve1',
         status: 'online',
         maxmem: 17179869184,
         mem: 0,
-        maxdisk: 549755813888,
-        disk: 0,
-        maxcpu: 8,
-        cpu: 0,
+        maxdisk: 900 * 1024 * 1024 * 1024,
+        disk: 300 * 1024 * 1024 * 1024,
+        maxcpu: 4,
+        cpu: 0.99,
       },
       {
-        node: 'pve-b',
+        node: 'pve2',
         status: 'online',
         maxmem: 17179869184,
         mem: 0,
-        maxdisk: 549755813888,
-        disk: 0,
-        maxcpu: 8,
-        cpu: 0,
+        maxdisk: 900 * 1024 * 1024 * 1024,
+        disk: 350 * 1024 * 1024 * 1024,
+        maxcpu: 4,
+        cpu: 0.95,
       },
       {
-        node: 'pve-c',
+        node: 'pve3',
         status: 'online',
         maxmem: 17179869184,
         mem: 0,
-        maxdisk: 549755813888,
-        disk: 0,
-        maxcpu: 8,
-        cpu: 0,
+        maxdisk: 900 * 1024 * 1024 * 1024,
+        disk: 400 * 1024 * 1024 * 1024,
+        maxcpu: 4,
+        cpu: 0.9,
       },
     ],
-    vms: [],
+    vms: [
+      {
+        node: 'pve1',
+        name: 'twinbox-prd-mgt',
+        tags: 'management;bootstrap;cluster-prd',
+        status: 'running',
+        vmid: 103,
+        maxmem: 4294967296,
+        maxdisk: 42949672960,
+      },
+    ],
   });
 
   assert.equal(result.assigned, 6);
   assert.equal(result.unassigned, 0);
   assert.equal(result.tone, 'success');
   assert.match(result.message, /assigned all 6 Talos VMs/i);
-  assert.equal(Object.values(result.vm_node_map).filter(Boolean).length, 6);
-  assert.equal(Object.keys(result.vm_size_map).length, 6);
+  assert.deepEqual(result.vm_node_map, {
+    'cp-1': 'pve1',
+    'cp-2': 'pve2',
+    'cp-3': 'pve3',
+    'worker-1': 'pve1',
+    'worker-2': 'pve2',
+    'worker-3': 'pve3',
+  });
+  assert.equal(result.vm_size_map['worker-1'].disk_gb, 400);
+  assert.equal(result.vm_size_map['worker-2'].disk_gb, 400);
+  assert.equal(result.vm_size_map['worker-3'].disk_gb, 400);
 });
 
 test('automatic placement leaves overflow VMs unassigned when capacity is constrained', () => {
   const result = buildAutomaticProvisionPlacementResult(stepInputs, {}, {
     nodes: [
       {
-        node: 'pve-a',
+        node: 'pve1',
         status: 'online',
         maxmem: 17179869184,
         mem: 0,
-        maxdisk: 549755813888,
-        disk: 0,
+        maxdisk: 20 * 1024 * 1024 * 1024,
+        disk: 10 * 1024 * 1024 * 1024,
         maxcpu: 4,
         cpu: 0,
       },
       {
-        node: 'pve-b',
+        node: 'pve2',
         status: 'online',
-        maxmem: 2147483648,
+        maxmem: 17179869184,
         mem: 0,
-        maxdisk: 10737418240,
-        disk: 0,
-        maxcpu: 1,
+        maxdisk: 20 * 1024 * 1024 * 1024,
+        disk: 10 * 1024 * 1024 * 1024,
+        maxcpu: 4,
         cpu: 0,
       },
     ],
@@ -334,21 +353,21 @@ test('automatic placement reports danger when no Talos VM can fit', () => {
   const result = buildAutomaticProvisionPlacementResult(stepInputs, {}, {
     nodes: [
       {
-        node: 'pve-a',
+        node: 'pve1',
         status: 'online',
         maxmem: 2147483648,
         mem: 0,
-        maxdisk: 5368709120,
+        maxdisk: 0,
         disk: 0,
         maxcpu: 1,
         cpu: 0,
       },
       {
-        node: 'pve-b',
+        node: 'pve2',
         status: 'online',
         maxmem: 2147483648,
         mem: 0,
-        maxdisk: 5368709120,
+        maxdisk: 0,
         disk: 0,
         maxcpu: 1,
         cpu: 0,
@@ -371,8 +390,8 @@ test('automatic placement uses host free disk instead of a fixed 100GB worker si
         status: 'online',
         maxmem: 17179869184,
         mem: 2147483648,
-        maxdisk: 549755813888,
-        disk: 505 * 1024 * 1024 * 1024,
+        maxdisk: 900 * 1024 * 1024 * 1024,
+        disk: 300 * 1024 * 1024 * 1024,
         maxcpu: 4,
         cpu: 0.25,
       },
@@ -381,8 +400,8 @@ test('automatic placement uses host free disk instead of a fixed 100GB worker si
         status: 'online',
         maxmem: 17179869184,
         mem: 2147483648,
-        maxdisk: 549755813888,
-        disk: 467 * 1024 * 1024 * 1024,
+        maxdisk: 900 * 1024 * 1024 * 1024,
+        disk: 350 * 1024 * 1024 * 1024,
         maxcpu: 4,
         cpu: 0,
       },
@@ -391,8 +410,8 @@ test('automatic placement uses host free disk instead of a fixed 100GB worker si
         status: 'online',
         maxmem: 17179869184,
         mem: 2147483648,
-        maxdisk: 549755813888,
-        disk: 496 * 1024 * 1024 * 1024,
+        maxdisk: 900 * 1024 * 1024 * 1024,
+        disk: 400 * 1024 * 1024 * 1024,
         maxcpu: 4,
         cpu: 0,
       },
@@ -411,64 +430,45 @@ test('automatic placement uses host free disk instead of a fixed 100GB worker si
   });
 
   assert.equal(board.managementVm.hostId, 'pve1');
-  assert.equal(Object.values(board.suggestedVmNodeMap).filter(Boolean).length, 3);
+  assert.equal(Object.values(board.suggestedVmNodeMap).filter(Boolean).length, 6);
   assert.equal(board.hostCards.find((host) => host.id === 'pve1').assignments.some((vm) => vm.isFixed && vm.name === 'twinbox-prd-mgt'), true);
-  assert.ok(board.suggestedVmSizeMap['worker-1'].disk_gb < 100);
-  assert.ok(board.suggestedVmSizeMap['worker-1'].disk_gb >= 10);
+  assert.equal(board.suggestedVmSizeMap['worker-1'].disk_gb, 400);
+  assert.equal(board.suggestedVmSizeMap['worker-2'].disk_gb, 400);
+  assert.equal(board.suggestedVmSizeMap['worker-3'].disk_gb, 400);
 });
 
-test('automatic placement fits hosts when free CPU is rounded to what the wizard shows', () => {
+test('automatic placement ignores CPU pressure and still follows the host order', () => {
   const result = buildAutomaticProvisionPlacementResult(stepInputs, {}, {
     nodes: [
       {
-        node: 'proxmox',
-        status: 'online',
-        maxmem: 8247017472,
-        mem: 7336640512,
-        maxdisk: 58598735872,
-        disk: 29285064704,
-        maxcpu: 4,
-        cpu: 0.361071060762101,
-      },
-      {
         node: 'pve1',
         status: 'online',
-        maxmem: 16657231872,
-        mem: 5644713984,
-        maxdisk: 100861726720,
-        disk: 53400879104,
-        maxcpu: 4,
-        cpu: 0.330465587044534,
+        maxmem: 17179869184,
+        mem: 0,
+        maxdisk: 900 * 1024 * 1024 * 1024,
+        disk: 300 * 1024 * 1024 * 1024,
+        maxcpu: 1,
+        cpu: 0.99,
       },
       {
         node: 'pve2',
         status: 'online',
-        maxmem: 16657240064,
-        mem: 1845702656,
-        maxdisk: 100861726720,
-        disk: 12452229120,
-        maxcpu: 4,
-        cpu: 0.0321850641186824,
+        maxmem: 17179869184,
+        mem: 0,
+        maxdisk: 900 * 1024 * 1024 * 1024,
+        disk: 350 * 1024 * 1024 * 1024,
+        maxcpu: 1,
+        cpu: 0.99,
       },
       {
         node: 'pve3',
         status: 'online',
-        maxmem: 16652808192,
-        mem: 2140229632,
-        maxdisk: 100861726720,
-        disk: 43796652032,
-        maxcpu: 4,
-        cpu: 0.0351137487636004,
-      },
-      {
-        node: 'pve4',
-        status: 'online',
-        maxmem: 8268734464,
-        mem: 7472197632,
-        maxdisk: 68865630208,
-        disk: 59460530176,
-        maxcpu: 4,
-        cpu: 0.0374167093798052,
+        maxmem: 17179869184,
+        mem: 0,
+        maxdisk: 900 * 1024 * 1024 * 1024,
+        disk: 400 * 1024 * 1024 * 1024,
+        maxcpu: 1,
+        cpu: 0.99,
       },
     ],
     vms: [
@@ -484,12 +484,14 @@ test('automatic placement fits hosts when free CPU is rounded to what the wizard
     ],
   });
 
-  assert.equal(result.tone, 'warning');
-  assert.equal(result.vm_node_map['cp-1'], 'pve2');
-  assert.equal(result.vm_node_map['cp-2'], 'pve3');
-  assert.notEqual(result.vm_node_map['cp-3'], 'pve2');
-  assert.notEqual(result.vm_node_map['cp-3'], 'pve3');
-  assert.ok(result.vm_size_map['worker-1'].disk_gb < 100);
+  assert.equal(result.tone, 'success');
+  assert.equal(result.vm_node_map['cp-1'], 'pve1');
+  assert.equal(result.vm_node_map['cp-2'], 'pve2');
+  assert.equal(result.vm_node_map['cp-3'], 'pve3');
+  assert.equal(result.vm_node_map['worker-1'], 'pve1');
+  assert.equal(result.vm_node_map['worker-2'], 'pve2');
+  assert.equal(result.vm_node_map['worker-3'], 'pve3');
+  assert.equal(result.assigned, 6);
 });
 
 test('automatic placement replaces stale manual placements with a fresh suggestion', () => {
@@ -535,7 +537,7 @@ test('worker disk follows the worker-disk slider share', () => {
     vms: [],
   });
 
-  assert.equal(board.vmSizeMap['worker-1'].disk_gb, 95);
+  assert.equal(board.vmSizeMap['worker-1'].disk_gb, 100);
   assert.equal(board.vmSizeMap['cp-1'].disk_gb, 10);
 });
 
@@ -591,7 +593,7 @@ test('default placement spreads one control plane and one worker across each hos
   assert.equal(board.suggestedVmNodeMap['worker-3'], 'pve-c');
 });
 
-test('automatic placement prefers separate hosts for control planes and one worker per host before stacking', () => {
+test('automatic placement preserves the pve1/pve2/pve3 pairing order', () => {
   const board = buildProvisionPlacementBoard(stepInputs, {}, {
     nodes: [
       {
@@ -638,24 +640,11 @@ test('automatic placement prefers separate hosts for control planes and one work
     ],
   });
 
-  const cpHosts = new Set([
-    board.suggestedVmNodeMap['cp-1'],
-    board.suggestedVmNodeMap['cp-2'],
-    board.suggestedVmNodeMap['cp-3'],
-  ]);
-  const workerHosts = new Set([
-    board.suggestedVmNodeMap['worker-1'],
-    board.suggestedVmNodeMap['worker-2'],
-    board.suggestedVmNodeMap['worker-3'],
-  ]);
-
-  assert.equal(cpHosts.size, 3);
-  assert.equal(workerHosts.size, 3);
   assert.equal(board.suggestedVmNodeMap['cp-1'], 'pve-a');
-  assert.equal(board.suggestedVmNodeMap['cp-2'], 'pve-c');
-  assert.equal(board.suggestedVmNodeMap['cp-3'], 'pve-b');
+  assert.equal(board.suggestedVmNodeMap['cp-2'], 'pve-b');
+  assert.equal(board.suggestedVmNodeMap['cp-3'], 'pve-c');
   assert.equal(board.suggestedVmNodeMap['worker-1'], 'pve-a');
-  assert.equal(board.suggestedVmNodeMap['worker-2'], 'pve-c');
-  assert.equal(board.suggestedVmNodeMap['worker-3'], 'pve-b');
+  assert.equal(board.suggestedVmNodeMap['worker-2'], 'pve-b');
+  assert.equal(board.suggestedVmNodeMap['worker-3'], 'pve-c');
   assert.equal(board.hostCards.find((host) => host.id === 'pve-b').assignments[0].isFixed, true);
 });
