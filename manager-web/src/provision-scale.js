@@ -282,6 +282,17 @@ function getOrderedHostsForVm(vm, hostCards) {
   ];
 }
 
+function isAutomaticPlacementHost(host) {
+  const name = normalizeHostName(host?.name || host?.id);
+  return /^pve[123]$/i.test(name);
+}
+
+function getAutomaticPlacementHostCards(hostCards) {
+  const hosts = Array.isArray(hostCards) ? hostCards : [];
+  const automaticHosts = hosts.filter((host) => isAutomaticPlacementHost(host));
+  return automaticHosts.length > 0 ? automaticHosts : hosts;
+}
+
 export function getProvisionNodeCount(stepInputs = [], currentValues = {}) {
   const baseline = buildBaseline(stepInputs);
   const controlplaneCount = Number.isFinite(Number(currentValues.controlplane_count))
@@ -733,11 +744,12 @@ function buildVmSizeMap(vmPlan, hostCards, currentMap = {}, workerDiskPercent = 
 export function buildProvisionPlacementBoard(stepInputs, currentValues = {}, resources = null) {
   const vmPlan = buildProvisionVmPlan(stepInputs, currentValues);
   const hostCards = buildProvisionHostCards(resources);
+  const autoPlacementHostCards = getAutomaticPlacementHostCards(hostCards);
   const currentMap = currentValues && typeof currentValues.vm_node_map === 'object'
     ? currentValues.vm_node_map
     : {};
   const workerDiskPercent = currentValues?.worker_disk_percent ?? DEFAULT_WORKER_DISK_PERCENT;
-  const suggestedWorkerDiskGb = deriveWorkerDiskGb(hostCards, vmPlan.filter((vm) => vm.type === 'worker').length, workerDiskPercent);
+  const suggestedWorkerDiskGb = deriveWorkerDiskGb(autoPlacementHostCards, vmPlan.filter((vm) => vm.type === 'worker').length, workerDiskPercent);
   const hostLookup = new Map(hostCards.map((host) => [host.id, host]));
   const placementsByHost = new Map(hostCards.map((host) => [host.id, []]));
   const managementVm = buildManagementVmResource(resources?.vms, hostLookup);
@@ -760,10 +772,10 @@ export function buildProvisionPlacementBoard(stepInputs, currentValues = {}, res
 
   const suggestedPlacementState = clonePlacementState(basePlacementState);
   const currentPlacementState = clonePlacementState(basePlacementState);
-  const suggestedVmNodeMap = suggestVmNodeMap(vmPlan, hostCards, {}, suggestedPlacementState, workerDiskPercent, suggestedWorkerDiskGb);
+  const suggestedVmNodeMap = suggestVmNodeMap(vmPlan, autoPlacementHostCards, {}, suggestedPlacementState, workerDiskPercent, suggestedWorkerDiskGb);
   const suggestedPlacement = buildVmSizeMap(
     vmPlan,
-    hostCards,
+    autoPlacementHostCards,
     suggestedVmNodeMap,
     workerDiskPercent,
     true,

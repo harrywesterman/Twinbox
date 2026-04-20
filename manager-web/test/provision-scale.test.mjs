@@ -255,6 +255,16 @@ test('automatic placement fills pve1, pve2, and pve3 in host order when they can
   const result = buildAutomaticProvisionPlacementResult(stepInputs, {}, {
     nodes: [
       {
+        node: 'proxmox',
+        status: 'online',
+        maxmem: 2147483648,
+        mem: 0,
+        maxdisk: 50 * 1024 * 1024 * 1024,
+        disk: 8 * 1024 * 1024 * 1024,
+        maxcpu: 2,
+        cpu: 0,
+      },
+      {
         node: 'pve1',
         status: 'online',
         maxmem: 17179869184,
@@ -284,6 +294,16 @@ test('automatic placement fills pve1, pve2, and pve3 in host order when they can
         maxcpu: 4,
         cpu: 0.9,
       },
+      {
+        node: 'pve4',
+        status: 'online',
+        maxmem: 17179869184,
+        mem: 0,
+        maxdisk: 700 * 1024 * 1024 * 1024,
+        disk: 650 * 1024 * 1024 * 1024,
+        maxcpu: 4,
+        cpu: 0.1,
+      },
     ],
     vms: [
       {
@@ -310,6 +330,7 @@ test('automatic placement fills pve1, pve2, and pve3 in host order when they can
     'worker-2': 'pve2',
     'worker-3': 'pve3',
   });
+  assert.ok(!Object.values(result.vm_node_map).includes('proxmox'));
   assert.equal(result.vm_size_map['worker-1'].disk_gb, 400);
   assert.equal(result.vm_size_map['worker-2'].disk_gb, 400);
   assert.equal(result.vm_size_map['worker-3'].disk_gb, 400);
