@@ -1473,12 +1473,6 @@ function App() {
         tone: result.tone,
         message: result.message,
       });
-      if (result.tone === 'danger') {
-        setError(result.message);
-      } else {
-        setError('');
-        setNotice(result.message);
-      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fill placement defaults.';
       setError(message);
@@ -1486,7 +1480,6 @@ function App() {
         tone: 'danger',
         message,
       });
-      setNotice(message);
     }
   }
 
