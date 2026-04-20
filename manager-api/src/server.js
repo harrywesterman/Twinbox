@@ -116,6 +116,76 @@ function proxmoxApiRequest(pathname, proxmoxEnv, { method = "GET", body, headers
   }
 }
 
+function normalizeStoragePoolName(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function readClusterStorageStatusViaProxmoxApi(nodeNames, storagePoolName, resolved = null, ticket = "") {
+  const ownsResolution = !resolved;
+  const bundle = resolved || resolveSecretBundle(buildProxmoxApiSecretBundle());
+
+  try {
+    const username = bundle.env.PROXMOX_USER;
+    const password = bundle.env.PROXMOX_PASSWORD;
+    const proxmoxHost = bundle.env.PROXMOX_HOST;
+    const storagePool = normalizeStoragePoolName(storagePoolName) || "local-lvm";
+
+    if (!proxmoxHost || !username || !password) {
+      throw new Error("Unable to inspect Proxmox storage: missing API credentials");
+    }
+
+    let authTicket = ticket;
+    if (!authTicket) {
+      const auth = proxmoxApiRequest("/api2/json/access/ticket", bundle.env, {
+        method: "POST",
+        body: new URLSearchParams({
+          username,
+          password,
+        }),
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      });
+      authTicket = auth?.data?.ticket;
+      if (!authTicket) {
+        throw new Error("Proxmox auth failed while reading storage resources");
+      }
+    }
+
+    const storageByNode = new Map();
+    for (const rawNodeName of Array.isArray(nodeNames) ? nodeNames : []) {
+      const nodeName = String(rawNodeName || "").trim();
+      if (!nodeName) {
+        continue;
+      }
+
+      try {
+        const storage = proxmoxApiRequest(
+          `/api2/json/nodes/${encodeURIComponent(nodeName)}/storage/${encodeURIComponent(storagePool)}/status`,
+          bundle.env,
+          {
+            headers: {
+              Cookie: `PVEAuthCookie=${authTicket}`,
+            },
+          },
+        );
+        const data = storage?.data || null;
+        if (data) {
+          storageByNode.set(nodeName, data);
+        }
+      } catch (error) {
+        // If the configured pool is missing on one node, fall back to node-level disk data.
+      }
+    }
+
+    return { storagePool, storageByNode };
+  } finally {
+    if (ownsResolution) {
+      bundle.cleanup();
+    }
+  }
+}
+
 function resolveRequestedCluster(clusterId) {
   if (typeof clusterId !== "string" || clusterId.trim() === "") {
     return { ok: false, error: "cluster_id is required for follow-up cluster steps" };
@@ -451,7 +521,34 @@ async function listClusterNodeResourcesViaProxmoxApi() {
       },
     });
 
-    return Array.isArray(resources?.data) ? resources.data : [];
+    const nodes = Array.isArray(resources?.data) ? resources.data : [];
+    const storagePoolName = normalizeStoragePoolName(process.env.PROXMOX_STORAGE_POOL || "local-lvm");
+    const nodeNames = nodes
+      .map((entry) => String(entry?.node || entry?.name || entry?.id || "").trim())
+      .filter(Boolean);
+    const { storageByNode } = readClusterStorageStatusViaProxmoxApi(nodeNames, storagePoolName, resolved, ticket);
+
+    return nodes.map((entry) => {
+      const nodeName = String(entry?.node || entry?.name || entry?.id || "").trim();
+      const storage = storageByNode.get(nodeName);
+      if (!storage) {
+        return entry;
+      }
+
+      const totalDisk = Number(storage.total || storage.maxdisk || entry?.maxdisk || 0);
+      const usedDisk = Number(storage.used || storage.disk || entry?.disk || 0);
+      const availDisk = Number(storage.avail || Math.max(0, totalDisk - usedDisk));
+
+      return {
+        ...entry,
+        maxdisk: Number.isFinite(totalDisk) && totalDisk > 0 ? totalDisk : entry?.maxdisk,
+        disk: Number.isFinite(usedDisk) && usedDisk >= 0 ? usedDisk : entry?.disk,
+        storage_pool: storagePoolName,
+        storage_total: Number.isFinite(totalDisk) && totalDisk > 0 ? totalDisk : undefined,
+        storage_used: Number.isFinite(usedDisk) && usedDisk >= 0 ? usedDisk : undefined,
+        storage_avail: Number.isFinite(availDisk) && availDisk >= 0 ? availDisk : undefined,
+      };
+    });
   } finally {
     resolved.cleanup();
   }
