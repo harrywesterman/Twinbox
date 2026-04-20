@@ -201,7 +201,8 @@ sed "s/__ZONE_NAME__/${public_zone_name}/g" \
 node "$WORKSPACE_ROOT/manager-worker/src/refresh-portal-config.mjs" \
   --workspace-root "$WORKSPACE_ROOT" \
   --manager-data-dir "$MANAGER_DATA_DIR" \
-  --cluster-id "$cluster_id"
+  --cluster-id "$cluster_id" \
+  --trigger-step-id install-twinbox-portal
 
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/deployment.yaml"
 kubectl apply -f "$rendered_ingressroute"
