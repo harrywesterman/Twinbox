@@ -194,7 +194,7 @@ server:
         service_registration "kubernetes" {}
   dataStorage:
     enabled: true
-    size: 10Gi
+    size: 3Gi
     storageClass: longhorn
     accessMode: ReadWriteOnce
   volumes:
