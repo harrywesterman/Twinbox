@@ -453,7 +453,7 @@ test.before(async () => {
         sourceStepId: "install-immich",
         sourceStepTitle: "Install Immich",
         iconText: "I",
-        iconUrl: "https://twinboxwizard.tst.example.com/assets/step-icons/install-immich.svg",
+        iconUrl: "/assets/step-icons/install-immich.svg",
         iconAlt: "Immich icon",
         liveUrl: "https://immich.example.com",
       },
@@ -465,7 +465,7 @@ test.before(async () => {
           {
             id: "immich",
             title: "Immich",
-            iconUrl: "https://twinboxwizard.tst.example.com/assets/step-icons/install-immich.svg",
+            iconUrl: "/assets/step-icons/install-immich.svg",
           },
         ],
       },
@@ -664,7 +664,7 @@ test("portal config exposes a single Apps section and image icons", async () => 
   assert.equal(config.payload.apps.length, 1);
   assert.equal(config.payload.appSections.length, 1);
   assert.equal(config.payload.appSections[0].name, "Apps");
-  assert.equal(config.payload.apps[0].iconUrl, "https://twinboxwizard.tst.example.com/assets/step-icons/install-immich.svg");
+  assert.equal(config.payload.apps[0].iconUrl, "/assets/step-icons/install-immich.svg");
   assert.equal(config.payload.apps[0].iconAlt, "Immich icon");
 });
 

@@ -416,10 +416,6 @@ function HomePage({ config, navigate }) {
           <span>Install the app category to populate this launcher.</span>
         </div>
       ) : null}
-      <div className="hero-actions apps-home-actions">
-        <button type="button" className="secondary-button" onClick={() => navigate('/status')}>Cluster status</button>
-        <button type="button" className="secondary-button" onClick={() => navigate('/settings')}>Settings</button>
-      </div>
     </Panel>
   );
 }

@@ -92,7 +92,7 @@ test("buildPortalConfig shows user apps only after the app category is installed
   assert.equal(config.appSections.length, 1);
   assert.equal(config.appSections[0].name, "Apps");
   assert.deepEqual(config.appSections[0].items.map((card) => card.title), ["Immich"]);
-  assert.match(config.apps[0].iconUrl, /^https:\/\/twinboxwizard\.tst\.example\.com\/assets\/step-icons\/install-immich\.svg$/);
+  assert.equal(config.apps[0].iconUrl, "/assets/step-icons/install-immich.svg");
   assert.equal(config.apps[0].iconAlt, "Immich icon");
   assert(config.adminApps.length > 0);
   assert(!config.apps.some((card) => card.title === "Grafana"));
