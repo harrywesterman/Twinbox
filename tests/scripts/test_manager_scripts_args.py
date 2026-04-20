@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+APP_JSX = REPO_ROOT / "manager-web" / "src" / "App.jsx"
 APPLY_CLUSTER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "apply-cluster.sh"
 BOOTSTRAP_SCRIPT = REPO_ROOT / "scripts" / "manager" / "bootstrap-talos.sh"
 PROVISION_NODES_SCRIPT = (
@@ -2293,10 +2294,24 @@ def test_authentik_helper_resolves_signing_key():
         'response="$(authentik_api_get "/flows/instances/?slug=${slug}&page_size=100")" || return 1'
         in text
     )
+    assert 'authentik_ensure_default_provider_flows()' in text
+    assert '"/flows/instances/${slug}/"' not in text
     assert (
         'response="$(authentik_api_get "/core/groups/?page_size=200")" || return 1'
         in text
     )
+
+
+def test_provision_step_rebuilds_completed_clusters_with_a_new_session():
+    text = APP_JSX.read_text(encoding="utf-8")
+
+    assert "shouldReuseProvisionClusterSession" in text
+    assert "['bootstrapped', 'provisioned']" in text
+    assert "step.id === 'provision-nodes'" in text
+    assert "body.cluster_instance_id = clusterInstanceIdRef.current" in text
+    assert "if (step.id === 'provision-nodes')" in text
+    assert "else if (clusterInstanceIdRef.current)" in text
+    assert "cluster?.status" in text
 
 
 def test_authentik_oidc_consumer_scripts_set_explicit_signing_key():
@@ -2542,8 +2557,8 @@ def test_authentik_consumer_scripts_read_from_openbao():
     idp_text = idp_path.read_text(encoding="utf-8")
     assert "authentik-auth.sh" in idp_text
     assert "authentik_ensure_token" in idp_text or "authentik_load_bootstrap_secret" in idp_text
-    # Flow creation should use AUTHENTIK_TOKEN from the helper, not the raw bootstrap token
-    assert "Authorization: Bearer ${AUTHENTIK_TOKEN}" in idp_text
+    assert "authentik_ensure_default_provider_flows" in idp_text
+    assert "create_flow_if_missing" not in idp_text
     assert "gitops/databases/immich" not in idp_text
     assert "immich-db" not in idp_text
     assert "immich-db-credentials" not in idp_text

@@ -902,6 +902,18 @@ function clusterScopeId(cluster = null, fallback = null) {
   return cluster?.cluster_instance_id || cluster?.instance_id || fallback || null;
 }
 
+function shouldReuseProvisionClusterInstance(existingCluster, requestedClusterInstanceId) {
+  if (!requestedClusterInstanceId || !existingCluster?.cluster_instance_id) {
+    return false;
+  }
+
+  if (requestedClusterInstanceId !== existingCluster.cluster_instance_id) {
+    return false;
+  }
+
+  return !["bootstrapped", "provisioned"].includes(String(existingCluster.status || ""));
+}
+
 function stepStatePath(stepId, clusterScope = null) {
   const scope = clusterScope ? path.join("clusters", clusterScope) : "global";
   return path.join(dirs.stepState, scope, `${stepId}.json`);
@@ -1310,6 +1322,10 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
       && requestedClusterInstanceId !== existingCluster.cluster_instance_id) {
       return res.status(409).json({ error: "cluster instance mismatch" });
     }
+    const reuseProvisionClusterInstance = shouldReuseProvisionClusterInstance(
+      existingCluster,
+      requestedClusterInstanceId,
+    );
 
     const built = buildClusterFromRequest({
       ...validated.value,
@@ -1317,7 +1333,7 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
       vm_node_map: req.body?.vm_node_map,
     }, process.env, {
       allowedVmHosts,
-      clusterInstanceId: requestedClusterInstanceId && existingCluster?.cluster_instance_id === requestedClusterInstanceId
+      clusterInstanceId: reuseProvisionClusterInstance
         ? requestedClusterInstanceId
         : null,
     });

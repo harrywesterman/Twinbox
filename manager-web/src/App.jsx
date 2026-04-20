@@ -286,6 +286,10 @@ function getDisplayStepTitle(step) {
   return step.title;
 }
 
+function shouldReuseProvisionClusterSession(cluster) {
+  return !['bootstrapped', 'provisioned'].includes(String(cluster?.status || ''));
+}
+
 function getStepPresentation(step) {
   return {
     icon: step?.icon || '🚀',
@@ -1506,7 +1510,11 @@ function App() {
       }
     }
 
-    if (clusterInstanceIdRef.current) {
+    if (step.id === 'provision-nodes') {
+      if (clusterInstanceIdRef.current && shouldReuseProvisionClusterSession(cluster)) {
+        body.cluster_instance_id = clusterInstanceIdRef.current;
+      }
+    } else if (clusterInstanceIdRef.current) {
       body.cluster_instance_id = clusterInstanceIdRef.current;
     }
 

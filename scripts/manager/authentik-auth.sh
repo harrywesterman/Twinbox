@@ -57,6 +57,8 @@ authentik_ensure_token() {
 AUTHENTIK_SA_NAME="${AUTHENTIK_SA_NAME:-twinbox-automation}"
 AUTHENTIK_SA_TOKEN_IDENTIFIER="${AUTHENTIK_SA_TOKEN_IDENTIFIER:-twinbox-automation-api-token}"
 AUTHENTIK_SIGNING_KEY_NAME="${AUTHENTIK_SIGNING_KEY_NAME:-authentik Self-signed Certificate}"
+AUTHENTIK_DEFAULT_PROVIDER_AUTHORIZATION_FLOW_SLUG="${AUTHENTIK_DEFAULT_PROVIDER_AUTHORIZATION_FLOW_SLUG:-default-provider-authorization-implicit-consent}"
+AUTHENTIK_DEFAULT_PROVIDER_INVALIDATION_FLOW_SLUG="${AUTHENTIK_DEFAULT_PROVIDER_INVALIDATION_FLOW_SLUG:-default-provider-invalidation-flow}"
 
 authentik_create_service_account_token() {
   if [[ -n "${AUTHENTIK_API_TOKEN:-}" ]]; then
@@ -257,6 +259,63 @@ authentik_api_write() {
   authentik_api_request "$1" "$2" "$3"
 }
 
+_authentik_create_flow_if_missing() {
+  local flow_slug="$1"
+  local flow_name="$2"
+  local flow_title="$3"
+  local flow_designation="$4"
+  local flow_authentication="$5"
+  local flow_policy_engine_mode="$6"
+  local flow_compatible_providers="$7"
+  local existing
+
+  existing="$(authentik_api_get "/flows/instances/?slug=${flow_slug}&page_size=100")" || return 1
+  if jq -e '.results | length > 0' >/dev/null 2>&1 <<<"$existing"; then
+    return 0
+  fi
+
+  _authentik_log "Creating flow '${flow_slug}'"
+  authentik_api_write POST "/flows/instances/" "$(
+    jq -n \
+      --arg name "$flow_name" \
+      --arg slug "$flow_slug" \
+      --arg title "$flow_title" \
+      --arg designation "$flow_designation" \
+      --arg authentication "$flow_authentication" \
+      --arg policy_engine_mode "$flow_policy_engine_mode" \
+      --argjson compatible_providers "$flow_compatible_providers" \
+      '{
+        name: $name,
+        slug: $slug,
+        title: $title,
+        designation: $designation,
+        authentication: $authentication,
+        policy_engine_mode: $policy_engine_mode,
+        compatible_providers: $compatible_providers
+      }'
+  )" >/dev/null
+}
+
+authentik_ensure_default_provider_flows() {
+  _authentik_create_flow_if_missing \
+    "$AUTHENTIK_DEFAULT_PROVIDER_AUTHORIZATION_FLOW_SLUG" \
+    "Default Provider Authorization Implicit Consent" \
+    "Default Provider Authorization Implicit Consent" \
+    "authorization" \
+    "required" \
+    "any" \
+    "[1, 2]"
+
+  _authentik_create_flow_if_missing \
+    "$AUTHENTIK_DEFAULT_PROVIDER_INVALIDATION_FLOW_SLUG" \
+    "Default Provider Invalidation Flow" \
+    "Default Provider Invalidation Flow" \
+    "invalidation" \
+    "required" \
+    "any" \
+    "[]"
+}
+
 authentik_resolve_flow_id() {
   local slug="$1"
   local designation="$2"
@@ -276,12 +335,26 @@ authentik_resolve_flow_id() {
     return 0
   fi
 
-  response="$(authentik_api_get "/flows/instances/${slug}/")" || return 1
-  jq -r \
-    --arg slug "$slug" \
-    --arg designation "$designation" \
-    'select((.slug // "") == $slug and (.designation // "") == $designation)
-      | .pk // .id // empty' <<<"$response" | head -n1
+  case "$slug" in
+    "$AUTHENTIK_DEFAULT_PROVIDER_AUTHORIZATION_FLOW_SLUG" | "$AUTHENTIK_DEFAULT_PROVIDER_INVALIDATION_FLOW_SLUG")
+      authentik_ensure_default_provider_flows || return 1
+      response="$(authentik_api_get "/flows/instances/?slug=${slug}&page_size=100")" || return 1
+      match_pk="$(
+        jq -r \
+          --arg slug "$slug" \
+          --arg designation "$designation" \
+          '.results[]?
+            | select((.slug // "") == $slug and (.designation // "") == $designation)
+            | .pk // .id // empty' <<<"$response" | head -n1
+      )"
+      if [[ -n "$match_pk" ]]; then
+        printf '%s\n' "$match_pk"
+        return 0
+      fi
+      ;;
+  esac
+
+  return 1
 }
 
 authentik_resolve_scope_mapping_id() {

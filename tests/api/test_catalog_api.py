@@ -564,6 +564,135 @@ def test_execute_step_persists_state_and_enqueues_run_step_job():
             proc.wait(timeout=5)
 
 
+def test_execute_step_rebuilds_provisioned_cluster_with_a_fresh_session():
+    with tempfile.TemporaryDirectory() as td:
+        data_dir = Path(td) / "data"
+        ping_mock = Path(td) / "mock-ping.sh"
+        vm_mock = Path(td) / "mock-vms.sh"
+        ping_mock.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        ping_mock.chmod(0o755)
+        vm_mock.write_text(
+            """#!/bin/sh
+cat <<'EOF'
+[
+  {"node": "pve-a", "status": "online"},
+  {"node": "pve-b", "status": "online"}
+]
+EOF
+""",
+            encoding="utf-8",
+        )
+        vm_mock.chmod(0o755)
+
+        port = _find_free_port()
+        env = os.environ.copy()
+        env["MANAGER_DATA_DIR"] = str(data_dir)
+        env["MANAGER_API_PORT"] = str(port)
+        env["MANAGER_API_PING_BIN"] = str(ping_mock)
+        env["MANAGER_API_CLUSTER_RESOURCES_BIN"] = str(vm_mock)
+
+        proc = subprocess.Popen(
+            ["node", "manager-api/src/server.js"],
+            cwd=REPO_ROOT,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        try:
+            base = f"http://127.0.0.1:{port}"
+            _wait_for_health(base)
+
+            cluster_dir = data_dir / "clusters"
+            cluster_dir.mkdir(parents=True, exist_ok=True)
+            old_instance_id = "11111111-1111-1111-1111-111111111111"
+            cluster_id = "demo"
+            (cluster_dir / f"{cluster_id}.json").write_text(
+                json.dumps(
+                    {
+                        "id": cluster_id,
+                        "cluster_instance_id": old_instance_id,
+                        "status": "bootstrapped",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            old_state_path = (
+                data_dir
+                / "step-state"
+                / "clusters"
+                / old_instance_id
+                / "provision-nodes.json"
+            )
+            old_state_path.parent.mkdir(parents=True, exist_ok=True)
+            old_state_path.write_text(
+                json.dumps(
+                    {
+                        "step_id": "provision-nodes",
+                        "status": "succeeded",
+                        "inputs": {"name": "demo"},
+                        "outputs": {"cluster_id": cluster_id},
+                        "cluster_id": cluster_id,
+                        "cluster_instance_id": old_instance_id,
+                        "error": None,
+                        "updated_at": "2026-03-20T10:00:00Z",
+                        "last_job_id": None,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            payload = {
+                "cluster_id": cluster_id,
+                "cluster_instance_id": old_instance_id,
+                "inputs": {
+                    "name": "demo",
+                    "controlplane_count": 1,
+                    "worker_count": 2,
+                    "cpu_cores": 2,
+                    "memory_mb": 4096,
+                    "disk_gb": 20,
+                    "bridge": "vmbr0",
+                    "start_vmid": 200,
+                    "vip_ip": "192.168.1.50",
+                    "node_prefix_length": 24,
+                    "gateway_ip": "192.168.1.1",
+                    "dns_servers": "1.1.1.1,8.8.8.8",
+                    "dns_domain": "lab.local",
+                },
+                "vm_ip_map": {
+                    "cp-1": "192.168.1.61",
+                    "worker-1": "192.168.1.62",
+                    "worker-2": "192.168.1.63",
+                },
+                "vm_node_map": {
+                    "cp-1": "pve-a",
+                    "worker-1": "pve-b",
+                    "worker-2": "pve-a",
+                },
+            }
+
+            status, body = _post_json(
+                f"{base}/api/steps/provision-nodes/execute", payload
+            )
+            assert status == 202
+            assert body["cluster_id"] == cluster_id
+            assert body["cluster_instance_id"] != old_instance_id
+
+            cluster = json.loads((cluster_dir / f"{cluster_id}.json").read_text())
+            assert cluster["cluster_instance_id"] == body["cluster_instance_id"]
+
+            new_state = json.loads(
+                _cluster_step_state(data_dir, cluster_id, "provision-nodes").read_text()
+            )
+            assert new_state["cluster_instance_id"] == body["cluster_instance_id"]
+            assert old_state_path.exists()
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
 def test_execute_step_accepts_manual_vm_ip_map_without_allocation_recheck():
     with tempfile.TemporaryDirectory() as td:
         data_dir = Path(td) / "data"
