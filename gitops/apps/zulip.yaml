@@ -18,8 +18,8 @@ spec:
     spec:
       project: default
       sources:
-        - repoURL: oci://ghcr.io/zulip/helm-charts
-          chart: zulip
+        - repoURL: oci://ghcr.io/zulip/helm-charts/zulip
+          path: .
           targetRevision: "1.11.61"
           helm:
             valueFiles:
