@@ -33,6 +33,12 @@ Twinbox is a Talos Linux based configuration for a Kubernetes cluster. Treat the
 - `categories/` - manifest-driven step catalog and step scripts.
 - `docker-compose.yml` - Docker configuration for on the management VM, running the web wizard
 - Code changes land in GitHub `main`, are built into container images by GitHub Actions, and are pulled onto the Management VM with `docker compose pull && docker compose up -d`.
+- The `Twinbox Portal` is deployed by Argo CD from the GitOps manifests. Update it by:
+  1. changing the portal code and committing to `main`
+  2. letting GitHub Actions build a new portal Docker image
+  3. letting the workflow bump the portal image tag in `gitops/platform-apps/twinbox-portal/deployment.yaml`
+  4. letting Argo CD sync the manifest change and roll out the new pod
+- Do not expect Argo CD to update the portal from a rebuilt `latest` image alone; the portal deployment needs a new version tag in Git to trigger a rollout.
 
 ## Editing Rules
 
@@ -50,7 +56,7 @@ Twinbox is a Talos Linux based configuration for a Kubernetes cluster. Treat the
   - Worker: `manager-worker/src/*`
   - Provisioning scripts: `scripts/manager/*`
   - Step manifests/scripts: `categories/*`
-  - After you made a change, alway commit and push to main on github.com. The look at the github action that builds a new version of the docker containers, and wait until it is done. Connect with the ssh connection skill to twinbox@<ipofthemanagementvm> and do a docker pull and restart the containers. Only then you can retest.
+  - After you made a change, always commit and push to `main` on github.com. Then watch the GitHub Action that builds the Docker images and wait until it is done. For the management VM stack, connect with the SSH connection skill to `twinbox@<ip-of-the-management-vm>` and do `docker compose pull && docker compose up -d` before retesting. For the portal, wait for the workflow to bump the image tag in GitOps and let Argo CD sync the deployment before retesting.
 
 ## Verification
 

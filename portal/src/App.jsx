@@ -285,6 +285,15 @@ function AppIcon({ card, className = '' }) {
   );
 }
 
+function adminStepIconUrl(card) {
+  const title = String(card?.title || '').trim();
+  const base = String(card?.sourceStepId || card?.id || '').trim();
+  if (title === 'Dashy') {
+    return '/assets/step-icons/install-dashy-dashboard.svg';
+  }
+  return base ? `/assets/step-icons/${base}.svg` : '';
+}
+
 function AppTile({ card, onOpen, showStatus = false }) {
   return (
     <button className="app-tile" type="button" onClick={onOpen}>
@@ -675,15 +684,19 @@ function LogViewport({ lines = [], emptyLabel = 'Waiting for output...', viewpor
 }
 
 function AdminAppCard({ card, selected, onSelect }) {
+  const iconCard = {
+    ...card,
+    iconUrl: card.iconUrl || adminStepIconUrl(card),
+    iconAlt: `${card.title} icon`,
+  };
+
   return (
     <button
       type="button"
       className={`admin-app-card ${selected ? 'is-selected' : ''} ${card.title === 'Dashy' ? 'is-dashy' : ''}`}
       onClick={onSelect}
     >
-      <span className="app-tile-badge" style={{ '--accent': card.accent || '#2dd4bf' }}>
-        <span>{card.iconText || 'TB'}</span>
-      </span>
+      <AppIcon card={iconCard} className="admin-app-icon" />
       <span className="admin-app-card-copy">
         <strong>{card.title}</strong>
         <span>{card.summary}</span>
@@ -989,9 +1002,14 @@ function AdminAppsPage({ onNavigate, adminAppsState }) {
                 description={selectedApp.description || selectedApp.summary}
               />
               <div className="admin-app-detail-head">
-                <span className="app-tile-badge" style={{ '--accent': selectedApp.accent || '#2dd4bf' }}>
-                  <span>{selectedApp.iconText || 'TB'}</span>
-                </span>
+                <AppIcon
+                  card={{
+                    ...selectedApp,
+                    iconUrl: selectedApp.iconUrl || adminStepIconUrl(selectedApp),
+                    iconAlt: `${selectedApp.title} icon`,
+                  }}
+                  className="admin-app-detail-icon"
+                />
                 <div>
                   <span className={`status-chip ${statusTone(selectedState)}`}>{statusLabel(selectedState)}</span>
                   {isPlaceholder ? <small>Placeholder app, not installable yet</small> : null}
