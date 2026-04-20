@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import heroIllustrationUrl from './assets/hero-illustration.svg';
 import {
+  buildAutomaticProvisionPlacementResult,
   buildProvisionPlacementBoard,
   buildProvisionScaleSummary,
   buildScaledProvisionInputs,
@@ -971,6 +972,7 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  const [placementStatus, setPlacementStatus] = useState({ tone: '', message: '' });
   const [activeJob, setActiveJob] = useState(null);
   const [provisionSuggestionsReadyState, setProvisionSuggestionsReadyState] = useState(false);
   const [provisionSuggestionRevision, setProvisionSuggestionRevision] = useState(0);
@@ -1407,11 +1409,12 @@ function App() {
       const nextDraft = typeof updater === 'function'
         ? updater(currentStepDraft)
         : { ...currentStepDraft, ...(updater || {}) };
-
-      return {
+      const nextAnswers = {
         ...current,
         [stepId]: nextDraft,
       };
+      answersRef.current = nextAnswers;
+      return nextAnswers;
     });
   }
 
@@ -1457,23 +1460,32 @@ function App() {
     }
 
     try {
-      const draft = answersRef.current?.[currentStep.id] || {};
-      const board = buildProvisionPlacementBoard(currentStep.inputs || [], draft, proxmoxResources);
-      if (!board?.hostCards?.length) {
-        throw new Error('No Proxmox host resources are available yet.');
-      }
-
-      const suggestedMap = board?.suggestedVmNodeMap || {};
-      const suggestedSizeMap = board?.suggestedVmSizeMap || {};
-
+      const result = buildAutomaticProvisionPlacementResult(
+        currentStep.inputs || [],
+        currentDraft,
+        proxmoxResources,
+      );
       updateProvisionDraft(currentStep.id, {
-        vm_node_map: suggestedMap,
-        vm_size_map: suggestedSizeMap,
+        vm_node_map: result.vm_node_map,
+        vm_size_map: result.vm_size_map,
       });
-      setNotice('Filled the placement board from the current Proxmox host resources.');
+      setPlacementStatus({
+        tone: result.tone,
+        message: result.message,
+      });
+      if (result.tone === 'danger') {
+        setError(result.message);
+      } else {
+        setError('');
+        setNotice(result.message);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fill placement defaults.';
       setError(message);
+      setPlacementStatus({
+        tone: 'danger',
+        message,
+      });
       setNotice(message);
     }
   }
@@ -1919,6 +1931,8 @@ function App() {
       provisionDirtyFieldsRef.current.add(inputId);
     }
 
+    const shouldClearPlacementStatus = stepId === 'provision-nodes' && inputId !== 'vm_node_map';
+
     setAnswers((current) => {
       const currentStep = current[stepId] || {};
       const nextStep = {
@@ -1945,6 +1959,10 @@ function App() {
         [stepId]: nextStep,
       };
     });
+
+    if (shouldClearPlacementStatus) {
+      setPlacementStatus({ tone: '', message: '' });
+    }
   }
 
   function updatePlacement(vmName, hostName) {
@@ -1960,6 +1978,7 @@ function App() {
       ...currentMap,
       [vmName]: hostName,
     });
+    setPlacementStatus({ tone: '', message: '' });
   }
 
   function handleExportAnswers() {
@@ -2089,6 +2108,7 @@ function App() {
     setWizardPhase('questions');
     setSelectedStepId(firstStepId);
     setAnswers({});
+    answersRef.current = {};
     setClusterId('');
     setClusterCreatedAt('');
     setClusterInstanceId('');
@@ -2097,6 +2117,7 @@ function App() {
     setActiveJob(null);
     setError('');
     setNotice('Starting a new setup.');
+    setPlacementStatus({ tone: '', message: '' });
     setProvisionSuggestionsReadyState(false);
     setProvisionSuggestionRevision(0);
     clusterIdRef.current = '';
@@ -2137,8 +2158,10 @@ function App() {
             ...(stepAnswers && typeof stepAnswers === 'object' ? stepAnswers : {}),
           };
         }
+        answersRef.current = next;
         return next;
       });
+      setPlacementStatus({ tone: '', message: '' });
       placementSuggestionKeyRef.current = '';
       provisionSuggestionKeyRef.current = '';
       provisionSuggestionSnapshotRef.current = {};
@@ -2622,6 +2645,11 @@ function App() {
                       }}
                       onReset={applyProvisionPlacementHelp}
                     />
+                    {placementStatus.message ? (
+                      <p className={`wizard-network-check-summary is-${placementStatus.tone || 'neutral'}`} aria-live="polite">
+                        {placementStatus.message}
+                      </p>
+                    ) : null}
 
                     <section className="wizard-input-block is-network" aria-label="Network and addressing">
                       <div className="wizard-input-grid">

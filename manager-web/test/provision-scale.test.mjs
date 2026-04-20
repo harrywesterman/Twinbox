@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  buildAutomaticProvisionPlacementResult,
   buildProvisionPlacementBoard,
   buildProvisionScaleSummary,
   buildScaledProvisionInputs,
@@ -248,6 +249,137 @@ test('placement board keeps manual placements while resuggesting the rest', () =
   assert.equal(remixedBoard.hostCards.find((host) => host.id === 'pve-b').assignments.find((vm) => vm.name === 'cp-1').assignmentSource, 'user-selected');
   assert.equal(remixedBoard.vmNodeMap['worker-2'], undefined);
   assert.equal(remixedBoard.suggestedVmNodeMap['worker-2'], initialBoard.suggestedVmNodeMap['worker-2']);
+});
+
+test('automatic placement assigns every Talos VM when the hosts can fit them', () => {
+  const result = buildAutomaticProvisionPlacementResult(stepInputs, {}, {
+    nodes: [
+      {
+        node: 'pve-a',
+        status: 'online',
+        maxmem: 17179869184,
+        mem: 0,
+        maxdisk: 549755813888,
+        disk: 0,
+        maxcpu: 8,
+        cpu: 0,
+      },
+      {
+        node: 'pve-b',
+        status: 'online',
+        maxmem: 17179869184,
+        mem: 0,
+        maxdisk: 549755813888,
+        disk: 0,
+        maxcpu: 8,
+        cpu: 0,
+      },
+      {
+        node: 'pve-c',
+        status: 'online',
+        maxmem: 17179869184,
+        mem: 0,
+        maxdisk: 549755813888,
+        disk: 0,
+        maxcpu: 8,
+        cpu: 0,
+      },
+    ],
+    vms: [],
+  });
+
+  assert.equal(result.assigned, 6);
+  assert.equal(result.unassigned, 0);
+  assert.equal(result.tone, 'success');
+  assert.match(result.message, /assigned all 6 Talos VMs/i);
+  assert.equal(Object.values(result.vm_node_map).filter(Boolean).length, 6);
+  assert.equal(Object.keys(result.vm_size_map).length, 6);
+});
+
+test('automatic placement leaves overflow VMs unassigned when capacity is constrained', () => {
+  const result = buildAutomaticProvisionPlacementResult(stepInputs, {}, {
+    nodes: [
+      {
+        node: 'pve-a',
+        status: 'online',
+        maxmem: 17179869184,
+        mem: 0,
+        maxdisk: 549755813888,
+        disk: 0,
+        maxcpu: 4,
+        cpu: 0,
+      },
+      {
+        node: 'pve-b',
+        status: 'online',
+        maxmem: 2147483648,
+        mem: 0,
+        maxdisk: 10737418240,
+        disk: 0,
+        maxcpu: 1,
+        cpu: 0,
+      },
+    ],
+    vms: [],
+  });
+
+  assert.equal(result.assigned, 2);
+  assert.equal(result.unassigned, 4);
+  assert.equal(result.tone, 'warning');
+  assert.match(result.message, /2 of 6 Talos VMs/i);
+  assert.ok(Object.values(result.vm_node_map).filter(Boolean).length < 6);
+});
+
+test('automatic placement reports danger when no Talos VM can fit', () => {
+  const result = buildAutomaticProvisionPlacementResult(stepInputs, {}, {
+    nodes: [
+      {
+        node: 'pve-a',
+        status: 'online',
+        maxmem: 2147483648,
+        mem: 0,
+        maxdisk: 5368709120,
+        disk: 0,
+        maxcpu: 1,
+        cpu: 0,
+      },
+      {
+        node: 'pve-b',
+        status: 'online',
+        maxmem: 2147483648,
+        mem: 0,
+        maxdisk: 5368709120,
+        disk: 0,
+        maxcpu: 1,
+        cpu: 0,
+      },
+    ],
+    vms: [],
+  });
+
+  assert.equal(result.assigned, 0);
+  assert.equal(result.unassigned, 6);
+  assert.equal(result.tone, 'danger');
+  assert.match(result.message, /could not place any Talos VMs/i);
+});
+
+test('automatic placement replaces stale manual placements with a fresh suggestion', () => {
+  const fresh = buildAutomaticProvisionPlacementResult(stepInputs, {}, balancedPlacementResources);
+  const rerun = buildAutomaticProvisionPlacementResult(stepInputs, {
+    vm_node_map: {
+      'cp-1': 'pve-b',
+      'cp-2': 'pve-b',
+      'cp-3': 'pve-b',
+      'worker-1': 'pve-b',
+      'worker-2': 'pve-b',
+      'worker-3': 'pve-b',
+    },
+  }, balancedPlacementResources);
+
+  assert.deepEqual(rerun.vm_node_map, fresh.vm_node_map);
+  assert.deepEqual(rerun.vm_size_map, fresh.vm_size_map);
+  assert.equal(rerun.assigned, fresh.assigned);
+  assert.equal(rerun.unassigned, fresh.unassigned);
 });
 
 test('worker disk follows the worker-disk slider share', () => {

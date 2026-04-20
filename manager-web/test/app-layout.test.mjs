@@ -42,6 +42,9 @@ test('app source defines a minimal wizard shell with guided input and step-by-st
   assert.match(source, /buildPlacementSuggestionKey/, 'expected a stable suggestion key for automatic placement');
   assert.match(source, /placementSuggestionKeyRef\.current = placementSuggestionKey/, 'expected the auto-placement effect to remember the last suggestion');
   assert.match(source, /void applyProvisionPlacementHelp\(\);/, 'expected automatic placement to run when step 1 opens without placements');
+  assert.match(source, /buildAutomaticProvisionPlacementResult/, 'expected automatic placement to use one shared helper path');
+  assert.match(source, /setPlacementStatus\(/, 'expected inline placement feedback state');
+  assert.match(source, /wizard-network-check-summary is-\$\{placementStatus\.tone \|\| 'neutral'\}/, 'expected inline placement status styling');
   assert.doesNotMatch(source, /Keep VM scale separate from networking/, 'expected the old network summary heading to be removed');
   assert.match(source, /Per-VM IPs/, 'expected a per-VM IP list');
   assert.match(source, /wizard-network-vm-list/, 'expected the VM IP list container');
@@ -126,6 +129,7 @@ test('styles define a wizard-first, responsive installer layout', async () => {
   assert.match(css, /\.wizard-step-actions-panel\s*\{/, 'expected the step 1 helper panel');
   assert.match(css, /\.wizard-step-actions-panel-actions\s*\{/, 'expected the helper button grid');
   assert.match(css, /\.wizard-network-check-summary\.is-pending\s*\{/, 'expected a pending loading style for IP suggestions');
+  assert.match(css, /\.wizard-network-check-summary\.is-warning\s*\{/, 'expected warning styling for partial placement');
   assert.match(css, /\.wizard-log-viewport\s*\{/, 'expected a scrolling live-log viewport');
   assert.match(css, /\.wizard-output-panel\.is-live\s*\{/, 'expected live output emphasis');
   assert.doesNotMatch(css, /\.technical-panel\[open\]\s*\{/, 'expected technical details to be removed');

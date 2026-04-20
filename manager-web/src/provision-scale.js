@@ -805,3 +805,62 @@ export function buildProvisionPlacementBoard(stepInputs, currentValues = {}, res
     vmSizeMap: placement.vmSizeMap,
   };
 }
+
+function countAssignedPlacementEntries(vmNodeMap = {}) {
+  return Object.values(vmNodeMap || {}).reduce((count, hostName) => (
+    String(hostName || '').trim().length > 0 ? count + 1 : count
+  ), 0);
+}
+
+function formatAutomaticPlacementMessage(assigned, total) {
+  if (total <= 0) {
+    return {
+      tone: 'danger',
+      message: 'No Talos VMs are defined for automatic placement.',
+    };
+  }
+
+  if (assigned <= 0) {
+    return {
+      tone: 'danger',
+      message: 'Automatic placement could not place any Talos VMs with the current free CPU, memory, and disk.',
+    };
+  }
+
+  if (assigned >= total) {
+    return {
+      tone: 'success',
+      message: `Automatic placement assigned all ${total} Talos VMs.`,
+    };
+  }
+
+  const unassigned = total - assigned;
+  return {
+    tone: 'warning',
+    message: `Automatic placement assigned ${assigned} of ${total} Talos VMs. ${unassigned} remain unassigned because current free CPU, memory, or disk is insufficient.`,
+  };
+}
+
+export function buildAutomaticProvisionPlacementResult(stepInputs, currentValues = {}, resources = null) {
+  const normalizedDraft = {
+    ...(currentValues && typeof currentValues === 'object' ? currentValues : {}),
+    vm_node_map: {},
+  };
+  const board = buildProvisionPlacementBoard(stepInputs, normalizedDraft, resources);
+  const vmNodeMap = board.suggestedVmNodeMap || {};
+  const vmSizeMap = board.suggestedVmSizeMap || {};
+  const total = Array.isArray(board.vmPlan) ? board.vmPlan.filter((vm) => vm.type !== 'management').length : 0;
+  const assigned = countAssignedPlacementEntries(vmNodeMap);
+  const unassigned = Math.max(0, total - assigned);
+  const placementMessage = formatAutomaticPlacementMessage(assigned, total);
+
+  return {
+    board,
+    vm_node_map: vmNodeMap,
+    vm_size_map: vmSizeMap,
+    assigned,
+    unassigned,
+    tone: placementMessage.tone,
+    message: placementMessage.message,
+  };
+}
