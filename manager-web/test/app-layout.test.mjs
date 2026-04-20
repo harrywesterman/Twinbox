@@ -34,6 +34,11 @@ test('app source defines a minimal wizard shell with guided input and step-by-st
   assert.match(source, /VM landing/, 'expected the VM placement block to be explicit');
   assert.match(source, /wizard-placement-board/, 'expected the host placement board');
   assert.match(source, /Automatic placement/, 'expected automatic placement controls');
+  assert.match(source, /onReset=\{applyProvisionPlacementHelp\}/, 'expected the placement reset button to reuse the placement helper');
+  assert.match(source, /hasPlacementAssignments/, 'expected the step 1 auto-placement guard');
+  assert.match(source, /buildPlacementSuggestionKey/, 'expected a stable suggestion key for automatic placement');
+  assert.match(source, /placementSuggestionKeyRef\.current = placementSuggestionKey/, 'expected the auto-placement effect to remember the last suggestion');
+  assert.match(source, /void applyProvisionPlacementHelp\(\);/, 'expected automatic placement to run when step 1 opens without placements');
   assert.doesNotMatch(source, /Keep VM scale separate from networking/, 'expected the old network summary heading to be removed');
   assert.match(source, /Per-VM IPs/, 'expected a per-VM IP list');
   assert.match(source, /wizard-network-vm-list/, 'expected the VM IP list container');
@@ -61,6 +66,7 @@ test('app source defines a minimal wizard shell with guided input and step-by-st
   assert.doesNotMatch(source, /wizard-placement-fixed-details/, 'expected the old fixed-details block to be removed');
   assert.doesNotMatch(source, /Sizing comes first/, 'expected the old explanatory placement note to be removed');
   assert.doesNotMatch(source, /Retry balanced suggestion/, 'expected the old placement button label to be removed');
+  assert.doesNotMatch(source, /resetPlacementToSuggested/, 'expected the old no-op placement reset handler to be removed');
   assert.doesNotMatch(source, /Waiting for step 1 suggestions to load/, 'expected the old loading copy to be removed');
   assert.doesNotMatch(source, /Twinbox repeats the same check automatically when you click Next\./, 'expected the old IP check helper copy to be removed');
   assert.doesNotMatch(source, /Green means the suggested address was checked once\./, 'expected the old VM status legend copy to be removed');

@@ -662,6 +662,29 @@ function buildPlacementRationale(vm, currentHostName, suggestedHostName) {
   return `Manually moved from ${suggestedHostName || 'the suggested host'} to ${currentHostName}.`;
 }
 
+function hasPlacementAssignments(vmNodeMap) {
+  if (!vmNodeMap || typeof vmNodeMap !== 'object' || Array.isArray(vmNodeMap)) {
+    return false;
+  }
+
+  return Object.values(vmNodeMap).some((hostName) => String(hostName || '').trim().length > 0);
+}
+
+function buildPlacementSuggestionKey(board) {
+  if (!board?.hostCards?.length || !board?.vmPlan?.length) {
+    return '';
+  }
+
+  const hostKey = board.hostCards.map((host) => host.id).join(',');
+  const vmKey = board.vmPlan.map((vm) => vm.id).join(',');
+  const suggestionKey = Object.entries(board.suggestedVmNodeMap || {})
+    .sort(([leftVmName], [rightVmName]) => leftVmName.localeCompare(rightVmName))
+    .map(([vmName, hostName]) => `${vmName}:${hostName}`)
+    .join('|');
+
+  return `${hostKey}::${vmKey}::${suggestionKey}`;
+}
+
 const INGRESS_ROUTE_LABELS = {
   wiredoor: '1. Wiredoor',
   'cloudflare-tunnel': '2. Cloudflare Tunnel',
@@ -1924,14 +1947,6 @@ function App() {
     });
   }
 
-  function resetPlacementToSuggested() {
-    if (!placementBoard || currentStep?.id !== 'provision-nodes') {
-      return;
-    }
-
-    updateAnswer(currentStep.id, 'vm_node_map', placementBoard.suggestedVmNodeMap || {});
-  }
-
   function handleExportAnswers() {
     const snapshot = serializeUiState({
       selectedStepId,
@@ -2165,6 +2180,9 @@ function App() {
   const placementBoard = currentStep?.id === 'provision-nodes'
     ? buildProvisionPlacementBoard(currentStep.inputs || [], currentDraft, proxmoxResources)
     : null;
+  const placementSuggestionKey = currentStep?.id === 'provision-nodes'
+    ? buildPlacementSuggestionKey(placementBoard)
+    : '';
   const provisionVmIpRows = currentStep?.id === 'provision-nodes'
     ? buildProvisionVmIpRows(
       placementBoard?.vmPlan || [],
@@ -2196,6 +2214,28 @@ function App() {
       proxmoxResources,
     )
     : null;
+  useEffect(() => {
+    if (currentStep?.id !== 'provision-nodes' || !placementBoard?.hostCards?.length) {
+      return;
+    }
+
+    if (hasPlacementAssignments(currentDraft.vm_node_map)) {
+      return;
+    }
+
+    if (!placementSuggestionKey || placementSuggestionKeyRef.current === placementSuggestionKey) {
+      return;
+    }
+
+    placementSuggestionKeyRef.current = placementSuggestionKey;
+    void applyProvisionPlacementHelp();
+  }, [
+    applyProvisionPlacementHelp,
+    currentStep?.id,
+    currentDraft.vm_node_map,
+    placementBoard,
+    placementSuggestionKey,
+  ]);
   const provisionStepValid = currentStep?.id === 'provision-nodes'
     ? provisionVmIpValidation.ok
     : true;
@@ -2565,7 +2605,7 @@ function App() {
                         }
                         setDraggingVmName('');
                       }}
-                      onReset={resetPlacementToSuggested}
+                      onReset={applyProvisionPlacementHelp}
                     />
 
                     <section className="wizard-input-block is-network" aria-label="Network and addressing">
