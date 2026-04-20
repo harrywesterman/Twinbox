@@ -636,8 +636,9 @@
 
 .wizard-step-icon-artwork {
   display: block;
-  width: 100%;
-  height: 100%;
+  width: 78%;
+  height: 78%;
+  margin: auto;
   object-fit: contain;
 }
 
