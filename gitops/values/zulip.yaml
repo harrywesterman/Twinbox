@@ -1,6 +1,3 @@
-global:
-  defaultStorageClass: longhorn-single
-
 zulip:
   environment:
     SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS:
@@ -17,7 +14,7 @@ zulip:
     enabled: true
     accessMode: ReadWriteOnce
     size: 5Gi
-    storageClass: longhorn-single
+    storageClass: longhorn
 
 postgresql:
   primary:
