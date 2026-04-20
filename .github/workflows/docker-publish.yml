@@ -8,8 +8,12 @@ on:
       - "v*"
   workflow_dispatch:
 
+concurrency:
+  group: docker-publish-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -49,6 +53,7 @@ jobs:
             dockerfile: ./portal/Dockerfile
             tags: |
               type=raw,value=latest,enable={{is_default_branch}}
+              type=raw,value=sha-${{ github.sha }},enable={{is_default_branch}}
               type=ref,event=tag
               type=sha
           - image_name: twinbox-jitsi-openid
@@ -89,3 +94,42 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Publish portal version tag to Git
+        if: matrix.image_name == 'twinbox-portal' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          tag="sha-${GITHUB_SHA}"
+          file="gitops/platform-apps/twinbox-portal/deployment.yaml"
+
+          python3 - <<'PY' "$file" "$tag"
+          import pathlib
+          import re
+          import sys
+
+          file_path = pathlib.Path(sys.argv[1])
+          tag = sys.argv[2]
+          source = file_path.read_text()
+          updated = re.sub(
+              r'(image:\s+ghcr\.io/harrywesterman/twinbox-portal:)[^\s]+',
+              rf'\1{tag}',
+              source,
+              count=1,
+          )
+          if updated == source:
+              raise SystemExit("portal image tag was not updated")
+          file_path.write_text(updated)
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$file"
+          if git diff --cached --quiet; then
+            echo "No portal version bump to commit"
+            exit 0
+          fi
+          git commit -m "chore: bump portal image tag [skip ci]"
+          git push origin HEAD:main
