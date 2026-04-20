@@ -26,7 +26,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: portal
-          image: ghcr.io/harrywesterman/twinbox-portal:sha-46ae1ed1ea8eb5cfc2d9dbb24bf84a199f850a4d
+          image: ghcr.io/harrywesterman/twinbox-portal:sha-dc24560cc9ce91a899da4930064a2c79615d7a17
           imagePullPolicy: Always
           ports:
             - name: http
