@@ -85,7 +85,15 @@ function buildCatalog(stepStatuses = {}) {
     ['install-gitea', 'Install Gitea', { dependsOn: ['install-karakeep'] }],
     ['install-uptimekuma', 'Install Uptimekuma', { dependsOn: ['install-gitea'] }],
     ['install-n8n', 'Install N8N', { dependsOn: ['install-uptimekuma'] }],
-    ['install-audiobookshelf', 'Install Audiobookshelf', { dependsOn: ['install-n8n'] }],
+    ['install-audiobookshelf', 'Install Audiobookshelf', {
+      dependsOn: [
+        'install-longhorn-storage',
+        'install-secret-sync',
+        'install-authentik-idp',
+        'create-users-and-groups',
+        'choose-ingress-route',
+      ],
+    }],
     ['install-freshrss', 'Install FreshRSS', { dependsOn: ['install-audiobookshelf'] }],
     ['install-jitsi', 'Install Jitsi', { dependsOn: ['install-freshrss'] }],
   ].map(([id, title, options]) => ({

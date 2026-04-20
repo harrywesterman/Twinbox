@@ -299,22 +299,29 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
             selected_ingress_route="wiredoor",
             updated_at="2026-04-19T00:00:00Z",
         )
-        _cluster_step_state(data_dir, "cluster-demo", "install-n8n").parent.mkdir(parents=True, exist_ok=True)
-        _cluster_step_state(data_dir, "cluster-demo", "install-n8n").write_text(
-            json.dumps(
-                {
-                    "status": "succeeded",
-                    "inputs": {},
-                    "outputs": {},
-                    "cluster_id": "cluster-demo",
-                    "cluster_instance_id": "cluster-demo",
-                    "error": None,
-                    "updated_at": "2026-04-19T00:00:00Z",
-                    "last_job_id": None,
-                }
-            ),
-            encoding="utf-8",
-        )
+        for dependency in [
+            "install-longhorn-storage",
+            "install-secret-sync",
+            "install-authentik-idp",
+            "create-users-and-groups",
+            "choose-ingress-route",
+        ]:
+            _cluster_step_state(data_dir, "cluster-demo", dependency).parent.mkdir(parents=True, exist_ok=True)
+            _cluster_step_state(data_dir, "cluster-demo", dependency).write_text(
+                json.dumps(
+                    {
+                        "status": "succeeded",
+                        "inputs": {},
+                        "outputs": {},
+                        "cluster_id": "cluster-demo",
+                        "cluster_instance_id": "cluster-demo",
+                        "error": None,
+                        "updated_at": "2026-04-19T00:00:00Z",
+                        "last_job_id": None,
+                    }
+                ),
+                encoding="utf-8",
+            )
 
         port = _find_free_port()
         proc = _start_api(data_dir, port)
@@ -331,6 +338,13 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
             assert audiobookshelf["installable"] is True
             assert audiobookshelf["app_state"] == "ready"
             assert audiobookshelf["runner"]["script"] == "categories/apps/steps/install-audiobookshelf/run.sh"
+            assert audiobookshelf["depends_on"] == [
+                "install-longhorn-storage",
+                "install-secret-sync",
+                "install-authentik-idp",
+                "create-users-and-groups",
+                "choose-ingress-route",
+            ]
             nextcloud = next(step for step in apps if step["id"] == "install-nextcloud")
             assert nextcloud["placeholder"] is False
             assert nextcloud["installable"] is True

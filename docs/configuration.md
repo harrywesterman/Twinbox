@@ -36,6 +36,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `/opt/twinbox/bootstrap/secrets/global/grafana-oidc-<cluster-id>.json`
 - `/opt/twinbox/bootstrap/secrets/global/authentik.json` - seed-only; deleted after Authentik syncs into OpenBao
 - `/opt/twinbox/bootstrap/secrets/global/pgadmin4-oidc-<cluster-id>.json`
+- `/opt/twinbox/bootstrap/secrets/global/audiobookshelf.json`
 - `/opt/twinbox/bootstrap/secrets/global/wiredoor-gateway.json`
 - `/opt/twinbox/bootstrap/secrets/global/velero.json`
 - `/opt/twinbox/bootstrap/secrets/global/velero-ui.json`

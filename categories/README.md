@@ -91,7 +91,7 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 - `install-immich` – Deploy Immich photo management.
 - `install-gitea` – Deploy Gitea.
 - `install-n8n` – Deploy n8n automation.
-- `install-audiobookshelf` – Deploy Audiobookshelf.
+- `install-audiobookshelf` – Deploy Audiobookshelf with Authentik OIDC, Traefik ingress, and Longhorn storage.
 - `install-freshrss` – Deploy FreshRSS.
 - `install-jitsi` – Deploy Jitsi Meet.
 - `install-karakeep` – Deploy Karakeep.
