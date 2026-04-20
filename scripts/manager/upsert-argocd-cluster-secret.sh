@@ -15,6 +15,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PUBLIC_ZONE_NAME=""
 SECRET_NAME="in-cluster-local"
 SERVER_URL="https://kubernetes.default.svc"
+# Argo CD needs a long-lived token here; the default 24h token would expire
+# and leave every application in ComparisonError until the secret is refreshed.
+TOKEN_DURATION="${ARGOCD_MANAGER_TOKEN_DURATION:-8760h}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -71,7 +74,7 @@ EOF
 ca_data="$(kubectl config view --raw --minify -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' 2>/dev/null || true)"
 [[ -n "$ca_data" ]] || fail "Could not read cluster CA data from kubeconfig"
 
-bearer_token="$(kubectl -n argocd create token argocd-manager --duration=24h)"
+bearer_token="$(kubectl -n argocd create token argocd-manager --duration="$TOKEN_DURATION")"
 [[ -n "$bearer_token" ]] || fail "Could not create token for argocd-manager"
 
 cluster_config="$(jq -nc \
