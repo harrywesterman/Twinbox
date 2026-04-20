@@ -7,7 +7,6 @@ summary: Install OpenCloud with LDAP, Authentik OIDC, Collabora, Tika, and Radic
 explanation: Twinbox provisions OpenCloud as a GitOps application stack with persistent Longhorn storage, an embedded OpenLDAP directory, Authentik OIDC clients for web and native apps, Collabora document editing, Apache Tika search, and Radicale calendar and contacts services. The step keeps all OpenCloud bootstrap secrets in OpenBao so reruns stay idempotent.
 side_help: OpenCloud sits between the Nextcloud placeholder and the rest of the user apps so the collaboration suite lands after the core platform pieces and before Immich and the other user-facing tools.
 depends_on:
-  - install-proxmox-backup-system
   - install-longhorn-storage
   - install-secret-sync
   - install-authentik-idp

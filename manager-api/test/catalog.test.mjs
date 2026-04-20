@@ -154,7 +154,6 @@ test('app catalog exposes apps while the wizard catalog keeps them out of sight'
     'install-cloudnativepg',
     'install-secret-sync',
     'install-authentik-idp',
-    'install-opencloud',
   ]) {
       fs.writeFileSync(
         path.join(dirs.stepState, 'clusters', 'cluster-1-instance', `${dependency}.json`),
@@ -184,22 +183,26 @@ test('app catalog exposes apps while the wizard catalog keeps them out of sight'
     });
     assert.equal(appCatalog.active_cluster.id, 'cluster-1');
     assert.equal(appCatalog.categories[0].id, 'apps');
-    const immichCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-immich');
     const opencloudCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-opencloud');
+    const immichCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-immich');
+    const audiobookshelfCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-audiobookshelf');
+    const n8nCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-n8n');
     const freshrssCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-freshrss');
-    const karakeepCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-karakeep');
-    assert.equal(opencloudCard?.title, 'Install OpenCloud');
-    assert.equal(opencloudCard?.app_state, 'installed');
-    assert.equal(opencloudCard?.runner?.script, 'categories/apps/steps/install-opencloud/run.sh');
+    const zulipCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-zulip');
     assert.equal(immichCard?.title, 'Install Immich');
     assert.equal(immichCard?.app_state, 'ready');
+    assert.deepEqual(immichCard?.depends_on, ['install-longhorn-storage', 'install-cloudnativepg', 'install-secret-sync', 'install-authentik-idp', 'choose-ingress-route']);
     assert.equal(immichCard?.runner?.script, 'categories/apps/steps/install-immich/run.sh');
+    assert.deepEqual(opencloudCard?.depends_on, ['install-longhorn-storage', 'install-secret-sync', 'install-authentik-idp', 'create-users-and-groups', 'choose-ingress-route']);
+    assert.deepEqual(audiobookshelfCard?.depends_on, []);
+    assert.deepEqual(n8nCard?.depends_on, []);
     assert.equal(freshrssCard?.title, 'Install FreshRSS');
     assert.equal(freshrssCard?.placeholder, false);
     assert.equal(freshrssCard?.installable, true);
+    assert.equal(freshrssCard?.app_state, 'ready');
+    assert.deepEqual(freshrssCard?.depends_on, []);
+    assert.deepEqual(zulipCard?.depends_on, []);
     assert.equal(freshrssCard?.runner?.script, 'categories/apps/steps/install-freshrss/run.sh');
-    assert.equal(karakeepCard?.title, 'Install Karakeep');
-    assert.equal(karakeepCard?.runner?.script, 'categories/apps/steps/install-karakeep/run.sh');
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

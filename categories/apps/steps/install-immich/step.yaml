@@ -7,7 +7,6 @@ summary: Install Immich with Longhorn storage, CloudNativePG, and Authentik OIDC
 explanation: Twinbox provisions Immich as a GitOps application with a Longhorn-backed library volume, a dedicated CloudNativePG database, Authentik OIDC login, and Traefik routes for the selected ingress path. The bootstrap also makes the first Twinbox user an Immich admin through the Authentik admins group and auto-launches OIDC so the initial registration screen is skipped.
 side_help: Immich is grouped with the other user services after OpenCloud so the photo stack lands after the collaboration suite and the login flow stays aligned with the rest of the app stack. The first Twinbox user is promoted to Immich admin automatically.
 depends_on:
-  - install-opencloud
   - install-longhorn-storage
   - install-cloudnativepg
   - install-secret-sync

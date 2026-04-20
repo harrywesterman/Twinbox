@@ -6,8 +6,7 @@ order: 80
 summary: Placeholder step for the Uptimekuma app phase.
 explanation: This wizard step is reserved for future Uptimekuma installation work and does not run a real cluster action yet.
 side_help: Monitoring tools are grouped with the user-facing app set.
-depends_on:
-  - install-gitea
+depends_on: []
 inputs: []
 runner:
   kind: script

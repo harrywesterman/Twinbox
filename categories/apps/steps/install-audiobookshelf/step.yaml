@@ -6,8 +6,7 @@ order: 84
 summary: Install Audiobookshelf with Longhorn storage and Traefik ingress.
 explanation: Twinbox provisions Audiobookshelf as a GitOps application with a Longhorn-backed data volume and Traefik routes for the selected ingress path so the media server is available from the wizard and the app catalog.
 side_help: Media libraries belong in the same user-services segment of the wizard.
-depends_on:
-  - install-n8n
+depends_on: []
 dashy:
   items:
     - section: Platform

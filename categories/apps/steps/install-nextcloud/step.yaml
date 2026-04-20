@@ -6,8 +6,7 @@ order: 68
 summary: Placeholder step for the Nextcloud app phase.
 explanation: This wizard step is reserved for future Nextcloud installation work and does not run a real cluster action yet.
 side_help: User apps are staged after the core management layer so the wizard can stay linear.
-depends_on:
-  - install-proxmox-backup-system
+depends_on: []
 inputs: []
 runner:
   kind: script

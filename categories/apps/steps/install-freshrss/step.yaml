@@ -6,8 +6,7 @@ order: 86
 summary: Install FreshRSS with persistent storage and a Traefik route.
 explanation: Twinbox provisions FreshRSS as a small self-hosted feed reader backed by Longhorn storage and exposed through Traefik on the selected cluster domain.
 side_help: Feed readers stay in the app rollout after the core management tools.
-depends_on:
-  - install-audiobookshelf
+depends_on: []
 dashy:
   items:
     - section: Apps

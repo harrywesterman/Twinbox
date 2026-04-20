@@ -6,8 +6,7 @@ order: 82
 summary: Placeholder step for the N8N app phase.
 explanation: This wizard step is reserved for future N8N installation work and does not run a real cluster action yet.
 side_help: Automation tools are staged alongside the rest of the app catalog.
-depends_on:
-  - install-uptimekuma
+depends_on: []
 inputs: []
 runner:
   kind: script
