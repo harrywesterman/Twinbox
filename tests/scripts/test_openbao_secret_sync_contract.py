@@ -168,6 +168,11 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "SETTING_ZULIP_ADMINISTRATOR: admin@{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in app_text
     assert "ZULIP_AUTH_BACKENDS: GenericOpenIdConnectBackend" in app_text
 
+    assert "defaultStorageClass: longhorn-single" in values_text
+    assert "size: 5Gi" in values_text
+    assert "storageClass: longhorn-single" in values_text
+    assert "primary:" in values_text
+    assert "size: 4Gi" in values_text
     assert "SECRETS_secret_key:" in values_text
     assert "SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS:" in values_text
     assert "persistence:" in values_text
