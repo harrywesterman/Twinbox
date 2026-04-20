@@ -2153,6 +2153,38 @@ def test_install_immich_step_uses_only_its_own_database_manifests():
     assert "twinbox/global/immich" in db_externalsecret_text
 
 
+def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
+    text = (
+        REPO_ROOT
+        / "categories"
+        / "apps"
+        / "steps"
+        / "install-nextcloud"
+        / "run.sh"
+    ).read_text(encoding="utf-8")
+    assert "gitops/databases/namespace.yaml" in text
+    assert "gitops/databases/nextcloud/cluster.yaml" in text
+    assert "gitops/databases/nextcloud/externalsecret.yaml" in text
+    assert "gitops/databases/nextcloud/pooler-ro.yaml" in text
+    assert "gitops/databases/nextcloud/pooler-rw.yaml" in text
+    assert "gitops/databases/nextcloud/scheduled-backup.yaml" in text
+    assert "gitops/databases/kustomization.yaml" not in text
+    assert "gitops/databases/authentik/" not in text
+    assert "user_oidc:provider" in text
+    assert "nextcloud" in text
+    assert "trustedDomains" in text
+    platform_text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "nextcloud" / "ingressroute.yaml"
+    ).read_text(encoding="utf-8")
+    assert "nextcloud.__ZONE_NAME__" in platform_text
+    db_externalsecret_text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "nextcloud" / "db-externalsecret.yaml"
+    ).read_text(encoding="utf-8")
+    assert "name: nextcloud-db-credentials" in db_externalsecret_text
+    assert "namespace: nextcloud" in db_externalsecret_text
+    assert "twinbox/global/nextcloud" in db_externalsecret_text
+
+
 def test_authentik_values_request_memory_for_server_and_worker():
     text = (REPO_ROOT / "gitops" / "apps" / "authentik" / "values.yaml").read_text(
         encoding="utf-8"

@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
+from typing import Optional
 from urllib import error, request
 
 
@@ -109,10 +110,10 @@ def _write_cluster_file(
     data_dir: Path,
     cluster_id: str,
     *,
-    slug: str | None = None,
+    slug: Optional[str] = None,
     dns_domain: str = "example.com",
-    selected_ingress_route: str | None = None,
-    updated_at: str | None = None,
+    selected_ingress_route: Optional[str] = None,
+    updated_at: Optional[str] = None,
 ):
     cluster_file = data_dir / "clusters" / f"{cluster_id}.json"
     cluster_file.parent.mkdir(parents=True, exist_ok=True)
@@ -235,6 +236,9 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert talos_steps["install-freshrss"]["title"] == "Install FreshRSS"
             assert "placeholder" not in talos_steps["install-freshrss"]["summary"].lower()
             assert "placeholder" not in talos_steps["install-freshrss"]["explanation"].lower()
+            assert talos_steps["install-nextcloud"]["title"] == "Install Nextcloud"
+            assert "placeholder" not in talos_steps["install-nextcloud"]["summary"].lower()
+            assert "placeholder" not in talos_steps["install-nextcloud"]["explanation"].lower()
             assert talos_steps["install-audiobookshelf"]["title"] == "Install Audiobookshelf"
             assert "placeholder" not in talos_steps["install-audiobookshelf"]["summary"].lower()
             assert "placeholder" not in talos_steps["install-audiobookshelf"]["explanation"].lower()
@@ -327,6 +331,11 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
             assert audiobookshelf["installable"] is True
             assert audiobookshelf["app_state"] == "ready"
             assert audiobookshelf["runner"]["script"] == "categories/apps/steps/install-audiobookshelf/run.sh"
+            nextcloud = next(step for step in apps if step["id"] == "install-nextcloud")
+            assert nextcloud["placeholder"] is False
+            assert nextcloud["installable"] is True
+            assert nextcloud["app_state"] == "ready"
+            assert nextcloud["runner"]["script"] == "categories/apps/steps/install-nextcloud/run.sh"
         finally:
             proc.terminate()
             proc.wait(timeout=5)

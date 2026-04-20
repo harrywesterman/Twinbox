@@ -1,0 +1,87 @@
+replicaCount: 1
+
+service:
+  type: ClusterIP
+
+phpClientHttpsFix:
+  enabled: true
+  protocol: https
+
+ingress:
+  enabled: false
+
+cronjob:
+  enabled: true
+  type: sidecar
+
+nextcloud:
+  existingSecret:
+    enabled: true
+    secretName: nextcloud-admin
+    usernameKey: username
+    passwordKey: password
+  defaultConfigs:
+    .htaccess: true
+    apps.config.php: true
+    autoconfig.php: true
+    redis.config.php: true
+    reverse-proxy.config.php: true
+  configs:
+    proxy.config.php: |-
+      <?php
+      $CONFIG = array (
+        'trusted_proxies' => array(
+          0 => 'traefik.traefik.svc.cluster.local',
+          1 => '127.0.0.1',
+          2 => '10.0.0.0/8',
+          3 => '172.16.0.0/12',
+          4 => '192.168.0.0/16',
+        ),
+        'forwarded_for_headers' => array('HTTP_X_FORWARDED_FOR'),
+      );
+  persistence:
+    enabled: true
+    storageClass: longhorn
+    size: 8Gi
+    nextcloudData:
+      enabled: true
+      storageClass: longhorn
+      size: 20Gi
+
+externalDatabase:
+  enabled: true
+  type: postgresql
+  host: nextcloud-db-pooler-rw.databases.svc.cluster.local
+  database: nextcloud
+  existingSecret:
+    enabled: true
+    secretName: nextcloud-db-credentials
+    usernameKey: username
+    passwordKey: password
+
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: true
+    existingSecret: nextcloud-redis
+    existingSecretPasswordKey: password
+  global:
+    storageClass: longhorn
+  master:
+    persistence:
+      enabled: true
+      storageClass: longhorn
+      size: 1Gi
+  replica:
+    persistence:
+      enabled: false
+
+mariadb:
+  enabled: false
+
+postgresql:
+  enabled: false
+
+externalRedis:
+  enabled: false

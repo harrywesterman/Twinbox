@@ -1,0 +1,54 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: nextcloud-db
+  namespace: databases
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.4
+
+  backup:
+    barmanObjectStore:
+      serverName: nextcloud-db
+      destinationPath: s3://twinbox-velero/nextcloud-db/
+      endpointURL: http://seaweedfs.longhorn-system.svc.cluster.local:8333
+      s3Credentials:
+        accessKeyId:
+          name: seaweedfs-backup-credentials
+          key: AWS_ACCESS_KEY_ID
+        secretAccessKey:
+          name: seaweedfs-backup-credentials
+          key: AWS_SECRET_ACCESS_KEY
+
+  bootstrap:
+    initdb:
+      database: nextcloud
+      owner: nextcloud
+      secret:
+        name: nextcloud-db-credentials
+
+  storage:
+    size: 3Gi
+    storageClass: longhorn-single
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+  postgresql:
+    parameters:
+      max_connections: "100"
+      shared_buffers: "256MB"
+      effective_cache_size: "768MB"
+      work_mem: "4MB"
+
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
+
+  monitoring:
+    enablePodMonitor: true
