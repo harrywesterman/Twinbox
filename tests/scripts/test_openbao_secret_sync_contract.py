@@ -169,7 +169,12 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "ZULIP_AUTH_BACKENDS: GenericOpenIdConnectBackend" in app_text
 
     assert "size: 5Gi" in values_text
-    assert "size: 4Gi" in values_text
+    assert "postgresql:" in values_text
+    assert "enabled: false" in values_text
+    assert "externalPostgresql:" in values_text
+    assert "host: zulip-db-pooler-rw.databases.svc.cluster.local" in values_text
+    assert "name: zulip-db-credentials" in values_text
+    assert "key: password" in values_text
     assert "storageClass: longhorn" in values_text
     assert "SECRETS_secret_key:" in values_text
     assert "SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS:" in values_text
