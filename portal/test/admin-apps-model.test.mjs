@@ -21,6 +21,7 @@ test("buildAdminAppsViewModel keeps all apps visible and marks install states", 
               title: "Install Immich",
               summary: "Photo and video library",
               description: "Immich on Longhorn",
+              icon_artwork_url: "/assets/step-icons/install-immich.svg",
               app_state: "ready",
               placeholder: false,
               dependencies: [
@@ -55,6 +56,8 @@ test("buildAdminAppsViewModel keeps all apps visible and marks install states", 
   assert.equal(viewModel.cards.length, 2);
   assert.equal(viewModel.selectedApp.id, "install-immich");
   assert.equal(viewModel.selectedApp.app_state, "ready");
+  assert.equal(viewModel.selectedApp.iconUrl, "/assets/step-icons/install-immich.svg");
+  assert.equal(viewModel.selectedApp.iconAlt, "Install Immich icon");
   assert.equal(viewModel.stateCounts.ready, 1);
   assert.equal(viewModel.stateCounts.planned, 1);
   assert.equal(viewModel.bundles.length, 1);

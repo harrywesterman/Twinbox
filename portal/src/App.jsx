@@ -686,7 +686,7 @@ function LogViewport({ lines = [], emptyLabel = 'Waiting for output...', viewpor
 function AdminAppCard({ card, selected, onSelect }) {
   const iconCard = {
     ...card,
-    iconUrl: card.iconUrl || adminStepIconUrl(card),
+    iconUrl: card.iconUrl || card.iconArtworkUrl || adminStepIconUrl(card),
     iconAlt: `${card.title} icon`,
   };
 
@@ -1005,7 +1005,7 @@ function AdminAppsPage({ onNavigate, adminAppsState }) {
                 <AppIcon
                   card={{
                     ...selectedApp,
-                    iconUrl: selectedApp.iconUrl || adminStepIconUrl(selectedApp),
+                    iconUrl: selectedApp.iconUrl || selectedApp.iconArtworkUrl || adminStepIconUrl(selectedApp),
                     iconAlt: `${selectedApp.title} icon`,
                   }}
                   className="admin-app-detail-icon"
