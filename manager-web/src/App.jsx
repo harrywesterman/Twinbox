@@ -418,8 +418,12 @@ function InputField({ stepId, input, value, onChange }) {
     );
   }
 
-  if (stepId === 'provision-nodes' && input.id === 'scale_percent') {
-    const numericValue = Number.isFinite(Number(value)) ? Number(value) : 90;
+  if (stepId === 'provision-nodes' && (input.id === 'scale_percent' || input.id === 'worker_disk_percent')) {
+    const numericValue = Number.isFinite(Number(value))
+      ? Number(value)
+      : Number.isFinite(Number(input.default))
+        ? Number(input.default)
+        : 90;
 
     return (
       <label className="wizard-field wizard-field-range" htmlFor={controlId}>
@@ -472,6 +476,7 @@ function InputField({ stepId, input, value, onChange }) {
 
 const PROVISION_VM_INPUT_IDS = [
   'scale_percent',
+  'worker_disk_percent',
   'controlplane_count',
   'worker_count',
   'cpu_cores',
@@ -1559,10 +1564,13 @@ function App() {
       const explicitPlacementMap = draft.vm_node_map && typeof draft.vm_node_map === 'object'
         ? draft.vm_node_map
         : {};
-      if (Object.values(explicitPlacementMap).some((hostName) => String(hostName || '').trim().length > 0)) {
-        body.vm_node_map = placement.vmNodeMap;
-        body.vm_size_map = placement.vmSizeMap;
-      }
+      const hasExplicitPlacement = hasPlacementAssignments(explicitPlacementMap);
+      body.vm_node_map = hasExplicitPlacement
+        ? placement.vmNodeMap
+        : placement.suggestedVmNodeMap;
+      body.vm_size_map = hasExplicitPlacement
+        ? placement.vmSizeMap
+        : placement.suggestedVmSizeMap;
       body.vm_ip_map = buildProvisionVmIpMap(vmIpRows);
     }
 
@@ -2571,7 +2579,7 @@ function App() {
                           <h3>Scale the cluster footprint</h3>
                         </div>
                         <p className="wizard-input-block-note">
-                          The slider sets the starting footprint; the manual fields below stay editable.
+                          The sliders set the starting footprint and worker disk share; the manual fields below stay editable.
                         </p>
                       </div>
                       <div className="wizard-input-grid">
@@ -2586,7 +2594,7 @@ function App() {
                         ))}
                       </div>
                       <p className="wizard-input-block-note">
-                        Control plane nodes are fixed at 4 GB RAM and 10 GB disk. Worker disks scale from the selected host&apos;s free space once placement is set across the three Proxmox hosts.
+                        Control plane nodes are fixed at 4 GB RAM and 10 GB disk. Worker disks default to 80% of the free space shared across the three Proxmox hosts and can be tuned with the slider.
                       </p>
                     </section>
 

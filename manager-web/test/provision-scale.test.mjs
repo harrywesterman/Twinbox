@@ -11,6 +11,7 @@ import {
 
 const stepInputs = [
   { id: 'scale_percent', default: 90, min: 0, max: 100 },
+  { id: 'worker_disk_percent', default: 80, min: 10, max: 100 },
   { id: 'controlplane_count', default: 3, min: 1, max: 15 },
   { id: 'worker_count', default: 3, min: 0, max: 200 },
   { id: 'cpu_cores', default: 2, min: 1, max: 64 },
@@ -82,6 +83,7 @@ test('scale 90 preserves the default VM footprint', () => {
   assert.equal(values.worker_count, 3);
   assert.equal(values.cpu_cores, 2);
   assert.equal(values.memory_mb, 4096);
+  assert.equal(values.worker_disk_percent, 80);
 });
 
 test('provision node count falls back to the wizard defaults when the draft is empty', () => {
@@ -100,8 +102,10 @@ test('higher scale percentages grow the VM footprint and totals', () => {
   assert.ok(values.memory_mb >= 4096);
   assert.ok(summary.total_nodes >= 3);
   assert.ok(summary.total_memory_mb >= 12288);
+  assert.equal(summary.worker_disk_percent, 80);
   assert.equal(summary.controlplane_disk_gb, 10);
-  assert.ok(summary.worker_disk_gb >= 100);
+  assert.equal(summary.worker_disk_gb, 300);
+  assert.equal(summary.total_worker_disk_gb, 2400);
 });
 
 test('manual overrides stay in place when the scale slider changes', () => {
@@ -132,7 +136,7 @@ test('placement board suggests a host-aware Talos VM layout', () => {
   assert.equal(board.unassigned.length, 6);
   assert.equal(board.hostCards[0].assignments.length, 0);
   assert.equal(board.vmSizeMap['cp-1'].disk_gb, 10);
-  assert.ok(board.vmSizeMap['worker-1'].disk_gb >= 100);
+  assert.ok(board.suggestedVmSizeMap['worker-1'].disk_gb > 100);
 });
 
 test('placement board keeps the management VM fixed on its host and exposes its size', () => {
@@ -246,9 +250,9 @@ test('placement board keeps manual placements while resuggesting the rest', () =
   assert.equal(remixedBoard.suggestedVmNodeMap['worker-2'], initialBoard.suggestedVmNodeMap['worker-2']);
 });
 
-test('worker disk scales from host free space and scale percent', () => {
+test('worker disk follows the worker-disk slider share', () => {
   const board = buildProvisionPlacementBoard(stepInputs, {
-    scale_percent: 75,
+    worker_disk_percent: 50,
     worker_count: 1,
     vm_node_map: {
       'cp-1': 'pve-a',
@@ -270,7 +274,7 @@ test('worker disk scales from host free space and scale percent', () => {
     vms: [],
   });
 
-  assert.ok(board.vmSizeMap['worker-1'].disk_gb > 100);
+  assert.equal(board.vmSizeMap['worker-1'].disk_gb, 95);
   assert.equal(board.vmSizeMap['cp-1'].disk_gb, 10);
 });
 

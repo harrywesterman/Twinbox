@@ -3,10 +3,15 @@ const MIN_SCALE_PERCENT = 0;
 const DEFAULT_SCALE_PERCENT = 90;
 const MAX_SCALE_PERCENT = 100;
 const MAX_FOOTPRINT_MULTIPLIER = 4;
+const MIN_WORKER_DISK_PERCENT = 10;
+const DEFAULT_WORKER_DISK_PERCENT = 80;
+const MAX_WORKER_DISK_PERCENT = 100;
 
 const CONTROLPLANE_MEMORY_MB = 4096;
 const CONTROLPLANE_DISK_GB = 10;
-const WORKER_DISK_MIN_GB = 100;
+const WORKER_DISK_MIN_GB = 10;
+const WORKER_DISK_FALLBACK_GB = 100;
+const WORKER_PLACEMENT_DISK_GB = 10;
 const WORKER_MEMORY_DEFAULT_MB = 8192;
 
 export const PROVISION_AUTOSCALED_FIELDS = [
@@ -52,6 +57,14 @@ function getInputBounds(stepInputs, inputId, fallback = {}) {
 
 function normalizeScalePercent(value) {
   return clamp(roundToInteger(toNumber(value, DEFAULT_SCALE_PERCENT)), MIN_SCALE_PERCENT, MAX_SCALE_PERCENT);
+}
+
+function normalizeWorkerDiskPercent(value) {
+  return clamp(
+    roundToInteger(toNumber(value, DEFAULT_WORKER_DISK_PERCENT)),
+    MIN_WORKER_DISK_PERCENT,
+    MAX_WORKER_DISK_PERCENT,
+  );
 }
 
 function normalizeHostName(value) {
@@ -147,9 +160,11 @@ function buildBaseline(stepInputs) {
   const cpuCores = Math.max(1, roundToInteger(getInputDefault(stepInputs, 'cpu_cores', 2)));
   const workerMemoryMb = Math.max(512, roundToStep(getInputDefault(stepInputs, 'memory_mb', WORKER_MEMORY_DEFAULT_MB), 512));
   const scalePercent = normalizeScalePercent(getInputDefault(stepInputs, 'scale_percent', DEFAULT_SCALE_PERCENT));
+  const workerDiskPercent = normalizeWorkerDiskPercent(getInputDefault(stepInputs, 'worker_disk_percent', DEFAULT_WORKER_DISK_PERCENT));
 
   return {
     scalePercent,
+    workerDiskPercent,
     controlplaneCount,
     workerCount,
     nodeCount,
@@ -162,6 +177,7 @@ function buildBaseline(stepInputs) {
       worker_count: getInputBounds(stepInputs, 'worker_count', { min: 0, max: 200 }),
       cpu_cores: getInputBounds(stepInputs, 'cpu_cores', { min: 1, max: 64 }),
       memory_mb: getInputBounds(stepInputs, 'memory_mb', { min: 512, max: 1048576 }),
+      worker_disk_percent: getInputBounds(stepInputs, 'worker_disk_percent', { min: MIN_WORKER_DISK_PERCENT, max: MAX_WORKER_DISK_PERCENT }),
     },
   };
 }
@@ -203,6 +219,52 @@ function calculateFootprintMultiplier(scalePercent, baseline, resources) {
     return interpolate(0.5, 1, scalePercent * (100 / DEFAULT_SCALE_PERCENT));
   }
   return interpolate(1, capacityMultiplier, ((scalePercent - DEFAULT_SCALE_PERCENT) * 100) / (MAX_SCALE_PERCENT - DEFAULT_SCALE_PERCENT));
+}
+
+function calculateWorkerDiskGb(vmPlan, hostCards, vmNodeMap, workerDiskPercent = DEFAULT_WORKER_DISK_PERCENT) {
+  const plan = Array.isArray(vmPlan) ? vmPlan : [];
+  const hosts = Array.isArray(hostCards) ? hostCards : [];
+  const resolvedPercent = normalizeWorkerDiskPercent(workerDiskPercent);
+  const hostLookup = new Map(hosts.map((host) => [host.id, {
+    freeDiskGb: toNumber(host.freeDiskGb, 0),
+    controlplaneCount: 0,
+    workerCount: 0,
+  }]));
+
+  if (hostLookup.size === 0) {
+    return WORKER_DISK_FALLBACK_GB;
+  }
+
+  for (const vm of plan) {
+    const hostId = typeof vmNodeMap?.[vm.name] === 'string' ? normalizeHostName(vmNodeMap[vm.name]) : '';
+    const state = hostId ? hostLookup.get(hostId) : null;
+    if (!state) {
+      continue;
+    }
+
+    if (vm.type === 'controlplane') {
+      state.controlplaneCount += 1;
+    } else if (vm.type === 'worker') {
+      state.workerCount += 1;
+    }
+  }
+
+  const workerShares = [];
+  for (const state of hostLookup.values()) {
+    if (state.workerCount <= 0) {
+      continue;
+    }
+
+    const availableDiskGb = Math.max(0, state.freeDiskGb - (state.controlplaneCount * CONTROLPLANE_DISK_GB));
+    workerShares.push(availableDiskGb / state.workerCount);
+  }
+
+  if (workerShares.length === 0) {
+    return WORKER_DISK_FALLBACK_GB;
+  }
+
+  const rawDiskGb = Math.min(...workerShares);
+  return Math.max(WORKER_DISK_MIN_GB, Math.floor(rawDiskGb * (resolvedPercent / 100)));
 }
 
 export function getProvisionNodeCount(stepInputs = [], currentValues = {}) {
@@ -248,6 +310,9 @@ export function buildScaledProvisionInputs(scalePercent, stepInputs, currentValu
   return {
     ...existing,
     scale_percent: resolvedScale,
+    worker_disk_percent: Number.isFinite(Number(existing.worker_disk_percent))
+      ? normalizeWorkerDiskPercent(existing.worker_disk_percent)
+      : baseline.workerDiskPercent,
     controlplane_count: isDirty('controlplane_count')
       ? roundOrFallback(existing.controlplane_count ?? baseline.controlplaneCount, baseline.controlplaneCount, baseline.bounds.controlplane_count)
       : targetControlplanes,
@@ -266,22 +331,29 @@ export function buildScaledProvisionInputs(scalePercent, stepInputs, currentValu
 export function buildProvisionScaleSummary(scalePercent, stepInputs, currentValues = {}, resources = null) {
   const baseline = buildBaseline(stepInputs);
   const resolvedScale = normalizeScalePercent(scalePercent ?? currentValues.scale_percent ?? baseline.scalePercent);
+  const resolvedWorkerDiskPercent = normalizeWorkerDiskPercent(currentValues.worker_disk_percent ?? baseline.workerDiskPercent);
   const resourceSummary = resources?.summary || null;
   const controlplaneCount = Math.max(1, roundToInteger(toNumber(currentValues.controlplane_count, baseline.controlplaneCount)));
   const workerCount = Math.max(0, roundToInteger(toNumber(currentValues.worker_count, baseline.workerCount)));
   const cpuCores = Math.max(1, roundToInteger(toNumber(currentValues.cpu_cores, baseline.cpuCores)));
   const workerMemoryMb = Math.max(512, roundToStep(toNumber(currentValues.memory_mb, baseline.workerMemoryMb), 512));
   const totalNodes = Math.max(1, controlplaneCount + workerCount);
-  const availableWorkerDiskGb = Math.max(
-    0,
-    (resourceSummary?.freeDiskGb || 0) - (controlplaneCount * CONTROLPLANE_DISK_GB),
-  );
-  const workerDiskPerVm = workerCount > 0
+  const placementBoard = buildProvisionPlacementBoard(stepInputs, currentValues, resources);
+  const hasCurrentPlacement = currentValues?.vm_node_map
+    && typeof currentValues.vm_node_map === 'object'
+    && Object.values(currentValues.vm_node_map).some((value) => String(value || '').trim().length > 0);
+  const sizeMap = hasCurrentPlacement ? placementBoard.vmSizeMap : placementBoard.suggestedVmSizeMap;
+  const summaryFallbackWorkerDiskGb = resourceSummary?.freeDiskGb > 0 && workerCount > 0
     ? Math.max(
       WORKER_DISK_MIN_GB,
-      Math.round((availableWorkerDiskGb / Math.max(1, workerCount)) * (resolvedScale / 100)),
+      Math.floor((resourceSummary.freeDiskGb / Math.max(1, workerCount)) * (resolvedWorkerDiskPercent / 100)),
     )
-    : WORKER_DISK_MIN_GB;
+    : WORKER_DISK_FALLBACK_GB;
+  const workerDiskPerVm = placementBoard.hostCards.length > 0
+    ? sizeMap?.['worker-1']?.disk_gb
+      ?? placementBoard.suggestedVmSizeMap?.['worker-1']?.disk_gb
+      ?? summaryFallbackWorkerDiskGb
+    : summaryFallbackWorkerDiskGb;
 
   const totalCpuCores = totalNodes * cpuCores;
   const totalWorkerMemoryMb = workerCount * workerMemoryMb;
@@ -294,6 +366,7 @@ export function buildProvisionScaleSummary(scalePercent, stepInputs, currentValu
     worker_count: workerCount,
     cpu_cores: cpuCores,
     worker_memory_mb: workerMemoryMb,
+    worker_disk_percent: resolvedWorkerDiskPercent,
     controlplane_memory_mb: CONTROLPLANE_MEMORY_MB,
     controlplane_disk_gb: CONTROLPLANE_DISK_GB,
     worker_disk_gb: workerDiskPerVm,
@@ -589,42 +662,38 @@ export function suggestVmNodeMap(vmPlan, hostCards, currentMap = {}, placementSt
   return assignments;
 }
 
-function buildVmSizeMap(vmPlan, hostCards, currentMap = {}, scalePercent = DEFAULT_SCALE_PERCENT, allowSuggestedPlacement = true, placementState = new Map()) {
+function buildVmSizeMap(vmPlan, hostCards, currentMap = {}, workerDiskPercent = DEFAULT_WORKER_DISK_PERCENT, allowSuggestedPlacement = true, placementState = new Map()) {
   const plan = Array.isArray(vmPlan) ? vmPlan : [];
-  const hosts = Array.isArray(hostCards) ? hostCards.map((host) => ({ ...host })) : [];
-  const hostLookup = new Map(hosts.map((host) => [host.id, host]));
+  const workingHosts = Array.isArray(hostCards) ? hostCards.map((host) => ({ ...host })) : [];
+  const hostLookup = new Map(workingHosts.map((host) => [host.id, host]));
   const sizeMap = {};
   const assignments = {};
-  const resolvedScale = normalizeScalePercent(scalePercent);
+  const resolvedWorkerDiskPercent = normalizeWorkerDiskPercent(workerDiskPercent);
 
   for (const vm of plan) {
     const preservedHost = typeof currentMap?.[vm.name] === 'string' ? normalizeHostName(currentMap[vm.name]) : '';
     const host = preservedHost && hostLookup.has(preservedHost)
       ? hostLookup.get(preservedHost)
       : allowSuggestedPlacement
-        ? chooseBestHostForVm(vm, hosts, placementState)
+        ? chooseBestHostForVm({
+          ...vm,
+          disk_gb: vm.type === 'controlplane' ? CONTROLPLANE_DISK_GB : WORKER_PLACEMENT_DISK_GB,
+        }, workingHosts, placementState)
         : null;
 
     if (!host) {
       sizeMap[vm.name] = {
         cpu: vm.cpu,
         memory_mb: vm.memory_mb,
-        disk_gb: vm.type === 'controlplane' ? CONTROLPLANE_DISK_GB : WORKER_DISK_MIN_GB,
+        disk_gb: vm.type === 'controlplane' ? CONTROLPLANE_DISK_GB : WORKER_DISK_FALLBACK_GB,
       };
       continue;
     }
 
-    const diskGb = vm.type === 'controlplane'
-      ? CONTROLPLANE_DISK_GB
-      : Math.max(
-        WORKER_DISK_MIN_GB,
-        Math.round(host.freeDiskGb * (resolvedScale / 100)),
-      );
-
     sizeMap[vm.name] = {
       cpu: vm.cpu,
       memory_mb: vm.type === 'controlplane' ? CONTROLPLANE_MEMORY_MB : vm.memory_mb,
-      disk_gb: diskGb,
+      disk_gb: vm.type === 'controlplane' ? CONTROLPLANE_DISK_GB : WORKER_DISK_MIN_GB,
     };
 
     assignments[vm.name] = host.id;
@@ -640,12 +709,24 @@ function buildVmSizeMap(vmPlan, hostCards, currentMap = {}, scalePercent = DEFAU
 
     host.freeCpuCores = Math.max(0, host.freeCpuCores - sizeMap[vm.name].cpu);
     host.freeMemoryMb = Math.max(0, host.freeMemoryMb - sizeMap[vm.name].memory_mb);
-    host.freeDiskGb = Math.max(0, host.freeDiskGb - sizeMap[vm.name].disk_gb);
+    host.freeDiskGb = Math.max(0, host.freeDiskGb - (vm.type === 'controlplane' ? CONTROLPLANE_DISK_GB : WORKER_PLACEMENT_DISK_GB));
+  }
+
+  const workerDiskGb = calculateWorkerDiskGb(plan, hostCards, assignments, resolvedWorkerDiskPercent);
+
+  for (const vm of plan) {
+    if (vm.type === 'worker' && Object.prototype.hasOwnProperty.call(sizeMap, vm.name)) {
+      sizeMap[vm.name] = {
+        ...sizeMap[vm.name],
+        disk_gb: workerDiskGb,
+      };
+    }
   }
 
   return {
     vmNodeMap: assignments,
     vmSizeMap: sizeMap,
+    workerDiskGb,
   };
 }
 
@@ -655,7 +736,7 @@ export function buildProvisionPlacementBoard(stepInputs, currentValues = {}, res
   const currentMap = currentValues && typeof currentValues.vm_node_map === 'object'
     ? currentValues.vm_node_map
     : {};
-  const scalePercent = currentValues?.scale_percent ?? DEFAULT_SCALE_PERCENT;
+  const workerDiskPercent = currentValues?.worker_disk_percent ?? DEFAULT_WORKER_DISK_PERCENT;
   const hostLookup = new Map(hostCards.map((host) => [host.id, host]));
   const placementsByHost = new Map(hostCards.map((host) => [host.id, []]));
   const managementVm = buildManagementVmResource(resources?.vms, hostLookup);
@@ -679,8 +760,8 @@ export function buildProvisionPlacementBoard(stepInputs, currentValues = {}, res
   const suggestedPlacementState = clonePlacementState(basePlacementState);
   const currentPlacementState = clonePlacementState(basePlacementState);
   const suggestedVmNodeMap = suggestVmNodeMap(vmPlan, hostCards, {}, suggestedPlacementState);
-  const suggestedPlacement = buildVmSizeMap(vmPlan, hostCards, suggestedVmNodeMap, scalePercent, true, clonePlacementState(basePlacementState));
-  const placement = buildVmSizeMap(vmPlan, hostCards, currentMap, scalePercent, false, currentPlacementState);
+  const suggestedPlacement = buildVmSizeMap(vmPlan, hostCards, suggestedVmNodeMap, workerDiskPercent, true, clonePlacementState(basePlacementState));
+  const placement = buildVmSizeMap(vmPlan, hostCards, currentMap, workerDiskPercent, false, currentPlacementState);
 
   for (const vm of vmPlan) {
     const hostId = placement.vmNodeMap[vm.name];

@@ -303,6 +303,7 @@ export function buildClusterFromRequest(body, env, { allowedVmHosts = [], cluste
   const parsedWorkers = parseIntInRange(body.worker_count, "worker_count", 0, 200);
   const parsedCpu = parseIntInRange(body.cpu_cores, "cpu_cores", 1, 64);
   const parsedMemory = parseIntInRange(body.memory_mb, "memory_mb", 512, 1048576);
+  const parsedWorkerDiskPercent = parseIntInRange(body.worker_disk_percent ?? 80, "worker_disk_percent", 10, 100);
   const parsedStartVmid = parseIntInRange(body.start_vmid, "start_vmid", 100, 999999);
   const parsedVipIp = parseIPv4(body.vip_ip, "vip_ip");
   const parsedNodePrefixLength = parseIntInRange(body.node_prefix_length, "node_prefix_length", 1, 32);
@@ -329,6 +330,7 @@ export function buildClusterFromRequest(body, env, { allowedVmHosts = [], cluste
     parsedWorkers,
     parsedCpu,
     parsedMemory,
+    parsedWorkerDiskPercent,
     parsedStartVmid,
     parsedVipIp,
     parsedNodePrefixLength,
@@ -372,10 +374,11 @@ export function buildClusterFromRequest(body, env, { allowedVmHosts = [], cluste
       worker_count: parsedWorkers.value,
       cpu_cores: parsedCpu.value,
       memory_mb: parsedMemory.value,
+      worker_disk_percent: parsedWorkerDiskPercent.value,
       controlplane_memory_mb: 4096,
       controlplane_disk_gb: 10,
       worker_memory_mb: parsedMemory.value,
-      worker_disk_gb: 100,
+      worker_disk_gb: parsedVmSizeMap.value["worker-1"]?.disk_gb ?? 100,
       bridge: parsedBridge.value,
       start_vmid: parsedStartVmid.value,
       vip_ip: parsedVipIp.value,

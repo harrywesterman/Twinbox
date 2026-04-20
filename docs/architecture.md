@@ -61,7 +61,7 @@ When you change Twinbox code, commit it to `main`, wait for the GitHub Actions i
 ## Secret Flow
 
 1. The Management VM bootstraps local JSON files under `/opt/twinbox/bootstrap/secrets/global/`.
-2. `provision-nodes` sizes control-plane VMs at `4 GB RAM / 10 GB disk`, sizes workers separately with a `90%` disk budget from the selected host's free space on each Proxmox node, and labels Talos nodes with `twinbox.io/role`.
+2. `provision-nodes` sizes control-plane VMs at `4 GB RAM / 10 GB disk`, sizes workers from an `80%` share of the free disk budget across the three Proxmox hosts with a worker-disk slider, and labels Talos nodes with `twinbox.io/role`.
 3. `provision-nodes` materializes Talos runtime files from the local bootstrap tree and cluster-scoped attachments.
 4. `provision-nodes` renders the pinned Cilium Helm chart against the cluster VIP/API endpoint, stores the bootstrap manifest under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/cilium/`, and injects it as an inline manifest into every control-plane Talos config.
 5. The Cilium bootstrap enables Hubble Relay and the Hubble UI so network flows are visible from the first cluster boot.
