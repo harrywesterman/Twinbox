@@ -192,13 +192,18 @@ kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/namespace.
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/externalsecret.yaml"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/pvc.yaml"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/service.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/deployment.yaml"
 
 rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/twinbox-portal-ingressroute.XXXXXX.yaml")"
 rendered_application="$(mktemp "${TMPDIR:-/tmp}/twinbox-portal-application.XXXXXX.yaml")"
 trap 'rm -f "$secret_file" "$rendered_ingressroute" "$rendered_application"' EXIT
 sed "s/__ZONE_NAME__/${public_zone_name}/g" \
   "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/ingressroute.yaml" >"$rendered_ingressroute"
+node "$WORKSPACE_ROOT/manager-worker/src/refresh-portal-config.mjs" \
+  --workspace-root "$WORKSPACE_ROOT" \
+  --manager-data-dir "$MANAGER_DATA_DIR" \
+  --cluster-id "$cluster_id"
+
+kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/deployment.yaml"
 kubectl apply -f "$rendered_ingressroute"
 
 sed "s/__ZONE_NAME__/${public_zone_name}/g" \
@@ -207,10 +212,5 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$rendered_application" \
   --application "twinbox-portal" \
   --destination-namespace "twinbox-portal"
-
-node "$WORKSPACE_ROOT/manager-worker/src/refresh-portal-config.mjs" \
-  --workspace-root "$WORKSPACE_ROOT" \
-  --manager-data-dir "$MANAGER_DATA_DIR" \
-  --cluster-id "$cluster_id"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Twinbox Portal configuration complete"

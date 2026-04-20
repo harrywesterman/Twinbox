@@ -210,7 +210,11 @@ function main() {
   const clusterScopeId = options.clusterInstanceId || currentCluster.cluster_instance_id || currentCluster.instance_id || currentCluster.id;
   const stepStateById = readStepStates(options.managerDataDir, steps, clusterScopeId);
   const portalStepState = stepStateById.get("install-twinbox-portal");
-  if (portalStepState && !["succeeded", "configured"].includes(String(portalStepState.status || ""))) {
+  if (
+    portalStepState &&
+    !["succeeded", "configured"].includes(String(portalStepState.status || "")) &&
+    options.triggerStepId !== "install-twinbox-portal"
+  ) {
     console.log("Portal refresh skipped: install-twinbox-portal is not complete yet");
     return;
   }

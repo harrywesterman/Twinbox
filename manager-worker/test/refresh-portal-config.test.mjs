@@ -13,7 +13,7 @@ function writeExecutable(file, content) {
   fs.chmodSync(file, 0o755);
 }
 
-function setupWorkspace() {
+function setupWorkspace(stepStatus = "succeeded") {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "portal-refresh-test-"));
   const dataDir = path.join(root, "data");
   const binDir = path.join(root, "bin");
@@ -39,7 +39,7 @@ function setupWorkspace() {
     path.join(dataDir, "step-state", "clusters", "cluster_test", "install-twinbox-portal.json"),
     JSON.stringify({
       step_id: "install-twinbox-portal",
-      status: "succeeded",
+      status: stepStatus,
       inputs: {},
       outputs: {},
       cluster_id: "cluster_test",
@@ -80,6 +80,34 @@ exit 0
 
 test("refresh-portal-config renders the portal secret after install", () => {
   const { dataDir, binDir, logFile } = setupWorkspace();
+  const env = {
+    ...process.env,
+    PATH: `${binDir}:${process.env.PATH || ""}`,
+    MANAGER_DATA_DIR: dataDir,
+    WORKSPACE_ROOT: repoRoot,
+  };
+
+  const result = spawnSync("node", [
+    "manager-worker/src/refresh-portal-config.mjs",
+    "--workspace-root", repoRoot,
+    "--manager-data-dir", dataDir,
+    "--cluster-id", "cluster_test",
+    "--cluster-instance-id", "cluster_test_instance",
+    "--trigger-step-id", "install-twinbox-portal",
+  ], {
+    cwd: repoRoot,
+    env,
+    encoding: "utf8",
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(fs.existsSync(logFile), true);
+  const logText = fs.readFileSync(logFile, "utf8");
+  assert.match(logText, /kubectl -n twinbox-portal create secret generic portal-config/);
+});
+
+test("refresh-portal-config runs during portal install when self-triggered", () => {
+  const { dataDir, binDir, logFile } = setupWorkspace("running");
   const env = {
     ...process.env,
     PATH: `${binDir}:${process.env.PATH || ""}`,
