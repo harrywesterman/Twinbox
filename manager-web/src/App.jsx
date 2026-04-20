@@ -979,6 +979,7 @@ function App() {
     results: {},
   });
   const [provisionIpChecking, setProvisionIpChecking] = useState(false);
+  const [provisionIpSuggestionsLoading, setProvisionIpSuggestionsLoading] = useState(false);
   const [hasStarted, setHasStarted] = useState(Boolean(
     storedWizardState.selectedStepId
     || storedWizardState.clusterId
@@ -1478,9 +1479,13 @@ function App() {
   }
 
   async function applyProvisionIpHelp() {
-    if (currentStep?.id !== 'provision-nodes') {
+    if (currentStep?.id !== 'provision-nodes' || busyRef.current || provisionIpSuggestionsLoading) {
       return;
     }
+
+    setProvisionIpSuggestionsLoading(true);
+    setError('');
+    setNotice('Checking the local subnet for free IP addresses. Please wait while Twinbox fills them in automatically.');
 
     try {
       const draft = answersRef.current?.[currentStep.id] || {};
@@ -1505,11 +1510,13 @@ function App() {
         dns_domain: suggestionData.dns_domain ?? draft.dns_domain,
         vm_ip_map: buildProvisionVmIpMap(vmIpRows),
       });
-      setNotice('Filled the network and free-IP defaults from the current Proxmox subnet.');
+      setNotice('Twinbox checked the subnet and filled the free IP defaults automatically.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fill free IP defaults.';
       setError(message);
       setNotice(message);
+    } finally {
+      setProvisionIpSuggestionsLoading(false);
     }
   }
 
@@ -2250,14 +2257,14 @@ function App() {
   const questionInputsValid = currentStep
     ? (currentStep.inputs || []).every((input) => hasRequiredValue(input, currentDraft[input.id]))
     : false;
-  const primaryActionDisabled = !provisionStepValid || !questionInputsValid || busy || provisionIpChecking;
+  const primaryActionDisabled = !provisionStepValid || !questionInputsValid || busy || provisionIpChecking || provisionIpSuggestionsLoading;
   const primaryActionLabel = isQuestionPhase
-    ? ((currentStep?.id === 'provision-nodes' && provisionIpChecking)
+    ? ((currentStep?.id === 'provision-nodes' && (provisionIpChecking || provisionIpSuggestionsLoading))
       ? 'Checking...'
       : (questionStepIndex === questionSteps.length - 1 ? 'Continue to installation' : 'Next'))
     : '';
   const primaryActionHelperText = isQuestionPhase
-    ? (currentStep?.id === 'provision-nodes' && provisionIpChecking
+    ? (currentStep?.id === 'provision-nodes' && (provisionIpChecking || provisionIpSuggestionsLoading)
       ? 'Checking IP addresses.'
       : currentStep?.id === 'provision-nodes' && !provisionVmIpValidation.ok
       ? 'Fill in the Talos IP addresses before continuing.'
@@ -2630,10 +2637,16 @@ function App() {
                       </div>
 
                       <div className="wizard-card-actions wizard-card-actions-inline wizard-network-help-row">
-                        <button className="button button-secondary" type="button" onClick={applyProvisionIpHelp} disabled={busy || provisionIpChecking}>
-                          Help me with free IPs
+                        <button className="button button-secondary" type="button" onClick={applyProvisionIpHelp} disabled={busy || provisionIpChecking || provisionIpSuggestionsLoading}>
+                          {provisionIpSuggestionsLoading ? 'Assigning free IPs…' : 'Help me with free IPs'}
                         </button>
                       </div>
+
+                      {provisionIpSuggestionsLoading ? (
+                        <p className="wizard-network-check-summary is-pending" aria-live="polite">
+                          Checking the local subnet for free IP addresses. Please wait while Twinbox fills them in automatically.
+                        </p>
+                      ) : null}
 
                       {provisionIpCheckSummary ? (
                         <p className={`wizard-network-check-summary is-${provisionIpCheckSummary.tone}`}>

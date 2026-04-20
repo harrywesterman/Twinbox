@@ -26,6 +26,9 @@ test('app source defines a minimal wizard shell with guided input and step-by-st
   assert.match(source, /type="range"/, 'expected the scale slider');
   assert.match(source, /wizard-step-actions-panel/, 'expected a dedicated step 1 helper bar');
   assert.match(source, /Help me with free IPs/, 'expected the IP helper button');
+  assert.match(source, /Assigning free IPs…/, 'expected the helper button to show a loading label');
+  assert.match(source, /Checking the local subnet for free IP addresses\. Please wait while Twinbox fills them in automatically\./, 'expected inline wait feedback for the IP helper');
+  assert.match(source, /is-pending/, 'expected a pending network status style hook');
   assert.match(source, /Cluster identity/, 'expected the Talos cluster name to be shown as a derived summary');
   assert.match(source, /Twinbox saves this name automatically from the wizard choice/, 'expected the cluster name to be auto-saved from the earlier choice');
   assert.doesNotMatch(questionFlow, /Cluster name/, 'expected the Talos questions to stop asking for the cluster name');
@@ -122,6 +125,7 @@ test('styles define a wizard-first, responsive installer layout', async () => {
   assert.match(css, /\.wizard-choice-grid\s*\{/, 'expected numbered choice cards');
   assert.match(css, /\.wizard-step-actions-panel\s*\{/, 'expected the step 1 helper panel');
   assert.match(css, /\.wizard-step-actions-panel-actions\s*\{/, 'expected the helper button grid');
+  assert.match(css, /\.wizard-network-check-summary\.is-pending\s*\{/, 'expected a pending loading style for IP suggestions');
   assert.match(css, /\.wizard-log-viewport\s*\{/, 'expected a scrolling live-log viewport');
   assert.match(css, /\.wizard-output-panel\.is-live\s*\{/, 'expected live output emphasis');
   assert.doesNotMatch(css, /\.technical-panel\[open\]\s*\{/, 'expected technical details to be removed');

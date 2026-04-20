@@ -1173,6 +1173,12 @@
   color: #047857;
 }
 
+.wizard-network-check-summary.is-pending {
+  border: 1px solid rgba(59, 130, 246, 0.24);
+  background: rgba(239, 246, 255, 0.96);
+  color: #1d4ed8;
+}
+
 .wizard-network-check-summary.is-danger {
   border: 1px solid rgba(248, 113, 113, 0.22);
   background: rgba(254, 242, 242, 0.96);
