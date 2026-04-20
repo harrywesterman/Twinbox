@@ -629,17 +629,25 @@ a {
 }
 
 .admin-actions {
-  gap: 10px;
+  gap: 14px;
   margin: 0 0 18px;
-  padding: 16px 18px;
+  padding: 18px;
   border: 1px solid var(--line);
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.04);
+  background: linear-gradient(135deg, rgba(45, 212, 191, 0.08), rgba(96, 165, 250, 0.06));
 }
 
-.admin-actions span {
+.admin-actions-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-actions-copy {
+  margin: 0;
   color: var(--muted);
   font-size: 0.92rem;
+  line-height: 1.5;
 }
 
 .inline-notice {
@@ -785,6 +793,17 @@ a {
   background: rgba(45, 212, 191, 0.08);
 }
 
+.admin-app-card.is-dashy {
+  border-color: rgba(96, 165, 250, 0.24);
+  background: linear-gradient(135deg, rgba(45, 212, 191, 0.12), rgba(96, 165, 250, 0.14));
+}
+
+.admin-app-card.is-dashy:hover,
+.admin-app-card.is-dashy.is-selected {
+  border-color: rgba(96, 165, 250, 0.38);
+  background: linear-gradient(135deg, rgba(45, 212, 191, 0.18), rgba(96, 165, 250, 0.22));
+}
+
 .admin-app-card-meta {
   display: grid;
   align-content: center;
@@ -807,6 +826,22 @@ a {
 .admin-app-card-copy strong,
 .admin-app-card-copy span {
   min-width: 0;
+}
+
+.admin-app-card.is-dashy .app-tile-badge {
+  background: linear-gradient(135deg, rgba(8, 16, 29, 0.96), rgba(30, 41, 59, 0.96));
+  box-shadow: 0 16px 24px rgba(8, 16, 29, 0.14);
+}
+
+.admin-app-card.is-dashy .admin-app-card-copy strong,
+.admin-app-card.is-dashy .admin-app-card-copy span,
+.admin-app-card.is-dashy .admin-app-card-meta small {
+  color: #08101d;
+}
+
+.admin-app-card.is-dashy .status-chip {
+  background: rgba(255, 255, 255, 0.5);
+  color: #08101d;
 }
 
 .admin-app-detail-head {

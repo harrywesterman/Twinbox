@@ -429,6 +429,10 @@ async function requestPortal(pathname, { method = "GET", body, cookie } = {}) {
 test.before(async () => {
   seedAuthentikState();
   writePortalConfig({
+    settings: {
+      authentikUserUrl: "https://authentik.tst.example.com/if/user/#/settings;{\"page\":\"page-details\"}",
+      authentikOtpUrl: "https://authentik.tst.example.com/if/user/#/settings;{\"page\":\"page-mfa\"}",
+    },
     userAdmin: {
       manageableGroups: [
         { name: "employees", label: "Employees" },
@@ -664,6 +668,8 @@ test("portal config exposes a single Apps section and image icons", async () => 
   assert.equal(config.payload.apps.length, 1);
   assert.equal(config.payload.appSections.length, 1);
   assert.equal(config.payload.appSections[0].name, "Apps");
+  assert.equal(config.payload.settings.authentikUserUrl, "https://authentik.tst.example.com/if/user/#/settings;{\"page\":\"page-details\"}");
+  assert.equal(config.payload.settings.authentikOtpUrl, "https://authentik.tst.example.com/if/user/#/settings;{\"page\":\"page-mfa\"}");
   assert.equal(config.payload.apps[0].iconUrl, "/assets/step-icons/install-immich.svg");
   assert.equal(config.payload.apps[0].iconAlt, "Immich icon");
 });

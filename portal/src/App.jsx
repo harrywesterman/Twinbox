@@ -603,13 +603,17 @@ function AdminPage({ adminApps, onNavigate }) {
         description="Operators and admins get their own screen, separate from the normal launcher."
       />
       <div className="admin-actions">
-        <button type="button" className="primary-button" onClick={() => onNavigate('/admin/apps')}>
-          Open app installs
-        </button>
-        <button type="button" className="primary-button" onClick={() => onNavigate('/admin/users')}>
-          Open user admin
-        </button>
-        <span>Give non-technical admins one safe place to add, disable, and group users.</span>
+        <div className="admin-actions-buttons">
+          <button type="button" className="primary-button" onClick={() => onNavigate('/admin/apps')}>
+            Open app installs
+          </button>
+          <button type="button" className="primary-button" onClick={() => onNavigate('/admin/users')}>
+            Open user admin
+          </button>
+        </div>
+        <p className="admin-actions-copy">
+          Give non-technical admins one safe place to add, disable, and group users.
+        </p>
       </div>
       <div className="card-grid">
         {adminApps.map((card) => (
@@ -674,7 +678,7 @@ function AdminAppCard({ card, selected, onSelect }) {
   return (
     <button
       type="button"
-      className={`admin-app-card ${selected ? 'is-selected' : ''}`}
+      className={`admin-app-card ${selected ? 'is-selected' : ''} ${card.title === 'Dashy' ? 'is-dashy' : ''}`}
       onClick={onSelect}
     >
       <span className="app-tile-badge" style={{ '--accent': card.accent || '#2dd4bf' }}>
