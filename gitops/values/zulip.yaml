@@ -17,9 +17,18 @@ zulip:
     storageClass: longhorn
 
 postgresql:
-  primary:
-    persistence:
-      size: 4Gi
+  enabled: false
+
+externalPostgresql:
+  host: zulip-db-pooler-rw.databases.svc.cluster.local
+  port: 5432
+  database: zulip
+  user: zulip
+  password:
+    valueFrom:
+      secretKeyRef:
+        name: zulip-db-credentials
+        key: password
 
 ingress:
   enabled: false

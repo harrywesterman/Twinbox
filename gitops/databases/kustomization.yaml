@@ -16,4 +16,9 @@ resources:
   - immich/pooler-rw.yaml
   - immich/pooler-rw-session.yaml
   - immich/scheduled-backup.yaml
+  - zulip/cluster.yaml
+  - zulip/externalsecret.yaml
+  - zulip/pooler-ro.yaml
+  - zulip/pooler-rw.yaml
+  - zulip/scheduled-backup.yaml
   - seaweedfs-backup-credentials.yaml

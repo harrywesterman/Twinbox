@@ -3,8 +3,8 @@ title: Install Zulip
 type: action
 journey_stage: setup
 order: 72
-summary: Install Zulip with Longhorn persistence, Authentik OIDC, and Traefik ingress.
-explanation: Twinbox provisions Zulip as a GitOps application with a Longhorn-backed persistent volume, an Authentik OIDC provider for login, and Traefik ingress routes for the selected cluster entrypoint. The step also seeds Zulip's secret key and OIDC configuration into OpenBao so the chart can read them through External Secrets instead of storing bootstrap material in the repository.
+summary: Install Zulip with Longhorn persistence, CloudNativePG, Authentik OIDC, and Traefik ingress.
+explanation: Twinbox provisions Zulip as a GitOps application with a Longhorn-backed persistent volume, a dedicated CloudNativePG PostgreSQL cluster, an Authentik OIDC provider for login, and Traefik ingress routes for the selected cluster entrypoint. The step also seeds Zulip's secret key, OIDC configuration, and database credentials into OpenBao so the chart can read them through External Secrets instead of storing bootstrap material in the repository.
 side_help: Communication tools belong in the same user-facing app sequence, and Zulip follows the same OIDC bootstrap pattern as the other user-facing apps.
 depends_on:
   - install-immich

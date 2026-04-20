@@ -11,12 +11,131 @@ source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
 # shellcheck disable=SC1091
 source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"
 
-export KUBECONFIG="$KUBECONFIG_FILE"
+log() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
 
 fail() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
   exit 1
 }
+
+resolve_kubeconfig_file() {
+  if [[ -z "${KUBECONFIG_FILE:-}" ]]; then
+    fail "KUBECONFIG_FILE is required"
+  fi
+
+  if [[ ! -f "${KUBECONFIG_FILE:-}" ]]; then
+    fail "KUBECONFIG_FILE does not exist at ${KUBECONFIG_FILE:-}"
+  fi
+
+  printf '%s\n' "$KUBECONFIG_FILE"
+}
+
+wait_for_resources_ready() {
+  local namespace="$1"
+  local kind="$2"
+  local condition="$3"
+  local label="$4"
+  local attempts=120
+  local attempt=1
+
+  while true; do
+    if kubectl -n "$namespace" get "$kind" -o name 2>/dev/null | grep -q .; then
+      if kubectl -n "$namespace" wait --for="condition=${condition}" "$kind" --all --timeout=5s >/dev/null 2>&1; then
+        log "${label} resources are ready"
+        return 0
+      fi
+
+      log "Waiting for ${label} resources to become ready"
+    else
+      log "Waiting for ${label} resources to appear"
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      fail "${label} resources did not become ready after ${attempts} attempts"
+    fi
+
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
+wait_for_statefulset_ready() {
+  local namespace="$1"
+  local statefulset="$2"
+  local label="${3:-$statefulset}"
+  local attempts=120
+  local attempt=1
+
+  while true; do
+    local status_json replicas ready_replicas
+    if status_json="$(kubectl -n "$namespace" get statefulset "$statefulset" -o json 2>/dev/null)"; then
+      replicas="$(jq -r '.spec.replicas // 0' <<<"$status_json")"
+      ready_replicas="$(jq -r '.status.readyReplicas // 0' <<<"$status_json")"
+      if [[ "$replicas" == "$ready_replicas" && "$replicas" != "0" ]]; then
+        log "${label} is ready"
+        return 0
+      fi
+
+      log "Waiting for ${label} (${attempt}/${attempts}): ready=${ready_replicas}, desired=${replicas}"
+    else
+      log "Waiting for ${label} statefulset to appear (${attempt}/${attempts})"
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      fail "Timed out waiting for ${label}"
+    fi
+
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
+wait_for_deployment_rollout() {
+  local namespace="$1"
+  local deployment="$2"
+  local label="${3:-$deployment}"
+  local attempts=120
+  local attempt=1
+  local status_json=""
+  local desired_replicas=""
+  local updated_replicas=""
+  local ready_replicas=""
+  local available_replicas=""
+
+  while true; do
+    if status_json="$(kubectl -n "$namespace" get deployment "$deployment" -o json 2>/dev/null)"; then
+      desired_replicas="$(jq -r '.spec.replicas // 0' <<<"$status_json")"
+      updated_replicas="$(jq -r '.status.updatedReplicas // 0' <<<"$status_json")"
+      ready_replicas="$(jq -r '.status.readyReplicas // 0' <<<"$status_json")"
+      available_replicas="$(jq -r '.status.availableReplicas // 0' <<<"$status_json")"
+
+      if [[ "$updated_replicas" == "$desired_replicas" && "$ready_replicas" == "$desired_replicas" && "$available_replicas" == "$desired_replicas" ]]; then
+        log "${label} is ready"
+        return 0
+      fi
+
+      log "Waiting for ${label} (${attempt}/${attempts}): desired=${desired_replicas}, updated=${updated_replicas}, ready=${ready_replicas}, available=${available_replicas}"
+    else
+      log "Waiting for ${label} deployment to appear (${attempt}/${attempts})"
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      fail "Timed out waiting for ${label}"
+    fi
+
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
+KUBECONFIG_FILE="$(resolve_kubeconfig_file)"
+export KUBECONFIG="$KUBECONFIG_FILE"
+
+command -v kubectl >/dev/null 2>&1 || fail "kubectl not found"
+command -v jq >/dev/null 2>&1 || fail "jq not found"
+command -v openssl >/dev/null 2>&1 || fail "openssl not found"
 
 find_oauth2_provider_pk_by_name() {
   local provider_name="$1"
@@ -95,6 +214,8 @@ zulip_issuer_url="${AUTHENTIK_HOST%/}/application/o/${zulip_application_slug}/"
 zulip_client_id="$(openssl rand -hex 16)"
 zulip_client_secret="$(openssl rand -hex 24)"
 zulip_secret_key="$(openssl rand -hex 32)"
+zulip_db_username="zulip"
+zulip_db_password="$(openssl rand -hex 24)"
 secrets_dir="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}/secrets/global"
 zulip_secret_file="${secrets_dir}/zulip-oidc-${cluster_id}.json"
 zulip_manifest_path="$WORKSPACE_ROOT/gitops/apps/zulip.yaml"
@@ -112,12 +233,20 @@ if [[ -n "$existing_zulip_secret_json" ]]; then
   existing_client_id="$(jq -r '.ZULIP_OIDC_CLIENT_ID // empty' <<<"$existing_zulip_secret_json")"
   existing_client_secret="$(jq -r '.ZULIP_OIDC_CLIENT_SECRET // empty' <<<"$existing_zulip_secret_json")"
   existing_secret_key="$(jq -r '.SECRETS_secret_key // empty' <<<"$existing_zulip_secret_json")"
+  existing_db_username="$(jq -r '.ZULIP_POSTGRESQL__USERNAME // empty' <<<"$existing_zulip_secret_json")"
+  existing_db_password="$(jq -r '.ZULIP_POSTGRESQL__PASSWORD // empty' <<<"$existing_zulip_secret_json")"
   if [[ -n "$existing_client_id" && -n "$existing_client_secret" ]]; then
     zulip_client_id="$existing_client_id"
     zulip_client_secret="$existing_client_secret"
   fi
   if [[ -n "$existing_secret_key" ]]; then
     zulip_secret_key="$existing_secret_key"
+  fi
+  if [[ -n "$existing_db_username" ]]; then
+    zulip_db_username="$existing_db_username"
+  fi
+  if [[ -n "$existing_db_password" ]]; then
+    zulip_db_password="$existing_db_password"
   fi
 fi
 
@@ -160,11 +289,15 @@ zulip_config_secret_json="$(
     --arg secret_key "$zulip_secret_key" \
     --arg client_id "$zulip_client_id" \
     --arg client_secret "$zulip_client_secret" \
+    --arg db_username "$zulip_db_username" \
+    --arg db_password "$zulip_db_password" \
     --arg oidc_idps "$zulip_oidc_idps_literal" \
     '{
       SECRETS_secret_key: $secret_key,
       ZULIP_OIDC_CLIENT_ID: $client_id,
       ZULIP_OIDC_CLIENT_SECRET: $client_secret,
+      ZULIP_POSTGRESQL__USERNAME: $db_username,
+      ZULIP_POSTGRESQL__PASSWORD: $db_password,
       SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS: $oidc_idps
     }'
 )"
@@ -174,7 +307,26 @@ chmod 600 "$zulip_secret_file"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "zulip-oidc" \
   --json-file "$zulip_secret_file" \
-  --required-keys "SECRETS_secret_key,SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS"
+  --required-keys "SECRETS_secret_key,SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS,ZULIP_POSTGRESQL__USERNAME,ZULIP_POSTGRESQL__PASSWORD"
+
+databases_namespace_manifest="$WORKSPACE_ROOT/gitops/databases/namespace.yaml"
+zulip_db_cluster_manifest="$WORKSPACE_ROOT/gitops/databases/zulip/cluster.yaml"
+zulip_db_externalsecret_manifest="$WORKSPACE_ROOT/gitops/databases/zulip/externalsecret.yaml"
+zulip_db_pooler_ro_manifest="$WORKSPACE_ROOT/gitops/databases/zulip/pooler-ro.yaml"
+zulip_db_pooler_rw_manifest="$WORKSPACE_ROOT/gitops/databases/zulip/pooler-rw.yaml"
+zulip_db_backup_manifest="$WORKSPACE_ROOT/gitops/databases/zulip/scheduled-backup.yaml"
+
+log "Applying Zulip database manifests"
+kubectl apply -f "$databases_namespace_manifest"
+kubectl apply -f "$zulip_db_cluster_manifest"
+kubectl apply -f "$zulip_db_externalsecret_manifest"
+kubectl apply -f "$zulip_db_pooler_ro_manifest"
+kubectl apply -f "$zulip_db_pooler_rw_manifest"
+kubectl apply -f "$zulip_db_backup_manifest"
+
+wait_for_resources_ready "databases" "cluster" "Ready" "Zulip CloudNativePG cluster"
+wait_for_resources_ready "databases" "externalsecret" "Ready" "Zulip database ExternalSecret"
+wait_for_resources_ready "databases" "deployment" "Available" "Zulip pooler deployment"
 
 provider_payload="$(
   jq -n \
@@ -237,16 +389,24 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$zulip_rendered_manifest" \
   --application "zulip"
 
+wait_for_resources_ready "zulip" "externalsecret" "Ready" "Zulip ExternalSecret"
+wait_for_statefulset_ready "zulip" "zulip-rabbitmq" "Zulip RabbitMQ"
+wait_for_statefulset_ready "zulip" "zulip-redis-master" "Zulip Redis master"
+wait_for_deployment_rollout "zulip" "zulip-memcached" "Zulip memcached"
+wait_for_statefulset_ready "zulip" "zulip" "Zulip application"
+
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \
     --arg application "zulip" \
     --arg manifest_path "$zulip_manifest_path" \
     --arg host "$zulip_host" \
+    --arg database "zulip-db" \
     --arg provider_pk "$provider_pk" \
     '{
       application: $application,
       manifest_path: $manifest_path,
       host: $host,
+      database: $database,
       provider_pk: $provider_pk
     }' >"$STEP_RESULT_FILE"
 fi
