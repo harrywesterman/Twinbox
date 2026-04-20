@@ -64,6 +64,7 @@ test("buildPortalConfig keeps operator tools out of the user applications grid",
   assert.equal(config.appSections[0].name, "Apps");
   assert.equal(config.appSections[0].items.length, 0);
   assert(config.adminApps.some((card) => card.title === "Dashy"));
+  assert.equal(config.adminApps.find((card) => card.title === "Dashy")?.label, "Open Admin tools");
   assert.equal(config.adminApps.find((card) => card.title === "Dashy")?.iconUrl, "/assets/step-icons/install-dashy-dashboard.svg");
   assert(config.intranetLinks.some((card) => card.title === "Wizard"));
   assert(config.statusChecks.some((card) => card.title === "Authentik"));

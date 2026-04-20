@@ -626,7 +626,15 @@ function AdminPage({ adminApps, onNavigate }) {
       </div>
       <div className="card-grid">
         {adminApps.map((card) => (
-          <AppTile key={card.id} card={card} onOpen={() => openInNewTab(card.liveUrl || card.url)} showStatus />
+          <AppTile
+            key={card.id}
+            card={{
+              ...card,
+              title: card.label || card.title,
+            }}
+            onOpen={() => openInNewTab(card.liveUrl || card.url)}
+            showStatus
+          />
         ))}
       </div>
       <button type="button" className="secondary-button" onClick={() => onNavigate('/')}>Back home</button>
