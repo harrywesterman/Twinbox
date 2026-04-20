@@ -3,6 +3,13 @@ kind: Application
 metadata:
   name: twinbox-portal
   namespace: argocd
+  annotations:
+    argocd-image-updater.argoproj.io/image-list: "portal=ghcr.io/harrywesterman/twinbox-portal"
+    argocd-image-updater.argoproj.io/portal.kustomize.image-name: "ghcr.io/harrywesterman/twinbox-portal"
+    argocd-image-updater.argoproj.io/portal.update-strategy: "newest-build"
+    argocd-image-updater.argoproj.io/portal.allow-tags: "regexp:^sha-[0-9a-f]+$"
+    argocd-image-updater.argoproj.io/write-back-method: "git"
+    argocd-image-updater.argoproj.io/write-back-target: "kustomization"
 spec:
   project: default
   ignoreDifferences:

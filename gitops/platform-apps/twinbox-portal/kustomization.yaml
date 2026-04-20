@@ -8,3 +8,7 @@ resources:
   - service.yaml
   - deployment.yaml
   - ingressroute.yaml
+
+images:
+  - name: ghcr.io/harrywesterman/twinbox-portal
+    newTag: sha-cb59744d5c7aae84fca5a3abe68051e2d62022e7
