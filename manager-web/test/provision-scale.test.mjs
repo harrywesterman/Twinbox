@@ -298,7 +298,7 @@ test('automatic placement fills pve1, pve2, and pve3 in host order when they can
         node: 'pve4',
         status: 'online',
         maxmem: 17179869184,
-        mem: 0,
+        mem: 17050000000,
         maxdisk: 700 * 1024 * 1024 * 1024,
         disk: 650 * 1024 * 1024 * 1024,
         maxcpu: 4,

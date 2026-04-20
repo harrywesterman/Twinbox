@@ -283,8 +283,9 @@ function getOrderedHostsForVm(vm, hostCards) {
 }
 
 function isAutomaticPlacementHost(host) {
-  const name = normalizeHostName(host?.name || host?.id);
-  return /^pve[123]$/i.test(name);
+  const freeMemoryMb = Math.max(0, toNumber(host?.freeMemoryMb, 0));
+  const freeDiskGb = Math.max(0, toNumber(host?.freeDiskGb, 0));
+  return freeMemoryMb >= CONTROLPLANE_MEMORY_MB && freeDiskGb >= CONTROLPLANE_DISK_GB;
 }
 
 function getAutomaticPlacementHostCards(hostCards) {
