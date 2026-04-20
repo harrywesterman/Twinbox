@@ -56,6 +56,26 @@ test("buildUserAdminViewModel filters users and marks the selected group members
         groupNames: [],
         groups: [],
       },
+      {
+        id: "3",
+        username: "akadmin",
+        name: "authentik Default Admin",
+        email: "akadmin@twinbox.local",
+        isActive: true,
+        type: "internal",
+        groupNames: ["admins"],
+        groups: [{ name: "admins", label: "Admins" }],
+      },
+      {
+        id: "4",
+        username: "outpost-1",
+        name: "Outpost authentik Embedded Outpost Service-Account",
+        email: "",
+        isActive: true,
+        type: "service_account",
+        groupNames: [],
+        groups: [],
+      },
     ],
     groups: [
       { id: "10", name: "employees", label: "Employees" },
@@ -67,5 +87,8 @@ test("buildUserAdminViewModel filters users and marks the selected group members
   assert.equal(viewModel.filteredUsers.length, 1);
   assert.equal(viewModel.filteredUsers[0].username, "sam");
   assert.equal(viewModel.selectedUser?.id, "2");
+  assert.equal(viewModel.stats.totalUsers, 2);
+  assert.equal(viewModel.stats.activeUsers, 1);
+  assert.equal(viewModel.stats.inactiveUsers, 1);
   assert.equal(viewModel.groups[0].selected, false);
 });

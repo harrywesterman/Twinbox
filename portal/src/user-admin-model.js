@@ -6,6 +6,34 @@ function normalizeSearchValue(value) {
   return trimString(value).toLowerCase();
 }
 
+function isVisibleUser(user) {
+  const username = normalizeSearchValue(user?.username);
+  const name = normalizeSearchValue(user?.name);
+  const type = normalizeSearchValue(user?.type);
+
+  if (type === 'service_account') {
+    return false;
+  }
+
+  if (username === 'akadmin') {
+    return false;
+  }
+
+  if (username.startsWith('outpost-') || username.startsWith('ak-outpost-')) {
+    return false;
+  }
+
+  if (name.includes('default admin')) {
+    return false;
+  }
+
+  if (name.includes('embedded outpost service-account')) {
+    return false;
+  }
+
+  return true;
+}
+
 export function buildAdminNavigationItems({ isAdmin = false } = {}) {
   if (!isAdmin) {
     return [];
@@ -44,8 +72,9 @@ export function buildUserAdminViewModel({
   const normalizedQuery = normalizeSearchValue(query);
   const normalizedUsers = Array.isArray(users) ? users : [];
   const normalizedGroups = Array.isArray(groups) ? groups : [];
+  const visibleUsers = normalizedUsers.filter((user) => isVisibleUser(user));
 
-  const filteredUsers = normalizedUsers.filter((user) => {
+  const filteredUsers = visibleUsers.filter((user) => {
     if (!normalizedQuery) {
       return true;
     }
@@ -62,7 +91,7 @@ export function buildUserAdminViewModel({
   });
 
   const selectedUser = filteredUsers.find((user) => user.id === selectedUserId)
-    || normalizedUsers.find((user) => user.id === selectedUserId)
+    || visibleUsers.find((user) => user.id === selectedUserId)
     || filteredUsers[0]
     || null;
 
@@ -95,9 +124,9 @@ export function buildUserAdminViewModel({
     groups: groupsWithSelection,
     emptyState,
     stats: {
-      totalUsers: normalizedUsers.length,
-      activeUsers: normalizedUsers.filter((user) => user?.isActive).length,
-      inactiveUsers: normalizedUsers.filter((user) => user?.isActive === false).length,
+      totalUsers: visibleUsers.length,
+      activeUsers: visibleUsers.filter((user) => user?.isActive).length,
+      inactiveUsers: visibleUsers.filter((user) => user?.isActive === false).length,
       manageableGroups: normalizedGroups.length,
     },
   };
