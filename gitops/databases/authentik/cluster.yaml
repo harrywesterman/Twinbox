@@ -28,7 +28,7 @@ spec:
         name: authentik-db-credentials
 
   storage:
-    size: 2Gi
+    size: 5Gi
     storageClass: longhorn-single
 
   resources:

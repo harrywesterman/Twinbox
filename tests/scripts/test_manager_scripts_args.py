@@ -2113,7 +2113,7 @@ def test_loki_and_openbao_longhorn_sizes_are_right_sized():
 def test_authentik_db_cluster_is_scaled_for_lab_capacity():
     text = AUTHENTIK_DB_CLUSTER.read_text(encoding="utf-8")
     assert "instances: 1" in text
-    assert "size: 2Gi" in text
+    assert "size: 5Gi" in text
     assert "storageClass: longhorn-single" in text
 
 
