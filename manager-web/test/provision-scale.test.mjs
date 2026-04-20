@@ -363,6 +363,60 @@ test('automatic placement reports danger when no Talos VM can fit', () => {
   assert.match(result.message, /could not place any Talos VMs/i);
 });
 
+test('automatic placement uses host free disk instead of a fixed 100GB worker size', () => {
+  const board = buildProvisionPlacementBoard(stepInputs, {}, {
+    nodes: [
+      {
+        node: 'pve1',
+        status: 'online',
+        maxmem: 17179869184,
+        mem: 2147483648,
+        maxdisk: 549755813888,
+        disk: 505 * 1024 * 1024 * 1024,
+        maxcpu: 4,
+        cpu: 0.25,
+      },
+      {
+        node: 'pve2',
+        status: 'online',
+        maxmem: 17179869184,
+        mem: 2147483648,
+        maxdisk: 549755813888,
+        disk: 467 * 1024 * 1024 * 1024,
+        maxcpu: 4,
+        cpu: 0,
+      },
+      {
+        node: 'pve3',
+        status: 'online',
+        maxmem: 17179869184,
+        mem: 2147483648,
+        maxdisk: 549755813888,
+        disk: 496 * 1024 * 1024 * 1024,
+        maxcpu: 4,
+        cpu: 0,
+      },
+    ],
+    vms: [
+      {
+        node: 'pve1',
+        name: 'twinbox-prd-mgt',
+        tags: 'management;bootstrap',
+        status: 'running',
+        vmid: 103,
+        maxmem: 4294967296,
+        maxdisk: 42949672960,
+      },
+    ],
+  });
+
+  assert.equal(board.managementVm.hostId, 'pve1');
+  assert.equal(Object.values(board.suggestedVmNodeMap).filter(Boolean).length, 3);
+  assert.equal(board.hostCards.find((host) => host.id === 'pve1').assignments.some((vm) => vm.isFixed && vm.name === 'twinbox-prd-mgt'), true);
+  assert.ok(board.suggestedVmSizeMap['worker-1'].disk_gb < 100);
+  assert.ok(board.suggestedVmSizeMap['worker-1'].disk_gb >= 10);
+});
+
 test('automatic placement replaces stale manual placements with a fresh suggestion', () => {
   const fresh = buildAutomaticProvisionPlacementResult(stepInputs, {}, balancedPlacementResources);
   const rerun = buildAutomaticProvisionPlacementResult(stepInputs, {
