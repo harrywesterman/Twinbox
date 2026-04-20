@@ -887,7 +887,7 @@ def test_manager_worker_image_includes_talos_image_factory_helper():
     assert "talosctl-linux-amd64" in text
     assert "COPY lib ./lib" in text
     assert (
-        "apt-get install -y --no-install-recommends bash ca-certificates curl jq openssl tar xz-utils sudo"
+        "apt-get install -y --no-install-recommends bash ca-certificates curl jq openssl python3 tar xz-utils sudo"
         in text
     )
     assert (
