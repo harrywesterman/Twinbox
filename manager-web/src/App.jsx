@@ -2246,7 +2246,14 @@ function App() {
     )
     : null;
   useEffect(() => {
-    if (currentStep?.id !== 'provision-nodes' || !placementBoard?.hostCards?.length) {
+    if (currentStep?.id !== 'provision-nodes' || !hasStarted) {
+      if (placementStatus.message) {
+        setPlacementStatus({ tone: '', message: '' });
+      }
+      return;
+    }
+
+    if (!placementBoard?.hostCards?.length) {
       return;
     }
 
@@ -2262,10 +2269,12 @@ function App() {
     void applyProvisionPlacementHelp();
   }, [
     applyProvisionPlacementHelp,
+    hasStarted,
     currentStep?.id,
     currentDraft.vm_node_map,
     placementBoard,
     placementSuggestionKey,
+    placementStatus.message,
   ]);
   const provisionStepValid = currentStep?.id === 'provision-nodes'
     ? provisionVmIpValidation.ok

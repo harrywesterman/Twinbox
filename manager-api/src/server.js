@@ -152,30 +152,20 @@ function readClusterStorageStatusViaProxmoxApi(nodeNames, storagePoolName, resol
       }
     }
 
+    const storageResources = proxmoxApiRequest("/api2/json/cluster/resources?type=storage", bundle.env, {
+      headers: {
+        Cookie: `PVEAuthCookie=${authTicket}`,
+      },
+    });
+    const nodeLookup = new Set(Array.isArray(nodeNames) ? nodeNames.map((entry) => String(entry || "").trim()).filter(Boolean) : []);
     const storageByNode = new Map();
-    for (const rawNodeName of Array.isArray(nodeNames) ? nodeNames : []) {
-      const nodeName = String(rawNodeName || "").trim();
-      if (!nodeName) {
+    for (const entry of Array.isArray(storageResources?.data) ? storageResources.data : []) {
+      const nodeName = String(entry?.node || "").trim();
+      const storageName = normalizeStoragePoolName(entry?.storage);
+      if (!nodeName || !nodeLookup.has(nodeName) || storageName !== storagePool) {
         continue;
       }
-
-      try {
-        const storage = proxmoxApiRequest(
-          `/api2/json/nodes/${encodeURIComponent(nodeName)}/storage/${encodeURIComponent(storagePool)}/status`,
-          bundle.env,
-          {
-            headers: {
-              Cookie: `PVEAuthCookie=${authTicket}`,
-            },
-          },
-        );
-        const data = storage?.data || null;
-        if (data) {
-          storageByNode.set(nodeName, data);
-        }
-      } catch (error) {
-        // If the configured pool is missing on one node, fall back to node-level disk data.
-      }
+      storageByNode.set(nodeName, entry);
     }
 
     return { storagePool, storageByNode };
