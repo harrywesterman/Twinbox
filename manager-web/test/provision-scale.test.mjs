@@ -417,6 +417,81 @@ test('automatic placement uses host free disk instead of a fixed 100GB worker si
   assert.ok(board.suggestedVmSizeMap['worker-1'].disk_gb >= 10);
 });
 
+test('automatic placement fits hosts when free CPU is rounded to what the wizard shows', () => {
+  const result = buildAutomaticProvisionPlacementResult(stepInputs, {}, {
+    nodes: [
+      {
+        node: 'proxmox',
+        status: 'online',
+        maxmem: 8247017472,
+        mem: 7336640512,
+        maxdisk: 58598735872,
+        disk: 29285064704,
+        maxcpu: 4,
+        cpu: 0.361071060762101,
+      },
+      {
+        node: 'pve1',
+        status: 'online',
+        maxmem: 16657231872,
+        mem: 5644713984,
+        maxdisk: 100861726720,
+        disk: 53400879104,
+        maxcpu: 4,
+        cpu: 0.330465587044534,
+      },
+      {
+        node: 'pve2',
+        status: 'online',
+        maxmem: 16657240064,
+        mem: 1845702656,
+        maxdisk: 100861726720,
+        disk: 12452229120,
+        maxcpu: 4,
+        cpu: 0.0321850641186824,
+      },
+      {
+        node: 'pve3',
+        status: 'online',
+        maxmem: 16652808192,
+        mem: 2140229632,
+        maxdisk: 100861726720,
+        disk: 43796652032,
+        maxcpu: 4,
+        cpu: 0.0351137487636004,
+      },
+      {
+        node: 'pve4',
+        status: 'online',
+        maxmem: 8268734464,
+        mem: 7472197632,
+        maxdisk: 68865630208,
+        disk: 59460530176,
+        maxcpu: 4,
+        cpu: 0.0374167093798052,
+      },
+    ],
+    vms: [
+      {
+        node: 'pve1',
+        name: 'twinbox-prd-mgt',
+        tags: 'twinbox;management;bootstrap;cluster-prd',
+        status: 'running',
+        vmid: 103,
+        maxmem: 4294967296,
+        maxdisk: 42949672960,
+      },
+    ],
+  });
+
+  assert.equal(result.tone, 'warning');
+  assert.equal(result.vm_node_map['cp-1'], 'pve2');
+  assert.equal(result.vm_node_map['cp-2'], 'pve3');
+  assert.notEqual(result.vm_node_map['cp-3'], 'pve2');
+  assert.notEqual(result.vm_node_map['cp-3'], 'pve3');
+  assert.ok(result.vm_size_map['worker-1'].disk_gb < 100);
+});
+
 test('automatic placement replaces stale manual placements with a fresh suggestion', () => {
   const fresh = buildAutomaticProvisionPlacementResult(stepInputs, {}, balancedPlacementResources);
   const rerun = buildAutomaticProvisionPlacementResult(stepInputs, {

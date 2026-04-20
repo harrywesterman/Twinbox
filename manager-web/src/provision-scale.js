@@ -579,7 +579,8 @@ function clonePlacementState(sourceState = new Map()) {
 }
 
 function hostCanFitVm(host, vm) {
-  return host.freeCpuCores >= vm.cpu
+  const visibleFreeCpuCores = Math.max(0, roundToInteger(toNumber(host?.freeCpuCores, 0)));
+  return visibleFreeCpuCores >= vm.cpu
     && host.freeMemoryMb >= vm.memory_mb
     && host.freeDiskGb >= vm.disk_gb;
 }
