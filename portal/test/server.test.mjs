@@ -435,6 +435,41 @@ test.before(async () => {
         { name: "family", label: "Family" },
       ],
     },
+    apps: [
+      {
+        id: "immich",
+        slug: "immich",
+        title: "Immich",
+        label: "Immich",
+        section: "Apps",
+        url: "https://immich.example.com",
+        route: "/apps/immich",
+        accent: "#ec4899",
+        summary: "Photo and video library",
+        description: "Photo and video library",
+        capabilities: [],
+        adminOnly: false,
+        status: "succeeded",
+        sourceStepId: "install-immich",
+        sourceStepTitle: "Install Immich",
+        iconText: "I",
+        iconUrl: "https://twinboxwizard.tst.example.com/assets/step-icons/install-immich.svg",
+        iconAlt: "Immich icon",
+        liveUrl: "https://immich.example.com",
+      },
+    ],
+    appSections: [
+      {
+        name: "Apps",
+        items: [
+          {
+            id: "immich",
+            title: "Immich",
+            iconUrl: "https://twinboxwizard.tst.example.com/assets/step-icons/install-immich.svg",
+          },
+        ],
+      },
+    ],
   });
 
   authentikServerOrigin = await startServer(authentikServer);
@@ -612,6 +647,27 @@ test("admin can load the app catalog and queue an install job", async () => {
   assert(logs.payload.lines.length > 0);
 });
 
+test("portal config exposes a single Apps section and image icons", async () => {
+  seedAuthentikState();
+
+  const adminCookie = createSignedSessionCookie({
+    sub: "admin-1",
+    name: "Portal Admin",
+    email: "admin@example.com",
+    preferredUsername: "portal-admin",
+    groups: ["admins"],
+    isAdmin: true,
+  });
+
+  const config = await requestPortal("/api/portal-config", { cookie: adminCookie });
+  assert.equal(config.status, 200);
+  assert.equal(config.payload.apps.length, 1);
+  assert.equal(config.payload.appSections.length, 1);
+  assert.equal(config.payload.appSections[0].name, "Apps");
+  assert.equal(config.payload.apps[0].iconUrl, "https://twinboxwizard.tst.example.com/assets/step-icons/install-immich.svg");
+  assert.equal(config.payload.apps[0].iconAlt, "Immich icon");
+});
+
 test("login requests the reduced Authentik scope set", async () => {
   const response = await fetch(`${portalOrigin}/auth/login`, {
     redirect: "manual",
@@ -625,6 +681,11 @@ test("login requests the reduced Authentik scope set", async () => {
 test("portal image copies the Authentik admin helper into the runtime image", async () => {
   const dockerfile = await fs.promises.readFile(path.join(repoRoot, "portal", "Dockerfile"), "utf8");
   assert.match(dockerfile, /COPY authentik-admin\.mjs \.\/[\s\S]*CMD \["node", "server\.mjs"\]/, 'expected the runtime image to include the portal helper module');
+});
+
+test("portal app launches open in a new tab", async () => {
+  const source = await fs.promises.readFile(path.join(repoRoot, "portal", "src", "App.jsx"), "utf8");
+  assert.match(source, /window\.open\(url,\s*'_blank',\s*'noopener,noreferrer'\)/);
 });
 
 test("portal menu popover sits above the page content", async () => {

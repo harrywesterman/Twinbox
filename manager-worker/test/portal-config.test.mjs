@@ -58,6 +58,9 @@ test("buildPortalConfig keeps operator tools out of the user applications grid",
   assert.equal(config.userAdmin.title, "Gebruikers en groepen");
   assert.deepEqual(config.userAdmin.manageableGroups, []);
   assert.equal(config.apps.length, 0);
+  assert.equal(config.appSections.length, 1);
+  assert.equal(config.appSections[0].name, "Apps");
+  assert.equal(config.appSections[0].items.length, 0);
   assert(config.adminApps.some((card) => card.title === "Dashy"));
   assert(config.intranetLinks.some((card) => card.title === "Wizard"));
   assert(config.statusChecks.some((card) => card.title === "Authentik"));
@@ -86,6 +89,11 @@ test("buildPortalConfig shows user apps only after the app category is installed
   });
 
   assert.deepEqual(config.apps.map((card) => card.title), ["Immich"]);
+  assert.equal(config.appSections.length, 1);
+  assert.equal(config.appSections[0].name, "Apps");
+  assert.deepEqual(config.appSections[0].items.map((card) => card.title), ["Immich"]);
+  assert.match(config.apps[0].iconUrl, /^https:\/\/twinboxwizard\.tst\.example\.com\/assets\/step-icons\/install-immich\.svg$/);
+  assert.equal(config.apps[0].iconAlt, "Immich icon");
   assert(config.adminApps.length > 0);
   assert(!config.apps.some((card) => card.title === "Grafana"));
 });

@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 
 import { buildAdminAppsViewModel } from './admin-apps-model.js';
 import { buildAdminNavigationItems, buildUserAdminViewModel } from './user-admin-model.js';
@@ -46,6 +46,13 @@ function slugify(value) {
 
 function badgeTone(ok) {
   return ok ? 'is-ok' : 'is-bad';
+}
+
+function openInNewTab(url) {
+  if (!url) {
+    return;
+  }
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 function useRoute() {
@@ -266,19 +273,31 @@ function SectionTitle({ eyebrow, title, description }) {
   );
 }
 
-function AppTile({ card, onOpen }) {
+function AppIcon({ card, className = '' }) {
+  if (card?.iconUrl) {
+    return <img className={`app-icon-image ${className}`.trim()} src={card.iconUrl} alt={card.iconAlt || `${card.title} icon`} loading="lazy" />;
+  }
+
+  return (
+    <span className={`app-tile-badge ${className}`.trim()} style={{ '--accent': card.accent }}>
+      <span>{card.iconText}</span>
+    </span>
+  );
+}
+
+function AppTile({ card, onOpen, showStatus = false }) {
   return (
     <button className="app-tile" type="button" onClick={onOpen}>
-      <span className="app-tile-badge" style={{ '--accent': card.accent }}>
-        <span>{card.iconText}</span>
-      </span>
+      <AppIcon card={card} className="app-tile-badge" />
       <span className="app-tile-body">
         <strong>{card.title}</strong>
         <span>{card.summary}</span>
       </span>
-      <span className="app-tile-meta">
-        <span className={`status-chip ${card.status ? 'is-live' : ''}`}>{card.status || 'ready'}</span>
-      </span>
+      {showStatus ? (
+        <span className="app-tile-meta">
+          <span className={`status-chip ${card.status ? 'is-live' : ''}`}>{card.status || 'ready'}</span>
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -376,50 +395,32 @@ function PortalHeader({ session, config, theme, onThemeToggle, onNavigate, onLog
   );
 }
 
-function HomePage({ config, navigate, isAdmin }) {
-  const sections = config?.appSections || [];
+function HomePage({ config, navigate }) {
+  const apps = config?.apps || [];
 
   return (
-    <div className="page-grid">
-      <Panel className="hero-panel">
-        <p className="eyebrow">{config?.portal?.hero?.eyebrow || 'User portal'}</p>
-        <h1>{config?.portal?.hero?.title || 'Twinbox Portal'}</h1>
-        <p className="hero-copy">{config?.portal?.hero?.description}</p>
-        <div className="hero-actions">
-          <button type="button" className="primary-button" onClick={() => navigate('/status')}>Cluster status</button>
-          <button type="button" className="secondary-button" onClick={() => navigate('/settings')}>Settings</button>
-        </div>
-      </Panel>
-
-      <div className="stack">
-        {sections.map((section) => (
-          <Panel key={section.name}>
-            <SectionTitle
-              eyebrow={section.name}
-              title="Applications"
-              description="Open the app, read the overview, and start when you are ready."
-            />
-            <div className="card-grid">
-              {section.items.map((card) => (
-                <AppTile key={card.id} card={card} onOpen={() => navigate(card.route)} />
-              ))}
-            </div>
-          </Panel>
+    <Panel className="apps-home-panel">
+      <SectionTitle
+        eyebrow="Apps"
+        title="Applications"
+        description="Open the app, read the overview, and start when you are ready."
+      />
+      <div className="card-grid apps-home-grid">
+        {apps.map((card) => (
+          <AppTile key={card.id} card={card} onOpen={() => navigate(card.route)} />
         ))}
-        {isAdmin ? (
-          <Panel className="admin-teaser">
-            <SectionTitle
-              eyebrow="Admin"
-              title="Management apps"
-              description="A separate space for the operator tools."
-            />
-            <button type="button" className="primary-button" onClick={() => navigate('/admin')}>
-              Open admin apps
-            </button>
-          </Panel>
-        ) : null}
       </div>
-    </div>
+      {apps.length === 0 ? (
+        <div className="empty-card">
+          <strong>No applications available yet</strong>
+          <span>Install the app category to populate this launcher.</span>
+        </div>
+      ) : null}
+      <div className="hero-actions apps-home-actions">
+        <button type="button" className="secondary-button" onClick={() => navigate('/status')}>Cluster status</button>
+        <button type="button" className="secondary-button" onClick={() => navigate('/settings')}>Settings</button>
+      </div>
+    </Panel>
   );
 }
 
@@ -436,15 +437,13 @@ function AppDetailPage({ card, onNavigate }) {
   return (
     <div className="detail-layout">
       <Panel className="detail-hero">
-        <span className="detail-icon" style={{ '--accent': card.accent }}>
-          <span>{card.iconText}</span>
-        </span>
+        <AppIcon card={card} className="detail-icon" />
         <div className="detail-copy">
           <p className="eyebrow">{card.section}</p>
           <h1>{card.title}</h1>
           <p>{card.description}</p>
           <div className="hero-actions">
-            <button type="button" className="primary-button" onClick={() => window.location.assign(card.liveUrl || card.url)}>Start</button>
+            <button type="button" className="primary-button" onClick={() => openInNewTab(card.liveUrl || card.url)}>Start in new tab</button>
             <button type="button" className="secondary-button" onClick={() => onNavigate('/')}>Back</button>
           </div>
         </div>
@@ -587,10 +586,8 @@ function IntranetPage({ links, onNavigate }) {
       />
       <div className="card-grid intranet-grid">
         {links.map((card) => (
-          <a key={card.id} className="intranet-card" href={card.liveUrl || card.url}>
-            <span className="app-tile-badge" style={{ '--accent': card.accent }}>
-              <span>{card.iconText}</span>
-            </span>
+          <a key={card.id} className="intranet-card" href={card.liveUrl || card.url} target="_blank" rel="noreferrer">
+            <AppIcon card={card} className="app-tile-badge" />
             <strong>{card.title}</strong>
             <span>{card.summary}</span>
           </a>
@@ -620,7 +617,7 @@ function AdminPage({ adminApps, onNavigate }) {
       </div>
       <div className="card-grid">
         {adminApps.map((card) => (
-          <AppTile key={card.id} card={card} onOpen={() => window.location.assign(card.liveUrl || card.url)} />
+          <AppTile key={card.id} card={card} onOpen={() => openInNewTab(card.liveUrl || card.url)} showStatus />
         ))}
       </div>
       <button type="button" className="secondary-button" onClick={() => onNavigate('/')}>Back home</button>
@@ -665,9 +662,9 @@ function statusLabel(state) {
   }
 }
 
-function LogViewport({ lines = [], emptyLabel = 'Waiting for output...' }) {
+function LogViewport({ lines = [], emptyLabel = 'Waiting for output...', viewportRef, onScroll }) {
   return (
-    <div className="admin-log-viewport">
+    <div className="admin-log-viewport" ref={viewportRef} onScroll={onScroll}>
       {lines.length === 0 ? (
         <p className="muted-copy">{emptyLabel}</p>
       ) : (
@@ -708,6 +705,8 @@ function AdminAppsPage({ onNavigate, adminAppsState }) {
   const [installBusy, setInstallBusy] = useState(false);
   const [pageError, setPageError] = useState('');
   const [pageNotice, setPageNotice] = useState('');
+  const logViewportRef = useRef(null);
+  const autoScrollLogsRef = useRef(true);
   const appsState = adminAppsState || useAdminAppsData(true);
 
   const viewModel = useMemo(() => buildAdminAppsViewModel({
@@ -756,8 +755,11 @@ function AdminAppsPage({ onNavigate, adminAppsState }) {
 
   useEffect(() => {
     if (!selectedJob?.id) {
+      autoScrollLogsRef.current = true;
       return undefined;
     }
+
+    autoScrollLogsRef.current = true;
 
     let cancelled = false;
     let timeoutId = null;
@@ -799,6 +801,25 @@ function AdminAppsPage({ onNavigate, adminAppsState }) {
       }
     };
   }, [appsState, selectedJob?.id]);
+
+  useEffect(() => {
+    const viewport = logViewportRef.current;
+    if (!viewport || !selectedJob?.id || !autoScrollLogsRef.current) {
+      return;
+    }
+
+    viewport.scrollTop = viewport.scrollHeight;
+  }, [jobLines, selectedJob?.id]);
+
+  const handleLogScroll = () => {
+    const viewport = logViewportRef.current;
+    if (!viewport) {
+      return;
+    }
+
+    const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+    autoScrollLogsRef.current = distanceFromBottom < 40;
+  };
 
   const installSelectedApp = async () => {
     if (!viewModel.selectedApp) {
@@ -1039,6 +1060,8 @@ function AdminAppsPage({ onNavigate, adminAppsState }) {
                 <LogViewport
                   lines={jobLines}
                   emptyLabel={selectedJob?.id ? 'Waiting for the first log line...' : 'Start an install to see live logs here.'}
+                  viewportRef={logViewportRef}
+                  onScroll={handleLogScroll}
                 />
               </div>
             </>
