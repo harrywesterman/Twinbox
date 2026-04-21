@@ -890,13 +890,21 @@ def test_provision_nodes_step_returns_refs_not_kubeconfig_paths():
 
 def test_manager_worker_image_includes_talos_image_factory_helper():
     text = (REPO_ROOT / "manager-worker" / "Dockerfile").read_text(encoding="utf-8")
+    refresh_dashy_text = (
+        REPO_ROOT / "manager-worker" / "src" / "refresh-dashy-config.mjs"
+    ).read_text(encoding="utf-8")
+    refresh_portal_text = (
+        REPO_ROOT / "manager-worker" / "src" / "refresh-portal-config.mjs"
+    ).read_text(encoding="utf-8")
+
     assert "PINNED_TALOS_VERSION" in text
     assert "talosctl-linux-amd64" in text
     assert "COPY lib ./lib" in text
-    assert (
-        "COPY manager-api/src/lib/catalog-definitions.mjs ./manager-api/src/lib/catalog-definitions.mjs"
-        in text
-    )
+    assert "manager-api/src/lib/catalog-definitions.mjs" not in text
+    assert "../../lib/catalog-definitions.mjs" in refresh_dashy_text
+    assert "../../lib/catalog-definitions.mjs" in refresh_portal_text
+    assert "../../manager-api/src/lib/catalog-definitions.mjs" not in refresh_dashy_text
+    assert "../../manager-api/src/lib/catalog-definitions.mjs" not in refresh_portal_text
     assert (
         "apt-get install -y --no-install-recommends bash ca-certificates curl jq openssl python3 tar xz-utils sudo"
         in text

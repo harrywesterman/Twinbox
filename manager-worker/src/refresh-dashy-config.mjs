@@ -4,8 +4,8 @@ import path from "path";
 import { spawnSync } from "child_process";
 import YAML from "yaml";
 
+import { loadCatalogDefinitions } from "../../lib/catalog-definitions.mjs";
 import { isClusterScopedStep } from "../../lib/step-scope.mjs";
-import { loadCatalogDefinitions } from "../../manager-api/src/lib/catalog-definitions.mjs";
 import {
   buildDashyConfig,
   stepHasDashyItems,
@@ -74,6 +74,10 @@ function readJsonIfExists(file) {
   }
 
   return JSON.parse(fs.readFileSync(file, "utf8"));
+}
+
+function loadYaml(file) {
+  return YAML.parse(fs.readFileSync(file, "utf8"));
 }
 
 function findCurrentCluster(dataRoot, clusterId) {
@@ -188,7 +192,10 @@ function restartDeployment(namespace, deploymentName) {
 
 function main() {
   const options = parseArgs(process.argv.slice(2));
-  const { steps } = loadCatalogDefinitions({ workspaceRoot: options.workspaceRoot });
+  const { steps } = loadCatalogDefinitions({
+    workspaceRoot: options.workspaceRoot,
+    loadYamlFn: loadYaml,
+  });
 
   const currentCluster = findCurrentCluster(options.managerDataDir, options.clusterId);
   if (!currentCluster?.id) {
