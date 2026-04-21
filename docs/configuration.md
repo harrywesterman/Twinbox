@@ -202,8 +202,11 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - Management VM bootstrap and maintenance use `TWINBOX_TIME_SERVER` to pin Ubuntu's `systemd-timesyncd` to the same timeserver.
 - `install-argocd` installs Argo CD after the cluster networking layer is already available.
 - `install-prometheus` installs the kube-prometheus-stack app so Prometheus, Alertmanager, node-exporter, and kube-state-metrics are available on Longhorn-backed storage.
+- `install-loki` installs Loki as the logs backend for Grafana Explore.
+- `install-tempo` installs Tempo as the traces backend for Grafana Explore.
+- `install-alloy` installs Grafana Alloy as the shared collector for Kubernetes logs, Kubernetes events, and OTLP traces.
 - Twinbox also seeds a small default alert set for Cilium and Longhorn so cluster network and storage health surface in Alertmanager and ntfy automatically.
-- `install-grafana` installs Grafana, provisions the Prometheus and Loki datasources automatically, seeds the default Kubernetes Overview, Node Exporter Full, Longhorn, Cilium Metrics, and Hubble Metrics dashboards so imported dashboards can bind to cluster metrics without manual UI setup, and stores Grafana's admin credentials alongside the OIDC client secret in OpenBao so Argo CD does not keep regenerating its admin Secret.
+- `install-grafana` installs Grafana, provisions the Prometheus, Loki, and Tempo datasources automatically, seeds the default Kubernetes Overview, Node Exporter Full, Longhorn, Cilium Metrics, and Hubble Metrics dashboards so imported dashboards can bind to cluster metrics without manual UI setup, and stores Grafana's admin credentials alongside the OIDC client secret in OpenBao so Argo CD does not keep regenerating its admin Secret.
 - `install-longhorn-storage` installs Longhorn, makes it the default storage class, and runs before any stateful secret infrastructure. Longhorn is configured to run only on worker nodes so storage and CSI components stay off control planes.
 - `install-secret-sync` installs:
   - External Secrets Operator

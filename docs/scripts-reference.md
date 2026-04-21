@@ -65,6 +65,8 @@ Installs the kube-prometheus-stack GitOps app, which enables Prometheus, Alertma
 
 Applies a single Argo CD `Application` manifest to the cluster. Used by step scripts that deploy through GitOps.
 
+The Talos step runners for `install-loki`, `install-tempo`, `install-alloy`, and `install-grafana` live under `categories/talos-cluster/steps/*/run.sh` and delegate to `apply-argocd-application.sh`.
+
 ## Storage & Secrets
 
 ### `install-longhorn-storage.sh`

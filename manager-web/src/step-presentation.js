@@ -63,6 +63,16 @@ function buildProjectUrlMap() {
       project_url: 'https://grafana.com/oss/loki/',
       github_url: 'https://github.com/grafana/loki',
     },
+    'install-tempo': {
+      icon: '⏱️',
+      project_url: 'https://grafana.com/oss/tempo/',
+      github_url: 'https://github.com/grafana/tempo',
+    },
+    'install-alloy': {
+      icon: '🧵',
+      project_url: 'https://grafana.com/docs/alloy/latest/',
+      github_url: 'https://github.com/grafana/alloy',
+    },
     'install-pgadmin4': {
       icon: '🗃️',
       project_url: 'https://www.pgadmin.org/',

@@ -21,6 +21,11 @@ datasources:
         type: loki
         access: proxy
         url: http://loki.monitoring.svc.cluster.local:3100
+      - name: Tempo
+        uid: Tempo
+        type: tempo
+        access: proxy
+        url: http://tempo.monitoring.svc.cluster.local:3200
 
 sidecar:
   datasources:

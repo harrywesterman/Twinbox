@@ -74,8 +74,10 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 - `create-users-and-groups` – Create the first Authentik user and `admins` group.
 - `choose-ingress-route` – Choose the ingress branch for this cluster.
 - `configure-argocd-oidc` – Connect Argo CD to Authentik for OIDC login.
-- `install-grafana` – Deploy Grafana monitoring dashboard.
 - `install-loki` – Deploy Loki log aggregation backend for Grafana.
+- `install-tempo` – Deploy Tempo trace storage and query backend for Grafana.
+- `install-alloy` – Deploy Grafana Alloy as the shared logs, events, and traces collector.
+- `install-grafana` – Deploy Grafana monitoring dashboard and seed the default observability datasources and dashboards.
 - `install-headlamp` – Deploy Headlamp Kubernetes dashboard.
 - `install-pgadmin4` – Deploy pgAdmin 4 for PostgreSQL administration.
 - `install-twinbox-portal` – Deploy the main Twinbox user portal with apps, settings, intranet, and status.

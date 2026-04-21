@@ -1,0 +1,42 @@
+replicas: 1
+
+tempo:
+  multitenancyEnabled: false
+  reportingEnabled: false
+  memBallastSizeMbs: 256
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+  storage:
+    trace:
+      backend: local
+      local:
+        path: /var/tempo/traces
+      wal:
+        path: /var/tempo/wal
+  server:
+    http_listen_port: 3200
+
+service:
+  type: ClusterIP
+  serviceMonitor:
+    enabled: true
+
+persistence:
+  enabled: true
+  storageClassName: longhorn
+  accessModes:
+    - ReadWriteOnce
+  size: 5Gi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi

@@ -53,8 +53,21 @@ function buildCatalog(stepStatuses = {}) {
     ['create-users-and-groups', 'Create Users and Groups', { dependsOn: ['install-authentik-idp'] }],
     ['choose-ingress-route', 'Choose Ingress Route', { dependsOn: ['create-users-and-groups'] }],
     ['install-headlamp', 'Install Headlamp', { dependsOn: ['install-traefik'] }],
-    ['install-grafana', 'Install Grafana', { dependsOn: ['install-headlamp'] }],
+    ['install-prometheus', 'Install Prometheus', { dependsOn: ['install-headlamp'] }],
     ['install-loki', 'Install Loki', { dependsOn: ['install-prometheus', 'install-longhorn-storage'] }],
+    ['install-tempo', 'Install Tempo', { dependsOn: ['install-longhorn-storage'] }],
+    ['install-alloy', 'Install Alloy', { dependsOn: ['install-loki', 'install-tempo'] }],
+    ['install-grafana', 'Install Grafana', {
+      dependsOn: [
+        'install-prometheus',
+        'install-cloudnativepg',
+        'install-secret-sync',
+        'install-authentik-idp',
+        'install-loki',
+        'install-tempo',
+        'install-alloy',
+      ],
+    }],
     ['install-dashy-dashboard', 'Install Dashy dashboard', { dependsOn: ['install-grafana'] }],
     ['install-twinbox-portal', 'Install Twinbox Portal', { dependsOn: ['install-dashy-dashboard'] }],
     ['install-management-consoles', 'Install Management consoles', { dependsOn: ['install-dashy-dashboard', 'install-twinbox-portal'] }],
@@ -134,7 +147,7 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   });
 
   assert.equal(model.mode, 'setup');
-  assert.equal(model.stepRail.length, 22);
+  assert.equal(model.stepRail.length, 25);
   const stepRailById = Object.fromEntries(model.stepRail.map((step) => [step.id, step]));
   assert.equal(stepRailById['provision-nodes'].title, 'Deploy Talos Cluster');
   assert.equal(stepRailById['provision-nodes'].isCurrent, true);
@@ -148,12 +161,16 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   assert.equal(stepRailById['install-nextcloud'].icon, '☁️');
   assert.equal(stepRailById['install-opencloud'].title, 'Install OpenCloud');
   assert.equal(stepRailById['install-opencloud'].icon, '☁️');
+  assert.equal(stepRailById['install-tempo'].title, 'Install Tempo');
+  assert.equal(stepRailById['install-tempo'].icon, '⏱️');
+  assert.equal(stepRailById['install-alloy'].title, 'Install Alloy');
+  assert.equal(stepRailById['install-alloy'].icon, '🧵');
   assert.equal(stepRailById['install-pgadmin4'].title, 'Install pgAdmin 4');
   assert.equal(stepRailById['install-pgadmin4'].icon, '🗃️');
   assert.equal(stepRailById['install-velero-ui'].title, 'Install Velero UI');
   assert.equal(stepRailById['install-velero-ui'].icon, '🖥️');
   assert.equal(model.primaryAction.label, 'Next');
-  assert.equal(model.progress.totalSteps, 22);
+  assert.equal(model.progress.totalSteps, 25);
   assert.equal(model.progress.completedSteps, 0);
   assert.equal(model.activity.runtime.currentStage, 'Applying cluster plan');
   assert.equal(model.activity.rawLogOutput, '[2026-03-20T10:10:00Z] Applying OpenTofu cluster plan');
@@ -235,8 +252,11 @@ test('wizard model switches to manage mode when setup flow is complete', () => {
         'install-cloudnativepg',
         'create-users-and-groups',
         'install-headlamp',
-        'install-grafana',
+        'install-prometheus',
         'install-loki',
+        'install-tempo',
+        'install-alloy',
+        'install-grafana',
         'install-pgadmin4',
         'install-dashy-dashboard',
         'install-twinbox-portal',
@@ -293,7 +313,7 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     selectedStepId: '',
   });
 
-  assert.equal(model.stepRail.length, 22);
+  assert.equal(model.stepRail.length, 25);
   const setupStepIds = new Set(model.stepRail.map((step) => step.id));
   for (const id of [
     'provision-nodes',
@@ -306,7 +326,7 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     'create-users-and-groups',
     'choose-ingress-route',
     'install-headlamp',
-    'install-grafana',
+    'install-prometheus',
     'install-dashy-dashboard',
     'install-twinbox-portal',
     'install-ntfy',
@@ -316,6 +336,10 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     'install-nextcloud',
     'install-opencloud',
     'install-immich',
+    'install-loki',
+    'install-tempo',
+    'install-alloy',
+    'install-grafana',
   ]) {
     assert.equal(setupStepIds.has(id), true);
   }

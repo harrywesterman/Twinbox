@@ -1,0 +1,15 @@
+id: install-alloy
+title: Install Alloy
+type: action
+journey_stage: setup
+order: 57
+summary: Apply Grafana Alloy so the cluster can ship logs, events, and traces into Loki and Tempo.
+explanation: Twinbox installs Grafana Alloy through Argo CD as the shared collection pipeline for Kubernetes pod logs, Kubernetes Events, and OTLP traces. The step keeps the collector in a single in-cluster deployment so the observability wiring stays simple in a greenfield cluster while still giving Grafana a full logs-and-traces backend.
+side_help: Alloy forwards Kubernetes logs and events to Loki and OTLP traces to Tempo.
+depends_on:
+  - install-loki
+  - install-tempo
+inputs: []
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/install-alloy/run.sh

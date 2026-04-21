@@ -18,6 +18,11 @@ bash -n wizard/setup-wizard.sh \
   scripts/manager/install-argocd.sh \
   scripts/manager/install-longhorn-storage.sh \
   scripts/manager/install-prometheus.sh \
+  scripts/manager/diagnose-monitoring.sh \
+  categories/talos-cluster/steps/install-loki/run.sh \
+  categories/talos-cluster/steps/install-tempo/run.sh \
+  categories/talos-cluster/steps/install-alloy/run.sh \
+  categories/talos-cluster/steps/install-grafana/run.sh \
   scripts/manager/install-secret-sync.sh \
   scripts/manager/install-velero-backup.sh \
   scripts/manager/openbao-secret-sync.sh \
@@ -135,6 +140,64 @@ Expected:
 - `ConfigMap/longhorn-dashboard` exists and is labeled for Grafana dashboard sidecar discovery
 - `ConfigMap/cilium-metrics-dashboard` exists and is labeled for Grafana dashboard sidecar discovery
 - `ConfigMap/hubble-metrics-dashboard` exists and is labeled for Grafana dashboard sidecar discovery
+
+### `install-loki`
+
+```bash
+kubectl --kubeconfig <kubeconfig> get application -n argocd loki
+kubectl --kubeconfig <kubeconfig> get pods -n monitoring -l app.kubernetes.io/name=loki
+kubectl --kubeconfig <kubeconfig> get pvc -n monitoring -l app=loki
+```
+
+Expected:
+
+- `Application/loki` is synced and healthy
+- Loki pods are running in `monitoring`
+- Longhorn-backed Loki PVCs are bound
+
+### `install-tempo`
+
+```bash
+kubectl --kubeconfig <kubeconfig> get application -n argocd tempo
+kubectl --kubeconfig <kubeconfig> get pods -n monitoring -l app.kubernetes.io/name=tempo
+kubectl --kubeconfig <kubeconfig> get svc -n monitoring -l app.kubernetes.io/name=tempo
+```
+
+Expected:
+
+- `Application/tempo` is synced and healthy
+- Tempo pods are running in `monitoring`
+- The Tempo service is available on port `3200`
+
+### `install-alloy`
+
+```bash
+kubectl --kubeconfig <kubeconfig> get application -n argocd alloy
+kubectl --kubeconfig <kubeconfig> get pods -n monitoring -l app.kubernetes.io/name=alloy
+kubectl --kubeconfig <kubeconfig> get svc -n monitoring -l app.kubernetes.io/name=alloy
+```
+
+Expected:
+
+- `Application/alloy` is synced and healthy
+- Alloy is running in `monitoring`
+- Alloy exposes OTLP and HTTP ports for log, event, and trace collection
+
+### `install-grafana`
+
+```bash
+kubectl --kubeconfig <kubeconfig> get application -n argocd grafana
+kubectl --kubeconfig <kubeconfig> get pods -n monitoring -l app.kubernetes.io/name=grafana
+kubectl --kubeconfig <kubeconfig> get configmap -n monitoring -l grafana_dashboard=1
+kubectl --kubeconfig <kubeconfig> get pod -n monitoring -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].metadata.name}'
+```
+
+Expected:
+
+- `Application/grafana` is synced and healthy
+- Grafana is running in `monitoring`
+- Grafana provisions the Prometheus, Loki, and Tempo datasources
+- The seeded Kubernetes Overview, Node Exporter Full, Longhorn, Cilium Metrics, and Hubble Metrics dashboard ConfigMaps exist and are discovered by the sidecar
 
 ### `install-longhorn-storage`
 
