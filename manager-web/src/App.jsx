@@ -457,7 +457,14 @@ function InputField({ stepId, input, value, onChange }) {
 
   return (
     <label className={fieldClassName} htmlFor={controlId}>
-      <span className="wizard-field-label">{input.label}</span>
+      {isDnsDomainField ? (
+        <div className="wizard-field-dns-head">
+          <span className="wizard-field-label">{input.label}</span>
+          <span className="wizard-field-required">Required</span>
+        </div>
+      ) : (
+        <span className="wizard-field-label">{input.label}</span>
+      )}
       {isDnsDomainField ? <p className="wizard-field-prelude">{helpText}</p> : null}
       <input
         id={controlId}
@@ -466,10 +473,10 @@ function InputField({ stepId, input, value, onChange }) {
         onChange={(event) => onChange(input.id, input.type === 'integer' ? event.target.valueAsNumber : event.target.value)}
         min={input.min}
         max={input.max}
-        placeholder={input.help || input.label}
+        placeholder={isDnsDomainField ? 'example.com' : input.help || input.label}
         inputMode={input.type === 'integer' ? 'numeric' : input.type === 'ipv4' ? 'decimal' : 'text'}
       />
-      {isDnsDomainField ? null : <small>{helpText}</small>}
+      {isDnsDomainField ? <small>Use the base domain you own or already added to Cloudflare.</small> : <small>{helpText}</small>}
       {isDnsDomainField || !defaultLabel ? null : <em>{defaultLabel}</em>}
     </label>
   );
