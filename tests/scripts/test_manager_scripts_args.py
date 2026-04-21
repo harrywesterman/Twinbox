@@ -1527,6 +1527,17 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
         "script: categories/talos-cluster/steps/install-prometheus/run.sh"
         in prometheus_text
     )
+    assert "url: http://tempo.monitoring.svc.cluster.local:3100" in (
+        GRAFANA_VALUES.read_text(encoding="utf-8")
+    )
+    assert "http://tempo.monitoring.svc.cluster.local:3100/ready" in (
+        REPO_ROOT / "scripts" / "manager" / "diagnose-monitoring.sh"
+    ).read_text(encoding="utf-8")
+    assert "port-forward svc/tempo 3100:3100" in (
+        REPO_ROOT / "scripts" / "manager" / "diagnose-monitoring.sh"
+    ).read_text(encoding="utf-8")
+
+
 def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     longhorn_app_text = LONGHORN_APP.read_text(encoding="utf-8")
     external_secrets_app_text = (
@@ -1932,6 +1943,10 @@ def test_grafana_values_includes_sidecar_and_datasources():
     assert "name: Loki" in text
     assert "type: prometheus" in text
     assert "type: loki" in text
+    assert "url: http://tempo.monitoring.svc.cluster.local:3100" in text
+    assert (
+        REPO_ROOT / "gitops" / "values" / "tempo.yaml"
+    ).read_text(encoding="utf-8").count("http_listen_port: 3100") == 1
     assert "root_url:" not in text
 
 
