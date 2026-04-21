@@ -821,6 +821,10 @@ def test_longhorn_step_installs_via_argocd_and_waits_for_health():
     assert "jobEnabled: false" in longhorn_values_text
     assert "global:" in longhorn_values_text
     assert "twinbox.io/role: worker" in longhorn_values_text
+    assert 'storageOverProvisioningPercentage: "300"' in longhorn_values_text
+    assert 'storageReservedPercentageForDefaultDisk: "10"' in longhorn_values_text
+    assert 'storageMinimalAvailablePercentage: "20"' in longhorn_values_text
+    assert "allowVolumeCreationWithDegradedAvailability: true" not in longhorn_values_text
     assert "allowVolumeExpansion: true" in (
         REPO_ROOT / "gitops" / "databases" / "longhorn-single-storageclass.yaml"
     ).read_text(encoding="utf-8")
@@ -2241,11 +2245,15 @@ def test_dashy_deployment_uses_a_published_image_tag():
     text = (
         REPO_ROOT / "gitops" / "platform-apps" / "dashy" / "deployment.yaml"
     ).read_text(encoding="utf-8")
+    pvc_text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "dashy" / "pvc.yaml"
+    ).read_text(encoding="utf-8")
     assert "strategy:" in text
     assert "type: Recreate" in text
     assert "kubernetes.io/hostname" not in text
     assert "persistentVolumeClaim:" in text
     assert "claimName: dashy-data" in text
+    assert "storage: 20Gi" in pvc_text
     assert "emptyDir: {}" not in text
     assert 'target = Path("/app/user-data/config.yml")' in text
     assert "requests:" in text
