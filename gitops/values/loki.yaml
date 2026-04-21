@@ -18,12 +18,12 @@ loki:
 
 deploymentMode: SingleBinary
 
-singleBinary:
-  replicas: 1
-  persistence:
-    enabled: true
-    storageClassName: longhorn
-    size: 5Gi
+  singleBinary:
+    replicas: 1
+    persistence:
+      enabled: true
+      storageClassName: longhorn
+      size: 50Gi
   resources:
     limits:
       memory: 2Gi

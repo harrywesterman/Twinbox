@@ -821,6 +821,9 @@ def test_longhorn_step_installs_via_argocd_and_waits_for_health():
     assert "jobEnabled: false" in longhorn_values_text
     assert "global:" in longhorn_values_text
     assert "twinbox.io/role: worker" in longhorn_values_text
+    assert "allowVolumeExpansion: true" in (
+        REPO_ROOT / "gitops" / "databases" / "longhorn-single-storageclass.yaml"
+    ).read_text(encoding="utf-8")
 
 
 def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
@@ -2112,16 +2115,16 @@ def test_loki_and_openbao_longhorn_sizes_are_right_sized():
         encoding="utf-8"
     )
 
-    assert "size: 5Gi" in loki_values_text
-    assert "size: 20Gi" not in loki_values_text
-    assert "size: 2Gi" in openbao_values_text
-    assert "size: 10Gi" not in openbao_values_text
+    assert "size: 50Gi" in loki_values_text
+    assert "size: 5Gi" not in loki_values_text
+    assert "size: 20Gi" in openbao_values_text
+    assert "size: 2Gi" not in openbao_values_text
 
 
 def test_authentik_db_cluster_is_scaled_for_lab_capacity():
     text = AUTHENTIK_DB_CLUSTER.read_text(encoding="utf-8")
     assert "instances: 1" in text
-    assert "size: 5Gi" in text
+    assert "size: 20Gi" in text
     assert "storageClass: longhorn-single" in text
 
 

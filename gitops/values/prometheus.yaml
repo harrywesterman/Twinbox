@@ -20,7 +20,7 @@ prometheus:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 3Gi
+              storage: 20Gi
 
 alertmanager:
   enabled: true
@@ -41,7 +41,7 @@ alertmanager:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 1Gi
+              storage: 20Gi
 
 grafana:
   enabled: false

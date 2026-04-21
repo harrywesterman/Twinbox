@@ -171,7 +171,7 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "SETTING_ZULIP_ADMINISTRATOR: admin@{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in app_text
     assert "ZULIP_AUTH_BACKENDS: GenericOpenIdConnectBackend" in app_text
 
-    assert "size: 5Gi" in values_text
+    assert "size: 20Gi" in values_text
     assert "postgresql:" in values_text
     assert "enabled: false" in values_text
     assert "externalPostgresql:" in values_text
