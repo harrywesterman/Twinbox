@@ -1,17 +1,10 @@
 # AGENTS.md
 
-Twinbox is a Talos Linux based configuration for a Kubernetes cluster. Treat these documents as the source of truth:
-
-- `README.md`
-- `docs/architecture.md`
-- `docs/getting-started.md`
-- `docs/configuration.md`
-- `docs/verification.md`
+Twinbox is a Talos Linux based configuration for a Kubernetes cluster.
 
 ## Current State
 
-- The repository’s active branch is `main`.
-- `manager-data/` is runtime state only.
+- The repository’s active branch is `main`. Don't use branches unless asked.
 
 ## Current Flow
 
@@ -32,19 +25,17 @@ Twinbox is a Talos Linux based configuration for a Kubernetes cluster. Treat the
 - `scripts/manager/` - cluster provisioning and management scripts.
 - `categories/` - manifest-driven step catalog and step scripts.
 - `docker-compose.yml` - Docker configuration for on the management VM, running the web wizard
-- Code changes land in GitHub `main`, are built into container images by GitHub Actions, and are pulled onto the Management VM with `docker compose pull && docker compose up -d`.
+- Code changes land in GitHub `main`, are built into container images by GitHub Actions, and are pulled onto the Management VM with `cd /opt/twinbox && docker compose pull && docker compose up -d`.
 - The `Twinbox Portal` is deployed by Argo CD from the GitOps manifests. Update it by:
   1. changing the portal code and committing to `main`
   2. letting GitHub Actions build a new portal Docker image
-  3. letting the workflow bump the portal image tag in `gitops/platform-apps/twinbox-portal/deployment.yaml`
-  4. letting Argo CD sync the manifest change and roll out the new pod
-- Do not expect Argo CD to update the portal from a rebuilt `latest` image alone; the portal deployment needs a new version tag in Git to trigger a rollout.
+  3. letting Argo CD sync the manifest change and roll out the new pod
 
 ## Editing Rules
 
-- Use the SSH remote-connection skill to connect to the management VM for debugging. Ask the user for the IP address when needed. Connect as `twinbox@<management-vm-ip>`.
+- Use the SSH remote-connection skill to connect to the management VM for debugging. TWINBOX_VM_PREVIEW_TARGET contains the user to connect with. Connect as `twinbox@<management-vm-ip>`.
 - Use the Playwright skill to look at the live web wizard.
-- Try python3 first, especially when working on a mac
+- Try python3 first, when working on a mac
 - Use `docker compose`, not legacy `docker-compose`.
 - Keep `manager-data/` as runtime state only.
 - The host does not carry a full repo checkout; the executable Twinbox code lives in the manager container images, while `/opt/twinbox` stores runtime and bootstrap state.
