@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Twinbox - Proxmox Console Setup Wizard for the Twinbox Management Environment
-# Creates only the Twinbox Management Environment and auto-starts the manager stack.
+# Creates only the Twinbox Management Environment and bootstraps the manager stack once.
 
 set -euo pipefail
 
@@ -1459,6 +1459,7 @@ runcmd:
   - install -m 0755 -d /opt/twinbox/bootstrap/ansible
   - install -m 0755 -d /opt/twinbox/bootstrap/config
   - install -m 0755 -d /opt/twinbox/bootstrap/bin
+  - install -m 0755 -d /opt/twinbox/scripts
   - install -m 0755 -d /opt/twinbox/bootstrap/secrets/global
   - install -m 0755 -d /opt/twinbox/bootstrap/openbao/seal
   - install -m 0755 -d /opt/twinbox/bootstrap/openbao/init
@@ -1471,8 +1472,11 @@ runcmd:
   - bash -lc 'curl -fsSL "${TWINBOX_RAW_BASE_URL}/config/pinned-defaults.sh" -o /opt/twinbox/bootstrap/config/pinned-defaults.sh'
   - bash -lc 'curl -fsSL "${TWINBOX_RAW_BASE_URL}/scripts/install-management-tools.sh" -o /opt/twinbox/bootstrap/bin/install-management-tools.sh'
   - chmod 0755 /opt/twinbox/bootstrap/bin/install-management-tools.sh
+  - bash -lc 'curl -fsSL "${TWINBOX_RAW_BASE_URL}/scripts/start-manager.sh" -o /opt/twinbox/scripts/start-manager.sh'
+  - chmod 0755 /opt/twinbox/scripts/start-manager.sh
   - chown -R ${CLOUD_INIT_USER}:${CLOUD_INIT_USER} ${TWINBOX_TARGET_DIR}
   - bash -lc 'set -a; source ${TWINBOX_TARGET_DIR}/.env; set +a; cd ${TWINBOX_TARGET_DIR} && ansible-playbook -i localhost, -c local /opt/twinbox/bootstrap/ansible/management-vm-maintenance.yml'
+  - bash -lc '/opt/twinbox/scripts/start-manager.sh --bootstrap-once'
 CLOUDINIT
   chmod 600 "$snippet_file"
 

@@ -7,7 +7,7 @@
 1. Detects existing Twinbox clusters on the host via VM tags, snippets, Proxmox users, and roles.
 2. Presents a menu to create a new cluster or manage (remove) an existing one.
 3. Auto-detects network settings (host IP, gateway, DNS, bridge, next free VMID).
-4. Creates an Ubuntu 24.04 Management VM with cloud-init plus an Ansible baseline (runtime directories, `.env`, Docker CE, management tools, `docker compose`).
+4. Creates an Ubuntu 24.04 Management VM with cloud-init plus an Ansible baseline (runtime directories, `.env`, Docker CE, management tools, `docker compose`), then bootstraps the manager stack once.
 5. Creates a cluster-specific Proxmox API user and least-privilege role.
 6. Waits for the Management VM to boot and the Twinbox web interface to become available.
 

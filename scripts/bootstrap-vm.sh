@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+
 TARGET_DIR="${TWINBOX_TARGET_DIR:-/opt/twinbox}"
 BOOTSTRAP_DIR="${TWINBOX_BOOTSTRAP_DIR:-${TARGET_DIR}/bootstrap}"
 RAW_BASE_URL="${TWINBOX_RAW_BASE_URL:-https://raw.githubusercontent.com/harrywesterman/twinbox/main}"
@@ -226,13 +229,8 @@ set +a
 ensure_bootstrap_material
 configure_management_time_sync
 
-if [[ ! -f docker-compose.yml ]]; then
-  log "Fetching docker-compose.yml into runtime root"
-  curl -fsSL "${RAW_BASE_URL}/docker-compose.yml" -o docker-compose.yml
-fi
-
-log "Starting development stack"
-docker compose up -d --build
+log "Starting manager stack once"
+./scripts/start-manager.sh --bootstrap-once
 
 log "Done"
 printf '\nNext steps:\n'

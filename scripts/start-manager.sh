@@ -6,6 +6,49 @@ cd "$REPO_ROOT"
 
 BOOTSTRAP_DIR="${TWINBOX_BOOTSTRAP_DIR:-${REPO_ROOT}/bootstrap}"
 RAW_BASE_URL="${TWINBOX_RAW_BASE_URL:-https://raw.githubusercontent.com/harrywesterman/twinbox/main}"
+BOOTSTRAP_ONCE=0
+BOOTSTRAP_MARKER="${BOOTSTRAP_DIR}/state/manager-stack.started"
+
+log() {
+  printf '[start-manager] %s\n' "$1"
+}
+
+fail() {
+  printf '[start-manager] ERROR: %s\n' "$1" >&2
+  exit 1
+}
+
+usage() {
+  cat <<'USAGE'
+Usage: start-manager.sh [--bootstrap-once]
+
+Start the Twinbox manager stack from the runtime tree.
+
+  --bootstrap-once  Skip if the stack was already bootstrapped and write a marker after the first successful start.
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --bootstrap-once)
+      BOOTSTRAP_ONCE=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ "$BOOTSTRAP_ONCE" -eq 1 && -f "$BOOTSTRAP_MARKER" ]]; then
+  log "Manager stack already bootstrapped; skipping"
+  exit 0
+fi
 
 append_secret_env_block() {
   local management_ip=""
@@ -192,7 +235,7 @@ if [[ ! -f .env ]]; then
 fi
 
 if [[ ! -d "$BOOTSTRAP_DIR" ]]; then
-  install -d -m 0755 "$BOOTSTRAP_DIR/secrets/global" "$BOOTSTRAP_DIR/ansible" "$BOOTSTRAP_DIR/config" "$BOOTSTRAP_DIR/bin"
+  install -d -m 0755 "$BOOTSTRAP_DIR/secrets/global" "$BOOTSTRAP_DIR/ansible" "$BOOTSTRAP_DIR/config" "$BOOTSTRAP_DIR/bin" "$BOOTSTRAP_DIR/state"
 fi
 
 if [[ ! -f "${BOOTSTRAP_DIR}/ansible/management-vm-maintenance.yml" ]]; then
@@ -230,6 +273,11 @@ fi
 docker compose pull
 docker compose up -d
 ensure_seaweedfs_bootstrap
+
+if [[ "$BOOTSTRAP_ONCE" -eq 1 ]]; then
+  install -d -m 0755 "$(dirname "$BOOTSTRAP_MARKER")"
+  date -u +"%Y-%m-%dT%H:%M:%SZ" > "$BOOTSTRAP_MARKER"
+fi
 
 echo "Manager stack started"
 echo "Web: http://localhost:3000"

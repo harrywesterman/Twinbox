@@ -3,7 +3,7 @@
 Twinbox is a complete K8s cluster based on Talos Linux, completely configured. The Management VM is the control point for bootstrap, queueing, and long-lived bootstrap material.
 
 GitHub `main` is the source of truth for both the management stack and the GitOps manifests. The Management VM is a runtime host that keeps only runtime, config, and bootstrap data under `/opt/twinbox`; the host does not carry a repo checkout.
-When you change Twinbox code, commit it to `main`, wait for the GitHub Actions image build, and then refresh the Management VM with `docker compose pull && docker compose up -d`.
+The initial Management VM deployment bootstraps the manager stack once from the published Docker images, and later image refreshes are manual with `docker compose pull && docker compose up -d`.
 
 ## Layers
 

@@ -36,9 +36,9 @@ scripts/
 
 | Script | Purpose |
 |--------|---------|
-| `bootstrap-vm.sh` | First-run script for the Management VM: seeds runtime files, fetches the bootstrap playbook tree when needed, installs the Ansible-driven host baseline, creates `.env`, and starts `docker compose`. |
+| `bootstrap-vm.sh` | First-run script for the Management VM: seeds runtime files, fetches the bootstrap playbook tree when needed, installs the Ansible-driven host baseline, creates `.env`, and bootstraps the manager stack once. |
 | `install-management-vm-maintenance.sh` | Installs and enables the systemd timer that runs the Management VM maintenance playbook. |
-| `start-manager.sh` | Loads `.env`, materializes bootstrap files if needed, and starts the manager stack via `docker compose`. |
+| `start-manager.sh` | Loads `.env`, materializes bootstrap files if needed, and starts the manager stack via `docker compose`. Use `--bootstrap-once` for the initial deployment path. |
 | `get-talos-image-factory.sh` | Queries the Talos Image Factory for a schematic ID, download URL, or shell command. Supports `--preset`, `--version`, `--arch`, `--platform`, `--output`. |
 | `install-management-tools.sh` | Installs `talosctl`, `tofu`, `kubectl`, and `helm` with versions pinned from `config/pinned-defaults.sh`. |
 | `management-vm-maintenance.sh` | Installs `ansible-core` if needed and runs the Management VM maintenance playbook from the bootstrap tree. The playbook keeps the VM on the pinned NTP server, Docker, and the management tools. |

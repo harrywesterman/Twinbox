@@ -8,9 +8,9 @@ This guide reflects the current manager-first deployment flow.
 2. Wizard creates only the Management VM.
 3. Cloud-init on that VM:
    - installs Docker CE from the official Docker repo,
-   - clones `https://github.com/harrywesterman/twinbox` into `/opt/twinbox`,
-   - writes `.env`,
-   - starts the manager stack.
+   - writes runtime files under `/opt/twinbox`,
+   - downloads the runtime start script into `/opt/twinbox/scripts`,
+   - bootstraps the manager stack once from the published Docker images.
 4. Open the UI and continue cluster provisioning from the browser.
 
 ## Run the Wizard

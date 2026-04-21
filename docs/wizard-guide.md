@@ -13,8 +13,8 @@
 - Creates the Management VM from Ubuntu 24.04 cloud image.
 - Seeds a thin cloud-init that installs Ansible and hands the Management VM baseline to an Ansible playbook.
 - Creates the `/opt/twinbox` runtime tree without cloning the Twinbox repository onto the VM.
-- Runs the management code from Docker images instead of a host-side repo checkout.
-- After you change code, commit it, push it to `main`, wait for the GitHub Actions `Publish Docker Images` workflow, and then run `docker compose pull && docker compose up -d` on the VM.
+- Downloads the runtime start script into `/opt/twinbox/scripts` and bootstraps the manager stack once from the published Docker images.
+- After you change code, commit it, push it to `main`, wait for the GitHub Actions `Publish Docker Images` workflow, and then run `docker compose pull && docker compose up -d` on the VM when you want to refresh images manually.
 - Management VM maintenance is now handled by Ansible and no longer appears as a user-facing wizard step.
 
 ## Run
