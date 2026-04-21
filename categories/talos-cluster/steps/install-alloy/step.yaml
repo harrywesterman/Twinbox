@@ -10,6 +10,13 @@ depends_on:
   - install-loki
   - install-tempo
 inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
 runner:
   kind: script
   script: categories/talos-cluster/steps/install-alloy/run.sh
