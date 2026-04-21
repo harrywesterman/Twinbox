@@ -11,7 +11,6 @@
     twinbox_management_time_server: "{{ lookup('env', 'TWINBOX_TIME_SERVER') | default('time.cloudflare.com', true) }}"
     twinbox_management_vm_ip: "{{ lookup('env', 'MANAGEMENT_VM_IP') | default('127.0.0.1', true) }}"
     twinbox_management_env_file: "{{ twinbox_runtime_root }}/.env"
-    twinbox_compose_file: "{{ twinbox_runtime_root }}/docker-compose.yml"
     twinbox_bootstrap_ansible_dir: "{{ twinbox_bootstrap_root }}/ansible"
     twinbox_bootstrap_config_dir: "{{ twinbox_bootstrap_root }}/config"
     twinbox_bootstrap_bin_dir: "{{ twinbox_bootstrap_root }}/bin"
@@ -245,12 +244,6 @@
       environment:
         TWINBOX_BOOTSTRAP_DIR: "{{ twinbox_bootstrap_root }}"
 
-    - name: Download the Docker Compose stack definition
-      ansible.builtin.get_url:
-        url: "{{ twinbox_raw_base_url }}/docker-compose.yml"
-        dest: "{{ twinbox_compose_file }}"
-        mode: "0644"
-
     - name: Ensure the SeaweedFS data directory exists
       ansible.builtin.file:
         path: "{{ twinbox_runtime_root }}/seaweedfs/data"
@@ -258,25 +251,6 @@
         owner: root
         group: root
         mode: "0755"
-
-    - name: Start the management stack with Docker Compose
-      ansible.builtin.command:
-        argv:
-          - docker
-          - compose
-          - pull
-      args:
-        chdir: "{{ twinbox_runtime_root }}"
-
-    - name: Bring the management stack up
-      ansible.builtin.command:
-        argv:
-          - docker
-          - compose
-          - up
-          - -d
-      args:
-        chdir: "{{ twinbox_runtime_root }}"
 
     - name: Install the management VM maintenance wrapper
       ansible.builtin.copy:
