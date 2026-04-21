@@ -9,6 +9,13 @@ side_help: Tempo stores and queries traces for Grafana Explore.
 depends_on:
   - install-longhorn-storage
 inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
 runner:
   kind: script
   script: categories/talos-cluster/steps/install-tempo/run.sh

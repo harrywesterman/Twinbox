@@ -223,6 +223,13 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert talos_steps["install-headlamp"]["title"] == "Install Headlamp"
             assert talos_steps["install-grafana"]["title"] == "Install Grafana"
             assert talos_steps["install-prometheus"]["title"] == "Install Prometheus"
+            assert talos_steps["install-tempo"]["title"] == "Install Tempo"
+            assert talos_steps["install-tempo"]["secrets"]["files"]["KUBECONFIG_FILE"][
+                "item"
+            ] == "kubeconfig"
+            assert talos_steps["install-tempo"]["secrets"]["files"]["KUBECONFIG_FILE"][
+                "attachment"
+            ] == "kubeconfig"
             assert talos_steps["install-pgadmin4"]["title"] == "Install pgAdmin 4"
             assert (
                 talos_steps["install-dashy-dashboard"]["title"]
