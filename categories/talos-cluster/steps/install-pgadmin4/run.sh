@@ -185,8 +185,7 @@ pgadmin_host="https://pgadmin4.${public_zone_name}"
 pgadmin_redirect_uri="${pgadmin_host}/oauth2/authorize"
 secrets_dir="/opt/twinbox/bootstrap/secrets/global"
 mkdir -p "$secrets_dir"
-pgadmin_servers_file="$secrets_dir/pgadmin4-servers-${cluster_id}.json"
-trap 'rm -f "$pgadmin_rendered_ingressroute" "${pgadmin_servers_file:-}"' EXIT
+trap 'rm -f "$pgadmin_rendered_ingressroute"' EXIT
 pgadmin_db_password_secret_name="pgadmin4-db-password"
 pgadmin_application_slug="pgadmin4"
 pgadmin_issuer_url="${AUTHENTIK_HOST%/}/application/o/${pgadmin_application_slug}/"
@@ -466,45 +465,13 @@ if kubectl -n pgadmin4 get deployment pgadmin4 >/dev/null 2>&1; then
 fi
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Removing stale pgAdmin 4 import resources"
-kubectl -n pgadmin4 delete job pgadmin4-load-servers configmap/pgadmin4-servers --ignore-not-found=true >/dev/null 2>&1 || true
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying pgAdmin 4 PVC bootstrap resource"
+kubectl -n pgadmin4 delete job pgadmin4-load-servers --ignore-not-found=true >/dev/null 2>&1 || true
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying pgAdmin 4 configmap and PVC bootstrap resource"
+kubectl apply -f "$pgadmin_platform_dir/configmap.yaml"
 kubectl apply -f "$pgadmin_platform_dir/pvc.yaml"
 wait_for_pvc_bound pgadmin4 pgadmin4-data
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Loading pgAdmin 4 shared server entry"
-jq -n \
-  --arg server_name "Authentik Database" \
-  --arg server_group "Shared Servers" \
-  --arg server_host "authentik-db-pooler-rw-session.databases.svc.cluster.local" \
-  --argjson server_port 5432 \
-  --arg maintenance_db "postgres" \
-  --arg username "authentik" \
-  --arg shared_username "authentik" \
-  --arg password_exec_cmd 'printf %s "$PGADMIN_AUTHENTIK_DB_PASSWORD"' \
-  '{
-    Servers: {
-      "1": {
-        Name: $server_name,
-        Group: $server_group,
-        Host: $server_host,
-        Port: $server_port,
-        MaintenanceDB: $maintenance_db,
-        Username: $username,
-        SharedUsername: $shared_username,
-        PasswordExecCommand: $password_exec_cmd,
-        Shared: true,
-        ConnectionParameters: {
-          sslmode: "prefer"
-        },
-        Comment: "CloudNativePG pooler for the Authentik cluster"
-      }
-    }
-  }' >"$pgadmin_servers_file"
-
-kubectl -n pgadmin4 create configmap pgadmin4-servers \
-  --from-file=pgadmin4-servers.json="$pgadmin_servers_file" \
-  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-
 kubectl apply -f - >/dev/null <<EOF
 apiVersion: batch/v1
 kind: Job
@@ -616,7 +583,7 @@ kubectl -n pgadmin4 wait --for=condition=Available deployment/pgadmin4 --timeout
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for pgAdmin 4 pod readiness"
 wait_for_ready_pod pgadmin4 app.kubernetes.io/name=pgadmin4
 
-kubectl -n pgadmin4 delete job pgadmin4-load-servers configmap/pgadmin4-servers --ignore-not-found=true >/dev/null 2>&1 || true
+kubectl -n pgadmin4 delete job pgadmin4-load-servers --ignore-not-found=true >/dev/null 2>&1 || true
 kubectl -n pgadmin4 delete job "${pgadmin_load_servers_job_name}" --ignore-not-found=true >/dev/null 2>&1 || true
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] pgAdmin 4 Authentik configuration complete"

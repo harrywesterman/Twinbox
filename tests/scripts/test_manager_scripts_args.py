@@ -203,6 +203,9 @@ PLATFORM_INGRESS_APP = REPO_ROOT / "gitops" / "apps" / "platform-ingress.yaml"
 PGADMIN_EXTERNALSECRET = (
     REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "externalsecret.yaml"
 )
+PGADMIN_SERVER_CONFIGMAP = (
+    REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "configmap.yaml"
+)
 PGADMIN_INGRESSROUTE = (
     REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "ingressroute.yaml"
 )
@@ -1222,6 +1225,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
 
     pgadmin_step_text = PGADMIN_STEP_MANIFEST.read_text(encoding="utf-8")
     pgadmin_run_text = PGADMIN_STEP_SCRIPT.read_text(encoding="utf-8")
+    pgadmin_server_config_text = PGADMIN_SERVER_CONFIGMAP.read_text(encoding="utf-8")
     assert "title: Install pgAdmin 4" in pgadmin_step_text
     assert "install-authentik-idp" in pgadmin_step_text
     assert "create-users-and-groups" in pgadmin_step_text
@@ -1252,25 +1256,13 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "Creating pgAdmin 4 database password secret" in pgadmin_run_text
     assert 'pgadmin4-db-password' in pgadmin_run_text
     assert "Removing stale pgAdmin 4 import resources" in pgadmin_run_text
-    assert 'kubectl -n pgadmin4 delete job pgadmin4-load-servers configmap/pgadmin4-servers --ignore-not-found=true' in pgadmin_run_text
+    assert 'kubectl -n pgadmin4 delete job pgadmin4-load-servers --ignore-not-found=true' in pgadmin_run_text
     assert (
         "wait_for_ready_pod pgadmin4 app.kubernetes.io/name=pgadmin4"
         in pgadmin_run_text
     )
     assert "Loading pgAdmin 4 shared server entry" in pgadmin_run_text
-    assert "Authentik Database" in pgadmin_run_text
-    assert "Shared Servers" in pgadmin_run_text
-    assert "authentik-db-pooler-rw-session.databases.svc.cluster.local" in pgadmin_run_text
-    assert "Shared: true" in pgadmin_run_text
-    assert "ConnectionParameters" in pgadmin_run_text
-    assert 'sslmode: "prefer"' in pgadmin_run_text
-    assert "--arg maintenance_db \"postgres\"" in pgadmin_run_text
-    assert "--arg username \"authentik\"" in pgadmin_run_text
-    assert "--arg shared_username \"authentik\"" in pgadmin_run_text
-    assert "SharedUsername: $shared_username" in pgadmin_run_text
-    assert 'PasswordExecCommand: $password_exec_cmd' in pgadmin_run_text
-    assert 'printf %s "$PGADMIN_AUTHENTIK_DB_PASSWORD"' in pgadmin_run_text
-    assert 'kubectl -n pgadmin4 create configmap pgadmin4-servers' in pgadmin_run_text
+    assert 'kubectl apply -f "$pgadmin_platform_dir/configmap.yaml"' in pgadmin_run_text
     assert 'kind: Job' in pgadmin_run_text
     assert 'name: pgadmin4-load-servers' in pgadmin_run_text
     assert 'cp /usr/local/bin/python3.14 /tmp/python3.14.no-cap' in pgadmin_run_text
@@ -1290,7 +1282,11 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert 'kubectl apply -f "$pgadmin_rendered_ingressroute"' in pgadmin_run_text
     assert 'kubectl -n pgadmin4 wait --for=condition=Available deployment/pgadmin4 --timeout=10m' in pgadmin_run_text
     assert 'pgAdmin 4 server import job failed' in pgadmin_run_text
-    assert 'kubectl -n pgadmin4 delete job pgadmin4-load-servers configmap/pgadmin4-servers --ignore-not-found=true' in pgadmin_run_text
+    assert 'kubectl -n pgadmin4 delete job pgadmin4-load-servers --ignore-not-found=true' in pgadmin_run_text
+    assert "kind: ConfigMap" in pgadmin_server_config_text
+    assert "Authentik Database" in pgadmin_server_config_text
+    assert "authentik-db-pooler-rw-session.databases.svc.cluster.local" in pgadmin_server_config_text
+    assert "PasswordExecCommand" in pgadmin_server_config_text
 
     pgadmin_app_text = PLATFORM_INGRESS_APP.read_text(encoding="utf-8")
     assert "kind: ApplicationSet" in pgadmin_app_text
@@ -1374,6 +1370,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "HEADLAMP_CONFIG_OIDC_IDP_ISSUER_URL" in headlamp_external_secret_text
     assert "HEADLAMP_CONFIG_OIDC_SCOPES" in headlamp_external_secret_text
     pgadmin_external_secret_text = PGADMIN_EXTERNALSECRET.read_text(encoding="utf-8")
+    pgadmin_server_config_text = PGADMIN_SERVER_CONFIGMAP.read_text(encoding="utf-8")
     assert "kind: ExternalSecret" in pgadmin_external_secret_text
     assert "pgadmin4-oidc" in pgadmin_external_secret_text
     assert "PGADMIN_DEFAULT_EMAIL" in pgadmin_external_secret_text
@@ -1383,10 +1380,17 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "PGADMIN_OAUTH2_CLIENT_SECRET" in pgadmin_external_secret_text
     assert "PGADMIN_OAUTH2_SERVER_METADATA_URL" in pgadmin_external_secret_text
     assert "PGADMIN_OAUTH2_SCOPE" in pgadmin_external_secret_text
+    assert "kind: ConfigMap" in pgadmin_server_config_text
+    assert "Authentik Database" in pgadmin_server_config_text
+    assert "authentik-db-pooler-rw-session.databases.svc.cluster.local" in pgadmin_server_config_text
+    assert "PasswordExecCommand" in pgadmin_server_config_text
     pgadmin_deployment_text = PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
     assert "pgadmin4-db-password" in pgadmin_deployment_text
     assert "name: pgadmin4-bootstrap" in pgadmin_deployment_text
     assert "name: pgadmin4-db-password" in pgadmin_deployment_text
+    assert "load-shared-servers" in pgadmin_deployment_text
+    assert "pgadmin4-servers" in pgadmin_deployment_text
+    assert "load-servers /config/pgadmin4-servers.json" in pgadmin_deployment_text
     assert "startupProbe" in pgadmin_deployment_text
     assert "failureThreshold: 36" in pgadmin_deployment_text
     assert "tcpSocket" in pgadmin_deployment_text
@@ -1583,6 +1587,9 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "dpage/pgadmin4:9.14" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
     assert "master-password-hook.sh" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
     assert "readinessProbe" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
+    assert "configmap.yaml" in (
+        REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "kustomization.yaml"
+    ).read_text(encoding="utf-8")
     assert "pgadmin4" in PGADMIN_SERVICE.read_text(encoding="utf-8")
     assert "name: pgadmin4" not in PLATFORM_INGRESS_APP.read_text(encoding="utf-8")
     assert "pgadmin4" not in PLATFORM_INGRESS_APP.read_text(encoding="utf-8")

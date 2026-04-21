@@ -80,6 +80,36 @@ spec:
           volumeMounts:
             - name: pgadmin-config
               mountPath: /work
+        - name: load-shared-servers
+          image: dpage/pgadmin4:9.14
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 5050
+            runAsGroup: 5050
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              cp /usr/local/bin/python3.14 /tmp/python3.14.no-cap
+              chmod 0755 /tmp/python3.14.no-cap
+              export PYTHONPATH=/venv/lib/python3.14/site-packages:/usr/local/lib/python3.14/site-packages
+              exec /tmp/python3.14.no-cap /pgadmin4/setup.py load-servers /config/pgadmin4-servers.json --user "${PGADMIN_DEFAULT_EMAIL}" --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace
+          envFrom:
+            - secretRef:
+                name: pgadmin4-bootstrap
+            - secretRef:
+                name: pgadmin4-db-password
+          volumeMounts:
+            - name: pgadmin-data
+              mountPath: /var/lib/pgadmin
+            - name: pgadmin-servers
+              mountPath: /config
+              readOnly: true
       containers:
         - name: pgadmin4
           image: dpage/pgadmin4:9.14
@@ -159,3 +189,6 @@ spec:
             claimName: pgadmin4-data
         - name: pgadmin-config
           emptyDir: {}
+        - name: pgadmin-servers
+          configMap:
+            name: pgadmin4-servers
