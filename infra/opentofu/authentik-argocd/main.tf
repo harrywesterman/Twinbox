@@ -9,8 +9,8 @@ data "authentik_flow" "invalidation" {
 }
 
 locals {
-  authentik_authorization_flow_id = "00585727-06b0-48a1-8ba3-892994c47e12"
-  authentik_invalidation_flow_id  = "cc1ce8ed-a537-4b02-8558-8b16f17a2328"
+  authentik_authorization_flow_id = data.authentik_flow.authorization.id
+  authentik_invalidation_flow_id  = data.authentik_flow.invalidation.id
 }
 
 data "authentik_property_mapping_provider_scope" "scopes" {

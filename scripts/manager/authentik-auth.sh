@@ -302,7 +302,7 @@ authentik_ensure_default_provider_flows() {
     "Default Provider Authorization Implicit Consent" \
     "Default Provider Authorization Implicit Consent" \
     "authorization" \
-    "required" \
+    "require_authenticated" \
     "any" \
     "[1, 2]"
 
@@ -311,7 +311,7 @@ authentik_ensure_default_provider_flows() {
     "Default Provider Invalidation Flow" \
     "Default Provider Invalidation Flow" \
     "invalidation" \
-    "required" \
+    "require_authenticated" \
     "any" \
     "[]"
 }
