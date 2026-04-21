@@ -5,6 +5,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_JSX = REPO_ROOT / "manager-web" / "src" / "App.jsx"
+MANAGER_WEB_JOURNEY = REPO_ROOT / "manager-web" / "src" / "journey.js"
 APPLY_CLUSTER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "apply-cluster.sh"
 BOOTSTRAP_SCRIPT = REPO_ROOT / "scripts" / "manager" / "bootstrap-talos.sh"
 PROVISION_NODES_SCRIPT = (
@@ -828,6 +829,21 @@ def test_longhorn_step_installs_via_argocd_and_waits_for_health():
     assert "allowVolumeExpansion: true" in (
         REPO_ROOT / "gitops" / "databases" / "longhorn-single-storageclass.yaml"
     ).read_text(encoding="utf-8")
+
+
+def test_user_apps_are_not_part_of_bootstrap_journey():
+    journey_text = MANAGER_WEB_JOURNEY.read_text(encoding="utf-8")
+    setup_step_ids = journey_text.split("const FIXED_SETUP_STEP_IDS = [", 1)[1].split(
+        "];",
+        1,
+    )[0]
+    category_text = (
+        REPO_ROOT / "categories" / "talos-cluster" / "category.yaml"
+    ).read_text(encoding="utf-8")
+
+    for step_id in ["install-nextcloud", "install-opencloud", "install-immich"]:
+        assert f"'{step_id}'" not in setup_step_ids
+        assert f"- id: {step_id}" not in category_text
 
 
 def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():

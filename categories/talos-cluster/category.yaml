@@ -7,29 +7,6 @@ app_steps:
     depends_on:
       - install-velero-backup
       - install-velero-ui
-  - id: install-nextcloud
-    side_help: Nextcloud is the collaboration hub for user files and sync.
-    depends_on:
-      - install-proxmox-backup-system
-  - id: install-opencloud
-    depends_on:
-      - install-proxmox-backup-system
-      - install-longhorn-storage
-      - install-secret-sync
-      - install-authentik-idp
-      - create-users-and-groups
-      - choose-ingress-route
-  - id: install-immich
-    explanation: >
-      Twinbox provisions Immich as a GitOps application with a Longhorn-backed
-      library volume, a dedicated CloudNativePG database, Authentik OIDC login,
-      and Traefik routes for the selected ingress path.
-    side_help: >
-      Immich is grouped with the other user services after OpenCloud so the
-      photo stack lands after the collaboration suite and the login flow stays
-      aligned with the rest of the app stack.
-    depends_on:
-      - install-opencloud
   - id: install-zulip
     summary: Install Zulip with Longhorn persistence, CloudNativePG, Authentik OIDC, and Traefik ingress.
     explanation: >
@@ -41,7 +18,7 @@ app_steps:
       them through External Secrets instead of storing bootstrap material in the
       repository.
     depends_on:
-      - install-immich
+      - install-proxmox-backup-system
   - id: install-paperless
     depends_on:
       - install-zulip

@@ -184,8 +184,6 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-ntfy",
                 "install-velero-backup",
                 "install-proxmox-backup-system",
-                "install-nextcloud",
-                "install-immich",
                 "install-zulip",
                 "install-paperless",
                 "install-karakeep",
@@ -250,29 +248,15 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert talos_steps["install-freshrss"]["title"] == "Install FreshRSS"
             assert "placeholder" not in talos_steps["install-freshrss"]["summary"].lower()
             assert "placeholder" not in talos_steps["install-freshrss"]["explanation"].lower()
-            assert talos_steps["install-nextcloud"]["title"] == "Install Nextcloud"
-            assert "placeholder" not in talos_steps["install-nextcloud"]["summary"].lower()
-            assert "placeholder" not in talos_steps["install-nextcloud"]["explanation"].lower()
+            assert "install-nextcloud" not in talos_steps
+            assert "install-opencloud" not in talos_steps
+            assert "install-immich" not in talos_steps
             assert talos_steps["install-proxmox-backup-system"]["depends_on"] == [
                 "install-velero-backup",
                 "install-velero-ui",
             ]
-            assert talos_steps["install-nextcloud"]["depends_on"] == [
-                "install-proxmox-backup-system",
-            ]
-            assert talos_steps["install-opencloud"]["depends_on"] == [
-                "install-proxmox-backup-system",
-                "install-longhorn-storage",
-                "install-secret-sync",
-                "install-authentik-idp",
-                "create-users-and-groups",
-                "choose-ingress-route",
-            ]
-            assert talos_steps["install-immich"]["depends_on"] == [
-                "install-opencloud",
-            ]
             assert talos_steps["install-zulip"]["depends_on"] == [
-                "install-immich",
+                "install-proxmox-backup-system",
             ]
             assert talos_steps["install-audiobookshelf"]["title"] == "Install Audiobookshelf"
             assert "placeholder" not in talos_steps["install-audiobookshelf"]["summary"].lower()
@@ -385,6 +369,14 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
             assert nextcloud["installable"] is True
             assert nextcloud["app_state"] == "ready"
             assert nextcloud["runner"]["script"] == "categories/apps/steps/install-nextcloud/run.sh"
+            opencloud = next(step for step in apps if step["id"] == "install-opencloud")
+            assert opencloud["placeholder"] is False
+            assert opencloud["installable"] is True
+            assert opencloud["app_state"] == "ready"
+            assert opencloud["runner"]["script"] == "categories/apps/steps/install-opencloud/run.sh"
+            immich = next(step for step in apps if step["id"] == "install-immich")
+            assert immich["placeholder"] is False
+            assert immich["runner"]["script"] == "categories/apps/steps/install-immich/run.sh"
         finally:
             proc.terminate()
             proc.wait(timeout=5)
