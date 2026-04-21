@@ -1,63 +1,161 @@
 # AGENTS.md
 
-Twinbox is a Talos Linux based configuration for a Kubernetes cluster.
+Twinbox turns a Proxmox host into a Talos Linux Kubernetes cluster through a Management VM, a web wizard, queued manager jobs, and GitOps-managed cluster services.
 
-## Current State
+## Source Of Truth
 
-- The repository’s active branch is `main`. Don't use branches unless asked.
+- Work on the current `main` branch. Do not create branches unless the user asks.
+- GitHub `main` is the source of truth for code, container images, and GitOps manifests.
+- The Management VM is runtime-only. It stores state under `/opt/twinbox`, but it does not carry a full repo checkout.
+- Do not treat files under `manager-data/` as canonical source. They are runtime state.
 
-## Current Flow
+## Architecture
 
-1. Run `wizard/setup-wizard.sh` on Proxmox.
-2. The wizard creates only the Management VM.
-3. The Management VM gets a thin cloud-init bootstrap, Ansible installs Docker CE and the management tools, and the host keeps runtime/bootstrap state under `/opt/twinbox`; the step and manager scripts run from the manager container images, not from a host-side Twinbox checkout.
-4. `manager-web` on port `3000` queues work through `manager-api` on port `8080`.
-5. `manager-worker` polls the file queue under `manager-data/` and executes bundled step and manager scripts inside the container image.
-6. `provision-nodes` starts the Talos journey, sizes the cluster, lands the VMs, and records the cluster state.
-7. `install-secret-sync` installs External Secrets Operator and OpenBao after Longhorn.
+1. `wizard/setup-wizard.sh` runs on Proxmox and creates the Management VM.
+2. The Management VM runs Docker Compose from `/opt/twinbox/docker-compose.yml`.
+3. `manager-web` serves the wizard on port `3000`.
+4. `manager-api` serves the API on port `8080`, validates input, reads the catalog, persists state, and queues jobs.
+5. `manager-worker` polls `manager-data/queue/` and executes bundled scripts from the container image.
+6. `provision-nodes` creates the Talos VMs and writes cluster state.
+7. Argo CD deploys platform services and the Twinbox Portal from `gitops/`.
 
-## Key Components
+## Important Paths
 
-- `wizard/setup-wizard.sh` - Proxmox bootstrap.
-- `manager-web/` - React UI.
-- `manager-api/` - catalog, validation, job queueing, and state reads/writes.
-- `manager-worker/` - queue polling and script execution.
-- `scripts/manager/` - cluster provisioning and management scripts.
-- `categories/` - manifest-driven step catalog and step scripts.
-- `docker-compose.yml` - Docker configuration for on the management VM, running the web wizard
-- Code changes land in GitHub `main`, are built into container images by GitHub Actions, and are pulled onto the Management VM with `cd /opt/twinbox && docker compose pull && docker compose up -d`.
-- The `Twinbox Portal` is deployed by Argo CD from the GitOps manifests. Update it by:
-  1. changing the portal code and committing to `main`
-  2. letting GitHub Actions build a new portal Docker image
-  3. letting Argo CD sync the manifest change and roll out the new pod
+- `wizard/setup-wizard.sh` - Proxmox bootstrap entrypoint.
+- `manager-web/src/` - React web wizard.
+- `manager-api/src/` - Express API, validation, catalog, queueing, and state access.
+- `manager-worker/src/` - queue polling, job execution, config refresh helpers.
+- `scripts/manager/` - Talos, Proxmox, Argo CD, OpenBao, and platform install scripts.
+- `categories/` - manifest-driven wizard steps and step runners.
+- `gitops/` - Argo CD applications, Helm values, Kustomize manifests.
+- `portal/` - Twinbox Portal app.
+- `config/` - pinned defaults, Cilium values, portal content.
+- `tests/` - Python integration/contract tests.
+- `manager-data/` - local/runtime state only; do not edit as source.
 
 ## Editing Rules
 
-- Use the SSH remote-connection skill to connect to the management VM for debugging. TWINBOX_VM_PREVIEW_TARGET contains the user to connect with. Connect as `twinbox@<management-vm-ip>`.
-- Use the Playwright skill to look at the live web wizard.
-- Try python3 first, when working on a mac
-- Use `docker compose`, not legacy `docker-compose`.
-- Keep `manager-data/` as runtime state only.
-- The host does not carry a full repo checkout; the executable Twinbox code lives in the manager container images, while `/opt/twinbox` stores runtime and bootstrap state.
-- docker-compose.yml on the management vm is in /opt/twinbox
+- Prefer small, targeted changes in the relevant component.
 - Use `apply_patch` for manual file edits.
-- Prefer small, targeted changes in the relevant component:
-  - UI: `manager-web/src/*`
-  - API: `manager-api/src/*`
-  - Worker: `manager-worker/src/*`
-  - Provisioning scripts: `scripts/manager/*`
-  - Step manifests/scripts: `categories/*`
-  - After you made a change, always commit and push to `main` on github.com. Then watch the GitHub Action that builds the Docker images and wait until it is done. For the management VM stack, connect with the SSH connection skill to `twinbox@<ip-of-the-management-vm>` and do `docker compose pull && docker compose up -d` before retesting. For the portal, wait for the workflow to bump the image tag in GitOps and let Argo CD sync the deployment before retesting.
+- Do not rewrite unrelated files or revert user changes.
+- Use `docker compose`, not `docker-compose`.
+- On macOS, prefer `python3`.
+- Keep generated, vendored, runtime, and dependency directories untouched unless the task specifically requires them:
+  - `manager-data/`
+  - `node_modules/`
+  - `dist/`
+  - `.venv/`
+  - `.terraform/`
+  - checked-in chart/vendor trees unless intentionally updating them
+
+## Component Guidance
+
+- UI changes usually belong in `manager-web/src/`.
+- API changes usually belong in `manager-api/src/`.
+- Worker/job execution changes usually belong in `manager-worker/src/`.
+- Provisioning behavior usually belongs in `scripts/manager/`.
+- Wizard step metadata or step execution usually belongs in `categories/*/steps/*/`.
+- Portal changes belong in `portal/` and may also require `gitops/apps/twinbox-portal.yaml` or `gitops/platform-apps/twinbox-portal/`.
+
+## Runtime And Deployment Model
+
+- Manager images are built by GitHub Actions from `main`.
+- The Management VM pulls updated images with:
+
+  ```bash
+  cd /opt/twinbox
+  docker compose pull
+  docker compose up -d
+  ```
+
+- The executable Twinbox code on the Management VM lives inside the manager container images.
+- `/opt/twinbox` on the Management VM stores compose config, bootstrap files, secrets, and runtime state.
+- The Twinbox Portal is deployed through Argo CD from GitOps manifests.
+- For portal updates, change source, commit to `main`, wait for the image build, then let Argo CD/image updater roll out the new image.
+
+## Remote Debugging
+
+- Use the SSH remote-connection skill for Management VM debugging.
+- `TWINBOX_VM_PREVIEW_TARGET` contains the SSH target.
+- Connect as `twinbox@<management-vm-ip>` when needed.
+- Use the Playwright skill to inspect the live web wizard.
+- Debug host/runtime files under `/opt/twinbox`.
+- Debug bundled executable files inside the relevant container image when needed.
 
 ## Verification
 
-Run the smallest useful checks for the area you changed:
+Run the smallest useful checks for the files changed.
 
-- Shell: `bash -n` on touched scripts
-- Node: `node --check` on touched entrypoints
-- Compose: `docker compose config`
-- Higher-level changes: the tests under `tests/`
+- Shell scripts:
+
+  ```bash
+  bash -n <changed-script.sh>
+  ```
+
+- Node entrypoints/helpers:
+
+  ```bash
+  node --check <changed-file.js>
+  node --check <changed-file.mjs>
+  ```
+
+- Portal build:
+
+  ```bash
+  npm run build --prefix portal
+  ```
+
+- Manager web build:
+
+  ```bash
+  npm run build --prefix manager-web
+  ```
+
+- Worker tests:
+
+  ```bash
+  node --test manager-worker/test/*.mjs
+  ```
+
+- Python test suite:
+
+  ```bash
+  python3 -m pytest -q tests
+  ```
+
+- Compose validation:
+
+  ```bash
+  cp .env.example .env
+  docker compose config >/dev/null
+  rm .env
+  ```
+
+## Commit And Deploy Policy
+
+When the user asks for a complete production change:
+
+1. Commit the change to `main`.
+2. Push to GitHub.
+3. Watch the relevant GitHub Actions workflow.
+4. For the Management VM stack, SSH to the VM and run:
+
+   ```bash
+   cd /opt/twinbox
+   docker compose pull
+   docker compose up -d
+   ```
+
+5. Retest the changed behavior.
+6. For portal changes, wait for the Docker image build and Argo CD rollout before final verification.
+
+Do not commit, push, or deploy for exploratory analysis unless the user explicitly asks.
 
 ## Operational Notes
 
-- The worker writes job logs and step state to `manager-data/`.
+- Job files and logs live under `manager-data/`.
+- Queue state lives under `manager-data/queue/{pending,running,completed}`.
+- Cluster state lives under `manager-data/clusters/`.
+- Step state lives under `manager-data/step-state/`.
+- Talos configs and kubeconfigs are runtime artifacts, not canonical repo source.
+- Secrets should never be printed in logs or committed.
