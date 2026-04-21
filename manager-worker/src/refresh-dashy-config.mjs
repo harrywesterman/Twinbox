@@ -2,6 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { spawnSync } from "child_process";
+import YAML from "yaml";
 
 import { isClusterScopedStep } from "../../lib/step-scope.mjs";
 import { loadCatalogDefinitions } from "../../manager-api/src/lib/catalog-definitions.mjs";

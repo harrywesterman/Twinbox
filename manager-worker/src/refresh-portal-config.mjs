@@ -66,6 +66,10 @@ function readJsonIfExists(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
+function readJson(file) {
+  return JSON.parse(fs.readFileSync(file, "utf8"));
+}
+
 function findCurrentCluster(dataRoot, clusterId) {
   const clustersRoot = path.join(dataRoot, "clusters");
   if (!fs.existsSync(clustersRoot)) {
@@ -167,7 +171,7 @@ function main() {
   }
 
   const contentPath = path.join(options.workspaceRoot, "config", "portal", "content.json");
-  const content = loadJson(contentPath);
+  const content = readJson(contentPath);
   const renderedConfig = JSON.stringify(buildPortalConfig({
     steps,
     stepStateById,
