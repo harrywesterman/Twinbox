@@ -1,64 +1,58 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import test from 'node:test';
+import assert from 'node:assert/strict';
 
-import { buildAdminAppsViewModel } from "../src/admin-apps-model.js";
+import { buildAdminAppsViewModel } from '../src/admin-apps-model.js';
 
-test("buildAdminAppsViewModel keeps all apps visible and marks install states", () => {
+test('admin app catalog view model enriches bundles with member cards', () => {
   const viewModel = buildAdminAppsViewModel({
     catalog: {
-      active_cluster: {
-        id: "cluster",
-        slug: "tst",
-      },
+      active_cluster: { id: 'cluster-1', slug: 'tst' },
+      errors: [],
       categories: [
         {
-          id: "apps",
-          title: "Apps",
-          summary: "Install user-facing applications and collaboration tools.",
+          id: 'apps',
+          title: 'Apps',
+          summary: 'Install user-facing applications and collaboration tools.',
           steps: [
             {
-              id: "install-immich",
-              title: "Install Immich",
-              summary: "Photo and video library",
-              description: "Immich on Longhorn",
-              icon_artwork_url: "/assets/step-icons/install-immich.svg",
-              app_state: "ready",
+              id: 'install-immich',
+              title: 'Install Immich',
+              summary: 'Photo app',
+              app_state: 'ready',
               placeholder: false,
-              dependencies: [
-                { id: "install-longhorn-storage", title: "Install Longhorn Storage", state: "done" },
-              ],
+              order: 10,
+              iconText: 'IM',
             },
             {
-              id: "install-paperless",
-              title: "Install Paperless",
-              summary: "Document archive",
-              description: "Placeholder app",
-              app_state: "planned",
-              placeholder: true,
-              dependencies: [],
+              id: 'install-nextcloud',
+              title: 'Install Nextcloud',
+              summary: 'Files app',
+              app_state: 'installed',
+              placeholder: false,
+              order: 20,
+              iconText: 'NC',
             },
           ],
         },
       ],
       bundles: [
         {
-          id: "media",
-          title: "Media",
-          summary: "Photo and video tools",
-          apps: ["install-immich"],
+          id: 'media',
+          title: 'Media',
+          summary: 'Photo and video tools',
+          order: 10,
+          apps: ['install-immich', 'install-nextcloud'],
         },
       ],
     },
-    selectedAppId: "install-immich",
+    query: 'media',
   });
 
-  assert.equal(viewModel.hasCards, true);
-  assert.equal(viewModel.cards.length, 2);
-  assert.equal(viewModel.selectedApp.id, "install-immich");
-  assert.equal(viewModel.selectedApp.app_state, "ready");
-  assert.equal(viewModel.selectedApp.iconUrl, "/assets/step-icons/install-immich.svg");
-  assert.equal(viewModel.selectedApp.iconAlt, "Install Immich icon");
-  assert.equal(viewModel.stateCounts.ready, 1);
-  assert.equal(viewModel.stateCounts.planned, 1);
-  assert.equal(viewModel.bundles.length, 1);
+  assert.equal(viewModel.filteredBundles.length, 1);
+  assert.equal(viewModel.filteredBundles[0].id, 'media');
+  assert.equal(viewModel.filteredBundles[0].cards.length, 2);
+  assert.equal(viewModel.filteredBundles[0].status, 'ready');
+  assert.equal(viewModel.filteredBundles[0].installedCount, 1);
+  assert.equal(viewModel.filteredBundles[0].searchText.includes('photo and video tools'), true);
+  assert.equal(viewModel.selectedApp, null);
 });

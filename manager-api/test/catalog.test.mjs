@@ -190,6 +190,7 @@ test('app catalog exposes apps while the wizard catalog keeps them out of sight'
     const n8nCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-n8n');
     const freshrssCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-freshrss');
     const zulipCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-zulip');
+    const mediaBundle = appCatalog.bundles.find((bundle) => bundle.id === 'media');
     assert.equal(nextcloudCard?.title, 'Install Nextcloud');
     assert.equal(nextcloudCard?.placeholder, false);
     assert.equal(nextcloudCard?.installable, true);
@@ -208,6 +209,8 @@ test('app catalog exposes apps while the wizard catalog keeps them out of sight'
     assert.deepEqual(freshrssCard?.depends_on, []);
     assert.deepEqual(zulipCard?.depends_on, []);
     assert.equal(freshrssCard?.runner?.script, 'categories/apps/steps/install-freshrss/run.sh');
+    assert.equal(mediaBundle?.title, 'Media');
+    assert.deepEqual(mediaBundle?.apps, ['install-immich']);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
