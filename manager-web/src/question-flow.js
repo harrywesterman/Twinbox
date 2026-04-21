@@ -25,7 +25,7 @@ const QUESTION_STEP_DEFS = [
     side_help: 'Talos Linux is a minimal, secure, API-driven operating system built specifically for running Kubernetes.',
     inputs: [
       { id: 'scale_percent', label: 'Cluster scale', type: 'integer', required: true, min: 0, max: 100, default: 90, help: 'Scale the VM footprint from 0 to 100 percent. The default reserves room on all three Proxmox hosts.' },
-      { id: 'worker_disk_percent', label: 'Worker disk', type: 'integer', required: true, min: 10, max: 100, default: 80, help: 'Set the worker disk size as a share of the free worker-host disk. Twinbox starts at 80 percent of the space shared across the three Proxmox hosts.' },
+      { id: 'worker_disk_percent', label: 'Worker disk', type: 'integer', required: true, min: 10, max: 100, default: 100, help: 'Set the worker disk size as a share of the free worker-host disk. Twinbox starts at 100 percent of the space shared across the three Proxmox hosts.' },
       { id: 'controlplane_count', label: 'Control planes', type: 'integer', required: true, min: 1, max: 15, default: 3, help: 'Current API range is 1 to 15. The default gives each Proxmox host one control plane.' },
       { id: 'worker_count', label: 'Workers', type: 'integer', required: true, min: 0, max: 200, default: 3, help: 'Current API range is 0 to 200. The default gives each Proxmox host one worker.' },
       { id: 'cpu_cores', label: 'CPU cores', type: 'integer', required: true, min: 1, max: 64, default: 4, help: 'Per-node CPU allocation. Use 4 vCPU or more for the standard Twinbox baseline; 2 vCPU is only realistic for a reduced dev/test cluster.' },

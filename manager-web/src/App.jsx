@@ -2668,7 +2668,7 @@ function App() {
                         ))}
                       </div>
                       <p className="wizard-input-block-note">
-                        Control plane nodes are fixed at 4 GB RAM and 10 GB disk. Worker disks default to 80% of the free space shared across the three Proxmox hosts and can be tuned with the slider.
+                        Control plane nodes are fixed at 4 GB RAM and 10 GB disk. Worker disks default to 100% of the free space shared across the three Proxmox hosts and can be tuned with the slider.
                       </p>
                     </section>
 

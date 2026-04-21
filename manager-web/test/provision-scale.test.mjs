@@ -12,7 +12,7 @@ import {
 
 const stepInputs = [
   { id: 'scale_percent', default: 90, min: 0, max: 100 },
-  { id: 'worker_disk_percent', default: 80, min: 10, max: 100 },
+  { id: 'worker_disk_percent', default: 100, min: 10, max: 100 },
   { id: 'controlplane_count', default: 3, min: 1, max: 15 },
   { id: 'worker_count', default: 3, min: 0, max: 200 },
   { id: 'cpu_cores', default: 2, min: 1, max: 64 },
@@ -84,7 +84,7 @@ test('scale 90 preserves the default VM footprint', () => {
   assert.equal(values.worker_count, 3);
   assert.equal(values.cpu_cores, 2);
   assert.equal(values.memory_mb, 4096);
-  assert.equal(values.worker_disk_percent, 80);
+  assert.equal(values.worker_disk_percent, 100);
 });
 
 test('provision node count falls back to the wizard defaults when the draft is empty', () => {
@@ -103,10 +103,10 @@ test('higher scale percentages grow the VM footprint and totals', () => {
   assert.ok(values.memory_mb >= 4096);
   assert.ok(summary.total_nodes >= 3);
   assert.ok(summary.total_memory_mb >= 12288);
-  assert.equal(summary.worker_disk_percent, 80);
+  assert.equal(summary.worker_disk_percent, 100);
   assert.equal(summary.controlplane_disk_gb, 10);
-  assert.equal(summary.worker_disk_gb, 300);
-  assert.equal(summary.total_worker_disk_gb, 2400);
+  assert.equal(summary.worker_disk_gb, 375);
+  assert.equal(summary.total_worker_disk_gb, 3000);
 });
 
 test('manual overrides stay in place when the scale slider changes', () => {
@@ -331,9 +331,9 @@ test('automatic placement fills pve1, pve2, and pve3 in host order when they can
     'worker-3': 'pve3',
   });
   assert.ok(!Object.values(result.vm_node_map).includes('proxmox'));
-  assert.equal(result.vm_size_map['worker-1'].disk_gb, 400);
-  assert.equal(result.vm_size_map['worker-2'].disk_gb, 400);
-  assert.equal(result.vm_size_map['worker-3'].disk_gb, 400);
+  assert.equal(result.vm_size_map['worker-1'].disk_gb, 490);
+  assert.equal(result.vm_size_map['worker-2'].disk_gb, 490);
+  assert.equal(result.vm_size_map['worker-3'].disk_gb, 490);
 });
 
 test('automatic placement leaves overflow VMs unassigned when capacity is constrained', () => {
@@ -453,9 +453,9 @@ test('automatic placement uses host free disk instead of a fixed 100GB worker si
   assert.equal(board.managementVm.hostId, 'pve1');
   assert.equal(Object.values(board.suggestedVmNodeMap).filter(Boolean).length, 6);
   assert.equal(board.hostCards.find((host) => host.id === 'pve1').assignments.some((vm) => vm.isFixed && vm.name === 'twinbox-prd-mgt'), true);
-  assert.equal(board.suggestedVmSizeMap['worker-1'].disk_gb, 400);
-  assert.equal(board.suggestedVmSizeMap['worker-2'].disk_gb, 400);
-  assert.equal(board.suggestedVmSizeMap['worker-3'].disk_gb, 400);
+  assert.equal(board.suggestedVmSizeMap['worker-1'].disk_gb, 490);
+  assert.equal(board.suggestedVmSizeMap['worker-2'].disk_gb, 490);
+  assert.equal(board.suggestedVmSizeMap['worker-3'].disk_gb, 490);
 });
 
 test('automatic placement ignores CPU pressure and still follows the host order', () => {
@@ -558,7 +558,7 @@ test('worker disk follows the worker-disk slider share', () => {
     vms: [],
   });
 
-  assert.equal(board.vmSizeMap['worker-1'].disk_gb, 100);
+  assert.equal(board.vmSizeMap['worker-1'].disk_gb, 85);
   assert.equal(board.vmSizeMap['cp-1'].disk_gb, 10);
 });
 

@@ -16,6 +16,8 @@ import {
   writeJson,
 } from "./common.js";
 
+const WORKER_DISK_MIN_GB = 10;
+
 export function normalizeClusterSlug(rawName) {
   const trimmed = String(rawName || "").trim().toLowerCase();
   const withoutPrefix = trimmed.startsWith("twinbox-") ? trimmed.slice("twinbox-".length) : trimmed;
@@ -74,7 +76,7 @@ function buildDefaultVmNodeMap(controlplaneCount, workerCount, allowedHosts = []
 
 function buildDefaultVmSizeMap(controlplaneCount, workerCount, cpuCores, workerMemoryMb) {
   const vmSizeMap = {};
-  const workerDiskGb = 100;
+  const workerDiskGb = WORKER_DISK_MIN_GB;
 
   for (let index = 1; index <= Math.max(1, Number(controlplaneCount) || 0); index += 1) {
     vmSizeMap[`cp-${index}`] = {
@@ -303,7 +305,7 @@ export function buildClusterFromRequest(body, env, { allowedVmHosts = [], cluste
   const parsedWorkers = parseIntInRange(body.worker_count, "worker_count", 0, 200);
   const parsedCpu = parseIntInRange(body.cpu_cores, "cpu_cores", 1, 64);
   const parsedMemory = parseIntInRange(body.memory_mb, "memory_mb", 512, 1048576);
-  const parsedWorkerDiskPercent = parseIntInRange(body.worker_disk_percent ?? 80, "worker_disk_percent", 10, 100);
+  const parsedWorkerDiskPercent = parseIntInRange(body.worker_disk_percent ?? 100, "worker_disk_percent", 10, 100);
   const parsedStartVmid = parseIntInRange(body.start_vmid, "start_vmid", 100, 999999);
   const parsedVipIp = parseIPv4(body.vip_ip, "vip_ip");
   const parsedNodePrefixLength = parseIntInRange(body.node_prefix_length, "node_prefix_length", 1, 32);

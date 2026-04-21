@@ -4,13 +4,13 @@ const DEFAULT_SCALE_PERCENT = 90;
 const MAX_SCALE_PERCENT = 100;
 const MAX_FOOTPRINT_MULTIPLIER = 4;
 const MIN_WORKER_DISK_PERCENT = 10;
-const DEFAULT_WORKER_DISK_PERCENT = 80;
+const DEFAULT_WORKER_DISK_PERCENT = 100;
 const MAX_WORKER_DISK_PERCENT = 100;
 
 const CONTROLPLANE_MEMORY_MB = 4096;
 const CONTROLPLANE_DISK_GB = 10;
 const WORKER_DISK_MIN_GB = 10;
-const WORKER_DISK_FALLBACK_GB = 100;
+const WORKER_DISK_FALLBACK_GB = WORKER_DISK_MIN_GB;
 const WORKER_PLACEMENT_DISK_GB = 10;
 const WORKER_MEMORY_DEFAULT_MB = 10240;
 
@@ -221,11 +221,19 @@ function calculateFootprintMultiplier(scalePercent, baseline, resources) {
   return interpolate(1, capacityMultiplier, ((scalePercent - DEFAULT_SCALE_PERCENT) * 100) / (MAX_SCALE_PERCENT - DEFAULT_SCALE_PERCENT));
 }
 
-function deriveWorkerDiskGb(hostCards, workerCount, workerDiskPercent = DEFAULT_WORKER_DISK_PERCENT, fallbackGb = WORKER_DISK_FALLBACK_GB) {
+function deriveWorkerDiskGb(
+  hostCards,
+  controlplaneCount,
+  workerCount,
+  workerDiskPercent = DEFAULT_WORKER_DISK_PERCENT,
+  fallbackGb = WORKER_DISK_FALLBACK_GB,
+) {
   const hosts = Array.isArray(hostCards) ? hostCards : [];
   const resolvedPercent = normalizeWorkerDiskPercent(workerDiskPercent);
+  const hostCount = Math.max(1, hosts.length);
+  const controlplaneReserveGb = Math.max(0, Math.ceil(Math.max(0, toNumber(controlplaneCount, 0)) / hostCount) * CONTROLPLANE_DISK_GB);
   const freeDiskShares = hosts
-    .map((host) => Math.max(0, toNumber(host.freeDiskGb, 0)))
+    .map((host) => Math.max(0, toNumber(host.freeDiskGb, 0) - controlplaneReserveGb))
     .filter((value) => value > 0);
 
   if (freeDiskShares.length === 0 || workerCount <= 0) {
@@ -750,7 +758,12 @@ export function buildProvisionPlacementBoard(stepInputs, currentValues = {}, res
     ? currentValues.vm_node_map
     : {};
   const workerDiskPercent = currentValues?.worker_disk_percent ?? DEFAULT_WORKER_DISK_PERCENT;
-  const suggestedWorkerDiskGb = deriveWorkerDiskGb(autoPlacementHostCards, vmPlan.filter((vm) => vm.type === 'worker').length, workerDiskPercent);
+  const suggestedWorkerDiskGb = deriveWorkerDiskGb(
+    autoPlacementHostCards,
+    vmPlan.filter((vm) => vm.type === 'controlplane').length,
+    vmPlan.filter((vm) => vm.type === 'worker').length,
+    workerDiskPercent,
+  );
   const hostLookup = new Map(hostCards.map((host) => [host.id, host]));
   const placementsByHost = new Map(hostCards.map((host) => [host.id, []]));
   const managementVm = buildManagementVmResource(resources?.vms, hostLookup);

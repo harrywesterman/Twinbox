@@ -77,6 +77,27 @@ test('cluster builder fills missing vm_node_map assignments with allowed hosts',
   });
 });
 
+test('cluster builder no longer falls back to a 100GB worker disk', () => {
+  const result = buildClusterFromRequest({
+    ...baseBody,
+    vm_ip_map: {
+      'cp-1': '192.168.1.61',
+      'worker-1': '192.168.1.62',
+      'worker-2': '192.168.1.63',
+    },
+  }, {
+    PROXMOX_NODE: 'pve-a',
+    PROXMOX_STORAGE_POOL: 'local-lvm',
+    PROXMOX_FILE_DATASTORE: 'local',
+  }, {
+    allowedVmHosts: ['pve-a', 'pve-b'],
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.cluster.worker_disk_percent, 100);
+  assert.equal(result.cluster.worker_disk_gb, 10);
+});
+
 test('cluster builder rejects stale vm_node_map host names', () => {
   const result = buildClusterFromRequest({
     ...baseBody,
