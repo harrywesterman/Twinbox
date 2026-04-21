@@ -631,6 +631,7 @@ export function toneForStatus(value) {
 
 export function serializeUiState({
   selectedStepId = '',
+  wizardPhase = 'questions',
   answers = {},
   clusterId = '',
   clusterCreatedAt = '',
@@ -640,6 +641,7 @@ export function serializeUiState({
   return JSON.stringify({
     version: 1,
     selectedStepId: typeof selectedStepId === 'string' ? selectedStepId : '',
+    wizardPhase: wizardPhase === 'install' ? 'install' : 'questions',
     clusterId: typeof clusterId === 'string' ? clusterId : '',
     clusterCreatedAt: typeof clusterCreatedAt === 'string' ? clusterCreatedAt : '',
     clusterInstanceId: typeof clusterInstanceId === 'string' ? clusterInstanceId : '',
@@ -677,6 +679,7 @@ export function restoreUiState(value) {
   if (!value) {
     return {
       selectedStepId: '',
+      wizardPhase: '',
       clusterId: '',
       clusterCreatedAt: '',
       clusterInstanceId: '',
@@ -689,6 +692,7 @@ export function restoreUiState(value) {
     const parsed = JSON.parse(value);
     return {
       selectedStepId: typeof parsed.selectedStepId === 'string' ? parsed.selectedStepId : '',
+      wizardPhase: typeof parsed.wizardPhase === 'string' ? parsed.wizardPhase : '',
       clusterId: typeof parsed.clusterId === 'string' ? parsed.clusterId : '',
       clusterCreatedAt: typeof parsed.clusterCreatedAt === 'string' ? parsed.clusterCreatedAt : '',
       clusterInstanceId: typeof parsed.clusterInstanceId === 'string' ? parsed.clusterInstanceId : '',
@@ -703,6 +707,7 @@ export function restoreUiState(value) {
   } catch {
     return {
       selectedStepId: '',
+      wizardPhase: '',
       clusterId: '',
       clusterCreatedAt: '',
       clusterInstanceId: '',
@@ -761,6 +766,15 @@ export function getMissionControlModel({
 
 export function getWizardSteps(catalog, answers = {}) {
   return flattenSetupSteps(catalog || fallbackCatalog(), answers);
+}
+
+export function getWizardPhaseBoundaries(questionSteps = [], setupSteps = []) {
+  return {
+    firstQuestionStep: questionSteps[0] || null,
+    lastQuestionStep: questionSteps.length > 0 ? questionSteps[questionSteps.length - 1] : null,
+    firstInstallStep: setupSteps[0] || null,
+    lastInstallStep: setupSteps.length > 0 ? setupSteps[setupSteps.length - 1] : null,
+  };
 }
 
 export function getNextInstallableSetupStep(catalog, answers = {}, fromStepId = '', excludedStepIds = new Set()) {

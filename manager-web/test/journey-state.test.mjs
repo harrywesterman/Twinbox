@@ -5,6 +5,7 @@ import {
   buildWizardExportFilename,
   getNextInstallableSetupStep,
   getMissionControlModel,
+  getWizardPhaseBoundaries,
   restoreUiState,
   serializeUiState,
 } from '../src/journey.js';
@@ -406,6 +407,48 @@ test('wizard model defaults to step 1 when nothing is selected', () => {
   assert.equal(model.activeStep.id, 'provision-nodes');
   assert.equal(model.stepRail.find((step) => step.id === 'provision-nodes')?.isCurrent, true);
   assert.equal(model.primaryAction.label, 'Next');
+});
+
+test('wizard phase boundaries expose the handoff points between questions and installs', () => {
+  const boundaries = getWizardPhaseBoundaries(
+    [
+      { id: 'provision-nodes', title: 'Deploy Talos Cluster' },
+      { id: 'choose-ingress-route', title: 'Choose Ingress Route' },
+      { id: 'create-users-and-groups', title: 'Create Users and Groups' },
+    ],
+    [
+      { id: 'provision-nodes', title: 'Deploy Talos Cluster' },
+      { id: 'install-argocd', title: 'Install Argo CD' },
+      { id: 'install-immich', title: 'Install Immich' },
+    ],
+  );
+
+  assert.equal(boundaries.firstQuestionStep?.id, 'provision-nodes');
+  assert.equal(boundaries.lastQuestionStep?.id, 'create-users-and-groups');
+  assert.equal(boundaries.firstInstallStep?.id, 'provision-nodes');
+  assert.equal(boundaries.lastInstallStep?.id, 'install-immich');
+});
+
+test('wizard ui state persists the selected phase alongside the active step', () => {
+  const snapshot = serializeUiState({
+    selectedStepId: 'provision-nodes',
+    wizardPhase: 'install',
+    answers: {
+      'provision-nodes': {
+        scale_percent: 90,
+      },
+    },
+  });
+
+  const restored = restoreUiState(snapshot);
+
+  assert.equal(restored.selectedStepId, 'provision-nodes');
+  assert.equal(restored.wizardPhase, 'install');
+  assert.deepEqual(restored.answers, {
+    'provision-nodes': {
+      scale_percent: 90,
+    },
+  });
 });
 
 test('wizard model falls back to step 1 when a restored selection no longer exists', () => {

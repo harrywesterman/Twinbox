@@ -24,6 +24,7 @@ import {
   buildWizardExportFilename,
   getMissionControlModel,
   getNextInstallableSetupStep,
+  getWizardPhaseBoundaries,
   getWizardSteps,
   restoreUiState,
   serializeUiState,
@@ -948,18 +949,37 @@ function renderTopBar({ onImportClick, showImportButton = true } = {}) {
 
 function App() {
   const storedWizardState = useMemo(() => readStoredWizardState(), []);
+  const initialHasStarted = Boolean(
+    storedWizardState.selectedStepId
+    || storedWizardState.clusterId
+    || storedWizardState.clusterCreatedAt
+    || storedWizardState.clusterInstanceId
+    || (storedWizardState.answers && Object.keys(storedWizardState.answers).length > 0),
+  );
+  const initialWizardPhase = (() => {
+    if (storedWizardState.wizardPhase === 'install' || storedWizardState.wizardPhase === 'questions') {
+      return storedWizardState.wizardPhase;
+    }
+
+    const storedQuestionStepIds = new Set(getQuestionSteps(storedWizardState.answers).map((step) => step.id));
+    if (storedWizardState.selectedStepId && !storedQuestionStepIds.has(storedWizardState.selectedStepId)) {
+      return 'install';
+    }
+
+    return 'questions';
+  })();
   const importInputRef = useRef(null);
   const liveOutputRef = useRef(null);
   const liveLogViewportRef = useRef(null);
   const liveLogAutoScrollRef = useRef(true);
   const busyRef = useRef(false);
-  const hasStartedRef = useRef(false);
   const clusterIdRef = useRef('');
   const clusterCreatedAtRef = useRef('');
   const clusterInstanceIdRef = useRef('');
   const selectedStepIdRef = useRef('');
   const answersRef = useRef({});
   const hydratedRef = useRef(false);
+  const hasStartedRef = useRef(initialHasStarted);
   const provisionDirtyFieldsRef = useRef(new Set());
   const provisionSuggestionKeyRef = useRef('');
   const provisionSuggestionSnapshotRef = useRef({});
@@ -989,24 +1009,11 @@ function App() {
   });
   const [provisionIpChecking, setProvisionIpChecking] = useState(false);
   const [provisionIpSuggestionsLoading, setProvisionIpSuggestionsLoading] = useState(false);
-  const [hasStarted, setHasStarted] = useState(Boolean(
-    storedWizardState.selectedStepId
-    || storedWizardState.clusterId
-    || storedWizardState.clusterCreatedAt
-    || storedWizardState.clusterInstanceId
-    || (storedWizardState.answers && Object.keys(storedWizardState.answers).length > 0),
-  ));
-  const [wizardPhase, setWizardPhase] = useState(() => {
-    const storedQuestionStepIds = new Set(getQuestionSteps(storedWizardState.answers).map((step) => step.id));
-    if (storedWizardState.selectedStepId && !storedQuestionStepIds.has(storedWizardState.selectedStepId)) {
-      return 'install';
-    }
-
-    return 'questions';
-  });
+  const [hasStarted, setHasStarted] = useState(initialHasStarted);
+  const [wizardPhase, setWizardPhase] = useState(initialWizardPhase);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const placementSuggestionKeyRef = useRef('');
-  const wizardPhaseRef = useRef('questions');
+  const wizardPhaseRef = useRef(initialWizardPhase);
 
   useEffect(() => {
     hydratedRef.current = true;
@@ -1034,6 +1041,10 @@ function App() {
 
   const questionSteps = useMemo(() => getQuestionSteps(answers), [answers]);
   const setupSteps = useMemo(() => getWizardSteps(catalog, answers), [catalog, answers]);
+  const wizardPhaseBoundaries = useMemo(
+    () => getWizardPhaseBoundaries(questionSteps, setupSteps),
+    [questionSteps, setupSteps],
+  );
   const initialAnswers = useMemo(() => buildInitialAnswers([...setupSteps, ...questionSteps], answers), [questionSteps, setupSteps, answers]);
   const model = useMemo(() => {
     return getMissionControlModel({
@@ -1055,6 +1066,8 @@ function App() {
   const nextQuestionStep = questionStepIndex >= 0 && questionStepIndex < questionSteps.length - 1
     ? questionSteps[questionStepIndex + 1]
     : null;
+  const lastQuestionStep = wizardPhaseBoundaries.lastQuestionStep;
+  const firstInstallStep = wizardPhaseBoundaries.firstInstallStep;
   const installStepIndex = setupSteps.findIndex((step) => step.id === selectedStepId);
   const safeInstallStepIndex = installStepIndex >= 0 ? installStepIndex : 0;
   const currentInstallStep = installStepIndex >= 0 ? setupSteps[installStepIndex] : (setupSteps[0] || null);
@@ -1088,9 +1101,21 @@ function App() {
       return;
     }
 
+    setWizardPhase('install');
     selectedStepIdRef.current = stepId;
     setSelectedStepId(stepId);
     setLogs(normalizeLogEntries(installLogsByStepRef.current[stepId] || []));
+  }
+
+  function selectQuestionStep(stepId) {
+    if (!stepId) {
+      return;
+    }
+
+    setWizardPhase('questions');
+    selectedStepIdRef.current = stepId;
+    setSelectedStepId(stepId);
+    setLogs([]);
   }
 
   useEffect(() => {
@@ -1712,13 +1737,12 @@ function App() {
 
     if (isQuestionPhase) {
       if (nextQuestionStep) {
-        setSelectedStepId(nextQuestionStep.id);
+        selectQuestionStep(nextQuestionStep.id);
         return;
       }
 
-      const firstInstallStepId = setupSteps[0]?.id || 'provision-nodes';
-      setWizardPhase('install');
-      setSelectedStepId(firstInstallStepId);
+      const nextInstallStepId = firstInstallStep?.id || 'provision-nodes';
+      selectInstallStep(nextInstallStepId);
       setNotice('Review each install step, run them one by one, or use Install all.');
       return;
     }
@@ -1984,6 +2008,7 @@ function App() {
   function handleExportAnswers() {
     const snapshot = serializeUiState({
       selectedStepId,
+      wizardPhase,
       answers: answersRef.current,
       clusterId: clusterIdRef.current,
       clusterCreatedAt: clusterCreatedAtRef.current,
@@ -2149,7 +2174,11 @@ function App() {
       setClusterCreatedAt(imported.clusterCreatedAt);
       setClusterInstanceId(imported.clusterInstanceId);
       setHasStarted(true);
-      setWizardPhase('questions');
+      const importedQuestionStepIds = new Set(getQuestionSteps(importedAnswers).map((step) => step.id));
+      const importedWizardPhase = imported.wizardPhase === 'install' || imported.wizardPhase === 'questions'
+        ? imported.wizardPhase
+        : (imported.selectedStepId && !importedQuestionStepIds.has(imported.selectedStepId) ? 'install' : 'questions');
+      setWizardPhase(importedWizardPhase);
       setAnswers((current) => {
         const next = { ...current };
         for (const [stepId, stepAnswers] of Object.entries(importedAnswers)) {
@@ -2519,12 +2548,18 @@ function App() {
                   <button
                     className="button button-secondary"
                     type="button"
-                      onClick={() => {
-                        if (previousInstallStep?.id) {
-                          selectInstallStep(previousInstallStep.id);
-                        }
-                      }}
-                    disabled={!previousInstallStep || installInProgress}
+                    onClick={() => {
+                      if (previousInstallStep?.id) {
+                        selectInstallStep(previousInstallStep.id);
+                        return;
+                      }
+
+                      if (lastQuestionStep?.id) {
+                        selectQuestionStep(lastQuestionStep.id);
+                        setNotice(`Moved back to ${lastQuestionStep.title}.`);
+                      }
+                    }}
+                    disabled={(!previousInstallStep && !lastQuestionStep) || installInProgress}
                   >
                     Previous
                   </button>
@@ -2776,7 +2811,7 @@ function App() {
                     <button
                       className="button button-secondary"
                       type="button"
-                      onClick={() => setSelectedStepId(previousQuestionStep.id)}
+                      onClick={() => selectQuestionStep(previousQuestionStep.id)}
                     >
                       Previous
                     </button>
