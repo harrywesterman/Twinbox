@@ -3,13 +3,8 @@ import os from "os";
 import path from "path";
 import { spawnSync } from "child_process";
 
-import YAML from "yaml";
-
-import {
-  normalizeCategoryManifest,
-  normalizeStepManifest,
-} from "../../lib/step-manifest.mjs";
 import { isClusterScopedStep } from "../../lib/step-scope.mjs";
+import { loadCatalogDefinitions } from "../../manager-api/src/lib/catalog-definitions.mjs";
 import {
   buildDashyConfig,
   stepHasDashyItems,
@@ -78,58 +73,6 @@ function readJsonIfExists(file) {
   }
 
   return JSON.parse(fs.readFileSync(file, "utf8"));
-}
-
-function loadYaml(file) {
-  return YAML.parse(fs.readFileSync(file, "utf8"));
-}
-
-function loadCatalogDefinitions(workspaceRoot) {
-  const categoriesRoot = process.env.TWINBOX_CATEGORIES_DIR || path.join(workspaceRoot, "categories");
-  const categories = [];
-  const steps = [];
-
-  if (!fs.existsSync(categoriesRoot)) {
-    throw new Error(`categories directory not found: ${categoriesRoot}`);
-  }
-
-  const categoryDirs = fs.readdirSync(categoriesRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort();
-
-  for (const categoryDir of categoryDirs) {
-    const categoryFile = path.join(categoriesRoot, categoryDir, "category.yaml");
-    const category = normalizeCategoryManifest(loadYaml(categoryFile), categoryFile);
-    const stepsRoot = path.join(categoriesRoot, categoryDir, "steps");
-
-    const normalizedSteps = fs.existsSync(stepsRoot)
-      ? fs.readdirSync(stepsRoot, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => entry.name)
-        .sort()
-        .map((stepDir) => {
-          const stepFile = path.join(stepsRoot, stepDir, "step.yaml");
-          if (!fs.existsSync(stepFile)) {
-            return null;
-          }
-          return normalizeStepManifest(loadYaml(stepFile), stepFile, category.id);
-        })
-        .filter(Boolean)
-        .sort((left, right) => left.order - right.order)
-      : [];
-
-    categories.push({
-      ...category,
-      steps: normalizedSteps,
-    });
-    steps.push(...normalizedSteps);
-  }
-
-  categories.sort((left, right) => left.order - right.order);
-  steps.sort((left, right) => left.order - right.order);
-
-  return { categories, steps };
 }
 
 function findCurrentCluster(dataRoot, clusterId) {
@@ -244,7 +187,7 @@ function restartDeployment(namespace, deploymentName) {
 
 function main() {
   const options = parseArgs(process.argv.slice(2));
-  const { steps } = loadCatalogDefinitions(options.workspaceRoot);
+  const { steps } = loadCatalogDefinitions({ workspaceRoot: options.workspaceRoot });
 
   const currentCluster = findCurrentCluster(options.managerDataDir, options.clusterId);
   if (!currentCluster?.id) {

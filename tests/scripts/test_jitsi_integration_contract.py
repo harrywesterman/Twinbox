@@ -3,9 +3,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 JITSI_APP_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-jitsi" / "step.yaml"
-JITSI_JOURNEY_STEP = (
-    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-jitsi" / "step.yaml"
-)
+JITSI_CATEGORY = REPO_ROOT / "categories" / "talos-cluster" / "category.yaml"
 JITSI_RUN = REPO_ROOT / "categories" / "apps" / "steps" / "install-jitsi" / "run.sh"
 JITSI_APP = REPO_ROOT / "gitops" / "apps" / "jitsi.yaml"
 JITSI_VALUES = REPO_ROOT / "gitops" / "values" / "jitsi.yaml"
@@ -29,24 +27,17 @@ def _read(path: Path) -> str:
 
 def test_install_jitsi_steps_are_backed_by_a_real_runner_and_cluster_secret_injection():
     app_step_text = _read(JITSI_APP_STEP)
-    journey_step_text = _read(JITSI_JOURNEY_STEP)
+    category_text = _read(JITSI_CATEGORY)
 
     assert "Placeholder step" not in app_step_text
-    assert "Placeholder step" not in journey_step_text
     assert "categories/apps/steps/install-jitsi/run.sh" in app_step_text
-    assert "categories/apps/steps/install-jitsi/run.sh" in journey_step_text
+    assert "install-jitsi" in category_text
     assert "summary: Install Jitsi" in app_step_text
-    assert "summary: Install Jitsi" in journey_step_text
     assert "install-secret-sync" in app_step_text
     assert "install-authentik-idp" in app_step_text
     assert "create-users-and-groups" in app_step_text
     assert "choose-ingress-route" in app_step_text
     assert "install-freshrss" not in app_step_text
-    assert "install-secret-sync" in journey_step_text
-    assert "install-authentik-idp" in journey_step_text
-    assert "create-users-and-groups" in journey_step_text
-    assert "choose-ingress-route" in journey_step_text
-    assert "install-freshrss" not in journey_step_text
     assert "KUBECONFIG_FILE:" in app_step_text
     assert "scope: cluster" in app_step_text
     assert "item: kubeconfig" in app_step_text

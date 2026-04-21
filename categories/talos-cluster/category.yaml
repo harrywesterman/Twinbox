@@ -2,3 +2,63 @@ id: talos-cluster
 title: Talos Cluster
 summary: Provision Talos infrastructure and bootstrap the cluster in guided steps.
 order: 20
+app_steps:
+  - id: install-proxmox-backup-system
+    depends_on:
+      - install-velero-backup
+      - install-velero-ui
+  - id: install-nextcloud
+    side_help: Nextcloud is the collaboration hub for user files and sync.
+    depends_on:
+      - install-proxmox-backup-system
+  - id: install-opencloud
+    depends_on:
+      - install-proxmox-backup-system
+      - install-longhorn-storage
+      - install-secret-sync
+      - install-authentik-idp
+      - create-users-and-groups
+      - choose-ingress-route
+  - id: install-immich
+    explanation: >
+      Twinbox provisions Immich as a GitOps application with a Longhorn-backed
+      library volume, a dedicated CloudNativePG database, Authentik OIDC login,
+      and Traefik routes for the selected ingress path.
+    side_help: >
+      Immich is grouped with the other user services after OpenCloud so the
+      photo stack lands after the collaboration suite and the login flow stays
+      aligned with the rest of the app stack.
+    depends_on:
+      - install-opencloud
+  - id: install-zulip
+    summary: Install Zulip with Longhorn persistence, CloudNativePG, Authentik OIDC, and Traefik ingress.
+    explanation: >
+      Twinbox provisions Zulip as a GitOps application with a Longhorn-backed
+      persistent volume, a dedicated CloudNativePG PostgreSQL cluster, an
+      Authentik OIDC provider for login, and Traefik ingress routes for the
+      selected cluster entrypoint. The step also seeds Zulip's secret key, OIDC
+      configuration, and database credentials into OpenBao so the chart can read
+      them through External Secrets instead of storing bootstrap material in the
+      repository.
+    depends_on:
+      - install-immich
+  - id: install-paperless
+    depends_on:
+      - install-zulip
+  - id: install-karakeep
+    depends_on:
+      - install-paperless
+  - id: install-gitea
+    depends_on:
+      - install-karakeep
+  - id: install-uptimekuma
+    depends_on:
+      - install-gitea
+  - id: install-n8n
+    depends_on:
+      - install-uptimekuma
+  - id: install-audiobookshelf
+  - id: install-freshrss
+    depends_on:
+      - install-audiobookshelf
+  - id: install-jitsi

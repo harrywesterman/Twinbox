@@ -239,6 +239,27 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert talos_steps["install-nextcloud"]["title"] == "Install Nextcloud"
             assert "placeholder" not in talos_steps["install-nextcloud"]["summary"].lower()
             assert "placeholder" not in talos_steps["install-nextcloud"]["explanation"].lower()
+            assert talos_steps["install-proxmox-backup-system"]["depends_on"] == [
+                "install-velero-backup",
+                "install-velero-ui",
+            ]
+            assert talos_steps["install-nextcloud"]["depends_on"] == [
+                "install-proxmox-backup-system",
+            ]
+            assert talos_steps["install-opencloud"]["depends_on"] == [
+                "install-proxmox-backup-system",
+                "install-longhorn-storage",
+                "install-secret-sync",
+                "install-authentik-idp",
+                "create-users-and-groups",
+                "choose-ingress-route",
+            ]
+            assert talos_steps["install-immich"]["depends_on"] == [
+                "install-opencloud",
+            ]
+            assert talos_steps["install-zulip"]["depends_on"] == [
+                "install-immich",
+            ]
             assert talos_steps["install-audiobookshelf"]["title"] == "Install Audiobookshelf"
             assert "placeholder" not in talos_steps["install-audiobookshelf"]["summary"].lower()
             assert "placeholder" not in talos_steps["install-audiobookshelf"]["explanation"].lower()

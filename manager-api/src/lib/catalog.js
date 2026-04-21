@@ -1,12 +1,8 @@
 import fs from "fs";
 import path from "path";
 
-import YAML from "yaml";
-import {
-  normalizeCategoryManifest,
-  normalizeStepManifest,
-} from "../../../lib/step-manifest.mjs";
 import { isClusterScopedStep } from "../../../lib/step-scope.mjs";
+import { loadCatalogDefinitions as loadWorkspaceCatalogDefinitions } from "./catalog-definitions.mjs";
 
 import {
   parseIPv4,
@@ -16,111 +12,8 @@ import {
   summarizeJob,
 } from "./common.js";
 
-function loadYaml(file) {
-  return YAML.parse(fs.readFileSync(file, "utf8"));
-}
-
-function normalizeAppBundleManifest(manifest, file) {
-  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
-    throw new Error(`bundle manifest must be an object in ${file}`);
-  }
-
-  for (const field of ["id", "title", "summary", "order"]) {
-    if (manifest?.[field] === undefined || manifest?.[field] === null || manifest?.[field] === "") {
-      throw new Error(`missing ${field} in ${file}`);
-    }
-  }
-
-  if (!Array.isArray(manifest.apps)) {
-    throw new Error(`apps must be an array in ${file}`);
-  }
-
-  return {
-    id: String(manifest.id),
-    title: String(manifest.title),
-    summary: String(manifest.summary),
-    order: Number(manifest.order),
-    apps: manifest.apps.map((appId) => String(appId)),
-  };
-}
-
 export function loadCatalogDefinitions({ workspaceRoot, includeApps = false, includeBundles = false } = {}) {
-  const categoriesRoot = process.env.TWINBOX_CATEGORIES_DIR || path.join(workspaceRoot, "categories");
-  const response = {
-    categoriesRoot,
-    categories: [],
-    stepsById: new Map(),
-    bundles: [],
-    errors: [],
-  };
-
-  if (!fs.existsSync(categoriesRoot)) {
-    response.errors.push(`categories directory not found: ${categoriesRoot}`);
-    return response;
-  }
-
-  const categoryDirs = fs.readdirSync(categoriesRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name);
-
-  for (const categoryDir of categoryDirs) {
-    const categoryFile = path.join(categoriesRoot, categoryDir, "category.yaml");
-    try {
-      const category = normalizeCategoryManifest(loadYaml(categoryFile), categoryFile);
-      if (category.id === "apps" && !includeApps) {
-        continue;
-      }
-      const stepsRoot = path.join(categoriesRoot, categoryDir, "steps");
-      const steps = [];
-
-      if (fs.existsSync(stepsRoot)) {
-        const stepDirs = fs.readdirSync(stepsRoot, { withFileTypes: true })
-          .filter((entry) => entry.isDirectory())
-          .map((entry) => entry.name);
-
-        for (const stepDir of stepDirs) {
-          const stepFile = path.join(stepsRoot, stepDir, "step.yaml");
-          if (!fs.existsSync(stepFile)) {
-            continue;
-          }
-          const step = normalizeStepManifest(loadYaml(stepFile), stepFile, category.id);
-          steps.push(step);
-          response.stepsById.set(step.id, step);
-        }
-      }
-
-      steps.sort((left, right) => left.order - right.order);
-      response.categories.push({
-        ...category,
-        steps,
-      });
-    } catch (error) {
-      response.errors.push(error instanceof Error ? error.message : `failed to load ${categoryFile}`);
-    }
-  }
-
-  response.categories.sort((left, right) => left.order - right.order);
-
-  if (includeBundles) {
-    const bundlesRoot = path.join(categoriesRoot, "apps", "bundles");
-    if (fs.existsSync(bundlesRoot)) {
-      const bundleFiles = fs.readdirSync(bundlesRoot, { withFileTypes: true })
-        .filter((entry) => entry.isFile() && entry.name.endsWith(".yaml"))
-        .map((entry) => path.join(bundlesRoot, entry.name));
-
-      for (const bundleFile of bundleFiles) {
-        try {
-          const bundle = normalizeAppBundleManifest(loadYaml(bundleFile), bundleFile);
-          response.bundles.push(bundle);
-        } catch (error) {
-          response.errors.push(error instanceof Error ? error.message : `failed to load ${bundleFile}`);
-        }
-      }
-
-      response.bundles.sort((left, right) => left.order - right.order);
-    }
-  }
-  return response;
+  return loadWorkspaceCatalogDefinitions({ workspaceRoot, includeApps, includeBundles });
 }
 
 function isDone(step, state) {

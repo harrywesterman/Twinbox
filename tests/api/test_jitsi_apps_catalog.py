@@ -90,11 +90,6 @@ def _write_succeeded_step_state(data_dir: Path, cluster_id: str, step_id: str):
 
 def _copy_categories_without_opencloud(destination: Path):
     shutil.copytree(REPO_ROOT / "categories", destination)
-    shutil.rmtree(destination / "apps" / "steps" / "install-opencloud", ignore_errors=True)
-    shutil.rmtree(
-        destination / "talos-cluster" / "steps" / "install-opencloud",
-        ignore_errors=True,
-    )
 
 
 def _start_api(data_dir: Path, port: int, categories_dir: Path):

@@ -29,11 +29,12 @@ PORTAL_SECRET = (
 PORTAL_STEP = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-twinbox-portal" / "run.sh"
 )
+TALOS_CATEGORY = REPO_ROOT / "categories" / "talos-cluster" / "category.yaml"
 ZULIP_STEP = (
-    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-zulip" / "step.yaml"
+    REPO_ROOT / "categories" / "apps" / "steps" / "install-zulip" / "step.yaml"
 )
 ZULIP_RUN = (
-    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-zulip" / "run.sh"
+    REPO_ROOT / "categories" / "apps" / "steps" / "install-zulip" / "run.sh"
 )
 ZULIP_APP = REPO_ROOT / "gitops" / "apps" / "zulip.yaml"
 ZULIP_PLATFORM_DIR = REPO_ROOT / "gitops" / "platform-apps" / "zulip"
@@ -147,11 +148,13 @@ def test_removed_placeholder_step_is_absent_from_the_journey():
 def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     step_text = _read(ZULIP_STEP)
     run_text = _read(ZULIP_RUN)
+    category_text = _read(TALOS_CATEGORY)
     app_text = _read(ZULIP_APP)
     values_text = _read(ZULIP_VALUES)
 
     assert "Placeholder step" not in step_text
-    assert "categories/talos-cluster/steps/install-zulip/run.sh" in step_text
+    assert "categories/apps/steps/install-zulip/run.sh" in step_text
+    assert "install-zulip" in category_text
     assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in run_text
     assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in run_text
     assert 'mkdir -p "$secrets_dir"' in run_text

@@ -199,7 +199,7 @@ test('app catalog exposes apps while the wizard catalog keeps them out of sight'
     assert.deepEqual(immichCard?.depends_on, ['install-longhorn-storage', 'install-cloudnativepg', 'install-secret-sync', 'install-authentik-idp', 'choose-ingress-route']);
     assert.equal(immichCard?.runner?.script, 'categories/apps/steps/install-immich/run.sh');
     assert.deepEqual(opencloudCard?.depends_on, ['install-longhorn-storage', 'install-secret-sync', 'install-authentik-idp', 'create-users-and-groups', 'choose-ingress-route']);
-    assert.deepEqual(audiobookshelfCard?.depends_on, []);
+    assert.deepEqual(audiobookshelfCard?.depends_on, ['install-longhorn-storage', 'install-secret-sync', 'install-authentik-idp', 'create-users-and-groups', 'choose-ingress-route']);
     assert.deepEqual(n8nCard?.depends_on, []);
     assert.equal(freshrssCard?.title, 'Install FreshRSS');
     assert.equal(freshrssCard?.placeholder, false);

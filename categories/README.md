@@ -86,17 +86,7 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 - `install-velero-ui` – Deploy the Velero UI dashboard for backup operations.
 - `install-wiredoor-gateway` – Deploy Wiredoor gateway.
 - `install-uptimekuma` – Deploy Uptime Kuma monitoring.
-- `install-nextcloud` – Deploy Nextcloud.
-- `install-opencloud` – Deploy OpenCloud with collaboration, search, and calendar support.
-- `install-immich` – Deploy Immich photo management.
-- `install-gitea` – Deploy Gitea.
-- `install-n8n` – Deploy n8n automation.
-- `install-audiobookshelf` – Deploy Audiobookshelf with Authentik OIDC, Traefik ingress, and Longhorn storage.
-- `install-freshrss` – Deploy FreshRSS.
-- `install-jitsi` – Deploy Jitsi Meet.
-- `install-karakeep` – Deploy Karakeep.
-- `install-paperless` – Deploy Paperless-ngx.
-- `install-zulip` – Deploy Zulip.
 - `install-proxmox-backup-system` – Deploy Proxmox Backup Server integration.
+- Shared app installs such as `install-nextcloud`, `install-opencloud`, `install-immich`, `install-zulip`, and the rest of the user-facing app set are referenced from `categories/apps/steps` via `app_steps` entries in `categories/talos-cluster/category.yaml`.
 - `configure-cloudflare-dns` – Configure Cloudflare DNS records.
 - `provision-wiredoor-bastion` – Provision the Wiredoor bastion host.
