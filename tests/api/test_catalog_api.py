@@ -556,6 +556,23 @@ def test_execute_step_persists_state_and_enqueues_run_step_job():
                         "start_vmid": 200,
                         "vip_ip": "192.168.1.50",
                     },
+                    "vm_size_map": {
+                        "cp-1": {
+                            "cpu": 2,
+                            "memory_mb": 4096,
+                            "disk_gb": 10,
+                        },
+                        "worker-1": {
+                            "cpu": 2,
+                            "memory_mb": 4096,
+                            "disk_gb": 192,
+                        },
+                        "worker-2": {
+                            "cpu": 2,
+                            "memory_mb": 4096,
+                            "disk_gb": 192,
+                        },
+                    },
                     "vm_ip_map": {
                         "cp-1": "192.168.1.61",
                         "worker-1": "192.168.1.62",
@@ -576,6 +593,12 @@ def test_execute_step_persists_state_and_enqueues_run_step_job():
             assert step_state["step_id"] == "provision-nodes"
             assert step_state["inputs"]["name"] == "demo"
             assert step_state["status"] == "pending"
+
+            cluster_file = data_dir / "clusters" / f"{body['cluster_id']}.json"
+            cluster = json.loads(cluster_file.read_text())
+            assert cluster["worker_disk_gb"] == 192
+            assert cluster["vm_size_map"]["worker-1"]["disk_gb"] == 192
+            assert cluster["vm_size_map"]["worker-2"]["disk_gb"] == 192
 
             job = json.loads((data_dir / "jobs" / f"{body['job_id']}.json").read_text())
             assert job["type"] == "run_step"

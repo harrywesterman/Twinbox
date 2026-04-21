@@ -1417,6 +1417,7 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
     const built = buildClusterFromRequest({
       ...validated.value,
       vm_ip_map: req.body?.vm_ip_map,
+      vm_size_map: req.body?.vm_size_map,
       vm_node_map: req.body?.vm_node_map,
     }, process.env, {
       allowedVmHosts,
