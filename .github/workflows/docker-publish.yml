@@ -17,53 +17,171 @@ permissions:
   packages: write
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+      should_publish: ${{ steps.select.outputs.should_publish }}
+      selected_images: ${{ steps.select.outputs.selected_images }}
+      skipped_images: ${{ steps.select.outputs.skipped_images }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed build inputs
+        id: filter
+        if: github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/v')
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            force_all:
+              - '.github/workflows/docker-publish.yml'
+            manager_api:
+              - 'manager-api/**'
+              - 'manager-api/Dockerfile'
+              - 'lib/**'
+              - 'categories/**'
+              - 'manager-web/src/assets/step-icons/**'
+            manager_worker:
+              - 'manager-worker/**'
+              - 'manager-worker/Dockerfile'
+              - 'config/**'
+              - 'lib/**'
+              - 'categories/**'
+              - 'infra/**'
+              - 'gitops/**'
+              - 'scripts/manager/**'
+              - 'scripts/get-talos-image-factory.sh'
+              - 'manager-web/src/assets/step-icons/**'
+            manager_web:
+              - 'manager-web/**'
+              - 'manager-web/Dockerfile'
+            portal:
+              - 'portal/**'
+              - 'portal/Dockerfile'
+            jitsi_openid:
+              - 'images/jitsi-openid/**'
+
+      - name: Select images to build
+        id: select
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REF: ${{ github.ref }}
+          FORCE_ALL: ${{ steps.filter.outputs.force_all || 'false' }}
+          MANAGER_API_CHANGED: ${{ steps.filter.outputs.manager_api || 'false' }}
+          MANAGER_WORKER_CHANGED: ${{ steps.filter.outputs.manager_worker || 'false' }}
+          MANAGER_WEB_CHANGED: ${{ steps.filter.outputs.manager_web || 'false' }}
+          PORTAL_CHANGED: ${{ steps.filter.outputs.portal || 'false' }}
+          JITSI_OPENID_CHANGED: ${{ steps.filter.outputs.jitsi_openid || 'false' }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          images = [
+              {
+                  "image_name": "twinbox-manager-api",
+                  "package_name": "twinbox-manager-api",
+                  "context": ".",
+                  "dockerfile": "./manager-api/Dockerfile",
+                  "tags": "\n".join([
+                      "type=raw,value=latest,enable={{is_default_branch}}",
+                      "type=ref,event=tag",
+                      "type=sha",
+                  ]),
+              },
+              {
+                  "image_name": "twinbox-manager-worker",
+                  "package_name": "twinbox-manager-worker",
+                  "context": ".",
+                  "dockerfile": "./manager-worker/Dockerfile",
+                  "tags": "\n".join([
+                      "type=raw,value=latest,enable={{is_default_branch}}",
+                      "type=ref,event=tag",
+                      "type=sha",
+                  ]),
+              },
+              {
+                  "image_name": "twinbox-manager-web",
+                  "package_name": "twinbox-manager-web",
+                  "context": "./manager-web",
+                  "dockerfile": "./manager-web/Dockerfile",
+                  "tags": "\n".join([
+                      "type=raw,value=latest,enable={{is_default_branch}}",
+                      "type=ref,event=tag",
+                      "type=sha",
+                  ]),
+              },
+              {
+                  "image_name": "twinbox-portal",
+                  "package_name": "twinbox-portal",
+                  "context": "./portal",
+                  "dockerfile": "./portal/Dockerfile",
+                  "tags": "\n".join([
+                      "type=raw,value=latest,enable={{is_default_branch}}",
+                      "type=raw,value=sha-${{ github.sha }},enable={{is_default_branch}}",
+                      "type=ref,event=tag",
+                      "type=sha",
+                  ]),
+              },
+              {
+                  "image_name": "twinbox-jitsi-openid",
+                  "package_name": "twinbox-manager-worker",
+                  "context": "./images/jitsi-openid",
+                  "dockerfile": "./images/jitsi-openid/Dockerfile",
+                  "tags": "\n".join([
+                      "type=raw,value=jitsi-openid-latest,enable={{is_default_branch}}",
+                      "type=ref,event=tag,prefix=jitsi-openid-",
+                      "type=sha,prefix=jitsi-openid-",
+                  ]),
+              },
+          ]
+
+          force_all = (
+              os.environ["EVENT_NAME"] == "workflow_dispatch"
+              or os.environ["GITHUB_REF"].startswith("refs/tags/v")
+              or os.environ["FORCE_ALL"] == "true"
+          )
+
+          changed = {
+              "twinbox-manager-api": os.environ["MANAGER_API_CHANGED"] == "true",
+              "twinbox-manager-worker": os.environ["MANAGER_WORKER_CHANGED"] == "true",
+              "twinbox-manager-web": os.environ["MANAGER_WEB_CHANGED"] == "true",
+              "twinbox-portal": os.environ["PORTAL_CHANGED"] == "true",
+              "twinbox-jitsi-openid": os.environ["JITSI_OPENID_CHANGED"] == "true",
+          }
+
+          selected = images if force_all else [
+              image for image in images if changed[image["image_name"]]
+          ]
+          selected_names = [image["image_name"] for image in selected]
+          skipped_names = [
+              image["image_name"] for image in images if image["image_name"] not in selected_names
+          ]
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(
+                  f"matrix={json.dumps({'include': selected}, separators=(',', ':'))}\n"
+              )
+              fh.write(f"should_publish={'true' if selected else 'false'}\n")
+              fh.write(
+                  f"selected_images={json.dumps(selected_names, separators=(',', ':'))}\n"
+              )
+              fh.write(
+                  f"skipped_images={json.dumps(skipped_names, separators=(',', ':'))}\n"
+              )
+          PY
+
   publish:
+    needs: changes
+    if: needs.changes.outputs.should_publish == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - image_name: twinbox-manager-api
-            package_name: twinbox-manager-api
-            context: .
-            dockerfile: ./manager-api/Dockerfile
-            tags: |
-              type=raw,value=latest,enable={{is_default_branch}}
-              type=ref,event=tag
-              type=sha
-          - image_name: twinbox-manager-worker
-            package_name: twinbox-manager-worker
-            context: .
-            dockerfile: ./manager-worker/Dockerfile
-            tags: |
-              type=raw,value=latest,enable={{is_default_branch}}
-              type=ref,event=tag
-              type=sha
-          - image_name: twinbox-manager-web
-            package_name: twinbox-manager-web
-            context: ./manager-web
-            dockerfile: ./manager-web/Dockerfile
-            tags: |
-              type=raw,value=latest,enable={{is_default_branch}}
-              type=ref,event=tag
-              type=sha
-          - image_name: twinbox-portal
-            package_name: twinbox-portal
-            context: ./portal
-            dockerfile: ./portal/Dockerfile
-            tags: |
-              type=raw,value=latest,enable={{is_default_branch}}
-              type=raw,value=sha-${{ github.sha }},enable={{is_default_branch}}
-              type=ref,event=tag
-              type=sha
-          - image_name: twinbox-jitsi-openid
-            package_name: twinbox-manager-worker
-            context: ./images/jitsi-openid
-            dockerfile: ./images/jitsi-openid/Dockerfile
-            tags: |
-              type=raw,value=jitsi-openid-latest,enable={{is_default_branch}}
-              type=ref,event=tag,prefix=jitsi-openid-
-              type=sha,prefix=jitsi-openid-
+      matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
 
     steps:
       - name: Checkout
@@ -94,3 +212,82 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Record built image
+        run: |
+          mkdir -p built-images
+          printf '%s\n' '${{ matrix.image_name }}' > 'built-images/${{ matrix.image_name }}.txt'
+
+      - name: Upload built image record
+        uses: actions/upload-artifact@v4
+        with:
+          name: built-image-${{ matrix.image_name }}
+          path: built-images/${{ matrix.image_name }}.txt
+          if-no-files-found: error
+
+  summary:
+    needs:
+      - changes
+      - publish
+    if: always() && needs.changes.result == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download built image records
+        if: needs.publish.result != 'skipped'
+        continue-on-error: true
+        uses: actions/download-artifact@v5
+        with:
+          path: built-images
+          pattern: built-image-*
+          merge-multiple: true
+
+      - name: Write workflow summary
+        env:
+          SELECTED_IMAGES: ${{ needs.changes.outputs.selected_images }}
+          SKIPPED_IMAGES: ${{ needs.changes.outputs.skipped_images }}
+          PUBLISH_RESULT: ${{ needs.publish.result }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          selected = json.loads(os.environ["SELECTED_IMAGES"])
+          skipped = json.loads(os.environ["SKIPPED_IMAGES"])
+          publish_result = os.environ["PUBLISH_RESULT"]
+
+          built_dir = Path("built-images")
+          built_lookup = {
+              path.stem for path in built_dir.glob("*.txt")
+          } if built_dir.exists() else set()
+          built = [image for image in selected if image in built_lookup]
+          if publish_result == "success" and not built:
+              built = selected
+
+          lines = [
+              "### Docker image publish summary",
+              "",
+              f"Publish job result: `{publish_result}`",
+              "",
+          ]
+
+          def append_list(title, items):
+              if items:
+                  lines.append(f"{title}:")
+                  lines.extend(f"- `{item}`" for item in items)
+              else:
+                  lines.append(f"{title}: none")
+              lines.append("")
+
+          append_list("Built images", built)
+          if publish_result not in {"success", "skipped"}:
+              pending = [image for image in selected if image not in built]
+              append_list("Not built due to publish interruption", pending)
+          append_list("Skipped images", skipped)
+
+          Path(os.environ["GITHUB_STEP_SUMMARY"]).write_text(
+              "\n".join(lines),
+              encoding="utf-8",
+          )
+          PY
