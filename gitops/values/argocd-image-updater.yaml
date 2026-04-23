@@ -10,6 +10,17 @@ config:
       prefix: ghcr.io
       ping: true
 
+extraObjects:
+  - apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+    kind: ImageUpdater
+    metadata:
+      name: twinbox-portal-images
+      namespace: argocd
+    spec:
+      applicationRefs:
+        - namePattern: twinbox-portal
+          useAnnotations: true
+
 tolerations:
   - key: node-role.kubernetes.io/control-plane
     operator: Exists
