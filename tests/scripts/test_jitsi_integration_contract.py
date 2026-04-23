@@ -184,10 +184,12 @@ def test_jitsi_openid_image_is_pinned_and_patched_for_room_scoped_short_lived_to
     dockerfile_text = _read(JITSI_IMAGE_DOCKERFILE)
     patch_text = _read(JITSI_IMAGE_PATCH)
 
-    assert "image_name: twinbox-jitsi-openid" in workflow_text
-    assert "package_name: twinbox-manager-worker" in workflow_text
-    assert "context: ./images/jitsi-openid" in workflow_text
-    assert "dockerfile: ./images/jitsi-openid/Dockerfile" in workflow_text
+    assert "jitsi_openid:" in workflow_text
+    assert "images/jitsi-openid/**" in workflow_text
+    assert '"image_name": "twinbox-jitsi-openid"' in workflow_text
+    assert '"package_name": "twinbox-manager-worker"' in workflow_text
+    assert '"context": "./images/jitsi-openid"' in workflow_text
+    assert '"dockerfile": "./images/jitsi-openid/Dockerfile"' in workflow_text
     assert "value=jitsi-openid-latest" in workflow_text
     assert "type=sha,prefix=jitsi-openid-" in workflow_text
 
