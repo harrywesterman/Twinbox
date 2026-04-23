@@ -11,6 +11,7 @@ Twinbox builds a Talos Linux Kubernetes cluster on Proxmox through a Management 
 - Do not revert unrelated/user changes.
 - Do not edit runtime/generated/dependency state as source: `manager-data/`, `node_modules/`, `dist/`, `.venv/`, `.terraform/`, vendored charts.
 - Never print or commit secrets.
+- Twinbox Portal runs on the k8s cluster, and is managed by argocd. 
 
 ## Map
 
