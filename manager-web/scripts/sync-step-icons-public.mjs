@@ -4,11 +4,14 @@ import { fileURLToPath } from 'node:url';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(scriptDir, '..');
+const repoRoot = path.resolve(webRoot, '..');
 const sourceDir = path.join(webRoot, 'src/assets/step-icons');
-const publicDir = path.join(webRoot, 'public/assets/step-icons');
+const webPublicDir = path.join(webRoot, 'public/assets/step-icons');
+const portalPublicDir = path.join(repoRoot, 'portal/public/assets/step-icons');
 
 async function main() {
-  await fs.mkdir(publicDir, { recursive: true });
+  await fs.mkdir(webPublicDir, { recursive: true });
+  await fs.mkdir(portalPublicDir, { recursive: true });
 
   const entries = await fs.readdir(sourceDir, { withFileTypes: true });
   const svgFiles = entries
@@ -18,9 +21,11 @@ async function main() {
   await Promise.all(
     svgFiles.map(async (fileName) => {
       const sourcePath = path.join(sourceDir, fileName);
-      const targetPath = path.join(publicDir, fileName);
       const contents = await fs.readFile(sourcePath);
-      await fs.writeFile(targetPath, contents);
+      await Promise.all([
+        fs.writeFile(path.join(webPublicDir, fileName), contents),
+        fs.writeFile(path.join(portalPublicDir, fileName), contents),
+      ]);
     }),
   );
 

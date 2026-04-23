@@ -34,6 +34,7 @@ Twinbox builds a Talos Linux Kubernetes cluster on Proxmox through a Management 
 - Cluster state: `manager-data/clusters/`.
 - Step state: `manager-data/step-state/`.
 - Talos configs and kubeconfigs are runtime artifacts, not canonical repo source.
+- On the Management VM, `/opt/twinbox/.env` is root-owned; when refreshing the stack there, run `docker compose` through `sudo` from `/opt/twinbox` instead of trying to read or edit that file as `twinbox`.
 
 ## Debug
 
@@ -61,3 +62,4 @@ Run the smallest useful check for touched files:
 - After pushing runtime changes, watch the relevant GitHub Actions workflow.
 - Management VM refresh: `cd /opt/twinbox && docker compose pull && docker compose up -d`.
 - Portal changes roll out through a Git commit to `main`, the portal image publish workflow, and Argo CD sync from `gitops/platform-apps/twinbox-portal`.
+- Management VM refresh example: `sudo -n sh -lc 'cd /opt/twinbox && docker compose pull && docker compose up -d'`.

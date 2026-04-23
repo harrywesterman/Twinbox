@@ -86,21 +86,21 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
 
   const iconByTitle = new Map(config.sections.flatMap((section) => section.items.map((item) => [item.title, item.icon])));
   const wizardIconBase = "https://twinboxwizard.tst.example.com/assets/step-icons";
-  assert.equal(iconByTitle.get("Hubble"), "https://cdn.simpleicons.org/cilium");
+  assert.equal(iconByTitle.get("Hubble"), `${wizardIconBase}/provision-nodes.svg`);
   assert.equal(iconByTitle.get("Argo CD"), `${wizardIconBase}/install-argocd.svg`);
   assert.equal(iconByTitle.get("Authentik"), `${wizardIconBase}/install-authentik-idp.svg`);
   assert.equal(iconByTitle.get("Grafana"), `${wizardIconBase}/install-grafana.svg`);
   assert.equal(iconByTitle.get("Prometheus"), `${wizardIconBase}/install-prometheus.svg`);
   assert.equal(iconByTitle.get("Loki"), `${wizardIconBase}/install-loki.svg`);
   assert.equal(iconByTitle.get("Proxmox"), `${wizardIconBase}/install-proxmox-backup-system.svg`);
-  assert.equal(iconByTitle.get("SeaweedFS"), "https://seaweedfs.com/favicon.ico");
-  assert.equal(iconByTitle.get("SeaweedFS Admin"), "https://seaweedfs.com/favicon.ico");
+  assert.equal(iconByTitle.get("SeaweedFS"), `${wizardIconBase}/install-management-consoles.svg`);
+  assert.equal(iconByTitle.get("SeaweedFS Admin"), `${wizardIconBase}/install-management-consoles.svg`);
   assert.equal(iconByTitle.get("Twinbox Portal"), `${wizardIconBase}/install-twinbox-portal.svg`);
   assert.equal(iconByTitle.get("Velero UI"), `${wizardIconBase}/install-velero-ui.svg`);
-  assert.equal(iconByTitle.get("pgAdmin 4"), "https://raw.githubusercontent.com/pgadmin-org/pgadmin4/master/web/pgadmin/static/favicon.ico");
-  assert.equal(iconByTitle.get("Wiredoor"), "https://www.wiredoor.net/favicon.ico");
+  assert.equal(iconByTitle.get("pgAdmin 4"), `${wizardIconBase}/install-pgadmin4.svg`);
+  assert.equal(iconByTitle.get("Wiredoor"), `${wizardIconBase}/install-wiredoor-gateway.svg`);
   assert.equal(iconByTitle.get("Cloudflare"), `${wizardIconBase}/configure-cloudflare-dns.svg`);
-  assert.equal(iconByTitle.get("GitHub"), "https://cdn.simpleicons.org/github");
+  assert.equal(iconByTitle.get("GitHub"), `${wizardIconBase}/github.svg`);
 
   assert.equal(config.appConfig.faviconApi, "local");
   assert.equal(config.appConfig.iconSize, "large");

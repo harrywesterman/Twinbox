@@ -6,8 +6,10 @@ import { STEP_ICON_MANIFEST } from '../src/assets/step-icons/manifest.js';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(scriptDir, '..');
+const repoRoot = path.resolve(webRoot, '..');
 const iconsDir = path.join(webRoot, 'src/assets/step-icons');
 const publicIconsDir = path.join(webRoot, 'public/assets/step-icons');
+const portalPublicIconsDir = path.join(repoRoot, 'portal/public/assets/step-icons');
 function asHexChannel(value) {
   return Math.max(0, Math.min(255, Number(value))).toString(16).padStart(2, '0');
 }
@@ -26,6 +28,42 @@ function tintSvg(svg, color) {
   return svg
     .replace(/currentColor/g, color)
     .replace(/fill="none"/g, 'fill="none"');
+}
+
+function parseDimension(value) {
+  if (!value) {
+    return null;
+  }
+
+  const match = String(value).trim().match(/^([0-9]+(?:\.[0-9]+)?)(?:px)?$/i);
+  if (!match) {
+    return null;
+  }
+  return Number(match[1]);
+}
+
+function normalizeSvgRoot(svg) {
+  const match = svg.match(/<svg\b[^>]*>/i);
+  if (!match) {
+    throw new Error('expected an <svg> root element');
+  }
+
+  const svgTag = match[0];
+  const widthMatch = svgTag.match(/\swidth\s*=\s*(['"])(.*?)\1/i);
+  const heightMatch = svgTag.match(/\sheight\s*=\s*(['"])(.*?)\1/i);
+  const hasViewBox = /\sviewBox\s*=/i.test(svgTag);
+  const width = parseDimension(widthMatch?.[2]);
+  const height = parseDimension(heightMatch?.[2]);
+
+  let replacementTag = svgTag
+    .replace(/\swidth\s*=\s*(['"])(.*?)\1/ig, '')
+    .replace(/\sheight\s*=\s*(['"])(.*?)\1/ig, '');
+
+  if (!hasViewBox && width && height) {
+    replacementTag = replacementTag.replace(/<svg\b/i, `<svg viewBox="0 0 ${width} ${height}"`);
+  }
+
+  return `${svg.slice(0, match.index)}${replacementTag}${svg.slice((match.index || 0) + svgTag.length)}`;
 }
 
 function toDataUrl(text, mimeType) {
@@ -168,6 +206,7 @@ async function main() {
   });
 
   await fs.mkdir(publicIconsDir, { recursive: true });
+  await fs.mkdir(portalPublicIconsDir, { recursive: true });
 
   const generated = [];
 
@@ -195,9 +234,12 @@ async function main() {
       }
     }
 
+    finalSvg = normalizeSvgRoot(finalSvg);
+
     await fs.writeFile(svgPath, finalSvg);
     await renderPng(page, finalSvg, pngPath);
     await fs.writeFile(path.join(publicIconsDir, `${entry.fileBase}.svg`), finalSvg);
+    await fs.writeFile(path.join(portalPublicIconsDir, `${entry.fileBase}.svg`), finalSvg);
     generated.push(entry.fileBase);
   }
 

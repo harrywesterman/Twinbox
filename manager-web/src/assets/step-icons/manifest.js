@@ -1,255 +1,248 @@
+function iconEntry({
+  stepId,
+  fileBase = stepId,
+  isAppOrPlatform = false,
+  officialSourceType = '',
+  officialSourceUrl = '',
+}) {
+  const entry = {
+    stepId,
+    fileBase,
+    sourceKind: 'local-svg',
+    sourceFile: `./${fileBase}.svg`,
+    isAppOrPlatform,
+  };
+
+  if (isAppOrPlatform) {
+    entry.officialSourceType = officialSourceType;
+    entry.officialSourceUrl = officialSourceUrl;
+  }
+
+  return entry;
+}
+
 export const STEP_ICON_MANIFEST = [
-  {
+  iconEntry({
     stepId: 'provision-nodes',
-    fileBase: 'provision-nodes',
-    sourceKind: 'simple-icons',
-    sourceSlug: 'talos',
-    sourceColor: '#FF7300',
-  },
-  {
+  }),
+  iconEntry({
     stepId: 'install-argocd',
-    fileBase: 'install-argocd',
-    sourceKind: 'local-svg',
-    sourceFile: './install-argocd.svg',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/argoproj/argo-cd',
+  }),
+  iconEntry({
     stepId: 'install-longhorn-storage',
-    fileBase: 'install-longhorn-storage',
-    sourceKind: 'simple-icons',
-    sourceSlug: 'longhorn',
-    sourceColor: '#5F224B',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/longhorn/longhorn',
+  }),
+  iconEntry({
     stepId: 'install-secret-sync',
-    fileBase: 'install-secret-sync',
-    sourceKind: 'simple-icons',
-    sourceSlug: 'openbao',
-    sourceColor: '#336D5C',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/openbao/openbao',
+  }),
+  iconEntry({
     stepId: 'install-traefik',
-    fileBase: 'install-traefik',
-    sourceKind: 'simple-icons',
-    sourceSlug: 'traefikproxy',
-    sourceColor: '#24A1C1',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/traefik/traefik',
+  }),
+  iconEntry({
     stepId: 'install-cloudnativepg',
-    fileBase: 'install-cloudnativepg',
-    sourceKind: 'local-svg',
-    sourceFile: './install-cloudnativepg.svg',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/cloudnative-pg/cloudnative-pg',
+  }),
+  iconEntry({
     stepId: 'install-prometheus',
-    fileBase: 'install-prometheus',
-    sourceKind: 'simple-icons',
-    sourceSlug: 'prometheus',
-    sourceColor: '#E6522C',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/prometheus/prometheus',
+  }),
+  iconEntry({
     stepId: 'install-loki',
-    fileBase: 'install-loki',
-    sourceKind: 'remote-svg',
-    sourceUrl: 'https://a-us.storyblok.com/f/1022730/24x24/e041973a44/icon-nav-loki.svg',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/grafana/loki',
+  }),
+  iconEntry({
     stepId: 'install-authentik-idp',
-    fileBase: 'install-authentik-idp',
-    sourceKind: 'simple-icons',
-    sourceSlug: 'authentik',
-    sourceColor: '#FD4B2D',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/goauthentik/authentik',
+  }),
+  iconEntry({
     stepId: 'create-users-and-groups',
-    fileBase: 'create-users-and-groups',
-    sourceKind: 'local-svg',
-    sourceFile: './create-users-and-groups.svg',
-  },
-  {
+  }),
+  iconEntry({
     stepId: 'configure-cloudflare-dns',
-    fileBase: 'configure-cloudflare-dns',
-    sourceKind: 'simple-icons',
-    sourceSlug: 'cloudflare',
-    sourceColor: '#F38020',
-  },
-  {
+  }),
+  iconEntry({
     stepId: 'install-whoami',
-    fileBase: 'install-whoami',
-    sourceKind: 'local-svg',
-    sourceFile: './install-whoami.svg',
-    tintFromPng: './install-whoami.png',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/traefik/whoami',
+  }),
+  iconEntry({
     stepId: 'install-headlamp',
-    fileBase: 'install-headlamp',
-    sourceKind: 'local-svg',
-    sourceFile: './install-headlamp.svg',
-    tintColor: '#ffd020',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/headlamp-k8s/headlamp',
+  }),
+  iconEntry({
     stepId: 'install-grafana',
-    fileBase: 'install-grafana',
-    sourceKind: 'simple-icons',
-    sourceSlug: 'grafana',
-    sourceColor: '#F46800',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/grafana/grafana',
+  }),
+  iconEntry({
     stepId: 'install-pgadmin4',
-    fileBase: 'install-pgadmin4',
-    sourceKind: 'local-svg',
-    sourceFile: './install-pgadmin4.svg',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/pgadmin-org/pgadmin4',
+  }),
+  iconEntry({
     stepId: 'install-wiredoor-gateway',
-    fileBase: 'install-wiredoor-gateway',
-    sourceKind: 'local-svg',
-    sourceFile: './install-wiredoor-gateway.svg',
-    tintFromPng: './install-wiredoor-gateway.png',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/wiredoor/wiredoor',
+  }),
+  iconEntry({
     stepId: 'install-dashy-dashboard',
-    fileBase: 'install-dashy-dashboard',
-    sourceKind: 'local-svg',
-    sourceFile: './install-dashy-dashboard.svg',
-    tintColor: '#0f172a',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/Lissy93/dashy',
+  }),
+  iconEntry({
     stepId: 'install-twinbox-portal',
-    fileBase: 'install-twinbox-portal',
-    sourceKind: 'local-svg',
-    sourceFile: './install-twinbox-portal.svg',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'twinbox-repository',
+    officialSourceUrl: 'https://github.com/harrywesterman/Twinbox/tree/main/portal',
+  }),
+  iconEntry({
     stepId: 'install-ntfy',
-    fileBase: 'install-ntfy',
-    sourceKind: 'simple-icons',
-    sourceSlug: 'ntfy',
-    sourceColor: '#317F6F',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/binwiederhier/ntfy',
+  }),
+  iconEntry({
     stepId: 'install-management-consoles',
-    fileBase: 'install-management-consoles',
-    sourceKind: 'local-svg',
-    sourceFile: './install-management-consoles.svg',
-    tintFromPng: './install-management-consoles.png',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'twinbox-repository',
+    officialSourceUrl: 'https://github.com/harrywesterman/Twinbox/tree/main/categories/talos-cluster/steps/install-management-consoles',
+  }),
+  iconEntry({
     stepId: 'install-velero-backup',
-    fileBase: 'install-velero-backup',
-    sourceKind: 'local-svg',
-    sourceFile: './install-velero-backup.svg',
-    tintFromPng: './install-velero-backup.png',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/vmware-tanzu/velero',
+  }),
+  iconEntry({
     stepId: 'install-velero-ui',
-    fileBase: 'install-velero-ui',
-    sourceKind: 'local-svg',
-    sourceFile: './install-velero-ui.svg',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/otwld/velero-ui',
+  }),
+  iconEntry({
     stepId: 'install-proxmox-backup-system',
-    fileBase: 'install-proxmox-backup-system',
-    sourceKind: 'simple-icons',
-    sourceSlug: 'proxmox',
-    sourceColor: '#E57000',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-website',
+    officialSourceUrl: 'https://www.proxmox.com/en/products/proxmox-backup-server',
+  }),
+  iconEntry({
     stepId: 'install-nextcloud',
-    fileBase: 'install-nextcloud',
-    sourceKind: 'simple-icons',
-    sourceSlug: 'nextcloud',
-    sourceColor: '#0082C9',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/nextcloud/server',
+  }),
+  iconEntry({
     stepId: 'install-opencloud',
-    fileBase: 'install-opencloud',
-    sourceKind: 'local-svg',
-    sourceFile: './install-opencloud.svg',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/opencloud-eu/opencloud',
+  }),
+  iconEntry({
     stepId: 'install-immich',
-    fileBase: 'install-immich',
-    sourceKind: 'simple-icons',
-    sourceSlug: 'immich',
-    sourceColor: '#4250AF',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/immich-app/immich',
+  }),
+  iconEntry({
     stepId: 'install-zulip',
-    fileBase: 'install-zulip',
-    sourceKind: 'simple-icons',
-    sourceSlug: 'zulip',
-    sourceColor: '#6492FE',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/zulip/zulip',
+  }),
+  iconEntry({
     stepId: 'install-paperless',
-    fileBase: 'install-paperless',
-    sourceKind: 'simple-icons',
-    sourceSlug: 'paperlessngx',
-    sourceColor: '#17541F',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/paperless-ngx/paperless-ngx',
+  }),
+  iconEntry({
     stepId: 'install-karakeep',
-    fileBase: 'install-karakeep',
-    sourceKind: 'simple-icons',
-    sourceSlug: 'karakeep',
-    sourceColor: '#000000',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/karakeep-app/karakeep',
+  }),
+  iconEntry({
     stepId: 'install-gitea',
-    fileBase: 'install-gitea',
-    sourceKind: 'simple-icons',
-    sourceSlug: 'gitea',
-    sourceColor: '#609926',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/go-gitea/gitea',
+  }),
+  iconEntry({
     stepId: 'install-uptimekuma',
-    fileBase: 'install-uptimekuma',
-    sourceKind: 'simple-icons',
-    sourceSlug: 'uptimekuma',
-    sourceColor: '#5CDD8B',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/louislam/uptime-kuma',
+  }),
+  iconEntry({
     stepId: 'install-n8n',
-    fileBase: 'install-n8n',
-    sourceKind: 'simple-icons',
-    sourceSlug: 'n8n',
-    sourceColor: '#EA4B71',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/n8n-io/n8n',
+  }),
+  iconEntry({
     stepId: 'install-audiobookshelf',
-    fileBase: 'install-audiobookshelf',
-    sourceKind: 'simple-icons',
-    sourceSlug: 'audiobookshelf',
-    sourceColor: '#82612C',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/advplyr/audiobookshelf',
+  }),
+  iconEntry({
     stepId: 'install-freshrss',
-    fileBase: 'install-freshrss',
-    sourceKind: 'simple-icons',
-    sourceSlug: 'freshrss',
-    sourceColor: '#0062BE',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/FreshRSS/FreshRSS',
+  }),
+  iconEntry({
     stepId: 'install-jitsi',
-    fileBase: 'install-jitsi',
-    sourceKind: 'simple-icons',
-    sourceSlug: 'jitsi',
-    sourceColor: '#97979A',
-  },
-  {
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/jitsi/jitsi-meet',
+  }),
+  iconEntry({
     stepId: 'configure-automatic-updates',
-    fileBase: 'configure-automatic-updates',
-    sourceKind: 'local-svg',
-    sourceFile: './configure-automatic-updates.svg',
-    tintFromPng: './configure-automatic-updates.png',
-  },
-  {
+  }),
+  iconEntry({
     stepId: 'install-flannel',
-    fileBase: 'install-flannel',
-    sourceKind: 'local-svg',
-    sourceFile: './install-flannel.svg',
-  },
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/flannel-io/flannel',
+  }),
 ];
+
+for (const entry of STEP_ICON_MANIFEST) {
+  if (!entry.isAppOrPlatform) {
+    continue;
+  }
+
+  if (!entry.officialSourceType || !entry.officialSourceUrl) {
+    throw new Error(`Missing official icon source metadata for ${entry.stepId}`);
+  }
+}
 
 export const STEP_ICON_MANIFEST_BY_STEP_ID = Object.fromEntries(
   STEP_ICON_MANIFEST.map((entry) => [entry.stepId, entry]),
