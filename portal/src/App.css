@@ -580,7 +580,8 @@ a {
   color: var(--muted);
 }
 
-.settings-form select {
+.settings-form input,
+.settings-form select,
 .user-admin-search input,
 .user-admin-form input {
   width: 100%;
