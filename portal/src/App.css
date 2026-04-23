@@ -749,9 +749,9 @@ a {
 
 .admin-install-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, clamp(140px, 11vw, 190px)));
+  grid-template-columns: repeat(4, minmax(0, clamp(124px, 7.2vw, 136px)));
   justify-content: start;
-  gap: 14px;
+  gap: 16px;
   align-items: start;
 }
 
@@ -761,8 +761,9 @@ a {
 
 .admin-install-tile {
   display: grid;
-  gap: 8px;
-  padding: 10px;
+  justify-items: center;
+  gap: 10px;
+  padding: 12px 8px 10px;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: linear-gradient(160deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
@@ -782,10 +783,10 @@ a {
 .admin-install-tile-media {
   display: grid;
   place-items: center;
-  width: 100%;
+  width: min(100%, 112px);
   aspect-ratio: 1 / 1;
-  border-radius: 16px;
-  padding: 8px;
+  border-radius: 18px;
+  padding: 6px;
   background: radial-gradient(circle at top left, rgba(45, 212, 191, 0.14), rgba(255, 255, 255, 0.04));
 }
 
@@ -793,7 +794,7 @@ a {
   width: 100%;
   height: 100%;
   border-radius: 12px;
-  padding: 6px;
+  padding: 8px;
   background: rgba(255, 255, 255, 0.94);
 }
 
@@ -801,8 +802,23 @@ a {
   box-shadow: none;
 }
 
+.admin-install-tile-title {
+  min-height: 2.4em;
+  max-width: 100%;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  text-align: center;
+  text-wrap: balance;
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
 .admin-install-tile-button {
-  width: 100%;
+  width: min(100%, 112px);
   min-height: 34px;
   padding: 0 10px;
   font-size: 0.86rem;
@@ -1224,7 +1240,7 @@ a {
   }
 
   .admin-install-grid {
-    grid-template-columns: repeat(3, minmax(0, clamp(132px, 20vw, 180px)));
+    grid-template-columns: repeat(3, minmax(0, clamp(122px, 20vw, 136px)));
   }
 
   .topbar {
@@ -1275,7 +1291,7 @@ a {
   }
 
   .admin-install-grid {
-    grid-template-columns: repeat(2, minmax(0, clamp(132px, 42vw, 190px)));
+    grid-template-columns: repeat(2, minmax(0, clamp(120px, 42vw, 136px)));
   }
 
   .admin-install-modal-backdrop {

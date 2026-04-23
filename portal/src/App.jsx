@@ -38,6 +38,10 @@ function requestJson(url, options = {}) {
   });
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 function formatHost(url) {
   try {
     return new URL(url, window.location.origin).host;
@@ -366,6 +370,7 @@ function AdminInstallTile({
       <div className="admin-install-tile-media" aria-hidden="true">
         <AppIcon card={iconCard} className="admin-install-tile-icon" />
       </div>
+      <strong className="admin-install-tile-title">{itemTitle}</strong>
       <button
         type="button"
         className="primary-button admin-install-tile-button"

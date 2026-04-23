@@ -209,8 +209,7 @@ test('app catalog exposes apps while the wizard catalog keeps them out of sight'
     assert.deepEqual(freshrssCard?.depends_on, []);
     assert.deepEqual(zulipCard?.depends_on, []);
     assert.equal(freshrssCard?.runner?.script, 'categories/apps/steps/install-freshrss/run.sh');
-    assert.equal(mediaBundle?.title, 'Media');
-    assert.deepEqual(mediaBundle?.apps, ['install-immich']);
+    assert.equal(mediaBundle, undefined);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
