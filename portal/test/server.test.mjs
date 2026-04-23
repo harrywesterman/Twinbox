@@ -687,6 +687,17 @@ test("admin path redirects to Authentik login", async () => {
   assert.equal(location.searchParams.get("returnTo"), "/admin");
 });
 
+test("admin apps path redirects to Authentik login when no session is present", async () => {
+  const response = await fetch(`${portalOrigin}/admin/apps`, {
+    redirect: "manual",
+  });
+
+  assert.equal(response.status, 302);
+  const location = new URL(response.headers.get("location"), portalOrigin);
+  assert.equal(location.pathname, "/auth/login");
+  assert.equal(location.searchParams.get("returnTo"), "/admin/apps");
+});
+
 test("login requests the reduced Authentik scope set", async () => {
   const response = await fetch(`${portalOrigin}/auth/login`, {
     redirect: "manual",

@@ -1048,6 +1048,12 @@ app.get(/.*/, async (req, res, next) => {
     next();
     return;
   }
+  const session = getCurrentSession(req);
+  if (!session) {
+    const returnTo = sanitizeReturnTo(req.originalUrl || req.path || "/");
+    res.redirect(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
+    return;
+  }
   try {
     await renderAppShell(req, res);
   } catch (error) {

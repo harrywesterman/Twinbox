@@ -423,35 +423,14 @@ function MenuPopover({ visible, onNavigate, onLogout, onClose, isAdmin }) {
   );
 }
 
-function LoginScreen({ brand, onLogin }) {
+function AuthRedirectScreen({ brand }) {
   return (
-    <main className="auth-screen">
-      <div className="auth-shell">
-        <div className="auth-hero">
-          <span className="auth-mark" />
-          <p className="eyebrow">{brand}</p>
-          <h1>Twinbox Portal</h1>
-          <p>
-            One place for your apps, settings, intranet links, and a high-level view of the cluster.
-          </p>
-          <button type="button" className="primary-button" onClick={onLogin}>
-            Sign in with Authentik
-          </button>
-        </div>
-        <div className="auth-notes">
-          <div>
-            <strong>Apps</strong>
-            <span>Launch the tools that are available for your account.</span>
-          </div>
-          <div>
-            <strong>Settings</strong>
-            <span>Store your language, timezone, and theme server-side.</span>
-          </div>
-          <div>
-            <strong>Status</strong>
-            <span>See whether the platform services are reachable.</span>
-          </div>
-        </div>
+    <main className="loading-screen">
+      <div className="loading-card">
+        <span className="brand-mark" />
+        <p className="eyebrow">{brand}</p>
+        <h1>Redirecting to Authentik</h1>
+        <p>Preparing secure sign-in.</p>
       </div>
     </main>
   );
@@ -1712,13 +1691,15 @@ export default function App() {
   }, [config, route]);
   const adminInstallTarget = useMemo(() => parseAdminAppInstallPath(route), [route]);
 
-  const login = () => {
-    window.location.href = `/auth/login?returnTo=${encodeURIComponent(route || '/')}`;
-  };
-
   const logout = () => {
     window.location.href = '/auth/logout';
   };
+
+  useEffect(() => {
+    if (!sessionState.loading && !session) {
+      window.location.replace(`/auth/login?returnTo=${encodeURIComponent(route || '/')}`);
+    }
+  }, [route, session, sessionState.loading]);
 
   useEffect(() => {
     if (route === '/admin' && adminRedirectUrl) {
@@ -1774,7 +1755,7 @@ export default function App() {
   }
 
   if (!session) {
-    return <LoginScreen brand="Twinbox" onLogin={login} />;
+    return <AuthRedirectScreen brand="Twinbox" />;
   }
 
   return (
