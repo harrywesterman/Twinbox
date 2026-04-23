@@ -2,6 +2,11 @@ function trimString(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function buildStepIconUrl(stepId) {
+  const normalizedStepId = trimString(stepId);
+  return normalizedStepId ? `/assets/step-icons/${normalizedStepId}.svg` : '';
+}
+
 export function buildAdminAppInstallPath(kind, id) {
   const normalizedKind = trimString(kind);
   const normalizedId = encodeURIComponent(trimString(id));
@@ -85,4 +90,50 @@ export function buildBundleInstallSummary(bundleCards = []) {
 export function buildBundleInstallQueue(bundle = {}, cardsById = new Map()) {
   const bundleCards = getInstallableBundleCards(bundle, cardsById);
   return bundleCards.filter((card) => ['ready', 'failed'].includes(card?.app_state));
+}
+
+export function isAdminAppInstallEnabled(card = {}) {
+  if (!card || card.placeholder) {
+    return false;
+  }
+
+  return ['ready', 'failed', 'installed'].includes(card.app_state);
+}
+
+export function getAdminAppInstallButtonState(card = {}) {
+  if (isAdminAppInstallEnabled(card)) {
+    return {
+      enabled: true,
+      label: 'Install',
+    };
+  }
+
+  if (card?.app_state === 'installing') {
+    return {
+      enabled: false,
+      label: 'Installing',
+    };
+  }
+
+  return {
+    enabled: false,
+    label: 'Unavailable',
+  };
+}
+
+export function resolveAdminCardIconUrl(card = {}) {
+  if (!card) {
+    return '';
+  }
+
+  const explicitIcon = trimString(card.iconUrl || card.iconArtworkUrl || card.icon_artwork_url);
+  if (explicitIcon) {
+    return explicitIcon;
+  }
+
+  if (trimString(card.title) === 'Dashy') {
+    return '/assets/step-icons/install-dashy-dashboard.svg';
+  }
+
+  return buildStepIconUrl(card.sourceStepId || card.id);
 }

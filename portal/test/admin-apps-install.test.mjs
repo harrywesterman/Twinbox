@@ -5,7 +5,10 @@ import {
   buildAdminAppInstallPath,
   buildBundleInstallQueue,
   buildBundleInstallSummary,
+  getAdminAppInstallButtonState,
+  isAdminAppInstallEnabled,
   parseAdminAppInstallPath,
+  resolveAdminCardIconUrl,
 } from '../src/admin-apps-install.js';
 
 test('admin app install routes round-trip for apps and bundles', () => {
@@ -36,4 +39,42 @@ test('bundle install queue skips installed apps and keeps runnable ones', () => 
     state: 'ready',
     label: '2 apps in this bundle',
   });
+});
+
+test('installed apps stay installable for explicit reinstalls', () => {
+  const installedCard = { id: 'install-immich', app_state: 'installed', placeholder: false };
+  const plannedCard = { id: 'install-zulip', app_state: 'planned', placeholder: false };
+
+  assert.equal(isAdminAppInstallEnabled(installedCard), true);
+  assert.equal(isAdminAppInstallEnabled(plannedCard), false);
+  assert.deepEqual(getAdminAppInstallButtonState(installedCard), {
+    enabled: true,
+    label: 'Install',
+  });
+  assert.deepEqual(getAdminAppInstallButtonState(plannedCard), {
+    enabled: false,
+    label: 'Unavailable',
+  });
+});
+
+test('icon resolver keeps explicit artwork and falls back to step icons', () => {
+  assert.equal(resolveAdminCardIconUrl({
+    id: 'install-immich',
+    iconUrl: '/assets/custom/immich.svg',
+  }), '/assets/custom/immich.svg');
+
+  assert.equal(resolveAdminCardIconUrl({
+    id: 'install-immich',
+    icon_artwork_url: '/assets/custom/immich-alt.svg',
+  }), '/assets/custom/immich-alt.svg');
+
+  assert.equal(resolveAdminCardIconUrl({
+    id: 'install-nextcloud',
+    sourceStepId: 'install-nextcloud',
+  }), '/assets/step-icons/install-nextcloud.svg');
+
+  assert.equal(resolveAdminCardIconUrl({
+    id: 'install-dashy-dashboard',
+    title: 'Dashy',
+  }), '/assets/step-icons/install-dashy-dashboard.svg');
 });

@@ -5,7 +5,10 @@ import {
   buildAdminAppInstallPath,
   buildBundleInstallQueue,
   buildBundleInstallSummary,
+  getAdminAppInstallButtonState,
+  isAdminAppInstallEnabled,
   parseAdminAppInstallPath,
+  resolveAdminCardIconUrl,
 } from './admin-apps-install.js';
 import { buildAdminNavigationItems, buildUserAdminViewModel } from './user-admin-model.js';
 
@@ -291,57 +294,89 @@ function AppIcon({ card, className = '' }) {
   );
 }
 
-function adminStepIconUrl(card) {
-  const title = String(card?.title || '').trim();
-  const base = String(card?.sourceStepId || card?.id || '').trim();
-  if (title === 'Dashy') {
-    return '/assets/step-icons/install-dashy-dashboard.svg';
-  }
-  return base ? `/assets/step-icons/${base}.svg` : '';
-}
-
-function openInstallWindow(pathname) {
-  if (!pathname) {
-    return;
-  }
-
-  const opened = window.open(pathname, '_blank', 'noopener,noreferrer');
-  opened?.focus?.();
-}
-
 function buildAdminInstallRoute(kind, id) {
   return buildAdminAppInstallPath(kind, id);
 }
 
-function AdminBundleIcon({ bundle, className = '' }) {
-  const cards = Array.isArray(bundle?.cards) ? bundle.cards.slice(0, 3) : [];
+function buildAdminIconCard(card = {}) {
+  if (!card) {
+    return {
+      title: 'App',
+      iconUrl: '',
+      iconAlt: 'App icon',
+      iconText: 'AP',
+    };
+  }
 
+  return {
+    ...card,
+    iconUrl: resolveAdminCardIconUrl(card),
+    iconAlt: card.iconAlt || `${card.title || 'App'} icon`,
+  };
+}
+
+function buildAdminBundleIconCard(bundle = {}) {
+  const bundleCards = Array.isArray(bundle?.cards) ? bundle.cards : [];
+  const sourceCard = bundleCards.find((entry) => Boolean(resolveAdminCardIconUrl(entry))) || bundleCards[0] || {};
+  const title = bundle?.title || sourceCard?.title || 'Bundle';
+
+  return {
+    ...sourceCard,
+    title,
+    iconUrl: bundle?.iconUrl || resolveAdminCardIconUrl(sourceCard),
+    iconAlt: bundle?.iconAlt || `${title} icon`,
+    iconText: sourceCard?.iconText || String(title).slice(0, 2).toUpperCase(),
+  };
+}
+
+function buildBundleInstallButtonState(bundleCards = []) {
+  const summary = buildBundleInstallSummary(bundleCards);
+  if (summary.state === 'ready') {
+    return {
+      summary,
+      enabled: true,
+      label: 'Install',
+    };
+  }
+
+  if (summary.state === 'installing') {
+    return {
+      summary,
+      enabled: false,
+      label: 'Installing',
+    };
+  }
+
+  return {
+    summary,
+    enabled: false,
+    label: 'Unavailable',
+  };
+}
+
+function AdminInstallTile({
+  iconCard,
+  itemTitle,
+  buttonLabel = 'Install',
+  disabled = false,
+  onInstall,
+}) {
   return (
-    <span className={`admin-bundle-icon ${className}`.trim()} aria-hidden="true">
-      <span className="admin-bundle-icon-main">
-        <AppIcon
-          card={{
-            ...cards[0],
-            title: bundle?.title || cards[0]?.title || 'Bundle',
-            iconUrl: bundle?.iconUrl || cards[0]?.iconUrl || cards[0]?.iconArtworkUrl || '',
-            iconAlt: bundle?.iconAlt || `${bundle?.title || 'Bundle'} icon`,
-            accent: cards[0]?.accent,
-            iconText: cards[0]?.iconText || bundle?.title?.slice(0, 2).toUpperCase() || 'GB',
-          }}
-          className="admin-bundle-icon-badge"
-        />
-      </span>
-      <span className="admin-bundle-icon-stack">
-        {cards.slice(1).map((card) => (
-          <span key={card.id} className="admin-bundle-icon-mini">
-            <AppIcon
-              card={card}
-              className="admin-bundle-icon-mini-badge"
-            />
-          </span>
-        ))}
-      </span>
-    </span>
+    <article className={`admin-install-tile ${disabled ? 'is-disabled' : ''}`} title={itemTitle}>
+      <div className="admin-install-tile-media" aria-hidden="true">
+        <AppIcon card={iconCard} className="admin-install-tile-icon" />
+      </div>
+      <button
+        type="button"
+        className="primary-button admin-install-tile-button"
+        onClick={onInstall}
+        disabled={disabled}
+        aria-label={`${buttonLabel} ${itemTitle}`}
+        title={`${buttonLabel} ${itemTitle}`}
+      >
+        {buttonLabel}
+      </button>
+    </article>
   );
 }
 
@@ -359,87 +394,6 @@ function AppTile({ card, onOpen, showStatus = false }) {
         </span>
       ) : null}
     </button>
-  );
-}
-
-function AdminAppCard({ card, selected, onSelect, onInstall }) {
-  return (
-    <article className={`admin-app-card ${selected ? 'is-selected' : ''} ${card.title === 'Dashy' ? 'is-dashy' : ''}`}>
-      <button type="button" className="admin-app-card-main" onClick={onSelect}>
-        <AppIcon
-          card={{
-            ...card,
-            iconUrl: card.iconUrl || card.iconArtworkUrl || adminStepIconUrl(card),
-            iconAlt: `${card.title} icon`,
-          }}
-          className="admin-app-icon"
-        />
-        <span className="admin-app-card-copy">
-          <strong>{card.title}</strong>
-          <span>{card.summary}</span>
-          <small>{card.positive_summary || card.explanation || card.description || ''}</small>
-        </span>
-      </button>
-      <span className="admin-app-card-meta">
-        <span className={`status-chip ${statusTone(card.app_state)}`}>{statusLabel(card.app_state)}</span>
-        {card.placeholder ? <small>Placeholder</small> : null}
-        <button
-          type="button"
-          className="secondary-button admin-app-install-button"
-          onClick={onInstall}
-          disabled={card.placeholder || ['blocked', 'planned', 'installing', 'installed'].includes(card.app_state)}
-        >
-          {card.app_state === 'installed'
-            ? 'Installed'
-            : card.app_state === 'blocked'
-              ? 'Blocked'
-              : card.app_state === 'planned'
-                ? 'Planned'
-                : 'Installeer'}
-        </button>
-      </span>
-    </article>
-  );
-}
-
-function AdminBundleCard({ bundle, onInstall }) {
-  const summary = buildBundleInstallSummary(bundle.cards || []);
-
-  return (
-    <article className={`admin-bundle-card is-${summary.state}`}>
-      <button type="button" className="admin-bundle-card-main" onClick={onInstall} disabled={summary.state !== 'ready'}>
-        <AdminBundleIcon bundle={bundle} />
-        <span className="admin-bundle-card-copy">
-          <strong>{bundle.title}</strong>
-          <span>{bundle.summary}</span>
-          <small>{summary.label}</small>
-        </span>
-      </button>
-      <div className="admin-bundle-card-foot">
-        <div className="admin-bundle-app-strip" aria-label={`${bundle.title} apps`}>
-          {(bundle.cards || []).map((card) => (
-            <span key={card.id} className="admin-bundle-app-chip">
-              <AppIcon
-                card={{
-                  ...card,
-                  iconUrl: card.iconUrl || card.iconArtworkUrl || adminStepIconUrl(card),
-                  iconAlt: `${card.title} icon`,
-                }}
-                className="admin-bundle-app-chip-icon"
-              />
-              <span>{card.title}</span>
-            </span>
-          ))}
-        </div>
-        <button type="button" className="primary-button admin-bundle-install-button" onClick={onInstall} disabled={summary.state !== 'ready'}>
-          {summary.state === 'installed'
-            ? 'Installed'
-            : summary.state === 'blocked'
-              ? 'Blocked'
-              : 'Installeer groep'}
-        </button>
-      </div>
-    </article>
   );
 }
 
@@ -789,9 +743,9 @@ function statusLabel(state) {
   }
 }
 
-function LogViewport({ lines = [], emptyLabel = 'Waiting for output...', viewportRef, onScroll }) {
+function LogViewport({ lines = [], emptyLabel = 'Waiting for output...', viewportRef, onScroll, className = '' }) {
   return (
-    <div className="admin-log-viewport" ref={viewportRef} onScroll={onScroll}>
+    <div className={`admin-log-viewport ${className}`.trim()} ref={viewportRef} onScroll={onScroll}>
       {lines.length === 0 ? (
         <p className="muted-copy">{emptyLabel}</p>
       ) : (
@@ -800,48 +754,31 @@ function LogViewport({ lines = [], emptyLabel = 'Waiting for output...', viewpor
     </div>
   );
 }
-function AdminAppsPage({ onNavigate, adminAppsState }) {
-  const [query, setQuery] = useState('');
-  const deferredQuery = useDeferredValue(query);
-  const [selectedAppId, setSelectedAppId] = useState('');
+function AdminAppsPage({ onNavigate, adminAppsState, installTarget }) {
   const appsState = adminAppsState || useAdminAppsData(true);
+  const [activeTab, setActiveTab] = useState(() => (installTarget?.kind === 'bundle' ? 'bundles' : 'apps'));
 
   const viewModel = useMemo(() => buildAdminAppsViewModel({
     catalog: appsState.catalog,
-    query: deferredQuery,
-    selectedAppId,
-  }), [appsState.catalog, deferredQuery, selectedAppId]);
+    query: '',
+    selectedAppId: '',
+  }), [appsState.catalog]);
 
   useEffect(() => {
-    if (!selectedAppId && viewModel.selectedApp) {
-      startTransition(() => setSelectedAppId(viewModel.selectedApp.id));
-    }
-  }, [selectedAppId, viewModel.selectedApp]);
-
-  const selectedApp = viewModel.selectedApp;
-  const selectedState = selectedApp?.app_state || 'planned';
-  const isPlaceholder = Boolean(selectedApp?.placeholder);
-  const installApp = (card) => {
-    if (!card) {
+    if (installTarget?.kind === 'bundle') {
+      setActiveTab('bundles');
       return;
     }
+    if (installTarget?.kind === 'app') {
+      setActiveTab('apps');
+    }
+  }, [installTarget?.kind]);
 
-    openInstallWindow(buildAdminInstallRoute('app', card.id));
-  };
-  const installSelectedApp = () => {
-    if (!selectedApp) {
+  const openInstall = (kind, id) => {
+    if (!kind || !id) {
       return;
     }
-
-    openInstallWindow(buildAdminInstallRoute('app', selectedApp.id));
-  };
-
-  const installBundle = (bundle) => {
-    if (!bundle) {
-      return;
-    }
-
-    openInstallWindow(buildAdminInstallRoute('bundle', bundle.id));
+    onNavigate(buildAdminInstallRoute(kind, id));
   };
 
   if (appsState.loading && !appsState.catalog) {
@@ -859,38 +796,44 @@ function AdminAppsPage({ onNavigate, adminAppsState }) {
 
   return (
     <div className="admin-apps-layout">
-      <Panel className="admin-apps-overview">
-        <SectionTitle
-          eyebrow="Admin"
-          title="App installs"
-          description="Browse the catalog, launch an install in a new tab, and keep this screen free for scanning the available apps."
-        />
-        <div className="admin-apps-cluster">
-          <div>
-            <span>Active cluster</span>
-            <strong>{viewModel.activeCluster?.slug || viewModel.activeCluster?.id || 'No cluster'}</strong>
-          </div>
-          <div>
-            <span>Instance</span>
-            <strong>{viewModel.activeCluster?.cluster_instance_id || 'n/a'}</strong>
-          </div>
-          <div>
-            <span>Installed</span>
-            <strong>{viewModel.stateCounts.installed}</strong>
-          </div>
-          <div>
-            <span>Ready</span>
-            <strong>{viewModel.stateCounts.ready}</strong>
+      <Panel className="admin-apps-shell">
+        <div className="admin-apps-shell-head">
+          <SectionTitle
+            eyebrow="Admin"
+            title="App installs"
+            description="Choose an icon and run installs from a clean in-page installer."
+          />
+          <div className="hero-actions admin-apps-shell-actions">
+            <button type="button" className="secondary-button" onClick={() => appsState.reload()} disabled={appsState.refreshing}>
+              {appsState.refreshing ? 'Refreshing…' : 'Refresh catalog'}
+            </button>
+            <button type="button" className="secondary-button" onClick={() => onNavigate('/')}>
+              Back home
+            </button>
           </div>
         </div>
-        <div className="hero-actions">
-          <button type="button" className="secondary-button" onClick={() => appsState.reload()} disabled={appsState.refreshing}>
-            {appsState.refreshing ? 'Refreshing…' : 'Refresh catalog'}
+
+        <div className="admin-apps-tabs" role="tablist" aria-label="Install catalog">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'apps'}
+            className={activeTab === 'apps' ? 'is-active' : ''}
+            onClick={() => setActiveTab('apps')}
+          >
+            Apps
           </button>
-          <button type="button" className="secondary-button" onClick={() => onNavigate('/')}>
-            Back home
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'bundles'}
+            className={activeTab === 'bundles' ? 'is-active' : ''}
+            onClick={() => setActiveTab('bundles')}
+          >
+            Bundles
           </button>
         </div>
+
         {appsState.error ? (
           <div className="inline-notice is-danger">
             <strong>Something needs attention.</strong>
@@ -903,155 +846,68 @@ function AdminAppsPage({ onNavigate, adminAppsState }) {
             <span>{viewModel.errors.join(' | ')}</span>
           </div>
         ) : null}
+
+        {activeTab === 'apps' ? (
+          <div role="tabpanel" aria-label="Apps install grid" className="admin-install-grid">
+            {viewModel.cards.length === 0 ? (
+              <div className="empty-card">
+                <strong>No installable apps yet</strong>
+                <span>Refresh the catalog after adding new app definitions.</span>
+              </div>
+            ) : (
+              viewModel.cards.map((card) => {
+                const buttonState = getAdminAppInstallButtonState(card);
+                return (
+                  <AdminInstallTile
+                    key={card.id}
+                    iconCard={buildAdminIconCard(card)}
+                    itemTitle={card.title || card.id}
+                    buttonLabel={buttonState.label}
+                    disabled={!buttonState.enabled}
+                    onInstall={() => openInstall('app', card.id)}
+                  />
+                );
+              })
+            )}
+          </div>
+        ) : (
+          <div role="tabpanel" aria-label="Bundle install grid" className="admin-install-grid">
+            {viewModel.bundles.length === 0 ? (
+              <div className="empty-card">
+                <strong>No bundles available</strong>
+                <span>Add bundle definitions to offer grouped installs.</span>
+              </div>
+            ) : (
+              viewModel.bundles.map((bundle) => {
+                const buttonState = buildBundleInstallButtonState(bundle.cards || []);
+                return (
+                  <AdminInstallTile
+                    key={bundle.id}
+                    iconCard={buildAdminBundleIconCard(bundle)}
+                    itemTitle={bundle.title || bundle.id}
+                    buttonLabel={buttonState.label}
+                    disabled={!buttonState.enabled}
+                    onInstall={() => openInstall('bundle', bundle.id)}
+                  />
+                );
+              })
+            )}
+          </div>
+        )}
       </Panel>
 
-      <div className="admin-apps-columns">
-        <Panel className="admin-apps-catalog">
-          <SectionTitle
-            eyebrow="Bundles"
-            title="Install groups"
-            description="Use a bundle when you want several related apps in one launch sequence."
-          />
-          <div className="bundle-grid">
-            {viewModel.filteredBundles.length === 0 ? (
-              <div className="empty-card">
-                <strong>No bundles match the search</strong>
-                <span>Try a different term or clear the filter.</span>
-              </div>
-            ) : (
-              viewModel.filteredBundles.map((bundle) => (
-                <AdminBundleCard
-                  key={bundle.id}
-                  bundle={bundle}
-                  onInstall={() => installBundle(bundle)}
-                />
-              ))
-            )}
-          </div>
-
-          <SectionTitle
-            eyebrow="Apps"
-            title={viewModel.title}
-            description={viewModel.description}
-          />
-          <div className="user-admin-search admin-app-search">
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search apps or bundles"
-            />
-          </div>
-          <div className="admin-app-grid">
-            {viewModel.filteredCards.length === 0 ? (
-              <div className="empty-card">
-                <strong>No apps match the search</strong>
-                <span>Try a different term or clear the filter.</span>
-              </div>
-            ) : (
-              viewModel.filteredCards.map((card) => (
-                <AdminAppCard
-                  key={card.id}
-                  card={card}
-                  selected={card.id === selectedApp?.id}
-                  onSelect={() => startTransition(() => setSelectedAppId(card.id))}
-                  onInstall={() => installApp(card)}
-                />
-              ))
-            )}
-          </div>
-        </Panel>
-
-        <Panel className="admin-apps-detail">
-          {selectedApp ? (
-            <>
-              <SectionTitle
-                eyebrow="Selected app"
-                title={selectedApp.title}
-                description={selectedApp.description || selectedApp.summary}
-              />
-              <div className="admin-app-detail-head">
-                <AppIcon
-                  card={{
-                    ...selectedApp,
-                    iconUrl: selectedApp.iconUrl || selectedApp.iconArtworkUrl || adminStepIconUrl(selectedApp),
-                    iconAlt: `${selectedApp.title} icon`,
-                  }}
-                  className="admin-app-detail-icon"
-                />
-                <div>
-                  <span className={`status-chip ${statusTone(selectedState)}`}>{statusLabel(selectedState)}</span>
-                  {isPlaceholder ? <small>Placeholder app, not installable yet</small> : null}
-                </div>
-              </div>
-
-              <div className="admin-app-stat-grid">
-                <article>
-                  <strong>{selectedApp.state?.updated_at ? 'Updated' : 'Ready'}</strong>
-                  <span>{selectedApp.state?.updated_at || 'Waiting for the first install'}</span>
-                </article>
-                <article>
-                  <strong>{selectedApp.latest_job?.status || 'none'}</strong>
-                  <span>Latest job</span>
-                </article>
-                <article>
-                  <strong>{selectedApp.dependencies.length}</strong>
-                  <span>Dependencies</span>
-                </article>
-              </div>
-
-              <div className="admin-app-dependencies">
-                <span>Prerequisites</span>
-                <div className="dependency-grid">
-                  {selectedApp.dependencies.length === 0 ? (
-                    <p className="muted-copy">No dependencies were declared for this app.</p>
-                  ) : selectedApp.dependencies.map((dependency) => (
-                    <span key={dependency.id} className={`dependency-pill ${dependency.state === 'done' ? 'is-done' : 'is-pending'}`}>
-                      {dependency.title}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="hero-actions">
-                <button
-                  type="button"
-                  className="primary-button"
-                  onClick={installSelectedApp}
-                  disabled={isPlaceholder || !['ready', 'failed'].includes(selectedState)}
-                >
-                  {selectedState === 'failed'
-                    ? 'Installeer opnieuw'
-                    : isPlaceholder
-                      ? 'Coming soon'
-                      : selectedState === 'blocked'
-                        ? 'Blocked'
-                        : selectedState === 'installed'
-                          ? 'Installed'
-                          : 'Installeer'}
-                </button>
-                <button type="button" className="secondary-button" onClick={() => onNavigate('/')}>
-                  Back home
-                </button>
-              </div>
-
-              <p className="muted-copy admin-app-hint">
-                The install window opens in a new tab so you can keep browsing this catalog while the script runs.
-              </p>
-            </>
-          ) : (
-            <div className="empty-card">
-              <strong>No app selected</strong>
-              <span>Pick an application from the catalog to view its install status.</span>
-            </div>
-          )}
-        </Panel>
-      </div>
+      {installTarget ? (
+        <AdminAppInstallModal
+          onNavigate={onNavigate}
+          adminAppsState={appsState}
+          installTarget={installTarget}
+        />
+      ) : null}
     </div>
   );
 }
 
-function AdminAppInstallPage({ onNavigate, adminAppsState, installTarget }) {
+function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
   const appsState = adminAppsState || useAdminAppsData(true);
   const logViewportRef = useRef(null);
   const autoScrollLogsRef = useRef(true);
@@ -1081,11 +937,6 @@ function AdminAppInstallPage({ onNavigate, adminAppsState, installTarget }) {
     : targetCard
       ? [targetCard]
       : [];
-  const displayQueue = installQueue.length
-    ? installQueue
-    : installTarget?.kind === 'bundle'
-      ? (targetBundle?.cards || [])
-      : (targetCard ? [targetCard] : []);
   const activeCard = cardsById.get(activeAppId) || installQueue[0] || null;
   const activeState = activeCard?.app_state || targetBundle?.app_state || targetCard?.app_state || 'planned';
   const installSummary = targetBundle
@@ -1093,16 +944,30 @@ function AdminAppInstallPage({ onNavigate, adminAppsState, installTarget }) {
     : null;
   const canInstall = Boolean(installQueue.length) && !running && (installTarget?.kind === 'bundle'
     ? installSummary?.state === 'ready'
-    : ['ready', 'failed'].includes(activeState));
-  const title = targetBundle?.title || targetCard?.title || 'Installatie';
-  const description = targetBundle?.summary || targetCard?.summary || 'Run the install script and watch the live output here.';
+    : isAdminAppInstallEnabled(targetCard));
+  const title = targetBundle?.title || targetCard?.title || 'Install';
+  const targetIconCard = installTarget?.kind === 'bundle'
+    ? buildAdminBundleIconCard(targetBundle)
+    : buildAdminIconCard(targetCard);
 
   if (appsState.loading && !appsState.catalog) {
     return (
-      <Panel>
-        <SectionTitle eyebrow="Admin" title="Installatie" description="Loading the app catalog." />
-        <p className="muted-copy">Twinbox is reading the app catalog before opening the installer.</p>
-      </Panel>
+      <div className="admin-install-modal-backdrop">
+        <Panel className="admin-install-modal" role="dialog" aria-modal="true" aria-labelledby="admin-install-modal-title">
+          <div className="admin-install-modal-head">
+            <div className="admin-install-modal-copy">
+              <p className="eyebrow">Install</p>
+              <h2 id="admin-install-modal-title">Loading installer</h2>
+            </div>
+          </div>
+          <p className="muted-copy">Twinbox is reading the app catalog before opening the installer.</p>
+          <div className="hero-actions admin-install-modal-actions">
+            <button type="button" className="secondary-button" onClick={() => onNavigate('/admin/apps')}>
+              Back
+            </button>
+          </div>
+        </Panel>
+      </div>
     );
   }
 
@@ -1211,12 +1076,7 @@ function AdminAppInstallPage({ onNavigate, adminAppsState, installTarget }) {
 
         setActiveAppId(card.id);
 
-        if (card.app_state === 'installed') {
-          setPageNotice(`${card.title} is already installed.`);
-          continue;
-        }
-
-        if (!['ready', 'failed', 'installed'].includes(card.app_state) && installTarget?.kind !== 'bundle') {
+        if (!isAdminAppInstallEnabled(card) && installTarget?.kind !== 'bundle') {
           throw new Error(`${card.title} is not installable yet`);
         }
 
@@ -1257,124 +1117,81 @@ function AdminAppInstallPage({ onNavigate, adminAppsState, installTarget }) {
     }
   };
 
-  const stopInstall = async () => {
-    if (!currentJob?.id) {
-      return;
-    }
-
-    setPageError('');
-    try {
-      await requestJson(`/api/admin/apps/jobs/${encodeURIComponent(currentJob.id)}/cancel`, {
-        method: 'POST',
-      });
-      setPageNotice(`Cancellation requested for ${currentJob.id}.`);
-    } catch (error) {
-      setPageError(error instanceof Error ? error.message : 'Failed to cancel the current job.');
-    }
-  };
-
   if (appsState.error) {
     return (
-      <Panel>
-        <SectionTitle eyebrow="Admin" title="Installatie" description="Loading the app catalog failed." />
-        <div className="inline-notice is-danger">
-          <strong>Catalog unavailable</strong>
-          <span>{appsState.error}</span>
-        </div>
-        <button type="button" className="secondary-button" onClick={() => onNavigate('/admin/apps')}>
-          Back to app catalog
-        </button>
-      </Panel>
+      <div className="admin-install-modal-backdrop">
+        <Panel className="admin-install-modal" role="dialog" aria-modal="true" aria-labelledby="admin-install-modal-title">
+          <div className="admin-install-modal-head">
+            <div className="admin-install-modal-copy">
+              <p className="eyebrow">Install</p>
+              <h2 id="admin-install-modal-title">Catalog unavailable</h2>
+            </div>
+          </div>
+          <div className="inline-notice is-danger">
+            <strong>Catalog unavailable</strong>
+            <span>{appsState.error}</span>
+          </div>
+          <div className="hero-actions admin-install-modal-actions">
+            <button type="button" className="secondary-button" onClick={() => onNavigate('/admin/apps')}>
+              Back
+            </button>
+          </div>
+        </Panel>
+      </div>
     );
   }
 
   if (!targetCard && !targetBundle) {
     return (
-      <Panel>
-        <SectionTitle eyebrow="Admin" title="Installatie" description="This install target is not available in the catalog." />
-        <button type="button" className="secondary-button" onClick={() => onNavigate('/admin/apps')}>
-          Back to app catalog
-        </button>
-      </Panel>
+      <div className="admin-install-modal-backdrop">
+        <Panel className="admin-install-modal" role="dialog" aria-modal="true" aria-labelledby="admin-install-modal-title">
+          <div className="admin-install-modal-head">
+            <div className="admin-install-modal-copy">
+              <p className="eyebrow">Install</p>
+              <h2 id="admin-install-modal-title">Install target not found</h2>
+            </div>
+          </div>
+          <p className="muted-copy">This install target is not available in the current catalog.</p>
+          <div className="hero-actions admin-install-modal-actions">
+            <button type="button" className="secondary-button" onClick={() => onNavigate('/admin/apps')}>
+              Back
+            </button>
+          </div>
+        </Panel>
+      </div>
     );
   }
 
   return (
-    <div className="admin-install-layout">
-      <Panel className="admin-install-hero">
-        <SectionTitle
-          eyebrow={installTarget?.kind === 'bundle' ? 'Bundle install' : 'App install'}
-          title={title}
-          description={description}
-        />
-        <div className="admin-install-head">
-          {installTarget?.kind === 'bundle' ? (
-            <AdminBundleIcon bundle={targetBundle} className="admin-install-bundle-icon" />
-          ) : (
-            <AppIcon
-              card={{
-                ...targetCard,
-                iconUrl: targetCard?.iconUrl || targetCard?.iconArtworkUrl || adminStepIconUrl(targetCard),
-                iconAlt: `${targetCard?.title || 'App'} icon`,
-              }}
-              className="admin-install-app-icon"
-            />
-          )}
-          <div className="admin-install-copy">
-            <span className={`status-chip ${statusTone(activeState)}`}>{statusLabel(activeState)}</span>
-            <p className="muted-copy">
-              {installTarget?.kind === 'bundle'
-                ? `${installQueue.length} app${installQueue.length === 1 ? '' : 's'} will run in sequence.`
-                : 'This opens the live installer for the selected app.'}
-            </p>
-            {installTarget?.kind === 'bundle' && installSummary ? (
-              <small>{installSummary.label}</small>
-            ) : null}
+    <div className="admin-install-modal-backdrop">
+      <Panel className="admin-install-modal" role="dialog" aria-modal="true" aria-labelledby="admin-install-modal-title">
+        <div className="admin-install-modal-head">
+          <div className="admin-install-modal-target">
+            <AppIcon card={targetIconCard} className="admin-install-modal-icon" />
+            <div className="admin-install-modal-copy">
+              <p className="eyebrow">{installTarget?.kind === 'bundle' ? 'Bundle install' : 'App install'}</p>
+              <h2 id="admin-install-modal-title">{title}</h2>
+            </div>
           </div>
-        </div>
-        <div className="admin-install-queue">
-          {displayQueue.map((card, index) => (
-            <article key={card?.id || index} className={`admin-install-queue-item ${card?.id === activeCard?.id ? 'is-active' : ''}`}>
-              <AppIcon
-                card={{
-                  ...card,
-                  iconUrl: card?.iconUrl || card?.iconArtworkUrl || adminStepIconUrl(card),
-                  iconAlt: `${card?.title || 'App'} icon`,
-                }}
-                className="admin-install-queue-icon"
-              />
-              <div>
-                <strong>{card?.title || title}</strong>
-                <span>{card?.summary || description}</span>
-              </div>
-            </article>
-          ))}
-        </div>
-      </Panel>
-
-      <Panel className="admin-install-output-panel">
-        <div className="admin-install-output-head">
-          <div>
-            <p className="eyebrow">Installatie</p>
-            <h2>{currentJob?.step_id ? cardsById.get(currentJob.step_id)?.title || title : title}</h2>
-          </div>
-          <span className={`status-chip ${currentJob?.status ? statusTone(currentJob.status) : statusTone(activeState)}`}>
-            {currentJob?.status || statusLabel(activeState)}
+          <span className={`status-chip ${statusTone(currentJob?.status || activeState)}`}>
+            {statusLabel(currentJob?.status || activeState)}
           </span>
         </div>
-        <div
-          ref={logViewportRef}
-          className={`admin-log-viewport admin-install-log-viewport ${currentJob?.id ? 'is-live' : ''}`}
+
+        {installTarget?.kind === 'bundle' && installSummary ? (
+          <p className="muted-copy">{installSummary.label}</p>
+        ) : (
+          <p className="muted-copy">Press Install to start the live install output.</p>
+        )}
+
+        <LogViewport
+          className="admin-install-log-viewport admin-install-modal-log"
+          viewportRef={logViewportRef}
           onScroll={handleLogScroll}
-        >
-          {jobLines.length === 0 ? (
-            <p className="muted-copy">
-              {running ? 'Waiting for the first log line…' : 'Press Installeer to start the script output.'}
-            </p>
-          ) : (
-            <pre className="admin-log-output">{jobLines.map((line) => (typeof line === 'string' ? line : line.line)).join('\n')}</pre>
-          )}
-        </div>
+          lines={jobLines}
+          emptyLabel={running ? 'Waiting for the first log line…' : 'Press Install to start the script output.'}
+        />
+
         {pageError ? (
           <div className="inline-notice is-danger">
             <strong>Something needs attention.</strong>
@@ -1384,31 +1201,22 @@ function AdminAppInstallPage({ onNavigate, adminAppsState, installTarget }) {
         {pageNotice ? (
           <div className="inline-notice is-accent">
             <strong>{pageNotice}</strong>
-            <span>The job log stays here while you work elsewhere in the browser.</span>
+            <span>The install log remains visible here for this session.</span>
           </div>
         ) : null}
-        <div className="admin-install-actions">
-          <div className="hero-actions admin-install-actions-row">
-            <button
-              type="button"
-              className="primary-button"
-              onClick={runInstall}
-              disabled={!canInstall}
-            >
-              {running ? 'Installeer…' : 'Installeer'}
-            </button>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={stopInstall}
-              disabled={!currentJob?.id || !['pending', 'running', 'cancel_requested'].includes(currentJob.status)}
-            >
-              Stop
-            </button>
-            <button type="button" className="secondary-button" onClick={() => onNavigate('/admin/apps')}>
-              Back to catalog
-            </button>
-          </div>
+
+        <div className="hero-actions admin-install-modal-actions">
+          <button
+            type="button"
+            className="primary-button"
+            onClick={runInstall}
+            disabled={!canInstall}
+          >
+            {running ? 'Install…' : 'Install'}
+          </button>
+          <button type="button" className="secondary-button" onClick={() => onNavigate('/admin/apps')}>
+            Back
+          </button>
         </div>
       </Panel>
     </div>
@@ -1989,10 +1797,9 @@ export default function App() {
         {route === '/settings' ? <SettingsPage config={config} preferences={preferences} setPreferences={setPreferences} onSave={savePreferences} onNavigate={navigate} /> : null}
         {route === '/intranet' ? <IntranetPage links={config?.intranetLinks || []} onNavigate={navigate} /> : null}
         {route === '/status' ? <StatusPage statusState={statusState} onRefresh={refreshStatus} onNavigate={navigate} /> : null}
-        {route.startsWith('/admin/apps/install/') && isAdmin ? (
-          <AdminAppInstallPage onNavigate={navigate} adminAppsState={adminAppsState} installTarget={adminInstallTarget} />
+        {route.startsWith('/admin/apps') && isAdmin ? (
+          <AdminAppsPage onNavigate={navigate} adminAppsState={adminAppsState} installTarget={adminInstallTarget} />
         ) : null}
-        {route === '/admin/apps' && isAdmin ? <AdminAppsPage onNavigate={navigate} adminAppsState={adminAppsState} /> : null}
         {route === '/admin/users' && isAdmin ? (
           <UserAdminPage config={config} directoryState={userAdminState} onNavigate={navigate} />
         ) : null}

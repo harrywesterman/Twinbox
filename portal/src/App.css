@@ -697,533 +697,200 @@ a {
 }
 
 .admin-apps-layout {
+  position: relative;
   display: grid;
   gap: 18px;
 }
 
-.admin-apps-columns {
-  display: grid;
-  grid-template-columns: minmax(0, 1.12fr) minmax(360px, 0.88fr);
-  gap: 18px;
-}
-
-.admin-apps-overview,
-.admin-apps-catalog,
-.admin-apps-detail {
+.admin-apps-shell {
   display: grid;
   gap: 18px;
+  overflow: visible;
 }
 
-.admin-apps-cluster,
-.admin-app-stat-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.admin-apps-cluster div,
-.admin-app-stat-grid article,
-.bundle-card,
-.dependency-pill,
-.admin-app-card {
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.admin-apps-cluster div,
-.admin-app-stat-grid article {
-  display: grid;
-  gap: 6px;
-  padding: 14px 16px;
-}
-
-.admin-apps-cluster span,
-.admin-app-stat-grid span,
-.bundle-card span,
-.admin-app-card-copy span,
-.admin-app-detail-head small,
-.admin-app-dependencies > span,
-.admin-app-search {
-  color: var(--muted);
-}
-
-.admin-apps-cluster strong,
-.admin-app-stat-grid strong,
-.bundle-card strong {
-  color: var(--text);
-  font-family: var(--display-font);
-}
-
-.admin-apps-cluster strong,
-.admin-app-stat-grid strong {
-  font-size: 1.35rem;
-}
-
-.admin-app-search {
-  margin-bottom: 12px;
-}
-
-.admin-app-grid,
-.bundle-grid {
-  display: grid;
-  gap: 12px;
-}
-
-.admin-app-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-bottom: 18px;
-}
-
-.admin-app-card {
-  display: grid;
-  gap: 12px;
-  width: 100%;
-  padding: 16px;
-  color: inherit;
-  text-align: left;
-  transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
-}
-
-.admin-app-card:hover,
-.admin-app-card.is-selected {
-  transform: translateY(-1px);
-  border-color: rgba(45, 212, 191, 0.34);
-  background: linear-gradient(180deg, rgba(45, 212, 191, 0.08), rgba(255, 255, 255, 0.03));
-  box-shadow: 0 16px 32px rgba(2, 6, 23, 0.08);
-}
-
-.admin-app-card.is-dashy {
-  border-color: rgba(96, 165, 250, 0.24);
-  background: linear-gradient(135deg, rgba(45, 212, 191, 0.12), rgba(96, 165, 250, 0.14));
-}
-
-.admin-app-card.is-dashy:hover,
-.admin-app-card.is-dashy.is-selected {
-  border-color: rgba(96, 165, 250, 0.38);
-  background: linear-gradient(135deg, rgba(45, 212, 191, 0.18), rgba(96, 165, 250, 0.22));
-}
-
-.admin-app-card-main {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+.admin-apps-shell-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
   gap: 16px;
-  padding: 0;
+  flex-wrap: wrap;
+}
+
+.admin-apps-shell-actions {
+  justify-content: flex-end;
+}
+
+.admin-apps-tabs {
+  display: inline-flex;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.05);
+  width: fit-content;
+}
+
+.admin-apps-tabs button {
+  min-height: 38px;
+  min-width: 94px;
   border: 0;
+  border-radius: 999px;
+  padding: 0 14px;
+  color: var(--text);
   background: transparent;
-  color: inherit;
-  text-align: left;
   cursor: pointer;
 }
 
-.admin-app-card-main:disabled,
-.admin-bundle-card-main:disabled,
-.admin-app-install-button:disabled,
-.admin-bundle-install-button:disabled {
+.admin-apps-tabs button.is-active {
+  color: #08101d;
+  background: linear-gradient(135deg, #2dd4bf, #60a5fa);
+}
+
+.admin-install-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.admin-install-grid .empty-card {
+  grid-column: 1 / -1;
+}
+
+.admin-install-tile {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+
+.admin-install-tile:hover {
+  transform: translateY(-1px);
+  border-color: rgba(45, 212, 191, 0.34);
+}
+
+.admin-install-tile.is-disabled {
+  opacity: 0.88;
+}
+
+.admin-install-tile-media {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 30px;
+  padding: 16px;
+  background: radial-gradient(circle at top left, rgba(45, 212, 191, 0.14), rgba(255, 255, 255, 0.04));
+}
+
+.admin-install-tile-icon {
+  width: 100%;
+  height: 100%;
+  border-radius: 28px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.admin-install-tile-icon.app-tile-badge {
+  box-shadow: none;
+}
+
+.admin-install-tile-button {
+  width: 100%;
+  min-height: 40px;
+  justify-content: center;
+}
+
+.admin-install-tile-button:disabled {
   cursor: not-allowed;
   opacity: 0.72;
 }
 
-.admin-app-card-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.admin-app-card-meta small {
-  color: var(--muted);
-  font-size: 0.76rem;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-}
-
-.admin-app-card-copy {
-  display: grid;
-  gap: 4px;
-}
-
-.admin-app-card-copy strong,
-.admin-app-card-copy span {
-  min-width: 0;
-}
-
-.admin-app-card .admin-app-card-copy strong {
-  font-size: 1.08rem;
-  line-height: 1.15;
-}
-
-.admin-app-card .admin-app-card-copy span {
-  font-size: 0.92rem;
-  line-height: 1.35;
-}
-
-.admin-app-card .admin-app-card-copy small {
-  color: var(--muted);
-  font-size: 0.82rem;
-  line-height: 1.35;
-}
-
-.admin-app-install-button {
-  min-height: 38px;
-  padding: 0 14px;
-}
-
-.admin-bundle-card {
-  display: grid;
-  gap: 14px;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 24px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-}
-
-.admin-bundle-card.is-installed {
-  opacity: 0.9;
-}
-
-.admin-bundle-card.is-blocked {
-  border-color: rgba(245, 158, 11, 0.25);
-}
-
-.admin-bundle-card-main {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 14px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.admin-bundle-card-copy {
-  display: grid;
-  gap: 4px;
-}
-
-.admin-bundle-card-copy strong {
-  font-family: var(--display-font);
-  font-size: 1.08rem;
-}
-
-.admin-bundle-card-copy span {
-  color: var(--muted);
-}
-
-.admin-bundle-card-copy small {
-  color: color-mix(in srgb, var(--accent) 60%, white);
-  font-size: 0.82rem;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-}
-
-.admin-bundle-card-foot {
-  display: grid;
-  gap: 12px;
-}
-
-.admin-bundle-app-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.admin-bundle-app-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  padding: 4px 10px 4px 4px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text);
-  font-size: 0.82rem;
-}
-
-.admin-bundle-app-chip span {
-  white-space: nowrap;
-}
-
-.admin-bundle-app-chip-icon {
-  width: 26px;
-  height: 26px;
-  border-radius: 10px;
-  padding: 4px;
-}
-
-.admin-bundle-install-button {
-  justify-self: start;
-}
-
-.admin-bundle-icon {
-  position: relative;
-  display: grid;
-  width: 74px;
-  height: 74px;
-  place-items: center;
-}
-
-.admin-bundle-icon-main {
-  position: relative;
-  z-index: 2;
-}
-
-.admin-bundle-icon-stack {
-  position: absolute;
+.admin-install-modal-backdrop {
+  position: fixed;
   inset: 0;
+  z-index: 80;
   display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(3, 8, 16, 0.68);
+  backdrop-filter: blur(8px);
 }
 
-.admin-bundle-icon-mini {
-  position: absolute;
-  width: 30px;
-  height: 30px;
+:root[data-theme='light'] .admin-install-modal-backdrop {
+  background: rgba(15, 23, 42, 0.26);
 }
 
-.admin-bundle-icon-mini:nth-child(1) {
-  top: -2px;
-  right: -2px;
-}
-
-.admin-bundle-icon-mini:nth-child(2) {
-  bottom: 2px;
-  right: 4px;
-}
-
-.admin-bundle-icon-mini:nth-child(3) {
-  bottom: 2px;
-  left: 4px;
-}
-
-.admin-bundle-icon-badge,
-.admin-bundle-icon-mini-badge,
-.admin-install-app-icon,
-.admin-install-bundle-icon {
-  width: 74px;
-  height: 74px;
-  border-radius: 24px;
-  background: linear-gradient(135deg, rgba(45, 212, 191, 0.14), rgba(96, 165, 250, 0.18));
-  padding: 10px;
-}
-
-.admin-bundle-icon-mini-badge {
-  width: 30px;
-  height: 30px;
-  border-radius: 12px;
-  padding: 4px;
-}
-
-.admin-bundle-icon-badge.app-tile-badge,
-.admin-bundle-icon-mini-badge.app-tile-badge,
-.admin-install-app-icon.app-tile-badge,
-.admin-install-bundle-icon.app-tile-badge {
-  box-shadow: none;
-}
-
-.admin-bundle-icon-badge img,
-.admin-bundle-icon-mini-badge img,
-.admin-install-app-icon img,
-.admin-install-bundle-icon img {
-  background: rgba(255, 255, 255, 0.94);
-}
-
-.admin-install-layout {
-  display: grid;
-  gap: 18px;
-}
-
-.admin-install-hero {
-  display: grid;
-  gap: 16px;
-}
-
-.admin-install-head {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 18px;
-  align-items: center;
-}
-
-.admin-install-copy {
-  display: grid;
-  gap: 8px;
-}
-
-.admin-install-copy small {
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  font-size: 0.74rem;
-}
-
-.admin-install-queue {
-  display: grid;
-  gap: 10px;
-}
-
-.admin-install-queue-item {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 12px;
-  align-items: center;
-  padding: 12px 14px;
-  border-radius: 20px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.admin-install-queue-item.is-active {
-  border-color: rgba(45, 212, 191, 0.3);
-  background: rgba(45, 212, 191, 0.08);
-}
-
-.admin-install-queue-item strong {
-  display: block;
-  margin-bottom: 2px;
-}
-
-.admin-install-queue-item span {
-  color: var(--muted);
-  font-size: 0.88rem;
-}
-
-.admin-install-queue-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 16px;
-  padding: 8px;
-}
-
-.admin-install-output-panel {
+.admin-install-modal {
+  width: min(980px, 100%);
+  max-height: calc(100dvh - 36px);
   display: grid;
   gap: 14px;
+  overflow: hidden;
+  border-radius: 28px;
+  background: var(--panel-strong);
 }
 
-.admin-install-output-head {
+.admin-install-modal-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
-.admin-install-output-head h2 {
-  margin: 4px 0 0;
+.admin-install-modal-target {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.admin-install-modal-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 24px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: none;
+  flex: none;
+}
+
+.admin-install-modal-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.admin-install-modal-copy h2 {
+  margin: 0;
   font-family: var(--display-font);
-  letter-spacing: -0.05em;
+  letter-spacing: -0.04em;
+  font-size: clamp(1.6rem, 2.8vw, 2.3rem);
 }
 
 .admin-install-log-viewport {
-  min-height: 360px;
-  max-height: 56dvh;
+  min-height: 380px;
+  max-height: 52dvh;
 }
 
+.admin-install-modal-log .admin-log-output,
 .admin-install-log-viewport .admin-log-output {
   color: color-mix(in srgb, var(--accent) 84%, white);
   font-size: 0.91rem;
 }
 
-.admin-app-hint {
-  margin-top: -2px;
-}
-
-.admin-install-actions {
-  display: grid;
-  gap: 12px;
-}
-
-.admin-install-actions-row {
+.admin-install-modal-actions {
   justify-content: flex-start;
 }
 
-.admin-app-icon,
-.admin-app-detail-icon {
-  width: 62px;
-  height: 62px;
-  border-radius: 18px;
-  padding: 8px;
-  background: rgba(255, 255, 255, 0.94);
-  flex: none;
-}
-
-.admin-app-detail-icon {
-  width: 72px;
-  height: 72px;
-  padding: 10px;
-}
-
-.admin-app-detail-head {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 24px;
-  background: linear-gradient(135deg, rgba(45, 212, 191, 0.08), rgba(37, 99, 235, 0.05));
-}
-
-.admin-app-detail-head > div {
-  display: grid;
-  gap: 4px;
-}
-
-.admin-app-detail-head small {
-  display: block;
-}
-
-.admin-app-dependencies {
-  display: grid;
-  gap: 10px;
-}
-
-.dependency-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.dependency-pill {
-  display: inline-flex;
-  align-items: center;
-  min-height: 34px;
-  padding: 0 12px;
-  color: var(--text);
-  font-size: 0.84rem;
-}
-
-.dependency-pill.is-done {
-  border-color: rgba(45, 212, 191, 0.28);
-  background: rgba(45, 212, 191, 0.12);
-}
-
-.dependency-pill.is-pending {
-  border-color: rgba(148, 163, 184, 0.24);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.bundle-list {
-  display: grid;
-  gap: 12px;
-}
-
-.bundle-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.bundle-card {
-  display: grid;
-  gap: 8px;
-  padding: 16px;
-}
-
-.bundle-card small {
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 0.72rem;
+.admin-install-modal-actions .primary-button,
+.admin-install-modal-actions .secondary-button {
+  min-width: 116px;
+  justify-content: center;
 }
 
 .admin-log-viewport {
@@ -1535,8 +1202,7 @@ a {
   .page-grid,
   .detail-layout,
   .auth-shell,
-  .user-admin-columns,
-  .admin-apps-columns {
+  .user-admin-columns {
     grid-template-columns: 1fr;
   }
 
@@ -1545,21 +1211,16 @@ a {
   .card-grid,
   .intranet-grid,
   .user-admin-stats,
-  .user-admin-profile,
-  .admin-apps-cluster,
-  .admin-app-stat-grid,
-  .admin-app-grid,
-  .bundle-grid,
-  .admin-install-head,
-  .admin-install-output-head,
-  .admin-app-card-main,
-  .admin-bundle-card-main {
+  .user-admin-profile {
     grid-template-columns: 1fr;
   }
 
-  .admin-install-head,
-  .admin-install-output-head {
+  .admin-install-modal-head {
     display: grid;
+  }
+
+  .admin-install-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .topbar {
@@ -1609,11 +1270,25 @@ a {
     max-height: none;
   }
 
-  .admin-apps-cluster {
+  .admin-install-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .admin-install-output-head {
+  .admin-install-modal-backdrop {
+    padding: 12px;
+  }
+
+  .admin-install-modal {
+    max-height: calc(100dvh - 24px);
+  }
+
+  .admin-install-modal-head {
     align-items: start;
+  }
+}
+
+@media (max-width: 520px) {
+  .admin-install-grid {
+    grid-template-columns: 1fr;
   }
 }
