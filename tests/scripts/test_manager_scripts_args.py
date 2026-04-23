@@ -2213,6 +2213,15 @@ def test_install_immich_step_uses_only_its_own_database_manifests():
     assert "twinbox/global/immich" in db_externalsecret_text
 
 
+def test_immich_values_keep_valkey_storageclass_nested():
+    text = (REPO_ROOT / "gitops" / "values" / "immich.yaml").read_text(
+        encoding="utf-8"
+    )
+    assert "valkey:" in text
+    assert "      storageClass: longhorn" in text
+    assert "\n    storageClass: longhorn\n" not in text
+
+
 def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     text = (
         REPO_ROOT
