@@ -219,7 +219,7 @@ jobs:
           printf '%s\n' '${{ matrix.image_name }}' > 'built-images/${{ matrix.image_name }}.txt'
 
       - name: Upload built image record
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: built-image-${{ matrix.image_name }}
           path: built-images/${{ matrix.image_name }}.txt
@@ -236,7 +236,7 @@ jobs:
       - name: Download built image records
         if: needs.publish.result != 'skipped'
         continue-on-error: true
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           path: built-images
           pattern: built-image-*
