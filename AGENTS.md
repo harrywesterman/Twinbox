@@ -11,7 +11,8 @@ Twinbox builds a Talos Linux Kubernetes cluster on Proxmox through a Management 
 - Do not revert unrelated/user changes.
 - Do not edit runtime/generated/dependency state as source: `manager-data/`, `node_modules/`, `dist/`, `.venv/`, `.terraform/`, vendored charts.
 - Never print or commit secrets.
-- Twinbox Portal runs on the k8s cluster, and is managed by argocd. 
+- Twinbox Portal runs on the Kubernetes cluster, not on the Management VM. Update it through `gitops/` and let Argo CD sync it.
+- Run cluster checks from the Management VM, not from the Mac. Use SSH to `twinbox@<management-vm-ip>` and work under `/opt/twinbox` there.
 
 ## Map
 
@@ -40,6 +41,7 @@ Twinbox builds a Talos Linux Kubernetes cluster on Proxmox through a Management 
 - `TWINBOX_VM_PREVIEW_TARGET` contains the SSH target; connect as `twinbox@<management-vm-ip>` when needed.
 - Use the Playwright skill for the live web wizard.
 - Debug host state under `/opt/twinbox`; debug executable code inside the relevant container.
+- If Argo CD reports `Synced` but the live deployment is still stale, hard-refresh the application from the Management VM and re-check the deployment image before assuming GitHub is wrong.
 
 ## Verify
 
@@ -58,4 +60,4 @@ Run the smallest useful check for touched files:
 - Commit/push/deploy only when the user asks for a complete production change.
 - After pushing runtime changes, watch the relevant GitHub Actions workflow.
 - Management VM refresh: `cd /opt/twinbox && docker compose pull && docker compose up -d`.
-- Portal changes roll out through image build plus Argo CD sync.
+- Portal changes roll out through a Git commit to `main`, the portal image publish workflow, and Argo CD sync from `gitops/platform-apps/twinbox-portal`.
