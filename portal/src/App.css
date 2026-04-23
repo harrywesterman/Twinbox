@@ -748,8 +748,9 @@ a {
 
 .admin-install-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, clamp(140px, 11vw, 190px)));
+  justify-content: start;
+  gap: 14px;
   align-items: start;
 }
 
@@ -759,10 +760,10 @@ a {
 
 .admin-install-tile {
   display: grid;
-  gap: 12px;
-  padding: 14px;
+  gap: 8px;
+  padding: 10px;
   border: 1px solid var(--line);
-  border-radius: 24px;
+  border-radius: 18px;
   background: linear-gradient(160deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   transition: transform 160ms ease, border-color 160ms ease;
@@ -782,16 +783,16 @@ a {
   place-items: center;
   width: 100%;
   aspect-ratio: 1 / 1;
-  border-radius: 30px;
-  padding: 16px;
+  border-radius: 16px;
+  padding: 8px;
   background: radial-gradient(circle at top left, rgba(45, 212, 191, 0.14), rgba(255, 255, 255, 0.04));
 }
 
 .admin-install-tile-icon {
   width: 100%;
   height: 100%;
-  border-radius: 28px;
-  padding: 16px;
+  border-radius: 12px;
+  padding: 6px;
   background: rgba(255, 255, 255, 0.94);
 }
 
@@ -801,7 +802,9 @@ a {
 
 .admin-install-tile-button {
   width: 100%;
-  min-height: 40px;
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 0.86rem;
   justify-content: center;
 }
 
@@ -1220,7 +1223,7 @@ a {
   }
 
   .admin-install-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, clamp(132px, 20vw, 180px)));
   }
 
   .topbar {
@@ -1271,7 +1274,7 @@ a {
   }
 
   .admin-install-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, clamp(132px, 42vw, 190px)));
   }
 
   .admin-install-modal-backdrop {
