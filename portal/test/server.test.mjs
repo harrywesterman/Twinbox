@@ -430,6 +430,7 @@ test.before(async () => {
   seedAuthentikState();
   writePortalConfig({
     settings: {
+      authentikAdminUrl: "https://authentik.tst.example.com/if/admin/",
       authentikUserUrl: "https://authentik.tst.example.com/if/user/#/settings;{\"page\":\"page-details\"}",
       authentikOtpUrl: "https://authentik.tst.example.com/if/user/#/settings;{\"page\":\"page-mfa\"}",
     },
@@ -669,9 +670,21 @@ test("portal config exposes a single Apps section and image icons", async () => 
   assert.equal(config.payload.appSections.length, 1);
   assert.equal(config.payload.appSections[0].name, "Apps");
   assert.equal(config.payload.settings.authentikUserUrl, "https://authentik.tst.example.com/if/user/#/settings;{\"page\":\"page-details\"}");
+  assert.equal(config.payload.settings.authentikAdminUrl, "https://authentik.tst.example.com/if/admin/");
   assert.equal(config.payload.settings.authentikOtpUrl, "https://authentik.tst.example.com/if/user/#/settings;{\"page\":\"page-mfa\"}");
   assert.equal(config.payload.apps[0].iconUrl, "/assets/step-icons/install-immich.svg");
   assert.equal(config.payload.apps[0].iconAlt, "Immich icon");
+});
+
+test("admin path redirects to Authentik login", async () => {
+  const response = await fetch(`${portalOrigin}/admin`, {
+    redirect: "manual",
+  });
+
+  assert.equal(response.status, 302);
+  const location = new URL(response.headers.get("location"), portalOrigin);
+  assert.equal(location.pathname, "/auth/login");
+  assert.equal(location.searchParams.get("returnTo"), "/admin");
 });
 
 test("login requests the reduced Authentik scope set", async () => {

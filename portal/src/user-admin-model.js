@@ -41,11 +41,6 @@ export function buildAdminNavigationItems({ isAdmin = false } = {}) {
 
   return [
     {
-      id: 'admin-apps',
-      path: '/admin',
-      label: 'Admin apps',
-    },
-    {
       id: 'admin-app-installs',
       path: '/admin/apps',
       label: 'App installs',

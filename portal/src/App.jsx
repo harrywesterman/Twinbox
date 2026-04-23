@@ -735,45 +735,6 @@ function IntranetPage({ links, onNavigate }) {
   );
 }
 
-function AdminPage({ adminApps, onNavigate }) {
-  return (
-    <Panel>
-      <SectionTitle
-        eyebrow="Admin"
-        title="Management apps"
-        description="Operators and admins get their own screen, separate from the normal launcher."
-      />
-      <div className="admin-actions">
-        <div className="admin-actions-buttons">
-          <button type="button" className="primary-button" onClick={() => onNavigate('/admin/apps')}>
-            Open app installs
-          </button>
-          <button type="button" className="primary-button" onClick={() => onNavigate('/admin/users')}>
-            Open user admin
-          </button>
-        </div>
-        <p className="admin-actions-copy">
-          Give non-technical admins one safe place to add, disable, and group users.
-        </p>
-      </div>
-      <div className="card-grid">
-        {adminApps.map((card) => (
-          <AppTile
-            key={card.id}
-            card={{
-              ...card,
-              title: card.label || card.title,
-            }}
-            onOpen={() => openInNewTab(card.liveUrl || card.url)}
-            showStatus
-          />
-        ))}
-      </div>
-      <button type="button" className="secondary-button" onClick={() => onNavigate('/')}>Back home</button>
-    </Panel>
-  );
-}
-
 function statusTone(state) {
   switch (state) {
     case 'installed':
@@ -926,8 +887,8 @@ function AdminAppsPage({ onNavigate, adminAppsState }) {
           <button type="button" className="secondary-button" onClick={() => appsState.reload()} disabled={appsState.refreshing}>
             {appsState.refreshing ? 'Refreshing…' : 'Refresh catalog'}
           </button>
-          <button type="button" className="secondary-button" onClick={() => onNavigate('/admin')}>
-            Back to admin apps
+          <button type="button" className="secondary-button" onClick={() => onNavigate('/')}>
+            Back home
           </button>
         </div>
         {appsState.error ? (
@@ -1643,8 +1604,8 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
           <button type="button" className="secondary-button" onClick={refreshDirectory} disabled={directoryState.refreshing}>
             {directoryState.refreshing ? 'Refreshing…' : 'Refresh'}
           </button>
-          <button type="button" className="secondary-button" onClick={() => onNavigate('/admin')}>
-            Back to admin apps
+          <button type="button" className="secondary-button" onClick={() => onNavigate('/admin/apps')}>
+            Back to app installs
           </button>
         </div>
         {directoryState.error || formError ? (
@@ -1932,6 +1893,7 @@ export default function App() {
   const session = sessionState.session;
   const config = configState.config;
   const isAdmin = Boolean(session?.isAdmin);
+  const adminRedirectUrl = config?.settings?.authentikAdminUrl || '';
 
   const currentApp = useMemo(() => {
     if (!config?.apps) {
@@ -1949,6 +1911,12 @@ export default function App() {
   const logout = () => {
     window.location.href = '/auth/logout';
   };
+
+  useEffect(() => {
+    if (route === '/admin' && adminRedirectUrl) {
+      window.location.replace(adminRedirectUrl);
+    }
+  }, [adminRedirectUrl, route]);
 
   const toggleTheme = async () => {
     if (!session) {
@@ -1979,6 +1947,10 @@ export default function App() {
     });
     return saved;
   };
+
+  if (route === '/admin') {
+    return null;
+  }
 
   if (sessionState.loading || configState.loading) {
     return (
@@ -2017,19 +1989,12 @@ export default function App() {
         {route === '/settings' ? <SettingsPage config={config} preferences={preferences} setPreferences={setPreferences} onSave={savePreferences} onNavigate={navigate} /> : null}
         {route === '/intranet' ? <IntranetPage links={config?.intranetLinks || []} onNavigate={navigate} /> : null}
         {route === '/status' ? <StatusPage statusState={statusState} onRefresh={refreshStatus} onNavigate={navigate} /> : null}
-        {route === '/admin' && isAdmin ? <AdminPage adminApps={config?.adminApps || []} onNavigate={navigate} /> : null}
         {route.startsWith('/admin/apps/install/') && isAdmin ? (
           <AdminAppInstallPage onNavigate={navigate} adminAppsState={adminAppsState} installTarget={adminInstallTarget} />
         ) : null}
         {route === '/admin/apps' && isAdmin ? <AdminAppsPage onNavigate={navigate} adminAppsState={adminAppsState} /> : null}
         {route === '/admin/users' && isAdmin ? (
           <UserAdminPage config={config} directoryState={userAdminState} onNavigate={navigate} />
-        ) : null}
-        {route === '/admin' && !isAdmin ? (
-          <Panel>
-            <SectionTitle eyebrow="Access denied" title="Admins only" description="This part of Twinbox is reserved for the admins group." />
-            <button type="button" className="secondary-button" onClick={() => navigate('/')}>Back home</button>
-          </Panel>
         ) : null}
         {route === '/admin/users' && !isAdmin ? (
           <Panel>

@@ -1033,6 +1033,14 @@ app.get("/api/status", async (req, res) => {
   }
 });
 
+app.get("/admin", (req, res) => {
+  res.redirect(`/auth/login?returnTo=${encodeURIComponent("/admin")}`);
+});
+
+app.get("/admin/", (req, res) => {
+  res.redirect(`/auth/login?returnTo=${encodeURIComponent("/admin")}`);
+});
+
 app.use(express.static(distDir, { extensions: ["html"] }));
 
 app.get(/.*/, async (req, res, next) => {
