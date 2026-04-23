@@ -36,6 +36,7 @@ done
 [[ -f "${KUBECONFIG_FILE:-}" ]] || fail "kubeconfig not found at ${KUBECONFIG_FILE:-}"
 
 require_cmd kubectl
+require_cmd jq
 
 export KUBECONFIG="$KUBECONFIG_FILE"
 
@@ -48,3 +49,9 @@ fi
 
 log "Bootstrapping Argo CD"
 bash "$WORKSPACE_ROOT/gitops/install.sh"
+
+log "Applying Argo CD Image Updater application"
+bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+  --manifest "$WORKSPACE_ROOT/gitops/apps/argocd-image-updater.yaml" \
+  --application "argocd-image-updater" \
+  --destination-namespace "argocd"
