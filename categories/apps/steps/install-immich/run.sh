@@ -105,25 +105,19 @@ wait_for_deployment_rollout() {
 
 find_oauth2_provider_pk_by_name() {
   local provider_name="$1"
-  local response
+  local search_response
 
-  response="$(authentik_api_get "/providers/oauth2/?page_size=100")"
+  search_response="$(authentik_api_get "/providers/oauth2/?search=${provider_name// /%20}&page_size=50")"
   jq -r \
     --arg provider_name "$provider_name" \
     '.results[]?
       | select((.name // "") == $provider_name)
-      | .pk // .id // empty' <<<"$response" | head -n1
+      | .pk // .id // empty' <<<"$search_response" | head -n1
 }
 
 find_application_json_by_slug() {
   local application_slug="$1"
-  local response
-
-  response="$(authentik_api_get "/core/applications/?page_size=100")"
-  jq -c \
-    --arg application_slug "$application_slug" \
-    '.results[]?
-      | select((.slug // "") == $application_slug)' <<<"$response" | head -n1
+  authentik_api_get "/core/applications/${application_slug}/" 2>/dev/null || true
 }
 
 create_or_update_provider() {

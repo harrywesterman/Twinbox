@@ -2201,6 +2201,8 @@ def test_install_immich_step_uses_only_its_own_database_manifests():
     assert "gitops/databases/immich/scheduled-backup.yaml" in text
     assert "gitops/databases/kustomization.yaml" not in text
     assert "gitops/databases/authentik/" not in text
+    assert 'search_response="$(authentik_api_get "/providers/oauth2/?search=${provider_name// /%20}&page_size=50")"' in text
+    assert 'authentik_api_get "/core/applications/${application_slug}/" 2>/dev/null || true' in text
     db_externalsecret_text = (
         REPO_ROOT / "gitops" / "platform-apps" / "immich" / "db-externalsecret.yaml"
     ).read_text(encoding="utf-8")
