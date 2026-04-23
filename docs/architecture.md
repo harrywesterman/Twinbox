@@ -90,7 +90,7 @@ The initial Management VM deployment bootstraps the manager stack once from the 
 23. `install-pgadmin4` refreshes the shared `platform-ingress` application so pgAdmin 4 is deployed behind Traefik with Longhorn-backed persistence, and it seeds the pgAdmin bootstrap secret into OpenBao while provisioning the Authentik OIDC application.
 24. GitOps apps consume secrets through `ExternalSecret` resources backed by `ClusterSecretStore/openbao`.
 25. `install-twinbox-portal` renders the user portal config on the Management VM from step metadata, the current step-state, and portal content, then writes the result into the in-cluster `Secret/portal-config` so the default user launcher reflects the installed browser UIs without a static list in Git.
-26. Dashy link tiles are still rendered on the Management VM from step metadata plus the current step-state, then written into the in-cluster `ConfigMap/dashy-config` so the legacy admin launcher reflects the installed operator UIs without a static list in Git.
+26. Dashy link tiles are still rendered on the Management VM from step metadata plus the current step-state, then written into the in-cluster `ConfigMap/dashy-config` so the legacy admin launcher reflects installed operator UIs while user-facing App Installs stay in the portal catalog.
 
 ## Domain Flow
 

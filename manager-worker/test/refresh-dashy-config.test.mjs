@@ -13,13 +13,18 @@ function writeExecutable(file, content) {
   fs.chmodSync(file, 0o755);
 }
 
-function setupWorkspace() {
+function setupWorkspace(options = {}) {
+  const {
+    stepStatuses = {},
+  } = options;
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "dashy-refresh-test-"));
   const dataDir = path.join(root, "data");
   const binDir = path.join(root, "bin");
   const logFile = path.join(root, "kubectl.log");
+  const capturedConfigFile = path.join(root, "captured-dashy-config.yml");
 
   fs.mkdirSync(path.join(dataDir, "clusters"), { recursive: true });
+  fs.mkdirSync(path.join(dataDir, "step-state", "clusters", "cluster_test_instance"), { recursive: true });
   fs.mkdirSync(binDir, { recursive: true });
 
   fs.writeFileSync(
@@ -33,6 +38,20 @@ function setupWorkspace() {
       updated_at: "2026-01-01T00:00:00.000Z",
     }),
   );
+
+  for (const [stepId, status] of Object.entries(stepStatuses)) {
+    fs.writeFileSync(
+      path.join(dataDir, "step-state", "clusters", "cluster_test_instance", `${stepId}.json`),
+      JSON.stringify({
+        step_id: stepId,
+        status,
+        inputs: {},
+        outputs: {},
+        cluster_id: "cluster_test",
+        cluster_instance_id: "cluster_test_instance",
+      }),
+    );
+  }
 
   writeExecutable(
     path.join(binDir, "kubectl"),
@@ -49,6 +68,12 @@ if [[ "$*" == *" get deployment "* ]]; then
 fi
 
 if [[ "$*" == *" create configmap "* ]]; then
+  for arg in "$@"; do
+    if [[ "$arg" == --from-file=conf.yml.tpl=* ]]; then
+      source_file="\${arg#--from-file=conf.yml.tpl=}"
+      cp "$source_file" "${capturedConfigFile}"
+    fi
+  done
   cat <<'YAML'
 apiVersion: v1
 kind: ConfigMap
@@ -77,11 +102,13 @@ exit 0
 `,
   );
 
-  return { root, dataDir, binDir, logFile };
+  return { root, dataDir, binDir, logFile, capturedConfigFile };
 }
 
 function runRefresh(triggerStepId, overrides = {}) {
-  const { root, dataDir, binDir, logFile } = setupWorkspace();
+  const { root, dataDir, binDir, logFile, capturedConfigFile } = setupWorkspace({
+    stepStatuses: overrides.stepStatuses || {},
+  });
   const env = {
     ...process.env,
     PATH: `${binDir}:${process.env.PATH || ""}`,
@@ -111,6 +138,7 @@ function runRefresh(triggerStepId, overrides = {}) {
     root,
     dataDir,
     logFile,
+    capturedConfigFile,
     status: result.status,
     stdout: result.stdout,
     stderr: result.stderr,
@@ -126,13 +154,29 @@ test("refresh-dashy-config skips pre-dashboard steps without Dashy items", () =>
 });
 
 test("refresh-dashy-config bootstraps Dashy on install-dashy-dashboard", () => {
-  const result = runRefresh("install-dashy-dashboard");
+  const result = runRefresh("install-dashy-dashboard", {
+    stepStatuses: {
+      "install-dashy-dashboard": "succeeded",
+      "install-jitsi": "succeeded",
+    },
+  });
 
   assert.equal(result.status, 0, result.stderr);
   assert.doesNotMatch(result.stdout, /Dashy refresh skipped/);
   assert.equal(fs.existsSync(result.logFile), true);
+  assert.equal(fs.existsSync(result.capturedConfigFile), true);
 
   const logText = fs.readFileSync(result.logFile, "utf8");
   assert.match(logText, /kubectl apply -f -/);
   assert.match(logText, /kubectl -n dashy create configmap dashy-config/);
+  const renderedConfig = fs.readFileSync(result.capturedConfigFile, "utf8");
+  assert.doesNotMatch(renderedConfig, /title: Jitsi\b/);
+});
+
+test("refresh-dashy-config skips App Installs steps", () => {
+  const result = runRefresh("install-jitsi");
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Dashy refresh skipped: install-jitsi is a user app install/);
+  assert.equal(fs.existsSync(result.logFile), false);
 });

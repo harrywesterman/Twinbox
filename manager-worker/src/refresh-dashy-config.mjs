@@ -194,8 +194,14 @@ function main() {
   const options = parseArgs(process.argv.slice(2));
   const { steps } = loadCatalogDefinitions({
     workspaceRoot: options.workspaceRoot,
+    includeApps: true,
     loadYamlFn: loadYaml,
   });
+  const appStepIds = new Set(
+    steps
+      .filter((step) => step?.category_id === "apps")
+      .map((step) => step.id),
+  );
 
   const currentCluster = findCurrentCluster(options.managerDataDir, options.clusterId);
   if (!currentCluster?.id) {
@@ -209,6 +215,11 @@ function main() {
     const triggerStep = steps.find((step) => step.id === options.triggerStepId);
     if (!triggerStep) {
       throw new Error(`unknown step: ${options.triggerStepId}`);
+    }
+
+    if (appStepIds.has(options.triggerStepId)) {
+      console.log(`Dashy refresh skipped: ${options.triggerStepId} is a user app install`);
+      return;
     }
 
     const isDashyBootstrapStep = triggerStep.id === "install-dashy-dashboard";
@@ -230,6 +241,7 @@ function main() {
     steps,
     stepStateById,
     cluster: currentCluster,
+    excludeStepIds: appStepIds,
   });
   const renderedConfig = YAML.stringify(dashyConfig);
 

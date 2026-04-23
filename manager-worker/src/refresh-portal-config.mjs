@@ -155,6 +155,7 @@ function main() {
   const options = parseArgs(process.argv.slice(2));
   const { steps } = loadCatalogDefinitions({
     workspaceRoot: options.workspaceRoot,
+    includeApps: true,
     loadYamlFn: loadYaml,
   });
   const currentCluster = findCurrentCluster(options.managerDataDir, options.clusterId);
