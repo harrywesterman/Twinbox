@@ -3,7 +3,6 @@ set -euo pipefail
 
 : "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"
 : "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"
-: "${MANAGER_DATA_DIR:?missing MANAGER_DATA_DIR}"
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
@@ -34,6 +33,7 @@ authentik_ensure_token
 authentik_setup_forward
 
 AUTHENTIK_HOST="${AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
+dashy_manifest_path="$WORKSPACE_ROOT/gitops/apps/dashy.yaml"
 
 dashy_host="https://admin.${public_zone_name}"
 dashy_redirect_uri="${dashy_host}"
@@ -282,22 +282,24 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --required-keys "DASHY_OIDC_CLIENT_ID,DASHY_OIDC_ENDPOINT,DASHY_OIDC_SCOPE"
 rm -f "$dashy_secret_file"
 
-kubectl create namespace dashy --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-dashy_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/dashy-ingressroute.XXXXXX.yaml")"
-trap 'rm -f "$dashy_rendered_ingressroute"' EXIT
-
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying Dashy ExternalSecret"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/dashy/externalsecret.yaml"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying Dashy Argo CD application"
+bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+  --manifest "$dashy_manifest_path" \
+  --application "dashy" \
+  --destination-namespace "dashy" \
+  --no-wait
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for Dashy OIDC secret"
+for attempt in $(seq 1 120); do
+  if kubectl -n dashy get externalsecret/dashy-oidc >/dev/null 2>&1; then
+    break
+  fi
+  if [[ "$attempt" -eq 120 ]]; then
+    fail "Dashy ExternalSecret did not appear in time"
+  fi
+  sleep 5
+done
 kubectl -n dashy wait --for=condition=Ready externalsecret/dashy-oidc --timeout=10m
-
-sed "s/__ZONE_NAME__/${public_zone_name}/g" \
-  "$WORKSPACE_ROOT/gitops/platform-apps/dashy/ingressroute.yaml" >"$dashy_rendered_ingressroute"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/dashy/pvc.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/dashy/service.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/dashy/deployment.yaml"
-kubectl apply -f "$dashy_rendered_ingressroute"
 
 for attempt in $(seq 1 120); do
   if kubectl -n dashy get deployment/dashy >/dev/null 2>&1; then
@@ -308,11 +310,6 @@ for attempt in $(seq 1 120); do
   fi
   sleep 5
 done
-
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Rendering and applying Dashy start page config"
-node "$WORKSPACE_ROOT/manager-worker/src/refresh-dashy-config.mjs" \
-  --workspace-root "$WORKSPACE_ROOT" \
-  --manager-data-dir "$MANAGER_DATA_DIR" \
-  --cluster-id "$cluster_id"
+kubectl -n dashy rollout status deployment/dashy --timeout=10m
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Dashy Authentik configuration complete"

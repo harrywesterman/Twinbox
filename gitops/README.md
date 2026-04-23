@@ -22,8 +22,9 @@ Argo CD `Application` resources. Most apps deploy a Helm chart with:
 - Automated sync with `prune` and `selfHeal` enabled.
 - `CreateNamespace=true` in sync options.
 
-Some apps use a repo-controlled subtree under `gitops/apps/<app>/` so chart output can be patched deterministically before Argo CD applies it. The current patterns are:
+Some apps use a repo-controlled subtree under `gitops/apps/<app>/` or a standalone ApplicationSet manifest under `gitops/apps/<app>.yaml` so chart output can be patched deterministically before Argo CD applies it. The current patterns are:
 
+- `gitops/apps/dashy.yaml` - ApplicationSet for the Dashy admin launcher with cluster-specific ingress hostnames.
 - `gitops/apps/authentik/` - Helm values plus Kustomize patches for the Authentik chart.
 - `gitops/apps/prometheus/` - Kustomize manifests for Prometheus alerts.
 

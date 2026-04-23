@@ -29,6 +29,7 @@ PROMETHEUS_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-prometheus.sh"
 TRAEFIK_MANAGER_SCRIPT = (
     REPO_ROOT / "scripts" / "manager" / "install-traefik-manager.sh"
 )
+DASHY_APP = REPO_ROOT / "gitops" / "apps" / "dashy.yaml"
 ARGO_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
 )
@@ -2298,6 +2299,17 @@ def test_dashy_deployment_uses_a_published_image_tag():
     assert "ghcr.io/lissy93/dashy:v3.2.3" not in text
 
 
+def test_dashy_argo_application_manages_the_platform_overlay():
+    text = DASHY_APP.read_text(encoding="utf-8")
+    assert "kind: ApplicationSet" in text
+    assert "name: dashy-set" in text
+    assert "path: gitops/platform-apps/dashy" in text
+    assert "name: dashy-wiredoor" in text
+    assert "name: dashy-tailscale" in text
+    assert 'Host(`admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)' in text
+    assert "CreateNamespace=true" in text
+
+
 def test_dashy_kustomization_includes_a_pvc():
     text = (
         REPO_ROOT / "gitops" / "platform-apps" / "dashy" / "kustomization.yaml"
@@ -2316,16 +2328,15 @@ def test_install_dashy_step_refreshes_platform_ingress_before_restart():
         / "install-dashy-dashboard"
         / "run.sh"
     ).read_text(encoding="utf-8")
-    assert "Applying Dashy ExternalSecret" in text
+    assert "Applying Dashy Argo CD application" in text
     assert "Waiting for Dashy OIDC secret" in text
-    assert "Refreshing platform-ingress so Dashy resources are applied" not in text
-    assert 'gitops/platform-apps/dashy/externalsecret.yaml' in text
-    assert 'gitops/platform-apps/dashy/pvc.yaml' in text
-    assert 'gitops/platform-apps/dashy/service.yaml' in text
-    assert 'gitops/platform-apps/dashy/deployment.yaml' in text
-    assert 'gitops/platform-apps/dashy/ingressroute.yaml' in text
-    assert 'kubectl apply -f "$dashy_rendered_ingressroute"' in text
-    assert 'kubectl -n dashy get deployment/dashy' in text
+    assert "Rendering and applying Dashy start page config" not in text
+    assert 'gitops/apps/dashy.yaml' in text
+    assert 'scripts/manager/apply-argocd-application.sh' in text
+    assert '--application "dashy"' in text
+    assert '--destination-namespace "dashy"' in text
+    assert 'kubectl -n dashy wait --for=condition=Ready externalsecret/dashy-oidc --timeout=10m' in text
+    assert 'kubectl -n dashy rollout status deployment/dashy --timeout=10m' in text
 
 
 def test_install_dashy_step_sets_explicit_authentik_signing_key():
@@ -2464,7 +2475,7 @@ def test_platform_namespace_baseline_covers_shared_overlay_resources():
     assert "namespace.yaml" in (
         REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
-    assert "kubectl create namespace dashy" in (
+    assert "gitops/apps/dashy.yaml" in (
         REPO_ROOT
         / "categories"
         / "talos-cluster"
