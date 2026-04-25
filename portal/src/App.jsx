@@ -889,7 +889,7 @@ function AdminAppsPage({ onNavigate, adminAppsState, installTarget }) {
                     iconCard={buildAdminIconCard(card)}
                     itemTitle={card.title || card.id}
                     buttonLabel={buttonState.label}
-                    buttonClassName={card.app_state === 'installed' ? 'secondary-button' : 'primary-button'}
+                    buttonClassName={buttonState.buttonClassName}
                     disabled={!buttonState.enabled}
                     onInstall={() => openInstall('app', card.id)}
                   />

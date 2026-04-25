@@ -105,6 +105,7 @@ export function getAdminAppInstallButtonState(card = {}) {
     return {
       enabled: true,
       label: card?.app_state === 'installed' ? 'Uninstall' : 'Install',
+      buttonClassName: card?.app_state === 'installed' ? 'secondary-button' : 'primary-button',
     };
   }
 
@@ -112,12 +113,14 @@ export function getAdminAppInstallButtonState(card = {}) {
     return {
       enabled: false,
       label: 'Installing',
+      buttonClassName: 'primary-button',
     };
   }
 
   return {
     enabled: false,
     label: 'Unavailable',
+    buttonClassName: 'primary-button',
   };
 }
 
