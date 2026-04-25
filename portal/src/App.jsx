@@ -287,8 +287,22 @@ function SectionTitle({ eyebrow, title, description }) {
 }
 
 function AppIcon({ card, className = '' }) {
-  if (card?.iconUrl) {
-    return <img className={`app-icon-image ${className}`.trim()} src={card.iconUrl} alt={card.iconAlt || `${card.title} icon`} loading="lazy" />;
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [card?.iconUrl]);
+
+  if (card?.iconUrl && !imageFailed) {
+    return (
+      <img
+        className={`app-icon-image ${className}`.trim()}
+        src={card.iconUrl}
+        alt={card.iconAlt || `${card.title} icon`}
+        loading="lazy"
+        onError={() => setImageFailed(true)}
+      />
+    );
   }
 
   return (

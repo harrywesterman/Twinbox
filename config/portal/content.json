@@ -21,28 +21,25 @@
   },
   "links": [
     {
-      "title": "Wizard",
-      "description": "Provisioning and bootstrap flow",
-      "url": "https://twinboxwizard.__ZONE_NAME__",
-      "accent": "#14b8a6"
-    },
-    {
       "title": "GitHub",
       "description": "Source repository and issues",
       "url": "https://github.com/harrywesterman/Twinbox",
-      "accent": "#0f172a"
+      "accent": "#0f172a",
+      "icon": "github"
     },
     {
       "title": "Cluster status",
       "description": "Quick health overview",
       "url": "/status",
-      "accent": "#2563eb"
+      "accent": "#2563eb",
+      "icon": "cluster-status"
     },
     {
       "title": "Support docs",
       "description": "Docs and troubleshooting",
       "url": "https://github.com/harrywesterman/Twinbox/blob/main/docs/README.md",
-      "accent": "#ea580c"
+      "accent": "#ea580c",
+      "icon": "support-docs"
     }
   ],
   "statusChecks": [

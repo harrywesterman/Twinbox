@@ -67,7 +67,10 @@ test("buildPortalConfig keeps operator tools out of the user applications grid",
   assert(config.adminApps.some((card) => card.title === "Dashy"));
   assert.equal(config.adminApps.find((card) => card.title === "Dashy")?.label, "Open Admin tools");
   assert.equal(config.adminApps.find((card) => card.title === "Dashy")?.iconUrl, "/assets/step-icons/install-dashy-dashboard.svg");
-  assert(config.intranetLinks.some((card) => card.title === "Wizard"));
+  assert.equal(config.intranetLinks.map((card) => card.title).join(", "), "Cluster status, GitHub, Support docs");
+  assert.equal(config.intranetLinks.find((card) => card.title === "GitHub")?.iconUrl, "/assets/step-icons/github.svg");
+  assert.equal(config.intranetLinks.find((card) => card.title === "Cluster status")?.iconUrl, "/assets/step-icons/cluster-status.svg");
+  assert.equal(config.intranetLinks.find((card) => card.title === "Support docs")?.iconUrl, "/assets/step-icons/support-docs.svg");
   assert(config.statusChecks.some((card) => card.title === "Authentik"));
   assert(config.apps.every((card) => card.liveUrl.startsWith("https://")));
 });
