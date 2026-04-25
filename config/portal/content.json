@@ -83,6 +83,7 @@
   "appProfiles": {
     "Argo CD": {
       "summary": "GitOps control plane and application sync",
+      "description": "See which apps are running, what is out of sync, and where a refresh or rollout is needed.",
       "capabilities": [
         "See application health and sync state",
         "Review the cluster's live GitOps resources",
@@ -93,6 +94,7 @@
     },
     "Authentik": {
       "summary": "Single sign-on and identity management",
+      "description": "Manage sign-in, users, and access rules for Twinbox from one central place.",
       "capabilities": [
         "Manage users, groups, and applications",
         "Configure login flows and policies",
@@ -103,6 +105,7 @@
     },
     "CloudNativePG": {
       "summary": "Managed PostgreSQL clusters",
+      "description": "Keep the PostgreSQL databases that power Twinbox apps healthy and available.",
       "capabilities": [
         "Inspect database clusters and backups",
         "Track database health and failover",
@@ -113,6 +116,7 @@
     },
     "Dashy": {
       "summary": "Legacy admin launcher",
+      "description": "An older admin launchpad that stays around as a quick fallback for common tools.",
       "capabilities": [
         "Open the old administrator launchpad",
         "Reach the operator consoles quickly",
@@ -123,6 +127,7 @@
     },
     "Grafana": {
       "summary": "Metrics, dashboards, and alert exploration",
+      "description": "Explore dashboards, metrics, and alerts to understand what the cluster is doing.",
       "capabilities": [
         "Browse dashboards for cluster health",
         "Explore metrics and logs in one place",
@@ -133,6 +138,7 @@
     },
     "Headlamp": {
       "summary": "Kubernetes dashboard",
+      "description": "Browse workloads and resources from a friendly web dashboard instead of the command line.",
       "capabilities": [
         "Inspect workloads and resources",
         "Check namespaces and rollout state",
@@ -143,6 +149,7 @@
     },
     "Hubble": {
       "summary": "Network visibility and traffic flows",
+      "description": "Watch how services talk to each other and spot network or policy issues quickly.",
       "capabilities": [
         "Watch service-to-service traffic",
         "Trace packet flows through the cluster",
@@ -153,6 +160,7 @@
     },
     "Immich": {
       "summary": "Photo and video library",
+      "description": "Back up your camera roll and keep your photos and videos in one private library.",
       "capabilities": [
         "Open your media library",
         "Browse photos and videos with search",
@@ -175,6 +183,7 @@
     },
     "OpenCloud": {
       "summary": "Files, collaboration, and sharing",
+      "description": "A shared cloud workspace for files, calendars, and working together across devices.",
       "capabilities": [
         "Open your files on the go",
         "Upload and share content from mobile",
@@ -197,6 +206,7 @@
     },
     "Jitsi": {
       "summary": "Video meetings",
+      "description": "Start a secure video call right from your browser or phone when you need to meet fast.",
       "capabilities": [
         "Start or join a meeting",
         "Use the browser-based conference flow",
@@ -219,6 +229,7 @@
     },
     "Karakeep": {
       "summary": "Bookmarking and knowledge capture",
+      "description": "Save links, notes, and ideas so you can find them again later.",
       "capabilities": [
         "Save links and notes for later",
         "Organize useful pages in one place",
@@ -229,6 +240,7 @@
     },
     "Loki": {
       "summary": "Log aggregation and querying",
+      "description": "Search cluster logs from one place and follow issues across workloads.",
       "capabilities": [
         "Search cluster logs from one UI",
         "Correlate logs with Grafana dashboards",
@@ -239,6 +251,7 @@
     },
     "Longhorn": {
       "summary": "Distributed block storage",
+      "description": "Provide reliable storage for apps that need persistent disks.",
       "capabilities": [
         "Inspect volumes and replicas",
         "Track storage health and usage",
@@ -249,6 +262,7 @@
     },
     "Ntfy": {
       "summary": "Notifications and quick alerts",
+      "description": "Send yourself quick updates, alerts, and one-off messages when something matters.",
       "capabilities": [
         "Send and receive cluster notifications",
         "Use lightweight push-style updates",
@@ -271,6 +285,7 @@
     },
     "Nextcloud": {
       "summary": "Files, calendars, and collaboration",
+      "description": "A private cloud hub for files, sync, calendars, and everyday collaboration.",
       "capabilities": [
         "Open cloud storage and shared files",
         "Use calendars and collaboration tools",
@@ -293,6 +308,7 @@
     },
     "N8N": {
       "summary": "Workflow automation",
+      "description": "Automate repetitive work by chaining apps, APIs, and webhooks together.",
       "capabilities": [
         "Build personal or team automations",
         "Chain webhooks and API actions",
@@ -303,6 +319,7 @@
     },
     "Paperless": {
       "summary": "Document archive",
+      "description": "Turn paper and scans into a searchable digital archive.",
       "capabilities": [
         "Store scanned documents",
         "Search and tag paperwork",
@@ -313,6 +330,7 @@
     },
     "pgAdmin 4": {
       "summary": "PostgreSQL administration",
+      "description": "Inspect and manage PostgreSQL databases from an admin-friendly web UI.",
       "capabilities": [
         "Inspect databases and schema",
         "Manage SQL-heavy maintenance tasks",
@@ -323,6 +341,7 @@
     },
     "Proxmox": {
       "summary": "Virtualization host",
+      "description": "Open the virtualization host that runs the Management VM and other machines.",
       "capabilities": [
         "Open the Proxmox management interface",
         "Inspect VMs, storage, and nodes",
@@ -333,6 +352,7 @@
     },
     "SeaweedFS": {
       "summary": "S3-compatible backup storage",
+      "description": "Back the cluster with object storage that keeps backups and shared data reachable.",
       "capabilities": [
         "Inspect the backup bucket service",
         "Use the object storage backend",
@@ -343,6 +363,7 @@
     },
     "SeaweedFS Admin": {
       "summary": "SeaweedFS administration console",
+      "description": "Manage the SeaweedFS storage layer and check that it is healthy.",
       "capabilities": [
         "Manage the SeaweedFS service",
         "Inspect object-store health",
@@ -353,6 +374,7 @@
     },
     "Traefik Dashboard": {
       "summary": "Ingress routes and routing rules",
+      "description": "See live routes and debug how requests reach each service in the cluster.",
       "capabilities": [
         "See live routes and services",
         "Inspect ingress configuration",
@@ -363,6 +385,7 @@
     },
     "Uptime Kuma": {
       "summary": "Service uptime checks",
+      "description": "Keep an eye on availability and spot outages or downtime quickly.",
       "capabilities": [
         "Monitor endpoints and webhooks",
         "See uptime trends at a glance",
@@ -373,6 +396,7 @@
     },
     "Velero": {
       "summary": "Cluster backups and restore tooling",
+      "description": "Review backups and prepare restores so cluster data stays portable.",
       "capabilities": [
         "Review backup state and history",
         "Prepare restores when needed",
@@ -383,6 +407,7 @@
     },
     "Velero UI": {
       "summary": "Backup dashboard",
+      "description": "A straightforward backup dashboard for checking Velero jobs and restore state.",
       "capabilities": [
         "Review Velero jobs and backups",
         "Inspect restore state",
@@ -393,6 +418,7 @@
     },
     "Wiredoor": {
       "summary": "Secure gateway access",
+      "description": "Use the secure gateway when you need remote access into the cluster.",
       "capabilities": [
         "Open the Wiredoor gateway",
         "Manage remote ingress access",
@@ -403,6 +429,7 @@
     },
     "Zulip": {
       "summary": "Team chat and discussion",
+      "description": "Keep team conversations threaded, searchable, and easy to follow.",
       "capabilities": [
         "Enter the team chat workspace",
         "Keep conversations threaded and searchable",
@@ -425,6 +452,7 @@
     },
     "FreshRSS": {
       "summary": "News reader and feed inbox",
+      "description": "Read all your RSS feeds in one clean inbox.",
       "capabilities": [
         "Collect and read RSS feeds",
         "Keep a lightweight feed workflow",
@@ -435,6 +463,7 @@
     },
     "Audiobookshelf": {
       "summary": "Personal audiobooks and podcasts",
+      "description": "Stream audiobooks and podcasts from your own media library.",
       "capabilities": [
         "Stream your audio library",
         "Keep podcasts and books organized",
