@@ -497,6 +497,15 @@ return {
 }' )"
 [[ -n "$roles_mapping_id" ]] || fail "Could not create the OpenCloud roles mapping"
 
+opencloud_property_mapping_ids_json="$(
+  jq -cn \
+    --arg openid "$openid_mapping_id" \
+    --arg email "$email_mapping_id" \
+    --arg profile "$profile_mapping_id" \
+    --arg roles "$roles_mapping_id" \
+    '[$openid, $email, $profile, $roles]'
+)"
+
 opencloud_web_provider_payload="$(
   jq -n \
     --arg name "OpenCloud Web" \
@@ -523,13 +532,14 @@ opencloud_web_provider_payload="$(
       signing_key: $signing_key,
       issuer_mode: $issuer_mode,
       include_claims_in_id_token: true,
-      property_mappings: [($openid | tonumber), ($email | tonumber), ($profile | tonumber), ($roles | tonumber)],
+      property_mappings: $property_mappings,
       redirect_uris: [
         { matching_mode: "strict", url: $redirect_1 },
         { matching_mode: "strict", url: $redirect_2 },
         { matching_mode: "strict", url: $redirect_3 }
       ]
-    }'
+    }' \
+    --argjson property_mappings "$opencloud_property_mapping_ids_json"
 )"
 opencloud_web_provider_pk="$(create_or_update_provider "OpenCloud Web" "opencloud-web" "$opencloud_web_provider_payload")"
 [[ -n "$opencloud_web_provider_pk" ]] || fail "Authentik did not return a provider ID for OpenCloud Web"
@@ -604,12 +614,13 @@ for provider_name in "OpenCloud Desktop" "OpenCloud Android" "OpenCloud iOS" "Cy
         client_type: "public",
         authorization_flow: $authorization_flow,
         invalidation_flow: $invalidation_flow,
-        signing_key: $signing_key,
-        issuer_mode: "per_provider",
-        include_claims_in_id_token: true,
-        property_mappings: [($openid | tonumber), ($email | tonumber), ($profile | tonumber), ($roles | tonumber)],
-        redirect_uris: $redirect_uris
-      }'
+      signing_key: $signing_key,
+      issuer_mode: "per_provider",
+      include_claims_in_id_token: true,
+      property_mappings: $property_mappings,
+      redirect_uris: $redirect_uris
+    }' \
+    --argjson property_mappings "$opencloud_property_mapping_ids_json"
   )"
   provider_pk="$(create_or_update_provider "$provider_name" "$slug" "$provider_payload")"
   [[ -n "$provider_pk" ]] || fail "Authentik did not return a provider ID for ${provider_name}"

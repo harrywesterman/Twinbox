@@ -29,6 +29,9 @@ PROMETHEUS_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-prometheus.sh"
 TRAEFIK_MANAGER_SCRIPT = (
     REPO_ROOT / "scripts" / "manager" / "install-traefik-manager.sh"
 )
+OPENCLOUD_STEP_SCRIPT = (
+    REPO_ROOT / "categories" / "apps" / "steps" / "install-opencloud" / "run.sh"
+)
 DASHY_APP = REPO_ROOT / "gitops" / "apps" / "dashy.yaml"
 ARGO_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
@@ -845,6 +848,21 @@ def test_user_apps_are_not_part_of_bootstrap_journey():
     for step_id in ["install-nextcloud", "install-opencloud", "install-immich"]:
         assert f"'{step_id}'" not in setup_step_ids
         assert f"- id: {step_id}" not in category_text
+
+
+def test_opencloud_step_keeps_authentik_property_mapping_ids_as_strings():
+    text = OPENCLOUD_STEP_SCRIPT.read_text(encoding="utf-8")
+
+    assert 'opencloud_property_mapping_ids_json="$(' in text
+    assert '--arg openid "$openid_mapping_id"' in text
+    assert '--arg email "$email_mapping_id"' in text
+    assert '--arg profile "$profile_mapping_id"' in text
+    assert '--arg roles "$roles_mapping_id"' in text
+    assert "property_mappings: $property_mappings" in text
+    assert (
+        "property_mappings: [($openid | tonumber), ($email | tonumber), ($profile | tonumber), ($roles | tonumber)]"
+        not in text
+    )
 
 
 def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
