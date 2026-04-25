@@ -148,7 +148,7 @@ function applySecret(namespace, secretName, renderedConfig) {
       "yaml",
     ]);
 
-    runKubectl(["apply", "-f", "-"], { input: createResult.stdout });
+    runKubectl(["apply", "--validate=false", "-f", "-"], { input: createResult.stdout });
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }

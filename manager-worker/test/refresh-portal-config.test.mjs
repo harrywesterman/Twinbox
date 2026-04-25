@@ -134,6 +134,7 @@ test("refresh-portal-config renders the portal secret after install", () => {
   assert.equal(fs.existsSync(capturedConfigFile), true);
   const logText = fs.readFileSync(logFile, "utf8");
   assert.match(logText, /kubectl -n twinbox-portal create secret generic portal-config/);
+  assert.match(logText, /kubectl apply --validate=false -f -/);
 });
 
 test("refresh-portal-config runs during portal install when self-triggered", () => {
@@ -162,6 +163,7 @@ test("refresh-portal-config runs during portal install when self-triggered", () 
   assert.equal(fs.existsSync(logFile), true);
   const logText = fs.readFileSync(logFile, "utf8");
   assert.match(logText, /kubectl -n twinbox-portal create secret generic portal-config/);
+  assert.match(logText, /kubectl apply --validate=false -f -/);
 });
 
 test("refresh-portal-config includes installed app steps in the portal catalog", () => {
