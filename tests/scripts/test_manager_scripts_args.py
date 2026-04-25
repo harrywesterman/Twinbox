@@ -1855,10 +1855,17 @@ def test_alertmanager_config_routes_to_ntfy():
     text = ALERTMANAGER_CONFIG.read_text(encoding="utf-8")
     assert "name: alertmanager-config" in text
     assert "alertmanager.yaml:" in text
-    assert "receiver: 'ntfy'" in text
-    assert "name: 'ntfy'" in text
+    assert "receiver: 'ntfy-warning'" in text
+    assert 'severity="critical"' in text
+    assert 'severity="emergency"' in text
+    assert "name: 'ntfy-warning'" in text
+    assert "name: 'ntfy-critical'" in text
+    assert "name: 'ntfy-emergency'" in text
     assert "webhook_configs:" in text
     assert "ntfy.monitoring.svc.cluster.local" in text
+    assert "priority=default" in text
+    assert "priority=high" in text
+    assert "priority=max" in text
     assert "send_resolved: true" in text
 
 

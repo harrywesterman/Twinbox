@@ -205,8 +205,8 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `install-loki` installs Loki as the logs backend for Grafana Explore.
 - `install-tempo` installs Tempo as the traces backend for Grafana Explore.
 - `install-alloy` installs Grafana Alloy as the shared collector for Kubernetes logs, Kubernetes events, and OTLP traces.
-- Twinbox also seeds a small default alert set for Cilium and Longhorn so cluster network and storage health surface in Alertmanager and ntfy automatically.
-- `install-grafana` installs Grafana, provisions the Prometheus, Loki, and Tempo datasources automatically, seeds the default Kubernetes Overview, Node Exporter Full, Longhorn, Cilium Metrics, and Hubble Metrics dashboards so imported dashboards can bind to cluster metrics without manual UI setup, and stores Grafana's admin credentials alongside the OIDC client secret in OpenBao so Argo CD does not keep regenerating its admin Secret.
+- Twinbox also seeds a small default alert set for Cilium and Longhorn so cluster network and storage health surface in Alertmanager and ntfy automatically, with warning, critical, and emergency alerts pushed to `ntfy.bierineenweek.nl` as different notification priorities.
+- `install-grafana` installs Grafana, provisions the Prometheus, Loki, and Tempo datasources automatically, seeds the default Managed Kubernetes Overview plus Twinbox Nodes, Twinbox Workloads, Twinbox Control Plane, Twinbox Storage, Twinbox Logs & Events, and Twinbox Network dashboards so the cluster starts with usable views for nodes, workloads, control plane, storage, logs, and traffic without manual UI setup, and stores Grafana's admin credentials alongside the OIDC client secret in OpenBao so Argo CD does not keep regenerating its admin Secret.
 - `install-longhorn-storage` installs Longhorn, makes it the default storage class, and runs before any stateful secret infrastructure. Longhorn is configured to run only on worker nodes so storage and CSI components stay off control planes.
 - `install-secret-sync` installs:
   - External Secrets Operator

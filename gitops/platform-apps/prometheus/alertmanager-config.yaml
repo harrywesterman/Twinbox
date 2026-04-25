@@ -13,9 +13,24 @@ stringData:
       group_wait: 30s
       group_interval: 5m
       repeat_interval: 4h
-      receiver: 'ntfy'
+      receiver: 'ntfy-warning'
+      routes:
+        - matchers:
+            - severity="emergency"
+          receiver: 'ntfy-emergency'
+        - matchers:
+            - severity="critical"
+          receiver: 'ntfy-critical'
     receivers:
-      - name: 'ntfy'
+      - name: 'ntfy-warning'
         webhook_configs:
-          - url: 'http://ntfy.monitoring.svc.cluster.local:80/twinbox-alerts'
+          - url: 'http://ntfy.monitoring.svc.cluster.local:80/twinbox-alerts?priority=default&title=Twinbox%20warning'
+            send_resolved: true
+      - name: 'ntfy-critical'
+        webhook_configs:
+          - url: 'http://ntfy.monitoring.svc.cluster.local:80/twinbox-alerts?priority=high&title=Twinbox%20critical'
+            send_resolved: true
+      - name: 'ntfy-emergency'
+        webhook_configs:
+          - url: 'http://ntfy.monitoring.svc.cluster.local:80/twinbox-alerts?priority=max&title=Twinbox%20emergency'
             send_resolved: true
