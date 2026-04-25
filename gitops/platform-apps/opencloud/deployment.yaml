@@ -17,16 +17,33 @@ spec:
       labels:
         app.kubernetes.io/name: opencloud
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
         - name: prepare-storage
           image: busybox:1.36
           imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           command:
             - /bin/sh
             - -ec
             - |
+              umask 0002
               mkdir -p /opencloud/config /opencloud/data /opencloud/apps
-              chown -R 1000:1000 /opencloud || true
           volumeMounts:
             - name: config
               mountPath: /opencloud/config
@@ -38,6 +55,16 @@ spec:
         - name: opencloud
           image: opencloudeu/opencloud-rolling:latest
           imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           command:
             - /bin/sh
             - -ec
@@ -127,10 +154,27 @@ spec:
       labels:
         app.kubernetes.io/name: opencloud-collaboration
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: collaboration
           image: opencloudeu/opencloud-rolling:latest
           imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           command:
             - /bin/sh
             - -ec
@@ -240,6 +284,16 @@ spec:
         - name: collabora
           image: collabora/code:24.04.11.2.1
           imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           ports:
             - containerPort: 9980
               name: http
@@ -301,6 +355,16 @@ spec:
         - name: radicale
           image: radicale/radicale:3.3.0
           imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           command:
             - /bin/sh
             - -ec
@@ -358,6 +422,16 @@ spec:
         - name: tika
           image: apache/tika:2.9.2.1-full
           imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           ports:
             - containerPort: 9998
               name: http

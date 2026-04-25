@@ -82,7 +82,29 @@ wait_for_statefulset_ready() {
         log "${label} is ready"
         return 0
       fi
-      log "Waiting for ${label} (${attempt}/${attempts}): ready=${ready_replicas}, desired=${replicas}"
+      local pod_status_json pod_summaries
+      pod_status_json="$(kubectl -n "$namespace" get pods -l "app.kubernetes.io/name=${statefulset}" -o json 2>/dev/null || true)"
+      if [[ -n "$pod_status_json" ]]; then
+        pod_summaries="$(
+          jq -r '
+            .items[]? |
+            .metadata.name as $name |
+            ($name + ":" + (.status.phase // "Unknown") +
+              (
+                (
+                  [.status.initContainerStatuses[]? | select(.ready != true) |
+                    (.name + "=" + (.state.waiting.reason // .state.terminated.reason // "init-not-ready"))
+                  ] +
+                  [.status.containerStatuses[]? | select(.ready != true) |
+                    (.name + "=" + (.state.waiting.reason // .state.terminated.reason // "not-ready"))
+                  ]
+                ) | if length > 0 then " [" + join(", ") + "]" else "" end
+              )
+            )
+          ' <<<"$pod_status_json" | awk 'NF { if (out) out = out " | "; out = out $0 } END { print out }'
+        )"
+      fi
+      log "Waiting for ${label} (${attempt}/${attempts}): ready=${ready_replicas}, desired=${replicas}${pod_summaries:+, pods=${pod_summaries}}"
     else
       log "Waiting for ${label} statefulset to appear (${attempt}/${attempts})"
     fi

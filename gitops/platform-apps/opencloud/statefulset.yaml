@@ -17,15 +17,31 @@ spec:
       labels:
         app.kubernetes.io/name: opencloud-ldap
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
         - name: generate-certs
-          image: alpine:3.20
+          image: bitnami/openldap:2.6
           imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           command:
             - /bin/sh
             - -ec
             - |
-              apk add --no-cache openssl >/dev/null
               if [ ! -s /certs/server.crt ] || [ ! -s /certs/server.key ]; then
                 openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
                   -keyout /certs/server.key \
@@ -40,6 +56,16 @@ spec:
         - name: ldap
           image: bitnami/openldap:2.6
           imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           ports:
             - containerPort: 1389
               name: ldap
