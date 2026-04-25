@@ -166,7 +166,7 @@ function recoverOrphanedRunningJobs() {
       });
       appendLog(jobId, wasCancelRequested ? "job canceled" : `job failed: ${failureMessage}`);
 
-      if (queued.type === "run_step" && queued.payload?.step_id) {
+      if ((queued.type === "run_step" || queued.type === "uninstall_step") && queued.payload?.step_id) {
         const clusterId = queued.cluster_id || queued.payload?.cluster_id || queued.payload?.context?.cluster?.id || null;
         const clusterInstanceId = queued.cluster_instance_id || queued.payload?.cluster_instance_id || queued.payload?.context?.cluster?.cluster_instance_id || queued.payload?.context?.cluster?.instance_id || null;
         updateStepState(queued.payload.step_id, {
@@ -817,6 +817,105 @@ async function handleRunStep(job) {
   }
 }
 
+async function handleUninstallStep(job) {
+  const payload = job.payload;
+  const stepId = payload.step_id;
+  const stepType = payload.step_type;
+  const appName = payload.app_name;
+  const manifestPath = payload.manifest_path;
+  const applicationSetName = payload.application_set_name || "";
+  const context = payload.context || {};
+
+  if (!stepId) {
+    throw new Error("uninstall_step payload missing step_id");
+  }
+  if (!stepType) {
+    throw new Error("uninstall_step payload missing step_type");
+  }
+  if (!appName) {
+    throw new Error("uninstall_step payload missing app_name");
+  }
+  if (!manifestPath) {
+    throw new Error("uninstall_step payload missing manifest_path");
+  }
+
+  const clusterId = context?.cluster?.id || job.cluster_id || null;
+  const clusterInstanceId = clusterScopeId(context?.cluster, job.cluster_instance_id || null);
+  updateStepState(stepId, {
+    status: "running",
+    inputs: {},
+    outputs: null,
+    error: null,
+    last_job_id: job.id,
+    cluster_id: clusterId,
+    cluster_instance_id: clusterInstanceId,
+    started_at: now(),
+    finished_at: null,
+  }, clusterInstanceId || clusterId);
+
+  try {
+    await runCommand(
+      job.id,
+      "bash",
+      ["scripts/manager/uninstall-argocd-application.sh"],
+      {
+        APP_NAME: appName,
+        APPLICATION_SET_NAME: applicationSetName,
+        MANIFEST_PATH: manifestPath,
+        STEP_ID: stepId,
+        STEP_TYPE: stepType,
+        TWINBOX_CLUSTER_ID: clusterId || "",
+        TWINBOX_CLUSTER_INSTANCE_ID: clusterInstanceId || "",
+      },
+      line => String(line ?? ""),
+      [],
+    );
+
+    updateStepState(stepId, {
+      status: "not_started",
+      inputs: {},
+      outputs: null,
+      error: null,
+      last_job_id: job.id,
+      cluster_id: clusterId,
+      cluster_instance_id: clusterInstanceId,
+      finished_at: now(),
+    }, clusterInstanceId || clusterId);
+
+    await refreshPortalConfig(
+      job.id,
+      stepId,
+      clusterId,
+      clusterInstanceId,
+      {},
+      line => String(line ?? ""),
+      [],
+    );
+  } catch (err) {
+    if (String(err?.message || "") === "job canceled") {
+      updateStepState(stepId, {
+        status: "canceled",
+        error: null,
+        last_job_id: job.id,
+        cluster_id: clusterId,
+        cluster_instance_id: clusterInstanceId,
+        finished_at: now(),
+      }, clusterInstanceId || clusterId);
+      throw err;
+    }
+
+    updateStepState(stepId, {
+      status: "failed",
+      error: err.message,
+      last_job_id: job.id,
+      cluster_id: clusterId,
+      cluster_instance_id: clusterInstanceId,
+      finished_at: now(),
+    }, clusterInstanceId || clusterId);
+    throw err;
+  }
+}
+
 async function handleJob(queueFile) {
   const queued = readJson(queueFile);
   const runningFile = path.join(dirs.running, path.basename(queueFile));
@@ -834,6 +933,13 @@ async function handleJob(queueFile) {
       await handleBootstrap({ id: queued.id, payload: queued.payload });
     } else if (queued.type === "run_step") {
       await handleRunStep({
+        id: queued.id,
+        payload: queued.payload,
+        cluster_id: queued.cluster_id,
+        cluster_instance_id: queued.cluster_instance_id,
+      });
+    } else if (queued.type === "uninstall_step") {
+      await handleUninstallStep({
         id: queued.id,
         payload: queued.payload,
         cluster_id: queued.cluster_id,

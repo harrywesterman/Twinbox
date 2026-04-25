@@ -376,6 +376,7 @@ function AdminInstallTile({
   iconCard,
   itemTitle,
   buttonLabel = 'Install',
+  buttonClassName = 'primary-button',
   disabled = false,
   onInstall,
 }) {
@@ -387,7 +388,7 @@ function AdminInstallTile({
       <strong className="admin-install-tile-title">{itemTitle}</strong>
       <button
         type="button"
-        className="primary-button admin-install-tile-button"
+        className={`${buttonClassName} admin-install-tile-button`}
         onClick={onInstall}
         disabled={disabled}
         aria-label={`${buttonLabel} ${itemTitle}`}
@@ -826,7 +827,7 @@ function AdminAppsPage({ onNavigate, adminAppsState, installTarget }) {
           <SectionTitle
             eyebrow="Admin"
             title="App installs"
-            description="Choose an icon and run installs from a clean in-page installer."
+            description="Choose an icon and install or remove user-facing apps from a clean in-page installer."
           />
           <div className="hero-actions admin-apps-shell-actions">
             <button type="button" className="secondary-button" onClick={() => appsState.reload()} disabled={appsState.refreshing}>
@@ -888,6 +889,7 @@ function AdminAppsPage({ onNavigate, adminAppsState, installTarget }) {
                     iconCard={buildAdminIconCard(card)}
                     itemTitle={card.title || card.id}
                     buttonLabel={buttonState.label}
+                    buttonClassName={card.app_state === 'installed' ? 'secondary-button' : 'primary-button'}
                     disabled={!buttonState.enabled}
                     onInstall={() => openInstall('app', card.id)}
                   />
@@ -964,16 +966,25 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
       : [];
   const activeCard = cardsById.get(activeAppId) || installQueue[0] || null;
   const activeState = activeCard?.app_state || targetBundle?.app_state || targetCard?.app_state || 'planned';
+  const action = installTarget?.kind === 'app' && targetCard?.app_state === 'installed' ? 'uninstall' : 'install';
   const installSummary = targetBundle
     ? buildBundleInstallSummary(targetBundle.cards || [])
     : null;
-  const canInstall = Boolean(installQueue.length) && !running && (installTarget?.kind === 'bundle'
+  const canSubmit = Boolean(installQueue.length) && !running && (installTarget?.kind === 'bundle'
     ? installSummary?.state === 'ready'
-    : isAdminAppInstallEnabled(targetCard));
+    : action === 'uninstall'
+      ? targetCard?.app_state === 'installed'
+      : isAdminAppInstallEnabled(targetCard));
   const title = targetBundle?.title || targetCard?.title || 'Install';
   const targetIconCard = installTarget?.kind === 'bundle'
     ? buildAdminBundleIconCard(targetBundle)
     : buildAdminIconCard(targetCard);
+  const modalEyebrow = installTarget?.kind === 'bundle'
+    ? 'Bundle install'
+    : action === 'uninstall'
+      ? 'App uninstall'
+      : 'App install';
+  const actionLabel = action === 'uninstall' ? 'Uninstall' : 'Install';
 
   if (appsState.loading && !appsState.catalog) {
     return (
@@ -1101,12 +1112,16 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
 
         setActiveAppId(card.id);
 
-        if (!isAdminAppInstallEnabled(card) && installTarget?.kind !== 'bundle') {
+        if (action === 'uninstall' && card.app_state !== 'installed') {
+          throw new Error(`${card.title} is not installed`);
+        }
+
+        if (action !== 'uninstall' && !isAdminAppInstallEnabled(card) && installTarget?.kind !== 'bundle') {
           throw new Error(`${card.title} is not installable yet`);
         }
 
-        setPageNotice(`Installing ${card.title}${installTarget?.kind === 'bundle' ? ` (${index + 1}/${installQueue.length})` : ''}`);
-        const response = await requestJson(`/api/admin/apps/${encodeURIComponent(card.id)}/install`, {
+        setPageNotice(`${action === 'uninstall' ? 'Removing' : 'Installing'} ${card.title}${installTarget?.kind === 'bundle' ? ` (${index + 1}/${installQueue.length})` : ''}`);
+        const response = await requestJson(`/api/admin/apps/${encodeURIComponent(card.id)}/${action}`, {
           method: 'POST',
         });
 
@@ -1133,10 +1148,16 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
       }
 
       if (!stopped) {
-        setPageNotice(targetBundle ? `${targetBundle.title} finished installing.` : `${title} completed successfully.`);
+        setPageNotice(
+          targetBundle
+            ? `${targetBundle.title} finished installing.`
+            : action === 'uninstall'
+              ? `${title} was removed successfully.`
+              : `${title} completed successfully.`,
+        );
       }
     } catch (error) {
-      setPageError(error instanceof Error ? error.message : 'Failed to install.');
+      setPageError(error instanceof Error ? error.message : `Failed to ${action}.`);
     } finally {
       setRunning(false);
     }
@@ -1194,7 +1215,7 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
           <div className="admin-install-modal-target">
             <AppIcon card={targetIconCard} className="admin-install-modal-icon" />
             <div className="admin-install-modal-copy">
-              <p className="eyebrow">{installTarget?.kind === 'bundle' ? 'Bundle install' : 'App install'}</p>
+              <p className="eyebrow">{modalEyebrow}</p>
               <h2 id="admin-install-modal-title">{title}</h2>
             </div>
           </div>
@@ -1214,7 +1235,7 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
           viewportRef={logViewportRef}
           onScroll={handleLogScroll}
           lines={jobLines}
-          emptyLabel={running ? 'Waiting for the first log line…' : 'Press Install to start the script output.'}
+          emptyLabel={running ? 'Waiting for the first log line…' : `Press ${actionLabel} to start the script output.`}
         />
 
         {pageError ? (
@@ -1233,11 +1254,11 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
         <div className="hero-actions admin-install-modal-actions">
           <button
             type="button"
-            className="primary-button"
+            className={action === 'uninstall' ? 'secondary-button' : 'primary-button'}
             onClick={runInstall}
-            disabled={!canInstall}
+            disabled={!canSubmit}
           >
-            {running ? 'Install…' : 'Install'}
+            {running ? `${actionLabel}…` : actionLabel}
           </button>
           <button type="button" className="secondary-button" onClick={() => onNavigate('/admin/apps')}>
             Back

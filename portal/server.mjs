@@ -759,6 +759,33 @@ app.post("/api/admin/apps/:stepId/install", async (req, res) => {
   }
 });
 
+app.post("/api/admin/apps/:stepId/uninstall", async (req, res) => {
+  const session = requireAdminSession(req, res);
+  if (!session) {
+    return;
+  }
+
+  try {
+    const catalog = await requestManagerJson("/api/apps/catalog");
+    const activeCluster = catalog?.active_cluster;
+    if (!activeCluster?.id) {
+      return res.status(404).json({ error: "cluster not found" });
+    }
+
+    const result = await requestManagerJson(`/api/apps/${encodeURIComponent(req.params.stepId)}/uninstall`, {
+      method: "POST",
+      body: {
+        ...(req.body || {}),
+        cluster_id: activeCluster.id,
+        cluster_instance_id: activeCluster.cluster_instance_id || activeCluster.instance_id || null,
+      },
+    });
+    res.status(202).json(result);
+  } catch (error) {
+    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to uninstall app" });
+  }
+});
+
 app.get("/api/admin/apps/jobs/:jobId", async (req, res) => {
   const session = requireAdminSession(req, res);
   if (!session) {

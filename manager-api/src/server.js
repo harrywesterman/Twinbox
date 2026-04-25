@@ -1239,6 +1239,81 @@ app.post("/api/apps/:stepId/install", async (req, res) => {
   });
 });
 
+app.post("/api/apps/:stepId/uninstall", async (req, res) => {
+  const stepId = req.params.stepId;
+  const requestedClusterId = typeof req.body?.cluster_id === "string" ? req.body.cluster_id.trim() : "";
+  const requestedClusterInstanceId = typeof req.body?.cluster_instance_id === "string"
+    ? req.body.cluster_instance_id.trim()
+    : "";
+  const catalog = buildAppCatalogResponse({ workspaceRoot, dirs, clusterId: requestedClusterId || null });
+  const appCategory = catalog.categories.find((category) => category.id === "apps");
+  const step = appCategory?.steps.find((candidate) => candidate.id === stepId);
+
+  if (!step || step.category_id !== "apps") {
+    return res.status(404).json({ error: "app not found" });
+  }
+
+  if (step.app_state !== "installed") {
+    return res.status(409).json({ error: `${stepId} is not installed` });
+  }
+
+  if (requestedClusterId && catalog.active_cluster?.id && requestedClusterId !== catalog.active_cluster.id) {
+    return res.status(409).json({ error: "cluster mismatch" });
+  }
+
+  const activeClusterId = catalog.active_cluster?.id;
+  if (!activeClusterId) {
+    return res.status(404).json({ error: "cluster not found" });
+  }
+
+  const resolvedCluster = resolveRequestedCluster(activeClusterId);
+  if (!resolvedCluster.ok || !resolvedCluster.cluster?.id) {
+    return res.status(resolvedCluster.status || 404).json({ error: resolvedCluster.error || "cluster not found" });
+  }
+  const activeCluster = resolvedCluster.cluster;
+
+  const activeClusterInstanceId = activeCluster.cluster_instance_id || activeCluster.instance_id || null;
+  if (requestedClusterInstanceId && activeClusterInstanceId && requestedClusterInstanceId !== activeClusterInstanceId) {
+    return res.status(409).json({ error: "cluster instance mismatch" });
+  }
+
+  const appName = stepId.startsWith("install-") ? stepId.slice("install-".length) : stepId;
+  const manifestPath = path.join(workspaceRoot, "gitops", "apps", `${appName}.yaml`);
+  if (!fs.existsSync(manifestPath)) {
+    return res.status(404).json({ error: "app manifest not found" });
+  }
+
+  const payload = {
+    step_id: step.id,
+    step_type: step.type,
+    cluster_id: activeCluster.id,
+    cluster_instance_id: activeClusterInstanceId,
+    app_name: appName,
+    manifest_path: manifestPath,
+    application_set_name: `${appName}-set`,
+    context: { cluster: activeCluster },
+  };
+
+  const job = queueJob(dirs, "uninstall_step", activeCluster.id, payload);
+  writeStepState(step.id, {
+    status: "running",
+    inputs: {},
+    outputs: null,
+    error: null,
+    last_job_id: job.id,
+    cluster_id: activeCluster.id,
+    cluster_instance_id: activeClusterInstanceId,
+  }, activeClusterInstanceId || activeCluster.id);
+
+  return res.status(202).json({
+    step_id: step.id,
+    cluster_id: activeCluster.id,
+    cluster_instance_id: activeClusterInstanceId,
+    job_id: job.id,
+    job_type: job.type,
+  });
+});
+
 app.get("/api/ip-suggestions", async (req, res) => {
   const queryIp = pickFirstString(req.query.management_ip);
   const envManagementIp = pickFirstString(process.env.MANAGEMENT_VM_IP);

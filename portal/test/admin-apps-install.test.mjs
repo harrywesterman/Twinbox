@@ -49,7 +49,7 @@ test('installed apps stay installable for explicit reinstalls', () => {
   assert.equal(isAdminAppInstallEnabled(plannedCard), false);
   assert.deepEqual(getAdminAppInstallButtonState(installedCard), {
     enabled: true,
-    label: 'Install',
+    label: 'Uninstall',
   });
   assert.deepEqual(getAdminAppInstallButtonState(plannedCard), {
     enabled: false,

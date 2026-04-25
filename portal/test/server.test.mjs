@@ -319,14 +319,15 @@ const managerServer = http.createServer(async (req, res) => {
     return;
   }
 
-  if (req.method === "POST" && /^\/api\/apps\/[^/]+\/install$/.test(pathname)) {
+  if (req.method === "POST" && /^\/api\/apps\/[^/]+\/(install|uninstall)$/.test(pathname)) {
     const stepId = pathname.split("/").filter(Boolean).at(-2);
+    const action = pathname.endsWith("/uninstall") ? "uninstall" : "install";
     const body = await readRequestBody(req);
     const jobId = `job-${managerState.nextJobId}`;
     managerState.nextJobId += 1;
     const job = {
       id: jobId,
-      type: "run_step",
+      type: action === "uninstall" ? "uninstall_step" : "run_step",
       status: "running",
       step: "started",
       cluster_id: body.cluster_id || "cluster-test",
@@ -341,7 +342,7 @@ const managerServer = http.createServer(async (req, res) => {
       cluster_id: job.cluster_id,
       cluster_instance_id: job.cluster_instance_id,
       job_id: jobId,
-      job_type: "run_step",
+      job_type: job.type,
     });
     return;
   }
@@ -683,6 +684,28 @@ test("admin can load the app catalog and queue an install job", async () => {
   assert.equal(logs.status, 200);
   assert.ok(Array.isArray(logs.payload.lines));
   assert(logs.payload.lines.length > 0);
+});
+
+test("admin can queue an uninstall job for installed apps", async () => {
+  seedAuthentikState();
+
+  const adminCookie = createSignedSessionCookie({
+    sub: "admin-1",
+    name: "Portal Admin",
+    email: "admin@example.com",
+    preferredUsername: "portal-admin",
+    groups: ["admins"],
+    isAdmin: true,
+  });
+
+  const uninstall = await requestPortal("/api/admin/apps/install-immich/uninstall", {
+    method: "POST",
+    cookie: adminCookie,
+  });
+
+  assert.equal(uninstall.status, 202);
+  assert.match(uninstall.payload.job_id, /^job-/);
+  assert.equal(uninstall.payload.job_type, "uninstall_step");
 });
 
 test("portal config exposes a single Apps section and image icons", async () => {
