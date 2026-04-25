@@ -347,6 +347,10 @@ function buildIconText(title) {
 }
 
 function deriveAppStepStatus(step, state, latestJob, completedDependencies) {
+  if (latestJob && latestJob.type === "uninstall_step" && (state?.status === "failed" || state?.status === "canceled")) {
+    return "installed";
+  }
+
   if (state?.status === "failed") {
     return "failed";
   }

@@ -242,3 +242,64 @@ test('uninstall jobs can merge cluster kubeconfig secrets with step secret refs'
   assert.equal(merged.files.KUBECONFIG_FILE.attachment, 'kubeconfig');
   assert.equal(merged.files.TWINBOX_KUBECONFIG_FILE.attachment, 'kubeconfig');
 });
+
+test('failed uninstall jobs keep apps exposed as installed in the app catalog', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'twinbox-uninstall-state-'));
+  const dirs = {
+    stepState: path.join(tempRoot, 'step-state'),
+    jobs: path.join(tempRoot, 'jobs'),
+    clusters: path.join(tempRoot, 'clusters'),
+    queue: path.join(tempRoot, 'queue'),
+  };
+
+  for (const dir of Object.values(dirs)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  fs.mkdirSync(path.join(dirs.stepState, 'clusters', 'cluster-1-instance'), { recursive: true });
+  fs.writeFileSync(
+    path.join(dirs.clusters, 'cluster-1.json'),
+    JSON.stringify({
+      id: 'cluster-1',
+      slug: 'tst',
+      dns_domain: 'example.com',
+      cluster_instance_id: 'cluster-1-instance',
+      status: 'bootstrapped',
+      updated_at: '2026-04-10T15:11:34Z',
+    }),
+  );
+  fs.writeFileSync(
+    path.join(dirs.stepState, 'clusters', 'cluster-1-instance', 'install-immich.json'),
+    JSON.stringify({
+      step_id: 'install-immich',
+      status: 'failed',
+      inputs: {},
+      outputs: null,
+      cluster_id: 'cluster-1',
+      cluster_instance_id: 'cluster-1-instance',
+      last_job_id: 'job-uninstall-1',
+    }),
+  );
+  fs.writeFileSync(
+    path.join(dirs.jobs, 'job-uninstall-1.json'),
+    JSON.stringify({
+      id: 'job-uninstall-1',
+      type: 'uninstall_step',
+      status: 'failed',
+      step: 'failed',
+    }),
+  );
+
+  try {
+    const appCatalog = buildAppCatalogResponse({
+      workspaceRoot: process.cwd(),
+      dirs,
+      clusterId: 'cluster-1',
+    });
+
+    const immichCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-immich');
+    assert.equal(immichCard?.app_state, 'installed');
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
