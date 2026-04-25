@@ -70,6 +70,10 @@ function setupWorkspace(options = {}) {
     path.join(binDir, "kubectl"),
     `#!/bin/bash
 set -euo pipefail
+if [[ "\${REQUIRE_KUBECONFIG_ENV:-}" == "1" && -z "\${KUBECONFIG:-}" ]]; then
+  echo "KUBECONFIG is required" >&2
+  exit 42
+fi
 echo "kubectl $*" >> "${logFile}"
 
 if [[ "$*" == *" create secret generic "* ]]; then
@@ -171,6 +175,8 @@ test("refresh-portal-config includes installed app steps in the portal catalog",
     PATH: `${binDir}:${process.env.PATH || ""}`,
     MANAGER_DATA_DIR: dataDir,
     WORKSPACE_ROOT: repoRoot,
+    TWINBOX_KUBECONFIG_FILE: "/tmp/fake-kubeconfig",
+    REQUIRE_KUBECONFIG_ENV: "1",
   };
 
   const result = spawnSync("node", [

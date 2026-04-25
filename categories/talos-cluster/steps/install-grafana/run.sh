@@ -303,12 +303,28 @@ rm -f "$grafana_secret_file"
 
 kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
+obsolete_dashboard_configmaps=(
+  "kubernetes-overview-dashboard"
+  "kubernetes-dashboard"
+  "node-exporter-full-dashboard"
+  "longhorn-dashboard"
+  "cilium-metrics-dashboard"
+  "hubble-metrics-dashboard"
+  "loki-dashboard"
+  "cilium-network-monitoring-dashboard"
+)
+
+for obsolete_dashboard_configmap in "${obsolete_dashboard_configmaps[@]}"; do
+  kubectl -n monitoring delete configmap "$obsolete_dashboard_configmap" --ignore-not-found=true >/dev/null
+done
+
 seed_dashboard() {
   local configmap_name="$1"
   local dashboard_url="$2"
   local dashboard_file_key="$3"
   local replacements_json="${4:-{}}"
-  local templating_names_json="${5:-[]}"
+  local templating_values_json="${5:-{}}"
+  local string_substitutions_json="${6:-{}}"
   local dashboard_file dashboard_patched_file
 
   dashboard_file="$(mktemp /tmp/${configmap_name}.XXXXXX.json)"
@@ -319,24 +335,31 @@ seed_dashboard() {
   curl -fsSL "$dashboard_url" -o "$dashboard_file"
   jq \
     --arg replacements_json "$replacements_json" \
-    --arg templating_names_json "$templating_names_json" \
+    --arg templating_values_json "$templating_values_json" \
+    --arg string_substitutions_json "$string_substitutions_json" \
     '
       ($replacements_json | fromjson? // {}) as $replacements
-      | ($templating_names_json | fromjson? // []) as $templating_names
+      | ($templating_values_json | fromjson? // {}) as $templating_values
+      | ($string_substitutions_json | fromjson? // {}) as $string_substitutions
       | walk(
         if type == "string" then
+          reduce ($string_substitutions | to_entries[]) as $string_substitution (.;
+            split($string_substitution.key) | join($string_substitution.value)
+          )
+          |
           ($replacements[.] // .)
         else
           .
         end
       )
-      | if ($templating_names | length) > 0 then
+      | if ($templating_values | type) == "object" and ($templating_values | length) > 0 then
           (.templating.list // []) |= map(
-            if ($templating_names | index(.name)) != null then
+            .name as $templating_name
+            | if ($templating_values | has($templating_name)) then
               .current = {
                 selected: true,
-                text: "Prometheus",
-                value: "Prometheus"
+                text: $templating_values[$templating_name],
+                value: $templating_values[$templating_name]
               }
             else
               .
@@ -356,36 +379,74 @@ seed_dashboard() {
     --overwrite >/dev/null
 }
 
-seed_dashboard \
-  "kubernetes-overview-dashboard" \
-  "https://grafana.com/api/dashboards/21410/revisions/1/download" \
-  "kubernetes-overview.json" \
-  '{"${DATASOURCE}":"Prometheus"}' \
-  '["DATASOURCE"]'
+seed_generated_dashboard() {
+  local configmap_name="$1"
+  local dashboard_name="$2"
+  local dashboard_file_key="$3"
+  local dashboard_file
+
+  dashboard_file="$(mktemp /tmp/${configmap_name}.XXXXXX.json)"
+  dashboard_temp_files+=("$dashboard_file")
+
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Generating ${configmap_name}"
+  node "$WORKSPACE_ROOT/scripts/manager/render-grafana-dashboard.mjs" "$dashboard_name" > "$dashboard_file"
+
+  kubectl -n monitoring create configmap "$configmap_name" \
+    --from-file="${dashboard_file_key}=${dashboard_file}" \
+    --dry-run=client -o yaml | kubectl apply --server-side --field-manager=grafana-dashboard -f - >/dev/null
+  kubectl -n monitoring label configmap "$configmap_name" \
+    grafana_dashboard=1 \
+    app.kubernetes.io/name=grafana \
+    --overwrite >/dev/null
+}
 
 seed_dashboard \
-  "node-exporter-full-dashboard" \
-  "https://grafana.com/api/dashboards/1860/revisions/1/download" \
-  "node-exporter-full.json" \
-  '{"${DS_LOCALHOST}":"Prometheus"}'
+  "managed-kubernetes-overview-dashboard" \
+  "https://grafana.com/api/dashboards/24155/revisions/1/download" \
+  "managed-kubernetes-overview.json" \
+  '{"${DS_MK8S}":"Prometheus","${datasource}":"Prometheus","${VAR_JOB}":"node-exporter"}' \
+  '{"datasource":"Prometheus","job":"node-exporter"}' \
+  '{"cluster_name=\"$cluster\"":"cluster_name=~\".*\""}'
 
-seed_dashboard \
-  "longhorn-dashboard" \
-  "https://grafana.com/api/dashboards/22705/revisions/1/download" \
-  "longhorn-dashboard.json" \
-  '{"${DS_PROMETHEUS}":"Prometheus"}'
+seed_generated_dashboard \
+  "twinbox-nodes-dashboard" \
+  "nodes" \
+  "twinbox-nodes.json"
 
-seed_dashboard \
-  "cilium-metrics-dashboard" \
-  "https://grafana.com/api/dashboards/21431/revisions/1/download" \
-  "cilium-metrics.json" \
-  '{"${DS_PROMETHEUS}":"Prometheus","${DS_VICTORIAMETRICS}":"Prometheus","victoriametrics-datasource":"prometheus","P4169E866C3094E38":"Prometheus"}'
+seed_generated_dashboard \
+  "twinbox-workloads-dashboard" \
+  "workloads" \
+  "twinbox-workloads.json"
 
-seed_dashboard \
-  "hubble-metrics-dashboard" \
-  "https://grafana.com/api/dashboards/13542/revisions/1/download" \
-  "hubble-metrics.json" \
-  '{"${DS_PROMETHEUS}":"Prometheus"}'
+seed_generated_dashboard \
+  "twinbox-control-plane-dashboard" \
+  "controlPlane" \
+  "twinbox-control-plane.json"
+
+seed_generated_dashboard \
+  "twinbox-storage-dashboard" \
+  "storage" \
+  "twinbox-storage.json"
+
+seed_generated_dashboard \
+  "twinbox-logs-events-dashboard" \
+  "logsEvents" \
+  "twinbox-logs-events.json"
+
+seed_generated_dashboard \
+  "twinbox-logs-detail-dashboard" \
+  "logsDetail" \
+  "twinbox-logs-detail.json"
+
+seed_generated_dashboard \
+  "twinbox-network-dashboard" \
+  "network" \
+  "twinbox-network.json"
+
+seed_generated_dashboard \
+  "twinbox-traefik-dashboard" \
+  "traefik" \
+  "twinbox-traefik.json"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying Grafana ExternalSecret"
 kubectl apply -f "$grafana_externalsecret_manifest"

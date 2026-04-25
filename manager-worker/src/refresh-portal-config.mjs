@@ -105,12 +105,15 @@ function readStepStates(dataRoot, steps, clusterScopeId) {
 }
 
 function runKubectl(args, { input = undefined, allowFailure = false } = {}) {
+  const env = { ...process.env };
+  const kubeconfig = env.KUBECONFIG_FILE || env.TWINBOX_KUBECONFIG_FILE || env.KUBECONFIG;
+  if (!env.KUBECONFIG && kubeconfig) {
+    env.KUBECONFIG = kubeconfig;
+  }
+
   const result = spawnSync("kubectl", args, {
     encoding: "utf8",
-    env: {
-      ...process.env,
-      KUBECONFIG: process.env.KUBECONFIG_FILE || process.env.KUBECONFIG,
-    },
+    env,
     input,
   });
 

@@ -57,6 +57,10 @@ function setupWorkspace(options = {}) {
     path.join(binDir, "kubectl"),
     `#!/bin/bash
 set -euo pipefail
+if [[ "\${REQUIRE_KUBECONFIG_ENV:-}" == "1" && -z "\${KUBECONFIG:-}" ]]; then
+  echo "KUBECONFIG is required" >&2
+  exit 42
+fi
 echo "kubectl $*" >> "${logFile}"
 
 if [[ "$*" == *" get configmap "* ]]; then
@@ -158,6 +162,10 @@ test("refresh-dashy-config bootstraps Dashy on install-dashy-dashboard", () => {
     stepStatuses: {
       "install-dashy-dashboard": "succeeded",
       "install-jitsi": "succeeded",
+    },
+    env: {
+      TWINBOX_KUBECONFIG_FILE: "/tmp/fake-kubeconfig",
+      REQUIRE_KUBECONFIG_ENV: "1",
     },
   });
 

@@ -122,11 +122,15 @@ kubectl --kubeconfig <kubeconfig> get application -n argocd prometheus
 kubectl --kubeconfig <kubeconfig> get pods -n monitoring
 kubectl --kubeconfig <kubeconfig> get ingressroute -n monitoring
 kubectl --kubeconfig <kubeconfig> get prometheusrule -n monitoring cluster-health-alerts pvc-usage-alerts
-kubectl --kubeconfig <kubeconfig> get configmap -n monitoring kubernetes-overview-dashboard -o jsonpath='{.metadata.labels.grafana_dashboard}'
-kubectl --kubeconfig <kubeconfig> get configmap -n monitoring node-exporter-full-dashboard -o jsonpath='{.metadata.labels.grafana_dashboard}'
-kubectl --kubeconfig <kubeconfig> get configmap -n monitoring longhorn-dashboard -o jsonpath='{.metadata.labels.grafana_dashboard}'
-kubectl --kubeconfig <kubeconfig> get configmap -n monitoring cilium-metrics-dashboard -o jsonpath='{.metadata.labels.grafana_dashboard}'
-kubectl --kubeconfig <kubeconfig> get configmap -n monitoring hubble-metrics-dashboard -o jsonpath='{.metadata.labels.grafana_dashboard}'
+kubectl --kubeconfig <kubeconfig> get configmap -n monitoring managed-kubernetes-overview-dashboard -o jsonpath='{.metadata.labels.grafana_dashboard}'
+kubectl --kubeconfig <kubeconfig> get configmap -n monitoring twinbox-nodes-dashboard -o jsonpath='{.metadata.labels.grafana_dashboard}'
+kubectl --kubeconfig <kubeconfig> get configmap -n monitoring twinbox-workloads-dashboard -o jsonpath='{.metadata.labels.grafana_dashboard}'
+kubectl --kubeconfig <kubeconfig> get configmap -n monitoring twinbox-control-plane-dashboard -o jsonpath='{.metadata.labels.grafana_dashboard}'
+kubectl --kubeconfig <kubeconfig> get configmap -n monitoring twinbox-storage-dashboard -o jsonpath='{.metadata.labels.grafana_dashboard}'
+kubectl --kubeconfig <kubeconfig> get configmap -n monitoring twinbox-logs-events-dashboard -o jsonpath='{.metadata.labels.grafana_dashboard}'
+kubectl --kubeconfig <kubeconfig> get configmap -n monitoring twinbox-logs-detail-dashboard -o jsonpath='{.metadata.labels.grafana_dashboard}'
+kubectl --kubeconfig <kubeconfig> get configmap -n monitoring twinbox-network-dashboard -o jsonpath='{.metadata.labels.grafana_dashboard}'
+kubectl --kubeconfig <kubeconfig> get configmap -n monitoring twinbox-traefik-dashboard -o jsonpath='{.metadata.labels.grafana_dashboard}'
 ```
 
 Expected:
@@ -135,11 +139,7 @@ Expected:
 - Prometheus, Alertmanager, node-exporter, and kube-state-metrics pods are running in `monitoring`
 - Prometheus ingress routes exist once the domain-aware platform ingress is applied
 - `PrometheusRule/cluster-health-alerts` and `PrometheusRule/pvc-usage-alerts` exist in `monitoring`
-- `ConfigMap/kubernetes-overview-dashboard` exists and is labeled for Grafana dashboard sidecar discovery
-- `ConfigMap/node-exporter-full-dashboard` exists and is labeled for Grafana dashboard sidecar discovery
-- `ConfigMap/longhorn-dashboard` exists and is labeled for Grafana dashboard sidecar discovery
-- `ConfigMap/cilium-metrics-dashboard` exists and is labeled for Grafana dashboard sidecar discovery
-- `ConfigMap/hubble-metrics-dashboard` exists and is labeled for Grafana dashboard sidecar discovery
+- `ConfigMap/managed-kubernetes-overview-dashboard`, `ConfigMap/twinbox-nodes-dashboard`, `ConfigMap/twinbox-workloads-dashboard`, `ConfigMap/twinbox-control-plane-dashboard`, `ConfigMap/twinbox-storage-dashboard`, `ConfigMap/twinbox-logs-events-dashboard`, `ConfigMap/twinbox-logs-detail-dashboard`, `ConfigMap/twinbox-network-dashboard`, and `ConfigMap/twinbox-traefik-dashboard` exist and are labeled for Grafana dashboard sidecar discovery
 
 ### `install-loki`
 
@@ -197,7 +197,7 @@ Expected:
 - `Application/grafana` is synced and healthy
 - Grafana is running in `monitoring`
 - Grafana provisions the Prometheus, Loki, and Tempo datasources
-- The seeded Kubernetes Overview, Node Exporter Full, Longhorn, Cilium Metrics, and Hubble Metrics dashboard ConfigMaps exist and are discovered by the sidecar
+- The seeded Managed Kubernetes Overview, Twinbox Nodes, Twinbox Workloads, Twinbox Control Plane, Twinbox Storage, Twinbox Logs & Events, Twinbox Logs Detail, Twinbox Network, and Twinbox Traefik dashboard ConfigMaps exist and are discovered by the sidecar
 
 ### `install-longhorn-storage`
 

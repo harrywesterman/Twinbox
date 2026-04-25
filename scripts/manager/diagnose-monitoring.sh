@@ -481,7 +481,7 @@ check_grafana_dashboards() {
     if [[ "$unreplaced" -gt 0 ]]; then
       warn "ConfigMap '$cm' may contain unreplaced datasource placeholders"
       info "  This dashboard may show 'No data' because placeholders weren't replaced."
-      info "  The install-grafana seeding script replaces: \${DATASOURCE}, \${DS_LOCALHOST}, \${DS_PROMETHEUS}, \${P4169E866C3094E38}"
+      info "  The install-grafana seeding script replaces: \${DATASOURCE}, \${DS_MK8S}, \${DS_LOCALHOST}, \${DS_PROMETHEUS}, \${DS_SERVICEMONITOR}, \${DS_LOKI}, \${VAR_JOB}, \${P4169E866C3094E38}"
       info "  But queries using \$$cm (by uid) are NOT replaced."
     fi
   done

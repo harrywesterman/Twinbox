@@ -111,8 +111,9 @@ function readStepStates(dataRoot, steps, clusterScopeId) {
 
 function buildKubectlEnv() {
   const env = { ...process.env };
-  if (!env.KUBECONFIG && env.KUBECONFIG_FILE) {
-    env.KUBECONFIG = env.KUBECONFIG_FILE;
+  const kubeconfig = env.KUBECONFIG_FILE || env.TWINBOX_KUBECONFIG_FILE || env.KUBECONFIG;
+  if (!env.KUBECONFIG && kubeconfig) {
+    env.KUBECONFIG = kubeconfig;
   }
   return env;
 }
