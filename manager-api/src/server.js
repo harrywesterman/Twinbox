@@ -25,6 +25,7 @@ import { cancelJob, queueJob } from "./lib/jobs.js";
 import {
   buildProxmoxApiSecretBundle,
   buildClusterWorkerSecretBundle,
+  mergeSecretBundles,
   normalizeSecretBaseRef,
   normalizeSecretBundle,
 } from "../../lib/secrets/schema.mjs";
@@ -1284,12 +1285,16 @@ app.post("/api/apps/:stepId/uninstall", async (req, res) => {
     return res.status(404).json({ error: "app manifest not found" });
   }
 
+  const stepSecretBundle = normalizeSecretBundle(step.secrets);
   const payload = {
     step_id: step.id,
     step_type: step.type,
     cluster_id: activeCluster.id,
     cluster_instance_id: activeClusterInstanceId,
-    secret_bundle: buildClusterWorkerSecretBundle(activeCluster),
+    secret_bundle: mergeSecretBundles(
+      buildClusterWorkerSecretBundle(activeCluster),
+      stepSecretBundle,
+    ),
     app_name: appName,
     manifest_path: manifestPath,
     application_set_name: `${appName}-set`,

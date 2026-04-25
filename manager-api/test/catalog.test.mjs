@@ -5,6 +5,11 @@ import path from 'node:path';
 import os from 'node:os';
 
 import { buildAppCatalogResponse, buildCatalogResponse } from '../src/lib/catalog.js';
+import {
+  buildClusterWorkerSecretBundle,
+  buildSecretAttachmentRef,
+  mergeSecretBundles,
+} from '../../lib/secrets/schema.mjs';
 
 test('catalog prefers the persisted cluster identity over the VM slug when a cluster exists', () => {
   const originalClusterSlug = process.env.TWINBOX_CLUSTER_SLUG;
@@ -213,4 +218,27 @@ test('app catalog exposes apps while the wizard catalog keeps them out of sight'
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
+});
+
+test('uninstall jobs can merge cluster kubeconfig secrets with step secret refs', () => {
+  const cluster = {
+    id: 'cluster-1',
+    slug: 'tst',
+    metadata: {},
+  };
+
+  const merged = mergeSecretBundles(
+    buildClusterWorkerSecretBundle(cluster),
+    {
+      files: {
+        KUBECONFIG_FILE: buildSecretAttachmentRef({
+          scope: 'cluster',
+          item: 'kubeconfig',
+        }, 'kubeconfig', { optional: true }),
+      },
+    },
+  );
+
+  assert.equal(merged.files.KUBECONFIG_FILE.attachment, 'kubeconfig');
+  assert.equal(merged.files.TWINBOX_KUBECONFIG_FILE.attachment, 'kubeconfig');
 });
