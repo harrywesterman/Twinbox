@@ -69,7 +69,7 @@ spec:
             - /bin/sh
             - -ec
             - |
-              opencloud init || true
+              opencloud init --insecure true || true
               exec opencloud server
           ports:
             - containerPort: 9200
