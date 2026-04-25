@@ -23,7 +23,7 @@ singleBinary:
   persistence:
     enabled: true
     storageClassName: longhorn
-    size: 50Gi
+    size: 20Gi
   resources:
     limits:
       memory: 2Gi

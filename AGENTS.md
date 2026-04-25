@@ -41,7 +41,6 @@ Twinbox builds a Talos Linux Kubernetes cluster on Proxmox through a Management 
 - Use the SSH remote-connection skill for the Management VM.
 - `TWINBOX_VM_PREVIEW_TARGET` contains the SSH target; connect as `twinbox@<management-vm-ip>` when needed.
 - Use the in-app browser skill as the default for live UI testing and inspection.
-- Use the Playwright skill for the live web wizard.
 - Debug host state under `/opt/twinbox`; debug executable code inside the relevant container.
 - If Argo CD reports `Synced` but the live deployment is still stale, hard-refresh the application from the Management VM and re-check the deployment image before assuming GitHub is wrong.
 

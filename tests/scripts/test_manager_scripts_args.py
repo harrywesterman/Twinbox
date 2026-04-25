@@ -2188,7 +2188,7 @@ def test_loki_and_openbao_longhorn_sizes_are_right_sized():
         encoding="utf-8"
     )
 
-    assert "size: 50Gi" in loki_values_text
+    assert "size: 20Gi" in loki_values_text
     assert "size: 5Gi" not in loki_values_text
     assert "size: 20Gi" in openbao_values_text
     assert "size: 2Gi" not in openbao_values_text
