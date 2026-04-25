@@ -23,14 +23,16 @@ function loadAppStep(stepId) {
   return normalizeStepManifest(manifest, file, "apps");
 }
 
-test("buildPortalConfig keeps operator tools out of the user applications grid", () => {
+test("buildPortalConfig keeps operator tools out of the user applications grid and carries mobile links", () => {
   const steps = [
     loadStep("install-grafana"),
     loadStep("install-headlamp"),
     loadStep("install-management-consoles"),
     loadStep("install-dashy-dashboard"),
     loadStep("install-velero-ui"),
+    loadAppStep("install-opencloud"),
     loadAppStep("install-immich"),
+    loadAppStep("install-audiobookshelf"),
   ];
 
   const stepStateById = new Map([
@@ -39,7 +41,9 @@ test("buildPortalConfig keeps operator tools out of the user applications grid",
     ["install-management-consoles", { status: "succeeded" }],
     ["install-dashy-dashboard", { status: "succeeded" }],
     ["install-velero-ui", { status: "configured" }],
-    ["install-immich", { status: "failed" }],
+    ["install-opencloud", { status: "succeeded" }],
+    ["install-immich", { status: "succeeded" }],
+    ["install-audiobookshelf", { status: "succeeded" }],
   ]);
 
   const config = buildPortalConfig({
@@ -60,10 +64,19 @@ test("buildPortalConfig keeps operator tools out of the user applications grid",
   assert.equal(config.settings.authentikAdminUrl, "https://authentik.tst.example.com/if/admin/");
   assert.equal(config.settings.authentikUserUrl, "https://authentik.tst.example.com/if/user/#/settings;{\"page\":\"page-details\"}");
   assert.equal(config.settings.authentikOtpUrl, "https://authentik.tst.example.com/if/user/#/settings;{\"page\":\"page-mfa\"}");
-  assert.equal(config.apps.length, 0);
+  assert.deepEqual(config.apps.map((card) => card.title), ["Audiobookshelf", "Immich", "OpenCloud"]);
   assert.equal(config.appSections.length, 1);
   assert.equal(config.appSections[0].name, "Apps");
-  assert.equal(config.appSections[0].items.length, 0);
+  assert.deepEqual(config.appSections[0].items.map((card) => card.title), ["Audiobookshelf", "Immich", "OpenCloud"]);
+  assert.deepEqual(config.apps.find((card) => card.title === "Immich")?.mobileLinks, [
+    { platform: "iPhone", label: "App Store", url: "https://apps.apple.com/us/app/immich/id1613945652" },
+    { platform: "Android", label: "Google Play", url: "https://play.google.com/store/apps/details?id=app.alextran.immich" },
+  ]);
+  assert.deepEqual(config.apps.find((card) => card.title === "OpenCloud")?.mobileLinks, [
+    { platform: "iPhone", label: "App Store", url: "https://apps.apple.com/us/app/opencloud-your-data-anywhere/id6743121005" },
+    { platform: "Android", label: "Google Play", url: "https://play.google.com/store/apps/details?id=eu.opencloud.android" },
+  ]);
+  assert.deepEqual(config.apps.find((card) => card.title === "Audiobookshelf")?.mobileLinks, []);
   assert(config.adminApps.some((card) => card.title === "Dashy"));
   assert.equal(config.adminApps.find((card) => card.title === "Dashy")?.label, "Open Admin tools");
   assert.equal(config.adminApps.find((card) => card.title === "Dashy")?.iconUrl, "/assets/step-icons/install-dashy-dashboard.svg");

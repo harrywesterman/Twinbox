@@ -447,8 +447,9 @@ auth_settings_payload="$(
     --arg auth_openid_client_id "$audiobookshelf_client_id" \
     --arg auth_openid_client_secret "$audiobookshelf_client_secret" \
     --arg auth_openid_button_text "Sign in with Authentik" \
-    --arg auth_openid_match_existing_by "email" \
+    --arg auth_openid_match_existing_by "preferred_username" \
     --arg auth_openid_group_claim "groups" \
+    --arg auth_openid_subfolder_for_redirect_urls "" \
     --argjson auth_openid_auto_launch true \
     --argjson auth_openid_auto_register true \
     --argjson auth_openid_mobile_redirect_uris '["audiobookshelf://oauth"]' \
@@ -464,6 +465,7 @@ auth_settings_payload="$(
       authOpenIDButtonText: $auth_openid_button_text,
       authOpenIDMatchExistingBy: $auth_openid_match_existing_by,
       authOpenIDGroupClaim: $auth_openid_group_claim,
+      authOpenIDSubfolderForRedirectURLs: $auth_openid_subfolder_for_redirect_urls,
       authOpenIDAutoLaunch: $auth_openid_auto_launch,
       authOpenIDAutoRegister: $auth_openid_auto_register,
       authOpenIDMobileRedirectURIs: $auth_openid_mobile_redirect_uris

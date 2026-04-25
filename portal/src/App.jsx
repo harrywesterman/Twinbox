@@ -416,6 +416,32 @@ function AppTile({ card, onOpen, showStatus = false }) {
   );
 }
 
+function MobileAppLinks({ links = [] }) {
+  if (!Array.isArray(links) || links.length === 0) {
+    return null;
+  }
+
+  return (
+    <Panel>
+      <SectionTitle eyebrow="Mobile" title="Mobile apps" />
+      <div className="mobile-link-grid">
+        {links.map((link) => (
+          <a
+            key={`${link.platform}-${link.url}`}
+            className="link-card mobile-link-card"
+            href={link.url}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <strong>{link.platform}</strong>
+            <span>{link.label}</span>
+          </a>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
 function Panel({ className = '', children }) {
   return <section className={`panel ${className}`}>{children}</section>;
 }
@@ -561,6 +587,7 @@ function AppDetailPage({ card, onNavigate }) {
             </div>
           </dl>
         </Panel>
+        <MobileAppLinks links={card.mobileLinks || []} />
       </div>
     </div>
   );

@@ -461,6 +461,39 @@ test.before(async () => {
         iconUrl: "/assets/step-icons/install-immich.svg",
         iconAlt: "Immich icon",
         liveUrl: "https://immich.example.com",
+        mobileLinks: [
+          {
+            platform: "iPhone",
+            label: "App Store",
+            url: "https://apps.apple.com/us/app/immich/id1613945652",
+          },
+          {
+            platform: "Android",
+            label: "Google Play",
+            url: "https://play.google.com/store/apps/details?id=app.alextran.immich",
+          },
+        ],
+      },
+      {
+        id: "paperless",
+        slug: "paperless",
+        title: "Paperless",
+        label: "Paperless",
+        section: "Apps",
+        url: "https://paperless.example.com",
+        route: "/apps/paperless",
+        accent: "#84cc16",
+        summary: "Document archive",
+        description: "Document archive",
+        capabilities: [],
+        adminOnly: false,
+        status: "succeeded",
+        sourceStepId: "install-paperless",
+        sourceStepTitle: "Install Paperless",
+        iconText: "P",
+        iconUrl: "/assets/step-icons/install-paperless.svg",
+        iconAlt: "Paperless icon",
+        liveUrl: "https://paperless.example.com",
       },
     ],
     appSections: [
@@ -666,14 +699,19 @@ test("portal config exposes a single Apps section and image icons", async () => 
 
   const config = await requestPortal("/api/portal-config", { cookie: adminCookie });
   assert.equal(config.status, 200);
-  assert.equal(config.payload.apps.length, 1);
+  assert.equal(config.payload.apps.length, 2);
   assert.equal(config.payload.appSections.length, 1);
   assert.equal(config.payload.appSections[0].name, "Apps");
   assert.equal(config.payload.settings.authentikUserUrl, "https://authentik.tst.example.com/if/user/#/settings;{\"page\":\"page-details\"}");
   assert.equal(config.payload.settings.authentikAdminUrl, "https://authentik.tst.example.com/if/admin/");
   assert.equal(config.payload.settings.authentikOtpUrl, "https://authentik.tst.example.com/if/user/#/settings;{\"page\":\"page-mfa\"}");
-  assert.equal(config.payload.apps[0].iconUrl, "/assets/step-icons/install-immich.svg");
-  assert.equal(config.payload.apps[0].iconAlt, "Immich icon");
+  assert.deepEqual(config.payload.apps.find((card) => card.title === "Immich")?.mobileLinks, [
+    { platform: "iPhone", label: "App Store", url: "https://apps.apple.com/us/app/immich/id1613945652" },
+    { platform: "Android", label: "Google Play", url: "https://play.google.com/store/apps/details?id=app.alextran.immich" },
+  ]);
+  assert.equal(config.payload.apps.find((card) => card.title === "Immich")?.iconUrl, "/assets/step-icons/install-immich.svg");
+  assert.equal(config.payload.apps.find((card) => card.title === "Immich")?.iconAlt, "Immich icon");
+  assert.deepEqual(config.payload.apps.find((card) => card.title === "Paperless")?.mobileLinks, undefined);
 });
 
 test("admin path redirects to Authentik login", async () => {

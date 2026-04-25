@@ -158,7 +158,41 @@
         "Browse photos and videos with search",
         "Use the mobile-first media workflow"
       ],
+      "mobileLinks": [
+        {
+          "platform": "iPhone",
+          "label": "App Store",
+          "url": "https://apps.apple.com/us/app/immich/id1613945652"
+        },
+        {
+          "platform": "Android",
+          "label": "Google Play",
+          "url": "https://play.google.com/store/apps/details?id=app.alextran.immich"
+        }
+      ],
       "accent": "#ec4899",
+      "category": "Apps"
+    },
+    "OpenCloud": {
+      "summary": "Files, collaboration, and sharing",
+      "capabilities": [
+        "Open your files on the go",
+        "Upload and share content from mobile",
+        "Use the same cloud workspace away from the browser"
+      ],
+      "mobileLinks": [
+        {
+          "platform": "iPhone",
+          "label": "App Store",
+          "url": "https://apps.apple.com/us/app/opencloud-your-data-anywhere/id6743121005"
+        },
+        {
+          "platform": "Android",
+          "label": "Google Play",
+          "url": "https://play.google.com/store/apps/details?id=eu.opencloud.android"
+        }
+      ],
+      "accent": "#0ea5e9",
       "category": "Apps"
     },
     "Jitsi": {
@@ -167,6 +201,18 @@
         "Start or join a meeting",
         "Use the browser-based conference flow",
         "Share screens and collaborate live"
+      ],
+      "mobileLinks": [
+        {
+          "platform": "iPhone",
+          "label": "App Store",
+          "url": "https://apps.apple.com/us/app/jitsi-meet/id1165103905"
+        },
+        {
+          "platform": "Android",
+          "label": "Google Play",
+          "url": "https://play.google.com/store/apps/details?id=org.jitsi.meet"
+        }
       ],
       "accent": "#7c3aed",
       "category": "Apps"
@@ -208,6 +254,18 @@
         "Use lightweight push-style updates",
         "Keep track of operational messages"
       ],
+      "mobileLinks": [
+        {
+          "platform": "iPhone",
+          "label": "App Store",
+          "url": "https://apps.apple.com/us/app/ntfy/id1625396347"
+        },
+        {
+          "platform": "Android",
+          "label": "Google Play",
+          "url": "https://play.google.com/store/apps/details?id=io.heckel.ntfy"
+        }
+      ],
       "accent": "#f43f5e",
       "category": "Apps"
     },
@@ -217,6 +275,18 @@
         "Open cloud storage and shared files",
         "Use calendars and collaboration tools",
         "Keep personal documents in one place"
+      ],
+      "mobileLinks": [
+        {
+          "platform": "iPhone",
+          "label": "App Store",
+          "url": "https://apps.apple.com/us/app/nextcloud/id1125420102"
+        },
+        {
+          "platform": "Android",
+          "label": "Google Play",
+          "url": "https://play.google.com/store/apps/details?id=com.nextcloud.client"
+        }
       ],
       "accent": "#0ea5e9",
       "category": "Apps"
@@ -337,6 +407,18 @@
         "Enter the team chat workspace",
         "Keep conversations threaded and searchable",
         "Stay connected with cluster updates"
+      ],
+      "mobileLinks": [
+        {
+          "platform": "iPhone",
+          "label": "App Store",
+          "url": "https://apps.apple.com/us/app/zulip/id1203036395"
+        },
+        {
+          "platform": "Android",
+          "label": "Google Play",
+          "url": "https://play.google.com/store/apps/details?id=com.zulipmobile"
+        }
       ],
       "accent": "#7c3aed",
       "category": "Apps"

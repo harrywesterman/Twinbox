@@ -501,6 +501,16 @@ a {
   text-decoration: none;
 }
 
+.mobile-link-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mobile-link-card {
+  min-height: 100%;
+}
+
 .intranet-card:hover,
 .link-card:hover {
   border-color: rgba(45, 212, 191, 0.4);
@@ -1230,6 +1240,7 @@ a {
   .status-grid,
   .card-grid,
   .intranet-grid,
+  .mobile-link-grid,
   .user-admin-stats,
   .user-admin-profile {
     grid-template-columns: 1fr;
