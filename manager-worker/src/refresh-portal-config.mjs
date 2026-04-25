@@ -104,16 +104,19 @@ function readStepStates(dataRoot, steps, clusterScopeId) {
   return stepStateById;
 }
 
-function runKubectl(args, { input = undefined, allowFailure = false } = {}) {
+function buildKubectlEnv() {
   const env = { ...process.env };
   const kubeconfig = env.KUBECONFIG_FILE || env.TWINBOX_KUBECONFIG_FILE || env.KUBECONFIG;
   if (!env.KUBECONFIG && kubeconfig) {
     env.KUBECONFIG = kubeconfig;
   }
+  return env;
+}
 
+function runKubectl(args, { input = undefined, allowFailure = false } = {}) {
   const result = spawnSync("kubectl", args, {
     encoding: "utf8",
-    env,
+    env: buildKubectlEnv(),
     input,
   });
 
@@ -127,6 +130,27 @@ function runKubectl(args, { input = undefined, allowFailure = false } = {}) {
   }
 
   return result;
+}
+
+function readInstalledAppIds() {
+  let parsed = null;
+  try {
+    const result = runKubectl(["-n", "argocd", "get", "application", "-o", "json"], { allowFailure: true });
+    if (result.status !== 0) {
+      return null;
+    }
+    parsed = JSON.parse(result.stdout || "{}");
+  } catch {
+    return null;
+  }
+
+  const items = Array.isArray(parsed?.items) ? parsed.items : [];
+  const installedAppIds = items
+    .map((item) => String(item?.metadata?.name || "").trim())
+    .filter(Boolean)
+    .map((appName) => `install-${appName}`);
+
+  return installedAppIds;
 }
 
 function applySecret(namespace, secretName, renderedConfig) {
@@ -161,6 +185,11 @@ function main() {
     includeApps: true,
     loadYamlFn: loadYaml,
   });
+  const appStepIds = new Set(
+    steps
+      .filter((step) => step?.category_id === "apps")
+      .map((step) => step.id),
+  );
   const currentCluster = findCurrentCluster(options.managerDataDir, options.clusterId);
   if (!currentCluster?.id) {
     throw new Error("could not determine current cluster for portal config generation");
@@ -184,11 +213,15 @@ function main() {
 
   const contentPath = path.join(options.workspaceRoot, "config", "portal", "content.json");
   const content = readJson(contentPath);
+  const installedAppIds = readInstalledAppIds();
   const renderedConfig = JSON.stringify(buildPortalConfig({
     steps,
     stepStateById,
     cluster: currentCluster,
     content,
+    installedAppIds: installedAppIds === null
+      ? Array.from(appStepIds)
+      : installedAppIds.filter((stepId) => appStepIds.has(stepId)),
   }), null, 2);
 
   applySecret(options.namespace, options.secretName, renderedConfig);

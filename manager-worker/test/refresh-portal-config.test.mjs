@@ -17,7 +17,11 @@ function setupWorkspace(options = {}) {
   const {
     portalStepStatus = "succeeded",
     additionalStepStatuses = {},
+    installedApplications = ["immich", "jitsi", "audiobookshelf"],
   } = options;
+  const installedApplicationsJson = installedApplications
+    .map((app) => `    { "metadata": { "name": "${app}" } }`)
+    .join(",\n");
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "portal-refresh-test-"));
   const dataDir = path.join(root, "data");
   const binDir = path.join(root, "bin");
@@ -92,6 +96,17 @@ metadata:
 type: Opaque
 data: {}
 YAML
+  exit 0
+fi
+
+if [[ "$*" == *"-n argocd get application -o json"* ]]; then
+  cat <<'JSON'
+{
+  "items": [
+${installedApplicationsJson}
+  ]
+}
+JSON
   exit 0
 fi
 
@@ -196,5 +211,41 @@ test("refresh-portal-config includes installed app steps in the portal catalog",
 
   assert.equal(result.status, 0, result.stderr);
   const renderedConfig = JSON.parse(fs.readFileSync(capturedConfigFile, "utf8"));
+  assert.equal(renderedConfig.apps.some((card) => card.title === "Jitsi"), true);
+});
+
+test("refresh-portal-config hides apps that no longer exist in Argo CD", () => {
+  const { dataDir, binDir, capturedConfigFile } = setupWorkspace({
+    additionalStepStatuses: {
+      "install-audiobookshelf": "succeeded",
+      "install-immich": "succeeded",
+      "install-jitsi": "succeeded",
+    },
+    installedApplications: ["jitsi"],
+  });
+  const env = {
+    ...process.env,
+    PATH: `${binDir}:${process.env.PATH || ""}`,
+    MANAGER_DATA_DIR: dataDir,
+    WORKSPACE_ROOT: repoRoot,
+  };
+
+  const result = spawnSync("node", [
+    "manager-worker/src/refresh-portal-config.mjs",
+    "--workspace-root", repoRoot,
+    "--manager-data-dir", dataDir,
+    "--cluster-id", "cluster_test",
+    "--cluster-instance-id", "cluster_test_instance",
+    "--trigger-step-id", "install-twinbox-portal",
+  ], {
+    cwd: repoRoot,
+    env,
+    encoding: "utf8",
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const renderedConfig = JSON.parse(fs.readFileSync(capturedConfigFile, "utf8"));
+  assert.equal(renderedConfig.apps.some((card) => card.title === "Immich"), false);
+  assert.equal(renderedConfig.apps.some((card) => card.title === "Audiobookshelf"), false);
   assert.equal(renderedConfig.apps.some((card) => card.title === "Jitsi"), true);
 });
