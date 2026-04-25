@@ -841,6 +841,8 @@ async function handleUninstallStep(job) {
 
   const clusterId = context?.cluster?.id || job.cluster_id || null;
   const clusterInstanceId = clusterScopeId(context?.cluster, job.cluster_instance_id || null);
+  const secretRuntime = resolveJobSecretRuntime(payload, clusterId);
+  const redact = buildRedactor(secretRuntime.redactions);
   updateStepState(stepId, {
     status: "running",
     inputs: {},
@@ -866,9 +868,10 @@ async function handleUninstallStep(job) {
         STEP_TYPE: stepType,
         TWINBOX_CLUSTER_ID: clusterId || "",
         TWINBOX_CLUSTER_INSTANCE_ID: clusterInstanceId || "",
+        ...secretRuntime.env,
       },
-      line => String(line ?? ""),
-      [],
+      redact,
+      secretRuntime.strip_env,
     );
 
     updateStepState(stepId, {
@@ -913,6 +916,8 @@ async function handleUninstallStep(job) {
       finished_at: now(),
     }, clusterInstanceId || clusterId);
     throw err;
+  } finally {
+    secretRuntime.cleanup();
   }
 }
 

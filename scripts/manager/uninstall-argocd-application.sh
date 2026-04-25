@@ -7,6 +7,10 @@ set -euo pipefail
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 export KUBECONFIG="$KUBECONFIG_FILE"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
@@ -17,6 +21,7 @@ fi
 
 platform_app_dir="$WORKSPACE_ROOT/gitops/platform-apps/$APP_NAME"
 database_app_dir="$WORKSPACE_ROOT/gitops/databases/$APP_NAME"
+needs_authentik_cleanup=false
 
 manifest_kind="$(awk '/^kind:/{print $2; exit}' "$MANIFEST_PATH")"
 manifest_name="$(awk '
@@ -29,6 +34,205 @@ application_set_name="${APPLICATION_SET_NAME:-}"
 if [[ -z "$application_set_name" && "$manifest_kind" == "ApplicationSet" ]]; then
   application_set_name="${manifest_name:-${APP_NAME}-set}"
 fi
+
+delete_authentik_application_by_slug() {
+  local application_slug="$1"
+  local response application_pk
+
+  response="$(authentik_api_get "/core/applications/?page_size=200")" || return 0
+  application_pk="$(
+    jq -r \
+      --arg application_slug "$application_slug" \
+      '.results[]?
+        | select((.slug // "") == $application_slug)
+        | .pk // .id // .uuid // empty' <<<"$response" | head -n1
+  )"
+
+  if [[ -n "$application_pk" ]]; then
+    log "Deleting Authentik application ${application_slug}"
+    authentik_api_write DELETE "/core/applications/${application_pk}/" >/dev/null || true
+  fi
+}
+
+delete_authentik_provider_by_name() {
+  local provider_name="$1"
+  local response provider_pk
+
+  response="$(authentik_api_get "/providers/oauth2/?page_size=200")" || return 0
+  provider_pk="$(
+    jq -r \
+      --arg provider_name "$provider_name" \
+      '.results[]?
+        | select((.name // "") == $provider_name)
+        | .pk // .id // empty' <<<"$response" | head -n1
+  )"
+
+  if [[ -n "$provider_pk" ]]; then
+    log "Deleting Authentik provider ${provider_name}"
+    authentik_api_write DELETE "/providers/oauth2/${provider_pk}/" >/dev/null || true
+  fi
+}
+
+delete_authentik_scope_mapping() {
+  local mapping_name="$1"
+  local scope_name="${2:-}"
+  local response mapping_pk query
+
+  query="/propertymappings/provider/scope/?page_size=200"
+  if [[ -n "$scope_name" ]]; then
+    query="/propertymappings/provider/scope/?scope_name=${scope_name}&page_size=200"
+  fi
+
+  response="$(authentik_api_get "$query")" || return 0
+  mapping_pk="$(
+    jq -r \
+      --arg mapping_name "$mapping_name" \
+      --arg scope_name "$scope_name" \
+      '.results[]?
+        | select((.name // "") == $mapping_name and (("" == $scope_name) or (.scope_name // "") == $scope_name))
+        | .pk // .id // empty' <<<"$response" | head -n1
+  )"
+
+  if [[ -n "$mapping_pk" ]]; then
+    log "Deleting Authentik scope mapping ${mapping_name}"
+    authentik_api_write DELETE "/propertymappings/provider/scope/${mapping_pk}/" >/dev/null || true
+  fi
+}
+
+delete_authentik_group() {
+  local group_name="$1"
+  local response group_pk
+
+  response="$(authentik_api_get "/core/groups/?page_size=200")" || return 0
+  group_pk="$(
+    jq -r \
+      --arg group_name "$group_name" \
+      '.results[]?
+        | select((.name // "") == $group_name)
+        | .pk // .id // .uuid // empty' <<<"$response" | head -n1
+  )"
+
+  if [[ -n "$group_pk" ]]; then
+    log "Deleting Authentik group ${group_name}"
+    authentik_api_write DELETE "/core/groups/${group_pk}/" >/dev/null || true
+  fi
+}
+
+delete_authentik_policy_binding_for_application_group() {
+  local application_slug="$1"
+  local group_name="$2"
+  local app_response group_id binding_pk
+
+  app_response="$(authentik_api_get "/core/applications/?page_size=200")" || return 0
+  local target_uuid
+  target_uuid="$(
+    jq -r \
+      --arg application_slug "$application_slug" \
+      '.results[]?
+        | select((.slug // "") == $application_slug)
+        | .pk // .uuid // .id // empty' <<<"$app_response" | head -n1
+  )"
+
+  [[ -n "$target_uuid" ]] || return 0
+
+  group_id="$(authentik_find_group_id "$group_name" || true)"
+  [[ -n "$group_id" ]] || return 0
+
+  binding_pk="$(
+    authentik_api_get "/policies/bindings/?page_size=500" | jq -r \
+      --arg target_uuid "$target_uuid" \
+      --arg group_id "$group_id" \
+      '.results[]?
+        | select((.target // "") == $target_uuid and (.group // "") == $group_id)
+        | .pk // .id // empty' | head -n1
+  )"
+
+  if [[ -n "$binding_pk" ]]; then
+    log "Deleting Authentik policy binding for ${application_slug}/${group_name}"
+    authentik_api_write DELETE "/policies/bindings/${binding_pk}/" >/dev/null || true
+  fi
+}
+
+delete_openbao_global_secret() {
+  local secret_name="$1"
+
+  if [[ ! -f "${OPENBAO_ROOT_TOKEN_FILE:-}" ]]; then
+    return 0
+  fi
+
+  local pod root_token
+  pod="$(openbao_wait_for_server_pod)"
+  openbao_wait_for_unsealed "$pod"
+  root_token="$(tr -d '\r\n' <"$OPENBAO_ROOT_TOKEN_FILE")"
+  [[ -n "$root_token" ]] || return 0
+
+  log "Deleting OpenBao secret ${secret_name}"
+  openbao_exec "$pod" env BAO_ADDR=http://127.0.0.1:8200 BAO_TOKEN="$root_token" sh -se <<EOF >/dev/null 2>&1 || true
+bao kv delete kv/twinbox/global/${secret_name}
+bao kv metadata delete kv/twinbox/global/${secret_name}
+EOF
+}
+
+cleanup_app_specific_state() {
+  case "$APP_NAME" in
+    immich)
+      needs_authentik_cleanup=true
+      delete_authentik_policy_binding_for_application_group "immich" "admins"
+      delete_authentik_scope_mapping "Immich role" "profile"
+      delete_authentik_provider_by_name "Immich"
+      delete_authentik_application_by_slug "immich"
+      delete_openbao_global_secret "immich"
+      ;;
+    nextcloud)
+      needs_authentik_cleanup=true
+      delete_authentik_scope_mapping "Nextcloud Profile" "profile"
+      delete_authentik_scope_mapping "Nextcloud Groups" "groups"
+      delete_authentik_provider_by_name "Nextcloud"
+      delete_authentik_application_by_slug "nextcloud"
+      delete_openbao_global_secret "nextcloud"
+      ;;
+    audiobookshelf)
+      needs_authentik_cleanup=true
+      delete_authentik_scope_mapping "Audiobookshelf groups" "groups"
+      delete_authentik_provider_by_name "Audiobookshelf"
+      delete_authentik_application_by_slug "audiobookshelf"
+      delete_openbao_global_secret "audiobookshelf"
+      ;;
+    karakeep)
+      needs_authentik_cleanup=true
+      delete_authentik_provider_by_name "Karakeep"
+      delete_authentik_application_by_slug "karakeep"
+      delete_openbao_global_secret "karakeep"
+      ;;
+    jitsi)
+      needs_authentik_cleanup=true
+      delete_authentik_policy_binding_for_application_group "jitsi-openid" "admins"
+      delete_authentik_policy_binding_for_application_group "jitsi-openid" "jitsi-hosts"
+      delete_authentik_scope_mapping "Jitsi host affiliation" "jitsi"
+      delete_authentik_group "jitsi-hosts"
+      delete_authentik_provider_by_name "Jitsi broker"
+      delete_authentik_application_by_slug "jitsi-openid"
+      delete_openbao_global_secret "jitsi-auth"
+      ;;
+    opencloud)
+      needs_authentik_cleanup=true
+      delete_authentik_scope_mapping "OpenCloud roles" "roles"
+      delete_authentik_provider_by_name "OpenCloud Web"
+      delete_authentik_provider_by_name "OpenCloud Desktop"
+      delete_authentik_provider_by_name "OpenCloud Android"
+      delete_authentik_provider_by_name "OpenCloud iOS"
+      delete_authentik_provider_by_name "Cyberduck"
+      delete_authentik_application_by_slug "opencloud"
+      delete_openbao_global_secret "opencloud"
+      ;;
+    zulip)
+      needs_authentik_cleanup=true
+      delete_authentik_provider_by_name "Zulip"
+      delete_authentik_application_by_slug "zulip"
+      delete_openbao_global_secret "zulip-oidc"
+      ;;
+  esac
+}
 
 log "Deleting Argo CD application ${APP_NAME}"
 kubectl delete application "$APP_NAME" -n argocd --ignore-not-found=true >/dev/null 2>&1 || true
@@ -52,5 +256,11 @@ if [[ -d "$database_app_dir" ]]; then
   log "Deleting database resources from ${database_app_dir}"
   kubectl delete -f "$database_app_dir" >/dev/null 2>&1 || true
 fi
+
+if [[ "$needs_authentik_cleanup" == "true" ]]; then
+  authentik_ensure_token
+  authentik_setup_forward
+fi
+cleanup_app_specific_state
 
 log "App ${APP_NAME} removed"

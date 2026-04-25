@@ -24,6 +24,7 @@ import { buildIpBlock, checkIpAvailability, selectSuggestedIpAllocation } from "
 import { cancelJob, queueJob } from "./lib/jobs.js";
 import {
   buildProxmoxApiSecretBundle,
+  buildClusterWorkerSecretBundle,
   normalizeSecretBaseRef,
   normalizeSecretBundle,
 } from "../../lib/secrets/schema.mjs";
@@ -1288,6 +1289,7 @@ app.post("/api/apps/:stepId/uninstall", async (req, res) => {
     step_type: step.type,
     cluster_id: activeCluster.id,
     cluster_instance_id: activeClusterInstanceId,
+    secret_bundle: buildClusterWorkerSecretBundle(activeCluster),
     app_name: appName,
     manifest_path: manifestPath,
     application_set_name: `${appName}-set`,
