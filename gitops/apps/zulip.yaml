@@ -31,6 +31,12 @@ spec:
                   SETTING_ZULIP_ADMINISTRATOR: admin@{{index .metadata.annotations "twinbox.io/public-zone-name"}}
                   SETTING_SOCIAL_AUTH_OIDC_FULL_NAME_VALIDATED: "True"
                   ZULIP_AUTH_BACKENDS: GenericOpenIdConnectBackend
+              rabbitmq:
+                auth:
+                  password: __ZULIP_RABBITMQ_PASSWORD__
+              redis:
+                auth:
+                  password: __ZULIP_REDIS_PASSWORD__
         - repoURL: __REPO_URL__
           targetRevision: __TARGET_REVISION__
           ref: values

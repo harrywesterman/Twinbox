@@ -216,11 +216,14 @@ zulip_client_secret="$(openssl rand -hex 24)"
 zulip_secret_key="$(openssl rand -hex 32)"
 zulip_db_username="zulip"
 zulip_db_password="$(openssl rand -hex 24)"
+zulip_rabbitmq_password="$(openssl rand -hex 24)"
+zulip_redis_password="$(openssl rand -hex 24)"
 secrets_dir="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}/secrets/global"
 zulip_secret_file="${secrets_dir}/zulip-oidc-${cluster_id}.json"
+zulip_runtime_secret_file="${secrets_dir}/zulip-runtime-${cluster_id}.json"
 zulip_manifest_path="$WORKSPACE_ROOT/gitops/apps/zulip.yaml"
 zulip_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/zulip-application.XXXXXX.yaml")"
-trap 'rm -f "$zulip_rendered_manifest" "$zulip_secret_file"' EXIT
+trap 'rm -f "$zulip_rendered_manifest" "$zulip_secret_file" "$zulip_runtime_secret_file"' EXIT
 
 mkdir -p "$secrets_dir"
 
@@ -247,6 +250,22 @@ if [[ -n "$existing_zulip_secret_json" ]]; then
   fi
   if [[ -n "$existing_db_password" ]]; then
     zulip_db_password="$existing_db_password"
+  fi
+fi
+
+existing_zulip_runtime_secret_json=""
+if command -v openbao_read_global_secret_json >/dev/null 2>&1; then
+  existing_zulip_runtime_secret_json="$(openbao_read_global_secret_json zulip-runtime 2>/dev/null || true)"
+fi
+
+if [[ -n "$existing_zulip_runtime_secret_json" ]]; then
+  existing_rabbitmq_password="$(jq -r '.ZULIP_RABBITMQ_PASSWORD // empty' <<<"$existing_zulip_runtime_secret_json")"
+  existing_redis_password="$(jq -r '.ZULIP_REDIS_PASSWORD // empty' <<<"$existing_zulip_runtime_secret_json")"
+  if [[ -n "$existing_rabbitmq_password" ]]; then
+    zulip_rabbitmq_password="$existing_rabbitmq_password"
+  fi
+  if [[ -n "$existing_redis_password" ]]; then
+    zulip_redis_password="$existing_redis_password"
   fi
 fi
 
@@ -308,6 +327,23 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "zulip-oidc" \
   --json-file "$zulip_secret_file" \
   --required-keys "SECRETS_secret_key,SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS,ZULIP_POSTGRESQL__USERNAME,ZULIP_POSTGRESQL__PASSWORD"
+
+zulip_runtime_secret_json="$(
+  jq -n \
+    --arg rabbitmq_password "$zulip_rabbitmq_password" \
+    --arg redis_password "$zulip_redis_password" \
+    '{
+      ZULIP_RABBITMQ_PASSWORD: $rabbitmq_password,
+      ZULIP_REDIS_PASSWORD: $redis_password
+    }'
+)"
+printf '%s\n' "$zulip_runtime_secret_json" >"$zulip_runtime_secret_file"
+chmod 600 "$zulip_runtime_secret_file"
+
+bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+  --secret-name "zulip-runtime" \
+  --json-file "$zulip_runtime_secret_file" \
+  --required-keys "ZULIP_RABBITMQ_PASSWORD,ZULIP_REDIS_PASSWORD"
 
 databases_namespace_manifest="$WORKSPACE_ROOT/gitops/databases/namespace.yaml"
 zulip_db_cluster_manifest="$WORKSPACE_ROOT/gitops/databases/zulip/cluster.yaml"
@@ -382,7 +418,11 @@ application_payload="$(
 application_pk="$(create_or_update_application "$application_payload")"
 [[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for Zulip"
 
-sed "s/__ZONE_NAME__/${public_zone_name}/g" "$zulip_manifest_path" >"$zulip_rendered_manifest"
+sed \
+  -e "s/__ZONE_NAME__/${public_zone_name}/g" \
+  -e "s/__ZULIP_RABBITMQ_PASSWORD__/${zulip_rabbitmq_password}/g" \
+  -e "s/__ZULIP_REDIS_PASSWORD__/${zulip_redis_password}/g" \
+  "$zulip_manifest_path" >"$zulip_rendered_manifest"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying Zulip Argo CD application"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
