@@ -14,7 +14,6 @@ resources:
   - hubble/ingressroute.yaml
   - hubble/authentik-callback-ingressroute.yaml
   - traefik/traefik-dashboard-ingressroute.yaml
-  - traefik/traefik-podmonitor.yaml
   - traefik/authentik-callback-ingressroute.yaml
   - traefik/authentik-forwardauth-middleware.yaml
   - traefik/argocd-server-transport.yaml

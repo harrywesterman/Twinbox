@@ -109,6 +109,9 @@ PROMETHEUS_STEP_SCRIPT = (
     / "install-prometheus"
     / "run.sh"
 )
+PROMETHEUS_MANIFESTS_KUSTOMIZATION = (
+    REPO_ROOT / "gitops" / "apps" / "prometheus" / "manifests" / "kustomization.yaml"
+)
 TWINBOX_PORTAL_STEP_SCRIPT = (
     REPO_ROOT
     / "categories"
@@ -2028,6 +2031,7 @@ def test_kustomization_includes_monitoring_resources():
     assert "argocd/argocd-wiredoor.yaml" in text
     assert "authentik/ingressroute.yaml" in text
     assert "hubble/ingressroute.yaml" in text
+    assert "traefik/traefik-podmonitor.yaml" not in text
     assert "management-consoles/proxmox-ingressroute.yaml" in text
     assert "pgadmin4/namespace.yaml" not in text
     assert "prometheus/ingressroute.yaml" not in text
@@ -2060,6 +2064,9 @@ def test_prometheus_step_applies_kube_prometheus_stack():
         / "manifests"
         / "kustomization.yaml"
     ).read_text(encoding="utf-8")
+    prometheus_manifests_text = PROMETHEUS_MANIFESTS_KUSTOMIZATION.read_text(
+        encoding="utf-8"
+    )
 
     assert "id: install-prometheus" in text
     assert "title: Install Prometheus" in text
@@ -2078,6 +2085,7 @@ def test_prometheus_step_applies_kube_prometheus_stack():
     assert "path: gitops/apps/prometheus/manifests" in app_text
     assert "cluster-health-alerts.yaml" in manifests_text
     assert "pvc-usage-alerts.yaml" in manifests_text
+    assert "traefik-podmonitor.yaml" in prometheus_manifests_text
 
 
 def test_traefik_manager_step_deploys_browser_ui():

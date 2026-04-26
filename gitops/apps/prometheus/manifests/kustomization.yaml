@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - cluster-health-alerts.yaml
   - pvc-usage-alerts.yaml
+  - traefik-podmonitor.yaml
