@@ -1765,6 +1765,25 @@ def test_grafana_oidc_is_openbao_backed():
     assert "- install-authentik-idp" in grafana_step_yaml
 
 
+def test_grafana_managed_overview_dashboard_is_rewritten_for_twinbox():
+    grafana_step_text = (
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-grafana"
+        / "run.sh"
+    ).read_text(encoding="utf-8")
+
+    assert "managed-kubernetes-overview-dashboard" in grafana_step_text
+    assert "https://grafana.com/api/dashboards/24155/revisions/1/download" in grafana_step_text
+    assert '{"${DS_MK8S}":"Prometheus","${datasource}":"Prometheus","${VAR_JOB}":"node-exporter"}' in grafana_step_text
+    assert '{"datasource":"Prometheus","job":"node-exporter"}' in grafana_step_text
+    assert '{"cluster_name=\\"$cluster\\"":"cluster_name=~\\".*\\""}' in grafana_step_text
+    assert '.name == "datasource"' in grafana_step_text
+    assert '.regex = ".*"' in grafana_step_text
+
+
 def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     main_text = _module_text()
     outputs_text = _module_outputs_text()

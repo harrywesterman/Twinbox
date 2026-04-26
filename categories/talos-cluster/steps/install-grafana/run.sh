@@ -403,6 +403,11 @@ seed_dashboard() {
             else
               .
             end
+            | if .name == "datasource" then
+                .regex = ".*"
+              else
+                .
+              end
           )
         else
           .
@@ -439,6 +444,13 @@ seed_generated_dashboard() {
     --overwrite >/dev/null
 }
 
+# The imported dashboard expects a mk8s-named datasource and a concrete cluster
+# selector. Twinbox rewrites those selectors so a fresh install works against
+# the local Prometheus datasource and does not depend on a preselected cluster.
+#
+# The datasource variable is kept broad enough to match the seeded Prometheus
+# datasource name, while the panel queries themselves are made cluster-agnostic.
+# This preserves the dashboard layout but removes the brittle upstream defaults.
 seed_dashboard \
   "managed-kubernetes-overview-dashboard" \
   "https://grafana.com/api/dashboards/24155/revisions/1/download" \
