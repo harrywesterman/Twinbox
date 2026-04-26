@@ -8,7 +8,7 @@ data:
     {
       "Servers": {
         "1": {
-          "Name": "Authentik Database",
+          "Name": "CloudNativePG",
           "Group": "Shared Servers",
           "Host": "authentik-db-pooler-rw-session.databases.svc.cluster.local",
           "Port": 5432,

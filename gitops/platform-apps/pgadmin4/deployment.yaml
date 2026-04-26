@@ -56,6 +56,7 @@ spec:
                   'OAUTH2_USERNAME_CLAIM': 'email',
               }]
               MASTER_PASSWORD_REQUIRED = True
+              ENABLE_SERVER_PASS_EXEC_CMD = True
               MASTER_PASSWORD_HOOK = '/pgadmin4/master-password-hook.sh %u'
               ENHANCED_COOKIE_PROTECTION = False
               PROXY_X_FOR_COUNT = 1
@@ -206,7 +207,7 @@ spec:
                     conn = sqlite3.connect(db_path)
                     cur = conn.cursor()
                     cur.execute(
-                        "select 1 from server where name = 'Authentik Database' and shared = 1"
+                        "select 1 from server where name = 'CloudNativePG' and shared = 1"
                     )
                     sys.exit(0 if cur.fetchone() else 1)
                   except sqlite3.Error:

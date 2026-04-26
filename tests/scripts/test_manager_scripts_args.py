@@ -1336,7 +1336,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert 'kubectl apply -f "$pgadmin_rendered_ingressroute"' in pgadmin_run_text
     assert 'kubectl -n pgadmin4 wait --for=condition=Available deployment/pgadmin4 --timeout=10m' in pgadmin_run_text
     assert "kind: ConfigMap" in pgadmin_server_config_text
-    assert "Authentik Database" in pgadmin_server_config_text
+    assert "CloudNativePG" in pgadmin_server_config_text
     assert "authentik-db-pooler-rw-session.databases.svc.cluster.local" in pgadmin_server_config_text
     assert "PasswordExecCommand" in pgadmin_server_config_text
 
@@ -1449,7 +1449,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "PGADMIN_OAUTH2_SERVER_METADATA_URL" in pgadmin_external_secret_text
     assert "PGADMIN_OAUTH2_SCOPE" in pgadmin_external_secret_text
     assert "kind: ConfigMap" in pgadmin_server_config_text
-    assert "Authentik Database" in pgadmin_server_config_text
+    assert "CloudNativePG" in pgadmin_server_config_text
     assert "authentik-db-pooler-rw-session.databases.svc.cluster.local" in pgadmin_server_config_text
     assert "PasswordExecCommand" in pgadmin_server_config_text
     pgadmin_deployment_text = PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
@@ -1459,11 +1459,12 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "pgadmin4-servers" in pgadmin_deployment_text
     assert "postStart" in pgadmin_deployment_text
     assert "load-servers" in pgadmin_deployment_text
-    assert "server where name = 'Authentik Database' and shared = 1" in pgadmin_deployment_text
+    assert "ENABLE_SERVER_PASS_EXEC_CMD = True" in pgadmin_deployment_text
+    assert "server where name = 'CloudNativePG' and shared = 1" in pgadmin_deployment_text
     assert "startupProbe" in pgadmin_deployment_text
     assert "failureThreshold: 36" in pgadmin_deployment_text
     assert "exec:" in pgadmin_deployment_text
-    assert "server where name = 'Authentik Database' and shared = 1" in pgadmin_deployment_text
+    assert "server where name = 'CloudNativePG' and shared = 1" in pgadmin_deployment_text
     assert "runAsNonRoot: true" in pgadmin_deployment_text
     assert "runAsUser: 5050" in pgadmin_deployment_text
     assert "runAsGroup: 0" in pgadmin_deployment_text
