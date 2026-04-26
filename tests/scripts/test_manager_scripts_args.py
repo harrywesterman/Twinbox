@@ -868,6 +868,19 @@ def test_opencloud_step_keeps_authentik_property_mapping_ids_as_strings():
     )
 
 
+def test_opencloud_pvc_sizes_match_the_live_bound_volumes():
+    pvc_text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "opencloud" / "pvc.yaml"
+    ).read_text(encoding="utf-8")
+
+    assert "name: opencloud-config" in pvc_text
+    assert "name: opencloud-data" in pvc_text
+    assert "name: opencloud-apps" in pvc_text
+    assert "name: opencloud-radicale-data" in pvc_text
+    assert pvc_text.count("storage: 20Gi") == 2
+    assert pvc_text.count("storage: 50Gi") == 2
+
+
 def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
     text = _apply_cluster_text()
     assert (

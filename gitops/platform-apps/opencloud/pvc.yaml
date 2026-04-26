@@ -11,7 +11,8 @@ spec:
   storageClassName: longhorn
   resources:
     requests:
-      storage: 5Gi
+      # Keep these at or above the live bound sizes so reruns do not try to shrink volumes.
+      storage: 20Gi
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -26,7 +27,7 @@ spec:
   storageClassName: longhorn
   resources:
     requests:
-      storage: 30Gi
+      storage: 50Gi
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -41,7 +42,7 @@ spec:
   storageClassName: longhorn
   resources:
     requests:
-      storage: 5Gi
+      storage: 20Gi
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -86,4 +87,4 @@ spec:
   storageClassName: longhorn
   resources:
     requests:
-      storage: 10Gi
+      storage: 50Gi
