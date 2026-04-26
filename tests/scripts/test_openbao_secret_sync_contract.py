@@ -158,11 +158,13 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in run_text
     assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in run_text
     assert 'mkdir -p "$secrets_dir"' in run_text
+    assert 'zulip_loadbalancer_ips=' in run_text
+    assert 'kubectl get nodes -o json' in run_text
     assert 'zulip_runtime_secret_file=' in run_text
     assert 'openbao_read_global_secret_json zulip-runtime' in run_text
     assert 'sync-openbao-global-secret.sh' in run_text
     assert '--secret-name "zulip-runtime"' in run_text
-    assert '--required-keys "ZULIP_RABBITMQ_PASSWORD,ZULIP_REDIS_PASSWORD"' in run_text
+    assert '--required-keys "LOADBALANCER_IPS,ZULIP_RABBITMQ_PASSWORD,ZULIP_REDIS_PASSWORD"' in run_text
     assert 'zulip_config_secret_json' in run_text
     assert 'zulip_runtime_secret_json' in run_text
 
@@ -175,6 +177,7 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "SETTING_EXTERNAL_HOST: zulip.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in app_text
     assert "SETTING_ZULIP_ADMINISTRATOR: admin@{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in app_text
     assert "ZULIP_AUTH_BACKENDS: GenericOpenIdConnectBackend" in app_text
+    assert "LOADBALANCER_IPS: __ZULIP_LOADBALANCER_IPS__" in app_text
     assert "password: __ZULIP_RABBITMQ_PASSWORD__" in app_text
     assert "password: __ZULIP_REDIS_PASSWORD__" in app_text
 
