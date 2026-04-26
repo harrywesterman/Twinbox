@@ -1040,7 +1040,19 @@ function App() {
       answers: initialAnswers,
     });
   }, [answers, busy, catalog, cluster, error, health, initialAnswers, logs, selectedStepId]);
-  const adminDashboardUrl = useMemo(() => buildAdminDashboardUrl(cluster), [cluster]);
+  const adminDashboardContext = useMemo(() => {
+    const provisionAnswers = answers?.['provision-nodes'] || {};
+    const ingressAnswers = answers?.['choose-ingress-route'] || {};
+
+    return {
+      ...cluster,
+      id: cluster?.id || clusterId || '',
+      slug: cluster?.slug || provisionAnswers.name || cluster?.id || clusterId || '',
+      dns_domain: cluster?.dns_domain || ingressAnswers.dns_domain || '',
+      public_zone_name: cluster?.public_zone_name || ingressAnswers.public_zone_name || '',
+    };
+  }, [answers, cluster, clusterId]);
+  const adminDashboardUrl = useMemo(() => buildAdminDashboardUrl(adminDashboardContext), [adminDashboardContext]);
   const isInstallPhase = hasStarted && wizardPhase === 'install' && !model.completion;
   const questionStepIndex = questionSteps.findIndex((step) => step.id === selectedStepId);
   const currentQuestionStep = questionStepIndex >= 0 ? questionSteps[questionStepIndex] : (questionSteps[0] || null);
@@ -2476,7 +2488,7 @@ function App() {
                   </button>
                   {adminDashboardUrl ? (
                     <a
-                      className="button button-secondary"
+                      className="button button-primary"
                       href={adminDashboardUrl}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -2484,7 +2496,7 @@ function App() {
                       Open Admin Dashboard
                     </a>
                   ) : (
-                    <button className="button button-secondary" type="button" disabled>
+                    <button className="button button-primary" type="button" disabled>
                       Open Admin Dashboard
                     </button>
                   )}

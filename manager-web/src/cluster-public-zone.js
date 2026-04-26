@@ -15,6 +15,19 @@ function normalizeHostname(value) {
     .replace(/^\.+/, '');
 }
 
+function normalizeClusterSlug(value) {
+  const trimmed = trimString(value).toLowerCase();
+  if (!trimmed) {
+    return '';
+  }
+
+  const withoutPrefix = trimmed.startsWith('twinbox-') ? trimmed.slice('twinbox-'.length) : trimmed;
+  return withoutPrefix
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 export function twinboxPublicZoneName(clusterId, clusterDnsDomain) {
   const normalizedClusterId = trimString(clusterId).toLowerCase();
   const normalizedDnsDomain = trimString(clusterDnsDomain);
@@ -34,10 +47,14 @@ export function twinboxPublicZoneName(clusterId, clusterDnsDomain) {
   return `${normalizedClusterId}.${normalizedDnsDomain}`;
 }
 
-export function buildAdminDashboardUrl(cluster = {}) {
+export function buildAdminDashboardUrl(cluster = {}, fallback = {}) {
   const zoneName = normalizeHostname(
     trimString(cluster?.public_zone_name)
-      || twinboxPublicZoneName(cluster?.slug || cluster?.id, cluster?.dns_domain),
+      || trimString(fallback?.public_zone_name)
+      || twinboxPublicZoneName(
+        normalizeClusterSlug(cluster?.slug || cluster?.id || fallback?.slug || fallback?.id),
+        cluster?.dns_domain || fallback?.dns_domain,
+      ),
   );
 
   if (!zoneName) {

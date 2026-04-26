@@ -86,6 +86,10 @@ test('app source defines a minimal wizard shell with guided input and step-by-st
   assert.doesNotMatch(source, /\|\| isCurrentStepComplete/, 'expected the install action to stay available even after a step is complete');
   assert.match(source, /href=\{adminDashboardUrl\}/, 'expected the admin dashboard action to use a direct link');
   assert.match(source, /target="_blank"/, 'expected the admin dashboard action to open in a new tab');
+  const adminDashboardTextIndex = source.indexOf('Open Admin Dashboard');
+  assert.ok(adminDashboardTextIndex >= 0, 'expected the admin dashboard action to exist in the source');
+  const adminDashboardBlock = source.slice(Math.max(0, adminDashboardTextIndex - 220), adminDashboardTextIndex + 40);
+  assert.match(adminDashboardBlock, /className="button button-primary"/, 'expected the admin dashboard action to use the primary blue style');
   assert.doesNotMatch(source, /window\.open\(adminDashboardUrl/, 'expected the admin dashboard action to avoid popup-based navigation');
   assert.match(source, /installLogsByStepRef/, 'expected the install view to cache logs per step');
   assert.match(source, /setInstallStepLogs\(/, 'expected the install pane to write per-step logs');

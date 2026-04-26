@@ -27,6 +27,16 @@ test('buildAdminDashboardUrl falls back to the legacy slug plus dns domain proje
   );
 });
 
+test('buildAdminDashboardUrl can use fallback wizard context when the cluster record is missing', () => {
+  assert.equal(
+    buildAdminDashboardUrl({}, {
+      slug: 'twinbox-demo',
+      dns_domain: 'example.com',
+    }),
+    'https://admin.demo.example.com',
+  );
+});
+
 test('twinboxPublicZoneName keeps the prd cluster on the base domain', () => {
   assert.equal(twinboxPublicZoneName('prd', 'example.com'), 'example.com');
 });

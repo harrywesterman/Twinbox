@@ -597,9 +597,15 @@ function buildPrimaryAction(activeStep, nextStep, busy, stepIndex, mode) {
 }
 
 function buildCompletion(activeStep, progress, cluster) {
+  const clusterIdentity = cluster?.id
+    || cluster?.slug
+    || activeStep?.state?.cluster_id
+    || activeStep?.state?.outputs?.cluster_id
+    || '';
+
   return {
-    title: cluster?.id ? 'Cluster bootstrap complete' : 'Setup complete',
-    summary: cluster?.id
+    title: clusterIdentity ? 'Cluster bootstrap complete' : 'Setup complete',
+    summary: clusterIdentity
       ? 'The cluster is provisioned and the wizard answers are ready to export.'
       : 'All setup steps are complete. Export the answers file or review the final output.',
     stepTitle: activeStep?.title || 'Final step',
