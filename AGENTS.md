@@ -34,6 +34,9 @@ Twinbox builds a Talos Linux Kubernetes cluster on Proxmox through a Management 
 - Cluster state: `manager-data/clusters/`.
 - Step state: `manager-data/step-state/`.
 - Talos configs and kubeconfigs are runtime artifacts, not canonical repo source.
+- On the Management VM, cluster credentials usually live under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/`:
+  - `kubeconfig/kubeconfig`
+  - `talosconfig/talosconfig`
 - On the Management VM, `/opt/twinbox/.env` is root-owned; when refreshing the stack there, run `docker compose` through `sudo` from `/opt/twinbox` instead of trying to read or edit that file as `twinbox`.
 
 ## Debug
