@@ -267,6 +267,8 @@ GRAFANA_STEP_MANIFEST = (
     / "install-grafana"
     / "step.yaml"
 )
+GRAFANA_REFRESH_HELPER = REPO_ROOT / "scripts" / "manager" / "refresh-grafana-dashboard.mjs"
+WORKER_JS = REPO_ROOT / "manager-worker" / "src" / "worker.js"
 WIREDOOR_GATEWAY_STEP_MANIFEST = (
     REPO_ROOT
     / "categories"
@@ -1782,6 +1784,7 @@ def test_grafana_oidc_is_openbao_backed():
 
 
 def test_grafana_managed_overview_dashboard_is_rewritten_for_twinbox():
+    helper_text = GRAFANA_REFRESH_HELPER.read_text(encoding="utf-8")
     grafana_step_text = (
         REPO_ROOT
         / "categories"
@@ -1791,13 +1794,27 @@ def test_grafana_managed_overview_dashboard_is_rewritten_for_twinbox():
         / "run.sh"
     ).read_text(encoding="utf-8")
 
-    assert "managed-kubernetes-overview-dashboard" in grafana_step_text
-    assert "https://grafana.com/api/dashboards/24155/revisions/1/download" in grafana_step_text
-    assert '{"${DS_MK8S}":"Prometheus","${datasource}":"Prometheus","${VAR_JOB}":"node-exporter"}' in grafana_step_text
-    assert '{"datasource":"Prometheus","job":"node-exporter"}' in grafana_step_text
-    assert '{"cluster_name=\\"$cluster\\"":"cluster_name=~\\".*\\""}' in grafana_step_text
-    assert '.name == "datasource"' in grafana_step_text
-    assert '.regex = ".*"' in grafana_step_text
+    assert "managed-kubernetes-overview-dashboard" in helper_text
+    assert "https://grafana.com/api/dashboards/24155/revisions/1/download" in helper_text
+    assert '["${DS_MK8S}", "Prometheus"],' in helper_text
+    assert '["${datasource}", "Prometheus"],' in helper_text
+    assert '["${VAR_JOB}", "node-exporter"],' in helper_text
+    assert "'cluster_name=\"$cluster\"', 'cluster_name=~\".*\"'" in helper_text
+    assert 'next.name === "datasource"' in helper_text
+    assert '.regex = ".*"' in helper_text
+    assert "refresh-grafana-dashboard.mjs" in grafana_step_text
+    assert "managed-kubernetes-overview-dashboard" not in grafana_step_text
+    assert "https://grafana.com/api/dashboards/24155/revisions/1/download" not in grafana_step_text
+    assert '.regex = ".*"' not in grafana_step_text
+
+
+def test_grafana_worker_refreshes_dashboard_after_cluster_jobs():
+    worker_text = WORKER_JS.read_text(encoding="utf-8")
+
+    assert "refreshGrafanaDashboard(" in worker_text
+    assert "scripts/manager/refresh-grafana-dashboard.mjs" in worker_text
+    assert worker_text.index("await refreshDashyConfig(") < worker_text.index("await refreshPortalConfig(")
+    assert worker_text.index("await refreshPortalConfig(") < worker_text.index("await refreshGrafanaDashboard(")
 
 
 def test_talos_module_is_vm_only_and_keeps_planned_outputs():

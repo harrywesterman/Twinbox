@@ -340,88 +340,11 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --required-keys "GF_AUTH_DISABLE_LOGIN_FORM,GF_AUTH_OAUTH_AUTO_LOGIN,GF_AUTH_BASIC_ENABLED,GF_USERS_AUTO_ASSIGN_ORG_ROLE,GF_AUTH_GENERIC_OAUTH_ENABLED,GF_AUTH_GENERIC_OAUTH_NAME,GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP,GF_AUTH_GENERIC_OAUTH_CLIENT_ID,GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET,GF_AUTH_GENERIC_OAUTH_SCOPES,GF_AUTH_GENERIC_OAUTH_AUTH_URL,GF_AUTH_GENERIC_OAUTH_TOKEN_URL,GF_AUTH_GENERIC_OAUTH_API_URL,GF_SECURITY_ADMIN_USER,GF_SECURITY_ADMIN_PASSWORD"
 rm -f "$grafana_secret_file"
 
-kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-
-obsolete_dashboard_configmaps=(
-  "kubernetes-overview-dashboard"
-  "kubernetes-dashboard"
-  "node-exporter-full-dashboard"
-  "longhorn-dashboard"
-  "cilium-metrics-dashboard"
-  "hubble-metrics-dashboard"
-  "loki-dashboard"
-  "cilium-network-monitoring-dashboard"
-)
-
-for obsolete_dashboard_configmap in "${obsolete_dashboard_configmaps[@]}"; do
-  kubectl -n monitoring delete configmap "$obsolete_dashboard_configmap" --ignore-not-found=true >/dev/null
-done
-
-seed_dashboard() {
-  local configmap_name="$1"
-  local dashboard_url="$2"
-  local dashboard_file_key="$3"
-  local replacements_json="${4:-{}}"
-  local templating_values_json="${5:-{}}"
-  local string_substitutions_json="${6:-{}}"
-  local dashboard_file dashboard_patched_file
-
-  dashboard_file="$(mktemp /tmp/${configmap_name}.XXXXXX.json)"
-  dashboard_patched_file="$(mktemp /tmp/${configmap_name}-patched.XXXXXX.json)"
-  dashboard_temp_files+=("$dashboard_file" "$dashboard_patched_file")
-
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Downloading ${configmap_name}"
-  curl -fsSL "$dashboard_url" -o "$dashboard_file"
-  jq \
-    --arg replacements_json "$replacements_json" \
-    --arg templating_values_json "$templating_values_json" \
-    --arg string_substitutions_json "$string_substitutions_json" \
-    '
-      ($replacements_json | fromjson? // {}) as $replacements
-      | ($templating_values_json | fromjson? // {}) as $templating_values
-      | ($string_substitutions_json | fromjson? // {}) as $string_substitutions
-      | walk(
-        if type == "string" then
-          reduce ($string_substitutions | to_entries[]) as $string_substitution (.;
-            split($string_substitution.key) | join($string_substitution.value)
-          )
-          |
-          ($replacements[.] // .)
-        else
-          .
-        end
-      )
-      | if ($templating_values | type) == "object" and ($templating_values | length) > 0 then
-          (.templating.list // []) |= map(
-            .name as $templating_name
-            | if ($templating_values | has($templating_name)) then
-              .current = {
-                selected: true,
-                text: $templating_values[$templating_name],
-                value: $templating_values[$templating_name]
-              }
-            else
-              .
-            end
-            | if .name == "datasource" then
-                .regex = ".*"
-              else
-                .
-              end
-          )
-        else
-          .
-        end
-    ' "$dashboard_file" > "$dashboard_patched_file"
-
-  kubectl -n monitoring create configmap "$configmap_name" \
-    --from-file="${dashboard_file_key}=${dashboard_patched_file}" \
-    --dry-run=client -o yaml | kubectl apply --server-side --field-manager=grafana-dashboard -f - >/dev/null
-  kubectl -n monitoring label configmap "$configmap_name" \
-    grafana_dashboard=1 \
-    app.kubernetes.io/name=grafana \
-    --overwrite >/dev/null
-}
+node "$WORKSPACE_ROOT/scripts/manager/refresh-grafana-dashboard.mjs" \
+  --manager-data-dir "${MANAGER_DATA_DIR:-/data}" \
+  --cluster-id "$cluster_id" \
+  --cluster-instance-id "${TWINBOX_CLUSTER_INSTANCE_ID:-}" \
+  --trigger-step-id "${STEP_ID:-install-grafana}"
 
 seed_generated_dashboard() {
   local configmap_name="$1"
@@ -443,21 +366,6 @@ seed_generated_dashboard() {
     app.kubernetes.io/name=grafana \
     --overwrite >/dev/null
 }
-
-# The imported dashboard expects a mk8s-named datasource and a concrete cluster
-# selector. Twinbox rewrites those selectors so a fresh install works against
-# the local Prometheus datasource and does not depend on a preselected cluster.
-#
-# The datasource variable is kept broad enough to match the seeded Prometheus
-# datasource name, while the panel queries themselves are made cluster-agnostic.
-# This preserves the dashboard layout but removes the brittle upstream defaults.
-seed_dashboard \
-  "managed-kubernetes-overview-dashboard" \
-  "https://grafana.com/api/dashboards/24155/revisions/1/download" \
-  "managed-kubernetes-overview.json" \
-  '{"${DS_MK8S}":"Prometheus","${datasource}":"Prometheus","${VAR_JOB}":"node-exporter"}' \
-  '{"datasource":"Prometheus","job":"node-exporter"}' \
-  '{"cluster_name=\"$cluster\"":"cluster_name=~\".*\""}'
 
 seed_generated_dashboard \
   "twinbox-nodes-dashboard" \

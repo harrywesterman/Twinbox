@@ -749,6 +749,37 @@ async function refreshPortalConfig(jobId, stepId, clusterId, clusterInstanceId, 
   }
 }
 
+async function refreshGrafanaDashboard(jobId, stepId, clusterId, clusterInstanceId, env, redact, stripEnv) {
+  if (!clusterId) {
+    return;
+  }
+
+  try {
+    await runCommand(
+      jobId,
+      "node",
+      [
+        "scripts/manager/refresh-grafana-dashboard.mjs",
+        "--manager-data-dir",
+        dataRoot,
+        "--cluster-id",
+        clusterId,
+        "--trigger-step-id",
+        stepId,
+        ...(clusterInstanceId ? ["--cluster-instance-id", clusterInstanceId] : []),
+        "--namespace",
+        "monitoring",
+      ],
+      env,
+      redact,
+      stripEnv,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error || "unknown error");
+    appendLog(jobId, `grafana refresh warning: ${message}`);
+  }
+}
+
 async function handleRunStep(job) {
   const payload = job.payload;
   const stepId = payload.step_id;
@@ -829,6 +860,15 @@ async function handleRunStep(job) {
       secretRuntime.strip_env,
     );
     await refreshPortalConfig(
+      job.id,
+      stepId,
+      outputs?.cluster_id || clusterId,
+      outputs?.cluster_instance_id || clusterInstanceId,
+      secretRuntime.env,
+      redact,
+      secretRuntime.strip_env,
+    );
+    await refreshGrafanaDashboard(
       job.id,
       stepId,
       outputs?.cluster_id || clusterId,
