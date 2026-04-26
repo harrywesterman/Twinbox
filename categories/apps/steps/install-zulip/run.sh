@@ -274,15 +274,11 @@ fi
 if [[ -n "$existing_zulip_runtime_secret_json" ]]; then
   existing_rabbitmq_password="$(jq -r '.ZULIP_RABBITMQ_PASSWORD // empty' <<<"$existing_zulip_runtime_secret_json")"
   existing_redis_password="$(jq -r '.ZULIP_REDIS_PASSWORD // empty' <<<"$existing_zulip_runtime_secret_json")"
-  existing_loadbalancer_ips="$(jq -r '.LOADBALANCER_IPS // empty' <<<"$existing_zulip_runtime_secret_json")"
   if [[ -n "$existing_rabbitmq_password" ]]; then
     zulip_rabbitmq_password="$existing_rabbitmq_password"
   fi
   if [[ -n "$existing_redis_password" ]]; then
     zulip_redis_password="$existing_redis_password"
-  fi
-  if [[ -n "$existing_loadbalancer_ips" ]]; then
-    zulip_loadbalancer_ips="$existing_loadbalancer_ips"
   fi
 fi
 
