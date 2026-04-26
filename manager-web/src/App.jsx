@@ -20,6 +20,7 @@ import {
   buildSuggestedProvisionInputs,
   mergeSuggestedProvisionDraft,
 } from './provision-defaults.js';
+import { buildAdminDashboardUrl } from './cluster-public-zone.js';
 import {
   buildWizardExportFilename,
   getMissionControlModel,
@@ -173,25 +174,6 @@ function downloadText(filename, content) {
   anchor.download = filename;
   anchor.click();
   URL.revokeObjectURL(url);
-}
-
-function buildAdminDashboardUrl(cluster) {
-  const rawDomain = String(cluster?.dns_domain || '').trim();
-  if (!rawDomain) {
-    return '';
-  }
-
-  const host = rawDomain
-    .replace(/^https?:\/\//i, '')
-    .replace(/^\/+/, '')
-    .split('/')[0]
-    .replace(/^\.+/, '');
-
-  if (!host) {
-    return '';
-  }
-
-  return `https://admin.${host}`;
 }
 
 function formatInputValue(input, value) {
