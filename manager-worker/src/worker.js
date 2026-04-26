@@ -78,6 +78,15 @@ function now() {
   return new Date().toISOString();
 }
 
+function parseQueuedAt(queuedAt) {
+  if (typeof queuedAt !== "string") {
+    return null;
+  }
+
+  const parsed = Date.parse(queuedAt);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function clusterScopeId(cluster = null, fallback = null) {
   return cluster?.cluster_instance_id || cluster?.instance_id || fallback || null;
 }
@@ -128,6 +137,44 @@ function finalizeQueueMarker(filePath) {
   const completedFile = queueMarkerPath(filePath);
   fs.rmSync(completedFile, { force: true });
   fs.renameSync(filePath, completedFile);
+}
+
+function readPendingJobCandidate(file) {
+  const fullPath = path.join(dirs.pending, file);
+
+  try {
+    const stat = fs.statSync(fullPath);
+    let queuedAtMs = null;
+
+    try {
+      const queued = readJson(fullPath);
+      queuedAtMs = parseQueuedAt(queued?.queued_at);
+    } catch {
+      queuedAtMs = null;
+    }
+
+    const mtimeMs = Number.isFinite(stat.mtimeMs) ? stat.mtimeMs : Number.MAX_SAFE_INTEGER;
+    return {
+      file,
+      fullPath,
+      queuedAtMs: queuedAtMs ?? mtimeMs,
+      mtimeMs,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function comparePendingJobs(left, right) {
+  if (left.queuedAtMs !== right.queuedAtMs) {
+    return left.queuedAtMs - right.queuedAtMs;
+  }
+
+  if (left.mtimeMs !== right.mtimeMs) {
+    return left.mtimeMs - right.mtimeMs;
+  }
+
+  return left.file.localeCompare(right.file);
 }
 
 function recoverOrphanedRunningJobs() {
@@ -980,8 +1027,13 @@ function pickNextJob() {
   if (entries.length === 0) {
     return null;
   }
-  entries.sort();
-  return path.join(dirs.pending, entries[0]);
+
+  const nextJobs = entries
+    .map(readPendingJobCandidate)
+    .filter(Boolean)
+    .sort(comparePendingJobs);
+
+  return nextJobs[0]?.fullPath || null;
 }
 
 async function loop() {

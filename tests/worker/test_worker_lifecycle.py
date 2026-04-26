@@ -669,6 +669,148 @@ def test_worker_processes_run_step_action_job_and_records_cluster_context():
             proc.wait(timeout=5)
 
 
+def test_worker_picks_oldest_pending_job_by_queued_at():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        data = root / "data"
+        workspace = root / "workspace"
+        bin_dir = root / "bin"
+        pending = data / "queue" / "pending"
+        jobs = data / "jobs"
+        logs = data / "logs"
+        clusters = data / "clusters"
+        step_state = data / "step-state"
+        older_script_dir = workspace / "categories" / "talos-cluster" / "steps" / "queue-order-older"
+        newer_script_dir = workspace / "categories" / "talos-cluster" / "steps" / "queue-order-newer"
+
+        for d in [pending, jobs, logs, clusters, step_state, older_script_dir, newer_script_dir, bin_dir]:
+            d.mkdir(parents=True, exist_ok=True)
+
+        _prepare_fake_toolchain(bin_dir)
+        _write_pinned_defaults(workspace)
+
+        older_marker = data / "queue-order-older-started.txt"
+        newer_marker = data / "queue-order-newer-started.txt"
+
+        older_script = older_script_dir / "run.sh"
+        older_script.write_text(
+            "#!/bin/bash\n"
+            "set -euo pipefail\n"
+            f"touch \"{older_marker}\"\n"
+            "sleep 2\n",
+        )
+        older_script.chmod(0o755)
+
+        newer_script = newer_script_dir / "run.sh"
+        newer_script.write_text(
+            "#!/bin/bash\n"
+            "set -euo pipefail\n"
+            f"touch \"{newer_marker}\"\n"
+            "sleep 2\n",
+        )
+        newer_script.chmod(0o755)
+
+        older_job = {
+            "id": "job_zulu",
+            "type": "run_step",
+            "cluster_id": None,
+            "status": "pending",
+            "step": "queued",
+            "payload": {
+                "step_id": "queue-order-older",
+                "step_type": "config",
+                "inputs": {"label": "older"},
+                "runner": {
+                    "kind": "script",
+                    "script": "categories/talos-cluster/steps/queue-order-older/run.sh",
+                },
+                "context": {},
+            },
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "started_at": None,
+            "finished_at": None,
+            "result": None,
+            "error": None,
+        }
+        newer_job = {
+            "id": "job_alpha",
+            "type": "run_step",
+            "cluster_id": None,
+            "status": "pending",
+            "step": "queued",
+            "payload": {
+                "step_id": "queue-order-newer",
+                "step_type": "config",
+                "inputs": {"label": "newer"},
+                "runner": {
+                    "kind": "script",
+                    "script": "categories/talos-cluster/steps/queue-order-newer/run.sh",
+                },
+                "context": {},
+            },
+            "created_at": "2026-01-01T00:00:01Z",
+            "updated_at": "2026-01-01T00:00:01Z",
+            "started_at": None,
+            "finished_at": None,
+            "result": None,
+            "error": None,
+        }
+
+        (jobs / "job_zulu.json").write_text(json.dumps(older_job))
+        (pending / "job_zulu.json").write_text(json.dumps({
+            "id": "job_zulu",
+            "type": "run_step",
+            "cluster_id": None,
+            "payload": older_job["payload"],
+            "queued_at": "2026-01-01T00:00:00Z",
+        }))
+        (jobs / "job_alpha.json").write_text(json.dumps(newer_job))
+        (pending / "job_alpha.json").write_text(json.dumps({
+            "id": "job_alpha",
+            "type": "run_step",
+            "cluster_id": None,
+            "payload": newer_job["payload"],
+            "queued_at": "2026-01-01T00:00:01Z",
+        }))
+
+        env = os.environ.copy()
+        env["MANAGER_DATA_DIR"] = str(data)
+        env["WORKSPACE_ROOT"] = str(workspace)
+        env["WORKER_POLL_MS"] = "100"
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+        env["TWINBOX_SECRET_BACKEND"] = "env"
+
+        proc = subprocess.Popen(
+            ["node", "manager-worker/src/worker.js"],
+            cwd=Path(__file__).resolve().parents[2],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        def job_status(job_id: str):
+            try:
+                return json.loads((jobs / f"{job_id}.json").read_text())["status"]
+            except Exception:
+                return None
+
+        try:
+            _wait_until(lambda: older_marker.exists() or newer_marker.exists())
+
+            older_status = job_status("job_zulu")
+            newer_status = job_status("job_alpha")
+
+            assert older_marker.exists()
+            assert older_status == "running"
+            assert newer_status == "pending"
+            assert not newer_marker.exists()
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
 def test_worker_marks_run_step_job_failed_when_script_fails():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
