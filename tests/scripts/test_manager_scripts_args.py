@@ -1459,11 +1459,11 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "pgadmin4-servers" in pgadmin_deployment_text
     assert "postStart" in pgadmin_deployment_text
     assert "load-servers" in pgadmin_deployment_text
-    assert "sharedserver" in pgadmin_deployment_text
+    assert "server where name = 'Authentik Database' and shared = 1" in pgadmin_deployment_text
     assert "startupProbe" in pgadmin_deployment_text
     assert "failureThreshold: 36" in pgadmin_deployment_text
     assert "exec:" in pgadmin_deployment_text
-    assert "sharedserver where name = 'Authentik Database'" in pgadmin_deployment_text
+    assert "server where name = 'Authentik Database' and shared = 1" in pgadmin_deployment_text
     assert "runAsNonRoot: true" in pgadmin_deployment_text
     assert "runAsUser: 5050" in pgadmin_deployment_text
     assert "runAsGroup: 0" in pgadmin_deployment_text
@@ -1667,6 +1667,8 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "pgadmin4-bootstrap" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
     assert "dpage/pgadmin4:9.14" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
     assert "master-password-hook.sh" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
+    assert "mountPath: /config" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
+    assert "pgadmin4-servers.json" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
     assert "readinessProbe" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
     assert "configmap.yaml" in (
         REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "kustomization.yaml"

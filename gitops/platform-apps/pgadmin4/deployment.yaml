@@ -203,14 +203,14 @@ spec:
                       sys.exit(1)
 
                   try:
-                      conn = sqlite3.connect(db_path)
-                      cur = conn.cursor()
-                      cur.execute(
-                          "select 1 from sharedserver where name = 'Authentik Database'"
-                      )
-                      sys.exit(0 if cur.fetchone() else 1)
+                    conn = sqlite3.connect(db_path)
+                    cur = conn.cursor()
+                    cur.execute(
+                        "select 1 from server where name = 'Authentik Database' and shared = 1"
+                    )
+                    sys.exit(0 if cur.fetchone() else 1)
                   except sqlite3.Error:
-                      sys.exit(1)
+                    sys.exit(1)
                   PY
             failureThreshold: 36
             periodSeconds: 5
@@ -237,6 +237,9 @@ spec:
             - name: pgadmin-config
               mountPath: /pgadmin4/master-password-hook.sh
               subPath: master-password-hook.sh
+              readOnly: true
+            - name: pgadmin-servers
+              mountPath: /config
               readOnly: true
       volumes:
         - name: pgadmin-data
