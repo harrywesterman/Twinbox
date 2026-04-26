@@ -3,6 +3,7 @@ set -euo pipefail
 
 : "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"
 : "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"
+: "${MANAGER_DATA_DIR:?missing MANAGER_DATA_DIR}"
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
@@ -22,6 +23,7 @@ cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
 cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty')"
+cluster_instance_id="$(printf '%s' "$cluster_json" | jq -r '.cluster_instance_id // .instance_id // empty')"
 
 [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
 [[ -n "$cluster_dns_domain" ]] || fail "Could not determine cluster DNS domain; run choose-ingress-route first"
@@ -281,6 +283,22 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --json-file "$dashy_secret_file" \
   --required-keys "DASHY_OIDC_CLIENT_ID,DASHY_OIDC_ENDPOINT,DASHY_OIDC_SCOPE"
 rm -f "$dashy_secret_file"
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Rendering Dashy config"
+refresh_dashy_config_args=(
+  "$WORKSPACE_ROOT/manager-worker/src/refresh-dashy-config.mjs"
+  --workspace-root "$WORKSPACE_ROOT"
+  --manager-data-dir "$MANAGER_DATA_DIR"
+  --cluster-id "$cluster_id"
+  --trigger-step-id install-dashy-dashboard
+)
+if [[ -n "$cluster_instance_id" ]]; then
+  refresh_dashy_config_args+=(--cluster-instance-id "$cluster_instance_id")
+fi
+if ! node "${refresh_dashy_config_args[@]}"; then
+  fail "Dashy config rendering failed before rollout wait"
+fi
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Dashy config rendered"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying Dashy Argo CD application"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \

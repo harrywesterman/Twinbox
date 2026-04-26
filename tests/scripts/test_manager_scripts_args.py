@@ -1382,6 +1382,22 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
         / "install-dashy-dashboard"
         / "run.sh"
     ).read_text(encoding="utf-8")
+    assert "refresh-dashy-config.mjs" in (
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-dashy-dashboard"
+        / "run.sh"
+    ).read_text(encoding="utf-8")
+    assert "--trigger-step-id install-dashy-dashboard" in (
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-dashy-dashboard"
+        / "run.sh"
+    ).read_text(encoding="utf-8")
 
     headlamp_module_text = _authentik_headlamp_module_text()
     headlamp_module_vars_text = _authentik_headlamp_module_vars_text()
