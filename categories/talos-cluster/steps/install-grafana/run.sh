@@ -101,9 +101,16 @@ find_policy_binding_pk() {
       | .pk // .id // empty' <<<"$response" | head -n1
 }
 
+extract_authentik_identifier() {
+  local payload="${1:-}"
+
+  [[ -n "$payload" ]] || return 0
+  jq -er '.pk // .uuid // .id // empty' <<<"$payload" 2>/dev/null || true
+}
+
 create_or_update_provider() {
   local provider_payload="$1"
-  local existing_pk
+  local existing_pk response_file http_status response_json
 
   existing_pk="$(find_oauth2_provider_pk_by_name "Grafana")"
   if [[ -n "$existing_pk" ]]; then
@@ -112,15 +119,43 @@ create_or_update_provider() {
     return 0
   fi
 
-  authentik_api_write POST "/providers/oauth2/" "$provider_payload" | jq -r '.pk // .id // empty'
+  response_file="$(mktemp)"
+  http_status="$(
+    curl -sS \
+      -X POST \
+      -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" \
+      -H "Accept: application/json" \
+      -H "Content-Type: application/json" \
+      --data "$provider_payload" \
+      -o "$response_file" \
+      -w '%{http_code}' \
+      "${AUTHENTIK_API_BASE}/providers/oauth2/"
+  )" || http_status="000"
+
+  response_json="$(cat "$response_file" 2>/dev/null || true)"
+  rm -f "$response_file"
+
+  if [[ "$http_status" =~ ^2 ]]; then
+    existing_pk="$(extract_authentik_identifier "$response_json")"
+    if [[ -n "$existing_pk" ]]; then
+      printf '%s\n' "$existing_pk"
+      return 0
+    fi
+  fi
+
+  existing_pk="$(find_oauth2_provider_pk_by_name "Grafana")"
+  [[ -n "$existing_pk" ]] || fail "Authentik did not return or expose a provider ID for Grafana"
+
+  authentik_api_write PATCH "/providers/oauth2/${existing_pk}/" "$provider_payload" >/dev/null
+  printf '%s\n' "$existing_pk"
 }
 
 create_or_update_application() {
   local application_payload="$1"
-  local existing_json existing_pk response_file http_status
+  local existing_json existing_pk response_file http_status response_json created_pk
 
   existing_json="$(find_application_json_by_slug "$grafana_application_slug" || true)"
-  existing_pk="$(jq -r '.pk // .id // empty' <<<"$existing_json")"
+  existing_pk="$(extract_authentik_identifier "$existing_json")"
   if [[ -n "$existing_pk" ]]; then
     authentik_api_write PATCH "/core/applications/${grafana_application_slug}/" "$application_payload" >/dev/null
     printf '%s\n' "$existing_pk"
@@ -141,17 +176,21 @@ create_or_update_application() {
   )" || http_status="000"
 
   if [[ "$http_status" =~ ^2 ]]; then
-    jq -r '.pk // .id // empty' <"$response_file"
-    rm -f "$response_file"
-    return 0
+    response_json="$(cat "$response_file" 2>/dev/null || true)"
+    created_pk="$(extract_authentik_identifier "$response_json")"
+    if [[ -n "$created_pk" ]]; then
+      rm -f "$response_file"
+      printf '%s\n' "$created_pk"
+      return 0
+    fi
   fi
 
   existing_json="$(find_application_json_by_slug "$grafana_application_slug" || true)"
-  existing_pk="$(jq -r '.pk // .id // empty' <<<"$existing_json")"
+  existing_pk="$(extract_authentik_identifier "$existing_json")"
+  rm -f "$response_file"
   [[ -n "$existing_pk" ]] || fail "Authentik did not return or expose an application ID for Grafana"
 
   authentik_api_write PATCH "/core/applications/${grafana_application_slug}/" "$application_payload" >/dev/null
-  rm -f "$response_file"
   printf '%s\n' "$existing_pk"
 }
 
@@ -251,7 +290,7 @@ application_pk="$(create_or_update_application "$application_payload")"
 [[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for Grafana"
 
 application_json="$(find_application_json_by_slug "$grafana_application_slug")"
-application_uuid="$(jq -r '.pk // .uuid // .id // empty' <<<"$application_json")"
+application_uuid="$(extract_authentik_identifier "$application_json")"
 [[ -n "$application_uuid" ]] || fail "Could not determine Authentik application UUID for Grafana"
 ensure_group_binding "$application_uuid" "$admins_group_id"
 
