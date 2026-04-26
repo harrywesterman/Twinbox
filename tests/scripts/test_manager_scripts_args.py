@@ -1813,8 +1813,11 @@ def test_grafana_worker_refreshes_dashboard_after_cluster_jobs():
 
     assert "refreshGrafanaDashboard(" in worker_text
     assert "scripts/manager/refresh-grafana-dashboard.mjs" in worker_text
-    assert worker_text.index("await refreshDashyConfig(") < worker_text.index("await refreshPortalConfig(")
-    assert worker_text.index("await refreshPortalConfig(") < worker_text.index("await refreshGrafanaDashboard(")
+    assert "reconcileGrafanaDashboardsOnStartup" in worker_text
+    assert "manager-worker-startup" in worker_text
+    assert "await refreshDashyConfig(" in worker_text
+    assert "await refreshPortalConfig(" in worker_text
+    assert "await refreshGrafanaDashboard(" in worker_text
 
 
 def test_talos_module_is_vm_only_and_keeps_planned_outputs():

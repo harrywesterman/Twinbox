@@ -326,6 +326,211 @@ def test_worker_recovers_orphaned_running_run_step_job_on_startup():
             proc.wait(timeout=5)
 
 
+def test_worker_reconciles_grafana_dashboard_on_startup():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        data = root / "data"
+        workspace = root / "workspace"
+        bootstrap = workspace / "bootstrap"
+        bin_dir = root / "bin"
+        kubectl_log = root / "kubectl.log"
+        curl_log = root / "curl.log"
+        captured_dashboard_file = root / "captured-dashboard.json"
+
+        for d in [
+            data / "queue" / "pending",
+            data / "jobs",
+            data / "logs",
+            data / "clusters",
+            data / "step-state" / "clusters" / "cluster_test_instance",
+            workspace / "scripts" / "manager",
+            bootstrap / "secrets" / "global",
+            bootstrap / "secrets" / "cluster" / "cluster_test" / "kubeconfig",
+            bin_dir,
+        ]:
+            d.mkdir(parents=True, exist_ok=True)
+
+        _prepare_fake_toolchain(bin_dir)
+        _write_pinned_defaults(workspace)
+        (workspace / "scripts" / "manager" / "refresh-grafana-dashboard.mjs").write_text(
+            (REPO_ROOT / "scripts" / "manager" / "refresh-grafana-dashboard.mjs").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+
+        (bootstrap / "secrets" / "global" / "proxmox.json").write_text(
+            json.dumps({
+                "host": "192.168.1.10",
+                "port": "8006",
+                "username": "root@pam",
+                "password": "super-secret",
+                "endpoint": "https://192.168.1.10:8006",
+            }),
+        )
+        (bootstrap / "secrets" / "cluster" / "cluster_test" / "kubeconfig" / "kubeconfig").write_text(
+            "apiVersion: v1\nkind: Config\nclusters: []\nusers: []\ncontexts: []\n"
+        )
+
+        dashboard = {
+            "templating": {
+                "list": [
+                    {
+                        "name": "datasource",
+                        "regex": "",
+                        "current": {
+                            "selected": False,
+                            "text": "${datasource}",
+                            "value": "${datasource}",
+                        },
+                    },
+                    {
+                        "name": "job",
+                        "current": {
+                            "selected": False,
+                            "text": "${VAR_JOB}",
+                            "value": "${VAR_JOB}",
+                        },
+                    },
+                ],
+            },
+            "panels": [
+                {
+                    "datasource": "${DS_MK8S}",
+                    "title": "Cluster overview",
+                    "targets": [
+                        {
+                            "expr": 'cluster_name="$cluster"',
+                        },
+                    ],
+                },
+            ],
+        }
+
+        kubectl_script = (
+            "#!/bin/bash\n"
+            "set -euo pipefail\n"
+            "if [[ \"$1\" == \"version\" ]]; then\n"
+            f"  echo '{{\"clientVersion\":{{\"gitVersion\":\"{PINNED_KUBECTL_VERSION}\"}}}}'\n"
+            "  exit 0\n"
+            "fi\n"
+            "if [[ \"${REQUIRE_KUBECONFIG_ENV:-}\" == \"1\" && -z \"${KUBECONFIG:-}\" ]]; then\n"
+            "  echo \"KUBECONFIG is required\" >&2\n"
+            "  exit 42\n"
+            "fi\n"
+            f"echo \"kubectl $*\" >> \"{kubectl_log}\"\n"
+            "if [[ \" $* \" == *\" create configmap managed-kubernetes-overview-dashboard \"* ]]; then\n"
+            "  for arg in \"$@\"; do\n"
+            "    if [[ \"$arg\" == --from-file=managed-kubernetes-overview.json=* ]]; then\n"
+            "      source_file=\"${arg#--from-file=managed-kubernetes-overview.json=}\"\n"
+            f"      cp \"$source_file\" \"{captured_dashboard_file}\"\n"
+            "    fi\n"
+            "  done\n"
+            "  cat <<'YAML'\n"
+            "apiVersion: v1\n"
+            "kind: ConfigMap\n"
+            "metadata:\n"
+            "  name: managed-kubernetes-overview-dashboard\n"
+            "  namespace: monitoring\n"
+            "data:\n"
+            "  managed-kubernetes-overview.json: |\n"
+            "    {}\n"
+            "YAML\n"
+            "  exit 0\n"
+            "fi\n"
+            "if [[ \" $* \" == *\" apply -f - \"* ]]; then\n"
+            "  cat >/dev/null\n"
+            "  exit 0\n"
+            "fi\n"
+            "exit 0\n"
+        )
+        _write_fake_tool(bin_dir / "kubectl", kubectl_script)
+
+        curl_script = (
+            "#!/bin/bash\n"
+            "set -euo pipefail\n"
+            f"echo \"curl $*\" >> \"{curl_log}\"\n"
+            "cat <<'JSON'\n"
+            f"{json.dumps(dashboard, indent=2)}\n"
+            "JSON\n"
+        )
+        _write_fake_tool(bin_dir / "curl", curl_script)
+
+        (data / "clusters" / "cluster_test.json").write_text(
+            json.dumps({
+                "id": "cluster_test",
+                "cluster_instance_id": "cluster_test_instance",
+                "metadata": {},
+                "created_at": "2026-01-01T00:00:00.000Z",
+                "updated_at": "2026-01-02T00:00:00.000Z",
+            }),
+        )
+        (data / "step-state" / "clusters" / "cluster_test_instance" / "install-grafana.json").write_text(
+            json.dumps({
+                "step_id": "install-grafana",
+                "status": "succeeded",
+                "inputs": {},
+                "outputs": {},
+                "cluster_id": "cluster_test",
+                "cluster_instance_id": "cluster_test_instance",
+            }),
+        )
+
+        env = os.environ.copy()
+        env["MANAGER_DATA_DIR"] = str(data)
+        env["WORKSPACE_ROOT"] = str(workspace)
+        env["TWINBOX_BOOTSTRAP_DIR"] = str(bootstrap)
+        env["WORKER_POLL_MS"] = "100"
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+        env["REQUIRE_KUBECONFIG_ENV"] = "1"
+
+        proc = subprocess.Popen(
+            ["node", "manager-worker/src/worker.js"],
+            cwd=Path(__file__).resolve().parents[2],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        try:
+            _wait_until(lambda: captured_dashboard_file.exists())
+
+            rendered_dashboard = json.loads(captured_dashboard_file.read_text())
+            assert rendered_dashboard["templating"]["list"][0]["regex"] == ".*"
+            assert rendered_dashboard["templating"]["list"][0]["current"] == {
+                "selected": True,
+                "text": "Prometheus",
+                "value": "Prometheus",
+            }
+            assert rendered_dashboard["templating"]["list"][1]["current"] == {
+                "selected": False,
+                "text": "node-exporter",
+                "value": "node-exporter",
+            }
+            assert rendered_dashboard["panels"][0]["datasource"] == "Prometheus"
+            assert rendered_dashboard["panels"][0]["targets"][0]["expr"] == 'cluster_name=~".*"'
+
+            kubectl_log_text = kubectl_log.read_text()
+            assert "managed-kubernetes-overview-dashboard" in kubectl_log_text
+            assert "label configmap managed-kubernetes-overview-dashboard" in kubectl_log_text
+
+            curl_log_text = curl_log.read_text()
+            assert "https://grafana.com/api/dashboards/24155/revisions/1/download" in curl_log_text
+        finally:
+            if not captured_dashboard_file.exists():
+                startup_log = data / "logs" / "startup-grafana-cluster_test.log"
+                startup_log_text = startup_log.read_text() if startup_log.exists() else "<missing>"
+                proc.terminate()
+                stdout, stderr = proc.communicate(timeout=5)
+                raise AssertionError(
+                    "startup grafana reconcile did not materialize the dashboard\n"
+                    f"stdout:\n{stdout}\n"
+                    f"stderr:\n{stderr}\n"
+                    f"startup log:\n{startup_log_text}\n"
+                )
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
 def test_worker_materializes_secret_bundle_files_and_cleans_up():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)

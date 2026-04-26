@@ -91,6 +91,18 @@ function clusterScopeId(cluster = null, fallback = null) {
   return cluster?.cluster_instance_id || cluster?.instance_id || fallback || null;
 }
 
+function readKnownClusters() {
+  if (!fs.existsSync(dirs.clusters)) {
+    return [];
+  }
+
+  return fs.readdirSync(dirs.clusters)
+    .filter((entry) => entry.endsWith(".json"))
+    .map((entry) => readJsonIfExists(path.join(dirs.clusters, entry)))
+    .filter((cluster) => cluster?.id)
+    .sort((left, right) => String(right?.updated_at || right?.created_at || "").localeCompare(String(left?.updated_at || left?.created_at || "")));
+}
+
 function stepStatePath(stepId, clusterScope = null) {
   const scope = clusterScope ? path.join("clusters", clusterScope) : "global";
   return path.join(dirs.stepState, scope, `${stepId}.json`);
@@ -780,6 +792,50 @@ async function refreshGrafanaDashboard(jobId, stepId, clusterId, clusterInstance
   }
 }
 
+async function reconcileGrafanaDashboardsOnStartup() {
+  const clusters = readKnownClusters();
+
+  for (const cluster of clusters) {
+    if (!cluster?.id || !cluster?.metadata) {
+      continue;
+    }
+
+    let secretRuntime;
+    try {
+      secretRuntime = resolveJobSecretRuntime(cluster, cluster.id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error || "unknown error");
+      console.warn(`manager-worker startup grafana reconcile skipped for ${cluster.id}: ${message}`);
+      continue;
+    }
+
+    const hasKubeconfig = Boolean(
+      secretRuntime.env.KUBECONFIG_FILE
+      || secretRuntime.env.TWINBOX_KUBECONFIG_FILE
+      || secretRuntime.env.KUBECONFIG,
+    );
+
+    if (!hasKubeconfig) {
+      secretRuntime.cleanup();
+      continue;
+    }
+
+    try {
+      await refreshGrafanaDashboard(
+        `startup-grafana-${cluster.id}`,
+        "manager-worker-startup",
+        cluster.id,
+        clusterScopeId(cluster, cluster.id),
+        secretRuntime.env,
+        buildRedactor(secretRuntime.redactions),
+        secretRuntime.strip_env,
+      );
+    } finally {
+      secretRuntime.cleanup();
+    }
+  }
+}
+
 async function handleRunStep(job) {
   const payload = job.payload;
   const stepId = payload.step_id;
@@ -1099,4 +1155,12 @@ try {
   console.error(`manager-worker startup failed: ${err.message}`);
   process.exit(1);
 }
-loop();
+reconcileGrafanaDashboardsOnStartup()
+  .then(() => {
+    console.log("manager-worker startup grafana reconcile complete");
+    loop();
+  })
+  .catch((err) => {
+    console.error(`manager-worker startup grafana reconcile failed: ${err.message}`);
+    process.exit(1);
+  });
