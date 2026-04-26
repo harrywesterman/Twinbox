@@ -1,0 +1,127 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: opencloud-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            twinbox.io/domain-ready: "true"
+  template:
+    metadata:
+      name: opencloud
+    spec:
+      project: default
+      source:
+        repoURL: __REPO_URL__
+        targetRevision: __TARGET_REVISION__
+        path: gitops/platform-apps/opencloud
+        kustomize:
+          patches:
+            - target:
+                kind: ConfigMap
+                name: opencloud-config
+              patch: |-
+                - op: replace
+                  path: /data/csp.yaml
+                  value: |-
+                    headers:
+                      content-security-policy:
+                        frame-ancestors:
+                          - "https://opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+                          - "https://collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+                          - "https://wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+                    origins:
+                      - "https://opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+                      - "https://collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+                      - "https://wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+            - target:
+                kind: Deployment
+                name: opencloud-collabora
+              patch: |-
+                - op: replace
+                  path: /spec/template/spec/containers/0/env/2/value
+                  value: https://opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                - op: replace
+                  path: /spec/template/spec/containers/0/env/3/value
+                  value: opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}|wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                - op: replace
+                  path: /spec/template/spec/containers/0/env/5/value
+                  value: --o:ssl.enable=false --o:ssl.termination=true --o:net.frame_ancestors=https://opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}} https://collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}} https://wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+            - target:
+                kind: IngressRoute
+                name: opencloud
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: opencloud-wiredoor
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: opencloud-tailscale
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: collabora
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: collabora-wiredoor
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: collabora-tailscale
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: wopiserver
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: wopiserver-wiredoor
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: wopiserver-tailscale
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: opencloud
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

@@ -25,6 +25,7 @@ Argo CD `Application` resources. Most apps deploy a Helm chart with:
 Some apps use a repo-controlled subtree under `gitops/apps/<app>/` or a standalone ApplicationSet manifest under `gitops/apps/<app>.yaml` so chart output can be patched deterministically before Argo CD applies it. The current patterns are:
 
 - `gitops/apps/dashy.yaml` - ApplicationSet for the Dashy admin launcher with cluster-specific ingress hostnames.
+- `gitops/apps/opencloud.yaml` - ApplicationSet for OpenCloud with repo-local platform-apps overlay and cluster-specific hostnames.
 - `gitops/apps/authentik/` - Helm values plus Kustomize patches for the Authentik chart.
 - `gitops/apps/prometheus/` - Kustomize manifests for Prometheus alerts.
 
@@ -62,6 +63,7 @@ App-specific Kubernetes manifests that are rendered or applied directly by the m
 - `immich/` - Immich namespace, PVC, ingress, and database secret wiring.
 - `loki/` - Loki ingress and auth middleware.
 - `ntfy/` - ntfy ingress and kustomization.
+- `opencloud/` - OpenCloud deployment, collaboration services, ingress, and bootstrap config.
 - `pgadmin4/` - pgAdmin 4 namespace, deployment, service, PVC, ingress, and secret wiring.
 - `twinbox-portal/` - Twinbox Portal deployment, service, ingress, config, and per-user preference storage.
 - `velero-ui/` - Velero UI namespace, ingress, and secret wiring.

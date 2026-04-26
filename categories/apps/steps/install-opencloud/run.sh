@@ -386,7 +386,8 @@ fi
 
 opencloud_secret_file="$(mktemp "${TMPDIR:-/tmp}/opencloud-bootstrap.XXXXXX.json")"
 opencloud_rendered_overlay="$(mktemp -d "${TMPDIR:-/tmp}/opencloud-overlay.XXXXXX")"
-trap 'rm -f "$opencloud_secret_file"; rm -rf "$opencloud_rendered_overlay"' EXIT
+opencloud_rendered_app_manifest="$(mktemp "${TMPDIR:-/tmp}/opencloud-application.XXXXXX.yaml")"
+trap 'rm -f "$opencloud_secret_file" "$opencloud_rendered_app_manifest"; rm -rf "$opencloud_rendered_overlay"' EXIT
 
 jq -n \
   --arg OC_URL "$opencloud_oc_url" \
@@ -653,6 +654,16 @@ render_opencloud_overlay "$WORKSPACE_ROOT/gitops/platform-apps/opencloud" "$open
 
 log "Applying OpenCloud GitOps overlay"
 kubectl apply -k "$opencloud_rendered_overlay"
+
+log "Applying OpenCloud Argo CD application"
+sed \
+  -e "s|__REPO_URL__|${TWINBOX_GIT_REPO_URL:-https://github.com/harrywesterman/Twinbox.git}|g" \
+  -e "s|__TARGET_REVISION__|${TWINBOX_GIT_TARGET_REVISION:-main}|g" \
+  "$WORKSPACE_ROOT/gitops/apps/opencloud.yaml" >"$opencloud_rendered_app_manifest"
+bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+  --manifest "$opencloud_rendered_app_manifest" \
+  --application "opencloud" \
+  --destination-namespace "opencloud"
 
 wait_for_statefulset_ready "opencloud" "opencloud-ldap" "OpenCloud LDAP"
 wait_for_deployment_rollout "opencloud" "opencloud" "OpenCloud core"
