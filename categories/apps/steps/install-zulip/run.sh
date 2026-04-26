@@ -433,11 +433,28 @@ application_payload="$(
 application_pk="$(create_or_update_application "$application_payload")"
 [[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for Zulip"
 
-sed \
-  -e "s/__ZONE_NAME__/${public_zone_name}/g" \
-  -e "s/__ZULIP_RABBITMQ_PASSWORD__/${zulip_rabbitmq_password}/g" \
-  -e "s/__ZULIP_REDIS_PASSWORD__/${zulip_redis_password}/g" \
-  "$zulip_manifest_path" >"$zulip_rendered_manifest"
+python3 - "$zulip_manifest_path" "$zulip_rendered_manifest" \
+  "$public_zone_name" \
+  "$zulip_rabbitmq_password" \
+  "$zulip_redis_password" \
+  "$zulip_loadbalancer_ips" <<'PY'
+from pathlib import Path
+import sys
+
+src_path = Path(sys.argv[1])
+dst_path = Path(sys.argv[2])
+public_zone_name = sys.argv[3]
+zulip_rabbitmq_password = sys.argv[4]
+zulip_redis_password = sys.argv[5]
+zulip_loadbalancer_ips = sys.argv[6]
+
+rendered = src_path.read_text()
+rendered = rendered.replace("__ZONE_NAME__", public_zone_name)
+rendered = rendered.replace("__ZULIP_RABBITMQ_PASSWORD__", zulip_rabbitmq_password)
+rendered = rendered.replace("__ZULIP_REDIS_PASSWORD__", zulip_redis_password)
+rendered = rendered.replace("__ZULIP_LOADBALANCER_IPS__", zulip_loadbalancer_ips)
+dst_path.write_text(rendered)
+PY
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying Zulip Argo CD application"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \

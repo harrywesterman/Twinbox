@@ -167,6 +167,7 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert '--required-keys "LOADBALANCER_IPS,ZULIP_RABBITMQ_PASSWORD,ZULIP_REDIS_PASSWORD"' in run_text
     assert 'zulip_config_secret_json' in run_text
     assert 'zulip_runtime_secret_json' in run_text
+    assert 'rendered = rendered.replace("__ZULIP_LOADBALANCER_IPS__", zulip_loadbalancer_ips)' in run_text
 
     assert "kind: ApplicationSet" in app_text
     assert "name: zulip-set" in app_text
