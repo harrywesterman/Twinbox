@@ -6,6 +6,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { exportJWK, generateKeyPair, SignJWT } from "jose";
 
 const repoRoot = "/Users/harrywesterman/Documents/Twinbox";
 const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "twinbox-portal-test-"));
@@ -21,6 +22,10 @@ const managerState = {
   jobs: new Map(),
   nextJobId: 1,
 };
+const issuedAuthCodes = new Map();
+
+let authentikSigningKey;
+let authentikJwk;
 
 function writePortalConfig(config) {
   fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
@@ -100,6 +105,17 @@ function readRequestBody(req) {
   });
 }
 
+function readRequestText(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on("data", (chunk) => chunks.push(chunk));
+    req.on("end", () => {
+      resolve(Buffer.concat(chunks).toString("utf8"));
+    });
+    req.on("error", reject);
+  });
+}
+
 function sendJson(res, status, payload) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json");
@@ -142,6 +158,98 @@ const authentikServer = http.createServer(async (req, res) => {
       userinfo_endpoint: `${authentikServerOrigin}/userinfo`,
       jwks_uri: `${authentikServerOrigin}/jwks`,
       issuer: `${authentikServerOrigin}/api/v3`,
+    });
+    return;
+  }
+
+  if (req.method === "GET" && pathname === "/authorize") {
+    const redirectUri = url.searchParams.get("redirect_uri") || "";
+    const state = url.searchParams.get("state") || "";
+    const code = `code-${crypto.randomBytes(12).toString("hex")}`;
+
+    issuedAuthCodes.set(code, {
+      clientId: url.searchParams.get("client_id") || "",
+      codeChallenge: url.searchParams.get("code_challenge") || "",
+      nonce: url.searchParams.get("nonce") || "",
+      redirectUri,
+    });
+
+    const callbackUrl = new URL(redirectUri);
+    callbackUrl.searchParams.set("code", code);
+    callbackUrl.searchParams.set("state", state);
+
+    res.statusCode = 302;
+    res.setHeader("Location", callbackUrl.toString());
+    res.end();
+    return;
+  }
+
+  if (req.method === "GET" && pathname === "/jwks") {
+    sendJson(res, 200, { keys: [authentikJwk] });
+    return;
+  }
+
+  if (req.method === "POST" && pathname === "/token") {
+    const body = new URLSearchParams(await readRequestText(req));
+    const code = body.get("code") || "";
+    const record = issuedAuthCodes.get(code);
+
+    if (!record) {
+      sendJson(res, 400, { error: "invalid_grant" });
+      return;
+    }
+
+    if (body.get("client_id") !== record.clientId) {
+      sendJson(res, 400, { error: "invalid_client" });
+      return;
+    }
+
+    if (body.get("redirect_uri") !== record.redirectUri) {
+      sendJson(res, 400, { error: "invalid_redirect_uri" });
+      return;
+    }
+
+    const codeVerifier = body.get("code_verifier") || "";
+    const codeChallenge = crypto.createHash("sha256").update(codeVerifier).digest("base64url");
+    if (codeChallenge !== record.codeChallenge) {
+      sendJson(res, 400, { error: "invalid_code_verifier" });
+      return;
+    }
+
+    issuedAuthCodes.delete(code);
+
+    const now = Math.floor(Date.now() / 1000);
+    const idToken = await new SignJWT({
+      sub: "portal-admin-1",
+      name: "Portal Admin",
+      email: "admin@example.com",
+      preferred_username: "portal-admin",
+      groups: ["admins"],
+      nonce: record.nonce,
+    })
+      .setProtectedHeader({ alg: "RS256", kid: authentikJwk.kid })
+      .setIssuer(`${authentikServerOrigin}/api/v3`)
+      .setAudience(record.clientId)
+      .setIssuedAt(now)
+      .setExpirationTime(now + 300)
+      .sign(authentikSigningKey);
+
+    sendJson(res, 200, {
+      access_token: "portal-access-token",
+      id_token: idToken,
+      token_type: "Bearer",
+      expires_in: 300,
+    });
+    return;
+  }
+
+  if (req.method === "GET" && pathname === "/userinfo") {
+    sendJson(res, 200, {
+      sub: "portal-admin-1",
+      name: "Portal Admin",
+      email: "admin@example.com",
+      preferred_username: "portal-admin",
+      groups: ["admins"],
     });
     return;
   }
@@ -429,6 +537,12 @@ async function requestPortal(pathname, { method = "GET", body, cookie } = {}) {
 
 test.before(async () => {
   seedAuthentikState();
+  const keyPair = await generateKeyPair("RS256");
+  authentikSigningKey = keyPair.privateKey;
+  authentikJwk = await exportJWK(keyPair.publicKey);
+  authentikJwk.kid = "authentik-test-key";
+  authentikJwk.use = "sig";
+  authentikJwk.alg = "RS256";
   writePortalConfig({
     settings: {
       authentikAdminUrl: "https://authentik.tst.example.com/if/admin/",
@@ -767,6 +881,32 @@ test("login requests the reduced Authentik scope set", async () => {
   assert.equal(response.status, 302);
   const location = new URL(response.headers.get("location"));
   assert.equal(location.searchParams.get("scope"), "openid profile email");
+});
+
+test("auth callback succeeds even when the browser does not return the oauth cookie", async () => {
+  const loginResponse = await fetch(`${portalOrigin}/auth/login?returnTo=%2Fadmin`, {
+    redirect: "manual",
+  });
+
+  assert.equal(loginResponse.status, 302);
+  const authorizeUrl = new URL(loginResponse.headers.get("location"));
+  assert.equal(authorizeUrl.pathname, "/authorize");
+
+  const authorizeResponse = await fetch(authorizeUrl, {
+    redirect: "manual",
+  });
+
+  assert.equal(authorizeResponse.status, 302);
+  const callbackUrl = new URL(authorizeResponse.headers.get("location"));
+  assert.equal(callbackUrl.pathname, "/auth/callback");
+
+  const callbackResponse = await fetch(callbackUrl, {
+    redirect: "manual",
+  });
+
+  assert.equal(callbackResponse.status, 302);
+  const redirectUrl = new URL(callbackResponse.headers.get("location"), portalOrigin);
+  assert.equal(redirectUrl.pathname, "/admin");
 });
 
 test("portal image copies the Authentik admin helper into the runtime image", async () => {

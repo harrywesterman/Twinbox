@@ -21,6 +21,8 @@ const configPath = process.env.PORTAL_CONFIG_PATH || "/config/portal-config.json
 const sessionSecret = process.env.PORTAL_SESSION_SECRET || "twinbox-portal-dev-secret";
 const sessionCookieName = process.env.PORTAL_SESSION_COOKIE || "twinbox_portal_session";
 const oauthCookieName = process.env.PORTAL_OAUTH_COOKIE || "twinbox_portal_oauth";
+const oauthStateDir = path.join(dataDir, "oauth-state");
+const oauthStateTtlMs = 10 * 60 * 1000;
 const managerBaseUrl = String(process.env.PORTAL_MANAGER_BASE_URL || "http://manager-api:8080").trim().replace(/\/+$/, "");
 const issuer = String(process.env.PORTAL_OIDC_ISSUER || process.env.AUTHENTIK_ISSUER || "").trim();
 const clientId = String(process.env.PORTAL_OIDC_CLIENT_ID || "").trim();
@@ -138,6 +140,90 @@ function clearCookie(res, req, name) {
     ...(Array.isArray(res.getHeader("Set-Cookie")) ? res.getHeader("Set-Cookie") : res.getHeader("Set-Cookie") ? [res.getHeader("Set-Cookie")] : []),
     `${name}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${String(req.headers["x-forwarded-proto"] || "").includes("https") ? "; Secure" : ""}`,
   ]);
+}
+
+function oauthStateFilePath(state) {
+  return path.join(oauthStateDir, `${state}.json`);
+}
+
+async function cleanupExpiredOAuthStates() {
+  try {
+    const entries = await fs.promises.readdir(oauthStateDir, { withFileTypes: true });
+    await Promise.all(entries.map(async (entry) => {
+      if (!entry.isFile() || !entry.name.endsWith(".json")) {
+        return;
+      }
+      const filePath = path.join(oauthStateDir, entry.name);
+      try {
+        const payload = await readJsonFile(filePath, null);
+        const createdAt = Number(payload?.createdAt || 0);
+        if (!createdAt || Date.now() - createdAt > oauthStateTtlMs) {
+          await fs.promises.rm(filePath, { force: true });
+        }
+      } catch {
+        await fs.promises.rm(filePath, { force: true });
+      }
+    }));
+  } catch (error) {
+    if (error?.code !== "ENOENT") {
+      throw error;
+    }
+  }
+}
+
+async function saveOAuthState(statePayload) {
+  if (!statePayload?.state) {
+    throw new Error("missing oauth state");
+  }
+
+  await fs.promises.mkdir(oauthStateDir, { recursive: true });
+  await cleanupExpiredOAuthStates();
+  const createdAt = Number(statePayload.createdAt || Date.now());
+  await writeJsonFile(oauthStateFilePath(statePayload.state), {
+    ...statePayload,
+    createdAt,
+  });
+  return {
+    ...statePayload,
+    createdAt,
+  };
+}
+
+async function loadOAuthState(state) {
+  const stateValue = String(state || "").trim();
+  if (!stateValue) {
+    return null;
+  }
+
+  const filePath = oauthStateFilePath(stateValue);
+  let payload = null;
+  try {
+    payload = await readJsonFile(filePath, null);
+  } catch {
+    await fs.promises.rm(filePath, { force: true });
+    return null;
+  }
+
+  if (!payload) {
+    return null;
+  }
+
+  const createdAt = Number(payload.createdAt || 0);
+  if (!createdAt || Date.now() - createdAt > oauthStateTtlMs) {
+    await fs.promises.rm(filePath, { force: true });
+    return null;
+  }
+
+  return payload;
+}
+
+async function clearOAuthState(state) {
+  const stateValue = String(state || "").trim();
+  if (!stateValue) {
+    return;
+  }
+
+  await fs.promises.rm(oauthStateFilePath(stateValue), { force: true });
 }
 
 function sanitizeReturnTo(rawValue) {
@@ -527,14 +613,15 @@ app.get("/auth/login", async (req, res) => {
     const codeChallenge = sha256Base64Url(codeVerifier);
     const nonce = randomBase64Url(24);
     const returnTo = sanitizeReturnTo(req.query.returnTo);
-
-    setCookie(res, req, oauthCookieName, encodeSignedJson({
+    const oauthState = await saveOAuthState({
       state,
       codeVerifier,
       nonce,
       returnTo,
       createdAt: Date.now(),
-    }), { maxAge: 10 * 60 * 1000 });
+    });
+
+    setCookie(res, req, oauthCookieName, encodeSignedJson(oauthState), { maxAge: oauthStateTtlMs });
 
     const authorizationUrl = new URL(discovery.authorization_endpoint);
     authorizationUrl.searchParams.set("response_type", "code");
@@ -553,10 +640,12 @@ app.get("/auth/login", async (req, res) => {
 });
 
 app.get("/auth/callback", async (req, res) => {
+  const stateValue = String(req.query.state || "");
+  let oauthState = null;
   try {
     const cookies = readCookies(req);
-    const oauthState = decodeSignedJson(cookies[oauthCookieName]);
-    if (!oauthState?.state || oauthState.state !== String(req.query.state || "")) {
+    oauthState = await loadOAuthState(stateValue) || decodeSignedJson(cookies[oauthCookieName]);
+    if (!oauthState?.state || oauthState.state !== stateValue) {
       throw new Error("invalid login state");
     }
 
@@ -586,8 +675,12 @@ app.get("/auth/callback", async (req, res) => {
       createdAt: Date.now(),
     }), { maxAge: 7 * 24 * 60 * 60 * 1000 });
     clearCookie(res, req, oauthCookieName);
+    await clearOAuthState(oauthState.state);
     res.redirect(oauthState.returnTo || "/");
   } catch (error) {
+    if (oauthState?.state) {
+      await clearOAuthState(oauthState.state);
+    }
     res.status(400).send(`
       <!doctype html>
       <html>
