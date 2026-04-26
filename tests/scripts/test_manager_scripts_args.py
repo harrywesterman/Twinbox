@@ -831,7 +831,7 @@ def test_longhorn_step_installs_via_argocd_and_waits_for_health():
     assert "twinbox.io/role: worker" in longhorn_values_text
     assert 'storageOverProvisioningPercentage: "300"' in longhorn_values_text
     assert 'storageReservedPercentageForDefaultDisk: "10"' in longhorn_values_text
-    assert 'storageMinimalAvailablePercentage: "20"' in longhorn_values_text
+    assert 'storageMinimalAvailablePercentage: "10"' in longhorn_values_text
     assert "allowVolumeCreationWithDegradedAvailability: true" not in longhorn_values_text
     assert "allowVolumeExpansion: true" in (
         REPO_ROOT / "gitops" / "databases" / "longhorn-single-storageclass.yaml"
@@ -1312,34 +1312,16 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "wait --for=condition=Ready externalsecret/pgadmin4-oidc" in pgadmin_run_text
     assert "Creating pgAdmin 4 database password secret" in pgadmin_run_text
     assert 'pgadmin4-db-password' in pgadmin_run_text
-    assert "Removing stale pgAdmin 4 import resources" in pgadmin_run_text
-    assert 'kubectl -n pgadmin4 delete job pgadmin4-load-servers --ignore-not-found=true' in pgadmin_run_text
     assert (
         "wait_for_ready_pod pgadmin4 app.kubernetes.io/name=pgadmin4"
         in pgadmin_run_text
     )
-    assert "Loading pgAdmin 4 shared server entry" in pgadmin_run_text
     assert 'kubectl apply -f "$pgadmin_platform_dir/configmap.yaml"' in pgadmin_run_text
-    assert 'kind: Job' in pgadmin_run_text
-    assert 'name: pgadmin4-load-servers' in pgadmin_run_text
-    assert 'cp /usr/local/bin/python3.14 /tmp/python3.14.no-cap' in pgadmin_run_text
-    assert 'chmod 0755 /tmp/python3.14.no-cap' in pgadmin_run_text
-    assert 'exec /tmp/python3.14.no-cap /pgadmin4/setup.py load-servers /config/pgadmin4-servers.json --user ${pgadmin_default_email} --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace' in pgadmin_run_text
-    assert 'job_status="unknown"' in pgadmin_run_text
-    assert 'job_timeout_seconds=600' in pgadmin_run_text
-    assert 'kubectl -n pgadmin4 get job "${pgadmin_load_servers_job_name}" -o json | jq -e' in pgadmin_run_text
-    assert 'select(.type == "Complete" and .status == "True")' in pgadmin_run_text
-    assert 'select(.type == "Failed" and .status == "True")' in pgadmin_run_text
-    assert 'Timed out waiting for pgAdmin 4 server import job' in pgadmin_run_text
-    assert 'kubectl -n pgadmin4 describe job "${pgadmin_load_servers_job_name}" || true' in pgadmin_run_text
-    assert 'if [[ "$job_status" == "failed" ]]; then' in pgadmin_run_text
     assert "Applying pgAdmin 4 service, deployment, and ingress" in pgadmin_run_text
     assert 'kubectl apply -f "$pgadmin_platform_dir/service.yaml"' in pgadmin_run_text
     assert 'kubectl apply -f "$pgadmin_platform_dir/deployment.yaml"' in pgadmin_run_text
     assert 'kubectl apply -f "$pgadmin_rendered_ingressroute"' in pgadmin_run_text
     assert 'kubectl -n pgadmin4 wait --for=condition=Available deployment/pgadmin4 --timeout=10m' in pgadmin_run_text
-    assert 'pgAdmin 4 server import job failed' in pgadmin_run_text
-    assert 'kubectl -n pgadmin4 delete job pgadmin4-load-servers --ignore-not-found=true' in pgadmin_run_text
     assert "kind: ConfigMap" in pgadmin_server_config_text
     assert "Authentik Database" in pgadmin_server_config_text
     assert "authentik-db-pooler-rw-session.databases.svc.cluster.local" in pgadmin_server_config_text
@@ -1461,12 +1443,14 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "pgadmin4-db-password" in pgadmin_deployment_text
     assert "name: pgadmin4-bootstrap" in pgadmin_deployment_text
     assert "name: pgadmin4-db-password" in pgadmin_deployment_text
-    assert "load-shared-servers" in pgadmin_deployment_text
     assert "pgadmin4-servers" in pgadmin_deployment_text
-    assert "load-servers /config/pgadmin4-servers.json" in pgadmin_deployment_text
+    assert "postStart" in pgadmin_deployment_text
+    assert "load-servers" in pgadmin_deployment_text
+    assert "sharedserver" in pgadmin_deployment_text
     assert "startupProbe" in pgadmin_deployment_text
     assert "failureThreshold: 36" in pgadmin_deployment_text
-    assert "tcpSocket" in pgadmin_deployment_text
+    assert "exec:" in pgadmin_deployment_text
+    assert "sharedserver where name = 'Authentik Database'" in pgadmin_deployment_text
     assert "runAsNonRoot: true" in pgadmin_deployment_text
     assert "runAsUser: 5050" in pgadmin_deployment_text
     assert "runAsGroup: 0" in pgadmin_deployment_text
@@ -2214,7 +2198,7 @@ def test_loki_and_openbao_longhorn_sizes_are_right_sized():
 
     assert "size: 20Gi" in loki_values_text
     assert "size: 5Gi" not in loki_values_text
-    assert "size: 20Gi" in openbao_values_text
+    assert "size: 10Gi" in openbao_values_text
     assert "size: 2Gi" not in openbao_values_text
 
 
@@ -2330,7 +2314,7 @@ def test_dashy_deployment_uses_a_published_image_tag():
     assert "kubernetes.io/hostname" not in text
     assert "persistentVolumeClaim:" in text
     assert "claimName: dashy-data" in text
-    assert "storage: 20Gi" in pvc_text
+    assert "storage: 5Gi" in pvc_text
     assert "emptyDir: {}" not in text
     assert 'target = Path("/app/user-data/config.yml")' in text
     assert "requests:" in text

@@ -80,36 +80,6 @@ spec:
           volumeMounts:
             - name: pgadmin-config
               mountPath: /work
-        - name: load-shared-servers
-          image: dpage/pgadmin4:9.14
-          imagePullPolicy: IfNotPresent
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 5050
-            runAsGroup: 5050
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-          command:
-            - /bin/sh
-            - -ec
-            - |
-              cp /usr/local/bin/python3.14 /tmp/python3.14.no-cap
-              chmod 0755 /tmp/python3.14.no-cap
-              export PYTHONPATH=/venv/lib/python3.14/site-packages:/usr/local/lib/python3.14/site-packages
-              exec /tmp/python3.14.no-cap /pgadmin4/setup.py load-servers /config/pgadmin4-servers.json --user "${PGADMIN_DEFAULT_EMAIL}" --sqlite-path /var/lib/pgadmin/pgadmin4.db --replace
-          envFrom:
-            - secretRef:
-                name: pgadmin4-bootstrap
-            - secretRef:
-                name: pgadmin4-db-password
-          volumeMounts:
-            - name: pgadmin-data
-              mountPath: /var/lib/pgadmin
-            - name: pgadmin-servers
-              mountPath: /config
-              readOnly: true
       containers:
         - name: pgadmin4
           image: dpage/pgadmin4:9.14
@@ -141,6 +111,67 @@ spec:
                 --access-logfile "${GUNICORN_ACCESS_LOGFILE:--}" \
                 -c gunicorn_config.py \
                 run_pgadmin:app
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -ec
+                  - |
+                    python_bin=/tmp/python3.14.no-cap
+                    cp /usr/local/bin/python3.14 "${python_bin}"
+                    chmod 0755 "${python_bin}"
+                    export PYTHONPATH=/venv/lib/python3.14/site-packages:/usr/local/lib/python3.14/site-packages
+                    cat > /tmp/load-shared-servers.py <<'PY'
+                    import os
+                    import sqlite3
+                    import subprocess
+                    import sys
+                    import time
+
+                    db_path = "/var/lib/pgadmin/pgadmin4.db"
+                    deadline = time.time() + 120
+
+                    while time.time() < deadline:
+                        if os.path.exists(db_path) and os.path.getsize(db_path) > 0:
+                            conn = None
+                            try:
+                                conn = sqlite3.connect(db_path)
+                                cur = conn.cursor()
+                                cur.execute(
+                                    "select 1 from sqlite_master where type='table' and name='sharedserver'"
+                                )
+                                if cur.fetchone():
+                                    break
+                            except sqlite3.Error:
+                                pass
+                            finally:
+                                if conn is not None:
+                                    conn.close()
+                        time.sleep(1)
+                    else:
+                        print(
+                            "Timed out waiting for pgAdmin configuration database",
+                            file=sys.stderr,
+                        )
+                        sys.exit(1)
+
+                    subprocess.run(
+                        [
+                            "/tmp/python3.14.no-cap",
+                            "/pgadmin4/setup.py",
+                            "load-servers",
+                            "/config/pgadmin4-servers.json",
+                            "--user",
+                            os.environ["PGADMIN_DEFAULT_EMAIL"],
+                            "--sqlite-path",
+                            db_path,
+                            "--replace",
+                        ],
+                        check=True,
+                    )
+                    PY
+                    exec "${python_bin}" /tmp/load-shared-servers.py
           ports:
             - containerPort: 80
               name: http
@@ -155,8 +186,32 @@ spec:
             - name: PYTHONPATH
               value: /venv/lib/python3.14/site-packages:/venv/lib/python3.14/dist-packages
           startupProbe:
-            tcpSocket:
-              port: http
+            exec:
+              command:
+                - /bin/sh
+                - -ec
+                - |
+                  test -x /tmp/python3.14.no-cap
+                  exec /tmp/python3.14.no-cap - <<'PY'
+                  import os
+                  import sqlite3
+                  import sys
+
+                  db_path = "/var/lib/pgadmin/pgadmin4.db"
+
+                  if not os.path.exists(db_path) or os.path.getsize(db_path) == 0:
+                      sys.exit(1)
+
+                  try:
+                      conn = sqlite3.connect(db_path)
+                      cur = conn.cursor()
+                      cur.execute(
+                          "select 1 from sharedserver where name = 'Authentik Database'"
+                      )
+                      sys.exit(0 if cur.fetchone() else 1)
+                  except sqlite3.Error:
+                      sys.exit(1)
+                  PY
             failureThreshold: 36
             periodSeconds: 5
             timeoutSeconds: 3
