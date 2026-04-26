@@ -38,7 +38,7 @@ valkey:
       enabled: true
       type: persistentVolumeClaim
       accessMode: ReadWriteOnce
-      size: 20Gi
+      size: 5Gi
       storageClass: longhorn
 
 server:

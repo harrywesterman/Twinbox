@@ -8,11 +8,12 @@ global:
 defaultSettings:
   createDefaultDiskLabeledNodes: true
   systemManagedComponentsNodeSelector: twinbox.io/role=worker
-  # Twinbox keeps three replicas for HA and allows roomy thin-provisioned PVCs.
-  # Longhorn still refuses writes once real free space drops below this guard.
+  # Twinbox keeps three replicas for HA and sizes PVCs against the cluster-wide
+  # worker disk budget. Dedicated worker disks can run closer to full, but we
+  # still keep a small free-space floor for snapshots and replica churn.
   storageOverProvisioningPercentage: "300"
   storageReservedPercentageForDefaultDisk: "10"
-  storageMinimalAvailablePercentage: "20"
+  storageMinimalAvailablePercentage: "10"
   systemManagedCSIComponentsResourceLimits: >-
     {
       "csi-attacher":{"requests":{"cpu":"20m","memory":"64Mi"},"limits":{"cpu":"200m","memory":"128Mi"}},

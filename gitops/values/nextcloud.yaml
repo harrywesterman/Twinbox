@@ -42,11 +42,11 @@ nextcloud:
   persistence:
     enabled: true
     storageClass: longhorn
-    size: 20Gi
+    size: 5Gi
     nextcloudData:
       enabled: true
       storageClass: longhorn
-      size: 100Gi
+      size: 50Gi
 
 externalDatabase:
   enabled: true
@@ -72,7 +72,7 @@ redis:
     persistence:
       enabled: true
       storageClass: longhorn
-      size: 20Gi
+      size: 5Gi
   replica:
     persistence:
       enabled: false

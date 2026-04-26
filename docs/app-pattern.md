@@ -11,7 +11,9 @@ Longhorn is the default StorageClass for all stateful workloads. It provides:
 - Snapshot and backup support
 - Automatic replica placement
 
-Stateless apps (Headlamp, Grafana with external storage) do not need a PVC. Stateful apps define a PVC in their Helm values:
+Stateless apps (Headlamp, Grafana with external storage) do not need a PVC.
+Stateful apps define a PVC in their Helm values and should size it from the
+cluster's Longhorn budget, not from a guess about the app's eventual lifetime.
 
 ```yaml
 persistence:
@@ -20,7 +22,40 @@ persistence:
   size: 10Gi
 ```
 
-CloudNativePG Clusters use Longhorn via `storageClass: longhorn` in the Cluster spec.
+CloudNativePG clusters use Longhorn via `storageClass: longhorn` or
+`storageClass: longhorn-single` in the Cluster spec.
+
+#### Cluster Budget Sizing
+
+Use the worker disks that Longhorn can actually schedule on as the budget input.
+Then keep a cluster-wide free-space buffer, and pick the smallest band that fits
+the workload's current state.
+
+| Band | Rule of thumb | Typical use |
+|------|---------------|-------------|
+| Small | `1-2%` of cluster budget | Portal state, dashboards, admin helpers |
+| Medium | `2-5%` of cluster budget | App metadata, caches, small queues |
+| Large | `5-10%` of cluster budget | Normal app data and modest databases |
+| Heavy/media | `10%+` of cluster budget | User files, photos, logs, traces |
+
+Replica-aware footprint matters:
+
+- `longhorn` requests cost roughly `requested size × 3`
+- `longhorn-single` requests cost roughly `requested size × 1`
+
+That means a `10Gi` volume on `longhorn` claims about `30Gi` of schedulable
+space, even if the filesystem is still mostly empty.
+
+### Practical Default Sizes
+
+| App class | Default size | Notes |
+|-----------|--------------|-------|
+| Small | `5Gi` | Portal, Dashy, pgAdmin, FreshRSS, other light metadata |
+| Medium | `10Gi` | OpenCloud config/apps, OpenBao, Zulip, Tempo, light queues |
+| Large | `20Gi` | Databases, observability, general app state |
+| Heavy/media | `50Gi+` | Immich libraries, Nextcloud user data, bulky app data |
+
+Start at the low end of the band and resize when the PVC usage alerts fire.
 
 ### Traefik — Ingress
 
@@ -543,19 +578,9 @@ Daily backup at 02:00 UTC:
 
 ## Volume Resize and Capacity Management
 
-### Initial Sizing
-
-The `size` field in a PVC or CloudNativePG Cluster spec defines the **initial capacity**. Start conservative — you can always grow later.
-
-```yaml
-storage:
-  size: 10Gi
-  storageClass: longhorn
-```
-
-### Online Resize (No Downtime)
-
-Longhorn supports online volume expansion. You can resize a PVC while the pod is running:
+The `size` field in a PVC or CloudNativePG Cluster spec defines the **initial
+capacity**. Start at the lower end of the band, then grow when the PVC usage
+alerts fire.
 
 ```bash
 # Resize an app PVC
@@ -567,75 +592,16 @@ kubectl patch cluster <app>-db -n databases \
   --type merge -p '{"spec":{"storage":{"size":"20Gi"}}}'
 ```
 
-Longhorn automatically expands the underlying volume and the filesystem grows to fill the new space. No pod restart is needed.
+Longhorn expands the underlying volume online, so this is a normal operational
+change rather than a migration.
 
-### Capacity Monitoring
-
-Prometheus and Grafana (already deployed) track PVC usage. Set up alerts for:
-
-- **Warning**: PVC usage > 70%
-- **Critical**: PVC usage > 85%
-- **Emergency**: PVC usage > 95%
-
-This gives you time to resize before the volume fills up.
-
-### Sizing Guidelines
-
-| App Type | Initial Size | Growth Pattern |
-|----------|-------------|----------------|
-| Stateless (Headlamp) | No PVC needed | N/A |
-| Light state (Ntfy) | 5Gi | Slow, predictable |
-| Monitoring data (Loki) | 20Gi | Steady, depends on retention |
-| Database (CloudNativePG) | 10Gi+ | Depends on app, monitor closely |
-| File storage (Grafana dashboards) | 5Gi | Very slow |
-
-## Volume Resize and Capacity Management
-
-### Initial Sizing
-
-The `size` field in a PVC or CloudNativePG Cluster spec defines the **initial capacity**. Start conservative — you can always grow later.
-
-```yaml
-storage:
-  size: 10Gi
-  storageClass: longhorn
-```
-
-### Online Resize (No Downtime)
-
-Longhorn supports online volume expansion. You can resize a PVC while the pod is running:
-
-```bash
-# Resize an app PVC
-kubectl patch pvc <app>-data -n <namespace> \
-  --type merge -p '{"spec":{"resources":{"requests":{"storage":"20Gi"}}}}'
-
-# Resize a CloudNativePG volume
-kubectl patch cluster <app>-db -n databases \
-  --type merge -p '{"spec":{"storage":{"size":"20Gi"}}}'
-```
-
-Longhorn automatically expands the underlying volume and the filesystem grows to fill the new space. No pod restart is needed.
-
-### Capacity Monitoring
-
-Prometheus and Grafana (already deployed) track PVC usage. Set up alerts for:
+Prometheus and Grafana already track PVC usage:
 
 - **Warning**: PVC usage > 70%
 - **Critical**: PVC usage > 85%
 - **Emergency**: PVC usage > 95%
 
-This gives you time to resize before the volume fills up.
-
-### Sizing Guidelines
-
-| App Type | Initial Size | Growth Pattern |
-|----------|-------------|----------------|
-| Stateless (Headlamp) | No PVC needed | N/A |
-| Light state (Ntfy) | 5Gi | Slow, predictable |
-| Monitoring data (Loki) | 20Gi | Steady, depends on retention |
-| Database (CloudNativePG) | 10Gi+ | Depends on app, monitor closely |
-| File storage (Grafana dashboards) | 5Gi | Very slow |
+Those alerts are the resize trigger, not the point where you start planning.
 
 ## Troubleshooting
 
@@ -791,7 +757,7 @@ Existing apps that do not yet follow this pattern can be migrated in phases.
    persistence:
      enabled: true
      storageClass: longhorn
-     size: 20Gi
+     size: 10Gi
      accessMode: ReadWriteOnce
    ```
 2. Migrate data from hostPath to the PVC:

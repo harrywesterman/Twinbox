@@ -207,7 +207,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `install-alloy` installs Grafana Alloy as the shared collector for Kubernetes logs, Kubernetes events, and OTLP traces.
 - Twinbox also seeds a small default alert set for Cilium and Longhorn so cluster network and storage health surface in Alertmanager and ntfy automatically, with warning, critical, and emergency alerts pushed to `ntfy.bierineenweek.nl` as different notification priorities.
 - `install-grafana` installs Grafana, provisions the Prometheus, Loki, and Tempo datasources automatically, seeds the default Managed Kubernetes Overview plus Twinbox Nodes, Twinbox Workloads, Twinbox Control Plane, Twinbox Storage, Twinbox Logs & Events, Twinbox Logs Detail, Twinbox Network, and Twinbox Traefik dashboards so the cluster starts with usable views for nodes, workloads, control plane, storage, logs, traffic, and ingress without manual UI setup, and stores Grafana's admin credentials alongside the OIDC client secret in OpenBao so Argo CD does not keep regenerating its admin Secret.
-- `install-longhorn-storage` installs Longhorn, makes it the default storage class, and runs before any stateful secret infrastructure. Longhorn is configured to run only on worker nodes so storage and CSI components stay off control planes.
+- `install-longhorn-storage` installs Longhorn, makes it the default storage class, and runs before any stateful secret infrastructure. Longhorn is configured to run only on worker nodes so storage and CSI components stay off control planes, and PVCs should be sized from the cluster-budget bands documented in [docs/app-pattern.md](./app-pattern.md).
 - `install-secret-sync` installs:
   - External Secrets Operator
   - OpenBao with Raft storage on Longhorn

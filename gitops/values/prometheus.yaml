@@ -22,26 +22,26 @@ prometheus:
             requests:
               storage: 20Gi
 
-alertmanager:
-  enabled: true
-  alertmanagerSpec:
-    configSecret: alertmanager-config
-    resources:
-      requests:
-        memory: 128Mi
-        cpu: 100m
-      limits:
-        memory: 256Mi
-        cpu: 200m
-    storage:
-      volumeClaimTemplate:
-        spec:
-          storageClassName: longhorn-single
-          accessModes:
-            - ReadWriteOnce
-          resources:
-            requests:
-              storage: 20Gi
+  alertmanager:
+    enabled: true
+    alertmanagerSpec:
+      configSecret: alertmanager-config
+      resources:
+        requests:
+          memory: 128Mi
+          cpu: 100m
+        limits:
+          memory: 256Mi
+          cpu: 200m
+      storage:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: longhorn-single
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 5Gi
 
 grafana:
   enabled: false

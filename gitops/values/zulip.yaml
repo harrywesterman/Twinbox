@@ -13,7 +13,7 @@ zulip:
   persistence:
     enabled: true
     accessMode: ReadWriteOnce
-    size: 20Gi
+    size: 10Gi
     storageClass: longhorn
 
 postgresql:
