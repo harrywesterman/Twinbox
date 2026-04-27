@@ -1,0 +1,95 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: nextcloud-platform-apps-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            twinbox.io/domain-ready: "true"
+  template:
+    metadata:
+      name: nextcloud-platform-apps
+    spec:
+      project: default
+      source:
+        repoURL: __REPO_URL__
+        targetRevision: __TARGET_REVISION__
+        path: gitops/platform-apps/nextcloud
+        kustomize:
+          patches:
+            - target:
+                kind: Middleware
+                name: nextcloud-well-known-redirect
+              patch: |-
+                - op: replace
+                  path: /spec/redirectRegex/regex
+                  value: ^https?://nextcloud\.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/\\.well-known/(carddav|caldav)$
+                - op: replace
+                  path: /spec/redirectRegex/replacement
+                  value: https://nextcloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/remote.php/dav
+            - target:
+                kind: Middleware
+                name: nextcloud-well-known-webfinger
+              patch: |-
+                - op: replace
+                  path: /spec/replacePathRegex/regex
+                  value: ^/\\.well-known/(webfinger|nodeinfo)$
+                - op: replace
+                  path: /spec/replacePathRegex/replacement
+                  value: /index.php/.well-known/$1
+            - target:
+                kind: Middleware
+                name: nextcloud-well-known-host-meta
+              patch: |-
+                - op: replace
+                  path: /spec/replacePathRegex/regex
+                  value: ^/\\.well-known/host-meta$
+                - op: replace
+                  path: /spec/replacePathRegex/replacement
+                  value: /public.php?service=host-meta
+            - target:
+                kind: Middleware
+                name: nextcloud-well-known-host-meta-json
+              patch: |-
+                - op: replace
+                  path: /spec/replacePathRegex/regex
+                  value: ^/\\.well-known/host-meta\\.json$
+                - op: replace
+                  path: /spec/replacePathRegex/replacement
+                  value: /public.php?service=host-meta-json
+            - target:
+                kind: IngressRoute
+                name: nextcloud
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`nextcloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: nextcloud-wiredoor
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`nextcloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: nextcloud-tailscale
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`nextcloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: nextcloud
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
