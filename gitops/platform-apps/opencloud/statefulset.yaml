@@ -29,9 +29,6 @@ spec:
           image: bitnamilegacy/openldap:2.6.10-debian-12-r4
           imagePullPolicy: IfNotPresent
           securityContext:
-            runAsNonRoot: true
-            runAsUser: 1001
-            runAsGroup: 1001
             allowPrivilegeEscalation: false
             capabilities:
               drop:
@@ -57,9 +54,6 @@ spec:
           image: bitnamilegacy/openldap:2.6.10-debian-12-r4
           imagePullPolicy: IfNotPresent
           securityContext:
-            runAsNonRoot: true
-            runAsUser: 1001
-            runAsGroup: 1001
             allowPrivilegeEscalation: false
             capabilities:
               drop:
