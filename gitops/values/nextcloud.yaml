@@ -20,6 +20,19 @@ cronjob:
     backoffLimit: 1
     command:
       - /cron.sh
+  env:
+    POSTGRES_DB: nextcloud
+    POSTGRES_HOST: nextcloud-db-pooler-rw.databases.svc.cluster.local
+    POSTGRES_USER:
+      valueFrom:
+        secretKeyRef:
+          name: nextcloud-db-credentials
+          key: username
+    POSTGRES_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: nextcloud-db-credentials
+          key: password
 
 livenessProbe:
   enabled: true
@@ -40,6 +53,19 @@ nextcloud:
     secretName: nextcloud-admin
     usernameKey: username
     passwordKey: password
+  env:
+    POSTGRES_DB: nextcloud
+    POSTGRES_HOST: nextcloud-db-pooler-rw.databases.svc.cluster.local
+    POSTGRES_USER:
+      valueFrom:
+        secretKeyRef:
+          name: nextcloud-db-credentials
+          key: username
+    POSTGRES_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: nextcloud-db-credentials
+          key: password
   defaultConfigs:
     .htaccess: true
     apps.config.php: true
