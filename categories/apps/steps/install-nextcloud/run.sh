@@ -294,7 +294,7 @@ fi
 [[ -n "$nextcloud_oidc_client_secret" ]] || nextcloud_oidc_client_secret="$(openssl rand -hex 32)"
 
 nextcloud_secret_file="$(mktemp)"
-trap 'rm -f "$nextcloud_secret_file" "${nextcloud_rendered_app_manifest:-}" "${nextcloud_rendered_middleware:-}" "${nextcloud_rendered_ingressroute:-}"' EXIT
+trap 'rm -f "$nextcloud_secret_file" "${nextcloud_rendered_app_manifest:-}" "${nextcloud_rendered_middleware:-}" "${nextcloud_rendered_ingressroute:-}" "${nextcloud_rendered_collabora_ingressroute:-}"' EXIT
 jq -n \
   --arg nextcloud_admin_username "$nextcloud_admin_username" \
   --arg nextcloud_admin_password "$nextcloud_admin_password" \
@@ -434,6 +434,10 @@ nextcloud_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/nextcloud-ingressrout
 sed "s/__ZONE_NAME__/${public_zone_name}/g" "$nextcloud_platform_dir/ingressroute.yaml" >"$nextcloud_rendered_ingressroute"
 kubectl apply -f "$nextcloud_rendered_ingressroute"
 
+nextcloud_rendered_collabora_ingressroute="$(mktemp "${TMPDIR:-/tmp}/nextcloud-collabora-ingressroute.XXXXXX.yaml")"
+sed "s/__ZONE_NAME__/${public_zone_name}/g" "$nextcloud_platform_dir/collabora-ingressroute.yaml" >"$nextcloud_rendered_collabora_ingressroute"
+kubectl apply -f "$nextcloud_rendered_collabora_ingressroute"
+
 wait_for_resources_ready "nextcloud" "externalsecret" "Ready" "Nextcloud ExternalSecret"
 
 log "Applying Nextcloud database manifests"
@@ -571,6 +575,51 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
     --send-id-token-hint='1' \
     --resolve-nested-claims='1'
 "
+
+log "Installing recommended Nextcloud apps"
+kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
+  set -euo pipefail
+  cd /var/www/html
+
+  # Office
+  php occ app:install richdocuments >/dev/null 2>&1 || true
+  
+  # Groupware
+  php occ app:install calendar >/dev/null 2>&1 || true
+  php occ app:install contacts >/dev/null 2>&1 || true
+  php occ app:install mail >/dev/null 2>&1 || true
+  
+  # Productivity
+  php occ app:install talk >/dev/null 2>&1 || true
+  php occ app:install deck >/dev/null 2>&1 || true
+  php occ app:install notes >/dev/null 2>&1 || true
+  php occ app:install tables >/dev/null 2>&1 || true
+  
+  # Media
+  php occ app:install photos >/dev/null 2>&1 || true
+  
+  # Enable all installed apps
+  php occ app:enable richdocuments >/dev/null 2>&1 || true
+  php occ app:enable calendar >/dev/null 2>&1 || true
+  php occ app:enable contacts >/dev/null 2>&1 || true
+  php occ app:enable mail >/dev/null 2>&1 || true
+  php occ app:enable talk >/dev/null 2>&1 || true
+  php occ app:enable deck >/dev/null 2>&1 || true
+  php occ app:enable notes >/dev/null 2>&1 || true
+  php occ app:enable tables >/dev/null 2>&1 || true
+  php occ app:enable photos >/dev/null 2>&1 || true
+  php occ app:enable activity >/dev/null 2>&1 || true
+"
+
+log "Configuring Collabora WOPI URL"
+kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
+  "php occ config:system:set wopi_url --value='https://collabora.${public_zone_name}' --type=string" || true
+
+log "Configuring Nextcloud Talk STUN/TURN servers"
+kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
+  "php occ config:system:set stun_servers --value='[\"turn.${public_zone_name}:3478\"]' --type=json" || true
+kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
+  "php occ config:app:set --value='yes' --type=string talk signaling" || true
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \

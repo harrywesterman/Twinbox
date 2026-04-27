@@ -8,3 +8,4 @@ resources:
   - redis-externalsecret.yaml
   - middleware.yaml
   - ingressroute.yaml
+  - collabora-ingressroute.yaml

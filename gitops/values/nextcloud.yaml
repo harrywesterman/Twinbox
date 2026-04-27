@@ -1,4 +1,4 @@
-replicaCount: 1
+replicaCount: 2
 
 service:
   type: ClusterIP
@@ -8,6 +8,21 @@ persistence:
   storageClass: longhorn
   size: 10Gi
   accessMode: ReadWriteOnce
+
+# S3 objectstore as primary storage
+objectstore:
+  enabled: true
+  bucket: nextcloud-data
+  hostname: garage-s3.garage.svc.cluster.local
+  region: us-east-1
+  port: 8000
+  accessKey:
+    existingSecret: garage-s3-credentials
+    accessKeyKey: accesskey
+  secretKey:
+    existingSecret: garage-s3-credentials
+    secretKeyKey: secretkey
+  usePathStyle: true
 
 phpClientHttpsFix:
   enabled: true
@@ -133,3 +148,18 @@ postgresql:
 
 externalRedis:
   enabled: false
+
+# Collabora CODE as subchart
+collabora:
+  enabled: true
+  service:
+    type: ClusterIP
+  collabora:
+    DONT_GEN_SSL_CERT: "true"
+    extra_params: "--o:ssl.termination=true --o:ssl.enable=false"
+    aliasgroups:
+      - hosts:
+        - nextcloud.__ZONE_NAME__
+    server_name: "collabora.__ZONE_NAME__"
+  ingress:
+    enabled: false

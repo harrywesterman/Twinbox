@@ -1,0 +1,25 @@
+id: install-coturn
+title: Install Coturn TURN Server
+type: action
+journey_stage: setup
+order: 66
+summary: Install Coturn TURN server for Nextcloud Talk video conferencing.
+explanation: Twinbox installs Coturn as a STUN/TURN server for Nextcloud Talk. This enables peer-to-peer video calls and screensharing even when users are behind NAT or firewalls.
+side_help: Coturn provides the TURN server needed for Nextcloud Talk to work through NAT and firewalls.
+depends_on:
+  - install-nextcloud
+  - install-longhorn
+inputs:
+  - name: turn_secret
+    type: string
+    description: Shared secret for TURN authentication (auto-generated if empty)
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/apps/steps/install-coturn/run.sh
