@@ -15,7 +15,7 @@ objectstore:
   bucket: nextcloud-data
   hostname: garage-s3.garage.svc.cluster.local
   region: us-east-1
-  port: 8000
+  port: 3900
   accessKey:
     existingSecret: garage-s3-credentials
     accessKeyKey: accesskey
