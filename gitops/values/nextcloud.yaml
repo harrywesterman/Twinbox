@@ -81,7 +81,7 @@ externalDatabase:
 
 redis:
   enabled: true
-  architecture: replication
+  architecture: standalone
   auth:
     enabled: true
     existingSecret: nextcloud-redis
@@ -94,14 +94,8 @@ redis:
       storageClass: longhorn
       size: 5Gi
   replica:
-    replicaCount: 2
     persistence:
-      enabled: true
-      storageClass: longhorn
-      size: 5Gi
-  sentinel:
-    enabled: true
-    quorum: 2
+      enabled: false
 
 mariadb:
   enabled: false
