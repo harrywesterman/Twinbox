@@ -22,16 +22,19 @@ cronjob:
       - /cron.sh
 
 livenessProbe:
+  enabled: true
   initialDelaySeconds: 120
   periodSeconds: 10
   failureThreshold: 6
 
 readinessProbe:
+  enabled: true
   initialDelaySeconds: 120
   periodSeconds: 10
   failureThreshold: 6
 
 nextcloud:
+  host: nextcloud.bierineenweek.nl
   existingSecret:
     enabled: true
     secretName: nextcloud-admin
