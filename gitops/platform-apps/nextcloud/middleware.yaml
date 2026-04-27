@@ -5,8 +5,8 @@ metadata:
   namespace: nextcloud
 spec:
   redirectRegex:
-    regex: ^https?://nextcloud\.__ZONE_NAME__/.well-known/(carddav|caldav)$
-    replacement: https://nextcloud.__ZONE_NAME__/remote.php/dav
+    regex: ^https?://nextcloud\.bierineenweek\.nl/.well-known/(carddav|caldav)$
+    replacement: https://nextcloud.bierineenweek.nl/remote.php/dav
     permanent: true
 ---
 apiVersion: traefik.io/v1alpha1
