@@ -33,6 +33,9 @@ OPENCLOUD_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "apps" / "steps" / "install-opencloud" / "run.sh"
 )
 DASHY_APP = REPO_ROOT / "gitops" / "apps" / "dashy.yaml"
+FRESHRSS_STEP_SCRIPT = (
+    REPO_ROOT / "categories" / "apps" / "steps" / "install-freshrss" / "run.sh"
+)
 ARGO_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
 )
@@ -290,6 +293,7 @@ LONGHORN_APP = REPO_ROOT / "gitops" / "apps" / "longhorn.yaml"
 TRAEFIK_APP = REPO_ROOT / "gitops" / "apps" / "traefik.yaml"
 WHOAMI_APP = REPO_ROOT / "gitops" / "apps" / "whoami.yaml"
 HEADLAMP_APP = REPO_ROOT / "gitops" / "apps" / "headlamp.yaml"
+FRESHRSS_APP = REPO_ROOT / "gitops" / "apps" / "freshrss.yaml"
 GRAFANA_APP = REPO_ROOT / "gitops" / "apps" / "grafana.yaml"
 WIREDOOR_GATEWAY_APP = REPO_ROOT / "gitops" / "apps" / "wiredoor-gateway.yaml"
 WHOAMI_DEPLOYMENT = (
@@ -321,6 +325,9 @@ WHOAMI_INGRESSROUTE = (
 )
 HEADLAMP_INGRESSROUTE = (
     REPO_ROOT / "gitops" / "platform-apps" / "headlamp" / "ingressroute.yaml"
+)
+FRESHRSS_INGRESSROUTE = (
+    REPO_ROOT / "gitops" / "platform-apps" / "freshrss" / "ingressroute.yaml"
 )
 GRAFANA_EXTERNALSECRET = (
     REPO_ROOT / "gitops" / "platform-apps" / "grafana" / "externalsecret.yaml"
@@ -1617,6 +1624,8 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
         REPO_ROOT / "gitops" / "values" / "external-secrets.yaml"
     ).read_text(encoding="utf-8")
     traefik_app_text = _traefik_app_text()
+    freshrss_run_text = FRESHRSS_STEP_SCRIPT.read_text(encoding="utf-8")
+    freshrss_app_text = FRESHRSS_APP.read_text(encoding="utf-8")
     headlamp_app_text = HEADLAMP_APP.read_text(encoding="utf-8")
     wiredoor_gateway_app_text = _wiredoor_gateway_app_text()
     traefik_values_text = _traefik_values_text()
@@ -1644,6 +1653,18 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "enabled: true" in traefik_values_text
     assert "existingSecret: wiredoor-gateway" in wiredoor_gateway_values_text
     assert "token:" not in wiredoor_gateway_values_text
+    assert "cluster-public-zone.sh" in freshrss_run_text
+    assert "Could not determine cluster DNS domain" in freshrss_run_text
+    assert 'rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/freshrss-application.XXXXXX.yaml")"' in freshrss_run_text
+    assert "Applying FreshRSS Argo CD application" in freshrss_run_text
+    assert 'sed "s/__ZONE_NAME__/${public_zone_name}/g" "$manifest_path" >"$rendered_manifest"' in freshrss_run_text
+    assert '--manifest "$rendered_manifest"' in freshrss_run_text
+    assert "kind: Application" in freshrss_app_text
+    assert "path: gitops/platform-apps/freshrss" in freshrss_app_text
+    assert "kustomize:" in freshrss_app_text
+    assert "Host(`freshrss.__ZONE_NAME__`)" in FRESHRSS_INGRESSROUTE.read_text(
+        encoding="utf-8"
+    )
     assert "kind: Application" in headlamp_app_text
     assert "path: gitops/platform-apps/headlamp" in headlamp_app_text
     assert "path: gitops/platform-apps/wiredoor-gateway" in wiredoor_gateway_app_text

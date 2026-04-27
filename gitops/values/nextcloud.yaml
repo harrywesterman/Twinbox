@@ -53,7 +53,7 @@ readinessProbe:
   failureThreshold: 6
 
 nextcloud:
-  host: nextcloud.bierineenweek.nl
+  host: nextcloud.__ZONE_NAME__
   existingSecret:
     enabled: true
     secretName: nextcloud-admin
@@ -94,7 +94,7 @@ nextcloud:
     overwrite.config.php: |
       <?php
       $CONFIG = array (
-        'overwrite.cli.url' => 'https://nextcloud.bierineenweek.nl',
+        'overwrite.cli.url' => 'https://nextcloud.__ZONE_NAME__',
       );
   externalDatabase:
     enabled: true

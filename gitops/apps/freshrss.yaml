@@ -9,6 +9,29 @@ spec:
     repoURL: __REPO_URL__
     targetRevision: __TARGET_REVISION__
     path: gitops/platform-apps/freshrss
+    kustomize:
+      patches:
+        - target:
+            kind: IngressRoute
+            name: freshrss
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`freshrss.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: freshrss-wiredoor
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`freshrss.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: freshrss-tailscale
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`freshrss.__ZONE_NAME__`)
   destination:
     server: https://kubernetes.default.svc
     namespace: freshrss

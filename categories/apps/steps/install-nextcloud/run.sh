@@ -294,7 +294,7 @@ fi
 [[ -n "$nextcloud_oidc_client_secret" ]] || nextcloud_oidc_client_secret="$(openssl rand -hex 32)"
 
 nextcloud_secret_file="$(mktemp)"
-trap 'rm -f "$nextcloud_secret_file" "${nextcloud_rendered_app_manifest:-}"' EXIT
+trap 'rm -f "$nextcloud_secret_file" "${nextcloud_rendered_app_manifest:-}" "${nextcloud_rendered_middleware:-}" "${nextcloud_rendered_ingressroute:-}"' EXIT
 jq -n \
   --arg nextcloud_admin_username "$nextcloud_admin_username" \
   --arg nextcloud_admin_password "$nextcloud_admin_password" \
@@ -425,8 +425,14 @@ kubectl apply -f "$nextcloud_platform_dir/namespace.yaml"
 kubectl apply -f "$nextcloud_platform_dir/admin-externalsecret.yaml"
 kubectl apply -f "$nextcloud_platform_dir/db-externalsecret.yaml"
 kubectl apply -f "$nextcloud_platform_dir/redis-externalsecret.yaml"
-kubectl apply -f "$nextcloud_platform_dir/middleware.yaml"
-kubectl apply -f "$nextcloud_platform_dir/ingressroute.yaml"
+
+nextcloud_rendered_middleware="$(mktemp "${TMPDIR:-/tmp}/nextcloud-middleware.XXXXXX.yaml")"
+sed "s/__ZONE_NAME__/${public_zone_name}/g" "$nextcloud_platform_dir/middleware.yaml" >"$nextcloud_rendered_middleware"
+kubectl apply -f "$nextcloud_rendered_middleware"
+
+nextcloud_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/nextcloud-ingressroute.XXXXXX.yaml")"
+sed "s/__ZONE_NAME__/${public_zone_name}/g" "$nextcloud_platform_dir/ingressroute.yaml" >"$nextcloud_rendered_ingressroute"
+kubectl apply -f "$nextcloud_rendered_ingressroute"
 
 wait_for_resources_ready "nextcloud" "externalsecret" "Ready" "Nextcloud ExternalSecret"
 
@@ -448,6 +454,7 @@ sed \
   -e "s|__REPO_URL__|${TWINBOX_GIT_REPO_URL:-https://github.com/harrywesterman/Twinbox.git}|g" \
   -e "s|__TARGET_REVISION__|${TWINBOX_GIT_TARGET_REVISION:-main}|g" \
   -e "s|__NEXTCLOUD_HOST__|${NEXTCLOUD_HOST}|g" \
+  -e "s|__ZONE_NAME__|${public_zone_name}|g" \
   "$nextcloud_app_manifest" >"$nextcloud_rendered_app_manifest"
 
 log "Applying Nextcloud Argo CD application"
