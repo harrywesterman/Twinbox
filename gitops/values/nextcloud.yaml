@@ -12,7 +12,24 @@ ingress:
 
 cronjob:
   enabled: true
-  type: sidecar
+  type: cronjob
+  cronjob:
+    schedule: "*/5 * * * *"
+    successfulJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 5
+    backoffLimit: 1
+    command:
+      - /cron.sh
+
+livenessProbe:
+  initialDelaySeconds: 120
+  periodSeconds: 10
+  failureThreshold: 6
+
+readinessProbe:
+  initialDelaySeconds: 120
+  periodSeconds: 10
+  failureThreshold: 6
 
 nextcloud:
   existingSecret:

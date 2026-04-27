@@ -455,7 +455,77 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$nextcloud_rendered_app_manifest" \
   --application "nextcloud"
 
-wait_for_deployment_rollout "nextcloud" "nextcloud" "Nextcloud application"
+log "Waiting for Nextcloud CronJob to be created"
+cronjob_attempts=60
+cronjob_attempt=1
+while ! kubectl -n nextcloud get cronjob nextcloud-cron &>/dev/null; do
+  log "Waiting for Nextcloud CronJob (${cronjob_attempt}/${cronjob_attempts})"
+  sleep 5
+  if [[ "$cronjob_attempt" -ge "$cronjob_attempts" ]]; then
+    fail "Timeout waiting for CronJob to be created. Debug with: kubectl -n nextcloud get cronjob"
+  fi
+  cronjob_attempt=$((cronjob_attempt + 1))
+done
+log "CronJob created"
+
+log "Triggering first CronJob run for initialization"
+kubectl -n nextcloud create job nextcloud-init --from=cronjob/nextcloud-cron --dry-run=client -o yaml | kubectl apply -f -
+
+max_retries=3
+retry_count=0
+init_success=false
+
+while [[ $retry_count -lt $max_retries ]]; do
+  log "Waiting for Nextcloud initialization (attempt $((retry_count + 1))/${max_retries})"
+  
+  if kubectl -n nextcloud wait --for=condition=complete job/nextcloud-init --timeout=300s 2>/dev/null; then
+    log "CronJob completed successfully"
+    init_success=true
+    break
+  fi
+  
+  job_failed=$(kubectl -n nextcloud get job nextcloud-init -o jsonpath='{.status.failed}' 2>/dev/null || echo "0")
+  if [[ "$job_failed" != "0" && "$job_failed" != "" ]]; then
+    log "CronJob failed (attempt $((retry_count + 1))/${max_retries})"
+    retry_count=$((retry_count + 1))
+    if [[ $retry_count -lt $max_retries ]]; then
+      log "Retrying initialization..."
+      kubectl -n nextcloud delete job nextcloud-init --ignore-not-found
+      kubectl -n nextcloud create job nextcloud-init --from=cronjob/nextcloud-cron --dry-run=client -o yaml | kubectl apply -f -
+      continue
+    else
+      fail "CronJob failed after ${max_retries} attempts. Debug with: kubectl -n nextcloud logs job/nextcloud-init"
+    fi
+  fi
+  
+  sleep 10
+done
+
+if [[ "$init_success" != "true" ]]; then
+  fail "Nextcloud initialization failed"
+fi
+
+log "Verifying Nextcloud installation status"
+verify_attempts=30
+verify_attempt=1
+while [[ $verify_attempt -le $verify_attempts ]]; do
+  pod=$(kubectl -n nextcloud get pods -l app.kubernetes.io/name=nextcloud -o name 2>/dev/null | head -1 | sed 's|pods/||')
+  if [[ -n "$pod" ]]; then
+    installed_status=$(kubectl -n nextcloud exec "$pod" -- wget -qO- --timeout=5 http://localhost/status.php 2>/dev/null | grep -o '"installed":[^,}]*' | cut -d: -f2 || echo "unknown")
+    if [[ "$installed_status" == "true" ]]; then
+      log "Nextcloud is initialized"
+      break
+    fi
+  fi
+  
+  if [[ $verify_attempt -ge $verify_attempts ]]; then
+    log "Warning: Could not verify Nextcloud installation status, proceeding anyway"
+  fi
+  
+  sleep 10
+  verify_attempt=$((verify_attempt + 1))
+done
+
 wait_for_statefulset_ready "nextcloud" "nextcloud-redis-master" "Nextcloud Redis master"
 
 log "Bootstrapping Nextcloud user_oidc"
