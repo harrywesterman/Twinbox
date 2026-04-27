@@ -10,11 +10,11 @@ spec:
       chart: nextcloud
       targetRevision: "9.0.5"
       helm:
-        values: |
-          nextcloud:
-            host: __NEXTCLOUD_HOST__
-            trustedDomains:
-              - __NEXTCLOUD_HOST__
+        valueFiles:
+          - $values/gitops/values/nextcloud.yaml
+        parameters:
+          - name: nextcloud.host
+            value: __NEXTCLOUD_HOST__
     - repoURL: __REPO_URL__
       targetRevision: __TARGET_REVISION__
       ref: values
