@@ -91,14 +91,9 @@ nextcloud:
         ),
         'forwarded_for_headers' => array('HTTP_X_FORWARDED_FOR'),
       );
-    db.config.php: |-
+    overwrite.config.php: |
       <?php
       $CONFIG = array (
-        'dbtype' => 'pgsql',
-        'dbhost' => 'nextcloud-db-pooler-rw.databases.svc.cluster.local',
-        'dbname' => 'nextcloud',
-        'dbuser' => 'nextcloud',
-        'dbpassword' => '8b7e14883e6e6cc5df41ceecee2a229cb1c6e42ef4b058cb',
         'overwrite.cli.url' => 'https://nextcloud.bierineenweek.nl',
       );
   externalDatabase:
