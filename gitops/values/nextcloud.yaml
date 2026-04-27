@@ -3,6 +3,12 @@ replicaCount: 2
 service:
   type: ClusterIP
 
+persistence:
+  enabled: true
+  storageClass: longhorn
+  size: 10Gi
+  accessMode: ReadWriteOnce
+
 phpClientHttpsFix:
   enabled: true
   protocol: https
@@ -85,25 +91,26 @@ nextcloud:
         ),
         'forwarded_for_headers' => array('HTTP_X_FORWARDED_FOR'),
       );
-  persistence:
+    db.config.php: |-
+      <?php
+      $CONFIG = array (
+        'dbtype' => 'pgsql',
+        'dbhost' => 'nextcloud-db-pooler-rw.databases.svc.cluster.local',
+        'dbname' => 'nextcloud',
+        'dbuser' => 'nextcloud',
+        'dbpassword' => '8b7e14883e6e6cc5df41ceecee2a229cb1c6e42ef4b058cb',
+        'overwrite.cli.url' => 'https://nextcloud.bierineenweek.nl',
+      );
+  externalDatabase:
     enabled: true
-    storageClass: longhorn
-    size: 5Gi
-    nextcloudData:
+    type: postgresql
+    host: nextcloud-db-pooler-rw.databases.svc.cluster.local
+    database: nextcloud
+    existingSecret:
       enabled: true
-      storageClass: longhorn
-      size: 50Gi
-
-externalDatabase:
-  enabled: true
-  type: postgresql
-  host: nextcloud-db-pooler-rw.databases.svc.cluster.local
-  database: nextcloud
-  existingSecret:
-    enabled: true
-    secretName: nextcloud-db-credentials
-    usernameKey: username
-    passwordKey: password
+      secretName: nextcloud-db-credentials
+      usernameKey: username
+      passwordKey: password
 
 redis:
   enabled: true
