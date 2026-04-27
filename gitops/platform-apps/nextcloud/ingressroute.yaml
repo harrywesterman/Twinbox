@@ -18,6 +18,11 @@ spec:
         - kind: Service
           name: nextcloud
           port: 8080
+          sticky:
+            cookie:
+              name: NCROLES
+              secure: true
+              httpOnly: true
   tls: {}
 ---
 apiVersion: traefik.io/v1alpha1
@@ -40,6 +45,11 @@ spec:
         - kind: Service
           name: nextcloud
           port: 8080
+          sticky:
+            cookie:
+              name: NCROLES
+              secure: true
+              httpOnly: true
 ---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
@@ -61,4 +71,9 @@ spec:
         - kind: Service
           name: nextcloud
           port: 8080
+          sticky:
+            cookie:
+              name: NCROLES
+              secure: true
+              httpOnly: true
   tls: {}

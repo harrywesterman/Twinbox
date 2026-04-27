@@ -528,6 +528,16 @@ done
 
 wait_for_statefulset_ready "nextcloud" "nextcloud-redis-master" "Nextcloud Redis master"
 
+log "Configuring Nextcloud Redis memcache for HA"
+kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
+  set -euo pipefail
+  cd /var/www/html
+  php occ config:system:set memcache.distributed --value='\\OC\\Memcache\\Redis' --type=string
+  php occ config:system:set memcache.local --value='\\OC\\Memcache\\APCu' --type=string
+  php occ config:system:set memcache.locking --value='\\OC\\Memcache\\Redis' --type=string
+  php occ config:system:set redis --value='host:nextcloud-redis-master,port:6379' --type=string
+"
+
 log "Bootstrapping Nextcloud user_oidc"
 kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
   set -euo pipefail
