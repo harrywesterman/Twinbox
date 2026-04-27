@@ -9,20 +9,9 @@ persistence:
   size: 10Gi
   accessMode: ReadWriteOnce
 
-# S3 objectstore as primary storage
+# S3 objectstore is DISABLED for greenfield single-pod setup
 objectstore:
-  enabled: true
-  bucket: nextcloud-data
-  hostname: garage-s3.garage.svc.cluster.local
-  region: us-east-1
-  port: 3900
-  accessKey:
-    existingSecret: garage-s3-credentials
-    accessKeyKey: accesskey
-  secretKey:
-    existingSecret: garage-s3-credentials
-    secretKeyKey: secretkey
-  usePathStyle: true
+  enabled: false
 
 phpClientHttpsFix:
   enabled: true
@@ -57,12 +46,18 @@ cronjob:
 
 livenessProbe:
   enabled: true
+  httpGet:
+    path: /status.php
+    port: 80
   initialDelaySeconds: 120
   periodSeconds: 10
   failureThreshold: 6
 
 readinessProbe:
   enabled: true
+  httpGet:
+    path: /status.php
+    port: 80
   initialDelaySeconds: 120
   periodSeconds: 10
   failureThreshold: 6
@@ -77,6 +72,7 @@ nextcloud:
   env:
     POSTGRES_DB: nextcloud
     POSTGRES_HOST: nextcloud-db-pooler-rw.databases.svc.cluster.local
+    APACHE_SERVER_NAME: nextcloud.__ZONE_NAME__
     POSTGRES_USER:
       valueFrom:
         secretKeyRef:
@@ -93,6 +89,8 @@ nextcloud:
     autoconfig.php: true
     redis.config.php: true
     reverse-proxy.config.php: true
+    s3.config.php: false
+    swift.config.php: false
   configs:
     proxy.config.php: |-
       <?php
@@ -149,7 +147,6 @@ postgresql:
 externalRedis:
   enabled: false
 
-# Collabora CODE as subchart
 collabora:
   enabled: true
   service:
