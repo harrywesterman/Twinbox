@@ -431,6 +431,7 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
 log "Applying Nextcloud namespace and secret resources"
 kubectl apply -f "$nextcloud_platform_dir/namespace.yaml"
 kubectl apply -f "$nextcloud_platform_dir/admin-externalsecret.yaml"
+kubectl apply -f "$nextcloud_platform_dir/authentik-externalsecret.yaml"
 kubectl apply -f "$nextcloud_platform_dir/db-externalsecret.yaml"
 kubectl apply -f "$nextcloud_platform_dir/redis-externalsecret.yaml"
 
@@ -618,6 +619,9 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
     --bearer-provisioning='0' \
     --send-id-token-hint='1' \
     --resolve-nested-claims='1'
+  # user_oidc does not always persist the provider's group provisioning toggle
+  # through the provider CLI, so write the app config explicitly as well.
+  php occ config:app:set --type=string --value=1 user_oidc provider-1-groupProvisioning
 "
 
 log "Installing recommended Nextcloud apps"

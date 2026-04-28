@@ -29,13 +29,27 @@ cronjob:
     failedJobsHistoryLimit: 5
     backoffLimit: 1
     command:
-      - /cron.sh
-  env:
-    POSTGRES_DB: nextcloud
-    POSTGRES_HOST: nextcloud-db-pooler-rw.databases.svc.cluster.local
-    POSTGRES_USER:
-      valueFrom:
-        secretKeyRef:
+      - /bin/sh
+      - -lc
+      - |-
+        set -euo pipefail
+        cd /var/www/html
+        if [[ -n "${AUTHENTIK_API_BASE:-}" && -n "${AUTHENTIK_API_TOKEN:-}" ]]; then
+          php -r '$apiBase = getenv("AUTHENTIK_API_BASE") ?: ""; $apiToken = getenv("AUTHENTIK_API_TOKEN") ?: ""; if ($apiBase === "" || $apiToken === "") { fwrite(STDERR, "Skipping Nextcloud admin sync: missing Authentik API settings\n"); exit(0); } $headers = "Accept: application/json\r\nAuthorization: Bearer {$apiToken}\r\n"; $context = stream_context_create(["http" => ["header" => $headers, "timeout" => 15]]); $groupsUrl = rtrim($apiBase, "/") . "/core/groups/?page_size=200"; $groupsPayload = @file_get_contents($groupsUrl, false, $context); if ($groupsPayload === false) { fwrite(STDERR, "Skipping Nextcloud admin sync: unable to query Authentik groups\n"); exit(0); } $groupsData = json_decode($groupsPayload, true); if (!is_array($groupsData)) { fwrite(STDERR, "Skipping Nextcloud admin sync: invalid Authentik groups payload\n"); exit(0); } $members = []; foreach (($groupsData["results"] ?? []) as $group) { if (($group["name"] ?? "") !== "admins") { continue; } $candidates = $group["users_obj"] ?? $group["users"] ?? []; foreach ($candidates as $candidate) { $username = null; if (is_array($candidate)) { $username = $candidate["username"] ?? null; if ($username === null && isset($candidate["pk"])) { $userUrl = rtrim($apiBase, "/") . "/core/users/" . rawurlencode((string)$candidate["pk"]) . "/"; $userPayload = @file_get_contents($userUrl, false, $context); if ($userPayload !== false) { $userData = json_decode($userPayload, true); if (is_array($userData)) { $username = $userData["username"] ?? null; } } } } elseif (is_string($candidate) || is_int($candidate)) { $userUrl = rtrim($apiBase, "/") . "/core/users/" . rawurlencode((string)$candidate) . "/"; $userPayload = @file_get_contents($userUrl, false, $context); if ($userPayload !== false) { $userData = json_decode($userPayload, true); if (is_array($userData)) { $username = $userData["username"] ?? null; } } } if (!is_string($username) || $username === "") { continue; } $members[hash("sha256", "1_0_" . $username)] = true; } break; } foreach (array_keys($members) as $userId) { $cmd = "php occ group:adduser admin " . escapeshellarg($userId); passthru($cmd, $status); if ($status !== 0) { fwrite(STDERR, "Nextcloud admin sync could not add {$userId} to admin group\n"); } }' || true
+        fi
+        exec /cron.sh
+    env:
+      AUTHENTIK_API_BASE: https://authentik.__ZONE_NAME__/api/v3
+      AUTHENTIK_API_TOKEN:
+        valueFrom:
+          secretKeyRef:
+            name: nextcloud-authentik
+            key: AUTHENTIK_API_TOKEN
+      POSTGRES_DB: nextcloud
+      POSTGRES_HOST: nextcloud-db-pooler-rw.databases.svc.cluster.local
+      POSTGRES_USER:
+        valueFrom:
+          secretKeyRef:
           name: nextcloud-db-credentials
           key: username
     POSTGRES_PASSWORD:
