@@ -611,7 +611,7 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
     --mapping-email='email' \
     --mapping-uid='preferred_username' \
     --mapping-groups='groups' \
-    --group-provisioning='0' \
+    --group-provisioning='1' \
     --group-restrict-login-to-whitelist='0' \
     --unique-uid='1' \
     --check-bearer='0' \
