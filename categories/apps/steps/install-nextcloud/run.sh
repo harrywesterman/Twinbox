@@ -518,11 +518,8 @@ done
 log "CronJob created"
 
 log "Triggering first CronJob run for initialization"
-kubectl -n nextcloud delete job nextcloud-init --ignore-not-found
-while kubectl -n nextcloud get job nextcloud-init &>/dev/null; do
-  sleep 1
-done
-kubectl -n nextcloud create job nextcloud-init --from=cronjob/nextcloud-cron --dry-run=client -o yaml | kubectl apply -f -
+init_job_name="nextcloud-init-$(date +%s)"
+kubectl -n nextcloud create job "${init_job_name}" --from=cronjob/nextcloud-cron --dry-run=client -o yaml | kubectl apply -f -
 
 max_retries=3
 retry_count=0
@@ -531,23 +528,26 @@ init_success=false
 while [[ $retry_count -lt $max_retries ]]; do
   log "Waiting for Nextcloud initialization (attempt $((retry_count + 1))/${max_retries})"
   
-  if kubectl -n nextcloud wait --for=condition=complete job/nextcloud-init --timeout=300s 2>/dev/null; then
+  if kubectl -n nextcloud wait --for=condition=complete "job/${init_job_name}" --timeout=300s 2>/dev/null; then
     log "CronJob completed successfully"
     init_success=true
     break
   fi
   
-  job_failed=$(kubectl -n nextcloud get job nextcloud-init -o jsonpath='{.status.failed}' 2>/dev/null || echo "0")
+  job_failed=$(kubectl -n nextcloud get job "${init_job_name}" -o jsonpath='{.status.failed}' 2>/dev/null || echo "0")
   if [[ "$job_failed" != "0" && "$job_failed" != "" ]]; then
     log "CronJob failed (attempt $((retry_count + 1))/${max_retries})"
     retry_count=$((retry_count + 1))
     if [[ $retry_count -lt $max_retries ]]; then
       log "Retrying initialization..."
-      kubectl -n nextcloud delete job nextcloud-init --ignore-not-found
-      kubectl -n nextcloud create job nextcloud-init --from=cronjob/nextcloud-cron --dry-run=client -o yaml | kubectl apply -f -
+      kubectl -n nextcloud delete job "${init_job_name}" --ignore-not-found
+      while kubectl -n nextcloud get job "${init_job_name}" &>/dev/null; do
+        sleep 1
+      done
+      kubectl -n nextcloud create job "${init_job_name}" --from=cronjob/nextcloud-cron --dry-run=client -o yaml | kubectl apply -f -
       continue
     else
-      fail "CronJob failed after ${max_retries} attempts. Debug with: kubectl -n nextcloud logs job/nextcloud-init"
+      fail "CronJob failed after ${max_retries} attempts. Debug with: kubectl -n nextcloud logs job/${init_job_name}"
     fi
   fi
   
