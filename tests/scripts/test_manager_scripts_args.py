@@ -2357,6 +2357,8 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert "authentik_resolve_signing_key_id" in text
     assert '--arg signing_key "$signing_key_id"' in text
     assert "signing_key: $signing_key" in text
+    assert 'if ak_is_group_member(request.user, name="admins") and "admin" not in groups:' in text
+    assert 'if request.user.is_superuser and "admin" not in groups:' in text
     assert (
         "Could not resolve Authentik signing key ID for ${AUTHENTIK_SIGNING_KEY_NAME}"
         in text

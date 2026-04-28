@@ -345,6 +345,8 @@ nextcloud_groups_mapping_id="$(upsert_scope_mapping \
   "groups" \
   "Expose Nextcloud group membership" \
   'groups = [group.name for group in request.user.ak_groups.all()]
+if ak_is_group_member(request.user, name="admins") and "admin" not in groups:
+    groups.append("admin")
 if request.user.is_superuser and "admin" not in groups:
     groups.append("admin")
 return {
