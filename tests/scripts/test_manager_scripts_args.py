@@ -36,6 +36,9 @@ DASHY_APP = REPO_ROOT / "gitops" / "apps" / "dashy.yaml"
 FRESHRSS_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "apps" / "steps" / "install-freshrss" / "run.sh"
 )
+VAULTWARDEN_STEP_SCRIPT = (
+    REPO_ROOT / "categories" / "apps" / "steps" / "install-vaultwarden" / "run.sh"
+)
 ARGO_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
 )
@@ -294,6 +297,7 @@ TRAEFIK_APP = REPO_ROOT / "gitops" / "apps" / "traefik.yaml"
 WHOAMI_APP = REPO_ROOT / "gitops" / "apps" / "whoami.yaml"
 HEADLAMP_APP = REPO_ROOT / "gitops" / "apps" / "headlamp.yaml"
 FRESHRSS_APP = REPO_ROOT / "gitops" / "apps" / "freshrss.yaml"
+VAULTWARDEN_APP = REPO_ROOT / "gitops" / "apps" / "vaultwarden.yaml"
 GRAFANA_APP = REPO_ROOT / "gitops" / "apps" / "grafana.yaml"
 WIREDOOR_GATEWAY_APP = REPO_ROOT / "gitops" / "apps" / "wiredoor-gateway.yaml"
 WHOAMI_DEPLOYMENT = (
@@ -328,6 +332,9 @@ HEADLAMP_INGRESSROUTE = (
 )
 FRESHRSS_INGRESSROUTE = (
     REPO_ROOT / "gitops" / "platform-apps" / "freshrss" / "ingressroute.yaml"
+)
+VAULTWARDEN_INGRESSROUTE = (
+    REPO_ROOT / "gitops" / "platform-apps" / "vaultwarden" / "ingressroute.yaml"
 )
 GRAFANA_EXTERNALSECRET = (
     REPO_ROOT / "gitops" / "platform-apps" / "grafana" / "externalsecret.yaml"
@@ -1708,6 +1715,8 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     traefik_app_text = _traefik_app_text()
     freshrss_run_text = FRESHRSS_STEP_SCRIPT.read_text(encoding="utf-8")
     freshrss_app_text = FRESHRSS_APP.read_text(encoding="utf-8")
+    vaultwarden_run_text = VAULTWARDEN_STEP_SCRIPT.read_text(encoding="utf-8")
+    vaultwarden_app_text = VAULTWARDEN_APP.read_text(encoding="utf-8")
     headlamp_app_text = HEADLAMP_APP.read_text(encoding="utf-8")
     wiredoor_gateway_app_text = _wiredoor_gateway_app_text()
     traefik_values_text = _traefik_values_text()
@@ -1745,6 +1754,16 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "path: gitops/platform-apps/freshrss" in freshrss_app_text
     assert "kustomize:" in freshrss_app_text
     assert "Host(`freshrss.__ZONE_NAME__`)" in FRESHRSS_INGRESSROUTE.read_text(
+        encoding="utf-8"
+    )
+    assert "cluster-public-zone.sh" in vaultwarden_run_text
+    assert "sync-openbao-global-secret.sh" in vaultwarden_run_text
+    assert "VAULTWARDEN_ADMIN_TOKEN" in vaultwarden_run_text
+    assert "gitops/databases/vaultwarden/cluster.yaml" in vaultwarden_run_text
+    assert '--application "vaultwarden"' in vaultwarden_run_text
+    assert "kind: Application" in vaultwarden_app_text
+    assert "path: gitops/platform-apps/vaultwarden" in vaultwarden_app_text
+    assert "Host(`vaultwarden.__ZONE_NAME__`)" in VAULTWARDEN_INGRESSROUTE.read_text(
         encoding="utf-8"
     )
     assert "kind: Application" in headlamp_app_text
@@ -2296,7 +2315,38 @@ def test_databases_kustomization_includes_authentik_resources():
     assert "authentik/pooler-ro.yaml" in text
     assert "authentik/pooler-rw.yaml" in text
     assert "authentik/scheduled-backup.yaml" in text
+    assert "vaultwarden/cluster.yaml" in text
+    assert "vaultwarden/externalsecret.yaml" in text
+    assert "vaultwarden/pooler-ro.yaml" in text
+    assert "vaultwarden/pooler-rw.yaml" in text
+    assert "vaultwarden/scheduled-backup.yaml" in text
     assert "seaweedfs-backup-credentials.yaml" in text
+
+
+def test_vaultwarden_manifests_use_postgresql_and_domain_limited_signups():
+    deployment_text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "vaultwarden" / "deployment.yaml"
+    ).read_text(encoding="utf-8")
+    externalsecret_text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "vaultwarden" / "externalsecret.yaml"
+    ).read_text(encoding="utf-8")
+    db_externalsecret_text = (
+        REPO_ROOT / "gitops" / "databases" / "vaultwarden" / "externalsecret.yaml"
+    ).read_text(encoding="utf-8")
+    cluster_text = (
+        REPO_ROOT / "gitops" / "databases" / "vaultwarden" / "cluster.yaml"
+    ).read_text(encoding="utf-8")
+
+    assert "ghcr.io/dani-garcia/vaultwarden:1.35.7" in deployment_text
+    assert "ghcr.io/dani-garcia/vaultwarden:latest" not in deployment_text
+    assert "SIGNUPS_DOMAINS_WHITELIST" in deployment_text
+    assert "WEBSOCKET_ENABLED" in deployment_text
+    assert "secretKeyRef:" in deployment_text
+    assert "VAULTWARDEN_DATABASE_URL" in externalsecret_text
+    assert "VAULTWARDEN_ADMIN_TOKEN" in externalsecret_text
+    assert "VAULTWARDEN_POSTGRESQL__USERNAME" in db_externalsecret_text
+    assert "VAULTWARDEN_POSTGRESQL__PASSWORD" in db_externalsecret_text
+    assert "destinationPath: s3://twinbox-velero/vaultwarden-db/" in cluster_text
 
 
 def test_cnpg_database_clusters_have_seaweedfs_backups():

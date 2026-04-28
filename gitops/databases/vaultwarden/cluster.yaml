@@ -1,0 +1,54 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: vaultwarden-db
+  namespace: databases
+spec:
+  instances: 2
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.4
+
+  backup:
+    barmanObjectStore:
+      serverName: vaultwarden-db
+      destinationPath: s3://twinbox-velero/vaultwarden-db/
+      endpointURL: http://seaweedfs.longhorn-system.svc.cluster.local:8333
+      s3Credentials:
+        accessKeyId:
+          name: seaweedfs-backup-credentials
+          key: AWS_ACCESS_KEY_ID
+        secretAccessKey:
+          name: seaweedfs-backup-credentials
+          key: AWS_SECRET_ACCESS_KEY
+
+  bootstrap:
+    initdb:
+      database: vaultwarden
+      owner: vaultwarden
+      secret:
+        name: vaultwarden-db-credentials
+
+  storage:
+    size: 10Gi
+    storageClass: longhorn-single
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  postgresql:
+    parameters:
+      max_connections: "100"
+      shared_buffers: "128MB"
+      effective_cache_size: "384MB"
+      work_mem: "4MB"
+
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
+
+  monitoring:
+    enablePodMonitor: true

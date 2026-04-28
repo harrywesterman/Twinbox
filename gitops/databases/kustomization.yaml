@@ -27,6 +27,11 @@ resources:
   - paperless/pooler-ro.yaml
   - paperless/pooler-rw.yaml
   - paperless/scheduled-backup.yaml
+  - vaultwarden/cluster.yaml
+  - vaultwarden/externalsecret.yaml
+  - vaultwarden/pooler-ro.yaml
+  - vaultwarden/pooler-rw.yaml
+  - vaultwarden/scheduled-backup.yaml
   - zulip/cluster.yaml
   - zulip/externalsecret.yaml
   - zulip/pooler-ro.yaml

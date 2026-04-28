@@ -102,7 +102,22 @@ function buildCatalog(stepStatuses = {}) {
         'choose-ingress-route',
       ],
     }],
-    ['install-n8n', 'Install N8N', { dependsOn: [] }],
+    ['install-vaultwarden', 'Install Vaultwarden', {
+      dependsOn: [
+        'install-longhorn-storage',
+        'install-cloudnativepg',
+        'install-secret-sync',
+        'choose-ingress-route',
+      ],
+    }],
+    ['install-n8n', 'Install N8N', {
+      dependsOn: [
+        'install-longhorn-storage',
+        'install-cloudnativepg',
+        'install-secret-sync',
+        'choose-ingress-route',
+      ],
+    }],
     ['install-audiobookshelf', 'Install Audiobookshelf', {
       dependsOn: [
         'install-longhorn-storage',

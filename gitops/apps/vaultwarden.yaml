@@ -1,0 +1,53 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vaultwarden
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __TARGET_REVISION__
+    path: gitops/platform-apps/vaultwarden
+    kustomize:
+      patches:
+        - target:
+            kind: Deployment
+            name: vaultwarden
+          patch: |-
+            - op: replace
+              path: /spec/template/spec/containers/0/env/0/value
+              value: https://vaultwarden.__ZONE_NAME__
+            - op: replace
+              path: /spec/template/spec/containers/0/env/2/value
+              value: __ZONE_NAME__
+        - target:
+            kind: IngressRoute
+            name: vaultwarden
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`vaultwarden.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: vaultwarden-wiredoor
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`vaultwarden.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: vaultwarden-tailscale
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`vaultwarden.__ZONE_NAME__`)
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vaultwarden
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

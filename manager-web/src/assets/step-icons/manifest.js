@@ -182,6 +182,12 @@ export const STEP_ICON_MANIFEST = [
     officialSourceUrl: 'https://github.com/karakeep-app/karakeep',
   }),
   iconEntry({
+    stepId: 'install-vaultwarden',
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/dani-garcia/vaultwarden',
+  }),
+  iconEntry({
     stepId: 'install-n8n',
     isAppOrPlatform: true,
     officialSourceType: 'project-repository',

@@ -186,6 +186,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-zulip",
                 "install-paperless",
                 "install-karakeep",
+                "install-vaultwarden",
                 "install-n8n",
                 "install-audiobookshelf",
                 "install-freshrss",
@@ -252,6 +253,19 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert "install-gitea" not in talos_steps
             assert "install-uptimekuma" not in talos_steps
             assert talos_steps["install-zulip"]["depends_on"] == []
+            assert talos_steps["install-n8n"]["depends_on"] == [
+                "install-longhorn-storage",
+                "install-cloudnativepg",
+                "install-secret-sync",
+                "choose-ingress-route",
+            ]
+            assert talos_steps["install-vaultwarden"]["title"] == "Install Vaultwarden"
+            assert talos_steps["install-vaultwarden"]["depends_on"] == [
+                "install-longhorn-storage",
+                "install-cloudnativepg",
+                "install-secret-sync",
+                "choose-ingress-route",
+            ]
             assert talos_steps["install-audiobookshelf"]["title"] == "Install Audiobookshelf"
             assert "placeholder" not in talos_steps["install-audiobookshelf"]["summary"].lower()
             assert "placeholder" not in talos_steps["install-audiobookshelf"]["explanation"].lower()
@@ -314,6 +328,7 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
         )
         for dependency in [
             "install-longhorn-storage",
+            "install-cloudnativepg",
             "install-secret-sync",
             "install-authentik-idp",
             "create-users-and-groups",
@@ -347,6 +362,7 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
             assert body["errors"] == []
             apps = body["categories"][0]["steps"]
             audiobookshelf = next(step for step in apps if step["id"] == "install-audiobookshelf")
+            vaultwarden = next(step for step in apps if step["id"] == "install-vaultwarden")
             assert audiobookshelf["placeholder"] is False
             assert audiobookshelf["installable"] is True
             assert audiobookshelf["app_state"] == "ready"
@@ -356,6 +372,16 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
                 "install-secret-sync",
                 "install-authentik-idp",
                 "create-users-and-groups",
+                "choose-ingress-route",
+            ]
+            assert vaultwarden["placeholder"] is False
+            assert vaultwarden["installable"] is True
+            assert vaultwarden["app_state"] == "ready"
+            assert vaultwarden["runner"]["script"] == "categories/apps/steps/install-vaultwarden/run.sh"
+            assert vaultwarden["depends_on"] == [
+                "install-longhorn-storage",
+                "install-cloudnativepg",
+                "install-secret-sync",
                 "choose-ingress-route",
             ]
             nextcloud = next(step for step in apps if step["id"] == "install-nextcloud")

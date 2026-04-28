@@ -163,6 +163,11 @@ function buildProjectUrlMap() {
       project_url: 'https://karakeep.app/',
       github_url: 'https://github.com/karakeep-app/karakeep',
     },
+    'install-vaultwarden': {
+      icon: '🔐',
+      project_url: 'https://www.vaultwarden.net/',
+      github_url: 'https://github.com/dani-garcia/vaultwarden',
+    },
     'install-n8n': {
       icon: '🔗',
       project_url: 'https://n8n.io/',

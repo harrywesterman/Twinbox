@@ -15,6 +15,7 @@ app_steps:
       repository.
   - id: install-paperless
   - id: install-karakeep
+  - id: install-vaultwarden
   - id: install-n8n
   - id: install-audiobookshelf
   - id: install-freshrss
