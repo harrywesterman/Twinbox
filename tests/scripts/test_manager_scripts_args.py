@@ -877,6 +877,88 @@ def test_opencloud_step_keeps_authentik_property_mapping_ids_as_strings():
     )
 
 
+def test_opencloud_step_enables_external_idp_autoprovisioning_and_ldap_checks():
+    text = OPENCLOUD_STEP_SCRIPT.read_text(encoding="utf-8")
+
+    for expected in [
+        'opencloud_proxy_autoprovision_accounts="true"',
+        'opencloud_proxy_autoprovision_claim_username="preferred_username"',
+        'opencloud_proxy_user_oidc_claim="preferred_username"',
+        'opencloud_proxy_user_cs3_claim="username"',
+        'opencloud_proxy_oidc_rewrite_wellknown="true"',
+        'opencloud_proxy_role_assignment_driver="oidc"',
+        'opencloud_graph_assign_default_user_role="false"',
+        'opencloud_graph_username_match="none"',
+        'opencloud_oc_exclude_run_services="idp"',
+        'opencloud_oc_ldap_disable_user_mechanism="none"',
+        'opencloud_oc_ldap_insecure="true"',
+        "PROXY_AUTOPROVISION_ACCOUNTS: $PROXY_AUTOPROVISION_ACCOUNTS",
+        "PROXY_AUTOPROVISION_CLAIM_USERNAME: $PROXY_AUTOPROVISION_CLAIM_USERNAME",
+        "PROXY_USER_OIDC_CLAIM: $PROXY_USER_OIDC_CLAIM",
+        "PROXY_USER_CS3_CLAIM: $PROXY_USER_CS3_CLAIM",
+        "PROXY_OIDC_REWRITE_WELLKNOWN: $PROXY_OIDC_REWRITE_WELLKNOWN",
+        "PROXY_ROLE_ASSIGNMENT_DRIVER: $PROXY_ROLE_ASSIGNMENT_DRIVER",
+        "GRAPH_ASSIGN_DEFAULT_USER_ROLE: $GRAPH_ASSIGN_DEFAULT_USER_ROLE",
+        "GRAPH_USERNAME_MATCH: $GRAPH_USERNAME_MATCH",
+        "OC_EXCLUDE_RUN_SERVICES: $OC_EXCLUDE_RUN_SERVICES",
+        "wait_for_resources_ready \"opencloud\" \"externalsecret\" \"Ready\" \"OpenCloud ExternalSecret\"",
+        "wait_for_opencloud_ldap_directory",
+    ]:
+        assert expected in text
+
+    assert '"preferred_username": request.user.username' in text
+    assert '"sub": request.user.uid' in text
+    assert "ldapsearch -H ldaps://127.0.0.1:1636" in text
+
+
+def test_opencloud_gitops_uses_schema_backed_writable_ldap_bootstrap():
+    platform_dir = REPO_ROOT / "gitops" / "platform-apps" / "opencloud"
+    kustomization_text = (platform_dir / "kustomization.yaml").read_text(
+        encoding="utf-8"
+    )
+    bootstrap_text = (platform_dir / "ldap-bootstrap-configmap.yaml").read_text(
+        encoding="utf-8"
+    )
+    statefulset_text = (platform_dir / "statefulset.yaml").read_text(
+        encoding="utf-8"
+    )
+    deployment_text = (platform_dir / "deployment.yaml").read_text(
+        encoding="utf-8"
+    )
+    externalsecret_text = (platform_dir / "externalsecret.yaml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "ldap-bootstrap-configmap.yaml" in kustomization_text
+    assert "name: opencloud-ldap-bootstrap" in bootstrap_text
+    assert "10_opencloud_schema.ldif" in bootstrap_text
+    assert "NAME 'openCloudUUID'" in bootstrap_text
+    assert "dn: ou=users,dc=opencloud,dc=eu" in bootstrap_text
+    assert "dn: ou=groups,dc=opencloud,dc=eu" in bootstrap_text
+    assert "LDAP_USERS" not in statefulset_text
+    assert "LDAP_PASSWORDS" not in statefulset_text
+    assert "key: OC_LDAP_BIND_PASSWORD" in statefulset_text
+    assert "mountPath: /schemas/10_opencloud_schema.ldif" in statefulset_text
+    assert "mountPath: /ldifs/10_base.ldif" in statefulset_text
+    assert "name: wait-for-ldap" in deployment_text
+    assert "ldapsearch -H \"$OC_LDAP_URI\"" in deployment_text
+
+    for secret_key in [
+        "OC_LDAP_INSECURE",
+        "PROXY_AUTOPROVISION_ACCOUNTS",
+        "PROXY_AUTOPROVISION_CLAIM_USERNAME",
+        "PROXY_USER_OIDC_CLAIM",
+        "PROXY_USER_CS3_CLAIM",
+        "PROXY_OIDC_REWRITE_WELLKNOWN",
+        "PROXY_ROLE_ASSIGNMENT_DRIVER",
+        "GRAPH_ASSIGN_DEFAULT_USER_ROLE",
+        "GRAPH_USERNAME_MATCH",
+        "OC_EXCLUDE_RUN_SERVICES",
+    ]:
+        assert f"secretKey: {secret_key}" in externalsecret_text
+        assert f"property: {secret_key}" in externalsecret_text
+
+
 def test_opencloud_pvc_sizes_match_the_live_bound_volumes():
     pvc_text = (
         REPO_ROOT / "gitops" / "platform-apps" / "opencloud" / "pvc.yaml"

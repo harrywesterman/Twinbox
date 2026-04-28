@@ -27,6 +27,35 @@ resolve_kubeconfig_file() {
   printf '%s\n' "$KUBECONFIG_FILE"
 }
 
+wait_for_resources_ready() {
+  local namespace="$1"
+  local kind="$2"
+  local condition="$3"
+  local label="$4"
+  local attempts=120
+  local attempt=1
+
+  while true; do
+    if kubectl -n "$namespace" get "$kind" -o name 2>/dev/null | grep -q .; then
+      if kubectl -n "$namespace" wait --for="condition=${condition}" "$kind" --all --timeout=5s >/dev/null 2>&1; then
+        log "${label} resources are ready"
+        return 0
+      fi
+
+      log "Waiting for ${label} resources to become ready"
+    else
+      log "Waiting for ${label} resources to appear"
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      fail "${label} resources did not become ready after ${attempts} attempts"
+    fi
+
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
 wait_for_deployment_rollout() {
   local namespace="$1"
   local deployment="$2"
@@ -113,6 +142,29 @@ wait_for_statefulset_ready() {
       fail "Timed out waiting for ${label}"
     fi
 
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
+wait_for_opencloud_ldap_directory() {
+  local attempts=60
+  local attempt=1
+
+  while true; do
+    if kubectl -n opencloud exec opencloud-ldap-0 -c ldap -- env LDAPTLS_REQCERT=never sh -ec '
+      ldapsearch -H ldaps://127.0.0.1:1636 -x -D "cn=admin,dc=opencloud,dc=eu" -w "$LDAP_ADMIN_PASSWORD" -b "ou=users,dc=opencloud,dc=eu" -s base dn >/dev/null &&
+      ldapsearch -H ldaps://127.0.0.1:1636 -x -D "cn=admin,dc=opencloud,dc=eu" -w "$LDAP_ADMIN_PASSWORD" -b "ou=groups,dc=opencloud,dc=eu" -s base dn >/dev/null
+    ' >/dev/null 2>&1; then
+      log "OpenCloud LDAP directory responds to bind/search"
+      return 0
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      fail "OpenCloud LDAP directory did not become searchable"
+    fi
+
+    log "Waiting for OpenCloud LDAP directory bind/search (${attempt}/${attempts})"
     sleep 5
     attempt=$((attempt + 1))
   done
@@ -307,10 +359,20 @@ opencloud_oc_ldap_group_base_dn="ou=groups,dc=opencloud,dc=eu"
 opencloud_oc_ldap_user_filter="(objectclass=inetOrgPerson)"
 opencloud_oc_ldap_user_schema_id="opencloudUUID"
 opencloud_oc_ldap_group_schema_id="opencloudUUID"
-opencloud_oc_ldap_disable_user_mechanism="attribute"
+opencloud_oc_ldap_disable_user_mechanism="none"
 opencloud_oc_ldap_server_write_enabled="true"
 opencloud_graph_ldap_server_uuid="false"
 opencloud_graph_ldap_refint_enabled="true"
+opencloud_oc_ldap_insecure="true"
+opencloud_proxy_autoprovision_accounts="true"
+opencloud_proxy_autoprovision_claim_username="preferred_username"
+opencloud_proxy_user_oidc_claim="preferred_username"
+opencloud_proxy_user_cs3_claim="username"
+opencloud_proxy_oidc_rewrite_wellknown="true"
+opencloud_proxy_role_assignment_driver="oidc"
+opencloud_graph_assign_default_user_role="false"
+opencloud_graph_username_match="none"
+opencloud_oc_exclude_run_services="idp"
 opencloud_search_extractor_type="tika"
 opencloud_search_extractor_tika_tika_url="http://opencloud-tika:9998"
 opencloud_frontend_full_text_search_enabled="true"
@@ -360,6 +422,16 @@ if [[ -n "$existing_opencloud_secret_json" ]]; then
     "OC_LDAP_SERVER_WRITE_ENABLED:opencloud_oc_ldap_server_write_enabled" \
     "GRAPH_LDAP_SERVER_UUID:opencloud_graph_ldap_server_uuid" \
     "GRAPH_LDAP_REFINT_ENABLED:opencloud_graph_ldap_refint_enabled" \
+    "OC_LDAP_INSECURE:opencloud_oc_ldap_insecure" \
+    "PROXY_AUTOPROVISION_ACCOUNTS:opencloud_proxy_autoprovision_accounts" \
+    "PROXY_AUTOPROVISION_CLAIM_USERNAME:opencloud_proxy_autoprovision_claim_username" \
+    "PROXY_USER_OIDC_CLAIM:opencloud_proxy_user_oidc_claim" \
+    "PROXY_USER_CS3_CLAIM:opencloud_proxy_user_cs3_claim" \
+    "PROXY_OIDC_REWRITE_WELLKNOWN:opencloud_proxy_oidc_rewrite_wellknown" \
+    "PROXY_ROLE_ASSIGNMENT_DRIVER:opencloud_proxy_role_assignment_driver" \
+    "GRAPH_ASSIGN_DEFAULT_USER_ROLE:opencloud_graph_assign_default_user_role" \
+    "GRAPH_USERNAME_MATCH:opencloud_graph_username_match" \
+    "OC_EXCLUDE_RUN_SERVICES:opencloud_oc_exclude_run_services" \
     "SEARCH_EXTRACTOR_TYPE:opencloud_search_extractor_type" \
     "SEARCH_EXTRACTOR_TIKA_TIKA_URL:opencloud_search_extractor_tika_tika_url" \
     "FRONTEND_FULL_TEXT_SEARCH_ENABLED:opencloud_frontend_full_text_search_enabled" \
@@ -422,6 +494,16 @@ jq -n \
   --arg OC_LDAP_SERVER_WRITE_ENABLED "$opencloud_oc_ldap_server_write_enabled" \
   --arg GRAPH_LDAP_SERVER_UUID "$opencloud_graph_ldap_server_uuid" \
   --arg GRAPH_LDAP_REFINT_ENABLED "$opencloud_graph_ldap_refint_enabled" \
+  --arg OC_LDAP_INSECURE "$opencloud_oc_ldap_insecure" \
+  --arg PROXY_AUTOPROVISION_ACCOUNTS "$opencloud_proxy_autoprovision_accounts" \
+  --arg PROXY_AUTOPROVISION_CLAIM_USERNAME "$opencloud_proxy_autoprovision_claim_username" \
+  --arg PROXY_USER_OIDC_CLAIM "$opencloud_proxy_user_oidc_claim" \
+  --arg PROXY_USER_CS3_CLAIM "$opencloud_proxy_user_cs3_claim" \
+  --arg PROXY_OIDC_REWRITE_WELLKNOWN "$opencloud_proxy_oidc_rewrite_wellknown" \
+  --arg PROXY_ROLE_ASSIGNMENT_DRIVER "$opencloud_proxy_role_assignment_driver" \
+  --arg GRAPH_ASSIGN_DEFAULT_USER_ROLE "$opencloud_graph_assign_default_user_role" \
+  --arg GRAPH_USERNAME_MATCH "$opencloud_graph_username_match" \
+  --arg OC_EXCLUDE_RUN_SERVICES "$opencloud_oc_exclude_run_services" \
   --arg SEARCH_EXTRACTOR_TYPE "$opencloud_search_extractor_type" \
   --arg SEARCH_EXTRACTOR_TIKA_TIKA_URL "$opencloud_search_extractor_tika_tika_url" \
   --arg FRONTEND_FULL_TEXT_SEARCH_ENABLED "$opencloud_frontend_full_text_search_enabled" \
@@ -469,6 +551,16 @@ jq -n \
     OC_LDAP_SERVER_WRITE_ENABLED: $OC_LDAP_SERVER_WRITE_ENABLED,
     GRAPH_LDAP_SERVER_UUID: $GRAPH_LDAP_SERVER_UUID,
     GRAPH_LDAP_REFINT_ENABLED: $GRAPH_LDAP_REFINT_ENABLED,
+    OC_LDAP_INSECURE: $OC_LDAP_INSECURE,
+    PROXY_AUTOPROVISION_ACCOUNTS: $PROXY_AUTOPROVISION_ACCOUNTS,
+    PROXY_AUTOPROVISION_CLAIM_USERNAME: $PROXY_AUTOPROVISION_CLAIM_USERNAME,
+    PROXY_USER_OIDC_CLAIM: $PROXY_USER_OIDC_CLAIM,
+    PROXY_USER_CS3_CLAIM: $PROXY_USER_CS3_CLAIM,
+    PROXY_OIDC_REWRITE_WELLKNOWN: $PROXY_OIDC_REWRITE_WELLKNOWN,
+    PROXY_ROLE_ASSIGNMENT_DRIVER: $PROXY_ROLE_ASSIGNMENT_DRIVER,
+    GRAPH_ASSIGN_DEFAULT_USER_ROLE: $GRAPH_ASSIGN_DEFAULT_USER_ROLE,
+    GRAPH_USERNAME_MATCH: $GRAPH_USERNAME_MATCH,
+    OC_EXCLUDE_RUN_SERVICES: $OC_EXCLUDE_RUN_SERVICES,
     SEARCH_EXTRACTOR_TYPE: $SEARCH_EXTRACTOR_TYPE,
     SEARCH_EXTRACTOR_TIKA_TIKA_URL: $SEARCH_EXTRACTOR_TIKA_TIKA_URL,
     FRONTEND_FULL_TEXT_SEARCH_ENABLED: $FRONTEND_FULL_TEXT_SEARCH_ENABLED,
@@ -489,7 +581,7 @@ log "Writing OpenCloud bootstrap secret to OpenBao"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "opencloud" \
   --json-file "$opencloud_secret_file" \
-  --required-keys "OC_URL,OC_OIDC_ISSUER,WEB_OPTION_ACCOUNT_EDIT_LINK_HREF,OC_JWT_SECRET,COLLABORATION_WOPI_SECRET,COLLABORATION_WOPI_SRC,IDM_ADMIN_PASSWORD,OC_LDAP_BIND_PASSWORD,COLLABORA_ADMIN_PASSWORD,COLLABORA_ADMIN_USER,COLLABORA_DOMAIN,COMPANION_DOMAIN,IDP_DOMAIN,OC_REVA_GATEWAY,MICRO_REGISTRY_ADDRESS,COLLABORATION_APP_NAME,COLLABORATION_APP_PRODUCT,COLLABORATION_APP_ADDR,COLLABORATION_APP_ICON,COLLABORATION_APP_INSECURE,COLLABORATION_CS3API_DATAGATEWAY_INSECURE,OC_LDAP_BIND_DN,OC_LDAP_URI,OC_LDAP_USER_BASE_DN,OC_LDAP_GROUP_BASE_DN,OC_LDAP_USER_FILTER,OC_LDAP_USER_SCHEMA_ID,OC_LDAP_GROUP_SCHEMA_ID,OC_LDAP_DISABLE_USER_MECHANISM,OC_LDAP_SERVER_WRITE_ENABLED,GRAPH_LDAP_SERVER_UUID,GRAPH_LDAP_REFINT_ENABLED,SEARCH_EXTRACTOR_TYPE,SEARCH_EXTRACTOR_TIKA_TIKA_URL,FRONTEND_FULL_TEXT_SEARCH_ENABLED,WEBFINGER_WEB_OIDC_CLIENT_ID,WEBFINGER_WEB_OIDC_CLIENT_SCOPES,WEBFINGER_DESKTOP_OIDC_CLIENT_ID,WEBFINGER_DESKTOP_OIDC_CLIENT_SCOPES,WEBFINGER_ANDROID_OIDC_CLIENT_ID,WEBFINGER_ANDROID_OIDC_CLIENT_SCOPES,WEBFINGER_IOS_OIDC_CLIENT_ID,WEBFINGER_IOS_OIDC_CLIENT_SCOPES,WEB_OIDC_CLIENT_ID,WEB_OIDC_SCOPE,INITIAL_ADMIN_PASSWORD"
+  --required-keys "OC_URL,OC_OIDC_ISSUER,WEB_OPTION_ACCOUNT_EDIT_LINK_HREF,OC_JWT_SECRET,COLLABORATION_WOPI_SECRET,COLLABORATION_WOPI_SRC,IDM_ADMIN_PASSWORD,OC_LDAP_BIND_PASSWORD,COLLABORA_ADMIN_PASSWORD,COLLABORA_ADMIN_USER,COLLABORA_DOMAIN,COMPANION_DOMAIN,IDP_DOMAIN,OC_REVA_GATEWAY,MICRO_REGISTRY_ADDRESS,COLLABORATION_APP_NAME,COLLABORATION_APP_PRODUCT,COLLABORATION_APP_ADDR,COLLABORATION_APP_ICON,COLLABORATION_APP_INSECURE,COLLABORATION_CS3API_DATAGATEWAY_INSECURE,OC_LDAP_BIND_DN,OC_LDAP_URI,OC_LDAP_USER_BASE_DN,OC_LDAP_GROUP_BASE_DN,OC_LDAP_USER_FILTER,OC_LDAP_USER_SCHEMA_ID,OC_LDAP_GROUP_SCHEMA_ID,OC_LDAP_DISABLE_USER_MECHANISM,OC_LDAP_SERVER_WRITE_ENABLED,GRAPH_LDAP_SERVER_UUID,GRAPH_LDAP_REFINT_ENABLED,OC_LDAP_INSECURE,PROXY_AUTOPROVISION_ACCOUNTS,PROXY_AUTOPROVISION_CLAIM_USERNAME,PROXY_USER_OIDC_CLAIM,PROXY_USER_CS3_CLAIM,PROXY_OIDC_REWRITE_WELLKNOWN,PROXY_ROLE_ASSIGNMENT_DRIVER,GRAPH_ASSIGN_DEFAULT_USER_ROLE,GRAPH_USERNAME_MATCH,OC_EXCLUDE_RUN_SERVICES,SEARCH_EXTRACTOR_TYPE,SEARCH_EXTRACTOR_TIKA_TIKA_URL,FRONTEND_FULL_TEXT_SEARCH_ENABLED,WEBFINGER_WEB_OIDC_CLIENT_ID,WEBFINGER_WEB_OIDC_CLIENT_SCOPES,WEBFINGER_DESKTOP_OIDC_CLIENT_ID,WEBFINGER_DESKTOP_OIDC_CLIENT_SCOPES,WEBFINGER_ANDROID_OIDC_CLIENT_ID,WEBFINGER_ANDROID_OIDC_CLIENT_SCOPES,WEBFINGER_IOS_OIDC_CLIENT_ID,WEBFINGER_IOS_OIDC_CLIENT_SCOPES,WEB_OIDC_CLIENT_ID,WEB_OIDC_SCOPE,INITIAL_ADMIN_PASSWORD"
 
 authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
 invalidation_flow_id="$(authentik_resolve_flow_id "default-provider-invalidation-flow" "invalidation")"
@@ -510,12 +602,16 @@ admins_group_id="$(authentik_find_group_id "admins")"
 roles_mapping_id="$(upsert_scope_mapping \
   "OpenCloud roles" \
   "roles" \
-  "Return OpenCloud username and role claims" \
+  "Return OpenCloud identity and role claims" \
   'roles = ["opencloudUser"]
 if ak_is_group_member(request.user, name="admins"):
     roles = ["opencloudAdmin", "opencloudUser"]
 return {
+    "sub": request.user.uid,
     "username": request.user.username,
+    "preferred_username": request.user.username,
+    "name": request.user.name or request.user.username,
+    "email": request.user.email,
     "roles": roles,
 }' )"
 [[ -n "$roles_mapping_id" ]] || fail "Could not create the OpenCloud roles mapping"
@@ -665,7 +761,9 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --application "opencloud" \
   --destination-namespace "opencloud"
 
+wait_for_resources_ready "opencloud" "externalsecret" "Ready" "OpenCloud ExternalSecret"
 wait_for_statefulset_ready "opencloud" "opencloud-ldap" "OpenCloud LDAP"
+wait_for_opencloud_ldap_directory
 wait_for_deployment_rollout "opencloud" "opencloud" "OpenCloud core"
 wait_for_deployment_rollout "opencloud" "opencloud-collaboration" "OpenCloud collaboration"
 wait_for_deployment_rollout "opencloud" "opencloud-collabora" "OpenCloud Collabora"

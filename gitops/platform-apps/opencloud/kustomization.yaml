@@ -5,6 +5,7 @@ resources:
   - namespace.yaml
   - pvc.yaml
   - configmap.yaml
+  - ldap-bootstrap-configmap.yaml
   - externalsecret.yaml
   - service.yaml
   - deployment.yaml

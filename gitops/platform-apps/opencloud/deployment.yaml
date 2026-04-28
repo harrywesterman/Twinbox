@@ -51,6 +51,31 @@ spec:
               mountPath: /opencloud/data
             - name: apps
               mountPath: /opencloud/apps
+        - name: wait-for-ldap
+          image: bitnamilegacy/openldap:2.6.10-debian-12-r4
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              until ldapsearch -H "$OC_LDAP_URI" -x -D "$OC_LDAP_BIND_DN" -w "$OC_LDAP_BIND_PASSWORD" -b "$OC_LDAP_USER_BASE_DN" -s base dn >/dev/null &&
+                    ldapsearch -H "$OC_LDAP_URI" -x -D "$OC_LDAP_BIND_DN" -w "$OC_LDAP_BIND_PASSWORD" -b "$OC_LDAP_GROUP_BASE_DN" -s base dn >/dev/null; do
+                echo "Waiting for OpenCloud LDAP directory"
+                sleep 5
+              done
+          envFrom:
+            - secretRef:
+                name: opencloud-bootstrap
+          env:
+            - name: LDAPTLS_REQCERT
+              value: never
       containers:
         - name: opencloud
           image: opencloudeu/opencloud-rolling:latest

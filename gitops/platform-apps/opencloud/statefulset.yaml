@@ -72,18 +72,11 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: opencloud-bootstrap
-                  key: IDM_ADMIN_PASSWORD
+                  key: OC_LDAP_BIND_PASSWORD
             - name: LDAP_ROOT
               value: dc=opencloud,dc=eu
-            - name: LDAP_USERS
-              value: twinbox
-            - name: LDAP_PASSWORDS
-              valueFrom:
-                secretKeyRef:
-                  name: opencloud-bootstrap
-                  key: IDM_ADMIN_PASSWORD
             - name: LDAP_SKIP_DEFAULT_TREE
-              value: "no"
+              value: "yes"
             - name: LDAP_ENABLE_TLS
               value: "yes"
             - name: LDAP_TLS_CERT_FILE
@@ -109,6 +102,14 @@ spec:
               mountPath: /bitnami/openldap
             - name: certs
               mountPath: /opt/bitnami/openldap/certs
+            - name: ldap-bootstrap
+              mountPath: /schemas/10_opencloud_schema.ldif
+              subPath: 10_opencloud_schema.ldif
+              readOnly: true
+            - name: ldap-bootstrap
+              mountPath: /ldifs/10_base.ldif
+              subPath: 10_base.ldif
+              readOnly: true
       volumes:
         - name: data
           persistentVolumeClaim:
@@ -116,3 +117,6 @@ spec:
         - name: certs
           persistentVolumeClaim:
             claimName: opencloud-ldap-certs
+        - name: ldap-bootstrap
+          configMap:
+            name: opencloud-ldap-bootstrap
