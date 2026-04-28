@@ -6,9 +6,7 @@ metadata:
   labels:
     app.kubernetes.io/name: dashy
 spec:
-  replicas: 1
-  strategy:
-    type: Recreate
+  replicas: 3
   selector:
     matchLabels:
       app.kubernetes.io/name: dashy

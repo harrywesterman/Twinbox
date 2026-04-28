@@ -1193,9 +1193,6 @@ def test_argo_step_script_bootstraps_argocd_without_cni_adoption():
 
 def test_argo_bootstrap_script_installs_argocd_without_root_application_tree():
     text = _argo_bootstrap_text()
-    wait_section = text.split("local resources=(")[1].split(
-        'for resource in "${resources[@]}"; do'
-    )[0]
     assert "Creating argocd namespace" in text
     assert "Installing Argo CD" in text
     assert (
@@ -1203,12 +1200,12 @@ def test_argo_bootstrap_script_installs_argocd_without_root_application_tree():
         in text
     )
     assert (
-        "kubectl apply --server-side --force-conflicts --validate=false -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.3.4/manifests/install.yaml"
+        "kubectl apply --server-side --force-conflicts --validate=false -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.3.4/manifests/ha/install.yaml"
         in text
     )
     assert "control_plane_tolerations" in text
     assert (
-        "Patching statefulset/argocd-application-controller for control-plane tolerations"
+        'kubectl -n argocd get statefulset -o name 2>/dev/null | sort'
         in text
     )
     assert "kubectl -n argocd patch" in text
@@ -1218,7 +1215,7 @@ def test_argo_bootstrap_script_installs_argocd_without_root_application_tree():
     assert '"initialDelaySeconds":300' in text
     assert "patch_argocd_repo_server_copyutil()" in text
     assert (
-        "Patching deployment/argocd-repo-server copyutil init container for idempotent startup"
+        "Patching ${resource} copyutil init container for idempotent startup"
         in text
     )
     assert (
@@ -1233,15 +1230,14 @@ def test_argo_bootstrap_script_installs_argocd_without_root_application_tree():
     assert "wait_for_statefulset_rollout()" in text
     assert 'kubectl -n argocd rollout status "$resource" --timeout=900s' in text
     assert (
-        'wait_for_statefulset_rollout "statefulset/argocd-application-controller"'
+        'for resource in $(kubectl -n argocd get statefulset -o name 2>/dev/null | sort); do'
         in text
     )
-    assert "statefulset/argocd-application-controller" not in wait_section
     assert "wait_for_application_ready()" not in text
     assert "wait_for_root_applications()" not in text
-    assert "deployment/argocd-applicationset-controller" in text
-    assert "deployment/argocd-repo-server" in text
-    assert "statefulset/argocd-application-controller" in text
+    assert "deployment/argocd-applicationset-controller" not in text
+    assert "grep -E '(^|/)argocd-repo-server($|-)'" in text
+    assert "statefulset/argocd-application-controller" not in text
     assert "Applying core Argo root application" not in text
     assert "gitops/argocd/root.yaml" not in text
 
@@ -2410,11 +2406,29 @@ def test_loki_and_openbao_longhorn_sizes_are_right_sized():
     assert "size: 2Gi" not in openbao_values_text
 
 
-def test_authentik_db_cluster_is_scaled_for_lab_capacity():
+def test_authentik_db_cluster_is_scaled_for_ha_capacity():
     text = AUTHENTIK_DB_CLUSTER.read_text(encoding="utf-8")
-    assert "instances: 1" in text
+    assert "instances: 3" in text
     assert "size: 20Gi" in text
-    assert "storageClass: longhorn-single" in text
+    assert "storageClass: longhorn" in text
+
+
+def test_critical_cnpg_clusters_use_ha_instances_and_storage():
+    for name in (
+        "authentik",
+        "n8n",
+        "zulip",
+        "nextcloud",
+        "paperless",
+        "vaultwarden",
+        "immich",
+    ):
+        text = (
+            REPO_ROOT / "gitops" / "databases" / name / "cluster.yaml"
+        ).read_text(encoding="utf-8")
+        assert "instances: 3" in text
+        assert "storageClass: longhorn" in text
+        assert "storageClass: longhorn-single" not in text
 
 
 def test_authentik_db_storageclass_uses_single_replica():
@@ -2560,11 +2574,12 @@ def test_dashy_deployment_uses_a_published_image_tag():
     pvc_text = (
         REPO_ROOT / "gitops" / "platform-apps" / "dashy" / "pvc.yaml"
     ).read_text(encoding="utf-8")
-    assert "strategy:" in text
-    assert "type: Recreate" in text
+    assert "replicas: 3" in text
+    assert "strategy:" not in text
     assert "kubernetes.io/hostname" not in text
     assert "persistentVolumeClaim:" in text
     assert "claimName: dashy-data" in text
+    assert "ReadWriteMany" in pvc_text
     assert "storage: 5Gi" in pvc_text
     assert "emptyDir: {}" not in text
     assert 'target = Path("/app/user-data/config.yml")' in text

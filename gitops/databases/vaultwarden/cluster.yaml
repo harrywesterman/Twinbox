@@ -4,7 +4,7 @@ metadata:
   name: vaultwarden-db
   namespace: databases
 spec:
-  instances: 2
+  instances: 3
   imageName: ghcr.io/cloudnative-pg/postgresql:16.4
 
   backup:
@@ -29,7 +29,7 @@ spec:
 
   storage:
     size: 10Gi
-    storageClass: longhorn-single
+    storageClass: longhorn
 
   resources:
     requests:

@@ -4,7 +4,7 @@ metadata:
   name: zulip-db
   namespace: databases
 spec:
-  instances: 1
+  instances: 3
   imageName: zulip/zulip-postgresql:14
 
   backup:
@@ -29,7 +29,7 @@ spec:
 
   storage:
     size: 20Gi
-    storageClass: longhorn-single
+    storageClass: longhorn
 
   resources:
     requests:

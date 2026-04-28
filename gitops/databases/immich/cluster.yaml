@@ -32,7 +32,7 @@ spec:
 
   storage:
     size: 20Gi
-    storageClass: longhorn-single
+    storageClass: longhorn
 
   resources:
     requests:

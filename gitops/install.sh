@@ -52,10 +52,10 @@ EOF
     kubectl -n argocd patch "$resource" --type merge -p "$patch"
   done
 
-  if kubectl -n argocd get statefulset/argocd-application-controller >/dev/null 2>&1; then
-    log "Patching statefulset/argocd-application-controller for control-plane tolerations"
-    kubectl -n argocd patch statefulset/argocd-application-controller --type merge -p "$patch"
-  fi
+  for resource in $(kubectl -n argocd get statefulset -o name 2>/dev/null | sort); do
+    log "Patching ${resource} for control-plane tolerations"
+    kubectl -n argocd patch "$resource" --type merge -p "$patch"
+  done
 }
 
 patch_argocd_workload_probes() {
@@ -94,8 +94,10 @@ patch_argocd_repo_server_copyutil() {
 EOF
   )
 
-  log "Patching deployment/argocd-repo-server copyutil init container for idempotent startup"
-  kubectl -n argocd patch deployment/argocd-repo-server --type strategic -p "$patch"
+  for resource in $(kubectl -n argocd get deployment -o name 2>/dev/null | grep -E '(^|/)argocd-repo-server($|-)' || true); do
+    log "Patching ${resource} copyutil init container for idempotent startup"
+    kubectl -n argocd patch "$resource" --type strategic -p "$patch"
+  done
 }
 
 wait_for_available() {
@@ -114,27 +116,21 @@ wait_for_statefulset_rollout() {
 
 wait_for_argocd_workloads() {
   local resource
-  local resources=(
-    "deployment/argocd-applicationset-controller"
-    "deployment/argocd-dex-server"
-    "deployment/argocd-notifications-controller"
-    "deployment/argocd-redis"
-    "deployment/argocd-repo-server"
-    "deployment/argocd-server"
-  )
 
-  for resource in "${resources[@]}"; do
+  for resource in $(kubectl -n argocd get deployment -o name 2>/dev/null | sort); do
     wait_for_available "$resource"
   done
 
-  wait_for_statefulset_rollout "statefulset/argocd-application-controller"
+  for resource in $(kubectl -n argocd get statefulset -o name 2>/dev/null | sort); do
+    wait_for_statefulset_rollout "$resource"
+  done
 }
 
 log "Creating argocd namespace"
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply --validate=false -f -
 
 log "Installing Argo CD"
-retry 3 10 kubectl apply --server-side --force-conflicts --validate=false -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.3.4/manifests/install.yaml
+retry 3 10 kubectl apply --server-side --force-conflicts --validate=false -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.3.4/manifests/ha/install.yaml
 
 patch_argocd_workload_tolerations
 patch_argocd_workload_probes
