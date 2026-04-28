@@ -1,0 +1,50 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: searxng
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __TARGET_REVISION__
+    path: gitops/platform-apps/searxng
+    kustomize:
+      patches:
+        - target:
+            kind: Deployment
+            name: searxng
+          patch: |-
+            - op: replace
+              path: /spec/template/spec/containers/0/env/0/value
+              value: https://searxng.__ZONE_NAME__/
+        - target:
+            kind: IngressRoute
+            name: searxng
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`searxng.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: searxng-wiredoor
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`searxng.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: searxng-tailscale
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`searxng.__ZONE_NAME__`)
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: searxng
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

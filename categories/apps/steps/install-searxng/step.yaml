@@ -1,0 +1,30 @@
+id: install-searxng
+title: Install SearXNG
+type: action
+journey_stage: setup
+order: 87
+summary: Install SearXNG with Valkey-backed limiter support and Traefik routes.
+explanation: Twinbox provisions SearXNG as a privacy-focused metasearch app backed by Longhorn storage, a dedicated Valkey cache for limiter and bot protection, an OpenBao-managed server secret, and Traefik routes for the selected cluster domain.
+side_help: Search tools sit with the lightweight user apps so they can be installed after feeds and before meeting tools.
+depends_on:
+  - install-longhorn-storage
+  - install-secret-sync
+  - choose-ingress-route
+dashy:
+  items:
+    - section: Apps
+      title: SearXNG
+      description: Private metasearch
+      icon: fas fa-search
+      url_template: https://searxng.__ZONE_NAME__
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/apps/steps/install-searxng/run.sh

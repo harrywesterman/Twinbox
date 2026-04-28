@@ -19,4 +19,5 @@ app_steps:
   - id: install-n8n
   - id: install-audiobookshelf
   - id: install-freshrss
+  - id: install-searxng
   - id: install-jitsi

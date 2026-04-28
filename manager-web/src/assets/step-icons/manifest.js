@@ -206,6 +206,12 @@ export const STEP_ICON_MANIFEST = [
     officialSourceUrl: 'https://github.com/FreshRSS/FreshRSS',
   }),
   iconEntry({
+    stepId: 'install-searxng',
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/searxng/searxng',
+  }),
+  iconEntry({
     stepId: 'install-jitsi',
     isAppOrPlatform: true,
     officialSourceType: 'project-repository',

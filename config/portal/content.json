@@ -450,6 +450,17 @@
       "accent": "#14b8a6",
       "category": "Apps"
     },
+    "SearXNG": {
+      "summary": "Private metasearch",
+      "description": "Search the web through a privacy-respecting metasearch engine.",
+      "capabilities": [
+        "Search across multiple engines",
+        "Keep queries away from a single provider",
+        "Use a clean self-hosted search page"
+      ],
+      "accent": "#38bdf8",
+      "category": "Apps"
+    },
     "Audiobookshelf": {
       "summary": "Personal audiobooks and podcasts",
       "description": "Stream audiobooks and podcasts from your own media library.",

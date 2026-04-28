@@ -190,6 +190,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-n8n",
                 "install-audiobookshelf",
                 "install-freshrss",
+                "install-searxng",
                 "install-jitsi",
             }
             assert expected_talos_step_ids.issubset(talos_steps)
@@ -246,6 +247,9 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert talos_steps["install-freshrss"]["title"] == "Install FreshRSS"
             assert "placeholder" not in talos_steps["install-freshrss"]["summary"].lower()
             assert "placeholder" not in talos_steps["install-freshrss"]["explanation"].lower()
+            assert talos_steps["install-searxng"]["title"] == "Install SearXNG"
+            assert "placeholder" not in talos_steps["install-searxng"]["summary"].lower()
+            assert "placeholder" not in talos_steps["install-searxng"]["explanation"].lower()
             assert "install-nextcloud" not in talos_steps
             assert "install-opencloud" not in talos_steps
             assert "install-immich" not in talos_steps
