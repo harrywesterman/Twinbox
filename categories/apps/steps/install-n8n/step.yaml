@@ -3,11 +3,29 @@ title: Install N8N
 type: action
 journey_stage: setup
 order: 82
-summary: Placeholder step for the N8N app phase.
-explanation: This wizard step is reserved for future N8N installation work and does not run a real cluster action yet.
-side_help: Automation tools are staged alongside the rest of the app catalog.
-depends_on: []
+summary: Install n8n with PostgreSQL, persistent storage, and Traefik ingress.
+explanation: Twinbox provisions n8n as a GitOps application backed by a dedicated CloudNativePG database, a Longhorn data volume, an OpenBao-managed encryption key, and Traefik routes on the selected cluster domain.
+side_help: Automation tools need a stable encryption key so workflow credentials remain readable across pod restarts and upgrades.
+depends_on:
+  - install-longhorn-storage
+  - install-cloudnativepg
+  - install-secret-sync
+  - choose-ingress-route
+dashy:
+  items:
+    - section: Apps
+      title: n8n
+      description: Workflow automation
+      icon: fas fa-diagram-project
+      url_template: https://n8n.__ZONE_NAME__
 inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
 runner:
   kind: script
-  script: categories/talos-cluster/steps/_placeholder/run.sh
+  script: categories/apps/steps/install-n8n/run.sh

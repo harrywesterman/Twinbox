@@ -16,6 +16,12 @@ resources:
   - immich/pooler-rw.yaml
   - immich/pooler-rw-session.yaml
   - immich/scheduled-backup.yaml
+  - n8n/cluster.yaml
+  - n8n/externalsecret.yaml
+  - n8n/pooler-ro.yaml
+  - n8n/pooler-rw.yaml
+  - n8n/pooler-rw-session.yaml
+  - n8n/scheduled-backup.yaml
   - zulip/cluster.yaml
   - zulip/externalsecret.yaml
   - zulip/pooler-ro.yaml
