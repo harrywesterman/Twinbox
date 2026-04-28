@@ -518,6 +518,7 @@ done
 log "CronJob created"
 
 log "Triggering first CronJob run for initialization"
+kubectl -n nextcloud delete job nextcloud-init --ignore-not-found
 kubectl -n nextcloud create job nextcloud-init --from=cronjob/nextcloud-cron --dry-run=client -o yaml | kubectl apply -f -
 
 max_retries=3
