@@ -2365,6 +2365,9 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert '\\"admins\\": \\"admin\\"' in text
     assert "--group-provisioning='1'" in text
     assert "config:app:set --type=string --value=1 user_oidc provider-1-groupProvisioning" in text
+    assert "config:system:set wopi_url --value='https://collabora.${public_zone_name}'" in text
+    assert "config:app:set --value='https://collabora.${public_zone_name}' richdocuments wopi_url" in text
+    assert "richdocuments:activate-config" in text
     assert (
         "Could not resolve Authentik signing key ID for ${AUTHENTIK_SIGNING_KEY_NAME}"
         in text
