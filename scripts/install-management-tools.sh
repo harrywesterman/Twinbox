@@ -3,6 +3,7 @@ set -euo pipefail
 
 ENV_FILE="/opt/twinbox/.env"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BOOTSTRAP_DIR="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
 
 source_pinned_defaults() {
   local candidate=""
@@ -76,6 +77,7 @@ source_pinned_defaults
 [[ -n "${PINNED_K9S_VERSION:-}" ]] || fail "Missing required variable in ${ENV_FILE}: PINNED_K9S_VERSION"
 [[ -n "${PINNED_KUBECTL_VERSION:-}" ]] || fail "Missing required variable in ${SCRIPT_DIR}/../config/pinned-defaults.sh: PINNED_KUBECTL_VERSION"
 [[ -n "${PINNED_HELM_VERSION:-}" ]] || fail "Missing required variable in ${SCRIPT_DIR}/../config/pinned-defaults.sh: PINNED_HELM_VERSION"
+[[ -n "${PINNED_ARGOCD_VERSION:-}" ]] || fail "Missing required variable in ${SCRIPT_DIR}/../config/pinned-defaults.sh: PINNED_ARGOCD_VERSION"
 
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
@@ -245,6 +247,32 @@ install_helm() {
   install -m 0755 "$tmp_dir/linux-amd64/helm" /usr/local/bin/helm
 }
 
+install_argocd() {
+  local version
+  local base_url
+  local bin_name
+  local bin_path
+  local checksums_path
+  local checksums_text=""
+  local expected_checksum=""
+
+  version="$(normalize_version "$PINNED_ARGOCD_VERSION")"
+  base_url="https://github.com/argoproj/argo-cd/releases/download/v${version}"
+  bin_name="argocd-linux-amd64"
+  bin_path="$tmp_dir/$bin_name"
+  checksums_path="$tmp_dir/cli_checksums.txt"
+
+  log "Installing argocd v${version}"
+  download_to "${base_url}/${bin_name}" "$bin_path"
+  download_to "${base_url}/cli_checksums.txt" "$checksums_path"
+  checksums_text="$(tr -d '\r' < "$checksums_path")"
+  expected_checksum="$(printf '%s\n' "$checksums_text" | awk -v target="$bin_name" '$2 == target { print $1; exit }')"
+  [[ -n "$expected_checksum" ]] || fail "Could not parse argocd checksum"
+  verify_checksum "$bin_path" "$expected_checksum"
+
+  install -m 0755 "$bin_path" /usr/local/bin/argocd
+}
+
 install_k9s() {
   local version
   local base_url
@@ -317,53 +345,142 @@ verify_versions() {
   local talos_output=""
   local kubectl_output=""
   local helm_output=""
+  local argocd_output=""
   local tofu_output=""
   local k9s_output=""
   local talos_actual=""
   local tofu_actual=""
   local kubectl_actual=""
   local helm_actual=""
+  local argocd_actual=""
   local k9s_actual=""
   local talos_expected
   local tofu_expected
   local kubectl_expected
   local helm_expected
+  local argocd_expected
   local k9s_expected
 
   talos_output="$(/usr/local/bin/talosctl version --client 2>&1)" || fail "talosctl version check failed: ${talos_output}"
   tofu_output="$(/usr/local/bin/tofu version 2>&1)" || fail "tofu version check failed: ${tofu_output}"
   kubectl_output="$(/usr/local/bin/kubectl version --client --output=yaml 2>&1)" || fail "kubectl version check failed: ${kubectl_output}"
   helm_output="$(/usr/local/bin/helm version --short 2>&1)" || fail "helm version check failed: ${helm_output}"
+  argocd_output="$(/usr/local/bin/argocd version --client --short 2>&1)" || fail "argocd version check failed: ${argocd_output}"
   k9s_output="$(/usr/local/bin/k9s version --short 2>&1)" || fail "k9s version check failed: ${k9s_output}"
 
   talos_actual="$(extract_semver "$talos_output")"
   tofu_actual="$(extract_semver "$tofu_output")"
   kubectl_actual="$(extract_semver "$kubectl_output")"
   helm_actual="$(extract_semver "$helm_output")"
+  argocd_actual="$(extract_semver "$argocd_output")"
   k9s_actual="$(extract_semver "$k9s_output")"
 
   talos_expected="$(normalize_version "$PINNED_TALOS_VERSION")"
   tofu_expected="$(normalize_version "$PINNED_OPENTOFU_VERSION")"
   kubectl_expected="$(normalize_version "$PINNED_KUBECTL_VERSION")"
   helm_expected="$(normalize_version "$PINNED_HELM_VERSION")"
+  argocd_expected="$(normalize_version "$PINNED_ARGOCD_VERSION")"
   k9s_expected="$(normalize_version "$PINNED_K9S_VERSION")"
 
   [[ "$talos_actual" == "$talos_expected" ]] || fail "talosctl version mismatch: expected v${talos_expected}, got v${talos_actual}"
   [[ "$tofu_actual" == "$tofu_expected" ]] || fail "tofu version mismatch: expected v${tofu_expected}, got v${tofu_actual}"
   [[ "$kubectl_actual" == "$kubectl_expected" ]] || fail "kubectl version mismatch: expected v${kubectl_expected}, got v${kubectl_actual}"
   [[ "$helm_actual" == "$helm_expected" ]] || fail "helm version mismatch: expected v${helm_expected}, got v${helm_actual}"
+  [[ "$argocd_actual" == "$argocd_expected" ]] || fail "argocd version mismatch: expected v${argocd_expected}, got v${argocd_actual}"
   [[ "$k9s_actual" == "$k9s_expected" ]] || fail "k9s version mismatch: expected v${k9s_expected}, got v${k9s_actual}"
-  log "Installed versions: talosctl=v${talos_actual}, tofu=v${tofu_actual}, kubectl=v${kubectl_actual}, helm=v${helm_actual}, k9s=v${k9s_actual}"
+  log "Installed versions: talosctl=v${talos_actual}, tofu=v${tofu_actual}, kubectl=v${kubectl_actual}, helm=v${helm_actual}, argocd=v${argocd_actual}, k9s=v${k9s_actual}"
+}
+
+configure_argocd_cli() {
+  local bootstrap_file="$BOOTSTRAP_DIR/secrets/global/argocd-cli.json"
+  local cluster_id=""
+  local argocd_host=""
+  local argocd_server=""
+  local kubeconfig_file=""
+  local config_dir="${HOME:-/root}/.config/argocd"
+  local config_file="${config_dir}/config"
+  local profile_file="/etc/profile.d/twinbox-argocd.sh"
+  local argocd_opts="--grpc-web"
+  local admin_password=""
+  local login_ok="false"
+
+  if [[ ! -f "$bootstrap_file" ]]; then
+    log "Argo CD CLI bootstrap file not found; skipping CLI configuration"
+    return 0
+  fi
+
+  cluster_id="$(jq -r '.CLUSTER_ID // empty' "$bootstrap_file")"
+  argocd_host="$(jq -r '.ARGOCD_HOST // empty' "$bootstrap_file")"
+  [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from ${bootstrap_file}"
+  [[ -n "$argocd_host" ]] || fail "Could not determine Argo CD host from ${bootstrap_file}"
+
+  argocd_server="${argocd_host#https://}"
+  kubeconfig_file="${BOOTSTRAP_DIR}/secrets/cluster/${cluster_id}/kubeconfig/kubeconfig"
+
+  if [[ ! -f "$kubeconfig_file" ]]; then
+    log "Kubeconfig not found for cluster ${cluster_id}; skipping Argo CD CLI configuration"
+    return 0
+  fi
+
+  mkdir -p "$config_dir"
+
+  if [[ -f "$config_file" ]]; then
+    log "Argo CD CLI config already exists at ${config_file}"
+  else
+    admin_password="$(
+      KUBECONFIG="$kubeconfig_file" kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' 2>/dev/null \
+        | base64 -d 2>/dev/null || true
+    )"
+
+    if [[ -z "$admin_password" ]]; then
+      log "Argo CD initial admin password not available; skipping CLI login"
+      return 0
+    fi
+
+    if /usr/local/bin/argocd login "$argocd_server" \
+      --username admin \
+      --password "$admin_password" \
+      --grpc-web \
+      --config "$config_file" >/dev/null 2>&1; then
+      login_ok="true"
+    else
+      argocd_opts="--grpc-web --insecure"
+      if /usr/local/bin/argocd login "$argocd_server" \
+        --username admin \
+        --password "$admin_password" \
+        --grpc-web \
+        --insecure \
+        --config "$config_file" >/dev/null 2>&1; then
+        login_ok="true"
+      fi
+    fi
+
+    if [[ "$login_ok" != "true" ]]; then
+      log "Argo CD CLI login failed; skipping CLI configuration"
+      return 0
+    fi
+  fi
+
+  install -d -m 0755 "$(dirname "$profile_file")"
+  cat > "$profile_file" <<EOF
+export ARGOCD_SERVER="${argocd_server}"
+export ARGOCD_OPTS="${argocd_opts}"
+EOF
+  chmod 0644 "$profile_file"
+
+  log "Configured Argo CD CLI for ${argocd_server}"
 }
 
 ensure_talos_cpu_compatibility
 ensure_openssl
 install_talosctl
 install_tofu
+install_argocd
 install_k9s
 install_kubectl
 install_helm
 install_wrappers
 verify_versions
+configure_argocd_cli
 
 log "Done"

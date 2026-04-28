@@ -25,6 +25,7 @@
       - software-properties-common
       - unattended-upgrades
       - ufw
+      - wget
     twinbox_docker_packages:
       - docker-ce
       - docker-ce-cli

@@ -40,6 +40,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `/opt/twinbox/bootstrap/secrets/global/wiredoor-gateway.json`
 - `/opt/twinbox/bootstrap/secrets/global/velero.json`
 - `/opt/twinbox/bootstrap/secrets/global/velero-ui.json`
+- `/opt/twinbox/bootstrap/secrets/global/argocd-cli.json`
 - `/opt/twinbox/bootstrap/secrets/global/twinbox-portal.json`
 - `/opt/twinbox/bootstrap/secrets/global/dashy-oidc-<cluster-id>.json`
 - `/opt/twinbox/bootstrap/secrets/global/wiredoor-bastion-<cluster-id>.json`
@@ -175,6 +176,17 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 ```
 
 `scripts/start-manager.sh` keeps this file aligned with the Management VM's SeaweedFS runtime credentials and endpoint, and `install-velero-backup` syncs the same JSON into OpenBao before rendering the Velero Application.
+
+### `argocd-cli.json`
+
+```json
+{
+  "ARGOCD_HOST": "https://argocd.example.com",
+  "CLUSTER_ID": "prd"
+}
+```
+
+`configure-argocd-oidc` writes this file on the Management VM and syncs it into OpenBao so the VM can bootstrap a usable `argocd` CLI login during maintenance runs.
 
 ### `authentik.json` (seed-only bootstrap database keys)
 

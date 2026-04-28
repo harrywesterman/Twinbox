@@ -2612,6 +2612,18 @@ def test_configure_argocd_oidc_refreshes_platform_ingress_without_waiting():
     assert "wait_for_argocd_oidc_config" in text
     assert "patch_live_argocd_config" not in text
     assert "platform-ingress did not refresh argocd-cm in time" not in text
+    assert 'argocd_cli_file="$secrets_dir/argocd-cli.json"' in text
+    assert 'bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \\' in text
+    assert '--secret-name "argocd-cli"' in text
+    assert '--required-keys "ARGOCD_HOST,CLUSTER_ID"' in text
+
+
+def test_management_vm_maintenance_installs_wget():
+    text = (REPO_ROOT / "ansible" / "management-vm-maintenance.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "wget" in text
+    assert "jq" in text
 
 
 def test_cloudtty_platform_ingress_is_committed_to_gitops():

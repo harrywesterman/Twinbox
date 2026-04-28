@@ -361,4 +361,19 @@ if kubectl -n argocd get deployment/argocd-server >/dev/null 2>&1; then
   kubectl -n argocd rollout status deployment/argocd-server --timeout=10m
 fi
 
+argocd_cli_file="$secrets_dir/argocd-cli.json"
+cat >"$argocd_cli_file" <<EOF
+{
+  "ARGOCD_HOST": "$argocd_host",
+  "CLUSTER_ID": "$cluster_id"
+}
+EOF
+
+chmod 600 "$argocd_cli_file"
+
+bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+  --secret-name "argocd-cli" \
+  --json-file "$argocd_cli_file" \
+  --required-keys "ARGOCD_HOST,CLUSTER_ID"
+
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Argo CD Authentik configuration complete"

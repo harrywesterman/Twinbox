@@ -37,6 +37,14 @@ def test_install_management_tools_installs_core_cli_stack_without_bw():
     text = _script_text()
     assert "ensure_openssl()" in text
     assert 'apt-get install -y openssl >/dev/null' in text
+    assert "install_argocd()" in text
+    assert 'PINNED_ARGOCD_VERSION' in text
+    assert 'argocd_output="$(/usr/local/bin/argocd version --client --short 2>&1)"' in text
+    assert 'cli_checksums.txt' in text
+    assert 'install -m 0755 "$bin_path" /usr/local/bin/argocd' in text
+    assert 'configure_argocd_cli()' in text
+    assert 'ARGOCD_SERVER' in text
+    assert 'export ARGOCD_OPTS="${argocd_opts}"' in text
     assert "install_k9s()" in text
     assert 'PINNED_K9S_VERSION' in text
     assert 'k9s version --short' in text
