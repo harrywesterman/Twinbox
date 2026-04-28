@@ -263,6 +263,7 @@ nextcloud_db_backup_manifest="$WORKSPACE_ROOT/gitops/databases/nextcloud/schedul
 nextcloud_platform_dir="$WORKSPACE_ROOT/gitops/platform-apps/nextcloud"
 nextcloud_app_manifest="$WORKSPACE_ROOT/gitops/apps/nextcloud.yaml"
 nextcloud_values_manifest="$WORKSPACE_ROOT/gitops/values/nextcloud.yaml"
+oidc_groups_mapping_release_url="https://github.com/strobelpierre/nextcloud_oidc_groups_mapping/releases/latest/download/oidc_groups_mapping.tar.gz"
 
 existing_nextcloud_secret_json=""
 if command -v openbao_read_global_secret_json >/dev/null 2>&1; then
@@ -431,7 +432,6 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
 log "Applying Nextcloud namespace and secret resources"
 kubectl apply -f "$nextcloud_platform_dir/namespace.yaml"
 kubectl apply -f "$nextcloud_platform_dir/admin-externalsecret.yaml"
-kubectl apply -f "$nextcloud_platform_dir/authentik-externalsecret.yaml"
 kubectl apply -f "$nextcloud_platform_dir/db-externalsecret.yaml"
 kubectl apply -f "$nextcloud_platform_dir/redis-externalsecret.yaml"
 
@@ -622,6 +622,41 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
   # user_oidc does not always persist the provider's group provisioning toggle
   # through the provider CLI, so write the app config explicitly as well.
   php occ config:app:set --type=string --value=1 user_oidc provider-1-groupProvisioning
+"
+
+log "Installing Nextcloud OIDC groups mapping"
+kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
+  set -euo pipefail
+  cd /var/www/html
+
+  if [[ ! -d custom_apps/oidc_groups_mapping/appinfo ]]; then
+    tmp_dir=\"\$(mktemp -d)\"
+    trap 'rm -rf \"$tmp_dir\"' EXIT
+    wget -qO \"$tmp_dir/oidc_groups_mapping.tar.gz\" '${oidc_groups_mapping_release_url}'
+    tar -xzf \"$tmp_dir/oidc_groups_mapping.tar.gz\" -C \"$tmp_dir\"
+    rm -rf custom_apps/oidc_groups_mapping
+    mv \"$tmp_dir/oidc_groups_mapping\" custom_apps/oidc_groups_mapping
+  fi
+
+  php occ app:enable -f oidc_groups_mapping >/dev/null
+  php occ oidc-groups:set '{
+    \"version\": 1,
+    \"mode\": \"additive\",
+    \"rules\": [
+      {
+        \"id\": \"admins-to-admin\",
+        \"type\": \"map\",
+        \"enabled\": true,
+        \"claimPath\": \"groups\",
+        \"config\": {
+          \"values\": {
+            \"admins\": \"admin\"
+          },
+          \"unmappedPolicy\": \"ignore\"
+        }
+      }
+    ]
+  }' >/dev/null
 "
 
 log "Installing recommended Nextcloud apps"

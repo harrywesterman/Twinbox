@@ -2349,7 +2349,6 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert "gitops/databases/nextcloud/scheduled-backup.yaml" in text
     assert "gitops/databases/kustomization.yaml" not in text
     assert "gitops/databases/authentik/" not in text
-    assert 'nextcloud_platform_dir/authentik-externalsecret.yaml' in text
     assert "user_oidc:provider" in text
     assert "nextcloud" in text
     assert "nextcloud-values-" in text
@@ -2358,8 +2357,12 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert "authentik_resolve_signing_key_id" in text
     assert '--arg signing_key "$signing_key_id"' in text
     assert "signing_key: $signing_key" in text
-    assert 'if ak_is_group_member(request.user, name="admins") and "admin" not in groups:' in text
-    assert 'if request.user.is_superuser and "admin" not in groups:' in text
+    assert "oidc_groups_mapping_release_url" in text
+    assert "app:enable -f oidc_groups_mapping" in text
+    assert "oidc-groups:set" in text
+    assert "admins-to-admin" in text
+    assert '\\"claimPath\\": \\"groups\\"' in text
+    assert '\\"admins\\": \\"admin\\"' in text
     assert "--group-provisioning='1'" in text
     assert "config:app:set --type=string --value=1 user_oidc provider-1-groupProvisioning" in text
     assert (
@@ -2371,9 +2374,10 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     )
     assert "nextcloud.__ZONE_NAME__" in values_text
     assert "aliasgroups:\n      - host: nextcloud.__ZONE_NAME__" in values_text
-    assert "AUTHENTIK_API_BASE: https://authentik.__ZONE_NAME__/api/v3" in values_text
-    assert "AUTHENTIK_API_TOKEN:" in values_text
-    assert "group:adduser admin" in values_text
+    assert "exec /cron.sh" in values_text
+    assert "AUTHENTIK_API_BASE" not in values_text
+    assert "AUTHENTIK_API_TOKEN" not in values_text
+    assert "group:adduser admin" not in values_text
     platform_text = (
         REPO_ROOT / "gitops" / "platform-apps" / "nextcloud" / "ingressroute.yaml"
     ).read_text(encoding="utf-8")
@@ -2390,15 +2394,14 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert "name: nextcloud-db-credentials" in db_externalsecret_text
     assert "namespace: nextcloud" in db_externalsecret_text
     assert "twinbox/global/nextcloud" in db_externalsecret_text
-    authentik_externalsecret_text = (
+    kustomization_text = (
         REPO_ROOT
         / "gitops"
         / "platform-apps"
         / "nextcloud"
-        / "authentik-externalsecret.yaml"
+        / "kustomization.yaml"
     ).read_text(encoding="utf-8")
-    assert "name: nextcloud-authentik" in authentik_externalsecret_text
-    assert "property: AUTHENTIK_API_TOKEN" in authentik_externalsecret_text
+    assert "authentik-externalsecret.yaml" not in kustomization_text
 
 
 def test_authentik_values_request_memory_for_server_and_worker():

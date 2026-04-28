@@ -4,7 +4,6 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - admin-externalsecret.yaml
-  - authentik-externalsecret.yaml
   - db-externalsecret.yaml
   - redis-externalsecret.yaml
   - middleware.yaml
