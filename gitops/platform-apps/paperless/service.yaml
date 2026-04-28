@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: paperless
+  namespace: paperless
+  labels:
+    app.kubernetes.io/name: paperless
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: paperless
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
