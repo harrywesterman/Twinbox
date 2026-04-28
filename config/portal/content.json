@@ -383,17 +383,6 @@
       "accent": "#38bdf8",
       "category": "Admin"
     },
-    "Uptime Kuma": {
-      "summary": "Service uptime checks",
-      "description": "Keep an eye on availability and spot outages or downtime quickly.",
-      "capabilities": [
-        "Monitor endpoints and webhooks",
-        "See uptime trends at a glance",
-        "Track basic service availability"
-      ],
-      "accent": "#16a34a",
-      "category": "Apps"
-    },
     "Velero": {
       "summary": "Cluster backups and restore tooling",
       "description": "Review backups and prepare restores so cluster data stays portable.",

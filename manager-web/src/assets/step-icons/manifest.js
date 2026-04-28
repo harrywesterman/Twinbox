@@ -146,12 +146,6 @@ export const STEP_ICON_MANIFEST = [
     officialSourceUrl: 'https://github.com/otwld/velero-ui',
   }),
   iconEntry({
-    stepId: 'install-proxmox-backup-system',
-    isAppOrPlatform: true,
-    officialSourceType: 'project-website',
-    officialSourceUrl: 'https://www.proxmox.com/en/products/proxmox-backup-server',
-  }),
-  iconEntry({
     stepId: 'install-nextcloud',
     isAppOrPlatform: true,
     officialSourceType: 'project-repository',
@@ -186,18 +180,6 @@ export const STEP_ICON_MANIFEST = [
     isAppOrPlatform: true,
     officialSourceType: 'project-repository',
     officialSourceUrl: 'https://github.com/karakeep-app/karakeep',
-  }),
-  iconEntry({
-    stepId: 'install-gitea',
-    isAppOrPlatform: true,
-    officialSourceType: 'project-repository',
-    officialSourceUrl: 'https://github.com/go-gitea/gitea',
-  }),
-  iconEntry({
-    stepId: 'install-uptimekuma',
-    isAppOrPlatform: true,
-    officialSourceType: 'project-repository',
-    officialSourceUrl: 'https://github.com/louislam/uptime-kuma',
   }),
   iconEntry({
     stepId: 'install-n8n',

@@ -45,6 +45,13 @@ function normalizeAdminCard(card = {}) {
   };
 }
 
+function compareCardsByTitle(left, right) {
+  return String(left?.title || '').localeCompare(String(right?.title || ''), undefined, {
+    numeric: true,
+    sensitivity: 'base',
+  }) || String(left?.id || '').localeCompare(String(right?.id || ''));
+}
+
 function normalizeBundleCard(bundle = {}, cardsById = new Map()) {
   const bundleCards = Array.isArray(bundle.apps)
     ? bundle.apps
@@ -105,10 +112,12 @@ export function buildAdminAppsViewModel({
   const category = Array.isArray(catalog?.categories)
     ? catalog.categories.find((entry) => entry.id === 'apps')
     : null;
-  const cards = Array.isArray(category?.steps) ? category.steps.map((card) => normalizeAdminCard(card)) : [];
+  const cards = Array.isArray(category?.steps)
+    ? category.steps.map((card) => normalizeAdminCard(card)).sort(compareCardsByTitle)
+    : [];
   const cardsById = new Map(cards.map((card) => [card.id, card]));
   const bundles = Array.isArray(catalog?.bundles) ? catalog.bundles.map((bundle) => normalizeBundleCard(bundle, cardsById)) : [];
-  const filteredCards = cards.filter((card) => matchesQuery(card, normalizedQuery));
+  const filteredCards = cards.filter((card) => matchesQuery(card, normalizedQuery)).sort(compareCardsByTitle);
   const filteredBundles = bundles.filter((bundle) => matchesBundleQuery(bundle, normalizedQuery));
   const selectedApp = filteredCards.find((card) => card.id === selectedAppId)
     || cards.find((card) => card.id === selectedAppId)

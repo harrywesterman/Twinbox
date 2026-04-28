@@ -83,22 +83,26 @@ function buildCatalog(stepStatuses = {}) {
     ['install-ntfy', 'Install Ntfy', { dependsOn: ['install-dashy-dashboard'] }],
     ['install-velero-backup', 'Install Velero backup', { dependsOn: ['install-management-consoles', 'install-longhorn-storage', 'install-secret-sync'] }],
     ['install-velero-ui', 'Install Velero UI', { dependsOn: ['install-velero-backup', 'install-authentik-idp', 'create-users-and-groups', 'choose-ingress-route'] }],
-    ['install-proxmox-backup-system', 'Install Proxmox Backup System', { dependsOn: ['install-velero-ui'] }],
   ].map(([id, title, options]) => ({
     ...makeStep(id, title, options),
     status: stepStatuses[id] ?? options.status ?? 'locked',
   }));
 
   const appSteps = [
-    ['install-nextcloud', 'Install Nextcloud', { dependsOn: ['install-proxmox-backup-system'] }],
-    ['install-opencloud', 'Install OpenCloud', { dependsOn: ['install-proxmox-backup-system', 'install-longhorn-storage', 'install-secret-sync', 'install-authentik-idp', 'create-users-and-groups', 'choose-ingress-route'] }],
-    ['install-immich', 'Install Immich', { dependsOn: ['install-opencloud'] }],
-    ['install-zulip', 'Install Zulip', { dependsOn: ['install-immich'] }],
-    ['install-paperless', 'Install Paperless', { dependsOn: ['install-zulip'] }],
-    ['install-karakeep', 'Install Karakeep', { dependsOn: ['install-paperless'] }],
-    ['install-gitea', 'Install Gitea', { dependsOn: ['install-karakeep'] }],
-    ['install-uptimekuma', 'Install Uptimekuma', { dependsOn: ['install-gitea'] }],
-    ['install-n8n', 'Install N8N', { dependsOn: ['install-uptimekuma'] }],
+    ['install-nextcloud', 'Install Nextcloud', { dependsOn: [] }],
+    ['install-opencloud', 'Install OpenCloud', { dependsOn: ['install-longhorn-storage', 'install-secret-sync', 'install-authentik-idp', 'create-users-and-groups', 'choose-ingress-route'] }],
+    ['install-immich', 'Install Immich', { dependsOn: ['install-longhorn-storage', 'install-cloudnativepg', 'install-secret-sync', 'install-authentik-idp', 'choose-ingress-route'] }],
+    ['install-zulip', 'Install Zulip', { dependsOn: [] }],
+    ['install-paperless', 'Install Paperless', { dependsOn: [] }],
+    ['install-karakeep', 'Install Karakeep', {
+      dependsOn: [
+        'install-longhorn-storage',
+        'install-secret-sync',
+        'install-authentik-idp',
+        'choose-ingress-route',
+      ],
+    }],
+    ['install-n8n', 'Install N8N', { dependsOn: [] }],
     ['install-audiobookshelf', 'Install Audiobookshelf', {
       dependsOn: [
         'install-longhorn-storage',
@@ -108,8 +112,8 @@ function buildCatalog(stepStatuses = {}) {
         'choose-ingress-route',
       ],
     }],
-    ['install-freshrss', 'Install FreshRSS', { dependsOn: ['install-audiobookshelf'] }],
-    ['install-jitsi', 'Install Jitsi', { dependsOn: ['install-freshrss'] }],
+    ['install-freshrss', 'Install FreshRSS', { dependsOn: [] }],
+    ['install-jitsi', 'Install Jitsi', { dependsOn: ['install-secret-sync', 'install-authentik-idp', 'create-users-and-groups', 'choose-ingress-route'] }],
   ].map(([id, title, options]) => ({
     ...makeStep(id, title, options),
     status: stepStatuses[id] ?? options.status ?? 'locked',
@@ -148,7 +152,7 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   });
 
   assert.equal(model.mode, 'setup');
-  assert.equal(model.stepRail.length, 25);
+  assert.equal(model.stepRail.length, 22);
   const stepRailById = Object.fromEntries(model.stepRail.map((step) => [step.id, step]));
   assert.equal(stepRailById['provision-nodes'].title, 'Deploy Talos Cluster');
   assert.equal(stepRailById['provision-nodes'].isCurrent, true);
@@ -158,10 +162,6 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   assert.match(stepRailById['provision-nodes'].positive_summary, /Twinbox stages/);
   assert.equal(stepRailById['install-cloudnativepg'].title, 'Install CloudNativePG');
   assert.equal(stepRailById['install-cloudnativepg'].icon, '🐘');
-  assert.equal(stepRailById['install-nextcloud'].title, 'Install Nextcloud');
-  assert.equal(stepRailById['install-nextcloud'].icon, '☁️');
-  assert.equal(stepRailById['install-opencloud'].title, 'Install OpenCloud');
-  assert.equal(stepRailById['install-opencloud'].icon, '☁️');
   assert.equal(stepRailById['install-tempo'].title, 'Install Tempo');
   assert.equal(stepRailById['install-tempo'].icon, '⏱️');
   assert.equal(stepRailById['install-alloy'].title, 'Install Alloy');
@@ -171,7 +171,7 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   assert.equal(stepRailById['install-velero-ui'].title, 'Install Velero UI');
   assert.equal(stepRailById['install-velero-ui'].icon, '🖥️');
   assert.equal(model.primaryAction.label, 'Next');
-  assert.equal(model.progress.totalSteps, 25);
+  assert.equal(model.progress.totalSteps, 22);
   assert.equal(model.progress.completedSteps, 0);
   assert.equal(model.activity.runtime.currentStage, 'Applying cluster plan');
   assert.equal(model.activity.rawLogOutput, '[2026-03-20T10:10:00Z] Applying OpenTofu cluster plan');
@@ -265,7 +265,6 @@ test('wizard model switches to manage mode when setup flow is complete', () => {
         'install-ntfy',
         'install-velero-backup',
         'install-velero-ui',
-        'install-proxmox-backup-system',
         'install-nextcloud',
         'install-opencloud',
         'install-immich',
@@ -299,7 +298,7 @@ test('wizard model switches to manage mode when setup flow is complete', () => {
   });
 
   assert.equal(model.mode, 'manage');
-  assert.equal(model.primaryAction.label, 'Next');
+  assert.equal(model.primaryAction.label, 'Finish');
   assert.equal(model.completion.title, 'Cluster bootstrap complete');
 });
 
@@ -314,7 +313,7 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     selectedStepId: '',
   });
 
-  assert.equal(model.stepRail.length, 25);
+  assert.equal(model.stepRail.length, 22);
   const setupStepIds = new Set(model.stepRail.map((step) => step.id));
   for (const id of [
     'provision-nodes',
@@ -334,9 +333,6 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     'install-management-consoles',
     'install-velero-backup',
     'install-velero-ui',
-    'install-nextcloud',
-    'install-opencloud',
-    'install-immich',
     'install-loki',
     'install-tempo',
     'install-alloy',

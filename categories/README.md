@@ -87,8 +87,6 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 - `install-velero-backup` – Deploy Velero with the default SeaweedFS backup target.
 - `install-velero-ui` – Deploy the Velero UI dashboard for backup operations.
 - `install-wiredoor-gateway` – Deploy Wiredoor gateway.
-- `install-uptimekuma` – Deploy Uptime Kuma monitoring.
-- `install-proxmox-backup-system` – Deploy Proxmox Backup Server integration.
 - Shared app installs such as `install-nextcloud`, `install-opencloud`, `install-immich`, `install-zulip`, and the rest of the user-facing app set are referenced from `categories/apps/steps` via `app_steps` entries in `categories/talos-cluster/category.yaml`.
 - `configure-cloudflare-dns` – Configure Cloudflare DNS records.
 - `provision-wiredoor-bastion` – Provision the Wiredoor bastion host.

@@ -183,12 +183,9 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-management-consoles",
                 "install-ntfy",
                 "install-velero-backup",
-                "install-proxmox-backup-system",
                 "install-zulip",
                 "install-paperless",
                 "install-karakeep",
-                "install-gitea",
-                "install-uptimekuma",
                 "install-n8n",
                 "install-audiobookshelf",
                 "install-freshrss",
@@ -251,13 +248,10 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert "install-nextcloud" not in talos_steps
             assert "install-opencloud" not in talos_steps
             assert "install-immich" not in talos_steps
-            assert talos_steps["install-proxmox-backup-system"]["depends_on"] == [
-                "install-velero-backup",
-                "install-velero-ui",
-            ]
-            assert talos_steps["install-zulip"]["depends_on"] == [
-                "install-proxmox-backup-system",
-            ]
+            assert "install-proxmox-backup-system" not in talos_steps
+            assert "install-gitea" not in talos_steps
+            assert "install-uptimekuma" not in talos_steps
+            assert talos_steps["install-zulip"]["depends_on"] == []
             assert talos_steps["install-audiobookshelf"]["title"] == "Install Audiobookshelf"
             assert "placeholder" not in talos_steps["install-audiobookshelf"]["summary"].lower()
             assert "placeholder" not in talos_steps["install-audiobookshelf"]["explanation"].lower()

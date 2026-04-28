@@ -15,15 +15,6 @@ test('admin app catalog view model enriches bundles with member cards', () => {
           summary: 'Install user-facing applications and collaboration tools.',
           steps: [
             {
-              id: 'install-immich',
-              title: 'Install Immich',
-              summary: 'Photo app',
-              app_state: 'ready',
-              placeholder: false,
-              order: 10,
-              iconText: 'IM',
-            },
-            {
               id: 'install-nextcloud',
               title: 'Install Nextcloud',
               summary: 'Files app',
@@ -31,6 +22,15 @@ test('admin app catalog view model enriches bundles with member cards', () => {
               placeholder: false,
               order: 20,
               iconText: 'NC',
+            },
+            {
+              id: 'install-immich',
+              title: 'Install Immich',
+              summary: 'Photo app',
+              app_state: 'ready',
+              placeholder: false,
+              order: 10,
+              iconText: 'IM',
             },
           ],
         },
@@ -55,4 +55,5 @@ test('admin app catalog view model enriches bundles with member cards', () => {
   assert.equal(viewModel.filteredBundles[0].installedCount, 1);
   assert.equal(viewModel.filteredBundles[0].searchText.includes('photo and video tools'), true);
   assert.equal(viewModel.selectedApp, null);
+  assert.deepEqual(viewModel.cards.map((card) => card.title), ['Install Immich', 'Install Nextcloud']);
 });

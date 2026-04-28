@@ -3,10 +3,6 @@ title: Talos Cluster
 summary: Provision Talos infrastructure and bootstrap the cluster in guided steps.
 order: 20
 app_steps:
-  - id: install-proxmox-backup-system
-    depends_on:
-      - install-velero-backup
-      - install-velero-ui
   - id: install-zulip
     summary: Install Zulip with Longhorn persistence, CloudNativePG, Authentik OIDC, and Traefik ingress.
     explanation: >
@@ -17,25 +13,9 @@ app_steps:
       configuration, and database credentials into OpenBao so the chart can read
       them through External Secrets instead of storing bootstrap material in the
       repository.
-    depends_on:
-      - install-proxmox-backup-system
   - id: install-paperless
-    depends_on:
-      - install-zulip
   - id: install-karakeep
-    depends_on:
-      - install-paperless
-  - id: install-gitea
-    depends_on:
-      - install-karakeep
-  - id: install-uptimekuma
-    depends_on:
-      - install-gitea
   - id: install-n8n
-    depends_on:
-      - install-uptimekuma
   - id: install-audiobookshelf
   - id: install-freshrss
-    depends_on:
-      - install-audiobookshelf
   - id: install-jitsi

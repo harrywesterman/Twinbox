@@ -92,7 +92,7 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   assert.equal(iconByTitle.get("Grafana"), `${wizardIconBase}/install-grafana.svg`);
   assert.equal(iconByTitle.get("Prometheus"), `${wizardIconBase}/install-prometheus.svg`);
   assert.equal(iconByTitle.get("Loki"), `${wizardIconBase}/install-loki.svg`);
-  assert.equal(iconByTitle.get("Proxmox"), `${wizardIconBase}/install-proxmox-backup-system.svg`);
+  assert.equal(iconByTitle.get("Proxmox"), `${wizardIconBase}/install-management-consoles.svg`);
   assert.equal(iconByTitle.get("SeaweedFS"), `${wizardIconBase}/install-management-consoles.svg`);
   assert.equal(iconByTitle.get("SeaweedFS Admin"), `${wizardIconBase}/install-management-consoles.svg`);
   assert.equal(iconByTitle.get("Twinbox Portal"), `${wizardIconBase}/install-twinbox-portal.svg`);

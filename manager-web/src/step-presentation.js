@@ -133,11 +133,6 @@ function buildProjectUrlMap() {
       project_url: 'https://velero-ui.docs.otwld.com/',
       github_url: 'https://github.com/otwld/velero-ui',
     },
-    'install-proxmox-backup-system': {
-      icon: '🗄️',
-      project_url: 'https://www.proxmox.com/en/products/proxmox-backup-server',
-      github_url: 'https://github.com/proxmox',
-    },
     'install-nextcloud': {
       icon: '☁️',
       project_url: 'https://nextcloud.com/',
@@ -167,16 +162,6 @@ function buildProjectUrlMap() {
       icon: '🔖',
       project_url: 'https://karakeep.app/',
       github_url: 'https://github.com/karakeep-app/karakeep',
-    },
-    'install-gitea': {
-      icon: '🛠️',
-      project_url: 'https://about.gitea.com/',
-      github_url: 'https://github.com/go-gitea/gitea',
-    },
-    'install-uptimekuma': {
-      icon: '⏱️',
-      project_url: 'https://uptime.kuma.pet/',
-      github_url: 'https://github.com/louislam/uptime-kuma',
     },
     'install-n8n': {
       icon: '🔗',
