@@ -558,9 +558,14 @@ log "Verifying Nextcloud installation status"
 verify_attempts=30
 verify_attempt=1
 while [[ $verify_attempt -le $verify_attempts ]]; do
-  pod=$(kubectl -n nextcloud get pods -l app.kubernetes.io/name=nextcloud -o name 2>/dev/null | head -1 | sed 's|pods/||')
+  pod=$(kubectl -n nextcloud get pods -l app.kubernetes.io/name=nextcloud -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
   if [[ -n "$pod" ]]; then
-    installed_status=$(kubectl -n nextcloud exec "$pod" -- wget -qO- --timeout=5 http://localhost/status.php 2>/dev/null | grep -o '"installed":[^,}]*' | cut -d: -f2 || echo "unknown")
+    status_json=$(kubectl -n nextcloud exec "$pod" -- php -r 'echo file_get_contents("http://localhost/status.php");' 2>/dev/null || true)
+    if [[ "$status_json" =~ \"installed\":(true|false) ]]; then
+      installed_status="${BASH_REMATCH[1]}"
+    else
+      installed_status="unknown"
+    fi
     if [[ "$installed_status" == "true" ]]; then
       log "Nextcloud is initialized"
       break
