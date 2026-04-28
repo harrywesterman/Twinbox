@@ -237,6 +237,7 @@ public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domai
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
 
 NEXTCLOUD_HOST="https://nextcloud.${public_zone_name}"
+NEXTCLOUD_DOMAIN="${NEXTCLOUD_HOST#https://}"
 NEXTCLOUD_OIDC_REDIRECT_URI="${NEXTCLOUD_HOST}/index.php/apps/user_oidc/code"
 NEXTCLOUD_OIDC_LOGOUT_URI="${NEXTCLOUD_HOST}/index.php/apps/user_oidc/sls"
 NEXTCLOUD_OIDC_BACKCHANNEL_URI="${NEXTCLOUD_HOST}/index.php/apps/user_oidc/backchannel-logout/nextcloud"
@@ -261,6 +262,7 @@ nextcloud_db_pooler_rw_manifest="$WORKSPACE_ROOT/gitops/databases/nextcloud/pool
 nextcloud_db_backup_manifest="$WORKSPACE_ROOT/gitops/databases/nextcloud/scheduled-backup.yaml"
 nextcloud_platform_dir="$WORKSPACE_ROOT/gitops/platform-apps/nextcloud"
 nextcloud_app_manifest="$WORKSPACE_ROOT/gitops/apps/nextcloud.yaml"
+nextcloud_values_manifest="$WORKSPACE_ROOT/gitops/values/nextcloud.yaml"
 
 existing_nextcloud_secret_json=""
 if command -v openbao_read_global_secret_json >/dev/null 2>&1; then
@@ -453,13 +455,42 @@ wait_for_resources_ready "databases" "externalsecret" "Ready" "Nextcloud databas
 wait_for_resources_ready "databases" "deployment" "Available" "Nextcloud pooler deployment"
 
 nextcloud_rendered_app_manifest="$(mktemp "${TMPDIR:-/tmp}/nextcloud-${cluster_id}.XXXXXX.yaml")"
-# Keep trustedDomains aligned with the runtime host we render into the Argo app.
-sed \
-  -e "s|__REPO_URL__|${TWINBOX_GIT_REPO_URL:-https://github.com/harrywesterman/Twinbox.git}|g" \
-  -e "s|__TARGET_REVISION__|${TWINBOX_GIT_TARGET_REVISION:-main}|g" \
-  -e "s|__NEXTCLOUD_HOST__|${NEXTCLOUD_HOST}|g" \
-  -e "s|__ZONE_NAME__|${public_zone_name}|g" \
-  "$nextcloud_app_manifest" >"$nextcloud_rendered_app_manifest"
+nextcloud_rendered_values_manifest="$(mktemp "${TMPDIR:-/tmp}/nextcloud-values-${cluster_id}.XXXXXX.yaml")"
+trap 'rm -f "$nextcloud_secret_file" "${nextcloud_rendered_values_manifest:-}" "${nextcloud_rendered_app_manifest:-}" "${nextcloud_rendered_middleware:-}" "${nextcloud_rendered_ingressroute:-}" "${nextcloud_rendered_collabora_ingressroute:-}"' EXIT
+sed "s/__ZONE_NAME__/${public_zone_name}/g" "$nextcloud_values_manifest" >"$nextcloud_rendered_values_manifest"
+
+python3 - \
+  "$nextcloud_app_manifest" \
+  "$nextcloud_rendered_app_manifest" \
+  "$nextcloud_rendered_values_manifest" \
+  "$public_zone_name" \
+  "${TWINBOX_GIT_REPO_URL:-https://github.com/harrywesterman/Twinbox.git}" \
+  "${TWINBOX_GIT_TARGET_REVISION:-main}" <<'PY'
+from pathlib import Path
+import sys
+import textwrap
+import re
+
+template_path = Path(sys.argv[1])
+output_path = Path(sys.argv[2])
+values_path = Path(sys.argv[3])
+zone_name = sys.argv[4]
+repo_url = sys.argv[5]
+target_revision = sys.argv[6]
+
+template = template_path.read_text(encoding="utf-8")
+values = values_path.read_text(encoding="utf-8").rstrip("\n")
+values = textwrap.indent(values, "          ")
+
+rendered = (
+    template.replace("__REPO_URL__", repo_url)
+    .replace("__TARGET_REVISION__", target_revision)
+    .replace("__ZONE_NAME__", zone_name)
+)
+rendered = re.sub(r"(?m)^          __NEXTCLOUD_VALUES__$", values, rendered)
+
+output_path.write_text(rendered, encoding="utf-8")
+PY
 
 log "Applying Nextcloud Argo CD application"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
@@ -538,6 +569,13 @@ while [[ $verify_attempt -le $verify_attempts ]]; do
 done
 
 wait_for_statefulset_ready "nextcloud" "nextcloud-redis-master" "Nextcloud Redis master"
+
+log "Updating Nextcloud trusted domains"
+kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
+  set -euo pipefail
+  cd /var/www/html
+  php occ config:system:set trusted_domains 1 --value='${NEXTCLOUD_DOMAIN}' --type=string
+"
 
 log "Configuring Nextcloud Redis memcache for HA"
 kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "

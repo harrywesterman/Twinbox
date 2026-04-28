@@ -10,8 +10,8 @@ spec:
       chart: nextcloud
       targetRevision: "9.0.5"
       helm:
-        valueFiles:
-          - $values/gitops/values/nextcloud.yaml
+        values: |
+          __NEXTCLOUD_VALUES__
     - repoURL: __REPO_URL__
       targetRevision: __TARGET_REVISION__
       ref: values

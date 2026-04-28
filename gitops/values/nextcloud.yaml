@@ -155,8 +155,7 @@ collabora:
     DONT_GEN_SSL_CERT: "true"
     extra_params: "--o:ssl.termination=true --o:ssl.enable=false"
     aliasgroups:
-      - hosts:
-        - nextcloud.__ZONE_NAME__
+      - host: nextcloud.__ZONE_NAME__
     server_name: "collabora.__ZONE_NAME__"
   ingress:
     enabled: false

@@ -2351,11 +2351,24 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert "gitops/databases/authentik/" not in text
     assert "user_oidc:provider" in text
     assert "nextcloud" in text
-    assert "trustedDomains" in text
+    assert "nextcloud-values-" in text
+    assert "__NEXTCLOUD_VALUES__" in text
+    assert "config:system:set trusted_domains 1" in text
+    values_text = (REPO_ROOT / "gitops" / "values" / "nextcloud.yaml").read_text(
+        encoding="utf-8"
+    )
+    assert "nextcloud.__ZONE_NAME__" in values_text
+    assert "aliasgroups:\n      - host: nextcloud.__ZONE_NAME__" in values_text
     platform_text = (
         REPO_ROOT / "gitops" / "platform-apps" / "nextcloud" / "ingressroute.yaml"
     ).read_text(encoding="utf-8")
     assert "nextcloud.__ZONE_NAME__" in platform_text
+    app_text = (REPO_ROOT / "gitops" / "apps" / "nextcloud.yaml").read_text(
+        encoding="utf-8"
+    )
+    assert "values: |" in app_text
+    assert "__NEXTCLOUD_VALUES__" in app_text
+    assert "valueFiles:" not in app_text
     db_externalsecret_text = (
         REPO_ROOT / "gitops" / "platform-apps" / "nextcloud" / "db-externalsecret.yaml"
     ).read_text(encoding="utf-8")
