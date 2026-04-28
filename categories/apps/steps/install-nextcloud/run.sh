@@ -504,6 +504,19 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$nextcloud_rendered_app_manifest" \
   --application "nextcloud"
 
+log "Checking whether Nextcloud is already installed"
+pod=$(kubectl -n nextcloud get pods -l app.kubernetes.io/name=nextcloud -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+if [[ -n "$pod" ]]; then
+  status_json=$(kubectl -n nextcloud exec "$pod" -- php -r 'echo file_get_contents("http://localhost/status.php");' 2>/dev/null || true)
+  if [[ "$status_json" =~ \"installed\":(true|false) ]]; then
+    installed_status="${BASH_REMATCH[1]}"
+    if [[ "$installed_status" == "true" ]]; then
+      log "Nextcloud is already installed; skipping initialization job"
+      init_success=true
+    fi
+  fi
+fi
+
 log "Waiting for Nextcloud CronJob to be created"
 cronjob_attempts=60
 cronjob_attempt=1
@@ -517,15 +530,23 @@ while ! kubectl -n nextcloud get cronjob nextcloud-cron &>/dev/null; do
 done
 log "CronJob created"
 
-log "Triggering first CronJob run for initialization"
-init_job_name="nextcloud-init-$(date +%s)"
-kubectl -n nextcloud create job "${init_job_name}" --from=cronjob/nextcloud-cron --dry-run=client -o yaml | kubectl apply -f -
+if [[ "$init_success" != "true" ]]; then
+  log "Triggering first CronJob run for initialization"
+  init_job_name="nextcloud-init-$(date +%s)"
+  kubectl -n nextcloud create job "${init_job_name}" --from=cronjob/nextcloud-cron --dry-run=client -o yaml | kubectl apply -f -
+fi
 
 max_retries=3
 retry_count=0
-init_success=false
+if [[ "$init_success" != "true" ]]; then
+  init_success=false
+fi
 
 while [[ $retry_count -lt $max_retries ]]; do
+  if [[ "$init_success" == "true" ]]; then
+    break
+  fi
+
   log "Waiting for Nextcloud initialization (attempt $((retry_count + 1))/${max_retries})"
   
   if kubectl -n nextcloud wait --for=condition=complete "job/${init_job_name}" --timeout=300s 2>/dev/null; then
