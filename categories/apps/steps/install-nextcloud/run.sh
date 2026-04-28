@@ -319,10 +319,12 @@ authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorizati
 invalidation_flow_id="$(authentik_resolve_flow_id "default-provider-invalidation-flow" "invalidation")"
 openid_mapping_id="$(authentik_resolve_scope_mapping_id "openid")"
 email_mapping_id="$(authentik_resolve_scope_mapping_id "email")"
+signing_key_id="$(authentik_resolve_signing_key_id)"
 [[ -n "$authorization_flow_id" ]] || fail "Could not resolve Authentik authorization flow ID"
 [[ -n "$invalidation_flow_id" ]] || fail "Could not resolve Authentik invalidation flow ID"
 [[ -n "$openid_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for openid"
 [[ -n "$email_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for email"
+[[ -n "$signing_key_id" ]] || fail "Could not resolve Authentik signing key ID for ${AUTHENTIK_SIGNING_KEY_NAME}"
 
 nextcloud_profile_mapping_id="$(upsert_scope_mapping \
   "Nextcloud Profile" \
@@ -358,6 +360,7 @@ provider_payload="$(
     --arg client_secret "$nextcloud_oidc_client_secret" \
     --arg authorization_flow "$authorization_flow_id" \
     --arg invalidation_flow "$invalidation_flow_id" \
+    --arg signing_key "$signing_key_id" \
     --argjson property_mappings "$(jq -cn \
       --arg openid "$openid_mapping_id" \
       --arg email "$email_mapping_id" \
@@ -374,6 +377,7 @@ provider_payload="$(
       client_secret: $client_secret,
       authorization_flow: $authorization_flow,
       invalidation_flow: $invalidation_flow,
+      signing_key: $signing_key,
       redirect_uris: [
         {
           matching_mode: "strict",

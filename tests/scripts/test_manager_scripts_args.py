@@ -2354,6 +2354,13 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert "nextcloud-values-" in text
     assert "__NEXTCLOUD_VALUES__" in text
     assert "config:system:set trusted_domains 1" in text
+    assert "authentik_resolve_signing_key_id" in text
+    assert '--arg signing_key "$signing_key_id"' in text
+    assert "signing_key: $signing_key" in text
+    assert (
+        "Could not resolve Authentik signing key ID for ${AUTHENTIK_SIGNING_KEY_NAME}"
+        in text
+    )
     values_text = (REPO_ROOT / "gitops" / "values" / "nextcloud.yaml").read_text(
         encoding="utf-8"
     )
