@@ -218,25 +218,11 @@ zulip_db_username="zulip"
 zulip_db_password="$(openssl rand -hex 24)"
 zulip_rabbitmq_password="$(openssl rand -hex 24)"
 zulip_redis_password="$(openssl rand -hex 24)"
-zulip_loadbalancer_ips="$(
-  kubectl get nodes -o json | jq -r '
-    [
-      .items[]
-      | ((.spec.podCIDRs // []) + ([.spec.podCIDR] // []))
-      | .[]
-      | select(. != null and . != "")
-    ]
-    | unique
-    | join(",")
-  '
-)"
-[[ -n "$zulip_loadbalancer_ips" ]] || fail "Could not determine Zulip trusted proxy CIDRs from cluster nodes"
 secrets_dir="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}/secrets/global"
 zulip_secret_file="${secrets_dir}/zulip-oidc-${cluster_id}.json"
 zulip_runtime_secret_file="${secrets_dir}/zulip-runtime-${cluster_id}.json"
 zulip_manifest_path="$WORKSPACE_ROOT/gitops/apps/zulip.yaml"
-zulip_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/zulip-application.XXXXXX.yaml")"
-trap 'rm -f "$zulip_rendered_manifest" "$zulip_secret_file" "$zulip_runtime_secret_file"' EXIT
+trap 'rm -f "$zulip_secret_file" "$zulip_runtime_secret_file"' EXIT
 
 mkdir -p "$secrets_dir"
 
@@ -345,11 +331,9 @@ zulip_runtime_secret_json="$(
   jq -n \
     --arg rabbitmq_password "$zulip_rabbitmq_password" \
     --arg redis_password "$zulip_redis_password" \
-    --arg loadbalancer_ips "$zulip_loadbalancer_ips" \
     '{
       ZULIP_RABBITMQ_PASSWORD: $rabbitmq_password,
-      ZULIP_REDIS_PASSWORD: $redis_password,
-      LOADBALANCER_IPS: $loadbalancer_ips
+      ZULIP_REDIS_PASSWORD: $redis_password
     }'
 )"
 printf '%s\n' "$zulip_runtime_secret_json" >"$zulip_runtime_secret_file"
@@ -358,7 +342,7 @@ chmod 600 "$zulip_runtime_secret_file"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "zulip-runtime" \
   --json-file "$zulip_runtime_secret_file" \
-  --required-keys "LOADBALANCER_IPS,ZULIP_RABBITMQ_PASSWORD,ZULIP_REDIS_PASSWORD"
+  --required-keys "ZULIP_RABBITMQ_PASSWORD,ZULIP_REDIS_PASSWORD"
 
 databases_namespace_manifest="$WORKSPACE_ROOT/gitops/databases/namespace.yaml"
 zulip_db_cluster_manifest="$WORKSPACE_ROOT/gitops/databases/zulip/cluster.yaml"
@@ -433,32 +417,9 @@ application_payload="$(
 application_pk="$(create_or_update_application "$application_payload")"
 [[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for Zulip"
 
-python3 - "$zulip_manifest_path" "$zulip_rendered_manifest" \
-  "$public_zone_name" \
-  "$zulip_rabbitmq_password" \
-  "$zulip_redis_password" \
-  "$zulip_loadbalancer_ips" <<'PY'
-from pathlib import Path
-import sys
-
-src_path = Path(sys.argv[1])
-dst_path = Path(sys.argv[2])
-public_zone_name = sys.argv[3]
-zulip_rabbitmq_password = sys.argv[4]
-zulip_redis_password = sys.argv[5]
-zulip_loadbalancer_ips = sys.argv[6]
-
-rendered = src_path.read_text()
-rendered = rendered.replace("__ZONE_NAME__", public_zone_name)
-rendered = rendered.replace("__ZULIP_RABBITMQ_PASSWORD__", zulip_rabbitmq_password)
-rendered = rendered.replace("__ZULIP_REDIS_PASSWORD__", zulip_redis_password)
-rendered = rendered.replace("__ZULIP_LOADBALANCER_IPS__", zulip_loadbalancer_ips)
-dst_path.write_text(rendered)
-PY
-
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying Zulip Argo CD application"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
-  --manifest "$zulip_rendered_manifest" \
+  --manifest "$zulip_manifest_path" \
   --application "zulip"
 
 wait_for_resources_ready "zulip" "externalsecret" "Ready" "Zulip ExternalSecret"

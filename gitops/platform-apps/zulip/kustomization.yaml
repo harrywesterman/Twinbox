@@ -4,4 +4,5 @@ kind: Kustomization
 resources:
   - externalsecret.yaml
   - db-externalsecret.yaml
+  - runtime-externalsecret.yaml
   - ingressroute.yaml

@@ -38,7 +38,9 @@ ZULIP_RUN = (
 )
 ZULIP_APP = REPO_ROOT / "gitops" / "apps" / "zulip.yaml"
 ZULIP_PLATFORM_DIR = REPO_ROOT / "gitops" / "platform-apps" / "zulip"
+ZULIP_RUNTIME_SECRET = ZULIP_PLATFORM_DIR / "runtime-externalsecret.yaml"
 ZULIP_VALUES = REPO_ROOT / "gitops" / "values" / "zulip.yaml"
+ZULIP_DB_CLUSTER = REPO_ROOT / "gitops" / "databases" / "zulip" / "cluster.yaml"
 REMOVED_PLACEHOLDER_STEP = (
     REPO_ROOT
     / "categories"
@@ -151,6 +153,8 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     category_text = _read(TALOS_CATEGORY)
     app_text = _read(ZULIP_APP)
     values_text = _read(ZULIP_VALUES)
+    runtime_secret_text = _read(ZULIP_RUNTIME_SECRET)
+    db_cluster_text = _read(ZULIP_DB_CLUSTER)
 
     assert "Placeholder step" not in step_text
     assert "categories/apps/steps/install-zulip/run.sh" in step_text
@@ -158,16 +162,16 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in run_text
     assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in run_text
     assert 'mkdir -p "$secrets_dir"' in run_text
-    assert 'zulip_loadbalancer_ips=' in run_text
-    assert 'kubectl get nodes -o json' in run_text
     assert 'zulip_runtime_secret_file=' in run_text
     assert 'openbao_read_global_secret_json zulip-runtime' in run_text
     assert 'sync-openbao-global-secret.sh' in run_text
     assert '--secret-name "zulip-runtime"' in run_text
-    assert '--required-keys "LOADBALANCER_IPS,ZULIP_RABBITMQ_PASSWORD,ZULIP_REDIS_PASSWORD"' in run_text
+    assert '--required-keys "ZULIP_RABBITMQ_PASSWORD,ZULIP_REDIS_PASSWORD"' in run_text
     assert 'zulip_config_secret_json' in run_text
     assert 'zulip_runtime_secret_json' in run_text
-    assert 'rendered = rendered.replace("__ZULIP_LOADBALANCER_IPS__", zulip_loadbalancer_ips)' in run_text
+    assert 'LOADBALANCER_IPS' not in run_text
+    assert '__ZULIP_RABBITMQ_PASSWORD__' not in run_text
+    assert '__ZULIP_REDIS_PASSWORD__' not in run_text
 
     assert "kind: ApplicationSet" in app_text
     assert "name: zulip-set" in app_text
@@ -178,9 +182,14 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "SETTING_EXTERNAL_HOST: zulip.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in app_text
     assert "SETTING_ZULIP_ADMINISTRATOR: admin@{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in app_text
     assert "ZULIP_AUTH_BACKENDS: GenericOpenIdConnectBackend" in app_text
-    assert "LOADBALANCER_IPS: __ZULIP_LOADBALANCER_IPS__" in app_text
-    assert "password: __ZULIP_RABBITMQ_PASSWORD__" in app_text
-    assert "password: __ZULIP_REDIS_PASSWORD__" in app_text
+    assert 'TRUST_GATEWAY_IP: "True"' in app_text
+    assert "existingPasswordSecret: zulip-runtime" in app_text
+    assert "existingSecretPasswordKey: rabbitmq-password" in app_text
+    assert "existingSecret: zulip-runtime" in app_text
+    assert "existingSecretPasswordKey: redis-password" in app_text
+    assert "LOADBALANCER_IPS" not in app_text
+    assert "__ZULIP_RABBITMQ_PASSWORD__" not in app_text
+    assert "__ZULIP_REDIS_PASSWORD__" not in app_text
 
     assert "size: 10Gi" in values_text
     assert "postgresql:" in values_text
@@ -193,6 +202,12 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "SECRETS_secret_key:" in values_text
     assert "SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS:" in values_text
     assert "persistence:" in values_text
+    assert "imageName: zulip/zulip-postgresql:14" in db_cluster_text
+    assert "name: zulip-runtime" in runtime_secret_text
+    assert "secretKey: rabbitmq-password" in runtime_secret_text
+    assert "property: ZULIP_RABBITMQ_PASSWORD" in runtime_secret_text
+    assert "secretKey: redis-password" in runtime_secret_text
+    assert "property: ZULIP_REDIS_PASSWORD" in runtime_secret_text
 
 
 def test_zulip_step_requests_kubeconfig_secret_injection():
