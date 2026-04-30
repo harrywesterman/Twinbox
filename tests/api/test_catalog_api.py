@@ -170,6 +170,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-argocd",
                 "install-longhorn-storage",
                 "install-secret-sync",
+                "install-crowdsec",
                 "install-traefik",
                 "install-cloudnativepg",
                 "choose-ingress-route",
@@ -204,6 +205,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 talos_steps["install-secret-sync"]["title"]
                 == "Install OpenBao and sync bootstrap secrets"
             )
+            assert talos_steps["install-crowdsec"]["title"] == "Install CrowdSec"
             assert talos_steps["install-traefik"]["title"] == "Install Traefik"
             assert (
                 talos_steps["install-cloudnativepg"]["title"] == "Install CloudNativePG"
@@ -277,6 +279,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert talos_steps["provision-nodes"]["status"] == "ready"
             assert talos_steps["install-argocd"]["status"] == "locked"
             assert talos_steps["install-traefik"]["status"] == "locked"
+            assert talos_steps["install-traefik"]["depends_on"] == ["install-crowdsec"]
             assert (
                 talos_steps["install-traefik"]["secrets"]["files"]["KUBECONFIG_FILE"][
                     "item"
@@ -382,6 +385,18 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
             assert vaultwarden["installable"] is True
             assert vaultwarden["app_state"] == "ready"
             assert vaultwarden["runner"]["script"] == "categories/apps/steps/install-vaultwarden/run.sh"
+            outline = next(step for step in apps if step["id"] == "install-outline")
+            assert outline["placeholder"] is False
+            assert outline["installable"] is True
+            assert outline["app_state"] == "ready"
+            assert outline["runner"]["script"] == "categories/apps/steps/install-outline/run.sh"
+            assert outline["depends_on"] == [
+                "install-longhorn-storage",
+                "install-cloudnativepg",
+                "install-secret-sync",
+                "install-authentik-idp",
+                "choose-ingress-route",
+            ]
             assert vaultwarden["depends_on"] == [
                 "install-longhorn-storage",
                 "install-cloudnativepg",
@@ -398,6 +413,19 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
             assert opencloud["installable"] is True
             assert opencloud["app_state"] == "ready"
             assert opencloud["runner"]["script"] == "categories/apps/steps/install-opencloud/run.sh"
+            openwebui = next(step for step in apps if step["id"] == "install-openwebui")
+            assert openwebui["placeholder"] is False
+            assert openwebui["installable"] is True
+            assert openwebui["app_state"] == "ready"
+            assert openwebui["runner"]["script"] == "categories/apps/steps/install-openwebui/run.sh"
+            assert openwebui["depends_on"] == [
+                "install-longhorn-storage",
+                "install-cloudnativepg",
+                "install-secret-sync",
+                "install-authentik-idp",
+                "create-users-and-groups",
+                "choose-ingress-route",
+            ]
             immich = next(step for step in apps if step["id"] == "install-immich")
             assert immich["placeholder"] is False
             assert immich["runner"]["script"] == "categories/apps/steps/install-immich/run.sh"

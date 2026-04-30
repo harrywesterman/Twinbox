@@ -1,0 +1,49 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: outline
+  namespace: outline
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`outline.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: outline
+          port: 80
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: outline-wiredoor
+  namespace: outline
+spec:
+  entryPoints:
+    - webwiredoor
+  routes:
+    - kind: Rule
+      match: Host(`outline.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: outline
+          port: 80
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: outline-tailscale
+  namespace: outline
+spec:
+  entryPoints:
+    - webtailscale
+  routes:
+    - kind: Rule
+      match: Host(`outline.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: outline
+          port: 80
+  tls: {}

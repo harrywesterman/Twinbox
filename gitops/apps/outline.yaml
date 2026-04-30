@@ -1,0 +1,56 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: outline
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __TARGET_REVISION__
+    path: gitops/platform-apps/outline
+    kustomize:
+      patches:
+        - target:
+            kind: Deployment
+            name: outline
+          patch: |-
+            - op: replace
+              path: /spec/template/spec/containers/0/env/0/value
+              value: https://outline.__ZONE_NAME__
+            - op: replace
+              path: /spec/template/spec/containers/0/env/5/value
+              value: https://authentik.__ZONE_NAME__/application/o/outline/
+            - op: replace
+              path: /spec/template/spec/containers/0/env/6/value
+              value: https://authentik.__ZONE_NAME__/application/o/outline/end-session/
+        - target:
+            kind: IngressRoute
+            name: outline
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`outline.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: outline-wiredoor
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`outline.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: outline-tailscale
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`outline.__ZONE_NAME__`)
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: outline
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

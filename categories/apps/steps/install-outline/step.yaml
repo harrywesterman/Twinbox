@@ -1,0 +1,32 @@
+id: install-outline
+title: Install Outline
+type: action
+journey_stage: setup
+order: 77
+summary: Install Outline with Longhorn storage, CloudNativePG, Redis, Authentik OIDC, and Traefik routes.
+explanation: Twinbox provisions Outline as a GitOps application with persistent Longhorn file storage, a dedicated PostgreSQL database, a local Redis service, OpenBao-managed bootstrap secrets, Authentik OIDC login, and Traefik routes for the selected cluster ingress path.
+side_help: Knowledge bases need the same storage, identity, and ingress foundations as the rest of the user-facing app stack.
+depends_on:
+  - install-longhorn-storage
+  - install-cloudnativepg
+  - install-secret-sync
+  - install-authentik-idp
+  - choose-ingress-route
+dashy:
+  items:
+    - section: Platform
+      title: Outline
+      description: Team knowledge base
+      icon: fas fa-book-open
+      url_template: https://outline.__ZONE_NAME__
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/apps/steps/install-outline/run.sh

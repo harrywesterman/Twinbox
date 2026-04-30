@@ -23,6 +23,12 @@ WIREDOOR_SECRET = (
 TRAEFIK_SECRET = (
     REPO_ROOT / "gitops" / "platform" / "traefik" / "traefik-dashboard-externalsecret.yaml"
 )
+CROWDSEC_BOUNCER_SECRET = (
+    REPO_ROOT / "gitops" / "platform" / "crowdsec" / "bouncer-externalsecret.yaml"
+)
+TRAEFIK_CROWDSEC_BOUNCER_SECRET = (
+    REPO_ROOT / "gitops" / "platform" / "traefik" / "crowdsec-bouncer-externalsecret.yaml"
+)
 PORTAL_SECRET = (
     REPO_ROOT / "gitops" / "platform-apps" / "twinbox-portal" / "externalsecret.yaml"
 )
@@ -41,6 +47,12 @@ ZULIP_PLATFORM_DIR = REPO_ROOT / "gitops" / "platform-apps" / "zulip"
 ZULIP_RUNTIME_SECRET = ZULIP_PLATFORM_DIR / "runtime-externalsecret.yaml"
 ZULIP_VALUES = REPO_ROOT / "gitops" / "values" / "zulip.yaml"
 ZULIP_DB_CLUSTER = REPO_ROOT / "gitops" / "databases" / "zulip" / "cluster.yaml"
+OUTLINE_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-outline" / "run.sh"
+OUTLINE_APP = REPO_ROOT / "gitops" / "apps" / "outline.yaml"
+OUTLINE_PLATFORM_DIR = REPO_ROOT / "gitops" / "platform-apps" / "outline"
+OUTLINE_DEPLOYMENT = OUTLINE_PLATFORM_DIR / "deployment.yaml"
+OUTLINE_SECRET = OUTLINE_PLATFORM_DIR / "externalsecret.yaml"
+OUTLINE_DB_CLUSTER = REPO_ROOT / "gitops" / "databases" / "outline" / "cluster.yaml"
 REMOVED_PLACEHOLDER_STEP = (
     REPO_ROOT
     / "categories"
@@ -124,6 +136,8 @@ def test_gitops_secret_consumers_now_reference_cluster_secret_store_openbao():
     grafana_text = _read(GRAFANA_SECRET)
     wiredoor_text = _read(WIREDOOR_SECRET)
     traefik_text = _read(TRAEFIK_SECRET)
+    crowdsec_bouncer_text = _read(CROWDSEC_BOUNCER_SECRET)
+    traefik_crowdsec_bouncer_text = _read(TRAEFIK_CROWDSEC_BOUNCER_SECRET)
 
     assert "name: openbao" in grafana_text
     assert "kind: ClusterSecretStore" in grafana_text
@@ -141,6 +155,18 @@ def test_gitops_secret_consumers_now_reference_cluster_secret_store_openbao():
     assert "name: openbao" in traefik_text
     assert "kind: ClusterSecretStore" in traefik_text
     assert "property: users" in traefik_text
+
+    assert "name: openbao" in crowdsec_bouncer_text
+    assert "kind: ClusterSecretStore" in crowdsec_bouncer_text
+    assert "secretKey: BOUNCER_KEY_traefik" in crowdsec_bouncer_text
+    assert "key: twinbox/global/crowdsec-bouncer" in crowdsec_bouncer_text
+    assert "property: lapi_key" in crowdsec_bouncer_text
+
+    assert "name: openbao" in traefik_crowdsec_bouncer_text
+    assert "kind: ClusterSecretStore" in traefik_crowdsec_bouncer_text
+    assert "secretKey: lapi-key" in traefik_crowdsec_bouncer_text
+    assert "key: twinbox/global/crowdsec-bouncer" in traefik_crowdsec_bouncer_text
+    assert "property: lapi_key" in traefik_crowdsec_bouncer_text
 
 
 def test_removed_placeholder_step_is_absent_from_the_journey():
@@ -219,3 +245,33 @@ def test_zulip_step_requests_kubeconfig_secret_injection():
     assert "item: kubeconfig" in step_text
     assert "attachment: kubeconfig" in step_text
     assert "format: file" in step_text
+
+
+def test_outline_step_projects_a_real_oidc_backed_app():
+    step_text = _read(OUTLINE_STEP)
+    app_text = _read(OUTLINE_APP)
+    deployment_text = _read(OUTLINE_DEPLOYMENT)
+    secret_text = _read(OUTLINE_SECRET)
+    db_cluster_text = _read(OUTLINE_DB_CLUSTER)
+
+    assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in step_text
+    assert 'openbao_read_global_secret_json outline' in step_text
+    assert '--secret-name "outline"' in step_text
+    assert '--required-keys "OUTLINE_POSTGRESQL__USERNAME,OUTLINE_POSTGRESQL__PASSWORD,DATABASE_URL,REDIS_URL,SECRET_KEY,UTILS_SECRET,OIDC_CLIENT_ID,OIDC_CLIENT_SECRET"' in step_text
+    assert 'create_or_update_provider()' in step_text
+    assert 'slug "outline"' in step_text
+    assert 'path: gitops/platform-apps/outline' in app_text
+    assert 'value: https://outline.__ZONE_NAME__' in app_text
+    assert 'value: https://authentik.__ZONE_NAME__/application/o/outline/' in app_text
+    assert 'application/o/outline/end-session/' in app_text
+    assert 'kind: Application' in app_text
+    assert 'image: docker.getoutline.com/outlinewiki/outline:1.6.1' in deployment_text
+    assert 'OIDC_ISSUER_URL' in deployment_text
+    assert 'OIDC_LOGOUT_URI' in deployment_text
+    assert 'property: DATABASE_URL' in secret_text
+    assert 'property: REDIS_URL' in secret_text
+    assert 'property: SECRET_KEY' in secret_text
+    assert 'property: UTILS_SECRET' in secret_text
+    assert 'property: OIDC_CLIENT_ID' in secret_text
+    assert 'property: OIDC_CLIENT_SECRET' in secret_text
+    assert 'imageName: ghcr.io/cloudnative-pg/postgresql:16.4' in db_cluster_text
