@@ -22,6 +22,12 @@ resources:
   - n8n/pooler-rw.yaml
   - n8n/pooler-rw-session.yaml
   - n8n/scheduled-backup.yaml
+  - hedgedoc/cluster.yaml
+  - hedgedoc/externalsecret.yaml
+  - hedgedoc/pooler-ro.yaml
+  - hedgedoc/pooler-rw.yaml
+  - hedgedoc/pooler-rw-session.yaml
+  - hedgedoc/scheduled-backup.yaml
   - paperless/cluster.yaml
   - paperless/externalsecret.yaml
   - paperless/pooler-ro.yaml

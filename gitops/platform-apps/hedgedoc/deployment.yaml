@@ -1,0 +1,121 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hedgedoc
+  namespace: hedgedoc
+  labels:
+    app.kubernetes.io/name: hedgedoc
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hedgedoc
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: hedgedoc
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: hedgedoc
+          image: quay.io/hedgedoc/hedgedoc:1.10.8
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - name: http
+              containerPort: 3000
+          envFrom:
+            - secretRef:
+                name: hedgedoc-bootstrap
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: CMD_HOST
+              value: 0.0.0.0
+            - name: CMD_PORT
+              value: "3000"
+            - name: CMD_DOMAIN
+              value: hedgedoc.__ZONE_NAME__
+            - name: CMD_PROTOCOL_USESSL
+              value: "true"
+            - name: CMD_URL_ADDPORT
+              value: "false"
+            - name: CMD_ALLOW_ANONYMOUS
+              value: "false"
+            - name: CMD_ALLOW_ANONYMOUS_EDITS
+              value: "false"
+            - name: CMD_EMAIL
+              value: "false"
+            - name: CMD_ALLOW_EMAIL_REGISTER
+              value: "false"
+            - name: CMD_ALLOW_FREEURL
+              value: "false"
+            - name: CMD_ENABLE_UPLOADS
+              value: registered
+            - name: CMD_IMAGE_UPLOAD_TYPE
+              value: filesystem
+            - name: CMD_UPLOADS_PATH
+              value: /hedgedoc/public/uploads
+            - name: CMD_ALLOW_GRAVATAR
+              value: "false"
+            - name: CMD_DEFAULT_PERMISSION
+              value: editable
+            - name: CMD_OAUTH2_PROVIDERNAME
+              value: Authentik
+            - name: CMD_OAUTH2_SCOPE
+              value: openid email profile
+            - name: CMD_OAUTH2_USER_PROFILE_USERNAME_ATTR
+              value: preferred_username
+            - name: CMD_OAUTH2_USER_PROFILE_DISPLAY_NAME_ATTR
+              value: name
+            - name: CMD_OAUTH2_USER_PROFILE_EMAIL_ATTR
+              value: email
+            - name: CMD_OAUTH2_USER_PROFILE_ID_ATTR
+              value: sub
+            - name: CMD_OAUTH2_AUTHORIZATION_URL
+              value: https://authentik.__ZONE_NAME__/application/o/authorize/
+            - name: CMD_OAUTH2_TOKEN_URL
+              value: https://authentik.__ZONE_NAME__/application/o/token/
+            - name: CMD_OAUTH2_USER_PROFILE_URL
+              value: https://authentik.__ZONE_NAME__/application/o/userinfo/
+          readinessProbe:
+            httpGet:
+              path: /_health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /_health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+          startupProbe:
+            httpGet:
+              path: /_health
+              port: http
+            failureThreshold: 60
+            periodSeconds: 5
+          volumeMounts:
+            - name: uploads
+              mountPath: /hedgedoc/public/uploads
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: hedgedoc-uploads

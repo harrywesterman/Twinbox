@@ -1,0 +1,32 @@
+id: install-hedgedoc
+title: Install HedgeDoc
+type: action
+journey_stage: setup
+order: 78
+summary: Install HedgeDoc with Longhorn uploads, Authentik OAuth, and CloudNativePG storage.
+explanation: Twinbox provisions HedgeDoc as a GitOps application with persistent Longhorn uploads, a dedicated PostgreSQL database, OpenBao-managed bootstrap secrets, Authentik OAuth login, and Traefik routes for the selected cluster ingress path.
+side_help: Collaborative markdown notes fit the same app stack as the rest of the user-facing services.
+depends_on:
+  - install-longhorn-storage
+  - install-cloudnativepg
+  - install-secret-sync
+  - install-authentik-idp
+  - choose-ingress-route
+dashy:
+  items:
+    - section: Apps
+      title: HedgeDoc
+      description: Collaborative markdown editor
+      icon: fas fa-pen-nib
+      url_template: https://hedgedoc.__ZONE_NAME__
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/apps/steps/install-hedgedoc/run.sh

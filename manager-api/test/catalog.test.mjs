@@ -196,6 +196,7 @@ test('app catalog exposes apps while the wizard catalog keeps them out of sight'
     const freshrssCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-freshrss');
     const zulipCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-zulip');
     const vaultwardenCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-vaultwarden');
+    const hedgedocCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-hedgedoc');
     const mediaBundle = appCatalog.bundles.find((bundle) => bundle.id === 'media');
     assert.equal(nextcloudCard?.title, 'Install Nextcloud');
     assert.equal(nextcloudCard?.placeholder, false);
@@ -212,6 +213,11 @@ test('app catalog exposes apps while the wizard catalog keeps them out of sight'
     assert.equal(vaultwardenCard?.installable, true);
     assert.deepEqual(vaultwardenCard?.depends_on, ['install-longhorn-storage', 'install-cloudnativepg', 'install-secret-sync', 'choose-ingress-route']);
     assert.equal(vaultwardenCard?.runner?.script, 'categories/apps/steps/install-vaultwarden/run.sh');
+    assert.equal(hedgedocCard?.title, 'Install HedgeDoc');
+    assert.equal(hedgedocCard?.placeholder, false);
+    assert.equal(hedgedocCard?.installable, true);
+    assert.deepEqual(hedgedocCard?.depends_on, ['install-longhorn-storage', 'install-cloudnativepg', 'install-secret-sync', 'install-authentik-idp', 'choose-ingress-route']);
+    assert.equal(hedgedocCard?.runner?.script, 'categories/apps/steps/install-hedgedoc/run.sh');
     assert.deepEqual(n8nCard?.depends_on, ['install-longhorn-storage', 'install-cloudnativepg', 'install-secret-sync', 'choose-ingress-route']);
     assert.equal(freshrssCard?.title, 'Install FreshRSS');
     assert.equal(freshrssCard?.placeholder, false);

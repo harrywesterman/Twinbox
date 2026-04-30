@@ -1,0 +1,49 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: hedgedoc
+  namespace: hedgedoc
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`hedgedoc.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: hedgedoc
+          port: 80
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: hedgedoc-wiredoor
+  namespace: hedgedoc
+spec:
+  entryPoints:
+    - webwiredoor
+  routes:
+    - kind: Rule
+      match: Host(`hedgedoc.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: hedgedoc
+          port: 80
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: hedgedoc-tailscale
+  namespace: hedgedoc
+spec:
+  entryPoints:
+    - webtailscale
+  routes:
+    - kind: Rule
+      match: Host(`hedgedoc.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: hedgedoc
+          port: 80
+  tls: {}

@@ -147,6 +147,17 @@
       "accent": "#06b6d4",
       "category": "Platform"
     },
+    "HedgeDoc": {
+      "summary": "Collaborative markdown editor",
+      "description": "Draft notes, guides, and project docs together in a private browser-based workspace.",
+      "capabilities": [
+        "Write shared markdown notes",
+        "Edit collaboratively in real time",
+        "Keep team docs inside Twinbox"
+      ],
+      "accent": "#0ea5e9",
+      "category": "Apps"
+    },
     "Hubble": {
       "summary": "Network visibility and traffic flows",
       "description": "Watch how services talk to each other and spot network or policy issues quickly.",

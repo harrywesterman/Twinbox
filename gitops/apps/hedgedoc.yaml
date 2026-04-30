@@ -1,0 +1,65 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: hedgedoc
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __TARGET_REVISION__
+    path: gitops/platform-apps/hedgedoc
+    kustomize:
+      patches:
+        - target:
+            kind: Deployment
+            name: hedgedoc
+          patch: |-
+            - op: replace
+              path: /spec/template/spec/containers/0/env/3/value
+              value: https://hedgedoc.__ZONE_NAME__
+            - op: replace
+              path: /spec/template/spec/containers/0/env/4/value
+              value: https://hedgedoc.__ZONE_NAME__
+            - op: replace
+              path: /spec/template/spec/containers/0/env/5/value
+              value: https://hedgedoc.__ZONE_NAME__
+            - op: replace
+              path: /spec/template/spec/containers/0/env/22/value
+              value: https://authentik.__ZONE_NAME__/application/o/authorize/
+            - op: replace
+              path: /spec/template/spec/containers/0/env/23/value
+              value: https://authentik.__ZONE_NAME__/application/o/token/
+            - op: replace
+              path: /spec/template/spec/containers/0/env/24/value
+              value: https://authentik.__ZONE_NAME__/application/o/userinfo/
+        - target:
+            kind: IngressRoute
+            name: hedgedoc
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`hedgedoc.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: hedgedoc-wiredoor
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`hedgedoc.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: hedgedoc-tailscale
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`hedgedoc.__ZONE_NAME__`)
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: hedgedoc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
