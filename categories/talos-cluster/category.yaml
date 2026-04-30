@@ -17,6 +17,7 @@ app_steps:
   - id: install-karakeep
   - id: install-vaultwarden
   - id: install-n8n
+  - id: install-openwebui
   - id: install-audiobookshelf
   - id: install-freshrss
   - id: install-searxng

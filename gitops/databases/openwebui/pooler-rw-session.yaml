@@ -1,0 +1,16 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: openwebui-db-pooler-rw-session
+  namespace: databases
+spec:
+  cluster:
+    name: openwebui-db
+  instances: 2
+  type: rw
+  pgbouncer:
+    poolMode: session
+    parameters:
+      max_client_conn: "200"
+      default_pool_size: "20"
+      min_pool_size: "5"

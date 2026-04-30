@@ -1,0 +1,33 @@
+id: install-openwebui
+title: Install Open WebUI
+type: action
+journey_stage: setup
+order: 83
+summary: Install Open WebUI with CloudNativePG, Authentik SSO, and Traefik routes.
+explanation: Twinbox provisions Open WebUI as a GitOps application with a dedicated CloudNativePG database, Longhorn-backed local storage, and Authentik OIDC so users get a private AI chat workspace with the same identity layer as the rest of the app stack.
+side_help: AI workspace tools fit with the rest of the user apps once storage, databases, and identity are ready.
+depends_on:
+  - install-longhorn-storage
+  - install-cloudnativepg
+  - install-secret-sync
+  - install-authentik-idp
+  - create-users-and-groups
+  - choose-ingress-route
+dashy:
+  items:
+    - section: Apps
+      title: Open WebUI
+      description: Private AI chat workspace
+      icon: fas fa-robot
+      url_template: https://openwebui.__ZONE_NAME__
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/apps/steps/install-openwebui/run.sh

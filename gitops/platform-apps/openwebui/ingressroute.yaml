@@ -1,0 +1,49 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: openwebui
+  namespace: openwebui
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`openwebui.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: openwebui
+          port: 80
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: openwebui-wiredoor
+  namespace: openwebui
+spec:
+  entryPoints:
+    - webwiredoor
+  routes:
+    - kind: Rule
+      match: Host(`openwebui.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: openwebui
+          port: 80
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: openwebui-tailscale
+  namespace: openwebui
+spec:
+  entryPoints:
+    - webtailscale
+  routes:
+    - kind: Rule
+      match: Host(`openwebui.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: openwebui
+          port: 80
+  tls: {}

@@ -328,6 +328,17 @@
       "accent": "#2563eb",
       "category": "Apps"
     },
+    "Open WebUI": {
+      "summary": "Private AI chat workspace",
+      "description": "Chat with models, keep prompts and files in one place, and use a private AI workspace inside Twinbox.",
+      "capabilities": [
+        "Open a private AI chat workspace",
+        "Organize prompts and conversations",
+        "Keep AI tooling inside your own cluster"
+      ],
+      "accent": "#06b6d4",
+      "category": "Apps"
+    },
     "Paperless": {
       "summary": "Document archive",
       "description": "Turn paper and scans into a searchable digital archive.",

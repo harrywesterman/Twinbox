@@ -194,6 +194,12 @@ export const STEP_ICON_MANIFEST = [
     officialSourceUrl: 'https://github.com/n8n-io/n8n',
   }),
   iconEntry({
+    stepId: 'install-openwebui',
+    isAppOrPlatform: true,
+    officialSourceType: 'project-repository',
+    officialSourceUrl: 'https://github.com/open-webui/open-webui',
+  }),
+  iconEntry({
     stepId: 'install-audiobookshelf',
     isAppOrPlatform: true,
     officialSourceType: 'project-repository',

@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openwebui
+  namespace: openwebui
+  labels:
+    app.kubernetes.io/name: openwebui
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openwebui
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openwebui
+    spec:
+      containers:
+        - name: openwebui
+          image: ghcr.io/open-webui/open-webui:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: WEBUI_URL
+              value: https://openwebui.__ZONE_NAME__
+            - name: OPENID_PROVIDER_URL
+              value: https://authentik.__ZONE_NAME__/application/o/openwebui/.well-known/openid-configuration
+            - name: OPENID_REDIRECT_URI
+              value: https://openwebui.__ZONE_NAME__/oauth/oidc/callback
+            - name: OAUTH_PROVIDER_NAME
+              value: Authentik
+            - name: OAUTH_SCOPES
+              value: openid email profile
+            - name: ENABLE_SIGNUP
+              value: "false"
+            - name: ENABLE_LOGIN_FORM
+              value: "false"
+            - name: ENABLE_PASSWORD_AUTH
+              value: "false"
+            - name: ENABLE_OAUTH_SIGNUP
+              value: "true"
+            - name: ENABLE_OAUTH_PERSISTENT_CONFIG
+              value: "false"
+            - name: ENABLE_PERSISTENT_CONFIG
+              value: "false"
+            - name: ENV
+              value: prod
+            - name: WEBUI_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openwebui-bootstrap
+                  key: WEBUI_SECRET_KEY
+            - name: OAUTH_SESSION_TOKEN_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openwebui-bootstrap
+                  key: OAUTH_SESSION_TOKEN_ENCRYPTION_KEY
+            - name: OAUTH_CLIENT_INFO_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openwebui-bootstrap
+                  key: OAUTH_CLIENT_INFO_ENCRYPTION_KEY
+            - name: OAUTH_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: openwebui-bootstrap
+                  key: OAUTH_CLIENT_ID
+            - name: OAUTH_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: openwebui-bootstrap
+                  key: OAUTH_CLIENT_SECRET
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: openwebui-bootstrap
+                  key: DATABASE_URL
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            failureThreshold: 90
+            periodSeconds: 5
+          volumeMounts:
+            - name: openwebui-data
+              mountPath: /app/backend/data
+      volumes:
+        - name: openwebui-data
+          persistentVolumeClaim:
+            claimName: openwebui-data
