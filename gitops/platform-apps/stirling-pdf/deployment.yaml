@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stirling-pdf
+  namespace: stirling-pdf
+  labels:
+    app.kubernetes.io/name: stirling-pdf
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: stirling-pdf
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: stirling-pdf
+    spec:
+      containers:
+        - name: stirling-pdf
+          image: ghcr.io/stirling-tools/stirling-pdf:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: ST_USE_AUTH_FILE
+              value: "false"
+            - name: ST_API_KEY_FOR_QR_CODE
+              valueFrom:
+                secretKeyRef:
+                  name: stirling-pdf-config
+                  key: STIRLING_PDF_API_KEY
+            - name: ST_BASE_URL
+              value: https://stirling-pdf.__ZONE_NAME__/
+            - name: ST_ENABLE_TRASH_CLEANUP
+              value: "true"
+            - name: ST_ENABLE_DELETE_ORPHAN_UPLOAD_FOLDERS
+              value: "true"
+            - name: ST_PDF_AUTO_UPDATE_CONVERTERS
+              value: "true"
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            failureThreshold: 90
+            periodSeconds: 5
+          volumeMounts:
+            - name: stirling-pdf-data
+              mountPath: /usr/local/tomcat/static
+      volumes:
+        - name: stirling-pdf-data
+          persistentVolumeClaim:
+            claimName: stirling-pdf-data

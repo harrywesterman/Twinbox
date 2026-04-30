@@ -1,0 +1,50 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: stirling-pdf
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __TARGET_REVISION__
+    path: gitops/platform-apps/stirling-pdf
+    kustomize:
+      patches:
+        - target:
+            kind: Deployment
+            name: stirling-pdf
+          patch: |-
+            - op: replace
+              path: /spec/template/spec/containers/0/env/2/value
+              value: https://stirling-pdf.__ZONE_NAME__/
+        - target:
+            kind: IngressRoute
+            name: stirling-pdf
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`stirling-pdf.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: stirling-pdf-wiredoor
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`stirling-pdf.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: stirling-pdf-tailscale
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`stirling-pdf.__ZONE_NAME__`)
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: stirling-pdf
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,49 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: stirling-pdf
+  namespace: stirling-pdf
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`stirling-pdf.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: stirling-pdf
+          port: 80
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: stirling-pdf-wiredoor
+  namespace: stirling-pdf
+spec:
+  entryPoints:
+    - webwiredoor
+  routes:
+    - kind: Rule
+      match: Host(`stirling-pdf.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: stirling-pdf
+          port: 80
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: stirling-pdf-tailscale
+  namespace: stirling-pdf
+spec:
+  entryPoints:
+    - webtailscale
+  routes:
+    - kind: Rule
+      match: Host(`stirling-pdf.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: stirling-pdf
+          port: 80
+  tls: {}

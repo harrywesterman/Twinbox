@@ -21,3 +21,4 @@ app_steps:
   - id: install-freshrss
   - id: install-searxng
   - id: install-jitsi
+  - id: install-stirling-pdf
