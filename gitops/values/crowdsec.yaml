@@ -1,0 +1,24 @@
+container_runtime: containerd
+
+agent:
+  enabled: true
+  isDeployment: false
+  acquisition:
+    - namespace: traefik
+      podName: traefik-*
+      program: traefik
+  env:
+    - name: COLLECTIONS
+      value: crowdsecurity/traefik
+
+lapi:
+  enabled: true
+  replicas: 1
+  env:
+    - name: BOUNCER_KEY_traefik
+      valueFrom:
+        secretKeyRef:
+          name: crowdsec-bouncer-keys
+          key: BOUNCER_KEY_traefik
+  service:
+    type: ClusterIP

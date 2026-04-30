@@ -48,7 +48,8 @@ function buildCatalog(stepStatuses = {}) {
     ['install-argocd', 'Install Argo CD', { dependsOn: ['provision-nodes'] }],
     ['install-longhorn-storage', 'Install Longhorn storage', { dependsOn: ['install-argocd'] }],
     ['install-secret-sync', 'Install OpenBao and sync bootstrap secrets', { dependsOn: ['install-longhorn-storage'] }],
-    ['install-traefik', 'Install Traefik', { dependsOn: ['install-secret-sync'] }],
+    ['install-crowdsec', 'Install CrowdSec', { dependsOn: ['install-secret-sync'] }],
+    ['install-traefik', 'Install Traefik', { dependsOn: ['install-crowdsec'] }],
     ['install-cloudnativepg', 'Install CloudNativePG', { dependsOn: ['install-argocd', 'install-longhorn-storage'] }],
     ['install-authentik-idp', 'Install Authentik', { dependsOn: ['install-secret-sync', 'install-longhorn-storage', 'install-cloudnativepg', 'install-traefik', 'choose-ingress-route'] }],
     ['create-users-and-groups', 'Create Users and Groups', { dependsOn: ['install-authentik-idp'] }],
@@ -167,7 +168,7 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   });
 
   assert.equal(model.mode, 'setup');
-  assert.equal(model.stepRail.length, 22);
+  assert.equal(model.stepRail.length, 23);
   const stepRailById = Object.fromEntries(model.stepRail.map((step) => [step.id, step]));
   assert.equal(stepRailById['provision-nodes'].title, 'Deploy Talos Cluster');
   assert.equal(stepRailById['provision-nodes'].isCurrent, true);
@@ -186,7 +187,7 @@ test('wizard model exposes a linear setup rail and guided actions', () => {
   assert.equal(stepRailById['install-velero-ui'].title, 'Install Velero UI');
   assert.equal(stepRailById['install-velero-ui'].icon, '🖥️');
   assert.equal(model.primaryAction.label, 'Next');
-  assert.equal(model.progress.totalSteps, 22);
+  assert.equal(model.progress.totalSteps, 23);
   assert.equal(model.progress.completedSteps, 0);
   assert.equal(model.activity.runtime.currentStage, 'Applying cluster plan');
   assert.equal(model.activity.rawLogOutput, '[2026-03-20T10:10:00Z] Applying OpenTofu cluster plan');
@@ -264,6 +265,7 @@ test('wizard model switches to manage mode when setup flow is complete', () => {
         'install-argocd',
         'install-longhorn-storage',
         'install-secret-sync',
+        'install-crowdsec',
         'install-traefik',
         'install-cloudnativepg',
         'create-users-and-groups',
@@ -328,13 +330,14 @@ test('wizard model keeps manage-only steps out of the setup rail', () => {
     selectedStepId: '',
   });
 
-  assert.equal(model.stepRail.length, 22);
+  assert.equal(model.stepRail.length, 23);
   const setupStepIds = new Set(model.stepRail.map((step) => step.id));
   for (const id of [
     'provision-nodes',
     'install-argocd',
     'install-longhorn-storage',
     'install-secret-sync',
+    'install-crowdsec',
     'install-traefik',
     'install-cloudnativepg',
     'install-authentik-idp',

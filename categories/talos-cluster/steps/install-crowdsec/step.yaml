@@ -1,0 +1,21 @@
+id: install-crowdsec
+title: Install CrowdSec
+type: action
+journey_stage: setup
+order: 16
+summary: Deploy CrowdSec security engine and seed the Traefik bouncer key.
+explanation: Twinbox generates or reuses a CrowdSec Traefik bouncer key, stores it in OpenBao, materializes the Kubernetes Secrets through External Secrets, and applies the CrowdSec Argo CD application. CrowdSec runs a Local API and node log agents that read Traefik access logs so Traefik can block known-bad client IPs through the CrowdSec plugin.
+side_help: CrowdSec watches service logs for suspicious behavior and exposes remediation decisions to Traefik. The first Twinbox integration enables IP remediation only; AppSec/WAF can be added later after rule tuning.
+depends_on:
+  - install-secret-sync
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/install-crowdsec/run.sh

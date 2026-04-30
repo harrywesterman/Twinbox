@@ -66,6 +66,7 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 - `provision-nodes` – Create Talos VMs on Proxmox, apply machine configs, bootstrap.
 - `install-argocd` – Deploy Argo CD.
 - `install-longhorn-storage` – Deploy Longhorn and set default StorageClass.
+- `install-crowdsec` – Deploy CrowdSec security engine and Traefik bouncer key plumbing.
 - `install-cloudnativepg` – Deploy CloudNativePG operator.
 - `install-prometheus` – Deploy Prometheus, Alertmanager, node-exporter, and kube-state-metrics.
 - `install-traefik` – Deploy Traefik ingress controller.

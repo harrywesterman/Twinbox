@@ -15,6 +15,7 @@ const FIXED_SETUP_STEP_IDS = [
   'install-argocd',
   'install-longhorn-storage',
   'install-secret-sync',
+  'install-crowdsec',
   'install-traefik',
   'install-cloudnativepg',
   'choose-ingress-route',

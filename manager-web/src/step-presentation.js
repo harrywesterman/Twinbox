@@ -33,6 +33,11 @@ function buildProjectUrlMap() {
       project_url: 'https://openbao.org/',
       github_url: 'https://github.com/openbao/openbao',
     },
+    'install-crowdsec': {
+      icon: '🛡️',
+      project_url: 'https://www.crowdsec.net/',
+      github_url: 'https://github.com/crowdsecurity/crowdsec',
+    },
     'install-cloudnativepg': {
       icon: '🐘',
       project_url: 'https://cloudnative-pg.io/',

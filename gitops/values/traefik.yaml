@@ -18,6 +18,43 @@ providers:
     allowCrossNamespace: true
   kubernetesIngress:
     enabled: true
+  file:
+    enabled: true
+    watch: true
+    content: |
+      http:
+        middlewares:
+          cloudflarewarp:
+            plugin:
+              cloudflarewarp:
+                disableDefault: false
+          crowdsec:
+            plugin:
+              bouncer:
+                enabled: true
+                crowdsecMode: stream
+                crowdsecLapiScheme: http
+                crowdsecLapiHost: crowdsec-service.crowdsec.svc.cluster.local:8080
+                crowdsecLapiKeyFile: /run/secrets/crowdsec/lapi-key
+
+experimental:
+  abortOnPluginFailure: true
+  plugins:
+    cloudflarewarp:
+      moduleName: github.com/BetterCorp/cloudflarewarp
+      version: v1.3.3
+    bouncer:
+      moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      version: v1.6.0
+
+additionalArguments:
+  - --entryPoints.web.http.middlewares=cloudflarewarp@file,crowdsec@file
+  - --entryPoints.websecure.http.middlewares=cloudflarewarp@file,crowdsec@file
+
+volumes:
+  - name: traefik-crowdsec-bouncer
+    mountPath: /run/secrets/crowdsec
+    type: secret
 
 ingressClass:
   enabled: true

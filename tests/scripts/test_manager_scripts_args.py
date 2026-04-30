@@ -91,12 +91,23 @@ LONGHORN_HELPER_SCRIPT = (
 TRAEFIK_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-traefik" / "run.sh"
 )
+CROWDSEC_STEP_SCRIPT = (
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-crowdsec" / "run.sh"
+)
 TRAEFIK_STEP_MANIFEST = (
     REPO_ROOT
     / "categories"
     / "talos-cluster"
     / "steps"
     / "install-traefik"
+    / "step.yaml"
+)
+CROWDSEC_STEP_MANIFEST = (
+    REPO_ROOT
+    / "categories"
+    / "talos-cluster"
+    / "steps"
+    / "install-crowdsec"
     / "step.yaml"
 )
 PROMETHEUS_STEP_MANIFEST = (
@@ -294,6 +305,7 @@ WIREDOOR_BASTION_STEP_MANIFEST = (
 ARGO_BOOTSTRAP_SCRIPT = REPO_ROOT / "gitops" / "install.sh"
 LONGHORN_APP = REPO_ROOT / "gitops" / "apps" / "longhorn.yaml"
 TRAEFIK_APP = REPO_ROOT / "gitops" / "apps" / "traefik.yaml"
+CROWDSEC_APP = REPO_ROOT / "gitops" / "apps" / "crowdsec.yaml"
 WHOAMI_APP = REPO_ROOT / "gitops" / "apps" / "whoami.yaml"
 HEADLAMP_APP = REPO_ROOT / "gitops" / "apps" / "headlamp.yaml"
 FRESHRSS_APP = REPO_ROOT / "gitops" / "apps" / "freshrss.yaml"
@@ -306,6 +318,7 @@ WHOAMI_DEPLOYMENT = (
 HEADLAMP_VALUES = REPO_ROOT / "gitops" / "values" / "headlamp.yaml"
 LONGHORN_VALUES = REPO_ROOT / "gitops" / "values" / "longhorn.yaml"
 TRAEFIK_VALUES = REPO_ROOT / "gitops" / "values" / "traefik.yaml"
+CROWDSEC_VALUES = REPO_ROOT / "gitops" / "values" / "crowdsec.yaml"
 WIREDOOR_GATEWAY_VALUES = REPO_ROOT / "gitops" / "values" / "wiredoor-gateway.yaml"
 GRAFANA_VALUES = REPO_ROOT / "gitops" / "values" / "grafana.yaml"
 TRAEFIK_DASHBOARD_EXTERNALSECRET = (
@@ -314,6 +327,12 @@ TRAEFIK_DASHBOARD_EXTERNALSECRET = (
     / "platform"
     / "traefik"
     / "traefik-dashboard-externalsecret.yaml"
+)
+CROWDSEC_BOUNCER_EXTERNALSECRET = (
+    REPO_ROOT / "gitops" / "platform" / "crowdsec" / "bouncer-externalsecret.yaml"
+)
+TRAEFIK_CROWDSEC_BOUNCER_EXTERNALSECRET = (
+    REPO_ROOT / "gitops" / "platform" / "traefik" / "crowdsec-bouncer-externalsecret.yaml"
 )
 ARGOCD_SERVER_TRANSPORT = (
     REPO_ROOT / "gitops" / "platform" / "traefik" / "argocd-server-transport.yaml"
@@ -469,6 +488,14 @@ def _longhorn_step_manifest_text() -> str:
     return LONGHORN_STEP_MANIFEST.read_text(encoding="utf-8")
 
 
+def _crowdsec_step_text() -> str:
+    return CROWDSEC_STEP_SCRIPT.read_text(encoding="utf-8")
+
+
+def _crowdsec_step_manifest_text() -> str:
+    return CROWDSEC_STEP_MANIFEST.read_text(encoding="utf-8")
+
+
 def _longhorn_helper_text() -> str:
     return LONGHORN_HELPER_SCRIPT.read_text(encoding="utf-8")
 
@@ -489,6 +516,10 @@ def _traefik_values_text() -> str:
     return TRAEFIK_VALUES.read_text(encoding="utf-8")
 
 
+def _crowdsec_values_text() -> str:
+    return CROWDSEC_VALUES.read_text(encoding="utf-8")
+
+
 def _longhorn_values_text() -> str:
     return LONGHORN_VALUES.read_text(encoding="utf-8")
 
@@ -499,6 +530,14 @@ def _wiredoor_gateway_values_text() -> str:
 
 def _traefik_dashboard_externalsecret_text() -> str:
     return TRAEFIK_DASHBOARD_EXTERNALSECRET.read_text(encoding="utf-8")
+
+
+def _crowdsec_bouncer_externalsecret_text() -> str:
+    return CROWDSEC_BOUNCER_EXTERNALSECRET.read_text(encoding="utf-8")
+
+
+def _traefik_crowdsec_bouncer_externalsecret_text() -> str:
+    return TRAEFIK_CROWDSEC_BOUNCER_EXTERNALSECRET.read_text(encoding="utf-8")
 
 
 def _wiredoor_gateway_externalsecret_text() -> str:
@@ -515,6 +554,10 @@ def _grafana_values_text() -> str:
 
 def _traefik_app_text() -> str:
     return TRAEFIK_APP.read_text(encoding="utf-8")
+
+
+def _crowdsec_app_text() -> str:
+    return CROWDSEC_APP.read_text(encoding="utf-8")
 
 
 def _wiredoor_gateway_app_text() -> str:
@@ -867,6 +910,42 @@ def test_user_apps_are_not_part_of_bootstrap_journey():
     for step_id in ["install-nextcloud", "install-opencloud", "install-immich"]:
         assert f"'{step_id}'" not in setup_step_ids
         assert f"- id: {step_id}" not in category_text
+
+
+def test_crowdsec_step_seeds_bouncer_secret_and_applies_gitops_app():
+    step_text = _crowdsec_step_text()
+    step_manifest_text = _crowdsec_step_manifest_text()
+    crowdsec_app_text = _crowdsec_app_text()
+    crowdsec_values_text = _crowdsec_values_text()
+    crowdsec_externalsecret_text = _crowdsec_bouncer_externalsecret_text()
+    traefik_bouncer_externalsecret_text = _traefik_crowdsec_bouncer_externalsecret_text()
+
+    assert "title: Install CrowdSec" in step_manifest_text
+    assert "order: 16" in step_manifest_text
+    assert "  - install-secret-sync" in step_manifest_text
+    assert "script: categories/talos-cluster/steps/install-crowdsec/run.sh" in step_manifest_text
+    assert "openbao_read_global_secret_json crowdsec-bouncer" in step_text
+    assert "openssl rand -hex 32" in step_text
+    assert '--secret-name "crowdsec-bouncer"' in step_text
+    assert '--required-keys "lapi_key"' in step_text
+    assert "gitops/platform/crowdsec/bouncer-externalsecret.yaml" in step_text
+    assert "gitops/platform/traefik/crowdsec-bouncer-externalsecret.yaml" in step_text
+    assert '--application "crowdsec"' in step_text
+    assert "chart: crowdsec" in crowdsec_app_text
+    assert "targetRevision: \"0.23.0\"" in crowdsec_app_text
+    assert "$values/gitops/values/crowdsec.yaml" in crowdsec_app_text
+    assert "namespace: crowdsec" in crowdsec_app_text
+    assert "container_runtime: containerd" in crowdsec_values_text
+    assert "podName: traefik-*" in crowdsec_values_text
+    assert "program: traefik" in crowdsec_values_text
+    assert "value: crowdsecurity/traefik" in crowdsec_values_text
+    assert "BOUNCER_KEY_traefik" in crowdsec_values_text
+    assert "secretKeyRef:" in crowdsec_values_text
+    assert "value: " not in crowdsec_externalsecret_text
+    assert "key: twinbox/global/crowdsec-bouncer" in crowdsec_externalsecret_text
+    assert "property: lapi_key" in crowdsec_externalsecret_text
+    assert "secretKey: lapi-key" in traefik_bouncer_externalsecret_text
+    assert "key: twinbox/global/crowdsec-bouncer" in traefik_bouncer_externalsecret_text
 
 
 def test_opencloud_step_keeps_authentik_property_mapping_ids_as_strings():
@@ -1270,6 +1349,7 @@ def test_install_argocd_step_bootstraps_argocd_without_cni_adoption():
 
 def test_app_step_manifests_chain_the_linear_gitops_flow():
     argocd_text = ARGO_STEP_MANIFEST.read_text(encoding="utf-8")
+    crowdsec_text = CROWDSEC_STEP_MANIFEST.read_text(encoding="utf-8")
     traefik_text = TRAEFIK_STEP_MANIFEST.read_text(encoding="utf-8")
     authentik_run_text = _authentik_step_text()
     cloudflare_text = CLOUDFLARE_STEP_MANIFEST.read_text(encoding="utf-8")
@@ -1283,7 +1363,8 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "provision-nodes" in argocd_text
     assert "install-flannel" not in argocd_text
 
-    assert "install-secret-sync" in traefik_text
+    assert "install-secret-sync" in crowdsec_text
+    assert "install-crowdsec" in traefik_text
 
     assert "type: config" in choose_ingress_text
     assert "value: wiredoor" in choose_ingress_text
@@ -1716,8 +1797,13 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     headlamp_app_text = HEADLAMP_APP.read_text(encoding="utf-8")
     wiredoor_gateway_app_text = _wiredoor_gateway_app_text()
     traefik_values_text = _traefik_values_text()
+    crowdsec_values_text = _crowdsec_values_text()
     wiredoor_gateway_values_text = _wiredoor_gateway_values_text()
     traefik_externalsecret_text = _traefik_dashboard_externalsecret_text()
+    crowdsec_bouncer_externalsecret_text = _crowdsec_bouncer_externalsecret_text()
+    traefik_crowdsec_bouncer_externalsecret_text = (
+        _traefik_crowdsec_bouncer_externalsecret_text()
+    )
     wiredoor_externalsecret_text = _wiredoor_gateway_externalsecret_text()
     headlamp_ingressroute_text = HEADLAMP_INGRESSROUTE.read_text(encoding="utf-8")
     authentik_ingressroute_text = (
@@ -1738,6 +1824,18 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "create: true" in external_secrets_values_text
     assert "enabled: trueß∑" not in traefik_values_text
     assert "enabled: true" in traefik_values_text
+    assert "github.com/BetterCorp/cloudflarewarp" in traefik_values_text
+    assert "version: v1.3.3" in traefik_values_text
+    assert "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin" in traefik_values_text
+    assert "version: v1.6.0" in traefik_values_text
+    assert "abortOnPluginFailure: true" in traefik_values_text
+    assert "cloudflarewarp@file,crowdsec@file" in traefik_values_text
+    assert "crowdsecLapiHost: crowdsec-service.crowdsec.svc.cluster.local:8080" in traefik_values_text
+    assert "crowdsecLapiKeyFile: /run/secrets/crowdsec/lapi-key" in traefik_values_text
+    assert "mountPath: /run/secrets/crowdsec" in traefik_values_text
+    assert "crowdsecurity/traefik" in crowdsec_values_text
+    assert "podName: traefik-*" in crowdsec_values_text
+    assert "program: traefik" in crowdsec_values_text
     assert "existingSecret: wiredoor-gateway" in wiredoor_gateway_values_text
     assert "token:" not in wiredoor_gateway_values_text
     assert "cluster-public-zone.sh" in freshrss_run_text
@@ -1809,10 +1907,24 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "hubble/ingressroute.yaml" in (
         REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
+    assert "crowdsec/bouncer-externalsecret.yaml" in (
+        REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
+    ).read_text(encoding="utf-8")
+    assert "traefik/crowdsec-bouncer-externalsecret.yaml" in (
+        REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
+    ).read_text(encoding="utf-8")
     assert "pgadmin4/externalsecret.yaml" not in (
         REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
     assert "kind: ExternalSecret" in _headlamp_oidc_externalsecret_text()
+    assert "kind: ExternalSecret" in crowdsec_bouncer_externalsecret_text
+    assert "name: openbao" in crowdsec_bouncer_externalsecret_text
+    assert "secretKey: BOUNCER_KEY_traefik" in crowdsec_bouncer_externalsecret_text
+    assert "property: lapi_key" in crowdsec_bouncer_externalsecret_text
+    assert "kind: ExternalSecret" in traefik_crowdsec_bouncer_externalsecret_text
+    assert "name: openbao" in traefik_crowdsec_bouncer_externalsecret_text
+    assert "secretKey: lapi-key" in traefik_crowdsec_bouncer_externalsecret_text
+    assert "property: lapi_key" in traefik_crowdsec_bouncer_externalsecret_text
     assert "HEADLAMP_CONFIG_OIDC_CLIENT_SECRET" in _headlamp_oidc_externalsecret_text()
     platform_ingress_app_text = (
         REPO_ROOT / "gitops" / "apps" / "platform-ingress.yaml"

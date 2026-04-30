@@ -13,7 +13,9 @@ resources:
   - hubble/authentik-forwardauth-middleware.yaml
   - hubble/ingressroute.yaml
   - hubble/authentik-callback-ingressroute.yaml
+  - crowdsec/bouncer-externalsecret.yaml
   - traefik/traefik-dashboard-ingressroute.yaml
+  - traefik/crowdsec-bouncer-externalsecret.yaml
   - traefik/authentik-callback-ingressroute.yaml
   - traefik/authentik-forwardauth-middleware.yaml
   - traefik/argocd-server-transport.yaml
