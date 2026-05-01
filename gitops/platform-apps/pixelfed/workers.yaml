@@ -1,0 +1,323 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pixelfed-worker
+  namespace: pixelfed
+  labels:
+    app.kubernetes.io/name: pixelfed-worker
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pixelfed-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: pixelfed-worker
+    spec:
+      containers:
+        - name: pixelfed-worker
+          image: ghcr.io/jippi/docker-pixelfed:v0.12.6-apache-8.4-bookworm
+          imagePullPolicy: IfNotPresent
+          command:
+            - php
+            - artisan
+            - horizon
+          envFrom:
+            - secretRef:
+                name: pixelfed-bootstrap
+          env:
+            - name: APP_NAME
+              value: Pixelfed
+            - name: APP_ENV
+              value: production
+            - name: APP_DEBUG
+              value: "false"
+            - name: APP_URL
+              value: https://pixelfed.__ZONE_NAME__
+            - name: APP_DOMAIN
+              value: pixelfed.__ZONE_NAME__
+            - name: ADMIN_DOMAIN
+              value: pixelfed.__ZONE_NAME__
+            - name: SESSION_DOMAIN
+              value: pixelfed.__ZONE_NAME__
+            - name: DB_CONNECTION
+              value: pgsql
+            - name: DB_HOST
+              value: pixelfed-db-pooler-rw-session.databases.svc.cluster.local
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_DATABASE
+              value: pixelfed
+            - name: REDIS_CLIENT
+              value: phpredis
+            - name: REDIS_SCHEME
+              value: tcp
+            - name: REDIS_HOST
+              value: pixelfed-redis
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_PASSWORD
+              value: "null"
+            - name: SESSION_DRIVER
+              value: redis
+            - name: CACHE_DRIVER
+              value: redis
+            - name: CACHE_STORE
+              value: redis
+            - name: QUEUE_DRIVER
+              value: redis
+            - name: QUEUE_CONNECTION
+              value: redis
+            - name: BROADCAST_DRIVER
+              value: log
+            - name: LOG_CHANNEL
+              value: stack
+            - name: TRUST_PROXIES
+              value: "*"
+            - name: OPEN_REGISTRATION
+              value: "true"
+            - name: ENFORCE_EMAIL_VERIFICATION
+              value: "false"
+            - name: INSTANCE_DISCOVER_PUBLIC
+              value: "true"
+            - name: INSTANCE_PUBLIC_HASHTAGS
+              value: "false"
+            - name: INSTANCE_PUBLIC_LOCAL_TIMELINE
+              value: "false"
+            - name: RESTRICTED_INSTANCE
+              value: "false"
+            - name: STORIES_ENABLED
+              value: "false"
+            - name: ACTIVITY_PUB
+              value: "true"
+            - name: AP_REMOTE_FOLLOW
+              value: "true"
+            - name: AP_INBOX
+              value: "true"
+            - name: AP_OUTBOX
+              value: "true"
+            - name: AP_SHAREDINBOX
+              value: "true"
+            - name: OAUTH_ENABLED
+              value: "true"
+            - name: PF_ENABLE_CLOUD
+              value: "false"
+            - name: PF_OPTIMIZE_IMAGES
+              value: "true"
+            - name: ENABLE_CONFIG_CACHE
+              value: "true"
+            - name: PF_MAX_USERS
+              value: "1000"
+            - name: PF_OPTIMIZE_VIDEOS
+              value: "true"
+            - name: IMAGE_QUALITY
+              value: "80"
+            - name: MAX_PHOTO_SIZE
+              value: "15000"
+            - name: MAX_CAPTION_LENGTH
+              value: "500"
+            - name: MAX_ALBUM_LENGTH
+              value: "4"
+            - name: SESSION_LIFETIME
+              value: "86400"
+            - name: HORIZON_PREFIX
+              value: horizon-
+            - name: MAIL_DRIVER
+              value: log
+            - name: MAIL_FROM_ADDRESS
+              value: no-reply@pixelfed.__ZONE_NAME__
+            - name: MAIL_FROM_NAME
+              value: Pixelfed
+            - name: PHP_POST_MAX_SIZE
+              value: 500M
+            - name: PHP_UPLOAD_MAX_FILE_SIZE
+              value: 500M
+            - name: PHP_OPCACHE_ENABLE
+              value: "1"
+            - name: AUTORUN_ENABLED
+              value: "false"
+          readinessProbe:
+            exec:
+              command:
+                - php
+                - artisan
+                - horizon:status
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - php
+                - artisan
+                - horizon:status
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          volumeMounts:
+            - name: pixelfed-data
+              mountPath: /var/www/html/storage
+            - name: pixelfed-cache
+              mountPath: /var/www/html/bootstrap/cache
+      volumes:
+        - name: pixelfed-data
+          persistentVolumeClaim:
+            claimName: pixelfed-data
+        - name: pixelfed-cache
+          persistentVolumeClaim:
+            claimName: pixelfed-data
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pixelfed-scheduler
+  namespace: pixelfed
+  labels:
+    app.kubernetes.io/name: pixelfed-scheduler
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pixelfed-scheduler
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: pixelfed-scheduler
+    spec:
+      containers:
+        - name: pixelfed-scheduler
+          image: ghcr.io/jippi/docker-pixelfed:v0.12.6-apache-8.4-bookworm
+          imagePullPolicy: IfNotPresent
+          command:
+            - php
+            - artisan
+            - schedule:work
+          envFrom:
+            - secretRef:
+                name: pixelfed-bootstrap
+          env:
+            - name: APP_NAME
+              value: Pixelfed
+            - name: APP_ENV
+              value: production
+            - name: APP_DEBUG
+              value: "false"
+            - name: APP_URL
+              value: https://pixelfed.__ZONE_NAME__
+            - name: APP_DOMAIN
+              value: pixelfed.__ZONE_NAME__
+            - name: ADMIN_DOMAIN
+              value: pixelfed.__ZONE_NAME__
+            - name: SESSION_DOMAIN
+              value: pixelfed.__ZONE_NAME__
+            - name: DB_CONNECTION
+              value: pgsql
+            - name: DB_HOST
+              value: pixelfed-db-pooler-rw-session.databases.svc.cluster.local
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_DATABASE
+              value: pixelfed
+            - name: REDIS_CLIENT
+              value: phpredis
+            - name: REDIS_SCHEME
+              value: tcp
+            - name: REDIS_HOST
+              value: pixelfed-redis
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_PASSWORD
+              value: "null"
+            - name: SESSION_DRIVER
+              value: redis
+            - name: CACHE_DRIVER
+              value: redis
+            - name: CACHE_STORE
+              value: redis
+            - name: QUEUE_DRIVER
+              value: redis
+            - name: QUEUE_CONNECTION
+              value: redis
+            - name: BROADCAST_DRIVER
+              value: log
+            - name: LOG_CHANNEL
+              value: stack
+            - name: TRUST_PROXIES
+              value: "*"
+            - name: OPEN_REGISTRATION
+              value: "true"
+            - name: ENFORCE_EMAIL_VERIFICATION
+              value: "false"
+            - name: INSTANCE_DISCOVER_PUBLIC
+              value: "true"
+            - name: INSTANCE_PUBLIC_HASHTAGS
+              value: "false"
+            - name: INSTANCE_PUBLIC_LOCAL_TIMELINE
+              value: "false"
+            - name: RESTRICTED_INSTANCE
+              value: "false"
+            - name: STORIES_ENABLED
+              value: "false"
+            - name: ACTIVITY_PUB
+              value: "true"
+            - name: AP_REMOTE_FOLLOW
+              value: "true"
+            - name: AP_INBOX
+              value: "true"
+            - name: AP_OUTBOX
+              value: "true"
+            - name: AP_SHAREDINBOX
+              value: "true"
+            - name: OAUTH_ENABLED
+              value: "true"
+            - name: PF_ENABLE_CLOUD
+              value: "false"
+            - name: PF_OPTIMIZE_IMAGES
+              value: "true"
+            - name: ENABLE_CONFIG_CACHE
+              value: "true"
+            - name: PF_MAX_USERS
+              value: "1000"
+            - name: PF_OPTIMIZE_VIDEOS
+              value: "true"
+            - name: IMAGE_QUALITY
+              value: "80"
+            - name: MAX_PHOTO_SIZE
+              value: "15000"
+            - name: MAX_CAPTION_LENGTH
+              value: "500"
+            - name: MAX_ALBUM_LENGTH
+              value: "4"
+            - name: SESSION_LIFETIME
+              value: "86400"
+            - name: HORIZON_PREFIX
+              value: horizon-
+            - name: MAIL_DRIVER
+              value: log
+            - name: MAIL_FROM_ADDRESS
+              value: no-reply@pixelfed.__ZONE_NAME__
+            - name: MAIL_FROM_NAME
+              value: Pixelfed
+            - name: PHP_POST_MAX_SIZE
+              value: 500M
+            - name: PHP_UPLOAD_MAX_FILE_SIZE
+              value: 500M
+            - name: PHP_OPCACHE_ENABLE
+              value: "1"
+            - name: AUTORUN_ENABLED
+              value: "false"
+          volumeMounts:
+            - name: pixelfed-data
+              mountPath: /var/www/html/storage
+            - name: pixelfed-cache
+              mountPath: /var/www/html/bootstrap/cache
+      volumes:
+        - name: pixelfed-data
+          persistentVolumeClaim:
+            claimName: pixelfed-data
+        - name: pixelfed-cache
+          persistentVolumeClaim:
+            claimName: pixelfed-data

@@ -1,0 +1,31 @@
+id: install-pixelfed
+title: Install Pixelfed
+type: action
+journey_stage: setup
+order: 73
+summary: Install Pixelfed with CloudNativePG, Redis, Longhorn storage, and Traefik ingress.
+explanation: Twinbox provisions Pixelfed as a GitOps application with a dedicated CloudNativePG database, a Redis cache and queue backend, Longhorn-backed media storage, and Traefik ingress routes for the selected cluster domain.
+side_help: Photo sharing belongs with the other user-facing apps once the storage and database foundations are in place.
+depends_on:
+  - install-longhorn-storage
+  - install-cloudnativepg
+  - install-secret-sync
+  - choose-ingress-route
+dashy:
+  items:
+    - section: Apps
+      title: Pixelfed
+      description: Federated photo sharing
+      icon: fas fa-camera-retro
+      url_template: https://pixelfed.__ZONE_NAME__
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/apps/steps/install-pixelfed/run.sh

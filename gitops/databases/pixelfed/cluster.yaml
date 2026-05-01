@@ -1,0 +1,54 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pixelfed-db
+  namespace: databases
+spec:
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.4
+
+  backup:
+    barmanObjectStore:
+      serverName: pixelfed-db
+      destinationPath: s3://twinbox-velero/pixelfed-db/
+      endpointURL: http://seaweedfs.longhorn-system.svc.cluster.local:8333
+      s3Credentials:
+        accessKeyId:
+          name: seaweedfs-backup-credentials
+          key: AWS_ACCESS_KEY_ID
+        secretAccessKey:
+          name: seaweedfs-backup-credentials
+          key: AWS_SECRET_ACCESS_KEY
+
+  bootstrap:
+    initdb:
+      database: pixelfed
+      owner: pixelfed
+      secret:
+        name: pixelfed-db-credentials
+
+  storage:
+    size: 20Gi
+    storageClass: longhorn
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+  postgresql:
+    parameters:
+      max_connections: "100"
+      shared_buffers: "256MB"
+      effective_cache_size: "768MB"
+      work_mem: "4MB"
+
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
+
+  monitoring:
+    enablePodMonitor: true

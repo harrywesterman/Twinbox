@@ -3,6 +3,7 @@ set -euo pipefail
 
 : "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"
 : "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"
+MANAGER_DATA_DIR="${MANAGER_DATA_DIR:-/data}"
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
@@ -195,13 +196,29 @@ create_or_update_application() {
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
+cluster_scope_id="$(printf '%s' "$cluster_json" | jq -r '.cluster_instance_id // .instance_id // .id')"
 cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty')"
 
 [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
+[[ -n "$cluster_scope_id" ]] || fail "Could not determine cluster scope ID from context"
 [[ -n "$cluster_dns_domain" ]] || fail "Could not determine cluster DNS domain; run choose-ingress-route first"
 
 public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
+
+zulip_default_realm_owner_email="admin@${public_zone_name}"
+zulip_default_realm_owner_name="Twinbox Admin"
+create_users_state_file="$MANAGER_DATA_DIR/step-state/clusters/${cluster_scope_id}/create-users-and-groups.json"
+if [[ -f "$create_users_state_file" ]]; then
+  step_owner_email="$(jq -r '.outputs.email // empty' "$create_users_state_file")"
+  step_owner_name="$(jq -r '.outputs.full_name // empty' "$create_users_state_file")"
+  if [[ -n "$step_owner_email" ]]; then
+    zulip_default_realm_owner_email="$step_owner_email"
+  fi
+  if [[ -n "$step_owner_name" ]]; then
+    zulip_default_realm_owner_name="$step_owner_name"
+  fi
+fi
 
 authentik_ensure_token
 authentik_setup_forward
@@ -309,6 +326,8 @@ zulip_config_secret_json="$(
     --arg client_secret "$zulip_client_secret" \
     --arg db_username "$zulip_db_username" \
     --arg db_password "$zulip_db_password" \
+    --arg owner_email "$zulip_default_realm_owner_email" \
+    --arg owner_name "$zulip_default_realm_owner_name" \
     --arg oidc_idps "$zulip_oidc_idps_literal" \
     '{
       SECRETS_secret_key: $secret_key,
@@ -316,6 +335,8 @@ zulip_config_secret_json="$(
       ZULIP_OIDC_CLIENT_SECRET: $client_secret,
       ZULIP_POSTGRESQL__USERNAME: $db_username,
       ZULIP_POSTGRESQL__PASSWORD: $db_password,
+      ZULIP_DEFAULT_REALM_OWNER_EMAIL: $owner_email,
+      ZULIP_DEFAULT_REALM_OWNER_NAME: $owner_name,
       SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS: $oidc_idps
     }'
 )"
@@ -427,6 +448,85 @@ wait_for_statefulset_ready "zulip" "zulip-rabbitmq" "Zulip RabbitMQ"
 wait_for_statefulset_ready "zulip" "zulip-redis-master" "Zulip Redis master"
 wait_for_deployment_rollout "zulip" "zulip-memcached" "Zulip memcached"
 wait_for_statefulset_ready "zulip" "zulip" "Zulip application"
+
+find_statefulset_pod() {
+  local namespace="$1"
+  local statefulset="$2"
+  local statefulset_json selector
+
+  statefulset_json="$(kubectl -n "$namespace" get statefulset "$statefulset" -o json 2>/dev/null)" || return 1
+  selector="$(
+    jq -r '
+      .spec.selector.matchLabels
+      | to_entries
+      | map("\(.key)=\(.value)")
+      | join(",")
+    ' <<<"$statefulset_json"
+  )"
+
+  [[ -n "$selector" ]] || return 1
+  kubectl -n "$namespace" get pods -l "$selector" -o json |
+    jq -r '
+      .items[]
+      | select((.status.phase // "") == "Running")
+      | .metadata.name
+    ' | head -n1
+}
+
+verify_zulip_bootstrap() {
+  local pod_name expected_owner_email_json
+  local verify_script
+
+  pod_name="$(find_statefulset_pod "zulip" "zulip")"
+  [[ -n "$pod_name" ]] || fail "Could not find a running Zulip pod for bootstrap verification"
+
+  verify_script="$(
+    cat <<'PY'
+from zerver.models import DefaultStream, OnboardingUserMessage, Realm, Stream, UserProfile
+
+realm = Realm.objects.get(string_id="")
+
+required_streams = ["Zulip", "sandbox", "general", "announcements", "support"]
+missing_streams = [
+    stream_name
+    for stream_name in required_streams
+    if not Stream.objects.filter(realm=realm, name=stream_name).exists()
+]
+if missing_streams:
+    raise SystemExit(f"Missing Zulip streams: {', '.join(missing_streams)}")
+
+missing_default_streams = [
+    stream_name
+    for stream_name in required_streams
+    if not DefaultStream.objects.filter(realm=realm, stream__name=stream_name).exists()
+]
+if missing_default_streams:
+    raise SystemExit(f"Missing Zulip default streams: {', '.join(missing_default_streams)}")
+
+owner_email = __OWNER_EMAIL_JSON__
+if not UserProfile.objects.filter(
+    realm=realm,
+    delivery_email__iexact=owner_email,
+    role=UserProfile.ROLE_REALM_OWNER,
+    is_active=True,
+).exists():
+    raise SystemExit(f"Missing active Zulip realm owner with email {owner_email}")
+
+if not OnboardingUserMessage.objects.filter(realm_id=realm.id).exists():
+    raise SystemExit("Missing Zulip onboarding messages")
+
+print("Zulip bootstrap verified")
+PY
+  )"
+
+  expected_owner_email_json="$(jq -n --arg value "$zulip_default_realm_owner_email" '$value')"
+  verify_script="${verify_script/__OWNER_EMAIL_JSON__/$expected_owner_email_json}"
+
+  kubectl -n zulip exec "$pod_name" -- /home/zulip/deployments/current/manage.py shell -c "$verify_script" >/dev/null
+  log "Zulip bootstrap verified"
+}
+
+verify_zulip_bootstrap
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \

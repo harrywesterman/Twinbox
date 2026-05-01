@@ -38,6 +38,12 @@ resources:
   - vaultwarden/pooler-ro.yaml
   - vaultwarden/pooler-rw.yaml
   - vaultwarden/scheduled-backup.yaml
+  - pixelfed/cluster.yaml
+  - pixelfed/externalsecret.yaml
+  - pixelfed/pooler-ro.yaml
+  - pixelfed/pooler-rw.yaml
+  - pixelfed/pooler-rw-session.yaml
+  - pixelfed/scheduled-backup.yaml
   - zulip/cluster.yaml
   - zulip/externalsecret.yaml
   - zulip/pooler-ro.yaml

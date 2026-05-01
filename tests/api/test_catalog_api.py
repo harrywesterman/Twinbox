@@ -185,6 +185,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-ntfy",
                 "install-velero-backup",
                 "install-zulip",
+                "install-pixelfed",
                 "install-paperless",
                 "install-karakeep",
                 "install-vaultwarden",
@@ -259,6 +260,13 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert "install-gitea" not in talos_steps
             assert "install-uptimekuma" not in talos_steps
             assert talos_steps["install-zulip"]["depends_on"] == []
+            assert talos_steps["install-pixelfed"]["title"] == "Install Pixelfed"
+            assert talos_steps["install-pixelfed"]["depends_on"] == [
+                "install-longhorn-storage",
+                "install-cloudnativepg",
+                "install-secret-sync",
+                "choose-ingress-route",
+            ]
             assert talos_steps["install-n8n"]["depends_on"] == [
                 "install-longhorn-storage",
                 "install-cloudnativepg",
@@ -424,6 +432,17 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
                 "install-secret-sync",
                 "install-authentik-idp",
                 "create-users-and-groups",
+                "choose-ingress-route",
+            ]
+            pixelfed = next(step for step in apps if step["id"] == "install-pixelfed")
+            assert pixelfed["placeholder"] is False
+            assert pixelfed["installable"] is True
+            assert pixelfed["app_state"] == "ready"
+            assert pixelfed["runner"]["script"] == "categories/apps/steps/install-pixelfed/run.sh"
+            assert pixelfed["depends_on"] == [
+                "install-longhorn-storage",
+                "install-cloudnativepg",
+                "install-secret-sync",
                 "choose-ingress-route",
             ]
             immich = next(step for step in apps if step["id"] == "install-immich")

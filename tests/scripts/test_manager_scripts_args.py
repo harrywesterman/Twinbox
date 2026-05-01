@@ -39,6 +39,9 @@ FRESHRSS_STEP_SCRIPT = (
 VAULTWARDEN_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "apps" / "steps" / "install-vaultwarden" / "run.sh"
 )
+PIXELFED_STEP_SCRIPT = (
+    REPO_ROOT / "categories" / "apps" / "steps" / "install-pixelfed" / "run.sh"
+)
 ARGO_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
 )
@@ -2457,6 +2460,51 @@ def test_vaultwarden_manifests_use_postgresql_and_domain_limited_signups():
     assert "destinationPath: s3://twinbox-velero/vaultwarden-db/" in cluster_text
 
 
+def test_pixelfed_manifests_use_postgresql_and_longhorn_storage():
+    step_text = PIXELFED_STEP_SCRIPT.read_text(encoding="utf-8")
+    deployment_text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "pixelfed" / "deployment.yaml"
+    ).read_text(encoding="utf-8")
+    workers_text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "pixelfed" / "workers.yaml"
+    ).read_text(encoding="utf-8")
+    externalsecret_text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "pixelfed" / "externalsecret.yaml"
+    ).read_text(encoding="utf-8")
+    db_externalsecret_text = (
+        REPO_ROOT / "gitops" / "databases" / "pixelfed" / "externalsecret.yaml"
+    ).read_text(encoding="utf-8")
+    cluster_text = (
+        REPO_ROOT / "gitops" / "databases" / "pixelfed" / "cluster.yaml"
+    ).read_text(encoding="utf-8")
+
+    assert "source \"$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh\"" in step_text
+    assert '--secret-name "pixelfed"' in step_text
+    assert '--required-keys "APP_KEY,PIXELFED_POSTGRESQL__USERNAME,PIXELFED_POSTGRESQL__PASSWORD"' in step_text
+    assert "gitops/databases/pixelfed/cluster.yaml" in step_text
+    assert "gitops/apps/pixelfed.yaml" in step_text
+    assert "php artisan instance:actor" in step_text
+    assert "php artisan passport:keys --force" in step_text
+
+    assert "ghcr.io/jippi/docker-pixelfed:v0.12.6-apache-8.4-bookworm" in deployment_text
+    assert "APP_URL" in deployment_text
+    assert "APP_DOMAIN" in deployment_text
+    assert "DB_HOST" in deployment_text
+    assert "pixelfed-db-pooler-rw-session.databases.svc.cluster.local" in deployment_text
+    assert "pixelfed-redis" in deployment_text
+    assert "AUTORUN_ENABLED" in deployment_text
+    assert "- horizon" in workers_text
+    assert "- schedule:work" in workers_text
+    assert "name: pixelfed-bootstrap" in externalsecret_text
+    assert "secretKey: APP_KEY" in externalsecret_text
+    assert "property: APP_KEY" in externalsecret_text
+    assert "property: PIXELFED_POSTGRESQL__USERNAME" in externalsecret_text
+    assert "property: PIXELFED_POSTGRESQL__PASSWORD" in externalsecret_text
+    assert "property: PIXELFED_POSTGRESQL__USERNAME" in db_externalsecret_text
+    assert "property: PIXELFED_POSTGRESQL__PASSWORD" in db_externalsecret_text
+    assert "destinationPath: s3://twinbox-velero/pixelfed-db/" in cluster_text
+
+
 def test_cnpg_database_clusters_have_seaweedfs_backups():
     authentik_cluster_text = (
         REPO_ROOT / "gitops" / "databases" / "authentik" / "cluster.yaml"
@@ -2533,6 +2581,7 @@ def test_critical_cnpg_clusters_use_ha_instances_and_storage():
         "nextcloud",
         "paperless",
         "vaultwarden",
+        "pixelfed",
         "immich",
     ):
         text = (

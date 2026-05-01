@@ -14,6 +14,7 @@ app_steps:
       them through External Secrets instead of storing bootstrap material in the
       repository.
   - id: install-paperless
+  - id: install-pixelfed
   - id: install-karakeep
   - id: install-vaultwarden
   - id: install-n8n

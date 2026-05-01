@@ -36,6 +36,9 @@ PORTAL_STEP = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-twinbox-portal" / "run.sh"
 )
 TALOS_CATEGORY = REPO_ROOT / "categories" / "talos-cluster" / "category.yaml"
+PIXELFED_STEP = (
+    REPO_ROOT / "categories" / "apps" / "steps" / "install-pixelfed" / "run.sh"
+)
 ZULIP_STEP = (
     REPO_ROOT / "categories" / "apps" / "steps" / "install-zulip" / "step.yaml"
 )
@@ -47,6 +50,8 @@ ZULIP_PLATFORM_DIR = REPO_ROOT / "gitops" / "platform-apps" / "zulip"
 ZULIP_RUNTIME_SECRET = ZULIP_PLATFORM_DIR / "runtime-externalsecret.yaml"
 ZULIP_VALUES = REPO_ROOT / "gitops" / "values" / "zulip.yaml"
 ZULIP_DB_CLUSTER = REPO_ROOT / "gitops" / "databases" / "zulip" / "cluster.yaml"
+PIXELFED_SECRET = REPO_ROOT / "gitops" / "platform-apps" / "pixelfed" / "externalsecret.yaml"
+PIXELFED_DB_CLUSTER = REPO_ROOT / "gitops" / "databases" / "pixelfed" / "cluster.yaml"
 OUTLINE_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-outline" / "run.sh"
 OUTLINE_APP = REPO_ROOT / "gitops" / "apps" / "outline.yaml"
 OUTLINE_PLATFORM_DIR = REPO_ROOT / "gitops" / "platform-apps" / "outline"
@@ -209,6 +214,8 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "SETTING_ZULIP_ADMINISTRATOR: admin@{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in app_text
     assert "ZULIP_AUTH_BACKENDS: GenericOpenIdConnectBackend" in app_text
     assert 'TRUST_GATEWAY_IP: "True"' in app_text
+    assert "ZULIP_DEFAULT_REALM_OWNER_EMAIL:" not in app_text
+    assert "ZULIP_DEFAULT_REALM_OWNER_NAME:" not in app_text
     assert "existingPasswordSecret: zulip-runtime" in app_text
     assert "existingSecretPasswordKey: rabbitmq-password" in app_text
     assert "existingSecret: zulip-runtime" in app_text
@@ -227,13 +234,29 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "storageClass: longhorn" in values_text
     assert "SECRETS_secret_key:" in values_text
     assert "SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS:" in values_text
+    assert "ZULIP_DEFAULT_REALM_OWNER_EMAIL:" in values_text
+    assert "ZULIP_DEFAULT_REALM_OWNER_NAME:" in values_text
     assert "persistence:" in values_text
+    assert "postSetup:" in values_text
+    assert "10-create-default-realm.sh" in values_text
+    assert "create-users-and-groups.json" in run_text
+    assert "MANAGER_DATA_DIR" in run_text
+    assert "announcements" in values_text
+    assert "support" in values_text
+    assert "send_initial_realm_messages(realm)" in values_text
+    assert 'Realm.objects.filter(string_id="").exists()' in values_text
+    assert "create_realm --automated --string-id=" in values_text
     assert "imageName: zulip/zulip-postgresql:14" in db_cluster_text
     assert "name: zulip-runtime" in runtime_secret_text
     assert "secretKey: rabbitmq-password" in runtime_secret_text
     assert "property: ZULIP_RABBITMQ_PASSWORD" in runtime_secret_text
     assert "secretKey: redis-password" in runtime_secret_text
     assert "property: ZULIP_REDIS_PASSWORD" in runtime_secret_text
+    assert "verify_zulip_bootstrap" in run_text
+    assert "find_statefulset_pod" in run_text
+    assert "OnboardingUserMessage" in run_text
+    assert "Missing Zulip onboarding messages" in run_text
+    assert "create-users-and-groups.json" in run_text
 
 
 def test_zulip_step_requests_kubeconfig_secret_injection():
@@ -274,4 +297,29 @@ def test_outline_step_projects_a_real_oidc_backed_app():
     assert 'property: UTILS_SECRET' in secret_text
     assert 'property: OIDC_CLIENT_ID' in secret_text
     assert 'property: OIDC_CLIENT_SECRET' in secret_text
+    assert 'imageName: ghcr.io/cloudnative-pg/postgresql:16.4' in db_cluster_text
+
+
+def test_pixelfed_step_and_secret_project_activitypub_and_bootstrap_keys():
+    step_text = _read(PIXELFED_STEP)
+    secret_text = _read(PIXELFED_SECRET)
+    db_cluster_text = _read(PIXELFED_DB_CLUSTER)
+
+    assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in step_text
+    assert 'openbao_read_global_secret_json pixelfed' in step_text
+    assert 'pixelfed_secret_file=' in step_text
+    assert '--secret-name "pixelfed"' in step_text
+    assert '--required-keys "APP_KEY,PIXELFED_POSTGRESQL__USERNAME,PIXELFED_POSTGRESQL__PASSWORD"' in step_text
+    assert 'php artisan instance:actor' in step_text
+    assert 'php artisan passport:keys --force' in step_text
+    assert 'gitops/databases/pixelfed/cluster.yaml' in step_text
+    assert 'gitops/apps/pixelfed.yaml' in step_text
+
+    assert 'name: pixelfed-bootstrap' in secret_text
+    assert 'secretKey: APP_KEY' in secret_text
+    assert 'property: APP_KEY' in secret_text
+    assert 'property: PIXELFED_POSTGRESQL__USERNAME' in secret_text
+    assert 'property: PIXELFED_POSTGRESQL__PASSWORD' in secret_text
+
+    assert 'destinationPath: s3://twinbox-velero/pixelfed-db/' in db_cluster_text
     assert 'imageName: ghcr.io/cloudnative-pg/postgresql:16.4' in db_cluster_text

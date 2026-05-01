@@ -191,6 +191,7 @@ test('app catalog exposes apps while the wizard catalog keeps them out of sight'
     const opencloudCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-opencloud');
     const nextcloudCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-nextcloud');
     const immichCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-immich');
+    const pixelfedCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-pixelfed');
     const audiobookshelfCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-audiobookshelf');
     const n8nCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-n8n');
     const freshrssCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-freshrss');
@@ -206,6 +207,11 @@ test('app catalog exposes apps while the wizard catalog keeps them out of sight'
     assert.equal(immichCard?.app_state, 'ready');
     assert.deepEqual(immichCard?.depends_on, ['install-longhorn-storage', 'install-cloudnativepg', 'install-secret-sync', 'install-authentik-idp', 'choose-ingress-route']);
     assert.equal(immichCard?.runner?.script, 'categories/apps/steps/install-immich/run.sh');
+    assert.equal(pixelfedCard?.title, 'Install Pixelfed');
+    assert.equal(pixelfedCard?.placeholder, false);
+    assert.equal(pixelfedCard?.installable, true);
+    assert.deepEqual(pixelfedCard?.depends_on, ['install-longhorn-storage', 'install-cloudnativepg', 'install-secret-sync', 'choose-ingress-route']);
+    assert.equal(pixelfedCard?.runner?.script, 'categories/apps/steps/install-pixelfed/run.sh');
     assert.deepEqual(opencloudCard?.depends_on, ['install-longhorn-storage', 'install-secret-sync', 'install-authentik-idp', 'create-users-and-groups', 'choose-ingress-route']);
     assert.deepEqual(audiobookshelfCard?.depends_on, ['install-longhorn-storage', 'install-secret-sync', 'install-authentik-idp', 'create-users-and-groups', 'choose-ingress-route']);
     assert.equal(vaultwardenCard?.title, 'Install Vaultwarden');

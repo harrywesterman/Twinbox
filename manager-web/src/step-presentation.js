@@ -153,6 +153,11 @@ function buildProjectUrlMap() {
       project_url: 'https://immich.app/',
       github_url: 'https://github.com/immich-app/immich',
     },
+    'install-pixelfed': {
+      icon: '🖼️',
+      project_url: 'https://pixelfed.org/',
+      github_url: 'https://github.com/pixelfed/pixelfed',
+    },
     'install-zulip': {
       icon: '💬',
       project_url: 'https://zulip.com/',

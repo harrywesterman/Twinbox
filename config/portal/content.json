@@ -339,6 +339,17 @@
       "accent": "#06b6d4",
       "category": "Apps"
     },
+    "Pixelfed": {
+      "summary": "Federated photo sharing",
+      "description": "Share photos and short posts in a private ActivityPub-enabled instance that stays inside Twinbox.",
+      "capabilities": [
+        "Publish photos and short updates",
+        "Browse a federated media timeline",
+        "Keep your media community on your own cluster"
+      ],
+      "accent": "#db2777",
+      "category": "Apps"
+    },
     "Paperless": {
       "summary": "Document archive",
       "description": "Turn paper and scans into a searchable digital archive.",
