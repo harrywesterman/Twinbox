@@ -76,6 +76,6 @@ App-specific Kubernetes manifests that are rendered or applied directly by the m
 Bootstraps ArgoCD into the cluster:
 
 1. Creates the `argocd` namespace.
-2. Installs ArgoCD v3.3.4 via server-side apply.
+2. Installs ArgoCD using the pinned version from `config/pinned-defaults.sh` via server-side apply.
 3. Patches workloads for control-plane tolerations, liveness probes, and idempotent init containers.
 4. Waits for all ArgoCD deployments and the application controller StatefulSet to become ready.

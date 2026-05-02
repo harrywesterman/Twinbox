@@ -15,6 +15,11 @@ command -v kubectl >/dev/null 2>&1 || {
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
+
+# shellcheck source=../config/pinned-defaults.sh
+source "$WORKSPACE_ROOT/config/pinned-defaults.sh"
+[[ -n "${PINNED_ARGOCD_VERSION:-}" ]] || fail "Missing required variable in ${WORKSPACE_ROOT}/config/pinned-defaults.sh: PINNED_ARGOCD_VERSION"
+ARGOCD_VERSION="${PINNED_ARGOCD_VERSION#v}"
 retry() {
   local attempts="$1"
   local delay_seconds="$2"
@@ -129,8 +134,8 @@ wait_for_argocd_workloads() {
 log "Creating argocd namespace"
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply --validate=false -f -
 
-log "Installing Argo CD"
-retry 3 10 kubectl apply --server-side --force-conflicts --validate=false -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.3.4/manifests/ha/install.yaml
+log "Installing Argo CD v${ARGOCD_VERSION}"
+retry 3 10 kubectl apply --server-side --force-conflicts --validate=false -n argocd -f "https://raw.githubusercontent.com/argoproj/argo-cd/v${ARGOCD_VERSION}/manifests/ha/install.yaml"
 
 patch_argocd_workload_tolerations
 patch_argocd_workload_probes
