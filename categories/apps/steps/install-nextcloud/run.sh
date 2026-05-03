@@ -661,11 +661,11 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
 
   if [[ ! -d custom_apps/oidc_groups_mapping/appinfo ]]; then
     tmp_dir=\"\$(mktemp -d)\"
-    trap 'rm -rf \"$tmp_dir\"' EXIT
-    wget -qO \"$tmp_dir/oidc_groups_mapping.tar.gz\" '${oidc_groups_mapping_release_url}'
-    tar -xzf \"$tmp_dir/oidc_groups_mapping.tar.gz\" -C \"$tmp_dir\"
+    trap 'rm -rf \"\$tmp_dir\"' EXIT
+    wget -qO \"\$tmp_dir/oidc_groups_mapping.tar.gz\" '${oidc_groups_mapping_release_url}'
+    tar -xzf \"\$tmp_dir/oidc_groups_mapping.tar.gz\" -C \"\$tmp_dir\"
     rm -rf custom_apps/oidc_groups_mapping
-    mv \"$tmp_dir/oidc_groups_mapping\" custom_apps/oidc_groups_mapping
+    mv \"\$tmp_dir/oidc_groups_mapping\" custom_apps/oidc_groups_mapping
   fi
 
   php occ app:enable -f oidc_groups_mapping >/dev/null

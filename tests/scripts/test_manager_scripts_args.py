@@ -2676,6 +2676,8 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert "app:enable -f oidc_groups_mapping" in text
     assert "oidc-groups:set" in text
     assert "admins-to-admin" in text
+    assert r'tmp_dir=\"\$(mktemp -d)\"' in text
+    assert "trap 'rm -rf \\\"\\$tmp_dir\\\"' EXIT" in text
     assert '\\"claimPath\\": \\"groups\\"' in text
     assert '\\"admins\\": \\"admin\\"' in text
     assert "--group-provisioning='1'" in text
