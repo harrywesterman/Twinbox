@@ -39,6 +39,62 @@ wait_for_resource_ready() {
   done
 }
 
+wait_for_resource_exists() {
+  local namespace="$1"
+  local resource="$2"
+  local label="$3"
+  local attempts=60
+  local attempt=1
+
+  while true; do
+    if kubectl -n "$namespace" get "$resource" >/dev/null 2>&1; then
+      log "${label} exists"
+      return 0
+    fi
+
+    log "Waiting for ${label} to appear"
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      fail "${label} did not appear after ${attempts} attempts"
+    fi
+
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
+wait_for_application_ready() {
+  local application="$1"
+  local status_json=""
+  local sync_status=""
+  local health_status=""
+  local operation_phase=""
+  local attempt=1
+  local attempts=180
+
+  while true; do
+    if status_json="$(kubectl -n argocd get application "$application" -o json 2>/dev/null)"; then
+      sync_status="$(jq -r '.status.sync.status // "Unknown"' <<<"$status_json")"
+      health_status="$(jq -r '.status.health.status // "Unknown"' <<<"$status_json")"
+      operation_phase="$(jq -r '.status.operationState.phase // "Unknown"' <<<"$status_json")"
+      log "Waiting for application/${application}: sync=${sync_status}, health=${health_status}, phase=${operation_phase}"
+
+      if [[ "$sync_status" == "Synced" && "$health_status" == "Healthy" && "$operation_phase" != "Running" && "$operation_phase" != "Terminating" ]]; then
+        log "Application/${application} is Synced and Healthy"
+        return 0
+      fi
+    else
+      log "Waiting for application/${application} to appear"
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      fail "Application/${application} did not become ready after ${attempts} attempts"
+    fi
+
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
 export KUBECONFIG="$KUBECONFIG_FILE"
 
 command -v kubectl >/dev/null 2>&1 || fail "kubectl not found"
@@ -81,7 +137,15 @@ log "Applying CrowdSec Argo CD application"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$manifest_path" \
   --application "crowdsec" \
-  --destination-namespace "crowdsec"
+  --destination-namespace "crowdsec" \
+  --no-wait
+
+wait_for_resource_exists "crowdsec" "daemonset/crowdsec-agent" "CrowdSec agent DaemonSet"
+log "Restarting CrowdSec agent DaemonSet to pick up the privileged namespace"
+kubectl -n crowdsec rollout restart daemonset/crowdsec-agent
+kubectl -n crowdsec rollout status daemonset/crowdsec-agent --timeout=10m
+
+wait_for_application_ready "crowdsec"
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \

@@ -934,6 +934,11 @@ def test_crowdsec_step_seeds_bouncer_secret_and_applies_gitops_app():
     assert "gitops/platform/crowdsec/bouncer-externalsecret.yaml" in step_text
     assert "gitops/platform/traefik/crowdsec-bouncer-externalsecret.yaml" in step_text
     assert '--application "crowdsec"' in step_text
+    assert "--no-wait" in step_text
+    assert "wait_for_resource_exists \"crowdsec\" \"daemonset/crowdsec-agent\"" in step_text
+    assert "rollout restart daemonset/crowdsec-agent" in step_text
+    assert "rollout status daemonset/crowdsec-agent --timeout=10m" in step_text
+    assert "wait_for_application_ready \"crowdsec\"" in step_text
     assert "chart: crowdsec" in crowdsec_app_text
     assert "targetRevision: \"0.23.0\"" in crowdsec_app_text
     assert "$values/gitops/values/crowdsec.yaml" in crowdsec_app_text
