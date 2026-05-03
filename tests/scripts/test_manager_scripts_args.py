@@ -3195,6 +3195,25 @@ def test_authentik_api_provisioning_steps_bypass_tofu_apply():
         assert 'tofu apply -no-color -auto-approve -input=false' not in text
 
 
+def test_management_consoles_waits_for_authentik_rollout_before_forwarding():
+    text = (
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-management-consoles"
+        / "run.sh"
+    ).read_text(encoding="utf-8")
+
+    assert "wait_for_deployment_rollout" in text
+    assert 'wait_for_deployment_rollout "authentik-server" "Authentik server"' in text
+    assert 'wait_for_deployment_rollout "authentik-worker" "Authentik worker"' in text
+    assert "authentik_ensure_token" in text
+    assert "authentik_setup_forward" in text
+    assert 'curl -X POST' not in text
+    assert 'authentik_api_write POST "/core/applications/"' in text
+
+
 def test_twinbox_portal_step_does_not_apply_missing_configmap_manifest():
     text = TWINBOX_PORTAL_STEP_SCRIPT.read_text(encoding="utf-8")
 

@@ -19,6 +19,43 @@ fail() {
   exit 1
 }
 
+wait_for_deployment_rollout() {
+  local deployment="$1"
+  local label="${2:-$deployment}"
+  local attempts=120
+  local attempt=1
+  local status_json=""
+  local desired_replicas=""
+  local updated_replicas=""
+  local ready_replicas=""
+  local available_replicas=""
+
+  while true; do
+    if status_json="$(kubectl -n authentik get deployment "$deployment" -o json 2>/dev/null)"; then
+      desired_replicas="$(jq -r '.spec.replicas // 0' <<<"$status_json")"
+      updated_replicas="$(jq -r '.status.updatedReplicas // 0' <<<"$status_json")"
+      ready_replicas="$(jq -r '.status.readyReplicas // 0' <<<"$status_json")"
+      available_replicas="$(jq -r '.status.availableReplicas // 0' <<<"$status_json")"
+
+      if [[ "$updated_replicas" == "$desired_replicas" && "$ready_replicas" == "$desired_replicas" && "$available_replicas" == "$desired_replicas" ]]; then
+        log "${label} is ready"
+        return 0
+      fi
+
+      log "Waiting for ${label} (${attempt}/${attempts}): desired=${desired_replicas}, updated=${updated_replicas}, ready=${ready_replicas}, available=${available_replicas}"
+    else
+      log "Waiting for ${label} deployment to appear (${attempt}/${attempts})"
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      fail "Timed out waiting for ${label}"
+    fi
+
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
@@ -29,6 +66,9 @@ cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty'
 
 public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
+
+wait_for_deployment_rollout "authentik-server" "Authentik server"
+wait_for_deployment_rollout "authentik-worker" "Authentik worker"
 
 authentik_ensure_token
 authentik_setup_forward
@@ -100,7 +140,7 @@ create_or_update_proxy_provider() {
 create_or_update_application() {
   local application_slug="$1"
   local application_payload="$2"
-  local existing_json existing_pk response_file http_status
+  local existing_json existing_pk response
 
   existing_json="$(find_application_json_by_slug "$application_slug" || true)"
   existing_pk="$(jq -r '.pk // .id // empty' <<<"$existing_json")"
@@ -110,23 +150,13 @@ create_or_update_application() {
     return 0
   fi
 
-  response_file="$(mktemp)"
-  http_status="$(
-    curl -sS \
-      -X POST \
-      -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" \
-      -H "Accept: application/json" \
-      -H "Content-Type: application/json" \
-      --data "$application_payload" \
-      -o "$response_file" \
-      -w '%{http_code}' \
-      "${AUTHENTIK_API_BASE}/core/applications/"
-  )" || http_status="000"
-
-  if [[ "$http_status" =~ ^2 ]]; then
-    jq -r '.pk // .id // empty' <"$response_file"
-    rm -f "$response_file"
-    return 0
+  response="$(authentik_api_write POST "/core/applications/" "$application_payload")"
+  if [[ -n "$response" ]]; then
+    existing_pk="$(jq -r '.pk // .id // empty' <<<"$response")"
+    if [[ -n "$existing_pk" ]]; then
+      printf '%s\n' "$existing_pk"
+      return 0
+    fi
   fi
 
   existing_json="$(find_application_json_by_slug "$application_slug" || true)"
@@ -134,7 +164,6 @@ create_or_update_application() {
   [[ -n "$existing_pk" ]] || fail "Authentik did not return or expose an application ID for ${application_slug}"
 
   authentik_api_write PATCH "/core/applications/${application_slug}/" "$application_payload" >/dev/null
-  rm -f "$response_file"
   printf '%s\n' "$existing_pk"
 }
 
