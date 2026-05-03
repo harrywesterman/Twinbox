@@ -955,6 +955,11 @@ def test_crowdsec_step_seeds_bouncer_secret_and_applies_gitops_app():
     assert "pod-security.kubernetes.io/enforce: privileged" in crowdsec_app_text
     assert "pod-security.kubernetes.io/warn-version: latest" in crowdsec_app_text
     assert "container_runtime: containerd" in crowdsec_values_text
+    assert "cpu: 100m" in crowdsec_values_text
+    assert "memory: 128Mi" in crowdsec_values_text
+    assert "memory: 256Mi" in crowdsec_values_text
+    assert "cpu: 250m" in crowdsec_values_text
+    assert "memory: 512Mi" in crowdsec_values_text
     assert "podName: traefik-*" in crowdsec_values_text
     assert "program: traefik" in crowdsec_values_text
     assert "value: crowdsecurity/traefik" in crowdsec_values_text

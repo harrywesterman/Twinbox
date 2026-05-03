@@ -3,6 +3,13 @@ container_runtime: containerd
 agent:
   enabled: true
   isDeployment: false
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
   acquisition:
     - namespace: traefik
       podName: traefik-*
@@ -14,6 +21,13 @@ agent:
 lapi:
   enabled: true
   replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
   secrets:
     externalSecret:
       name: crowdsec-lapi-secrets
