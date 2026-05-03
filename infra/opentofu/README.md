@@ -10,7 +10,13 @@ OpenTofu modules for provisioning external infrastructure components used by Twi
 | `authentik-headlamp/` | Authentik + Random | Headlamp OIDC application/client in Authentik |
 | `authentik-pgadmin4/` | Authentik + Random | pgAdmin 4 OIDC application/client in Authentik |
 | `authentik-management-consoles/` | Authentik | Proxy applications for Traefik Dashboard and Longhorn in Authentik |
+| `authentik-netbird/` | Authentik + Random | NetBird OIDC application/client in Authentik |
 | `cloudflare/` | Cloudflare | DNS records (wiredoor + wildcard A records) |
+| `cloudflare-netbird/` | Cloudflare | DNS records for NetBird and NetBird proxy domains |
+| `netbird/` | Hetzner Cloud | Self-hosted NetBird VPS with dashboard, server, Traefik, and proxy |
+| `netbird-idp/` | NetBird | Authentik identity provider registration in NetBird |
+| `netbird-network/` | NetBird | Twinbox groups, setup keys, network resource, router, and policies |
+| `netbird-proxy-services/` | NetBird | NetBird reverse proxy services targeting internal Traefik |
 | `talos-proxmox/` | Proxmox (bpg) | Talos Linux VMs on Proxmox VE |
 | `wiredoor/` | Hetzner Cloud | Wiredoor bastion VM with cloud-init bootstrap |
 
@@ -56,3 +62,12 @@ Provisions a Hetzner Cloud VM running Wiredoor with:
 - SSH key management
 
 See [wiredoor/README.md](wiredoor/README.md) for details.
+
+### netbird/
+
+Provisions a Hetzner Cloud VM running self-hosted NetBird with:
+
+- Official NetBird Docker Compose bootstrap
+- Built-in Traefik for NetBird dashboard/API and TLS passthrough
+- NetBird Reverse Proxy enabled for `proxy.<zone>` service domains
+- Firewall rules for SSH, HTTP, HTTPS, and STUN

@@ -25,7 +25,7 @@ dns_domain="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.dns_domain')"
 public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$dns_domain")"
 
 case "$ingress_route" in
-  wiredoor|cloudflare-tunnel|metallb|tailscale) ;;
+  wiredoor|cloudflare-tunnel|metallb|tailscale|netbird) ;;
   *)
     fail "Unsupported ingress route: $ingress_route"
     ;;

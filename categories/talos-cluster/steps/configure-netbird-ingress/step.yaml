@@ -1,0 +1,52 @@
+id: configure-netbird-ingress
+title: Configure NetBird Ingress
+type: action
+journey_stage: setup
+order: 51
+summary: Configure NetBird SSO, groups, setup keys, routes, and proxy targets.
+explanation: >
+  This step connects NetBird to Authentik for SSO, creates Twinbox NetBird groups
+  and setup keys with OpenTofu, and records the routing peer credentials in
+  OpenBao for GitOps deployment.
+side_help: >
+  Create a NetBird personal access token from the NetBird dashboard after the
+  VPS is reachable. Twinbox uses it to configure NetBird resources through the
+  NetBird OpenTofu provider.
+depends_on:
+  - provision-netbird-bastion
+  - install-secret-sync
+  - install-traefik
+  - install-authentik-idp
+  - create-users-and-groups
+ingress_route: netbird
+inputs:
+  - id: netbird_token
+    label: NetBird API Token
+    type: string
+    required: true
+    help: Personal access token from the self-hosted NetBird dashboard
+  - id: netbird_management_url
+    label: NetBird Management URL
+    type: string
+    required: false
+    help: Optional override, defaults to the NetBird VPS URL from the bastion step
+  - id: traefik_resource_address
+    label: Traefik Resource Address
+    type: string
+    required: false
+    help: Optional override, defaults to the Traefik ClusterIP when Kubernetes is reachable
+  - id: proxy_services_json
+    label: Reverse Proxy Services JSON
+    type: string
+    required: false
+    help: Optional JSON array like [{"name":"portal","domain":"portal.example.com","path":"/"}]
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/configure-netbird-ingress/run.sh

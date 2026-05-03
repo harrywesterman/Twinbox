@@ -316,6 +316,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 ]
             ] == [
                 "wiredoor",
+                "netbird",
                 "cloudflare-tunnel",
                 "metallb",
                 "tailscale",
@@ -542,6 +543,7 @@ def test_catalog_endpoint_shows_cloudflare_only_for_prd_clusters():
                 option["value"] for option in choose_step["inputs"][0]["options"]
             ] == [
                 "wiredoor",
+                "netbird",
                 "metallb",
                 "tailscale",
             ]
@@ -559,6 +561,7 @@ def test_catalog_endpoint_shows_cloudflare_only_for_prd_clusters():
                 option["value"] for option in choose_step["inputs"][0]["options"]
             ] == [
                 "wiredoor",
+                "netbird",
                 "cloudflare-tunnel",
                 "metallb",
                 "tailscale",
@@ -577,6 +580,7 @@ def test_catalog_endpoint_shows_cloudflare_only_for_prd_clusters():
                 option["value"] for option in choose_step["inputs"][0]["options"]
             ] == [
                 "wiredoor",
+                "netbird",
                 "metallb",
                 "tailscale",
             ]

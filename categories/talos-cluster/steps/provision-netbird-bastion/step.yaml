@@ -1,0 +1,59 @@
+id: provision-netbird-bastion
+title: Deploy NetBird Bastion Host
+type: action
+order: 32
+journey_stage: setup
+summary: Provision a self-hosted NetBird VPS on Hetzner Cloud.
+explanation: >
+  This step provisions a Hetzner Cloud VM running self-hosted NetBird with the
+  combined NetBird server, dashboard, built-in Traefik, and NetBird Reverse Proxy.
+  The VPS becomes the public frontend for NetBird and for proxying selected
+  Twinbox services back to the Kubernetes cluster through NetBird routing peers.
+side_help: >
+  You need a Hetzner Cloud API token. If you also provide Cloudflare credentials,
+  Twinbox creates netbird and proxy DNS records pointing at the new VPS.
+depends_on:
+  - provision-nodes
+  - choose-ingress-route
+ingress_route: netbird
+inputs:
+  - id: hcloud_token
+    label: Hetzner API Token
+    type: string
+    required: true
+    help: Your Hetzner Cloud API token. Create one at https://console.hetzner.cloud/
+  - id: hcloud_location
+    label: Server Location
+    type: string
+    required: false
+    default: fsn1
+    help: "Datacenter location: fsn1 (Falkenstein), nbg1 (Nürnberg), or hel1 (Helsinki)"
+  - id: hcloud_server_type
+    label: Server Type
+    type: string
+    required: false
+    default: cax11
+    help: "Server size: cax11 (ARM64, 2vCPU/4GB), cx22 (x86, 2vCPU/4GB)"
+  - id: zone_name
+    label: Domain Name
+    type: string
+    required: true
+    help: Root DNS zone name, e.g. example.com
+  - id: netbird_admin_email
+    label: Let's Encrypt Email
+    type: string
+    required: true
+    help: Email address used for NetBird/Traefik Let's Encrypt certificates
+  - id: ssh_public_key
+    label: SSH Public Key
+    type: string
+    required: false
+    help: "Optional: Your SSH public key for direct server access"
+  - id: cloudflare_api_token
+    label: Cloudflare API Token
+    type: string
+    required: false
+    help: Optional Cloudflare token for netbird/proxy DNS records
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/provision-netbird-bastion/run.sh

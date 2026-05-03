@@ -17,6 +17,8 @@ inputs:
     options:
       - label: Wiredoor
         value: wiredoor
+      - label: NetBird
+        value: netbird
       - label: Cloudflare Tunnel
         value: cloudflare-tunnel
       - label: MetalLB

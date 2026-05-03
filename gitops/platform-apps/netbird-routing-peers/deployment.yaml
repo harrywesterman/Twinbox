@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: netbird-routing-peer
+  namespace: netbird
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: netbird-routing-peer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: netbird-routing-peer
+    spec:
+      containers:
+        - name: netbird
+          image: netbirdio/netbird:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NB_SETUP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: netbird-routing-peers
+                  key: NB_SETUP_KEY
+            - name: NB_MANAGEMENT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: netbird-routing-peers
+                  key: NB_MANAGEMENT_URL
+            - name: NB_HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NB_LOG_LEVEL
+              value: info
+          securityContext:
+            privileged: true
+            capabilities:
+              add:
+                - NET_ADMIN
+                - SYS_ADMIN
+                - SYS_RESOURCE
+          volumeMounts:
+            - name: tun
+              mountPath: /dev/net/tun
+            - name: state
+              mountPath: /var/lib/netbird
+          livenessProbe:
+            exec:
+              command:
+                - netbird
+                - status
+                - --check
+                - live
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - netbird
+                - status
+                - --check
+                - ready
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            exec:
+              command:
+                - netbird
+                - status
+                - --check
+                - startup
+            periodSeconds: 2
+            timeoutSeconds: 10
+            failureThreshold: 30
+      volumes:
+        - name: tun
+          hostPath:
+            path: /dev/net/tun
+            type: CharDevice
+        - name: state
+          emptyDir: {}
