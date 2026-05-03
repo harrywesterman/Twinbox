@@ -2790,7 +2790,7 @@ def test_dashy_deployment_uses_a_published_image_tag():
     pvc_text = (
         REPO_ROOT / "gitops" / "platform-apps" / "dashy" / "pvc.yaml"
     ).read_text(encoding="utf-8")
-    assert "replicas: 3" in text
+    assert "replicas: 1" in text
     assert "strategy:" not in text
     assert "kubernetes.io/hostname" not in text
     assert "persistentVolumeClaim:" in text
