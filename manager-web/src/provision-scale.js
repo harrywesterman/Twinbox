@@ -7,6 +7,7 @@ const MIN_WORKER_DISK_PERCENT = 10;
 const DEFAULT_WORKER_DISK_PERCENT = 100;
 const MAX_WORKER_DISK_PERCENT = 100;
 
+const CONTROLPLANE_CPU_CORES = 2;
 const CONTROLPLANE_MEMORY_MB = 4096;
 const CONTROLPLANE_DISK_GB = 10;
 const WORKER_DISK_MIN_GB = 10;
@@ -170,7 +171,7 @@ function buildBaseline(stepInputs) {
     nodeCount,
     cpuCores,
     workerMemoryMb,
-    totalCpuCores: nodeCount * cpuCores,
+    totalCpuCores: (controlplaneCount * CONTROLPLANE_CPU_CORES) + (workerCount * cpuCores),
     totalWorkerMemoryMb: workerCount * workerMemoryMb,
     bounds: {
       controlplane_count: getInputBounds(stepInputs, 'controlplane_count', { min: 1, max: 15 }),
@@ -390,7 +391,7 @@ export function buildProvisionScaleSummary(scalePercent, stepInputs, currentValu
       ?? summaryFallbackWorkerDiskGb
     : summaryFallbackWorkerDiskGb;
 
-  const totalCpuCores = totalNodes * cpuCores;
+  const totalCpuCores = (controlplaneCount * CONTROLPLANE_CPU_CORES) + (workerCount * cpuCores);
   const totalWorkerMemoryMb = workerCount * workerMemoryMb;
   const totalWorkerDiskGb = workerCount * workerDiskPerVm;
 
@@ -400,6 +401,7 @@ export function buildProvisionScaleSummary(scalePercent, stepInputs, currentValu
     controlplane_count: controlplaneCount,
     worker_count: workerCount,
     cpu_cores: cpuCores,
+    controlplane_cpu_cores: CONTROLPLANE_CPU_CORES,
     worker_memory_mb: workerMemoryMb,
     worker_disk_percent: resolvedWorkerDiskPercent,
     controlplane_memory_mb: CONTROLPLANE_MEMORY_MB,
@@ -517,7 +519,7 @@ export function buildProvisionVmPlan(stepInputs, currentValues = {}) {
       label: `Control plane ${index}`,
       type: 'controlplane',
       vmid,
-      cpu: cpuCores,
+      cpu: CONTROLPLANE_CPU_CORES,
       memory_mb: CONTROLPLANE_MEMORY_MB,
       disk_gb: CONTROLPLANE_DISK_GB,
     });

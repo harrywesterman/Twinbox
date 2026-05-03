@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   buildAutomaticProvisionPlacementResult,
   buildProvisionPlacementBoard,
+  buildProvisionVmPlan,
   buildProvisionScaleSummary,
   buildScaledProvisionInputs,
   getProvisionNodeCount,
@@ -104,6 +105,7 @@ test('higher scale percentages grow the VM footprint and totals', () => {
   assert.ok(summary.total_nodes >= 3);
   assert.ok(summary.total_memory_mb >= 12288);
   assert.equal(summary.worker_disk_percent, 100);
+  assert.equal(summary.controlplane_cpu_cores, 2);
   assert.equal(summary.controlplane_disk_gb, 10);
   assert.equal(summary.worker_disk_gb, 375);
   assert.equal(summary.total_worker_disk_gb, 3000);
@@ -125,6 +127,17 @@ test('memory formatter prefers gigabytes for larger values', () => {
   assert.equal(formatMemoryMb(768), '768 MB');
 });
 
+test('VM plan fixes control-plane CPU and keeps worker CPU configurable', () => {
+  const plan = buildProvisionVmPlan(stepInputs, {
+    controlplane_count: 1,
+    worker_count: 1,
+    cpu_cores: 6,
+  });
+
+  assert.equal(plan.find((vm) => vm.name === 'cp-1').cpu, 2);
+  assert.equal(plan.find((vm) => vm.name === 'worker-1').cpu, 6);
+});
+
 test('placement board suggests a host-aware Talos VM layout', () => {
   const board = buildProvisionPlacementBoard(stepInputs, {}, balancedPlacementResources);
 
@@ -136,8 +149,41 @@ test('placement board suggests a host-aware Talos VM layout', () => {
   assert.equal(Object.keys(board.suggestedVmNodeMap).length, 6);
   assert.equal(board.unassigned.length, 6);
   assert.equal(board.hostCards[0].assignments.length, 0);
+  assert.equal(board.vmSizeMap['cp-1'].cpu, 2);
   assert.equal(board.vmSizeMap['cp-1'].disk_gb, 10);
+  assert.equal(board.suggestedVmSizeMap['cp-1'].cpu, 2);
   assert.ok(board.suggestedVmSizeMap['worker-1'].disk_gb > 100);
+});
+
+test('placement size maps fix control-plane CPU and keep worker CPU configurable', () => {
+  const board = buildProvisionPlacementBoard(stepInputs, {
+    controlplane_count: 1,
+    worker_count: 1,
+    cpu_cores: 6,
+    vm_node_map: {
+      'cp-1': 'pve-a',
+      'worker-1': 'pve-a',
+    },
+  }, {
+    nodes: [
+      {
+        node: 'pve-a',
+        status: 'online',
+        maxmem: 34359738368,
+        mem: 0,
+        maxdisk: 1099511627776,
+        disk: 0,
+        maxcpu: 16,
+        cpu: 0,
+      },
+    ],
+    vms: [],
+  });
+
+  assert.equal(board.vmSizeMap['cp-1'].cpu, 2);
+  assert.equal(board.vmSizeMap['worker-1'].cpu, 6);
+  assert.equal(board.suggestedVmSizeMap['cp-1'].cpu, 2);
+  assert.equal(board.suggestedVmSizeMap['worker-1'].cpu, 6);
 });
 
 test('placement board keeps the management VM fixed on its host and exposes its size', () => {

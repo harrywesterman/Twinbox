@@ -98,6 +98,67 @@ test('cluster builder no longer falls back to a 100GB worker disk', () => {
   assert.equal(result.cluster.worker_disk_gb, 10);
 });
 
+test('cluster builder defaults control planes to 2 vCPU while workers use requested CPU', () => {
+  const result = buildClusterFromRequest({
+    ...baseBody,
+    cpu_cores: 6,
+    vm_ip_map: {
+      'cp-1': '192.168.1.61',
+      'worker-1': '192.168.1.62',
+      'worker-2': '192.168.1.63',
+    },
+  }, {
+    PROXMOX_NODE: 'pve-a',
+    PROXMOX_STORAGE_POOL: 'local-lvm',
+    PROXMOX_FILE_DATASTORE: 'local',
+  }, {
+    allowedVmHosts: ['pve-a', 'pve-b'],
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.cluster.vm_size_map['cp-1'].cpu, 2);
+  assert.equal(result.cluster.vm_size_map['worker-1'].cpu, 6);
+  assert.equal(result.cluster.vm_size_map['worker-2'].cpu, 6);
+});
+
+test('cluster builder preserves explicit control-plane CPU overrides', () => {
+  const result = buildClusterFromRequest({
+    ...baseBody,
+    cpu_cores: 6,
+    vm_ip_map: {
+      'cp-1': '192.168.1.61',
+      'worker-1': '192.168.1.62',
+      'worker-2': '192.168.1.63',
+    },
+    vm_size_map: {
+      'cp-1': {
+        cpu: 4,
+        memory_mb: 4096,
+        disk_gb: 10,
+      },
+      'worker-1': {
+        cpu: 6,
+        memory_mb: 4096,
+        disk_gb: 10,
+      },
+      'worker-2': {
+        cpu: 6,
+        memory_mb: 4096,
+        disk_gb: 10,
+      },
+    },
+  }, {
+    PROXMOX_NODE: 'pve-a',
+    PROXMOX_STORAGE_POOL: 'local-lvm',
+    PROXMOX_FILE_DATASTORE: 'local',
+  }, {
+    allowedVmHosts: ['pve-a', 'pve-b'],
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.cluster.vm_size_map['cp-1'].cpu, 4);
+});
+
 test('cluster builder rejects stale vm_node_map host names', () => {
   const result = buildClusterFromRequest({
     ...baseBody,

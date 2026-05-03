@@ -59,7 +59,7 @@ inputs:
     min: 1
     max: 64
     default: 4
-    help: Per-node CPU allocation. Use 4 vCPU or more for the standard Twinbox baseline; 2 vCPU is only realistic for a reduced dev/test cluster.
+    help: Worker CPU allocation. Control planes stay fixed at 2 vCPU, while workers use this value.
   - id: memory_mb
     label: Memory MB
     type: integer

@@ -17,6 +17,7 @@ import {
 } from "./common.js";
 
 const WORKER_DISK_MIN_GB = 10;
+const CONTROLPLANE_CPU_CORES = 2;
 
 export function normalizeClusterSlug(rawName) {
   const trimmed = String(rawName || "").trim().toLowerCase();
@@ -80,7 +81,7 @@ function buildDefaultVmSizeMap(controlplaneCount, workerCount, cpuCores, workerM
 
   for (let index = 1; index <= Math.max(1, Number(controlplaneCount) || 0); index += 1) {
     vmSizeMap[`cp-${index}`] = {
-      cpu: cpuCores,
+      cpu: CONTROLPLANE_CPU_CORES,
       memory_mb: 4096,
       disk_gb: 10,
     };
