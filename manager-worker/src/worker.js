@@ -1033,9 +1033,9 @@ async function handleUninstallStep(job) {
       stepId,
       clusterId,
       clusterInstanceId,
-      {},
-      line => String(line ?? ""),
-      [],
+      secretRuntime.env,
+      redact,
+      secretRuntime.strip_env,
     );
   } catch (err) {
     if (String(err?.message || "") === "job canceled") {

@@ -176,7 +176,6 @@ EOF
 cleanup_app_specific_state() {
   case "$APP_NAME" in
     immich)
-      needs_authentik_cleanup=true
       delete_authentik_policy_binding_for_application_group "immich" "admins"
       delete_authentik_scope_mapping "Immich role" "profile"
       delete_authentik_provider_by_name "Immich"
@@ -184,7 +183,6 @@ cleanup_app_specific_state() {
       delete_openbao_global_secret "immich"
       ;;
     nextcloud)
-      needs_authentik_cleanup=true
       delete_authentik_scope_mapping "Nextcloud Profile" "profile"
       delete_authentik_scope_mapping "Nextcloud Groups" "groups"
       delete_authentik_provider_by_name "Nextcloud"
@@ -192,20 +190,17 @@ cleanup_app_specific_state() {
       delete_openbao_global_secret "nextcloud"
       ;;
     audiobookshelf)
-      needs_authentik_cleanup=true
       delete_authentik_scope_mapping "Audiobookshelf groups" "groups"
       delete_authentik_provider_by_name "Audiobookshelf"
       delete_authentik_application_by_slug "audiobookshelf"
       delete_openbao_global_secret "audiobookshelf"
       ;;
     karakeep)
-      needs_authentik_cleanup=true
       delete_authentik_provider_by_name "Karakeep"
       delete_authentik_application_by_slug "karakeep"
       delete_openbao_global_secret "karakeep"
       ;;
     jitsi)
-      needs_authentik_cleanup=true
       delete_authentik_policy_binding_for_application_group "jitsi-openid" "admins"
       delete_authentik_policy_binding_for_application_group "jitsi-openid" "jitsi-hosts"
       delete_authentik_scope_mapping "Jitsi host affiliation" "jitsi"
@@ -215,7 +210,6 @@ cleanup_app_specific_state() {
       delete_openbao_global_secret "jitsi-auth"
       ;;
     opencloud)
-      needs_authentik_cleanup=true
       delete_authentik_scope_mapping "OpenCloud roles" "roles"
       delete_authentik_provider_by_name "OpenCloud Web"
       delete_authentik_provider_by_name "OpenCloud Desktop"
@@ -226,13 +220,18 @@ cleanup_app_specific_state() {
       delete_openbao_global_secret "opencloud"
       ;;
     zulip)
-      needs_authentik_cleanup=true
       delete_authentik_provider_by_name "Zulip"
       delete_authentik_application_by_slug "zulip"
       delete_openbao_global_secret "zulip-oidc"
       ;;
   esac
 }
+
+case "$APP_NAME" in
+  immich|nextcloud|audiobookshelf|karakeep|jitsi|opencloud|zulip)
+    needs_authentik_cleanup=true
+    ;;
+esac
 
 log "Deleting Argo CD application ${APP_NAME}"
 kubectl delete application "$APP_NAME" -n argocd --ignore-not-found=true >/dev/null 2>&1 || true

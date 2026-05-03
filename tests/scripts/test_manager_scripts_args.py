@@ -3330,3 +3330,17 @@ def test_twinbox_portal_step_does_not_apply_missing_configmap_manifest():
 
     assert "gitops/platform-apps/twinbox-portal/configmap.yaml" not in text
     assert "refresh-portal-config.mjs" in text
+
+
+def test_uninstall_authentik_cleanup_sets_forward_before_app_cleanup():
+    text = (
+        REPO_ROOT / "scripts" / "manager" / "uninstall-argocd-application.sh"
+    ).read_text(encoding="utf-8")
+
+    app_detection_index = text.index("immich|nextcloud|audiobookshelf|karakeep|jitsi|opencloud|zulip")
+    setup_condition_index = text.index('if [[ "$needs_authentik_cleanup" == "true" ]]')
+    setup_forward_index = text.index("authentik_setup_forward", setup_condition_index)
+    cleanup_index = text.index("cleanup_app_specific_state", setup_forward_index)
+
+    assert app_detection_index < setup_condition_index
+    assert setup_forward_index < cleanup_index

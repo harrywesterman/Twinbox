@@ -643,6 +643,168 @@ def test_worker_materializes_secret_bundle_files_and_cleans_up():
             proc.wait(timeout=5)
 
 
+def test_worker_passes_secret_runtime_to_portal_refresh_after_uninstall():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        data = root / "data"
+        workspace = root / "workspace"
+        bootstrap = workspace / "bootstrap"
+        bin_dir = root / "bin"
+        pending = data / "queue" / "pending"
+        jobs = data / "jobs"
+        logs = data / "logs"
+        kubectl_log = root / "kubectl.log"
+
+        for d in [
+            pending,
+            jobs,
+            logs,
+            data / "clusters",
+            workspace / "scripts" / "manager",
+            workspace / "manager-worker" / "src",
+            workspace / "gitops" / "apps",
+            bootstrap / "secrets" / "cluster" / "cluster_test" / "kubeconfig",
+            bin_dir,
+        ]:
+            d.mkdir(parents=True, exist_ok=True)
+
+        _prepare_fake_toolchain(bin_dir)
+        _write_pinned_defaults(workspace)
+        _write_fake_tool(
+            bin_dir / "kubectl",
+            "#!/bin/bash\n"
+            "set -euo pipefail\n"
+            "if [[ \"$1\" == \"version\" ]]; then\n"
+            f"  echo '{{\"clientVersion\":{{\"gitVersion\":\"{PINNED_KUBECTL_VERSION}\"}}}}'\n"
+            "  exit 0\n"
+            "fi\n"
+            "if [[ \"${REQUIRE_KUBECONFIG_ENV:-}\" == \"1\" && -z \"${KUBECONFIG:-}\" ]]; then\n"
+            "  echo \"KUBECONFIG is required\" >&2\n"
+            "  exit 42\n"
+            "fi\n"
+            f"echo \"kubectl $* KUBECONFIG=${{KUBECONFIG:-}}\" >> \"{kubectl_log}\"\n"
+            "if [[ \" $* \" == *\" apply --validate=false -f - \"* ]]; then\n"
+            "  cat >/dev/null\n"
+            "fi\n"
+            "exit 0\n",
+        )
+
+        (bootstrap / "secrets" / "cluster" / "cluster_test" / "kubeconfig" / "kubeconfig").write_text(
+            "apiVersion: v1\nkind: Config\nclusters: []\nusers: []\ncontexts: []\n"
+        )
+        manifest_path = workspace / "gitops" / "apps" / "nextcloud.yaml"
+        manifest_path.write_text(
+            "apiVersion: argoproj.io/v1alpha1\n"
+            "kind: Application\n"
+            "metadata:\n"
+            "  name: nextcloud\n",
+        )
+        (workspace / "scripts" / "manager" / "uninstall-argocd-application.sh").write_text(
+            "#!/bin/bash\n"
+            "set -euo pipefail\n"
+            ": \"${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}\"\n"
+            "export KUBECONFIG=\"$KUBECONFIG_FILE\"\n"
+            "kubectl delete application \"$APP_NAME\" -n argocd --ignore-not-found=true >/dev/null\n",
+        )
+        (workspace / "scripts" / "manager" / "uninstall-argocd-application.sh").chmod(0o755)
+        (workspace / "manager-worker" / "src" / "refresh-portal-config.mjs").write_text(
+            "import { spawnSync } from 'child_process';\n"
+            "const env = { ...process.env };\n"
+            "const kubeconfig = env.KUBECONFIG_FILE || env.TWINBOX_KUBECONFIG_FILE || env.KUBECONFIG;\n"
+            "if (!env.KUBECONFIG && kubeconfig) env.KUBECONFIG = kubeconfig;\n"
+            "const result = spawnSync('kubectl', ['apply', '--validate=false', '-f', '-'], {\n"
+            "  env,\n"
+            "  input: 'apiVersion: v1\\nkind: Secret\\nmetadata:\\n  name: portal-config\\n',\n"
+            "  encoding: 'utf8',\n"
+            "});\n"
+            "if (result.status !== 0) {\n"
+            "  process.stderr.write(result.stderr || 'kubectl failed');\n"
+            "  process.exit(result.status || 1);\n"
+            "}\n",
+        )
+
+        payload = {
+            "step_id": "install-nextcloud",
+            "step_type": "app",
+            "app_name": "nextcloud",
+            "manifest_path": str(manifest_path),
+            "context": {
+                "cluster": {
+                    "id": "cluster_test",
+                    "name": "demo",
+                    "cluster_instance_id": "cluster_test_instance",
+                }
+            },
+            "secret_bundle": {
+                "files": {
+                    "KUBECONFIG_FILE": {
+                        "scope": "cluster",
+                        "item": "kubeconfig",
+                        "attachment": "kubeconfig",
+                    }
+                }
+            },
+        }
+        job = {
+            "id": "job_uninstall_nextcloud",
+            "type": "uninstall_step",
+            "cluster_id": "cluster_test",
+            "cluster_instance_id": "cluster_test_instance",
+            "status": "pending",
+            "step": "queued",
+            "payload": payload,
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "started_at": None,
+            "finished_at": None,
+            "result": None,
+            "error": None,
+        }
+        (jobs / "job_uninstall_nextcloud.json").write_text(json.dumps(job))
+        (pending / "job_uninstall_nextcloud.json").write_text(json.dumps({
+            "id": "job_uninstall_nextcloud",
+            "type": "uninstall_step",
+            "cluster_id": "cluster_test",
+            "cluster_instance_id": "cluster_test_instance",
+            "payload": payload,
+            "queued_at": "2026-01-01T00:00:00Z",
+        }))
+
+        env = os.environ.copy()
+        env["MANAGER_DATA_DIR"] = str(data)
+        env["WORKSPACE_ROOT"] = str(workspace)
+        env["TWINBOX_BOOTSTRAP_DIR"] = str(bootstrap)
+        env["WORKER_POLL_MS"] = "100"
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+        env["REQUIRE_KUBECONFIG_ENV"] = "1"
+
+        proc = subprocess.Popen(
+            ["node", "manager-worker/src/worker.js"],
+            cwd=Path(__file__).resolve().parents[2],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        try:
+            _wait_until(lambda: (data / "queue" / "completed" / "job_uninstall_nextcloud.json").exists())
+
+            updated_job = json.loads((jobs / "job_uninstall_nextcloud.json").read_text())
+            assert updated_job["status"] == "succeeded"
+
+            log_text = (logs / "job_uninstall_nextcloud.log").read_text()
+            assert "portal refresh warning" not in log_text
+
+            kubectl_log_text = kubectl_log.read_text()
+            assert "kubectl apply --validate=false -f -" in kubectl_log_text
+            assert "KUBECONFIG=" in kubectl_log_text
+            assert "/bootstrap/secrets/cluster/cluster_test/kubeconfig/kubeconfig" in kubectl_log_text
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
 def test_worker_exits_on_tool_version_mismatch():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
