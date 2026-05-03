@@ -921,6 +921,9 @@ def test_crowdsec_step_seeds_bouncer_secret_and_applies_gitops_app():
     crowdsec_app_text = _crowdsec_app_text()
     crowdsec_values_text = _crowdsec_values_text()
     crowdsec_externalsecret_text = _crowdsec_bouncer_externalsecret_text()
+    crowdsec_lapi_externalsecret_text = (
+        REPO_ROOT / "gitops" / "platform" / "crowdsec" / "lapi-externalsecret.yaml"
+    ).read_text(encoding="utf-8")
     traefik_bouncer_externalsecret_text = _traefik_crowdsec_bouncer_externalsecret_text()
 
     assert "title: Install CrowdSec" in step_manifest_text
@@ -932,12 +935,17 @@ def test_crowdsec_step_seeds_bouncer_secret_and_applies_gitops_app():
     assert '--secret-name "crowdsec-bouncer"' in step_text
     assert '--required-keys "lapi_key"' in step_text
     assert "gitops/platform/crowdsec/bouncer-externalsecret.yaml" in step_text
+    assert "gitops/platform/crowdsec/lapi-externalsecret.yaml" in step_text
     assert "gitops/platform/traefik/crowdsec-bouncer-externalsecret.yaml" in step_text
+    assert "openbao_read_global_secret_json crowdsec-lapi" in step_text
+    assert '--secret-name "crowdsec-lapi"' in step_text
+    assert '--required-keys "csLapiSecret,registrationToken"' in step_text
     assert '--application "crowdsec"' in step_text
     assert "--no-wait" in step_text
     assert "wait_for_resource_exists \"crowdsec\" \"daemonset/crowdsec-agent\"" in step_text
     assert "rollout restart daemonset/crowdsec-agent" in step_text
     assert "rollout status daemonset/crowdsec-agent --timeout=10m" in step_text
+    assert 'wait_for_resource_ready "crowdsec" "externalsecret/crowdsec-lapi-secrets"' in step_text
     assert "wait_for_application_ready \"crowdsec\"" in step_text
     assert "chart: crowdsec" in crowdsec_app_text
     assert "targetRevision: \"0.23.0\"" in crowdsec_app_text
@@ -950,11 +958,21 @@ def test_crowdsec_step_seeds_bouncer_secret_and_applies_gitops_app():
     assert "podName: traefik-*" in crowdsec_values_text
     assert "program: traefik" in crowdsec_values_text
     assert "value: crowdsecurity/traefik" in crowdsec_values_text
+    assert "secrets:" in crowdsec_values_text
+    assert "externalSecret:" in crowdsec_values_text
+    assert "name: crowdsec-lapi-secrets" in crowdsec_values_text
     assert "BOUNCER_KEY_traefik" in crowdsec_values_text
     assert "secretKeyRef:" in crowdsec_values_text
     assert "value: " not in crowdsec_externalsecret_text
     assert "key: twinbox/global/crowdsec-bouncer" in crowdsec_externalsecret_text
     assert "property: lapi_key" in crowdsec_externalsecret_text
+    assert "kind: ExternalSecret" in crowdsec_lapi_externalsecret_text
+    assert "name: openbao" in crowdsec_lapi_externalsecret_text
+    assert "secretKey: csLapiSecret" in crowdsec_lapi_externalsecret_text
+    assert "secretKey: registrationToken" in crowdsec_lapi_externalsecret_text
+    assert "key: twinbox/global/crowdsec-lapi" in crowdsec_lapi_externalsecret_text
+    assert "property: csLapiSecret" in crowdsec_lapi_externalsecret_text
+    assert "property: registrationToken" in crowdsec_lapi_externalsecret_text
     assert "secretKey: lapi-key" in traefik_bouncer_externalsecret_text
     assert "key: twinbox/global/crowdsec-bouncer" in traefik_bouncer_externalsecret_text
 
@@ -2682,6 +2700,13 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert '\\"admins\\": \\"admin\\"' in text
     assert "--group-provisioning='1'" in text
     assert "config:app:set --type=string --value=1 user_oidc provider-1-groupProvisioning" in text
+    assert "NEXTCLOUD_OIDC_REDIRECT_URI_PRETTY" in text
+    assert "NEXTCLOUD_OIDC_LOGOUT_URI_PRETTY" in text
+    assert "NEXTCLOUD_OIDC_BACKCHANNEL_URI_PRETTY" in text
+    assert "redirect_login_pretty" in text
+    assert "redirect_logout_pretty" in text
+    assert "redirect_backchannel_pretty" in text
+    assert "apps/user_oidc/code" in text
     assert "config:system:set wopi_url --value='https://collabora.${public_zone_name}'" in text
     assert "config:app:set --value='https://collabora.${public_zone_name}' richdocuments wopi_url" in text
     assert "richdocuments:activate-config" in text
@@ -2722,6 +2747,24 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
         / "kustomization.yaml"
     ).read_text(encoding="utf-8")
     assert "authentik-externalsecret.yaml" not in kustomization_text
+
+
+def test_hedgedoc_database_cluster_is_right_sized_and_keeps_topology():
+    text = (REPO_ROOT / "gitops" / "databases" / "hedgedoc" / "cluster.yaml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "name: hedgedoc-db" in text
+    assert "instances: 3" in text
+    assert "storageClass: longhorn" in text
+    assert "cpu: 250m" in text
+    assert "memory: 512Mi" in text
+    assert 'cpu: "1"' in text
+    assert "memory: 1Gi" in text
+    assert "s3://twinbox-velero/hedgedoc-db/" in text
+    assert "bootstrap:" in text
+    assert "secret:" in text
+    assert "name: hedgedoc-db-credentials" in text
 
 
 def test_authentik_values_request_memory_for_server_and_worker():

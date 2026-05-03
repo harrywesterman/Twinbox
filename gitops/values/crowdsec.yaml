@@ -14,6 +14,9 @@ agent:
 lapi:
   enabled: true
   replicas: 1
+  secrets:
+    externalSecret:
+      name: crowdsec-lapi-secrets
   env:
     - name: BOUNCER_KEY_traefik
       valueFrom:

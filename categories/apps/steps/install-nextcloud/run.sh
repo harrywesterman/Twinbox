@@ -239,8 +239,11 @@ public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domai
 NEXTCLOUD_HOST="https://nextcloud.${public_zone_name}"
 NEXTCLOUD_DOMAIN="${NEXTCLOUD_HOST#https://}"
 NEXTCLOUD_OIDC_REDIRECT_URI="${NEXTCLOUD_HOST}/index.php/apps/user_oidc/code"
+NEXTCLOUD_OIDC_REDIRECT_URI_PRETTY="${NEXTCLOUD_HOST}/apps/user_oidc/code"
 NEXTCLOUD_OIDC_LOGOUT_URI="${NEXTCLOUD_HOST}/index.php/apps/user_oidc/sls"
+NEXTCLOUD_OIDC_LOGOUT_URI_PRETTY="${NEXTCLOUD_HOST}/apps/user_oidc/sls"
 NEXTCLOUD_OIDC_BACKCHANNEL_URI="${NEXTCLOUD_HOST}/index.php/apps/user_oidc/backchannel-logout/nextcloud"
+NEXTCLOUD_OIDC_BACKCHANNEL_URI_PRETTY="${NEXTCLOUD_HOST}/apps/user_oidc/backchannel-logout/nextcloud"
 
 KUBECONFIG_FILE="$(resolve_kubeconfig_file)"
 export KUBECONFIG_FILE
@@ -372,8 +375,11 @@ provider_payload="$(
       '[$openid, $email, $profile, $groups]'
     )" \
     --arg redirect_login "$NEXTCLOUD_OIDC_REDIRECT_URI" \
+    --arg redirect_login_pretty "$NEXTCLOUD_OIDC_REDIRECT_URI_PRETTY" \
     --arg redirect_logout "$NEXTCLOUD_OIDC_LOGOUT_URI" \
+    --arg redirect_logout_pretty "$NEXTCLOUD_OIDC_LOGOUT_URI_PRETTY" \
     --arg redirect_backchannel "$NEXTCLOUD_OIDC_BACKCHANNEL_URI" \
+    --arg redirect_backchannel_pretty "$NEXTCLOUD_OIDC_BACKCHANNEL_URI_PRETTY" \
     '{
       name: $name,
       client_id: $client_id,
@@ -388,11 +394,23 @@ provider_payload="$(
         },
         {
           matching_mode: "strict",
+          url: $redirect_login_pretty
+        },
+        {
+          matching_mode: "strict",
           url: $redirect_logout
         },
         {
           matching_mode: "strict",
+          url: $redirect_logout_pretty
+        },
+        {
+          matching_mode: "strict",
           url: $redirect_backchannel
+        },
+        {
+          matching_mode: "strict",
+          url: $redirect_backchannel_pretty
         }
       ],
       property_mappings: $property_mappings,

@@ -243,6 +243,7 @@ function main() {
     stepStateById,
     cluster: currentCluster,
     excludeStepIds: appStepIds,
+    workspaceRoot: options.workspaceRoot,
   });
   const renderedConfig = YAML.stringify(dashyConfig);
 

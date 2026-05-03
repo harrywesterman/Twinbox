@@ -103,7 +103,8 @@ command -v openssl >/dev/null 2>&1 || fail "openssl not found"
 
 manifest_path="$WORKSPACE_ROOT/gitops/apps/crowdsec.yaml"
 bouncer_secret_file="$(mktemp "${TMPDIR:-/tmp}/crowdsec-bouncer.XXXXXX.json")"
-trap 'rm -f "$bouncer_secret_file"' EXIT
+bouncer_lapi_secret_file="$(mktemp "${TMPDIR:-/tmp}/crowdsec-lapi.XXXXXX.json")"
+trap 'rm -f "$bouncer_secret_file" "$bouncer_lapi_secret_file"' EXIT
 
 bouncer_key="$(openssl rand -hex 32)"
 existing_bouncer_secret_json=""
@@ -118,19 +119,51 @@ fi
 
 jq -n --arg lapi_key "$bouncer_key" '{lapi_key: $lapi_key}' >"$bouncer_secret_file"
 
+crowdsec_lapi_cs_lapi_secret="$(openssl rand -hex 48)"
+crowdsec_lapi_registration_token="$(openssl rand -hex 32)"
+existing_crowdsec_lapi_secret_json=""
+if command -v openbao_read_global_secret_json >/dev/null 2>&1; then
+  existing_crowdsec_lapi_secret_json="$(openbao_read_global_secret_json crowdsec-lapi 2>/dev/null || true)"
+fi
+
+if [[ -n "$existing_crowdsec_lapi_secret_json" ]]; then
+  existing_cs_lapi_secret="$(jq -r '.csLapiSecret // empty' <<<"$existing_crowdsec_lapi_secret_json")"
+  existing_registration_token="$(jq -r '.registrationToken // empty' <<<"$existing_crowdsec_lapi_secret_json")"
+  if [[ -n "$existing_cs_lapi_secret" && -n "$existing_registration_token" ]]; then
+    crowdsec_lapi_cs_lapi_secret="$existing_cs_lapi_secret"
+    crowdsec_lapi_registration_token="$existing_registration_token"
+  fi
+fi
+
+jq -n \
+  --arg csLapiSecret "$crowdsec_lapi_cs_lapi_secret" \
+  --arg registrationToken "$crowdsec_lapi_registration_token" \
+  '{
+    csLapiSecret: $csLapiSecret,
+    registrationToken: $registrationToken
+  }' >"$bouncer_lapi_secret_file"
+
 log "Writing CrowdSec bouncer key to OpenBao"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "crowdsec-bouncer" \
   --json-file "$bouncer_secret_file" \
   --required-keys "lapi_key"
 
+log "Writing CrowdSec LAPI secrets to OpenBao"
+bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+  --secret-name "crowdsec-lapi" \
+  --json-file "$bouncer_lapi_secret_file" \
+  --required-keys "csLapiSecret,registrationToken"
+
 log "Applying CrowdSec and Traefik bouncer ExternalSecrets"
 kubectl create namespace crowdsec --dry-run=client -o yaml | kubectl apply -f -
 kubectl create namespace traefik --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform/crowdsec/bouncer-externalsecret.yaml"
+kubectl apply -f "$WORKSPACE_ROOT/gitops/platform/crowdsec/lapi-externalsecret.yaml"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform/traefik/crowdsec-bouncer-externalsecret.yaml"
 
 wait_for_resource_ready "crowdsec" "externalsecret/crowdsec-bouncer-keys" "Ready" "CrowdSec bouncer ExternalSecret"
+wait_for_resource_ready "crowdsec" "externalsecret/crowdsec-lapi-secrets" "Ready" "CrowdSec LAPI ExternalSecret"
 wait_for_resource_ready "traefik" "externalsecret/traefik-crowdsec-bouncer" "Ready" "Traefik CrowdSec bouncer ExternalSecret"
 
 log "Applying CrowdSec Argo CD application"

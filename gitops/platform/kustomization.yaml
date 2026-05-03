@@ -14,6 +14,7 @@ resources:
   - hubble/ingressroute.yaml
   - hubble/authentik-callback-ingressroute.yaml
   - crowdsec/bouncer-externalsecret.yaml
+  - crowdsec/lapi-externalsecret.yaml
   - traefik/traefik-dashboard-ingressroute.yaml
   - traefik/crowdsec-bouncer-externalsecret.yaml
   - traefik/authentik-callback-ingressroute.yaml

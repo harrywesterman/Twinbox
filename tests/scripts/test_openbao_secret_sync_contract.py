@@ -26,6 +26,9 @@ TRAEFIK_SECRET = (
 CROWDSEC_BOUNCER_SECRET = (
     REPO_ROOT / "gitops" / "platform" / "crowdsec" / "bouncer-externalsecret.yaml"
 )
+CROWDSEC_LAPI_SECRET = (
+    REPO_ROOT / "gitops" / "platform" / "crowdsec" / "lapi-externalsecret.yaml"
+)
 TRAEFIK_CROWDSEC_BOUNCER_SECRET = (
     REPO_ROOT / "gitops" / "platform" / "traefik" / "crowdsec-bouncer-externalsecret.yaml"
 )
@@ -142,6 +145,7 @@ def test_gitops_secret_consumers_now_reference_cluster_secret_store_openbao():
     wiredoor_text = _read(WIREDOOR_SECRET)
     traefik_text = _read(TRAEFIK_SECRET)
     crowdsec_bouncer_text = _read(CROWDSEC_BOUNCER_SECRET)
+    crowdsec_lapi_text = _read(CROWDSEC_LAPI_SECRET)
     traefik_crowdsec_bouncer_text = _read(TRAEFIK_CROWDSEC_BOUNCER_SECRET)
 
     assert "name: openbao" in grafana_text
@@ -166,6 +170,14 @@ def test_gitops_secret_consumers_now_reference_cluster_secret_store_openbao():
     assert "secretKey: BOUNCER_KEY_traefik" in crowdsec_bouncer_text
     assert "key: twinbox/global/crowdsec-bouncer" in crowdsec_bouncer_text
     assert "property: lapi_key" in crowdsec_bouncer_text
+
+    assert "kind: ExternalSecret" in crowdsec_lapi_text
+    assert "name: openbao" in crowdsec_lapi_text
+    assert "secretKey: csLapiSecret" in crowdsec_lapi_text
+    assert "secretKey: registrationToken" in crowdsec_lapi_text
+    assert "key: twinbox/global/crowdsec-lapi" in crowdsec_lapi_text
+    assert "property: csLapiSecret" in crowdsec_lapi_text
+    assert "property: registrationToken" in crowdsec_lapi_text
 
     assert "name: openbao" in traefik_crowdsec_bouncer_text
     assert "kind: ClusterSecretStore" in traefik_crowdsec_bouncer_text

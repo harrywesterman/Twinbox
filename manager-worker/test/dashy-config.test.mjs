@@ -65,6 +65,7 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
       dns_domain: "example.com",
       cluster_instance_id: "tst-1",
     },
+    workspaceRoot: repoRoot,
   });
 
   const platformSection = config.sections.find((section) => section.name === "Platform");
@@ -85,22 +86,25 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   assert(platformSection.items.some((item) => item.title === "GitHub" && item.url === "https://github.com/harrywesterman/Twinbox"));
 
   const iconByTitle = new Map(config.sections.flatMap((section) => section.items.map((item) => [item.title, item.icon])));
-  const wizardIconBase = "https://twinboxwizard.tst.example.com/assets/step-icons";
-  assert.equal(iconByTitle.get("Hubble"), `${wizardIconBase}/provision-nodes.svg`);
-  assert.equal(iconByTitle.get("Argo CD"), `${wizardIconBase}/install-argocd.svg`);
-  assert.equal(iconByTitle.get("Authentik"), `${wizardIconBase}/install-authentik-idp.svg`);
-  assert.equal(iconByTitle.get("Grafana"), `${wizardIconBase}/install-grafana.svg`);
-  assert.equal(iconByTitle.get("Prometheus"), `${wizardIconBase}/install-prometheus.svg`);
-  assert.equal(iconByTitle.get("Loki"), `${wizardIconBase}/install-loki.svg`);
-  assert.equal(iconByTitle.get("Proxmox"), `${wizardIconBase}/install-management-consoles.svg`);
-  assert.equal(iconByTitle.get("SeaweedFS"), `${wizardIconBase}/install-management-consoles.svg`);
-  assert.equal(iconByTitle.get("SeaweedFS Admin"), `${wizardIconBase}/install-management-consoles.svg`);
-  assert.equal(iconByTitle.get("Twinbox Portal"), `${wizardIconBase}/install-twinbox-portal.svg`);
-  assert.equal(iconByTitle.get("Velero UI"), `${wizardIconBase}/install-velero-ui.svg`);
-  assert.equal(iconByTitle.get("pgAdmin 4"), `${wizardIconBase}/install-pgadmin4.svg`);
-  assert.equal(iconByTitle.get("Wiredoor"), `${wizardIconBase}/install-wiredoor-gateway.svg`);
-  assert.equal(iconByTitle.get("Cloudflare"), `${wizardIconBase}/configure-cloudflare-dns.svg`);
-  assert.equal(iconByTitle.get("GitHub"), `${wizardIconBase}/github.svg`);
+  for (const title of [
+    "Hubble",
+    "Argo CD",
+    "Authentik",
+    "Grafana",
+    "Prometheus",
+    "Loki",
+    "Proxmox",
+    "SeaweedFS",
+    "SeaweedFS Admin",
+    "Twinbox Portal",
+    "Velero UI",
+    "pgAdmin 4",
+    "Wiredoor",
+    "Cloudflare",
+    "GitHub",
+  ]) {
+    assert.match(iconByTitle.get(title), /^data:image\/(?:svg\+xml|png);base64,/);
+  }
 
   assert.equal(config.appConfig.faviconApi, "local");
   assert.equal(config.appConfig.iconSize, "large");
@@ -130,6 +134,7 @@ test("buildDashyConfig hides steps that are not completed", () => {
       dns_domain: "example.com",
       cluster_instance_id: "tst-1",
     },
+    workspaceRoot: repoRoot,
   });
 
   const titles = config.sections.flatMap((section) => section.items.map((item) => item.title));
@@ -154,6 +159,7 @@ test("buildDashyConfig skips zone-based URLs until the public zone is known", ()
       dns_domain: "",
       cluster_instance_id: "tst-1",
     },
+    workspaceRoot: repoRoot,
   });
 
   const platformSection = config.sections.find((section) => section.name === "Platform");
