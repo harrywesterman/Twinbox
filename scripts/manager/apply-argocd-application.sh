@@ -8,7 +8,7 @@ source "$WORKSPACE_ROOT/config/pinned-defaults.sh"
 
 usage() {
   cat <<USAGE
-Usage: $0 --manifest PATH --application NAME [--destination-namespace NAMESPACE] [--no-wait]
+Usage: $0 --manifest PATH --application NAME [--destination-namespace NAMESPACE] [--skip-namespace-baseline] [--no-wait]
 USAGE
 }
 
@@ -204,6 +204,7 @@ MANIFEST_PATH=""
 APPLICATION_NAME=""
 DESTINATION_NAMESPACE=""
 WAIT_FOR_READY=true
+SKIP_NAMESPACE_BASELINE=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -221,6 +222,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-wait)
       WAIT_FOR_READY=false
+      shift
+      ;;
+    --skip-namespace-baseline)
+      SKIP_NAMESPACE_BASELINE=true
       shift
       ;;
     -h|--help)
@@ -251,8 +256,10 @@ else
   destination_namespace="$DESTINATION_NAMESPACE"
 fi
 resource_profile="$(cluster_resource_profile)"
-if [[ -n "$destination_namespace" ]]; then
+if [[ -n "$destination_namespace" && "$SKIP_NAMESPACE_BASELINE" != true ]]; then
   namespace_resource_baseline "$destination_namespace" "$resource_profile"
+elif [[ -n "$destination_namespace" ]]; then
+  log "Skipping namespace resource baseline for ${destination_namespace}"
 fi
 
 repo_url="${TWINBOX_GIT_REPO_URL:-https://github.com/harrywesterman/Twinbox.git}"

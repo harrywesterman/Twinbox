@@ -1268,7 +1268,7 @@ def test_apply_argocd_application_helper_applies_and_waits_for_health():
     text = _apply_argocd_application_text()
 
     assert (
-        "Usage: $0 --manifest PATH --application NAME [--destination-namespace NAMESPACE] [--no-wait]"
+        "Usage: $0 --manifest PATH --application NAME [--destination-namespace NAMESPACE] [--skip-namespace-baseline] [--no-wait]"
         in text
     )
     assert "cluster_resource_profile()" in text
@@ -1288,6 +1288,8 @@ def test_apply_argocd_application_helper_applies_and_waits_for_health():
     assert "Application/${application} is Synced and Healthy" in text
     assert "Application/${application} is Synced and has no unhealthy resources" in text
     assert "has_unhealthy_resources()" in text
+    assert "--skip-namespace-baseline" in text
+    assert "Skipping namespace resource baseline for" in text
     assert "--no-wait" in text
 
 
@@ -2139,6 +2141,8 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
 
 PROMETHEUS_APP = REPO_ROOT / "gitops" / "apps" / "prometheus.yaml"
 PROMETHEUS_VALUES = REPO_ROOT / "gitops" / "values" / "prometheus.yaml"
+METRICS_SERVER_APP = REPO_ROOT / "gitops" / "apps" / "metrics-server.yaml"
+METRICS_SERVER_VALUES = REPO_ROOT / "gitops" / "values" / "metrics-server.yaml"
 PROMETHEUS_INGRESSROUTE = (
     REPO_ROOT / "gitops" / "platform-apps" / "prometheus" / "ingressroute.yaml"
 )
@@ -2168,6 +2172,41 @@ def test_prometheus_argocd_app_uses_kube_prometheus_stack():
     assert "prometheus-community.github.io/helm-charts" in text
     assert "$values/gitops/values/prometheus.yaml" in text
     assert "namespace: monitoring" in text
+
+
+def test_metrics_server_argocd_app_uses_official_chart():
+    text = METRICS_SERVER_APP.read_text(encoding="utf-8")
+    assert "kind: Application" in text
+    assert "name: metrics-server" in text
+    assert "chart: metrics-server" in text
+    assert "https://kubernetes-sigs.github.io/metrics-server/" in text
+    assert 'targetRevision: "3.13.0"' in text
+    assert "$values/gitops/values/metrics-server.yaml" in text
+    assert "repoURL: __REPO_URL__" in text
+    assert "targetRevision: __TARGET_REVISION__" in text
+    assert "namespace: kube-system" in text
+
+
+def test_metrics_server_values_configures_talos_friendly_args():
+    text = METRICS_SERVER_VALUES.read_text(encoding="utf-8")
+    assert "--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname" in text
+    assert "--kubelet-use-node-status-port" in text
+    assert "--kubelet-insecure-tls" in text
+    assert "--metric-resolution=15s" in text
+    assert "cpu: 50m" in text
+    assert "memory: 64Mi" in text
+    assert "cpu: 200m" in text
+    assert "memory: 256Mi" in text
+
+
+def test_prometheus_installer_applies_metrics_server_first_without_kube_system_baseline():
+    text = PROMETHEUS_SCRIPT.read_text(encoding="utf-8")
+    metrics_server_index = text.index('gitops/apps/metrics-server.yaml')
+    prometheus_index = text.index('gitops/apps/prometheus.yaml')
+    assert metrics_server_index < prometheus_index
+    assert '--application "metrics-server"' in text
+    assert "--skip-namespace-baseline" in text
+    assert '--application "prometheus"' in text
 
 
 def test_prometheus_values_configures_alertmanager_and_storage():

@@ -9,6 +9,7 @@ WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." &&
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
 export KUBECONFIG="$KUBECONFIG_FILE"
 
+metrics_server_manifest_path="$WORKSPACE_ROOT/gitops/apps/metrics-server.yaml"
 manifest_path="$WORKSPACE_ROOT/gitops/apps/prometheus.yaml"
 rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/prometheus-application.XXXXXX.yaml")"
 trap 'rm -f "$rendered_manifest"' EXIT
@@ -31,6 +32,11 @@ public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domai
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: Could not determine public zone name" >&2
   exit 1
 }
+
+bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+  --manifest "$metrics_server_manifest_path" \
+  --application "metrics-server" \
+  --skip-namespace-baseline
 
 sed "s/__ZONE_NAME__/${public_zone_name}/g" "$manifest_path" >"$rendered_manifest"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
