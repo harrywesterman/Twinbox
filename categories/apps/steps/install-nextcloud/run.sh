@@ -469,7 +469,11 @@ wait_for_resources_ready "nextcloud" "externalsecret" "Ready" "Nextcloud Externa
 
 log "Applying Nextcloud database manifests"
 kubectl apply -f "$databases_namespace_manifest"
-kubectl apply -f "$nextcloud_db_cluster_manifest"
+if kubectl -n databases get cluster nextcloud-db >/dev/null 2>&1; then
+  log "Nextcloud database cluster already exists; leaving existing CloudNativePG spec unchanged"
+else
+  kubectl apply -f "$nextcloud_db_cluster_manifest"
+fi
 kubectl apply -f "$nextcloud_db_externalsecret_manifest"
 kubectl apply -f "$nextcloud_db_pooler_ro_manifest"
 kubectl apply -f "$nextcloud_db_pooler_rw_manifest"

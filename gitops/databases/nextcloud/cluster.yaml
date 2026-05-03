@@ -4,7 +4,7 @@ metadata:
   name: nextcloud-db
   namespace: databases
 spec:
-  instances: 3
+  instances: 2
   imageName: ghcr.io/cloudnative-pg/postgresql:16.4
 
   backup:

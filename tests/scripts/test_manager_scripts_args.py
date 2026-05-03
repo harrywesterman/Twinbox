@@ -2648,7 +2648,6 @@ def test_critical_cnpg_clusters_use_ha_instances_and_storage():
         "authentik",
         "n8n",
         "zulip",
-        "nextcloud",
         "paperless",
         "vaultwarden",
         "pixelfed",
@@ -2660,6 +2659,14 @@ def test_critical_cnpg_clusters_use_ha_instances_and_storage():
         assert "instances: 3" in text
         assert "storageClass: longhorn" in text
         assert "storageClass: longhorn-single" not in text
+
+
+def test_nextcloud_db_cluster_uses_future_install_capacity():
+    text = (
+        REPO_ROOT / "gitops" / "databases" / "nextcloud" / "cluster.yaml"
+    ).read_text(encoding="utf-8")
+    assert "instances: 2" in text
+    assert "storageClass: longhorn" in text
 
 
 def test_authentik_db_storageclass_uses_single_replica():
@@ -2724,6 +2731,8 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert "gitops/databases/nextcloud/pooler-ro.yaml" in text
     assert "gitops/databases/nextcloud/pooler-rw.yaml" in text
     assert "gitops/databases/nextcloud/scheduled-backup.yaml" in text
+    assert "Nextcloud database cluster already exists" in text
+    assert "leaving existing CloudNativePG spec unchanged" in text
     assert "gitops/databases/kustomization.yaml" not in text
     assert "gitops/databases/authentik/" not in text
     assert "user_oidc:provider" in text
