@@ -2749,18 +2749,20 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert "authentik-externalsecret.yaml" not in kustomization_text
 
 
-def test_hedgedoc_database_cluster_is_right_sized_and_keeps_topology():
+def test_hedgedoc_database_cluster_is_right_sized_for_current_capacity():
     text = (REPO_ROOT / "gitops" / "databases" / "hedgedoc" / "cluster.yaml").read_text(
         encoding="utf-8"
     )
 
     assert "name: hedgedoc-db" in text
-    assert "instances: 3" in text
+    assert "instances: 2" in text
     assert "storageClass: longhorn" in text
-    assert "cpu: 250m" in text
+    assert "cpu: 100m" in text
+    assert "memory: 256Mi" in text
+    assert 'cpu: "500m"' in text
     assert "memory: 512Mi" in text
-    assert 'cpu: "1"' in text
-    assert "memory: 1Gi" in text
+    assert "shared_buffers: \"64MB\"" in text
+    assert "effective_cache_size: \"192MB\"" in text
     assert "s3://twinbox-velero/hedgedoc-db/" in text
     assert "bootstrap:" in text
     assert "secret:" in text
