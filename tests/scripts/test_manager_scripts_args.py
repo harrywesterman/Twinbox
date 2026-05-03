@@ -938,6 +938,9 @@ def test_crowdsec_step_seeds_bouncer_secret_and_applies_gitops_app():
     assert "targetRevision: \"0.23.0\"" in crowdsec_app_text
     assert "$values/gitops/values/crowdsec.yaml" in crowdsec_app_text
     assert "namespace: crowdsec" in crowdsec_app_text
+    assert "managedNamespaceMetadata:" in crowdsec_app_text
+    assert "pod-security.kubernetes.io/enforce: privileged" in crowdsec_app_text
+    assert "pod-security.kubernetes.io/warn-version: latest" in crowdsec_app_text
     assert "container_runtime: containerd" in crowdsec_values_text
     assert "podName: traefik-*" in crowdsec_values_text
     assert "program: traefik" in crowdsec_values_text
