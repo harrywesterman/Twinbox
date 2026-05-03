@@ -19,6 +19,10 @@ fail() {
   exit 1
 }
 
+log() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
+
 wait_for_deployment_rollout() {
   local deployment="$1"
   local label="${2:-$deployment}"
