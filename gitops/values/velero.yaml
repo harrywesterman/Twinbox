@@ -24,6 +24,14 @@ snapshotsEnabled: false
 defaultVolumesToFsBackup: true
 deployNodeAgent: true
 
+schedules:
+  twinbox-daily:
+    disabled: false
+    schedule: "0 3 * * *"
+    template:
+      ttl: 720h
+      storageLocation: default
+
 initContainers:
   - name: velero-plugin-for-aws
     image: velero/velero-plugin-for-aws:v1.13.1

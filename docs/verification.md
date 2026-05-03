@@ -25,6 +25,7 @@ bash -n wizard/setup-wizard.sh \
   categories/talos-cluster/steps/install-grafana/run.sh \
   scripts/manager/install-secret-sync.sh \
   scripts/manager/install-velero-backup.sh \
+  scripts/manager/install-management-backup.sh \
   scripts/manager/openbao-secret-sync.sh \
   scripts/manager/sync-openbao-global-secret.sh \
   ansible/management-vm-maintenance.yml \
@@ -215,6 +216,8 @@ Expected:
 - Longhorn manager and CSI pods run on worker nodes
 - `StorageClass/longhorn` exists
 - `StorageClass/longhorn` is marked as the default storage class
+- `Secret/longhorn-seaweedfs-backup` exists in `longhorn-system`
+- `RecurringJob/twinbox-snapshot-4h` and `RecurringJob/twinbox-backup-daily` exist in `longhorn-system`
 - worker nodes are labeled `twinbox.io/role=worker`
 - control-plane nodes are labeled `twinbox.io/role=control-plane`
 
@@ -306,6 +309,7 @@ Expected:
 kubectl --kubeconfig <kubeconfig> get application -n argocd velero
 kubectl --kubeconfig <kubeconfig> get pods -n velero
 kubectl --kubeconfig <kubeconfig> get backupstoragelocation -n velero
+kubectl --kubeconfig <kubeconfig> get schedule -n velero twinbox-daily
 kubectl --kubeconfig <kubeconfig> get secret velero-credentials -n velero
 kubectl --kubeconfig <kubeconfig> get ingressroute -n longhorn-system seaweedfs seaweedfs-admin
 ```
@@ -317,6 +321,25 @@ Expected:
 - `BackupStorageLocation/default` is ready
 - The generated Velero credentials secret exists in the `velero` namespace
 - The Velero backup storage location points at the configured SeaweedFS endpoint
+- `Schedule/twinbox-daily` exists with 30-day retention
+
+### `install-management-backup`
+
+Run on the Management VM:
+
+```bash
+sudo test -f /etc/cron.d/twinbox-management-backup
+sudo test -x /opt/twinbox/bootstrap/bin/twinbox-management-backup.sh
+sudo jq -r '.retention_days' /opt/twinbox/bootstrap/secrets/global/management-backup.json
+sudo grep -q '/opt/twinbox/seaweedfs/data' /opt/twinbox/bootstrap/secrets/global/management-backup.json
+```
+
+Expected:
+
+- The cron file exists and schedules daily `etcd` and `opt-twinbox` backup runs
+- The runtime backup script is executable
+- `management-backup.json` stores the restic repository settings with `retention_days` set to `30`
+- `/opt/twinbox/seaweedfs/data` is listed as an excluded path
 
 ### `install-velero-ui`
 

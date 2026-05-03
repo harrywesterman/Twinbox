@@ -5,16 +5,13 @@ metadata:
   namespace: argocd
 spec:
   project: default
-  sources:
-    - repoURL: https://charts.longhorn.io
-      chart: longhorn
-      targetRevision: "1.11.1"
-      helm:
-        valueFiles:
-          - $values/gitops/values/longhorn.yaml
-    - repoURL: __REPO_URL__
-      targetRevision: __TARGET_REVISION__
-      ref: values
+  source:
+    repoURL: https://charts.longhorn.io
+    chart: longhorn
+    targetRevision: "1.11.1"
+    helm:
+      values: |
+__LONGHORN_VALUES__
   destination:
     server: https://kubernetes.default.svc
     namespace: longhorn-system

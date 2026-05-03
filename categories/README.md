@@ -65,7 +65,7 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 
 - `provision-nodes` – Create Talos VMs on Proxmox, apply machine configs, bootstrap.
 - `install-argocd` – Deploy Argo CD.
-- `install-longhorn-storage` – Deploy Longhorn and set default StorageClass.
+- `install-longhorn-storage` – Deploy Longhorn, set default StorageClass, and configure recurring SeaweedFS backups.
 - `install-crowdsec` – Deploy CrowdSec security engine and Traefik bouncer key plumbing.
 - `install-cloudnativepg` – Deploy CloudNativePG operator.
 - `install-prometheus` – Deploy Prometheus, Alertmanager, node-exporter, and kube-state-metrics.
@@ -87,6 +87,7 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 - `install-ntfy` – Deploy ntfy push notifications.
 - `install-velero-backup` – Deploy Velero with the default SeaweedFS backup target.
 - `install-velero-ui` – Deploy the Velero UI dashboard for backup operations.
+- `install-management-backup` – Install Management VM cron backups for Talos etcd snapshots and `/opt/twinbox`.
 - `install-wiredoor-gateway` – Deploy Wiredoor gateway.
 - `provision-netbird-bastion` – Provision the self-hosted NetBird VPS.
 - `configure-netbird-ingress` – Configure NetBird SSO, routing groups, and setup keys.

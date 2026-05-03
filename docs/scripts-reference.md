@@ -71,7 +71,7 @@ The Talos step runners for `install-loki`, `install-tempo`, `install-alloy`, and
 
 ### `install-longhorn-storage.sh`
 
-Installs Longhorn via Argo CD and sets `StorageClass/longhorn` as the default.
+Installs Longhorn via Argo CD, sets `StorageClass/longhorn` as the default, configures SeaweedFS as the default Longhorn backup target, and installs recurring Longhorn snapshot/backup jobs.
 
 ### `install-secret-sync.sh`
 
@@ -104,7 +104,11 @@ Syncs a specific global secret item from the filesystem into OpenBao.
 
 ### `install-velero-backup.sh`
 
-Installs Velero with the SeaweedFS S3 target running on the Management VM.
+Installs Velero with the SeaweedFS S3 target running on the Management VM and a daily cluster backup schedule.
+
+### `install-management-backup.sh`
+
+Installs the Management VM host cron jobs that create daily Talos etcd snapshots and daily restic backups of `/opt/twinbox` into SeaweedFS. The backup excludes `/opt/twinbox/seaweedfs/data`.
 
 ### `install-velero-ui.sh`
 

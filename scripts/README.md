@@ -27,6 +27,7 @@ scripts/
     ├── install-longhorn-storage.sh # Install Longhorn storage
     ├── install-secret-sync.sh      # Install External Secrets Operator + OpenBao
     ├── install-velero-backup.sh    # Install Velero backup
+    ├── install-management-backup.sh # Install Management VM backup cron
     ├── openbao-secret-sync.sh      # Sync secrets to OpenBao
     ├── sync-openbao-global-secret.sh # Sync global secrets
     └── upsert-secret-artifact.mjs  # Node.js helper to upsert secret artifacts
@@ -40,7 +41,7 @@ scripts/
 | `install-management-vm-maintenance.sh` | Installs and enables the systemd timer that runs the Management VM maintenance playbook. |
 | `start-manager.sh` | Loads `.env`, materializes bootstrap files if needed, and starts the manager stack via `docker compose`. Use `--bootstrap-once` for the initial deployment path. |
 | `get-talos-image-factory.sh` | Queries the Talos Image Factory for a schematic ID, download URL, or shell command. Supports `--preset`, `--version`, `--arch`, `--platform`, `--output`. |
-| `install-management-tools.sh` | Installs `talosctl`, `tofu`, `kubectl`, and `helm` with versions pinned from `config/pinned-defaults.sh`. |
+| `install-management-tools.sh` | Installs `talosctl`, `tofu`, `kubectl`, `helm`, and `restic` with versions pinned from `config/pinned-defaults.sh` where applicable. |
 | `management-vm-maintenance.sh` | Installs `ansible-core` if needed and runs the Management VM maintenance playbook from the bootstrap tree. The playbook keeps the VM on the pinned NTP server, Docker, and the management tools. |
 | `manager-web-preview.sh` | Dev helper for previewing `manager-web`. |
 | `wizard-dev-run.sh` | Dev helper for running the setup wizard locally. |
@@ -62,6 +63,7 @@ These scripts are executed by `manager-worker` during job processing. They are c
 | `install-longhorn-storage.sh` | Deploys Longhorn and sets the default StorageClass. |
 | `install-secret-sync.sh` | Deploys External Secrets Operator and OpenBao. |
 | `install-velero-backup.sh` | Deploys Velero for cluster backups. |
+| `install-management-backup.sh` | Installs host cron jobs for Talos etcd snapshots and `/opt/twinbox` restic backups. |
 | `openbao-secret-sync.sh` | Syncs application secrets into OpenBao. |
 | `sync-openbao-global-secret.sh` | Syncs global secrets into OpenBao. |
 | `upsert-secret-artifact.mjs` | Node.js helper to write secret artifacts to the filesystem store. |

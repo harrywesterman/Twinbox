@@ -4,6 +4,6 @@ metadata:
   name: zulip-db-daily
   namespace: databases
 spec:
-  schedule: "0 3 * * *"
+  schedule: "0 2 * * *"
   cluster:
     name: zulip-db

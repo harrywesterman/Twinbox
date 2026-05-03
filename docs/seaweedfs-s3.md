@@ -58,3 +58,5 @@ The `velero.json` bootstrap secret now looks like this:
 - SeaweedFS is the only built-in S3 target.
 - Garage is no longer installed or referenced.
 - Velero always points at SeaweedFS unless the operator changes the generated bootstrap secret manually.
+- Longhorn, CloudNativePG, Velero, Talos etcd snapshots, and Management VM restic backups all use the same SeaweedFS S3 target by default.
+- Management VM restic backups exclude `/opt/twinbox/seaweedfs/data` to avoid recursively backing up the backup store.

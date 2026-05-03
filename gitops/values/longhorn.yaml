@@ -47,6 +47,14 @@ longhornDriver:
     twinbox.io/role: worker
 
 persistence:
+  recurringJobSelector:
+    enable: true
+    jobList: '[{"name":"default","isGroup":true}]'
   defaultNodeSelector:
     enable: false
     selector: ""
+
+defaultBackupStore:
+  backupTarget: __LONGHORN_BACKUP_TARGET__
+  backupTargetCredentialSecret: __LONGHORN_BACKUP_SECRET_NAME__
+  pollInterval: "300"

@@ -39,6 +39,8 @@ CLI tools pinned in `config/pinned-defaults.sh`:
 | `helm` | `v4.1.3` |
 | Talos version | `v1.12.6` |
 
+`restic` is installed from the Management VM package repositories for host backups and is not pinned in `config/pinned-defaults.sh`.
+
 ## Manager
 
 | Variable | Example | Description |
@@ -53,7 +55,7 @@ CLI tools pinned in `config/pinned-defaults.sh`:
 |----------|---------|-------------|
 | `SEAWEEDFS_ACCESS_KEY_ID` | `velero` | S3 access key used by SeaweedFS and Velero |
 | `SEAWEEDFS_SECRET_ACCESS_KEY` | `generated-secret` | S3 secret key used by SeaweedFS and Velero |
-| `SEAWEEDFS_BUCKET` | `twinbox-velero` | Default bucket for Velero backups |
+| `SEAWEEDFS_BUCKET` | `twinbox-velero` | Default bucket for Velero, Longhorn, CloudNativePG, and Management VM backups |
 | `SEAWEEDFS_REGION` | `seaweedfs` | Compatibility region label for the SeaweedFS S3 endpoint |
 
 ## Secrets

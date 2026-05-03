@@ -40,6 +40,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `/opt/twinbox/bootstrap/secrets/global/wiredoor-gateway.json`
 - `/opt/twinbox/bootstrap/secrets/global/velero.json`
 - `/opt/twinbox/bootstrap/secrets/global/velero-ui.json`
+- `/opt/twinbox/bootstrap/secrets/global/management-backup.json`
 - `/opt/twinbox/bootstrap/secrets/global/argocd-cli.json`
 - `/opt/twinbox/bootstrap/secrets/global/twinbox-portal.json`
 - `/opt/twinbox/bootstrap/secrets/global/dashy-oidc-<cluster-id>.json`
@@ -177,6 +178,28 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 
 `scripts/start-manager.sh` keeps this file aligned with the Management VM's SeaweedFS runtime credentials and endpoint, and `install-velero-backup` syncs the same JSON into OpenBao before rendering the Velero Application.
 
+### `management-backup.json`
+
+```json
+{
+  "mode": "seaweedfs",
+  "endpoint": "http://192.168.1.50:8333",
+  "bucket": "twinbox-velero",
+  "region": "seaweedfs",
+  "username": "velero",
+  "password": "generated-password",
+  "restic_password": "generated-password",
+  "cluster_id": "cluster-id",
+  "controlplane_ip": "192.168.1.101",
+  "talosconfig": "/opt/twinbox/bootstrap/secrets/cluster/cluster-id/talosconfig/talosconfig",
+  "host_root": "/opt/twinbox",
+  "retention_days": 30,
+  "exclude_paths": ["/opt/twinbox/seaweedfs/data"]
+}
+```
+
+`install-management-backup` writes this file on the Management VM and installs `/etc/cron.d/twinbox-management-backup`. The cron jobs create daily Talos etcd snapshots and restic backups of `/opt/twinbox` into SeaweedFS while excluding SeaweedFS object data.
+
 ### `argocd-cli.json`
 
 ```json
@@ -219,7 +242,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `install-alloy` installs Grafana Alloy as the shared collector for Kubernetes logs, Kubernetes events, and OTLP traces.
 - Twinbox also seeds a small default alert set for Cilium and Longhorn so cluster network and storage health surface in Alertmanager and ntfy automatically, with warning, critical, and emergency alerts pushed to `ntfy.bierineenweek.nl` as different notification priorities.
 - `install-grafana` installs Grafana, provisions the Prometheus, Loki, and Tempo datasources automatically, seeds the default Managed Kubernetes Overview plus Twinbox Nodes, Twinbox Workloads, Twinbox Control Plane, Twinbox Storage, Twinbox Logs & Events, Twinbox Logs Detail, Twinbox Network, and Twinbox Traefik dashboards so the cluster starts with usable views for nodes, workloads, control plane, storage, logs, traffic, and ingress without manual UI setup, and stores Grafana's admin credentials alongside the OIDC client secret in OpenBao so Argo CD does not keep regenerating its admin Secret.
-- `install-longhorn-storage` installs Longhorn, makes it the default storage class, and runs before any stateful secret infrastructure. Longhorn is configured to run only on worker nodes so storage and CSI components stay off control planes, and PVCs should be sized from the cluster-budget bands documented in [docs/app-pattern.md](./app-pattern.md).
+- `install-longhorn-storage` installs Longhorn, makes it the default storage class, and configures SeaweedFS S3 as Longhorn's default backup target. Longhorn is configured to run only on worker nodes so storage and CSI components stay off control planes. New Longhorn PVCs inherit the default recurring job group, which creates snapshots every four hours and backups daily.
 - `install-secret-sync` installs:
   - External Secrets Operator
   - OpenBao with Raft storage on Longhorn
@@ -234,7 +257,8 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `wizard/setup-wizard.sh` writes the chosen cluster login password to `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` inside the Management VM so later bootstrap steps can reuse it without prompting again.
 - `create-users-and-groups` reads the Authentik bootstrap secret from OpenBao via the shared `authentik-auth.sh` helper, which loads the persistent `AUTHENTIK_API_TOKEN` (created by the blueprint) and uses it for all API calls. It creates the first Authentik user, creates the `admins` group as a superuser group, and adds the user to that group. The automation service account itself is also placed in a dedicated superuser group so it can set passwords and manage group membership during bootstrap.
 - All downstream steps that talk to the Authentik API (`install-headlamp`, `install-twinbox-portal`, `install-dashy-dashboard`, `configure-argocd-oidc`, `install-pgadmin4`, `install-management-consoles`) source the bundled `scripts/manager/authentik-auth.sh` helper and call `authentik_ensure_token`. The helper reads the persistent `AUTHENTIK_API_TOKEN` from OpenBao and uses it for all API calls.
-- `install-velero-backup` installs Velero together with the SeaweedFS S3 target that runs on the Management VM, syncs `/opt/twinbox/bootstrap/secrets/global/velero.json` into OpenBao, and renders the Argo CD values inline from that bootstrap file.
+- `install-velero-backup` installs Velero together with the SeaweedFS S3 target that runs on the Management VM, syncs `/opt/twinbox/bootstrap/secrets/global/velero.json` into OpenBao, and renders the Argo CD values inline from that bootstrap file. Velero creates a daily cluster backup with 30-day retention.
+- `install-management-backup` installs host cron jobs on the Management VM for daily Talos etcd snapshots and daily `/opt/twinbox` restic backups to SeaweedFS. The `/opt/twinbox/seaweedfs/data` directory is excluded so the object store is not backed up into itself.
 - Later application steps write bootstrap JSON into OpenBao before enabling their Argo CD applications.
 
 ## Dynamic Domain Configuration

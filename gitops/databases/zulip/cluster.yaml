@@ -8,6 +8,7 @@ spec:
   imageName: zulip/zulip-postgresql:14
 
   backup:
+    retentionPolicy: "14d"
     barmanObjectStore:
       serverName: zulip-db
       destinationPath: s3://twinbox-velero/zulip-db/

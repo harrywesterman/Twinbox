@@ -8,6 +8,7 @@ spec:
   imageName: ghcr.io/cloudnative-pg/postgresql:16.4
 
   backup:
+    retentionPolicy: "14d"
     barmanObjectStore:
       serverName: hedgedoc-db
       destinationPath: s3://twinbox-velero/hedgedoc-db/

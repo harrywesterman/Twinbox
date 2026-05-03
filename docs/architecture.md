@@ -72,7 +72,7 @@ The initial Management VM deployment bootstraps the manager stack once from the 
 6. `provision-nodes` sets `cluster.network.cni.name: none`, `cluster.proxy.disabled: true`, `machine.features.kubePrism.enabled: true`, and `machine.features.hostDNS.forwardKubeDNSToHost: false` so Talos boots with kube-proxy-free Cilium from the start.
 7. `provision-nodes` waits for `cilium`, `cilium-operator`, and `coredns` to become ready before the step completes.
 8. `install-argocd` installs Argo CD after the Talos/Cilium bootstrap has completed.
- 9. `install-longhorn-storage` runs before cluster secret sync so stateful workloads and backup storage can use Longhorn PVCs immediately through the cluster default storage class, and Longhorn stays on worker nodes through the `twinbox.io/role=worker` selector.
+9. `install-longhorn-storage` runs before cluster secret sync so stateful workloads and backup storage can use Longhorn PVCs immediately through the cluster default storage class, configures SeaweedFS as Longhorn's backup target, and keeps Longhorn on worker nodes through the `twinbox.io/role=worker` selector.
 10. `install-prometheus` installs the kube-prometheus-stack through Argo CD, enabling Prometheus, Alertmanager, node-exporter, and kube-state-metrics on Longhorn-backed storage.
 11. `install-loki` installs Loki so Grafana can query cluster logs.
 12. `install-tempo` installs Tempo so Grafana can query traces.
@@ -80,17 +80,18 @@ The initial Management VM deployment bootstraps the manager stack once from the 
 14. `install-grafana` installs Grafana, provisions Prometheus, Loki, and Tempo datasources, and seeds the default observability dashboards.
 15. `install-secret-sync` installs External Secrets Operator and OpenBao on Longhorn.
 16. `install-secret-sync` seeds OpenBao from the Management VM bootstrap files and creates `ClusterSecretStore/openbao`.
-17. `install-velero-backup` deploys Velero together with a Twinbox-managed Garage bucket or an external S3-compatible backup target.
+17. `install-velero-backup` deploys Velero with a daily schedule against the Twinbox-managed SeaweedFS S3 backup target.
 18. `install-velero-ui` deploys the Velero UI dashboard with OIDC login and admins-group authorization on top of the Velero install.
-19. `install-cloudnativepg` installs the CloudNativePG operator on top of Longhorn so PostgreSQL-backed workloads can share one database platform.
-20. Authentik uses a `Recreate` rollout strategy so its bootstrap lock is only held by one pod at a time during upgrades and restarts.
-20. The Proxmox wizard stores the cluster login password in `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` inside the Management VM so the Authentik onboarding step can reuse it.
-21. `install-authentik-idp` provisions the PostgreSQL cluster for Authentik and seeds the Authentik bootstrap secret into OpenBao, then removes the temporary local seed file after sync.
-22. Later Authentik consumers read the bootstrap data from OpenBao instead of reopening `/opt/twinbox/bootstrap/secrets/global/authentik.json`.
-23. `install-pgadmin4` refreshes the shared `platform-ingress` application so pgAdmin 4 is deployed behind Traefik with Longhorn-backed persistence, and it seeds the pgAdmin bootstrap secret into OpenBao while provisioning the Authentik OIDC application.
-24. GitOps apps consume secrets through `ExternalSecret` resources backed by `ClusterSecretStore/openbao`.
-25. `install-twinbox-portal` renders the user portal config on the Management VM from step metadata, the current step-state, and portal content, then writes the result into the in-cluster `Secret/portal-config` so the default user launcher reflects the installed browser UIs without a static list in Git.
-26. Dashy link tiles are still rendered on the Management VM from step metadata plus the current step-state, then written into the in-cluster `ConfigMap/dashy-config` so the legacy admin launcher reflects installed operator UIs while user-facing App Installs stay in the portal catalog.
+19. `install-management-backup` installs Management VM cron jobs for daily Talos etcd snapshots and `/opt/twinbox` restic backups.
+20. `install-cloudnativepg` installs the CloudNativePG operator on top of Longhorn so PostgreSQL-backed workloads can share one database platform.
+21. Authentik uses a `Recreate` rollout strategy so its bootstrap lock is only held by one pod at a time during upgrades and restarts.
+22. The Proxmox wizard stores the cluster login password in `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` inside the Management VM so the Authentik onboarding step can reuse it.
+23. `install-authentik-idp` provisions the PostgreSQL cluster for Authentik and seeds the Authentik bootstrap secret into OpenBao, then removes the temporary local seed file after sync.
+24. Later Authentik consumers read the bootstrap data from OpenBao instead of reopening `/opt/twinbox/bootstrap/secrets/global/authentik.json`.
+25. `install-pgadmin4` refreshes the shared `platform-ingress` application so pgAdmin 4 is deployed behind Traefik with Longhorn-backed persistence, and it seeds the pgAdmin bootstrap secret into OpenBao while provisioning the Authentik OIDC application.
+26. GitOps apps consume secrets through `ExternalSecret` resources backed by `ClusterSecretStore/openbao`.
+27. `install-twinbox-portal` renders the user portal config on the Management VM from step metadata, the current step-state, and portal content, then writes the result into the in-cluster `Secret/portal-config` so the default user launcher reflects the installed browser UIs without a static list in Git.
+28. Dashy link tiles are still rendered on the Management VM from step metadata plus the current step-state, then written into the in-cluster `ConfigMap/dashy-config` so the legacy admin launcher reflects installed operator UIs while user-facing App Installs stay in the portal catalog.
 
 ## Domain Flow
 
@@ -112,7 +113,7 @@ The local Argo cluster secret must exist before the domain-aware ApplicationSets
 - Talos configs and kubeconfigs are runtime artifacts, not canonical files under `manager-data/`.
 - Management VM edits under `/opt/twinbox` are temporary runtime changes unless they are committed and pushed back to GitHub `main`.
 - OpenBao uses static auto-unseal material stored on the Management VM for zero-touch restarts.
-- The Management VM runs SeaweedFS in Docker as the default S3 target for Velero backups.
+- The Management VM runs SeaweedFS in Docker as the default S3 target for Velero, Longhorn, CloudNativePG, Talos etcd snapshots, and `/opt/twinbox` backups.
 - The Management VM does not need a Twinbox repository checkout; cloud-init seeds `/opt/twinbox` runtime and bootstrap data, while the manager images carry the executable step catalog.
 - Debugging follows the layer split:
   - host: `/opt/twinbox/bootstrap`, `.env`, compose files, runtime state

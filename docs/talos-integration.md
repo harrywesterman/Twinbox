@@ -19,19 +19,21 @@ Talos lifecycle operations are triggered through the manager stack.
 13. The management VM bootstrap and maintenance flow pin Ubuntu's `systemd-timesyncd` to the same `TWINBOX_TIME_SERVER` value.
 14. The worker waits for `cilium`, `cilium-operator`, `coredns`, `hubble-relay`, and `hubble-ui` to become healthy and verifies that `kube-proxy` is not deployed.
 15. `install-argocd` installs Argo CD after the cluster networking layer is already available.
-16. `install-longhorn-storage` applies the Longhorn Argo CD application, makes `StorageClass/longhorn` the default, and waits for it to be ready. Longhorn is configured to run on worker nodes only, so its managers, UI, and CSI components stay off control planes.
+16. `install-longhorn-storage` applies the Longhorn Argo CD application, makes `StorageClass/longhorn` the default, configures SeaweedFS as the default Longhorn backup target, and installs recurring snapshot/backup jobs for new Longhorn PVCs. Longhorn is configured to run on worker nodes only, so its managers, UI, and CSI components stay off control planes.
 17. `install-secret-sync` installs External Secrets Operator and OpenBao, seeds OpenBao from management-local bootstrap JSON, and creates `Secret/proxmox-bootstrap`.
 18. `install-authentik-idp` provisions the PostgreSQL cluster for Authentik, installs Authentik, seeds the Authentik bootstrap secret into OpenBao, and deletes the temporary local seed file after sync.
 19. `create-users-and-groups` creates the first Authentik user, creates the `admins` group, and adds the user to that group using the Authentik bootstrap secret from OpenBao and the Management VM login password stored under `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json`.
-20. `install-velero-backup` deploys Velero and points it at the SeaweedFS S3 target running on the Management VM as the default backup storage location for cluster backups.
+20. `install-velero-backup` deploys Velero and points it at the SeaweedFS S3 target running on the Management VM as the default backup storage location for daily cluster backups.
 21. `install-velero-ui` deploys the Velero UI dashboard on top of the Velero install and gates access through Authentik.
-22. Later wizard steps apply one Argo CD `Application` at a time for Traefik and the remaining workloads.
+22. `install-management-backup` installs host cron jobs on the Management VM for daily Talos etcd snapshots and daily `/opt/twinbox` restic backups to SeaweedFS.
+23. Later wizard steps apply one Argo CD `Application` at a time for Traefik and the remaining workloads.
 
 ## Runtime Dependencies
 
 - Proxmox settings from `.env`
 - Bootstrap file tree under `/opt/twinbox/bootstrap`
 - CLI tooling in the worker image: `bash`, `curl`, `jq`, `openssl`, `tofu`, `talosctl`, `kubectl`, `helm`
+- Host backup tooling on the Management VM: `restic`
 
 ## Outputs
 

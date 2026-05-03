@@ -1821,7 +1821,7 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     )
 
     assert "chart: longhorn" in longhorn_app_text
-    assert "$values/gitops/values/longhorn.yaml" in longhorn_app_text
+    assert "__LONGHORN_VALUES__" in longhorn_app_text
     assert "ServerSideApply=true" in external_secrets_app_text
     assert "certController:" in external_secrets_values_text
     assert "create: true" in external_secrets_values_text

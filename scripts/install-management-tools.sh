@@ -315,6 +315,19 @@ ensure_openssl() {
   apt-get install -y openssl >/dev/null
 }
 
+install_restic() {
+  if command -v restic >/dev/null 2>&1; then
+    log "restic already installed: $(restic version 2>/dev/null || printf 'unknown version')"
+    return 0
+  fi
+
+  log "Installing restic"
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -qq
+  apt-get install -y restic >/dev/null
+  command -v restic >/dev/null 2>&1 || fail "restic install did not provide a restic binary"
+}
+
 install_wrappers() {
   local kubectl_wrapper="$tmp_dir/k"
   local talosctl_wrapper="$tmp_dir/t"
@@ -473,6 +486,7 @@ EOF
 
 ensure_talos_cpu_compatibility
 ensure_openssl
+install_restic
 install_talosctl
 install_tofu
 install_argocd
