@@ -314,13 +314,13 @@ kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/outline/redis.yaml"
 render_template \
   "$WORKSPACE_ROOT/gitops/platform-apps/outline/deployment.yaml" \
   "$outline_rendered_deployment" \
-  "$public_zone_name"
+  "__ZONE_NAME__=$public_zone_name"
 kubectl apply -f "$outline_rendered_deployment"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/outline/service.yaml"
 render_template \
   "$WORKSPACE_ROOT/gitops/platform-apps/outline/ingressroute.yaml" \
   "$outline_rendered_ingressroute" \
-  "$public_zone_name"
+  "__ZONE_NAME__=$public_zone_name"
 kubectl apply -f "$outline_rendered_ingressroute"
 
 log "Applying Outline Argo CD application"

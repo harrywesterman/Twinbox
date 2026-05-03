@@ -295,6 +295,7 @@ def test_outline_step_projects_a_real_oidc_backed_app():
     assert '--required-keys "OUTLINE_POSTGRESQL__USERNAME,OUTLINE_POSTGRESQL__PASSWORD,DATABASE_URL,REDIS_URL,SECRET_KEY,UTILS_SECRET,OIDC_CLIENT_ID,OIDC_CLIENT_SECRET"' in step_text
     assert 'create_or_update_provider()' in step_text
     assert 'slug "outline"' in step_text
+    assert '"__ZONE_NAME__=$public_zone_name"' in step_text
     assert 'path: gitops/platform-apps/outline' in app_text
     assert 'value: https://outline.__ZONE_NAME__' in app_text
     assert 'value: https://authentik.__ZONE_NAME__/application/o/outline/' in app_text
