@@ -3,7 +3,8 @@ prometheus:
     serviceMonitorSelectorNilUsesHelmValues: false
     podMonitorSelectorNilUsesHelmValues: false
     ruleSelectorNilUsesHelmValues: false
-    retention: 14d
+    scrapeInterval: 60s
+    retention: 7d
     retentionSize: 10GB
     resources:
       requests:

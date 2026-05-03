@@ -2151,6 +2151,7 @@ ALERTMANAGER_CONFIG = (
 )
 LOKI_APP = REPO_ROOT / "gitops" / "apps" / "loki.yaml"
 LOKI_VALUES = REPO_ROOT / "gitops" / "values" / "loki.yaml"
+ALLOY_VALUES = REPO_ROOT / "gitops" / "values" / "alloy.yaml"
 NTFY_APP = REPO_ROOT / "gitops" / "apps" / "ntfy.yaml"
 NTFY_VALUES = REPO_ROOT / "gitops" / "values" / "ntfy.yaml"
 NTFY_INGRESSROUTE = (
@@ -2213,6 +2214,8 @@ def test_prometheus_values_configures_alertmanager_and_storage():
     text = PROMETHEUS_VALUES.read_text(encoding="utf-8")
     assert "kube-prometheus-stack" not in text
     assert "serviceMonitorSelectorNilUsesHelmValues: false" in text
+    assert "scrapeInterval: 60s" in text
+    assert "retention: 7d" in text
     assert "alertmanager:" in text
     assert "enabled: true" in text
     assert "configSecret: alertmanager-config" in text
@@ -2264,7 +2267,15 @@ def test_loki_values_configures_filesystem_storage():
     assert "replication_factor: 1" in text
     assert "type: filesystem" in text
     assert "storageClassName: longhorn" in text
-    assert "retention_period: 14d" in text
+    assert "retention_period: 7d" in text
+
+
+def test_alloy_values_keeps_pod_logs_to_core_platform_namespaces():
+    text = ALLOY_VALUES.read_text(encoding="utf-8")
+
+    assert 'action        = "keep"' in text
+    assert 'source_labels = ["__meta_kubernetes_namespace"]' in text
+    assert "kube-system|argocd|monitoring|longhorn-system" in text
 
 
 def test_ntfy_argocd_app_uses_ntfy_chart():

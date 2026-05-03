@@ -31,6 +31,12 @@ alloy:
         targets = discovery.kubernetes.pods.targets
 
         rule {
+          action        = "keep"
+          source_labels = ["__meta_kubernetes_namespace"]
+          regex         = "kube-system|argocd|monitoring|longhorn-system|external-secrets|openbao|authentik|traefik|metallb-system|cloudflare-tunnel|tailscale|wiredoor-gateway|velero|crowdsec|cloudnativepg"
+        }
+
+        rule {
           source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_name"]
           target_label  = "job"
           separator     = "/"
