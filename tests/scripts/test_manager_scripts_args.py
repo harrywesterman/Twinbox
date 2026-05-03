@@ -1839,7 +1839,7 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "version: v1.3.3" in traefik_values_text
     assert "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin" in traefik_values_text
     assert "version: v1.6.0" in traefik_values_text
-    assert "abortOnPluginFailure: true" in traefik_values_text
+    assert "abortOnPluginFailure" not in traefik_values_text
     assert "cloudflarewarp@file,crowdsec@file" in traefik_values_text
     assert "crowdsecLapiHost: crowdsec-service.crowdsec.svc.cluster.local:8080" in traefik_values_text
     assert "crowdsecLapiKeyFile: /run/secrets/crowdsec/lapi-key" in traefik_values_text
