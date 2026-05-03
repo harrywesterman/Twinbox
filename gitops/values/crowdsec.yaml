@@ -1,5 +1,9 @@
 container_runtime: containerd
 
+secrets:
+  externalSecret:
+    name: crowdsec-lapi-secrets
+
 agent:
   enabled: true
   isDeployment: false
@@ -28,9 +32,6 @@ lapi:
     limits:
       cpu: 250m
       memory: 512Mi
-  secrets:
-    externalSecret:
-      name: crowdsec-lapi-secrets
   env:
     - name: BOUNCER_KEY_traefik
       valueFrom:

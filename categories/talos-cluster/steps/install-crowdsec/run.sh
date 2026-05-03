@@ -166,6 +166,8 @@ wait_for_resource_ready "crowdsec" "externalsecret/crowdsec-bouncer-keys" "Ready
 wait_for_resource_ready "crowdsec" "externalsecret/crowdsec-lapi-secrets" "Ready" "CrowdSec LAPI ExternalSecret"
 wait_for_resource_ready "traefik" "externalsecret/traefik-crowdsec-bouncer" "Ready" "Traefik CrowdSec bouncer ExternalSecret"
 
+kubectl -n crowdsec annotate secret crowdsec-lapi-secrets argocd.argoproj.io/tracking-id- >/dev/null 2>&1 || true
+
 log "Applying CrowdSec Argo CD application"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$manifest_path" \
