@@ -311,6 +311,7 @@ proxmox_upload_talos_image() {
 
     if [[ "$curl_exit" -eq 0 && "$http_code" == 2* ]]; then
       log "Uploaded Talos ISO to ${node}/${datastore}"
+      PROXMOX_TALOS_IMAGE_ERROR=""
       return 0
     fi
 
@@ -322,11 +323,15 @@ proxmox_upload_talos_image() {
     fi
 
     if [[ "$http_code" == 4* ]]; then
-      fail "Talos ISO upload to ${node}/${datastore} failed permanently (${reason}): ${response_body:-no response body}"
+      PROXMOX_TALOS_IMAGE_ERROR="Talos ISO upload to ${node}/${datastore} failed permanently (${reason}): ${response_body:-no response body}"
+      log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+      return 1
     fi
 
     if [[ "$attempt" -ge "$PROXMOX_UPLOAD_MAX_ATTEMPTS" ]]; then
-      fail "Talos ISO upload to ${node}/${datastore} failed after ${PROXMOX_UPLOAD_MAX_ATTEMPTS} attempts (${reason}): ${response_body:-no response body}"
+      PROXMOX_TALOS_IMAGE_ERROR="Talos ISO upload to ${node}/${datastore} failed after ${PROXMOX_UPLOAD_MAX_ATTEMPTS} attempts (${reason}): ${response_body:-no response body}"
+      log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+      return 1
     fi
 
     local delay=$((2 ** (attempt - 1)))
@@ -350,15 +355,22 @@ proxmox_verify_talos_image() {
   while true; do
     local content_json=""
 
-    content_json="$(proxmox_get_storage_content "$node" "$datastore")" || fail "Failed to read Proxmox storage content for ${node}/${datastore}"
+    if ! content_json="$(proxmox_get_storage_content "$node" "$datastore")"; then
+      PROXMOX_TALOS_IMAGE_ERROR="Failed to read Proxmox storage content for ${node}/${datastore}"
+      log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+      return 1
+    fi
 
     if jq -e --arg volid "$expected_volid" '.data[]? | select(.volid == $volid and .content == "iso")' >/dev/null <<<"$content_json"; then
       log "Verified Talos ISO on ${node}/${datastore}: ${expected_volid}"
+      PROXMOX_TALOS_IMAGE_ERROR=""
       return 0
     fi
 
     if [[ "$attempt" -ge "$PROXMOX_VERIFY_MAX_ATTEMPTS" ]]; then
-      fail "Talos ISO not visible after upload on ${node}/${datastore}: ${expected_volid}"
+      PROXMOX_TALOS_IMAGE_ERROR="Talos ISO not visible after upload on ${node}/${datastore}: ${expected_volid}"
+      log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+      return 1
     fi
 
     local delay=$((2 ** (attempt - 1)))
@@ -388,17 +400,48 @@ upload_talos_image_to_nodes() {
   local image_name="$2"
   local nodes_json="$3"
   local node=""
+  local success_nodes=()
+  local failed_nodes=()
+  local failure_messages=()
 
   while IFS= read -r node; do
     [[ -n "$node" ]] || continue
     if proxmox_talos_image_present "$node" "$FILE_DATASTORE" "$image_name"; then
       log "Talos ISO already present on ${node}/${FILE_DATASTORE}: ${image_name}"
+      success_nodes+=("$node")
       continue
     fi
     log "Uploading Talos ISO to ${node}"
-    proxmox_upload_talos_image "$node" "$FILE_DATASTORE" "$image_path" "$image_name"
-    proxmox_verify_talos_image "$node" "$FILE_DATASTORE" "$image_name"
+    PROXMOX_TALOS_IMAGE_ERROR=""
+    if ! proxmox_upload_talos_image "$node" "$FILE_DATASTORE" "$image_path" "$image_name"; then
+      failed_nodes+=("$node")
+      failure_messages+=("${PROXMOX_TALOS_IMAGE_ERROR:-Talos ISO upload to ${node}/${FILE_DATASTORE} failed}")
+      continue
+    fi
+    PROXMOX_TALOS_IMAGE_ERROR=""
+    if ! proxmox_verify_talos_image "$node" "$FILE_DATASTORE" "$image_name"; then
+      failed_nodes+=("$node")
+      failure_messages+=("${PROXMOX_TALOS_IMAGE_ERROR:-Talos ISO verification failed for ${node}/${FILE_DATASTORE}}")
+      continue
+    fi
+    success_nodes+=("$node")
   done < <(jq -r '.[]' <<<"$nodes_json")
+
+  if [[ ${#failed_nodes[@]} -gt 0 ]]; then
+    log "Talos ISO upload summary: succeeded=${success_nodes[*]:-none}; failed=${failed_nodes[*]}"
+    local failure_message=""
+    local failure=""
+    for failure in "${failure_messages[@]}"; do
+      failure_message+="${failure}"$'\n'
+    done
+    while IFS= read -r failure; do
+      [[ -n "$failure" ]] || continue
+      log "Talos ISO upload failure: ${failure}"
+    done <<<"${failure_message%$'\n'}"
+    return 1
+  fi
+
+  log "Talos ISO upload summary: succeeded=${success_nodes[*]:-none}; failed=none"
 }
 
 remove_legacy_talos_file_state() {
