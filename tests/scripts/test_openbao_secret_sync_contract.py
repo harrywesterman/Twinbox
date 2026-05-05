@@ -301,7 +301,7 @@ def test_outline_step_projects_a_real_oidc_backed_app():
     assert 'value: https://authentik.__ZONE_NAME__/application/o/outline/' in app_text
     assert 'application/o/outline/end-session/' in app_text
     assert 'kind: Application' in app_text
-    assert 'image: docker.getoutline.com/outlinewiki/outline:1.6.1' in deployment_text
+    assert 'image: docker.getoutline.com/outlinewiki/outline:1.7.1' in deployment_text
     assert 'OIDC_ISSUER_URL' in deployment_text
     assert 'OIDC_LOGOUT_URI' in deployment_text
     assert 'property: DATABASE_URL' in secret_text

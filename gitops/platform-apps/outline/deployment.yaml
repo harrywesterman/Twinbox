@@ -26,7 +26,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: outline
-          image: docker.getoutline.com/outlinewiki/outline:1.6.1
+          image: docker.getoutline.com/outlinewiki/outline:1.7.1
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false

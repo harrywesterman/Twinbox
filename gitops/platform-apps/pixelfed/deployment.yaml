@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: pixelfed
-          image: ghcr.io/jippi/docker-pixelfed:v0.12.6-apache-8.4-bookworm
+          image: ghcr.io/jippi/docker-pixelfed:v0.12.7-apache-8.4-bookworm
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

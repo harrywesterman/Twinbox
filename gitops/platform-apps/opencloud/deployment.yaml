@@ -26,7 +26,7 @@ spec:
           type: RuntimeDefault
       initContainers:
         - name: prepare-storage
-          image: busybox:1.36
+          image: busybox:1.37.0
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
@@ -78,7 +78,7 @@ spec:
               value: never
       containers:
         - name: opencloud
-          image: opencloudeu/opencloud-rolling:latest
+          image: opencloudeu/opencloud-rolling:6.1.0
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
@@ -188,7 +188,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: collaboration
-          image: opencloudeu/opencloud-rolling:latest
+          image: opencloudeu/opencloud-rolling:6.1.0
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
@@ -307,7 +307,7 @@ spec:
     spec:
       containers:
         - name: collabora
-          image: collabora/code:24.04.11.2.1
+          image: collabora/code:25.04.9.4.1
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
@@ -378,7 +378,7 @@ spec:
     spec:
       containers:
         - name: radicale
-          image: tomsquest/docker-radicale:3.6.1.0
+          image: ghcr.io/kozea/radicale:3.7.2
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
@@ -445,7 +445,7 @@ spec:
     spec:
       containers:
         - name: tika
-          image: apache/tika:2.9.2.1-full
+          image: apache/tika:3.3.0.0-full
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true

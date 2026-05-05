@@ -26,7 +26,7 @@ def test_docker_compose_exposes_filesystem_secret_contract():
     assert "- -masters=seaweedfs:9333" in text
     assert "- -port=23646" in text
     assert text.count('"23646:23646"') == 1
-    assert 'seaweedfs:\n    image: chrislusf/seaweedfs:latest' in text
+    assert 'seaweedfs:\n    image: chrislusf/seaweedfs:4.23' in text
     assert "vaultwarden" not in text
     assert "bitwarden" not in text
 

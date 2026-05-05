@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: valkey
-          image: docker.io/valkey/valkey:8-alpine
+          image: docker.io/valkey/valkey:9-alpine
           imagePullPolicy: IfNotPresent
           args:
             - valkey-server

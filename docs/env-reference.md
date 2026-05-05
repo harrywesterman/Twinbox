@@ -32,12 +32,12 @@ CLI tools pinned in `config/pinned-defaults.sh`:
 
 | Tool | Pinned Version |
 |------|----------------|
-| `talosctl` | `v1.12.6` |
-| `tofu` | `v1.8.8` |
+| `talosctl` | `v1.13.0` |
+| `tofu` | `v1.11.6` |
 | `k9s` | `v0.50.18` |
-| `kubectl` | `v1.35.1` |
-| `helm` | `v4.1.3` |
-| Talos version | `v1.12.6` |
+| `kubectl` | `v1.36.0` |
+| `helm` | `v4.1.4` |
+| Talos version | `v1.13.0` |
 
 `restic` is installed from the Management VM package repositories for host backups and is not pinned in `config/pinned-defaults.sh`.
 
@@ -73,5 +73,5 @@ Helm chart versions are pinned in the Argo CD `Application` manifests under `git
 
 | Application | Chart Version | Manifest |
 |-------------|---------------|----------|
-| External Secrets | `0.20.1` | `gitops/apps/external-secrets.yaml` |
-| OpenBao | `0.26.2` | Generated `install-secret-sync.sh` Application manifest |
+| External Secrets | `2.4.1` | `gitops/apps/external-secrets.yaml` |
+| OpenBao | `0.27.2` | Generated `install-secret-sync.sh` Application manifest |

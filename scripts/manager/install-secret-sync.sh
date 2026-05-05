@@ -126,7 +126,7 @@ spec:
   sources:
     - repoURL: https://openbao.github.io/openbao-helm
       chart: openbao
-      targetRevision: "0.26.2"
+      targetRevision: "0.27.2"
       helm:
         values: |
 EOF

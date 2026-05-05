@@ -803,7 +803,7 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert 'if [[ -n "${CILIUM_K8S_SERVICE_HOST:-}" ]]; then' in helper_text
     assert 'if [[ -n "${CILIUM_K8S_SERVICE_PORT:-}" ]]; then' in helper_text
     assert "if ((${#helm_args[@]})); then" in helper_text
-    assert "PINNED_CILIUM_CHART_VERSION=1.19.2" in pinned_defaults_text
+    assert "PINNED_CILIUM_CHART_VERSION=1.19.3" in pinned_defaults_text
     assert "PINNED_CLOUDTTY_CHART_VERSION=0.8.9" in pinned_defaults_text
     assert "PINNED_TRAEFIK_MANAGER_IMAGE_TAG=v0.8.0" in pinned_defaults_text
     assert "ipam:" in values_text
@@ -1227,7 +1227,7 @@ def test_install_secret_sync_renders_argocd_values_and_applies_secret_sync_manif
     assert "--no-wait" in text
     assert "repoURL: https://openbao.github.io/openbao-helm" in text
     assert "chart: openbao" in text
-    assert 'targetRevision: "0.26.2"' in text
+    assert 'targetRevision: "0.27.2"' in text
     assert "gitops/apps/openbao.yaml" not in text
     assert "openbao_render_values_file" in text
     assert "openbao_seed_management_bootstrap_files" in text
@@ -2566,7 +2566,7 @@ def test_vaultwarden_manifests_use_postgresql_and_domain_limited_signups():
         REPO_ROOT / "gitops" / "databases" / "vaultwarden" / "cluster.yaml"
     ).read_text(encoding="utf-8")
 
-    assert "ghcr.io/dani-garcia/vaultwarden:1.35.7" in deployment_text
+    assert "ghcr.io/dani-garcia/vaultwarden:1.36.0" in deployment_text
     assert "ghcr.io/dani-garcia/vaultwarden:latest" not in deployment_text
     assert "SIGNUPS_DOMAINS_WHITELIST" in deployment_text
     assert "WEBSOCKET_ENABLED" in deployment_text
@@ -2604,7 +2604,7 @@ def test_pixelfed_manifests_use_postgresql_and_longhorn_storage():
     assert "php artisan instance:actor" in step_text
     assert "php artisan passport:keys --force" in step_text
 
-    assert "ghcr.io/jippi/docker-pixelfed:v0.12.6-apache-8.4-bookworm" in deployment_text
+    assert "ghcr.io/jippi/docker-pixelfed:v0.12.7-apache-8.4-bookworm" in deployment_text
     assert "APP_URL" in deployment_text
     assert "APP_DOMAIN" in deployment_text
     assert "DB_HOST" in deployment_text

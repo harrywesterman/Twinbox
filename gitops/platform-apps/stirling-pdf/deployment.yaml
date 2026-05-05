@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: stirling-pdf
-          image: ghcr.io/stirling-tools/stirling-pdf:latest
+          image: ghcr.io/stirling-tools/stirling-pdf:2.10.0
           imagePullPolicy: IfNotPresent
           env:
             - name: ST_USE_AUTH_FILE
