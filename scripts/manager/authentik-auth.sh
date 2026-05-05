@@ -148,32 +148,56 @@ authentik_create_service_account_token() {
 # ---------------------------------------------------------------------------
 AUTHENTIK_FORWARD_PID=""
 AUTHENTIK_FORWARD_LOG=""
+AUTHENTIK_FORWARD_PORT=""
 
 authentik_setup_forward() {
-  local port="${AUTHENTIK_LOCAL_FORWARD_PORT:-18299}"
+  authentik_teardown_forward
+
+  local requested_port="${AUTHENTIK_LOCAL_FORWARD_PORT:-}"
+  local port="$requested_port"
+  local port_forward_arg=":80"
+
+  if [[ -n "$requested_port" ]]; then
+    port_forward_arg="${requested_port}:80"
+  fi
 
   AUTHENTIK_FORWARD_LOG="$(mktemp "${TMPDIR:-/tmp}/authentik-port-forward.XXXXXX.log")"
-  kubectl -n authentik port-forward "svc/authentik-server" "${port}:80" >"$AUTHENTIK_FORWARD_LOG" 2>&1 &
+  kubectl -n authentik port-forward "svc/authentik-server" "$port_forward_arg" >"$AUTHENTIK_FORWARD_LOG" 2>&1 &
   AUTHENTIK_FORWARD_PID="$!"
 
   local attempt=1
   local attempts=60
   while [[ "$attempt" -le "$attempts" ]]; do
+    if [[ -z "$port" && -s "$AUTHENTIK_FORWARD_LOG" ]]; then
+      port="$(
+        sed -nE \
+          -e 's/^Forwarding from 127\.0\.0\.1:([0-9]+) -> 80$/\1/p' \
+          -e 's/^Forwarding from \[::1\]:([0-9]+) -> 80$/\1/p' \
+          "$AUTHENTIK_FORWARD_LOG" | head -n1
+      )"
+    fi
     if curl -fsS "http://127.0.0.1:${port}/-/health/live/" >/dev/null 2>&1; then
       AUTHENTIK_API_BASE="http://127.0.0.1:${port}/api/v3"
+      AUTHENTIK_FORWARD_PORT="$port"
       return 0
     fi
     if ! kill -0 "$AUTHENTIK_FORWARD_PID" >/dev/null 2>&1; then
       if [[ -s "$AUTHENTIK_FORWARD_LOG" ]]; then
         tail -n 20 "$AUTHENTIK_FORWARD_LOG" >&2
       fi
-      _authentik_fail "Authentik port-forward on 127.0.0.1:${port} exited before ready"
+      if [[ -n "$requested_port" ]]; then
+        _authentik_fail "Authentik port-forward on 127.0.0.1:${requested_port} exited before ready"
+      fi
+      _authentik_fail "Authentik port-forward exited before ready"
     fi
     sleep 1
     attempt=$((attempt + 1))
   done
 
-  _authentik_fail "Authentik port-forward on 127.0.0.1:${port} did not become ready"
+  if [[ -n "$requested_port" ]]; then
+    _authentik_fail "Authentik port-forward on 127.0.0.1:${requested_port} did not become ready"
+  fi
+  _authentik_fail "Authentik port-forward did not become ready"
 }
 
 authentik_api_request() {
@@ -414,6 +438,9 @@ authentik_teardown_forward() {
     wait "$AUTHENTIK_FORWARD_PID" >/dev/null 2>&1 || true
   fi
   rm -f "${AUTHENTIK_FORWARD_LOG:-}"
+  AUTHENTIK_FORWARD_PID=""
+  AUTHENTIK_FORWARD_LOG=""
+  AUTHENTIK_FORWARD_PORT=""
 }
 
 if [[ -z "${_AUTHENTIK_FORWARD_TRAP_SET:-}" ]]; then

@@ -14,7 +14,6 @@ source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"
 
 BOOTSTRAP_ROOT="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
 LOGIN_SECRET_FILE="$BOOTSTRAP_ROOT/secrets/global/twinbox-login.json"
-AUTHENTIK_LOCAL_FORWARD_PORT="${AUTHENTIK_LOCAL_FORWARD_PORT:-18299}"
 
 fail() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
@@ -259,7 +258,6 @@ ADMIN_GROUP_NAME="admins"
 [[ -n "$FULL_NAME" ]] || fail "full_name is required"
 [[ -n "$USERNAME" ]] || fail "username is required"
 
-AUTHENTIK_LOCAL_FORWARD_PORT="${AUTHENTIK_LOCAL_FORWARD_PORT:-18299}"
 authentik_ensure_token
 authentik_setup_forward
 

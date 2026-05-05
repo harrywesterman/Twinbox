@@ -385,31 +385,7 @@ wait_for_blueprint_service_account() {
   local attempts=60
   local attempt=1
 
-  AUTHENTIK_LOCAL_FORWARD_PORT="${AUTHENTIK_LOCAL_FORWARD_PORT:-18299}"
-
-  AUTHENTIK_API_BASE="http://127.0.0.1:${AUTHENTIK_LOCAL_FORWARD_PORT}/api/v3"
-  AUTHENTIK_FORWARD_PID=""
-  AUTHENTIK_FORWARD_LOG=""
-
-  AUTHENTIK_FORWARD_LOG="$(mktemp "${TMPDIR:-/tmp}/authentik-port-forward.XXXXXX.log")"
-  kubectl -n authentik port-forward "svc/authentik-server" "${AUTHENTIK_LOCAL_FORWARD_PORT}:80" >"$AUTHENTIK_FORWARD_LOG" 2>&1 &
-  AUTHENTIK_FORWARD_PID="$!"
-
-  local fwd_attempt=1
-  local fwd_max=60
-  while [[ "$fwd_attempt" -le "$fwd_max" ]]; do
-    if curl -fsS "http://127.0.0.1:${AUTHENTIK_LOCAL_FORWARD_PORT}/-/health/live/" >/dev/null 2>&1; then
-      break
-    fi
-    if ! kill -0 "$AUTHENTIK_FORWARD_PID" >/dev/null 2>&1; then
-      if [[ -s "$AUTHENTIK_FORWARD_LOG" ]]; then
-        tail -n 20 "$AUTHENTIK_FORWARD_LOG" >&2
-      fi
-      fail "Authentik port-forward did not become ready"
-    fi
-    sleep 1
-    fwd_attempt=$((fwd_attempt + 1))
-  done
+  authentik_setup_forward
 
   # Use the automation token directly (not the bootstrap token).
   local auth_token="$authentik_automation_token_key"
@@ -428,11 +404,7 @@ wait_for_blueprint_service_account() {
     fi
 
     if ! kill -0 "$AUTHENTIK_FORWARD_PID" >/dev/null 2>&1; then
-      kill "$AUTHENTIK_FORWARD_PID" >/dev/null 2>&1 || true
-      wait "$AUTHENTIK_FORWARD_PID" >/dev/null 2>&1 || true
-      AUTHENTIK_FORWARD_LOG="$(mktemp "${TMPDIR:-/tmp}/authentik-port-forward.XXXXXX.log")"
-      kubectl -n authentik port-forward "svc/authentik-server" "${AUTHENTIK_LOCAL_FORWARD_PORT}:80" >"$AUTHENTIK_FORWARD_LOG" 2>&1 &
-      AUTHENTIK_FORWARD_PID="$!"
+      authentik_setup_forward
     fi
 
     log "Waiting for blueprint to create service account 'twinbox-automation' (${attempt}/${attempts})"
@@ -445,17 +417,11 @@ wait_for_blueprint_service_account() {
 
 wait_for_blueprint_service_account
 
-# Clean up the port-forward from the wait function.
-if [[ -n "${AUTHENTIK_FORWARD_PID:-}" ]]; then
-  kill "$AUTHENTIK_FORWARD_PID" >/dev/null 2>&1 || true
-  wait "$AUTHENTIK_FORWARD_PID" >/dev/null 2>&1 || true
-fi
-rm -f "${AUTHENTIK_FORWARD_LOG:-}"
+authentik_teardown_forward
 
 # Create default OAuth2 provider flows if they don't exist
 log "Ensuring default OAuth2 provider flows exist"
 
-AUTHENTIK_LOCAL_FORWARD_PORT="${AUTHENTIK_LOCAL_FORWARD_PORT:-18299}"
 authentik_ensure_token
 authentik_setup_forward
 
