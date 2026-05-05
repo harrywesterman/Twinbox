@@ -891,6 +891,8 @@ def test_longhorn_step_installs_via_argocd_and_waits_for_health():
     assert "jobEnabled: false" in longhorn_values_text
     assert "global:" in longhorn_values_text
     assert "twinbox.io/role: worker" in longhorn_values_text
+    assert "defaultReplicaCount: 2" in longhorn_values_text
+    assert "defaultClassReplicaCount: 2" in longhorn_values_text
     assert 'storageOverProvisioningPercentage: "300"' in longhorn_values_text
     assert 'storageReservedPercentageForDefaultDisk: "10"' in longhorn_values_text
     assert 'storageMinimalAvailablePercentage: "10"' in longhorn_values_text
@@ -2266,7 +2268,7 @@ def test_loki_values_configures_filesystem_storage():
     assert "auth_enabled: false" in text
     assert "replication_factor: 1" in text
     assert "type: filesystem" in text
-    assert "storageClassName: longhorn" in text
+    assert "storageClassName: longhorn-single" in text
     assert "retention_period: 7d" in text
 
 
@@ -2642,19 +2644,21 @@ def test_loki_and_openbao_longhorn_sizes_are_right_sized():
     )
 
     assert "size: 20Gi" in loki_values_text
+    assert "storageClassName: longhorn-single" in loki_values_text
     assert "size: 5Gi" not in loki_values_text
     assert "size: 10Gi" in openbao_values_text
+    assert "storageClass: longhorn-single" in openbao_values_text
     assert "size: 2Gi" not in openbao_values_text
 
 
-def test_authentik_db_cluster_is_scaled_for_ha_capacity():
+def test_authentik_db_cluster_is_scaled_for_ha_capacity_without_storage_replication():
     text = AUTHENTIK_DB_CLUSTER.read_text(encoding="utf-8")
     assert "instances: 3" in text
     assert "size: 20Gi" in text
-    assert "storageClass: longhorn" in text
+    assert "storageClass: longhorn-single" in text
 
 
-def test_critical_cnpg_clusters_use_ha_instances_and_storage():
+def test_critical_cnpg_clusters_use_ha_instances_with_single_replica_storage():
     for name in (
         "authentik",
         "n8n",
@@ -2668,8 +2672,7 @@ def test_critical_cnpg_clusters_use_ha_instances_and_storage():
             REPO_ROOT / "gitops" / "databases" / name / "cluster.yaml"
         ).read_text(encoding="utf-8")
         assert "instances: 3" in text
-        assert "storageClass: longhorn" in text
-        assert "storageClass: longhorn-single" not in text
+        assert "storageClass: longhorn-single" in text
 
 
 def test_nextcloud_db_cluster_uses_future_install_capacity():
@@ -2677,7 +2680,7 @@ def test_nextcloud_db_cluster_uses_future_install_capacity():
         REPO_ROOT / "gitops" / "databases" / "nextcloud" / "cluster.yaml"
     ).read_text(encoding="utf-8")
     assert "instances: 2" in text
-    assert "storageClass: longhorn" in text
+    assert "storageClass: longhorn-single" in text
 
 
 def test_authentik_db_storageclass_uses_single_replica():
@@ -2820,7 +2823,7 @@ def test_hedgedoc_database_cluster_is_right_sized_for_current_capacity():
 
     assert "name: hedgedoc-db" in text
     assert "instances: 2" in text
-    assert "storageClass: longhorn" in text
+    assert "storageClass: longhorn-single" in text
     assert "cpu: 100m" in text
     assert "memory: 256Mi" in text
     assert 'cpu: "500m"' in text
@@ -2859,7 +2862,8 @@ def test_dashy_deployment_uses_a_published_image_tag():
     assert "kubernetes.io/hostname" not in text
     assert "persistentVolumeClaim:" in text
     assert "claimName: dashy-data" in text
-    assert "ReadWriteMany" in pvc_text
+    assert "ReadWriteOnce" in pvc_text
+    assert "ReadWriteMany" not in pvc_text
     assert "storage: 5Gi" in pvc_text
     assert "emptyDir: {}" not in text
     assert 'target = Path("/app/user-data/config.yml")' in text
@@ -3336,9 +3340,18 @@ def test_management_consoles_waits_for_authentik_rollout_before_forwarding():
 
 def test_twinbox_portal_step_does_not_apply_missing_configmap_manifest():
     text = TWINBOX_PORTAL_STEP_SCRIPT.read_text(encoding="utf-8")
+    deployment_text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "twinbox-portal" / "deployment.yaml"
+    ).read_text(encoding="utf-8")
+    pvc_text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "twinbox-portal" / "pvc.yaml"
+    ).read_text(encoding="utf-8")
 
     assert "gitops/platform-apps/twinbox-portal/configmap.yaml" not in text
     assert "refresh-portal-config.mjs" in text
+    assert "replicas: 1" in deployment_text
+    assert "ReadWriteOnce" in pvc_text
+    assert "ReadWriteMany" not in pvc_text
 
 
 def test_uninstall_authentik_cleanup_sets_forward_before_app_cleanup():

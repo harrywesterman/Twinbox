@@ -51,7 +51,7 @@ server:
   dataStorage:
     enabled: true
     size: 10Gi
-    storageClass: longhorn
+    storageClass: longhorn-single
     accessMode: ReadWriteOnce
   volumes:
     - name: openbao-static-seal

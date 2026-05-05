@@ -28,7 +28,7 @@ service:
 
 persistence:
   enabled: true
-  storageClassName: longhorn
+  storageClassName: longhorn-single
   accessModes:
     - ReadWriteOnce
   size: 10Gi

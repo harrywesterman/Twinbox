@@ -8,9 +8,10 @@ global:
 defaultSettings:
   createDefaultDiskLabeledNodes: true
   systemManagedComponentsNodeSelector: twinbox.io/role=worker
-  # Twinbox keeps three replicas for HA and sizes PVCs against the cluster-wide
-  # worker disk budget. Dedicated worker disks can run closer to full, but we
-  # still keep a small free-space floor for snapshots and replica churn.
+  defaultReplicaCount: 2
+  # Twinbox defaults to two replicas for homelab HA without tripling every
+  # single-pod PVC. Dedicated worker disks can run closer to full, but we still
+  # keep a small free-space floor for snapshots and replica churn.
   storageOverProvisioningPercentage: "300"
   storageReservedPercentageForDefaultDisk: "10"
   storageMinimalAvailablePercentage: "10"
@@ -47,6 +48,7 @@ longhornDriver:
     twinbox.io/role: worker
 
 persistence:
+  defaultClassReplicaCount: 2
   recurringJobSelector:
     enable: true
     jobList: '[{"name":"default","isGroup":true}]'

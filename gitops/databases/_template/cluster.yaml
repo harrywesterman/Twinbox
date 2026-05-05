@@ -16,7 +16,7 @@ spec:
 
   storage:
     size: 20Gi
-    storageClass: longhorn
+    storageClass: longhorn-single
     # Start with a roomy baseline; Longhorn supports online expansion if this still grows.
     # Resize with: kubectl patch cluster CHANGEME-db -n databases \
     #   --type merge -p '{"spec":{"storage":{"size":"40Gi"}}}'
