@@ -104,7 +104,7 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
     "Cloudflare",
     "GitHub",
   ]) {
-    assert.match(iconByTitle.get(title), /^data:image\/(?:svg\+xml|png);base64,/);
+    assert.match(iconByTitle.get(title), /\.(?:svg|png)$/);
   }
 
   assert.equal(config.appConfig.faviconApi, "local");
@@ -145,7 +145,7 @@ test("buildDashyConfig hides steps that are not completed", () => {
   assert(titles.includes("GitHub"));
 });
 
-test("buildDashyConfig embeds icons from manager-web assets in worker runtime layout", () => {
+test("buildDashyConfig uses local icon filenames from manager-web assets in worker runtime layout", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "twinbox-dashy-icons-"));
   const iconRoot = path.join(tempRoot, "manager-web", "src", "assets", "step-icons");
   fs.mkdirSync(iconRoot, { recursive: true });
@@ -177,9 +177,9 @@ test("buildDashyConfig embeds icons from manager-web assets in worker runtime la
     });
 
     const iconByTitle = new Map(config.sections.flatMap((section) => section.items.map((item) => [item.title, item.icon])));
-    assert.match(iconByTitle.get("Argo CD"), /^data:image\/svg\+xml;base64,/);
-    assert.match(iconByTitle.get("Cloudflare"), /^data:image\/svg\+xml;base64,/);
-    assert.match(iconByTitle.get("GitHub"), /^data:image\/svg\+xml;base64,/);
+    assert.equal(iconByTitle.get("Argo CD"), "install-argocd.svg");
+    assert.equal(iconByTitle.get("Cloudflare"), "configure-cloudflare-dns.svg");
+    assert.equal(iconByTitle.get("GitHub"), "github.svg");
     assert(![...iconByTitle.values()].some((icon) => icon.includes("twinboxwizard.")));
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
