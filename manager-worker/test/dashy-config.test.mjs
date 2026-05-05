@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -142,6 +143,47 @@ test("buildDashyConfig hides steps that are not completed", () => {
   assert(!titles.includes("pgAdmin 4"));
   assert(titles.includes("Cloudflare"));
   assert(titles.includes("GitHub"));
+});
+
+test("buildDashyConfig embeds icons from manager-web assets in worker runtime layout", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "twinbox-dashy-icons-"));
+  const iconRoot = path.join(tempRoot, "manager-web", "src", "assets", "step-icons");
+  fs.mkdirSync(iconRoot, { recursive: true });
+
+  for (const fileName of [
+    "install-argocd.svg",
+    "configure-cloudflare-dns.svg",
+    "github.svg",
+  ]) {
+    fs.copyFileSync(
+      path.join(repoRoot, "manager-web", "src", "assets", "step-icons", fileName),
+      path.join(iconRoot, fileName),
+    );
+  }
+
+  try {
+    const config = buildDashyConfig({
+      steps: [loadStep("install-argocd")],
+      stepStateById: new Map([
+        ["install-argocd", { status: "succeeded", outputs: {} }],
+      ]),
+      cluster: {
+        id: "tst",
+        slug: "tst",
+        dns_domain: "example.com",
+        cluster_instance_id: "tst-1",
+      },
+      workspaceRoot: tempRoot,
+    });
+
+    const iconByTitle = new Map(config.sections.flatMap((section) => section.items.map((item) => [item.title, item.icon])));
+    assert.match(iconByTitle.get("Argo CD"), /^data:image\/svg\+xml;base64,/);
+    assert.match(iconByTitle.get("Cloudflare"), /^data:image\/svg\+xml;base64,/);
+    assert.match(iconByTitle.get("GitHub"), /^data:image\/svg\+xml;base64,/);
+    assert(![...iconByTitle.values()].some((icon) => icon.includes("twinboxwizard.")));
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
 });
 
 test("buildDashyConfig skips zone-based URLs until the public zone is known", () => {
