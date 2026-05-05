@@ -3322,7 +3322,16 @@ def test_management_consoles_waits_for_authentik_rollout_before_forwarding():
     assert "authentik_ensure_token" in text
     assert "authentik_setup_forward" in text
     assert 'curl -X POST' not in text
-    assert 'authentik_api_write POST "/core/applications/"' in text
+    assert "log_app_start" in text
+    assert "log_app_done" in text
+    assert "fail_with_context" in text
+    assert "extract_authentik_identifier" in text
+    assert "authentik_write_or_fail_context" in text
+    assert 'provider_pk="$(create_or_update_proxy_provider' not in text
+    assert 'application_pk="$(create_or_update_application' not in text
+    assert 'POST "/core/applications/"' in text
+    assert "Management console status:" in text
+    assert "not attached to outpost" in text
 
 
 def test_twinbox_portal_step_does_not_apply_missing_configmap_manifest():

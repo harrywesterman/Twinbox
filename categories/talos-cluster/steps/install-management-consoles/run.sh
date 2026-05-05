@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 : "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"
 : "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"
@@ -14,14 +14,74 @@ source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"
 
 export KUBECONFIG="$KUBECONFIG_FILE"
 
+CURRENT_APP_NAME=""
+CURRENT_APP_SLUG=""
+CURRENT_RESOURCE_TYPE=""
+CURRENT_OPERATION=""
+CURRENT_ENDPOINT=""
+AUTHENTIK_RESOURCE_ID=""
+IN_FAIL="false"
+
 fail() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
+  IN_FAIL="true"
+  fail_with_context "$@"
+}
+
+fail_with_context() {
+  local message="$1"
+  local context=""
+
+  [[ -n "$CURRENT_APP_NAME" ]] && context="${context} app=${CURRENT_APP_NAME}"
+  [[ -n "$CURRENT_APP_SLUG" ]] && context="${context} slug=${CURRENT_APP_SLUG}"
+  [[ -n "$CURRENT_RESOURCE_TYPE" ]] && context="${context} resource=${CURRENT_RESOURCE_TYPE}"
+  [[ -n "$CURRENT_OPERATION" ]] && context="${context} operation=${CURRENT_OPERATION}"
+  [[ -n "$CURRENT_ENDPOINT" ]] && context="${context} endpoint=${CURRENT_ENDPOINT}"
+
+  if [[ -n "$context" ]]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: ${message} (${context# })" >&2
+  else
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: ${message}" >&2
+  fi
   exit 1
 }
 
 log() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >&2
 }
+
+log_step() {
+  log "$*"
+}
+
+log_app_start() {
+  log "Provisioning management console: $1"
+}
+
+log_app_done() {
+  log "Provisioned management console: $1 (provider=$2, application=$3)"
+}
+
+set_context() {
+  CURRENT_APP_NAME="${1:-}"
+  CURRENT_APP_SLUG="${2:-}"
+  CURRENT_RESOURCE_TYPE="${3:-}"
+  CURRENT_OPERATION="${4:-}"
+  CURRENT_ENDPOINT="${5:-}"
+}
+
+clear_context() {
+  set_context "" "" "" "" ""
+}
+
+on_unexpected_error() {
+  local status="$1"
+  local line="$2"
+
+  [[ "$IN_FAIL" == "true" ]] && exit "$status"
+  fail_with_context "Unexpected command failure at line ${line} with exit code ${status}"
+}
+
+trap 'on_unexpected_error "$?" "$LINENO"' ERR
 
 wait_for_deployment_rollout() {
   local deployment="$1"
@@ -97,19 +157,26 @@ done
 
 find_proxy_provider_pk_by_name() {
   local provider_name="$1"
+  local application_slug="${2:-}"
   local response
 
-  response="$(authentik_api_get "/providers/proxy/?page_size=100")"
+  authentik_get_json_context response "/providers/proxy/?page_size=100" "$provider_name" "$application_slug" "proxy provider" "lookup" "true" \
+    || return 0
   jq -r \
     --arg provider_name "$provider_name" \
     '.results[]?
       | select((.name // "") == $provider_name)
-      | .pk // .id // empty' <<<"$response" | head -n1
+      | .pk // .id // .uuid // empty' <<<"$response" | head -n1
 }
 
 find_application_json_by_slug() {
   local application_slug="$1"
-  authentik_api_get "/core/applications/${application_slug}/" 2>/dev/null || true
+  local application_name="${2:-$CURRENT_APP_NAME}"
+  local response
+
+  authentik_get_json_context response "/core/applications/${application_slug}/" "$application_name" "$application_slug" "application" "lookup" "true" \
+    || return 0
+  printf '%s' "$response"
 }
 
 find_policy_binding_pk() {
@@ -117,64 +184,219 @@ find_policy_binding_pk() {
   local group_id="$2"
   local response
 
-  response="$(authentik_api_get "/policies/bindings/?page_size=200")"
+  authentik_get_json_context response "/policies/bindings/?page_size=200" "$CURRENT_APP_NAME" "$CURRENT_APP_SLUG" "policy binding" "lookup" "true" \
+    || return 0
   jq -r \
     --arg target_uuid "$target_uuid" \
     --arg group_id "$group_id" \
     '.results[]?
       | select((.target // "") == $target_uuid and (.group // "") == $group_id)
-      | .pk // .id // empty' <<<"$response" | head -n1
+      | .pk // .id // .uuid // empty' <<<"$response" | head -n1
+}
+
+extract_authentik_identifier() {
+  local payload="${1:-}"
+
+  [[ -n "$payload" ]] || return 0
+  jq -er '.pk // .id // .uuid // empty' <<<"$payload" 2>/dev/null || true
+}
+
+safe_authentik_error_summary() {
+  local body="${1:-}"
+
+  if [[ -z "$body" ]]; then
+    printf 'empty response body'
+    return 0
+  fi
+
+  if jq -e . >/dev/null 2>&1 <<<"$body"; then
+    jq -cr '
+      if type == "object" then
+        {
+          detail: (.detail // empty),
+          error: (.error // empty),
+          non_field_errors: (.non_field_errors // empty),
+          fields: (keys_unsorted | map(select(. != "token" and . != "key" and . != "password" and . != "secret")))
+        }
+        | with_entries(select(.value != null and .value != "" and .value != []))
+      else
+        {response_type: type}
+      end
+    ' <<<"$body"
+    return 0
+  fi
+
+  printf '%s' "$body" | tr '\n' ' ' | cut -c1-240
+}
+
+authentik_request_context() {
+  local output_var="$1"
+  local method="$2"
+  local path="$3"
+  local data="${4:-}"
+  local app_name="$5"
+  local app_slug="$6"
+  local resource_type="$7"
+  local operation="$8"
+  local allow_failure="${9:-false}"
+  local response_file status body summary
+  local auth_headers=(-H "Accept: application/json")
+
+  set_context "$app_name" "$app_slug" "$resource_type" "$operation" "$path"
+
+  [[ -n "${AUTHENTIK_API_BASE:-}" ]] || fail "AUTHENTIK_API_BASE is not set"
+  [[ -n "${AUTHENTIK_TOKEN:-}" ]] || fail "AUTHENTIK_TOKEN is not set"
+
+  if [[ "${AUTHENTIK_USE_COOKIE:-false}" == "true" ]]; then
+    auth_headers+=(-H "Cookie: ${AUTHENTIK_TOKEN}")
+  else
+    auth_headers+=(-H "Authorization: Bearer ${AUTHENTIK_TOKEN}")
+  fi
+
+  response_file="$(mktemp)"
+  if [[ -n "$data" ]]; then
+    status="$(
+      curl -sS \
+        -X "$method" \
+        "${auth_headers[@]}" \
+        -H "Content-Type: application/json" \
+        --data-binary "$data" \
+        -o "$response_file" \
+        -w '%{http_code}' \
+        "${AUTHENTIK_API_BASE}${path}"
+    )" || status="000"
+  else
+    status="$(
+      curl -sS \
+        -X "$method" \
+        "${auth_headers[@]}" \
+        -o "$response_file" \
+        -w '%{http_code}' \
+        "${AUTHENTIK_API_BASE}${path}"
+    )" || status="000"
+  fi
+
+  body="$(cat "$response_file" 2>/dev/null || true)"
+  rm -f "$response_file"
+
+  if [[ "$status" =~ ^2 ]]; then
+    if [[ -n "$body" ]] && ! jq -e . >/dev/null 2>&1 <<<"$body"; then
+      fail "Authentik API returned invalid JSON with HTTP ${status}"
+    fi
+    printf -v "$output_var" '%s' "$body"
+    return 0
+  fi
+
+  summary="$(safe_authentik_error_summary "$body")"
+  log "Authentik API ${method} ${path} failed with HTTP ${status}: ${summary}"
+  printf -v "$output_var" '%s' "$body"
+
+  if [[ "$allow_failure" == "true" ]]; then
+    return 1
+  fi
+
+  fail "Authentik API ${method} ${path} failed with HTTP ${status}: ${summary}"
+}
+
+authentik_get_json_context() {
+  local output_var="$1"
+  local path="$2"
+  local app_name="$3"
+  local app_slug="$4"
+  local resource_type="$5"
+  local operation="$6"
+  local allow_failure="${7:-false}"
+
+  authentik_request_context "$output_var" GET "$path" "" "$app_name" "$app_slug" "$resource_type" "$operation" "$allow_failure"
+}
+
+authentik_write_or_fail_context() {
+  local output_var="$1"
+  local method="$2"
+  local path="$3"
+  local payload="$4"
+  local app_name="$5"
+  local app_slug="$6"
+  local resource_type="$7"
+  local operation="$8"
+  local allow_failure="${9:-false}"
+
+  authentik_request_context "$output_var" "$method" "$path" "$payload" "$app_name" "$app_slug" "$resource_type" "$operation" "$allow_failure"
 }
 
 create_or_update_proxy_provider() {
   local provider_name="$1"
-  local provider_payload="$2"
-  local existing_pk
+  local application_slug="$2"
+  local provider_payload="$3"
+  local existing_pk response created_pk
 
-  existing_pk="$(find_proxy_provider_pk_by_name "$provider_name")"
+  existing_pk="$(find_proxy_provider_pk_by_name "$provider_name" "$application_slug")"
   if [[ -n "$existing_pk" ]]; then
-    authentik_api_write PATCH "/providers/proxy/${existing_pk}/" "$provider_payload" >/dev/null
-    printf '%s\n' "$existing_pk"
+    log "Updating Authentik proxy provider for ${provider_name} (provider=${existing_pk})"
+    authentik_write_or_fail_context response PATCH "/providers/proxy/${existing_pk}/" "$provider_payload" "$provider_name" "$application_slug" "proxy provider" "update"
+    AUTHENTIK_RESOURCE_ID="$existing_pk"
     return 0
   fi
 
-  authentik_api_write POST "/providers/proxy/" "$provider_payload" | jq -r '.pk // .id // empty'
+  log "Creating Authentik proxy provider for ${provider_name}"
+  if authentik_write_or_fail_context response POST "/providers/proxy/" "$provider_payload" "$provider_name" "$application_slug" "proxy provider" "create" "true"; then
+    created_pk="$(extract_authentik_identifier "$response")"
+    if [[ -n "$created_pk" ]]; then
+      AUTHENTIK_RESOURCE_ID="$created_pk"
+      return 0
+    fi
+    log "Authentik proxy provider create for ${provider_name} returned no identifier; checking by name"
+  else
+    log "Recovering Authentik proxy provider for ${provider_name} after create failure by looking it up"
+  fi
+
+  existing_pk="$(find_proxy_provider_pk_by_name "$provider_name" "$application_slug")"
+  [[ -n "$existing_pk" ]] || fail "Authentik did not return or expose a proxy provider ID for ${provider_name}"
+  log "Recovered Authentik proxy provider for ${provider_name} (provider=${existing_pk})"
+  authentik_write_or_fail_context response PATCH "/providers/proxy/${existing_pk}/" "$provider_payload" "$provider_name" "$application_slug" "proxy provider" "reconcile"
+  AUTHENTIK_RESOURCE_ID="$existing_pk"
 }
 
 create_or_update_application() {
   local application_slug="$1"
-  local application_payload="$2"
-  local existing_json existing_pk response
+  local application_name="$2"
+  local application_payload="$3"
+  local existing_json existing_pk response created_pk
 
-  existing_json="$(find_application_json_by_slug "$application_slug" || true)"
-  existing_pk="$(jq -r '.pk // .id // empty' <<<"$existing_json")"
+  existing_json="$(find_application_json_by_slug "$application_slug" "$application_name" || true)"
+  existing_pk="$(extract_authentik_identifier "$existing_json")"
   if [[ -n "$existing_pk" ]]; then
-    authentik_api_write PATCH "/core/applications/${application_slug}/" "$application_payload" >/dev/null
-    printf '%s\n' "$existing_pk"
+    log "Updating Authentik application for ${application_name} (application=${existing_pk})"
+    authentik_write_or_fail_context response PATCH "/core/applications/${application_slug}/" "$application_payload" "$application_name" "$application_slug" "application" "update"
+    AUTHENTIK_RESOURCE_ID="$existing_pk"
     return 0
   fi
 
-  response="$(authentik_api_write POST "/core/applications/" "$application_payload")"
-  if [[ -n "$response" ]]; then
-    existing_pk="$(jq -r '.pk // .id // empty' <<<"$response")"
-    if [[ -n "$existing_pk" ]]; then
-      printf '%s\n' "$existing_pk"
+  log "Creating Authentik application for ${application_name}"
+  if authentik_write_or_fail_context response POST "/core/applications/" "$application_payload" "$application_name" "$application_slug" "application" "create" "true"; then
+    created_pk="$(extract_authentik_identifier "$response")"
+    if [[ -n "$created_pk" ]]; then
+      AUTHENTIK_RESOURCE_ID="$created_pk"
       return 0
     fi
+    log "Authentik application create for ${application_name} returned no identifier; checking by slug"
+  else
+    log "Recovering Authentik application for ${application_name} after create failure by looking it up"
   fi
 
-  existing_json="$(find_application_json_by_slug "$application_slug" || true)"
-  existing_pk="$(jq -r '.pk // .id // empty' <<<"$existing_json")"
-  [[ -n "$existing_pk" ]] || fail "Authentik did not return or expose an application ID for ${application_slug}"
+  existing_json="$(find_application_json_by_slug "$application_slug" "$application_name" || true)"
+  existing_pk="$(extract_authentik_identifier "$existing_json")"
+  [[ -n "$existing_pk" ]] || fail "Authentik did not return or expose an application ID for ${application_name}"
 
-  authentik_api_write PATCH "/core/applications/${application_slug}/" "$application_payload" >/dev/null
-  printf '%s\n' "$existing_pk"
+  log "Recovered Authentik application for ${application_name} (application=${existing_pk})"
+  authentik_write_or_fail_context response PATCH "/core/applications/${application_slug}/" "$application_payload" "$application_name" "$application_slug" "application" "reconcile"
+  AUTHENTIK_RESOURCE_ID="$existing_pk"
 }
 
 ensure_group_binding() {
   local target_uuid="$1"
   local group_id="$2"
-  local binding_payload existing_pk
+  local binding_payload existing_pk response
 
   binding_payload="$(
     jq -n \
@@ -185,11 +407,19 @@ ensure_group_binding() {
 
   existing_pk="$(find_policy_binding_pk "$target_uuid" "$group_id")"
   if [[ -n "$existing_pk" ]]; then
-    authentik_api_write PATCH "/policies/bindings/${existing_pk}/" "$binding_payload" >/dev/null
+    log "Updating Authentik admins binding for ${CURRENT_APP_NAME} (binding=${existing_pk})"
+    authentik_write_or_fail_context response PATCH "/policies/bindings/${existing_pk}/" "$binding_payload" "$CURRENT_APP_NAME" "$CURRENT_APP_SLUG" "policy binding" "update"
     return 0
   fi
 
-  authentik_api_write POST "/policies/bindings/" "$binding_payload" >/dev/null
+  log "Creating Authentik admins binding for ${CURRENT_APP_NAME}"
+  if authentik_write_or_fail_context response POST "/policies/bindings/" "$binding_payload" "$CURRENT_APP_NAME" "$CURRENT_APP_SLUG" "policy binding" "create" "true"; then
+    return 0
+  fi
+
+  existing_pk="$(find_policy_binding_pk "$target_uuid" "$group_id")"
+  [[ -n "$existing_pk" ]] || fail "Authentik did not create or expose the admins policy binding"
+  log "Recovered Authentik admins binding for ${CURRENT_APP_NAME} after create failure (binding=${existing_pk})"
 }
 
 authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
@@ -256,15 +486,18 @@ management_apps_json="$(
     ]'
 )"
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Provisioning Authentik proxy applications for Traefik, Longhorn, Hubble, Proxmox, Twinbox Wizard, and SeaweedFS"
+log_step "Provisioning Authentik proxy applications for Traefik, Longhorn, Hubble, Proxmox, Twinbox Wizard, and SeaweedFS"
 
 provider_ids_json='{}'
+application_ids_json='{}'
 while IFS= read -r app_json; do
   app_key="$(jq -r '.key' <<<"$app_json")"
   app_name="$(jq -r '.name' <<<"$app_json")"
   app_slug="$(jq -r '.slug' <<<"$app_json")"
   app_external_host="$(jq -r '.external_host' <<<"$app_json")"
   app_launch_url="$(jq -r '.launch_url' <<<"$app_json")"
+  set_context "$app_name" "$app_slug" "management console" "provision" ""
+  log_app_start "$app_name"
 
   provider_payload="$(
     jq -n \
@@ -280,7 +513,9 @@ while IFS= read -r app_json; do
         mode: "forward_single"
       }'
   )"
-  provider_pk="$(create_or_update_proxy_provider "$app_name" "$provider_payload")"
+  AUTHENTIK_RESOURCE_ID=""
+  create_or_update_proxy_provider "$app_name" "$app_slug" "$provider_payload"
+  provider_pk="$AUTHENTIK_RESOURCE_ID"
   [[ -n "$provider_pk" ]] || fail "Authentik did not return a proxy provider ID for ${app_name}"
 
   application_payload="$(
@@ -296,16 +531,21 @@ while IFS= read -r app_json; do
         provider: ($provider_pk | tonumber)
       }'
   )"
-  application_pk="$(create_or_update_application "$app_slug" "$application_payload")"
+  AUTHENTIK_RESOURCE_ID=""
+  create_or_update_application "$app_slug" "$app_name" "$application_payload"
+  application_pk="$AUTHENTIK_RESOURCE_ID"
   [[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for ${app_name}"
 
-  application_json="$(find_application_json_by_slug "$app_slug")"
-  application_uuid="$(jq -r '.pk // .uuid // .id // empty' <<<"$application_json")"
+  authentik_get_json_context application_json "/core/applications/${app_slug}/" "$app_name" "$app_slug" "application" "verify"
+  application_uuid="$(extract_authentik_identifier "$application_json")"
   [[ -n "$application_uuid" ]] || fail "Could not determine Authentik application UUID for ${app_name}"
   ensure_group_binding "$application_uuid" "$admins_group_id"
 
   provider_ids_json="$(jq -c --arg app_key "$app_key" --arg provider_pk "$provider_pk" '. + {($app_key): $provider_pk}' <<<"$provider_ids_json")"
+  application_ids_json="$(jq -c --arg app_key "$app_key" --arg application_pk "$application_pk" '. + {($app_key): $application_pk}' <<<"$application_ids_json")"
+  log_app_done "$app_name" "$provider_pk" "$application_pk"
 done < <(jq -c '.[]' <<<"$management_apps_json")
+clear_context
 
 traefik_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.traefik_dashboard')"
 longhorn_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.longhorn')"
@@ -323,11 +563,13 @@ seaweedfs_admin_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.seawee
 [[ "$seaweedfs_provider_id" != "null" && -n "$seaweedfs_provider_id" ]] || fail "Could not determine SeaweedFS provider ID"
 [[ "$seaweedfs_admin_provider_id" != "null" && -n "$seaweedfs_admin_provider_id" ]] || fail "Could not determine SeaweedFS admin provider ID"
 
-outpost_json="$(authentik_api_get "/outposts/instances/?page_size=100")"
+set_context "authentik Embedded Outpost" "" "outpost" "lookup" "/outposts/instances/?page_size=100"
+authentik_get_json_context outpost_json "/outposts/instances/?page_size=100" "authentik Embedded Outpost" "" "outpost" "lookup"
 outpost_id="$(printf '%s' "$outpost_json" | jq -r '.results[] | select(.name == "authentik Embedded Outpost") | .pk' | head -n1)"
 [[ -n "$outpost_id" && "$outpost_id" != "null" ]] || fail "Could not find the embedded Authentik outpost"
 
 current_providers="$(printf '%s' "$outpost_json" | jq -c '.results[] | select(.pk == "'"$outpost_id"'") | .providers // []')"
+log "Embedded Authentik outpost currently has $(jq -r 'length' <<<"$current_providers") proxy provider(s)"
 updated_providers="$(
   printf '%s\n' "$current_providers" \
     | jq --arg traefik "$traefik_provider_id" --arg longhorn "$longhorn_provider_id" --arg hubble "$hubble_provider_id" --arg proxmox "$proxmox_provider_id" --arg twinboxwizard "$twinboxwizard_provider_id" --arg seaweedfs "$seaweedfs_provider_id" --arg seaweedfs_admin "$seaweedfs_admin_provider_id" '
@@ -339,61 +581,47 @@ updated_providers="$(
 )"
 
 if [[ "$current_providers" != "$updated_providers" ]]; then
-  authentik_api_write PATCH "/outposts/instances/${outpost_id}/" \
-    "$(jq -n --argjson providers "$updated_providers" '{providers: $providers}')" >/dev/null
+  log "Attaching management console proxy providers to embedded Authentik outpost"
+  authentik_write_or_fail_context outpost_patch_response PATCH "/outposts/instances/${outpost_id}/" \
+    "$(jq -n --argjson providers "$updated_providers" '{providers: $providers}')" \
+    "authentik Embedded Outpost" "" "outpost" "attach providers"
+else
+  log "Embedded Authentik outpost already has all management console proxy providers"
 fi
 
-final_outpost_json="$(authentik_api_get "/outposts/instances/${outpost_id}/")"
+authentik_get_json_context final_outpost_json "/outposts/instances/${outpost_id}/" "authentik Embedded Outpost" "" "outpost" "verify"
 final_provider_count="$(printf '%s' "$final_outpost_json" | jq -r '.providers | length')"
-if ! printf '%s' "$final_outpost_json" | jq -e --arg traefik "$traefik_provider_id" --arg longhorn "$longhorn_provider_id" '
-      (.providers // [])
-      | map(tostring)
-      | index($traefik) != null and index($longhorn) != null
-    ' >/dev/null; then
-  fail "Embedded Authentik outpost did not retain both provider IDs"
+missing_consoles=()
+while IFS= read -r app_json; do
+  app_key="$(jq -r '.key' <<<"$app_json")"
+  app_name="$(jq -r '.name' <<<"$app_json")"
+  app_slug="$(jq -r '.slug' <<<"$app_json")"
+  provider_id="$(jq -r --arg app_key "$app_key" '.[$app_key] // empty' <<<"$provider_ids_json")"
+  application_id="$(jq -r --arg app_key "$app_key" '.[$app_key] // empty' <<<"$application_ids_json")"
+
+  status="ready"
+  if [[ -z "$provider_id" || -z "$application_id" ]]; then
+    status="missing"
+  elif ! printf '%s' "$final_outpost_json" | jq -e --arg provider_id "$provider_id" '
+        (.providers // [])
+        | map(tostring)
+        | index($provider_id) != null
+      ' >/dev/null; then
+    status="not attached to outpost"
+  fi
+
+  log "Management console status: ${app_name} slug=${app_slug} provider=${provider_id:-missing} application=${application_id:-missing} status=${status}"
+  if [[ "$status" != "ready" ]]; then
+    missing_consoles+=("${app_name}: ${status}")
+  fi
+done < <(jq -c '.[]' <<<"$management_apps_json")
+
+if [[ "${#missing_consoles[@]}" -gt 0 ]]; then
+  fail "One or more management consoles are not ready: ${missing_consoles[*]}"
 fi
 
-if ! printf '%s' "$final_outpost_json" | jq -e --arg hubble "$hubble_provider_id" '
-      (.providers // [])
-      | map(tostring)
-      | index($hubble) != null
-    ' >/dev/null; then
-  fail "Embedded Authentik outpost did not retain the Hubble provider ID"
-fi
-
-if ! printf '%s' "$final_outpost_json" | jq -e --arg proxmox "$proxmox_provider_id" '
-      (.providers // [])
-      | map(tostring)
-      | index($proxmox) != null
-    ' >/dev/null; then
-  fail "Embedded Authentik outpost did not retain the Proxmox provider ID"
-fi
-
-if ! printf '%s' "$final_outpost_json" | jq -e --arg twinboxwizard "$twinboxwizard_provider_id" '
-      (.providers // [])
-      | map(tostring)
-      | index($twinboxwizard) != null
-    ' >/dev/null; then
-  fail "Embedded Authentik outpost did not retain the Twinbox Wizard provider ID"
-fi
-
-if ! printf '%s' "$final_outpost_json" | jq -e --arg seaweedfs "$seaweedfs_provider_id" '
-      (.providers // [])
-      | map(tostring)
-      | index($seaweedfs) != null
-    ' >/dev/null; then
-  fail "Embedded Authentik outpost did not retain the SeaweedFS provider ID"
-fi
-
-if ! printf '%s' "$final_outpost_json" | jq -e --arg seaweedfs_admin "$seaweedfs_admin_provider_id" '
-      (.providers // [])
-      | map(tostring)
-      | index($seaweedfs_admin) != null
-    ' >/dev/null; then
-  fail "Embedded Authentik outpost did not retain the SeaweedFS admin provider ID"
-fi
-
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Embedded Authentik outpost now has ${final_provider_count} proxy provider(s)"
+clear_context
+log "Embedded Authentik outpost now has ${final_provider_count} proxy provider(s)"
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \
