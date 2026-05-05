@@ -23,7 +23,6 @@ AUTHENTIK_RESOURCE_ID=""
 IN_FAIL="false"
 
 fail() {
-  IN_FAIL="true"
   fail_with_context "$@"
 }
 
@@ -31,11 +30,24 @@ fail_with_context() {
   local message="$1"
   local context=""
 
-  [[ -n "$CURRENT_APP_NAME" ]] && context="${context} app=${CURRENT_APP_NAME}"
-  [[ -n "$CURRENT_APP_SLUG" ]] && context="${context} slug=${CURRENT_APP_SLUG}"
-  [[ -n "$CURRENT_RESOURCE_TYPE" ]] && context="${context} resource=${CURRENT_RESOURCE_TYPE}"
-  [[ -n "$CURRENT_OPERATION" ]] && context="${context} operation=${CURRENT_OPERATION}"
-  [[ -n "$CURRENT_ENDPOINT" ]] && context="${context} endpoint=${CURRENT_ENDPOINT}"
+  IN_FAIL="true"
+  trap - ERR
+
+  if [[ -n "$CURRENT_APP_NAME" ]]; then
+    context="${context} app=${CURRENT_APP_NAME}"
+  fi
+  if [[ -n "$CURRENT_APP_SLUG" ]]; then
+    context="${context} slug=${CURRENT_APP_SLUG}"
+  fi
+  if [[ -n "$CURRENT_RESOURCE_TYPE" ]]; then
+    context="${context} resource=${CURRENT_RESOURCE_TYPE}"
+  fi
+  if [[ -n "$CURRENT_OPERATION" ]]; then
+    context="${context} operation=${CURRENT_OPERATION}"
+  fi
+  if [[ -n "$CURRENT_ENDPOINT" ]]; then
+    context="${context} endpoint=${CURRENT_ENDPOINT}"
+  fi
 
   if [[ -n "$context" ]]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: ${message} (${context# })" >&2
@@ -239,7 +251,10 @@ authentik_request_context() {
   local resource_type="$7"
   local operation="$8"
   local allow_failure="${9:-false}"
-  local response_file status body summary
+  local response_file status body summary curl_rc
+  local attempt=1
+  local max_attempts=5
+  local retry_delay=1
   local auth_headers=(-H "Accept: application/json")
 
   set_context "$app_name" "$app_slug" "$resource_type" "$operation" "$path"
@@ -253,49 +268,78 @@ authentik_request_context() {
     auth_headers+=(-H "Authorization: Bearer ${AUTHENTIK_TOKEN}")
   fi
 
-  response_file="$(mktemp)"
-  if [[ -n "$data" ]]; then
-    status="$(
-      curl -sS \
-        -X "$method" \
-        "${auth_headers[@]}" \
-        -H "Content-Type: application/json" \
-        --data-binary "$data" \
-        -o "$response_file" \
-        -w '%{http_code}' \
-        "${AUTHENTIK_API_BASE}${path}"
-    )" || status="000"
-  else
-    status="$(
-      curl -sS \
-        -X "$method" \
-        "${auth_headers[@]}" \
-        -o "$response_file" \
-        -w '%{http_code}' \
-        "${AUTHENTIK_API_BASE}${path}"
-    )" || status="000"
-  fi
-
-  body="$(cat "$response_file" 2>/dev/null || true)"
-  rm -f "$response_file"
-
-  if [[ "$status" =~ ^2 ]]; then
-    if [[ -n "$body" ]] && ! jq -e . >/dev/null 2>&1 <<<"$body"; then
-      fail "Authentik API returned invalid JSON with HTTP ${status}"
+  while true; do
+    response_file="$(mktemp)"
+    set +e
+    if [[ -n "$data" ]]; then
+      status="$(
+        curl -sS \
+          --connect-timeout 10 \
+          --max-time 60 \
+          -X "$method" \
+          "${auth_headers[@]}" \
+          -H "Content-Type: application/json" \
+          --data-binary "$data" \
+          -o "$response_file" \
+          -w '%{http_code}' \
+          "${AUTHENTIK_API_BASE}${path}"
+      )"
+      curl_rc="$?"
+    else
+      status="$(
+        curl -sS \
+          --connect-timeout 10 \
+          --max-time 60 \
+          -X "$method" \
+          "${auth_headers[@]}" \
+          -o "$response_file" \
+          -w '%{http_code}' \
+          "${AUTHENTIK_API_BASE}${path}"
+      )"
+      curl_rc="$?"
     fi
+    set -e
+
+    if [[ "$curl_rc" -ne 0 ]]; then
+      status="000"
+    fi
+
+    body="$(cat "$response_file" 2>/dev/null || true)"
+    rm -f "$response_file"
+
+    if [[ "$status" =~ ^2 ]]; then
+      if [[ -n "$body" ]] && ! jq -e . >/dev/null 2>&1 <<<"$body"; then
+        fail "Authentik API returned invalid JSON with HTTP ${status}"
+      fi
+      printf -v "$output_var" '%s' "$body"
+      return 0
+    fi
+
+    if [[ "$status" == "000" || "$status" =~ ^5 ]]; then
+      if [[ "$attempt" -lt "$max_attempts" ]]; then
+        if [[ -n "${AUTHENTIK_FORWARD_PID:-}" ]] && ! kill -0 "$AUTHENTIK_FORWARD_PID" >/dev/null 2>&1; then
+          log "Authentik port-forward died while calling ${method} ${path}; re-establishing"
+          authentik_setup_forward
+        fi
+        summary="$(safe_authentik_error_summary "$body")"
+        log "Retrying Authentik API ${method} ${path} after transient HTTP ${status} curl_rc=${curl_rc}: ${summary}"
+        sleep "$retry_delay"
+        attempt=$((attempt + 1))
+        retry_delay=$((retry_delay * 2))
+        continue
+      fi
+    fi
+
+    summary="$(safe_authentik_error_summary "$body")"
+    log "Authentik API ${method} ${path} failed with HTTP ${status} curl_rc=${curl_rc}: ${summary}"
     printf -v "$output_var" '%s' "$body"
-    return 0
-  fi
 
-  summary="$(safe_authentik_error_summary "$body")"
-  log "Authentik API ${method} ${path} failed with HTTP ${status}: ${summary}"
-  printf -v "$output_var" '%s' "$body"
+    if [[ "$allow_failure" == "true" ]]; then
+      return 1
+    fi
 
-  if [[ "$allow_failure" == "true" ]]; then
-    return 1
-  fi
-
-  fail "Authentik API ${method} ${path} failed with HTTP ${status}: ${summary}"
+    fail "Authentik API ${method} ${path} failed with HTTP ${status} curl_rc=${curl_rc}: ${summary}"
+  done
 }
 
 authentik_get_json_context() {
