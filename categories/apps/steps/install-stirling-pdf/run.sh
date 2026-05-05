@@ -25,6 +25,119 @@ resolve_kubeconfig_file() {
   printf '%s\n' "$KUBECONFIG_FILE"
 }
 
+wait_for_resource_ready() {
+  local namespace="$1"
+  local resource="$2"
+  local condition="$3"
+  local label="$4"
+  local attempts=120
+  local attempt=1
+  local status_json=""
+  local message=""
+
+  while true; do
+    if status_json="$(kubectl -n "$namespace" get "$resource" -o json 2>/dev/null)"; then
+      if kubectl -n "$namespace" wait --for="condition=${condition}" "$resource" --timeout=5s >/dev/null 2>&1; then
+        log "${label} is ready"
+        return 0
+      fi
+
+      message="$(
+        jq -r '
+          [
+            .status.conditions[]?
+            | select((.type // "") == $condition)
+            | (.reason // empty), (.message // empty)
+          ] | map(select(. != "")) | join(": ")
+        ' --arg condition "$condition" <<<"$status_json"
+      )"
+      log "Waiting for ${label} (${attempt}/${attempts})${message:+: ${message}}"
+    else
+      log "Waiting for ${label} to appear (${attempt}/${attempts})"
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      fail "${label} did not become ready after ${attempts} attempts"
+    fi
+
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
+wait_for_pvc_bound() {
+  local namespace="$1"
+  local pvc="$2"
+  local label="$3"
+  local attempts=120
+  local attempt=1
+  local phase=""
+
+  while true; do
+    phase="$(kubectl -n "$namespace" get pvc "$pvc" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+    if [[ "$phase" == "Bound" ]]; then
+      log "${label} is bound"
+      return 0
+    fi
+
+    log "Waiting for ${label} (${attempt}/${attempts}): phase=${phase:-Missing}"
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      fail "${label} did not become Bound after ${attempts} attempts"
+    fi
+
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
+wait_for_deployment_rollout() {
+  local namespace="$1"
+  local deployment="$2"
+  local label="${3:-$deployment}"
+  local attempts=120
+  local attempt=1
+  local status_json=""
+  local desired_replicas=""
+  local updated_replicas=""
+  local ready_replicas=""
+  local available_replicas=""
+  local progressing_status=""
+  local progressing_reason=""
+  local available_status=""
+  local available_reason=""
+  local message=""
+
+  while true; do
+    if status_json="$(kubectl -n "$namespace" get deployment "$deployment" -o json 2>/dev/null)"; then
+      desired_replicas="$(jq -r '.spec.replicas // 0' <<<"$status_json")"
+      updated_replicas="$(jq -r '.status.updatedReplicas // 0' <<<"$status_json")"
+      ready_replicas="$(jq -r '.status.readyReplicas // 0' <<<"$status_json")"
+      available_replicas="$(jq -r '.status.availableReplicas // 0' <<<"$status_json")"
+      progressing_status="$(jq -r '.status.conditions[]? | select(.type == "Progressing") | .status // "Unknown"' <<<"$status_json")"
+      progressing_reason="$(jq -r '.status.conditions[]? | select(.type == "Progressing") | .reason // empty' <<<"$status_json")"
+      available_status="$(jq -r '.status.conditions[]? | select(.type == "Available") | .status // "Unknown"' <<<"$status_json")"
+      available_reason="$(jq -r '.status.conditions[]? | select(.type == "Available") | .reason // empty' <<<"$status_json")"
+      message="$(jq -r '.status.conditions[]? | select(.type == "Progressing" or .type == "Available") | .message // empty' <<<"$status_json" | awk 'NF { if (out) out = out " | "; out = out $0 } END { print out }')"
+
+      if [[ "$updated_replicas" == "$desired_replicas" && "$ready_replicas" == "$desired_replicas" && "$available_replicas" == "$desired_replicas" ]]; then
+        log "${label} is ready"
+        return 0
+      fi
+
+      log "Waiting for ${label} (${attempt}/${attempts}): desired=${desired_replicas}, updated=${updated_replicas}, ready=${ready_replicas}, available=${available_replicas}, progressing=${progressing_status}${progressing_reason:+/${progressing_reason}}, available=${available_status}${available_reason:+/${available_reason}}${message:+, message=${message}}"
+    else
+      log "Waiting for ${label} deployment to appear (${attempt}/${attempts})"
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      fail "Timed out waiting for ${label}"
+    fi
+
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
@@ -77,7 +190,12 @@ sed "s/__ZONE_NAME__/${public_zone_name}/g" "$manifest_path" >"$stirling_rendere
 
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$stirling_rendered_manifest" \
-  --application "stirling-pdf"
+  --application "stirling-pdf" \
+  --no-wait
+
+wait_for_resource_ready "stirling-pdf" "externalsecret/stirling-pdf-config" "Ready" "Stirling PDF ExternalSecret"
+wait_for_pvc_bound "stirling-pdf" "stirling-pdf-data" "Stirling PDF data PVC"
+wait_for_deployment_rollout "stirling-pdf" "stirling-pdf" "Stirling PDF application"
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \

@@ -24,7 +24,7 @@ spec:
           env:
             - name: ST_USE_AUTH_FILE
               value: "false"
-            - name: ST_API_KEY_FOR_QR_CODE
+            - name: SECURITY_CUSTOMGLOBALAPIKEY
               valueFrom:
                 secretKeyRef:
                   name: stirling-pdf-config
@@ -42,25 +42,32 @@ spec:
               containerPort: 8080
           readinessProbe:
             httpGet:
-              path: /
+              path: /actuator/health
               port: http
             initialDelaySeconds: 30
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /
+              path: /actuator/health
               port: http
             initialDelaySeconds: 60
             periodSeconds: 20
           startupProbe:
             httpGet:
-              path: /
+              path: /actuator/health
               port: http
             failureThreshold: 90
             periodSeconds: 5
           volumeMounts:
             - name: stirling-pdf-data
-              mountPath: /usr/local/tomcat/static
+              mountPath: /configs
+              subPath: configs
+            - name: stirling-pdf-data
+              mountPath: /customFiles
+              subPath: customFiles
+            - name: stirling-pdf-data
+              mountPath: /logs
+              subPath: logs
       volumes:
         - name: stirling-pdf-data
           persistentVolumeClaim:

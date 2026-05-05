@@ -39,6 +39,9 @@ FRESHRSS_STEP_SCRIPT = (
 VAULTWARDEN_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "apps" / "steps" / "install-vaultwarden" / "run.sh"
 )
+STIRLING_PDF_STEP_SCRIPT = (
+    REPO_ROOT / "categories" / "apps" / "steps" / "install-stirling-pdf" / "run.sh"
+)
 PIXELFED_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "apps" / "steps" / "install-pixelfed" / "run.sh"
 )
@@ -313,6 +316,9 @@ WHOAMI_APP = REPO_ROOT / "gitops" / "apps" / "whoami.yaml"
 HEADLAMP_APP = REPO_ROOT / "gitops" / "apps" / "headlamp.yaml"
 FRESHRSS_APP = REPO_ROOT / "gitops" / "apps" / "freshrss.yaml"
 VAULTWARDEN_APP = REPO_ROOT / "gitops" / "apps" / "vaultwarden.yaml"
+STIRLING_PDF_DEPLOYMENT = (
+    REPO_ROOT / "gitops" / "platform-apps" / "stirling-pdf" / "deployment.yaml"
+)
 GRAFANA_APP = REPO_ROOT / "gitops" / "apps" / "grafana.yaml"
 WIREDOOR_GATEWAY_APP = REPO_ROOT / "gitops" / "apps" / "wiredoor-gateway.yaml"
 WHOAMI_DEPLOYMENT = (
@@ -1293,6 +1299,35 @@ def test_apply_argocd_application_helper_applies_and_waits_for_health():
     assert "--skip-namespace-baseline" in text
     assert "Skipping namespace resource baseline for" in text
     assert "--no-wait" in text
+
+
+def test_stirling_pdf_waits_for_real_kubernetes_readiness():
+    step_text = STIRLING_PDF_STEP_SCRIPT.read_text(encoding="utf-8")
+    deployment_text = STIRLING_PDF_DEPLOYMENT.read_text(encoding="utf-8")
+
+    assert '--application "stirling-pdf" \\' in step_text
+    assert "--no-wait" in step_text
+    assert (
+        'wait_for_resource_ready "stirling-pdf" "externalsecret/stirling-pdf-config" "Ready" "Stirling PDF ExternalSecret"'
+        in step_text
+    )
+    assert (
+        'wait_for_pvc_bound "stirling-pdf" "stirling-pdf-data" "Stirling PDF data PVC"'
+        in step_text
+    )
+    assert (
+        'wait_for_deployment_rollout "stirling-pdf" "stirling-pdf" "Stirling PDF application"'
+        in step_text
+    )
+    assert "desired=${desired_replicas}, updated=${updated_replicas}, ready=${ready_replicas}, available=${available_replicas}" in step_text
+    assert "path: /actuator/health" in deployment_text
+    assert "SECURITY_CUSTOMGLOBALAPIKEY" in deployment_text
+    assert "ST_API_KEY_FOR_QR_CODE" not in deployment_text
+    assert "mountPath: /configs" in deployment_text
+    assert "subPath: configs" in deployment_text
+    assert "mountPath: /customFiles" in deployment_text
+    assert "mountPath: /logs" in deployment_text
+    assert "mountPath: /usr/local/tomcat/static" not in deployment_text
 
 
 def test_argo_step_script_bootstraps_argocd_without_cni_adoption():
