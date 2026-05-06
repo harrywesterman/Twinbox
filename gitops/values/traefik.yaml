@@ -72,8 +72,9 @@ ports:
     expose:
       default: true
     exposedPort: 443
-    tls:
-      enabled: true
+    http:
+      tls:
+        enabled: true
 
   webwiredoor:
     port: 8081
@@ -100,9 +101,8 @@ ingressRoute:
 logs:
   general:
     level: INFO
-
-accessLogs:
-  enabled: true
+  access:
+    enabled: true
 
 metrics:
   prometheus:
