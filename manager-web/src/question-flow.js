@@ -56,6 +56,7 @@ const QUESTION_STEP_DEFS = [
         help: 'Choose the ingress branch you want Twinbox to configure.',
         options: [
           { label: 'Wiredoor', value: 'wiredoor' },
+          { label: 'NetBird', value: 'netbird' },
           { label: 'Cloudflare Tunnel', value: 'cloudflare-tunnel' },
           { label: 'MetalLB', value: 'metallb' },
           { label: 'Tailscale', value: 'tailscale' },

@@ -364,9 +364,11 @@ function InputField({ stepId, input, value, onChange }) {
                   <strong>{option.label}</strong>
                   <small>{option.value === 'wiredoor'
                     ? 'Use your own Wiredoor bastion host.'
+                    : option.value === 'netbird'
+                      ? 'Use your own NetBird bastion host.'
                     : option.value === 'cloudflare-tunnel'
                       ? 'No public IP or router forwarding.'
-                      : option.value === 'metallb'
+                    : option.value === 'metallb'
                         ? 'Use your LAN and router port forwarding.'
                         : 'Use Tailscale or Headscale to reach the cluster.'}</small>
                 </button>
@@ -683,9 +685,10 @@ function buildPlacementSuggestionKey(board) {
 
 const INGRESS_ROUTE_LABELS = {
   wiredoor: '1. Wiredoor',
-  'cloudflare-tunnel': '2. Cloudflare Tunnel',
-  metallb: '3. MetalLB',
-  tailscale: '4. Tailscale',
+  netbird: '2. NetBird',
+  'cloudflare-tunnel': '3. Cloudflare Tunnel',
+  metallb: '4. MetalLB',
+  tailscale: '5. Tailscale',
 };
 
 const WIZARD_GUIDES = {
