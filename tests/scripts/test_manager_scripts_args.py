@@ -752,7 +752,7 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert "curl -ksS --show-error" in text
     assert "CSRFPreventionToken" in text
     assert "access/ticket" in text
-    assert "cluster/resources?type=node" in text
+    assert "cluster/status" in text
     assert 'if ! existing_vm_ids_output="$(proxmox_get_all_vm_ids)"; then' in text
     assert "storage/${datastore}/content" in text
     assert "Failed to obtain Proxmox API ticket" in text
