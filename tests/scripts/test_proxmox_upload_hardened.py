@@ -5,7 +5,11 @@ import textwrap
 from pathlib import Path
 
 
-def test_talos_iso_upload_continues_after_one_node_failure():
+REPO_ROOT = Path(__file__).resolve().parents[2]
+APPLY_CLUSTER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "apply-cluster.sh"
+
+
+def test_talos_iso_upload_uses_direct_node_endpoints_and_continues_after_failure():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         log_file = root / "upload.log"
@@ -13,118 +17,96 @@ def test_talos_iso_upload_continues_after_one_node_failure():
 
         harness.write_text(
             textwrap.dedent(
-                """
-                #!/usr/bin/env bash
+                f"""#!/usr/bin/env bash
                 set -euo pipefail
 
-                LOG_FILE=__LOG_FILE__
+                LOG_FILE={shlex.quote(str(log_file))}
                 : > "$LOG_FILE"
 
-                log() {
+                log() {{
                   printf '%s\n' "$*" >> "$LOG_FILE"
-                }
+                }}
 
-                fail() {
+                fail() {{
                   printf 'FAIL:%s\n' "$*" >> "$LOG_FILE"
                   return 1
-                }
-
-                jq() {
-                  if [[ "$1" == "-r" && "$2" == ".[]" ]]; then
-                    python3 -c 'import json,sys; [print(item) for item in json.load(sys.stdin)]'
-                    return $?
-                  fi
-
-                  printf 'unsupported jq invocation: %s\n' "$*" >&2
-                  return 127
-                }
+                }}
 
                 export FILE_DATASTORE=local
                 export PROXMOX_UPLOAD_MAX_ATTEMPTS=1
                 export PROXMOX_VERIFY_MAX_ATTEMPTS=1
+                export PROXMOX_PORT=8006
+                export PROXMOX_USER=root@pam
+                export PROXMOX_PASSWORD=secret
+                export TF_VAR_proxmox_endpoint=https://pve1.local.westermanonline.com:8006
+                UPLOAD_MARKER_FILE="$PWD/node-a-uploaded"
+                rm -f "$UPLOAD_MARKER_FILE"
 
-                proxmox_talos_image_present() {
+                HELPERS_FILE="$(mktemp)"
+                sed -n '173,481p' {shlex.quote(str(APPLY_CLUSTER_SCRIPT))} >"$HELPERS_FILE"
+                source "$HELPERS_FILE"
+
+                FAKE_CLUSTER_STATUS='{{"data":[{{"type":"node","name":"node-a","ip":"192.168.2.91"}},{{"type":"node","name":"node-b","ip":"192.168.2.92"}}]}}'
+                UPLOAD_URLS=()
+
+                curl() {{
+                  local output_file=""
+                  local url="${{@: -1}}"
+                  local arg=""
+                  local prev=""
+
+                  for arg in "$@"; do
+                    if [[ "$prev" == "--output" ]]; then
+                      output_file="$arg"
+                    fi
+                    prev="$arg"
+                  done
+
+                  case "$url" in
+                    */access/ticket)
+                      printf '%s\n' '{{"data":{{"ticket":"ticket","CSRFPreventionToken":"csrf"}}}}'
+                      return 0
+                      ;;
+                    */cluster/status)
+                      printf '%s\n' "$FAKE_CLUSTER_STATUS"
+                      return 0
+                      ;;
+                    */storage/local/content)
+                      case "$url" in
+                        *192.168.2.91*)
+                          if [[ -f "$UPLOAD_MARKER_FILE" ]]; then
+                            printf '%s\n' '{{"data":[{{"volid":"local:iso/talos.iso","content":"iso"}}]}}'
+                          else
+                            printf '%s\n' '{{"data":[]}}'
+                          fi
+                          return 0
+                          ;;
+                        *192.168.2.92*)
+                          printf '%s\n' '{{"data":[]}}'
+                          return 0
+                          ;;
+                      esac
+                      ;;
+                    */storage/local/upload)
+                      UPLOAD_URLS+=("$url")
+                      log "UPLOAD_URL=$url"
+                      if [[ "$url" == *192.168.2.92* ]]; then
+                        return 52
+                      fi
+                      if [[ -n "$output_file" ]]; then
+                        printf '%s\n' '{{"data":"ok"}}' >"$output_file"
+                      fi
+                      if [[ "$url" == *192.168.2.91* ]]; then
+                        : > "$UPLOAD_MARKER_FILE"
+                      fi
+                      printf '200\n'
+                      return 0
+                      ;;
+                  esac
+
+                  printf 'unexpected curl url: %s\n' "$url" >&2
                   return 1
-                }
-
-                proxmox_upload_talos_image() {
-                  local node="$1"
-                  local datastore="$2"
-
-                  if [[ "$node" == "node-b" ]]; then
-                    PROXMOX_TALOS_IMAGE_ERROR="Talos ISO upload to ${node}/${datastore} failed after 1 attempts (curl exit 52): no response body"
-                    log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
-                    return 1
-                  fi
-
-                  log "Uploaded Talos ISO to ${node}/${datastore}"
-                  PROXMOX_TALOS_IMAGE_ERROR=""
-                  return 0
-                }
-
-                proxmox_verify_talos_image() {
-                  local node="$1"
-                  local datastore="$2"
-
-                  if [[ "$node" == "node-a" ]]; then
-                    log "Verified Talos ISO on ${node}/${datastore}: ${datastore}:iso/talos.iso"
-                    PROXMOX_TALOS_IMAGE_ERROR=""
-                    return 0
-                  fi
-
-                  PROXMOX_TALOS_IMAGE_ERROR="Talos ISO not visible after upload on ${node}/${datastore}: ${datastore}:iso/talos.iso"
-                  log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
-                  return 1
-                }
-
-                upload_talos_image_to_nodes() {
-                  local image_path="$1"
-                  local image_name="$2"
-                  local nodes_json="$3"
-                  local node=""
-                  local success_nodes=()
-                  local failed_nodes=()
-                  local failure_messages=()
-
-                  while IFS= read -r node; do
-                    [[ -n "$node" ]] || continue
-                    if proxmox_talos_image_present "$node" "$FILE_DATASTORE" "$image_name"; then
-                      log "Talos ISO already present on ${node}/${FILE_DATASTORE}: ${image_name}"
-                      success_nodes+=("$node")
-                      continue
-                    fi
-                    log "Uploading Talos ISO to ${node}"
-                    PROXMOX_TALOS_IMAGE_ERROR=""
-                    if ! proxmox_upload_talos_image "$node" "$FILE_DATASTORE" "$image_path" "$image_name"; then
-                      failed_nodes+=("$node")
-                      failure_messages+=("${PROXMOX_TALOS_IMAGE_ERROR:-Talos ISO upload to ${node}/${FILE_DATASTORE} failed}")
-                      continue
-                    fi
-                    PROXMOX_TALOS_IMAGE_ERROR=""
-                    if ! proxmox_verify_talos_image "$node" "$FILE_DATASTORE" "$image_name"; then
-                      failed_nodes+=("$node")
-                      failure_messages+=("${PROXMOX_TALOS_IMAGE_ERROR:-Talos ISO verification failed for ${node}/${FILE_DATASTORE}}")
-                      continue
-                    fi
-                    success_nodes+=("$node")
-                  done < <(jq -r '.[]' <<<"$nodes_json")
-
-                  if [[ ${#failed_nodes[@]} -gt 0 ]]; then
-                    log "Talos ISO upload summary: succeeded=${success_nodes[*]:-none}; failed=${failed_nodes[*]}"
-                    local failure_message=""
-                    local failure=""
-                    for failure in "${failure_messages[@]}"; do
-                      failure_message+="${failure}"$'\n'
-                    done
-                    while IFS= read -r failure; do
-                      [[ -n "$failure" ]] || continue
-                      log "Talos ISO upload failure: ${failure}"
-                    done <<<"${failure_message%$'\n'}"
-                    return 1
-                  fi
-
-                  log "Talos ISO upload summary: succeeded=${success_nodes[*]:-none}; failed=none"
-                }
+                }}
 
                 set +e
                 upload_talos_image_to_nodes "/tmp/talos.iso" "talos.iso" '["node-b","node-a"]'
@@ -133,8 +115,7 @@ def test_talos_iso_upload_continues_after_one_node_failure():
 
                 printf 'STATUS=%s\n' "$status" >> "$LOG_FILE"
                 """
-            )
-            .replace("__LOG_FILE__", shlex.quote(str(log_file))),
+            ),
             encoding="utf-8",
         )
         harness.chmod(0o755)
@@ -150,9 +131,11 @@ def test_talos_iso_upload_continues_after_one_node_failure():
         assert proc.returncode == 0, proc.stderr
 
         log_text = log_file.read_text(encoding="utf-8")
-        assert "Uploading Talos ISO to node-b" in log_text
+        assert "Uploading Talos ISO directly to node-b/local via https://192.168.2.92:8006" in log_text
+        assert "Uploading Talos ISO directly to node-a/local via https://192.168.2.91:8006" in log_text
+        assert "UPLOAD_URL=https://192.168.2.92:8006/api2/json/nodes/node-b/storage/local/upload" in log_text
+        assert "UPLOAD_URL=https://192.168.2.91:8006/api2/json/nodes/node-a/storage/local/upload" in log_text
         assert "ERROR: Talos ISO upload to node-b/local failed after 1 attempts (curl exit 52): no response body" in log_text
-        assert "Uploading Talos ISO to node-a" in log_text
         assert "Verified Talos ISO on node-a/local: local:iso/talos.iso" in log_text
         assert "Talos ISO upload summary: succeeded=node-a; failed=node-b" in log_text
         assert "Talos ISO upload failure: Talos ISO upload to node-b/local failed after 1 attempts (curl exit 52): no response body" in log_text

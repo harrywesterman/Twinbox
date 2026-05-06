@@ -190,20 +190,50 @@ proxmox_api_login() {
   [[ -n "$PROXMOX_CSRF_TOKEN" ]] || fail "Proxmox API ticket response did not include a CSRF token"
 }
 
-proxmox_get_all_vm_ids() {
-  # Returns all VM IDs across all nodes in the cluster
-  proxmox_api_login
+proxmox_cluster_status() {
   local cluster_status=""
+
+  if [[ -n "${PROXMOX_CLUSTER_STATUS_JSON:-}" ]]; then
+    printf '%s' "$PROXMOX_CLUSTER_STATUS_JSON"
+    return 0
+  fi
+
+  proxmox_api_login
   cluster_status="$(curl -ksS --fail \
     --cookie "$PROXMOX_TICKET_COOKIE" \
     --header "CSRFPreventionToken: ${PROXMOX_CSRF_TOKEN}" \
-    "${TF_VAR_proxmox_endpoint}/api2/json/cluster/resources?type=node")" || fail "Failed to fetch Proxmox cluster status"
+    "${TF_VAR_proxmox_endpoint}/api2/json/cluster/status")" || fail "Failed to fetch Proxmox cluster status"
+  PROXMOX_CLUSTER_STATUS_JSON="$cluster_status"
+  printf '%s' "$cluster_status"
+}
+
+proxmox_node_ip() {
+  local node="$1"
+  local cluster_status=""
+
+  cluster_status="$(proxmox_cluster_status)"
+  jq -r --arg node "$node" '.data[]? | select(.type == "node" and .name == $node) | .ip // empty' <<<"$cluster_status"
+}
+
+proxmox_node_endpoint() {
+  local node="$1"
+  local node_ip=""
+
+  node_ip="$(proxmox_node_ip "$node")"
+  [[ -n "$node_ip" ]] || fail "Unable to resolve Proxmox endpoint for ${node}"
+  printf 'https://%s:%s' "$node_ip" "$PROXMOX_PORT"
+}
+
+proxmox_get_all_vm_ids() {
+  # Returns all VM IDs across all nodes in the cluster
+  local cluster_status=""
+  cluster_status="$(proxmox_cluster_status)"
 
   local node_names=()
   while IFS= read -r node_name; do
     [[ -n "$node_name" ]] || continue
     node_names+=("$node_name")
-  done < <(jq -r '.data[].node' <<<"$cluster_status" 2>/dev/null | sort -u)
+  done < <(jq -r '.data[]? | select(.type == "node") | .name' <<<"$cluster_status" 2>/dev/null | sort -u)
 
   local all_vm_ids=()
   local node=""
@@ -265,12 +295,14 @@ validate_vm_ids_available() {
 proxmox_get_storage_content() {
   local node="$1"
   local datastore="$2"
+  local node_endpoint=""
 
+  node_endpoint="$(proxmox_node_endpoint "$node")"
   proxmox_api_login
   curl -ksS --fail \
     --cookie "$PROXMOX_TICKET_COOKIE" \
     --header "CSRFPreventionToken: ${PROXMOX_CSRF_TOKEN}" \
-    "${TF_VAR_proxmox_endpoint}/api2/json/nodes/${node}/storage/${datastore}/content"
+    "${node_endpoint}/api2/json/nodes/${node}/storage/${datastore}/content"
 }
 
 proxmox_upload_talos_image() {
@@ -278,8 +310,12 @@ proxmox_upload_talos_image() {
   local datastore="$2"
   local image_path="$3"
   local image_name="$4"
-  local upload_url="${TF_VAR_proxmox_endpoint}/api2/json/nodes/${node}/storage/${datastore}/upload"
+  local node_endpoint=""
+  local upload_url=""
   local attempt=1
+
+  node_endpoint="$(proxmox_node_endpoint "$node")"
+  upload_url="${node_endpoint}/api2/json/nodes/${node}/storage/${datastore}/upload"
 
   while true; do
     proxmox_api_login
@@ -411,7 +447,7 @@ upload_talos_image_to_nodes() {
       success_nodes+=("$node")
       continue
     fi
-    log "Uploading Talos ISO to ${node}"
+    log "Uploading Talos ISO directly to ${node}/${FILE_DATASTORE} via $(proxmox_node_endpoint "$node")"
     PROXMOX_TALOS_IMAGE_ERROR=""
     if ! proxmox_upload_talos_image "$node" "$FILE_DATASTORE" "$image_path" "$image_name"; then
       failed_nodes+=("$node")
