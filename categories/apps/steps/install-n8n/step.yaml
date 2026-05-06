@@ -10,6 +10,7 @@ depends_on:
   - install-longhorn-storage
   - install-cloudnativepg
   - install-secret-sync
+  - install-authentik-idp
   - choose-ingress-route
 dashy:
   items:

@@ -224,7 +224,7 @@ test('app catalog exposes apps while the wizard catalog keeps them out of sight'
     assert.equal(hedgedocCard?.installable, true);
     assert.deepEqual(hedgedocCard?.depends_on, ['install-longhorn-storage', 'install-cloudnativepg', 'install-secret-sync', 'install-authentik-idp', 'choose-ingress-route']);
     assert.equal(hedgedocCard?.runner?.script, 'categories/apps/steps/install-hedgedoc/run.sh');
-    assert.deepEqual(n8nCard?.depends_on, ['install-longhorn-storage', 'install-cloudnativepg', 'install-secret-sync', 'choose-ingress-route']);
+    assert.deepEqual(n8nCard?.depends_on, ['install-longhorn-storage', 'install-cloudnativepg', 'install-secret-sync', 'install-authentik-idp', 'choose-ingress-route']);
     assert.equal(freshrssCard?.title, 'Install FreshRSS');
     assert.equal(freshrssCard?.placeholder, false);
     assert.equal(freshrssCard?.installable, true);

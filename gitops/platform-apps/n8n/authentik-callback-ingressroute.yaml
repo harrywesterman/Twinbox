@@ -1,0 +1,17 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: n8n-authentik-callback
+  namespace: n8n
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`n8n.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
+      services:
+        - kind: Service
+          name: authentik-server
+          namespace: authentik
+          port: 80
+  tls: {}

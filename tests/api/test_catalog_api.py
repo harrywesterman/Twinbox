@@ -271,6 +271,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-longhorn-storage",
                 "install-cloudnativepg",
                 "install-secret-sync",
+                "install-authentik-idp",
                 "choose-ingress-route",
             ]
             assert talos_steps["install-vaultwarden"]["title"] == "Install Vaultwarden"
