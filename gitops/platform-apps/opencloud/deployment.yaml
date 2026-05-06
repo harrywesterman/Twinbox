@@ -115,6 +115,10 @@ spec:
               value: /etc/opencloud/csp.yaml
             - name: PROXY_CONFIG_FILE_LOCATION
               value: /etc/opencloud/proxy.yaml
+            - name: NATS_NATS_HOST
+              value: 0.0.0.0
+            - name: GATEWAY_GRPC_ADDR
+              value: 0.0.0.0:9142
           readinessProbe:
             tcpSocket:
               port: http
@@ -225,6 +229,12 @@ spec:
             periodSeconds: 20
             timeoutSeconds: 5
           env:
+            - name: COLLABORATION_HTTP_ADDR
+              value: 0.0.0.0:9300
+            - name: COLLABORATION_GRPC_ADDR
+              value: 0.0.0.0:9301
+            - name: MICRO_REGISTRY
+              value: nats-js-kv
             - name: OC_URL
               valueFrom:
                 secretKeyRef:
@@ -302,6 +312,8 @@ spec:
       app.kubernetes.io/name: opencloud-collabora
   template:
     metadata:
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/collabora: unconfined
       labels:
         app.kubernetes.io/name: opencloud-collabora
     spec:
@@ -310,15 +322,18 @@ spec:
           image: collabora/code:25.04.9.4.1
           imagePullPolicy: IfNotPresent
           securityContext:
-            runAsNonRoot: true
-            runAsUser: 1000
-            runAsGroup: 1000
-            allowPrivilegeEscalation: false
+            allowPrivilegeEscalation: true
+            appArmorProfile:
+              type: Unconfined
             capabilities:
-              drop:
-                - ALL
+              add:
+                - SYS_ADMIN
             seccompProfile:
-              type: RuntimeDefault
+              type: Unconfined
+          command:
+            - /bin/bash
+            - -ec
+            - coolconfig generate-proof-key && /start-collabora-online.sh
           ports:
             - containerPort: 9980
               name: http
@@ -390,10 +405,9 @@ spec:
                 - ALL
             seccompProfile:
               type: RuntimeDefault
-          command:
-            - /bin/sh
-            - -ec
-            - radicale --config /config/radicale.conf
+          args:
+            - --config
+            - /config/radicale.conf
           ports:
             - containerPort: 5232
               name: http

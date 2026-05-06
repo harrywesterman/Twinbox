@@ -36,7 +36,7 @@ spec:
       targetPort: 9300
     - name: grpc
       port: 9301
-      targetPort: 9300
+      targetPort: 9301
   type: ClusterIP
 ---
 apiVersion: v1

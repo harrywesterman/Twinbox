@@ -25,6 +25,17 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       initContainers:
+        - name: prepare-share
+          image: bitnamilegacy/openldap:2.6.10-debian-12-r4
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              cp -a /opt/bitnami/openldap/share/. /share/ 2>/dev/null || true
+          volumeMounts:
+            - name: share
+              mountPath: /share
         - name: generate-certs
           image: bitnamilegacy/openldap:2.6.10-debian-12-r4
           imagePullPolicy: IfNotPresent
@@ -53,13 +64,6 @@ spec:
         - name: ldap
           image: bitnamilegacy/openldap:2.6.10-debian-12-r4
           imagePullPolicy: IfNotPresent
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-            seccompProfile:
-              type: RuntimeDefault
           ports:
             - containerPort: 1389
               name: ldap
@@ -100,6 +104,8 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /bitnami/openldap
+            - name: share
+              mountPath: /opt/bitnami/openldap/share
             - name: certs
               mountPath: /opt/bitnami/openldap/certs
             - name: ldap-bootstrap
@@ -117,6 +123,8 @@ spec:
         - name: certs
           persistentVolumeClaim:
             claimName: opencloud-ldap-certs
+        - name: share
+          emptyDir: {}
         - name: ldap-bootstrap
           configMap:
             name: opencloud-ldap-bootstrap
