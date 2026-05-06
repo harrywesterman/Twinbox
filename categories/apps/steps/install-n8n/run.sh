@@ -132,6 +132,10 @@ wait_for_resource_ready "databases" "deployment/n8n-db-pooler-ro" "Available" "n
 wait_for_resource_ready "databases" "deployment/n8n-db-pooler-rw" "Available" "n8n read-write pooler deployment"
 wait_for_resource_ready "databases" "deployment/n8n-db-pooler-rw-session" "Available" "n8n session pooler deployment"
 
+bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
+  --app-id "n8n" \
+  --host "n8n-db-pooler-rw-session.databases.svc.cluster.local"
+
 log "Applying n8n Argo CD application"
 sed "s/__ZONE_NAME__/${public_zone_name}/g" \
   "$WORKSPACE_ROOT/gitops/apps/n8n.yaml" >"$n8n_rendered_app_manifest"

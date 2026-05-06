@@ -275,6 +275,10 @@ kubectl -n databases wait --for=condition=Available deployment/openwebui-db-pool
   || fail "Open WebUI pooler deployments did not become available"
 log "Open WebUI pooler deployments are ready"
 
+bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
+  --app-id "openwebui" \
+  --host "openwebui-db-pooler-rw-session.databases.svc.cluster.local"
+
 log "Applying Open WebUI Argo CD application"
 sed "s/__ZONE_NAME__/${public_zone_name}/g" "$WORKSPACE_ROOT/gitops/apps/openwebui.yaml" >"$openwebui_rendered_app_manifest"
 

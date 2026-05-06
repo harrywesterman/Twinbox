@@ -127,6 +127,10 @@ wait_for_resource_ready "databases" "deployment/pixelfed-db-pooler-ro" "Availabl
 wait_for_resource_ready "databases" "deployment/pixelfed-db-pooler-rw" "Available" "Pixelfed read-write pooler"
 wait_for_resource_ready "databases" "deployment/pixelfed-db-pooler-rw-session" "Available" "Pixelfed session pooler"
 
+bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
+  --app-id "pixelfed" \
+  --host "pixelfed-db-pooler-rw-session.databases.svc.cluster.local"
+
 log "Applying Pixelfed Argo CD application"
 sed "s/__ZONE_NAME__/${public_zone_name}/g" \
   "$WORKSPACE_ROOT/gitops/apps/pixelfed.yaml" >"$pixelfed_rendered_manifest"

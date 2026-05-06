@@ -134,6 +134,10 @@ wait_for_resource_ready "databases" "cluster/vaultwarden-db" "Ready" "Vaultwarde
 wait_for_resource_ready "databases" "deployment/vaultwarden-db-pooler-rw" "Available" "Vaultwarden rw pooler"
 wait_for_resource_ready "databases" "deployment/vaultwarden-db-pooler-ro" "Available" "Vaultwarden ro pooler"
 
+bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
+  --app-id "vaultwarden" \
+  --host "vaultwarden-db-pooler-rw.databases.svc.cluster.local"
+
 log "Applying Vaultwarden Argo CD application"
 sed "s/__ZONE_NAME__/${public_zone_name}/g" \
   "$WORKSPACE_ROOT/gitops/apps/vaultwarden.yaml" >"$vaultwarden_rendered_manifest"

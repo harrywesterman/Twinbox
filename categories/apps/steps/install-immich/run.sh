@@ -518,6 +518,10 @@ wait_for_resources_ready "databases" "cluster" "Ready" "CloudNativePG cluster"
 wait_for_resources_ready "databases" "externalsecret" "Ready" "Database ExternalSecret"
 wait_for_resources_ready "databases" "deployment" "Available" "Pooler deployment"
 
+bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
+  --app-id "immich" \
+  --host "immich-db-pooler-rw-session.databases.svc.cluster.local"
+
 log "Applying Immich Argo CD application"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$WORKSPACE_ROOT/gitops/apps/immich.yaml" \

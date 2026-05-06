@@ -237,6 +237,9 @@ PGADMIN_EXTERNALSECRET = (
 PGADMIN_SERVER_CONFIGMAP = (
     REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "configmap.yaml"
 )
+PGADMIN_SYNC_SERVER_SCRIPT = (
+    REPO_ROOT / "scripts" / "manager" / "sync-pgadmin4-server.sh"
+)
 PGADMIN_INGRESSROUTE = (
     REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "ingressroute.yaml"
 )
@@ -2713,6 +2716,31 @@ def test_critical_cnpg_clusters_use_ha_instances_with_single_replica_storage():
         ).read_text(encoding="utf-8")
         assert "instances: 3" in text
         assert "storageClass: longhorn-single" in text
+
+
+def test_database_app_installers_refresh_pgadmin_after_database_ready():
+    expectations = {
+        "install-hedgedoc": ("hedgedoc", "hedgedoc-db-pooler-rw-session.databases.svc.cluster.local"),
+        "install-immich": ("immich", "immich-db-pooler-rw-session.databases.svc.cluster.local"),
+        "install-n8n": ("n8n", "n8n-db-pooler-rw-session.databases.svc.cluster.local"),
+        "install-nextcloud": ("nextcloud", "nextcloud-db-pooler-rw.databases.svc.cluster.local"),
+        "install-openwebui": ("openwebui", "openwebui-db-pooler-rw-session.databases.svc.cluster.local"),
+        "install-outline": ("outline", "outline-db-pooler-rw-session.databases.svc.cluster.local"),
+        "install-paperless": ("paperless", "paperless-db-pooler-rw.databases.svc.cluster.local"),
+        "install-pixelfed": ("pixelfed", "pixelfed-db-pooler-rw-session.databases.svc.cluster.local"),
+        "install-vaultwarden": ("vaultwarden", "vaultwarden-db-pooler-rw.databases.svc.cluster.local"),
+        "install-zulip": ("zulip", "zulip-db-pooler-rw.databases.svc.cluster.local"),
+    }
+
+    assert PGADMIN_SYNC_SERVER_SCRIPT.read_text(encoding="utf-8").startswith("#!/usr/bin/env bash")
+
+    for step_id, (app_id, host) in expectations.items():
+        text = (
+            REPO_ROOT / "categories" / "apps" / "steps" / step_id / "run.sh"
+        ).read_text(encoding="utf-8")
+        assert "sync-pgadmin4-server.sh" in text
+        assert f'--app-id "{app_id}"' in text
+        assert f'--host "{host}"' in text
 
 
 def test_nextcloud_db_cluster_uses_future_install_capacity():

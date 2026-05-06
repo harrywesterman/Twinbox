@@ -483,6 +483,10 @@ wait_for_resources_ready "databases" "cluster" "Ready" "Nextcloud CloudNativePG 
 wait_for_resources_ready "databases" "externalsecret" "Ready" "Nextcloud database ExternalSecret"
 wait_for_resources_ready "databases" "deployment" "Available" "Nextcloud pooler deployment"
 
+bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
+  --app-id "nextcloud" \
+  --host "nextcloud-db-pooler-rw.databases.svc.cluster.local"
+
 nextcloud_rendered_app_manifest="$(mktemp "${TMPDIR:-/tmp}/nextcloud-${cluster_id}.XXXXXX.yaml")"
 nextcloud_rendered_values_manifest="$(mktemp "${TMPDIR:-/tmp}/nextcloud-values-${cluster_id}.XXXXXX.yaml")"
 trap 'rm -f "$nextcloud_secret_file" "${nextcloud_rendered_values_manifest:-}" "${nextcloud_rendered_app_manifest:-}" "${nextcloud_rendered_middleware:-}" "${nextcloud_rendered_ingressroute:-}" "${nextcloud_rendered_collabora_ingressroute:-}"' EXIT

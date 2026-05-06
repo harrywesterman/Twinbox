@@ -295,6 +295,10 @@ wait_for_resource_ready "databases" "deployment/hedgedoc-db-pooler-ro" "Availabl
 wait_for_resource_ready "databases" "deployment/hedgedoc-db-pooler-rw" "Available" "HedgeDoc read-write pooler"
 wait_for_resource_ready "databases" "deployment/hedgedoc-db-pooler-rw-session" "Available" "HedgeDoc session pooler"
 
+bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
+  --app-id "hedgedoc" \
+  --host "hedgedoc-db-pooler-rw-session.databases.svc.cluster.local"
+
 log "Applying HedgeDoc app namespace, storage, secrets, and ingress"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/hedgedoc/pvc.yaml"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/hedgedoc/externalsecret.yaml"

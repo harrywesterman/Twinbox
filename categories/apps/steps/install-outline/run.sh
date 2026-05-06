@@ -304,6 +304,10 @@ wait_for_resource_ready "databases" "deployment/outline-db-pooler-ro" "Available
 wait_for_resource_ready "databases" "deployment/outline-db-pooler-rw" "Available" "Outline read-write pooler"
 wait_for_resource_ready "databases" "deployment/outline-db-pooler-rw-session" "Available" "Outline session pooler"
 
+bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
+  --app-id "outline" \
+  --host "outline-db-pooler-rw-session.databases.svc.cluster.local"
+
 log "Applying Outline namespace, storage, secrets, cache, and ingress"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/outline/namespace.yaml"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/outline/pvc.yaml"

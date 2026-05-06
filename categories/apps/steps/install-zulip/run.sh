@@ -384,6 +384,10 @@ wait_for_resources_ready "databases" "cluster" "Ready" "Zulip CloudNativePG clus
 wait_for_resources_ready "databases" "externalsecret" "Ready" "Zulip database ExternalSecret"
 wait_for_resources_ready "databases" "deployment" "Available" "Zulip pooler deployment"
 
+bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
+  --app-id "zulip" \
+  --host "zulip-db-pooler-rw.databases.svc.cluster.local"
+
 provider_payload="$(
   jq -n \
     --arg name "Zulip" \

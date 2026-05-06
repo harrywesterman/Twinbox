@@ -340,6 +340,10 @@ wait_for_resources_ready "databases" "externalsecret" "Ready" "Paperless-ngx dat
 wait_for_resources_ready "databases" "cluster" "Ready" "Paperless-ngx CloudNativePG cluster"
 wait_for_resources_ready "databases" "deployment" "Available" "Paperless-ngx pooler deployment"
 
+bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
+  --app-id "paperless" \
+  --host "paperless-db-pooler-rw.databases.svc.cluster.local"
+
 log "Applying Paperless-ngx Argo CD application"
 render_template \
   "$paperless_app_manifest" \
