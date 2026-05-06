@@ -8,7 +8,7 @@ data:
     {
       "Servers": {
         "1": {
-          "Name": "CloudNativePG",
+          "Name": "CloudNativePG - Authentik",
           "Group": "Shared Servers",
           "Host": "authentik-db-pooler-rw-session.databases.svc.cluster.local",
           "Port": 5432,
@@ -21,6 +21,156 @@ data:
             "sslmode": "prefer"
           },
           "Comment": "CloudNativePG pooler for the Authentik cluster"
+        },
+        "2": {
+          "Name": "CloudNativePG - Immich",
+          "Group": "Shared Servers",
+          "Host": "immich-db-pooler-rw-session.databases.svc.cluster.local",
+          "Port": 5432,
+          "MaintenanceDB": "postgres",
+          "Username": "immich",
+          "SharedUsername": "immich",
+          "PasswordExecCommand": "printf %s \"$PGADMIN_IMMICH_DB_PASSWORD\"",
+          "Shared": true,
+          "ConnectionParameters": {
+            "sslmode": "prefer"
+          },
+          "Comment": "CloudNativePG pooler for the Immich cluster"
+        },
+        "3": {
+          "Name": "CloudNativePG - n8n",
+          "Group": "Shared Servers",
+          "Host": "n8n-db-pooler-rw-session.databases.svc.cluster.local",
+          "Port": 5432,
+          "MaintenanceDB": "postgres",
+          "Username": "n8n",
+          "SharedUsername": "n8n",
+          "PasswordExecCommand": "printf %s \"$PGADMIN_N8N_DB_PASSWORD\"",
+          "Shared": true,
+          "ConnectionParameters": {
+            "sslmode": "prefer"
+          },
+          "Comment": "CloudNativePG pooler for the n8n cluster"
+        },
+        "4": {
+          "Name": "CloudNativePG - HedgeDoc",
+          "Group": "Shared Servers",
+          "Host": "hedgedoc-db-pooler-rw-session.databases.svc.cluster.local",
+          "Port": 5432,
+          "MaintenanceDB": "postgres",
+          "Username": "hedgedoc",
+          "SharedUsername": "hedgedoc",
+          "PasswordExecCommand": "printf %s \"$PGADMIN_HEDGEDOC_DB_PASSWORD\"",
+          "Shared": true,
+          "ConnectionParameters": {
+            "sslmode": "prefer"
+          },
+          "Comment": "CloudNativePG pooler for the HedgeDoc cluster"
+        },
+        "5": {
+          "Name": "CloudNativePG - Paperless",
+          "Group": "Shared Servers",
+          "Host": "paperless-db-pooler-rw.databases.svc.cluster.local",
+          "Port": 5432,
+          "MaintenanceDB": "postgres",
+          "Username": "paperless",
+          "SharedUsername": "paperless",
+          "PasswordExecCommand": "printf %s \"$PGADMIN_PAPERLESS_DB_PASSWORD\"",
+          "Shared": true,
+          "ConnectionParameters": {
+            "sslmode": "prefer"
+          },
+          "Comment": "CloudNativePG pooler for the Paperless cluster"
+        },
+        "6": {
+          "Name": "CloudNativePG - Vaultwarden",
+          "Group": "Shared Servers",
+          "Host": "vaultwarden-db-pooler-rw.databases.svc.cluster.local",
+          "Port": 5432,
+          "MaintenanceDB": "postgres",
+          "Username": "vaultwarden",
+          "SharedUsername": "vaultwarden",
+          "PasswordExecCommand": "printf %s \"$PGADMIN_VAULTWARDEN_DB_PASSWORD\"",
+          "Shared": true,
+          "ConnectionParameters": {
+            "sslmode": "prefer"
+          },
+          "Comment": "CloudNativePG pooler for the Vaultwarden cluster"
+        },
+        "7": {
+          "Name": "CloudNativePG - Pixelfed",
+          "Group": "Shared Servers",
+          "Host": "pixelfed-db-pooler-rw-session.databases.svc.cluster.local",
+          "Port": 5432,
+          "MaintenanceDB": "postgres",
+          "Username": "pixelfed",
+          "SharedUsername": "pixelfed",
+          "PasswordExecCommand": "printf %s \"$PGADMIN_PIXELFED_DB_PASSWORD\"",
+          "Shared": true,
+          "ConnectionParameters": {
+            "sslmode": "prefer"
+          },
+          "Comment": "CloudNativePG pooler for the Pixelfed cluster"
+        },
+        "8": {
+          "Name": "CloudNativePG - Zulip",
+          "Group": "Shared Servers",
+          "Host": "zulip-db-pooler-rw.databases.svc.cluster.local",
+          "Port": 5432,
+          "MaintenanceDB": "postgres",
+          "Username": "zulip",
+          "SharedUsername": "zulip",
+          "PasswordExecCommand": "printf %s \"$PGADMIN_ZULIP_DB_PASSWORD\"",
+          "Shared": true,
+          "ConnectionParameters": {
+            "sslmode": "prefer"
+          },
+          "Comment": "CloudNativePG pooler for the Zulip cluster"
+        },
+        "9": {
+          "Name": "CloudNativePG - Nextcloud",
+          "Group": "Shared Servers",
+          "Host": "nextcloud-db-pooler-rw.databases.svc.cluster.local",
+          "Port": 5432,
+          "MaintenanceDB": "postgres",
+          "Username": "nextcloud",
+          "SharedUsername": "nextcloud",
+          "PasswordExecCommand": "printf %s \"$PGADMIN_NEXTCLOUD_DB_PASSWORD\"",
+          "Shared": true,
+          "ConnectionParameters": {
+            "sslmode": "prefer"
+          },
+          "Comment": "CloudNativePG pooler for the Nextcloud cluster"
+        },
+        "10": {
+          "Name": "CloudNativePG - OpenWebUI",
+          "Group": "Shared Servers",
+          "Host": "openwebui-db-pooler-rw-session.databases.svc.cluster.local",
+          "Port": 5432,
+          "MaintenanceDB": "postgres",
+          "Username": "openwebui",
+          "SharedUsername": "openwebui",
+          "PasswordExecCommand": "printf %s \"$PGADMIN_OPENWEBUI_DB_PASSWORD\"",
+          "Shared": true,
+          "ConnectionParameters": {
+            "sslmode": "prefer"
+          },
+          "Comment": "CloudNativePG pooler for the OpenWebUI cluster"
+        },
+        "11": {
+          "Name": "CloudNativePG - Outline",
+          "Group": "Shared Servers",
+          "Host": "outline-db-pooler-rw-session.databases.svc.cluster.local",
+          "Port": 5432,
+          "MaintenanceDB": "postgres",
+          "Username": "outline",
+          "SharedUsername": "outline",
+          "PasswordExecCommand": "printf %s \"$PGADMIN_OUTLINE_DB_PASSWORD\"",
+          "Shared": true,
+          "ConnectionParameters": {
+            "sslmode": "prefer"
+          },
+          "Comment": "CloudNativePG pooler for the Outline cluster"
         }
       }
     }
