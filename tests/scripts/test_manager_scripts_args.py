@@ -1230,6 +1230,9 @@ def test_install_secret_sync_renders_argocd_values_and_applies_secret_sync_manif
     assert 'targetRevision: "0.27.2"' in text
     assert "gitops/apps/openbao.yaml" not in text
     assert "openbao_render_values_file" in text
+    assert "size: 10Gi" in helper_text
+    assert "storageClass: longhorn-single" in helper_text
+    assert "size: 2Gi" not in helper_text
     assert "openbao_seed_management_bootstrap_files" in text
     assert "openbao_seed_release_secret" in text
     assert 'openbao_initialize_if_needed "$openbao_pod"' in text
@@ -2303,7 +2306,8 @@ def test_loki_values_configures_filesystem_storage():
     assert "auth_enabled: false" in text
     assert "replication_factor: 1" in text
     assert "type: filesystem" in text
-    assert "storageClassName: longhorn-single" in text
+    assert "storageClass: longhorn-single" in text
+    assert "storageClassName: longhorn-single" not in text
     assert "retention_period: 7d" in text
 
 
@@ -2679,7 +2683,8 @@ def test_loki_and_openbao_longhorn_sizes_are_right_sized():
     )
 
     assert "size: 20Gi" in loki_values_text
-    assert "storageClassName: longhorn-single" in loki_values_text
+    assert "storageClass: longhorn-single" in loki_values_text
+    assert "storageClassName: longhorn-single" not in loki_values_text
     assert "size: 5Gi" not in loki_values_text
     assert "size: 10Gi" in openbao_values_text
     assert "storageClass: longhorn-single" in openbao_values_text
@@ -3223,6 +3228,8 @@ def test_bootstrap_scripts_use_the_management_vm_ip_for_seaweedfs():
     assert "os.environ[\"MANAGEMENT_VM_IP\"]" in bootstrap_vm_text
     assert "192.168.1.50:8333" not in start_manager_text
     assert "192.168.1.50:8333" not in bootstrap_vm_text
+    assert start_manager_text.index("s3.configure --user") < start_manager_text.index("s3.bucket.create -name")
+    assert "SeaweedFS bucket ${SEAWEEDFS_BUCKET} was not created" in start_manager_text
 
 
 def test_authentik_consumer_scripts_read_from_openbao():

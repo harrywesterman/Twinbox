@@ -194,8 +194,8 @@ server:
         service_registration "kubernetes" {}
   dataStorage:
     enabled: true
-    size: 2Gi
-    storageClass: longhorn
+    size: 10Gi
+    storageClass: longhorn-single
     accessMode: ReadWriteOnce
   volumes:
     - name: openbao-static-seal

@@ -22,7 +22,7 @@ singleBinary:
   replicas: 1
   persistence:
     enabled: true
-    storageClassName: longhorn-single
+    storageClass: longhorn-single
     size: 20Gi
   resources:
     limits:

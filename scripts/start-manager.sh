@@ -199,7 +199,7 @@ ensure_seaweedfs_bootstrap() {
   local bucket_list=""
 
   while [[ "$attempt" -le "$attempts" ]]; do
-    if docker exec -i twinbox-seaweedfs sh -lc 'printf "s3.config.show\n" | weed shell' >/dev/null 2>&1; then
+    if docker exec twinbox-seaweedfs sh -lc 'printf "s3.config.show\n" | weed shell' >/dev/null 2>&1; then
       break
     fi
 
@@ -213,19 +213,26 @@ ensure_seaweedfs_bootstrap() {
     return 1
   fi
 
-  bucket_list="$(
-    docker exec -i twinbox-seaweedfs sh -lc 'printf "s3.bucket.list\n" | weed shell'
-  )"
+  log "Reconciling SeaweedFS IAM config for ${SEAWEEDFS_ACCESS_KEY_ID}"
+  docker exec twinbox-seaweedfs sh -lc \
+    "printf 's3.configure --user ${SEAWEEDFS_ACCESS_KEY_ID} --access_key ${SEAWEEDFS_ACCESS_KEY_ID} --secret_key ${SEAWEEDFS_SECRET_ACCESS_KEY} --buckets ${SEAWEEDFS_BUCKET} --actions Read,Write,List,Tagging,Admin --apply true\n' | weed shell" >/dev/null
 
+  bucket_list="$(
+    docker exec twinbox-seaweedfs sh -lc 'printf "s3.bucket.list\n" | weed shell'
+  )"
   if ! grep -Eq "^[[:space:]]+${SEAWEEDFS_BUCKET}[[:space:]]" <<<"$bucket_list"; then
     log "Creating SeaweedFS bucket ${SEAWEEDFS_BUCKET}"
-    docker exec -i twinbox-seaweedfs sh -lc \
+    docker exec twinbox-seaweedfs sh -lc \
       "printf 's3.bucket.create -name ${SEAWEEDFS_BUCKET} -owner ${SEAWEEDFS_ACCESS_KEY_ID}\n' | weed shell" >/dev/null
   fi
 
-  log "Reconciling SeaweedFS IAM config for ${SEAWEEDFS_ACCESS_KEY_ID}"
-  docker exec -i twinbox-seaweedfs sh -lc \
-    "printf 's3.configure --user ${SEAWEEDFS_ACCESS_KEY_ID} --access_key ${SEAWEEDFS_ACCESS_KEY_ID} --secret_key ${SEAWEEDFS_SECRET_ACCESS_KEY} --buckets ${SEAWEEDFS_BUCKET} --actions Read,Write,List,Tagging,Admin --apply true\n' | weed shell" >/dev/null
+  bucket_list="$(
+    docker exec twinbox-seaweedfs sh -lc 'printf "s3.bucket.list\n" | weed shell'
+  )"
+  if ! grep -Eq "^[[:space:]]+${SEAWEEDFS_BUCKET}[[:space:]]" <<<"$bucket_list"; then
+    log "SeaweedFS bucket ${SEAWEEDFS_BUCKET} was not created"
+    return 1
+  fi
 }
 
 if [[ ! -f .env ]]; then
