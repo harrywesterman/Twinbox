@@ -719,15 +719,16 @@ const WIZARD_GUIDES = {
     intro: 'Pick the ingress route that matches your network. The wizard will only show the follow-up questions for the path you choose.',
     checklist: [
       'Read the short explanation for each route.',
-      'Pick option 1, 2, 3, or 4.',
+      'Pick option 1, 2, 3, 4, or 5.',
       'Continue only with the follow-up questions for that route.',
     ],
     screenshotTitle: 'Route choice',
     screenshotLines: [
       '1. Wiredoor',
-      '2. Cloudflare Tunnel',
-      '3. MetalLB',
-      '4. Tailscale',
+      '2. NetBird',
+      '3. Cloudflare Tunnel',
+      '4. MetalLB',
+      '5. Tailscale',
     ],
     helpLink: {
       label: 'Wizard guide',
