@@ -122,12 +122,12 @@ check_data_sources() {
   info "Testing Tempo datasource connection from Grafana..."
   local tempo_ready
   tempo_ready=$(kubectl --kubeconfig="$KUBECONFIG" exec -n monitoring "$grafana_pod" \
-    -- curl -sS --max-time 5 http://tempo.monitoring.svc.cluster.local:3100/ready 2>/dev/null || echo "UNREACHABLE")
+    -- curl -sS --max-time 5 http://tempo.monitoring.svc.cluster.local:3200/ready 2>/dev/null || echo "UNREACHABLE")
 
   if [[ "$tempo_ready" == *"ready"* || "$tempo_ready" == *"Ready"* ]]; then
     pass "Tempo datasource is reachable and ready"
   elif [[ "$tempo_ready" == "UNREACHABLE" ]]; then
-    fail "Cannot reach Tempo at http://tempo.monitoring.svc.cluster.local:3100"
+    fail "Cannot reach Tempo at http://tempo.monitoring.svc.cluster.local:3200"
     info "Check: kubectl -n monitoring get svc -l app.kubernetes.io/name=tempo"
     info "Check: kubectl -n monitoring get pods -l app.kubernetes.io/name=tempo"
   else
@@ -157,7 +157,7 @@ check_data_sources() {
   info "Expected datasource URLs (from gitops/values/grafana.yaml):"
   info "  Prometheus: http://prometheus-operated.monitoring.svc.cluster.local:9090"
   info "  Loki:       http://loki.monitoring.svc.cluster.local:3100"
-  info "  Tempo:      http://tempo.monitoring.svc.cluster.local:3100"
+  info "  Tempo:      http://tempo.monitoring.svc.cluster.local:3200"
 
   return 0
 }
@@ -708,7 +708,7 @@ main() {
   echo "  Port-forward Grafana: kubectl -n monitoring port-forward svc/grafana 3000:80"
   echo "  Port-forward Prometheus: kubectl -n monitoring port-forward svc/prometheus-kube-prometheus-stack-prometheus 9090:9090"
   echo "  Port-forward Loki: kubectl -n monitoring port-forward svc/loki 3100:3100"
-  echo "  Port-forward Tempo: kubectl -n monitoring port-forward svc/tempo 3100:3100"
+  echo "  Port-forward Tempo: kubectl -n monitoring port-forward svc/tempo 3200:3200"
   echo ""
   echo "  View Prometheus targets: http://localhost:9090/targets"
   echo "  Query Prometheus: http://localhost:9090/graph"
