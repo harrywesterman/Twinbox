@@ -53,6 +53,55 @@ if [[ -n "$existing_portal_secret_json" ]]; then
   [[ -n "$existing_session_secret" ]] && portal_session_secret="$existing_session_secret"
 fi
 
+wait_for_authentik_api_ready() {
+  local attempt=1
+  local attempts=60
+  local response_file status body
+  local auth_headers=(-H "Accept: application/json")
+
+  if [[ "${AUTHENTIK_USE_COOKIE:-false}" == "true" ]]; then
+    auth_headers+=(-H "Cookie: ${AUTHENTIK_TOKEN}")
+  else
+    auth_headers+=(-H "Authorization: Bearer ${AUTHENTIK_TOKEN}")
+  fi
+
+  while [[ "$attempt" -le "$attempts" ]]; do
+    response_file="$(mktemp)"
+    status="$(
+      curl -sS \
+        --connect-timeout 10 \
+        --max-time 30 \
+        "${auth_headers[@]}" \
+        -o "$response_file" \
+        -w '%{http_code}' \
+        "${AUTHENTIK_API_BASE}/flows/instances/?page_size=1"
+    )" || status="000"
+
+    body="$(cat "$response_file" 2>/dev/null || true)"
+    rm -f "$response_file"
+
+    if [[ "$status" =~ ^2 ]]; then
+      return 0
+    fi
+
+    if [[ -n "$body" ]]; then
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for Authentik API readiness (${attempt}/${attempts}): HTTP ${status} ${body}" >&2
+    else
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for Authentik API readiness (${attempt}/${attempts}): HTTP ${status}" >&2
+    fi
+
+    if [[ -n "${AUTHENTIK_FORWARD_PID:-}" ]] && ! kill -0 "$AUTHENTIK_FORWARD_PID" >/dev/null 2>&1; then
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Authentik port-forward died while waiting for API readiness; re-establishing" >&2
+      authentik_setup_forward
+    fi
+
+    sleep 2
+    attempt=$((attempt + 1))
+  done
+
+  fail "Authentik API did not become ready after ${attempts} attempts"
+}
+
 resolve_flow_id() {
   authentik_resolve_flow_id "$1" "$2"
 }
@@ -70,7 +119,7 @@ extract_authentik_identifier() {
 
 create_or_update_provider() {
   local provider_payload="$1"
-  local search_response existing_pk response_file http_status response_json
+  local search_response existing_pk response_json
 
   search_response="$(authentik_api_get "/providers/oauth2/?page_size=100")"
   existing_pk="$(
@@ -87,28 +136,11 @@ create_or_update_provider() {
     return 0
   fi
 
-  response_file="$(mktemp)"
-  http_status="$(
-    curl -sS \
-      -X POST \
-      -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" \
-      -H "Accept: application/json" \
-      -H "Content-Type: application/json" \
-      --data "$provider_payload" \
-      -o "$response_file" \
-      -w '%{http_code}' \
-      "${AUTHENTIK_API_BASE}/providers/oauth2/"
-  )" || http_status="000"
-
-  response_json="$(cat "$response_file" 2>/dev/null || true)"
-  rm -f "$response_file"
-
-  if [[ "$http_status" =~ ^2 ]]; then
-    existing_pk="$(extract_authentik_identifier "$response_json")"
-    if [[ -n "$existing_pk" ]]; then
-      printf '%s\n' "$existing_pk"
-      return 0
-    fi
+  response_json="$(authentik_api_write POST "/providers/oauth2/" "$provider_payload")"
+  existing_pk="$(extract_authentik_identifier "$response_json")"
+  if [[ -n "$existing_pk" ]]; then
+    printf '%s\n' "$existing_pk"
+    return 0
   fi
 
   search_response="$(authentik_api_get "/providers/oauth2/?page_size=100")"
@@ -127,7 +159,7 @@ create_or_update_provider() {
 
 create_or_update_application() {
   local app_payload="$1"
-  local existing_json existing_pk response_file http_status response_json created_pk
+  local existing_json existing_pk response_json created_pk
 
   existing_json="$(authentik_api_get "/core/applications/${portal_application_slug}/" 2>/dev/null || true)"
   existing_pk="$(extract_authentik_identifier "$existing_json")"
@@ -138,37 +170,22 @@ create_or_update_application() {
     return 0
   fi
 
-  response_file="$(mktemp)"
-  http_status="$(
-    curl -sS \
-      -X POST \
-      -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" \
-      -H "Accept: application/json" \
-      -H "Content-Type: application/json" \
-      --data "$app_payload" \
-      -o "$response_file" \
-      -w '%{http_code}' \
-      "${AUTHENTIK_API_BASE}/core/applications/"
-  )" || http_status="000"
-
-  if [[ "$http_status" =~ ^2 ]]; then
-    response_json="$(cat "$response_file" 2>/dev/null || true)"
-    created_pk="$(extract_authentik_identifier "$response_json")"
-    if [[ -n "$created_pk" ]]; then
-      rm -f "$response_file"
-      printf '%s\n' "$created_pk"
-      return 0
-    fi
+  response_json="$(authentik_api_write POST "/core/applications/" "$app_payload")"
+  created_pk="$(extract_authentik_identifier "$response_json")"
+  if [[ -n "$created_pk" ]]; then
+    printf '%s\n' "$created_pk"
+    return 0
   fi
 
   existing_json="$(authentik_api_get "/core/applications/${portal_application_slug}/" 2>/dev/null || true)"
   existing_pk="$(extract_authentik_identifier "$existing_json")"
-  rm -f "$response_file"
   [[ -n "$existing_pk" ]] || fail "Authentik did not return or expose an application ID for Twinbox Portal"
 
   authentik_api_write PATCH "/core/applications/${portal_application_slug}/" "$app_payload" >/dev/null
   printf '%s\n' "$existing_pk"
 }
+
+wait_for_authentik_api_ready
 
 authorization_flow_id="$(resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
 invalidation_flow_id="$(resolve_flow_id "default-provider-invalidation-flow" "invalidation")"
