@@ -117,6 +117,8 @@ spec:
               value: /etc/opencloud/proxy.yaml
             - name: MICRO_REGISTRY_ADDRESS
               value: 127.0.0.1:9233
+            - name: OC_REVA_GATEWAY
+              value: http://127.0.0.1:9142
             - name: NATS_NATS_HOST
               value: 0.0.0.0
             - name: GATEWAY_GRPC_ADDR
