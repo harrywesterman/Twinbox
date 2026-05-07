@@ -56,6 +56,17 @@ resolve_database_password() {
   kubectl -n databases get secret "$secret_name" -o jsonpath='{.data.password}' | base64 -d
 }
 
+resolve_database_password_optional() {
+  local secret_name="$1"
+
+  if kubectl -n databases get secret "$secret_name" >/dev/null 2>&1; then
+    resolve_database_password "$secret_name"
+    return 0
+  fi
+
+  echo ""
+}
+
 wait_for_secret() {
   local namespace="$1"
   local secret_name="$2"
@@ -201,16 +212,16 @@ pgadmin_default_email="pgadmin@${public_zone_name}"
 pgadmin_default_password="$(openssl rand -hex 24)"
 pgadmin_master_password="$(openssl rand -hex 32)"
 pgadmin_authentik_db_password="$(resolve_authentik_db_password)"
-pgadmin_immich_db_password="$(resolve_database_password immich-db-credentials)"
-pgadmin_n8n_db_password="$(resolve_database_password n8n-db-credentials)"
-pgadmin_hedgedoc_db_password="$(resolve_database_password hedgedoc-db-credentials)"
-pgadmin_paperless_db_password="$(resolve_database_password paperless-db-credentials)"
-pgadmin_vaultwarden_db_password="$(resolve_database_password vaultwarden-db-credentials)"
-pgadmin_pixelfed_db_password="$(resolve_database_password pixelfed-db-credentials)"
-pgadmin_zulip_db_password="$(resolve_database_password zulip-db-credentials)"
-pgadmin_nextcloud_db_password="$(resolve_database_password nextcloud-db-credentials)"
-pgadmin_openwebui_db_password="$(resolve_database_password openwebui-db-credentials)"
-pgadmin_outline_db_password="$(resolve_database_password outline-db-credentials)"
+pgadmin_immich_db_password="$(resolve_database_password_optional immich-db-credentials)"
+pgadmin_n8n_db_password="$(resolve_database_password_optional n8n-db-credentials)"
+pgadmin_hedgedoc_db_password="$(resolve_database_password_optional hedgedoc-db-credentials)"
+pgadmin_paperless_db_password="$(resolve_database_password_optional paperless-db-credentials)"
+pgadmin_vaultwarden_db_password="$(resolve_database_password_optional vaultwarden-db-credentials)"
+pgadmin_pixelfed_db_password="$(resolve_database_password_optional pixelfed-db-credentials)"
+pgadmin_zulip_db_password="$(resolve_database_password_optional zulip-db-credentials)"
+pgadmin_nextcloud_db_password="$(resolve_database_password_optional nextcloud-db-credentials)"
+pgadmin_openwebui_db_password="$(resolve_database_password_optional openwebui-db-credentials)"
+pgadmin_outline_db_password="$(resolve_database_password_optional outline-db-credentials)"
 
 existing_pgadmin_secret_json=""
 if command -v openbao_read_global_secret_json >/dev/null 2>&1; then
@@ -464,18 +475,32 @@ rm -f "$pgadmin_secret_file"
 kubectl create namespace pgadmin4 --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating pgAdmin 4 database password secret"
+secret_args=(
+  --from-literal=PGADMIN_AUTHENTIK_DB_PASSWORD="$pgadmin_authentik_db_password"
+)
+
+append_secret_literal() {
+  local key="$1"
+  local value="$2"
+
+  if [[ -n "$value" ]]; then
+    secret_args+=(--from-literal="${key}=${value}")
+  fi
+}
+
+append_secret_literal PGADMIN_IMMICH_DB_PASSWORD "$pgadmin_immich_db_password"
+append_secret_literal PGADMIN_N8N_DB_PASSWORD "$pgadmin_n8n_db_password"
+append_secret_literal PGADMIN_HEDGEDOC_DB_PASSWORD "$pgadmin_hedgedoc_db_password"
+append_secret_literal PGADMIN_PAPERLESS_DB_PASSWORD "$pgadmin_paperless_db_password"
+append_secret_literal PGADMIN_VAULTWARDEN_DB_PASSWORD "$pgadmin_vaultwarden_db_password"
+append_secret_literal PGADMIN_PIXELFED_DB_PASSWORD "$pgadmin_pixelfed_db_password"
+append_secret_literal PGADMIN_ZULIP_DB_PASSWORD "$pgadmin_zulip_db_password"
+append_secret_literal PGADMIN_NEXTCLOUD_DB_PASSWORD "$pgadmin_nextcloud_db_password"
+append_secret_literal PGADMIN_OPENWEBUI_DB_PASSWORD "$pgadmin_openwebui_db_password"
+append_secret_literal PGADMIN_OUTLINE_DB_PASSWORD "$pgadmin_outline_db_password"
+
 kubectl -n pgadmin4 create secret generic "$pgadmin_db_password_secret_name" \
-  --from-literal=PGADMIN_AUTHENTIK_DB_PASSWORD="$pgadmin_authentik_db_password" \
-  --from-literal=PGADMIN_IMMICH_DB_PASSWORD="$pgadmin_immich_db_password" \
-  --from-literal=PGADMIN_N8N_DB_PASSWORD="$pgadmin_n8n_db_password" \
-  --from-literal=PGADMIN_HEDGEDOC_DB_PASSWORD="$pgadmin_hedgedoc_db_password" \
-  --from-literal=PGADMIN_PAPERLESS_DB_PASSWORD="$pgadmin_paperless_db_password" \
-  --from-literal=PGADMIN_VAULTWARDEN_DB_PASSWORD="$pgadmin_vaultwarden_db_password" \
-  --from-literal=PGADMIN_PIXELFED_DB_PASSWORD="$pgadmin_pixelfed_db_password" \
-  --from-literal=PGADMIN_ZULIP_DB_PASSWORD="$pgadmin_zulip_db_password" \
-  --from-literal=PGADMIN_NEXTCLOUD_DB_PASSWORD="$pgadmin_nextcloud_db_password" \
-  --from-literal=PGADMIN_OPENWEBUI_DB_PASSWORD="$pgadmin_openwebui_db_password" \
-  --from-literal=PGADMIN_OUTLINE_DB_PASSWORD="$pgadmin_outline_db_password" \
+  "${secret_args[@]}" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying pgAdmin 4 ExternalSecret"
