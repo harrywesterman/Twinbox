@@ -118,7 +118,7 @@ spec:
             - name: MICRO_REGISTRY_ADDRESS
               value: 127.0.0.1:9233
             - name: OC_REVA_GATEWAY
-              value: http://127.0.0.1:9142
+              value: eu.opencloud.api.gateway
             - name: NATS_NATS_HOST
               value: 0.0.0.0
             - name: GATEWAY_GRPC_ADDR
@@ -250,10 +250,7 @@ spec:
                   name: opencloud-bootstrap
                   key: OC_JWT_SECRET
             - name: OC_REVA_GATEWAY
-              valueFrom:
-                secretKeyRef:
-                  name: opencloud-bootstrap
-                  key: OC_REVA_GATEWAY
+              value: eu.opencloud.api.gateway
             - name: MICRO_REGISTRY_ADDRESS
               valueFrom:
                 secretKeyRef:
