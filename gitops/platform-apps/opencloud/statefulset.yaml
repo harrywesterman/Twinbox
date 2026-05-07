@@ -106,6 +106,8 @@ spec:
               mountPath: /bitnami/openldap
             - name: share
               mountPath: /opt/bitnami/openldap/share
+            - name: run
+              mountPath: /opt/bitnami/openldap/var/run
             - name: certs
               mountPath: /opt/bitnami/openldap/certs
             - name: ldap-bootstrap
@@ -124,6 +126,8 @@ spec:
           persistentVolumeClaim:
             claimName: opencloud-ldap-certs
         - name: share
+          emptyDir: {}
+        - name: run
           emptyDir: {}
         - name: ldap-bootstrap
           configMap:
