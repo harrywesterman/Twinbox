@@ -346,10 +346,10 @@ opencloud_companion_domain="$OPENCLOUD_HOST"
 opencloud_idp_domain="$AUTHENTIK_HOST"
 opencloud_reva_gateway="eu.opencloud.api.gateway"
 opencloud_micro_registry_address="opencloud:9233"
-opencloud_collaboration_app_name="OpenCloud"
-opencloud_collaboration_app_product="OpenCloud"
-opencloud_collaboration_app_addr="http://opencloud-collaboration:9300"
-opencloud_collaboration_app_icon="${OPENCLOUD_HOST}/favicon.ico"
+opencloud_collaboration_app_name="CollaboraOnline"
+opencloud_collaboration_app_product="Collabora"
+opencloud_collaboration_app_addr="$COLLABORA_HOST"
+opencloud_collaboration_app_icon="${COLLABORA_HOST}/favicon.ico"
 opencloud_collaboration_app_insecure="true"
 opencloud_collaboration_cs3api_datagateway_insecure="true"
 opencloud_oc_ldap_bind_dn="cn=admin,dc=opencloud,dc=eu"
@@ -455,6 +455,13 @@ if [[ -n "$existing_opencloud_secret_json" ]]; then
     fi
   done
 fi
+
+# These are non-secret integration endpoints. Keep them aligned with the
+# current Collabora route even when preserving existing bootstrap secrets.
+opencloud_collaboration_app_name="CollaboraOnline"
+opencloud_collaboration_app_product="Collabora"
+opencloud_collaboration_app_addr="$COLLABORA_HOST"
+opencloud_collaboration_app_icon="${COLLABORA_HOST}/favicon.ico"
 
 opencloud_secret_file="$(mktemp "${TMPDIR:-/tmp}/opencloud-bootstrap.XXXXXX.json")"
 opencloud_rendered_overlay="$(mktemp -d "${TMPDIR:-/tmp}/opencloud-overlay.XXXXXX")"
