@@ -207,7 +207,7 @@ spec:
                     conn = sqlite3.connect(db_path)
                     cur = conn.cursor()
                     cur.execute(
-                        "select 1 from server where name = 'CloudNativePG' and shared = 1"
+                        "select 1 from server where shared = 1 limit 1"
                     )
                     sys.exit(0 if cur.fetchone() else 1)
                   except sqlite3.Error:

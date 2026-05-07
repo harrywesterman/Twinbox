@@ -1720,11 +1720,11 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "postStart" in pgadmin_deployment_text
     assert "load-servers" in pgadmin_deployment_text
     assert "ENABLE_SERVER_PASS_EXEC_CMD = True" in pgadmin_deployment_text
-    assert "server where name = 'CloudNativePG' and shared = 1" in pgadmin_deployment_text
+    assert "server where shared = 1 limit 1" in pgadmin_deployment_text
     assert "startupProbe" in pgadmin_deployment_text
     assert "failureThreshold: 36" in pgadmin_deployment_text
     assert "exec:" in pgadmin_deployment_text
-    assert "server where name = 'CloudNativePG' and shared = 1" in pgadmin_deployment_text
+    assert "server where shared = 1 limit 1" in pgadmin_deployment_text
     assert "runAsNonRoot: true" in pgadmin_deployment_text
     assert "runAsUser: 5050" in pgadmin_deployment_text
     assert "runAsGroup: 0" in pgadmin_deployment_text
