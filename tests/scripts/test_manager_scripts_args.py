@@ -880,12 +880,18 @@ def test_longhorn_step_installs_via_argocd_and_waits_for_health():
         in step_text
     )
     assert 'manifest_path="$WORKSPACE_ROOT/gitops/apps/longhorn.yaml"' in helper_text
+    assert (
+        'longhorn_single_storageclass_manifest="$WORKSPACE_ROOT/gitops/databases/longhorn-single-storageclass.yaml"'
+        in helper_text
+    )
     assert "Installing Longhorn through Argo CD" in helper_text
     assert (
         'bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \\'
         in helper_text
     )
     assert '--application "longhorn"' in helper_text
+    assert 'Applying longhorn-single StorageClass manifest' in helper_text
+    assert 'kubectl apply -f "$longhorn_single_storageclass_manifest" >/dev/null' in helper_text
     assert "wait_for_storage_class" in helper_text
     assert "StorageClass/${storage_class} is available" in helper_text
     assert "make_storage_class_default" in helper_text

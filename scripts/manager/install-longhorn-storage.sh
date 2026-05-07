@@ -225,6 +225,7 @@ WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." &&
 BOOTSTRAP_ROOT="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
 VELERO_SECRET_FILE="${BOOTSTRAP_ROOT}/secrets/global/velero.json"
 manifest_path="$WORKSPACE_ROOT/gitops/apps/longhorn.yaml"
+longhorn_single_storageclass_manifest="$WORKSPACE_ROOT/gitops/databases/longhorn-single-storageclass.yaml"
 LONGHORN_VALUES_TEMPLATE_PATH="${WORKSPACE_ROOT}/gitops/values/longhorn.yaml"
 LONGHORN_NAMESPACE="${LONGHORN_NAMESPACE:-longhorn-system}"
 LONGHORN_BACKUP_SECRET_NAME="${LONGHORN_BACKUP_SECRET_NAME:-longhorn-seaweedfs-backup}"
@@ -256,6 +257,8 @@ log "Installing Longhorn through Argo CD"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$rendered_manifest" \
   --application "longhorn"
+log "Applying longhorn-single StorageClass manifest"
+kubectl apply -f "$longhorn_single_storageclass_manifest" >/dev/null
 wait_for_storage_class
 make_storage_class_default
 apply_longhorn_recurring_jobs
