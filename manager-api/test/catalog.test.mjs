@@ -53,7 +53,7 @@ test('catalog prefers the persisted cluster identity over the VM slug when a clu
     assert.equal(catalog.cluster_slug, 'cluster');
     assert.deepEqual(
       chooseIngress.inputs.find((input) => input.id === 'ingress_route')?.options.map((option) => option.value),
-      ['wiredoor', 'metallb', 'tailscale'],
+      ['wiredoor', 'netbird', 'metallb', 'tailscale'],
     );
     assert.equal(
       provisionNodes.inputs.find((input) => input.id === 'name')?.default,
@@ -101,7 +101,7 @@ test('catalog falls back to the VM slug before a persisted cluster exists', () =
     assert.equal(catalog.cluster_slug, 'prd');
     assert.deepEqual(
       chooseIngress.inputs.find((input) => input.id === 'ingress_route')?.options.map((option) => option.value),
-      ['wiredoor', 'cloudflare-tunnel', 'metallb', 'tailscale'],
+      ['wiredoor', 'netbird', 'cloudflare-tunnel', 'metallb', 'tailscale'],
     );
     assert.equal(
       provisionNodes.inputs.find((input) => input.id === 'name')?.default,
@@ -198,7 +198,9 @@ test('app catalog exposes apps while the wizard catalog keeps them out of sight'
     const zulipCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-zulip');
     const vaultwardenCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-vaultwarden');
     const hedgedocCard = appCatalog.categories[0].steps.find((step) => step.id === 'install-hedgedoc');
-    const mediaBundle = appCatalog.bundles.find((bundle) => bundle.id === 'media');
+    const mijnBureauBundle = appCatalog.bundles.find((bundle) => bundle.id === 'mijn-bureau');
+    const openDeskBundle = appCatalog.bundles.find((bundle) => bundle.id === 'opendesk');
+    const laSuiteBundle = appCatalog.bundles.find((bundle) => bundle.id === 'lasuite');
     assert.equal(nextcloudCard?.title, 'Install Nextcloud');
     assert.equal(nextcloudCard?.placeholder, false);
     assert.equal(nextcloudCard?.installable, true);
@@ -232,7 +234,15 @@ test('app catalog exposes apps while the wizard catalog keeps them out of sight'
     assert.deepEqual(freshrssCard?.depends_on, []);
     assert.deepEqual(zulipCard?.depends_on, []);
     assert.equal(freshrssCard?.runner?.script, 'categories/apps/steps/install-freshrss/run.sh');
-    assert.equal(mediaBundle, undefined);
+    assert.equal(mijnBureauBundle?.title, 'Mijn Bureau');
+    assert.equal(mijnBureauBundle?.iconUrl, '/assets/step-icons/install-nextcloud.svg');
+    assert.deepEqual(mijnBureauBundle?.apps, ['install-nextcloud', 'install-outline', 'install-jitsi']);
+    assert.equal(openDeskBundle?.title, 'openDesk');
+    assert.equal(openDeskBundle?.iconUrl, '/assets/step-icons/install-opencloud.svg');
+    assert.deepEqual(openDeskBundle?.apps, ['install-opencloud', 'install-nextcloud', 'install-zulip', 'install-jitsi']);
+    assert.equal(laSuiteBundle?.title, 'La Suite');
+    assert.equal(laSuiteBundle?.iconUrl, '/assets/step-icons/install-outline.svg');
+    assert.deepEqual(laSuiteBundle?.apps, ['install-outline', 'install-nextcloud', 'install-zulip', 'install-jitsi']);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

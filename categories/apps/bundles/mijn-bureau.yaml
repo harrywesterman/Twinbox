@@ -1,0 +1,10 @@
+id: mijn-bureau
+title: Mijn Bureau
+summary: Dutch government workspace bundle for shared files, documents, and meetings.
+order: 10
+iconUrl: /assets/step-icons/install-nextcloud.svg
+iconAlt: Mijn Bureau icon
+apps:
+  - install-nextcloud
+  - install-outline
+  - install-jitsi

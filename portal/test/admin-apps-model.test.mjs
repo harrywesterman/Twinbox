@@ -41,6 +41,8 @@ test('admin app catalog view model enriches bundles with member cards', () => {
           title: 'Media',
           summary: 'Photo and video tools',
           order: 10,
+          iconUrl: '/assets/custom/media.svg',
+          iconAlt: 'Media bundle icon',
           apps: ['install-immich', 'install-nextcloud'],
         },
       ],
@@ -53,6 +55,8 @@ test('admin app catalog view model enriches bundles with member cards', () => {
   assert.equal(viewModel.filteredBundles[0].cards.length, 2);
   assert.equal(viewModel.filteredBundles[0].status, 'ready');
   assert.equal(viewModel.filteredBundles[0].installedCount, 1);
+  assert.equal(viewModel.filteredBundles[0].iconUrl, '/assets/custom/media.svg');
+  assert.equal(viewModel.filteredBundles[0].iconAlt, 'Media bundle icon');
   assert.equal(viewModel.filteredBundles[0].searchText.includes('photo and video tools'), true);
   assert.equal(viewModel.selectedApp, null);
   assert.deepEqual(viewModel.cards.map((card) => card.title), ['Install Immich', 'Install Nextcloud']);

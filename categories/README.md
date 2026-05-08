@@ -50,6 +50,20 @@ Each step directory contains a `step.yaml` manifest and a runner script.
 | `secrets.files` | Secret references with `scope`, `item`, `attachment`, `format` |
 | `runner.script` | Relative path to the shell script to execute |
 
+## Bundle manifests
+
+Bundle manifests live in `categories/apps/bundles/` and are loaded into the app catalog when the manager API asks for bundle definitions.
+
+| Field | Description |
+|-------|-------------|
+| `id` | Unique bundle identifier |
+| `title` | Display name |
+| `summary` | Short description |
+| `order` | Numeric sort order in the catalog |
+| `apps` | Array of app step ids that the bundle installs |
+| `iconUrl` | Optional bundle artwork |
+| `iconAlt` | Optional accessible label for the artwork |
+
 ## Categories
 
 ### management-vm (order: 10)

@@ -1,0 +1,11 @@
+id: opendesk
+title: openDesk
+summary: German sovereign workspace bundle for collaboration, search, and meetings.
+order: 20
+iconUrl: /assets/step-icons/install-opencloud.svg
+iconAlt: openDesk icon
+apps:
+  - install-opencloud
+  - install-nextcloud
+  - install-zulip
+  - install-jitsi
