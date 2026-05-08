@@ -30,16 +30,55 @@ spec:
                 - op: replace
                   path: /data/csp.yaml
                   value: |-
-                    headers:
-                      content-security-policy:
-                        frame-ancestors:
-                          - "https://opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
-                          - "https://collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
-                          - "https://wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
-                    origins:
-                      - "https://opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
-                      - "https://collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
-                      - "https://wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+                    directives:
+                      child-src:
+                        - "'self'"
+                      connect-src:
+                        - "'self'"
+                        - "blob:"
+                        - "https://authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/"
+                        - "https://collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/"
+                        - "wss://collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/"
+                        - "https://raw.githubusercontent.com/opencloud-eu/awesome-apps/"
+                        - "https://update.opencloud.eu/"
+                      default-src:
+                        - "'none'"
+                      font-src:
+                        - "'self'"
+                      frame-ancestors:
+                        - "'self'"
+                        - "https://opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+                        - "https://collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+                        - "https://wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+                      frame-src:
+                        - "'self'"
+                        - "blob:"
+                        - "https://embed.diagrams.net/"
+                        - "https://collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/"
+                        - "https://wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/"
+                      img-src:
+                        - "'self'"
+                        - "data:"
+                        - "blob:"
+                        - "https://raw.githubusercontent.com/opencloud-eu/awesome-apps/"
+                        - "https://collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/"
+                      manifest-src:
+                        - "'self'"
+                      media-src:
+                        - "'self'"
+                      object-src:
+                        - "'self'"
+                        - "blob:"
+                      script-src:
+                        - "'self'"
+                        - "'unsafe-inline'"
+                        - "https://authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/"
+                      style-src:
+                        - "'self'"
+                        - "'unsafe-inline'"
+                      worker-src:
+                        - "'self'"
+                        - "blob:"
             - target:
                 kind: Deployment
                 name: opencloud-collabora

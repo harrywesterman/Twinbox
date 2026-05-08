@@ -7,16 +7,55 @@ metadata:
     app.kubernetes.io/name: opencloud
 data:
   csp.yaml: |
-    headers:
-      content-security-policy:
-        frame-ancestors:
-          - "https://opencloud.__ZONE_NAME__"
-          - "https://collabora.__ZONE_NAME__"
-          - "https://wopiserver.__ZONE_NAME__"
-    origins:
-      - "https://opencloud.__ZONE_NAME__"
-      - "https://collabora.__ZONE_NAME__"
-      - "https://wopiserver.__ZONE_NAME__"
+    directives:
+      child-src:
+        - "'self'"
+      connect-src:
+        - "'self'"
+        - "blob:"
+        - "https://authentik.__ZONE_NAME__/"
+        - "https://collabora.__ZONE_NAME__/"
+        - "wss://collabora.__ZONE_NAME__/"
+        - "https://raw.githubusercontent.com/opencloud-eu/awesome-apps/"
+        - "https://update.opencloud.eu/"
+      default-src:
+        - "'none'"
+      font-src:
+        - "'self'"
+      frame-ancestors:
+        - "'self'"
+        - "https://opencloud.__ZONE_NAME__"
+        - "https://collabora.__ZONE_NAME__"
+        - "https://wopiserver.__ZONE_NAME__"
+      frame-src:
+        - "'self'"
+        - "blob:"
+        - "https://embed.diagrams.net/"
+        - "https://collabora.__ZONE_NAME__/"
+        - "https://wopiserver.__ZONE_NAME__/"
+      img-src:
+        - "'self'"
+        - "data:"
+        - "blob:"
+        - "https://raw.githubusercontent.com/opencloud-eu/awesome-apps/"
+        - "https://collabora.__ZONE_NAME__/"
+      manifest-src:
+        - "'self'"
+      media-src:
+        - "'self'"
+      object-src:
+        - "'self'"
+        - "blob:"
+      script-src:
+        - "'self'"
+        - "'unsafe-inline'"
+        - "https://authentik.__ZONE_NAME__/"
+      style-src:
+        - "'self'"
+        - "'unsafe-inline'"
+      worker-src:
+        - "'self'"
+        - "blob:"
   proxy.yaml: |
     role_assignment:
       driver: oidc

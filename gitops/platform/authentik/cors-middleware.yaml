@@ -4,7 +4,7 @@ metadata:
   name: authentik-cors
   namespace: authentik
   annotations:
-    twinbox.io/description: Allow Dashy browser-side OIDC discovery and token requests from the start page origin.
+    twinbox.io/description: Allow browser-side OIDC discovery and token requests from approved Twinbox app origins.
 spec:
   headers:
     accessControlAllowMethods:
@@ -15,7 +15,6 @@ spec:
       - "*"
     accessControlAllowOriginList:
       - https://admin.__ZONE_NAME__
+      - https://opencloud.__ZONE_NAME__
     accessControlMaxAge: 100
     addVaryHeader: true
-    customResponseHeaders:
-      Access-Control-Allow-Origin: https://admin.__ZONE_NAME__
