@@ -153,6 +153,45 @@ delete_authentik_policy_binding_for_application_group() {
   fi
 }
 
+remove_provider_from_embedded_outpost() {
+  local provider_name="$1"
+  local response provider_pk outpost_id current_providers updated_providers
+
+  response="$(authentik_api_get "/providers/proxy/?page_size=200")" || return 0
+  provider_pk="$(
+    jq -r \
+      --arg provider_name "$provider_name" \
+      '.results[]?
+        | select((.name // "") == $provider_name)
+        | .pk // .id // .uuid // empty' <<<"$response" | head -n1
+  )"
+  [[ -n "$provider_pk" ]] || return 0
+
+  response="$(authentik_api_get "/outposts/instances/?page_size=100")" || return 0
+  outpost_id="$(
+    jq -r '.results[]? | select(.name == "authentik Embedded Outpost") | .pk // .id // .uuid // empty' <<<"$response" | head -n1
+  )"
+  [[ -n "$outpost_id" ]] || return 0
+
+  current_providers="$(
+    jq -c --arg outpost_id "$outpost_id" '.results[]? | select((.pk // .id // .uuid // "") == $outpost_id) | .providers // []' <<<"$response"
+  )"
+  [[ -n "$current_providers" ]] || current_providers="[]"
+
+  updated_providers="$(
+    printf '%s\n' "$current_providers" \
+      | jq --arg provider_pk "$provider_pk" '
+          map(tostring)
+          | map(select(. != $provider_pk))
+        '
+  )"
+
+  if [[ "$current_providers" != "$updated_providers" ]]; then
+    log "Removing provider ${provider_name} from the embedded Authentik outpost"
+    authentik_api_write PATCH "/outposts/instances/${outpost_id}/" "$(jq -n --argjson providers "$updated_providers" '{providers: $providers}')" >/dev/null
+  fi
+}
+
 delete_openbao_global_secret() {
   local secret_name="$1"
 
@@ -231,6 +270,9 @@ case "$APP_NAME" in
   immich|nextcloud|audiobookshelf|karakeep|jitsi|opencloud|zulip)
     needs_authentik_cleanup=true
     ;;
+  grafana|loki)
+    needs_authentik_cleanup=true
+    ;;
 esac
 
 log "Deleting Argo CD application ${APP_NAME}"
@@ -261,5 +303,20 @@ if [[ "$needs_authentik_cleanup" == "true" ]]; then
   authentik_setup_forward
 fi
 cleanup_app_specific_state
+
+case "$APP_NAME" in
+  grafana)
+    delete_authentik_policy_binding_for_application_group "grafana" "admins"
+    delete_authentik_provider_by_name "Grafana"
+    delete_authentik_application_by_slug "grafana"
+    delete_openbao_global_secret "grafana-oidc"
+    ;;
+  loki)
+    delete_authentik_policy_binding_for_application_group "loki" "admins"
+    remove_provider_from_embedded_outpost "Loki"
+    delete_authentik_provider_by_name "Loki"
+    delete_authentik_application_by_slug "loki"
+    ;;
+esac
 
 log "App ${APP_NAME} removed"

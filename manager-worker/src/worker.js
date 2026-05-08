@@ -26,6 +26,8 @@ const dirs = {
   stepResults: path.join(dataRoot, "step-results"),
 };
 
+const OBSERVABILITY_PROFILES = new Set(["full", "minimal", "off"]);
+
 Object.values(dirs).forEach((dir) => fs.mkdirSync(dir, { recursive: true }));
 
 function readJson(file) {
@@ -137,6 +139,26 @@ function updateStepState(stepId, patch, clusterScope = null) {
   return next;
 }
 
+function updateClusterState(clusterId, patch) {
+  if (!clusterId) {
+    return null;
+  }
+
+  const file = path.join(dirs.clusters, `${clusterId}.json`);
+  if (!fs.existsSync(file)) {
+    return null;
+  }
+
+  const current = readJson(file);
+  const next = {
+    ...current,
+    ...patch,
+    updated_at: now(),
+  };
+  writeJson(file, next);
+  return next;
+}
+
 function queueMarkerPath(filePath) {
   return path.join(dirs.completed, path.basename(filePath));
 }
@@ -236,6 +258,22 @@ function recoverOrphanedRunningJobs() {
           cluster_instance_id: clusterInstanceId,
           finished_at: now(),
         }, clusterInstanceId || clusterId);
+      }
+
+      if (queued.type === "reconcile_observability") {
+        const clusterId = queued.cluster_id || queued.payload?.cluster?.id || null;
+        const cluster = queued.payload?.cluster || {};
+        const desiredProfile = OBSERVABILITY_PROFILES.has(String(queued.payload?.desired_profile || cluster.observability_profile || "full").trim().toLowerCase())
+          ? String(queued.payload?.desired_profile || cluster.observability_profile || "full").trim().toLowerCase()
+          : "full";
+        updateClusterState(clusterId, {
+          ...cluster,
+          observability_profile: desiredProfile,
+          observability_status: "failed",
+          observability_error: failureMessage,
+          observability_last_job_id: jobId,
+          observability_updated_at: now(),
+        });
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error || "unknown error");
@@ -702,6 +740,71 @@ async function handleApply(job) {
   }
 }
 
+async function handleReconcileObservability(job) {
+  const payload = job.payload || {};
+  const cluster = payload.cluster || {};
+  const clusterId = cluster?.id || job.cluster_id || null;
+  const clusterInstanceId = clusterScopeId(cluster, job.cluster_instance_id || null);
+  const desiredProfile = OBSERVABILITY_PROFILES.has(String(payload.desired_profile || cluster.observability_profile || "full").trim().toLowerCase())
+    ? String(payload.desired_profile || cluster.observability_profile || "full").trim().toLowerCase()
+    : "full";
+  const secretRuntime = resolveJobSecretRuntime(payload, clusterId);
+  const redact = buildRedactor(secretRuntime.redactions);
+  const reconcileCluster = {
+    ...cluster,
+    observability_profile: desiredProfile,
+    observability_status: "applying",
+    observability_error: null,
+    observability_last_job_id: job.id,
+    observability_updated_at: now(),
+  };
+
+  updateClusterState(clusterId, {
+    ...reconcileCluster,
+    observability_status: "applying",
+    observability_error: null,
+    observability_last_job_id: job.id,
+    observability_updated_at: now(),
+  });
+
+  try {
+    await runCommand(
+      job.id,
+      "bash",
+      ["scripts/manager/reconcile-observability.sh"],
+      {
+        STEP_CONTEXT_JSON: JSON.stringify({ cluster: reconcileCluster }),
+        OBSERVABILITY_PROFILE: desiredProfile,
+        TWINBOX_OBSERVABILITY_PROFILE: desiredProfile,
+        TWINBOX_CLUSTER_ID: clusterId || "",
+        TWINBOX_CLUSTER_INSTANCE_ID: clusterInstanceId || "",
+        ...secretRuntime.env,
+      },
+      redact,
+      secretRuntime.strip_env,
+    );
+
+    updateClusterState(clusterId, {
+      ...reconcileCluster,
+      observability_status: "ready",
+      observability_error: null,
+      observability_last_job_id: job.id,
+      observability_updated_at: now(),
+    });
+  } catch (err) {
+    updateClusterState(clusterId, {
+      ...reconcileCluster,
+      observability_status: "failed",
+      observability_error: err.message,
+      observability_last_job_id: job.id,
+      observability_updated_at: now(),
+    });
+    throw err;
+  } finally {
+    secretRuntime.cleanup();
+  }
+}
+
 async function handleBootstrap(job) {
   const cluster = job.payload.cluster || job.payload;
   await handleApply({ id: job.id, payload: cluster });
@@ -1079,6 +1182,13 @@ async function handleJob(queueFile) {
       await handleApply({ id: queued.id, payload: queued.payload });
     } else if (queued.type === "bootstrap_cluster") {
       await handleBootstrap({ id: queued.id, payload: queued.payload });
+    } else if (queued.type === "reconcile_observability") {
+      await handleReconcileObservability({
+        id: queued.id,
+        payload: queued.payload,
+        cluster_id: queued.cluster_id,
+        cluster_instance_id: queued.cluster_instance_id,
+      });
     } else if (queued.type === "run_step") {
       await handleRunStep({
         id: queued.id,

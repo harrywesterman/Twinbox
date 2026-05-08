@@ -56,6 +56,17 @@ const defaultPortalConfig = {
     emptyStateDescription: "Voeg eerst beheerbare groepen toe aan de portal-config.",
     manageableGroups: [],
   },
+  observability: {
+    eyebrow: "Admin",
+    title: "Observability control",
+    description: "Choose how much monitoring the cluster should carry.",
+    footnote: "Metrics-server stays enabled in every mode so kubectl top keeps working.",
+    profiles: {
+      minimal: {},
+      full: {},
+      off: {},
+    },
+  },
   apps: [],
   adminApps: [],
   intranetLinks: [],
@@ -276,6 +287,14 @@ async function loadPortalConfig() {
       ...(config?.userAdmin || {}),
       manageableGroups: normalizeManageableGroupsConfig(config?.userAdmin?.manageableGroups),
     },
+    observability: {
+      ...defaultPortalConfig.observability,
+      ...(config?.observability || {}),
+      profiles: {
+        ...defaultPortalConfig.observability.profiles,
+        ...(config?.observability?.profiles || {}),
+      },
+    },
   };
 }
 
@@ -326,6 +345,23 @@ async function requestManagerJson(pathname, { method = "GET", body = undefined, 
   }
 
   return parsed;
+}
+
+async function loadActiveClusterState() {
+  const catalog = await requestManagerJson("/api/apps/catalog");
+  const activeCluster = catalog?.active_cluster;
+  if (!activeCluster?.id) {
+    const error = new Error("cluster not found");
+    error.status = 404;
+    throw error;
+  }
+
+  const cluster = await requestManagerJson(`/api/clusters/${encodeURIComponent(activeCluster.id)}`);
+  return {
+    catalog,
+    activeCluster,
+    cluster,
+  };
 }
 
 function getOrigin(req) {
@@ -822,6 +858,44 @@ app.get("/api/admin/apps/catalog", async (req, res) => {
     res.json(catalog);
   } catch (error) {
     res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to load apps" });
+  }
+});
+
+app.get("/api/admin/observability", async (req, res) => {
+  const session = requireAdminSession(req, res);
+  if (!session) {
+    return;
+  }
+
+  try {
+    const { cluster } = await loadActiveClusterState();
+    res.json({
+      cluster,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to load observability state" });
+  }
+});
+
+app.put("/api/admin/observability", async (req, res) => {
+  const session = requireAdminSession(req, res);
+  if (!session) {
+    return;
+  }
+
+  try {
+    const { activeCluster } = await loadActiveClusterState();
+    const result = await requestManagerJson(`/api/clusters/${encodeURIComponent(activeCluster.id)}/observability`, {
+      method: "PUT",
+      body: {
+        profile: req.body?.profile,
+      },
+    });
+
+    res.status(202).json(result);
+  } catch (error) {
+    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to update observability" });
   }
 });
 

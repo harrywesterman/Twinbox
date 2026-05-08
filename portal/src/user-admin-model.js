@@ -46,6 +46,11 @@ export function buildAdminNavigationItems({ isAdmin = false } = {}) {
       label: 'App installs',
     },
     {
+      id: 'admin-observability',
+      path: '/admin/observability',
+      label: 'Observability',
+    },
+    {
       id: 'admin-users',
       path: '/admin/users',
       label: 'Users & groups',

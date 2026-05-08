@@ -10,7 +10,19 @@ source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
 export KUBECONFIG="$KUBECONFIG_FILE"
 
 metrics_server_manifest_path="$WORKSPACE_ROOT/gitops/apps/metrics-server.yaml"
-manifest_path="$WORKSPACE_ROOT/gitops/apps/prometheus.yaml"
+observability_profile="${TWINBOX_OBSERVABILITY_PROFILE:-full}"
+case "$observability_profile" in
+  minimal)
+    manifest_path="$WORKSPACE_ROOT/gitops/apps/prometheus-minimal.yaml"
+    ;;
+  full|off|"")
+    manifest_path="$WORKSPACE_ROOT/gitops/apps/prometheus.yaml"
+    ;;
+  *)
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: Unsupported TWINBOX_OBSERVABILITY_PROFILE=${observability_profile}" >&2
+    exit 1
+    ;;
+esac
 rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/prometheus-application.XXXXXX.yaml")"
 trap 'rm -f "$rendered_manifest"' EXIT
 

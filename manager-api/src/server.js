@@ -8,6 +8,7 @@ import {
   buildBootstrapPayload,
   buildClusterFromRequest,
   normalizeClusterName,
+  normalizeObservabilityProfile,
   persistCluster,
 } from "./lib/clusters.js";
 import { buildAppCatalogResponse, buildCatalogResponse, validateStepInputs } from "./lib/catalog.js";
@@ -1647,6 +1648,50 @@ app.get("/api/clusters/:clusterId", (req, res) => {
     return res.status(404).json({ error: "cluster not found" });
   }
   return res.json(readJson(file));
+});
+
+app.put("/api/clusters/:clusterId/observability", (req, res) => {
+  try {
+    const file = path.join(dirs.clusters, `${req.params.clusterId}.json`);
+    if (!fs.existsSync(file)) {
+      return res.status(404).json({ error: "cluster not found" });
+    }
+
+    const cluster = readJson(file);
+    const profile = normalizeObservabilityProfile(req.body?.profile);
+    const clusterInstanceId = cluster.cluster_instance_id || cluster.instance_id || null;
+    const updatedCluster = {
+      ...cluster,
+      observability_profile: profile,
+      observability_status: "applying",
+      observability_error: null,
+      observability_last_job_id: null,
+      observability_updated_at: now(),
+      updated_at: now(),
+    };
+
+    persistCluster(dirs, updatedCluster);
+    const job = queueJob(dirs, "reconcile_observability", updatedCluster.id, buildApplyJobPayload(updatedCluster));
+    persistCluster(dirs, {
+      ...updatedCluster,
+      observability_last_job_id: job.id,
+      observability_status: "applying",
+      observability_updated_at: now(),
+    });
+
+    return res.status(202).json({
+      cluster_id: updatedCluster.id,
+      cluster_instance_id: clusterInstanceId,
+      observability_profile: profile,
+      observability_status: "applying",
+      job_id: job.id,
+      cluster: updatedCluster,
+    });
+  } catch (error) {
+    return res.status(error?.status || 500).json({
+      error: error instanceof Error ? error.message : "failed to update observability",
+    });
+  }
 });
 
 app.get("/api/jobs/:jobId", (req, res) => {

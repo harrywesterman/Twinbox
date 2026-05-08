@@ -64,6 +64,9 @@ test("buildPortalConfig keeps operator tools out of the user applications grid a
   assert.equal(config.settings.authentikAdminUrl, "https://authentik.tst.example.com/if/admin/");
   assert.equal(config.settings.authentikUserUrl, "https://authentik.tst.example.com/if/user/#/settings;{\"page\":\"page-details\"}");
   assert.equal(config.settings.authentikOtpUrl, "https://authentik.tst.example.com/if/user/#/settings;{\"page\":\"page-mfa\"}");
+  assert.equal(config.observability.title, "Observability control");
+  assert.equal(config.observability.profiles.minimal.summary, "Small-cluster mode");
+  assert.equal(config.observability.profiles.off.priority, "destructive");
   assert.deepEqual(config.apps.map((card) => card.title), ["Audiobookshelf", "Immich", "OpenCloud"]);
   assert.equal(config.appSections.length, 1);
   assert.equal(config.appSections[0].name, "Apps");

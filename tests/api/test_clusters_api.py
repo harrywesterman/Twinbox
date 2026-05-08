@@ -38,6 +38,18 @@ def _post_json(url, payload):
         return e.code, json.loads(body)
 
 
+def _put_json(url, payload):
+    data = json.dumps(payload).encode("utf-8")
+    req = request.Request(url, data=data, method="PUT")
+    req.add_header("Content-Type", "application/json")
+    try:
+        with request.urlopen(req, timeout=3) as resp:
+            return resp.status, json.loads(resp.read().decode("utf-8"))
+    except error.HTTPError as e:
+        body = e.read().decode("utf-8")
+        return e.code, json.loads(body)
+
+
 def _get_json(url):
     req = request.Request(url, method="GET")
     try:
@@ -250,6 +262,70 @@ EOF
             )
             assert status == 409
             assert body["error"] == "cluster instance mismatch"
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
+def test_update_cluster_observability_persists_profile_and_queues_job():
+    with tempfile.TemporaryDirectory() as td:
+        data_dir = Path(td) / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        cluster_dir = data_dir / "clusters"
+        cluster_dir.mkdir(parents=True, exist_ok=True)
+        cluster_file = cluster_dir / "cluster-test.json"
+        cluster_file.write_text(
+            json.dumps(
+                {
+                    "id": "cluster-test",
+                    "slug": "tst",
+                    "dns_domain": "example.com",
+                    "cluster_instance_id": "cluster-test-instance",
+                    "observability_profile": "full",
+                    "observability_status": "ready",
+                    "observability_error": None,
+                    "observability_last_job_id": None,
+                    "created_at": "2026-01-01T00:00:00.000Z",
+                    "updated_at": "2026-01-01T00:00:00.000Z",
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        port = _find_free_port()
+        env = os.environ.copy()
+        env["MANAGER_DATA_DIR"] = str(data_dir)
+        env["MANAGER_API_PORT"] = str(port)
+
+        proc = subprocess.Popen(
+            ["node", "manager-api/src/server.js"],
+            cwd=Path(__file__).resolve().parents[2],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            _wait_for_health(f"http://127.0.0.1:{port}")
+            status, body = _put_json(
+                f"http://127.0.0.1:{port}/api/clusters/cluster-test/observability",
+                {"profile": "minimal"},
+            )
+            assert status == 202
+            assert body["observability_profile"] == "minimal"
+            assert body["observability_status"] == "applying"
+            assert body["cluster"]["observability_profile"] == "minimal"
+            assert body["job_id"]
+
+            updated_cluster = json.loads(cluster_file.read_text())
+            assert updated_cluster["observability_profile"] == "minimal"
+            assert updated_cluster["observability_status"] == "applying"
+            assert updated_cluster["observability_last_job_id"] == body["job_id"]
+
+            job_file = data_dir / "jobs" / f"{body['job_id']}.json"
+            queue_file = data_dir / "queue" / "pending" / f"{body['job_id']}.json"
+            assert job_file.exists()
+            assert queue_file.exists()
         finally:
             proc.terminate()
             proc.wait(timeout=5)

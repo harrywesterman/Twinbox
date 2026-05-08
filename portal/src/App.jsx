@@ -1,6 +1,7 @@
 import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 
 import { buildAdminAppsViewModel } from './admin-apps-model.js';
+import { buildObservabilityViewModel } from './admin-observability-model.js';
 import {
   buildAdminAppInstallPath,
   buildBundleInstallQueue,
@@ -269,6 +270,72 @@ function useAdminAppsData(enabled) {
   useEffect(() => {
     load();
   }, [load]);
+
+  return {
+    ...state,
+    reload: useCallback((options) => load(options), [load]),
+  };
+}
+
+function useObservabilityAdminData(enabled) {
+  const [state, setState] = useState({
+    loading: false,
+    refreshing: false,
+    error: '',
+    cluster: null,
+  });
+
+  const load = useCallback(async ({ silent = false } = {}) => {
+    if (!enabled) {
+      setState({
+        loading: false,
+        refreshing: false,
+        error: '',
+        cluster: null,
+      });
+      return;
+    }
+
+    setState((current) => ({
+      ...current,
+      loading: current.cluster === null && !silent,
+      refreshing: current.cluster !== null || silent,
+      error: '',
+    }));
+
+    try {
+      const payload = await requestJson('/api/admin/observability');
+      setState({
+        loading: false,
+        refreshing: false,
+        error: '',
+        cluster: payload?.cluster || null,
+      });
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        loading: false,
+        refreshing: false,
+        error: error instanceof Error ? error.message : 'Failed to load observability state.',
+      }));
+    }
+  }, [enabled]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useEffect(() => {
+    if (!enabled || state.cluster?.observability_status !== 'applying') {
+      return undefined;
+    }
+
+    const timer = window.setInterval(() => {
+      load({ silent: true });
+    }, 3000);
+
+    return () => window.clearInterval(timer);
+  }, [enabled, load, state.cluster?.observability_status]);
 
   return {
     ...state,
@@ -723,6 +790,8 @@ function statusTone(state) {
       return 'is-live';
     case 'ready':
       return 'is-ok';
+    case 'applying':
+      return 'is-warning';
     case 'pending':
     case 'running':
     case 'cancel_requested':
@@ -752,6 +821,8 @@ function statusLabel(state) {
       return 'queued';
     case 'running':
       return 'running';
+    case 'applying':
+      return 'applying';
     case 'cancel_requested':
       return 'stopping';
     case 'installing':
@@ -1269,6 +1340,308 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
   );
 }
 
+function ObservabilityProfileCard({ profile, isCurrent = false, isSelected = false, onSelect }) {
+  const tone = profile.priority === 'destructive'
+    ? 'is-bad'
+    : profile.priority === 'default'
+      ? 'is-live'
+      : 'is-ok';
+
+  return (
+    <article
+      className={`observability-card ${profile.priority === 'destructive' ? 'is-destructive' : ''} ${isCurrent ? 'is-current' : ''} ${isSelected ? 'is-selected' : ''}`.trim()}
+      style={{ '--accent': profile.accent }}
+    >
+      <div className="observability-card-head">
+        <div className="observability-card-title">
+          <p className="eyebrow">Profile</p>
+          <h3>{profile.label}</h3>
+        </div>
+        <span className={`status-chip ${tone}`}>
+          {isCurrent ? 'current' : isSelected ? 'selected' : profile.priority === 'destructive' ? 'destructive' : 'available'}
+        </span>
+      </div>
+      <p className="observability-card-summary">{profile.summary}</p>
+      <p className="observability-card-copy">{profile.description}</p>
+
+      <dl className="observability-footprint">
+        <div>
+          <dt>CPU</dt>
+          <dd>{profile.footprint?.cpu || '—'}</dd>
+        </div>
+        <div>
+          <dt>Memory</dt>
+          <dd>{profile.footprint?.memory || '—'}</dd>
+        </div>
+        <div>
+          <dt>Storage</dt>
+          <dd>{profile.footprint?.storage || '—'}</dd>
+        </div>
+      </dl>
+
+      {Array.isArray(profile.impact) && profile.impact.length > 0 ? (
+        <ul className="observability-mini-list">
+          {profile.impact.slice(0, 3).map((item) => <li key={item}>{item}</li>)}
+        </ul>
+      ) : null}
+
+      {profile.warning ? (
+        <div className={`inline-notice ${profile.priority === 'destructive' ? 'is-danger' : 'is-accent'}`}>
+          <strong>Watch out</strong>
+          <span>{profile.warning}</span>
+        </div>
+      ) : null}
+
+      <button
+        type="button"
+        className={profile.priority === 'destructive' ? 'secondary-button' : 'primary-button'}
+        onClick={onSelect}
+        aria-pressed={isSelected}
+      >
+        {isSelected ? 'Selected' : 'Select mode'}
+      </button>
+    </article>
+  );
+}
+
+function ObservabilityAdminPage({ config, observabilityState, onNavigate }) {
+  const [selectedProfile, setSelectedProfile] = useState('');
+  const [running, setRunning] = useState(false);
+  const [pageError, setPageError] = useState('');
+  const [pageNotice, setPageNotice] = useState('');
+
+  const viewModel = useMemo(() => buildObservabilityViewModel({
+    config,
+    cluster: observabilityState.cluster,
+    selectedProfile,
+  }), [config, observabilityState.cluster, selectedProfile]);
+
+  useEffect(() => {
+    if (!selectedProfile && viewModel.currentProfile) {
+      setSelectedProfile(viewModel.currentProfile);
+    }
+  }, [selectedProfile, viewModel.currentProfile]);
+
+  useEffect(() => {
+    setPageError(observabilityState.error || '');
+  }, [observabilityState.error]);
+
+  const selected = viewModel.selectedProfileCard || viewModel.currentProfileCard;
+  const canApply = Boolean(viewModel.canChangeProfile) && !running && Boolean(selected?.id);
+
+  const handleSelect = (profileId) => {
+    if (!profileId) {
+      return;
+    }
+    startTransition(() => {
+      setSelectedProfile(profileId);
+      setPageError('');
+      setPageNotice('');
+    });
+  };
+
+  const handleApply = async () => {
+    if (!selected?.id || !viewModel.clusterId) {
+      return;
+    }
+
+    setRunning(true);
+    setPageError('');
+    setPageNotice('');
+
+    try {
+      const response = await requestJson('/api/admin/observability', {
+        method: 'PUT',
+        body: JSON.stringify({ profile: selected.id }),
+      });
+
+      setPageNotice(
+        response?.observability_status === 'applying'
+          ? `${selected.label} is being reconciled on ${viewModel.clusterName}.`
+          : `${selected.label} was submitted for reconciliation.`,
+      );
+      await observabilityState.reload({ silent: true });
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : 'Failed to update observability.');
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  if (observabilityState.loading && !observabilityState.cluster) {
+    return (
+      <Panel>
+        <SectionTitle
+          eyebrow="Admin"
+          title="Observability control"
+          description="Loading the current cluster profile."
+        />
+        <p className="muted-copy">Twinbox is reading the cluster policy and current observability state.</p>
+      </Panel>
+    );
+  }
+
+  if (observabilityState.error && !observabilityState.cluster) {
+    return (
+      <Panel>
+        <SectionTitle
+          eyebrow="Admin"
+          title="Observability control"
+          description="The current cluster state could not be loaded."
+        />
+        <div className="inline-notice is-danger">
+          <strong>Something needs attention.</strong>
+          <span>{observabilityState.error}</span>
+        </div>
+        <button type="button" className="secondary-button" onClick={() => onNavigate('/admin/apps')}>
+          Back to admin
+        </button>
+      </Panel>
+    );
+  }
+
+  return (
+    <div className="observability-layout">
+      <Panel className="observability-shell">
+        <div className="observability-shell-head">
+          <SectionTitle
+            eyebrow={viewModel.eyebrow}
+            title={viewModel.title}
+            description={viewModel.description}
+          />
+          <div className="hero-actions observability-shell-actions">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => observabilityState.reload()}
+              disabled={observabilityState.refreshing}
+            >
+              {observabilityState.refreshing ? 'Refreshing…' : 'Refresh state'}
+            </button>
+            <button type="button" className="secondary-button" onClick={() => onNavigate('/admin/apps')}>
+              Back home
+            </button>
+          </div>
+        </div>
+
+        <div className="observability-summary-strip">
+          <div>
+            <span className={`status-chip ${viewModel.currentStatusTone}`}>{viewModel.currentStatusLabel}</span>
+            <strong>{viewModel.clusterName}</strong>
+            <span>Current profile: {viewModel.currentProfileCard?.label || 'Unknown'}</span>
+            {viewModel.currentJobId ? <span>Job: {viewModel.currentJobId}</span> : null}
+          </div>
+          <div>
+            <span className={`status-chip ${selected?.priority === 'destructive' ? 'is-bad' : selected?.priority === 'default' ? 'is-live' : 'is-ok'}`}>
+              Selected
+            </span>
+            <strong>{selected?.label || 'Select a profile'}</strong>
+            <span>{selected?.summary || 'Choose a profile below to review its impact.'}</span>
+          </div>
+          <div>
+            <span className="status-chip is-neutral">Baseline</span>
+            <strong>Metrics-server stays on</strong>
+            <span>{viewModel.footnote}</span>
+          </div>
+        </div>
+
+        {viewModel.currentStatus === 'failed' && viewModel.currentError ? (
+          <div className="inline-notice is-danger">
+            <strong>Reconciliation failed</strong>
+            <span>{viewModel.currentError}</span>
+          </div>
+        ) : null}
+
+        <div className="observability-profile-grid">
+          {viewModel.profiles.filter((profile) => profile.id !== 'off').map((profile) => (
+            <ObservabilityProfileCard
+              key={profile.id}
+              profile={profile}
+              isCurrent={viewModel.currentProfile === profile.id}
+              isSelected={selected?.id === profile.id}
+              onSelect={() => handleSelect(profile.id)}
+            />
+          ))}
+        </div>
+
+        <ObservabilityProfileCard
+          profile={viewModel.profiles.find((profile) => profile.id === 'off') || viewModel.currentProfileCard}
+          isCurrent={viewModel.currentProfile === 'off'}
+          isSelected={selected?.id === 'off'}
+          onSelect={() => handleSelect('off')}
+        />
+
+        <div className="observability-detail-panel">
+          <SectionTitle
+            eyebrow="Impact"
+            title={`${selected?.label || 'Selected profile'} details`}
+            description="Review what stays, what disappears, and how much Longhorn churn this mode should create."
+          />
+          <div className="observability-detail-grid">
+            <article className="observability-detail-box">
+              <strong>Kept</strong>
+              <ul>
+                {(selected?.keeps || []).map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </article>
+            <article className="observability-detail-box">
+              <strong>Removed</strong>
+              <ul>
+                {(selected?.removes || []).map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </article>
+            <article className="observability-detail-box">
+              <strong>Footprint</strong>
+              <dl className="observability-footprint">
+                <div>
+                  <dt>CPU</dt>
+                  <dd>{selected?.footprint?.cpu || '—'}</dd>
+                </div>
+                <div>
+                  <dt>Memory</dt>
+                  <dd>{selected?.footprint?.memory || '—'}</dd>
+                </div>
+                <div>
+                  <dt>Storage</dt>
+                  <dd>{selected?.footprint?.storage || '—'}</dd>
+                </div>
+              </dl>
+            </article>
+          </div>
+          {selected?.warning ? (
+            <div className={`inline-notice ${selected.priority === 'destructive' ? 'is-danger' : 'is-accent'}`}>
+              <strong>Watch out</strong>
+              <span>{selected.warning}</span>
+            </div>
+          ) : null}
+        </div>
+
+        {pageError ? (
+          <div className="inline-notice is-danger">
+            <strong>Something needs attention.</strong>
+            <span>{pageError}</span>
+          </div>
+        ) : null}
+        {pageNotice ? (
+          <div className="inline-notice is-accent">
+            <strong>{pageNotice}</strong>
+            <span>The cluster state will refresh while the reconciliation job runs.</span>
+          </div>
+        ) : null}
+
+        <div className="hero-actions observability-shell-actions">
+          <button type="button" className="primary-button" onClick={handleApply} disabled={!canApply}>
+            {running ? 'Applying…' : selected?.id === viewModel.currentProfile ? 'Reconcile current mode' : 'Apply selected mode'}
+          </button>
+          <button type="button" className="secondary-button" onClick={() => observabilityState.reload()} disabled={observabilityState.refreshing}>
+            Refresh state
+          </button>
+        </div>
+      </Panel>
+    </div>
+  );
+}
+
 function UserAdminPage({ config, directoryState, onNavigate }) {
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
@@ -1719,8 +2092,10 @@ export default function App() {
   const { sessionState, configState, preferences, setPreferences, statusState, refreshStatus } = usePortalData();
   const userAdminEnabled = Boolean(sessionState.session?.isAdmin) && route === '/admin/users';
   const adminAppsEnabled = Boolean(sessionState.session?.isAdmin) && route.startsWith('/admin/apps');
+  const observabilityAdminEnabled = Boolean(sessionState.session?.isAdmin) && route === '/admin/observability';
   const userAdminState = useUserAdminData(userAdminEnabled);
   const adminAppsState = useAdminAppsData(adminAppsEnabled);
+  const observabilityAdminState = useObservabilityAdminData(observabilityAdminEnabled);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -1848,6 +2223,9 @@ export default function App() {
         {route.startsWith('/admin/apps') && isAdmin ? (
           <AdminAppsPage onNavigate={navigate} adminAppsState={adminAppsState} installTarget={adminInstallTarget} />
         ) : null}
+        {route === '/admin/observability' && isAdmin ? (
+          <ObservabilityAdminPage config={config} observabilityState={observabilityAdminState} onNavigate={navigate} />
+        ) : null}
         {route === '/admin/users' && isAdmin ? (
           <UserAdminPage config={config} directoryState={userAdminState} onNavigate={navigate} />
         ) : null}
@@ -1860,6 +2238,12 @@ export default function App() {
         {route.startsWith('/admin/apps') && !isAdmin ? (
           <Panel>
             <SectionTitle eyebrow="Access denied" title="Admins only" description="App installs are only available to the admins group." />
+            <button type="button" className="secondary-button" onClick={() => navigate('/')}>Back home</button>
+          </Panel>
+        ) : null}
+        {route === '/admin/observability' && !isAdmin ? (
+          <Panel>
+            <SectionTitle eyebrow="Access denied" title="Admins only" description="Observability control is only available to the admins group." />
             <button type="button" className="secondary-button" onClick={() => navigate('/')}>Back home</button>
           </Panel>
         ) : null}

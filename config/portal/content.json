@@ -19,6 +19,92 @@
     "emptyStateDescription": "Voeg in config/portal/content.json expliciet de zakelijke groepen toe die deze eenvoudige beheerpagina mag tonen en beheren.",
     "manageableGroups": []
   },
+  "observability": {
+    "eyebrow": "Admin",
+    "title": "Observability control",
+    "description": "Choose how much monitoring the cluster should carry. Small clusters can switch to a stripped-down profile while bigger clusters can keep the full stack.",
+    "footnote": "Metrics-server stays enabled in every mode so kubectl top and basic capacity checks continue to work.",
+    "profiles": {
+      "minimal": {
+        "summary": "Small-cluster mode",
+        "description": "Keep metrics, drop the logs/traces/dashboard stack, and run Prometheus with short retention and no Longhorn-backed observability PVCs.",
+        "impact": [
+          "Prometheus stays on in a lightweight form",
+          "Grafana, Loki, Tempo, and Alloy are removed",
+          "Monitoring churn drops sharply on small hardware"
+        ],
+        "keeps": [
+          "Kubernetes resource metrics",
+          "Cluster capacity visibility",
+          "The smallest supported monitoring baseline"
+        ],
+        "removes": [
+          "Grafana dashboards",
+          "Log aggregation via Loki",
+          "Trace storage via Tempo",
+          "Kubernetes log and event shipping via Alloy"
+        ],
+        "footprint": {
+          "cpu": "~0.2-0.3 core",
+          "memory": "~256-512 MiB",
+          "storage": "no long-lived observability PVCs"
+        },
+        "warning": "This profile is tuned for small clusters and trades history depth for lower churn.",
+        "accent": "#14b8a6",
+        "priority": "low"
+      },
+      "full": {
+        "summary": "Full monitoring stack",
+        "description": "Keep Prometheus, Alertmanager, Loki, Tempo, Alloy, and Grafana active for the richest operator experience.",
+        "impact": [
+          "Prometheus, Alertmanager, Loki, Tempo, Alloy, and Grafana are active",
+          "Dashboards, logs, traces, and alerts stay available",
+          "Best for larger clusters or active debugging"
+        ],
+        "keeps": [
+          "Full Grafana dashboards",
+          "Log and trace exploration",
+          "Alertmanager notifications"
+        ],
+        "removes": [],
+        "footprint": {
+          "cpu": "~1.2-1.5 cores",
+          "memory": "~1.5-2 GiB",
+          "storage": "~50 GiB observability data"
+        },
+        "warning": "This is the most capable and the heaviest mode.",
+        "accent": "#2563eb",
+        "priority": "default"
+      },
+      "off": {
+        "summary": "Monitoring off",
+        "description": "Remove the observability apps and leave only the small baseline cluster utilities.",
+        "impact": [
+          "Prometheus is removed",
+          "Grafana, Loki, Tempo, and Alloy are removed",
+          "Observability PVCs are pruned"
+        ],
+        "keeps": [
+          "Metrics-server stays available",
+          "Cluster apps keep running",
+          "GitOps and storage remain intact"
+        ],
+        "removes": [
+          "Every observability application",
+          "All observability PVCs",
+          "Historical logs, traces, and dashboards"
+        ],
+        "footprint": {
+          "cpu": "~0 core beyond baseline utilities",
+          "memory": "~0 MiB for observability apps",
+          "storage": "observability PVCs are pruned"
+        },
+        "warning": "Use this only when you want the stack fully gone, not merely trimmed.",
+        "accent": "#ef4444",
+        "priority": "destructive"
+      }
+    }
+  },
   "links": [
     {
       "title": "GitHub",

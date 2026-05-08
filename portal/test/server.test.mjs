@@ -20,6 +20,7 @@ const fakeState = {
 };
 const managerState = {
   jobs: new Map(),
+  clusters: new Map(),
   nextJobId: 1,
 };
 const issuedAuthCodes = new Map();
@@ -427,6 +428,49 @@ const managerServer = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "GET" && pathname === "/api/clusters/cluster-test") {
+    const cluster = managerState.clusters.get("cluster-test") || {
+      id: "cluster-test",
+      cluster_instance_id: "cluster-test-instance",
+      slug: "tst",
+      dns_domain: "example.com",
+      observability_profile: "full",
+      observability_status: "ready",
+      observability_error: null,
+      observability_last_job_id: null,
+    };
+    sendJson(res, 200, cluster);
+    return;
+  }
+
+  if (req.method === "PUT" && pathname === "/api/clusters/cluster-test/observability") {
+    const body = await readRequestBody(req);
+    const profile = ["minimal", "full", "off"].includes(String(body.profile || "").trim().toLowerCase())
+      ? String(body.profile).trim().toLowerCase()
+      : "full";
+    const cluster = {
+      id: "cluster-test",
+      cluster_instance_id: "cluster-test-instance",
+      slug: "tst",
+      dns_domain: "example.com",
+      observability_profile: profile,
+      observability_status: "applying",
+      observability_error: null,
+      observability_last_job_id: `job-${managerState.nextJobId}`,
+    };
+    managerState.clusters.set("cluster-test", cluster);
+    sendJson(res, 202, {
+      cluster,
+      cluster_id: "cluster-test",
+      cluster_instance_id: "cluster-test-instance",
+      observability_profile: profile,
+      observability_status: "applying",
+      job_id: `job-${managerState.nextJobId}`,
+    });
+    managerState.nextJobId += 1;
+    return;
+  }
+
   if (req.method === "POST" && /^\/api\/apps\/[^/]+\/(install|uninstall)$/.test(pathname)) {
     const stepId = pathname.split("/").filter(Boolean).at(-2);
     const action = pathname.endsWith("/uninstall") ? "uninstall" : "install";
@@ -658,6 +702,8 @@ test("admin endpoints require an authenticated admin session", async () => {
 
   const unauthenticatedApps = await requestPortal("/api/admin/apps/catalog");
   assert.equal(unauthenticatedApps.status, 401);
+  const unauthenticatedObservability = await requestPortal("/api/admin/observability");
+  assert.equal(unauthenticatedObservability.status, 401);
 
   const memberCookie = createSignedSessionCookie({
     sub: "member-1",
@@ -673,6 +719,9 @@ test("admin endpoints require an authenticated admin session", async () => {
 
   const forbiddenApps = await requestPortal("/api/admin/apps/catalog", { cookie: memberCookie });
   assert.equal(forbiddenApps.status, 403);
+
+  const forbiddenObservability = await requestPortal("/api/admin/observability", { cookie: memberCookie });
+  assert.equal(forbiddenObservability.status, 403);
 });
 
 test("admin can create a user with a temporary password and approved groups", async () => {
@@ -849,6 +898,35 @@ test("portal config exposes a single Apps section and image icons", async () => 
   assert.equal(config.payload.apps.find((card) => card.title === "Immich")?.iconUrl, "/assets/step-icons/install-immich.svg");
   assert.equal(config.payload.apps.find((card) => card.title === "Immich")?.iconAlt, "Immich icon");
   assert.deepEqual(config.payload.apps.find((card) => card.title === "Paperless")?.mobileLinks, undefined);
+});
+
+test("admin can read and update observability state", async () => {
+  seedAuthentikState();
+
+  const adminCookie = createSignedSessionCookie({
+    sub: "admin-1",
+    name: "Portal Admin",
+    email: "admin@example.com",
+    preferredUsername: "portal-admin",
+    groups: ["admins"],
+    isAdmin: true,
+  });
+
+  const current = await requestPortal("/api/admin/observability", { cookie: adminCookie });
+  assert.equal(current.status, 200);
+  assert.equal(current.payload.cluster.id, "cluster-test");
+  assert.equal(current.payload.cluster.observability_profile, "full");
+
+  const updated = await requestPortal("/api/admin/observability", {
+    method: "PUT",
+    cookie: adminCookie,
+    body: {
+      profile: "minimal",
+    },
+  });
+  assert.equal(updated.status, 202);
+  assert.equal(updated.payload.observability_profile, "minimal");
+  assert.equal(updated.payload.cluster.observability_profile, "minimal");
 });
 
 test("admin path redirects to Authentik login", async () => {

@@ -18,6 +18,7 @@ import {
 
 const WORKER_DISK_MIN_GB = 10;
 const CONTROLPLANE_CPU_CORES = 2;
+const OBSERVABILITY_PROFILES = new Set(["full", "minimal", "off"]);
 
 export function normalizeClusterSlug(rawName) {
   const trimmed = String(rawName || "").trim().toLowerCase();
@@ -37,6 +38,14 @@ export function normalizeClusterName(rawName) {
     slug,
     name: `twinbox-${slug}`,
   };
+}
+
+export function normalizeObservabilityProfile(rawProfile) {
+  const profile = String(rawProfile || "").trim().toLowerCase();
+  if (OBSERVABILITY_PROFILES.has(profile)) {
+    return profile;
+  }
+  return "full";
 }
 
 function buildAllowedHostLookup(allowedHosts = []) {
@@ -394,6 +403,11 @@ export function buildClusterFromRequest(body, env, { allowedVmHosts = [], cluste
       vm_size_map: parsedVmSizeMap.value,
       vm_node_map: parsedVmNodeMap.value,
       status: "requested",
+      observability_profile: "full",
+      observability_status: "ready",
+      observability_error: null,
+      observability_last_job_id: null,
+      observability_updated_at: null,
       created_at: now(),
       updated_at: now(),
       metadata,
