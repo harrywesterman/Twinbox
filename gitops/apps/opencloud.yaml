@@ -85,7 +85,7 @@ spec:
               patch: |-
                 - op: replace
                   path: /spec/template/spec/containers/0/env/2/value
-                  value: https://opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                  value: https://opencloud-wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
                 - op: replace
                   path: /spec/template/spec/containers/0/env/3/value
                   value: opencloud-wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
