@@ -585,6 +585,20 @@ function emptySecretRuntime() {
   };
 }
 
+function withKubeconfigAliases(env = {}) {
+  const next = { ...env };
+  const kubeconfig = next.KUBECONFIG_FILE || next.TWINBOX_KUBECONFIG_FILE || next.KUBECONFIG;
+
+  if (kubeconfig && !next.KUBECONFIG_FILE) {
+    next.KUBECONFIG_FILE = kubeconfig;
+  }
+  if (kubeconfig && !next.KUBECONFIG) {
+    next.KUBECONFIG = kubeconfig;
+  }
+
+  return next;
+}
+
 function resolveJobSecretRuntime(payload, clusterId = null) {
   const cluster = payload?.context?.cluster || payload;
   const secretBundle = payload?.secret_bundle
@@ -768,18 +782,20 @@ async function handleReconcileObservability(job) {
   });
 
   try {
+    const scriptEnv = withKubeconfigAliases({
+      STEP_CONTEXT_JSON: JSON.stringify({ cluster: reconcileCluster }),
+      OBSERVABILITY_PROFILE: desiredProfile,
+      TWINBOX_OBSERVABILITY_PROFILE: desiredProfile,
+      TWINBOX_CLUSTER_ID: clusterId || "",
+      TWINBOX_CLUSTER_INSTANCE_ID: clusterInstanceId || "",
+      ...secretRuntime.env,
+    });
+
     await runCommand(
       job.id,
       "bash",
       ["scripts/manager/reconcile-observability.sh"],
-      {
-        STEP_CONTEXT_JSON: JSON.stringify({ cluster: reconcileCluster }),
-        OBSERVABILITY_PROFILE: desiredProfile,
-        TWINBOX_OBSERVABILITY_PROFILE: desiredProfile,
-        TWINBOX_CLUSTER_ID: clusterId || "",
-        TWINBOX_CLUSTER_INSTANCE_ID: clusterInstanceId || "",
-        ...secretRuntime.env,
-      },
+      scriptEnv,
       redact,
       secretRuntime.strip_env,
     );

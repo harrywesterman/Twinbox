@@ -805,6 +805,125 @@ def test_worker_passes_secret_runtime_to_portal_refresh_after_uninstall():
             proc.wait(timeout=5)
 
 
+def test_worker_reconcile_observability_aliases_twinbox_kubeconfig_to_kubeconfig_file():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        data = root / "data"
+        workspace = root / "workspace"
+        bootstrap = workspace / "bootstrap"
+        bin_dir = root / "bin"
+        pending = data / "queue" / "pending"
+        jobs = data / "jobs"
+        logs = data / "logs"
+
+        for d in [
+            pending,
+            jobs,
+            logs,
+            data / "clusters",
+            workspace / "scripts" / "manager",
+            bootstrap / "secrets" / "cluster" / "cluster_test" / "kubeconfig",
+            bin_dir,
+        ]:
+            d.mkdir(parents=True, exist_ok=True)
+
+        _prepare_fake_toolchain(bin_dir)
+        _write_pinned_defaults(workspace)
+
+        (bootstrap / "secrets" / "cluster" / "cluster_test" / "kubeconfig" / "kubeconfig").write_text(
+            "apiVersion: v1\nkind: Config\nclusters: []\nusers: []\ncontexts: []\n",
+            encoding="utf-8",
+        )
+        (workspace / "scripts" / "manager" / "reconcile-observability.sh").write_text(
+            "#!/bin/bash\n"
+            "set -euo pipefail\n"
+            ": \"${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}\"\n"
+            ": \"${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}\"\n"
+            ": \"${TWINBOX_KUBECONFIG_FILE:?missing TWINBOX_KUBECONFIG_FILE}\"\n"
+            ": \"${KUBECONFIG:?missing KUBECONFIG}\"\n"
+            "printf '%s' \"$KUBECONFIG_FILE\" > \"$MANAGER_DATA_DIR/kubeconfig-file.txt\"\n"
+            "printf '%s' \"$TWINBOX_KUBECONFIG_FILE\" > \"$MANAGER_DATA_DIR/twinbox-kubeconfig-file.txt\"\n"
+            "printf '%s' \"$KUBECONFIG\" > \"$MANAGER_DATA_DIR/kubeconfig-env.txt\"\n",
+            encoding="utf-8",
+        )
+        (workspace / "scripts" / "manager" / "reconcile-observability.sh").chmod(0o755)
+
+        payload = {
+            "cluster": {
+                "id": "cluster_test",
+                "name": "demo",
+            },
+            "desired_profile": "minimal",
+            "secret_bundle": {
+                "files": {
+                    "TWINBOX_KUBECONFIG_FILE": {
+                        "scope": "cluster",
+                        "item": "kubeconfig",
+                        "attachment": "kubeconfig",
+                        "format": "file",
+                    }
+                }
+            },
+        }
+        job = {
+            "id": "job_reconcile_observability",
+            "type": "reconcile_observability",
+            "cluster_id": "cluster_test",
+            "status": "pending",
+            "step": "queued",
+            "payload": payload,
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "started_at": None,
+            "finished_at": None,
+            "result": None,
+            "error": None,
+        }
+        (jobs / "job_reconcile_observability.json").write_text(json.dumps(job))
+        (pending / "job_reconcile_observability.json").write_text(json.dumps({
+            "id": "job_reconcile_observability",
+            "type": "reconcile_observability",
+            "cluster_id": "cluster_test",
+            "payload": payload,
+            "queued_at": "2026-01-01T00:00:00Z",
+        }))
+
+        env = os.environ.copy()
+        env["MANAGER_DATA_DIR"] = str(data)
+        env["WORKSPACE_ROOT"] = str(workspace)
+        env["TWINBOX_BOOTSTRAP_DIR"] = str(bootstrap)
+        env["WORKER_POLL_MS"] = "100"
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+
+        proc = subprocess.Popen(
+            ["node", "manager-worker/src/worker.js"],
+            cwd=Path(__file__).resolve().parents[2],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        try:
+            _wait_until(lambda: (data / "queue" / "completed" / "job_reconcile_observability.json").exists())
+
+            updated_job = json.loads((jobs / "job_reconcile_observability.json").read_text())
+            assert updated_job["status"] == "succeeded"
+
+            kubeconfig_file = (data / "kubeconfig-file.txt").read_text()
+            twinbox_kubeconfig_file = (data / "twinbox-kubeconfig-file.txt").read_text()
+            kubeconfig_env = (data / "kubeconfig-env.txt").read_text()
+            expected_path = str(
+                bootstrap / "secrets" / "cluster" / "cluster_test" / "kubeconfig" / "kubeconfig"
+            )
+            assert kubeconfig_file == expected_path
+            assert twinbox_kubeconfig_file == expected_path
+            assert kubeconfig_env == expected_path
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
 def test_worker_exits_on_tool_version_mismatch():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)

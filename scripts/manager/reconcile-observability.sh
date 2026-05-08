@@ -2,15 +2,15 @@
 set -euo pipefail
 
 : "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"
-: "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
-export KUBECONFIG="$KUBECONFIG_FILE"
 
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id // empty')"
 cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty')"
+cluster_kubeconfig_file="$WORKSPACE_ROOT/bootstrap/secrets/cluster/${cluster_id}/kubeconfig/kubeconfig"
+kubeconfig_file="${KUBECONFIG_FILE:-${TWINBOX_KUBECONFIG_FILE:-$cluster_kubeconfig_file}}"
 profile="${OBSERVABILITY_PROFILE:-${TWINBOX_OBSERVABILITY_PROFILE:-full}}"
 profile="$(printf '%s' "$profile" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
 
@@ -26,6 +26,11 @@ fail() {
 [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from STEP_CONTEXT_JSON"
 [[ -n "$cluster_slug" ]] || fail "Could not determine cluster slug from STEP_CONTEXT_JSON"
 [[ -n "$cluster_dns_domain" ]] || fail "Could not determine cluster DNS domain from STEP_CONTEXT_JSON"
+[[ -n "$kubeconfig_file" ]] || fail "Could not determine kubeconfig file for cluster ${cluster_id}"
+[[ -f "$kubeconfig_file" ]] || fail "kubeconfig not found at ${kubeconfig_file}"
+
+export KUBECONFIG_FILE="$kubeconfig_file"
+export KUBECONFIG="$kubeconfig_file"
 
 apply_full_stack() {
   log "Applying full observability stack"

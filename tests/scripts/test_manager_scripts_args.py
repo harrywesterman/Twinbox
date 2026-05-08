@@ -26,6 +26,9 @@ APPLY_ARGO_APP_SCRIPT = (
 RENDER_CILIUM_SCRIPT = REPO_ROOT / "scripts" / "manager" / "render-cilium-manifest.sh"
 CLOUDTTY_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-cloudtty.sh"
 PROMETHEUS_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-prometheus.sh"
+RECONCILE_OBSERVABILITY_SCRIPT = (
+    REPO_ROOT / "scripts" / "manager" / "reconcile-observability.sh"
+)
 TRAEFIK_MANAGER_SCRIPT = (
     REPO_ROOT / "scripts" / "manager" / "install-traefik-manager.sh"
 )
@@ -2517,6 +2520,18 @@ def test_prometheus_step_applies_kube_prometheus_stack():
     assert "cluster-health-alerts.yaml" in manifests_text
     assert "pvc-usage-alerts.yaml" in manifests_text
     assert "traefik-podmonitor.yaml" in prometheus_manifests_text
+
+
+def test_reconcile_observability_script_accepts_cluster_kubeconfig_fallback():
+    script_text = RECONCILE_OBSERVABILITY_SCRIPT.read_text(encoding="utf-8")
+
+    assert ': "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"' in script_text
+    assert ': "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"' not in script_text
+    assert "cluster_kubeconfig_file" in script_text
+    assert 'kubeconfig_file="${KUBECONFIG_FILE:-${TWINBOX_KUBECONFIG_FILE:-$cluster_kubeconfig_file}}"' in script_text
+    assert 'export KUBECONFIG_FILE="$kubeconfig_file"' in script_text
+    assert 'export KUBECONFIG="$kubeconfig_file"' in script_text
+    assert "kubeconfig not found at ${kubeconfig_file}" in script_text
 
 
 def test_traefik_manager_step_deploys_browser_ui():
