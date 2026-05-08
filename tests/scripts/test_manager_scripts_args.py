@@ -1952,9 +1952,10 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "name: authentik-cors" in authentik_ingressroute_text
     assert "kind: Middleware" in authentik_cors_text
     assert "accessControlAllowOriginList" in authentik_cors_text
-    assert "customResponseHeaders" in authentik_cors_text
-    assert "Access-Control-Allow-Origin" in authentik_cors_text
     assert "https://admin.__ZONE_NAME__" in authentik_cors_text
+    assert "https://opencloud.__ZONE_NAME__" in authentik_cors_text
+    assert "customResponseHeaders" not in authentik_cors_text
+    assert "Access-Control-Allow-Origin" not in authentik_cors_text
     assert "Host(`headlamp.__ZONE_NAME__`)" in headlamp_ingressroute_text
     assert "Host(`grafana.__ZONE_NAME__`)" in grafana_ingressroute_text
     assert "Host(`hubble.__ZONE_NAME__`)" in HUBBLE_INGRESSROUTE.read_text(
@@ -2021,8 +2022,14 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "name: authentik-cors" in platform_ingress_app_text
     assert "name: hubble" in platform_ingress_app_text
     assert "accessControlAllowOriginList/0" in platform_ingress_app_text
+    assert "accessControlAllowOriginList/1" in platform_ingress_app_text
     assert (
-        "customResponseHeaders/Access-Control-Allow-Origin" in platform_ingress_app_text
+        'opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
+        in platform_ingress_app_text
+    )
+    assert (
+        "customResponseHeaders/Access-Control-Allow-Origin"
+        not in platform_ingress_app_text
     )
     assert (
         'hubble.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
