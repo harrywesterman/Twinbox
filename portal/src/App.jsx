@@ -514,18 +514,29 @@ function Panel({ className = '', children }) {
   return <section className={`panel ${className}`}>{children}</section>;
 }
 
-function MenuPopover({ visible, onNavigate, onLogout, onClose, isAdmin }) {
+function MenuPopover({ visible, onNavigate, onLogout, onClose, isAdmin, zoneName }) {
   if (!visible) {
     return null;
   }
 
-  const adminItems = buildAdminNavigationItems({ isAdmin });
+  const adminItems = buildAdminNavigationItems({ isAdmin, zoneName });
 
   return (
     <div className="menu-popover" role="menu">
       <button type="button" onClick={() => { onNavigate('/settings'); onClose(); }}>Settings</button>
       {adminItems.map((item) => (
-        <button key={item.id} type="button" onClick={() => { onNavigate(item.path); onClose(); }}>
+        <button
+          key={item.id}
+          type="button"
+          onClick={() => {
+            if (item.url) {
+              openInNewTab(item.url);
+            } else if (item.path) {
+              onNavigate(item.path);
+            }
+            onClose();
+          }}
+        >
           {item.label}
         </button>
       ))}
@@ -550,6 +561,8 @@ function AuthRedirectScreen({ brand }) {
 }
 
 function PortalHeader({ session, config, theme, onThemeToggle, onNavigate, onLogout, onMenuToggle, menuOpen, isAdmin }) {
+  const zoneName = config?.portal?.zoneName || '';
+
   return (
     <header className="topbar">
       <button type="button" className="topbar-brand" onClick={() => onNavigate('/')}>
@@ -572,6 +585,7 @@ function PortalHeader({ session, config, theme, onThemeToggle, onNavigate, onLog
           onLogout={onLogout}
           onClose={onMenuToggle}
           isAdmin={isAdmin}
+          zoneName={zoneName}
         />
         <div className="topbar-session">
           <strong>{session?.name || 'User'}</strong>

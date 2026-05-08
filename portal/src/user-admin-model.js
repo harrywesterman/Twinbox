@@ -34,12 +34,12 @@ function isVisibleUser(user) {
   return true;
 }
 
-export function buildAdminNavigationItems({ isAdmin = false } = {}) {
+export function buildAdminNavigationItems({ isAdmin = false, zoneName = '' } = {}) {
   if (!isAdmin) {
     return [];
   }
 
-  return [
+  const items = [
     {
       id: 'admin-app-installs',
       path: '/admin/apps',
@@ -56,6 +56,16 @@ export function buildAdminNavigationItems({ isAdmin = false } = {}) {
       label: 'Users & groups',
     },
   ];
+
+  if (zoneName) {
+    items.splice(1, 0, {
+      id: 'admin-management-consoles',
+      url: `https://admin.${zoneName}`,
+      label: 'Management consoles',
+    });
+  }
+
+  return items;
 }
 
 export function buildUserAdminViewModel({

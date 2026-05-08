@@ -6,8 +6,13 @@ import { buildAdminNavigationItems, buildUserAdminViewModel } from "../src/user-
 test("buildAdminNavigationItems shows the user admin route only for admins", () => {
   assert.equal(buildAdminNavigationItems({ isAdmin: false }).length, 0);
   assert.deepEqual(
-    buildAdminNavigationItems({ isAdmin: true }).map((item) => item.path),
-    ["/admin/apps", "/admin/observability", "/admin/users"],
+    buildAdminNavigationItems({ isAdmin: true, zoneName: "tst.example.com" }),
+    [
+      { id: "admin-app-installs", path: "/admin/apps", label: "App installs" },
+      { id: "admin-management-consoles", url: "https://admin.tst.example.com", label: "Management consoles" },
+      { id: "admin-observability", path: "/admin/observability", label: "Observability" },
+      { id: "admin-users", path: "/admin/users", label: "Users & groups" },
+    ],
   );
 });
 
