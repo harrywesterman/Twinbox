@@ -250,7 +250,7 @@ spec:
                   name: opencloud-bootstrap
                   key: OC_JWT_SECRET
             - name: OC_REVA_GATEWAY
-              value: opencloud
+              value: eu.opencloud.api.gateway
             - name: MICRO_REGISTRY_ADDRESS
               valueFrom:
                 secretKeyRef:
