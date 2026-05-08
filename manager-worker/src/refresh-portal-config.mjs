@@ -156,6 +156,7 @@ function readInstalledAppIds() {
 function applySecret(namespace, secretName, renderedConfig) {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "portal-config-"));
   const configFile = path.join(tempDir, "portal-config.json");
+  const secretManifestFile = path.join(tempDir, "portal-config-secret.yaml");
   fs.writeFileSync(configFile, renderedConfig, "utf8");
 
   try {
@@ -172,7 +173,8 @@ function applySecret(namespace, secretName, renderedConfig) {
       "yaml",
     ]);
 
-    runKubectl(["apply", "--validate=false", "-f", "-"], { input: createResult.stdout });
+    fs.writeFileSync(secretManifestFile, createResult.stdout || "", "utf8");
+    runKubectl(["apply", "--validate=false", "-f", secretManifestFile]);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
