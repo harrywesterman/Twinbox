@@ -1,0 +1,4 @@
+application_name        = "Vaultwarden"
+application_slug        = "vaultwarden"
+authentik_url           = "https://authentik.example.com"
+vaultwarden_redirect_uri = "https://vaultwarden.example.com/identity/account/connect/callback"

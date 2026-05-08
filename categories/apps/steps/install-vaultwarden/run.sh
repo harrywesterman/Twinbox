@@ -9,6 +9,8 @@ WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
 # shellcheck disable=SC1091
 source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
@@ -52,6 +54,93 @@ wait_for_resource_ready() {
     sleep 5
     attempt=$((attempt + 1))
   done
+}
+
+find_oauth2_provider_pk_by_name() {
+  local provider_name="$1"
+  local response
+
+  response="$(authentik_api_get "/providers/oauth2/?page_size=100")"
+  jq -r \
+    --arg provider_name "$provider_name" \
+    '.results[]?
+      | select((.name // "") == $provider_name)
+      | .pk // .id // empty' <<<"$response" | head -n1
+}
+
+find_application_json_by_slug() {
+  local application_slug="$1"
+  local response
+
+  response="$(authentik_api_get "/core/applications/?page_size=100")"
+  jq -c \
+    --arg application_slug "$application_slug" \
+    '.results[]?
+      | select((.slug // "") == $application_slug)' <<<"$response" | head -n1
+}
+
+create_or_update_provider() {
+  local provider_payload="$1"
+  local existing_pk
+
+  existing_pk="$(find_oauth2_provider_pk_by_name "Vaultwarden")"
+  if [[ -n "$existing_pk" ]]; then
+    authentik_api_write PATCH "/providers/oauth2/${existing_pk}/" "$provider_payload" >/dev/null
+    printf '%s\n' "$existing_pk"
+    return 0
+  fi
+
+  authentik_api_write POST "/providers/oauth2/" "$provider_payload" | jq -r '.pk // .id // empty'
+}
+
+create_or_update_application() {
+  local application_payload="$1"
+  local existing_json existing_pk
+
+  existing_json="$(find_application_json_by_slug "$vaultwarden_oidc_application_slug" || true)"
+  existing_pk="$(jq -r '.pk // .id // empty' <<<"$existing_json")"
+  if [[ -n "$existing_pk" ]]; then
+    authentik_api_write PATCH "/core/applications/${vaultwarden_oidc_application_slug}/" "$application_payload" >/dev/null
+    printf '%s\n' "$existing_pk"
+    return 0
+  fi
+
+  authentik_api_write POST "/core/applications/" "$application_payload" | jq -r '.pk // .id // empty'
+}
+
+find_policy_binding_pk() {
+  local target_uuid="$1"
+  local group_id="$2"
+  local response
+
+  response="$(authentik_api_get "/policies/bindings/?page_size=200")"
+  jq -r \
+    --arg target_uuid "$target_uuid" \
+    --arg group_id "$group_id" \
+    '.results[]?
+      | select((.target // "") == $target_uuid and (.group // "") == $group_id)
+      | .pk // .id // empty' <<<"$response" | head -n1
+}
+
+ensure_group_binding() {
+  local target_uuid="$1"
+  local group_id="$2"
+  local binding_payload existing_pk
+
+  binding_payload="$(
+    jq -n \
+      --arg target_uuid "$target_uuid" \
+      --arg group_id "$group_id" \
+      '{target: $target_uuid, group: $group_id, order: 1, enabled: true}'
+  )"
+
+  existing_pk="$(find_policy_binding_pk "$target_uuid" "$group_id")"
+  if [[ -n "$existing_pk" ]]; then
+    authentik_api_write PATCH "/policies/bindings/${existing_pk}/" "$binding_payload" >/dev/null
+    return 0
+  fi
+
+  authentik_api_write POST "/policies/bindings/" "$binding_payload" >/dev/null
 }
 
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
@@ -103,23 +192,16 @@ if [[ -n "$existing_vaultwarden_secret_json" ]]; then
   fi
 fi
 
-jq -n \
-  --arg VAULTWARDEN_ADMIN_TOKEN "$vaultwarden_admin_token" \
-  --arg VAULTWARDEN_POSTGRESQL__USERNAME "$vaultwarden_db_username" \
-  --arg VAULTWARDEN_POSTGRESQL__PASSWORD "$vaultwarden_db_password" \
-  --arg VAULTWARDEN_DATABASE_URL "$vaultwarden_database_url" \
-  '{
-    VAULTWARDEN_ADMIN_TOKEN: $VAULTWARDEN_ADMIN_TOKEN,
-    VAULTWARDEN_POSTGRESQL__USERNAME: $VAULTWARDEN_POSTGRESQL__USERNAME,
-    VAULTWARDEN_POSTGRESQL__PASSWORD: $VAULTWARDEN_POSTGRESQL__PASSWORD,
-    VAULTWARDEN_DATABASE_URL: $VAULTWARDEN_DATABASE_URL
-  }' >"$vaultwarden_secret_file"
-
-log "Writing Vaultwarden bootstrap secret to OpenBao"
-bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
-  --secret-name "vaultwarden" \
-  --json-file "$vaultwarden_secret_file" \
-  --required-keys "VAULTWARDEN_ADMIN_TOKEN,VAULTWARDEN_POSTGRESQL__USERNAME,VAULTWARDEN_POSTGRESQL__PASSWORD,VAULTWARDEN_DATABASE_URL"
+vaultwarden_oidc_client_id="$(openssl rand -hex 16)"
+vaultwarden_oidc_client_secret="$(openssl rand -hex 24)"
+if [[ -n "$existing_vaultwarden_secret_json" ]]; then
+  existing_oidc_client_id="$(jq -r '.OIDC_CLIENT_ID // empty' <<<"$existing_vaultwarden_secret_json")"
+  existing_oidc_client_secret="$(jq -r '.OIDC_CLIENT_SECRET // empty' <<<"$existing_vaultwarden_secret_json")"
+  [[ -n "$existing_oidc_client_id" ]] && vaultwarden_oidc_client_id="$existing_oidc_client_id"
+  [[ -n "$existing_oidc_client_secret" ]] && vaultwarden_oidc_client_secret="$existing_oidc_client_secret"
+fi
+vaultwarden_oidc_application_slug="vaultwarden"
+vaultwarden_oidc_redirect_uri="${vaultwarden_host}/identity/account/connect/callback"
 
 log "Applying Vaultwarden database manifests"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/namespace.yaml"
@@ -137,6 +219,113 @@ wait_for_resource_ready "databases" "deployment/vaultwarden-db-pooler-ro" "Avail
 bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
   --app-id "vaultwarden" \
   --host "vaultwarden-db-pooler-rw.databases.svc.cluster.local"
+
+log "Provisioning Authentik OIDC client for Vaultwarden"
+authentik_ensure_token
+authentik_setup_forward
+
+AUTHENTIK_HOST="${AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
+vaultwarden_oidc_issuer_url="${AUTHENTIK_HOST%/}/application/o/${vaultwarden_oidc_application_slug}/"
+
+authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
+invalidation_flow_id="$(authentik_resolve_flow_id "default-provider-invalidation-flow" "invalidation")"
+openid_mapping_id="$(authentik_resolve_scope_mapping_id "openid")"
+email_mapping_id="$(authentik_resolve_scope_mapping_id "email")"
+profile_mapping_id="$(authentik_resolve_scope_mapping_id "profile")"
+admins_group_id="$(authentik_find_group_id "admins")"
+signing_key_id="$(authentik_resolve_signing_key_id)"
+
+[[ -n "$authorization_flow_id" ]] || fail "Could not resolve Authentik authorization flow ID"
+[[ -n "$invalidation_flow_id" ]] || fail "Could not resolve Authentik invalidation flow ID"
+[[ -n "$openid_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for openid"
+[[ -n "$email_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for email"
+[[ -n "$profile_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for profile"
+[[ -n "$admins_group_id" ]] || fail "Could not resolve Authentik admins group ID"
+[[ -n "$signing_key_id" ]] || fail "Could not resolve Authentik signing key ID"
+
+property_mapping_ids_json="$(
+  jq -cn \
+    --arg openid "$openid_mapping_id" \
+    --arg email "$email_mapping_id" \
+    --arg profile "$profile_mapping_id" \
+    '[$openid, $email, $profile]'
+)"
+
+provider_payload="$(
+  jq -n \
+    --arg name "Vaultwarden" \
+    --arg client_id "$vaultwarden_oidc_client_id" \
+    --arg client_secret "$vaultwarden_oidc_client_secret" \
+    --arg authorization_flow "$authorization_flow_id" \
+    --arg invalidation_flow "$invalidation_flow_id" \
+    --arg signing_key "$signing_key_id" \
+    --arg redirect_uri "$vaultwarden_oidc_redirect_uri" \
+    --argjson property_mappings "$property_mapping_ids_json" \
+    '{
+      name: $name,
+      client_id: $client_id,
+      client_secret: $client_secret,
+      authorization_flow: $authorization_flow,
+      invalidation_flow: $invalidation_flow,
+      signing_key: $signing_key,
+      redirect_uris: [
+        {
+          matching_mode: "strict",
+          url: $redirect_uri
+        }
+      ],
+      property_mappings: $property_mappings,
+      include_claims_in_id_token: true,
+      client_type: "confidential",
+      issuer_mode: "per_provider"
+    }'
+)"
+
+provider_pk="$(create_or_update_provider "$provider_payload")"
+[[ -n "$provider_pk" ]] || fail "Authentik did not return a provider ID for Vaultwarden"
+
+application_payload="$(
+  jq -n \
+    --arg name "Vaultwarden" \
+    --arg slug "$vaultwarden_oidc_application_slug" \
+    --arg provider_pk "$provider_pk" \
+    '{
+      name: $name,
+      slug: $slug,
+      provider: ($provider_pk | tonumber)
+    }'
+)"
+application_pk="$(create_or_update_application "$application_payload")"
+[[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for Vaultwarden"
+
+application_json="$(find_application_json_by_slug "$vaultwarden_oidc_application_slug")"
+application_uuid="$(jq -r '.pk // .uuid // .id // empty' <<<"$application_json")"
+[[ -n "$application_uuid" ]] || fail "Could not determine Authentik application UUID for Vaultwarden"
+ensure_group_binding "$application_uuid" "$admins_group_id"
+
+jq -n \
+  --arg VAULTWARDEN_ADMIN_TOKEN "$vaultwarden_admin_token" \
+  --arg VAULTWARDEN_POSTGRESQL__USERNAME "$vaultwarden_db_username" \
+  --arg VAULTWARDEN_POSTGRESQL__PASSWORD "$vaultwarden_db_password" \
+  --arg VAULTWARDEN_DATABASE_URL "$vaultwarden_database_url" \
+  --arg OIDC_CLIENT_ID "$vaultwarden_oidc_client_id" \
+  --arg OIDC_CLIENT_SECRET "$vaultwarden_oidc_client_secret" \
+  --arg OIDC_ISSUER_URL "$vaultwarden_oidc_issuer_url" \
+  '{
+    VAULTWARDEN_ADMIN_TOKEN: $VAULTWARDEN_ADMIN_TOKEN,
+    VAULTWARDEN_POSTGRESQL__USERNAME: $VAULTWARDEN_POSTGRESQL__USERNAME,
+    VAULTWARDEN_POSTGRESQL__PASSWORD: $VAULTWARDEN_POSTGRESQL__PASSWORD,
+    VAULTWARDEN_DATABASE_URL: $VAULTWARDEN_DATABASE_URL,
+    OIDC_CLIENT_ID: $OIDC_CLIENT_ID,
+    OIDC_CLIENT_SECRET: $OIDC_CLIENT_SECRET,
+    OIDC_ISSUER_URL: $OIDC_ISSUER_URL
+  }' >"$vaultwarden_secret_file"
+
+log "Writing Vaultwarden bootstrap secret to OpenBao"
+bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+  --secret-name "vaultwarden" \
+  --json-file "$vaultwarden_secret_file" \
+  --required-keys "VAULTWARDEN_ADMIN_TOKEN,VAULTWARDEN_POSTGRESQL__USERNAME,VAULTWARDEN_POSTGRESQL__PASSWORD,VAULTWARDEN_DATABASE_URL,OIDC_CLIENT_ID,OIDC_CLIENT_SECRET,OIDC_ISSUER_URL"
 
 log "Applying Vaultwarden Argo CD application"
 sed "s/__ZONE_NAME__/${public_zone_name}/g" \

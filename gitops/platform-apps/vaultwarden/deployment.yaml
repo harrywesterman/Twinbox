@@ -28,11 +28,11 @@ spec:
             - name: DOMAIN
               value: https://vaultwarden.__ZONE_NAME__
             - name: SIGNUPS_ALLOWED
-              value: "true"
+              value: "false"
             - name: SIGNUPS_DOMAINS_WHITELIST
               value: __ZONE_NAME__
             - name: INVITATIONS_ALLOWED
-              value: "true"
+              value: "false"
             - name: WEBSOCKET_ENABLED
               value: "true"
             - name: ROCKET_ADDRESS
@@ -49,6 +49,27 @@ spec:
                 secretKeyRef:
                   name: vaultwarden-config
                   key: ADMIN_TOKEN
+            - name: OIDC_ENABLED
+              value: "true"
+            - name: OIDC_ISSUER
+              valueFrom:
+                secretKeyRef:
+                  name: vaultwarden-config
+                  key: OIDC_ISSUER_URL
+            - name: OIDC_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: vaultwarden-config
+                  key: OIDC_CLIENT_ID
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: vaultwarden-config
+                  key: OIDC_CLIENT_SECRET
+            - name: OIDC_REDIRECT_URI
+              value: https://vaultwarden.__ZONE_NAME__/identity/account/connect/callback
+            - name: OIDC_SCOPES
+              value: "openid profile email"
           readinessProbe:
             httpGet:
               path: /alive

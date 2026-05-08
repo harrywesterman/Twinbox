@@ -21,6 +21,9 @@ spec:
             - op: replace
               path: /spec/template/spec/containers/0/env/2/value
               value: __ZONE_NAME__
+            - op: replace
+              path: /spec/template/spec/containers/0/env/13/value
+              value: https://vaultwarden.__ZONE_NAME__/identity/account/connect/callback
         - target:
             kind: IngressRoute
             name: vaultwarden

@@ -3,14 +3,15 @@ title: Install Vaultwarden
 type: action
 journey_stage: setup
 order: 82
-summary: Install Vaultwarden with CloudNativePG, Longhorn storage, OpenBao secrets, and Traefik ingress.
-explanation: Twinbox provisions Vaultwarden as a GitOps application with a dedicated PostgreSQL database, a small Longhorn data volume, an admin token stored in OpenBao, and domain-limited account registration for the selected cluster domain.
+summary: Install Vaultwarden with CloudNativePG, Longhorn storage, OpenBao secrets, Authentik OIDC, and Traefik ingress.
+explanation: Twinbox provisions Vaultwarden as a GitOps application with a dedicated PostgreSQL database, a small Longhorn data volume, an admin token stored in OpenBao, Authentik OIDC single sign-on, and domain-limited account registration for the selected cluster domain.
 side_help: Password vaults need the same storage and secret foundations as the rest of the personal app stack.
 depends_on:
   - install-longhorn-storage
   - install-cloudnativepg
   - install-secret-sync
   - choose-ingress-route
+  - install-authentik-idp
 dashy:
   items:
     - section: Platform

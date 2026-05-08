@@ -219,7 +219,7 @@ test('app catalog exposes apps while the wizard catalog keeps them out of sight'
     assert.equal(vaultwardenCard?.title, 'Install Vaultwarden');
     assert.equal(vaultwardenCard?.placeholder, false);
     assert.equal(vaultwardenCard?.installable, true);
-    assert.deepEqual(vaultwardenCard?.depends_on, ['install-longhorn-storage', 'install-cloudnativepg', 'install-secret-sync', 'choose-ingress-route']);
+    assert.deepEqual(vaultwardenCard?.depends_on, ['install-longhorn-storage', 'install-cloudnativepg', 'install-secret-sync', 'choose-ingress-route', 'install-authentik-idp']);
     assert.equal(vaultwardenCard?.runner?.script, 'categories/apps/steps/install-vaultwarden/run.sh');
     assert.equal(hedgedocCard?.title, 'Install HedgeDoc');
     assert.equal(hedgedocCard?.placeholder, false);

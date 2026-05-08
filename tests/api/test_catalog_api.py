@@ -280,6 +280,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-cloudnativepg",
                 "install-secret-sync",
                 "choose-ingress-route",
+                "install-authentik-idp",
             ]
             assert talos_steps["install-audiobookshelf"]["title"] == "Install Audiobookshelf"
             assert "placeholder" not in talos_steps["install-audiobookshelf"]["summary"].lower()
