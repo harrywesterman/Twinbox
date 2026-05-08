@@ -1342,7 +1342,7 @@ def test_stirling_pdf_waits_for_real_kubernetes_readiness():
         in step_text
     )
     assert "desired=${desired_replicas}, updated=${updated_replicas}, ready=${ready_replicas}, available=${available_replicas}" in step_text
-    assert "path: /actuator/health" in deployment_text
+    assert "tcpSocket:" in deployment_text
     assert "SECURITY_CUSTOMGLOBALAPIKEY" in deployment_text
     assert "ST_API_KEY_FOR_QR_CODE" not in deployment_text
     assert "mountPath: /configs" in deployment_text
@@ -1350,6 +1350,17 @@ def test_stirling_pdf_waits_for_real_kubernetes_readiness():
     assert "mountPath: /customFiles" in deployment_text
     assert "mountPath: /logs" in deployment_text
     assert "mountPath: /usr/local/tomcat/static" not in deployment_text
+    assert "SECURITY_OAUTH2_ENABLED" in deployment_text
+    assert "SECURITY_OAUTH2_ISSUER" in deployment_text
+    assert "SECURITY_OAUTH2_CLIENTID" in deployment_text
+    assert "SECURITY_OAUTH2_CLIENTSECRET" in deployment_text
+    assert "SECURITY_OAUTH2_PROVIDER" in deployment_text
+    assert "SECURITY_LOGINMETHOD" in deployment_text
+    assert "authentik" in deployment_text
+    assert 'authentik_ensure_token' in step_text
+    assert 'authentik_setup_forward' in step_text
+    assert '"Stirling PDF"' in step_text
+    assert '"stirling-pdf"' in step_text
 
 
 def test_argo_step_script_bootstraps_argocd_without_cni_adoption():

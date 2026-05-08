@@ -16,8 +16,15 @@ spec:
             name: stirling-pdf
           patch: |-
             - op: replace
-              path: /spec/template/spec/containers/0/env/2/value
+              path: /spec/template/spec/containers/0/env/6/value
               value: https://stirling-pdf.__ZONE_NAME__/
+        - target:
+            kind: Deployment
+            name: stirling-pdf
+          patch: |-
+            - op: replace
+              path: /spec/template/spec/containers/0/env/11/value
+              value: https://authentik.__ZONE_NAME__/application/o/stirling-pdf/
         - target:
             kind: IngressRoute
             name: stirling-pdf
