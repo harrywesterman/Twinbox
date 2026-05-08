@@ -5,6 +5,7 @@ resources:
   - namespace.yaml
   - pvc.yaml
   - externalsecret.yaml
+  - authentik-forwardauth-middleware.yaml
   - deployment.yaml
   - service.yaml
   - ingressroute.yaml

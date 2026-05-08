@@ -9,6 +9,8 @@ spec:
   routes:
     - kind: Rule
       match: Host(`stirling-pdf.__ZONE_NAME__`)
+      middlewares:
+        - name: authentik-forwardauth
       services:
         - kind: Service
           name: stirling-pdf
@@ -26,6 +28,8 @@ spec:
   routes:
     - kind: Rule
       match: Host(`stirling-pdf.__ZONE_NAME__`)
+      middlewares:
+        - name: authentik-forwardauth
       services:
         - kind: Service
           name: stirling-pdf
@@ -42,6 +46,8 @@ spec:
   routes:
     - kind: Rule
       match: Host(`stirling-pdf.__ZONE_NAME__`)
+      middlewares:
+        - name: authentik-forwardauth
       services:
         - kind: Service
           name: stirling-pdf

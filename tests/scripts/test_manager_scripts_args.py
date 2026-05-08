@@ -1326,6 +1326,20 @@ def test_apply_argocd_application_helper_applies_and_waits_for_health():
 def test_stirling_pdf_waits_for_real_kubernetes_readiness():
     step_text = STIRLING_PDF_STEP_SCRIPT.read_text(encoding="utf-8")
     deployment_text = STIRLING_PDF_DEPLOYMENT.read_text(encoding="utf-8")
+    ingressroute_text = (
+        REPO_ROOT
+        / "gitops"
+        / "platform-apps"
+        / "stirling-pdf"
+        / "ingressroute.yaml"
+    ).read_text(encoding="utf-8")
+    middleware_text = (
+        REPO_ROOT
+        / "gitops"
+        / "platform-apps"
+        / "stirling-pdf"
+        / "authentik-forwardauth-middleware.yaml"
+    ).read_text(encoding="utf-8")
 
     assert '--application "stirling-pdf" \\' in step_text
     assert "--no-wait" in step_text
@@ -1350,17 +1364,12 @@ def test_stirling_pdf_waits_for_real_kubernetes_readiness():
     assert "mountPath: /customFiles" in deployment_text
     assert "mountPath: /logs" in deployment_text
     assert "mountPath: /usr/local/tomcat/static" not in deployment_text
-    assert "SECURITY_OAUTH2_ENABLED" in deployment_text
-    assert "SECURITY_OAUTH2_ISSUER" in deployment_text
-    assert "SECURITY_OAUTH2_CLIENTID" in deployment_text
-    assert "SECURITY_OAUTH2_CLIENTSECRET" in deployment_text
-    assert "SECURITY_OAUTH2_PROVIDER" in deployment_text
-    assert "SECURITY_LOGINMETHOD" in deployment_text
-    assert "authentik" in deployment_text
-    assert 'authentik_ensure_token' in step_text
-    assert 'authentik_setup_forward' in step_text
-    assert '"Stirling PDF"' in step_text
-    assert '"stirling-pdf"' in step_text
+    assert "SECURITY_ENABLELOGIN" in deployment_text
+    assert "false" in deployment_text
+    assert "SECURITY_OAUTH2_ENABLED" not in deployment_text
+    assert "authentik-forwardauth" in ingressroute_text
+    assert "authentik-forwardauth" in middleware_text
+    assert "authentik-server" in middleware_text
 
 
 def test_argo_step_script_bootstraps_argocd_without_cni_adoption():

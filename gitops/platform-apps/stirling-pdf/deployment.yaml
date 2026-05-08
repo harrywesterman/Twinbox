@@ -23,13 +23,7 @@ spec:
           imagePullPolicy: IfNotPresent
           env:
             - name: SECURITY_ENABLELOGIN
-              value: "true"
-            - name: SECURITY_LOGINMETHOD
-              value: all
-            - name: SECURITY_INITIALLOGIN_USERNAME
-              value: admin
-            - name: SECURITY_INITIALLOGIN_PASSWORD
-              value: stirling
+              value: "false"
             - name: ST_USE_AUTH_FILE
               value: "false"
             - name: SECURITY_CUSTOMGLOBALAPIKEY
@@ -45,30 +39,6 @@ spec:
               value: "true"
             - name: ST_PDF_AUTO_UPDATE_CONVERTERS
               value: "true"
-            - name: SECURITY_OAUTH2_ENABLED
-              value: "true"
-            - name: SECURITY_OAUTH2_ISSUER
-              value: https://authentik.__ZONE_NAME__/application/o/stirling-pdf/
-            - name: SECURITY_OAUTH2_CLIENTID
-              valueFrom:
-                secretKeyRef:
-                  name: stirling-pdf-config
-                  key: STIRLING_PDF_OAUTH2_CLIENT_ID
-            - name: SECURITY_OAUTH2_CLIENTSECRET
-              valueFrom:
-                secretKeyRef:
-                  name: stirling-pdf-config
-                  key: STIRLING_PDF_OAUTH2_CLIENT_SECRET
-            - name: SECURITY_OAUTH2_SCOPES
-              value: openid, profile, email
-            - name: SECURITY_OAUTH2_USEASUSERNAME
-              value: preferred_username
-            - name: SECURITY_OAUTH2_PROVIDER
-              value: authentik
-            - name: SECURITY_OAUTH2_AUTOCREATEUSER
-              value: "true"
-            - name: SECURITY_OAUTH2_BLOCKREGISTRATION
-              value: "false"
             - name: ST_CUSTOM_IDP_LOGO_URL
               value: ""
           ports:
