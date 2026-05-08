@@ -325,7 +325,7 @@ authentik_api_get() {
 }
 
 authentik_api_write() {
-  authentik_api_request "$1" "$2" "$3"
+  authentik_api_request "$1" "$2" "${3:-}"
 }
 
 _authentik_create_flow_if_missing() {
