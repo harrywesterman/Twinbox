@@ -23,8 +23,6 @@ spec:
           imagePullPolicy: IfNotPresent
           args:
             - redis-server
-            - --appendonly
-            - "yes"
             - --save
             - "60"
             - "1"
@@ -46,8 +44,7 @@ spec:
               mountPath: /data
       volumes:
         - name: redis-data
-          persistentVolumeClaim:
-            claimName: outline-redis-data
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
