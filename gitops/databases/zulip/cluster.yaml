@@ -5,7 +5,7 @@ metadata:
   namespace: databases
 spec:
   instances: 3
-  imageName: zulip/zulip-postgresql:14
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.4
 
   backup:
     retentionPolicy: "14d"
@@ -27,6 +27,11 @@ spec:
       owner: zulip
       secret:
         name: zulip-db-credentials
+      postInitApplicationSQL:
+        - CREATE EXTENSION IF NOT EXISTS hstore
+        - CREATE EXTENSION IF NOT EXISTS citext
+        - CREATE EXTENSION IF NOT EXISTS pg_trgm
+        - CREATE EXTENSION IF NOT EXISTS unaccent
 
   storage:
     size: 20Gi
