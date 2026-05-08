@@ -1,6 +1,4 @@
 zulip:
-  startupProbe:
-    failureThreshold: 90
   environment:
     SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS:
       valueFrom:
