@@ -756,7 +756,7 @@ async function handleApply(job) {
 
 async function handleReconcileObservability(job) {
   const payload = job.payload || {};
-  const cluster = payload.cluster || {};
+  const cluster = payload.cluster || payload.context?.cluster || payload;
   const clusterId = cluster?.id || job.cluster_id || null;
   const clusterInstanceId = clusterScopeId(cluster, job.cluster_instance_id || null);
   const desiredProfile = OBSERVABILITY_PROFILES.has(String(payload.desired_profile || cluster.observability_profile || "full").trim().toLowerCase())

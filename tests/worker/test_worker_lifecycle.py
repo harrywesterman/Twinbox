@@ -849,10 +849,9 @@ def test_worker_reconcile_observability_aliases_twinbox_kubeconfig_to_kubeconfig
         (workspace / "scripts" / "manager" / "reconcile-observability.sh").chmod(0o755)
 
         payload = {
-            "cluster": {
-                "id": "cluster_test",
-                "name": "demo",
-            },
+            "id": "cluster_test",
+            "slug": "cluster-test",
+            "name": "demo",
             "desired_profile": "minimal",
             "secret_bundle": {
                 "files": {
