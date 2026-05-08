@@ -41,30 +41,18 @@ spec:
             - name: http
               containerPort: 8080
           readinessProbe:
-            exec:
-              command:
-                - sh
-                - -c
-                - |
-                  wget -q -O /dev/null --header="X-API-KEY: ${SECURITY_CUSTOMGLOBALAPIKEY}" http://localhost:8080/api/v1/health
+            tcpSocket:
+              port: http
             initialDelaySeconds: 30
             periodSeconds: 10
           livenessProbe:
-            exec:
-              command:
-                - sh
-                - -c
-                - |
-                  wget -q -O /dev/null --header="X-API-KEY: ${SECURITY_CUSTOMGLOBALAPIKEY}" http://localhost:8080/api/v1/health
+            tcpSocket:
+              port: http
             initialDelaySeconds: 60
             periodSeconds: 20
           startupProbe:
-            exec:
-              command:
-                - sh
-                - -c
-                - |
-                  wget -q -O /dev/null --header="X-API-KEY: ${SECURITY_CUSTOMGLOBALAPIKEY}" http://localhost:8080/api/v1/health || curl -sf -o /dev/null -H "X-API-KEY: ${SECURITY_CUSTOMGLOBALAPIKEY}" http://localhost:8080/api/v1/health
+            tcpSocket:
+              port: http
             failureThreshold: 90
             periodSeconds: 5
           volumeMounts:
