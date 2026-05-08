@@ -69,6 +69,8 @@ spec:
               value: "true"
             - name: SECURITY_OAUTH2_BLOCKREGISTRATION
               value: "false"
+            - name: ST_CUSTOM_IDP_LOGO_URL
+              value: ""
           ports:
             - name: http
               containerPort: 8080

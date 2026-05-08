@@ -66,7 +66,7 @@ find_oauth2_provider_pk_by_name() {
   local provider_name="$1"
   local response
 
-  response="$(authentik_api_get "/providers/oauth2/?page_size=100")"
+  response="$(authentik_api_get "/providers/oauth2/?name=$(printf '%s' "$provider_name" | jq -sRr @uri)&page_size=100")"
   jq -r \
     --arg provider_name "$provider_name" \
     '.results[]?
@@ -78,7 +78,7 @@ find_application_json_by_slug() {
   local application_slug="$1"
   local response
 
-  response="$(authentik_api_get "/core/applications/?page_size=100")"
+  response="$(authentik_api_get "/core/applications/?slug=$(printf '%s' "$application_slug" | jq -sRr @uri)")"
   jq -c \
     --arg application_slug "$application_slug" \
     '.results[]?
