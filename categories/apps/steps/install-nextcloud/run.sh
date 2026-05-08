@@ -752,9 +752,9 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
 
 log "Configuring Collabora WOPI URL"
 kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
-  "php occ config:system:set wopi_url --value='https://collabora.${public_zone_name}' --type=string" || true
+  "php occ config:system:set wopi_url --value='https://nextcloud-collabora.${public_zone_name}' --type=string" || true
 kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
-  "php occ config:app:set --value='https://collabora.${public_zone_name}' richdocuments wopi_url && php occ richdocuments:activate-config" || true
+  "php occ config:app:set --value='https://nextcloud-collabora.${public_zone_name}' richdocuments wopi_url && php occ richdocuments:activate-config" || true
 
 log "Configuring Nextcloud Talk STUN/TURN servers"
 kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \

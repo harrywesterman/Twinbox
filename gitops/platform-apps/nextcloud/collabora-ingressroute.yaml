@@ -8,7 +8,7 @@ spec:
     - websecure
   routes:
     - kind: Rule
-      match: Host(`collabora.__ZONE_NAME__`)
+      match: Host(`nextcloud-collabora.__ZONE_NAME__`)
       services:
         - name: nextcloud-collabora
           port: 9980
@@ -24,7 +24,7 @@ spec:
     - webwiredoor
   routes:
     - kind: Rule
-      match: Host(`collabora.__ZONE_NAME__`)
+      match: Host(`nextcloud-collabora.__ZONE_NAME__`)
       services:
         - name: nextcloud-collabora
           port: 9980
@@ -40,7 +40,7 @@ spec:
     - webtailscale
   routes:
     - kind: Rule
-      match: Host(`collabora.__ZONE_NAME__`)
+      match: Host(`nextcloud-collabora.__ZONE_NAME__`)
       services:
         - name: nextcloud-collabora
           port: 9980

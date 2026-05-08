@@ -353,13 +353,13 @@ spec:
                   name: opencloud-bootstrap
                   key: COLLABORA_ADMIN_PASSWORD
             - name: aliasgroup1
-              value: https://opencloud.__ZONE_NAME__
+              value: https://opencloud-wopiserver.__ZONE_NAME__
             - name: domain
-              value: opencloud.__ZONE_NAME__|wopiserver.__ZONE_NAME__
+              value: opencloud-wopiserver.__ZONE_NAME__
             - name: DONT_GEN_SSL_CERT
               value: "YES"
             - name: extra_params
-              value: --o:ssl.enable=false --o:ssl.termination=true --o:net.frame_ancestors=https://opencloud.__ZONE_NAME__ https://collabora.__ZONE_NAME__ https://wopiserver.__ZONE_NAME__
+              value: --o:ssl.enable=false --o:ssl.termination=true --o:net.frame_ancestors=https://opencloud.__ZONE_NAME__ https://opencloud-collabora.__ZONE_NAME__ https://opencloud-wopiserver.__ZONE_NAME__
           readinessProbe:
             tcpSocket:
               port: http

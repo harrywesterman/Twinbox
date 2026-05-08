@@ -323,8 +323,8 @@ authentik_setup_forward
 
 AUTHENTIK_HOST="${AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
 OPENCLOUD_HOST="https://opencloud.${public_zone_name}"
-COLLABORA_HOST="https://collabora.${public_zone_name}"
-WOPISERVER_HOST="https://wopiserver.${public_zone_name}"
+COLLABORA_HOST="https://opencloud-collabora.${public_zone_name}"
+WOPISERVER_HOST="https://opencloud-wopiserver.${public_zone_name}"
 
 existing_opencloud_secret_json=""
 if command -v openbao_read_global_secret_json >/dev/null 2>&1; then

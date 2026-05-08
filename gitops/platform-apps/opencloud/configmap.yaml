@@ -14,8 +14,8 @@ data:
         - "'self'"
         - "blob:"
         - "https://authentik.__ZONE_NAME__/"
-        - "https://collabora.__ZONE_NAME__/"
-        - "wss://collabora.__ZONE_NAME__/"
+        - "https://opencloud-collabora.__ZONE_NAME__/"
+        - "wss://opencloud-collabora.__ZONE_NAME__/"
         - "https://raw.githubusercontent.com/opencloud-eu/awesome-apps/"
         - "https://update.opencloud.eu/"
       default-src:
@@ -25,20 +25,20 @@ data:
       frame-ancestors:
         - "'self'"
         - "https://opencloud.__ZONE_NAME__"
-        - "https://collabora.__ZONE_NAME__"
-        - "https://wopiserver.__ZONE_NAME__"
+        - "https://opencloud-collabora.__ZONE_NAME__"
+        - "https://opencloud-wopiserver.__ZONE_NAME__"
       frame-src:
         - "'self'"
         - "blob:"
         - "https://embed.diagrams.net/"
-        - "https://collabora.__ZONE_NAME__/"
-        - "https://wopiserver.__ZONE_NAME__/"
+        - "https://opencloud-collabora.__ZONE_NAME__/"
+        - "https://opencloud-wopiserver.__ZONE_NAME__/"
       img-src:
         - "'self'"
         - "data:"
         - "blob:"
         - "https://raw.githubusercontent.com/opencloud-eu/awesome-apps/"
-        - "https://collabora.__ZONE_NAME__/"
+        - "https://opencloud-collabora.__ZONE_NAME__/"
       manifest-src:
         - "'self'"
       media-src:

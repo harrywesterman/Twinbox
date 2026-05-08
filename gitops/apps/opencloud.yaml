@@ -37,8 +37,8 @@ spec:
                         - "'self'"
                         - "blob:"
                         - "https://authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/"
-                        - "https://collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/"
-                        - "wss://collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/"
+                        - "https://opencloud-collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/"
+                        - "wss://opencloud-collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/"
                         - "https://raw.githubusercontent.com/opencloud-eu/awesome-apps/"
                         - "https://update.opencloud.eu/"
                       default-src:
@@ -48,20 +48,20 @@ spec:
                       frame-ancestors:
                         - "'self'"
                         - "https://opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
-                        - "https://collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
-                        - "https://wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+                        - "https://opencloud-collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+                        - "https://opencloud-wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
                       frame-src:
                         - "'self'"
                         - "blob:"
                         - "https://embed.diagrams.net/"
-                        - "https://collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/"
-                        - "https://wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/"
+                        - "https://opencloud-collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/"
+                        - "https://opencloud-wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/"
                       img-src:
                         - "'self'"
                         - "data:"
                         - "blob:"
                         - "https://raw.githubusercontent.com/opencloud-eu/awesome-apps/"
-                        - "https://collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/"
+                        - "https://opencloud-collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/"
                       manifest-src:
                         - "'self'"
                       media-src:
@@ -88,10 +88,10 @@ spec:
                   value: https://opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
                 - op: replace
                   path: /spec/template/spec/containers/0/env/3/value
-                  value: opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}|wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                  value: opencloud-wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
                 - op: replace
                   path: /spec/template/spec/containers/0/env/5/value
-                  value: --o:ssl.enable=false --o:ssl.termination=true --o:net.frame_ancestors=https://opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}} https://collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}} https://wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                  value: --o:ssl.enable=false --o:ssl.termination=true --o:net.frame_ancestors=https://opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}} https://opencloud-collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}} https://opencloud-wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
             - target:
                 kind: IngressRoute
                 name: opencloud
@@ -119,42 +119,42 @@ spec:
               patch: |-
                 - op: replace
                   path: /spec/routes/0/match
-                  value: Host(`collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+                  value: Host(`opencloud-collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
                 name: collabora-wiredoor
               patch: |-
                 - op: replace
                   path: /spec/routes/0/match
-                  value: Host(`collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+                  value: Host(`opencloud-collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
                 name: collabora-tailscale
               patch: |-
                 - op: replace
                   path: /spec/routes/0/match
-                  value: Host(`collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+                  value: Host(`opencloud-collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
                 name: wopiserver
               patch: |-
                 - op: replace
                   path: /spec/routes/0/match
-                  value: Host(`wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+                  value: Host(`opencloud-wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
                 name: wopiserver-wiredoor
               patch: |-
                 - op: replace
                   path: /spec/routes/0/match
-                  value: Host(`wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+                  value: Host(`opencloud-wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
                 name: wopiserver-tailscale
               patch: |-
                 - op: replace
                   path: /spec/routes/0/match
-                  value: Host(`wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+                  value: Host(`opencloud-wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
       destination:
         server: https://kubernetes.default.svc
         namespace: opencloud

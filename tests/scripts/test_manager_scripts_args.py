@@ -1037,6 +1037,8 @@ def test_opencloud_step_enables_external_idp_autoprovisioning_and_ldap_checks():
         'opencloud_webfinger_android_scopes="openid profile email roles offline_access"',
         'opencloud_webfinger_ios_scopes="openid profile email roles offline_access"',
         'opencloud_web_scope="openid profile email roles"',
+        'COLLABORA_HOST="https://opencloud-collabora.${public_zone_name}"',
+        'WOPISERVER_HOST="https://opencloud-wopiserver.${public_zone_name}"',
         "PROXY_AUTOPROVISION_ACCOUNTS: $PROXY_AUTOPROVISION_ACCOUNTS",
         "PROXY_AUTOPROVISION_CLAIM_USERNAME: $PROXY_AUTOPROVISION_CLAIM_USERNAME",
         "PROXY_USER_OIDC_CLAIM: $PROXY_USER_OIDC_CLAIM",
@@ -2875,8 +2877,8 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert "redirect_logout_pretty" in text
     assert "redirect_backchannel_pretty" in text
     assert "apps/user_oidc/code" in text
-    assert "config:system:set wopi_url --value='https://collabora.${public_zone_name}'" in text
-    assert "config:app:set --value='https://collabora.${public_zone_name}' richdocuments wopi_url" in text
+    assert "config:system:set wopi_url --value='https://nextcloud-collabora.${public_zone_name}'" in text
+    assert "config:app:set --value='https://nextcloud-collabora.${public_zone_name}' richdocuments wopi_url" in text
     assert "richdocuments:activate-config" in text
     assert (
         "Could not resolve Authentik signing key ID for ${AUTHENTIK_SIGNING_KEY_NAME}"
@@ -2887,6 +2889,7 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     )
     assert "nextcloud.__ZONE_NAME__" in values_text
     assert "aliasgroups:\n      - host: nextcloud.__ZONE_NAME__" in values_text
+    assert 'server_name: "nextcloud-collabora.__ZONE_NAME__"' in values_text
     assert "exec /cron.sh" in values_text
     assert "AUTHENTIK_API_BASE" not in values_text
     assert "AUTHENTIK_API_TOKEN" not in values_text
@@ -2895,6 +2898,14 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
         REPO_ROOT / "gitops" / "platform-apps" / "nextcloud" / "ingressroute.yaml"
     ).read_text(encoding="utf-8")
     assert "nextcloud.__ZONE_NAME__" in platform_text
+    collabora_text = (
+        REPO_ROOT
+        / "gitops"
+        / "platform-apps"
+        / "nextcloud"
+        / "collabora-ingressroute.yaml"
+    ).read_text(encoding="utf-8")
+    assert "nextcloud-collabora.__ZONE_NAME__" in collabora_text
     app_text = (REPO_ROOT / "gitops" / "apps" / "nextcloud.yaml").read_text(
         encoding="utf-8"
     )
