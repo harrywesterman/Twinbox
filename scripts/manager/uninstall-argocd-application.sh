@@ -276,7 +276,7 @@ case "$APP_NAME" in
 esac
 
 log "Deleting Argo CD application ${APP_NAME}"
-kubectl delete application "$APP_NAME" -n argocd --ignore-not-found=true >/dev/null 2>&1 || true
+kubectl delete application "$APP_NAME" -n argocd --cascade --ignore-not-found=true >/dev/null 2>&1 || true
 kubectl -n argocd wait --for=delete "application/${APP_NAME}" --timeout=5m >/dev/null 2>&1 || true
 
 if [[ "$manifest_kind" == "ApplicationSet" || -n "$application_set_name" ]]; then
@@ -284,7 +284,7 @@ if [[ "$manifest_kind" == "ApplicationSet" || -n "$application_set_name" ]]; the
     application_set_name="${manifest_name:-${APP_NAME}-set}"
   fi
   log "Deleting Argo CD applicationset ${application_set_name}"
-  kubectl delete applicationset "$application_set_name" -n argocd --ignore-not-found=true >/dev/null 2>&1 || true
+  kubectl delete applicationset "$application_set_name" -n argocd --cascade --ignore-not-found=true >/dev/null 2>&1 || true
   kubectl -n argocd wait --for=delete "applicationset/${application_set_name}" --timeout=5m >/dev/null 2>&1 || true
 fi
 

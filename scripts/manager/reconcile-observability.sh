@@ -45,6 +45,8 @@ apply_minimal_stack() {
   log "Applying minimal observability stack"
   TWINBOX_OBSERVABILITY_PROFILE=minimal bash "$WORKSPACE_ROOT/categories/talos-cluster/steps/install-prometheus/run.sh"
   remove_full_stack_components
+  delete_orphan_statefulsets
+  delete_orphan_deployments
 }
 
 remove_observability_app() {
@@ -65,14 +67,25 @@ remove_full_stack_components() {
 
 delete_monitoring_pvcs() {
   log "Deleting monitoring namespace PVCs"
-  kubectl -n monitoring delete pvc --all --ignore-not-found=true >/dev/null 2>&1 || true
+  kubectl -n monitoring delete pvc --all --ignore-not-found=true --force --grace-period=0 --timeout=120s >/dev/null 2>&1 || true
+}
+
+delete_orphan_statefulsets() {
+  log "Deleting orphaned statefulsets in monitoring namespace"
+  kubectl -n monitoring delete statefulset --all --ignore-not-found=true --timeout=60s >/dev/null 2>&1 || true
+}
+
+delete_orphan_deployments() {
+  log "Deleting orphaned deployments in monitoring namespace"
+  kubectl -n monitoring delete deployment --all --ignore-not-found=true --timeout=60s >/dev/null 2>&1 || true
 }
 
 remove_complete_stack() {
   log "Removing full observability stack"
   remove_full_stack_components
   remove_observability_app "prometheus" "$WORKSPACE_ROOT/gitops/apps/prometheus.yaml"
-  delete_monitoring_pvcs
+  delete_orphan_statefulsets
+  delete_orphan_deployments
 }
 
 case "$profile" in
