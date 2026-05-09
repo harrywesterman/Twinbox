@@ -434,7 +434,7 @@ authentik_resolve_scope_mapping_id() {
   local scope_name="$1"
   local response managed_pk fallback_pk
 
-  response="$(authentik_api_get "/propertymappings/provider/scope/?scope_name=${scope_name}&page_size=20")" || return 1
+  response="$(authentik_api_get "/propertymappings/provider/scope/?scope_name=${scope_name}&page_size=200")" || return 1
   managed_pk="$(
     jq -r \
       --arg scope_name "$scope_name" \

@@ -112,27 +112,6 @@ if [[ -n "$existing_argocd_secret_json" ]]; then
   fi
 fi
 
-api_get() {
-  local path="$1"
-  curl -fsS \
-    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" \
-    -H "Accept: application/json" \
-    "${AUTHENTIK_API_BASE}${path}"
-}
-
-api_write() {
-  local method="$1"
-  local path="$2"
-  local payload="$3"
-  curl -fsS \
-    -X "$method" \
-    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" \
-    -H "Accept: application/json" \
-    -H "Content-Type: application/json" \
-    --data "$payload" \
-    "${AUTHENTIK_API_BASE}${path}"
-}
-
 resolve_flow_id() {
   local slug="$1"
   local designation="$2"
@@ -142,38 +121,11 @@ resolve_flow_id() {
   authentik_resolve_flow_id "$slug" "$designation"
 }
 
-resolve_scope_mapping_id() {
-  local scope_name="$1"
-  local response managed_pk fallback_pk
-
-  response="$(api_get "/propertymappings/provider/scope/?scope_name=${scope_name}&page_size=20")"
-  managed_pk="$(
-    jq -r \
-      --arg scope_name "$scope_name" \
-      '.results[]?
-        | select((.scope_name // "") == $scope_name and ((.managed // "") | length > 0))
-        | .pk // empty' <<<"$response" | head -n1
-  )"
-  if [[ -n "$managed_pk" ]]; then
-    printf '%s\n' "$managed_pk"
-    return 0
-  fi
-
-  fallback_pk="$(
-    jq -r \
-      --arg scope_name "$scope_name" \
-      '.results[]?
-        | select((.scope_name // "") == $scope_name)
-        | .pk // empty' <<<"$response" | head -n1
-  )"
-  printf '%s\n' "$fallback_pk"
-}
-
 authorization_flow_id="$(resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
 invalidation_flow_id="$(resolve_flow_id "default-provider-invalidation-flow" "invalidation")"
-openid_mapping_id="$(resolve_scope_mapping_id "openid")"
-email_mapping_id="$(resolve_scope_mapping_id "email")"
-profile_mapping_id="$(resolve_scope_mapping_id "profile")"
+openid_mapping_id="$(authentik_resolve_scope_mapping_id "openid")"
+email_mapping_id="$(authentik_resolve_scope_mapping_id "email")"
+profile_mapping_id="$(authentik_resolve_scope_mapping_id "profile")"
 admins_group_id="$(authentik_find_group_id "admins")"
 signing_key_id="$(authentik_resolve_signing_key_id)"
 
@@ -197,7 +149,7 @@ create_or_update_provider() {
   local provider_payload="$1"
   local search_response provider_pk existing_pk
 
-  search_response="$(api_get "/providers/oauth2/?search=Argo%20CD")"
+  search_response="$(authentik_api_get "/providers/oauth2/?search=Argo%20CD")"
   existing_pk="$(
     jq -r '
       .results[]?
@@ -207,13 +159,13 @@ create_or_update_provider() {
   )"
 
   if [[ -n "$existing_pk" ]]; then
-    api_write PATCH "/providers/oauth2/${existing_pk}/" "$provider_payload" >/dev/null
+    authentik_api_write PATCH "/providers/oauth2/${existing_pk}/" "$provider_payload" >/dev/null
     printf '%s\n' "$existing_pk"
     return 0
   fi
 
   provider_pk="$(
-    api_write POST "/providers/oauth2/" "$provider_payload" | jq -r '.pk // .id // empty'
+    authentik_api_write POST "/providers/oauth2/" "$provider_payload" | jq -r '.pk // .id // empty'
   )"
 
   [[ -n "$provider_pk" ]] || fail "Authentik did not return a provider ID for Argo CD"
@@ -224,16 +176,16 @@ create_or_update_application() {
   local app_payload="$1"
   local existing_json existing_pk
 
-  existing_json="$(api_get "/core/applications/${argocd_application_slug}/" 2>/dev/null || true)"
+  existing_json="$(authentik_api_get "/core/applications/${argocd_application_slug}/" 2>/dev/null || true)"
   existing_pk="$(jq -r '.pk // .id // empty' <<<"$existing_json")"
 
   if [[ -n "$existing_pk" ]]; then
-    api_write PATCH "/core/applications/${argocd_application_slug}/" "$app_payload" >/dev/null
+    authentik_api_write PATCH "/core/applications/${argocd_application_slug}/" "$app_payload" >/dev/null
     printf '%s\n' "$existing_pk"
     return 0
   fi
 
-  api_write POST "/core/applications/" "$app_payload" | jq -r '.pk // .id // empty'
+  authentik_api_write POST "/core/applications/" "$app_payload" | jq -r '.pk // .id // empty'
 }
 
 find_policy_binding_pk() {
@@ -241,7 +193,7 @@ find_policy_binding_pk() {
   local group_id="$2"
   local response
 
-  response="$(api_get "/policies/bindings/?page_size=200")"
+  response="$(authentik_api_get "/policies/bindings/?page_size=200")"
   jq -r \
     --arg target_uuid "$target_uuid" \
     --arg group_id "$group_id" \
@@ -264,11 +216,11 @@ ensure_group_binding() {
 
   existing_pk="$(find_policy_binding_pk "$target_uuid" "$group_id")"
   if [[ -n "$existing_pk" ]]; then
-    api_write PATCH "/policies/bindings/${existing_pk}/" "$binding_payload" >/dev/null
+    authentik_api_write PATCH "/policies/bindings/${existing_pk}/" "$binding_payload" >/dev/null
     return 0
   fi
 
-  api_write POST "/policies/bindings/" "$binding_payload" >/dev/null
+  authentik_api_write POST "/policies/bindings/" "$binding_payload" >/dev/null
 }
 
 provider_payload="$(
@@ -317,7 +269,7 @@ application_payload="$(
 application_pk="$(create_or_update_application "$application_payload")"
 [[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for Argo CD"
 
-application_json="$(api_get "/core/applications/${argocd_application_slug}/")"
+application_json="$(authentik_api_get "/core/applications/${argocd_application_slug}/")"
 application_uuid="$(jq -r '.pk // .uuid // .id // empty' <<<"$application_json")"
 [[ -n "$application_uuid" ]] || fail "Could not determine Authentik application UUID for Argo CD"
 ensure_group_binding "$application_uuid" "$admins_group_id"
