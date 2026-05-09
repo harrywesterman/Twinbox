@@ -421,6 +421,7 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
                 "install-cloudnativepg",
                 "install-secret-sync",
                 "choose-ingress-route",
+                "install-authentik-idp",
             ]
             nextcloud = next(step for step in apps if step["id"] == "install-nextcloud")
             assert nextcloud["placeholder"] is False

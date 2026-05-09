@@ -258,7 +258,7 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "send_initial_realm_messages(realm)" in values_text
     assert 'Realm.objects.filter(string_id="").exists()' in values_text
     assert "create_realm --automated --string-id=" in values_text
-    assert "imageName: zulip/zulip-postgresql:14" in db_cluster_text
+    assert "imageName: ghcr.io/cloudnative-pg/postgresql:16.4" in db_cluster_text
     assert "name: zulip-runtime" in runtime_secret_text
     assert "secretKey: rabbitmq-password" in runtime_secret_text
     assert "property: ZULIP_RABBITMQ_PASSWORD" in runtime_secret_text
