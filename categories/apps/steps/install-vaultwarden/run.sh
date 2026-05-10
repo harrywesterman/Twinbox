@@ -253,6 +253,14 @@ signing_key_id="$(authentik_resolve_signing_key_id)"
 [[ -n "$invalidation_flow_id" ]] || fail "Could not resolve Authentik invalidation flow ID"
 [[ -n "$openid_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for openid"
 [[ -n "$email_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for email"
+
+email_mapping_json="$(authentik_api_get "/propertymappings/scope/${email_mapping_id}/" || true)"
+email_mapping_expr="$(printf '%s' "$email_mapping_json" | jq -r '.expression // empty')"
+if printf '%s' "$email_mapping_expr" | grep -q 'email_verified.*[Ff]alse'; then
+  log "Patching Authentik email scope mapping to return email_verified: true"
+  email_patch_payload="$(printf '%s' "$email_mapping_json" | jq -c '{expression: (.expression | sub("email_verified.*: .*(False|false)[,\n]?"; "email_verified\": true,\n    "))}')"
+  authentik_api_write PATCH "/propertymappings/scope/${email_mapping_id}/" "$email_patch_payload" >/dev/null || true
+fi
 [[ -n "$profile_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for profile"
 [[ -n "$admins_group_id" ]] || fail "Could not resolve Authentik admins group ID"
 [[ -n "$signing_key_id" ]] || fail "Could not resolve Authentik signing key ID"
