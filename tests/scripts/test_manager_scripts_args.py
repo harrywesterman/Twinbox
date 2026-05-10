@@ -1370,6 +1370,15 @@ def test_stirling_pdf_waits_for_real_kubernetes_readiness():
     assert "authentik-forwardauth" in ingressroute_text
     assert "authentik-forwardauth" in middleware_text
     assert "authentik-server" in middleware_text
+    assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in step_text
+    assert "authentik_ensure_token" in step_text
+    assert "authentik_setup_forward" in step_text
+    assert 'authentik_api_request POST "/providers/proxy/"' in step_text
+    assert 'authentik_api_request POST "/core/applications/"' in step_text
+    assert 'authentik_api_request POST "/policies/bindings/"' in step_text
+    assert 'authentik_api_request GET "/outposts/instances/?page_size=100"' in step_text
+    assert "authentik_teardown_forward" in step_text
+    assert "forward_single" in step_text
 
 
 def test_argo_step_script_bootstraps_argocd_without_cni_adoption():

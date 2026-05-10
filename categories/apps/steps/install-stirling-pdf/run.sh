@@ -9,6 +9,8 @@ WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
 # shellcheck disable=SC1091
 source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
@@ -196,6 +198,86 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
 wait_for_resource_ready "stirling-pdf" "externalsecret/stirling-pdf-config" "Ready" "Stirling PDF ExternalSecret"
 wait_for_pvc_bound "stirling-pdf" "stirling-pdf-data" "Stirling PDF data PVC"
 wait_for_deployment_rollout "stirling-pdf" "stirling-pdf" "Stirling PDF application"
+
+log "Configuring Authentik proxy provider for Stirling PDF"
+
+authentik_ensure_token
+authentik_setup_forward
+
+authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
+invalidation_flow_id="$(authentik_resolve_flow_id "default-provider-invalidation-flow" "invalidation")"
+admins_group_id="$(authentik_find_group_id "admins")"
+
+provider_payload="$(
+  jq -n \
+    --arg name "Stirling PDF" \
+    --arg external_host "https://stirling-pdf.${public_zone_name}" \
+    --arg authorization_flow "$authorization_flow_id" \
+    --arg invalidation_flow "$invalidation_flow_id" \
+    '{
+      name: $name,
+      external_host: $external_host,
+      authorization_flow: $authorization_flow,
+      invalidation_flow: $invalidation_flow,
+      mode: "forward_single"
+    }'
+)"
+
+provider_response="$(authentik_api_request POST "/providers/proxy/" "$provider_payload")"
+provider_pk="$(jq -r '.pk // .id // .uuid // empty' <<<"$provider_response")"
+
+if [[ -z "$provider_pk" || "$provider_pk" == "null" ]]; then
+  lookup_response="$(authentik_api_request GET "/providers/proxy/?page_size=100")"
+  provider_pk="$(jq -r '.results[]? | select(.name == "Stirling PDF") | .pk // .id // .uuid // empty' <<<"$lookup_response")"
+fi
+
+[[ -n "$provider_pk" && "$provider_pk" != "null" ]] || fail "Could not determine Authentik proxy provider PK"
+
+application_payload="$(
+  jq -n \
+    --arg name "Stirling PDF" \
+    --arg slug "stirling-pdf" \
+    --arg launch_url "https://stirling-pdf.${public_zone_name}" \
+    --arg provider_pk "$provider_pk" \
+    '{
+      name: $name,
+      slug: $slug,
+      meta_launch_url: $launch_url,
+      provider: ($provider_pk | tonumber)
+    }'
+)"
+
+app_response="$(authentik_api_request POST "/core/applications/" "$application_payload")"
+app_pk="$(jq -r '.pk // .id // .uuid // empty' <<<"$app_response")"
+
+if [[ -z "$app_pk" || "$app_pk" == "null" ]]; then
+  app_response="$(authentik_api_request GET "/core/applications/stirling-pdf/")"
+  app_pk="$(jq -r '.pk // .id // .uuid // empty' <<<"$app_response")"
+fi
+
+[[ -n "$app_pk" && "$app_pk" != "null" ]] || fail "Could not determine Authentik application PK"
+
+binding_payload="$(
+  jq -n \
+    --arg target_uuid "$app_pk" \
+    --arg group_id "$admins_group_id" \
+    '{target: $target_uuid, group: $group_id, order: 1, enabled: true}'
+)"
+authentik_api_request POST "/policies/bindings/" "$binding_payload" >/dev/null
+
+outpost_response="$(authentik_api_request GET "/outposts/instances/?page_size=100")"
+outpost_id="$(jq -r '.results[] | select(.name == "authentik Embedded Outpost") | .pk' <<<"$outpost_response")"
+current_providers="$(jq -c '.results[] | select(.pk == "'"$outpost_id"'") | .providers // []' <<<"$outpost_response")"
+
+if ! jq -e --arg pk "$provider_pk" 'map(tostring) | index($pk) != null' <<<"$current_providers" >/dev/null 2>&1; then
+  updated_providers="$(jq -c --argjson pk "$provider_pk" '. + [$pk] | map(tostring) | unique' <<<"$current_providers")"
+  authentik_api_request PATCH "/outposts/instances/${outpost_id}/" \
+    "$(jq -n --argjson providers "$updated_providers" '{providers: $providers}')" >/dev/null
+fi
+
+authentik_teardown_forward
+
+log "Stirling PDF proxy provider configured in Authentik"
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \
