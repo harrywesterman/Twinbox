@@ -2,25 +2,3 @@ id: talos-cluster
 title: Talos Cluster
 summary: Provision Talos infrastructure and bootstrap the cluster in guided steps.
 order: 20
-app_steps:
-  - id: install-zulip
-    summary: Install Zulip with Longhorn persistence, CloudNativePG, Authentik OIDC, and Traefik ingress.
-    explanation: >
-      Twinbox provisions Zulip as a GitOps application with a Longhorn-backed
-      persistent volume, a dedicated CloudNativePG PostgreSQL cluster, an
-      Authentik OIDC provider for login, and Traefik ingress routes for the
-      selected cluster entrypoint. The step also seeds Zulip's secret key, OIDC
-      configuration, and database credentials into OpenBao so the chart can read
-      them through External Secrets instead of storing bootstrap material in the
-      repository.
-  - id: install-paperless
-  - id: install-pixelfed
-  - id: install-karakeep
-  - id: install-vaultwarden
-  - id: install-n8n
-  - id: install-openwebui
-  - id: install-audiobookshelf
-  - id: install-freshrss
-  - id: install-searxng
-  - id: install-jitsi
-  - id: install-stirling-pdf

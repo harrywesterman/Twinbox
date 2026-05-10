@@ -108,6 +108,5 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 - `configure-netbird-ingress` – Configure NetBird SSO, routing groups, and setup keys.
 - `install-netbird-routing-peers` – Deploy NetBird routing peers to Kubernetes.
 - `configure-netbird-admin-access` – Enroll the Management VM as a NetBird admin peer.
-- Shared app installs such as `install-nextcloud`, `install-opencloud`, `install-immich`, `install-zulip`, and the rest of the user-facing app set are referenced from `categories/apps/steps` via `app_steps` entries in `categories/talos-cluster/category.yaml`.
 - `configure-cloudflare-dns` – Configure Cloudflare DNS records.
 - `provision-wiredoor-bastion` – Provision the Wiredoor bastion host.

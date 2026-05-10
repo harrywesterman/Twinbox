@@ -201,7 +201,6 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
 
     assert "Placeholder step" not in step_text
     assert "categories/apps/steps/install-zulip/run.sh" in step_text
-    assert "install-zulip" in category_text
     assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in run_text
     assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in run_text
     assert 'mkdir -p "$secrets_dir"' in run_text

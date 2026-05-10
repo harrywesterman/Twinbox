@@ -184,16 +184,6 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-management-consoles",
                 "install-ntfy",
                 "install-velero-backup",
-                "install-zulip",
-                "install-pixelfed",
-                "install-paperless",
-                "install-karakeep",
-                "install-vaultwarden",
-                "install-n8n",
-                "install-audiobookshelf",
-                "install-freshrss",
-                "install-searxng",
-                "install-jitsi",
             }
             assert expected_talos_step_ids.issubset(talos_steps)
             assert talos_steps["provision-nodes"]["title"] == "Deploy Talos Cluster"
@@ -247,44 +237,12 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 == "Install Management consoles"
             )
             assert talos_steps["install-ntfy"]["title"] == "Install Ntfy"
-            assert talos_steps["install-freshrss"]["title"] == "Install FreshRSS"
-            assert "placeholder" not in talos_steps["install-freshrss"]["summary"].lower()
-            assert "placeholder" not in talos_steps["install-freshrss"]["explanation"].lower()
-            assert talos_steps["install-searxng"]["title"] == "Install SearXNG"
-            assert "placeholder" not in talos_steps["install-searxng"]["summary"].lower()
-            assert "placeholder" not in talos_steps["install-searxng"]["explanation"].lower()
             assert "install-nextcloud" not in talos_steps
             assert "install-opencloud" not in talos_steps
             assert "install-immich" not in talos_steps
             assert "install-proxmox-backup-system" not in talos_steps
             assert "install-gitea" not in talos_steps
             assert "install-uptimekuma" not in talos_steps
-            assert talos_steps["install-zulip"]["depends_on"] == []
-            assert talos_steps["install-pixelfed"]["title"] == "Install Pixelfed"
-            assert talos_steps["install-pixelfed"]["depends_on"] == [
-                "install-longhorn-storage",
-                "install-cloudnativepg",
-                "install-secret-sync",
-                "choose-ingress-route",
-            ]
-            assert talos_steps["install-n8n"]["depends_on"] == [
-                "install-longhorn-storage",
-                "install-cloudnativepg",
-                "install-secret-sync",
-                "install-authentik-idp",
-                "choose-ingress-route",
-            ]
-            assert talos_steps["install-vaultwarden"]["title"] == "Install Vaultwarden"
-            assert talos_steps["install-vaultwarden"]["depends_on"] == [
-                "install-longhorn-storage",
-                "install-cloudnativepg",
-                "install-secret-sync",
-                "choose-ingress-route",
-                "install-authentik-idp",
-            ]
-            assert talos_steps["install-audiobookshelf"]["title"] == "Install Audiobookshelf"
-            assert "placeholder" not in talos_steps["install-audiobookshelf"]["summary"].lower()
-            assert "placeholder" not in talos_steps["install-audiobookshelf"]["explanation"].lower()
             assert talos_steps["provision-nodes"]["journey_stage"] == "setup"
             assert talos_steps["provision-nodes"]["status"] == "ready"
             assert talos_steps["install-argocd"]["status"] == "locked"
