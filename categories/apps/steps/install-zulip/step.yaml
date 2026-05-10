@@ -8,6 +8,13 @@ explanation: Twinbox provisions Zulip as a GitOps application with a Longhorn-ba
 side_help: Communication tools belong in the same user-facing app sequence, and Zulip follows the same OIDC bootstrap pattern as the other user-facing apps.
 depends_on: []
 inputs: []
+dashy:
+  items:
+    - section: Platform
+      title: Zulip
+      description: Threaded team chat
+      icon: fas fa-comments
+      url_template: https://zulip.__ZONE_NAME__
 secrets:
   files:
     KUBECONFIG_FILE:
