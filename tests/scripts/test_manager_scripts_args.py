@@ -2631,6 +2631,7 @@ def test_vaultwarden_manifests_use_postgresql_and_domain_limited_signups():
     assert "ghcr.io/dani-garcia/vaultwarden:1.36.0" in deployment_text
     assert "ghcr.io/dani-garcia/vaultwarden:latest" not in deployment_text
     assert "SIGNUPS_ALLOWED" in deployment_text
+    assert "SIGNUPS_VERIFY" in deployment_text
     assert "WEBSOCKET_ENABLED" in deployment_text
     assert "secretKeyRef:" in deployment_text
     assert "VAULTWARDEN_DATABASE_URL" in externalsecret_text

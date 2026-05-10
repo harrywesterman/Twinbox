@@ -29,6 +29,8 @@ spec:
               value: https://vaultwarden.__ZONE_NAME__
             - name: SIGNUPS_ALLOWED
               value: "true"
+            - name: SIGNUPS_VERIFY
+              value: "false"
             - name: INVITATIONS_ALLOWED
               value: "false"
             - name: WEBSOCKET_ENABLED
