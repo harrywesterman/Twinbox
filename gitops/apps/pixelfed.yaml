@@ -32,6 +32,32 @@ spec:
             - op: replace
               path: /spec/routes/0/match
               value: Host(`pixelfed.__ZONE_NAME__`)
+        - target:
+            kind: Deployment
+            name: pixelfed
+          patch: |-
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: pixelfed
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: pixelfed
+                      env:
+                        - name: APP_URL
+                          value: https://pixelfed.__ZONE_NAME__
+                        - name: APP_DOMAIN
+                          value: pixelfed.__ZONE_NAME__
+                        - name: ADMIN_DOMAIN
+                          value: pixelfed.__ZONE_NAME__
+                        - name: SESSION_DOMAIN
+                          value: pixelfed.__ZONE_NAME__
+                        - name: MAIL_FROM_ADDRESS
+                          value: no-reply@pixelfed.__ZONE_NAME__
+                        - name: INSTANCE_CONTACT_EMAIL
+                          value: admin@pixelfed.__ZONE_NAME__
   destination:
     server: https://kubernetes.default.svc
     namespace: pixelfed

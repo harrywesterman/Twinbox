@@ -139,6 +139,10 @@ spec:
               value: "1"
             - name: AUTORUN_ENABLED
               value: "false"
+            - name: INSTANCE_CONTACT_EMAIL
+              value: "admin@pixelfed.__ZONE_NAME__"
+            - name: ENTRYPOINT_SKIP_SCRIPTS
+              value: 01-permissions.sh
           readinessProbe:
             exec:
               command:
@@ -147,6 +151,7 @@ spec:
                 - horizon:status
             initialDelaySeconds: 20
             periodSeconds: 10
+            timeoutSeconds: 10
           livenessProbe:
             exec:
               command:
@@ -155,6 +160,7 @@ spec:
                 - horizon:status
             initialDelaySeconds: 60
             periodSeconds: 20
+            timeoutSeconds: 10
           volumeMounts:
             - name: pixelfed-data
               mountPath: /var/www/html/storage
@@ -309,6 +315,10 @@ spec:
               value: "1"
             - name: AUTORUN_ENABLED
               value: "false"
+            - name: INSTANCE_CONTACT_EMAIL
+              value: "admin@pixelfed.__ZONE_NAME__"
+            - name: ENTRYPOINT_SKIP_SCRIPTS
+              value: 01-permissions.sh
           volumeMounts:
             - name: pixelfed-data
               mountPath: /var/www/html/storage
