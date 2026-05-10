@@ -219,7 +219,7 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "name: zulip-set" in app_text
     assert "repoURL: oci://ghcr.io/zulip/helm-charts/zulip" in app_text
     assert "path: ." in app_text
-    assert 'targetRevision: "1.11.61"' in app_text
+    assert 'targetRevision: "1.12.0"' in app_text
     assert "path: gitops/platform-apps/zulip" in app_text
     assert "SETTING_EXTERNAL_HOST: zulip.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in app_text
     assert "SETTING_ZULIP_ADMINISTRATOR: admin@{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in app_text
