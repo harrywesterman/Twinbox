@@ -168,8 +168,9 @@ vaultwarden_db_password="$(openssl rand -hex 24)"
 vaultwarden_database_url="postgresql://${vaultwarden_db_username}:${vaultwarden_db_password}@vaultwarden-db-pooler-rw.databases.svc.cluster.local:5432/vaultwarden"
 vaultwarden_host="https://vaultwarden.${public_zone_name}"
 vaultwarden_secret_file="$(mktemp "${TMPDIR:-/tmp}/vaultwarden-bootstrap.XXXXXX.json")"
+vaultwarden_db_secret_file="$(mktemp "${TMPDIR:-/tmp}/vaultwarden-db-credentials.XXXXXX.json")"
 vaultwarden_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/vaultwarden-application.XXXXXX.yaml")"
-trap 'rm -f "$vaultwarden_secret_file" "$vaultwarden_rendered_manifest"' EXIT
+trap 'rm -f "$vaultwarden_secret_file" "$vaultwarden_db_secret_file" "$vaultwarden_rendered_manifest"' EXIT
 
 existing_vaultwarden_secret_json=""
 if command -v openbao_read_global_secret_json >/dev/null 2>&1; then
@@ -202,6 +203,19 @@ if [[ -n "$existing_vaultwarden_secret_json" ]]; then
 fi
 vaultwarden_sso_application_slug="vaultwarden"
 vaultwarden_sso_redirect_uri="${vaultwarden_host}/identity/connect/oidc-signin"
+
+log "Writing Vaultwarden DB credentials to OpenBao"
+jq -n \
+  --arg VAULTWARDEN_POSTGRESQL__USERNAME "$vaultwarden_db_username" \
+  --arg VAULTWARDEN_POSTGRESQL__PASSWORD "$vaultwarden_db_password" \
+  '{
+    VAULTWARDEN_POSTGRESQL__USERNAME: $VAULTWARDEN_POSTGRESQL__USERNAME,
+    VAULTWARDEN_POSTGRESQL__PASSWORD: $VAULTWARDEN_POSTGRESQL__PASSWORD
+  }' >"$vaultwarden_db_secret_file"
+bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+  --secret-name "vaultwarden" \
+  --json-file "$vaultwarden_db_secret_file" \
+  --required-keys "VAULTWARDEN_POSTGRESQL__USERNAME,VAULTWARDEN_POSTGRESQL__PASSWORD"
 
 log "Applying Vaultwarden database manifests"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/namespace.yaml"
