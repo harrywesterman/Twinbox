@@ -28,7 +28,7 @@ spec:
             - name: DOMAIN
               value: https://vaultwarden.__ZONE_NAME__
             - name: SIGNUPS_ALLOWED
-              value: "false"
+              value: "true"
             - name: SIGNUPS_DOMAINS_WHITELIST
               value: __ZONE_NAME__
             - name: INVITATIONS_ALLOWED
