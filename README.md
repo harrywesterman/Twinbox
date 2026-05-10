@@ -2,7 +2,7 @@
 
 **Production-grade Kubernetes on your own hardware. One command.**
 
-Twinbox turns a Proxmox server into a fully configured Talos Linux cluster with GitOps, secrets, storage, backups, and ingress — all set up through a guided web interface.
+Twinbox turns one or more Proxmox servers into a fully configured Talos Linux cluster with GitOps, secrets, storage, backups, and ingress — all set up through a guided web interface. Then you can install your own private application set to run your own on-prem cloud.
 
 ## What you start with
 
@@ -35,7 +35,6 @@ Open your browser to continue the installation. The web UI guides you through cl
 - **Talos Linux** — immutable, API-driven Kubernetes OS
 - **Cilium** — kube-proxy-free networking and policy-ready datapath
 - **Hubble** — network flow visibility and the Hubble UI dashboard
-- **Cloudtty** — browser-based Kubernetes shell on the cluster itself
 - **Argo CD** — GitOps for every component
 - **Longhorn** — distributed block storage
 - **Prometheus** — cluster metrics, Alertmanager, node-exporter, and kube-state-metrics
@@ -43,7 +42,6 @@ Open your browser to continue the installation. The web UI guides you through cl
 - **Loki** — log aggregation and log querying for Grafana
 - **OpenBao + External Secrets Operator** — centralized secret management
 - **Traefik** — ingress and routing
-- **Traefik Manager** — browser UI for managing Traefik routes and services
 - **MetalLB** — bare-metal load balancer for on-prem ingress
 - **Cloudflare Tunnel** — secure external access without opening ports
 - **Tailscale** — mesh VPN for secure remote access
