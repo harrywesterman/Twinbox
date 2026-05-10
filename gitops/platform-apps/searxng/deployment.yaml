@@ -25,10 +25,6 @@ spec:
             - name: http
               containerPort: 8080
           env:
-            - name: SEARXNG_PORT
-              value: "8080"
-            - name: SEARXNG_BIND_ADDRESS
-              value: "0.0.0.0"
             - name: SEARXNG_BASE_URL
               value: https://searxng.__ZONE_NAME__/
             - name: SEARXNG_SECRET
@@ -38,6 +34,10 @@ spec:
                   key: SEARXNG_SECRET
             - name: SEARXNG_VALKEY_URL
               value: valkey://searxng-valkey:6379/0
+            - name: SEARXNG_PORT
+              value: "8080"
+            - name: SEARXNG_BIND_ADDRESS
+              value: "0.0.0.0"
           readinessProbe:
             httpGet:
               path: /
