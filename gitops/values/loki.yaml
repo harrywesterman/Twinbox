@@ -14,7 +14,7 @@ loki:
           prefix: loki_index_
           period: 24h
   limits_config:
-    retention_period: 7d
+    retention_period: 1d
 
 deploymentMode: SingleBinary
 
@@ -23,12 +23,12 @@ singleBinary:
   persistence:
     enabled: true
     storageClass: longhorn-single
-    size: 20Gi
+    size: 10Gi
   resources:
     limits:
-      memory: 2Gi
+      memory: 512Mi
     requests:
-      memory: 1Gi
+      memory: 512Mi
 
 read:
   replicas: 0
