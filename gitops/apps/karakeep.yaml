@@ -8,7 +8,7 @@ spec:
   sources:
     - repoURL: https://karakeep-app.github.io/helm-charts
       chart: karakeep
-      targetRevision: "0.31.0"
+      targetRevision: "0.32.0"
       helm:
         values: |
           applicationProtocol: https
