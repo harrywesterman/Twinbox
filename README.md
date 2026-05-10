@@ -44,12 +44,42 @@ Open your browser to continue the installation. The web UI guides you through cl
 - **OpenBao + External Secrets Operator** — centralized secret management
 - **Traefik** — ingress and routing
 - **Traefik Manager** — browser UI for managing Traefik routes and services
+- **MetalLB** — bare-metal load balancer for on-prem ingress
+- **Cloudflare Tunnel** — secure external access without opening ports
+- **Tailscale** — mesh VPN for secure remote access
+- **NetBird** — self-hosted WireGuard VPN with SSO
+- **Wiredoor** — WireGuard-based reverse proxy gateway
 - **SeaweedFS** — S3-compatible backup target on the Management VM
 - **Velero** — automated cluster backups to SeaweedFS
 - **CloudNativePG** — managed PostgreSQL clusters
 - **Authentik** — single sign-on and identity provider
+- **CrowdSec** — collaborative intrusion detection and Traefik bouncer
+- **Tempo** — distributed tracing backend for Grafana
+- **Grafana Alloy** — unified telemetry collector for logs, metrics, and traces
 - **Twinbox Portal** — the default user-facing launcher with settings, intranet links, and cluster status
 - **Dashy** — legacy admin launcher for operator tools on `admin.<domain>`
+
+## App Catalog
+
+Install additional applications through the Twinbox Portal:
+
+- **Audiobookshelf** — audiobook and podcast server
+- **FreshRSS** — self-hosted RSS feed reader
+- **HedgeDoc** — real-time collaborative markdown editor
+- **Immich** — photo and video backup
+- **Jitsi** — video conferencing with OpenID Connect
+- **Karakeep** — bookmark and web archiving
+- **n8n** — workflow automation
+- **Nextcloud** — file sync and collaboration
+- **OpenCloud** — open source collaboration platform
+- **OpenWebUI** — AI chat interface
+- **Outline** — team knowledge base
+- **Paperless** — document management with OCR
+- **Pixelfed** — decentralized photo sharing
+- **SearXNG** — privacy-respecting metasearch engine
+- **Stirling PDF** — PDF manipulation tools
+- **Vaultwarden** — Bitwarden-compatible password manager
+- **Zulip** — threaded team chat
 
 ## Quick start
 

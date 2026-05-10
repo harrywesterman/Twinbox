@@ -7,6 +7,7 @@ Test suite for the current manager-first runtime.
 - `tests/api/`: API contract and file-persistence behavior
 - `tests/worker/`: worker queue lifecycle behavior
 - `tests/scripts/`: shell script argument/env validation
+- `tests/portal/`: Portal component and integration tests
 
 ## Run
 

@@ -78,6 +78,14 @@ Steps for configuring the Management VM itself.
 
 Steps for provisioning the Talos Kubernetes cluster and deploying platform services.
 
+See [categories/talos-cluster/README.md](talos-cluster/README.md) for the full step reference.
+
+### apps (order: 30)
+
+Standalone applications that can be installed on top of the cluster through the Twinbox Portal.
+
+See [categories/apps/README.md](apps/README.md) for the full app catalog.
+
 - `provision-nodes` – Create Talos VMs on Proxmox, apply machine configs, bootstrap.
 - `install-argocd` – Deploy Argo CD.
 - `install-longhorn-storage` – Deploy Longhorn, set default StorageClass, and configure recurring SeaweedFS backups.
@@ -109,4 +117,10 @@ Steps for provisioning the Talos Kubernetes cluster and deploying platform servi
 - `install-netbird-routing-peers` – Deploy NetBird routing peers to Kubernetes.
 - `configure-netbird-admin-access` – Enroll the Management VM as a NetBird admin peer.
 - `configure-cloudflare-dns` – Configure Cloudflare DNS records.
+- `configure-cloudflare-tunnel` – Configure Cloudflare Tunnel for external access.
+- `configure-metallb-ingress` – Configure MetalLB load balancer for bare-metal ingress.
+- `configure-tailscale-ingress` – Configure Tailscale VPN ingress.
+- `configure-wiredoor-ingress` – Configure Wiredoor VPN ingress.
+- `install-alloy` – Deploy Grafana Alloy as the shared telemetry collector.
+- `install-tempo` – Deploy Tempo trace storage and query backend for Grafana.
 - `provision-wiredoor-bastion` – Provision the Wiredoor bastion host.

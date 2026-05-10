@@ -28,12 +28,14 @@ manager-worker/
 | `bootstrap_cluster` | Alias for apply_cluster |
 | `reconcile_observability` | Reconciles the observability profile for the active cluster |
 | `run_step` | Executes a step script from `categories/` |
+| `uninstall_step` | Uninstalls an app by removing its Argo CD Application |
 
 ## Startup Sequence
 
 1. Recovers orphaned running jobs (marks them as failed).
 2. Validates installed tool versions against `config/pinned-defaults.sh` (talosctl, tofu, kubectl, helm).
-3. Starts polling loop.
+3. Reconciles Grafana dashboards for all known clusters on startup.
+4. Starts polling loop.
 
 ## Container Image
 
@@ -42,6 +44,9 @@ The Dockerfile bundles:
 - `talosctl`, `tofu` (OpenTofu), `kubectl`, `helm` — installed at build time with pinned versions from `config/pinned-defaults.sh`.
 - `categories/` — step manifests and step runner scripts executed by the worker.
 - `scripts/manager/`, `scripts/get-talos-image-factory.sh` — provisioning scripts.
+- `scripts/manager/reconcile-observability.sh` — observability reconciliation.
+- `scripts/manager/refresh-grafana-dashboard.mjs` — Grafana dashboard sync.
+- `scripts/manager/uninstall-argocd-application.sh` — app uninstall helper.
 - `config/pinned-defaults.sh` — version pin definitions.
 - `infra/`, `lib/` — OpenTofu modules and shared libraries.
 

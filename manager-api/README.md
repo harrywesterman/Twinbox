@@ -24,7 +24,7 @@ manager-api/
 - Listens on port `8080` (configurable via `MANAGER_API_PORT`)
 - Reads/writes runtime state under `MANAGER_DATA_DIR` (default `/data`)
 - Bundles the repo catalog under `categories/` so `/api/catalog` can serve the wizard from inside the container
-- Dependencies: `express`, `yaml`
+- Dependencies: `express ^5.0.0`, `yaml ^2.8.4`
 
 ## Endpoints
 
@@ -32,7 +32,11 @@ manager-api/
 |--------|------|-------------|
 | `GET` | `/api/health` | Health check |
 | `GET` | `/api/catalog` | Step catalog with status |
+| `GET` | `/api/apps/catalog` | App catalog with install state |
+| `POST` | `/api/apps/:stepId/install` | Install an app |
+| `POST` | `/api/apps/:stepId/uninstall` | Uninstall an app |
 | `GET` | `/api/ip-suggestions` | VMID and IP suggestions |
+| `POST` | `/api/ip-availability` | Check IP availability |
 | `GET` | `/api/secrets/*` | Secret item lookup |
 | `GET` | `/api/proxmox/cluster-resources` | Proxmox node/VM summary |
 | `POST` | `/api/clusters` | Create cluster and queue apply |

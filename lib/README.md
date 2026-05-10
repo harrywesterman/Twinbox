@@ -6,15 +6,51 @@ Shared Node.js (ESM) modules used by `manager-api`, `manager-worker`, and step s
 
 ```
 lib/
-├── step-presentation.mjs   # Step icon, URL, and summary resolution for the UI
+├── catalog-definitions.mjs  # Load and merge category, step, and bundle manifests
+├── cluster-public-zone.mjs  # Resolve public DNS zone for a cluster
+├── dashy-config.mjs         # Generate and refresh Dashy configuration
+├── portal-config.mjs        # Generate and refresh Twinbox Portal configuration
+├── step-manifest.mjs        # Parse and validate step.yaml manifests
+├── step-presentation.mjs    # Step icon, URL, and summary resolution for the UI
+├── step-scope.mjs           # Determine if a step is cluster-scoped
 └── secrets/
-    ├── schema.mjs          # Secret ref normalization, bundle building, Proxmox helpers
+    ├── schema.mjs           # Secret ref normalization, bundle building, Proxmox helpers
     ├── filesystem-store.mjs # Read/write secrets on the filesystem under bootstrap/secrets/
-    ├── redact.mjs          # String redactor for log output
-    └── broker.mjs          # Secret resolution with caching and attachment support
+    ├── redact.mjs           # String redactor for log output
+    └── broker.mjs           # Secret resolution with caching and attachment support
 ```
 
 ## Modules
+
+### catalog-definitions.mjs
+
+Loads and merges catalog definitions from the filesystem:
+
+- `loadCatalogDefinitions({ workspaceRoot, includeApps, includeBundles })` — returns merged category, step, and bundle definitions
+
+### cluster-public-zone.mjs
+
+Resolves the public DNS zone for a given cluster:
+
+- `resolveClusterPublicZone(cluster)` — returns the public zone name (e.g., `*.example.com`)
+
+### dashy-config.mjs
+
+Generates and refreshes Dashy configuration based on installed steps:
+
+- `refreshDashyConfig(...)` — writes Dashy `conf.yml` with active app links
+
+### portal-config.mjs
+
+Generates and refreshes Twinbox Portal configuration:
+
+- `refreshPortalConfig(...)` — writes portal config with app catalog and cluster status
+
+### step-manifest.mjs
+
+Parses and validates `step.yaml` manifests:
+
+- `loadStepManifest(path)` — reads and validates a step manifest
 
 ### step-presentation.mjs
 
@@ -50,6 +86,12 @@ Filesystem-based secret storage under `bootstrap/secrets/`:
 Simple string redactor for scrubbing secrets from log output:
 
 - `buildRedactor(values)` — returns a function that replaces all `values` with `[REDACTED]`
+
+### step-scope.mjs
+
+Determines if a step requires a cluster context:
+
+- `isClusterScopedStep(step)` — returns `true` if the step needs an active cluster
 
 ### secrets/broker.mjs
 
