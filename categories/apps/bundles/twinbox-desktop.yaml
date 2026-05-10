@@ -1,0 +1,47 @@
+id: twinbox-desktop
+title: Twinbox Desktop
+summary: A sovereign desktop workspace bundle with knowledge management, communication, document processing, media, and search tools.
+order: 5
+iconUrl: /assets/step-icons/install-outline.svg
+iconAlt: Twinbox Desktop icon
+description: >
+  Twinbox Desktop provides a complete sovereign workspace running on your own infrastructure.
+  It bundles knowledge management, team communication, document processing, media management,
+  and privacy-respecting search into a single installable package.
+
+
+  Every app in this bundle is deployed through Argo CD GitOps, giving you full control over
+  updates, configuration, and data ownership. No external cloud dependencies — everything
+  stays inside your Twinbox Kubernetes cluster, behind your own ingress and authentication.
+
+
+  **Whats included**
+
+
+  **Outline** — A fast, collaborative knowledge base for your team wiki and documentation.
+
+  **HedgeDoc** — Real-time collaborative markdown editor for meeting notes and brainstorms.
+
+  **Zulip** — Threaded team chat with powerful topic-based organisation.
+
+  **Jitsi** — Private video conferencing with screen sharing, no accounts needed.
+
+  **Paperless-ngx** — Document management with OCR, tagging, and full-text search.
+
+  **Immich** — Self-hosted photo and video management with automatic backup from your phone.
+
+  **SearXNG** — Privacy-respecting metasearch engine that aggregates results without tracking.
+
+  **Audiobookshelf** — Self-hosted audiobook and podcast server with mobile apps.
+
+  **Pixelfed** — Federated image sharing, a privacy-first alternative to Instagram.
+apps:
+  - install-outline
+  - install-hedgedoc
+  - install-zulip
+  - install-jitsi
+  - install-paperless
+  - install-immich
+  - install-searxng
+  - install-audiobookshelf
+  - install-pixelfed

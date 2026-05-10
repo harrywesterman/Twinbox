@@ -379,13 +379,15 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
             assert status == 200
             assert body["errors"] == []
             assert [bundle["id"] for bundle in body["bundles"]] == [
+                "twinbox-desktop",
                 "mijn-bureau",
                 "opendesk",
                 "lasuite",
             ]
-            assert body["bundles"][0]["iconUrl"] == "/assets/step-icons/install-nextcloud.svg"
-            assert body["bundles"][1]["iconUrl"] == "/assets/step-icons/install-opencloud.svg"
-            assert body["bundles"][2]["iconUrl"] == "/assets/step-icons/install-outline.svg"
+            assert body["bundles"][0]["iconUrl"] == "/assets/step-icons/install-outline.svg"
+            assert body["bundles"][1]["iconUrl"] == "/assets/step-icons/install-nextcloud.svg"
+            assert body["bundles"][2]["iconUrl"] == "/assets/step-icons/install-opencloud.svg"
+            assert body["bundles"][3]["iconUrl"] == "/assets/step-icons/install-outline.svg"
             apps = body["categories"][0]["steps"]
             audiobookshelf = next(step for step in apps if step["id"] == "install-audiobookshelf")
             vaultwarden = next(step for step in apps if step["id"] == "install-vaultwarden")
