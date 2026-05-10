@@ -31,7 +31,7 @@ def test_install_jitsi_steps_are_backed_by_a_real_runner_and_cluster_secret_inje
 
     assert "Placeholder step" not in app_step_text
     assert "categories/apps/steps/install-jitsi/run.sh" in app_step_text
-    assert "summary: Install Jitsi" in app_step_text
+    assert "summary: Start secure video calls without needing an account." in app_step_text
     assert "install-secret-sync" in app_step_text
     assert "install-authentik-idp" in app_step_text
     assert "create-users-and-groups" in app_step_text

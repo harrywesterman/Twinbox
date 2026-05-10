@@ -2309,8 +2309,8 @@ def test_prometheus_values_configures_alertmanager_and_storage():
     text = PROMETHEUS_VALUES.read_text(encoding="utf-8")
     assert "kube-prometheus-stack" not in text
     assert "serviceMonitorSelectorNilUsesHelmValues: false" in text
-    assert "scrapeInterval: 60s" in text
-    assert "retention: 7d" in text
+    assert "scrapeInterval: 300s" in text
+    assert "retention: 2d" in text
     assert "alertmanager:" in text
     assert "enabled: true" in text
     assert "configSecret: alertmanager-config" in text
@@ -2363,7 +2363,7 @@ def test_loki_values_configures_filesystem_storage():
     assert "type: filesystem" in text
     assert "storageClass: longhorn-single" in text
     assert "storageClassName: longhorn-single" not in text
-    assert "retention_period: 7d" in text
+    assert "retention_period: 1d" in text
 
 
 def test_alloy_values_keeps_pod_logs_to_core_platform_namespaces():
@@ -2766,7 +2766,7 @@ def test_loki_and_openbao_longhorn_sizes_are_right_sized():
         encoding="utf-8"
     )
 
-    assert "size: 20Gi" in loki_values_text
+    assert "size: 10Gi" in loki_values_text
     assert "storageClass: longhorn-single" in loki_values_text
     assert "storageClassName: longhorn-single" not in loki_values_text
     assert "size: 5Gi" not in loki_values_text
