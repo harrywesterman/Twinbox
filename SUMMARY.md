@@ -1,32 +1,65 @@
-# Twinbox Summary
+# Summary
 
-## Platform Shape
+[Introduction](README.md)
 
-Twinbox is a manager-first deployment flow for Talos on Proxmox.
+# Getting Started
 
-- Proxmox wizard provisions infrastructure baseline.
-- Management VM hosts the manager stack.
-- UI/API/Worker coordinate async provisioning and bootstrap jobs.
-- Runtime services use prebuilt public GHCR images.
+- [Quick Start](docs/getting-started.md)
+- [Deployment Guide](DEPLOYMENT.md)
+- [Wizard Guide](docs/wizard-guide.md)
+- [VM Development](docs/vm-dev.md)
 
-## Core Components
+# Architecture
 
-- `wizard/setup-wizard.sh`
-- `docker-compose.yml`
-- `manager-web/`
-- `manager-api/`
-- `manager-worker/`
-- `scripts/manager/`
-- `manager-data/`
+- [System Architecture](docs/architecture.md)
+- [App Pattern](docs/app-pattern.md)
+- [App Bundles](docs/app-bundles.md)
+- [Portal Architecture](docs/portal.md)
 
-## Phase 1 Delivered
+# Configuration
 
-- Job-driven Talos VM provisioning.
-- Job-driven Talos bootstrap.
-- Persistent job state + logs.
+- [Configuration Overview](docs/configuration.md)
+- [Environment Reference](docs/env-reference.md)
+- [Ingress Policy](docs/ingress-policy.md)
+- [IP Allocation](docs/ip-allocation.md)
 
-## Planned Next Phase
+# Platform Components
 
-- ArgoCD workflow integration.
-- Application sync workflows.
-- Authentication and RBAC for manager access.
+- [Talos Integration](docs/talos-integration.md)
+- [Secrets Library](docs/secrets-library.md)
+- [Scripts Reference](docs/scripts-reference.md)
+- [API Reference](docs/api-reference.md)
+
+# Networking & Ingress
+
+- [Cloudflare](docs/cloudflare.md)
+- [NetBird VPN](docs/netbird.md)
+- [Wiredoor Bastion](docs/wiredoor-bastion.md)
+
+# Security
+
+- [CrowdSec](docs/crowdsec.md)
+
+# Storage & Backup
+
+- [SeaweedFS S3](docs/seaweedfs-s3.md)
+
+# Observability
+
+- [ntfy Notifications](docs/ntfy.md)
+
+# Utilities
+
+- [Argo CD Image Updater](docs/argocd-image-updater.md)
+- [Management Consoles](docs/management-consoles.md)
+
+# Operations
+
+- [Verification](docs/verification.md)
+- [Troubleshooting](docs/troubleshooting.md)
+
+# Development
+
+- [Testing](TESTING.md)
+- [Release Notes](RELEASE-NOTES.md)
+- [Agent Guidelines](AGENTS.md)

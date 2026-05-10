@@ -5,14 +5,15 @@ Twinbox builds a Talos Linux Kubernetes cluster on Proxmox through a Management 
 ## Rules
 
 - Stay on `main`; do not branch unless asked.
-- GitHub `main` is source of truth. The Management VM is runtime-only under `/opt/twinbox`.
-- Manager containers carry executable Twinbox code; the VM host does not keep a full repo checkout.
+- GitHub `main` is source of truth. 
+- The Management VM runs the Web Wizard in a couple of docker containers. They are built from github actions to GHCR. 
+- Update the web wizard: Edit the code, check to MAIN in github, wait for the docker build actions, pull the new version of the docker images on the management VM. 
 - Use `apply_patch`, small scoped edits, `docker compose`, and `python3` on macOS.
 - Do not revert unrelated/user changes.
 - Do not edit runtime/generated/dependency state as source: `manager-data/`, `node_modules/`, `dist/`, `.venv/`, `.terraform/`, vendored charts.
 - Never print or commit secrets.
 - Twinbox Portal runs on the Kubernetes cluster, not on the Management VM. Update it through `gitops/` and let Argo CD sync it.
-- Run cluster checks from the Management VM, not from the Mac. Use SSH to `twinbox@<management-vm-ip>` and work under `/opt/twinbox` there.
+- Run cluster checks from the Management VM. Use SSH to `twinbox@<management-vm-ip>` Look into .env.vm-preview.local to find the management-vm-ip.
 
 ## Map
 
@@ -42,7 +43,6 @@ Twinbox builds a Talos Linux Kubernetes cluster on Proxmox through a Management 
 ## Debug
 
 - Use the SSH remote-connection skill for the Management VM.
-- `TWINBOX_VM_PREVIEW_TARGET` contains the SSH target; connect as `twinbox@<management-vm-ip>` when needed.
 - Use the browser-use skill for all live browser testing and inspection; do not substitute shell-based or external browser checks.
 - Debug host state under `/opt/twinbox`; debug executable code inside the relevant container.
 - Do not wait passively for deployments to finish; start inspecting pod logs right away so you can spot stalls and failures early.
@@ -65,6 +65,5 @@ Run the smallest useful check for touched files:
 
 - Commit/push/deploy only when the user asks for a complete production change.
 - After pushing runtime changes, watch the relevant GitHub Actions workflow.
-- Management VM refresh: `cd /opt/twinbox && docker compose pull && docker compose up -d`.
 - Portal changes roll out through a Git commit to `main`, the portal image publish workflow, and Argo CD sync from `gitops/platform-apps/twinbox-portal`.
 - Management VM refresh example: `sudo -n sh -lc 'cd /opt/twinbox && docker compose pull && docker compose up -d'`.
