@@ -7,6 +7,8 @@ set -euo pipefail
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/config/pinned-defaults.sh"
 
 fail() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
@@ -76,7 +78,8 @@ tofu apply -auto-approve \
   -var "location=$hcloud_location" \
   -var "netbird_fqdn=$netbird_fqdn" \
   -var "netbird_proxy_domain=$netbird_proxy_domain" \
-  -var "netbird_admin_email=$netbird_admin_email"
+  -var "netbird_admin_email=$netbird_admin_email" \
+  -var "netbird_version=${PINNED_NETBIRD_VERSION:-0.70.5}"
 
 server_ipv4="$(tofu output -raw server_ipv4)"
 netbird_url="$(tofu output -raw netbird_url)"
@@ -140,6 +143,35 @@ if [[ -n "$ssh_private_key" ]]; then
   tmp_file="$(mktemp)"
   jq --arg key "$ssh_private_key" '. + {SSH_PRIVATE_KEY: $key}' "$secret_file" >"$tmp_file"
   mv "$tmp_file" "$secret_file"
+fi
+chmod 600 "$secret_file"
+
+# Wait for automated setup to complete and fetch the token
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for NetBird automated setup to complete..."
+setup_result_json=""
+for i in $(seq 1 60); do
+  if [[ -n "$ssh_private_key" ]]; then
+    setup_result_json="$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -i "$ssh_key_dir/id_ed25519" root@"$server_ipv4" 'cat /opt/netbird/setup-result.json 2>/dev/null || echo "{}"' 2>/dev/null || echo "{}")"
+  fi
+  if echo "$setup_result_json" | jq -e '.personal_access_token' >/dev/null 2>&1; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird automated setup completed."
+    break
+  fi
+  if [[ $i -eq 60 ]]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: NetBird automated setup did not complete in time. You may need to create a Personal Access Token manually." >&2
+  fi
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for NetBird setup (attempt ${i}/60)..."
+  sleep 10
+done
+
+if echo "$setup_result_json" | jq -e '.personal_access_token' >/dev/null 2>&1; then
+  netbird_setup_token="$(echo "$setup_result_json" | jq -r '.personal_access_token')"
+  tmp_file="$(mktemp)"
+  jq --arg token "$netbird_setup_token" '. + {NETBIRD_SETUP_TOKEN: $token}' "$secret_file" >"$tmp_file"
+  mv "$tmp_file" "$secret_file"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird setup token saved to secret file."
+else
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: No setup token found. Step 'configure-netbird-ingress' will require a manual NetBird API token." >&2
 fi
 chmod 600 "$secret_file"
 

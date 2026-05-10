@@ -29,7 +29,7 @@ public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "${cluster_dns_doma
 [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
 
-netbird_token="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.netbird_token')"
+netbird_token="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.netbird_token // empty')"
 netbird_management_url="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.netbird_management_url // empty')"
 traefik_resource_address="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.traefik_resource_address // empty')"
 proxy_services_json="$(printf '%s' "$STEP_INPUTS_JSON" | jq -c '.proxy_services_json // empty')"
@@ -37,13 +37,19 @@ if [[ -n "$proxy_services_json" && "$proxy_services_json" != "null" ]]; then
   proxy_services_json="$(printf '%s' "$proxy_services_json" | jq -r '.')"
 fi
 
-[[ -n "$netbird_token" ]] || fail "NetBird API token is required"
-
 netbird_bastion_secret="/opt/twinbox/bootstrap/secrets/global/netbird-bastion-${cluster_id}.json"
 if [[ -z "$netbird_management_url" ]]; then
   [[ -f "$netbird_bastion_secret" ]] || fail "NetBird bastion secret not found at $netbird_bastion_secret"
   netbird_management_url="$(jq -r '.NETBIRD_URL // empty' "$netbird_bastion_secret")"
 fi
+
+if [[ -z "$netbird_token" ]]; then
+  if [[ -f "$netbird_bastion_secret" ]]; then
+    netbird_token="$(jq -r '.NETBIRD_SETUP_TOKEN // empty' "$netbird_bastion_secret")"
+  fi
+fi
+
+[[ -n "$netbird_token" ]] || fail "NetBird API token is required. Either provide it as input or ensure the bastion step generated a setup token."
 [[ -n "$netbird_management_url" ]] || fail "Could not determine NetBird management URL"
 
 if [[ -z "$traefik_resource_address" ]]; then

@@ -54,6 +54,12 @@ variable "netbird_admin_email" {
   type        = string
 }
 
+variable "netbird_version" {
+  description = "NetBird Docker image version tag"
+  type        = string
+  default     = "0.70.5"
+}
+
 variable "allowed_ssh_cidrs" {
   description = "CIDRs allowed to SSH to the VM"
   type        = list(string)

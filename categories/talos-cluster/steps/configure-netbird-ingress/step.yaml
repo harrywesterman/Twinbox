@@ -9,9 +9,10 @@ explanation: >
   and setup keys with OpenTofu, and records the routing peer credentials in
   OpenBao for GitOps deployment.
 side_help: >
-  Create a NetBird personal access token from the NetBird dashboard after the
-  VPS is reachable. Twinbox uses it to configure NetBird resources through the
-  NetBird OpenTofu provider.
+  If the bastion step was able to SSH into the NetBird server, Twinbox already
+  created an admin account and token automatically. You can leave this field empty.
+  Otherwise, create a NetBird personal access token manually from the dashboard
+  and enter it here.
 depends_on:
   - provision-netbird-bastion
   - install-secret-sync
@@ -23,8 +24,10 @@ inputs:
   - id: netbird_token
     label: NetBird API Token
     type: string
-    required: true
-    help: Personal access token from the self-hosted NetBird dashboard
+    required: false
+    help: >
+      Personal access token from the self-hosted NetBird dashboard.
+      If omitted, Twinbox reads the auto-generated token from the bastion step secrets.
   - id: netbird_management_url
     label: NetBird Management URL
     type: string

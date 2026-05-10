@@ -4,6 +4,8 @@ set -euo pipefail
 : "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/config/pinned-defaults.sh"
 
 fail() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
@@ -49,7 +51,7 @@ elif command -v docker >/dev/null 2>&1; then
     -e NB_LOG_LEVEL=info \
     -v twinbox-netbird:/var/lib/netbird \
     -v /dev/net/tun:/dev/net/tun \
-    netbirdio/netbird:latest >/dev/null
+    "netbirdio/netbird:${PINNED_NETBIRD_VERSION:-latest}" >/dev/null
 else
   fail "Neither host netbird client nor docker is available for Management VM enrollment"
 fi

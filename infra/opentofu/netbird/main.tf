@@ -28,5 +28,6 @@ resource "hcloud_server" "netbird" {
     netbird_fqdn         = var.netbird_fqdn
     netbird_proxy_domain = var.netbird_proxy_domain
     netbird_admin_email  = var.netbird_admin_email
+    netbird_version      = var.netbird_version
   })
 }

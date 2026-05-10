@@ -12,6 +12,8 @@ explanation: >
 side_help: >
   You need a Hetzner Cloud API token. If you also provide Cloudflare credentials,
   Twinbox creates netbird and proxy DNS records pointing at the new VPS.
+  Twinbox automatically sets up the first NetBird admin account and generates
+  a Personal Access Token for the next step.
 depends_on:
   - provision-nodes
   - choose-ingress-route
