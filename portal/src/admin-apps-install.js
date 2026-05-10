@@ -92,6 +92,50 @@ export function buildBundleInstallQueue(bundle = {}, cardsById = new Map()) {
   return bundleCards.filter((card) => ['ready', 'failed'].includes(card?.app_state));
 }
 
+export function buildSelectableBundleInstallQueue(bundle = {}, cardsById = new Map(), selectedIds = new Set()) {
+  const bundleCards = getInstallableBundleCards(bundle, cardsById);
+  return bundleCards.filter((card) => {
+    if (!card || !card.id) {
+      return false;
+    }
+
+    if (card.app_state === 'installed') {
+      return false;
+    }
+
+    if (card.app_state === 'installing' || card.app_state === 'blocked' || card.app_state === 'planned') {
+      return false;
+    }
+
+    return selectedIds.size === 0 || selectedIds.has(card.id);
+  });
+}
+
+export function getSelectableBundleApps(bundle = {}, cardsById = new Map()) {
+  const bundleCards = getInstallableBundleCards(bundle, cardsById);
+  return bundleCards.map((card) => {
+    if (!card) {
+      return null;
+    }
+
+    const selectable = card.app_state === 'ready' || card.app_state === 'failed';
+    const installed = card.app_state === 'installed';
+    const blocked = card.app_state === 'blocked' || card.app_state === 'planned' || card.app_state === 'installing';
+
+    return {
+      id: card.id,
+      title: card.title || card.id,
+      iconUrl: resolveAdminCardIconUrl(card),
+      iconAlt: card.iconAlt || `${card.title || 'App'} icon`,
+      iconText: card.iconText || String(card.title || 'AP').slice(0, 2).toUpperCase(),
+      status: card.app_state,
+      selectable,
+      installed,
+      blocked,
+    };
+  }).filter(Boolean);
+}
+
 export function isAdminAppInstallEnabled(card = {}) {
   if (!card || card.placeholder) {
     return false;

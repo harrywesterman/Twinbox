@@ -1110,6 +1110,179 @@ a {
   justify-content: center;
 }
 
+/* Bundle detail modal: wider variant */
+.admin-install-modal-wide {
+  width: min(1100px, 100%);
+  max-height: calc(100dvh - 36px);
+  overflow-y: auto;
+}
+
+/* Bundle description section */
+.bundle-detail-description {
+  padding: 16px 0 8px;
+  border-top: 1px solid var(--line);
+}
+
+.bundle-detail-subhead {
+  margin: 18px 0 6px;
+  font-family: var(--display-font);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.bundle-detail-subhead:first-child {
+  margin-top: 0;
+}
+
+.bundle-detail-para {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.bundle-detail-para:last-of-type {
+  margin-bottom: 0;
+}
+
+/* Bundle app list */
+.bundle-detail-app-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.bundle-detail-app-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 140ms ease;
+}
+
+.bundle-detail-app-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.bundle-detail-app-row.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bundle-detail-app-row.is-disabled:hover {
+  background: transparent;
+}
+
+.bundle-detail-app-row.is-installed {
+  opacity: 0.65;
+}
+
+.bundle-detail-checkbox {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.bundle-detail-checkbox:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.bundle-detail-app-icon {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.bundle-detail-app-icon.app-tile-badge {
+  box-shadow: none;
+}
+
+.bundle-detail-app-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.93rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Install step progress rows */
+.bundle-install-step {
+  cursor: default;
+}
+
+.bundle-install-step:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.bundle-install-step.is-current {
+  background: rgba(45, 212, 191, 0.08);
+  border: 1px solid rgba(45, 212, 191, 0.18);
+}
+
+.bundle-install-step.is-done {
+  opacity: 0.6;
+}
+
+.bundle-install-step-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.bundle-install-step.is-current .bundle-install-step-indicator {
+  color: var(--accent);
+  background: rgba(45, 212, 191, 0.16);
+}
+
+.bundle-install-step.is-done .bundle-install-step-indicator {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.14);
+}
+
+/* Destructive button variant */
+.secondary-button.is-destructive {
+  background: rgba(239, 68, 68, 0.14);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.28);
+}
+
+.secondary-button.is-destructive:hover {
+  background: rgba(239, 68, 68, 0.24);
+  color: #fecaca;
+}
+
+/* Actions row wrapping for bundle controls */
+.admin-install-modal-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .admin-log-viewport {
   min-height: 320px;
   max-height: 520px;

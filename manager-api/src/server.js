@@ -1181,7 +1181,8 @@ app.post("/api/apps/:stepId/install", async (req, res) => {
     return res.status(409).json({ error: `${stepId} is already installing` });
   }
 
-  if (visibleStep.app_state === "installed") {
+  const forceInstall = req.body?.force === true || req.query?.force === "true";
+  if (!forceInstall && visibleStep.app_state === "installed") {
     return res.status(409).json({ error: `${stepId} is already installed` });
   }
 
@@ -1256,7 +1257,8 @@ app.post("/api/apps/:stepId/uninstall", async (req, res) => {
     return res.status(404).json({ error: "app not found" });
   }
 
-  if (step.app_state !== "installed") {
+  const forceUninstall = req.body?.force === true || req.query?.force === "true";
+  if (!forceUninstall && step.app_state !== "installed") {
     return res.status(409).json({ error: `${stepId} is not installed` });
   }
 

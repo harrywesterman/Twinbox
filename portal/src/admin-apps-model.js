@@ -90,6 +90,7 @@ function normalizeBundleCard(bundle = {}, cardsById = new Map()) {
     searchText: [
       bundle.title,
       bundle.summary,
+      bundle.description,
       ...bundleCards.map((card) => card.title),
     ].join(' ').toLowerCase(),
   };

@@ -5,7 +5,9 @@ import {
   buildAdminAppInstallPath,
   buildBundleInstallQueue,
   buildBundleInstallSummary,
+  buildSelectableBundleInstallQueue,
   getAdminAppInstallButtonState,
+  getSelectableBundleApps,
   isAdminAppInstallEnabled,
   parseAdminAppInstallPath,
   resolveAdminCardIconUrl,
@@ -79,4 +81,65 @@ test('icon resolver keeps explicit artwork and falls back to step icons', () => 
     id: 'install-dashy-dashboard',
     title: 'Dashy',
   }), '/assets/step-icons/install-dashy-dashboard.svg');
+});
+
+test('getSelectableBundleApps returns all bundle apps with selectable state', () => {
+  const cardsById = new Map([
+    ['install-immich', { id: 'install-immich', title: 'Immich', app_state: 'ready', iconUrl: '/assets/immich.svg' }],
+    ['install-nextcloud', { id: 'install-nextcloud', title: 'Nextcloud', app_state: 'installed', iconUrl: '/assets/nc.svg' }],
+    ['install-zulip', { id: 'install-zulip', title: 'Zulip', app_state: 'planned' }],
+    ['install-jitsi', { id: 'install-jitsi', title: 'Jitsi', app_state: 'failed' }],
+  ]);
+
+  const apps = getSelectableBundleApps({
+    apps: ['install-immich', 'install-nextcloud', 'install-zulip', 'install-jitsi'],
+  }, cardsById);
+
+  assert.equal(apps.length, 4);
+  assert.deepEqual(apps.map((app) => ({ id: app.id, selectable: app.selectable, installed: app.installed, blocked: app.blocked })), [
+    { id: 'install-immich', selectable: true, installed: false, blocked: false },
+    { id: 'install-nextcloud', selectable: false, installed: true, blocked: false },
+    { id: 'install-zulip', selectable: false, installed: false, blocked: true },
+    { id: 'install-jitsi', selectable: true, installed: false, blocked: false },
+  ]);
+});
+
+test('buildSelectableBundleInstallQueue only installs selected ready or failed apps', () => {
+  const cardsById = new Map([
+    ['install-immich', { id: 'install-immich', title: 'Immich', app_state: 'ready' }],
+    ['install-nextcloud', { id: 'install-nextcloud', title: 'Nextcloud', app_state: 'installed' }],
+    ['install-jitsi', { id: 'install-jitsi', title: 'Jitsi', app_state: 'failed' }],
+    ['install-zulip', { id: 'install-zulip', title: 'Zulip', app_state: 'ready' }],
+  ]);
+
+  const bundle = { apps: ['install-immich', 'install-nextcloud', 'install-jitsi', 'install-zulip'] };
+
+  const allQueue = buildSelectableBundleInstallQueue(bundle, cardsById, new Set());
+  assert.deepEqual(allQueue.map((card) => card.id), ['install-immich', 'install-jitsi', 'install-zulip']);
+
+  const partialQueue = buildSelectableBundleInstallQueue(bundle, cardsById, new Set(['install-immich', 'install-jitsi']));
+  assert.deepEqual(partialQueue.map((card) => card.id), ['install-immich', 'install-jitsi']);
+
+  const noneQueue = buildSelectableBundleInstallQueue(bundle, cardsById, new Set(['install-nextcloud']));
+  assert.deepEqual(noneQueue.map((card) => card.id), []);
+});
+
+test('empty bundle returns empty selectable apps', () => {
+  const apps = getSelectableBundleApps({}, new Map());
+  assert.deepEqual(apps, []);
+});
+
+test('resolveAdminCardIconUrl resolves bundle app icons', () => {
+  const iconCard = {
+    id: 'install-immich',
+    title: 'Immich',
+    iconUrl: '/assets/custom/immich.svg',
+  };
+
+  assert.equal(resolveAdminCardIconUrl(iconCard), '/assets/custom/immich.svg');
+
+  assert.equal(resolveAdminCardIconUrl({
+    id: 'install-nextcloud',
+    sourceStepId: 'install-nextcloud',
+  }), '/assets/step-icons/install-nextcloud.svg');
 });

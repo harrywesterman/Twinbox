@@ -59,6 +59,7 @@ Bundle manifests live in `categories/apps/bundles/` and are loaded into the app 
 | `id` | Unique bundle identifier |
 | `title` | Display name |
 | `summary` | Short description |
+| `description` | Optional long-form text explaining the bundles purpose, origin, and included apps. Supports markdown-style formatting (paragraphs separated by blank lines, `**bold**` section headers). |
 | `order` | Numeric sort order in the catalog |
 | `apps` | Array of app step ids that the bundle installs |
 | `iconUrl` | Optional bundle artwork |

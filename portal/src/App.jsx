@@ -6,8 +6,9 @@ import {
   buildAdminAppInstallPath,
   buildBundleInstallQueue,
   buildBundleInstallSummary,
+  buildSelectableBundleInstallQueue,
   getAdminAppInstallButtonState,
-  isAdminAppInstallEnabled,
+  getSelectableBundleApps,
   parseAdminAppInstallPath,
   resolveAdminCardIconUrl,
 } from './admin-apps-install.js';
@@ -1029,6 +1030,10 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
   const [jobLines, setJobLines] = useState([]);
   const [running, setRunning] = useState(false);
   const [activeAppId, setActiveAppId] = useState('');
+  const [installPhase, setInstallPhase] = useState('detail');
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [stepStatuses, setStepStatuses] = useState(new Map());
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
   const viewModel = useMemo(() => buildAdminAppsViewModel({
     catalog: appsState.catalog,
@@ -1041,35 +1046,114 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
   const targetBundle = installTarget?.kind === 'bundle'
     ? viewModel.bundles.find((bundle) => bundle.id === installTarget.id) || null
     : null;
+
+  const selectableApps = useMemo(() => (
+    targetBundle ? getSelectableBundleApps(targetBundle, cardsById) : []
+  ), [cardsById, targetBundle]);
+
+  const initializedSelectedIdsRef = useRef(false);
+  useEffect(() => {
+    if (installTarget?.kind !== 'bundle' || initializedSelectedIdsRef.current) {
+      return;
+    }
+
+    const initialIds = new Set(selectableApps
+      .filter((app) => app.selectable)
+      .map((app) => app.id));
+
+    setSelectedIds(initialIds);
+    initializedSelectedIdsRef.current = true;
+  }, [installTarget?.kind, selectableApps]);
+
+  useEffect(() => {
+    if (installTarget?.kind !== 'bundle') {
+      initializedSelectedIdsRef.current = false;
+      setInstallPhase('detail');
+      setSelectedIds(new Set());
+      setStepStatuses(new Map());
+      setCurrentStepIndex(0);
+    }
+  }, [installTarget?.kind, installTarget?.id]);
+
+  const bundleInstallQueue = useMemo(() => {
+    if (!targetBundle) {
+      return [];
+    }
+
+    return buildSelectableBundleInstallQueue(targetBundle, cardsById, selectedIds);
+  }, [cardsById, targetBundle, selectedIds]);
+
   const bundleQueue = useMemo(() => (
     targetBundle ? buildBundleInstallQueue(targetBundle, cardsById) : []
   ), [cardsById, targetBundle]);
+
   const installQueue = installTarget?.kind === 'bundle'
-    ? bundleQueue
+    ? (installPhase === 'install' ? bundleInstallQueue : [])
     : targetCard
       ? [targetCard]
       : [];
-  const activeCard = cardsById.get(activeAppId) || installQueue[0] || null;
+
+  const currentStepCard = installTarget?.kind === 'bundle' && installPhase === 'install'
+    ? installQueue[currentStepIndex] || null
+    : null;
+
+  const activeCard = installTarget?.kind === 'bundle' && installPhase === 'install'
+    ? (cardsById.get(activeAppId) || currentStepCard)
+    : cardsById.get(activeAppId) || installQueue[0] || null;
+
   const activeState = activeCard?.app_state || targetBundle?.app_state || targetCard?.app_state || 'planned';
-  const action = installTarget?.kind === 'app' && targetCard?.app_state === 'installed' ? 'uninstall' : 'install';
   const installSummary = targetBundle
     ? buildBundleInstallSummary(targetBundle.cards || [])
     : null;
-  const canSubmit = Boolean(installQueue.length) && !running && (installTarget?.kind === 'bundle'
-    ? installSummary?.state === 'ready'
-    : action === 'uninstall'
-      ? targetCard?.app_state === 'installed'
-      : isAdminAppInstallEnabled(targetCard));
+
+  const bundleSelectableCount = selectableApps.filter((app) => app.selectable).length;
+  const selectedCount = selectedIds.size;
+  const canStartBundleInstall = installTarget?.kind === 'bundle'
+    && installPhase === 'detail'
+    && selectedCount > 0
+    && !running;
+
+  const isAppInstall = installTarget?.kind === 'app';
+
+  const canInstall = isAppInstall && Boolean(installQueue.length) && !running;
+  const canUninstall = isAppInstall && !running;
+  const canStop = running && Boolean(currentJob?.id);
+
+  const canInstallCurrentStep = installTarget?.kind === 'bundle'
+    && installPhase === 'install'
+    && currentStepCard
+    && !running
+    && (stepStatuses.get(currentStepCard.id) !== 'succeeded');
+
+  const canNavigatePrevious = installTarget?.kind === 'bundle'
+    && installPhase === 'install'
+    && currentStepIndex > 0
+    && !running;
+
+  const canNavigateNext = installTarget?.kind === 'bundle'
+    && installPhase === 'install'
+    && currentStepIndex < installQueue.length - 1
+    && !running;
+
+  const canInstallAllRemaining = installTarget?.kind === 'bundle'
+    && installPhase === 'install'
+    && installQueue.length > 0
+    && !running
+    && installQueue.some((card, idx) => {
+      if (idx < currentStepIndex) {
+        return false;
+      }
+
+      return (stepStatuses.get(card.id) || 'pending') !== 'succeeded';
+    });
+
   const title = targetBundle?.title || targetCard?.title || 'Install';
   const targetIconCard = installTarget?.kind === 'bundle'
     ? buildAdminBundleIconCard(targetBundle)
     : buildAdminIconCard(targetCard);
   const modalEyebrow = installTarget?.kind === 'bundle'
-    ? 'Bundle install'
-    : action === 'uninstall'
-      ? 'App uninstall'
-      : 'App install';
-  const actionLabel = action === 'uninstall' ? 'Uninstall' : 'Install';
+    ? 'Bundle installer'
+    : 'App installer';
 
   if (appsState.loading && !appsState.catalog) {
     return (
@@ -1125,6 +1209,10 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
   }, [currentJob?.id, jobLines]);
 
   useEffect(() => {
+    if (installTarget?.kind === 'bundle' && installPhase === 'install') {
+      return undefined;
+    }
+
     if (currentJob?.id) {
       return undefined;
     }
@@ -1177,7 +1265,45 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
     autoScrollLogsRef.current = distanceFromBottom < 40;
   };
 
-  const runInstall = async () => {
+  const installSingleStep = async (card, stepLabel) => {
+    setActiveAppId(card.id);
+    setStepStatuses((prev) => new Map(prev).set(card.id, 'running'));
+
+    if (stepLabel) {
+      setPageNotice(stepLabel);
+    }
+
+    const response = await requestJson(`/api/admin/apps/${encodeURIComponent(card.id)}/install`, {
+      method: 'POST',
+    });
+
+    const initialJob = {
+      id: response.job_id,
+      status: 'pending',
+      step_id: card.id,
+    };
+    setCurrentJob(initialJob);
+    setJobLines([{ line: `queued ${response.job_type || 'run_step'} for ${card.title}` }]);
+
+    const terminalJob = await pollJob(response.job_id);
+
+    if (terminalJob?.status === 'failed') {
+      setStepStatuses((prev) => new Map(prev).set(card.id, 'failed'));
+      throw new Error(terminalJob.error || `${card.title} failed`);
+    }
+
+    if (terminalJob?.status === 'canceled') {
+      setStepStatuses((prev) => new Map(prev).set(card.id, 'failed'));
+      setPageNotice(`${card.title} was stopped.`);
+      return 'canceled';
+    }
+
+    setStepStatuses((prev) => new Map(prev).set(card.id, 'succeeded'));
+    await appsState.reload({ silent: true });
+    return 'succeeded';
+  };
+
+  const runInstall = async (actionOverride) => {
     if (!installQueue.length || running) {
       return;
     }
@@ -1186,6 +1312,37 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
     setPageError('');
     setPageNotice('');
     setJobLines([]);
+
+    if (installTarget?.kind === 'bundle' && installPhase === 'install') {
+      let stopped = false;
+
+      try {
+        for (let idx = currentStepIndex; idx < installQueue.length; idx += 1) {
+          const card = installQueue[idx];
+          if (!card) {
+            continue;
+          }
+
+          if ((stepStatuses.get(card.id) || 'pending') === 'succeeded') {
+            continue;
+          }
+
+          setCurrentStepIndex(idx);
+          await installSingleStep(card, `Installing ${card.title} (${idx + 1}/${installQueue.length})`);
+        }
+
+        if (!stopped) {
+          setPageNotice(`${targetBundle.title} finished installing.`);
+        }
+      } catch (error) {
+        setPageError(error instanceof Error ? error.message : 'Failed to install.');
+      } finally {
+        setRunning(false);
+      }
+
+      return;
+    }
+
     let stopped = false;
 
     try {
@@ -1197,17 +1354,10 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
 
         setActiveAppId(card.id);
 
-        if (action === 'uninstall' && card.app_state !== 'installed') {
-          throw new Error(`${card.title} is not installed`);
-        }
-
-        if (action !== 'uninstall' && !isAdminAppInstallEnabled(card) && installTarget?.kind !== 'bundle') {
-          throw new Error(`${card.title} is not installable yet`);
-        }
-
-        setPageNotice(`${action === 'uninstall' ? 'Removing' : 'Installing'} ${card.title}${installTarget?.kind === 'bundle' ? ` (${index + 1}/${installQueue.length})` : ''}`);
-        const response = await requestJson(`/api/admin/apps/${encodeURIComponent(card.id)}/${action}`, {
+        setPageNotice(`${actionOverride === 'uninstall' ? 'Removing' : 'Installing'} ${card.title}${installTarget?.kind === 'bundle' ? ` (${index + 1}/${installQueue.length})` : ''}`);
+        const response = await requestJson(`/api/admin/apps/${encodeURIComponent(card.id)}/${actionOverride}`, {
           method: 'POST',
+          body: JSON.stringify({ force: true }),
         });
 
         const initialJob = {
@@ -1236,16 +1386,135 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
         setPageNotice(
           targetBundle
             ? `${targetBundle.title} finished installing.`
-            : action === 'uninstall'
+            : actionOverride === 'uninstall'
               ? `${title} was removed successfully.`
               : `${title} completed successfully.`,
         );
       }
     } catch (error) {
-      setPageError(error instanceof Error ? error.message : `Failed to ${action}.`);
+      setPageError(error instanceof Error ? error.message : `Failed to ${actionOverride}.`);
     } finally {
       setRunning(false);
     }
+  };
+
+  const handleStop = async () => {
+    if (!currentJob?.id || !running) {
+      return;
+    }
+    try {
+      await requestJson(`/api/admin/apps/jobs/${encodeURIComponent(currentJob.id)}/cancel`, {
+        method: 'POST',
+      });
+      setPageNotice('Stop requested. The job will cancel shortly.');
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : 'Failed to stop job.');
+    }
+  };
+
+  const handleInstallCurrentStep = async () => {
+    if (!canInstallCurrentStep || !currentStepCard) {
+      return;
+    }
+
+    setRunning(true);
+    setPageError('');
+    setPageNotice('');
+    setJobLines([]);
+
+    try {
+      const result = await installSingleStep(currentStepCard, `Installing ${currentStepCard.title}`);
+      if (result === 'succeeded' && currentStepIndex < installQueue.length - 1) {
+        setCurrentStepIndex((prev) => prev + 1);
+      }
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : 'Failed to install.');
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const handleStartBundleInstall = () => {
+    setInstallPhase('install');
+    setCurrentStepIndex(0);
+    setStepStatuses(new Map());
+    setPageError('');
+    setPageNotice('');
+  };
+
+  const handlePreviousStep = () => {
+    if (!canNavigatePrevious) {
+      return;
+    }
+
+    setCurrentStepIndex((prev) => prev - 1);
+  };
+
+  const handleNextStep = () => {
+    if (!canNavigateNext) {
+      return;
+    }
+
+    setCurrentStepIndex((prev) => prev + 1);
+  };
+
+  const handleCancelActiveJob = async () => {
+    if (!currentJob?.id) {
+      return;
+    }
+
+    try {
+      await requestJson(`/api/admin/apps/jobs/${encodeURIComponent(currentJob.id)}/cancel`, {
+        method: 'POST',
+      });
+      setPageNotice('Stopping the current install job.');
+      setCurrentJob((prev) => (prev ? { ...prev, status: 'cancel_requested' } : null));
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : 'Failed to cancel the job.');
+    }
+  };
+
+  const toggleSelectedId = (appId) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(appId)) {
+        next.delete(appId);
+      } else {
+        next.add(appId);
+      }
+
+      return next;
+    });
+  };
+
+  const renderDescription = (text) => {
+    if (!text) {
+      return null;
+    }
+
+    const paragraphs = text.split(/\n{2,}/);
+    return paragraphs.map((paragraph, index) => {
+      const trimmed = paragraph.trim();
+      if (!trimmed) {
+        return null;
+      }
+
+      if (trimmed.startsWith('**') && trimmed.endsWith('**')) {
+        return <h3 key={index} className="bundle-detail-subhead">{trimmed.replace(/^\*\*|\*\*$/g, '')}</h3>;
+      }
+
+      const lines = trimmed.split('\n');
+      return (
+        <p key={index} className="bundle-detail-para">
+          {lines.map((line, lineIndex) => (
+            <span key={lineIndex}>
+              {lineIndex > 0 && <br />}
+              {line}
+            </span>
+          ))}
+        </p>
+      );
+    });
   };
 
   if (appsState.error) {
@@ -1293,6 +1562,208 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
     );
   }
 
+  if (installTarget?.kind === 'bundle' && installPhase === 'detail') {
+    return (
+      <div className="admin-install-modal-backdrop">
+        <Panel className="admin-install-modal admin-install-modal-wide" role="dialog" aria-modal="true" aria-labelledby="admin-install-modal-title">
+          <div className="admin-install-modal-head">
+            <div className="admin-install-modal-target">
+              <AppIcon card={targetIconCard} className="admin-install-modal-icon" />
+              <div className="admin-install-modal-copy">
+                <p className="eyebrow">{modalEyebrow}</p>
+                <h2 id="admin-install-modal-title">{title}</h2>
+              </div>
+            </div>
+            <span className={`status-chip ${statusTone(targetBundle?.app_state || 'ready')}`}>
+              {statusLabel(targetBundle?.app_state || 'ready')}
+            </span>
+          </div>
+
+          {targetBundle?.description ? (
+            <div className="bundle-detail-description">
+              {renderDescription(targetBundle.description)}
+            </div>
+          ) : (
+            <p className="muted-copy">{installSummary?.label || `${selectableApps.length} apps in this bundle`}</p>
+          )}
+
+          <div className="bundle-detail-app-list">
+            {selectableApps.length === 0 ? (
+              <p className="muted-copy">No apps available for this bundle.</p>
+            ) : (
+              selectableApps.map((app) => {
+                const isSelected = selectedIds.has(app.id);
+                const checkboxId = `bundle-app-${app.id}`;
+
+                return (
+                  <label
+                    key={app.id}
+                    htmlFor={checkboxId}
+                    className={`bundle-detail-app-row ${!app.selectable && !app.installed ? 'is-disabled' : ''} ${app.installed ? 'is-installed' : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      id={checkboxId}
+                      className="bundle-detail-checkbox"
+                      checked={isSelected}
+                      disabled={!app.selectable && !app.installed}
+                      onChange={() => {
+                        if (app.selectable) {
+                          toggleSelectedId(app.id);
+                        }
+                      }}
+                    />
+                    <AppIcon
+                      card={{ iconUrl: app.iconUrl, iconAlt: app.iconAlt, iconText: app.iconText, title: app.title }}
+                      className="bundle-detail-app-icon"
+                    />
+                    <span className="bundle-detail-app-title">{app.title}</span>
+                    <span className={`status-chip ${statusTone(app.status)}`}>
+                      {statusLabel(app.status)}
+                    </span>
+                  </label>
+                );
+              })
+            )}
+          </div>
+
+          <div className="hero-actions admin-install-modal-actions">
+            <button
+              type="button"
+              className="primary-button"
+              onClick={handleStartBundleInstall}
+              disabled={!canStartBundleInstall}
+            >
+              Install all ({selectedCount})
+            </button>
+            <button type="button" className="secondary-button" onClick={() => onNavigate('/admin/apps')}>
+              Back
+            </button>
+          </div>
+        </Panel>
+      </div>
+    );
+  }
+
+  if (installTarget?.kind === 'bundle' && installPhase === 'install') {
+    const bundleProgress = bundleInstallQueue.map((card, idx) => ({
+      card,
+      index: idx,
+      status: stepStatuses.get(card.id) || 'pending',
+      isCurrent: idx === currentStepIndex,
+    }));
+
+    const isInstallAll = bundleProgress.some((item) => item.status === 'running');
+
+    return (
+      <div className="admin-install-modal-backdrop">
+        <Panel className="admin-install-modal admin-install-modal-wide" role="dialog" aria-modal="true" aria-labelledby="admin-install-modal-title">
+          <div className="admin-install-modal-head">
+            <div className="admin-install-modal-target">
+              <AppIcon card={targetIconCard} className="admin-install-modal-icon" />
+              <div className="admin-install-modal-copy">
+                <p className="eyebrow">{modalEyebrow}</p>
+                <h2 id="admin-install-modal-title">{title}</h2>
+              </div>
+            </div>
+            <span className={`status-chip ${statusTone(running ? 'installing' : bundleInstallQueue.every((c) => stepStatuses.get(c.id) === 'succeeded') ? 'installed' : 'ready')}`}>
+              {statusLabel(running ? 'installing' : bundleInstallQueue.every((c) => stepStatuses.get(c.id) === 'succeeded') ? 'installed' : 'ready')}
+            </span>
+          </div>
+
+          <div className="bundle-detail-app-list">
+            {bundleProgress.map(({ card, index, status, isCurrent }) => {
+              const statusLabelText = status === 'succeeded'
+                ? 'Installed'
+                : status === 'running'
+                  ? 'Installing'
+                  : status === 'failed'
+                    ? 'Failed'
+                    : 'Ready';
+
+              const statusToneClass = status === 'succeeded' ? 'is-ok' : status === 'running' ? 'is-live' : status === 'failed' ? 'is-bad' : 'is-neutral';
+
+              return (
+                <div
+                  key={card.id}
+                  className={`bundle-detail-app-row bundle-install-step ${isCurrent ? 'is-current' : ''} ${status === 'succeeded' ? 'is-done' : ''}`}
+                >
+                  <span className="bundle-install-step-indicator">
+                    {status === 'succeeded' ? '✓' : status === 'running' ? '▶' : status === 'failed' ? '✗' : `${index + 1}`}
+                  </span>
+                  <AppIcon
+                    card={{ iconUrl: card.iconUrl, iconAlt: card.iconAlt, iconText: card.iconText, title: card.title }}
+                    className="bundle-detail-app-icon"
+                  />
+                  <span className="bundle-detail-app-title">{card.title}</span>
+                  <span className={`status-chip ${statusToneClass}`}>
+                    {statusLabelText}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          <LogViewport
+            className="admin-install-log-viewport admin-install-modal-log"
+            viewportRef={logViewportRef}
+            onScroll={handleLogScroll}
+            lines={jobLines}
+            emptyLabel={running ? 'Waiting for the first log line…' : 'Navigate to a step and press Install to start.'}
+          />
+
+          {pageError ? (
+            <div className="inline-notice is-danger">
+              <strong>Something needs attention.</strong>
+              <span>{pageError}</span>
+            </div>
+          ) : null}
+          {pageNotice ? (
+            <div className="inline-notice is-accent">
+              <strong>{pageNotice}</strong>
+              <span>The install log remains visible here for this session.</span>
+            </div>
+          ) : null}
+
+          <div className="hero-actions admin-install-modal-actions">
+            <button type="button" className="secondary-button" onClick={handlePreviousStep} disabled={!canNavigatePrevious}>
+              Previous
+            </button>
+            <button type="button" className="secondary-button" onClick={handleNextStep} disabled={!canNavigateNext}>
+              Next
+            </button>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={handleInstallCurrentStep}
+              disabled={!canInstallCurrentStep}
+            >
+              {running && activeAppId === currentStepCard?.id ? 'Installing…' : 'Install'}
+            </button>
+            {canInstallAllRemaining && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={runInstall}
+                disabled={!canInstallAllRemaining || running}
+              >
+                Install all
+              </button>
+            )}
+            {running && currentJob?.id ? (
+              <button type="button" className="secondary-button is-destructive" onClick={handleCancelActiveJob}>
+                Stop
+              </button>
+            ) : null}
+            <button type="button" className="secondary-button" onClick={() => { setInstallPhase('detail'); }}>
+              Back
+            </button>
+          </div>
+        </Panel>
+      </div>
+    );
+  }
+
   return (
     <div className="admin-install-modal-backdrop">
       <Panel className="admin-install-modal" role="dialog" aria-modal="true" aria-labelledby="admin-install-modal-title">
@@ -1320,7 +1791,7 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
           viewportRef={logViewportRef}
           onScroll={handleLogScroll}
           lines={jobLines}
-          emptyLabel={running ? 'Waiting for the first log line…' : `Press ${actionLabel} to start the script output.`}
+          emptyLabel={running ? 'Waiting for the first log line…' : 'Press Install or Uninstall to start the script output.'}
         />
 
         {pageError ? (
@@ -1339,11 +1810,27 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
         <div className="hero-actions admin-install-modal-actions">
           <button
             type="button"
-            className={action === 'uninstall' ? 'secondary-button' : 'primary-button'}
-            onClick={runInstall}
-            disabled={!canSubmit}
+            className="primary-button"
+            onClick={() => runInstall('install')}
+            disabled={!canInstall}
           >
-            {running ? `${actionLabel}…` : actionLabel}
+            {running ? 'Installing…' : 'Install'}
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => runInstall('uninstall')}
+            disabled={!canUninstall}
+          >
+            {running ? 'Uninstalling…' : 'Uninstall'}
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={handleStop}
+            disabled={!canStop}
+          >
+            Stop
           </button>
           <button type="button" className="secondary-button" onClick={() => onNavigate('/admin/apps')}>
             Back
@@ -1353,7 +1840,6 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
     </div>
   );
 }
-
 function ObservabilityProfileCard({ profile, isCurrent = false, isSelected = false, onSelect }) {
   const tone = profile.priority === 'destructive'
     ? 'is-bad'
