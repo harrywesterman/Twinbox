@@ -14,13 +14,10 @@ spec:
         - target:
             kind: Deployment
             name: vaultwarden
-          patch: |-
+           patch: |-
             - op: replace
               path: /spec/template/spec/containers/0/env/0/value
               value: https://vaultwarden.__ZONE_NAME__
-            - op: replace
-              path: /spec/template/spec/containers/0/env/2/value
-              value: __ZONE_NAME__
         - target:
             kind: IngressRoute
             name: vaultwarden
