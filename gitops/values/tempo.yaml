@@ -31,7 +31,7 @@ persistence:
   storageClassName: longhorn-single
   accessModes:
     - ReadWriteOnce
-  size: 10Gi
+  size: 2Gi
 
 resources:
   requests:
@@ -39,4 +39,4 @@ resources:
     memory: 256Mi
   limits:
     cpu: 500m
-    memory: 1Gi
+    memory: 512Mi
