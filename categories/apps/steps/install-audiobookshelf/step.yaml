@@ -3,9 +3,9 @@ title: Install Audiobookshelf
 type: action
 journey_stage: setup
 order: 84
-summary: Install Audiobookshelf with Longhorn storage, Traefik ingress, and Authentik OIDC.
-explanation: Twinbox provisions Audiobookshelf as a GitOps application with a Longhorn-backed data volume, Traefik ingress, and an Authentik OIDC client so the media server gets the same SSO pattern as the rest of the platform.
-side_help: Media libraries belong in the same user-services segment of the wizard, after the identity and storage foundations are in place.
+summary: Listen to your own audiobooks and podcasts, anywhere.
+explanation: Audiobookshelf is your personal media server for audiobooks and podcasts. Upload your collection, organize titles and series, and listen through the web app or mobile apps for iOS and Android. Everything stays on your own server, so your library remains private and within reach at all times.
+side_help: Ideal if you have your own audiobook collection and want to play it on all your devices without depending on commercial streaming services.
 depends_on:
   - install-longhorn-storage
   - install-secret-sync

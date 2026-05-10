@@ -3,9 +3,9 @@ title: Install Paperless
 type: action
 journey_stage: setup
 order: 74
-summary: Install Paperless-ngx with Longhorn storage, CloudNativePG, Authentik OIDC, and Traefik routes.
-explanation: Twinbox provisions Paperless-ngx as a GitOps application with persistent Longhorn document storage, Redis, Tika/Gotenberg document conversion, a dedicated CloudNativePG database, Authentik OIDC login, and Traefik routes for the selected cluster entrypoint.
-side_help: Paperless-ngx turns scanned bills, letters, and PDFs into a private searchable document archive inside Twinbox.
+summary: Turn your paper administration into a searchable digital archive.
+explanation: Paperless-ngx helps you scan, recognize, and index letters, invoices, and documents. Upload a PDF or scan, and the system reads the content so you can search it later. This keeps your administration organized and always within reach.
+side_help: Perfect if you want a paperless office and need to retrieve old documents quickly.
 depends_on:
   - install-longhorn-storage
   - install-cloudnativepg

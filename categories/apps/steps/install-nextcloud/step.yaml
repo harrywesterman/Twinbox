@@ -3,9 +3,9 @@ title: Install Nextcloud
 type: action
 journey_stage: setup
 order: 68
-summary: Install Nextcloud with Longhorn storage, CloudNativePG, and native OIDC.
-explanation: Twinbox provisions Nextcloud as a GitOps application with Longhorn-backed storage, a dedicated CloudNativePG database, a standalone Redis cache, Traefik routes for the selected ingress path, and an Authentik OIDC provider so the same identity layer backs the rest of the app stack.
-side_help: Nextcloud is the collaboration hub for user files and sync.
+summary: Your own private cloud for files, calendars, and collaboration.
+explanation: Nextcloud is a comprehensive platform for file storage, sync, and teamwork. Store documents securely, share folders with colleagues, manage shared calendars, and use built-in chat and video calls. Everything runs on your own infrastructure, giving you full control over your data.
+side_help: The central hub for teams that want to share files and collaborate without relying on public cloud providers.
 depends_on: []
 dashy:
   items:

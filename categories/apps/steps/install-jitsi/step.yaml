@@ -3,9 +3,9 @@ title: Install Jitsi
 type: action
 journey_stage: setup
 order: 88
-summary: Install Jitsi Meet with Authentik-backed host login and guest access.
-explanation: Twinbox provisions Jitsi Meet as a GitOps application with native JWT auth, an Authentik-backed Jitsi OpenID broker, Traefik routes for the web UI and login broker, and direct worker-node media transport for meetings.
-side_help: Video meetings stay in the collaboration app rollout after the other personal tools.
+summary: Start secure video calls without needing an account.
+explanation: Jitsi Meet is a video conferencing solution that lets you start a meeting room with one click. Share the link with your guests and talk right away — no account needed. Built-in screen sharing and chat make it suitable for meetings, webinars, and online collaboration.
+side_help: A solid choice if you want quick, hassle-free video calls with colleagues, family, or clients.
 depends_on:
   - install-secret-sync
   - install-authentik-idp

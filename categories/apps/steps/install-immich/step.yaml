@@ -3,9 +3,9 @@ title: Install Immich
 type: action
 journey_stage: setup
 order: 70
-summary: Back up your phone photos and videos privately.
-explanation: Immich is your personal photo library for Twinbox. Install the mobile app on your iPhone or Android phone, and it can automatically sync your photos and videos so everything stays safely in one place. It feels like Google Photos, but it runs on your own Twinbox setup.
-side_help: Immich is the easiest way to keep your camera roll backed up and organized without handing your photos over to a big cloud provider.
+summary: Back up your photos and videos privately on your own server.
+explanation: Immich is your personal photo library. Install the mobile app on your phone and your photos and videos will be synced automatically. You get a clean timeline, albums, and search features — just like big cloud services, but fully under your own control.
+side_help: The easiest way to safely back up your entire camera roll without handing your memories over to external parties.
 depends_on:
   - install-longhorn-storage
   - install-cloudnativepg

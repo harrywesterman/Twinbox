@@ -3,9 +3,9 @@ title: Install Karakeep
 type: action
 journey_stage: setup
 order: 76
-summary: Install Karakeep with Longhorn storage, Authentik OIDC, and Traefik routes.
-explanation: Twinbox provisions Karakeep as a GitOps application with persistent Longhorn storage, a dedicated Meilisearch master key, Authentik OIDC login, and Traefik routes for the selected ingress path. The step keeps the Karakeep bootstrap secret in OpenBao so reruns stay idempotent.
-side_help: Bookmark-style apps are shown with the rest of the user services so the launchers stay aligned with the rest of the app stack.
+summary: Save and organize interesting links, articles, and ideas.
+explanation: Karakeep helps you save and rediscover content you come across online. Store links, articles, and notes in your personal archive. With search and tagging, nothing gets lost, and you gradually build your own knowledge base.
+side_help: Useful if you collect a lot of information and want a central place to store everything in a structured way.
 depends_on:
   - install-longhorn-storage
   - install-secret-sync

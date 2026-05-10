@@ -3,9 +3,9 @@ title: Install HedgeDoc
 type: action
 journey_stage: setup
 order: 78
-summary: Install HedgeDoc with Longhorn uploads, Authentik OAuth, and CloudNativePG storage.
-explanation: Twinbox provisions HedgeDoc as a GitOps application with persistent Longhorn uploads, a dedicated PostgreSQL database, OpenBao-managed bootstrap secrets, Authentik OAuth login, and Traefik routes for the selected cluster ingress path.
-side_help: Collaborative markdown notes fit the same app stack as the rest of the user-facing services.
+summary: Write and edit notes together in Markdown, in real time.
+explanation: HedgeDoc is a collaborative Markdown editor. Create a note, share the link, and edit simultaneously with multiple people in the browser. You see a live preview of your formatted text, making it ideal for documentation, meeting notes, and quick ideas.
+side_help: Great for teams that need to draft shared documents quickly without the complexity of a full office suite.
 depends_on:
   - install-longhorn-storage
   - install-cloudnativepg

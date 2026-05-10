@@ -3,9 +3,9 @@ title: Install Open WebUI
 type: action
 journey_stage: setup
 order: 83
-summary: Install Open WebUI with CloudNativePG, Authentik SSO, and Traefik routes.
-explanation: Twinbox provisions Open WebUI as a GitOps application with a dedicated CloudNativePG database, Longhorn-backed local storage, and Authentik OIDC so users get a private AI chat workspace with the same identity layer as the rest of the app stack.
-side_help: AI workspace tools fit with the rest of the user apps once storage, databases, and identity are ready.
+summary: A private chat environment for AI models.
+explanation: Open WebUI gives you a user-friendly interface to chat with AI models you host yourself. Ask questions, summarize texts, or generate ideas — all within your own environment. Team members can log in with the same account and participate in the same conversation.
+side_help: Ideal if you want to leverage AI capabilities without sending data to external services.
 depends_on:
   - install-longhorn-storage
   - install-cloudnativepg

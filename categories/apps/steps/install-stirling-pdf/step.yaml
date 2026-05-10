@@ -3,9 +3,9 @@ title: Install Stirling PDF
 type: action
 journey_stage: setup
 order: 75
-summary: Install Stirling PDF with Longhorn storage for uploads and Traefik routes.
-explanation: Twinbox provisions Stirling PDF as a GitOps application with persistent Longhorn storage for uploaded documents, an OpenBao-managed API key, and Traefik routes for the selected cluster entrypoint.
-side_help: PDF tools sit with the lightweight user apps so they can be installed after document archives and before search tools.
+summary: Edit, split, and convert PDF files in your browser.
+explanation: Stirling PDF is a complete online toolkit for PDF manipulation. Merge documents, split pages, rotate, compress, or add watermarks — all through a simple web interface. Your files stay on your own server, so you never have to upload anything to external services.
+side_help: Practical for anyone who works with PDFs regularly and values the security of self-hosting.
 depends_on:
   - install-longhorn-storage
   - install-secret-sync
