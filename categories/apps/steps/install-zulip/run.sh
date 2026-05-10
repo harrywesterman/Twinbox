@@ -533,7 +533,12 @@ PY
   expected_owner_email_json="$(jq -n --arg value "$zulip_default_realm_owner_email" '$value')"
   verify_script="${verify_script/__OWNER_EMAIL_JSON__/$expected_owner_email_json}"
 
-  kubectl -n zulip exec "$pod_name" -- /home/zulip/deployments/current/manage.py shell -c "$verify_script" >/dev/null
+  kubectl -n zulip exec "$pod_name" -- bash -c "
+cat > /tmp/verify-bootstrap.py << 'VERIFYEOF'
+$verify_script
+VERIFYEOF
+su zulip -c '/home/zulip/deployments/current/manage.py shell -c \"\$(cat /tmp/verify-bootstrap.py)\"'
+" >/dev/null
   log "Zulip bootstrap verified"
 }
 
