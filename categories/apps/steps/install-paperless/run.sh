@@ -74,6 +74,35 @@ wait_for_resources_ready() {
   done
 }
 
+wait_for_resource_ready() {
+  local namespace="$1"
+  local resource="$2"
+  local condition="$3"
+  local label="$4"
+  local attempts=120
+  local attempt=1
+
+  while true; do
+    if kubectl -n "$namespace" get "$resource" >/dev/null 2>&1; then
+      if kubectl -n "$namespace" wait --for="condition=${condition}" "$resource" --timeout=5s >/dev/null 2>&1; then
+        log "${label} is ready"
+        return 0
+      fi
+
+      log "Waiting for ${label} to become ready"
+    else
+      log "Waiting for ${label} to appear"
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      fail "${label} did not become ready after ${attempts} attempts"
+    fi
+
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
 find_oauth2_provider_pk_by_name() {
   local provider_name="$1"
   local response
@@ -326,7 +355,7 @@ render_template \
   "__ZONE_NAME__=$public_zone_name"
 kubectl apply -f "$paperless_rendered_ingressroute"
 
-wait_for_resources_ready "paperless" "externalsecret" "Ready" "Paperless-ngx ExternalSecret"
+wait_for_resource_ready "paperless" "externalsecret/paperless-config" "Ready" "Paperless-ngx ExternalSecret"
 
 log "Applying Paperless-ngx database manifests"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/namespace.yaml"
@@ -336,9 +365,10 @@ kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/paperless/pooler-ro.yaml"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/paperless/pooler-rw.yaml"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/paperless/scheduled-backup.yaml"
 
-wait_for_resources_ready "databases" "externalsecret" "Ready" "Paperless-ngx database ExternalSecret"
-wait_for_resources_ready "databases" "cluster" "Ready" "Paperless-ngx CloudNativePG cluster"
-wait_for_resources_ready "databases" "deployment" "Available" "Paperless-ngx pooler deployment"
+wait_for_resource_ready "databases" "externalsecret/paperless-db-credentials" "Ready" "Paperless-ngx database ExternalSecret"
+wait_for_resource_ready "databases" "cluster/paperless-db" "Ready" "Paperless-ngx CloudNativePG cluster"
+wait_for_resource_ready "databases" "deployment/paperless-db-pooler-rw" "Available" "Paperless-ngx rw pooler"
+wait_for_resource_ready "databases" "deployment/paperless-db-pooler-ro" "Available" "Paperless-ngx ro pooler"
 
 bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
   --app-id "paperless" \
