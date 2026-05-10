@@ -17,6 +17,7 @@ description: >
 
   **Whats included**
 
+  **OpenCloud** Awesome doc editor and sharing
 
   **Outline** — A fast, collaborative knowledge base for your team wiki and documentation.
 
@@ -36,6 +37,7 @@ description: >
 
   **Pixelfed** — Federated image sharing, a privacy-first alternative to Instagram.
 apps:
+  - install-opencloud
   - install-outline
   - install-hedgedoc
   - install-zulip
@@ -45,3 +47,4 @@ apps:
   - install-searxng
   - install-audiobookshelf
   - install-pixelfed
+  - install-stirling-pdf
