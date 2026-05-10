@@ -473,7 +473,7 @@ function AppTile({ card, onOpen, showStatus = false }) {
     <button className="app-tile" type="button" onClick={onOpen}>
       <AppIcon card={card} className="app-tile-badge" />
       <span className="app-tile-body">
-        <strong>{card.title}</strong>
+        <strong>{card.label}</strong>
         <span>{card.summary}</span>
       </span>
       {showStatus ? (
@@ -638,7 +638,7 @@ function AppDetailPage({ card, onNavigate }) {
         <AppIcon card={card} className="detail-icon" />
         <div className="detail-copy">
           <p className="eyebrow">{card.section}</p>
-          <h1>{card.title}</h1>
+          <h1>{card.label}</h1>
           <p>{card.description}</p>
           <div className="hero-actions">
             <button type="button" className="primary-button" onClick={() => openInNewTab(card.liveUrl || card.url)}>Start in new tab</button>

@@ -590,6 +590,18 @@
       ],
       "accent": "#f97316",
       "category": "Apps"
+    },
+    "Vaultwarden": {
+      "label": "Password Manager",
+      "summary": "Self-hosted password vault",
+      "description": "Store, generate, and manage passwords with a Bitwarden-compatible vault that you control.",
+      "capabilities": [
+        "Store and organise passwords securely",
+        "Generate strong passwords on the fly",
+        "Sync across devices with Bitwarden-compatible clients"
+      ],
+      "accent": "#1e40af",
+      "category": "Apps"
     }
   }
 }
