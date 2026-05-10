@@ -234,7 +234,8 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "existingSecretErlangKey: rabbitmq-erlang-cookie" in app_text
     assert "existingSecret: zulip-runtime" in app_text
     assert "existingSecretPasswordKey: redis-password" in app_text
-    assert "LOADBALANCER_IPS" not in app_text
+    assert "LOADBALANCER_IPS:" in app_text
+    assert 'pod-cidr' in app_text
     assert "__ZULIP_RABBITMQ_PASSWORD__" not in app_text
     assert "__ZULIP_REDIS_PASSWORD__" not in app_text
 

@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<USAGE
-Usage: $0 --public-zone-name NAME [--secret-name NAME]
+Usage: $0 --public-zone-name NAME [--secret-name NAME] [--pod-cidr CIDR]
 USAGE
 }
 
@@ -13,6 +13,7 @@ fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 PUBLIC_ZONE_NAME=""
+POD_CIDR=""
 SECRET_NAME="in-cluster-local"
 SERVER_URL="https://kubernetes.default.svc"
 # Argo CD needs a long-lived token here; the default 24h token would expire
@@ -23,6 +24,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --public-zone-name)
       PUBLIC_ZONE_NAME="$2"
+      shift 2
+      ;;
+    --pod-cidr)
+      POD_CIDR="$2"
       shift 2
       ;;
     --secret-name)
@@ -77,6 +82,15 @@ ca_data="$(kubectl config view --raw --minify -o jsonpath='{.clusters[0].cluster
 bearer_token="$(kubectl -n argocd create token argocd-manager --duration="$TOKEN_DURATION")"
 [[ -n "$bearer_token" ]] || fail "Could not create token for argocd-manager"
 
+if [[ -z "$POD_CIDR" ]]; then
+  POD_CIDR="$(kubectl get nodes -o jsonpath='{.items[*].spec.podCIDRs[0]}' 2>/dev/null || true)"
+  if [[ -n "$POD_CIDR" ]]; then
+    POD_CIDR="$(tr ' ' ',' <<<"$POD_CIDR")"
+  else
+    POD_CIDR="10.244.0.0/16"
+  fi
+fi
+
 cluster_config="$(jq -nc \
   --arg bearerToken "$bearer_token" \
   --arg caData "$ca_data" \
@@ -100,6 +114,7 @@ metadata:
     twinbox.io/domain-ready: "true"
   annotations:
     twinbox.io/public-zone-name: "${PUBLIC_ZONE_NAME}"
+    twinbox.io/pod-cidr: "${POD_CIDR}"
 type: Opaque
 stringData:
   name: ${SECRET_NAME}

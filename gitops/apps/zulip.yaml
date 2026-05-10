@@ -32,6 +32,7 @@ spec:
                   SETTING_SOCIAL_AUTH_OIDC_FULL_NAME_VALIDATED: "True"
                   ZULIP_AUTH_BACKENDS: GenericOpenIdConnectBackend
                   TRUST_GATEWAY_IP: "True"
+                  LOADBALANCER_IPS: "{{default "10.244.0.0/16" (index .metadata.annotations "twinbox.io/pod-cidr")}}"
               rabbitmq:
                 auth:
                   existingPasswordSecret: zulip-runtime
