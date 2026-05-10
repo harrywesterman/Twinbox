@@ -15,10 +15,12 @@ bash -n wizard/setup-wizard.sh \
   scripts/manager/collect-state.sh \
   scripts/manager/render-cilium-manifest.sh \
   scripts/manager/apply-argocd-application.sh \
+  scripts/manager/uninstall-argocd-application.sh \
   scripts/manager/install-argocd.sh \
   scripts/manager/install-longhorn-storage.sh \
   scripts/manager/install-prometheus.sh \
   scripts/manager/diagnose-monitoring.sh \
+  scripts/manager/reconcile-observability.sh \
   categories/talos-cluster/steps/install-loki/run.sh \
   categories/talos-cluster/steps/install-tempo/run.sh \
   categories/talos-cluster/steps/install-alloy/run.sh \
@@ -29,7 +31,7 @@ bash -n wizard/setup-wizard.sh \
   scripts/manager/openbao-secret-sync.sh \
   scripts/manager/sync-openbao-global-secret.sh \
   ansible/management-vm-maintenance.yml \
-   categories/talos-cluster/steps/install-cloudnativepg/run.sh
+  categories/talos-cluster/steps/install-cloudnativepg/run.sh
 
 ansible-playbook --syntax-check -i localhost, -c local ansible/management-vm-maintenance.yml
 
@@ -358,6 +360,95 @@ Expected:
 - the generated Velero UI bootstrap secret exists in the `velero-ui` namespace
 - the Velero UI ingress route points at `velero-ui.__ZONE_NAME__`
 - only members of the `admins` group can authorize the Authentik application
+
+### `install-crowdsec`
+
+```bash
+kubectl --kubeconfig <kubeconfig> get application -n argocd crowdsec
+kubectl --kubeconfig <kubeconfig> get pods -n crowdsec
+kubectl --kubeconfig <kubeconfig> get externalsecret -n crowdsec crowdsec-bouncer-credentials
+kubectl --kubeconfig <kubeconfig> get secret crowdsec-bouncer-credentials -n crowdsec
+```
+
+Expected:
+
+- `Application/crowdsec` is synced and healthy
+- Crowdsec pods (LAPI and agent) are running in `crowdsec`
+- The bouncer ExternalSecret reports `Ready=True`
+- The bouncer secret exists in the `crowdsec` namespace
+
+### `install-ntfy`
+
+```bash
+kubectl --kubeconfig <kubeconfig> get application -n argocd ntfy
+kubectl --kubeconfig <kubeconfig> get pods -n ntfy
+kubectl --kubeconfig <kubeconfig> get ingressroute -n ntfy
+```
+
+Expected:
+
+- `Application/ntfy` is synced and healthy
+- ntfy pod is running in `ntfy`
+- The ntfy ingress route points at `ntfy.<ZONE_NAME>`
+- Alertmanager routes warnings to ntfy with the correct topic
+
+### `install-cloudtty`
+
+```bash
+kubectl --kubeconfig <kubeconfig> get application -n argocd cloudtty
+kubectl --kubeconfig <kubeconfig> get pods -n cloudtty
+kubectl --kubeconfig <kubeconfig> get cloudshell -n cloudtty
+```
+
+Expected:
+
+- `Application/cloudtty` is synced and healthy
+- Cloudtty operator pod is running in `cloudtty`
+- A default `CloudShell` instance exists
+
+### `install-management-consoles`
+
+```bash
+kubectl --kubeconfig <kubeconfig> get application -n argocd platform-ingress
+kubectl --kubeconfig <kubeconfig> get ingressroute -n traefik proxmox seaweedfs seaweedfs-admin
+kubectl --kubeconfig <kubeconfig> get service -n traefik proxmox seaweedfs
+kubectl --kubeconfig <kubeconfig> get endpoints -n traefik proxmox seaweedfs
+```
+
+Expected:
+
+- `Application/platform-ingress` is synced
+- IngressRoutes for Proxmox, SeaweedFS, and SeaweedFS Admin exist
+- Services and Endpoints point at the Management VM IP
+- Routes are protected by Authentik forwardAuth
+
+### `install-netbird-routing-peers`
+
+```bash
+kubectl --kubeconfig <kubeconfig> get application -n argocd netbird-routing-peers
+kubectl --kubeconfig <kubeconfig> get pods -n netbird
+kubectl --kubeconfig <kubeconfig> get daemonset -n netbird
+kubectl --kubeconfig <kubeconfig> get externalsecret -n netbird
+```
+
+Expected:
+
+- `Application/netbird-routing-peers` is synced and healthy
+- NetBird agent pods are running on all worker nodes
+- The DaemonSet is available
+- The setup key ExternalSecret reports `Ready=True`
+
+### `provision-netbird-bastion`
+
+```bash
+ssh twinbox@<management-vm-ip> 'test -f /opt/twinbox/bootstrap/secrets/global/netbird.json'
+ssh twinbox@<management-vm-ip> 'jq -r ".NETBIRD_MANAGEMENT_URL" /opt/twinbox/bootstrap/secrets/global/netbird.json'
+```
+
+Expected:
+
+- `netbird.json` exists with management URL, setup key, and admin token
+- The Hetzner VM is reachable at the recorded management URL
 
 ### OpenBao restart check
 

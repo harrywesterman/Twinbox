@@ -19,6 +19,8 @@ Complete reference for the `.env` file used by the Twinbox manager stack.
 | Variable | Example | Description |
 |----------|---------|-------------|
 | `TALOS_IMAGE_PRESET` | `qemu-guest-agent` | Talos image factory preset applied to generated machine configs. Common values: `qemu-guest-agent` (enables the QEMU guest agent for Proxmox VM management), or empty for no preset. |
+| `TALOS_IMAGE_PLATFORM` | `cloud-server` | Talos image platform selector (e.g. `cloud-server`, `metal`) |
+| `TALOS_IMAGE_ARCH` | `amd64` | Talos image architecture (`amd64` or `arm64`) |
 
 ## Image
 
@@ -38,6 +40,10 @@ CLI tools pinned in `config/pinned-defaults.sh`:
 | `kubectl` | `v1.36.0` |
 | `helm` | `v4.1.4` |
 | Talos version | `v1.13.0` |
+| Argo CD | `v3.3.9` |
+| Cilium chart | `1.19.3` |
+| Cloudtty chart | `0.8.9` |
+| NetBird | `0.70.5` |
 
 `restic` is installed from the Management VM package repositories for host backups and is not pinned in `config/pinned-defaults.sh`.
 
@@ -69,9 +75,4 @@ CLI tools pinned in `config/pinned-defaults.sh`:
 
 ## GitOps Chart Versions
 
-Helm chart versions are pinned in the Argo CD `Application` manifests under `gitops/apps/`:
-
-| Application | Chart Version | Manifest |
-|-------------|---------------|----------|
-| External Secrets | `2.4.1` | `gitops/apps/external-secrets.yaml` |
-| OpenBao | `0.27.2` | Generated `install-secret-sync.sh` Application manifest |
+Helm chart versions are declared in the Argo CD `Application` manifests under `gitops/apps/` and in [`config/pinned-defaults.sh`](../config/pinned-defaults.sh). These versions drift with every release, so the canonical source is the repository itself. Check those files directly rather than relying on a static table.

@@ -128,3 +128,117 @@ Fix:
 - Inspect the rendered manifest under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/cilium/cilium-bootstrap.yaml`
 - Check `kubectl -n kube-system logs daemonset/cilium` and `kubectl -n kube-system logs deployment/cilium-operator`
 - If Cilium still crashes after the endpoint is corrected, compare the pinned chart version against the next supported Cilium release before considering a cluster rebuild
+
+## CrowdSec Bouncer Fails
+
+Symptoms:
+
+- Traefik returns 500 errors
+- CrowdSec bouncer plugin cannot connect to LAPI
+- `kubectl -n crowdsec logs deployment/crowdsec-bouncer` shows auth failures
+
+Fix:
+
+```bash
+# Verify the bouncer key exists in OpenBao
+kubectl -n crowdsec get externalsecret crowdsec-bouncer-credentials
+kubectl -n crowdsec get secret crowdsec-bouncer-credentials -o jsonpath='{.data.CROWDSEC_BOUNCER_KEY}' | base64 -d
+
+# Verify the LAPI is reachable from Traefik
+kubectl -n traefik exec deploy/traefik -- wget -qO- http://crowdsec-service.crowdsec.svc.cluster.local:8080
+```
+
+If the key is missing, rerun `install-crowdsec` to regenerate and sync it.
+
+## ntfy Not Receiving Alerts
+
+Symptoms:
+
+- Alerts fire in Alertmanager but no push notifications arrive
+- ntfy topic returns 404
+
+Fix:
+
+```bash
+# Verify ntfy is running
+kubectl -n ntfy get pods
+kubectl -n ntfy logs deployment/ntfy
+
+# Verify Alertmanager routing
+kubectl -n monitoring get configmap alertmanager-config -o yaml | grep ntfy
+
+# Test manually
+curl -d "Test message" https://ntfy.<ZONE_NAME>/twinbox-alerts
+```
+
+If the topic does not exist, ntfy creates it automatically on first publish. Check that the Alertmanager URL includes the correct topic path.
+
+## NetBird Routing Peers Not Connecting
+
+Symptoms:
+
+- NetBird bastion is reachable but internal services return 502/503
+- Routing peer pods show connection errors
+
+Fix:
+
+```bash
+# Verify routing peers are running
+kubectl -n netbird get pods
+kubectl -n netbird logs daemonset/netbird-routing-peers
+
+# Verify the setup key is valid
+kubectl -n netbird get externalsecret
+kubectl -n netbird get secret netbird-setup-key -o jsonpath='{.data.key}' | base64 -d
+
+# Verify NetBird routes are advertised
+talosctl dmesg | grep -i netbird
+```
+
+If the setup key is expired, rerun `configure-netbird-ingress` to generate a new one.
+
+## Cloudtty Shell Not Opening
+
+Symptoms:
+
+- Cloudtty UI loads but the terminal stays blank
+- CloudShell pod is stuck in Pending
+
+Fix:
+
+```bash
+# Verify the operator is running
+kubectl -n cloudtty get pods
+kubectl -n cloudtty logs deployment/cloudtty-operator
+
+# Verify the CloudShell instance exists
+kubectl -n cloudtty get cloudshell
+
+# Check for resource constraints
+kubectl -n cloudtty describe pod -l app.kubernetes.io/name=cloudtty
+```
+
+If the CloudShell pod is Pending, check whether the cluster has sufficient CPU/memory and whether the NodePort range is open.
+
+## Management Consoles Return 404
+
+Symptoms:
+
+- Proxmox, SeaweedFS, or Longhorn UIs return 404 through Traefik
+- Services exist but Endpoints are empty
+
+Fix:
+
+```bash
+# Verify Endpoints point at the Management VM IP
+kubectl -n traefik get endpoints proxmox seaweedfs
+kubectl -n traefik describe endpoints proxmox
+
+# Verify the Management VM IP has not changed
+ssh twinbox@<management-vm-ip> 'ip addr show scope global'
+
+# Verify Traefik can reach the Management VM
+kubectl -n traefik exec deploy/traefik -- wget -qO- http://<management-vm-ip>:8006
+```
+
+If the Management VM IP changed, update the Endpoints or restart `install-management-consoles` to regenerate them.

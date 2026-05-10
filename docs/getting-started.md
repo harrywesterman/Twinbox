@@ -22,8 +22,10 @@ The wizard also stores the cluster login password in `/opt/twinbox/bootstrap/sec
 
 ## Step 2: Verify bootstrap material on the Management VM
 
+Connect as the `twinbox` user (the wizard creates this account):
+
 ```bash
-ssh root@<management-vm-ip> 'find /opt/twinbox/bootstrap -maxdepth 3 -type f | sort'
+ssh twinbox@<management-vm-ip> 'find /opt/twinbox/bootstrap -maxdepth 3 -type f | sort'
 ```
 
 Expected early files:
@@ -39,47 +41,97 @@ Expected early files:
 
 - `http://<management-vm-ip>:3000`
 
-Use the UI to:
+Use the UI to work through the setup steps. The exact order depends on your chosen ingress route, but the core platform steps are:
 
-1. Deploy the Talos cluster
-2. Install Argo CD
-3. Install Longhorn and make it the default storage class
-4. Install OpenBao and sync bootstrap secrets
-5. Install CloudNativePG
-6. Install Postgres clusters
-7. Install Traefik
-8. Install Authentik
-9. Create the first Authentik user and `admins` group
-10. Install Velero backup
-11. Install Velero UI
-12. Install pgAdmin 4
-13. Continue through the GitOps application steps
+### Core Infrastructure
+
+1. **Deploy Talos Cluster** (`provision-nodes`) — Creates VMs, bootstraps Talos, installs Cilium (kube-proxy-free with Hubble)
+2. **Install Argo CD** (`install-argocd`) — GitOps controller
+3. **Install Longhorn** (`install-longhorn-storage`) — Default storage class, SeaweedFS backup target
+4. **Install Prometheus** (`install-prometheus`) — Metrics and alerting stack
+5. **Install Loki** (`install-loki`) — Log aggregation
+6. **Install Tempo** (`install-tempo`) — Distributed tracing
+7. **Install Alloy** (`install-alloy`) — Unified telemetry collector
+8. **Install Grafana** (`install-grafana`) — Dashboards with pre-seeded Twinbox views
+
+### Secrets & Identity
+
+9. **Install Secret Sync** (`install-secret-sync`) — External Secrets Operator + OpenBao
+10. **Install CloudNativePG** (`install-cloudnativepg`) — PostgreSQL operator
+11. **Install Postgres Clusters** (`install-postgres-clusters`) — Authentik database
+12. **Install Authentik IDP** (`install-authentik-idp`) — Identity provider with OIDC
+13. **Create Users and Groups** (`create-users-and-groups`) — First user + `admins` group
+
+### Ingress & Networking
+
+14. **Choose Ingress Route** (`choose-ingress-route`) — Select and configure your ingress strategy
+15. **Configure Wiredoor Bastion** (`provision-wiredoor-bastion`) — Hetzner WireGuard VPS *(if Wiredoor selected)*
+16. **Install Wiredoor Gateway** (`install-wiredoor-gateway`) — Cluster-side WireGuard *(if Wiredoor selected)*
+17. **Configure Cloudflare DNS** (`configure-cloudflare-dns`) — DNS records for Wiredoor *(if Cloudflare used)*
+18. **Configure Cloudflare Tunnel** (`configure-cloudflare-tunnel`) — Outbound tunnel *(if Cloudflare Tunnel selected, prd-only)*
+19. **Configure MetalLB Ingress** (`configure-metallb-ingress`) — Bare-metal LB *(if MetalLB selected)*
+20. **Configure Tailscale Ingress** (`configure-tailscale-ingress`) — Mesh VPN *(if Tailscale selected)*
+21. **Deploy NetBird Bastion** (`provision-netbird-bastion`) — Hetzner NetBird VPS *(if NetBird selected)*
+22. **Configure NetBird Ingress** (`configure-netbird-ingress`) — SSO, groups, setup keys *(if NetBird selected)*
+23. **Install NetBird Routing Peers** (`install-netbird-routing-peers`) — K8s DaemonSet *(if NetBird selected)*
+24. **Configure NetBird Admin Access** (`configure-netbird-admin-access`) — Management VM enrollment *(if NetBird selected)*
+
+### Platform Services
+
+25. **Install Traefik** (`install-traefik`) — Ingress controller
+26. **Install Velero Backup** (`install-velero-backup`) — Cluster backups to SeaweedFS
+27. **Install Velero UI** (`install-velero-ui`) — Backup dashboard with OIDC
+28. **Install Management Backup** (`install-management-backup`) — Host cron jobs for etcd + restic
+29. **Install CrowdSec** (`install-crowdsec`) — IDS + Traefik bouncer
+30. **Install ntfy** (`install-ntfy`) — Push notifications for alerts
+31. **Install Cloudtty** (`install-cloudtty`) — Browser-based cluster shell
+
+### User-Facing Services
+
+32. **Install Headlamp** (`install-headlamp`) — Kubernetes dashboard with OIDC
+33. **Install Twinbox Portal** (`install-twinbox-portal`) — User app launcher
+34. **Install Dashy Dashboard** (`install-dashy-dashboard`) — Legacy admin launcher
+35. **Install Management Consoles** (`install-management-consoles`) — Proxmox, Longhorn, SeaweedFS UIs
+36. **Install pgAdmin 4** (`install-pgadmin4`) — PostgreSQL management
+37. **Configure Argo CD OIDC** (`configure-argocd-oidc`) — Argo CD Authentik integration
+
+### Application Bundles (optional)
+
+38. **Twinbox Desktop** — OpenCloud, Outline, HedgeDoc, Zulip, Jitsi, Paperless, Immich, SearXNG, Audiobookshelf, Pixelfed, Stirling PDF
+39. **Mijn Bureau** — Nextcloud, Outline, Jitsi
+40. **La Suite** — Outline, Nextcloud, Zulip, Jitsi
+41. **openDesk** — OpenCloud, Nextcloud, Zulip, Jitsi
+
+### Individual Apps (optional)
+
+Any of the 20+ individual apps: Audiobookshelf, FreshRSS, HedgeDoc, Immich, Jitsi, Karakeep, n8n, Nextcloud, OpenCloud, OpenWebUI, Outline, Paperless, Pixelfed, SearXNG, Stirling PDF, Vaultwarden, Zulip.
 
 Cilium is installed during the Talos provisioning step, so there is no separate networking step in the wizard.
 Talos control planes stay at `4 GB RAM / 10 GB disk`, while worker disks default to `100%` of the free space shared across the three Proxmox hosts and can be tuned with the worker-disk slider; Longhorn is scheduled onto workers through the Talos role label.
 
 ## Management VM maintenance
 
-Management VM maintenance is now handled by Ansible during the host bootstrap. There is no separate wizard step for it anymore.
-
-## Recovery
-
-If the manager stack needs a restart:
-
-```bash
-ssh root@<management-vm-ip> 'docker compose pull && docker compose up -d'
-```
-
-Use this after the `Publish Docker Images` workflow finishes for the commit you want to run.
+Management VM maintenance is handled by Ansible during the host bootstrap. There is no separate wizard step for it anymore.
 
 If bootstrap files are missing, rerun the host bootstrap logic:
 
 ```bash
-ssh root@<management-vm-ip> 'sudo ansible-playbook -i localhost, -c local /opt/twinbox/bootstrap/ansible/management-vm-maintenance.yml'
+ssh twinbox@<management-vm-ip> 'sudo ansible-playbook -i localhost, -c local /opt/twinbox/bootstrap/ansible/management-vm-maintenance.yml'
 ```
+
+## Recovery
+
+If the manager stack needs a restart, run this from the Management VM (`.env` is root-owned, so use `sudo`):
+
+```bash
+ssh twinbox@<management-vm-ip>
+sudo -n sh -lc 'cd /opt/twinbox && docker compose pull && docker compose up -d'
+```
+
+Use this after the `Publish Docker Images` workflow finishes for the commit you want to run.
 
 If you need to inspect a step script, do it inside the worker container:
 
 ```bash
-ssh root@<management-vm-ip> 'docker exec twinbox-manager-worker sh -lc "sed -n \"1,80p\" /opt/twinbox/categories/talos-cluster/steps/install-pgadmin4/run.sh"'
+ssh twinbox@<management-vm-ip> 'docker exec twinbox-manager-worker sh -lc "sed -n \"1,80p\" /opt/twinbox/categories/talos-cluster/steps/install-pgadmin4/run.sh"'
 ```

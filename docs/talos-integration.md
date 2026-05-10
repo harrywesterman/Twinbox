@@ -20,13 +20,41 @@ Talos lifecycle operations are triggered through the manager stack.
 14. The worker waits for `cilium`, `cilium-operator`, `coredns`, `hubble-relay`, and `hubble-ui` to become healthy and verifies that `kube-proxy` is not deployed.
 15. `install-argocd` installs Argo CD after the cluster networking layer is already available.
 16. `install-longhorn-storage` applies the Longhorn Argo CD application, makes `StorageClass/longhorn` the default, configures SeaweedFS as the default Longhorn backup target, and installs recurring snapshot/backup jobs for new Longhorn PVCs. Longhorn is configured to run on worker nodes only, so its managers, UI, and CSI components stay off control planes.
-17. `install-secret-sync` installs External Secrets Operator and OpenBao, seeds OpenBao from management-local bootstrap JSON, and creates `Secret/proxmox-bootstrap`.
-18. `install-authentik-idp` provisions the PostgreSQL cluster for Authentik, installs Authentik, seeds the Authentik bootstrap secret into OpenBao, and deletes the temporary local seed file after sync.
-19. `create-users-and-groups` creates the first Authentik user, creates the `admins` group, and adds the user to that group using the Authentik bootstrap secret from OpenBao and the Management VM login password stored under `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json`.
-20. `install-velero-backup` deploys Velero and points it at the SeaweedFS S3 target running on the Management VM as the default backup storage location for daily cluster backups.
-21. `install-velero-ui` deploys the Velero UI dashboard on top of the Velero install and gates access through Authentik.
-22. `install-management-backup` installs host cron jobs on the Management VM for daily Talos etcd snapshots and daily `/opt/twinbox` restic backups to SeaweedFS.
-23. Later wizard steps apply one Argo CD `Application` at a time for Traefik and the remaining workloads.
+17. `install-prometheus` installs the kube-prometheus-stack through Argo CD, enabling Prometheus, Alertmanager, node-exporter, and kube-state-metrics on Longhorn-backed storage.
+18. `install-loki` installs Loki so Grafana can query cluster logs.
+19. `install-tempo` installs Tempo so Grafana can query traces.
+20. `install-alloy` installs Grafana Alloy as the shared collection pipeline for logs, events, and traces.
+21. `install-grafana` installs Grafana, provisions Prometheus, Loki, and Tempo datasources, and seeds the default observability dashboards.
+22. `install-secret-sync` installs External Secrets Operator and OpenBao, seeds OpenBao from management-local bootstrap JSON, and creates `Secret/proxmox-bootstrap`.
+23. `install-cloudnativepg` installs the CloudNativePG operator on top of Longhorn so PostgreSQL-backed workloads can share one database platform.
+24. `install-authentik-idp` provisions the PostgreSQL cluster for Authentik, installs Authentik, seeds the Authentik bootstrap secret into OpenBao, and deletes the temporary local seed file after sync.
+25. `create-users-and-groups` creates the first Authentik user, creates the `admins` group, and adds the user to that group using the Authentik bootstrap secret from OpenBao and the Management VM login password stored under `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json`.
+26. `install-traefik` installs the Traefik ingress controller through Argo CD.
+27. `install-velero-backup` deploys Velero and points it at the SeaweedFS S3 target running on the Management VM as the default backup storage location for daily cluster backups.
+28. `install-velero-ui` deploys the Velero UI dashboard on top of the Velero install and gates access through Authentik.
+29. `install-management-backup` installs host cron jobs on the Management VM for daily Talos etcd snapshots and daily `/opt/twinbox` restic backups to SeaweedFS.
+30. `install-crowdsec` deploys CrowdSec security engine and seeds the Traefik bouncer key into OpenBao.
+31. `install-ntfy` deploys the ntfy push notification service for cluster alerts.
+32. `install-cloudtty` installs the Cloudtty operator and creates a browser-based cluster shell.
+33. `install-headlamp` deploys the Kubernetes dashboard with native Authentik OIDC login.
+34. `install-twinbox-portal` renders the user portal config from step metadata and cluster state, writing it to `Secret/portal-config`.
+35. `install-dashy-dashboard` renders the legacy admin launcher config into `ConfigMap/dashy-config`.
+36. `install-management-consoles` publishes Proxmox, Longhorn, and SeaweedFS web UIs behind Traefik with Authentik protection.
+37. `install-pgadmin4` deploys pgAdmin 4 with Longhorn-backed persistence and Authentik OIDC.
+38. `configure-argocd-oidc` configures Argo CD to use Authentik for SSO.
+39. Later wizard steps apply one Argo CD `Application` at a time for ingress configuration, NetBird, Wiredoor, Cloudflare, MetalLB, Tailscale, and user applications.
+
+## Ingress Configuration Steps
+
+After the core platform, ingress routes are configured based on user choice:
+
+| Ingress | Steps | Description |
+|---------|-------|-------------|
+| **Wiredoor** | `provision-wiredoor-bastion` → `install-wiredoor-gateway` | Hetzner VM + WireGuard tunnel |
+| **Cloudflare Tunnel** | `configure-cloudflare-tunnel` | Outbound tunnel (prd-only on Free) |
+| **MetalLB** | `configure-metallb-ingress` | Bare-metal LB + port forwarding |
+| **Tailscale** | `configure-tailscale-ingress` | Mesh VPN |
+| **NetBird** | `provision-netbird-bastion` → `configure-netbird-ingress` → `install-netbird-routing-peers` → `configure-netbird-admin-access` | Self-hosted WireGuard VPN |
 
 ## Runtime Dependencies
 
@@ -48,3 +76,5 @@ Talos lifecycle operations are triggered through the manager stack.
 - Talos configs and kubeconfigs are runtime artifacts, not canonical files under `manager-data/`.
 - OpenBao is the runtime secret backend for cluster workloads after `install-secret-sync`.
 - Kubernetes secrets remain derived outputs of External Secrets Operator.
+- The `twinbox-automation` service account and its non-expiring API token are created declaratively by an Authentik blueprint, avoiding brittle bootstrap token calls.
+- All downstream steps that talk to the Authentik API source the bundled `scripts/manager/authentik-auth.sh` helper.

@@ -67,6 +67,18 @@ Applies a single Argo CD `Application` manifest to the cluster. Used by step scr
 
 The Talos step runners for `install-loki`, `install-tempo`, `install-alloy`, and `install-grafana` live under `categories/talos-cluster/steps/*/run.sh` and delegate to `apply-argocd-application.sh`.
 
+### `uninstall-argocd-application.sh`
+
+Removes a single Argo CD `Application` manifest from the cluster. Used by steps that need to clean up or reinstall apps.
+
+### `upsert-argocd-cluster-secret.sh`
+
+Upserts a local Argo CD cluster secret in the `argocd` namespace with the derived public zone name as an annotation. This secret is read by ApplicationSets to project domain names into manifests at render time.
+
+### `cluster-public-zone.sh`
+
+Derives the public zone name from the cluster ID and base domain. Used by steps that need to know whether to use the bare domain (`prd`) or a slug-prefixed hostname (non-`prd`).
+
 ## Storage & Secrets
 
 ### `install-longhorn-storage.sh`
@@ -83,7 +95,7 @@ Bootstraps the management secrets layer for GitOps:
 - Bootstraps management JSON files (proxmox, traefik-dashboard, seal key)
 
 External Secrets Operator is deployed from `gitops/apps/external-secrets.yaml`. OpenBao is applied from a generated Argo CD `Application` manifest that inlines the rendered Helm values so the local bootstrap output is authoritative during install.
-ESO’s webhook TLS bootstrap is handled internally by its `certController`; Twinbox does not provide ingress-style certificates for this step.
+ESO's webhook TLS bootstrap is handled internally by its `certController`; Twinbox does not provide ingress-style certificates for this step.
 
 ### `openbao-secret-sync.sh`
 
@@ -114,6 +126,34 @@ Installs the Management VM host cron jobs that create daily Talos etcd snapshots
 
 Installs Velero UI, provisions its Authentik OIDC application, syncs the bootstrap secret into OpenBao, and applies the Velero UI Argo CD application and Traefik ingress route.
 
+## Observability
+
+### `diagnose-monitoring.sh`
+
+Runs diagnostics against the monitoring stack. Checks Prometheus, Alertmanager, Grafana, and related component health. Useful for troubleshooting observability issues.
+
+### `reconcile-observability.sh`
+
+Reconciles the observability stack state. Ensures Prometheus rules, Grafana datasources, and dashboard ConfigMaps are in sync with the expected configuration.
+
+### `refresh-grafana-dashboard.mjs`
+
+Node.js script that refreshes Grafana dashboards from the repo-owned definitions. Updates existing dashboards without full reinstallation.
+
+### `render-grafana-dashboard.mjs`
+
+Node.js script that renders a Grafana dashboard JSON from template inputs. Used during the Grafana installation step to inject cluster-specific values.
+
+## Security
+
+### `authentik-auth.sh`
+
+Shared helper for all steps that interact with the Authentik API.
+
+- Reads the persistent `AUTHENTIK_API_TOKEN` from OpenBao
+- Provides `authentik_ensure_token` for token refresh
+- Used by `install-headlamp`, `install-twinbox-portal`, `install-dashy-dashboard`, `configure-argocd-oidc`, `install-pgadmin4`, `install-management-consoles`, and `create-users-and-groups`
+
 ## Utility
 
 ### `upsert-secret-artifact.mjs`
@@ -123,6 +163,10 @@ Node.js script that writes or updates a secret file attachment. Used by bootstra
 ```
 Usage: upsert-secret-artifact.mjs --scope <scope> --item <item> --attachment <name> --source <path> [--cluster-id <id>]
 ```
+
+### `sync-pgadmin4-server.sh`
+
+Syncs pgAdmin 4 server configurations into the running pgAdmin instance. Connects to the PostgreSQL clusters discovered in the `databases` namespace and registers them as managed servers.
 
 ## Environment
 

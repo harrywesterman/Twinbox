@@ -34,7 +34,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `/opt/twinbox/bootstrap/secrets/global/traefik-dashboard.json`
 - `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json`
 - `/opt/twinbox/bootstrap/secrets/global/grafana-oidc-<cluster-id>.json`
-- `/opt/twinbox/bootstrap/secrets/global/authentik.json` - seed-only; deleted after Authentik syncs into OpenBao
+- `/opt/twinbox/bootstrap/secrets/global/authentik.json` — seed-only; deleted after Authentik syncs into OpenBao
 - `/opt/twinbox/bootstrap/secrets/global/pgadmin4-oidc-<cluster-id>.json`
 - `/opt/twinbox/bootstrap/secrets/global/audiobookshelf.json`
 - `/opt/twinbox/bootstrap/secrets/global/wiredoor-gateway.json`
@@ -46,8 +46,10 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `/opt/twinbox/bootstrap/secrets/global/dashy-oidc-<cluster-id>.json`
 - `/opt/twinbox/bootstrap/secrets/global/wiredoor-bastion-<cluster-id>.json`
 - `/opt/twinbox/bootstrap/secrets/global/cloudflare-<cluster-id>.json`
-- `/opt/twinbox/bootstrap/secrets/global/wiredoor-bastion-<cluster-id>.json`
-- `/opt/twinbox/bootstrap/secrets/global/cloudflare-<cluster-id>.json`
+- `/opt/twinbox/bootstrap/secrets/global/crowdsec.json`
+- `/opt/twinbox/bootstrap/secrets/global/ntfy.json`
+- `/opt/twinbox/bootstrap/secrets/global/netbird.json`
+- `/opt/twinbox/bootstrap/secrets/global/cloudtty.json`
 
 ### Cluster-scoped runtime artifacts
 
@@ -55,6 +57,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/talosconfig/talosconfig`
 - `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/kubeconfig/kubeconfig`
 - `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/cilium/cilium-bootstrap.yaml`
+- `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/argocd/argocd-cli.json`
 
 ### OpenBao bootstrap state
 
@@ -227,6 +230,40 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 }
 ```
 
+### `crowdsec.json`
+
+```json
+{
+  "CROWDSEC_BOUNCER_KEY": "generated-key",
+  "CROWDSEC_LAPI_URL": "http://crowdsec-service.crowdsec.svc.cluster.local:8080"
+}
+```
+
+`install-crowdsec` generates or reuses a Traefik bouncer key, stores it in OpenBao, and materializes the Kubernetes Secrets through External Secrets.
+
+### `ntfy.json`
+
+```json
+{
+  "NTFY_BASE_URL": "https://ntfy.example.com",
+  "NTFY_TOPIC": "twinbox-alerts"
+}
+```
+
+`install-ntfy` stores the ntfy base URL and default alert topic in OpenBao for Alertmanager routing.
+
+### `netbird.json`
+
+```json
+{
+  "NETBIRD_MANAGEMENT_URL": "https://netbird.example.com",
+  "NETBIRD_SETUP_KEY": "generated-key",
+  "NETBIRD_ADMIN_TOKEN": "generated-token"
+}
+```
+
+`configure-netbird-ingress` stores the NetBird management URL, setup keys, and admin tokens in OpenBao for routing peers and admin access.
+
 ## Cluster Secret Runtime
 
 - `provision-nodes` bootstraps Talos and writes the Talos runtime artifacts for a cluster.
@@ -283,15 +320,27 @@ This avoids Argo CD sync failures like `namespaces "..." not found` when `platfo
 
 Current baseline namespaces:
 
+- `argocd`
 - `authentik`
+- `cloudtty`
+- `cnpg-system`
+- `crowdsec`
 - `dashy`
+- `databases`
+- `external-secrets`
 - `homepage`
 - `immich`
 - `longhorn-system`
 - `monitoring`
+- `netbird`
+- `ntfy`
+- `openbao`
 - `pgadmin4`
 - `tailscale`
 - `traefik`
+- `twinbox-portal`
+- `velero`
+- `velero-ui`
 - `wiredoor`
 
 ### Affected services
@@ -308,6 +357,10 @@ All platform services use the runtime domain projection from the local Argo clus
 | Grafana | `grafana.<ZONE_NAME>` |
 | Twinbox Portal | `portal.<ZONE_NAME>` |
 | Dashy admin launcher | `admin.<ZONE_NAME>` |
+| ntfy | `ntfy.<ZONE_NAME>` |
+| SeaweedFS | `seaweedfs.<ZONE_NAME>` |
+| SeaweedFS Admin | `seaweedfs-admin.<ZONE_NAME>` |
+| Proxmox (proxy) | `proxmox.<ZONE_NAME>` |
 
 Twinbox Portal is the default user landing page. It uses Authentik OIDC in the portal backend, stores per-user preferences in its own PVC-backed store, and renders the app catalog from step metadata plus the cluster step-state into `Secret/portal-config` at runtime.
 Dashy remains the legacy admin launcher at `admin.<ZONE_NAME>` for operator tools while the new portal becomes the normal front door for users.
@@ -319,13 +372,16 @@ The Dashy tile list itself is still not GitOps-static: Twinbox renders operator 
 ```
 gitops/platform/
 ├── kustomization.yaml          # Central Kustomize config for the shared platform shape
-├── authentik/ingressroute.yaml # Host match patched by the platform-ingress ApplicationSet
-├── grafana/
-├── headlamp/ingressroute.yaml  # Host match patched by the platform-ingress ApplicationSet
-├── headlamp/externalsecret.yaml # Headlamp OIDC client credentials from OpenBao
-├── traefik/
-├── wiredoor-gateway/
-├── dashy/
+├── authentik/                  # IngressRoute, ExternalSecret, forwardAuth middleware
+├── argocd/                     # Argo CD ConfigMap, RBAC, Wiredoor config
+├── crowdsec/                   # Bouncer and LAPI ExternalSecrets
+├── grafana/                    # ExternalSecret for admin + OIDC
+├── headlamp/                   # IngressRoute, ExternalSecret for OIDC
+├── hubble/                     # IngressRoute, forwardAuth for Hubble UI
+├── management-consoles/        # Proxmox, Longhorn, SeaweedFS proxy routes
+├── traefik/                    # Argo CD routes, dashboard auth, CrowdSec bouncer
+├── wiredoor-gateway/           # WireGuard gateway configuration
+├── dashy/                      # Legacy admin launcher
 └── twinbox-portal/
     ├── portal-config (Secret)   # Runtime-generated portal configuration
     ├── deployment.yaml         # Portal app + API
