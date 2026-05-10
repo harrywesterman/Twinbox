@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: pixelfed
-          image: ghcr.io/jippi/docker-pixelfed:v0.12.7-apache-8.4-bookworm
+          image: ghcr.io/jippi/docker-pixelfed:nightly-2026-05-10-staging-apache-8.4-bookworm
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -158,6 +158,44 @@ spec:
               value: "true"
             - name: AUTORUN_LARAVEL_CONFIG_CACHE
               value: "true"
+            - name: PF_OIDC_ENABLED
+              value: "true"
+            - name: PF_OIDC_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: pixelfed-bootstrap
+                  key: PF_OIDC_CLIENT_ID
+            - name: PF_OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: pixelfed-bootstrap
+                  key: PF_OIDC_CLIENT_SECRET
+            - name: PF_OIDC_AUTHORIZE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pixelfed-bootstrap
+                  key: PF_OIDC_AUTHORIZE_URL
+            - name: PF_OIDC_TOKEN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pixelfed-bootstrap
+                  key: PF_OIDC_TOKEN_URL
+            - name: PF_OIDC_PROFILE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pixelfed-bootstrap
+                  key: PF_OIDC_PROFILE_URL
+            - name: PF_OIDC_LOGOUT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pixelfed-bootstrap
+                  key: PF_OIDC_LOGOUT_URL
+            - name: PF_OIDC_SCOPES
+              value: "openid profile email"
+            - name: PF_OIDC_USERNAME_FIELD
+              value: "preferred_username"
+            - name: PF_OIDC_FIELD_ID
+              value: "sub"
           readinessProbe:
             tcpSocket:
               port: http

@@ -263,11 +263,17 @@ cleanup_app_specific_state() {
       delete_authentik_application_by_slug "zulip"
       delete_openbao_global_secret "zulip-oidc"
       ;;
+    pixelfed)
+      delete_authentik_policy_binding_for_application_group "pixelfed" "admins"
+      delete_authentik_provider_by_name "Pixelfed"
+      delete_authentik_application_by_slug "pixelfed"
+      delete_openbao_global_secret "pixelfed"
+      ;;
   esac
 }
 
 case "$APP_NAME" in
-  immich|nextcloud|audiobookshelf|karakeep|jitsi|opencloud|zulip)
+  immich|nextcloud|audiobookshelf|karakeep|jitsi|opencloud|zulip|pixelfed)
     needs_authentik_cleanup=true
     ;;
   grafana|loki)

@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: pixelfed-worker
-          image: ghcr.io/jippi/docker-pixelfed:v0.12.7-apache-8.4-bookworm
+          image: ghcr.io/jippi/docker-pixelfed:nightly-2026-05-10-staging-apache-8.4-bookworm
           imagePullPolicy: IfNotPresent
           command:
             - php
@@ -102,6 +102,8 @@ spec:
             - name: AP_SHAREDINBOX
               value: "true"
             - name: OAUTH_ENABLED
+              value: "true"
+            - name: PF_OIDC_ENABLED
               value: "true"
             - name: PF_ENABLE_CLOUD
               value: "false"
@@ -195,7 +197,7 @@ spec:
     spec:
       containers:
         - name: pixelfed-scheduler
-          image: ghcr.io/jippi/docker-pixelfed:v0.12.7-apache-8.4-bookworm
+          image: ghcr.io/jippi/docker-pixelfed:nightly-2026-05-10-staging-apache-8.4-bookworm
           imagePullPolicy: IfNotPresent
           command:
             - php
@@ -278,6 +280,8 @@ spec:
             - name: AP_SHAREDINBOX
               value: "true"
             - name: OAUTH_ENABLED
+              value: "true"
+            - name: PF_OIDC_ENABLED
               value: "true"
             - name: PF_ENABLE_CLOUD
               value: "false"

@@ -2668,20 +2668,31 @@ def test_pixelfed_manifests_use_postgresql_and_longhorn_storage():
     ).read_text(encoding="utf-8")
 
     assert "source \"$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh\"" in step_text
+    assert "source \"$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh\"" in step_text
     assert '--secret-name "pixelfed"' in step_text
-    assert '--required-keys "APP_KEY,PIXELFED_POSTGRESQL__USERNAME,PIXELFED_POSTGRESQL__PASSWORD"' in step_text
+    assert '--required-keys "APP_KEY,PIXELFED_POSTGRESQL__USERNAME,PIXELFED_POSTGRESQL__PASSWORD,PF_OIDC_CLIENT_ID,PF_OIDC_CLIENT_SECRET,PF_OIDC_AUTHORIZE_URL,PF_OIDC_TOKEN_URL,PF_OIDC_PROFILE_URL,PF_OIDC_LOGOUT_URL"' in step_text
     assert "gitops/databases/pixelfed/cluster.yaml" in step_text
     assert "gitops/apps/pixelfed.yaml" in step_text
     assert "php artisan instance:actor" in step_text
     assert "php artisan passport:keys --force" in step_text
+    assert "Provisioning Authentik OIDC client for Pixelfed" in step_text
 
-    assert "ghcr.io/jippi/docker-pixelfed:v0.12.7-apache-8.4-bookworm" in deployment_text
+    assert "ghcr.io/jippi/docker-pixelfed:nightly-2026-05-10-staging-apache-8.4-bookworm" in deployment_text
+    assert "ghcr.io/jippi/docker-pixelfed:nightly-2026-05-10-staging-apache-8.4-bookworm" in workers_text
     assert "APP_URL" in deployment_text
     assert "APP_DOMAIN" in deployment_text
     assert "DB_HOST" in deployment_text
     assert "pixelfed-db-pooler-rw-session.databases.svc.cluster.local" in deployment_text
     assert "pixelfed-redis" in deployment_text
     assert "AUTORUN_ENABLED" in deployment_text
+    assert "PF_OIDC_ENABLED" in deployment_text
+    assert "PF_OIDC_ENABLED" in workers_text
+    assert "PF_OIDC_CLIENT_ID" in deployment_text
+    assert "PF_OIDC_CLIENT_SECRET" in deployment_text
+    assert "PF_OIDC_AUTHORIZE_URL" in deployment_text
+    assert "PF_OIDC_TOKEN_URL" in deployment_text
+    assert "PF_OIDC_PROFILE_URL" in deployment_text
+    assert "PF_OIDC_LOGOUT_URL" in deployment_text
     assert "- horizon" in workers_text
     assert "- schedule:work" in workers_text
     assert "name: pixelfed-bootstrap" in externalsecret_text
@@ -2689,6 +2700,12 @@ def test_pixelfed_manifests_use_postgresql_and_longhorn_storage():
     assert "property: APP_KEY" in externalsecret_text
     assert "property: PIXELFED_POSTGRESQL__USERNAME" in externalsecret_text
     assert "property: PIXELFED_POSTGRESQL__PASSWORD" in externalsecret_text
+    assert "property: PF_OIDC_CLIENT_ID" in externalsecret_text
+    assert "property: PF_OIDC_CLIENT_SECRET" in externalsecret_text
+    assert "property: PF_OIDC_AUTHORIZE_URL" in externalsecret_text
+    assert "property: PF_OIDC_TOKEN_URL" in externalsecret_text
+    assert "property: PF_OIDC_PROFILE_URL" in externalsecret_text
+    assert "property: PF_OIDC_LOGOUT_URL" in externalsecret_text
     assert "property: PIXELFED_POSTGRESQL__USERNAME" in db_externalsecret_text
     assert "property: PIXELFED_POSTGRESQL__PASSWORD" in db_externalsecret_text
     assert "destinationPath: s3://twinbox-velero/pixelfed-db/" in cluster_text
@@ -2772,7 +2789,6 @@ def test_critical_cnpg_clusters_use_ha_instances_with_single_replica_storage():
         "zulip",
         "paperless",
         "vaultwarden",
-        "pixelfed",
         "immich",
     ):
         text = (
@@ -2780,6 +2796,12 @@ def test_critical_cnpg_clusters_use_ha_instances_with_single_replica_storage():
         ).read_text(encoding="utf-8")
         assert "instances: 3" in text
         assert "storageClass: longhorn-single" in text
+
+    pixelfed_cluster_text = (
+        REPO_ROOT / "gitops" / "databases" / "pixelfed" / "cluster.yaml"
+    ).read_text(encoding="utf-8")
+    assert "instances: 2" in pixelfed_cluster_text
+    assert "storageClass: longhorn-single" in pixelfed_cluster_text
 
 
 def test_database_app_installers_refresh_pgadmin_after_database_ready():
