@@ -4,6 +4,57 @@ summary: Dutch government workspace bundle for shared files, documents, and meet
 order: 10
 iconUrl: /assets/step-icons/install-nextcloud.svg
 iconAlt: Mijn Bureau icon
+description: >
+  Mijn Bureau is the Dutch government's sovereign workspace initiative, developed
+  by the Ministry of the Interior (BZK), Gemeente Amsterdam, and VNG-Realisatie.
+  It provides a complete self-hosted digital workplace for public-sector teams,
+  combining secure file sharing, team knowledge management, private video
+  conferencing, and AI-assisted productivity tools.
+
+  The project is inspired by Germany's openDesk and France's La Suite, and is
+  built on Haven — the Dutch government Kubernetes platform. It uses a democratic
+  governance model with a Product Steering Group and Technical Steering Group,
+  where participating organisations vote on which components to include. Mijn
+  Bureau classifies components by maturity (Graduated, Incubating, Sandbox) to
+  balance stability with innovation.
+
+  Every app in this bundle is deployed through Argo CD GitOps, giving you full
+  control over updates, configuration, and data ownership. No external cloud
+  dependencies — everything stays inside your Twinbox Kubernetes cluster, behind
+  your own ingress and authentication.
+
+  **Whats included**
+
+  **Nextcloud** — Secure file sync and share with collaboration tools.
+
+  **Outline** — A fast, collaborative knowledge base for your team wiki and documentation.
+
+  **Jitsi** — Private video conferencing with screen sharing, no accounts needed.
+
+
+  **Coming soon**
+
+  **Bureaublad** — The Dutch government portal that brings all workspace tools together.
+
+  **Element** — Secure team chat and messaging powered by the Matrix protocol.
+
+  **Collabora** — Web-based office suite for editing documents, spreadsheets, and presentations.
+
+  **OpenProject** — Project management and team planning.
+
+  **Grist** — Collaborative spreadsheets and databases.
+
+  **Meet** — Private video conferencing and webinars.
+
+  **Docs** — Real-time collaborative text editor and notes.
+
+  **Drive** — File storage, sync, and sharing workspace.
+
+  **Ollama** — Self-hosted AI model serving for local LLM inference.
+
+  **OpenWebUI** — Chat interface for interacting with local AI models.
+
+  **ClamAV** — Antivirus scanning for uploaded files and email.
 apps:
   - install-nextcloud
   - install-outline

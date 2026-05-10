@@ -4,6 +4,60 @@ summary: French sovereign workspace bundle for documents, files, messaging, and 
 order: 30
 iconUrl: /assets/step-icons/install-outline.svg
 iconAlt: La Suite icon
+description: >
+  La Suite is the French government's sovereign workspace, created by DINUM
+  (Direction interministérielle du numérique) for the French public sector.
+  It is already used by over 500,000 agents each month across 15 ministries
+  and numerous administrations.
+
+  La Suite provides a modern, self-hosted digital workplace built on five core
+  principles: Simplicity, Security, Sovereignty, Openness, and Interoperability.
+  All data is stored and processed in France on SecNumCloud-certified
+  infrastructure, and access is unified through ProConnect single sign-on.
+
+  The project is financed by 10 inter-ministerial co-funders and actively
+  integrates AI across its tools — from call transcription in Visio to text
+  improvement in Docs. It is built on open-source standards including Matrix,
+  LiveKit, and Grist Core, and welcomes community contributions through its
+  GitHub organisation.
+
+  Every app in this bundle is deployed through Argo CD GitOps, giving you full
+  control over updates, configuration, and data ownership. No external cloud
+  dependencies — everything stays inside your Twinbox Kubernetes cluster, behind
+  your own ingress and authentication.
+
+  **Whats included**
+
+  **Outline** — A fast, collaborative knowledge base for your team wiki and documentation.
+
+  **Nextcloud** — Secure file sync and share with collaboration tools.
+
+  **Zulip** — Threaded team chat with powerful topic-based organisation.
+
+  **Jitsi** — Private video conferencing with screen sharing, no accounts needed.
+
+
+  **Coming soon**
+
+  **Tchap** — Secure instant messaging for government agents, built on Matrix.
+
+  **Visio** — Video conferencing and webinar platform with AI transcription.
+
+  **Docs** — Real-time collaborative text editor and document workspace.
+
+  **Drive** — File storage, sync, and sharing for teams.
+
+  **Grist** — Collaborative spreadsheets and databases.
+
+  **France Transfert** — Large file send and receive service.
+
+  **Messagerie** — Next-generation email client.
+
+  **Projets** — Project management and team coordination.
+
+  **Recherche** — Federated search across all workspace content.
+
+  **Assistant IA** — AI chatbot and assistant for workplace productivity.
 apps:
   - install-outline
   - install-nextcloud

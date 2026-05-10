@@ -4,6 +4,64 @@ summary: German sovereign workspace bundle for collaboration, search, and meetin
 order: 20
 iconUrl: /assets/step-icons/install-opencloud.svg
 iconAlt: openDesk icon
+description: >
+  openDesk is Germany's sovereign digital workplace, developed by ZenDiS
+  (Zentrum für Digitale Souveränität der Öffentlichen Verwaltung GmbH) — a
+  federal government GmbH. It builds on the "Souveräner Arbeitsplatz" initiative
+  of the Bundesministerium des Innern (BMI), and has been continuously developed
+  by ZenDiS since January 2024.
+
+  openDesk delivers a comprehensive self-hosted collaboration suite covering
+  files, documents, chat, video, email, and project management. It unites all
+  essential office applications under a single user-friendly interface, while
+  remaining modular, operator-independent, and based on open standards.
+
+  The project is hosted on openCode.de, the German government's open-source
+  platform, and is developed in close collaboration with public administration,
+  established open-source companies, and European partners.
+
+  Every app in this bundle is deployed through Argo CD GitOps, giving you full
+  control over updates, configuration, and data ownership. No external cloud
+  dependencies — everything stays inside your Twinbox Kubernetes cluster, behind
+  your own ingress and authentication.
+
+  **Whats included**
+
+  **OpenCloud** — Modern file sync and collaboration with integrated document
+  editing, calendar, and contacts.
+
+  **Nextcloud** — Secure file sync and share with collaboration tools.
+
+  **Zulip** — Threaded team chat with powerful topic-based organisation.
+
+  **Jitsi** — Private video conferencing with screen sharing, no accounts needed.
+
+
+  **Coming soon**
+
+  **Collabora** — Web-based office suite for documents, spreadsheets, and presentations.
+
+  **CryptPad** — Encrypted collaborative documents and diagrams.
+
+  **Element** — Secure team chat and messaging powered by the Matrix protocol.
+
+  **OX App Suite** — Full groupware with email, calendar, and contacts.
+
+  **OpenProject** — Project management and team planning.
+
+  **XWiki** — Enterprise knowledge base and documentation.
+
+  **Notes** — Collaborative note-taking and document editing.
+
+  **Nubus** — Identity and access management with Keycloak, OpenLDAP, and Univention.
+
+  **Postfix** — Mail transfer agent for email delivery.
+
+  **Dovecot** — IMAP server for secure email access.
+
+  **ClamAV** — Antivirus scanning for files and email.
+
+  **Coturn** — TURN server for reliable WebRTC video connectivity.
 apps:
   - install-opencloud
   - install-nextcloud
