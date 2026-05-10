@@ -36,6 +36,8 @@ spec:
                 auth:
                   existingPasswordSecret: zulip-runtime
                   existingSecretPasswordKey: rabbitmq-password
+                  existingErlangSecret: zulip-runtime
+                  existingSecretErlangKey: rabbitmq-erlang-cookie
               redis:
                 auth:
                   existingSecret: zulip-runtime
