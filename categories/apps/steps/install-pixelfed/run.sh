@@ -216,9 +216,11 @@ authentik_ensure_token
 authentik_setup_forward
 
 AUTHENTIK_HOST="${AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
-pixelfed_sso_authorize_url="${AUTHENTIK_HOST%/}/application/o/${pixelfed_sso_application_slug}/authorize/"
-pixelfed_sso_token_url="${AUTHENTIK_HOST%/}/application/o/${pixelfed_sso_application_slug}/token/"
-pixelfed_sso_profile_url="${AUTHENTIK_HOST%/}/application/o/${pixelfed_sso_application_slug}/userinfo/"
+# Authentik OAuth2 endpoints: authorize, token and userinfo are global;
+# end-session is per-application.
+pixelfed_sso_authorize_url="${AUTHENTIK_HOST%/}/application/o/authorize/"
+pixelfed_sso_token_url="${AUTHENTIK_HOST%/}/application/o/token/"
+pixelfed_sso_profile_url="${AUTHENTIK_HOST%/}/application/o/userinfo/"
 pixelfed_sso_logout_url="${AUTHENTIK_HOST%/}/application/o/${pixelfed_sso_application_slug}/end-session/"
 
 authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
