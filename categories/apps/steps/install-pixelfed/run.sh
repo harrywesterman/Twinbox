@@ -197,25 +197,6 @@ pixelfed_secret_file="$(mktemp "${TMPDIR:-/tmp}/pixelfed-bootstrap.XXXXXX.json")
 pixelfed_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/pixelfed-application.XXXXXX.yaml")"
 trap 'rm -f "$pixelfed_secret_file" "$pixelfed_rendered_manifest"' EXIT
 
-log "Applying Pixelfed database manifests"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/namespace.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/pixelfed/externalsecret.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/pixelfed/cluster.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/pixelfed/pooler-ro.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/pixelfed/pooler-rw.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/pixelfed/pooler-rw-session.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/pixelfed/scheduled-backup.yaml"
-
-wait_for_resource_ready "databases" "externalsecret/pixelfed-db-credentials" "Ready" "Pixelfed database ExternalSecret"
-wait_for_resource_ready "databases" "cluster/pixelfed-db" "Ready" "Pixelfed CloudNativePG cluster"
-wait_for_resource_ready "databases" "deployment/pixelfed-db-pooler-ro" "Available" "Pixelfed read-only pooler"
-wait_for_resource_ready "databases" "deployment/pixelfed-db-pooler-rw" "Available" "Pixelfed read-write pooler"
-wait_for_resource_ready "databases" "deployment/pixelfed-db-pooler-rw-session" "Available" "Pixelfed session pooler"
-
-bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
-  --app-id "pixelfed" \
-  --host "pixelfed-db-pooler-rw-session.databases.svc.cluster.local"
-
 log "Provisioning Authentik OIDC client for Pixelfed"
 authentik_ensure_token
 authentik_setup_forward
@@ -329,6 +310,25 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "pixelfed" \
   --json-file "$pixelfed_secret_file" \
   --required-keys "APP_KEY,PIXELFED_POSTGRESQL__USERNAME,PIXELFED_POSTGRESQL__PASSWORD,PF_OIDC_CLIENT_ID,PF_OIDC_CLIENT_SECRET,PF_OIDC_AUTHORIZE_URL,PF_OIDC_TOKEN_URL,PF_OIDC_PROFILE_URL,PF_OIDC_LOGOUT_URL"
+
+log "Applying Pixelfed database manifests"
+kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/namespace.yaml"
+kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/pixelfed/externalsecret.yaml"
+kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/pixelfed/cluster.yaml"
+kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/pixelfed/pooler-ro.yaml"
+kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/pixelfed/pooler-rw.yaml"
+kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/pixelfed/pooler-rw-session.yaml"
+kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/pixelfed/scheduled-backup.yaml"
+
+wait_for_resource_ready "databases" "externalsecret/pixelfed-db-credentials" "Ready" "Pixelfed database ExternalSecret"
+wait_for_resource_ready "databases" "cluster/pixelfed-db" "Ready" "Pixelfed CloudNativePG cluster"
+wait_for_resource_ready "databases" "deployment/pixelfed-db-pooler-ro" "Available" "Pixelfed read-only pooler"
+wait_for_resource_ready "databases" "deployment/pixelfed-db-pooler-rw" "Available" "Pixelfed read-write pooler"
+wait_for_resource_ready "databases" "deployment/pixelfed-db-pooler-rw-session" "Available" "Pixelfed session pooler"
+
+bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
+  --app-id "pixelfed" \
+  --host "pixelfed-db-pooler-rw-session.databases.svc.cluster.local"
 
 log "Applying Pixelfed Argo CD application"
 sed "s/__ZONE_NAME__/${public_zone_name}/g" \
