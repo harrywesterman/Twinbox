@@ -73,10 +73,24 @@ find_application_json_by_slug() {
   local response
 
   response="$(authentik_api_get "/core/applications/?slug=$(printf '%s' "$application_slug" | jq -sRr @uri)")"
-  jq -c \
+  local match
+  match="$(jq -c \
     --arg application_slug "$application_slug" \
     '.results[]?
-      | select((.slug // "") == $application_slug)' <<<"$response" | head -n1
+      | select((.slug // "") == $application_slug)' <<<"$response" | head -n1)"
+  if [[ -n "$match" ]]; then
+    printf '%s\n' "$match"
+    return 0
+  fi
+
+  # Fallback: direct lookup by slug (Authentik list filter can be unreliable)
+  response="$(authentik_api_get "/core/applications/${application_slug}/" 2>/dev/null || true)"
+  if [[ -n "$response" ]] && jq -e --arg slug "$application_slug" '(.slug // "") == $slug' >/dev/null 2>&1 <<<"$response"; then
+    printf '%s\n' "$response"
+    return 0
+  fi
+
+  return 0
 }
 
 create_or_update_provider() {
