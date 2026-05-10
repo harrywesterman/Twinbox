@@ -37,4 +37,5 @@ terraform.tfvars.json
 skills/
 skills-lock.json
 .github
+.playwright-mcp/
 .ruff_cache
