@@ -3,15 +3,15 @@ prometheus:
     serviceMonitorSelectorNilUsesHelmValues: false
     podMonitorSelectorNilUsesHelmValues: false
     ruleSelectorNilUsesHelmValues: false
-    scrapeInterval: 60s
-    retention: 7d
+    scrapeInterval: 300s
+    retention: 2d
     retentionSize: 10GB
     resources:
       requests:
         memory: 512Mi
         cpu: 250m
       limits:
-        memory: 2Gi
+        memory: 512Mi
         cpu: 1000m
     storageSpec:
       volumeClaimTemplate:
@@ -21,7 +21,7 @@ prometheus:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 20Gi
+              storage: 10Gi
 
   alertmanager:
     enabled: true
@@ -42,7 +42,7 @@ prometheus:
               - ReadWriteOnce
             resources:
               requests:
-                storage: 5Gi
+                storage: 2Gi
 
 grafana:
   enabled: false
