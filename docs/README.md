@@ -53,6 +53,7 @@ Operational documentation for Twinbox.
 
 - [`cloudtty.md`](./cloudtty.md) — Browser-based Kubernetes shell.
 - [`argocd-image-updater.md`](./argocd-image-updater.md) — Automated image updates through Argo CD.
+- [`renovate.md`](./renovate.md) — Automated dependency and Helm chart updates via Renovate.
 - [`management-consoles.md`](./management-consoles.md) — Operator web consoles (Proxmox, Longhorn, SeaweedFS).
 
 ### Operations
