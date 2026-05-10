@@ -209,7 +209,7 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert 'openbao_read_global_secret_json zulip-runtime' in run_text
     assert 'sync-openbao-global-secret.sh' in run_text
     assert '--secret-name "zulip-runtime"' in run_text
-    assert '--required-keys "ZULIP_RABBITMQ_PASSWORD,ZULIP_REDIS_PASSWORD"' in run_text
+    assert '--required-keys "ZULIP_RABBITMQ_PASSWORD,ZULIP_RABBITMQ_ERLANG_COOKIE,ZULIP_REDIS_PASSWORD"' in run_text
     assert 'zulip_config_secret_json' in run_text
     assert 'zulip_runtime_secret_json' in run_text
     assert 'LOADBALANCER_IPS' not in run_text
@@ -230,6 +230,8 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "ZULIP_DEFAULT_REALM_OWNER_NAME:" not in app_text
     assert "existingPasswordSecret: zulip-runtime" in app_text
     assert "existingSecretPasswordKey: rabbitmq-password" in app_text
+    assert "existingErlangSecret: zulip-runtime" in app_text
+    assert "existingSecretErlangKey: rabbitmq-erlang-cookie" in app_text
     assert "existingSecret: zulip-runtime" in app_text
     assert "existingSecretPasswordKey: redis-password" in app_text
     assert "LOADBALANCER_IPS" not in app_text
@@ -264,6 +266,8 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "property: ZULIP_RABBITMQ_PASSWORD" in runtime_secret_text
     assert "secretKey: redis-password" in runtime_secret_text
     assert "property: ZULIP_REDIS_PASSWORD" in runtime_secret_text
+    assert "secretKey: rabbitmq-erlang-cookie" in runtime_secret_text
+    assert "property: ZULIP_RABBITMQ_ERLANG_COOKIE" in runtime_secret_text
     assert "verify_zulip_bootstrap" in run_text
     assert "find_statefulset_pod" in run_text
     assert "OnboardingUserMessage" in run_text
