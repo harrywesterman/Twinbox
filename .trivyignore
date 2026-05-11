@@ -1,0 +1,23 @@
+# Trivy ignore rules for Twinbox
+# See: https://aquasecurity.github.io/trivy/latest/docs/configuration/filtering/#trivyignore
+
+# CVE-2026-33671: picomatch Regular Expression Denial of Service
+# Location: npm transitive dependency (node_modules/picomatch)
+# Status: Fixed in picomatch 4.0.4, but npm 11.x bundles 4.0.3 internally.
+# Risk: LOW for our use case — picomatch is used only at build time / dev tooling.
+# Action: Will be resolved automatically when npm updates its bundled version.
+CVE-2026-33671
+
+# CVE-2026-34986: go-jose/v4 vulnerability
+# Location: /usr/local/bin/tofu, /usr/local/bin/helm, /usr/local/bin/kubectl
+# Status: Fixed in go-jose 4.1.4, awaiting upstream releases.
+# Risk: MEDIUM — these are CLI tools, not long-running services.
+# Action: Will be resolved when OpenTofu, Helm, and kubectl release new builds.
+CVE-2026-34986
+
+# CVE-2026-33186: google.golang.org/grpc CRITICAL vulnerability
+# Location: /usr/local/bin/tofu, /usr/local/bin/helm, /usr/local/bin/kubectl
+# Status: Fixed in grpc-go 1.79.3, awaiting upstream releases.
+# Risk: MEDIUM — these are CLI tools, not long-running services.
+# Action: Will be resolved when OpenTofu, Helm, and kubectl release new builds.
+CVE-2026-33186
