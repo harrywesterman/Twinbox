@@ -880,8 +880,7 @@ def test_opencloud_step_uses_global_issuer_for_all_providers():
 
     assert 'issuer_mode: "global"' in text
     assert 'issuer_mode: "per_provider"' not in text
-    assert 'opencloud_oc_oidc_issuer="${AUTHENTIK_HOST}/"' in text
-    assert 'opencloud_oc_oidc_issuer="${AUTHENTIK_HOST}/application/o/opencloud/"' not in text
+    assert 'opencloud_oc_oidc_issuer="${AUTHENTIK_HOST}/application/o/opencloud/"' in text
 
 
 def test_opencloud_gitops_uses_schema_backed_writable_ldap_bootstrap():

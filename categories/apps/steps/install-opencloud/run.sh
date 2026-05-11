@@ -332,7 +332,7 @@ if command -v openbao_read_global_secret_json >/dev/null 2>&1; then
 fi
 
 opencloud_oc_url="${OPENCLOUD_HOST}"
-opencloud_oc_oidc_issuer="${AUTHENTIK_HOST}/"
+opencloud_oc_oidc_issuer="${AUTHENTIK_HOST}/application/o/opencloud/"
 opencloud_web_edit_link="${AUTHENTIK_HOST}/if/user/"
 opencloud_oc_jwt_secret="$(openssl rand -hex 32)"
 opencloud_wopi_secret="$(openssl rand -hex 32)"
@@ -465,7 +465,7 @@ opencloud_collaboration_app_icon="${COLLABORA_HOST}/favicon.ico"
 
 # Use Authentik global issuer so all OpenCloud providers (web, android,
 # desktop, ios) issue tokens with the same issuer URL.
-opencloud_oc_oidc_issuer="${AUTHENTIK_HOST}/"
+opencloud_oc_oidc_issuer="${AUTHENTIK_HOST}/application/o/opencloud/"
 
 opencloud_secret_file="$(mktemp "${TMPDIR:-/tmp}/opencloud-bootstrap-XXXXXX")"
 opencloud_rendered_overlay="$(mktemp -d "${TMPDIR:-/tmp}/opencloud-overlay.XXXXXX")"
