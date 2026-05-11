@@ -2808,10 +2808,10 @@ def test_provision_step_rebuilds_completed_clusters_with_a_new_session():
     text = APP_JSX.read_text(encoding="utf-8")
 
     assert "shouldReuseProvisionClusterSession" in text
-    assert "['bootstrapped', 'provisioned']" in text
-    assert "step.id === 'provision-nodes'" in text
+    assert '["bootstrapped", "provisioned"]' in text
+    assert 'step.id === "provision-nodes"' in text
     assert "body.cluster_instance_id = clusterInstanceIdRef.current" in text
-    assert "if (step.id === 'provision-nodes')" in text
+    assert 'if (step.id === "provision-nodes")' in text
     assert "else if (clusterInstanceIdRef.current)" in text
     assert "cluster?.status" in text
 

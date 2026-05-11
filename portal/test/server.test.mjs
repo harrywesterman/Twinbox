@@ -1038,7 +1038,7 @@ test("portal app launches open in a new tab", async () => {
     path.join(repoRoot, "portal", "src", "App.jsx"),
     "utf8"
   );
-  assert.match(source, /window\.open\(url,\s*'_blank',\s*'noopener,noreferrer'\)/);
+  assert.match(source, /window\.open\(url,\s*"_blank",\s*"noopener,noreferrer"\)/);
 });
 
 test("portal menu popover sits above the page content", async () => {

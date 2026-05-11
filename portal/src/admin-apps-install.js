@@ -165,6 +165,14 @@ export function isAdminAppInstallEnabled(card = {}) {
 
 export function getAdminAppInstallButtonState(card = {}) {
   if (isAdminAppInstallEnabled(card)) {
+    if (card.app_state === "installed") {
+      return {
+        enabled: true,
+        label: "Uninstall",
+        buttonClassName: "secondary-button",
+      };
+    }
+
     return {
       enabled: true,
       label: "Install",
