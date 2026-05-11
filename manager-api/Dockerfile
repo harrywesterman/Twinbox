@@ -1,10 +1,10 @@
-FROM node:24-bookworm-slim
+FROM node:24-alpine
 
 WORKDIR /opt/twinbox
 
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates curl iproute2 iputils-ping \
-  && rm -rf /var/lib/apt/lists/*
+RUN apk update \
+  && apk add --no-cache ca-certificates curl iproute2 iputils-ping \
+  && rm -rf /var/cache/apk/*
 
 COPY manager-api/package.json ./manager-api/package.json
 RUN cd /opt/twinbox/manager-api && npm install --omit=dev

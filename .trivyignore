@@ -1,6 +1,0 @@
-# zlib CVE causing false-positive build failures.
-# The vulnerability is in zlib's zip file handling which is not used
-# by our Node.js applications. The Debian package maintainers have
-# marked it as "will_not_fix" because the affected code path is not
-# exposed in standard usage.
-CVE-2023-45853
