@@ -743,16 +743,30 @@ for provider_name in "OpenCloud Desktop" "OpenCloud Android" "OpenCloud iOS" "Cy
         client_type: "public",
         authorization_flow: $authorization_flow,
         invalidation_flow: $invalidation_flow,
-      signing_key: $signing_key,
-      issuer_mode: "per_provider",
-      include_claims_in_id_token: true,
-      property_mappings: $property_mappings,
-      redirect_uris: $redirect_uris
-    }' \
-    --argjson property_mappings "$opencloud_property_mapping_ids_json"
+        signing_key: $signing_key,
+        issuer_mode: "per_provider",
+        include_claims_in_id_token: true,
+        property_mappings: $property_mappings,
+        redirect_uris: $redirect_uris
+      }' \
+      --argjson property_mappings "$opencloud_property_mapping_ids_json"
   )"
   provider_pk="$(create_or_update_provider "$provider_name" "$slug" "$provider_payload")"
   [[ -n "$provider_pk" ]] || fail "Authentik did not return a provider ID for ${provider_name}"
+
+  application_payload="$(
+    jq -n \
+      --arg name "$provider_name" \
+      --arg slug "$slug" \
+      --arg provider_pk "$provider_pk" \
+      '{
+        name: $name,
+        slug: $slug,
+        provider: ($provider_pk | tonumber)
+      }'
+  )"
+  application_pk="$(create_or_update_application "$slug" "$application_payload")"
+  [[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for ${provider_name}"
 done
 
 log "Rendering OpenCloud GitOps overlay"

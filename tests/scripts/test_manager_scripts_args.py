@@ -846,6 +846,23 @@ def test_opencloud_step_enables_external_idp_autoprovisioning_and_ldap_checks():
     assert "ldapsearch -H ldaps://127.0.0.1:1636" in text
 
 
+def test_opencloud_step_creates_authentik_applications_for_mobile_and_desktop_clients():
+    text = OPENCLOUD_STEP_SCRIPT.read_text(encoding="utf-8")
+
+    for client_name, slug in [
+        ("OpenCloud Desktop", "opencloud-desktop"),
+        ("OpenCloud Android", "opencloud-android"),
+        ("OpenCloud iOS", "opencloud-ios"),
+        ("Cyberduck", "opencloud-cyberduck"),
+    ]:
+        assert f'"{client_name}"' in text
+        assert f'slug="{slug}"' in text
+
+    assert 'application_payload="$(' in text
+    assert 'application_pk="$(create_or_update_application' in text
+    assert 'fail "Authentik did not return an application ID for ${provider_name}"' in text
+
+
 def test_opencloud_gitops_uses_schema_backed_writable_ldap_bootstrap():
     platform_dir = REPO_ROOT / "gitops" / "platform-apps" / "opencloud"
     kustomization_text = (platform_dir / "kustomization.yaml").read_text(encoding="utf-8")
