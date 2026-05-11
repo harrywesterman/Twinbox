@@ -1,12 +1,11 @@
-FROM node:24-bookworm-slim
+FROM node:24-alpine
 
 WORKDIR /opt/twinbox
 
 COPY config ./config
 
-RUN apt-get update \
-  && apt-get upgrade -y --no-install-recommends \
-  && apt-get install -y --no-install-recommends bash ca-certificates curl jq openssl python3 tar xz-utils sudo \
+RUN apk update \
+  && apk add --no-cache bash ca-certificates curl jq openssl python3 tar xz sudo \
   && . /opt/twinbox/config/pinned-defaults.sh \
   && curl -fsSL "https://github.com/siderolabs/talos/releases/download/${PINNED_TALOS_VERSION}/talosctl-linux-amd64" -o /tmp/talosctl \
   && curl -fsSL "https://github.com/opentofu/opentofu/releases/download/${PINNED_OPENTOFU_VERSION}/tofu_${PINNED_OPENTOFU_VERSION#v}_linux_amd64.tar.gz" -o /tmp/tofu.tar.gz \
@@ -22,8 +21,7 @@ RUN apt-get update \
   && chmod +x /usr/local/bin/tofu \
   && chmod +x /usr/local/bin/kubectl \
   && chmod +x /usr/local/bin/helm \
-  && rm -rf /tmp/talosctl /tmp/tofu /tmp/tofu.tar.gz /tmp/kubectl /tmp/helm.tar.gz /tmp/linux-amd64 \
-  && rm -rf /var/lib/apt/lists/*
+  && rm -rf /tmp/talosctl /tmp/tofu /tmp/tofu.tar.gz /tmp/kubectl /tmp/helm.tar.gz /tmp/linux-amd64
 
 COPY manager-worker/package.json ./manager-worker/package.json
 COPY manager-worker/package-lock.json ./manager-worker/package-lock.json
