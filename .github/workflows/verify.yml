@@ -23,6 +23,7 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: |
+            package-lock.json
             manager-api/package-lock.json
             manager-web/package-lock.json
             manager-worker/package-lock.json
@@ -38,6 +39,7 @@ jobs:
       - name: Install test dependencies
         run: |
           python -m pip install -r requirements-test.txt
+          npm ci
           npm ci --prefix manager-api
           npm ci --prefix manager-web
           npm ci --prefix manager-worker
@@ -49,7 +51,7 @@ jobs:
           npm run lint --prefix manager-web
           npm run lint --prefix manager-worker
           npm run lint --prefix portal
-          npx eslint lib/ scripts/
+          ./node_modules/.bin/eslint lib/ scripts/
           npm run format:check --prefix manager-api
           npm run format:check --prefix manager-web
           npm run format:check --prefix manager-worker
