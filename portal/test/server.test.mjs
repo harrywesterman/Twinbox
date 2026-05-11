@@ -5,10 +5,10 @@ import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
 
-const repoRoot = "/Users/harrywesterman/Documents/Twinbox";
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "twinbox-portal-test-"));
 const configPath = path.join(workspaceRoot, "portal-config.json");
 const dataDir = path.join(workspaceRoot, "data");
