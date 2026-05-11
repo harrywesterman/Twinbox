@@ -1,0 +1,8 @@
+# Git Blame Ignore Revs
+# Usage: git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# This file lists commits that should be ignored by git blame.
+# Primarily used for mass formatting/reformatting commits to keep git blame useful.
+
+# Mass linting/formatting: Add ESLint, Prettier, and Ruff
+e6a0b511b93475205601d17b4956100ee4284d0b
