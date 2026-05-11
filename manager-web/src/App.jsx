@@ -780,26 +780,47 @@ const WIZARD_GUIDES = {
     },
   },
   "configure-cloudflare-dns": {
-    eyebrow: "Cloudflare setup",
-    title: "Create the DNS records in Cloudflare",
+    eyebrow: "Wiredoor DNS",
+    title: "Create the Wiredoor DNS A records",
     intro:
-      "This step creates the DNS records that point your public hostnames to the Wiredoor bastion host. You only need a Cloudflare API token and your domain name.",
+      "This step creates DNSEndpoint resources for the Wiredoor bastion hostnames. External DNS picks them up and creates the A records automatically. No token needed here; the provider was already configured in the Configure DNS step.",
     checklist: [
-      "Create a Cloudflare token with DNS edit permission.",
-      "Pick the domain you already own or added to Cloudflare.",
-      "Paste the token and domain name into Twinbox.",
-      "Let Twinbox create the A and wildcard records for you.",
+      "DNS provider is already configured.",
+      "Twinbox reads the Wiredoor IP from the bastion secrets.",
+      "A and wildcard records are created via external-dns.",
     ],
-    screenshotTitle: "DNS token checklist",
+    screenshotTitle: "Wiredoor DNS records",
     screenshotLines: [
-      "Zone DNS Edit permission",
-      "Your domain name",
-      "Twinbox writes the required records automatically",
-      "No manual zone editing after this",
+      "DNS provider already configured",
+      "Wiredoor IP from bastion secrets",
+      "Records created automatically via external-dns",
     ],
     helpLink: {
-      label: "Cloudflare DNS",
-      href: "https://developers.cloudflare.com/dns/",
+      label: "External DNS documentation",
+      href: "https://github.com/kubernetes-sigs/external-dns",
+    },
+  },
+  "configure-dns": {
+    eyebrow: "DNS",
+    title: "Configure automatic DNS management",
+    intro:
+      "Twinbox uses external-dns to create and update DNS records in your provider automatically. You only need to choose the provider and paste your API token once.",
+    checklist: [
+      "Pick the DNS provider that hosts your domain.",
+      "Paste the API token or access key.",
+      "Add the API secret only if your provider requires one (e.g. AWS).",
+      "Twinbox stores the credentials securely and starts external-dns.",
+    ],
+    screenshotTitle: "Provider selection",
+    screenshotLines: [
+      "Cloudflare, AWS, DigitalOcean, Google",
+      "API token field",
+      "Optional secret field",
+      "One-click deploy",
+    ],
+    helpLink: {
+      label: "External DNS documentation",
+      href: "https://github.com/kubernetes-sigs/external-dns",
     },
   },
   "configure-metallb-ingress": {

@@ -1,0 +1,57 @@
+id: configure-dns
+title: Configure DNS Provider
+type: action
+journey_stage: setup
+order: 21
+summary: Choose your DNS provider and give Twinbox an API token so it can manage DNS records automatically.
+explanation: >
+  This step installs external-dns in your cluster and stores your DNS provider
+  credentials. After this, all ingress steps will create DNS records through
+  external-dns instead of using direct API calls or OpenTofu.
+side_help: >
+  Pick the DNS provider where your domain is registered. Twinbox needs an API
+  token with permission to create DNS records (e.g. Zone DNS Edit for
+  Cloudflare). The token is stored in a Kubernetes Secret in the
+  external-dns namespace.
+depends_on:
+  - install-cloudnativepg
+inputs:
+  - id: dns_domain
+    label: DNS Domain
+    type: string
+    required: true
+    help: Your domain name (e.g. example.com)
+  - id: dns_provider
+    label: DNS Provider
+    type: string
+    required: true
+    help: Choose the DNS provider that hosts your domain.
+    options:
+      - label: Cloudflare
+        value: cloudflare
+      - label: AWS Route 53
+        value: aws
+      - label: DigitalOcean
+        value: digitalocean
+      - label: Google Cloud DNS
+        value: google
+  - id: dns_api_token
+    label: API Token / Access Key
+    type: string
+    required: true
+    help: API token with DNS zone edit permissions.
+  - id: dns_api_secret
+    label: API Secret Key (optional)
+    type: string
+    required: false
+    help: Only required for AWS (Secret Access Key). Leave empty for Cloudflare, DigitalOcean.
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/configure-dns/run.sh

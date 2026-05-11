@@ -18,6 +18,7 @@ depends_on:
   - install-secret-sync
   - install-traefik
   - install-authentik-idp
+  - configure-dns
   - create-users-and-groups
 ingress_route: netbird
 inputs:

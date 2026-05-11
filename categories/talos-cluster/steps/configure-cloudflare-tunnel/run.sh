@@ -197,64 +197,25 @@ EOF
 trap 'rm -f "$cloudflare_tunnel_manifest"' EXIT
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Rendered cloudflare-tunnel application to $cloudflare_tunnel_manifest"
 
-# Step 4: Create DNS CNAME record pointing to the tunnel
+# Step 4: Create DNS CNAME record via external-dns DNSEndpoint
 dns_record_name="*.${public_zone_name}"
 dns_record_content="${cf_tunnel_id}.cfargotunnel.com"
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Looking up DNS CNAME record for ${dns_record_name}"
-dns_lookup_response="$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${cf_zone_id}/dns_records?type=CNAME&per_page=5000" \
-  -H "Authorization: Bearer $cf_api_token" \
-  -H "Content-Type: application/json")"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating DNSEndpoint for tunnel CNAME: ${dns_record_name} -> ${dns_record_content}"
 
-dns_lookup_success="$(echo "$dns_lookup_response" | jq -r '.success // false')"
-if [[ "$dns_lookup_success" != "true" ]]; then
-  dns_lookup_error="$(echo "$dns_lookup_response" | jq -r '.errors[0].message // "Unknown error"')"
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: DNS lookup failed: $dns_lookup_error"
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Falling back to DNS create"
-  dns_record_id=""
-else
-  dns_record_id="$(echo "$dns_lookup_response" | jq -r --arg name "$dns_record_name" '.result[]? | select(.name == $name) | .id' | head -n1)"
-fi
-
-if [[ -n "$dns_record_id" ]]; then
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] DNS record already exists: $dns_record_id"
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Updating DNS CNAME record for tunnel"
-  dns_response="$(curl -s -X PATCH "https://api.cloudflare.com/client/v4/zones/${cf_zone_id}/dns_records/${dns_record_id}" \
-    -H "Authorization: Bearer $cf_api_token" \
-    -H "Content-Type: application/json" \
-    -d "{
-      \"type\":\"CNAME\",
-      \"name\":\"${dns_record_name}\",
-      \"content\":\"${dns_record_content}\",
-      \"proxied\":true,
-      \"ttl\":1
-    }")"
-else
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating DNS CNAME record for tunnel"
-  dns_response="$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${cf_zone_id}/dns_records" \
-    -H "Authorization: Bearer $cf_api_token" \
-    -H "Content-Type: application/json" \
-    -d "{
-      \"type\":\"CNAME\",
-      \"name\":\"${dns_record_name}\",
-      \"content\":\"${dns_record_content}\",
-      \"proxied\":true,
-      \"ttl\":1
-    }")"
-fi
-
-dns_success="$(echo "$dns_response" | jq -r '.success // false')"
-if [[ "$dns_success" != "true" ]]; then
-  dns_error="$(echo "$dns_response" | jq -r '.errors[0].message // "Unknown error"')"
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: DNS record upsert failed: $dns_error"
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] You may need a Cloudflare token with Zone DNS Edit permissions, or create the DNS record manually"
-else
-  dns_record_id="$(echo "$dns_response" | jq -r '.result.id // empty')"
-  if [[ -n "$dns_record_id" ]]; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] DNS record upserted: $dns_record_id"
-  else
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] DNS record upserted"
-  fi
-fi
+kubectl apply -f - <<EOF
+apiVersion: externaldns.k8s.io/v1alpha1
+kind: DNSEndpoint
+metadata:
+  name: cloudflare-tunnel-dns
+  namespace: external-dns
+spec:
+  endpoints:
+    - dnsName: "${dns_record_name}"
+      recordType: CNAME
+      targets:
+        - "${dns_record_content}"
+      recordTTL: 300
+EOF
 
 # Step 5: Store credentials as global secret
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Writing Cloudflare Tunnel credentials to secrets"

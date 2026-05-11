@@ -17,6 +17,7 @@ depends_on:
   - install-secret-sync
   - provision-wiredoor-bastion
   - choose-ingress-route
+  - configure-dns
 ingress_route: wiredoor
 inputs:
   - id: wiredoor_url

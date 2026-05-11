@@ -17,6 +17,7 @@ side_help: >
 depends_on:
   - install-secret-sync
   - choose-ingress-route
+  - configure-dns
 ingress_route: metallb
 inputs:
   - id: metallb_ip_range

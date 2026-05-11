@@ -4,10 +4,11 @@ type: config
 journey_stage: setup
 order: 22
 summary: Choose which ingress branch Twinbox should expose for this cluster.
-explanation: This step records the ingress strategy you want to use and the DNS domain that will back the platform hostnames. It does not change the apps themselves, only which branch of ingress-specific infrastructure the wizard shows next.
-side_help: Pick one ingress route and enter the base DNS domain you want to use. On Cloudflare Free, Cloudflare Tunnel is shown only for prd clusters. Non-prd clusters keep the slug-prefixed hostname model, so tst with example.com becomes tst.example.com. prd uses hostnames directly under the base domain, such as authentik.example.com.
+explanation: This step records the ingress strategy you want to use. It does not change the apps themselves, only which branch of ingress-specific infrastructure the wizard shows next.
+side_help: Pick one ingress route. The DNS domain was already configured in the previous step. Non-prd clusters keep the slug-prefixed hostname model, so tst with example.com becomes tst.example.com. prd uses hostnames directly under the base domain, such as authentik.example.com.
 depends_on:
   - install-cloudnativepg
+  - configure-dns
 inputs:
   - id: ingress_route
     label: Ingress Route
@@ -25,11 +26,6 @@ inputs:
         value: metallb
       - label: Tailscale
         value: tailscale
-  - id: dns_domain
-    label: DNS Domain
-    type: string
-    required: true
-    help: Base zone for platform hostnames. Twinbox prefixes the cluster slug for non-prd clusters, so tst with example.com becomes tst.example.com. prd uses hostnames directly under the base domain, such as authentik.example.com.
 runner:
   kind: script
   script: categories/talos-cluster/steps/choose-ingress-route/run.sh

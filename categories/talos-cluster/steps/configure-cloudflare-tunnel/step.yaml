@@ -6,24 +6,25 @@ order: 26
 summary: Expose services through a Cloudflare Tunnel (cloudflared).
 explanation: >
   This step creates or reuses the Cloudflare tunnel, asks Cloudflare for a
-  tunnel token, and writes the DNS CNAME for the selected public zone. On
-  Cloudflare Free, Twinbox only shows this step for prd clusters. Use one
-  custom Cloudflare API token with both Account > Cloudflare Tunnel > Edit and
-  Zone > DNS > Edit on the zone you selected in the ingress step.
+  tunnel token, and creates a DNSEndpoint for the CNAME record (external-dns
+  handles the actual DNS record). On Cloudflare Free, Twinbox only shows this
+  step for prd clusters. The DNS provider was already set up in the Configure
+  DNS step before this.
 side_help: >
   Create one Cloudflare custom API token for Twinbox:
   1. Open Cloudflare Dashboard → My Profile → API Tokens → Create Token → Create Custom Token.
-  2. Add two permissions:
+  2. Add one permission:
      - Account → Cloudflare Tunnel → Edit
-     - Zone → DNS → Edit
-  3. Scope the token to your Cloudflare account and to the specific zone you
-     selected in the ingress step.
-  4. Copy that single token into Twinbox. Do not create a second DNS-only token.
-  5. This step is only available for prd clusters on Cloudflare Free.
+  3. Scope the token to your Cloudflare account.
+  4. Copy that single token into Twinbox.
+  5. The DNS provider was already configured separately in the Configure DNS
+     step (requires Zone → DNS → Edit).
+  6. This step is only available for prd clusters on Cloudflare Free.
   Cloudflare Tunnel requires no public IP or port forwarding.
 depends_on:
   - install-secret-sync
   - choose-ingress-route
+  - configure-dns
 ingress_route: cloudflare-tunnel
 inputs:
   - id: cf_api_token

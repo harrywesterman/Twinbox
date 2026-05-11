@@ -1,0 +1,66 @@
+provider:
+  name: __DNS_PROVIDER__
+
+sources:
+  - crd
+
+policy: sync
+
+domainFilters:
+  - __DNS_ZONE__
+
+managedRecordTypes:
+  - A
+  - CNAME
+  - TXT
+
+extraArgs:
+  - --managed-record-types=A
+  - --managed-record-types=CNAME
+  - --managed-record-types=TXT
+
+env:
+  - name: CF_API_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: external-dns-credentials
+        key: token
+        optional: true
+  - name: AWS_ACCESS_KEY_ID
+    valueFrom:
+      secretKeyRef:
+        name: external-dns-credentials
+        key: access-key
+        optional: true
+  - name: AWS_SECRET_ACCESS_KEY
+    valueFrom:
+      secretKeyRef:
+        name: external-dns-credentials
+        key: secret-key
+        optional: true
+  - name: DO_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: external-dns-credentials
+        key: token
+        optional: true
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    valueFrom:
+      secretKeyRef:
+        name: external-dns-credentials
+        key: google-credentials
+        optional: true
+
+serviceAccount:
+  annotations: {}
+
+rbac:
+  create: true
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi

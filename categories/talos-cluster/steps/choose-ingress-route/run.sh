@@ -21,8 +21,8 @@ cluster_slug_lower="$(printf '%s' "$cluster_slug" | tr '[:upper:]' '[:lower:]')"
 [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
 
 ingress_route="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.ingress_route')"
-dns_domain="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.dns_domain')"
-public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$dns_domain")"
+dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty')"
+public_zone_name="$(printf '%s' "$cluster_json" | jq -r '.public_zone_name // empty')"
 
 case "$ingress_route" in
   wiredoor|cloudflare-tunnel|metallb|tailscale|netbird) ;;
@@ -35,8 +35,13 @@ if [[ "$ingress_route" == "cloudflare-tunnel" && "$cluster_slug_lower" != "prd" 
   fail "Cloudflare Tunnel is only available for prd clusters on Cloudflare Free"
 fi
 
-[[ -n "$dns_domain" ]] || fail "DNS domain is required"
+[[ -n "$dns_domain" ]] || fail "DNS domain is required. Please run the Configure DNS step first."
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
+
+# Recompute public_zone_name from dns_domain if not already set
+if [[ -z "$public_zone_name" ]]; then
+  public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$dns_domain")"
+fi
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Selected ingress route: $ingress_route"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Base DNS domain: $dns_domain"
@@ -47,9 +52,8 @@ if [[ -f "$cluster_file" ]]; then
   tmp_file="$(mktemp)"
   jq \
     --arg ingress_route "$ingress_route" \
-    --arg dns_domain "$dns_domain" \
     --arg public_zone_name "$public_zone_name" \
-    '.selected_ingress_route = $ingress_route | .dns_domain = $dns_domain | .public_zone_name = $public_zone_name' \
+    '.selected_ingress_route = $ingress_route | .public_zone_name = $public_zone_name' \
     "$cluster_file" > "$tmp_file"
   mv "$tmp_file" "$cluster_file"
 fi
