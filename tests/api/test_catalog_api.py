@@ -248,7 +248,6 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 input_def["id"] for input_def in talos_steps["choose-ingress-route"]["inputs"]
             ] == [
                 "ingress_route",
-                "dns_domain",
             ]
             assert [
                 option["value"]
@@ -260,8 +259,6 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "metallb",
                 "tailscale",
             ]
-            assert talos_steps["choose-ingress-route"]["inputs"][1]["id"] == "dns_domain"
-            assert talos_steps["choose-ingress-route"]["inputs"][1]["required"] is True
             assert talos_steps["install-grafana"]["icon"] == "📈"
         finally:
             proc.terminate()

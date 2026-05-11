@@ -1285,24 +1285,23 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "value: wiredoor" in choose_ingress_text
     assert "value: metallb" in choose_ingress_text
     assert "depends_on:" in choose_ingress_text
-    assert "dns_domain" in choose_ingress_text
-    assert "DNS Domain" in choose_ingress_text
+    assert "dns_domain" not in choose_ingress_text
+    assert "DNS Domain" not in choose_ingress_text
     assert "Cloudflare Tunnel is shown only for prd clusters" in choose_ingress_text
     assert "Non-prd clusters keep the slug-prefixed hostname model" in choose_ingress_text
     assert (
         "Cloudflare Tunnel is available only for prd clusters on Cloudflare Free."
         in choose_ingress_text
     )
-    assert "Base zone for platform hostnames." in choose_ingress_text
 
     choose_ingress_run_text = CHOOSE_INGRESS_ROUTE_RUN_SCRIPT.read_text(encoding="utf-8")
     assert "cluster_slug" in choose_ingress_run_text
     assert "cluster_slug_lower" in choose_ingress_run_text
     assert "Base DNS domain:" in choose_ingress_run_text
     assert "public_zone_name" in choose_ingress_run_text
-    assert ".dns_domain = $dns_domain" in choose_ingress_run_text
     assert ".public_zone_name = $public_zone_name" in choose_ingress_run_text
     assert '"dns_domain": "$dns_domain"' in choose_ingress_run_text
+    assert '"public_zone_name": "$public_zone_name"' in choose_ingress_run_text
     assert (
         "Cloudflare Tunnel is only available for prd clusters on Cloudflare Free"
         in choose_ingress_run_text
@@ -1595,8 +1594,8 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     )
     assert "continuing without a zone-name preflight" in cloudflare_tunnel_run_text
     assert 'dns_record_name="*.${public_zone_name}"' in cloudflare_tunnel_run_text
-    assert "Updating DNS CNAME record for tunnel" in cloudflare_tunnel_run_text
-    assert "DNS record upserted" in cloudflare_tunnel_run_text
+    assert "Creating DNSEndpoint for tunnel CNAME" in cloudflare_tunnel_run_text
+    assert "cloudflare-tunnel-dns" in cloudflare_tunnel_run_text
     assert "already have a tunnel with this name" in cloudflare_tunnel_run_text
     assert ".result.Token" not in cloudflare_tunnel_run_text
     assert "cluster-hostnames" in cloudflare_tunnel_run_text
@@ -1606,7 +1605,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "tunnel_token" in cloudflare_tunnel_run_text
     assert "platform-ingress.yaml" in cloudflare_tunnel_run_text
     assert "upsert-argocd-cluster-secret.sh" in cloudflare_tunnel_run_text
-    assert "Zone DNS Edit permissions" in cloudflare_tunnel_run_text
+    assert "DNSEndpoint for tunnel CNAME" in cloudflare_tunnel_run_text
     assert "argocd-server" in cloudflare_tunnel_run_text
     assert "Argo CD server not ready yet (attempt ${i}/30)" in cloudflare_tunnel_run_text
     assert (
@@ -1629,11 +1628,9 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "Public zone name:" in cloudflare_dns_run_text
     assert "ZONE_NAME" in cloudflare_dns_run_text
     assert "cluster-hostnames" in cloudflare_dns_run_text
-    assert "upsert-argocd-cluster-secret.sh" in cloudflare_dns_run_text
-    assert "Applying platform-ingress application" in cloudflare_dns_run_text
-    assert "apply-argocd-application.sh" in cloudflare_dns_run_text
-    assert "gitops/apps/platform-ingress.yaml" in cloudflare_dns_run_text
-    assert "apply-argocd-application.sh" in cloudflare_dns_run_text
+    assert "Creating DNSEndpoint resources" in cloudflare_dns_run_text
+    assert "wiredoor-dns" in cloudflare_dns_run_text
+    assert "external-dns" in cloudflare_dns_run_text
 
     assert "install-cloudnativepg" in headlamp_text
     assert "script: categories/talos-cluster/steps/install-headlamp/run.sh" in headlamp_text
