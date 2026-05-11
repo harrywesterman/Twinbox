@@ -170,8 +170,8 @@ if [[ -n "$existing_stirling_secret_json" ]]; then
   [[ -n "$existing_api_key" ]] && stirling_api_key="$existing_api_key"
 fi
 
-stirling_secret_file="$(mktemp "${TMPDIR:-/tmp}/stirling-pdf-bootstrap.XXXXXX.json")"
-stirling_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/stirling-pdf-application.XXXXXX.yaml")"
+stirling_secret_file="$(mktemp "${TMPDIR:-/tmp}/stirling-pdf-bootstrap-XXXXXX.json")"
+stirling_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/stirling-pdf-application-XXXXXX.yaml")"
 trap 'rm -f "$stirling_secret_file" "$stirling_rendered_manifest"' EXIT
 
 jq -n \

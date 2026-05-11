@@ -35,7 +35,7 @@ authentik_setup_forward
 
 AUTHENTIK_HOST="${AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
 headlamp_manifest_path="$WORKSPACE_ROOT/gitops/apps/headlamp.yaml"
-headlamp_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/headlamp-application.XXXXXX.yaml")"
+headlamp_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/headlamp-application-XXXXXX.yaml")"
 trap 'rm -f "$headlamp_rendered_manifest"' EXIT
 
 headlamp_host="https://headlamp.${public_zone_name}"

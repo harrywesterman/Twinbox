@@ -270,8 +270,8 @@ fi
 [[ -n "$audiobookshelf_client_secret" ]] || audiobookshelf_client_secret="$(openssl rand -hex 32)"
 
 audiobookshelf_secret_file="$(mktemp)"
-audiobookshelf_port_forward_log="$(mktemp "${TMPDIR:-/tmp}/audiobookshelf-port-forward.XXXXXX.log")"
-audiobookshelf_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/audiobookshelf-application.XXXXXX.yaml")"
+audiobookshelf_port_forward_log="$(mktemp "${TMPDIR:-/tmp}/audiobookshelf-port-forward-XXXXXX.log")"
+audiobookshelf_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/audiobookshelf-application-XXXXXX.yaml")"
 trap 'rm -f "$audiobookshelf_secret_file" "$audiobookshelf_port_forward_log" "$audiobookshelf_rendered_manifest"' EXIT
 
 jq -n \

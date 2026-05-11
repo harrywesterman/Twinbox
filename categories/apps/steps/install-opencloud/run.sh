@@ -467,9 +467,9 @@ opencloud_collaboration_app_icon="${COLLABORA_HOST}/favicon.ico"
 # desktop, ios) issue tokens with the same issuer URL.
 opencloud_oc_oidc_issuer="${AUTHENTIK_HOST}/"
 
-opencloud_secret_file="$(mktemp "${TMPDIR:-/tmp}/opencloud-bootstrap.XXXXXX.json")"
+opencloud_secret_file="$(mktemp "${TMPDIR:-/tmp}/opencloud-bootstrap-XXXXXX.json")"
 opencloud_rendered_overlay="$(mktemp -d "${TMPDIR:-/tmp}/opencloud-overlay.XXXXXX")"
-opencloud_rendered_app_manifest="$(mktemp "${TMPDIR:-/tmp}/opencloud-application.XXXXXX.yaml")"
+opencloud_rendered_app_manifest="$(mktemp "${TMPDIR:-/tmp}/opencloud-application-XXXXXX.yaml")"
 trap 'rm -f "$opencloud_secret_file" "$opencloud_rendered_app_manifest"; rm -rf "$opencloud_rendered_overlay"' EXIT
 
 jq -n \

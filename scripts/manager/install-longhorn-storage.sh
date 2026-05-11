@@ -249,7 +249,7 @@ fi
 
 load_longhorn_backup_settings
 create_or_update_longhorn_backup_secret
-rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/longhorn-application.XXXXXX.yaml")"
+rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/longhorn-application-XXXXXX.yaml")"
 trap 'rm -f "$rendered_manifest"' EXIT
 render_longhorn_application_manifest "$rendered_manifest"
 

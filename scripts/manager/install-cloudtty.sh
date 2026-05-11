@@ -89,7 +89,7 @@ cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty'
 
 public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
-rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/cloudtty-ingressroute.XXXXXX.yaml")"
+rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/cloudtty-ingressroute-XXXXXX.yaml")"
 trap 'rm -f "$rendered_ingressroute"' EXIT
 
 authentik_ensure_token

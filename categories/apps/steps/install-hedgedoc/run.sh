@@ -180,10 +180,10 @@ if [[ -n "$existing_hedgedoc_secret_json" ]]; then
   [[ -n "$existing_oauth_client_secret" ]] && hedgedoc_oauth_client_secret="$existing_oauth_client_secret"
 fi
 
-hedgedoc_secret_file="$(mktemp "${TMPDIR:-/tmp}/hedgedoc-bootstrap.XXXXXX.json")"
-hedgedoc_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/hedgedoc-application.XXXXXX.yaml")"
-hedgedoc_rendered_deployment="$(mktemp "${TMPDIR:-/tmp}/hedgedoc-deployment.XXXXXX.yaml")"
-hedgedoc_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/hedgedoc-ingressroute.XXXXXX.yaml")"
+hedgedoc_secret_file="$(mktemp "${TMPDIR:-/tmp}/hedgedoc-bootstrap-XXXXXX.json")"
+hedgedoc_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/hedgedoc-application-XXXXXX.yaml")"
+hedgedoc_rendered_deployment="$(mktemp "${TMPDIR:-/tmp}/hedgedoc-deployment-XXXXXX.yaml")"
+hedgedoc_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/hedgedoc-ingressroute-XXXXXX.yaml")"
 trap 'rm -f "$hedgedoc_secret_file" "$hedgedoc_rendered_manifest" "$hedgedoc_rendered_deployment" "$hedgedoc_rendered_ingressroute"' EXIT
 
 jq -n \

@@ -258,7 +258,7 @@ application_payload="$(
 application_pk="$(create_or_update_application "$application_payload")"
 [[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for Twinbox Portal"
 
-secret_file="$(mktemp "${TMPDIR:-/tmp}/twinbox-portal.XXXXXX.json")"
+secret_file="$(mktemp "${TMPDIR:-/tmp}/twinbox-portal-XXXXXX.json")"
 trap 'rm -f "$secret_file"' EXIT
 cat >"$secret_file" <<EOF
 {
@@ -281,8 +281,8 @@ kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/externalse
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/pvc.yaml"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/service.yaml"
 
-rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/twinbox-portal-ingressroute.XXXXXX.yaml")"
-rendered_application="$(mktemp "${TMPDIR:-/tmp}/twinbox-portal-application.XXXXXX.yaml")"
+rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/twinbox-portal-ingressroute-XXXXXX.yaml")"
+rendered_application="$(mktemp "${TMPDIR:-/tmp}/twinbox-portal-application-XXXXXX.yaml")"
 trap 'rm -f "$secret_file" "$rendered_ingressroute" "$rendered_application"' EXIT
 sed "s/__ZONE_NAME__/${public_zone_name}/g" \
   "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/ingressroute.yaml" >"$rendered_ingressroute"

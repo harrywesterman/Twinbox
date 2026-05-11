@@ -163,7 +163,7 @@ download_talos_image() {
     return 0
   fi
 
-  tmp_compressed="$(mktemp "${image_cache_dir%/}/.talos-image.XXXXXX.iso")"
+  tmp_compressed="$(mktemp "${image_cache_dir%/}/talos-image-XXXXXX.iso")"
   log "Downloading Talos ISO to ${target_path}"
   curl -fsSL --retry 3 --retry-delay 2 --output "$tmp_compressed" "$image_download_url"
   mv "$tmp_compressed" "$target_path"

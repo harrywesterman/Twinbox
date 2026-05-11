@@ -498,7 +498,7 @@ kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/immich/pvc.yaml"
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/immich/externalsecret.yaml"
 kubectl apply -f "$immich_app_db_externalsecret_manifest"
 
-immich_rendered_ingressroute_file="$(mktemp "${TMPDIR:-/tmp}/immich-ingressroute.XXXXXX.yaml")"
+immich_rendered_ingressroute_file="$(mktemp "${TMPDIR:-/tmp}/immich-ingressroute-XXXXXX.yaml")"
 sed "s/__ZONE_NAME__/${public_zone_name}/g" \
   "$WORKSPACE_ROOT/gitops/platform-apps/immich/ingressroute.yaml" >"$immich_rendered_ingressroute_file"
 kubectl apply -f "$immich_rendered_ingressroute_file"

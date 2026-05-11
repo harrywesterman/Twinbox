@@ -207,8 +207,8 @@ pixelfed_sso_application_slug="pixelfed"
 pixelfed_host="https://pixelfed.${public_zone_name}"
 pixelfed_sso_redirect_uri="${pixelfed_host}/auth/oidc/callback"
 
-pixelfed_secret_file="$(mktemp "${TMPDIR:-/tmp}/pixelfed-bootstrap.XXXXXX.json")"
-pixelfed_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/pixelfed-application.XXXXXX.yaml")"
+pixelfed_secret_file="$(mktemp "${TMPDIR:-/tmp}/pixelfed-bootstrap-XXXXXX.json")"
+pixelfed_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/pixelfed-application-XXXXXX.yaml")"
 trap 'rm -f "$pixelfed_secret_file" "$pixelfed_rendered_manifest"' EXIT
 
 log "Provisioning Authentik OIDC client for Pixelfed"

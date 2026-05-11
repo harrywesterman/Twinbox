@@ -23,7 +23,7 @@ case "$observability_profile" in
     exit 1
     ;;
 esac
-rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/prometheus-application.XXXXXX.yaml")"
+rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/prometheus-application-XXXXXX.yaml")"
 trap 'rm -f "$rendered_manifest"' EXIT
 
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"

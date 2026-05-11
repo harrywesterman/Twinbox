@@ -167,7 +167,7 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
 kubectl create namespace "$VELERO_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 create_or_update_secret "$VELERO_SECRET_NAME" "$VELERO_NAMESPACE" "$VELERO_USERNAME" "$VELERO_PASSWORD"
 
-rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/velero-application.XXXXXX.yaml")"
+rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/velero-application-XXXXXX.yaml")"
 trap 'rm -f "$rendered_manifest"' EXIT
 render_velero_application_manifest "$rendered_manifest"
 

@@ -386,7 +386,7 @@ kubectl apply -f "$VELERO_UI_PLATFORM_DIR/externalsecret.yaml"
 kubectl -n "$VELERO_UI_NAMESPACE" wait --for=condition=Ready externalsecret/velero-ui-bootstrap --timeout=10m
 wait_for_secret "$VELERO_UI_NAMESPACE" "velero-ui-bootstrap"
 
-velero_ui_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/velero-ui-application.XXXXXX.yaml")"
+velero_ui_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/velero-ui-application-XXXXXX.yaml")"
 trap 'rm -f "$velero_ui_rendered_manifest"' EXIT
 sed "s/__ZONE_NAME__/${public_zone_name}/g" "$VELERO_UI_APP_MANIFEST_PATH" >"$velero_ui_rendered_manifest"
 

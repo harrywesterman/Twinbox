@@ -92,8 +92,8 @@ if [[ -n "$existing_n8n_secret_json" ]]; then
   [[ -n "$existing_encryption_key" ]] && n8n_encryption_key="$existing_encryption_key"
 fi
 
-n8n_secret_file="$(mktemp "${TMPDIR:-/tmp}/n8n-bootstrap.XXXXXX.json")"
-n8n_rendered_app_manifest="$(mktemp "${TMPDIR:-/tmp}/n8n-application.XXXXXX.yaml")"
+n8n_secret_file="$(mktemp "${TMPDIR:-/tmp}/n8n-bootstrap-XXXXXX.json")"
+n8n_rendered_app_manifest="$(mktemp "${TMPDIR:-/tmp}/n8n-application-XXXXXX.yaml")"
 trap 'rm -f "$n8n_secret_file" "$n8n_rendered_app_manifest"' EXIT
 
 jq -n \

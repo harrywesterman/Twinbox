@@ -25,7 +25,7 @@ public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domai
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
 
 manifest_path="$WORKSPACE_ROOT/gitops/apps/freshrss.yaml"
-rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/freshrss-application.XXXXXX.yaml")"
+rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/freshrss-application-XXXXXX.yaml")"
 trap 'rm -f "$rendered_manifest"' EXIT
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying FreshRSS Argo CD application"

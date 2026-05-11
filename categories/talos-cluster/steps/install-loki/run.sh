@@ -15,7 +15,7 @@ source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"
 export KUBECONFIG="$KUBECONFIG_FILE"
 
 manifest_path="$WORKSPACE_ROOT/gitops/apps/loki.yaml"
-rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/loki-application.XXXXXX.yaml")"
+rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/loki-application-XXXXXX.yaml")"
 trap 'rm -f "$rendered_manifest"' EXIT
 
 fail() {

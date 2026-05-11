@@ -167,9 +167,9 @@ vaultwarden_db_username="vaultwarden"
 vaultwarden_db_password="$(openssl rand -hex 24)"
 vaultwarden_database_url="postgresql://${vaultwarden_db_username}:${vaultwarden_db_password}@vaultwarden-db-pooler-rw.databases.svc.cluster.local:5432/vaultwarden"
 vaultwarden_host="https://vaultwarden.${public_zone_name}"
-vaultwarden_secret_file="$(mktemp "${TMPDIR:-/tmp}/vaultwarden-bootstrap.XXXXXX.json")"
-vaultwarden_db_secret_file="$(mktemp "${TMPDIR:-/tmp}/vaultwarden-db-credentials.XXXXXX.json")"
-vaultwarden_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/vaultwarden-application.XXXXXX.yaml")"
+vaultwarden_secret_file="$(mktemp "${TMPDIR:-/tmp}/vaultwarden-bootstrap-XXXXXX.json")"
+vaultwarden_db_secret_file="$(mktemp "${TMPDIR:-/tmp}/vaultwarden-db-credentials-XXXXXX.json")"
+vaultwarden_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/vaultwarden-application-XXXXXX.yaml")"
 trap 'rm -f "$vaultwarden_secret_file" "$vaultwarden_db_secret_file" "$vaultwarden_rendered_manifest"' EXIT
 
 existing_vaultwarden_secret_json=""
