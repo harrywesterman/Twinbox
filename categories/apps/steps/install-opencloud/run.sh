@@ -332,7 +332,7 @@ if command -v openbao_read_global_secret_json >/dev/null 2>&1; then
 fi
 
 opencloud_oc_url="${OPENCLOUD_HOST}"
-opencloud_oc_oidc_issuer="${AUTHENTIK_HOST}/application/o/opencloud/"
+opencloud_oc_oidc_issuer="${AUTHENTIK_HOST}/"
 opencloud_web_edit_link="${AUTHENTIK_HOST}/if/user/"
 opencloud_oc_jwt_secret="$(openssl rand -hex 32)"
 opencloud_wopi_secret="$(openssl rand -hex 32)"
@@ -463,8 +463,9 @@ opencloud_collaboration_app_product="Collabora"
 opencloud_collaboration_app_addr="$COLLABORA_HOST"
 opencloud_collaboration_app_icon="${COLLABORA_HOST}/favicon.ico"
 
-# Authentik exposes OIDC discovery by application slug, not provider slug.
-opencloud_oc_oidc_issuer="${AUTHENTIK_HOST}/application/o/opencloud/"
+# Use Authentik global issuer so all OpenCloud providers (web, android,
+# desktop, ios) issue tokens with the same issuer URL.
+opencloud_oc_oidc_issuer="${AUTHENTIK_HOST}/"
 
 opencloud_secret_file="$(mktemp "${TMPDIR:-/tmp}/opencloud-bootstrap.XXXXXX.json")"
 opencloud_rendered_overlay="$(mktemp -d "${TMPDIR:-/tmp}/opencloud-overlay.XXXXXX")"
@@ -651,7 +652,6 @@ opencloud_web_provider_payload="$(
     --arg authorization_flow "$authorization_flow_id" \
     --arg invalidation_flow "$invalidation_flow_id" \
     --arg signing_key "$signing_key_id" \
-    --arg issuer_mode "per_provider" \
     --arg openid "$openid_mapping_id" \
     --arg email "$email_mapping_id" \
     --arg profile "$profile_mapping_id" \
@@ -667,7 +667,7 @@ opencloud_web_provider_payload="$(
       authorization_flow: $authorization_flow,
       invalidation_flow: $invalidation_flow,
       signing_key: $signing_key,
-      issuer_mode: $issuer_mode,
+      issuer_mode: "global",
       include_claims_in_id_token: true,
       property_mappings: $property_mappings,
       redirect_uris: [
@@ -752,7 +752,7 @@ for provider_name in "OpenCloud Desktop" "OpenCloud Android" "OpenCloud iOS" "Cy
         authorization_flow: $authorization_flow,
         invalidation_flow: $invalidation_flow,
         signing_key: $signing_key,
-        issuer_mode: "per_provider",
+        issuer_mode: "global",
         include_claims_in_id_token: true,
         property_mappings: $property_mappings,
         redirect_uris: $redirect_uris
