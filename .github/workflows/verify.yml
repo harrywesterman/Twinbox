@@ -80,4 +80,8 @@ jobs:
 
       - name: Runtime tests
         run: |
+          node --test manager-api/test/*.mjs
+          node --test manager-web/test/*.mjs
+          node --test manager-worker/test/*.mjs
+          node --test portal/test/*.mjs
           python -m pytest -q tests
