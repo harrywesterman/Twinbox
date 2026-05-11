@@ -879,7 +879,7 @@ def test_opencloud_step_uses_application_issuer_with_per_provider():
     text = OPENCLOUD_STEP_SCRIPT.read_text(encoding="utf-8")
 
     assert 'issuer_mode: "global"' not in text
-    assert 'issuer_mode: "per_provider"' not in text
+    assert 'issuer_mode: "per_provider"' in text
     assert 'opencloud_oc_oidc_issuer="${AUTHENTIK_HOST}/application/o/opencloud/"' in text
 
 
