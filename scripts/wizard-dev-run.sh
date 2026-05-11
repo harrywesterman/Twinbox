@@ -7,7 +7,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 LOCAL_WIZARD_PATH="${REPO_ROOT}/wizard/setup-wizard.sh"
 DEFAULT_CONFIG_FILE="${REPO_ROOT}/.env.vm-preview.local"
 CONFIG_FILE="${WIZARD_DEV_CONFIG_FILE:-${DEFAULT_CONFIG_FILE}}"
-DEFAULT_REMOTE_DIR="/root/twinbox-dev"
+DEFAULT_REMOTE_DIR="/tmp/twinbox-dev"
 
 SSH_TARGET=""
 REMOTE_DIR=""
@@ -16,10 +16,10 @@ DEBUG_MODE=0
 
 usage() {
   cat <<EOF
-Usage: $(basename "$0") [--target root@host] [--remote-dir /path] [--debug]
+Usage: $(basename "$0") [--target user@host] [--remote-dir /path] [--debug]
 
-Uploads the local Proxmox wizard to a remote host over SSH and runs it there
-with an interactive TTY, so whiptail keeps working.
+Uploads the local Proxmox bootstrap wizard and runs it as root via sudo on
+the remote host with an interactive TTY, so whiptail keeps working.
 EOF
 }
 
@@ -53,12 +53,9 @@ load_config() {
   SSH_TARGET="${WIZARD_DEV_SSH_TARGET:-}"
   REMOTE_DIR="${WIZARD_DEV_REMOTE_DIR:-${DEFAULT_REMOTE_DIR}}"
 
-  # Derive root SSH target from the preview target (twinbox@ → root@)
+  # Fall back to TWINBOX_VM_PREVIEW_TARGET from .env.vm-preview.local
   if [[ -z "${SSH_TARGET}" && -n "${TWINBOX_VM_PREVIEW_TARGET:-}" ]]; then
-    local cleaned="${TWINBOX_VM_PREVIEW_TARGET#twinbox@}"
-    if [[ "${cleaned}" != "${TWINBOX_VM_PREVIEW_TARGET}" ]]; then
-      SSH_TARGET="root@${cleaned}"
-    fi
+    SSH_TARGET="${TWINBOX_VM_PREVIEW_TARGET}"
   fi
 }
 
@@ -99,7 +96,7 @@ check_deps() {
 
 validate_inputs() {
   [[ -f "${LOCAL_WIZARD_PATH}" ]] || die "Local wizard not found: ${LOCAL_WIZARD_PATH}"
-  [[ -n "${SSH_TARGET}" ]] || die "Set WIZARD_DEV_SSH_TARGET or TWINBOX_VM_PREVIEW_TARGET in .env.vm-preview.local, or pass --target."
+  [[ -n "${SSH_TARGET}" ]] || die "Set TWINBOX_VM_PREVIEW_TARGET in .env.vm-preview.local, or pass --target."
 }
 
 run_local_checks() {
@@ -119,9 +116,11 @@ upload_and_run_remote() {
     remote_bash="bash -x"
   fi
 
+  echo "Uploading wizard to ${SSH_TARGET}:${REMOTE_SCRIPT_PATH}"
   ssh -n "${SSH_TARGET}" "mkdir -p ${quoted_remote_dir}"
   scp -q "${LOCAL_WIZARD_PATH}" "${SSH_TARGET}:${REMOTE_SCRIPT_PATH}" </dev/null
-  ssh -tt "${SSH_TARGET}" "chmod +x ${quoted_remote_script} && TERM=xterm-256color ${remote_bash} ${quoted_remote_script}"
+  echo "Running wizard as root via sudo on ${SSH_TARGET}"
+  ssh -tt "${SSH_TARGET}" "sudo chmod +x ${quoted_remote_script} && sudo TERM=xterm-256color ${remote_bash} ${quoted_remote_script}"
 }
 
 report_retained_remote_copy() {
