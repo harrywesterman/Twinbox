@@ -866,13 +866,13 @@ def test_opencloud_step_creates_authentik_applications_for_mobile_and_desktop_cl
 def test_opencloud_step_includes_offline_access_scope_mapping():
     text = OPENCLOUD_STEP_SCRIPT.read_text(encoding="utf-8")
 
-    assert 'upsert_scope_mapping \\' in text
+    assert "upsert_scope_mapping \\" in text
     assert '"OpenCloud offline_access"' in text
     assert '"offline_access"' in text
     assert '"Enable refresh tokens for OpenCloud clients"' in text
     assert "'return {}'" in text
     assert 'offline_access_mapping_id="$(upsert_scope_mapping' in text
-    assert '[$openid, $email, $profile, $roles, $offline_access]' in text
+    assert "[$openid, $email, $profile, $roles, $offline_access]" in text
 
 
 def test_opencloud_gitops_uses_schema_backed_writable_ldap_bootstrap():
