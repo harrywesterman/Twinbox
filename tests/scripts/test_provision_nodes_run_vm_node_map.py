@@ -4,7 +4,6 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUN_SCRIPT = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "provision-nodes" / "run.sh"
 
@@ -34,8 +33,8 @@ def test_provision_nodes_uses_current_step_context_vm_node_map():
         fake_apply.write_text(
             "#!/bin/bash\n"
             "set -euo pipefail\n"
-            "printf 'VM_NODE_MAP=%s\\n' \"${VM_NODE_MAP:-}\" >> \"$MANAGER_DATA_DIR/captured-env.txt\"\n"
-            "printf '%s\\n' \"$@\" > \"$MANAGER_DATA_DIR/captured-args.txt\"\n",
+            'printf \'VM_NODE_MAP=%s\\n\' "${VM_NODE_MAP:-}" >> "$MANAGER_DATA_DIR/captured-env.txt"\n'
+            'printf \'%s\\n\' "$@" > "$MANAGER_DATA_DIR/captured-args.txt"\n',
             encoding="utf-8",
         )
         fake_apply.chmod(0o755)
@@ -108,7 +107,9 @@ def test_provision_nodes_uses_current_step_context_vm_node_map():
             "cp-2": "192.168.1.62",
             "worker-1": "192.168.1.63",
         }
-        assert json.loads((data_dir / "clusters" / "tst.json").read_text(encoding="utf-8"))["vm_node_map"] == {
+        assert json.loads((data_dir / "clusters" / "tst.json").read_text(encoding="utf-8"))[
+            "vm_node_map"
+        ] == {
             "cp-1": "old-a",
             "cp-2": "old-b",
             "worker-1": "old-c",

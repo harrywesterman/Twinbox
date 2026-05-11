@@ -1,5 +1,5 @@
 function normalizeIpv4(value) {
-  return String(value || '').trim();
+  return String(value || "").trim();
 }
 
 export function isValidIpv4(value) {
@@ -8,7 +8,7 @@ export function isValidIpv4(value) {
     return false;
   }
 
-  const parts = candidate.split('.');
+  const parts = candidate.split(".");
   if (parts.length !== 4) {
     return false;
   }
@@ -17,7 +17,7 @@ export function isValidIpv4(value) {
     if (!/^\d+$/.test(part)) {
       return false;
     }
-    if (part.length > 1 && part.startsWith('0')) {
+    if (part.length > 1 && part.startsWith("0")) {
       return false;
     }
     const octet = Number(part);
@@ -25,15 +25,23 @@ export function isValidIpv4(value) {
   });
 }
 
-export function buildProvisionVmIpRows(vmPlan = [], currentValues = {}, suggestionSnapshot = {}, availabilityMap = {}) {
+export function buildProvisionVmIpRows(
+  vmPlan = [],
+  currentValues = {},
+  suggestionSnapshot = {},
+  availabilityMap = {}
+) {
   const plan = Array.isArray(vmPlan) ? vmPlan : [];
-  const currentVmIpMap = currentValues && typeof currentValues.vm_ip_map === 'object' && !Array.isArray(currentValues.vm_ip_map)
-    ? currentValues.vm_ip_map
-    : {};
+  const currentVmIpMap =
+    currentValues &&
+    typeof currentValues.vm_ip_map === "object" &&
+    !Array.isArray(currentValues.vm_ip_map)
+      ? currentValues.vm_ip_map
+      : {};
   const suggestedVmIps = Array.isArray(suggestionSnapshot?.vm_ips) ? suggestionSnapshot.vm_ips : [];
 
   const rows = plan.map((vm, index) => {
-    const suggestedIp = normalizeIpv4(suggestedVmIps[index] || '');
+    const suggestedIp = normalizeIpv4(suggestedVmIps[index] || "");
     const value = normalizeIpv4(currentVmIpMap[vm.name] ?? suggestedIp);
     return {
       ...vm,
@@ -55,44 +63,47 @@ export function buildProvisionVmIpRows(vmPlan = [], currentValues = {}, suggesti
     const isValid = isValidIpv4(row.value);
     const isDuplicate = isValid && duplicateCounts[row.value] > 1;
     const isSuggested = Boolean(isValid && row.suggestedIp && row.value === row.suggestedIp);
-    const isEmpty = String(row.value || '').trim().length === 0;
+    const isEmpty = String(row.value || "").trim().length === 0;
 
     let status = {
-      tone: isEmpty ? 'neutral' : 'warning',
-      label: isEmpty ? 'Awaiting IP' : 'Locally edited',
-      icon: isEmpty ? '·' : '◌',
+      tone: isEmpty ? "neutral" : "warning",
+      label: isEmpty ? "Awaiting IP" : "Locally edited",
+      icon: isEmpty ? "·" : "◌",
     };
 
     if (isEmpty) {
       status = {
-        tone: 'neutral',
-        label: 'Awaiting IP',
-        icon: '·',
+        tone: "neutral",
+        label: "Awaiting IP",
+        icon: "·",
       };
     } else if (!isValid) {
       status = {
-        tone: 'danger',
-        label: 'Invalid IP',
-        icon: '!',
+        tone: "danger",
+        label: "Invalid IP",
+        icon: "!",
       };
-    } else if (availabilityMap && Object.prototype.hasOwnProperty.call(availabilityMap, row.value)) {
+    } else if (
+      availabilityMap &&
+      Object.prototype.hasOwnProperty.call(availabilityMap, row.value)
+    ) {
       const isFree = Boolean(availabilityMap[row.value]);
       status = {
-        tone: isFree ? 'success' : 'danger',
-        label: isFree ? 'Checked free' : 'Already in use',
-        icon: isFree ? '✓' : '!',
+        tone: isFree ? "success" : "danger",
+        label: isFree ? "Checked free" : "Already in use",
+        icon: isFree ? "✓" : "!",
       };
     } else if (isDuplicate) {
       status = {
-        tone: 'danger',
-        label: 'Duplicate IP',
-        icon: '!',
+        tone: "danger",
+        label: "Duplicate IP",
+        icon: "!",
       };
     } else if (isSuggested) {
       status = {
-        tone: 'success',
-        label: 'Verified free',
-        icon: '✓',
+        tone: "success",
+        label: "Verified free",
+        icon: "✓",
       };
     }
 
@@ -119,7 +130,10 @@ export function validateProvisionVmIpRows(vmIpRows = []) {
   const rows = Array.isArray(vmIpRows) ? vmIpRows : [];
   const invalidRows = rows.filter((row) => !row.isValid);
   const duplicateRows = rows.filter((row) => row.isDuplicate);
-  const allValid = invalidRows.length === 0 && duplicateRows.length === 0 && rows.every((row) => normalizeIpv4(row.value));
+  const allValid =
+    invalidRows.length === 0 &&
+    duplicateRows.length === 0 &&
+    rows.every((row) => normalizeIpv4(row.value));
 
   if (invalidRows.length > 0) {
     return {
@@ -141,7 +155,7 @@ export function validateProvisionVmIpRows(vmIpRows = []) {
 
   return {
     ok: allValid,
-    error: allValid ? '' : 'One or more VM IP addresses are missing',
+    error: allValid ? "" : "One or more VM IP addresses are missing",
     invalidRows,
     duplicateRows,
   };

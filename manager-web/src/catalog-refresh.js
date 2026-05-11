@@ -1,12 +1,14 @@
-import { getWizardSteps } from './journey.js';
-import { normalizeLogEntries } from './install-logs.js';
+import { getWizardSteps } from "./journey.js";
+import { normalizeLogEntries } from "./install-logs.js";
 
-const PROVISION_STEP_ID = 'provision-nodes';
-const MISSING_CLUSTER_NOTICE = 'Twinbox is waiting for the cluster catalog. Your saved answers and current step are still preserved.';
-const RECREATED_CLUSTER_NOTICE = 'Twinbox detected a new cluster session and restarted from the first question while keeping your saved answers.';
+const PROVISION_STEP_ID = "provision-nodes";
+const MISSING_CLUSTER_NOTICE =
+  "Twinbox is waiting for the cluster catalog. Your saved answers and current step are still preserved.";
+const RECREATED_CLUSTER_NOTICE =
+  "Twinbox detected a new cluster session and restarted from the first question while keeping your saved answers.";
 
 export function isMissingClusterError(error) {
-  if (!error || typeof error !== 'object') {
+  if (!error || typeof error !== "object") {
     return false;
   }
 
@@ -15,15 +17,15 @@ export function isMissingClusterError(error) {
     return false;
   }
 
-  const message = String(error.message || error.body?.error || error.body || '');
+  const message = String(error.message || error.body?.error || error.body || "");
   return /cluster not found/i.test(message);
 }
 
 export function shouldResetRecreatedClusterDraft({
-  previousClusterInstanceId = '',
-  nextClusterInstanceId = '',
-  previousCreatedAt = '',
-  nextCreatedAt = '',
+  previousClusterInstanceId = "",
+  nextClusterInstanceId = "",
+  previousCreatedAt = "",
+  nextCreatedAt = "",
   hasProvisionDraft = false,
 } = {}) {
   if (!hasProvisionDraft || !nextCreatedAt) {
@@ -38,18 +40,20 @@ export function shouldResetRecreatedClusterDraft({
 }
 
 export function isProvisionSuggestionReady({
-  activeStepId = '',
-  suggestionKey = '',
-  currentSuggestionKey = '',
+  activeStepId = "",
+  suggestionKey = "",
+  currentSuggestionKey = "",
   suggestionSnapshot = {},
 } = {}) {
   if (activeStepId !== PROVISION_STEP_ID) {
     return true;
   }
 
-  return currentSuggestionKey === suggestionKey
-    && suggestionSnapshot
-    && Object.keys(suggestionSnapshot).length > 0;
+  return (
+    currentSuggestionKey === suggestionKey &&
+    suggestionSnapshot &&
+    Object.keys(suggestionSnapshot).length > 0
+  );
 }
 
 function discoverClusterId(catalog) {
@@ -57,12 +61,12 @@ function discoverClusterId(catalog) {
     for (const step of category.steps || []) {
       const stateClusterId = step?.state?.cluster_id;
       const outputClusterId = step?.state?.outputs?.cluster_id;
-      if (typeof stateClusterId === 'string' && stateClusterId) return stateClusterId;
-      if (typeof outputClusterId === 'string' && outputClusterId) return outputClusterId;
+      if (typeof stateClusterId === "string" && stateClusterId) return stateClusterId;
+      if (typeof outputClusterId === "string" && outputClusterId) return outputClusterId;
     }
   }
 
-  return '';
+  return "";
 }
 
 function discoverClusterInstanceId(catalog) {
@@ -70,12 +74,14 @@ function discoverClusterInstanceId(catalog) {
     for (const step of category.steps || []) {
       const stateClusterInstanceId = step?.state?.cluster_instance_id;
       const outputClusterInstanceId = step?.state?.outputs?.cluster_instance_id;
-      if (typeof stateClusterInstanceId === 'string' && stateClusterInstanceId) return stateClusterInstanceId;
-      if (typeof outputClusterInstanceId === 'string' && outputClusterInstanceId) return outputClusterInstanceId;
+      if (typeof stateClusterInstanceId === "string" && stateClusterInstanceId)
+        return stateClusterInstanceId;
+      if (typeof outputClusterInstanceId === "string" && outputClusterInstanceId)
+        return outputClusterInstanceId;
     }
   }
 
-  return '';
+  return "";
 }
 
 function clearStaleClusterState({
@@ -96,13 +102,13 @@ function clearStaleClusterState({
     provisionDirtyFieldsRef.current = new Set();
   }
   if (provisionSuggestionKeyRef) {
-    provisionSuggestionKeyRef.current = '';
+    provisionSuggestionKeyRef.current = "";
   }
   if (provisionSuggestionSnapshotRef) {
     provisionSuggestionSnapshotRef.current = {};
   }
   if (placementSuggestionKeyRef) {
-    placementSuggestionKeyRef.current = '';
+    placementSuggestionKeyRef.current = "";
   }
   setProvisionSuggestionsReady?.(false);
 
@@ -110,7 +116,7 @@ function clearStaleClusterState({
   setLogs?.([]);
   clearInstallLogs?.();
   setActiveJob?.(null);
-  setError?.('');
+  setError?.("");
   setNotice?.(notice);
 }
 
@@ -152,35 +158,37 @@ export async function refreshWizardSnapshot({
   provisionSuggestionSnapshotRef,
   placementSuggestionKeyRef,
   clusterCreatedAtRef,
-  clusterIdOverride = '',
+  clusterIdOverride = "",
   clearError = true,
   allowAutoSelectStep = true,
 }) {
   const effectiveClusterId = clusterIdOverride || clusterIdRef.current;
   const clusterQuery = effectiveClusterId
     ? `?cluster_id=${encodeURIComponent(effectiveClusterId)}`
-    : '';
+    : "";
   const [healthData, catalogData, resourcesData] = await Promise.allSettled([
-    requestJson('/api/health'),
+    requestJson("/api/health"),
     requestJson(`/api/catalog${clusterQuery}`),
-    requestJson('/api/proxmox/cluster-resources'),
+    requestJson("/api/proxmox/cluster-resources"),
   ]);
 
-  if (healthData.status === 'fulfilled') {
+  if (healthData.status === "fulfilled") {
     setHealth(healthData.value);
   }
-  if (resourcesData.status === 'fulfilled') {
+  if (resourcesData.status === "fulfilled") {
     setProxmoxResources(resourcesData.value);
   } else {
     setProxmoxResources(null);
   }
 
-  if (healthData.status === 'rejected') {
-    throw healthData.reason instanceof Error ? healthData.reason : new Error('Failed to refresh wizard health');
+  if (healthData.status === "rejected") {
+    throw healthData.reason instanceof Error
+      ? healthData.reason
+      : new Error("Failed to refresh wizard health");
   }
 
   let catalogValue = null;
-  if (catalogData.status === 'fulfilled') {
+  if (catalogData.status === "fulfilled") {
     catalogValue = catalogData.value;
   } else if (isMissingClusterError(catalogData.reason)) {
     clearStaleClusterState({
@@ -205,33 +213,35 @@ export async function refreshWizardSnapshot({
       placementSuggestionKeyRef,
     });
 
-    catalogValue = await requestJson('/api/catalog');
+    catalogValue = await requestJson("/api/catalog");
     setCatalog(catalogValue);
   } else {
-    throw catalogData.reason instanceof Error ? catalogData.reason : new Error('Failed to refresh wizard state');
+    throw catalogData.reason instanceof Error
+      ? catalogData.reason
+      : new Error("Failed to refresh wizard state");
   }
 
-  if (catalogData.status === 'fulfilled') {
+  if (catalogData.status === "fulfilled") {
     setCatalog(catalogValue);
   }
 
-  const discoveredClusterId = discoverClusterId(catalogValue) || clusterIdRef.current || '';
+  const discoveredClusterId = discoverClusterId(catalogValue) || clusterIdRef.current || "";
   if (discoveredClusterId && discoveredClusterId !== clusterIdRef.current) {
     clusterIdRef.current = discoveredClusterId;
     setClusterId(discoveredClusterId);
   }
 
-  const discoveredClusterInstanceId = discoverClusterInstanceId(catalogValue) || clusterInstanceIdRef.current || '';
+  const discoveredClusterInstanceId =
+    discoverClusterInstanceId(catalogValue) || clusterInstanceIdRef.current || "";
   if (discoveredClusterInstanceId && discoveredClusterInstanceId !== clusterInstanceIdRef.current) {
     clusterInstanceIdRef.current = discoveredClusterInstanceId;
     setClusterInstanceId?.(discoveredClusterInstanceId);
   }
 
   const steps = getWizardSteps(catalogValue, answersRef.current);
-  const currentSelectedStepId = selectedStepIdRef.current || '';
-  const nextStepId = !currentSelectedStepId && allowAutoSelectStep
-    ? steps[0]?.id || ''
-    : currentSelectedStepId;
+  const currentSelectedStepId = selectedStepIdRef.current || "";
+  const nextStepId =
+    !currentSelectedStepId && allowAutoSelectStep ? steps[0]?.id || "" : currentSelectedStepId;
   const effectiveSelectedStepId = currentSelectedStepId || nextStepId;
   if (allowAutoSelectStep && !currentSelectedStepId && nextStepId) {
     selectedStepIdRef.current = nextStepId;
@@ -239,7 +249,12 @@ export async function refreshWizardSnapshot({
   }
 
   const selectedStep = steps.find((step) => step.id === effectiveSelectedStepId);
-  const activeJobStep = steps.find((step) => step.status === 'running' || (step.latest_job && ['pending', 'running', 'cancel_requested'].includes(step.latest_job.status)));
+  const activeJobStep = steps.find(
+    (step) =>
+      step.status === "running" ||
+      (step.latest_job &&
+        ["pending", "running", "cancel_requested"].includes(step.latest_job.status))
+  );
   const activeJob = activeJobStep?.latest_job || null;
   const activeJobId = activeJob?.id || activeJobStep?.state?.last_job_id || null;
   const latestJobId = selectedStep?.latest_job?.id;
@@ -247,11 +262,24 @@ export async function refreshWizardSnapshot({
     setActiveJob?.({
       id: activeJobId,
       stepId: activeJobStep.id,
-      clusterId: activeJob?.cluster_id || activeJobStep?.state?.cluster_id || discoveredClusterId || clusterIdRef.current || '',
-      clusterInstanceId: activeJob?.cluster_instance_id || activeJobStep?.state?.cluster_instance_id || discoveredClusterInstanceId || clusterInstanceIdRef.current || '',
-      status: activeJob?.status || activeJobStep?.status || 'running',
+      clusterId:
+        activeJob?.cluster_id ||
+        activeJobStep?.state?.cluster_id ||
+        discoveredClusterId ||
+        clusterIdRef.current ||
+        "",
+      clusterInstanceId:
+        activeJob?.cluster_instance_id ||
+        activeJobStep?.state?.cluster_instance_id ||
+        discoveredClusterInstanceId ||
+        clusterInstanceIdRef.current ||
+        "",
+      status: activeJob?.status || activeJobStep?.status || "running",
     });
-  } else if (selectedStep?.latest_job?.status && ['canceled', 'failed', 'succeeded'].includes(selectedStep.latest_job.status)) {
+  } else if (
+    selectedStep?.latest_job?.status &&
+    ["canceled", "failed", "succeeded"].includes(selectedStep.latest_job.status)
+  ) {
     setActiveJob?.(null);
   }
   if (latestJobId) {
@@ -268,7 +296,7 @@ export async function refreshWizardSnapshot({
   }
 
   if (clearError) {
-    setError('');
+    setError("");
   }
 
   return catalogValue;

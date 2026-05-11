@@ -11,7 +11,11 @@ import {
   normalizeObservabilityProfile,
   persistCluster,
 } from "./lib/clusters.js";
-import { buildAppCatalogResponse, buildCatalogResponse, validateStepInputs } from "./lib/catalog.js";
+import {
+  buildAppCatalogResponse,
+  buildCatalogResponse,
+  validateStepInputs,
+} from "./lib/catalog.js";
 import {
   buildDataDirs,
   ensureDir,
@@ -21,7 +25,11 @@ import {
   readJson,
   writeJson,
 } from "./lib/common.js";
-import { buildIpBlock, checkIpAvailability, selectSuggestedIpAllocation } from "./lib/ip-allocation.js";
+import {
+  buildIpBlock,
+  checkIpAvailability,
+  selectSuggestedIpAllocation,
+} from "./lib/ip-allocation.js";
 import { cancelJob, queueJob } from "./lib/jobs.js";
 import {
   buildProxmoxApiSecretBundle,
@@ -64,9 +72,9 @@ function probeIpInUse(ip, options = {}) {
     : 2;
   const isDefaultPing = path.basename(pingBin) === "ping";
   const args = isDefaultPing
-    ? (process.platform === "darwin"
+    ? process.platform === "darwin"
       ? ["-n", "-c", "1", "-W", "1000", ip]
-      : ["-n", "-c", "1", "-W", "1", ip])
+      : ["-n", "-c", "1", "-W", "1", ip]
     : [ip];
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
@@ -109,13 +117,17 @@ function proxmoxApiRequest(pathname, proxmoxEnv, { method = "GET", body, headers
     throw new Error("curl is required for Proxmox API suggestions");
   }
   if (result.status !== 0) {
-    throw new Error(result.stderr?.trim() || result.stdout?.trim() || `Proxmox API ${method} ${pathname} failed`);
+    throw new Error(
+      result.stderr?.trim() || result.stdout?.trim() || `Proxmox API ${method} ${pathname} failed`
+    );
   }
 
   try {
     return JSON.parse(result.stdout || "{}");
   } catch (error) {
-    throw new Error(`Failed to parse Proxmox API response: ${error instanceof Error ? error.message : "unknown error"}`);
+    throw new Error(
+      `Failed to parse Proxmox API response: ${error instanceof Error ? error.message : "unknown error"}`
+    );
   }
 }
 
@@ -123,7 +135,12 @@ function normalizeStoragePoolName(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function readClusterStorageStatusViaProxmoxApi(nodeNames, storagePoolName, resolved = null, ticket = "") {
+function readClusterStorageStatusViaProxmoxApi(
+  nodeNames,
+  storagePoolName,
+  resolved = null,
+  ticket = ""
+) {
   const ownsResolution = !resolved;
   const bundle = resolved || resolveSecretBundle(buildProxmoxApiSecretBundle());
 
@@ -155,12 +172,20 @@ function readClusterStorageStatusViaProxmoxApi(nodeNames, storagePoolName, resol
       }
     }
 
-    const storageResources = proxmoxApiRequest("/api2/json/cluster/resources?type=storage", bundle.env, {
-      headers: {
-        Cookie: `PVEAuthCookie=${authTicket}`,
-      },
-    });
-    const nodeLookup = new Set(Array.isArray(nodeNames) ? nodeNames.map((entry) => String(entry || "").trim()).filter(Boolean) : []);
+    const storageResources = proxmoxApiRequest(
+      "/api2/json/cluster/resources?type=storage",
+      bundle.env,
+      {
+        headers: {
+          Cookie: `PVEAuthCookie=${authTicket}`,
+        },
+      }
+    );
+    const nodeLookup = new Set(
+      Array.isArray(nodeNames)
+        ? nodeNames.map((entry) => String(entry || "").trim()).filter(Boolean)
+        : []
+    );
     const storageByNode = new Map();
     for (const entry of Array.isArray(storageResources?.data) ? storageResources.data : []) {
       const nodeName = String(entry?.node || "").trim();
@@ -191,20 +216,6 @@ function resolveRequestedCluster(clusterId) {
   }
 
   return { ok: true, cluster: readJson(clusterFile) };
-}
-
-function resolveLatestCluster() {
-  if (!fs.existsSync(dirs.clusters)) {
-    return null;
-  }
-
-  const clusterFiles = fs.readdirSync(dirs.clusters)
-    .filter((entry) => entry.endsWith(".json"))
-    .map((entry) => readJson(path.join(dirs.clusters, entry)))
-    .filter((cluster) => cluster?.id)
-    .sort((left, right) => String(right?.updated_at || right?.created_at || "").localeCompare(String(left?.updated_at || left?.created_at || "")));
-
-  return clusterFiles[0] || null;
 }
 
 function buildSecretItemName(ref, context = {}) {
@@ -266,8 +277,7 @@ function envFallbackRecord(ref) {
   const username = trimString(process.env.PROXMOX_USER || process.env.PROXMOX_USERNAME);
   const password = trimString(process.env.PROXMOX_PASSWORD || process.env.TF_VAR_proxmox_password);
   const endpoint = trimString(
-    process.env.TF_VAR_proxmox_endpoint
-    || (host && port ? `https://${host}:${port}` : ""),
+    process.env.TF_VAR_proxmox_endpoint || (host && port ? `https://${host}:${port}` : "")
   );
 
   const record = {};
@@ -307,9 +317,13 @@ function materializeRef(rawRef, label, context = {}) {
   }
 
   const value = resolveTextRef(ref, context);
-  const tempRoot = process.env.TWINBOX_SECRET_TEMP_DIR || path.join(process.env.MANAGER_DATA_DIR || "/tmp", "twinbox-secrets");
+  const tempRoot =
+    process.env.TWINBOX_SECRET_TEMP_DIR ||
+    path.join(process.env.MANAGER_DATA_DIR || "/tmp", "twinbox-secrets");
   fs.mkdirSync(tempRoot, { recursive: true, mode: 0o700 });
-  const targetDir = fs.mkdtempSync(path.join(tempRoot, `${String(label || "secret").replace(/[^a-zA-Z0-9_.-]+/g, "-")}-`));
+  const targetDir = fs.mkdtempSync(
+    path.join(tempRoot, `${String(label || "secret").replace(/[^a-zA-Z0-9_.-]+/g, "-")}-`)
+  );
   const targetFile = path.join(targetDir, "value");
   fs.writeFileSync(targetFile, value, { mode: 0o600 });
   return targetFile;
@@ -383,15 +397,21 @@ function listAttachmentNames(ref, context = {}) {
     return [];
   }
 
-  const dir = scope === "cluster"
-    ? clusterSecretDir(process.env, ref?.cluster_id || context.clusterId || context.cluster_id, item)
-    : path.join(secretRoot(process.env), "global", item);
+  const dir =
+    scope === "cluster"
+      ? clusterSecretDir(
+          process.env,
+          ref?.cluster_id || context.clusterId || context.cluster_id,
+          item
+        )
+      : path.join(secretRoot(process.env), "global", item);
 
   if (!fs.existsSync(dir)) {
     return [];
   }
 
-  return fs.readdirSync(dir, { withFileTypes: true })
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
     .filter((entry) => entry.isFile())
     .map((entry) => entry.name)
     .sort();
@@ -471,9 +491,9 @@ async function listUsedVmidsViaProxmoxApi() {
     return new Set(
       Array.isArray(resources?.data)
         ? resources.data
-          .map((entry) => Number(entry?.vmid))
-          .filter((value) => Number.isInteger(value) && value >= 100)
-        : [],
+            .map((entry) => Number(entry?.vmid))
+            .filter((value) => Number.isInteger(value) && value >= 100)
+        : []
     );
   } finally {
     resolved.cleanup();
@@ -515,11 +535,18 @@ async function listClusterNodeResourcesViaProxmoxApi() {
     });
 
     const nodes = Array.isArray(resources?.data) ? resources.data : [];
-    const storagePoolName = normalizeStoragePoolName(process.env.PROXMOX_STORAGE_POOL || "local-lvm");
+    const storagePoolName = normalizeStoragePoolName(
+      process.env.PROXMOX_STORAGE_POOL || "local-lvm"
+    );
     const nodeNames = nodes
       .map((entry) => String(entry?.node || entry?.name || entry?.id || "").trim())
       .filter(Boolean);
-    const { storageByNode } = readClusterStorageStatusViaProxmoxApi(nodeNames, storagePoolName, resolved, ticket);
+    const { storageByNode } = readClusterStorageStatusViaProxmoxApi(
+      nodeNames,
+      storagePoolName,
+      resolved,
+      ticket
+    );
 
     return nodes.map((entry) => {
       const nodeName = String(entry?.node || entry?.name || entry?.id || "").trim();
@@ -606,21 +633,27 @@ async function listClusterVmResources() {
   }
 
   if (result.status !== 0) {
-    throw new Error(`Cluster resources lookup failed: ${(result.stderr || result.stdout || "").trim()}`);
+    throw new Error(
+      `Cluster resources lookup failed: ${(result.stderr || result.stdout || "").trim()}`
+    );
   }
 
   try {
     const parsed = JSON.parse(result.stdout || "[]");
     return Array.isArray(parsed) ? parsed : [];
   } catch (error) {
-    throw new Error(`Failed to parse cluster VM resources: ${error instanceof Error ? error.message : "unknown error"}`);
+    throw new Error(
+      `Failed to parse cluster VM resources: ${error instanceof Error ? error.message : "unknown error"}`
+    );
   }
 }
 
 async function listUsedVmids() {
   const resourcesBin = process.env.MANAGER_API_CLUSTER_RESOURCES_BIN || "pvesh";
   const isDefaultResourcesBin = path.basename(resourcesBin) === "pvesh";
-  const args = isDefaultResourcesBin ? ["get", "/cluster/resources", "--type", "vm", "--output-format", "json"] : [];
+  const args = isDefaultResourcesBin
+    ? ["get", "/cluster/resources", "--type", "vm", "--output-format", "json"]
+    : [];
   const result = spawnSync(resourcesBin, args, {
     encoding: "utf8",
     timeout: 3000,
@@ -644,14 +677,16 @@ async function listUsedVmids() {
           .slice(1)
           .map((line) => line.trim().split(/\s+/)[0])
           .filter((value) => /^\d+$/.test(value))
-          .map(Number),
+          .map(Number)
       );
     }
     throw new Error(`Cluster resources command not found: ${resourcesBin}`);
   }
 
   if (result.status !== 0) {
-    throw new Error(`Cluster resources lookup failed: ${(result.stderr || result.stdout || "").trim()}`);
+    throw new Error(
+      `Cluster resources lookup failed: ${(result.stderr || result.stdout || "").trim()}`
+    );
   }
 
   try {
@@ -659,12 +694,14 @@ async function listUsedVmids() {
     return new Set(
       Array.isArray(parsed)
         ? parsed
-          .map((entry) => Number(entry?.vmid))
-          .filter((value) => Number.isInteger(value) && value >= 100)
-        : [],
+            .map((entry) => Number(entry?.vmid))
+            .filter((value) => Number.isInteger(value) && value >= 100)
+        : []
     );
   } catch (error) {
-    throw new Error(`Failed to parse cluster VM resources: ${error instanceof Error ? error.message : "unknown error"}`);
+    throw new Error(
+      `Failed to parse cluster VM resources: ${error instanceof Error ? error.message : "unknown error"}`
+    );
   }
 }
 
@@ -687,14 +724,18 @@ async function listClusterNodeResources() {
   }
 
   if (result.status !== 0) {
-    throw new Error(`Cluster resources lookup failed: ${(result.stderr || result.stdout || "").trim()}`);
+    throw new Error(
+      `Cluster resources lookup failed: ${(result.stderr || result.stdout || "").trim()}`
+    );
   }
 
   try {
     const parsed = JSON.parse(result.stdout || "[]");
     return Array.isArray(parsed) ? parsed : [];
   } catch (error) {
-    throw new Error(`Failed to parse cluster node resources: ${error instanceof Error ? error.message : "unknown error"}`);
+    throw new Error(
+      `Failed to parse cluster node resources: ${error instanceof Error ? error.message : "unknown error"}`
+    );
   }
 }
 
@@ -702,8 +743,8 @@ async function listClusterNodeNames() {
   const resources = await listClusterNodeResources();
   const names = Array.isArray(resources)
     ? resources
-      .map((entry) => String(entry?.node || entry?.name || entry?.id || "").trim())
-      .filter(Boolean)
+        .map((entry) => String(entry?.node || entry?.name || entry?.id || "").trim())
+        .filter(Boolean)
     : [];
 
   if (names.length === 0) {
@@ -720,7 +761,9 @@ function summarizeClusterResources(resources, vmResources = []) {
   const vms = Array.isArray(vmResources) ? vmResources : [];
   const activeVmCounts = vms.reduce((accumulator, entry) => {
     const node = String(entry?.node || "").trim();
-    const status = String(entry?.status || entry?.qmpstatus || "").trim().toLowerCase();
+    const status = String(entry?.status || entry?.qmpstatus || "")
+      .trim()
+      .toLowerCase();
     if (!node || (status && status !== "running")) {
       return accumulator;
     }
@@ -728,34 +771,37 @@ function summarizeClusterResources(resources, vmResources = []) {
     return accumulator;
   }, {});
 
-  const summary = nodes.reduce((accumulator, entry) => {
-    const maxMem = Number(entry?.maxmem || 0);
-    const usedMem = Number(entry?.mem || 0);
-    const maxDisk = Number(entry?.maxdisk || 0);
-    const usedDisk = Number(entry?.disk || 0);
-    const maxCpu = Number(entry?.maxcpu || 0);
-    const cpuLoad = Number(entry?.cpu || 0);
+  const summary = nodes.reduce(
+    (accumulator, entry) => {
+      const maxMem = Number(entry?.maxmem || 0);
+      const usedMem = Number(entry?.mem || 0);
+      const maxDisk = Number(entry?.maxdisk || 0);
+      const usedDisk = Number(entry?.disk || 0);
+      const maxCpu = Number(entry?.maxcpu || 0);
+      const cpuLoad = Number(entry?.cpu || 0);
 
-    accumulator.nodeCount += 1;
-    accumulator.totalMemoryMb += maxMem > 0 ? maxMem / MB : 0;
-    accumulator.usedMemoryMb += usedMem > 0 ? usedMem / MB : 0;
-    accumulator.totalDiskGb += maxDisk > 0 ? maxDisk / GB : 0;
-    accumulator.usedDiskGb += usedDisk > 0 ? usedDisk / GB : 0;
-    accumulator.totalCpuCores += maxCpu > 0 ? maxCpu : 0;
-    accumulator.usedCpuCores += maxCpu > 0 ? maxCpu * Math.min(Math.max(cpuLoad, 0), 1) : 0;
-    return accumulator;
-  }, {
-    nodeCount: 0,
-    totalMemoryMb: 0,
-    usedMemoryMb: 0,
-    freeMemoryMb: 0,
-    totalDiskGb: 0,
-    usedDiskGb: 0,
-    freeDiskGb: 0,
-    totalCpuCores: 0,
-    usedCpuCores: 0,
-    freeCpuCores: 0,
-  });
+      accumulator.nodeCount += 1;
+      accumulator.totalMemoryMb += maxMem > 0 ? maxMem / MB : 0;
+      accumulator.usedMemoryMb += usedMem > 0 ? usedMem / MB : 0;
+      accumulator.totalDiskGb += maxDisk > 0 ? maxDisk / GB : 0;
+      accumulator.usedDiskGb += usedDisk > 0 ? usedDisk / GB : 0;
+      accumulator.totalCpuCores += maxCpu > 0 ? maxCpu : 0;
+      accumulator.usedCpuCores += maxCpu > 0 ? maxCpu * Math.min(Math.max(cpuLoad, 0), 1) : 0;
+      return accumulator;
+    },
+    {
+      nodeCount: 0,
+      totalMemoryMb: 0,
+      usedMemoryMb: 0,
+      freeMemoryMb: 0,
+      totalDiskGb: 0,
+      usedDiskGb: 0,
+      freeDiskGb: 0,
+      totalCpuCores: 0,
+      usedCpuCores: 0,
+      freeCpuCores: 0,
+    }
+  );
 
   summary.freeMemoryMb = Math.max(0, summary.totalMemoryMb - summary.usedMemoryMb);
   summary.freeDiskGb = Math.max(0, summary.totalDiskGb - summary.usedDiskGb);
@@ -764,7 +810,8 @@ function summarizeClusterResources(resources, vmResources = []) {
   return {
     nodes: nodes.map((entry) => ({
       ...entry,
-      activeVmCount: activeVmCounts[String(entry?.node || entry?.name || entry?.id || "").trim()] || 0,
+      activeVmCount:
+        activeVmCounts[String(entry?.node || entry?.name || entry?.id || "").trim()] || 0,
     })),
     vms,
     summary,
@@ -807,7 +854,10 @@ function readIpCommand(args) {
 
 function detectNodePrefixLength(managementIp) {
   const output = readIpCommand(["-o", "-f", "inet", "addr", "show", "scope", "global"]);
-  const lines = output.split("\n").map((line) => line.trim()).filter(Boolean);
+  const lines = output
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
   const exact = lines.find((line) => line.includes(` inet ${managementIp}/`));
   if (!exact) {
     return 24;
@@ -843,7 +893,9 @@ function isLoopbackIpv4(ip) {
 }
 
 function isPlaceholderDnsDomain(domain) {
-  const normalized = String(domain || "").trim().toLowerCase();
+  const normalized = String(domain || "")
+    .trim()
+    .toLowerCase();
   return normalized === "localdomain" || normalized === "localhost.localdomain";
 }
 
@@ -940,15 +992,11 @@ async function suggestAllocation(managementIp, nodeCount) {
 }
 
 async function validateRequestedAllocation({ startVmid, vipIp, startIp, nodeCount }, options = {}) {
-  const {
-    skipVmidCheck = false,
-    usedVmids = null,
-    probeIpInUseFn = probeIpInUse,
-  } = options;
+  const { skipVmidCheck = false, usedVmids = null, probeIpInUseFn = probeIpInUse } = options;
   const requestedVmids = Array.from({ length: nodeCount }, (_, offset) => startVmid + offset);
 
   if (!skipVmidCheck) {
-    const vmidLookup = usedVmids || await listUsedVmids();
+    const vmidLookup = usedVmids || (await listUsedVmids());
     if (!requestedVmids.every((vmid) => !vmidLookup.has(vmid))) {
       return {
         ok: false,
@@ -986,10 +1034,6 @@ async function validateRequestedAllocation({ startVmid, vipIp, startIp, nodeCoun
   }
 
   return { ok: true };
-}
-
-function clusterScopeId(cluster = null, fallback = null) {
-  return cluster?.cluster_instance_id || cluster?.instance_id || fallback || null;
 }
 
 function shouldReuseProvisionClusterInstance(existingCluster, requestedClusterInstanceId) {
@@ -1036,7 +1080,8 @@ function writeStepState(stepId, patch, clusterScope = null) {
     ...patch,
     step_id: stepId,
     cluster_id: patch.cluster_id ?? current.cluster_id ?? clusterScope ?? null,
-    cluster_instance_id: patch.cluster_instance_id ?? current.cluster_instance_id ?? clusterScope ?? null,
+    cluster_instance_id:
+      patch.cluster_instance_id ?? current.cluster_instance_id ?? clusterScope ?? null,
     updated_at: now(),
   };
   writeJson(file, next);
@@ -1087,7 +1132,9 @@ app.get("/api/health", (_, res) => {
 });
 
 app.get(/^\/api\/secrets\/.*$/, (req, res) => {
-  const secretKeyPath = decodeURIComponent(String(req.originalUrl || "").split("/api/secrets/")[1] || "");
+  const secretKeyPath = decodeURIComponent(
+    String(req.originalUrl || "").split("/api/secrets/")[1] || ""
+  );
 
   try {
     const ref = parseSecretKeyPath(secretKeyPath);
@@ -1105,10 +1152,7 @@ app.get(/^\/api\/secrets\/.*$/, (req, res) => {
 
 app.get("/api/proxmox/cluster-resources", async (_, res) => {
   try {
-    const [nodes, vms] = await Promise.all([
-      listClusterNodeResources(),
-      listClusterVmResources(),
-    ]);
+    const [nodes, vms] = await Promise.all([listClusterNodeResources(), listClusterVmResources()]);
     return res.json(summarizeClusterResources(nodes, vms));
   } catch (error) {
     return res.status(500).json({
@@ -1126,7 +1170,11 @@ app.get("/api/catalog", (req, res) => {
     }
   }
 
-  const catalog = buildCatalogResponse({ workspaceRoot, dirs, clusterId: requestedClusterId || null });
+  const catalog = buildCatalogResponse({
+    workspaceRoot,
+    dirs,
+    clusterId: requestedClusterId || null,
+  });
   return res.json({
     categories: catalog.categories,
     errors: catalog.errors,
@@ -1142,7 +1190,11 @@ app.get("/api/apps/catalog", (req, res) => {
     }
   }
 
-  const catalog = buildAppCatalogResponse({ workspaceRoot, dirs, clusterId: requestedClusterId || null });
+  const catalog = buildAppCatalogResponse({
+    workspaceRoot,
+    dirs,
+    clusterId: requestedClusterId || null,
+  });
   if (!catalog.active_cluster?.id) {
     return res.status(404).json({ error: "cluster not found" });
   }
@@ -1152,11 +1204,15 @@ app.get("/api/apps/catalog", (req, res) => {
 
 app.post("/api/apps/:stepId/install", async (req, res) => {
   const stepId = req.params.stepId;
-  const requestedClusterId = typeof req.body?.cluster_id === "string" ? req.body.cluster_id.trim() : "";
-  const requestedClusterInstanceId = typeof req.body?.cluster_instance_id === "string"
-    ? req.body.cluster_instance_id.trim()
-    : "";
-  const catalog = buildAppCatalogResponse({ workspaceRoot, dirs, clusterId: requestedClusterId || null });
+  const requestedClusterId =
+    typeof req.body?.cluster_id === "string" ? req.body.cluster_id.trim() : "";
+  const requestedClusterInstanceId =
+    typeof req.body?.cluster_instance_id === "string" ? req.body.cluster_instance_id.trim() : "";
+  const catalog = buildAppCatalogResponse({
+    workspaceRoot,
+    dirs,
+    clusterId: requestedClusterId || null,
+  });
   const appCategory = catalog.categories.find((category) => category.id === "apps");
   const step = appCategory?.steps.find((candidate) => candidate.id === stepId);
 
@@ -1170,7 +1226,9 @@ app.post("/api/apps/:stepId/install", async (req, res) => {
   }
 
   if (visibleStep.app_state === "blocked") {
-    return res.status(409).json({ error: `${stepId} is blocked until its dependencies are complete` });
+    return res
+      .status(409)
+      .json({ error: `${stepId} is blocked until its dependencies are complete` });
   }
 
   if (visibleStep.app_state === "planned") {
@@ -1186,7 +1244,11 @@ app.post("/api/apps/:stepId/install", async (req, res) => {
     return res.status(409).json({ error: `${stepId} is already installed` });
   }
 
-  if (requestedClusterId && catalog.active_cluster?.id && requestedClusterId !== catalog.active_cluster.id) {
+  if (
+    requestedClusterId &&
+    catalog.active_cluster?.id &&
+    requestedClusterId !== catalog.active_cluster.id
+  ) {
     return res.status(409).json({ error: "cluster mismatch" });
   }
 
@@ -1197,12 +1259,19 @@ app.post("/api/apps/:stepId/install", async (req, res) => {
 
   const resolvedCluster = resolveRequestedCluster(activeClusterId);
   if (!resolvedCluster.ok || !resolvedCluster.cluster?.id) {
-    return res.status(resolvedCluster.status || 404).json({ error: resolvedCluster.error || "cluster not found" });
+    return res
+      .status(resolvedCluster.status || 404)
+      .json({ error: resolvedCluster.error || "cluster not found" });
   }
   const activeCluster = resolvedCluster.cluster;
 
-  const activeClusterInstanceId = activeCluster.cluster_instance_id || activeCluster.instance_id || null;
-  if (requestedClusterInstanceId && activeClusterInstanceId && requestedClusterInstanceId !== activeClusterInstanceId) {
+  const activeClusterInstanceId =
+    activeCluster.cluster_instance_id || activeCluster.instance_id || null;
+  if (
+    requestedClusterInstanceId &&
+    activeClusterInstanceId &&
+    requestedClusterInstanceId !== activeClusterInstanceId
+  ) {
     return res.status(409).json({ error: "cluster instance mismatch" });
   }
 
@@ -1219,20 +1288,28 @@ app.post("/api/apps/:stepId/install", async (req, res) => {
     context: { cluster: activeCluster },
   };
 
-  if (step.secrets && (Object.keys(step.secrets.env || {}).length > 0 || Object.keys(step.secrets.files || {}).length > 0)) {
+  if (
+    step.secrets &&
+    (Object.keys(step.secrets.env || {}).length > 0 ||
+      Object.keys(step.secrets.files || {}).length > 0)
+  ) {
     payload.secret_bundle = normalizeSecretBundle(step.secrets);
   }
 
   const job = queueJob(dirs, "run_step", activeCluster.id, payload);
-  writeStepState(step.id, {
-    status: "pending",
-    inputs: validated.value,
-    outputs: null,
-    error: null,
-    last_job_id: job.id,
-    cluster_id: activeCluster.id,
-    cluster_instance_id: activeClusterInstanceId,
-  }, activeClusterInstanceId || activeCluster.id);
+  writeStepState(
+    step.id,
+    {
+      status: "pending",
+      inputs: validated.value,
+      outputs: null,
+      error: null,
+      last_job_id: job.id,
+      cluster_id: activeCluster.id,
+      cluster_instance_id: activeClusterInstanceId,
+    },
+    activeClusterInstanceId || activeCluster.id
+  );
 
   return res.status(202).json({
     step_id: step.id,
@@ -1245,11 +1322,15 @@ app.post("/api/apps/:stepId/install", async (req, res) => {
 
 app.post("/api/apps/:stepId/uninstall", async (req, res) => {
   const stepId = req.params.stepId;
-  const requestedClusterId = typeof req.body?.cluster_id === "string" ? req.body.cluster_id.trim() : "";
-  const requestedClusterInstanceId = typeof req.body?.cluster_instance_id === "string"
-    ? req.body.cluster_instance_id.trim()
-    : "";
-  const catalog = buildAppCatalogResponse({ workspaceRoot, dirs, clusterId: requestedClusterId || null });
+  const requestedClusterId =
+    typeof req.body?.cluster_id === "string" ? req.body.cluster_id.trim() : "";
+  const requestedClusterInstanceId =
+    typeof req.body?.cluster_instance_id === "string" ? req.body.cluster_instance_id.trim() : "";
+  const catalog = buildAppCatalogResponse({
+    workspaceRoot,
+    dirs,
+    clusterId: requestedClusterId || null,
+  });
   const appCategory = catalog.categories.find((category) => category.id === "apps");
   const step = appCategory?.steps.find((candidate) => candidate.id === stepId);
 
@@ -1262,7 +1343,11 @@ app.post("/api/apps/:stepId/uninstall", async (req, res) => {
     return res.status(409).json({ error: `${stepId} is not installed` });
   }
 
-  if (requestedClusterId && catalog.active_cluster?.id && requestedClusterId !== catalog.active_cluster.id) {
+  if (
+    requestedClusterId &&
+    catalog.active_cluster?.id &&
+    requestedClusterId !== catalog.active_cluster.id
+  ) {
     return res.status(409).json({ error: "cluster mismatch" });
   }
 
@@ -1273,12 +1358,19 @@ app.post("/api/apps/:stepId/uninstall", async (req, res) => {
 
   const resolvedCluster = resolveRequestedCluster(activeClusterId);
   if (!resolvedCluster.ok || !resolvedCluster.cluster?.id) {
-    return res.status(resolvedCluster.status || 404).json({ error: resolvedCluster.error || "cluster not found" });
+    return res
+      .status(resolvedCluster.status || 404)
+      .json({ error: resolvedCluster.error || "cluster not found" });
   }
   const activeCluster = resolvedCluster.cluster;
 
-  const activeClusterInstanceId = activeCluster.cluster_instance_id || activeCluster.instance_id || null;
-  if (requestedClusterInstanceId && activeClusterInstanceId && requestedClusterInstanceId !== activeClusterInstanceId) {
+  const activeClusterInstanceId =
+    activeCluster.cluster_instance_id || activeCluster.instance_id || null;
+  if (
+    requestedClusterInstanceId &&
+    activeClusterInstanceId &&
+    requestedClusterInstanceId !== activeClusterInstanceId
+  ) {
     return res.status(409).json({ error: "cluster instance mismatch" });
   }
 
@@ -1296,7 +1388,7 @@ app.post("/api/apps/:stepId/uninstall", async (req, res) => {
     cluster_instance_id: activeClusterInstanceId,
     secret_bundle: mergeSecretBundles(
       buildClusterWorkerSecretBundle(activeCluster),
-      stepSecretBundle,
+      stepSecretBundle
     ),
     app_name: appName,
     manifest_path: manifestPath,
@@ -1305,15 +1397,19 @@ app.post("/api/apps/:stepId/uninstall", async (req, res) => {
   };
 
   const job = queueJob(dirs, "uninstall_step", activeCluster.id, payload);
-  writeStepState(step.id, {
-    status: "running",
-    inputs: {},
-    outputs: null,
-    error: null,
-    last_job_id: job.id,
-    cluster_id: activeCluster.id,
-    cluster_instance_id: activeClusterInstanceId,
-  }, activeClusterInstanceId || activeCluster.id);
+  writeStepState(
+    step.id,
+    {
+      status: "running",
+      inputs: {},
+      outputs: null,
+      error: null,
+      last_job_id: job.id,
+      cluster_id: activeCluster.id,
+      cluster_instance_id: activeClusterInstanceId,
+    },
+    activeClusterInstanceId || activeCluster.id
+  );
 
   return res.status(202).json({
     step_id: step.id,
@@ -1368,10 +1464,12 @@ app.post("/api/ip-availability", async (req, res) => {
   }
 
   try {
-    return res.json(await checkIpAvailability({
-      ips: normalizedIps,
-      isIpInUse: probeIpInUse,
-    }));
+    return res.json(
+      await checkIpAvailability({
+        ips: normalizedIps,
+        isIpInUse: probeIpInUse,
+      })
+    );
   } catch (error) {
     return res.status(500).json({
       error: error instanceof Error ? error.message : "failed to check IP availability",
@@ -1412,7 +1510,12 @@ app.post("/api/clusters", async (req, res) => {
   }
 
   persistCluster(dirs, built.cluster);
-  const job = queueJob(dirs, "apply_cluster", built.cluster.id, buildApplyJobPayload(built.cluster));
+  const job = queueJob(
+    dirs,
+    "apply_cluster",
+    built.cluster.id,
+    buildApplyJobPayload(built.cluster)
+  );
   return res.status(202).json({
     cluster_id: built.cluster.id,
     cluster_instance_id: built.cluster.cluster_instance_id,
@@ -1429,10 +1532,12 @@ app.post("/api/clusters/:clusterId/bootstrap", (req, res) => {
   }
 
   const cluster = readJson(clusterFile);
-  const requestedClusterInstanceId = typeof req.body?.cluster_instance_id === "string"
-    ? req.body.cluster_instance_id.trim()
-    : "";
-  if (requestedClusterInstanceId && requestedClusterInstanceId !== (cluster.cluster_instance_id || "")) {
+  const requestedClusterInstanceId =
+    typeof req.body?.cluster_instance_id === "string" ? req.body.cluster_instance_id.trim() : "";
+  if (
+    requestedClusterInstanceId &&
+    requestedClusterInstanceId !== (cluster.cluster_instance_id || "")
+  ) {
     return res.status(409).json({ error: "cluster instance mismatch" });
   }
   const payload = buildBootstrapPayload(cluster, req.body || {});
@@ -1447,24 +1552,32 @@ app.post("/api/clusters/:clusterId/bootstrap", (req, res) => {
 
 app.post("/api/steps/:stepId/execute", async (req, res) => {
   const stepId = req.params.stepId;
-  const requestedClusterId = typeof req.body?.cluster_id === "string" ? req.body.cluster_id.trim() : "";
-  const requestedClusterInstanceId = typeof req.body?.cluster_instance_id === "string"
-    ? req.body.cluster_instance_id.trim()
-    : "";
-  const catalog = buildCatalogResponse({ workspaceRoot, dirs, clusterId: requestedClusterId || null });
+  const requestedClusterId =
+    typeof req.body?.cluster_id === "string" ? req.body.cluster_id.trim() : "";
+  const requestedClusterInstanceId =
+    typeof req.body?.cluster_instance_id === "string" ? req.body.cluster_instance_id.trim() : "";
+  const catalog = buildCatalogResponse({
+    workspaceRoot,
+    dirs,
+    clusterId: requestedClusterId || null,
+  });
   const step = catalog.stepsById.get(stepId);
 
   if (!step) {
     return res.status(404).json({ error: "step not found" });
   }
 
-  const visibleStep = catalog.categories.flatMap((category) => category.steps).find((candidate) => candidate.id === stepId);
+  const visibleStep = catalog.categories
+    .flatMap((category) => category.steps)
+    .find((candidate) => candidate.id === stepId);
   if (!visibleStep) {
     return res.status(404).json({ error: "step not found" });
   }
 
   if (visibleStep.status === "locked") {
-    return res.status(409).json({ error: `${stepId} is locked until its dependencies are complete` });
+    return res
+      .status(409)
+      .json({ error: `${stepId} is locked until its dependencies are complete` });
   }
 
   const validated = validateStepInputs(step, req.body?.inputs);
@@ -1485,31 +1598,38 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
       });
     }
 
-    const requestedClusterFile = requestedClusterId ? path.join(dirs.clusters, `${requestedClusterId}.json`) : "";
-    const existingCluster = requestedClusterFile && fs.existsSync(requestedClusterFile)
-      ? readJson(requestedClusterFile)
-      : null;
-    if (requestedClusterInstanceId
-      && existingCluster?.cluster_instance_id
-      && requestedClusterInstanceId !== existingCluster.cluster_instance_id) {
+    const requestedClusterFile = requestedClusterId
+      ? path.join(dirs.clusters, `${requestedClusterId}.json`)
+      : "";
+    const existingCluster =
+      requestedClusterFile && fs.existsSync(requestedClusterFile)
+        ? readJson(requestedClusterFile)
+        : null;
+    if (
+      requestedClusterInstanceId &&
+      existingCluster?.cluster_instance_id &&
+      requestedClusterInstanceId !== existingCluster.cluster_instance_id
+    ) {
       return res.status(409).json({ error: "cluster instance mismatch" });
     }
     const reuseProvisionClusterInstance = shouldReuseProvisionClusterInstance(
       existingCluster,
-      requestedClusterInstanceId,
+      requestedClusterInstanceId
     );
 
-    const built = buildClusterFromRequest({
-      ...validated.value,
-      vm_ip_map: req.body?.vm_ip_map,
-      vm_size_map: req.body?.vm_size_map,
-      vm_node_map: req.body?.vm_node_map,
-    }, process.env, {
-      allowedVmHosts,
-      clusterInstanceId: reuseProvisionClusterInstance
-        ? requestedClusterInstanceId
-        : null,
-    });
+    const built = buildClusterFromRequest(
+      {
+        ...validated.value,
+        vm_ip_map: req.body?.vm_ip_map,
+        vm_size_map: req.body?.vm_size_map,
+        vm_node_map: req.body?.vm_node_map,
+      },
+      process.env,
+      {
+        allowedVmHosts,
+        clusterInstanceId: reuseProvisionClusterInstance ? requestedClusterInstanceId : null,
+      }
+    );
     if (!built.ok) {
       return res.status(400).json({ error: built.error });
     }
@@ -1522,9 +1642,11 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
     if (!requestedCluster.ok) {
       return res.status(requestedCluster.status || 400).json({ error: requestedCluster.error });
     }
-    if (requestedClusterInstanceId
-      && requestedCluster.cluster.cluster_instance_id
-      && requestedClusterInstanceId !== requestedCluster.cluster.cluster_instance_id) {
+    if (
+      requestedClusterInstanceId &&
+      requestedCluster.cluster.cluster_instance_id &&
+      requestedClusterInstanceId !== requestedCluster.cluster.cluster_instance_id
+    ) {
       return res.status(409).json({ error: "cluster instance mismatch" });
     }
     clusterId = requestedCluster.cluster.id;
@@ -1540,21 +1662,29 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
   };
   if (stepId === "provision-nodes" && context.cluster) {
     payload.secret_bundle = buildApplyJobPayload(context.cluster).secret_bundle;
-  } else if (step.secrets && (Object.keys(step.secrets.env || {}).length > 0 || Object.keys(step.secrets.files || {}).length > 0)) {
+  } else if (
+    step.secrets &&
+    (Object.keys(step.secrets.env || {}).length > 0 ||
+      Object.keys(step.secrets.files || {}).length > 0)
+  ) {
     payload.secret_bundle = normalizeSecretBundle(step.secrets);
   }
   const job = queueJob(dirs, "run_step", clusterId, payload);
   const clusterInstanceId = context?.cluster?.cluster_instance_id || null;
 
-  writeStepState(step.id, {
-    status: "pending",
-    inputs: validated.value,
-    outputs: null,
-    error: null,
-    last_job_id: job.id,
-    cluster_id: clusterId,
-    cluster_instance_id: clusterInstanceId,
-  }, isClusterScopedStep(step) ? (clusterInstanceId || clusterId) : null);
+  writeStepState(
+    step.id,
+    {
+      status: "pending",
+      inputs: validated.value,
+      outputs: null,
+      error: null,
+      last_job_id: job.id,
+      cluster_id: clusterId,
+      cluster_instance_id: clusterInstanceId,
+    },
+    isClusterScopedStep(step) ? clusterInstanceId || clusterId : null
+  );
 
   return res.status(202).json({
     step_id: step.id,
@@ -1567,15 +1697,22 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
 
 app.post("/api/steps/:stepId/skip", (req, res) => {
   const stepId = req.params.stepId;
-  const requestedClusterId = typeof req.body?.cluster_id === "string" ? req.body.cluster_id.trim() : "";
-  const catalog = buildCatalogResponse({ workspaceRoot, dirs, clusterId: requestedClusterId || null });
+  const requestedClusterId =
+    typeof req.body?.cluster_id === "string" ? req.body.cluster_id.trim() : "";
+  const catalog = buildCatalogResponse({
+    workspaceRoot,
+    dirs,
+    clusterId: requestedClusterId || null,
+  });
   const step = catalog.stepsById.get(stepId);
 
   if (!step) {
     return res.status(404).json({ error: "step not found" });
   }
 
-  const visibleStep = catalog.categories.flatMap((category) => category.steps).find((candidate) => candidate.id === stepId);
+  const visibleStep = catalog.categories
+    .flatMap((category) => category.steps)
+    .find((candidate) => candidate.id === stepId);
   if (!visibleStep) {
     return res.status(404).json({ error: "step not found" });
   }
@@ -1593,16 +1730,20 @@ app.post("/api/steps/:stepId/skip", (req, res) => {
   }
 
   const clusterScopeId = isClusterScopedStep(visibleStep)
-    ? (requestedClusterId || catalog.activeClusterScopeId || null)
+    ? requestedClusterId || catalog.activeClusterScopeId || null
     : null;
 
-  writeStepState(stepId, {
-    status: "skipped",
-    inputs: {},
-    outputs: null,
-    error: null,
-    last_job_id: null,
-  }, clusterScopeId);
+  writeStepState(
+    stepId,
+    {
+      status: "skipped",
+      inputs: {},
+      outputs: null,
+      error: null,
+      last_job_id: null,
+    },
+    clusterScopeId
+  );
 
   return res.status(200).json({
     step_id: stepId,
@@ -1612,15 +1753,22 @@ app.post("/api/steps/:stepId/skip", (req, res) => {
 
 app.post("/api/steps/:stepId/unskip", (req, res) => {
   const stepId = req.params.stepId;
-  const requestedClusterId = typeof req.body?.cluster_id === "string" ? req.body.cluster_id.trim() : "";
-  const catalog = buildCatalogResponse({ workspaceRoot, dirs, clusterId: requestedClusterId || null });
+  const requestedClusterId =
+    typeof req.body?.cluster_id === "string" ? req.body.cluster_id.trim() : "";
+  const catalog = buildCatalogResponse({
+    workspaceRoot,
+    dirs,
+    clusterId: requestedClusterId || null,
+  });
   const step = catalog.stepsById.get(stepId);
 
   if (!step) {
     return res.status(404).json({ error: "step not found" });
   }
 
-  const visibleStep = catalog.categories.flatMap((category) => category.steps).find((candidate) => candidate.id === stepId);
+  const visibleStep = catalog.categories
+    .flatMap((category) => category.steps)
+    .find((candidate) => candidate.id === stepId);
   if (!visibleStep) {
     return res.status(404).json({ error: "step not found" });
   }
@@ -1630,7 +1778,7 @@ app.post("/api/steps/:stepId/unskip", (req, res) => {
   }
 
   const clusterScopeId = isClusterScopedStep(visibleStep)
-    ? (requestedClusterId || catalog.activeClusterScopeId || null)
+    ? requestedClusterId || catalog.activeClusterScopeId || null
     : null;
 
   const file = stepStatePath(stepId, clusterScopeId);
@@ -1673,7 +1821,12 @@ app.put("/api/clusters/:clusterId/observability", (req, res) => {
     };
 
     persistCluster(dirs, updatedCluster);
-    const job = queueJob(dirs, "reconcile_observability", updatedCluster.id, buildApplyJobPayload(updatedCluster));
+    const job = queueJob(
+      dirs,
+      "reconcile_observability",
+      updatedCluster.id,
+      buildApplyJobPayload(updatedCluster)
+    );
     persistCluster(dirs, {
       ...updatedCluster,
       observability_last_job_id: job.id,
@@ -1710,7 +1863,11 @@ app.get("/api/jobs/:jobId/logs", (req, res) => {
     return res.json({ lines: [] });
   }
 
-  const lines = fs.readFileSync(file, "utf8").split("\n").filter(Boolean).map((line) => ({ line }));
+  const lines = fs
+    .readFileSync(file, "utf8")
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => ({ line }));
   return res.json({ lines });
 });
 

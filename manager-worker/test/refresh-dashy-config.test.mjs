@@ -14,9 +14,7 @@ function writeExecutable(file, content) {
 }
 
 function setupWorkspace(options = {}) {
-  const {
-    stepStatuses = {},
-  } = options;
+  const { stepStatuses = {} } = options;
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "dashy-refresh-test-"));
   const dataDir = path.join(root, "data");
   const binDir = path.join(root, "bin");
@@ -24,7 +22,9 @@ function setupWorkspace(options = {}) {
   const capturedConfigFile = path.join(root, "captured-dashy-config.yml");
 
   fs.mkdirSync(path.join(dataDir, "clusters"), { recursive: true });
-  fs.mkdirSync(path.join(dataDir, "step-state", "clusters", "cluster_test_instance"), { recursive: true });
+  fs.mkdirSync(path.join(dataDir, "step-state", "clusters", "cluster_test_instance"), {
+    recursive: true,
+  });
   fs.mkdirSync(binDir, { recursive: true });
 
   fs.writeFileSync(
@@ -36,7 +36,7 @@ function setupWorkspace(options = {}) {
       cluster_instance_id: "cluster_test_instance",
       created_at: "2026-01-01T00:00:00.000Z",
       updated_at: "2026-01-01T00:00:00.000Z",
-    }),
+    })
   );
 
   for (const [stepId, status] of Object.entries(stepStatuses)) {
@@ -49,7 +49,7 @@ function setupWorkspace(options = {}) {
         outputs: {},
         cluster_id: "cluster_test",
         cluster_instance_id: "cluster_test_instance",
-      }),
+      })
     );
   }
 
@@ -103,7 +103,7 @@ if [[ "$*" == *" rollout restart "* || "$*" == *" rollout status "* ]]; then
 fi
 
 exit 0
-`,
+`
   );
 
   return { root, dataDir, binDir, logFile, capturedConfigFile };
@@ -125,11 +125,16 @@ function runRefresh(triggerStepId, overrides = {}) {
 
   const args = [
     "manager-worker/src/refresh-dashy-config.mjs",
-    "--workspace-root", repoRoot,
-    "--manager-data-dir", dataDir,
-    "--cluster-id", "cluster_test",
-    "--trigger-step-id", triggerStepId,
-    "--cluster-instance-id", "cluster_test_instance",
+    "--workspace-root",
+    repoRoot,
+    "--manager-data-dir",
+    dataDir,
+    "--cluster-id",
+    "cluster_test",
+    "--trigger-step-id",
+    triggerStepId,
+    "--cluster-instance-id",
+    "cluster_test_instance",
   ];
 
   const result = spawnSync("node", args, {
@@ -153,7 +158,10 @@ test("refresh-dashy-config skips pre-dashboard steps without Dashy items", () =>
   const result = runRefresh("provision-nodes");
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Dashy refresh skipped: provision-nodes ran before Dashy was installed/);
+  assert.match(
+    result.stdout,
+    /Dashy refresh skipped: provision-nodes ran before Dashy was installed/
+  );
   assert.equal(fs.existsSync(result.logFile), false);
 });
 

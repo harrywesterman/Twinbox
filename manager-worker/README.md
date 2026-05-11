@@ -21,14 +21,14 @@ manager-worker/
 
 ## Job Types
 
-| Type | Description |
-|------|-------------|
-| `apply_cluster` | Runs `scripts/manager/apply-cluster.sh` with cluster parameters |
-| `create_cluster` | Alias for apply_cluster |
-| `bootstrap_cluster` | Alias for apply_cluster |
-| `reconcile_observability` | Reconciles the observability profile for the active cluster |
-| `run_step` | Executes a step script from `categories/` |
-| `uninstall_step` | Uninstalls an app by removing its Argo CD Application |
+| Type                      | Description                                                     |
+| ------------------------- | --------------------------------------------------------------- |
+| `apply_cluster`           | Runs `scripts/manager/apply-cluster.sh` with cluster parameters |
+| `create_cluster`          | Alias for apply_cluster                                         |
+| `bootstrap_cluster`       | Alias for apply_cluster                                         |
+| `reconcile_observability` | Reconciles the observability profile for the active cluster     |
+| `run_step`                | Executes a step script from `categories/`                       |
+| `uninstall_step`          | Uninstalls an app by removing its Argo CD Application           |
 
 ## Startup Sequence
 

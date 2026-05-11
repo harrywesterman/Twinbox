@@ -1,5 +1,5 @@
 function trimString(value) {
-  return typeof value === 'string' ? value.trim() : '';
+  return typeof value === "string" ? value.trim() : "";
 }
 
 function normalizeSearchValue(value) {
@@ -11,57 +11,57 @@ function isVisibleUser(user) {
   const name = normalizeSearchValue(user?.name);
   const type = normalizeSearchValue(user?.type);
 
-  if (type === 'service_account') {
+  if (type === "service_account") {
     return false;
   }
 
-  if (username === 'akadmin') {
+  if (username === "akadmin") {
     return false;
   }
 
-  if (username.startsWith('outpost-') || username.startsWith('ak-outpost-')) {
+  if (username.startsWith("outpost-") || username.startsWith("ak-outpost-")) {
     return false;
   }
 
-  if (name.includes('default admin')) {
+  if (name.includes("default admin")) {
     return false;
   }
 
-  if (name.includes('embedded outpost service-account')) {
+  if (name.includes("embedded outpost service-account")) {
     return false;
   }
 
   return true;
 }
 
-export function buildAdminNavigationItems({ isAdmin = false, zoneName = '' } = {}) {
+export function buildAdminNavigationItems({ isAdmin = false, zoneName = "" } = {}) {
   if (!isAdmin) {
     return [];
   }
 
   const items = [
     {
-      id: 'admin-app-installs',
-      path: '/admin/apps',
-      label: 'App installs',
+      id: "admin-app-installs",
+      path: "/admin/apps",
+      label: "App installs",
     },
     {
-      id: 'admin-observability',
-      path: '/admin/observability',
-      label: 'Observability',
+      id: "admin-observability",
+      path: "/admin/observability",
+      label: "Observability",
     },
     {
-      id: 'admin-users',
-      path: '/admin/users',
-      label: 'Users & groups',
+      id: "admin-users",
+      path: "/admin/users",
+      label: "Users & groups",
     },
   ];
 
   if (zoneName) {
     items.splice(1, 0, {
-      id: 'admin-management-consoles',
+      id: "admin-management-consoles",
       url: `https://admin.${zoneName}`,
-      label: 'Management consoles',
+      label: "Management consoles",
     });
   }
 
@@ -72,8 +72,8 @@ export function buildUserAdminViewModel({
   config = {},
   users = [],
   groups = [],
-  query = '',
-  selectedUserId = '',
+  query = "",
+  selectedUserId = "",
 } = {}) {
   const userAdminConfig = config?.userAdmin || {};
   const configuredGroups = Array.isArray(userAdminConfig.manageableGroups)
@@ -93,17 +93,20 @@ export function buildUserAdminViewModel({
       user?.name,
       user?.username,
       user?.email,
-      ...(Array.isArray(user?.groups) ? user.groups.map((group) => group?.label || group?.name) : []),
+      ...(Array.isArray(user?.groups)
+        ? user.groups.map((group) => group?.label || group?.name)
+        : []),
       ...(Array.isArray(user?.groupNames) ? user.groupNames : []),
     ];
 
     return haystacks.some((value) => normalizeSearchValue(value).includes(normalizedQuery));
   });
 
-  const selectedUser = filteredUsers.find((user) => user.id === selectedUserId)
-    || visibleUsers.find((user) => user.id === selectedUserId)
-    || filteredUsers[0]
-    || null;
+  const selectedUser =
+    filteredUsers.find((user) => user.id === selectedUserId) ||
+    visibleUsers.find((user) => user.id === selectedUserId) ||
+    filteredUsers[0] ||
+    null;
 
   const selectedGroupNames = new Set(selectedUser?.groupNames || []);
   const groupsWithSelection = normalizedGroups.map((group) => ({
@@ -114,21 +117,24 @@ export function buildUserAdminViewModel({
   let emptyState = null;
   if (configuredGroups.length === 0) {
     emptyState = {
-      title: userAdminConfig.emptyStateTitle || 'Nog geen beheerbare groepen ingesteld',
-      description: userAdminConfig.emptyStateDescription || 'Voeg eerst beheerbare groepen toe aan de portal-config.',
-      kind: 'not-configured',
+      title: userAdminConfig.emptyStateTitle || "Nog geen beheerbare groepen ingesteld",
+      description:
+        userAdminConfig.emptyStateDescription ||
+        "Voeg eerst beheerbare groepen toe aan de portal-config.",
+      kind: "not-configured",
     };
   } else if (normalizedGroups.length === 0) {
     emptyState = {
-      title: 'Nog geen beheerbare groepen gevonden',
-      description: 'De allowlist is ingesteld, maar deze groepen bestaan nog niet in Authentik of zijn bewust weggefilterd.',
-      kind: 'not-found',
+      title: "Nog geen beheerbare groepen gevonden",
+      description:
+        "De allowlist is ingesteld, maar deze groepen bestaan nog niet in Authentik of zijn bewust weggefilterd.",
+      kind: "not-found",
     };
   }
 
   return {
-    title: userAdminConfig.title || 'Gebruikers en groepen',
-    description: userAdminConfig.description || 'Beheer gebruikers en groepen vanuit het portal.',
+    title: userAdminConfig.title || "Gebruikers en groepen",
+    description: userAdminConfig.description || "Beheer gebruikers en groepen vanuit het portal.",
     filteredUsers,
     selectedUser,
     groups: groupsWithSelection,

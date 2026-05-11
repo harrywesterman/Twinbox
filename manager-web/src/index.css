@@ -17,8 +17,7 @@ html {
   scroll-behavior: smooth;
   background:
     radial-gradient(circle at top left, rgba(20, 184, 166, 0.14), transparent 26%),
-    radial-gradient(circle at top right, rgba(245, 158, 11, 0.12), transparent 22%),
-    #eef4fb;
+    radial-gradient(circle at top right, rgba(245, 158, 11, 0.12), transparent 22%), #eef4fb;
 }
 
 body {
@@ -26,8 +25,7 @@ body {
   min-height: 100dvh;
   background:
     radial-gradient(circle at top left, rgba(20, 184, 166, 0.14), transparent 26%),
-    radial-gradient(circle at top right, rgba(245, 158, 11, 0.12), transparent 22%),
-    #eef4fb;
+    radial-gradient(circle at top right, rgba(245, 158, 11, 0.12), transparent 22%), #eef4fb;
   color: var(--ink-1);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -41,8 +39,7 @@ body {
   padding: 24px;
   background:
     radial-gradient(circle at top left, rgba(20, 184, 166, 0.14), transparent 26%),
-    radial-gradient(circle at top right, rgba(245, 158, 11, 0.12), transparent 22%),
-    #eef4fb;
+    radial-gradient(circle at top right, rgba(245, 158, 11, 0.12), transparent 22%), #eef4fb;
   z-index: 20;
 }
 

@@ -1,11 +1,11 @@
 const SUGGESTED_FIELD_IDS = [
-  'name',
-  'start_vmid',
-  'vip_ip',
-  'node_prefix_length',
-  'gateway_ip',
-  'dns_servers',
-  'dns_domain',
+  "name",
+  "start_vmid",
+  "vip_ip",
+  "node_prefix_length",
+  "gateway_ip",
+  "dns_servers",
+  "dns_domain",
 ];
 
 export function buildSuggestedProvisionInputs(data = {}) {
@@ -15,8 +15,10 @@ export function buildSuggestedProvisionInputs(data = {}) {
     vip_ip: data.vip_ip ?? undefined,
     node_prefix_length: data.node_prefix_length ?? undefined,
     gateway_ip: data.gateway_ip ?? undefined,
-    dns_servers: Array.isArray(data.dns_servers) ? data.dns_servers.join(', ') : (data.dns_servers ?? undefined),
-    dns_domain: typeof data.dns_domain === 'string' ? data.dns_domain : undefined,
+    dns_servers: Array.isArray(data.dns_servers)
+      ? data.dns_servers.join(", ")
+      : (data.dns_servers ?? undefined),
+    dns_domain: typeof data.dns_domain === "string" ? data.dns_domain : undefined,
   };
 }
 
@@ -44,7 +46,11 @@ export function mergeSuggestedProvisionDraft({
     const currentValue = currentDraft[fieldId];
     const defaultValue = defaults.get(fieldId);
     const previousValue = previousSuggested[fieldId];
-    if (currentValue === undefined || currentValue === defaultValue || currentValue === previousValue) {
+    if (
+      currentValue === undefined ||
+      currentValue === defaultValue ||
+      currentValue === previousValue
+    ) {
       merged[fieldId] = suggestedValue;
     }
   }

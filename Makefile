@@ -1,16 +1,20 @@
 # Makefile for Twinbox testing
 
-.PHONY: help test unit integration coverage clean install wizard-dev-run
+.PHONY: help test unit integration coverage clean install wizard-dev-run lint lint-fix format format-check
 
 help:
 	@echo "Available targets:"
-	@echo "  test        - Run all tests (unit + integration)"
-	@echo "  unit        - Run unit tests only"
-	@echo "  integration - Run integration tests only"
-	@echo "  coverage    - Run tests with coverage report"
-	@echo "  install     - Install test dependencies"
-	@echo "  clean       - Clean up test artifacts"
-	@echo "  wizard-dev-run - Upload local wizard to Proxmox and run it via SSH"
+	@echo "  test             - Run all tests (unit + integration)"
+	@echo "  unit             - Run unit tests only"
+	@echo "  integration      - Run integration tests only"
+	@echo "  coverage         - Run tests with coverage report"
+	@echo "  install          - Install test dependencies"
+	@echo "  clean            - Clean up test artifacts"
+	@echo "  lint             - Run linters (JS + Python)"
+	@echo "  lint-fix         - Auto-fix lint issues"
+	@echo "  format           - Format code (JS + Python)"
+	@echo "  format-check     - Check formatting"
+	@echo "  wizard-dev-run   - Upload local wizard to Proxmox and run it via SSH"
 
 install:
 	pip install -e .
@@ -41,8 +45,42 @@ test-watch:
 	pytest-watch tests/ -v
 
 lint:
-	@echo "Linting code..."
-	# Add linting commands as needed (flake8, black, etc.)
+	@echo "Linting JavaScript..."
+	npm run lint --prefix manager-api
+	npm run lint --prefix manager-web
+	npm run lint --prefix manager-worker
+	npm run lint --prefix portal
+	npx eslint lib/ scripts/
+	@echo "Linting Python..."
+	ruff check tests/
+
+lint-fix:
+	@echo "Auto-fixing JavaScript..."
+	npm run lint:fix --prefix manager-api
+	npm run lint:fix --prefix manager-web
+	npm run lint:fix --prefix manager-worker
+	npm run lint:fix --prefix portal
+	npx eslint lib/ scripts/ --fix
+	@echo "Auto-fixing Python..."
+	ruff check --fix tests/
+
+format:
+	@echo "Formatting code..."
+	npm run format --prefix manager-api
+	npm run format --prefix manager-web
+	npm run format --prefix manager-worker
+	npm run format --prefix portal
+	npx prettier --write "lib/**/*.{js,mjs}" "scripts/**/*.{js,mjs}"
+	ruff format tests/
+
+format-check:
+	@echo "Checking formatting..."
+	npm run format:check --prefix manager-api
+	npm run format:check --prefix manager-web
+	npm run format:check --prefix manager-worker
+	npm run format:check --prefix portal
+	npx prettier --check "lib/**/*.{js,mjs}" "scripts/**/*.{js,mjs}"
+	ruff format --check tests/
 
 wizard-dev-run:
 	bash scripts/wizard-dev-run.sh

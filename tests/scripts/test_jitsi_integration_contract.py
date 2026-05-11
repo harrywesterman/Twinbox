@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 JITSI_APP_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-jitsi" / "step.yaml"
 JITSI_CATEGORY = REPO_ROOT / "categories" / "talos-cluster" / "category.yaml"
@@ -15,9 +14,7 @@ JITSI_BROKER_DEPLOYMENT = JITSI_PLATFORM_DIR / "auth-deployment.yaml"
 JITSI_BROKER_SERVICE = JITSI_PLATFORM_DIR / "auth-service.yaml"
 JITSI_INGRESS = JITSI_PLATFORM_DIR / "ingressroute.yaml"
 JITSI_IMAGE_DOCKERFILE = REPO_ROOT / "images" / "jitsi-openid" / "Dockerfile"
-JITSI_IMAGE_PATCH = (
-    REPO_ROOT / "images" / "jitsi-openid" / "0001-room-scoped-short-lived-jwt.patch"
-)
+JITSI_IMAGE_PATCH = REPO_ROOT / "images" / "jitsi-openid" / "0001-room-scoped-short-lived-jwt.patch"
 DOCKER_PUBLISH_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "docker-publish.yml"
 
 
@@ -27,8 +24,6 @@ def _read(path: Path) -> str:
 
 def test_install_jitsi_steps_are_backed_by_a_real_runner_and_cluster_secret_injection():
     app_step_text = _read(JITSI_APP_STEP)
-    category_text = _read(JITSI_CATEGORY)
-
     assert "Placeholder step" not in app_step_text
     assert "categories/apps/steps/install-jitsi/run.sh" in app_step_text
     assert "summary: Start secure video calls without needing an account." in app_step_text
@@ -51,31 +46,39 @@ def test_install_jitsi_runner_provisions_authentik_groups_scope_mapping_and_open
     assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in run_text
     assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in run_text
     assert 'jitsi_hosts_group_name="jitsi-hosts"' in run_text
-    assert 'find_scope_mapping_pk_by_name()' in run_text
-    assert 'create_or_update_scope_mapping()' in run_text
-    assert 'ensure_group()' in run_text
-    assert 'ensure_group_binding()' in run_text
+    assert "find_scope_mapping_pk_by_name()" in run_text
+    assert "create_or_update_scope_mapping()" in run_text
+    assert "ensure_group()" in run_text
+    assert "ensure_group_binding()" in run_text
     assert 'authentik_api_get "/core/applications/${application_slug}/"' in run_text
     assert 'authentik_api_write PATCH "/core/applications/${application_slug}/"' in run_text
-    assert 'response="$(authentik_api_get "/providers/oauth2/?page_size=100")" || return 1' in run_text
-    assert 'response="$(authentik_api_get "/policies/bindings/?page_size=200")" || return 1' in run_text
+    assert (
+        'response="$(authentik_api_get "/providers/oauth2/?page_size=100")" || return 1' in run_text
+    )
+    assert (
+        'response="$(authentik_api_get "/policies/bindings/?page_size=200")" || return 1'
+        in run_text
+    )
     assert 'existing_pk="$(find_policy_binding_pk "$target_uuid" "$group_id")"' in run_text
     assert 'authentik_api_write PATCH "/policies/bindings/${existing_pk}/"' not in run_text
     assert 'jicofo_auth_password="$(openssl rand -hex 16)"' in run_text
     assert 'jvb_auth_user="jvb"' in run_text
     assert 'jvb_auth_password="$(openssl rand -hex 16)"' in run_text
-    assert 'JICOFO_AUTH_PASSWORD: $jicofo_auth_password' in run_text
-    assert 'JVB_AUTH_USER: $jvb_auth_user' in run_text
-    assert 'JVB_AUTH_PASSWORD: $jvb_auth_password' in run_text
-    assert 'sync-openbao-global-secret.sh' in run_text
+    assert "JICOFO_AUTH_PASSWORD: $jicofo_auth_password" in run_text
+    assert "JVB_AUTH_USER: $jvb_auth_user" in run_text
+    assert "JVB_AUTH_PASSWORD: $jvb_auth_password" in run_text
+    assert "sync-openbao-global-secret.sh" in run_text
     assert '--secret-name "jitsi-auth"' in run_text
     assert 'jitsi_secret_file="${secrets_dir}/jitsi-auth-${cluster_id}.json"' in run_text
-    assert 'JICOFO_AUTH_PASSWORD,JVB_AUTH_USER,JVB_AUTH_PASSWORD' in run_text
+    assert "JICOFO_AUTH_PASSWORD,JVB_AUTH_USER,JVB_AUTH_PASSWORD" in run_text
     assert 'kubectl apply -f "$jitsi_namespace_manifest"' in run_text
     assert 'kubectl apply -f "$jitsi_externalsecret_manifest"' in run_text
-    assert 'kubectl -n jitsi wait --for=condition=Ready externalsecret/jitsi-auth --timeout=10m' in run_text
-    assert 'gitops/apps/jitsi.yaml' in run_text
-    assert 'Provisioning Authentik OIDC client for Jitsi broker' in run_text
+    assert (
+        "kubectl -n jitsi wait --for=condition=Ready externalsecret/jitsi-auth --timeout=10m"
+        in run_text
+    )
+    assert "gitops/apps/jitsi.yaml" in run_text
+    assert "Provisioning Authentik OIDC client for Jitsi broker" in run_text
 
 
 def test_jitsi_gitops_application_and_values_enable_token_auth_guests_and_broker_redirects():
@@ -163,7 +166,7 @@ def test_jitsi_platform_overlay_provides_broker_secret_sync_service_and_ingress(
     assert "name: jitsi-auth" in deployment_text
     assert 'value: "0.0.0.0:3000"' in deployment_text
     assert 'value: "openid profile email jitsi"' in deployment_text
-    assert 'name: VERIFY_ACCESS_TOKEN_HASH' in deployment_text
+    assert "name: VERIFY_ACCESS_TOKEN_HASH" in deployment_text
     assert 'value: "false"' in deployment_text
 
     assert "kind: Service" in service_text
@@ -198,4 +201,4 @@ def test_jitsi_openid_image_is_pinned_and_patched_for_room_scoped_short_lived_to
     assert "https://github.com/MarcelCoding/jitsi-openid.git" in dockerfile_text
 
     assert "session.room.clone()" in patch_text
-    assert 'Duration::minutes(15)' in patch_text
+    assert "Duration::minutes(15)" in patch_text

@@ -6,10 +6,7 @@ import YAML from "yaml";
 
 import { loadCatalogDefinitions } from "../../lib/catalog-definitions.mjs";
 import { isClusterScopedStep } from "../../lib/step-scope.mjs";
-import {
-  buildDashyConfig,
-  stepHasDashyItems,
-} from "../../lib/dashy-config.mjs";
+import { buildDashyConfig, stepHasDashyItems } from "../../lib/dashy-config.mjs";
 
 function parseArgs(argv) {
   const options = {
@@ -90,18 +87,27 @@ function findCurrentCluster(dataRoot, clusterId) {
     return readJsonIfExists(path.join(clustersRoot, `${clusterId}.json`));
   }
 
-  return fs.readdirSync(clustersRoot)
-    .filter((entry) => entry.endsWith(".json"))
-    .map((entry) => readJsonIfExists(path.join(clustersRoot, entry)))
-    .filter((cluster) => cluster?.id)
-    .sort((left, right) => String(right?.updated_at || right?.created_at || "").localeCompare(String(left?.updated_at || left?.created_at || "")))[0] || null;
+  return (
+    fs
+      .readdirSync(clustersRoot)
+      .filter((entry) => entry.endsWith(".json"))
+      .map((entry) => readJsonIfExists(path.join(clustersRoot, entry)))
+      .filter((cluster) => cluster?.id)
+      .sort((left, right) =>
+        String(right?.updated_at || right?.created_at || "").localeCompare(
+          String(left?.updated_at || left?.created_at || "")
+        )
+      )[0] || null
+  );
 }
 
 function readStepStates(dataRoot, steps, clusterScopeId) {
   const stepStateById = new Map();
 
   for (const step of steps) {
-    const scope = isClusterScopedStep(step) ? path.join("clusters", clusterScopeId || "") : "global";
+    const scope = isClusterScopedStep(step)
+      ? path.join("clusters", clusterScopeId || "")
+      : "global";
     const file = path.join(dataRoot, "step-state", scope, `${step.id}.json`);
     stepStateById.set(step.id, readJsonIfExists(file));
   }
@@ -148,12 +154,16 @@ metadata:
 }
 
 function deploymentExists(namespace, deploymentName) {
-  const result = runKubectl(["-n", namespace, "get", "deployment", deploymentName], { allowFailure: true });
+  const result = runKubectl(["-n", namespace, "get", "deployment", deploymentName], {
+    allowFailure: true,
+  });
   return result.status === 0;
 }
 
 function readCurrentConfigMap(namespace, configMapName) {
-  const result = runKubectl(["-n", namespace, "get", "configmap", configMapName, "-o", "json"], { allowFailure: true });
+  const result = runKubectl(["-n", namespace, "get", "configmap", configMapName, "-o", "json"], {
+    allowFailure: true,
+  });
   if (result.status !== 0) {
     return "";
   }
@@ -188,7 +198,14 @@ function applyConfigMap(namespace, configMapName, renderedConfig) {
 
 function restartDeployment(namespace, deploymentName) {
   runKubectl(["-n", namespace, "rollout", "restart", `deployment/${deploymentName}`]);
-  runKubectl(["-n", namespace, "rollout", "status", `deployment/${deploymentName}`, "--timeout=10m"]);
+  runKubectl([
+    "-n",
+    namespace,
+    "rollout",
+    "status",
+    `deployment/${deploymentName}`,
+    "--timeout=10m",
+  ]);
 }
 
 function main() {
@@ -199,9 +216,7 @@ function main() {
     loadYamlFn: loadYaml,
   });
   const appStepIds = new Set(
-    steps
-      .filter((step) => step?.category_id === "apps")
-      .map((step) => step.id),
+    steps.filter((step) => step?.category_id === "apps").map((step) => step.id)
   );
 
   const currentCluster = findCurrentCluster(options.managerDataDir, options.clusterId);
@@ -209,7 +224,11 @@ function main() {
     throw new Error("could not determine current cluster for Dashy config generation");
   }
 
-  const clusterScopeId = options.clusterInstanceId || currentCluster.cluster_instance_id || currentCluster.instance_id || currentCluster.id;
+  const clusterScopeId =
+    options.clusterInstanceId ||
+    currentCluster.cluster_instance_id ||
+    currentCluster.instance_id ||
+    currentCluster.id;
   const stepStateById = readStepStates(options.managerDataDir, steps, clusterScopeId);
 
   if (options.triggerStepId) {
@@ -225,7 +244,8 @@ function main() {
 
     const isDashyBootstrapStep = triggerStep.id === "install-dashy-dashboard";
     const dashyBootstrapState = stepStateById.get("install-dashy-dashboard") || null;
-    const dashyBootstrapReady = dashyBootstrapState?.status === "succeeded" || dashyBootstrapState?.status === "configured";
+    const dashyBootstrapReady =
+      dashyBootstrapState?.status === "succeeded" || dashyBootstrapState?.status === "configured";
 
     if (!isDashyBootstrapStep && !dashyBootstrapReady) {
       console.log(`Dashy refresh skipped: ${options.triggerStepId} ran before Dashy was installed`);
@@ -259,7 +279,9 @@ function main() {
   console.log(`Applied ${options.configMapName} in namespace ${options.namespace}`);
 
   if (!deploymentExists(options.namespace, options.deploymentName)) {
-    console.log(`Dashy deployment ${options.deploymentName} not present yet; config applied without rollout`);
+    console.log(
+      `Dashy deployment ${options.deploymentName} not present yet; config applied without rollout`
+    );
     return;
   }
 

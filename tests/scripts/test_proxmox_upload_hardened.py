@@ -4,7 +4,6 @@ import tempfile
 import textwrap
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 APPLY_CLUSTER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "apply-cluster.sh"
 
@@ -131,12 +130,28 @@ def test_talos_iso_upload_uses_direct_node_endpoints_and_continues_after_failure
         assert proc.returncode == 0, proc.stderr
 
         log_text = log_file.read_text(encoding="utf-8")
-        assert "Uploading Talos ISO directly to node-b/local via https://192.168.2.92:8006" in log_text
-        assert "Uploading Talos ISO directly to node-a/local via https://192.168.2.91:8006" in log_text
-        assert "UPLOAD_URL=https://192.168.2.92:8006/api2/json/nodes/node-b/storage/local/upload" in log_text
-        assert "UPLOAD_URL=https://192.168.2.91:8006/api2/json/nodes/node-a/storage/local/upload" in log_text
-        assert "ERROR: Talos ISO upload to node-b/local failed after 1 attempts (curl exit 52): no response body" in log_text
+        assert (
+            "Uploading Talos ISO directly to node-b/local via https://192.168.2.92:8006" in log_text
+        )
+        assert (
+            "Uploading Talos ISO directly to node-a/local via https://192.168.2.91:8006" in log_text
+        )
+        assert (
+            "UPLOAD_URL=https://192.168.2.92:8006/api2/json/nodes/node-b/storage/local/upload"
+            in log_text
+        )
+        assert (
+            "UPLOAD_URL=https://192.168.2.91:8006/api2/json/nodes/node-a/storage/local/upload"
+            in log_text
+        )
+        assert (
+            "ERROR: Talos ISO upload to node-b/local failed after 1 attempts (curl exit 52): no response body"
+            in log_text
+        )
         assert "Verified Talos ISO on node-a/local: local:iso/talos.iso" in log_text
         assert "Talos ISO upload summary: succeeded=node-a; failed=node-b" in log_text
-        assert "Talos ISO upload failure: Talos ISO upload to node-b/local failed after 1 attempts (curl exit 52): no response body" in log_text
+        assert (
+            "Talos ISO upload failure: Talos ISO upload to node-b/local failed after 1 attempts (curl exit 52): no response body"
+            in log_text
+        )
         assert "STATUS=1" in log_text

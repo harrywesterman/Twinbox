@@ -1,0 +1,11 @@
+{
+  "name": "twinbox-root",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^10.0.0",
+    "globals": "^16.0.0",
+    "prettier": "^3.0.0"
+  }
+}

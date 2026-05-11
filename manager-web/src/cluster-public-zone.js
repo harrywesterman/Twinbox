@@ -1,31 +1,31 @@
 function trimString(value) {
-  return typeof value === 'string' ? value.trim() : '';
+  return typeof value === "string" ? value.trim() : "";
 }
 
 function normalizeHostname(value) {
   const rawValue = trimString(value);
   if (!rawValue) {
-    return '';
+    return "";
   }
 
   return rawValue
-    .replace(/^https?:\/\//i, '')
-    .replace(/^\/+/, '')
-    .split('/')[0]
-    .replace(/^\.+/, '');
+    .replace(/^https?:\/\//i, "")
+    .replace(/^\/+/, "")
+    .split("/")[0]
+    .replace(/^\.+/, "");
 }
 
 function normalizeClusterSlug(value) {
   const trimmed = trimString(value).toLowerCase();
   if (!trimmed) {
-    return '';
+    return "";
   }
 
-  const withoutPrefix = trimmed.startsWith('twinbox-') ? trimmed.slice('twinbox-'.length) : trimmed;
+  const withoutPrefix = trimmed.startsWith("twinbox-") ? trimmed.slice("twinbox-".length) : trimmed;
   return withoutPrefix
-    .replace(/[^a-z0-9-]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 export function twinboxPublicZoneName(clusterId, clusterDnsDomain) {
@@ -33,10 +33,10 @@ export function twinboxPublicZoneName(clusterId, clusterDnsDomain) {
   const normalizedDnsDomain = trimString(clusterDnsDomain);
 
   if (!normalizedClusterId || !normalizedDnsDomain) {
-    return '';
+    return "";
   }
 
-  if (normalizedClusterId === 'prd') {
+  if (normalizedClusterId === "prd") {
     return normalizedDnsDomain;
   }
 
@@ -49,16 +49,16 @@ export function twinboxPublicZoneName(clusterId, clusterDnsDomain) {
 
 export function buildAdminDashboardUrl(cluster = {}, fallback = {}) {
   const zoneName = normalizeHostname(
-    trimString(cluster?.public_zone_name)
-      || trimString(fallback?.public_zone_name)
-      || twinboxPublicZoneName(
+    trimString(cluster?.public_zone_name) ||
+      trimString(fallback?.public_zone_name) ||
+      twinboxPublicZoneName(
         normalizeClusterSlug(cluster?.slug || cluster?.id || fallback?.slug || fallback?.id),
-        cluster?.dns_domain || fallback?.dns_domain,
-      ),
+        cluster?.dns_domain || fallback?.dns_domain
+      )
   );
 
   if (!zoneName) {
-    return '';
+    return "";
   }
 
   return `https://admin.${zoneName}`;

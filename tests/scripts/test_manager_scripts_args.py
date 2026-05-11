@@ -13,90 +13,49 @@ PROVISION_NODES_SCRIPT = (
 )
 MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "main.tf"
 MODULE_OUTPUTS = REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "outputs.tf"
-INSTALL_SECRET_SYNC_SCRIPT = (
-    REPO_ROOT / "scripts" / "manager" / "install-secret-sync.sh"
-)
-OPENBAO_SECRET_SYNC_HELPER = (
-    REPO_ROOT / "scripts" / "manager" / "sync-openbao-global-secret.sh"
-)
+INSTALL_SECRET_SYNC_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-secret-sync.sh"
+OPENBAO_SECRET_SYNC_HELPER = REPO_ROOT / "scripts" / "manager" / "sync-openbao-global-secret.sh"
 ARGO_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-argocd.sh"
-APPLY_ARGO_APP_SCRIPT = (
-    REPO_ROOT / "scripts" / "manager" / "apply-argocd-application.sh"
-)
+APPLY_ARGO_APP_SCRIPT = REPO_ROOT / "scripts" / "manager" / "apply-argocd-application.sh"
 RENDER_CILIUM_SCRIPT = REPO_ROOT / "scripts" / "manager" / "render-cilium-manifest.sh"
 CLOUDTTY_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-cloudtty.sh"
 PROMETHEUS_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-prometheus.sh"
-RECONCILE_OBSERVABILITY_SCRIPT = (
-    REPO_ROOT / "scripts" / "manager" / "reconcile-observability.sh"
-)
-TRAEFIK_MANAGER_SCRIPT = (
-    REPO_ROOT / "scripts" / "manager" / "install-traefik-manager.sh"
-)
-OPENCLOUD_STEP_SCRIPT = (
-    REPO_ROOT / "categories" / "apps" / "steps" / "install-opencloud" / "run.sh"
-)
+RECONCILE_OBSERVABILITY_SCRIPT = REPO_ROOT / "scripts" / "manager" / "reconcile-observability.sh"
+TRAEFIK_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-traefik-manager.sh"
+OPENCLOUD_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-opencloud" / "run.sh"
 DASHY_APP = REPO_ROOT / "gitops" / "apps" / "dashy.yaml"
-FRESHRSS_STEP_SCRIPT = (
-    REPO_ROOT / "categories" / "apps" / "steps" / "install-freshrss" / "run.sh"
-)
+FRESHRSS_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-freshrss" / "run.sh"
 VAULTWARDEN_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "apps" / "steps" / "install-vaultwarden" / "run.sh"
 )
 STIRLING_PDF_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "apps" / "steps" / "install-stirling-pdf" / "run.sh"
 )
-PIXELFED_STEP_SCRIPT = (
-    REPO_ROOT / "categories" / "apps" / "steps" / "install-pixelfed" / "run.sh"
-)
+PIXELFED_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-pixelfed" / "run.sh"
 ARGO_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
 )
 ARGO_STEP_MANIFEST = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "install-argocd"
-    / "step.yaml"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "step.yaml"
 )
 CILIUM_VALUES_FILE = REPO_ROOT / "config" / "cilium-values.yaml"
 HUBBLE_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "hubble" / "ingressroute.yaml"
 HUBBLE_AUTHENTIK_CALLBACK_INGRESSROUTE = (
-    REPO_ROOT
-    / "gitops"
-    / "platform"
-    / "hubble"
-    / "authentik-callback-ingressroute.yaml"
+    REPO_ROOT / "gitops" / "platform" / "hubble" / "authentik-callback-ingressroute.yaml"
 )
 HUBBLE_AUTHENTIK_FORWARDAUTH_MIDDLEWARE = (
-    REPO_ROOT
-    / "gitops"
-    / "platform"
-    / "hubble"
-    / "authentik-forwardauth-middleware.yaml"
+    REPO_ROOT / "gitops" / "platform" / "hubble" / "authentik-forwardauth-middleware.yaml"
 )
 ARGOCD_CM = REPO_ROOT / "gitops" / "platform" / "argocd" / "argocd-cm.yaml"
 START_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "start-manager.sh"
 BOOTSTRAP_VM_SCRIPT = REPO_ROOT / "scripts" / "bootstrap-vm.sh"
 LONGHORN_STEP_SCRIPT = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "install-longhorn-storage"
-    / "run.sh"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-longhorn-storage" / "run.sh"
 )
 LONGHORN_STEP_MANIFEST = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "install-longhorn-storage"
-    / "step.yaml"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-longhorn-storage" / "step.yaml"
 )
-LONGHORN_HELPER_SCRIPT = (
-    REPO_ROOT / "scripts" / "manager" / "install-longhorn-storage.sh"
-)
+LONGHORN_HELPER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-longhorn-storage.sh"
 TRAEFIK_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-traefik" / "run.sh"
 )
@@ -104,100 +63,43 @@ CROWDSEC_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-crowdsec" / "run.sh"
 )
 TRAEFIK_STEP_MANIFEST = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "install-traefik"
-    / "step.yaml"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-traefik" / "step.yaml"
 )
 CROWDSEC_STEP_MANIFEST = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "install-crowdsec"
-    / "step.yaml"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-crowdsec" / "step.yaml"
 )
 PROMETHEUS_STEP_MANIFEST = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "install-prometheus"
-    / "step.yaml"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-prometheus" / "step.yaml"
 )
 PROMETHEUS_STEP_SCRIPT = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "install-prometheus"
-    / "run.sh"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-prometheus" / "run.sh"
 )
 PROMETHEUS_MANIFESTS_KUSTOMIZATION = (
     REPO_ROOT / "gitops" / "apps" / "prometheus" / "manifests" / "kustomization.yaml"
 )
 TWINBOX_PORTAL_STEP_SCRIPT = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "install-twinbox-portal"
-    / "run.sh"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-twinbox-portal" / "run.sh"
 )
 TRAEFIK_MANAGER_STEP_MANIFEST = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "install-traefik-manager"
-    / "step.yaml"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-traefik-manager" / "step.yaml"
 )
 TRAEFIK_MANAGER_STEP_SCRIPT = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "install-traefik-manager"
-    / "run.sh"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-traefik-manager" / "run.sh"
 )
 CLOUDFLARE_STEP_MANIFEST = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "configure-cloudflare-dns"
-    / "step.yaml"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "configure-cloudflare-dns" / "step.yaml"
 )
 INGRESS_POLICY_DOC = REPO_ROOT / "docs" / "ingress-policy.md"
 CHOOSE_INGRESS_ROUTE_RUN_SCRIPT = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "choose-ingress-route"
-    / "run.sh"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "choose-ingress-route" / "run.sh"
 )
 AUTHENTIK_STEP_MANIFEST = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "install-authentik-idp"
-    / "step.yaml"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-authentik-idp" / "step.yaml"
 )
 AUTHENTIK_STEP_SCRIPT = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "install-authentik-idp"
-    / "run.sh"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-authentik-idp" / "run.sh"
 )
-AUTHENTIK_HEADLAMP_MODULE_MAIN = (
-    REPO_ROOT / "infra" / "opentofu" / "authentik-headlamp" / "main.tf"
-)
+AUTHENTIK_HEADLAMP_MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "authentik-headlamp" / "main.tf"
 AUTHENTIK_HEADLAMP_MODULE_VARS = (
     REPO_ROOT / "infra" / "opentofu" / "authentik-headlamp" / "variables.tf"
 )
@@ -207,12 +109,8 @@ AUTHENTIK_HEADLAMP_MODULE_OUTPUTS = (
 AUTHENTIK_DASHY_MODULE_PROVIDERS = (
     REPO_ROOT / "infra" / "opentofu" / "authentik-dashy" / "providers.tf"
 )
-AUTHENTIK_DASHY_MODULE_MAIN = (
-    REPO_ROOT / "infra" / "opentofu" / "authentik-dashy" / "main.tf"
-)
-AUTHENTIK_PGADMIN4_MODULE_MAIN = (
-    REPO_ROOT / "infra" / "opentofu" / "authentik-pgadmin4" / "main.tf"
-)
+AUTHENTIK_DASHY_MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "authentik-dashy" / "main.tf"
+AUTHENTIK_PGADMIN4_MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "authentik-pgadmin4" / "main.tf"
 AUTHENTIK_PGADMIN4_MODULE_VARS = (
     REPO_ROOT / "infra" / "opentofu" / "authentik-pgadmin4" / "variables.tf"
 )
@@ -223,88 +121,41 @@ AUTHENTIK_PGADMIN4_MODULE_PROVIDERS = (
     REPO_ROOT / "infra" / "opentofu" / "authentik-pgadmin4" / "providers.tf"
 )
 PGADMIN_STEP_MANIFEST = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "install-pgadmin4"
-    / "step.yaml"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-pgadmin4" / "step.yaml"
 )
 PGADMIN_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-pgadmin4" / "run.sh"
 )
 PLATFORM_INGRESS_APP = REPO_ROOT / "gitops" / "apps" / "platform-ingress.yaml"
-PGADMIN_EXTERNALSECRET = (
-    REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "externalsecret.yaml"
-)
-PGADMIN_SERVER_CONFIGMAP = (
-    REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "configmap.yaml"
-)
-PGADMIN_SYNC_SERVER_SCRIPT = (
-    REPO_ROOT / "scripts" / "manager" / "sync-pgadmin4-server.sh"
-)
-PGADMIN_INGRESSROUTE = (
-    REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "ingressroute.yaml"
-)
-PGADMIN_DEPLOYMENT = (
-    REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "deployment.yaml"
-)
+PGADMIN_EXTERNALSECRET = REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "externalsecret.yaml"
+PGADMIN_SERVER_CONFIGMAP = REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "configmap.yaml"
+PGADMIN_SYNC_SERVER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "sync-pgadmin4-server.sh"
+PGADMIN_INGRESSROUTE = REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "ingressroute.yaml"
+PGADMIN_DEPLOYMENT = REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "deployment.yaml"
 PGADMIN_PVC = REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "pvc.yaml"
-PGADMIN_SERVICE = (
-    REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "service.yaml"
-)
+PGADMIN_SERVICE = REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "service.yaml"
 HEADLAMP_OIDC_EXTERNALSECRET = (
     REPO_ROOT / "gitops" / "platform-apps" / "headlamp" / "externalsecret.yaml"
 )
 CREATE_USERS_STEP_MANIFEST = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "create-users-and-groups"
-    / "step.yaml"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "create-users-and-groups" / "step.yaml"
 )
 CHOOSE_INGRESS_ROUTE_STEP_MANIFEST = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "choose-ingress-route"
-    / "step.yaml"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "choose-ingress-route" / "step.yaml"
 )
 WHOAMI_STEP_MANIFEST = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "install-whoami"
-    / "step.yaml"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-whoami" / "step.yaml"
 )
 HEADLAMP_STEP_MANIFEST = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "install-headlamp"
-    / "step.yaml"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-headlamp" / "step.yaml"
 )
 GRAFANA_STEP_MANIFEST = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "install-grafana"
-    / "step.yaml"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-grafana" / "step.yaml"
 )
 GRAFANA_REFRESH_HELPER = REPO_ROOT / "scripts" / "manager" / "refresh-grafana-dashboard.mjs"
 WORKER_JS = REPO_ROOT / "manager-worker" / "src" / "worker.js"
 WIREDOOR_GATEWAY_STEP_MANIFEST = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "install-wiredoor-gateway"
-    / "step.yaml"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-wiredoor-gateway" / "step.yaml"
 )
 WIREDOOR_BASTION_STEP_MANIFEST = (
     REPO_ROOT
@@ -327,9 +178,7 @@ STIRLING_PDF_DEPLOYMENT = (
 )
 GRAFANA_APP = REPO_ROOT / "gitops" / "apps" / "grafana.yaml"
 WIREDOOR_GATEWAY_APP = REPO_ROOT / "gitops" / "apps" / "wiredoor-gateway.yaml"
-WHOAMI_DEPLOYMENT = (
-    REPO_ROOT / "gitops" / "platform-apps" / "whoami" / "deployment.yaml"
-)
+WHOAMI_DEPLOYMENT = REPO_ROOT / "gitops" / "platform-apps" / "whoami" / "deployment.yaml"
 HEADLAMP_VALUES = REPO_ROOT / "gitops" / "values" / "headlamp.yaml"
 LONGHORN_VALUES = REPO_ROOT / "gitops" / "values" / "longhorn.yaml"
 TRAEFIK_VALUES = REPO_ROOT / "gitops" / "values" / "traefik.yaml"
@@ -337,11 +186,7 @@ CROWDSEC_VALUES = REPO_ROOT / "gitops" / "values" / "crowdsec.yaml"
 WIREDOOR_GATEWAY_VALUES = REPO_ROOT / "gitops" / "values" / "wiredoor-gateway.yaml"
 GRAFANA_VALUES = REPO_ROOT / "gitops" / "values" / "grafana.yaml"
 TRAEFIK_DASHBOARD_EXTERNALSECRET = (
-    REPO_ROOT
-    / "gitops"
-    / "platform"
-    / "traefik"
-    / "traefik-dashboard-externalsecret.yaml"
+    REPO_ROOT / "gitops" / "platform" / "traefik" / "traefik-dashboard-externalsecret.yaml"
 )
 CROWDSEC_BOUNCER_EXTERNALSECRET = (
     REPO_ROOT / "gitops" / "platform" / "crowdsec" / "bouncer-externalsecret.yaml"
@@ -352,30 +197,16 @@ TRAEFIK_CROWDSEC_BOUNCER_EXTERNALSECRET = (
 ARGOCD_SERVER_TRANSPORT = (
     REPO_ROOT / "gitops" / "platform" / "traefik" / "argocd-server-transport.yaml"
 )
-ARGOCD_INGRESSROUTE = (
-    REPO_ROOT / "gitops" / "platform" / "traefik" / "argocd-ingressroute.yaml"
-)
-ARGOCD_WIREDOOR_INGRESSROUTE = (
-    REPO_ROOT / "gitops" / "platform" / "argocd" / "argocd-wiredoor.yaml"
-)
-WHOAMI_INGRESSROUTE = (
-    REPO_ROOT / "gitops" / "platform-apps" / "whoami" / "ingressroute.yaml"
-)
-HEADLAMP_INGRESSROUTE = (
-    REPO_ROOT / "gitops" / "platform-apps" / "headlamp" / "ingressroute.yaml"
-)
-FRESHRSS_INGRESSROUTE = (
-    REPO_ROOT / "gitops" / "platform-apps" / "freshrss" / "ingressroute.yaml"
-)
+ARGOCD_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "traefik" / "argocd-ingressroute.yaml"
+ARGOCD_WIREDOOR_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "argocd" / "argocd-wiredoor.yaml"
+WHOAMI_INGRESSROUTE = REPO_ROOT / "gitops" / "platform-apps" / "whoami" / "ingressroute.yaml"
+HEADLAMP_INGRESSROUTE = REPO_ROOT / "gitops" / "platform-apps" / "headlamp" / "ingressroute.yaml"
+FRESHRSS_INGRESSROUTE = REPO_ROOT / "gitops" / "platform-apps" / "freshrss" / "ingressroute.yaml"
 VAULTWARDEN_INGRESSROUTE = (
     REPO_ROOT / "gitops" / "platform-apps" / "vaultwarden" / "ingressroute.yaml"
 )
-GRAFANA_EXTERNALSECRET = (
-    REPO_ROOT / "gitops" / "platform-apps" / "grafana" / "externalsecret.yaml"
-)
-GRAFANA_INGRESSROUTE = (
-    REPO_ROOT / "gitops" / "platform-apps" / "grafana" / "ingressroute.yaml"
-)
+GRAFANA_EXTERNALSECRET = REPO_ROOT / "gitops" / "platform-apps" / "grafana" / "externalsecret.yaml"
+GRAFANA_INGRESSROUTE = REPO_ROOT / "gitops" / "platform-apps" / "grafana" / "ingressroute.yaml"
 WIREDOOR_GATEWAY_EXTERNALSECRET = (
     REPO_ROOT / "gitops" / "platform-apps" / "wiredoor-gateway" / "externalsecret.yaml"
 )
@@ -402,9 +233,9 @@ def _module_outputs_text() -> str:
 
 
 def _module_variables_text() -> str:
-    return (
-        REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "variables.tf"
-    ).read_text(encoding="utf-8")
+    return (REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "variables.tf").read_text(
+        encoding="utf-8"
+    )
 
 
 def _install_secret_sync_text() -> str:
@@ -643,9 +474,7 @@ def test_collect_state_missing_cluster_file_fails():
             "--data-dir",
             td,
         ]
-        proc = subprocess.run(
-            cmd, env=os.environ.copy(), capture_output=True, text=True
-        )
+        proc = subprocess.run(cmd, env=os.environ.copy(), capture_output=True, text=True)
         assert proc.returncode != 0
         assert "cluster not found" in (proc.stdout + proc.stderr)
 
@@ -690,9 +519,7 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert "TALOS_IMAGE_INSTALLER=" in text
     assert "TALOS_IMAGE_DOWNLOAD_URL=" in text
     assert "download_talos_image()" in text
-    assert (
-        'talos_image_local_path="$image_cache_dir/talos-${image_cache_key}.iso"' in text
-    )
+    assert 'talos_image_local_path="$image_cache_dir/talos-${image_cache_key}.iso"' in text
     assert 'talos_image_file_name="talos-${image_cache_key}.iso"' in text
     assert "proxmox_api_login()" in text
     assert "proxmox_upload_talos_image()" in text
@@ -703,14 +530,9 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'PROXMOX_VERIFY_MAX_ATTEMPTS="${PROXMOX_VERIFY_MAX_ATTEMPTS:-5}"' in text
     assert "Uploading Talos ISO to Proxmox nodes:" in text
     assert "Uploaded Talos ISO to ${node}/${datastore}" in text
-    assert (
-        "Talos ISO not visible yet on ${node}/${datastore}; retrying in ${delay}s"
-        in text
-    )
+    assert "Talos ISO not visible yet on ${node}/${datastore}; retrying in ${delay}s" in text
     assert "Talos ISO not visible after upload on ${node}/${datastore}" in text
-    assert (
-        "Talos ISO already present on ${node}/${FILE_DATASTORE}: ${image_name}" in text
-    )
+    assert "Talos ISO already present on ${node}/${FILE_DATASTORE}: ${image_name}" in text
     assert "Removing legacy Talos ISO resources from OpenTofu state:" in text
     assert 'state rm "${legacy_addresses[@]}"' in text
     assert "controlplane_ipv4_addresses.value" in text
@@ -720,17 +542,9 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert "TF_VAR_proxmox_endpoint" in text
     assert "TF_VAR_proxmox_username" in text
     assert "TF_VAR_proxmox_password" in text
-    assert (
-        'PROXMOX_PASSWORD="${PROXMOX_PASSWORD:-${TF_VAR_proxmox_password:-}}" '
-        not in text
-    )
-    assert (
-        'PROXMOX_PASSWORD="${PROXMOX_PASSWORD:-${TF_VAR_proxmox_password:-}}"' in text
-    )
-    assert (
-        "Missing environment variable: PROXMOX_PASSWORD or TF_VAR_proxmox_password"
-        in text
-    )
+    assert 'PROXMOX_PASSWORD="${PROXMOX_PASSWORD:-${TF_VAR_proxmox_password:-}}" ' not in text
+    assert 'PROXMOX_PASSWORD="${PROXMOX_PASSWORD:-${TF_VAR_proxmox_password:-}}"' in text
+    assert "Missing environment variable: PROXMOX_PASSWORD or TF_VAR_proxmox_password" in text
     assert "proxmox_password: $proxmox_password" not in text
     assert "normalize_json_object()" in text
     assert 'cluster_file="$clusters_dir/${CLUSTER_ID}.json"' in text
@@ -789,18 +603,12 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert "disabled: true" in text
     assert "inlineManifests:" in text
     assert "sed 's/^/        /' \"$cilium_manifest_file\"" in text
-    assert (
-        'wait_for_kubernetes_rollout "daemonset/cilium" "kube-system" "Cilium DaemonSet"'
-        in text
-    )
+    assert 'wait_for_kubernetes_rollout "daemonset/cilium" "kube-system" "Cilium DaemonSet"' in text
     assert (
         'wait_for_kubernetes_rollout "deployment/cilium-operator" "kube-system" "Cilium operator"'
         in text
     )
-    assert (
-        'wait_for_kubernetes_rollout "deployment/coredns" "kube-system" "CoreDNS"'
-        in text
-    )
+    assert 'wait_for_kubernetes_rollout "deployment/coredns" "kube-system" "CoreDNS"' in text
     assert "kube-proxy daemonset should not exist in kube-proxy-free mode" in text
     assert "helm repo add cilium https://helm.cilium.io" in helper_text
     assert "helm repo update" in helper_text
@@ -824,9 +632,7 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert "hostRoot: /sys/fs/cgroup" in values_text
     assert "operator:" in values_text
     assert "replicas: 1" in values_text
-    assert (
-        "hubble:\n  relay:\n    enabled: true\n  ui:\n    enabled: true" in values_text
-    )
+    assert "hubble:\n  relay:\n    enabled: true\n  ui:\n    enabled: true" in values_text
     assert "SYS_MODULE" not in values_text
 
     cloudtty_text = _cloudtty_script_text()
@@ -834,14 +640,8 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert '--version "$PINNED_CLOUDTTY_CHART_VERSION"' in cloudtty_text
     assert "exposureMode: NodePort" in cloudtty_text
     assert "commandAction: bash" in cloudtty_text
-    assert (
-        'CONTROLLER_DEPLOYMENT_NAME="${RELEASE_NAME}-controller-manager"'
-        in cloudtty_text
-    )
-    assert (
-        'wait_for_deployment "$NAMESPACE" "$CONTROLLER_DEPLOYMENT_NAME"'
-        in cloudtty_text
-    )
+    assert 'CONTROLLER_DEPLOYMENT_NAME="${RELEASE_NAME}-controller-manager"' in cloudtty_text
+    assert 'wait_for_deployment "$NAMESPACE" "$CONTROLLER_DEPLOYMENT_NAME"' in cloudtty_text
 
     assert '--set-string "k8sServiceHost=${VIP_IP}"' in text
     assert '--set-string "k8sServicePort=6443"' in text
@@ -867,17 +667,11 @@ def test_longhorn_step_installs_via_argocd_and_waits_for_health():
         "script: categories/talos-cluster/steps/install-longhorn-storage/run.sh"
         in step_manifest_text
     )
-    assert (
-        "cluster_json=\"$(printf '%s' \"$STEP_CONTEXT_JSON\" | jq -c '.cluster')\""
-        in step_text
-    )
+    assert "cluster_json=\"$(printf '%s' \"$STEP_CONTEXT_JSON\" | jq -c '.cluster')\"" in step_text
     assert 'TWINBOX_CLUSTER_ID="$cluster_id"' in step_text
     assert 'TWINBOX_CLUSTER_INSTANCE_ID="$cluster_instance_id"' in step_text
     assert 'KUBE_API_SERVER="https://${controlplane_ip}:6443"' in step_text
-    assert (
-        'bash "$WORKSPACE_ROOT/scripts/manager/install-longhorn-storage.sh"'
-        in step_text
-    )
+    assert 'bash "$WORKSPACE_ROOT/scripts/manager/install-longhorn-storage.sh"' in step_text
     assert (
         'WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"'
         in step_text
@@ -888,20 +682,14 @@ def test_longhorn_step_installs_via_argocd_and_waits_for_health():
         in helper_text
     )
     assert "Installing Longhorn through Argo CD" in helper_text
-    assert (
-        'bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \\'
-        in helper_text
-    )
+    assert 'bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \\' in helper_text
     assert '--application "longhorn"' in helper_text
-    assert 'Applying longhorn-single StorageClass manifest' in helper_text
+    assert "Applying longhorn-single StorageClass manifest" in helper_text
     assert 'kubectl apply -f "$longhorn_single_storageclass_manifest" >/dev/null' in helper_text
     assert "wait_for_storage_class" in helper_text
     assert "StorageClass/${storage_class} is available" in helper_text
     assert "make_storage_class_default" in helper_text
-    assert (
-        "Marking StorageClass/${storage_class} as the default storage class"
-        in helper_text
-    )
+    assert "Marking StorageClass/${storage_class} as the default storage class" in helper_text
     assert "storageclass.kubernetes.io/is-default-class" in helper_text
     assert "storageclass.beta.kubernetes.io/is-default-class" in helper_text
     assert "is not the only default storage class" in helper_text
@@ -926,9 +714,9 @@ def test_user_apps_are_not_part_of_bootstrap_journey():
         "];",
         1,
     )[0]
-    category_text = (
-        REPO_ROOT / "categories" / "talos-cluster" / "category.yaml"
-    ).read_text(encoding="utf-8")
+    category_text = (REPO_ROOT / "categories" / "talos-cluster" / "category.yaml").read_text(
+        encoding="utf-8"
+    )
 
     for step_id in ["install-nextcloud", "install-opencloud", "install-immich"]:
         assert f"'{step_id}'" not in setup_step_ids
@@ -962,13 +750,13 @@ def test_crowdsec_step_seeds_bouncer_secret_and_applies_gitops_app():
     assert '--required-keys "csLapiSecret,registrationToken"' in step_text
     assert '--application "crowdsec"' in step_text
     assert "--no-wait" in step_text
-    assert "wait_for_resource_exists \"crowdsec\" \"daemonset/crowdsec-agent\"" in step_text
+    assert 'wait_for_resource_exists "crowdsec" "daemonset/crowdsec-agent"' in step_text
     assert "rollout restart daemonset/crowdsec-agent" in step_text
     assert "rollout status daemonset/crowdsec-agent --timeout=10m" in step_text
     assert 'wait_for_resource_ready "crowdsec" "externalsecret/crowdsec-lapi-secrets"' in step_text
-    assert "wait_for_application_ready \"crowdsec\"" in step_text
+    assert 'wait_for_application_ready "crowdsec"' in step_text
     assert "chart: crowdsec" in crowdsec_app_text
-    assert "targetRevision: \"0.23.0\"" in crowdsec_app_text
+    assert 'targetRevision: "0.23.0"' in crowdsec_app_text
     assert "$values/gitops/values/crowdsec.yaml" in crowdsec_app_text
     assert "namespace: crowdsec" in crowdsec_app_text
     assert "managedNamespaceMetadata:" in crowdsec_app_text
@@ -1048,7 +836,7 @@ def test_opencloud_step_enables_external_idp_autoprovisioning_and_ldap_checks():
         "GRAPH_ASSIGN_DEFAULT_USER_ROLE: $GRAPH_ASSIGN_DEFAULT_USER_ROLE",
         "GRAPH_USERNAME_MATCH: $GRAPH_USERNAME_MATCH",
         "OC_EXCLUDE_RUN_SERVICES: $OC_EXCLUDE_RUN_SERVICES",
-        "wait_for_resources_ready \"opencloud\" \"externalsecret\" \"Ready\" \"OpenCloud ExternalSecret\"",
+        'wait_for_resources_ready "opencloud" "externalsecret" "Ready" "OpenCloud ExternalSecret"',
         "wait_for_opencloud_ldap_directory",
     ]:
         assert expected in text
@@ -1060,21 +848,11 @@ def test_opencloud_step_enables_external_idp_autoprovisioning_and_ldap_checks():
 
 def test_opencloud_gitops_uses_schema_backed_writable_ldap_bootstrap():
     platform_dir = REPO_ROOT / "gitops" / "platform-apps" / "opencloud"
-    kustomization_text = (platform_dir / "kustomization.yaml").read_text(
-        encoding="utf-8"
-    )
-    bootstrap_text = (platform_dir / "ldap-bootstrap-configmap.yaml").read_text(
-        encoding="utf-8"
-    )
-    statefulset_text = (platform_dir / "statefulset.yaml").read_text(
-        encoding="utf-8"
-    )
-    deployment_text = (platform_dir / "deployment.yaml").read_text(
-        encoding="utf-8"
-    )
-    externalsecret_text = (platform_dir / "externalsecret.yaml").read_text(
-        encoding="utf-8"
-    )
+    kustomization_text = (platform_dir / "kustomization.yaml").read_text(encoding="utf-8")
+    bootstrap_text = (platform_dir / "ldap-bootstrap-configmap.yaml").read_text(encoding="utf-8")
+    statefulset_text = (platform_dir / "statefulset.yaml").read_text(encoding="utf-8")
+    deployment_text = (platform_dir / "deployment.yaml").read_text(encoding="utf-8")
+    externalsecret_text = (platform_dir / "externalsecret.yaml").read_text(encoding="utf-8")
 
     assert "ldap-bootstrap-configmap.yaml" in kustomization_text
     assert "name: opencloud-ldap-bootstrap" in bootstrap_text
@@ -1088,7 +866,7 @@ def test_opencloud_gitops_uses_schema_backed_writable_ldap_bootstrap():
     assert "mountPath: /schemas/10_opencloud_schema.ldif" in statefulset_text
     assert "mountPath: /ldifs/10_base.ldif" in statefulset_text
     assert "name: wait-for-ldap" in deployment_text
-    assert "ldapsearch -H \"$OC_LDAP_URI\"" in deployment_text
+    assert 'ldapsearch -H "$OC_LDAP_URI"' in deployment_text
 
     for secret_key in [
         "OC_LDAP_INSECURE",
@@ -1107,9 +885,9 @@ def test_opencloud_gitops_uses_schema_backed_writable_ldap_bootstrap():
 
 
 def test_opencloud_pvc_sizes_match_the_live_bound_volumes():
-    pvc_text = (
-        REPO_ROOT / "gitops" / "platform-apps" / "opencloud" / "pvc.yaml"
-    ).read_text(encoding="utf-8")
+    pvc_text = (REPO_ROOT / "gitops" / "platform-apps" / "opencloud" / "pvc.yaml").read_text(
+        encoding="utf-8"
+    )
 
     assert "name: opencloud-config" in pvc_text
     assert "name: opencloud-data" in pvc_text
@@ -1121,9 +899,7 @@ def test_opencloud_pvc_sizes_match_the_live_bound_volumes():
 
 def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
     text = _apply_cluster_text()
-    assert (
-        'helper_output="$("$WORKSPACE_ROOT/scripts/get-talos-image-factory.sh"' in text
-    )
+    assert 'helper_output="$("$WORKSPACE_ROOT/scripts/get-talos-image-factory.sh"' in text
     assert '--preset "$talos_image_preset"' in text
     assert "--output shell" in text
     assert "while IFS= read -r line; do" in text
@@ -1164,9 +940,15 @@ def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
     assert 'image_installer="${line#TALOS_IMAGE_INSTALLER=}"' in text
     assert "image_extensions=" not in text
     assert "TALOS_IMAGE_EXTENSIONS=" not in text
-    assert text.index("Applying control plane Talos configs") < text.index("bootstrap_cluster \"$first_controlplane_ip\"")
-    assert text.index("bootstrap_cluster \"$first_controlplane_ip\"") < text.index("Control planes are healthy; discovering worker DHCP addresses")
-    assert text.index("Control planes are healthy; discovering worker DHCP addresses") < text.index("Applying worker Talos configs")
+    assert text.index("Applying control plane Talos configs") < text.index(
+        'bootstrap_cluster "$first_controlplane_ip"'
+    )
+    assert text.index('bootstrap_cluster "$first_controlplane_ip"') < text.index(
+        "Control planes are healthy; discovering worker DHCP addresses"
+    )
+    assert text.index("Control planes are healthy; discovering worker DHCP addresses") < text.index(
+        "Applying worker Talos configs"
+    )
 
 
 def test_provision_nodes_step_returns_refs_not_kubeconfig_paths():
@@ -1174,10 +956,7 @@ def test_provision_nodes_step_returns_refs_not_kubeconfig_paths():
     assert "secret_refs: .metadata.secret_refs" in text
     assert "kubeconfig_path" not in text
     assert "Using ${effective_vm_node_map_source} vm_node_map:" in text
-    assert (
-        'VM_NODE_MAP="$effective_vm_node_map" bash scripts/manager/apply-cluster.sh \\'
-        in text
-    )
+    assert 'VM_NODE_MAP="$effective_vm_node_map" bash scripts/manager/apply-cluster.sh \\' in text
     assert '--vm-node-map "$effective_vm_node_map"' in text
 
 
@@ -1202,10 +981,7 @@ def test_manager_worker_image_includes_talos_image_factory_helper():
         "apt-get install -y --no-install-recommends bash ca-certificates curl jq openssl python3 tar xz-utils sudo"
         in text
     )
-    assert (
-        "COPY scripts/get-talos-image-factory.sh ./scripts/get-talos-image-factory.sh"
-        in text
-    )
+    assert "COPY scripts/get-talos-image-factory.sh ./scripts/get-talos-image-factory.sh" in text
     assert "RUN chmod +x ./scripts/get-talos-image-factory.sh" in text
 
 
@@ -1231,9 +1007,9 @@ def test_bootstrap_talos_uses_discovered_ips_and_records_runtime_state():
 
 def test_install_secret_sync_renders_argocd_values_and_applies_secret_sync_manifests():
     text = _install_secret_sync_text()
-    helper_text = (
-        REPO_ROOT / "scripts" / "manager" / "openbao-secret-sync.sh"
-    ).read_text(encoding="utf-8")
+    helper_text = (REPO_ROOT / "scripts" / "manager" / "openbao-secret-sync.sh").read_text(
+        encoding="utf-8"
+    )
     assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in text
     assert "scripts/manager/apply-argocd-application.sh" in text
     assert '--manifest "$WORKSPACE_ROOT/gitops/apps/external-secrets.yaml"' in text
@@ -1269,10 +1045,7 @@ def test_install_secret_sync_renders_argocd_values_and_applies_secret_sync_manif
 def test_openbao_secret_sync_helper_uses_shared_library_and_port_forward_writeback():
     text = _openbao_secret_sync_helper_text()
     assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in text
-    assert (
-        "Usage: sync-openbao-global-secret.sh --secret-name NAME --json-file PATH"
-        in text
-    )
+    assert "Usage: sync-openbao-global-secret.sh --secret-name NAME --json-file PATH" in text
     assert (
         'openbao_sync_global_secret_file "$SECRET_NAME" "$JSON_FILE" "${required_key_list[@]}"'
         in text
@@ -1308,13 +1081,10 @@ def test_apply_argocd_application_helper_applies_and_waits_for_health():
     assert "kind: LimitRange" in text
     assert "defaultRequest:" in text
     assert "default:" in text
-    assert (
-        "printf '%s\\n' \"$rendered_manifest\" | kubectl apply --validate=false -f -"
-        in text
-    )
+    assert "printf '%s\\n' \"$rendered_manifest\" | kubectl apply --validate=false -f -" in text
     assert 'kubectl -n argocd get application "$application" -o json' in text
     assert 'select((.type // "") == "ComparisonError" or (.type // "" | test("Error$")))' in text
-    assert 'Application/${application} compare/spec error:' in text
+    assert "Application/${application} compare/spec error:" in text
     assert "Application/${application} is Synced and Healthy" in text
     assert "Application/${application} is Synced and has no unhealthy resources" in text
     assert "has_unhealthy_resources()" in text
@@ -1327,11 +1097,7 @@ def test_stirling_pdf_waits_for_real_kubernetes_readiness():
     step_text = STIRLING_PDF_STEP_SCRIPT.read_text(encoding="utf-8")
     deployment_text = STIRLING_PDF_DEPLOYMENT.read_text(encoding="utf-8")
     ingressroute_text = (
-        REPO_ROOT
-        / "gitops"
-        / "platform-apps"
-        / "stirling-pdf"
-        / "ingressroute.yaml"
+        REPO_ROOT / "gitops" / "platform-apps" / "stirling-pdf" / "ingressroute.yaml"
     ).read_text(encoding="utf-8")
     middleware_text = (
         REPO_ROOT
@@ -1348,14 +1114,16 @@ def test_stirling_pdf_waits_for_real_kubernetes_readiness():
         in step_text
     )
     assert (
-        'wait_for_pvc_bound "stirling-pdf" "stirling-pdf-data" "Stirling PDF data PVC"'
-        in step_text
+        'wait_for_pvc_bound "stirling-pdf" "stirling-pdf-data" "Stirling PDF data PVC"' in step_text
     )
     assert (
         'wait_for_deployment_rollout "stirling-pdf" "stirling-pdf" "Stirling PDF application"'
         in step_text
     )
-    assert "desired=${desired_replicas}, updated=${updated_replicas}, ready=${ready_replicas}, available=${available_replicas}" in step_text
+    assert (
+        "desired=${desired_replicas}, updated=${updated_replicas}, ready=${ready_replicas}, available=${available_replicas}"
+        in step_text
+    )
     assert "tcpSocket:" in deployment_text
     assert "SECURITY_CUSTOMGLOBALAPIKEY" in deployment_text
     assert "ST_API_KEY_FOR_QR_CODE" not in deployment_text
@@ -1407,33 +1175,22 @@ def test_argo_bootstrap_script_installs_argocd_without_root_application_tree():
         in text
     )
     assert "control_plane_tolerations" in text
-    assert (
-        'kubectl -n argocd get statefulset -o name 2>/dev/null | sort'
-        in text
-    )
+    assert "kubectl -n argocd get statefulset -o name 2>/dev/null | sort" in text
     assert "kubectl -n argocd patch" in text
     assert "patch_argocd_workload_probes()" in text
     assert "Patching ${resource} liveness probe for single-node bootstrap" in text
     assert "--type strategic -p" in text
     assert '"initialDelaySeconds":300' in text
     assert "patch_argocd_repo_server_copyutil()" in text
-    assert (
-        "Patching ${resource} copyutil init container for idempotent startup"
-        in text
-    )
-    assert (
-        "/bin/ln -sfn /var/run/argocd/argocd /var/run/argocd/argocd-cmp-server" in text
-    )
+    assert "Patching ${resource} copyutil init container for idempotent startup" in text
+    assert "/bin/ln -sfn /var/run/argocd/argocd /var/run/argocd/argocd-cmp-server" in text
     assert "wait_for_available()" in text
     assert "Waiting for ${resource} to become available" in text
-    assert (
-        'kubectl -n argocd wait --for=condition=Available "$resource" --timeout=900s'
-        in text
-    )
+    assert 'kubectl -n argocd wait --for=condition=Available "$resource" --timeout=900s' in text
     assert "wait_for_statefulset_rollout()" in text
     assert 'kubectl -n argocd rollout status "$resource" --timeout=900s' in text
     assert (
-        'for resource in $(kubectl -n argocd get statefulset -o name 2>/dev/null | sort); do'
+        "for resource in $(kubectl -n argocd get statefulset -o name 2>/dev/null | sort); do"
         in text
     )
     assert "wait_for_application_ready()" not in text
@@ -1497,18 +1254,14 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "dns_domain" in choose_ingress_text
     assert "DNS Domain" in choose_ingress_text
     assert "Cloudflare Tunnel is shown only for prd clusters" in choose_ingress_text
-    assert (
-        "Non-prd clusters keep the slug-prefixed hostname model" in choose_ingress_text
-    )
+    assert "Non-prd clusters keep the slug-prefixed hostname model" in choose_ingress_text
     assert (
         "Cloudflare Tunnel is available only for prd clusters on Cloudflare Free."
         in choose_ingress_text
     )
     assert "Base zone for platform hostnames." in choose_ingress_text
 
-    choose_ingress_run_text = CHOOSE_INGRESS_ROUTE_RUN_SCRIPT.read_text(
-        encoding="utf-8"
-    )
+    choose_ingress_run_text = CHOOSE_INGRESS_ROUTE_RUN_SCRIPT.read_text(encoding="utf-8")
     assert "cluster_slug" in choose_ingress_run_text
     assert "cluster_slug_lower" in choose_ingress_run_text
     assert "Base DNS domain:" in choose_ingress_run_text
@@ -1529,10 +1282,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "configure-wiredoor-ingress" in wiredoor_text
     assert "KUBECONFIG_FILE:" in wiredoor_text
     assert "item: kubeconfig" in wiredoor_text
-    assert (
-        "script: categories/talos-cluster/steps/install-wiredoor-gateway/run.sh"
-        in wiredoor_text
-    )
+    assert "script: categories/talos-cluster/steps/install-wiredoor-gateway/run.sh" in wiredoor_text
 
     assert "choose-ingress-route" in wiredoor_bastion_text
     assert "ingress_route: wiredoor" in wiredoor_bastion_text
@@ -1548,10 +1298,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "gitops/platform/authentik/externalsecret.yaml" in authentik_run_text
     assert "gitops/platform/authentik/ingressroute.yaml" in authentik_run_text
     assert "AUTHENTIK_POSTGRESQL__HOST" in authentik_run_text
-    assert (
-        "authentik-db-pooler-rw-session.databases.svc.cluster.local"
-        in authentik_run_text
-    )
+    assert "authentik-db-pooler-rw-session.databases.svc.cluster.local" in authentik_run_text
     assert "AUTHENTIK_POSTGRESQL__PORT" in authentik_run_text
     assert "AUTHENTIK_POSTGRESQL__NAME" in authentik_run_text
     assert "AUTHENTIK_POSTGRESQL__USER" in authentik_run_text
@@ -1559,20 +1306,13 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "AUTHENTIK_POSTGRESQL__DISABLE_SERVER_SIDE_CURSORS" in authentik_run_text
     assert "AUTHENTIK_POSTGRESQL__CONN_MAX_AGE" in authentik_run_text
     assert "openbao_read_global_secret_json authentik" in authentik_run_text
-    assert (
-        'rm -f "$bootstrap_secret_file" "$authentik_secret_file"' in authentik_run_text
-    )
+    assert 'rm -f "$bootstrap_secret_file" "$authentik_secret_file"' in authentik_run_text
     assert "apply-argocd-application.sh" in authentik_run_text
     assert '--application "authentik"' in authentik_run_text
     assert "twinbox_public_zone_name" in authentik_run_text
-    assert (
-        'authentik_host="https://authentik.${public_zone_name}"' in authentik_run_text
-    )
+    assert 'authentik_host="https://authentik.${public_zone_name}"' in authentik_run_text
     assert "wait_for_secret()" in authentik_run_text
-    assert (
-        'wait_for_secret "authentik-bootstrap" "Authentik bootstrap"'
-        in authentik_run_text
-    )
+    assert 'wait_for_secret "authentik-bootstrap" "Authentik bootstrap"' in authentik_run_text
     assert "Waiting for Authentik server" not in authentik_run_text
     assert "Waiting for Authentik worker" not in authentik_run_text
     assert (
@@ -1599,10 +1339,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "install-authentik-idp" in pgadmin_step_text
     assert "create-users-and-groups" in pgadmin_step_text
     assert "choose-ingress-route" in pgadmin_step_text
-    assert (
-        "script: categories/talos-cluster/steps/install-pgadmin4/run.sh"
-        in pgadmin_step_text
-    )
+    assert "script: categories/talos-cluster/steps/install-pgadmin4/run.sh" in pgadmin_step_text
     assert "optional: true" in pgadmin_step_text
     assert "authentik-pgadmin4" in pgadmin_run_text
     assert "pgadmin4-oidc" in pgadmin_run_text
@@ -1610,33 +1347,43 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "PGADMIN_MASTER_PASSWORD" in pgadmin_run_text
     assert "PGADMIN_DEFAULT_EMAIL" in pgadmin_run_text
     assert "Could not find a usable kubeconfig" in pgadmin_run_text
-    assert 'pgadmin_platform_dir="$WORKSPACE_ROOT/gitops/platform-apps/pgadmin4"' in pgadmin_run_text
-    assert 'pgadmin_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-ingressroute.XXXXXX.yaml")"' in pgadmin_run_text
+    assert (
+        'pgadmin_platform_dir="$WORKSPACE_ROOT/gitops/platform-apps/pgadmin4"' in pgadmin_run_text
+    )
+    assert (
+        'pgadmin_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-ingressroute.XXXXXX.yaml")"'
+        in pgadmin_run_text
+    )
     assert (
         "kubectl create namespace pgadmin4 --dry-run=client -o yaml | kubectl apply -f -"
         in pgadmin_run_text
     )
     assert "gitops/platform-apps/pgadmin4/externalsecret.yaml" not in pgadmin_run_text
-    assert '$pgadmin_platform_dir/externalsecret.yaml' in pgadmin_run_text
-    assert 'kubectl delete application pgadmin4 -n argocd --ignore-not-found=true' not in pgadmin_run_text
+    assert "$pgadmin_platform_dir/externalsecret.yaml" in pgadmin_run_text
+    assert (
+        "kubectl delete application pgadmin4 -n argocd --ignore-not-found=true"
+        not in pgadmin_run_text
+    )
     assert '--application "platform-ingress"' not in pgadmin_run_text
     assert "gitops/apps/platform-ingress.yaml" not in pgadmin_run_text
     assert "wait --for=condition=Ready externalsecret/pgadmin4-oidc" in pgadmin_run_text
     assert "Creating pgAdmin 4 database password secret" in pgadmin_run_text
-    assert 'pgadmin4-db-password' in pgadmin_run_text
-    assert (
-        "wait_for_ready_pod pgadmin4 app.kubernetes.io/name=pgadmin4"
-        in pgadmin_run_text
-    )
+    assert "pgadmin4-db-password" in pgadmin_run_text
+    assert "wait_for_ready_pod pgadmin4 app.kubernetes.io/name=pgadmin4" in pgadmin_run_text
     assert 'kubectl apply -f "$pgadmin_platform_dir/configmap.yaml"' in pgadmin_run_text
     assert "Applying pgAdmin 4 service, deployment, and ingress" in pgadmin_run_text
     assert 'kubectl apply -f "$pgadmin_platform_dir/service.yaml"' in pgadmin_run_text
     assert 'kubectl apply -f "$pgadmin_platform_dir/deployment.yaml"' in pgadmin_run_text
     assert 'kubectl apply -f "$pgadmin_rendered_ingressroute"' in pgadmin_run_text
-    assert 'kubectl -n pgadmin4 wait --for=condition=Available deployment/pgadmin4 --timeout=10m' in pgadmin_run_text
+    assert (
+        "kubectl -n pgadmin4 wait --for=condition=Available deployment/pgadmin4 --timeout=10m"
+        in pgadmin_run_text
+    )
     assert "kind: ConfigMap" in pgadmin_server_config_text
     assert "CloudNativePG" in pgadmin_server_config_text
-    assert "authentik-db-pooler-rw-session.databases.svc.cluster.local" in pgadmin_server_config_text
+    assert (
+        "authentik-db-pooler-rw-session.databases.svc.cluster.local" in pgadmin_server_config_text
+    )
     assert "PasswordExecCommand" in pgadmin_server_config_text
 
     pgadmin_app_text = PLATFORM_INGRESS_APP.read_text(encoding="utf-8")
@@ -1645,15 +1392,13 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "kustomize:" in pgadmin_app_text
     assert "pgadmin4-wiredoor" not in pgadmin_app_text
     assert "pgadmin4-tailscale" not in pgadmin_app_text
-    assert 'pgadmin4.{{index .metadata.annotations "twinbox.io/public-zone-name"}}' not in pgadmin_app_text
+    assert (
+        'pgadmin4.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
+        not in pgadmin_app_text
+    )
 
     headlamp_run_text = (
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "install-headlamp"
-        / "run.sh"
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-headlamp" / "run.sh"
     ).read_text(encoding="utf-8")
     assert "authentik-headlamp" in headlamp_run_text
     assert "authentik-auth.sh" in headlamp_run_text
@@ -1666,31 +1411,22 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "headlamp-oidc" in headlamp_run_text
     assert "sync-openbao-global-secret.sh" in headlamp_run_text
     assert "gitops/platform-apps/headlamp/externalsecret.yaml" in headlamp_run_text
-    assert 'headlamp_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/headlamp-application.XXXXXX.yaml")"' in headlamp_run_text
-    assert 'sed "s/__ZONE_NAME__/${public_zone_name}/g" "$headlamp_manifest_path" >"$headlamp_rendered_manifest"' in headlamp_run_text
+    assert (
+        'headlamp_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/headlamp-application.XXXXXX.yaml")"'
+        in headlamp_run_text
+    )
+    assert (
+        'sed "s/__ZONE_NAME__/${public_zone_name}/g" "$headlamp_manifest_path" >"$headlamp_rendered_manifest"'
+        in headlamp_run_text
+    )
     assert 'dashy_redirect_uri="${dashy_host}"' in (
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "install-dashy-dashboard"
-        / "run.sh"
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-dashy-dashboard" / "run.sh"
     ).read_text(encoding="utf-8")
     assert "refresh-dashy-config.mjs" in (
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "install-dashy-dashboard"
-        / "run.sh"
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-dashy-dashboard" / "run.sh"
     ).read_text(encoding="utf-8")
     assert "--trigger-step-id install-dashy-dashboard" in (
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "install-dashy-dashboard"
-        / "run.sh"
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-dashy-dashboard" / "run.sh"
     ).read_text(encoding="utf-8")
 
     headlamp_module_text = _authentik_headlamp_module_text()
@@ -1749,7 +1485,9 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "PGADMIN_OAUTH2_SCOPE" in pgadmin_external_secret_text
     assert "kind: ConfigMap" in pgadmin_server_config_text
     assert "CloudNativePG" in pgadmin_server_config_text
-    assert "authentik-db-pooler-rw-session.databases.svc.cluster.local" in pgadmin_server_config_text
+    assert (
+        "authentik-db-pooler-rw-session.databases.svc.cluster.local" in pgadmin_server_config_text
+    )
     assert "PasswordExecCommand" in pgadmin_server_config_text
     pgadmin_deployment_text = PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
     assert "pgadmin4-db-password" in pgadmin_deployment_text
@@ -1778,7 +1516,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "drop:" in pgadmin_deployment_text
     assert "- ALL" in pgadmin_deployment_text
     assert "cd /pgadmin4" in pgadmin_deployment_text
-    assert "--timeout \"${GUNICORN_TIMEOUT:-86400}\"" in pgadmin_deployment_text
+    assert '--timeout "${GUNICORN_TIMEOUT:-86400}"' in pgadmin_deployment_text
 
     cloudflare_tunnel_run_text = (
         REPO_ROOT
@@ -1804,8 +1542,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
         in cloudflare_tunnel_run_text
     )
     assert (
-        "Using the provided Cloudflare token for DNS record creation"
-        in cloudflare_tunnel_run_text
+        "Using the provided Cloudflare token for DNS record creation" in cloudflare_tunnel_run_text
     )
     assert "DNS zone name: $cloudflare_dns_zone_name" in cloudflare_tunnel_run_text
     assert (
@@ -1817,9 +1554,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
         'curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${cf_zone_id}"'
         in cloudflare_tunnel_run_text
     )
-    assert (
-        "Cloudflare sees zone name: $cloudflare_zone_name" in cloudflare_tunnel_run_text
-    )
+    assert "Cloudflare sees zone name: $cloudflare_zone_name" in cloudflare_tunnel_run_text
     assert (
         "resolves to ${cloudflare_zone_name}, but the wizard selected ${cloudflare_dns_zone_name}"
         in cloudflare_tunnel_run_text
@@ -1839,9 +1574,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "upsert-argocd-cluster-secret.sh" in cloudflare_tunnel_run_text
     assert "Zone DNS Edit permissions" in cloudflare_tunnel_run_text
     assert "argocd-server" in cloudflare_tunnel_run_text
-    assert (
-        "Argo CD server not ready yet (attempt ${i}/30)" in cloudflare_tunnel_run_text
-    )
+    assert "Argo CD server not ready yet (attempt ${i}/30)" in cloudflare_tunnel_run_text
     assert (
         "Timed out waiting for the Argo CD server deployment to become ready"
         in cloudflare_tunnel_run_text
@@ -1850,18 +1583,12 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
         "platform-ingress.yaml"
     ) < cloudflare_tunnel_run_text.index("Applying cloudflare-tunnel application")
 
-    assert (
-        "Cloudflare Tunnel is **prd-only** on Cloudflare Free"
-        in INGRESS_POLICY_DOC.read_text(encoding="utf-8")
+    assert "Cloudflare Tunnel is **prd-only** on Cloudflare Free" in INGRESS_POLICY_DOC.read_text(
+        encoding="utf-8"
     )
 
     cloudflare_dns_run_text = (
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "configure-cloudflare-dns"
-        / "run.sh"
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "configure-cloudflare-dns" / "run.sh"
     ).read_text(encoding="utf-8")
     assert "cluster-public-zone.sh" in cloudflare_dns_run_text
     assert "twinbox_public_zone_name" in cloudflare_dns_run_text
@@ -1871,29 +1598,21 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "upsert-argocd-cluster-secret.sh" in cloudflare_dns_run_text
     assert "Applying platform-ingress application" in cloudflare_dns_run_text
     assert "apply-argocd-application.sh" in cloudflare_dns_run_text
-    assert 'gitops/apps/platform-ingress.yaml' in cloudflare_dns_run_text
+    assert "gitops/apps/platform-ingress.yaml" in cloudflare_dns_run_text
     assert "apply-argocd-application.sh" in cloudflare_dns_run_text
 
     assert "install-cloudnativepg" in headlamp_text
-    assert (
-        "script: categories/talos-cluster/steps/install-headlamp/run.sh"
-        in headlamp_text
-    )
+    assert "script: categories/talos-cluster/steps/install-headlamp/run.sh" in headlamp_text
 
     assert "install-secret-sync" in grafana_text
     assert "install-prometheus" in grafana_text
-    assert (
-        "script: categories/talos-cluster/steps/install-grafana/run.sh" in grafana_text
-    )
+    assert "script: categories/talos-cluster/steps/install-grafana/run.sh" in grafana_text
     assert "--no-wait" not in (
         REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-grafana" / "run.sh"
     ).read_text(encoding="utf-8")
     assert "install-longhorn-storage" in prometheus_text
     assert "choose-ingress-route" in prometheus_text
-    assert (
-        "script: categories/talos-cluster/steps/install-prometheus/run.sh"
-        in prometheus_text
-    )
+    assert "script: categories/talos-cluster/steps/install-prometheus/run.sh" in prometheus_text
     assert "url: http://tempo.monitoring.svc.cluster.local:3200" in (
         GRAFANA_VALUES.read_text(encoding="utf-8")
     )
@@ -1907,13 +1626,12 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
 
 def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     longhorn_app_text = LONGHORN_APP.read_text(encoding="utf-8")
-    external_secrets_app_text = (
-        REPO_ROOT / "gitops" / "apps" / "external-secrets.yaml"
-    ).read_text(encoding="utf-8")
+    external_secrets_app_text = (REPO_ROOT / "gitops" / "apps" / "external-secrets.yaml").read_text(
+        encoding="utf-8"
+    )
     external_secrets_values_text = (
         REPO_ROOT / "gitops" / "values" / "external-secrets.yaml"
     ).read_text(encoding="utf-8")
-    traefik_app_text = _traefik_app_text()
     freshrss_run_text = FRESHRSS_STEP_SCRIPT.read_text(encoding="utf-8")
     freshrss_app_text = FRESHRSS_APP.read_text(encoding="utf-8")
     vaultwarden_run_text = VAULTWARDEN_STEP_SCRIPT.read_text(encoding="utf-8")
@@ -1925,9 +1643,7 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     wiredoor_gateway_values_text = _wiredoor_gateway_values_text()
     traefik_externalsecret_text = _traefik_dashboard_externalsecret_text()
     crowdsec_bouncer_externalsecret_text = _crowdsec_bouncer_externalsecret_text()
-    traefik_crowdsec_bouncer_externalsecret_text = (
-        _traefik_crowdsec_bouncer_externalsecret_text()
-    )
+    traefik_crowdsec_bouncer_externalsecret_text = _traefik_crowdsec_bouncer_externalsecret_text()
     wiredoor_externalsecret_text = _wiredoor_gateway_externalsecret_text()
     headlamp_ingressroute_text = HEADLAMP_INGRESSROUTE.read_text(encoding="utf-8")
     authentik_ingressroute_text = (
@@ -1937,9 +1653,7 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
         REPO_ROOT / "gitops" / "platform" / "authentik" / "cors-middleware.yaml"
     ).read_text(encoding="utf-8")
     grafana_ingressroute_text = GRAFANA_INGRESSROUTE.read_text(encoding="utf-8")
-    wiredoor_ingressroute_text = WIREDOOR_GATEWAY_INGRESSROUTE.read_text(
-        encoding="utf-8"
-    )
+    wiredoor_ingressroute_text = WIREDOOR_GATEWAY_INGRESSROUTE.read_text(encoding="utf-8")
 
     assert "chart: longhorn" in longhorn_app_text
     assert "__LONGHORN_VALUES__" in longhorn_app_text
@@ -1954,7 +1668,9 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "version: v1.6.0" in traefik_values_text
     assert "abortOnPluginFailure" not in traefik_values_text
     assert "cloudflarewarp@file,crowdsec@file" in traefik_values_text
-    assert "crowdsecLapiHost: crowdsec-service.crowdsec.svc.cluster.local:8080" in traefik_values_text
+    assert (
+        "crowdsecLapiHost: crowdsec-service.crowdsec.svc.cluster.local:8080" in traefik_values_text
+    )
     assert "crowdsecLapiKeyFile: /run/secrets/crowdsec/lapi-key" in traefik_values_text
     assert "mountPath: /run/secrets/crowdsec" in traefik_values_text
     assert "crowdsecurity/traefik" in crowdsec_values_text
@@ -1964,16 +1680,20 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "token:" not in wiredoor_gateway_values_text
     assert "cluster-public-zone.sh" in freshrss_run_text
     assert "Could not determine cluster DNS domain" in freshrss_run_text
-    assert 'rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/freshrss-application.XXXXXX.yaml")"' in freshrss_run_text
+    assert (
+        'rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/freshrss-application.XXXXXX.yaml")"'
+        in freshrss_run_text
+    )
     assert "Applying FreshRSS Argo CD application" in freshrss_run_text
-    assert 'sed "s/__ZONE_NAME__/${public_zone_name}/g" "$manifest_path" >"$rendered_manifest"' in freshrss_run_text
+    assert (
+        'sed "s/__ZONE_NAME__/${public_zone_name}/g" "$manifest_path" >"$rendered_manifest"'
+        in freshrss_run_text
+    )
     assert '--manifest "$rendered_manifest"' in freshrss_run_text
     assert "kind: Application" in freshrss_app_text
     assert "path: gitops/platform-apps/freshrss" in freshrss_app_text
     assert "kustomize:" in freshrss_app_text
-    assert "Host(`freshrss.__ZONE_NAME__`)" in FRESHRSS_INGRESSROUTE.read_text(
-        encoding="utf-8"
-    )
+    assert "Host(`freshrss.__ZONE_NAME__`)" in FRESHRSS_INGRESSROUTE.read_text(encoding="utf-8")
     assert "cluster-public-zone.sh" in vaultwarden_run_text
     assert "sync-openbao-global-secret.sh" in vaultwarden_run_text
     assert "VAULTWARDEN_ADMIN_TOKEN" in vaultwarden_run_text
@@ -1997,16 +1717,10 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "Access-Control-Allow-Origin" not in authentik_cors_text
     assert "Host(`headlamp.__ZONE_NAME__`)" in headlamp_ingressroute_text
     assert "Host(`grafana.__ZONE_NAME__`)" in grafana_ingressroute_text
-    assert "Host(`hubble.__ZONE_NAME__`)" in HUBBLE_INGRESSROUTE.read_text(
-        encoding="utf-8"
-    )
-    assert "kind: Middleware" in HUBBLE_AUTHENTIK_FORWARDAUTH_MIDDLEWARE.read_text(
-        encoding="utf-8"
-    )
+    assert "Host(`hubble.__ZONE_NAME__`)" in HUBBLE_INGRESSROUTE.read_text(encoding="utf-8")
+    assert "kind: Middleware" in HUBBLE_AUTHENTIK_FORWARDAUTH_MIDDLEWARE.read_text(encoding="utf-8")
     assert "Host(`argocd.__ZONE_NAME__`)" in wiredoor_ingressroute_text
-    assert "Host(`pgadmin4.__ZONE_NAME__`)" in PGADMIN_INGRESSROUTE.read_text(
-        encoding="utf-8"
-    )
+    assert "Host(`pgadmin4.__ZONE_NAME__`)" in PGADMIN_INGRESSROUTE.read_text(encoding="utf-8")
     assert "pgadmin4-data" in PGADMIN_PVC.read_text(encoding="utf-8")
     assert "pgadmin4-bootstrap" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
     assert "dpage/pgadmin4:9.14" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
@@ -2051,9 +1765,9 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "secretKey: lapi-key" in traefik_crowdsec_bouncer_externalsecret_text
     assert "property: lapi_key" in traefik_crowdsec_bouncer_externalsecret_text
     assert "HEADLAMP_CONFIG_OIDC_CLIENT_SECRET" in _headlamp_oidc_externalsecret_text()
-    platform_ingress_app_text = (
-        REPO_ROOT / "gitops" / "apps" / "platform-ingress.yaml"
-    ).read_text(encoding="utf-8")
+    platform_ingress_app_text = (REPO_ROOT / "gitops" / "apps" / "platform-ingress.yaml").read_text(
+        encoding="utf-8"
+    )
     grafana_appset_text = GRAFANA_APP.read_text(encoding="utf-8")
     ntfy_appset_text = NTFY_APP.read_text(encoding="utf-8")
     assert "kind: ApplicationSet" in platform_ingress_app_text
@@ -2066,17 +1780,23 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
         'opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
         in platform_ingress_app_text
     )
-    assert (
-        "customResponseHeaders/Access-Control-Allow-Origin"
-        not in platform_ingress_app_text
-    )
+    assert "customResponseHeaders/Access-Control-Allow-Origin" not in platform_ingress_app_text
     assert (
         'hubble.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
         in platform_ingress_app_text
     )
-    assert 'pgadmin4.{{index .metadata.annotations "twinbox.io/public-zone-name"}}' not in platform_ingress_app_text
-    assert 'cloudtty.{{index .metadata.annotations "twinbox.io/public-zone-name"}}' not in platform_ingress_app_text
-    assert 'Host(`start.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)' not in platform_ingress_app_text
+    assert (
+        'pgadmin4.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
+        not in platform_ingress_app_text
+    )
+    assert (
+        'cloudtty.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
+        not in platform_ingress_app_text
+    )
+    assert (
+        'Host(`start.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)'
+        not in platform_ingress_app_text
+    )
     assert (
         'seaweedfs.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
         in platform_ingress_app_text
@@ -2116,12 +1836,7 @@ def test_grafana_oidc_is_openbao_backed():
     grafana_app_text = GRAFANA_APP.read_text(encoding="utf-8")
     grafana_externalsecret_text = _grafana_externalsecret_text()
     grafana_step_text = (
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "install-grafana"
-        / "run.sh"
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-grafana" / "run.sh"
     ).read_text(encoding="utf-8")
     grafana_step_yaml = GRAFANA_STEP_MANIFEST.read_text(encoding="utf-8")
 
@@ -2147,12 +1862,7 @@ def test_grafana_oidc_is_openbao_backed():
 def test_grafana_managed_overview_dashboard_is_rewritten_for_twinbox():
     helper_text = GRAFANA_REFRESH_HELPER.read_text(encoding="utf-8")
     grafana_step_text = (
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "install-grafana"
-        / "run.sh"
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-grafana" / "run.sh"
     ).read_text(encoding="utf-8")
 
     assert "managed-kubernetes-overview-dashboard" in helper_text
@@ -2185,27 +1895,20 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     main_text = _module_text()
     outputs_text = _module_outputs_text()
     assert 'resource "proxmox_virtual_environment_vm" "node"' in main_text
-    assert (
-        'resource "proxmox_virtual_environment_file" "talos_nocloud"' not in main_text
-    )
+    assert 'resource "proxmox_virtual_environment_file" "talos_nocloud"' not in main_text
     assert "talos_image_nodes" not in main_text
     assert 'content_type = "iso"' not in main_text
     assert "source_file {" not in main_text
     assert "path      = var.talos_image_local_path" not in main_text
     assert "node_name    = each.value" not in main_text
     assert 'machine   = "q35"' not in main_text
-    assert (
-        'boot_order = var.boot_from_disk ? ["virtio0"] : ["ide2", "virtio0"]'
-        in main_text
-    )
+    assert 'boot_order = var.boot_from_disk ? ["virtio0"] : ["ide2", "virtio0"]' in main_text
     assert "cdrom {" in main_text
     assert 'dynamic "cdrom"' not in main_text
     assert "for_each = var.boot_from_disk ? [] : [1]" not in main_text
     assert "validation {" not in _module_variables_text()
     assert "vm_host_map = var.vm_node_map" in main_text
-    assert (
-        'talos_image_file_name = "talos-${var.talos_image_cache_key}.iso"' in main_text
-    )
+    assert 'talos_image_file_name = "talos-${var.talos_image_cache_key}.iso"' in main_text
     assert (
         'talos_image_file_id   = "${var.file_datastore}:iso/${local.talos_image_file_name}"'
         in main_text
@@ -2213,10 +1916,7 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     assert "merge(" not in main_text
     assert "file_id   = local.talos_image_file_id" in main_text
     assert "node_name = local.vm_host_map[each.key]" in main_text
-    assert (
-        "file_id      = proxmox_virtual_environment_file.talos_nocloud.id"
-        not in main_text
-    )
+    assert "file_id      = proxmox_virtual_environment_file.talos_nocloud.id" not in main_text
     assert "remove_legacy_talos_file_state" not in main_text
     assert 'file_format  = "raw"' not in main_text
     assert "agent {" in main_text
@@ -2249,15 +1949,11 @@ LOKI_VALUES = REPO_ROOT / "gitops" / "values" / "loki.yaml"
 ALLOY_VALUES = REPO_ROOT / "gitops" / "values" / "alloy.yaml"
 NTFY_APP = REPO_ROOT / "gitops" / "apps" / "ntfy.yaml"
 NTFY_VALUES = REPO_ROOT / "gitops" / "values" / "ntfy.yaml"
-NTFY_INGRESSROUTE = (
-    REPO_ROOT / "gitops" / "platform-apps" / "ntfy" / "ingressroute.yaml"
-)
+NTFY_INGRESSROUTE = REPO_ROOT / "gitops" / "platform-apps" / "ntfy" / "ingressroute.yaml"
 KUSTOMIZATION = REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
 DATABASES_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "kustomization.yaml"
 AUTHENTIK_DB_CLUSTER = REPO_ROOT / "gitops" / "databases" / "authentik" / "cluster.yaml"
-AUTHENTIK_DB_STORAGECLASS = (
-    REPO_ROOT / "gitops" / "databases" / "longhorn-single-storageclass.yaml"
-)
+AUTHENTIK_DB_STORAGECLASS = REPO_ROOT / "gitops" / "databases" / "longhorn-single-storageclass.yaml"
 
 
 def test_prometheus_argocd_app_uses_kube_prometheus_stack():
@@ -2297,8 +1993,8 @@ def test_metrics_server_values_configures_talos_friendly_args():
 
 def test_prometheus_installer_applies_metrics_server_first_without_kube_system_baseline():
     text = PROMETHEUS_SCRIPT.read_text(encoding="utf-8")
-    metrics_server_index = text.index('gitops/apps/metrics-server.yaml')
-    prometheus_index = text.index('gitops/apps/prometheus.yaml')
+    metrics_server_index = text.index("gitops/apps/metrics-server.yaml")
+    prometheus_index = text.index("gitops/apps/prometheus.yaml")
     assert metrics_server_index < prometheus_index
     assert '--application "metrics-server"' in text
     assert "--skip-namespace-baseline" in text
@@ -2408,15 +2104,10 @@ def test_ntfy_argocd_app_is_an_applicationset():
 
 def test_ntfy_step_replaces_existing_applicationset_before_apply():
     text = (
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "install-ntfy"
-        / "run.sh"
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-ntfy" / "run.sh"
     ).read_text(encoding="utf-8")
-    assert 'kubectl delete application ntfy -n argocd --ignore-not-found=true' in text
-    assert 'kubectl delete applicationset ntfy-set -n argocd --ignore-not-found=true' in text
+    assert "kubectl delete application ntfy -n argocd --ignore-not-found=true" in text
+    assert "kubectl delete applicationset ntfy-set -n argocd --ignore-not-found=true" in text
     assert '--application "ntfy"' in text
 
 
@@ -2470,9 +2161,9 @@ def test_grafana_values_includes_sidecar_and_datasources():
     assert "type: prometheus" in text
     assert "type: loki" in text
     assert "url: http://tempo.monitoring.svc.cluster.local:3200" in text
-    assert (
-        REPO_ROOT / "gitops" / "values" / "tempo.yaml"
-    ).read_text(encoding="utf-8").count("http_listen_port: 3200") == 1
+    assert (REPO_ROOT / "gitops" / "values" / "tempo.yaml").read_text(encoding="utf-8").count(
+        "http_listen_port: 3200"
+    ) == 1
     assert "root_url:" not in text
 
 
@@ -2481,9 +2172,7 @@ def test_grafana_argocd_app_is_an_applicationset():
     assert "kind: ApplicationSet" in text
     assert "name: grafana-set" in text
     assert "root_url:" in text
-    assert (
-        'grafana.{{index .metadata.annotations "twinbox.io/public-zone-name"}}' in text
-    )
+    assert 'grafana.{{index .metadata.annotations "twinbox.io/public-zone-name"}}' in text
 
 
 def test_homepage_configmap_is_not_part_of_the_core_platform_overlay():
@@ -2518,20 +2207,11 @@ def test_prometheus_step_applies_kube_prometheus_stack():
     text = PROMETHEUS_STEP_MANIFEST.read_text(encoding="utf-8")
     run_text = PROMETHEUS_STEP_SCRIPT.read_text(encoding="utf-8")
     script_text = _prometheus_script_text()
-    app_text = (REPO_ROOT / "gitops" / "apps" / "prometheus.yaml").read_text(
-        encoding="utf-8"
-    )
+    app_text = (REPO_ROOT / "gitops" / "apps" / "prometheus.yaml").read_text(encoding="utf-8")
     manifests_text = (
-        REPO_ROOT
-        / "gitops"
-        / "apps"
-        / "prometheus"
-        / "manifests"
-        / "kustomization.yaml"
+        REPO_ROOT / "gitops" / "apps" / "prometheus" / "manifests" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
-    prometheus_manifests_text = PROMETHEUS_MANIFESTS_KUSTOMIZATION.read_text(
-        encoding="utf-8"
-    )
+    prometheus_manifests_text = PROMETHEUS_MANIFESTS_KUSTOMIZATION.read_text(encoding="utf-8")
 
     assert "id: install-prometheus" in text
     assert "title: Install Prometheus" in text
@@ -2559,7 +2239,10 @@ def test_reconcile_observability_script_accepts_cluster_kubeconfig_fallback():
     assert ': "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"' in script_text
     assert ': "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"' not in script_text
     assert "cluster_kubeconfig_file" in script_text
-    assert 'kubeconfig_file="${KUBECONFIG_FILE:-${TWINBOX_KUBECONFIG_FILE:-$cluster_kubeconfig_file}}"' in script_text
+    assert (
+        'kubeconfig_file="${KUBECONFIG_FILE:-${TWINBOX_KUBECONFIG_FILE:-$cluster_kubeconfig_file}}"'
+        in script_text
+    )
     assert 'export KUBECONFIG_FILE="$kubeconfig_file"' in script_text
     assert 'export KUBECONFIG="$kubeconfig_file"' in script_text
     assert "kubeconfig not found at ${kubeconfig_file}" in script_text
@@ -2575,7 +2258,10 @@ def test_traefik_manager_step_deploys_browser_ui():
     assert "Provisioning Authentik proxy application for Traefik Manager" in script_text
     assert "Traefik Manager" in script_text
     assert "outpost.goauthentik.io/auth/traefik" not in script_text
-    assert 'kubectl delete application traefik-manager -n argocd --ignore-not-found=true' not in script_text
+    assert (
+        "kubectl delete application traefik-manager -n argocd --ignore-not-found=true"
+        not in script_text
+    )
     assert '--application "platform-ingress"' not in script_text
     assert "gitops/apps/platform-ingress.yaml" not in script_text
     assert 'platform_dir="$WORKSPACE_ROOT/gitops/platform-apps/traefik-manager"' in script_text
@@ -2594,9 +2280,9 @@ def test_traefik_manager_step_deploys_browser_ui():
 
 
 def test_argocd_cluster_secret_helper_writes_runtime_projection():
-    text = (
-        REPO_ROOT / "scripts" / "manager" / "upsert-argocd-cluster-secret.sh"
-    ).read_text(encoding="utf-8")
+    text = (REPO_ROOT / "scripts" / "manager" / "upsert-argocd-cluster-secret.sh").read_text(
+        encoding="utf-8"
+    )
 
     assert "argocd-manager-cluster-admin" in text
     assert "twinbox.io/domain-ready" in text
@@ -2633,9 +2319,9 @@ def test_vaultwarden_manifests_use_postgresql_and_domain_limited_signups():
     db_externalsecret_text = (
         REPO_ROOT / "gitops" / "databases" / "vaultwarden" / "externalsecret.yaml"
     ).read_text(encoding="utf-8")
-    cluster_text = (
-        REPO_ROOT / "gitops" / "databases" / "vaultwarden" / "cluster.yaml"
-    ).read_text(encoding="utf-8")
+    cluster_text = (REPO_ROOT / "gitops" / "databases" / "vaultwarden" / "cluster.yaml").read_text(
+        encoding="utf-8"
+    )
 
     assert "ghcr.io/dani-garcia/vaultwarden:1.36.0" in deployment_text
     assert "ghcr.io/dani-garcia/vaultwarden:latest" not in deployment_text
@@ -2654,31 +2340,40 @@ def test_pixelfed_manifests_use_postgresql_and_longhorn_storage():
     deployment_text = (
         REPO_ROOT / "gitops" / "platform-apps" / "pixelfed" / "deployment.yaml"
     ).read_text(encoding="utf-8")
-    workers_text = (
-        REPO_ROOT / "gitops" / "platform-apps" / "pixelfed" / "workers.yaml"
-    ).read_text(encoding="utf-8")
+    workers_text = (REPO_ROOT / "gitops" / "platform-apps" / "pixelfed" / "workers.yaml").read_text(
+        encoding="utf-8"
+    )
     externalsecret_text = (
         REPO_ROOT / "gitops" / "platform-apps" / "pixelfed" / "externalsecret.yaml"
     ).read_text(encoding="utf-8")
     db_externalsecret_text = (
         REPO_ROOT / "gitops" / "databases" / "pixelfed" / "externalsecret.yaml"
     ).read_text(encoding="utf-8")
-    cluster_text = (
-        REPO_ROOT / "gitops" / "databases" / "pixelfed" / "cluster.yaml"
-    ).read_text(encoding="utf-8")
+    cluster_text = (REPO_ROOT / "gitops" / "databases" / "pixelfed" / "cluster.yaml").read_text(
+        encoding="utf-8"
+    )
 
-    assert "source \"$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh\"" in step_text
-    assert "source \"$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh\"" in step_text
+    assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in step_text
+    assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in step_text
     assert '--secret-name "pixelfed"' in step_text
-    assert '--required-keys "APP_KEY,PIXELFED_POSTGRESQL__USERNAME,PIXELFED_POSTGRESQL__PASSWORD,PF_OIDC_CLIENT_ID,PF_OIDC_CLIENT_SECRET,PF_OIDC_AUTHORIZE_URL,PF_OIDC_TOKEN_URL,PF_OIDC_PROFILE_URL,PF_OIDC_LOGOUT_URL"' in step_text
+    assert (
+        '--required-keys "APP_KEY,PIXELFED_POSTGRESQL__USERNAME,PIXELFED_POSTGRESQL__PASSWORD,PF_OIDC_CLIENT_ID,PF_OIDC_CLIENT_SECRET,PF_OIDC_AUTHORIZE_URL,PF_OIDC_TOKEN_URL,PF_OIDC_PROFILE_URL,PF_OIDC_LOGOUT_URL"'
+        in step_text
+    )
     assert "gitops/databases/pixelfed/cluster.yaml" in step_text
     assert "gitops/apps/pixelfed.yaml" in step_text
     assert "php artisan instance:actor" in step_text
     assert "php artisan passport:keys --force" in step_text
     assert "Provisioning Authentik OIDC client for Pixelfed" in step_text
 
-    assert "ghcr.io/jippi/docker-pixelfed:nightly-2026-05-10-staging-apache-8.4-bookworm" in deployment_text
-    assert "ghcr.io/jippi/docker-pixelfed:nightly-2026-05-10-staging-apache-8.4-bookworm" in workers_text
+    assert (
+        "ghcr.io/jippi/docker-pixelfed:nightly-2026-05-10-staging-apache-8.4-bookworm"
+        in deployment_text
+    )
+    assert (
+        "ghcr.io/jippi/docker-pixelfed:nightly-2026-05-10-staging-apache-8.4-bookworm"
+        in workers_text
+    )
     assert "APP_URL" in deployment_text
     assert "APP_DOMAIN" in deployment_text
     assert "DB_HOST" in deployment_text
@@ -2753,15 +2448,13 @@ def test_install_secret_sync_also_populates_seaweedfs_backup_credentials():
 
     assert "velero.json" in text
     assert "Syncing SeaweedFS/Velero credentials to OpenBao" in text
-    assert "openbao_sync_global_secret_file \"$VELERO_SECRET_NAME\"" in text
+    assert 'openbao_sync_global_secret_file "$VELERO_SECRET_NAME"' in text
     assert '"mode" "endpoint" "bucket" "region" "username" "password"' in text
     assert "velero_secret_name" in text
 
 
 def test_loki_and_openbao_longhorn_sizes_are_right_sized():
-    loki_values_text = (REPO_ROOT / "gitops" / "values" / "loki.yaml").read_text(
-        encoding="utf-8"
-    )
+    loki_values_text = (REPO_ROOT / "gitops" / "values" / "loki.yaml").read_text(encoding="utf-8")
     openbao_values_text = (REPO_ROOT / "gitops" / "values" / "openbao.yaml").read_text(
         encoding="utf-8"
     )
@@ -2791,9 +2484,9 @@ def test_critical_cnpg_clusters_use_ha_instances_with_single_replica_storage():
         "vaultwarden",
         "immich",
     ):
-        text = (
-            REPO_ROOT / "gitops" / "databases" / name / "cluster.yaml"
-        ).read_text(encoding="utf-8")
+        text = (REPO_ROOT / "gitops" / "databases" / name / "cluster.yaml").read_text(
+            encoding="utf-8"
+        )
         assert "instances: 3" in text
         assert "storageClass: longhorn-single" in text
 
@@ -2806,33 +2499,45 @@ def test_critical_cnpg_clusters_use_ha_instances_with_single_replica_storage():
 
 def test_database_app_installers_refresh_pgadmin_after_database_ready():
     expectations = {
-        "install-hedgedoc": ("hedgedoc", "hedgedoc-db-pooler-rw-session.databases.svc.cluster.local"),
+        "install-hedgedoc": (
+            "hedgedoc",
+            "hedgedoc-db-pooler-rw-session.databases.svc.cluster.local",
+        ),
         "install-immich": ("immich", "immich-db-pooler-rw-session.databases.svc.cluster.local"),
         "install-n8n": ("n8n", "n8n-db-pooler-rw-session.databases.svc.cluster.local"),
         "install-nextcloud": ("nextcloud", "nextcloud-db-pooler-rw.databases.svc.cluster.local"),
-        "install-openwebui": ("openwebui", "openwebui-db-pooler-rw-session.databases.svc.cluster.local"),
+        "install-openwebui": (
+            "openwebui",
+            "openwebui-db-pooler-rw-session.databases.svc.cluster.local",
+        ),
         "install-outline": ("outline", "outline-db-pooler-rw-session.databases.svc.cluster.local"),
         "install-paperless": ("paperless", "paperless-db-pooler-rw.databases.svc.cluster.local"),
-        "install-pixelfed": ("pixelfed", "pixelfed-db-pooler-rw-session.databases.svc.cluster.local"),
-        "install-vaultwarden": ("vaultwarden", "vaultwarden-db-pooler-rw.databases.svc.cluster.local"),
+        "install-pixelfed": (
+            "pixelfed",
+            "pixelfed-db-pooler-rw-session.databases.svc.cluster.local",
+        ),
+        "install-vaultwarden": (
+            "vaultwarden",
+            "vaultwarden-db-pooler-rw.databases.svc.cluster.local",
+        ),
         "install-zulip": ("zulip", "zulip-db-pooler-rw.databases.svc.cluster.local"),
     }
 
     assert PGADMIN_SYNC_SERVER_SCRIPT.read_text(encoding="utf-8").startswith("#!/usr/bin/env bash")
 
     for step_id, (app_id, host) in expectations.items():
-        text = (
-            REPO_ROOT / "categories" / "apps" / "steps" / step_id / "run.sh"
-        ).read_text(encoding="utf-8")
+        text = (REPO_ROOT / "categories" / "apps" / "steps" / step_id / "run.sh").read_text(
+            encoding="utf-8"
+        )
         assert "sync-pgadmin4-server.sh" in text
         assert f'--app-id "{app_id}"' in text
         assert f'--host "{host}"' in text
 
 
 def test_nextcloud_db_cluster_uses_future_install_capacity():
-    text = (
-        REPO_ROOT / "gitops" / "databases" / "nextcloud" / "cluster.yaml"
-    ).read_text(encoding="utf-8")
+    text = (REPO_ROOT / "gitops" / "databases" / "nextcloud" / "cluster.yaml").read_text(
+        encoding="utf-8"
+    )
     assert "instances: 2" in text
     assert "storageClass: longhorn-single" in text
 
@@ -2845,25 +2550,26 @@ def test_authentik_db_storageclass_uses_single_replica():
 
 
 def test_install_immich_step_uses_only_its_own_database_manifests():
-    text = (
-        REPO_ROOT
-        / "categories"
-        / "apps"
-        / "steps"
-        / "install-immich"
-        / "run.sh"
-    ).read_text(encoding="utf-8")
+    text = (REPO_ROOT / "categories" / "apps" / "steps" / "install-immich" / "run.sh").read_text(
+        encoding="utf-8"
+    )
     assert "gitops/databases/namespace.yaml" in text
     assert "gitops/databases/immich/cluster.yaml" in text
     assert "gitops/databases/immich/externalsecret.yaml" in text
-    assert 'immich_app_db_externalsecret_manifest="$WORKSPACE_ROOT/gitops/platform-apps/immich/db-externalsecret.yaml"' in text
+    assert (
+        'immich_app_db_externalsecret_manifest="$WORKSPACE_ROOT/gitops/platform-apps/immich/db-externalsecret.yaml"'
+        in text
+    )
     assert 'kubectl apply -f "$immich_app_db_externalsecret_manifest"' in text
     assert "gitops/databases/immich/pooler-ro.yaml" in text
     assert "gitops/databases/immich/pooler-rw.yaml" in text
     assert "gitops/databases/immich/scheduled-backup.yaml" in text
     assert "gitops/databases/kustomization.yaml" not in text
     assert "gitops/databases/authentik/" not in text
-    assert 'search_response="$(authentik_api_get "/providers/oauth2/?search=${provider_name// /%20}&page_size=50")"' in text
+    assert (
+        'search_response="$(authentik_api_get "/providers/oauth2/?search=${provider_name// /%20}&page_size=50")"'
+        in text
+    )
     assert 'authentik_api_get "/core/applications/${application_slug}/" 2>/dev/null || true' in text
     db_externalsecret_text = (
         REPO_ROOT / "gitops" / "platform-apps" / "immich" / "db-externalsecret.yaml"
@@ -2876,23 +2582,16 @@ def test_install_immich_step_uses_only_its_own_database_manifests():
 
 
 def test_immich_values_keep_valkey_storageclass_nested():
-    text = (REPO_ROOT / "gitops" / "values" / "immich.yaml").read_text(
-        encoding="utf-8"
-    )
+    text = (REPO_ROOT / "gitops" / "values" / "immich.yaml").read_text(encoding="utf-8")
     assert "valkey:" in text
     assert "      storageClass: longhorn" in text
     assert "\n    storageClass: longhorn\n" not in text
 
 
 def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
-    text = (
-        REPO_ROOT
-        / "categories"
-        / "apps"
-        / "steps"
-        / "install-nextcloud"
-        / "run.sh"
-    ).read_text(encoding="utf-8")
+    text = (REPO_ROOT / "categories" / "apps" / "steps" / "install-nextcloud" / "run.sh").read_text(
+        encoding="utf-8"
+    )
     assert "gitops/databases/namespace.yaml" in text
     assert "gitops/databases/nextcloud/cluster.yaml" in text
     assert "gitops/databases/nextcloud/externalsecret.yaml" in text
@@ -2915,7 +2614,7 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert "app:enable -f oidc_groups_mapping" in text
     assert "oidc-groups:set" in text
     assert "admins-to-admin" in text
-    assert r'tmp_dir=\"\$(mktemp -d)\"' in text
+    assert r"tmp_dir=\"\$(mktemp -d)\"" in text
     assert "trap 'rm -rf \\\"\\$tmp_dir\\\"' EXIT" in text
     assert '\\"claimPath\\": \\"groups\\"' in text
     assert '\\"admins\\": \\"admin\\"' in text
@@ -2928,16 +2627,17 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert "redirect_logout_pretty" in text
     assert "redirect_backchannel_pretty" in text
     assert "apps/user_oidc/code" in text
-    assert "config:system:set wopi_url --value='https://nextcloud-collabora.${public_zone_name}'" in text
-    assert "config:app:set --value='https://nextcloud-collabora.${public_zone_name}' richdocuments wopi_url" in text
-    assert "richdocuments:activate-config" in text
     assert (
-        "Could not resolve Authentik signing key ID for ${AUTHENTIK_SIGNING_KEY_NAME}"
+        "config:system:set wopi_url --value='https://nextcloud-collabora.${public_zone_name}'"
         in text
     )
-    values_text = (REPO_ROOT / "gitops" / "values" / "nextcloud.yaml").read_text(
-        encoding="utf-8"
+    assert (
+        "config:app:set --value='https://nextcloud-collabora.${public_zone_name}' richdocuments wopi_url"
+        in text
     )
+    assert "richdocuments:activate-config" in text
+    assert "Could not resolve Authentik signing key ID for ${AUTHENTIK_SIGNING_KEY_NAME}" in text
+    values_text = (REPO_ROOT / "gitops" / "values" / "nextcloud.yaml").read_text(encoding="utf-8")
     assert "nextcloud.__ZONE_NAME__" in values_text
     assert "aliasgroups:\n      - host: nextcloud.__ZONE_NAME__" in values_text
     assert 'server_name: "nextcloud-collabora.__ZONE_NAME__"' in values_text
@@ -2950,16 +2650,10 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     ).read_text(encoding="utf-8")
     assert "nextcloud.__ZONE_NAME__" in platform_text
     collabora_text = (
-        REPO_ROOT
-        / "gitops"
-        / "platform-apps"
-        / "nextcloud"
-        / "collabora-ingressroute.yaml"
+        REPO_ROOT / "gitops" / "platform-apps" / "nextcloud" / "collabora-ingressroute.yaml"
     ).read_text(encoding="utf-8")
     assert "nextcloud-collabora.__ZONE_NAME__" in collabora_text
-    app_text = (REPO_ROOT / "gitops" / "apps" / "nextcloud.yaml").read_text(
-        encoding="utf-8"
-    )
+    app_text = (REPO_ROOT / "gitops" / "apps" / "nextcloud.yaml").read_text(encoding="utf-8")
     assert "values: |" in app_text
     assert "__NEXTCLOUD_VALUES__" in app_text
     assert "valueFiles:" not in app_text
@@ -2970,11 +2664,7 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert "namespace: nextcloud" in db_externalsecret_text
     assert "twinbox/global/nextcloud" in db_externalsecret_text
     kustomization_text = (
-        REPO_ROOT
-        / "gitops"
-        / "platform-apps"
-        / "nextcloud"
-        / "kustomization.yaml"
+        REPO_ROOT / "gitops" / "platform-apps" / "nextcloud" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
     assert "authentik-externalsecret.yaml" not in kustomization_text
 
@@ -2991,8 +2681,8 @@ def test_hedgedoc_database_cluster_is_right_sized_for_current_capacity():
     assert "memory: 256Mi" in text
     assert 'cpu: "500m"' in text
     assert "memory: 512Mi" in text
-    assert "shared_buffers: \"64MB\"" in text
-    assert "effective_cache_size: \"192MB\"" in text
+    assert 'shared_buffers: "64MB"' in text
+    assert 'effective_cache_size: "192MB"' in text
     assert "s3://twinbox-velero/hedgedoc-db/" in text
     assert "bootstrap:" in text
     assert "secret:" in text
@@ -3000,9 +2690,7 @@ def test_hedgedoc_database_cluster_is_right_sized_for_current_capacity():
 
 
 def test_authentik_values_request_memory_for_server_and_worker():
-    text = (REPO_ROOT / "gitops" / "apps" / "authentik" / "values.yaml").read_text(
-        encoding="utf-8"
-    )
+    text = (REPO_ROOT / "gitops" / "apps" / "authentik" / "values.yaml").read_text(encoding="utf-8")
     assert "server:" in text
     assert "memory: 512Mi" in text
     assert "limits:\n      memory: 1Gi" in text
@@ -3014,12 +2702,12 @@ def test_authentik_values_request_memory_for_server_and_worker():
 
 
 def test_dashy_deployment_uses_a_published_image_tag():
-    text = (
-        REPO_ROOT / "gitops" / "platform-apps" / "dashy" / "deployment.yaml"
-    ).read_text(encoding="utf-8")
-    pvc_text = (
-        REPO_ROOT / "gitops" / "platform-apps" / "dashy" / "pvc.yaml"
-    ).read_text(encoding="utf-8")
+    text = (REPO_ROOT / "gitops" / "platform-apps" / "dashy" / "deployment.yaml").read_text(
+        encoding="utf-8"
+    )
+    pvc_text = (REPO_ROOT / "gitops" / "platform-apps" / "dashy" / "pvc.yaml").read_text(
+        encoding="utf-8"
+    )
     assert "replicas: 1" in text
     assert "strategy:" not in text
     assert "kubernetes.io/hostname" not in text
@@ -3057,9 +2745,9 @@ def test_dashy_argo_application_manages_the_platform_overlay():
 
 
 def test_dashy_kustomization_includes_a_pvc():
-    text = (
-        REPO_ROOT / "gitops" / "platform-apps" / "dashy" / "kustomization.yaml"
-    ).read_text(encoding="utf-8")
+    text = (REPO_ROOT / "gitops" / "platform-apps" / "dashy" / "kustomization.yaml").read_text(
+        encoding="utf-8"
+    )
     assert "pvc.yaml" in text
     assert "deployment.yaml" in text
     assert "ingressroute.yaml" in text
@@ -3067,32 +2755,25 @@ def test_dashy_kustomization_includes_a_pvc():
 
 def test_install_dashy_step_refreshes_platform_ingress_before_restart():
     text = (
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "install-dashy-dashboard"
-        / "run.sh"
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-dashy-dashboard" / "run.sh"
     ).read_text(encoding="utf-8")
     assert "Applying Dashy Argo CD application" in text
     assert "Waiting for Dashy OIDC secret" in text
     assert "Rendering and applying Dashy start page config" not in text
-    assert 'gitops/apps/dashy.yaml' in text
-    assert 'scripts/manager/apply-argocd-application.sh' in text
+    assert "gitops/apps/dashy.yaml" in text
+    assert "scripts/manager/apply-argocd-application.sh" in text
     assert '--application "dashy"' in text
     assert '--destination-namespace "dashy"' in text
-    assert 'kubectl -n dashy wait --for=condition=Ready externalsecret/dashy-oidc --timeout=10m' in text
-    assert 'kubectl -n dashy rollout status deployment/dashy --timeout=10m' in text
+    assert (
+        "kubectl -n dashy wait --for=condition=Ready externalsecret/dashy-oidc --timeout=10m"
+        in text
+    )
+    assert "kubectl -n dashy rollout status deployment/dashy --timeout=10m" in text
 
 
 def test_install_dashy_step_sets_explicit_authentik_signing_key():
     text = (
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "install-dashy-dashboard"
-        / "run.sh"
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-dashy-dashboard" / "run.sh"
     ).read_text(encoding="utf-8")
     assert (
         'AUTHENTIK_SIGNING_KEY_NAME="${AUTHENTIK_SIGNING_KEY_NAME:-authentik Self-signed Certificate}"'
@@ -3101,34 +2782,26 @@ def test_install_dashy_step_sets_explicit_authentik_signing_key():
     assert "authentik_resolve_signing_key_id" in text
     assert '--arg signing_key "$signing_key_id"' in text
     assert "signing_key: $signing_key" in text
-    assert (
-        'Could not resolve Authentik signing key ID for ${AUTHENTIK_SIGNING_KEY_NAME}'
-        in text
-    )
+    assert "Could not resolve Authentik signing key ID for ${AUTHENTIK_SIGNING_KEY_NAME}" in text
 
 
 def test_authentik_helper_resolves_signing_key():
-    text = (REPO_ROOT / "scripts" / "manager" / "authentik-auth.sh").read_text(
-        encoding="utf-8"
-    )
+    text = (REPO_ROOT / "scripts" / "manager" / "authentik-auth.sh").read_text(encoding="utf-8")
     assert (
         'AUTHENTIK_SIGNING_KEY_NAME="${AUTHENTIK_SIGNING_KEY_NAME:-authentik Self-signed Certificate}"'
         in text
     )
     assert "authentik_resolve_signing_key_id()" in text
-    assert '/crypto/certificatekeypairs/?page_size=200' in text
-    assert '.pk // .id // .uuid // empty' in text
-    assert 'local max_attempts=5' in text
+    assert "/crypto/certificatekeypairs/?page_size=200" in text
+    assert ".pk // .id // .uuid // empty" in text
+    assert "local max_attempts=5" in text
     assert (
         'response="$(authentik_api_get "/flows/instances/?slug=${slug}&page_size=100")" || return 1'
         in text
     )
-    assert 'authentik_ensure_default_provider_flows()' in text
+    assert "authentik_ensure_default_provider_flows()" in text
     assert '"/flows/instances/${slug}/"' not in text
-    assert (
-        'response="$(authentik_api_get "/core/groups/?page_size=200")" || return 1'
-        in text
-    )
+    assert 'response="$(authentik_api_get "/core/groups/?page_size=200")" || return 1' in text
 
 
 def test_provision_step_rebuilds_completed_clusters_with_a_new_session():
@@ -3145,44 +2818,18 @@ def test_provision_step_rebuilds_completed_clusters_with_a_new_session():
 
 def test_authentik_oidc_consumer_scripts_set_explicit_signing_key():
     consumer_paths = [
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "configure-argocd-oidc"
-        / "run.sh",
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "install-dashy-dashboard"
-        / "run.sh",
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "install-grafana"
-        / "run.sh",
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "install-headlamp"
-        / "run.sh",
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "install-pgadmin4"
-        / "run.sh",
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "configure-argocd-oidc" / "run.sh",
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-dashy-dashboard" / "run.sh",
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-grafana" / "run.sh",
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-headlamp" / "run.sh",
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-pgadmin4" / "run.sh",
     ]
 
     for path in consumer_paths:
         text = path.read_text(encoding="utf-8")
         assert 'signing_key_id="$(authentik_resolve_signing_key_id)"' in text
         assert (
-            'Could not resolve Authentik signing key ID for ${AUTHENTIK_SIGNING_KEY_NAME}'
-            in text
+            "Could not resolve Authentik signing key ID for ${AUTHENTIK_SIGNING_KEY_NAME}" in text
         )
         assert '--arg signing_key "$signing_key_id"' in text
         assert "signing_key: $signing_key" in text
@@ -3190,16 +2837,11 @@ def test_authentik_oidc_consumer_scripts_set_explicit_signing_key():
 
 def test_configure_argocd_oidc_refreshes_platform_ingress_without_waiting():
     text = (
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "configure-argocd-oidc"
-        / "run.sh"
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "configure-argocd-oidc" / "run.sh"
     ).read_text(encoding="utf-8")
 
     assert "Refreshing platform-ingress so Argo CD picks up OIDC config" in text
-    assert 'gitops/apps/platform-ingress.yaml' in text
+    assert "gitops/apps/platform-ingress.yaml" in text
     assert '--application "platform-ingress"' in text
     assert '--destination-namespace "argocd"' in text
     assert "--no-wait" not in text
@@ -3213,9 +2855,7 @@ def test_configure_argocd_oidc_refreshes_platform_ingress_without_waiting():
 
 
 def test_management_vm_maintenance_installs_wget():
-    text = (REPO_ROOT / "ansible" / "management-vm-maintenance.yml").read_text(
-        encoding="utf-8"
-    )
+    text = (REPO_ROOT / "ansible" / "management-vm-maintenance.yml").read_text(encoding="utf-8")
     assert "wget" in text
     assert "jq" in text
 
@@ -3234,23 +2874,22 @@ def test_platform_namespace_baseline_covers_shared_overlay_resources():
         REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
     assert "gitops/apps/dashy.yaml" in (
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "install-dashy-dashboard"
-        / "run.sh"
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-dashy-dashboard" / "run.sh"
     ).read_text(encoding="utf-8")
 
 
 def test_platform_ingress_manifest_patches_authentik_callback_routes():
-    text = (REPO_ROOT / "gitops" / "apps" / "platform-ingress.yaml").read_text(
-        encoding="utf-8"
-    )
+    text = (REPO_ROOT / "gitops" / "apps" / "platform-ingress.yaml").read_text(encoding="utf-8")
     assert "name: traefik-authentik-callback" in text
     assert "name: longhorn-authentik-callback" in text
-    assert 'Host(`traefik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)' in text
-    assert 'Host(`longhorn.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)' in text
+    assert (
+        'Host(`traefik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)'
+        in text
+    )
+    assert (
+        'Host(`longhorn.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)'
+        in text
+    )
 
 
 def test_argocd_config_does_not_exclude_managed_endpoints():
@@ -3262,25 +2901,13 @@ def test_argocd_config_does_not_exclude_managed_endpoints():
 
 def test_management_console_endpoints_target_the_right_hosts():
     proxmox_text = (
-        REPO_ROOT
-        / "gitops"
-        / "platform"
-        / "management-consoles"
-        / "proxmox-endpoints.yaml"
+        REPO_ROOT / "gitops" / "platform" / "management-consoles" / "proxmox-endpoints.yaml"
     ).read_text(encoding="utf-8")
     seaweedfs_text = (
-        REPO_ROOT
-        / "gitops"
-        / "platform"
-        / "management-consoles"
-        / "seaweedfs-endpoints.yaml"
+        REPO_ROOT / "gitops" / "platform" / "management-consoles" / "seaweedfs-endpoints.yaml"
     ).read_text(encoding="utf-8")
     twinboxwizard_text = (
-        REPO_ROOT
-        / "gitops"
-        / "platform"
-        / "management-consoles"
-        / "twinboxwizard-endpoints.yaml"
+        REPO_ROOT / "gitops" / "platform" / "management-consoles" / "twinboxwizard-endpoints.yaml"
     ).read_text(encoding="utf-8")
 
     assert "ip: 192.168.2.105" in proxmox_text
@@ -3304,11 +2931,7 @@ def test_seaweedfs_admin_routes_to_the_admin_web_port():
 
 def test_authentik_callback_ingressroutes_reference_the_authentik_namespace():
     hubble_callback_text = (
-        REPO_ROOT
-        / "gitops"
-        / "platform"
-        / "hubble"
-        / "authentik-callback-ingressroute.yaml"
+        REPO_ROOT / "gitops" / "platform" / "hubble" / "authentik-callback-ingressroute.yaml"
     ).read_text(encoding="utf-8")
     longhorn_callback_text = (
         REPO_ROOT
@@ -3318,11 +2941,7 @@ def test_authentik_callback_ingressroutes_reference_the_authentik_namespace():
         / "authentik-callback-ingressroute.yaml"
     ).read_text(encoding="utf-8")
     traefik_callback_text = (
-        REPO_ROOT
-        / "gitops"
-        / "platform"
-        / "traefik"
-        / "authentik-callback-ingressroute.yaml"
+        REPO_ROOT / "gitops" / "platform" / "traefik" / "authentik-callback-ingressroute.yaml"
     ).read_text(encoding="utf-8")
 
     for callback_text in (
@@ -3335,9 +2954,7 @@ def test_authentik_callback_ingressroutes_reference_the_authentik_namespace():
 
 
 def test_hubble_authentik_callback_ingressroute_uses_the_real_host():
-    hubble_callback_text = HUBBLE_AUTHENTIK_CALLBACK_INGRESSROUTE.read_text(
-        encoding="utf-8"
-    )
+    hubble_callback_text = HUBBLE_AUTHENTIK_CALLBACK_INGRESSROUTE.read_text(encoding="utf-8")
 
     assert "Host(`hubble.bierineenweek.nl`)" in hubble_callback_text
     assert "__ZONE_NAME__" not in hubble_callback_text
@@ -3347,56 +2964,35 @@ def test_bootstrap_scripts_use_the_management_vm_ip_for_seaweedfs():
     start_manager_text = START_MANAGER_SCRIPT.read_text(encoding="utf-8")
     bootstrap_vm_text = BOOTSTRAP_VM_SCRIPT.read_text(encoding="utf-8")
 
-    assert "os.environ[\"MANAGEMENT_VM_IP\"]" in start_manager_text
-    assert "os.environ[\"MANAGEMENT_VM_IP\"]" in bootstrap_vm_text
+    assert 'os.environ["MANAGEMENT_VM_IP"]' in start_manager_text
+    assert 'os.environ["MANAGEMENT_VM_IP"]' in bootstrap_vm_text
     assert "192.168.1.50:8333" not in start_manager_text
     assert "192.168.1.50:8333" not in bootstrap_vm_text
-    assert start_manager_text.index("s3.configure --user") < start_manager_text.index("s3.bucket.create -name")
+    assert start_manager_text.index("s3.configure --user") < start_manager_text.index(
+        "s3.bucket.create -name"
+    )
     assert "SeaweedFS bucket ${SEAWEEDFS_BUCKET} was not created" in start_manager_text
 
 
 def test_authentik_consumer_scripts_read_from_openbao():
     consumer_paths = [
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "configure-argocd-oidc"
-        / "run.sh",
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "install-headlamp"
-        / "run.sh",
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "install-dashy-dashboard"
-        / "run.sh",
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "configure-argocd-oidc" / "run.sh",
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-headlamp" / "run.sh",
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-dashy-dashboard" / "run.sh",
         REPO_ROOT
         / "categories"
         / "talos-cluster"
         / "steps"
         / "install-management-consoles"
         / "run.sh",
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "create-users-and-groups"
-        / "run.sh",
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "install-pgadmin4"
-        / "run.sh",
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "create-users-and-groups" / "run.sh",
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-pgadmin4" / "run.sh",
     ]
 
     # install-authentik-idp seeds the authentik.json file, so it legitimately references it
-    idp_path = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-authentik-idp" / "run.sh"
+    idp_path = (
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-authentik-idp" / "run.sh"
+    )
     idp_text = idp_path.read_text(encoding="utf-8")
     assert "authentik-auth.sh" in idp_text
     assert "authentik_ensure_token" in idp_text or "authentik_load_bootstrap_secret" in idp_text
@@ -3415,18 +3011,8 @@ def test_authentik_consumer_scripts_read_from_openbao():
 
 def test_authentik_consumer_scripts_use_shared_flow_resolver():
     consumer_paths = [
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "configure-argocd-oidc"
-        / "run.sh",
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "install-dashy-dashboard"
-        / "run.sh",
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "configure-argocd-oidc" / "run.sh",
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-dashy-dashboard" / "run.sh",
     ]
 
     for path in consumer_paths:
@@ -3437,42 +3023,22 @@ def test_authentik_consumer_scripts_use_shared_flow_resolver():
 
 def test_authentik_api_provisioning_steps_bypass_tofu_apply():
     api_paths = [
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "configure-argocd-oidc"
-        / "run.sh",
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "install-dashy-dashboard"
-        / "run.sh",
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "install-headlamp"
-        / "run.sh",
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "configure-argocd-oidc" / "run.sh",
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-dashy-dashboard" / "run.sh",
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-headlamp" / "run.sh",
         REPO_ROOT
         / "categories"
         / "talos-cluster"
         / "steps"
         / "install-management-consoles"
         / "run.sh",
-        REPO_ROOT
-        / "categories"
-        / "talos-cluster"
-        / "steps"
-        / "install-pgadmin4"
-        / "run.sh",
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-pgadmin4" / "run.sh",
     ]
 
     for path in api_paths:
         text = path.read_text(encoding="utf-8")
         assert "authentik_setup_forward" in text
-        assert 'tofu apply -no-color -auto-approve -input=false' not in text
+        assert "tofu apply -no-color -auto-approve -input=false" not in text
 
 
 def test_management_consoles_waits_for_authentik_rollout_before_forwarding():
@@ -3490,7 +3056,7 @@ def test_management_consoles_waits_for_authentik_rollout_before_forwarding():
     assert 'wait_for_deployment_rollout "authentik-worker" "Authentik worker"' in text
     assert "authentik_ensure_token" in text
     assert "authentik_setup_forward" in text
-    assert 'curl -X POST' not in text
+    assert "curl -X POST" not in text
     assert "log_app_start" in text
     assert "log_app_done" in text
     assert "fail_with_context" in text
@@ -3508,9 +3074,9 @@ def test_twinbox_portal_step_does_not_apply_missing_configmap_manifest():
     deployment_text = (
         REPO_ROOT / "gitops" / "platform-apps" / "twinbox-portal" / "deployment.yaml"
     ).read_text(encoding="utf-8")
-    pvc_text = (
-        REPO_ROOT / "gitops" / "platform-apps" / "twinbox-portal" / "pvc.yaml"
-    ).read_text(encoding="utf-8")
+    pvc_text = (REPO_ROOT / "gitops" / "platform-apps" / "twinbox-portal" / "pvc.yaml").read_text(
+        encoding="utf-8"
+    )
 
     assert "gitops/platform-apps/twinbox-portal/configmap.yaml" not in text
     assert "refresh-portal-config.mjs" in text
@@ -3520,11 +3086,13 @@ def test_twinbox_portal_step_does_not_apply_missing_configmap_manifest():
 
 
 def test_uninstall_authentik_cleanup_sets_forward_before_app_cleanup():
-    text = (
-        REPO_ROOT / "scripts" / "manager" / "uninstall-argocd-application.sh"
-    ).read_text(encoding="utf-8")
+    text = (REPO_ROOT / "scripts" / "manager" / "uninstall-argocd-application.sh").read_text(
+        encoding="utf-8"
+    )
 
-    app_detection_index = text.index("immich|nextcloud|audiobookshelf|karakeep|jitsi|opencloud|zulip")
+    app_detection_index = text.index(
+        "immich|nextcloud|audiobookshelf|karakeep|jitsi|opencloud|zulip"
+    )
     setup_condition_index = text.index('if [[ "$needs_authentik_cleanup" == "true" ]]')
     setup_forward_index = text.index("authentik_setup_forward", setup_condition_index)
     cleanup_index = text.index("cleanup_app_specific_state", setup_forward_index)

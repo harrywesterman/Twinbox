@@ -3,7 +3,6 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "get-talos-image-factory.sh"
 PINNED_DEFAULTS = REPO_ROOT / "config" / "pinned-defaults.sh"
@@ -61,9 +60,18 @@ fi
 
         assert proc.returncode == 0, proc.stderr
         assert "TALOS_IMAGE_SCHEMATIC=schematic123" in proc.stdout
-        assert "TALOS_IMAGE_FACTORY_URL=https://factory.talos.dev/image/schematic123/v1.9.2/metal-amd64.iso" in proc.stdout
-        assert "TALOS_IMAGE_INSTALLER=factory.talos.dev/metal-installer/schematic123:v1.9.2" in proc.stdout
-        assert "TALOS_IMAGE_DOWNLOAD_URL=https://assets.factory.talos.dev/assets/final.iso" in proc.stdout
+        assert (
+            "TALOS_IMAGE_FACTORY_URL=https://factory.talos.dev/image/schematic123/v1.9.2/metal-amd64.iso"
+            in proc.stdout
+        )
+        assert (
+            "TALOS_IMAGE_INSTALLER=factory.talos.dev/metal-installer/schematic123:v1.9.2"
+            in proc.stdout
+        )
+        assert (
+            "TALOS_IMAGE_DOWNLOAD_URL=https://assets.factory.talos.dev/assets/final.iso"
+            in proc.stdout
+        )
 
         curl_args_1 = args_file.with_name("curl-args.txt.1").read_text(encoding="utf-8")
         curl_stdin_1 = stdin_file.with_name("curl-stdin.txt.1").read_text(encoding="utf-8")

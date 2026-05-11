@@ -4,7 +4,6 @@ import subprocess
 import textwrap
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUNNER_PATH = REPO_ROOT / "scripts" / "wizard-dev-run.sh"
 
@@ -49,7 +48,9 @@ def _prepare_fake_remote_tools(tmp_path: Path) -> tuple[Path, Path, Path]:
     return bin_dir, log_path, ssh_count_path
 
 
-def _run_runner(tmp_path: Path, args: list[str], config_text: str = "") -> subprocess.CompletedProcess[str]:
+def _run_runner(
+    tmp_path: Path, args: list[str], config_text: str = ""
+) -> subprocess.CompletedProcess[str]:
     config_path = tmp_path / ".env.wizard.local"
     config_path.write_text(config_text, encoding="utf-8")
     bin_dir, log_path, ssh_count_path = _prepare_fake_remote_tools(tmp_path)
@@ -81,8 +82,7 @@ def test_wizard_dev_run_loads_default_local_config_and_uses_tty_remote_run(tmp_p
         tmp_path,
         [],
         config_text=(
-            'WIZARD_DEV_SSH_TARGET="root@proxmox-dev"\n'
-            'WIZARD_DEV_REMOTE_DIR="/root/twinbox-dev"\n'
+            'WIZARD_DEV_SSH_TARGET="root@proxmox-dev"\nWIZARD_DEV_REMOTE_DIR="/root/twinbox-dev"\n'
         ),
     )
 
@@ -117,8 +117,7 @@ def test_wizard_dev_run_cli_overrides_config_file_defaults(tmp_path: Path):
         tmp_path,
         ["--target", "root@override-host", "--remote-dir", "/tmp/wizard-dev"],
         config_text=(
-            'WIZARD_DEV_SSH_TARGET="root@proxmox-dev"\n'
-            'WIZARD_DEV_REMOTE_DIR="/root/twinbox-dev"\n'
+            'WIZARD_DEV_SSH_TARGET="root@proxmox-dev"\nWIZARD_DEV_REMOTE_DIR="/root/twinbox-dev"\n'
         ),
     )
 
@@ -142,8 +141,7 @@ def test_wizard_dev_run_debug_flag_uses_bash_x_for_remote_execution(tmp_path: Pa
         tmp_path,
         ["--debug"],
         config_text=(
-            'WIZARD_DEV_SSH_TARGET="root@proxmox-dev"\n'
-            'WIZARD_DEV_REMOTE_DIR="/root/twinbox-dev"\n'
+            'WIZARD_DEV_SSH_TARGET="root@proxmox-dev"\nWIZARD_DEV_REMOTE_DIR="/root/twinbox-dev"\n'
         ),
     )
 
@@ -166,8 +164,7 @@ def test_wizard_dev_run_requires_target_when_no_config_or_override_is_present(tm
 def test_wizard_dev_run_reports_retained_remote_copy_when_remote_execution_fails(tmp_path: Path):
     config_path = tmp_path / ".env.wizard.local"
     config_path.write_text(
-        'WIZARD_DEV_SSH_TARGET="root@proxmox-dev"\n'
-        'WIZARD_DEV_REMOTE_DIR="/root/twinbox-dev"\n',
+        'WIZARD_DEV_SSH_TARGET="root@proxmox-dev"\nWIZARD_DEV_REMOTE_DIR="/root/twinbox-dev"\n',
         encoding="utf-8",
     )
     bin_dir, log_path, ssh_count_path = _prepare_fake_remote_tools(tmp_path)
@@ -191,4 +188,7 @@ def test_wizard_dev_run_reports_retained_remote_copy_when_remote_execution_fails
     )
 
     assert proc.returncode == 23
-    assert "Remote wizard copy retained at root@proxmox-dev:/root/twinbox-dev/setup-wizard.sh" in proc.stderr
+    assert (
+        "Remote wizard copy retained at root@proxmox-dev:/root/twinbox-dev/setup-wizard.sh"
+        in proc.stderr
+    )

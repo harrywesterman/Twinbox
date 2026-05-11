@@ -29,7 +29,9 @@ function setupWorkspace(options = {}) {
   const capturedConfigFile = path.join(root, "captured-portal-config.json");
 
   fs.mkdirSync(path.join(dataDir, "clusters"), { recursive: true });
-  fs.mkdirSync(path.join(dataDir, "step-state", "clusters", "cluster_test_instance"), { recursive: true });
+  fs.mkdirSync(path.join(dataDir, "step-state", "clusters", "cluster_test_instance"), {
+    recursive: true,
+  });
   fs.mkdirSync(binDir, { recursive: true });
 
   fs.writeFileSync(
@@ -41,11 +43,17 @@ function setupWorkspace(options = {}) {
       cluster_instance_id: "cluster_test_instance",
       created_at: "2026-01-01T00:00:00.000Z",
       updated_at: "2026-01-01T00:00:00.000Z",
-    }),
+    })
   );
 
   fs.writeFileSync(
-    path.join(dataDir, "step-state", "clusters", "cluster_test_instance", "install-twinbox-portal.json"),
+    path.join(
+      dataDir,
+      "step-state",
+      "clusters",
+      "cluster_test_instance",
+      "install-twinbox-portal.json"
+    ),
     JSON.stringify({
       step_id: "install-twinbox-portal",
       status: portalStepStatus,
@@ -53,7 +61,7 @@ function setupWorkspace(options = {}) {
       outputs: {},
       cluster_id: "cluster_test",
       cluster_instance_id: "cluster_test_instance",
-    }),
+    })
   );
 
   for (const [stepId, status] of Object.entries(additionalStepStatuses)) {
@@ -66,7 +74,7 @@ function setupWorkspace(options = {}) {
         outputs: {},
         cluster_id: "cluster_test",
         cluster_instance_id: "cluster_test_instance",
-      }),
+      })
     );
   }
 
@@ -116,7 +124,7 @@ if [[ "$*" == *" apply -f -"* ]]; then
 fi
 
 exit 0
-`,
+`
   );
 
   return { root, dataDir, binDir, logFile, capturedConfigFile };
@@ -131,18 +139,27 @@ test("refresh-portal-config renders the portal secret after install", () => {
     WORKSPACE_ROOT: repoRoot,
   };
 
-  const result = spawnSync("node", [
-    "manager-worker/src/refresh-portal-config.mjs",
-    "--workspace-root", repoRoot,
-    "--manager-data-dir", dataDir,
-    "--cluster-id", "cluster_test",
-    "--cluster-instance-id", "cluster_test_instance",
-    "--trigger-step-id", "install-twinbox-portal",
-  ], {
-    cwd: repoRoot,
-    env,
-    encoding: "utf8",
-  });
+  const result = spawnSync(
+    "node",
+    [
+      "manager-worker/src/refresh-portal-config.mjs",
+      "--workspace-root",
+      repoRoot,
+      "--manager-data-dir",
+      dataDir,
+      "--cluster-id",
+      "cluster_test",
+      "--cluster-instance-id",
+      "cluster_test_instance",
+      "--trigger-step-id",
+      "install-twinbox-portal",
+    ],
+    {
+      cwd: repoRoot,
+      env,
+      encoding: "utf8",
+    }
+  );
 
   assert.equal(result.status, 0, result.stderr);
   assert.equal(fs.existsSync(logFile), true);
@@ -161,18 +178,27 @@ test("refresh-portal-config runs during portal install when self-triggered", () 
     WORKSPACE_ROOT: repoRoot,
   };
 
-  const result = spawnSync("node", [
-    "manager-worker/src/refresh-portal-config.mjs",
-    "--workspace-root", repoRoot,
-    "--manager-data-dir", dataDir,
-    "--cluster-id", "cluster_test",
-    "--cluster-instance-id", "cluster_test_instance",
-    "--trigger-step-id", "install-twinbox-portal",
-  ], {
-    cwd: repoRoot,
-    env,
-    encoding: "utf8",
-  });
+  const result = spawnSync(
+    "node",
+    [
+      "manager-worker/src/refresh-portal-config.mjs",
+      "--workspace-root",
+      repoRoot,
+      "--manager-data-dir",
+      dataDir,
+      "--cluster-id",
+      "cluster_test",
+      "--cluster-instance-id",
+      "cluster_test_instance",
+      "--trigger-step-id",
+      "install-twinbox-portal",
+    ],
+    {
+      cwd: repoRoot,
+      env,
+      encoding: "utf8",
+    }
+  );
 
   assert.equal(result.status, 0, result.stderr);
   assert.equal(fs.existsSync(logFile), true);
@@ -196,22 +222,34 @@ test("refresh-portal-config includes installed app steps in the portal catalog",
     REQUIRE_KUBECONFIG_ENV: "1",
   };
 
-  const result = spawnSync("node", [
-    "manager-worker/src/refresh-portal-config.mjs",
-    "--workspace-root", repoRoot,
-    "--manager-data-dir", dataDir,
-    "--cluster-id", "cluster_test",
-    "--cluster-instance-id", "cluster_test_instance",
-    "--trigger-step-id", "install-twinbox-portal",
-  ], {
-    cwd: repoRoot,
-    env,
-    encoding: "utf8",
-  });
+  const result = spawnSync(
+    "node",
+    [
+      "manager-worker/src/refresh-portal-config.mjs",
+      "--workspace-root",
+      repoRoot,
+      "--manager-data-dir",
+      dataDir,
+      "--cluster-id",
+      "cluster_test",
+      "--cluster-instance-id",
+      "cluster_test_instance",
+      "--trigger-step-id",
+      "install-twinbox-portal",
+    ],
+    {
+      cwd: repoRoot,
+      env,
+      encoding: "utf8",
+    }
+  );
 
   assert.equal(result.status, 0, result.stderr);
   const renderedConfig = JSON.parse(fs.readFileSync(capturedConfigFile, "utf8"));
-  assert.equal(renderedConfig.apps.some((card) => card.title === "Jitsi"), true);
+  assert.equal(
+    renderedConfig.apps.some((card) => card.title === "Jitsi"),
+    true
+  );
 });
 
 test("refresh-portal-config hides apps that no longer exist in Argo CD", () => {
@@ -230,22 +268,40 @@ test("refresh-portal-config hides apps that no longer exist in Argo CD", () => {
     WORKSPACE_ROOT: repoRoot,
   };
 
-  const result = spawnSync("node", [
-    "manager-worker/src/refresh-portal-config.mjs",
-    "--workspace-root", repoRoot,
-    "--manager-data-dir", dataDir,
-    "--cluster-id", "cluster_test",
-    "--cluster-instance-id", "cluster_test_instance",
-    "--trigger-step-id", "install-twinbox-portal",
-  ], {
-    cwd: repoRoot,
-    env,
-    encoding: "utf8",
-  });
+  const result = spawnSync(
+    "node",
+    [
+      "manager-worker/src/refresh-portal-config.mjs",
+      "--workspace-root",
+      repoRoot,
+      "--manager-data-dir",
+      dataDir,
+      "--cluster-id",
+      "cluster_test",
+      "--cluster-instance-id",
+      "cluster_test_instance",
+      "--trigger-step-id",
+      "install-twinbox-portal",
+    ],
+    {
+      cwd: repoRoot,
+      env,
+      encoding: "utf8",
+    }
+  );
 
   assert.equal(result.status, 0, result.stderr);
   const renderedConfig = JSON.parse(fs.readFileSync(capturedConfigFile, "utf8"));
-  assert.equal(renderedConfig.apps.some((card) => card.title === "Immich"), false);
-  assert.equal(renderedConfig.apps.some((card) => card.title === "Audiobookshelf"), false);
-  assert.equal(renderedConfig.apps.some((card) => card.title === "Jitsi"), true);
+  assert.equal(
+    renderedConfig.apps.some((card) => card.title === "Immich"),
+    false
+  );
+  assert.equal(
+    renderedConfig.apps.some((card) => card.title === "Audiobookshelf"),
+    false
+  );
+  assert.equal(
+    renderedConfig.apps.some((card) => card.title === "Jitsi"),
+    true
+  );
 });

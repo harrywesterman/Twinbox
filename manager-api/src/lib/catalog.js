@@ -12,7 +12,11 @@ import {
   summarizeJob,
 } from "./common.js";
 
-export function loadCatalogDefinitions({ workspaceRoot, includeApps = false, includeBundles = false } = {}) {
+export function loadCatalogDefinitions({
+  workspaceRoot,
+  includeApps = false,
+  includeBundles = false,
+} = {}) {
   return loadWorkspaceCatalogDefinitions({ workspaceRoot, includeApps, includeBundles });
 }
 
@@ -104,7 +108,8 @@ function inferClusterSlug(currentCluster, stepStateById, dirs) {
 
   const clusterStatesRoot = path.join(dirs.stepState, "clusters");
   if (fs.existsSync(clusterStatesRoot)) {
-    const clusterStateDirs = fs.readdirSync(clusterStatesRoot, { withFileTypes: true })
+    const clusterStateDirs = fs
+      .readdirSync(clusterStatesRoot, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .map((entry) => path.join(clusterStatesRoot, entry.name))
       .sort((left, right) => {
@@ -163,9 +168,11 @@ function isAllowedIngressRoute(route, currentClusterOrSlug) {
     return isPrdCluster(currentClusterOrSlug);
   }
 
-  return normalizedRoute === "wiredoor"
-    || normalizedRoute === "metallb"
-    || normalizedRoute === "tailscale";
+  return (
+    normalizedRoute === "wiredoor" ||
+    normalizedRoute === "metallb" ||
+    normalizedRoute === "tailscale"
+  );
 }
 
 function renderStepForCluster(step, clusterSlugHint) {
@@ -262,7 +269,9 @@ function synthesizeProvisionStateFromCluster(step, cluster, state) {
 }
 
 function deriveStepStatus(step, state, latestJob, completedDependencies) {
-  const dependenciesMet = step.depends_on.every((dependency) => completedDependencies.has(dependency));
+  const dependenciesMet = step.depends_on.every((dependency) =>
+    completedDependencies.has(dependency)
+  );
   if (!dependenciesMet) {
     return "locked";
   }
@@ -301,7 +310,11 @@ function deriveStepStatus(step, state, latestJob, completedDependencies) {
 function deriveCategoryStatus(steps) {
   if (steps.some((step) => step.status === "running")) return "running";
   if (steps.some((step) => step.status === "failed")) return "failed";
-  if (steps.length > 0 && steps.every((step) => step.status === "done" || step.status === "skipped")) return "done";
+  if (
+    steps.length > 0 &&
+    steps.every((step) => step.status === "done" || step.status === "skipped")
+  )
+    return "done";
   if (steps.every((step) => step.status === "locked")) return "locked";
   return "ready";
 }
@@ -337,17 +350,23 @@ function pickPalette(value) {
 }
 
 function buildIconText(title) {
-  return String(title || "")
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase() || "TB";
+  return (
+    String(title || "")
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "TB"
+  );
 }
 
 function deriveAppStepStatus(step, state, latestJob, completedDependencies) {
-  if (latestJob && latestJob.type === "uninstall_step" && (state?.status === "failed" || state?.status === "canceled")) {
+  if (
+    latestJob &&
+    latestJob.type === "uninstall_step" &&
+    (state?.status === "failed" || state?.status === "canceled")
+  ) {
     return "installed";
   }
 
@@ -375,7 +394,9 @@ function deriveAppStepStatus(step, state, latestJob, completedDependencies) {
     return "planned";
   }
 
-  const dependenciesMet = step.depends_on.every((dependency) => completedDependencies.has(dependency));
+  const dependenciesMet = step.depends_on.every((dependency) =>
+    completedDependencies.has(dependency)
+  );
   if (!dependenciesMet) {
     return "blocked";
   }
@@ -466,11 +487,16 @@ export function findCurrentCluster(dirs) {
     return null;
   }
 
-  const clusterFiles = fs.readdirSync(dirs.clusters)
+  const clusterFiles = fs
+    .readdirSync(dirs.clusters)
     .filter((entry) => entry.endsWith(".json"))
     .map((entry) => readJsonIfExists(path.join(dirs.clusters, entry)))
     .filter((cluster) => cluster?.id)
-    .sort((left, right) => String(right?.updated_at || right?.created_at || "").localeCompare(String(left?.updated_at || left?.created_at || "")));
+    .sort((left, right) =>
+      String(right?.updated_at || right?.created_at || "").localeCompare(
+        String(left?.updated_at || left?.created_at || "")
+      )
+    );
 
   return clusterFiles[0] || null;
 }
@@ -486,7 +512,6 @@ function findClusterById(dirs, clusterId) {
 export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) {
   const definitions = loadCatalogDefinitions({ workspaceRoot });
   const currentCluster = clusterId ? findClusterById(dirs, clusterId) : findCurrentCluster(dirs);
-  const activeClusterId = currentCluster?.id || null;
   const activeClusterScopeId = clusterScopeId(currentCluster);
   const stepStateById = new Map();
   const renderedStepsById = new Map();
@@ -495,7 +520,10 @@ export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) 
     for (const step of category.steps) {
       const scopedClusterId = isClusterScopedStep(step) ? activeClusterScopeId : null;
       const rawState = readStepState(dirs, step.id, scopedClusterId);
-      const state = step.id === "provision-nodes" ? synthesizeProvisionStateFromCluster(step, currentCluster, rawState) : rawState;
+      const state =
+        step.id === "provision-nodes"
+          ? synthesizeProvisionStateFromCluster(step, currentCluster, rawState)
+          : rawState;
       const latestJob = state?.last_job_id
         ? readJsonIfExists(path.join(dirs.jobs, `${state.last_job_id}.json`))
         : null;
@@ -524,42 +552,42 @@ export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) 
         const step = definitions.stepsById.get(stepId);
         return step && isDone(step, state);
       })
-      .map(([stepId]) => stepId),
+      .map(([stepId]) => stepId)
   );
 
   const categories = definitions.categories.map((category) => {
     const steps = category.steps
       .filter((step) => shouldExposeStep(step, activeIngressRoute))
       .map((step) => {
-      const renderedStep = renderedStepsById.get(step.id) || step;
-      const { state, latestJob } = stepStateById.get(step.id) || { state: null, latestJob: null };
-      const status = deriveStepStatus(renderedStep, state, latestJob, completedDependencies);
+        const renderedStep = renderedStepsById.get(step.id) || step;
+        const { state, latestJob } = stepStateById.get(step.id) || { state: null, latestJob: null };
+        const status = deriveStepStatus(renderedStep, state, latestJob, completedDependencies);
 
-      return {
-        id: renderedStep.id,
-        category_id: renderedStep.category_id,
-        title: renderedStep.title,
-        type: renderedStep.type,
-        journey_stage: renderedStep.journey_stage,
-        order: renderedStep.order,
-        ingress_route: renderedStep.ingress_route,
-        summary: renderedStep.summary,
-        explanation: renderedStep.explanation,
-        side_help: renderedStep.side_help,
-        dashy: renderedStep.dashy,
-        inputs: renderedStep.inputs,
-        secrets: renderedStep.secrets,
-        depends_on: renderedStep.depends_on,
-        icon: renderedStep.icon,
-        icon_artwork_url: renderedStep.icon_artwork_url,
-        project_url: renderedStep.project_url,
-        github_url: renderedStep.github_url,
-        positive_summary: renderedStep.positive_summary,
-        status,
-        state: summarizeStepState(state),
-        latest_job: summarizeJob(latestJob),
-      };
-    });
+        return {
+          id: renderedStep.id,
+          category_id: renderedStep.category_id,
+          title: renderedStep.title,
+          type: renderedStep.type,
+          journey_stage: renderedStep.journey_stage,
+          order: renderedStep.order,
+          ingress_route: renderedStep.ingress_route,
+          summary: renderedStep.summary,
+          explanation: renderedStep.explanation,
+          side_help: renderedStep.side_help,
+          dashy: renderedStep.dashy,
+          inputs: renderedStep.inputs,
+          secrets: renderedStep.secrets,
+          depends_on: renderedStep.depends_on,
+          icon: renderedStep.icon,
+          icon_artwork_url: renderedStep.icon_artwork_url,
+          project_url: renderedStep.project_url,
+          github_url: renderedStep.github_url,
+          positive_summary: renderedStep.positive_summary,
+          status,
+          state: summarizeStepState(state),
+          latest_job: summarizeJob(latestJob),
+        };
+      });
 
     return {
       id: category.id,
@@ -664,9 +692,12 @@ function buildActiveClusterSummary(cluster) {
 }
 
 export function buildAppCatalogResponse({ workspaceRoot, dirs, clusterId = null }) {
-  const definitions = loadCatalogDefinitions({ workspaceRoot, includeApps: true, includeBundles: true });
+  const definitions = loadCatalogDefinitions({
+    workspaceRoot,
+    includeApps: true,
+    includeBundles: true,
+  });
   const currentCluster = clusterId ? findClusterById(dirs, clusterId) : findCurrentCluster(dirs);
-  const activeClusterId = currentCluster?.id || null;
   const activeClusterScopeId = clusterScopeId(currentCluster);
   const stepStateById = new Map();
   const renderedStepsById = new Map();
@@ -675,7 +706,10 @@ export function buildAppCatalogResponse({ workspaceRoot, dirs, clusterId = null 
     for (const step of category.steps) {
       const scopedClusterId = isClusterScopedStep(step) ? activeClusterScopeId : null;
       const rawState = readStepState(dirs, step.id, scopedClusterId);
-      const state = step.id === "provision-nodes" ? synthesizeProvisionStateFromCluster(step, currentCluster, rawState) : rawState;
+      const state =
+        step.id === "provision-nodes"
+          ? synthesizeProvisionStateFromCluster(step, currentCluster, rawState)
+          : rawState;
       const latestJob = state?.last_job_id
         ? readJsonIfExists(path.join(dirs.jobs, `${state.last_job_id}.json`))
         : null;
@@ -690,7 +724,7 @@ export function buildAppCatalogResponse({ workspaceRoot, dirs, clusterId = null 
         const step = definitions.stepsById.get(stepId);
         return step && isDone(step, state);
       })
-      .map(([stepId]) => stepId),
+      .map(([stepId]) => stepId)
   );
 
   const appCategory = definitions.categories.find((category) => category.id === "apps") || {
@@ -704,20 +738,28 @@ export function buildAppCatalogResponse({ workspaceRoot, dirs, clusterId = null 
   const appSteps = appCategory.steps
     .map((step) => {
       const { state, latestJob } = stepStateById.get(step.id) || { state: null, latestJob: null };
-      return summarizeAppStep(step, normalizeAppStepState(state), latestJob, completedDependencies, definitions.stepsById);
+      return summarizeAppStep(
+        step,
+        normalizeAppStepState(state),
+        latestJob,
+        completedDependencies,
+        definitions.stepsById
+      );
     })
     .sort((left, right) => left.order - right.order);
 
   return {
     active_cluster: buildActiveClusterSummary(currentCluster),
-    categories: [{
-      id: appCategory.id,
-      title: appCategory.title,
-      summary: appCategory.summary,
-      order: appCategory.order,
-      status: deriveCategoryStatus(appSteps),
-      steps: appSteps,
-    }],
+    categories: [
+      {
+        id: appCategory.id,
+        title: appCategory.title,
+        summary: appCategory.summary,
+        order: appCategory.order,
+        status: deriveCategoryStatus(appSteps),
+        steps: appSteps,
+      },
+    ],
     bundles: definitions.bundles,
     errors: definitions.errors,
   };
@@ -734,7 +776,7 @@ function parseBoolean(value, field) {
 }
 
 export function validateStepInputs(step, bodyInputs) {
-  const inputs = (bodyInputs && typeof bodyInputs === "object") ? bodyInputs : {};
+  const inputs = bodyInputs && typeof bodyInputs === "object" ? bodyInputs : {};
   const normalized = {};
 
   for (const input of step.inputs) {
@@ -761,7 +803,10 @@ export function validateStepInputs(step, bodyInputs) {
       if (Array.isArray(input.options) && input.options.length > 0) {
         const allowedValues = new Set(input.options.map((option) => String(option.value)));
         if (!allowedValues.has(parsed.value)) {
-          return { ok: false, error: `${input.id} must be one of: ${Array.from(allowedValues).join(", ")}` };
+          return {
+            ok: false,
+            error: `${input.id} must be one of: ${Array.from(allowedValues).join(", ")}`,
+          };
         }
       }
       normalized[input.id] = parsed.value;
@@ -769,7 +814,12 @@ export function validateStepInputs(step, bodyInputs) {
     }
 
     if (input.type === "integer") {
-      const parsed = parseIntInRange(value, input.id, input.min ?? Number.MIN_SAFE_INTEGER, input.max ?? Number.MAX_SAFE_INTEGER);
+      const parsed = parseIntInRange(
+        value,
+        input.id,
+        input.min ?? Number.MIN_SAFE_INTEGER,
+        input.max ?? Number.MAX_SAFE_INTEGER
+      );
       if (!parsed.ok) return parsed;
       normalized[input.id] = parsed.value;
       continue;

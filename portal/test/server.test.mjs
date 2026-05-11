@@ -396,7 +396,11 @@ const managerServer = http.createServer(async (req, res) => {
               iconText: "I",
               latest_job: null,
               dependencies: [
-                { id: "install-longhorn-storage", title: "Install Longhorn Storage", state: "done" },
+                {
+                  id: "install-longhorn-storage",
+                  title: "Install Longhorn Storage",
+                  state: "done",
+                },
               ],
             },
             {
@@ -445,7 +449,11 @@ const managerServer = http.createServer(async (req, res) => {
 
   if (req.method === "PUT" && pathname === "/api/clusters/cluster-test/observability") {
     const body = await readRequestBody(req);
-    const profile = ["minimal", "full", "off"].includes(String(body.profile || "").trim().toLowerCase())
+    const profile = ["minimal", "full", "off"].includes(
+      String(body.profile || "")
+        .trim()
+        .toLowerCase()
+    )
       ? String(body.profile).trim().toLowerCase()
       : "full";
     const cluster = {
@@ -590,8 +598,9 @@ test.before(async () => {
   writePortalConfig({
     settings: {
       authentikAdminUrl: "https://authentik.tst.example.com/if/admin/",
-      authentikUserUrl: "https://authentik.tst.example.com/if/user/#/settings;{\"page\":\"page-details\"}",
-      authentikOtpUrl: "https://authentik.tst.example.com/if/user/#/settings;{\"page\":\"page-mfa\"}",
+      authentikUserUrl:
+        'https://authentik.tst.example.com/if/user/#/settings;{"page":"page-details"}',
+      authentikOtpUrl: 'https://authentik.tst.example.com/if/user/#/settings;{"page":"page-mfa"}',
     },
     userAdmin: {
       manageableGroups: [
@@ -720,7 +729,9 @@ test("admin endpoints require an authenticated admin session", async () => {
   const forbiddenApps = await requestPortal("/api/admin/apps/catalog", { cookie: memberCookie });
   assert.equal(forbiddenApps.status, 403);
 
-  const forbiddenObservability = await requestPortal("/api/admin/observability", { cookie: memberCookie });
+  const forbiddenObservability = await requestPortal("/api/admin/observability", {
+    cookie: memberCookie,
+  });
   assert.equal(forbiddenObservability.status, 403);
 });
 
@@ -888,16 +899,39 @@ test("portal config exposes a single Apps section and image icons", async () => 
   assert.equal(config.payload.apps.length, 2);
   assert.equal(config.payload.appSections.length, 1);
   assert.equal(config.payload.appSections[0].name, "Apps");
-  assert.equal(config.payload.settings.authentikUserUrl, "https://authentik.tst.example.com/if/user/#/settings;{\"page\":\"page-details\"}");
-  assert.equal(config.payload.settings.authentikAdminUrl, "https://authentik.tst.example.com/if/admin/");
-  assert.equal(config.payload.settings.authentikOtpUrl, "https://authentik.tst.example.com/if/user/#/settings;{\"page\":\"page-mfa\"}");
+  assert.equal(
+    config.payload.settings.authentikUserUrl,
+    'https://authentik.tst.example.com/if/user/#/settings;{"page":"page-details"}'
+  );
+  assert.equal(
+    config.payload.settings.authentikAdminUrl,
+    "https://authentik.tst.example.com/if/admin/"
+  );
+  assert.equal(
+    config.payload.settings.authentikOtpUrl,
+    'https://authentik.tst.example.com/if/user/#/settings;{"page":"page-mfa"}'
+  );
   assert.deepEqual(config.payload.apps.find((card) => card.title === "Immich")?.mobileLinks, [
-    { platform: "iPhone", label: "App Store", url: "https://apps.apple.com/us/app/immich/id1613945652" },
-    { platform: "Android", label: "Google Play", url: "https://play.google.com/store/apps/details?id=app.alextran.immich" },
+    {
+      platform: "iPhone",
+      label: "App Store",
+      url: "https://apps.apple.com/us/app/immich/id1613945652",
+    },
+    {
+      platform: "Android",
+      label: "Google Play",
+      url: "https://play.google.com/store/apps/details?id=app.alextran.immich",
+    },
   ]);
-  assert.equal(config.payload.apps.find((card) => card.title === "Immich")?.iconUrl, "/assets/step-icons/install-immich.svg");
+  assert.equal(
+    config.payload.apps.find((card) => card.title === "Immich")?.iconUrl,
+    "/assets/step-icons/install-immich.svg"
+  );
   assert.equal(config.payload.apps.find((card) => card.title === "Immich")?.iconAlt, "Immich icon");
-  assert.deepEqual(config.payload.apps.find((card) => card.title === "Paperless")?.mobileLinks, undefined);
+  assert.deepEqual(
+    config.payload.apps.find((card) => card.title === "Paperless")?.mobileLinks,
+    undefined
+  );
 });
 
 test("admin can read and update observability state", async () => {
@@ -988,18 +1022,40 @@ test("auth callback succeeds even when the browser does not return the oauth coo
 });
 
 test("portal image copies the Authentik admin helper into the runtime image", async () => {
-  const dockerfile = await fs.promises.readFile(path.join(repoRoot, "portal", "Dockerfile"), "utf8");
-  assert.match(dockerfile, /COPY authentik-admin\.mjs \.\/[\s\S]*CMD \["node", "server\.mjs"\]/, 'expected the runtime image to include the portal helper module');
+  const dockerfile = await fs.promises.readFile(
+    path.join(repoRoot, "portal", "Dockerfile"),
+    "utf8"
+  );
+  assert.match(
+    dockerfile,
+    /COPY authentik-admin\.mjs \.\/[\s\S]*CMD \["node", "server\.mjs"\]/,
+    "expected the runtime image to include the portal helper module"
+  );
 });
 
 test("portal app launches open in a new tab", async () => {
-  const source = await fs.promises.readFile(path.join(repoRoot, "portal", "src", "App.jsx"), "utf8");
+  const source = await fs.promises.readFile(
+    path.join(repoRoot, "portal", "src", "App.jsx"),
+    "utf8"
+  );
   assert.match(source, /window\.open\(url,\s*'_blank',\s*'noopener,noreferrer'\)/);
 });
 
 test("portal menu popover sits above the page content", async () => {
   const css = await fs.promises.readFile(path.join(repoRoot, "portal", "src", "App.css"), "utf8");
-  assert.match(css, /\.topbar\s*\{[\s\S]*z-index:\s*30;[\s\S]*\}/, 'expected the header to establish a stacking layer');
-  assert.match(css, /\.topbar-actions\s*\{[\s\S]*z-index:\s*40;[\s\S]*\}/, 'expected the action cluster to sit above the page content');
-  assert.match(css, /\.menu-popover\s*\{[\s\S]*z-index:\s*50;[\s\S]*\}/, 'expected the menu popover to render on top of cards');
+  assert.match(
+    css,
+    /\.topbar\s*\{[\s\S]*z-index:\s*30;[\s\S]*\}/,
+    "expected the header to establish a stacking layer"
+  );
+  assert.match(
+    css,
+    /\.topbar-actions\s*\{[\s\S]*z-index:\s*40;[\s\S]*\}/,
+    "expected the action cluster to sit above the page content"
+  );
+  assert.match(
+    css,
+    /\.menu-popover\s*\{[\s\S]*z-index:\s*50;[\s\S]*\}/,
+    "expected the menu popover to render on top of cards"
+  );
 });

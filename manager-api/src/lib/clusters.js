@@ -21,7 +21,9 @@ const CONTROLPLANE_CPU_CORES = 2;
 const OBSERVABILITY_PROFILES = new Set(["full", "minimal", "off"]);
 
 export function normalizeClusterSlug(rawName) {
-  const trimmed = String(rawName || "").trim().toLowerCase();
+  const trimmed = String(rawName || "")
+    .trim()
+    .toLowerCase();
   const withoutPrefix = trimmed.startsWith("twinbox-") ? trimmed.slice("twinbox-".length) : trimmed;
   return withoutPrefix
     .replace(/[^a-z0-9-]+/g, "-")
@@ -41,7 +43,9 @@ export function normalizeClusterName(rawName) {
 }
 
 export function normalizeObservabilityProfile(rawProfile) {
-  const profile = String(rawProfile || "").trim().toLowerCase();
+  const profile = String(rawProfile || "")
+    .trim()
+    .toLowerCase();
   if (OBSERVABILITY_PROFILES.has(profile)) {
     return profile;
   }
@@ -60,13 +64,17 @@ function buildAllowedHostLookup(allowedHosts = []) {
   return lookup;
 }
 
-function buildDefaultVmNodeMap(controlplaneCount, workerCount, allowedHosts = [], fallbackHost = "pve") {
+function buildDefaultVmNodeMap(
+  controlplaneCount,
+  workerCount,
+  allowedHosts = [],
+  fallbackHost = "pve"
+) {
   const hostList = Array.isArray(allowedHosts)
     ? allowedHosts.map((host) => String(host || "").trim()).filter(Boolean)
     : [];
-  const placementHosts = hostList.length > 0
-    ? hostList
-    : [String(fallbackHost || "").trim() || "pve"];
+  const placementHosts =
+    hostList.length > 0 ? hostList : [String(fallbackHost || "").trim() || "pve"];
   const vmNodeMap = {};
   const vmNames = [];
 
@@ -112,15 +120,15 @@ function normalizeVmNodeMap(rawMap, allowedHosts = [], fallbackHost = "pve", vmN
     vmNames.filter((name) => String(name).startsWith("cp-")).length,
     vmNames.filter((name) => String(name).startsWith("worker-")).length,
     allowedHosts,
-    fallbackHost,
+    fallbackHost
   );
 
-  if (rawMap === null || rawMap === undefined || rawMap === '') {
+  if (rawMap === null || rawMap === undefined || rawMap === "") {
     return { ok: true, value: defaultMap };
   }
 
   let candidate = rawMap;
-  if (typeof candidate === 'string') {
+  if (typeof candidate === "string") {
     try {
       candidate = JSON.parse(candidate);
     } catch {
@@ -128,7 +136,7 @@ function normalizeVmNodeMap(rawMap, allowedHosts = [], fallbackHost = "pve", vmN
     }
   }
 
-  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
     return { ok: false, error: "vm_node_map must be an object" };
   }
 
@@ -146,12 +154,16 @@ function normalizeVmNodeMap(rawMap, allowedHosts = [], fallbackHost = "pve", vmN
       return { ok: false, error: `vm_node_map entry ${normalizedVmName} must map to a host name` };
     }
 
-    const resolvedHost = allowedHostLookup.size > 0
-      ? allowedHostLookup.get(normalizedHostName.toLowerCase())
-      : normalizedHostName;
+    const resolvedHost =
+      allowedHostLookup.size > 0
+        ? allowedHostLookup.get(normalizedHostName.toLowerCase())
+        : normalizedHostName;
 
     if (allowedHostLookup.size > 0 && !resolvedHost) {
-      return { ok: false, error: `vm_node_map references unknown Proxmox host ${normalizedHostName}` };
+      return {
+        ok: false,
+        error: `vm_node_map references unknown Proxmox host ${normalizedHostName}`,
+      };
     }
 
     normalized[normalizedVmName] = resolvedHost;
@@ -184,7 +196,9 @@ function buildLegacyVmIpMap(startIp, vmNames = []) {
 }
 
 function normalizeVmIpMap(rawMap, vmNames = [], fallbackStartIp = "") {
-  const vmNameList = Array.isArray(vmNames) ? vmNames.map((name) => String(name || "").trim()).filter(Boolean) : [];
+  const vmNameList = Array.isArray(vmNames)
+    ? vmNames.map((name) => String(name || "").trim()).filter(Boolean)
+    : [];
   if (vmNameList.length === 0) {
     return { ok: false, error: "vm_ip_map cannot be built without VM names" };
   }
@@ -240,7 +254,9 @@ function normalizeVmIpMap(rawMap, vmNames = [], fallbackStartIp = "") {
 }
 
 function normalizeVmSizeMap(rawMap, vmNames = [], cpuCores = 2, workerMemoryMb = 10240) {
-  const vmNameList = Array.isArray(vmNames) ? vmNames.map((name) => String(name || "").trim()).filter(Boolean) : [];
+  const vmNameList = Array.isArray(vmNames)
+    ? vmNames.map((name) => String(name || "").trim()).filter(Boolean)
+    : [];
   if (vmNameList.length === 0) {
     return { ok: false, error: "vm_size_map cannot be built without VM names" };
   }
@@ -249,7 +265,7 @@ function normalizeVmSizeMap(rawMap, vmNames = [], cpuCores = 2, workerMemoryMb =
     vmNameList.filter((name) => name.startsWith("cp-")).length,
     vmNameList.filter((name) => name.startsWith("worker-")).length,
     cpuCores,
-    workerMemoryMb,
+    workerMemoryMb
   );
 
   if (rawMap === null || rawMap === undefined || rawMap === "") {
@@ -285,8 +301,18 @@ function normalizeVmSizeMap(rawMap, vmNames = [], cpuCores = 2, workerMemoryMb =
     }
 
     const parsedCpu = parseIntInRange(value.cpu, `vm_size_map.${normalizedVmName}.cpu`, 1, 64);
-    const parsedMemory = parseIntInRange(value.memory_mb, `vm_size_map.${normalizedVmName}.memory_mb`, 512, 1048576);
-    const parsedDisk = parseIntInRange(value.disk_gb, `vm_size_map.${normalizedVmName}.disk_gb`, 10, 8192);
+    const parsedMemory = parseIntInRange(
+      value.memory_mb,
+      `vm_size_map.${normalizedVmName}.memory_mb`,
+      512,
+      1048576
+    );
+    const parsedDisk = parseIntInRange(
+      value.disk_gb,
+      `vm_size_map.${normalizedVmName}.disk_gb`,
+      10,
+      8192
+    );
     if (!parsedCpu.ok) return { ok: false, error: parsedCpu.error };
     if (!parsedMemory.ok) return { ok: false, error: parsedMemory.error };
     if (!parsedDisk.ok) return { ok: false, error: parsedDisk.error };
@@ -308,17 +334,31 @@ function normalizeVmSizeMap(rawMap, vmNames = [], cpuCores = 2, workerMemoryMb =
   return { ok: true, value: normalized };
 }
 
-export function buildClusterFromRequest(body, env, { allowedVmHosts = [], clusterInstanceId = null } = {}) {
+export function buildClusterFromRequest(
+  body,
+  env,
+  { allowedVmHosts = [], clusterInstanceId = null } = {}
+) {
   const parsedName = parseRequiredString(body.name, "name");
   const parsedBridge = parseRequiredString(body.bridge, "bridge");
   const parsedControlplanes = parseIntInRange(body.controlplane_count, "controlplane_count", 1, 15);
   const parsedWorkers = parseIntInRange(body.worker_count, "worker_count", 0, 200);
   const parsedCpu = parseIntInRange(body.cpu_cores, "cpu_cores", 1, 64);
   const parsedMemory = parseIntInRange(body.memory_mb, "memory_mb", 512, 1048576);
-  const parsedWorkerDiskPercent = parseIntInRange(body.worker_disk_percent ?? 100, "worker_disk_percent", 10, 100);
+  const parsedWorkerDiskPercent = parseIntInRange(
+    body.worker_disk_percent ?? 100,
+    "worker_disk_percent",
+    10,
+    100
+  );
   const parsedStartVmid = parseIntInRange(body.start_vmid, "start_vmid", 100, 999999);
   const parsedVipIp = parseIPv4(body.vip_ip, "vip_ip");
-  const parsedNodePrefixLength = parseIntInRange(body.node_prefix_length, "node_prefix_length", 1, 32);
+  const parsedNodePrefixLength = parseIntInRange(
+    body.node_prefix_length,
+    "node_prefix_length",
+    1,
+    32
+  );
   const parsedGatewayIp = parseIPv4(body.gateway_ip, "gateway_ip");
   const parsedDnsServers = parseIPv4List(body.dns_servers, "dns_servers");
   const parsedDnsDomain = parseOptionalString(body.dns_domain, "dns_domain");
@@ -326,13 +366,22 @@ export function buildClusterFromRequest(body, env, { allowedVmHosts = [], cluste
     ...Array.from({ length: parsedControlplanes.value }, (_, index) => `cp-${index + 1}`),
     ...Array.from({ length: parsedWorkers.value }, (_, index) => `worker-${index + 1}`),
   ];
-  const parsedVmIpMap = normalizeVmIpMap(body.vm_ip_map, vmNames, String(body.start_ip || "").trim());
-  const parsedVmSizeMap = normalizeVmSizeMap(body.vm_size_map, vmNames, parsedCpu.value, parsedMemory.value);
+  const parsedVmIpMap = normalizeVmIpMap(
+    body.vm_ip_map,
+    vmNames,
+    String(body.start_ip || "").trim()
+  );
+  const parsedVmSizeMap = normalizeVmSizeMap(
+    body.vm_size_map,
+    vmNames,
+    parsedCpu.value,
+    parsedMemory.value
+  );
   const parsedVmNodeMap = normalizeVmNodeMap(
     body.vm_node_map,
     allowedVmHosts,
     body.proxmox_node || env.PROXMOX_NODE || "pve",
-    vmNames,
+    vmNames
   );
 
   const validations = [

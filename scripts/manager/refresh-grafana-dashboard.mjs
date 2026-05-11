@@ -35,7 +35,8 @@ function parseArgs(argv) {
   const options = {
     managerDataDir: process.env.MANAGER_DATA_DIR || "/data",
     clusterId: process.env.TWINBOX_CLUSTER_ID || process.env.CLUSTER_ID || "",
-    clusterInstanceId: process.env.TWINBOX_CLUSTER_INSTANCE_ID || process.env.CLUSTER_INSTANCE_ID || "",
+    clusterInstanceId:
+      process.env.TWINBOX_CLUSTER_INSTANCE_ID || process.env.CLUSTER_INSTANCE_ID || "",
     triggerStepId: process.env.STEP_ID || process.env.TRIGGER_STEP_ID || "",
     namespace: DASHBOARD_NAMESPACE,
   };
@@ -95,11 +96,16 @@ function findCurrentCluster(dataRoot) {
     return null;
   }
 
-  const clusterFiles = fs.readdirSync(clustersRoot)
+  const clusterFiles = fs
+    .readdirSync(clustersRoot)
     .filter((entry) => entry.endsWith(".json"))
     .map((entry) => readJsonIfExists(path.join(clustersRoot, entry)))
     .filter((cluster) => cluster?.id)
-    .sort((left, right) => String(right?.updated_at || right?.created_at || "").localeCompare(String(left?.updated_at || left?.created_at || "")));
+    .sort((left, right) =>
+      String(right?.updated_at || right?.created_at || "").localeCompare(
+        String(left?.updated_at || left?.created_at || "")
+      )
+    );
 
   return clusterFiles[0] || null;
 }
@@ -147,7 +153,9 @@ function runKubectl(args, { input = undefined } = {}) {
   if (result.status !== 0) {
     const stderr = (result.stderr || "").trim();
     const stdout = (result.stdout || "").trim();
-    throw new Error(`kubectl ${args.join(" ")} failed${stderr ? `: ${stderr}` : stdout ? `: ${stdout}` : ""}`);
+    throw new Error(
+      `kubectl ${args.join(" ")} failed${stderr ? `: ${stderr}` : stdout ? `: ${stdout}` : ""}`
+    );
   }
 
   return result.stdout || "";
@@ -177,9 +185,7 @@ function rewriteDashboardStrings(value) {
     ["${datasource}", "Prometheus"],
     ["${VAR_JOB}", "node-exporter"],
   ]);
-  const substitutions = [
-    ['cluster_name="$cluster"', 'cluster_name=~".*"'],
-  ];
+  const substitutions = [['cluster_name="$cluster"', 'cluster_name=~".*"']];
 
   if (Array.isArray(value)) {
     return value.map((entry) => rewriteDashboardStrings(entry));
@@ -243,14 +249,7 @@ metadata:
 
 function deleteObsoleteDashboardConfigMaps(namespace) {
   for (const configmapName of OBSOLETE_DASHBOARD_CONFIGMAPS) {
-    runKubectl([
-      "-n",
-      namespace,
-      "delete",
-      "configmap",
-      configmapName,
-      "--ignore-not-found=true",
-    ]);
+    runKubectl(["-n", namespace, "delete", "configmap", configmapName, "--ignore-not-found=true"]);
   }
 }
 
@@ -260,20 +259,24 @@ function applyManagedOverviewDashboard(namespace, dashboard) {
   fs.writeFileSync(dashboardFile, `${JSON.stringify(dashboard, null, 2)}\n`, "utf8");
 
   try {
-    const createResult = spawnSync("kubectl", [
-      "-n",
-      namespace,
-      "create",
-      "configmap",
-      DASHBOARD_CONFIGMAP_NAME,
-      `--from-file=${DASHBOARD_FILE_KEY}=${dashboardFile}`,
-      "--dry-run=client",
-      "-o",
-      "yaml",
-    ], {
-      encoding: "utf8",
-      env: buildKubectlEnv(),
-    });
+    const createResult = spawnSync(
+      "kubectl",
+      [
+        "-n",
+        namespace,
+        "create",
+        "configmap",
+        DASHBOARD_CONFIGMAP_NAME,
+        `--from-file=${DASHBOARD_FILE_KEY}=${dashboardFile}`,
+        "--dry-run=client",
+        "-o",
+        "yaml",
+      ],
+      {
+        encoding: "utf8",
+        env: buildKubectlEnv(),
+      }
+    );
 
     if (createResult.error) {
       throw createResult.error;
@@ -282,7 +285,9 @@ function applyManagedOverviewDashboard(namespace, dashboard) {
     if (createResult.status !== 0) {
       const stderr = (createResult.stderr || "").trim();
       const stdout = (createResult.stdout || "").trim();
-      throw new Error(`kubectl create configmap ${DASHBOARD_CONFIGMAP_NAME} failed${stderr ? `: ${stderr}` : stdout ? `: ${stdout}` : ""}`);
+      throw new Error(
+        `kubectl create configmap ${DASHBOARD_CONFIGMAP_NAME} failed${stderr ? `: ${stderr}` : stdout ? `: ${stdout}` : ""}`
+      );
     }
 
     runKubectl(["apply", "--server-side", "--field-manager=grafana-dashboard", "-f", "-"], {
@@ -314,7 +319,9 @@ function shouldRefreshDashboard(triggerStepId, stepState) {
 
 function main() {
   const options = parseArgs(process.argv.slice(2));
-  const currentCluster = findClusterById(options.managerDataDir, options.clusterId) || findCurrentCluster(options.managerDataDir);
+  const currentCluster =
+    findClusterById(options.managerDataDir, options.clusterId) ||
+    findCurrentCluster(options.managerDataDir);
 
   if (!currentCluster?.id && !options.clusterId) {
     fail("could not determine current cluster for Grafana dashboard refresh");
@@ -325,7 +332,11 @@ function main() {
     cluster_instance_id: options.clusterInstanceId || options.clusterId,
   };
   const clusterInstanceId = options.clusterInstanceId || clusterScopeId(cluster, options.clusterId);
-  const installGrafanaState = readStepState(options.managerDataDir, "install-grafana", clusterInstanceId || null);
+  const installGrafanaState = readStepState(
+    options.managerDataDir,
+    "install-grafana",
+    clusterInstanceId || null
+  );
 
   if (!shouldRefreshDashboard(options.triggerStepId, installGrafanaState)) {
     log("Grafana dashboard refresh skipped: install-grafana is not installed yet");
@@ -345,6 +356,8 @@ function main() {
 try {
   main();
 } catch (error) {
-  console.error(`[${now()}] ERROR: ${error instanceof Error ? error.message : String(error || "unknown error")}`);
+  console.error(
+    `[${now()}] ERROR: ${error instanceof Error ? error.message : String(error || "unknown error")}`
+  );
   process.exit(1);
 }

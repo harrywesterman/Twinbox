@@ -22,7 +22,11 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: manager-api/package-lock.json
+          cache-dependency-path: |
+            manager-api/package-lock.json
+            manager-web/package-lock.json
+            manager-worker/package-lock.json
+            portal/package-lock.json
 
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -35,8 +39,24 @@ jobs:
         run: |
           python -m pip install -r requirements-test.txt
           npm ci --prefix manager-api
+          npm ci --prefix manager-web
           npm ci --prefix manager-worker
           npm ci --prefix portal
+
+      - name: Lint and format check
+        run: |
+          npm run lint --prefix manager-api
+          npm run lint --prefix manager-web
+          npm run lint --prefix manager-worker
+          npm run lint --prefix portal
+          npx eslint lib/ scripts/
+          npm run format:check --prefix manager-api
+          npm run format:check --prefix manager-web
+          npm run format:check --prefix manager-worker
+          npm run format:check --prefix portal
+          npx prettier --check "lib/**/*.{js,mjs}" "scripts/**/*.{js,mjs}"
+          ruff check tests/
+          ruff format --check tests/
 
       - name: Static checks
         run: |
@@ -49,6 +69,9 @@ jobs:
       - name: Portal build
         run: npm run build --prefix portal
 
+      - name: Manager web build
+        run: npm run build --prefix manager-web
+
       - name: Compose config check
         run: |
           cp .env.example .env
@@ -57,5 +80,4 @@ jobs:
 
       - name: Runtime tests
         run: |
-          node --test manager-worker/test/*.mjs
           python -m pytest -q tests

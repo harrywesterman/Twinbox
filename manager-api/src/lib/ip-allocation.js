@@ -21,16 +21,14 @@ function preferredNodeOctetsForVip(vipOctet) {
   return ordered;
 }
 
-export async function selectSuggestedIpAllocation({
-  managementIp,
-  nodeCount,
-  isIpInUse,
-}) {
+export async function selectSuggestedIpAllocation({ managementIp, nodeCount, isIpInUse }) {
   if (typeof isIpInUse !== "function") {
     throw new TypeError("isIpInUse must be a function");
   }
 
-  const octets = String(managementIp || "").split(".").map(Number);
+  const octets = String(managementIp || "")
+    .split(".")
+    .map(Number);
   const prefix = `${octets[0]}.${octets[1]}.${octets[2]}`;
   const managementOctet = octets[3];
   let probedAddresses = 0;
@@ -90,10 +88,7 @@ export async function selectSuggestedIpAllocation({
   throw new Error(`No free ${nodeCount}-IP allocation found in ${prefix}.0/24`);
 }
 
-export async function checkIpAvailability({
-  ips = [],
-  isIpInUse,
-}) {
+export async function checkIpAvailability({ ips = [], isIpInUse }) {
   if (typeof isIpInUse !== "function") {
     throw new TypeError("isIpInUse must be a function");
   }

@@ -1,53 +1,31 @@
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SYNC_SCRIPT = REPO_ROOT / "scripts" / "manager" / "sync-openbao-global-secret.sh"
-GRAFANA_STEP = (
-    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-grafana" / "run.sh"
-)
+GRAFANA_STEP = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-grafana" / "run.sh"
 WIREDOOR_STEP = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "install-wiredoor-gateway"
-    / "run.sh"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-wiredoor-gateway" / "run.sh"
 )
-GRAFANA_SECRET = (
-    REPO_ROOT / "gitops" / "platform" / "grafana" / "externalsecret.yaml"
-)
-WIREDOOR_SECRET = (
-    REPO_ROOT / "gitops" / "apps" / "wiredoor-gateway-secret" / "externalsecret.yaml"
-)
+GRAFANA_SECRET = REPO_ROOT / "gitops" / "platform" / "grafana" / "externalsecret.yaml"
+WIREDOOR_SECRET = REPO_ROOT / "gitops" / "apps" / "wiredoor-gateway-secret" / "externalsecret.yaml"
 TRAEFIK_SECRET = (
     REPO_ROOT / "gitops" / "platform" / "traefik" / "traefik-dashboard-externalsecret.yaml"
 )
 CROWDSEC_BOUNCER_SECRET = (
     REPO_ROOT / "gitops" / "platform" / "crowdsec" / "bouncer-externalsecret.yaml"
 )
-CROWDSEC_LAPI_SECRET = (
-    REPO_ROOT / "gitops" / "platform" / "crowdsec" / "lapi-externalsecret.yaml"
-)
+CROWDSEC_LAPI_SECRET = REPO_ROOT / "gitops" / "platform" / "crowdsec" / "lapi-externalsecret.yaml"
 TRAEFIK_CROWDSEC_BOUNCER_SECRET = (
     REPO_ROOT / "gitops" / "platform" / "traefik" / "crowdsec-bouncer-externalsecret.yaml"
 )
-PORTAL_SECRET = (
-    REPO_ROOT / "gitops" / "platform-apps" / "twinbox-portal" / "externalsecret.yaml"
-)
+PORTAL_SECRET = REPO_ROOT / "gitops" / "platform-apps" / "twinbox-portal" / "externalsecret.yaml"
 PORTAL_STEP = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-twinbox-portal" / "run.sh"
 )
 TALOS_CATEGORY = REPO_ROOT / "categories" / "talos-cluster" / "category.yaml"
-PIXELFED_STEP = (
-    REPO_ROOT / "categories" / "apps" / "steps" / "install-pixelfed" / "run.sh"
-)
-ZULIP_STEP = (
-    REPO_ROOT / "categories" / "apps" / "steps" / "install-zulip" / "step.yaml"
-)
-ZULIP_RUN = (
-    REPO_ROOT / "categories" / "apps" / "steps" / "install-zulip" / "run.sh"
-)
+PIXELFED_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-pixelfed" / "run.sh"
+ZULIP_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-zulip" / "step.yaml"
+ZULIP_RUN = REPO_ROOT / "categories" / "apps" / "steps" / "install-zulip" / "run.sh"
 ZULIP_APP = REPO_ROOT / "gitops" / "apps" / "zulip.yaml"
 ZULIP_PLATFORM_DIR = REPO_ROOT / "gitops" / "platform-apps" / "zulip"
 ZULIP_RUNTIME_SECRET = ZULIP_PLATFORM_DIR / "runtime-externalsecret.yaml"
@@ -62,12 +40,7 @@ OUTLINE_DEPLOYMENT = OUTLINE_PLATFORM_DIR / "deployment.yaml"
 OUTLINE_SECRET = OUTLINE_PLATFORM_DIR / "externalsecret.yaml"
 OUTLINE_DB_CLUSTER = REPO_ROOT / "gitops" / "databases" / "outline" / "cluster.yaml"
 REMOVED_PLACEHOLDER_STEP = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "install-vaultwarden-app"
-    / "step.yaml"
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-vaultwarden-app" / "step.yaml"
 )
 
 
@@ -91,7 +64,10 @@ def test_grafana_step_generates_and_syncs_an_oidc_secret():
     text = _read(GRAFANA_STEP)
 
     assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in text
-    assert 'grafana_secret_file="$BOOTSTRAP_ROOT/secrets/global/grafana-oidc-${cluster_id}.json"' in text
+    assert (
+        'grafana_secret_file="$BOOTSTRAP_ROOT/secrets/global/grafana-oidc-${cluster_id}.json"'
+        in text
+    )
     assert "openssl rand -hex 16" in text
     assert "openssl rand -hex 24" in text
     assert "Provisioning Authentik OIDC client for Grafana" in text
@@ -101,9 +77,12 @@ def test_grafana_step_generates_and_syncs_an_oidc_secret():
     assert '"GF_SECURITY_ADMIN_PASSWORD": $admin_password' in text
     assert "scripts/manager/sync-openbao-global-secret.sh" in text
     assert '--secret-name "grafana-oidc"' in text
-    assert '--required-keys "GF_AUTH_DISABLE_LOGIN_FORM,GF_AUTH_OAUTH_AUTO_LOGIN,GF_AUTH_BASIC_ENABLED,GF_USERS_AUTO_ASSIGN_ORG_ROLE,GF_AUTH_GENERIC_OAUTH_ENABLED,GF_AUTH_GENERIC_OAUTH_NAME,GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP,GF_AUTH_GENERIC_OAUTH_CLIENT_ID,GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET,GF_AUTH_GENERIC_OAUTH_SCOPES,GF_AUTH_GENERIC_OAUTH_AUTH_URL,GF_AUTH_GENERIC_OAUTH_TOKEN_URL,GF_AUTH_GENERIC_OAUTH_API_URL,GF_SECURITY_ADMIN_USER,GF_SECURITY_ADMIN_PASSWORD"' in text
     assert (
-        'kubectl -n monitoring wait --for=condition=Ready externalsecret/grafana-oidc --timeout=10m'
+        '--required-keys "GF_AUTH_DISABLE_LOGIN_FORM,GF_AUTH_OAUTH_AUTO_LOGIN,GF_AUTH_BASIC_ENABLED,GF_USERS_AUTO_ASSIGN_ORG_ROLE,GF_AUTH_GENERIC_OAUTH_ENABLED,GF_AUTH_GENERIC_OAUTH_NAME,GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP,GF_AUTH_GENERIC_OAUTH_CLIENT_ID,GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET,GF_AUTH_GENERIC_OAUTH_SCOPES,GF_AUTH_GENERIC_OAUTH_AUTH_URL,GF_AUTH_GENERIC_OAUTH_TOKEN_URL,GF_AUTH_GENERIC_OAUTH_API_URL,GF_SECURITY_ADMIN_USER,GF_SECURITY_ADMIN_PASSWORD"'
+        in text
+    )
+    assert (
+        "kubectl -n monitoring wait --for=condition=Ready externalsecret/grafana-oidc --timeout=10m"
         in text
     )
 
@@ -115,10 +94,7 @@ def test_wiredoor_step_requires_url_generates_token_and_syncs_to_openbao():
     assert 'if [[ ! -f "$wiredoor_secret_file" ]]; then' in text
     assert 'wiredoor_url="${WIREDOOR_URL:-${TWINBOX_WIREDOOR_URL:-}}"' in text
     assert "openssl rand -hex 24" in text
-    assert (
-        'wiredoor_secret_file="$BOOTSTRAP_ROOT/secrets/global/wiredoor-gateway.json"'
-        in text
-    )
+    assert 'wiredoor_secret_file="$BOOTSTRAP_ROOT/secrets/global/wiredoor-gateway.json"' in text
     assert "WIREDOOR_URL missing in $wiredoor_secret_file" in text
     assert "scripts/manager/sync-openbao-global-secret.sh" in text
     assert '--secret-name "wiredoor-gateway"' in text
@@ -130,7 +106,10 @@ def test_portal_step_and_secret_project_authentik_management_env():
     secret_text = _read(PORTAL_SECRET)
 
     assert '"AUTHENTIK_API_BASE": "$authentik_api_base"' in step_text
-    assert '--required-keys "PORTAL_BASE_URL,PORTAL_OIDC_CLIENT_ID,PORTAL_OIDC_ISSUER,PORTAL_SESSION_SECRET,AUTHENTIK_API_BASE"' in step_text
+    assert (
+        '--required-keys "PORTAL_BASE_URL,PORTAL_OIDC_CLIENT_ID,PORTAL_OIDC_ISSUER,PORTAL_SESSION_SECRET,AUTHENTIK_API_BASE"'
+        in step_text
+    )
 
     assert "name: portal-bootstrap" in secret_text
     assert "secretKey: AUTHENTIK_API_BASE" in secret_text
@@ -193,7 +172,6 @@ def test_removed_placeholder_step_is_absent_from_the_journey():
 def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     step_text = _read(ZULIP_STEP)
     run_text = _read(ZULIP_RUN)
-    category_text = _read(TALOS_CATEGORY)
     app_text = _read(ZULIP_APP)
     values_text = _read(ZULIP_VALUES)
     runtime_secret_text = _read(ZULIP_RUNTIME_SECRET)
@@ -204,16 +182,19 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in run_text
     assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in run_text
     assert 'mkdir -p "$secrets_dir"' in run_text
-    assert 'zulip_runtime_secret_file=' in run_text
-    assert 'openbao_read_global_secret_json zulip-runtime' in run_text
-    assert 'sync-openbao-global-secret.sh' in run_text
+    assert "zulip_runtime_secret_file=" in run_text
+    assert "openbao_read_global_secret_json zulip-runtime" in run_text
+    assert "sync-openbao-global-secret.sh" in run_text
     assert '--secret-name "zulip-runtime"' in run_text
-    assert '--required-keys "ZULIP_RABBITMQ_PASSWORD,ZULIP_RABBITMQ_ERLANG_COOKIE,ZULIP_REDIS_PASSWORD"' in run_text
-    assert 'zulip_config_secret_json' in run_text
-    assert 'zulip_runtime_secret_json' in run_text
-    assert 'LOADBALANCER_IPS' not in run_text
-    assert '__ZULIP_RABBITMQ_PASSWORD__' not in run_text
-    assert '__ZULIP_REDIS_PASSWORD__' not in run_text
+    assert (
+        '--required-keys "ZULIP_RABBITMQ_PASSWORD,ZULIP_RABBITMQ_ERLANG_COOKIE,ZULIP_REDIS_PASSWORD"'
+        in run_text
+    )
+    assert "zulip_config_secret_json" in run_text
+    assert "zulip_runtime_secret_json" in run_text
+    assert "LOADBALANCER_IPS" not in run_text
+    assert "__ZULIP_RABBITMQ_PASSWORD__" not in run_text
+    assert "__ZULIP_REDIS_PASSWORD__" not in run_text
 
     assert "kind: ApplicationSet" in app_text
     assert "name: zulip-set" in app_text
@@ -221,8 +202,14 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "path: ." in app_text
     assert 'targetRevision: "1.12.0"' in app_text
     assert "path: gitops/platform-apps/zulip" in app_text
-    assert "SETTING_EXTERNAL_HOST: zulip.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in app_text
-    assert "SETTING_ZULIP_ADMINISTRATOR: admin@{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in app_text
+    assert (
+        'SETTING_EXTERNAL_HOST: zulip.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
+        in app_text
+    )
+    assert (
+        'SETTING_ZULIP_ADMINISTRATOR: admin@{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
+        in app_text
+    )
     assert "ZULIP_AUTH_BACKENDS: GenericOpenIdConnectBackend" in app_text
     assert 'TRUST_GATEWAY_IP: "True"' in app_text
     assert "ZULIP_DEFAULT_REALM_OWNER_EMAIL:" not in app_text
@@ -234,7 +221,7 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "existingSecret: zulip-runtime" in app_text
     assert "existingSecretPasswordKey: redis-password" in app_text
     assert "LOADBALANCER_IPS:" in app_text
-    assert 'pod-cidr' in app_text
+    assert "pod-cidr" in app_text
     assert "__ZULIP_RABBITMQ_PASSWORD__" not in app_text
     assert "__ZULIP_REDIS_PASSWORD__" not in app_text
 
@@ -294,27 +281,30 @@ def test_outline_step_projects_a_real_oidc_backed_app():
     db_cluster_text = _read(OUTLINE_DB_CLUSTER)
 
     assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in step_text
-    assert 'openbao_read_global_secret_json outline' in step_text
+    assert "openbao_read_global_secret_json outline" in step_text
     assert '--secret-name "outline"' in step_text
-    assert '--required-keys "OUTLINE_POSTGRESQL__USERNAME,OUTLINE_POSTGRESQL__PASSWORD,DATABASE_URL,REDIS_URL,SECRET_KEY,UTILS_SECRET,OIDC_CLIENT_ID,OIDC_CLIENT_SECRET"' in step_text
-    assert 'create_or_update_provider()' in step_text
+    assert (
+        '--required-keys "OUTLINE_POSTGRESQL__USERNAME,OUTLINE_POSTGRESQL__PASSWORD,DATABASE_URL,REDIS_URL,SECRET_KEY,UTILS_SECRET,OIDC_CLIENT_ID,OIDC_CLIENT_SECRET"'
+        in step_text
+    )
+    assert "create_or_update_provider()" in step_text
     assert 'slug "outline"' in step_text
     assert '"__ZONE_NAME__=$public_zone_name"' in step_text
-    assert 'path: gitops/platform-apps/outline' in app_text
-    assert 'value: https://outline.__ZONE_NAME__' in app_text
-    assert 'value: https://authentik.__ZONE_NAME__/application/o/outline/' in app_text
-    assert 'application/o/outline/end-session/' in app_text
-    assert 'kind: Application' in app_text
-    assert 'image: docker.getoutline.com/outlinewiki/outline:1.7.1' in deployment_text
-    assert 'OIDC_ISSUER_URL' in deployment_text
-    assert 'OIDC_LOGOUT_URI' in deployment_text
-    assert 'property: DATABASE_URL' in secret_text
-    assert 'property: REDIS_URL' in secret_text
-    assert 'property: SECRET_KEY' in secret_text
-    assert 'property: UTILS_SECRET' in secret_text
-    assert 'property: OIDC_CLIENT_ID' in secret_text
-    assert 'property: OIDC_CLIENT_SECRET' in secret_text
-    assert 'imageName: ghcr.io/cloudnative-pg/postgresql:16.4' in db_cluster_text
+    assert "path: gitops/platform-apps/outline" in app_text
+    assert "value: https://outline.__ZONE_NAME__" in app_text
+    assert "value: https://authentik.__ZONE_NAME__/application/o/outline/" in app_text
+    assert "application/o/outline/end-session/" in app_text
+    assert "kind: Application" in app_text
+    assert "image: docker.getoutline.com/outlinewiki/outline:1.7.1" in deployment_text
+    assert "OIDC_ISSUER_URL" in deployment_text
+    assert "OIDC_LOGOUT_URI" in deployment_text
+    assert "property: DATABASE_URL" in secret_text
+    assert "property: REDIS_URL" in secret_text
+    assert "property: SECRET_KEY" in secret_text
+    assert "property: UTILS_SECRET" in secret_text
+    assert "property: OIDC_CLIENT_ID" in secret_text
+    assert "property: OIDC_CLIENT_SECRET" in secret_text
+    assert "imageName: ghcr.io/cloudnative-pg/postgresql:16.4" in db_cluster_text
 
 
 def test_pixelfed_step_and_secret_project_activitypub_and_bootstrap_keys():
@@ -324,26 +314,29 @@ def test_pixelfed_step_and_secret_project_activitypub_and_bootstrap_keys():
 
     assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in step_text
     assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in step_text
-    assert 'openbao_read_global_secret_json pixelfed' in step_text
-    assert 'pixelfed_secret_file=' in step_text
+    assert "openbao_read_global_secret_json pixelfed" in step_text
+    assert "pixelfed_secret_file=" in step_text
     assert '--secret-name "pixelfed"' in step_text
-    assert '--required-keys "APP_KEY,PIXELFED_POSTGRESQL__USERNAME,PIXELFED_POSTGRESQL__PASSWORD,PF_OIDC_CLIENT_ID,PF_OIDC_CLIENT_SECRET,PF_OIDC_AUTHORIZE_URL,PF_OIDC_TOKEN_URL,PF_OIDC_PROFILE_URL,PF_OIDC_LOGOUT_URL"' in step_text
-    assert 'php artisan instance:actor' in step_text
-    assert 'php artisan passport:keys --force' in step_text
-    assert 'gitops/databases/pixelfed/cluster.yaml' in step_text
-    assert 'gitops/apps/pixelfed.yaml' in step_text
+    assert (
+        '--required-keys "APP_KEY,PIXELFED_POSTGRESQL__USERNAME,PIXELFED_POSTGRESQL__PASSWORD,PF_OIDC_CLIENT_ID,PF_OIDC_CLIENT_SECRET,PF_OIDC_AUTHORIZE_URL,PF_OIDC_TOKEN_URL,PF_OIDC_PROFILE_URL,PF_OIDC_LOGOUT_URL"'
+        in step_text
+    )
+    assert "php artisan instance:actor" in step_text
+    assert "php artisan passport:keys --force" in step_text
+    assert "gitops/databases/pixelfed/cluster.yaml" in step_text
+    assert "gitops/apps/pixelfed.yaml" in step_text
 
-    assert 'name: pixelfed-bootstrap' in secret_text
-    assert 'secretKey: APP_KEY' in secret_text
-    assert 'property: APP_KEY' in secret_text
-    assert 'property: PIXELFED_POSTGRESQL__USERNAME' in secret_text
-    assert 'property: PIXELFED_POSTGRESQL__PASSWORD' in secret_text
-    assert 'property: PF_OIDC_CLIENT_ID' in secret_text
-    assert 'property: PF_OIDC_CLIENT_SECRET' in secret_text
-    assert 'property: PF_OIDC_AUTHORIZE_URL' in secret_text
-    assert 'property: PF_OIDC_TOKEN_URL' in secret_text
-    assert 'property: PF_OIDC_PROFILE_URL' in secret_text
-    assert 'property: PF_OIDC_LOGOUT_URL' in secret_text
+    assert "name: pixelfed-bootstrap" in secret_text
+    assert "secretKey: APP_KEY" in secret_text
+    assert "property: APP_KEY" in secret_text
+    assert "property: PIXELFED_POSTGRESQL__USERNAME" in secret_text
+    assert "property: PIXELFED_POSTGRESQL__PASSWORD" in secret_text
+    assert "property: PF_OIDC_CLIENT_ID" in secret_text
+    assert "property: PF_OIDC_CLIENT_SECRET" in secret_text
+    assert "property: PF_OIDC_AUTHORIZE_URL" in secret_text
+    assert "property: PF_OIDC_TOKEN_URL" in secret_text
+    assert "property: PF_OIDC_PROFILE_URL" in secret_text
+    assert "property: PF_OIDC_LOGOUT_URL" in secret_text
 
-    assert 'destinationPath: s3://twinbox-velero/pixelfed-db/' in db_cluster_text
-    assert 'imageName: ghcr.io/cloudnative-pg/postgresql:16.4' in db_cluster_text
+    assert "destinationPath: s3://twinbox-velero/pixelfed-db/" in db_cluster_text
+    assert "imageName: ghcr.io/cloudnative-pg/postgresql:16.4" in db_cluster_text

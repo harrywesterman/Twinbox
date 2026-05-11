@@ -82,9 +82,12 @@ export function parseIPv4(value, field) {
 export function parseIPv4List(value, field) {
   const values = Array.isArray(value)
     ? value.map((entry) => String(entry ?? "").trim()).filter(Boolean)
-    : (typeof value === "string"
-      ? value.split(",").map((entry) => entry.trim()).filter(Boolean)
-      : []);
+    : typeof value === "string"
+      ? value
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean)
+      : [];
 
   if (values.length === 0) {
     return { ok: false, error: `${field} must contain valid IPv4 addresses` };

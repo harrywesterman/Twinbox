@@ -5,13 +5,14 @@ import tempfile
 import time
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _read_repo_pinned_defaults():
     values = {}
-    for raw_line in (REPO_ROOT / "config" / "pinned-defaults.sh").read_text(encoding="utf-8").splitlines():
+    for raw_line in (
+        (REPO_ROOT / "config" / "pinned-defaults.sh").read_text(encoding="utf-8").splitlines()
+    ):
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
@@ -44,19 +45,19 @@ def _write_fake_tool(path: Path, body: str):
 def _prepare_fake_toolchain(bin_dir: Path):
     _write_fake_tool(
         bin_dir / "talosctl",
-        f"#!/bin/bash\nif [[ \"$1\" == \"version\" ]]; then echo 'Client: {PINNED_TALOS_VERSION}'; exit 0; fi\nexit 0\n",
+        f'#!/bin/bash\nif [[ "$1" == "version" ]]; then echo \'Client: {PINNED_TALOS_VERSION}\'; exit 0; fi\nexit 0\n',
     )
     _write_fake_tool(
         bin_dir / "tofu",
-        f"#!/bin/bash\nif [[ \"$1\" == \"version\" ]]; then echo 'OpenTofu {PINNED_OPENTOFU_VERSION}'; exit 0; fi\nexit 0\n",
+        f'#!/bin/bash\nif [[ "$1" == "version" ]]; then echo \'OpenTofu {PINNED_OPENTOFU_VERSION}\'; exit 0; fi\nexit 0\n',
     )
     _write_fake_tool(
         bin_dir / "kubectl",
-        f"#!/bin/bash\nif [[ \"$1\" == \"version\" ]]; then echo '{{\"clientVersion\":{{\"gitVersion\":\"{PINNED_KUBECTL_VERSION}\"}}}}'; exit 0; fi\nexit 0\n",
+        f'#!/bin/bash\nif [[ "$1" == "version" ]]; then echo \'{{"clientVersion":{{"gitVersion":"{PINNED_KUBECTL_VERSION}"}}}}\'; exit 0; fi\nexit 0\n',
     )
     _write_fake_tool(
         bin_dir / "helm",
-        f"#!/bin/bash\nif [[ \"$1\" == \"version\" ]]; then echo '{PINNED_HELM_VERSION}+gabcdef'; exit 0; fi\nexit 0\n",
+        f'#!/bin/bash\nif [[ "$1" == "version" ]]; then echo \'{PINNED_HELM_VERSION}+gabcdef\'; exit 0; fi\nexit 0\n',
     )
 
 
@@ -114,7 +115,7 @@ def test_worker_processes_pending_job_to_completed():
         create_script.write_text(
             "#!/bin/bash\n"
             "set -euo pipefail\n"
-            "cat > \"$MANAGER_DATA_DIR/child-env.txt\" <<EOF\n"
+            'cat > "$MANAGER_DATA_DIR/child-env.txt" <<EOF\n'
             "PROXMOX_HOST=${PROXMOX_HOST-}\n"
             "PROXMOX_PORT=${PROXMOX_PORT-}\n"
             "PROXMOX_USER=${PROXMOX_USER-}\n"
@@ -165,13 +166,17 @@ def test_worker_processes_pending_job_to_completed():
             "error": None,
         }
         (jobs / "job_test.json").write_text(json.dumps(job))
-        (pending / "job_test.json").write_text(json.dumps({
-            "id": "job_test",
-            "type": "apply_cluster",
-            "cluster_id": "cluster_test",
-            "payload": cluster,
-            "queued_at": "2026-01-01T00:00:00Z",
-        }))
+        (pending / "job_test.json").write_text(
+            json.dumps(
+                {
+                    "id": "job_test",
+                    "type": "apply_cluster",
+                    "cluster_id": "cluster_test",
+                    "payload": cluster,
+                    "queued_at": "2026-01-01T00:00:00Z",
+                }
+            )
+        )
 
         env = os.environ.copy()
         env["MANAGER_DATA_DIR"] = str(data)
@@ -277,13 +282,17 @@ def test_worker_recovers_orphaned_running_run_step_job_on_startup():
             "error": None,
         }
         (data / "jobs" / "job_orphaned.json").write_text(json.dumps(job))
-        (data / "queue" / "running" / "job_orphaned.json").write_text(json.dumps({
-            "id": "job_orphaned",
-            "type": "run_step",
-            "cluster_id": "cluster_test",
-            "payload": payload,
-            "queued_at": "2026-01-01T00:00:00Z",
-        }))
+        (data / "queue" / "running" / "job_orphaned.json").write_text(
+            json.dumps(
+                {
+                    "id": "job_orphaned",
+                    "type": "run_step",
+                    "cluster_id": "cluster_test",
+                    "payload": payload,
+                    "queued_at": "2026-01-01T00:00:00Z",
+                }
+            )
+        )
 
         env = os.environ.copy()
         env["MANAGER_DATA_DIR"] = str(data)
@@ -313,7 +322,9 @@ def test_worker_recovers_orphaned_running_run_step_job_on_startup():
             assert updated_job["step"] == "failed"
             assert updated_job["error"] == "worker restarted while job was running"
 
-            step_state = json.loads(_cluster_step_state(data, "cluster_test", "provision-nodes").read_text())
+            step_state = json.loads(
+                _cluster_step_state(data, "cluster_test", "provision-nodes").read_text()
+            )
             assert step_state["status"] == "failed"
             assert step_state["cluster_id"] == "cluster_test"
             assert step_state["error"] == "worker restarted while job was running"
@@ -353,22 +364,26 @@ def test_worker_reconciles_grafana_dashboard_on_startup():
         _prepare_fake_toolchain(bin_dir)
         _write_pinned_defaults(workspace)
         (workspace / "scripts" / "manager" / "refresh-grafana-dashboard.mjs").write_text(
-            (REPO_ROOT / "scripts" / "manager" / "refresh-grafana-dashboard.mjs").read_text(encoding="utf-8"),
+            (REPO_ROOT / "scripts" / "manager" / "refresh-grafana-dashboard.mjs").read_text(
+                encoding="utf-8"
+            ),
             encoding="utf-8",
         )
 
         (bootstrap / "secrets" / "global" / "proxmox.json").write_text(
-            json.dumps({
-                "host": "192.168.1.10",
-                "port": "8006",
-                "username": "root@pam",
-                "password": "super-secret",
-                "endpoint": "https://192.168.1.10:8006",
-            }),
+            json.dumps(
+                {
+                    "host": "192.168.1.10",
+                    "port": "8006",
+                    "username": "root@pam",
+                    "password": "super-secret",
+                    "endpoint": "https://192.168.1.10:8006",
+                }
+            ),
         )
-        (bootstrap / "secrets" / "cluster" / "cluster_test" / "kubeconfig" / "kubeconfig").write_text(
-            "apiVersion: v1\nkind: Config\nclusters: []\nusers: []\ncontexts: []\n"
-        )
+        (
+            bootstrap / "secrets" / "cluster" / "cluster_test" / "kubeconfig" / "kubeconfig"
+        ).write_text("apiVersion: v1\nkind: Config\nclusters: []\nusers: []\ncontexts: []\n")
 
         dashboard = {
             "templating": {
@@ -408,20 +423,20 @@ def test_worker_reconciles_grafana_dashboard_on_startup():
         kubectl_script = (
             "#!/bin/bash\n"
             "set -euo pipefail\n"
-            "if [[ \"$1\" == \"version\" ]]; then\n"
-            f"  echo '{{\"clientVersion\":{{\"gitVersion\":\"{PINNED_KUBECTL_VERSION}\"}}}}'\n"
+            'if [[ "$1" == "version" ]]; then\n'
+            f'  echo \'{{"clientVersion":{{"gitVersion":"{PINNED_KUBECTL_VERSION}"}}}}\'\n'
             "  exit 0\n"
             "fi\n"
-            "if [[ \"${REQUIRE_KUBECONFIG_ENV:-}\" == \"1\" && -z \"${KUBECONFIG:-}\" ]]; then\n"
-            "  echo \"KUBECONFIG is required\" >&2\n"
+            'if [[ "${REQUIRE_KUBECONFIG_ENV:-}" == "1" && -z "${KUBECONFIG:-}" ]]; then\n'
+            '  echo "KUBECONFIG is required" >&2\n'
             "  exit 42\n"
             "fi\n"
-            f"echo \"kubectl $*\" >> \"{kubectl_log}\"\n"
-            "if [[ \" $* \" == *\" create configmap managed-kubernetes-overview-dashboard \"* ]]; then\n"
-            "  for arg in \"$@\"; do\n"
-            "    if [[ \"$arg\" == --from-file=managed-kubernetes-overview.json=* ]]; then\n"
-            "      source_file=\"${arg#--from-file=managed-kubernetes-overview.json=}\"\n"
-            f"      cp \"$source_file\" \"{captured_dashboard_file}\"\n"
+            f'echo "kubectl $*" >> "{kubectl_log}"\n'
+            'if [[ " $* " == *" create configmap managed-kubernetes-overview-dashboard "* ]]; then\n'
+            '  for arg in "$@"; do\n'
+            '    if [[ "$arg" == --from-file=managed-kubernetes-overview.json=* ]]; then\n'
+            '      source_file="${arg#--from-file=managed-kubernetes-overview.json=}"\n'
+            f'      cp "$source_file" "{captured_dashboard_file}"\n'
             "    fi\n"
             "  done\n"
             "  cat <<'YAML'\n"
@@ -436,7 +451,7 @@ def test_worker_reconciles_grafana_dashboard_on_startup():
             "YAML\n"
             "  exit 0\n"
             "fi\n"
-            "if [[ \" $* \" == *\" apply -f - \"* ]]; then\n"
+            'if [[ " $* " == *" apply -f - "* ]]; then\n'
             "  cat >/dev/null\n"
             "  exit 0\n"
             "fi\n"
@@ -447,7 +462,7 @@ def test_worker_reconciles_grafana_dashboard_on_startup():
         curl_script = (
             "#!/bin/bash\n"
             "set -euo pipefail\n"
-            f"echo \"curl $*\" >> \"{curl_log}\"\n"
+            f'echo "curl $*" >> "{curl_log}"\n'
             "cat <<'JSON'\n"
             f"{json.dumps(dashboard, indent=2)}\n"
             "JSON\n"
@@ -455,23 +470,29 @@ def test_worker_reconciles_grafana_dashboard_on_startup():
         _write_fake_tool(bin_dir / "curl", curl_script)
 
         (data / "clusters" / "cluster_test.json").write_text(
-            json.dumps({
-                "id": "cluster_test",
-                "cluster_instance_id": "cluster_test_instance",
-                "metadata": {},
-                "created_at": "2026-01-01T00:00:00.000Z",
-                "updated_at": "2026-01-02T00:00:00.000Z",
-            }),
+            json.dumps(
+                {
+                    "id": "cluster_test",
+                    "cluster_instance_id": "cluster_test_instance",
+                    "metadata": {},
+                    "created_at": "2026-01-01T00:00:00.000Z",
+                    "updated_at": "2026-01-02T00:00:00.000Z",
+                }
+            ),
         )
-        (data / "step-state" / "clusters" / "cluster_test_instance" / "install-grafana.json").write_text(
-            json.dumps({
-                "step_id": "install-grafana",
-                "status": "succeeded",
-                "inputs": {},
-                "outputs": {},
-                "cluster_id": "cluster_test",
-                "cluster_instance_id": "cluster_test_instance",
-            }),
+        (
+            data / "step-state" / "clusters" / "cluster_test_instance" / "install-grafana.json"
+        ).write_text(
+            json.dumps(
+                {
+                    "step_id": "install-grafana",
+                    "status": "succeeded",
+                    "inputs": {},
+                    "outputs": {},
+                    "cluster_id": "cluster_test",
+                    "cluster_instance_id": "cluster_test_instance",
+                }
+            ),
         )
 
         env = os.environ.copy()
@@ -553,10 +574,10 @@ def test_worker_materializes_secret_bundle_files_and_cleans_up():
         secret_script.write_text(
             "#!/bin/bash\n"
             "set -euo pipefail\n"
-            "test -f \"$TALOS_SECRETS_FILE\"\n"
-            "printf '%s' \"$(cat \"$TALOS_SECRETS_FILE\")\" > \"$MANAGER_DATA_DIR/secret-file-content.txt\"\n"
-            "printf '%s' \"$TALOS_SECRETS_FILE\" > \"$MANAGER_DATA_DIR/secret-file-path.txt\"\n"
-            "printf '{\"materialized\":true}' > \"$STEP_RESULT_FILE\"\n",
+            'test -f "$TALOS_SECRETS_FILE"\n'
+            'printf \'%s\' "$(cat "$TALOS_SECRETS_FILE")" > "$MANAGER_DATA_DIR/secret-file-content.txt"\n'
+            'printf \'%s\' "$TALOS_SECRETS_FILE" > "$MANAGER_DATA_DIR/secret-file-path.txt"\n'
+            'printf \'{"materialized":true}\' > "$STEP_RESULT_FILE"\n',
         )
         secret_script.chmod(0o755)
 
@@ -599,13 +620,17 @@ def test_worker_materializes_secret_bundle_files_and_cleans_up():
             "error": None,
         }
         (jobs / "job_secret_file.json").write_text(json.dumps(job))
-        (pending / "job_secret_file.json").write_text(json.dumps({
-            "id": "job_secret_file",
-            "type": "run_step",
-            "cluster_id": "cluster_test",
-            "payload": job["payload"],
-            "queued_at": "2026-01-01T00:00:00Z",
-        }))
+        (pending / "job_secret_file.json").write_text(
+            json.dumps(
+                {
+                    "id": "job_secret_file",
+                    "type": "run_step",
+                    "cluster_id": "cluster_test",
+                    "payload": job["payload"],
+                    "queued_at": "2026-01-01T00:00:00Z",
+                }
+            )
+        )
 
         env = os.environ.copy()
         env["MANAGER_DATA_DIR"] = str(data)
@@ -674,37 +699,34 @@ def test_worker_passes_secret_runtime_to_portal_refresh_after_uninstall():
             bin_dir / "kubectl",
             "#!/bin/bash\n"
             "set -euo pipefail\n"
-            "if [[ \"$1\" == \"version\" ]]; then\n"
-            f"  echo '{{\"clientVersion\":{{\"gitVersion\":\"{PINNED_KUBECTL_VERSION}\"}}}}'\n"
+            'if [[ "$1" == "version" ]]; then\n'
+            f'  echo \'{{"clientVersion":{{"gitVersion":"{PINNED_KUBECTL_VERSION}"}}}}\'\n'
             "  exit 0\n"
             "fi\n"
-            "if [[ \"${REQUIRE_KUBECONFIG_ENV:-}\" == \"1\" && -z \"${KUBECONFIG:-}\" ]]; then\n"
-            "  echo \"KUBECONFIG is required\" >&2\n"
+            'if [[ "${REQUIRE_KUBECONFIG_ENV:-}" == "1" && -z "${KUBECONFIG:-}" ]]; then\n'
+            '  echo "KUBECONFIG is required" >&2\n'
             "  exit 42\n"
             "fi\n"
-            f"echo \"kubectl $* KUBECONFIG=${{KUBECONFIG:-}}\" >> \"{kubectl_log}\"\n"
-            "if [[ \" $* \" == *\" apply --validate=false -f - \"* ]]; then\n"
+            f'echo "kubectl $* KUBECONFIG=${{KUBECONFIG:-}}" >> "{kubectl_log}"\n'
+            'if [[ " $* " == *" apply --validate=false -f - "* ]]; then\n'
             "  cat >/dev/null\n"
             "fi\n"
             "exit 0\n",
         )
 
-        (bootstrap / "secrets" / "cluster" / "cluster_test" / "kubeconfig" / "kubeconfig").write_text(
-            "apiVersion: v1\nkind: Config\nclusters: []\nusers: []\ncontexts: []\n"
-        )
+        (
+            bootstrap / "secrets" / "cluster" / "cluster_test" / "kubeconfig" / "kubeconfig"
+        ).write_text("apiVersion: v1\nkind: Config\nclusters: []\nusers: []\ncontexts: []\n")
         manifest_path = workspace / "gitops" / "apps" / "nextcloud.yaml"
         manifest_path.write_text(
-            "apiVersion: argoproj.io/v1alpha1\n"
-            "kind: Application\n"
-            "metadata:\n"
-            "  name: nextcloud\n",
+            "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: nextcloud\n",
         )
         (workspace / "scripts" / "manager" / "uninstall-argocd-application.sh").write_text(
             "#!/bin/bash\n"
             "set -euo pipefail\n"
-            ": \"${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}\"\n"
-            "export KUBECONFIG=\"$KUBECONFIG_FILE\"\n"
-            "kubectl delete application \"$APP_NAME\" -n argocd --ignore-not-found=true >/dev/null\n",
+            ': "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"\n'
+            'export KUBECONFIG="$KUBECONFIG_FILE"\n'
+            'kubectl delete application "$APP_NAME" -n argocd --ignore-not-found=true >/dev/null\n',
         )
         (workspace / "scripts" / "manager" / "uninstall-argocd-application.sh").chmod(0o755)
         (workspace / "manager-worker" / "src" / "refresh-portal-config.mjs").write_text(
@@ -761,14 +783,18 @@ def test_worker_passes_secret_runtime_to_portal_refresh_after_uninstall():
             "error": None,
         }
         (jobs / "job_uninstall_nextcloud.json").write_text(json.dumps(job))
-        (pending / "job_uninstall_nextcloud.json").write_text(json.dumps({
-            "id": "job_uninstall_nextcloud",
-            "type": "uninstall_step",
-            "cluster_id": "cluster_test",
-            "cluster_instance_id": "cluster_test_instance",
-            "payload": payload,
-            "queued_at": "2026-01-01T00:00:00Z",
-        }))
+        (pending / "job_uninstall_nextcloud.json").write_text(
+            json.dumps(
+                {
+                    "id": "job_uninstall_nextcloud",
+                    "type": "uninstall_step",
+                    "cluster_id": "cluster_test",
+                    "cluster_instance_id": "cluster_test_instance",
+                    "payload": payload,
+                    "queued_at": "2026-01-01T00:00:00Z",
+                }
+            )
+        )
 
         env = os.environ.copy()
         env["MANAGER_DATA_DIR"] = str(data)
@@ -788,7 +814,9 @@ def test_worker_passes_secret_runtime_to_portal_refresh_after_uninstall():
         )
 
         try:
-            _wait_until(lambda: (data / "queue" / "completed" / "job_uninstall_nextcloud.json").exists())
+            _wait_until(
+                lambda: (data / "queue" / "completed" / "job_uninstall_nextcloud.json").exists()
+            )
 
             updated_job = json.loads((jobs / "job_uninstall_nextcloud.json").read_text())
             assert updated_job["status"] == "succeeded"
@@ -799,7 +827,9 @@ def test_worker_passes_secret_runtime_to_portal_refresh_after_uninstall():
             kubectl_log_text = kubectl_log.read_text()
             assert "kubectl apply --validate=false -f -" in kubectl_log_text
             assert "KUBECONFIG=" in kubectl_log_text
-            assert "/bootstrap/secrets/cluster/cluster_test/kubeconfig/kubeconfig" in kubectl_log_text
+            assert (
+                "/bootstrap/secrets/cluster/cluster_test/kubeconfig/kubeconfig" in kubectl_log_text
+            )
         finally:
             proc.terminate()
             proc.wait(timeout=5)
@@ -830,20 +860,22 @@ def test_worker_reconcile_observability_aliases_twinbox_kubeconfig_to_kubeconfig
         _prepare_fake_toolchain(bin_dir)
         _write_pinned_defaults(workspace)
 
-        (bootstrap / "secrets" / "cluster" / "cluster_test" / "kubeconfig" / "kubeconfig").write_text(
+        (
+            bootstrap / "secrets" / "cluster" / "cluster_test" / "kubeconfig" / "kubeconfig"
+        ).write_text(
             "apiVersion: v1\nkind: Config\nclusters: []\nusers: []\ncontexts: []\n",
             encoding="utf-8",
         )
         (workspace / "scripts" / "manager" / "reconcile-observability.sh").write_text(
             "#!/bin/bash\n"
             "set -euo pipefail\n"
-            ": \"${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}\"\n"
-            ": \"${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}\"\n"
-            ": \"${TWINBOX_KUBECONFIG_FILE:?missing TWINBOX_KUBECONFIG_FILE}\"\n"
-            ": \"${KUBECONFIG:?missing KUBECONFIG}\"\n"
-            "printf '%s' \"$KUBECONFIG_FILE\" > \"$MANAGER_DATA_DIR/kubeconfig-file.txt\"\n"
-            "printf '%s' \"$TWINBOX_KUBECONFIG_FILE\" > \"$MANAGER_DATA_DIR/twinbox-kubeconfig-file.txt\"\n"
-            "printf '%s' \"$KUBECONFIG\" > \"$MANAGER_DATA_DIR/kubeconfig-env.txt\"\n",
+            ': "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"\n'
+            ': "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"\n'
+            ': "${TWINBOX_KUBECONFIG_FILE:?missing TWINBOX_KUBECONFIG_FILE}"\n'
+            ': "${KUBECONFIG:?missing KUBECONFIG}"\n'
+            'printf \'%s\' "$KUBECONFIG_FILE" > "$MANAGER_DATA_DIR/kubeconfig-file.txt"\n'
+            'printf \'%s\' "$TWINBOX_KUBECONFIG_FILE" > "$MANAGER_DATA_DIR/twinbox-kubeconfig-file.txt"\n'
+            'printf \'%s\' "$KUBECONFIG" > "$MANAGER_DATA_DIR/kubeconfig-env.txt"\n',
             encoding="utf-8",
         )
         (workspace / "scripts" / "manager" / "reconcile-observability.sh").chmod(0o755)
@@ -879,13 +911,17 @@ def test_worker_reconcile_observability_aliases_twinbox_kubeconfig_to_kubeconfig
             "error": None,
         }
         (jobs / "job_reconcile_observability.json").write_text(json.dumps(job))
-        (pending / "job_reconcile_observability.json").write_text(json.dumps({
-            "id": "job_reconcile_observability",
-            "type": "reconcile_observability",
-            "cluster_id": "cluster_test",
-            "payload": payload,
-            "queued_at": "2026-01-01T00:00:00Z",
-        }))
+        (pending / "job_reconcile_observability.json").write_text(
+            json.dumps(
+                {
+                    "id": "job_reconcile_observability",
+                    "type": "reconcile_observability",
+                    "cluster_id": "cluster_test",
+                    "payload": payload,
+                    "queued_at": "2026-01-01T00:00:00Z",
+                }
+            )
+        )
 
         env = os.environ.copy()
         env["MANAGER_DATA_DIR"] = str(data)
@@ -904,7 +940,9 @@ def test_worker_reconcile_observability_aliases_twinbox_kubeconfig_to_kubeconfig
         )
 
         try:
-            _wait_until(lambda: (data / "queue" / "completed" / "job_reconcile_observability.json").exists())
+            _wait_until(
+                lambda: (data / "queue" / "completed" / "job_reconcile_observability.json").exists()
+            )
 
             updated_job = json.loads((jobs / "job_reconcile_observability.json").read_text())
             assert updated_job["status"] == "succeeded"
@@ -930,7 +968,14 @@ def test_worker_exits_on_tool_version_mismatch():
         workspace = root / "workspace"
         bin_dir = root / "bin"
 
-        for d in [data / "queue" / "pending", data / "jobs", data / "logs", data / "clusters", workspace, bin_dir]:
+        for d in [
+            data / "queue" / "pending",
+            data / "jobs",
+            data / "logs",
+            data / "clusters",
+            workspace,
+            bin_dir,
+        ]:
             d.mkdir(parents=True, exist_ok=True)
 
         _prepare_fake_toolchain(bin_dir)
@@ -979,13 +1024,15 @@ def test_worker_processes_run_step_config_job_and_persists_outputs():
         _prepare_fake_toolchain(bin_dir)
         _write_pinned_defaults(workspace)
 
-        script = workspace / "categories" / "talos-cluster" / "steps" / "choose-ingress-route" / "run.sh"
+        script = (
+            workspace / "categories" / "talos-cluster" / "steps" / "choose-ingress-route" / "run.sh"
+        )
         script.write_text(
             "#!/bin/bash\n"
             "set -euo pipefail\n"
             "echo config-step-running\n"
-            "touch \"$TWINBOX_HOST_CRON_DIR/twinbox-managed-test\"\n"
-            "printf '{\"applied\":true}' > \"$STEP_RESULT_FILE\"\n"
+            'touch "$TWINBOX_HOST_CRON_DIR/twinbox-managed-test"\n'
+            'printf \'{"applied":true}\' > "$STEP_RESULT_FILE"\n'
         )
         script.chmod(0o755)
 
@@ -1013,13 +1060,17 @@ def test_worker_processes_run_step_config_job_and_persists_outputs():
             "error": None,
         }
         (data / "jobs" / "job_config.json").write_text(json.dumps(job))
-        (data / "queue" / "pending" / "job_config.json").write_text(json.dumps({
-            "id": "job_config",
-            "type": "run_step",
-            "cluster_id": None,
-            "payload": job["payload"],
-            "queued_at": "2026-01-01T00:00:00Z",
-        }))
+        (data / "queue" / "pending" / "job_config.json").write_text(
+            json.dumps(
+                {
+                    "id": "job_config",
+                    "type": "run_step",
+                    "cluster_id": None,
+                    "payload": job["payload"],
+                    "queued_at": "2026-01-01T00:00:00Z",
+                }
+            )
+        )
 
         env = os.environ.copy()
         env["MANAGER_DATA_DIR"] = str(data)
@@ -1082,8 +1133,8 @@ def test_worker_processes_run_step_action_job_and_records_cluster_context():
             "#!/bin/bash\n"
             "set -euo pipefail\n"
             "cluster_id=$(printf '%s' \"$STEP_CONTEXT_JSON\" | jq -r '.cluster.id')\n"
-            "echo action-step-running \"$cluster_id\"\n"
-            "printf '{\"cluster_id\":\"%s\"}' \"$cluster_id\" > \"$STEP_RESULT_FILE\"\n"
+            'echo action-step-running "$cluster_id"\n'
+            'printf \'{"cluster_id":"%s"}\' "$cluster_id" > "$STEP_RESULT_FILE"\n'
         )
         script.chmod(0o755)
 
@@ -1116,13 +1167,17 @@ def test_worker_processes_run_step_action_job_and_records_cluster_context():
             "error": None,
         }
         (data / "jobs" / "job_action.json").write_text(json.dumps(job))
-        (data / "queue" / "pending" / "job_action.json").write_text(json.dumps({
-            "id": "job_action",
-            "type": "run_step",
-            "cluster_id": "cluster_test",
-            "payload": job["payload"],
-            "queued_at": "2026-01-01T00:00:00Z",
-        }))
+        (data / "queue" / "pending" / "job_action.json").write_text(
+            json.dumps(
+                {
+                    "id": "job_action",
+                    "type": "run_step",
+                    "cluster_id": "cluster_test",
+                    "payload": job["payload"],
+                    "queued_at": "2026-01-01T00:00:00Z",
+                }
+            )
+        )
 
         env = os.environ.copy()
         env["MANAGER_DATA_DIR"] = str(data)
@@ -1145,7 +1200,9 @@ def test_worker_processes_run_step_action_job_and_records_cluster_context():
             updated_job = json.loads((data / "jobs" / "job_action.json").read_text())
             assert updated_job["status"] == "succeeded"
 
-            step_state = json.loads(_cluster_step_state(data, "cluster_test", "provision-nodes").read_text())
+            step_state = json.loads(
+                _cluster_step_state(data, "cluster_test", "provision-nodes").read_text()
+            )
             assert step_state["status"] == "succeeded"
             assert step_state["cluster_id"] == "cluster_test"
             assert step_state["outputs"] == {"cluster_id": "cluster_test"}
@@ -1165,10 +1222,23 @@ def test_worker_picks_oldest_pending_job_by_queued_at():
         logs = data / "logs"
         clusters = data / "clusters"
         step_state = data / "step-state"
-        older_script_dir = workspace / "categories" / "talos-cluster" / "steps" / "queue-order-older"
-        newer_script_dir = workspace / "categories" / "talos-cluster" / "steps" / "queue-order-newer"
+        older_script_dir = (
+            workspace / "categories" / "talos-cluster" / "steps" / "queue-order-older"
+        )
+        newer_script_dir = (
+            workspace / "categories" / "talos-cluster" / "steps" / "queue-order-newer"
+        )
 
-        for d in [pending, jobs, logs, clusters, step_state, older_script_dir, newer_script_dir, bin_dir]:
+        for d in [
+            pending,
+            jobs,
+            logs,
+            clusters,
+            step_state,
+            older_script_dir,
+            newer_script_dir,
+            bin_dir,
+        ]:
             d.mkdir(parents=True, exist_ok=True)
 
         _prepare_fake_toolchain(bin_dir)
@@ -1179,19 +1249,13 @@ def test_worker_picks_oldest_pending_job_by_queued_at():
 
         older_script = older_script_dir / "run.sh"
         older_script.write_text(
-            "#!/bin/bash\n"
-            "set -euo pipefail\n"
-            f"touch \"{older_marker}\"\n"
-            "sleep 2\n",
+            f'#!/bin/bash\nset -euo pipefail\ntouch "{older_marker}"\nsleep 2\n',
         )
         older_script.chmod(0o755)
 
         newer_script = newer_script_dir / "run.sh"
         newer_script.write_text(
-            "#!/bin/bash\n"
-            "set -euo pipefail\n"
-            f"touch \"{newer_marker}\"\n"
-            "sleep 2\n",
+            f'#!/bin/bash\nset -euo pipefail\ntouch "{newer_marker}"\nsleep 2\n',
         )
         newer_script.chmod(0o755)
 
@@ -1243,21 +1307,29 @@ def test_worker_picks_oldest_pending_job_by_queued_at():
         }
 
         (jobs / "job_zulu.json").write_text(json.dumps(older_job))
-        (pending / "job_zulu.json").write_text(json.dumps({
-            "id": "job_zulu",
-            "type": "run_step",
-            "cluster_id": None,
-            "payload": older_job["payload"],
-            "queued_at": "2026-01-01T00:00:00Z",
-        }))
+        (pending / "job_zulu.json").write_text(
+            json.dumps(
+                {
+                    "id": "job_zulu",
+                    "type": "run_step",
+                    "cluster_id": None,
+                    "payload": older_job["payload"],
+                    "queued_at": "2026-01-01T00:00:00Z",
+                }
+            )
+        )
         (jobs / "job_alpha.json").write_text(json.dumps(newer_job))
-        (pending / "job_alpha.json").write_text(json.dumps({
-            "id": "job_alpha",
-            "type": "run_step",
-            "cluster_id": None,
-            "payload": newer_job["payload"],
-            "queued_at": "2026-01-01T00:00:01Z",
-        }))
+        (pending / "job_alpha.json").write_text(
+            json.dumps(
+                {
+                    "id": "job_alpha",
+                    "type": "run_step",
+                    "cluster_id": None,
+                    "payload": newer_job["payload"],
+                    "queued_at": "2026-01-01T00:00:01Z",
+                }
+            )
+        )
 
         env = os.environ.copy()
         env["MANAGER_DATA_DIR"] = str(data)
@@ -1317,7 +1389,9 @@ def test_worker_marks_run_step_job_failed_when_script_fails():
         _prepare_fake_toolchain(bin_dir)
         _write_pinned_defaults(workspace)
 
-        script = workspace / "categories" / "talos-cluster" / "steps" / "choose-ingress-route" / "run.sh"
+        script = (
+            workspace / "categories" / "talos-cluster" / "steps" / "choose-ingress-route" / "run.sh"
+        )
         script.write_text("#!/bin/bash\nset -euo pipefail\necho boom >&2\nexit 42\n")
         script.chmod(0o755)
 
@@ -1345,13 +1419,17 @@ def test_worker_marks_run_step_job_failed_when_script_fails():
             "error": None,
         }
         (data / "jobs" / "job_failed_step.json").write_text(json.dumps(job))
-        (data / "queue" / "pending" / "job_failed_step.json").write_text(json.dumps({
-            "id": "job_failed_step",
-            "type": "run_step",
-            "cluster_id": None,
-            "payload": job["payload"],
-            "queued_at": "2026-01-01T00:00:00Z",
-        }))
+        (data / "queue" / "pending" / "job_failed_step.json").write_text(
+            json.dumps(
+                {
+                    "id": "job_failed_step",
+                    "type": "run_step",
+                    "cluster_id": None,
+                    "payload": job["payload"],
+                    "queued_at": "2026-01-01T00:00:00Z",
+                }
+            )
+        )
 
         env = os.environ.copy()
         env["MANAGER_DATA_DIR"] = str(data)
@@ -1404,7 +1482,9 @@ def test_worker_includes_recent_script_output_in_failed_run_step_error():
         _prepare_fake_toolchain(bin_dir)
         _write_pinned_defaults(workspace)
 
-        script = workspace / "categories" / "talos-cluster" / "steps" / "choose-ingress-route" / "run.sh"
+        script = (
+            workspace / "categories" / "talos-cluster" / "steps" / "choose-ingress-route" / "run.sh"
+        )
         script.write_text(
             "#!/bin/bash\n"
             "set -euo pipefail\n"
@@ -1438,13 +1518,17 @@ def test_worker_includes_recent_script_output_in_failed_run_step_error():
             "error": None,
         }
         (data / "jobs" / "job_failed_step_output.json").write_text(json.dumps(job))
-        (data / "queue" / "pending" / "job_failed_step_output.json").write_text(json.dumps({
-            "id": "job_failed_step_output",
-            "type": "run_step",
-            "cluster_id": None,
-            "payload": job["payload"],
-            "queued_at": "2026-01-01T00:00:00Z",
-        }))
+        (data / "queue" / "pending" / "job_failed_step_output.json").write_text(
+            json.dumps(
+                {
+                    "id": "job_failed_step_output",
+                    "type": "run_step",
+                    "cluster_id": None,
+                    "payload": job["payload"],
+                    "queued_at": "2026-01-01T00:00:00Z",
+                }
+            )
+        )
 
         env = os.environ.copy()
         env["MANAGER_DATA_DIR"] = str(data)
@@ -1462,7 +1546,9 @@ def test_worker_includes_recent_script_output_in_failed_run_step_error():
         )
 
         try:
-            _wait_until(lambda: (data / "queue" / "completed" / "job_failed_step_output.json").exists())
+            _wait_until(
+                lambda: (data / "queue" / "completed" / "job_failed_step_output.json").exists()
+            )
 
             updated_job = json.loads((data / "jobs" / "job_failed_step_output.json").read_text())
             assert updated_job["status"] == "failed"
@@ -1501,11 +1587,13 @@ def test_worker_cancels_running_run_step_job_when_job_status_changes():
         _prepare_fake_toolchain(bin_dir)
         _write_pinned_defaults(workspace)
 
-        script = workspace / "categories" / "talos-cluster" / "steps" / "choose-ingress-route" / "run.sh"
+        script = (
+            workspace / "categories" / "talos-cluster" / "steps" / "choose-ingress-route" / "run.sh"
+        )
         script.write_text(
             "#!/bin/bash\n"
             "set -euo pipefail\n"
-            f"touch \"{marker_file}\"\n"
+            f'touch "{marker_file}"\n'
             "trap 'echo stopping >&2; exit 0' TERM\n"
             "while true; do sleep 1; done\n",
         )
@@ -1535,13 +1623,17 @@ def test_worker_cancels_running_run_step_job_when_job_status_changes():
             "error": None,
         }
         (data / "jobs" / "job_cancel_running.json").write_text(json.dumps(job))
-        (data / "queue" / "pending" / "job_cancel_running.json").write_text(json.dumps({
-            "id": "job_cancel_running",
-            "type": "run_step",
-            "cluster_id": None,
-            "payload": job["payload"],
-            "queued_at": "2026-01-01T00:00:00Z",
-        }))
+        (data / "queue" / "pending" / "job_cancel_running.json").write_text(
+            json.dumps(
+                {
+                    "id": "job_cancel_running",
+                    "type": "run_step",
+                    "cluster_id": None,
+                    "payload": job["payload"],
+                    "queued_at": "2026-01-01T00:00:00Z",
+                }
+            )
+        )
 
         env = os.environ.copy()
         env["MANAGER_DATA_DIR"] = str(data)
@@ -1561,7 +1653,12 @@ def test_worker_cancels_running_run_step_job_when_job_status_changes():
 
         try:
             _wait_until(lambda: marker_file.exists())
-            _wait_until(lambda: json.loads((data / "jobs" / "job_cancel_running.json").read_text())["status"] == "running")
+            _wait_until(
+                lambda: (
+                    json.loads((data / "jobs" / "job_cancel_running.json").read_text())["status"]
+                    == "running"
+                )
+            )
 
             job_data = json.loads((data / "jobs" / "job_cancel_running.json").read_text())
             job_data["status"] = "cancel_requested"

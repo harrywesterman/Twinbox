@@ -6,11 +6,13 @@ import { id, now, writeJson } from "./common.js";
 export const CANCELABLE_JOB_STATUSES = new Set(["pending", "running", "cancel_requested"]);
 
 function resolveClusterInstanceId(payload = {}) {
-  return payload?.cluster_instance_id
-    || payload?.context?.cluster?.cluster_instance_id
-    || payload?.context?.cluster?.instance_id
-    || payload?.cluster?.cluster_instance_id
-    || null;
+  return (
+    payload?.cluster_instance_id ||
+    payload?.context?.cluster?.cluster_instance_id ||
+    payload?.context?.cluster?.instance_id ||
+    payload?.cluster?.cluster_instance_id ||
+    null
+  );
 }
 
 export function queueJob(dirs, type, clusterId, payload) {
@@ -81,7 +83,10 @@ export function cancelJob(dirs, jobId) {
       fs.rmSync(path.join(dirs.completed, `${jobId}.json`), { force: true });
     }
     if (dirs.logs) {
-      fs.appendFileSync(path.join(dirs.logs, `${jobId}.log`), `[${now()}] job canceled before start\n`);
+      fs.appendFileSync(
+        path.join(dirs.logs, `${jobId}.log`),
+        `[${now()}] job canceled before start\n`
+      );
     }
   } else {
     if (dirs.logs) {

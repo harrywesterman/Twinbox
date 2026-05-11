@@ -7,7 +7,7 @@ import { createSecretBroker } from "../../lib/secrets/broker.mjs";
 
 function usage() {
   process.stderr.write(
-    "Usage: upsert-secret-artifact.mjs --scope <scope> --item <item> --attachment <name> --source <path> [--cluster-id <id>]\n",
+    "Usage: upsert-secret-artifact.mjs --scope <scope> --item <item> --attachment <name> --source <path> [--cluster-id <id>]\n"
   );
 }
 
@@ -54,6 +54,7 @@ function parseArgs(argv) {
       case "--help":
         usage();
         process.exit(0);
+        break;
       default:
         fail(`Unknown argument: ${current}`);
     }
@@ -85,15 +86,19 @@ function main() {
   const args = parseArgs(process.argv.slice(2));
   const broker = createSecretBroker(process.env);
 
-  broker.upsertAttachment({
-    scope: args.scope,
-    item: args.item,
-    cluster_id: args.clusterId || undefined,
-    attachment: args.attachment,
-    format: "file",
-  }, path.resolve(args.source), {
-    clusterId: args.clusterId || undefined,
-  });
+  broker.upsertAttachment(
+    {
+      scope: args.scope,
+      item: args.item,
+      cluster_id: args.clusterId || undefined,
+      attachment: args.attachment,
+      format: "file",
+    },
+    path.resolve(args.source),
+    {
+      clusterId: args.clusterId || undefined,
+    }
+  );
 }
 
 main();

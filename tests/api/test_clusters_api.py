@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-from urllib import request, error
+from urllib import error, request
 
 
 def _find_free_port():
@@ -193,9 +193,18 @@ EOF
             assert "kubeconfig_path" not in json.dumps(cluster)
             assert "PROXMOX_PASSWORD" not in json.dumps(cluster)
             assert job["cluster_instance_id"] == cluster["cluster_instance_id"]
-            assert job["payload"]["secret_bundle"]["env"]["TF_VAR_proxmox_password"]["field"] == "password"
-            assert job["payload"]["secret_bundle"]["env"]["TF_VAR_proxmox_password"]["item"] == "proxmox"
-            assert queue_entry["payload"]["secret_bundle"]["env"]["TF_VAR_proxmox_password"]["field"] == "password"
+            assert (
+                job["payload"]["secret_bundle"]["env"]["TF_VAR_proxmox_password"]["field"]
+                == "password"
+            )
+            assert (
+                job["payload"]["secret_bundle"]["env"]["TF_VAR_proxmox_password"]["item"]
+                == "proxmox"
+            )
+            assert (
+                queue_entry["payload"]["secret_bundle"]["env"]["TF_VAR_proxmox_password"]["field"]
+                == "password"
+            )
         finally:
             proc.terminate()
             proc.wait(timeout=5)

@@ -1,66 +1,75 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
+import test from "node:test";
+import assert from "node:assert/strict";
 
-import { buildAdminAppsViewModel } from '../src/admin-apps-model.js';
+import { buildAdminAppsViewModel } from "../src/admin-apps-model.js";
 
-test('admin app catalog view model enriches bundles with member cards', () => {
+test("admin app catalog view model enriches bundles with member cards", () => {
   const viewModel = buildAdminAppsViewModel({
     catalog: {
-      active_cluster: { id: 'cluster-1', slug: 'tst' },
+      active_cluster: { id: "cluster-1", slug: "tst" },
       errors: [],
       categories: [
         {
-          id: 'apps',
-          title: 'Apps',
-          summary: 'Install user-facing applications and collaboration tools.',
+          id: "apps",
+          title: "Apps",
+          summary: "Install user-facing applications and collaboration tools.",
           steps: [
             {
-              id: 'install-nextcloud',
-              title: 'Install Nextcloud',
-              summary: 'Files app',
-              app_state: 'installed',
+              id: "install-nextcloud",
+              title: "Install Nextcloud",
+              summary: "Files app",
+              app_state: "installed",
               placeholder: false,
               order: 20,
-              iconText: 'NC',
+              iconText: "NC",
             },
             {
-              id: 'install-immich',
-              title: 'Install Immich',
-              summary: 'Photo app',
-              app_state: 'ready',
+              id: "install-immich",
+              title: "Install Immich",
+              summary: "Photo app",
+              app_state: "ready",
               placeholder: false,
               order: 10,
-              iconText: 'IM',
+              iconText: "IM",
             },
           ],
         },
       ],
       bundles: [
         {
-          id: 'media',
-          title: 'Media',
-          summary: 'Photo and video tools',
-          description: 'A curated set of self-hosted media tools.',
+          id: "media",
+          title: "Media",
+          summary: "Photo and video tools",
+          description: "A curated set of self-hosted media tools.",
           order: 10,
-          iconUrl: '/assets/custom/media.svg',
-          iconAlt: 'Media bundle icon',
-          apps: ['install-immich', 'install-nextcloud'],
+          iconUrl: "/assets/custom/media.svg",
+          iconAlt: "Media bundle icon",
+          apps: ["install-immich", "install-nextcloud"],
         },
       ],
     },
-    query: 'media',
+    query: "media",
   });
 
   assert.equal(viewModel.filteredBundles.length, 1);
-  assert.equal(viewModel.filteredBundles[0].id, 'media');
+  assert.equal(viewModel.filteredBundles[0].id, "media");
   assert.equal(viewModel.filteredBundles[0].cards.length, 2);
-  assert.equal(viewModel.filteredBundles[0].status, 'ready');
+  assert.equal(viewModel.filteredBundles[0].status, "ready");
   assert.equal(viewModel.filteredBundles[0].installedCount, 1);
-  assert.equal(viewModel.filteredBundles[0].iconUrl, '/assets/custom/media.svg');
-  assert.equal(viewModel.filteredBundles[0].iconAlt, 'Media bundle icon');
-  assert.equal(viewModel.filteredBundles[0].searchText.includes('photo and video tools'), true);
-  assert.equal(viewModel.filteredBundles[0].description, 'A curated set of self-hosted media tools.');
-  assert.equal(viewModel.filteredBundles[0].searchText.includes('curated set of self-hosted media tools'), true);
+  assert.equal(viewModel.filteredBundles[0].iconUrl, "/assets/custom/media.svg");
+  assert.equal(viewModel.filteredBundles[0].iconAlt, "Media bundle icon");
+  assert.equal(viewModel.filteredBundles[0].searchText.includes("photo and video tools"), true);
+  assert.equal(
+    viewModel.filteredBundles[0].description,
+    "A curated set of self-hosted media tools."
+  );
+  assert.equal(
+    viewModel.filteredBundles[0].searchText.includes("curated set of self-hosted media tools"),
+    true
+  );
   assert.equal(viewModel.selectedApp, null);
-  assert.deepEqual(viewModel.cards.map((card) => card.title), ['Install Immich', 'Install Nextcloud']);
+  assert.deepEqual(
+    viewModel.cards.map((card) => card.title),
+    ["Install Immich", "Install Nextcloud"]
+  );
 });

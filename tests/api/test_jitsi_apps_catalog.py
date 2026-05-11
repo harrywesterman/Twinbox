@@ -8,7 +8,6 @@ import time
 from pathlib import Path
 from urllib import error, request
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 

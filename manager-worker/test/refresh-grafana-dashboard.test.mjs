@@ -61,7 +61,9 @@ function setupWorkspace(options = {}) {
   const kubeconfigFile = path.join(root, "kubeconfig");
 
   fs.mkdirSync(path.join(dataDir, "clusters"), { recursive: true });
-  fs.mkdirSync(path.join(dataDir, "step-state", "clusters", "cluster_test_instance"), { recursive: true });
+  fs.mkdirSync(path.join(dataDir, "step-state", "clusters", "cluster_test_instance"), {
+    recursive: true,
+  });
   fs.mkdirSync(binDir, { recursive: true });
 
   fs.writeFileSync(kubeconfigFile, "apiVersion: v1\nkind: Config\n", "utf8");
@@ -74,7 +76,7 @@ function setupWorkspace(options = {}) {
       cluster_instance_id: "cluster_test_instance",
       created_at: "2026-01-01T00:00:00.000Z",
       updated_at: "2026-01-02T00:00:00.000Z",
-    }),
+    })
   );
 
   if (installGrafanaStatus) {
@@ -87,7 +89,7 @@ function setupWorkspace(options = {}) {
         outputs: {},
         cluster_id: "cluster_test",
         cluster_instance_id: "cluster_test_instance",
-      }),
+      })
     );
   }
 
@@ -127,7 +129,7 @@ if [[ " $* " == *" apply -f - "* ]]; then
 fi
 
 exit 0
-`,
+`
   );
 
   writeExecutable(
@@ -138,7 +140,7 @@ echo "curl $*" >> "${curlLog}"
 cat <<'JSON'
 ${JSON.stringify(dashboard, null, 2)}
 JSON
-`,
+`
   );
 
   return {
@@ -161,23 +163,27 @@ function runHelper({ dataDir, binDir, kubeconfigFile }, triggerStepId, overrides
     ...overrides.env,
   };
 
-  const result = spawnSync("node", [
-    "scripts/manager/refresh-grafana-dashboard.mjs",
-    "--manager-data-dir",
-    dataDir,
-    "--cluster-id",
-    "cluster_test",
-    "--cluster-instance-id",
-    "cluster_test_instance",
-    "--trigger-step-id",
-    triggerStepId,
-    "--namespace",
-    "monitoring",
-  ], {
-    cwd: repoRoot,
-    env,
-    encoding: "utf8",
-  });
+  const result = spawnSync(
+    "node",
+    [
+      "scripts/manager/refresh-grafana-dashboard.mjs",
+      "--manager-data-dir",
+      dataDir,
+      "--cluster-id",
+      "cluster_test",
+      "--cluster-instance-id",
+      "cluster_test_instance",
+      "--trigger-step-id",
+      triggerStepId,
+      "--namespace",
+      "monitoring",
+    ],
+    {
+      cwd: repoRoot,
+      env,
+      encoding: "utf8",
+    }
+  );
 
   return {
     status: result.status,
@@ -214,9 +220,18 @@ test("refresh-grafana-dashboard reconciles the managed overview dashboard after 
 
   const kubectlLog = fs.readFileSync(workspace.kubectlLog, "utf8");
   assert.match(kubectlLog, /kubectl apply -f -/);
-  assert.match(kubectlLog, /kubectl -n monitoring delete configmap kubernetes-overview-dashboard --ignore-not-found=true/);
-  assert.match(kubectlLog, /kubectl -n monitoring create configmap managed-kubernetes-overview-dashboard/);
-  assert.match(kubectlLog, /kubectl -n monitoring label configmap managed-kubernetes-overview-dashboard/);
+  assert.match(
+    kubectlLog,
+    /kubectl -n monitoring delete configmap kubernetes-overview-dashboard --ignore-not-found=true/
+  );
+  assert.match(
+    kubectlLog,
+    /kubectl -n monitoring create configmap managed-kubernetes-overview-dashboard/
+  );
+  assert.match(
+    kubectlLog,
+    /kubectl -n monitoring label configmap managed-kubernetes-overview-dashboard/
+  );
 
   const curlLog = fs.readFileSync(workspace.curlLog, "utf8");
   assert.match(curlLog, /https:\/\/grafana\.com\/api\/dashboards\/24155\/revisions\/1\/download/);
@@ -227,7 +242,10 @@ test("refresh-grafana-dashboard skips before grafana is installed", () => {
   const result = runHelper(workspace, "install-prometheus");
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Grafana dashboard refresh skipped: install-grafana is not installed yet/);
+  assert.match(
+    result.stdout,
+    /Grafana dashboard refresh skipped: install-grafana is not installed yet/
+  );
   assert.equal(fs.existsSync(workspace.kubectlLog), false);
   assert.equal(fs.existsSync(workspace.curlLog), false);
   assert.equal(fs.existsSync(workspace.capturedDashboardFile), false);

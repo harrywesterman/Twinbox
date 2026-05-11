@@ -85,18 +85,27 @@ function findCurrentCluster(dataRoot, clusterId) {
     return readJsonIfExists(path.join(clustersRoot, `${clusterId}.json`));
   }
 
-  return fs.readdirSync(clustersRoot)
-    .filter((entry) => entry.endsWith(".json"))
-    .map((entry) => readJsonIfExists(path.join(clustersRoot, entry)))
-    .filter((cluster) => cluster?.id)
-    .sort((left, right) => String(right?.updated_at || right?.created_at || "").localeCompare(String(left?.updated_at || left?.created_at || "")))[0] || null;
+  return (
+    fs
+      .readdirSync(clustersRoot)
+      .filter((entry) => entry.endsWith(".json"))
+      .map((entry) => readJsonIfExists(path.join(clustersRoot, entry)))
+      .filter((cluster) => cluster?.id)
+      .sort((left, right) =>
+        String(right?.updated_at || right?.created_at || "").localeCompare(
+          String(left?.updated_at || left?.created_at || "")
+        )
+      )[0] || null
+  );
 }
 
 function readStepStates(dataRoot, steps, clusterScopeId) {
   const stepStateById = new Map();
 
   for (const step of steps) {
-    const scope = isClusterScopedStep(step) ? path.join("clusters", clusterScopeId || "") : "global";
+    const scope = isClusterScopedStep(step)
+      ? path.join("clusters", clusterScopeId || "")
+      : "global";
     const file = path.join(dataRoot, "step-state", scope, `${step.id}.json`);
     stepStateById.set(step.id, readJsonIfExists(file));
   }
@@ -135,7 +144,9 @@ function runKubectl(args, { input = undefined, allowFailure = false } = {}) {
 function readInstalledAppIds() {
   let parsed = null;
   try {
-    const result = runKubectl(["-n", "argocd", "get", "application", "-o", "json"], { allowFailure: true });
+    const result = runKubectl(["-n", "argocd", "get", "application", "-o", "json"], {
+      allowFailure: true,
+    });
     if (result.status !== 0) {
       return null;
     }
@@ -188,16 +199,18 @@ function main() {
     loadYamlFn: loadYaml,
   });
   const appStepIds = new Set(
-    steps
-      .filter((step) => step?.category_id === "apps")
-      .map((step) => step.id),
+    steps.filter((step) => step?.category_id === "apps").map((step) => step.id)
   );
   const currentCluster = findCurrentCluster(options.managerDataDir, options.clusterId);
   if (!currentCluster?.id) {
     throw new Error("could not determine current cluster for portal config generation");
   }
 
-  const clusterScopeId = options.clusterInstanceId || currentCluster.cluster_instance_id || currentCluster.instance_id || currentCluster.id;
+  const clusterScopeId =
+    options.clusterInstanceId ||
+    currentCluster.cluster_instance_id ||
+    currentCluster.instance_id ||
+    currentCluster.id;
   const stepStateById = readStepStates(options.managerDataDir, steps, clusterScopeId);
   const portalStepState = stepStateById.get("install-twinbox-portal");
   if (
@@ -216,15 +229,20 @@ function main() {
   const contentPath = path.join(options.workspaceRoot, "config", "portal", "content.json");
   const content = readJson(contentPath);
   const installedAppIds = readInstalledAppIds();
-  const renderedConfig = JSON.stringify(buildPortalConfig({
-    steps,
-    stepStateById,
-    cluster: currentCluster,
-    content,
-    installedAppIds: installedAppIds === null
-      ? Array.from(appStepIds)
-      : installedAppIds.filter((stepId) => appStepIds.has(stepId)),
-  }), null, 2);
+  const renderedConfig = JSON.stringify(
+    buildPortalConfig({
+      steps,
+      stepStateById,
+      cluster: currentCluster,
+      content,
+      installedAppIds:
+        installedAppIds === null
+          ? Array.from(appStepIds)
+          : installedAppIds.filter((stepId) => appStepIds.has(stepId)),
+    }),
+    null,
+    2
+  );
 
   applySecret(options.namespace, options.secretName, renderedConfig);
   console.log(`Portal config refreshed for ${currentCluster.id}`);

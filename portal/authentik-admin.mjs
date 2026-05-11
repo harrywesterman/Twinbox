@@ -1,6 +1,7 @@
 import crypto from "crypto";
 
-export const DEFAULT_AUTHENTIK_API_BASE = "http://authentik-server.authentik.svc.cluster.local/api/v3";
+export const DEFAULT_AUTHENTIK_API_BASE =
+  "http://authentik-server.authentik.svc.cluster.local/api/v3";
 
 const TEMP_PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
 
@@ -86,8 +87,7 @@ export function blockedGroupReason(group = {}) {
 
 export function filterManageableGroups(groups = [], manageableGroupsConfig = []) {
   const allowedByName = new Map(
-    normalizeManageableGroupsConfig(manageableGroupsConfig)
-      .map((entry) => [entry.name, entry]),
+    normalizeManageableGroupsConfig(manageableGroupsConfig).map((entry) => [entry.name, entry])
   );
 
   return groups
@@ -123,11 +123,13 @@ export function parseGroupUserIds(group = {}) {
 }
 
 export function normalizeRequestedGroupNames(groupNames = []) {
-  return [...new Set(
-    (Array.isArray(groupNames) ? groupNames : [])
-      .map((value) => trimString(value))
-      .filter(Boolean),
-  )].sort((left, right) => left.localeCompare(right));
+  return [
+    ...new Set(
+      (Array.isArray(groupNames) ? groupNames : [])
+        .map((value) => trimString(value))
+        .filter(Boolean)
+    ),
+  ].sort((left, right) => left.localeCompare(right));
 }
 
 export function createTemporaryPassword() {
@@ -180,8 +182,9 @@ export function buildDirectory({ users = [], groups = [], manageableGroupsConfig
     .filter((user) => !isServiceAccountUser(user))
     .map((user) => {
       const id = normalizeId(user.pk || user.id || user.uuid);
-      const memberships = (membershipsByUserId.get(id) || [])
-        .sort((left, right) => left.label.localeCompare(right.label));
+      const memberships = (membershipsByUserId.get(id) || []).sort((left, right) =>
+        left.label.localeCompare(right.label)
+      );
       return {
         id,
         username: trimString(user.username),
@@ -210,7 +213,10 @@ export function buildDirectory({ users = [], groups = [], manageableGroupsConfig
   };
 }
 
-export function ensureRequestedGroupsAreManageable(requestedGroupNames = [], manageableGroups = []) {
+export function ensureRequestedGroupsAreManageable(
+  requestedGroupNames = [],
+  manageableGroups = []
+) {
   const allowedNames = new Set(manageableGroups.map((group) => group.name));
 
   for (const groupName of normalizeRequestedGroupNames(requestedGroupNames)) {
@@ -270,11 +276,11 @@ export function createAuthentikAdminClient({
 
     if (!response.ok) {
       const error = new Error(
-        payload?.detail
-          || payload?.error
-          || payload?.message
-          || text
-          || `Authentik API ${method} ${pathname} failed with HTTP ${response.status}`,
+        payload?.detail ||
+          payload?.error ||
+          payload?.message ||
+          text ||
+          `Authentik API ${method} ${pathname} failed with HTTP ${response.status}`
       );
       error.status = response.status;
       throw error;

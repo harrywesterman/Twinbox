@@ -24,7 +24,7 @@ test("real step manifests normalize Dashy metadata", () => {
   assert.equal(step.dashy.items.length, 3);
   assert.deepEqual(
     step.dashy.items.map((item) => item.title),
-    ["Proxmox", "SeaweedFS", "SeaweedFS Admin"],
+    ["Proxmox", "SeaweedFS", "SeaweedFS Admin"]
   );
 });
 
@@ -54,7 +54,10 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
     ["install-pgadmin4", { status: "succeeded", outputs: {} }],
     ["install-twinbox-portal", { status: "succeeded", outputs: {} }],
     ["install-velero-ui", { status: "succeeded", outputs: {} }],
-    ["install-wiredoor-gateway", { status: "succeeded", outputs: { wiredoor_url: "https://wiredoor.example.net" } }],
+    [
+      "install-wiredoor-gateway",
+      { status: "succeeded", outputs: { wiredoor_url: "https://wiredoor.example.net" } },
+    ],
   ]);
 
   const config = buildDashyConfig({
@@ -73,20 +76,71 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   assert(platformSection, "expected Platform section");
   assert.deepEqual(platformSection.displayData, { sortBy: "alphabetical" });
 
-  assert(platformSection.items.some((item) => item.title === "Hubble" && item.url === "https://hubble.tst.example.com"));
-  assert(platformSection.items.some((item) => item.title === "Argo CD" && item.url === "https://argocd.tst.example.com"));
-  assert(platformSection.items.some((item) => item.title === "Authentik" && item.url === "https://authentik.tst.example.com"));
-  assert(platformSection.items.some((item) => item.title === "Grafana" && item.url === "https://grafana.tst.example.com"));
-  assert(platformSection.items.some((item) => item.title === "Loki" && item.url === "https://grafana.tst.example.com/explore"));
-  assert(platformSection.items.some((item) => item.title === "SeaweedFS Admin" && item.url === "https://seaweedfs-admin.tst.example.com"));
-  assert(platformSection.items.some((item) => item.title === "Twinbox Portal" && item.url === "https://portal.tst.example.com"));
-  assert(platformSection.items.some((item) => item.title === "Velero UI" && item.url === "https://velero-ui.tst.example.com"));
-  assert(platformSection.items.some((item) => item.title === "pgAdmin 4" && item.url === "https://pgadmin4.tst.example.com"));
-  assert(platformSection.items.some((item) => item.title === "Wiredoor" && item.url === "https://wiredoor.example.net"));
-  assert(platformSection.items.some((item) => item.title === "Cloudflare" && item.url === "https://dash.cloudflare.com/"));
-  assert(platformSection.items.some((item) => item.title === "GitHub" && item.url === "https://github.com/harrywesterman/Twinbox"));
+  assert(
+    platformSection.items.some(
+      (item) => item.title === "Hubble" && item.url === "https://hubble.tst.example.com"
+    )
+  );
+  assert(
+    platformSection.items.some(
+      (item) => item.title === "Argo CD" && item.url === "https://argocd.tst.example.com"
+    )
+  );
+  assert(
+    platformSection.items.some(
+      (item) => item.title === "Authentik" && item.url === "https://authentik.tst.example.com"
+    )
+  );
+  assert(
+    platformSection.items.some(
+      (item) => item.title === "Grafana" && item.url === "https://grafana.tst.example.com"
+    )
+  );
+  assert(
+    platformSection.items.some(
+      (item) => item.title === "Loki" && item.url === "https://grafana.tst.example.com/explore"
+    )
+  );
+  assert(
+    platformSection.items.some(
+      (item) =>
+        item.title === "SeaweedFS Admin" && item.url === "https://seaweedfs-admin.tst.example.com"
+    )
+  );
+  assert(
+    platformSection.items.some(
+      (item) => item.title === "Twinbox Portal" && item.url === "https://portal.tst.example.com"
+    )
+  );
+  assert(
+    platformSection.items.some(
+      (item) => item.title === "Velero UI" && item.url === "https://velero-ui.tst.example.com"
+    )
+  );
+  assert(
+    platformSection.items.some(
+      (item) => item.title === "pgAdmin 4" && item.url === "https://pgadmin4.tst.example.com"
+    )
+  );
+  assert(
+    platformSection.items.some(
+      (item) => item.title === "Wiredoor" && item.url === "https://wiredoor.example.net"
+    )
+  );
+  assert(
+    platformSection.items.some(
+      (item) => item.title === "Cloudflare" && item.url === "https://dash.cloudflare.com/"
+    )
+  );
+  assert(
+    platformSection.items.some(
+      (item) => item.title === "GitHub" && item.url === "https://github.com/harrywesterman/Twinbox"
+    )
+  );
 
-  const iconByTitle = new Map(config.sections.flatMap((section) => section.items.map((item) => [item.title, item.icon])));
+  const iconByTitle = new Map(
+    config.sections.flatMap((section) => section.items.map((item) => [item.title, item.icon]))
+  );
   for (const title of [
     "Hubble",
     "Argo CD",
@@ -116,10 +170,7 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
 });
 
 test("buildDashyConfig hides steps that are not completed", () => {
-  const steps = [
-    loadStep("provision-nodes"),
-    loadStep("install-pgadmin4"),
-  ];
+  const steps = [loadStep("provision-nodes"), loadStep("install-pgadmin4")];
 
   const stepStateById = new Map([
     ["provision-nodes", { status: "failed", outputs: {} }],
@@ -150,23 +201,17 @@ test("buildDashyConfig uses local icon filenames from manager-web assets in work
   const iconRoot = path.join(tempRoot, "manager-web", "src", "assets", "step-icons");
   fs.mkdirSync(iconRoot, { recursive: true });
 
-  for (const fileName of [
-    "install-argocd.svg",
-    "configure-cloudflare-dns.svg",
-    "github.svg",
-  ]) {
+  for (const fileName of ["install-argocd.svg", "configure-cloudflare-dns.svg", "github.svg"]) {
     fs.copyFileSync(
       path.join(repoRoot, "manager-web", "src", "assets", "step-icons", fileName),
-      path.join(iconRoot, fileName),
+      path.join(iconRoot, fileName)
     );
   }
 
   try {
     const config = buildDashyConfig({
       steps: [loadStep("install-argocd")],
-      stepStateById: new Map([
-        ["install-argocd", { status: "succeeded", outputs: {} }],
-      ]),
+      stepStateById: new Map([["install-argocd", { status: "succeeded", outputs: {} }]]),
       cluster: {
         id: "tst",
         slug: "tst",
@@ -176,7 +221,9 @@ test("buildDashyConfig uses local icon filenames from manager-web assets in work
       workspaceRoot: tempRoot,
     });
 
-    const iconByTitle = new Map(config.sections.flatMap((section) => section.items.map((item) => [item.title, item.icon])));
+    const iconByTitle = new Map(
+      config.sections.flatMap((section) => section.items.map((item) => [item.title, item.icon]))
+    );
     assert.equal(iconByTitle.get("Argo CD"), "install-argocd.svg");
     assert.equal(iconByTitle.get("Cloudflare"), "configure-cloudflare-dns.svg");
     assert.equal(iconByTitle.get("GitHub"), "github.svg");
@@ -188,9 +235,7 @@ test("buildDashyConfig uses local icon filenames from manager-web assets in work
 
 test("buildDashyConfig skips zone-based URLs until the public zone is known", () => {
   const steps = [loadStep("provision-nodes")];
-  const stepStateById = new Map([
-    ["provision-nodes", { status: "succeeded", outputs: {} }],
-  ]);
+  const stepStateById = new Map([["provision-nodes", { status: "succeeded", outputs: {} }]]);
 
   const config = buildDashyConfig({
     steps,
@@ -212,12 +257,19 @@ test("buildDashyConfig skips zone-based URLs until the public zone is known", ()
 });
 
 test("normalizeStepManifest rejects Dashy items with conflicting URL sources", () => {
-  const file = path.join(repoRoot, "categories", "talos-cluster", "steps", "install-pgadmin4", "step.yaml");
+  const file = path.join(
+    repoRoot,
+    "categories",
+    "talos-cluster",
+    "steps",
+    "install-pgadmin4",
+    "step.yaml"
+  );
   const manifest = YAML.parse(fs.readFileSync(file, "utf8"));
   manifest.dashy.items[0].output_url_key = "access_url";
 
   assert.throws(
     () => normalizeStepManifest(manifest, file, "talos-cluster"),
-    /must not define both url_template and output_url_key/,
+    /must not define both url_template and output_url_key/
   );
 });

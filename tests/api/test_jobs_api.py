@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-from urllib import request, error
+from urllib import error, request
 
 
 def _find_free_port():
@@ -124,7 +124,7 @@ EOF
             status, logs = _get_json(f"{base}/api/jobs/{job_id}/logs")
             assert status == 200
             assert isinstance(logs["lines"], list)
-            assert any("queued apply_cluster" in l["line"] for l in logs["lines"])
+            assert any("queued apply_cluster" in entry["line"] for entry in logs["lines"])
 
             status, boot = _post_json(f"{base}/api/clusters/{cluster_id}/bootstrap", {})
             assert status == 202
@@ -169,13 +169,17 @@ def test_job_cancel_endpoint_marks_pending_job_canceled():
             "error": None,
         }
         (jobs_dir / "job_cancel_me.json").write_text(json.dumps(job))
-        (pending_dir / "job_cancel_me.json").write_text(json.dumps({
-            "id": "job_cancel_me",
-            "type": "run_step",
-            "cluster_id": "cluster_test",
-            "payload": job["payload"],
-            "queued_at": "2026-01-01T00:00:00Z",
-        }))
+        (pending_dir / "job_cancel_me.json").write_text(
+            json.dumps(
+                {
+                    "id": "job_cancel_me",
+                    "type": "run_step",
+                    "cluster_id": "cluster_test",
+                    "payload": job["payload"],
+                    "queued_at": "2026-01-01T00:00:00Z",
+                }
+            )
+        )
 
         port = _find_free_port()
         env = os.environ.copy()

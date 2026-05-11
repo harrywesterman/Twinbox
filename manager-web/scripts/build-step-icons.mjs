@@ -1,17 +1,19 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { chromium } from 'playwright';
-import { STEP_ICON_MANIFEST } from '../src/assets/step-icons/manifest.js';
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { chromium } from "playwright";
+import { STEP_ICON_MANIFEST } from "../src/assets/step-icons/manifest.js";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const webRoot = path.resolve(scriptDir, '..');
-const repoRoot = path.resolve(webRoot, '..');
-const iconsDir = path.join(webRoot, 'src/assets/step-icons');
-const publicIconsDir = path.join(webRoot, 'public/assets/step-icons');
-const portalPublicIconsDir = path.join(repoRoot, 'portal/public/assets/step-icons');
+const webRoot = path.resolve(scriptDir, "..");
+const repoRoot = path.resolve(webRoot, "..");
+const iconsDir = path.join(webRoot, "src/assets/step-icons");
+const publicIconsDir = path.join(webRoot, "public/assets/step-icons");
+const portalPublicIconsDir = path.join(repoRoot, "portal/public/assets/step-icons");
 function asHexChannel(value) {
-  return Math.max(0, Math.min(255, Number(value))).toString(16).padStart(2, '0');
+  return Math.max(0, Math.min(255, Number(value)))
+    .toString(16)
+    .padStart(2, "0");
 }
 
 function rgbToHex([red, green, blue]) {
@@ -21,13 +23,11 @@ function rgbToHex([red, green, blue]) {
 function isNeutral([red, green, blue]) {
   const max = Math.max(red, green, blue);
   const min = Math.min(red, green, blue);
-  return max < 48 || min > 220 || (max - min) < 18;
+  return max < 48 || min > 220 || max - min < 18;
 }
 
 function tintSvg(svg, color) {
-  return svg
-    .replace(/currentColor/g, color)
-    .replace(/fill="none"/g, 'fill="none"');
+  return svg.replace(/currentColor/g, color).replace(/fill="none"/g, 'fill="none"');
 }
 
 function parseDimension(value) {
@@ -35,7 +35,9 @@ function parseDimension(value) {
     return null;
   }
 
-  const match = String(value).trim().match(/^([0-9]+(?:\.[0-9]+)?)(?:px)?$/i);
+  const match = String(value)
+    .trim()
+    .match(/^([0-9]+(?:\.[0-9]+)?)(?:px)?$/i);
   if (!match) {
     return null;
   }
@@ -45,7 +47,7 @@ function parseDimension(value) {
 function normalizeSvgRoot(svg) {
   const match = svg.match(/<svg\b[^>]*>/i);
   if (!match) {
-    throw new Error('expected an <svg> root element');
+    throw new Error("expected an <svg> root element");
   }
 
   const svgTag = match[0];
@@ -56,8 +58,8 @@ function normalizeSvgRoot(svg) {
   const height = parseDimension(heightMatch?.[2]);
 
   let replacementTag = svgTag
-    .replace(/\swidth\s*=\s*(['"])(.*?)\1/ig, '')
-    .replace(/\sheight\s*=\s*(['"])(.*?)\1/ig, '');
+    .replace(/\swidth\s*=\s*(['"])(.*?)\1/gi, "")
+    .replace(/\sheight\s*=\s*(['"])(.*?)\1/gi, "");
 
   if (!hasViewBox && width && height) {
     replacementTag = replacementTag.replace(/<svg\b/i, `<svg viewBox="0 0 ${width} ${height}"`);
@@ -67,13 +69,13 @@ function normalizeSvgRoot(svg) {
 }
 
 function toDataUrl(text, mimeType) {
-  return `data:${mimeType};base64,${Buffer.from(text).toString('base64')}`;
+  return `data:${mimeType};base64,${Buffer.from(text).toString("base64")}`;
 }
 
 async function loadTextSource(entry) {
-  if (entry.sourceKind === 'simple-icons') {
-    const color = entry.sourceColor || '000000';
-    const url = `https://cdn.simpleicons.org/${entry.sourceSlug}/${color.replace(/^#/, '')}`;
+  if (entry.sourceKind === "simple-icons") {
+    const color = entry.sourceColor || "000000";
+    const url = `https://cdn.simpleicons.org/${entry.sourceSlug}/${color.replace(/^#/, "")}`;
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Failed to fetch ${entry.stepId} from ${url}: ${response.status}`);
@@ -81,17 +83,19 @@ async function loadTextSource(entry) {
     return await response.text();
   }
 
-  if (entry.sourceKind === 'remote-svg') {
+  if (entry.sourceKind === "remote-svg") {
     const response = await fetch(entry.sourceUrl);
     if (!response.ok) {
-      throw new Error(`Failed to fetch ${entry.stepId} from ${entry.sourceUrl}: ${response.status}`);
+      throw new Error(
+        `Failed to fetch ${entry.stepId} from ${entry.sourceUrl}: ${response.status}`
+      );
     }
     return await response.text();
   }
 
-  if (entry.sourceKind === 'local-svg') {
+  if (entry.sourceKind === "local-svg") {
     const filePath = path.join(iconsDir, entry.sourceFile);
-    return await fs.readFile(filePath, 'utf8');
+    return await fs.readFile(filePath, "utf8");
   }
 
   throw new Error(`Unsupported source kind for ${entry.stepId}: ${entry.sourceKind}`);
@@ -99,7 +103,7 @@ async function loadTextSource(entry) {
 
 async function samplePngColor(page, pngPath) {
   const bytes = await fs.readFile(pngPath);
-  const dataUrl = toDataUrl(bytes, 'image/png');
+  const dataUrl = toDataUrl(bytes, "image/png");
   await page.setContent(`
     <!doctype html>
     <html>
@@ -111,10 +115,10 @@ async function samplePngColor(page, pngPath) {
   `);
 
   const result = await page.evaluate(async () => {
-    const image = document.getElementById('image');
+    const image = document.getElementById("image");
     await image.decode();
-    const canvas = document.getElementById('canvas');
-    const context = canvas.getContext('2d');
+    const canvas = document.getElementById("canvas");
+    const context = canvas.getContext("2d");
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
     const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
@@ -129,7 +133,10 @@ async function samplePngColor(page, pngPath) {
       const red = pixels[index];
       const green = pixels[index + 1];
       const blue = pixels[index + 2];
-      const neutral = Math.max(red, green, blue) < 48 || Math.min(red, green, blue) > 220 || (Math.max(red, green, blue) - Math.min(red, green, blue)) < 18;
+      const neutral =
+        Math.max(red, green, blue) < 48 ||
+        Math.min(red, green, blue) > 220 ||
+        Math.max(red, green, blue) - Math.min(red, green, blue) < 18;
       const key = `${Math.round(red / 16) * 16},${Math.round(green / 16) * 16},${Math.round(blue / 16) * 16}`;
       const current = counts.get(key) || { count: 0, neutral: 0 };
       counts.set(key, {
@@ -138,29 +145,29 @@ async function samplePngColor(page, pngPath) {
       });
     }
 
-    const sorted = [...counts.entries()]
-      .sort((left, right) => {
-        const leftValue = left[1];
-        const rightValue = right[1];
-        if (leftValue.neutral !== rightValue.neutral) {
-          return leftValue.neutral > rightValue.neutral ? 1 : -1;
-        }
-        return rightValue.count - leftValue.count;
-      });
+    const sorted = [...counts.entries()].sort((left, right) => {
+      const leftValue = left[1];
+      const rightValue = right[1];
+      if (leftValue.neutral !== rightValue.neutral) {
+        return leftValue.neutral > rightValue.neutral ? 1 : -1;
+      }
+      return rightValue.count - leftValue.count;
+    });
 
     return sorted.map(([key]) => key).slice(0, 10);
   });
 
-  const bestColor = result
-    .map((value) => value.split(',').map((part) => Number(part)))
-    .find((rgb) => !isNeutral(rgb))
-    || (result[0] ? result[0].split(',').map((part) => Number(part)) : [15, 23, 42]);
+  const bestColor =
+    result
+      .map((value) => value.split(",").map((part) => Number(part)))
+      .find((rgb) => !isNeutral(rgb)) ||
+    (result[0] ? result[0].split(",").map((part) => Number(part)) : [15, 23, 42]);
 
   return rgbToHex(bestColor);
 }
 
 async function renderPng(page, svgText, outputPath) {
-  const svgDataUrl = toDataUrl(svgText, 'image/svg+xml');
+  const svgDataUrl = toDataUrl(svgText, "image/svg+xml");
   await page.setContent(`
     <!doctype html>
     <html>
@@ -216,17 +223,17 @@ async function main() {
     const sourceText = await loadTextSource(entry);
     let finalSvg = sourceText;
 
-    if (entry.sourceKind === 'local-svg') {
-      const currentColor = sourceText.includes('currentColor');
+    if (entry.sourceKind === "local-svg") {
+      const currentColor = sourceText.includes("currentColor");
       const tintSource = entry.tintFromPng ? path.join(iconsDir, entry.tintFromPng) : null;
-      let tintColor = entry.tintColor || '';
+      let tintColor = entry.tintColor || "";
 
       if (!tintColor && currentColor && tintSource) {
         tintColor = await samplePngColor(page, tintSource);
       }
 
       if (!tintColor && currentColor) {
-        tintColor = '#0f172a';
+        tintColor = "#0f172a";
       }
 
       if (tintColor && currentColor) {
@@ -247,9 +254,11 @@ async function main() {
   return generated;
 }
 
-main().then((generated) => {
-  console.log(`Generated ${generated.length} icon pairs.`);
-}).catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+main()
+  .then((generated) => {
+    console.log(`Generated ${generated.length} icon pairs.`);
+  })
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });

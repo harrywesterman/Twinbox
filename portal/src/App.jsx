@@ -1,23 +1,30 @@
-import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  startTransition,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
-import { buildAdminAppsViewModel } from './admin-apps-model.js';
-import { buildObservabilityViewModel } from './admin-observability-model.js';
+import { buildAdminAppsViewModel } from "./admin-apps-model.js";
+import { buildObservabilityViewModel } from "./admin-observability-model.js";
 import {
   buildAdminAppInstallPath,
-  buildBundleInstallQueue,
   buildBundleInstallSummary,
   buildSelectableBundleInstallQueue,
   getAdminAppInstallButtonState,
   getSelectableBundleApps,
   parseAdminAppInstallPath,
   resolveAdminCardIconUrl,
-} from './admin-apps-install.js';
-import { buildAdminNavigationItems, buildUserAdminViewModel } from './user-admin-model.js';
+} from "./admin-apps-install.js";
+import { buildAdminNavigationItems, buildUserAdminViewModel } from "./user-admin-model.js";
 
 function requestJson(url, options = {}) {
   return fetch(url, {
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...(options.headers || {}),
     },
     ...options,
@@ -32,7 +39,9 @@ function requestJson(url, options = {}) {
       }
     }
     if (!response.ok) {
-      const error = new Error(body?.error || body?.message || text || `Request failed with ${response.status}`);
+      const error = new Error(
+        body?.error || body?.message || text || `Request failed with ${response.status}`
+      );
       error.status = response.status;
       throw error;
     }
@@ -52,22 +61,15 @@ function formatHost(url) {
   }
 }
 
-function slugify(value) {
-  return String(value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
 function badgeTone(ok) {
-  return ok ? 'is-ok' : 'is-bad';
+  return ok ? "is-ok" : "is-bad";
 }
 
 function openInNewTab(url) {
   if (!url) {
     return;
   }
-  window.open(url, '_blank', 'noopener,noreferrer');
+  window.open(url, "_blank", "noopener,noreferrer");
 }
 
 function useRoute() {
@@ -75,15 +77,15 @@ function useRoute() {
 
   useEffect(() => {
     const onPopState = () => setPathname(window.location.pathname);
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
   const navigate = (nextPath) => {
     if (nextPath === window.location.pathname) {
       return;
     }
-    window.history.pushState({}, '', nextPath);
+    window.history.pushState({}, "", nextPath);
     setPathname(nextPath);
   };
 
@@ -98,7 +100,7 @@ function usePortalData() {
 
   useEffect(() => {
     let cancelled = false;
-    requestJson('/api/session')
+    requestJson("/api/session")
       .then((payload) => {
         if (!cancelled) {
           setSessionState({ loading: false, session: payload.session });
@@ -122,21 +124,20 @@ function usePortalData() {
     }
 
     let cancelled = false;
-    Promise.all([
-      requestJson('/api/portal-config'),
-      requestJson('/api/preferences'),
-    ]).then(([config, prefs]) => {
-      if (cancelled) {
-        return;
-      }
-      setConfigState({ loading: false, config });
-      setPreferences(prefs);
-    }).catch(() => {
-      if (!cancelled) {
-        setConfigState({ loading: false, config: null });
-        setPreferences(null);
-      }
-    });
+    Promise.all([requestJson("/api/portal-config"), requestJson("/api/preferences")])
+      .then(([config, prefs]) => {
+        if (cancelled) {
+          return;
+        }
+        setConfigState({ loading: false, config });
+        setPreferences(prefs);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setConfigState({ loading: false, config: null });
+          setPreferences(null);
+        }
+      });
 
     return () => {
       cancelled = true;
@@ -146,7 +147,7 @@ function usePortalData() {
   const refreshStatus = useCallback(async () => {
     setStatusState((current) => ({ ...current, loading: true }));
     try {
-      const data = await requestJson('/api/status');
+      const data = await requestJson("/api/status");
       setStatusState({ loading: false, data });
     } catch {
       setStatusState({ loading: false, data: null });
@@ -167,52 +168,55 @@ function useUserAdminData(enabled) {
   const [state, setState] = useState({
     loading: false,
     refreshing: false,
-    error: '',
+    error: "",
     users: [],
     groups: [],
   });
 
-  const load = useCallback(async ({ silent = false } = {}) => {
-    if (!enabled) {
-      setState({
-        loading: false,
-        refreshing: false,
-        error: '',
-        users: [],
-        groups: [],
-      });
-      return;
-    }
+  const load = useCallback(
+    async ({ silent = false } = {}) => {
+      if (!enabled) {
+        setState({
+          loading: false,
+          refreshing: false,
+          error: "",
+          users: [],
+          groups: [],
+        });
+        return;
+      }
 
-    setState((current) => ({
-      ...current,
-      loading: current.users.length === 0 && !silent,
-      refreshing: current.users.length > 0 || silent,
-      error: '',
-    }));
-
-    try {
-      const [usersPayload, groupsPayload] = await Promise.all([
-        requestJson('/api/admin/users'),
-        requestJson('/api/admin/groups'),
-      ]);
-
-      setState({
-        loading: false,
-        refreshing: false,
-        error: '',
-        users: Array.isArray(usersPayload?.users) ? usersPayload.users : [],
-        groups: Array.isArray(groupsPayload?.groups) ? groupsPayload.groups : [],
-      });
-    } catch (error) {
       setState((current) => ({
         ...current,
-        loading: false,
-        refreshing: false,
-        error: error instanceof Error ? error.message : 'Failed to load users and groups.',
+        loading: current.users.length === 0 && !silent,
+        refreshing: current.users.length > 0 || silent,
+        error: "",
       }));
-    }
-  }, [enabled]);
+
+      try {
+        const [usersPayload, groupsPayload] = await Promise.all([
+          requestJson("/api/admin/users"),
+          requestJson("/api/admin/groups"),
+        ]);
+
+        setState({
+          loading: false,
+          refreshing: false,
+          error: "",
+          users: Array.isArray(usersPayload?.users) ? usersPayload.users : [],
+          groups: Array.isArray(groupsPayload?.groups) ? groupsPayload.groups : [],
+        });
+      } catch (error) {
+        setState((current) => ({
+          ...current,
+          loading: false,
+          refreshing: false,
+          error: error instanceof Error ? error.message : "Failed to load users and groups.",
+        }));
+      }
+    },
+    [enabled]
+  );
 
   useEffect(() => {
     load();
@@ -228,45 +232,48 @@ function useAdminAppsData(enabled) {
   const [state, setState] = useState({
     loading: false,
     refreshing: false,
-    error: '',
+    error: "",
     catalog: null,
   });
 
-  const load = useCallback(async ({ silent = false } = {}) => {
-    if (!enabled) {
-      setState({
-        loading: false,
-        refreshing: false,
-        error: '',
-        catalog: null,
-      });
-      return;
-    }
+  const load = useCallback(
+    async ({ silent = false } = {}) => {
+      if (!enabled) {
+        setState({
+          loading: false,
+          refreshing: false,
+          error: "",
+          catalog: null,
+        });
+        return;
+      }
 
-    setState((current) => ({
-      ...current,
-      loading: current.catalog === null && !silent,
-      refreshing: current.catalog !== null || silent,
-      error: '',
-    }));
-
-    try {
-      const catalog = await requestJson('/api/admin/apps/catalog');
-      setState({
-        loading: false,
-        refreshing: false,
-        error: '',
-        catalog,
-      });
-    } catch (error) {
       setState((current) => ({
         ...current,
-        loading: false,
-        refreshing: false,
-        error: error instanceof Error ? error.message : 'Failed to load app catalog.',
+        loading: current.catalog === null && !silent,
+        refreshing: current.catalog !== null || silent,
+        error: "",
       }));
-    }
-  }, [enabled]);
+
+      try {
+        const catalog = await requestJson("/api/admin/apps/catalog");
+        setState({
+          loading: false,
+          refreshing: false,
+          error: "",
+          catalog,
+        });
+      } catch (error) {
+        setState((current) => ({
+          ...current,
+          loading: false,
+          refreshing: false,
+          error: error instanceof Error ? error.message : "Failed to load app catalog.",
+        }));
+      }
+    },
+    [enabled]
+  );
 
   useEffect(() => {
     load();
@@ -282,52 +289,55 @@ function useObservabilityAdminData(enabled) {
   const [state, setState] = useState({
     loading: false,
     refreshing: false,
-    error: '',
+    error: "",
     cluster: null,
   });
 
-  const load = useCallback(async ({ silent = false } = {}) => {
-    if (!enabled) {
-      setState({
-        loading: false,
-        refreshing: false,
-        error: '',
-        cluster: null,
-      });
-      return;
-    }
+  const load = useCallback(
+    async ({ silent = false } = {}) => {
+      if (!enabled) {
+        setState({
+          loading: false,
+          refreshing: false,
+          error: "",
+          cluster: null,
+        });
+        return;
+      }
 
-    setState((current) => ({
-      ...current,
-      loading: current.cluster === null && !silent,
-      refreshing: current.cluster !== null || silent,
-      error: '',
-    }));
-
-    try {
-      const payload = await requestJson('/api/admin/observability');
-      setState({
-        loading: false,
-        refreshing: false,
-        error: '',
-        cluster: payload?.cluster || null,
-      });
-    } catch (error) {
       setState((current) => ({
         ...current,
-        loading: false,
-        refreshing: false,
-        error: error instanceof Error ? error.message : 'Failed to load observability state.',
+        loading: current.cluster === null && !silent,
+        refreshing: current.cluster !== null || silent,
+        error: "",
       }));
-    }
-  }, [enabled]);
+
+      try {
+        const payload = await requestJson("/api/admin/observability");
+        setState({
+          loading: false,
+          refreshing: false,
+          error: "",
+          cluster: payload?.cluster || null,
+        });
+      } catch (error) {
+        setState((current) => ({
+          ...current,
+          loading: false,
+          refreshing: false,
+          error: error instanceof Error ? error.message : "Failed to load observability state.",
+        }));
+      }
+    },
+    [enabled]
+  );
 
   useEffect(() => {
     load();
   }, [load]);
 
   useEffect(() => {
-    if (!enabled || state.cluster?.observability_status !== 'applying') {
+    if (!enabled || state.cluster?.observability_status !== "applying") {
       return undefined;
     }
 
@@ -354,7 +364,7 @@ function SectionTitle({ eyebrow, title, description }) {
   );
 }
 
-function AppIcon({ card, className = '' }) {
+function AppIcon({ card, className = "" }) {
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
@@ -374,7 +384,7 @@ function AppIcon({ card, className = '' }) {
   }
 
   return (
-    <span className={`app-tile-badge ${className}`.trim()} style={{ '--accent': card.accent }}>
+    <span className={`app-tile-badge ${className}`.trim()} style={{ "--accent": card.accent }}>
       <span>{card.iconText}</span>
     </span>
   );
@@ -387,24 +397,25 @@ function buildAdminInstallRoute(kind, id) {
 function buildAdminIconCard(card = {}) {
   if (!card) {
     return {
-      title: 'App',
-      iconUrl: '',
-      iconAlt: 'App icon',
-      iconText: 'AP',
+      title: "App",
+      iconUrl: "",
+      iconAlt: "App icon",
+      iconText: "AP",
     };
   }
 
   return {
     ...card,
     iconUrl: resolveAdminCardIconUrl(card),
-    iconAlt: card.iconAlt || `${card.title || 'App'} icon`,
+    iconAlt: card.iconAlt || `${card.title || "App"} icon`,
   };
 }
 
 function buildAdminBundleIconCard(bundle = {}) {
   const bundleCards = Array.isArray(bundle?.cards) ? bundle.cards : [];
-  const sourceCard = bundleCards.find((entry) => Boolean(resolveAdminCardIconUrl(entry))) || bundleCards[0] || {};
-  const title = bundle?.title || sourceCard?.title || 'Bundle';
+  const sourceCard =
+    bundleCards.find((entry) => Boolean(resolveAdminCardIconUrl(entry))) || bundleCards[0] || {};
+  const title = bundle?.title || sourceCard?.title || "Bundle";
 
   return {
     ...sourceCard,
@@ -417,39 +428,39 @@ function buildAdminBundleIconCard(bundle = {}) {
 
 function buildBundleInstallButtonState(bundleCards = []) {
   const summary = buildBundleInstallSummary(bundleCards);
-  if (summary.state === 'ready') {
+  if (summary.state === "ready") {
     return {
       summary,
       enabled: true,
-      label: 'Install',
+      label: "Install",
     };
   }
 
-  if (summary.state === 'installing') {
+  if (summary.state === "installing") {
     return {
       summary,
       enabled: false,
-      label: 'Installing',
+      label: "Installing",
     };
   }
 
   return {
     summary,
     enabled: false,
-    label: 'Unavailable',
+    label: "Unavailable",
   };
 }
 
 function AdminInstallTile({
   iconCard,
   itemTitle,
-  buttonLabel = 'Install',
-  buttonClassName = 'primary-button',
+  buttonLabel = "Install",
+  buttonClassName = "primary-button",
   disabled = false,
   onInstall,
 }) {
   return (
-    <article className={`admin-install-tile ${disabled ? 'is-disabled' : ''}`} title={itemTitle}>
+    <article className={`admin-install-tile ${disabled ? "is-disabled" : ""}`} title={itemTitle}>
       <div className="admin-install-tile-media" aria-hidden="true">
         <AppIcon card={iconCard} className="admin-install-tile-icon" />
       </div>
@@ -478,7 +489,9 @@ function AppTile({ card, onOpen, showStatus = false }) {
       </span>
       {showStatus ? (
         <span className="app-tile-meta">
-          <span className={`status-chip ${card.status ? 'is-live' : ''}`}>{card.status || 'ready'}</span>
+          <span className={`status-chip ${card.status ? "is-live" : ""}`}>
+            {card.status || "ready"}
+          </span>
         </span>
       ) : null}
     </button>
@@ -511,7 +524,7 @@ function MobileAppLinks({ links = [] }) {
   );
 }
 
-function Panel({ className = '', children }) {
+function Panel({ className = "", children }) {
   return <section className={`panel ${className}`}>{children}</section>;
 }
 
@@ -524,7 +537,15 @@ function MenuPopover({ visible, onNavigate, onLogout, onClose, isAdmin, zoneName
 
   return (
     <div className="menu-popover" role="menu">
-      <button type="button" onClick={() => { onNavigate('/settings'); onClose(); }}>Settings</button>
+      <button
+        type="button"
+        onClick={() => {
+          onNavigate("/settings");
+          onClose();
+        }}
+      >
+        Settings
+      </button>
       {adminItems.map((item) => (
         <button
           key={item.id}
@@ -541,9 +562,33 @@ function MenuPopover({ visible, onNavigate, onLogout, onClose, isAdmin, zoneName
           {item.label}
         </button>
       ))}
-      <button type="button" onClick={() => { onNavigate('/intranet'); onClose(); }}>Intranet</button>
-      <button type="button" onClick={() => { onNavigate('/status'); onClose(); }}>Cluster status</button>
-      <button type="button" onClick={() => { onLogout(); onClose(); }}>Log out</button>
+      <button
+        type="button"
+        onClick={() => {
+          onNavigate("/intranet");
+          onClose();
+        }}
+      >
+        Intranet
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          onNavigate("/status");
+          onClose();
+        }}
+      >
+        Cluster status
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          onLogout();
+          onClose();
+        }}
+      >
+        Log out
+      </button>
     </div>
   );
 }
@@ -561,21 +606,36 @@ function AuthRedirectScreen({ brand }) {
   );
 }
 
-function PortalHeader({ session, config, theme, onThemeToggle, onNavigate, onLogout, onMenuToggle, menuOpen, isAdmin }) {
-  const zoneName = config?.portal?.zoneName || '';
+function PortalHeader({
+  session,
+  config,
+  theme,
+  onThemeToggle,
+  onNavigate,
+  onLogout,
+  onMenuToggle,
+  menuOpen,
+  isAdmin,
+}) {
+  const zoneName = config?.portal?.zoneName || "";
 
   return (
     <header className="topbar">
-      <button type="button" className="topbar-brand" onClick={() => onNavigate('/')}>
+      <button type="button" className="topbar-brand" onClick={() => onNavigate("/")}>
         <span className="brand-mark" />
         <div>
           <strong>Twinbox</strong>
-          <span>{config?.portal?.hero?.eyebrow || 'User portal'}</span>
+          <span>{config?.portal?.hero?.eyebrow || "User portal"}</span>
         </div>
       </button>
       <div className="topbar-actions">
-        <button type="button" className="icon-button" onClick={onThemeToggle} aria-label="Toggle theme">
-          {theme === 'dark' ? '◐' : '◑'}
+        <button
+          type="button"
+          className="icon-button"
+          onClick={onThemeToggle}
+          aria-label="Toggle theme"
+        >
+          {theme === "dark" ? "◐" : "◑"}
         </button>
         <button type="button" className="icon-button" onClick={onMenuToggle} aria-label="Open menu">
           ☰
@@ -589,8 +649,8 @@ function PortalHeader({ session, config, theme, onThemeToggle, onNavigate, onLog
           zoneName={zoneName}
         />
         <div className="topbar-session">
-          <strong>{session?.name || 'User'}</strong>
-          <span>{isAdmin ? 'Admins' : 'Member'}</span>
+          <strong>{session?.name || "User"}</strong>
+          <span>{isAdmin ? "Admins" : "Member"}</span>
         </div>
       </div>
     </header>
@@ -626,8 +686,14 @@ function AppDetailPage({ card, onNavigate }) {
   if (!card) {
     return (
       <Panel>
-        <SectionTitle eyebrow="Missing app" title="Nothing here yet" description="This app is not available in the current cluster state." />
-        <button type="button" className="secondary-button" onClick={() => onNavigate('/')}>Back home</button>
+        <SectionTitle
+          eyebrow="Missing app"
+          title="Nothing here yet"
+          description="This app is not available in the current cluster state."
+        />
+        <button type="button" className="secondary-button" onClick={() => onNavigate("/")}>
+          Back home
+        </button>
       </Panel>
     );
   }
@@ -641,8 +707,16 @@ function AppDetailPage({ card, onNavigate }) {
           <h1>{card.label}</h1>
           <p>{card.description}</p>
           <div className="hero-actions">
-            <button type="button" className="primary-button" onClick={() => openInNewTab(card.liveUrl || card.url)}>Start in new tab</button>
-            <button type="button" className="secondary-button" onClick={() => onNavigate('/')}>Back</button>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => openInNewTab(card.liveUrl || card.url)}
+            >
+              Start in new tab
+            </button>
+            <button type="button" className="secondary-button" onClick={() => onNavigate("/")}>
+              Back
+            </button>
           </div>
         </div>
       </Panel>
@@ -650,7 +724,9 @@ function AppDetailPage({ card, onNavigate }) {
         <Panel>
           <SectionTitle eyebrow="What it does" title="Capabilities" />
           <ul className="capability-list">
-            {card.capabilities.map((item) => <li key={item}>{item}</li>)}
+            {card.capabilities.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
           </ul>
         </Panel>
         <Panel>
@@ -662,7 +738,9 @@ function AppDetailPage({ card, onNavigate }) {
             </div>
             <div>
               <dt>Status</dt>
-              <dd><span className="status-chip is-live">{card.status || 'ready'}</span></dd>
+              <dd>
+                <span className="status-chip is-live">{card.status || "ready"}</span>
+              </dd>
             </div>
             <div>
               <dt>Source</dt>
@@ -677,11 +755,23 @@ function AppDetailPage({ card, onNavigate }) {
 }
 
 function SettingsPage({ config, preferences, setPreferences, onSave, onNavigate }) {
-  const [draft, setDraft] = useState(preferences || { theme: 'dark', language: 'nl', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+  const [draft, setDraft] = useState(
+    preferences || {
+      theme: "dark",
+      language: "nl",
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    }
+  );
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setDraft(preferences || { theme: 'dark', language: 'nl', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+    setDraft(
+      preferences || {
+        theme: "dark",
+        language: "nl",
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      }
+    );
   }, [preferences]);
 
   const submit = async (event) => {
@@ -693,9 +783,9 @@ function SettingsPage({ config, preferences, setPreferences, onSave, onNavigate 
   };
 
   const timezoneOptions = useMemo(() => {
-    if (typeof Intl.supportedValuesOf === 'function') {
+    if (typeof Intl.supportedValuesOf === "function") {
       try {
-        return Intl.supportedValuesOf('timeZone').slice(0, 400);
+        return Intl.supportedValuesOf("timeZone").slice(0, 400);
       } catch {
         return [];
       }
@@ -713,64 +803,103 @@ function SettingsPage({ config, preferences, setPreferences, onSave, onNavigate 
       <form className="settings-form" onSubmit={submit}>
         <label>
           <span>Language</span>
-          <select value={draft.language || 'nl'} onChange={(event) => setDraft((current) => ({ ...current, language: event.target.value }))}>
-            {(config?.settings?.languages || [{ value: 'nl', label: 'Nederlands' }, { value: 'en', label: 'English' }]).map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
+          <select
+            value={draft.language || "nl"}
+            onChange={(event) =>
+              setDraft((current) => ({ ...current, language: event.target.value }))
+            }
+          >
+            {(
+              config?.settings?.languages || [
+                { value: "nl", label: "Nederlands" },
+                { value: "en", label: "English" },
+              ]
+            ).map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
             ))}
           </select>
         </label>
         <label>
           <span>Timezone</span>
-          <select value={draft.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone} onChange={(event) => setDraft((current) => ({ ...current, timezone: event.target.value }))}>
+          <select
+            value={draft.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone}
+            onChange={(event) =>
+              setDraft((current) => ({ ...current, timezone: event.target.value }))
+            }
+          >
             <option value={Intl.DateTimeFormat().resolvedOptions().timeZone}>
               {Intl.DateTimeFormat().resolvedOptions().timeZone}
             </option>
             {timezoneOptions.slice(0, 20).map((timezone) => (
-              <option key={timezone} value={timezone}>{timezone}</option>
+              <option key={timezone} value={timezone}>
+                {timezone}
+              </option>
             ))}
           </select>
         </label>
+        {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
         <label>
           <span>Theme</span>
           <div className="segmented-control">
             <button
               type="button"
-              className={draft.theme === 'light' ? 'is-active' : ''}
-              onClick={() => setDraft((current) => ({ ...current, theme: 'light' }))}
+              className={draft.theme === "light" ? "is-active" : ""}
+              onClick={() => setDraft((current) => ({ ...current, theme: "light" }))}
             >
               Light
             </button>
             <button
               type="button"
-              className={draft.theme === 'dark' ? 'is-active' : ''}
-              onClick={() => setDraft((current) => ({ ...current, theme: 'dark' }))}
+              className={draft.theme === "dark" ? "is-active" : ""}
+              onClick={() => setDraft((current) => ({ ...current, theme: "dark" }))}
             >
               Dark
             </button>
           </div>
         </label>
         <div className="settings-actions">
-          <button type="submit" className="primary-button">Save preferences</button>
-          <span className={`save-banner ${saved ? 'is-visible' : ''}`}>Saved</span>
+          <button type="submit" className="primary-button">
+            Save preferences
+          </button>
+          <span className={`save-banner ${saved ? "is-visible" : ""}`}>Saved</span>
         </div>
       </form>
 
       <div className="settings-links">
-        <a className="link-card" href={config?.settings?.authentikUserUrl || '#'} target="_blank" rel="noreferrer">
+        <a
+          className="link-card"
+          href={config?.settings?.authentikUserUrl || "#"}
+          target="_blank"
+          rel="noreferrer"
+        >
           <strong>Set password</strong>
           <span>Open the Authentik user self-service area.</span>
         </a>
-        <a className="link-card" href={config?.settings?.authentikOtpUrl || '#'} target="_blank" rel="noreferrer">
+        <a
+          className="link-card"
+          href={config?.settings?.authentikOtpUrl || "#"}
+          target="_blank"
+          rel="noreferrer"
+        >
           <strong>Enable 2FA</strong>
           <span>Manage your Authentik authenticator devices.</span>
         </a>
-        <a className="link-card" href={config?.settings?.issueUrl || '#'} target="_blank" rel="noreferrer">
+        <a
+          className="link-card"
+          href={config?.settings?.issueUrl || "#"}
+          target="_blank"
+          rel="noreferrer"
+        >
           <strong>Meld een issue</strong>
           <span>Open a GitHub issue for bug reports or requests.</span>
         </a>
       </div>
 
-      <button type="button" className="secondary-button" onClick={() => onNavigate('/')}>Back home</button>
+      <button type="button" className="secondary-button" onClick={() => onNavigate("/")}>
+        Back home
+      </button>
     </Panel>
   );
 }
@@ -785,104 +914,127 @@ function IntranetPage({ links, onNavigate }) {
       />
       <div className="card-grid intranet-grid">
         {links.map((card) => (
-          <a key={card.id} className="intranet-card" href={card.liveUrl || card.url} target="_blank" rel="noreferrer">
+          <a
+            key={card.id}
+            className="intranet-card"
+            href={card.liveUrl || card.url}
+            target="_blank"
+            rel="noreferrer"
+          >
             <AppIcon card={card} className="app-tile-badge" />
             <strong>{card.title}</strong>
             <span>{card.summary}</span>
           </a>
         ))}
       </div>
-      <button type="button" className="secondary-button" onClick={() => onNavigate('/')}>Back home</button>
+      <button type="button" className="secondary-button" onClick={() => onNavigate("/")}>
+        Back home
+      </button>
     </Panel>
   );
 }
 
 function statusTone(state) {
   switch (state) {
-    case 'installed':
-    case 'succeeded':
-    case 'done':
-      return 'is-live';
-    case 'ready':
-      return 'is-ok';
-    case 'applying':
-      return 'is-warning';
-    case 'pending':
-    case 'running':
-    case 'cancel_requested':
-      return 'is-warning';
-    case 'installing':
-      return 'is-warning';
-    case 'blocked':
-    case 'planned':
-      return 'is-neutral';
-    case 'failed':
-    case 'canceled':
-      return 'is-bad';
+    case "installed":
+    case "succeeded":
+    case "done":
+      return "is-live";
+    case "ready":
+      return "is-ok";
+    case "applying":
+      return "is-warning";
+    case "pending":
+    case "running":
+    case "cancel_requested":
+      return "is-warning";
+    case "installing":
+      return "is-warning";
+    case "blocked":
+    case "planned":
+      return "is-neutral";
+    case "failed":
+    case "canceled":
+      return "is-bad";
     default:
-      return 'is-neutral';
+      return "is-neutral";
   }
 }
 
 function statusLabel(state) {
   switch (state) {
-    case 'installed':
-    case 'succeeded':
-    case 'done':
-      return 'installed';
-    case 'ready':
-      return 'ready';
-    case 'pending':
-      return 'queued';
-    case 'running':
-      return 'running';
-    case 'applying':
-      return 'applying';
-    case 'cancel_requested':
-      return 'stopping';
-    case 'installing':
-      return 'installing';
-    case 'blocked':
-      return 'blocked';
-    case 'planned':
-      return 'coming soon';
-    case 'failed':
-      return 'failed';
-    case 'canceled':
-      return 'stopped';
+    case "installed":
+    case "succeeded":
+    case "done":
+      return "installed";
+    case "ready":
+      return "ready";
+    case "pending":
+      return "queued";
+    case "running":
+      return "running";
+    case "applying":
+      return "applying";
+    case "cancel_requested":
+      return "stopping";
+    case "installing":
+      return "installing";
+    case "blocked":
+      return "blocked";
+    case "planned":
+      return "coming soon";
+    case "failed":
+      return "failed";
+    case "canceled":
+      return "stopped";
     default:
-      return 'planned';
+      return "planned";
   }
 }
 
-function LogViewport({ lines = [], emptyLabel = 'Waiting for output...', viewportRef, onScroll, className = '' }) {
+function LogViewport({
+  lines = [],
+  emptyLabel = "Waiting for output...",
+  viewportRef,
+  onScroll,
+  className = "",
+}) {
   return (
     <div className={`admin-log-viewport ${className}`.trim()} ref={viewportRef} onScroll={onScroll}>
       {lines.length === 0 ? (
         <p className="muted-copy">{emptyLabel}</p>
       ) : (
-        <pre className="admin-log-output">{lines.map((line) => (typeof line === 'string' ? line : line.line)).join('\n')}</pre>
+        <pre className="admin-log-output">
+          {lines.map((line) => (typeof line === "string" ? line : line.line)).join("\n")}
+        </pre>
       )}
     </div>
   );
 }
 function AdminAppsPage({ onNavigate, adminAppsState, installTarget }) {
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const appsState = adminAppsState || useAdminAppsData(true);
-  const [activeTab, setActiveTab] = useState(() => (installTarget?.kind === 'bundle' ? 'bundles' : 'apps'));
+  const [activeTab, setActiveTab] = useState(() =>
+    installTarget?.kind === "bundle" ? "bundles" : "apps"
+  );
 
-  const viewModel = useMemo(() => buildAdminAppsViewModel({
-    catalog: appsState.catalog,
-    query: '',
-    selectedAppId: '',
-  }), [appsState.catalog]);
+  const viewModel = useMemo(
+    () =>
+      buildAdminAppsViewModel({
+        catalog: appsState.catalog,
+        query: "",
+        selectedAppId: "",
+      }),
+    [appsState.catalog]
+  );
 
   useEffect(() => {
-    if (installTarget?.kind === 'bundle') {
-      setActiveTab('bundles');
+    if (installTarget?.kind === "bundle") {
+      setActiveTab("bundles");
       return;
     }
-    if (installTarget?.kind === 'app') {
-      setActiveTab('apps');
+    if (installTarget?.kind === "app") {
+      setActiveTab("apps");
     }
   }, [installTarget?.kind]);
 
@@ -896,12 +1048,10 @@ function AdminAppsPage({ onNavigate, adminAppsState, installTarget }) {
   if (appsState.loading && !appsState.catalog) {
     return (
       <Panel>
-        <SectionTitle
-          eyebrow="Admin"
-          title="App installs"
-          description="Loading the app catalog."
-        />
-        <p className="muted-copy">Twinbox is building the install catalog from the current cluster state.</p>
+        <SectionTitle eyebrow="Admin" title="App installs" description="Loading the app catalog." />
+        <p className="muted-copy">
+          Twinbox is building the install catalog from the current cluster state.
+        </p>
       </Panel>
     );
   }
@@ -916,10 +1066,15 @@ function AdminAppsPage({ onNavigate, adminAppsState, installTarget }) {
             description="Choose an icon and install or remove user-facing apps from a clean in-page installer."
           />
           <div className="hero-actions admin-apps-shell-actions">
-            <button type="button" className="secondary-button" onClick={() => appsState.reload()} disabled={appsState.refreshing}>
-              {appsState.refreshing ? 'Refreshing…' : 'Refresh catalog'}
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => appsState.reload()}
+              disabled={appsState.refreshing}
+            >
+              {appsState.refreshing ? "Refreshing…" : "Refresh catalog"}
             </button>
-            <button type="button" className="secondary-button" onClick={() => onNavigate('/')}>
+            <button type="button" className="secondary-button" onClick={() => onNavigate("/")}>
               Back home
             </button>
           </div>
@@ -929,18 +1084,18 @@ function AdminAppsPage({ onNavigate, adminAppsState, installTarget }) {
           <button
             type="button"
             role="tab"
-            aria-selected={activeTab === 'apps'}
-            className={activeTab === 'apps' ? 'is-active' : ''}
-            onClick={() => setActiveTab('apps')}
+            aria-selected={activeTab === "apps"}
+            className={activeTab === "apps" ? "is-active" : ""}
+            onClick={() => setActiveTab("apps")}
           >
             Apps
           </button>
           <button
             type="button"
             role="tab"
-            aria-selected={activeTab === 'bundles'}
-            className={activeTab === 'bundles' ? 'is-active' : ''}
-            onClick={() => setActiveTab('bundles')}
+            aria-selected={activeTab === "bundles"}
+            className={activeTab === "bundles" ? "is-active" : ""}
+            onClick={() => setActiveTab("bundles")}
           >
             Bundles
           </button>
@@ -955,11 +1110,11 @@ function AdminAppsPage({ onNavigate, adminAppsState, installTarget }) {
         {viewModel.errors.length > 0 ? (
           <div className="inline-notice is-warning">
             <strong>Catalog warnings</strong>
-            <span>{viewModel.errors.join(' | ')}</span>
+            <span>{viewModel.errors.join(" | ")}</span>
           </div>
         ) : null}
 
-        {activeTab === 'apps' ? (
+        {activeTab === "apps" ? (
           <div role="tabpanel" aria-label="Apps install grid" className="admin-install-grid">
             {viewModel.cards.length === 0 ? (
               <div className="empty-card">
@@ -977,7 +1132,7 @@ function AdminAppsPage({ onNavigate, adminAppsState, installTarget }) {
                     buttonLabel={buttonState.label}
                     buttonClassName={buttonState.buttonClassName}
                     disabled={!buttonState.enabled}
-                    onInstall={() => openInstall('app', card.id)}
+                    onInstall={() => openInstall("app", card.id)}
                   />
                 );
               })
@@ -1000,7 +1155,7 @@ function AdminAppsPage({ onNavigate, adminAppsState, installTarget }) {
                     itemTitle={bundle.title || bundle.id}
                     buttonLabel={buttonState.label}
                     disabled={!buttonState.enabled}
-                    onInstall={() => openInstall('bundle', bundle.id)}
+                    onInstall={() => openInstall("bundle", bundle.id)}
                   />
                 );
               })
@@ -1021,54 +1176,62 @@ function AdminAppsPage({ onNavigate, adminAppsState, installTarget }) {
 }
 
 function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const appsState = adminAppsState || useAdminAppsData(true);
   const logViewportRef = useRef(null);
   const autoScrollLogsRef = useRef(true);
-  const [pageError, setPageError] = useState('');
-  const [pageNotice, setPageNotice] = useState('');
+  const [pageError, setPageError] = useState("");
+  const [pageNotice, setPageNotice] = useState("");
   const [currentJob, setCurrentJob] = useState(null);
   const [jobLines, setJobLines] = useState([]);
   const [running, setRunning] = useState(false);
-  const [activeAppId, setActiveAppId] = useState('');
-  const [installPhase, setInstallPhase] = useState('detail');
+  const [activeAppId, setActiveAppId] = useState("");
+  const [installPhase, setInstallPhase] = useState("detail");
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [stepStatuses, setStepStatuses] = useState(new Map());
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
-  const viewModel = useMemo(() => buildAdminAppsViewModel({
-    catalog: appsState.catalog,
-    query: '',
-    selectedAppId: '',
-  }), [appsState.catalog]);
+  const viewModel = useMemo(
+    () =>
+      buildAdminAppsViewModel({
+        catalog: appsState.catalog,
+        query: "",
+        selectedAppId: "",
+      }),
+    [appsState.catalog]
+  );
 
-  const cardsById = useMemo(() => new Map(viewModel.cards.map((card) => [card.id, card])), [viewModel.cards]);
-  const targetCard = installTarget?.kind === 'app' ? cardsById.get(installTarget.id) || null : null;
-  const targetBundle = installTarget?.kind === 'bundle'
-    ? viewModel.bundles.find((bundle) => bundle.id === installTarget.id) || null
-    : null;
+  const cardsById = useMemo(
+    () => new Map(viewModel.cards.map((card) => [card.id, card])),
+    [viewModel.cards]
+  );
+  const targetCard = installTarget?.kind === "app" ? cardsById.get(installTarget.id) || null : null;
+  const targetBundle =
+    installTarget?.kind === "bundle"
+      ? viewModel.bundles.find((bundle) => bundle.id === installTarget.id) || null
+      : null;
 
-  const selectableApps = useMemo(() => (
-    targetBundle ? getSelectableBundleApps(targetBundle, cardsById) : []
-  ), [cardsById, targetBundle]);
+  const selectableApps = useMemo(
+    () => (targetBundle ? getSelectableBundleApps(targetBundle, cardsById) : []),
+    [cardsById, targetBundle]
+  );
 
   const initializedSelectedIdsRef = useRef(false);
   useEffect(() => {
-    if (installTarget?.kind !== 'bundle' || initializedSelectedIdsRef.current) {
+    if (installTarget?.kind !== "bundle" || initializedSelectedIdsRef.current) {
       return;
     }
 
-    const initialIds = new Set(selectableApps
-      .filter((app) => app.selectable)
-      .map((app) => app.id));
+    const initialIds = new Set(selectableApps.filter((app) => app.selectable).map((app) => app.id));
 
     setSelectedIds(initialIds);
     initializedSelectedIdsRef.current = true;
   }, [installTarget?.kind, selectableApps]);
 
   useEffect(() => {
-    if (installTarget?.kind !== 'bundle') {
+    if (installTarget?.kind !== "bundle") {
       initializedSelectedIdsRef.current = false;
-      setInstallPhase('detail');
+      setInstallPhase("detail");
       setSelectedIds(new Set());
       setStepStatuses(new Map());
       setCurrentStepIndex(0);
@@ -1083,91 +1246,102 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
     return buildSelectableBundleInstallQueue(targetBundle, cardsById, selectedIds);
   }, [cardsById, targetBundle, selectedIds]);
 
-  const bundleQueue = useMemo(() => (
-    targetBundle ? buildBundleInstallQueue(targetBundle, cardsById) : []
-  ), [cardsById, targetBundle]);
+  const installQueue =
+    installTarget?.kind === "bundle"
+      ? installPhase === "install"
+        ? bundleInstallQueue
+        : []
+      : targetCard
+        ? [targetCard]
+        : [];
 
-  const installQueue = installTarget?.kind === 'bundle'
-    ? (installPhase === 'install' ? bundleInstallQueue : [])
-    : targetCard
-      ? [targetCard]
-      : [];
+  const currentStepCard =
+    installTarget?.kind === "bundle" && installPhase === "install"
+      ? installQueue[currentStepIndex] || null
+      : null;
 
-  const currentStepCard = installTarget?.kind === 'bundle' && installPhase === 'install'
-    ? installQueue[currentStepIndex] || null
-    : null;
+  const activeCard =
+    installTarget?.kind === "bundle" && installPhase === "install"
+      ? cardsById.get(activeAppId) || currentStepCard
+      : cardsById.get(activeAppId) || installQueue[0] || null;
 
-  const activeCard = installTarget?.kind === 'bundle' && installPhase === 'install'
-    ? (cardsById.get(activeAppId) || currentStepCard)
-    : cardsById.get(activeAppId) || installQueue[0] || null;
+  const activeState =
+    activeCard?.app_state || targetBundle?.app_state || targetCard?.app_state || "planned";
+  const installSummary = targetBundle ? buildBundleInstallSummary(targetBundle.cards || []) : null;
 
-  const activeState = activeCard?.app_state || targetBundle?.app_state || targetCard?.app_state || 'planned';
-  const installSummary = targetBundle
-    ? buildBundleInstallSummary(targetBundle.cards || [])
-    : null;
-
-  const bundleSelectableCount = selectableApps.filter((app) => app.selectable).length;
   const selectedCount = selectedIds.size;
-  const canStartBundleInstall = installTarget?.kind === 'bundle'
-    && installPhase === 'detail'
-    && selectedCount > 0
-    && !running;
+  const canStartBundleInstall =
+    installTarget?.kind === "bundle" && installPhase === "detail" && selectedCount > 0 && !running;
 
-  const isAppInstall = installTarget?.kind === 'app';
+  const isAppInstall = installTarget?.kind === "app";
 
   const canInstall = isAppInstall && Boolean(installQueue.length) && !running;
   const canUninstall = isAppInstall && !running;
   const canStop = running && Boolean(currentJob?.id);
 
-  const canInstallCurrentStep = installTarget?.kind === 'bundle'
-    && installPhase === 'install'
-    && currentStepCard
-    && !running
-    && (stepStatuses.get(currentStepCard.id) !== 'succeeded');
+  const canInstallCurrentStep =
+    installTarget?.kind === "bundle" &&
+    installPhase === "install" &&
+    currentStepCard &&
+    !running &&
+    stepStatuses.get(currentStepCard.id) !== "succeeded";
 
-  const canNavigatePrevious = installTarget?.kind === 'bundle'
-    && installPhase === 'install'
-    && currentStepIndex > 0
-    && !running;
+  const canNavigatePrevious =
+    installTarget?.kind === "bundle" &&
+    installPhase === "install" &&
+    currentStepIndex > 0 &&
+    !running;
 
-  const canNavigateNext = installTarget?.kind === 'bundle'
-    && installPhase === 'install'
-    && currentStepIndex < installQueue.length - 1
-    && !running;
+  const canNavigateNext =
+    installTarget?.kind === "bundle" &&
+    installPhase === "install" &&
+    currentStepIndex < installQueue.length - 1 &&
+    !running;
 
-  const canInstallAllRemaining = installTarget?.kind === 'bundle'
-    && installPhase === 'install'
-    && installQueue.length > 0
-    && !running
-    && installQueue.some((card, idx) => {
+  const canInstallAllRemaining =
+    installTarget?.kind === "bundle" &&
+    installPhase === "install" &&
+    installQueue.length > 0 &&
+    !running &&
+    installQueue.some((card, idx) => {
       if (idx < currentStepIndex) {
         return false;
       }
 
-      return (stepStatuses.get(card.id) || 'pending') !== 'succeeded';
+      return (stepStatuses.get(card.id) || "pending") !== "succeeded";
     });
 
-  const title = targetBundle?.title || targetCard?.title || 'Install';
-  const targetIconCard = installTarget?.kind === 'bundle'
-    ? buildAdminBundleIconCard(targetBundle)
-    : buildAdminIconCard(targetCard);
-  const modalEyebrow = installTarget?.kind === 'bundle'
-    ? 'Bundle installer'
-    : 'App installer';
+  const title = targetBundle?.title || targetCard?.title || "Install";
+  const targetIconCard =
+    installTarget?.kind === "bundle"
+      ? buildAdminBundleIconCard(targetBundle)
+      : buildAdminIconCard(targetCard);
+  const modalEyebrow = installTarget?.kind === "bundle" ? "Bundle installer" : "App installer";
 
   if (appsState.loading && !appsState.catalog) {
     return (
       <div className="admin-install-modal-backdrop">
-        <Panel className="admin-install-modal" role="dialog" aria-modal="true" aria-labelledby="admin-install-modal-title">
+        <Panel
+          className="admin-install-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-install-modal-title"
+        >
           <div className="admin-install-modal-head">
             <div className="admin-install-modal-copy">
               <p className="eyebrow">Install</p>
               <h2 id="admin-install-modal-title">Loading installer</h2>
             </div>
           </div>
-          <p className="muted-copy">Twinbox is reading the app catalog before opening the installer.</p>
+          <p className="muted-copy">
+            Twinbox is reading the app catalog before opening the installer.
+          </p>
           <div className="hero-actions admin-install-modal-actions">
-            <button type="button" className="secondary-button" onClick={() => onNavigate('/admin/apps')}>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => onNavigate("/admin/apps")}
+            >
               Back
             </button>
           </div>
@@ -1189,7 +1363,7 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
       setCurrentJob(jobPayload);
       setJobLines(Array.isArray(logsPayload?.lines) ? logsPayload.lines : []);
 
-      if (!['pending', 'running', 'cancel_requested'].includes(jobPayload.status)) {
+      if (!["pending", "running", "cancel_requested"].includes(jobPayload.status)) {
         break;
       }
 
@@ -1199,6 +1373,7 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
     return latestJob;
   }
 
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
     const viewport = logViewportRef.current;
     if (!viewport || !currentJob?.id || !autoScrollLogsRef.current) {
@@ -1208,8 +1383,9 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
     viewport.scrollTop = viewport.scrollHeight;
   }, [currentJob?.id, jobLines]);
 
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
-    if (installTarget?.kind === 'bundle' && installPhase === 'install') {
+    if (installTarget?.kind === "bundle" && installPhase === "install") {
       return undefined;
     }
 
@@ -1217,11 +1393,17 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
       return undefined;
     }
 
-    const resumeCard = installTarget?.kind === 'bundle'
-      ? targetBundle?.cards.find((card) => card?.latest_job?.id && ['pending', 'running', 'cancel_requested'].includes(card.latest_job.status))
-      : targetCard?.latest_job?.id && ['pending', 'running', 'cancel_requested'].includes(targetCard.latest_job.status)
-        ? targetCard
-        : null;
+    const resumeCard =
+      installTarget?.kind === "bundle"
+        ? targetBundle?.cards.find(
+            (card) =>
+              card?.latest_job?.id &&
+              ["pending", "running", "cancel_requested"].includes(card.latest_job.status)
+          )
+        : targetCard?.latest_job?.id &&
+            ["pending", "running", "cancel_requested"].includes(targetCard.latest_job.status)
+          ? targetCard
+          : null;
 
     if (!resumeCard?.latest_job?.id) {
       return undefined;
@@ -1236,16 +1418,20 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
     (async () => {
       try {
         const nextJob = await pollJob(resumeCard.latest_job.id);
-        if (!cancelled && nextJob && nextJob.status === 'failed') {
+        if (!cancelled && nextJob && nextJob.status === "failed") {
           setPageError(nextJob.error || `${resumeCard.title} failed`);
         }
-        if (!cancelled && nextJob && !['pending', 'running', 'cancel_requested'].includes(nextJob.status)) {
+        if (
+          !cancelled &&
+          nextJob &&
+          !["pending", "running", "cancel_requested"].includes(nextJob.status)
+        ) {
           setRunning(false);
           await appsState.reload({ silent: true });
         }
       } catch (error) {
         if (!cancelled) {
-          setPageError(error instanceof Error ? error.message : 'Failed to load job progress.');
+          setPageError(error instanceof Error ? error.message : "Failed to load job progress.");
         }
       }
     })();
@@ -1267,40 +1453,40 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
 
   const installSingleStep = async (card, stepLabel) => {
     setActiveAppId(card.id);
-    setStepStatuses((prev) => new Map(prev).set(card.id, 'running'));
+    setStepStatuses((prev) => new Map(prev).set(card.id, "running"));
 
     if (stepLabel) {
       setPageNotice(stepLabel);
     }
 
     const response = await requestJson(`/api/admin/apps/${encodeURIComponent(card.id)}/install`, {
-      method: 'POST',
+      method: "POST",
     });
 
     const initialJob = {
       id: response.job_id,
-      status: 'pending',
+      status: "pending",
       step_id: card.id,
     };
     setCurrentJob(initialJob);
-    setJobLines([{ line: `queued ${response.job_type || 'run_step'} for ${card.title}` }]);
+    setJobLines([{ line: `queued ${response.job_type || "run_step"} for ${card.title}` }]);
 
     const terminalJob = await pollJob(response.job_id);
 
-    if (terminalJob?.status === 'failed') {
-      setStepStatuses((prev) => new Map(prev).set(card.id, 'failed'));
+    if (terminalJob?.status === "failed") {
+      setStepStatuses((prev) => new Map(prev).set(card.id, "failed"));
       throw new Error(terminalJob.error || `${card.title} failed`);
     }
 
-    if (terminalJob?.status === 'canceled') {
-      setStepStatuses((prev) => new Map(prev).set(card.id, 'failed'));
+    if (terminalJob?.status === "canceled") {
+      setStepStatuses((prev) => new Map(prev).set(card.id, "failed"));
       setPageNotice(`${card.title} was stopped.`);
-      return 'canceled';
+      return "canceled";
     }
 
-    setStepStatuses((prev) => new Map(prev).set(card.id, 'succeeded'));
+    setStepStatuses((prev) => new Map(prev).set(card.id, "succeeded"));
     await appsState.reload({ silent: true });
-    return 'succeeded';
+    return "succeeded";
   };
 
   const runInstall = async (actionOverride) => {
@@ -1309,11 +1495,11 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
     }
 
     setRunning(true);
-    setPageError('');
-    setPageNotice('');
+    setPageError("");
+    setPageNotice("");
     setJobLines([]);
 
-    if (installTarget?.kind === 'bundle' && installPhase === 'install') {
+    if (installTarget?.kind === "bundle" && installPhase === "install") {
       let stopped = false;
 
       try {
@@ -1323,19 +1509,22 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
             continue;
           }
 
-          if ((stepStatuses.get(card.id) || 'pending') === 'succeeded') {
+          if ((stepStatuses.get(card.id) || "pending") === "succeeded") {
             continue;
           }
 
           setCurrentStepIndex(idx);
-          await installSingleStep(card, `Installing ${card.title} (${idx + 1}/${installQueue.length})`);
+          await installSingleStep(
+            card,
+            `Installing ${card.title} (${idx + 1}/${installQueue.length})`
+          );
         }
 
         if (!stopped) {
           setPageNotice(`${targetBundle.title} finished installing.`);
         }
       } catch (error) {
-        setPageError(error instanceof Error ? error.message : 'Failed to install.');
+        setPageError(error instanceof Error ? error.message : "Failed to install.");
       } finally {
         setRunning(false);
       }
@@ -1354,26 +1543,31 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
 
         setActiveAppId(card.id);
 
-        setPageNotice(`${actionOverride === 'uninstall' ? 'Removing' : 'Installing'} ${card.title}${installTarget?.kind === 'bundle' ? ` (${index + 1}/${installQueue.length})` : ''}`);
-        const response = await requestJson(`/api/admin/apps/${encodeURIComponent(card.id)}/${actionOverride}`, {
-          method: 'POST',
-          body: JSON.stringify({ force: true }),
-        });
+        setPageNotice(
+          `${actionOverride === "uninstall" ? "Removing" : "Installing"} ${card.title}${installTarget?.kind === "bundle" ? ` (${index + 1}/${installQueue.length})` : ""}`
+        );
+        const response = await requestJson(
+          `/api/admin/apps/${encodeURIComponent(card.id)}/${actionOverride}`,
+          {
+            method: "POST",
+            body: JSON.stringify({ force: true }),
+          }
+        );
 
         const initialJob = {
           id: response.job_id,
-          status: 'pending',
+          status: "pending",
           step_id: card.id,
         };
         setCurrentJob(initialJob);
-        setJobLines([{ line: `queued ${response.job_type || 'run_step'} for ${card.title}` }]);
+        setJobLines([{ line: `queued ${response.job_type || "run_step"} for ${card.title}` }]);
 
         const terminalJob = await pollJob(response.job_id);
-        if (terminalJob?.status === 'failed') {
+        if (terminalJob?.status === "failed") {
           throw new Error(terminalJob.error || `${card.title} failed`);
         }
 
-        if (terminalJob?.status === 'canceled') {
+        if (terminalJob?.status === "canceled") {
           setPageNotice(`${card.title} was stopped.`);
           stopped = true;
           break;
@@ -1386,9 +1580,9 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
         setPageNotice(
           targetBundle
             ? `${targetBundle.title} finished installing.`
-            : actionOverride === 'uninstall'
+            : actionOverride === "uninstall"
               ? `${title} was removed successfully.`
-              : `${title} completed successfully.`,
+              : `${title} completed successfully.`
         );
       }
     } catch (error) {
@@ -1404,11 +1598,11 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
     }
     try {
       await requestJson(`/api/admin/apps/jobs/${encodeURIComponent(currentJob.id)}/cancel`, {
-        method: 'POST',
+        method: "POST",
       });
-      setPageNotice('Stop requested. The job will cancel shortly.');
+      setPageNotice("Stop requested. The job will cancel shortly.");
     } catch (error) {
-      setPageError(error instanceof Error ? error.message : 'Failed to stop job.');
+      setPageError(error instanceof Error ? error.message : "Failed to stop job.");
     }
   };
 
@@ -1418,28 +1612,31 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
     }
 
     setRunning(true);
-    setPageError('');
-    setPageNotice('');
+    setPageError("");
+    setPageNotice("");
     setJobLines([]);
 
     try {
-      const result = await installSingleStep(currentStepCard, `Installing ${currentStepCard.title}`);
-      if (result === 'succeeded' && currentStepIndex < installQueue.length - 1) {
+      const result = await installSingleStep(
+        currentStepCard,
+        `Installing ${currentStepCard.title}`
+      );
+      if (result === "succeeded" && currentStepIndex < installQueue.length - 1) {
         setCurrentStepIndex((prev) => prev + 1);
       }
     } catch (error) {
-      setPageError(error instanceof Error ? error.message : 'Failed to install.');
+      setPageError(error instanceof Error ? error.message : "Failed to install.");
     } finally {
       setRunning(false);
     }
   };
 
   const handleStartBundleInstall = () => {
-    setInstallPhase('install');
+    setInstallPhase("install");
     setCurrentStepIndex(0);
     setStepStatuses(new Map());
-    setPageError('');
-    setPageNotice('');
+    setPageError("");
+    setPageNotice("");
   };
 
   const handlePreviousStep = () => {
@@ -1465,12 +1662,12 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
 
     try {
       await requestJson(`/api/admin/apps/jobs/${encodeURIComponent(currentJob.id)}/cancel`, {
-        method: 'POST',
+        method: "POST",
       });
-      setPageNotice('Stopping the current install job.');
-      setCurrentJob((prev) => (prev ? { ...prev, status: 'cancel_requested' } : null));
+      setPageNotice("Stopping the current install job.");
+      setCurrentJob((prev) => (prev ? { ...prev, status: "cancel_requested" } : null));
     } catch (error) {
-      setPageError(error instanceof Error ? error.message : 'Failed to cancel the job.');
+      setPageError(error instanceof Error ? error.message : "Failed to cancel the job.");
     }
   };
 
@@ -1499,11 +1696,15 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
         return null;
       }
 
-      if (trimmed.startsWith('**') && trimmed.endsWith('**')) {
-        return <h3 key={index} className="bundle-detail-subhead">{trimmed.replace(/^\*\*|\*\*$/g, '')}</h3>;
+      if (trimmed.startsWith("**") && trimmed.endsWith("**")) {
+        return (
+          <h3 key={index} className="bundle-detail-subhead">
+            {trimmed.replace(/^\*\*|\*\*$/g, "")}
+          </h3>
+        );
       }
 
-      const lines = trimmed.split('\n');
+      const lines = trimmed.split("\n");
       return (
         <p key={index} className="bundle-detail-para">
           {lines.map((line, lineIndex) => (
@@ -1520,7 +1721,12 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
   if (appsState.error) {
     return (
       <div className="admin-install-modal-backdrop">
-        <Panel className="admin-install-modal" role="dialog" aria-modal="true" aria-labelledby="admin-install-modal-title">
+        <Panel
+          className="admin-install-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-install-modal-title"
+        >
           <div className="admin-install-modal-head">
             <div className="admin-install-modal-copy">
               <p className="eyebrow">Install</p>
@@ -1532,7 +1738,11 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
             <span>{appsState.error}</span>
           </div>
           <div className="hero-actions admin-install-modal-actions">
-            <button type="button" className="secondary-button" onClick={() => onNavigate('/admin/apps')}>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => onNavigate("/admin/apps")}
+            >
               Back
             </button>
           </div>
@@ -1544,7 +1754,12 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
   if (!targetCard && !targetBundle) {
     return (
       <div className="admin-install-modal-backdrop">
-        <Panel className="admin-install-modal" role="dialog" aria-modal="true" aria-labelledby="admin-install-modal-title">
+        <Panel
+          className="admin-install-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-install-modal-title"
+        >
           <div className="admin-install-modal-head">
             <div className="admin-install-modal-copy">
               <p className="eyebrow">Install</p>
@@ -1553,7 +1768,11 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
           </div>
           <p className="muted-copy">This install target is not available in the current catalog.</p>
           <div className="hero-actions admin-install-modal-actions">
-            <button type="button" className="secondary-button" onClick={() => onNavigate('/admin/apps')}>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => onNavigate("/admin/apps")}
+            >
               Back
             </button>
           </div>
@@ -1562,10 +1781,15 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
     );
   }
 
-  if (installTarget?.kind === 'bundle' && installPhase === 'detail') {
+  if (installTarget?.kind === "bundle" && installPhase === "detail") {
     return (
       <div className="admin-install-modal-backdrop">
-        <Panel className="admin-install-modal admin-install-modal-wide" role="dialog" aria-modal="true" aria-labelledby="admin-install-modal-title">
+        <Panel
+          className="admin-install-modal admin-install-modal-wide"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-install-modal-title"
+        >
           <div className="admin-install-modal-head">
             <div className="admin-install-modal-target">
               <AppIcon card={targetIconCard} className="admin-install-modal-icon" />
@@ -1574,8 +1798,8 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
                 <h2 id="admin-install-modal-title">{title}</h2>
               </div>
             </div>
-            <span className={`status-chip ${statusTone(targetBundle?.app_state || 'ready')}`}>
-              {statusLabel(targetBundle?.app_state || 'ready')}
+            <span className={`status-chip ${statusTone(targetBundle?.app_state || "ready")}`}>
+              {statusLabel(targetBundle?.app_state || "ready")}
             </span>
           </div>
 
@@ -1584,7 +1808,9 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
               {renderDescription(targetBundle.description)}
             </div>
           ) : (
-            <p className="muted-copy">{installSummary?.label || `${selectableApps.length} apps in this bundle`}</p>
+            <p className="muted-copy">
+              {installSummary?.label || `${selectableApps.length} apps in this bundle`}
+            </p>
           )}
 
           <div className="bundle-detail-app-list">
@@ -1599,7 +1825,7 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
                   <label
                     key={app.id}
                     htmlFor={checkboxId}
-                    className={`bundle-detail-app-row ${!app.selectable && !app.installed ? 'is-disabled' : ''} ${app.installed ? 'is-installed' : ''}`}
+                    className={`bundle-detail-app-row ${!app.selectable && !app.installed ? "is-disabled" : ""} ${app.installed ? "is-installed" : ""}`}
                   >
                     <input
                       type="checkbox"
@@ -1614,7 +1840,12 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
                       }}
                     />
                     <AppIcon
-                      card={{ iconUrl: app.iconUrl, iconAlt: app.iconAlt, iconText: app.iconText, title: app.title }}
+                      card={{
+                        iconUrl: app.iconUrl,
+                        iconAlt: app.iconAlt,
+                        iconText: app.iconText,
+                        title: app.title,
+                      }}
                       className="bundle-detail-app-icon"
                     />
                     <span className="bundle-detail-app-title">{app.title}</span>
@@ -1636,7 +1867,11 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
             >
               Install all ({selectedCount})
             </button>
-            <button type="button" className="secondary-button" onClick={() => onNavigate('/admin/apps')}>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => onNavigate("/admin/apps")}
+            >
               Back
             </button>
           </div>
@@ -1645,19 +1880,22 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
     );
   }
 
-  if (installTarget?.kind === 'bundle' && installPhase === 'install') {
+  if (installTarget?.kind === "bundle" && installPhase === "install") {
     const bundleProgress = bundleInstallQueue.map((card, idx) => ({
       card,
       index: idx,
-      status: stepStatuses.get(card.id) || 'pending',
+      status: stepStatuses.get(card.id) || "pending",
       isCurrent: idx === currentStepIndex,
     }));
 
-    const isInstallAll = bundleProgress.some((item) => item.status === 'running');
-
     return (
       <div className="admin-install-modal-backdrop">
-        <Panel className="admin-install-modal admin-install-modal-wide" role="dialog" aria-modal="true" aria-labelledby="admin-install-modal-title">
+        <Panel
+          className="admin-install-modal admin-install-modal-wide"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-install-modal-title"
+        >
           <div className="admin-install-modal-head">
             <div className="admin-install-modal-target">
               <AppIcon card={targetIconCard} className="admin-install-modal-icon" />
@@ -1666,39 +1904,64 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
                 <h2 id="admin-install-modal-title">{title}</h2>
               </div>
             </div>
-            <span className={`status-chip ${statusTone(running ? 'installing' : bundleInstallQueue.every((c) => stepStatuses.get(c.id) === 'succeeded') ? 'installed' : 'ready')}`}>
-              {statusLabel(running ? 'installing' : bundleInstallQueue.every((c) => stepStatuses.get(c.id) === 'succeeded') ? 'installed' : 'ready')}
+            <span
+              className={`status-chip ${statusTone(running ? "installing" : bundleInstallQueue.every((c) => stepStatuses.get(c.id) === "succeeded") ? "installed" : "ready")}`}
+            >
+              {statusLabel(
+                running
+                  ? "installing"
+                  : bundleInstallQueue.every((c) => stepStatuses.get(c.id) === "succeeded")
+                    ? "installed"
+                    : "ready"
+              )}
             </span>
           </div>
 
           <div className="bundle-detail-app-list">
             {bundleProgress.map(({ card, index, status, isCurrent }) => {
-              const statusLabelText = status === 'succeeded'
-                ? 'Installed'
-                : status === 'running'
-                  ? 'Installing'
-                  : status === 'failed'
-                    ? 'Failed'
-                    : 'Ready';
+              const statusLabelText =
+                status === "succeeded"
+                  ? "Installed"
+                  : status === "running"
+                    ? "Installing"
+                    : status === "failed"
+                      ? "Failed"
+                      : "Ready";
 
-              const statusToneClass = status === 'succeeded' ? 'is-ok' : status === 'running' ? 'is-live' : status === 'failed' ? 'is-bad' : 'is-neutral';
+              const statusToneClass =
+                status === "succeeded"
+                  ? "is-ok"
+                  : status === "running"
+                    ? "is-live"
+                    : status === "failed"
+                      ? "is-bad"
+                      : "is-neutral";
 
               return (
                 <div
                   key={card.id}
-                  className={`bundle-detail-app-row bundle-install-step ${isCurrent ? 'is-current' : ''} ${status === 'succeeded' ? 'is-done' : ''}`}
+                  className={`bundle-detail-app-row bundle-install-step ${isCurrent ? "is-current" : ""} ${status === "succeeded" ? "is-done" : ""}`}
                 >
                   <span className="bundle-install-step-indicator">
-                    {status === 'succeeded' ? '✓' : status === 'running' ? '▶' : status === 'failed' ? '✗' : `${index + 1}`}
+                    {status === "succeeded"
+                      ? "✓"
+                      : status === "running"
+                        ? "▶"
+                        : status === "failed"
+                          ? "✗"
+                          : `${index + 1}`}
                   </span>
                   <AppIcon
-                    card={{ iconUrl: card.iconUrl, iconAlt: card.iconAlt, iconText: card.iconText, title: card.title }}
+                    card={{
+                      iconUrl: card.iconUrl,
+                      iconAlt: card.iconAlt,
+                      iconText: card.iconText,
+                      title: card.title,
+                    }}
                     className="bundle-detail-app-icon"
                   />
                   <span className="bundle-detail-app-title">{card.title}</span>
-                  <span className={`status-chip ${statusToneClass}`}>
-                    {statusLabelText}
-                  </span>
+                  <span className={`status-chip ${statusToneClass}`}>{statusLabelText}</span>
                 </div>
               );
             })}
@@ -1709,7 +1972,11 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
             viewportRef={logViewportRef}
             onScroll={handleLogScroll}
             lines={jobLines}
-            emptyLabel={running ? 'Waiting for the first log line…' : 'Navigate to a step and press Install to start.'}
+            emptyLabel={
+              running
+                ? "Waiting for the first log line…"
+                : "Navigate to a step and press Install to start."
+            }
           />
 
           {pageError ? (
@@ -1726,10 +1993,20 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
           ) : null}
 
           <div className="hero-actions admin-install-modal-actions">
-            <button type="button" className="secondary-button" onClick={handlePreviousStep} disabled={!canNavigatePrevious}>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={handlePreviousStep}
+              disabled={!canNavigatePrevious}
+            >
               Previous
             </button>
-            <button type="button" className="secondary-button" onClick={handleNextStep} disabled={!canNavigateNext}>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={handleNextStep}
+              disabled={!canNavigateNext}
+            >
               Next
             </button>
             <button
@@ -1738,7 +2015,7 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
               onClick={handleInstallCurrentStep}
               disabled={!canInstallCurrentStep}
             >
-              {running && activeAppId === currentStepCard?.id ? 'Installing…' : 'Install'}
+              {running && activeAppId === currentStepCard?.id ? "Installing…" : "Install"}
             </button>
             {canInstallAllRemaining && (
               <button
@@ -1751,11 +2028,21 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
               </button>
             )}
             {running && currentJob?.id ? (
-              <button type="button" className="secondary-button is-destructive" onClick={handleCancelActiveJob}>
+              <button
+                type="button"
+                className="secondary-button is-destructive"
+                onClick={handleCancelActiveJob}
+              >
                 Stop
               </button>
             ) : null}
-            <button type="button" className="secondary-button" onClick={() => { setInstallPhase('detail'); }}>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => {
+                setInstallPhase("detail");
+              }}
+            >
               Back
             </button>
           </div>
@@ -1766,7 +2053,12 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
 
   return (
     <div className="admin-install-modal-backdrop">
-      <Panel className="admin-install-modal" role="dialog" aria-modal="true" aria-labelledby="admin-install-modal-title">
+      <Panel
+        className="admin-install-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="admin-install-modal-title"
+      >
         <div className="admin-install-modal-head">
           <div className="admin-install-modal-target">
             <AppIcon card={targetIconCard} className="admin-install-modal-icon" />
@@ -1780,7 +2072,7 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
           </span>
         </div>
 
-        {installTarget?.kind === 'bundle' && installSummary ? (
+        {installTarget?.kind === "bundle" && installSummary ? (
           <p className="muted-copy">{installSummary.label}</p>
         ) : (
           <p className="muted-copy">Press Install to start the live install output.</p>
@@ -1791,7 +2083,11 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
           viewportRef={logViewportRef}
           onScroll={handleLogScroll}
           lines={jobLines}
-          emptyLabel={running ? 'Waiting for the first log line…' : 'Press Install or Uninstall to start the script output.'}
+          emptyLabel={
+            running
+              ? "Waiting for the first log line…"
+              : "Press Install or Uninstall to start the script output."
+          }
         />
 
         {pageError ? (
@@ -1811,18 +2107,18 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
           <button
             type="button"
             className="primary-button"
-            onClick={() => runInstall('install')}
+            onClick={() => runInstall("install")}
             disabled={!canInstall}
           >
-            {running ? 'Installing…' : 'Install'}
+            {running ? "Installing…" : "Install"}
           </button>
           <button
             type="button"
             className="secondary-button"
-            onClick={() => runInstall('uninstall')}
+            onClick={() => runInstall("uninstall")}
             disabled={!canUninstall}
           >
-            {running ? 'Uninstalling…' : 'Uninstall'}
+            {running ? "Uninstalling…" : "Uninstall"}
           </button>
           <button
             type="button"
@@ -1832,7 +2128,11 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
           >
             Stop
           </button>
-          <button type="button" className="secondary-button" onClick={() => onNavigate('/admin/apps')}>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => onNavigate("/admin/apps")}
+          >
             Back
           </button>
         </div>
@@ -1841,16 +2141,17 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
   );
 }
 function ObservabilityProfileCard({ profile, isCurrent = false, isSelected = false, onSelect }) {
-  const tone = profile.priority === 'destructive'
-    ? 'is-bad'
-    : profile.priority === 'default'
-      ? 'is-live'
-      : 'is-ok';
+  const tone =
+    profile.priority === "destructive"
+      ? "is-bad"
+      : profile.priority === "default"
+        ? "is-live"
+        : "is-ok";
 
   return (
     <article
-      className={`observability-card ${profile.priority === 'destructive' ? 'is-destructive' : ''} ${isCurrent ? 'is-current' : ''} ${isSelected ? 'is-selected' : ''}`.trim()}
-      style={{ '--accent': profile.accent }}
+      className={`observability-card ${profile.priority === "destructive" ? "is-destructive" : ""} ${isCurrent ? "is-current" : ""} ${isSelected ? "is-selected" : ""}`.trim()}
+      style={{ "--accent": profile.accent }}
     >
       <div className="observability-card-head">
         <div className="observability-card-title">
@@ -1858,7 +2159,13 @@ function ObservabilityProfileCard({ profile, isCurrent = false, isSelected = fal
           <h3>{profile.label}</h3>
         </div>
         <span className={`status-chip ${tone}`}>
-          {isCurrent ? 'current' : isSelected ? 'selected' : profile.priority === 'destructive' ? 'destructive' : 'available'}
+          {isCurrent
+            ? "current"
+            : isSelected
+              ? "selected"
+              : profile.priority === "destructive"
+                ? "destructive"
+                : "available"}
         </span>
       </div>
       <p className="observability-card-summary">{profile.summary}</p>
@@ -1867,26 +2174,30 @@ function ObservabilityProfileCard({ profile, isCurrent = false, isSelected = fal
       <dl className="observability-footprint">
         <div>
           <dt>CPU</dt>
-          <dd>{profile.footprint?.cpu || '—'}</dd>
+          <dd>{profile.footprint?.cpu || "—"}</dd>
         </div>
         <div>
           <dt>Memory</dt>
-          <dd>{profile.footprint?.memory || '—'}</dd>
+          <dd>{profile.footprint?.memory || "—"}</dd>
         </div>
         <div>
           <dt>Storage</dt>
-          <dd>{profile.footprint?.storage || '—'}</dd>
+          <dd>{profile.footprint?.storage || "—"}</dd>
         </div>
       </dl>
 
       {Array.isArray(profile.impact) && profile.impact.length > 0 ? (
         <ul className="observability-mini-list">
-          {profile.impact.slice(0, 3).map((item) => <li key={item}>{item}</li>)}
+          {profile.impact.slice(0, 3).map((item) => (
+            <li key={item}>{item}</li>
+          ))}
         </ul>
       ) : null}
 
       {profile.warning ? (
-        <div className={`inline-notice ${profile.priority === 'destructive' ? 'is-danger' : 'is-accent'}`}>
+        <div
+          className={`inline-notice ${profile.priority === "destructive" ? "is-danger" : "is-accent"}`}
+        >
           <strong>Watch out</strong>
           <span>{profile.warning}</span>
         </div>
@@ -1894,27 +2205,31 @@ function ObservabilityProfileCard({ profile, isCurrent = false, isSelected = fal
 
       <button
         type="button"
-        className={profile.priority === 'destructive' ? 'secondary-button' : 'primary-button'}
+        className={profile.priority === "destructive" ? "secondary-button" : "primary-button"}
         onClick={onSelect}
         aria-pressed={isSelected}
       >
-        {isSelected ? 'Selected' : 'Select mode'}
+        {isSelected ? "Selected" : "Select mode"}
       </button>
     </article>
   );
 }
 
 function ObservabilityAdminPage({ config, observabilityState, onNavigate }) {
-  const [selectedProfile, setSelectedProfile] = useState('');
+  const [selectedProfile, setSelectedProfile] = useState("");
   const [running, setRunning] = useState(false);
-  const [pageError, setPageError] = useState('');
-  const [pageNotice, setPageNotice] = useState('');
+  const [pageError, setPageError] = useState("");
+  const [pageNotice, setPageNotice] = useState("");
 
-  const viewModel = useMemo(() => buildObservabilityViewModel({
-    config,
-    cluster: observabilityState.cluster,
-    selectedProfile,
-  }), [config, observabilityState.cluster, selectedProfile]);
+  const viewModel = useMemo(
+    () =>
+      buildObservabilityViewModel({
+        config,
+        cluster: observabilityState.cluster,
+        selectedProfile,
+      }),
+    [config, observabilityState.cluster, selectedProfile]
+  );
 
   useEffect(() => {
     if (!selectedProfile && viewModel.currentProfile) {
@@ -1923,7 +2238,7 @@ function ObservabilityAdminPage({ config, observabilityState, onNavigate }) {
   }, [selectedProfile, viewModel.currentProfile]);
 
   useEffect(() => {
-    setPageError(observabilityState.error || '');
+    setPageError(observabilityState.error || "");
   }, [observabilityState.error]);
 
   const selected = viewModel.selectedProfileCard || viewModel.currentProfileCard;
@@ -1935,8 +2250,8 @@ function ObservabilityAdminPage({ config, observabilityState, onNavigate }) {
     }
     startTransition(() => {
       setSelectedProfile(profileId);
-      setPageError('');
-      setPageNotice('');
+      setPageError("");
+      setPageNotice("");
     });
   };
 
@@ -1946,23 +2261,23 @@ function ObservabilityAdminPage({ config, observabilityState, onNavigate }) {
     }
 
     setRunning(true);
-    setPageError('');
-    setPageNotice('');
+    setPageError("");
+    setPageNotice("");
 
     try {
-      const response = await requestJson('/api/admin/observability', {
-        method: 'PUT',
+      const response = await requestJson("/api/admin/observability", {
+        method: "PUT",
         body: JSON.stringify({ profile: selected.id }),
       });
 
       setPageNotice(
-        response?.observability_status === 'applying'
+        response?.observability_status === "applying"
           ? `${selected.label} is being reconciled on ${viewModel.clusterName}.`
-          : `${selected.label} was submitted for reconciliation.`,
+          : `${selected.label} was submitted for reconciliation.`
       );
       await observabilityState.reload({ silent: true });
     } catch (error) {
-      setPageError(error instanceof Error ? error.message : 'Failed to update observability.');
+      setPageError(error instanceof Error ? error.message : "Failed to update observability.");
     } finally {
       setRunning(false);
     }
@@ -1976,7 +2291,9 @@ function ObservabilityAdminPage({ config, observabilityState, onNavigate }) {
           title="Observability control"
           description="Loading the current cluster profile."
         />
-        <p className="muted-copy">Twinbox is reading the cluster policy and current observability state.</p>
+        <p className="muted-copy">
+          Twinbox is reading the cluster policy and current observability state.
+        </p>
       </Panel>
     );
   }
@@ -1993,7 +2310,11 @@ function ObservabilityAdminPage({ config, observabilityState, onNavigate }) {
           <strong>Something needs attention.</strong>
           <span>{observabilityState.error}</span>
         </div>
-        <button type="button" className="secondary-button" onClick={() => onNavigate('/admin/apps')}>
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={() => onNavigate("/admin/apps")}
+        >
           Back to admin
         </button>
       </Panel>
@@ -2016,9 +2337,13 @@ function ObservabilityAdminPage({ config, observabilityState, onNavigate }) {
               onClick={() => observabilityState.reload()}
               disabled={observabilityState.refreshing}
             >
-              {observabilityState.refreshing ? 'Refreshing…' : 'Refresh state'}
+              {observabilityState.refreshing ? "Refreshing…" : "Refresh state"}
             </button>
-            <button type="button" className="secondary-button" onClick={() => onNavigate('/admin/apps')}>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => onNavigate("/admin/apps")}
+            >
               Back home
             </button>
           </div>
@@ -2026,17 +2351,21 @@ function ObservabilityAdminPage({ config, observabilityState, onNavigate }) {
 
         <div className="observability-summary-strip">
           <div>
-            <span className={`status-chip ${viewModel.currentStatusTone}`}>{viewModel.currentStatusLabel}</span>
+            <span className={`status-chip ${viewModel.currentStatusTone}`}>
+              {viewModel.currentStatusLabel}
+            </span>
             <strong>{viewModel.clusterName}</strong>
-            <span>Current profile: {viewModel.currentProfileCard?.label || 'Unknown'}</span>
+            <span>Current profile: {viewModel.currentProfileCard?.label || "Unknown"}</span>
             {viewModel.currentJobId ? <span>Job: {viewModel.currentJobId}</span> : null}
           </div>
           <div>
-            <span className={`status-chip ${selected?.priority === 'destructive' ? 'is-bad' : selected?.priority === 'default' ? 'is-live' : 'is-ok'}`}>
+            <span
+              className={`status-chip ${selected?.priority === "destructive" ? "is-bad" : selected?.priority === "default" ? "is-live" : "is-ok"}`}
+            >
               Selected
             </span>
-            <strong>{selected?.label || 'Select a profile'}</strong>
-            <span>{selected?.summary || 'Choose a profile below to review its impact.'}</span>
+            <strong>{selected?.label || "Select a profile"}</strong>
+            <span>{selected?.summary || "Choose a profile below to review its impact."}</span>
           </div>
           <div>
             <span className="status-chip is-neutral">Baseline</span>
@@ -2045,7 +2374,7 @@ function ObservabilityAdminPage({ config, observabilityState, onNavigate }) {
           </div>
         </div>
 
-        {viewModel.currentStatus === 'failed' && viewModel.currentError ? (
+        {viewModel.currentStatus === "failed" && viewModel.currentError ? (
           <div className="inline-notice is-danger">
             <strong>Reconciliation failed</strong>
             <span>{viewModel.currentError}</span>
@@ -2053,41 +2382,50 @@ function ObservabilityAdminPage({ config, observabilityState, onNavigate }) {
         ) : null}
 
         <div className="observability-profile-grid">
-          {viewModel.profiles.filter((profile) => profile.id !== 'off').map((profile) => (
-            <ObservabilityProfileCard
-              key={profile.id}
-              profile={profile}
-              isCurrent={viewModel.currentProfile === profile.id}
-              isSelected={selected?.id === profile.id}
-              onSelect={() => handleSelect(profile.id)}
-            />
-          ))}
+          {viewModel.profiles
+            .filter((profile) => profile.id !== "off")
+            .map((profile) => (
+              <ObservabilityProfileCard
+                key={profile.id}
+                profile={profile}
+                isCurrent={viewModel.currentProfile === profile.id}
+                isSelected={selected?.id === profile.id}
+                onSelect={() => handleSelect(profile.id)}
+              />
+            ))}
         </div>
 
         <ObservabilityProfileCard
-          profile={viewModel.profiles.find((profile) => profile.id === 'off') || viewModel.currentProfileCard}
-          isCurrent={viewModel.currentProfile === 'off'}
-          isSelected={selected?.id === 'off'}
-          onSelect={() => handleSelect('off')}
+          profile={
+            viewModel.profiles.find((profile) => profile.id === "off") ||
+            viewModel.currentProfileCard
+          }
+          isCurrent={viewModel.currentProfile === "off"}
+          isSelected={selected?.id === "off"}
+          onSelect={() => handleSelect("off")}
         />
 
         <div className="observability-detail-panel">
           <SectionTitle
             eyebrow="Impact"
-            title={`${selected?.label || 'Selected profile'} details`}
+            title={`${selected?.label || "Selected profile"} details`}
             description="Review what stays, what disappears, and how much Longhorn churn this mode should create."
           />
           <div className="observability-detail-grid">
             <article className="observability-detail-box">
               <strong>Kept</strong>
               <ul>
-                {(selected?.keeps || []).map((item) => <li key={item}>{item}</li>)}
+                {(selected?.keeps || []).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
               </ul>
             </article>
             <article className="observability-detail-box">
               <strong>Removed</strong>
               <ul>
-                {(selected?.removes || []).map((item) => <li key={item}>{item}</li>)}
+                {(selected?.removes || []).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
               </ul>
             </article>
             <article className="observability-detail-box">
@@ -2095,21 +2433,23 @@ function ObservabilityAdminPage({ config, observabilityState, onNavigate }) {
               <dl className="observability-footprint">
                 <div>
                   <dt>CPU</dt>
-                  <dd>{selected?.footprint?.cpu || '—'}</dd>
+                  <dd>{selected?.footprint?.cpu || "—"}</dd>
                 </div>
                 <div>
                   <dt>Memory</dt>
-                  <dd>{selected?.footprint?.memory || '—'}</dd>
+                  <dd>{selected?.footprint?.memory || "—"}</dd>
                 </div>
                 <div>
                   <dt>Storage</dt>
-                  <dd>{selected?.footprint?.storage || '—'}</dd>
+                  <dd>{selected?.footprint?.storage || "—"}</dd>
                 </div>
               </dl>
             </article>
           </div>
           {selected?.warning ? (
-            <div className={`inline-notice ${selected.priority === 'destructive' ? 'is-danger' : 'is-accent'}`}>
+            <div
+              className={`inline-notice ${selected.priority === "destructive" ? "is-danger" : "is-accent"}`}
+            >
               <strong>Watch out</strong>
               <span>{selected.warning}</span>
             </div>
@@ -2130,10 +2470,24 @@ function ObservabilityAdminPage({ config, observabilityState, onNavigate }) {
         ) : null}
 
         <div className="hero-actions observability-shell-actions">
-          <button type="button" className="primary-button" onClick={handleApply} disabled={!canApply}>
-            {running ? 'Applying…' : selected?.id === viewModel.currentProfile ? 'Reconcile current mode' : 'Apply selected mode'}
+          <button
+            type="button"
+            className="primary-button"
+            onClick={handleApply}
+            disabled={!canApply}
+          >
+            {running
+              ? "Applying…"
+              : selected?.id === viewModel.currentProfile
+                ? "Reconcile current mode"
+                : "Apply selected mode"}
           </button>
-          <button type="button" className="secondary-button" onClick={() => observabilityState.reload()} disabled={observabilityState.refreshing}>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => observabilityState.reload()}
+            disabled={observabilityState.refreshing}
+          >
             Refresh state
           </button>
         </div>
@@ -2143,29 +2497,33 @@ function ObservabilityAdminPage({ config, observabilityState, onNavigate }) {
 }
 
 function UserAdminPage({ config, directoryState, onNavigate }) {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
-  const [selectedUserId, setSelectedUserId] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState("");
   const [groupDraft, setGroupDraft] = useState([]);
   const [createDraft, setCreateDraft] = useState({
-    username: '',
-    name: '',
-    email: '',
+    username: "",
+    name: "",
+    email: "",
     groupNames: [],
   });
   const [createBusy, setCreateBusy] = useState(false);
   const [groupBusy, setGroupBusy] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
-  const [formError, setFormError] = useState('');
+  const [formError, setFormError] = useState("");
   const [temporaryPassword, setTemporaryPassword] = useState(null);
 
-  const viewModel = useMemo(() => buildUserAdminViewModel({
-    config,
-    users: directoryState.users,
-    groups: directoryState.groups,
-    query: deferredQuery,
-    selectedUserId,
-  }), [config, directoryState.groups, directoryState.users, deferredQuery, selectedUserId]);
+  const viewModel = useMemo(
+    () =>
+      buildUserAdminViewModel({
+        config,
+        users: directoryState.users,
+        groups: directoryState.groups,
+        query: deferredQuery,
+        selectedUserId,
+      }),
+    [config, directoryState.groups, directoryState.users, deferredQuery, selectedUserId]
+  );
 
   useEffect(() => {
     if (viewModel.selectedUser?.id && viewModel.selectedUser.id !== selectedUserId) {
@@ -2181,9 +2539,9 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
 
   useEffect(() => {
     setCreateDraft((current) => {
-      const nextGroupNames = current.groupNames.filter((groupName) => (
+      const nextGroupNames = current.groupNames.filter((groupName) =>
         viewModel.groups.some((group) => group.name === groupName)
-      ));
+      );
       if (nextGroupNames.length === current.groupNames.length) {
         return current;
       }
@@ -2204,26 +2562,26 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
   };
 
   const toggleSelectedGroup = (groupName) => {
-    setGroupDraft((current) => (
+    setGroupDraft((current) =>
       current.includes(groupName)
         ? current.filter((value) => value !== groupName)
         : [...current, groupName].sort((left, right) => left.localeCompare(right))
-    ));
+    );
   };
 
   const refreshDirectory = async () => {
-    setFormError('');
+    setFormError("");
     await directoryState.reload();
   };
 
   const submitCreate = async (event) => {
     event.preventDefault();
     setCreateBusy(true);
-    setFormError('');
+    setFormError("");
 
     try {
-      const payload = await requestJson('/api/admin/users', {
-        method: 'POST',
+      const payload = await requestJson("/api/admin/users", {
+        method: "POST",
         body: JSON.stringify(createDraft),
       });
 
@@ -2232,17 +2590,17 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
         user: payload.user,
       });
       setCreateDraft({
-        username: '',
-        name: '',
-        email: '',
+        username: "",
+        name: "",
+        email: "",
         groupNames: [],
       });
       startTransition(() => {
-        setSelectedUserId(payload?.user?.id || '');
+        setSelectedUserId(payload?.user?.id || "");
       });
       await directoryState.reload();
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'Failed to create user.');
+      setFormError(error instanceof Error ? error.message : "Failed to create user.");
     } finally {
       setCreateBusy(false);
     }
@@ -2254,15 +2612,18 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
     }
 
     setGroupBusy(true);
-    setFormError('');
+    setFormError("");
     try {
-      await requestJson(`/api/admin/users/${encodeURIComponent(viewModel.selectedUser.id)}/groups`, {
-        method: 'PUT',
-        body: JSON.stringify({ groupNames: groupDraft }),
-      });
+      await requestJson(
+        `/api/admin/users/${encodeURIComponent(viewModel.selectedUser.id)}/groups`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ groupNames: groupDraft }),
+        }
+      );
       await directoryState.reload();
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'Failed to save groups.');
+      setFormError(error instanceof Error ? error.message : "Failed to save groups.");
     } finally {
       setGroupBusy(false);
     }
@@ -2274,15 +2635,18 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
     }
 
     setStatusBusy(true);
-    setFormError('');
+    setFormError("");
     try {
-      const endpoint = viewModel.selectedUser.isActive ? 'disable' : 'enable';
-      await requestJson(`/api/admin/users/${encodeURIComponent(viewModel.selectedUser.id)}/${endpoint}`, {
-        method: 'POST',
-      });
+      const endpoint = viewModel.selectedUser.isActive ? "disable" : "enable";
+      await requestJson(
+        `/api/admin/users/${encodeURIComponent(viewModel.selectedUser.id)}/${endpoint}`,
+        {
+          method: "POST",
+        }
+      );
       await directoryState.reload();
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'Failed to update account status.');
+      setFormError(error instanceof Error ? error.message : "Failed to update account status.");
     } finally {
       setStatusBusy(false);
     }
@@ -2292,8 +2656,8 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
     return (
       <Panel>
         <SectionTitle
-          eyebrow={config?.userAdmin?.eyebrow || 'Admin'}
-          title={config?.userAdmin?.title || 'Gebruikers en groepen'}
+          eyebrow={config?.userAdmin?.eyebrow || "Admin"}
+          title={config?.userAdmin?.title || "Gebruikers en groepen"}
           description="Loading the current Authentik directory."
         />
         <p className="muted-copy">Twinbox is reading users and groups from Authentik.</p>
@@ -2305,7 +2669,7 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
     <div className="user-admin-layout">
       <Panel className="user-admin-overview">
         <SectionTitle
-          eyebrow={config?.userAdmin?.eyebrow || 'Admin'}
+          eyebrow={config?.userAdmin?.eyebrow || "Admin"}
           title={viewModel.title}
           description={viewModel.description}
         />
@@ -2328,10 +2692,19 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
           </article>
         </div>
         <div className="hero-actions">
-          <button type="button" className="secondary-button" onClick={refreshDirectory} disabled={directoryState.refreshing}>
-            {directoryState.refreshing ? 'Refreshing…' : 'Refresh'}
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={refreshDirectory}
+            disabled={directoryState.refreshing}
+          >
+            {directoryState.refreshing ? "Refreshing…" : "Refresh"}
           </button>
-          <button type="button" className="secondary-button" onClick={() => onNavigate('/admin/apps')}>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => onNavigate("/admin/apps")}
+          >
             Back to app installs
           </button>
         </div>
@@ -2343,10 +2716,17 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
         ) : null}
         {temporaryPassword ? (
           <div className="inline-notice is-accent">
-            <strong>Temporary password for {temporaryPassword.user?.name || temporaryPassword.user?.username}</strong>
+            <strong>
+              Temporary password for{" "}
+              {temporaryPassword.user?.name || temporaryPassword.user?.username}
+            </strong>
             <code>{temporaryPassword.password}</code>
             <span>Show this once to the user. The portal does not keep a readable copy.</span>
-            <button type="button" className="secondary-button" onClick={() => setTemporaryPassword(null)}>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => setTemporaryPassword(null)}
+            >
               Hide password
             </button>
           </div>
@@ -2367,7 +2747,9 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
                 <input
                   type="text"
                   value={createDraft.name}
-                  onChange={(event) => setCreateDraft((current) => ({ ...current, name: event.target.value }))}
+                  onChange={(event) =>
+                    setCreateDraft((current) => ({ ...current, name: event.target.value }))
+                  }
                   placeholder="Jane Example"
                   required
                 />
@@ -2377,7 +2759,9 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
                 <input
                   type="text"
                   value={createDraft.username}
-                  onChange={(event) => setCreateDraft((current) => ({ ...current, username: event.target.value }))}
+                  onChange={(event) =>
+                    setCreateDraft((current) => ({ ...current, username: event.target.value }))
+                  }
                   placeholder="jane"
                   required
                 />
@@ -2387,7 +2771,9 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
                 <input
                   type="email"
                   value={createDraft.email}
-                  onChange={(event) => setCreateDraft((current) => ({ ...current, email: event.target.value }))}
+                  onChange={(event) =>
+                    setCreateDraft((current) => ({ ...current, email: event.target.value }))
+                  }
                   placeholder="jane@example.com"
                 />
               </label>
@@ -2415,9 +2801,11 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
               </div>
               <div className="hero-actions">
                 <button type="submit" className="primary-button" disabled={createBusy}>
-                  {createBusy ? 'Creating…' : 'Create user'}
+                  {createBusy ? "Creating…" : "Create user"}
                 </button>
-                <span className="muted-copy">Twinbox will generate a temporary password and show it once.</span>
+                <span className="muted-copy">
+                  Twinbox will generate a temporary password and show it once.
+                </span>
               </div>
             </form>
           </Panel>
@@ -2447,16 +2835,19 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
                   <button
                     key={user.id}
                     type="button"
-                    className={`user-list-row ${user.id === viewModel.selectedUser?.id ? 'is-selected' : ''}`}
+                    className={`user-list-row ${user.id === viewModel.selectedUser?.id ? "is-selected" : ""}`}
                     onClick={() => startTransition(() => setSelectedUserId(user.id))}
                   >
                     <span className="user-list-copy">
                       <strong>{user.name}</strong>
-                      <span>{user.username}{user.email ? ` · ${user.email}` : ''}</span>
+                      <span>
+                        {user.username}
+                        {user.email ? ` · ${user.email}` : ""}
+                      </span>
                     </span>
                     <span className="user-list-meta">
-                      <span className={`status-chip ${user.isActive ? 'is-live' : ''}`}>
-                        {user.isActive ? 'active' : 'disabled'}
+                      <span className={`status-chip ${user.isActive ? "is-live" : ""}`}>
+                        {user.isActive ? "active" : "disabled"}
                       </span>
                     </span>
                   </button>
@@ -2481,11 +2872,11 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
                 </div>
                 <div>
                   <span>Email</span>
-                  <strong>{viewModel.selectedUser.email || 'No email set'}</strong>
+                  <strong>{viewModel.selectedUser.email || "No email set"}</strong>
                 </div>
                 <div>
                   <span>Status</span>
-                  <strong>{viewModel.selectedUser.isActive ? 'Active' : 'Disabled'}</strong>
+                  <strong>{viewModel.selectedUser.isActive ? "Active" : "Disabled"}</strong>
                 </div>
                 <div>
                   <span>Hidden memberships</span>
@@ -2519,21 +2910,33 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
                     </div>
                   </div>
                   <div className="hero-actions">
-                    <button type="button" className="primary-button" onClick={saveGroups} disabled={groupBusy}>
-                      {groupBusy ? 'Saving…' : 'Save groups'}
+                    <button
+                      type="button"
+                      className="primary-button"
+                      onClick={saveGroups}
+                      disabled={groupBusy}
+                    >
+                      {groupBusy ? "Saving…" : "Save groups"}
                     </button>
-                    <span className="muted-copy">Only the approved groups above are editable here.</span>
+                    <span className="muted-copy">
+                      Only the approved groups above are editable here.
+                    </span>
                   </div>
                 </>
               )}
 
               <div className="hero-actions user-admin-status-actions">
-                <button type="button" className="secondary-button" onClick={toggleUserStatus} disabled={statusBusy}>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={toggleUserStatus}
+                  disabled={statusBusy}
+                >
                   {statusBusy
-                    ? 'Updating…'
+                    ? "Updating…"
                     : viewModel.selectedUser.isActive
-                      ? 'Disable account'
-                      : 'Reactivate account'}
+                      ? "Disable account"
+                      : "Reactivate account"}
                 </button>
                 <span className="muted-copy">
                   Disabling keeps the account history intact and blocks new sign-ins.
@@ -2563,12 +2966,20 @@ function StatusPage({ statusState, onRefresh, onNavigate }) {
       />
       <div className="status-summary">
         <div>
-          <strong>{data?.summary?.label || 'Status is not loaded yet'}</strong>
-          <span>{data?.summary ? `${data.summary.healthy}/${data.summary.total} checks healthy` : 'Tap refresh to load the current view.'}</span>
+          <strong>{data?.summary?.label || "Status is not loaded yet"}</strong>
+          <span>
+            {data?.summary
+              ? `${data.summary.healthy}/${data.summary.total} checks healthy`
+              : "Tap refresh to load the current view."}
+          </span>
         </div>
         <div className="hero-actions">
-          <button type="button" className="secondary-button" onClick={onRefresh}>Refresh</button>
-          <button type="button" className="secondary-button" onClick={() => onNavigate('/')}>Back home</button>
+          <button type="button" className="secondary-button" onClick={onRefresh}>
+            Refresh
+          </button>
+          <button type="button" className="secondary-button" onClick={() => onNavigate("/")}>
+            Back home
+          </button>
         </div>
       </div>
       <div className="status-grid">
@@ -2576,7 +2987,7 @@ function StatusPage({ statusState, onRefresh, onNavigate }) {
           <article key={check.title} className={`status-card ${badgeTone(check.ok)}`}>
             <div className="status-card-head">
               <strong>{check.title}</strong>
-              <span className="status-chip">{check.ok ? 'healthy' : 'attention'}</span>
+              <span className="status-chip">{check.ok ? "healthy" : "attention"}</span>
             </div>
             <p>{check.description}</p>
             <span>{check.note}</span>
@@ -2589,62 +3000,65 @@ function StatusPage({ statusState, onRefresh, onNavigate }) {
 
 export default function App() {
   const [route, navigate] = useRoute();
-  const { sessionState, configState, preferences, setPreferences, statusState, refreshStatus } = usePortalData();
-  const userAdminEnabled = Boolean(sessionState.session?.isAdmin) && route === '/admin/users';
-  const adminAppsEnabled = Boolean(sessionState.session?.isAdmin) && route.startsWith('/admin/apps');
-  const observabilityAdminEnabled = Boolean(sessionState.session?.isAdmin) && route === '/admin/observability';
+  const { sessionState, configState, preferences, setPreferences, statusState, refreshStatus } =
+    usePortalData();
+  const userAdminEnabled = Boolean(sessionState.session?.isAdmin) && route === "/admin/users";
+  const adminAppsEnabled =
+    Boolean(sessionState.session?.isAdmin) && route.startsWith("/admin/apps");
+  const observabilityAdminEnabled =
+    Boolean(sessionState.session?.isAdmin) && route === "/admin/observability";
   const userAdminState = useUserAdminData(userAdminEnabled);
   const adminAppsState = useAdminAppsData(adminAppsEnabled);
   const observabilityAdminState = useObservabilityAdminData(observabilityAdminEnabled);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    const theme = preferences?.theme || 'dark';
+    const theme = preferences?.theme || "dark";
     document.documentElement.dataset.theme = theme;
   }, [preferences?.theme]);
 
   useEffect(() => {
-    if (route === '/status' && !statusState.loading && !statusState.data) {
+    if (route === "/status" && !statusState.loading && !statusState.data) {
       refreshStatus();
     }
   }, [route, refreshStatus, statusState.data, statusState.loading]);
 
   useEffect(() => {
     const onClick = (event) => {
-      if (!event.target.closest?.('.menu-popover') && !event.target.closest?.('.icon-button')) {
+      if (!event.target.closest?.(".menu-popover") && !event.target.closest?.(".icon-button")) {
         setMenuOpen(false);
       }
     };
-    window.addEventListener('click', onClick);
-    return () => window.removeEventListener('click', onClick);
+    window.addEventListener("click", onClick);
+    return () => window.removeEventListener("click", onClick);
   }, []);
 
   const session = sessionState.session;
   const config = configState.config;
   const isAdmin = Boolean(session?.isAdmin);
-  const adminRedirectUrl = config?.settings?.authentikAdminUrl || '';
+  const adminRedirectUrl = config?.settings?.authentikAdminUrl || "";
 
   const currentApp = useMemo(() => {
     if (!config?.apps) {
       return null;
     }
-    const slug = route.startsWith('/apps/') ? route.split('/').pop() : '';
+    const slug = route.startsWith("/apps/") ? route.split("/").pop() : "";
     return config.apps.find((card) => card.slug === slug) || null;
   }, [config, route]);
   const adminInstallTarget = useMemo(() => parseAdminAppInstallPath(route), [route]);
 
   const logout = () => {
-    window.location.href = '/auth/logout';
+    window.location.href = "/auth/logout";
   };
 
   useEffect(() => {
     if (!sessionState.loading && !session) {
-      window.location.replace(`/auth/login?returnTo=${encodeURIComponent(route || '/')}`);
+      window.location.replace(`/auth/login?returnTo=${encodeURIComponent(route || "/")}`);
     }
   }, [route, session, sessionState.loading]);
 
   useEffect(() => {
-    if (route === '/admin' && adminRedirectUrl) {
+    if (route === "/admin" && adminRedirectUrl) {
       window.location.replace(adminRedirectUrl);
     }
   }, [adminRedirectUrl, route]);
@@ -2653,16 +3067,16 @@ export default function App() {
     if (!session) {
       return;
     }
-    const nextTheme = preferences?.theme === 'dark' ? 'light' : 'dark';
+    const nextTheme = preferences?.theme === "dark" ? "light" : "dark";
     const nextPreferences = {
       ...(preferences || {}),
       theme: nextTheme,
-      language: preferences?.language || 'nl',
+      language: preferences?.language || "nl",
       timezone: preferences?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
     };
     try {
-      const saved = await requestJson('/api/preferences', {
-        method: 'PUT',
+      const saved = await requestJson("/api/preferences", {
+        method: "PUT",
         body: JSON.stringify(nextPreferences),
       });
       setPreferences(saved);
@@ -2672,14 +3086,14 @@ export default function App() {
   };
 
   const savePreferences = async (draft) => {
-    const saved = await requestJson('/api/preferences', {
-      method: 'PUT',
+    const saved = await requestJson("/api/preferences", {
+      method: "PUT",
       body: JSON.stringify(draft),
     });
     return saved;
   };
 
-  if (route === '/admin') {
+  if (route === "/admin") {
     return null;
   }
 
@@ -2705,7 +3119,7 @@ export default function App() {
       <PortalHeader
         session={session}
         config={config}
-        theme={preferences?.theme || 'dark'}
+        theme={preferences?.theme || "dark"}
         onThemeToggle={toggleTheme}
         onNavigate={navigate}
         onLogout={logout}
@@ -2715,36 +3129,76 @@ export default function App() {
       />
 
       <section className="portal-content">
-        {route === '/' ? <HomePage config={config} navigate={navigate} isAdmin={isAdmin} /> : null}
-        {route.startsWith('/apps/') ? <AppDetailPage card={currentApp} onNavigate={navigate} /> : null}
-        {route === '/settings' ? <SettingsPage config={config} preferences={preferences} setPreferences={setPreferences} onSave={savePreferences} onNavigate={navigate} /> : null}
-        {route === '/intranet' ? <IntranetPage links={config?.intranetLinks || []} onNavigate={navigate} /> : null}
-        {route === '/status' ? <StatusPage statusState={statusState} onRefresh={refreshStatus} onNavigate={navigate} /> : null}
-        {route.startsWith('/admin/apps') && isAdmin ? (
-          <AdminAppsPage onNavigate={navigate} adminAppsState={adminAppsState} installTarget={adminInstallTarget} />
+        {route === "/" ? <HomePage config={config} navigate={navigate} isAdmin={isAdmin} /> : null}
+        {route.startsWith("/apps/") ? (
+          <AppDetailPage card={currentApp} onNavigate={navigate} />
         ) : null}
-        {route === '/admin/observability' && isAdmin ? (
-          <ObservabilityAdminPage config={config} observabilityState={observabilityAdminState} onNavigate={navigate} />
+        {route === "/settings" ? (
+          <SettingsPage
+            config={config}
+            preferences={preferences}
+            setPreferences={setPreferences}
+            onSave={savePreferences}
+            onNavigate={navigate}
+          />
         ) : null}
-        {route === '/admin/users' && isAdmin ? (
+        {route === "/intranet" ? (
+          <IntranetPage links={config?.intranetLinks || []} onNavigate={navigate} />
+        ) : null}
+        {route === "/status" ? (
+          <StatusPage statusState={statusState} onRefresh={refreshStatus} onNavigate={navigate} />
+        ) : null}
+        {route.startsWith("/admin/apps") && isAdmin ? (
+          <AdminAppsPage
+            onNavigate={navigate}
+            adminAppsState={adminAppsState}
+            installTarget={adminInstallTarget}
+          />
+        ) : null}
+        {route === "/admin/observability" && isAdmin ? (
+          <ObservabilityAdminPage
+            config={config}
+            observabilityState={observabilityAdminState}
+            onNavigate={navigate}
+          />
+        ) : null}
+        {route === "/admin/users" && isAdmin ? (
           <UserAdminPage config={config} directoryState={userAdminState} onNavigate={navigate} />
         ) : null}
-        {route === '/admin/users' && !isAdmin ? (
+        {route === "/admin/users" && !isAdmin ? (
           <Panel>
-            <SectionTitle eyebrow="Access denied" title="Admins only" description="User administration is only available to the admins group." />
-            <button type="button" className="secondary-button" onClick={() => navigate('/')}>Back home</button>
+            <SectionTitle
+              eyebrow="Access denied"
+              title="Admins only"
+              description="User administration is only available to the admins group."
+            />
+            <button type="button" className="secondary-button" onClick={() => navigate("/")}>
+              Back home
+            </button>
           </Panel>
         ) : null}
-        {route.startsWith('/admin/apps') && !isAdmin ? (
+        {route.startsWith("/admin/apps") && !isAdmin ? (
           <Panel>
-            <SectionTitle eyebrow="Access denied" title="Admins only" description="App installs are only available to the admins group." />
-            <button type="button" className="secondary-button" onClick={() => navigate('/')}>Back home</button>
+            <SectionTitle
+              eyebrow="Access denied"
+              title="Admins only"
+              description="App installs are only available to the admins group."
+            />
+            <button type="button" className="secondary-button" onClick={() => navigate("/")}>
+              Back home
+            </button>
           </Panel>
         ) : null}
-        {route === '/admin/observability' && !isAdmin ? (
+        {route === "/admin/observability" && !isAdmin ? (
           <Panel>
-            <SectionTitle eyebrow="Access denied" title="Admins only" description="Observability control is only available to the admins group." />
-            <button type="button" className="secondary-button" onClick={() => navigate('/')}>Back home</button>
+            <SectionTitle
+              eyebrow="Access denied"
+              title="Admins only"
+              description="Observability control is only available to the admins group."
+            />
+            <button type="button" className="secondary-button" onClick={() => navigate("/")}>
+              Back home
+            </button>
           </Panel>
         ) : null}
       </section>

@@ -6,9 +6,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-from typing import Optional
 from urllib import error, request
-
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -110,10 +108,10 @@ def _write_cluster_file(
     data_dir: Path,
     cluster_id: str,
     *,
-    slug: Optional[str] = None,
+    slug: str | None = None,
     dns_domain: str = "example.com",
-    selected_ingress_route: Optional[str] = None,
-    updated_at: Optional[str] = None,
+    selected_ingress_route: str | None = None,
+    updated_at: str | None = None,
 ):
     cluster_file = data_dir / "clusters" / f"{cluster_id}.json"
     cluster_file.parent.mkdir(parents=True, exist_ok=True)
@@ -130,9 +128,7 @@ def _write_cluster_file(
 
 
 def _write_choose_ingress_state(data_dir: Path, cluster_id: str, route: str):
-    state_file = (
-        data_dir / "step-state" / "clusters" / cluster_id / "choose-ingress-route.json"
-    )
+    state_file = data_dir / "step-state" / "clusters" / cluster_id / "choose-ingress-route.json"
     state_file.parent.mkdir(parents=True, exist_ok=True)
     state_file.write_text(
         json.dumps(
@@ -188,53 +184,43 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert expected_talos_step_ids.issubset(talos_steps)
             assert talos_steps["provision-nodes"]["title"] == "Deploy Talos Cluster"
             assert talos_steps["install-argocd"]["title"] == "Install Argo CD"
-            assert (
-                talos_steps["install-longhorn-storage"]["title"]
-                == "Install Longhorn Storage"
-            )
+            assert talos_steps["install-longhorn-storage"]["title"] == "Install Longhorn Storage"
             assert (
                 talos_steps["install-secret-sync"]["title"]
                 == "Install OpenBao and sync bootstrap secrets"
             )
             assert talos_steps["install-crowdsec"]["title"] == "Install CrowdSec"
             assert talos_steps["install-traefik"]["title"] == "Install Traefik"
-            assert (
-                talos_steps["install-cloudnativepg"]["title"] == "Install CloudNativePG"
-            )
+            assert talos_steps["install-cloudnativepg"]["title"] == "Install CloudNativePG"
 
-            assert (
-                talos_steps["choose-ingress-route"]["title"] == "Choose Ingress Route"
-            )
+            assert talos_steps["choose-ingress-route"]["title"] == "Choose Ingress Route"
             assert talos_steps["install-authentik-idp"]["title"] == "Install Authentik"
-            assert (
-                talos_steps["create-users-and-groups"]["title"]
-                == "Create Users and Groups"
-            )
+            assert talos_steps["create-users-and-groups"]["title"] == "Create Users and Groups"
             assert talos_steps["install-headlamp"]["title"] == "Install Headlamp"
             assert talos_steps["install-grafana"]["title"] == "Install Grafana"
             assert talos_steps["install-prometheus"]["title"] == "Install Prometheus"
             assert talos_steps["install-tempo"]["title"] == "Install Tempo"
-            assert talos_steps["install-tempo"]["secrets"]["files"]["KUBECONFIG_FILE"][
-                "item"
-            ] == "kubeconfig"
-            assert talos_steps["install-tempo"]["secrets"]["files"]["KUBECONFIG_FILE"][
-                "attachment"
-            ] == "kubeconfig"
-            assert talos_steps["install-alloy"]["title"] == "Install Alloy"
-            assert talos_steps["install-alloy"]["secrets"]["files"]["KUBECONFIG_FILE"][
-                "item"
-            ] == "kubeconfig"
-            assert talos_steps["install-alloy"]["secrets"]["files"]["KUBECONFIG_FILE"][
-                "attachment"
-            ] == "kubeconfig"
-            assert talos_steps["install-pgadmin4"]["title"] == "Install pgAdmin 4"
             assert (
-                talos_steps["install-dashy-dashboard"]["title"]
-                == "Install Dashy dashboard"
+                talos_steps["install-tempo"]["secrets"]["files"]["KUBECONFIG_FILE"]["item"]
+                == "kubeconfig"
             )
             assert (
-                talos_steps["install-management-consoles"]["title"]
-                == "Install Management consoles"
+                talos_steps["install-tempo"]["secrets"]["files"]["KUBECONFIG_FILE"]["attachment"]
+                == "kubeconfig"
+            )
+            assert talos_steps["install-alloy"]["title"] == "Install Alloy"
+            assert (
+                talos_steps["install-alloy"]["secrets"]["files"]["KUBECONFIG_FILE"]["item"]
+                == "kubeconfig"
+            )
+            assert (
+                talos_steps["install-alloy"]["secrets"]["files"]["KUBECONFIG_FILE"]["attachment"]
+                == "kubeconfig"
+            )
+            assert talos_steps["install-pgadmin4"]["title"] == "Install pgAdmin 4"
+            assert talos_steps["install-dashy-dashboard"]["title"] == "Install Dashy dashboard"
+            assert (
+                talos_steps["install-management-consoles"]["title"] == "Install Management consoles"
             )
             assert talos_steps["install-ntfy"]["title"] == "Install Ntfy"
             assert "install-nextcloud" not in talos_steps
@@ -249,31 +235,24 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert talos_steps["install-traefik"]["status"] == "locked"
             assert talos_steps["install-traefik"]["depends_on"] == ["install-crowdsec"]
             assert (
-                talos_steps["install-traefik"]["secrets"]["files"]["KUBECONFIG_FILE"][
-                    "item"
-                ]
+                talos_steps["install-traefik"]["secrets"]["files"]["KUBECONFIG_FILE"]["item"]
                 == "kubeconfig"
             )
             assert (
-                talos_steps["install-traefik"]["secrets"]["files"]["KUBECONFIG_FILE"][
-                    "attachment"
-                ]
+                talos_steps["install-traefik"]["secrets"]["files"]["KUBECONFIG_FILE"]["attachment"]
                 == "kubeconfig"
             )
             assert talos_steps["provision-nodes"]["icon"] == "🖥️"
             assert talos_steps["choose-ingress-route"]["type"] == "config"
             assert [
-                input_def["id"]
-                for input_def in talos_steps["choose-ingress-route"]["inputs"]
+                input_def["id"] for input_def in talos_steps["choose-ingress-route"]["inputs"]
             ] == [
                 "ingress_route",
                 "dns_domain",
             ]
             assert [
                 option["value"]
-                for option in talos_steps["choose-ingress-route"]["inputs"][0][
-                    "options"
-                ]
+                for option in talos_steps["choose-ingress-route"]["inputs"][0]["options"]
             ] == [
                 "wiredoor",
                 "netbird",
@@ -281,9 +260,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "metallb",
                 "tailscale",
             ]
-            assert (
-                talos_steps["choose-ingress-route"]["inputs"][1]["id"] == "dns_domain"
-            )
+            assert talos_steps["choose-ingress-route"]["inputs"][1]["id"] == "dns_domain"
             assert talos_steps["choose-ingress-route"]["inputs"][1]["required"] is True
             assert talos_steps["install-grafana"]["icon"] == "📈"
         finally:
@@ -310,7 +287,9 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
             "create-users-and-groups",
             "choose-ingress-route",
         ]:
-            _cluster_step_state(data_dir, "cluster-demo", dependency).parent.mkdir(parents=True, exist_ok=True)
+            _cluster_step_state(data_dir, "cluster-demo", dependency).parent.mkdir(
+                parents=True, exist_ok=True
+            )
             _cluster_step_state(data_dir, "cluster-demo", dependency).write_text(
                 json.dumps(
                     {
@@ -352,7 +331,10 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
             assert audiobookshelf["placeholder"] is False
             assert audiobookshelf["installable"] is True
             assert audiobookshelf["app_state"] == "ready"
-            assert audiobookshelf["runner"]["script"] == "categories/apps/steps/install-audiobookshelf/run.sh"
+            assert (
+                audiobookshelf["runner"]["script"]
+                == "categories/apps/steps/install-audiobookshelf/run.sh"
+            )
             assert audiobookshelf["depends_on"] == [
                 "install-longhorn-storage",
                 "install-secret-sync",
@@ -363,7 +345,10 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
             assert vaultwarden["placeholder"] is False
             assert vaultwarden["installable"] is True
             assert vaultwarden["app_state"] == "ready"
-            assert vaultwarden["runner"]["script"] == "categories/apps/steps/install-vaultwarden/run.sh"
+            assert (
+                vaultwarden["runner"]["script"]
+                == "categories/apps/steps/install-vaultwarden/run.sh"
+            )
             outline = next(step for step in apps if step["id"] == "install-outline")
             assert outline["placeholder"] is False
             assert outline["installable"] is True
@@ -510,17 +495,13 @@ def test_catalog_endpoint_shows_cloudflare_only_for_prd_clusters():
             choose_step = next(
                 step for step in talos["steps"] if step["id"] == "choose-ingress-route"
             )
-            assert [
-                option["value"] for option in choose_step["inputs"][0]["options"]
-            ] == [
+            assert [option["value"] for option in choose_step["inputs"][0]["options"]] == [
                 "wiredoor",
                 "netbird",
                 "metallb",
                 "tailscale",
             ]
-            assert "configure-cloudflare-tunnel" not in [
-                step["id"] for step in talos["steps"]
-            ]
+            assert "configure-cloudflare-tunnel" not in [step["id"] for step in talos["steps"]]
 
             status, body = _get_json(f"{base}/api/catalog?cluster_id=prd")
             assert status == 200
@@ -528,18 +509,14 @@ def test_catalog_endpoint_shows_cloudflare_only_for_prd_clusters():
             choose_step = next(
                 step for step in talos["steps"] if step["id"] == "choose-ingress-route"
             )
-            assert [
-                option["value"] for option in choose_step["inputs"][0]["options"]
-            ] == [
+            assert [option["value"] for option in choose_step["inputs"][0]["options"]] == [
                 "wiredoor",
                 "netbird",
                 "cloudflare-tunnel",
                 "metallb",
                 "tailscale",
             ]
-            assert "configure-cloudflare-tunnel" in [
-                step["id"] for step in talos["steps"]
-            ]
+            assert "configure-cloudflare-tunnel" in [step["id"] for step in talos["steps"]]
 
             status, body = _get_json(f"{base}/api/catalog?cluster_id=tst")
             assert status == 200
@@ -547,17 +524,13 @@ def test_catalog_endpoint_shows_cloudflare_only_for_prd_clusters():
             choose_step = next(
                 step for step in talos["steps"] if step["id"] == "choose-ingress-route"
             )
-            assert [
-                option["value"] for option in choose_step["inputs"][0]["options"]
-            ] == [
+            assert [option["value"] for option in choose_step["inputs"][0]["options"]] == [
                 "wiredoor",
                 "netbird",
                 "metallb",
                 "tailscale",
             ]
-            assert "configure-cloudflare-tunnel" not in [
-                step["id"] for step in talos["steps"]
-            ]
+            assert "configure-cloudflare-tunnel" not in [step["id"] for step in talos["steps"]]
         finally:
             proc.terminate()
             proc.wait(timeout=5)
@@ -637,9 +610,7 @@ def test_execute_step_persists_state_and_enqueues_run_step_job():
             assert body["step_id"] == "provision-nodes"
 
             step_state = json.loads(
-                _cluster_step_state(
-                    data_dir, body["cluster_id"], "provision-nodes"
-                ).read_text()
+                _cluster_step_state(data_dir, body["cluster_id"], "provision-nodes").read_text()
             )
             assert body["cluster_id"] == step_state["cluster_id"]
             assert step_state["step_id"] == "provision-nodes"
@@ -715,11 +686,7 @@ EOF
                 encoding="utf-8",
             )
             old_state_path = (
-                data_dir
-                / "step-state"
-                / "clusters"
-                / old_instance_id
-                / "provision-nodes.json"
+                data_dir / "step-state" / "clusters" / old_instance_id / "provision-nodes.json"
             )
             old_state_path.parent.mkdir(parents=True, exist_ok=True)
             old_state_path.write_text(
@@ -769,9 +736,7 @@ EOF
                 },
             }
 
-            status, body = _post_json(
-                f"{base}/api/steps/provision-nodes/execute", payload
-            )
+            status, body = _post_json(f"{base}/api/steps/provision-nodes/execute", payload)
             assert status == 202
             assert body["cluster_id"] == cluster_id
             assert body["cluster_instance_id"] != old_instance_id
@@ -862,9 +827,7 @@ EOF
             assert status == 202
             assert body["step_id"] == "provision-nodes"
 
-            cluster = json.loads(
-                (data_dir / "clusters" / f"{body['cluster_id']}.json").read_text()
-            )
+            cluster = json.loads((data_dir / "clusters" / f"{body['cluster_id']}.json").read_text())
             assert cluster["vm_ip_map"] == {
                 "cp-1": "192.168.1.61",
                 "worker-1": "192.168.1.62",
@@ -1013,7 +976,6 @@ def test_catalog_endpoint_isolates_invalid_manifest_entries():
             proc.terminate()
             proc.wait(timeout=5)
 
-
     with tempfile.TemporaryDirectory() as td:
         data_dir = Path(td) / "data"
         port = _find_free_port()
@@ -1044,10 +1006,7 @@ def test_catalog_endpoint_isolates_invalid_manifest_entries():
             assert talos["steps"][0]["id"] == "provision-nodes"
             assert talos["steps"][0]["status"] == "done"
             assert talos["steps"][0]["state"]["cluster_id"] == cluster_id
-            assert (
-                talos["steps"][0]["state"]["outputs"]["cluster_status"]
-                == "bootstrapped"
-            )
+            assert talos["steps"][0]["state"]["outputs"]["cluster_status"] == "bootstrapped"
             assert talos["steps"][1]["id"] == "install-argocd"
             assert talos["steps"][1]["status"] == "ready"
             assert talos["steps"][2]["id"] == "install-longhorn-storage"
@@ -1099,9 +1058,7 @@ def test_execute_follow_up_cluster_step_requires_explicit_cluster_context():
             ),
             encoding="utf-8",
         )
-        (data_dir / "step-state" / "clusters" / cluster_id).mkdir(
-            parents=True, exist_ok=True
-        )
+        (data_dir / "step-state" / "clusters" / cluster_id).mkdir(parents=True, exist_ok=True)
         _cluster_step_state(data_dir, cluster_id, "provision-nodes").write_text(
             json.dumps(
                 {
@@ -1132,9 +1089,7 @@ def test_execute_follow_up_cluster_step_requires_explicit_cluster_context():
             ),
             encoding="utf-8",
         )
-        _cluster_step_state(
-            data_dir, cluster_id, "install-longhorn-storage"
-        ).write_text(
+        _cluster_step_state(data_dir, cluster_id, "install-longhorn-storage").write_text(
             json.dumps(
                 {
                     "step_id": "install-longhorn-storage",
@@ -1243,9 +1198,7 @@ def test_execute_follow_up_cluster_step_uses_requested_cluster_context_and_secre
         (data_dir / "step-state" / "clusters" / selected_cluster_id).mkdir(
             parents=True, exist_ok=True
         )
-        _cluster_step_state(
-            data_dir, selected_cluster_id, "provision-nodes"
-        ).write_text(
+        _cluster_step_state(data_dir, selected_cluster_id, "provision-nodes").write_text(
             json.dumps(
                 {
                     "step_id": "provision-nodes",
@@ -1275,9 +1228,7 @@ def test_execute_follow_up_cluster_step_uses_requested_cluster_context_and_secre
             ),
             encoding="utf-8",
         )
-        _cluster_step_state(
-            data_dir, selected_cluster_id, "install-longhorn-storage"
-        ).write_text(
+        _cluster_step_state(data_dir, selected_cluster_id, "install-longhorn-storage").write_text(
             json.dumps(
                 {
                     "step_id": "install-longhorn-storage",
@@ -1292,9 +1243,7 @@ def test_execute_follow_up_cluster_step_uses_requested_cluster_context_and_secre
             ),
             encoding="utf-8",
         )
-        _cluster_step_state(
-            data_dir, selected_cluster_id, "install-secret-sync"
-        ).write_text(
+        _cluster_step_state(data_dir, selected_cluster_id, "install-secret-sync").write_text(
             json.dumps(
                 {
                     "step_id": "install-secret-sync",
@@ -1326,13 +1275,10 @@ def test_execute_follow_up_cluster_step_uses_requested_cluster_context_and_secre
             assert job["cluster_id"] == selected_cluster_id
             assert job["payload"]["context"]["cluster"]["id"] == selected_cluster_id
             assert (
-                job["payload"]["secret_bundle"]["files"]["KUBECONFIG_FILE"]["item"]
-                == "kubeconfig"
+                job["payload"]["secret_bundle"]["files"]["KUBECONFIG_FILE"]["item"] == "kubeconfig"
             )
             assert (
-                job["payload"]["secret_bundle"]["files"]["KUBECONFIG_FILE"][
-                    "attachment"
-                ]
+                job["payload"]["secret_bundle"]["files"]["KUBECONFIG_FILE"]["attachment"]
                 == "kubeconfig"
             )
         finally:
@@ -1418,12 +1364,8 @@ def test_execute_argo_follow_up_cluster_step_uses_requested_cluster_context_and_
         (data_dir / "step-state" / "clusters" / selected_cluster_id).mkdir(
             parents=True, exist_ok=True
         )
-        (data_dir / "step-state" / "clusters" / newer_cluster_id).mkdir(
-            parents=True, exist_ok=True
-        )
-        _cluster_step_state(
-            data_dir, selected_cluster_id, "provision-nodes"
-        ).write_text(
+        (data_dir / "step-state" / "clusters" / newer_cluster_id).mkdir(parents=True, exist_ok=True)
+        _cluster_step_state(data_dir, selected_cluster_id, "provision-nodes").write_text(
             json.dumps(
                 {
                     "step_id": "provision-nodes",
@@ -1470,13 +1412,10 @@ def test_execute_argo_follow_up_cluster_step_uses_requested_cluster_context_and_
             assert job["cluster_id"] == selected_cluster_id
             assert job["payload"]["context"]["cluster"]["id"] == selected_cluster_id
             assert (
-                job["payload"]["secret_bundle"]["files"]["KUBECONFIG_FILE"]["item"]
-                == "kubeconfig"
+                job["payload"]["secret_bundle"]["files"]["KUBECONFIG_FILE"]["item"] == "kubeconfig"
             )
             assert (
-                job["payload"]["secret_bundle"]["files"]["KUBECONFIG_FILE"][
-                    "attachment"
-                ]
+                job["payload"]["secret_bundle"]["files"]["KUBECONFIG_FILE"]["attachment"]
                 == "kubeconfig"
             )
         finally:

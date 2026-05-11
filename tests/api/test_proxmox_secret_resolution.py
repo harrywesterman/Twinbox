@@ -59,21 +59,21 @@ def test_ip_suggestions_can_use_secret_broker_for_proxmox_api_fallback():
         ping_mock.chmod(0o755)
         ip_mock.write_text(
             "#!/bin/sh\n"
-            "if [ \"$1\" = \"-o\" ]; then echo '2: eth0    inet 192.168.2.20/24 brd 192.168.2.255 scope global eth0'; exit 0; fi\n"
-            "if [ \"$1\" = \"route\" ]; then echo 'default via 192.168.2.1 dev eth0'; exit 0; fi\n"
+            'if [ "$1" = "-o" ]; then echo \'2: eth0    inet 192.168.2.20/24 brd 192.168.2.255 scope global eth0\'; exit 0; fi\n'
+            'if [ "$1" = "route" ]; then echo \'default via 192.168.2.1 dev eth0\'; exit 0; fi\n'
             "exit 1\n",
             encoding="utf-8",
         )
         ip_mock.chmod(0o755)
         curl_mock.write_text(
             "#!/bin/sh\n"
-            f"printf '%s\\n' \"$*\" >> \"{curl_log}\"\n"
-            "case \"$*\" in\n"
+            f'printf \'%s\\n\' "$*" >> "{curl_log}"\n'
+            'case "$*" in\n'
             "  *'/access/ticket'*)\n"
-            "    echo '{\"data\":{\"ticket\":\"ticket-123\"}}'\n"
+            '    echo \'{"data":{"ticket":"ticket-123"}}\'\n'
             "    ;;\n"
             "  *'/cluster/resources?type=vm'*)\n"
-            "    echo '{\"data\":[{\"vmid\":100},{\"vmid\":101}]}'\n"
+            '    echo \'{"data":[{"vmid":100},{"vmid":101}]}\'\n'
             "    ;;\n"
             "  *)\n"
             "    echo '{\"data\":[]}'\n"

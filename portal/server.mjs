@@ -23,10 +23,14 @@ const sessionCookieName = process.env.PORTAL_SESSION_COOKIE || "twinbox_portal_s
 const oauthCookieName = process.env.PORTAL_OAUTH_COOKIE || "twinbox_portal_oauth";
 const oauthStateDir = path.join(dataDir, "oauth-state");
 const oauthStateTtlMs = 10 * 60 * 1000;
-const managerBaseUrl = String(process.env.PORTAL_MANAGER_BASE_URL || "http://manager-api:8080").trim().replace(/\/+$/, "");
+const managerBaseUrl = String(process.env.PORTAL_MANAGER_BASE_URL || "http://manager-api:8080")
+  .trim()
+  .replace(/\/+$/, "");
 const issuer = String(process.env.PORTAL_OIDC_ISSUER || process.env.AUTHENTIK_ISSUER || "").trim();
 const clientId = String(process.env.PORTAL_OIDC_CLIENT_ID || "").trim();
-const authentikApiBase = String(process.env.AUTHENTIK_API_BASE || DEFAULT_AUTHENTIK_API_BASE).trim();
+const authentikApiBase = String(
+  process.env.AUTHENTIK_API_BASE || DEFAULT_AUTHENTIK_API_BASE
+).trim();
 const authentikApiToken = String(process.env.AUTHENTIK_API_TOKEN || "").trim();
 
 fs.mkdirSync(dataDir, { recursive: true });
@@ -136,19 +140,29 @@ function cookieOptions(req, { maxAge = null } = {}) {
     "SameSite=Lax",
     secure ? "Secure" : null,
     maxAge ? `Max-Age=${Math.floor(maxAge / 1000)}` : null,
-  ].filter(Boolean).join("; ");
+  ]
+    .filter(Boolean)
+    .join("; ");
 }
 
 function setCookie(res, req, name, value, options = {}) {
   res.setHeader("Set-Cookie", [
-    ...(Array.isArray(res.getHeader("Set-Cookie")) ? res.getHeader("Set-Cookie") : res.getHeader("Set-Cookie") ? [res.getHeader("Set-Cookie")] : []),
+    ...(Array.isArray(res.getHeader("Set-Cookie"))
+      ? res.getHeader("Set-Cookie")
+      : res.getHeader("Set-Cookie")
+        ? [res.getHeader("Set-Cookie")]
+        : []),
     `${name}=${encodeURIComponent(value)}; ${cookieOptions(req, options)}`,
   ]);
 }
 
 function clearCookie(res, req, name) {
   res.setHeader("Set-Cookie", [
-    ...(Array.isArray(res.getHeader("Set-Cookie")) ? res.getHeader("Set-Cookie") : res.getHeader("Set-Cookie") ? [res.getHeader("Set-Cookie")] : []),
+    ...(Array.isArray(res.getHeader("Set-Cookie"))
+      ? res.getHeader("Set-Cookie")
+      : res.getHeader("Set-Cookie")
+        ? [res.getHeader("Set-Cookie")]
+        : []),
     `${name}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${String(req.headers["x-forwarded-proto"] || "").includes("https") ? "; Secure" : ""}`,
   ]);
 }
@@ -160,21 +174,23 @@ function oauthStateFilePath(state) {
 async function cleanupExpiredOAuthStates() {
   try {
     const entries = await fs.promises.readdir(oauthStateDir, { withFileTypes: true });
-    await Promise.all(entries.map(async (entry) => {
-      if (!entry.isFile() || !entry.name.endsWith(".json")) {
-        return;
-      }
-      const filePath = path.join(oauthStateDir, entry.name);
-      try {
-        const payload = await readJsonFile(filePath, null);
-        const createdAt = Number(payload?.createdAt || 0);
-        if (!createdAt || Date.now() - createdAt > oauthStateTtlMs) {
+    await Promise.all(
+      entries.map(async (entry) => {
+        if (!entry.isFile() || !entry.name.endsWith(".json")) {
+          return;
+        }
+        const filePath = path.join(oauthStateDir, entry.name);
+        try {
+          const payload = await readJsonFile(filePath, null);
+          const createdAt = Number(payload?.createdAt || 0);
+          if (!createdAt || Date.now() - createdAt > oauthStateTtlMs) {
+            await fs.promises.rm(filePath, { force: true });
+          }
+        } catch {
           await fs.promises.rm(filePath, { force: true });
         }
-      } catch {
-        await fs.promises.rm(filePath, { force: true });
-      }
-    }));
+      })
+    );
   } catch (error) {
     if (error?.code !== "ENOENT") {
       throw error;
@@ -308,11 +324,16 @@ async function savePreferences(nextPreferences) {
 }
 
 function managerUrl(pathname) {
-  const normalizedPath = String(pathname || "").startsWith("/") ? String(pathname || "") : `/${String(pathname || "")}`;
+  const normalizedPath = String(pathname || "").startsWith("/")
+    ? String(pathname || "")
+    : `/${String(pathname || "")}`;
   return new URL(normalizedPath, `${managerBaseUrl}/`).toString();
 }
 
-async function requestManagerJson(pathname, { method = "GET", body = undefined, headers = {} } = {}) {
+async function requestManagerJson(
+  pathname,
+  { method = "GET", body = undefined, headers = {} } = {}
+) {
   const init = {
     method,
     headers: {
@@ -339,7 +360,9 @@ async function requestManagerJson(pathname, { method = "GET", body = undefined, 
   }
 
   if (!response.ok) {
-    const error = new Error(parsed?.error || parsed?.message || text || `Manager request failed with ${response.status}`);
+    const error = new Error(
+      parsed?.error || parsed?.message || text || `Manager request failed with ${response.status}`
+    );
     error.status = response.status;
     throw error;
   }
@@ -365,8 +388,13 @@ async function loadActiveClusterState() {
 }
 
 function getOrigin(req) {
-  const proto = String(req.headers["x-forwarded-proto"] || "http").split(",")[0].trim() || "http";
-  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
+  const proto =
+    String(req.headers["x-forwarded-proto"] || "http")
+      .split(",")[0]
+      .trim() || "http";
+  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "")
+    .split(",")[0]
+    .trim();
   return `${proto}://${host}`;
 }
 
@@ -436,18 +464,20 @@ function getAuthentikAdminClient() {
 async function listAuthentikGroupsWithMembers(client) {
   const groups = readListPayload(await client.listGroups());
 
-  return Promise.all(groups.map(async (group) => {
-    const groupId = resolveRecordId(group);
-    if (!groupId) {
-      return group;
-    }
+  return Promise.all(
+    groups.map(async (group) => {
+      const groupId = resolveRecordId(group);
+      if (!groupId) {
+        return group;
+      }
 
-    try {
-      return await client.getGroup(groupId);
-    } catch {
-      return group;
-    }
-  }));
+      try {
+        return await client.getGroup(groupId);
+      } catch {
+        return group;
+      }
+    })
+  );
 }
 
 async function loadUserAdminDirectory(config) {
@@ -531,7 +561,9 @@ async function discoverIssuer() {
     throw new Error("PORTAL_OIDC_ISSUER is not configured");
   }
 
-  const response = await fetch(new URL(".well-known/openid-configuration", issuer.endsWith("/") ? issuer : `${issuer}/`));
+  const response = await fetch(
+    new URL(".well-known/openid-configuration", issuer.endsWith("/") ? issuer : `${issuer}/`)
+  );
   if (!response.ok) {
     throw new Error(`failed to discover OIDC metadata (${response.status})`);
   }
@@ -619,7 +651,9 @@ function buildSessionFromClaims(claims) {
 
   return {
     sub: String(claims?.sub || "").trim(),
-    name: String(claims?.name || claims?.preferred_username || claims?.email || "Twinbox user").trim(),
+    name: String(
+      claims?.name || claims?.preferred_username || claims?.email || "Twinbox user"
+    ).trim(),
     email: String(claims?.email || "").trim(),
     preferredUsername: String(claims?.preferred_username || "").trim(),
     groups,
@@ -680,7 +714,7 @@ app.get("/auth/callback", async (req, res) => {
   let oauthState = null;
   try {
     const cookies = readCookies(req);
-    oauthState = await loadOAuthState(stateValue) || decodeSignedJson(cookies[oauthCookieName]);
+    oauthState = (await loadOAuthState(stateValue)) || decodeSignedJson(cookies[oauthCookieName]);
     if (!oauthState?.state || oauthState.state !== stateValue) {
       throw new Error("invalid login state");
     }
@@ -705,11 +739,17 @@ app.get("/auth/callback", async (req, res) => {
       throw new Error("missing subject claim");
     }
 
-    setCookie(res, req, sessionCookieName, encodeSignedJson({
-      ...session,
-      tokenType: tokenResponse.token_type || "Bearer",
-      createdAt: Date.now(),
-    }), { maxAge: 7 * 24 * 60 * 60 * 1000 });
+    setCookie(
+      res,
+      req,
+      sessionCookieName,
+      encodeSignedJson({
+        ...session,
+        tokenType: tokenResponse.token_type || "Bearer",
+        createdAt: Date.now(),
+      }),
+      { maxAge: 7 * 24 * 60 * 60 * 1000 }
+    );
     clearCookie(res, req, oauthCookieName);
     await clearOAuthState(oauthState.state);
     res.redirect(oauthState.returnTo || "/");
@@ -767,7 +807,9 @@ app.get("/api/portal-config", async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "failed to load portal config" });
+    res
+      .status(500)
+      .json({ error: error instanceof Error ? error.message : "failed to load portal config" });
   }
 });
 
@@ -786,7 +828,9 @@ app.get("/api/preferences", async (req, res) => {
       timezone: existing.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
     });
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "failed to load preferences" });
+    res
+      .status(500)
+      .json({ error: error instanceof Error ? error.message : "failed to load preferences" });
   }
 });
 
@@ -825,7 +869,9 @@ app.put("/api/preferences", async (req, res) => {
     await savePreferences(current);
     res.json(nextForUser);
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "failed to save preferences" });
+    res
+      .status(500)
+      .json({ error: error instanceof Error ? error.message : "failed to save preferences" });
   }
 });
 
@@ -843,7 +889,9 @@ app.get("/api/admin/groups", async (req, res) => {
       generatedAt: new Date().toISOString(),
     });
   } catch (error) {
-    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to load groups" });
+    res
+      .status(error?.status || 500)
+      .json({ error: error instanceof Error ? error.message : "failed to load groups" });
   }
 });
 
@@ -857,7 +905,9 @@ app.get("/api/admin/apps/catalog", async (req, res) => {
     const catalog = await requestManagerJson("/api/apps/catalog");
     res.json(catalog);
   } catch (error) {
-    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to load apps" });
+    res
+      .status(error?.status || 500)
+      .json({ error: error instanceof Error ? error.message : "failed to load apps" });
   }
 });
 
@@ -874,7 +924,9 @@ app.get("/api/admin/observability", async (req, res) => {
       generatedAt: new Date().toISOString(),
     });
   } catch (error) {
-    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to load observability state" });
+    res.status(error?.status || 500).json({
+      error: error instanceof Error ? error.message : "failed to load observability state",
+    });
   }
 });
 
@@ -886,16 +938,21 @@ app.put("/api/admin/observability", async (req, res) => {
 
   try {
     const { activeCluster } = await loadActiveClusterState();
-    const result = await requestManagerJson(`/api/clusters/${encodeURIComponent(activeCluster.id)}/observability`, {
-      method: "PUT",
-      body: {
-        profile: req.body?.profile,
-      },
-    });
+    const result = await requestManagerJson(
+      `/api/clusters/${encodeURIComponent(activeCluster.id)}/observability`,
+      {
+        method: "PUT",
+        body: {
+          profile: req.body?.profile,
+        },
+      }
+    );
 
     res.status(202).json(result);
   } catch (error) {
-    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to update observability" });
+    res
+      .status(error?.status || 500)
+      .json({ error: error instanceof Error ? error.message : "failed to update observability" });
   }
 });
 
@@ -912,17 +969,23 @@ app.post("/api/admin/apps/:stepId/install", async (req, res) => {
       return res.status(404).json({ error: "cluster not found" });
     }
 
-    const result = await requestManagerJson(`/api/apps/${encodeURIComponent(req.params.stepId)}/install`, {
-      method: "POST",
-      body: {
-        ...(req.body || {}),
-        cluster_id: activeCluster.id,
-        cluster_instance_id: activeCluster.cluster_instance_id || activeCluster.instance_id || null,
-      },
-    });
+    const result = await requestManagerJson(
+      `/api/apps/${encodeURIComponent(req.params.stepId)}/install`,
+      {
+        method: "POST",
+        body: {
+          ...(req.body || {}),
+          cluster_id: activeCluster.id,
+          cluster_instance_id:
+            activeCluster.cluster_instance_id || activeCluster.instance_id || null,
+        },
+      }
+    );
     res.status(202).json(result);
   } catch (error) {
-    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to install app" });
+    res
+      .status(error?.status || 500)
+      .json({ error: error instanceof Error ? error.message : "failed to install app" });
   }
 });
 
@@ -939,17 +1002,23 @@ app.post("/api/admin/apps/:stepId/uninstall", async (req, res) => {
       return res.status(404).json({ error: "cluster not found" });
     }
 
-    const result = await requestManagerJson(`/api/apps/${encodeURIComponent(req.params.stepId)}/uninstall`, {
-      method: "POST",
-      body: {
-        ...(req.body || {}),
-        cluster_id: activeCluster.id,
-        cluster_instance_id: activeCluster.cluster_instance_id || activeCluster.instance_id || null,
-      },
-    });
+    const result = await requestManagerJson(
+      `/api/apps/${encodeURIComponent(req.params.stepId)}/uninstall`,
+      {
+        method: "POST",
+        body: {
+          ...(req.body || {}),
+          cluster_id: activeCluster.id,
+          cluster_instance_id:
+            activeCluster.cluster_instance_id || activeCluster.instance_id || null,
+        },
+      }
+    );
     res.status(202).json(result);
   } catch (error) {
-    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to uninstall app" });
+    res
+      .status(error?.status || 500)
+      .json({ error: error instanceof Error ? error.message : "failed to uninstall app" });
   }
 });
 
@@ -963,7 +1032,9 @@ app.get("/api/admin/apps/jobs/:jobId", async (req, res) => {
     const job = await requestManagerJson(`/api/jobs/${encodeURIComponent(req.params.jobId)}`);
     res.json(job);
   } catch (error) {
-    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to load job" });
+    res
+      .status(error?.status || 500)
+      .json({ error: error instanceof Error ? error.message : "failed to load job" });
   }
 });
 
@@ -977,7 +1048,9 @@ app.get("/api/admin/apps/jobs/:jobId/logs", async (req, res) => {
     const logs = await requestManagerJson(`/api/jobs/${encodeURIComponent(req.params.jobId)}/logs`);
     res.json(logs);
   } catch (error) {
-    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to load job logs" });
+    res
+      .status(error?.status || 500)
+      .json({ error: error instanceof Error ? error.message : "failed to load job logs" });
   }
 });
 
@@ -988,13 +1061,18 @@ app.post("/api/admin/apps/jobs/:jobId/cancel", async (req, res) => {
   }
 
   try {
-    const result = await requestManagerJson(`/api/jobs/${encodeURIComponent(req.params.jobId)}/cancel`, {
-      method: "POST",
-      body: {},
-    });
+    const result = await requestManagerJson(
+      `/api/jobs/${encodeURIComponent(req.params.jobId)}/cancel`,
+      {
+        method: "POST",
+        body: {},
+      }
+    );
     res.json(result);
   } catch (error) {
-    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to cancel job" });
+    res
+      .status(error?.status || 500)
+      .json({ error: error instanceof Error ? error.message : "failed to cancel job" });
   }
 });
 
@@ -1012,7 +1090,9 @@ app.get("/api/admin/users", async (req, res) => {
       generatedAt: new Date().toISOString(),
     });
   } catch (error) {
-    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to load users" });
+    res
+      .status(error?.status || 500)
+      .json({ error: error instanceof Error ? error.message : "failed to load users" });
   }
 });
 
@@ -1057,7 +1137,9 @@ app.post("/api/admin/users", async (req, res) => {
       temporaryPassword,
     });
   } catch (error) {
-    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to create user" });
+    res
+      .status(error?.status || 500)
+      .json({ error: error instanceof Error ? error.message : "failed to create user" });
   }
 });
 
@@ -1077,7 +1159,9 @@ app.post("/api/admin/users/:userId/disable", async (req, res) => {
     const directory = await loadUserAdminDirectory(config);
     res.json({ user: buildUserResponse(directory, userId) });
   } catch (error) {
-    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to disable user" });
+    res
+      .status(error?.status || 500)
+      .json({ error: error instanceof Error ? error.message : "failed to disable user" });
   }
 });
 
@@ -1097,7 +1181,9 @@ app.post("/api/admin/users/:userId/enable", async (req, res) => {
     const directory = await loadUserAdminDirectory(config);
     res.json({ user: buildUserResponse(directory, userId) });
   } catch (error) {
-    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to reactivate user" });
+    res
+      .status(error?.status || 500)
+      .json({ error: error instanceof Error ? error.message : "failed to reactivate user" });
   }
 });
 
@@ -1137,7 +1223,9 @@ app.put("/api/admin/users/:userId/groups", async (req, res) => {
     const directoryAfter = await loadUserAdminDirectory(config);
     res.json({ user: buildUserResponse(directoryAfter, userId) });
   } catch (error) {
-    res.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "failed to update groups" });
+    res
+      .status(error?.status || 500)
+      .json({ error: error instanceof Error ? error.message : "failed to update groups" });
   }
 });
 
@@ -1205,17 +1293,19 @@ app.get("/api/status", async (req, res) => {
     const config = await loadPortalConfig();
     const origin = getOrigin(req);
     const checks = Array.isArray(config.statusChecks) ? config.statusChecks : [];
-    const results = await Promise.all(checks.map(async (check) => {
-      const probeTarget = normalizeUrlForProbe(check.url, origin);
-      const result = await probeUrl(probeTarget);
-      return {
-        title: check.title,
-        description: check.description,
-        url: probeTarget,
-        accent: check.accent,
-        ...result,
-      };
-    }));
+    const results = await Promise.all(
+      checks.map(async (check) => {
+        const probeTarget = normalizeUrlForProbe(check.url, origin);
+        const result = await probeUrl(probeTarget);
+        return {
+          title: check.title,
+          description: check.description,
+          url: probeTarget,
+          accent: check.accent,
+          ...result,
+        };
+      })
+    );
 
     res.json({
       summary: buildStatusSummary(results),
@@ -1223,7 +1313,9 @@ app.get("/api/status", async (req, res) => {
       generatedAt: new Date().toISOString(),
     });
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "failed to build status report" });
+    res
+      .status(500)
+      .json({ error: error instanceof Error ? error.message : "failed to build status report" });
   }
 });
 
@@ -1256,7 +1348,9 @@ app.get(/.*/, async (req, res, next) => {
 });
 
 app.use((error, req, res, _next) => {
-  res.status(500).json({ error: error instanceof Error ? error.message : "unexpected server error" });
+  res
+    .status(500)
+    .json({ error: error instanceof Error ? error.message : "unexpected server error" });
 });
 
 if (process.env.NODE_ENV !== "test") {

@@ -25,13 +25,13 @@ npm run build
 
 ## Scripts
 
-| Script | Purpose |
-|--------|---------|
-| `dev` | Start Vite development server |
-| `build:step-icons` | Generate step icon assets from source |
-| `prebuild` | Sync step icons to `public/` before build |
-| `build` | Production Vite build |
-| `preview` | Preview production build on `0.0.0.0:4173` |
+| Script             | Purpose                                    |
+| ------------------ | ------------------------------------------ |
+| `dev`              | Start Vite development server              |
+| `build:step-icons` | Generate step icon assets from source      |
+| `prebuild`         | Sync step icons to `public/` before build  |
+| `build`            | Production Vite build                      |
+| `preview`          | Preview production build on `0.0.0.0:4173` |
 
 ## Testing
 

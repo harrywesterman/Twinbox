@@ -52,14 +52,15 @@ Twinbox builds a Talos Linux Kubernetes cluster on Proxmox through a Management 
 
 Run the smallest useful check for touched files:
 
-- Shell: `bash -n <file.sh>`
-- Node: `node --check <file.js|file.mjs>`
-- Portal: `npm run build --prefix portal`
-- Manager web: `npm run build --prefix manager-web`
-- Worker tests: `node --test manager-worker/test/*.mjs`
-- Python tests: `python3 -m pytest -q tests`
-- Compose: `cp .env.example .env && docker compose config >/dev/null && rm .env`
-- Do not state that a change "works" unless you have personally verified it in the relevant environment with one of the smallest useful checks above or a direct live inspection. If something is only inferred or not yet checked, say so plainly.
+- **Shell** → `bash -n <file.sh>`
+- **Node** → `node --check <file.js|file.mjs>`
+- **Lint/format** → `make lint && make format-check`
+- **Portal** → `npm run build --prefix portal`
+- **Manager web** → `npm run build --prefix manager-web`
+- **Worker tests** → `node --test manager-worker/test/*.mjs`
+- **Python tests** → `python3 -m pytest -q tests`
+- **Compose** → `cp .env.example .env && docker compose config >/dev/null && rm .env`
+- **Do not state that a change "works"** unless you have personally verified it in the relevant environment with one of the smallest useful checks above or a direct live inspection. If something is only inferred or not yet checked, say so plainly.
 
 ## Ship
 

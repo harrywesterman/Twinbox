@@ -6,10 +6,7 @@ import {
   buildClusterWorkerSecretBundle,
   normalizeSecretBundle,
 } from "../../lib/secrets/schema.mjs";
-import {
-  readItemRecord,
-  resolveAttachmentPath,
-} from "../../lib/secrets/filesystem-store.mjs";
+import { readItemRecord, resolveAttachmentPath } from "../../lib/secrets/filesystem-store.mjs";
 
 const dataRoot = process.env.MANAGER_DATA_DIR || "/data";
 const workspace = process.env.WORKSPACE_ROOT || "/opt/twinbox";
@@ -98,11 +95,16 @@ function readKnownClusters() {
     return [];
   }
 
-  return fs.readdirSync(dirs.clusters)
+  return fs
+    .readdirSync(dirs.clusters)
     .filter((entry) => entry.endsWith(".json"))
     .map((entry) => readJsonIfExists(path.join(dirs.clusters, entry)))
     .filter((cluster) => cluster?.id)
-    .sort((left, right) => String(right?.updated_at || right?.created_at || "").localeCompare(String(left?.updated_at || left?.created_at || "")));
+    .sort((left, right) =>
+      String(right?.updated_at || right?.created_at || "").localeCompare(
+        String(left?.updated_at || left?.created_at || "")
+      )
+    );
 }
 
 function stepStatePath(stepId, clusterScope = null) {
@@ -132,7 +134,8 @@ function updateStepState(stepId, patch, clusterScope = null) {
     ...patch,
     step_id: stepId,
     cluster_id: patch.cluster_id ?? current.cluster_id ?? clusterScope ?? null,
-    cluster_instance_id: patch.cluster_instance_id ?? current.cluster_instance_id ?? clusterScope ?? null,
+    cluster_instance_id:
+      patch.cluster_instance_id ?? current.cluster_instance_id ?? clusterScope ?? null,
     updated_at: now(),
   };
   writeJson(file, next);
@@ -222,7 +225,10 @@ function recoverOrphanedRunningJobs() {
       queued = readJson(runningFile);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error || "unknown error");
-      appendLog(entry.replace(/\.json$/, ""), `job recovery skipped: unable to read running marker: ${message}`);
+      appendLog(
+        entry.replace(/\.json$/, ""),
+        `job recovery skipped: unable to read running marker: ${message}`
+      );
       finalizeQueueMarker(runningFile);
       continue;
     }
@@ -230,14 +236,18 @@ function recoverOrphanedRunningJobs() {
     const jobId = String(queued?.id || "").trim();
     const failureMessage = "worker restarted while job was running";
     if (!jobId) {
-      appendLog(entry.replace(/\.json$/, ""), `job recovery skipped: running marker missing job id`);
+      appendLog(
+        entry.replace(/\.json$/, ""),
+        `job recovery skipped: running marker missing job id`
+      );
       finalizeQueueMarker(runningFile);
       continue;
     }
 
     try {
       const currentJob = readJson(path.join(dirs.jobs, `${jobId}.json`));
-      const wasCancelRequested = currentJob?.status === "cancel_requested" || currentJob?.status === "canceled";
+      const wasCancelRequested =
+        currentJob?.status === "cancel_requested" || currentJob?.status === "canceled";
 
       updateJob(jobId, {
         status: wasCancelRequested ? "canceled" : "failed",
@@ -247,24 +257,46 @@ function recoverOrphanedRunningJobs() {
       });
       appendLog(jobId, wasCancelRequested ? "job canceled" : `job failed: ${failureMessage}`);
 
-      if ((queued.type === "run_step" || queued.type === "uninstall_step") && queued.payload?.step_id) {
-        const clusterId = queued.cluster_id || queued.payload?.cluster_id || queued.payload?.context?.cluster?.id || null;
-        const clusterInstanceId = queued.cluster_instance_id || queued.payload?.cluster_instance_id || queued.payload?.context?.cluster?.cluster_instance_id || queued.payload?.context?.cluster?.instance_id || null;
-        updateStepState(queued.payload.step_id, {
-          status: wasCancelRequested ? "canceled" : "failed",
-          error: wasCancelRequested ? null : failureMessage,
-          last_job_id: jobId,
-          cluster_id: clusterId,
-          cluster_instance_id: clusterInstanceId,
-          finished_at: now(),
-        }, clusterInstanceId || clusterId);
+      if (
+        (queued.type === "run_step" || queued.type === "uninstall_step") &&
+        queued.payload?.step_id
+      ) {
+        const clusterId =
+          queued.cluster_id ||
+          queued.payload?.cluster_id ||
+          queued.payload?.context?.cluster?.id ||
+          null;
+        const clusterInstanceId =
+          queued.cluster_instance_id ||
+          queued.payload?.cluster_instance_id ||
+          queued.payload?.context?.cluster?.cluster_instance_id ||
+          queued.payload?.context?.cluster?.instance_id ||
+          null;
+        updateStepState(
+          queued.payload.step_id,
+          {
+            status: wasCancelRequested ? "canceled" : "failed",
+            error: wasCancelRequested ? null : failureMessage,
+            last_job_id: jobId,
+            cluster_id: clusterId,
+            cluster_instance_id: clusterInstanceId,
+            finished_at: now(),
+          },
+          clusterInstanceId || clusterId
+        );
       }
 
       if (queued.type === "reconcile_observability") {
         const clusterId = queued.cluster_id || queued.payload?.cluster?.id || null;
         const cluster = queued.payload?.cluster || {};
-        const desiredProfile = OBSERVABILITY_PROFILES.has(String(queued.payload?.desired_profile || cluster.observability_profile || "full").trim().toLowerCase())
-          ? String(queued.payload?.desired_profile || cluster.observability_profile || "full").trim().toLowerCase()
+        const desiredProfile = OBSERVABILITY_PROFILES.has(
+          String(queued.payload?.desired_profile || cluster.observability_profile || "full")
+            .trim()
+            .toLowerCase()
+        )
+          ? String(queued.payload?.desired_profile || cluster.observability_profile || "full")
+              .trim()
+              .toLowerCase()
           : "full";
         updateClusterState(clusterId, {
           ...cluster,
@@ -334,8 +366,7 @@ function envFallbackRecord(ref) {
   const username = trimString(process.env.PROXMOX_USER || process.env.PROXMOX_USERNAME);
   const password = trimString(process.env.PROXMOX_PASSWORD || process.env.TF_VAR_proxmox_password);
   const endpoint = trimString(
-    process.env.TF_VAR_proxmox_endpoint
-    || (host && port ? `https://${host}:${port}` : ""),
+    process.env.TF_VAR_proxmox_endpoint || (host && port ? `https://${host}:${port}` : "")
   );
 
   const record = {};
@@ -358,7 +389,9 @@ function resolveTextRef(rawRef, context = {}) {
   const value = resolveFieldValue(record, ref);
 
   if (!value) {
-    throw new Error(`secret field not found: ${ref.field} on ${ref.scope === "cluster" ? `${ref.cluster_id || context.clusterId || context.cluster_id}/${ref.item}` : ref.item}`);
+    throw new Error(
+      `secret field not found: ${ref.field} on ${ref.scope === "cluster" ? `${ref.cluster_id || context.clusterId || context.cluster_id}/${ref.item}` : ref.item}`
+    );
   }
 
   return value;
@@ -375,9 +408,13 @@ function materializeRef(rawRef, label, context = {}) {
   }
 
   const value = resolveTextRef(ref, context);
-  const tempRoot = process.env.TWINBOX_SECRET_TEMP_DIR || path.join(process.env.MANAGER_DATA_DIR || "/tmp", "twinbox-secrets");
+  const tempRoot =
+    process.env.TWINBOX_SECRET_TEMP_DIR ||
+    path.join(process.env.MANAGER_DATA_DIR || "/tmp", "twinbox-secrets");
   fs.mkdirSync(tempRoot, { recursive: true, mode: 0o700 });
-  const targetDir = fs.mkdtempSync(path.join(tempRoot, `${String(label || "secret").replace(/[^a-zA-Z0-9_.-]+/g, "-")}-`));
+  const targetDir = fs.mkdtempSync(
+    path.join(tempRoot, `${String(label || "secret").replace(/[^a-zA-Z0-9_.-]+/g, "-")}-`)
+  );
   const targetFile = path.join(targetDir, "value");
   fs.writeFileSync(targetFile, value, { mode: 0o600 });
   return targetFile;
@@ -444,7 +481,14 @@ function resolveSecretBundle(bundleSpec = {}, context = {}) {
   };
 }
 
-function runCommand(jobId, command, args, env = {}, redactLine = (line) => String(line ?? ""), stripEnv = []) {
+function runCommand(
+  jobId,
+  command,
+  args,
+  env = {},
+  redactLine = (line) => String(line ?? ""),
+  stripEnv = []
+) {
   return new Promise((resolve, reject) => {
     appendLog(jobId, `exec: ${command} ${args.join(" ")}`);
     const recentOutput = [];
@@ -564,7 +608,9 @@ function runCommand(jobId, command, args, env = {}, redactLine = (line) => Strin
       if (code === 0) {
         finishResolve();
       } else {
-        finishReject(new Error(summarizeFailureOutput(recentOutput, `command exited with code ${code}`)));
+        finishReject(
+          new Error(summarizeFailureOutput(recentOutput, `command exited with code ${code}`))
+        );
       }
     });
   });
@@ -601,8 +647,8 @@ function withKubeconfigAliases(env = {}) {
 
 function resolveJobSecretRuntime(payload, clusterId = null) {
   const cluster = payload?.context?.cluster || payload;
-  const secretBundle = payload?.secret_bundle
-    || (cluster?.metadata ? buildClusterWorkerSecretBundle(cluster) : null);
+  const secretBundle =
+    payload?.secret_bundle || (cluster?.metadata ? buildClusterWorkerSecretBundle(cluster) : null);
 
   if (!secretBundle) {
     return emptySecretRuntime();
@@ -615,9 +661,10 @@ function resolveJobSecretRuntime(payload, clusterId = null) {
 
   return {
     ...runtime,
-    strip_env: envKeys.includes("TF_VAR_proxmox_password") && !envKeys.includes("PROXMOX_PASSWORD")
-      ? ["PROXMOX_PASSWORD"]
-      : [],
+    strip_env:
+      envKeys.includes("TF_VAR_proxmox_password") && !envKeys.includes("PROXMOX_PASSWORD")
+        ? ["PROXMOX_PASSWORD"]
+        : [],
   };
 }
 
@@ -671,7 +718,9 @@ function runVersionCommand(command, args) {
   }
   if (result.status !== 0) {
     const stderr = (result.stderr || "").trim();
-    throw new Error(`${command} ${args.join(" ")} exited with code ${result.status}${stderr ? `: ${stderr}` : ""}`);
+    throw new Error(
+      `${command} ${args.join(" ")} exited with code ${result.status}${stderr ? `: ${stderr}` : ""}`
+    );
   }
   const output = `${result.stdout || ""}\n${result.stderr || ""}`.trim();
   return output;
@@ -715,7 +764,9 @@ function ensureToolVersionsMatchPolicy() {
 
 async function handleApply(job) {
   const cluster = job.payload;
-  const dnsServers = Array.isArray(cluster.dns_servers) ? cluster.dns_servers.join(",") : String(cluster.dns_servers || "");
+  const dnsServers = Array.isArray(cluster.dns_servers)
+    ? cluster.dns_servers.join(",")
+    : String(cluster.dns_servers || "");
   const secretRuntime = resolveJobSecretRuntime(cluster, cluster.id);
   const redact = buildRedactor(secretRuntime.redactions);
 
@@ -725,29 +776,48 @@ async function handleApply(job) {
       "bash",
       [
         "scripts/manager/apply-cluster.sh",
-        "--cluster-id", cluster.id,
-        "--name", cluster.name,
-        "--controlplane-count", String(cluster.controlplane_count),
-        "--worker-count", String(cluster.worker_count),
-        "--cpu-cores", String(cluster.cpu_cores),
-        "--memory-mb", String(cluster.memory_mb),
-        "--disk-gb", String(cluster.disk_gb),
-        "--bridge", cluster.bridge,
-        "--start-vmid", String(cluster.start_vmid),
-        "--start-ip", cluster.start_ip,
-        "--vip-ip", cluster.vip_ip,
-        "--node-prefix-length", String(cluster.node_prefix_length),
-        "--gateway-ip", cluster.gateway_ip,
-        "--dns-servers", dnsServers,
-        "--dns-domain", cluster.dns_domain,
-        "--proxmox-node", cluster.metadata.proxmox_node,
-        "--storage-pool", cluster.metadata.storage_pool,
-        "--file-datastore", cluster.metadata.file_datastore,
-        "--data-dir", dataRoot,
+        "--cluster-id",
+        cluster.id,
+        "--name",
+        cluster.name,
+        "--controlplane-count",
+        String(cluster.controlplane_count),
+        "--worker-count",
+        String(cluster.worker_count),
+        "--cpu-cores",
+        String(cluster.cpu_cores),
+        "--memory-mb",
+        String(cluster.memory_mb),
+        "--disk-gb",
+        String(cluster.disk_gb),
+        "--bridge",
+        cluster.bridge,
+        "--start-vmid",
+        String(cluster.start_vmid),
+        "--start-ip",
+        cluster.start_ip,
+        "--vip-ip",
+        cluster.vip_ip,
+        "--node-prefix-length",
+        String(cluster.node_prefix_length),
+        "--gateway-ip",
+        cluster.gateway_ip,
+        "--dns-servers",
+        dnsServers,
+        "--dns-domain",
+        cluster.dns_domain,
+        "--proxmox-node",
+        cluster.metadata.proxmox_node,
+        "--storage-pool",
+        cluster.metadata.storage_pool,
+        "--file-datastore",
+        cluster.metadata.file_datastore,
+        "--data-dir",
+        dataRoot,
       ],
       secretRuntime.env,
       redact,
-      secretRuntime.strip_env,
+      secretRuntime.strip_env
     );
   } finally {
     secretRuntime.cleanup();
@@ -759,8 +829,14 @@ async function handleReconcileObservability(job) {
   const cluster = payload.cluster || payload.context?.cluster || payload;
   const clusterId = cluster?.id || job.cluster_id || null;
   const clusterInstanceId = clusterScopeId(cluster, job.cluster_instance_id || null);
-  const desiredProfile = OBSERVABILITY_PROFILES.has(String(payload.desired_profile || cluster.observability_profile || "full").trim().toLowerCase())
-    ? String(payload.desired_profile || cluster.observability_profile || "full").trim().toLowerCase()
+  const desiredProfile = OBSERVABILITY_PROFILES.has(
+    String(payload.desired_profile || cluster.observability_profile || "full")
+      .trim()
+      .toLowerCase()
+  )
+    ? String(payload.desired_profile || cluster.observability_profile || "full")
+        .trim()
+        .toLowerCase()
     : "full";
   const secretRuntime = resolveJobSecretRuntime(payload, clusterId);
   const redact = buildRedactor(secretRuntime.redactions);
@@ -797,7 +873,7 @@ async function handleReconcileObservability(job) {
       ["scripts/manager/reconcile-observability.sh"],
       scriptEnv,
       redact,
-      secretRuntime.strip_env,
+      secretRuntime.strip_env
     );
 
     updateClusterState(clusterId, {
@@ -826,7 +902,15 @@ async function handleBootstrap(job) {
   await handleApply({ id: job.id, payload: cluster });
 }
 
-async function refreshDashyConfig(jobId, stepId, clusterId, clusterInstanceId, env, redact, stripEnv) {
+async function refreshDashyConfig(
+  jobId,
+  stepId,
+  clusterId,
+  clusterInstanceId,
+  env,
+  redact,
+  stripEnv
+) {
   if (!clusterId) {
     return;
   }
@@ -837,15 +921,19 @@ async function refreshDashyConfig(jobId, stepId, clusterId, clusterInstanceId, e
       "node",
       [
         "manager-worker/src/refresh-dashy-config.mjs",
-        "--workspace-root", workspace,
-        "--manager-data-dir", dataRoot,
-        "--cluster-id", clusterId,
-        "--trigger-step-id", stepId,
+        "--workspace-root",
+        workspace,
+        "--manager-data-dir",
+        dataRoot,
+        "--cluster-id",
+        clusterId,
+        "--trigger-step-id",
+        stepId,
         ...(clusterInstanceId ? ["--cluster-instance-id", clusterInstanceId] : []),
       ],
       env,
       redact,
-      stripEnv,
+      stripEnv
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error || "unknown error");
@@ -853,7 +941,15 @@ async function refreshDashyConfig(jobId, stepId, clusterId, clusterInstanceId, e
   }
 }
 
-async function refreshPortalConfig(jobId, stepId, clusterId, clusterInstanceId, env, redact, stripEnv) {
+async function refreshPortalConfig(
+  jobId,
+  stepId,
+  clusterId,
+  clusterInstanceId,
+  env,
+  redact,
+  stripEnv
+) {
   if (!clusterId) {
     return;
   }
@@ -864,15 +960,19 @@ async function refreshPortalConfig(jobId, stepId, clusterId, clusterInstanceId, 
       "node",
       [
         "manager-worker/src/refresh-portal-config.mjs",
-        "--workspace-root", workspace,
-        "--manager-data-dir", dataRoot,
-        "--cluster-id", clusterId,
-        "--trigger-step-id", stepId,
+        "--workspace-root",
+        workspace,
+        "--manager-data-dir",
+        dataRoot,
+        "--cluster-id",
+        clusterId,
+        "--trigger-step-id",
+        stepId,
         ...(clusterInstanceId ? ["--cluster-instance-id", clusterInstanceId] : []),
       ],
       env,
       redact,
-      stripEnv,
+      stripEnv
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error || "unknown error");
@@ -880,7 +980,15 @@ async function refreshPortalConfig(jobId, stepId, clusterId, clusterInstanceId, 
   }
 }
 
-async function refreshGrafanaDashboard(jobId, stepId, clusterId, clusterInstanceId, env, redact, stripEnv) {
+async function refreshGrafanaDashboard(
+  jobId,
+  stepId,
+  clusterId,
+  clusterInstanceId,
+  env,
+  redact,
+  stripEnv
+) {
   if (!clusterId) {
     return;
   }
@@ -903,7 +1011,7 @@ async function refreshGrafanaDashboard(jobId, stepId, clusterId, clusterInstance
       ],
       env,
       redact,
-      stripEnv,
+      stripEnv
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error || "unknown error");
@@ -924,14 +1032,16 @@ async function reconcileGrafanaDashboardsOnStartup() {
       secretRuntime = resolveJobSecretRuntime(cluster, cluster.id);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error || "unknown error");
-      console.warn(`manager-worker startup grafana reconcile skipped for ${cluster.id}: ${message}`);
+      console.warn(
+        `manager-worker startup grafana reconcile skipped for ${cluster.id}: ${message}`
+      );
       continue;
     }
 
     const hasKubeconfig = Boolean(
-      secretRuntime.env.KUBECONFIG_FILE
-      || secretRuntime.env.TWINBOX_KUBECONFIG_FILE
-      || secretRuntime.env.KUBECONFIG,
+      secretRuntime.env.KUBECONFIG_FILE ||
+      secretRuntime.env.TWINBOX_KUBECONFIG_FILE ||
+      secretRuntime.env.KUBECONFIG
     );
 
     if (!hasKubeconfig) {
@@ -947,7 +1057,7 @@ async function reconcileGrafanaDashboardsOnStartup() {
         clusterScopeId(cluster, cluster.id),
         secretRuntime.env,
         buildRedactor(secretRuntime.redactions),
-        secretRuntime.strip_env,
+        secretRuntime.strip_env
       );
     } finally {
       secretRuntime.cleanup();
@@ -979,17 +1089,21 @@ async function handleRunStep(job) {
   const resultFile = path.join(dirs.stepResults, `${job.id}.json`);
   fs.rmSync(resultFile, { force: true });
 
-  updateStepState(stepId, {
-    status: "running",
-    inputs,
-    outputs: null,
-    error: null,
-    last_job_id: job.id,
-    cluster_id: clusterId,
-    cluster_instance_id: clusterInstanceId,
-    started_at: now(),
-    finished_at: null,
-  }, clusterInstanceId || clusterId);
+  updateStepState(
+    stepId,
+    {
+      status: "running",
+      inputs,
+      outputs: null,
+      error: null,
+      last_job_id: job.id,
+      cluster_id: clusterId,
+      cluster_instance_id: clusterInstanceId,
+      started_at: now(),
+      finished_at: null,
+    },
+    clusterInstanceId || clusterId
+  );
 
   const secretRuntime = resolveJobSecretRuntime(payload, clusterId);
   const redact = buildRedactor(secretRuntime.redactions);
@@ -1011,19 +1125,23 @@ async function handleRunStep(job) {
         ...secretRuntime.env,
       },
       redact,
-      secretRuntime.strip_env,
+      secretRuntime.strip_env
     );
 
     const outputs = readJsonIfExists(resultFile);
-    updateStepState(stepId, {
-      status: stepType === "config" ? "configured" : "succeeded",
-      outputs,
-      error: null,
-      last_job_id: job.id,
-      cluster_id: outputs?.cluster_id || clusterId,
-      cluster_instance_id: outputs?.cluster_instance_id || clusterInstanceId,
-      finished_at: now(),
-    }, clusterInstanceId || clusterId);
+    updateStepState(
+      stepId,
+      {
+        status: stepType === "config" ? "configured" : "succeeded",
+        outputs,
+        error: null,
+        last_job_id: job.id,
+        cluster_id: outputs?.cluster_id || clusterId,
+        cluster_instance_id: outputs?.cluster_instance_id || clusterInstanceId,
+        finished_at: now(),
+      },
+      clusterInstanceId || clusterId
+    );
 
     await refreshDashyConfig(
       job.id,
@@ -1032,7 +1150,7 @@ async function handleRunStep(job) {
       outputs?.cluster_instance_id || clusterInstanceId,
       secretRuntime.env,
       redact,
-      secretRuntime.strip_env,
+      secretRuntime.strip_env
     );
     await refreshPortalConfig(
       job.id,
@@ -1041,7 +1159,7 @@ async function handleRunStep(job) {
       outputs?.cluster_instance_id || clusterInstanceId,
       secretRuntime.env,
       redact,
-      secretRuntime.strip_env,
+      secretRuntime.strip_env
     );
     await refreshGrafanaDashboard(
       job.id,
@@ -1050,28 +1168,36 @@ async function handleRunStep(job) {
       outputs?.cluster_instance_id || clusterInstanceId,
       secretRuntime.env,
       redact,
-      secretRuntime.strip_env,
+      secretRuntime.strip_env
     );
   } catch (err) {
     if (String(err?.message || "") === "job canceled") {
-      updateStepState(stepId, {
-        status: "canceled",
-        error: null,
+      updateStepState(
+        stepId,
+        {
+          status: "canceled",
+          error: null,
+          last_job_id: job.id,
+          cluster_id: clusterId,
+          cluster_instance_id: clusterInstanceId,
+          finished_at: now(),
+        },
+        clusterInstanceId || clusterId
+      );
+      throw err;
+    }
+    updateStepState(
+      stepId,
+      {
+        status: "failed",
+        error: err.message,
         last_job_id: job.id,
         cluster_id: clusterId,
         cluster_instance_id: clusterInstanceId,
         finished_at: now(),
-      }, clusterInstanceId || clusterId);
-      throw err;
-    }
-    updateStepState(stepId, {
-      status: "failed",
-      error: err.message,
-      last_job_id: job.id,
-      cluster_id: clusterId,
-      cluster_instance_id: clusterInstanceId,
-      finished_at: now(),
-    }, clusterInstanceId || clusterId);
+      },
+      clusterInstanceId || clusterId
+    );
     throw err;
   } finally {
     secretRuntime.cleanup();
@@ -1105,17 +1231,21 @@ async function handleUninstallStep(job) {
   const clusterInstanceId = clusterScopeId(context?.cluster, job.cluster_instance_id || null);
   const secretRuntime = resolveJobSecretRuntime(payload, clusterId);
   const redact = buildRedactor(secretRuntime.redactions);
-  updateStepState(stepId, {
-    status: "running",
-    inputs: {},
-    outputs: null,
-    error: null,
-    last_job_id: job.id,
-    cluster_id: clusterId,
-    cluster_instance_id: clusterInstanceId,
-    started_at: now(),
-    finished_at: null,
-  }, clusterInstanceId || clusterId);
+  updateStepState(
+    stepId,
+    {
+      status: "running",
+      inputs: {},
+      outputs: null,
+      error: null,
+      last_job_id: job.id,
+      cluster_id: clusterId,
+      cluster_instance_id: clusterInstanceId,
+      started_at: now(),
+      finished_at: null,
+    },
+    clusterInstanceId || clusterId
+  );
 
   try {
     await runCommand(
@@ -1133,19 +1263,23 @@ async function handleUninstallStep(job) {
         ...secretRuntime.env,
       },
       redact,
-      secretRuntime.strip_env,
+      secretRuntime.strip_env
     );
 
-    updateStepState(stepId, {
-      status: "not_started",
-      inputs: {},
-      outputs: null,
-      error: null,
-      last_job_id: job.id,
-      cluster_id: clusterId,
-      cluster_instance_id: clusterInstanceId,
-      finished_at: now(),
-    }, clusterInstanceId || clusterId);
+    updateStepState(
+      stepId,
+      {
+        status: "not_started",
+        inputs: {},
+        outputs: null,
+        error: null,
+        last_job_id: job.id,
+        cluster_id: clusterId,
+        cluster_instance_id: clusterInstanceId,
+        finished_at: now(),
+      },
+      clusterInstanceId || clusterId
+    );
 
     await refreshPortalConfig(
       job.id,
@@ -1154,29 +1288,37 @@ async function handleUninstallStep(job) {
       clusterInstanceId,
       secretRuntime.env,
       redact,
-      secretRuntime.strip_env,
+      secretRuntime.strip_env
     );
   } catch (err) {
     if (String(err?.message || "") === "job canceled") {
-      updateStepState(stepId, {
-        status: "canceled",
-        error: null,
+      updateStepState(
+        stepId,
+        {
+          status: "canceled",
+          error: null,
+          last_job_id: job.id,
+          cluster_id: clusterId,
+          cluster_instance_id: clusterInstanceId,
+          finished_at: now(),
+        },
+        clusterInstanceId || clusterId
+      );
+      throw err;
+    }
+
+    updateStepState(
+      stepId,
+      {
+        status: "failed",
+        error: err.message,
         last_job_id: job.id,
         cluster_id: clusterId,
         cluster_instance_id: clusterInstanceId,
         finished_at: now(),
-      }, clusterInstanceId || clusterId);
-      throw err;
-    }
-
-    updateStepState(stepId, {
-      status: "failed",
-      error: err.message,
-      last_job_id: job.id,
-      cluster_id: clusterId,
-      cluster_instance_id: clusterInstanceId,
-      finished_at: now(),
-    }, clusterInstanceId || clusterId);
+      },
+      clusterInstanceId || clusterId
+    );
     throw err;
   } finally {
     secretRuntime.cleanup();
@@ -1224,7 +1366,12 @@ async function handleJob(queueFile) {
     }
 
     if (isJobCanceled(queued.id)) {
-      updateJob(queued.id, { status: "canceled", step: "canceled", error: null, finished_at: now() });
+      updateJob(queued.id, {
+        status: "canceled",
+        step: "canceled",
+        error: null,
+        finished_at: now(),
+      });
       appendLog(queued.id, "job canceled");
       return;
     }
@@ -1233,10 +1380,20 @@ async function handleJob(queueFile) {
     appendLog(queued.id, "job completed");
   } catch (err) {
     if (String(err?.message || "") === "job canceled") {
-      updateJob(queued.id, { status: "canceled", step: "canceled", error: null, finished_at: now() });
+      updateJob(queued.id, {
+        status: "canceled",
+        step: "canceled",
+        error: null,
+        finished_at: now(),
+      });
       appendLog(queued.id, "job canceled");
     } else {
-      updateJob(queued.id, { status: "failed", step: "failed", error: err.message, finished_at: now() });
+      updateJob(queued.id, {
+        status: "failed",
+        step: "failed",
+        error: err.message,
+        finished_at: now(),
+      });
       appendLog(queued.id, `job failed: ${err.message}`);
     }
   } finally {
@@ -1250,10 +1407,7 @@ function pickNextJob() {
     return null;
   }
 
-  const nextJobs = entries
-    .map(readPendingJobCandidate)
-    .filter(Boolean)
-    .sort(comparePendingJobs);
+  const nextJobs = entries.map(readPendingJobCandidate).filter(Boolean).sort(comparePendingJobs);
 
   return nextJobs[0]?.fullPath || null;
 }
