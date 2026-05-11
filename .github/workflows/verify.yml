@@ -45,6 +45,12 @@ jobs:
           npm ci --prefix manager-worker
           npm ci --prefix portal
 
+      - name: Debug check eslint
+        run: |
+          ls -la node_modules/.bin/ | grep eslint || echo "eslint not found in .bin"
+          which eslint || echo "eslint not in PATH"
+          node -e "require.resolve('eslint')" || echo "eslint not resolvable"
+
       - name: Lint and format check
         run: |
           npm run lint --prefix manager-api
