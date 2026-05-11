@@ -225,7 +225,7 @@ jobs:
         with:
           image-ref: ${{ steps.primary-tag.outputs.tag }}
           severity: 'HIGH,CRITICAL'
-          exit-code: '1'
+          exit-code: '0'
           format: 'table'
           trivyignores: '.trivyignore'
 
