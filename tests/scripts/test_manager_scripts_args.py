@@ -1386,7 +1386,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
         'pgadmin_platform_dir="$WORKSPACE_ROOT/gitops/platform-apps/pgadmin4"' in pgadmin_run_text
     )
     assert (
-        'pgadmin_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-ingressroute-XXXXXX.yaml")"'
+        'pgadmin_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-ingressroute-XXXXXX")"'
         in pgadmin_run_text
     )
     assert (
@@ -1447,7 +1447,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "sync-openbao-global-secret.sh" in headlamp_run_text
     assert "gitops/platform-apps/headlamp/externalsecret.yaml" in headlamp_run_text
     assert (
-        'headlamp_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/headlamp-application-XXXXXX.yaml")"'
+        'headlamp_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/headlamp-application-XXXXXX")"'
         in headlamp_run_text
     )
     assert (
@@ -1716,7 +1716,7 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "cluster-public-zone.sh" in freshrss_run_text
     assert "Could not determine cluster DNS domain" in freshrss_run_text
     assert (
-        'rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/freshrss-application-XXXXXX.yaml")"'
+        'rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/freshrss-application-XXXXXX")"'
         in freshrss_run_text
     )
     assert "Applying FreshRSS Argo CD application" in freshrss_run_text
@@ -2307,9 +2307,9 @@ def test_traefik_manager_step_deploys_browser_ui():
     assert 'kubectl apply -f "$rendered_callback_ingressroute"' in script_text
     assert "cluster-public-zone.sh" in script_text
     assert 'sed "s/__ZONE_NAME__/${public_zone_name}/g"' in script_text
-    assert 'mktemp "${TMPDIR:-/tmp}/traefik-manager-deployment-XXXXXX.yaml"' in script_text
-    assert 'mktemp "${TMPDIR:-/tmp}/traefik-manager-ingressroute-XXXXXX.yaml"' in script_text
-    assert 'mktemp "${TMPDIR:-/tmp}/traefik-manager-authentik-callback-XXXXXX.yaml"' in script_text
+    assert 'mktemp "${TMPDIR:-/tmp}/traefik-manager-deployment-XXXXXX"' in script_text
+    assert 'mktemp "${TMPDIR:-/tmp}/traefik-manager-ingressroute-XXXXXX"' in script_text
+    assert 'mktemp "${TMPDIR:-/tmp}/traefik-manager-authentik-callback-XXXXXX"' in script_text
     assert ': "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"' in script_text
     assert "twinbox_public_zone_name" in script_text
 

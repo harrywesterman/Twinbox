@@ -102,8 +102,8 @@ command -v jq >/dev/null 2>&1 || fail "jq not found"
 command -v openssl >/dev/null 2>&1 || fail "openssl not found"
 
 manifest_path="$WORKSPACE_ROOT/gitops/apps/crowdsec.yaml"
-bouncer_secret_file="$(mktemp "${TMPDIR:-/tmp}/crowdsec-bouncer-XXXXXX.json")"
-bouncer_lapi_secret_file="$(mktemp "${TMPDIR:-/tmp}/crowdsec-lapi-XXXXXX.json")"
+bouncer_secret_file="$(mktemp "${TMPDIR:-/tmp}/crowdsec-bouncer-XXXXXX")"
+bouncer_lapi_secret_file="$(mktemp "${TMPDIR:-/tmp}/crowdsec-lapi-XXXXXX")"
 trap 'rm -f "$bouncer_secret_file" "$bouncer_lapi_secret_file"' EXIT
 
 bouncer_key="$(openssl rand -hex 32)"

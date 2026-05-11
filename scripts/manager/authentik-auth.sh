@@ -211,7 +211,7 @@ authentik_setup_forward() {
     port="$(_authentik_pick_forward_port)"
   fi
 
-  AUTHENTIK_FORWARD_LOG="$(mktemp "${TMPDIR:-/tmp}/authentik-port-forward-XXXXXX.log")"
+  AUTHENTIK_FORWARD_LOG="$(mktemp "${TMPDIR:-/tmp}/authentik-port-forward-XXXXXX")"
   kubectl -n authentik port-forward "svc/authentik-server" "${port}:80" >"$AUTHENTIK_FORWARD_LOG" 2>&1 &
   AUTHENTIK_FORWARD_PID="$!"
 

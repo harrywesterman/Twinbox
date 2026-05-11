@@ -453,15 +453,15 @@ kubectl apply -f "$nextcloud_platform_dir/admin-externalsecret.yaml"
 kubectl apply -f "$nextcloud_platform_dir/db-externalsecret.yaml"
 kubectl apply -f "$nextcloud_platform_dir/redis-externalsecret.yaml"
 
-nextcloud_rendered_middleware="$(mktemp "${TMPDIR:-/tmp}/nextcloud-middleware-XXXXXX.yaml")"
+nextcloud_rendered_middleware="$(mktemp "${TMPDIR:-/tmp}/nextcloud-middleware-XXXXXX")"
 sed "s/__ZONE_NAME__/${public_zone_name}/g" "$nextcloud_platform_dir/middleware.yaml" >"$nextcloud_rendered_middleware"
 kubectl apply -f "$nextcloud_rendered_middleware"
 
-nextcloud_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/nextcloud-ingressroute-XXXXXX.yaml")"
+nextcloud_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/nextcloud-ingressroute-XXXXXX")"
 sed "s/__ZONE_NAME__/${public_zone_name}/g" "$nextcloud_platform_dir/ingressroute.yaml" >"$nextcloud_rendered_ingressroute"
 kubectl apply -f "$nextcloud_rendered_ingressroute"
 
-nextcloud_rendered_collabora_ingressroute="$(mktemp "${TMPDIR:-/tmp}/nextcloud-collabora-ingressroute-XXXXXX.yaml")"
+nextcloud_rendered_collabora_ingressroute="$(mktemp "${TMPDIR:-/tmp}/nextcloud-collabora-ingressroute-XXXXXX")"
 sed "s/__ZONE_NAME__/${public_zone_name}/g" "$nextcloud_platform_dir/collabora-ingressroute.yaml" >"$nextcloud_rendered_collabora_ingressroute"
 kubectl apply -f "$nextcloud_rendered_collabora_ingressroute"
 
@@ -487,8 +487,8 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
   --app-id "nextcloud" \
   --host "nextcloud-db-pooler-rw.databases.svc.cluster.local"
 
-nextcloud_rendered_app_manifest="$(mktemp "${TMPDIR:-/tmp}/nextcloud-${cluster_id}-XXXXXX.yaml")"
-nextcloud_rendered_values_manifest="$(mktemp "${TMPDIR:-/tmp}/nextcloud-values-${cluster_id}-XXXXXX.yaml")"
+nextcloud_rendered_app_manifest="$(mktemp "${TMPDIR:-/tmp}/nextcloud-${cluster_id}-XXXXXX")"
+nextcloud_rendered_values_manifest="$(mktemp "${TMPDIR:-/tmp}/nextcloud-values-${cluster_id}-XXXXXX")"
 trap 'rm -f "$nextcloud_secret_file" "${nextcloud_rendered_values_manifest:-}" "${nextcloud_rendered_app_manifest:-}" "${nextcloud_rendered_middleware:-}" "${nextcloud_rendered_ingressroute:-}" "${nextcloud_rendered_collabora_ingressroute:-}"' EXIT
 sed "s/__ZONE_NAME__/${public_zone_name}/g" "$nextcloud_values_manifest" >"$nextcloud_rendered_values_manifest"
 

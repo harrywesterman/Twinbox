@@ -239,9 +239,9 @@ paperless_socialaccount_providers="$(
     }'
 )"
 
-paperless_secret_file="$(mktemp "${TMPDIR:-/tmp}/paperless-bootstrap-XXXXXX.json")"
-paperless_rendered_app_manifest="$(mktemp "${TMPDIR:-/tmp}/paperless-application-XXXXXX.yaml")"
-paperless_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/paperless-ingressroute-XXXXXX.yaml")"
+paperless_secret_file="$(mktemp "${TMPDIR:-/tmp}/paperless-bootstrap-XXXXXX")"
+paperless_rendered_app_manifest="$(mktemp "${TMPDIR:-/tmp}/paperless-application-XXXXXX")"
+paperless_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/paperless-ingressroute-XXXXXX")"
 trap 'rm -f "$paperless_secret_file" "$paperless_rendered_app_manifest" "$paperless_rendered_ingressroute"' EXIT
 
 jq -n \

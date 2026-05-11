@@ -111,8 +111,8 @@ fi
 
 openwebui_database_url="postgresql://${openwebui_db_username}:${openwebui_db_password}@openwebui-db-pooler-rw-session.databases.svc.cluster.local:5432/openwebui"
 
-openwebui_secret_file="$(mktemp "${TMPDIR:-/tmp}/openwebui-bootstrap-XXXXXX.json")"
-openwebui_rendered_app_manifest="$(mktemp "${TMPDIR:-/tmp}/openwebui-application-XXXXXX.yaml")"
+openwebui_secret_file="$(mktemp "${TMPDIR:-/tmp}/openwebui-bootstrap-XXXXXX")"
+openwebui_rendered_app_manifest="$(mktemp "${TMPDIR:-/tmp}/openwebui-application-XXXXXX")"
 trap 'rm -f "$openwebui_secret_file" "$openwebui_rendered_app_manifest"' EXIT
 
 jq -n \

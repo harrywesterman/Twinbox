@@ -352,7 +352,7 @@ seed_generated_dashboard() {
   local dashboard_file_key="$3"
   local dashboard_file
 
-  dashboard_file="$(mktemp /tmp/${configmap_name}-XXXXXX.json)"
+  dashboard_file="$(mktemp /tmp/${configmap_name}-XXXXXX)"
   dashboard_temp_files+=("$dashboard_file")
 
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Generating ${configmap_name}"

@@ -190,7 +190,7 @@ cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty'
 public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
 pgadmin_platform_dir="$WORKSPACE_ROOT/gitops/platform-apps/pgadmin4"
-pgadmin_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-ingressroute-XXXXXX.yaml")"
+pgadmin_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-ingressroute-XXXXXX")"
 
 authentik_ensure_token
 authentik_setup_forward

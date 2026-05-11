@@ -129,7 +129,7 @@ openbao_seed_release_secret() {
   normalized="$(tr -d '[:space:]' <"$OPENBAO_SEAL_KEY_FILE" | tr '[:upper:]' '[:lower:]')"
 
   if [[ "$normalized" =~ ^[0-9a-f]{64}$ ]]; then
-    tmp_key_file="$(mktemp "${TMPDIR:-/tmp}/openbao-seal-key-XXXXXX.bin")"
+    tmp_key_file="$(mktemp "${TMPDIR:-/tmp}/openbao-seal-key-XXXXXX")"
     trap 'rm -f "$tmp_key_file"' RETURN
     printf '%b' "$(printf '%s' "$normalized" | sed 's/../\\x&/g')" >"$tmp_key_file"
     chmod 0600 "$tmp_key_file"
@@ -584,7 +584,7 @@ openbao_sync_global_secret_file() {
   payload="$(jq -c '{data: .}' "$json_file")"
   local forward_port="${OPENBAO_LOCAL_FORWARD_PORT:-18200}"
   local forward_log=""
-  forward_log="$(mktemp "${TMPDIR:-/tmp}/openbao-port-forward-XXXXXX.log")"
+  forward_log="$(mktemp "${TMPDIR:-/tmp}/openbao-port-forward-XXXXXX")"
   local port_forward_pid=""
 
   cleanup_openbao_port_forward() {

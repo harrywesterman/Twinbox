@@ -112,7 +112,7 @@ openbao_log "Seeding OpenBao static seal secret"
 openbao_seed_release_secret
 
 openbao_log "Applying OpenBao application"
-openbao_application_manifest="$(mktemp "${TMPDIR:-/tmp}/openbao-application-XXXXXX.yaml")"
+openbao_application_manifest="$(mktemp "${TMPDIR:-/tmp}/openbao-application-XXXXXX")"
 trap 'rm -f "$openbao_application_manifest"' RETURN
 {
   cat <<EOF

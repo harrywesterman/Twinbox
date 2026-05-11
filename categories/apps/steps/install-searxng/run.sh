@@ -55,8 +55,8 @@ if [[ -n "$existing_searxng_secret_json" ]]; then
   [[ -n "$existing_secret" ]] && searxng_secret="$existing_secret"
 fi
 
-searxng_secret_file="$(mktemp "${TMPDIR:-/tmp}/searxng-bootstrap-XXXXXX.json")"
-searxng_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/searxng-application-XXXXXX.yaml")"
+searxng_secret_file="$(mktemp "${TMPDIR:-/tmp}/searxng-bootstrap-XXXXXX")"
+searxng_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/searxng-application-XXXXXX")"
 trap 'rm -f "$searxng_secret_file" "$searxng_rendered_manifest"' EXIT
 
 jq -n \

@@ -14,9 +14,9 @@ source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
 source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"
 
 platform_dir="$WORKSPACE_ROOT/gitops/platform-apps/traefik-manager"
-rendered_deployment="$(mktemp "${TMPDIR:-/tmp}/traefik-manager-deployment-XXXXXX.yaml")"
-rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/traefik-manager-ingressroute-XXXXXX.yaml")"
-rendered_callback_ingressroute="$(mktemp "${TMPDIR:-/tmp}/traefik-manager-authentik-callback-XXXXXX.yaml")"
+rendered_deployment="$(mktemp "${TMPDIR:-/tmp}/traefik-manager-deployment-XXXXXX")"
+rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/traefik-manager-ingressroute-XXXXXX")"
+rendered_callback_ingressroute="$(mktemp "${TMPDIR:-/tmp}/traefik-manager-authentik-callback-XXXXXX")"
 trap 'rm -f "$rendered_deployment" "$rendered_ingressroute" "$rendered_callback_ingressroute"' EXIT
 
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"

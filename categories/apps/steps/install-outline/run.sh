@@ -186,10 +186,10 @@ if [[ -n "$existing_outline_secret_json" ]]; then
   [[ -n "$existing_oauth_client_secret" ]] && outline_oauth_client_secret="$existing_oauth_client_secret"
 fi
 
-outline_secret_file="$(mktemp "${TMPDIR:-/tmp}/outline-bootstrap-XXXXXX.json")"
-outline_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/outline-application-XXXXXX.yaml")"
-outline_rendered_deployment="$(mktemp "${TMPDIR:-/tmp}/outline-deployment-XXXXXX.yaml")"
-outline_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/outline-ingressroute-XXXXXX.yaml")"
+outline_secret_file="$(mktemp "${TMPDIR:-/tmp}/outline-bootstrap-XXXXXX")"
+outline_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/outline-application-XXXXXX")"
+outline_rendered_deployment="$(mktemp "${TMPDIR:-/tmp}/outline-deployment-XXXXXX")"
+outline_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/outline-ingressroute-XXXXXX")"
 trap 'rm -f "$outline_secret_file" "$outline_rendered_manifest" "$outline_rendered_deployment" "$outline_rendered_ingressroute"' EXIT
 
 jq -n \

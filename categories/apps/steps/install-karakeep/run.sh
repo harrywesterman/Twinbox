@@ -146,9 +146,9 @@ if [[ -n "$existing_karakeep_secret_json" ]]; then
   [[ -n "$existing_oauth_client_secret" ]] && karakeep_oauth_client_secret="$existing_oauth_client_secret"
 fi
 
-karakeep_secret_file="$(mktemp "${TMPDIR:-/tmp}/karakeep-bootstrap-XXXXXX.json")"
-karakeep_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/karakeep-application-XXXXXX.yaml")"
-karakeep_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/karakeep-ingressroute-XXXXXX.yaml")"
+karakeep_secret_file="$(mktemp "${TMPDIR:-/tmp}/karakeep-bootstrap-XXXXXX")"
+karakeep_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/karakeep-application-XXXXXX")"
+karakeep_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/karakeep-ingressroute-XXXXXX")"
 trap 'rm -f "$karakeep_secret_file" "$karakeep_rendered_manifest" "$karakeep_rendered_ingressroute"' EXIT
 
 jq -n \

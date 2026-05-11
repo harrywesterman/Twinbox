@@ -206,7 +206,7 @@ jitsi_hosts_group_name="jitsi-hosts"
 secrets_dir="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}/secrets/global"
 jitsi_secret_file="${secrets_dir}/jitsi-auth-${cluster_id}.json"
 jitsi_manifest_path="$WORKSPACE_ROOT/gitops/apps/jitsi.yaml"
-jitsi_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/jitsi-application-XXXXXX.yaml")"
+jitsi_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/jitsi-application-XXXXXX")"
 jitsi_namespace_manifest="$WORKSPACE_ROOT/gitops/platform-apps/jitsi/namespace.yaml"
 jitsi_externalsecret_manifest="$WORKSPACE_ROOT/gitops/platform-apps/jitsi/externalsecret.yaml"
 trap 'rm -f "$jitsi_rendered_manifest" "$jitsi_secret_file"' EXIT
