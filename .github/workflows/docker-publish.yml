@@ -227,6 +227,7 @@ jobs:
           severity: 'HIGH,CRITICAL'
           exit-code: '1'
           format: 'table'
+          trivyignores: '.trivyignore'
 
       - name: Push image
         uses: docker/build-push-action@v7
