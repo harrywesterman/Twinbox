@@ -5,6 +5,7 @@ WORKDIR /opt/twinbox
 COPY config ./config
 
 RUN apt-get update \
+  && apt-get upgrade -y --no-install-recommends \
   && apt-get install -y --no-install-recommends bash ca-certificates curl jq openssl python3 tar xz-utils sudo \
   && . /opt/twinbox/config/pinned-defaults.sh \
   && curl -fsSL "https://github.com/siderolabs/talos/releases/download/${PINNED_TALOS_VERSION}/talosctl-linux-amd64" -o /tmp/talosctl \
