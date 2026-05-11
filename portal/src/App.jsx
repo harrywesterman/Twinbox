@@ -1442,7 +1442,15 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
     return () => {
       cancelled = true;
     };
-  }, [appsState, currentJob?.id, installPhase, installQueue, installTarget, targetBundle, targetCard]);
+  }, [
+    appsState,
+    currentJob?.id,
+    installPhase,
+    installQueue,
+    installTarget,
+    targetBundle,
+    targetCard,
+  ]);
 
   const handleLogScroll = () => {
     const viewport = logViewportRef.current;
