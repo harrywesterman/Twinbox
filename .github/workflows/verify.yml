@@ -45,6 +45,14 @@ jobs:
           npm ci --prefix manager-worker
           npm ci --prefix portal
 
+      - name: Audit dependencies
+        run: |
+          npm audit --audit-level=high
+          npm audit --audit-level=high --prefix manager-api
+          npm audit --audit-level=high --prefix manager-web
+          npm audit --audit-level=high --prefix manager-worker
+          npm audit --audit-level=high --prefix portal
+
       - name: Lint and format check
         run: |
           npm run lint --prefix manager-api

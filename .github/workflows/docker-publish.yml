@@ -204,7 +204,31 @@ jobs:
           images: ghcr.io/harrywesterman/${{ matrix.package_name }}
           tags: ${{ matrix.tags }}
 
-      - name: Build and push
+      - name: Build image
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: false
+          load: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Get primary image tag
+        id: primary-tag
+        run: |
+          primary=$(echo '${{ steps.meta.outputs.tags }}' | head -n 1)
+          echo "tag=$primary" >> "$GITHUB_OUTPUT"
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          image-ref: ${{ steps.primary-tag.outputs.tag }}
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+          format: 'table'
+
+      - name: Push image
         uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
