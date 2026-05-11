@@ -18,6 +18,7 @@ const FIXED_SETUP_STEP_IDS = [
   "install-crowdsec",
   "install-traefik",
   "install-cloudnativepg",
+  "configure-dns",
   "choose-ingress-route",
   "provision-wiredoor-bastion",
   "provision-netbird-bastion",
