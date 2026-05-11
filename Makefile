@@ -50,7 +50,7 @@ lint:
 	npm run lint --prefix manager-web
 	npm run lint --prefix manager-worker
 	npm run lint --prefix portal
-	npx eslint lib/ scripts/
+	npm run lint
 	@echo "Linting Python..."
 	ruff check tests/
 
@@ -60,7 +60,7 @@ lint-fix:
 	npm run lint:fix --prefix manager-web
 	npm run lint:fix --prefix manager-worker
 	npm run lint:fix --prefix portal
-	npx eslint lib/ scripts/ --fix
+	npm run lint:fix
 	@echo "Auto-fixing Python..."
 	ruff check --fix tests/
 
@@ -70,7 +70,7 @@ format:
 	npm run format --prefix manager-web
 	npm run format --prefix manager-worker
 	npm run format --prefix portal
-	npx prettier --write "lib/**/*.{js,mjs}" "scripts/**/*.{js,mjs}"
+	npm run format
 	ruff format tests/
 
 format-check:
@@ -79,7 +79,7 @@ format-check:
 	npm run format:check --prefix manager-web
 	npm run format:check --prefix manager-worker
 	npm run format:check --prefix portal
-	npx prettier --check "lib/**/*.{js,mjs}" "scripts/**/*.{js,mjs}"
+	npm run format:check
 	ruff format --check tests/
 
 wizard-dev-run:

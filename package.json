@@ -2,6 +2,12 @@
   "name": "twinbox-root",
   "private": true,
   "type": "module",
+  "scripts": {
+    "lint": "eslint lib/ scripts/",
+    "lint:fix": "eslint lib/ scripts/ --fix",
+    "format": "prettier --write \"lib/**/*.{js,mjs}\" \"scripts/**/*.{js,mjs}\"",
+    "format:check": "prettier --check \"lib/**/*.{js,mjs}\" \"scripts/**/*.{js,mjs}\""
+  },
   "devDependencies": {
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^10.0.0",
