@@ -50,14 +50,6 @@ load_config() {
     WIZARD_DEV_REMOTE_DIR="${env_remote_dir}"
   fi
 
-  # Fall back to TWINBOX_VM_PREVIEW_* naming convention
-  if [[ -z "${WIZARD_DEV_SSH_TARGET:-}" && -n "${TWINBOX_VM_PREVIEW_TARGET:-}" ]]; then
-    WIZARD_DEV_SSH_TARGET="${TWINBOX_VM_PREVIEW_TARGET}"
-  fi
-  if [[ -z "${WIZARD_DEV_REMOTE_DIR:-}" && -n "${TWINBOX_VM_PREVIEW_REMOTE_DIR:-}" ]]; then
-    WIZARD_DEV_REMOTE_DIR="${TWINBOX_VM_PREVIEW_REMOTE_DIR}"
-  fi
-
   SSH_TARGET="${WIZARD_DEV_SSH_TARGET:-}"
   REMOTE_DIR="${WIZARD_DEV_REMOTE_DIR:-${DEFAULT_REMOTE_DIR}}"
 }
@@ -99,7 +91,7 @@ check_deps() {
 
 validate_inputs() {
   [[ -f "${LOCAL_WIZARD_PATH}" ]] || die "Local wizard not found: ${LOCAL_WIZARD_PATH}"
-  [[ -n "${SSH_TARGET}" ]] || die "Set TWINBOX_VM_PREVIEW_TARGET in .env.vm-preview.local, or pass --target."
+  [[ -n "${SSH_TARGET}" ]] || die "Pass --target root@<host> to upload and run the Proxmox wizard."
 }
 
 run_local_checks() {
