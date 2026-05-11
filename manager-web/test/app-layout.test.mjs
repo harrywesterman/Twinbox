@@ -54,7 +54,7 @@ test("app source defines a minimal wizard shell with guided input and step-by-st
   );
   assert.match(
     source,
-    /showImportButton = !isInstallPhase && !model\.completion && currentStep\?\.id !== 'provision-nodes'/,
+    /showImportButton =\s*!isInstallPhase && !model\.completion && currentStep\?\.id !== "provision-nodes"/,
     "expected the topbar import button to hide on step 1"
   );
   assert.match(source, /1\. VM sizing/, "expected sizing to come first");
@@ -90,7 +90,7 @@ test("app source defines a minimal wizard shell with guided input and step-by-st
   assert.match(source, /setPlacementStatus\(/, "expected inline placement feedback state");
   assert.match(
     source,
-    /wizard-network-check-summary is-\$\{placementStatus\.tone \|\| 'neutral'\}/,
+    /wizard-network-check-summary is-\$\{placementStatus\.tone \|\| "neutral"\}/,
     "expected inline placement status styling"
   );
   assert.doesNotMatch(
@@ -144,12 +144,12 @@ test("app source defines a minimal wizard shell with guided input and step-by-st
   );
   assert.match(
     source,
-    /setWizardPhase\('questions'\)/,
+    /setWizardPhase\("questions"\)/,
     "expected a recreated cluster to restart in the question flow"
   );
   assert.match(
     source,
-    /getQuestionSteps\(answersRef\.current\)\[0\]\?\.id \|\| 'provision-nodes'/,
+    /getQuestionSteps\(answersRef\.current\)\[0\]\?\.id \|\| "provision-nodes"/,
     "expected a recreated cluster to restart at the first question"
   );
   assert.match(
@@ -281,12 +281,12 @@ test("app source defines a minimal wizard shell with guided input and step-by-st
   assert.match(source, /setInstallStepLogs\(/, "expected the install pane to write per-step logs");
   assert.match(
     source,
-    /renderStepIcon\(activeStepPresentation, 'wizard-step-icon wizard-step-icon-large wizard-install-stage-icon'\)/,
+    /renderStepIcon\(\s*activeStepPresentation,\s*"wizard-step-icon wizard-step-icon-large wizard-install-stage-icon"\s*\)/,
     "expected the install stage to render the large icon artwork above the title"
   );
   assert.match(
     source,
-    /model\.activity\.rawLogOutput \|\| ''/,
+    /model\.activity\.rawLogOutput \|\| ""/,
     "expected the install pane to render only the current step output"
   );
   assert.doesNotMatch(
@@ -422,7 +422,7 @@ test("styles define a wizard-first, responsive installer layout", async () => {
   assert.match(css, /\.wizard-step-icon-large\s*\{/, "expected the active-step icon treatment");
   assert.match(
     css,
-    /\.wizard-field input\[type='range'\]\s*\{/,
+    /\.wizard-field input\[type="range"\]\s*\{/,
     "expected the range slider styling"
   );
   assert.match(css, /\.wizard-field-dns\s*\{/, "expected a compact DNS field style");
@@ -435,7 +435,7 @@ test("vite and document metadata still support relative hosting", async () => {
   const viteConfig = await readFile(viteConfigPath, "utf8");
   const indexHtml = await readFile(indexHtmlPath, "utf8");
 
-  assert.match(viteConfig, /base:\s*'\.\/'/, "expected relative asset paths");
+  assert.match(viteConfig, /base:\s*"\.\/"/, "expected relative asset paths");
   assert.match(indexHtml, /lang="en"/, "expected English language metadata");
   assert.match(indexHtml, /Twinbox Web Installation Wizard/, "expected the wizard title");
   assert.match(
