@@ -667,7 +667,6 @@ opencloud_web_provider_payload="$(
       authorization_flow: $authorization_flow,
       invalidation_flow: $invalidation_flow,
       signing_key: $signing_key,
-      issuer_mode: "global",
       include_claims_in_id_token: true,
       property_mappings: $property_mappings,
       redirect_uris: [
@@ -751,11 +750,10 @@ for provider_name in "OpenCloud Desktop" "OpenCloud Android" "OpenCloud iOS" "Cy
         client_type: "public",
         authorization_flow: $authorization_flow,
         invalidation_flow: $invalidation_flow,
-        signing_key: $signing_key,
-        issuer_mode: "global",
-        include_claims_in_id_token: true,
-        property_mappings: $property_mappings,
-        redirect_uris: $redirect_uris
+      signing_key: $signing_key,
+      include_claims_in_id_token: true,
+      property_mappings: $property_mappings,
+      redirect_uris: $redirect_uris
       }' \
       --argjson property_mappings "$opencloud_property_mapping_ids_json"
   )"
