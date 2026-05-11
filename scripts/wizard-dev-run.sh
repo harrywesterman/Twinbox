@@ -91,7 +91,7 @@ check_deps() {
 
 validate_inputs() {
   [[ -f "${LOCAL_WIZARD_PATH}" ]] || die "Local wizard not found: ${LOCAL_WIZARD_PATH}"
-  [[ -n "${SSH_TARGET}" ]] || die "Pass --target root@<proxmox-host-ip> to upload and run the Proxmox bootstrap wizard."
+  [[ -n "${SSH_TARGET}" ]] || die "Set WIZARD_DEV_SSH_TARGET=root@<proxmox-ip> in .env.vm-preview.local, or pass WIZARD_DEV_SSH_TARGET as env var."
 }
 
 run_local_checks() {

@@ -83,4 +83,4 @@ format-check:
 	ruff format --check tests/
 
 wizard-dev-run:
-	bash scripts/wizard-dev-run.sh
+	bash scripts/wizard-dev-run.sh $(ARGS)
