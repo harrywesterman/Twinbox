@@ -1246,14 +1246,17 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
     return buildSelectableBundleInstallQueue(targetBundle, cardsById, selectedIds);
   }, [cardsById, targetBundle, selectedIds]);
 
-  const installQueue =
-    installTarget?.kind === "bundle"
-      ? installPhase === "install"
-        ? bundleInstallQueue
-        : []
-      : targetCard
-        ? [targetCard]
-        : [];
+  const installQueue = useMemo(
+    () =>
+      installTarget?.kind === "bundle"
+        ? installPhase === "install"
+          ? bundleInstallQueue
+          : []
+        : targetCard
+          ? [targetCard]
+          : [],
+    [bundleInstallQueue, installPhase, installTarget, targetCard]
+  );
 
   const currentStepCard =
     installTarget?.kind === "bundle" && installPhase === "install"
@@ -1439,7 +1442,7 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
     return () => {
       cancelled = true;
     };
-  }, [appsState, currentJob?.id, installQueue, installTarget, targetBundle, targetCard]);
+  }, [appsState, currentJob?.id, installPhase, installQueue, installTarget, targetBundle, targetCard]);
 
   const handleLogScroll = () => {
     const viewport = logViewportRef.current;

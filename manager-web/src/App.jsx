@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import "./App.css";
 import heroIllustrationUrl from "./assets/hero-illustration.svg";
@@ -1045,7 +1045,7 @@ function App() {
       busy,
       answers: initialAnswers,
     });
-  }, [answers, busy, catalog, cluster, error, health, initialAnswers, logs, selectedStepId]);
+  }, [busy, catalog, cluster, error, health, initialAnswers, logs, selectedStepId]);
   const adminDashboardContext = useMemo(() => {
     const provisionAnswers = answers?.["provision-nodes"] || {};
     const ingressAnswers = answers?.["choose-ingress-route"] || {};
@@ -1476,7 +1476,7 @@ function App() {
     }
   }
 
-  function updateProvisionDraft(stepId, updater) {
+  const updateProvisionDraft = useCallback((stepId, updater) => {
     setAnswers((current) => {
       const currentStepDraft = current[stepId] || {};
       const nextDraft =
@@ -1490,36 +1490,40 @@ function App() {
       answersRef.current = nextAnswers;
       return nextAnswers;
     });
-  }
+  }, []);
 
-  async function applyProvisionPlacementHelp() {
-    if (currentStep?.id !== "provision-nodes") {
-      return;
-    }
+  const applyProvisionPlacementHelp = useCallback(
+    async (draft) => {
+      if (currentStep?.id !== "provision-nodes") {
+        return;
+      }
 
-    try {
-      const result = buildAutomaticProvisionPlacementResult(
-        currentStep.inputs || [],
-        currentDraft,
-        proxmoxResources
-      );
-      updateProvisionDraft(currentStep.id, {
-        vm_node_map: result.vm_node_map,
-        vm_size_map: result.vm_size_map,
-      });
-      setPlacementStatus({
-        tone: result.tone,
-        message: result.message,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to fill placement defaults.";
-      setError(message);
-      setPlacementStatus({
-        tone: "danger",
-        message,
-      });
-    }
-  }
+      try {
+        const result = buildAutomaticProvisionPlacementResult(
+          currentStep.inputs || [],
+          draft,
+          proxmoxResources
+        );
+        updateProvisionDraft(currentStep.id, {
+          vm_node_map: result.vm_node_map,
+          vm_size_map: result.vm_size_map,
+        });
+        setPlacementStatus({
+          tone: result.tone,
+          message: result.message,
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to fill placement defaults.";
+        setError(message);
+        setPlacementStatus({
+          tone: "danger",
+          message,
+        });
+      }
+    },
+    [currentStep, proxmoxResources, updateProvisionDraft]
+  );
 
   async function applyProvisionIpHelp() {
     if (currentStep?.id !== "provision-nodes" || busyRef.current || provisionIpSuggestionsLoading) {
@@ -2163,16 +2167,20 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [currentInstallStep?.latest_job?.id, selectedStepId, wizardPhase]);
+  }, [currentInstallStep?.id, currentInstallStep?.latest_job?.id, selectedStepId, wizardPhase]);
 
-  const currentDraft = currentStep
-    ? buildProvisionQuestionDraft({
-        step: currentStep,
-        answers,
-        suggestionSnapshot: provisionSuggestionSnapshotRef.current,
-        dirtyFields: provisionDirtyFieldsRef.current,
-      })
-    : {};
+  const currentDraft = useMemo(
+    () =>
+      currentStep
+        ? buildProvisionQuestionDraft({
+            step: currentStep,
+            answers,
+            suggestionSnapshot: provisionSuggestionSnapshotRef.current,
+            dirtyFields: provisionDirtyFieldsRef.current,
+          })
+        : {},
+    [currentStep, answers]
+  );
   const placementBoard =
     currentStep?.id === "provision-nodes"
       ? buildProvisionPlacementBoard(currentStep.inputs || [], currentDraft, proxmoxResources)
@@ -2226,9 +2234,10 @@ function App() {
     }
 
     placementSuggestionKeyRef.current = placementSuggestionKey;
-    void applyProvisionPlacementHelp();
+    void applyProvisionPlacementHelp(currentDraft);
   }, [
     applyProvisionPlacementHelp,
+    currentDraft,
     hasStarted,
     currentStep?.id,
     currentDraft.vm_node_map,
