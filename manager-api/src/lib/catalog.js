@@ -268,14 +268,7 @@ function synthesizeProvisionStateFromCluster(step, cluster, state) {
   return state;
 }
 
-function deriveStepStatus(step, state, latestJob, completedDependencies) {
-  const dependenciesMet = step.depends_on.every((dependency) =>
-    completedDependencies.has(dependency)
-  );
-  if (!dependenciesMet) {
-    return "locked";
-  }
-
+function deriveStepStatus(step, state, latestJob) {
   if (state?.status === "skipped") {
     return "skipped";
   }
@@ -546,48 +539,52 @@ export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) 
     definitions,
   });
 
-  const completedDependencies = new Set(
-    Array.from(stepStateById.entries())
-      .filter(([stepId, { state }]) => {
-        const step = definitions.stepsById.get(stepId);
-        return step && isDone(step, state);
-      })
-      .map(([stepId]) => stepId)
-  );
-
   const categories = definitions.categories.map((category) => {
-    const steps = category.steps
+    const visibleSteps = category.steps
       .filter((step) => shouldExposeStep(step, activeIngressRoute))
-      .map((step) => {
-        const renderedStep = renderedStepsById.get(step.id) || step;
-        const { state, latestJob } = stepStateById.get(step.id) || { state: null, latestJob: null };
-        const status = deriveStepStatus(renderedStep, state, latestJob, completedDependencies);
+      .sort((left, right) => left.order - right.order);
 
-        return {
-          id: renderedStep.id,
-          category_id: renderedStep.category_id,
-          title: renderedStep.title,
-          type: renderedStep.type,
-          journey_stage: renderedStep.journey_stage,
-          order: renderedStep.order,
-          ingress_route: renderedStep.ingress_route,
-          summary: renderedStep.summary,
-          explanation: renderedStep.explanation,
-          side_help: renderedStep.side_help,
-          dashy: renderedStep.dashy,
-          inputs: renderedStep.inputs,
-          secrets: renderedStep.secrets,
-          depends_on: renderedStep.depends_on,
-          icon: renderedStep.icon,
-          icon_artwork_url: renderedStep.icon_artwork_url,
-          project_url: renderedStep.project_url,
-          github_url: renderedStep.github_url,
-          positive_summary: renderedStep.positive_summary,
-          status,
-          state: summarizeStepState(state),
-          latest_job: summarizeJob(latestJob),
-        };
-      });
+    let allPreviousDone = true;
+    const steps = visibleSteps.map((step) => {
+      const renderedStep = renderedStepsById.get(step.id) || step;
+      const { state, latestJob } = stepStateById.get(step.id) || { state: null, latestJob: null };
+      const baseStatus = deriveStepStatus(renderedStep, state, latestJob);
+
+      let status;
+      if (baseStatus === "done" || baseStatus === "skipped") {
+        status = baseStatus;
+      } else if (!allPreviousDone) {
+        status = "locked";
+      } else {
+        status = baseStatus;
+        allPreviousDone = false;
+      }
+
+      return {
+        id: renderedStep.id,
+        category_id: renderedStep.category_id,
+        title: renderedStep.title,
+        type: renderedStep.type,
+        journey_stage: renderedStep.journey_stage,
+        order: renderedStep.order,
+        ingress_route: renderedStep.ingress_route,
+        summary: renderedStep.summary,
+        explanation: renderedStep.explanation,
+        side_help: renderedStep.side_help,
+        dashy: renderedStep.dashy,
+        inputs: renderedStep.inputs,
+        secrets: renderedStep.secrets,
+        depends_on: renderedStep.depends_on,
+        icon: renderedStep.icon,
+        icon_artwork_url: renderedStep.icon_artwork_url,
+        project_url: renderedStep.project_url,
+        github_url: renderedStep.github_url,
+        positive_summary: renderedStep.positive_summary,
+        status,
+        state: summarizeStepState(state),
+        latest_job: summarizeJob(latestJob),
+      };
+    });
 
     return {
       id: category.id,
