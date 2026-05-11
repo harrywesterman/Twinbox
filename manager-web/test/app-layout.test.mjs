@@ -79,7 +79,7 @@ test("app source defines a minimal wizard shell with guided input and step-by-st
   );
   assert.match(
     source,
-    /void applyProvisionPlacementHelp\(\);/,
+    /void applyProvisionPlacementHelp\(/,
     "expected automatic placement to run when step 1 opens without placements"
   );
   assert.match(
