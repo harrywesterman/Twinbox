@@ -863,6 +863,18 @@ def test_opencloud_step_creates_authentik_applications_for_mobile_and_desktop_cl
     assert 'fail "Authentik did not return an application ID for ${provider_name}"' in text
 
 
+def test_opencloud_step_includes_offline_access_scope_mapping():
+    text = OPENCLOUD_STEP_SCRIPT.read_text(encoding="utf-8")
+
+    assert 'upsert_scope_mapping \\' in text
+    assert '"OpenCloud offline_access"' in text
+    assert '"offline_access"' in text
+    assert '"Enable refresh tokens for OpenCloud clients"' in text
+    assert "'return {}'" in text
+    assert 'offline_access_mapping_id="$(upsert_scope_mapping' in text
+    assert '[$openid, $email, $profile, $roles, $offline_access]' in text
+
+
 def test_opencloud_gitops_uses_schema_backed_writable_ldap_bootstrap():
     platform_dir = REPO_ROOT / "gitops" / "platform-apps" / "opencloud"
     kustomization_text = (platform_dir / "kustomization.yaml").read_text(encoding="utf-8")

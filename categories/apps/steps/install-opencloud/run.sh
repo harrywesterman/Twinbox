@@ -626,13 +626,21 @@ return {
 }' )"
 [[ -n "$roles_mapping_id" ]] || fail "Could not create the OpenCloud roles mapping"
 
+offline_access_mapping_id="$(upsert_scope_mapping \
+  "OpenCloud offline_access" \
+  "offline_access" \
+  "Enable refresh tokens for OpenCloud clients" \
+  'return {}' )"
+[[ -n "$offline_access_mapping_id" ]] || fail "Could not create the OpenCloud offline_access mapping"
+
 opencloud_property_mapping_ids_json="$(
   jq -cn \
     --arg openid "$openid_mapping_id" \
     --arg email "$email_mapping_id" \
     --arg profile "$profile_mapping_id" \
     --arg roles "$roles_mapping_id" \
-    '[$openid, $email, $profile, $roles]'
+    --arg offline_access "$offline_access_mapping_id" \
+    '[$openid, $email, $profile, $roles, $offline_access]'
 )"
 
 opencloud_web_provider_payload="$(
