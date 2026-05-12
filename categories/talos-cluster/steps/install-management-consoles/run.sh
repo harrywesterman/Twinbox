@@ -149,6 +149,53 @@ wait_for_deployment_rollout "authentik-worker" "Authentik worker"
 authentik_ensure_token
 authentik_setup_forward
 
+wait_for_authentik_api_ready() {
+  local attempt=1
+  local attempts=60
+  local response_file status body
+  local auth_headers=(-H "Accept: application/json")
+
+  if [[ "${AUTHENTIK_USE_COOKIE:-false}" == "true" ]]; then
+    auth_headers+=(-H "Cookie: ${AUTHENTIK_TOKEN}")
+  else
+    auth_headers+=(-H "Authorization: Bearer ${AUTHENTIK_TOKEN}")
+  fi
+
+  while [[ "$attempt" -le "$attempts" ]]; do
+    response_file="$(mktemp)"
+    status="$(
+      curl -sS \
+        --connect-timeout 10 \
+        --max-time 30 \
+        "${auth_headers[@]}" \
+        -o "$response_file" \
+        -w '%{http_code}' \
+        "${AUTHENTIK_API_BASE}/flows/instances/?page_size=1"
+    )" || status="000"
+
+    body="$(cat "$response_file" 2>/dev/null || true)"
+    rm -f "$response_file"
+
+    if [[ "$status" =~ ^2 ]]; then
+      return 0
+    fi
+
+    log "Waiting for Authentik API readiness (${attempt}/${attempts}): HTTP ${status}"
+
+    if [[ -n "${AUTHENTIK_FORWARD_PID:-}" ]] && ! kill -0 "$AUTHENTIK_FORWARD_PID" >/dev/null 2>&1; then
+      log "Authentik port-forward died while waiting for API readiness; re-establishing"
+      authentik_setup_forward
+    fi
+
+    sleep 2
+    attempt=$((attempt + 1))
+  done
+
+  fail "Authentik API did not become ready after ${attempts} attempts"
+}
+
+wait_for_authentik_api_ready
+
 AUTHENTIK_HOST="${AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
 
 for attempt in $(seq 1 120); do
@@ -176,9 +223,9 @@ find_proxy_provider_pk_by_name() {
     || return 0
   jq -r \
     --arg provider_name "$provider_name" \
-    '.results[]?
+    'limit(1; .results[]?
       | select((.name // "") == $provider_name)
-      | .pk // .id // .uuid // empty' <<<"$response" | head -n1
+      | .pk // .id // .uuid // empty)' <<<"$response"
 }
 
 find_application_json_by_slug() {
@@ -201,9 +248,9 @@ find_policy_binding_pk() {
   jq -r \
     --arg target_uuid "$target_uuid" \
     --arg group_id "$group_id" \
-    '.results[]?
+    'limit(1; .results[]?
       | select((.target // "") == $target_uuid and (.group // "") == $group_id)
-      | .pk // .id // .uuid // empty' <<<"$response" | head -n1
+      | .pk // .id // .uuid // empty)' <<<"$response"
 }
 
 extract_authentik_identifier() {

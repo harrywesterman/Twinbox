@@ -245,11 +245,10 @@ openbao_wait_for_server_pod() {
       kubectl get pod -n "$OPENBAO_NAMESPACE" \
         -l app.kubernetes.io/instance=openbao,app.kubernetes.io/name=openbao \
         -o json 2>/dev/null | jq -r '
-          .items[]
+          limit(1; .items[]
           | select(.status.phase == "Running")
           | select(any(.status.containerStatuses[]?; .name == "openbao" and .state.running != null))
-          | .metadata.name
-        ' | head -n 1
+          | .metadata.name)'
     )"
     if [[ -n "$pod" ]]; then
       printf '%s\n' "$pod"

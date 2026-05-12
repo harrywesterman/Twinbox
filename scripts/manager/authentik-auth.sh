@@ -399,9 +399,9 @@ authentik_resolve_flow_id() {
     jq -r \
       --arg slug "$slug" \
       --arg designation "$designation" \
-      '.results[]?
+      'limit(1; .results[]?
         | select((.slug // "") == $slug and (.designation // "") == $designation)
-        | .pk // .id // empty' <<<"$response" | head -n1
+        | .pk // .id // empty)' <<<"$response"
   )"
   if [[ -n "$match_pk" ]]; then
     printf '%s\n' "$match_pk"
@@ -416,9 +416,9 @@ authentik_resolve_flow_id() {
         jq -r \
           --arg slug "$slug" \
           --arg designation "$designation" \
-          '.results[]?
+          'limit(1; .results[]?
             | select((.slug // "") == $slug and (.designation // "") == $designation)
-            | .pk // .id // empty' <<<"$response" | head -n1
+            | .pk // .id // empty)' <<<"$response"
       )"
       if [[ -n "$match_pk" ]]; then
         printf '%s\n' "$match_pk"
@@ -438,9 +438,9 @@ authentik_resolve_scope_mapping_id() {
   managed_pk="$(
     jq -r \
       --arg scope_name "$scope_name" \
-      '.results[]?
+      'limit(1; .results[]?
         | select((.scope_name // "") == $scope_name and ((.managed // "") | length > 0))
-        | .pk // empty' <<<"$response" | head -n1
+        | .pk // empty)' <<<"$response"
   )"
   if [[ -n "$managed_pk" ]]; then
     printf '%s\n' "$managed_pk"
@@ -450,9 +450,9 @@ authentik_resolve_scope_mapping_id() {
   fallback_pk="$(
     jq -r \
       --arg scope_name "$scope_name" \
-      '.results[]?
+      'limit(1; .results[]?
         | select((.scope_name // "") == $scope_name)
-        | .pk // empty' <<<"$response" | head -n1
+        | .pk // empty)' <<<"$response"
   )"
   printf '%s\n' "$fallback_pk"
 }
@@ -464,9 +464,9 @@ authentik_resolve_signing_key_id() {
   response="$(authentik_api_get "/crypto/certificatekeypairs/?page_size=200")" || return 1
   jq -r \
     --arg name "$signing_key_name" \
-    '.results[]?
+    'limit(1; .results[]?
       | select((.name // "") == $name)
-      | .pk // .id // .uuid // empty' <<<"$response" | head -n1
+      | .pk // .id // .uuid // empty)' <<<"$response"
 }
 
 authentik_find_group_id() {
@@ -476,9 +476,9 @@ authentik_find_group_id() {
   response="$(authentik_api_get "/core/groups/?page_size=200")" || return 1
   jq -r \
     --arg group_name "$group_name" \
-    '.results[]?
+    'limit(1; .results[]?
       | select((.name // "") == $group_name)
-      | .pk // .id // .uuid // empty' <<<"$response" | head -n1
+      | .pk // .id // .uuid // empty)' <<<"$response"
 }
 
 authentik_teardown_forward() {

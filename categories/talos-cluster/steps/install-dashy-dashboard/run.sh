@@ -74,9 +74,9 @@ resolve_scope_mapping_id() {
   managed_pk="$(
     jq -r \
       --arg scope_name "$scope_name" \
-      '.results[]?
+      'limit(1; .results[]?
         | select((.scope_name // "") == $scope_name and ((.managed // "") | length > 0))
-        | .pk // empty' <<<"$response" | head -n1
+        | .pk // empty)' <<<"$response"
   )"
   if [[ -n "$managed_pk" ]]; then
     printf '%s\n' "$managed_pk"
@@ -86,9 +86,9 @@ resolve_scope_mapping_id() {
   fallback_pk="$(
     jq -r \
       --arg scope_name "$scope_name" \
-      '.results[]?
+      'limit(1; .results[]?
         | select((.scope_name // "") == $scope_name)
-        | .pk // empty' <<<"$response" | head -n1
+        | .pk // empty)' <<<"$response"
   )"
   printf '%s\n' "$fallback_pk"
 }
@@ -100,10 +100,10 @@ create_or_update_provider() {
   search_response="$(authentik_api_get "/providers/oauth2/?search=Dashy")"
   existing_pk="$(
     jq -r '
-      .results[]?
+      limit(1; .results[]?
       | select((.name // "") == "Dashy")
-      | .pk // .id // empty
-    ' <<<"$search_response" | head -n1
+      | .pk // .id // empty)
+    ' <<<"$search_response"
   )"
 
   if [[ -n "$existing_pk" ]]; then
@@ -151,8 +151,8 @@ find_application_json_by_slug() {
   list_response="$(authentik_api_get "/core/applications/?page_size=100")"
   jq -c \
     --arg application_slug "$application_slug" \
-    '.results[]?
-      | select((.slug // "") == $application_slug)' <<<"$list_response" | head -n1
+    'limit(1; .results[]?
+      | select((.slug // "") == $application_slug))' <<<"$list_response"
 }
 
 find_policy_binding_pk() {
@@ -164,9 +164,9 @@ find_policy_binding_pk() {
   jq -r \
     --arg target_uuid "$target_uuid" \
     --arg group_id "$group_id" \
-    '.results[]?
+    'limit(1; .results[]?
       | select((.target // "") == $target_uuid and (.group // "") == $group_id)
-      | .pk // .id // empty' <<<"$response" | head -n1
+      | .pk // .id // empty)' <<<"$response"
 }
 
 ensure_group_binding() {

@@ -2706,7 +2706,7 @@ def test_dashy_deployment_uses_a_published_image_tag():
         encoding="utf-8"
     )
     assert "replicas: 1" in text
-    assert "strategy:" not in text
+    assert "strategy:\n    type: Recreate" in text
     assert "kubernetes.io/hostname" not in text
     assert "persistentVolumeClaim:" in text
     assert "claimName: dashy-data" in text
