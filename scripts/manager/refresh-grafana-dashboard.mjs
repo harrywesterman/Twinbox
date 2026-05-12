@@ -199,7 +199,7 @@ function rewriteDashboardStrings(value) {
         .replace(/cluster_name="\$cluster"/g, "");
 
       return `${metricName}{${rewrittenInner}}`;
-    });
+    }).replace(/(node_cpu_[a-zA-Z0-9_]+\{[^}]+\})\[\$__rate_interval\]/g, "$1[15m]");
 
   if (Array.isArray(value)) {
     return value.map((entry) => rewriteDashboardStrings(entry));

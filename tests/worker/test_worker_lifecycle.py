@@ -425,7 +425,7 @@ def test_worker_reconciles_grafana_dashboard_on_startup():
                     "title": "Cluster CPU Utilization",
                     "targets": [
                         {
-                            "expr": 'avg(sum by (instance, cpu) (rate(node_cpu_seconds_total{mode!~"idle|iowait|steal", cluster_name="$cluster", job="$job"}[$__rate_interval])))',
+                            "expr": 'avg(sum by (instance, cpu) (rate(node_cpu_seconds_total{mode!~"idle|iowait|steal", cluster_name="$cluster", job="$job"}[15m])))',
                         },
                     ],
                 },
@@ -434,7 +434,7 @@ def test_worker_reconciles_grafana_dashboard_on_startup():
                     "title": "Node CPU Throttles",
                     "targets": [
                         {
-                            "expr": 'sum(rate(node_cpu_core_throttles_total{cluster_name="$cluster", job="$job"}[$__rate_interval])) by (instance)',
+                            "expr": 'sum(rate(node_cpu_core_throttles_total{cluster_name="$cluster", job="$job"}[15m])) by (instance)',
                         },
                     ],
                 },
@@ -552,11 +552,11 @@ def test_worker_reconciles_grafana_dashboard_on_startup():
             assert rendered_dashboard["panels"][0]["targets"][0]["expr"] == 'cluster_name=~".*"'
             assert (
                 rendered_dashboard["panels"][1]["targets"][0]["expr"]
-                == 'avg(sum by (instance, cpu) (rate(node_cpu_seconds_total{mode!~"idle|iowait|steal", job="$job"}[$__rate_interval])))'
+                == 'avg(sum by (instance, cpu) (rate(node_cpu_seconds_total{mode!~"idle|iowait|steal", job="$job"}[15m])))'
             )
             assert (
                 rendered_dashboard["panels"][2]["targets"][0]["expr"]
-                == 'sum(rate(node_cpu_core_throttles_total{job="$job"}[$__rate_interval])) by (instance)'
+                == 'sum(rate(node_cpu_core_throttles_total{job="$job"}[15m])) by (instance)'
             )
 
             kubectl_log_text = kubectl_log.read_text()
