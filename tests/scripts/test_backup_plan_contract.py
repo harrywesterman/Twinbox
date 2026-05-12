@@ -121,7 +121,9 @@ def test_management_vm_backup_install_uses_cluster_state_before_step_context():
         manager_data_root = host_repo_root / "manager-data"
         cluster_dir = manager_data_root / "clusters"
         secrets_dir = bootstrap_root / "secrets" / "global"
-        cluster_secrets_dir = bootstrap_root / "secrets" / "cluster" / "cluster-test" / "talosconfig"
+        cluster_secrets_dir = (
+            bootstrap_root / "secrets" / "cluster" / "cluster-test" / "talosconfig"
+        )
         host_cron_dir = root / "etc" / "cron.d"
 
         for directory in [
@@ -228,8 +230,7 @@ exit 0
 
         assert "17 2 * * * root ${RUNTIME_SCRIPT} etcd" not in cron_text
         assert (
-            f"17 2 * * * root {bootstrap_root}/bin/twinbox-management-backup.sh etcd"
-            in cron_text
+            f"17 2 * * * root {bootstrap_root}/bin/twinbox-management-backup.sh etcd" in cron_text
         )
         assert (
             f"47 2 * * * root {bootstrap_root}/bin/twinbox-management-backup.sh opt-twinbox"
