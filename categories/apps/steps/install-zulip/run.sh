@@ -544,11 +544,11 @@ su zulip -c '/home/zulip/deployments/current/manage.py shell -c \"\$(cat /tmp/ve
 
 wait_for_zulip_realm() {
   local pod_name realm_exists
-  local attempts=60
+  local attempts=24
   local attempt=1
 
   pod_name="$1"
-  while true; do
+  while [[ "$attempt" -le "$attempts" ]]; do
     realm_exists="$(
       kubectl -n zulip exec "$pod_name" -- bash -c 'su zulip -c "cd /home/zulip/deployments/current && ./manage.py shell -c '\''from zerver.models import Realm; print(\"yes\" if Realm.objects.count() else \"no\")'\''"' 2>/dev/null | tail -n1
     )"
@@ -558,13 +558,40 @@ wait_for_zulip_realm() {
       return 0
     fi
 
-    if [[ "$attempt" -ge "$attempts" ]]; then
-      fail "Timed out waiting for Zulip default realm to be created by postSetup"
+    if [[ "$((attempt % 6))" == "0" ]]; then
+      log "Waiting for Zulip default realm to be created by postSetup ($((attempt * 5))s)"
     fi
 
     sleep 5
     attempt=$((attempt + 1))
   done
+
+  log "Creating Zulip default realm (postSetup may not have run)"
+  local realm_name="Twinbox"
+  local create_script
+  create_script="$(cat <<SCRIPTEOF
+#!/usr/bin/env bash
+set -euo pipefail
+cd /home/zulip/deployments/current
+su zulip -c "./manage.py create_realm --automated --string-id= '${realm_name}' '${zulip_default_realm_owner_email}' '${zulip_default_realm_owner_name}'"
+SCRIPTEOF
+  )"
+
+  kubectl -n zulip exec "$pod_name" -- bash -c "cat > /tmp/create-realm.sh << 'INNEREOF'
+${create_script}
+INNEREOF
+bash /tmp/create-realm.sh
+" >/dev/null
+
+  realm_exists="$(
+    kubectl -n zulip exec "$pod_name" -- bash -c 'su zulip -c "cd /home/zulip/deployments/current && ./manage.py shell -c '\''from zerver.models import Realm; print(\"yes\" if Realm.objects.count() else \"no\")'\''"' 2>/dev/null | tail -n1
+  )"
+
+  if [[ "$realm_exists" != "yes" ]]; then
+    fail "Failed to create Zulip default realm"
+  fi
+
+  log "Zulip default realm created"
 }
 
 zulip_realm_pod="$(find_statefulset_pod "zulip" "zulip")"
