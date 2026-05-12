@@ -241,11 +241,11 @@ function rewriteDashboardStrings(value) {
 
   if (typeof value === "string") {
     let next = value;
+    next = rewriteNodeExporterCpuQuery(next);
+
     for (const [from, to] of substitutions) {
       next = next.split(from).join(to);
     }
-
-    next = rewriteNodeExporterCpuQuery(next);
 
     return replacements.get(next) || next;
   }
