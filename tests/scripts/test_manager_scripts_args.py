@@ -26,14 +26,10 @@ OPENCLOUD_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-o
 DASHY_APP = REPO_ROOT / "gitops" / "apps" / "dashy.yaml"
 FRESHRSS_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-freshrss" / "run.sh"
 OUTLINE_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-outline" / "run.sh"
-OPENWEBUI_STEP_SCRIPT = (
-    REPO_ROOT / "categories" / "apps" / "steps" / "install-openwebui" / "run.sh"
-)
+OPENWEBUI_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-openwebui" / "run.sh"
 N8N_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-n8n" / "run.sh"
 HEDGEDOC_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-hedgedoc" / "run.sh"
-PAPERLESS_STEP_SCRIPT = (
-    REPO_ROOT / "categories" / "apps" / "steps" / "install-paperless" / "run.sh"
-)
+PAPERLESS_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-paperless" / "run.sh"
 VAULTWARDEN_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "apps" / "steps" / "install-vaultwarden" / "run.sh"
 )
@@ -49,14 +45,10 @@ HEDGEDOC_APP = REPO_ROOT / "gitops" / "apps" / "hedgedoc.yaml"
 PAPERLESS_APP = REPO_ROOT / "gitops" / "apps" / "paperless.yaml"
 PIXELFED_APP = REPO_ROOT / "gitops" / "apps" / "pixelfed.yaml"
 OUTLINE_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "outline" / "kustomization.yaml"
-OPENWEBUI_DB_KUSTOMIZATION = (
-    REPO_ROOT / "gitops" / "databases" / "openwebui" / "kustomization.yaml"
-)
+OPENWEBUI_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "openwebui" / "kustomization.yaml"
 N8N_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "n8n" / "kustomization.yaml"
 HEDGEDOC_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "hedgedoc" / "kustomization.yaml"
-PAPERLESS_DB_KUSTOMIZATION = (
-    REPO_ROOT / "gitops" / "databases" / "paperless" / "kustomization.yaml"
-)
+PAPERLESS_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "paperless" / "kustomization.yaml"
 VAULTWARDEN_DB_KUSTOMIZATION = (
     REPO_ROOT / "gitops" / "databases" / "vaultwarden" / "kustomization.yaml"
 )
@@ -892,7 +884,7 @@ def test_opencloud_step_enables_external_idp_autoprovisioning_and_ldap_checks():
     ]:
         assert expected in text
 
-    assert "kubectl apply -k \"$opencloud_rendered_overlay\"" not in text
+    assert 'kubectl apply -k "$opencloud_rendered_overlay"' not in text
 
     assert '"preferred_username": request.user.username' in text
     assert '"sub": request.user.uid' in text
@@ -1414,7 +1406,10 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "PGADMIN_DEFAULT_EMAIL" in pgadmin_run_text
     assert "Could not find a usable kubeconfig" in pgadmin_run_text
     assert "render_template()" in pgadmin_run_text
-    assert 'pgadmin_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-application-XXXXXX")"' in pgadmin_run_text
+    assert (
+        'pgadmin_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-application-XXXXXX")"'
+        in pgadmin_run_text
+    )
     assert (
         "kubectl create namespace pgadmin4 --dry-run=client -o yaml | kubectl apply -f -"
         in pgadmin_run_text
@@ -1431,7 +1426,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "Applying pgAdmin 4 configmap and PVC bootstrap resource" not in pgadmin_run_text
     assert "Applying pgAdmin 4 service, deployment, and ingress" not in pgadmin_run_text
     assert "Applying pgAdmin 4 Argo CD application" in pgadmin_run_text
-    assert 'render_template \\' in pgadmin_run_text
+    assert "render_template \\" in pgadmin_run_text
     assert '--manifest "$pgadmin_rendered_manifest"' in pgadmin_run_text
     assert '--application "pgadmin4"' in pgadmin_run_text
     assert '--destination-namespace "pgadmin4"' in pgadmin_run_text
@@ -1936,30 +1931,30 @@ def test_optional_apps_route_steady_state_through_argocd_sources():
 
     forbidden_snippets = {
         OUTLINE_STEP_SCRIPT: [
-            "kubectl apply -f \"$WORKSPACE_ROOT/gitops/databases/namespace.yaml\"",
-            "kubectl apply -f \"$WORKSPACE_ROOT/gitops/platform-apps/outline/namespace.yaml\"",
+            'kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/namespace.yaml"',
+            'kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/outline/namespace.yaml"',
         ],
         OPENWEBUI_STEP_SCRIPT: [
-            "kubectl apply -f \"$WORKSPACE_ROOT/gitops/platform-apps/openwebui/namespace.yaml\"",
-            "kubectl apply -k \"$WORKSPACE_ROOT/gitops/databases/openwebui\"",
+            'kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/openwebui/namespace.yaml"',
+            'kubectl apply -k "$WORKSPACE_ROOT/gitops/databases/openwebui"',
         ],
         N8N_STEP_SCRIPT: [
-            "kubectl apply -f \"$WORKSPACE_ROOT/gitops/platform-apps/n8n/namespace.yaml\"",
-            "kubectl apply -f \"$WORKSPACE_ROOT/gitops/databases/n8n/cluster.yaml\"",
+            'kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/n8n/namespace.yaml"',
+            'kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/n8n/cluster.yaml"',
         ],
         HEDGEDOC_STEP_SCRIPT: [
-            "kubectl apply -f \"$WORKSPACE_ROOT/gitops/platform-apps/hedgedoc/namespace.yaml\"",
-            "kubectl apply -f \"$WORKSPACE_ROOT/gitops/databases/hedgedoc/cluster.yaml\"",
+            'kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/hedgedoc/namespace.yaml"',
+            'kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/hedgedoc/cluster.yaml"',
         ],
         PAPERLESS_STEP_SCRIPT: [
-            "kubectl apply -f \"$WORKSPACE_ROOT/gitops/platform-apps/paperless/namespace.yaml\"",
-            "kubectl apply -f \"$WORKSPACE_ROOT/gitops/databases/paperless/cluster.yaml\"",
+            'kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/paperless/namespace.yaml"',
+            'kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/paperless/cluster.yaml"',
         ],
         VAULTWARDEN_STEP_SCRIPT: [
-            "kubectl apply -f \"$WORKSPACE_ROOT/gitops/databases/vaultwarden/cluster.yaml\"",
+            'kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/vaultwarden/cluster.yaml"',
         ],
         PIXELFED_STEP_SCRIPT: [
-            "kubectl apply -f \"$WORKSPACE_ROOT/gitops/databases/pixelfed/cluster.yaml\"",
+            'kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/pixelfed/cluster.yaml"',
         ],
     }
 
@@ -2710,7 +2705,9 @@ def test_install_immich_step_applies_its_argo_application():
     text = (REPO_ROOT / "categories" / "apps" / "steps" / "install-immich" / "run.sh").read_text(
         encoding="utf-8"
     )
-    assert 'immich_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/immich-application-XXXXXX")"' in text
+    assert (
+        'immich_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/immich-application-XXXXXX")"' in text
+    )
     assert "gitops/apps/immich.yaml" in text
     assert "gitops/platform-apps/immich/db-externalsecret.yaml" not in text
     assert "gitops/databases/immich/cluster.yaml" not in text
@@ -2718,19 +2715,24 @@ def test_install_immich_step_applies_its_argo_application():
     assert "gitops/databases/immich/pooler-ro.yaml" not in text
     assert "gitops/databases/immich/pooler-rw.yaml" not in text
     assert "gitops/databases/immich/scheduled-backup.yaml" not in text
-    assert "kubectl apply -f \"$WORKSPACE_ROOT/gitops/platform-apps/immich/namespace.yaml\"" not in text
-    assert "kubectl apply -f \"$WORKSPACE_ROOT/gitops/platform-apps/immich/pvc.yaml\"" not in text
-    assert "kubectl apply -f \"$WORKSPACE_ROOT/gitops/platform-apps/immich/externalsecret.yaml\"" not in text
-    assert "kubectl apply -f \"$immich_app_db_externalsecret_manifest\"" not in text
-    assert "kubectl apply -f \"$WORKSPACE_ROOT/gitops/databases/namespace.yaml\"" not in text
-    assert "kubectl apply -f \"$databases_namespace_manifest\"" not in text
-    assert "wait_for_resources_ready \"databases\"" not in text
-    assert "wait_for_deployment_rollout \"immich\"" not in text
+    assert (
+        'kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/immich/namespace.yaml"' not in text
+    )
+    assert 'kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/immich/pvc.yaml"' not in text
+    assert (
+        'kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/immich/externalsecret.yaml"'
+        not in text
+    )
+    assert 'kubectl apply -f "$immich_app_db_externalsecret_manifest"' not in text
+    assert 'kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/namespace.yaml"' not in text
+    assert 'kubectl apply -f "$databases_namespace_manifest"' not in text
+    assert 'wait_for_resources_ready "databases"' not in text
+    assert 'wait_for_deployment_rollout "immich"' not in text
     assert (
         'search_response="$(authentik_api_get "/providers/oauth2/?search=${provider_name// /%20}&page_size=50")"'
         in text
     )
-    assert 'render_template \\' in text
+    assert "render_template \\" in text
     assert '--manifest "$immich_rendered_manifest"' in text
     assert '--application "immich"' in text
     assert '--destination-namespace "immich"' in text
@@ -2939,9 +2941,9 @@ def test_karakeep_argo_application_manages_the_platform_overlay():
 
 def test_tailscale_argo_application_manages_the_platform_overlay():
     text = _tailscale_app_text()
-    kustomization_text = (REPO_ROOT / "gitops" / "platform-apps" / "tailscale" / "kustomization.yaml").read_text(
-        encoding="utf-8"
-    )
+    kustomization_text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "tailscale" / "kustomization.yaml"
+    ).read_text(encoding="utf-8")
 
     assert "kind: Application" in text
     assert "path: gitops/platform-apps/tailscale" in text
@@ -2952,9 +2954,9 @@ def test_tailscale_argo_application_manages_the_platform_overlay():
 
 def test_pgadmin4_argo_application_manages_the_platform_overlay():
     text = _pgadmin_app_text()
-    kustomization_text = (REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "kustomization.yaml").read_text(
-        encoding="utf-8"
-    )
+    kustomization_text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "kustomization.yaml"
+    ).read_text(encoding="utf-8")
 
     assert "kind: Application" in text
     assert "path: gitops/platform-apps/pgadmin4" in text
