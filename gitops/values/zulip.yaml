@@ -32,20 +32,24 @@ postSetup:
       #!/usr/bin/env bash
       set -euo pipefail
 
-      manage_py="/home/zulip/deployments/current/manage.py"
       realm_name="${ZULIP_DEFAULT_REALM_NAME:-Twinbox}"
       owner_name="${ZULIP_DEFAULT_REALM_OWNER_NAME:-Twinbox Admin}"
       owner_email="${ZULIP_DEFAULT_REALM_OWNER_EMAIL:-${SETTING_ZULIP_ADMINISTRATOR:-admin@${SETTING_EXTERNAL_HOST}}}"
 
-      realm_exists="$("$manage_py" shell -c 'from zerver.models import Realm; print("yes" if Realm.objects.filter(string_id="").exists() else "no")' | tail -n1)"
+      realm_exists="$(
+        su zulip -c "cd /home/zulip/deployments/current && ./manage.py shell" <<'PY' | tail -n1
+from zerver.models import Realm
+print("yes" if Realm.objects.filter(string_id="").exists() else "no")
+PY
+      )"
       if [[ "$realm_exists" != "yes" ]]; then
-        "$manage_py" create_realm --automated --string-id= "$realm_name" "$owner_email" "$owner_name"
+        su zulip -c "cd /home/zulip/deployments/current && ./manage.py create_realm --automated --string-id= \"$realm_name\" \"$owner_email\" \"$owner_name\""
         echo "Created default Zulip organization: ${realm_name}"
       else
         echo "Default Zulip organization already exists"
       fi
 
-      "$manage_py" shell <<'PY'
+      su zulip -c "cd /home/zulip/deployments/current && ./manage.py shell" <<'PY'
       from zerver.actions.default_streams import do_add_default_stream
       from zerver.lib.onboarding import send_initial_realm_messages
       from zerver.lib.streams import ensure_stream
