@@ -289,8 +289,11 @@ def test_outline_step_projects_a_real_oidc_backed_app():
     )
     assert "create_or_update_provider()" in step_text
     assert 'slug "outline"' in step_text
-    assert '"__ZONE_NAME__=$public_zone_name"' in step_text
+    assert 'sed "s/__ZONE_NAME__/${public_zone_name}/g"' in step_text
+    assert "apply-argocd-application.sh" in step_text
+    assert '--application "outline"' in step_text
     assert "path: gitops/platform-apps/outline" in app_text
+    assert "path: gitops/databases/outline" in app_text
     assert "value: https://outline.__ZONE_NAME__" in app_text
     assert "value: https://authentik.__ZONE_NAME__/application/o/outline/" in app_text
     assert "application/o/outline/end-session/" in app_text
@@ -323,7 +326,8 @@ def test_pixelfed_step_and_secret_project_activitypub_and_bootstrap_keys():
     )
     assert "php artisan instance:actor" in step_text
     assert "php artisan passport:keys --force" in step_text
-    assert "gitops/databases/pixelfed/cluster.yaml" in step_text
+    assert "apply-argocd-application.sh" in step_text
+    assert '--application "pixelfed"' in step_text
     assert "gitops/apps/pixelfed.yaml" in step_text
 
     assert "name: pixelfed-bootstrap" in secret_text

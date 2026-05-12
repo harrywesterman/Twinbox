@@ -112,30 +112,6 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --json-file "$n8n_secret_file" \
   --required-keys "N8N_POSTGRESQL__USERNAME,N8N_POSTGRESQL__PASSWORD,N8N_ENCRYPTION_KEY"
 
-log "Applying n8n namespace and ExternalSecret"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/n8n/namespace.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/n8n/externalsecret.yaml"
-wait_for_resource_ready "n8n" "externalsecret/n8n-bootstrap" "Ready" "n8n application ExternalSecret"
-
-log "Applying n8n database manifests"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/namespace.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/n8n/cluster.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/n8n/externalsecret.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/n8n/pooler-ro.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/n8n/pooler-rw.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/n8n/pooler-rw-session.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/n8n/scheduled-backup.yaml"
-
-wait_for_resource_ready "databases" "cluster/n8n-db" "Ready" "n8n CloudNativePG cluster"
-wait_for_resource_ready "databases" "externalsecret/n8n-db-credentials" "Ready" "n8n database ExternalSecret"
-wait_for_resource_ready "databases" "deployment/n8n-db-pooler-ro" "Available" "n8n read-only pooler deployment"
-wait_for_resource_ready "databases" "deployment/n8n-db-pooler-rw" "Available" "n8n read-write pooler deployment"
-wait_for_resource_ready "databases" "deployment/n8n-db-pooler-rw-session" "Available" "n8n session pooler deployment"
-
-bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
-  --app-id "n8n" \
-  --host "n8n-db-pooler-rw-session.databases.svc.cluster.local"
-
 log "Applying n8n Argo CD application"
 sed "s/__ZONE_NAME__/${public_zone_name}/g" \
   "$WORKSPACE_ROOT/gitops/apps/n8n.yaml" >"$n8n_rendered_app_manifest"
@@ -143,6 +119,10 @@ sed "s/__ZONE_NAME__/${public_zone_name}/g" \
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$n8n_rendered_app_manifest" \
   --application "n8n"
+
+bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
+  --app-id "n8n" \
+  --host "n8n-db-pooler-rw-session.databases.svc.cluster.local"
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \

@@ -148,8 +148,7 @@ fi
 
 karakeep_secret_file="$(mktemp "${TMPDIR:-/tmp}/karakeep-bootstrap-XXXXXX")"
 karakeep_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/karakeep-application-XXXXXX")"
-karakeep_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/karakeep-ingressroute-XXXXXX")"
-trap 'rm -f "$karakeep_secret_file" "$karakeep_rendered_manifest" "$karakeep_rendered_ingressroute"' EXIT
+trap 'rm -f "$karakeep_secret_file" "$karakeep_rendered_manifest"' EXIT
 
 jq -n \
   --arg KARAKEEP_NEXTAUTH_SECRET "$karakeep_nextauth_secret" \
@@ -239,14 +238,6 @@ application_payload="$(
 )"
 application_pk="$(create_or_update_application "$application_payload")"
 [[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for Karakeep"
-
-log "Applying Karakeep namespace and ingress routes"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/karakeep/namespace.yaml"
-render_template \
-  "$WORKSPACE_ROOT/gitops/platform-apps/karakeep/ingressroute.yaml" \
-  "$karakeep_rendered_ingressroute" \
-  "__ZONE_NAME__=$public_zone_name"
-kubectl apply -f "$karakeep_rendered_ingressroute"
 
 log "Applying Karakeep Argo CD application"
 render_template \

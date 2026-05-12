@@ -262,29 +262,16 @@ openwebui_application_payload="$(
 application_pk="$(create_or_update_application "$openwebui_application_slug" "$openwebui_application_payload")"
 [[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for Open WebUI"
 
-log "Applying Open WebUI application namespace and ExternalSecret"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/openwebui/namespace.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/openwebui/externalsecret.yaml"
-wait_for_resources_ready "openwebui" "externalsecret" "Ready" "Open WebUI application"
-
-log "Applying Open WebUI database manifests"
-kubectl apply -k "$WORKSPACE_ROOT/gitops/databases/openwebui"
-wait_for_resources_ready "databases" "externalsecret" "Ready" "Open WebUI database"
-wait_for_resources_ready "databases" "cluster" "Ready" "Open WebUI CloudNativePG cluster"
-kubectl -n databases wait --for=condition=Available deployment/openwebui-db-pooler-ro deployment/openwebui-db-pooler-rw deployment/openwebui-db-pooler-rw-session --timeout=10m >/dev/null 2>&1 \
-  || fail "Open WebUI pooler deployments did not become available"
-log "Open WebUI pooler deployments are ready"
-
-bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
-  --app-id "openwebui" \
-  --host "openwebui-db-pooler-rw-session.databases.svc.cluster.local"
-
 log "Applying Open WebUI Argo CD application"
 sed "s/__ZONE_NAME__/${public_zone_name}/g" "$WORKSPACE_ROOT/gitops/apps/openwebui.yaml" >"$openwebui_rendered_app_manifest"
 
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$openwebui_rendered_app_manifest" \
   --application "openwebui"
+
+bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
+  --app-id "openwebui" \
+  --host "openwebui-db-pooler-rw-session.databases.svc.cluster.local"
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \

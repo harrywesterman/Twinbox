@@ -55,6 +55,32 @@ spec:
     - repoURL: __REPO_URL__
       targetRevision: __TARGET_REVISION__
       ref: values
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      path: gitops/platform-apps/karakeep
+      kustomize:
+        patches:
+          - target:
+              kind: IngressRoute
+              name: karakeep
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`karakeep.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: karakeep-wiredoor
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`karakeep.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: karakeep-tailscale
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`karakeep.__ZONE_NAME__`)
   destination:
     server: https://kubernetes.default.svc
     namespace: karakeep

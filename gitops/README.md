@@ -38,9 +38,9 @@ Some apps use a repo-controlled subtree under `gitops/apps/<app>/` or a standalo
 - `gitops/apps/grafana.yaml` - Grafana Application.
 - `gitops/apps/headlamp.yaml` - Headlamp dashboard Application.
 - `gitops/apps/hedgedoc.yaml` - HedgeDoc ApplicationSet.
-- `gitops/apps/immich.yaml` - Immich ApplicationSet.
+- `gitops/apps/immich.yaml` - Immich ApplicationSet with repo-local platform and database overlays.
 - `gitops/apps/jitsi.yaml` - Jitsi ApplicationSet.
-- `gitops/apps/karakeep.yaml` - Karakeep ApplicationSet.
+- `gitops/apps/karakeep.yaml` - Karakeep ApplicationSet with repo-local platform overlay.
 - `gitops/apps/loki.yaml` - Loki log aggregation Application.
 - `gitops/apps/longhorn.yaml` - Longhorn storage Application.
 - `gitops/apps/metallb.yaml` - MetalLB load balancer Application.
@@ -53,6 +53,7 @@ Some apps use a repo-controlled subtree under `gitops/apps/<app>/` or a standalo
 - `gitops/apps/openwebui.yaml` - OpenWebUI ApplicationSet.
 - `gitops/apps/outline.yaml` - Outline ApplicationSet.
 - `gitops/apps/paperless.yaml` - Paperless ApplicationSet.
+- `gitops/apps/pgadmin4.yaml` - pgAdmin 4 Application.
 - `gitops/apps/pixelfed.yaml` - Pixelfed ApplicationSet.
 - `gitops/apps/platform-ingress.yaml` - Shared platform ingress resources.
 - `gitops/apps/prometheus-minimal.yaml` - Minimal Prometheus scrape config Application.
@@ -100,7 +101,7 @@ Traefik route templates. See [routes/README.md](routes/README.md).
 
 ## `platform-apps/`
 
-App-specific Kubernetes manifests that are rendered or applied directly by the manager scripts. Common examples include:
+App-specific Kubernetes manifests. Some are still rendered or applied directly by the manager scripts during bootstrap, but the long-term target is for these resources to be owned by Argo CD Applications in `gitops/apps/`. Common examples include:
 
 - `audiobookshelf/` - Audiobookshelf deployment, service, ingress, and PVC.
 - `cloudnativepg-barman-cloud/` - CloudNativePG Barman Cloud backup configuration.

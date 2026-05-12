@@ -276,24 +276,13 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --json-file "$secret_file" \
   --required-keys "PORTAL_BASE_URL,PORTAL_OIDC_CLIENT_ID,PORTAL_OIDC_ISSUER,PORTAL_SESSION_SECRET,AUTHENTIK_API_BASE"
 
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/namespace.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/externalsecret.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/pvc.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/service.yaml"
-
-rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/twinbox-portal-ingressroute-XXXXXX")"
 rendered_application="$(mktemp "${TMPDIR:-/tmp}/twinbox-portal-application-XXXXXX")"
-trap 'rm -f "$secret_file" "$rendered_ingressroute" "$rendered_application"' EXIT
-sed "s/__ZONE_NAME__/${public_zone_name}/g" \
-  "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/ingressroute.yaml" >"$rendered_ingressroute"
+trap 'rm -f "$secret_file" "$rendered_application"' EXIT
 node "$WORKSPACE_ROOT/manager-worker/src/refresh-portal-config.mjs" \
   --workspace-root "$WORKSPACE_ROOT" \
   --manager-data-dir "$MANAGER_DATA_DIR" \
   --cluster-id "$cluster_id" \
   --trigger-step-id install-twinbox-portal
-
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/twinbox-portal/deployment.yaml"
-kubectl apply -f "$rendered_ingressroute"
 
 sed "s/__ZONE_NAME__/${public_zone_name}/g" \
   "$WORKSPACE_ROOT/gitops/apps/twinbox-portal.yaml" >"$rendered_application"

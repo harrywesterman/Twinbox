@@ -5,46 +5,49 @@ metadata:
   namespace: argocd
 spec:
   project: default
-  source:
-    repoURL: __REPO_URL__
-    targetRevision: __TARGET_REVISION__
-    path: gitops/platform-apps/openwebui
-    kustomize:
-      patches:
-        - target:
-            kind: Deployment
-            name: openwebui
-          patch: |-
-            - op: replace
-              path: /spec/template/spec/containers/0/env/0/value
-              value: https://openwebui.__ZONE_NAME__
-            - op: replace
-              path: /spec/template/spec/containers/0/env/1/value
-              value: https://authentik.__ZONE_NAME__/application/o/openwebui/.well-known/openid-configuration
-            - op: replace
-              path: /spec/template/spec/containers/0/env/2/value
-              value: https://openwebui.__ZONE_NAME__/oauth/oidc/callback
-        - target:
-            kind: IngressRoute
-            name: openwebui
-          patch: |-
-            - op: replace
-              path: /spec/routes/0/match
-              value: Host(`openwebui.__ZONE_NAME__`)
-        - target:
-            kind: IngressRoute
-            name: openwebui-wiredoor
-          patch: |-
-            - op: replace
-              path: /spec/routes/0/match
-              value: Host(`openwebui.__ZONE_NAME__`)
-        - target:
-            kind: IngressRoute
-            name: openwebui-tailscale
-          patch: |-
-            - op: replace
-              path: /spec/routes/0/match
-              value: Host(`openwebui.__ZONE_NAME__`)
+  sources:
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      path: gitops/platform-apps/openwebui
+      kustomize:
+        patches:
+          - target:
+              kind: Deployment
+              name: openwebui
+            patch: |-
+              - op: replace
+                path: /spec/template/spec/containers/0/env/0/value
+                value: https://openwebui.__ZONE_NAME__
+              - op: replace
+                path: /spec/template/spec/containers/0/env/1/value
+                value: https://authentik.__ZONE_NAME__/application/o/openwebui/.well-known/openid-configuration
+              - op: replace
+                path: /spec/template/spec/containers/0/env/2/value
+                value: https://openwebui.__ZONE_NAME__/oauth/oidc/callback
+          - target:
+              kind: IngressRoute
+              name: openwebui
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`openwebui.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: openwebui-wiredoor
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`openwebui.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: openwebui-tailscale
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`openwebui.__ZONE_NAME__`)
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      path: gitops/databases/openwebui
   destination:
     server: https://kubernetes.default.svc
     namespace: openwebui

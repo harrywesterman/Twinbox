@@ -5,46 +5,49 @@ metadata:
   namespace: argocd
 spec:
   project: default
-  source:
-    repoURL: __REPO_URL__
-    targetRevision: __TARGET_REVISION__
-    path: gitops/platform-apps/paperless
-    kustomize:
-      patches:
-        - target:
-            kind: Deployment
-            name: paperless
-          patch: |-
-            - op: replace
-              path: /spec/template/spec/containers/0/env/3/value
-              value: https://paperless.__ZONE_NAME__
-            - op: replace
-              path: /spec/template/spec/containers/0/env/4/value
-              value: paperless.__ZONE_NAME__
-            - op: replace
-              path: /spec/template/spec/containers/0/env/5/value
-              value: https://paperless.__ZONE_NAME__
-        - target:
-            kind: IngressRoute
-            name: paperless
-          patch: |-
-            - op: replace
-              path: /spec/routes/0/match
-              value: Host(`paperless.__ZONE_NAME__`)
-        - target:
-            kind: IngressRoute
-            name: paperless-wiredoor
-          patch: |-
-            - op: replace
-              path: /spec/routes/0/match
-              value: Host(`paperless.__ZONE_NAME__`)
-        - target:
-            kind: IngressRoute
-            name: paperless-tailscale
-          patch: |-
-            - op: replace
-              path: /spec/routes/0/match
-              value: Host(`paperless.__ZONE_NAME__`)
+  sources:
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      path: gitops/platform-apps/paperless
+      kustomize:
+        patches:
+          - target:
+              kind: Deployment
+              name: paperless
+            patch: |-
+              - op: replace
+                path: /spec/template/spec/containers/0/env/3/value
+                value: https://paperless.__ZONE_NAME__
+              - op: replace
+                path: /spec/template/spec/containers/0/env/4/value
+                value: paperless.__ZONE_NAME__
+              - op: replace
+                path: /spec/template/spec/containers/0/env/5/value
+                value: https://paperless.__ZONE_NAME__
+          - target:
+              kind: IngressRoute
+              name: paperless
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`paperless.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: paperless-wiredoor
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`paperless.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: paperless-tailscale
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`paperless.__ZONE_NAME__`)
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      path: gitops/databases/paperless
   destination:
     server: https://kubernetes.default.svc
     namespace: paperless

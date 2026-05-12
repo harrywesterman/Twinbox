@@ -25,6 +25,15 @@ TRAEFIK_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-traefik-ma
 OPENCLOUD_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-opencloud" / "run.sh"
 DASHY_APP = REPO_ROOT / "gitops" / "apps" / "dashy.yaml"
 FRESHRSS_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-freshrss" / "run.sh"
+OUTLINE_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-outline" / "run.sh"
+OPENWEBUI_STEP_SCRIPT = (
+    REPO_ROOT / "categories" / "apps" / "steps" / "install-openwebui" / "run.sh"
+)
+N8N_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-n8n" / "run.sh"
+HEDGEDOC_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-hedgedoc" / "run.sh"
+PAPERLESS_STEP_SCRIPT = (
+    REPO_ROOT / "categories" / "apps" / "steps" / "install-paperless" / "run.sh"
+)
 VAULTWARDEN_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "apps" / "steps" / "install-vaultwarden" / "run.sh"
 )
@@ -32,6 +41,26 @@ STIRLING_PDF_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "apps" / "steps" / "install-stirling-pdf" / "run.sh"
 )
 PIXELFED_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-pixelfed" / "run.sh"
+TWINBOX_PORTAL_APP = REPO_ROOT / "gitops" / "apps" / "twinbox-portal.yaml"
+OUTLINE_APP = REPO_ROOT / "gitops" / "apps" / "outline.yaml"
+OPENWEBUI_APP = REPO_ROOT / "gitops" / "apps" / "openwebui.yaml"
+N8N_APP = REPO_ROOT / "gitops" / "apps" / "n8n.yaml"
+HEDGEDOC_APP = REPO_ROOT / "gitops" / "apps" / "hedgedoc.yaml"
+PAPERLESS_APP = REPO_ROOT / "gitops" / "apps" / "paperless.yaml"
+PIXELFED_APP = REPO_ROOT / "gitops" / "apps" / "pixelfed.yaml"
+OUTLINE_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "outline" / "kustomization.yaml"
+OPENWEBUI_DB_KUSTOMIZATION = (
+    REPO_ROOT / "gitops" / "databases" / "openwebui" / "kustomization.yaml"
+)
+N8N_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "n8n" / "kustomization.yaml"
+HEDGEDOC_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "hedgedoc" / "kustomization.yaml"
+PAPERLESS_DB_KUSTOMIZATION = (
+    REPO_ROOT / "gitops" / "databases" / "paperless" / "kustomization.yaml"
+)
+VAULTWARDEN_DB_KUSTOMIZATION = (
+    REPO_ROOT / "gitops" / "databases" / "vaultwarden" / "kustomization.yaml"
+)
+PIXELFED_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "pixelfed" / "kustomization.yaml"
 ARGO_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
 )
@@ -126,6 +155,10 @@ PGADMIN_STEP_MANIFEST = (
 PGADMIN_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-pgadmin4" / "run.sh"
 )
+IMMICH_APP = REPO_ROOT / "gitops" / "apps" / "immich.yaml"
+KARAKEEP_APP = REPO_ROOT / "gitops" / "apps" / "karakeep.yaml"
+PGADMIN_APP = REPO_ROOT / "gitops" / "apps" / "pgadmin4.yaml"
+TAILSCALE_APP = REPO_ROOT / "gitops" / "apps" / "tailscale.yaml"
 PLATFORM_INGRESS_APP = REPO_ROOT / "gitops" / "apps" / "platform-ingress.yaml"
 PGADMIN_EXTERNALSECRET = REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "externalsecret.yaml"
 PGADMIN_SERVER_CONFIGMAP = REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "configmap.yaml"
@@ -134,6 +167,10 @@ PGADMIN_INGRESSROUTE = REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "in
 PGADMIN_DEPLOYMENT = REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "deployment.yaml"
 PGADMIN_PVC = REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "pvc.yaml"
 PGADMIN_SERVICE = REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "service.yaml"
+KARAKEEP_PLATFORM_KUSTOMIZATION = (
+    REPO_ROOT / "gitops" / "platform-apps" / "karakeep" / "kustomization.yaml"
+)
+IMMICH_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "immich" / "kustomization.yaml"
 HEADLAMP_OIDC_EXTERNALSECRET = (
     REPO_ROOT / "gitops" / "platform-apps" / "headlamp" / "externalsecret.yaml"
 )
@@ -412,6 +449,22 @@ def _wiredoor_gateway_app_text() -> str:
 
 def _grafana_externalsecret_text() -> str:
     return GRAFANA_EXTERNALSECRET.read_text(encoding="utf-8")
+
+
+def _immich_app_text() -> str:
+    return IMMICH_APP.read_text(encoding="utf-8")
+
+
+def _karakeep_app_text() -> str:
+    return KARAKEEP_APP.read_text(encoding="utf-8")
+
+
+def _pgadmin_app_text() -> str:
+    return PGADMIN_APP.read_text(encoding="utf-8")
+
+
+def _tailscale_app_text() -> str:
+    return TAILSCALE_APP.read_text(encoding="utf-8")
 
 
 def test_apply_cluster_requires_proxmox_env():
@@ -834,8 +887,12 @@ def test_opencloud_step_enables_external_idp_autoprovisioning_and_ldap_checks():
         "OC_EXCLUDE_RUN_SERVICES: $OC_EXCLUDE_RUN_SERVICES",
         'wait_for_resources_ready "opencloud" "externalsecret" "Ready" "OpenCloud ExternalSecret"',
         "wait_for_opencloud_ldap_directory",
+        "apply-argocd-application.sh",
+        '--application "opencloud"',
     ]:
         assert expected in text
+
+    assert "kubectl apply -k \"$opencloud_rendered_overlay\"" not in text
 
     assert '"preferred_username": request.user.username' in text
     assert '"sub": request.user.uid' in text
@@ -1356,44 +1413,37 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "PGADMIN_MASTER_PASSWORD" in pgadmin_run_text
     assert "PGADMIN_DEFAULT_EMAIL" in pgadmin_run_text
     assert "Could not find a usable kubeconfig" in pgadmin_run_text
-    assert (
-        'pgadmin_platform_dir="$WORKSPACE_ROOT/gitops/platform-apps/pgadmin4"' in pgadmin_run_text
-    )
-    assert (
-        'pgadmin_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-ingressroute-XXXXXX")"'
-        in pgadmin_run_text
-    )
+    assert "render_template()" in pgadmin_run_text
+    assert 'pgadmin_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/pgadmin4-application-XXXXXX")"' in pgadmin_run_text
     assert (
         "kubectl create namespace pgadmin4 --dry-run=client -o yaml | kubectl apply -f -"
         in pgadmin_run_text
     )
+    assert "gitops/apps/pgadmin4.yaml" in pgadmin_run_text
     assert "gitops/platform-apps/pgadmin4/externalsecret.yaml" not in pgadmin_run_text
-    assert "$pgadmin_platform_dir/externalsecret.yaml" in pgadmin_run_text
-    assert (
-        "kubectl delete application pgadmin4 -n argocd --ignore-not-found=true"
-        not in pgadmin_run_text
-    )
-    assert '--application "platform-ingress"' not in pgadmin_run_text
-    assert "gitops/apps/platform-ingress.yaml" not in pgadmin_run_text
-    assert "wait --for=condition=Ready externalsecret/pgadmin4-oidc" in pgadmin_run_text
+    assert "gitops/platform-apps/pgadmin4/configmap.yaml" not in pgadmin_run_text
+    assert "gitops/platform-apps/pgadmin4/deployment.yaml" not in pgadmin_run_text
+    assert "gitops/platform-apps/pgadmin4/ingressroute.yaml" not in pgadmin_run_text
+    assert "wait --for=condition=Ready externalsecret/pgadmin4-oidc" not in pgadmin_run_text
     assert "Creating pgAdmin 4 database password secret" in pgadmin_run_text
     assert "pgadmin4-db-password" in pgadmin_run_text
-    assert "wait_for_ready_pod pgadmin4 app.kubernetes.io/name=pgadmin4" in pgadmin_run_text
-    assert 'kubectl apply -f "$pgadmin_platform_dir/configmap.yaml"' in pgadmin_run_text
-    assert "Applying pgAdmin 4 service, deployment, and ingress" in pgadmin_run_text
-    assert 'kubectl apply -f "$pgadmin_platform_dir/service.yaml"' in pgadmin_run_text
-    assert 'kubectl apply -f "$pgadmin_platform_dir/deployment.yaml"' in pgadmin_run_text
-    assert 'kubectl apply -f "$pgadmin_rendered_ingressroute"' in pgadmin_run_text
-    assert (
-        "kubectl -n pgadmin4 wait --for=condition=Available deployment/pgadmin4 --timeout=10m"
-        in pgadmin_run_text
-    )
+    assert "wait_for_ready_pod pgadmin4 app.kubernetes.io/name=pgadmin4" not in pgadmin_run_text
+    assert "Applying pgAdmin 4 configmap and PVC bootstrap resource" not in pgadmin_run_text
+    assert "Applying pgAdmin 4 service, deployment, and ingress" not in pgadmin_run_text
+    assert "Applying pgAdmin 4 Argo CD application" in pgadmin_run_text
+    assert 'render_template \\' in pgadmin_run_text
+    assert '--manifest "$pgadmin_rendered_manifest"' in pgadmin_run_text
+    assert '--application "pgadmin4"' in pgadmin_run_text
+    assert '--destination-namespace "pgadmin4"' in pgadmin_run_text
     assert "kind: ConfigMap" in pgadmin_server_config_text
     assert "CloudNativePG" in pgadmin_server_config_text
     assert (
         "authentik-db-pooler-rw-session.databases.svc.cluster.local" in pgadmin_server_config_text
     )
     assert "PasswordExecCommand" in pgadmin_server_config_text
+    assert "path: gitops/platform-apps/pgadmin4" in PGADMIN_APP.read_text(encoding="utf-8")
+    assert "path: gitops/platform-apps/karakeep" in KARAKEEP_APP.read_text(encoding="utf-8")
+    assert "path: gitops/platform-apps/tailscale" in TAILSCALE_APP.read_text(encoding="utf-8")
 
     pgadmin_app_text = PLATFORM_INGRESS_APP.read_text(encoding="utf-8")
     assert "kind: ApplicationSet" in pgadmin_app_text
@@ -1419,7 +1469,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "/oidc-callback" in headlamp_run_text
     assert "headlamp-oidc" in headlamp_run_text
     assert "sync-openbao-global-secret.sh" in headlamp_run_text
-    assert "gitops/platform-apps/headlamp/externalsecret.yaml" in headlamp_run_text
+    assert "apply-argocd-application.sh" in headlamp_run_text
     assert (
         'headlamp_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/headlamp-application-XXXXXX")"'
         in headlamp_run_text
@@ -1700,10 +1750,11 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "cluster-public-zone.sh" in vaultwarden_run_text
     assert "sync-openbao-global-secret.sh" in vaultwarden_run_text
     assert "VAULTWARDEN_ADMIN_TOKEN" in vaultwarden_run_text
-    assert "gitops/databases/vaultwarden/cluster.yaml" in vaultwarden_run_text
+    assert "apply-argocd-application.sh" in vaultwarden_run_text
     assert '--application "vaultwarden"' in vaultwarden_run_text
     assert "kind: Application" in vaultwarden_app_text
     assert "path: gitops/platform-apps/vaultwarden" in vaultwarden_app_text
+    assert "path: gitops/databases/vaultwarden" in vaultwarden_app_text
     assert "Host(`vaultwarden.__ZONE_NAME__`)" in VAULTWARDEN_INGRESSROUTE.read_text(
         encoding="utf-8"
     )
@@ -1832,6 +1883,112 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "property: WIREDOOR_URL" in wiredoor_externalsecret_text
     assert "property: TOKEN" in wiredoor_externalsecret_text
     assert "secretKey: TOKEN" in wiredoor_externalsecret_text
+
+
+def test_optional_apps_route_steady_state_through_argocd_sources():
+    app_expectations = {
+        "outline": (OUTLINE_APP, OUTLINE_DB_KUSTOMIZATION),
+        "openwebui": (OPENWEBUI_APP, OPENWEBUI_DB_KUSTOMIZATION),
+        "n8n": (N8N_APP, N8N_DB_KUSTOMIZATION),
+        "hedgedoc": (HEDGEDOC_APP, HEDGEDOC_DB_KUSTOMIZATION),
+        "paperless": (PAPERLESS_APP, PAPERLESS_DB_KUSTOMIZATION),
+        "vaultwarden": (VAULTWARDEN_APP, VAULTWARDEN_DB_KUSTOMIZATION),
+        "pixelfed": (PIXELFED_APP, PIXELFED_DB_KUSTOMIZATION),
+    }
+
+    step_expectations = {
+        OUTLINE_STEP_SCRIPT: [
+            "apply-argocd-application.sh",
+            '--application "outline"',
+            "gitops/apps/outline.yaml",
+        ],
+        OPENWEBUI_STEP_SCRIPT: [
+            "apply-argocd-application.sh",
+            '--application "openwebui"',
+            "gitops/apps/openwebui.yaml",
+        ],
+        N8N_STEP_SCRIPT: [
+            "apply-argocd-application.sh",
+            '--application "n8n"',
+            "gitops/apps/n8n.yaml",
+        ],
+        HEDGEDOC_STEP_SCRIPT: [
+            "apply-argocd-application.sh",
+            '--application "hedgedoc"',
+            "gitops/apps/hedgedoc.yaml",
+        ],
+        PAPERLESS_STEP_SCRIPT: [
+            "apply-argocd-application.sh",
+            '--application "paperless"',
+            "gitops/apps/paperless.yaml",
+        ],
+        VAULTWARDEN_STEP_SCRIPT: [
+            "apply-argocd-application.sh",
+            '--application "vaultwarden"',
+            "gitops/apps/vaultwarden.yaml",
+        ],
+        PIXELFED_STEP_SCRIPT: [
+            "apply-argocd-application.sh",
+            '--application "pixelfed"',
+            "gitops/apps/pixelfed.yaml",
+        ],
+    }
+
+    forbidden_snippets = {
+        OUTLINE_STEP_SCRIPT: [
+            "kubectl apply -f \"$WORKSPACE_ROOT/gitops/databases/namespace.yaml\"",
+            "kubectl apply -f \"$WORKSPACE_ROOT/gitops/platform-apps/outline/namespace.yaml\"",
+        ],
+        OPENWEBUI_STEP_SCRIPT: [
+            "kubectl apply -f \"$WORKSPACE_ROOT/gitops/platform-apps/openwebui/namespace.yaml\"",
+            "kubectl apply -k \"$WORKSPACE_ROOT/gitops/databases/openwebui\"",
+        ],
+        N8N_STEP_SCRIPT: [
+            "kubectl apply -f \"$WORKSPACE_ROOT/gitops/platform-apps/n8n/namespace.yaml\"",
+            "kubectl apply -f \"$WORKSPACE_ROOT/gitops/databases/n8n/cluster.yaml\"",
+        ],
+        HEDGEDOC_STEP_SCRIPT: [
+            "kubectl apply -f \"$WORKSPACE_ROOT/gitops/platform-apps/hedgedoc/namespace.yaml\"",
+            "kubectl apply -f \"$WORKSPACE_ROOT/gitops/databases/hedgedoc/cluster.yaml\"",
+        ],
+        PAPERLESS_STEP_SCRIPT: [
+            "kubectl apply -f \"$WORKSPACE_ROOT/gitops/platform-apps/paperless/namespace.yaml\"",
+            "kubectl apply -f \"$WORKSPACE_ROOT/gitops/databases/paperless/cluster.yaml\"",
+        ],
+        VAULTWARDEN_STEP_SCRIPT: [
+            "kubectl apply -f \"$WORKSPACE_ROOT/gitops/databases/vaultwarden/cluster.yaml\"",
+        ],
+        PIXELFED_STEP_SCRIPT: [
+            "kubectl apply -f \"$WORKSPACE_ROOT/gitops/databases/pixelfed/cluster.yaml\"",
+        ],
+    }
+
+    for app_name, (app_path, db_path) in app_expectations.items():
+        app_text = app_path.read_text(encoding="utf-8")
+        db_text = db_path.read_text(encoding="utf-8")
+        assert "kind: Application" in app_text
+        assert f"path: gitops/platform-apps/{app_name}" in app_text
+        assert f"path: gitops/databases/{app_name}" in app_text
+        assert "../namespace.yaml" in db_text
+        assert "cluster.yaml" in db_text or "externalsecret.yaml" in db_text
+
+    for step_path, snippets in step_expectations.items():
+        step_text = step_path.read_text(encoding="utf-8")
+        for snippet in snippets:
+            assert snippet in step_text
+        for snippet in forbidden_snippets[step_path]:
+            assert snippet not in step_text
+
+    headlamp_run_text = (
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-headlamp" / "run.sh"
+    ).read_text(encoding="utf-8")
+    twinbox_portal_run_text = TWINBOX_PORTAL_STEP_SCRIPT.read_text(encoding="utf-8")
+    assert "apply-argocd-application.sh" in headlamp_run_text
+    assert "gitops/platform-apps/headlamp/externalsecret.yaml" not in headlamp_run_text
+    assert "apply-argocd-application.sh" in twinbox_portal_run_text
+    assert "gitops/platform-apps/twinbox-portal/namespace.yaml" not in twinbox_portal_run_text
+    assert "gitops/platform-apps/twinbox-portal/deployment.yaml" not in twinbox_portal_run_text
+    assert "gitops/platform-apps/twinbox-portal/ingressroute.yaml" not in twinbox_portal_run_text
 
 
 def test_grafana_oidc_is_openbao_backed():
@@ -2359,7 +2516,8 @@ def test_pixelfed_manifests_use_postgresql_and_longhorn_storage():
         '--required-keys "APP_KEY,PIXELFED_POSTGRESQL__USERNAME,PIXELFED_POSTGRESQL__PASSWORD,PF_OIDC_CLIENT_ID,PF_OIDC_CLIENT_SECRET,PF_OIDC_AUTHORIZE_URL,PF_OIDC_TOKEN_URL,PF_OIDC_PROFILE_URL,PF_OIDC_LOGOUT_URL"'
         in step_text
     )
-    assert "gitops/databases/pixelfed/cluster.yaml" in step_text
+    assert "apply-argocd-application.sh" in step_text
+    assert '--application "pixelfed"' in step_text
     assert "gitops/apps/pixelfed.yaml" in step_text
     assert "php artisan instance:actor" in step_text
     assert "php artisan passport:keys --force" in step_text
@@ -2548,28 +2706,34 @@ def test_authentik_db_storageclass_uses_single_replica():
     assert "provisioner: driver.longhorn.io" in text
 
 
-def test_install_immich_step_uses_only_its_own_database_manifests():
+def test_install_immich_step_applies_its_argo_application():
     text = (REPO_ROOT / "categories" / "apps" / "steps" / "install-immich" / "run.sh").read_text(
         encoding="utf-8"
     )
-    assert "gitops/databases/namespace.yaml" in text
-    assert "gitops/databases/immich/cluster.yaml" in text
-    assert "gitops/databases/immich/externalsecret.yaml" in text
-    assert (
-        'immich_app_db_externalsecret_manifest="$WORKSPACE_ROOT/gitops/platform-apps/immich/db-externalsecret.yaml"'
-        in text
-    )
-    assert 'kubectl apply -f "$immich_app_db_externalsecret_manifest"' in text
-    assert "gitops/databases/immich/pooler-ro.yaml" in text
-    assert "gitops/databases/immich/pooler-rw.yaml" in text
-    assert "gitops/databases/immich/scheduled-backup.yaml" in text
-    assert "gitops/databases/kustomization.yaml" not in text
-    assert "gitops/databases/authentik/" not in text
+    assert 'immich_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/immich-application-XXXXXX")"' in text
+    assert "gitops/apps/immich.yaml" in text
+    assert "gitops/platform-apps/immich/db-externalsecret.yaml" not in text
+    assert "gitops/databases/immich/cluster.yaml" not in text
+    assert "gitops/databases/immich/externalsecret.yaml" not in text
+    assert "gitops/databases/immich/pooler-ro.yaml" not in text
+    assert "gitops/databases/immich/pooler-rw.yaml" not in text
+    assert "gitops/databases/immich/scheduled-backup.yaml" not in text
+    assert "kubectl apply -f \"$WORKSPACE_ROOT/gitops/platform-apps/immich/namespace.yaml\"" not in text
+    assert "kubectl apply -f \"$WORKSPACE_ROOT/gitops/platform-apps/immich/pvc.yaml\"" not in text
+    assert "kubectl apply -f \"$WORKSPACE_ROOT/gitops/platform-apps/immich/externalsecret.yaml\"" not in text
+    assert "kubectl apply -f \"$immich_app_db_externalsecret_manifest\"" not in text
+    assert "kubectl apply -f \"$WORKSPACE_ROOT/gitops/databases/namespace.yaml\"" not in text
+    assert "kubectl apply -f \"$databases_namespace_manifest\"" not in text
+    assert "wait_for_resources_ready \"databases\"" not in text
+    assert "wait_for_deployment_rollout \"immich\"" not in text
     assert (
         'search_response="$(authentik_api_get "/providers/oauth2/?search=${provider_name// /%20}&page_size=50")"'
         in text
     )
-    assert 'authentik_api_get "/core/applications/${application_slug}/" 2>/dev/null || true' in text
+    assert 'render_template \\' in text
+    assert '--manifest "$immich_rendered_manifest"' in text
+    assert '--application "immich"' in text
+    assert '--destination-namespace "immich"' in text
     db_externalsecret_text = (
         REPO_ROOT / "gitops" / "platform-apps" / "immich" / "db-externalsecret.yaml"
     ).read_text(encoding="utf-8")
@@ -2578,6 +2742,13 @@ def test_install_immich_step_uses_only_its_own_database_manifests():
     assert "secretStoreRef:" in db_externalsecret_text
     assert "name: openbao" in db_externalsecret_text
     assert "twinbox/global/immich" in db_externalsecret_text
+    immich_app_text = _immich_app_text()
+    assert "path: gitops/platform-apps/immich" in immich_app_text
+    assert "path: gitops/databases/immich" in immich_app_text
+    assert "db-externalsecret.yaml" in (
+        REPO_ROOT / "gitops" / "platform-apps" / "immich" / "kustomization.yaml"
+    ).read_text(encoding="utf-8")
+    assert "../namespace.yaml" in IMMICH_DB_KUSTOMIZATION.read_text(encoding="utf-8")
 
 
 def test_immich_values_keep_valkey_storageclass_nested():
@@ -2752,6 +2923,50 @@ def test_dashy_kustomization_includes_a_pvc():
     assert "ingressroute.yaml" in text
 
 
+def test_karakeep_argo_application_manages_the_platform_overlay():
+    text = _karakeep_app_text()
+    kustomization_text = KARAKEEP_PLATFORM_KUSTOMIZATION.read_text(encoding="utf-8")
+
+    assert "kind: Application" in text
+    assert "path: gitops/platform-apps/karakeep" in text
+    assert "CreateNamespace=true" in text
+    assert "name: karakeep-wiredoor" in text
+    assert "name: karakeep-tailscale" in text
+    assert "kind: Kustomization" in kustomization_text
+    assert "namespace.yaml" in kustomization_text
+    assert "ingressroute.yaml" in kustomization_text
+
+
+def test_tailscale_argo_application_manages_the_platform_overlay():
+    text = _tailscale_app_text()
+    kustomization_text = (REPO_ROOT / "gitops" / "platform-apps" / "tailscale" / "kustomization.yaml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "kind: Application" in text
+    assert "path: gitops/platform-apps/tailscale" in text
+    assert "CreateNamespace=true" in text
+    assert "kind: Kustomization" in kustomization_text
+    assert "externalsecret.yaml" in kustomization_text
+
+
+def test_pgadmin4_argo_application_manages_the_platform_overlay():
+    text = _pgadmin_app_text()
+    kustomization_text = (REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "kustomization.yaml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "kind: Application" in text
+    assert "path: gitops/platform-apps/pgadmin4" in text
+    assert "CreateNamespace=true" in text
+    assert "name: pgadmin4-wiredoor" in text
+    assert "name: pgadmin4-tailscale" in text
+    assert "Host(`pgadmin4.__ZONE_NAME__`)" in text
+    assert "kind: Kustomization" in kustomization_text
+    assert "configmap.yaml" in kustomization_text
+    assert "deployment.yaml" in kustomization_text
+
+
 def test_install_dashy_step_refreshes_platform_ingress_before_restart():
     text = (
         REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-dashy-dashboard" / "run.sh"
@@ -2872,6 +3087,11 @@ def test_platform_namespace_baseline_covers_shared_overlay_resources():
     assert "namespace.yaml" in (
         REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
+    assert "namespace.yaml" in KARAKEEP_PLATFORM_KUSTOMIZATION.read_text(encoding="utf-8")
+    assert "db-externalsecret.yaml" in (
+        REPO_ROOT / "gitops" / "platform-apps" / "immich" / "kustomization.yaml"
+    ).read_text(encoding="utf-8")
+    assert "../namespace.yaml" in IMMICH_DB_KUSTOMIZATION.read_text(encoding="utf-8")
     assert "gitops/apps/dashy.yaml" in (
         REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-dashy-dashboard" / "run.sh"
     ).read_text(encoding="utf-8")
@@ -3090,7 +3310,7 @@ def test_uninstall_authentik_cleanup_sets_forward_before_app_cleanup():
     )
 
     app_detection_index = text.index(
-        "immich|nextcloud|audiobookshelf|karakeep|jitsi|opencloud|zulip"
+        "immich|nextcloud|audiobookshelf|karakeep|outline|openwebui|hedgedoc|paperless|vaultwarden|jitsi|opencloud|zulip|pixelfed|headlamp|twinbox-portal"
     )
     setup_condition_index = text.index('if [[ "$needs_authentik_cleanup" == "true" ]]')
     setup_forward_index = text.index("authentik_setup_forward", setup_condition_index)
@@ -3098,3 +3318,5 @@ def test_uninstall_authentik_cleanup_sets_forward_before_app_cleanup():
 
     assert app_detection_index < setup_condition_index
     assert setup_forward_index < cleanup_index
+    assert 'kubectl delete -k "$database_app_dir"' in text
+    assert 'kubectl delete -f "$database_app_dir"' in text

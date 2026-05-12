@@ -3,9 +3,8 @@ kind: Kustomization
 
 resources:
   - ../namespace.yaml
-  - cluster.yaml
   - externalsecret.yaml
+  - cluster.yaml
   - pooler-ro.yaml
   - pooler-rw.yaml
-  - pooler-rw-session.yaml
   - scheduled-backup.yaml

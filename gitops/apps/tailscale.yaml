@@ -15,6 +15,9 @@ spec:
     - repoURL: __REPO_URL__
       targetRevision: __TARGET_REVISION__
       ref: values
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      path: gitops/platform-apps/tailscale
   destination:
     server: https://kubernetes.default.svc
     namespace: tailscale

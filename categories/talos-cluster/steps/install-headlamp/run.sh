@@ -253,9 +253,6 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
 rm -f "$headlamp_secret_file"
 
 if command -v kubectl &>/dev/null; then
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying Headlamp ExternalSecret"
-  kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/headlamp/externalsecret.yaml"
-
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying Headlamp Argo CD application"
   sed "s/__ZONE_NAME__/${public_zone_name}/g" "$headlamp_manifest_path" >"$headlamp_rendered_manifest"
   bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \

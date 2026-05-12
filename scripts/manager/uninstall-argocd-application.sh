@@ -239,6 +239,34 @@ cleanup_app_specific_state() {
       delete_authentik_application_by_slug "karakeep"
       delete_openbao_global_secret "karakeep"
       ;;
+    outline)
+      delete_authentik_provider_by_name "Outline"
+      delete_authentik_application_by_slug "outline"
+      delete_openbao_global_secret "outline"
+      ;;
+    openwebui)
+      delete_authentik_provider_by_name "Open WebUI"
+      delete_authentik_application_by_slug "openwebui"
+      delete_openbao_global_secret "openwebui"
+      ;;
+    n8n)
+      delete_openbao_global_secret "n8n"
+      ;;
+    hedgedoc)
+      delete_authentik_provider_by_name "HedgeDoc"
+      delete_authentik_application_by_slug "hedgedoc"
+      delete_openbao_global_secret "hedgedoc"
+      ;;
+    paperless)
+      delete_authentik_provider_by_name "Paperless-ngx"
+      delete_authentik_application_by_slug "paperless"
+      delete_openbao_global_secret "paperless"
+      ;;
+    vaultwarden)
+      delete_authentik_provider_by_name "Vaultwarden"
+      delete_authentik_application_by_slug "vaultwarden"
+      delete_openbao_global_secret "vaultwarden"
+      ;;
     jitsi)
       delete_authentik_policy_binding_for_application_group "jitsi-openid" "admins"
       delete_authentik_policy_binding_for_application_group "jitsi-openid" "jitsi-hosts"
@@ -269,11 +297,22 @@ cleanup_app_specific_state() {
       delete_authentik_application_by_slug "pixelfed"
       delete_openbao_global_secret "pixelfed"
       ;;
+    headlamp)
+      delete_authentik_policy_binding_for_application_group "headlamp" "admins"
+      delete_authentik_provider_by_name "Headlamp"
+      delete_authentik_application_by_slug "headlamp"
+      delete_openbao_global_secret "headlamp-oidc"
+      ;;
+    twinbox-portal)
+      delete_authentik_provider_by_name "Twinbox Portal"
+      delete_authentik_application_by_slug "twinbox-portal"
+      delete_openbao_global_secret "twinbox-portal"
+      ;;
   esac
 }
 
 case "$APP_NAME" in
-  immich|nextcloud|audiobookshelf|karakeep|jitsi|opencloud|zulip|pixelfed)
+  immich|nextcloud|audiobookshelf|karakeep|outline|openwebui|hedgedoc|paperless|vaultwarden|jitsi|opencloud|zulip|pixelfed|headlamp|twinbox-portal)
     needs_authentik_cleanup=true
     ;;
   grafana|loki)
@@ -301,7 +340,11 @@ fi
 
 if [[ -d "$database_app_dir" ]]; then
   log "Deleting database resources from ${database_app_dir}"
-  kubectl delete -f "$database_app_dir" >/dev/null 2>&1 || true
+  if [[ -f "$database_app_dir/kustomization.yaml" || -f "$database_app_dir/kustomization.yml" ]]; then
+    kubectl delete -k "$database_app_dir" >/dev/null 2>&1 || true
+  else
+    kubectl delete -f "$database_app_dir" >/dev/null 2>&1 || true
+  fi
 fi
 
 if [[ "$needs_authentik_cleanup" == "true" ]]; then

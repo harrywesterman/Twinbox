@@ -346,34 +346,6 @@ application_pk="$(create_or_update_application "$application_payload")"
 paperless_platform_dir="$WORKSPACE_ROOT/gitops/platform-apps/paperless"
 paperless_app_manifest="$WORKSPACE_ROOT/gitops/apps/paperless.yaml"
 
-log "Applying Paperless-ngx namespace and secret resources"
-kubectl apply -f "$paperless_platform_dir/namespace.yaml"
-kubectl apply -f "$paperless_platform_dir/externalsecret.yaml"
-render_template \
-  "$paperless_platform_dir/ingressroute.yaml" \
-  "$paperless_rendered_ingressroute" \
-  "__ZONE_NAME__=$public_zone_name"
-kubectl apply -f "$paperless_rendered_ingressroute"
-
-wait_for_resource_ready "paperless" "externalsecret/paperless-config" "Ready" "Paperless-ngx ExternalSecret"
-
-log "Applying Paperless-ngx database manifests"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/namespace.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/paperless/externalsecret.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/paperless/cluster.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/paperless/pooler-ro.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/paperless/pooler-rw.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/paperless/scheduled-backup.yaml"
-
-wait_for_resource_ready "databases" "externalsecret/paperless-db-credentials" "Ready" "Paperless-ngx database ExternalSecret"
-wait_for_resource_ready "databases" "cluster/paperless-db" "Ready" "Paperless-ngx CloudNativePG cluster"
-wait_for_resource_ready "databases" "deployment/paperless-db-pooler-rw" "Available" "Paperless-ngx rw pooler"
-wait_for_resource_ready "databases" "deployment/paperless-db-pooler-ro" "Available" "Paperless-ngx ro pooler"
-
-bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
-  --app-id "paperless" \
-  --host "paperless-db-pooler-rw.databases.svc.cluster.local"
-
 log "Applying Paperless-ngx Argo CD application"
 render_template \
   "$paperless_app_manifest" \
@@ -384,6 +356,10 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$paperless_rendered_app_manifest" \
   --application "paperless" \
   --destination-namespace "paperless"
+
+bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
+  --app-id "paperless" \
+  --host "paperless-db-pooler-rw.databases.svc.cluster.local"
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \

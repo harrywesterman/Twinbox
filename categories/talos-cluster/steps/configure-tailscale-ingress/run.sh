@@ -96,21 +96,10 @@ if command -v kubectl &>/dev/null; then
 
   # Apply the Tailscale application
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying Tailscale application"
-  kubectl apply -f "$WORKSPACE_ROOT/gitops/apps/tailscale.yaml" 2>/dev/null || true
-  kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/tailscale/externalsecret.yaml" 2>/dev/null || true
-
-  # Wait for Tailscale operator to be ready
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for Tailscale operator"
-  for i in $(seq 1 60); do
-    if kubectl get deployment tailscale-operator -n tailscale &>/dev/null; then
-      ready="$(kubectl get deployment tailscale-operator -n tailscale -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")"
-      if [[ "$ready" -gt 0 ]]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Tailscale operator is ready"
-        break
-      fi
-    fi
-    sleep 5
-  done
+  bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+    --manifest "$WORKSPACE_ROOT/gitops/apps/tailscale.yaml" \
+    --application "tailscale" \
+    --destination-namespace "tailscale"
 
   # Step 3: Create Tailscale connector for the cluster
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating Tailscale connector"

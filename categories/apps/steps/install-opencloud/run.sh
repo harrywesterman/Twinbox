@@ -468,9 +468,8 @@ opencloud_collaboration_app_icon="${COLLABORA_HOST}/favicon.ico"
 opencloud_oc_oidc_issuer="${AUTHENTIK_HOST}/application/o/opencloud/"
 
 opencloud_secret_file="$(mktemp "${TMPDIR:-/tmp}/opencloud-bootstrap-XXXXXX")"
-opencloud_rendered_overlay="$(mktemp -d "${TMPDIR:-/tmp}/opencloud-overlay.XXXXXX")"
 opencloud_rendered_app_manifest="$(mktemp "${TMPDIR:-/tmp}/opencloud-application-XXXXXX")"
-trap 'rm -f "$opencloud_secret_file" "$opencloud_rendered_app_manifest"; rm -rf "$opencloud_rendered_overlay"' EXIT
+trap 'rm -f "$opencloud_secret_file" "$opencloud_rendered_app_manifest"' EXIT
 
 jq -n \
   --arg OC_URL "$opencloud_oc_url" \
@@ -776,12 +775,6 @@ for provider_name in "OpenCloud Desktop" "OpenCloud Android" "OpenCloud iOS" "Cy
   application_pk="$(create_or_update_application "$slug" "$application_payload")"
   [[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for ${provider_name}"
 done
-
-log "Rendering OpenCloud GitOps overlay"
-render_opencloud_overlay "$WORKSPACE_ROOT/gitops/platform-apps/opencloud" "$opencloud_rendered_overlay" "$public_zone_name"
-
-log "Applying OpenCloud GitOps overlay"
-kubectl apply -k "$opencloud_rendered_overlay"
 
 log "Applying OpenCloud Argo CD application"
 sed \

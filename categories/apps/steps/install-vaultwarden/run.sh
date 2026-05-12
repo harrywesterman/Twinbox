@@ -217,23 +217,6 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --json-file "$vaultwarden_db_secret_file" \
   --required-keys "VAULTWARDEN_POSTGRESQL__USERNAME,VAULTWARDEN_POSTGRESQL__PASSWORD"
 
-log "Applying Vaultwarden database manifests"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/namespace.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/vaultwarden/externalsecret.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/vaultwarden/cluster.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/vaultwarden/pooler-ro.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/vaultwarden/pooler-rw.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/vaultwarden/scheduled-backup.yaml"
-
-wait_for_resource_ready "databases" "externalsecret/vaultwarden-db-credentials" "Ready" "Vaultwarden database ExternalSecret"
-wait_for_resource_ready "databases" "cluster/vaultwarden-db" "Ready" "Vaultwarden CloudNativePG cluster"
-wait_for_resource_ready "databases" "deployment/vaultwarden-db-pooler-rw" "Available" "Vaultwarden rw pooler"
-wait_for_resource_ready "databases" "deployment/vaultwarden-db-pooler-ro" "Available" "Vaultwarden ro pooler"
-
-bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
-  --app-id "vaultwarden" \
-  --host "vaultwarden-db-pooler-rw.databases.svc.cluster.local"
-
 log "Provisioning Authentik OIDC client for Vaultwarden"
 authentik_ensure_token
 authentik_setup_forward
@@ -357,6 +340,10 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$vaultwarden_rendered_manifest" \
   --application "vaultwarden" \
   --destination-namespace "vaultwarden"
+
+bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
+  --app-id "vaultwarden" \
+  --host "vaultwarden-db-pooler-rw.databases.svc.cluster.local"
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \

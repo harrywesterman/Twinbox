@@ -289,44 +289,6 @@ application_payload="$(
 application_pk="$(create_or_update_application "$application_payload")"
 [[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for Outline"
 
-log "Applying Outline database manifests"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/namespace.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/outline/externalsecret.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/outline/cluster.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/outline/pooler-ro.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/outline/pooler-rw.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/outline/pooler-rw-session.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/outline/scheduled-backup.yaml"
-
-wait_for_resource_ready "databases" "externalsecret/outline-db-credentials" "Ready" "Outline database ExternalSecret"
-wait_for_resource_ready "databases" "cluster/outline-db" "Ready" "Outline CloudNativePG cluster"
-wait_for_resource_ready "databases" "deployment/outline-db-pooler-ro" "Available" "Outline read-only pooler"
-wait_for_resource_ready "databases" "deployment/outline-db-pooler-rw" "Available" "Outline read-write pooler"
-wait_for_resource_ready "databases" "deployment/outline-db-pooler-rw-session" "Available" "Outline session pooler"
-
-bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
-  --app-id "outline" \
-  --host "outline-db-pooler-rw-session.databases.svc.cluster.local"
-
-log "Applying Outline namespace, storage, secrets, cache, and ingress"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/outline/namespace.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/outline/pvc.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/outline/externalsecret.yaml"
-wait_for_resource_ready "outline" "externalsecret/outline-bootstrap" "Ready" "Outline application ExternalSecret"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/outline/redis-pvc.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/outline/redis.yaml"
-render_template \
-  "$WORKSPACE_ROOT/gitops/platform-apps/outline/deployment.yaml" \
-  "$outline_rendered_deployment" \
-  "__ZONE_NAME__=$public_zone_name"
-kubectl apply -f "$outline_rendered_deployment"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/outline/service.yaml"
-render_template \
-  "$WORKSPACE_ROOT/gitops/platform-apps/outline/ingressroute.yaml" \
-  "$outline_rendered_ingressroute" \
-  "__ZONE_NAME__=$public_zone_name"
-kubectl apply -f "$outline_rendered_ingressroute"
-
 log "Applying Outline Argo CD application"
 sed "s/__ZONE_NAME__/${public_zone_name}/g" \
   "$WORKSPACE_ROOT/gitops/apps/outline.yaml" >"$outline_rendered_manifest"
@@ -335,6 +297,10 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$outline_rendered_manifest" \
   --application "outline" \
   --destination-namespace "outline"
+
+bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
+  --app-id "outline" \
+  --host "outline-db-pooler-rw-session.databases.svc.cluster.local"
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \

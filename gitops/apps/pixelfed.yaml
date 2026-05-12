@@ -5,111 +5,114 @@ metadata:
   namespace: argocd
 spec:
   project: default
-  source:
-    repoURL: __REPO_URL__
-    targetRevision: __TARGET_REVISION__
-    path: gitops/platform-apps/pixelfed
-    kustomize:
-      patches:
-        - target:
-            kind: IngressRoute
-            name: pixelfed
-          patch: |-
-            - op: replace
-              path: /spec/routes/0/match
-              value: Host(`pixelfed.__ZONE_NAME__`)
-        - target:
-            kind: IngressRoute
-            name: pixelfed-wiredoor
-          patch: |-
-            - op: replace
-              path: /spec/routes/0/match
-              value: Host(`pixelfed.__ZONE_NAME__`)
-        - target:
-            kind: IngressRoute
-            name: pixelfed-tailscale
-          patch: |-
-            - op: replace
-              path: /spec/routes/0/match
-              value: Host(`pixelfed.__ZONE_NAME__`)
-        - target:
-            kind: Deployment
-            name: pixelfed
-          patch: |-
-            apiVersion: apps/v1
-            kind: Deployment
-            metadata:
+  sources:
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      path: gitops/platform-apps/pixelfed
+      kustomize:
+        patches:
+          - target:
+              kind: IngressRoute
               name: pixelfed
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: pixelfed
-                      env:
-                        - name: APP_URL
-                          value: https://pixelfed.__ZONE_NAME__
-                        - name: APP_DOMAIN
-                          value: pixelfed.__ZONE_NAME__
-                        - name: ADMIN_DOMAIN
-                          value: pixelfed.__ZONE_NAME__
-                        - name: SESSION_DOMAIN
-                          value: pixelfed.__ZONE_NAME__
-                        - name: MAIL_FROM_ADDRESS
-                          value: no-reply@pixelfed.__ZONE_NAME__
-                        - name: INSTANCE_CONTACT_EMAIL
-                          value: admin@pixelfed.__ZONE_NAME__
-        - target:
-            kind: Deployment
-            name: pixelfed-worker
-          patch: |-
-            apiVersion: apps/v1
-            kind: Deployment
-            metadata:
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`pixelfed.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: pixelfed-wiredoor
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`pixelfed.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: pixelfed-tailscale
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`pixelfed.__ZONE_NAME__`)
+          - target:
+              kind: Deployment
+              name: pixelfed
+            patch: |-
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: pixelfed
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - name: pixelfed
+                        env:
+                          - name: APP_URL
+                            value: https://pixelfed.__ZONE_NAME__
+                          - name: APP_DOMAIN
+                            value: pixelfed.__ZONE_NAME__
+                          - name: ADMIN_DOMAIN
+                            value: pixelfed.__ZONE_NAME__
+                          - name: SESSION_DOMAIN
+                            value: pixelfed.__ZONE_NAME__
+                          - name: MAIL_FROM_ADDRESS
+                            value: no-reply@pixelfed.__ZONE_NAME__
+                          - name: INSTANCE_CONTACT_EMAIL
+                            value: admin@pixelfed.__ZONE_NAME__
+          - target:
+              kind: Deployment
               name: pixelfed-worker
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: pixelfed-worker
-                      env:
-                        - name: APP_URL
-                          value: https://pixelfed.__ZONE_NAME__
-                        - name: APP_DOMAIN
-                          value: pixelfed.__ZONE_NAME__
-                        - name: ADMIN_DOMAIN
-                          value: pixelfed.__ZONE_NAME__
-                        - name: SESSION_DOMAIN
-                          value: pixelfed.__ZONE_NAME__
-                        - name: MAIL_FROM_ADDRESS
-                          value: no-reply@pixelfed.__ZONE_NAME__
-                        - name: INSTANCE_CONTACT_EMAIL
-                          value: admin@pixelfed.__ZONE_NAME__
-        - target:
-            kind: Deployment
-            name: pixelfed-scheduler
-          patch: |-
-            apiVersion: apps/v1
-            kind: Deployment
-            metadata:
+            patch: |-
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: pixelfed-worker
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - name: pixelfed-worker
+                        env:
+                          - name: APP_URL
+                            value: https://pixelfed.__ZONE_NAME__
+                          - name: APP_DOMAIN
+                            value: pixelfed.__ZONE_NAME__
+                          - name: ADMIN_DOMAIN
+                            value: pixelfed.__ZONE_NAME__
+                          - name: SESSION_DOMAIN
+                            value: pixelfed.__ZONE_NAME__
+                          - name: MAIL_FROM_ADDRESS
+                            value: no-reply@pixelfed.__ZONE_NAME__
+                          - name: INSTANCE_CONTACT_EMAIL
+                            value: admin@pixelfed.__ZONE_NAME__
+          - target:
+              kind: Deployment
               name: pixelfed-scheduler
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: pixelfed-scheduler
-                      env:
-                        - name: APP_URL
-                          value: https://pixelfed.__ZONE_NAME__
-                        - name: APP_DOMAIN
-                          value: pixelfed.__ZONE_NAME__
-                        - name: ADMIN_DOMAIN
-                          value: pixelfed.__ZONE_NAME__
-                        - name: SESSION_DOMAIN
-                          value: pixelfed.__ZONE_NAME__
-                        - name: MAIL_FROM_ADDRESS
-                          value: no-reply@pixelfed.__ZONE_NAME__
-                        - name: INSTANCE_CONTACT_EMAIL
-                          value: admin@pixelfed.__ZONE_NAME__
+            patch: |-
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: pixelfed-scheduler
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - name: pixelfed-scheduler
+                        env:
+                          - name: APP_URL
+                            value: https://pixelfed.__ZONE_NAME__
+                          - name: APP_DOMAIN
+                            value: pixelfed.__ZONE_NAME__
+                          - name: ADMIN_DOMAIN
+                            value: pixelfed.__ZONE_NAME__
+                          - name: SESSION_DOMAIN
+                            value: pixelfed.__ZONE_NAME__
+                          - name: MAIL_FROM_ADDRESS
+                            value: no-reply@pixelfed.__ZONE_NAME__
+                          - name: INSTANCE_CONTACT_EMAIL
+                            value: admin@pixelfed.__ZONE_NAME__
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      path: gitops/databases/pixelfed
   destination:
     server: https://kubernetes.default.svc
     namespace: pixelfed

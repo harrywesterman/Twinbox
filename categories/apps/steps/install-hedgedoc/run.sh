@@ -279,43 +279,6 @@ application_payload="$(
 application_pk="$(create_or_update_application "$application_payload")"
 [[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for HedgeDoc"
 
-log "Applying HedgeDoc namespace and database manifests"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/hedgedoc/namespace.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/namespace.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/hedgedoc/externalsecret.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/hedgedoc/cluster.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/hedgedoc/pooler-ro.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/hedgedoc/pooler-rw.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/hedgedoc/pooler-rw-session.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/hedgedoc/scheduled-backup.yaml"
-
-wait_for_resource_ready "databases" "externalsecret/hedgedoc-db-credentials" "Ready" "HedgeDoc database ExternalSecret"
-wait_for_resource_ready "databases" "cluster/hedgedoc-db" "Ready" "HedgeDoc CloudNativePG cluster"
-wait_for_resource_ready "databases" "deployment/hedgedoc-db-pooler-ro" "Available" "HedgeDoc read-only pooler"
-wait_for_resource_ready "databases" "deployment/hedgedoc-db-pooler-rw" "Available" "HedgeDoc read-write pooler"
-wait_for_resource_ready "databases" "deployment/hedgedoc-db-pooler-rw-session" "Available" "HedgeDoc session pooler"
-
-bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
-  --app-id "hedgedoc" \
-  --host "hedgedoc-db-pooler-rw-session.databases.svc.cluster.local"
-
-log "Applying HedgeDoc app namespace, storage, secrets, and ingress"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/hedgedoc/pvc.yaml"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/hedgedoc/externalsecret.yaml"
-render_template \
-  "$WORKSPACE_ROOT/gitops/platform-apps/hedgedoc/deployment.yaml" \
-  "$hedgedoc_rendered_deployment" \
-  "$public_zone_name"
-kubectl apply -f "$hedgedoc_rendered_deployment"
-kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/hedgedoc/service.yaml"
-render_template \
-  "$WORKSPACE_ROOT/gitops/platform-apps/hedgedoc/ingressroute.yaml" \
-  "$hedgedoc_rendered_ingressroute" \
-  "$public_zone_name"
-kubectl apply -f "$hedgedoc_rendered_ingressroute"
-
-wait_for_resource_ready "hedgedoc" "externalsecret/hedgedoc-bootstrap" "Ready" "HedgeDoc application ExternalSecret"
-
 log "Applying HedgeDoc Argo CD application"
 sed "s/__ZONE_NAME__/${public_zone_name}/g" \
   "$WORKSPACE_ROOT/gitops/apps/hedgedoc.yaml" >"$hedgedoc_rendered_manifest"
@@ -324,6 +287,10 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$hedgedoc_rendered_manifest" \
   --application "hedgedoc" \
   --destination-namespace "hedgedoc"
+
+bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
+  --app-id "hedgedoc" \
+  --host "hedgedoc-db-pooler-rw-session.databases.svc.cluster.local"
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \
