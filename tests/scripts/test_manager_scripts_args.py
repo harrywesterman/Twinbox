@@ -752,7 +752,7 @@ def test_crowdsec_step_seeds_bouncer_secret_and_applies_gitops_app():
     assert 'wait_for_resource_ready "crowdsec" "externalsecret/crowdsec-lapi-secrets"' in step_text
     assert 'wait_for_application_ready "crowdsec"' in step_text
     assert "chart: crowdsec" in crowdsec_app_text
-    assert 'targetRevision: "0.23.0"' in crowdsec_app_text
+    assert 'targetRevision: "0.24.0"' in crowdsec_app_text
     assert "$values/gitops/values/crowdsec.yaml" in crowdsec_app_text
     assert "namespace: crowdsec" in crowdsec_app_text
     assert "managedNamespaceMetadata:" in crowdsec_app_text
