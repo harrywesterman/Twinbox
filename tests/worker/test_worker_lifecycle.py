@@ -5,6 +5,8 @@ import tempfile
 import time
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -336,8 +338,6 @@ def test_worker_recovers_orphaned_running_run_step_job_on_startup():
             proc.terminate()
             proc.wait(timeout=5)
 
-
-import pytest
 
 @pytest.mark.skip(reason="flaky: kubectl EPIPE in CI, passes locally")
 def test_worker_reconciles_grafana_dashboard_on_startup():
