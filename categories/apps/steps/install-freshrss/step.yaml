@@ -2,11 +2,9 @@ id: install-freshrss
 title: Install FreshRSS
 type: action
 journey_stage: setup
-order: 86
 summary: Keep all your news feeds and blogs in one place.
 explanation: FreshRSS is a lightweight, self-hosted feed reader. Add your favorite websites, blogs, and news sources and stay up to date without visiting each site individually. Read everything in a clean timeline, with read-later and star features to organize articles.
 side_help: Perfect if you want more control over the sources you follow and prefer to avoid newsletters or algorithmic timelines.
-depends_on: []
 dashy:
   items:
     - section: Apps

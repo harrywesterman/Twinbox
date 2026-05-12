@@ -2,17 +2,9 @@ id: install-openwebui
 title: Install Open WebUI
 type: action
 journey_stage: setup
-order: 83
 summary: A private chat environment for AI models.
 explanation: Open WebUI gives you a user-friendly interface to chat with AI models you host yourself. Ask questions, summarize texts, or generate ideas — all within your own environment. Team members can log in with the same account and participate in the same conversation.
 side_help: Ideal if you want to leverage AI capabilities without sending data to external services.
-depends_on:
-  - install-longhorn-storage
-  - install-cloudnativepg
-  - install-secret-sync
-  - install-authentik-idp
-  - create-users-and-groups
-  - choose-ingress-route
 dashy:
   items:
     - section: Apps

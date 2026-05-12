@@ -2,12 +2,9 @@ id: install-tempo
 title: Install Tempo
 type: action
 journey_stage: setup
-order: 56
 summary: Apply Tempo so Grafana has a trace backend for the new observability stack.
 explanation: Twinbox installs Grafana Tempo through Argo CD as the trace store for the cluster. The step uses Longhorn-backed persistence and the monolithic Tempo chart so Grafana can query traces without introducing another moving part in the first pass.
 side_help: Tempo stores and queries traces for Grafana Explore.
-depends_on:
-  - install-longhorn-storage
 inputs: []
 secrets:
   files:

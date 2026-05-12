@@ -2,16 +2,9 @@ id: install-immich
 title: Install Immich
 type: action
 journey_stage: setup
-order: 70
 summary: Back up your photos and videos privately on your own server.
 explanation: Immich is your personal photo library. Install the mobile app on your phone and your photos and videos will be synced automatically. You get a clean timeline, albums, and search features — just like big cloud services, but fully under your own control.
 side_help: The easiest way to safely back up your entire camera roll without handing your memories over to external parties.
-depends_on:
-  - install-longhorn-storage
-  - install-cloudnativepg
-  - install-secret-sync
-  - install-authentik-idp
-  - choose-ingress-route
 dashy:
   items:
     - section: Platform

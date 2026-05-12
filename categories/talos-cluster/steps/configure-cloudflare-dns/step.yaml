@@ -2,7 +2,6 @@ id: configure-cloudflare-dns
 title: Configure Cloudflare DNS Records (Wiredoor)
 type: action
 journey_stage: setup
-order: 34
 summary: Create DNS A records for the Wiredoor bastion in Cloudflare via external-dns.
 explanation: >
   This step creates DNSEndpoint resources in the cluster for the Wiredoor bastion
@@ -14,10 +13,6 @@ side_help: >
   needs to know the Wiredoor bastion IP address (which Twinbox reads from the
   bastion secrets). The DNS records will be created by external-dns running in
   the cluster.
-depends_on:
-  - choose-ingress-route
-  - provision-wiredoor-bastion
-  - configure-dns
 ingress_route: wiredoor
 inputs: []
 secrets:

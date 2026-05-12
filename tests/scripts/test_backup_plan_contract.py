@@ -89,7 +89,6 @@ def test_management_vm_backup_installs_host_cron_without_embedding_secrets():
     assert "AWS_SECRET_ACCESS_KEY" not in cron_template
 
     assert "id: install-management-backup" in step_text
-    assert "install-velero-backup" in step_text
     assert "TWINBOX_TALOSCONFIG_FILE" in step_text
     assert "attachment: talosconfig" in step_text
 

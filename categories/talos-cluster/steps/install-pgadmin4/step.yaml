@@ -2,15 +2,9 @@ id: install-pgadmin4
 title: Install pgAdmin 4
 type: action
 journey_stage: setup
-order: 60
 summary: Install pgAdmin 4 with Longhorn storage and Authentik OIDC access.
 explanation: Twinbox provisions pgAdmin 4 as a GitOps application with persistent Longhorn storage, exposes it through Traefik at pgadmin4.__ZONE_NAME__, and registers a native Authentik OIDC provider that only members of the admins group can use.
 side_help: pgAdmin 4 gives the cluster a dedicated PostgreSQL administration UI without exposing internal database passwords to unauthorised users.
-depends_on:
-  - install-secret-sync
-  - install-authentik-idp
-  - create-users-and-groups
-  - choose-ingress-route
 dashy:
   items:
     - section: Platform

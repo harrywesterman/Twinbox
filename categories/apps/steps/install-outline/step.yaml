@@ -2,16 +2,9 @@ id: install-outline
 title: Install Outline
 type: action
 journey_stage: setup
-order: 77
 summary: Build a shared knowledge base for your team.
 explanation: Outline is a modern wiki and knowledge base where your team can create and maintain documentation, guides, and processes. With a clean editor, access control, and search, you ensure knowledge is always findable and never lost in email or chat.
 side_help: Essential for teams that want to build and share structured documentation.
-depends_on:
-  - install-longhorn-storage
-  - install-cloudnativepg
-  - install-secret-sync
-  - install-authentik-idp
-  - choose-ingress-route
 dashy:
   items:
     - section: Platform

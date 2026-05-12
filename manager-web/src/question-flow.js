@@ -19,7 +19,6 @@ const QUESTION_STEP_DEFS = [
     title: "Deploy Talos Cluster",
     type: "action",
     journey_stage: "setup",
-    order: 10,
     summary: "Install Talos Linux on separate VMs on the cluster.",
     explanation:
       "Talos Linux is the immutable, Kubernetes-focused operating system that Twinbox uses. This page collects the cluster sizing, placement, and network values before the long installation starts.",
@@ -145,7 +144,6 @@ const QUESTION_STEP_DEFS = [
     title: "Configure DNS Provider",
     type: "config",
     journey_stage: "setup",
-    order: 15,
     summary: "Enter your DNS provider details so Twinbox can manage DNS records automatically.",
     explanation:
       "Twinbox uses external-dns to create and update DNS records in your provider. Your API token is stored in a Kubernetes Secret in the cluster.",
@@ -193,7 +191,6 @@ const QUESTION_STEP_DEFS = [
     title: "Choose Ingress Route",
     type: "config",
     journey_stage: "setup",
-    order: 22,
     summary: "Choose which ingress branch Twinbox should expose for this cluster.",
     explanation:
       "This page records the ingress strategy you want to use. The DNS domain was already configured in the previous step.",
@@ -221,7 +218,6 @@ const QUESTION_STEP_DEFS = [
     title: "Deploy Wiredoor Bastion Host",
     type: "action",
     journey_stage: "setup",
-    order: 32,
     ingress_route: "wiredoor",
     summary: "Provision a Wiredoor bastion host on Hetzner Cloud for external access.",
     explanation:
@@ -281,7 +277,6 @@ const QUESTION_STEP_DEFS = [
     title: "Configure Wiredoor Ingress",
     type: "action",
     journey_stage: "setup",
-    order: 34,
     ingress_route: "wiredoor",
     summary: "Set up Wiredoor tunnel access to the cluster.",
     explanation:
@@ -316,7 +311,6 @@ const QUESTION_STEP_DEFS = [
     title: "Configure Cloudflare DNS",
     type: "action",
     journey_stage: "setup",
-    order: 36,
     ingress_route: "wiredoor",
     summary: "Configure DNS records in Cloudflare for the Wiredoor host.",
     explanation:
@@ -344,7 +338,6 @@ const QUESTION_STEP_DEFS = [
     title: "Configure Cloudflare Tunnel",
     type: "action",
     journey_stage: "setup",
-    order: 38,
     ingress_route: "cloudflare-tunnel",
     summary: "Expose services through a Cloudflare Tunnel.",
     explanation:
@@ -380,7 +373,6 @@ const QUESTION_STEP_DEFS = [
     title: "Configure MetalLB Ingress",
     type: "action",
     journey_stage: "setup",
-    order: 40,
     ingress_route: "metallb",
     summary: "Expose services using MetalLB load balancer with port forwarding.",
     explanation:
@@ -423,7 +415,6 @@ const QUESTION_STEP_DEFS = [
     title: "Configure Tailscale Ingress",
     type: "action",
     journey_stage: "setup",
-    order: 42,
     ingress_route: "tailscale",
     summary: "Expose services through a Tailscale tailnet.",
     explanation:
@@ -466,7 +457,6 @@ const QUESTION_STEP_DEFS = [
     title: "Create Users and Groups",
     type: "action",
     journey_stage: "setup",
-    order: 44,
     summary: "Create the first Authentik user and admin group.",
     explanation: "This page collects the first account details Twinbox will use for Authentik.",
     side_help:

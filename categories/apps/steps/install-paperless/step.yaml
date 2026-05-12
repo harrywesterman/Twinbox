@@ -2,17 +2,9 @@ id: install-paperless
 title: Install Paperless
 type: action
 journey_stage: setup
-order: 74
 summary: Turn your paper administration into a searchable digital archive.
 explanation: Paperless-ngx helps you scan, recognize, and index letters, invoices, and documents. Upload a PDF or scan, and the system reads the content so you can search it later. This keeps your administration organized and always within reach.
 side_help: Perfect if you want a paperless office and need to retrieve old documents quickly.
-depends_on:
-  - install-longhorn-storage
-  - install-cloudnativepg
-  - install-secret-sync
-  - install-authentik-idp
-  - create-users-and-groups
-  - choose-ingress-route
 dashy:
   items:
     - section: Platform

@@ -11,15 +11,7 @@ function matchesQuery(card, query) {
     return true;
   }
 
-  const haystacks = [
-    card.title,
-    card.summary,
-    card.description,
-    card.app_state,
-    ...(Array.isArray(card.dependencies)
-      ? card.dependencies.map((dependency) => dependency.title || dependency.id)
-      : []),
-  ];
+  const haystacks = [card.title, card.summary, card.description, card.app_state];
 
   return haystacks.some((value) => normalizeSearchValue(value).includes(query));
 }
@@ -33,7 +25,6 @@ function buildStateCounts(cards) {
     },
     {
       planned: 0,
-      blocked: 0,
       ready: 0,
       installing: 0,
       installed: 0,
@@ -67,21 +58,19 @@ function normalizeBundleCard(bundle = {}, cardsById = new Map()) {
   const installedCount = bundleCards.filter((card) => card.app_state === "installed").length;
   const installingCount = bundleCards.filter((card) => card.app_state === "installing").length;
   const readyCount = bundleCards.filter((card) => card.app_state === "ready").length;
-  const blockedCount = bundleCards.filter(
-    (card) => card.app_state === "blocked" || card.app_state === "planned"
-  ).length;
+  const plannedCount = bundleCards.filter((card) => card.app_state === "planned").length;
   const sourceCard =
     bundleCards.find((card) => card.iconUrl || card.iconArtworkUrl) || bundleCards[0] || null;
   const status =
     installingCount > 0
       ? "installing"
-      : blockedCount > 0
-        ? "blocked"
-        : installedCount === bundleCards.length && bundleCards.length > 0
-          ? "installed"
-          : readyCount > 0
-            ? "ready"
-            : "planned";
+      : installedCount === bundleCards.length && bundleCards.length > 0
+        ? "installed"
+        : readyCount > 0
+          ? "ready"
+          : plannedCount > 0
+            ? "planned"
+            : "ready";
 
   return {
     ...bundle,
@@ -105,7 +94,7 @@ function normalizeBundleCard(bundle = {}, cardsById = new Map()) {
     installedCount,
     installingCount,
     readyCount,
-    blockedCount,
+    plannedCount,
     searchText: [
       bundle.title,
       bundle.summary,

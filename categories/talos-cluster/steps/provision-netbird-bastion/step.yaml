@@ -1,7 +1,6 @@
 id: provision-netbird-bastion
 title: Deploy NetBird Bastion Host
 type: action
-order: 32
 journey_stage: setup
 summary: Provision a self-hosted NetBird VPS on Hetzner Cloud.
 explanation: >
@@ -14,9 +13,6 @@ side_help: >
   Twinbox creates netbird and proxy DNS records pointing at the new VPS.
   Twinbox automatically sets up the first NetBird admin account and generates
   a Personal Access Token for the next step.
-depends_on:
-  - provision-nodes
-  - choose-ingress-route
 ingress_route: netbird
 inputs:
   - id: hcloud_token

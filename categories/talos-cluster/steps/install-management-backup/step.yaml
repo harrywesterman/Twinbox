@@ -2,12 +2,9 @@ id: install-management-backup
 title: Install Management VM backup
 type: action
 journey_stage: setup
-order: 66
 summary: Schedule daily Management VM backups for Talos etcd snapshots and /opt/twinbox.
 explanation: Twinbox writes a host cron file on the Management VM that takes a daily Talos etcd snapshot and backs it up with restic to the SeaweedFS S3 target. It also backs up /opt/twinbox daily while excluding SeaweedFS object data to avoid backing the backup store into itself.
 side_help: This protects the Management VM runtime state and the Talos control-plane data that live outside regular Kubernetes resource backups.
-depends_on:
-  - install-velero-backup
 inputs: []
 secrets:
   files:

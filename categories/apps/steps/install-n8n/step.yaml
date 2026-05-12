@@ -2,16 +2,9 @@ id: install-n8n
 title: Install N8N
 type: action
 journey_stage: setup
-order: 82
 summary: Automate tasks and connect your favorite apps together.
 explanation: "n8n is a visual workflow automation tool. Build automation chains with a drag-and-drop interface: from moving files and sending notifications to syncing data between different services. You decide which steps are executed in sequence."
 side_help: Save time by automating repetitive tasks and connecting your services in smart ways.
-depends_on:
-  - install-longhorn-storage
-  - install-cloudnativepg
-  - install-secret-sync
-  - install-authentik-idp
-  - choose-ingress-route
 dashy:
   items:
     - section: Apps

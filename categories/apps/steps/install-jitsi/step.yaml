@@ -2,15 +2,9 @@ id: install-jitsi
 title: Install Jitsi
 type: action
 journey_stage: setup
-order: 88
 summary: Start secure video calls without needing an account.
 explanation: Jitsi Meet is a video conferencing solution that lets you start a meeting room with one click. Share the link with your guests and talk right away — no account needed. Built-in screen sharing and chat make it suitable for meetings, webinars, and online collaboration.
 side_help: A solid choice if you want quick, hassle-free video calls with colleagues, family, or clients.
-depends_on:
-  - install-secret-sync
-  - install-authentik-idp
-  - create-users-and-groups
-  - choose-ingress-route
 dashy:
   items:
     - section: Apps

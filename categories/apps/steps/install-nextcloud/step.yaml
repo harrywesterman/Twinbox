@@ -2,11 +2,9 @@ id: install-nextcloud
 title: Install Nextcloud
 type: action
 journey_stage: setup
-order: 68
 summary: Your own private cloud for files, calendars, and collaboration.
 explanation: Nextcloud is a comprehensive platform for file storage, sync, and teamwork. Store documents securely, share folders with colleagues, manage shared calendars, and use built-in chat and video calls. Everything runs on your own infrastructure, giving you full control over your data.
 side_help: The central hub for teams that want to share files and collaborate without relying on public cloud providers.
-depends_on: []
 dashy:
   items:
     - section: Platform

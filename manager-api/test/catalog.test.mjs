@@ -186,9 +186,6 @@ test("app catalog exposes apps while the wizard catalog keeps them out of sight"
     });
     assert.equal(appCatalog.active_cluster.id, "cluster-1");
     assert.equal(appCatalog.categories[0].id, "apps");
-    const opencloudCard = appCatalog.categories[0].steps.find(
-      (step) => step.id === "install-opencloud"
-    );
     const nextcloudCard = appCatalog.categories[0].steps.find(
       (step) => step.id === "install-nextcloud"
     );
@@ -196,14 +193,9 @@ test("app catalog exposes apps while the wizard catalog keeps them out of sight"
     const pixelfedCard = appCatalog.categories[0].steps.find(
       (step) => step.id === "install-pixelfed"
     );
-    const audiobookshelfCard = appCatalog.categories[0].steps.find(
-      (step) => step.id === "install-audiobookshelf"
-    );
-    const n8nCard = appCatalog.categories[0].steps.find((step) => step.id === "install-n8n");
     const freshrssCard = appCatalog.categories[0].steps.find(
       (step) => step.id === "install-freshrss"
     );
-    const zulipCard = appCatalog.categories[0].steps.find((step) => step.id === "install-zulip");
     const vaultwardenCard = appCatalog.categories[0].steps.find(
       (step) => step.id === "install-vaultwarden"
     );
@@ -219,48 +211,14 @@ test("app catalog exposes apps while the wizard catalog keeps them out of sight"
     assert.equal(nextcloudCard?.runner?.script, "categories/apps/steps/install-nextcloud/run.sh");
     assert.equal(immichCard?.title, "Install Immich");
     assert.equal(immichCard?.app_state, "ready");
-    assert.deepEqual(immichCard?.depends_on, [
-      "install-longhorn-storage",
-      "install-cloudnativepg",
-      "install-secret-sync",
-      "install-authentik-idp",
-      "choose-ingress-route",
-    ]);
     assert.equal(immichCard?.runner?.script, "categories/apps/steps/install-immich/run.sh");
     assert.equal(pixelfedCard?.title, "Install Pixelfed");
     assert.equal(pixelfedCard?.placeholder, false);
     assert.equal(pixelfedCard?.installable, true);
-    assert.deepEqual(pixelfedCard?.depends_on, [
-      "install-longhorn-storage",
-      "install-cloudnativepg",
-      "install-secret-sync",
-      "choose-ingress-route",
-    ]);
     assert.equal(pixelfedCard?.runner?.script, "categories/apps/steps/install-pixelfed/run.sh");
-    assert.deepEqual(opencloudCard?.depends_on, [
-      "install-longhorn-storage",
-      "install-secret-sync",
-      "install-authentik-idp",
-      "create-users-and-groups",
-      "choose-ingress-route",
-    ]);
-    assert.deepEqual(audiobookshelfCard?.depends_on, [
-      "install-longhorn-storage",
-      "install-secret-sync",
-      "install-authentik-idp",
-      "create-users-and-groups",
-      "choose-ingress-route",
-    ]);
     assert.equal(vaultwardenCard?.title, "Install Vaultwarden");
     assert.equal(vaultwardenCard?.placeholder, false);
     assert.equal(vaultwardenCard?.installable, true);
-    assert.deepEqual(vaultwardenCard?.depends_on, [
-      "install-longhorn-storage",
-      "install-cloudnativepg",
-      "install-secret-sync",
-      "choose-ingress-route",
-      "install-authentik-idp",
-    ]);
     assert.equal(
       vaultwardenCard?.runner?.script,
       "categories/apps/steps/install-vaultwarden/run.sh"
@@ -268,27 +226,11 @@ test("app catalog exposes apps while the wizard catalog keeps them out of sight"
     assert.equal(hedgedocCard?.title, "Install HedgeDoc");
     assert.equal(hedgedocCard?.placeholder, false);
     assert.equal(hedgedocCard?.installable, true);
-    assert.deepEqual(hedgedocCard?.depends_on, [
-      "install-longhorn-storage",
-      "install-cloudnativepg",
-      "install-secret-sync",
-      "install-authentik-idp",
-      "choose-ingress-route",
-    ]);
     assert.equal(hedgedocCard?.runner?.script, "categories/apps/steps/install-hedgedoc/run.sh");
-    assert.deepEqual(n8nCard?.depends_on, [
-      "install-longhorn-storage",
-      "install-cloudnativepg",
-      "install-secret-sync",
-      "install-authentik-idp",
-      "choose-ingress-route",
-    ]);
     assert.equal(freshrssCard?.title, "Install FreshRSS");
     assert.equal(freshrssCard?.placeholder, false);
     assert.equal(freshrssCard?.installable, true);
     assert.equal(freshrssCard?.app_state, "ready");
-    assert.deepEqual(freshrssCard?.depends_on, []);
-    assert.deepEqual(zulipCard?.depends_on, []);
     assert.equal(freshrssCard?.runner?.script, "categories/apps/steps/install-freshrss/run.sh");
     assert.equal(mijnBureauBundle?.title, "Mijn Bureau");
     assert.equal(mijnBureauBundle?.iconUrl, "/assets/step-icons/install-nextcloud.svg");

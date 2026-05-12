@@ -2,16 +2,9 @@ id: install-vaultwarden
 title: Install Vaultwarden
 type: action
 journey_stage: setup
-order: 82
 summary: Manage all your passwords securely in one central place.
 explanation: Vaultwarden is a lightweight password manager that lets you store and sync all your login credentials securely. Use browser extensions and mobile apps to auto-fill everywhere. Everything is encrypted and only you hold the key.
 side_help: "Essential for a secure online workflow: unique, strong passwords for all your accounts without having to remember them."
-depends_on:
-  - install-longhorn-storage
-  - install-cloudnativepg
-  - install-secret-sync
-  - choose-ingress-route
-  - install-authentik-idp
 dashy:
   items:
     - section: Platform

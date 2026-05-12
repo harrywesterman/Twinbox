@@ -2,14 +2,9 @@ id: install-searxng
 title: Install SearXNG
 type: action
 journey_stage: setup
-order: 87
 summary: Search the web privately through your own meta-search engine.
 explanation: SearXNG combines search results from multiple sources into one clean overview. Your queries are not stored or profiled, so you can explore the web anonymously and without a filter bubble. You can choose which search engines are used.
 side_help: Useful if you value privacy when searching the web and want to avoid tracking.
-depends_on:
-  - install-longhorn-storage
-  - install-secret-sync
-  - choose-ingress-route
 dashy:
   items:
     - section: Apps
