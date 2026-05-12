@@ -1872,6 +1872,8 @@ def test_grafana_managed_overview_dashboard_is_rewritten_for_twinbox():
     assert '["${datasource}", "Prometheus"],' in helper_text
     assert '["${VAR_JOB}", "node-exporter"],' in helper_text
     assert "'cluster_name=\"$cluster\"', 'cluster_name=~\".*\"'" in helper_text
+    assert "rewriteNodeExporterCpuQuery" in helper_text
+    assert 'replace(/cluster_name="\\$cluster"/g, "")' in helper_text
     assert 'next.name === "datasource"' in helper_text
     assert '.regex = ".*"' in helper_text
     assert "refresh-grafana-dashboard.mjs" in grafana_step_text

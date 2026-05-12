@@ -187,6 +187,20 @@ function rewriteDashboardStrings(value) {
   ]);
   const substitutions = [['cluster_name="$cluster"', 'cluster_name=~".*"']];
 
+  const rewriteNodeExporterCpuQuery = (expr) =>
+    expr.replace(/(node_cpu_[a-zA-Z0-9_]+)\{([^}]*)\}/g, (match, metricName, inner) => {
+      if (!inner.includes('cluster_name="$cluster"')) {
+        return match;
+      }
+
+      const rewrittenInner = inner
+        .replace(/,\s*cluster_name="\$cluster"/g, "")
+        .replace(/cluster_name="\$cluster",\s*/g, "")
+        .replace(/cluster_name="\$cluster"/g, "");
+
+      return `${metricName}{${rewrittenInner}}`;
+    });
+
   if (Array.isArray(value)) {
     return value.map((entry) => rewriteDashboardStrings(entry));
   }
@@ -230,6 +244,8 @@ function rewriteDashboardStrings(value) {
     for (const [from, to] of substitutions) {
       next = next.split(from).join(to);
     }
+
+    next = rewriteNodeExporterCpuQuery(next);
 
     return replacements.get(next) || next;
   }
