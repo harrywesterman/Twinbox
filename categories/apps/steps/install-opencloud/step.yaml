@@ -2,16 +2,9 @@ id: install-opencloud
 title: Install OpenCloud
 type: action
 journey_stage: setup
-order: 69
 summary: Files, document editing, calendar, and contacts in one place.
 explanation: OpenCloud offers a complete productivity and collaboration suite. Store and share files, edit documents directly in the browser with Collabora, and manage your calendars and contacts with Radicale. With a single login you get access to everything you need for daily work.
 side_help: Suitable if you are looking for an alternative to commercial office suites and want to host everything locally.
-depends_on:
-  - install-longhorn-storage
-  - install-secret-sync
-  - install-authentik-idp
-  - create-users-and-groups
-  - choose-ingress-route
 dashy:
   items:
     - section: Platform

@@ -2,13 +2,9 @@ id: install-management-consoles
 title: Install Management consoles
 type: action
 journey_stage: setup
-order: 48
 summary: Publish the operator web consoles and wire them into Authentik after the portal and Dashy are online.
 explanation: Twinbox groups the operator consoles directly after the user portal and legacy admin launcher so the Traefik, Longhorn, Proxmox, and SeaweedFS web UIs can be published, registered as Authentik proxy applications, and protected with the shared admin policy in the same post-ingress operator phase.
 side_help: Management consoles are grouped as a dedicated phase so the wizard can keep operator tools separate from core infra.
-depends_on:
-  - install-twinbox-portal
-  - install-dashy-dashboard
 dashy:
   items:
     - section: Platform

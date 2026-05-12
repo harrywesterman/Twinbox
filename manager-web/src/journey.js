@@ -18,6 +18,7 @@ const FIXED_SETUP_STEP_IDS = [
   "install-crowdsec",
   "install-traefik",
   "install-cloudnativepg",
+  "configure-dns",
   "choose-ingress-route",
   "provision-wiredoor-bastion",
   "provision-netbird-bastion",
@@ -32,7 +33,6 @@ const FIXED_SETUP_STEP_IDS = [
   "install-netbird-routing-peers",
   "configure-netbird-admin-access",
   "configure-argocd-oidc",
-  "install-whoami",
   "install-headlamp",
   "install-prometheus",
   "install-loki",
@@ -43,12 +43,11 @@ const FIXED_SETUP_STEP_IDS = [
   "install-dashy-dashboard",
   "install-twinbox-portal",
   "install-management-consoles",
-  "install-traefik-manager",
-  "install-cloudtty",
   "install-pgadmin4",
   "install-ntfy",
   "install-velero-backup",
   "install-velero-ui",
+  "install-management-backup",
 ];
 
 const FIXED_SETUP_ORDER = new Map(FIXED_SETUP_STEP_IDS.map((id, index) => [id, index]));
@@ -123,7 +122,6 @@ function buildStepRail(steps, activeStep) {
     isCurrent: step.id === activeStep?.id,
     isComplete: isComplete(step),
     isSkipped: step.status === "skipped",
-    isLocked: step.status === "locked",
     project_url: step.project_url,
     github_url: step.github_url,
     positive_summary: step.positive_summary,
@@ -495,14 +493,6 @@ function buildEvents(runtime) {
 function buildRisks(activeStep, catalogErrors, error) {
   const risks = [];
 
-  if (activeStep?.status === "locked") {
-    risks.push({
-      label: "Dependencies incomplete",
-      detail: "Complete the prerequisite steps before this step can run.",
-      tone: "warning",
-    });
-  }
-
   if (activeStep?.status === "skipped") {
     risks.push({
       label: "Step skipped",
@@ -562,15 +552,6 @@ function buildPrimaryAction(activeStep, nextStep, _busy, _stepIndex, _mode) {
       label: "Working…",
       disabled: true,
       helperText: "This step is currently running. Monitor the live output below.",
-    };
-  }
-
-  if (activeStep.status === "locked") {
-    return {
-      type: "execute",
-      label: "Waiting…",
-      disabled: true,
-      helperText: "Complete the dependency chain before running this step.",
     };
   }
 
@@ -649,7 +630,7 @@ export function toneForStatus(value) {
   if (value === "running" || value === "ready" || value === "active") return "active";
   if (value === "canceled") return "warning";
   if (value === "failed" || value === "danger") return "danger";
-  if (value === "locked" || value === "warning") return "warning";
+  if (value === "warning") return "warning";
   return "neutral";
 }
 

@@ -2,12 +2,9 @@ id: install-argocd
 title: Install Argo CD
 type: action
 journey_stage: setup
-order: 12
 summary: Install Argo CD so the remaining platform services can be managed declaratively.
 explanation: Twinbox installs Argo CD after the Talos/Cilium bootstrap has completed, then waits for the Argo CD control plane to become healthy before continuing.
 side_help: Argo CD manages the GitOps layer; the core Cilium networking stack stays Talos-owned.
-depends_on:
-  - provision-nodes
 dashy:
   items:
     - section: Platform

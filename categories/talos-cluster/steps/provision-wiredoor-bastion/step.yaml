@@ -1,7 +1,6 @@
 id: provision-wiredoor-bastion
 title: Deploy Wiredoor Bastion Host
 type: action
-order: 23
 journey_stage: setup
 summary: Provision a Wiredoor bastion host on Hetzner Cloud for external access.
 explanation: >
@@ -19,9 +18,6 @@ side_help: >
   3. Go to "Security" → "API Tokens"
   4. Generate a new token with "Read & Write" permissions
   5. Copy the token (it won't be shown again)
-depends_on:
-  - provision-nodes
-  - choose-ingress-route
 ingress_route: wiredoor
 inputs:
   - id: hcloud_token

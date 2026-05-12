@@ -2,7 +2,6 @@ id: configure-tailscale-ingress
 title: Configure Tailscale Ingress
 type: action
 journey_stage: setup
-order: 30
 summary: Expose services through a Tailscale tailnet.
 explanation: >
   This step joins your cluster to a Tailscale tailnet, making services accessible
@@ -15,10 +14,6 @@ side_help: >
   2. An auth key generated from your Tailscale admin console
   3. Optionally, an ACL tag to assign to this cluster node
   For self-hosted Headscale, you will also need your Headscale URL and API key.
-depends_on:
-  - install-secret-sync
-  - choose-ingress-route
-  - configure-dns
 ingress_route: tailscale
 inputs:
   - id: ts_authkey

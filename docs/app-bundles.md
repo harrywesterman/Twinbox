@@ -18,7 +18,6 @@ Bundle definitions live in `categories/apps/bundles/*.yaml`. Each bundle declare
 - `id` — Unique identifier
 - `title` — Display name
 - `summary` — Short description
-- `order` — Sort order in the UI
 - `iconUrl` / `iconAlt` — Visual assets
 - `description` — Full markdown description
 - `apps` — List of step IDs to install
@@ -29,7 +28,6 @@ Example from `categories/apps/bundles/twinbox-desktop.yaml`:
 id: twinbox-desktop
 title: Twinbox Desktop
 summary: A sovereign desktop workspace bundle
-order: 5
 iconUrl: /assets/step-icons/install-outline.svg
 iconAlt: Twinbox Desktop icon
 description: >
@@ -58,10 +56,6 @@ apps:
 4. If an app step fails, the bundle step marks it as failed but continues with the next app
 5. The portal updates to show newly installed apps
 
-### Dependency Resolution
-
-Bundles do not declare explicit dependencies. Each app step within a bundle has its own `depends_on` that must be satisfied before it can run. The wizard UI shows apps as "locked" until their dependencies are met.
-
 ### State Tracking
 
 Bundle installation state is tracked per-app, not per-bundle. Each app step has its own state file:
@@ -89,7 +83,6 @@ To create a custom bundle:
 id: my-team-bundle
 title: My Team Workspace
 summary: Curated apps for my team
-order: 100
 iconUrl: /assets/step-icons/custom.svg
 iconAlt: Custom bundle icon
 description: >

@@ -1860,11 +1860,6 @@ function App() {
       return;
     }
 
-    if (step.status === "locked") {
-      setNotice(`Run the earlier steps first before installing ${step.title}.`);
-      return;
-    }
-
     if (step.status === "skipped") {
       await handleUnskipAndExecute(step);
       return;
@@ -1908,10 +1903,6 @@ function App() {
         }
 
         setSelectedStepId(currentStep.id);
-
-        if (currentStep.status === "locked") {
-          throw new Error(`${currentStep.title} is locked until its dependencies are complete.`);
-        }
 
         const result =
           currentStep.status === "skipped"
@@ -2298,7 +2289,6 @@ function App() {
             : "Review the values on this page and continue to the next question."
     : "";
   const installStepCount = setupSteps.length;
-  const installStepBlocked = currentStep?.status === "locked";
   const installInProgress =
     Boolean(
       visibleActiveJob?.id &&
@@ -2308,7 +2298,6 @@ function App() {
     !currentStep ||
     busy ||
     installInProgress ||
-    installStepBlocked ||
     (currentStep?.id === "provision-nodes" && !provisionStepValid);
   const remainingInstallableSteps = setupSteps
     .slice(safeInstallStepIndex)
@@ -2317,7 +2306,6 @@ function App() {
     !currentStep ||
     busy ||
     installInProgress ||
-    installStepBlocked ||
     remainingInstallableSteps.length === 0 ||
     (currentStep?.id === "provision-nodes" && !provisionStepValid);
 

@@ -231,9 +231,8 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert "install-uptimekuma" not in talos_steps
             assert talos_steps["provision-nodes"]["journey_stage"] == "setup"
             assert talos_steps["provision-nodes"]["status"] == "ready"
-            assert talos_steps["install-argocd"]["status"] == "locked"
-            assert talos_steps["install-traefik"]["status"] == "locked"
-            assert talos_steps["install-traefik"]["depends_on"] == ["install-crowdsec"]
+            assert talos_steps["install-argocd"]["status"] == "ready"
+            assert talos_steps["install-traefik"]["status"] == "ready"
             assert (
                 talos_steps["install-traefik"]["secrets"]["files"]["KUBECONFIG_FILE"]["item"]
                 == "kubeconfig"
@@ -312,11 +311,12 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
             status, body = _get_json(f"{base}/api/apps/catalog?cluster_id=cluster-demo")
             assert status == 200
             assert body["errors"] == []
-            assert [bundle["id"] for bundle in body["bundles"]] == [
-                "twinbox-desktop",
+            bundle_ids = [bundle["id"] for bundle in body["bundles"]]
+            assert sorted(bundle_ids) == [
+                "lasuite",
                 "mijn-bureau",
                 "opendesk",
-                "lasuite",
+                "twinbox-desktop",
             ]
             assert body["bundles"][0]["iconUrl"] == "/assets/step-icons/install-outline.svg"
             assert body["bundles"][1]["iconUrl"] == "/assets/step-icons/install-nextcloud.svg"
@@ -332,13 +332,6 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
                 audiobookshelf["runner"]["script"]
                 == "categories/apps/steps/install-audiobookshelf/run.sh"
             )
-            assert audiobookshelf["depends_on"] == [
-                "install-longhorn-storage",
-                "install-secret-sync",
-                "install-authentik-idp",
-                "create-users-and-groups",
-                "choose-ingress-route",
-            ]
             assert vaultwarden["placeholder"] is False
             assert vaultwarden["installable"] is True
             assert vaultwarden["app_state"] == "ready"
@@ -351,20 +344,6 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
             assert outline["installable"] is True
             assert outline["app_state"] == "ready"
             assert outline["runner"]["script"] == "categories/apps/steps/install-outline/run.sh"
-            assert outline["depends_on"] == [
-                "install-longhorn-storage",
-                "install-cloudnativepg",
-                "install-secret-sync",
-                "install-authentik-idp",
-                "choose-ingress-route",
-            ]
-            assert vaultwarden["depends_on"] == [
-                "install-longhorn-storage",
-                "install-cloudnativepg",
-                "install-secret-sync",
-                "choose-ingress-route",
-                "install-authentik-idp",
-            ]
             nextcloud = next(step for step in apps if step["id"] == "install-nextcloud")
             assert nextcloud["placeholder"] is False
             assert nextcloud["installable"] is True
@@ -380,25 +359,11 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
             assert openwebui["installable"] is True
             assert openwebui["app_state"] == "ready"
             assert openwebui["runner"]["script"] == "categories/apps/steps/install-openwebui/run.sh"
-            assert openwebui["depends_on"] == [
-                "install-longhorn-storage",
-                "install-cloudnativepg",
-                "install-secret-sync",
-                "install-authentik-idp",
-                "create-users-and-groups",
-                "choose-ingress-route",
-            ]
             pixelfed = next(step for step in apps if step["id"] == "install-pixelfed")
             assert pixelfed["placeholder"] is False
             assert pixelfed["installable"] is True
             assert pixelfed["app_state"] == "ready"
             assert pixelfed["runner"]["script"] == "categories/apps/steps/install-pixelfed/run.sh"
-            assert pixelfed["depends_on"] == [
-                "install-longhorn-storage",
-                "install-cloudnativepg",
-                "install-secret-sync",
-                "choose-ingress-route",
-            ]
             immich = next(step for step in apps if step["id"] == "install-immich")
             assert immich["placeholder"] is False
             assert immich["runner"]["script"] == "categories/apps/steps/install-immich/run.sh"
@@ -1000,14 +965,18 @@ def test_catalog_endpoint_isolates_invalid_manifest_entries():
             assert status == 200
 
             talos = body["categories"][0]
-            assert talos["steps"][0]["id"] == "provision-nodes"
-            assert talos["steps"][0]["status"] == "done"
-            assert talos["steps"][0]["state"]["cluster_id"] == cluster_id
-            assert talos["steps"][0]["state"]["outputs"]["cluster_status"] == "bootstrapped"
-            assert talos["steps"][1]["id"] == "install-argocd"
-            assert talos["steps"][1]["status"] == "ready"
-            assert talos["steps"][2]["id"] == "install-longhorn-storage"
-            assert talos["steps"][2]["status"] == "locked"
+            talos_steps = {step["id"]: step for step in talos["steps"]}
+            assert "provision-nodes" in talos_steps
+            assert talos_steps["provision-nodes"]["status"] == "done"
+            assert talos_steps["provision-nodes"]["state"]["cluster_id"] == cluster_id
+            assert (
+                talos_steps["provision-nodes"]["state"]["outputs"]["cluster_status"]
+                == "bootstrapped"
+            )
+            assert "install-argocd" in talos_steps
+            assert talos_steps["install-argocd"]["status"] == "ready"
+            assert "install-longhorn-storage" in talos_steps
+            assert talos_steps["install-longhorn-storage"]["status"] == "ready"
         finally:
             proc.terminate()
             proc.wait(timeout=5)

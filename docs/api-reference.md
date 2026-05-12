@@ -12,7 +12,7 @@ Returns `{ ok: true, time: "..." }`.
 
 ### `GET /api/catalog`
 
-Returns the full wizard catalog: categories, steps, dependencies, inputs, and current state.
+Returns the full wizard catalog: categories, steps, inputs, and current state.
 
 Query parameters:
 
@@ -22,7 +22,7 @@ Query parameters:
 
 Response: `{ categories: [...], errors: [...] }`
 
-Each step includes: `id`, `title`, `type`, `status`, `depends_on`, `inputs`, `secrets`, `runner`, presentation metadata.
+Each step includes: `id`, `title`, `type`, `status`, `inputs`, `secrets`, `runner`, presentation metadata.
 
 ## Clusters
 
@@ -56,7 +56,7 @@ Request body: `{ cluster_id, cluster_instance_id, inputs: {...} }`
 
 Response (202): `{ step_id, cluster_id, cluster_instance_id, job_id, job_type }`
 
-Fails with 409 if the step is locked (dependencies not met).
+Accepts execution for any step at any time, provided inputs are valid.
 
 ### `POST /api/steps/:stepId/skip`
 

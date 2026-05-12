@@ -2,7 +2,6 @@ id: configure-netbird-ingress
 title: Configure NetBird Ingress
 type: action
 journey_stage: setup
-order: 51
 summary: Configure NetBird SSO, groups, setup keys, routes, and proxy targets.
 explanation: >
   This step connects NetBird to Authentik for SSO, creates Twinbox NetBird groups
@@ -13,13 +12,6 @@ side_help: >
   created an admin account and token automatically. You can leave this field empty.
   Otherwise, create a NetBird personal access token manually from the dashboard
   and enter it here.
-depends_on:
-  - provision-netbird-bastion
-  - install-secret-sync
-  - install-traefik
-  - install-authentik-idp
-  - configure-dns
-  - create-users-and-groups
 ingress_route: netbird
 inputs:
   - id: netbird_token
