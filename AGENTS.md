@@ -13,6 +13,7 @@ Twinbox builds a Talos Linux Kubernetes cluster on Proxmox through a Management 
 - Do not revert unrelated/user changes.
 - Do not edit runtime/generated/dependency state as source: `manager-data/`, `node_modules/`, `dist/`, `.venv/`, `.terraform/`, vendored charts.
 - Never print or commit secrets.
+- **When changing code, always update the corresponding tests** in the same commit. Run `python3 -m pytest -q tests` and `node --test manager-*/test/*.mjs` before pushing to verify.
 - Twinbox Portal runs on the Kubernetes cluster, not on the Management VM. Update it through `gitops/` and let Argo CD sync it.
 - Run cluster checks from the Management VM. Use SSH to `twinbox@<management-vm-ip>` Look into .env.vm-preview.local to find the management-vm-ip.
 

@@ -2,7 +2,6 @@ id: configure-netbird-admin-access
 title: Configure NetBird Admin Access
 type: action
 journey_stage: setup
-order: 53
 summary: Register the Management VM as a NetBird peer for admin access.
 explanation: >
   This step installs or starts a NetBird agent for the Twinbox Management VM
@@ -13,8 +12,6 @@ side_help: >
   Run this from the Management VM runtime. It does not open public firewall
   ports; it only enrolls the VM into NetBird so approved admin devices can reach
   SSH and manager ports through NetBird policies.
-depends_on:
-  - configure-netbird-ingress
 ingress_route: netbird
 inputs: []
 runner:

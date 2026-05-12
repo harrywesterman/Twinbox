@@ -2,7 +2,6 @@ id: configure-wiredoor-ingress
 title: Configure Wiredoor Ingress
 type: action
 journey_stage: setup
-order: 24
 summary: Set up Wiredoor tunnel to an external server for ingress traffic.
 explanation: >
   This step configures a Wiredoor tunnel that routes external traffic through
@@ -13,11 +12,6 @@ side_help: >
   1. Access to a Wiredoor server
   2. An API token from the Wiredoor server
   3. The Wiredoor server URL
-depends_on:
-  - install-secret-sync
-  - provision-wiredoor-bastion
-  - choose-ingress-route
-  - configure-dns
 ingress_route: wiredoor
 inputs:
   - id: wiredoor_url

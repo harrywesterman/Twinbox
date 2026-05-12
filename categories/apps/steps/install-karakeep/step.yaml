@@ -2,15 +2,9 @@ id: install-karakeep
 title: Install Karakeep
 type: action
 journey_stage: setup
-order: 76
 summary: Save and organize interesting links, articles, and ideas.
 explanation: Karakeep helps you save and rediscover content you come across online. Store links, articles, and notes in your personal archive. With search and tagging, nothing gets lost, and you gradually build your own knowledge base.
 side_help: Useful if you collect a lot of information and want a central place to store everything in a structured way.
-depends_on:
-  - install-longhorn-storage
-  - install-secret-sync
-  - install-authentik-idp
-  - choose-ingress-route
 dashy:
   items:
     - section: Platform

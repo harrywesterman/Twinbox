@@ -950,7 +950,6 @@ function statusTone(state) {
       return "is-warning";
     case "installing":
       return "is-warning";
-    case "blocked":
     case "planned":
       return "is-neutral";
     case "failed":
@@ -979,8 +978,6 @@ function statusLabel(state) {
       return "stopping";
     case "installing":
       return "installing";
-    case "blocked":
-      return "blocked";
     case "planned":
       return "coming soon";
     case "failed":
@@ -1442,7 +1439,15 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
     return () => {
       cancelled = true;
     };
-  }, [appsState, currentJob?.id, installPhase, installQueue, installTarget, targetBundle, targetCard]);
+  }, [
+    appsState,
+    currentJob?.id,
+    installPhase,
+    installQueue,
+    installTarget,
+    targetBundle,
+    targetCard,
+  ]);
 
   const handleLogScroll = () => {
     const viewport = logViewportRef.current;

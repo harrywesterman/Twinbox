@@ -10,7 +10,8 @@ resources:
     memory: 256Mi
 
 service:
-  type: ClusterIP
+  spec:
+    type: ClusterIP
 
 providers:
   kubernetesCRD:

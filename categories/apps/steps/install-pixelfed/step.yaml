@@ -2,15 +2,9 @@ id: install-pixelfed
 title: Install Pixelfed
 type: action
 journey_stage: setup
-order: 73
 summary: Share photos with your network through a decentralized platform.
 explanation: Pixelfed is a privacy-friendly alternative to commercial photo services. Publish photos in albums, follow other users, and comment on posts. Because Pixelfed is part of the federated network (ActivityPub), you can also interact with users on other platforms.
 side_help: A good choice if you want to share photos without ads or data mining, with full control over your own content.
-depends_on:
-  - install-longhorn-storage
-  - install-cloudnativepg
-  - install-secret-sync
-  - choose-ingress-route
 dashy:
   items:
     - section: Apps

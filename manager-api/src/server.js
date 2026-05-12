@@ -1225,12 +1225,6 @@ app.post("/api/apps/:stepId/install", async (req, res) => {
     return res.status(404).json({ error: "app not found" });
   }
 
-  if (visibleStep.app_state === "blocked") {
-    return res
-      .status(409)
-      .json({ error: `${stepId} is blocked until its dependencies are complete` });
-  }
-
   if (visibleStep.app_state === "planned") {
     return res.status(409).json({ error: `${stepId} is not installable yet` });
   }
@@ -1574,12 +1568,6 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
     return res.status(404).json({ error: "step not found" });
   }
 
-  if (visibleStep.status === "locked") {
-    return res
-      .status(409)
-      .json({ error: `${stepId} is locked until its dependencies are complete` });
-  }
-
   const validated = validateStepInputs(step, req.body?.inputs);
   if (!validated.ok) {
     return res.status(400).json({ error: validated.error });
@@ -1715,10 +1703,6 @@ app.post("/api/steps/:stepId/skip", (req, res) => {
     .find((candidate) => candidate.id === stepId);
   if (!visibleStep) {
     return res.status(404).json({ error: "step not found" });
-  }
-
-  if (visibleStep.status === "locked") {
-    return res.status(409).json({ error: "cannot skip a locked step" });
   }
 
   if (visibleStep.status === "running") {

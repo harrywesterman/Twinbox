@@ -2,16 +2,9 @@ id: install-audiobookshelf
 title: Install Audiobookshelf
 type: action
 journey_stage: setup
-order: 84
 summary: Listen to your own audiobooks and podcasts, anywhere.
 explanation: Audiobookshelf is your personal media server for audiobooks and podcasts. Upload your collection, organize titles and series, and listen through the web app or mobile apps for iOS and Android. Everything stays on your own server, so your library remains private and within reach at all times.
 side_help: Ideal if you have your own audiobook collection and want to play it on all your devices without depending on commercial streaming services.
-depends_on:
-  - install-longhorn-storage
-  - install-secret-sync
-  - install-authentik-idp
-  - create-users-and-groups
-  - choose-ingress-route
 dashy:
   items:
     - section: Platform

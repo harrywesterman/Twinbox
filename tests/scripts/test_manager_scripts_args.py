@@ -658,8 +658,6 @@ def test_longhorn_step_installs_via_argocd_and_waits_for_health():
         "summary: Apply the Longhorn GitOps application, make its storage class the cluster default, and wait for it to become available."
         in step_manifest_text
     )
-    assert "depends_on:" in step_manifest_text
-    assert "  - install-argocd" in step_manifest_text
     assert "runner:" in step_manifest_text
     assert "KUBECONFIG_FILE:" in step_manifest_text
     assert "item: kubeconfig" in step_manifest_text
@@ -735,8 +733,6 @@ def test_crowdsec_step_seeds_bouncer_secret_and_applies_gitops_app():
     traefik_bouncer_externalsecret_text = _traefik_crowdsec_bouncer_externalsecret_text()
 
     assert "title: Install CrowdSec" in step_manifest_text
-    assert "order: 16" in step_manifest_text
-    assert "  - install-secret-sync" in step_manifest_text
     assert "script: categories/talos-cluster/steps/install-crowdsec/run.sh" in step_manifest_text
     assert "openbao_read_global_secret_json crowdsec-bouncer" in step_text
     assert "openssl rand -hex 32" in step_text
@@ -1255,8 +1251,6 @@ def test_install_argocd_step_bootstraps_argocd_without_cni_adoption():
         "summary: Install Argo CD so the remaining platform services can be managed declaratively."
         in text
     )
-    assert "depends_on:" in text
-    assert "  - provision-nodes" in text
     assert "Talos/Cilium bootstrap" in text
     assert "Talos networking layer" not in text
     assert "root application tree" not in text
@@ -1264,10 +1258,8 @@ def test_install_argocd_step_bootstraps_argocd_without_cni_adoption():
 
 def test_app_step_manifests_chain_the_linear_gitops_flow():
     argocd_text = ARGO_STEP_MANIFEST.read_text(encoding="utf-8")
-    crowdsec_text = CROWDSEC_STEP_MANIFEST.read_text(encoding="utf-8")
     traefik_text = TRAEFIK_STEP_MANIFEST.read_text(encoding="utf-8")
     authentik_run_text = _authentik_step_text()
-    cloudflare_text = CLOUDFLARE_STEP_MANIFEST.read_text(encoding="utf-8")
     choose_ingress_text = CHOOSE_INGRESS_ROUTE_STEP_MANIFEST.read_text(encoding="utf-8")
     headlamp_text = HEADLAMP_STEP_MANIFEST.read_text(encoding="utf-8")
     grafana_text = GRAFANA_STEP_MANIFEST.read_text(encoding="utf-8")
@@ -1275,50 +1267,39 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     wiredoor_text = WIREDOOR_GATEWAY_STEP_MANIFEST.read_text(encoding="utf-8")
     wiredoor_bastion_text = WIREDOOR_BASTION_STEP_MANIFEST.read_text(encoding="utf-8")
 
-    assert "provision-nodes" in argocd_text
     assert "install-flannel" not in argocd_text
 
-    assert "install-secret-sync" in crowdsec_text
-    assert "install-crowdsec" in traefik_text
+    assert "title: Install Traefik" in traefik_text
 
     assert "type: config" in choose_ingress_text
     assert "value: wiredoor" in choose_ingress_text
     assert "value: metallb" in choose_ingress_text
-    assert "depends_on:" in choose_ingress_text
-    assert "dns_domain" in choose_ingress_text
-    assert "DNS Domain" in choose_ingress_text
+    assert "dns_domain" not in choose_ingress_text
+    assert "DNS Domain" not in choose_ingress_text
     assert "Cloudflare Tunnel is shown only for prd clusters" in choose_ingress_text
     assert "Non-prd clusters keep the slug-prefixed hostname model" in choose_ingress_text
     assert (
         "Cloudflare Tunnel is available only for prd clusters on Cloudflare Free."
         in choose_ingress_text
     )
-    assert "Base zone for platform hostnames." in choose_ingress_text
 
     choose_ingress_run_text = CHOOSE_INGRESS_ROUTE_RUN_SCRIPT.read_text(encoding="utf-8")
     assert "cluster_slug" in choose_ingress_run_text
     assert "cluster_slug_lower" in choose_ingress_run_text
     assert "Base DNS domain:" in choose_ingress_run_text
     assert "public_zone_name" in choose_ingress_run_text
-    assert ".dns_domain = $dns_domain" in choose_ingress_run_text
     assert ".public_zone_name = $public_zone_name" in choose_ingress_run_text
     assert '"dns_domain": "$dns_domain"' in choose_ingress_run_text
+    assert '"public_zone_name": "$public_zone_name"' in choose_ingress_run_text
     assert (
         "Cloudflare Tunnel is only available for prd clusters on Cloudflare Free"
         in choose_ingress_run_text
     )
 
-    assert "choose-ingress-route" in cloudflare_text
-    assert "provision-wiredoor-bastion" in cloudflare_text
-
-    assert "install-grafana" in wiredoor_text
-    assert "choose-ingress-route" in wiredoor_text
-    assert "configure-wiredoor-ingress" in wiredoor_text
     assert "KUBECONFIG_FILE:" in wiredoor_text
     assert "item: kubeconfig" in wiredoor_text
     assert "script: categories/talos-cluster/steps/install-wiredoor-gateway/run.sh" in wiredoor_text
 
-    assert "choose-ingress-route" in wiredoor_bastion_text
     assert "ingress_route: wiredoor" in wiredoor_bastion_text
 
     assert "cluster_dns_domain" in authentik_run_text
@@ -1361,18 +1342,12 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     )
 
     headlamp_step_text = HEADLAMP_STEP_MANIFEST.read_text(encoding="utf-8")
-    assert "install-cloudnativepg" in headlamp_step_text
-    assert "install-authentik-idp" in headlamp_step_text
-    assert "choose-ingress-route" in headlamp_step_text
     assert "OpenTofu" in headlamp_step_text
 
     pgadmin_step_text = PGADMIN_STEP_MANIFEST.read_text(encoding="utf-8")
     pgadmin_run_text = PGADMIN_STEP_SCRIPT.read_text(encoding="utf-8")
     pgadmin_server_config_text = PGADMIN_SERVER_CONFIGMAP.read_text(encoding="utf-8")
     assert "title: Install pgAdmin 4" in pgadmin_step_text
-    assert "install-authentik-idp" in pgadmin_step_text
-    assert "create-users-and-groups" in pgadmin_step_text
-    assert "choose-ingress-route" in pgadmin_step_text
     assert "script: categories/talos-cluster/steps/install-pgadmin4/run.sh" in pgadmin_step_text
     assert "optional: true" in pgadmin_step_text
     assert "authentik-pgadmin4" in pgadmin_run_text
@@ -1595,8 +1570,8 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     )
     assert "continuing without a zone-name preflight" in cloudflare_tunnel_run_text
     assert 'dns_record_name="*.${public_zone_name}"' in cloudflare_tunnel_run_text
-    assert "Updating DNS CNAME record for tunnel" in cloudflare_tunnel_run_text
-    assert "DNS record upserted" in cloudflare_tunnel_run_text
+    assert "Creating DNSEndpoint for tunnel CNAME" in cloudflare_tunnel_run_text
+    assert "cloudflare-tunnel-dns" in cloudflare_tunnel_run_text
     assert "already have a tunnel with this name" in cloudflare_tunnel_run_text
     assert ".result.Token" not in cloudflare_tunnel_run_text
     assert "cluster-hostnames" in cloudflare_tunnel_run_text
@@ -1606,7 +1581,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "tunnel_token" in cloudflare_tunnel_run_text
     assert "platform-ingress.yaml" in cloudflare_tunnel_run_text
     assert "upsert-argocd-cluster-secret.sh" in cloudflare_tunnel_run_text
-    assert "Zone DNS Edit permissions" in cloudflare_tunnel_run_text
+    assert "DNSEndpoint for tunnel CNAME" in cloudflare_tunnel_run_text
     assert "argocd-server" in cloudflare_tunnel_run_text
     assert "Argo CD server not ready yet (attempt ${i}/30)" in cloudflare_tunnel_run_text
     assert (
@@ -1629,23 +1604,17 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "Public zone name:" in cloudflare_dns_run_text
     assert "ZONE_NAME" in cloudflare_dns_run_text
     assert "cluster-hostnames" in cloudflare_dns_run_text
-    assert "upsert-argocd-cluster-secret.sh" in cloudflare_dns_run_text
-    assert "Applying platform-ingress application" in cloudflare_dns_run_text
-    assert "apply-argocd-application.sh" in cloudflare_dns_run_text
-    assert "gitops/apps/platform-ingress.yaml" in cloudflare_dns_run_text
-    assert "apply-argocd-application.sh" in cloudflare_dns_run_text
+    assert "Creating DNSEndpoint resources" in cloudflare_dns_run_text
+    assert "wiredoor-dns" in cloudflare_dns_run_text
+    assert "external-dns" in cloudflare_dns_run_text
 
-    assert "install-cloudnativepg" in headlamp_text
     assert "script: categories/talos-cluster/steps/install-headlamp/run.sh" in headlamp_text
 
-    assert "install-secret-sync" in grafana_text
-    assert "install-prometheus" in grafana_text
     assert "script: categories/talos-cluster/steps/install-grafana/run.sh" in grafana_text
     assert "--no-wait" not in (
         REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-grafana" / "run.sh"
     ).read_text(encoding="utf-8")
-    assert "install-longhorn-storage" in prometheus_text
-    assert "choose-ingress-route" in prometheus_text
+    assert "script: categories/talos-cluster/steps/install-prometheus/run.sh" in prometheus_text
     assert "script: categories/talos-cluster/steps/install-prometheus/run.sh" in prometheus_text
     assert "url: http://tempo.monitoring.svc.cluster.local:3200" in (
         GRAFANA_VALUES.read_text(encoding="utf-8")
@@ -1872,7 +1841,6 @@ def test_grafana_oidc_is_openbao_backed():
     grafana_step_text = (
         REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-grafana" / "run.sh"
     ).read_text(encoding="utf-8")
-    grafana_step_yaml = GRAFANA_STEP_MANIFEST.read_text(encoding="utf-8")
 
     assert "adminPassword:" not in grafana_values_text
     assert "existingSecret: grafana-oidc" in grafana_values_text
@@ -1890,7 +1858,6 @@ def test_grafana_oidc_is_openbao_backed():
     assert '--secret-name "grafana-oidc"' in grafana_step_text
     assert "GF_SECURITY_ADMIN_USER" in grafana_step_text
     assert "GF_SECURITY_ADMIN_PASSWORD" in grafana_step_text
-    assert "- install-authentik-idp" in grafana_step_yaml
 
 
 def test_grafana_managed_overview_dashboard_is_rewritten_for_twinbox():
@@ -2249,12 +2216,8 @@ def test_prometheus_step_applies_kube_prometheus_stack():
 
     assert "id: install-prometheus" in text
     assert "title: Install Prometheus" in text
-    assert "order: 52" in text
     assert "kube-prometheus-stack" in text
     assert "Prometheus, Alertmanager, node-exporter, and kube-state-metrics" in text
-    assert "depends_on:" in text
-    assert "install-longhorn-storage" in text
-    assert "choose-ingress-route" in text
     assert "script: categories/talos-cluster/steps/install-prometheus/run.sh" in text
     assert ': "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"' in run_text
     assert "install-prometheus.sh" in run_text

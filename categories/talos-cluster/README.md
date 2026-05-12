@@ -89,17 +89,6 @@ categories/talos-cluster/
 | `install-velero-ui` | Deploy Velero UI dashboard |
 | `install-management-backup` | Install Management VM cron backups |
 
-## Step Dependencies
-
-Steps declare `depends_on` in their `step.yaml` manifests to enforce ordering:
-
-- `install-argocd` → `provision-nodes`
-- `install-longhorn-storage` → `provision-nodes`
-- `install-authentik-idp` → `install-secret-sync`
-- `install-grafana` → `install-prometheus`, `install-loki`
-- `install-twinbox-portal` → `install-traefik`
-- `install-velero-backup` → `install-longhorn-storage`
-
 ## Runner Scripts
 
 Each step directory contains:

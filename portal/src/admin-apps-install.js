@@ -58,9 +58,7 @@ export function buildBundleInstallSummary(bundleCards = []) {
   const cards = Array.isArray(bundleCards) ? bundleCards : [];
   const installed = cards.filter((card) => card?.app_state === "installed").length;
   const installing = cards.filter((card) => card?.app_state === "installing").length;
-  const blocked = cards.filter(
-    (card) => card?.app_state === "blocked" || card?.app_state === "planned"
-  ).length;
+  const planned = cards.filter((card) => card?.app_state === "planned").length;
 
   if (installing > 0) {
     return {
@@ -69,10 +67,10 @@ export function buildBundleInstallSummary(bundleCards = []) {
     };
   }
 
-  if (blocked > 0) {
+  if (planned > 0) {
     return {
-      state: "blocked",
-      label: `${blocked} app${blocked === 1 ? "" : "s"} still need earlier steps`,
+      state: "planned",
+      label: `${planned} app${planned === 1 ? "" : "s"} coming soon`,
     };
   }
 
@@ -109,11 +107,7 @@ export function buildSelectableBundleInstallQueue(
       return false;
     }
 
-    if (
-      card.app_state === "installing" ||
-      card.app_state === "blocked" ||
-      card.app_state === "planned"
-    ) {
+    if (card.app_state === "installing" || card.app_state === "planned") {
       return false;
     }
 
@@ -131,10 +125,7 @@ export function getSelectableBundleApps(bundle = {}, cardsById = new Map()) {
 
       const selectable = card.app_state === "ready" || card.app_state === "failed";
       const installed = card.app_state === "installed";
-      const blocked =
-        card.app_state === "blocked" ||
-        card.app_state === "planned" ||
-        card.app_state === "installing";
+      const disabled = card.app_state === "planned" || card.app_state === "installing";
 
       return {
         id: card.id,
@@ -149,7 +140,7 @@ export function getSelectableBundleApps(bundle = {}, cardsById = new Map()) {
         status: card.app_state,
         selectable,
         installed,
-        blocked,
+        disabled,
       };
     })
     .filter(Boolean);

@@ -394,7 +394,7 @@ gitops/platform/
 
 ### Argo CD application order
 
-The local Argo cluster secret must exist before the domain-aware ApplicationSets are applied. Add `depends_on` in the wizard journey:
+The local Argo cluster secret must exist before the domain-aware ApplicationSets are applied. The wizard journey follows this sequence:
 
 ```
 ingress selection → Argo cluster secret projection → platform-ingress

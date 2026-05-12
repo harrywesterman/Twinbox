@@ -106,9 +106,11 @@ def test_wizard_dev_run_loads_default_local_config_and_uses_tty_remote_run(tmp_p
         "args": [
             "-tt",
             "root@proxmox-dev",
-            "chmod +x '/root/twinbox-dev/setup-wizard.sh' && TERM=xterm-256color bash '/root/twinbox-dev/setup-wizard.sh'",
+            "sudo chmod +x '/root/twinbox-dev/setup-wizard.sh' && sudo TERM=xterm-256color bash '/root/twinbox-dev/setup-wizard.sh'",
         ],
     }
+    assert "Uploading wizard to" in proc.stdout
+    assert "Running wizard as root via sudo on" in proc.stdout
     assert "Remote wizard copy: root@proxmox-dev:/root/twinbox-dev/setup-wizard.sh" in proc.stdout
 
 
@@ -132,7 +134,7 @@ def test_wizard_dev_run_cli_overrides_config_file_defaults(tmp_path: Path):
     assert calls[2]["args"] == [
         "-tt",
         "root@override-host",
-        "chmod +x '/tmp/wizard-dev/setup-wizard.sh' && TERM=xterm-256color bash '/tmp/wizard-dev/setup-wizard.sh'",
+        "sudo chmod +x '/tmp/wizard-dev/setup-wizard.sh' && sudo TERM=xterm-256color bash '/tmp/wizard-dev/setup-wizard.sh'",
     ]
 
 
@@ -150,7 +152,7 @@ def test_wizard_dev_run_debug_flag_uses_bash_x_for_remote_execution(tmp_path: Pa
     assert calls[2]["args"] == [
         "-tt",
         "root@proxmox-dev",
-        "chmod +x '/root/twinbox-dev/setup-wizard.sh' && TERM=xterm-256color bash -x '/root/twinbox-dev/setup-wizard.sh'",
+        "sudo chmod +x '/root/twinbox-dev/setup-wizard.sh' && sudo TERM=xterm-256color bash -x '/root/twinbox-dev/setup-wizard.sh'",
     ]
 
 
@@ -158,7 +160,8 @@ def test_wizard_dev_run_requires_target_when_no_config_or_override_is_present(tm
     proc = _run_runner(tmp_path, [])
 
     assert proc.returncode != 0
-    assert "Set WIZARD_DEV_SSH_TARGET in .env.wizard.local or pass --target." in proc.stderr
+    assert "WIZARD_DEV_SSH_TARGET" in proc.stderr
+    assert ".env.wizard.local" not in proc.stderr
 
 
 def test_wizard_dev_run_reports_retained_remote_copy_when_remote_execution_fails(tmp_path: Path):

@@ -2,12 +2,9 @@ id: install-traefik
 title: Install Traefik
 type: action
 journey_stage: setup
-order: 18
 summary: Apply the Traefik GitOps application after secret sync is ready.
 explanation: Twinbox installs Traefik through a single Argo CD application that includes the chart, dashboard authentication resources, and ingress routes for the Traefik dashboard and Argo CD.
 side_help: Traefik is a modern cloud-native reverse proxy and ingress controller that automatically routes traffic to your applications and services.
-depends_on:
-  - install-crowdsec
 dashy:
   items:
     - section: Platform

@@ -2,7 +2,6 @@ id: configure-cloudflare-tunnel
 title: Configure Cloudflare Tunnel
 type: action
 journey_stage: setup
-order: 26
 summary: Expose services through a Cloudflare Tunnel (cloudflared).
 explanation: >
   This step creates or reuses the Cloudflare tunnel, asks Cloudflare for a
@@ -21,10 +20,6 @@ side_help: >
      step (requires Zone → DNS → Edit).
   6. This step is only available for prd clusters on Cloudflare Free.
   Cloudflare Tunnel requires no public IP or port forwarding.
-depends_on:
-  - install-secret-sync
-  - choose-ingress-route
-  - configure-dns
 ingress_route: cloudflare-tunnel
 inputs:
   - id: cf_api_token

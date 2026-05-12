@@ -2,7 +2,6 @@ id: install-netbird-routing-peers
 title: Install NetBird Routing Peers
 type: action
 journey_stage: setup
-order: 52
 summary: Deploy NetBird routing peers into Kubernetes through Argo CD.
 explanation: >
   This step deploys the NetBird agent in the Talos Kubernetes cluster so NetBird
@@ -11,8 +10,6 @@ side_help: >
   The setup key is read from OpenBao through External Secrets. The routing peer
   pod runs with privileged networking because NetBird needs to create a WireGuard
   interface and forward traffic into the cluster.
-depends_on:
-  - configure-netbird-ingress
 ingress_route: netbird
 inputs: []
 secrets:

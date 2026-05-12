@@ -2,7 +2,6 @@ id: configure-dns
 title: Configure DNS Provider
 type: action
 journey_stage: setup
-order: 21
 summary: Choose your DNS provider and give Twinbox an API token so it can manage DNS records automatically.
 explanation: >
   This step installs external-dns in your cluster and stores your DNS provider
@@ -13,8 +12,6 @@ side_help: >
   token with permission to create DNS records (e.g. Zone DNS Edit for
   Cloudflare). The token is stored in a Kubernetes Secret in the
   external-dns namespace.
-depends_on:
-  - install-cloudnativepg
 inputs:
   - id: dns_domain
     label: DNS Domain

@@ -133,13 +133,13 @@ test("getSelectableBundleApps returns all bundle apps with selectable state", ()
       id: app.id,
       selectable: app.selectable,
       installed: app.installed,
-      blocked: app.blocked,
+      disabled: app.disabled,
     })),
     [
-      { id: "install-immich", selectable: true, installed: false, blocked: false },
-      { id: "install-nextcloud", selectable: false, installed: true, blocked: false },
-      { id: "install-zulip", selectable: false, installed: false, blocked: true },
-      { id: "install-jitsi", selectable: true, installed: false, blocked: false },
+      { id: "install-immich", selectable: true, installed: false, disabled: false },
+      { id: "install-nextcloud", selectable: false, installed: true, disabled: false },
+      { id: "install-zulip", selectable: false, installed: false, disabled: true },
+      { id: "install-jitsi", selectable: true, installed: false, disabled: false },
     ]
   );
 });

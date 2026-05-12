@@ -2,14 +2,9 @@ id: install-stirling-pdf
 title: Install Stirling PDF
 type: action
 journey_stage: setup
-order: 75
 summary: Edit, split, and convert PDF files in your browser.
 explanation: Stirling PDF is a complete online toolkit for PDF manipulation. Merge documents, split pages, rotate, compress, or add watermarks — all through a simple web interface. Your files stay on your own server, so you never have to upload anything to external services.
 side_help: Practical for anyone who works with PDFs regularly and values the security of self-hosting.
-depends_on:
-  - install-longhorn-storage
-  - install-secret-sync
-  - choose-ingress-route
 dashy:
   items:
     - section: Platform

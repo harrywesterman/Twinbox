@@ -79,7 +79,7 @@ test("app source defines a minimal wizard shell with guided input and step-by-st
   );
   assert.match(
     source,
-    /void applyProvisionPlacementHelp\(\);/,
+    /void applyProvisionPlacementHelp\(/,
     "expected automatic placement to run when step 1 opens without placements"
   );
   assert.match(
@@ -310,8 +310,13 @@ test("app source defines a minimal wizard shell with guided input and step-by-st
 
   assert.match(
     questionFlow,
-    /Enter the DNS domain for your cluster\./,
-    "expected the DNS helper sentence in the question flow"
+    /Your domain name \(e\.g\. example\.com\)\./,
+    "expected the DNS helper sentence in the configure-dns question step"
+  );
+  assert.match(
+    questionFlow,
+    /API token with DNS zone edit permissions\./,
+    "expected the DNS API token input in the configure-dns question step"
   );
   assert.doesNotMatch(
     questionFlow,

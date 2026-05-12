@@ -2,11 +2,9 @@ id: install-zulip
 title: Install Zulip
 type: action
 journey_stage: setup
-order: 72
 summary: Team chat with clear topics, so conversations stay organized.
 explanation: Zulip is a chat application where every conversation gets a topic. This keeps discussions structured and makes it easy to find what was discussed later. Suitable for teams of any size, with support for direct messages, group channels, and file sharing.
 side_help: A strong choice if you want an alternative to Slack or Teams and prefer to keep conversations well-organized.
-depends_on: []
 inputs: []
 dashy:
   items:

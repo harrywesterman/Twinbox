@@ -268,14 +268,7 @@ function synthesizeProvisionStateFromCluster(step, cluster, state) {
   return state;
 }
 
-function deriveStepStatus(step, state, latestJob, completedDependencies) {
-  const dependenciesMet = step.depends_on.every((dependency) =>
-    completedDependencies.has(dependency)
-  );
-  if (!dependenciesMet) {
-    return "locked";
-  }
-
+function deriveStepStatus(step, state, latestJob) {
   if (state?.status === "skipped") {
     return "skipped";
   }
@@ -315,7 +308,6 @@ function deriveCategoryStatus(steps) {
     steps.every((step) => step.status === "done" || step.status === "skipped")
   )
     return "done";
-  if (steps.every((step) => step.status === "locked")) return "locked";
   return "ready";
 }
 
@@ -361,7 +353,7 @@ function buildIconText(title) {
   );
 }
 
-function deriveAppStepStatus(step, state, latestJob, completedDependencies) {
+function deriveAppStepStatus(step, state, latestJob) {
   if (
     latestJob &&
     latestJob.type === "uninstall_step" &&
@@ -392,13 +384,6 @@ function deriveAppStepStatus(step, state, latestJob, completedDependencies) {
 
   if (isPlaceholderAppStep(step)) {
     return "planned";
-  }
-
-  const dependenciesMet = step.depends_on.every((dependency) =>
-    completedDependencies.has(dependency)
-  );
-  if (!dependenciesMet) {
-    return "blocked";
   }
 
   return "ready";
@@ -546,54 +531,44 @@ export function buildCatalogResponse({ workspaceRoot, dirs, clusterId = null }) 
     definitions,
   });
 
-  const completedDependencies = new Set(
-    Array.from(stepStateById.entries())
-      .filter(([stepId, { state }]) => {
-        const step = definitions.stepsById.get(stepId);
-        return step && isDone(step, state);
-      })
-      .map(([stepId]) => stepId)
-  );
-
   const categories = definitions.categories.map((category) => {
-    const steps = category.steps
-      .filter((step) => shouldExposeStep(step, activeIngressRoute))
-      .map((step) => {
-        const renderedStep = renderedStepsById.get(step.id) || step;
-        const { state, latestJob } = stepStateById.get(step.id) || { state: null, latestJob: null };
-        const status = deriveStepStatus(renderedStep, state, latestJob, completedDependencies);
+    const visibleSteps = category.steps.filter((step) =>
+      shouldExposeStep(step, activeIngressRoute)
+    );
 
-        return {
-          id: renderedStep.id,
-          category_id: renderedStep.category_id,
-          title: renderedStep.title,
-          type: renderedStep.type,
-          journey_stage: renderedStep.journey_stage,
-          order: renderedStep.order,
-          ingress_route: renderedStep.ingress_route,
-          summary: renderedStep.summary,
-          explanation: renderedStep.explanation,
-          side_help: renderedStep.side_help,
-          dashy: renderedStep.dashy,
-          inputs: renderedStep.inputs,
-          secrets: renderedStep.secrets,
-          depends_on: renderedStep.depends_on,
-          icon: renderedStep.icon,
-          icon_artwork_url: renderedStep.icon_artwork_url,
-          project_url: renderedStep.project_url,
-          github_url: renderedStep.github_url,
-          positive_summary: renderedStep.positive_summary,
-          status,
-          state: summarizeStepState(state),
-          latest_job: summarizeJob(latestJob),
-        };
-      });
+    const steps = visibleSteps.map((step) => {
+      const renderedStep = renderedStepsById.get(step.id) || step;
+      const { state, latestJob } = stepStateById.get(step.id) || { state: null, latestJob: null };
+      const status = deriveStepStatus(renderedStep, state, latestJob);
+
+      return {
+        id: renderedStep.id,
+        category_id: renderedStep.category_id,
+        title: renderedStep.title,
+        type: renderedStep.type,
+        journey_stage: renderedStep.journey_stage,
+        ingress_route: renderedStep.ingress_route,
+        summary: renderedStep.summary,
+        explanation: renderedStep.explanation,
+        side_help: renderedStep.side_help,
+        dashy: renderedStep.dashy,
+        inputs: renderedStep.inputs,
+        secrets: renderedStep.secrets,
+        icon: renderedStep.icon,
+        icon_artwork_url: renderedStep.icon_artwork_url,
+        project_url: renderedStep.project_url,
+        github_url: renderedStep.github_url,
+        positive_summary: renderedStep.positive_summary,
+        status,
+        state: summarizeStepState(state),
+        latest_job: summarizeJob(latestJob),
+      };
+    });
 
     return {
       id: category.id,
       title: category.title,
       summary: category.summary,
-      order: category.order,
       status: deriveCategoryStatus(steps),
       steps,
     };
@@ -633,14 +608,9 @@ function normalizeAppStepState(state) {
   };
 }
 
-function summarizeAppStep(step, state, latestJob, completedDependencies, stepLookup) {
-  const status = deriveAppStepStatus(step, state, latestJob, completedDependencies);
+function summarizeAppStep(step, state, latestJob) {
+  const status = deriveAppStepStatus(step, state, latestJob);
   const placeholder = isPlaceholderAppStep(step);
-  const dependencies = step.depends_on.map((dependencyId) => ({
-    id: dependencyId,
-    title: stepLookup.get(dependencyId)?.title || dependencyId,
-    state: completedDependencies.has(dependencyId) ? "done" : "pending",
-  }));
 
   return {
     id: step.id,
@@ -648,7 +618,6 @@ function summarizeAppStep(step, state, latestJob, completedDependencies, stepLoo
     title: step.title,
     type: step.type,
     journey_stage: step.journey_stage,
-    order: step.order,
     ingress_route: step.ingress_route,
     summary: step.summary,
     explanation: step.explanation,
@@ -657,7 +626,6 @@ function summarizeAppStep(step, state, latestJob, completedDependencies, stepLoo
     inputs: step.inputs,
     secrets: step.secrets,
     runner: step.runner,
-    depends_on: step.depends_on,
     icon: step.icon,
     icon_artwork_url: step.icon_artwork_url,
     project_url: step.project_url,
@@ -669,7 +637,6 @@ function summarizeAppStep(step, state, latestJob, completedDependencies, stepLoo
     app_state: status,
     placeholder,
     installable: !placeholder,
-    dependencies,
     state: summarizeStepState(state),
     latest_job: summarizeJob(latestJob),
   };
@@ -718,35 +685,17 @@ export function buildAppCatalogResponse({ workspaceRoot, dirs, clusterId = null 
     }
   }
 
-  const completedDependencies = new Set(
-    Array.from(stepStateById.entries())
-      .filter(([stepId, { state }]) => {
-        const step = definitions.stepsById.get(stepId);
-        return step && isDone(step, state);
-      })
-      .map(([stepId]) => stepId)
-  );
-
   const appCategory = definitions.categories.find((category) => category.id === "apps") || {
     id: "apps",
     title: "Apps",
     summary: "Install user-facing applications and collaboration tools.",
-    order: 30,
     steps: [],
   };
 
-  const appSteps = appCategory.steps
-    .map((step) => {
-      const { state, latestJob } = stepStateById.get(step.id) || { state: null, latestJob: null };
-      return summarizeAppStep(
-        step,
-        normalizeAppStepState(state),
-        latestJob,
-        completedDependencies,
-        definitions.stepsById
-      );
-    })
-    .sort((left, right) => left.order - right.order);
+  const appSteps = appCategory.steps.map((step) => {
+    const { state, latestJob } = stepStateById.get(step.id) || { state: null, latestJob: null };
+    return summarizeAppStep(step, normalizeAppStepState(state), latestJob);
+  });
 
   return {
     active_cluster: buildActiveClusterSummary(currentCluster),
@@ -755,7 +704,6 @@ export function buildAppCatalogResponse({ workspaceRoot, dirs, clusterId = null 
         id: appCategory.id,
         title: appCategory.title,
         summary: appCategory.summary,
-        order: appCategory.order,
         status: deriveCategoryStatus(appSteps),
         steps: appSteps,
       },

@@ -10,6 +10,8 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$manifest_path" \
   --application "traefik"
 
+KUBECONFIG="$KUBECONFIG_FILE" kubectl -n traefik rollout status deployment/traefik --timeout=300s
+
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \
     --arg application "traefik" \
