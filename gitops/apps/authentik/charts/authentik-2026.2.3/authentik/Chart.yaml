@@ -1,22 +1,22 @@
 annotations:
   artifacthub.io/changes: |
     - kind: changed
-      description: upgrade to authentik 2026.2.2
+      description: upgrade to authentik 2026.2.3
   artifacthub.io/images: |
     - name: authentik
-      image: ghcr.io/goauthentik/server:2026.2.2
+      image: ghcr.io/goauthentik/server:2026.2.3
       whitelisted: true
     - name: authentik-outpost-proxy
-      image: ghcr.io/goauthentik/proxy:2026.2.2
+      image: ghcr.io/goauthentik/proxy:2026.2.3
       whitelisted: true
     - name: authentik-outpost-ldap
-      image: ghcr.io/goauthentik/ldap:2026.2.2
+      image: ghcr.io/goauthentik/ldap:2026.2.3
       whitelisted: true
     - name: authentik-outpost-radius
-      image: ghcr.io/goauthentik/radius:2026.2.2
+      image: ghcr.io/goauthentik/radius:2026.2.3
       whitelisted: true
     - name: authentik-outpost-rac
-      image: ghcr.io/goauthentik/rac:2026.2.2
+      image: ghcr.io/goauthentik/rac:2026.2.3
       whitelisted: true
   artifacthub.io/license: GPL
   artifacthub.io/links: |
@@ -34,12 +34,12 @@ annotations:
     - title: Admin interface
       url: https://docs.goauthentik.io/img/screen_admin_light.jpg
 apiVersion: v2
-appVersion: 2026.2.2
+appVersion: 2026.2.3
 dependencies:
 - condition: postgresql.enabled
   name: postgresql
   repository: oci://registry-1.docker.io/bitnamicharts
-  version: 18.6.4
+  version: 16.7.27
 - alias: serviceAccount
   condition: serviceAccount.create
   name: authentik-remote-cluster
@@ -72,4 +72,4 @@ sources:
 - https://goauthentik.io/docs/
 - https://github.com/goauthentik/authentik
 type: application
-version: 2026.2.2
+version: 2026.2.3
