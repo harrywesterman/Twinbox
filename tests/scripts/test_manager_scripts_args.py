@@ -2751,7 +2751,12 @@ def test_install_immich_step_applies_its_argo_application():
     assert "db-externalsecret.yaml" in (
         REPO_ROOT / "gitops" / "platform-apps" / "immich" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
-    assert "../namespace.yaml" in IMMICH_DB_KUSTOMIZATION.read_text(encoding="utf-8")
+    immich_db_text = IMMICH_DB_KUSTOMIZATION.read_text(encoding="utf-8")
+    assert "namespace.yaml" in immich_db_text
+    assert "../namespace.yaml" not in immich_db_text
+    assert (
+        REPO_ROOT / "gitops" / "databases" / "immich" / "namespace.yaml"
+    ).read_text(encoding="utf-8").startswith("apiVersion: v1\nkind: Namespace\n")
 
 
 def test_immich_values_keep_valkey_storageclass_nested():
@@ -3094,7 +3099,7 @@ def test_platform_namespace_baseline_covers_shared_overlay_resources():
     assert "db-externalsecret.yaml" in (
         REPO_ROOT / "gitops" / "platform-apps" / "immich" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
-    assert "../namespace.yaml" in IMMICH_DB_KUSTOMIZATION.read_text(encoding="utf-8")
+    assert "namespace.yaml" in IMMICH_DB_KUSTOMIZATION.read_text(encoding="utf-8")
     assert "gitops/apps/dashy.yaml" in (
         REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-dashy-dashboard" / "run.sh"
     ).read_text(encoding="utf-8")
