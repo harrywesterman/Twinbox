@@ -2755,8 +2755,10 @@ def test_install_immich_step_applies_its_argo_application():
     assert "namespace.yaml" in immich_db_text
     assert "../namespace.yaml" not in immich_db_text
     assert (
-        REPO_ROOT / "gitops" / "databases" / "immich" / "namespace.yaml"
-    ).read_text(encoding="utf-8").startswith("apiVersion: v1\nkind: Namespace\n")
+        (REPO_ROOT / "gitops" / "databases" / "immich" / "namespace.yaml")
+        .read_text(encoding="utf-8")
+        .startswith("apiVersion: v1\nkind: Namespace\n")
+    )
 
 
 def test_immich_values_keep_valkey_storageclass_nested():

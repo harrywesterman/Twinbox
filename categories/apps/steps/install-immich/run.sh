@@ -39,7 +39,8 @@ template_file = Path(sys.argv[1])
 rendered_file = Path(sys.argv[2])
 zone_name = sys.argv[3]
 
-rendered = template_file.read_text(encoding="utf-8").replace("__ZONE_NAME__", zone_name)
+template = template_file.read_text(encoding="utf-8")
+rendered = template.replace("__ZONE_NAME__", zone_name)
 rendered_file.write_text(rendered, encoding="utf-8")
 PY
 }
@@ -511,7 +512,7 @@ log "Applying Immich Argo CD application"
 render_template \
   "$WORKSPACE_ROOT/gitops/apps/immich.yaml" \
   "$immich_rendered_manifest" \
-  "__ZONE_NAME__=$public_zone_name"
+  "$public_zone_name"
 
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$immich_rendered_manifest" \
