@@ -26,6 +26,24 @@ resolve_kubeconfig_file() {
   printf '%s\n' "$KUBECONFIG_FILE"
 }
 
+render_template() {
+  local template_file="$1"
+  local rendered_file="$2"
+  local zone_name="$3"
+
+  python3 - "$template_file" "$rendered_file" "$zone_name" <<'PY'
+from pathlib import Path
+import sys
+
+template_file = Path(sys.argv[1])
+rendered_file = Path(sys.argv[2])
+zone_name = sys.argv[3]
+
+rendered = template_file.read_text(encoding="utf-8").replace("__ZONE_NAME__", zone_name)
+rendered_file.write_text(rendered, encoding="utf-8")
+PY
+}
+
 wait_for_resources_ready() {
   local namespace="$1"
   local kind="$2"

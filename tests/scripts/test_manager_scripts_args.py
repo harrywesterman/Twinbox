@@ -2732,6 +2732,7 @@ def test_install_immich_step_applies_its_argo_application():
         'search_response="$(authentik_api_get "/providers/oauth2/?search=${provider_name// /%20}&page_size=50")"'
         in text
     )
+    assert "render_template() {" in text
     assert "render_template \\" in text
     assert '--manifest "$immich_rendered_manifest"' in text
     assert '--application "immich"' in text
