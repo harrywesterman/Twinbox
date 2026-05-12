@@ -8,6 +8,7 @@ WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." &&
 BOOTSTRAP_ROOT="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
 HOST_CRON_DIR="${TWINBOX_HOST_CRON_DIR:-/host/etc/cron.d}"
 HOST_REPO_ROOT="${TWINBOX_HOST_REPO_ROOT:-/opt/twinbox}"
+MANAGER_DATA_ROOT="${MANAGER_DATA_DIR:-${HOST_REPO_ROOT}/manager-data}"
 VELERO_SECRET_FILE="${BOOTSTRAP_ROOT}/secrets/global/velero.json"
 MANAGEMENT_BACKUP_FILE="${BOOTSTRAP_ROOT}/secrets/global/management-backup.json"
 RUNTIME_SCRIPT="${BOOTSTRAP_ROOT}/bin/twinbox-management-backup.sh"
@@ -17,14 +18,44 @@ RETENTION_DAYS="${TWINBOX_MANAGEMENT_BACKUP_RETENTION_DAYS:-30}"
 command -v jq >/dev/null 2>&1 || fail "jq not found"
 command -v openssl >/dev/null 2>&1 || fail "openssl not found"
 
-cluster_json="$(printf '%s' "${STEP_CONTEXT_JSON:-{}}" | jq -c '.cluster // {}')"
-cluster_id="${TWINBOX_CLUSTER_ID:-$(jq -r '.id // empty' <<<"$cluster_json")}"
-controlplane_ip="$(jq -r '(.discovered_controlplane_ips[0] // .controlplane_ips[0] // empty)' <<<"$cluster_json")"
+cluster_id="${TWINBOX_CLUSTER_ID:-}"
 talosconfig_file="${TWINBOX_TALOSCONFIG_FILE:-}"
+cluster_state_file=""
+
+read_controlplane_ip_from_json() {
+  local source_file="$1"
+  jq -r '(.discovered_controlplane_ips[0] // .controlplane_ips[0] // empty)' "$source_file" 2>/dev/null || printf ''
+}
+
+read_controlplane_ip_from_step_context() {
+  local step_context_json="${STEP_CONTEXT_JSON:-}"
+  local cluster_json=""
+
+  [[ -n "$step_context_json" ]] || return 1
+  cluster_json="$(
+    printf '%s' "$step_context_json" | jq -c '.cluster // {}' 2>/dev/null
+  )" || return 1
+  jq -r '(.discovered_controlplane_ips[0] // .controlplane_ips[0] // empty)' <<<"$cluster_json" 2>/dev/null || printf ''
+}
+
+if [[ -z "$cluster_id" && -n "${STEP_CONTEXT_JSON:-}" ]]; then
+  cluster_id="$(
+    printf '%s' "$STEP_CONTEXT_JSON" | jq -r '.cluster.id // empty' 2>/dev/null || printf ''
+  )"
+fi
 
 [[ -n "$cluster_id" ]] || fail "cluster id is required"
-[[ -n "$controlplane_ip" ]] || fail "control-plane IP is required"
 [[ -f "$VELERO_SECRET_FILE" ]] || fail "Velero/SeaweedFS bootstrap secret not found at ${VELERO_SECRET_FILE}"
+
+cluster_state_file="${MANAGER_DATA_ROOT}/clusters/${cluster_id}.json"
+if [[ -f "$cluster_state_file" ]]; then
+  controlplane_ip="$(read_controlplane_ip_from_json "$cluster_state_file")"
+fi
+if [[ -z "${controlplane_ip:-}" ]]; then
+  controlplane_ip="$(read_controlplane_ip_from_step_context || printf '')"
+fi
+
+[[ -n "${controlplane_ip:-}" ]] || fail "control-plane IP is required"
 
 if [[ -z "$talosconfig_file" ]]; then
   talosconfig_file="${BOOTSTRAP_ROOT}/secrets/cluster/${cluster_id}/talosconfig/talosconfig"
