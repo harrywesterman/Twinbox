@@ -277,6 +277,11 @@ test("app source defines a minimal wizard shell with guided input and step-by-st
     /window\.open\(adminDashboardUrl/,
     "expected the admin dashboard action to avoid popup-based navigation"
   );
+  assert.match(
+    source,
+    /answers\?\.\["configure-dns"\]/,
+    "expected the admin dashboard link to derive the DNS domain from the DNS step"
+  );
   assert.match(source, /installLogsByStepRef/, "expected the install view to cache logs per step");
   assert.match(source, /setInstallStepLogs\(/, "expected the install pane to write per-step logs");
   assert.match(

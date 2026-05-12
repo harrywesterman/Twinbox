@@ -37,6 +37,19 @@ test("buildAdminDashboardUrl can use fallback wizard context when the cluster re
   );
 });
 
+test("buildAdminDashboardUrl can use the DNS step context when the cluster record is missing", () => {
+  assert.equal(
+    buildAdminDashboardUrl(
+      {},
+      {
+        slug: "tst",
+        dns_domain: "example.com",
+      }
+    ),
+    "https://admin.tst.example.com"
+  );
+});
+
 test("twinboxPublicZoneName keeps the prd cluster on the base domain", () => {
   assert.equal(twinboxPublicZoneName("prd", "example.com"), "example.com");
 });

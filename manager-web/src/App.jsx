@@ -1069,14 +1069,14 @@ function App() {
   }, [busy, catalog, cluster, error, health, initialAnswers, logs, selectedStepId]);
   const adminDashboardContext = useMemo(() => {
     const provisionAnswers = answers?.["provision-nodes"] || {};
-    const ingressAnswers = answers?.["choose-ingress-route"] || {};
+    const dnsAnswers = answers?.["configure-dns"] || {};
 
     return {
       ...cluster,
       id: cluster?.id || clusterId || "",
       slug: cluster?.slug || provisionAnswers.name || cluster?.id || clusterId || "",
-      dns_domain: cluster?.dns_domain || ingressAnswers.dns_domain || "",
-      public_zone_name: cluster?.public_zone_name || ingressAnswers.public_zone_name || "",
+      dns_domain: cluster?.dns_domain || dnsAnswers.dns_domain || "",
+      public_zone_name: cluster?.public_zone_name || dnsAnswers.public_zone_name || "",
     };
   }, [answers, cluster, clusterId]);
   const adminDashboardUrl = useMemo(
