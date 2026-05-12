@@ -542,6 +542,34 @@ su zulip -c '/home/zulip/deployments/current/manage.py shell -c \"\$(cat /tmp/ve
   log "Zulip bootstrap verified"
 }
 
+wait_for_zulip_realm() {
+  local pod_name realm_exists
+  local attempts=60
+  local attempt=1
+
+  pod_name="$1"
+  while true; do
+    realm_exists="$(
+      kubectl -n zulip exec "$pod_name" -- bash -c 'su zulip -c "cd /home/zulip/deployments/current && ./manage.py shell -c '\''from zerver.models import Realm; print(\"yes\" if Realm.objects.count() else \"no\")'\''"' 2>/dev/null | tail -n1
+    )"
+
+    if [[ "$realm_exists" == "yes" ]]; then
+      log "Zulip default realm exists"
+      return 0
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      fail "Timed out waiting for Zulip default realm to be created by postSetup"
+    fi
+
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
+zulip_realm_pod="$(find_statefulset_pod "zulip" "zulip")"
+[[ -n "$zulip_realm_pod" ]] || fail "Could not find running Zulip pod for realm existence check"
+wait_for_zulip_realm "$zulip_realm_pod"
 verify_zulip_bootstrap
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
