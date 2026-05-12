@@ -8,8 +8,7 @@ manifest_path="$WORKSPACE_ROOT/gitops/apps/traefik.yaml"
 
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$manifest_path" \
-  --application "traefik" \
-  --no-wait
+  --application "traefik"
 
 KUBECONFIG="$KUBECONFIG_FILE" kubectl -n traefik rollout status deployment/traefik --timeout=300s
 
