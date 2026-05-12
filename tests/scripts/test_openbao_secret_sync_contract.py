@@ -245,8 +245,9 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "announcements" in values_text
     assert "support" in values_text
     assert "send_initial_realm_messages(realm)" in values_text
-    assert 'Realm.objects.filter(string_id="").exists()' in values_text
-    assert 'su zulip -c "cd /home/zulip/deployments/current && ./manage.py shell"' in values_text
+    assert "Realm.objects.filter(string_id=" in values_text
+    assert "Realm.objects.get(string_id=" in values_text
+    assert 'su zulip -c "cd /home/zulip/deployments/current && ./manage.py shell -c' in values_text
     assert (
         'su zulip -c "cd /home/zulip/deployments/current && ./manage.py create_realm '
         '--automated --string-id='

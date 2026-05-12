@@ -37,10 +37,7 @@ postSetup:
       owner_email="${ZULIP_DEFAULT_REALM_OWNER_EMAIL:-${SETTING_ZULIP_ADMINISTRATOR:-admin@${SETTING_EXTERNAL_HOST}}}"
 
       realm_exists="$(
-        su zulip -c "cd /home/zulip/deployments/current && ./manage.py shell" <<'PY' | tail -n1
-from zerver.models import Realm
-print("yes" if Realm.objects.filter(string_id="").exists() else "no")
-PY
+        su zulip -c "cd /home/zulip/deployments/current && ./manage.py shell -c 'from zerver.models import Realm; print(\"yes\" if Realm.objects.filter(string_id=\"\").exists() else \"no\")'" | tail -n1
       )"
       if [[ "$realm_exists" != "yes" ]]; then
         su zulip -c "cd /home/zulip/deployments/current && ./manage.py create_realm --automated --string-id= \"$realm_name\" \"$owner_email\" \"$owner_name\""
@@ -49,48 +46,7 @@ PY
         echo "Default Zulip organization already exists"
       fi
 
-      su zulip -c "cd /home/zulip/deployments/current && ./manage.py shell" <<'PY'
-      from zerver.actions.default_streams import do_add_default_stream
-      from zerver.lib.onboarding import send_initial_realm_messages
-      from zerver.lib.streams import ensure_stream
-      from zerver.models import DefaultStream, OnboardingUserMessage, Realm, Stream
-
-      realm = Realm.objects.get(string_id="")
-
-      streams = {
-          "general": "General conversation for the Twinbox cluster.",
-          "announcements": "Announcements and release notes for Twinbox.",
-          "support": "Questions, setup help, and troubleshooting.",
-      }
-
-      for stream_name, stream_description in streams.items():
-          stream = ensure_stream(
-              realm, stream_name, stream_description=stream_description, acting_user=None
-          )
-          do_add_default_stream(stream)
-
-      if not OnboardingUserMessage.objects.filter(realm_id=realm.id).exists():
-          send_initial_realm_messages(realm)
-
-      required_default_streams = sorted(streams)
-      missing_default_streams = [
-          stream_name
-          for stream_name in required_default_streams
-          if not DefaultStream.objects.filter(realm=realm, stream__name=stream_name).exists()
-      ]
-      if missing_default_streams:
-          raise SystemExit(f"Missing default streams: {', '.join(missing_default_streams)}")
-
-      missing_streams = [
-          stream_name
-          for stream_name in required_default_streams
-          if not Stream.objects.filter(realm=realm, name=stream_name).exists()
-      ]
-      if missing_streams:
-          raise SystemExit(f"Missing streams: {', '.join(missing_streams)}")
-
-      print("Zulip bootstrap streams and onboarding are present")
-      PY
+      su zulip -c "cd /home/zulip/deployments/current && ./manage.py shell -c 'from zerver.actions.default_streams import do_add_default_stream; from zerver.lib.onboarding import send_initial_realm_messages; from zerver.lib.streams import ensure_stream; from zerver.models import DefaultStream, OnboardingUserMessage, Realm, Stream; realm = Realm.objects.get(string_id=\"\"); streams = {\"general\": \"General conversation for the Twinbox cluster.\", \"announcements\": \"Announcements and release notes for Twinbox.\", \"support\": \"Questions, setup help, and troubleshooting.\"}; [do_add_default_stream(ensure_stream(realm, stream_name, stream_description=stream_description, acting_user=None)) for stream_name, stream_description in streams.items()]; OnboardingUserMessage.objects.filter(realm_id=realm.id).exists() or send_initial_realm_messages(realm); required_default_streams = sorted(streams); missing_default_streams = [stream_name for stream_name in required_default_streams if not DefaultStream.objects.filter(realm=realm, stream__name=stream_name).exists()]; missing_streams = [stream_name for stream_name in required_default_streams if not Stream.objects.filter(realm=realm, name=stream_name).exists()]; missing_default_streams and (__import__(\"sys\").exit(f\"Missing default streams: {', '.join(missing_default_streams)}\")); missing_streams and (__import__(\"sys\").exit(f\"Missing streams: {', '.join(missing_streams)}\")); print(\"Zulip bootstrap streams and onboarding are present\")'"
 
 postgresql:
   enabled: false
