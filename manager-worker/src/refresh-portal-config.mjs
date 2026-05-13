@@ -142,7 +142,7 @@ function runKubectl(args, { input = undefined, allowFailure = false } = {}) {
 }
 
 function readInstalledAppIds() {
-  let parsed = null;
+  let parsed;
   try {
     const result = runKubectl(["-n", "argocd", "get", "application", "-o", "json"], {
       allowFailure: true,

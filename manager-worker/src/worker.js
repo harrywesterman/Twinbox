@@ -220,7 +220,7 @@ function recoverOrphanedRunningJobs() {
 
   for (const entry of entries) {
     const runningFile = path.join(dirs.running, entry);
-    let queued = null;
+    let queued;
     try {
       queued = readJson(runningFile);
     } catch (error) {
