@@ -244,9 +244,18 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "MANAGER_DATA_DIR" in run_text
     assert "announcements" in values_text
     assert "support" in values_text
+    assert (
+        'desired_jitsi_server_url = "https://${SETTING_EXTERNAL_HOST/zulip./jitsi.}"' in values_text
+    )
+    assert (
+        'desired_video_chat_provider = Realm.VIDEO_CHAT_PROVIDERS["jitsi_meet"]["id"]'
+        in values_text
+    )
     assert "send_initial_realm_messages(realm)" in values_text
     assert "Realm.objects.filter(string_id=" in values_text
-    assert "cat > /tmp/zulip-bootstrap.py <<'PY'" in values_text
+    assert "realm.jitsi_server_url" in values_text
+    assert "realm.video_chat_provider" in values_text
+    assert "cat > /tmp/zulip-bootstrap.py <<PY" in values_text
     assert (
         'su zulip -c "cd /home/zulip/deployments/current && ./manage.py shell < '
         "/tmp/zulip-bootstrap.py"
@@ -264,6 +273,9 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "property: ZULIP_RABBITMQ_ERLANG_COOKIE" in runtime_secret_text
     assert "verify_zulip_bootstrap" in run_text
     assert "ensure_zulip_bootstrap_streams" in run_text
+    assert "zulip_jitsi_server_url" in run_text
+    assert "realm.jitsi_server_url" in run_text
+    assert "realm.video_chat_provider" in run_text
     assert "wait_for_zulip_realm" in run_text
     assert "find_statefulset_pod" in run_text
     assert "OnboardingUserMessage" in run_text

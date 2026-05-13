@@ -208,6 +208,7 @@ public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domai
 
 zulip_default_realm_owner_email="admin@${public_zone_name}"
 zulip_default_realm_owner_name="Twinbox Admin"
+zulip_jitsi_server_url="https://jitsi.${public_zone_name}"
 create_users_state_file="$MANAGER_DATA_DIR/step-state/clusters/${cluster_scope_id}/create-users-and-groups.json"
 if [[ -f "$create_users_state_file" ]]; then
   step_owner_email="$(jq -r '.outputs.email // empty' "$create_users_state_file")"
@@ -485,7 +486,7 @@ find_statefulset_pod() {
 }
 
 verify_zulip_bootstrap() {
-  local pod_name expected_owner_email_json
+  local pod_name expected_owner_email_json expected_jitsi_server_url_json
   local verify_script
 
   pod_name="$(find_statefulset_pod "zulip" "zulip")"
@@ -496,6 +497,15 @@ verify_zulip_bootstrap() {
 from zerver.models import DefaultStream, OnboardingUserMessage, Realm, Stream, UserProfile
 
 realm = Realm.objects.get(string_id="")
+
+expected_jitsi_server_url = __JITSI_SERVER_URL_JSON__
+if realm.jitsi_server_url != expected_jitsi_server_url:
+    raise SystemExit(
+        f"Unexpected Zulip Jitsi server URL: {realm.jitsi_server_url!r} != {expected_jitsi_server_url!r}"
+    )
+
+if realm.video_chat_provider != Realm.VIDEO_CHAT_PROVIDERS["jitsi_meet"]["id"]:
+    raise SystemExit("Zulip video chat provider is not configured for Jitsi Meet")
 
 required_streams = ["Zulip", "sandbox", "general", "announcements", "support"]
 missing_streams = [
@@ -531,7 +541,9 @@ PY
   )"
 
   expected_owner_email_json="$(jq -n --arg value "$zulip_default_realm_owner_email" '$value')"
+  expected_jitsi_server_url_json="$(jq -n --arg value "$zulip_jitsi_server_url" '$value')"
   verify_script="${verify_script/__OWNER_EMAIL_JSON__/$expected_owner_email_json}"
+  verify_script="${verify_script/__JITSI_SERVER_URL_JSON__/$expected_jitsi_server_url_json}"
 
   kubectl -n zulip exec "$pod_name" -- bash -c "
 cat > /tmp/verify-bootstrap.py << 'VERIFYEOF'
@@ -556,6 +568,20 @@ from zerver.lib.streams import ensure_stream
 from zerver.models import DefaultStream, OnboardingUserMessage, Realm, Stream
 
 realm = Realm.objects.get(string_id="")
+desired_jitsi_server_url = __JITSI_SERVER_URL_JSON__
+
+update_fields = []
+if realm.jitsi_server_url != desired_jitsi_server_url:
+    realm.jitsi_server_url = desired_jitsi_server_url
+    update_fields.append("jitsi_server_url")
+
+desired_video_chat_provider = Realm.VIDEO_CHAT_PROVIDERS["jitsi_meet"]["id"]
+if realm.video_chat_provider != desired_video_chat_provider:
+    realm.video_chat_provider = desired_video_chat_provider
+    update_fields.append("video_chat_provider")
+
+if update_fields:
+    realm.save(update_fields=update_fields)
 
 streams = {
     "general": "General conversation for the Twinbox cluster.",
@@ -593,13 +619,15 @@ print("Zulip bootstrap streams and onboarding are present")
 PY
   )"
 
+  bootstrap_script="${bootstrap_script/__JITSI_SERVER_URL_JSON__/$(jq -n --arg value "$zulip_jitsi_server_url" '$value')}"
+
   kubectl -n zulip exec "$pod_name" -- bash -c "
 cat > /tmp/ensure-zulip-bootstrap.py << 'BOOTSTRAPEOF'
 $bootstrap_script
 BOOTSTRAPEOF
 su zulip -c '/home/zulip/deployments/current/manage.py shell < /tmp/ensure-zulip-bootstrap.py'
 " >/dev/null
-  log "Zulip bootstrap streams are present"
+  log "Zulip bootstrap streams and Jitsi configuration are present"
 }
 
 wait_for_zulip_realm() {

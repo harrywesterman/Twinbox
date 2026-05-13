@@ -46,13 +46,27 @@ postSetup:
         echo "Default Zulip organization already exists"
       fi
 
-      cat > /tmp/zulip-bootstrap.py <<'PY'
+      cat > /tmp/zulip-bootstrap.py <<PY
       from zerver.actions.default_streams import do_add_default_stream
       from zerver.lib.onboarding import send_initial_realm_messages
       from zerver.lib.streams import ensure_stream
       from zerver.models import DefaultStream, OnboardingUserMessage, Realm, Stream
 
       realm = Realm.objects.get(string_id="")
+      desired_jitsi_server_url = "https://${SETTING_EXTERNAL_HOST/zulip./jitsi.}"
+
+      update_fields = []
+      if realm.jitsi_server_url != desired_jitsi_server_url:
+          realm.jitsi_server_url = desired_jitsi_server_url
+          update_fields.append("jitsi_server_url")
+
+      desired_video_chat_provider = Realm.VIDEO_CHAT_PROVIDERS["jitsi_meet"]["id"]
+      if realm.video_chat_provider != desired_video_chat_provider:
+          realm.video_chat_provider = desired_video_chat_provider
+          update_fields.append("video_chat_provider")
+
+      if update_fields:
+          realm.save(update_fields=update_fields)
 
       streams = {
           "general": "General conversation for the Twinbox cluster.",
