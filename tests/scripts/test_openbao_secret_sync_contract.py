@@ -247,7 +247,11 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "send_initial_realm_messages(realm)" in values_text
     assert "Realm.objects.filter(string_id=" in values_text
     assert "cat > /tmp/zulip-bootstrap.py <<'PY'" in values_text
-    assert 'su zulip -c "cd /home/zulip/deployments/current && ./manage.py shell < /tmp/zulip-bootstrap.py"' in values_text
+    assert (
+        'su zulip -c "cd /home/zulip/deployments/current && ./manage.py shell < '
+        "/tmp/zulip-bootstrap.py"
+        '"'
+    ) in values_text
     assert "missing_default_streams" in values_text
     assert "missing_streams" in values_text
     assert "imageName: ghcr.io/cloudnative-pg/postgresql:16.4" in db_cluster_text
