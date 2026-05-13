@@ -839,7 +839,6 @@ function SettingsPage({ config, preferences, setPreferences, onSave, onNavigate 
             ))}
           </select>
         </label>
-        {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
         <label>
           <span>Theme</span>
           <div className="segmented-control">
@@ -1351,26 +1350,21 @@ function AdminAppInstallModal({ onNavigate, adminAppsState, installTarget }) {
   }
 
   async function pollJob(jobId) {
-    let latestJob = null;
-
     while (true) {
       const [jobPayload, logsPayload] = await Promise.all([
         requestJson(`/api/admin/apps/jobs/${encodeURIComponent(jobId)}`),
         requestJson(`/api/admin/apps/jobs/${encodeURIComponent(jobId)}/logs`),
       ]);
 
-      latestJob = jobPayload;
       setCurrentJob(jobPayload);
       setJobLines(Array.isArray(logsPayload?.lines) ? logsPayload.lines : []);
 
       if (!["pending", "running", "cancel_requested"].includes(jobPayload.status)) {
-        break;
+        return jobPayload;
       }
 
       await sleep(2000);
     }
-
-    return latestJob;
   }
 
   // eslint-disable-next-line react-hooks/rules-of-hooks

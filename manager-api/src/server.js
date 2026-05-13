@@ -126,7 +126,8 @@ function proxmoxApiRequest(pathname, proxmoxEnv, { method = "GET", body, headers
     return JSON.parse(result.stdout || "{}");
   } catch (error) {
     throw new Error(
-      `Failed to parse Proxmox API response: ${error instanceof Error ? error.message : "unknown error"}`
+      `Failed to parse Proxmox API response: ${error instanceof Error ? error.message : "unknown error"}`,
+      { cause: error }
     );
   }
 }
@@ -643,7 +644,8 @@ async function listClusterVmResources() {
     return Array.isArray(parsed) ? parsed : [];
   } catch (error) {
     throw new Error(
-      `Failed to parse cluster VM resources: ${error instanceof Error ? error.message : "unknown error"}`
+      `Failed to parse cluster VM resources: ${error instanceof Error ? error.message : "unknown error"}`,
+      { cause: error }
     );
   }
 }
@@ -700,7 +702,8 @@ async function listUsedVmids() {
     );
   } catch (error) {
     throw new Error(
-      `Failed to parse cluster VM resources: ${error instanceof Error ? error.message : "unknown error"}`
+      `Failed to parse cluster VM resources: ${error instanceof Error ? error.message : "unknown error"}`,
+      { cause: error }
     );
   }
 }
@@ -734,7 +737,8 @@ async function listClusterNodeResources() {
     return Array.isArray(parsed) ? parsed : [];
   } catch (error) {
     throw new Error(
-      `Failed to parse cluster node resources: ${error instanceof Error ? error.message : "unknown error"}`
+      `Failed to parse cluster node resources: ${error instanceof Error ? error.message : "unknown error"}`,
+      { cause: error }
     );
   }
 }
@@ -1473,48 +1477,46 @@ app.post("/api/ip-availability", async (req, res) => {
 
 app.post("/api/clusters", async (req, res) => {
   const body = req.body || {};
-  let allowedVmHosts = [];
   try {
-    allowedVmHosts = await listClusterNodeNames();
+    const allowedVmHosts = await listClusterNodeNames();
+    const built = buildClusterFromRequest(body, process.env, { allowedVmHosts });
+    if (!built.ok) {
+      return res.status(400).json({ error: built.error });
+    }
+
+    try {
+      const allocation = await validateRequestedAllocation({
+        startVmid: built.cluster.start_vmid,
+        vipIp: built.cluster.vip_ip,
+        startIp: built.cluster.start_ip,
+        nodeCount: built.cluster.controlplane_count + built.cluster.worker_count,
+      });
+      if (!allocation.ok) {
+        return res.status(400).json({ error: allocation.error });
+      }
+    } catch (error) {
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : "failed to validate allocation",
+      });
+    }
+
+    persistCluster(dirs, built.cluster);
+    const job = queueJob(
+      dirs,
+      "apply_cluster",
+      built.cluster.id,
+      buildApplyJobPayload(built.cluster)
+    );
+    return res.status(202).json({
+      cluster_id: built.cluster.id,
+      cluster_instance_id: built.cluster.cluster_instance_id,
+      job_id: job.id,
+    });
   } catch (error) {
     return res.status(500).json({
       error: error instanceof Error ? error.message : "failed to read Proxmox hosts",
     });
   }
-
-  const built = buildClusterFromRequest(body, process.env, { allowedVmHosts });
-  if (!built.ok) {
-    return res.status(400).json({ error: built.error });
-  }
-
-  try {
-    const allocation = await validateRequestedAllocation({
-      startVmid: built.cluster.start_vmid,
-      vipIp: built.cluster.vip_ip,
-      startIp: built.cluster.start_ip,
-      nodeCount: built.cluster.controlplane_count + built.cluster.worker_count,
-    });
-    if (!allocation.ok) {
-      return res.status(400).json({ error: allocation.error });
-    }
-  } catch (e) {
-    return res.status(500).json({
-      error: e instanceof Error ? e.message : "failed to validate allocation",
-    });
-  }
-
-  persistCluster(dirs, built.cluster);
-  const job = queueJob(
-    dirs,
-    "apply_cluster",
-    built.cluster.id,
-    buildApplyJobPayload(built.cluster)
-  );
-  return res.status(202).json({
-    cluster_id: built.cluster.id,
-    cluster_instance_id: built.cluster.cluster_instance_id,
-    job_id: job.id,
-  });
 });
 
 app.post("/api/clusters/:clusterId/bootstrap", (req, res) => {
@@ -1577,54 +1579,53 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
   let context = {};
 
   if (stepId === "provision-nodes") {
-    let allowedVmHosts = [];
     try {
-      allowedVmHosts = await listClusterNodeNames();
+      const allowedVmHosts = await listClusterNodeNames();
+
+      const requestedClusterFile = requestedClusterId
+        ? path.join(dirs.clusters, `${requestedClusterId}.json`)
+        : "";
+      const existingCluster =
+        requestedClusterFile && fs.existsSync(requestedClusterFile)
+          ? readJson(requestedClusterFile)
+          : null;
+      if (
+        requestedClusterInstanceId &&
+        existingCluster?.cluster_instance_id &&
+        requestedClusterInstanceId !== existingCluster.cluster_instance_id
+      ) {
+        return res.status(409).json({ error: "cluster instance mismatch" });
+      }
+      const reuseProvisionClusterInstance = shouldReuseProvisionClusterInstance(
+        existingCluster,
+        requestedClusterInstanceId
+      );
+
+      const built = buildClusterFromRequest(
+        {
+          ...validated.value,
+          vm_ip_map: req.body?.vm_ip_map,
+          vm_size_map: req.body?.vm_size_map,
+          vm_node_map: req.body?.vm_node_map,
+        },
+        process.env,
+        {
+          allowedVmHosts,
+          clusterInstanceId: reuseProvisionClusterInstance ? requestedClusterInstanceId : null,
+        }
+      );
+      if (!built.ok) {
+        return res.status(400).json({ error: built.error });
+      }
+
+      persistCluster(dirs, built.cluster);
+      clusterId = built.cluster.id;
+      context = { cluster: built.cluster };
     } catch (error) {
       return res.status(500).json({
         error: error instanceof Error ? error.message : "failed to read Proxmox hosts",
       });
     }
-
-    const requestedClusterFile = requestedClusterId
-      ? path.join(dirs.clusters, `${requestedClusterId}.json`)
-      : "";
-    const existingCluster =
-      requestedClusterFile && fs.existsSync(requestedClusterFile)
-        ? readJson(requestedClusterFile)
-        : null;
-    if (
-      requestedClusterInstanceId &&
-      existingCluster?.cluster_instance_id &&
-      requestedClusterInstanceId !== existingCluster.cluster_instance_id
-    ) {
-      return res.status(409).json({ error: "cluster instance mismatch" });
-    }
-    const reuseProvisionClusterInstance = shouldReuseProvisionClusterInstance(
-      existingCluster,
-      requestedClusterInstanceId
-    );
-
-    const built = buildClusterFromRequest(
-      {
-        ...validated.value,
-        vm_ip_map: req.body?.vm_ip_map,
-        vm_size_map: req.body?.vm_size_map,
-        vm_node_map: req.body?.vm_node_map,
-      },
-      process.env,
-      {
-        allowedVmHosts,
-        clusterInstanceId: reuseProvisionClusterInstance ? requestedClusterInstanceId : null,
-      }
-    );
-    if (!built.ok) {
-      return res.status(400).json({ error: built.error });
-    }
-
-    persistCluster(dirs, built.cluster);
-    clusterId = built.cluster.id;
-    context = { cluster: built.cluster };
   } else if (isClusterScopedStep(step)) {
     const requestedCluster = resolveRequestedCluster(req.body?.cluster_id);
     if (!requestedCluster.ok) {

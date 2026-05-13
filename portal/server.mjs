@@ -223,25 +223,23 @@ async function loadOAuthState(state) {
   }
 
   const filePath = oauthStateFilePath(stateValue);
-  let payload = null;
   try {
-    payload = await readJsonFile(filePath, null);
+    const payload = await readJsonFile(filePath, null);
+    if (!payload) {
+      return null;
+    }
+
+    const createdAt = Number(payload.createdAt || 0);
+    if (!createdAt || Date.now() - createdAt > oauthStateTtlMs) {
+      await fs.promises.rm(filePath, { force: true });
+      return null;
+    }
+
+    return payload;
   } catch {
     await fs.promises.rm(filePath, { force: true });
     return null;
   }
-
-  if (!payload) {
-    return null;
-  }
-
-  const createdAt = Number(payload.createdAt || 0);
-  if (!createdAt || Date.now() - createdAt > oauthStateTtlMs) {
-    await fs.promises.rm(filePath, { force: true });
-    return null;
-  }
-
-  return payload;
 }
 
 async function clearOAuthState(state) {
