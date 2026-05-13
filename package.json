@@ -9,6 +9,7 @@
     "format:check": "prettier --check \"lib/**/*.{js,mjs}\" \"scripts/**/*.{js,mjs}\""
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "eslint": "^10.0.0",
     "eslint-config-prettier": "^10.0.0",
     "globals": "^17.6.0",
