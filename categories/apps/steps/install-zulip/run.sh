@@ -542,6 +542,66 @@ su zulip -c '/home/zulip/deployments/current/manage.py shell -c \"\$(cat /tmp/ve
   log "Zulip bootstrap verified"
 }
 
+ensure_zulip_bootstrap_streams() {
+  local pod_name bootstrap_script
+
+  pod_name="$(find_statefulset_pod "zulip" "zulip")"
+  [[ -n "$pod_name" ]] || fail "Could not find a running Zulip pod for bootstrap stream setup"
+
+  bootstrap_script="$(
+    cat <<'PY'
+from zerver.actions.default_streams import do_add_default_stream
+from zerver.lib.onboarding import send_initial_realm_messages
+from zerver.lib.streams import ensure_stream
+from zerver.models import DefaultStream, OnboardingUserMessage, Realm, Stream
+
+realm = Realm.objects.get(string_id="")
+
+streams = {
+    "general": "General conversation for the Twinbox cluster.",
+    "announcements": "Announcements and release notes for Twinbox.",
+    "support": "Questions, setup help, and troubleshooting.",
+}
+
+for stream_name, stream_description in streams.items():
+    stream = ensure_stream(
+        realm, stream_name, stream_description=stream_description, acting_user=None
+    )
+    do_add_default_stream(stream)
+
+if not OnboardingUserMessage.objects.filter(realm_id=realm.id).exists():
+    send_initial_realm_messages(realm)
+
+required_default_streams = sorted(streams)
+missing_default_streams = [
+    stream_name
+    for stream_name in required_default_streams
+    if not DefaultStream.objects.filter(realm=realm, stream__name=stream_name).exists()
+]
+if missing_default_streams:
+    raise SystemExit(f"Missing default streams: {', '.join(missing_default_streams)}")
+
+missing_streams = [
+    stream_name
+    for stream_name in required_default_streams
+    if not Stream.objects.filter(realm=realm, name=stream_name).exists()
+]
+if missing_streams:
+    raise SystemExit(f"Missing streams: {', '.join(missing_streams)}")
+
+print("Zulip bootstrap streams and onboarding are present")
+PY
+  )"
+
+  kubectl -n zulip exec "$pod_name" -- bash -c "
+cat > /tmp/ensure-zulip-bootstrap.py << 'BOOTSTRAPEOF'
+$bootstrap_script
+BOOTSTRAPEOF
+su zulip -c '/home/zulip/deployments/current/manage.py shell < /tmp/ensure-zulip-bootstrap.py'
+" >/dev/null
+  log "Zulip bootstrap streams are present"
+}
+
 wait_for_zulip_realm() {
   local pod_name realm_exists
   local attempts=24
@@ -597,6 +657,7 @@ bash /tmp/create-realm.sh
 zulip_realm_pod="$(find_statefulset_pod "zulip" "zulip")"
 [[ -n "$zulip_realm_pod" ]] || fail "Could not find running Zulip pod for realm existence check"
 wait_for_zulip_realm "$zulip_realm_pod"
+ensure_zulip_bootstrap_streams
 verify_zulip_bootstrap
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then

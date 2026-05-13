@@ -263,6 +263,7 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "secretKey: rabbitmq-erlang-cookie" in runtime_secret_text
     assert "property: ZULIP_RABBITMQ_ERLANG_COOKIE" in runtime_secret_text
     assert "verify_zulip_bootstrap" in run_text
+    assert "ensure_zulip_bootstrap_streams" in run_text
     assert "wait_for_zulip_realm" in run_text
     assert "find_statefulset_pod" in run_text
     assert "OnboardingUserMessage" in run_text
