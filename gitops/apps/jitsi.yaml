@@ -8,7 +8,7 @@ spec:
   sources:
     - repoURL: https://jitsi-contrib.github.io/jitsi-helm/
       chart: jitsi-meet
-      targetRevision: "2.16.0"
+      targetRevision: "2.17.0"
       helm:
         valueFiles:
           - $values/gitops/values/jitsi.yaml
