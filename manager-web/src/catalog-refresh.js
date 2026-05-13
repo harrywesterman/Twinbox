@@ -187,7 +187,7 @@ export async function refreshWizardSnapshot({
       : new Error("Failed to refresh wizard health");
   }
 
-  let catalogValue = null;
+  let catalogValue;
   if (catalogData.status === "fulfilled") {
     catalogValue = catalogData.value;
   } else if (isMissingClusterError(catalogData.reason)) {

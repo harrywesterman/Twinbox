@@ -317,7 +317,6 @@ function InputField({ stepId, input, value, onChange }) {
 
   if (input.type === "boolean") {
     return (
-      /* eslint-disable-next-line jsx-a11y/label-has-associated-control */
       <label className="wizard-field wizard-field-boolean" htmlFor={controlId}>
         <input
           id={controlId}
@@ -1441,17 +1440,13 @@ function App() {
   ]);
 
   async function pollJob(jobId, stepId) {
-    let latestJob = null;
-    let latestLogs = [];
-
     for (;;) {
       const [jobData, logsData] = await Promise.all([
         requestJson(`/api/jobs/${encodeURIComponent(jobId)}`),
         requestJson(`/api/jobs/${encodeURIComponent(jobId)}/logs`),
       ]);
 
-      latestJob = jobData;
-      latestLogs = logsData?.lines || [];
+      const latestLogs = logsData?.lines || [];
       if (stepId && latestLogs.length > 0) {
         setInstallStepLogs(stepId, latestLogs);
       }
@@ -1465,7 +1460,7 @@ function App() {
         continue;
       }
 
-      return { job: latestJob, logs: latestLogs };
+      return jobData;
     }
   }
 
@@ -1686,7 +1681,7 @@ function App() {
         stepId: step.id,
         clusterId: nextClusterId,
         clusterInstanceId: nextClusterInstanceId,
-        status: terminal.job.status,
+        status: terminal.status,
       });
 
       if (nextClusterId && nextClusterId !== clusterIdRef.current) {
