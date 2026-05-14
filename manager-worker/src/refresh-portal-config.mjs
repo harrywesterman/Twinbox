@@ -141,6 +141,16 @@ function runKubectl(args, { input = undefined, allowFailure = false } = {}) {
   return result;
 }
 
+function ensureNamespace(namespace) {
+  const manifest = `apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${namespace}
+`;
+
+  runKubectl(["apply", "-f", "-"], { input: manifest });
+}
+
 function readInstalledAppIds() {
   let parsed;
   try {
@@ -244,6 +254,7 @@ function main() {
     2
   );
 
+  ensureNamespace(options.namespace);
   applySecret(options.namespace, options.secretName, renderedConfig);
   console.log(`Portal config refreshed for ${currentCluster.id}`);
 }

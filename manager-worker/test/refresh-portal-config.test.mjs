@@ -118,8 +118,11 @@ JSON
   exit 0
 fi
 
-if [[ "$*" == *" apply -f -"* ]]; then
-  cat >/dev/null
+if [[ "$*" == *"apply -f -"* ]]; then
+  input="$(cat)"
+  if [[ "$input" == *"kind: Namespace"* && "$input" == *"name: twinbox-portal"* ]]; then
+    echo "namespace twinbox-portal ensured" >> "${logFile}"
+  fi
   exit 0
 fi
 
@@ -165,6 +168,7 @@ test("refresh-portal-config renders the portal secret after install", () => {
   assert.equal(fs.existsSync(logFile), true);
   assert.equal(fs.existsSync(capturedConfigFile), true);
   const logText = fs.readFileSync(logFile, "utf8");
+  assert.match(logText, /namespace twinbox-portal ensured/);
   assert.match(logText, /kubectl -n twinbox-portal create secret generic portal-config/);
   assert.match(logText, /kubectl apply --validate=false -f .*portal-config-secret\.yaml/);
 });
@@ -203,6 +207,7 @@ test("refresh-portal-config runs during portal install when self-triggered", () 
   assert.equal(result.status, 0, result.stderr);
   assert.equal(fs.existsSync(logFile), true);
   const logText = fs.readFileSync(logFile, "utf8");
+  assert.match(logText, /namespace twinbox-portal ensured/);
   assert.match(logText, /kubectl -n twinbox-portal create secret generic portal-config/);
   assert.match(logText, /kubectl apply --validate=false -f .*portal-config-secret\.yaml/);
 });

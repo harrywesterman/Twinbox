@@ -43,6 +43,7 @@ Twinbox builds a Talos Linux Kubernetes cluster on Proxmox through a Management 
   - `kubeconfig/kubeconfig`
   - `talosconfig/talosconfig`
 - On the Management VM, `/opt/twinbox/.env` is root-owned; when refreshing the stack there, run `docker compose` through `sudo` from `/opt/twinbox` instead of trying to read or edit that file as `twinbox`.
+- On the Management VM, `/opt/twinbox` is the live deployment workspace, not a git checkout; refresh it with `docker compose pull && docker compose up -d`, not `git pull`.
 
 ## Debug
 
