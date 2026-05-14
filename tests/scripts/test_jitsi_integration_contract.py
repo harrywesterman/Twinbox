@@ -113,6 +113,11 @@ def test_jitsi_gitops_application_and_values_enable_token_auth_guests_and_broker
     assert "jicofo:" in values_text
     assert "xmpp:" in values_text
     assert "port: 8888" in values_text
+    assert "requests:" in values_text
+    assert "cpu: 50m" in values_text
+    assert "memory: 128Mi" in values_text
+    assert "cpu: 100m" in values_text
+    assert "memory: 256Mi" in values_text
     assert "WAIT_FOR_HOST_DISABLE_AUTO_OWNERS" in values_text
     assert "ENABLE_AUTO_OWNER" in values_text
     assert "XMPP_MODULES" in values_text
@@ -124,9 +129,12 @@ def test_jitsi_gitops_application_and_values_enable_token_auth_guests_and_broker
     assert "token_no_wildcard" in values_text
     assert "useHostPort: true" in values_text
     assert "useNodeIP: true" in values_text
+    assert "initialDelaySeconds: 60" in values_text
+    assert "initialDelaySeconds: 30" in values_text
+    assert "initialDelaySeconds: 90" in values_text
     assert "initialDelaySeconds: 45" in values_text
-    assert "initialDelaySeconds: 20" in values_text
     assert "timeoutSeconds: 5" in values_text
+    assert "failureThreshold: 6" in values_text
     assert "enabled: false" in values_text
     assert "enableUserRolesBasedOnToken = true;" in values_text
 

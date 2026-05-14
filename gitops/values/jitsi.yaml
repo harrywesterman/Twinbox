@@ -38,20 +38,27 @@ extraCommonEnvs:
 jicofo:
   xmpp:
     existingSecretName: jitsi-auth
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
   livenessProbe:
     tcpSocket:
       port: 8888
-    initialDelaySeconds: 45
+    initialDelaySeconds: 60
     timeoutSeconds: 5
     periodSeconds: 10
-    failureThreshold: 3
+    failureThreshold: 6
   readinessProbe:
     tcpSocket:
       port: 8888
-    initialDelaySeconds: 20
+    initialDelaySeconds: 30
     timeoutSeconds: 5
     periodSeconds: 10
-    failureThreshold: 3
+    failureThreshold: 6
 
 jvb:
   useHostPort: true
@@ -60,21 +67,28 @@ jvb:
     existingSecretName: jitsi-auth
   nodeSelector:
     twinbox.io/role: worker
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
   livenessProbe:
+    httpGet:
+      path: /about/health
+      port: 8080
+    initialDelaySeconds: 90
+    timeoutSeconds: 5
+    periodSeconds: 10
+    failureThreshold: 6
+  readinessProbe:
     httpGet:
       path: /about/health
       port: 8080
     initialDelaySeconds: 45
     timeoutSeconds: 5
     periodSeconds: 10
-    failureThreshold: 3
-  readinessProbe:
-    httpGet:
-      path: /about/health
-      port: 8080
-    initialDelaySeconds: 20
-    timeoutSeconds: 5
-    periodSeconds: 10
-    failureThreshold: 3
+    failureThreshold: 6
   service:
     enabled: false
