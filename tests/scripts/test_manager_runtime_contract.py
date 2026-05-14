@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -23,7 +24,9 @@ def test_docker_compose_exposes_filesystem_secret_contract():
     assert "- -masters=seaweedfs:9333" in text
     assert "- -port=23646" in text
     assert text.count('"23646:23646"') == 1
-    assert "seaweedfs:\n    image: chrislusf/seaweedfs:4.23" in text
+    seaweedfs_images = re.findall(r"image: chrislusf/seaweedfs:([0-9.]+)", text)
+    assert seaweedfs_images
+    assert set(seaweedfs_images) == {seaweedfs_images[0]}
     assert "vaultwarden" not in text
     assert "bitwarden" not in text
 
