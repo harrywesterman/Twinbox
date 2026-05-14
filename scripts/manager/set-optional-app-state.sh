@@ -13,6 +13,7 @@ fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
 APP_NAME=""
 STATE=""
 SECRET_NAME="in-cluster-local"
+RESOURCE_PROFILE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -54,15 +55,34 @@ case "$STATE" in
 esac
 
 command -v kubectl >/dev/null 2>&1 || fail "kubectl not found"
+command -v jq >/dev/null 2>&1 || fail "jq not found"
 
 export KUBECONFIG="$KUBECONFIG_FILE"
 
 label_key="twinbox.io/app-${APP_NAME}"
 
+if [[ -n "${STEP_CONTEXT_JSON:-}" ]]; then
+  RESOURCE_PROFILE="$(jq -r '.cluster.resource_profile // empty' <<<"$STEP_CONTEXT_JSON")"
+fi
+case "$RESOURCE_PROFILE" in
+  small|standard|large|"")
+    ;;
+  *)
+    fail "STEP_CONTEXT_JSON cluster.resource_profile must be small, standard, or large"
+    ;;
+esac
+
 case "$STATE" in
   enabled)
     log "Enabling optional app ${APP_NAME} on Argo CD cluster secret ${SECRET_NAME}"
-    kubectl -n argocd label secret "$SECRET_NAME" "$label_key=enabled" --overwrite
+    if [[ -n "$RESOURCE_PROFILE" ]]; then
+      kubectl -n argocd label secret "$SECRET_NAME" \
+        "$label_key=enabled" \
+        "twinbox.io/resource-profile=${RESOURCE_PROFILE}" \
+        --overwrite
+    else
+      kubectl -n argocd label secret "$SECRET_NAME" "$label_key=enabled" --overwrite
+    fi
     ;;
   disabled)
     log "Disabling optional app ${APP_NAME} on Argo CD cluster secret ${SECRET_NAME}"

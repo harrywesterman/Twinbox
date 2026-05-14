@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildClusterFromRequest } from '../../manager-api/src/lib/clusters.js';
+import {
+  buildClusterFromRequest,
+  deriveClusterResourceProfile,
+  ensureClusterResourceProfile,
+} from '../../manager-api/src/lib/clusters.js';
 
 const baseBody = {
   name: 'demo',
@@ -177,4 +181,76 @@ test('cluster builder rejects stale vm_node_map host names', () => {
 
   assert.equal(result.ok, false);
   assert.match(result.error, /unknown Proxmox host stale-host/);
+});
+
+test('cluster builder stores an automatic small resource profile for homelab defaults', () => {
+  const result = buildClusterFromRequest({
+    ...baseBody,
+    worker_count: 3,
+    cpu_cores: 4,
+    memory_mb: 10240,
+    vm_ip_map: {
+      'cp-1': '192.168.1.61',
+      'worker-1': '192.168.1.62',
+      'worker-2': '192.168.1.63',
+      'worker-3': '192.168.1.64',
+    },
+  }, {
+    PROXMOX_NODE: 'pve-a',
+    PROXMOX_STORAGE_POOL: 'local-lvm',
+    PROXMOX_FILE_DATASTORE: 'local',
+  }, {
+    allowedVmHosts: ['pve-a', 'pve-b'],
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.cluster.resource_profile, 'small');
+  assert.equal(result.cluster.worker_cpu_total, 12);
+  assert.equal(result.cluster.worker_memory_total_mb, 30720);
+  assert.match(result.cluster.resource_profile_reason, /12 worker CPU cores/);
+});
+
+test('resource profile derivation uses worker capacity thresholds only', () => {
+  assert.equal(deriveClusterResourceProfile({
+    worker_count: 3,
+    cpu_cores: 8,
+    memory_mb: 16384,
+  }).resource_profile, 'standard');
+
+  assert.equal(deriveClusterResourceProfile({
+    worker_count: 4,
+    cpu_cores: 8,
+    memory_mb: 24576,
+  }).resource_profile, 'large');
+});
+
+test('resource profile derivation honors per-worker vm_size_map overrides', () => {
+  const profile = deriveClusterResourceProfile({
+    worker_count: 3,
+    cpu_cores: 4,
+    memory_mb: 10240,
+    vm_size_map: {
+      'cp-1': { cpu: 16, memory_mb: 65536, disk_gb: 10 },
+      'worker-1': { cpu: 8, memory_mb: 16384, disk_gb: 10 },
+      'worker-2': { cpu: 8, memory_mb: 16384, disk_gb: 10 },
+      'worker-3': { cpu: 8, memory_mb: 16384, disk_gb: 10 },
+    },
+  });
+
+  assert.equal(profile.resource_profile, 'standard');
+  assert.equal(profile.worker_cpu_total, 24);
+  assert.equal(profile.worker_memory_total_mb, 49152);
+});
+
+test('missing resource profile fields are added lazily for existing clusters', () => {
+  const cluster = ensureClusterResourceProfile({
+    id: 'legacy',
+    worker_count: 4,
+    cpu_cores: 8,
+    memory_mb: 24576,
+  });
+
+  assert.equal(cluster.resource_profile, 'large');
+  assert.equal(cluster.worker_cpu_total, 32);
+  assert.equal(cluster.worker_memory_total_mb, 98304);
 });

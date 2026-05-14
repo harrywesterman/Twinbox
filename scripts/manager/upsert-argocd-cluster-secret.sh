@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<USAGE
-Usage: $0 --public-zone-name NAME [--secret-name NAME] [--pod-cidr CIDR]
+Usage: $0 --public-zone-name NAME [--secret-name NAME] [--pod-cidr CIDR] [--resource-profile small|standard|large]
 USAGE
 }
 
@@ -16,6 +16,7 @@ PUBLIC_ZONE_NAME=""
 POD_CIDR=""
 SECRET_NAME="in-cluster-local"
 SERVER_URL="https://kubernetes.default.svc"
+RESOURCE_PROFILE=""
 # Argo CD needs a long-lived token here; the default 24h token would expire
 # and leave every application in ComparisonError until the secret is refreshed.
 TOKEN_DURATION="${ARGOCD_MANAGER_TOKEN_DURATION:-8760h}"
@@ -28,6 +29,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --pod-cidr)
       POD_CIDR="$2"
+      shift 2
+      ;;
+    --resource-profile)
+      RESOURCE_PROFILE="$2"
       shift 2
       ;;
     --secret-name)
@@ -99,12 +104,44 @@ if [[ -n "$existing_secret_json" ]]; then
   existing_annotations="$(jq -c '.metadata.annotations // {}' <<<"$existing_secret_json")"
 fi
 
+if [[ -z "$RESOURCE_PROFILE" && -n "${STEP_CONTEXT_JSON:-}" ]]; then
+  RESOURCE_PROFILE="$(jq -r '.cluster.resource_profile // empty' <<<"$STEP_CONTEXT_JSON")"
+fi
+if [[ -z "$RESOURCE_PROFILE" ]]; then
+  RESOURCE_PROFILE="$(
+    jq -r '
+      .["twinbox.io/resource-profile"]
+      // empty
+    ' <<<"$existing_labels"
+  )"
+fi
+if [[ -z "$RESOURCE_PROFILE" ]]; then
+  RESOURCE_PROFILE="$(
+    jq -r '
+      .["twinbox.io/resource-profile"]
+      // empty
+    ' <<<"$existing_annotations"
+  )"
+fi
+case "$RESOURCE_PROFILE" in
+  small|standard|large)
+    ;;
+  "")
+    RESOURCE_PROFILE="standard"
+    ;;
+  *)
+    fail "--resource-profile must be small, standard, or large"
+    ;;
+esac
+
 merged_labels="$(
   jq -cn \
     --argjson existing "$existing_labels" \
+    --arg resource_profile "$RESOURCE_PROFILE" \
     '($existing + {
       "argocd.argoproj.io/secret-type": "cluster",
-      "twinbox.io/domain-ready": "true"
+      "twinbox.io/domain-ready": "true",
+      "twinbox.io/resource-profile": $resource_profile
     })'
 )"
 merged_annotations="$(
@@ -112,9 +149,11 @@ merged_annotations="$(
     --argjson existing "$existing_annotations" \
     --arg public_zone_name "$PUBLIC_ZONE_NAME" \
     --arg pod_cidr "$POD_CIDR" \
+    --arg resource_profile "$RESOURCE_PROFILE" \
     '($existing + {
       "twinbox.io/public-zone-name": $public_zone_name,
-      "twinbox.io/pod-cidr": $pod_cidr
+      "twinbox.io/pod-cidr": $pod_cidr,
+      "twinbox.io/resource-profile": $resource_profile
     })'
 )"
 

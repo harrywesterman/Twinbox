@@ -19,6 +19,11 @@ import {
 const WORKER_DISK_MIN_GB = 10;
 const CONTROLPLANE_CPU_CORES = 2;
 const OBSERVABILITY_PROFILES = new Set(["full", "minimal", "off"]);
+const RESOURCE_PROFILES = new Set(["small", "standard", "large"]);
+const STANDARD_WORKER_CPU_CORES = 16;
+const STANDARD_WORKER_MEMORY_MB = 48 * 1024;
+const LARGE_WORKER_CPU_CORES = 32;
+const LARGE_WORKER_MEMORY_MB = 96 * 1024;
 
 export function normalizeClusterSlug(rawName) {
   const trimmed = String(rawName || "")
@@ -50,6 +55,87 @@ export function normalizeObservabilityProfile(rawProfile) {
     return profile;
   }
   return "full";
+}
+
+export function normalizeResourceProfile(rawProfile) {
+  const profile = String(rawProfile || "")
+    .trim()
+    .toLowerCase();
+  if (RESOURCE_PROFILES.has(profile)) {
+    return profile;
+  }
+  return "standard";
+}
+
+function summarizeWorkerCapacity(workerCount, cpuCores, workerMemoryMb, vmSizeMap = {}) {
+  const workerEntries = Object.entries(vmSizeMap || {}).filter(([name]) =>
+    String(name || "").startsWith("worker-")
+  );
+
+  if (workerEntries.length > 0) {
+    return workerEntries.reduce(
+      (summary, [, value]) => ({
+        cpu: summary.cpu + (Number(value?.cpu) || 0),
+        memoryMb: summary.memoryMb + (Number(value?.memory_mb) || 0),
+      }),
+      { cpu: 0, memoryMb: 0 }
+    );
+  }
+
+  return {
+    cpu: Math.max(0, Number(workerCount) || 0) * Math.max(0, Number(cpuCores) || 0),
+    memoryMb: Math.max(0, Number(workerCount) || 0) * Math.max(0, Number(workerMemoryMb) || 0),
+  };
+}
+
+export function deriveClusterResourceProfile({
+  worker_count: workerCount,
+  cpu_cores: cpuCores,
+  memory_mb: workerMemoryMb,
+  vm_size_map: vmSizeMap = {},
+} = {}) {
+  const capacity = summarizeWorkerCapacity(workerCount, cpuCores, workerMemoryMb, vmSizeMap);
+  let resourceProfile = "small";
+
+  if (capacity.cpu >= LARGE_WORKER_CPU_CORES && capacity.memoryMb >= LARGE_WORKER_MEMORY_MB) {
+    resourceProfile = "large";
+  } else if (
+    capacity.cpu >= STANDARD_WORKER_CPU_CORES &&
+    capacity.memoryMb >= STANDARD_WORKER_MEMORY_MB
+  ) {
+    resourceProfile = "standard";
+  }
+
+  return {
+    resource_profile: resourceProfile,
+    worker_cpu_total: capacity.cpu,
+    worker_memory_total_mb: capacity.memoryMb,
+    resource_profile_reason: `${capacity.cpu} worker CPU cores and ${capacity.memoryMb} MiB worker memory`,
+  };
+}
+
+export function ensureClusterResourceProfile(cluster = {}) {
+  const existingProfile = String(cluster.resource_profile || "").trim();
+  if (
+    RESOURCE_PROFILES.has(existingProfile) &&
+    Number.isFinite(Number(cluster.worker_cpu_total)) &&
+    Number.isFinite(Number(cluster.worker_memory_total_mb)) &&
+    String(cluster.resource_profile_reason || "").trim()
+  ) {
+    return {
+      ...cluster,
+      resource_profile: existingProfile,
+    };
+  }
+
+  const resourceProfile = deriveClusterResourceProfile(cluster);
+  return {
+    ...cluster,
+    resource_profile: resourceProfile.resource_profile,
+    worker_cpu_total: resourceProfile.worker_cpu_total,
+    worker_memory_total_mb: resourceProfile.worker_memory_total_mb,
+    resource_profile_reason: resourceProfile.resource_profile_reason,
+  };
 }
 
 function buildAllowedHostLookup(allowedHosts = []) {
@@ -423,6 +509,12 @@ export function buildClusterFromRequest(
     talos_image_platform: env.TALOS_IMAGE_PLATFORM || "cloud-server",
     talos_image_arch: env.TALOS_IMAGE_ARCH || "amd64",
   };
+  const resourceProfile = deriveClusterResourceProfile({
+    worker_count: parsedWorkers.value,
+    cpu_cores: parsedCpu.value,
+    memory_mb: parsedMemory.value,
+    vm_size_map: parsedVmSizeMap.value,
+  });
 
   return {
     ok: true,
@@ -453,6 +545,10 @@ export function buildClusterFromRequest(
       vm_node_map: parsedVmNodeMap.value,
       status: "requested",
       observability_profile: "full",
+      resource_profile: resourceProfile.resource_profile,
+      worker_cpu_total: resourceProfile.worker_cpu_total,
+      worker_memory_total_mb: resourceProfile.worker_memory_total_mb,
+      resource_profile_reason: resourceProfile.resource_profile_reason,
       observability_status: "ready",
       observability_error: null,
       observability_last_job_id: null,
@@ -475,7 +571,7 @@ export function loadCluster(dirs, clusterId) {
 
 export function buildBootstrapPayload(cluster, body = {}) {
   const normalized = ensureClusterSecretRefs({
-    ...cluster,
+    ...ensureClusterResourceProfile(cluster),
     bootstrap_resume: true,
     controlplane_ips: body.controlplane_ips || cluster.controlplane_ips || [],
     worker_ips: body.worker_ips || cluster.worker_ips || [],
@@ -489,7 +585,7 @@ export function buildBootstrapPayload(cluster, body = {}) {
 }
 
 export function buildApplyJobPayload(cluster) {
-  const normalized = ensureClusterSecretRefs(cluster);
+  const normalized = ensureClusterSecretRefs(ensureClusterResourceProfile(cluster));
   return {
     ...normalized,
     secret_bundle: buildClusterWorkerSecretBundle(normalized),

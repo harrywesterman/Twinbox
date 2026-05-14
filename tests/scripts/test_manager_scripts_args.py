@@ -1087,9 +1087,6 @@ def test_bootstrap_talos_uses_discovered_ips_and_records_runtime_state():
 
 def test_install_secret_sync_renders_argocd_values_and_applies_secret_sync_manifests():
     text = _install_secret_sync_text()
-    helper_text = (REPO_ROOT / "scripts" / "manager" / "openbao-secret-sync.sh").read_text(
-        encoding="utf-8"
-    )
     assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in text
     assert "scripts/manager/apply-argocd-application.sh" in text
     assert '--manifest "$WORKSPACE_ROOT/gitops/apps/external-secrets.yaml"' in text
@@ -1110,12 +1107,12 @@ def test_optional_app_helper_enables_labels_before_waiting_for_readiness():
     text = _apply_argocd_application_text()
 
     assert "set-optional-app-state.sh" in text
-    assert "wait_for_application_ready \"$APPLICATION_NAME\"" in text
+    assert 'wait_for_application_ready "$APPLICATION_NAME"' in text
     assert text.index("set-optional-app-state.sh") < text.index(
-        "wait_for_application_ready \"$APPLICATION_NAME\""
+        'wait_for_application_ready "$APPLICATION_NAME"'
     )
     assert text.index("set-optional-app-state.sh") < text.index(
-        "kubectl annotate application \"$APPLICATION_NAME\""
+        'kubectl annotate application "$APPLICATION_NAME"'
     )
     assert "bw " not in text
     assert "KUBECONFIG_FILE is required" in text
@@ -1170,6 +1167,8 @@ def test_apply_argocd_application_helper_applies_and_waits_for_health():
     assert "--skip-namespace-baseline" in text
     assert "Skipping namespace resource baseline for" in text
     assert "--no-wait" in text
+    assert ".resource_profile // empty" in text
+    assert "(.worker_count // 0)" in text
 
 
 def test_stirling_pdf_waits_for_real_kubernetes_readiness():
@@ -2439,6 +2438,8 @@ def test_argocd_cluster_secret_helper_writes_runtime_projection():
     assert "twinbox.io/domain-ready" in text
     assert "twinbox.io/public-zone-name" in text
     assert "twinbox.io/pod-cidr" in text
+    assert "twinbox.io/resource-profile" in text
+    assert "--resource-profile" in text
     assert "argocd.argoproj.io/secret-type" in text
     assert "create token argocd-manager" in text
     assert "tlsClientConfig" in text
@@ -2454,7 +2455,24 @@ def test_argocd_cluster_secret_helper_resolves_pod_cidr_before_rendering_annotat
     assert text.index('if [[ -z "$POD_CIDR" ]]; then') < text.index(
         'existing_secret_json="$(kubectl -n argocd get secret "$SECRET_NAME" -o json 2>/dev/null || true)"'
     )
-    assert text.index('if [[ -z "$POD_CIDR" ]]; then') < text.index('"twinbox.io/pod-cidr": $pod_cidr')
+    assert text.index('if [[ -z "$POD_CIDR" ]]; then') < text.index(
+        '"twinbox.io/pod-cidr": $pod_cidr'
+    )
+
+
+def test_argocd_cluster_secret_helper_preserves_existing_resource_profile():
+    text = (REPO_ROOT / "scripts" / "manager" / "upsert-argocd-cluster-secret.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'RESOURCE_PROFILE="$(' in text
+    assert '.["twinbox.io/resource-profile"]' in text
+    assert text.index('existing_secret_json="$(kubectl -n argocd get secret') < text.index(
+        'if [[ -z "$RESOURCE_PROFILE" && -n "${STEP_CONTEXT_JSON:-}" ]]; then'
+    )
+    assert text.index('if [[ -z "$RESOURCE_PROFILE" ]]; then') < text.index(
+        'RESOURCE_PROFILE="standard"'
+    )
 
 
 def test_optional_app_state_helper_labels_the_argocd_cluster_secret():
@@ -2463,6 +2481,8 @@ def test_optional_app_state_helper_labels_the_argocd_cluster_secret():
     )
 
     assert "twinbox.io/app-" in text
+    assert ".cluster.resource_profile // empty" in text
+    assert '"twinbox.io/resource-profile=${RESOURCE_PROFILE}"' in text
     assert "enabled|disabled" in text
     assert "kubectl -n argocd label secret" in text
 
@@ -2483,16 +2503,47 @@ def test_optional_apps_root_and_redirected_manifests_are_present():
     assert "name: optional-apps-root" in root_text
     assert "path: gitops/optional-apps" in root_text
     assert "kind: ApplicationSet" in jitsi_optional_text
-    assert "twinbox.io/app-jitsi: \"enabled\"" in jitsi_optional_text
+    assert 'twinbox.io/app-jitsi: "enabled"' in jitsi_optional_text
     assert "kind: ApplicationSet" in opencloud_optional_text
-    assert "twinbox.io/app-opencloud: \"enabled\"" in opencloud_optional_text
+    assert 'twinbox.io/app-opencloud: "enabled"' in opencloud_optional_text
     assert "kind: ApplicationSet" in nextcloud_optional_text
-    assert "twinbox.io/app-nextcloud: \"enabled\"" in nextcloud_optional_text
+    assert 'twinbox.io/app-nextcloud: "enabled"' in nextcloud_optional_text
     assert "path: gitops/platform-apps/nextcloud" in nextcloud_optional_text
     assert "path: gitops/databases/nextcloud" in nextcloud_optional_text
     assert "kind: ApplicationSet" in karakeep_optional_text
-    assert "twinbox.io/app-karakeep: \"enabled\"" in karakeep_optional_text
+    assert 'twinbox.io/app-karakeep: "enabled"' in karakeep_optional_text
     assert "path: gitops/platform-apps/karakeep" in karakeep_optional_text
+
+
+def test_optional_database_apps_patch_cloudnativepg_requests_by_resource_profile():
+    database_apps = [
+        "hedgedoc",
+        "immich",
+        "n8n",
+        "nextcloud",
+        "openwebui",
+        "outline",
+        "paperless",
+        "pixelfed",
+        "vaultwarden",
+    ]
+
+    for app_name in database_apps:
+        text = (REPO_ROOT / "gitops" / "optional-apps" / f"{app_name}.yaml").read_text(
+            encoding="utf-8"
+        )
+        assert "twinbox.io/resource-profile" in text
+        assert "path: /spec/resources/requests/cpu" in text
+        assert "path: /spec/resources/requests/memory" in text
+        assert f"name: {app_name}-db" in text
+
+
+def test_dashy_appset_patches_requests_by_resource_profile():
+    text = (REPO_ROOT / "gitops" / "apps" / "dashy.yaml").read_text(encoding="utf-8")
+
+    assert "twinbox.io/resource-profile" in text
+    assert "path: /spec/template/spec/containers/0/resources/requests/cpu" in text
+    assert "path: /spec/template/spec/containers/0/resources/requests/memory" in text
 
 
 def test_databases_kustomization_includes_authentik_resources():
@@ -2831,7 +2882,7 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert '--manifest "$WORKSPACE_ROOT/gitops/optional-apps/nextcloud.yaml"' in text
     assert "Syncing Nextcloud bootstrap secret to OpenBao" in text
     assert "nextcloud-db-pooler-rw.databases.svc.cluster.local" in text
-    assert "kubectl apply -f \"$nextcloud_platform_dir/namespace.yaml\"" not in text
+    assert 'kubectl apply -f "$nextcloud_platform_dir/namespace.yaml"' not in text
     assert "nextcloud_db_cluster_manifest" not in text
     assert "nextcloud_rendered_app_manifest" not in text
     assert "__NEXTCLOUD_VALUES__" not in text
@@ -2875,8 +2926,8 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     )
     assert "kind: ApplicationSet" in optional_app_text
     assert "name: nextcloud-set" in optional_app_text
-    assert "twinbox.io/app-nextcloud: \"enabled\"" in optional_app_text
-    assert "targetRevision: \"9.1.0\"" in optional_app_text
+    assert 'twinbox.io/app-nextcloud: "enabled"' in optional_app_text
+    assert 'targetRevision: "9.1.0"' in optional_app_text
     assert "path: gitops/platform-apps/nextcloud" in optional_app_text
     assert "path: gitops/databases/nextcloud" in optional_app_text
     assert "name: nextcloud-well-known-redirect" in optional_app_text
@@ -2973,9 +3024,12 @@ def test_karakeep_argo_application_manages_the_platform_overlay():
 
     assert "kind: ApplicationSet" in text
     assert "name: karakeep-set" in text
-    assert "twinbox.io/app-karakeep: \"enabled\"" in text
-    assert "targetRevision: \"0.32.0\"" in text
-    assert "applicationHost: karakeep.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in text
+    assert 'twinbox.io/app-karakeep: "enabled"' in text
+    assert 'targetRevision: "0.32.0"' in text
+    assert (
+        'applicationHost: karakeep.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
+        in text
+    )
     assert "secrets:" in text
     assert "enabled: false" in text
     assert "path: gitops/platform-apps/karakeep" in text
@@ -3167,7 +3221,9 @@ def test_gitops_docs_describe_bootstrap_seed_and_current_app_ownership():
     assert "twinbox.io/app-<name>: enabled" in gitops_text
     assert "karakeep" in gitops_text
     assert "older bootstrap-seeded path" not in gitops_text
-    assert "Argo CD creates the live `Application` from `gitops/optional-apps/<app>.yaml`" in apps_text
+    assert (
+        "Argo CD creates the live `Application` from `gitops/optional-apps/<app>.yaml`" in apps_text
+    )
     assert "GitHub `main` owns the opt-in app definition" in apps_text
 
 

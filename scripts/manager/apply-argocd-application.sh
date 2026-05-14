@@ -50,7 +50,7 @@ fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
 
 cluster_resource_profile() {
   local cluster_json="${STEP_CONTEXT_JSON:-}"
-  local node_count per_node_cpu per_node_memory total_cpu total_memory
+  local resource_profile worker_count per_worker_cpu per_worker_memory total_cpu total_memory
 
   if [[ -z "$cluster_json" ]]; then
     printf 'standard\n'
@@ -63,18 +63,26 @@ cluster_resource_profile() {
     return 0
   fi
 
-  node_count="$(jq -r '(.controlplane_count // 0) + (.worker_count // 0)' <<<"$cluster_json")"
-  per_node_cpu="$(jq -r '(.cpu_cores // 0)' <<<"$cluster_json")"
-  per_node_memory="$(jq -r '(.memory_mb // 0)' <<<"$cluster_json")"
-  total_cpu="$(( per_node_cpu * node_count ))"
-  total_memory="$(( per_node_memory * node_count ))"
+  resource_profile="$(jq -r '.resource_profile // empty' <<<"$cluster_json")"
+  case "$resource_profile" in
+    small|standard|large)
+      printf '%s\n' "$resource_profile"
+      return 0
+      ;;
+  esac
 
-  if [[ "$node_count" -le 2 || "$per_node_cpu" -lt 4 || "$per_node_memory" -lt 8192 || "$total_memory" -lt 24576 ]]; then
-    printf 'small\n'
-  elif [[ "$total_cpu" -le 24 || "$total_memory" -le 65536 ]]; then
+  worker_count="$(jq -r '(.worker_count // 0)' <<<"$cluster_json")"
+  per_worker_cpu="$(jq -r '(.cpu_cores // 0)' <<<"$cluster_json")"
+  per_worker_memory="$(jq -r '(.memory_mb // 0)' <<<"$cluster_json")"
+  total_cpu="$(( per_worker_cpu * worker_count ))"
+  total_memory="$(( per_worker_memory * worker_count ))"
+
+  if [[ "$total_cpu" -ge 32 && "$total_memory" -ge 98304 ]]; then
+    printf 'large\n'
+  elif [[ "$total_cpu" -ge 16 && "$total_memory" -ge 49152 ]]; then
     printf 'standard\n'
   else
-    printf 'large\n'
+    printf 'small\n'
   fi
 }
 

@@ -58,6 +58,19 @@ spec:
         - repoURL: https://github.com/harrywesterman/Twinbox.git
           targetRevision: main
           path: gitops/databases/vaultwarden
+          kustomize:
+            patches:
+              - target:
+                  group: postgresql.cnpg.io
+                  kind: Cluster
+                  name: vaultwarden-db
+                patch: |-
+                  - op: replace
+                    path: /spec/resources/requests/cpu
+                    value: '{{ if eq (dig "twinbox.io/resource-profile" "standard" .metadata.labels) "small" }}100m{{ else if eq (dig "twinbox.io/resource-profile" "standard" .metadata.labels) "large" }}500m{{ else }}250m{{ end }}'
+                  - op: replace
+                    path: /spec/resources/requests/memory
+                    value: '{{ if eq (dig "twinbox.io/resource-profile" "standard" .metadata.labels) "small" }}256Mi{{ else if eq (dig "twinbox.io/resource-profile" "standard" .metadata.labels) "large" }}1Gi{{ else }}512Mi{{ end }}'
       destination:
         server: https://kubernetes.default.svc
         namespace: vaultwarden

@@ -7,6 +7,7 @@ import {
   buildApplyJobPayload,
   buildBootstrapPayload,
   buildClusterFromRequest,
+  ensureClusterResourceProfile,
   normalizeClusterName,
   normalizeObservabilityProfile,
   persistCluster,
@@ -216,7 +217,7 @@ function resolveRequestedCluster(clusterId) {
     return { ok: false, status: 404, error: "cluster not found" };
   }
 
-  return { ok: true, cluster: readJson(clusterFile) };
+  return { ok: true, cluster: ensureClusterResourceProfile(readJson(clusterFile)) };
 }
 
 function buildSecretItemName(ref, context = {}) {
@@ -1782,7 +1783,7 @@ app.get("/api/clusters/:clusterId", (req, res) => {
   if (!fs.existsSync(file)) {
     return res.status(404).json({ error: "cluster not found" });
   }
-  return res.json(readJson(file));
+  return res.json(ensureClusterResourceProfile(readJson(file)));
 });
 
 app.put("/api/clusters/:clusterId/observability", (req, res) => {
@@ -1792,7 +1793,7 @@ app.put("/api/clusters/:clusterId/observability", (req, res) => {
       return res.status(404).json({ error: "cluster not found" });
     }
 
-    const cluster = readJson(file);
+    const cluster = ensureClusterResourceProfile(readJson(file));
     const profile = normalizeObservabilityProfile(req.body?.profile);
     const clusterInstanceId = cluster.cluster_instance_id || cluster.instance_id || null;
     const updatedCluster = {
