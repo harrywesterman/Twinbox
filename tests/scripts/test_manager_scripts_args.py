@@ -75,6 +75,9 @@ MANAGEMENT_IP_HELPER = REPO_ROOT / "scripts" / "manager" / "management-ip.sh"
 LONGHORN_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-longhorn-storage" / "run.sh"
 )
+CLOUDNATIVEPG_STEP_SCRIPT = (
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-cloudnativepg" / "run.sh"
+)
 LONGHORN_STEP_MANIFEST = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-longhorn-storage" / "step.yaml"
 )
@@ -210,6 +213,7 @@ STIRLING_PDF_DEPLOYMENT = (
 )
 GRAFANA_APP = REPO_ROOT / "gitops" / "apps" / "grafana.yaml"
 WIREDOOR_GATEWAY_APP = REPO_ROOT / "gitops" / "apps" / "wiredoor-gateway.yaml"
+DATABASES_APP = REPO_ROOT / "gitops" / "apps" / "databases.yaml"
 WHOAMI_DEPLOYMENT = REPO_ROOT / "gitops" / "platform-apps" / "whoami" / "deployment.yaml"
 HEADLAMP_VALUES = REPO_ROOT / "gitops" / "values" / "headlamp.yaml"
 LONGHORN_VALUES = REPO_ROOT / "gitops" / "values" / "longhorn.yaml"
@@ -1972,7 +1976,7 @@ def test_optional_apps_route_steady_state_through_argocd_sources():
             optional_app_text = OUTLINE_OPTIONAL_APP.read_text(encoding="utf-8")
             assert 'index .metadata.labels "twinbox.io/resource-profile"' in optional_app_text
             assert 'dig "twinbox.io/resource-profile"' not in optional_app_text
-        assert "../namespace.yaml" in db_text or "namespace.yaml" in db_text
+        assert "namespace.yaml" not in db_text
         assert "cluster.yaml" in db_text or "externalsecret.yaml" in db_text
 
     for step_path, snippets in step_expectations.items():
@@ -2136,6 +2140,7 @@ KUSTOMIZATION = REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
 DATABASES_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "kustomization.yaml"
 AUTHENTIK_DB_CLUSTER = REPO_ROOT / "gitops" / "databases" / "authentik" / "cluster.yaml"
 AUTHENTIK_DB_STORAGECLASS = REPO_ROOT / "gitops" / "databases" / "longhorn-single-storageclass.yaml"
+DATABASES_NAMESPACE = REPO_ROOT / "gitops" / "databases" / "namespace.yaml"
 
 
 def test_prometheus_argocd_app_uses_kube_prometheus_stack():
@@ -2583,12 +2588,39 @@ def test_databases_kustomization_includes_authentik_resources():
     assert "authentik/pooler-ro.yaml" in text
     assert "authentik/pooler-rw.yaml" in text
     assert "authentik/scheduled-backup.yaml" in text
-    assert "vaultwarden/cluster.yaml" in text
-    assert "vaultwarden/externalsecret.yaml" in text
-    assert "vaultwarden/pooler-ro.yaml" in text
-    assert "vaultwarden/pooler-rw.yaml" in text
-    assert "vaultwarden/scheduled-backup.yaml" in text
-    assert "seaweedfs-backup-credentials.yaml" in text
+    assert DATABASES_NAMESPACE.read_text(encoding="utf-8").startswith(
+        "apiVersion: v1\nkind: Namespace\n"
+    )
+
+
+def test_cloudnativepg_bootstrap_installs_shared_database_application():
+    step_text = CLOUDNATIVEPG_STEP_SCRIPT.read_text(encoding="utf-8")
+    app_text = DATABASES_APP.read_text(encoding="utf-8")
+
+    assert "gitops/apps/cloudnativepg.yaml" in step_text
+    assert "gitops/apps/databases.yaml" in step_text
+    assert '--application "cloudnativepg"' in step_text
+    assert '--application "databases"' in step_text
+    assert "kind: Application" in app_text
+    assert "name: databases" in app_text
+    assert "path: gitops/databases" in app_text
+    assert "namespace: databases" in app_text
+    assert "CreateNamespace=true" in app_text
+
+
+def test_database_app_overlays_do_not_carry_namespace_manifests():
+    for app_name in [
+        "hedgedoc",
+        "immich",
+        "n8n",
+        "nextcloud",
+        "openwebui",
+        "outline",
+        "paperless",
+        "pixelfed",
+        "vaultwarden",
+    ]:
+        assert not (REPO_ROOT / "gitops" / "databases" / app_name / "namespace.yaml").exists()
 
 
 def test_vaultwarden_manifests_use_postgresql_and_domain_limited_signups():
@@ -2687,6 +2719,20 @@ def test_pixelfed_manifests_use_postgresql_and_longhorn_storage():
     assert "property: PIXELFED_POSTGRESQL__USERNAME" in db_externalsecret_text
     assert "property: PIXELFED_POSTGRESQL__PASSWORD" in db_externalsecret_text
     assert "destinationPath: s3://twinbox-velero/pixelfed-db/" in cluster_text
+
+
+def test_paperless_redis_manifest_sets_group_permissions_for_persistent_data():
+    redis_text = (REPO_ROOT / "gitops" / "platform-apps" / "paperless" / "redis.yaml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "name: paperless-redis" in redis_text
+    assert "persistentVolumeClaim:" in redis_text
+    assert "claimName: paperless-redis-data" in redis_text
+    assert "securityContext:" in redis_text
+    assert "fsGroup: 999" in redis_text
+    assert "--appendonly" in redis_text
+    assert 'value: "yes"' not in redis_text
 
 
 def test_cnpg_database_clusters_have_seaweedfs_backups():
@@ -2883,12 +2929,11 @@ def test_install_immich_step_applies_its_argo_application():
         REPO_ROOT / "gitops" / "platform-apps" / "immich" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
     immich_db_text = IMMICH_DB_KUSTOMIZATION.read_text(encoding="utf-8")
-    assert "namespace.yaml" in immich_db_text
+    assert "namespace.yaml" not in immich_db_text
     assert "../namespace.yaml" not in immich_db_text
-    assert (
-        (REPO_ROOT / "gitops" / "databases" / "immich" / "namespace.yaml")
-        .read_text(encoding="utf-8")
-        .startswith("apiVersion: v1\nkind: Namespace\n")
+    assert not (REPO_ROOT / "gitops" / "databases" / "immich" / "namespace.yaml").exists()
+    assert DATABASES_NAMESPACE.read_text(encoding="utf-8").startswith(
+        "apiVersion: v1\nkind: Namespace\n"
     )
 
 
@@ -3236,7 +3281,7 @@ def test_platform_namespace_baseline_covers_shared_overlay_resources():
     assert "db-externalsecret.yaml" in (
         REPO_ROOT / "gitops" / "platform-apps" / "immich" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
-    assert "namespace.yaml" in IMMICH_DB_KUSTOMIZATION.read_text(encoding="utf-8")
+    assert "namespace.yaml" not in IMMICH_DB_KUSTOMIZATION.read_text(encoding="utf-8")
     assert "gitops/apps/dashy.yaml" in (
         REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-dashy-dashboard" / "run.sh"
     ).read_text(encoding="utf-8")
@@ -3250,11 +3295,13 @@ def test_gitops_docs_describe_bootstrap_seed_and_current_app_ownership():
     assert "optional-apps-root.yaml" in gitops_text
     assert "twinbox.io/app-<name>: enabled" in gitops_text
     assert "karakeep" in gitops_text
+    assert "gitops/apps/databases.yaml" in gitops_text
     assert "older bootstrap-seeded path" not in gitops_text
     assert (
         "Argo CD creates the live `Application` from `gitops/optional-apps/<app>.yaml`" in apps_text
     )
     assert "GitHub `main` owns the opt-in app definition" in apps_text
+    assert "shared `databases` namespace is owned by `gitops/apps/databases.yaml`" in apps_text
 
 
 def test_platform_ingress_manifest_patches_authentik_callback_routes():
