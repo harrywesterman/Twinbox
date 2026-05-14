@@ -73,10 +73,10 @@ spec:
                 patch: |-
                   - op: replace
                     path: /spec/resources/requests/cpu
-                    value: '{{ if eq (dig "twinbox.io/resource-profile" "standard" .metadata.labels) "large" }}250m{{ else }}100m{{ end }}'
+                    value: '{{ if eq (index .metadata.labels "twinbox.io/resource-profile") "large" }}250m{{ else }}100m{{ end }}'
                   - op: replace
                     path: /spec/resources/requests/memory
-                    value: '{{ if eq (dig "twinbox.io/resource-profile" "standard" .metadata.labels) "large" }}512Mi{{ else }}256Mi{{ end }}'
+                    value: '{{ if eq (index .metadata.labels "twinbox.io/resource-profile") "large" }}512Mi{{ else }}256Mi{{ end }}'
       destination:
         server: https://kubernetes.default.svc
         namespace: hedgedoc

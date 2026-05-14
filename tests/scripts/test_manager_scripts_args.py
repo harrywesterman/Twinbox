@@ -1994,6 +1994,25 @@ def test_optional_apps_route_steady_state_through_argocd_sources():
     assert "gitops/platform-apps/twinbox-portal/ingressroute.yaml" not in twinbox_portal_run_text
 
 
+def test_optional_apps_resource_profile_lookups_use_index_on_labels():
+    manifest_paths = [
+        REPO_ROOT / "gitops" / "optional-apps" / "hedgedoc.yaml",
+        REPO_ROOT / "gitops" / "optional-apps" / "immich.yaml",
+        REPO_ROOT / "gitops" / "optional-apps" / "n8n.yaml",
+        REPO_ROOT / "gitops" / "optional-apps" / "nextcloud.yaml",
+        REPO_ROOT / "gitops" / "optional-apps" / "outline.yaml",
+        REPO_ROOT / "gitops" / "optional-apps" / "paperless.yaml",
+        REPO_ROOT / "gitops" / "optional-apps" / "pixelfed.yaml",
+        REPO_ROOT / "gitops" / "optional-apps" / "openwebui.yaml",
+        REPO_ROOT / "gitops" / "optional-apps" / "vaultwarden.yaml",
+    ]
+
+    for manifest_path in manifest_paths:
+        text = manifest_path.read_text(encoding="utf-8")
+        assert 'index .metadata.labels "twinbox.io/resource-profile"' in text
+        assert 'dig "twinbox.io/resource-profile"' not in text
+
+
 def test_grafana_oidc_is_openbao_backed():
     grafana_values_text = _grafana_values_text()
     grafana_app_text = GRAFANA_APP.read_text(encoding="utf-8")
