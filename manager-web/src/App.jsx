@@ -19,7 +19,7 @@ import {
   buildSuggestedProvisionInputs,
   mergeSuggestedProvisionDraft,
 } from "./provision-defaults.js";
-import { buildAdminDashboardUrl } from "./cluster-public-zone.js";
+import { buildPortalUrl } from "./cluster-public-zone.js";
 import {
   buildInstallRefreshFailureNotice,
   buildQueueFailureNotice,
@@ -1071,7 +1071,7 @@ function App() {
       answers: initialAnswers,
     });
   }, [busy, catalog, cluster, error, health, initialAnswers, logs, selectedStepId]);
-  const adminDashboardContext = useMemo(() => {
+  const portalContext = useMemo(() => {
     const provisionAnswers = answers?.["provision-nodes"] || {};
     const dnsAnswers = answers?.["configure-dns"] || {};
 
@@ -1083,10 +1083,7 @@ function App() {
       public_zone_name: cluster?.public_zone_name || dnsAnswers.public_zone_name || "",
     };
   }, [answers, cluster, clusterId]);
-  const adminDashboardUrl = useMemo(
-    () => buildAdminDashboardUrl(adminDashboardContext),
-    [adminDashboardContext]
-  );
+  const portalUrl = useMemo(() => buildPortalUrl(portalContext), [portalContext]);
   const isInstallPhase = hasStarted && wizardPhase === "install" && !model.completion;
   const questionStepIndex = questionSteps.findIndex((step) => step.id === selectedStepId);
   const currentQuestionStep =
@@ -2513,18 +2510,18 @@ function App() {
                   >
                     Export all answers
                   </button>
-                  {adminDashboardUrl ? (
+                  {portalUrl ? (
                     <a
                       className="button button-primary"
-                      href={adminDashboardUrl}
+                      href={portalUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      Open Admin Dashboard
+                      Open Portal
                     </a>
                   ) : (
                     <button className="button button-primary" type="button" disabled>
-                      Open Admin Dashboard
+                      Open Portal
                     </button>
                   )}
                 </div>

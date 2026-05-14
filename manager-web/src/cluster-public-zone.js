@@ -47,7 +47,7 @@ export function twinboxPublicZoneName(clusterId, clusterDnsDomain) {
   return `${normalizedClusterId}.${normalizedDnsDomain}`;
 }
 
-export function buildAdminDashboardUrl(cluster = {}, fallback = {}) {
+export function buildPortalUrl(cluster = {}, fallback = {}) {
   const zoneName = normalizeHostname(
     trimString(cluster?.public_zone_name) ||
       trimString(fallback?.public_zone_name) ||
@@ -61,5 +61,7 @@ export function buildAdminDashboardUrl(cluster = {}, fallback = {}) {
     return "";
   }
 
-  return `https://admin.${zoneName}`;
+  return `https://portal.${zoneName}`;
 }
+
+export const buildAdminDashboardUrl = buildPortalUrl;

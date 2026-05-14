@@ -254,39 +254,25 @@ test("app source defines a minimal wizard shell with guided input and step-by-st
     /\|\| isCurrentStepComplete/,
     "expected the install action to stay available even after a step is complete"
   );
+  assert.match(source, /href=\{portalUrl\}/, "expected the portal action to use a direct link");
+  assert.match(source, /target="_blank"/, "expected the portal action to open in a new tab");
+  const portalTextIndex = source.indexOf("Open Portal");
+  assert.ok(portalTextIndex >= 0, "expected the portal action to exist in the source");
+  const portalBlock = source.slice(Math.max(0, portalTextIndex - 220), portalTextIndex + 40);
   assert.match(
-    source,
-    /href=\{adminDashboardUrl\}/,
-    "expected the admin dashboard action to use a direct link"
-  );
-  assert.match(
-    source,
-    /target="_blank"/,
-    "expected the admin dashboard action to open in a new tab"
-  );
-  const adminDashboardTextIndex = source.indexOf("Open Admin Dashboard");
-  assert.ok(
-    adminDashboardTextIndex >= 0,
-    "expected the admin dashboard action to exist in the source"
-  );
-  const adminDashboardBlock = source.slice(
-    Math.max(0, adminDashboardTextIndex - 220),
-    adminDashboardTextIndex + 40
-  );
-  assert.match(
-    adminDashboardBlock,
+    portalBlock,
     /className="button button-primary"/,
-    "expected the admin dashboard action to use the primary blue style"
+    "expected the portal action to use the primary blue style"
   );
   assert.doesNotMatch(
     source,
-    /window\.open\(adminDashboardUrl/,
-    "expected the admin dashboard action to avoid popup-based navigation"
+    /window\.open\(portalUrl/,
+    "expected the portal action to avoid popup-based navigation"
   );
   assert.match(
     source,
     /answers\?\.\["configure-dns"\]/,
-    "expected the admin dashboard link to derive the DNS domain from the DNS step"
+    "expected the portal link to derive the DNS domain from the DNS step"
   );
   assert.match(source, /installLogsByStepRef/, "expected the install view to cache logs per step");
   assert.match(source, /setInstallStepLogs\(/, "expected the install pane to write per-step logs");
