@@ -75,7 +75,7 @@ services:
       - "3000:80"
 
   seaweedfs:
-    image: chrislusf/seaweedfs:4.23
+    image: chrislusf/seaweedfs:4.24
     container_name: twinbox-seaweedfs
     restart: unless-stopped
     environment:
@@ -92,7 +92,7 @@ services:
       - "8888:8888"
 
   seaweedfs-admin:
-    image: chrislusf/seaweedfs:4.23
+    image: chrislusf/seaweedfs:4.24
     container_name: twinbox-seaweedfs-admin
     restart: unless-stopped
     command:
