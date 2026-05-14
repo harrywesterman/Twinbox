@@ -39,6 +39,7 @@ STIRLING_PDF_STEP_SCRIPT = (
 PIXELFED_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-pixelfed" / "run.sh"
 TWINBOX_PORTAL_APP = REPO_ROOT / "gitops" / "apps" / "twinbox-portal.yaml"
 OUTLINE_APP = REPO_ROOT / "gitops" / "apps" / "outline.yaml"
+OUTLINE_OPTIONAL_APP = REPO_ROOT / "gitops" / "optional-apps" / "outline.yaml"
 OPENWEBUI_APP = REPO_ROOT / "gitops" / "apps" / "openwebui.yaml"
 N8N_APP = REPO_ROOT / "gitops" / "apps" / "n8n.yaml"
 HEDGEDOC_APP = REPO_ROOT / "gitops" / "apps" / "hedgedoc.yaml"
@@ -1967,6 +1968,10 @@ def test_optional_apps_route_steady_state_through_argocd_sources():
         assert "kind: Application" in app_text
         assert f"path: gitops/platform-apps/{app_name}" in app_text
         assert f"path: gitops/databases/{app_name}" in app_text
+        if app_name == "outline":
+            optional_app_text = OUTLINE_OPTIONAL_APP.read_text(encoding="utf-8")
+            assert 'index .metadata.labels "twinbox.io/resource-profile"' in optional_app_text
+            assert 'dig "twinbox.io/resource-profile"' not in optional_app_text
         assert "../namespace.yaml" in db_text or "namespace.yaml" in db_text
         assert "cluster.yaml" in db_text or "externalsecret.yaml" in db_text
 
