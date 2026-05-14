@@ -3010,6 +3010,8 @@ def test_dashy_argo_application_manages_the_platform_overlay():
     assert "name: dashy-wiredoor" in text
     assert "name: dashy-tailscale" in text
     assert 'Host(`admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)' in text
+    assert '.metadata.labels "twinbox.io/resource-profile"' in text
+    assert 'dig "twinbox.io/resource-profile"' not in text
     assert "CreateNamespace=true" in text
 
 
