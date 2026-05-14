@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
+  - pvc.yaml
   - externalsecret.yaml
   - redis.yaml
   - document-converters.yaml

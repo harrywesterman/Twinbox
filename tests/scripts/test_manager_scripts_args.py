@@ -2798,6 +2798,18 @@ def test_paperless_redis_manifest_runs_statelessly():
     assert 'value: "60"' not in redis_text
 
 
+def test_paperless_storage_manifest_keeps_app_pvcs_only():
+    pvc_text = (REPO_ROOT / "gitops" / "platform-apps" / "paperless" / "pvc.yaml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "name: paperless-data" in pvc_text
+    assert "name: paperless-media" in pvc_text
+    assert "name: paperless-consume" in pvc_text
+    assert "name: paperless-export" in pvc_text
+    assert "paperless-redis-data" not in pvc_text
+
+
 def test_cnpg_database_clusters_have_seaweedfs_backups():
     authentik_cluster_text = (
         REPO_ROOT / "gitops" / "databases" / "authentik" / "cluster.yaml"
