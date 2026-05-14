@@ -2794,7 +2794,7 @@ def test_paperless_redis_manifest_runs_statelessly():
     assert "emptyDir: {}" in redis_text
     assert "--appendonly" in redis_text
     assert '- "no"' in redis_text
-    assert '--save' in redis_text
+    assert "--save" in redis_text
     assert 'value: "60"' not in redis_text
 
 
