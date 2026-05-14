@@ -2138,6 +2138,9 @@ NTFY_VALUES = REPO_ROOT / "gitops" / "values" / "ntfy.yaml"
 NTFY_INGRESSROUTE = REPO_ROOT / "gitops" / "platform-apps" / "ntfy" / "ingressroute.yaml"
 KUSTOMIZATION = REPO_ROOT / "gitops" / "platform" / "kustomization.yaml"
 DATABASES_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "kustomization.yaml"
+DATABASES_SHARED_KUSTOMIZATION = (
+    REPO_ROOT / "gitops" / "databases" / "shared" / "kustomization.yaml"
+)
 AUTHENTIK_DB_CLUSTER = REPO_ROOT / "gitops" / "databases" / "authentik" / "cluster.yaml"
 AUTHENTIK_DB_STORAGECLASS = REPO_ROOT / "gitops" / "databases" / "longhorn-single-storageclass.yaml"
 DATABASES_NAMESPACE = REPO_ROOT / "gitops" / "databases" / "namespace.yaml"
@@ -2593,6 +2596,26 @@ def test_databases_kustomization_includes_authentik_resources():
     )
 
 
+def test_databases_shared_kustomization_only_owns_namespace():
+    text = DATABASES_SHARED_KUSTOMIZATION.read_text(encoding="utf-8")
+    assert "../namespace.yaml" in text
+    assert "longhorn-single-storageclass.yaml" not in text
+    for app_name in [
+        "authentik",
+        "hedgedoc",
+        "immich",
+        "n8n",
+        "nextcloud",
+        "openwebui",
+        "outline",
+        "paperless",
+        "pixelfed",
+        "vaultwarden",
+        "zulip",
+    ]:
+        assert f"{app_name}/" not in text
+
+
 def test_cloudnativepg_bootstrap_installs_shared_database_application():
     step_text = CLOUDNATIVEPG_STEP_SCRIPT.read_text(encoding="utf-8")
     app_text = DATABASES_APP.read_text(encoding="utf-8")
@@ -2603,7 +2626,7 @@ def test_cloudnativepg_bootstrap_installs_shared_database_application():
     assert '--application "databases"' in step_text
     assert "kind: Application" in app_text
     assert "name: databases" in app_text
-    assert "path: gitops/databases" in app_text
+    assert "path: gitops/databases/shared" in app_text
     assert "namespace: databases" in app_text
     assert "CreateNamespace=true" in app_text
 

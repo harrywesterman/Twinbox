@@ -81,7 +81,7 @@ Bundles group related apps into curated sets:
 6. The helper labels the Argo CD cluster secret with `twinbox.io/app-<app>=enabled`
 7. Argo CD creates the live `Application` from `gitops/optional-apps/<app>.yaml`
 8. Platform-specific overlays are applied from `gitops/platform-apps/<app>/`
-9. Database resources (CloudNativePG) are provisioned from `gitops/databases/<app>/` when needed
+9. Database resources (CloudNativePG) are provisioned from `gitops/databases/<app>/` when needed, while the shared `databases` namespace is owned by `gitops/apps/databases.yaml`
 
 From that point on, GitHub `main` owns the opt-in app definition and Argo CD keeps the generated `Application` up to date.
 

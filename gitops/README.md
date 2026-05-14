@@ -21,6 +21,8 @@ Argo CD `Application` resources that bootstrap the GitOps graph itself.
 
 The most important bootstrap resource is [`gitops/apps/optional-apps-root.yaml`](apps/optional-apps-root.yaml). It points Argo CD at `gitops/optional-apps/`, where the opt-in app `ApplicationSet` manifests live.
 
+[`gitops/apps/databases.yaml`](apps/databases.yaml) owns only the shared `databases` namespace. App-specific CloudNativePG resources stay owned by their app Applications.
+
 The other files in this directory are still cluster bootstrap or platform entrypoints. They are seeded once and then reconciled by Argo CD.
 
 ## `optional-apps/`
@@ -57,7 +59,8 @@ Bootstrap-facing `ExternalSecret` resources live under `gitops/platform-apps/<ap
 - `authentik/` - Authentik database resources.
 - `immich/` - Immich database resources.
 - `longhorn-single-storageclass.yaml` - StorageClass used by single-replica clusters.
-- `namespace.yaml` - `databases` namespace definition.
+- `shared/` - Argo CD source for shared database resources; currently only the `databases` namespace.
+- `namespace.yaml` - shared `databases` namespace definition, owned by [`gitops/apps/databases.yaml`](apps/databases.yaml).
 
 ## `platform/`
 
