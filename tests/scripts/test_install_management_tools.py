@@ -22,6 +22,7 @@ def test_install_management_tools_fails_on_version_command_errors():
     assert "Usage: install-management-tools.sh [--env-file /path/to/.env]" in text
     assert "PINNED_KUBECTL_VERSION" in text
     assert "PINNED_HELM_VERSION" in text
+    assert 'export HOME="${HOME:-/root}"' in text
     assert (
         'talos_output="$(/usr/local/bin/talosctl version --client 2>&1)" || fail "talosctl version check failed: ${talos_output}"'
         in text

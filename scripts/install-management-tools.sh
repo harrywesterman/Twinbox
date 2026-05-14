@@ -66,6 +66,8 @@ done
 [[ "$(uname -s)" == "Linux" ]] || fail "Only Linux is supported"
 [[ "$(uname -m)" == "x86_64" ]] || fail "Only amd64/x86_64 is supported"
 
+export HOME="${HOME:-/root}"
+
 set -a
 # shellcheck disable=SC1090
 source "$ENV_FILE"
