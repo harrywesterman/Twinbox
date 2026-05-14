@@ -2810,6 +2810,19 @@ def test_paperless_storage_manifest_keeps_app_pvcs_only():
     assert "paperless-redis-data" not in pvc_text
 
 
+def test_paperless_deployment_uses_reasonable_resources():
+    deployment_text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "paperless" / "deployment.yaml"
+    ).read_text(encoding="utf-8")
+
+    assert "resources:" in deployment_text
+    assert "memory: 512Mi" in deployment_text
+    assert "memory: 1Gi" in deployment_text
+    assert "cpu: 250m" in deployment_text
+    assert 'cpu: "1"' in deployment_text
+    assert "failureThreshold: 120" in deployment_text
+
+
 def test_cnpg_database_clusters_have_seaweedfs_backups():
     authentik_cluster_text = (
         REPO_ROOT / "gitops" / "databases" / "authentik" / "cluster.yaml"
