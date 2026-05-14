@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -2143,7 +2144,19 @@ DATABASES_SHARED_KUSTOMIZATION = (
 )
 AUTHENTIK_DB_CLUSTER = REPO_ROOT / "gitops" / "databases" / "authentik" / "cluster.yaml"
 AUTHENTIK_DB_STORAGECLASS = REPO_ROOT / "gitops" / "databases" / "longhorn-single-storageclass.yaml"
-DATABASES_NAMESPACE = REPO_ROOT / "gitops" / "databases" / "namespace.yaml"
+DATABASES_NAMESPACE = REPO_ROOT / "gitops" / "databases" / "shared" / "namespace.yaml"
+
+
+def _argocd_source_paths_with_kustomizations():
+    source_paths = set()
+    for manifest_root in [REPO_ROOT / "gitops" / "apps", REPO_ROOT / "gitops" / "optional-apps"]:
+        for manifest_path in manifest_root.rglob("*.yaml"):
+            text = manifest_path.read_text(encoding="utf-8")
+            source_paths.update(re.findall(r"^\s*path:\s*(gitops/[^\s#]+)", text, re.MULTILINE))
+
+    return sorted(
+        path for path in source_paths if (REPO_ROOT / path / "kustomization.yaml").exists()
+    )
 
 
 def test_prometheus_argocd_app_uses_kube_prometheus_stack():
@@ -2584,7 +2597,7 @@ def test_dashy_appset_patches_requests_by_resource_profile():
 
 def test_databases_kustomization_includes_authentik_resources():
     text = DATABASES_KUSTOMIZATION.read_text(encoding="utf-8")
-    assert "namespace.yaml" in text
+    assert "shared/namespace.yaml" in text
     assert "longhorn-single-storageclass.yaml" in text
     assert "authentik/cluster.yaml" in text
     assert "authentik/externalsecret.yaml" in text
@@ -2598,7 +2611,8 @@ def test_databases_kustomization_includes_authentik_resources():
 
 def test_databases_shared_kustomization_only_owns_namespace():
     text = DATABASES_SHARED_KUSTOMIZATION.read_text(encoding="utf-8")
-    assert "../namespace.yaml" in text
+    assert "namespace.yaml" in text
+    assert "../namespace.yaml" not in text
     assert "longhorn-single-storageclass.yaml" not in text
     for app_name in [
         "authentik",
@@ -2614,6 +2628,33 @@ def test_databases_shared_kustomization_only_owns_namespace():
         "zulip",
     ]:
         assert f"{app_name}/" not in text
+
+
+def test_databases_shared_namespace_manifest_is_canonical():
+    text = DATABASES_NAMESPACE.read_text(encoding="utf-8")
+
+    assert text.startswith("apiVersion: v1\nkind: Namespace\n")
+    assert "  name: databases\n" in text
+    assert "    app.kubernetes.io/part-of: twinbox\n" in text
+    assert "    app.kubernetes.io/component: databases\n" in text
+    assert not (REPO_ROOT / "gitops" / "databases" / "namespace.yaml").exists()
+
+
+def test_database_namespace_direct_apply_scripts_use_shared_manifest():
+    authentik_text = AUTHENTIK_STEP_SCRIPT.read_text(encoding="utf-8")
+    zulip_text = (
+        REPO_ROOT / "categories" / "apps" / "steps" / "install-zulip" / "run.sh"
+    ).read_text(encoding="utf-8")
+
+    for text in [authentik_text, zulip_text]:
+        assert "gitops/databases/shared/namespace.yaml" in text
+        assert "gitops/databases/namespace.yaml" not in text
+
+
+def test_argocd_source_kustomizations_are_self_contained():
+    for source_path in _argocd_source_paths_with_kustomizations():
+        text = (REPO_ROOT / source_path / "kustomization.yaml").read_text(encoding="utf-8")
+        assert "../" not in text, f"{source_path}/kustomization.yaml references a parent path"
 
 
 def test_cloudnativepg_bootstrap_installs_shared_database_application():

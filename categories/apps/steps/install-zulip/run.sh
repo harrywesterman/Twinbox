@@ -373,7 +373,7 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --json-file "$zulip_runtime_secret_file" \
   --required-keys "ZULIP_RABBITMQ_PASSWORD,ZULIP_RABBITMQ_ERLANG_COOKIE,ZULIP_REDIS_PASSWORD"
 
-databases_namespace_manifest="$WORKSPACE_ROOT/gitops/databases/namespace.yaml"
+databases_namespace_manifest="$WORKSPACE_ROOT/gitops/databases/shared/namespace.yaml"
 zulip_db_cluster_manifest="$WORKSPACE_ROOT/gitops/databases/zulip/cluster.yaml"
 zulip_db_externalsecret_manifest="$WORKSPACE_ROOT/gitops/databases/zulip/externalsecret.yaml"
 zulip_db_pooler_ro_manifest="$WORKSPACE_ROOT/gitops/databases/zulip/pooler-ro.yaml"

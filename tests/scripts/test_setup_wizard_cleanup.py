@@ -149,7 +149,7 @@ def test_setup_wizard_bootstraps_filesystem_secret_material_before_starting_mana
     assert "install -m 0755 -d /opt/twinbox/bootstrap/bin" in text
     assert "install -m 0755 -d /opt/twinbox/scripts/manager" in text
     assert (
-        'bash -lc \'curl -fsSL "${TWINBOX_RAW_BASE_URL}/scripts/manager/management-ip.sh" -o /opt/twinbox/scripts/manager/management-ip.sh\''
+        "bash -lc 'curl -fsSL \"${TWINBOX_RAW_BASE_URL}/scripts/manager/management-ip.sh\" -o /opt/twinbox/scripts/manager/management-ip.sh'"
         in text
     )
     assert "chmod 0755 /opt/twinbox/scripts/manager/management-ip.sh" in text

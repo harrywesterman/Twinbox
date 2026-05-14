@@ -60,7 +60,7 @@ Bootstrap-facing `ExternalSecret` resources live under `gitops/platform-apps/<ap
 - `immich/` - Immich database resources.
 - `longhorn-single-storageclass.yaml` - StorageClass used by single-replica clusters.
 - `shared/` - Argo CD source for shared database resources; currently only the `databases` namespace.
-- `namespace.yaml` - shared `databases` namespace definition, owned by [`gitops/apps/databases.yaml`](apps/databases.yaml).
+- `shared/namespace.yaml` - shared `databases` namespace definition, owned by [`gitops/apps/databases.yaml`](apps/databases.yaml).
 
 ## `platform/`
 
