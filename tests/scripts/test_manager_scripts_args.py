@@ -2785,18 +2785,17 @@ def test_pixelfed_manifests_use_postgresql_and_longhorn_storage():
     assert "destinationPath: s3://twinbox-velero/pixelfed-db/" in cluster_text
 
 
-def test_paperless_redis_manifest_sets_group_permissions_for_persistent_data():
+def test_paperless_redis_manifest_runs_statelessly():
     redis_text = (REPO_ROOT / "gitops" / "platform-apps" / "paperless" / "redis.yaml").read_text(
         encoding="utf-8"
     )
 
     assert "name: paperless-redis" in redis_text
-    assert "persistentVolumeClaim:" in redis_text
-    assert "claimName: paperless-redis-data" in redis_text
-    assert "securityContext:" in redis_text
-    assert "fsGroup: 999" in redis_text
+    assert "emptyDir: {}" in redis_text
     assert "--appendonly" in redis_text
-    assert 'value: "yes"' not in redis_text
+    assert '- "no"' in redis_text
+    assert '--save' in redis_text
+    assert 'value: "60"' not in redis_text
 
 
 def test_cnpg_database_clusters_have_seaweedfs_backups():

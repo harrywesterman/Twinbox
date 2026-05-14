@@ -25,11 +25,10 @@ spec:
           imagePullPolicy: IfNotPresent
           args:
             - redis-server
-            - --appendonly
-            - "yes"
             - --save
-            - "60"
-            - "1"
+            - ""
+            - --appendonly
+            - "no"
           ports:
             - name: redis
               containerPort: 6379
@@ -48,8 +47,7 @@ spec:
               mountPath: /data
       volumes:
         - name: redis-data
-          persistentVolumeClaim:
-            claimName: paperless-redis-data
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
