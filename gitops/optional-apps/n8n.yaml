@@ -58,6 +58,13 @@ spec:
                   - op: replace
                     path: /spec/routes/0/match
                     value: Host(`n8n.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: n8n-authentik-callback
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`n8n.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)
         - repoURL: https://github.com/harrywesterman/Twinbox.git
           targetRevision: main
           path: gitops/databases/n8n
