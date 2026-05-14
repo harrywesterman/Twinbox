@@ -21,6 +21,11 @@ import {
 } from "./provision-defaults.js";
 import { buildAdminDashboardUrl } from "./cluster-public-zone.js";
 import {
+  buildInstallRefreshFailureNotice,
+  buildQueueFailureNotice,
+  normalizeJobResult,
+} from "./install-flow.js";
+import {
   buildWizardExportFilename,
   getMissionControlModel,
   getNextInstallableSetupStep,
@@ -1445,22 +1450,27 @@ function App() {
         requestJson(`/api/jobs/${encodeURIComponent(jobId)}`),
         requestJson(`/api/jobs/${encodeURIComponent(jobId)}/logs`),
       ]);
+      const currentJob = normalizeJobResult(jobData);
 
       const latestLogs = logsData?.lines || [];
       if (stepId && latestLogs.length > 0) {
         setInstallStepLogs(stepId, latestLogs);
       }
 
+      if (!currentJob) {
+        throw new Error(`Job ${jobId} returned an empty response`);
+      }
+
       if (
-        jobData.status === "pending" ||
-        jobData.status === "running" ||
-        jobData.status === "cancel_requested"
+        currentJob.status === "pending" ||
+        currentJob.status === "running" ||
+        currentJob.status === "cancel_requested"
       ) {
         await sleep(1600);
         continue;
       }
 
-      return jobData;
+      return currentJob;
     }
   }
 
@@ -1658,56 +1668,74 @@ function App() {
     setActiveJob({ id: null, stepId: step.id, status: "starting" });
     setInstallStepLogs(step.id, []);
 
+    let response;
     try {
-      const response = await requestJson(`/api/steps/${encodeURIComponent(step.id)}/execute`, {
+      response = await requestJson(`/api/steps/${encodeURIComponent(step.id)}/execute`, {
         method: "POST",
         body: JSON.stringify(body),
       });
+    } catch (stepError) {
+      const message =
+        stepError instanceof Error ? stepError.message : `Failed to execute ${step.title}`;
+      setError(message);
+      setNotice(buildQueueFailureNotice(step.title));
+      return { ok: false, error: message };
+    }
 
-      const nextClusterId = response.cluster_id || clusterIdOverride || "";
-      const nextClusterInstanceId =
-        response.cluster_instance_id || clusterInstanceIdRef.current || "";
-      setActiveJob({
-        id: response.job_id,
-        stepId: step.id,
-        clusterId: nextClusterId,
-        clusterInstanceId: nextClusterInstanceId,
-        status: "running",
-      });
+    const nextClusterId = response.cluster_id || clusterIdOverride || "";
+    const nextClusterInstanceId =
+      response.cluster_instance_id || clusterInstanceIdRef.current || "";
+    setActiveJob({
+      id: response.job_id,
+      stepId: step.id,
+      clusterId: nextClusterId,
+      clusterInstanceId: nextClusterInstanceId,
+      status: "running",
+    });
 
-      const terminal = await pollJob(response.job_id, step.id);
-      setActiveJob({
-        id: response.job_id,
-        stepId: step.id,
-        clusterId: nextClusterId,
-        clusterInstanceId: nextClusterInstanceId,
-        status: terminal.status,
-      });
+    let terminalJob;
+    try {
+      terminalJob = await pollJob(response.job_id, step.id);
+    } catch (stepError) {
+      const message =
+        stepError instanceof Error ? stepError.message : `Failed while waiting for ${step.title}`;
+      setError(message);
+      setNotice(`Failed to finish ${step.title}.`);
+      return { ok: false, error: message };
+    }
 
-      if (nextClusterId && nextClusterId !== clusterIdRef.current) {
-        setClusterId(nextClusterId);
+    setActiveJob({
+      id: response.job_id,
+      stepId: step.id,
+      clusterId: nextClusterId,
+      clusterInstanceId: nextClusterInstanceId,
+      status: terminalJob.status,
+    });
+
+    if (nextClusterId && nextClusterId !== clusterIdRef.current) {
+      setClusterId(nextClusterId);
+    }
+    if (nextClusterInstanceId && nextClusterInstanceId !== clusterInstanceIdRef.current) {
+      clusterInstanceIdRef.current = nextClusterInstanceId;
+      setClusterInstanceId(nextClusterInstanceId);
+    }
+
+    if (terminalJob.status === "failed") {
+      const failure = terminalJob.error || step.state?.error || `${step.title} failed`;
+      setError(failure);
+      setNotice(`Failed to finish ${step.title}.`);
+    } else if (terminalJob.status === "canceled") {
+      setNotice(`${step.title} was stopped.`);
+    } else {
+      setNotice(`${step.title} completed successfully.`);
+      const currentInstallIndex = setupSteps.findIndex((candidate) => candidate.id === step.id);
+      const nextInstallStep = currentInstallIndex >= 0 ? setupSteps[currentInstallIndex + 1] : null;
+      if (nextInstallStep?.id) {
+        selectInstallStep(nextInstallStep.id);
       }
-      if (nextClusterInstanceId && nextClusterInstanceId !== clusterInstanceIdRef.current) {
-        clusterInstanceIdRef.current = nextClusterInstanceId;
-        setClusterInstanceId(nextClusterInstanceId);
-      }
+    }
 
-      if (terminal.job.status === "failed") {
-        const failure = terminal.job.error || step.state?.error || `${step.title} failed`;
-        setError(failure);
-        setNotice(`Failed to finish ${step.title}.`);
-      } else if (terminal.job.status === "canceled") {
-        setNotice(`${step.title} was stopped.`);
-      } else {
-        setNotice(`${step.title} completed successfully.`);
-        const currentInstallIndex = setupSteps.findIndex((candidate) => candidate.id === step.id);
-        const nextInstallStep =
-          currentInstallIndex >= 0 ? setupSteps[currentInstallIndex + 1] : null;
-        if (nextInstallStep?.id) {
-          selectInstallStep(nextInstallStep.id);
-        }
-      }
-
+    try {
       const refreshedCatalog = await refreshWizardSnapshot({
         requestJson,
         clusterIdRef,
@@ -1739,17 +1767,25 @@ function App() {
       });
 
       return {
-        ok: terminal.job.status === "succeeded",
-        job: terminal.job,
+        ok: terminalJob.status === "succeeded",
+        job: terminalJob,
         clusterId: nextClusterId,
         catalog: refreshedCatalog,
       };
     } catch (stepError) {
       const message =
-        stepError instanceof Error ? stepError.message : `Failed to execute ${step.title}`;
+        stepError instanceof Error
+          ? stepError.message
+          : `Failed to refresh the wizard after ${step.title}`;
       setError(message);
-      setNotice(`Could not queue ${step.title}.`);
-      return { ok: false, error: message };
+      setNotice(buildInstallRefreshFailureNotice(step.title));
+      return {
+        ok: terminalJob.status === "succeeded",
+        job: terminalJob,
+        clusterId: nextClusterId,
+        catalog: catalog,
+        refreshError: message,
+      };
     } finally {
       if (manageBusy) {
         setBusy(false);

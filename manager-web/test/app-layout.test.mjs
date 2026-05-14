@@ -27,6 +27,12 @@ test("app source defines a minimal wizard shell with guided input and step-by-st
     "expected the last question to lead into the install phase"
   );
   assert.match(source, /Install all/, "expected an install-all action in the install phase");
+  assert.match(source, /normalizeJobResult/, "expected the job polling response to be normalized");
+  assert.match(
+    source,
+    /buildInstallRefreshFailureNotice/,
+    "expected a distinct helper for refresh failures after a successful install"
+  );
   assert.match(source, /type="range"/, "expected the scale slider");
   assert.match(source, /wizard-step-actions-panel/, "expected a dedicated step 1 helper bar");
   assert.match(source, /Help me with free IPs/, "expected the IP helper button");
