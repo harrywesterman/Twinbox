@@ -143,7 +143,9 @@ verify_checksum() {
 download_to() {
   local url="$1"
   local dest="$2"
-  curl -fsSL "$url" -o "$dest"
+  curl --fail --silent --show-error --location \
+    --retry 5 --retry-delay 2 --retry-max-time 120 --retry-all-errors \
+    "$url" -o "$dest"
 }
 
 install_talosctl() {
