@@ -2,6 +2,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SYNC_SCRIPT = REPO_ROOT / "scripts" / "manager" / "sync-openbao-global-secret.sh"
+OPENBAO_HELPER = REPO_ROOT / "scripts" / "manager" / "openbao-secret-sync.sh"
 GRAFANA_STEP = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-grafana" / "run.sh"
 WIREDOOR_STEP = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-wiredoor-gateway" / "run.sh"
@@ -58,6 +59,18 @@ def test_sync_openbao_global_secret_script_uses_port_forward_and_kv_v2_api():
         'openbao_sync_global_secret_file "$SECRET_NAME" "$JSON_FILE" "${required_key_list[@]}"'
         in text
     )
+
+
+def test_openbao_global_secret_reads_use_active_service_port_forward():
+    text = _read(OPENBAO_HELPER)
+    read_function = text.split("openbao_read_global_secret_json() {", 1)[1].split(
+        "openbao_read_global_secret_field() {", 1
+    )[0]
+
+    assert 'kubectl -n "$OPENBAO_NAMESPACE" port-forward "svc/openbao-active"' in read_function
+    assert "/v1/kv/data/twinbox/global/${secret_name}" in read_function
+    assert "openbao_wait_for_server_pod" not in read_function
+    assert "bao kv get" not in read_function
 
 
 def test_grafana_step_generates_and_syncs_an_oidc_secret():

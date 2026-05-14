@@ -618,17 +618,44 @@ openbao_read_global_secret_json() {
   [[ -n "$secret_name" ]] || openbao_fail "secret name is required"
   [[ -f "$OPENBAO_ROOT_TOKEN_FILE" ]] || openbao_fail "OpenBao root token file not found: ${OPENBAO_ROOT_TOKEN_FILE}"
 
-  local openbao_pod=""
-  openbao_pod="$(openbao_wait_for_server_pod)"
+  [[ -n "${KUBECONFIG_FILE:-}" ]] || openbao_fail "KUBECONFIG_FILE is required"
+  [[ -f "${KUBECONFIG_FILE:-}" ]] || openbao_fail "kubeconfig not found at ${KUBECONFIG_FILE:-}"
+
+  openbao_require_cmd jq
+  openbao_require_cmd kubectl
+  openbao_require_cmd curl
 
   local root_token=""
   root_token="$(tr -d '\r\n' <"$OPENBAO_ROOT_TOKEN_FILE")"
   [[ -n "$root_token" ]] || openbao_fail "OpenBao root token file is empty: ${OPENBAO_ROOT_TOKEN_FILE}"
 
-  openbao_exec "$openbao_pod" \
-    env BAO_ADDR=http://127.0.0.1:8200 BAO_TOKEN="$root_token" sh -se <<EOF | jq -c '.data.data'
-bao kv get -format=json kv/twinbox/global/${secret_name}
-EOF
+  export KUBECONFIG="$KUBECONFIG_FILE"
+
+  local forward_port="${OPENBAO_LOCAL_FORWARD_PORT:-18200}"
+  local forward_log=""
+  forward_log="$(mktemp "${TMPDIR:-/tmp}/openbao-read-port-forward-XXXXXX")"
+  local port_forward_pid=""
+
+  cleanup_openbao_read_port_forward() {
+    if [[ -n "$port_forward_pid" ]]; then
+      kill "$port_forward_pid" >/dev/null 2>&1 || true
+      wait "$port_forward_pid" >/dev/null 2>&1 || true
+    fi
+    rm -f "$forward_log"
+  }
+
+  trap cleanup_openbao_read_port_forward RETURN
+  # Read through the active service rather than an arbitrary pod. In HA mode a
+  # standby pod can reject KV requests while the cluster itself is healthy.
+  kubectl -n "$OPENBAO_NAMESPACE" port-forward "svc/openbao-active" "${forward_port}:8200" >"$forward_log" 2>&1 &
+  port_forward_pid="$!"
+  openbao_wait_for_local_forward "$forward_port"
+
+  curl -fsS \
+    -H "Accept: application/json" \
+    -H "X-Vault-Token: ${root_token}" \
+    "http://127.0.0.1:${forward_port}/v1/kv/data/twinbox/global/${secret_name}" \
+    | jq -c '.data.data'
 }
 
 openbao_read_global_secret_field() {
