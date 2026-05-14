@@ -9,6 +9,9 @@ RAW_BASE_URL="${TWINBOX_RAW_BASE_URL:-https://raw.githubusercontent.com/harrywes
 BOOTSTRAP_ONCE=0
 BOOTSTRAP_MARKER="${BOOTSTRAP_DIR}/state/manager-stack.started"
 
+# shellcheck disable=SC1091
+source "$REPO_ROOT/scripts/manager/management-ip.sh"
+
 log() {
   printf '[start-manager] %s\n' "$1"
 }
@@ -57,7 +60,9 @@ append_secret_env_block() {
     return 0
   fi
 
-  management_ip="${MANAGEMENT_VM_IP:-$(hostname -I | awk '{print $1}')}"
+  if ! management_ip="$(resolve_management_vm_ip)"; then
+    fail "Could not determine management VM IP"
+  fi
 
   cat >> .env <<EOF
 
@@ -87,7 +92,7 @@ ensure_bootstrap_material() {
   local velero_file="${secret_dir}/velero.json"
   local seal_key_file="${openbao_seal_dir}/current.key"
   local seal_key_id_file="${openbao_seal_dir}/current-key-id"
-  local management_ip="${MANAGEMENT_VM_IP:-$(hostname -I | awk '{print $1}')}"
+  local management_ip=""
   local username="${SEAWEEDFS_ACCESS_KEY_ID:-velero}"
   local password="${SEAWEEDFS_SECRET_ACCESS_KEY:-}"
   local bucket="${SEAWEEDFS_BUCKET:-twinbox-velero}"
@@ -154,6 +159,10 @@ PY
 
   if [[ -z "$password" ]]; then
     password="$(openssl rand -hex 16)"
+  fi
+
+  if ! management_ip="$(resolve_management_vm_ip)"; then
+    fail "Could not determine management VM IP"
   fi
 
   export MANAGEMENT_VM_IP="$management_ip"

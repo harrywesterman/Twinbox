@@ -97,6 +97,22 @@ def test_management_vm_backup_installs_host_cron_without_embedding_secrets():
     assert "attachment: talosconfig" in step_text
 
 
+def test_velero_backup_uses_portable_management_ip_resolution():
+    script_text = (REPO_ROOT / "scripts" / "manager" / "install-velero-backup.sh").read_text(
+        encoding="utf-8"
+    )
+    helper_text = (REPO_ROOT / "scripts" / "manager" / "management-ip.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert "management-ip.sh" in script_text
+    assert "hostname -I" not in script_text
+    assert "resolve_management_vm_ip()" in helper_text
+    assert "hostname -I" not in helper_text
+    assert "python3 - <<'PY'" in helper_text
+    assert "ip route get 1.1.1.1" in helper_text
+
+
 def test_management_tools_install_restic_for_host_backup_jobs():
     text = (REPO_ROOT / "scripts" / "install-management-tools.sh").read_text(encoding="utf-8")
 

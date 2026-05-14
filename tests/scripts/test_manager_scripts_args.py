@@ -70,6 +70,7 @@ HUBBLE_AUTHENTIK_FORWARDAUTH_MIDDLEWARE = (
 ARGOCD_CM = REPO_ROOT / "gitops" / "platform" / "argocd" / "argocd-cm.yaml"
 START_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "start-manager.sh"
 BOOTSTRAP_VM_SCRIPT = REPO_ROOT / "scripts" / "bootstrap-vm.sh"
+MANAGEMENT_IP_HELPER = REPO_ROOT / "scripts" / "manager" / "management-ip.sh"
 LONGHORN_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-longhorn-storage" / "run.sh"
 )
@@ -720,11 +721,14 @@ def test_longhorn_step_installs_via_argocd_and_waits_for_health():
         'WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"'
         in step_text
     )
+    assert "management-ip.sh" in helper_text
     assert 'manifest_path="$WORKSPACE_ROOT/gitops/apps/longhorn.yaml"' in helper_text
     assert (
         'longhorn_single_storageclass_manifest="$WORKSPACE_ROOT/gitops/databases/longhorn-single-storageclass.yaml"'
         in helper_text
     )
+    assert "hostname -I" not in helper_text
+    assert "resolve_management_vm_ip()" in MANAGEMENT_IP_HELPER.read_text(encoding="utf-8")
     assert "Installing Longhorn through Argo CD" in helper_text
     assert 'bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \\' in helper_text
     assert '--application "longhorn"' in helper_text
@@ -3312,9 +3316,16 @@ def test_hubble_authentik_callback_ingressroute_uses_the_real_host():
 def test_bootstrap_scripts_use_the_management_vm_ip_for_seaweedfs():
     start_manager_text = START_MANAGER_SCRIPT.read_text(encoding="utf-8")
     bootstrap_vm_text = BOOTSTRAP_VM_SCRIPT.read_text(encoding="utf-8")
+    helper_text = MANAGEMENT_IP_HELPER.read_text(encoding="utf-8")
 
-    assert 'os.environ["MANAGEMENT_VM_IP"]' in start_manager_text
-    assert 'os.environ["MANAGEMENT_VM_IP"]' in bootstrap_vm_text
+    assert "management-ip.sh" in start_manager_text
+    assert "management-ip.sh" in bootstrap_vm_text
+    assert "hostname -I" not in start_manager_text
+    assert "hostname -I" not in bootstrap_vm_text
+    assert "hostname -I" not in helper_text
+    assert "resolve_management_vm_ip()" in helper_text
+    assert "python3 - <<'PY'" in helper_text
+    assert "ip route get 1.1.1.1" in helper_text
     assert "192.168.1.50:8333" not in start_manager_text
     assert "192.168.1.50:8333" not in bootstrap_vm_text
     assert start_manager_text.index("s3.configure --user") < start_manager_text.index(

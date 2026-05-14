@@ -4,6 +4,9 @@ set -euo pipefail
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
 
+# shellcheck disable=SC1091
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/management-ip.sh"
+
 [[ -n "${KUBECONFIG_FILE:-}" ]] || fail "KUBECONFIG_FILE is required"
 [[ -f "${KUBECONFIG_FILE:-}" ]] || fail "kubeconfig not found at ${KUBECONFIG_FILE:-}"
 
@@ -55,8 +58,8 @@ render_secret_file() {
 }
 
 load_velero_settings() {
-  local management_ip="${MANAGEMENT_VM_IP:-$(hostname -I | awk '{print $1}')}"
-  local endpoint="http://${management_ip}:8333"
+  local endpoint=""
+  local management_ip=""
   local username="${SEAWEEDFS_ACCESS_KEY_ID:-velero}"
   local password="${SEAWEEDFS_SECRET_ACCESS_KEY:-}"
   local bucket="${SEAWEEDFS_BUCKET:-twinbox-velero}"
@@ -84,6 +87,13 @@ load_velero_settings() {
     [[ -n "$file_password" ]] && password="$file_password"
   fi
 
+  if [[ -z "$endpoint" ]]; then
+    if ! management_ip="$(resolve_management_vm_ip)"; then
+      fail "Could not determine management VM IP"
+    fi
+    endpoint="http://${management_ip}:8333"
+  fi
+
   if [[ -z "$password" ]]; then
     password="$(openssl rand -hex 16)"
   fi
@@ -94,7 +104,9 @@ load_velero_settings() {
   VELERO_USERNAME="$username"
   VELERO_PASSWORD="$password"
 
-  export MANAGEMENT_VM_IP="$management_ip"
+  if [[ -n "$management_ip" ]]; then
+    export MANAGEMENT_VM_IP="$management_ip"
+  fi
   export SEAWEEDFS_ENDPOINT SEAWEEDFS_BUCKET SEAWEEDFS_REGION
   export VELERO_USERNAME VELERO_PASSWORD
 

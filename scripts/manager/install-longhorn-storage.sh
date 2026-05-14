@@ -4,6 +4,9 @@ set -euo pipefail
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
 
+# shellcheck disable=SC1091
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/management-ip.sh"
+
 wait_for_storage_class() {
   local storage_class="${LONGHORN_STORAGE_CLASS:-longhorn}"
   local attempts=120
@@ -51,8 +54,7 @@ render_secret_file() {
 }
 
 load_longhorn_backup_settings() {
-  local management_ip="${MANAGEMENT_VM_IP:-$(hostname -I | awk '{print $1}')}"
-  local endpoint="http://${management_ip}:8333"
+  local endpoint=""
   local bucket="${SEAWEEDFS_BUCKET:-twinbox-velero}"
   local region="${SEAWEEDFS_REGION:-seaweedfs}"
   local username="${SEAWEEDFS_ACCESS_KEY_ID:-velero}"
@@ -70,6 +72,15 @@ load_longhorn_backup_settings() {
     [[ -n "$file_value" ]] && username="$file_value"
     file_value="$(jq -r '.password // empty' "$VELERO_SECRET_FILE")"
     [[ -n "$file_value" ]] && password="$file_value"
+  fi
+
+  if [[ -z "$endpoint" ]]; then
+    local management_ip=""
+
+    if ! management_ip="$(resolve_management_vm_ip)"; then
+      fail "Could not determine management VM IP"
+    fi
+    endpoint="http://${management_ip}:8333"
   fi
 
   if [[ -z "$password" ]]; then

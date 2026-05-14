@@ -8,6 +8,9 @@ TARGET_DIR="${TWINBOX_TARGET_DIR:-/opt/twinbox}"
 BOOTSTRAP_DIR="${TWINBOX_BOOTSTRAP_DIR:-${TARGET_DIR}/bootstrap}"
 RAW_BASE_URL="${TWINBOX_RAW_BASE_URL:-https://raw.githubusercontent.com/harrywesterman/twinbox/main}"
 
+# shellcheck disable=SC1091
+source "$REPO_ROOT/scripts/manager/management-ip.sh"
+
 append_secret_env_block() {
   local management_ip=""
 
@@ -15,7 +18,9 @@ append_secret_env_block() {
     return 0
   fi
 
-  management_ip="${MANAGEMENT_VM_IP:-$(hostname -I | awk '{print $1}')}"
+  if ! management_ip="$(resolve_management_vm_ip)"; then
+    fail "Could not determine management VM IP"
+  fi
 
   cat >> .env <<EOF
 
@@ -59,6 +64,7 @@ ensure_bootstrap_material() {
   local velero_file="${secret_dir}/velero.json"
   local seal_key_file="${openbao_seal_dir}/current.key"
   local seal_key_id_file="${openbao_seal_dir}/current-key-id"
+  local management_ip=""
 
   install -d -m 0700 "$secret_dir" "$openbao_seal_dir" "$openbao_init_dir"
 
@@ -106,6 +112,10 @@ PY
   if [[ ! -f "$velero_file" ]]; then
     local seaweedfs_password=""
     seaweedfs_password="$(openssl rand -hex 16)"
+    if ! management_ip="$(resolve_management_vm_ip)"; then
+      fail "Could not determine management VM IP"
+    fi
+    export MANAGEMENT_VM_IP="$management_ip"
     python3 - "$velero_file" "$seaweedfs_password" <<'PY'
 import json
 import os
