@@ -1,0 +1,70 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: immich-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            twinbox.io/domain-ready: "true"
+            twinbox.io/app-immich: "enabled"
+  template:
+    metadata:
+      name: immich
+    spec:
+      project: default
+      sources:
+        # Immich still publishes the chart through the legacy Helm repository.
+        # Argo CD in this environment cannot authenticate to the GHCR OCI source.
+        - repoURL: https://immich-app.github.io/immich-charts/
+          chart: immich
+          targetRevision: "0.11.1"
+          helm:
+            valueFiles:
+              - $values/gitops/values/immich.yaml
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          ref: values
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          path: gitops/platform-apps/immich
+          kustomize:
+            patches:
+              - target:
+                  kind: IngressRoute
+                  name: immich
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`immich.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: immich-wiredoor
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`immich.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: immich-tailscale
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`immich.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          path: gitops/databases/immich
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: immich
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

@@ -76,9 +76,14 @@ Bundles group related apps into curated sets:
 1. User selects an app in the Portal or wizard
 2. `manager-api` queues a `run_step` job
 3. `manager-worker` executes the step runner script
-4. The script applies the Argo CD Application manifest from `gitops/apps/<app>.yaml`
-5. Platform-specific overlays are applied from `gitops/platform-apps/<app>/`
-6. Database resources (CloudNativePG) are provisioned from `gitops/databases/<app>/` when needed
+4. The script bootstraps any app-specific secrets and platform resources
+5. The shared Argo CD helper applies the opt-in app `ApplicationSet` manifest
+6. The helper labels the Argo CD cluster secret with `twinbox.io/app-<app>=enabled`
+7. Argo CD creates the live `Application` from `gitops/optional-apps/<app>.yaml`
+8. Platform-specific overlays are applied from `gitops/platform-apps/<app>/`
+9. Database resources (CloudNativePG) are provisioned from `gitops/databases/<app>/` when needed
+
+From that point on, GitHub `main` owns the opt-in app definition and Argo CD keeps the generated `Application` up to date.
 
 ## Dependencies
 

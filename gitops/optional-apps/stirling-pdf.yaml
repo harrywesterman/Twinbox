@@ -1,0 +1,63 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: stirling-pdf-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            twinbox.io/domain-ready: "true"
+            twinbox.io/app-stirling-pdf: "enabled"
+  template:
+    metadata:
+      name: stirling-pdf
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/harrywesterman/Twinbox.git
+        targetRevision: main
+        path: gitops/platform-apps/stirling-pdf
+        kustomize:
+          patches:
+            - target:
+                kind: Deployment
+                name: stirling-pdf
+              patch: |-
+                - op: replace
+                  path: /spec/template/spec/containers/0/env/3/value
+                  value: https://stirling-pdf.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/
+            - target:
+                kind: IngressRoute
+                name: stirling-pdf
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`stirling-pdf.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: stirling-pdf-wiredoor
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`stirling-pdf.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: stirling-pdf-tailscale
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`stirling-pdf.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: stirling-pdf
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

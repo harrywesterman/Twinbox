@@ -1,0 +1,72 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: outline-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            twinbox.io/domain-ready: "true"
+            twinbox.io/app-outline: "enabled"
+  template:
+    metadata:
+      name: outline
+    spec:
+      project: default
+      sources:
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          path: gitops/platform-apps/outline
+          kustomize:
+            patches:
+              - target:
+                  kind: Deployment
+                  name: outline
+                patch: |-
+                  - op: replace
+                    path: /spec/template/spec/containers/0/env/0/value
+                    value: https://outline.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                  - op: replace
+                    path: /spec/template/spec/containers/0/env/5/value
+                    value: https://authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/application/o/outline/
+                  - op: replace
+                    path: /spec/template/spec/containers/0/env/6/value
+                    value: https://authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/application/o/outline/end-session/
+              - target:
+                  kind: IngressRoute
+                  name: outline
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`outline.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: outline-wiredoor
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`outline.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: outline-tailscale
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`outline.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          path: gitops/databases/outline
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: outline
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

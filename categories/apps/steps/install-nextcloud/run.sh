@@ -257,15 +257,6 @@ authentik_ensure_token
 authentik_setup_forward
 
 AUTHENTIK_HOST="${AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
-databases_namespace_manifest="$WORKSPACE_ROOT/gitops/databases/namespace.yaml"
-nextcloud_db_cluster_manifest="$WORKSPACE_ROOT/gitops/databases/nextcloud/cluster.yaml"
-nextcloud_db_externalsecret_manifest="$WORKSPACE_ROOT/gitops/databases/nextcloud/externalsecret.yaml"
-nextcloud_db_pooler_ro_manifest="$WORKSPACE_ROOT/gitops/databases/nextcloud/pooler-ro.yaml"
-nextcloud_db_pooler_rw_manifest="$WORKSPACE_ROOT/gitops/databases/nextcloud/pooler-rw.yaml"
-nextcloud_db_backup_manifest="$WORKSPACE_ROOT/gitops/databases/nextcloud/scheduled-backup.yaml"
-nextcloud_platform_dir="$WORKSPACE_ROOT/gitops/platform-apps/nextcloud"
-nextcloud_app_manifest="$WORKSPACE_ROOT/gitops/apps/nextcloud.yaml"
-nextcloud_values_manifest="$WORKSPACE_ROOT/gitops/values/nextcloud.yaml"
 oidc_groups_mapping_release_url="https://github.com/strobelpierre/nextcloud_oidc_groups_mapping/releases/latest/download/oidc_groups_mapping.tar.gz"
 
 existing_nextcloud_secret_json=""
@@ -300,7 +291,7 @@ fi
 [[ -n "$nextcloud_oidc_client_secret" ]] || nextcloud_oidc_client_secret="$(openssl rand -hex 32)"
 
 nextcloud_secret_file="$(mktemp)"
-trap 'rm -f "$nextcloud_secret_file" "${nextcloud_rendered_app_manifest:-}" "${nextcloud_rendered_middleware:-}" "${nextcloud_rendered_ingressroute:-}" "${nextcloud_rendered_collabora_ingressroute:-}"' EXIT
+trap 'rm -f "$nextcloud_secret_file"' EXIT
 jq -n \
   --arg nextcloud_admin_username "$nextcloud_admin_username" \
   --arg nextcloud_admin_password "$nextcloud_admin_password" \
@@ -446,89 +437,14 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "nextcloud" \
   --json-file "$nextcloud_secret_file" \
   --required-keys "NEXTCLOUD_ADMIN_USERNAME,NEXTCLOUD_ADMIN_PASSWORD,NEXTCLOUD_POSTGRESQL__USERNAME,NEXTCLOUD_POSTGRESQL__PASSWORD,NEXTCLOUD_REDIS_PASSWORD,NEXTCLOUD_OIDC_CLIENT_ID,NEXTCLOUD_OIDC_CLIENT_SECRET"
-
-log "Applying Nextcloud namespace and secret resources"
-kubectl apply -f "$nextcloud_platform_dir/namespace.yaml"
-kubectl apply -f "$nextcloud_platform_dir/admin-externalsecret.yaml"
-kubectl apply -f "$nextcloud_platform_dir/db-externalsecret.yaml"
-kubectl apply -f "$nextcloud_platform_dir/redis-externalsecret.yaml"
-
-nextcloud_rendered_middleware="$(mktemp "${TMPDIR:-/tmp}/nextcloud-middleware-XXXXXX")"
-sed "s/__ZONE_NAME__/${public_zone_name}/g" "$nextcloud_platform_dir/middleware.yaml" >"$nextcloud_rendered_middleware"
-kubectl apply -f "$nextcloud_rendered_middleware"
-
-nextcloud_rendered_ingressroute="$(mktemp "${TMPDIR:-/tmp}/nextcloud-ingressroute-XXXXXX")"
-sed "s/__ZONE_NAME__/${public_zone_name}/g" "$nextcloud_platform_dir/ingressroute.yaml" >"$nextcloud_rendered_ingressroute"
-kubectl apply -f "$nextcloud_rendered_ingressroute"
-
-nextcloud_rendered_collabora_ingressroute="$(mktemp "${TMPDIR:-/tmp}/nextcloud-collabora-ingressroute-XXXXXX")"
-sed "s/__ZONE_NAME__/${public_zone_name}/g" "$nextcloud_platform_dir/collabora-ingressroute.yaml" >"$nextcloud_rendered_collabora_ingressroute"
-kubectl apply -f "$nextcloud_rendered_collabora_ingressroute"
-
-wait_for_resources_ready "nextcloud" "externalsecret" "Ready" "Nextcloud ExternalSecret"
-
-log "Applying Nextcloud database manifests"
-kubectl apply -f "$databases_namespace_manifest"
-if kubectl -n databases get cluster nextcloud-db >/dev/null 2>&1; then
-  log "Nextcloud database cluster already exists; leaving existing CloudNativePG spec unchanged"
-else
-  kubectl apply -f "$nextcloud_db_cluster_manifest"
-fi
-kubectl apply -f "$nextcloud_db_externalsecret_manifest"
-kubectl apply -f "$nextcloud_db_pooler_ro_manifest"
-kubectl apply -f "$nextcloud_db_pooler_rw_manifest"
-kubectl apply -f "$nextcloud_db_backup_manifest"
-
-wait_for_resources_ready "databases" "cluster" "Ready" "Nextcloud CloudNativePG cluster"
-wait_for_resources_ready "databases" "externalsecret" "Ready" "Nextcloud database ExternalSecret"
-wait_for_resources_ready "databases" "deployment" "Available" "Nextcloud pooler deployment"
+log "Applying Nextcloud Argo CD application"
+bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+  --manifest "$WORKSPACE_ROOT/gitops/optional-apps/nextcloud.yaml" \
+  --application "nextcloud"
 
 bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
   --app-id "nextcloud" \
   --host "nextcloud-db-pooler-rw.databases.svc.cluster.local"
-
-nextcloud_rendered_app_manifest="$(mktemp "${TMPDIR:-/tmp}/nextcloud-${cluster_id}-XXXXXX")"
-nextcloud_rendered_values_manifest="$(mktemp "${TMPDIR:-/tmp}/nextcloud-values-${cluster_id}-XXXXXX")"
-trap 'rm -f "$nextcloud_secret_file" "${nextcloud_rendered_values_manifest:-}" "${nextcloud_rendered_app_manifest:-}" "${nextcloud_rendered_middleware:-}" "${nextcloud_rendered_ingressroute:-}" "${nextcloud_rendered_collabora_ingressroute:-}"' EXIT
-sed "s/__ZONE_NAME__/${public_zone_name}/g" "$nextcloud_values_manifest" >"$nextcloud_rendered_values_manifest"
-
-python3 - \
-  "$nextcloud_app_manifest" \
-  "$nextcloud_rendered_app_manifest" \
-  "$nextcloud_rendered_values_manifest" \
-  "$public_zone_name" \
-  "${TWINBOX_GIT_REPO_URL:-https://github.com/harrywesterman/Twinbox.git}" \
-  "${TWINBOX_GIT_TARGET_REVISION:-main}" <<'PY'
-from pathlib import Path
-import sys
-import textwrap
-import re
-
-template_path = Path(sys.argv[1])
-output_path = Path(sys.argv[2])
-values_path = Path(sys.argv[3])
-zone_name = sys.argv[4]
-repo_url = sys.argv[5]
-target_revision = sys.argv[6]
-
-template = template_path.read_text(encoding="utf-8")
-values = values_path.read_text(encoding="utf-8").rstrip("\n")
-values = textwrap.indent(values, "          ")
-
-rendered = (
-    template.replace("__REPO_URL__", repo_url)
-    .replace("__TARGET_REVISION__", target_revision)
-    .replace("__ZONE_NAME__", zone_name)
-)
-rendered = re.sub(r"(?m)^          __NEXTCLOUD_VALUES__$", values, rendered)
-
-output_path.write_text(rendered, encoding="utf-8")
-PY
-
-log "Applying Nextcloud Argo CD application"
-bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
-  --manifest "$nextcloud_rendered_app_manifest" \
-  --application "nextcloud"
 
 log "Checking whether Nextcloud is already installed"
 pod=$(kubectl -n nextcloud get pods -l app.kubernetes.io/name=nextcloud -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")

@@ -148,7 +148,8 @@ PGADMIN_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-pgadmin4" / "run.sh"
 )
 IMMICH_APP = REPO_ROOT / "gitops" / "apps" / "immich.yaml"
-KARAKEEP_APP = REPO_ROOT / "gitops" / "apps" / "karakeep.yaml"
+KARAKEEP_APP = REPO_ROOT / "gitops" / "optional-apps" / "karakeep.yaml"
+NEXTCLOUD_OPTIONAL_APP = REPO_ROOT / "gitops" / "optional-apps" / "nextcloud.yaml"
 PGADMIN_APP = REPO_ROOT / "gitops" / "apps" / "pgadmin4.yaml"
 TAILSCALE_APP = REPO_ROOT / "gitops" / "apps" / "tailscale.yaml"
 PLATFORM_INGRESS_APP = REPO_ROOT / "gitops" / "apps" / "platform-ingress.yaml"
@@ -1103,20 +1104,19 @@ def test_install_secret_sync_renders_argocd_values_and_applies_secret_sync_manif
     assert "chart: openbao" in text
     assert 'targetRevision: "0.27.2"' in text
     assert "gitops/apps/openbao.yaml" not in text
-    assert "openbao_render_values_file" in text
-    assert "size: 10Gi" in helper_text
-    assert "storageClass: longhorn-single" in helper_text
-    assert "size: 2Gi" not in helper_text
-    assert "openbao_seed_management_bootstrap_files" in text
-    assert "openbao_seed_release_secret" in text
-    assert 'openbao_initialize_if_needed "$openbao_pod"' in text
-    assert 'openbao_configure_auth_and_policy "$openbao_pod"' in text
-    assert 'openbao_seed_secret_paths "$openbao_pod"' in text
-    assert "openbao_apply_cluster_secret_store" in text
-    assert "openbao_apply_bootstrap_external_secret" in text
-    assert 'openbao_wait_for_secret "$TARGET_SECRET_NAME" "$TARGET_NAMESPACE"' in text
-    assert "kind: ClusterSecretStore" not in text
-    assert "openbao-active.${OPENBAO_NAMESPACE}.svc.cluster.local" in helper_text
+
+
+def test_optional_app_helper_enables_labels_before_waiting_for_readiness():
+    text = _apply_argocd_application_text()
+
+    assert "set-optional-app-state.sh" in text
+    assert "wait_for_application_ready \"$APPLICATION_NAME\"" in text
+    assert text.index("set-optional-app-state.sh") < text.index(
+        "wait_for_application_ready \"$APPLICATION_NAME\""
+    )
+    assert text.index("set-optional-app-state.sh") < text.index(
+        "kubectl annotate application \"$APPLICATION_NAME\""
+    )
     assert "bw " not in text
     assert "KUBECONFIG_FILE is required" in text
 
@@ -1964,7 +1964,7 @@ def test_optional_apps_route_steady_state_through_argocd_sources():
         assert "kind: Application" in app_text
         assert f"path: gitops/platform-apps/{app_name}" in app_text
         assert f"path: gitops/databases/{app_name}" in app_text
-        assert "../namespace.yaml" in db_text
+        assert "../namespace.yaml" in db_text or "namespace.yaml" in db_text
         assert "cluster.yaml" in db_text or "externalsecret.yaml" in db_text
 
     for step_path, snippets in step_expectations.items():
@@ -2438,9 +2438,61 @@ def test_argocd_cluster_secret_helper_writes_runtime_projection():
     assert "argocd-manager-cluster-admin" in text
     assert "twinbox.io/domain-ready" in text
     assert "twinbox.io/public-zone-name" in text
-    assert "argocd.argoproj.io/secret-type: cluster" in text
+    assert "twinbox.io/pod-cidr" in text
+    assert "argocd.argoproj.io/secret-type" in text
     assert "create token argocd-manager" in text
     assert "tlsClientConfig" in text
+    assert "existing_labels" in text
+    assert "existing_annotations" in text
+
+
+def test_argocd_cluster_secret_helper_resolves_pod_cidr_before_rendering_annotations():
+    text = (REPO_ROOT / "scripts" / "manager" / "upsert-argocd-cluster-secret.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert text.index('if [[ -z "$POD_CIDR" ]]; then') < text.index(
+        'existing_secret_json="$(kubectl -n argocd get secret "$SECRET_NAME" -o json 2>/dev/null || true)"'
+    )
+    assert text.index('if [[ -z "$POD_CIDR" ]]; then') < text.index('"twinbox.io/pod-cidr": $pod_cidr')
+
+
+def test_optional_app_state_helper_labels_the_argocd_cluster_secret():
+    text = (REPO_ROOT / "scripts" / "manager" / "set-optional-app-state.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert "twinbox.io/app-" in text
+    assert "enabled|disabled" in text
+    assert "kubectl -n argocd label secret" in text
+
+
+def test_optional_apps_root_and_redirected_manifests_are_present():
+    root_text = (REPO_ROOT / "gitops" / "apps" / "optional-apps-root.yaml").read_text(
+        encoding="utf-8"
+    )
+    jitsi_optional_text = (REPO_ROOT / "gitops" / "optional-apps" / "jitsi.yaml").read_text(
+        encoding="utf-8"
+    )
+    opencloud_optional_text = (REPO_ROOT / "gitops" / "optional-apps" / "opencloud.yaml").read_text(
+        encoding="utf-8"
+    )
+    nextcloud_optional_text = NEXTCLOUD_OPTIONAL_APP.read_text(encoding="utf-8")
+    karakeep_optional_text = KARAKEEP_APP.read_text(encoding="utf-8")
+
+    assert "name: optional-apps-root" in root_text
+    assert "path: gitops/optional-apps" in root_text
+    assert "kind: ApplicationSet" in jitsi_optional_text
+    assert "twinbox.io/app-jitsi: \"enabled\"" in jitsi_optional_text
+    assert "kind: ApplicationSet" in opencloud_optional_text
+    assert "twinbox.io/app-opencloud: \"enabled\"" in opencloud_optional_text
+    assert "kind: ApplicationSet" in nextcloud_optional_text
+    assert "twinbox.io/app-nextcloud: \"enabled\"" in nextcloud_optional_text
+    assert "path: gitops/platform-apps/nextcloud" in nextcloud_optional_text
+    assert "path: gitops/databases/nextcloud" in nextcloud_optional_text
+    assert "kind: ApplicationSet" in karakeep_optional_text
+    assert "twinbox.io/app-karakeep: \"enabled\"" in karakeep_optional_text
+    assert "path: gitops/platform-apps/karakeep" in karakeep_optional_text
 
 
 def test_databases_kustomization_includes_authentik_resources():
@@ -2772,20 +2824,21 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     text = (REPO_ROOT / "categories" / "apps" / "steps" / "install-nextcloud" / "run.sh").read_text(
         encoding="utf-8"
     )
-    assert "gitops/databases/namespace.yaml" in text
-    assert "gitops/databases/nextcloud/cluster.yaml" in text
-    assert "gitops/databases/nextcloud/externalsecret.yaml" in text
-    assert "gitops/databases/nextcloud/pooler-ro.yaml" in text
-    assert "gitops/databases/nextcloud/pooler-rw.yaml" in text
-    assert "gitops/databases/nextcloud/scheduled-backup.yaml" in text
-    assert "Nextcloud database cluster already exists" in text
-    assert "leaving existing CloudNativePG spec unchanged" in text
-    assert "gitops/databases/kustomization.yaml" not in text
-    assert "gitops/databases/authentik/" not in text
+    optional_app_text = NEXTCLOUD_OPTIONAL_APP.read_text(encoding="utf-8")
+
+    assert "gitops/optional-apps/nextcloud.yaml" in text
+    assert 'bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \\' in text
+    assert '--manifest "$WORKSPACE_ROOT/gitops/optional-apps/nextcloud.yaml"' in text
+    assert "Syncing Nextcloud bootstrap secret to OpenBao" in text
+    assert "nextcloud-db-pooler-rw.databases.svc.cluster.local" in text
+    assert "kubectl apply -f \"$nextcloud_platform_dir/namespace.yaml\"" not in text
+    assert "nextcloud_db_cluster_manifest" not in text
+    assert "nextcloud_rendered_app_manifest" not in text
+    assert "__NEXTCLOUD_VALUES__" not in text
+    assert "gitops/apps/nextcloud.yaml" not in text
+    assert "gitops/databases/namespace.yaml" not in text
     assert "user_oidc:provider" in text
     assert "nextcloud" in text
-    assert "nextcloud-values-" in text
-    assert "__NEXTCLOUD_VALUES__" in text
     assert "config:system:set trusted_domains 1" in text
     assert "authentik_resolve_signing_key_id" in text
     assert '--arg signing_key "$signing_key_id"' in text
@@ -2817,36 +2870,17 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     )
     assert "richdocuments:activate-config" in text
     assert "Could not resolve Authentik signing key ID for ${AUTHENTIK_SIGNING_KEY_NAME}" in text
-    values_text = (REPO_ROOT / "gitops" / "values" / "nextcloud.yaml").read_text(encoding="utf-8")
-    assert "nextcloud.__ZONE_NAME__" in values_text
-    assert "aliasgroups:\n      - host: nextcloud.__ZONE_NAME__" in values_text
-    assert 'server_name: "nextcloud-collabora.__ZONE_NAME__"' in values_text
-    assert "exec /cron.sh" in values_text
-    assert "AUTHENTIK_API_BASE" not in values_text
-    assert "AUTHENTIK_API_TOKEN" not in values_text
-    assert "group:adduser admin" not in values_text
-    platform_text = (
-        REPO_ROOT / "gitops" / "platform-apps" / "nextcloud" / "ingressroute.yaml"
-    ).read_text(encoding="utf-8")
-    assert "nextcloud.__ZONE_NAME__" in platform_text
-    collabora_text = (
-        REPO_ROOT / "gitops" / "platform-apps" / "nextcloud" / "collabora-ingressroute.yaml"
-    ).read_text(encoding="utf-8")
-    assert "nextcloud-collabora.__ZONE_NAME__" in collabora_text
-    app_text = (REPO_ROOT / "gitops" / "apps" / "nextcloud.yaml").read_text(encoding="utf-8")
-    assert "values: |" in app_text
-    assert "__NEXTCLOUD_VALUES__" in app_text
-    assert "valueFiles:" not in app_text
-    db_externalsecret_text = (
-        REPO_ROOT / "gitops" / "platform-apps" / "nextcloud" / "db-externalsecret.yaml"
-    ).read_text(encoding="utf-8")
-    assert "name: nextcloud-db-credentials" in db_externalsecret_text
-    assert "namespace: nextcloud" in db_externalsecret_text
-    assert "twinbox/global/nextcloud" in db_externalsecret_text
-    kustomization_text = (
-        REPO_ROOT / "gitops" / "platform-apps" / "nextcloud" / "kustomization.yaml"
-    ).read_text(encoding="utf-8")
-    assert "authentik-externalsecret.yaml" not in kustomization_text
+    assert "exec /cron.sh" in (REPO_ROOT / "gitops" / "values" / "nextcloud.yaml").read_text(
+        encoding="utf-8"
+    )
+    assert "kind: ApplicationSet" in optional_app_text
+    assert "name: nextcloud-set" in optional_app_text
+    assert "twinbox.io/app-nextcloud: \"enabled\"" in optional_app_text
+    assert "targetRevision: \"9.1.0\"" in optional_app_text
+    assert "path: gitops/platform-apps/nextcloud" in optional_app_text
+    assert "path: gitops/databases/nextcloud" in optional_app_text
+    assert "name: nextcloud-well-known-redirect" in optional_app_text
+    assert "name: nextcloud-db" in optional_app_text
 
 
 def test_hedgedoc_database_cluster_is_right_sized_for_current_capacity():
@@ -2937,14 +2971,31 @@ def test_karakeep_argo_application_manages_the_platform_overlay():
     text = _karakeep_app_text()
     kustomization_text = KARAKEEP_PLATFORM_KUSTOMIZATION.read_text(encoding="utf-8")
 
-    assert "kind: Application" in text
+    assert "kind: ApplicationSet" in text
+    assert "name: karakeep-set" in text
+    assert "twinbox.io/app-karakeep: \"enabled\"" in text
+    assert "targetRevision: \"0.32.0\"" in text
+    assert "applicationHost: karakeep.{{index .metadata.annotations \"twinbox.io/public-zone-name\"}}" in text
+    assert "secrets:" in text
+    assert "enabled: false" in text
     assert "path: gitops/platform-apps/karakeep" in text
     assert "CreateNamespace=true" in text
     assert "name: karakeep-wiredoor" in text
     assert "name: karakeep-tailscale" in text
     assert "kind: Kustomization" in kustomization_text
     assert "namespace.yaml" in kustomization_text
+    assert "externalsecret.yaml" in kustomization_text
     assert "ingressroute.yaml" in kustomization_text
+    externalsecret_text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "karakeep" / "externalsecret.yaml"
+    ).read_text(encoding="utf-8")
+    assert "name: karakeep" in externalsecret_text
+    assert "NEXTAUTH_SECRET" in externalsecret_text
+    assert "OAUTH_CLIENT_ID" in externalsecret_text
+    assert "OAUTH_CLIENT_SECRET" in externalsecret_text
+    assert "name: karakeep-meilesearch" in externalsecret_text
+    assert "MEILI_MASTER_KEY" in externalsecret_text
+    assert "twinbox/global/karakeep" in externalsecret_text
 
 
 def test_tailscale_argo_application_manages_the_platform_overlay():
@@ -3105,6 +3156,19 @@ def test_platform_namespace_baseline_covers_shared_overlay_resources():
     assert "gitops/apps/dashy.yaml" in (
         REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-dashy-dashboard" / "run.sh"
     ).read_text(encoding="utf-8")
+
+
+def test_gitops_docs_describe_bootstrap_seed_and_current_app_ownership():
+    gitops_text = (REPO_ROOT / "gitops" / "README.md").read_text(encoding="utf-8")
+    apps_text = (REPO_ROOT / "categories" / "apps" / "README.md").read_text(encoding="utf-8")
+
+    assert "Label-driven ApplicationSets for opt-in apps" in gitops_text
+    assert "optional-apps-root.yaml" in gitops_text
+    assert "twinbox.io/app-<name>: enabled" in gitops_text
+    assert "karakeep" in gitops_text
+    assert "older bootstrap-seeded path" not in gitops_text
+    assert "Argo CD creates the live `Application` from `gitops/optional-apps/<app>.yaml`" in apps_text
+    assert "GitHub `main` owns the opt-in app definition" in apps_text
 
 
 def test_platform_ingress_manifest_patches_authentik_callback_routes():

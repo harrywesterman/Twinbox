@@ -1,0 +1,56 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: freshrss-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            twinbox.io/domain-ready: "true"
+            twinbox.io/app-freshrss: "enabled"
+  template:
+    metadata:
+      name: freshrss
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/harrywesterman/Twinbox.git
+        targetRevision: main
+        path: gitops/platform-apps/freshrss
+        kustomize:
+          patches:
+            - target:
+                kind: IngressRoute
+                name: freshrss
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`freshrss.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: freshrss-wiredoor
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`freshrss.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: freshrss-tailscale
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`freshrss.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: freshrss
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

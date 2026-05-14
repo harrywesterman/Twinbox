@@ -6,70 +6,50 @@ Argo CD manifests, platform overlays, and values for the Twinbox Kubernetes clus
 
 ```
 gitops/
-├── apps/                  # Argo CD Application manifests and app-local overlays
+├── apps/                  # Argo CD bootstrap apps and parent Application resources
 ├── databases/             # CloudNativePG cluster templates and bootstrap resources
 ├── install.sh             # Argo CD bootstrap script
 ├── platform/              # Cluster and platform overlays
 ├── platform-apps/         # App-specific manifests applied by manager scripts
+├── optional-apps/         # Label-driven ApplicationSets for opt-in apps
 └── values/                # Helm values overrides per app
 ```
 
 ## `apps/`
 
-Argo CD `Application` resources. Most apps deploy a Helm chart with:
+Argo CD `Application` resources that bootstrap the GitOps graph itself.
 
-- Multi-source spec: chart repo, `ref: values` from this repo, optional platform overlay.
-- Automated sync with `prune` and `selfHeal` enabled.
-- `CreateNamespace=true` in sync options.
+The most important bootstrap resource is [`gitops/apps/optional-apps-root.yaml`](apps/optional-apps-root.yaml). It points Argo CD at `gitops/optional-apps/`, where the opt-in app `ApplicationSet` manifests live.
 
-Some apps use a repo-controlled subtree under `gitops/apps/<app>/` or a standalone ApplicationSet manifest under `gitops/apps/<app>.yaml` so chart output can be patched deterministically before Argo CD applies it. The current patterns are:
+The other files in this directory are still cluster bootstrap or platform entrypoints. They are seeded once and then reconciled by Argo CD.
 
-- `gitops/apps/dashy.yaml` - ApplicationSet for the Dashy admin launcher with cluster-specific ingress hostnames.
-- `gitops/apps/opencloud.yaml` - ApplicationSet for OpenCloud with repo-local platform-apps overlay and cluster-specific hostnames.
-- `gitops/apps/authentik/` - Helm values plus Kustomize patches for the Authentik chart.
-- `gitops/apps/prometheus/` - Kustomize manifests for Prometheus alerts.
-- `gitops/apps/alloy.yaml` - Grafana Alloy collector Application.
-- `gitops/apps/audiobookshelf.yaml` - Audiobookshelf ApplicationSet.
-- `gitops/apps/cloudflare-tunnel.yaml` - Cloudflare Tunnel Application.
-- `gitops/apps/cloudnativepg.yaml` - CloudNativePG operator Application.
-- `gitops/apps/crowdsec.yaml` - CrowdSec security engine Application.
-- `gitops/apps/external-secrets.yaml` - External Secrets Operator Application.
-- `gitops/apps/freshrss.yaml` - FreshRSS ApplicationSet.
-- `gitops/apps/grafana.yaml` - Grafana Application.
-- `gitops/apps/headlamp.yaml` - Headlamp dashboard Application.
-- `gitops/apps/hedgedoc.yaml` - HedgeDoc ApplicationSet.
-- `gitops/apps/immich.yaml` - Immich ApplicationSet with repo-local platform and database overlays.
-- `gitops/apps/jitsi.yaml` - Jitsi ApplicationSet.
-- `gitops/apps/karakeep.yaml` - Karakeep ApplicationSet with repo-local platform overlay.
-- `gitops/apps/loki.yaml` - Loki log aggregation Application.
-- `gitops/apps/longhorn.yaml` - Longhorn storage Application.
-- `gitops/apps/metallb.yaml` - MetalLB load balancer Application.
-- `gitops/apps/metrics-server.yaml` - Kubernetes Metrics Server Application.
-- `gitops/apps/n8n.yaml` - n8n workflow automation ApplicationSet.
-- `gitops/apps/netbird-routing-peers.yaml` - NetBird routing peers Application.
-- `gitops/apps/nextcloud.yaml` - Nextcloud ApplicationSet.
-- `gitops/apps/ntfy.yaml` - ntfy push notifications Application.
-- `gitops/apps/openbao.yaml` - OpenBao secret management Application.
-- `gitops/apps/openwebui.yaml` - OpenWebUI ApplicationSet.
-- `gitops/apps/outline.yaml` - Outline ApplicationSet.
-- `gitops/apps/paperless.yaml` - Paperless ApplicationSet.
-- `gitops/apps/pgadmin4.yaml` - pgAdmin 4 Application.
-- `gitops/apps/pixelfed.yaml` - Pixelfed ApplicationSet.
-- `gitops/apps/platform-ingress.yaml` - Shared platform ingress resources.
-- `gitops/apps/prometheus-minimal.yaml` - Minimal Prometheus scrape config Application.
-- `gitops/apps/searxng.yaml` - SearXNG ApplicationSet.
-- `gitops/apps/stirling-pdf.yaml` - Stirling PDF ApplicationSet.
-- `gitops/apps/tailscale.yaml` - Tailscale VPN Application.
-- `gitops/apps/tempo.yaml` - Tempo trace storage Application.
-- `gitops/apps/traefik.yaml` - Traefik ingress controller Application.
-- `gitops/apps/twinbox-portal.yaml` - Twinbox Portal Application.
-- `gitops/apps/vaultwarden.yaml` - Vaultwarden ApplicationSet.
-- `gitops/apps/velero.yaml` - Velero backup Application.
-- `gitops/apps/velero-ui.yaml` - Velero UI Application.
-- `gitops/apps/wiredoor-gateway.yaml` - Wiredoor gateway Application.
-- `gitops/apps/zulip.yaml` - Zulip ApplicationSet.
+## `optional-apps/`
 
-Bootstrap-facing `ExternalSecret` resources live under `gitops/platform/<app>/` and pull credentials from OpenBao via the `openbao` ClusterSecretStore.
+Label-driven `ApplicationSet` manifests for user-installable apps.
+
+Each optional app is enabled by adding a `twinbox.io/app-<name>: enabled` label to the Argo CD cluster secret. The bootstrap script or installer seeds the manifest once, then Argo CD owns the generated `Application` and continues reconciling it from GitHub `main`.
+
+The current opt-in apps are:
+
+- `audiobookshelf`
+- `freshrss`
+- `hedgedoc`
+- `immich`
+- `jitsi`
+- `karakeep`
+- `n8n`
+- `nextcloud`
+- `opencloud`
+- `openwebui`
+- `outline`
+- `paperless`
+- `pixelfed`
+- `searxng`
+- `stirling-pdf`
+- `vaultwarden`
+- `zulip`
+
+Bootstrap-facing `ExternalSecret` resources live under `gitops/platform-apps/<app>/` and pull credentials from OpenBao via the `openbao` ClusterSecretStore.
 
 ## `databases/`
 

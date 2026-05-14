@@ -1,0 +1,93 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: jitsi-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            twinbox.io/domain-ready: "true"
+            twinbox.io/app-jitsi: "enabled"
+  template:
+    metadata:
+      name: jitsi
+    spec:
+      project: default
+      sources:
+        - repoURL: https://jitsi-contrib.github.io/jitsi-helm/
+          chart: jitsi-meet
+          targetRevision: "2.17.0"
+          helm:
+            valueFiles:
+              - $values/gitops/values/jitsi.yaml
+            values: |
+              publicURL: https://jitsi.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+              xmpp:
+                domain: jitsi.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                guestDomain: guest.jitsi.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+              extraCommonEnvs:
+                TOKEN_AUTH_URL: https://auth-jitsi.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/room/{room}
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          ref: values
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          path: gitops/platform-apps/jitsi
+          kustomize:
+            patches:
+              - target:
+                  kind: IngressRoute
+                  name: jitsi
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`jitsi.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: jitsi-wiredoor
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`jitsi.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: jitsi-tailscale
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`jitsi.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: auth-jitsi
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`auth-jitsi.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: auth-jitsi-wiredoor
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`auth-jitsi.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: auth-jitsi-tailscale
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`auth-jitsi.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: jitsi
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

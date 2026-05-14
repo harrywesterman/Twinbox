@@ -23,6 +23,38 @@ platform_app_dir="$WORKSPACE_ROOT/gitops/platform-apps/$APP_NAME"
 database_app_dir="$WORKSPACE_ROOT/gitops/databases/$APP_NAME"
 needs_authentik_cleanup=false
 
+optional_app_names=(
+  audiobookshelf
+  freshrss
+  hedgedoc
+  immich
+  jitsi
+  n8n
+  nextcloud
+  opencloud
+  openwebui
+  outline
+  paperless
+  pixelfed
+  searxng
+  stirling-pdf
+  vaultwarden
+  zulip
+)
+
+is_optional_app() {
+  local application_name="$1"
+  local candidate
+
+  for candidate in "${optional_app_names[@]}"; do
+    if [[ "$candidate" == "$application_name" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 manifest_kind="$(awk '/^kind:/{print $2; exit}' "$MANIFEST_PATH")"
 manifest_name="$(awk '
   $1 == "metadata:" { in_metadata = 1; next }
@@ -33,6 +65,12 @@ manifest_name="$(awk '
 application_set_name="${APPLICATION_SET_NAME:-}"
 if [[ -z "$application_set_name" && "$manifest_kind" == "ApplicationSet" ]]; then
   application_set_name="${manifest_name:-${APP_NAME}-set}"
+fi
+
+if is_optional_app "$APP_NAME"; then
+  bash "$WORKSPACE_ROOT/scripts/manager/set-optional-app-state.sh" \
+    --app "$APP_NAME" \
+    --state disabled
 fi
 
 delete_authentik_application_by_slug() {

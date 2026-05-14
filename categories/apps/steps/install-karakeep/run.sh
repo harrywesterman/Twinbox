@@ -27,24 +27,6 @@ resolve_kubeconfig_file() {
   printf '%s\n' "$KUBECONFIG_FILE"
 }
 
-render_template() {
-  local template_file="$1"
-  local rendered_file="$2"
-  shift 2
-
-  python3 - "$template_file" "$rendered_file" "$@" <<'PY'
-from pathlib import Path
-import sys
-
-template = Path(sys.argv[1]).read_text(encoding="utf-8")
-rendered = template
-for item in sys.argv[3:]:
-    key, value = item.split("=", 1)
-    rendered = rendered.replace(key, value)
-Path(sys.argv[2]).write_text(rendered, encoding="utf-8")
-PY
-}
-
 find_oauth2_provider_pk_by_name() {
   local provider_name="$1"
   local response
@@ -147,8 +129,7 @@ if [[ -n "$existing_karakeep_secret_json" ]]; then
 fi
 
 karakeep_secret_file="$(mktemp "${TMPDIR:-/tmp}/karakeep-bootstrap-XXXXXX")"
-karakeep_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/karakeep-application-XXXXXX")"
-trap 'rm -f "$karakeep_secret_file" "$karakeep_rendered_manifest"' EXIT
+trap 'rm -f "$karakeep_secret_file"' EXIT
 
 jq -n \
   --arg KARAKEEP_NEXTAUTH_SECRET "$karakeep_nextauth_secret" \
@@ -240,17 +221,8 @@ application_pk="$(create_or_update_application "$application_payload")"
 [[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for Karakeep"
 
 log "Applying Karakeep Argo CD application"
-render_template \
-  "$WORKSPACE_ROOT/gitops/apps/karakeep.yaml" \
-  "$karakeep_rendered_manifest" \
-  "__ZONE_NAME__=$public_zone_name" \
-  "__KARAKEEP_NEXTAUTH_SECRET__=$karakeep_nextauth_secret" \
-  "__KARAKEEP_MEILI_MASTER_KEY__=$karakeep_meili_master_key" \
-  "__KARAKEEP_OAUTH_CLIENT_ID__=$karakeep_oauth_client_id" \
-  "__KARAKEEP_OAUTH_CLIENT_SECRET__=$karakeep_oauth_client_secret"
-
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
-  --manifest "$karakeep_rendered_manifest" \
+  --manifest "$WORKSPACE_ROOT/gitops/optional-apps/karakeep.yaml" \
   --application "karakeep" \
   --destination-namespace "karakeep"
 

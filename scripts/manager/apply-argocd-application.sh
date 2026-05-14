@@ -6,6 +6,39 @@ WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # shellcheck disable=SC1091
 source "$WORKSPACE_ROOT/config/pinned-defaults.sh"
 
+optional_app_names=(
+  audiobookshelf
+  freshrss
+  hedgedoc
+  immich
+  jitsi
+  n8n
+  nextcloud
+  opencloud
+  openwebui
+  outline
+  paperless
+  karakeep
+  pixelfed
+  searxng
+  stirling-pdf
+  vaultwarden
+  zulip
+)
+
+is_optional_app() {
+  local application_name="$1"
+  local candidate
+
+  for candidate in "${optional_app_names[@]}"; do
+    if [[ "$candidate" == "$application_name" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 usage() {
   cat <<USAGE
 Usage: $0 --manifest PATH --application NAME [--destination-namespace NAMESPACE] [--skip-namespace-baseline] [--no-wait]
@@ -250,6 +283,12 @@ command -v jq >/dev/null 2>&1 || fail "jq not found"
 
 export KUBECONFIG="$KUBECONFIG_FILE"
 
+if is_optional_app "$APPLICATION_NAME"; then
+  optional_manifest="$WORKSPACE_ROOT/gitops/optional-apps/${APPLICATION_NAME}.yaml"
+  [[ -f "$optional_manifest" ]] || fail "optional app manifest not found at ${optional_manifest}"
+  MANIFEST_PATH="$optional_manifest"
+fi
+
 if [[ -z "$DESTINATION_NAMESPACE" ]]; then
   destination_namespace="$(extract_destination_namespace)"
 else
@@ -270,6 +309,13 @@ rendered_manifest="$(sed "s|__REPO_URL__|${repo_url}|g; s|__TARGET_REVISION__|${
 
 log "Applying Argo CD application manifest ${MANIFEST_PATH}"
 printf '%s\n' "$rendered_manifest" | kubectl apply --validate=false -f -
+
+if is_optional_app "$APPLICATION_NAME"; then
+  bash "$WORKSPACE_ROOT/scripts/manager/set-optional-app-state.sh" \
+    --app "$APPLICATION_NAME" \
+    --state enabled
+fi
+
 kubectl annotate application "$APPLICATION_NAME" -n argocd argocd.argoproj.io/refresh=hard --overwrite >/dev/null 2>&1 || true
 if [[ "$WAIT_FOR_READY" == true ]]; then
   wait_for_application_ready "$APPLICATION_NAME"

@@ -50,6 +50,12 @@ fi
 log "Bootstrapping Argo CD"
 bash "$WORKSPACE_ROOT/gitops/install.sh"
 
+log "Applying optional apps root application"
+bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+  --manifest "$WORKSPACE_ROOT/gitops/apps/optional-apps-root.yaml" \
+  --application "optional-apps-root" \
+  --destination-namespace "argocd"
+
 log "Applying Argo CD Image Updater application"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$WORKSPACE_ROOT/gitops/apps/argocd-image-updater.yaml" \

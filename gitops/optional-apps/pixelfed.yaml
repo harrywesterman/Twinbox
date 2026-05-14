@@ -1,0 +1,137 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: pixelfed-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            twinbox.io/domain-ready: "true"
+            twinbox.io/app-pixelfed: "enabled"
+  template:
+    metadata:
+      name: pixelfed
+    spec:
+      project: default
+      sources:
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          path: gitops/platform-apps/pixelfed
+          kustomize:
+            patches:
+              - target:
+                  kind: IngressRoute
+                  name: pixelfed
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: pixelfed-wiredoor
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: pixelfed-tailscale
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: Deployment
+                  name: pixelfed
+                patch: |-
+                  apiVersion: apps/v1
+                  kind: Deployment
+                  metadata:
+                    name: pixelfed
+                  spec:
+                    template:
+                      spec:
+                        containers:
+                          - name: pixelfed
+                            env:
+                              - name: APP_URL
+                                value: https://pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                              - name: APP_DOMAIN
+                                value: pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                              - name: ADMIN_DOMAIN
+                                value: pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                              - name: SESSION_DOMAIN
+                                value: pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                              - name: MAIL_FROM_ADDRESS
+                                value: no-reply@pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                              - name: INSTANCE_CONTACT_EMAIL
+                                value: admin@pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+              - target:
+                  kind: Deployment
+                  name: pixelfed-worker
+                patch: |-
+                  apiVersion: apps/v1
+                  kind: Deployment
+                  metadata:
+                    name: pixelfed-worker
+                  spec:
+                    template:
+                      spec:
+                        containers:
+                          - name: pixelfed-worker
+                            env:
+                              - name: APP_URL
+                                value: https://pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                              - name: APP_DOMAIN
+                                value: pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                              - name: ADMIN_DOMAIN
+                                value: pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                              - name: SESSION_DOMAIN
+                                value: pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                              - name: MAIL_FROM_ADDRESS
+                                value: no-reply@pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                              - name: INSTANCE_CONTACT_EMAIL
+                                value: admin@pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+              - target:
+                  kind: Deployment
+                  name: pixelfed-scheduler
+                patch: |-
+                  apiVersion: apps/v1
+                  kind: Deployment
+                  metadata:
+                    name: pixelfed-scheduler
+                  spec:
+                    template:
+                      spec:
+                        containers:
+                          - name: pixelfed-scheduler
+                            env:
+                              - name: APP_URL
+                                value: https://pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                              - name: APP_DOMAIN
+                                value: pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                              - name: ADMIN_DOMAIN
+                                value: pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                              - name: SESSION_DOMAIN
+                                value: pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                              - name: MAIL_FROM_ADDRESS
+                                value: no-reply@pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                              - name: INSTANCE_CONTACT_EMAIL
+                                value: admin@pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          path: gitops/databases/pixelfed
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: pixelfed
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

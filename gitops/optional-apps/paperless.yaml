@@ -1,0 +1,72 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: paperless-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            twinbox.io/domain-ready: "true"
+            twinbox.io/app-paperless: "enabled"
+  template:
+    metadata:
+      name: paperless
+    spec:
+      project: default
+      sources:
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          path: gitops/platform-apps/paperless
+          kustomize:
+            patches:
+              - target:
+                  kind: Deployment
+                  name: paperless
+                patch: |-
+                  - op: replace
+                    path: /spec/template/spec/containers/0/env/3/value
+                    value: https://paperless.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                  - op: replace
+                    path: /spec/template/spec/containers/0/env/4/value
+                    value: paperless.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                  - op: replace
+                    path: /spec/template/spec/containers/0/env/5/value
+                    value: https://paperless.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+              - target:
+                  kind: IngressRoute
+                  name: paperless
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`paperless.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: paperless-wiredoor
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`paperless.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: paperless-tailscale
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`paperless.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          path: gitops/databases/paperless
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: paperless
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

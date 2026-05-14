@@ -1,0 +1,72 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: n8n-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            twinbox.io/domain-ready: "true"
+            twinbox.io/app-n8n: "enabled"
+  template:
+    metadata:
+      name: n8n
+    spec:
+      project: default
+      sources:
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          path: gitops/platform-apps/n8n
+          kustomize:
+            patches:
+              - target:
+                  kind: Deployment
+                  name: n8n
+                patch: |-
+                  - op: replace
+                    path: /spec/template/spec/containers/0/env/9/value
+                    value: n8n.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                  - op: replace
+                    path: /spec/template/spec/containers/0/env/14/value
+                    value: https://n8n.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                  - op: replace
+                    path: /spec/template/spec/containers/0/env/15/value
+                    value: https://n8n.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+              - target:
+                  kind: IngressRoute
+                  name: n8n
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`n8n.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: n8n-wiredoor
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`n8n.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: n8n-tailscale
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`n8n.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          path: gitops/databases/n8n
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: n8n
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

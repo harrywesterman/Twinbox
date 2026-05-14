@@ -1,0 +1,289 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: nextcloud-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            twinbox.io/domain-ready: "true"
+            twinbox.io/app-nextcloud: "enabled"
+  template:
+    metadata:
+      name: nextcloud
+    spec:
+      project: default
+      sources:
+        - repoURL: https://nextcloud.github.io/helm/
+          chart: nextcloud
+          targetRevision: "9.1.0"
+          helm:
+            values: |-
+              replicaCount: 1
+
+              service:
+                type: ClusterIP
+
+              persistence:
+                enabled: true
+                storageClass: longhorn
+                size: 10Gi
+                accessMode: ReadWriteOnce
+
+              # S3 objectstore is DISABLED for greenfield single-pod setup
+              objectstore:
+                enabled: false
+
+              phpClientHttpsFix:
+                enabled: true
+                protocol: https
+
+              ingress:
+                enabled: false
+
+              cronjob:
+                enabled: true
+                type: cronjob
+                cronjob:
+                  schedule: "*/5 * * * *"
+                  successfulJobsHistoryLimit: 3
+                  failedJobsHistoryLimit: 5
+                  backoffLimit: 1
+                  command:
+                    - /bin/sh
+                    - -lc
+                    - |-
+                      exec /cron.sh
+                  env:
+                    POSTGRES_DB: nextcloud
+                    POSTGRES_HOST: nextcloud-db-pooler-rw.databases.svc.cluster.local
+                    POSTGRES_USER:
+                      valueFrom:
+                        secretKeyRef:
+                          name: nextcloud-db-credentials
+                          key: username
+                    POSTGRES_PASSWORD:
+                      valueFrom:
+                        secretKeyRef:
+                          name: nextcloud-db-credentials
+                          key: password
+
+              livenessProbe:
+                enabled: true
+                httpGet:
+                  path: /status.php
+                  port: 80
+                initialDelaySeconds: 120
+                periodSeconds: 10
+                failureThreshold: 6
+
+              readinessProbe:
+                enabled: true
+                httpGet:
+                  path: /status.php
+                  port: 80
+                initialDelaySeconds: 120
+                periodSeconds: 10
+                failureThreshold: 6
+
+              nextcloud:
+                host: nextcloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                existingSecret:
+                  enabled: true
+                  secretName: nextcloud-admin
+                  usernameKey: username
+                  passwordKey: password
+                env:
+                  POSTGRES_DB: nextcloud
+                  POSTGRES_HOST: nextcloud-db-pooler-rw.databases.svc.cluster.local
+                  APACHE_SERVER_NAME: nextcloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                  POSTGRES_USER:
+                    valueFrom:
+                      secretKeyRef:
+                        name: nextcloud-db-credentials
+                        key: username
+                  POSTGRES_PASSWORD:
+                    valueFrom:
+                      secretKeyRef:
+                        name: nextcloud-db-credentials
+                        key: password
+                defaultConfigs:
+                  .htaccess: true
+                  apps.config.php: true
+                  autoconfig.php: true
+                  redis.config.php: true
+                  reverse-proxy.config.php: true
+                  s3.config.php: false
+                  swift.config.php: false
+                configs:
+                  proxy.config.php: |-
+                    <?php
+                    $CONFIG = array (
+                      'trusted_proxies' => array(
+                        0 => 'traefik.traefik.svc.cluster.local',
+                        1 => '127.0.0.1',
+                        2 => '10.0.0.0/8',
+                        3 => '172.16.0.0/12',
+                        4 => '192.168.0.0/16',
+                      ),
+                      'forwarded_for_headers' => array('HTTP_X_FORWARDED_FOR'),
+                    );
+                  overwrite.config.php: |
+                    <?php
+                    $CONFIG = array (
+                      'overwrite.cli.url' => 'https://nextcloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}',
+                    );
+                externalDatabase:
+                  enabled: true
+                  type: postgresql
+                  host: nextcloud-db-pooler-rw.databases.svc.cluster.local
+                  database: nextcloud
+                  existingSecret:
+                    enabled: true
+                    secretName: nextcloud-db-credentials
+                    usernameKey: username
+                    passwordKey: password
+
+              redis:
+                enabled: true
+                architecture: standalone
+                auth:
+                  enabled: true
+                  existingSecret: nextcloud-redis
+                  existingSecretPasswordKey: password
+                global:
+                  storageClass: longhorn
+                master:
+                  persistence:
+                    enabled: true
+                    storageClass: longhorn
+                    size: 5Gi
+                replica:
+                  persistence:
+                    enabled: false
+
+              mariadb:
+                enabled: false
+
+              postgresql:
+                enabled: false
+
+              externalRedis:
+                enabled: false
+
+              collabora:
+                enabled: true
+                service:
+                  type: ClusterIP
+                collabora:
+                  DONT_GEN_SSL_CERT: "true"
+                  extra_params: "--o:ssl.termination=true --o:ssl.enable=false"
+                  aliasgroups:
+                    - host: nextcloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                  server_name: 'nextcloud-collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
+                ingress:
+                  enabled: false
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          path: gitops/platform-apps/nextcloud
+          kustomize:
+            patches:
+              - target:
+                  kind: Middleware
+                  name: nextcloud-well-known-redirect
+                patch: |-
+                  - op: replace
+                    path: /spec/redirectRegex/regex
+                    value: ^https?://nextcloud\.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/\\.well-known/(carddav|caldav)$
+                  - op: replace
+                    path: /spec/redirectRegex/replacement
+                    value: https://nextcloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/remote.php/dav
+              - target:
+                  kind: Middleware
+                  name: nextcloud-well-known-webfinger
+                patch: |-
+                  - op: replace
+                    path: /spec/replacePathRegex/regex
+                    value: ^/\\.well-known/(webfinger|nodeinfo)$
+                  - op: replace
+                    path: /spec/replacePathRegex/replacement
+                    value: /index.php/.well-known/$1
+              - target:
+                  kind: Middleware
+                  name: nextcloud-well-known-host-meta
+                patch: |-
+                  - op: replace
+                    path: /spec/replacePathRegex/regex
+                    value: ^/\\.well-known/host-meta$
+                  - op: replace
+                    path: /spec/replacePathRegex/replacement
+                    value: /public.php?service=host-meta
+              - target:
+                  kind: Middleware
+                  name: nextcloud-well-known-host-meta-json
+                patch: |-
+                  - op: replace
+                    path: /spec/replacePathRegex/regex
+                    value: ^/\\.well-known/host-meta\\.json$
+                  - op: replace
+                    path: /spec/replacePathRegex/replacement
+                    value: /public.php?service=host-meta-json
+              - target:
+                  kind: IngressRoute
+                  name: nextcloud
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`nextcloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: nextcloud-wiredoor
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`nextcloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: nextcloud-tailscale
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`nextcloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: collabora
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`nextcloud-collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: collabora-wiredoor
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`nextcloud-collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: collabora-tailscale
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`nextcloud-collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          path: gitops/databases/nextcloud
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: nextcloud
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

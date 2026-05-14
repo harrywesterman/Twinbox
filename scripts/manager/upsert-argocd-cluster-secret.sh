@@ -91,6 +91,33 @@ if [[ -z "$POD_CIDR" ]]; then
   fi
 fi
 
+existing_secret_json="$(kubectl -n argocd get secret "$SECRET_NAME" -o json 2>/dev/null || true)"
+existing_labels="{}"
+existing_annotations="{}"
+if [[ -n "$existing_secret_json" ]]; then
+  existing_labels="$(jq -c '.metadata.labels // {}' <<<"$existing_secret_json")"
+  existing_annotations="$(jq -c '.metadata.annotations // {}' <<<"$existing_secret_json")"
+fi
+
+merged_labels="$(
+  jq -cn \
+    --argjson existing "$existing_labels" \
+    '($existing + {
+      "argocd.argoproj.io/secret-type": "cluster",
+      "twinbox.io/domain-ready": "true"
+    })'
+)"
+merged_annotations="$(
+  jq -cn \
+    --argjson existing "$existing_annotations" \
+    --arg public_zone_name "$PUBLIC_ZONE_NAME" \
+    --arg pod_cidr "$POD_CIDR" \
+    '($existing + {
+      "twinbox.io/public-zone-name": $public_zone_name,
+      "twinbox.io/pod-cidr": $pod_cidr
+    })'
+)"
+
 cluster_config="$(jq -nc \
   --arg bearerToken "$bearer_token" \
   --arg caData "$ca_data" \
@@ -109,12 +136,8 @@ kind: Secret
 metadata:
   name: ${SECRET_NAME}
   namespace: argocd
-  labels:
-    argocd.argoproj.io/secret-type: cluster
-    twinbox.io/domain-ready: "true"
-  annotations:
-    twinbox.io/public-zone-name: "${PUBLIC_ZONE_NAME}"
-    twinbox.io/pod-cidr: "${POD_CIDR}"
+  labels: ${merged_labels}
+  annotations: ${merged_annotations}
 type: Opaque
 stringData:
   name: ${SECRET_NAME}

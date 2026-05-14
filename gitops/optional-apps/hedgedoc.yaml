@@ -1,0 +1,75 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: hedgedoc-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            twinbox.io/domain-ready: "true"
+            twinbox.io/app-hedgedoc: "enabled"
+  template:
+    metadata:
+      name: hedgedoc
+    spec:
+      project: default
+      sources:
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          path: gitops/platform-apps/hedgedoc
+          kustomize:
+            patches:
+              - target:
+                  kind: Deployment
+                  name: hedgedoc
+                patch: |-
+                  - op: replace
+                    path: /spec/template/spec/containers/0/env/3/value
+                    value: hedgedoc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                  - op: replace
+                    path: /spec/template/spec/containers/0/env/22/value
+                    value: https://authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/application/o/authorize/
+                  - op: replace
+                    path: /spec/template/spec/containers/0/env/23/value
+                    value: https://authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/application/o/token/
+                  - op: replace
+                    path: /spec/template/spec/containers/0/env/24/value
+                    value: https://authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/application/o/userinfo/
+              - target:
+                  kind: IngressRoute
+                  name: hedgedoc
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`hedgedoc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: hedgedoc-wiredoor
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`hedgedoc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: hedgedoc-tailscale
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`hedgedoc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          path: gitops/databases/hedgedoc
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: hedgedoc
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

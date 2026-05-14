@@ -1,0 +1,63 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: searxng-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            twinbox.io/domain-ready: "true"
+            twinbox.io/app-searxng: "enabled"
+  template:
+    metadata:
+      name: searxng
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/harrywesterman/Twinbox.git
+        targetRevision: main
+        path: gitops/platform-apps/searxng
+        kustomize:
+          patches:
+            - target:
+                kind: Deployment
+                name: searxng
+              patch: |-
+                - op: replace
+                  path: /spec/template/spec/containers/0/env/0/value
+                  value: https://searxng.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/
+            - target:
+                kind: IngressRoute
+                name: searxng
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`searxng.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: searxng-wiredoor
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`searxng.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: searxng-tailscale
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`searxng.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: searxng
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
