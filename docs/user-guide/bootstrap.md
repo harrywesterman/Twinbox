@@ -10,12 +10,24 @@ workflow.
 - Prepares the Docker-based runtime on that VM
 - Hands off to the web wizard once the environment is ready
 
-## What the user should see
+Open the console of one of the Proxmox servers. You can use the web interface to connect to the console, or use SSH:
 
-![Twinbox Proxmox bootstrap wizard](../assets/user-guide/bootstrap/wizard.png)
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/harrywesterman/twinbox/main/wizard/setup-wizard.sh)
+```
 
-## Notes
+## Proxmox wizard
 
-- Keep this step short and explicit.
-- Avoid mixing cluster design choices into the bootstrap page.
-- Use the page to show users exactly what they should expect on the host.
+![Twinbox Proxmox bootstrap wizard](../assets/user-guide/bootstrap/twinbox-docs-screenshot-013.webp)
+
+![Twinbox Proxmox bootstrap wizard](../assets/user-guide/bootstrap/twinbox-docs-screenshot-014.webp)
+
+![Twinbox Proxmox bootstrap wizard](../assets/user-guide/bootstrap/twinbox-docs-screenshot-015.webp)
+![Twinbox Proxmox bootstrap wizard](../assets/user-guide/bootstrap/twinbox-docs-screenshot-016.webp)
+![Twinbox Proxmox bootstrap wizard](../assets/user-guide/bootstrap/twinbox-docs-screenshot-017.webp)
+![Twinbox Proxmox bootstrap wizard](../assets/user-guide/bootstrap/twinbox-docs-screenshot-018.webp)
+![Twinbox Proxmox bootstrap wizard](../assets/user-guide/bootstrap/twinbox-docs-screenshot-019.webp)
+![Twinbox Proxmox bootstrap wizard](../assets/user-guide/bootstrap/twinbox-docs-screenshot-020.webp)
+![Twinbox Proxmox bootstrap wizard](../assets/user-guide/bootstrap/twinbox-docs-screenshot-021.webp)
+
+

@@ -18,7 +18,33 @@ asks for so many decisions.
 
 ## Visual summary
 
-![Twinbox platform logos](../assets/user-guide/platform/twinbox_app_logos.png)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-056.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-057.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-058.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-059.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-060.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-061.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-061.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-063.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-064.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-065.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-066.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-067.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-068.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-069.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-070.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-071.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-072.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-073.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-074.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-075.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-076.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-077.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-078.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-079.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-080.webp)
+![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-081.webp)
+
 
 ## How to use this page
 
