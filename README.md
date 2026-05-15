@@ -22,7 +22,13 @@ Run one command on the Proxmox console. The wizard creates a Management VM that 
   <img src="screenshots/twinbox-docs-screenshot-015.webp" alt="Proxmox setup wizard" width="800">
 </p>
 
-Open your browser to continue the installation. The web UI guides you through cluster provisioning, networking, and platform services. It takes about an hour if you have the minimal hardware. After that you have an Admin console page:
+Open your browser to continue the installation. The web UI guides you through cluster provisioning, networking, and platform services. It takes about an hour if you have the minimal hardware! 
+
+<p align="center">
+  <img src="screenshots/twinbox-docs-screenshot-024.webp" alt="Twinbox Web wizard" width="800">
+</p>
+
+After that you have an Admin console page:
 
 <p align="center">
   <img src="screenshots/twinbox-docs-screenshot-058.webp" alt="Web installation wizard" width="800">
