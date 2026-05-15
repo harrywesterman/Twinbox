@@ -30,7 +30,7 @@ Complete reference for the `.env` file used by the Twinbox manager stack.
 
 ## Pinned Tool Versions
 
-CLI tools pinned in `config/pinned-defaults.sh`:
+CLI tools pinned in [`config/pinned-defaults.sh`](https://github.com/harrywesterman/Twinbox/blob/main/config/pinned-defaults.sh):
 
 | Tool | Pinned Version |
 |------|----------------|
@@ -45,7 +45,7 @@ CLI tools pinned in `config/pinned-defaults.sh`:
 | Cloudtty chart | `0.8.9` |
 | NetBird | `0.70.5` |
 
-`restic` is installed from the Management VM package repositories for host backups and is not pinned in `config/pinned-defaults.sh`.
+`restic` is installed from the Management VM package repositories for host backups and is not pinned in [`config/pinned-defaults.sh`](https://github.com/harrywesterman/Twinbox/blob/main/config/pinned-defaults.sh).
 
 ## Manager
 
@@ -75,4 +75,4 @@ CLI tools pinned in `config/pinned-defaults.sh`:
 
 ## GitOps Chart Versions
 
-Helm chart versions are declared in the Argo CD `Application` manifests under `gitops/apps/` and in [`config/pinned-defaults.sh`](../config/pinned-defaults.sh). These versions drift with every release, so the canonical source is the repository itself. Check those files directly rather than relying on a static table.
+Helm chart versions are declared in the Argo CD `Application` manifests under `gitops/apps/` and in [`config/pinned-defaults.sh`](https://github.com/harrywesterman/Twinbox/blob/main/config/pinned-defaults.sh). These versions drift with every release, so the canonical source is the repository itself. Check those files directly rather than relying on a static table.

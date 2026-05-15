@@ -404,6 +404,6 @@ The `platform-ingress` ApplicationSet deploys the entire `gitops/platform/` dire
 
 ## Tooling Versions
 
-Tool versions are pinned in [`config/pinned-defaults.sh`](../config/pinned-defaults.sh) and are not meant to be edited through `.env`.
+Tool versions are pinned in [`config/pinned-defaults.sh`](https://github.com/harrywesterman/Twinbox/blob/main/config/pinned-defaults.sh) and are not meant to be edited through `.env`.
 
 The runtime `.env` only carries per-installation settings such as Proxmox access, image tags, and secret backend selection.

@@ -1,0 +1,71 @@
+site_name: Twinbox
+site_description: Twinbox user manual and technical reference
+site_url: https://harrywesterman.github.io/Twinbox/
+repo_url: https://github.com/harrywesterman/Twinbox
+repo_name: Twinbox
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.sections
+    - navigation.path
+    - navigation.top
+    - toc.follow
+    - content.code.copy
+    - content.action.edit
+
+nav:
+  - Home: index.md
+  - User Guide:
+      - Start here: user-guide/index.md
+      - Before you begin: user-guide/getting-started.md
+      - Proxmox bootstrap: user-guide/bootstrap.md
+      - Web wizard: user-guide/web-wizard.md
+      - What gets installed: user-guide/platform.md
+  - Technical Reference:
+      - Overview: technical/index.md
+      - Getting started: getting-started.md
+      - Wizard guide: wizard-guide.md
+      - Architecture: architecture.md
+      - App pattern: app-pattern.md
+      - App bundles: app-bundles.md
+      - Configuration: configuration.md
+      - Environment variables: env-reference.md
+      - IP allocation: ip-allocation.md
+      - Ingress policy: ingress-policy.md
+      - Talos integration: talos-integration.md
+      - Secrets library: secrets-library.md
+      - Scripts reference: scripts-reference.md
+      - API reference: api-reference.md
+      - Portal: portal.md
+      - Management consoles: management-consoles.md
+      - SeaweedFS S3: seaweedfs-s3.md
+      - Cloudflare: cloudflare.md
+      - NetBird: netbird.md
+      - Wiredoor bastion: wiredoor-bastion.md
+      - CrowdSec: crowdsec.md
+      - Ntfy: ntfy.md
+      - Argo CD image updater: argocd-image-updater.md
+      - Renovate: renovate.md
+      - VM development: vm-dev.md
+      - Verification: verification.md
+      - Troubleshooting: troubleshooting.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - footnotes
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.superfences
+  - tables
+  - toc:
+      permalink: true
+
+extra_css:
+  - stylesheets/extra.css

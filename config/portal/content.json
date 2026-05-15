@@ -121,9 +121,9 @@
       "icon": "cluster-status"
     },
     {
-      "title": "Support docs",
-      "description": "Docs and troubleshooting",
-      "url": "https://github.com/harrywesterman/Twinbox/blob/main/docs/README.md",
+      "title": "Documentation",
+      "description": "User guide and technical reference",
+      "url": "https://harrywesterman.github.io/Twinbox/",
       "accent": "#ea580c",
       "icon": "support-docs"
     }

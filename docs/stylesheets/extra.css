@@ -1,0 +1,9 @@
+.md-typeset img {
+  border-radius: 0.75rem;
+  box-shadow: 0 18px 40px rgba(7, 17, 31, 0.12);
+}
+
+.md-typeset img[alt*="Twinbox"] {
+  max-width: 100%;
+  height: auto;
+}
