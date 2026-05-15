@@ -18,8 +18,6 @@ asks for so many decisions.
 
 ## Visual summary
 
-![Twinbox platform logos](../assets/user-guide/platform/twinbox_app_logos.png)
-
 ![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-056.webp)
 ![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-057.webp)
 ![Twinbox platform logos](../assets/user-guide/platform/twinbox-docs-screenshot-058.webp)
