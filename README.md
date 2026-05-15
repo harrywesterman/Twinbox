@@ -14,11 +14,6 @@ The minimal hardware it runs on is:
 500 Gb of harddisk space on each node.
 1 Gbit networking, but faster is awesome.
 
-
-#<p align="center">
-#  <img src="screenshots/lab.jpg" alt="Homelab hardware" #width="800">
-#</p>
-
 ## What Twinbox does
 
 Run one command on the Proxmox console. The wizard creates a Management VM that boots the full Twinbox stack.
