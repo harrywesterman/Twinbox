@@ -98,6 +98,35 @@ spec:
               python_bin=/tmp/python3.14.no-cap
               cp /usr/local/bin/python3.14 "${python_bin}"
               chmod 0755 "${python_bin}"
+              cat > /tmp/patch-sharedserver-passexec.py <<'PY'
+              from pathlib import Path
+              import sys
+
+              path = Path("/pgadmin4/pgadmin/browser/server_groups/servers/__init__.py")
+              text = path.read_text(encoding="utf-8")
+              old = (
+                  "                prepare_threshold=data.prepare_threshold,\n"
+                  "                passexec_cmd=None,\n"
+                  "                passexec_expiration=None,\n"
+              )
+              new = (
+                  "                prepare_threshold=data.prepare_threshold,\n"
+                  "                passexec_cmd=data.passexec_cmd,\n"
+                  "                passexec_expiration=data.passexec_expiration,\n"
+              )
+              if new in text:
+                  print("pgAdmin shared server passexec patch already applied")
+              elif old in text:
+                  path.write_text(text.replace(old, new, 1), encoding="utf-8")
+                  print("pgAdmin shared server passexec patch applied")
+              else:
+                  print(
+                      "Could not patch pgAdmin shared server passexec handling",
+                      file=sys.stderr,
+                  )
+                  sys.exit(1)
+              PY
+              "${python_bin}" /tmp/patch-sharedserver-passexec.py
               # Mirror the vendor entrypoint setup env so SQLite migrations stay non-interactive.
               export PGADMIN_SETUP_EMAIL="${PGADMIN_SETUP_EMAIL:-${PGADMIN_DEFAULT_EMAIL:-}}"
               export PGADMIN_SETUP_PASSWORD="${PGADMIN_SETUP_PASSWORD:-${PGADMIN_DEFAULT_PASSWORD:-}}"
@@ -170,6 +199,54 @@ spec:
                             "--replace",
                         ],
                         check=True,
+                    )
+
+                    conn = sqlite3.connect(db_path)
+                    try:
+                        cur = conn.cursor()
+                        owner_passexec_count = cur.execute(
+                            """
+                            select count(*)
+                            from server
+                            where shared = 1
+                              and passexec_cmd is not null
+                              and passexec_cmd != ''
+                            """
+                        ).fetchone()[0]
+                        cur.execute(
+                            """
+                            update sharedserver
+                            set passexec_cmd = (
+                                    select server.passexec_cmd
+                                    from server
+                                    where server.id = sharedserver.osid
+                                ),
+                                passexec_expiration = (
+                                    select server.passexec_expiration
+                                    from server
+                                    where server.id = sharedserver.osid
+                                )
+                            where exists (
+                                select 1
+                                from server
+                                where server.id = sharedserver.osid
+                                  and server.passexec_cmd is not null
+                                  and server.passexec_cmd != ''
+                            )
+                            """
+                        )
+                        sharedserver_repair_count = cur.rowcount
+                        conn.commit()
+                    finally:
+                        conn.close()
+
+                    print(
+                        "pgAdmin owner servers with password exec commands: "
+                        f"{owner_passexec_count}"
+                    )
+                    print(
+                        "pgAdmin shared server password exec rows repaired: "
+                        f"{sharedserver_repair_count}"
                     )
                     PY
                     exec "${python_bin}" /tmp/load-shared-servers.py
