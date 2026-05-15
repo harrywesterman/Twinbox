@@ -121,7 +121,7 @@ test("buildPortalConfig keeps operator tools out of the user applications grid a
   );
   assert.equal(
     config.intranetLinks.map((card) => card.title).join(", "),
-    "Cluster status, GitHub, Support docs"
+    "Cluster status, Documentation, GitHub"
   );
   assert.equal(
     config.intranetLinks.find((card) => card.title === "GitHub")?.iconUrl,
@@ -132,7 +132,7 @@ test("buildPortalConfig keeps operator tools out of the user applications grid a
     "/assets/step-icons/cluster-status.svg"
   );
   assert.equal(
-    config.intranetLinks.find((card) => card.title === "Support docs")?.iconUrl,
+    config.intranetLinks.find((card) => card.title === "Documentation")?.iconUrl,
     "/assets/step-icons/support-docs.svg"
   );
   assert(config.statusChecks.some((card) => card.title === "Authentik"));
