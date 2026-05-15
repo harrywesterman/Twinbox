@@ -288,6 +288,9 @@ cleanup_app_specific_state() {
       delete_openbao_global_secret "openwebui"
       ;;
     n8n)
+      remove_provider_from_embedded_outpost "n8n"
+      delete_authentik_provider_by_name "n8n"
+      delete_authentik_application_by_slug "n8n"
       delete_openbao_global_secret "n8n"
       ;;
     hedgedoc)
@@ -350,7 +353,7 @@ cleanup_app_specific_state() {
 }
 
 case "$APP_NAME" in
-  immich|nextcloud|audiobookshelf|karakeep|outline|openwebui|hedgedoc|paperless|vaultwarden|jitsi|opencloud|zulip|pixelfed|headlamp|twinbox-portal)
+  n8n|immich|nextcloud|audiobookshelf|karakeep|outline|openwebui|hedgedoc|paperless|vaultwarden|jitsi|opencloud|zulip|pixelfed|headlamp|twinbox-portal)
     needs_authentik_cleanup=true
     ;;
   grafana|loki)
