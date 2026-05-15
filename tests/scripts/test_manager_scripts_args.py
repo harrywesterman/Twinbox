@@ -1560,6 +1560,14 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "postStart" in pgadmin_deployment_text
     assert "load-servers" in pgadmin_deployment_text
     assert "ENABLE_SERVER_PASS_EXEC_CMD = True" in pgadmin_deployment_text
+    assert "pgAdmin shared server passexec patch applied" in pgadmin_deployment_text
+    assert "passexec_cmd=data.passexec_cmd" in pgadmin_deployment_text
+    assert "passexec_expiration=data.passexec_expiration" in pgadmin_deployment_text
+    assert "update sharedserver" in pgadmin_deployment_text
+    assert "server.id = sharedserver.osid" in pgadmin_deployment_text
+    assert "pgAdmin owner servers with password exec commands:" in pgadmin_deployment_text
+    assert "pgAdmin shared server password exec rows repaired:" in pgadmin_deployment_text
+    assert "print(os.environ" not in pgadmin_deployment_text
     assert "server where shared = 1 limit 1" in pgadmin_deployment_text
     assert "startupProbe" in pgadmin_deployment_text
     assert "failureThreshold: 36" in pgadmin_deployment_text
