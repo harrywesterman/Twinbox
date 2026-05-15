@@ -1,90 +1,122 @@
 # Twinbox
 
+[![Verify](https://github.com/harrywesterman/Twinbox/actions/workflows/verify.yml/badge.svg)](https://github.com/harrywesterman/Twinbox/actions/workflows/verify.yml)
+[![Publish Docker Images](https://github.com/harrywesterman/Twinbox/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/harrywesterman/Twinbox/actions/workflows/docker-publish.yml)
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://harrywesterman.github.io/Twinbox/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 **Production-grade Kubernetes on your own hardware. One command.**
 
-Twinbox runs on your own hardware on the Proxmox platform and turns them into a fully configured Talos Linux cluster with GitOps, secrets, storage, backups, and ingress — all set up through a guided web interface. Then you can install your own private application set to run your own on-prem cloud.
+Twinbox turns Proxmox hosts into a fully configured [Talos Linux](https://www.talos.dev/) Kubernetes platform with GitOps, secrets, storage, backups, ingress, observability, identity, and an application portal. It starts with a small Proxmox console bootstrap, then continues through a guided web interface that provisions the cluster and platform services for you.
 
-## What you start with
+Use it to build an on-prem cloud for private applications, shared services, and homelab or small-site infrastructure without hand-assembling every Kubernetes component yourself.
 
-Bring any machine with [Proxmox](https://www.proxmox.com/en/products/proxmox-virtual-environment/get-started) installed. Old servers, workstations, or a fresh build — anything with virtualization support works. 
+## Quick Start
 
-The minimal hardware it runs on is:
-3 x86 machines. I build this on three second hand Intel Nucs.
-16 Gb of memory on each node.
-500 Gb of harddisk space on each node.
-1 Gbit networking, but faster is awesome.
+1. Install [Proxmox VE](https://www.proxmox.com/en/products/proxmox-virtual-environment/get-started) on the machines that will host Twinbox.
+2. Run the Twinbox setup wizard from the Proxmox console. The wizard creates a Management VM and starts the Twinbox manager stack.
+3. Open the web wizard in your browser and follow the guided flow for cluster provisioning, networking, and platform services.
+4. Continue in the [Twinbox documentation](https://harrywesterman.github.io/Twinbox/) for the full user guide, architecture notes, and troubleshooting reference.
 
-## What Twinbox does
+## Requirements
 
-Run one command on the Proxmox console. The wizard creates a Management VM that boots the full Twinbox stack.
+Twinbox is designed for x86 hardware running Proxmox VE. Old servers, workstations, compact machines, and fresh builds can all work as long as they support virtualization.
+
+| Resource | Minimum         |
+| -------- | --------------- |
+| Nodes    | 3 x86 machines  |
+| Memory   | 16 GB per node  |
+| Disk     | 500 GB per node |
+| Network  | 1 Gbit Ethernet |
+
+The original Twinbox lab was built on three second-hand Intel NUCs. Faster networking and more memory are welcome, especially for larger app catalogs or heavier storage workloads.
+
+## How It Works
+
+Run one command on the Proxmox console. The bootstrap wizard creates a Management VM that runs the Twinbox manager API, web UI, worker, queue, and supporting services.
 
 <p align="center">
   <img src="screenshots/twinbox-docs-screenshot-015.webp" alt="Proxmox setup wizard" width="800">
 </p>
 
-Open your browser to continue the installation. The web UI guides you through cluster provisioning, networking, and platform services. It takes about an hour if you have the minimal hardware! 
+Open the web wizard to continue the installation. It guides you through Proxmox access, VM creation, Talos provisioning, networking, storage, GitOps, identity, observability, ingress, and backup setup.
 
 <p align="center">
-  <img src="screenshots/twinbox-docs-screenshot-024.webp" alt="Twinbox Web wizard" width="800">
+  <img src="screenshots/twinbox-docs-screenshot-024.webp" alt="Twinbox web wizard" width="800">
 </p>
 
-After that you have an Admin console page:
+When the platform is ready, the admin console gives operators a single place to inspect the cluster and management services.
 
 <p align="center">
-  <img src="screenshots/twinbox-docs-screenshot-058.webp" alt="Web installation wizard" width="800">
+  <img src="screenshots/twinbox-docs-screenshot-058.webp" alt="Twinbox admin console" width="800">
 </p>
 
-## What you get
-
-The Twinbox Portal is the portal for the users of the platform. You can install loads of applications and bundles on Twinbox that they can use.
+The Twinbox Portal is the user-facing launcher for applications, bundles, intranet links, settings, and cluster status.
 
 <p align="center">
-  <img src="screenshots/twinbox-docs-screenshot-056.webp" alt="Talos, Argo CD, Longhorn, OpenBao, Traefik, Velero, and more" width="800">
+  <img src="screenshots/twinbox-docs-screenshot-056.webp" alt="Twinbox portal with application launcher" width="800">
 </p>
 
-The Twinbox platform itself is formed of the following parts:
-- **Talos Linux** — immutable, API-driven Kubernetes OS
-- **Cilium** — kube-proxy-free networking and policy-ready datapath
-- **Hubble** — network flow visibility and the Hubble UI dashboard
-- **Argo CD** — GitOps for every component
-- **Longhorn** — distributed block storage
-- **Prometheus** — cluster metrics, Alertmanager, node-exporter, and kube-state-metrics
-- **Grafana** — dashboarding on top of the Prometheus stack
-- **Loki** — log aggregation and log querying for Grafana
-- **OpenBao + External Secrets Operator** — centralized secret management
-- **Traefik** — ingress and routing
-- **MetalLB** — bare-metal load balancer for on-prem ingress
-- **Cloudflare Tunnel** — secure external access without opening ports
-- **NetBird** — self-hosted WireGuard VPN with SSO
-- **Wiredoor** — WireGuard-based reverse proxy gateway
-- **SeaweedFS** — S3-compatible backup target on the Management VM
-- **Velero** — automated cluster backups to SeaweedFS
-- **CloudNativePG** — managed PostgreSQL clusters
-- **Authentik** — single sign-on and identity provider
-- **CrowdSec** — collaborative intrusion detection and Traefik bouncer
-- **Tempo** — distributed tracing backend for Grafana
-- **Grafana Alloy** — unified telemetry collector for logs, metrics, and traces
-- **Twinbox Portal** — the default user-facing launcher with settings, intranet links, and cluster status
-- **Dashy** — admin launcher for operator tools on `admin.<domain>`
+## Platform
+
+Twinbox installs a complete Kubernetes operations stack:
+
+| Area                   | Components                                                    |
+| ---------------------- | ------------------------------------------------------------- |
+| Kubernetes foundation  | Talos Linux, Cilium, Hubble                                   |
+| GitOps                 | Argo CD                                                       |
+| Storage and backups    | Longhorn, SeaweedFS, Velero                                   |
+| Ingress and access     | Traefik, MetalLB, Cloudflare Tunnel, NetBird, Wiredoor        |
+| Identity and secrets   | Authentik, OpenBao, External Secrets Operator                 |
+| Databases              | CloudNativePG                                                 |
+| Observability          | Prometheus, Alertmanager, Grafana, Loki, Tempo, Grafana Alloy |
+| Security               | CrowdSec with Traefik bouncer                                 |
+| User and admin portals | Twinbox Portal, Dashy                                         |
 
 ## App Catalog
 
 Install additional applications through the Twinbox Portal:
 
-- **Audiobookshelf** — audiobook and podcast server
-- **FreshRSS** — self-hosted RSS feed reader
-- **HedgeDoc** — real-time collaborative markdown editor
-- **Immich** — photo and video backup
-- **Jitsi** — video conferencing with OpenID Connect
-- **Karakeep** — bookmark and web archiving
-- **n8n** — workflow automation
-- **Nextcloud** — file sync and collaboration
-- **OpenCloud** — open source collaboration platform
-- **OpenWebUI** — AI chat interface
-- **Outline** — team knowledge base
-- **Paperless** — document management with OCR
-- **Pixelfed** — decentralized photo sharing
-- **SearXNG** — privacy-respecting metasearch engine
-- **Stirling PDF** — PDF manipulation tools
-- **Vaultwarden** — Bitwarden-compatible password manager
-- **Zulip** — threaded team chat
+- **Audiobookshelf** - audiobook and podcast server
+- **FreshRSS** - self-hosted RSS feed reader
+- **HedgeDoc** - real-time collaborative markdown editor
+- **Immich** - photo and video backup
+- **Jitsi** - video conferencing with OpenID Connect
+- **Karakeep** - bookmark and web archiving
+- **n8n** - workflow automation
+- **Nextcloud** - file sync and collaboration
+- **OpenCloud** - open source collaboration platform
+- **OpenWebUI** - AI chat interface
+- **Outline** - team knowledge base
+- **Paperless** - document management with OCR
+- **Pixelfed** - decentralized photo sharing
+- **SearXNG** - privacy-respecting metasearch engine
+- **Stirling PDF** - PDF manipulation tools
+- **Vaultwarden** - Bitwarden-compatible password manager
+- **Zulip** - threaded team chat
+
+## Documentation
+
+- [User guide](https://harrywesterman.github.io/Twinbox/user-guide/) - prerequisites, bootstrap, web wizard, and platform overview
+- [Architecture](https://harrywesterman.github.io/Twinbox/architecture/) - system layers, runtime flow, and component responsibilities
+- [Configuration](https://harrywesterman.github.io/Twinbox/configuration/) - environment and platform configuration reference
+- [Troubleshooting](https://harrywesterman.github.io/Twinbox/troubleshooting/) - operational checks and recovery notes
+
+## Project Structure
+
+| Path               | Purpose                                                   |
+| ------------------ | --------------------------------------------------------- |
+| `wizard/`          | Proxmox bootstrap scripts that create the Management VM   |
+| `manager-web/`     | React web wizard on port `3000`                           |
+| `manager-api/`     | Manager API, catalog, validation, state, and job queueing |
+| `manager-worker/`  | Queue polling and job execution                           |
+| `scripts/manager/` | Talos, Proxmox, Argo CD, OpenBao, and platform automation |
+| `categories/`      | Wizard step manifests and runners                         |
+| `gitops/`          | Argo CD applications, Helm values, and Kustomize overlays |
+| `portal/`          | Twinbox Portal                                            |
+| `config/`          | Pinned defaults, Cilium values, and portal content        |
+| `docs/`            | MkDocs user guide and technical reference                 |
+
+## License
+
+Twinbox is released under the [MIT License](LICENSE).
