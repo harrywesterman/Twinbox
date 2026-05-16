@@ -17,9 +17,3 @@ The installation has two distinct phases:
 1. A bootstrap step on the Proxmox host creates the Management VM.
 2. The Management VM serves the web wizard that finishes the cluster setup.
 
-## Visual cue
-
-![Twinbox lab hardware setup](../assets/user-guide/getting-started/lab.jpg)
-
-The first screen in the guide should orient the user before they ever click a
-button.

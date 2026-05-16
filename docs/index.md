@@ -27,8 +27,3 @@ oriented angle:
 - [Architecture](architecture.md)
 - [Configuration](configuration.md)
 
-## What to expect
-
-- Screenshots are grouped by chapter so each page stays focused.
-- The guide is written in English and keeps the language plain.
-- GitHub Pages builds the site from `main` through MkDocs Material.

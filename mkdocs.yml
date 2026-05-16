@@ -39,6 +39,8 @@ theme:
 
 nav:
   - Home: index.md
+  - Vision:
+      - About me: vision/index.md
   - User Guide:
       - Start here: user-guide/index.md
       - Before you begin: user-guide/getting-started.md

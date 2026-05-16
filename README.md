@@ -5,7 +5,17 @@
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://harrywesterman.github.io/Twinbox/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Production-grade Kubernetes on your own hardware. One command.**
+**Your own private little datacenter to run at home**
+
+<p align="center">
+  <img src="screenshots/intheliving.png" alt="Twinbox at home" width="800">
+</p>
+
+You can run awesome Open Source alternatives like NextCloud for your documents and Immich for you photos on your phones. Your email, your chats and much more is all hosted on your own servers. No more sharing of all your information with Big Tech. No data is ever leaving your personal servers. Twinbox is simple to install, even for non-technical people. It will update itself, and keep itself safe. 
+
+<p align="center">
+  <img src="screenshots/phones.png" alt="Twinbox at home" width="800">
+</p>
 
 Twinbox turns Proxmox hosts into a fully configured [Talos Linux](https://www.talos.dev/) Kubernetes platform with GitOps, secrets, storage, backups, ingress, observability, identity, and an application portal. It starts with a small Proxmox console bootstrap, then continues through a guided web interface that provisions the cluster and platform services for you.
 
