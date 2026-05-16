@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: termix
+  namespace: termix
+  labels:
+    app.kubernetes.io/name: termix
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: termix
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: termix
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: termix
+          image: ghcr.io/lukegus/termix:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 4090
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "4090"
+            - name: NODE_ENV
+              value: production
+            - name: DATA_DIR
+              value: /app/data
+            - name: LOG_LEVEL
+              value: info
+            - name: ENABLE_GUACAMOLE
+              value: "true"
+            - name: GUACD_HOST
+              value: localhost
+            - name: GUACD_PORT
+              value: "4822"
+            - name: OIDC_ALLOWED_USERS
+              value: "*"
+            - name: OIDC_ALLOW_REGISTRATION
+              value: "true"
+          envFrom:
+            - secretRef:
+                name: termix-bootstrap
+          volumeMounts:
+            - name: termix-data
+              mountPath: /app/data
+          readinessProbe:
+            httpGet:
+              path: /users/database-health-check
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /users/database-health-check
+              port: http
+            initialDelaySeconds: 25
+            periodSeconds: 20
+          startupProbe:
+            httpGet:
+              path: /users/database-health-check
+              port: http
+            failureThreshold: 60
+            periodSeconds: 5
+        - name: guacd
+          image: guacamole/guacd:1.6.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: guacd
+              containerPort: 4822
+              protocol: TCP
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          readinessProbe:
+            tcpSocket:
+              port: guacd
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: guacd
+            initialDelaySeconds: 15
+            periodSeconds: 20
+      volumes:
+        - name: termix-data
+          persistentVolumeClaim:
+            claimName: termix-data
