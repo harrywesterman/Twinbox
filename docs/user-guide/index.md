@@ -16,8 +16,3 @@ implementation first.
 - [Proxmox bootstrap](bootstrap.md)
 - [Web wizard](web-wizard.md)
 - [What gets installed](platform.md)
-
-## Screenshot strategy
-
-Each chapter keeps its own screenshots close to the text so the page stays
-focused and easy to scan.

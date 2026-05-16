@@ -14,7 +14,7 @@ My fascination with computers started when I was 12 and my uncle gave me a Sincl
 
 In my teens I ran a wonderful Amiga bulletin board called Epsilon BBS, connected to FidoNET. Together with a couple of friends I also worked on April, a mail point system for Amiga computers. Looking back, that was probably my first taste of the same thing that still interests me now: computers talking to each other, people building things together, and networks that do not have to be mysterious to be powerful.
 
-I have always tinkered with a so-called homelab. I tried many Linux distributions, played with loads of open source projects, automated my house with the excellent [Home Assistant](https://www.home-assistant.io/), and ran all kinds of things in Docker and Kubernetes.
+I have always tinkered with a so-called [homelab](https://www.reddit.com/r/homelab/). I tried many Linux distributions, played with loads of open source projects, automated my house with the excellent [Home Assistant](https://www.home-assistant.io/), and ran all kinds of things in Docker and Kubernetes.
 
 ## The coffee table cluster
 

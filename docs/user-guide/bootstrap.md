@@ -10,7 +10,9 @@ workflow.
 - Prepares the Docker-based runtime on that VM
 - Hands off to the web wizard once the environment is ready
 
-Open the console of one of the Proxmox servers. You can use the web interface to connect to the console, or use SSH:
+Open the console of one of the Proxmox servers. You can use the web interface to connect to the console, or use from the commandline an ssh client to connect to the Proxmox host and run the command there.
+
+Give this command to start the bootstrap process:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/harrywesterman/twinbox/main/wizard/setup-wizard.sh)
@@ -19,6 +21,8 @@ bash <(curl -fsSL https://raw.githubusercontent.com/harrywesterman/twinbox/main/
 ## Proxmox wizard
 
 ![Twinbox Proxmox bootstrap wizard](../assets/user-guide/bootstrap/twinbox-docs-screenshot-013.webp)
+
+
 
 ![Twinbox Proxmox bootstrap wizard](../assets/user-guide/bootstrap/twinbox-docs-screenshot-014.webp)
 
