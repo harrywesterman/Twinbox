@@ -4,6 +4,7 @@ prometheus:
     podMonitorSelectorNilUsesHelmValues: false
     ruleSelectorNilUsesHelmValues: false
     scrapeInterval: 300s
+    scrapeTimeout: 30s
     retention: 2d
     retentionSize: 10GB
     resources:
@@ -52,3 +53,12 @@ nodeExporter:
 
 kubeStateMetrics:
   enabled: true
+
+kube-state-metrics:
+  resources:
+    requests:
+      memory: 128Mi
+      cpu: 50m
+    limits:
+      memory: 512Mi
+      cpu: 500m
