@@ -1,0 +1,793 @@
+{
+  "uid": "twinbox-data-protection",
+  "title": "Twinbox Data Protection",
+  "description": "Storage risk, Longhorn readiness, Velero health, and database backup signals.",
+  "tags": [
+    "twinbox",
+    "backup",
+    "storage",
+    "longhorn",
+    "velero",
+    "cloudnativepg"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {
+    "hidden": false
+  },
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "graphTooltip": 1,
+  "links": [],
+  "liveNow": false,
+  "fiscalYearStartMonth": 0,
+  "style": "dark",
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Bound PVCs",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(count(kube_persistentvolumeclaim_status_phase{phase=\"Bound\"})) or vector(0)",
+          "instant": true,
+          "range": false,
+          "queryType": "instant",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "links": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "transparent": false
+    },
+    {
+      "id": 2,
+      "title": "PVCs > 85%",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(count((kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) > 0.85)) or vector(0)",
+          "instant": true,
+          "range": false,
+          "queryType": "instant",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "links": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "transparent": false
+    },
+    {
+      "id": 3,
+      "title": "PVCs > 95%",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(count((kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) > 0.95)) or vector(0)",
+          "instant": true,
+          "range": false,
+          "queryType": "instant",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "links": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "transparent": false
+    },
+    {
+      "id": 4,
+      "title": "Longhorn ready pods",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum(kube_pod_status_ready{namespace=\"longhorn-system\",condition=\"true\"})) or vector(0)",
+          "instant": true,
+          "range": false,
+          "queryType": "instant",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "links": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "transparent": false
+    },
+    {
+      "id": 5,
+      "title": "Longhorn CSI ready",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum(kube_pod_status_ready{namespace=\"longhorn-system\",condition=\"true\",pod=~\"longhorn-csi-plugin.*\"})) or vector(0)",
+          "instant": true,
+          "range": false,
+          "queryType": "instant",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "links": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "transparent": false
+    },
+    {
+      "id": 6,
+      "title": "Velero ready pods",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 6,
+        "y": 4,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum(kube_pod_status_ready{namespace=\"velero\",condition=\"true\"})) or vector(0)",
+          "instant": true,
+          "range": false,
+          "queryType": "instant",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "links": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "transparent": false
+    },
+    {
+      "id": 7,
+      "title": "Velero restarts (24h)",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum(increase(kube_pod_container_status_restarts_total{namespace=\"velero\"}[24h]))) or vector(0)",
+          "instant": true,
+          "range": false,
+          "queryType": "instant",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "links": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "transparent": false
+    },
+    {
+      "id": 8,
+      "title": "CNPG ready pods",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 18,
+        "y": 4,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum(kube_pod_status_ready{namespace=\"databases\",condition=\"true\"})) or vector(0)",
+          "instant": true,
+          "range": false,
+          "queryType": "instant",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "links": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "transparent": false
+    },
+    {
+      "id": 9,
+      "title": "PVC risk by namespace",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (namespace) ((kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) > 0.70)",
+          "legendFormat": "{{namespace}} > 70%",
+          "instant": false,
+          "range": true,
+          "queryType": "range",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (namespace) ((kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) > 0.85)",
+          "legendFormat": "{{namespace}} > 85%",
+          "instant": false,
+          "range": true,
+          "queryType": "range",
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "expr": "sum by (namespace) ((kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) > 0.95)",
+          "legendFormat": "{{namespace}} > 95%",
+          "instant": false,
+          "range": true,
+          "queryType": "range",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "transparent": false
+    },
+    {
+      "id": 10,
+      "title": "Top PVC usage",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(10, kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes)",
+          "legendFormat": "{{namespace}}/{{persistentvolumeclaim}}",
+          "instant": false,
+          "range": true,
+          "queryType": "range",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "transparent": false
+    },
+    {
+      "id": 11,
+      "title": "Longhorn control-plane readiness",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(kube_pod_status_ready{namespace=\"longhorn-system\",condition=\"true\",pod=~\"longhorn-manager.*\"})",
+          "legendFormat": "manager",
+          "instant": false,
+          "range": true,
+          "queryType": "range",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(kube_pod_status_ready{namespace=\"longhorn-system\",condition=\"true\",pod=~\"longhorn-csi-plugin.*\"})",
+          "legendFormat": "csi",
+          "instant": false,
+          "range": true,
+          "queryType": "range",
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "expr": "sum(kube_pod_status_ready{namespace=\"longhorn-system\",condition=\"true\",pod=~\"instance-manager.*\"})",
+          "legendFormat": "instance manager",
+          "instant": false,
+          "range": true,
+          "queryType": "range",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "transparent": false
+    },
+    {
+      "id": 12,
+      "title": "Backup workload restarts",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (namespace) (increase(kube_pod_container_status_restarts_total{namespace=~\"velero|databases|longhorn-system\"}[24h]))",
+          "legendFormat": "{{namespace}}",
+          "instant": false,
+          "range": true,
+          "queryType": "range",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "transparent": false
+    },
+    {
+      "id": 13,
+      "title": "Backup and storage warnings",
+      "type": "logs",
+      "datasource": "Loki",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 12
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{cluster=\"twinbox\", namespace=~\"velero|longhorn-system|databases\"} |~ \"(?i)backup|snapshot|restore|barman|wal|error|warn|fail\"",
+          "queryType": "range",
+          "range": true,
+          "instant": false,
+          "format": "logs",
+          "maxLines": 120
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none"
+      },
+      "transparent": false,
+      "timeFrom": "24h"
+    }
+  ]
+}

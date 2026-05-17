@@ -4,3 +4,29 @@ kind: Kustomization
 resources:
   - externalsecret.yaml
   - ingressroute.yaml
+
+configMapGenerator:
+  - name: twinbox-command-center-dashboard
+    files:
+      - twinbox-command-center.json=dashboards/twinbox-command-center.json
+    options:
+      labels:
+        app.kubernetes.io/name: grafana
+        grafana_dashboard: "1"
+  - name: twinbox-apps-gitops-dashboard
+    files:
+      - twinbox-apps-gitops.json=dashboards/twinbox-apps-gitops.json
+    options:
+      labels:
+        app.kubernetes.io/name: grafana
+        grafana_dashboard: "1"
+  - name: twinbox-data-protection-dashboard
+    files:
+      - twinbox-data-protection.json=dashboards/twinbox-data-protection.json
+    options:
+      labels:
+        app.kubernetes.io/name: grafana
+        grafana_dashboard: "1"
+
+generatorOptions:
+  disableNameSuffixHash: true

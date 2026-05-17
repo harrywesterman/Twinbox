@@ -1,0 +1,1062 @@
+{
+  "uid": "twinbox-command-center",
+  "title": "Twinbox Command Center",
+  "description": "At-a-glance operator status across cluster health, workloads, storage, edge, and logs.",
+  "tags": [
+    "twinbox",
+    "overview",
+    "command-center",
+    "status"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-3h",
+    "to": "now"
+  },
+  "timepicker": {
+    "hidden": false
+  },
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "graphTooltip": 1,
+  "links": [
+    {
+      "title": "Nodes",
+      "url": "/d/twinbox-nodes/twinbox-nodes?orgId=1",
+      "targetBlank": false,
+      "includeVars": true
+    },
+    {
+      "title": "Workloads",
+      "url": "/d/twinbox-workloads/twinbox-workloads?orgId=1",
+      "targetBlank": false,
+      "includeVars": true
+    },
+    {
+      "title": "Logs",
+      "url": "/d/twinbox-logs-events/twinbox-logs-and-events?orgId=1",
+      "targetBlank": false,
+      "includeVars": true
+    }
+  ],
+  "liveNow": false,
+  "fiscalYearStartMonth": 0,
+  "style": "dark",
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Ready nodes",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(count(kube_node_status_condition{condition=\"Ready\",status=\"true\"})) or vector(0)",
+          "instant": true,
+          "range": false,
+          "queryType": "instant",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "links": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "transparent": false
+    },
+    {
+      "id": 2,
+      "title": "Not ready nodes",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 4,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(count(kube_node_status_condition{condition=\"Ready\",status=\"true\"} == 0)) or vector(0)",
+          "instant": true,
+          "range": false,
+          "queryType": "instant",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "links": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "transparent": false
+    },
+    {
+      "id": 3,
+      "title": "Unhealthy pods",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum(kube_pod_status_phase{phase=~\"Pending|Failed|Unknown\"})) or vector(0)",
+          "instant": true,
+          "range": false,
+          "queryType": "instant",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "links": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "transparent": false
+    },
+    {
+      "id": 4,
+      "title": "Restarts (1h)",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum(increase(kube_pod_container_status_restarts_total[1h]))) or vector(0)",
+          "instant": true,
+          "range": false,
+          "queryType": "instant",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "links": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 3
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "transparent": false
+    },
+    {
+      "id": 5,
+      "title": "PVCs > 85%",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(count((kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) > 0.85)) or vector(0)",
+          "instant": true,
+          "range": false,
+          "queryType": "instant",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "links": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "transparent": false
+    },
+    {
+      "id": 6,
+      "title": "Prometheus targets down",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 20,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(count(up == 0)) or vector(0)",
+          "instant": true,
+          "range": false,
+          "queryType": "instant",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "links": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "transparent": false
+    },
+    {
+      "id": 7,
+      "title": "Traefik 5xx / s",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum(rate(traefik_entrypoint_requests_total{code=~\"5..\"}[5m]))) or vector(0)",
+          "instant": true,
+          "range": false,
+          "queryType": "instant",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "links": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.1
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "transparent": false
+    },
+    {
+      "id": 8,
+      "title": "Error logs / s",
+      "type": "stat",
+      "datasource": "Loki",
+      "gridPos": {
+        "x": 4,
+        "y": 4,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum(count_over_time({cluster=\"twinbox\"} |~ \"(?i)error|panic|fail\" [5m])) / 300) or vector(0)",
+          "instant": true,
+          "range": false,
+          "queryType": "instant",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "links": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "transparent": false
+    },
+    {
+      "id": 9,
+      "title": "Longhorn managers",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 8,
+        "y": 4,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum(kube_pod_status_ready{namespace=\"longhorn-system\",condition=\"true\",pod=~\"longhorn-manager.*\"})) or vector(0)",
+          "instant": true,
+          "range": false,
+          "queryType": "instant",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "links": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "transparent": false
+    },
+    {
+      "id": 10,
+      "title": "Cluster CPU",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum(rate(node_cpu_seconds_total{mode!=\"idle\",mode!=\"iowait\"}[15m])) / sum(rate(node_cpu_seconds_total[15m]))) or vector(0)",
+          "instant": true,
+          "range": false,
+          "queryType": "instant",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "links": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "transparent": false
+    },
+    {
+      "id": 11,
+      "title": "Cluster memory",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 16,
+        "y": 4,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(1 - sum(node_memory_MemAvailable_bytes) / sum(node_memory_MemTotal_bytes)) or vector(0)",
+          "instant": true,
+          "range": false,
+          "queryType": "instant",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "links": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "transparent": false
+    },
+    {
+      "id": 12,
+      "title": "Network errors / s",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 20,
+        "y": 4,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum(rate(node_network_receive_errs_total{device!~\"lo|veth.*|cni.*|flannel.*|docker.*|dummy.*\"}[15m])) + sum(rate(node_network_transmit_errs_total{device!~\"lo|veth.*|cni.*|flannel.*|docker.*|dummy.*\"}[15m])) + sum(rate(node_network_receive_drop_total{device!~\"lo|veth.*|cni.*|flannel.*|docker.*|dummy.*\"}[15m])) + sum(rate(node_network_transmit_drop_total{device!~\"lo|veth.*|cni.*|flannel.*|docker.*|dummy.*\"}[15m]))) or vector(0)",
+          "instant": true,
+          "range": false,
+          "queryType": "instant",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "links": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "transparent": false
+    },
+    {
+      "id": 13,
+      "title": "Cluster resource pressure",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(node_cpu_seconds_total{mode!=\"idle\",mode!=\"iowait\"}[15m])) / sum(rate(node_cpu_seconds_total[15m]))",
+          "legendFormat": "CPU",
+          "instant": false,
+          "range": true,
+          "queryType": "range",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "expr": "1 - sum(node_memory_MemAvailable_bytes) / sum(node_memory_MemTotal_bytes)",
+          "legendFormat": "Memory",
+          "instant": false,
+          "range": true,
+          "queryType": "range",
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "expr": "sum(node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|squashfs|nsfs|proc|sysfs|cgroup2\"} - node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|squashfs|nsfs|proc|sysfs|cgroup2\"}) / sum(node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|squashfs|nsfs|proc|sysfs|cgroup2\"})",
+          "legendFormat": "Filesystem",
+          "instant": false,
+          "range": true,
+          "queryType": "range",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "transparent": false
+    },
+    {
+      "id": 14,
+      "title": "Workload pressure",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(kube_pod_status_phase{phase=~\"Pending|Failed|Unknown\"})",
+          "legendFormat": "Unhealthy pods",
+          "instant": false,
+          "range": true,
+          "queryType": "range",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(increase(kube_pod_container_status_restarts_total[1h]))",
+          "legendFormat": "Restarts (1h)",
+          "instant": false,
+          "range": true,
+          "queryType": "range",
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "expr": "sum(kube_deployment_spec_replicas - kube_deployment_status_replicas_available)",
+          "legendFormat": "Unavailable deployment replicas",
+          "instant": false,
+          "range": true,
+          "queryType": "range",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "transparent": false
+    },
+    {
+      "id": 15,
+      "title": "Ingress and logs",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(traefik_entrypoint_requests_total[5m]))",
+          "legendFormat": "Traefik requests / s",
+          "instant": false,
+          "range": true,
+          "queryType": "range",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(traefik_entrypoint_requests_total{code=~\"5..\"}[5m]))",
+          "legendFormat": "Traefik 5xx / s",
+          "instant": false,
+          "range": true,
+          "queryType": "range",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "transparent": false
+    },
+    {
+      "id": 16,
+      "title": "Storage pressure",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count((kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) > 0.70)",
+          "legendFormat": "PVCs > 70%",
+          "instant": false,
+          "range": true,
+          "queryType": "range",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "expr": "count((kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) > 0.85)",
+          "legendFormat": "PVCs > 85%",
+          "instant": false,
+          "range": true,
+          "queryType": "range",
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "expr": "count((kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) > 0.95)",
+          "legendFormat": "PVCs > 95%",
+          "instant": false,
+          "range": true,
+          "queryType": "range",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "transparent": false
+    }
+  ]
+}
