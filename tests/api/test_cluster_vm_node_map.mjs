@@ -205,6 +205,7 @@ test('cluster builder stores an automatic small resource profile for homelab def
 
   assert.equal(result.ok, true);
   assert.equal(result.cluster.resource_profile, 'small');
+  assert.equal(result.cluster.observability_profile, 'full');
   assert.equal(result.cluster.worker_cpu_total, 12);
   assert.equal(result.cluster.worker_memory_total_mb, 30720);
   assert.match(result.cluster.resource_profile_reason, /12 worker CPU cores/);

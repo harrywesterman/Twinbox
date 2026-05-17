@@ -300,6 +300,7 @@ function dashboard({
 const nodeNetworkFilter = '{device!~"lo|veth.*|cni.*|flannel.*|docker.*|dummy.*"}';
 const nodeFilesystemFilter = '{fstype!~"tmpfs|overlay|squashfs|nsfs|proc|sysfs|cgroup2"}';
 const runningContainerFilter = '{container!="",image!=""}';
+const dashboardRateWindow = "15m";
 const lokiCluster = '{cluster="twinbox"}';
 const lokiEvents =
   '{cluster="twinbox", kubernetes_cluster_events="integrations/kubernetes/eventhandler"}';
@@ -365,11 +366,11 @@ function buildNodesDashboard() {
         title: "Network throughput by node",
         targets: [
           {
-            expr: `sum by (node) (rate(node_network_receive_bytes_total${nodeNetworkFilter}[5m]))`,
+            expr: `sum by (node) (rate(node_network_receive_bytes_total${nodeNetworkFilter}[${dashboardRateWindow}]))`,
             legendFormat: "RX {{node}}",
           },
           {
-            expr: `sum by (node) (rate(node_network_transmit_bytes_total${nodeNetworkFilter}[5m]))`,
+            expr: `sum by (node) (rate(node_network_transmit_bytes_total${nodeNetworkFilter}[${dashboardRateWindow}]))`,
             legendFormat: "TX {{node}}",
           },
         ],
@@ -919,7 +920,7 @@ function buildNetworkDashboard() {
     panels: [
       statPanel({
         title: "Total RX",
-        expr: `sum(rate(node_network_receive_bytes_total${nodeNetworkFilter}[5m]))`,
+        expr: `sum(rate(node_network_receive_bytes_total${nodeNetworkFilter}[${dashboardRateWindow}]))`,
         unit: "Bps",
         decimals: 2,
         x: 0,
@@ -927,7 +928,7 @@ function buildNetworkDashboard() {
       }),
       statPanel({
         title: "Total TX",
-        expr: `sum(rate(node_network_transmit_bytes_total${nodeNetworkFilter}[5m]))`,
+        expr: `sum(rate(node_network_transmit_bytes_total${nodeNetworkFilter}[${dashboardRateWindow}]))`,
         unit: "Bps",
         decimals: 2,
         x: 6,
@@ -935,7 +936,7 @@ function buildNetworkDashboard() {
       }),
       statPanel({
         title: "Packet errors",
-        expr: `sum(rate(node_network_receive_errs_total${nodeNetworkFilter}[5m])) + sum(rate(node_network_transmit_errs_total${nodeNetworkFilter}[5m])) + sum(rate(node_network_receive_drop_total${nodeNetworkFilter}[5m])) + sum(rate(node_network_transmit_drop_total${nodeNetworkFilter}[5m]))`,
+        expr: `sum(rate(node_network_receive_errs_total${nodeNetworkFilter}[${dashboardRateWindow}])) + sum(rate(node_network_transmit_errs_total${nodeNetworkFilter}[${dashboardRateWindow}])) + sum(rate(node_network_receive_drop_total${nodeNetworkFilter}[${dashboardRateWindow}])) + sum(rate(node_network_transmit_drop_total${nodeNetworkFilter}[${dashboardRateWindow}]))`,
         unit: "ops",
         decimals: 2,
         x: 12,
@@ -951,11 +952,11 @@ function buildNetworkDashboard() {
         title: "Node RX/TX",
         targets: [
           {
-            expr: `sum by (node) (rate(node_network_receive_bytes_total${nodeNetworkFilter}[5m]))`,
+            expr: `sum by (node) (rate(node_network_receive_bytes_total${nodeNetworkFilter}[${dashboardRateWindow}]))`,
             legendFormat: "RX {{node}}",
           },
           {
-            expr: `sum by (node) (rate(node_network_transmit_bytes_total${nodeNetworkFilter}[5m]))`,
+            expr: `sum by (node) (rate(node_network_transmit_bytes_total${nodeNetworkFilter}[${dashboardRateWindow}]))`,
             legendFormat: "TX {{node}}",
           },
         ],
@@ -970,7 +971,7 @@ function buildNetworkDashboard() {
         title: "Top pod RX",
         targets: [
           {
-            expr: `topk(10, sum by (namespace, pod) (rate(container_network_receive_bytes_total{interface!="lo"}[5m])))`,
+            expr: `topk(10, sum by (namespace, pod) (rate(container_network_receive_bytes_total{interface!="lo"}[${dashboardRateWindow}])))`,
             legendFormat: "{{namespace}}/{{pod}}",
           },
         ],
@@ -985,7 +986,7 @@ function buildNetworkDashboard() {
         title: "Top pod TX",
         targets: [
           {
-            expr: `topk(10, sum by (namespace, pod) (rate(container_network_transmit_bytes_total{interface!="lo"}[5m])))`,
+            expr: `topk(10, sum by (namespace, pod) (rate(container_network_transmit_bytes_total{interface!="lo"}[${dashboardRateWindow}])))`,
             legendFormat: "{{namespace}}/{{pod}}",
           },
         ],

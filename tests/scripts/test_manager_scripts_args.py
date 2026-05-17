@@ -2224,6 +2224,15 @@ def test_prometheus_values_configures_alertmanager_and_storage():
     assert "grafana:" in text
     assert "enabled: false" in text
     assert "storageClassName: longhorn-single" in text
+    assert "memory: 1Gi" in text
+    assert "cpu: 500m" in text
+    assert "memory: 2Gi" in text
+    assert "cpu: 2000m" in text
+    assert "kube-state-metrics:" in text
+    assert "memory: 256Mi" in text
+    assert "cpu: 100m" in text
+    assert "memory: 768Mi" in text
+    assert "cpu: 750m" in text
 
 
 def test_prometheus_ingressroute_exposes_ui():
