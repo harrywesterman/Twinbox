@@ -407,6 +407,21 @@ seed_generated_dashboard \
   "traefik" \
   "twinbox-traefik.json"
 
+seed_generated_dashboard \
+  "twinbox-command-center-dashboard" \
+  "commandCenter" \
+  "twinbox-command-center.json"
+
+seed_generated_dashboard \
+  "twinbox-apps-gitops-dashboard" \
+  "appsGitOps" \
+  "twinbox-apps-gitops.json"
+
+seed_generated_dashboard \
+  "twinbox-data-protection-dashboard" \
+  "dataProtection" \
+  "twinbox-data-protection.json"
+
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying Grafana ExternalSecret"
 kubectl apply -f "$grafana_externalsecret_manifest"
 kubectl -n monitoring wait --for=condition=Ready externalsecret/grafana-oidc --timeout=10m

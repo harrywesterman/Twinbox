@@ -1160,7 +1160,594 @@ function buildTraefikDashboard() {
   });
 }
 
+function buildCommandCenterDashboard() {
+  return dashboard({
+    uid: "twinbox-command-center",
+    title: "Twinbox Command Center",
+    description:
+      "At-a-glance operator status across cluster health, workloads, storage, edge, and logs.",
+    tags: ["overview", "command-center", "status"],
+    timeFrom: "now-3h",
+    links: [
+      {
+        title: "Nodes",
+        url: "/d/twinbox-nodes/twinbox-nodes?orgId=1",
+        targetBlank: false,
+        includeVars: true,
+      },
+      {
+        title: "Workloads",
+        url: "/d/twinbox-workloads/twinbox-workloads?orgId=1",
+        targetBlank: false,
+        includeVars: true,
+      },
+      {
+        title: "Logs",
+        url: "/d/twinbox-logs-events/twinbox-logs-and-events?orgId=1",
+        targetBlank: false,
+        includeVars: true,
+      },
+    ],
+    panels: [
+      statPanel({
+        title: "Ready nodes",
+        expr: 'count(kube_node_status_condition{condition="Ready",status="true"})',
+        x: 0,
+        y: 0,
+        w: 4,
+      }),
+      statPanel({
+        title: "Not ready nodes",
+        expr: 'count(kube_node_status_condition{condition="Ready",status="true"} == 0)',
+        x: 4,
+        y: 0,
+        w: 4,
+        thresholds: [
+          { color: "green", value: null },
+          { color: "orange", value: 1 },
+          { color: "red", value: 2 },
+        ],
+      }),
+      statPanel({
+        title: "Unhealthy pods",
+        expr: 'sum(kube_pod_status_phase{phase=~"Pending|Failed|Unknown"})',
+        x: 8,
+        y: 0,
+        w: 4,
+        thresholds: [
+          { color: "green", value: null },
+          { color: "orange", value: 1 },
+          { color: "red", value: 5 },
+        ],
+      }),
+      statPanel({
+        title: "Restarts (1h)",
+        expr: "sum(increase(kube_pod_container_status_restarts_total[1h]))",
+        x: 12,
+        y: 0,
+        w: 4,
+        thresholds: [
+          { color: "green", value: null },
+          { color: "orange", value: 3 },
+          { color: "red", value: 10 },
+        ],
+      }),
+      statPanel({
+        title: "PVCs > 85%",
+        expr: "count((kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) > 0.85)",
+        x: 16,
+        y: 0,
+        w: 4,
+        thresholds: [
+          { color: "green", value: null },
+          { color: "orange", value: 1 },
+          { color: "red", value: 3 },
+        ],
+      }),
+      statPanel({
+        title: "Prometheus targets down",
+        expr: "count(up == 0)",
+        x: 20,
+        y: 0,
+        w: 4,
+        thresholds: [
+          { color: "green", value: null },
+          { color: "orange", value: 1 },
+          { color: "red", value: 5 },
+        ],
+      }),
+      statPanel({
+        title: "Traefik 5xx / s",
+        expr: 'sum(rate(traefik_entrypoint_requests_total{code=~"5.."}[5m]))',
+        unit: "reqps",
+        decimals: 2,
+        x: 0,
+        y: 4,
+        w: 4,
+        thresholds: [
+          { color: "green", value: null },
+          { color: "orange", value: 0.1 },
+          { color: "red", value: 1 },
+        ],
+      }),
+      statPanel({
+        title: "Error logs / s",
+        expr: `sum(count_over_time(${lokiCluster} |~ "(?i)error|panic|fail" [5m])) / 300`,
+        datasource: LOKI,
+        unit: "ops",
+        decimals: 2,
+        x: 4,
+        y: 4,
+        w: 4,
+      }),
+      statPanel({
+        title: "Longhorn managers",
+        expr: 'sum(kube_pod_status_ready{namespace="longhorn-system",condition="true",pod=~"longhorn-manager.*"})',
+        x: 8,
+        y: 4,
+        w: 4,
+      }),
+      statPanel({
+        title: "Cluster CPU",
+        expr: `sum(rate(node_cpu_seconds_total{mode!="idle",mode!="iowait"}[${dashboardRateWindow}])) / sum(rate(node_cpu_seconds_total[${dashboardRateWindow}]))`,
+        unit: "percentunit",
+        decimals: 1,
+        x: 12,
+        y: 4,
+        w: 4,
+      }),
+      statPanel({
+        title: "Cluster memory",
+        expr: "1 - sum(node_memory_MemAvailable_bytes) / sum(node_memory_MemTotal_bytes)",
+        unit: "percentunit",
+        decimals: 1,
+        x: 16,
+        y: 4,
+        w: 4,
+      }),
+      statPanel({
+        title: "Network errors / s",
+        expr: `sum(rate(node_network_receive_errs_total${nodeNetworkFilter}[${dashboardRateWindow}])) + sum(rate(node_network_transmit_errs_total${nodeNetworkFilter}[${dashboardRateWindow}])) + sum(rate(node_network_receive_drop_total${nodeNetworkFilter}[${dashboardRateWindow}])) + sum(rate(node_network_transmit_drop_total${nodeNetworkFilter}[${dashboardRateWindow}]))`,
+        unit: "ops",
+        decimals: 2,
+        x: 20,
+        y: 4,
+        w: 4,
+        thresholds: [
+          { color: "green", value: null },
+          { color: "orange", value: 1 },
+          { color: "red", value: 5 },
+        ],
+      }),
+      timeSeriesPanel({
+        title: "Cluster resource pressure",
+        targets: [
+          {
+            expr: `sum(rate(node_cpu_seconds_total{mode!="idle",mode!="iowait"}[${dashboardRateWindow}])) / sum(rate(node_cpu_seconds_total[${dashboardRateWindow}]))`,
+            legendFormat: "CPU",
+          },
+          {
+            expr: "1 - sum(node_memory_MemAvailable_bytes) / sum(node_memory_MemTotal_bytes)",
+            legendFormat: "Memory",
+          },
+          {
+            expr: `sum(node_filesystem_size_bytes${nodeFilesystemFilter} - node_filesystem_avail_bytes${nodeFilesystemFilter}) / sum(node_filesystem_size_bytes${nodeFilesystemFilter})`,
+            legendFormat: "Filesystem",
+          },
+        ],
+        unit: "percentunit",
+        decimals: 1,
+        x: 0,
+        y: 8,
+        w: 12,
+        h: 8,
+      }),
+      timeSeriesPanel({
+        title: "Workload pressure",
+        targets: [
+          {
+            expr: 'sum(kube_pod_status_phase{phase=~"Pending|Failed|Unknown"})',
+            legendFormat: "Unhealthy pods",
+          },
+          {
+            expr: "sum(increase(kube_pod_container_status_restarts_total[1h]))",
+            legendFormat: "Restarts (1h)",
+          },
+          {
+            expr: "sum(kube_deployment_spec_replicas - kube_deployment_status_replicas_available)",
+            legendFormat: "Unavailable deployment replicas",
+          },
+        ],
+        unit: "short",
+        decimals: 0,
+        x: 12,
+        y: 8,
+        w: 12,
+        h: 8,
+      }),
+      timeSeriesPanel({
+        title: "Ingress and logs",
+        targets: [
+          {
+            expr: "sum(rate(traefik_entrypoint_requests_total[5m]))",
+            legendFormat: "Traefik requests / s",
+          },
+          {
+            expr: 'sum(rate(traefik_entrypoint_requests_total{code=~"5.."}[5m]))',
+            legendFormat: "Traefik 5xx / s",
+          },
+        ],
+        unit: "reqps",
+        decimals: 2,
+        x: 0,
+        y: 16,
+        w: 12,
+        h: 8,
+      }),
+      timeSeriesPanel({
+        title: "Storage pressure",
+        targets: [
+          {
+            expr: "count((kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) > 0.70)",
+            legendFormat: "PVCs > 70%",
+          },
+          {
+            expr: "count((kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) > 0.85)",
+            legendFormat: "PVCs > 85%",
+          },
+          {
+            expr: "count((kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) > 0.95)",
+            legendFormat: "PVCs > 95%",
+          },
+        ],
+        unit: "short",
+        decimals: 0,
+        x: 12,
+        y: 16,
+        w: 12,
+        h: 8,
+      }),
+    ],
+  });
+}
+
+function buildAppsGitOpsDashboard() {
+  return dashboard({
+    uid: "twinbox-apps-gitops",
+    title: "Twinbox Apps & GitOps",
+    description:
+      "Application and GitOps readiness from Kubernetes workload state and platform logs.",
+    tags: ["apps", "gitops", "argocd"],
+    timeFrom: "now-6h",
+    panels: [
+      statPanel({
+        title: "Argo CD ready pods",
+        expr: 'sum(kube_pod_status_ready{namespace="argocd",condition="true"})',
+        x: 0,
+        y: 0,
+      }),
+      statPanel({
+        title: "Argo CD unavailable replicas",
+        expr: 'sum(kube_deployment_spec_replicas{namespace="argocd"} - kube_deployment_status_replicas_available{namespace="argocd"})',
+        x: 6,
+        y: 0,
+        thresholds: [
+          { color: "green", value: null },
+          { color: "orange", value: 1 },
+          { color: "red", value: 2 },
+        ],
+      }),
+      statPanel({
+        title: "Unavailable deployments",
+        expr: "sum(kube_deployment_spec_replicas - kube_deployment_status_replicas_available)",
+        x: 12,
+        y: 0,
+        thresholds: [
+          { color: "green", value: null },
+          { color: "orange", value: 1 },
+          { color: "red", value: 5 },
+        ],
+      }),
+      statPanel({
+        title: "StatefulSet replicas missing",
+        expr: "sum(kube_statefulset_replicas - kube_statefulset_status_replicas_ready)",
+        x: 18,
+        y: 0,
+        thresholds: [
+          { color: "green", value: null },
+          { color: "orange", value: 1 },
+          { color: "red", value: 3 },
+        ],
+      }),
+      statPanel({
+        title: "App restarts (1h)",
+        expr: 'sum(increase(kube_pod_container_status_restarts_total{namespace!~"kube-system|monitoring|argocd"}[1h]))',
+        x: 0,
+        y: 4,
+        thresholds: [
+          { color: "green", value: null },
+          { color: "orange", value: 3 },
+          { color: "red", value: 10 },
+        ],
+      }),
+      statPanel({
+        title: "Namespaces active",
+        expr: 'count(kube_namespace_status_phase{phase="Active"})',
+        x: 6,
+        y: 4,
+      }),
+      statPanel({
+        title: "GitOps log errors / s",
+        expr: 'sum(count_over_time({cluster="twinbox", namespace="argocd"} |~ "(?i)error|fail|panic" [5m])) / 300',
+        datasource: LOKI,
+        unit: "ops",
+        decimals: 2,
+        x: 12,
+        y: 4,
+      }),
+      statPanel({
+        title: "Image updater ready",
+        expr: 'sum(kube_pod_status_ready{namespace="argocd",condition="true",pod=~"argocd-image-updater.*"})',
+        x: 18,
+        y: 4,
+      }),
+      timeSeriesPanel({
+        title: "Argo CD component readiness",
+        targets: [
+          {
+            expr: 'sum by (deployment) (kube_deployment_status_replicas_available{namespace="argocd"})',
+            legendFormat: "available {{deployment}}",
+          },
+          {
+            expr: 'sum by (deployment) (kube_deployment_spec_replicas{namespace="argocd"})',
+            legendFormat: "desired {{deployment}}",
+          },
+        ],
+        unit: "short",
+        decimals: 0,
+        x: 0,
+        y: 8,
+        w: 12,
+        h: 8,
+      }),
+      timeSeriesPanel({
+        title: "Unavailable replicas by namespace",
+        targets: [
+          {
+            expr: "sum by (namespace) (kube_deployment_spec_replicas - kube_deployment_status_replicas_available)",
+            legendFormat: "{{namespace}} deployments",
+          },
+          {
+            expr: "sum by (namespace) (kube_statefulset_replicas - kube_statefulset_status_replicas_ready)",
+            legendFormat: "{{namespace}} statefulsets",
+          },
+        ],
+        unit: "short",
+        decimals: 0,
+        x: 12,
+        y: 8,
+        w: 12,
+        h: 8,
+      }),
+      timeSeriesPanel({
+        title: "Top restarting workloads",
+        targets: [
+          {
+            expr: "topk(10, sum by (namespace, pod) (increase(kube_pod_container_status_restarts_total[1h])))",
+            legendFormat: "{{namespace}}/{{pod}}",
+          },
+        ],
+        unit: "short",
+        decimals: 0,
+        x: 0,
+        y: 16,
+        w: 12,
+        h: 8,
+      }),
+      timeSeriesPanel({
+        title: "Top app CPU",
+        targets: [
+          {
+            expr: `topk(10, sum by (namespace, pod) (rate(container_cpu_usage_seconds_total${runningContainerFilter}[${dashboardRateWindow}])))`,
+            legendFormat: "{{namespace}}/{{pod}}",
+          },
+        ],
+        unit: "cores",
+        decimals: 3,
+        x: 12,
+        y: 16,
+        w: 12,
+        h: 8,
+      }),
+      logsPanel({
+        title: "Argo CD errors",
+        expr: '{cluster="twinbox", namespace="argocd"} |~ "(?i)error|fail|panic"',
+        x: 0,
+        y: 24,
+        w: 12,
+        h: 10,
+        maxLines: 80,
+        timeFrom: "6h",
+      }),
+      logsPanel({
+        title: "Noisy app logs",
+        expr: '{cluster="twinbox", namespace!~"kube-system|monitoring|argocd"} |~ "(?i)error|warn|fail|panic"',
+        x: 12,
+        y: 24,
+        w: 12,
+        h: 10,
+        maxLines: 80,
+        timeFrom: "6h",
+      }),
+    ],
+  });
+}
+
+function buildDataProtectionDashboard() {
+  return dashboard({
+    uid: "twinbox-data-protection",
+    title: "Twinbox Data Protection",
+    description: "Storage risk, Longhorn readiness, Velero health, and database backup signals.",
+    tags: ["backup", "storage", "longhorn", "velero", "cloudnativepg"],
+    timeFrom: "now-24h",
+    panels: [
+      statPanel({
+        title: "Bound PVCs",
+        expr: 'count(kube_persistentvolumeclaim_status_phase{phase="Bound"})',
+        x: 0,
+        y: 0,
+      }),
+      statPanel({
+        title: "PVCs > 85%",
+        expr: "count((kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) > 0.85)",
+        x: 6,
+        y: 0,
+        thresholds: [
+          { color: "green", value: null },
+          { color: "orange", value: 1 },
+          { color: "red", value: 3 },
+        ],
+      }),
+      statPanel({
+        title: "PVCs > 95%",
+        expr: "count((kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) > 0.95)",
+        x: 12,
+        y: 0,
+        thresholds: [
+          { color: "green", value: null },
+          { color: "orange", value: 1 },
+          { color: "red", value: 2 },
+        ],
+      }),
+      statPanel({
+        title: "Longhorn ready pods",
+        expr: 'sum(kube_pod_status_ready{namespace="longhorn-system",condition="true"})',
+        x: 18,
+        y: 0,
+      }),
+      statPanel({
+        title: "Longhorn CSI ready",
+        expr: 'sum(kube_pod_status_ready{namespace="longhorn-system",condition="true",pod=~"longhorn-csi-plugin.*"})',
+        x: 0,
+        y: 4,
+      }),
+      statPanel({
+        title: "Velero ready pods",
+        expr: 'sum(kube_pod_status_ready{namespace="velero",condition="true"})',
+        x: 6,
+        y: 4,
+      }),
+      statPanel({
+        title: "Velero restarts (24h)",
+        expr: 'sum(increase(kube_pod_container_status_restarts_total{namespace="velero"}[24h]))',
+        x: 12,
+        y: 4,
+        thresholds: [
+          { color: "green", value: null },
+          { color: "orange", value: 1 },
+          { color: "red", value: 5 },
+        ],
+      }),
+      statPanel({
+        title: "CNPG ready pods",
+        expr: 'sum(kube_pod_status_ready{namespace="databases",condition="true"})',
+        x: 18,
+        y: 4,
+      }),
+      timeSeriesPanel({
+        title: "PVC risk by namespace",
+        targets: [
+          {
+            expr: "sum by (namespace) ((kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) > 0.70)",
+            legendFormat: "{{namespace}} > 70%",
+          },
+          {
+            expr: "sum by (namespace) ((kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) > 0.85)",
+            legendFormat: "{{namespace}} > 85%",
+          },
+          {
+            expr: "sum by (namespace) ((kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) > 0.95)",
+            legendFormat: "{{namespace}} > 95%",
+          },
+        ],
+        unit: "short",
+        decimals: 0,
+        x: 0,
+        y: 8,
+        w: 12,
+        h: 8,
+      }),
+      timeSeriesPanel({
+        title: "Top PVC usage",
+        targets: [
+          {
+            expr: "topk(10, kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes)",
+            legendFormat: "{{namespace}}/{{persistentvolumeclaim}}",
+          },
+        ],
+        unit: "percentunit",
+        decimals: 1,
+        x: 12,
+        y: 8,
+        w: 12,
+        h: 8,
+      }),
+      timeSeriesPanel({
+        title: "Longhorn control-plane readiness",
+        targets: [
+          {
+            expr: 'sum(kube_pod_status_ready{namespace="longhorn-system",condition="true",pod=~"longhorn-manager.*"})',
+            legendFormat: "manager",
+          },
+          {
+            expr: 'sum(kube_pod_status_ready{namespace="longhorn-system",condition="true",pod=~"longhorn-csi-plugin.*"})',
+            legendFormat: "csi",
+          },
+          {
+            expr: 'sum(kube_pod_status_ready{namespace="longhorn-system",condition="true",pod=~"instance-manager.*"})',
+            legendFormat: "instance manager",
+          },
+        ],
+        unit: "short",
+        decimals: 0,
+        x: 0,
+        y: 16,
+        w: 12,
+        h: 8,
+      }),
+      timeSeriesPanel({
+        title: "Backup workload restarts",
+        targets: [
+          {
+            expr: 'sum by (namespace) (increase(kube_pod_container_status_restarts_total{namespace=~"velero|databases|longhorn-system"}[24h]))',
+            legendFormat: "{{namespace}}",
+          },
+        ],
+        unit: "short",
+        decimals: 0,
+        x: 12,
+        y: 16,
+        w: 12,
+        h: 8,
+      }),
+      logsPanel({
+        title: "Backup and storage warnings",
+        expr: '{cluster="twinbox", namespace=~"velero|longhorn-system|databases"} |~ "(?i)backup|snapshot|restore|barman|wal|error|warn|fail"',
+        x: 0,
+        y: 24,
+        w: 24,
+        h: 12,
+        maxLines: 120,
+        timeFrom: "24h",
+      }),
+    ],
+  });
+}
+
 const dashboards = {
+  commandCenter: buildCommandCenterDashboard(),
+  appsGitOps: buildAppsGitOpsDashboard(),
+  dataProtection: buildDataProtectionDashboard(),
   nodes: buildNodesDashboard(),
   workloads: buildWorkloadsDashboard(),
   controlPlane: buildControlPlaneDashboard(),
