@@ -16,5 +16,5 @@ output "client_secret" {
 
 output "issuer_url" {
   description = "OIDC issuer URL for NetBird"
-  value       = "${trim(var.authentik_url, "/")}/application/o/${var.application_slug}/"
+  value       = "${trim(var.authentik_public_url, "/")}/application/o/${var.application_slug}/"
 }

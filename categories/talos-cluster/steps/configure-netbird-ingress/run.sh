@@ -20,6 +20,48 @@ fail() {
   exit 1
 }
 
+wait_for_argocd_server() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for Argo CD server"
+  for i in $(seq 1 30); do
+    ready="$(kubectl get deployment argocd-server -n argocd -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")"
+    if [[ "${ready:-0}" -gt 0 ]]; then
+      return 0
+    fi
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Argo CD server not ready yet (attempt ${i}/30)"
+    sleep 5
+  done
+  fail "Argo CD server did not become ready"
+}
+
+wait_for_netbird_routing_peer() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for NetBird routing peer deployment"
+  for i in $(seq 1 60); do
+    if kubectl -n netbird get deployment netbird-routing-peer >/dev/null 2>&1; then
+      kubectl -n netbird rollout status deployment/netbird-routing-peer --timeout=180s
+      return 0
+    fi
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird routing peer deployment not ready yet (attempt ${i}/60)"
+    sleep 5
+  done
+  fail "NetBird routing peer deployment did not appear"
+}
+
+wait_for_public_oidc_discovery() {
+  local issuer_url="$1"
+  local discovery_url="${issuer_url%/}/.well-known/openid-configuration"
+
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for public Authentik OIDC discovery through NetBird proxy"
+  for i in $(seq 1 60); do
+    if curl -fsS "$discovery_url" >/dev/null 2>&1; then
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Public Authentik OIDC discovery is reachable"
+      return 0
+    fi
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Public Authentik OIDC discovery not reachable yet (attempt ${i}/60): ${discovery_url}"
+    sleep 5
+  done
+  fail "Public Authentik OIDC discovery did not become reachable through NetBird proxy: ${discovery_url}"
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
@@ -51,6 +93,9 @@ fi
 
 [[ -n "$netbird_token" ]] || fail "NetBird API token is required. Either provide it as input or ensure the bastion step generated a setup token."
 [[ -n "$netbird_management_url" ]] || fail "Could not determine NetBird management URL"
+[[ -f "$netbird_bastion_secret" ]] || fail "NetBird bastion secret not found at $netbird_bastion_secret"
+netbird_proxy_ip="$(jq -r '.NETBIRD_IP // empty' "$netbird_bastion_secret")"
+[[ -n "$netbird_proxy_ip" ]] || fail "NetBird bastion secret does not contain NETBIRD_IP"
 
 if [[ -z "$traefik_resource_address" ]]; then
   traefik_resource_address="$(kubectl -n traefik get svc traefik -o jsonpath='{.spec.clusterIP}' 2>/dev/null || true)"
@@ -59,78 +104,64 @@ if [[ -z "$traefik_resource_address" ]]; then
   fi
 fi
 
-authentik_url="${TWINBOX_AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
+authentik_public_url="${TWINBOX_AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
+authentik_domain="${authentik_public_url#https://}"
+authentik_domain="${authentik_domain#http://}"
+authentik_domain="${authentik_domain%%/*}"
+
+if [[ -n "$proxy_services_json" && "$proxy_services_json" != "null" ]]; then
+  if ! printf '%s' "$proxy_services_json" | jq -e 'type == "array"' >/dev/null; then
+    fail "proxy_services_json must be a JSON array"
+  fi
+else
+  proxy_services_json="[]"
+fi
+proxy_services_json="$(
+  jq -cn \
+    --arg authentik_domain "$authentik_domain" \
+    --argjson extra "$proxy_services_json" \
+    '[{name: "authentik", domain: $authentik_domain, path: "/"}] + ($extra | map(select(.name != "authentik")))'
+)"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Configuring Authentik OIDC application for NetBird"
 authentik_ensure_token
+authentik_setup_forward
 export AUTHENTIK_TOKEN
+authentik_api_url="${AUTHENTIK_API_BASE%/api/v3}"
 
 auth_workdir="$MANAGER_DATA_DIR/opentofu/authentik-netbird-${cluster_id}"
 mkdir -p "$auth_workdir"
 cp -r "$WORKSPACE_ROOT/infra/opentofu/authentik-netbird/"* "$auth_workdir/"
 cd "$auth_workdir"
-tofu init -input=false
-tofu apply -auto-approve \
-  -var "authentik_url=$authentik_url" \
+tofu init -input=false -no-color
+tofu apply -auto-approve -no-color \
+  -var "authentik_api_url=$authentik_api_url" \
+  -var "authentik_public_url=$authentik_public_url" \
   -var "netbird_url=$netbird_management_url"
 
-netbird_oidc_client_id="$(tofu output -raw client_id)"
-netbird_oidc_client_secret="$(tofu output -raw client_secret)"
-netbird_oidc_issuer="$(tofu output -raw issuer_url)"
-
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Registering Authentik as NetBird identity provider"
-idp_workdir="$MANAGER_DATA_DIR/opentofu/netbird-idp-${cluster_id}"
-mkdir -p "$idp_workdir"
-cp -r "$WORKSPACE_ROOT/infra/opentofu/netbird-idp/"* "$idp_workdir/"
-cd "$idp_workdir"
-tofu init -input=false
-tofu apply -auto-approve \
-  -var "netbird_token=$netbird_token" \
-  -var "netbird_management_url=$netbird_management_url" \
-  -var "client_id=$netbird_oidc_client_id" \
-  -var "client_secret=$netbird_oidc_client_secret" \
-  -var "issuer=$netbird_oidc_issuer"
+netbird_oidc_client_id="$(tofu output -raw -no-color client_id)"
+netbird_oidc_client_secret="$(tofu output -raw -no-color client_secret)"
+netbird_oidc_issuer="$(tofu output -raw -no-color issuer_url)"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating NetBird groups, routing resources, and setup keys"
 network_workdir="$MANAGER_DATA_DIR/opentofu/netbird-network-${cluster_id}"
 mkdir -p "$network_workdir"
 cp -r "$WORKSPACE_ROOT/infra/opentofu/netbird-network/"* "$network_workdir/"
 cd "$network_workdir"
-tofu init -input=false
-tofu apply -auto-approve \
+tofu init -input=false -no-color
+tofu apply -auto-approve -no-color \
   -var "netbird_token=$netbird_token" \
   -var "netbird_management_url=$netbird_management_url" \
   -var "cluster_id=$cluster_id" \
   -var "traefik_resource_address=$traefik_resource_address"
 
-k8s_setup_key="$(tofu output -raw k8s_setup_key)"
-management_vm_setup_key="$(tofu output -raw management_vm_setup_key)"
-admins_group_id="$(tofu output -raw admins_group_id)"
-management_vm_group_id="$(tofu output -raw management_vm_group_id)"
-k8s_routers_group_id="$(tofu output -raw k8s_routers_group_id)"
-proxy_group_id="$(tofu output -raw proxy_group_id)"
-traefik_resource_id="$(tofu output -raw traefik_resource_id)"
-
-proxy_service_ids="{}"
-if [[ -n "$proxy_services_json" ]]; then
-  if ! printf '%s' "$proxy_services_json" | jq -e 'type == "array"' >/dev/null; then
-    fail "proxy_services_json must be a JSON array"
-  fi
-
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating NetBird reverse proxy services"
-  proxy_services_workdir="$MANAGER_DATA_DIR/opentofu/netbird-proxy-services-${cluster_id}"
-  mkdir -p "$proxy_services_workdir"
-  cp -r "$WORKSPACE_ROOT/infra/opentofu/netbird-proxy-services/"* "$proxy_services_workdir/"
-  cd "$proxy_services_workdir"
-  tofu init -input=false
-  tofu apply -auto-approve \
-    -var "netbird_token=$netbird_token" \
-    -var "netbird_management_url=$netbird_management_url" \
-    -var "traefik_resource_id=$traefik_resource_id" \
-    -var "traefik_resource_address=$traefik_resource_address" \
-    -var "services=$proxy_services_json"
-  proxy_service_ids="$(tofu output -json service_ids)"
-fi
+k8s_setup_key="$(tofu output -raw -no-color k8s_setup_key)"
+management_vm_setup_key="$(tofu output -raw -no-color management_vm_setup_key)"
+admins_group_id="$(tofu output -raw -no-color admins_group_id)"
+management_vm_group_id="$(tofu output -raw -no-color management_vm_group_id)"
+k8s_routers_group_id="$(tofu output -raw -no-color k8s_routers_group_id)"
+proxy_group_id="$(tofu output -raw -no-color proxy_group_id)"
+traefik_resource_id="$(tofu output -raw -no-color traefik_resource_id)"
 
 secrets_dir="/opt/twinbox/bootstrap/secrets/global"
 mkdir -p "$secrets_dir"
@@ -149,6 +180,40 @@ jq -n \
   --arg management_url "$netbird_management_url" \
   --arg cluster_id "$cluster_id" \
   '{NB_SETUP_KEY: $setup_key, NB_MANAGEMENT_URL: $management_url, CLUSTER_ID: $cluster_id}' >"$admin_secret"
+
+chmod 600 "$routing_secret" "$admin_secret"
+
+bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+  --secret-name "netbird-routing-peers" \
+  --json-file "$routing_secret" \
+  --required-keys "NB_SETUP_KEY,NB_MANAGEMENT_URL"
+
+bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+  --secret-name "netbird-admin-access" \
+  --json-file "$admin_secret" \
+  --required-keys "NB_SETUP_KEY,NB_MANAGEMENT_URL"
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploying NetBird routing peers before enabling reverse proxy"
+wait_for_argocd_server
+bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+  --manifest "$WORKSPACE_ROOT/gitops/apps/netbird-routing-peers.yaml" \
+  --application "netbird-routing-peers" \
+  --destination-namespace "argocd"
+wait_for_netbird_routing_peer
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating NetBird reverse proxy services"
+proxy_services_workdir="$MANAGER_DATA_DIR/opentofu/netbird-proxy-services-${cluster_id}"
+mkdir -p "$proxy_services_workdir"
+cp -r "$WORKSPACE_ROOT/infra/opentofu/netbird-proxy-services/"* "$proxy_services_workdir/"
+cd "$proxy_services_workdir"
+tofu init -input=false -no-color
+tofu apply -auto-approve -no-color \
+  -var "netbird_token=$netbird_token" \
+  -var "netbird_management_url=$netbird_management_url" \
+  -var "traefik_resource_id=$traefik_resource_id" \
+  -var "traefik_resource_address=$traefik_resource_address" \
+  -var "services=$proxy_services_json"
+proxy_service_ids="$(tofu output -json -no-color service_ids)"
 
 jq -n \
   --arg management_url "$netbird_management_url" \
@@ -171,18 +236,39 @@ jq -n \
     PROXY_SERVICE_IDS: $proxy_service_ids,
     CLUSTER_ID: $cluster_id
   }' >"$network_secret"
+chmod 600 "$network_secret"
 
-chmod 600 "$routing_secret" "$admin_secret" "$network_secret"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating DNS record for Authentik through NetBird proxy"
+kubectl create namespace external-dns --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f - <<EOF
+apiVersion: externaldns.k8s.io/v1alpha1
+kind: DNSEndpoint
+metadata:
+  name: netbird-authentik-dns
+  namespace: external-dns
+spec:
+  endpoints:
+    - dnsName: ${authentik_domain}
+      recordType: A
+      targets:
+        - ${netbird_proxy_ip}
+      recordTTL: 300
+EOF
 
-bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
-  --secret-name "netbird-routing-peers" \
-  --json-file "$routing_secret" \
-  --required-keys "NB_SETUP_KEY,NB_MANAGEMENT_URL"
+wait_for_public_oidc_discovery "$netbird_oidc_issuer"
 
-bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
-  --secret-name "netbird-admin-access" \
-  --json-file "$admin_secret" \
-  --required-keys "NB_SETUP_KEY,NB_MANAGEMENT_URL"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Registering Authentik as NetBird identity provider"
+idp_workdir="$MANAGER_DATA_DIR/opentofu/netbird-idp-${cluster_id}"
+mkdir -p "$idp_workdir"
+cp -r "$WORKSPACE_ROOT/infra/opentofu/netbird-idp/"* "$idp_workdir/"
+cd "$idp_workdir"
+tofu init -input=false -no-color
+tofu apply -auto-approve -no-color \
+  -var "netbird_token=$netbird_token" \
+  -var "netbird_management_url=$netbird_management_url" \
+  -var "client_id=$netbird_oidc_client_id" \
+  -var "client_secret=$netbird_oidc_client_secret" \
+  -var "issuer=$netbird_oidc_issuer"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Recording ingress strategy as netbird"
 cluster_file="$MANAGER_DATA_DIR/clusters/${cluster_id}.json"

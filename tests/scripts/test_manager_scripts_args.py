@@ -207,6 +207,18 @@ NETBIRD_BASTION_STEP_MANIFEST = (
 NETBIRD_BASTION_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "provision-netbird-bastion" / "run.sh"
 )
+NETBIRD_INGRESS_STEP_SCRIPT = (
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "configure-netbird-ingress" / "run.sh"
+)
+AUTHENTIK_NETBIRD_MODULE_VARS = (
+    REPO_ROOT / "infra" / "opentofu" / "authentik-netbird" / "variables.tf"
+)
+AUTHENTIK_NETBIRD_MODULE_PROVIDERS = (
+    REPO_ROOT / "infra" / "opentofu" / "authentik-netbird" / "providers.tf"
+)
+AUTHENTIK_NETBIRD_MODULE_OUTPUTS = (
+    REPO_ROOT / "infra" / "opentofu" / "authentik-netbird" / "outputs.tf"
+)
 ARGO_BOOTSTRAP_SCRIPT = REPO_ROOT / "gitops" / "install.sh"
 LONGHORN_APP = REPO_ROOT / "gitops" / "apps" / "longhorn.yaml"
 TRAEFIK_APP = REPO_ROOT / "gitops" / "apps" / "traefik.yaml"
@@ -1767,9 +1779,46 @@ def test_netbird_cloud_init_escapes_shell_variables_for_templatefile():
     assert "/root/bootstrap-netbird.sh" in text
     assert "ufw --force enable" in text
     assert "$${" not in text, "template should not contain $$ escapes"
-    assert '${NETBIRD_VERSION}' not in text, "bash var NETBIRD_VERSION must use $VAR not ${VAR}"
+    assert "${NETBIRD_VERSION}" not in text, "bash var NETBIRD_VERSION must use $VAR not ${VAR}"
     assert '"$NETBIRD_URL' in text or "'$NETBIRD_URL" in text
     assert "netbird-automated-setup.sh" not in text
+
+
+def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
+    text = NETBIRD_INGRESS_STEP_SCRIPT.read_text(encoding="utf-8")
+    vars_text = AUTHENTIK_NETBIRD_MODULE_VARS.read_text(encoding="utf-8")
+    providers_text = AUTHENTIK_NETBIRD_MODULE_PROVIDERS.read_text(encoding="utf-8")
+    outputs_text = AUTHENTIK_NETBIRD_MODULE_OUTPUTS.read_text(encoding="utf-8")
+
+    assert "authentik_setup_forward" in text
+    assert 'authentik_api_url="${AUTHENTIK_API_BASE%/api/v3}"' in text
+    assert '-var "authentik_api_url=$authentik_api_url"' in text
+    assert '-var "authentik_public_url=$authentik_public_url"' in text
+    assert '-var "authentik_url=$authentik_url"' not in text
+    assert "api.cloudflare.com/client/v4" not in text
+    assert "cloudflare-tunnel" not in text
+
+    assert 'variable "authentik_api_url"' in vars_text
+    assert 'variable "authentik_public_url"' in vars_text
+    assert "url = var.authentik_api_url" in providers_text
+    assert 'trim(var.authentik_public_url, "/")' in outputs_text
+
+    assert 'name: "authentik", domain: $authentik_domain, path: "/"' in text
+    assert "netbird-authentik-dns" in text
+    assert "NETBIRD_IP" in text
+    assert "wait_for_netbird_routing_peer" in text
+    assert "wait_for_public_oidc_discovery" in text
+
+    auth_setup_index = text.index("Configuring Authentik OIDC application for NetBird")
+    network_index = text.index("Creating NetBird groups, routing resources, and setup keys")
+    routing_peer_index = text.index("Deploying NetBird routing peers before enabling reverse proxy")
+    proxy_index = text.index("Creating NetBird reverse proxy services")
+    dns_index = text.index("Creating DNS record for Authentik through NetBird proxy")
+    discovery_index = text.index('wait_for_public_oidc_discovery "$netbird_oidc_issuer"')
+    idp_index = text.index("Registering Authentik as NetBird identity provider")
+
+    assert auth_setup_index < network_index < routing_peer_index < proxy_index < dns_index
+    assert dns_index < discovery_index < idp_index
 
 
 def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():

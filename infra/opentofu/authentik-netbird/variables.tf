@@ -10,8 +10,13 @@ variable "application_slug" {
   default     = "netbird"
 }
 
-variable "authentik_url" {
-  description = "Base URL of the Authentik instance"
+variable "authentik_api_url" {
+  description = "Base URL used by the Authentik provider for API calls"
+  type        = string
+}
+
+variable "authentik_public_url" {
+  description = "Public base URL of the Authentik instance used for OIDC issuer URLs"
   type        = string
 }
 
