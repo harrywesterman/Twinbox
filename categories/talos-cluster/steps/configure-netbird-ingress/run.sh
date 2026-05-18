@@ -128,6 +128,21 @@ authentik_ensure_token
 authentik_setup_forward
 export AUTHENTIK_TOKEN
 authentik_api_url="${AUTHENTIK_API_BASE%/api/v3}"
+openid_mapping_id="$(authentik_resolve_scope_mapping_id "openid")"
+email_mapping_id="$(authentik_resolve_scope_mapping_id "email")"
+profile_mapping_id="$(authentik_resolve_scope_mapping_id "profile")"
+
+[[ -n "$openid_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for openid"
+[[ -n "$email_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for email"
+[[ -n "$profile_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for profile"
+
+property_mapping_ids_json="$(
+  jq -cn \
+    --arg openid "$openid_mapping_id" \
+    --arg email "$email_mapping_id" \
+    --arg profile "$profile_mapping_id" \
+    '[$openid, $email, $profile]'
+)"
 
 auth_workdir="$MANAGER_DATA_DIR/opentofu/authentik-netbird-${cluster_id}"
 mkdir -p "$auth_workdir"
@@ -137,7 +152,8 @@ tofu init -input=false -no-color
 tofu apply -auto-approve -no-color \
   -var "authentik_api_url=$authentik_api_url" \
   -var "authentik_public_url=$authentik_public_url" \
-  -var "netbird_url=$netbird_management_url"
+  -var "netbird_url=$netbird_management_url" \
+  -var "property_mapping_ids=$property_mapping_ids_json"
 
 netbird_oidc_client_id="$(tofu output -raw -no-color client_id)"
 netbird_oidc_client_secret="$(tofu output -raw -no-color client_secret)"

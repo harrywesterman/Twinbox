@@ -213,6 +213,7 @@ NETBIRD_INGRESS_STEP_SCRIPT = (
 AUTHENTIK_NETBIRD_MODULE_VARS = (
     REPO_ROOT / "infra" / "opentofu" / "authentik-netbird" / "variables.tf"
 )
+AUTHENTIK_NETBIRD_MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "authentik-netbird" / "main.tf"
 AUTHENTIK_NETBIRD_MODULE_PROVIDERS = (
     REPO_ROOT / "infra" / "opentofu" / "authentik-netbird" / "providers.tf"
 )
@@ -1786,6 +1787,7 @@ def test_netbird_cloud_init_escapes_shell_variables_for_templatefile():
 
 def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     text = NETBIRD_INGRESS_STEP_SCRIPT.read_text(encoding="utf-8")
+    main_text = AUTHENTIK_NETBIRD_MODULE_MAIN.read_text(encoding="utf-8")
     vars_text = AUTHENTIK_NETBIRD_MODULE_VARS.read_text(encoding="utf-8")
     providers_text = AUTHENTIK_NETBIRD_MODULE_PROVIDERS.read_text(encoding="utf-8")
     outputs_text = AUTHENTIK_NETBIRD_MODULE_OUTPUTS.read_text(encoding="utf-8")
@@ -1794,12 +1796,17 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert 'authentik_api_url="${AUTHENTIK_API_BASE%/api/v3}"' in text
     assert '-var "authentik_api_url=$authentik_api_url"' in text
     assert '-var "authentik_public_url=$authentik_public_url"' in text
+    assert "authentik_resolve_scope_mapping_id" in text
+    assert '-var "property_mapping_ids=$property_mapping_ids_json"' in text
     assert '-var "authentik_url=$authentik_url"' not in text
     assert "api.cloudflare.com/client/v4" not in text
     assert "cloudflare-tunnel" not in text
 
+    assert "authentik_property_mapping_provider_scope" not in main_text
+    assert "property_mappings          = var.property_mapping_ids" in main_text
     assert 'variable "authentik_api_url"' in vars_text
     assert 'variable "authentik_public_url"' in vars_text
+    assert 'variable "property_mapping_ids"' in vars_text
     assert "url = var.authentik_api_url" in providers_text
     assert 'trim(var.authentik_public_url, "/")' in outputs_text
 

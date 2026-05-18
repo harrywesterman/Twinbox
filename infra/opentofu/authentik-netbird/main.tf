@@ -8,10 +8,6 @@ data "authentik_flow" "invalidation" {
   designation = "invalidation"
 }
 
-data "authentik_property_mapping_provider_scope" "scopes" {
-  managed_list = ["openid", "email", "profile"]
-}
-
 data "authentik_certificate_key_pair" "authentik_signing_key" {
   name = "authentik Self-signed Certificate"
 }
@@ -49,7 +45,7 @@ resource "authentik_provider_oauth2" "netbird" {
       url           = "http://localhost:53000/"
     },
   ]
-  property_mappings          = data.authentik_property_mapping_provider_scope.scopes.ids
+  property_mappings          = var.property_mapping_ids
   signing_key                = data.authentik_certificate_key_pair.authentik_signing_key.id
   include_claims_in_id_token = true
   client_type                = "confidential"

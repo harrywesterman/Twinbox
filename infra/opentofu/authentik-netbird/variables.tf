@@ -24,3 +24,8 @@ variable "netbird_url" {
   description = "Base URL of the NetBird dashboard"
   type        = string
 }
+
+variable "property_mapping_ids" {
+  description = "Authentik OAuth scope property mapping IDs for openid, email, and profile"
+  type        = list(string)
+}
