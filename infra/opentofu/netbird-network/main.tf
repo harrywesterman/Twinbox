@@ -62,9 +62,9 @@ resource "netbird_network_router" "k8s_routers" {
   enabled     = true
 }
 
-resource "netbird_policy" "admin_to_management_vm" {
-  name        = "${local.name_prefix}-admin-to-management-vm"
-  description = "Allow Twinbox admins to reach the Management VM over NetBird"
+resource "netbird_policy" "admin_to_management_vm_ssh" {
+  name        = "${local.name_prefix}-admin-to-management-vm-ssh"
+  description = "Allow Twinbox admins to reach the Management VM SSH service over NetBird"
   enabled     = true
 
   rule {
@@ -77,6 +77,12 @@ resource "netbird_policy" "admin_to_management_vm" {
     destinations  = [netbird_group.management_vm.id]
     ports         = [tostring(var.management_vm_ssh_port)]
   }
+}
+
+resource "netbird_policy" "admin_to_management_vm_web" {
+  name        = "${local.name_prefix}-admin-to-management-vm-web"
+  description = "Allow Twinbox admins to reach the Management VM web service over NetBird"
+  enabled     = true
 
   rule {
     name          = "manager-web"
@@ -88,6 +94,12 @@ resource "netbird_policy" "admin_to_management_vm" {
     destinations  = [netbird_group.management_vm.id]
     ports         = [tostring(var.management_vm_web_port)]
   }
+}
+
+resource "netbird_policy" "admin_to_management_vm_api" {
+  name        = "${local.name_prefix}-admin-to-management-vm-api"
+  description = "Allow Twinbox admins to reach the Management VM API service over NetBird"
+  enabled     = true
 
   rule {
     name          = "manager-api"
@@ -101,9 +113,9 @@ resource "netbird_policy" "admin_to_management_vm" {
   }
 }
 
-resource "netbird_policy" "proxy_to_traefik" {
-  name        = "${local.name_prefix}-proxy-to-traefik"
-  description = "Allow NetBird proxy traffic to reach internal Traefik"
+resource "netbird_policy" "proxy_to_traefik_http" {
+  name        = "${local.name_prefix}-proxy-to-traefik-http"
+  description = "Allow NetBird proxy HTTP traffic to reach internal Traefik"
   enabled     = true
 
   rule {
@@ -120,6 +132,12 @@ resource "netbird_policy" "proxy_to_traefik" {
       type = "host"
     }
   }
+}
+
+resource "netbird_policy" "proxy_to_traefik_https" {
+  name        = "${local.name_prefix}-proxy-to-traefik-https"
+  description = "Allow NetBird proxy HTTPS traffic to reach internal Traefik"
+  enabled     = true
 
   rule {
     name          = "https"

@@ -220,6 +220,7 @@ AUTHENTIK_NETBIRD_MODULE_PROVIDERS = (
 AUTHENTIK_NETBIRD_MODULE_OUTPUTS = (
     REPO_ROOT / "infra" / "opentofu" / "authentik-netbird" / "outputs.tf"
 )
+NETBIRD_NETWORK_MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "netbird-network" / "main.tf"
 ARGO_BOOTSTRAP_SCRIPT = REPO_ROOT / "gitops" / "install.sh"
 LONGHORN_APP = REPO_ROOT / "gitops" / "apps" / "longhorn.yaml"
 TRAEFIK_APP = REPO_ROOT / "gitops" / "apps" / "traefik.yaml"
@@ -1826,6 +1827,23 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
 
     assert auth_setup_index < network_index < routing_peer_index < proxy_index < dns_index
     assert dns_index < discovery_index < idp_index
+
+
+def test_netbird_network_policies_use_single_rule_per_policy():
+    text = NETBIRD_NETWORK_MODULE_MAIN.read_text(encoding="utf-8")
+
+    policy_blocks = re.findall(
+        r'resource\s+"netbird_policy"\s+"([^"]+)"\s+\{(.*?)(?=\nresource\s+"netbird_policy"|\Z)',
+        text,
+        flags=re.DOTALL,
+    )
+
+    assert policy_blocks
+    assert "admin_to_management_vm" not in {name for name, _ in policy_blocks}
+    assert "proxy_to_traefik" not in {name for name, _ in policy_blocks}
+
+    for name, body in policy_blocks:
+        assert body.count("\n  rule {") == 1, name
 
 
 def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
