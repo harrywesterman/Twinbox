@@ -14,7 +14,6 @@ OpenTofu modules for provisioning external infrastructure components used by Twi
 | `authentik-netbird/` | Authentik + Random | NetBird OIDC application/client in Authentik |
 | `authentik-vaultwarden/` | Authentik | Proxy provider for Vaultwarden in Authentik |
 | `cloudflare/` | Cloudflare | DNS records (wiredoor + wildcard A records) |
-| `cloudflare-netbird/` | Cloudflare | DNS records for NetBird and NetBird proxy domains |
 | `netbird/` | Hetzner Cloud | Self-hosted NetBird VPS with dashboard, server, Traefik, and proxy |
 | `netbird-idp/` | NetBird | Authentik identity provider registration in NetBird |
 | `netbird-network/` | NetBird | Twinbox groups, setup keys, network resource, router, and policies |

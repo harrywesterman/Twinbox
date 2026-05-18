@@ -4,37 +4,69 @@ set -euo pipefail
 : "${STEP_INPUTS_JSON:?missing STEP_INPUTS_JSON}"
 : "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"
 : "${MANAGER_DATA_DIR:?missing MANAGER_DATA_DIR}"
+: "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
 # shellcheck disable=SC1091
 source "$WORKSPACE_ROOT/config/pinned-defaults.sh"
 
+export KUBECONFIG="$KUBECONFIG_FILE"
+
 fail() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
   exit 1
 }
 
+read_first_admin_email() {
+  local cluster_scope="$1"
+  local state_file
+  local email
+  local candidate_paths=(
+    "$MANAGER_DATA_DIR/step-state/clusters/${cluster_scope}/create-users-and-groups.json"
+    "$MANAGER_DATA_DIR/step-state/clusters/${cluster_id}/create-users-and-groups.json"
+    "$MANAGER_DATA_DIR/step-state/global/create-users-and-groups.json"
+  )
+
+  for state_file in "${candidate_paths[@]}"; do
+    [[ -f "$state_file" ]] || continue
+    email="$(jq -r '.inputs.email // .outputs.email // empty' "$state_file")"
+    if [[ -n "$email" ]]; then
+      printf '%s\n' "$email"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
+cluster_scope_id="$(printf '%s' "$cluster_json" | jq -r '.cluster_instance_id // .instance_id // .id // empty')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
 cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty')"
-public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "${cluster_dns_domain:-}")"
+public_zone_name="$(printf '%s' "$cluster_json" | jq -r '.public_zone_name // empty')"
+if [[ -z "$public_zone_name" && -n "$cluster_dns_domain" ]]; then
+  public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
+fi
 
 [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
 
 hcloud_token="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.hcloud_token')"
 hcloud_location="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.hcloud_location // "fsn1"')"
 hcloud_server_type="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.hcloud_server_type // "cax11"')"
-zone_name="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.zone_name')"
-netbird_admin_email="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.netbird_admin_email')"
+netbird_admin_email="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.netbird_admin_email // empty')"
 ssh_public_key="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.ssh_public_key // ""')"
-cloudflare_api_token="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.cloudflare_api_token // empty')"
+
+if [[ -z "$netbird_admin_email" ]]; then
+  netbird_admin_email="$(read_first_admin_email "$cluster_scope_id" || true)"
+fi
 
 [[ -n "$hcloud_token" ]] || fail "Hetzner API token is required"
-[[ -n "$zone_name" ]] || fail "Domain name is required"
-[[ -n "$netbird_admin_email" ]] || fail "Let's Encrypt email is required"
-[[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
+[[ -n "$netbird_admin_email" ]] || fail "First admin email is required. Please run Create Users and Groups before provisioning NetBird."
+[[ -n "$cluster_dns_domain" ]] || fail "DNS domain not found. Please run Configure DNS Provider before provisioning NetBird."
+[[ -n "$public_zone_name" ]] || fail "Could not determine public zone name from the configured DNS provider"
+command -v kubectl >/dev/null 2>&1 || fail "kubectl is required to create NetBird DNS records through external-dns"
 
 netbird_fqdn="netbird.${public_zone_name}"
 netbird_proxy_domain="proxy.${public_zone_name}"
@@ -84,40 +116,26 @@ tofu apply -auto-approve \
 server_ipv4="$(tofu output -raw server_ipv4)"
 netbird_url="$(tofu output -raw netbird_url)"
 
-if [[ -n "$cloudflare_api_token" ]]; then
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating NetBird DNS records in Cloudflare"
-  zone_response="$(curl -sS -X GET "https://api.cloudflare.com/client/v4/zones?name=$zone_name" \
-    -H "Authorization: Bearer $cloudflare_api_token" \
-    -H "Content-Type: application/json")"
-  [[ "$(printf '%s' "$zone_response" | jq -r '.success')" == "true" ]] || fail "Failed to fetch Cloudflare zone"
-  cloudflare_zone_id="$(printf '%s' "$zone_response" | jq -r '.result[0].id // empty')"
-  [[ -n "$cloudflare_zone_id" ]] || fail "Cloudflare zone not found for $zone_name"
-
-  relative_public_zone="${public_zone_name%.$zone_name}"
-  if [[ "$relative_public_zone" == "$public_zone_name" ]]; then
-    netbird_record_name="netbird"
-    proxy_record_name="proxy"
-  elif [[ -n "$relative_public_zone" ]]; then
-    netbird_record_name="netbird.${relative_public_zone}"
-    proxy_record_name="proxy.${relative_public_zone}"
-  else
-    netbird_record_name="netbird"
-    proxy_record_name="proxy"
-  fi
-
-  dns_workdir="$MANAGER_DATA_DIR/opentofu/cloudflare-netbird-${cluster_id}"
-  mkdir -p "$dns_workdir"
-  cp -r "$WORKSPACE_ROOT/infra/opentofu/cloudflare-netbird/"* "$dns_workdir/"
-  cd "$dns_workdir"
-  tofu init -input=false
-  tofu apply -auto-approve \
-    -var "cloudflare_api_token=$cloudflare_api_token" \
-    -var "cloudflare_zone_id=$cloudflare_zone_id" \
-    -var "zone_name=$zone_name" \
-    -var "netbird_record_name=$netbird_record_name" \
-    -var "proxy_record_name=$proxy_record_name" \
-    -var "target_ipv4=$server_ipv4"
-fi
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating NetBird DNS records through external-dns"
+kubectl apply -f - <<EOF
+apiVersion: externaldns.k8s.io/v1alpha1
+kind: DNSEndpoint
+metadata:
+  name: netbird-bastion-dns
+  namespace: external-dns
+spec:
+  endpoints:
+    - dnsName: ${netbird_fqdn}
+      recordType: A
+      targets:
+        - ${server_ipv4}
+      recordTTL: 300
+    - dnsName: ${netbird_proxy_domain}
+      recordType: A
+      targets:
+        - ${server_ipv4}
+      recordTTL: 300
+EOF
 
 secrets_dir="/opt/twinbox/bootstrap/secrets/global"
 mkdir -p "$secrets_dir"

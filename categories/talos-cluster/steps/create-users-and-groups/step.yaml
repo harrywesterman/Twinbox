@@ -19,8 +19,8 @@ inputs:
   - id: email
     label: Email address
     type: string
-    required: false
-    help: Optional email address for account recovery and profile completeness.
+    required: true
+    help: Email address for account recovery, NetBird setup, and Let's Encrypt certificate notices.
 secrets:
   files:
     KUBECONFIG_FILE:

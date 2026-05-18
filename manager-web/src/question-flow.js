@@ -334,6 +334,39 @@ const QUESTION_STEP_DEFS = [
     ],
   },
   {
+    id: "create-users-and-groups",
+    title: "Create Users and Groups",
+    type: "action",
+    journey_stage: "setup",
+    summary: "Create the first Authentik user and admin group.",
+    explanation: "This page collects the first account details Twinbox will use for Authentik.",
+    side_help:
+      "Use this page to create the account you will use to sign in to Authentik and the protected applications later. Twinbox also uses this email for NetBird setup and Let's Encrypt certificate notices.",
+    inputs: [
+      {
+        id: "full_name",
+        label: "Full name",
+        type: "string",
+        required: true,
+        help: "Display name for the first Authentik user.",
+      },
+      {
+        id: "username",
+        label: "Login name",
+        type: "string",
+        required: true,
+        help: "Authentik username for the first user.",
+      },
+      {
+        id: "email",
+        label: "Email address",
+        type: "string",
+        required: true,
+        help: "Email address for account recovery, NetBird setup, and Let's Encrypt certificate notices.",
+      },
+    ],
+  },
+  {
     id: "provision-netbird-bastion",
     title: "Deploy NetBird Bastion Host",
     type: "action",
@@ -343,7 +376,7 @@ const QUESTION_STEP_DEFS = [
     explanation:
       "This step provisions a Hetzner Cloud VM running self-hosted NetBird with the combined NetBird server, dashboard, built-in Traefik, and NetBird Reverse Proxy.",
     side_help:
-      "You need a Hetzner Cloud API token. If you also provide Cloudflare credentials, Twinbox creates netbird and proxy DNS records pointing at the new VPS.",
+      "You need a Hetzner Cloud API token. Twinbox uses the DNS provider configured earlier to create netbird and proxy DNS records pointing at the new VPS.",
     inputs: [
       {
         id: "hcloud_token",
@@ -367,34 +400,6 @@ const QUESTION_STEP_DEFS = [
         required: false,
         default: "cax11",
         help: "Server size: cax11 (ARM64, 2vCPU/4GB), cx22 (x86, 2vCPU/4GB)",
-      },
-      {
-        id: "zone_name",
-        label: "Domain Name",
-        type: "string",
-        required: true,
-        help: "Root DNS zone name, e.g. example.com",
-      },
-      {
-        id: "netbird_admin_email",
-        label: "Let's Encrypt Email",
-        type: "string",
-        required: true,
-        help: "Email address used for NetBird/Traefik Let's Encrypt certificates",
-      },
-      {
-        id: "ssh_public_key",
-        label: "SSH Public Key",
-        type: "string",
-        required: false,
-        help: "Optional: Your SSH public key for direct server access",
-      },
-      {
-        id: "cloudflare_api_token",
-        label: "Cloudflare API Token",
-        type: "string",
-        required: false,
-        help: "Optional Cloudflare token for netbird/proxy DNS records",
       },
     ],
   },
@@ -556,39 +561,6 @@ const QUESTION_STEP_DEFS = [
         type: "string",
         required: false,
         help: "API key for your self-hosted Headscale instance.",
-      },
-    ],
-  },
-  {
-    id: "create-users-and-groups",
-    title: "Create Users and Groups",
-    type: "action",
-    journey_stage: "setup",
-    summary: "Create the first Authentik user and admin group.",
-    explanation: "This page collects the first account details Twinbox will use for Authentik.",
-    side_help:
-      "Use this page to create the account you will use to sign in to Authentik and the protected applications later.",
-    inputs: [
-      {
-        id: "full_name",
-        label: "Full name",
-        type: "string",
-        required: true,
-        help: "Display name for the first Authentik user.",
-      },
-      {
-        id: "username",
-        label: "Login name",
-        type: "string",
-        required: true,
-        help: "Authentik username for the first user.",
-      },
-      {
-        id: "email",
-        label: "Email address",
-        type: "string",
-        required: false,
-        help: "Optional email address for account recovery and profile completeness.",
       },
     ],
   },

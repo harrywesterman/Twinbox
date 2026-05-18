@@ -170,6 +170,7 @@ function isAllowedIngressRoute(route, currentClusterOrSlug) {
 
   return (
     normalizedRoute === "wiredoor" ||
+    normalizedRoute === "netbird" ||
     normalizedRoute === "metallb" ||
     normalizedRoute === "tailscale"
   );

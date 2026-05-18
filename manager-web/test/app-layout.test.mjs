@@ -433,6 +433,34 @@ test("styles define a wizard-first, responsive installer layout", async () => {
   assert.match(css, /@media \(max-width:\s*720px\)/, "expected mobile responsiveness");
 });
 
+test("NetBird bastion question flow uses external-dns values from the earlier DNS step", async () => {
+  const { getQuestionSteps } = await import(questionFlowPath.href);
+  const steps = getQuestionSteps({
+    "choose-ingress-route": {
+      ingress_route: "netbird",
+    },
+  });
+  const netbirdBastion = steps.find((step) => step.id === "provision-netbird-bastion");
+  const createUsers = steps.find((step) => step.id === "create-users-and-groups");
+
+  assert.ok(createUsers, "expected the shared account step in the question flow");
+  assert.ok(netbirdBastion, "expected the NetBird bastion step in the NetBird route");
+  assert.ok(
+    steps.findIndex((step) => step.id === "create-users-and-groups") <
+      steps.findIndex((step) => step.id === "provision-netbird-bastion"),
+    "expected the shared account step before the NetBird bastion questions"
+  );
+  assert.deepEqual(
+    netbirdBastion.inputs.map((input) => input.id),
+    ["hcloud_token", "hcloud_location", "hcloud_server_type"]
+  );
+  assert.match(netbirdBastion.side_help, /DNS provider configured earlier/);
+  assert.doesNotMatch(netbirdBastion.side_help, /Cloudflare credentials/);
+
+  assert.equal(createUsers.inputs.find((input) => input.id === "email")?.required, true);
+  assert.match(createUsers.side_help, /NetBird setup/);
+});
+
 test("vite and document metadata still support relative hosting", async () => {
   const viteConfig = await readFile(viteConfigPath, "utf8");
   const indexHtml = await readFile(indexHtmlPath, "utf8");

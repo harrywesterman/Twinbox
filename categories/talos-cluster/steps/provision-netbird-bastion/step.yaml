@@ -9,8 +9,8 @@ explanation: >
   The VPS becomes the public frontend for NetBird and for proxying selected
   Twinbox services back to the Kubernetes cluster through NetBird routing peers.
 side_help: >
-  You need a Hetzner Cloud API token. If you also provide Cloudflare credentials,
-  Twinbox creates netbird and proxy DNS records pointing at the new VPS.
+  You need a Hetzner Cloud API token. Twinbox uses the DNS provider configured
+  earlier to create netbird and proxy DNS records pointing at the new VPS.
   Twinbox automatically sets up the first NetBird admin account and generates
   a Personal Access Token for the next step.
 ingress_route: netbird
@@ -32,26 +32,13 @@ inputs:
     required: false
     default: cax11
     help: "Server size: cax11 (ARM64, 2vCPU/4GB), cx22 (x86, 2vCPU/4GB)"
-  - id: zone_name
-    label: Domain Name
-    type: string
-    required: true
-    help: Root DNS zone name, e.g. example.com
-  - id: netbird_admin_email
-    label: Let's Encrypt Email
-    type: string
-    required: true
-    help: Email address used for NetBird/Traefik Let's Encrypt certificates
-  - id: ssh_public_key
-    label: SSH Public Key
-    type: string
-    required: false
-    help: "Optional: Your SSH public key for direct server access"
-  - id: cloudflare_api_token
-    label: Cloudflare API Token
-    type: string
-    required: false
-    help: Optional Cloudflare token for netbird/proxy DNS records
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
 runner:
   kind: script
   script: categories/talos-cluster/steps/provision-netbird-bastion/run.sh

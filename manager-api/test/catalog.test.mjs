@@ -115,6 +115,57 @@ test("catalog falls back to the VM slug before a persisted cluster exists", () =
   }
 });
 
+test("catalog exposes NetBird bastion without duplicate DNS, SSH, or Cloudflare inputs", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "twinbox-catalog-"));
+  const dirs = {
+    stepState: path.join(tempRoot, "step-state"),
+    jobs: path.join(tempRoot, "jobs"),
+    clusters: path.join(tempRoot, "clusters"),
+    queue: path.join(tempRoot, "queue"),
+  };
+
+  for (const dir of Object.values(dirs)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(
+    path.join(dirs.clusters, "cluster.json"),
+    JSON.stringify({
+      id: "cluster",
+      slug: "tst",
+      dns_domain: "example.com",
+      selected_ingress_route: "netbird",
+      status: "bootstrapped",
+      updated_at: "2026-05-18T10:00:00Z",
+    })
+  );
+
+  try {
+    const catalog = buildCatalogResponse({
+      workspaceRoot: process.cwd(),
+      dirs,
+      clusterId: "cluster",
+    });
+
+    const talosCategory = catalog.categories.find((category) => category.id === "talos-cluster");
+    const netbirdBastion = talosCategory?.steps.find(
+      (step) => step.id === "provision-netbird-bastion"
+    );
+    const createUsers = talosCategory?.steps.find((step) => step.id === "create-users-and-groups");
+
+    assert.ok(netbirdBastion, "expected provision-netbird-bastion in the catalog");
+    assert.deepEqual(
+      netbirdBastion.inputs.map((input) => input.id),
+      ["hcloud_token", "hcloud_location", "hcloud_server_type"]
+    );
+    assert.equal(netbirdBastion.secrets.files.KUBECONFIG_FILE.attachment, "kubeconfig");
+    assert.match(netbirdBastion.side_help, /DNS provider configured earlier/);
+    assert.doesNotMatch(netbirdBastion.side_help, /Cloudflare credentials/);
+    assert.equal(createUsers.inputs.find((input) => input.id === "email")?.required, true);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test("app catalog exposes apps while the wizard catalog keeps them out of sight", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "twinbox-app-catalog-"));
   const dirs = {

@@ -201,6 +201,12 @@ WIREDOOR_BASTION_STEP_MANIFEST = (
     / "provision-wiredoor-bastion"
     / "step.yaml"
 )
+NETBIRD_BASTION_STEP_MANIFEST = (
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "provision-netbird-bastion" / "step.yaml"
+)
+NETBIRD_BASTION_STEP_SCRIPT = (
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "provision-netbird-bastion" / "run.sh"
+)
 ARGO_BOOTSTRAP_SCRIPT = REPO_ROOT / "gitops" / "install.sh"
 LONGHORN_APP = REPO_ROOT / "gitops" / "apps" / "longhorn.yaml"
 TRAEFIK_APP = REPO_ROOT / "gitops" / "apps" / "traefik.yaml"
@@ -776,6 +782,13 @@ def test_user_apps_are_not_part_of_bootstrap_journey():
         assert f"'{step_id}'" not in setup_step_ids
         assert f"- id: {step_id}" not in category_text
 
+    assert setup_step_ids.index('"install-authentik-idp"') < setup_step_ids.index(
+        '"create-users-and-groups"'
+    )
+    assert setup_step_ids.index('"create-users-and-groups"') < setup_step_ids.index(
+        '"provision-netbird-bastion"'
+    )
+
 
 def test_crowdsec_step_seeds_bouncer_secret_and_applies_gitops_app():
     step_text = _crowdsec_step_text()
@@ -1324,6 +1337,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     prometheus_text = PROMETHEUS_STEP_MANIFEST.read_text(encoding="utf-8")
     wiredoor_text = WIREDOOR_GATEWAY_STEP_MANIFEST.read_text(encoding="utf-8")
     wiredoor_bastion_text = WIREDOOR_BASTION_STEP_MANIFEST.read_text(encoding="utf-8")
+    netbird_bastion_text = NETBIRD_BASTION_STEP_MANIFEST.read_text(encoding="utf-8")
 
     assert "install-flannel" not in argocd_text
 
@@ -1359,6 +1373,19 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "script: categories/talos-cluster/steps/install-wiredoor-gateway/run.sh" in wiredoor_text
 
     assert "ingress_route: wiredoor" in wiredoor_bastion_text
+
+    assert "ingress_route: netbird" in netbird_bastion_text
+    assert "zone_name" not in netbird_bastion_text
+    assert "ssh_public_key" not in netbird_bastion_text
+    assert "cloudflare_api_token" not in netbird_bastion_text
+    assert "netbird_admin_email" not in netbird_bastion_text
+    assert "Cloudflare credentials" not in netbird_bastion_text
+    assert "KUBECONFIG_FILE:" in netbird_bastion_text
+    assert "item: kubeconfig" in netbird_bastion_text
+    create_users_text = CREATE_USERS_STEP_MANIFEST.read_text(encoding="utf-8")
+    assert "id: email" in create_users_text
+    assert "required: true" in create_users_text
+    assert "NetBird setup" in create_users_text
 
     assert "cluster_dns_domain" in authentik_run_text
     assert "public_zone_name" in authentik_run_text
@@ -1669,6 +1696,31 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "Creating DNSEndpoint resources" in cloudflare_dns_run_text
     assert "wiredoor-dns" in cloudflare_dns_run_text
     assert "external-dns" in cloudflare_dns_run_text
+
+    netbird_bastion_run_text = NETBIRD_BASTION_STEP_SCRIPT.read_text(encoding="utf-8")
+    assert "cluster-public-zone.sh" in netbird_bastion_run_text
+    assert "twinbox_public_zone_name" in netbird_bastion_run_text
+    assert (
+        "DNS domain not found. Please run Configure DNS Provider before provisioning NetBird."
+        in (netbird_bastion_run_text)
+    )
+    assert "Creating NetBird DNS records through external-dns" in netbird_bastion_run_text
+    assert "kind: DNSEndpoint" in netbird_bastion_run_text
+    assert "netbird-bastion-dns" in netbird_bastion_run_text
+    assert "dnsName: ${netbird_fqdn}" in netbird_bastion_run_text
+    assert "dnsName: ${netbird_proxy_domain}" in netbird_bastion_run_text
+    assert "external-dns" in netbird_bastion_run_text
+    assert "read_first_admin_email()" in netbird_bastion_run_text
+    assert "create-users-and-groups.json" in netbird_bastion_run_text
+    assert (
+        "First admin email is required. Please run Create Users and Groups before provisioning NetBird."
+        in (netbird_bastion_run_text)
+    )
+    assert "ssh-keygen -t ed25519" in netbird_bastion_run_text
+    assert "NETBIRD_SETUP_TOKEN" in netbird_bastion_run_text
+    assert "cloudflare-netbird" not in netbird_bastion_run_text
+    assert "api.cloudflare.com/client/v4/zones" not in netbird_bastion_run_text
+    assert "cloudflare_api_token" not in netbird_bastion_run_text
 
     assert "script: categories/talos-cluster/steps/install-headlamp/run.sh" in headlamp_text
 
