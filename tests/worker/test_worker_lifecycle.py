@@ -1592,6 +1592,107 @@ def test_worker_includes_recent_script_output_in_failed_run_step_error():
             proc.wait(timeout=5)
 
 
+def test_worker_strips_ansi_sequences_from_run_step_logs_and_errors():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        data = root / "data"
+        workspace = root / "workspace"
+        bin_dir = root / "bin"
+
+        for d in [
+            data / "queue" / "pending",
+            data / "jobs",
+            data / "logs",
+            data / "clusters",
+            data / "step-state",
+            workspace / "categories" / "talos-cluster" / "steps" / "choose-ingress-route",
+            bin_dir,
+        ]:
+            d.mkdir(parents=True, exist_ok=True)
+
+        _prepare_fake_toolchain(bin_dir)
+        _write_pinned_defaults(workspace)
+
+        script = (
+            workspace / "categories" / "talos-cluster" / "steps" / "choose-ingress-route" / "run.sh"
+        )
+        script.write_text(
+            "#!/bin/bash\n"
+            "set -euo pipefail\n"
+            "printf '\\033[31mred tofu error\\033[0m\\n' >&2\n"
+            "exit 7\n"
+        )
+        script.chmod(0o755)
+
+        job = {
+            "id": "job_failed_step_ansi",
+            "type": "run_step",
+            "cluster_id": None,
+            "status": "pending",
+            "step": "queued",
+            "payload": {
+                "step_id": "choose-ingress-route",
+                "step_type": "config",
+                "inputs": {"enabled": True},
+                "runner": {
+                    "kind": "script",
+                    "script": "categories/talos-cluster/steps/choose-ingress-route/run.sh",
+                },
+                "context": {},
+            },
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "started_at": None,
+            "finished_at": None,
+            "result": None,
+            "error": None,
+        }
+        (data / "jobs" / "job_failed_step_ansi.json").write_text(json.dumps(job))
+        (data / "queue" / "pending" / "job_failed_step_ansi.json").write_text(
+            json.dumps(
+                {
+                    "id": "job_failed_step_ansi",
+                    "type": "run_step",
+                    "cluster_id": None,
+                    "payload": job["payload"],
+                    "queued_at": "2026-01-01T00:00:00Z",
+                }
+            )
+        )
+
+        env = os.environ.copy()
+        env["MANAGER_DATA_DIR"] = str(data)
+        env["WORKSPACE_ROOT"] = str(workspace)
+        env["WORKER_POLL_MS"] = "100"
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+
+        proc = subprocess.Popen(
+            ["node", "manager-worker/src/worker.js"],
+            cwd=Path(__file__).resolve().parents[2],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        try:
+            _wait_until(
+                lambda: (data / "queue" / "completed" / "job_failed_step_ansi.json").exists()
+            )
+
+            updated_job = json.loads((data / "jobs" / "job_failed_step_ansi.json").read_text())
+            assert updated_job["status"] == "failed"
+            assert updated_job["error"] == "command exited with code 7: red tofu error"
+            assert "\x1b" not in updated_job["error"]
+
+            log_text = (data / "logs" / "job_failed_step_ansi.log").read_text()
+            assert "red tofu error" in log_text
+            assert "\x1b" not in log_text
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
 def test_worker_cancels_running_run_step_job_when_job_status_changes():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)

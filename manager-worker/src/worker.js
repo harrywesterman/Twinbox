@@ -48,9 +48,17 @@ function appendLog(jobId, message) {
   fs.appendFileSync(path.join(dirs.logs, `${jobId}.log`), `[${now()}] ${message}\n`);
 }
 
+function stripAnsiSequences(value) {
+  return String(value || "").replace(
+    // eslint-disable-next-line no-control-regex
+    /[\u001b\u009b][[\]()#;?]*(?:(?:(?:[a-zA-Z\d]*(?:;[a-zA-Z\d]*)*)?\u0007)|(?:(?:\d{1,4}(?:;\d{0,4})*)?[\dA-PR-TZcf-nq-uy=><~]))/g,
+    ""
+  );
+}
+
 function summarizeFailureOutput(lines, fallbackMessage) {
   const cleaned = (lines || [])
-    .map((line) => String(line || "").trim())
+    .map((line) => stripAnsiSequences(line).trim())
     .filter(Boolean)
     .filter((line) => !line.startsWith("exec: "))
     .filter((line) => !line.startsWith("running job type="))
@@ -527,7 +535,7 @@ function runCommand(
     const recordChunk = (chunk) => {
       const text = chunk.toString();
       for (const line of text.split(/\r?\n/)) {
-        const trimmed = line.trimEnd();
+        const trimmed = stripAnsiSequences(line).trimEnd();
         if (!trimmed) continue;
         const redacted = redactLine(trimmed);
         recentOutput.push(redacted);
