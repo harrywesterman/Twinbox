@@ -67,6 +67,8 @@ fi
 [[ -n "$cluster_dns_domain" ]] || fail "DNS domain not found. Please run Configure DNS Provider before provisioning NetBird."
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name from the configured DNS provider"
 command -v kubectl >/dev/null 2>&1 || fail "kubectl is required to create NetBird DNS records through external-dns"
+command -v ssh >/dev/null 2>&1 || fail "ssh is required to fetch the NetBird setup token. Refresh the manager-worker image so OpenSSH client tools are available."
+command -v ssh-keygen >/dev/null 2>&1 || fail "ssh-keygen is required to create the NetBird bootstrap key. Refresh the manager-worker image so OpenSSH client tools are available."
 
 netbird_fqdn="netbird.${public_zone_name}"
 netbird_proxy_domain="proxy.${public_zone_name}"

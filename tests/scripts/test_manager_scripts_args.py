@@ -1083,7 +1083,10 @@ def test_manager_worker_image_includes_talos_image_factory_helper():
     assert "../../lib/catalog-definitions.mjs" in refresh_portal_text
     assert "../../manager-api/src/lib/catalog-definitions.mjs" not in refresh_dashy_text
     assert "../../manager-api/src/lib/catalog-definitions.mjs" not in refresh_portal_text
-    assert "apk add --no-cache bash ca-certificates curl jq openssl python3 tar xz sudo" in text
+    assert (
+        "apk add --no-cache bash ca-certificates curl jq openssh-client openssl python3 tar xz sudo"
+        in text
+    )
     assert "COPY scripts/get-talos-image-factory.sh ./scripts/get-talos-image-factory.sh" in text
     assert "RUN chmod +x ./scripts/get-talos-image-factory.sh" in text
 
@@ -1714,6 +1717,9 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "dnsName: ${netbird_fqdn}" in netbird_bastion_run_text
     assert "dnsName: ${netbird_proxy_domain}" in netbird_bastion_run_text
     assert "external-dns" in netbird_bastion_run_text
+    assert "command -v ssh >/dev/null" in netbird_bastion_run_text
+    assert "command -v ssh-keygen >/dev/null" in netbird_bastion_run_text
+    assert "OpenSSH client tools are available" in netbird_bastion_run_text
     assert "read_first_admin_email()" in netbird_bastion_run_text
     assert "create-users-and-groups.json" in netbird_bastion_run_text
     assert (
