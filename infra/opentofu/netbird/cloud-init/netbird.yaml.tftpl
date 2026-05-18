@@ -18,10 +18,10 @@ write_files:
       set -euo pipefail
 
       export DEBIAN_FRONTEND=noninteractive
-      NETBIRD_DOMAIN="${netbird_fqdn}"
-      ADMIN_EMAIL="${netbird_admin_email}"
-      NETBIRD_VERSION="${netbird_version}"
-      PROXY_DOMAIN="${netbird_proxy_domain}"
+      export NETBIRD_DOMAIN="${netbird_fqdn}"
+      export ADMIN_EMAIL="${netbird_admin_email}"
+      export NETBIRD_VERSION="${netbird_version}"
+      export PROXY_DOMAIN="${netbird_proxy_domain}"
 
       if ! command -v docker >/dev/null 2>&1; then
         curl -fsSL https://get.docker.com | sh
