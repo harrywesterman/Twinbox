@@ -435,6 +435,8 @@ test("styles define a wizard-first, responsive installer layout", async () => {
 
 test("NetBird bastion question flow uses external-dns values from the earlier DNS step", async () => {
   const { getQuestionSteps } = await import(questionFlowPath.href);
+  const baseSteps = getQuestionSteps();
+  const chooseIngress = baseSteps.find((step) => step.id === "choose-ingress-route");
   const steps = getQuestionSteps({
     "choose-ingress-route": {
       ingress_route: "netbird",
@@ -443,6 +445,10 @@ test("NetBird bastion question flow uses external-dns values from the earlier DN
   const netbirdBastion = steps.find((step) => step.id === "provision-netbird-bastion");
   const createUsers = steps.find((step) => step.id === "create-users-and-groups");
 
+  assert.deepEqual(chooseIngress.inputs.find((input) => input.id === "ingress_route")?.options, [
+    { label: "Cloudflare", value: "cloudflare-tunnel" },
+    { label: "NetBird", value: "netbird" },
+  ]);
   assert.ok(createUsers, "expected the shared account step in the question flow");
   assert.ok(netbirdBastion, "expected the NetBird bastion step in the NetBird route");
   assert.ok(

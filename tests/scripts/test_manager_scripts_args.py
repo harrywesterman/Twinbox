@@ -1344,15 +1344,19 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "title: Install Traefik" in traefik_text
 
     assert "type: config" in choose_ingress_text
-    assert "value: wiredoor" in choose_ingress_text
-    assert "value: metallb" in choose_ingress_text
+    assert "label: Cloudflare" in choose_ingress_text
+    assert "value: cloudflare-tunnel" in choose_ingress_text
+    assert "label: NetBird" in choose_ingress_text
+    assert "value: netbird" in choose_ingress_text
+    assert "value: wiredoor" not in choose_ingress_text
+    assert "value: metallb" not in choose_ingress_text
+    assert "value: tailscale" not in choose_ingress_text
     assert "dns_domain" not in choose_ingress_text
     assert "DNS Domain" not in choose_ingress_text
-    assert "Cloudflare Tunnel is shown only for prd clusters" in choose_ingress_text
-    assert "Non-prd clusters keep the slug-prefixed hostname model" in choose_ingress_text
+    assert "Cloudflare is shown only for prd clusters" in choose_ingress_text
+    assert "Non-prd clusters use NetBird" in choose_ingress_text
     assert (
-        "Cloudflare Tunnel is available only for prd clusters on Cloudflare Free."
-        in choose_ingress_text
+        "Cloudflare is available only for prd clusters on Cloudflare Free." in choose_ingress_text
     )
 
     choose_ingress_run_text = CHOOSE_INGRESS_ROUTE_RUN_SCRIPT.read_text(encoding="utf-8")

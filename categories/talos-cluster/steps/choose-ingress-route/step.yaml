@@ -2,26 +2,20 @@ id: choose-ingress-route
 title: Choose Ingress Route
 type: config
 journey_stage: setup
-summary: Choose which ingress branch Twinbox should expose for this cluster.
+summary: Choose whether Twinbox should expose this cluster through Cloudflare or NetBird.
 explanation: This step records the ingress strategy you want to use. It does not change the apps themselves, only which branch of ingress-specific infrastructure the wizard shows next.
-side_help: Pick one ingress route. Cloudflare Tunnel is shown only for prd clusters. The DNS domain was already configured in the previous step. Non-prd clusters keep the slug-prefixed hostname model, so tst with example.com becomes tst.example.com. prd uses hostnames directly under the base domain, such as authentik.example.com.
+side_help: Pick one ingress route. Cloudflare is shown only for prd clusters. The DNS domain was already configured in the previous step. Non-prd clusters use NetBird and keep the slug-prefixed hostname model, so tst with example.com becomes tst.example.com. prd uses hostnames directly under the base domain, such as authentik.example.com.
 inputs:
   - id: ingress_route
     label: Ingress Route
     type: string
     required: true
-    help: Choose the ingress branch you want Twinbox to configure. Cloudflare Tunnel is available only for prd clusters on Cloudflare Free.
+    help: Choose the ingress branch you want Twinbox to configure. Cloudflare is available only for prd clusters on Cloudflare Free.
     options:
-      - label: Wiredoor
-        value: wiredoor
+      - label: Cloudflare
+        value: cloudflare-tunnel
       - label: NetBird
         value: netbird
-      - label: Cloudflare Tunnel
-        value: cloudflare-tunnel
-      - label: MetalLB
-        value: metallb
-      - label: Tailscale
-        value: tailscale
 runner:
   kind: script
   script: categories/talos-cluster/steps/choose-ingress-route/run.sh

@@ -191,24 +191,21 @@ const QUESTION_STEP_DEFS = [
     title: "Choose Ingress Route",
     type: "config",
     journey_stage: "setup",
-    summary: "Choose which ingress branch Twinbox should expose for this cluster.",
+    summary: "Choose whether Twinbox should expose this cluster through Cloudflare or NetBird.",
     explanation:
       "This page records the ingress strategy you want to use. The DNS domain was already configured in the previous step.",
     side_help:
-      "Pick one ingress route. Cloudflare Tunnel is shown only for prd clusters. Non-prd clusters keep the slug-prefixed hostname model, so tst with example.com becomes tst.example.com. prd uses hostnames directly under the base domain, such as authentik.example.com.",
+      "Pick one ingress route. Cloudflare is shown only for prd clusters. Non-prd clusters use NetBird and keep the slug-prefixed hostname model, so tst with example.com becomes tst.example.com. prd uses hostnames directly under the base domain, such as authentik.example.com.",
     inputs: [
       {
         id: "ingress_route",
         label: "Ingress Route",
         type: "string",
         required: true,
-        help: "Choose the ingress branch you want Twinbox to configure.",
+        help: "Choose the ingress branch you want Twinbox to configure. Cloudflare is available only for prd clusters on Cloudflare Free.",
         options: [
-          { label: "Wiredoor", value: "wiredoor" },
+          { label: "Cloudflare", value: "cloudflare-tunnel" },
           { label: "NetBird", value: "netbird" },
-          { label: "Cloudflare Tunnel", value: "cloudflare-tunnel" },
-          { label: "MetalLB", value: "metallb" },
-          { label: "Tailscale", value: "tailscale" },
         ],
       },
     ],

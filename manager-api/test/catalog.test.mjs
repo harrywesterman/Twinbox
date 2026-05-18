@@ -55,7 +55,7 @@ test("catalog prefers the persisted cluster identity over the VM slug when a clu
       chooseIngress.inputs
         .find((input) => input.id === "ingress_route")
         ?.options.map((option) => option.value),
-      ["wiredoor", "netbird", "metallb", "tailscale"]
+      ["netbird"]
     );
     assert.equal(provisionNodes.inputs.find((input) => input.id === "name")?.default, "cluster");
   } finally {
@@ -102,7 +102,7 @@ test("catalog falls back to the VM slug before a persisted cluster exists", () =
       chooseIngress.inputs
         .find((input) => input.id === "ingress_route")
         ?.options.map((option) => option.value),
-      ["wiredoor", "netbird", "cloudflare-tunnel", "metallb", "tailscale"]
+      ["cloudflare-tunnel", "netbird"]
     );
     assert.equal(provisionNodes.inputs.find((input) => input.id === "name")?.default, "prd");
   } finally {

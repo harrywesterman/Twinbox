@@ -252,11 +252,8 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 option["value"]
                 for option in talos_steps["choose-ingress-route"]["inputs"][0]["options"]
             ] == [
-                "wiredoor",
-                "netbird",
                 "cloudflare-tunnel",
-                "metallb",
-                "tailscale",
+                "netbird",
             ]
             assert talos_steps["install-grafana"]["icon"] == "📈"
         finally:
@@ -458,10 +455,7 @@ def test_catalog_endpoint_shows_cloudflare_only_for_prd_clusters():
                 step for step in talos["steps"] if step["id"] == "choose-ingress-route"
             )
             assert [option["value"] for option in choose_step["inputs"][0]["options"]] == [
-                "wiredoor",
                 "netbird",
-                "metallb",
-                "tailscale",
             ]
             assert "configure-cloudflare-tunnel" not in [step["id"] for step in talos["steps"]]
 
@@ -472,11 +466,8 @@ def test_catalog_endpoint_shows_cloudflare_only_for_prd_clusters():
                 step for step in talos["steps"] if step["id"] == "choose-ingress-route"
             )
             assert [option["value"] for option in choose_step["inputs"][0]["options"]] == [
-                "wiredoor",
-                "netbird",
                 "cloudflare-tunnel",
-                "metallb",
-                "tailscale",
+                "netbird",
             ]
             assert "configure-cloudflare-tunnel" in [step["id"] for step in talos["steps"]]
 
@@ -487,10 +478,7 @@ def test_catalog_endpoint_shows_cloudflare_only_for_prd_clusters():
                 step for step in talos["steps"] if step["id"] == "choose-ingress-route"
             )
             assert [option["value"] for option in choose_step["inputs"][0]["options"]] == [
-                "wiredoor",
                 "netbird",
-                "metallb",
-                "tailscale",
             ]
             assert "configure-cloudflare-tunnel" not in [step["id"] for step in talos["steps"]]
         finally:
