@@ -64,7 +64,7 @@ write_files:
       fi
 
       if [[ -f /opt/netbird/docker-compose.yml ]]; then
-        sed -i "s|netbirdio/netbird:latest|netbirdio/netbird:${NETBIRD_VERSION}|g" /opt/netbird/docker-compose.yml 2>/dev/null || true
+        sed -i "s|netbirdio/netbird:latest|netbirdio/netbird:$NETBIRD_VERSION|g" /opt/netbird/docker-compose.yml 2>/dev/null || true
 
         python3 <<'PY'
       import yaml

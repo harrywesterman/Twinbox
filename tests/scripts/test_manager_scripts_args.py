@@ -1767,6 +1767,7 @@ def test_netbird_cloud_init_escapes_shell_variables_for_templatefile():
     assert "/root/bootstrap-netbird.sh" in text
     assert "ufw --force enable" in text
     assert "$${" not in text, "template should not contain $$ escapes"
+    assert '${NETBIRD_VERSION}' not in text, "bash var NETBIRD_VERSION must use $VAR not ${VAR}"
     assert '"$NETBIRD_URL' in text or "'$NETBIRD_URL" in text
     assert "netbird-automated-setup.sh" not in text
 
