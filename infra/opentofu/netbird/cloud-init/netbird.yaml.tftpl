@@ -40,6 +40,7 @@ write_files:
 
       if [[ ! -f docker-compose.yml ]]; then
         python3 <<'PY'
+      import os
       from pathlib import Path
 
       path = Path("/opt/netbird/getting-started.sh")
@@ -50,7 +51,7 @@ write_files:
           "# Twinbox non-interactive defaults.\n"
           "configure_reverse_proxy() {\n"
           '  REVERSE_PROXY_TYPE="0"\n'
-          '  TRAEFIK_ACME_EMAIL="'"$ADMIN_EMAIL"'"\n'
+          '  TRAEFIK_ACME_EMAIL="' + os.environ['ADMIN_EMAIL'] + '"\n'
           '  ENABLE_PROXY="true"\n'
           '  ENABLE_CROWDSEC="false"\n'
           "  return 0\n"
@@ -86,12 +87,13 @@ write_files:
 
       if [[ -f proxy.env ]]; then
         python3 <<'PY'
+      import os
       from pathlib import Path
 
       path = Path("/opt/netbird/proxy.env")
       lines = path.read_text().splitlines()
       updates = {
-          "NB_PROXY_DOMAIN": "'"$PROXY_DOMAIN"'",
+          "NB_PROXY_DOMAIN": "'" + os.environ['PROXY_DOMAIN'] + "'",
           "NB_PROXY_ACME_CERTIFICATES": "true",
           "NB_PROXY_ACME_CHALLENGE_TYPE": "tls-alpn-01",
           "NB_PROXY_CERTIFICATE_DIRECTORY": "/certs",
