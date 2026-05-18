@@ -62,6 +62,15 @@ wait_for_public_oidc_discovery() {
   fail "Public Authentik OIDC discovery did not become reachable through NetBird proxy: ${discovery_url}"
 }
 
+netbird_host_resource_address() {
+  local address="$1"
+  if [[ "$address" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+    printf '%s/32' "$address"
+    return
+  fi
+  printf '%s' "$address"
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
@@ -103,6 +112,7 @@ if [[ -z "$traefik_resource_address" ]]; then
     traefik_resource_address="traefik.traefik.svc.cluster.local"
   fi
 fi
+traefik_network_resource_address="$(netbird_host_resource_address "$traefik_resource_address")"
 
 authentik_public_url="${TWINBOX_AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
 authentik_domain="${authentik_public_url#https://}"
@@ -169,7 +179,7 @@ tofu apply -auto-approve -no-color \
   -var "netbird_token=$netbird_token" \
   -var "netbird_management_url=$netbird_management_url" \
   -var "cluster_id=$cluster_id" \
-  -var "traefik_resource_address=$traefik_resource_address"
+  -var "traefik_resource_address=$traefik_network_resource_address"
 
 k8s_setup_key="$(tofu output -raw -no-color k8s_setup_key)"
 management_vm_setup_key="$(tofu output -raw -no-color management_vm_setup_key)"
@@ -234,6 +244,7 @@ proxy_service_ids="$(tofu output -json -no-color service_ids)"
 jq -n \
   --arg management_url "$netbird_management_url" \
   --arg traefik_address "$traefik_resource_address" \
+  --arg traefik_network_resource_address "$traefik_network_resource_address" \
   --arg traefik_resource_id "$traefik_resource_id" \
   --arg admins_group_id "$admins_group_id" \
   --arg management_vm_group_id "$management_vm_group_id" \
@@ -244,6 +255,7 @@ jq -n \
   '{
     NETBIRD_MANAGEMENT_URL: $management_url,
     TRAEFIK_RESOURCE_ADDRESS: $traefik_address,
+    TRAEFIK_NETWORK_RESOURCE_ADDRESS: $traefik_network_resource_address,
     TRAEFIK_RESOURCE_ID: $traefik_resource_id,
     ADMINS_GROUP_ID: $admins_group_id,
     MANAGEMENT_VM_GROUP_ID: $management_vm_group_id,
@@ -300,6 +312,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     --arg ingress_strategy "netbird" \
     --arg netbird_management_url "$netbird_management_url" \
     --arg traefik_resource_address "$traefik_resource_address" \
+    --arg traefik_network_resource_address "$traefik_network_resource_address" \
     --arg traefik_resource_id "$traefik_resource_id" \
     --arg cluster_id "$cluster_id" \
     '{
@@ -308,6 +321,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
         ingress_strategy: $ingress_strategy,
         netbird_management_url: $netbird_management_url,
         traefik_resource_address: $traefik_resource_address,
+        traefik_network_resource_address: $traefik_network_resource_address,
         traefik_resource_id: $traefik_resource_id,
         cluster_id: $cluster_id
       }

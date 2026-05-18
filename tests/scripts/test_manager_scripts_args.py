@@ -1797,6 +1797,14 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert 'authentik_api_url="${AUTHENTIK_API_BASE%/api/v3}"' in text
     assert '-var "authentik_api_url=$authentik_api_url"' in text
     assert '-var "authentik_public_url=$authentik_public_url"' in text
+    assert "netbird_host_resource_address()" in text
+    assert (
+        'traefik_network_resource_address="$(netbird_host_resource_address "$traefik_resource_address")"'
+        in text
+    )
+    assert '-var "traefik_resource_address=$traefik_network_resource_address"' in text
+    assert '-var "traefik_resource_address=$traefik_resource_address"' in text
+    assert "TRAEFIK_NETWORK_RESOURCE_ADDRESS" in text
     assert "authentik_resolve_scope_mapping_id" in text
     assert '-var "property_mapping_ids=$property_mapping_ids_json"' in text
     assert '-var "authentik_url=$authentik_url"' not in text
