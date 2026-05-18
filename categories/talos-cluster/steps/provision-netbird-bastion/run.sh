@@ -189,6 +189,20 @@ if [[ -n "$ssh_private_key" ]]; then
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
+# Wait for cloud-init to finish (apt may still be running)
+echo "Waiting for apt to be available..."
+for i in $(seq 1 60); do
+  if ! fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/cache/apt/archives/lock >/dev/null 2>&1 && \
+     ! fuser /var/lib/dpkg/lock >/dev/null 2>&1; then
+    echo "apt is free."
+    break
+  fi
+  if [[ $i -eq 60 ]]; then
+    echo "WARNING: apt did not become free in time, proceeding anyway."
+  fi
+  sleep 5
+done
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "Installing Docker..."
   curl -fsSL https://get.docker.com | sh
