@@ -137,7 +137,7 @@ test('cluster builder preserves explicit control-plane CPU overrides', () => {
     vm_size_map: {
       'cp-1': {
         cpu: 4,
-        memory_mb: 4096,
+        memory_mb: 3072,
         disk_gb: 10,
       },
       'worker-1': {

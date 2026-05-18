@@ -992,7 +992,7 @@ apply_educated_defaults() {
   management_ip="$(guess_free_management_ip "${detected_host:-}" || true)"
 
   MGT_ID="${next_vmid:-100}"
-  MGT_RAM="4096"
+  MGT_RAM="3072"
   MGT_CORES="2"
   MGT_CPU_TYPE="host"
   MGT_DISK="40"
@@ -1064,7 +1064,7 @@ EOF
 
   set_cluster_naming_defaults
   MGT_ID="${next_vmid:-100}"
-  MGT_RAM="4096"
+  MGT_RAM="3072"
   MGT_CORES="2"
   MGT_CPU_TYPE="host"
   MGT_DISK="40"

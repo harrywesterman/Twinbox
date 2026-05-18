@@ -185,7 +185,7 @@ function buildDefaultVmSizeMap(controlplaneCount, workerCount, cpuCores, workerM
   for (let index = 1; index <= Math.max(1, Number(controlplaneCount) || 0); index += 1) {
     vmSizeMap[`cp-${index}`] = {
       cpu: CONTROLPLANE_CPU_CORES,
-      memory_mb: 4096,
+      memory_mb: 3072,
       disk_gb: 10,
     };
   }
@@ -528,7 +528,7 @@ export function buildClusterFromRequest(
       cpu_cores: parsedCpu.value,
       memory_mb: parsedMemory.value,
       worker_disk_percent: parsedWorkerDiskPercent.value,
-      controlplane_memory_mb: 4096,
+      controlplane_memory_mb: 3072,
       controlplane_disk_gb: 10,
       worker_memory_mb: parsedMemory.value,
       worker_disk_gb: parsedVmSizeMap.value["worker-1"]?.disk_gb ?? 100,

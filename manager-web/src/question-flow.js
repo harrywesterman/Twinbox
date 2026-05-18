@@ -83,7 +83,7 @@ const QUESTION_STEP_DEFS = [
         min: 512,
         max: 1048576,
         default: 10240,
-        help: "Worker memory allocation. Control planes stay fixed at 4096 MB, while workers default to 10240 MB unless you change the slider.",
+        help: "Worker memory allocation. Control planes stay fixed at 3072 MB, while workers default to 10240 MB unless you change the slider.",
       },
       {
         id: "bridge",

@@ -546,7 +546,7 @@ def test_execute_step_persists_state_and_enqueues_run_step_job():
                     "vm_size_map": {
                         "cp-1": {
                             "cpu": 2,
-                            "memory_mb": 4096,
+                            "memory_mb": 3072,
                             "disk_gb": 10,
                         },
                         "worker-1": {
