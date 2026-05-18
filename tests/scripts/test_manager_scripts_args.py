@@ -1762,12 +1762,12 @@ def test_netbird_cloud_init_escapes_shell_variables_for_templatefile():
     assert "package_update: true" in text
     assert "  - python3-yaml" in text
     assert "  - ufw" in text
+    assert "write_files" in text
+    assert "bootstrap-netbird.sh" in text
+    assert "/root/bootstrap-netbird.sh" in text
     assert "ufw --force enable" in text
-    assert "curl -fsSL https://get.docker.com | sh" in text
-    assert "systemctl enable docker" in text
-    assert "systemctl start docker" in text
-    assert "write_files" not in text
-    assert "bootstrap-netbird.sh" not in text
+    assert "$${" not in text, "template should not contain $$ escapes"
+    assert '"$NETBIRD_URL' in text or "'$NETBIRD_URL" in text
     assert "netbird-automated-setup.sh" not in text
 
 

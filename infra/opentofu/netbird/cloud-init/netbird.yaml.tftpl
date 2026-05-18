@@ -10,12 +10,156 @@ packages:
   - python3-yaml
   - ufw
 
+write_files:
+  - path: /root/bootstrap-netbird.sh
+    permissions: "0700"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      export DEBIAN_FRONTEND=noninteractive
+      NETBIRD_DOMAIN="${netbird_fqdn}"
+      ADMIN_EMAIL="${netbird_admin_email}"
+      NETBIRD_VERSION="${netbird_version}"
+      PROXY_DOMAIN="${netbird_proxy_domain}"
+
+      if ! command -v docker >/dev/null 2>&1; then
+        curl -fsSL https://get.docker.com | sh
+      fi
+
+      systemctl enable docker
+      systemctl start docker
+
+      install -d -m 0755 /opt/netbird
+      cd /opt/netbird
+
+      if [[ ! -f getting-started.sh ]]; then
+        curl -fsSL https://github.com/netbirdio/netbird/releases/latest/download/getting-started.sh -o getting-started.sh
+        chmod 0755 getting-started.sh
+      fi
+
+      if [[ ! -f docker-compose.yml ]]; then
+        python3 <<'PY'
+      from pathlib import Path
+
+      path = Path("/opt/netbird/getting-started.sh")
+      script = path.read_text()
+      marker = "\ninit_environment\n"
+      overrides = (
+          "\n"
+          "# Twinbox non-interactive defaults.\n"
+          "configure_reverse_proxy() {\n"
+          '  REVERSE_PROXY_TYPE="0"\n'
+          '  TRAEFIK_ACME_EMAIL="'"$ADMIN_EMAIL"'"\n'
+          '  ENABLE_PROXY="true"\n'
+          '  ENABLE_CROWDSEC="false"\n'
+          "  return 0\n"
+          "}\n"
+      )
+      if marker in script and "Twinbox non-interactive defaults" not in script:
+          script = script.replace(marker, overrides + marker, 1)
+          path.write_text(script)
+      PY
+        ./getting-started.sh
+      fi
+
+      if [[ -f /opt/netbird/docker-compose.yml ]]; then
+        sed -i "s|netbirdio/netbird:latest|netbirdio/netbird:${NETBIRD_VERSION}|g" /opt/netbird/docker-compose.yml 2>/dev/null || true
+
+        python3 <<'PY'
+      import yaml
+      from pathlib import Path
+
+      path = Path("/opt/netbird/docker-compose.yml")
+      compose = yaml.safe_load(path.read_text())
+      services = compose.get("services", {})
+      if "netbird-server" in services:
+          env = services["netbird-server"].setdefault("environment", [])
+          if isinstance(env, list):
+              if not any("NB_SETUP_PAT_ENABLED" in e for e in env):
+                  env.append("NB_SETUP_PAT_ENABLED=true")
+          elif isinstance(env, dict):
+              env.setdefault("NB_SETUP_PAT_ENABLED", "true")
+          path.write_text(yaml.dump(compose, default_flow_style=False, sort_keys=False))
+      PY
+      fi
+
+      if [[ -f proxy.env ]]; then
+        python3 <<'PY'
+      from pathlib import Path
+
+      path = Path("/opt/netbird/proxy.env")
+      lines = path.read_text().splitlines()
+      updates = {
+          "NB_PROXY_DOMAIN": "'"$PROXY_DOMAIN"'",
+          "NB_PROXY_ACME_CERTIFICATES": "true",
+          "NB_PROXY_ACME_CHALLENGE_TYPE": "tls-alpn-01",
+          "NB_PROXY_CERTIFICATE_DIRECTORY": "/certs",
+      }
+      seen = set()
+      out = []
+      for line in lines:
+          if "=" in line and not line.lstrip().startswith("#"):
+              key = line.split("=", 1)[0].strip()
+              if key in updates:
+                  out.append(f"{key}={updates[key]}")
+                  seen.add(key)
+                  continue
+          out.append(line)
+      for key, value in updates.items():
+          if key not in seen:
+              out.append(f"{key}={value}")
+      path.write_text("\n".join(out) + "\n")
+      PY
+      fi
+
+      docker compose pull || true
+      docker compose up -d
+
+      NETBIRD_URL="https://$NETBIRD_DOMAIN"
+      SETUP_RESULT="/opt/netbird/setup-result.json"
+
+      echo "Waiting for NetBird server to become ready..."
+      for i in $(seq 1 120); do
+        if curl -fsS -o /dev/null "$NETBIRD_URL/oauth2/.well-known/openid-configuration" 2>/dev/null; then
+          echo "NetBird server is ready."
+          break
+        fi
+        if [[ $i -eq 120 ]]; then
+          echo "ERROR: NetBird server did not become ready in time." >&2
+          exit 1
+        fi
+        echo -n "."
+        sleep 5
+      done
+      echo
+
+      ADMIN_PASSWORD="$(openssl rand -base64 32 | sed 's/=//g')"
+      echo "Calling NetBird automated setup API..."
+      SETUP_RESPONSE="$(curl -fsS -X POST "$NETBIRD_URL/api/setup" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "email": "'"$ADMIN_EMAIL"'",
+          "name": "Twinbox Admin",
+          "password": "'"$ADMIN_PASSWORD"'",
+          "create_pat": true,
+          "pat_expire_in": 7
+        }')"
+
+      echo "$SETUP_RESPONSE" > "$SETUP_RESULT"
+      chmod 600 "$SETUP_RESULT"
+
+      if ! echo "$SETUP_RESPONSE" | jq -e '.personal_access_token' >/dev/null 2>&1; then
+        echo "ERROR: Setup did not return a personal access token." >&2
+        echo "$SETUP_RESPONSE" >&2
+        exit 1
+      fi
+      echo "NetBird automated setup completed successfully."
+
 runcmd:
   - ufw allow 22/tcp
   - ufw allow 80/tcp
   - ufw allow 443/tcp
   - ufw allow 3478/udp
   - ufw --force enable
-  - curl -fsSL https://get.docker.com | sh
-  - systemctl enable docker
-  - systemctl start docker
+  - /root/bootstrap-netbird.sh
