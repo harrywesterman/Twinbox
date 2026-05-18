@@ -266,17 +266,22 @@ jq -n \
   }' >"$network_secret"
 chmod 600 "$network_secret"
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating DNS record for Authentik through NetBird proxy"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating wildcard DNS record for NetBird proxy"
 kubectl create namespace external-dns --dry-run=client -o yaml | kubectl apply -f -
+
+# Remove stale tunnel wildcard if transitioning from Cloudflare Tunnel
+kubectl delete dnsendpoint cloudflare-tunnel-dns -n external-dns --ignore-not-found 2>/dev/null || true
+
+# Create wildcard A record pointing all subdomains to the NetBird proxy
 kubectl apply -f - <<EOF
 apiVersion: externaldns.k8s.io/v1alpha1
 kind: DNSEndpoint
 metadata:
-  name: netbird-authentik-dns
+  name: netbird-wildcard-dns
   namespace: external-dns
 spec:
   endpoints:
-    - dnsName: ${authentik_domain}
+    - dnsName: "*.${public_zone_name}"
       recordType: A
       targets:
         - ${netbird_proxy_ip}
