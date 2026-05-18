@@ -1758,15 +1758,17 @@ def test_netbird_cloud_init_escapes_shell_variables_for_templatefile():
         REPO_ROOT / "infra" / "opentofu" / "netbird" / "cloud-init" / "netbird.yaml.tftpl"
     ).read_text(encoding="utf-8")
 
+    assert "#cloud-config" in text
+    assert "package_update: true" in text
     assert "  - python3-yaml" in text
-    assert "$${NETBIRD_URL}" in text
-    assert "$${NETBIRD_ADMIN_EMAIL}" in text
-    assert "$${ADMIN_PASSWORD}" in text
-    assert '"${NETBIRD_URL}' not in text
-    assert '"${NETBIRD_ADMIN_EMAIL}' not in text
-    assert '"${ADMIN_PASSWORD}' not in text
-    assert "\n# Twinbox non-interactive defaults.\n" not in text
-    assert "\nconfigure_reverse_proxy() {\n" not in text
+    assert "  - ufw" in text
+    assert "ufw --force enable" in text
+    assert "curl -fsSL https://get.docker.com | sh" in text
+    assert "systemctl enable docker" in text
+    assert "systemctl start docker" in text
+    assert "write_files" not in text
+    assert "bootstrap-netbird.sh" not in text
+    assert "netbird-automated-setup.sh" not in text
 
 
 def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():

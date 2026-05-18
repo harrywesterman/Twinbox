@@ -166,26 +166,172 @@ if [[ -n "$ssh_private_key" ]]; then
 fi
 chmod 600 "$secret_file"
 
-# Wait for automated setup to complete and fetch the token
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for NetBird automated setup to complete..."
-setup_result_json=""
-for i in $(seq 1 60); do
-  if [[ -n "$ssh_private_key" ]]; then
-    setup_result_json="$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -i "$ssh_key_dir/id_ed25519" root@"$server_ipv4" 'cat /opt/netbird/setup-result.json 2>/dev/null || echo "{}"' 2>/dev/null || echo "{}")"
-  fi
-  if echo "$setup_result_json" | jq -e '.personal_access_token' >/dev/null 2>&1; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird automated setup completed."
+# Bootstrap NetBird on VPS via SSH (only when we have the private key)
+if [[ -n "$ssh_private_key" ]]; then
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for SSH on $server_ipv4..."
+  ssh_connected=false
+  for i in $(seq 1 30); do
+    if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -i "$ssh_key_dir/id_ed25519" root@"$server_ipv4" 'uptime' 2>/dev/null; then
+      ssh_connected=true
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] SSH connection established."
+      break
+    fi
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for SSH (attempt ${i}/30)..."
+    sleep 10
+  done
+
+  if [[ "$ssh_connected" == "true" ]]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Bootstrapping NetBird on VPS via SSH..."
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 \
+      -i "$ssh_key_dir/id_ed25519" root@"$server_ipv4" \
+      "NETBIRD_FQDN='$netbird_fqdn' NETBIRD_ADMIN_EMAIL='$netbird_admin_email' NETBIRD_VERSION='${PINNED_NETBIRD_VERSION:-0.70.5}' NETBIRD_PROXY_DOMAIN='$netbird_proxy_domain' bash -s" <<'REMOTE_BOOTSTRAP'
+#!/usr/bin/env bash
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Installing Docker..."
+  curl -fsSL https://get.docker.com | sh
+fi
+systemctl enable docker
+systemctl start docker
+
+install -d -m 0755 /opt/netbird
+cd /opt/netbird
+
+# Download getting-started.sh if needed
+if [[ ! -f getting-started.sh ]]; then
+  curl -fsSL https://github.com/netbirdio/netbird/releases/latest/download/getting-started.sh -o getting-started.sh
+  chmod 0755 getting-started.sh
+fi
+
+# Patch for non-interactive mode
+python3 <<'PY'
+from pathlib import Path
+path = Path("/opt/netbird/getting-started.sh")
+script = path.read_text()
+marker = "\ninit_environment\n"
+overrides = (
+    "\n"
+    "# Twinbox non-interactive defaults.\n"
+    "configure_reverse_proxy() {\n"
+    '  REVERSE_PROXY_TYPE="0"\n'
+    '  TRAEFIK_ACME_EMAIL="'"$NETBIRD_ADMIN_EMAIL"'"\n'
+    '  ENABLE_PROXY="true"\n'
+    '  ENABLE_CROWDSEC="false"\n'
+    "  return 0\n"
+    "}\n"
+)
+if marker in script and "Twinbox non-interactive defaults" not in script:
+    script = script.replace(marker, overrides + marker, 1)
+    path.write_text(script)
+PY
+
+./getting-started.sh
+
+# Pin NetBird version
+sed -i "s|netbirdio/netbird:latest|netbirdio/netbird:${NETBIRD_VERSION}|g" /opt/netbird/docker-compose.yml 2>/dev/null || true
+
+# Enable PAT creation at setup
+python3 <<'PY'
+import yaml
+from pathlib import Path
+path = Path("/opt/netbird/docker-compose.yml")
+compose = yaml.safe_load(path.read_text())
+services = compose.get("services", {})
+if "netbird-server" in services:
+    env = services["netbird-server"].setdefault("environment", [])
+    if isinstance(env, list):
+        if not any("NB_SETUP_PAT_ENABLED" in e for e in env):
+            env.append("NB_SETUP_PAT_ENABLED=true")
+    elif isinstance(env, dict):
+        env.setdefault("NB_SETUP_PAT_ENABLED", "true")
+    path.write_text(yaml.dump(compose, default_flow_style=False, sort_keys=False))
+PY
+
+# Configure proxy domain
+if [[ -f proxy.env ]]; then
+  python3 <<'PY'
+from pathlib import Path
+path = Path("/opt/netbird/proxy.env")
+lines = path.read_text().splitlines()
+updates = {
+    "NB_PROXY_DOMAIN": "'"$NETBIRD_PROXY_DOMAIN"'",
+    "NB_PROXY_ACME_CERTIFICATES": "true",
+    "NB_PROXY_ACME_CHALLENGE_TYPE": "tls-alpn-01",
+    "NB_PROXY_CERTIFICATE_DIRECTORY": "/certs",
+}
+seen = set()
+out = []
+for line in lines:
+    if "=" in line and not line.lstrip().startswith("#"):
+        key = line.split("=", 1)[0].strip()
+        if key in updates:
+            out.append(f"{key}={updates[key]}")
+            seen.add(key)
+            continue
+    out.append(line)
+for key, value in updates.items():
+    if key not in seen:
+        out.append(f"{key}={value}")
+path.write_text("\n".join(out) + "\n")
+PY
+fi
+
+# Pull images and start containers
+docker compose pull || true
+docker compose up -d
+
+echo "Waiting for NetBird server to become ready..."
+for i in $(seq 1 120); do
+  if curl -fsS -o /dev/null "https://${NETBIRD_FQDN}/oauth2/.well-known/openid-configuration" 2>/dev/null; then
+    echo "NetBird server is ready."
     break
   fi
-  if [[ $i -eq 60 ]]; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: NetBird automated setup did not complete in time. You may need to create a Personal Access Token manually." >&2
+  if [[ $i -eq 120 ]]; then
+    echo "ERROR: NetBird server did not become ready in time." >&2
+    exit 1
   fi
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for NetBird setup (attempt ${i}/60)..."
-  sleep 10
+  echo -n "."
+  sleep 5
 done
+echo
 
-if echo "$setup_result_json" | jq -e '.personal_access_token' >/dev/null 2>&1; then
-  netbird_setup_token="$(echo "$setup_result_json" | jq -r '.personal_access_token')"
+ADMIN_PASSWORD="$(openssl rand -base64 32 | sed 's/=//g')"
+echo "Calling NetBird automated setup API..."
+SETUP_RESPONSE="$(curl -fsS -X POST "https://${NETBIRD_FQDN}/api/setup" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "'"${NETBIRD_ADMIN_EMAIL}"'",
+    "name": "Twinbox Admin",
+    "password": "'"${ADMIN_PASSWORD}"'",
+    "create_pat": true,
+    "pat_expire_in": 7
+  }')"
+
+echo "$SETUP_RESPONSE" > /opt/netbird/setup-result.json
+chmod 600 /opt/netbird/setup-result.json
+
+if ! echo "$SETUP_RESPONSE" | jq -e '.personal_access_token' >/dev/null 2>&1; then
+  echo "ERROR: Setup did not return a personal access token." >&2
+  echo "$SETUP_RESPONSE" >&2
+  exit 1
+fi
+echo "NetBird automated setup completed successfully."
+echo "TOKEN_EXTRACTED"
+REMOTE_BOOTSTRAP
+
+  # Read back the setup token
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird bootstrap completed on VPS."
+  setup_token_result="$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -i "$ssh_key_dir/id_ed25519" root@"$server_ipv4" 'cat /opt/netbird/setup-result.json 2>/dev/null || echo "{}"')"
+else
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: Could not establish SSH connection to $server_ipv4. NetBird bootstrap skipped." >&2
+  setup_token_result="{}"
+fi
+fi
+
+if echo "$setup_token_result" | jq -e '.personal_access_token' >/dev/null 2>&1; then
+  netbird_setup_token="$(echo "$setup_token_result" | jq -r '.personal_access_token')"
   tmp_file="$(mktemp)"
   jq --arg token "$netbird_setup_token" '. + {NETBIRD_SETUP_TOKEN: $token}' "$secret_file" >"$tmp_file"
   mv "$tmp_file" "$secret_file"
