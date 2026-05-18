@@ -221,6 +221,10 @@ AUTHENTIK_NETBIRD_MODULE_OUTPUTS = (
     REPO_ROOT / "infra" / "opentofu" / "authentik-netbird" / "outputs.tf"
 )
 NETBIRD_NETWORK_MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "netbird-network" / "main.tf"
+NETBIRD_ROUTING_PEER_DEPLOYMENT = (
+    REPO_ROOT / "gitops" / "platform-apps" / "netbird-routing-peers" / "deployment.yaml"
+)
+PINNED_DEFAULTS = REPO_ROOT / "config" / "pinned-defaults.sh"
 ARGO_BOOTSTRAP_SCRIPT = REPO_ROOT / "gitops" / "install.sh"
 LONGHORN_APP = REPO_ROOT / "gitops" / "apps" / "longhorn.yaml"
 TRAEFIK_APP = REPO_ROOT / "gitops" / "apps" / "traefik.yaml"
@@ -1852,6 +1856,16 @@ def test_netbird_network_policies_use_single_rule_per_policy():
 
     for name, body in policy_blocks:
         assert body.count("\n  rule {") == 1, name
+
+
+def test_netbird_routing_peer_uses_pinned_image_tag():
+    deployment_text = NETBIRD_ROUTING_PEER_DEPLOYMENT.read_text(encoding="utf-8")
+    pinned_defaults_text = PINNED_DEFAULTS.read_text(encoding="utf-8")
+    pinned_match = re.search(r"^PINNED_NETBIRD_VERSION=(\S+)$", pinned_defaults_text, re.M)
+
+    assert pinned_match
+    assert "__NETBIRD_VERSION__" not in deployment_text
+    assert f"image: netbirdio/netbird:{pinned_match.group(1)}" in deployment_text
 
 
 def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():

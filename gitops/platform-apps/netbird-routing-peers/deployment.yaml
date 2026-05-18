@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: netbird
-          image: netbirdio/netbird:__NETBIRD_VERSION__
+          image: netbirdio/netbird:0.70.5
           imagePullPolicy: IfNotPresent
           env:
             - name: NB_SETUP_KEY
