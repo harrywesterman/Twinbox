@@ -126,7 +126,7 @@ configure_reverse_proxy() {
       echo "Waiting for NetBird server to become ready..."
       for i in $(seq 1 120); do
         # Check the embedded IdP endpoint; when it responds the server is ready
-        if curl -fsS -o /dev/null "${NETBIRD_URL}/oauth2/.well-known/openid-configuration" 2>/dev/null; then
+        if curl -fsS -o /dev/null "$${NETBIRD_URL}/oauth2/.well-known/openid-configuration" 2>/dev/null; then
           echo "NetBird server is ready for setup."
           break
         fi
@@ -141,12 +141,12 @@ configure_reverse_proxy() {
       ADMIN_PASSWORD="$(openssl rand -base64 32 | sed 's/=//g')"
 
       echo "Calling NetBird automated setup API..."
-      SETUP_RESPONSE="$(curl -fsS -X POST "${NETBIRD_URL}/api/setup" \
+      SETUP_RESPONSE="$(curl -fsS -X POST "$${NETBIRD_URL}/api/setup" \
         -H "Content-Type: application/json" \
         -d '{
-          "email": "'"${NETBIRD_ADMIN_EMAIL}"'",
+          "email": "'"$${NETBIRD_ADMIN_EMAIL}"'",
           "name": "Twinbox Admin",
-          "password": "'"${ADMIN_PASSWORD}"'",
+          "password": "'"$${ADMIN_PASSWORD}"'",
           "create_pat": true,
           "pat_expire_in": 7
         }')"

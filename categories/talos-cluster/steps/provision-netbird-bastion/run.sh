@@ -100,10 +100,10 @@ cp -r "$WORKSPACE_ROOT/infra/opentofu/netbird/"* "$tf_workdir/"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Initializing OpenTofu for NetBird VPS"
 cd "$tf_workdir"
-tofu init -input=false
+tofu init -no-color -input=false
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying NetBird VPS OpenTofu configuration"
-tofu apply -auto-approve \
+tofu apply -no-color -auto-approve -input=false \
   -var "hcloud_token=$hcloud_token" \
   -var "ssh_public_key=$ssh_public_key" \
   -var "server_name=$server_name" \

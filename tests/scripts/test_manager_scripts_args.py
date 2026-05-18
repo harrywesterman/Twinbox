@@ -1720,6 +1720,8 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "command -v ssh >/dev/null" in netbird_bastion_run_text
     assert "command -v ssh-keygen >/dev/null" in netbird_bastion_run_text
     assert "OpenSSH client tools are available" in netbird_bastion_run_text
+    assert "tofu init -no-color -input=false" in netbird_bastion_run_text
+    assert "tofu apply -no-color -auto-approve -input=false" in netbird_bastion_run_text
     assert "read_first_admin_email()" in netbird_bastion_run_text
     assert "create-users-and-groups.json" in netbird_bastion_run_text
     assert (
@@ -1749,6 +1751,19 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "port-forward svc/tempo 3200:3200" in (
         REPO_ROOT / "scripts" / "manager" / "diagnose-monitoring.sh"
     ).read_text(encoding="utf-8")
+
+
+def test_netbird_cloud_init_escapes_shell_variables_for_templatefile():
+    text = (
+        REPO_ROOT / "infra" / "opentofu" / "netbird" / "cloud-init" / "netbird.yaml.tftpl"
+    ).read_text(encoding="utf-8")
+
+    assert "$${NETBIRD_URL}" in text
+    assert "$${NETBIRD_ADMIN_EMAIL}" in text
+    assert "$${ADMIN_PASSWORD}" in text
+    assert '"${NETBIRD_URL}' not in text
+    assert '"${NETBIRD_ADMIN_EMAIL}' not in text
+    assert '"${ADMIN_PASSWORD}' not in text
 
 
 def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
