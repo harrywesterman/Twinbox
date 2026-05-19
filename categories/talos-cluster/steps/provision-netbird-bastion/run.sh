@@ -72,11 +72,7 @@ command -v ssh-keygen >/dev/null 2>&1 || fail "ssh-keygen is required to create 
 
 netbird_fqdn="netbird.${public_zone_name}"
 netbird_proxy_domain="proxy.${public_zone_name}"
-if [[ "$cluster_id" == "prd" ]]; then
-  server_name="netbird"
-else
-  server_name="netbird-${cluster_id}"
-fi
+server_name="netbird-${cluster_id}"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting NetBird bastion provisioning for cluster: $cluster_id"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird FQDN: $netbird_fqdn"
