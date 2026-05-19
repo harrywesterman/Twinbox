@@ -1850,6 +1850,7 @@ def test_netbird_proxy_targets_dedicated_traefik_backend_entrypoint():
     network_text = NETBIRD_NETWORK_MODULE_MAIN.read_text(encoding="utf-8")
     proxy_services_text = NETBIRD_PROXY_SERVICES_MODULE_MAIN.read_text(encoding="utf-8")
     authentik_ingress_text = AUTHENTIK_INGRESSROUTE.read_text(encoding="utf-8")
+    platform_ingress_text = PLATFORM_INGRESS_APP.read_text(encoding="utf-8")
     traefik_values_text = _traefik_values_text()
 
     assert 'data "netbird_group" "all"' in network_text
@@ -1883,6 +1884,11 @@ def test_netbird_proxy_targets_dedicated_traefik_backend_entrypoint():
     assert "name: authentik-cors" in netbird_route_text
     assert "name: authentik-server" in netbird_route_text
     assert "tls:" not in netbird_route_text
+    assert "name: authentik-netbird" in platform_ingress_text
+    assert (
+        'Host(`authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)'
+        in platform_ingress_text
+    )
 
 
 def test_netbird_network_policies_use_single_rule_per_policy():
