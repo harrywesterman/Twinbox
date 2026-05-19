@@ -53,6 +53,42 @@ Twinbox builds a Talos Linux Kubernetes cluster on Proxmox through a Management 
 - Do not wait passively for deployments to finish; start inspecting pod logs right away so you can spot stalls and failures early.
 - If Argo CD reports `Synced` but the live deployment is still stale, hard-refresh the application from the Management VM and re-check the deployment image before assuming GitHub is wrong.
 
+### Bastion Node
+
+- The bastion is a Hetzner VPS, root user. IP is dynamic — find it from the Management VM secrets:
+  ```bash
+  # Find the cluster ID from step state
+  cluster_id=$(ls /opt/twinbox/bootstrap/secrets/global/netbird-bastion-*.json 2>/dev/null | head -1 | sed 's/.*netbird-bastion-//;s/\.json//')
+
+  # Or read from the secret file directly
+  bastion_ip=$(sudo cat /opt/twinbox/bootstrap/secrets/global/netbird-bastion-${cluster_id}.json | python3 -c "import sys,json; print(json.load(sys.stdin)['NETBIRD_IP'])")
+  bastion_key=$(sudo cat /opt/twinbox/bootstrap/secrets/global/netbird-bastion-${cluster_id}.json | python3 -c "import sys,json; print(json.load(sys.stdin)['SSH_PRIVATE_KEY'])")
+
+  # Write key and connect
+  echo "$bastion_key" > /tmp/bastion_key && chmod 600 /tmp/bastion_key
+  ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -i /tmp/bastion_key "root@${bastion_ip}"
+  ```
+- To run multi-line scripts on the bastion without shell escaping hell, use Python heredoc:
+  ```bash
+  ssh -i /tmp/bastion_key "root@${bastion_ip}" 'python3 << "PYEOF"'
+  import json, urllib.request
+  # ... any Python code here, no escaping needed ...
+  PYEOF'
+  ```
+- Docker commands on bastion: `docker logs <container>`, `docker inspect <container>`, `docker exec <container> <cmd>`
+
+### NetBird Debugging
+
+- Management API at `https://netbird.bierineenweek.nl/api/` with Bearer token from the management container config.
+- Key API endpoints: `/api/policies`, `/api/routes`, `/api/groups`, `/api/peers`.
+- Management UI: `https://netbird.bierineenweek.nl` (dashboard).
+- Management server + embedded relay runs in one container (`netbird-server`), no separate coturn/signal.
+- Proxy container (`netbird-proxy`) runs eBPF wgProxy for tunnel backhaul to routing peers in-cluster.
+- Proxy service targets a **NetBird resource** (the Traefik ClusterIP), not the upstream service directly.
+- Routing peer container (`netbirdio/netbird:0.70.5`) runs in-cluster (namespace `netbird`), image pinned in both `config/pinned-defaults.sh` and `gitops/platform-apps/netbird-routing-peers/deployment.yaml`.
+- To force ExternalSecret refresh: add annotation `force-sync: "1"` to the ExternalSecret and delete/recreate the pod.
+- Route `10.96.0.0/12` has `groups=[proxy_group]`, `peer_groups=[k8s_routers_group]`.
+
 ## Verify
 
 Run the smallest useful check for touched files:
