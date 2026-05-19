@@ -70,3 +70,21 @@ variable "allowed_ssh_cidrs" {
   type        = list(string)
   default     = ["0.0.0.0/0", "::/0"]
 }
+
+variable "dns_provider" {
+  description = "DNS provider for ACME DNS-01 wildcard certificate (cloudflare, aws, digitalocean, google)"
+  type        = string
+}
+
+variable "dns_api_token" {
+  description = "DNS provider API token for ACME DNS-01 wildcard certificate"
+  type        = string
+  sensitive   = true
+}
+
+variable "dns_api_secret" {
+  description = "DNS provider API secret (required for AWS Route 53)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}

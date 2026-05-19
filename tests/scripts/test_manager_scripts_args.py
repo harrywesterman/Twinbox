@@ -232,6 +232,9 @@ NETBIRD_NETWORK_MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "netbird-networ
 NETBIRD_PROXY_SERVICES_MODULE_MAIN = (
     REPO_ROOT / "infra" / "opentofu" / "netbird-proxy-services" / "main.tf"
 )
+NETBIRD_MODULE_VARS = REPO_ROOT / "infra" / "opentofu" / "netbird" / "variables.tf"
+NETBIRD_MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "netbird" / "main.tf"
+NETBIRD_CLOUD_INIT = REPO_ROOT / "infra" / "opentofu" / "netbird" / "cloud-init" / "netbird.yaml.tftpl"
 AUTHENTIK_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "authentik" / "ingressroute.yaml"
 AUTHENTIK_NETBIRD_FORWARDED_HEADERS_MIDDLEWARE = (
     REPO_ROOT / "gitops" / "platform" / "authentik" / "netbird-forwarded-headers-middleware.yaml"
@@ -3937,3 +3940,35 @@ def test_uninstall_authentik_cleanup_sets_forward_before_app_cleanup():
     assert setup_forward_index < cleanup_index
     assert 'kubectl delete -k "$database_app_dir"' in text
     assert 'kubectl delete -f "$database_app_dir"' in text
+
+
+def test_netbird_bastion_provisioning_fetches_dns_credentials():
+    text = NETBIRD_BASTION_STEP_SCRIPT.read_text(encoding="utf-8")
+
+    assert "external-dns-credentials" in text
+    assert "dns_provider" in text
+    assert "dns_api_token" in text
+    assert "dns_api_secret" in text
+    assert '-var "dns_provider=$dns_provider"' in text
+    assert '-var "dns_api_token=$dns_api_token"' in text
+    assert '-var "dns_api_secret=$dns_api_secret"' in text
+    assert "base64 -d" in text
+    for provider in ("cloudflare", "aws", "digitalocean", "google"):
+        assert f'"{provider}"' in text or f"'{provider}'" in text
+
+
+def test_netbird_cloud_init_configures_dns01_wildcard():
+    text = NETBIRD_CLOUD_INIT.read_text(encoding="utf-8")
+
+    assert "DNS_PROVIDER" in text
+    assert "DNS_API_TOKEN" in text
+    assert "dnschallenge.provider" in text
+    assert "dns_api_token" in text
+    assert "CF_API_TOKEN" in text
+    assert "HostRegexp" in text
+    assert "tls.domains[0].main" in text
+    assert "tls.domains[0].sans" in text
+    assert "insecureSkipVerify" in text
+    assert "cluster-proxy" in text
+    assert "NB_PROXY_ACME_CERTIFICATES" in text
+    assert '"false"' in text

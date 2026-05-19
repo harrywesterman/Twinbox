@@ -70,6 +70,49 @@ command -v kubectl >/dev/null 2>&1 || fail "kubectl is required to create NetBir
 command -v ssh >/dev/null 2>&1 || fail "ssh is required to fetch the NetBird setup token. Refresh the manager-worker image so OpenSSH client tools are available."
 command -v ssh-keygen >/dev/null 2>&1 || fail "ssh-keygen is required to create the NetBird bootstrap key. Refresh the manager-worker image so OpenSSH client tools are available."
 
+# Read DNS provider and credentials from the external-dns secret
+cluster_file="$MANAGER_DATA_DIR/clusters/${cluster_id}.json"
+if [[ -f "$cluster_file" ]]; then
+  dns_provider="$(jq -r '.selected_dns_provider // empty' "$cluster_file")"
+fi
+if [[ -z "$dns_provider" ]]; then
+  dns_provider="$(kubectl get secret external-dns-credentials -n external-dns -o jsonpath='{.metadata.annotations}' 2>/dev/null | jq -r '.["twinbox.io/dns-provider"] // empty' || true)"
+fi
+if [[ -z "$dns_provider" ]]; then
+  dns_provider="$(kubectl get secret external-dns-credentials -n external-dns -o json 2>/dev/null | jq -r '
+    if .data.CF_API_TOKEN or .data.token then "cloudflare"
+    elif .data.AWS_ACCESS_KEY_ID or .data["access-key"] then "aws"
+    elif .data.DO_TOKEN then "digitalocean"
+    elif .data.GOOGLE_APPLICATION_CREDENTIALS or .data["google-credentials"] then "google"
+    else ""
+    end' 2>/dev/null || true)"
+fi
+[[ -n "$dns_provider" ]] || fail "Could not determine DNS provider. Please run Configure DNS Provider before provisioning NetBird."
+
+dns_api_token=""
+dns_api_secret=""
+case "$dns_provider" in
+  cloudflare)
+    dns_api_token="$(kubectl get secret external-dns-credentials -n external-dns -o jsonpath='{.data.token}' 2>/dev/null | base64 -d || true)"
+    ;;
+  aws)
+    dns_api_token="$(kubectl get secret external-dns-credentials -n external-dns -o jsonpath='{.data.access-key}' 2>/dev/null | base64 -d || true)"
+    dns_api_secret="$(kubectl get secret external-dns-credentials -n external-dns -o jsonpath='{.data.secret-key}' 2>/dev/null | base64 -d || true)"
+    ;;
+  digitalocean)
+    dns_api_token="$(kubectl get secret external-dns-credentials -n external-dns -o jsonpath='{.data.token}' 2>/dev/null | base64 -d || true)"
+    ;;
+  google)
+    dns_api_token="$(kubectl get secret external-dns-credentials -n external-dns -o jsonpath='{.data.google-credentials}' 2>/dev/null | base64 -d || true)"
+    ;;
+  *)
+    fail "Unsupported DNS provider for wildcard certificate: $dns_provider"
+    ;;
+esac
+[[ -n "$dns_api_token" ]] || fail "Could not read DNS API token from external-dns-credentials secret"
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] DNS provider for wildcard certificate: $dns_provider"
+
 netbird_fqdn="netbird.${public_zone_name}"
 netbird_proxy_domain="proxy.${public_zone_name}"
 server_name="netbird-${cluster_id}"
@@ -110,7 +153,10 @@ tofu apply -no-color -auto-approve -input=false \
   -var "netbird_proxy_domain=$netbird_proxy_domain" \
   -var "public_zone_name=$public_zone_name" \
   -var "netbird_admin_email=$netbird_admin_email" \
-  -var "netbird_version=${PINNED_NETBIRD_VERSION:-0.70.5}"
+  -var "netbird_version=${PINNED_NETBIRD_VERSION:-0.70.5}" \
+  -var "dns_provider=$dns_provider" \
+  -var "dns_api_token=$dns_api_token" \
+  -var "dns_api_secret=$dns_api_secret"
 
 server_ipv4="$(tofu output -raw server_ipv4)"
 netbird_url="$(tofu output -raw netbird_url)"

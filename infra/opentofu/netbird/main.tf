@@ -30,5 +30,8 @@ resource "hcloud_server" "netbird" {
     public_zone_name     = var.public_zone_name
     netbird_admin_email  = var.netbird_admin_email
     netbird_version      = var.netbird_version
+    dns_provider         = var.dns_provider
+    dns_api_token        = var.dns_api_token
+    dns_api_secret       = var.dns_api_secret
   })
 }

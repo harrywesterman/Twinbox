@@ -11,6 +11,11 @@ packages:
   - ufw
 
 write_files:
+  - path: /opt/netbird/.dns-credentials
+    permissions: "0600"
+    content: |
+      DNS_API_TOKEN=${dns_api_token}
+      DNS_API_SECRET=${dns_api_secret}
   - path: /root/bootstrap-netbird.sh
     permissions: "0700"
     content: |
@@ -23,6 +28,7 @@ write_files:
       export NETBIRD_VERSION="${netbird_version}"
       export PROXY_DOMAIN="${netbird_proxy_domain}"
       export PUBLIC_ZONE_NAME="${public_zone_name}"
+      export DNS_PROVIDER="${dns_provider}"
 
       seed_netbird_account_domain() {
         local volume_dir
@@ -120,12 +126,97 @@ write_files:
         sed -i "s|netbirdio/netbird:latest|netbirdio/netbird:$NETBIRD_VERSION|g" /opt/netbird/docker-compose.yml 2>/dev/null || true
 
         python3 <<'PY'
+      import os
       import yaml
       from pathlib import Path
 
       path = Path("/opt/netbird/docker-compose.yml")
       compose = yaml.safe_load(path.read_text())
       services = compose.get("services", {})
+      zone = os.environ["PUBLIC_ZONE_NAME"]
+      dns_provider = os.environ["DNS_PROVIDER"]
+      creds = {}
+      creds_path = Path("/opt/netbird/.dns-credentials")
+      if creds_path.exists():
+          for line in creds_path.read_text().splitlines():
+              if "=" in line and not line.lstrip().startswith("#"):
+                  k, v = line.split("=", 1)
+                  creds[k] = v
+      dns_api_token = creds.get("DNS_API_TOKEN", "")
+      dns_api_secret = creds.get("DNS_API_SECRET", "")
+
+      traefik = services.get("traefik", {})
+
+      # Add DNS-01 challenge arguments to traefik command
+      command = traefik.get("command", [])
+      dns_challenge_arg = f"--certificatesresolvers.letsencrypt.acme.dnschallenge.provider={dns_provider}"
+      if dns_challenge_arg not in command:
+          command.append(dns_challenge_arg)
+      traefik["command"] = command
+
+      # Add DNS provider environment variables to traefik
+      env = traefik.setdefault("environment", [])
+      if isinstance(env, list):
+          env_vars = {}
+          for item in env:
+              if "=" in item:
+                  k, v = item.split("=", 1)
+                  env_vars[k] = v
+          provider_env = {
+              "cloudflare": {"CF_API_TOKEN": dns_api_token},
+              "aws": {"AWS_ACCESS_KEY_ID": dns_api_token, "AWS_SECRET_ACCESS_KEY": dns_api_secret},
+              "digitalocean": {"DO_TOKEN": dns_api_token},
+              "google": {"GOOGLE_APPLICATION_CREDENTIALS": dns_api_token},
+          }
+          for k, v in provider_env.get(dns_provider, {}).items():
+              if v and k not in env_vars:
+                  env.append(f"{k}={v}")
+      elif isinstance(env, dict):
+          provider_env = {
+              "cloudflare": {"CF_API_TOKEN": dns_api_token},
+              "aws": {"AWS_ACCESS_KEY_ID": dns_api_token, "AWS_SECRET_ACCESS_KEY": dns_api_secret},
+              "digitalocean": {"DO_TOKEN": dns_api_token},
+              "google": {"GOOGLE_APPLICATION_CREDENTIALS": dns_api_token},
+          }
+          for k, v in provider_env.get(dns_provider, {}).items():
+              if v:
+                  env.setdefault(k, v)
+
+      # Add wildcard router and serversTransport labels
+      labels = traefik.setdefault("labels", [])
+      if isinstance(labels, list):
+          wildcard_labels = [
+              "traefik.http.routers.wildcard.rule=HostRegexp(`{subdomain:[a-z0-9-]+}." + zone + "`)",
+              "traefik.http.routers.wildcard.entrypoints=websecure",
+              "traefik.http.routers.wildcard.tls=true",
+              "traefik.http.routers.wildcard.tls.certresolver=letsencrypt",
+              "traefik.http.routers.wildcard.tls.domains[0].main=" + zone,
+              "traefik.http.routers.wildcard.tls.domains[0].sans=*." + zone,
+              "traefik.http.routers.wildcard.priority=0",
+              "traefik.http.routers.wildcard.service=cluster-proxy",
+              "traefik.http.services.cluster-proxy.loadbalancer.server.port=8443",
+              "traefik.http.services.cluster-proxy.loadbalancer.server.scheme=https",
+              "traefik.http.services.cluster-proxy.loadbalancer.serversTransport=proxy-insecure",
+              "traefik.http.serverstransports.proxy-insecure.insecureSkipVerify=true",
+          ]
+          for label in wildcard_labels:
+              if label not in labels:
+                  labels.append(label)
+      elif isinstance(labels, dict):
+          labels["traefik.http.routers.wildcard.rule"] = "HostRegexp(`{subdomain:[a-z0-9-]+}." + zone + "`)"
+          labels["traefik.http.routers.wildcard.entrypoints"] = "websecure"
+          labels["traefik.http.routers.wildcard.tls"] = "true"
+          labels["traefik.http.routers.wildcard.tls.certresolver"] = "letsencrypt"
+          labels["traefik.http.routers.wildcard.tls.domains[0].main"] = zone
+          labels["traefik.http.routers.wildcard.tls.domains[0].sans"] = "*." + zone
+          labels["traefik.http.routers.wildcard.priority"] = "0"
+          labels["traefik.http.routers.wildcard.service"] = "cluster-proxy"
+          labels["traefik.http.services.cluster-proxy.loadbalancer.server.port"] = "8443"
+          labels["traefik.http.services.cluster-proxy.loadbalancer.server.scheme"] = "https"
+          labels["traefik.http.services.cluster-proxy.loadbalancer.serversTransport"] = "proxy-insecure"
+          labels["traefik.http.serverstransports.proxy-insecure.insecureSkipVerify"] = "true"
+
+      # Add NB_SETUP_PAT_ENABLED to netbird-server
       if "netbird-server" in services:
           env = services["netbird-server"].setdefault("environment", [])
           if isinstance(env, list):
@@ -133,7 +224,8 @@ write_files:
                   env.append("NB_SETUP_PAT_ENABLED=true")
           elif isinstance(env, dict):
               env.setdefault("NB_SETUP_PAT_ENABLED", "true")
-          path.write_text(yaml.dump(compose, default_flow_style=False, sort_keys=False))
+
+      path.write_text(yaml.dump(compose, default_flow_style=False, sort_keys=False))
       PY
       fi
 
@@ -146,7 +238,7 @@ write_files:
       lines = path.read_text().splitlines()
       updates = {
           "NB_PROXY_DOMAIN": "'" + os.environ['PROXY_DOMAIN'] + "'",
-          "NB_PROXY_ACME_CERTIFICATES": "true",
+          "NB_PROXY_ACME_CERTIFICATES": "false",
           "NB_PROXY_ACME_CHALLENGE_TYPE": "tls-alpn-01",
           "NB_PROXY_CERTIFICATE_DIRECTORY": "/certs",
       }
