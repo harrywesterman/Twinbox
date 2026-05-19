@@ -11,6 +11,7 @@ def test_docker_compose_mounts_categories_and_host_cron_contract():
     assert "/opt/twinbox/manager-data:/data" in text
     assert "TWINBOX_HOST_REPO_ROOT=${TWINBOX_HOST_REPO_ROOT}" in text
     assert "/etc/cron.d:/host/etc/cron.d" in text
+    assert "/var/run/docker.sock:/var/run/docker.sock" in text
 
 
 def test_docker_compose_exposes_filesystem_secret_contract():

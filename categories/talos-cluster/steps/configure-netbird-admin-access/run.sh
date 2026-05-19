@@ -32,7 +32,7 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Configuring NetBird admin access peer: $hos
 if command -v netbird >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Using host NetBird client"
   netbird up --setup-key "$setup_key" --management-url "$management_url" --hostname "$hostname"
-elif command -v docker >/dev/null 2>&1; then
+elif command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Using Dockerized NetBird client with host networking"
   docker volume create twinbox-netbird >/dev/null
   if docker ps -a --format '{{.Names}}' | grep -qx twinbox-netbird; then
@@ -52,6 +52,8 @@ elif command -v docker >/dev/null 2>&1; then
     -v twinbox-netbird:/var/lib/netbird \
     -v /dev/net/tun:/dev/net/tun \
     "netbirdio/netbird:${PINNED_NETBIRD_VERSION:-latest}" >/dev/null
+elif command -v docker >/dev/null 2>&1; then
+  fail "Docker CLI is available, but the host Docker daemon is not reachable for Management VM enrollment"
 else
   fail "Neither host netbird client nor docker is available for Management VM enrollment"
 fi

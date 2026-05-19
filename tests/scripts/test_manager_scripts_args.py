@@ -210,6 +210,14 @@ NETBIRD_BASTION_STEP_SCRIPT = (
 NETBIRD_INGRESS_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "configure-netbird-ingress" / "run.sh"
 )
+NETBIRD_ADMIN_ACCESS_STEP_SCRIPT = (
+    REPO_ROOT
+    / "categories"
+    / "talos-cluster"
+    / "steps"
+    / "configure-netbird-admin-access"
+    / "run.sh"
+)
 AUTHENTIK_NETBIRD_MODULE_VARS = (
     REPO_ROOT / "infra" / "opentofu" / "authentik-netbird" / "variables.tf"
 )
@@ -1111,10 +1119,7 @@ def test_manager_worker_image_includes_talos_image_factory_helper():
     assert "../../lib/catalog-definitions.mjs" in refresh_portal_text
     assert "../../manager-api/src/lib/catalog-definitions.mjs" not in refresh_dashy_text
     assert "../../manager-api/src/lib/catalog-definitions.mjs" not in refresh_portal_text
-    assert (
-        "apk add --no-cache bash ca-certificates curl jq openssh-client openssl python3 tar xz sudo"
-        in text
-    )
+    assert "apk add --no-cache bash ca-certificates curl docker-cli jq" in text
     assert "COPY scripts/get-talos-image-factory.sh ./scripts/get-talos-image-factory.sh" in text
     assert "RUN chmod +x ./scripts/get-talos-image-factory.sh" in text
 
@@ -1927,6 +1932,17 @@ def test_netbird_proxy_targets_dedicated_traefik_backend_entrypoint():
         'Host(`authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)'
         in platform_ingress_text
     )
+
+
+def test_netbird_admin_access_uses_reachable_host_docker_daemon():
+    text = NETBIRD_ADMIN_ACCESS_STEP_SCRIPT.read_text(encoding="utf-8")
+
+    assert "docker info >/dev/null 2>&1" in text
+    assert "docker volume create twinbox-netbird" in text
+    assert "--network host" in text
+    assert "--cap-add NET_ADMIN" in text
+    assert "-v /dev/net/tun:/dev/net/tun" in text
+    assert "Docker CLI is available, but the host Docker daemon is not reachable" in text
 
 
 def test_netbird_network_policies_use_single_rule_per_policy():
