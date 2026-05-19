@@ -114,7 +114,7 @@ if [[ -z "$traefik_resource_address" ]]; then
 fi
 traefik_network_resource_address="$(netbird_host_resource_address "$traefik_resource_address")"
 
-service_cidr="$(kubectl -n kube-system get pod -l component=kube-apiserver -o jsonpath='{.items[0].spec.containers[0].command}' 2>/dev/null | tr ' ' '\n' | sed -n 's/.*--service-cluster-ip-range=\([^ ]*\).*/\1/p' || true)"
+service_cidr="$(kubectl -n kube-system get pod -l component=kube-apiserver -o json 2>/dev/null | jq -r '.items[0].spec.containers[0].command[] | select(startswith("--service-cluster-ip-range=")) | sub("^--service-cluster-ip-range="; "")' || true)"
 if [[ -z "$service_cidr" ]]; then
   service_cidr="10.96.0.0/12"
 fi
