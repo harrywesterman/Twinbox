@@ -238,7 +238,7 @@ write_files:
       lines = path.read_text().splitlines()
       updates = {
           "NB_PROXY_DOMAIN": "'" + os.environ['PROXY_DOMAIN'] + "'",
-          "NB_PROXY_ACME_CERTIFICATES": "false",
+          "NB_PROXY_ACME_CERTIFICATES": "true",
           "NB_PROXY_ACME_CHALLENGE_TYPE": "tls-alpn-01",
           "NB_PROXY_CERTIFICATE_DIRECTORY": "/certs",
       }

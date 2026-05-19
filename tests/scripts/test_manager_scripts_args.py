@@ -3971,4 +3971,4 @@ def test_netbird_cloud_init_configures_dns01_wildcard():
     assert "insecureSkipVerify" in text
     assert "cluster-proxy" in text
     assert "NB_PROXY_ACME_CERTIFICATES" in text
-    assert '"false"' in text
+    assert '"true"' in text
