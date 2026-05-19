@@ -118,6 +118,7 @@ service_cidr="$(kubectl -n kube-system get pod -l component=kube-apiserver -o js
 if [[ -z "$service_cidr" ]]; then
   service_cidr="10.96.0.0/12"
 fi
+service_cidrs_json="$(jq -n --arg cidr "$service_cidr" '[$cidr]')"
 
 authentik_public_url="${TWINBOX_AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
 authentik_domain="${authentik_public_url#https://}"
@@ -185,7 +186,7 @@ tofu apply -auto-approve -no-color \
   -var "netbird_management_url=$netbird_management_url" \
   -var "cluster_id=$cluster_id" \
   -var "traefik_resource_address=$traefik_network_resource_address" \
-  -var 'service_cidrs=["'"$service_cidr"'"]'
+  -var "service_cidrs=${service_cidrs_json}"
 
 k8s_setup_key="$(tofu output -raw -no-color k8s_setup_key)"
 management_vm_setup_key="$(tofu output -raw -no-color management_vm_setup_key)"
