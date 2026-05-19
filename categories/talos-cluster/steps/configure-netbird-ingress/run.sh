@@ -46,6 +46,24 @@ wait_for_netbird_routing_peer() {
   fail "NetBird routing peer deployment did not appear"
 }
 
+wait_for_traefik_netbird_backend() {
+  local address="$1"
+  if [[ "$address" != "traefik-netbird.traefik.svc.cluster.local" ]]; then
+    return 0
+  fi
+
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for Traefik NetBird backend endpoints"
+  for i in $(seq 1 30); do
+    if kubectl -n traefik get endpointslice -l kubernetes.io/service-name=traefik-netbird -o json 2>/dev/null \
+      | jq -e '([.items[].endpoints[]? | select(.conditions.ready != false)] | length) > 0' >/dev/null; then
+      return 0
+    fi
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Traefik NetBird backend endpoints not ready yet (attempt ${i}/30)"
+    sleep 5
+  done
+  fail "Traefik NetBird backend service did not become ready"
+}
+
 wait_for_public_oidc_discovery() {
   local issuer_url="$1"
   local discovery_url="${issuer_url%/}/.well-known/openid-configuration"
@@ -107,10 +125,7 @@ netbird_proxy_ip="$(jq -r '.NETBIRD_IP // empty' "$netbird_bastion_secret")"
 [[ -n "$netbird_proxy_ip" ]] || fail "NetBird bastion secret does not contain NETBIRD_IP"
 
 if [[ -z "$traefik_resource_address" ]]; then
-  traefik_resource_address="$(kubectl -n traefik get svc traefik -o jsonpath='{.spec.clusterIP}' 2>/dev/null || true)"
-  if [[ -z "$traefik_resource_address" || "$traefik_resource_address" == "None" ]]; then
-    traefik_resource_address="traefik.traefik.svc.cluster.local"
-  fi
+  traefik_resource_address="traefik-netbird.traefik.svc.cluster.local"
 fi
 traefik_network_resource_address="$(netbird_host_resource_address "$traefik_resource_address")"
 
@@ -233,6 +248,7 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --application "netbird-routing-peers" \
   --destination-namespace "argocd"
 wait_for_netbird_routing_peer
+wait_for_traefik_netbird_backend "$traefik_resource_address"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating NetBird reverse proxy services"
 proxy_services_workdir="$MANAGER_DATA_DIR/opentofu/netbird-proxy-services-${cluster_id}"

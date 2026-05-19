@@ -1,5 +1,8 @@
 locals {
   name_prefix = "twinbox-${var.cluster_id}"
+
+  traefik_resource_is_host = length(regexall("^([0-9]{1,3}\\.){3}[0-9]{1,3}(/32)?$", var.traefik_resource_address)) > 0
+  traefik_resource_type    = local.traefik_resource_is_host ? "host" : "domain"
 }
 
 data "netbird_group" "all" {
@@ -146,7 +149,7 @@ resource "netbird_policy" "proxy_to_traefik_http" {
 
     destination_resource = {
       id   = netbird_network_resource.traefik.id
-      type = "host"
+      type = local.traefik_resource_type
     }
   }
 }

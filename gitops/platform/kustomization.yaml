@@ -10,12 +10,14 @@ resources:
   - authentik/ingressroute.yaml
   - authentik/cors-middleware.yaml
   - authentik/forwardauth-middleware.yaml
+  - authentik/netbird-forwarded-headers-middleware.yaml
   - hubble/authentik-forwardauth-middleware.yaml
   - hubble/ingressroute.yaml
   - hubble/authentik-callback-ingressroute.yaml
   - crowdsec/bouncer-externalsecret.yaml
   - crowdsec/lapi-externalsecret.yaml
   - traefik/traefik-dashboard-ingressroute.yaml
+  - traefik/traefik-netbird-service.yaml
   - traefik/crowdsec-bouncer-externalsecret.yaml
   - traefik/authentik-callback-ingressroute.yaml
   - traefik/authentik-forwardauth-middleware.yaml

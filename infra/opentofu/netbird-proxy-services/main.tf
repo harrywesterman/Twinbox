@@ -1,5 +1,10 @@
 data "netbird_reverse_proxy_clusters" "all" {}
 
+locals {
+  traefik_target_is_host = length(regexall("^([0-9]{1,3}\\.){3}[0-9]{1,3}$", var.traefik_resource_address)) > 0
+  traefik_target_type    = local.traefik_target_is_host ? "host" : "domain"
+}
+
 resource "netbird_reverse_proxy_domain" "services" {
   for_each = toset(distinct([for service in var.services : service.domain]))
 
@@ -21,7 +26,7 @@ resource "netbird_reverse_proxy_service" "services" {
   targets = [
     {
       target_id   = var.traefik_resource_id
-      target_type = "host"
+      target_type = local.traefik_target_type
       host        = var.traefik_resource_address
       path        = each.value.path
       port        = 8082

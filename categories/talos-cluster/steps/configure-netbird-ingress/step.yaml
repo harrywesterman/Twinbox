@@ -30,7 +30,7 @@ inputs:
     label: Traefik Resource Address
     type: string
     required: false
-    help: Optional override, defaults to the Traefik ClusterIP when Kubernetes is reachable
+    help: Optional override, defaults to the Traefik NetBird headless service DNS name
   - id: proxy_services_json
     label: Reverse Proxy Services JSON
     type: string

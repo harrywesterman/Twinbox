@@ -29,6 +29,7 @@ spec:
     - kind: Rule
       match: Host(`authentik.__ZONE_NAME__`)
       middlewares:
+        - name: authentik-netbird-forwarded-headers
         - name: authentik-cors
       services:
         - kind: Service

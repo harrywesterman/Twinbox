@@ -100,7 +100,7 @@ Connects NetBird to Authentik for SSO and configures routing.
 |-------|----------|---------|-------------|
 | `netbird_token` | No | — | Personal access token from dashboard (auto-generated if omitted) |
 | `netbird_management_url` | No | — | Override for management URL |
-| `traefik_resource_address` | No | — | Override for Traefik ClusterIP |
+| `traefik_resource_address` | No | `traefik-netbird.traefik.svc.cluster.local` | Override for the internal Traefik NetBird backend resource |
 | `proxy_services_json` | No | — | JSON array of reverse proxy targets |
 
 **What it does:**

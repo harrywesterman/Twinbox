@@ -225,6 +225,12 @@ NETBIRD_PROXY_SERVICES_MODULE_MAIN = (
     REPO_ROOT / "infra" / "opentofu" / "netbird-proxy-services" / "main.tf"
 )
 AUTHENTIK_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "authentik" / "ingressroute.yaml"
+AUTHENTIK_NETBIRD_FORWARDED_HEADERS_MIDDLEWARE = (
+    REPO_ROOT / "gitops" / "platform" / "authentik" / "netbird-forwarded-headers-middleware.yaml"
+)
+TRAEFIK_NETBIRD_SERVICE = (
+    REPO_ROOT / "gitops" / "platform" / "traefik" / "traefik-netbird-service.yaml"
+)
 NETBIRD_ROUTING_PEER_DEPLOYMENT = (
     REPO_ROOT / "gitops" / "platform-apps" / "netbird-routing-peers" / "deployment.yaml"
 )
@@ -1812,6 +1818,8 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     )
     assert '-var "traefik_resource_address=$traefik_network_resource_address"' in text
     assert '-var "traefik_resource_address=$traefik_resource_address"' in text
+    assert 'traefik_resource_address="traefik-netbird.traefik.svc.cluster.local"' in text
+    assert "kubectl -n traefik get svc traefik -o jsonpath" not in text
     assert "TRAEFIK_NETWORK_RESOURCE_ADDRESS" in text
     assert "authentik_resolve_scope_mapping_id" in text
     assert '-var "property_mapping_ids=$property_mapping_ids_json"' in text
@@ -1831,18 +1839,28 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "netbird-wildcard-dns" in text
     assert "NETBIRD_IP" in text
     assert "wait_for_netbird_routing_peer" in text
+    assert "wait_for_traefik_netbird_backend" in text
+    assert "kubernetes.io/service-name=traefik-netbird" in text
     assert "wait_for_public_oidc_discovery" in text
     assert 'curl -fsS --connect-timeout 5 --max-time 15 "$discovery_url"' in text
 
     auth_setup_index = text.index("Configuring Authentik OIDC application for NetBird")
     network_index = text.index("Creating NetBird groups, routing resources, and setup keys")
     routing_peer_index = text.index("Deploying NetBird routing peers before enabling reverse proxy")
+    backend_index = text.index('wait_for_traefik_netbird_backend "$traefik_resource_address"')
     proxy_index = text.index("Creating NetBird reverse proxy services")
     dns_index = text.index("Creating wildcard DNS record for NetBird proxy")
     discovery_index = text.index('wait_for_public_oidc_discovery "$netbird_oidc_issuer"')
     idp_index = text.index("Registering Authentik as NetBird identity provider")
 
-    assert auth_setup_index < network_index < routing_peer_index < proxy_index < dns_index
+    assert (
+        auth_setup_index
+        < network_index
+        < routing_peer_index
+        < backend_index
+        < proxy_index
+        < dns_index
+    )
     assert dns_index < discovery_index < idp_index
 
 
@@ -1850,11 +1868,17 @@ def test_netbird_proxy_targets_dedicated_traefik_backend_entrypoint():
     network_text = NETBIRD_NETWORK_MODULE_MAIN.read_text(encoding="utf-8")
     proxy_services_text = NETBIRD_PROXY_SERVICES_MODULE_MAIN.read_text(encoding="utf-8")
     authentik_ingress_text = AUTHENTIK_INGRESSROUTE.read_text(encoding="utf-8")
+    authentik_netbird_middleware_text = AUTHENTIK_NETBIRD_FORWARDED_HEADERS_MIDDLEWARE.read_text(
+        encoding="utf-8"
+    )
     platform_ingress_text = PLATFORM_INGRESS_APP.read_text(encoding="utf-8")
+    platform_kustomization_text = KUSTOMIZATION.read_text(encoding="utf-8")
+    traefik_netbird_service_text = TRAEFIK_NETBIRD_SERVICE.read_text(encoding="utf-8")
     traefik_values_text = _traefik_values_text()
 
     assert 'data "netbird_group" "all"' in network_text
     assert 'name = "All"' in network_text
+    assert "traefik_resource_type" in network_text
     assert 'resource "netbird_policy" "proxy_to_traefik_https"' not in network_text
 
     proxy_policy = re.search(
@@ -1868,8 +1892,11 @@ def test_netbird_proxy_targets_dedicated_traefik_backend_entrypoint():
     assert "sources       = [data.netbird_group.all.id]" in proxy_policy_body
     assert "sources       = [netbird_group.proxy.id]" not in proxy_policy_body
     assert 'ports         = ["8082"]' in proxy_policy_body
+    assert "type = local.traefik_resource_type" in proxy_policy_body
     assert "groups      = [data.netbird_group.all.id, netbird_group.proxy.id]" in network_text
 
+    assert "traefik_target_type" in proxy_services_text
+    assert "target_type = local.traefik_target_type" in proxy_services_text
     assert "port        = 8082" in proxy_services_text
     assert 'protocol    = "http"' in proxy_services_text
     assert not re.search(r"port\s*=\s*80(?:\D|$)", proxy_services_text)
@@ -1877,14 +1904,24 @@ def test_netbird_proxy_targets_dedicated_traefik_backend_entrypoint():
     assert "webnetbird:" in traefik_values_text
     assert "port: 8082" in traefik_values_text
     assert "exposedPort: 8082" in traefik_values_text
+    assert "name: traefik-netbird" in traefik_netbird_service_text
+    assert "namespace: traefik" in traefik_netbird_service_text
+    assert "clusterIP: None" in traefik_netbird_service_text
+    assert "targetPort: webnetbird" in traefik_netbird_service_text
+    assert "traefik/traefik-netbird-service.yaml" in platform_kustomization_text
 
     assert "name: authentik-netbird" in authentik_ingress_text
     netbird_route_text = authentik_ingress_text.split("name: authentik-netbird", 1)[1]
     assert "entryPoints:\n    - webnetbird" in netbird_route_text
     assert "Host(`authentik.__ZONE_NAME__`)" in netbird_route_text
+    assert "name: authentik-netbird-forwarded-headers" in netbird_route_text
     assert "name: authentik-cors" in netbird_route_text
     assert "name: authentik-server" in netbird_route_text
     assert "tls:" not in netbird_route_text
+    assert "name: authentik-netbird-forwarded-headers" in authentik_netbird_middleware_text
+    assert "X-Forwarded-Proto: https" in authentik_netbird_middleware_text
+    assert 'X-Forwarded-Port: "443"' in authentik_netbird_middleware_text
+    assert "authentik/netbird-forwarded-headers-middleware.yaml" in platform_kustomization_text
     assert "name: authentik-netbird" in platform_ingress_text
     assert (
         'Host(`authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)'

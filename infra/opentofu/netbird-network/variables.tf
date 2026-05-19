@@ -15,7 +15,7 @@ variable "cluster_id" {
 }
 
 variable "traefik_resource_address" {
-  description = "Internal Traefik resource address reachable from NetBird Kubernetes routing peers"
+  description = "Internal Traefik resource address reachable from NetBird Kubernetes routing peers, as an IP/32 host or DNS domain"
   type        = string
 }
 

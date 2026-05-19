@@ -15,7 +15,7 @@ variable "traefik_resource_id" {
 }
 
 variable "traefik_resource_address" {
-  description = "Internal Traefik address used as the reverse proxy target host"
+  description = "Internal Traefik address used as the reverse proxy target host or domain"
   type        = string
 }
 
