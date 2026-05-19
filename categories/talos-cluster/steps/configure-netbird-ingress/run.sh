@@ -52,7 +52,7 @@ wait_for_public_oidc_discovery() {
 
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for public Authentik OIDC discovery through NetBird proxy"
   for i in $(seq 1 60); do
-    if curl -fsS "$discovery_url" >/dev/null 2>&1; then
+    if curl -fsS --connect-timeout 5 --max-time 15 "$discovery_url" >/dev/null 2>&1; then
       echo "[$(date '+%Y-%m-%d %H:%M:%S')] Public Authentik OIDC discovery is reachable"
       return 0
     fi

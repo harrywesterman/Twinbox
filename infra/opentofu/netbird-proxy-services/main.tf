@@ -24,7 +24,7 @@ resource "netbird_reverse_proxy_service" "services" {
       target_type = "host"
       host        = var.traefik_resource_address
       path        = each.value.path
-      port        = 80
+      port        = 8082
       protocol    = "http"
       enabled     = true
     }

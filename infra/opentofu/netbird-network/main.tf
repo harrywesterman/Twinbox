@@ -2,6 +2,10 @@ locals {
   name_prefix = "twinbox-${var.cluster_id}"
 }
 
+data "netbird_group" "all" {
+  name = "All"
+}
+
 resource "netbird_group" "admins" {
   name = "${local.name_prefix}-admins"
 }
@@ -65,14 +69,14 @@ resource "netbird_network_router" "k8s_routers" {
 resource "netbird_route" "k8s_services" {
   for_each = toset(var.service_cidrs)
 
-  network_id            = "k8s-services-${var.cluster_id}"
-  description           = "Kubernetes service CIDR ${each.key}"
-  network               = each.key
-  peer_groups           = [netbird_group.k8s_routers.id]
-  groups                = [netbird_group.proxy.id]
-  masquerade            = true
-  metric                = 9999
-  enabled               = true
+  network_id  = "k8s-services-${var.cluster_id}"
+  description = "Kubernetes service CIDR ${each.key}"
+  network     = each.key
+  peer_groups = [netbird_group.k8s_routers.id]
+  groups      = [netbird_group.proxy.id]
+  masquerade  = true
+  metric      = 9999
+  enabled     = true
 }
 
 resource "netbird_policy" "admin_to_management_vm_ssh" {
@@ -127,39 +131,18 @@ resource "netbird_policy" "admin_to_management_vm_api" {
 }
 
 resource "netbird_policy" "proxy_to_traefik_http" {
-  name        = "${local.name_prefix}-proxy-to-traefik-http"
-  description = "Allow NetBird proxy HTTP traffic to reach internal Traefik"
+  name        = "${local.name_prefix}-proxy-to-traefik-netbird"
+  description = "Allow NetBird reverse proxy traffic to reach the internal Traefik NetBird entrypoint"
   enabled     = true
 
   rule {
-    name          = "http"
+    name          = "webnetbird"
     action        = "accept"
     enabled       = true
     bidirectional = true
     protocol      = "tcp"
-    sources       = [netbird_group.proxy.id]
-    ports         = ["80"]
-
-    destination_resource = {
-      id   = netbird_network_resource.traefik.id
-      type = "host"
-    }
-  }
-}
-
-resource "netbird_policy" "proxy_to_traefik_https" {
-  name        = "${local.name_prefix}-proxy-to-traefik-https"
-  description = "Allow NetBird proxy HTTPS traffic to reach internal Traefik"
-  enabled     = true
-
-  rule {
-    name          = "https"
-    action        = "accept"
-    enabled       = true
-    bidirectional = true
-    protocol      = "tcp"
-    sources       = [netbird_group.proxy.id]
-    ports         = ["443"]
+    sources       = [data.netbird_group.all.id]
+    ports         = ["8082"]
 
     destination_resource = {
       id   = netbird_network_resource.traefik.id

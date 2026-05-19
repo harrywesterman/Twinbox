@@ -221,6 +221,10 @@ AUTHENTIK_NETBIRD_MODULE_OUTPUTS = (
     REPO_ROOT / "infra" / "opentofu" / "authentik-netbird" / "outputs.tf"
 )
 NETBIRD_NETWORK_MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "netbird-network" / "main.tf"
+NETBIRD_PROXY_SERVICES_MODULE_MAIN = (
+    REPO_ROOT / "infra" / "opentofu" / "netbird-proxy-services" / "main.tf"
+)
+AUTHENTIK_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "authentik" / "ingressroute.yaml"
 NETBIRD_ROUTING_PEER_DEPLOYMENT = (
     REPO_ROOT / "gitops" / "platform-apps" / "netbird-routing-peers" / "deployment.yaml"
 )
@@ -1828,6 +1832,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "NETBIRD_IP" in text
     assert "wait_for_netbird_routing_peer" in text
     assert "wait_for_public_oidc_discovery" in text
+    assert 'curl -fsS --connect-timeout 5 --max-time 15 "$discovery_url"' in text
 
     auth_setup_index = text.index("Configuring Authentik OIDC application for NetBird")
     network_index = text.index("Creating NetBird groups, routing resources, and setup keys")
@@ -1839,6 +1844,45 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
 
     assert auth_setup_index < network_index < routing_peer_index < proxy_index < dns_index
     assert dns_index < discovery_index < idp_index
+
+
+def test_netbird_proxy_targets_dedicated_traefik_backend_entrypoint():
+    network_text = NETBIRD_NETWORK_MODULE_MAIN.read_text(encoding="utf-8")
+    proxy_services_text = NETBIRD_PROXY_SERVICES_MODULE_MAIN.read_text(encoding="utf-8")
+    authentik_ingress_text = AUTHENTIK_INGRESSROUTE.read_text(encoding="utf-8")
+    traefik_values_text = _traefik_values_text()
+
+    assert 'data "netbird_group" "all"' in network_text
+    assert 'name = "All"' in network_text
+    assert 'resource "netbird_policy" "proxy_to_traefik_https"' not in network_text
+
+    proxy_policy = re.search(
+        r'resource\s+"netbird_policy"\s+"proxy_to_traefik_http"\s+\{'
+        r'(.*?)(?=\nresource\s+"netbird_policy"|\Z)',
+        network_text,
+        flags=re.DOTALL,
+    )
+    assert proxy_policy
+    proxy_policy_body = proxy_policy.group(1)
+    assert "sources       = [data.netbird_group.all.id]" in proxy_policy_body
+    assert "sources       = [netbird_group.proxy.id]" not in proxy_policy_body
+    assert 'ports         = ["8082"]' in proxy_policy_body
+
+    assert "port        = 8082" in proxy_services_text
+    assert 'protocol    = "http"' in proxy_services_text
+    assert not re.search(r"port\s*=\s*80(?:\D|$)", proxy_services_text)
+
+    assert "webnetbird:" in traefik_values_text
+    assert "port: 8082" in traefik_values_text
+    assert "exposedPort: 8082" in traefik_values_text
+
+    assert "name: authentik-netbird" in authentik_ingress_text
+    netbird_route_text = authentik_ingress_text.split("name: authentik-netbird", 1)[1]
+    assert "entryPoints:\n    - webnetbird" in netbird_route_text
+    assert "Host(`authentik.__ZONE_NAME__`)" in netbird_route_text
+    assert "name: authentik-cors" in netbird_route_text
+    assert "name: authentik-server" in netbird_route_text
+    assert "tls:" not in netbird_route_text
 
 
 def test_netbird_network_policies_use_single_rule_per_policy():

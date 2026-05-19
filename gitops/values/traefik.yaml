@@ -77,6 +77,13 @@ ports:
       tls:
         enabled: true
 
+  webnetbird:
+    port: 8082
+    expose:
+      default: true
+    exposedPort: 8082
+    protocol: TCP
+
   webwiredoor:
     port: 8081
     expose:
