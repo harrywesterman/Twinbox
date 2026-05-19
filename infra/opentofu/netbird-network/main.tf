@@ -62,6 +62,19 @@ resource "netbird_network_router" "k8s_routers" {
   enabled     = true
 }
 
+resource "netbird_route" "k8s_services" {
+  for_each = toset(var.service_cidrs)
+
+  network_id            = "k8s-services-${var.cluster_id}"
+  description           = "Kubernetes service CIDR ${each.key}"
+  network               = each.key
+  peer_groups           = [netbird_group.k8s_routers.id]
+  groups                = [netbird_group.proxy.id]
+  masquerade            = true
+  metric                = 9999
+  enabled               = true
+}
+
 resource "netbird_policy" "admin_to_management_vm_ssh" {
   name        = "${local.name_prefix}-admin-to-management-vm-ssh"
   description = "Allow Twinbox admins to reach the Management VM SSH service over NetBird"

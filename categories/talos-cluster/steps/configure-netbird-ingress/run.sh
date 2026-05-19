@@ -114,6 +114,11 @@ if [[ -z "$traefik_resource_address" ]]; then
 fi
 traefik_network_resource_address="$(netbird_host_resource_address "$traefik_resource_address")"
 
+service_cidr="$(kubectl -n kube-system get pod -l component=kube-apiserver -o jsonpath='{.items[0].spec.containers[0].command}' 2>/dev/null | tr ' ' '\n' | sed -n 's/.*--service-cluster-ip-range=\([^ ]*\).*/\1/p' || true)"
+if [[ -z "$service_cidr" ]]; then
+  service_cidr="10.96.0.0/12"
+fi
+
 authentik_public_url="${TWINBOX_AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
 authentik_domain="${authentik_public_url#https://}"
 authentik_domain="${authentik_domain#http://}"
@@ -179,7 +184,8 @@ tofu apply -auto-approve -no-color \
   -var "netbird_token=$netbird_token" \
   -var "netbird_management_url=$netbird_management_url" \
   -var "cluster_id=$cluster_id" \
-  -var "traefik_resource_address=$traefik_network_resource_address"
+  -var "traefik_resource_address=$traefik_network_resource_address" \
+  -var 'service_cidrs=["'"$service_cidr"'"]'
 
 k8s_setup_key="$(tofu output -raw -no-color k8s_setup_key)"
 management_vm_setup_key="$(tofu output -raw -no-color management_vm_setup_key)"

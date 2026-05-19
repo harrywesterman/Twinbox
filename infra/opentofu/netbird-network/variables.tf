@@ -19,6 +19,11 @@ variable "traefik_resource_address" {
   type        = string
 }
 
+variable "service_cidrs" {
+  description = "Kubernetes service CIDRs the NetBird routing peer should advertise (e.g. 10.96.0.0/12)"
+  type        = list(string)
+}
+
 variable "management_vm_ssh_port" {
   description = "SSH port on the Twinbox Management VM"
   type        = number

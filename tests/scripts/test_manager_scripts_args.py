@@ -1813,7 +1813,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert '-var "property_mapping_ids=$property_mapping_ids_json"' in text
     assert '-var "authentik_url=$authentik_url"' not in text
     assert "api.cloudflare.com/client/v4" not in text
-    assert "cloudflare-tunnel" not in text
+    assert "cloudflare-tunnel-dns" in text  # cleanup of stale tunnel record
 
     assert "authentik_property_mapping_provider_scope" not in main_text
     assert "property_mappings          = var.property_mapping_ids" in main_text
@@ -1824,7 +1824,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert 'trim(var.authentik_public_url, "/")' in outputs_text
 
     assert 'name: "authentik", domain: $authentik_domain, path: "/"' in text
-    assert "netbird-authentik-dns" in text
+    assert "netbird-wildcard-dns" in text
     assert "NETBIRD_IP" in text
     assert "wait_for_netbird_routing_peer" in text
     assert "wait_for_public_oidc_discovery" in text
@@ -1833,7 +1833,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     network_index = text.index("Creating NetBird groups, routing resources, and setup keys")
     routing_peer_index = text.index("Deploying NetBird routing peers before enabling reverse proxy")
     proxy_index = text.index("Creating NetBird reverse proxy services")
-    dns_index = text.index("Creating DNS record for Authentik through NetBird proxy")
+    dns_index = text.index("Creating wildcard DNS record for NetBird proxy")
     discovery_index = text.index('wait_for_public_oidc_discovery "$netbird_oidc_issuer"')
     idp_index = text.index("Registering Authentik as NetBird identity provider")
 
