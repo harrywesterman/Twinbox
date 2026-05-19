@@ -27,6 +27,7 @@ resource "hcloud_server" "netbird" {
   user_data = templatefile("${path.module}/cloud-init/netbird.yaml.tftpl", {
     netbird_fqdn         = var.netbird_fqdn
     netbird_proxy_domain = var.netbird_proxy_domain
+    public_zone_name     = var.public_zone_name
     netbird_admin_email  = var.netbird_admin_email
     netbird_version      = var.netbird_version
   })

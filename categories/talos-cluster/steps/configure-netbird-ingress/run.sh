@@ -89,9 +89,287 @@ netbird_host_resource_address() {
   printf '%s' "$address"
 }
 
+read_first_admin_email() {
+  local cluster_scope="$1"
+  local state_file
+  local email
+  local candidate_paths=(
+    "$MANAGER_DATA_DIR/step-state/clusters/${cluster_scope}/create-users-and-groups.json"
+    "$MANAGER_DATA_DIR/step-state/clusters/${cluster_id}/create-users-and-groups.json"
+    "$MANAGER_DATA_DIR/step-state/global/create-users-and-groups.json"
+  )
+
+  for state_file in "${candidate_paths[@]}"; do
+    [[ -f "$state_file" ]] || continue
+    email="$(jq -r '.inputs.email // .outputs.email // empty' "$state_file")"
+    if [[ -n "$email" ]]; then
+      printf '%s\n' "$email"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+authentik_user_uid_by_email() {
+  local email="$1"
+  local encoded_email
+  local response
+
+  encoded_email="$(jq -rn --arg value "$email" '$value | @uri')"
+  response="$(authentik_api_get "/core/users/?search=${encoded_email}&page_size=100")"
+  printf '%s' "$response" | jq -r --arg email "$email" '
+    (.results // [])
+    | map(select((.email // "" | ascii_downcase) == ($email | ascii_downcase)))
+    | .[0].uid // empty
+  '
+}
+
+seed_netbird_account_for_sso() {
+  local identity_provider_id="$1"
+  local admin_email="$2"
+  local admin_uid=""
+  local ssh_key_path="$MANAGER_DATA_DIR/ssh/netbird-${cluster_id}/id_ed25519"
+  local temp_ssh_key=""
+  local public_zone_q
+  local cluster_id_q
+  local admin_uid_q
+  local identity_provider_id_q
+  local admin_email_q
+
+  if [[ -n "$admin_email" ]]; then
+    admin_uid="$(authentik_user_uid_by_email "$admin_email")"
+    if [[ -z "$admin_uid" ]]; then
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: Could not resolve Authentik user uid for ${admin_email}; NetBird SSO owner preseed skipped." >&2
+    fi
+  fi
+
+  if [[ ! -f "$ssh_key_path" ]]; then
+    if jq -e '.SSH_PRIVATE_KEY // empty' "$netbird_bastion_secret" >/dev/null; then
+      temp_ssh_key="$(mktemp)"
+      jq -r '.SSH_PRIVATE_KEY' "$netbird_bastion_secret" >"$temp_ssh_key"
+      chmod 600 "$temp_ssh_key"
+      ssh_key_path="$temp_ssh_key"
+    fi
+  fi
+
+  if [[ ! -f "$ssh_key_path" || -z "$netbird_proxy_ip" ]] || ! command -v ssh >/dev/null 2>&1; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: NetBird host SSH is unavailable; account domain and SSO owner preseed skipped." >&2
+    [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
+    return 0
+  fi
+
+  printf -v public_zone_q '%q' "$public_zone_name"
+  printf -v cluster_id_q '%q' "$cluster_id"
+  printf -v admin_uid_q '%q' "$admin_uid"
+  printf -v identity_provider_id_q '%q' "$identity_provider_id"
+  printf -v admin_email_q '%q' "$admin_email"
+
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Seeding NetBird account domain and SSO owner context"
+  if ! ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 \
+    -i "$ssh_key_path" root@"$netbird_proxy_ip" \
+    "PUBLIC_ZONE_NAME=$public_zone_q CLUSTER_ID=$cluster_id_q ADMIN_UID=$admin_uid_q CONNECTOR_ID=$identity_provider_id_q ADMIN_EMAIL=$admin_email_q python3 -" <<'PY'
+import base64
+import glob
+import json
+import os
+import shutil
+import sqlite3
+import time
+
+public_zone_name = os.environ["PUBLIC_ZONE_NAME"]
+cluster_id = os.environ["CLUSTER_ID"]
+admin_uid = os.environ.get("ADMIN_UID", "")
+connector_id = os.environ.get("CONNECTOR_ID", "")
+admin_email = os.environ.get("ADMIN_EMAIL", "")
+store_db_candidates = [
+    "/var/lib/docker/volumes/netbird_netbird_data/_data/store.db",
+    "/var/lib/docker/volumes/netbird-server_netbird_data/_data/store.db",
+    "/var/lib/docker/volumes/netbird_netbird-data/_data/store.db",
+]
+store_db = next((path for path in store_db_candidates if os.path.exists(path)), "")
+if not store_db:
+    store_db = next(
+        (
+            path
+            for path in glob.glob("/var/lib/docker/volumes/*/_data/store.db")
+            if "netbird" in path
+        ),
+        "",
+    )
+
+if not os.path.exists(store_db):
+    print("WARNING: NetBird store database not found; cannot seed SSO account context.")
+    raise SystemExit(0)
+
+backup_dir = "/opt/netbird/twinbox-db-backups"
+os.makedirs(backup_dir, exist_ok=True)
+stamp = time.strftime("%Y%m%d%H%M%S")
+shutil.copy2(store_db, os.path.join(backup_dir, f"store.db.{stamp}.bak"))
+
+def encode_dex_user_id(user_id, provider_id):
+    if len(user_id) > 255 or len(provider_id) > 255:
+        raise ValueError("Dex user ID components are too long")
+    raw = (
+        bytes([0x0A, len(user_id)])
+        + user_id.encode()
+        + bytes([0x12, len(provider_id)])
+        + provider_id.encode()
+    )
+    return base64.b64encode(raw).decode().rstrip("=")
+
+with sqlite3.connect(store_db) as connection:
+    connection.row_factory = sqlite3.Row
+    connection.execute("begin immediate")
+
+    admin_group_name = f"twinbox-{cluster_id}-admins"
+    admin_group = connection.execute(
+        "select id, account_id from groups where name = ? order by id limit 1",
+        (admin_group_name,),
+    ).fetchone()
+    if admin_group is None:
+        account = connection.execute(
+            "select id from accounts order by created_at limit 1",
+        ).fetchone()
+        if account is None:
+            print("WARNING: NetBird account not found; cannot seed SSO account context.")
+            connection.rollback()
+            raise SystemExit(0)
+        target_account_id = account["id"]
+        admin_group_id = ""
+    else:
+        target_account_id = admin_group["account_id"]
+        admin_group_id = admin_group["id"]
+
+    connection.execute(
+        "update accounts set domain = ?, domain_category = ?, is_domain_primary_account = 1, "
+        "settings_extra_user_approval_required = 0 where id = ?",
+        (public_zone_name, "private", target_account_id),
+    )
+    connection.execute(
+        "update account_onboardings set onboarding_flow_pending = 0 where account_id = ?",
+        (target_account_id,),
+    )
+
+    deleted_accounts = []
+    if admin_uid and connector_id:
+        sso_user_id = encode_dex_user_id(admin_uid, connector_id)
+        padded_sso_user_id = base64.b64encode(
+            bytes([0x0A, len(admin_uid)])
+            + admin_uid.encode()
+            + bytes([0x12, len(connector_id)])
+            + connector_id.encode()
+        ).decode()
+        auto_groups = json.dumps([admin_group_id] if admin_group_id else [])
+
+        connection.execute(
+            "delete from users where id = ? and account_id = ?",
+            (padded_sso_user_id, target_account_id),
+        )
+        existing = connection.execute(
+            "select id from users where id = ?",
+            (sso_user_id,),
+        ).fetchone()
+        if existing:
+            connection.execute(
+                "update users set account_id = ?, role = ?, blocked = 0, pending_approval = 0, auto_groups = ? where id = ?",
+                (target_account_id, "owner", auto_groups, sso_user_id),
+            )
+        else:
+            connection.execute(
+                "insert into users (id, account_id, role, is_service_user, non_deletable, service_user_name, "
+                "auto_groups, blocked, pending_approval, last_login, created_at, issued, integration_ref_id, "
+                "integration_ref_integration_type, name, email) "
+                "values (?, ?, ?, 0, 0, ?, ?, 0, 0, NULL, datetime('now'), ?, 0, ?, ?, ?)",
+                (sso_user_id, target_account_id, "owner", "", auto_groups, "api", "", "", ""),
+            )
+
+        duplicate_accounts = [
+            row["id"]
+            for row in connection.execute(
+                "select id from accounts where id != ? and created_by in (?, ?)",
+                (target_account_id, sso_user_id, padded_sso_user_id),
+            )
+        ]
+        for account_id in duplicate_accounts:
+            remaining_users = connection.execute(
+                "select count(*) from users where account_id = ? and id not in (?, ?)",
+                (account_id, sso_user_id, padded_sso_user_id),
+            ).fetchone()[0]
+            if remaining_users:
+                continue
+
+            policies = [
+                row["id"]
+                for row in connection.execute(
+                    "select id from policies where account_id = ?",
+                    (account_id,),
+                )
+            ]
+            if policies:
+                connection.executemany(
+                    "delete from policy_rules where policy_id = ?",
+                    [(policy_id,) for policy_id in policies],
+                )
+
+            for table in [
+                "account_onboardings",
+                "group_peers",
+                "groups",
+                "policies",
+                "routes",
+                "networks",
+                "network_routers",
+                "network_resources",
+                "setup_keys",
+                "peers",
+                "services",
+                "targets",
+                "domains",
+                "zones",
+                "records",
+                "name_server_groups",
+                "posture_checks",
+                "proxy_access_tokens",
+                "access_log_entries",
+                "jobs",
+                "user_invites",
+            ]:
+                try:
+                    connection.execute(f"delete from {table} where account_id = ?", (account_id,))
+                except sqlite3.OperationalError:
+                    pass
+            connection.execute("delete from users where account_id = ?", (account_id,))
+            connection.execute("delete from accounts where id = ?", (account_id,))
+            deleted_accounts.append(account_id)
+
+    connection.commit()
+
+    print(
+        json.dumps(
+            {
+                "target_account": target_account_id,
+                "domain": public_zone_name,
+                "admin_email": admin_email,
+                "sso_owner_seeded": bool(admin_uid and connector_id),
+                "deleted_duplicate_accounts": deleted_accounts,
+            },
+            sort_keys=True,
+        )
+    )
+PY
+  then
+    [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
+    fail "Failed to seed NetBird account domain and SSO owner context"
+  fi
+
+  [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
+cluster_scope_id="$(printf '%s' "$cluster_json" | jq -r '.cluster_instance_id // .instance_id // .id // empty')"
 cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty')"
 public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "${cluster_dns_domain:-}")"
 
@@ -100,10 +378,15 @@ public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "${cluster_dns_doma
 
 netbird_token="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.netbird_token // empty')"
 netbird_management_url="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.netbird_management_url // empty')"
+netbird_admin_email="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.netbird_admin_email // empty')"
 traefik_resource_address="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.traefik_resource_address // empty')"
 proxy_services_json="$(printf '%s' "$STEP_INPUTS_JSON" | jq -c '.proxy_services_json // empty')"
 if [[ -n "$proxy_services_json" && "$proxy_services_json" != "null" ]]; then
   proxy_services_json="$(printf '%s' "$proxy_services_json" | jq -r '.')"
+fi
+
+if [[ -z "$netbird_admin_email" ]]; then
+  netbird_admin_email="$(read_first_admin_email "$cluster_scope_id" || true)"
 fi
 
 netbird_bastion_secret="/opt/twinbox/bootstrap/secrets/global/netbird-bastion-${cluster_id}.json"
@@ -325,6 +608,9 @@ tofu apply -auto-approve -no-color \
   -var "client_id=$netbird_oidc_client_id" \
   -var "client_secret=$netbird_oidc_client_secret" \
   -var "issuer=$netbird_oidc_issuer"
+identity_provider_id="$(tofu output -raw -no-color identity_provider_id)"
+
+seed_netbird_account_for_sso "$identity_provider_id" "$netbird_admin_email"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Recording ingress strategy as netbird"
 cluster_file="$MANAGER_DATA_DIR/clusters/${cluster_id}.json"

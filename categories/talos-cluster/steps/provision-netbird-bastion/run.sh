@@ -108,6 +108,7 @@ tofu apply -no-color -auto-approve -input=false \
   -var "location=$hcloud_location" \
   -var "netbird_fqdn=$netbird_fqdn" \
   -var "netbird_proxy_domain=$netbird_proxy_domain" \
+  -var "public_zone_name=$public_zone_name" \
   -var "netbird_admin_email=$netbird_admin_email" \
   -var "netbird_version=${PINNED_NETBIRD_VERSION:-0.70.5}"
 

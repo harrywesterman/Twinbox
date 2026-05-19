@@ -1749,6 +1749,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "netbird-bastion-dns" in netbird_bastion_run_text
     assert "dnsName: ${netbird_fqdn}" in netbird_bastion_run_text
     assert "dnsName: ${netbird_proxy_domain}" in netbird_bastion_run_text
+    assert '-var "public_zone_name=$public_zone_name"' in netbird_bastion_run_text
     assert "external-dns" in netbird_bastion_run_text
     assert "command -v ssh >/dev/null" in netbird_bastion_run_text
     assert "command -v ssh-keygen >/dev/null" in netbird_bastion_run_text
@@ -1801,8 +1802,13 @@ def test_netbird_cloud_init_escapes_shell_variables_for_templatefile():
     assert "ufw --force enable" in text
     assert "$${" not in text, "template should not contain $$ escapes"
     assert "${NETBIRD_VERSION}" not in text, "bash var NETBIRD_VERSION must use $VAR not ${VAR}"
+    assert "${volume_dir}" not in text, "bash vars must not be Terraform template expressions"
     assert '"$NETBIRD_URL' in text or "'$NETBIRD_URL" in text
     assert "netbird-automated-setup.sh" not in text
+    assert 'export PUBLIC_ZONE_NAME="${public_zone_name}"' in text
+    assert "seed_netbird_account_domain()" in text
+    assert "settings_extra_user_approval_required = 0" in text
+    assert "domain_category = ?, is_domain_primary_account = 1" in text
 
 
 def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
@@ -1816,6 +1822,15 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert 'authentik_api_url="${AUTHENTIK_API_BASE%/api/v3}"' in text
     assert '-var "authentik_api_url=$authentik_api_url"' in text
     assert '-var "authentik_public_url=$authentik_public_url"' in text
+    assert "read_first_admin_email()" in text
+    assert "authentik_user_uid_by_email()" in text
+    assert "seed_netbird_account_for_sso()" in text
+    assert 'identity_provider_id="$(tofu output -raw -no-color identity_provider_id)"' in text
+    assert 'seed_netbird_account_for_sso "$identity_provider_id" "$netbird_admin_email"' in text
+    assert 'glob.glob("/var/lib/docker/volumes/*/_data/store.db")' in text
+    assert "Failed to seed NetBird account domain and SSO owner context" in text
+    assert "settings_extra_user_approval_required = 0" in text
+    assert 'base64.b64encode(raw).decode().rstrip("=")' in text
     assert "netbird_host_resource_address()" in text
     assert (
         'traefik_network_resource_address="$(netbird_host_resource_address "$traefik_resource_address")"'

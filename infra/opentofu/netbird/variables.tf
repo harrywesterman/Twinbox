@@ -49,6 +49,11 @@ variable "netbird_proxy_domain" {
   type        = string
 }
 
+variable "public_zone_name" {
+  description = "Public DNS zone used to seed NetBird single-account mode, e.g. example.com"
+  type        = string
+}
+
 variable "netbird_admin_email" {
   description = "Email used for Let's Encrypt certificates"
   type        = string
