@@ -54,7 +54,7 @@ resource "netbird_network_resource" "traefik" {
   name        = "${local.name_prefix}-traefik"
   description = "Internal Traefik service for NetBird Reverse Proxy targets"
   address     = var.traefik_resource_address
-  groups      = [netbird_group.proxy.id]
+  groups      = [data.netbird_group.all.id, netbird_group.proxy.id]
   enabled     = true
 }
 

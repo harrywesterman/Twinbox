@@ -1868,6 +1868,7 @@ def test_netbird_proxy_targets_dedicated_traefik_backend_entrypoint():
     assert "sources       = [data.netbird_group.all.id]" in proxy_policy_body
     assert "sources       = [netbird_group.proxy.id]" not in proxy_policy_body
     assert 'ports         = ["8082"]' in proxy_policy_body
+    assert "groups      = [data.netbird_group.all.id, netbird_group.proxy.id]" in network_text
 
     assert "port        = 8082" in proxy_services_text
     assert 'protocol    = "http"' in proxy_services_text
