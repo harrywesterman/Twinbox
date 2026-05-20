@@ -323,5 +323,8 @@ export function createAuthentikAdminClient({
         body: { pk: userId },
       });
     },
+    listWebAuthnDevices(userId) {
+      return request("GET", `/authenticators/admin/webauthn/?page_size=200&user=${encodeURIComponent(userId)}`);
+    },
   };
 }

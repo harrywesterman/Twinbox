@@ -882,8 +882,8 @@ function SettingsPage({ config, preferences, setPreferences, onSave, onNavigate 
           target="_blank"
           rel="noreferrer"
         >
-          <strong>Enable 2FA</strong>
-          <span>Manage your Authentik authenticator devices.</span>
+          <strong>Manage Authenticators</strong>
+          <span>Set up passkeys, TOTP, and other authentication methods.</span>
         </a>
         <a
           className="link-card"
@@ -2723,7 +2723,9 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
               {temporaryPassword.user?.name || temporaryPassword.user?.username}
             </strong>
             <code>{temporaryPassword.password}</code>
-            <span>Show this once to the user. The portal does not keep a readable copy.</span>
+            <span>
+              Show this once to the user. After first login they should register a passkey in Authentik.
+            </span>
             <button
               type="button"
               className="secondary-button"
@@ -2850,6 +2852,9 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
                     <span className="user-list-meta">
                       <span className={`status-chip ${user.isActive ? "is-live" : ""}`}>
                         {user.isActive ? "active" : "disabled"}
+                      </span>
+                      <span className={`status-chip${user.hasPasskey ? " is-live" : ""}`}>
+                        {user.hasPasskey ? "passkey" : "no passkey"}
                       </span>
                     </span>
                   </button>

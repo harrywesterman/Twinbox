@@ -1074,6 +1074,20 @@ app.post("/api/admin/apps/jobs/:jobId/cancel", async (req, res) => {
   }
 });
 
+async function enrichUsersWithPasskeyStatus(users, client) {
+  const enriched = [];
+  for (const user of users) {
+    try {
+      const devices = await client.listWebAuthnDevices(user.id);
+      const hasPasskey = Array.isArray(devices?.results) && devices.results.length > 0;
+      enriched.push({ ...user, hasPasskey });
+    } catch {
+      enriched.push({ ...user, hasPasskey: false });
+    }
+  }
+  return enriched;
+}
+
 app.get("/api/admin/users", async (req, res) => {
   const session = requireAdminSession(req, res);
   if (!session) {
@@ -1083,8 +1097,11 @@ app.get("/api/admin/users", async (req, res) => {
   try {
     const config = await loadPortalConfig();
     const directory = await loadUserAdminDirectory(config);
+    const client = getAuthentikAdminClient();
+    const users = await enrichUsersWithPasskeyStatus(directory.users, client);
     res.json({
-      users: directory.users,
+      users,
+      groups: directory.groups,
       generatedAt: new Date().toISOString(),
     });
   } catch (error) {

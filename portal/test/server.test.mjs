@@ -362,6 +362,11 @@ const authentikServer = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "GET" && pathname === "/api/v3/authenticators/admin/webauthn/") {
+    sendJson(res, 200, { results: [] });
+    return;
+  }
+
   sendJson(res, 404, { error: `Unhandled fake Authentik route: ${req.method} ${pathname}` });
 });
 
@@ -767,6 +772,10 @@ test("admin can create a user with a temporary password and approved groups", as
   assert.equal(listing.status, 200);
   assert(listing.payload.users.some((user) => user.username === "mia"));
   assert(!listing.payload.users.some((user) => user.username === "twinbox-automation"));
+
+  const newUser = listing.payload.users.find((user) => user.username === "mia");
+  assert.equal(newUser.hasPasskey, false);
+  assert(Array.isArray(listing.payload.groups));
 });
 
 test("admin can disable and reactivate a regular user", async () => {
