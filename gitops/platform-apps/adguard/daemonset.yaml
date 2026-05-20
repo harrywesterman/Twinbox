@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: adguard
+  namespace: adguard
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: adguard
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: adguard
+    spec:
+      hostNetwork: true
+      containers:
+        - name: adguard
+          image: adguard/adguardhome:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: dns-udp
+              containerPort: 53
+              protocol: UDP
+            - name: dns-tcp
+              containerPort: 53
+              protocol: TCP
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          volumeMounts:
+            - name: config
+              mountPath: /opt/adguardhome/conf
+            - name: work
+              mountPath: /opt/adguardhome/work
+          livenessProbe:
+            httpGet:
+              path: /healthcheck
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthcheck
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: config
+          emptyDir: {}
+        - name: work
+          emptyDir: {}
