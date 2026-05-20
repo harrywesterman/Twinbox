@@ -31,6 +31,7 @@ Twinbox builds a Talos Linux Kubernetes cluster on Proxmox through a Management 
 - `portal/` - Twinbox Portal.
 - `config/` - pinned defaults, Cilium values, portal content.
 - `tests/` - Python integration/contract tests.
+- `docs/` - Reference documentation (API, architecture, troubleshooting, etc.).
 
 ## Runtime
 
