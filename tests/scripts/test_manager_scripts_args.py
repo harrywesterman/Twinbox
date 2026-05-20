@@ -1786,6 +1786,24 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
         netbird_bastion_run_text
     )
     assert "/var/log/cloud-init-output.log" in netbird_bastion_run_text
+    assert 'bastion_cloud_init_log_path="/var/log/cloud-init-output.log"' in (
+        netbird_bastion_run_text
+    )
+    assert "redact_bastion_cloud_init_log()" in netbird_bastion_run_text
+    assert "personal_access_token" in netbird_bastion_run_text
+    assert "TOKEN|PASSWORD|SECRET|PRIVATE_KEY" in netbird_bastion_run_text
+    assert "emit_bastion_cloud_init_tail 80" in netbird_bastion_run_text
+    assert "emit_bastion_cloud_init_tail 120" in netbird_bastion_run_text
+    assert "emit_new_bastion_cloud_init_lines" in netbird_bastion_run_text
+    assert "Streaming bastion cloud-init output while waiting for setup token" in (
+        netbird_bastion_run_text
+    )
+    assert "[bastion cloud-init] %s" in netbird_bastion_run_text
+    assert "No new bastion cloud-init output yet; waiting for setup token" in (
+        netbird_bastion_run_text
+    )
+    assert "Last bastion cloud-init output before timeout" in netbird_bastion_run_text
+    assert "Waiting for NetBird setup (attempt ${i}/60)" not in netbird_bastion_run_text
     assert "No NetBird setup token found after bastion bootstrap" in netbird_bastion_run_text
     assert "cloudflare-netbird" not in netbird_bastion_run_text
     assert "api.cloudflare.com/client/v4/zones" not in netbird_bastion_run_text

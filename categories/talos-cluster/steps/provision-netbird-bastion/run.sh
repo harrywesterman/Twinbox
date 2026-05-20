@@ -89,6 +89,77 @@ read_first_admin_email() {
   return 1
 }
 
+bastion_cloud_init_log_path="/var/log/cloud-init-output.log"
+bastion_cloud_init_last_line=0
+
+redact_bastion_cloud_init_log() {
+  sed -E \
+    -e 's/(personal_access_token["'"'"']?[[:space:]]*[:=][[:space:]]*)["'"'"']?[^"'"'"',}[:space:]]+["'"'"']?/\1[REDACTED]/Ig' \
+    -e 's/((access_)?token["'"'"']?[[:space:]]*[:=][[:space:]]*)["'"'"']?[^"'"'"',}[:space:]]+["'"'"']?/\1[REDACTED]/Ig' \
+    -e 's/(password["'"'"']?[[:space:]]*[:=][[:space:]]*)["'"'"']?[^"'"'"',}[:space:]]+["'"'"']?/\1[REDACTED]/Ig' \
+    -e 's/(secret["'"'"']?[[:space:]]*[:=][[:space:]]*)["'"'"']?[^"'"'"',}[:space:]]+["'"'"']?/\1[REDACTED]/Ig' \
+    -e 's/([A-Za-z0-9_]*(TOKEN|PASSWORD|SECRET|PRIVATE_KEY)[A-Za-z0-9_]*[[:space:]]*=[[:space:]]*)[^[:space:]]+/\1[REDACTED]/g' \
+    -e 's/(Auth secret:[[:space:]]*)[^[:space:]]+/\1[REDACTED]/Ig' \
+    -e 's/-----BEGIN OPENSSH PRIVATE KEY-----/[REDACTED OPENSSH PRIVATE KEY]/g' \
+    -e 's/-----END OPENSSH PRIVATE KEY-----/[REDACTED OPENSSH PRIVATE KEY]/g'
+}
+
+emit_bastion_cloud_init_lines() {
+  local lines="$1"
+  [[ -n "$lines" ]] || return 1
+
+  printf '%s\n' "$lines" |
+    redact_bastion_cloud_init_log |
+    while IFS= read -r line; do
+      [[ -n "$line" ]] || continue
+      printf '[bastion cloud-init] %s\n' "$line"
+    done
+}
+
+bastion_cloud_init_line_count() {
+  ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
+    -i "$ssh_key_dir/id_ed25519" root@"$server_ipv4" \
+    "test -f '$bastion_cloud_init_log_path' && wc -l < '$bastion_cloud_init_log_path' || echo 0" \
+    2>/dev/null || echo 0
+}
+
+emit_bastion_cloud_init_tail() {
+  local line_count="$1"
+  local lines
+
+  lines="$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
+    -i "$ssh_key_dir/id_ed25519" root@"$server_ipv4" \
+    "test -f '$bastion_cloud_init_log_path' && tail -n '$line_count' '$bastion_cloud_init_log_path' || true" \
+    2>/dev/null || true)"
+  emit_bastion_cloud_init_lines "$lines" || true
+  bastion_cloud_init_last_line="$(bastion_cloud_init_line_count)"
+}
+
+emit_new_bastion_cloud_init_lines() {
+  local current_line
+  local start_line
+  local lines
+
+  current_line="$(bastion_cloud_init_line_count)"
+  if ! [[ "$current_line" =~ ^[0-9]+$ ]]; then
+    current_line=0
+  fi
+  if ! [[ "$bastion_cloud_init_last_line" =~ ^[0-9]+$ ]]; then
+    bastion_cloud_init_last_line=0
+  fi
+  if (( current_line <= bastion_cloud_init_last_line )); then
+    return 1
+  fi
+
+  start_line=$((bastion_cloud_init_last_line + 1))
+  lines="$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
+    -i "$ssh_key_dir/id_ed25519" root@"$server_ipv4" \
+    "tail -n +$start_line '$bastion_cloud_init_log_path'" \
+    2>/dev/null || true)"
+  bastion_cloud_init_last_line="$current_line"
+  emit_bastion_cloud_init_lines "$lines"
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_scope_id="$(printf '%s' "$cluster_json" | jq -r '.cluster_instance_id // .instance_id // .id // empty')"
@@ -284,16 +355,23 @@ if [[ -n "$ssh_private_key" ]]; then
   done
 
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for NetBird automated setup to complete..."
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Streaming bastion cloud-init output while waiting for setup token..."
+  emit_bastion_cloud_init_tail 80
   for i in $(seq 1 60); do
     setup_token_result="$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -i "$ssh_key_dir/id_ed25519" root@"$server_ipv4" 'cat /opt/netbird/setup-result.json 2>/dev/null || echo "{}"' 2>/dev/null || echo "{}")"
     if echo "$setup_token_result" | jq -e '.personal_access_token' >/dev/null 2>&1; then
+      emit_new_bastion_cloud_init_lines || true
       echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird automated setup completed."
       break
     fi
     if [[ $i -eq 60 ]]; then
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Last bastion cloud-init output before timeout:"
+      emit_bastion_cloud_init_tail 120
       fail "NetBird automated setup did not produce a Personal Access Token in time. Check /var/log/cloud-init-output.log on the bastion host for the root cause."
     fi
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for NetBird setup (attempt ${i}/60)..."
+    if ! emit_new_bastion_cloud_init_lines; then
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] No new bastion cloud-init output yet; waiting for setup token (attempt ${i}/60)..."
+    fi
     sleep 10
   done
 else
