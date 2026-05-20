@@ -326,11 +326,17 @@ write_files:
       docker compose up -d
 
       NETBIRD_URL="https://$NETBIRD_DOMAIN"
+      NETBIRD_SERVER_IP="$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' netbird-server)"
+      if [[ -z "$NETBIRD_SERVER_IP" ]]; then
+        echo "ERROR: Could not determine netbird-server container IP." >&2
+        exit 1
+      fi
+      BOOTSTRAP_NETBIRD_URL="http://$NETBIRD_SERVER_IP"
       SETUP_RESULT="/opt/netbird/setup-result.json"
 
       echo "Waiting for NetBird server to become ready..."
       for i in $(seq 1 120); do
-        if curl -fsS -o /dev/null "$NETBIRD_URL/oauth2/.well-known/openid-configuration" 2>/dev/null; then
+        if curl -fsS -H "Host: $NETBIRD_DOMAIN" -o /dev/null "$BOOTSTRAP_NETBIRD_URL/oauth2/.well-known/openid-configuration" 2>/dev/null; then
           echo "NetBird server is ready."
           break
         fi
@@ -345,7 +351,8 @@ write_files:
 
       ADMIN_PASSWORD="$(openssl rand -base64 32 | sed 's/=//g')"
       echo "Calling NetBird automated setup API..."
-      SETUP_RESPONSE="$(curl -fsS -X POST "$NETBIRD_URL/api/setup" \
+      SETUP_RESPONSE="$(curl -fsS -X POST "$BOOTSTRAP_NETBIRD_URL/api/setup" \
+        -H "Host: $NETBIRD_DOMAIN" \
         -H "Content-Type: application/json" \
         -d '{
           "email": "'"$ADMIN_EMAIL"'",
@@ -365,6 +372,13 @@ write_files:
         exit 1
       fi
       echo "NetBird automated setup completed successfully."
+
+      echo "Checking public NetBird TLS endpoint..."
+      if curl -fsS -o /dev/null "$NETBIRD_URL/oauth2/.well-known/openid-configuration" 2>/dev/null; then
+        echo "Public NetBird TLS endpoint is ready."
+      else
+        echo "WARNING: NetBird setup completed, but public TLS is not trusted or reachable yet. This is often temporary during Let's Encrypt issuance or rate limiting." >&2
+      fi
 
 runcmd:
   - ufw allow 22/tcp

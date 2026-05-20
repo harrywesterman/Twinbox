@@ -1845,6 +1845,15 @@ def test_netbird_cloud_init_escapes_shell_variables_for_templatefile():
     assert "${NETBIRD_VERSION}" not in text, "bash var NETBIRD_VERSION must use $VAR not ${VAR}"
     assert "${volume_dir}" not in text, "bash vars must not be Terraform template expressions"
     assert '"$NETBIRD_URL' in text or "'$NETBIRD_URL" in text
+    assert 'BOOTSTRAP_NETBIRD_URL="http://$NETBIRD_SERVER_IP"' in text
+    assert "docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}'" in text
+    assert '-H "Host: $NETBIRD_DOMAIN"' in text
+    assert '"$BOOTSTRAP_NETBIRD_URL/oauth2/.well-known/openid-configuration"' in text
+    assert 'curl -fsS -X POST "$BOOTSTRAP_NETBIRD_URL/api/setup"' in text
+    assert 'curl -fsS -X POST "$NETBIRD_URL/api/setup"' not in text
+    assert "Checking public NetBird TLS endpoint" in text
+    assert "Public NetBird TLS endpoint is ready" in text
+    assert "NetBird setup completed, but public TLS is not trusted or reachable yet" in text
     assert "netbird-automated-setup.sh" not in text
     assert 'export PUBLIC_ZONE_NAME="${public_zone_name}"' in text
     assert "seed_netbird_account_domain()" in text
@@ -1916,6 +1925,11 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "kubernetes.io/service-name=traefik-netbird" in text
     assert "wait_for_public_oidc_discovery" in text
     assert 'curl -fsS --connect-timeout 5 --max-time 15 "$discovery_url"' in text
+    assert "Continuing NetBird configuration; browser SSO will be healthy once public TLS" in text
+    assert (
+        'fail "Public Authentik OIDC discovery did not become reachable through NetBird proxy'
+        not in text
+    )
 
     auth_setup_index = text.index("Configuring Authentik OIDC application for NetBird")
     network_index = text.index("Creating NetBird groups, routing resources, and setup keys")

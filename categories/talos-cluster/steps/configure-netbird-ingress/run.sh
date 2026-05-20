@@ -77,7 +77,9 @@ wait_for_public_oidc_discovery() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Public Authentik OIDC discovery not reachable yet (attempt ${i}/60): ${discovery_url}"
     sleep 5
   done
-  fail "Public Authentik OIDC discovery did not become reachable through NetBird proxy: ${discovery_url}"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: Public Authentik OIDC discovery is not reachable through NetBird proxy yet: ${discovery_url}" >&2
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: Continuing NetBird configuration; browser SSO will be healthy once public TLS and proxy reachability are ready." >&2
+  return 0
 }
 
 netbird_host_resource_address() {
