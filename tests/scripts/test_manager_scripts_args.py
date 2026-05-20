@@ -1756,7 +1756,18 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "external-dns" in netbird_bastion_run_text
     assert "command -v ssh >/dev/null" in netbird_bastion_run_text
     assert "command -v ssh-keygen >/dev/null" in netbird_bastion_run_text
+    assert "command -v python3 >/dev/null" in netbird_bastion_run_text
     assert "OpenSSH client tools are available" in netbird_bastion_run_text
+    assert 'server_name="twinbox-${cluster_id}-netbird"' in netbird_bastion_run_text
+    assert "NetBird Hetzner resource prefix" in netbird_bastion_run_text
+    assert 'delete_hcloud_resources_by_name "servers" "$legacy_server_name" "$server_name"' in (
+        netbird_bastion_run_text
+    )
+    assert (
+        'delete_hcloud_resources_by_name "ssh_keys" "${legacy_server_name}-ssh-key" '
+        '"${server_name}-ssh-key"'
+        in netbird_bastion_run_text
+    )
     assert "tofu init -no-color -input=false" in netbird_bastion_run_text
     assert "tofu apply -no-color -auto-approve -input=false" in netbird_bastion_run_text
     assert "read_first_admin_email()" in netbird_bastion_run_text

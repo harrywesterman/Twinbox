@@ -18,6 +18,44 @@ fail() {
   exit 1
 }
 
+delete_hcloud_resources_by_name() {
+  local resource_type="$1"
+  shift
+  local resource_name
+
+  for resource_name in "$@"; do
+    [[ -n "$resource_name" ]] || continue
+    python3 - "$hcloud_token" "$resource_type" "$resource_name" <<'PY'
+import json
+import sys
+import urllib.parse
+import urllib.request
+
+token, resource_type, resource_name = sys.argv[1:]
+base_url = "https://api.hetzner.cloud/v1"
+headers = {"Authorization": f"Bearer {token}"}
+query = urllib.parse.urlencode({"name": resource_name})
+request = urllib.request.Request(f"{base_url}/{resource_type}?{query}", headers=headers)
+
+with urllib.request.urlopen(request) as response:
+    payload = json.load(response)
+
+items = payload.get(resource_type, [])
+for item in items:
+    if item.get("name") != resource_name:
+        continue
+    delete_request = urllib.request.Request(
+        f"{base_url}/{resource_type}/{item['id']}",
+        headers=headers,
+        method="DELETE",
+    )
+    with urllib.request.urlopen(delete_request):
+        pass
+    print(f"Deleted existing Hetzner {resource_type[:-1]}: {resource_name}")
+PY
+  done
+}
+
 read_first_admin_email() {
   local cluster_scope="$1"
   local state_file
@@ -69,6 +107,7 @@ fi
 command -v kubectl >/dev/null 2>&1 || fail "kubectl is required to create NetBird DNS records through external-dns"
 command -v ssh >/dev/null 2>&1 || fail "ssh is required to fetch the NetBird setup token. Refresh the manager-worker image so OpenSSH client tools are available."
 command -v ssh-keygen >/dev/null 2>&1 || fail "ssh-keygen is required to create the NetBird bootstrap key. Refresh the manager-worker image so OpenSSH client tools are available."
+command -v python3 >/dev/null 2>&1 || fail "python3 is required to clean up stale Hetzner resources before provisioning NetBird."
 
 # Read DNS provider and credentials from the external-dns secret
 cluster_file="$MANAGER_DATA_DIR/clusters/${cluster_id}.json"
@@ -120,6 +159,14 @@ server_name="netbird-${cluster_id}"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting NetBird bastion provisioning for cluster: $cluster_id"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird FQDN: $netbird_fqdn"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird proxy domain: $netbird_proxy_domain"
+
+server_name="twinbox-${cluster_id}-netbird"
+legacy_server_name="netbird-${cluster_id}"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird Hetzner resource prefix: $server_name"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Removing stale Hetzner resources from previous runs"
+delete_hcloud_resources_by_name "servers" "$legacy_server_name" "$server_name"
+delete_hcloud_resources_by_name "firewalls" "${legacy_server_name}-fw" "${server_name}-fw"
+delete_hcloud_resources_by_name "ssh_keys" "${legacy_server_name}-ssh-key" "${server_name}-ssh-key"
 
 if [[ -z "$ssh_public_key" ]]; then
   ssh_key_dir="$MANAGER_DATA_DIR/ssh/netbird-${cluster_id}"
