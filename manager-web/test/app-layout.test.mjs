@@ -170,6 +170,21 @@ test("app source defines a minimal wizard shell with guided input and step-by-st
   );
   assert.match(
     source,
+    /setWizardStateCanSave\(true\)/,
+    "expected wizard state autosave to enable only after a successful hydration"
+  );
+  assert.match(
+    source,
+    /if \(!wizardStateCanSave\)/,
+    "expected wizard state autosave to stay disabled after hydration failures"
+  );
+  assert.match(
+    source,
+    /if \(!hydratedRef\.current \|\| !wizardStateHydrated\) return/,
+    "expected catalog polling to wait until wizard state hydration finishes"
+  );
+  assert.match(
+    source,
     /wizard-vm-card is-fixed/,
     "expected the management VM to render as a fixed VM card"
   );

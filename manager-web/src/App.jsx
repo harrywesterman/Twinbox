@@ -1022,6 +1022,9 @@ function App() {
   const [hasStarted, setHasStarted] = useState(initialHasStarted);
   const [wizardPhase, setWizardPhase] = useState(initialWizardPhase);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [wizardStateHydrated, setWizardStateHydrated] = useState(false);
+  const [wizardStateCanSave, setWizardStateCanSave] = useState(false);
+  const saveWizardStateTimerRef = useRef(null);
   const placementSuggestionKeyRef = useRef("");
   const wizardPhaseRef = useRef(initialWizardPhase);
 
@@ -1048,6 +1051,61 @@ function App() {
   useEffect(() => {
     answersRef.current = answers;
   }, [answers]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    requestJson("/api/wizard/state")
+      .then((data) => {
+        if (cancelled || !data) return;
+
+        const hasRestoredAnswers =
+          data.answers && typeof data.answers === "object" && Object.keys(data.answers).length > 0;
+        const hasRestoredSession = Boolean(
+          data.selectedStepId || data.clusterId || data.clusterInstanceId || hasRestoredAnswers
+        );
+
+        if (data.selectedStepId) {
+          selectedStepIdRef.current = data.selectedStepId;
+          setSelectedStepId(data.selectedStepId);
+        }
+        if (data.wizardPhase === "install" || data.wizardPhase === "questions") {
+          wizardPhaseRef.current = data.wizardPhase;
+          setWizardPhase(data.wizardPhase);
+        }
+        if (hasRestoredAnswers) {
+          answersRef.current = data.answers;
+          setAnswers(data.answers);
+        }
+        if (data.clusterId) {
+          clusterIdRef.current = data.clusterId;
+          setClusterId(data.clusterId);
+        }
+        if (data.clusterCreatedAt) {
+          clusterCreatedAtRef.current = data.clusterCreatedAt;
+          setClusterCreatedAt(data.clusterCreatedAt);
+        }
+        if (data.clusterInstanceId) {
+          clusterInstanceIdRef.current = data.clusterInstanceId;
+          setClusterInstanceId(data.clusterInstanceId);
+        }
+        if (hasRestoredSession) {
+          hasStartedRef.current = true;
+          setHasStarted(true);
+        }
+        setWizardStateCanSave(true);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) {
+          setWizardStateHydrated(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const questionSteps = useMemo(() => getQuestionSteps(answers), [answers]);
   const setupSteps = useMemo(() => getWizardSteps(catalog, answers), [catalog, answers]);
@@ -1204,7 +1262,7 @@ function App() {
   }, [activeJob, clusterIdRef, clusterInstanceIdRef, model.steps]);
 
   useEffect(() => {
-    if (!hydratedRef.current) return;
+    if (!hydratedRef.current || !wizardStateHydrated) return;
 
     let cancelled = false;
 
@@ -1266,7 +1324,48 @@ function App() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, []);
+  }, [wizardStateHydrated]);
+
+  useEffect(() => {
+    if (!wizardStateCanSave) {
+      return;
+    }
+
+    const state = {
+      selectedStepId,
+      wizardPhase,
+      answers,
+      clusterId,
+      clusterCreatedAt,
+      clusterInstanceId,
+    };
+
+    if (saveWizardStateTimerRef.current) {
+      clearTimeout(saveWizardStateTimerRef.current);
+    }
+
+    saveWizardStateTimerRef.current = window.setTimeout(() => {
+      requestJson("/api/wizard/state", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(state),
+      }).catch(() => {});
+    }, 500);
+
+    return () => {
+      if (saveWizardStateTimerRef.current) {
+        window.clearTimeout(saveWizardStateTimerRef.current);
+      }
+    };
+  }, [
+    wizardStateCanSave,
+    selectedStepId,
+    wizardPhase,
+    answers,
+    clusterId,
+    clusterCreatedAt,
+    clusterInstanceId,
+  ]);
 
   useEffect(() => {
     if (!hydratedRef.current) return;
@@ -2120,6 +2219,19 @@ function App() {
     provisionSuggestionSnapshotRef.current = {};
     placementSuggestionKeyRef.current = "";
     clearInstallStepLogs();
+
+    requestJson("/api/wizard/state", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        selectedStepId: "",
+        wizardPhase: "questions",
+        answers: {},
+        clusterId: "",
+        clusterCreatedAt: "",
+        clusterInstanceId: "",
+      }),
+    }).catch(() => {});
   }
 
   async function handleImportFile(event) {

@@ -19,11 +19,13 @@ import {
 } from "./lib/catalog.js";
 import {
   buildDataDirs,
+  buildDataFiles,
   ensureDir,
   now,
   parseIPv4,
   pickFirstString,
   readJson,
+  readJsonIfExists,
   writeJson,
 } from "./lib/common.js";
 import {
@@ -53,6 +55,7 @@ const port = Number(process.env.MANAGER_API_PORT || 8080);
 const dataRoot = process.env.MANAGER_DATA_DIR || "/data";
 const workspaceRoot = process.env.WORKSPACE_ROOT || process.cwd();
 const dirs = buildDataDirs(dataRoot);
+const dataFiles = buildDataFiles(dataRoot);
 
 Object.values(dirs).forEach((dir) => ensureDir(dir));
 
@@ -1869,6 +1872,63 @@ app.post("/api/jobs/:jobId/cancel", (req, res) => {
       return res.status(409).json({ error: error.message });
     }
     return res.status(500).json({ error: error?.message || "failed to cancel job" });
+  }
+});
+
+function ensureWizardStateFilePath(file) {
+  if (!fs.existsSync(file)) {
+    return;
+  }
+
+  const stat = fs.statSync(file);
+  if (!stat.isDirectory()) {
+    return;
+  }
+
+  try {
+    const backup = `${file}.dir-backup-${Date.now()}`;
+    fs.renameSync(file, backup);
+  } catch (error) {
+    if (error?.code !== "ENOENT") {
+      throw error;
+    }
+  }
+}
+
+ensureWizardStateFilePath(dataFiles.wizardState);
+
+function normalizeWizardState(value = {}) {
+  const answers =
+    value.answers && typeof value.answers === "object" && !Array.isArray(value.answers)
+      ? value.answers
+      : {};
+
+  return {
+    selectedStepId: typeof value.selectedStepId === "string" ? value.selectedStepId : "",
+    wizardPhase: value.wizardPhase === "install" ? "install" : "questions",
+    answers,
+    clusterId: typeof value.clusterId === "string" ? value.clusterId : "",
+    clusterCreatedAt: typeof value.clusterCreatedAt === "string" ? value.clusterCreatedAt : "",
+    clusterInstanceId: typeof value.clusterInstanceId === "string" ? value.clusterInstanceId : "",
+  };
+}
+
+app.get("/api/wizard/state", (_, res) => {
+  try {
+    const state = normalizeWizardState(readJsonIfExists(dataFiles.wizardState) || {});
+    return res.json(state);
+  } catch {
+    return res.status(500).json({ error: "failed to read wizard state" });
+  }
+});
+
+app.put("/api/wizard/state", (req, res) => {
+  try {
+    const normalized = normalizeWizardState(req.body || {});
+    writeJson(dataFiles.wizardState, normalized);
+    return res.json(normalized);
+  } catch {
+    return res.status(500).json({ error: "failed to write wizard state" });
   }
 });
 

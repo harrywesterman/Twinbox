@@ -120,6 +120,12 @@ export function buildDataDirs(dataRoot) {
   };
 }
 
+export function buildDataFiles(dataRoot) {
+  return {
+    wizardState: path.join(dataRoot, "wizard-state.json"),
+  };
+}
+
 export function summarizeJob(job) {
   if (!job) return null;
   return {
