@@ -291,11 +291,13 @@ if [[ -n "$ssh_private_key" ]]; then
       break
     fi
     if [[ $i -eq 60 ]]; then
-      echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: NetBird automated setup did not complete in time. You may need to create a Personal Access Token manually." >&2
+      fail "NetBird automated setup did not produce a Personal Access Token in time. Check /var/log/cloud-init-output.log on the bastion host for the root cause."
     fi
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for NetBird setup (attempt ${i}/60)..."
     sleep 10
   done
+else
+  fail "Cannot verify NetBird automated setup because no SSH private key is available. Use the generated NetBird bastion key so the wizard can fetch the setup token."
 fi
 
 if echo "$setup_token_result" | jq -e '.personal_access_token' >/dev/null 2>&1; then
@@ -305,7 +307,7 @@ if echo "$setup_token_result" | jq -e '.personal_access_token' >/dev/null 2>&1; 
   mv "$tmp_file" "$secret_file"
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird setup token saved to secret file."
 else
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: No setup token found. Step 'configure-netbird-ingress' will require a manual NetBird API token." >&2
+  fail "No NetBird setup token found after bastion bootstrap. Check /var/log/cloud-init-output.log on the bastion host for the root cause."
 fi
 chmod 600 "$secret_file"
 

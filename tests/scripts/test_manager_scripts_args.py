@@ -234,7 +234,9 @@ NETBIRD_PROXY_SERVICES_MODULE_MAIN = (
 )
 NETBIRD_MODULE_VARS = REPO_ROOT / "infra" / "opentofu" / "netbird" / "variables.tf"
 NETBIRD_MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "netbird" / "main.tf"
-NETBIRD_CLOUD_INIT = REPO_ROOT / "infra" / "opentofu" / "netbird" / "cloud-init" / "netbird.yaml.tftpl"
+NETBIRD_CLOUD_INIT = (
+    REPO_ROOT / "infra" / "opentofu" / "netbird" / "cloud-init" / "netbird.yaml.tftpl"
+)
 AUTHENTIK_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "authentik" / "ingressroute.yaml"
 AUTHENTIK_NETBIRD_FORWARDED_HEADERS_MIDDLEWARE = (
     REPO_ROOT / "gitops" / "platform" / "authentik" / "netbird-forwarded-headers-middleware.yaml"
@@ -1767,8 +1769,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     )
     assert (
         'delete_hcloud_resources_by_name "ssh_keys" "${legacy_server_name}-ssh-key" '
-        '"${server_name}-ssh-key"'
-        in netbird_bastion_run_text
+        '"${server_name}-ssh-key"' in netbird_bastion_run_text
     )
     assert "tofu init -no-color -input=false" in netbird_bastion_run_text
     assert "tofu apply -no-color -auto-approve -input=false" in netbird_bastion_run_text
@@ -1780,6 +1781,12 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     )
     assert "ssh-keygen -t ed25519" in netbird_bastion_run_text
     assert "NETBIRD_SETUP_TOKEN" in netbird_bastion_run_text
+    assert "manual NetBird API token" not in netbird_bastion_run_text
+    assert "NetBird automated setup did not produce a Personal Access Token in time" in (
+        netbird_bastion_run_text
+    )
+    assert "/var/log/cloud-init-output.log" in netbird_bastion_run_text
+    assert "No NetBird setup token found after bastion bootstrap" in netbird_bastion_run_text
     assert "cloudflare-netbird" not in netbird_bastion_run_text
     assert "api.cloudflare.com/client/v4/zones" not in netbird_bastion_run_text
     assert "cloudflare_api_token" not in netbird_bastion_run_text
@@ -1825,6 +1832,18 @@ def test_netbird_cloud_init_escapes_shell_variables_for_templatefile():
     assert "seed_netbird_account_domain()" in text
     assert "settings_extra_user_approval_required = 0" in text
     assert "domain_category = ?, is_domain_primary_account = 1" in text
+    assert "retry_netbird_step()" in text
+    assert "local max_attempts=8" in text
+    assert (
+        'retry_netbird_step "Start NetBird reverse proxy" $DOCKER_COMPOSE_COMMAND up -d proxy'
+        in (text)
+    )
+    assert (
+        'raise SystemExit("ERROR: Could not patch NetBird reverse proxy startup for retries.")'
+        in (text)
+    )
+    assert 'retry_netbird_step "Pull NetBird compose images" docker compose pull' in text
+    assert "docker compose pull || true" not in text
 
 
 def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
@@ -3977,7 +3996,7 @@ def test_netbird_cloud_init_configures_dns01_wildcard():
     assert "DNS_API_TOKEN" in text
     assert "dnschallenge.provider" in text
     assert "dns_api_token" in text
-    assert "CF_API_TOKEN" in text
+    assert "CLOUDFLARE_DNS_API_TOKEN" in text
     assert "HostRegexp" in text
     assert "tls.domains[0].main" in text
     assert "tls.domains[0].sans" in text
