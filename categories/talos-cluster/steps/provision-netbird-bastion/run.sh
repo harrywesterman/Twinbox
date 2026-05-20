@@ -28,6 +28,8 @@ delete_hcloud_resources_by_name() {
     python3 - "$hcloud_token" "$resource_type" "$resource_name" <<'PY'
 import json
 import sys
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -44,14 +46,23 @@ items = payload.get(resource_type, [])
 for item in items:
     if item.get("name") != resource_name:
         continue
+
     delete_request = urllib.request.Request(
         f"{base_url}/{resource_type}/{item['id']}",
         headers=headers,
         method="DELETE",
     )
-    with urllib.request.urlopen(delete_request):
-        pass
-    print(f"Deleted existing Hetzner {resource_type[:-1]}: {resource_name}")
+
+    for attempt in range(1, 11):
+        try:
+            with urllib.request.urlopen(delete_request):
+                pass
+            print(f"Deleted existing Hetzner {resource_type[:-1]}: {resource_name}")
+            break
+        except urllib.error.HTTPError as exc:
+            if exc.code not in {409, 422} or attempt == 10:
+                raise
+            time.sleep(3)
 PY
   done
 }

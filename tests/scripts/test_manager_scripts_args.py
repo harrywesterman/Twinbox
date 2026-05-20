@@ -1760,6 +1760,8 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "OpenSSH client tools are available" in netbird_bastion_run_text
     assert 'server_name="twinbox-${cluster_id}-netbird"' in netbird_bastion_run_text
     assert "NetBird Hetzner resource prefix" in netbird_bastion_run_text
+    assert "urllib.error.HTTPError" in netbird_bastion_run_text
+    assert "time.sleep(3)" in netbird_bastion_run_text
     assert 'delete_hcloud_resources_by_name "servers" "$legacy_server_name" "$server_name"' in (
         netbird_bastion_run_text
     )
