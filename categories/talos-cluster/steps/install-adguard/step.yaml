@@ -1,0 +1,7 @@
+name: install-adguard
+title: Install AdGuard Home
+description: Deploy AdGuard Home as a DaemonSet and configure NetBird DNS routing
+category: talos-cluster
+depends_on:
+  - install-netbird-routing-peers
+  - install-argocd
