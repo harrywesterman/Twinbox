@@ -65,15 +65,6 @@ resource "netbird_network_resource" "traefik" {
   enabled     = true
 }
 
-resource "netbird_network_resource" "adguard" {
-  network_id  = netbird_network.twinbox.id
-  name        = "${local.name_prefix}-adguard"
-  description = "AdGuard Home DNS server for NetBird peers"
-  address     = var.adguard_resource_address
-  groups      = [data.netbird_group.all.id]
-  enabled     = true
-}
-
 resource "netbird_network_router" "k8s_routers" {
   network_id  = netbird_network.twinbox.id
   peer_groups = [netbird_group.k8s_routers.id]
@@ -89,20 +80,9 @@ resource "netbird_route" "k8s_services" {
   description = "Kubernetes service CIDR ${each.key}"
   network     = each.key
   peer_groups = [netbird_group.k8s_routers.id]
-  groups      = [netbird_group.proxy.id]
+  groups      = [netbird_group.proxy.id, netbird_group.adguard_dns.id]
   masquerade  = true
   metric      = 9999
-  enabled     = true
-}
-
-resource "netbird_route" "adguard_dns" {
-  network_id  = "adguard-dns-${var.cluster_id}"
-  description = "Route DNS traffic to AdGuard Home"
-  network     = "0.0.0.0/0"
-  peer_groups = [netbird_group.adguard_dns.id]
-  groups      = [data.netbird_group.all.id]
-  masquerade  = false
-  metric      = 1000
   enabled     = true
 }
 
@@ -174,42 +154,6 @@ resource "netbird_policy" "proxy_to_traefik_http" {
     destination_resource = {
       id   = netbird_network_resource.traefik.id
       type = local.traefik_resource_type
-    }
-  }
-}
-
-resource "netbird_policy" "all_to_adguard_dns" {
-  name        = "${local.name_prefix}-all-to-adguard-dns"
-  description = "Allow all NetBird peers to reach AdGuard Home DNS"
-  enabled     = true
-
-  rule {
-    name          = "dns"
-    action        = "accept"
-    enabled       = true
-    bidirectional = true
-    protocol      = "udp"
-    sources       = [data.netbird_group.all.id]
-    ports         = ["53"]
-
-    destination_resource = {
-      id   = netbird_network_resource.adguard.id
-      type = "domain"
-    }
-  }
-
-  rule {
-    name          = "dns-tcp"
-    action        = "accept"
-    enabled       = true
-    bidirectional = true
-    protocol      = "tcp"
-    sources       = [data.netbird_group.all.id]
-    ports         = ["53"]
-
-    destination_resource = {
-      id   = netbird_network_resource.adguard.id
-      type = "domain"
     }
   }
 }

@@ -1,7 +1,23 @@
-name: install-adguard
-title: Install AdGuard Home
-description: Deploy AdGuard Home as a DaemonSet and configure NetBird DNS routing
-category: talos-cluster
-depends_on:
-  - install-netbird-routing-peers
-  - install-argocd
+id: install-adguard
+title: Install AdGuard Home DNS
+type: action
+journey_stage: setup
+summary: Deploy AdGuard Home and configure a NetBird DNS peer group.
+explanation: >
+  This step deploys AdGuard Home inside Kubernetes and configures NetBird DNS
+  management for a controlled peer group.
+side_help: >
+  Add one test device to the AdGuard DNS group first. Mobile clients may need
+  Android Private DNS disabled before VPN DNS is used.
+ingress_route: netbird
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/install-adguard/run.sh

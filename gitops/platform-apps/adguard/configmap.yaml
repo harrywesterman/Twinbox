@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: adguard-config
+  namespace: adguard
+data:
+  AdGuardHome.yaml: |
+    bind_host: 0.0.0.0
+    bind_port: 3000
+    users:
+      - name: admin
+        password: $2b$12$BouBSJO/uUdwzyV3oxebouVskhtxb4Ccm54RLdnHNlnQB3cbRaRda
+    dns:
+      bind_hosts:
+        - 0.0.0.0
+      port: 53
+      upstream_dns:
+        - tls://9.9.9.9
+        - tls://1.1.1.1
+      bootstrap_dns:
+        - 9.9.9.9
+        - 1.1.1.1
+      blocking_mode: default
+      protection_enabled: true
+      edns_enabled: true
+      filtering_enabled: true
+      safesearch_enabled: false
+      querylog_enabled: true
+      stats_enabled: true
+      ratelimit: 20
+      ratelimit_whitelist: []
+      refuse_any: true
+      upstream_dns_file: ""
+    filtering:
+      filtering_enabled: true
+      safebrowsing_enabled: true
+      parental_enabled: false
+      safesearch:
+        enabled: false
+      blocked_response_ttl: 10
+      resolve_clients: true
+    filters:
+      - enabled: true
+        url: https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt
+        name: AdGuard DNS filter
+        id: 1
+    theme: auto
+    http_session:
+      - ip: 10.0.0.0/8
+        user_agent: ""
+      - ip: 172.16.0.0/12
+        user_agent: ""
+      - ip: 192.168.0.0/16
+        user_agent: ""
+      - ip: 100.64.0.0/10
+        user_agent: ""

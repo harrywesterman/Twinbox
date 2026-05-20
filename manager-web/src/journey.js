@@ -31,6 +31,7 @@ const FIXED_SETUP_STEP_IDS = [
   "configure-cloudflare-dns",
   "configure-netbird-ingress",
   "install-netbird-routing-peers",
+  "install-adguard",
   "configure-netbird-admin-access",
   "configure-argocd-oidc",
   "install-headlamp",

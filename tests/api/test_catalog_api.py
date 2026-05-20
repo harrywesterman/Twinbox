@@ -229,6 +229,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert "install-proxmox-backup-system" not in talos_steps
             assert "install-gitea" not in talos_steps
             assert "install-uptimekuma" not in talos_steps
+            assert "install-adguard" not in talos_steps
             assert talos_steps["provision-nodes"]["journey_stage"] == "setup"
             assert talos_steps["provision-nodes"]["status"] == "ready"
             assert talos_steps["install-argocd"]["status"] == "ready"
@@ -402,6 +403,7 @@ def test_catalog_endpoint_filters_ingress_routes_after_choice():
             assert "configure-cloudflare-tunnel" not in talos_step_ids
             assert "configure-metallb-ingress" not in talos_step_ids
             assert "configure-tailscale-ingress" not in talos_step_ids
+            assert "install-adguard" not in talos_step_ids
         finally:
             proc.terminate()
             proc.wait(timeout=5)

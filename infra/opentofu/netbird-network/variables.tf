@@ -42,8 +42,3 @@ variable "management_vm_api_port" {
   default     = 8080
 }
 
-variable "adguard_resource_address" {
-  description = "AdGuard Home DNS service address reachable from NetBird (e.g., adguard.adguard.svc.cluster.local)"
-  type        = string
-  default     = "adguard.adguard.svc.cluster.local"
-}

@@ -12,10 +12,9 @@ spec:
       labels:
         app.kubernetes.io/name: adguard
     spec:
-      hostNetwork: true
       containers:
         - name: adguard
-          image: adguard/adguardhome:latest
+          image: adguard/adguardhome:v0.107.74
           imagePullPolicy: IfNotPresent
           ports:
             - name: dns-udp
@@ -32,20 +31,28 @@ spec:
               mountPath: /opt/adguardhome/conf
             - name: work
               mountPath: /opt/adguardhome/work
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
           livenessProbe:
             httpGet:
-              path: /healthcheck
+              path: /control/status
               port: 3000
             initialDelaySeconds: 10
             periodSeconds: 10
           readinessProbe:
             httpGet:
-              path: /healthcheck
+              path: /control/status
               port: 3000
             initialDelaySeconds: 5
             periodSeconds: 5
       volumes:
         - name: config
-          emptyDir: {}
+          configMap:
+            name: adguard-config
         - name: work
           emptyDir: {}

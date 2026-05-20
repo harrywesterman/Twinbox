@@ -14,9 +14,9 @@ output "proxy_group_id" {
   value = netbird_group.proxy.id
 }
 
-output "adguard_group_id" {
+output "adguard_dns_group_id" {
   value       = netbird_group.adguard_dns.id
-  description = "NetBird group ID for AdGuard DNS peers"
+  description = "NetBird group ID for peers that should receive AdGuard DNS"
 }
 
 output "traefik_resource_id" {
