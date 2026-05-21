@@ -76,27 +76,26 @@ fi
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] AdGuard DNS service IP: $adguard_service_ip"
 
 # --- Step 4: Find the adguard_dns group ID ---
-# Try OpenTofu state output first, then fall back to running OpenTofu
+# Read from the netbird-network OpenTofu state (created by configure-netbird-ingress)
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Looking up AdGuard DNS NetBird group..."
 adguard_dns_group_id=""
 
-# Check OpenTofu state for previous netbird-network run
-tofu_state_dir="$MANAGER_DATA_DIR/clusters/${cluster_id}/iac"
-if [[ -d "$tofu_state_dir" ]]; then
-  adguard_dns_group_id="$(cd "$tofu_state_dir" && tofu output -raw adguard_dns_group_id 2>/dev/null || true)"
+network_workdir="$MANAGER_DATA_DIR/opentofu/netbird-network-${cluster_id}"
+if [[ -d "$network_workdir" ]]; then
+  adguard_dns_group_id="$(cd "$network_workdir" && tofu output -raw adguard_dns_group_id 2>/dev/null || true)"
 fi
 
-# Fallback: run OpenTofu from source (like configure-netbird-ingress does)
+# Fallback: run OpenTofu from source
 if [[ -z "$adguard_dns_group_id" ]]; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] AdGuard DNS group not found in state, applying OpenTofu..."
   service_cidr="$(kubectl -n kube-system get pod -l component=kube-apiserver -o json 2>/dev/null | jq -r '.items[0].spec.containers[0].command[] | select(startswith("--service-cluster-ip-range=")) | sub("^--service-cluster-ip-range="; "")' || true)"
   [[ -z "$service_cidr" ]] && service_cidr="10.96.0.0/12"
 
-  cd "$WORKSPACE_ROOT/infra/opentofu/netbird-network"
-  TOFU_VARS_DIR="$MANAGER_DATA_DIR/clusters/${cluster_id}/iac"
-  mkdir -p "$TOFU_VARS_DIR"
+  network_workdir="$MANAGER_DATA_DIR/opentofu/netbird-network-${cluster_id}"
+  mkdir -p "$network_workdir"
+  cp -r "$WORKSPACE_ROOT/infra/opentofu/netbird-network/"* "$network_workdir/"
 
-  cat > "$TOFU_VARS_DIR/terraform.tfvars" <<EOF
+  cat > "$network_workdir/terraform.tfvars" <<EOF
 netbird_token              = "$netbird_token"
 netbird_management_url     = "$netbird_management_url"
 cluster_id                 = "$cluster_id"
@@ -106,9 +105,9 @@ management_vm_ssh_port     = 22
 management_vm_web_port     = 3000
 management_vm_api_port     = 8080
 EOF
-  cd "$TOFU_VARS_DIR"
-  tofu init -from-module "$WORKSPACE_ROOT/infra/opentofu/netbird-network"
-  tofu apply -auto-approve -var-file=terraform.tfvars
+  cd "$network_workdir"
+  tofu init
+  tofu apply -auto-approve
   adguard_dns_group_id="$(tofu output -raw adguard_dns_group_id)"
 fi
 
