@@ -17,9 +17,7 @@ data:
       upstream_dns:
         - tls://9.9.9.9
         - tls://1.1.1.1
-      bootstrap_dns:
-        - 9.9.9.9
-        - 1.1.1.1
+      bootstrap_dns: 9.9.9.9
       blocking_mode: default
       protection_enabled: true
       edns_enabled: true
