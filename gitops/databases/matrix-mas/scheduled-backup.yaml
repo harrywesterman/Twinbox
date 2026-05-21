@@ -1,0 +1,9 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: matrix-mas-db-daily
+  namespace: databases
+spec:
+  schedule: "0 2 * * *"
+  cluster:
+    name: matrix-mas-db

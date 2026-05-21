@@ -1,0 +1,36 @@
+id: install-matrix
+title: Install Matrix Chat
+type: action
+journey_stage: setup
+summary: Federated chat with end-to-end encryption, so you control your conversations.
+explanation: >
+  Matrix is an open protocol for secure, federated real-time communication.
+  Element Server Suite provides a complete Matrix deployment with Synapse as
+  the homeserver, Element Web as the client, and Element Admin for management.
+  Conversations are end-to-end encrypted by default, and Matrix federation
+  lets you communicate with users on other Matrix servers.
+side_help: Choose Matrix if you want a Slack/Discord alternative with full data
+  ownership, end-to-end encryption, and the ability to communicate across servers.
+inputs: []
+dashy:
+  items:
+    - section: Platform
+      title: Element
+      description: Matrix chat client
+      icon: fas fa-comments
+      url_template: https://chat.__ZONE_NAME__
+    - section: Platform
+      title: Element Admin
+      description: Matrix admin console
+      icon: fas fa-cog
+      url_template: https://element-admin.__ZONE_NAME__
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/apps/steps/install-matrix/run.sh

@@ -1,0 +1,24 @@
+# Matrix RTC (Element Call) NodePorts
+# Exposes additional WebRTC ports for TCP/UDP connections.
+# Required for Element Call (video/voIP) to work outside the cluster.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ess-matrix-rtc-sfu-nodeport
+  namespace: matrix
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: ess-matrix-rtc-sfu
+  ports:
+    # WebRTC TCP transport
+    - name: webrtc-tcp
+      port: 30001
+      targetPort: 30001
+      nodePort: 30001
+    # WebRTC muxed transport (UDP)
+    - name: webrtc-muxed
+      port: 30002
+      targetPort: 30002
+      nodePort: 30002
+      protocol: UDP

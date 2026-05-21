@@ -1,0 +1,25 @@
+id: install-coder
+title: Install Coder
+type: action
+journey_stage: setup
+summary: A cloud development environment for your team.
+explanation: "Coder gives you a full IDE in the browser — running on your own cluster. With opencode AI built in, Git, Node.js and Python. Build and test Twinbox directly from your workspace without any local setup."
+side_help: "Ideal if you want consistent dev environments without local tooling."
+dashy:
+  items:
+    - section: Platform
+      title: Coder
+      description: Cloud development environment
+      icon: fas fa-laptop-code
+      url_template: https://coder.__ZONE_NAME__
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/apps/steps/install-coder/run.sh

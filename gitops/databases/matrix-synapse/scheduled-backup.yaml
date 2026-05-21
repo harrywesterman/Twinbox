@@ -1,0 +1,9 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: matrix-synapse-db-daily
+  namespace: databases
+spec:
+  schedule: "0 2 * * *"
+  cluster:
+    name: matrix-synapse-db

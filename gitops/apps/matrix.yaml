@@ -1,0 +1,159 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: matrix-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            twinbox.io/domain-ready: "true"
+  template:
+    metadata:
+      name: matrix
+    spec:
+      project: default
+      sources:
+        - repoURL: oci://ghcr.io/element-hq/ess-helm/matrix-stack
+          path: .
+          targetRevision: "26.3.1"
+          helm:
+            valueFiles:
+              - $values/gitops/values/matrix.yaml
+            values: |
+              serverName: "matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+              elementWeb:
+                host: "chat.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+              matrixAuthenticationService:
+                host: "account.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+              elementAdmin:
+                host: "element-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+              matrixRTC:
+                sfu:
+                  host: "mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+        - repoURL: __REPO_URL__
+          targetRevision: __TARGET_REVISION__
+          ref: values
+        - repoURL: __REPO_URL__
+          targetRevision: __TARGET_REVISION__
+          path: gitops/platform-apps/matrix
+          kustomize:
+            patches:
+              - target:
+                  kind: IngressRoute
+                  name: matrix
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: matrix-wiredoor
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: matrix-tailscale
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: chat
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`chat.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: chat-wiredoor
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`chat.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: chat-tailscale
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`chat.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: account
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`account.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: account-wiredoor
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`account.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: account-tailscale
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`account.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: element-admin
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`element-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: element-admin-wiredoor
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`element-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: element-admin-tailscale
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`element-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: mrtc
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: mrtc-wiredoor
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: mrtc-tailscale
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: matrix
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

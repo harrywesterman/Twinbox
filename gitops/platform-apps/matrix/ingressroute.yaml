@@ -1,0 +1,264 @@
+# Matrix (Synapse) - Public
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: matrix
+  namespace: matrix
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`matrix.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: ess-synapse-haproxy
+          port: 80
+  tls: {}
+---
+# Matrix (Synapse) - Wiredoor
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: matrix-wiredoor
+  namespace: matrix
+spec:
+  entryPoints:
+    - webwiredoor
+  routes:
+    - kind: Rule
+      match: Host(`matrix.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: ess-synapse-haproxy
+          port: 80
+---
+# Matrix (Synapse) - Tailscale
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: matrix-tailscale
+  namespace: matrix
+spec:
+  entryPoints:
+    - webtailscale
+  routes:
+    - kind: Rule
+      match: Host(`matrix.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: ess-synapse-haproxy
+          port: 80
+  tls: {}
+---
+# Element Web (Chat) - Public
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: chat
+  namespace: matrix
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`chat.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: ess-element-web
+          port: 80
+  tls: {}
+---
+# Element Web (Chat) - Wiredoor
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: chat-wiredoor
+  namespace: matrix
+spec:
+  entryPoints:
+    - webwiredoor
+  routes:
+    - kind: Rule
+      match: Host(`chat.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: ess-element-web
+          port: 80
+---
+# Element Web (Chat) - Tailscale
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: chat-tailscale
+  namespace: matrix
+spec:
+  entryPoints:
+    - webtailscale
+  routes:
+    - kind: Rule
+      match: Host(`chat.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: ess-element-web
+          port: 80
+  tls: {}
+---
+# MAS (Account) - Public
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: account
+  namespace: matrix
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`account.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: ess-matrix-authentication-service
+          port: 80
+  tls: {}
+---
+# MAS (Account) - Wiredoor
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: account-wiredoor
+  namespace: matrix
+spec:
+  entryPoints:
+    - webwiredoor
+  routes:
+    - kind: Rule
+      match: Host(`account.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: ess-matrix-authentication-service
+          port: 80
+---
+# MAS (Account) - Tailscale
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: account-tailscale
+  namespace: matrix
+spec:
+  entryPoints:
+    - webtailscale
+  routes:
+    - kind: Rule
+      match: Host(`account.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: ess-matrix-authentication-service
+          port: 80
+  tls: {}
+---
+# Element Admin - Public
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: element-admin
+  namespace: matrix
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`element-admin.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: ess-element-admin
+          port: 80
+  tls: {}
+---
+# Element Admin - Wiredoor
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: element-admin-wiredoor
+  namespace: matrix
+spec:
+  entryPoints:
+    - webwiredoor
+  routes:
+    - kind: Rule
+      match: Host(`element-admin.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: ess-element-admin
+          port: 80
+---
+# Element Admin - Tailscale
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: element-admin-tailscale
+  namespace: matrix
+spec:
+  entryPoints:
+    - webtailscale
+  routes:
+    - kind: Rule
+      match: Host(`element-admin.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: ess-element-admin
+          port: 80
+  tls: {}
+---
+# Matrix RTC (Element Call) - Public
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: mrtc
+  namespace: matrix
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`mrtc.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: ess-matrix-rtc-sfu
+          port: 443
+  tls: {}
+---
+# Matrix RTC (Element Call) - Wiredoor
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: mrtc-wiredoor
+  namespace: matrix
+spec:
+  entryPoints:
+    - webwiredoor
+  routes:
+    - kind: Rule
+      match: Host(`mrtc.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: ess-matrix-rtc-sfu
+          port: 443
+---
+# Matrix RTC (Element Call) - Tailscale
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: mrtc-tailscale
+  namespace: matrix
+spec:
+  entryPoints:
+    - webtailscale
+  routes:
+    - kind: Rule
+      match: Host(`mrtc.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: ess-matrix-rtc-sfu
+          port: 443
+  tls: {}

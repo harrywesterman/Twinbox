@@ -1,0 +1,31 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: coder-db-pooler-rw
+  namespace: databases
+spec:
+  cluster:
+    name: coder-db
+  instances: 1
+  type: rw
+  pgbouncer:
+    poolMode: transaction
+    parameters:
+      max_client_conn: "200"
+      default_pool_size: "20"
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: coder-db-pooler-rw-session
+  namespace: databases
+spec:
+  cluster:
+    name: coder-db
+  instances: 1
+  type: rw
+  pgbouncer:
+    poolMode: session
+    parameters:
+      max_client_conn: "200"
+      default_pool_size: "20"

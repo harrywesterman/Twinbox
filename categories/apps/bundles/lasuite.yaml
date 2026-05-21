@@ -33,12 +33,12 @@ description: >
 
   **Zulip** — Threaded team chat with powerful topic-based organisation.
 
+  **Matrix** — Federated chat with end-to-end encryption and Element client.
+
   **Jitsi** — Private video conferencing with screen sharing, no accounts needed.
 
 
   **Coming soon**
-
-  **Tchap** — Secure instant messaging for government agents, built on Matrix.
 
   **Visio** — Video conferencing and webinar platform with AI transcription.
 
@@ -61,4 +61,5 @@ apps:
   - install-outline
   - install-nextcloud
   - install-zulip
+  - install-matrix
   - install-jitsi
