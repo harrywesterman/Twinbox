@@ -1,6 +1,7 @@
 """Tests for AdGuard Home GitOps manifests."""
-import yaml
 import pathlib
+
+import yaml
 
 GITOPS_DIR = pathlib.Path(__file__).parent.parent / "gitops" / "platform-apps" / "adguard"
 
