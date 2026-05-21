@@ -304,6 +304,7 @@ test("app catalog exposes apps while the wizard catalog keeps them out of sight"
       "install-outline",
       "install-nextcloud",
       "install-zulip",
+      "install-matrix",
       "install-jitsi",
     ]);
   } finally {
