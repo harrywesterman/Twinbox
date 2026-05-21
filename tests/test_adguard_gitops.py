@@ -1,4 +1,5 @@
 """Tests for AdGuard Home GitOps manifests."""
+
 import pathlib
 
 import yaml
