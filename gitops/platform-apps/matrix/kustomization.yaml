@@ -6,4 +6,3 @@ resources:
   - db-externalsecret.yaml
   - runtime-externalsecret.yaml
   - ingressroute.yaml
-  - element-call-nodeport.yaml
