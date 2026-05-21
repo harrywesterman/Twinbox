@@ -406,7 +406,9 @@ fi
 [[ -n "$netbird_token" ]] || fail "NetBird API token is required. Either provide it as input or ensure the bastion step generated a setup token."
 [[ -n "$netbird_management_url" ]] || fail "Could not determine NetBird management URL"
 [[ -f "$netbird_bastion_secret" ]] || fail "NetBird bastion secret not found at $netbird_bastion_secret"
+netbird_proxy_domain="$(jq -r '.NETBIRD_PROXY_DOMAIN // empty' "$netbird_bastion_secret")"
 netbird_proxy_ip="$(jq -r '.NETBIRD_IP // empty' "$netbird_bastion_secret")"
+[[ -n "$netbird_proxy_domain" ]] || fail "NetBird bastion secret does not contain NETBIRD_PROXY_DOMAIN"
 [[ -n "$netbird_proxy_ip" ]] || fail "NetBird bastion secret does not contain NETBIRD_IP"
 
 if [[ -z "$traefik_resource_address" ]]; then
@@ -544,6 +546,7 @@ tofu init -input=false -no-color
 tofu apply -auto-approve -no-color \
   -var "netbird_token=$netbird_token" \
   -var "netbird_management_url=$netbird_management_url" \
+  -var "netbird_proxy_domain=$netbird_proxy_domain" \
   -var "traefik_resource_id=$traefik_resource_id" \
   -var "traefik_resource_address=$traefik_resource_address" \
   -var "services=$proxy_services_json"

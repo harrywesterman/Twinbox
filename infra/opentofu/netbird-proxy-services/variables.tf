@@ -9,6 +9,11 @@ variable "netbird_management_url" {
   type        = string
 }
 
+variable "netbird_proxy_domain" {
+  description = "NetBird reverse proxy cluster address to target"
+  type        = string
+}
+
 variable "traefik_resource_id" {
   description = "NetBird network resource ID for Traefik"
   type        = string

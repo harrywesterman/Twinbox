@@ -232,6 +232,9 @@ NETBIRD_NETWORK_MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "netbird-networ
 NETBIRD_PROXY_SERVICES_MODULE_MAIN = (
     REPO_ROOT / "infra" / "opentofu" / "netbird-proxy-services" / "main.tf"
 )
+NETBIRD_PROXY_SERVICES_MODULE_VARS = (
+    REPO_ROOT / "infra" / "opentofu" / "netbird-proxy-services" / "variables.tf"
+)
 NETBIRD_MODULE_VARS = REPO_ROOT / "infra" / "opentofu" / "netbird" / "variables.tf"
 NETBIRD_MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "netbird" / "main.tf"
 NETBIRD_CLOUD_INIT = (
@@ -1920,6 +1923,8 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert 'name: "authentik", domain: $authentik_domain, path: "/"' in text
     assert "netbird-wildcard-dns" in text
     assert "NETBIRD_IP" in text
+    assert "NETBIRD_PROXY_DOMAIN" in text
+    assert '-var "netbird_proxy_domain=$netbird_proxy_domain"' in text
     assert "wait_for_netbird_routing_peer" in text
     assert "wait_for_traefik_netbird_backend" in text
     assert "kubernetes.io/service-name=traefik-netbird" in text
@@ -1954,6 +1959,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
 def test_netbird_proxy_targets_dedicated_traefik_backend_entrypoint():
     network_text = NETBIRD_NETWORK_MODULE_MAIN.read_text(encoding="utf-8")
     proxy_services_text = NETBIRD_PROXY_SERVICES_MODULE_MAIN.read_text(encoding="utf-8")
+    proxy_services_vars_text = NETBIRD_PROXY_SERVICES_MODULE_VARS.read_text(encoding="utf-8")
     authentik_ingress_text = AUTHENTIK_INGRESSROUTE.read_text(encoding="utf-8")
     authentik_netbird_middleware_text = AUTHENTIK_NETBIRD_FORWARDED_HEADERS_MIDDLEWARE.read_text(
         encoding="utf-8"
@@ -1983,6 +1989,11 @@ def test_netbird_proxy_targets_dedicated_traefik_backend_entrypoint():
     assert "groups      = [data.netbird_group.all.id, netbird_group.proxy.id]" in network_text
 
     assert "traefik_target_type" in proxy_services_text
+    assert "target_clusters" in proxy_services_text
+    assert "cluster.address == var.netbird_proxy_domain" in proxy_services_text
+    assert "cluster.connected_proxies" in proxy_services_text
+    assert "data.netbird_reverse_proxy_clusters.all.clusters[0].address" not in proxy_services_text
+    assert 'variable "netbird_proxy_domain"' in proxy_services_vars_text
     assert "target_type = local.traefik_target_type" in proxy_services_text
     assert "port        = 8082" in proxy_services_text
     assert 'protocol    = "http"' in proxy_services_text
