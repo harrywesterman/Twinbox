@@ -4037,6 +4037,19 @@ def test_uninstall_authentik_cleanup_sets_forward_before_app_cleanup():
 
 def test_netbird_bastion_provisioning_fetches_dns_credentials():
     text = NETBIRD_BASTION_STEP_SCRIPT.read_text(encoding="utf-8")
+    dns_step_text = (
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "configure-dns" / "step.yaml"
+    ).read_text(encoding="utf-8")
+    dns_step_run_text = (
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "configure-dns" / "run.sh"
+    ).read_text(encoding="utf-8")
+    question_flow_text = (REPO_ROOT / "manager-web" / "src" / "question-flow.js").read_text(
+        encoding="utf-8"
+    )
+    external_dns_values_text = (REPO_ROOT / "gitops" / "values" / "external-dns.yaml").read_text(
+        encoding="utf-8"
+    )
+    netbird_vars_text = NETBIRD_MODULE_VARS.read_text(encoding="utf-8")
 
     assert "external-dns-credentials" in text
     assert "dns_provider" in text
@@ -4046,8 +4059,21 @@ def test_netbird_bastion_provisioning_fetches_dns_credentials():
     assert '-var "dns_api_token=$dns_api_token"' in text
     assert '-var "dns_api_secret=$dns_api_secret"' in text
     assert "base64 -d" in text
-    for provider in ("cloudflare", "aws", "digitalocean", "google"):
+    for provider in ("cloudflare", "aws", "digitalocean"):
         assert f'"{provider}"' in text or f"'{provider}'" in text
+        assert provider in dns_step_text
+        assert provider in dns_step_run_text
+        assert provider in question_flow_text
+        assert provider in netbird_vars_text
+    assert "Google Cloud DNS" not in dns_step_text
+    assert "Google Cloud DNS" not in question_flow_text
+    for removed in ("google", "google-credentials", "GOOGLE_APPLICATION_CREDENTIALS"):
+        assert removed not in text
+        assert removed not in dns_step_text
+        assert removed not in dns_step_run_text
+        assert removed not in question_flow_text
+        assert removed not in external_dns_values_text
+        assert removed not in netbird_vars_text
 
 
 def test_netbird_cloud_init_configures_dns01_wildcard():
@@ -4055,12 +4081,32 @@ def test_netbird_cloud_init_configures_dns01_wildcard():
 
     assert "DNS_PROVIDER" in text
     assert "DNS_API_TOKEN" in text
+    assert "issue_netbird_wildcard_certificate()" in text
+    assert "goacme/lego:v4.27.0" in text
+    assert '--domains "$PUBLIC_ZONE_NAME"' in text
+    assert '--domains "*.$PUBLIC_ZONE_NAME"' in text
     assert "dnschallenge.provider" in text
     assert "dns_api_token" in text
     assert "CLOUDFLARE_DNS_API_TOKEN" in text
+    assert "DO_AUTH_TOKEN" in text
+    assert "GOOGLE_APPLICATION_CREDENTIALS" not in text
+    assert "google" not in text
     assert "HostRegexp" in text
+    assert "HostSNI(`*`) && !HostSNI(`{os.environ['NETBIRD_DOMAIN']}`)" in text
     assert "tls.domains[0].main" in text
     assert "tls.domains[0].sans" in text
+    assert "/opt/netbird/certs:/certs:ro" in text
+    assert "/opt/netbird/traefik-dynamic.yaml:/opt/netbird/traefik-dynamic.yaml:ro" in text
+    assert "--providers.file.filename=/opt/netbird/traefik-dynamic.yaml" in text
+    assert "traefik-dynamic.yaml" in text
+    assert "certFile" in text
+    assert "keyFile" in text
+    assert "/certs/live/{zone}.crt" in text
+    assert "dashboard_tls_domain_labels" in text
+    assert "server_tls_domain_labels" in text
+    assert "merge_labels(dashboard, dashboard_tls_domain_labels)" in text
+    assert "merge_labels(netbird_server, server_tls_domain_labels)" in text
+    assert 'for service_name in ("dashboard", "netbird-server")' not in text
     assert "insecureSkipVerify" in text
     assert "cluster-proxy" in text
     assert "NB_PROXY_ACME_CERTIFICATES" in text

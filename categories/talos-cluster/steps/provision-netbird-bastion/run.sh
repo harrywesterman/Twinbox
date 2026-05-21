@@ -204,7 +204,6 @@ if [[ -z "$dns_provider" ]]; then
     if .data.CF_API_TOKEN or .data.token then "cloudflare"
     elif .data.AWS_ACCESS_KEY_ID or .data["access-key"] then "aws"
     elif .data.DO_TOKEN then "digitalocean"
-    elif .data.GOOGLE_APPLICATION_CREDENTIALS or .data["google-credentials"] then "google"
     else ""
     end' 2>/dev/null || true)"
 fi
@@ -222,9 +221,6 @@ case "$dns_provider" in
     ;;
   digitalocean)
     dns_api_token="$(kubectl get secret external-dns-credentials -n external-dns -o jsonpath='{.data.token}' 2>/dev/null | base64 -d || true)"
-    ;;
-  google)
-    dns_api_token="$(kubectl get secret external-dns-credentials -n external-dns -o jsonpath='{.data.google-credentials}' 2>/dev/null | base64 -d || true)"
     ;;
   *)
     fail "Unsupported DNS provider for wildcard certificate: $dns_provider"

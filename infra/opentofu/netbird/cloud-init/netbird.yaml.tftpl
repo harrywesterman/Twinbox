@@ -105,6 +105,70 @@ write_files:
       PY
       }
 
+      issue_netbird_wildcard_certificate() {
+        local cert_name="$PUBLIC_ZONE_NAME"
+        local cert_dir="/opt/netbird/certs"
+        local lego_dir="$cert_dir/lego"
+        local live_dir="$cert_dir/live"
+        local cert_file="$live_dir/$cert_name.crt"
+        local key_file="$live_dir/$cert_name.key"
+        local lego_cert="$lego_dir/certificates/$cert_name.crt"
+        local lego_key="$lego_dir/certificates/$cert_name.key"
+
+        case "$DNS_PROVIDER" in
+          cloudflare|aws|digitalocean)
+            ;;
+          *)
+            echo "ERROR: DNS provider $DNS_PROVIDER is not supported for NetBird wildcard pre-issuance." >&2
+            return 1
+            ;;
+        esac
+
+        install -d -m 0700 "$lego_dir" "$live_dir"
+        if [[ -s "$cert_file" && -s "$key_file" ]]; then
+          echo "NetBird wildcard certificate already exists at $cert_file."
+          return 0
+        fi
+
+        set -a
+        # shellcheck disable=SC1091
+        source /opt/netbird/.dns-credentials
+        set +a
+
+        local -a dns_env=()
+        case "$DNS_PROVIDER" in
+          cloudflare)
+            dns_env=(-e "CLOUDFLARE_DNS_API_TOKEN=$DNS_API_TOKEN")
+            ;;
+          aws)
+            dns_env=(-e "AWS_ACCESS_KEY_ID=$DNS_API_TOKEN" -e "AWS_SECRET_ACCESS_KEY=$DNS_API_SECRET")
+            ;;
+          digitalocean)
+            dns_env=(-e "DO_AUTH_TOKEN=$DNS_API_TOKEN" -e "DO_TOKEN=$DNS_API_TOKEN")
+            ;;
+        esac
+
+        retry_netbird_step "Issue NetBird wildcard certificate" \
+          docker run --rm \
+            "${dns_env[@]}" \
+            -v "$lego_dir:/data" \
+            goacme/lego:v4.27.0 \
+            --path /data \
+            --email "$ADMIN_EMAIL" \
+            --dns "$DNS_PROVIDER" \
+            --domains "$PUBLIC_ZONE_NAME" \
+            --domains "*.$PUBLIC_ZONE_NAME" \
+            --accept-tos \
+            run
+
+        if [[ ! -s "$lego_cert" || ! -s "$lego_key" ]]; then
+          echo "ERROR: Lego did not produce the expected NetBird wildcard certificate files." >&2
+          return 1
+        fi
+        install -m 0644 "$lego_cert" "$cert_file"
+        install -m 0600 "$lego_key" "$key_file"
+      }
+
       if ! command -v docker >/dev/null 2>&1; then
         curl -fsSL https://get.docker.com | sh
       fi
@@ -212,10 +276,44 @@ write_files:
 
       # Add DNS-01 challenge arguments to traefik command
       command = traefik.get("command", [])
-      dns_challenge_arg = f"--certificatesresolvers.letsencrypt.acme.dnschallenge.provider={dns_provider}"
-      if dns_challenge_arg not in command:
-          command.append(dns_challenge_arg)
+      command_args = {
+          "--certificatesresolvers.letsencrypt.acme.dnschallenge.provider=": (
+              f"--certificatesresolvers.letsencrypt.acme.dnschallenge.provider={dns_provider}"
+          ),
+          "--providers.file.filename=": "--providers.file.filename=/opt/netbird/traefik-dynamic.yaml",
+      }
+      if isinstance(command, list):
+          for prefix, desired_arg in command_args.items():
+              replaced = False
+              next_command = []
+              for arg in command:
+                  if isinstance(arg, str) and arg.startswith(prefix):
+                      if not replaced:
+                          next_command.append(desired_arg)
+                          replaced = True
+                  else:
+                      next_command.append(arg)
+              if not replaced:
+                  next_command.append(desired_arg)
+              command = next_command
+      elif isinstance(command, str):
+          existing_args = command.split()
+          for prefix, desired_arg in command_args.items():
+              kept_args = [arg for arg in existing_args if not arg.startswith(prefix)]
+              kept_args.append(desired_arg)
+              existing_args = kept_args
+          command = " ".join(existing_args)
+      else:
+          command = list(command_args.values())
       traefik["command"] = command
+
+      volumes = traefik.setdefault("volumes", [])
+      cert_volume = "/opt/netbird/certs:/certs:ro"
+      dynamic_volume = "/opt/netbird/traefik-dynamic.yaml:/opt/netbird/traefik-dynamic.yaml:ro"
+      if isinstance(volumes, list):
+          for volume in (cert_volume, dynamic_volume):
+              if volume not in volumes:
+                  volumes.append(volume)
 
       # Add DNS provider environment variables to traefik
       env = traefik.setdefault("environment", [])
@@ -228,8 +326,7 @@ write_files:
           provider_env = {
               "cloudflare": {"CLOUDFLARE_DNS_API_TOKEN": dns_api_token},
               "aws": {"AWS_ACCESS_KEY_ID": dns_api_token, "AWS_SECRET_ACCESS_KEY": dns_api_secret},
-              "digitalocean": {"DO_TOKEN": dns_api_token},
-              "google": {"GOOGLE_APPLICATION_CREDENTIALS": dns_api_token},
+              "digitalocean": {"DO_AUTH_TOKEN": dns_api_token, "DO_TOKEN": dns_api_token},
           }
           for k, v in provider_env.get(dns_provider, {}).items():
               if v and k not in env_vars:
@@ -238,8 +335,7 @@ write_files:
           provider_env = {
               "cloudflare": {"CLOUDFLARE_DNS_API_TOKEN": dns_api_token},
               "aws": {"AWS_ACCESS_KEY_ID": dns_api_token, "AWS_SECRET_ACCESS_KEY": dns_api_secret},
-              "digitalocean": {"DO_TOKEN": dns_api_token},
-              "google": {"GOOGLE_APPLICATION_CREDENTIALS": dns_api_token},
+              "digitalocean": {"DO_AUTH_TOKEN": dns_api_token, "DO_TOKEN": dns_api_token},
           }
           for k, v in provider_env.get(dns_provider, {}).items():
               if v:
@@ -279,6 +375,51 @@ write_files:
           labels["traefik.http.services.cluster-proxy.loadbalancer.serversTransport"] = "proxy-insecure"
           labels["traefik.http.serverstransports.proxy-insecure.insecureSkipVerify"] = "true"
 
+      def merge_labels(service, updates):
+          labels = service.setdefault("labels", [])
+          if isinstance(labels, list):
+              existing = {item.split("=", 1)[0] for item in labels if "=" in item}
+              for key, value in updates.items():
+                  if key not in existing:
+                      labels.append(f"{key}={value}")
+          elif isinstance(labels, dict):
+              for key, value in updates.items():
+                  labels.setdefault(key, value)
+
+      dashboard_tls_domain_labels = {
+          "traefik.http.routers.netbird-dashboard.tls.domains[0].main": zone,
+          "traefik.http.routers.netbird-dashboard.tls.domains[0].sans": "*." + zone,
+      }
+      server_tls_domain_labels = {
+          "traefik.http.routers.netbird-backend.tls.domains[0].main": zone,
+          "traefik.http.routers.netbird-backend.tls.domains[0].sans": "*." + zone,
+          "traefik.http.routers.netbird-grpc.tls.domains[0].main": zone,
+          "traefik.http.routers.netbird-grpc.tls.domains[0].sans": "*." + zone,
+      }
+      dashboard = services.get("dashboard")
+      if dashboard:
+          merge_labels(dashboard, dashboard_tls_domain_labels)
+
+      netbird_server = services.get("netbird-server")
+      if netbird_server:
+          merge_labels(netbird_server, server_tls_domain_labels)
+
+      proxy = services.get("proxy")
+      if proxy:
+          passthrough_label = "traefik.tcp.routers.proxy-passthrough.rule"
+          passthrough_rule = f"HostSNI(`*`) && !HostSNI(`{os.environ['NETBIRD_DOMAIN']}`)"
+          merge_labels(proxy, {passthrough_label: passthrough_rule})
+          labels = proxy.get("labels", [])
+          if isinstance(labels, list):
+              labels[:] = [
+                  f"{passthrough_label}={passthrough_rule}"
+                  if item == f"{passthrough_label}=HostSNI(`*`)"
+                  else item
+                  for item in labels
+              ]
+          elif isinstance(labels, dict):
+              labels[passthrough_label] = passthrough_rule
+
       # Add NB_SETUP_PAT_ENABLED to netbird-server
       if "netbird-server" in services:
           env = services["netbird-server"].setdefault("environment", [])
@@ -289,6 +430,28 @@ write_files:
               env.setdefault("NB_SETUP_PAT_ENABLED", "true")
 
       path.write_text(yaml.dump(compose, default_flow_style=False, sort_keys=False))
+      PY
+
+        python3 <<'PY'
+      import os
+      import yaml
+      from pathlib import Path
+
+      zone = os.environ["PUBLIC_ZONE_NAME"]
+      path = Path("/opt/netbird/traefik-dynamic.yaml")
+      if path.exists():
+          data = yaml.safe_load(path.read_text()) or {}
+      else:
+          data = {}
+      tls = data.setdefault("tls", {})
+      certificates = tls.setdefault("certificates", [])
+      wildcard_cert = {
+          "certFile": f"/certs/live/{zone}.crt",
+          "keyFile": f"/certs/live/{zone}.key",
+      }
+      if wildcard_cert not in certificates:
+          certificates.append(wildcard_cert)
+      path.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
       PY
       fi
 
@@ -322,6 +485,7 @@ write_files:
       PY
       fi
 
+      issue_netbird_wildcard_certificate
       retry_netbird_step "Pull NetBird compose images" docker compose pull
       docker compose up -d
 

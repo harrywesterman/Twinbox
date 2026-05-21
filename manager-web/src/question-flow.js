@@ -167,7 +167,6 @@ const QUESTION_STEP_DEFS = [
           { label: "Cloudflare", value: "cloudflare" },
           { label: "AWS Route 53", value: "aws" },
           { label: "DigitalOcean", value: "digitalocean" },
-          { label: "Google Cloud DNS", value: "google" },
         ],
       },
       {
