@@ -76,7 +76,7 @@ resource "netbird_network_router" "k8s_routers" {
 resource "netbird_route" "k8s_services" {
   for_each = toset(var.service_cidrs)
 
-  network_id  = "k8s-services-${var.cluster_id}"
+  network_id  = netbird_network.twinbox.id
   description = "Kubernetes service CIDR ${each.key}"
   network     = each.key
   peer_groups = [netbird_group.k8s_routers.id]
