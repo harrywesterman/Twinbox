@@ -42,10 +42,30 @@ def test_daemonset_dns_ports():
 
 def test_daemonset_config_mount():
     ds = yaml.safe_load((GITOPS_DIR / "daemonset.yaml").read_text())
+    spec = ds["spec"]["template"]["spec"]
     mounts = ds["spec"]["template"]["spec"]["containers"][0]["volumeMounts"]
     config_mounts = [m for m in mounts if m["mountPath"] == "/opt/adguardhome/conf"]
     assert len(config_mounts) == 1
     assert config_mounts[0]["name"] == "config"
+    config_volumes = [v for v in spec["volumes"] if v["name"] == "config"]
+    assert config_volumes[0] == {"name": "config", "emptyDir": {}}
+
+
+def test_daemonset_seeds_config_into_writable_volume():
+    ds = yaml.safe_load((GITOPS_DIR / "daemonset.yaml").read_text())
+    spec = ds["spec"]["template"]["spec"]
+    init_container = spec["initContainers"][0]
+    assert init_container["name"] == "seed-config"
+    assert init_container["image"] == "busybox:1.36"
+    assert any(m["name"] == "config-seed" and m["readOnly"] for m in init_container["volumeMounts"])
+    assert any(
+        m["name"] == "config" and m["mountPath"] == "/opt/adguardhome/conf"
+        for m in init_container["volumeMounts"]
+    )
+    assert any(
+        v["name"] == "config-seed" and v["configMap"]["name"] == "adguard-config"
+        for v in spec["volumes"]
+    )
 
 
 def test_daemonset_resources():

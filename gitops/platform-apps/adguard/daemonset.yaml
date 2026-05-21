@@ -12,6 +12,19 @@ spec:
       labels:
         app.kubernetes.io/name: adguard
     spec:
+      initContainers:
+        - name: seed-config
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - cp /config-seed/AdGuardHome.yaml /opt/adguardhome/conf/AdGuardHome.yaml
+          volumeMounts:
+            - name: config-seed
+              mountPath: /config-seed
+              readOnly: true
+            - name: config
+              mountPath: /opt/adguardhome/conf
       containers:
         - name: adguard
           image: adguard/adguardhome:v0.107.74
@@ -52,6 +65,8 @@ spec:
             periodSeconds: 5
       volumes:
         - name: config
+          emptyDir: {}
+        - name: config-seed
           configMap:
             name: adguard-config
         - name: work
