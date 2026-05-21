@@ -4,6 +4,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+import yaml
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_JSX = REPO_ROOT / "manager-web" / "src" / "App.jsx"
 MANAGER_WEB_JOURNEY = REPO_ROOT / "manager-web" / "src" / "journey.js"
@@ -3518,6 +3520,22 @@ def test_authentik_values_request_memory_for_server_and_worker():
     assert "limits:\n      memory: 512Mi" in text
     assert "authentik:\n  existingSecret:" in text
     assert "authentik-db-pooler-rw-session.databases.svc.cluster.local" in text
+
+
+def test_authentik_passwordless_blueprint_uses_valid_instantiate_label():
+    manifest = yaml.safe_load(
+        (
+            REPO_ROOT
+            / "gitops"
+            / "apps"
+            / "authentik"
+            / "manifests"
+            / "blueprint-passwordless.yaml"
+        ).read_text(encoding="utf-8")
+    )
+
+    labels = manifest["metadata"]["labels"]
+    assert labels == {"blueprints.goauthentik.io/instantiate": "true"}
 
 
 def test_dashy_deployment_uses_a_published_image_tag():
