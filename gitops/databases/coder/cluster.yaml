@@ -6,6 +6,20 @@ metadata:
 spec:
   instances: 1
 
+  backup:
+    retentionPolicy: "14d"
+    barmanObjectStore:
+      serverName: coder-db
+      destinationPath: s3://twinbox-velero/coder-db/
+      endpointURL: http://seaweedfs.longhorn-system.svc.cluster.local:8333
+      s3Credentials:
+        accessKeyId:
+          name: seaweedfs-backup-credentials
+          key: AWS_ACCESS_KEY_ID
+        secretAccessKey:
+          name: seaweedfs-backup-credentials
+          key: AWS_SECRET_ACCESS_KEY
+
   bootstrap:
     initdb:
       database: coder

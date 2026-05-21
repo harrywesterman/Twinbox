@@ -86,7 +86,7 @@ def test_jitsi_gitops_application_and_values_enable_token_auth_guests_and_broker
     assert "kind: Application" in app_text
     assert "name: jitsi" in app_text
     assert "chart: jitsi-meet" in app_text
-    assert 'targetRevision: "2.17.0"' in app_text
+    assert 'targetRevision: "2.18.0"' in app_text
     assert "path: gitops/platform-apps/jitsi" in app_text
     assert "publicURL: https://jitsi.__ZONE_NAME__" in app_text
     assert "domain: jitsi.__ZONE_NAME__" in app_text
@@ -95,7 +95,7 @@ def test_jitsi_gitops_application_and_values_enable_token_auth_guests_and_broker
     assert "kind: ApplicationSet" in optional_app_text
     assert "name: jitsi-set" in optional_app_text
     assert 'twinbox.io/app-jitsi: "enabled"' in optional_app_text
-    assert 'targetRevision: "2.17.0"' in optional_app_text
+    assert 'targetRevision: "2.18.0"' in optional_app_text
     assert "repoURL: https://jitsi-contrib.github.io/jitsi-helm/" in optional_app_text
     assert (
         'publicURL: https://jitsi.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
