@@ -52,15 +52,13 @@ spec:
               memory: "256Mi"
               cpu: "500m"
           livenessProbe:
-            httpGet:
-              path: /control/status
-              port: 3000
+            tcpSocket:
+              port: 53
             initialDelaySeconds: 10
             periodSeconds: 10
           readinessProbe:
-            httpGet:
-              path: /control/status
-              port: 3000
+            tcpSocket:
+              port: 53
             initialDelaySeconds: 5
             periodSeconds: 5
       volumes:
