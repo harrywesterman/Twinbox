@@ -324,7 +324,10 @@ export function createAuthentikAdminClient({
       });
     },
     listWebAuthnDevices(userId) {
-      return request("GET", `/authenticators/admin/webauthn/?page_size=200&user=${encodeURIComponent(userId)}`);
+      return request(
+        "GET",
+        `/authenticators/admin/webauthn/?page_size=200&user=${encodeURIComponent(userId)}`
+      );
     },
   };
 }

@@ -2724,7 +2724,8 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
             </strong>
             <code>{temporaryPassword.password}</code>
             <span>
-              Show this once to the user. After first login they should register a passkey in Authentik.
+              Show this once to the user. After first login they should register a passkey in
+              Authentik.
             </span>
             <button
               type="button"
