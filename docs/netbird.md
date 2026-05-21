@@ -412,9 +412,37 @@ installed; otherwise the wizard uses the Dockerized client.
 | `netbird-routing-peer` is not created | Argo CD app was not applied or External Secrets is not ready | `kubectl -n argocd get app netbird-routing-peers` and `kubectl -n netbird get externalsecret` |
 | Routing peer starts but proxy cannot reach apps | Traefik NetBird backend has no endpoints or NetBird route/policy is missing | Check `traefik-netbird` EndpointSlices and NetBird `/api/routes`, `/api/policies`. |
 | Authentik OIDC discovery fails | The `authentik-netbird` route or forwarded-header middleware is missing/stale | Fetch `https://authentik.<public-zone>/.well-known/openid-configuration` through the public NetBird path. |
+| Browser lands on `https://authentik.<public-zone>/application/o/authorize/` and sees `404 page not found` | That usually means the request lost its OIDC query string or never reached the real authorize flow | Compare the browser URL with Authentik logs. A healthy request includes `?client_id=...&redirect_uri=...&scope=...` and Authentik responds with `302` into `/if/flow/default-authentication-flow/`. |
 | Browser or strict `curl` shows a certificate error for NetBird | Let's Encrypt issuance is still pending or the exact hostname hit a temporary rate limit; the bastion may be serving Traefik's default self-signed certificate | Check `/var/log/cloud-init-output.log` on the bastion for the public TLS warning and retry after the rate-limit window. The install can continue if the NetBird setup token was created. |
 | Public app hostname resolves but returns no app | Reverse proxy service targets are missing or target the wrong Traefik resource | Check NetBird reverse proxy services and `netbird-network-<cluster-id>.json`. |
 | Management VM is unreachable over NetBird | The Management VM peer is not enrolled or admin group policy is missing | Check `netbird status`, the `twinbox-netbird` container, NetBird peers, and admin policies. |
+
+### NetBird OIDC login check
+
+When you need to verify the browser-side login path, test the exact authorize
+URL from the management VM and expect a redirect into Authentik's login flow:
+
+```bash
+curl -sS -D - -o /dev/null \
+  --get \
+  --data-urlencode "client_id=<netbird-client-id>" \
+  --data-urlencode "code_challenge=<pkce-challenge>" \
+  --data-urlencode "code_challenge_method=S256" \
+  --data-urlencode "redirect_uri=https://netbird.<public-zone>/oauth2/callback" \
+  --data-urlencode "response_type=code" \
+  --data-urlencode "scope=openid profile email" \
+  --data-urlencode "state=<random-state>" \
+  "https://authentik.<public-zone>/application/o/authorize/"
+```
+
+Expected result:
+
+- `HTTP/2 302`
+- `Location: /if/flow/default-authentication-flow/...`
+
+If the same host returns `404` only when the query string is missing, that is a
+signal that the authorize endpoint itself is fine and the browser or proxy path
+is dropping OIDC parameters somewhere upstream.
 
 ## Comparison
 

@@ -82,6 +82,66 @@ wait_for_public_oidc_discovery() {
   return 0
 }
 
+verify_public_oidc_authorize() {
+  local authentik_base_url="$1"
+  local client_id="$2"
+  local redirect_uri="$3"
+  local authorize_url="${authentik_base_url%/}/application/o/authorize/"
+  local response_headers
+  local http_code
+  local location
+  local state
+  local code_verifier
+  local code_challenge
+
+  state="$(openssl rand -hex 16)"
+  code_verifier="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"
+  code_challenge="$(python3 - "$code_verifier" <<'PY'
+import base64
+import hashlib
+import sys
+
+verifier = sys.argv[1].encode()
+challenge = hashlib.sha256(verifier).digest()
+print(base64.urlsafe_b64encode(challenge).decode().rstrip("="))
+PY
+)"
+
+  response_headers="$(
+    curl -sS -o /dev/null -D - \
+      --connect-timeout 5 \
+      --max-time 15 \
+      --get \
+      --data-urlencode "client_id=${client_id}" \
+      --data-urlencode "code_challenge=${code_challenge}" \
+      --data-urlencode "code_challenge_method=S256" \
+      --data-urlencode "redirect_uri=${redirect_uri}" \
+      --data-urlencode "response_type=code" \
+      --data-urlencode "scope=openid profile email" \
+      --data-urlencode "state=${state}" \
+      "$authorize_url"
+  )"
+
+  http_code="$(sed -n 's/^HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p' <<<"$response_headers" | tail -n1)"
+  location="$(sed -n 's/^location: //p' <<<"$response_headers" | tail -n1)"
+
+  if [[ "$http_code" != "302" ]]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: Authentik authorize endpoint did not return a redirect for NetBird" >&2
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: URL=${authorize_url} client_id=${client_id}" >&2
+    echo "$response_headers" >&2
+    return 1
+  fi
+
+  if [[ -z "$location" || "$location" != /if/flow/* ]]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: Authentik authorize endpoint returned an unexpected Location header" >&2
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: location=${location:-<empty>}" >&2
+    echo "$response_headers" >&2
+    return 1
+  fi
+
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Public Authentik authorize endpoint is reachable and redirects into the login flow"
+}
+
 netbird_host_resource_address() {
   local address="$1"
   if [[ "$address" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
@@ -600,6 +660,7 @@ spec:
 EOF
 
 wait_for_public_oidc_discovery "$netbird_oidc_issuer"
+verify_public_oidc_authorize "$authentik_public_url" "$netbird_oidc_client_id" "https://netbird.${public_zone_name}/oauth2/callback"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Registering Authentik as NetBird identity provider"
 idp_workdir="$MANAGER_DATA_DIR/opentofu/netbird-idp-${cluster_id}"
