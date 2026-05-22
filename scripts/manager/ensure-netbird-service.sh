@@ -274,26 +274,9 @@ check_existing_service() {
 
 EXISTING_SERVICE_ID="$(check_existing_service || true)"
 
-# 3. Build the service payload
-# Find the Traefik resource on the proxy cluster
-find_traefik_resource_on_cluster() {
-  local response
-  response="$(api_get "${NETBIRD_REVERSE_PROXY_API}/clusters/${PROXY_CLUSTER_ID}/resources" "Traefik resource lookup")" || return 1
-  printf '%s' "$response" \
-    | normalize_netbird_collection "resources" \
-    | jq -r '.[]? | select(.address == "'"$TRAEFIK_RESOURCE_ADDRESS"'") | .id // empty' \
-    | head -n1
-}
-
-TRAEFIK_RESOURCE_ON_CLUSTER=""
-if [[ -n "$TRAEFIK_RESOURCE_ADDRESS" && "$TRAEFIK_RESOURCE_ADDRESS" != "traefik-netbird.traefik.svc.cluster.local" ]]; then
-  TRAEFIK_RESOURCE_ON_CLUSTER="$(find_traefik_resource_on_cluster || true)"
-  if [[ -z "$TRAEFIK_RESOURCE_ON_CLUSTER" ]]; then
-    log_skip "Could not find Traefik resource ${TRAEFIK_RESOURCE_ADDRESS} on proxy cluster; skipping service creation for ${SERVICE_NAME}."
-    exit 0
-  fi
-fi
-
+# 3. Build the service payload. The network step creates the Traefik resource
+# and writes its ID to the network secret; the live cluster resources endpoint
+# can be unavailable on some NetBird versions, so do not re-discover it here.
 # Determine target type (host vs domain)
 if [[ "$TRAEFIK_RESOURCE_ADDRESS" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
   TARGET_TYPE="host"
@@ -308,11 +291,12 @@ build_service_payload() {
   jq -cn \
     --arg name "$SERVICE_NAME" \
     --arg domain "$SERVICE_DOMAIN" \
-    --arg target_id "${TRAEFIK_RESOURCE_ON_CLUSTER:-$TRAEFIK_RESOURCE_ID}" \
+    --arg target_id "$TRAEFIK_RESOURCE_ID" \
     --arg target_type "$TARGET_TYPE" \
     --arg host "$TRAEFIK_RESOURCE_ADDRESS" \
     --arg path "$SERVICE_PATH" \
     --argjson service_enabled "true" \
+    --argjson skip_tls_verify "true" \
     '{
       name: $name,
       domain: $domain,
@@ -324,8 +308,11 @@ build_service_payload() {
         target_type: $target_type,
         host: $host,
         path: $path,
-        port: 8082,
-        protocol: "http",
+        port: 443,
+        protocol: "https",
+        options: {
+          skip_tls_verify: $skip_tls_verify
+        },
         enabled: $service_enabled
       }],
       auth: {

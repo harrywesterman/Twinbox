@@ -1916,7 +1916,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert '-var "traefik_resource_address=$traefik_network_resource_address"' in text
     # The services block was removed; traefik_resource_address is now only passed to the network module
     assert "netbird-proxy-services-" not in text
-    assert 'traefik_resource_address="traefik-netbird.traefik.svc.cluster.local"' in text
+    assert 'traefik_resource_address="traefik.traefik.svc.cluster.local"' in text
     assert "kubectl -n traefik get svc traefik -o jsonpath" not in text
     assert "TRAEFIK_NETWORK_RESOURCE_ADDRESS" in text
     assert "authentik_resolve_scope_mapping_id" in text
@@ -1940,7 +1940,8 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "NETBIRD_PROXY_DOMAIN" in text
     # The services block was removed; netbird_proxy_domain is no longer passed to tofu
     assert "wait_for_netbird_routing_peer" in text
-    assert "wait_for_traefik_netbird_backend" in text
+    assert "wait_for_traefik_reverse_proxy_backend" in text
+    assert "kubernetes.io/service-name=traefik" in text
     assert "kubernetes.io/service-name=traefik-netbird" in text
     assert "wait_for_public_oidc_discovery" in text
     assert "wait_for_public_oidc_authorize" in text
@@ -1960,7 +1961,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     auth_setup_index = text.index("Configuring Authentik OIDC application for NetBird")
     network_index = text.index("Creating NetBird groups, routing resources, and setup keys")
     routing_peer_index = text.index("Deploying NetBird routing peers before enabling reverse proxy")
-    backend_index = text.index('wait_for_traefik_netbird_backend "$traefik_resource_address"')
+    backend_index = text.index('wait_for_traefik_reverse_proxy_backend "$traefik_resource_address"')
     network_secret_index = text.index("Writing network secret for helper scripts")
     dns_index = text.index("Creating wildcard DNS record for NetBird proxy")
     discovery_index = text.index('wait_for_public_oidc_discovery "$netbird_oidc_issuer"')
@@ -2015,9 +2016,16 @@ def test_ensure_netbird_service_uses_current_api_and_safe_skips():
     assert "NetBird service lookup failed; skipping service creation" in text
     assert "response was not JSON; skipping service creation" in text
     assert "already targets ${existing_target_cluster}, expected ${NETBIRD_PROXY_DOMAIN}" in text
-    assert "Could not find Traefik resource ${TRAEFIK_RESOURCE_ADDRESS}" in text
+    assert "live cluster resources endpoint" in text
+    assert "Could not find Traefik resource ${TRAEFIK_RESOURCE_ADDRESS}" not in text
     assert "--argjson service_enabled" in text
+    assert "--argjson skip_tls_verify" in text
     assert "--argjson enabled" not in text
+    assert "port: 443" in text
+    assert 'protocol: "https"' in text
+    assert "skip_tls_verify: $skip_tls_verify" in text
+    assert "port: 8082" not in text
+    assert 'protocol: "http"' not in text
 
 
 def normalize_netbird_collection(payload, field):
@@ -2099,7 +2107,7 @@ def test_netbird_service_hostnames_match_ingress_routes():
     ).read_text(encoding="utf-8")
 
 
-def test_netbird_proxy_targets_dedicated_traefik_backend_entrypoint():
+def test_netbird_proxy_reuses_traefik_websecure_origin():
     network_text = NETBIRD_NETWORK_MODULE_MAIN.read_text(encoding="utf-8")
     proxy_services_text = NETBIRD_PROXY_SERVICES_MODULE_MAIN.read_text(encoding="utf-8")
     proxy_services_vars_text = NETBIRD_PROXY_SERVICES_MODULE_VARS.read_text(encoding="utf-8")
@@ -2115,10 +2123,11 @@ def test_netbird_proxy_targets_dedicated_traefik_backend_entrypoint():
     assert 'data "netbird_group" "all"' in network_text
     assert 'name = "All"' in network_text
     assert "traefik_resource_type" in network_text
-    assert 'resource "netbird_policy" "proxy_to_traefik_https"' not in network_text
+    assert 'resource "netbird_policy" "proxy_to_traefik_https"' in network_text
+    assert 'resource "netbird_policy" "proxy_to_traefik_http"' not in network_text
 
     proxy_policy = re.search(
-        r'resource\s+"netbird_policy"\s+"proxy_to_traefik_http"\s+\{'
+        r'resource\s+"netbird_policy"\s+"proxy_to_traefik_https"\s+\{'
         r'(.*?)(?=\nresource\s+"netbird_policy"|\Z)',
         network_text,
         flags=re.DOTALL,
@@ -2127,7 +2136,8 @@ def test_netbird_proxy_targets_dedicated_traefik_backend_entrypoint():
     proxy_policy_body = proxy_policy.group(1)
     assert "sources       = [data.netbird_group.all.id]" in proxy_policy_body
     assert "sources       = [netbird_group.proxy.id]" not in proxy_policy_body
-    assert 'ports         = ["8082"]' in proxy_policy_body
+    assert 'ports         = ["443"]' in proxy_policy_body
+    assert 'ports         = ["8082"]' not in proxy_policy_body
     assert "type = local.traefik_resource_type" in proxy_policy_body
     assert "groups      = [data.netbird_group.all.id, netbird_group.proxy.id]" in network_text
 
@@ -2138,10 +2148,15 @@ def test_netbird_proxy_targets_dedicated_traefik_backend_entrypoint():
     assert "data.netbird_reverse_proxy_clusters.all.clusters[0].address" not in proxy_services_text
     assert 'variable "netbird_proxy_domain"' in proxy_services_vars_text
     assert "target_type = local.traefik_target_type" in proxy_services_text
-    assert "port        = 8082" in proxy_services_text
-    assert 'protocol    = "http"' in proxy_services_text
+    assert "port        = 443" in proxy_services_text
+    assert "port        = 8082" not in proxy_services_text
+    assert 'protocol    = "https"' in proxy_services_text
+    assert 'protocol    = "http"' not in proxy_services_text
+    assert "skip_tls_verify = true" in proxy_services_text
     assert not re.search(r"port\s*=\s*80(?:\D|$)", proxy_services_text)
 
+    assert "websecure:" in traefik_values_text
+    assert "exposedPort: 443" in traefik_values_text
     assert "webnetbird:" in traefik_values_text
     assert "port: 8082" in traefik_values_text
     assert "exposedPort: 8082" in traefik_values_text

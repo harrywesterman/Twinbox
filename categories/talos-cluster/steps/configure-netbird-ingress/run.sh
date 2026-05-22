@@ -46,22 +46,30 @@ wait_for_netbird_routing_peer() {
   fail "NetBird routing peer deployment did not appear"
 }
 
-wait_for_traefik_netbird_backend() {
+wait_for_traefik_reverse_proxy_backend() {
   local address="$1"
-  if [[ "$address" != "traefik-netbird.traefik.svc.cluster.local" ]]; then
+  local service_name="traefik"
+  local label_selector="kubernetes.io/service-name=traefik"
+  local description="Traefik websecure"
+
+  if [[ "$address" == "traefik-netbird.traefik.svc.cluster.local" ]]; then
+    service_name="traefik-netbird"
+    label_selector="kubernetes.io/service-name=traefik-netbird"
+    description="Traefik NetBird"
+  elif [[ "$address" != "traefik.traefik.svc.cluster.local" ]]; then
     return 0
   fi
 
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for Traefik NetBird backend endpoints"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for ${description} backend endpoints"
   for i in $(seq 1 30); do
-    if kubectl -n traefik get endpointslice -l kubernetes.io/service-name=traefik-netbird -o json 2>/dev/null \
+    if kubectl -n traefik get endpointslice -l "$label_selector" -o json 2>/dev/null \
       | jq -e '([.items[].endpoints[]? | select(.conditions.ready != false)] | length) > 0' >/dev/null; then
       return 0
     fi
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Traefik NetBird backend endpoints not ready yet (attempt ${i}/30)"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ${description} backend endpoints not ready yet (attempt ${i}/30)"
     sleep 5
   done
-  fail "Traefik NetBird backend service did not become ready"
+  fail "${description} backend service ${service_name} did not become ready"
 }
 
 wait_for_public_oidc_discovery() {
@@ -495,7 +503,7 @@ fi
 [[ -n "$netbird_proxy_ip" ]] || fail "NetBird bastion secret does not contain NETBIRD_IP"
 
 if [[ -z "$traefik_resource_address" ]]; then
-  traefik_resource_address="traefik-netbird.traefik.svc.cluster.local"
+  traefik_resource_address="traefik.traefik.svc.cluster.local"
 fi
 traefik_network_resource_address="$(netbird_host_resource_address "$traefik_resource_address")"
 
@@ -642,7 +650,7 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --application "netbird-routing-peers" \
   --destination-namespace "argocd"
 wait_for_netbird_routing_peer
-wait_for_traefik_netbird_backend "$traefik_resource_address"
+wait_for_traefik_reverse_proxy_backend "$traefik_resource_address"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating wildcard DNS record for NetBird proxy"
 kubectl create namespace external-dns --dry-run=client -o yaml | kubectl apply -f -

@@ -41,8 +41,11 @@ resource "netbird_reverse_proxy_service" "services" {
       target_type = local.traefik_target_type
       host        = var.traefik_resource_address
       path        = each.value.path
-      port        = 8082
-      protocol    = "http"
+      port        = 443
+      protocol    = "https"
+      options = {
+        skip_tls_verify = true
+      }
       enabled     = true
     }
   ]
