@@ -135,31 +135,52 @@ write_files:
         source /opt/netbird/.dns-credentials
         set +a
 
-        local -a dns_env=()
         case "$DNS_PROVIDER" in
           cloudflare)
-            dns_env=(-e "CLOUDFLARE_DNS_API_TOKEN=$DNS_API_TOKEN")
+            retry_netbird_step "Issue NetBird wildcard certificate" \
+              docker run --rm \
+                -e "CLOUDFLARE_DNS_API_TOKEN=$DNS_API_TOKEN" \
+                -v "$lego_dir:/data" \
+                goacme/lego:v4.27.0 \
+                --path /data \
+                --email "$ADMIN_EMAIL" \
+                --dns "$DNS_PROVIDER" \
+                --domains "$PUBLIC_ZONE_NAME" \
+                --domains "*.$PUBLIC_ZONE_NAME" \
+                --accept-tos \
+                run
             ;;
           aws)
-            dns_env=(-e "AWS_ACCESS_KEY_ID=$DNS_API_TOKEN" -e "AWS_SECRET_ACCESS_KEY=$DNS_API_SECRET")
+            retry_netbird_step "Issue NetBird wildcard certificate" \
+              docker run --rm \
+                -e "AWS_ACCESS_KEY_ID=$DNS_API_TOKEN" \
+                -e "AWS_SECRET_ACCESS_KEY=$DNS_API_SECRET" \
+                -v "$lego_dir:/data" \
+                goacme/lego:v4.27.0 \
+                --path /data \
+                --email "$ADMIN_EMAIL" \
+                --dns "$DNS_PROVIDER" \
+                --domains "$PUBLIC_ZONE_NAME" \
+                --domains "*.$PUBLIC_ZONE_NAME" \
+                --accept-tos \
+                run
             ;;
           digitalocean)
-            dns_env=(-e "DO_AUTH_TOKEN=$DNS_API_TOKEN" -e "DO_TOKEN=$DNS_API_TOKEN")
+            retry_netbird_step "Issue NetBird wildcard certificate" \
+              docker run --rm \
+                -e "DO_AUTH_TOKEN=$DNS_API_TOKEN" \
+                -e "DO_TOKEN=$DNS_API_TOKEN" \
+                -v "$lego_dir:/data" \
+                goacme/lego:v4.27.0 \
+                --path /data \
+                --email "$ADMIN_EMAIL" \
+                --dns "$DNS_PROVIDER" \
+                --domains "$PUBLIC_ZONE_NAME" \
+                --domains "*.$PUBLIC_ZONE_NAME" \
+                --accept-tos \
+                run
             ;;
         esac
-
-        retry_netbird_step "Issue NetBird wildcard certificate" \
-          docker run --rm \
-            "${dns_env[@]}" \
-            -v "$lego_dir:/data" \
-            goacme/lego:v4.27.0 \
-            --path /data \
-            --email "$ADMIN_EMAIL" \
-            --dns "$DNS_PROVIDER" \
-            --domains "$PUBLIC_ZONE_NAME" \
-            --domains "*.$PUBLIC_ZONE_NAME" \
-            --accept-tos \
-            run
 
         if [[ ! -s "$lego_cert" || ! -s "$lego_key" ]]; then
           echo "ERROR: Lego did not produce the expected NetBird wildcard certificate files." >&2

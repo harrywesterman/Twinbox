@@ -1854,6 +1854,8 @@ def test_netbird_cloud_init_escapes_shell_variables_for_templatefile():
     assert "/root/bootstrap-netbird.sh" in text
     assert "ufw --force enable" in text
     assert "$${" not in text, "template should not contain $$ escapes"
+    assert "${dns_env[@]}" not in text, "bash arrays must not be Terraform template expressions"
+    assert "[@" not in text, "bash array expansions are invalid Terraform template expressions"
     assert "${NETBIRD_VERSION}" not in text, "bash var NETBIRD_VERSION must use $VAR not ${VAR}"
     assert "${volume_dir}" not in text, "bash vars must not be Terraform template expressions"
     assert '"$NETBIRD_URL' in text or "'$NETBIRD_URL" in text
