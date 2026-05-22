@@ -66,6 +66,7 @@ nav:
       - Management consoles: management-consoles.md
       - SeaweedFS S3: seaweedfs-s3.md
       - Cloudflare: cloudflare.md
+      - Authentik: authentik.md
       - NetBird: netbird.md
       - Wiredoor bastion: wiredoor-bastion.md
       - CrowdSec: crowdsec.md

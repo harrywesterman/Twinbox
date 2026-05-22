@@ -4268,38 +4268,44 @@ def test_netbird_bastion_provisioning_fetches_dns_credentials():
         assert removed not in netbird_vars_text
 
 
-def test_netbird_cloud_init_configures_dns01_wildcard():
+def test_netbird_cloud_init_uses_exact_netbird_cert_and_tcp_passthrough():
     text = NETBIRD_CLOUD_INIT.read_text(encoding="utf-8")
 
     assert "DNS_PROVIDER" in text
     assert "DNS_API_TOKEN" in text
-    assert "issue_netbird_wildcard_certificate()" in text
-    assert "goacme/lego:v4.27.0" in text
-    assert '--domains "$PUBLIC_ZONE_NAME"' in text
-    assert '--domains "*.$PUBLIC_ZONE_NAME"' in text
     assert "dnschallenge.provider" in text
     assert "dns_api_token" in text
     assert "CLOUDFLARE_DNS_API_TOKEN" in text
     assert "DO_AUTH_TOKEN" in text
     assert "GOOGLE_APPLICATION_CREDENTIALS" not in text
     assert "google" not in text
-    assert "HostRegexp" in text
-    assert "HostSNI(`*`) && !HostSNI(`{os.environ['NETBIRD_DOMAIN']}`)" in text
+    assert "HostSNI(`*`) && !HostSNI(`{netbird_domain}`)" in text
     assert "tls.domains[0].main" in text
-    assert "tls.domains[0].sans" in text
-    assert "/opt/netbird/certs:/certs:ro" in text
+    assert '"traefik.http.routers.netbird-dashboard.tls.domains[0].main": netbird_domain' in text
+    assert '"traefik.http.routers.netbird-backend.tls.domains[0].main": netbird_domain' in text
+    assert '"traefik.http.routers.netbird-grpc.tls.domains[0].main": netbird_domain' in text
     assert "/opt/netbird/traefik-dynamic.yaml:/opt/netbird/traefik-dynamic.yaml:ro" in text
     assert "--providers.file.filename=/opt/netbird/traefik-dynamic.yaml" in text
     assert "traefik-dynamic.yaml" in text
-    assert "certFile" in text
-    assert "keyFile" in text
-    assert "/certs/live/{zone}.crt" in text
+    assert 'data.pop("tls", None)' in text
+    assert 'data.pop("http", None)' in text
+    assert 'pp_v2["proxyProtocol"] = {"version": 2}' in text
     assert "dashboard_tls_domain_labels" in text
     assert "server_tls_domain_labels" in text
-    assert "merge_labels(dashboard, dashboard_tls_domain_labels)" in text
-    assert "merge_labels(netbird_server, server_tls_domain_labels)" in text
-    assert 'for service_name in ("dashboard", "netbird-server")' not in text
-    assert "insecureSkipVerify" in text
-    assert "cluster-proxy" in text
+    assert "set_labels(dashboard, dashboard_tls_domain_labels)" in text
+    assert "set_labels(netbird_server, server_tls_domain_labels)" in text
+    assert "remove_label_keys(traefik, is_removed_http_wildcard_label)" in text
+    assert "remove_label_keys(proxy, is_removed_http_wildcard_label)" in text
+    assert "HostRegexp" not in text
+    assert "goacme/lego" not in text
+    assert '--domains "*.$PUBLIC_ZONE_NAME"' not in text
+    assert "tls.domains[0].sans" not in text
+    assert "certFile" not in text
+    assert "keyFile" not in text
+    assert "/certs/live/{zone}.crt" not in text
+    assert "insecureSkipVerify" not in text
+    assert "cluster-proxy" not in text
+    assert "traefik.http.services.cluster-proxy" not in text
+    assert "traefik.http.serverstransports.proxy-insecure" not in text
     assert "NB_PROXY_ACME_CERTIFICATES" in text
     assert '"true"' in text

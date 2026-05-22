@@ -13,8 +13,8 @@ In the current Twinbox implementation, NetBird is used for two related paths:
 
 | Component | Location | Purpose |
 | --- | --- | --- |
-| NetBird bastion | Hetzner Cloud VPS | Runs the self-hosted NetBird server, dashboard, management API, embedded relay/proxy stack, Docker, and Traefik for TLS. |
-| NetBird Reverse Proxy | Bastion Docker stack | Terminates public HTTPS for `*.ZONE` and forwards requests into the NetBird network. |
+| NetBird bastion | Hetzner Cloud VPS | Runs the self-hosted NetBird server, dashboard, management API, embedded relay/proxy stack, Docker, and Traefik for the NetBird hostname. |
+| NetBird Reverse Proxy | Bastion Docker stack | Terminates public HTTPS for app hostnames such as `authentik.ZONE` and forwards requests into the NetBird network. |
 | NetBird network resources | NetBird management API | Defines the internal Traefik target, groups, setup keys, routes, and policies. |
 | Routing peer | Kubernetes namespace `netbird` | Runs `netbirdio/netbird:0.70.5` with privileged networking and forwards proxy traffic to the cluster service network. |
 | Traefik NetBird backend | Kubernetes service `traefik/traefik-netbird` | Headless service exposing Traefik's `webnetbird` entrypoint on port `8082`. |
@@ -26,7 +26,8 @@ flowchart LR
     user["Browser or NetBird user"]
 
     subgraph bastion["Hetzner NetBird bastion"]
-        tls["Bastion Traefik\n*.public-zone TLS"]
+        tls["Bastion Traefik\nnetbird.public-zone TLS"]
+        passthrough["TCP passthrough\nall non-NetBird SNI"]
         proxy["NetBird Reverse Proxy"]
         server["NetBird server\nmanagement API and dashboard"]
     end
@@ -50,7 +51,8 @@ flowchart LR
     end
 
     user --> tls
-    tls --> proxy
+    user --> passthrough
+    passthrough --> proxy
     proxy --> resource
     resource --> route
     route --> peer
@@ -76,11 +78,29 @@ The bastion also receives a wildcard DNS record for the selected public zone:
 *.public-zone -> NetBird bastion IPv4
 ```
 
-The bastion's Traefik stack obtains certificates with DNS-01 and forwards
-wildcard HTTPS traffic to the NetBird Reverse Proxy. Reverse proxy services are
-auto-created during application installation by the `ensure-netbird-service.sh`
-helper. Each service targets the NetBird network resource for the internal
-Traefik backend:
+The bastion Traefik stack terminates HTTPS only for
+`netbird.<public-zone>`. It must serve an exact certificate whose SAN contains
+only `netbird.<public-zone>`. It must not load or serve a wildcard
+`*.public-zone` certificate. Browsers can reuse an HTTP/2 connection across
+origins when the certificate is valid for both names; if NetBird serves a
+wildcard certificate, a browser can send the later Authentik authorize request
+over the existing NetBird connection. That request then reaches bastion Traefik
+as HTTP traffic instead of as raw TLS passthrough and can fail with Traefik's
+`404 page not found` and `router: "-"`.
+
+All non-NetBird hostnames, including `authentik.<public-zone>` and app
+hostnames, are handled by a TCP passthrough router on the bastion proxy
+container:
+
+```text
+HostSNI(*) && !HostSNI(netbird.<public-zone>)
+```
+
+That passthrough route forwards the original TLS connection to NetBird Reverse
+Proxy. The reverse proxy owns the app and Authentik certificates and routes each
+hostname through the NetBird network. Reverse proxy services are auto-created
+during application installation by the `ensure-netbird-service.sh` helper. Each
+service targets the NetBird network resource for the internal Traefik backend:
 
 ```text
 traefik-netbird.traefik.svc.cluster.local:8082
@@ -138,8 +158,15 @@ The step:
 The bastion cloud-init config installs Docker, runs NetBird's upstream
 `getting-started.sh`, patches the compose stack for Twinbox defaults, pins the
 NetBird image to `PINNED_NETBIRD_VERSION`, enables the reverse proxy, configures
-DNS-01 wildcard certificates, and opens `22/tcp`, `80/tcp`, `443/tcp`, and
-`3478/udp` with UFW.
+DNS-01 for the exact NetBird hostname, and opens `22/tcp`, `80/tcp`, `443/tcp`,
+and `3478/udp` with UFW.
+
+The compose patch deliberately does not create a bastion HTTP wildcard router.
+There should be no `traefik.http.routers.wildcard`, `cluster-proxy`, or HTTP
+`proxy-insecure` transport labels on the bastion Traefik or proxy containers.
+The bastion Traefik dynamic file should contain only the TCP `pp-v2`
+serversTransport used by the passthrough service; it should not contain
+`tls.certificates` for `/certs/live/<zone>.crt`.
 
 For greenfield bootstrap, the automated setup call is intentionally made over
 the bastion's internal Docker network with the public NetBird hostname in the
@@ -407,10 +434,17 @@ docker ps
 docker logs netbird-server
 docker logs netbird-proxy
 docker logs traefik
+openssl s_client -connect 127.0.0.1:443 -servername netbird.<public-zone> </dev/null 2>/dev/null \
+  | openssl x509 -noout -subject -ext subjectAltName
 cat /opt/netbird/setup-result.json
 ```
 
 The setup result contains credentials and tokens, so treat it as secret.
+
+The NetBird certificate check should show `DNS:netbird.<public-zone>` and must
+not show `DNS:*.public-zone`. A wildcard SAN on the NetBird hostname reopens the
+browser HTTP/2 connection coalescing bug that broke NetBird login through
+Authentik.
 
 ### Refresh External Secrets
 
@@ -440,9 +474,9 @@ installed; otherwise the wizard uses the Dockerized client.
 | --- | --- | --- |
 | `netbird-routing-peer` is not created | Argo CD app was not applied or External Secrets is not ready | `kubectl -n argocd get app netbird-routing-peers` and `kubectl -n netbird get externalsecret` |
 | Routing peer starts but proxy cannot reach apps | Traefik NetBird backend has no endpoints or NetBird route/policy is missing | Check `traefik-netbird` EndpointSlices and NetBird `/api/routes`, `/api/policies`. |
-| Authentik OIDC discovery fails | The `authentik-netbird` route or forwarded-header middleware is missing/stale | Fetch `https://authentik.<public-zone>/.well-known/openid-configuration` through the public NetBird path. |
-| Browser lands on `https://authentik.<public-zone>/application/o/authorize/` and sees `404 page not found` | That usually means the request lost its OIDC query string or never reached the real authorize flow | Compare the browser URL with Authentik logs. A healthy request includes `?client_id=...&redirect_uri=...&scope=...` and Authentik responds with `302` into `/if/flow/default-authentication-flow/`. |
-| Browser or strict `curl` shows a certificate error for NetBird | Let's Encrypt issuance is still pending or the exact hostname hit a temporary rate limit; the bastion may be serving Traefik's default self-signed certificate | Check `/var/log/cloud-init-output.log` on the bastion for the public TLS warning and retry after the rate-limit window. The install can continue if the NetBird setup token was created. |
+| Authentik OIDC discovery fails | The `authentik-netbird` route, forwarded-header middleware, NetBird reverse proxy service, or routing peer is missing/stale | Fetch `https://authentik.<public-zone>/.well-known/openid-configuration` through the public NetBird path and compare NetBird proxy plus in-cluster Authentik logs. |
+| Browser lands on `https://authentik.<public-zone>/application/o/authorize/` and sees `404 page not found` | Bastion Traefik is terminating Authentik as HTTP instead of passing raw TLS to NetBird Reverse Proxy. The usual cause is that bastion Traefik serves a wildcard certificate for `netbird.<public-zone>`, allowing browser HTTP/2 connection coalescing. | Confirm the NetBird certificate has only `DNS:netbird.<public-zone>`, confirm there is no bastion HTTP wildcard router, and confirm `authentik.<public-zone>` uses the TCP passthrough route. |
+| Browser or strict `curl` shows a certificate error for NetBird | Let's Encrypt issuance is still pending or the exact hostname hit a temporary rate limit; the bastion may be serving Traefik's default self-signed certificate | Check `/var/log/cloud-init-output.log` on the bastion and retry after the rate-limit window. The install can continue if the NetBird setup token was created. |
 | Public app hostname resolves but returns no app | Reverse proxy service is missing or targets the wrong Traefik resource (check `netbird-network-<cluster-id>.json`) | Check NetBird reverse proxy services and `netbird-network-<cluster-id>.json`. |
 | Management VM is unreachable over NetBird | The Management VM peer is not enrolled or admin group policy is missing | Check `netbird status`, the `twinbox-netbird` container, NetBird peers, and admin policies. |
 
@@ -469,9 +503,19 @@ Expected result:
 - `HTTP/2 302`
 - `Location: /if/flow/default-authentication-flow/...`
 
-If the same host returns `404` only when the query string is missing, that is a
-signal that the authorize endpoint itself is fine and the browser or proxy path
-is dropping OIDC parameters somewhere upstream.
+The most reliable end-to-end signal is the browser flow itself. In the bastion
+Traefik access log, a healthy flow shows:
+
+- `GET /oauth2/auth...` on `netbird-backend@docker`
+- redirect to Authentik through TCP passthrough, not `router: "-"`
+- `GET /oauth2/callback?...` on `netbird-backend@docker` with `303`
+- `POST /oauth2/token` on `netbird-backend@docker` with `200`
+- authenticated API calls such as `/api/users/current` with `200`
+
+Do not treat `curl` from the bastion host as proof that the browser path works:
+fresh command-line requests usually open a new TLS connection and do not
+reproduce browser HTTP/2 connection coalescing from `netbird.<public-zone>` to
+`authentik.<public-zone>`.
 
 ## Comparison
 
