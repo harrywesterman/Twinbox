@@ -252,7 +252,7 @@ ensure_netbird_domain() {
     -H "Content-Type: application/json" \
     --data "$(jq -cn --arg domain "$SERVICE_DOMAIN" --arg cluster "$NETBIRD_PROXY_DOMAIN" '{domain: $domain, target_cluster: $cluster}')" \
     -o /dev/null -w '%{http_code}' \
-    "${NETBIRD_REVERSE_PROXY_API}/domains/")" || true
+    "${NETBIRD_REVERSE_PROXY_API}/domains")" || true
   if [[ ! "$http_status" =~ ^2 ]]; then
     log_skip "NetBird domain creation returned HTTP ${http_status:-<empty>}; skipping service creation for ${SERVICE_NAME}."
     return 1
@@ -347,7 +347,7 @@ if [[ -n "$EXISTING_SERVICE_ID" ]]; then
     -H "Content-Type: application/json" \
     --data "$(build_service_payload "$EXISTING_SERVICE_ID")" \
     -o /dev/null -w '%{http_code}' \
-    "${NETBIRD_REVERSE_PROXY_API}/services/${EXISTING_SERVICE_ID}/")" || true
+    "${NETBIRD_REVERSE_PROXY_API}/services/${EXISTING_SERVICE_ID}")" || true
   if [[ "$http_status" =~ ^2 ]]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird service ${SERVICE_NAME} -> ${SERVICE_DOMAIN}${SERVICE_PATH} configured"
   else
@@ -363,7 +363,7 @@ else
     -H "Content-Type: application/json" \
     --data "$(build_service_payload "")" \
     -o /dev/null -w '%{http_code}' \
-    "${NETBIRD_REVERSE_PROXY_API}/services/")" || true
+    "${NETBIRD_REVERSE_PROXY_API}/services")" || true
   if [[ "$http_status" =~ ^2 ]]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird service ${SERVICE_NAME} -> ${SERVICE_DOMAIN}${SERVICE_PATH} configured"
   else

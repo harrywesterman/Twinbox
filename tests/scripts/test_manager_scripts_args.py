@@ -1997,8 +1997,10 @@ def test_ensure_netbird_service_uses_current_api_and_safe_skips():
     assert 'NETBIRD_REVERSE_PROXY_API="${NETBIRD_URL%/}/api/reverse-proxies"' in text
     assert "/api/reverse-proxy/" not in text
     assert '"${NETBIRD_REVERSE_PROXY_API}/clusters"' in text
-    assert '"${NETBIRD_REVERSE_PROXY_API}/domains/"' in text
-    assert '"${NETBIRD_REVERSE_PROXY_API}/services/"' in text
+    assert '"${NETBIRD_REVERSE_PROXY_API}/domains"' in text
+    assert '"${NETBIRD_REVERSE_PROXY_API}/services"' in text
+    assert '"${NETBIRD_REVERSE_PROXY_API}/domains/"' not in text
+    assert '"${NETBIRD_REVERSE_PROXY_API}/services/"' not in text
     assert "normalize_netbird_collection" in text
     assert "--normalize-collection" in text
     assert 'elif (.clusters | type) == "array" then .clusters' in text
