@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import subprocess
@@ -1976,7 +1977,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "netbird-proxy-services-" not in text or text.index(
         "netbird-proxy-services-"
     ) > text.index("Writing network secret for helper scripts")
-    # network secret is written before routing peers and the OIDC flow
+    # network secret is written before routing peers, service creation, and the OIDC flow.
     assert (
         auth_setup_index
         < network_index
@@ -1984,8 +1985,8 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
         < routing_peer_index
         < backend_index
         < dns_index
-        < discovery_index
         < authentik_service_index
+        < discovery_index
         < idp_index
     )
 
@@ -1998,6 +1999,12 @@ def test_ensure_netbird_service_uses_current_api_and_safe_skips():
     assert '"${NETBIRD_REVERSE_PROXY_API}/clusters"' in text
     assert '"${NETBIRD_REVERSE_PROXY_API}/domains/"' in text
     assert '"${NETBIRD_REVERSE_PROXY_API}/services/"' in text
+    assert "normalize_netbird_collection" in text
+    assert "--normalize-collection" in text
+    assert 'elif (.clusters | type) == "array" then .clusters' in text
+    assert 'elif (.results | type) == "array" then .results' in text
+    assert 'elif (.items | type) == "array" then .items' in text
+    assert 'elif (.resources | type) == "array" then .resources' in text
     assert "NetBird network secret not ready; skipping service creation" in text
     assert "NetBird network secret does not contain TRAEFIK_RESOURCE_ADDRESS" in text
     assert "Could not find TRAEFIK_RESOURCE_ID; service creation may fail" not in text
@@ -2009,6 +2016,42 @@ def test_ensure_netbird_service_uses_current_api_and_safe_skips():
     assert "Could not find Traefik resource ${TRAEFIK_RESOURCE_ADDRESS}" in text
     assert "--argjson service_enabled" in text
     assert "--argjson enabled" not in text
+
+
+def normalize_netbird_collection(payload, field):
+    result = subprocess.run(
+        ["bash", str(ENSURE_NETBIRD_SERVICE_SCRIPT), "--normalize-collection", field],
+        input=json.dumps(payload),
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    return json.loads(result.stdout)
+
+
+def test_ensure_netbird_service_normalizes_live_and_legacy_api_shapes():
+    live_clusters = [
+        {
+            "id": "netbird-proxy-20260522080504",
+            "address": "bierineenweek.nl",
+            "connected_proxies": 1,
+        }
+    ]
+    legacy_clusters = {"clusters": live_clusters}
+    legacy_domains = {"results": [{"domain": "authentik.example.test", "id": "domain-1"}]}
+    item_services = {"items": [{"domain": "authentik.example.test", "name": "authentik"}]}
+    resource_response = {"resources": [{"id": "resource-1", "address": "10.96.0.1"}]}
+
+    assert normalize_netbird_collection(live_clusters, "clusters") == live_clusters
+    assert normalize_netbird_collection(legacy_clusters, "clusters") == live_clusters
+    assert normalize_netbird_collection(legacy_domains, "domains") == legacy_domains["results"]
+    assert normalize_netbird_collection(item_services, "services") == item_services["items"]
+    assert (
+        normalize_netbird_collection(resource_response, "resources")
+        == resource_response["resources"]
+    )
+    assert normalize_netbird_collection({"domains": None}, "domains") == []
+    assert normalize_netbird_collection("not-a-collection", "clusters") == []
 
 
 def test_netbird_service_hostnames_match_ingress_routes():

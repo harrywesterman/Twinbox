@@ -666,14 +666,13 @@ spec:
       recordTTL: 300
 EOF
 
-wait_for_public_oidc_discovery "$netbird_oidc_issuer"
-
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating NetBird reverse proxy service for Authentik (required for OIDC verification)"
 bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
   --service-name "authentik" \
   --service-domain "$authentik_domain" \
   --service-path /
 
+wait_for_public_oidc_discovery "$netbird_oidc_issuer"
 wait_for_public_oidc_authorize "$authentik_public_url" "$netbird_oidc_client_id" "https://netbird.${public_zone_name}/oauth2/callback"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Registering Authentik as NetBird identity provider"

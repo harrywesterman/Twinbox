@@ -7,28 +7,58 @@ set -euo pipefail
 
 usage() {
   echo "Usage: $0 --service-name <name> --service-domain <domain> [--service-path /]" >&2
+  echo "       $0 --normalize-collection <field> < json" >&2
   exit 1
 }
 
 SERVICE_NAME=""
 SERVICE_DOMAIN=""
 SERVICE_PATH="/"
+NORMALIZE_COLLECTION_FIELD=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --service-name)  SERVICE_NAME="$2"; shift 2 ;;
     --service-domain) SERVICE_DOMAIN="$2"; shift 2 ;;
     --service-path)  SERVICE_PATH="$2"; shift 2 ;;
+    --normalize-collection) NORMALIZE_COLLECTION_FIELD="$2"; shift 2 ;;
     *) usage ;;
   esac
 done
 
-[[ -n "$SERVICE_NAME" ]] || usage
-[[ -n "$SERVICE_DOMAIN" ]] || usage
-
 log_skip() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >&2
 }
+
+normalize_netbird_collection() {
+  local preferred_field="$1"
+
+  jq -c --arg preferred_field "$preferred_field" '
+    def collection($field):
+      if type == "array" then .
+      elif type == "object" then
+        (
+          if $field != "" and (.[$field] | type) == "array" then .[$field]
+          elif (.clusters | type) == "array" then .clusters
+          elif (.results | type) == "array" then .results
+          elif (.items | type) == "array" then .items
+          elif (.resources | type) == "array" then .resources
+          else []
+          end
+        )
+      else []
+      end;
+    collection($preferred_field)
+  '
+}
+
+if [[ -n "$NORMALIZE_COLLECTION_FIELD" ]]; then
+  normalize_netbird_collection "$NORMALIZE_COLLECTION_FIELD"
+  exit 0
+fi
+
+[[ -n "$SERVICE_NAME" ]] || usage
+[[ -n "$SERVICE_DOMAIN" ]] || usage
 
 api_get() {
   local url="$1"
@@ -172,7 +202,10 @@ fi
 find_proxy_cluster() {
   local response
   response="$(api_get "${NETBIRD_REVERSE_PROXY_API}/clusters" "proxy cluster lookup")" || return 1
-  printf '%s' "$response" | jq -r '.clusters[]? | select(.address == "'"$NETBIRD_PROXY_DOMAIN"'") | .id // empty' | head -n1
+  printf '%s' "$response" \
+    | normalize_netbird_collection "clusters" \
+    | jq -r '.[]? | select(.address == "'"$NETBIRD_PROXY_DOMAIN"'") | .id // empty' \
+    | head -n1
 }
 
 PROXY_CLUSTER_ID="$(find_proxy_cluster || true)"
@@ -191,12 +224,14 @@ ensure_netbird_domain() {
   domains_json="$(api_get "${NETBIRD_REVERSE_PROXY_API}/domains" "domain lookup")" || return 1
   existing_domain_id="$(
     printf '%s' "$domains_json" \
-      | jq -r '.results[]? | select(.domain == "'"$SERVICE_DOMAIN"'") | .id // empty' \
+      | normalize_netbird_collection "domains" \
+      | jq -r '.[]? | select(.domain == "'"$SERVICE_DOMAIN"'") | .id // empty' \
       | head -n1
   )"
   existing_target_cluster="$(
     printf '%s' "$domains_json" \
-      | jq -r '.results[]? | select(.domain == "'"$SERVICE_DOMAIN"'") | .target_cluster // .targetCluster // empty' \
+      | normalize_netbird_collection "domains" \
+      | jq -r '.[]? | select(.domain == "'"$SERVICE_DOMAIN"'") | .target_cluster // .targetCluster // empty' \
       | head -n1
   )"
 
@@ -232,7 +267,8 @@ check_existing_service() {
   local response
   response="$(api_get_services)" || return 1
   printf '%s' "$response" \
-    | jq -r '.results[]? | select(.domain == "'"$SERVICE_DOMAIN"'" and .name == "'"$SERVICE_NAME"'") | .id // empty' \
+    | normalize_netbird_collection "services" \
+    | jq -r '.[]? | select(.domain == "'"$SERVICE_DOMAIN"'" and .name == "'"$SERVICE_NAME"'") | .id // empty' \
     | head -n1
 }
 
@@ -243,7 +279,10 @@ EXISTING_SERVICE_ID="$(check_existing_service || true)"
 find_traefik_resource_on_cluster() {
   local response
   response="$(api_get "${NETBIRD_REVERSE_PROXY_API}/clusters/${PROXY_CLUSTER_ID}/resources" "Traefik resource lookup")" || return 1
-  printf '%s' "$response" | jq -r '.results[]? | select(.address == "'"$TRAEFIK_RESOURCE_ADDRESS"'") | .id // empty' | head -n1
+  printf '%s' "$response" \
+    | normalize_netbird_collection "resources" \
+    | jq -r '.[]? | select(.address == "'"$TRAEFIK_RESOURCE_ADDRESS"'") | .id // empty' \
+    | head -n1
 }
 
 TRAEFIK_RESOURCE_ON_CLUSTER=""
