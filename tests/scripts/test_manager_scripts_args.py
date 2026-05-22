@@ -1909,16 +1909,30 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "settings_extra_user_approval_required = 0" in text
     assert 'base64.b64encode(raw).decode().rstrip("=")' in text
     assert "netbird_host_resource_address()" in text
+    assert "resolve_traefik_websecure_endpoint()" in text
+    assert "read_pod_cidrs_json()" in text
+    assert "ensure_netbird_proxy_peer()" in text
+    assert "wait_for_netbird_proxy_backend()" in text
     assert (
         'traefik_network_resource_address="$(netbird_host_resource_address "$traefik_resource_address")"'
         in text
     )
+    assert 'traefik_resource_address="$(resolve_traefik_websecure_endpoint)"' in text
+    assert 'traefik_target_port="8443"' in text
+    assert 'pod_cidrs_json="$(read_pod_cidrs_json)"' in text
     assert '-var "traefik_resource_address=$traefik_network_resource_address"' in text
+    assert '-var "pod_cidrs=${pod_cidrs_json}"' in text
     # The services block was removed; traefik_resource_address is now only passed to the network module
     assert "netbird-proxy-services-" not in text
-    assert 'traefik_resource_address="traefik.traefik.svc.cluster.local"' in text
+    assert 'traefik_resource_address="traefik.traefik.svc.cluster.local"' not in text
     assert "kubectl -n traefik get svc traefik -o jsonpath" not in text
     assert "TRAEFIK_NETWORK_RESOURCE_ADDRESS" in text
+    assert "TRAEFIK_TARGET_PORT" in text
+    assert "POD_CIDRS" in text
+    assert "proxy_setup_key" in text
+    assert "netbird-proxy-access" in text
+    assert "netbirdio/netbird:${PINNED_NETBIRD_VERSION:-0.70.5}" in text
+    assert "docker run -d" in text and "--name netbird-client" in text
     assert "authentik_resolve_scope_mapping_id" in text
     assert '-var "property_mapping_ids=$property_mapping_ids_json"' in text
     assert '-var "authentik_url=$authentik_url"' not in text
@@ -1962,6 +1976,8 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     network_index = text.index("Creating NetBird groups, routing resources, and setup keys")
     routing_peer_index = text.index("Deploying NetBird routing peers before enabling reverse proxy")
     backend_index = text.index('wait_for_traefik_reverse_proxy_backend "$traefik_resource_address"')
+    proxy_peer_index = text.index('ensure_netbird_proxy_peer "$proxy_setup_key"')
+    proxy_backend_index = text.index("wait_for_netbird_proxy_backend \\")
     network_secret_index = text.index("Writing network secret for helper scripts")
     dns_index = text.index("Creating wildcard DNS record for NetBird proxy")
     discovery_index = text.index('wait_for_public_oidc_discovery "$netbird_oidc_issuer"')
@@ -1985,6 +2001,8 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
         < network_secret_index
         < routing_peer_index
         < backend_index
+        < proxy_peer_index
+        < proxy_backend_index
         < dns_index
         < authentik_service_index
         < discovery_index
@@ -2019,9 +2037,12 @@ def test_ensure_netbird_service_uses_current_api_and_safe_skips():
     assert "live cluster resources endpoint" in text
     assert "Could not find Traefik resource ${TRAEFIK_RESOURCE_ADDRESS}" not in text
     assert "--argjson service_enabled" in text
+    assert "--argjson target_port" in text
     assert "--argjson skip_tls_verify" in text
     assert "--argjson enabled" not in text
-    assert "port: 443" in text
+    assert "TRAEFIK_TARGET_PORT" in text
+    assert "port: $target_port" in text
+    assert "port: 443" not in text
     assert 'protocol: "https"' in text
     assert "skip_tls_verify: $skip_tls_verify" in text
     assert "port: 8082" not in text
@@ -2081,6 +2102,9 @@ def test_netbird_service_hostnames_match_ingress_routes():
     velero_text = (
         REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-velero-ui" / "run.sh"
     ).read_text(encoding="utf-8")
+    argocd_text = (
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
+    ).read_text(encoding="utf-8")
     dashy_text = (
         REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-dashy-dashboard" / "run.sh"
     ).read_text(encoding="utf-8")
@@ -2096,6 +2120,11 @@ def test_netbird_service_hostnames_match_ingress_routes():
         assert f'--service-domain "{host}.${{public_zone_name}}"' in matrix_text
     assert '--service-domain "loki.${public_zone_name}"' in loki_text
     assert '--service-domain "velero-ui.${public_zone_name}"' in velero_text
+    assert '--service-name "argocd"' in argocd_text
+    assert (
+        '--service-domain "argocd.$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"'
+        in argocd_text
+    )
     assert '--service-domain "admin.${public_zone_name}"' in dashy_text
     assert '--service-name "hubble"' in (
         REPO_ROOT
@@ -2123,6 +2152,11 @@ def test_netbird_proxy_reuses_traefik_websecure_origin():
     assert 'data "netbird_group" "all"' in network_text
     assert 'name = "All"' in network_text
     assert "traefik_resource_type" in network_text
+    assert 'resource "netbird_setup_key" "proxy"' in network_text
+    assert 'resource "netbird_route" "k8s_pods"' in network_text
+    assert 'output "proxy_setup_key"' in (
+        REPO_ROOT / "infra" / "opentofu" / "netbird-network" / "outputs.tf"
+    ).read_text(encoding="utf-8")
     assert 'resource "netbird_policy" "proxy_to_traefik_https"' in network_text
     assert 'resource "netbird_policy" "proxy_to_traefik_http"' not in network_text
 
@@ -2136,7 +2170,8 @@ def test_netbird_proxy_reuses_traefik_websecure_origin():
     proxy_policy_body = proxy_policy.group(1)
     assert "sources       = [data.netbird_group.all.id]" in proxy_policy_body
     assert "sources       = [netbird_group.proxy.id]" not in proxy_policy_body
-    assert 'ports         = ["443"]' in proxy_policy_body
+    assert 'ports         = ["8443"]' in proxy_policy_body
+    assert 'ports         = ["443"]' not in proxy_policy_body
     assert 'ports         = ["8082"]' not in proxy_policy_body
     assert "type = local.traefik_resource_type" in proxy_policy_body
     assert "groups      = [data.netbird_group.all.id, netbird_group.proxy.id]" in network_text
@@ -2148,7 +2183,8 @@ def test_netbird_proxy_reuses_traefik_websecure_origin():
     assert "data.netbird_reverse_proxy_clusters.all.clusters[0].address" not in proxy_services_text
     assert 'variable "netbird_proxy_domain"' in proxy_services_vars_text
     assert "target_type = local.traefik_target_type" in proxy_services_text
-    assert "port        = 443" in proxy_services_text
+    assert "port        = 8443" in proxy_services_text
+    assert "port        = 443" not in proxy_services_text
     assert "port        = 8082" not in proxy_services_text
     assert 'protocol    = "https"' in proxy_services_text
     assert 'protocol    = "http"' not in proxy_services_text

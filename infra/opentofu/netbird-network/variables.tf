@@ -24,6 +24,11 @@ variable "service_cidrs" {
   type        = list(string)
 }
 
+variable "pod_cidrs" {
+  description = "Kubernetes pod CIDRs the NetBird routing peer should advertise for pod endpoint targets"
+  type        = list(string)
+}
+
 variable "management_vm_ssh_port" {
   description = "SSH port on the Twinbox Management VM"
   type        = number
@@ -41,4 +46,3 @@ variable "management_vm_api_port" {
   type        = number
   default     = 8080
 }
-

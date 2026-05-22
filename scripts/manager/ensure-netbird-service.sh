@@ -181,11 +181,13 @@ fi
 # Find the Traefik network resource ID from the network secret
 TRAEFIK_RESOURCE_ID=""
 TRAEFIK_RESOURCE_ADDRESS=""
+TRAEFIK_TARGET_PORT="443"
 if [[ -n "$NETBIRD_CLUSTER_ID" ]]; then
   NETWORK_SECRET="/opt/twinbox/bootstrap/secrets/global/netbird-network-${NETBIRD_CLUSTER_ID}.json"
   if [[ -f "$NETWORK_SECRET" ]]; then
     TRAEFIK_RESOURCE_ID="$(jq -r '.TRAEFIK_RESOURCE_ID // empty' "$NETWORK_SECRET")"
     TRAEFIK_RESOURCE_ADDRESS="$(jq -r '.TRAEFIK_RESOURCE_ADDRESS // empty' "$NETWORK_SECRET")"
+    TRAEFIK_TARGET_PORT="$(jq -r '.TRAEFIK_TARGET_PORT // "443"' "$NETWORK_SECRET")"
   fi
 fi
 
@@ -295,6 +297,7 @@ build_service_payload() {
     --arg target_type "$TARGET_TYPE" \
     --arg host "$TRAEFIK_RESOURCE_ADDRESS" \
     --arg path "$SERVICE_PATH" \
+    --argjson target_port "$TRAEFIK_TARGET_PORT" \
     --argjson service_enabled "true" \
     --argjson skip_tls_verify "true" \
     '{
@@ -308,7 +311,7 @@ build_service_payload() {
         target_type: $target_type,
         host: $host,
         path: $path,
-        port: 443,
+        port: $target_port,
         protocol: "https",
         options: {
           skip_tls_verify: $skip_tls_verify

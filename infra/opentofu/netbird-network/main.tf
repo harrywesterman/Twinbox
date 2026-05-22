@@ -51,6 +51,17 @@ resource "netbird_setup_key" "management_vm" {
   revoked                = false
 }
 
+resource "netbird_setup_key" "proxy" {
+  name                   = "${local.name_prefix}-proxy"
+  type                   = "reusable"
+  expiry_seconds         = 0
+  usage_limit            = 1
+  allow_extra_dns_labels = true
+  auto_groups            = [netbird_group.proxy.id]
+  ephemeral              = false
+  revoked                = false
+}
+
 resource "netbird_network" "twinbox" {
   name        = local.name_prefix
   description = "Twinbox ${var.cluster_id} internal Kubernetes services"
@@ -81,6 +92,19 @@ resource "netbird_route" "k8s_services" {
   network     = each.key
   peer_groups = [netbird_group.k8s_routers.id]
   groups      = [netbird_group.proxy.id, netbird_group.adguard_dns.id]
+  masquerade  = true
+  metric      = 9999
+  enabled     = true
+}
+
+resource "netbird_route" "k8s_pods" {
+  for_each = toset(var.pod_cidrs)
+
+  network_id  = netbird_network.twinbox.id
+  description = "Kubernetes pod CIDR ${each.key}"
+  network     = each.key
+  peer_groups = [netbird_group.k8s_routers.id]
+  groups      = [netbird_group.proxy.id]
   masquerade  = true
   metric      = 9999
   enabled     = true
@@ -149,7 +173,7 @@ resource "netbird_policy" "proxy_to_traefik_https" {
     bidirectional = true
     protocol      = "tcp"
     sources       = [data.netbird_group.all.id]
-    ports         = ["443"]
+    ports         = ["8443"]
 
     destination_resource = {
       id   = netbird_network_resource.traefik.id

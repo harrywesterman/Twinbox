@@ -32,3 +32,8 @@ output "management_vm_setup_key" {
   value     = netbird_setup_key.management_vm.key
   sensitive = true
 }
+
+output "proxy_setup_key" {
+  value     = netbird_setup_key.proxy.key
+  sensitive = true
+}
