@@ -693,3 +693,13 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
       public_url: $public_url
     }' >"$STEP_RESULT_FILE"
 fi
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "nextcloud" \
+  --service-domain "nextcloud.${public_zone_name}" \
+  --service-path /
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "nextcloud-collabora" \
+  --service-domain "nextcloud-collabora.${public_zone_name}" \
+  --service-path /

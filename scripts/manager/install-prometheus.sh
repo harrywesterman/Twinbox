@@ -55,3 +55,8 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$rendered_manifest" \
   --application "prometheus" \
   --destination-namespace "monitoring"
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "prometheus" \
+  --service-domain "prometheus.${public_zone_name}" \
+  --service-path /

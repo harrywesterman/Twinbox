@@ -239,3 +239,8 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
       public_url: $public_url
     }' >"$STEP_RESULT_FILE"
 fi
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "karakeep" \
+  --service-domain "karakeep.${public_zone_name}" \
+  --service-path /

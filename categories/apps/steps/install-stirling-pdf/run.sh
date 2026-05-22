@@ -288,3 +288,8 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
       manifest_path: $manifest_path
     }' >"$STEP_RESULT_FILE"
 fi
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "stirling-pdf" \
+  --service-domain "stirling-pdf.${public_zone_name}" \
+  --service-path /

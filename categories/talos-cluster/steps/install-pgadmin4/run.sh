@@ -532,4 +532,9 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --application "pgadmin4" \
   --destination-namespace "pgadmin4"
 
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "pgadmin4" \
+  --service-domain "pgadmin4.${public_zone_name}" \
+  --service-path /
+
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] pgAdmin 4 Authentik configuration complete"

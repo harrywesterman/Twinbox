@@ -491,4 +491,9 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     }' >"$STEP_RESULT_FILE"
 fi
 
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "audiobookshelf" \
+  --service-domain "audiobookshelf.${public_zone_name}" \
+  --service-path /
+
 log "Audiobookshelf installation completed"

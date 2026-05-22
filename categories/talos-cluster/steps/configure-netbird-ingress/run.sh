@@ -142,6 +142,23 @@ PY
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Public Authentik authorize endpoint is reachable and redirects into the login flow"
 }
 
+wait_for_public_oidc_authorize() {
+  local authentik_base_url="$1"
+  local client_id="$2"
+  local redirect_uri="$3"
+
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for public Authentik authorize endpoint through NetBird proxy"
+  for i in $(seq 1 30); do
+    if verify_public_oidc_authorize "$authentik_base_url" "$client_id" "$redirect_uri"; then
+      return 0
+    fi
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Public Authentik authorize endpoint not ready yet (attempt ${i}/30)"
+    sleep 5
+  done
+
+  fail "Public Authentik authorize endpoint did not become reachable through NetBird proxy"
+}
+
 netbird_host_resource_address() {
   local address="$1"
   if [[ "$address" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
@@ -468,7 +485,13 @@ fi
 [[ -f "$netbird_bastion_secret" ]] || fail "NetBird bastion secret not found at $netbird_bastion_secret"
 netbird_proxy_domain="$(jq -r '.NETBIRD_PROXY_DOMAIN // empty' "$netbird_bastion_secret")"
 netbird_proxy_ip="$(jq -r '.NETBIRD_IP // empty' "$netbird_bastion_secret")"
-[[ -n "$netbird_proxy_domain" ]] || fail "NetBird bastion secret does not contain NETBIRD_PROXY_DOMAIN"
+
+# NETBIRD_PROXY_DOMAIN is now the zone itself (not proxy.<zone>).
+# Derive it from NETBIRD_FQDN when the bastion secret doesn't contain it.
+if [[ -z "$netbird_proxy_domain" ]]; then
+  netbird_proxy_domain="$(jq -r '.NETBIRD_FQDN // empty' "$netbird_bastion_secret" | sed 's/^netbird\.//')"
+fi
+
 [[ -n "$netbird_proxy_ip" ]] || fail "NetBird bastion secret does not contain NETBIRD_IP"
 
 if [[ -z "$traefik_resource_address" ]]; then
@@ -588,30 +611,7 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --json-file "$admin_secret" \
   --required-keys "NB_SETUP_KEY,NB_MANAGEMENT_URL"
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploying NetBird routing peers before enabling reverse proxy"
-wait_for_argocd_server
-bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
-  --manifest "$WORKSPACE_ROOT/gitops/apps/netbird-routing-peers.yaml" \
-  --application "netbird-routing-peers" \
-  --destination-namespace "argocd"
-wait_for_netbird_routing_peer
-wait_for_traefik_netbird_backend "$traefik_resource_address"
-
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating NetBird reverse proxy services"
-proxy_services_workdir="$MANAGER_DATA_DIR/opentofu/netbird-proxy-services-${cluster_id}"
-mkdir -p "$proxy_services_workdir"
-cp -r "$WORKSPACE_ROOT/infra/opentofu/netbird-proxy-services/"* "$proxy_services_workdir/"
-cd "$proxy_services_workdir"
-tofu init -input=false -no-color
-tofu apply -auto-approve -no-color \
-  -var "netbird_token=$netbird_token" \
-  -var "netbird_management_url=$netbird_management_url" \
-  -var "netbird_proxy_domain=$netbird_proxy_domain" \
-  -var "traefik_resource_id=$traefik_resource_id" \
-  -var "traefik_resource_address=$traefik_resource_address" \
-  -var "services=$proxy_services_json"
-proxy_service_ids="$(tofu output -json -no-color service_ids)"
-
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Writing network secret for helper scripts"
 jq -n \
   --arg management_url "$netbird_management_url" \
   --arg traefik_address "$traefik_resource_address" \
@@ -621,7 +621,6 @@ jq -n \
   --arg management_vm_group_id "$management_vm_group_id" \
   --arg k8s_routers_group_id "$k8s_routers_group_id" \
   --arg proxy_group_id "$proxy_group_id" \
-  --argjson proxy_service_ids "$proxy_service_ids" \
   --arg cluster_id "$cluster_id" \
   '{
     NETBIRD_MANAGEMENT_URL: $management_url,
@@ -632,10 +631,18 @@ jq -n \
     MANAGEMENT_VM_GROUP_ID: $management_vm_group_id,
     K8S_ROUTERS_GROUP_ID: $k8s_routers_group_id,
     PROXY_GROUP_ID: $proxy_group_id,
-    PROXY_SERVICE_IDS: $proxy_service_ids,
     CLUSTER_ID: $cluster_id
   }' >"$network_secret"
 chmod 600 "$network_secret"
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploying NetBird routing peers before enabling reverse proxy"
+wait_for_argocd_server
+bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+  --manifest "$WORKSPACE_ROOT/gitops/apps/netbird-routing-peers.yaml" \
+  --application "netbird-routing-peers" \
+  --destination-namespace "argocd"
+wait_for_netbird_routing_peer
+wait_for_traefik_netbird_backend "$traefik_resource_address"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating wildcard DNS record for NetBird proxy"
 kubectl create namespace external-dns --dry-run=client -o yaml | kubectl apply -f -
@@ -660,7 +667,14 @@ spec:
 EOF
 
 wait_for_public_oidc_discovery "$netbird_oidc_issuer"
-verify_public_oidc_authorize "$authentik_public_url" "$netbird_oidc_client_id" "https://netbird.${public_zone_name}/oauth2/callback"
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating NetBird reverse proxy service for Authentik (required for OIDC verification)"
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "authentik" \
+  --service-domain "$authentik_domain" \
+  --service-path /
+
+wait_for_public_oidc_authorize "$authentik_public_url" "$netbird_oidc_client_id" "https://netbird.${public_zone_name}/oauth2/callback"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Registering Authentik as NetBird identity provider"
 idp_workdir="$MANAGER_DATA_DIR/opentofu/netbird-idp-${cluster_id}"

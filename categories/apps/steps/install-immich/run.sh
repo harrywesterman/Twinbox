@@ -534,3 +534,8 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
       public_url: $public_url
     }' >"$STEP_RESULT_FILE"
 fi
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "immich" \
+  --service-domain "immich.${public_zone_name}" \
+  --service-path /

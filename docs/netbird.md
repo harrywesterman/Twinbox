@@ -6,7 +6,7 @@ Management VM directly to the internet.
 
 In the current Twinbox implementation, NetBird is used for two related paths:
 
-- public application ingress through NetBird Reverse Proxy
+- public application ingress through NetBird Reverse Proxy (auto-created per app)
 - private administrator access to the Management VM through a NetBird peer
 
 ## Components
@@ -68,7 +68,7 @@ flowchart LR
 Twinbox creates two public DNS records for NetBird:
 
 - `netbird.<public-zone>` points to the NetBird dashboard and management API
-- `proxy.<public-zone>` points to the NetBird proxy endpoint
+- `<public-zone>` (wildcard) points to the NetBird proxy endpoint
 
 The bastion also receives a wildcard DNS record for the selected public zone:
 
@@ -78,12 +78,18 @@ The bastion also receives a wildcard DNS record for the selected public zone:
 
 The bastion's Traefik stack obtains certificates with DNS-01 and forwards
 wildcard HTTPS traffic to the NetBird Reverse Proxy. Reverse proxy services are
-created in NetBird for application hostnames. Each service targets the NetBird
-network resource for the internal Traefik backend:
+auto-created during application installation by the `ensure-netbird-service.sh`
+helper. Each service targets the NetBird network resource for the internal
+Traefik backend:
 
 ```text
 traefik-netbird.traefik.svc.cluster.local:8082
 ```
+
+Services are created per-application as each `install-*` step runs, using the
+helper script that reads credentials from the bastion secret. The
+`configure-netbird-ingress` step no longer creates services — only groups,
+routes, setup keys, and the Traefik resource.
 
 Inside Kubernetes, `gitops/platform/traefik/traefik-netbird-service.yaml`
 creates a headless service named `traefik-netbird`. That service selects the
@@ -125,7 +131,7 @@ The step:
 1. reads DNS provider credentials from the `external-dns-credentials` secret
 2. removes stale Hetzner resources with the same Twinbox names
 3. applies `infra/opentofu/netbird/`
-4. creates `netbird.<public-zone>` and `proxy.<public-zone>` `DNSEndpoint` records
+4. creates `netbird.<public-zone>` and `<public-zone>` (wildcard) `DNSEndpoint` records
 5. waits for cloud-init to finish on the bastion
 6. calls NetBird's automated setup API and stores the short-lived personal access token
 
@@ -156,8 +162,7 @@ Important keys in that file:
 | --- | --- |
 | `NETBIRD_IP` | Bastion public IPv4 address. |
 | `NETBIRD_URL` | Management URL, for example `https://netbird.example.com`. |
-| `NETBIRD_FQDN` | Dashboard/API FQDN. |
-| `NETBIRD_PROXY_DOMAIN` | Proxy FQDN, for example `proxy.example.com`. |
+| `NETBIRD_FQDN` | Dashboard/API FQDN (e.g. `netbird.example.com`). |
 | `NETBIRD_SETUP_TOKEN` | Personal access token from the bootstrap setup API. |
 | `SSH_PRIVATE_KEY` | Present when Twinbox generated the bastion SSH key. |
 
@@ -175,16 +180,18 @@ Inputs:
 | `netbird_token` | No | Uses `NETBIRD_SETUP_TOKEN` from the bastion secret when omitted. |
 | `netbird_management_url` | No | Uses `NETBIRD_URL` from the bastion secret when omitted. |
 | `traefik_resource_address` | No | Defaults to `traefik-netbird.traefik.svc.cluster.local`. |
-| `proxy_services_json` | No | Extra reverse proxy services. Authentik is always included. |
+| `proxy_services_json` | No | Extra reverse proxy services. Authentik is always included. Services are auto-created during application installation; this form is for initial setup only. |
 
-The step runs four OpenTofu modules:
+The step runs three OpenTofu modules:
 
 | Module | Runtime workdir | Purpose |
 | --- | --- | --- |
 | `infra/opentofu/authentik-netbird/` | `manager-data/opentofu/authentik-netbird-<cluster-id>/` | Creates the Authentik OAuth/OIDC provider for NetBird. |
 | `infra/opentofu/netbird-network/` | `manager-data/opentofu/netbird-network-<cluster-id>/` | Creates groups, setup keys, routes, the Traefik network resource, and policies. |
-| `infra/opentofu/netbird-proxy-services/` | `manager-data/opentofu/netbird-proxy-services-<cluster-id>/` | Creates NetBird Reverse Proxy domains and services. |
 | `infra/opentofu/netbird-idp/` | `manager-data/opentofu/netbird-idp-<cluster-id>/` | Registers Authentik as the NetBird identity provider. |
+
+Reverse proxy services are auto-created during application installation by the
+`ensure-netbird-service.sh` helper script.
 
 NetBird groups:
 
@@ -223,9 +230,12 @@ OpenBao:
 
 It then applies the `netbird-routing-peers` Argo CD application, waits for the
 routing peer deployment, waits for the Traefik NetBird backend endpoints, creates
-reverse proxy services, creates the wildcard DNS record, waits for public
-Authentik OIDC discovery through the NetBird proxy, and finally registers
-Authentik as the NetBird identity provider. Public OIDC discovery is allowed to
+the wildcard DNS record, waits for public Authentik OIDC discovery through the
+NetBird proxy, and finally registers Authentik as the NetBird identity provider.
+
+Reverse proxy services are created by each `install-*` step through the
+`ensure-netbird-service.sh` helper script rather than during this configuration
+step. Public OIDC discovery is allowed to
 log a warning and continue when public TLS or reverse-proxy reachability is not
 healthy yet, so the NetBird API configuration can still finish. Browser SSO is
 only healthy once the public NetBird path has a trusted certificate and can
@@ -317,12 +327,31 @@ Management VM:
 manager-data/opentofu/netbird-<cluster-id>/
 manager-data/opentofu/authentik-netbird-<cluster-id>/
 manager-data/opentofu/netbird-network-<cluster-id>/
-manager-data/opentofu/netbird-proxy-services-<cluster-id>/
 manager-data/opentofu/netbird-idp-<cluster-id>/
 manager-data/ssh/netbird-<cluster-id>/
 ```
 
 ## Operations
+
+### Auto-create services
+
+The `ensure-netbird-service.sh` helper script creates or updates NetBird reverse
+proxy services. It is called automatically by every `install-*` step that exposes
+an app through Traefik.
+
+Usage:
+
+```bash
+bash scripts/manager/ensure-netbird-service.sh \
+  --service-name <name> \
+  --service-domain <domain> \
+  [--service-path /]
+```
+
+The script reads credentials from the bastion secret file
+(`/opt/twinbox/bootstrap/secrets/global/netbird-bastion-<cluster-id>.json`),
+finds the proxy cluster by domain, checks for an existing service by name+domain,
+and either creates or updates it. It is idempotent.
 
 ### Check the routing peer
 
@@ -414,7 +443,7 @@ installed; otherwise the wizard uses the Dockerized client.
 | Authentik OIDC discovery fails | The `authentik-netbird` route or forwarded-header middleware is missing/stale | Fetch `https://authentik.<public-zone>/.well-known/openid-configuration` through the public NetBird path. |
 | Browser lands on `https://authentik.<public-zone>/application/o/authorize/` and sees `404 page not found` | That usually means the request lost its OIDC query string or never reached the real authorize flow | Compare the browser URL with Authentik logs. A healthy request includes `?client_id=...&redirect_uri=...&scope=...` and Authentik responds with `302` into `/if/flow/default-authentication-flow/`. |
 | Browser or strict `curl` shows a certificate error for NetBird | Let's Encrypt issuance is still pending or the exact hostname hit a temporary rate limit; the bastion may be serving Traefik's default self-signed certificate | Check `/var/log/cloud-init-output.log` on the bastion for the public TLS warning and retry after the rate-limit window. The install can continue if the NetBird setup token was created. |
-| Public app hostname resolves but returns no app | Reverse proxy service targets are missing or target the wrong Traefik resource | Check NetBird reverse proxy services and `netbird-network-<cluster-id>.json`. |
+| Public app hostname resolves but returns no app | Reverse proxy service is missing or targets the wrong Traefik resource (check `netbird-network-<cluster-id>.json`) | Check NetBird reverse proxy services and `netbird-network-<cluster-id>.json`. |
 | Management VM is unreachable over NetBird | The Management VM peer is not enrolled or admin group policy is missing | Check `netbird status`, the `twinbox-netbird` container, NetBird peers, and admin policies. |
 
 ### NetBird OIDC login check

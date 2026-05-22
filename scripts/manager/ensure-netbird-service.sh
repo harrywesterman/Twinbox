@@ -1,0 +1,334 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ensure-netbird-service.sh
+# Creates or updates a NetBird reverse proxy service.
+# Reads credentials from the bastion secret — apps don't need to pass them.
+
+usage() {
+  echo "Usage: $0 --service-name <name> --service-domain <domain> [--service-path /]" >&2
+  exit 1
+}
+
+SERVICE_NAME=""
+SERVICE_DOMAIN=""
+SERVICE_PATH="/"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --service-name)  SERVICE_NAME="$2"; shift 2 ;;
+    --service-domain) SERVICE_DOMAIN="$2"; shift 2 ;;
+    --service-path)  SERVICE_PATH="$2"; shift 2 ;;
+    *) usage ;;
+  esac
+done
+
+[[ -n "$SERVICE_NAME" ]] || usage
+[[ -n "$SERVICE_DOMAIN" ]] || usage
+
+log_skip() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >&2
+}
+
+api_get() {
+  local url="$1"
+  local label="$2"
+  local tmp_file
+  local http_status
+
+  tmp_file="$(mktemp)"
+  http_status="$(curl -sS -f \
+    -H "Authorization: Bearer ${NETBIRD_TOKEN}" \
+    -H "Accept: application/json" \
+    -o "$tmp_file" \
+    -w '%{http_code}' \
+    "$url")" || {
+    log_skip "NetBird ${label} request failed; skipping service creation for ${SERVICE_NAME}."
+    rm -f "$tmp_file"
+    return 1
+  }
+
+  if [[ ! "$http_status" =~ ^2 ]]; then
+    log_skip "NetBird ${label} request returned HTTP ${http_status:-<empty>}; skipping service creation for ${SERVICE_NAME}."
+    rm -f "$tmp_file"
+    return 1
+  fi
+  if ! jq -e . "$tmp_file" >/dev/null 2>&1; then
+    log_skip "NetBird ${label} response was not JSON; skipping service creation for ${SERVICE_NAME}."
+    rm -f "$tmp_file"
+    return 1
+  fi
+
+  cat "$tmp_file"
+  rm -f "$tmp_file"
+}
+
+api_get_services() {
+  local tmp_file
+  local http_status
+
+  tmp_file="$(mktemp)"
+  http_status="$(curl -sS -f -G \
+    -H "Authorization: Bearer ${NETBIRD_TOKEN}" \
+    -H "Accept: application/json" \
+    --data-urlencode "domain=${SERVICE_DOMAIN}" \
+    --data-urlencode "name=${SERVICE_NAME}" \
+    --data-urlencode "page_size=500" \
+    -o "$tmp_file" \
+    -w '%{http_code}' \
+    "${NETBIRD_REVERSE_PROXY_API}/services")" || {
+    log_skip "NetBird service lookup failed; skipping service creation for ${SERVICE_NAME}."
+    rm -f "$tmp_file"
+    return 1
+  }
+
+  if [[ ! "$http_status" =~ ^2 ]]; then
+    log_skip "NetBird service lookup returned HTTP ${http_status:-<empty>}; skipping service creation for ${SERVICE_NAME}."
+    rm -f "$tmp_file"
+    return 1
+  fi
+  if ! jq -e . "$tmp_file" >/dev/null 2>&1; then
+    log_skip "NetBird service lookup response was not JSON; skipping service creation for ${SERVICE_NAME}."
+    rm -f "$tmp_file"
+    return 1
+  fi
+
+  cat "$tmp_file"
+  rm -f "$tmp_file"
+}
+
+CLUSTER_ID="${CLUSTER_ID:-}"
+NETBIRD_BASTION_SECRET="${TWINBOX_NETBIRD_BASTION_SECRET:-}"
+
+# Locate the bastion secret file
+if [[ -z "$NETBIRD_BASTION_SECRET" ]]; then
+  for candidate in \
+    "/opt/twinbox/bootstrap/secrets/global/netbird-bastion-${CLUSTER_ID}.json" \
+    "/opt/twinbox/bootstrap/secrets/global/netbird-bastion-*.json"; do
+    if [[ -f "$candidate" ]]; then
+      NETBIRD_BASTION_SECRET="$candidate"
+      break
+    fi
+  done
+  # If glob matched nothing, try the most recent one
+  if [[ -z "$NETBIRD_BASTION_SECRET" || ! -f "$NETBIRD_BASTION_SECRET" ]]; then
+    NETBIRD_BASTION_SECRET="$(ls -t /opt/twinbox/bootstrap/secrets/global/netbird-bastion-*.json 2>/dev/null | head -n1 || true)"
+  fi
+fi
+
+if [[ -z "$NETBIRD_BASTION_SECRET" || ! -f "$NETBIRD_BASTION_SECRET" ]]; then
+  log_skip "No NetBird bastion secret found; skipping service creation (NetBird ingress route not selected)."
+  exit 0
+fi
+
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
+
+NETBIRD_TOKEN="$(jq -r '.NETBIRD_SETUP_TOKEN // empty' "$NETBIRD_BASTION_SECRET")"
+NETBIRD_URL="$(jq -r '.NETBIRD_URL // empty' "$NETBIRD_BASTION_SECRET")"
+NETBIRD_FQDN="$(jq -r '.NETBIRD_FQDN // empty' "$NETBIRD_BASTION_SECRET")"
+NETBIRD_CLUSTER_ID="$(jq -r '.CLUSTER_ID // empty' "$NETBIRD_BASTION_SECRET")"
+NETBIRD_IP="$(jq -r '.NETBIRD_IP // empty' "$NETBIRD_BASTION_SECRET")"
+NETBIRD_REVERSE_PROXY_API="${NETBIRD_URL%/}/api/reverse-proxies"
+
+# Derive proxy domain from the zone (now the zone itself, not proxy.<zone>)
+NETBIRD_PROXY_DOMAIN="$(jq -r '.NETBIRD_PROXY_DOMAIN // empty' "$NETBIRD_BASTION_SECRET")"
+if [[ -z "$NETBIRD_PROXY_DOMAIN" && -n "$NETBIRD_FQDN" ]]; then
+  # netbird.<zone> → strip "netbird." prefix
+  NETBIRD_PROXY_DOMAIN="${NETBIRD_FQDN#netbird.}"
+fi
+
+if [[ -z "$NETBIRD_TOKEN" ]]; then
+  log_skip "No NetBird setup token found; skipping service creation (NetBird ingress route not selected)."
+  exit 0
+fi
+if [[ -z "$NETBIRD_URL" ]]; then
+  log_skip "No NetBird URL found; skipping service creation (NetBird ingress route not selected)."
+  exit 0
+fi
+
+# Find the Traefik network resource ID from the network secret
+TRAEFIK_RESOURCE_ID=""
+TRAEFIK_RESOURCE_ADDRESS=""
+if [[ -n "$NETBIRD_CLUSTER_ID" ]]; then
+  NETWORK_SECRET="/opt/twinbox/bootstrap/secrets/global/netbird-network-${NETBIRD_CLUSTER_ID}.json"
+  if [[ -f "$NETWORK_SECRET" ]]; then
+    TRAEFIK_RESOURCE_ID="$(jq -r '.TRAEFIK_RESOURCE_ID // empty' "$NETWORK_SECRET")"
+    TRAEFIK_RESOURCE_ADDRESS="$(jq -r '.TRAEFIK_RESOURCE_ADDRESS // empty' "$NETWORK_SECRET")"
+  fi
+fi
+
+if [[ -z "$TRAEFIK_RESOURCE_ID" ]]; then
+  log_skip "NetBird network secret not ready; skipping service creation for ${SERVICE_NAME}."
+  exit 0
+fi
+if [[ -z "$TRAEFIK_RESOURCE_ADDRESS" ]]; then
+  log_skip "NetBird network secret does not contain TRAEFIK_RESOURCE_ADDRESS; skipping service creation for ${SERVICE_NAME}."
+  exit 0
+fi
+
+# 1. Find the proxy cluster by domain
+find_proxy_cluster() {
+  local response
+  response="$(api_get "${NETBIRD_REVERSE_PROXY_API}/clusters" "proxy cluster lookup")" || return 1
+  printf '%s' "$response" | jq -r '.clusters[]? | select(.address == "'"$NETBIRD_PROXY_DOMAIN"'") | .id // empty' | head -n1
+}
+
+PROXY_CLUSTER_ID="$(find_proxy_cluster || true)"
+if [[ -z "$PROXY_CLUSTER_ID" ]]; then
+  log_skip "No NetBird reverse proxy cluster found for $NETBIRD_PROXY_DOMAIN; skipping service creation for ${SERVICE_NAME}."
+  exit 0
+fi
+
+# 1.5. Ensure the domain exists before creating services
+# The Terraform module creates netbird_reverse_proxy_domain first.
+ensure_netbird_domain() {
+  local domains_json
+  local existing_domain_id
+  local existing_target_cluster
+
+  domains_json="$(api_get "${NETBIRD_REVERSE_PROXY_API}/domains" "domain lookup")" || return 1
+  existing_domain_id="$(
+    printf '%s' "$domains_json" \
+      | jq -r '.results[]? | select(.domain == "'"$SERVICE_DOMAIN"'") | .id // empty' \
+      | head -n1
+  )"
+  existing_target_cluster="$(
+    printf '%s' "$domains_json" \
+      | jq -r '.results[]? | select(.domain == "'"$SERVICE_DOMAIN"'") | .target_cluster // .targetCluster // empty' \
+      | head -n1
+  )"
+
+  if [[ -n "$existing_domain_id" ]]; then
+    if [[ -n "$existing_target_cluster" && "$existing_target_cluster" != "$NETBIRD_PROXY_DOMAIN" ]]; then
+      log_skip "NetBird domain ${SERVICE_DOMAIN} already targets ${existing_target_cluster}, expected ${NETBIRD_PROXY_DOMAIN}; skipping service creation."
+      return 1
+    fi
+    return 0
+  fi
+
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating NetBird reverse proxy domain: ${SERVICE_DOMAIN}"
+  local http_status
+  http_status="$(curl -sS -f \
+    -X POST \
+    -H "Authorization: Bearer ${NETBIRD_TOKEN}" \
+    -H "Accept: application/json" \
+    -H "Content-Type: application/json" \
+    --data "$(jq -cn --arg domain "$SERVICE_DOMAIN" --arg cluster "$NETBIRD_PROXY_DOMAIN" '{domain: $domain, target_cluster: $cluster}')" \
+    -o /dev/null -w '%{http_code}' \
+    "${NETBIRD_REVERSE_PROXY_API}/domains/")" || true
+  if [[ ! "$http_status" =~ ^2 ]]; then
+    log_skip "NetBird domain creation returned HTTP ${http_status:-<empty>}; skipping service creation for ${SERVICE_NAME}."
+    return 1
+  fi
+  return 0
+}
+
+ensure_netbird_domain || exit 0
+
+# 2. Check if service already exists
+check_existing_service() {
+  local response
+  response="$(api_get_services)" || return 1
+  printf '%s' "$response" \
+    | jq -r '.results[]? | select(.domain == "'"$SERVICE_DOMAIN"'" and .name == "'"$SERVICE_NAME"'") | .id // empty' \
+    | head -n1
+}
+
+EXISTING_SERVICE_ID="$(check_existing_service || true)"
+
+# 3. Build the service payload
+# Find the Traefik resource on the proxy cluster
+find_traefik_resource_on_cluster() {
+  local response
+  response="$(api_get "${NETBIRD_REVERSE_PROXY_API}/clusters/${PROXY_CLUSTER_ID}/resources" "Traefik resource lookup")" || return 1
+  printf '%s' "$response" | jq -r '.results[]? | select(.address == "'"$TRAEFIK_RESOURCE_ADDRESS"'") | .id // empty' | head -n1
+}
+
+TRAEFIK_RESOURCE_ON_CLUSTER=""
+if [[ -n "$TRAEFIK_RESOURCE_ADDRESS" && "$TRAEFIK_RESOURCE_ADDRESS" != "traefik-netbird.traefik.svc.cluster.local" ]]; then
+  TRAEFIK_RESOURCE_ON_CLUSTER="$(find_traefik_resource_on_cluster || true)"
+  if [[ -z "$TRAEFIK_RESOURCE_ON_CLUSTER" ]]; then
+    log_skip "Could not find Traefik resource ${TRAEFIK_RESOURCE_ADDRESS} on proxy cluster; skipping service creation for ${SERVICE_NAME}."
+    exit 0
+  fi
+fi
+
+# Determine target type (host vs domain)
+if [[ "$TRAEFIK_RESOURCE_ADDRESS" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+  TARGET_TYPE="host"
+else
+  TARGET_TYPE="domain"
+fi
+
+# Build the service JSON
+build_service_payload() {
+  local service_id="$1"
+
+  jq -cn \
+    --arg name "$SERVICE_NAME" \
+    --arg domain "$SERVICE_DOMAIN" \
+    --arg target_id "${TRAEFIK_RESOURCE_ON_CLUSTER:-$TRAEFIK_RESOURCE_ID}" \
+    --arg target_type "$TARGET_TYPE" \
+    --arg host "$TRAEFIK_RESOURCE_ADDRESS" \
+    --arg path "$SERVICE_PATH" \
+    --argjson service_enabled "true" \
+    '{
+      name: $name,
+      domain: $domain,
+      enabled: $service_enabled,
+      pass_host_header: true,
+      rewrite_redirects: true,
+      targets: [{
+        target_id: $target_id,
+        target_type: $target_type,
+        host: $host,
+        path: $path,
+        port: 8082,
+        protocol: "http",
+        enabled: $service_enabled
+      }],
+      auth: {
+        link_auth: { enabled: false },
+        password_auth: { enabled: false },
+        pin_auth: { enabled: false },
+        bearer_auth: { enabled: false }
+      }
+    }'
+}
+
+# 4. Create or update the service
+if [[ -n "$EXISTING_SERVICE_ID" ]]; then
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Updating existing NetBird service: ${SERVICE_NAME} (id: ${EXISTING_SERVICE_ID})"
+  http_status="$(curl -sS -f \
+    -X PUT \
+    -H "Authorization: Bearer ${NETBIRD_TOKEN}" \
+    -H "Accept: application/json" \
+    -H "Content-Type: application/json" \
+    --data "$(build_service_payload "$EXISTING_SERVICE_ID")" \
+    -o /dev/null -w '%{http_code}' \
+    "${NETBIRD_REVERSE_PROXY_API}/services/${EXISTING_SERVICE_ID}/")" || true
+  if [[ "$http_status" =~ ^2 ]]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird service ${SERVICE_NAME} -> ${SERVICE_DOMAIN}${SERVICE_PATH} configured"
+  else
+    log_skip "NetBird PUT returned HTTP ${http_status:-<empty>}; skipping service creation for ${SERVICE_NAME}."
+    exit 0
+  fi
+else
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating NetBird reverse proxy service: ${SERVICE_NAME}"
+  http_status="$(curl -sS -f \
+    -X POST \
+    -H "Authorization: Bearer ${NETBIRD_TOKEN}" \
+    -H "Accept: application/json" \
+    -H "Content-Type: application/json" \
+    --data "$(build_service_payload "")" \
+    -o /dev/null -w '%{http_code}' \
+    "${NETBIRD_REVERSE_PROXY_API}/services/")" || true
+  if [[ "$http_status" =~ ^2 ]]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird service ${SERVICE_NAME} -> ${SERVICE_DOMAIN}${SERVICE_PATH} configured"
+  else
+    log_skip "NetBird POST returned HTTP ${http_status:-<empty>}; skipping service creation for ${SERVICE_NAME}."
+    exit 0
+  fi
+fi

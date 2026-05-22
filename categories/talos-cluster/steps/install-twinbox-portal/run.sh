@@ -291,4 +291,9 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --application "twinbox-portal" \
   --destination-namespace "twinbox-portal"
 
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "twinbox-portal" \
+  --service-domain "portal.${public_zone_name}" \
+  --service-path /
+
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Twinbox Portal configuration complete"

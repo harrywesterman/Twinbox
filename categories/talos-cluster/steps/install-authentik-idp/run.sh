@@ -430,3 +430,12 @@ ensure_embedded_outpost_browser_host
 authentik_ensure_default_provider_flows
 
 log "Authentik installation complete"
+
+# Source for zone lookup (already sourced at top of file)
+cluster_dns_domain="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -r '.cluster.dns_domain // empty')"
+cluster_slug="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -r '.cluster.slug // .cluster.id // empty')"
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "authentik" \
+  --service-domain "authentik.$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")" \
+  --service-path /

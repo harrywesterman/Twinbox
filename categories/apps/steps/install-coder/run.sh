@@ -301,3 +301,8 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
       database: $database
     }' >"$STEP_RESULT_FILE"
 fi
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "coder" \
+  --service-domain "coder.${public_zone_name}" \
+  --service-path /

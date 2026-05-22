@@ -733,3 +733,42 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
       seaweedfs_admin_route: $seaweedfs_admin_route
     }' >"$STEP_RESULT_FILE"
 fi
+
+# Source for zone lookup (already sourced at top of file)
+cluster_dns_domain="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -r '.cluster.dns_domain // empty')"
+cluster_slug="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -r '.cluster.slug // .cluster.id // empty')"
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "traefik" \
+  --service-domain "traefik.$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")" \
+  --service-path /
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "longhorn" \
+  --service-domain "longhorn.$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")" \
+  --service-path /
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "hubble" \
+  --service-domain "hubble.$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")" \
+  --service-path /
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "proxmox" \
+  --service-domain "proxmox.$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")" \
+  --service-path /
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "seaweedfs" \
+  --service-domain "seaweedfs.$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")" \
+  --service-path /
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "seaweedfs-admin" \
+  --service-domain "seaweedfs-admin.$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")" \
+  --service-path /
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "twinboxwizard" \
+  --service-domain "twinboxwizard.$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")" \
+  --service-path /
