@@ -41,6 +41,7 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
     loadStep("install-twinbox-portal"),
     loadStep("install-velero-ui"),
     loadStep("install-wiredoor-gateway"),
+    loadStep("install-adguard"),
   ];
 
   const stepStateById = new Map([
@@ -58,6 +59,7 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
       "install-wiredoor-gateway",
       { status: "succeeded", outputs: { wiredoor_url: "https://wiredoor.example.net" } },
     ],
+    ["install-adguard", { status: "succeeded", outputs: {} }],
   ]);
 
   const config = buildDashyConfig({
@@ -129,6 +131,11 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   );
   assert(
     platformSection.items.some(
+      (item) => item.title === "AdGuard" && item.url === "https://adguard.tst.example.com"
+    )
+  );
+  assert(
+    platformSection.items.some(
       (item) => item.title === "Cloudflare" && item.url === "https://dash.cloudflare.com/"
     )
   );
@@ -155,6 +162,7 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
     "Velero UI",
     "pgAdmin 4",
     "Wiredoor",
+    "AdGuard",
     "Cloudflare",
     "GitHub",
   ]) {

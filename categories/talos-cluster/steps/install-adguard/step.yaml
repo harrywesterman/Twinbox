@@ -9,6 +9,13 @@ explanation: >
 side_help: >
   Add one test device to the AdGuard DNS group first. Mobile clients may need
   Android Private DNS disabled before VPN DNS is used.
+dashy:
+  items:
+    - section: Platform
+      title: AdGuard
+      description: DNS filtering and ad blocking
+      icon: fas fa-shield-halved
+      url_template: https://adguard.__ZONE_NAME__
 ingress_route: netbird
 inputs: []
 secrets:

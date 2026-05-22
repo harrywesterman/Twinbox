@@ -6,6 +6,7 @@ set -euo pipefail
 : "${MANAGER_DATA_DIR:?missing MANAGER_DATA_DIR}"
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
+source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
 export KUBECONFIG="$KUBECONFIG_FILE"
 
 fail() {
@@ -14,6 +15,8 @@ fail() {
 }
 
 cluster_id="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -r '.cluster.id')"
+cluster_slug="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -r '.cluster.slug // .cluster.id')"
+cluster_dns_domain="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -r '.cluster.dns_domain // empty')"
 [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Installing AdGuard Home DNS for cluster: $cluster_id"
@@ -137,7 +140,14 @@ else
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: DNS verification from pod failed. Output: $dns_check_output"
 fi
 
-# --- Step 7: Write result ---
+# --- Step 7: Register NetBird reverse proxy service ---
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Registering NetBird reverse proxy service for AdGuard..."
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "adguard" \
+  --service-domain "adguard.$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")" \
+  --service-path /
+
+# --- Step 8: Write result ---
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] AdGuard Home DNS installation complete"
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \

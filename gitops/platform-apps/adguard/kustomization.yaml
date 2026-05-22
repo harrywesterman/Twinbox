@@ -6,3 +6,4 @@ resources:
   - configmap.yaml
   - daemonset.yaml
   - service.yaml
+  - ingressroute.yaml

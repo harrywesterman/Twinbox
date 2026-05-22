@@ -91,6 +91,14 @@ def test_service_has_dns_ports():
     assert len(tcp53) == 1
 
 
+def test_service_has_http_port():
+    svc = yaml.safe_load((GITOPS_DIR / "service.yaml").read_text())
+    ports = svc["spec"]["ports"]
+    http = [p for p in ports if p["port"] == 3000 and p["protocol"] == "TCP"]
+    assert len(http) == 1
+    assert http[0].get("targetPort") == 3000
+
+
 def test_configmap_exists():
     cm = yaml.safe_load((GITOPS_DIR / "configmap.yaml").read_text())
     assert cm["kind"] == "ConfigMap"
@@ -99,7 +107,24 @@ def test_configmap_exists():
     assert "upstream_dns" in cm["data"]["AdGuardHome.yaml"]
 
 
+def test_ingressroute_exists():
+    ir = yaml.safe_load((GITOPS_DIR / "ingressroute.yaml").read_text())
+    assert ir["kind"] == "IngressRoute"
+    assert ir["metadata"]["name"] == "adguard-netbird"
+
+
+def test_ingressroute_uses_webnetbird():
+    ir = yaml.safe_load((GITOPS_DIR / "ingressroute.yaml").read_text())
+    assert "webnetbird" in ir["spec"]["entryPoints"]
+
+
 def test_kustomization_resources():
     kust = yaml.safe_load((GITOPS_DIR / "kustomization.yaml").read_text())
-    expected = ["namespace.yaml", "configmap.yaml", "daemonset.yaml", "service.yaml"]
+    expected = [
+        "namespace.yaml",
+        "configmap.yaml",
+        "daemonset.yaml",
+        "service.yaml",
+        "ingressroute.yaml",
+    ]
     assert sorted(kust["resources"]) == sorted(expected)
