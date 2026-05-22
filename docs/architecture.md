@@ -1,6 +1,6 @@
 # Architecture
 
-Twinbox turns a single Proxmox host into a production-grade Kubernetes platform. The system is built from four layers: a Proxmox bootstrap wizard, a Management VM that runs the control plane, a Talos Linux Kubernetes cluster, and a GitOps-managed application platform.
+Twinbox runs on a Proxmox cluster to deliver a production-grade Kubernetes platform. The system is built from five layers: a Proxmox bootstrap wizard, a Management VM that runs the control plane, a Talos Linux Kubernetes cluster, a GitOps-managed application platform, and a suite of infrastructure services (NetBird, Traefik, Cilium, etc.).
 
 ```mermaid
 graph TB
@@ -8,7 +8,9 @@ graph TB
         Users["Users / Admins"]
     end
 
-    subgraph Proxmox["Proxmox Host"]
+    subgraph Proxmox["Proxmox Cluster"]
+        subgraph ProxmoxHosts["3 Proxmox Hosts (HPM managed)"]
+        end
         subgraph ManagementVM["Management VM (Ubuntu 24.04)"]
             subgraph DockerStack["Docker Compose Stack"]
                 Web["manager-web<br/>Port 3000"]
@@ -456,7 +458,9 @@ All strategies use the same `IngressRoute` structure; only `entryPoints` and `tl
 ```mermaid
 graph TB
     subgraph Hetzner["Hetzner Cloud"]
-        NBServer["NetBird Server<br/>Dashboard + Management API<br/>Built-in Traefik + Let's Encrypt"]
+        subgraph NBServer["NetBird Server"]
+            Server["Management API<br/>+ Dashboard<br/>+ Built-in Traefik<br/>+ Let's Encrypt"]
+        end
     end
 
     subgraph AdminDevices["Admin Devices"]
@@ -465,9 +469,10 @@ graph TB
 
     subgraph TwinboxCluster["Twinbox Kubernetes"]
         subgraph K8sWorkers["Worker Nodes"]
-            NBRP["NetBird Routing Peers<br/>(DaemonSet, privileged)"]
+            NBRP["NetBird Routing Peers<br/>(DaemonSet, privileged,<br/>image 0.70.5)"]
         end
         Traefik["Traefik<br/>ClusterIP Service"]
+        Proxy["NetBird Proxy<br/>(wgProxy via eBPF)"]
         Apps["Internal Apps"]
     end
 
@@ -478,19 +483,37 @@ graph TB
 
     Admin1 -->|"WireGuard"| NBServer
     NBServer -->|"WireGuard"| NBRP
-    NBRP -->|"ClusterIP"| Traefik
+    NBRP -->|"eBPF"| Proxy
+    Proxy -->|"ClusterIP"| Traefik
     Traefik -->|"Route"| Apps
 
     Admin1 -->|"WireGuard"| NBAgent
     NBAgent -->|"SSH / HTTP"| Manager
 ```
 
-NetBird provides a self-hosted VPN alternative to Wiredoor and Tailscale:
+NetBird provides a self-hosted VPN alternative to Wiredoor and Tailscale, with SSO integration via Authentik. The solution consists of four components:
+
+| Component | Role | Details |
+|-----------|------|---------|
+| **Server** (`netbird-server`) | Management VM | Runs the NetBird server, dashboard, and embedded Traefik with Let's Encrypt. Serves the management API and dashboard at `https://netbird.<zone>`. |
+| **Proxy** (`netbird-proxy`) | In-cluster | Runs an eBPF-based wgProxy for tunnel backhaul. Targets the Traefik ClusterIP (not the upstream service directly). |
+| **Routing Peers** (`netbirdio/netbird:0.70.5`) | In-cluster (DaemonSet) | Deployed as a privileged DaemonSet across worker nodes. Image pinned in `config/pinned-defaults.sh` and `gitops/platform-apps/netbird-routing-peers/deployment.yaml`. |
+| **Admin Agent** (`netbird-agent`) | Management VM | Enrolls the Management VM into the NetBird tailnet for admin access. |
+
+### Setup Steps
 
 1. **Bastion** (`provision-netbird-bastion`) — Provisions a Hetzner VM running the NetBird server, dashboard, and built-in Traefik with Let's Encrypt.
 2. **Ingress Config** (`configure-netbird-ingress`) — Connects NetBird to Authentik for SSO, creates groups and setup keys via OpenTofu, and configures reverse proxy targets.
 3. **Routing Peers** (`install-netbird-routing-peers`) — Deploys NetBird agents in the Kubernetes cluster as a DaemonSet so the bastion can route traffic to internal Traefik services.
 4. **Admin Access** (`configure-netbird-admin-access`) — Enrolls the Management VM into the NetBird tailnet so admin devices can reach it securely.
+
+### Domain Pattern
+
+The proxy domain is `<zone>` (e.g. `bierineenweek.nl`), not `proxy.<zone>`. Apps are addressed as `<app>.<zone>`. Route `10.96.0.0/12` has `groups=[proxy_group]`, `peer_groups=[k8s_routers_group]`.
+
+### Proxy & Routing
+
+The proxy service targets a **NetBird resource** (the Traefik ClusterIP), not the upstream service directly. The eBPF-based wgProxy handles tunnel backhaul between the bastion and in-cluster services, allowing the NetBird server to route traffic to internal Traefik services on the proxy subnet `10.96.0.0/12`.
 
 ## App Bundle Architecture
 

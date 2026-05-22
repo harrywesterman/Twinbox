@@ -2041,6 +2041,7 @@ def test_ensure_netbird_service_uses_current_api_and_safe_skips():
     assert "--argjson skip_tls_verify" in text
     assert "--argjson enabled" not in text
     assert "TRAEFIK_TARGET_PORT" in text
+    assert '.TRAEFIK_TARGET_PORT // "8443"' in text
     assert "port: $target_port" in text
     assert "port: 443" not in text
     assert 'protocol: "https"' in text
