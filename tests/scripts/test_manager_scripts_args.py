@@ -1914,13 +1914,20 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "netbird_host_resource_address()" in text
     assert "resolve_traefik_websecure_endpoint()" in text
     assert "read_pod_cidrs_json()" in text
+    assert "ipv4_in_cidrs_json()" in text
+    assert "normalize_traefik_resource_address()" in text
     assert "ensure_netbird_proxy_peer()" in text
     assert "wait_for_netbird_proxy_backend()" in text
     assert (
         'traefik_network_resource_address="$(netbird_host_resource_address "$traefik_resource_address")"'
         in text
     )
-    assert 'traefik_resource_address="$(resolve_traefik_websecure_endpoint)"' in text
+    assert (
+        'traefik_resource_address="$(normalize_traefik_resource_address "$traefik_resource_address" "$service_cidrs_json" "$pod_cidrs_json")"'
+        in text
+    )
+    assert "is in the Kubernetes service CIDR; using a ready Traefik pod endpoint instead" in text
+    assert "is a Kubernetes service DNS name; using a ready Traefik pod endpoint instead" in text
     assert 'traefik_target_port="8443"' in text
     assert 'pod_cidrs_json="$(read_pod_cidrs_json)"' in text
     assert '-var "traefik_resource_address=$traefik_network_resource_address"' in text
@@ -1982,6 +1989,11 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     proxy_peer_index = text.index('ensure_netbird_proxy_peer "$proxy_setup_key"')
     proxy_backend_index = text.index("wait_for_netbird_proxy_backend \\")
     network_secret_index = text.index("Writing network secret for helper scripts")
+    service_cidrs_index = text.index('service_cidrs_json="$(jq -n --arg cidr "$service_cidr"')
+    pod_cidrs_index = text.index('pod_cidrs_json="$(read_pod_cidrs_json)"')
+    normalize_traefik_index = text.index(
+        'traefik_resource_address="$(normalize_traefik_resource_address'
+    )
     dns_index = text.index("Creating wildcard DNS record for NetBird proxy")
     discovery_index = text.index('wait_for_public_oidc_discovery "$netbird_oidc_issuer"')
     authentik_service_index = text.index("Creating NetBird reverse proxy service for Authentik")
@@ -1998,6 +2010,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
         "netbird-proxy-services-"
     ) > text.index("Writing network secret for helper scripts")
     # network secret is written before routing peers, service creation, and the OIDC flow.
+    assert service_cidrs_index < pod_cidrs_index < normalize_traefik_index < auth_setup_index
     assert (
         auth_setup_index
         < network_index

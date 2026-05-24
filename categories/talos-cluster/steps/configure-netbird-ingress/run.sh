@@ -106,6 +106,61 @@ read_pod_cidrs_json() {
   printf '%s\n' "$cidrs_json"
 }
 
+ipv4_in_cidrs_json() {
+  local address="$1"
+  local cidrs_json="$2"
+
+  python3 - "$address" "$cidrs_json" <<'PY'
+import ipaddress
+import json
+import sys
+
+address = sys.argv[1]
+try:
+    ip = ipaddress.ip_address(address)
+    cidrs = json.loads(sys.argv[2])
+except Exception:
+    raise SystemExit(1)
+
+for cidr in cidrs:
+    try:
+        if ip in ipaddress.ip_network(cidr, strict=False):
+            raise SystemExit(0)
+    except ValueError:
+        continue
+raise SystemExit(1)
+PY
+}
+
+normalize_traefik_resource_address() {
+  local requested_address="$1"
+  local service_cidrs="$2"
+  local pod_cidrs="$3"
+
+  if [[ -z "$requested_address" ]]; then
+    resolve_traefik_websecure_endpoint
+    return
+  fi
+
+  case "$requested_address" in
+    traefik.traefik.svc.cluster.local|traefik-netbird.traefik.svc.cluster.local|*.svc|*.svc.cluster.local)
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird Traefik target ${requested_address} is a Kubernetes service DNS name; using a ready Traefik pod endpoint instead" >&2
+      resolve_traefik_websecure_endpoint
+      return
+      ;;
+  esac
+
+  if [[ "$requested_address" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] \
+    && ipv4_in_cidrs_json "$requested_address" "$service_cidrs" \
+    && ! ipv4_in_cidrs_json "$requested_address" "$pod_cidrs"; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird Traefik target ${requested_address} is in the Kubernetes service CIDR; using a ready Traefik pod endpoint instead" >&2
+    resolve_traefik_websecure_endpoint
+    return
+  fi
+
+  printf '%s\n' "$requested_address"
+}
+
 wait_for_public_oidc_discovery() {
   local issuer_url="$1"
   local discovery_url="${issuer_url%/}/.well-known/openid-configuration"
@@ -661,18 +716,16 @@ fi
 
 [[ -n "$netbird_proxy_ip" ]] || fail "NetBird bastion secret does not contain NETBIRD_IP"
 
-if [[ -z "$traefik_resource_address" ]]; then
-  traefik_resource_address="$(resolve_traefik_websecure_endpoint)"
-fi
-traefik_network_resource_address="$(netbird_host_resource_address "$traefik_resource_address")"
-traefik_target_port="8443"
-
 service_cidr="$(kubectl -n kube-system get pod -l component=kube-apiserver -o json 2>/dev/null | jq -r '.items[0].spec.containers[0].command[] | select(startswith("--service-cluster-ip-range=")) | sub("^--service-cluster-ip-range="; "")' || true)"
 if [[ -z "$service_cidr" ]]; then
   service_cidr="10.96.0.0/12"
 fi
 service_cidrs_json="$(jq -n --arg cidr "$service_cidr" '[$cidr]')"
 pod_cidrs_json="$(read_pod_cidrs_json)"
+
+traefik_resource_address="$(normalize_traefik_resource_address "$traefik_resource_address" "$service_cidrs_json" "$pod_cidrs_json")"
+traefik_network_resource_address="$(netbird_host_resource_address "$traefik_resource_address")"
+traefik_target_port="8443"
 
 authentik_public_url="${TWINBOX_AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
 authentik_domain="${authentik_public_url#https://}"
