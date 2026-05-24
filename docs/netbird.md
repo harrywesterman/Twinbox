@@ -341,6 +341,75 @@ The forwarded-header middleware forces `X-Forwarded-Proto=https` and
 URLs even though the in-cluster backend connection is plain HTTP on the
 `webnetbird` entrypoint.
 
+## DNS Nameserver Integration
+
+The `install-adguard` step deploys AdGuard Home into the cluster and configures a
+NetBird DNS nameserver group that pushes the AdGuard DNS server to peers. This
+allows ad-blocking DNS resolution on any device connected to the NetBird VPN
+without manual DNS configuration.
+
+### Architecture
+
+```mermaid
+flowchart LR
+    phone["Android Phone\n(non-routing peer)"]
+    mgmt["Management VM\n100.105.x.x:5354"]
+    k8s["Kubernetes Cluster\nAdGuard Pod\n10.106.x.x:53"]
+    bastion["NetBird Bastion\nDNS settings"]
+
+    bastion -->|Pushes nameserver\nto peer| phone
+    phone -->|UDP DNS query\nvia NetBird mesh| mgmt
+    mgmt -->|TCP port-forward\nkubectl| k8s
+    k8s -->|AdGuard response| mgmt
+    mgmt -->|UDP response| phone
+```
+
+Peers in the AdGuard DNS group receive the DNS nameserver address automatically
+via NetBird's nameserver group push. On the management VM, a Docker container
+named `twinbox-dns-forwarder` runs a Python UDP/TCP-to-TCP DNS proxy alongside
+`kubectl port-forward` to relay queries from the management VM's NetBird IP to
+the in-cluster AdGuard service.
+
+### Android Compatibility
+
+NetBird's DNS nameserver push works on all platforms. On Android, the kernel
+WireGuard implementation never updates peer `AllowedIPs`, making routed
+networks (e.g. `10.96.0.0/12`) unreachable. The DNS forwarder on the management
+VM avoids this entirely because the management VM is reachable via direct
+NetBird mesh (P2P), not through a route.
+
+### Components
+
+| Component | Location | Purpose |
+| --- | --- | --- |
+| `dns-proxy.py` | `scripts/manager/dns-proxy.py` | Python UDP/TCP-to-TCP DNS proxy with correct RFC 1035 framing |
+| `setup-dns-forwarder.sh` | `scripts/manager/setup-dns-forwarder.sh` | Installs or replaces the Docker forwarder on the management VM |
+| `twinbox-dns-forwarder` | Management VM Docker | Container that starts `kubectl port-forward` + the Python proxy |
+| `netbird-dns-nameserver.py` | `scripts/manager/netbird-dns-nameserver.py` | Creates/updates the NetBird DNS nameserver group |
+
+### Troubleshooting
+
+Check the forwarder status from the management VM:
+
+```bash
+sudo docker ps --filter name=twinbox-dns-forwarder
+sudo docker logs twinbox-dns-forwarder --tail 50
+```
+
+Test DNS resolution through the forwarder:
+
+```bash
+nslookup -port=5354 doubleclick.net 100.105.183.178
+```
+
+Expected result: `Address: 0.0.0.0` (AdGuard blocks the ad domain).
+
+If the forwarder is not running, restart it:
+
+```bash
+sudo docker restart twinbox-dns-forwarder
+```
+
 ## Runtime State
 
 Do not edit these as source files. They are created by the wizard on the
@@ -479,6 +548,9 @@ installed; otherwise the wizard uses the Dockerized client.
 | Browser or strict `curl` shows a certificate error for NetBird | Let's Encrypt issuance is still pending or the exact hostname hit a temporary rate limit; the bastion may be serving Traefik's default self-signed certificate | Check `/var/log/cloud-init-output.log` on the bastion and retry after the rate-limit window. The install can continue if the NetBird setup token was created. |
 | Public app hostname resolves but returns no app | Reverse proxy service is missing or targets the wrong Traefik resource (check `netbird-network-<cluster-id>.json`) | Check NetBird reverse proxy services and `netbird-network-<cluster-id>.json`. |
 | Management VM is unreachable over NetBird | The Management VM peer is not enrolled or admin group policy is missing | Check `netbird status`, the `twinbox-netbird` container, NetBird peers, and admin policies. |
+| DNS queries from peers fail (e.g. Android) | NetBird DNS nameserver points to the cluster IP (`10.96.x.x`), which is unreachable from Android's kernel WireGuard because it never updates `AllowedIPs`. Nameserver should point to the management VM NetBird IP:5354. | Check `/api/dns/nameservers` in the NetBird management API and verify the nameserver IP is the management VM's NetBird IP on port 5354. |
+| AdGuard is not blocking ads | The DNS forwarder is down or `kubectl port-forward` is stale | `sudo docker ps --filter name=twinbox-dns-forwarder` and `sudo docker logs twinbox-dns-forwarder --tail 30` |
+| `twinbox-dns-forwarder` fails to start | `kubectl` cannot reach the cluster or the AdGuard service is not deployed | Verify `KUBECONFIG` is set correctly and `kubectl -n adguard get svc adguard-dns` returns a valid ClusterIP |
 
 ### NetBird OIDC login check
 

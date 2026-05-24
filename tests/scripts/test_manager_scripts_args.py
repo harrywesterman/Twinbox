@@ -61,6 +61,9 @@ PIXELFED_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "pixelfed" / "k
 ARGO_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
 )
+ADGUARD_STEP_SCRIPT = (
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-adguard" / "run.sh"
+)
 ARGO_STEP_MANIFEST = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "step.yaml"
 )
@@ -2222,6 +2225,16 @@ def test_netbird_proxy_reuses_traefik_websecure_origin():
     )
 
 
+def test_adguard_install_uses_management_vm_dns_forwarder_for_netbird_dns():
+    text = ADGUARD_STEP_SCRIPT.read_text(encoding="utf-8")
+
+    assert "setup-dns-forwarder.sh" in text
+    assert 'bash "$WORKSPACE_ROOT/scripts/manager/setup-dns-forwarder.sh"' in text
+    assert '--nameserver-ip "$mgmt_netbird_ip"' in text
+    assert "--nameserver-port 5354" in text
+    assert "Management VM NetBird IP" in text
+
+
 def test_netbird_admin_access_uses_reachable_host_docker_daemon():
     text = NETBIRD_ADMIN_ACCESS_STEP_SCRIPT.read_text(encoding="utf-8")
 
@@ -2248,6 +2261,11 @@ def test_netbird_network_policies_use_single_rule_per_policy():
 
     for name, body in policy_blocks:
         assert body.count("\n  rule {") == 1, name
+
+    assert "adguard_dns_to_k8s_routers" in {name for name, _ in policy_blocks}
+    assert "adguard_dns_to_k8s_routers_tcp" in {name for name, _ in policy_blocks}
+    assert "adguard_dns_to_management_vm" in {name for name, _ in policy_blocks}
+    assert "adguard_dns_to_management_vm_tcp" in {name for name, _ in policy_blocks}
 
 
 def test_netbird_routing_peer_uses_pinned_image_tag():

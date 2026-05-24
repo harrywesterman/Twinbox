@@ -91,7 +91,7 @@ resource "netbird_route" "k8s_services" {
   description = "Kubernetes service CIDR ${each.key}"
   network     = each.key
   peer_groups = [netbird_group.k8s_routers.id]
-  groups      = [netbird_group.proxy.id, netbird_group.adguard_dns.id]
+  groups      = [netbird_group.proxy.id, netbird_group.adguard_dns.id, netbird_group.admins.id, netbird_group.management_vm.id]
   masquerade  = true
   metric      = 9999
   enabled     = true
@@ -158,6 +158,74 @@ resource "netbird_policy" "admin_to_management_vm_api" {
     sources       = [netbird_group.admins.id]
     destinations  = [netbird_group.management_vm.id]
     ports         = [tostring(var.management_vm_api_port)]
+  }
+}
+
+resource "netbird_policy" "adguard_dns_to_k8s_routers" {
+  name        = "${local.name_prefix}-adguard-dns-to-k8s-routers"
+  description = "Allow AdGuard DNS UDP queries to reach the Kubernetes cluster via routing peers"
+  enabled     = true
+
+  rule {
+    name          = "dns"
+    action        = "accept"
+    enabled       = true
+    bidirectional = false
+    protocol      = "udp"
+    sources       = [netbird_group.adguard_dns.id]
+    destinations  = [netbird_group.k8s_routers.id]
+    ports         = ["53"]
+  }
+}
+
+resource "netbird_policy" "adguard_dns_to_k8s_routers_tcp" {
+  name        = "${local.name_prefix}-adguard-dns-to-k8s-routers-tcp"
+  description = "Allow AdGuard DNS TCP queries to reach the Kubernetes cluster via routing peers"
+  enabled     = true
+
+  rule {
+    name          = "dns"
+    action        = "accept"
+    enabled       = true
+    bidirectional = false
+    protocol      = "tcp"
+    sources       = [netbird_group.adguard_dns.id]
+    destinations  = [netbird_group.k8s_routers.id]
+    ports         = ["53"]
+  }
+}
+
+resource "netbird_policy" "adguard_dns_to_management_vm" {
+  name        = "${local.name_prefix}-adguard-dns-to-management-vm"
+  description = "Allow AdGuard DNS UDP queries to reach the Management VM DNS forwarder"
+  enabled     = true
+
+  rule {
+    name          = "dns-forwarder"
+    action        = "accept"
+    enabled       = true
+    bidirectional = true
+    protocol      = "udp"
+    sources       = [netbird_group.adguard_dns.id]
+    destinations  = [netbird_group.management_vm.id]
+    ports         = ["5354"]
+  }
+}
+
+resource "netbird_policy" "adguard_dns_to_management_vm_tcp" {
+  name        = "${local.name_prefix}-adguard-dns-to-management-vm-tcp"
+  description = "Allow AdGuard DNS TCP fallback to reach the Management VM DNS forwarder"
+  enabled     = true
+
+  rule {
+    name          = "dns-forwarder"
+    action        = "accept"
+    enabled       = true
+    bidirectional = true
+    protocol      = "tcp"
+    sources       = [netbird_group.adguard_dns.id]
+    destinations  = [netbird_group.management_vm.id]
+    ports         = ["5354"]
   }
 }
 
