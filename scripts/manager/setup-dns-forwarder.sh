@@ -82,10 +82,19 @@ docker run -d \
   --entrypoint bash \
   "$WORKER_IMAGE" \
   -lc "set -euo pipefail
+cleanup() {
+  kill \"\${proxy_pid:-}\" \"\${pf_pid:-}\" 2>/dev/null || true
+  wait \"\${proxy_pid:-}\" \"\${pf_pid:-}\" 2>/dev/null || true
+}
+trap cleanup EXIT
+
 kubectl -n '$NAMESPACE' port-forward --address 127.0.0.1 service/'$SERVICE_NAME' '$LOCAL_PORT':'$SERVICE_PORT' &
 pf_pid=\$!
-trap 'kill \"\$pf_pid\" 2>/dev/null || true; wait \"\$pf_pid\" 2>/dev/null || true' EXIT
 for i in \$(seq 1 30); do
+  if ! kill -0 \"\$pf_pid\" 2>/dev/null; then
+    echo 'DNS forwarder port-forward exited before becoming ready' >&2
+    exit 1
+  fi
   if python3 - <<'PY' >/dev/null 2>&1
 import socket
 s = socket.create_connection(('127.0.0.1', $LOCAL_PORT), timeout=1)
@@ -96,7 +105,25 @@ PY
   fi
   sleep 1
 done
-python3 /opt/twinbox/scripts/manager/dns-proxy.py --listen-host '$LISTEN_IP' --listen-port '$LISTEN_PORT' --upstream-host 127.0.0.1 --upstream-port '$LOCAL_PORT'
+if ! python3 - <<'PY' >/dev/null 2>&1
+import socket
+s = socket.create_connection(('127.0.0.1', $LOCAL_PORT), timeout=1)
+s.close()
+PY
+then
+  echo 'DNS forwarder port-forward did not become ready' >&2
+  exit 1
+fi
+
+python3 /opt/twinbox/scripts/manager/dns-proxy.py --listen-host '$LISTEN_IP' --listen-port '$LISTEN_PORT' --upstream-host 127.0.0.1 --upstream-port '$LOCAL_PORT' &
+proxy_pid=\$!
+
+if ! wait -n \"\$pf_pid\" \"\$proxy_pid\"; then
+  echo 'DNS forwarder child process exited; restarting container' >&2
+else
+  echo 'DNS forwarder child process exited cleanly; restarting container' >&2
+fi
+exit 1
 " >/dev/null
 
 echo "Twinbox DNS forwarder is running on ${LISTEN_IP}:${LISTEN_PORT} via container ${CONTAINER_NAME}"

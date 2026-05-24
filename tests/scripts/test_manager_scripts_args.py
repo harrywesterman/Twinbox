@@ -64,6 +64,7 @@ ARGO_STEP_SCRIPT = (
 ADGUARD_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-adguard" / "run.sh"
 )
+SETUP_DNS_FORWARDER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "setup-dns-forwarder.sh"
 ARGO_STEP_MANIFEST = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "step.yaml"
 )
@@ -2246,6 +2247,20 @@ def test_adguard_install_uses_management_vm_dns_forwarder_for_netbird_dns():
     assert '--nameserver-ip "$mgmt_netbird_ip"' in text
     assert "--nameserver-port 5354" in text
     assert "Management VM NetBird IP" in text
+
+
+def test_dns_forwarder_restarts_when_port_forward_or_proxy_exits():
+    text = SETUP_DNS_FORWARDER_SCRIPT.read_text(encoding="utf-8")
+
+    assert "cleanup()" in text
+    assert 'kill \\"\\${proxy_pid:-}\\" \\"\\${pf_pid:-}\\"' in text
+    assert 'if ! kill -0 \\"\\$pf_pid\\"' in text
+    assert "DNS forwarder port-forward exited before becoming ready" in text
+    assert "DNS forwarder port-forward did not become ready" in text
+    assert "proxy_pid=\\$!" in text
+    assert 'wait -n \\"\\$pf_pid\\" \\"\\$proxy_pid\\"' in text
+    assert "DNS forwarder child process exited; restarting container" in text
+    assert "exit 1" in text
 
 
 def test_netbird_admin_access_uses_reachable_host_docker_daemon():

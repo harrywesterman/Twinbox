@@ -107,6 +107,17 @@ def test_configmap_exists():
     assert "upstream_dns" in cm["data"]["AdGuardHome.yaml"]
 
 
+def test_configmap_dns_settings_are_valid_for_netbird_clients():
+    cm = yaml.safe_load((GITOPS_DIR / "configmap.yaml").read_text())
+    adguard_config = yaml.safe_load(cm["data"]["AdGuardHome.yaml"])
+    dns_config = adguard_config["dns"]
+
+    assert dns_config["bootstrap_dns"] == ["9.9.9.9", "1.1.1.1"]
+    assert dns_config["ratelimit"] == 0
+    assert {"domain": "bierineenweek.nl", "answer": "188.34.166.172"} in dns_config["rewrites"]
+    assert {"domain": "*.bierineenweek.nl", "answer": "188.34.166.172"} in dns_config["rewrites"]
+
+
 def test_ingressroute_exists():
     ir = yaml.safe_load((GITOPS_DIR / "ingressroute.yaml").read_text())
     assert ir["kind"] == "IngressRoute"

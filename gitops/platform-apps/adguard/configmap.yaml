@@ -17,7 +17,14 @@ data:
       upstream_dns:
         - tls://9.9.9.9
         - tls://1.1.1.1
-      bootstrap_dns: 9.9.9.9
+      bootstrap_dns:
+        - 9.9.9.9
+        - 1.1.1.1
+      rewrites:
+        - domain: bierineenweek.nl
+          answer: 188.34.166.172
+        - domain: "*.bierineenweek.nl"
+          answer: 188.34.166.172
       blocking_mode: default
       protection_enabled: true
       edns_enabled: true
@@ -25,7 +32,7 @@ data:
       safesearch_enabled: false
       querylog_enabled: true
       stats_enabled: true
-      ratelimit: 20
+      ratelimit: 0
       ratelimit_whitelist: []
       refuse_any: true
       upstream_dns_file: ""
