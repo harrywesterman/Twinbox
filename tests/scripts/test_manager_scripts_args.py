@@ -65,6 +65,7 @@ ADGUARD_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-adguard" / "run.sh"
 )
 SETUP_DNS_FORWARDER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "setup-dns-forwarder.sh"
+NETBIRD_DNS_ZONE_SCRIPT = REPO_ROOT / "scripts" / "manager" / "netbird-dns-zone.py"
 ARGO_STEP_MANIFEST = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "step.yaml"
 )
@@ -1876,6 +1877,9 @@ def test_netbird_cloud_init_escapes_shell_variables_for_templatefile():
     assert "netbird-automated-setup.sh" not in text
     assert 'export PUBLIC_ZONE_NAME="${public_zone_name}"' in text
     assert "seed_netbird_account_domain()" in text
+    assert '"twinbox.internal"' in text
+    assert "private peer DNS domain" in text
+    assert "public_zone_name, setup_result = sys.argv" not in text
     assert "settings_extra_user_approval_required = 0" in text
     assert "domain_category = ?, is_domain_primary_account = 1" in text
     assert "retry_netbird_step()" in text
@@ -1940,6 +1944,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "TRAEFIK_NETWORK_RESOURCE_ADDRESS" in text
     assert "TRAEFIK_TARGET_PORT" in text
     assert "POD_CIDRS" in text
+    assert "ADGUARD_DNS_GROUP_ID" in text
     assert "proxy_setup_key" in text
     assert "netbird-proxy-access" in text
     assert "netbirdio/netbird:${PINNED_NETBIRD_VERSION:-0.70.5}" in text
@@ -1961,6 +1966,13 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
 
     assert 'name: "authentik", domain: $authentik_domain, path: "/"' in text
     assert "netbird-wildcard-dns" in text
+    assert "netbird-dns-zone.py" in text
+    assert '--zone-domain "$public_zone_name"' in text
+    assert '--group-id "$admins_group_id"' in text
+    assert '--group-id "$management_vm_group_id"' in text
+    assert '--group-id "$adguard_dns_group_id"' in text
+    assert '--record "${public_zone_name}=${netbird_proxy_ip}"' in text
+    assert '--record "*.${public_zone_name}=${netbird_proxy_ip}"' in text
     assert "NETBIRD_IP" in text
     assert "NETBIRD_PROXY_DOMAIN" in text
     # The services block was removed; netbird_proxy_domain is no longer passed to tofu
@@ -2247,6 +2259,20 @@ def test_adguard_install_uses_management_vm_dns_forwarder_for_netbird_dns():
     assert '--nameserver-ip "$mgmt_netbird_ip"' in text
     assert "--nameserver-port 5354" in text
     assert "Management VM NetBird IP" in text
+
+
+def test_netbird_dns_zone_helper_manages_custom_zone_and_records():
+    text = NETBIRD_DNS_ZONE_SCRIPT.read_text(encoding="utf-8")
+
+    assert "/api/dns/zones" in text
+    assert "distribution_groups" in text
+    assert "enable_search_domain" in text
+    assert "args.group_id" in text
+    assert "records_url" in text
+    assert '"type": "A"' in text
+    assert '"ttl": 300' in text
+    assert "PUT" in text
+    assert "POST" in text
 
 
 def test_dns_forwarder_restarts_when_port_forward_or_proxy_exits():

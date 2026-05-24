@@ -803,6 +803,7 @@ admins_group_id="$(tofu output -raw -no-color admins_group_id)"
 management_vm_group_id="$(tofu output -raw -no-color management_vm_group_id)"
 k8s_routers_group_id="$(tofu output -raw -no-color k8s_routers_group_id)"
 proxy_group_id="$(tofu output -raw -no-color proxy_group_id)"
+adguard_dns_group_id="$(tofu output -raw -no-color adguard_dns_group_id)"
 traefik_resource_id="$(tofu output -raw -no-color traefik_resource_id)"
 
 secrets_dir="/opt/twinbox/bootstrap/secrets/global"
@@ -860,6 +861,7 @@ jq -n \
   --arg management_vm_group_id "$management_vm_group_id" \
   --arg k8s_routers_group_id "$k8s_routers_group_id" \
   --arg proxy_group_id "$proxy_group_id" \
+  --arg adguard_dns_group_id "$adguard_dns_group_id" \
   --arg cluster_id "$cluster_id" \
   '{
     NETBIRD_MANAGEMENT_URL: $management_url,
@@ -872,6 +874,7 @@ jq -n \
     MANAGEMENT_VM_GROUP_ID: $management_vm_group_id,
     K8S_ROUTERS_GROUP_ID: $k8s_routers_group_id,
     PROXY_GROUP_ID: $proxy_group_id,
+    ADGUARD_DNS_GROUP_ID: $adguard_dns_group_id,
     CLUSTER_ID: $cluster_id
   }' >"$network_secret"
 chmod 600 "$network_secret"
@@ -912,6 +915,19 @@ spec:
         - ${netbird_proxy_ip}
       recordTTL: 300
 EOF
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating NetBird custom DNS zone for app domains"
+zone_result="$(python3 "$WORKSPACE_ROOT/scripts/manager/netbird-dns-zone.py" \
+  --management-url "$netbird_management_url" \
+  --token "$netbird_token" \
+  --zone-name "Twinbox ${public_zone_name}" \
+  --zone-domain "$public_zone_name" \
+  --group-id "$admins_group_id" \
+  --group-id "$management_vm_group_id" \
+  --group-id "$adguard_dns_group_id" \
+  --record "${public_zone_name}=${netbird_proxy_ip}" \
+  --record "*.${public_zone_name}=${netbird_proxy_ip}")"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] $zone_result"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating NetBird reverse proxy service for Authentik (required for OIDC verification)"
 bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
