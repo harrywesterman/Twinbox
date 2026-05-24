@@ -112,7 +112,7 @@ def test_configmap_dns_settings_are_valid_for_netbird_clients():
     adguard_config = yaml.safe_load(cm["data"]["AdGuardHome.yaml"])
     dns_config = adguard_config["dns"]
 
-    assert dns_config["bootstrap_dns"] == ["9.9.9.9", "1.1.1.1"]
+    assert dns_config["bootstrap_dns"] == "9.9.9.9"
     assert dns_config["ratelimit"] == 0
     assert {"domain": "bierineenweek.nl", "answer": "188.34.166.172"} in dns_config["rewrites"]
     assert {"domain": "*.bierineenweek.nl", "answer": "188.34.166.172"} in dns_config["rewrites"]
