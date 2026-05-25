@@ -3,8 +3,9 @@ FROM codercom/enterprise-base:ubuntu
 ARG TALOS_VERSION=v1.13.0
 ARG KUBECTL_VERSION=v1.36.0
 ARG HELM_VERSION=v4.1.4
-ARG TERRAFORM_VERSION=1.11.6
+ARG OPENTOFU_VERSION=v1.11.6
 ARG PROTOC_VERSION=30.3
+ARG YQ_VERSION=v4.45.2
 ARG USER=coder
 
 USER root
@@ -59,9 +60,10 @@ RUN curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" -o 
     && install -m 0755 /tmp/linux-amd64/helm /usr/local/bin/helm \
     && rm -rf /tmp/helm.tar.gz /tmp/linux-amd64
 
-RUN curl -fsSL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o /tmp/terraform.zip \
-    && unzip -o /tmp/terraform.zip -d /usr/local/bin \
-    && rm -f /tmp/terraform.zip
+RUN curl -fsSL "https://github.com/opentofu/opentofu/releases/download/${OPENTOFU_VERSION}/tofu_${OPENTOFU_VERSION#v}_linux_amd64.tar.gz" -o /tmp/tofu.tar.gz \
+    && tar -xzf /tmp/tofu.tar.gz -C /tmp \
+    && install -m 0755 /tmp/tofu /usr/local/bin/tofu \
+    && rm -rf /tmp/tofu.tar.gz /tmp/tofu
 
 ENV GO_VERSION=1.24.4 \
     PATH=/usr/local/go/bin:$PATH
@@ -100,7 +102,7 @@ RUN pip3 install --break-system-packages --no-cache-dir \
         ansible-core \
     && ansible --version | head -1
 
-RUN curl -fsSL "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64" -o /usr/local/bin/yq \
+RUN curl -fsSL "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64" -o /usr/local/bin/yq \
     && chmod +x /usr/local/bin/yq
 
 COPY --chmod=755 <<"ENTRY" /usr/local/bin/entrypoint.sh
