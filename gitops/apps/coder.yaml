@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: https://helm.coder.com/v2
+    -       repoURL: https://helm.coder.com
       chart: coder
       targetRevision: "__CODER_CHART_VERSION__"
       helm:
