@@ -15,8 +15,6 @@ RUN apt-get update && \
         ca-certificates \
         cmake \
         curl \
-        docker.io \
-        docker-compose-v2 \
         g++ \
         gcc \
         git \
@@ -39,7 +37,13 @@ RUN apt-get update && \
         vim \
         wget \
         zsh \
-        musl-tools \
+    && rm -rf /var/lib/apt/lists/* && \
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker.gpg && \
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        docker-ce-cli \
+        docker-compose-plugin \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL "https://github.com/siderolabs/talos/releases/download/${TALOS_VERSION}/talosctl-linux-amd64" -o /tmp/talosctl \
