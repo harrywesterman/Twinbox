@@ -1,8 +1,11 @@
+import json
 import os
 import re
 import subprocess
 import tempfile
 from pathlib import Path
+
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_JSX = REPO_ROOT / "manager-web" / "src" / "App.jsx"
@@ -38,6 +41,7 @@ STIRLING_PDF_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "apps" / "steps" / "install-stirling-pdf" / "run.sh"
 )
 PIXELFED_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-pixelfed" / "run.sh"
+PUSH_CODER_TEMPLATE_SCRIPT = REPO_ROOT / "scripts" / "manager" / "push-coder-template.sh"
 TWINBOX_PORTAL_APP = REPO_ROOT / "gitops" / "apps" / "twinbox-portal.yaml"
 OUTLINE_APP = REPO_ROOT / "gitops" / "apps" / "outline.yaml"
 OUTLINE_OPTIONAL_APP = REPO_ROOT / "gitops" / "optional-apps" / "outline.yaml"
@@ -46,6 +50,8 @@ N8N_APP = REPO_ROOT / "gitops" / "apps" / "n8n.yaml"
 HEDGEDOC_APP = REPO_ROOT / "gitops" / "apps" / "hedgedoc.yaml"
 PAPERLESS_APP = REPO_ROOT / "gitops" / "apps" / "paperless.yaml"
 PIXELFED_APP = REPO_ROOT / "gitops" / "apps" / "pixelfed.yaml"
+CODER_APP = REPO_ROOT / "gitops" / "apps" / "coder.yaml"
+CODER_VALUES = REPO_ROOT / "gitops" / "values" / "coder.yaml"
 OUTLINE_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "outline" / "kustomization.yaml"
 OPENWEBUI_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "openwebui" / "kustomization.yaml"
 N8N_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "n8n" / "kustomization.yaml"
@@ -58,6 +64,12 @@ PIXELFED_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "pixelfed" / "k
 ARGO_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
 )
+ADGUARD_STEP_SCRIPT = (
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-adguard" / "run.sh"
+)
+SETUP_DNS_FORWARDER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "setup-dns-forwarder.sh"
+NETBIRD_DNS_ZONE_SCRIPT = REPO_ROOT / "scripts" / "manager" / "netbird-dns-zone.py"
+NETBIRD_DNS_NAMESERVER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "netbird-dns-nameserver.py"
 ARGO_STEP_MANIFEST = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "step.yaml"
 )
@@ -218,6 +230,7 @@ NETBIRD_ADMIN_ACCESS_STEP_SCRIPT = (
     / "configure-netbird-admin-access"
     / "run.sh"
 )
+ENSURE_NETBIRD_SERVICE_SCRIPT = REPO_ROOT / "scripts" / "manager" / "ensure-netbird-service.sh"
 AUTHENTIK_NETBIRD_MODULE_VARS = (
     REPO_ROOT / "infra" / "opentofu" / "authentik-netbird" / "variables.tf"
 )
@@ -1122,12 +1135,14 @@ def test_manager_worker_image_includes_talos_image_factory_helper():
     assert "PINNED_TALOS_VERSION" in text
     assert "talosctl-linux-amd64" in text
     assert "COPY lib ./lib" in text
+    assert "COPY coder ./coder" in text
     assert "manager-api/src/lib/catalog-definitions.mjs" not in text
     assert "../../lib/catalog-definitions.mjs" in refresh_dashy_text
     assert "../../lib/catalog-definitions.mjs" in refresh_portal_text
     assert "../../manager-api/src/lib/catalog-definitions.mjs" not in refresh_dashy_text
     assert "../../manager-api/src/lib/catalog-definitions.mjs" not in refresh_portal_text
     assert "apk add --no-cache bash ca-certificates curl docker-cli jq" in text
+    assert "iproute2" in text
     assert "COPY scripts/get-talos-image-factory.sh ./scripts/get-talos-image-factory.sh" in text
     assert "RUN chmod +x ./scripts/get-talos-image-factory.sh" in text
 
@@ -1236,6 +1251,45 @@ def test_apply_argocd_application_helper_applies_and_waits_for_health():
     assert "--no-wait" in text
     assert ".resource_profile // empty" in text
     assert "(.worker_count // 0)" in text
+
+
+def test_coder_app_injects_zone_specific_helm_values():
+    app = yaml.safe_load(CODER_APP.read_text(encoding="utf-8"))
+    values = yaml.safe_load(CODER_VALUES.read_text(encoding="utf-8"))
+
+    helm = app["spec"]["sources"][0]["helm"]
+    parameters = {item["name"]: item["value"] for item in helm["parameters"]}
+    env = values["coder"]["env"]
+
+    assert helm["valueFiles"] == ["$values/gitops/values/coder.yaml"]
+    assert env[4]["name"] == "CODER_ACCESS_URL"
+    assert env[5]["name"] == "CODER_OIDC_ISSUER_URL"
+    assert env[4]["value"] == "https://coder.__ZONE_NAME__"
+    assert env[5]["value"] == "https://authentik.__ZONE_NAME__/application/o/coder/"
+    assert parameters["coder.env[4].value"] == "https://coder.__ZONE_NAME__"
+    assert parameters["coder.env[5].value"] == (
+        "https://authentik.__ZONE_NAME__/application/o/coder/"
+    )
+    assert values["coder"]["service"]["type"] == "ClusterIP"
+    assert values["coder"]["serviceAccount"]["extraRules"] == [
+        {
+            "apiGroups": ["metrics.k8s.io"],
+            "resources": ["pods"],
+            "verbs": ["get", "list", "watch"],
+        }
+    ]
+
+
+def test_push_coder_template_downloads_current_linux_cli_asset():
+    text = PUSH_CODER_TEMPLATE_SCRIPT.read_text(encoding="utf-8")
+
+    assert 'source "$WORKSPACE_ROOT/config/pinned-defaults.sh"' in text
+    assert '[[ -d "$TEMPLATE_DIR" ]]' in text
+    assert "PINNED_CODER_CHART_VERSION" in text
+    assert "Replacing Coder CLI" in text
+    assert "releases/download/v${coder_release_version}" in text
+    assert "coder_${coder_release_version}_linux_amd64.tar.gz" in text
+    assert "coder-linux-amd64.tar.gz" not in text
 
 
 def test_stirling_pdf_waits_for_real_kubernetes_readiness():
@@ -1756,7 +1810,11 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "kind: DNSEndpoint" in netbird_bastion_run_text
     assert "netbird-bastion-dns" in netbird_bastion_run_text
     assert "dnsName: ${netbird_fqdn}" in netbird_bastion_run_text
-    assert "dnsName: ${netbird_proxy_domain}" in netbird_bastion_run_text
+    # Proxy subdomain record was removed; proxy domain is now the zone itself
+    assert (
+        "netbird-bastion-dns" not in netbird_bastion_run_text
+        or "proxy." not in netbird_bastion_run_text
+    )
     assert '-var "public_zone_name=$public_zone_name"' in netbird_bastion_run_text
     assert "external-dns" in netbird_bastion_run_text
     assert "command -v ssh >/dev/null" in netbird_bastion_run_text
@@ -1765,6 +1823,8 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "OpenSSH client tools are available" in netbird_bastion_run_text
     assert 'server_name="twinbox-${cluster_id}-netbird"' in netbird_bastion_run_text
     assert "NetBird Hetzner resource prefix" in netbird_bastion_run_text
+    # The step result includes cluster_id and secrets_path (netbird_proxy_domain was removed)
+    assert "cluster_id: $cluster_id," in netbird_bastion_run_text
     assert "urllib.error.HTTPError" in netbird_bastion_run_text
     assert "time.sleep(3)" in netbird_bastion_run_text
     assert 'delete_hcloud_resources_by_name "servers" "$legacy_server_name" "$server_name"' in (
@@ -1845,6 +1905,8 @@ def test_netbird_cloud_init_escapes_shell_variables_for_templatefile():
     assert "/root/bootstrap-netbird.sh" in text
     assert "ufw --force enable" in text
     assert "$${" not in text, "template should not contain $$ escapes"
+    assert "${dns_env[@]}" not in text, "bash arrays must not be Terraform template expressions"
+    assert "[@" not in text, "bash array expansions are invalid Terraform template expressions"
     assert "${NETBIRD_VERSION}" not in text, "bash var NETBIRD_VERSION must use $VAR not ${VAR}"
     assert "${volume_dir}" not in text, "bash vars must not be Terraform template expressions"
     assert '"$NETBIRD_URL' in text or "'$NETBIRD_URL" in text
@@ -1860,6 +1922,9 @@ def test_netbird_cloud_init_escapes_shell_variables_for_templatefile():
     assert "netbird-automated-setup.sh" not in text
     assert 'export PUBLIC_ZONE_NAME="${public_zone_name}"' in text
     assert "seed_netbird_account_domain()" in text
+    assert '"twinbox.internal"' in text
+    assert "private peer DNS domain" in text
+    assert "public_zone_name, setup_result = sys.argv" not in text
     assert "settings_extra_user_approval_required = 0" in text
     assert "domain_category = ?, is_domain_primary_account = 1" in text
     assert "retry_netbird_step()" in text
@@ -1897,21 +1962,77 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "settings_extra_user_approval_required = 0" in text
     assert 'base64.b64encode(raw).decode().rstrip("=")' in text
     assert "netbird_host_resource_address()" in text
+    assert "resolve_traefik_websecure_endpoint()" in text
+    assert "read_pod_cidrs_json()" in text
+    assert "read_management_lan_cidrs_json()" in text
+    assert "ipv4_in_cidrs_json()" in text
+    assert "normalize_traefik_resource_address()" in text
+    assert "ensure_netbird_proxy_peer()" in text
+    assert "ensure_netbird_bastion_exit_peer()" in text
+    assert "wait_for_netbird_proxy_backend()" in text
     assert (
         'traefik_network_resource_address="$(netbird_host_resource_address "$traefik_resource_address")"'
         in text
     )
+    assert (
+        'traefik_resource_address="$(normalize_traefik_resource_address "$traefik_resource_address" "$service_cidrs_json" "$pod_cidrs_json")"'
+        in text
+    )
+    assert "is in the Kubernetes service CIDR; using a ready Traefik pod endpoint instead" in text
+    assert "is a Kubernetes service DNS name; using a ready Traefik pod endpoint instead" in text
+    assert 'traefik_target_port="8443"' in text
+    assert 'pod_cidrs_json="$(read_pod_cidrs_json)"' in text
+    assert 'management_lan_cidrs_json="$(read_management_lan_cidrs_json "$cluster_json")"' in text
     assert '-var "traefik_resource_address=$traefik_network_resource_address"' in text
-    assert '-var "traefik_resource_address=$traefik_resource_address"' in text
-    assert 'traefik_resource_address="traefik-netbird.traefik.svc.cluster.local"' in text
+    assert '-var "pod_cidrs=${pod_cidrs_json}"' in text
+    assert '-var "management_lan_cidrs=${management_lan_cidrs_json}"' in text
+    # The services block was removed; traefik_resource_address is now only passed to the network module
+    assert "netbird-proxy-services-" not in text
+    assert 'traefik_resource_address="traefik.traefik.svc.cluster.local"' not in text
     assert "kubectl -n traefik get svc traefik -o jsonpath" not in text
     assert "TRAEFIK_NETWORK_RESOURCE_ADDRESS" in text
+    assert "TRAEFIK_TARGET_PORT" in text
+    assert "POD_CIDRS" in text
+    assert "MANAGEMENT_LAN_CIDRS" in text
+    assert "ADGUARD_DNS_GROUP_ID" in text
+    assert "MANAGEMENT_LAN_ROUTERS_GROUP_ID" in text
+    assert "BASTION_EXIT_ROUTERS_GROUP_ID" in text
+    assert "EXIT_NODE_USERS_GROUP_ID" in text
+    assert "proxy_setup_key" in text
+    assert "netbird-proxy-access" in text
+    assert "management_lan_router_setup_key" in text
+    assert "bastion_exit_router_setup_key" in text
+    assert "netbird-management-lan-router" in text
+    assert "netbird-bastion-exit-router" in text
+    assert "netbirdio/netbird:${PINNED_NETBIRD_VERSION:-0.70.5}" in text
+    assert "docker run -d" in text and "--name netbird-client" in text
+    assert "--name netbird-hetzner-exit" in text
+    assert "twinbox-${cluster_id}-hetzner-exit" in text
+    assert "/var/lib/netbird-hetzner-exit:/var/lib/netbird" in text
+    assert "--sysctl net.ipv4.ip_forward=1" in text
+    exit_peer_block = re.search(
+        r"docker run -d \\\n  --name netbird-hetzner-exit(.*?)netbird status --check ready",
+        text,
+        flags=re.DOTALL,
+    )
+    assert exit_peer_block
+    assert "--network host" not in exit_peer_block.group(1)
+    assert "NB_INTERFACE_NAME=wt1" in text
+    assert "NB_WIREGUARD_PORT=51821" in text
+    assert "NB_NFTABLES_TABLE=netbird_exit" in text
+    assert "NB_DISABLE_IPV6=true" in text
+    assert "disable_netbird_account_ipv6_overlay" in text
+    assert '"ipv6_enabled_groups": []' in text
+    assert "node_prefix_length" in text
+    assert 'emit(f"{management_ip}/{prefix_length}")' in text
+    assert 'emit(f"{gateway_ip}/{prefix_length}")' in text
     assert "authentik_resolve_scope_mapping_id" in text
     assert '-var "property_mapping_ids=$property_mapping_ids_json"' in text
     assert '-var "authentik_url=$authentik_url"' not in text
     assert "api.cloudflare.com/client/v4" not in text
     assert "cloudflare-tunnel-dns" in text  # cleanup of stale tunnel record
-
+    # Network secret is now written (was removed when services block was removed)
+    assert "Writing network secret for helper scripts" in text
     assert "authentik_property_mapping_provider_scope" not in main_text
     assert "property_mappings          = var.property_mapping_ids" in main_text
     assert 'variable "authentik_api_url"' in vars_text
@@ -1922,13 +2043,29 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
 
     assert 'name: "authentik", domain: $authentik_domain, path: "/"' in text
     assert "netbird-wildcard-dns" in text
+    assert "netbird-dns-zone.py" in text
+    assert '--zone-domain "$public_zone_name"' in text
+    assert '--group-id "$admins_group_id"' in text
+    assert '--group-id "$management_vm_group_id"' in text
+    assert '--group-id "$adguard_dns_group_id"' in text
+    assert '--group-id "$exit_node_users_group_id"' in text
+    assert '--record "${public_zone_name}=${netbird_proxy_ip}"' in text
+    assert '--record "*.${public_zone_name}=${netbird_proxy_ip}"' in text
     assert "NETBIRD_IP" in text
     assert "NETBIRD_PROXY_DOMAIN" in text
-    assert '-var "netbird_proxy_domain=$netbird_proxy_domain"' in text
+    # The services block was removed; netbird_proxy_domain is no longer passed to tofu
     assert "wait_for_netbird_routing_peer" in text
-    assert "wait_for_traefik_netbird_backend" in text
+    assert "wait_for_traefik_reverse_proxy_backend" in text
+    assert "kubernetes.io/service-name=traefik" in text
     assert "kubernetes.io/service-name=traefik-netbird" in text
     assert "wait_for_public_oidc_discovery" in text
+    assert "wait_for_public_oidc_authorize" in text
+    assert "verify_public_oidc_authorize" in text
+    assert 'verify_public_oidc_authorize "$authentik_base_url" "$client_id" "$redirect_uri"' in text
+    assert (
+        'wait_for_public_oidc_authorize "$authentik_public_url" "$netbird_oidc_client_id"' in text
+    )
+    assert "Public Authentik authorize endpoint not ready yet" in text
     assert 'curl -fsS --connect-timeout 5 --max-time 15 "$discovery_url"' in text
     assert "Continuing NetBird configuration; browser SSO will be healthy once public TLS" in text
     assert (
@@ -1939,24 +2076,186 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     auth_setup_index = text.index("Configuring Authentik OIDC application for NetBird")
     network_index = text.index("Creating NetBird groups, routing resources, and setup keys")
     routing_peer_index = text.index("Deploying NetBird routing peers before enabling reverse proxy")
-    backend_index = text.index('wait_for_traefik_netbird_backend "$traefik_resource_address"')
-    proxy_index = text.index("Creating NetBird reverse proxy services")
+    backend_index = text.index('wait_for_traefik_reverse_proxy_backend "$traefik_resource_address"')
+    proxy_peer_index = text.index('ensure_netbird_proxy_peer "$proxy_setup_key"')
+    exit_peer_index = text.index(
+        'ensure_netbird_bastion_exit_peer "$bastion_exit_router_setup_key"'
+    )
+    proxy_backend_index = text.index("wait_for_netbird_proxy_backend \\")
+    network_secret_index = text.index("Writing network secret for helper scripts")
+    service_cidrs_index = text.index('service_cidrs_json="$(jq -n --arg cidr "$service_cidr"')
+    pod_cidrs_index = text.index('pod_cidrs_json="$(read_pod_cidrs_json)"')
+    management_lan_index = text.index('management_lan_cidrs_json="$(read_management_lan_cidrs_json')
+    normalize_traefik_index = text.index(
+        'traefik_resource_address="$(normalize_traefik_resource_address'
+    )
     dns_index = text.index("Creating wildcard DNS record for NetBird proxy")
     discovery_index = text.index('wait_for_public_oidc_discovery "$netbird_oidc_issuer"')
+    authentik_service_index = text.index("Creating NetBird reverse proxy service for Authentik")
     idp_index = text.index("Registering Authentik as NetBird identity provider")
 
+    # The services block was removed; services are now created per-app by ensure-netbird-service.sh
+    assert "Creating NetBird reverse proxy services" not in text or text.index(
+        "Creating NetBird reverse proxy services"
+    ) > text.index("Writing network secret for helper scripts")
+    assert (
+        "wait_for_netbird_routing_peer" in text and "wait_forward_netbird_routing_peer" not in text
+    )
+    assert "netbird-proxy-services-" not in text or text.index(
+        "netbird-proxy-services-"
+    ) > text.index("Writing network secret for helper scripts")
+    # network secret is written before routing peers, service creation, and the OIDC flow.
+    assert (
+        service_cidrs_index
+        < pod_cidrs_index
+        < management_lan_index
+        < normalize_traefik_index
+        < auth_setup_index
+    )
     assert (
         auth_setup_index
         < network_index
+        < network_secret_index
         < routing_peer_index
         < backend_index
-        < proxy_index
+        < proxy_peer_index
+        < exit_peer_index
+        < proxy_backend_index
         < dns_index
+        < authentik_service_index
+        < discovery_index
+        < idp_index
     )
-    assert dns_index < discovery_index < idp_index
 
 
-def test_netbird_proxy_targets_dedicated_traefik_backend_entrypoint():
+def test_ensure_netbird_service_uses_current_api_and_safe_skips():
+    text = ENSURE_NETBIRD_SERVICE_SCRIPT.read_text(encoding="utf-8")
+
+    assert 'NETBIRD_REVERSE_PROXY_API="${NETBIRD_URL%/}/api/reverse-proxies"' in text
+    assert "/api/reverse-proxy/" not in text
+    assert '"${NETBIRD_REVERSE_PROXY_API}/clusters"' in text
+    assert '"${NETBIRD_REVERSE_PROXY_API}/domains"' in text
+    assert '"${NETBIRD_REVERSE_PROXY_API}/services"' in text
+    assert '"${NETBIRD_REVERSE_PROXY_API}/domains/"' not in text
+    assert '"${NETBIRD_REVERSE_PROXY_API}/services/"' not in text
+    assert "normalize_netbird_collection" in text
+    assert "--normalize-collection" in text
+    assert 'elif (.clusters | type) == "array" then .clusters' in text
+    assert 'elif (.results | type) == "array" then .results' in text
+    assert 'elif (.items | type) == "array" then .items' in text
+    assert 'elif (.resources | type) == "array" then .resources' in text
+    assert "NetBird network secret not ready; skipping service creation" in text
+    assert "NetBird network secret does not contain TRAEFIK_RESOURCE_ADDRESS" in text
+    assert "Could not find TRAEFIK_RESOURCE_ID; service creation may fail" not in text
+    assert "No NetBird reverse proxy cluster found" in text
+    assert "NetBird domain creation returned HTTP" in text
+    assert "NetBird service lookup failed; skipping service creation" in text
+    assert "response was not JSON; skipping service creation" in text
+    assert "already targets ${existing_target_cluster}, expected ${NETBIRD_PROXY_DOMAIN}" in text
+    assert "live cluster resources endpoint" in text
+    assert "Could not find Traefik resource ${TRAEFIK_RESOURCE_ADDRESS}" not in text
+    assert "--argjson service_enabled" in text
+    assert "--argjson target_port" in text
+    assert "--argjson skip_tls_verify" in text
+    assert "--argjson enabled" not in text
+    assert "TRAEFIK_TARGET_PORT" in text
+    assert '.TRAEFIK_TARGET_PORT // "8443"' in text
+    assert "port: $target_port" in text
+    assert "port: 443" not in text
+    assert 'protocol: "https"' in text
+    assert "skip_tls_verify: $skip_tls_verify" in text
+    assert "port: 8082" not in text
+    assert 'protocol: "http"' not in text
+
+
+def normalize_netbird_collection(payload, field):
+    result = subprocess.run(
+        ["bash", str(ENSURE_NETBIRD_SERVICE_SCRIPT), "--normalize-collection", field],
+        input=json.dumps(payload),
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    return json.loads(result.stdout)
+
+
+def test_ensure_netbird_service_normalizes_live_and_legacy_api_shapes():
+    live_clusters = [
+        {
+            "id": "netbird-proxy-20260522080504",
+            "address": "bierineenweek.nl",
+            "connected_proxies": 1,
+        }
+    ]
+    legacy_clusters = {"clusters": live_clusters}
+    legacy_domains = {"results": [{"domain": "authentik.example.test", "id": "domain-1"}]}
+    item_services = {"items": [{"domain": "authentik.example.test", "name": "authentik"}]}
+    resource_response = {"resources": [{"id": "resource-1", "address": "10.96.0.1"}]}
+
+    assert normalize_netbird_collection(live_clusters, "clusters") == live_clusters
+    assert normalize_netbird_collection(legacy_clusters, "clusters") == live_clusters
+    assert normalize_netbird_collection(legacy_domains, "domains") == legacy_domains["results"]
+    assert normalize_netbird_collection(item_services, "services") == item_services["items"]
+    assert (
+        normalize_netbird_collection(resource_response, "resources")
+        == resource_response["resources"]
+    )
+    assert normalize_netbird_collection({"domains": None}, "domains") == []
+    assert normalize_netbird_collection("not-a-collection", "clusters") == []
+
+
+def test_netbird_service_hostnames_match_ingress_routes():
+    opencloud_text = OPENCLOUD_STEP_SCRIPT.read_text(encoding="utf-8")
+    jitsi_text = (
+        REPO_ROOT / "categories" / "apps" / "steps" / "install-jitsi" / "run.sh"
+    ).read_text(encoding="utf-8")
+    nextcloud_text = (
+        REPO_ROOT / "categories" / "apps" / "steps" / "install-nextcloud" / "run.sh"
+    ).read_text(encoding="utf-8")
+    matrix_text = (
+        REPO_ROOT / "categories" / "apps" / "steps" / "install-matrix" / "run.sh"
+    ).read_text(encoding="utf-8")
+    loki_text = (
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-loki" / "run.sh"
+    ).read_text(encoding="utf-8")
+    velero_text = (
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-velero-ui" / "run.sh"
+    ).read_text(encoding="utf-8")
+    argocd_text = (
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
+    ).read_text(encoding="utf-8")
+    dashy_text = (
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-dashy-dashboard" / "run.sh"
+    ).read_text(encoding="utf-8")
+
+    assert '--service-domain "opencloud-collabora.${public_zone_name}"' in opencloud_text
+    assert '--service-domain "collabora.${public_zone_name}"' not in opencloud_text
+    assert '--service-domain "opencloud-wopiserver.${public_zone_name}"' in opencloud_text
+    assert '--service-name "auth-jitsi"' in jitsi_text
+    assert '--service-domain "auth-jitsi.${public_zone_name}"' in jitsi_text
+    assert "jitsi-broker.${public_zone_name}" not in jitsi_text
+    assert '--service-domain "nextcloud-collabora.${public_zone_name}"' in nextcloud_text
+    for host in ["chat", "matrix", "element-admin", "account", "mrtc"]:
+        assert f'--service-domain "{host}.${{public_zone_name}}"' in matrix_text
+    assert '--service-domain "loki.${public_zone_name}"' in loki_text
+    assert '--service-domain "velero-ui.${public_zone_name}"' in velero_text
+    assert '--service-name "argocd"' in argocd_text
+    assert (
+        '--service-domain "argocd.$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"'
+        in argocd_text
+    )
+    assert '--service-domain "admin.${public_zone_name}"' in dashy_text
+    assert '--service-name "hubble"' in (
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-management-consoles"
+        / "run.sh"
+    ).read_text(encoding="utf-8")
+
+
+def test_netbird_proxy_reuses_traefik_websecure_origin():
     network_text = NETBIRD_NETWORK_MODULE_MAIN.read_text(encoding="utf-8")
     proxy_services_text = NETBIRD_PROXY_SERVICES_MODULE_MAIN.read_text(encoding="utf-8")
     proxy_services_vars_text = NETBIRD_PROXY_SERVICES_MODULE_VARS.read_text(encoding="utf-8")
@@ -1972,10 +2271,16 @@ def test_netbird_proxy_targets_dedicated_traefik_backend_entrypoint():
     assert 'data "netbird_group" "all"' in network_text
     assert 'name = "All"' in network_text
     assert "traefik_resource_type" in network_text
-    assert 'resource "netbird_policy" "proxy_to_traefik_https"' not in network_text
+    assert 'resource "netbird_setup_key" "proxy"' in network_text
+    assert 'resource "netbird_route" "k8s_pods"' in network_text
+    assert 'output "proxy_setup_key"' in (
+        REPO_ROOT / "infra" / "opentofu" / "netbird-network" / "outputs.tf"
+    ).read_text(encoding="utf-8")
+    assert 'resource "netbird_policy" "proxy_to_traefik_https"' in network_text
+    assert 'resource "netbird_policy" "proxy_to_traefik_http"' not in network_text
 
     proxy_policy = re.search(
-        r'resource\s+"netbird_policy"\s+"proxy_to_traefik_http"\s+\{'
+        r'resource\s+"netbird_policy"\s+"proxy_to_traefik_https"\s+\{'
         r'(.*?)(?=\nresource\s+"netbird_policy"|\Z)',
         network_text,
         flags=re.DOTALL,
@@ -1984,7 +2289,9 @@ def test_netbird_proxy_targets_dedicated_traefik_backend_entrypoint():
     proxy_policy_body = proxy_policy.group(1)
     assert "sources       = [data.netbird_group.all.id]" in proxy_policy_body
     assert "sources       = [netbird_group.proxy.id]" not in proxy_policy_body
-    assert 'ports         = ["8082"]' in proxy_policy_body
+    assert 'ports         = ["8443"]' in proxy_policy_body
+    assert 'ports         = ["443"]' not in proxy_policy_body
+    assert 'ports         = ["8082"]' not in proxy_policy_body
     assert "type = local.traefik_resource_type" in proxy_policy_body
     assert "groups      = [data.netbird_group.all.id, netbird_group.proxy.id]" in network_text
 
@@ -1995,10 +2302,16 @@ def test_netbird_proxy_targets_dedicated_traefik_backend_entrypoint():
     assert "data.netbird_reverse_proxy_clusters.all.clusters[0].address" not in proxy_services_text
     assert 'variable "netbird_proxy_domain"' in proxy_services_vars_text
     assert "target_type = local.traefik_target_type" in proxy_services_text
-    assert "port        = 8082" in proxy_services_text
-    assert 'protocol    = "http"' in proxy_services_text
+    assert "port        = 8443" in proxy_services_text
+    assert "port        = 443" not in proxy_services_text
+    assert "port        = 8082" not in proxy_services_text
+    assert 'protocol    = "https"' in proxy_services_text
+    assert 'protocol    = "http"' not in proxy_services_text
+    assert "skip_tls_verify = true" in proxy_services_text
     assert not re.search(r"port\s*=\s*80(?:\D|$)", proxy_services_text)
 
+    assert "websecure:" in traefik_values_text
+    assert "exposedPort: 443" in traefik_values_text
     assert "webnetbird:" in traefik_values_text
     assert "port: 8082" in traefik_values_text
     assert "exposedPort: 8082" in traefik_values_text
@@ -2027,10 +2340,125 @@ def test_netbird_proxy_targets_dedicated_traefik_backend_entrypoint():
     )
 
 
+def test_netbird_lan_and_exit_routes_are_opt_in():
+    network_text = NETBIRD_NETWORK_MODULE_MAIN.read_text(encoding="utf-8")
+    vars_text = (REPO_ROOT / "infra" / "opentofu" / "netbird-network" / "variables.tf").read_text(
+        encoding="utf-8"
+    )
+    outputs_text = (REPO_ROOT / "infra" / "opentofu" / "netbird-network" / "outputs.tf").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'variable "management_lan_cidrs"' in vars_text
+    assert 'variable "exit_node_skip_auto_apply"' in vars_text
+    assert 'resource "netbird_group" "management_lan_routers"' in network_text
+    assert 'resource "netbird_group" "bastion_exit_routers"' in network_text
+    assert 'resource "netbird_group" "exit_node_users"' in network_text
+    assert 'name = "${local.name_prefix}-exit-node-users"' in network_text
+    assert 'resource "netbird_setup_key" "management_lan_router"' in network_text
+    assert 'resource "netbird_setup_key" "bastion_exit_router"' in network_text
+    assert 'output "management_lan_router_setup_key"' in outputs_text
+    assert 'output "bastion_exit_router_setup_key"' in outputs_text
+    assert 'output "exit_node_users_group_id"' in outputs_text
+
+    lan_route = re.search(
+        r'resource\s+"netbird_route"\s+"management_lan"\s+\{'
+        r'(.*?)(?=\nresource\s+"netbird_route"|\Z)',
+        network_text,
+        flags=re.DOTALL,
+    )
+    assert lan_route
+    lan_body = lan_route.group(1)
+    assert "for_each = toset(var.management_lan_cidrs)" in lan_body
+    assert (
+        "peer_groups     = [netbird_group.management_vm.id, netbird_group.management_lan_routers.id]"
+        in lan_body
+    )
+    assert (
+        "groups          = [netbird_group.admins.id, netbird_group.exit_node_users.id]" in lan_body
+    )
+    assert "masquerade      = true" in lan_body
+    assert "skip_auto_apply = var.exit_node_skip_auto_apply" in lan_body
+
+    exit_route = re.search(
+        r'resource\s+"netbird_route"\s+"hetzner_internet_exit"\s+\{'
+        r'(.*?)(?=\nresource\s+"netbird_policy"|\Z)',
+        network_text,
+        flags=re.DOTALL,
+    )
+    assert exit_route
+    exit_body = exit_route.group(1)
+    assert 'network         = "0.0.0.0/0"' in exit_body
+    assert "peer_groups     = [netbird_group.bastion_exit_routers.id]" in exit_body
+    assert (
+        "groups          = [netbird_group.admins.id, netbird_group.exit_node_users.id]" in exit_body
+    )
+    assert "masquerade      = true" in exit_body
+    assert "skip_auto_apply = var.exit_node_skip_auto_apply" in exit_body
+
+    assert 'protocol      = "icmp"' in network_text
+    assert "exit_node_users_to_management_lan_routers_icmp" in network_text
+    assert "exit_node_users_to_bastion_exit_routers_icmp" in network_text
+
+
+def test_adguard_install_uses_management_vm_dns_forwarder_for_netbird_dns():
+    text = ADGUARD_STEP_SCRIPT.read_text(encoding="utf-8")
+
+    assert "setup-dns-forwarder.sh" in text
+    assert 'bash "$WORKSPACE_ROOT/scripts/manager/setup-dns-forwarder.sh"' in text
+    assert "admins_group_id" in text
+    assert "exit_node_users_group_id" in text
+    assert '--group-id "$adguard_dns_group_id"' in text
+    assert '--group-id "$admins_group_id"' in text
+    assert '--group-id "$exit_node_users_group_id"' in text
+    assert '--nameserver-ip "$mgmt_netbird_ip"' in text
+    assert "--nameserver-port 5354" in text
+    assert "Management VM NetBird IP" in text
+
+
+def test_netbird_dns_zone_helper_manages_custom_zone_and_records():
+    text = NETBIRD_DNS_ZONE_SCRIPT.read_text(encoding="utf-8")
+
+    assert "/api/dns/zones" in text
+    assert "distribution_groups" in text
+    assert "enable_search_domain" in text
+    assert "args.group_id" in text
+    assert "records_url" in text
+    assert '"type": "A"' in text
+    assert '"ttl": 300' in text
+    assert "PUT" in text
+    assert "POST" in text
+
+
+def test_netbird_dns_nameserver_helper_supports_multiple_groups():
+    text = NETBIRD_DNS_NAMESERVER_SCRIPT.read_text(encoding="utf-8")
+
+    assert 'parser.add_argument("--group-id", action="append", required=True)' in text
+    assert "blocked_groups" in text
+    assert '"groups": list(dict.fromkeys(args.group_id))' in text
+
+
+def test_dns_forwarder_restarts_when_port_forward_or_proxy_exits():
+    text = SETUP_DNS_FORWARDER_SCRIPT.read_text(encoding="utf-8")
+
+    assert "cleanup()" in text
+    assert 'kill \\"\\${proxy_pid:-}\\" \\"\\${pf_pid:-}\\"' in text
+    assert 'if ! kill -0 \\"\\$pf_pid\\"' in text
+    assert "DNS forwarder port-forward exited before becoming ready" in text
+    assert "DNS forwarder port-forward did not become ready" in text
+    assert "proxy_pid=\\$!" in text
+    assert 'wait -n \\"\\$pf_pid\\" \\"\\$proxy_pid\\"' in text
+    assert "DNS forwarder child process exited; restarting container" in text
+    assert "exit 1" in text
+
+
 def test_netbird_admin_access_uses_reachable_host_docker_daemon():
     text = NETBIRD_ADMIN_ACCESS_STEP_SCRIPT.read_text(encoding="utf-8")
 
     assert "docker info >/dev/null 2>&1" in text
+    assert "netbird-management-lan-router-${cluster_id}.json" in text
+    assert "netbird-admin-access-${cluster_id}.json" in text
+    assert 'secret_file="$lan_router_secret"' in text
     assert "docker volume create twinbox-netbird" in text
     assert "--network host" in text
     assert "--cap-add NET_ADMIN" in text
@@ -2053,6 +2481,15 @@ def test_netbird_network_policies_use_single_rule_per_policy():
 
     for name, body in policy_blocks:
         assert body.count("\n  rule {") == 1, name
+
+    assert "adguard_dns_to_k8s_routers" in {name for name, _ in policy_blocks}
+    assert "adguard_dns_to_k8s_routers_tcp" in {name for name, _ in policy_blocks}
+    assert "adguard_dns_to_management_vm" in {name for name, _ in policy_blocks}
+    assert "adguard_dns_to_management_vm_tcp" in {name for name, _ in policy_blocks}
+    assert (
+        "sources       = [netbird_group.adguard_dns.id, netbird_group.admins.id, netbird_group.exit_node_users.id]"
+        in text
+    )
 
 
 def test_netbird_routing_peer_uses_pinned_image_tag():
@@ -3520,6 +3957,22 @@ def test_authentik_values_request_memory_for_server_and_worker():
     assert "authentik-db-pooler-rw-session.databases.svc.cluster.local" in text
 
 
+def test_authentik_passwordless_blueprint_uses_valid_instantiate_label():
+    manifest = yaml.safe_load(
+        (
+            REPO_ROOT
+            / "gitops"
+            / "apps"
+            / "authentik"
+            / "manifests"
+            / "blueprint-passwordless.yaml"
+        ).read_text(encoding="utf-8")
+    )
+
+    labels = manifest["metadata"]["labels"]
+    assert labels == {"blueprints.goauthentik.io/instantiate": "true"}
+
+
 def test_dashy_deployment_uses_a_published_image_tag():
     text = (REPO_ROOT / "gitops" / "platform-apps" / "dashy" / "deployment.yaml").read_text(
         encoding="utf-8"
@@ -4019,6 +4472,19 @@ def test_uninstall_authentik_cleanup_sets_forward_before_app_cleanup():
 
 def test_netbird_bastion_provisioning_fetches_dns_credentials():
     text = NETBIRD_BASTION_STEP_SCRIPT.read_text(encoding="utf-8")
+    dns_step_text = (
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "configure-dns" / "step.yaml"
+    ).read_text(encoding="utf-8")
+    dns_step_run_text = (
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "configure-dns" / "run.sh"
+    ).read_text(encoding="utf-8")
+    question_flow_text = (REPO_ROOT / "manager-web" / "src" / "question-flow.js").read_text(
+        encoding="utf-8"
+    )
+    external_dns_values_text = (REPO_ROOT / "gitops" / "values" / "external-dns.yaml").read_text(
+        encoding="utf-8"
+    )
+    netbird_vars_text = NETBIRD_MODULE_VARS.read_text(encoding="utf-8")
 
     assert "external-dns-credentials" in text
     assert "dns_provider" in text
@@ -4028,11 +4494,24 @@ def test_netbird_bastion_provisioning_fetches_dns_credentials():
     assert '-var "dns_api_token=$dns_api_token"' in text
     assert '-var "dns_api_secret=$dns_api_secret"' in text
     assert "base64 -d" in text
-    for provider in ("cloudflare", "aws", "digitalocean", "google"):
+    for provider in ("cloudflare", "aws", "digitalocean"):
         assert f'"{provider}"' in text or f"'{provider}'" in text
+        assert provider in dns_step_text
+        assert provider in dns_step_run_text
+        assert provider in question_flow_text
+        assert provider in netbird_vars_text
+    assert "Google Cloud DNS" not in dns_step_text
+    assert "Google Cloud DNS" not in question_flow_text
+    for removed in ("google", "google-credentials", "GOOGLE_APPLICATION_CREDENTIALS"):
+        assert removed not in text
+        assert removed not in dns_step_text
+        assert removed not in dns_step_run_text
+        assert removed not in question_flow_text
+        assert removed not in external_dns_values_text
+        assert removed not in netbird_vars_text
 
 
-def test_netbird_cloud_init_configures_dns01_wildcard():
+def test_netbird_cloud_init_uses_exact_netbird_cert_and_tcp_passthrough():
     text = NETBIRD_CLOUD_INIT.read_text(encoding="utf-8")
 
     assert "DNS_PROVIDER" in text
@@ -4040,10 +4519,36 @@ def test_netbird_cloud_init_configures_dns01_wildcard():
     assert "dnschallenge.provider" in text
     assert "dns_api_token" in text
     assert "CLOUDFLARE_DNS_API_TOKEN" in text
-    assert "HostRegexp" in text
+    assert "DO_AUTH_TOKEN" in text
+    assert "GOOGLE_APPLICATION_CREDENTIALS" not in text
+    assert "google" not in text
+    assert "HostSNI(`*`) && !HostSNI(`{netbird_domain}`)" in text
     assert "tls.domains[0].main" in text
-    assert "tls.domains[0].sans" in text
-    assert "insecureSkipVerify" in text
-    assert "cluster-proxy" in text
+    assert '"traefik.http.routers.netbird-dashboard.tls.domains[0].main": netbird_domain' in text
+    assert '"traefik.http.routers.netbird-backend.tls.domains[0].main": netbird_domain' in text
+    assert '"traefik.http.routers.netbird-grpc.tls.domains[0].main": netbird_domain' in text
+    assert "/opt/netbird/traefik-dynamic.yaml:/opt/netbird/traefik-dynamic.yaml:ro" in text
+    assert "--providers.file.filename=/opt/netbird/traefik-dynamic.yaml" in text
+    assert "traefik-dynamic.yaml" in text
+    assert 'data.pop("tls", None)' in text
+    assert 'data.pop("http", None)' in text
+    assert 'pp_v2["proxyProtocol"] = {"version": 2}' in text
+    assert "dashboard_tls_domain_labels" in text
+    assert "server_tls_domain_labels" in text
+    assert "set_labels(dashboard, dashboard_tls_domain_labels)" in text
+    assert "set_labels(netbird_server, server_tls_domain_labels)" in text
+    assert "remove_label_keys(traefik, is_removed_http_wildcard_label)" in text
+    assert "remove_label_keys(proxy, is_removed_http_wildcard_label)" in text
+    assert "HostRegexp" not in text
+    assert "goacme/lego" not in text
+    assert '--domains "*.$PUBLIC_ZONE_NAME"' not in text
+    assert "tls.domains[0].sans" not in text
+    assert "certFile" not in text
+    assert "keyFile" not in text
+    assert "/certs/live/{zone}.crt" not in text
+    assert "insecureSkipVerify" not in text
+    assert "cluster-proxy" not in text
+    assert "traefik.http.services.cluster-proxy" not in text
+    assert "traefik.http.serverstransports.proxy-insecure" not in text
     assert "NB_PROXY_ACME_CERTIFICATES" in text
     assert '"true"' in text

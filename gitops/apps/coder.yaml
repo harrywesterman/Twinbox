@@ -12,6 +12,11 @@ spec:
       helm:
         valueFiles:
           - $values/gitops/values/coder.yaml
+        parameters:
+          - name: coder.env[4].value
+            value: https://coder.__ZONE_NAME__
+          - name: coder.env[5].value
+            value: https://authentik.__ZONE_NAME__/application/o/coder/
     - repoURL: __REPO_URL__
       targetRevision: __TARGET_REVISION__
       ref: values
@@ -20,16 +25,6 @@ spec:
       path: gitops/platform-apps/coder
       kustomize:
         patches:
-          - target:
-              kind: Deployment
-              name: coder
-            patch: |-
-              - op: replace
-                path: /spec/template/spec/containers/0/env/0/value
-                value: https://coder.__ZONE_NAME__
-              - op: replace
-                path: /spec/template/spec/containers/0/env/2/value
-                value: https://authentik.__ZONE_NAME__/application/o/coder/
           - target:
               kind: IngressRoute
               name: coder

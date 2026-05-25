@@ -74,12 +74,6 @@ case "$dns_provider" in
       --from-literal=token="$dns_api_token" \
       --dry-run=client -o yaml | kubectl apply -f -
     ;;
-  google)
-    kubectl create secret generic external-dns-credentials \
-      --namespace=external-dns \
-      --from-literal=google-credentials="$dns_api_token" \
-      --dry-run=client -o yaml | kubectl apply -f -
-    ;;
   *)
     fail "Unsupported DNS provider: $dns_provider"
     ;;

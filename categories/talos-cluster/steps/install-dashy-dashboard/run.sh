@@ -330,4 +330,9 @@ for attempt in $(seq 1 120); do
 done
 kubectl -n dashy rollout status deployment/dashy --timeout=10m
 
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "dashy" \
+  --service-domain "admin.${public_zone_name}" \
+  --service-path /
+
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Dashy Authentik configuration complete"

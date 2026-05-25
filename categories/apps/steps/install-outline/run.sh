@@ -317,3 +317,8 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
       database: $database
     }' >"$STEP_RESULT_FILE"
 fi
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "outline" \
+  --service-domain "outline.${public_zone_name}" \
+  --service-path /

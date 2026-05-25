@@ -431,3 +431,8 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$manifest_path" \
   --application "grafana" \
   --destination-namespace "monitoring"
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "grafana" \
+  --service-domain "grafana.${public_zone_name}" \
+  --service-path /

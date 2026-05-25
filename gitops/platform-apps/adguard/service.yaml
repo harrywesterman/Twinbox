@@ -13,5 +13,9 @@ spec:
     - name: dns-tcp
       port: 53
       protocol: TCP
+    - name: http
+      port: 3000
+      targetPort: 3000
+      protocol: TCP
   selector:
     app.kubernetes.io/name: adguard

@@ -19,15 +19,21 @@ hostname="twinbox-mgmt-${cluster_slug}"
 
 [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
 
-secret_file="/opt/twinbox/bootstrap/secrets/global/netbird-admin-access-${cluster_id}.json"
-[[ -f "$secret_file" ]] || fail "NetBird admin access secret not found at $secret_file"
+lan_router_secret="/opt/twinbox/bootstrap/secrets/global/netbird-management-lan-router-${cluster_id}.json"
+admin_secret="/opt/twinbox/bootstrap/secrets/global/netbird-admin-access-${cluster_id}.json"
+if [[ -f "$lan_router_secret" ]]; then
+  secret_file="$lan_router_secret"
+else
+  secret_file="$admin_secret"
+fi
+[[ -f "$secret_file" ]] || fail "NetBird Management VM access secret not found at $lan_router_secret or $admin_secret"
 
 setup_key="$(jq -r '.NB_SETUP_KEY // empty' "$secret_file")"
 management_url="$(jq -r '.NB_MANAGEMENT_URL // empty' "$secret_file")"
 [[ -n "$setup_key" ]] || fail "NB_SETUP_KEY is missing from $secret_file"
 [[ -n "$management_url" ]] || fail "NB_MANAGEMENT_URL is missing from $secret_file"
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Configuring NetBird admin access peer: $hostname"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Configuring NetBird admin access and LAN routing peer: $hostname"
 
 if command -v netbird >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Using host NetBird client"
@@ -58,7 +64,7 @@ else
   fail "Neither host netbird client nor docker is available for Management VM enrollment"
 fi
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird admin access peer configured"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird admin access and LAN routing peer configured"
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \

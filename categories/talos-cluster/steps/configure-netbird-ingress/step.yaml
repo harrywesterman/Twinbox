@@ -30,7 +30,7 @@ inputs:
     label: Traefik Resource Address
     type: string
     required: false
-    help: Optional override, defaults to the Traefik NetBird headless service DNS name
+    help: Optional override, defaults to a ready Traefik websecure pod endpoint
   - id: proxy_services_json
     label: Reverse Proxy Services JSON
     type: string

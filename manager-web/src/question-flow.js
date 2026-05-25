@@ -167,7 +167,6 @@ const QUESTION_STEP_DEFS = [
           { label: "Cloudflare", value: "cloudflare" },
           { label: "AWS Route 53", value: "aws" },
           { label: "DigitalOcean", value: "digitalocean" },
-          { label: "Google Cloud DNS", value: "google" },
         ],
       },
       {
@@ -438,7 +437,7 @@ const QUESTION_STEP_DEFS = [
         label: "Reverse Proxy Services JSON",
         type: "string",
         required: false,
-        help: 'Optional JSON array like [{"name":"portal","domain":"portal.example.com","path":"/"}]',
+        help: 'Optional JSON array like [{"name":"portal","domain":"portal.example.com","path":"/"}]. These services will be created automatically during app installation. This form is for initial setup.',
       },
     ],
   },

@@ -395,6 +395,11 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$velero_ui_rendered_manifest" \
   --application "velero-ui"
 
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "velero-ui" \
+  --service-domain "velero-ui.${public_zone_name}" \
+  --service-path /
+
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \
     --arg application "velero-ui" \

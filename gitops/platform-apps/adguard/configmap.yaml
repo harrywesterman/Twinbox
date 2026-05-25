@@ -5,8 +5,9 @@ metadata:
   namespace: adguard
 data:
   AdGuardHome.yaml: |
-    bind_host: 0.0.0.0
-    bind_port: 3000
+    http:
+      address: 0.0.0.0:3000
+      session_ttl: 720h
     users:
       - name: admin
         password: $2b$12$BouBSJO/uUdwzyV3oxebouVskhtxb4Ccm54RLdnHNlnQB3cbRaRda
@@ -17,9 +18,12 @@ data:
       upstream_dns:
         - tls://9.9.9.9
         - tls://1.1.1.1
-      bootstrap_dns:
-        - 9.9.9.9
-        - 1.1.1.1
+      bootstrap_dns: 9.9.9.9
+      rewrites:
+        - domain: bierineenweek.nl
+          answer: 188.34.166.172
+        - domain: "*.bierineenweek.nl"
+          answer: 188.34.166.172
       blocking_mode: default
       protection_enabled: true
       edns_enabled: true
@@ -27,7 +31,7 @@ data:
       safesearch_enabled: false
       querylog_enabled: true
       stats_enabled: true
-      ratelimit: 20
+      ratelimit: 0
       ratelimit_whitelist: []
       refuse_any: true
       upstream_dns_file: ""
@@ -45,12 +49,3 @@ data:
         name: AdGuard DNS filter
         id: 1
     theme: auto
-    http_session:
-      - ip: 10.0.0.0/8
-        user_agent: ""
-      - ip: 172.16.0.0/12
-        user_agent: ""
-      - ip: 192.168.0.0/16
-        user_agent: ""
-      - ip: 100.64.0.0/10
-        user_agent: ""

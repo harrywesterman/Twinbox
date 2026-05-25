@@ -42,10 +42,30 @@ def test_daemonset_dns_ports():
 
 def test_daemonset_config_mount():
     ds = yaml.safe_load((GITOPS_DIR / "daemonset.yaml").read_text())
+    spec = ds["spec"]["template"]["spec"]
     mounts = ds["spec"]["template"]["spec"]["containers"][0]["volumeMounts"]
     config_mounts = [m for m in mounts if m["mountPath"] == "/opt/adguardhome/conf"]
     assert len(config_mounts) == 1
     assert config_mounts[0]["name"] == "config"
+    config_volumes = [v for v in spec["volumes"] if v["name"] == "config"]
+    assert config_volumes[0] == {"name": "config", "emptyDir": {}}
+
+
+def test_daemonset_seeds_config_into_writable_volume():
+    ds = yaml.safe_load((GITOPS_DIR / "daemonset.yaml").read_text())
+    spec = ds["spec"]["template"]["spec"]
+    init_container = spec["initContainers"][0]
+    assert init_container["name"] == "seed-config"
+    assert init_container["image"] == "busybox:1.36"
+    assert any(m["name"] == "config-seed" and m["readOnly"] for m in init_container["volumeMounts"])
+    assert any(
+        m["name"] == "config" and m["mountPath"] == "/opt/adguardhome/conf"
+        for m in init_container["volumeMounts"]
+    )
+    assert any(
+        v["name"] == "config-seed" and v["configMap"]["name"] == "adguard-config"
+        for v in spec["volumes"]
+    )
 
 
 def test_daemonset_resources():
@@ -71,6 +91,14 @@ def test_service_has_dns_ports():
     assert len(tcp53) == 1
 
 
+def test_service_has_http_port():
+    svc = yaml.safe_load((GITOPS_DIR / "service.yaml").read_text())
+    ports = svc["spec"]["ports"]
+    http = [p for p in ports if p["port"] == 3000 and p["protocol"] == "TCP"]
+    assert len(http) == 1
+    assert http[0].get("targetPort") == 3000
+
+
 def test_configmap_exists():
     cm = yaml.safe_load((GITOPS_DIR / "configmap.yaml").read_text())
     assert cm["kind"] == "ConfigMap"
@@ -79,7 +107,43 @@ def test_configmap_exists():
     assert "upstream_dns" in cm["data"]["AdGuardHome.yaml"]
 
 
+def test_configmap_dns_settings_are_valid_for_netbird_clients():
+    cm = yaml.safe_load((GITOPS_DIR / "configmap.yaml").read_text())
+    adguard_config = yaml.safe_load(cm["data"]["AdGuardHome.yaml"])
+    dns_config = adguard_config["dns"]
+
+    assert dns_config["bootstrap_dns"] == "9.9.9.9"
+    assert dns_config["ratelimit"] == 0
+    assert {"domain": "bierineenweek.nl", "answer": "188.34.166.172"} in dns_config["rewrites"]
+    assert {"domain": "*.bierineenweek.nl", "answer": "188.34.166.172"} in dns_config["rewrites"]
+
+
+def test_ingressroute_has_both_entrypoints():
+    docs = list(yaml.safe_load_all((GITOPS_DIR / "ingressroute.yaml").read_text()))
+    assert len(docs) == 2
+    names = {d["metadata"]["name"] for d in docs}
+    assert names == {"adguard", "adguard-netbird"}
+
+
+def test_ingressroute_websecure_has_tls():
+    docs = list(yaml.safe_load_all((GITOPS_DIR / "ingressroute.yaml").read_text()))
+    ir = next(d for d in docs if d["spec"]["entryPoints"] == ["websecure"])
+    assert ir["spec"]["tls"] == {}
+
+
+def test_ingressroute_netbird_no_tls():
+    docs = list(yaml.safe_load_all((GITOPS_DIR / "ingressroute.yaml").read_text()))
+    ir = next(d for d in docs if d["spec"]["entryPoints"] == ["webnetbird"])
+    assert "tls" not in ir["spec"]
+
+
 def test_kustomization_resources():
     kust = yaml.safe_load((GITOPS_DIR / "kustomization.yaml").read_text())
-    expected = ["namespace.yaml", "configmap.yaml", "daemonset.yaml", "service.yaml"]
+    expected = [
+        "namespace.yaml",
+        "configmap.yaml",
+        "daemonset.yaml",
+        "service.yaml",
+        "ingressroute.yaml",
+    ]
     assert sorted(kust["resources"]) == sorted(expected)

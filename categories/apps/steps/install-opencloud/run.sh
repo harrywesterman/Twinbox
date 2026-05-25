@@ -807,4 +807,19 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     }' >"$STEP_RESULT_FILE"
 fi
 
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "opencloud" \
+  --service-domain "opencloud.${public_zone_name}" \
+  --service-path /
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "collabora" \
+  --service-domain "opencloud-collabora.${public_zone_name}" \
+  --service-path /
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "wopiserver" \
+  --service-domain "opencloud-wopiserver.${public_zone_name}" \
+  --service-path /
+
 log "OpenCloud installation completed"

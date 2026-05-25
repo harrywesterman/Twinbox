@@ -204,7 +204,6 @@ if [[ -z "$dns_provider" ]]; then
     if .data.CF_API_TOKEN or .data.token then "cloudflare"
     elif .data.AWS_ACCESS_KEY_ID or .data["access-key"] then "aws"
     elif .data.DO_TOKEN then "digitalocean"
-    elif .data.GOOGLE_APPLICATION_CREDENTIALS or .data["google-credentials"] then "google"
     else ""
     end' 2>/dev/null || true)"
 fi
@@ -223,9 +222,6 @@ case "$dns_provider" in
   digitalocean)
     dns_api_token="$(kubectl get secret external-dns-credentials -n external-dns -o jsonpath='{.data.token}' 2>/dev/null | base64 -d || true)"
     ;;
-  google)
-    dns_api_token="$(kubectl get secret external-dns-credentials -n external-dns -o jsonpath='{.data.google-credentials}' 2>/dev/null | base64 -d || true)"
-    ;;
   *)
     fail "Unsupported DNS provider for wildcard certificate: $dns_provider"
     ;;
@@ -235,7 +231,7 @@ esac
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] DNS provider for wildcard certificate: $dns_provider"
 
 netbird_fqdn="netbird.${public_zone_name}"
-netbird_proxy_domain="proxy.${public_zone_name}"
+netbird_proxy_domain="${public_zone_name}"
 server_name="netbird-${cluster_id}"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting NetBird bastion provisioning for cluster: $cluster_id"
@@ -300,11 +296,6 @@ metadata:
 spec:
   endpoints:
     - dnsName: ${netbird_fqdn}
-      recordType: A
-      targets:
-        - ${server_ipv4}
-      recordTTL: 300
-    - dnsName: ${netbird_proxy_domain}
       recordType: A
       targets:
         - ${server_ipv4}
@@ -392,7 +383,6 @@ chmod 600 "$secret_file"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird bastion host provisioned successfully"
 echo "  Server IP: $server_ipv4"
 echo "  NetBird URL: $netbird_url"
-echo "  Proxy domain: $netbird_proxy_domain"
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \
@@ -400,7 +390,6 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     --arg server_ipv4 "$server_ipv4" \
     --arg netbird_url "$netbird_url" \
     --arg netbird_fqdn "$netbird_fqdn" \
-    --arg netbird_proxy_domain "$netbird_proxy_domain" \
     --arg cluster_id "$cluster_id" \
     --arg secrets_path "$secret_file" \
     '{
@@ -408,7 +397,6 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
       server_ipv4: $server_ipv4,
       netbird_url: $netbird_url,
       netbird_fqdn: $netbird_fqdn,
-      netbird_proxy_domain: $netbird_proxy_domain,
       cluster_id: $cluster_id,
       secrets_path: $secrets_path
     }' >"$STEP_RESULT_FILE"

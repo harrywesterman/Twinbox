@@ -4,30 +4,35 @@ NetBird is the self-hosted ingress and VPN option for Twinbox. It gives the
 cluster a public HTTPS entrypoint without exposing the Talos nodes or the
 Management VM directly to the internet.
 
-In the current Twinbox implementation, NetBird is used for two related paths:
+In the current Twinbox implementation, NetBird is used for four related paths:
 
-- public application ingress through NetBird Reverse Proxy
+- public application ingress through NetBird Reverse Proxy (auto-created per app)
 - private administrator access to the Management VM through a NetBird peer
+- opt-in local LAN access through the Management VM routing peer
+- opt-in internet exit through a separate Hetzner bastion routing peer
 
 ## Components
 
 | Component | Location | Purpose |
 | --- | --- | --- |
-| NetBird bastion | Hetzner Cloud VPS | Runs the self-hosted NetBird server, dashboard, management API, embedded relay/proxy stack, Docker, and Traefik for TLS. |
-| NetBird Reverse Proxy | Bastion Docker stack | Terminates public HTTPS for `*.ZONE` and forwards requests into the NetBird network. |
+| NetBird bastion | Hetzner Cloud VPS | Runs the self-hosted NetBird server, dashboard, management API, embedded relay/proxy stack, Docker, and Traefik for the NetBird hostname. |
+| NetBird Reverse Proxy | Bastion Docker stack | Terminates public HTTPS for app hostnames such as `authentik.ZONE` and forwards requests into the NetBird network. |
 | NetBird network resources | NetBird management API | Defines the internal Traefik target, groups, setup keys, routes, and policies. |
 | Routing peer | Kubernetes namespace `netbird` | Runs `netbirdio/netbird:0.70.5` with privileged networking and forwards proxy traffic to the cluster service network. |
 | Traefik NetBird backend | Kubernetes service `traefik/traefik-netbird` | Headless service exposing Traefik's `webnetbird` entrypoint on port `8082`. |
 | Authentik OIDC app | Authentik | Lets NetBird use Twinbox Authentik as its identity provider. |
-| Management VM peer | Management VM | Enrolls the Management VM as `twinbox-mgmt-<cluster-slug>` for admin access. |
+| Management VM peer | Management VM | Enrolls the Management VM as `twinbox-mgmt-<cluster-slug>` for admin access and local LAN routing. |
+| Hetzner exit peer | NetBird bastion | Runs a separate Dockerized NetBird client named `twinbox-<cluster-id>-hetzner-exit` for opt-in internet exit traffic. |
 
 ```mermaid
 flowchart LR
     user["Browser or NetBird user"]
 
     subgraph bastion["Hetzner NetBird bastion"]
-        tls["Bastion Traefik\n*.public-zone TLS"]
+        tls["Bastion Traefik\nnetbird.public-zone TLS"]
+        passthrough["TCP passthrough\nall non-NetBird SNI"]
         proxy["NetBird Reverse Proxy"]
+        exitpeer["Hetzner exit peer\n0.0.0.0/0"]
         server["NetBird server\nmanagement API and dashboard"]
     end
 
@@ -46,11 +51,13 @@ flowchart LR
 
     subgraph mgmt["Management VM"]
         mgmtpeer["NetBird client\nor Dockerized client"]
+        lan["Local LAN"]
         manager["Manager web/API/worker"]
     end
 
     user --> tls
-    tls --> proxy
+    user --> passthrough
+    passthrough --> proxy
     proxy --> resource
     resource --> route
     route --> peer
@@ -61,6 +68,9 @@ flowchart LR
     server --> authentik
     user -. admin VPN .-> mgmtpeer
     mgmtpeer --> manager
+    user -. opt-in LAN route .-> mgmtpeer
+    mgmtpeer --> lan
+    user -. opt-in internet exit .-> exitpeer
 ```
 
 ## Traffic Model
@@ -68,7 +78,7 @@ flowchart LR
 Twinbox creates two public DNS records for NetBird:
 
 - `netbird.<public-zone>` points to the NetBird dashboard and management API
-- `proxy.<public-zone>` points to the NetBird proxy endpoint
+- `<public-zone>` (wildcard) points to the NetBird proxy endpoint
 
 The bastion also receives a wildcard DNS record for the selected public zone:
 
@@ -76,14 +86,38 @@ The bastion also receives a wildcard DNS record for the selected public zone:
 *.public-zone -> NetBird bastion IPv4
 ```
 
-The bastion's Traefik stack obtains certificates with DNS-01 and forwards
-wildcard HTTPS traffic to the NetBird Reverse Proxy. Reverse proxy services are
-created in NetBird for application hostnames. Each service targets the NetBird
-network resource for the internal Traefik backend:
+The bastion Traefik stack terminates HTTPS only for
+`netbird.<public-zone>`. It must serve an exact certificate whose SAN contains
+only `netbird.<public-zone>`. It must not load or serve a wildcard
+`*.public-zone` certificate. Browsers can reuse an HTTP/2 connection across
+origins when the certificate is valid for both names; if NetBird serves a
+wildcard certificate, a browser can send the later Authentik authorize request
+over the existing NetBird connection. That request then reaches bastion Traefik
+as HTTP traffic instead of as raw TLS passthrough and can fail with Traefik's
+`404 page not found` and `router: "-"`.
+
+All non-NetBird hostnames, including `authentik.<public-zone>` and app
+hostnames, are handled by a TCP passthrough router on the bastion proxy
+container:
+
+```text
+HostSNI(*) && !HostSNI(netbird.<public-zone>)
+```
+
+That passthrough route forwards the original TLS connection to NetBird Reverse
+Proxy. The reverse proxy owns the app and Authentik certificates and routes each
+hostname through the NetBird network. Reverse proxy services are auto-created
+during application installation by the `ensure-netbird-service.sh` helper. Each
+service targets the NetBird network resource for the internal Traefik backend:
 
 ```text
 traefik-netbird.traefik.svc.cluster.local:8082
 ```
+
+Services are created per-application as each `install-*` step runs, using the
+helper script that reads credentials from the bastion secret. The
+`configure-netbird-ingress` step no longer creates services — only groups,
+routes, setup keys, and the Traefik resource.
 
 Inside Kubernetes, `gitops/platform/traefik/traefik-netbird-service.yaml`
 creates a headless service named `traefik-netbird`. That service selects the
@@ -125,15 +159,22 @@ The step:
 1. reads DNS provider credentials from the `external-dns-credentials` secret
 2. removes stale Hetzner resources with the same Twinbox names
 3. applies `infra/opentofu/netbird/`
-4. creates `netbird.<public-zone>` and `proxy.<public-zone>` `DNSEndpoint` records
+4. creates `netbird.<public-zone>` and `<public-zone>` (wildcard) `DNSEndpoint` records
 5. waits for cloud-init to finish on the bastion
 6. calls NetBird's automated setup API and stores the short-lived personal access token
 
 The bastion cloud-init config installs Docker, runs NetBird's upstream
 `getting-started.sh`, patches the compose stack for Twinbox defaults, pins the
 NetBird image to `PINNED_NETBIRD_VERSION`, enables the reverse proxy, configures
-DNS-01 wildcard certificates, and opens `22/tcp`, `80/tcp`, `443/tcp`, and
-`3478/udp` with UFW.
+DNS-01 for the exact NetBird hostname, and opens `22/tcp`, `80/tcp`, `443/tcp`,
+and `3478/udp` with UFW.
+
+The compose patch deliberately does not create a bastion HTTP wildcard router.
+There should be no `traefik.http.routers.wildcard`, `cluster-proxy`, or HTTP
+`proxy-insecure` transport labels on the bastion Traefik or proxy containers.
+The bastion Traefik dynamic file should contain only the TCP `pp-v2`
+serversTransport used by the passthrough service; it should not contain
+`tls.certificates` for `/certs/live/<zone>.crt`.
 
 For greenfield bootstrap, the automated setup call is intentionally made over
 the bastion's internal Docker network with the public NetBird hostname in the
@@ -156,8 +197,7 @@ Important keys in that file:
 | --- | --- |
 | `NETBIRD_IP` | Bastion public IPv4 address. |
 | `NETBIRD_URL` | Management URL, for example `https://netbird.example.com`. |
-| `NETBIRD_FQDN` | Dashboard/API FQDN. |
-| `NETBIRD_PROXY_DOMAIN` | Proxy FQDN, for example `proxy.example.com`. |
+| `NETBIRD_FQDN` | Dashboard/API FQDN (e.g. `netbird.example.com`). |
 | `NETBIRD_SETUP_TOKEN` | Personal access token from the bootstrap setup API. |
 | `SSH_PRIVATE_KEY` | Present when Twinbox generated the bastion SSH key. |
 
@@ -175,16 +215,18 @@ Inputs:
 | `netbird_token` | No | Uses `NETBIRD_SETUP_TOKEN` from the bastion secret when omitted. |
 | `netbird_management_url` | No | Uses `NETBIRD_URL` from the bastion secret when omitted. |
 | `traefik_resource_address` | No | Defaults to `traefik-netbird.traefik.svc.cluster.local`. |
-| `proxy_services_json` | No | Extra reverse proxy services. Authentik is always included. |
+| `proxy_services_json` | No | Extra reverse proxy services. Authentik is always included. Services are auto-created during application installation; this form is for initial setup only. |
 
-The step runs four OpenTofu modules:
+The step runs three OpenTofu modules:
 
 | Module | Runtime workdir | Purpose |
 | --- | --- | --- |
 | `infra/opentofu/authentik-netbird/` | `manager-data/opentofu/authentik-netbird-<cluster-id>/` | Creates the Authentik OAuth/OIDC provider for NetBird. |
 | `infra/opentofu/netbird-network/` | `manager-data/opentofu/netbird-network-<cluster-id>/` | Creates groups, setup keys, routes, the Traefik network resource, and policies. |
-| `infra/opentofu/netbird-proxy-services/` | `manager-data/opentofu/netbird-proxy-services-<cluster-id>/` | Creates NetBird Reverse Proxy domains and services. |
 | `infra/opentofu/netbird-idp/` | `manager-data/opentofu/netbird-idp-<cluster-id>/` | Registers Authentik as the NetBird identity provider. |
+
+Reverse proxy services are auto-created during application installation by the
+`ensure-netbird-service.sh` helper script.
 
 NetBird groups:
 
@@ -194,6 +236,9 @@ NetBird groups:
 | `twinbox-<cluster-id>-management-vm` | Management VM peer group. |
 | `twinbox-<cluster-id>-k8s-routers` | Kubernetes routing peer group. |
 | `twinbox-<cluster-id>-proxy` | Reverse proxy route/resource group. |
+| `twinbox-<cluster-id>-management-lan-routers` | Management VM LAN routing peers. |
+| `twinbox-<cluster-id>-bastion-exit-routers` | Hetzner internet exit routing peers. |
+| `twinbox-<cluster-id>-exit-node-users` | Peers allowed to manually select Twinbox LAN and exit routes. |
 
 NetBird setup keys:
 
@@ -201,6 +246,8 @@ NetBird setup keys:
 | --- | --- |
 | `twinbox-<cluster-id>-k8s-routers` | Reusable setup key for the Kubernetes routing peer. |
 | `twinbox-<cluster-id>-management-vm` | Single-use setup key for the Management VM peer. |
+| `twinbox-<cluster-id>-management-lan-router` | Single-use setup key for the Management VM peer with LAN routing group membership. |
+| `twinbox-<cluster-id>-bastion-exit-router` | Single-use setup key for the separate Hetzner internet exit peer. |
 
 Network and policy details:
 
@@ -208,10 +255,28 @@ Network and policy details:
 - Traefik resource: `twinbox-<cluster-id>-traefik`
 - Traefik resource address: `traefik-netbird.traefik.svc.cluster.local` by default
 - Kubernetes service route: discovered from the API server, falling back to `10.96.0.0/12`
+- Management VM LAN route: detected from the Management VM IP/interface and distributed to admins/exit node users
+- Hetzner exit route: `0.0.0.0/0`, distributed to admins/exit node users
+- IPv6 overlay groups are cleared because Twinbox currently declares IPv4-only
+  LAN and exit routes. Without this, NetBird clients can auto-pair the exit
+  route with `::/0` even though the Hetzner peer is not configured for IPv6
+  internet egress.
 - Route `groups`: proxy group
 - Route `peer_groups`: Kubernetes routing peer group
+- LAN and exit routes set `masquerade = true` and `skip_auto_apply = true`
 - Reverse proxy policy: allows the NetBird `All` group to reach the Traefik resource on TCP `8082`
 - Admin policies: allow the admins group to reach the Management VM group on SSH, manager web, and manager API ports
+- ICMP policies allow admin/exit node users to select the LAN and internet exit routes
+
+The Management VM route is for the local LAN only. It is not the default
+internet exit. The Hetzner bastion exit peer is the only Twinbox route that
+advertises `0.0.0.0/0`, so selecting it sends internet-bound traffic out
+through the Hetzner VPS public IP.
+
+Both routes are intentionally opt-in on clients. Twinbox creates the routes
+enabled in NetBird but with Auto Apply disabled (`skip_auto_apply = true`), so
+mobile and desktop clients must select the LAN route or Hetzner exit route
+manually.
 
 After creating the network resources, the step syncs these runtime secrets into
 OpenBao:
@@ -220,12 +285,17 @@ OpenBao:
 | --- | --- | --- |
 | `twinbox/global/netbird-routing-peers` | `/opt/twinbox/bootstrap/secrets/global/netbird-routing-peers-<cluster-id>.json` | `NB_SETUP_KEY`, `NB_MANAGEMENT_URL` |
 | `twinbox/global/netbird-admin-access` | `/opt/twinbox/bootstrap/secrets/global/netbird-admin-access-<cluster-id>.json` | `NB_SETUP_KEY`, `NB_MANAGEMENT_URL` |
+| `twinbox/global/netbird-management-lan-router` | `/opt/twinbox/bootstrap/secrets/global/netbird-management-lan-router-<cluster-id>.json` | `NB_SETUP_KEY`, `NB_MANAGEMENT_URL`, `NB_HOSTNAME` |
+| `twinbox/global/netbird-bastion-exit-router` | `/opt/twinbox/bootstrap/secrets/global/netbird-bastion-exit-router-<cluster-id>.json` | `NB_SETUP_KEY`, `NB_MANAGEMENT_URL`, `NB_HOSTNAME` |
 
 It then applies the `netbird-routing-peers` Argo CD application, waits for the
 routing peer deployment, waits for the Traefik NetBird backend endpoints, creates
-reverse proxy services, creates the wildcard DNS record, waits for public
-Authentik OIDC discovery through the NetBird proxy, and finally registers
-Authentik as the NetBird identity provider. Public OIDC discovery is allowed to
+the wildcard DNS record, waits for public Authentik OIDC discovery through the
+NetBird proxy, and finally registers Authentik as the NetBird identity provider.
+
+Reverse proxy services are created by each `install-*` step through the
+`ensure-netbird-service.sh` helper script rather than during this configuration
+step. Public OIDC discovery is allowed to
 log a warning and continue when public TLS or reverse-proxy reachability is not
 healthy yet, so the NetBird API configuration can still finish. Browser SSO is
 only healthy once the public NetBird path has a trusted certificate and can
@@ -304,6 +374,75 @@ The forwarded-header middleware forces `X-Forwarded-Proto=https` and
 URLs even though the in-cluster backend connection is plain HTTP on the
 `webnetbird` entrypoint.
 
+## DNS Nameserver Integration
+
+The `install-adguard` step deploys AdGuard Home into the cluster and configures a
+NetBird DNS nameserver group that pushes the AdGuard DNS server to peers. This
+allows ad-blocking DNS resolution on any device connected to the NetBird VPN
+without manual DNS configuration.
+
+### Architecture
+
+```mermaid
+flowchart LR
+    phone["Android Phone\n(non-routing peer)"]
+    mgmt["Management VM\n100.105.x.x:5354"]
+    k8s["Kubernetes Cluster\nAdGuard Pod\n10.106.x.x:53"]
+    bastion["NetBird Bastion\nDNS settings"]
+
+    bastion -->|Pushes nameserver\nto peer| phone
+    phone -->|UDP DNS query\nvia NetBird mesh| mgmt
+    mgmt -->|TCP port-forward\nkubectl| k8s
+    k8s -->|AdGuard response| mgmt
+    mgmt -->|UDP response| phone
+```
+
+Peers in the AdGuard DNS group receive the DNS nameserver address automatically
+via NetBird's nameserver group push. On the management VM, a Docker container
+named `twinbox-dns-forwarder` runs a Python UDP/TCP-to-TCP DNS proxy alongside
+`kubectl port-forward` to relay queries from the management VM's NetBird IP to
+the in-cluster AdGuard service.
+
+### Android Compatibility
+
+NetBird's DNS nameserver push works on all platforms. On Android, the kernel
+WireGuard implementation never updates peer `AllowedIPs`, making routed
+networks (e.g. `10.96.0.0/12`) unreachable. The DNS forwarder on the management
+VM avoids this entirely because the management VM is reachable via direct
+NetBird mesh (P2P), not through a route.
+
+### Components
+
+| Component | Location | Purpose |
+| --- | --- | --- |
+| `dns-proxy.py` | `scripts/manager/dns-proxy.py` | Python UDP/TCP-to-TCP DNS proxy with correct RFC 1035 framing |
+| `setup-dns-forwarder.sh` | `scripts/manager/setup-dns-forwarder.sh` | Installs or replaces the Docker forwarder on the management VM |
+| `twinbox-dns-forwarder` | Management VM Docker | Container that starts `kubectl port-forward` + the Python proxy |
+| `netbird-dns-nameserver.py` | `scripts/manager/netbird-dns-nameserver.py` | Creates/updates the NetBird DNS nameserver group |
+
+### Troubleshooting
+
+Check the forwarder status from the management VM:
+
+```bash
+sudo docker ps --filter name=twinbox-dns-forwarder
+sudo docker logs twinbox-dns-forwarder --tail 50
+```
+
+Test DNS resolution through the forwarder:
+
+```bash
+nslookup -port=5354 doubleclick.net 100.105.183.178
+```
+
+Expected result: `Address: 0.0.0.0` (AdGuard blocks the ad domain).
+
+If the forwarder is not running, restart it:
+
+```bash
+sudo docker restart twinbox-dns-forwarder
+```
+
 ## Runtime State
 
 Do not edit these as source files. They are created by the wizard on the
@@ -317,12 +456,31 @@ Management VM:
 manager-data/opentofu/netbird-<cluster-id>/
 manager-data/opentofu/authentik-netbird-<cluster-id>/
 manager-data/opentofu/netbird-network-<cluster-id>/
-manager-data/opentofu/netbird-proxy-services-<cluster-id>/
 manager-data/opentofu/netbird-idp-<cluster-id>/
 manager-data/ssh/netbird-<cluster-id>/
 ```
 
 ## Operations
+
+### Auto-create services
+
+The `ensure-netbird-service.sh` helper script creates or updates NetBird reverse
+proxy services. It is called automatically by every `install-*` step that exposes
+an app through Traefik.
+
+Usage:
+
+```bash
+bash scripts/manager/ensure-netbird-service.sh \
+  --service-name <name> \
+  --service-domain <domain> \
+  [--service-path /]
+```
+
+The script reads credentials from the bastion secret file
+(`/opt/twinbox/bootstrap/secrets/global/netbird-bastion-<cluster-id>.json`),
+finds the proxy cluster by domain, checks for an existing service by name+domain,
+and either creates or updates it. It is idempotent.
 
 ### Check the routing peer
 
@@ -378,10 +536,17 @@ docker ps
 docker logs netbird-server
 docker logs netbird-proxy
 docker logs traefik
+openssl s_client -connect 127.0.0.1:443 -servername netbird.<public-zone> </dev/null 2>/dev/null \
+  | openssl x509 -noout -subject -ext subjectAltName
 cat /opt/netbird/setup-result.json
 ```
 
 The setup result contains credentials and tokens, so treat it as secret.
+
+The NetBird certificate check should show `DNS:netbird.<public-zone>` and must
+not show `DNS:*.public-zone`. A wildcard SAN on the NetBird hostname reopens the
+browser HTTP/2 connection coalescing bug that broke NetBird login through
+Authentik.
 
 ### Refresh External Secrets
 
@@ -405,16 +570,92 @@ docker logs twinbox-netbird
 Only one of those paths is expected to exist. Native `netbird` is used when
 installed; otherwise the wizard uses the Dockerized client.
 
+This same peer can route the local LAN when a client manually enables the
+Management VM LAN route in NetBird.
+
+### Opt-in LAN and Exit Routes
+
+In the NetBird client UI, route-capable devices should see two Twinbox routes:
+
+- the Management VM LAN CIDR, routed through `twinbox-mgmt-<cluster-slug>`
+- `0.0.0.0/0`, routed through `twinbox-<cluster-id>-hetzner-exit`
+
+Only the `0.0.0.0/0` route appears under the client's exit-node view. The
+Management VM LAN route is a normal network route, not an internet exit node.
+
+They are not applied automatically. On mobile, open NetBird, choose the route or
+exit node explicitly, and disable it again when finished.
+
+Check the route definitions through the management API:
+
+```bash
+curl -fsS \
+  -H "Authorization: Bearer $NETBIRD_TOKEN" \
+  https://netbird.<public-zone>/api/routes | jq
+```
+
+On the bastion, the exit peer is separate from the reverse-proxy peer:
+
+```bash
+docker ps --filter name=netbird-hetzner-exit
+docker logs netbird-hetzner-exit --tail 50
+docker exec netbird-hetzner-exit netbird status
+```
+
 ## Common Failure Modes
 
 | Symptom | Likely cause | Check |
 | --- | --- | --- |
 | `netbird-routing-peer` is not created | Argo CD app was not applied or External Secrets is not ready | `kubectl -n argocd get app netbird-routing-peers` and `kubectl -n netbird get externalsecret` |
 | Routing peer starts but proxy cannot reach apps | Traefik NetBird backend has no endpoints or NetBird route/policy is missing | Check `traefik-netbird` EndpointSlices and NetBird `/api/routes`, `/api/policies`. |
-| Authentik OIDC discovery fails | The `authentik-netbird` route or forwarded-header middleware is missing/stale | Fetch `https://authentik.<public-zone>/.well-known/openid-configuration` through the public NetBird path. |
-| Browser or strict `curl` shows a certificate error for NetBird | Let's Encrypt issuance is still pending or the exact hostname hit a temporary rate limit; the bastion may be serving Traefik's default self-signed certificate | Check `/var/log/cloud-init-output.log` on the bastion for the public TLS warning and retry after the rate-limit window. The install can continue if the NetBird setup token was created. |
-| Public app hostname resolves but returns no app | Reverse proxy service targets are missing or target the wrong Traefik resource | Check NetBird reverse proxy services and `netbird-network-<cluster-id>.json`. |
+| Authentik OIDC discovery fails | The `authentik-netbird` route, forwarded-header middleware, NetBird reverse proxy service, or routing peer is missing/stale | Fetch `https://authentik.<public-zone>/.well-known/openid-configuration` through the public NetBird path and compare NetBird proxy plus in-cluster Authentik logs. |
+| Browser lands on `https://authentik.<public-zone>/application/o/authorize/` and sees `404 page not found` | Bastion Traefik is terminating Authentik as HTTP instead of passing raw TLS to NetBird Reverse Proxy. The usual cause is that bastion Traefik serves a wildcard certificate for `netbird.<public-zone>`, allowing browser HTTP/2 connection coalescing. | Confirm the NetBird certificate has only `DNS:netbird.<public-zone>`, confirm there is no bastion HTTP wildcard router, and confirm `authentik.<public-zone>` uses the TCP passthrough route. |
+| Browser or strict `curl` shows a certificate error for NetBird | Let's Encrypt issuance is still pending or the exact hostname hit a temporary rate limit; the bastion may be serving Traefik's default self-signed certificate | Check `/var/log/cloud-init-output.log` on the bastion and retry after the rate-limit window. The install can continue if the NetBird setup token was created. |
+| Public app hostname resolves but returns no app | Reverse proxy service is missing or targets the wrong Traefik resource (check `netbird-network-<cluster-id>.json`) | Check NetBird reverse proxy services and `netbird-network-<cluster-id>.json`. |
 | Management VM is unreachable over NetBird | The Management VM peer is not enrolled or admin group policy is missing | Check `netbird status`, the `twinbox-netbird` container, NetBird peers, and admin policies. |
+| LAN or Hetzner exit route is visible but not used | Auto Apply is intentionally disabled | Manually select the LAN route or Hetzner exit node in the NetBird client. |
+| Hetzner exit route is missing | The separate bastion exit peer was not enrolled or is down | Check `docker ps --filter name=netbird-hetzner-exit`, NetBird peers, and `/api/routes`. |
+| Selecting the Hetzner exit route breaks internet | IPv6 overlay is still enabled for a group or the DNS nameserver is not distributed to admins/exit-node users | Check `/api/accounts` for empty `settings.ipv6_enabled_groups`, confirm the client no longer shows `::/0`, and verify `/api/dns/nameservers` includes the admin and exit-node user groups. |
+| DNS queries from peers fail (e.g. Android) | NetBird DNS nameserver points to the cluster IP (`10.96.x.x`), which is unreachable from Android's kernel WireGuard because it never updates `AllowedIPs`. Nameserver should point to the management VM NetBird IP:5354. | Check `/api/dns/nameservers` in the NetBird management API and verify the nameserver IP is the management VM's NetBird IP on port 5354. |
+| AdGuard is not blocking ads | The DNS forwarder is down or `kubectl port-forward` is stale | `sudo docker ps --filter name=twinbox-dns-forwarder` and `sudo docker logs twinbox-dns-forwarder --tail 30` |
+| `twinbox-dns-forwarder` fails to start | `kubectl` cannot reach the cluster or the AdGuard service is not deployed | Verify `KUBECONFIG` is set correctly and `kubectl -n adguard get svc adguard-dns` returns a valid ClusterIP |
+
+### NetBird OIDC login check
+
+When you need to verify the browser-side login path, test the exact authorize
+URL from the management VM and expect a redirect into Authentik's login flow:
+
+```bash
+curl -sS -D - -o /dev/null \
+  --get \
+  --data-urlencode "client_id=<netbird-client-id>" \
+  --data-urlencode "code_challenge=<pkce-challenge>" \
+  --data-urlencode "code_challenge_method=S256" \
+  --data-urlencode "redirect_uri=https://netbird.<public-zone>/oauth2/callback" \
+  --data-urlencode "response_type=code" \
+  --data-urlencode "scope=openid profile email" \
+  --data-urlencode "state=<random-state>" \
+  "https://authentik.<public-zone>/application/o/authorize/"
+```
+
+Expected result:
+
+- `HTTP/2 302`
+- `Location: /if/flow/default-authentication-flow/...`
+
+The most reliable end-to-end signal is the browser flow itself. In the bastion
+Traefik access log, a healthy flow shows:
+
+- `GET /oauth2/auth...` on `netbird-backend@docker`
+- redirect to Authentik through TCP passthrough, not `router: "-"`
+- `GET /oauth2/callback?...` on `netbird-backend@docker` with `303`
+- `POST /oauth2/token` on `netbird-backend@docker` with `200`
+- authenticated API calls such as `/api/users/current` with `200`
+
+Do not treat `curl` from the bastion host as proof that the browser path works:
+fresh command-line requests usually open a new TLS connection and do not
+reproduce browser HTTP/2 connection coalescing from `netbird.<public-zone>` to
+`authentik.<public-zone>`.
 
 ## Comparison
 

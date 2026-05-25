@@ -72,7 +72,7 @@ variable "allowed_ssh_cidrs" {
 }
 
 variable "dns_provider" {
-  description = "DNS provider for ACME DNS-01 wildcard certificate (cloudflare, aws, digitalocean, google)"
+  description = "DNS provider for ACME DNS-01 wildcard certificate (cloudflare, aws, digitalocean)"
   type        = string
 }
 

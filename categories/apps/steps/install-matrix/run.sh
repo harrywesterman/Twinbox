@@ -515,4 +515,29 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     }' >"$STEP_RESULT_FILE"
 fi
 
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "element" \
+  --service-domain "chat.${public_zone_name}" \
+  --service-path /
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "matrix" \
+  --service-domain "matrix.${public_zone_name}" \
+  --service-path /
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "element-admin" \
+  --service-domain "element-admin.${public_zone_name}" \
+  --service-path /
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "matrix-account" \
+  --service-domain "account.${public_zone_name}" \
+  --service-path /
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "matrix-rtc" \
+  --service-domain "mrtc.${public_zone_name}" \
+  --service-path /
+
 log "Matrix chat installation complete"

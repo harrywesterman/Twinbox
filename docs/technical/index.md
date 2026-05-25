@@ -19,6 +19,7 @@ This section collects the repo's implementation-oriented documentation.
 - [Scripts reference](../scripts-reference.md)
 - [Secrets library](../secrets-library.md)
 - [Cloudflare](../cloudflare.md)
+- [Authentik](../authentik.md)
 - [NetBird](../netbird.md)
 - [CrowdSec](../crowdsec.md)
 - [Ingress policy](../ingress-policy.md)
