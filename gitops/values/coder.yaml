@@ -1,4 +1,5 @@
 coder:
+  envUseClusterAccessURL: false
   env:
     - name: CODER_PG_CONNECTION_URL
       valueFrom:
@@ -17,6 +18,10 @@ coder:
           key: client_secret
     - name: CODER_OAUTH2_GITHUB_DEFAULT_PROVIDER_ENABLE
       value: "false"
+    - name: CODER_ACCESS_URL
+      value: https://coder.__ZONE_NAME__
+    - name: CODER_OIDC_ISSUER_URL
+      value: https://authentik.__ZONE_NAME__/application/o/coder/
   service:
     type: NodePort
   serviceAccount:
