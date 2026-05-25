@@ -1,5 +1,5 @@
-coderd:
-  extraEnvs:
+coder:
+  env:
     - name: CODER_PG_CONNECTION_URL
       valueFrom:
         secretKeyRef:
@@ -17,11 +17,11 @@ coderd:
           key: client_secret
     - name: CODER_OAUTH2_GITHUB_DEFAULT_PROVIDER_ENABLE
       value: "false"
-  serviceSpec:
+  service:
     type: NodePort
-  builtinProviderServiceAccount:
+  serviceAccount:
     workspacePerms: true
     workspaceNamespaces:
       - name: coder-workspaces
-ingress:
-  enable: false
+  ingress:
+    enable: false

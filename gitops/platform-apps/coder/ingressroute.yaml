@@ -11,7 +11,7 @@ spec:
       match: Host(`coder.__ZONE_NAME__`)
       services:
         - kind: Service
-          name: coderd
+          name: coder
           port: 80
   tls: {}
 ---
@@ -28,7 +28,7 @@ spec:
       match: Host(`coder.__ZONE_NAME__`)
       services:
         - kind: Service
-          name: coderd
+          name: coder
           port: 80
 ---
 apiVersion: traefik.io/v1alpha1
@@ -44,6 +44,6 @@ spec:
       match: Host(`coder.__ZONE_NAME__`)
       services:
         - kind: Service
-          name: coderd
+          name: coder
           port: 80
   tls: {}
