@@ -11,8 +11,8 @@ spec:
       match: Host(`coder.__ZONE_NAME__`)
       services:
         - kind: Service
-          name: coder
-          port: 8080
+          name: coderd
+          port: 80
   tls: {}
 ---
 apiVersion: traefik.io/v1alpha1
@@ -28,8 +28,8 @@ spec:
       match: Host(`coder.__ZONE_NAME__`)
       services:
         - kind: Service
-          name: coder
-          port: 8080
+          name: coderd
+          port: 80
 ---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
@@ -44,6 +44,6 @@ spec:
       match: Host(`coder.__ZONE_NAME__`)
       services:
         - kind: Service
-          name: coder
-          port: 8080
+          name: coderd
+          port: 80
   tls: {}
