@@ -504,10 +504,6 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --json-file "$immich_secret_file" \
   --required-keys "IMMICH_POSTGRESQL__USERNAME,IMMICH_POSTGRESQL__PASSWORD,IMMICH_OAUTH_ENABLED,IMMICH_OAUTH_ISSUER_URL,IMMICH_OAUTH_CLIENT_ID,IMMICH_OAUTH_CLIENT_SECRET,IMMICH_OAUTH_SCOPE,IMMICH_OAUTH_BUTTON_TEXT,IMMICH_OAUTH_AUTO_REGISTER,IMMICH_OAUTH_AUTO_LAUNCH,IMMICH_OAUTH_SIGNING_ALGORITHM,IMMICH_OAUTH_PROFILE_SIGNING_ALGORITHM,IMMICH_OAUTH_TOKEN_ENDPOINT_AUTH_METHOD,IMMICH_OAUTH_STORAGE_LABEL_CLAIM,IMMICH_OAUTH_STORAGE_QUOTA_CLAIM,IMMICH_OAUTH_ROLE_CLAIM,IMMICH_OAUTH_MOBILE_OVERRIDE_ENABLED,IMMICH_OAUTH_MOBILE_REDIRECT_URI,IMMICH_SERVER_EXTERNAL_DOMAIN"
 
-bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
-  --app-id "immich" \
-  --host "immich-db-pooler-rw-session.databases.svc.cluster.local"
-
 log "Applying Immich Argo CD application"
 render_template \
   "$WORKSPACE_ROOT/gitops/apps/immich.yaml" \
@@ -518,6 +514,10 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$immich_rendered_manifest" \
   --application "immich" \
   --destination-namespace "immich"
+
+bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
+  --app-id "immich" \
+  --host "immich-db-pooler-rw-session.databases.svc.cluster.local"
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \

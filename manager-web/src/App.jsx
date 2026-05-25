@@ -1142,7 +1142,7 @@ function App() {
     };
   }, [answers, cluster, clusterId]);
   const portalUrl = useMemo(() => buildPortalUrl(portalContext), [portalContext]);
-  const isInstallPhase = hasStarted && wizardPhase === "install" && !model.completion;
+  const isInstallPhase = hasStarted && wizardPhase === "install";
   const questionStepIndex = questionSteps.findIndex((step) => step.id === selectedStepId);
   const currentQuestionStep =
     questionStepIndex >= 0 ? questionSteps[questionStepIndex] : questionSteps[0] || null;
@@ -2636,10 +2636,18 @@ function App() {
                       Open Portal
                     </button>
                   )}
+                  <button
+                    className="button button-secondary"
+                    type="button"
+                    onClick={() => selectInstallStep(firstInstallStep?.id || setupSteps[0]?.id)}
+                  >
+                    Previous
+                  </button>
                 </div>
               </article>
             </section>
-          ) : isInstallPhase ? (
+          ) : null}
+          {isInstallPhase ? (
             <section className="wizard-install-stage" aria-label="Installation output and controls">
               <div className="wizard-install-stage-head">
                 {renderStepIcon(
@@ -2743,7 +2751,8 @@ function App() {
                 </div>
               </div>
             </section>
-          ) : (
+          ) : null}
+          {!model.completion && !isInstallPhase ? (
             <div className="wizard-flow wizard-flow-minimal">
               <section className="wizard-card wizard-step-workspace wizard-step-workspace-minimal">
                 {currentStep?.id === "provision-nodes" ? (
@@ -3016,7 +3025,7 @@ function App() {
                 ) : null}
               </section>
             </div>
-          )}
+          ) : null}
         </section>
       </main>
 

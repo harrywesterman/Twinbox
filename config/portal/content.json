@@ -558,6 +558,18 @@
       "accent": "#7c3aed",
       "category": "Apps"
     },
+    "Coder": {
+      "label": "Cloud Development",
+      "summary": "Cloud development environments on your cluster",
+      "description": "Open Coder to create workspaces with VS Code in the browser, SSH, and all the tools you need for Twinbox development.",
+      "capabilities": [
+        "Create and manage cloud dev environments",
+        "Use VS Code in the browser with code-server",
+        "Build and test Twinbox from a workspace"
+      ],
+      "accent": "#e2368c",
+      "category": "Platform"
+    },
     "FreshRSS": {
       "summary": "News reader and feed inbox",
       "description": "Read all your RSS feeds in one clean inbox.",

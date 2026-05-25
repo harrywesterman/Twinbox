@@ -9,6 +9,22 @@ spec:
     repoURL: __REPO_URL__
     targetRevision: __TARGET_REVISION__
     path: gitops/platform-apps/adguard
+    kustomize:
+      patches:
+        - target:
+            kind: IngressRoute
+            name: adguard
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`adguard.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: adguard-netbird
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`adguard.__ZONE_NAME__`)
   destination:
     server: https://kubernetes.default.svc
     namespace: adguard
