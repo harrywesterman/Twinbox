@@ -41,8 +41,13 @@ if command -v kubectl >/dev/null 2>&1; then
     sleep 5
   done
 
+  public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
+  adguard_rendered_manifest="$(mktemp)"
+  sed "s/__ZONE_NAME__/${public_zone_name}/g" \
+    "$WORKSPACE_ROOT/gitops/apps/adguard.yaml" >"$adguard_rendered_manifest"
+
   bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
-    --manifest "$WORKSPACE_ROOT/gitops/apps/adguard.yaml" \
+    --manifest "$adguard_rendered_manifest" \
     --application "adguard" \
     --destination-namespace "argocd"
 else
@@ -82,10 +87,14 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] AdGuard DNS service IP: $adguard_service_ip
 # Read from the netbird-network OpenTofu state (created by configure-netbird-ingress)
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Looking up AdGuard DNS NetBird group..."
 adguard_dns_group_id=""
+admins_group_id=""
+exit_node_users_group_id=""
 
 network_workdir="$MANAGER_DATA_DIR/opentofu/netbird-network-${cluster_id}"
 if [[ -d "$network_workdir" ]]; then
   adguard_dns_group_id="$(cd "$network_workdir" && tofu output -raw adguard_dns_group_id 2>/dev/null || true)"
+  admins_group_id="$(cd "$network_workdir" && tofu output -raw admins_group_id 2>/dev/null || true)"
+  exit_node_users_group_id="$(cd "$network_workdir" && tofu output -raw exit_node_users_group_id 2>/dev/null || true)"
 fi
 
 # Fallback: run OpenTofu from source
@@ -112,12 +121,40 @@ EOF
   tofu init
   tofu apply -auto-approve
   adguard_dns_group_id="$(tofu output -raw adguard_dns_group_id)"
+  admins_group_id="$(tofu output -raw admins_group_id)"
+  exit_node_users_group_id="$(tofu output -raw exit_node_users_group_id)"
 fi
 
 [[ -n "$adguard_dns_group_id" ]] || fail "Could not determine AdGuard DNS NetBird group ID"
+[[ -n "$admins_group_id" ]] || fail "Could not determine admins NetBird group ID"
+[[ -n "$exit_node_users_group_id" ]] || fail "Could not determine exit-node-users NetBird group ID"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] AdGuard DNS group ID: $adguard_dns_group_id"
 
-# --- Step 5: Configure NetBird DNS nameserver group ---
+# --- Step 5: Configure the Management VM DNS forwarder ---
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detecting Management VM NetBird IP..."
+mgmt_netbird_status=""
+if command -v netbird >/dev/null 2>&1; then
+  mgmt_netbird_status="$(netbird status 2>/dev/null || true)"
+fi
+if [[ -z "$mgmt_netbird_status" ]] && command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+  mgmt_netbird_status="$(docker exec twinbox-netbird netbird status 2>/dev/null || true)"
+fi
+mgmt_netbird_ip="$(printf '%s\n' "$mgmt_netbird_status" | awk -F': ' '/NetBird IP:/ {print $2; exit}' | cut -d/ -f1)"
+[[ -n "$mgmt_netbird_ip" ]] || fail "Could not determine Management VM NetBird IP"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Management VM NetBird IP: $mgmt_netbird_ip"
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Installing DNS forwarder on Management VM..."
+bash "$WORKSPACE_ROOT/scripts/manager/setup-dns-forwarder.sh" \
+  --listen-ip "$mgmt_netbird_ip" \
+  --listen-port 5354 \
+  --kubeconfig "$KUBECONFIG_FILE" \
+  --namespace adguard \
+  --service adguard-dns \
+  --service-port 53
+
+# --- Step 6: Configure NetBird DNS nameserver group ---
+# Point peers at the Management VM's NetBird IP so Android does not need a
+# routed Kubernetes service CIDR in WireGuard AllowedIPs.
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Configuring NetBird DNS nameserver group..."
 ns_result=$(python3 "$WORKSPACE_ROOT/scripts/manager/netbird-dns-nameserver.py" \
   --management-url "$netbird_management_url" \
@@ -125,12 +162,15 @@ ns_result=$(python3 "$WORKSPACE_ROOT/scripts/manager/netbird-dns-nameserver.py" 
   --name "twinbox-${cluster_id}-adguard-dns" \
   --description "Twinbox AdGuard Home DNS" \
   --group-id "$adguard_dns_group_id" \
-  --nameserver-ip "$adguard_service_ip")
+  --group-id "$admins_group_id" \
+  --group-id "$exit_node_users_group_id" \
+  --nameserver-ip "$mgmt_netbird_ip" \
+  --nameserver-port 5354)
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] $ns_result"
 ns_group_id="$(printf '%s' "$ns_result" | jq -r '.nameserver_group_id')"
 [[ -n "$ns_group_id" ]] || fail "NetBird nameserver group was not created"
 
-# --- Step 6: Verify in-cluster DNS ---
+# --- Step 7: Verify in-cluster DNS ---
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Verifying in-cluster DNS..."
 dns_check_output="$(kubectl -n adguard run adguard-dns-check --rm -i --restart=Never \
   --image=busybox:1.36 -- nslookup example.com "$adguard_service_ip" 2>&1 || true)"
@@ -140,14 +180,37 @@ else
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: DNS verification from pod failed. Output: $dns_check_output"
 fi
 
-# --- Step 7: Register NetBird reverse proxy service ---
+# --- Step 8: Verify DNS through the Management VM forwarder ---
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Verifying DNS through Management VM forwarder..."
+forwarder_check_output="$(python3 - "$mgmt_netbird_ip" <<'PY' 2>&1 || true
+import socket
+import sys
+
+server = (sys.argv[1], 5354)
+query = bytes.fromhex("123401000001000000000000076578616d706c6503636f6d0000010001")
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.settimeout(5)
+sock.sendto(query, server)
+data, _ = sock.recvfrom(4096)
+if len(data) < 12 or data[:2] != query[:2]:
+    raise SystemExit("unexpected DNS response")
+print("DNS forwarder verification successful")
+PY
+)"
+if echo "$forwarder_check_output" | grep -q "successful"; then
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] DNS forwarder verification successful"
+else
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: DNS forwarder verification failed. Output: $forwarder_check_output"
+fi
+
+# --- Step 9: Register NetBird reverse proxy service ---
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Registering NetBird reverse proxy service for AdGuard..."
 bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
   --service-name "adguard" \
   --service-domain "adguard.$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")" \
   --service-path /
 
-# --- Step 8: Write result ---
+# --- Step 10: Write result ---
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] AdGuard Home DNS installation complete"
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \
@@ -155,6 +218,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     --arg cluster_id "$cluster_id" \
     --arg application "adguard" \
     --arg adguard_service_ip "$adguard_service_ip" \
+    --arg management_vm_netbird_ip "$mgmt_netbird_ip" \
     --arg netbird_nameserver_group_id "$ns_group_id" \
     --arg netbird_adguard_dns_group_id "$adguard_dns_group_id" \
     '{
@@ -163,6 +227,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
         cluster_id: $cluster_id,
         application: $application,
         adguard_service_ip: $adguard_service_ip,
+        management_vm_netbird_ip: $management_vm_netbird_ip,
         netbird_nameserver_group_id: $netbird_nameserver_group_id,
         netbird_adguard_dns_group_id: $netbird_adguard_dns_group_id
       }
