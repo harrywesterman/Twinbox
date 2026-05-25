@@ -30,7 +30,7 @@ coder:
       cpu: 2000m
       memory: 4096Mi
   service:
-    type: NodePort
+    type: ClusterIP
   serviceAccount:
     workspacePerms: true
     workspaceNamespaces:

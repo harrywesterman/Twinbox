@@ -1268,7 +1268,7 @@ def test_coder_app_injects_zone_specific_helm_values():
     assert parameters["coder.env[5].value"] == (
         "https://authentik.__ZONE_NAME__/application/o/coder/"
     )
-    assert values["coder"]["service"]["type"] == "NodePort"
+    assert values["coder"]["service"]["type"] == "ClusterIP"
     assert values["coder"]["serviceAccount"]["extraRules"] == [
         {
             "apiGroups": ["metrics.k8s.io"],
