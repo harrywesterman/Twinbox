@@ -23,5 +23,9 @@ coder:
     workspacePerms: true
     workspaceNamespaces:
       - name: coder-workspaces
+    extraRules:
+      - apiGroups: ["metrics.k8s.io"]
+        resources: ["pods"]
+        verbs: ["get", "list", "watch"]
   ingress:
     enable: false
