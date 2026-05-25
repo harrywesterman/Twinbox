@@ -4,10 +4,12 @@ NetBird is the self-hosted ingress and VPN option for Twinbox. It gives the
 cluster a public HTTPS entrypoint without exposing the Talos nodes or the
 Management VM directly to the internet.
 
-In the current Twinbox implementation, NetBird is used for two related paths:
+In the current Twinbox implementation, NetBird is used for four related paths:
 
 - public application ingress through NetBird Reverse Proxy (auto-created per app)
 - private administrator access to the Management VM through a NetBird peer
+- opt-in local LAN access through the Management VM routing peer
+- opt-in internet exit through a separate Hetzner bastion routing peer
 
 ## Components
 
@@ -19,7 +21,8 @@ In the current Twinbox implementation, NetBird is used for two related paths:
 | Routing peer | Kubernetes namespace `netbird` | Runs `netbirdio/netbird:0.70.5` with privileged networking and forwards proxy traffic to the cluster service network. |
 | Traefik NetBird backend | Kubernetes service `traefik/traefik-netbird` | Headless service exposing Traefik's `webnetbird` entrypoint on port `8082`. |
 | Authentik OIDC app | Authentik | Lets NetBird use Twinbox Authentik as its identity provider. |
-| Management VM peer | Management VM | Enrolls the Management VM as `twinbox-mgmt-<cluster-slug>` for admin access. |
+| Management VM peer | Management VM | Enrolls the Management VM as `twinbox-mgmt-<cluster-slug>` for admin access and local LAN routing. |
+| Hetzner exit peer | NetBird bastion | Runs a separate Dockerized NetBird client named `twinbox-<cluster-id>-hetzner-exit` for opt-in internet exit traffic. |
 
 ```mermaid
 flowchart LR
@@ -29,6 +32,7 @@ flowchart LR
         tls["Bastion Traefik\nnetbird.public-zone TLS"]
         passthrough["TCP passthrough\nall non-NetBird SNI"]
         proxy["NetBird Reverse Proxy"]
+        exitpeer["Hetzner exit peer\n0.0.0.0/0"]
         server["NetBird server\nmanagement API and dashboard"]
     end
 
@@ -47,6 +51,7 @@ flowchart LR
 
     subgraph mgmt["Management VM"]
         mgmtpeer["NetBird client\nor Dockerized client"]
+        lan["Local LAN"]
         manager["Manager web/API/worker"]
     end
 
@@ -63,6 +68,9 @@ flowchart LR
     server --> authentik
     user -. admin VPN .-> mgmtpeer
     mgmtpeer --> manager
+    user -. opt-in LAN route .-> mgmtpeer
+    mgmtpeer --> lan
+    user -. opt-in internet exit .-> exitpeer
 ```
 
 ## Traffic Model
@@ -228,6 +236,9 @@ NetBird groups:
 | `twinbox-<cluster-id>-management-vm` | Management VM peer group. |
 | `twinbox-<cluster-id>-k8s-routers` | Kubernetes routing peer group. |
 | `twinbox-<cluster-id>-proxy` | Reverse proxy route/resource group. |
+| `twinbox-<cluster-id>-management-lan-routers` | Management VM LAN routing peers. |
+| `twinbox-<cluster-id>-bastion-exit-routers` | Hetzner internet exit routing peers. |
+| `twinbox-<cluster-id>-exit-node-users` | Peers allowed to manually select Twinbox LAN and exit routes. |
 
 NetBird setup keys:
 
@@ -235,6 +246,8 @@ NetBird setup keys:
 | --- | --- |
 | `twinbox-<cluster-id>-k8s-routers` | Reusable setup key for the Kubernetes routing peer. |
 | `twinbox-<cluster-id>-management-vm` | Single-use setup key for the Management VM peer. |
+| `twinbox-<cluster-id>-management-lan-router` | Single-use setup key for the Management VM peer with LAN routing group membership. |
+| `twinbox-<cluster-id>-bastion-exit-router` | Single-use setup key for the separate Hetzner internet exit peer. |
 
 Network and policy details:
 
@@ -242,10 +255,28 @@ Network and policy details:
 - Traefik resource: `twinbox-<cluster-id>-traefik`
 - Traefik resource address: `traefik-netbird.traefik.svc.cluster.local` by default
 - Kubernetes service route: discovered from the API server, falling back to `10.96.0.0/12`
+- Management VM LAN route: detected from the Management VM IP/interface and distributed to admins/exit node users
+- Hetzner exit route: `0.0.0.0/0`, distributed to admins/exit node users
+- IPv6 overlay groups are cleared because Twinbox currently declares IPv4-only
+  LAN and exit routes. Without this, NetBird clients can auto-pair the exit
+  route with `::/0` even though the Hetzner peer is not configured for IPv6
+  internet egress.
 - Route `groups`: proxy group
 - Route `peer_groups`: Kubernetes routing peer group
+- LAN and exit routes set `masquerade = true` and `skip_auto_apply = true`
 - Reverse proxy policy: allows the NetBird `All` group to reach the Traefik resource on TCP `8082`
 - Admin policies: allow the admins group to reach the Management VM group on SSH, manager web, and manager API ports
+- ICMP policies allow admin/exit node users to select the LAN and internet exit routes
+
+The Management VM route is for the local LAN only. It is not the default
+internet exit. The Hetzner bastion exit peer is the only Twinbox route that
+advertises `0.0.0.0/0`, so selecting it sends internet-bound traffic out
+through the Hetzner VPS public IP.
+
+Both routes are intentionally opt-in on clients. Twinbox creates the routes
+enabled in NetBird but with Auto Apply disabled (`skip_auto_apply = true`), so
+mobile and desktop clients must select the LAN route or Hetzner exit route
+manually.
 
 After creating the network resources, the step syncs these runtime secrets into
 OpenBao:
@@ -254,6 +285,8 @@ OpenBao:
 | --- | --- | --- |
 | `twinbox/global/netbird-routing-peers` | `/opt/twinbox/bootstrap/secrets/global/netbird-routing-peers-<cluster-id>.json` | `NB_SETUP_KEY`, `NB_MANAGEMENT_URL` |
 | `twinbox/global/netbird-admin-access` | `/opt/twinbox/bootstrap/secrets/global/netbird-admin-access-<cluster-id>.json` | `NB_SETUP_KEY`, `NB_MANAGEMENT_URL` |
+| `twinbox/global/netbird-management-lan-router` | `/opt/twinbox/bootstrap/secrets/global/netbird-management-lan-router-<cluster-id>.json` | `NB_SETUP_KEY`, `NB_MANAGEMENT_URL`, `NB_HOSTNAME` |
+| `twinbox/global/netbird-bastion-exit-router` | `/opt/twinbox/bootstrap/secrets/global/netbird-bastion-exit-router-<cluster-id>.json` | `NB_SETUP_KEY`, `NB_MANAGEMENT_URL`, `NB_HOSTNAME` |
 
 It then applies the `netbird-routing-peers` Argo CD application, waits for the
 routing peer deployment, waits for the Traefik NetBird backend endpoints, creates
@@ -537,6 +570,38 @@ docker logs twinbox-netbird
 Only one of those paths is expected to exist. Native `netbird` is used when
 installed; otherwise the wizard uses the Dockerized client.
 
+This same peer can route the local LAN when a client manually enables the
+Management VM LAN route in NetBird.
+
+### Opt-in LAN and Exit Routes
+
+In the NetBird client UI, route-capable devices should see two Twinbox routes:
+
+- the Management VM LAN CIDR, routed through `twinbox-mgmt-<cluster-slug>`
+- `0.0.0.0/0`, routed through `twinbox-<cluster-id>-hetzner-exit`
+
+Only the `0.0.0.0/0` route appears under the client's exit-node view. The
+Management VM LAN route is a normal network route, not an internet exit node.
+
+They are not applied automatically. On mobile, open NetBird, choose the route or
+exit node explicitly, and disable it again when finished.
+
+Check the route definitions through the management API:
+
+```bash
+curl -fsS \
+  -H "Authorization: Bearer $NETBIRD_TOKEN" \
+  https://netbird.<public-zone>/api/routes | jq
+```
+
+On the bastion, the exit peer is separate from the reverse-proxy peer:
+
+```bash
+docker ps --filter name=netbird-hetzner-exit
+docker logs netbird-hetzner-exit --tail 50
+docker exec netbird-hetzner-exit netbird status
+```
+
 ## Common Failure Modes
 
 | Symptom | Likely cause | Check |
@@ -548,6 +613,9 @@ installed; otherwise the wizard uses the Dockerized client.
 | Browser or strict `curl` shows a certificate error for NetBird | Let's Encrypt issuance is still pending or the exact hostname hit a temporary rate limit; the bastion may be serving Traefik's default self-signed certificate | Check `/var/log/cloud-init-output.log` on the bastion and retry after the rate-limit window. The install can continue if the NetBird setup token was created. |
 | Public app hostname resolves but returns no app | Reverse proxy service is missing or targets the wrong Traefik resource (check `netbird-network-<cluster-id>.json`) | Check NetBird reverse proxy services and `netbird-network-<cluster-id>.json`. |
 | Management VM is unreachable over NetBird | The Management VM peer is not enrolled or admin group policy is missing | Check `netbird status`, the `twinbox-netbird` container, NetBird peers, and admin policies. |
+| LAN or Hetzner exit route is visible but not used | Auto Apply is intentionally disabled | Manually select the LAN route or Hetzner exit node in the NetBird client. |
+| Hetzner exit route is missing | The separate bastion exit peer was not enrolled or is down | Check `docker ps --filter name=netbird-hetzner-exit`, NetBird peers, and `/api/routes`. |
+| Selecting the Hetzner exit route breaks internet | IPv6 overlay is still enabled for a group or the DNS nameserver is not distributed to admins/exit-node users | Check `/api/accounts` for empty `settings.ipv6_enabled_groups`, confirm the client no longer shows `::/0`, and verify `/api/dns/nameservers` includes the admin and exit-node user groups. |
 | DNS queries from peers fail (e.g. Android) | NetBird DNS nameserver points to the cluster IP (`10.96.x.x`), which is unreachable from Android's kernel WireGuard because it never updates `AllowedIPs`. Nameserver should point to the management VM NetBird IP:5354. | Check `/api/dns/nameservers` in the NetBird management API and verify the nameserver IP is the management VM's NetBird IP on port 5354. |
 | AdGuard is not blocking ads | The DNS forwarder is down or `kubectl port-forward` is stale | `sudo docker ps --filter name=twinbox-dns-forwarder` and `sudo docker logs twinbox-dns-forwarder --tail 30` |
 | `twinbox-dns-forwarder` fails to start | `kubectl` cannot reach the cluster or the AdGuard service is not deployed | Verify `KUBECONFIG` is set correctly and `kubectl -n adguard get svc adguard-dns` returns a valid ClusterIP |
