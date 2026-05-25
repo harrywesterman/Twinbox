@@ -97,7 +97,13 @@ if ! command -v coder &>/dev/null; then
   log "Downloading Coder CLI..."
   CACHED_CLI="/tmp/coder-cli"
   if [[ ! -f "$CACHED_CLI" ]]; then
-    curl -fsSL "https://github.com/coder/coder/releases/latest/download/coder-linux-amd64.tar.gz" -o /tmp/coder.tar.gz
+    coder_release_version="$(
+      curl -fsSL "https://api.github.com/repos/coder/coder/releases/latest" |
+        jq -r '.tag_name // empty' |
+        sed 's/^v//'
+    )"
+    [[ -n "$coder_release_version" ]] || fail "Could not resolve latest Coder CLI release"
+    curl -fsSL "https://github.com/coder/coder/releases/latest/download/coder_${coder_release_version}_linux_amd64.tar.gz" -o /tmp/coder.tar.gz
     tar -xzf /tmp/coder.tar.gz -C /tmp
     install -m 0755 /tmp/coder /usr/local/bin/coder
     rm -rf /tmp/coder.tar.gz /tmp/coder

@@ -41,6 +41,7 @@ STIRLING_PDF_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "apps" / "steps" / "install-stirling-pdf" / "run.sh"
 )
 PIXELFED_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-pixelfed" / "run.sh"
+PUSH_CODER_TEMPLATE_SCRIPT = REPO_ROOT / "scripts" / "manager" / "push-coder-template.sh"
 TWINBOX_PORTAL_APP = REPO_ROOT / "gitops" / "apps" / "twinbox-portal.yaml"
 OUTLINE_APP = REPO_ROOT / "gitops" / "apps" / "outline.yaml"
 OUTLINE_OPTIONAL_APP = REPO_ROOT / "gitops" / "optional-apps" / "outline.yaml"
@@ -1276,6 +1277,14 @@ def test_coder_app_injects_zone_specific_helm_values():
             "verbs": ["get", "list", "watch"],
         }
     ]
+
+
+def test_push_coder_template_downloads_current_linux_cli_asset():
+    text = PUSH_CODER_TEMPLATE_SCRIPT.read_text(encoding="utf-8")
+
+    assert "https://api.github.com/repos/coder/coder/releases/latest" in text
+    assert "coder_${coder_release_version}_linux_amd64.tar.gz" in text
+    assert "coder-linux-amd64.tar.gz" not in text
 
 
 def test_stirling_pdf_waits_for_real_kubernetes_readiness():
