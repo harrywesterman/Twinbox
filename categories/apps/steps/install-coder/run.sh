@@ -150,7 +150,7 @@ authentik_ensure_token
 authentik_setup_forward
 
 CODER_HOST="https://coder.${public_zone_name}"
-CODER_REDIRECT_URI="${CODER_HOST}/api/v2/users/oidc/callback"
+CODER_REDIRECT_URI="${CODER_HOST}/oauth/callback"
 
 coder_db_username="coder"
 coder_db_password="$(openssl rand -hex 24)"
@@ -179,8 +179,9 @@ if [[ -n "$existing_coder_secret_json" ]]; then
 fi
 
 coder_secret_file="$(mktemp "${TMPDIR:-/tmp}/coder-bootstrap-XXXXXX")"
+coder_oidc_file="$(mktemp "${TMPDIR:-/tmp}/coder-oidc-XXXXXX")"
 coder_rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/coder-application-XXXXXX")"
-trap 'rm -f "$coder_secret_file" "$coder_rendered_manifest"' EXIT
+trap 'rm -f "$coder_secret_file" "$coder_oidc_file" "$coder_rendered_manifest"' EXIT
 
 jq -n \
   --arg CODER_POSTGRESQL__USERNAME "$coder_db_username" \
@@ -201,6 +202,20 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "coder" \
   --json-file "$coder_secret_file" \
   --required-keys "CODER_POSTGRESQL__USERNAME,CODER_POSTGRESQL__PASSWORD,DATABASE_URL,CODER_OIDC_CLIENT_ID,CODER_OIDC_CLIENT_SECRET"
+
+jq -n \
+  --arg CODER_OIDC_CLIENT_ID "$coder_oauth_client_id" \
+  --arg CODER_OIDC_CLIENT_SECRET "$coder_oauth_client_secret" \
+  '{
+    CODER_OIDC_CLIENT_ID: $CODER_OIDC_CLIENT_ID,
+    CODER_OIDC_CLIENT_SECRET: $CODER_OIDC_CLIENT_SECRET
+  }' >"$coder_oidc_file"
+
+log "Writing Coder OIDC secret to OpenBao"
+bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+  --secret-name "coder-oidc" \
+  --json-file "$coder_oidc_file" \
+  --required-keys "CODER_OIDC_CLIENT_ID,CODER_OIDC_CLIENT_SECRET"
 
 log "Provisioning Authentik OIDC client for Coder"
 authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
@@ -300,4 +315,20 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
       public_url: $public_url,
       database: $database
     }' >"$STEP_RESULT_FILE"
+fi
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "coder" \
+  --service-domain "coder.${public_zone_name}" \
+  --service-path /
+
+log "Pushing Twinbox Coder template..."
+export KUBECONFIG="$KUBECONFIG_FILE"
+export CODER_URL="https://coder.${public_zone_name}"
+if bash "$WORKSPACE_ROOT/scripts/manager/push-coder-template.sh"; then
+  log "Coder template pushed successfully"
+else
+  log "Template push skipped or failed (non-fatal). Push manually after Coder is ready:"
+  log "  export CODER_SESSION_TOKEN=<your-token>"
+  log "  bash $WORKSPACE_ROOT/scripts/manager/push-coder-template.sh"
 fi

@@ -19,3 +19,14 @@ TWINBOX_CLUSTER_ID="$cluster_id" \
 TWINBOX_CLUSTER_INSTANCE_ID="$cluster_instance_id" \
 KUBE_API_SERVER="https://${controlplane_ip}:6443" \
   bash "$WORKSPACE_ROOT/scripts/manager/install-longhorn-storage.sh"
+
+# Source for zone lookup
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
+cluster_dns_domain="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -r '.cluster.dns_domain // empty')"
+cluster_slug="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -r '.cluster.slug // .cluster.id // empty')"
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "longhorn" \
+  --service-domain "longhorn.$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")" \
+  --service-path /

@@ -313,7 +313,7 @@ repo_url="${TWINBOX_GIT_REPO_URL:-https://github.com/harrywesterman/Twinbox.git}
 target_rev="${TWINBOX_GIT_TARGET_REVISION:-main}"
 
 netbird_version="${PINNED_NETBIRD_VERSION:-latest}"
-rendered_manifest="$(sed "s|__REPO_URL__|${repo_url}|g; s|__TARGET_REVISION__|${target_rev}|g; s|__NETBIRD_VERSION__|${netbird_version}|g" "$MANIFEST_PATH")"
+rendered_manifest="$(sed "s|__REPO_URL__|${repo_url}|g; s|__TARGET_REVISION__|${target_rev}|g; s|__NETBIRD_VERSION__|${netbird_version}|g; s|__CODER_CHART_VERSION__|${PINNED_CODER_CHART_VERSION:-latest}|g" "$MANIFEST_PATH")"
 
 log "Applying Argo CD application manifest ${MANIFEST_PATH}"
 printf '%s\n' "$rendered_manifest" | kubectl apply --validate=false -f -

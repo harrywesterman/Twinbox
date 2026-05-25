@@ -542,10 +542,18 @@ openbao_validate_json_keys() {
 
 openbao_wait_for_local_forward() {
   local forward_port="$1"
+  local forward_log="$2"
+  local port_forward_pid="$3"
   local attempt=1
-  local attempts=20
+  local attempts=60
 
   while [[ "$attempt" -le "$attempts" ]]; do
+    if ! kill -0 "$port_forward_pid" >/dev/null 2>&1; then
+      if [[ -s "$forward_log" ]]; then
+        tail -n 20 "$forward_log" >&2
+      fi
+      openbao_fail "OpenBao port-forward process exited before ready"
+    fi
     if curl -fsS "http://127.0.0.1:${forward_port}/v1/sys/health" >/dev/null 2>&1; then
       return 0
     fi
@@ -553,6 +561,9 @@ openbao_wait_for_local_forward() {
     attempt=$((attempt + 1))
   done
 
+  if [[ -s "$forward_log" ]]; then
+    tail -n 20 "$forward_log" >&2
+  fi
   openbao_fail "OpenBao port-forward on 127.0.0.1:${forward_port} did not become ready"
 }
 
@@ -595,13 +606,19 @@ openbao_sync_global_secret_file() {
   }
 
   trap cleanup_openbao_port_forward RETURN
+  # Kill any leftover port-forward on the target port before binding.
+  if command -v fuser >/dev/null 2>&1; then
+    fuser -k "${forward_port}/tcp" 2>/dev/null || true
+  elif command -v lsof >/dev/null 2>&1; then
+    lsof -ti ":${forward_port}" | xargs kill 2>/dev/null || true
+  fi
   # Always forward through the active service rather than a single pod. OpenBao
   # pods in HA mode can answer `/v1/sys/health` with 429 when they are standby,
   # which would make a pod-specific readiness probe flaky even though the
   # cluster is healthy.
   kubectl -n "$OPENBAO_NAMESPACE" port-forward "svc/openbao-active" "${forward_port}:8200" >"$forward_log" 2>&1 &
   port_forward_pid="$!"
-  openbao_wait_for_local_forward "$forward_port"
+  openbao_wait_for_local_forward "$forward_port" "$forward_log" "$port_forward_pid"
 
   curl -fsS \
     -X POST \
@@ -645,11 +662,17 @@ openbao_read_global_secret_json() {
   }
 
   trap cleanup_openbao_read_port_forward RETURN
+  # Kill any leftover port-forward on the target port before binding.
+  if command -v fuser >/dev/null 2>&1; then
+    fuser -k "${forward_port}/tcp" 2>/dev/null || true
+  elif command -v lsof >/dev/null 2>&1; then
+    lsof -ti ":${forward_port}" | xargs kill 2>/dev/null || true
+  fi
   # Read through the active service rather than an arbitrary pod. In HA mode a
   # standby pod can reject KV requests while the cluster itself is healthy.
   kubectl -n "$OPENBAO_NAMESPACE" port-forward "svc/openbao-active" "${forward_port}:8200" >"$forward_log" 2>&1 &
   port_forward_pid="$!"
-  openbao_wait_for_local_forward "$forward_port"
+  openbao_wait_for_local_forward "$forward_port" "$forward_log" "$port_forward_pid"
 
   curl -fsS \
     -H "Accept: application/json" \

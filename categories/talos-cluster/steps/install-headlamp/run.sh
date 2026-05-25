@@ -266,4 +266,9 @@ if command -v kubectl &>/dev/null; then
   fi
 fi
 
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "headlamp" \
+  --service-domain "headlamp.${public_zone_name}" \
+  --service-path /
+
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Headlamp Authentik configuration complete"

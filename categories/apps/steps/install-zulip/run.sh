@@ -703,3 +703,8 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
       provider_pk: $provider_pk
     }' >"$STEP_RESULT_FILE"
 fi
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "zulip" \
+  --service-domain "zulip.${public_zone_name}" \
+  --service-path /

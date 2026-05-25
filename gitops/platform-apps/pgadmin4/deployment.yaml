@@ -127,6 +127,59 @@ spec:
                   sys.exit(1)
               PY
               "${python_bin}" /tmp/patch-sharedserver-passexec.py
+              cat > /tmp/patch-manager-passexec.py <<'PY'
+              from pathlib import Path
+              import sys
+
+              path = Path("/pgadmin4/pgadmin/browser/server_groups/servers/__init__.py")
+              text = path.read_text(encoding="utf-8")
+
+              # Patch 1: In the modify function — suppress passexec for non-owners.
+              old1 = (
+                  "            # Suppress passexec for non-owners so the manager\n"
+                  "            # never holds the owner's password-exec command.\n"
+                  "            if _is_non_owner(server):\n"
+                  "                manager.passexec = None"
+              )
+              new1 = (
+                  "            # Allow passexec for shared server users.\n"
+                  "            # Values are safely copied from sharedserver table.\n"
+                  "            if _is_non_owner(server):\n"
+                  "                pass"
+              )
+
+              # Patch 2: In the connect function — same pattern.
+              old2 = (
+                  "            # Re-suppress passexec after update() which rebuilds\n"
+                  "            # from the (overlaid) server object.  Belt-and-suspenders:\n"
+                  "            # the overlay already defaults passexec to None, but this\n"
+                  "            # guards against direct DB edits.\n"
+                  "            if _is_non_owner(server):\n"
+                  "                manager.passexec = None"
+              )
+              new2 = (
+                  "            # Allow passexec for shared servers - values are\n"
+                  "            # safely provided by get_shared_server_properties.\n"
+                  "            if _is_non_owner(server):\n"
+                  "                pass"
+              )
+
+              count1 = text.count(old1)
+              count2 = text.count(old2)
+
+              if count1 == 1 and count2 == 1:
+                  text = text.replace(old1, new1)
+                  text = text.replace(old2, new2)
+                  path.write_text(text, encoding="utf-8")
+                  print("pgAdmin manager.passexec patches applied (both)")
+              elif count1 != 1 or count2 != 1:
+                  print(
+                      f"Could not patch manager passexec (c1={count1},c2={count2})",
+                      file=sys.stderr,
+                  )
+                  sys.exit(1)
+              PY
+              "${python_bin}" /tmp/patch-manager-passexec.py
               # Mirror the vendor entrypoint setup env so SQLite migrations stay non-interactive.
               export PGADMIN_SETUP_EMAIL="${PGADMIN_SETUP_EMAIL:-${PGADMIN_DEFAULT_EMAIL:-}}"
               export PGADMIN_SETUP_PASSWORD="${PGADMIN_SETUP_PASSWORD:-${PGADMIN_DEFAULT_PASSWORD:-}}"

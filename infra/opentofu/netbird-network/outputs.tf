@@ -19,6 +19,21 @@ output "adguard_dns_group_id" {
   description = "NetBird group ID for peers that should receive AdGuard DNS"
 }
 
+output "management_lan_routers_group_id" {
+  value       = netbird_group.management_lan_routers.id
+  description = "NetBird group ID for Management VM LAN routing peers"
+}
+
+output "bastion_exit_routers_group_id" {
+  value       = netbird_group.bastion_exit_routers.id
+  description = "NetBird group ID for Hetzner internet exit routing peers"
+}
+
+output "exit_node_users_group_id" {
+  value       = netbird_group.exit_node_users.id
+  description = "NetBird group ID for peers allowed to opt into Twinbox routes"
+}
+
 output "traefik_resource_id" {
   value = netbird_network_resource.traefik.id
 }
@@ -30,5 +45,20 @@ output "k8s_setup_key" {
 
 output "management_vm_setup_key" {
   value     = netbird_setup_key.management_vm.key
+  sensitive = true
+}
+
+output "management_lan_router_setup_key" {
+  value     = netbird_setup_key.management_lan_router.key
+  sensitive = true
+}
+
+output "proxy_setup_key" {
+  value     = netbird_setup_key.proxy.key
+  sensitive = true
+}
+
+output "bastion_exit_router_setup_key" {
+  value     = netbird_setup_key.bastion_exit_router.key
   sensitive = true
 }

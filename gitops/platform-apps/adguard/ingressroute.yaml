@@ -1,0 +1,36 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: adguard
+  namespace: adguard
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`adguard.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: adguard-dns
+          port: 3000
+          sticky:
+            cookie: {}
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: adguard-netbird
+  namespace: adguard
+spec:
+  entryPoints:
+    - webnetbird
+  routes:
+    - kind: Rule
+      match: Host(`adguard.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: adguard-dns
+          port: 3000
+          sticky:
+            cookie: {}

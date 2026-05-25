@@ -24,6 +24,23 @@ variable "service_cidrs" {
   type        = list(string)
 }
 
+variable "pod_cidrs" {
+  description = "Kubernetes pod CIDRs the NetBird routing peer should advertise for pod endpoint targets"
+  type        = list(string)
+}
+
+variable "management_lan_cidrs" {
+  description = "Local LAN CIDRs advertised through the Management VM routing peer"
+  type        = list(string)
+  default     = []
+}
+
+variable "exit_node_skip_auto_apply" {
+  description = "Keep LAN and internet exit routes available but not automatically applied on clients"
+  type        = bool
+  default     = true
+}
+
 variable "management_vm_ssh_port" {
   description = "SSH port on the Twinbox Management VM"
   type        = number
@@ -41,4 +58,3 @@ variable "management_vm_api_port" {
   type        = number
   default     = 8080
 }
-

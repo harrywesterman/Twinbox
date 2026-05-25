@@ -51,6 +51,7 @@ jobs:
               - 'config/**'
               - 'lib/**'
               - 'categories/**'
+              - 'coder/**'
               - 'infra/**'
               - 'gitops/**'
               - 'scripts/manager/**'

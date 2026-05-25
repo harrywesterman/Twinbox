@@ -213,3 +213,8 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$rendered_manifest" \
   --application "loki" \
   --destination-namespace "monitoring"
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "loki" \
+  --service-domain "loki.${public_zone_name}" \
+  --service-path /
