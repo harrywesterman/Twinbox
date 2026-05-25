@@ -1,16 +1,10 @@
-coder:
-  envUseClusterAccessURL: false
-
-  env:
-    - name: CODER_ACCESS_URL
-      value: "PLACEHOLDER_ACCESS_URL"
+coderd:
+  extraEnvs:
     - name: CODER_PG_CONNECTION_URL
       valueFrom:
         secretKeyRef:
           name: coder-db-url
           key: url
-    - name: CODER_OIDC_ISSUER_URL
-      value: "PLACEHOLDER_OIDC_ISSUER"
     - name: CODER_OIDC_CLIENT_ID
       valueFrom:
         secretKeyRef:
@@ -23,14 +17,11 @@ coder:
           key: client_secret
     - name: CODER_OAUTH2_GITHUB_DEFAULT_PROVIDER_ENABLE
       value: "false"
-
-  service:
+  serviceSpec:
     type: ClusterIP
-
-  ingress:
-    enable: false
-
-  serviceAccount:
-    workspacePerms: true
-    workspaceNamespaces:
-      - name: coder-workspaces
+ingress:
+  enable: false
+serviceAccount:
+  workspacePerms: true
+  workspaceNamespaces:
+    - name: coder-workspaces

@@ -22,14 +22,18 @@ spec:
         patches:
           - target:
               kind: Deployment
-              name: coder
+              name: coderd
             patch: |-
-              - op: replace
-                path: /spec/template/spec/containers/0/env/0/value
-                value: https://coder.__ZONE_NAME__
-              - op: replace
-                path: /spec/template/spec/containers/0/env/2/value
-                value: https://authentik.__ZONE_NAME__/application/o/coder/
+              - op: add
+                path: /spec/template/spec/containers/0/env/-
+                value:
+                  name: CODER_ACCESS_URL
+                  value: https://coder.__ZONE_NAME__
+              - op: add
+                path: /spec/template/spec/containers/0/env/-
+                value:
+                  name: CODER_OIDC_ISSUER_URL
+                  value: https://authentik.__ZONE_NAME__/application/o/coder/
           - target:
               kind: IngressRoute
               name: coder
