@@ -1135,6 +1135,7 @@ def test_manager_worker_image_includes_talos_image_factory_helper():
     assert "PINNED_TALOS_VERSION" in text
     assert "talosctl-linux-amd64" in text
     assert "COPY lib ./lib" in text
+    assert "COPY coder ./coder" in text
     assert "manager-api/src/lib/catalog-definitions.mjs" not in text
     assert "../../lib/catalog-definitions.mjs" in refresh_dashy_text
     assert "../../lib/catalog-definitions.mjs" in refresh_portal_text
@@ -1282,7 +1283,11 @@ def test_coder_app_injects_zone_specific_helm_values():
 def test_push_coder_template_downloads_current_linux_cli_asset():
     text = PUSH_CODER_TEMPLATE_SCRIPT.read_text(encoding="utf-8")
 
-    assert "https://api.github.com/repos/coder/coder/releases/latest" in text
+    assert 'source "$WORKSPACE_ROOT/config/pinned-defaults.sh"' in text
+    assert '[[ -d "$TEMPLATE_DIR" ]]' in text
+    assert "PINNED_CODER_CHART_VERSION" in text
+    assert "Replacing Coder CLI" in text
+    assert "releases/download/v${coder_release_version}" in text
     assert "coder_${coder_release_version}_linux_amd64.tar.gz" in text
     assert "coder-linux-amd64.tar.gz" not in text
 

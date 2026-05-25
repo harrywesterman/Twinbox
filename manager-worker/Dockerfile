@@ -30,6 +30,7 @@ RUN cd /opt/twinbox/manager-worker && npm ci --omit=dev
 COPY manager-worker/src ./manager-worker/src
 COPY lib ./lib
 COPY categories ./categories
+COPY coder ./coder
 COPY infra ./infra
 COPY gitops ./gitops
 COPY scripts/manager ./scripts/manager

@@ -7,12 +7,15 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/config/pinned-defaults.sh"
 TEMPLATE_DIR="$WORKSPACE_ROOT/coder/templates/twinbox"
 TEMPLATE_NAME="${TEMPLATE_NAME:-twinbox}"
 
 command -v kubectl >/dev/null 2>&1 || fail "kubectl is required"
 command -v jq >/dev/null 2>&1 || fail "jq is required"
 command -v curl >/dev/null 2>&1 || fail "curl is required"
+[[ -d "$TEMPLATE_DIR" ]] || fail "Coder template directory not found at $TEMPLATE_DIR"
 
 CODER_NAMESPACE="${CODER_NAMESPACE:-coder}"
 CODER_SERVICE="${CODER_SERVICE:-coder}"
@@ -93,21 +96,23 @@ if [[ -z "$CODER_SESSION_TOKEN" ]]; then
   fail "Could not obtain a Coder session token. Log in to $CODER_URL, create a token, and export CODER_SESSION_TOKEN."
 fi
 
-if ! command -v coder &>/dev/null; then
-  log "Downloading Coder CLI..."
-  CACHED_CLI="/tmp/coder-cli"
-  if [[ ! -f "$CACHED_CLI" ]]; then
-    coder_release_version="$(
-      curl -fsSL "https://api.github.com/repos/coder/coder/releases/latest" |
-        jq -r '.tag_name // empty' |
-        sed 's/^v//'
-    )"
-    [[ -n "$coder_release_version" ]] || fail "Could not resolve latest Coder CLI release"
-    curl -fsSL "https://github.com/coder/coder/releases/latest/download/coder_${coder_release_version}_linux_amd64.tar.gz" -o /tmp/coder.tar.gz
-    tar -xzf /tmp/coder.tar.gz -C /tmp
-    install -m 0755 /tmp/coder /usr/local/bin/coder
-    rm -rf /tmp/coder.tar.gz /tmp/coder
+coder_release_version="${PINNED_CODER_CHART_VERSION:-}"
+[[ -n "$coder_release_version" ]] || fail "PINNED_CODER_CHART_VERSION is required"
+installed_coder_version=""
+if command -v coder &>/dev/null; then
+  installed_coder_version="$(coder version 2>/dev/null | sed -n 's/^Coder v\([^+[:space:]]*\).*/\1/p' | head -n1)"
+fi
+
+if [[ "$installed_coder_version" != "$coder_release_version" ]]; then
+  if [[ -n "$installed_coder_version" ]]; then
+    log "Replacing Coder CLI v${installed_coder_version} with v${coder_release_version}"
+  else
+    log "Downloading Coder CLI v${coder_release_version}"
   fi
+  curl -fsSL "https://github.com/coder/coder/releases/download/v${coder_release_version}/coder_${coder_release_version}_linux_amd64.tar.gz" -o /tmp/coder.tar.gz
+  tar -xzf /tmp/coder.tar.gz -C /tmp
+  install -m 0755 /tmp/coder /usr/local/bin/coder
+  rm -rf /tmp/coder.tar.gz /tmp/coder
 fi
 
 log "Logging in to Coder..."
