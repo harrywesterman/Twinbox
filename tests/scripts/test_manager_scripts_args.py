@@ -66,6 +66,7 @@ ADGUARD_STEP_SCRIPT = (
 )
 SETUP_DNS_FORWARDER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "setup-dns-forwarder.sh"
 NETBIRD_DNS_ZONE_SCRIPT = REPO_ROOT / "scripts" / "manager" / "netbird-dns-zone.py"
+NETBIRD_DNS_NAMESERVER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "netbird-dns-nameserver.py"
 ARGO_STEP_MANIFEST = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "step.yaml"
 )
@@ -1965,9 +1966,20 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "--name netbird-hetzner-exit" in text
     assert "twinbox-${cluster_id}-hetzner-exit" in text
     assert "/var/lib/netbird-hetzner-exit:/var/lib/netbird" in text
+    assert "--sysctl net.ipv4.ip_forward=1" in text
+    exit_peer_block = re.search(
+        r"docker run -d \\\n  --name netbird-hetzner-exit(.*?)netbird status --check ready",
+        text,
+        flags=re.DOTALL,
+    )
+    assert exit_peer_block
+    assert "--network host" not in exit_peer_block.group(1)
     assert "NB_INTERFACE_NAME=wt1" in text
     assert "NB_WIREGUARD_PORT=51821" in text
     assert "NB_NFTABLES_TABLE=netbird_exit" in text
+    assert "NB_DISABLE_IPV6=true" in text
+    assert "disable_netbird_account_ipv6_overlay" in text
+    assert '"ipv6_enabled_groups": []' in text
     assert "node_prefix_length" in text
     assert 'emit(f"{management_ip}/{prefix_length}")' in text
     assert 'emit(f"{gateway_ip}/{prefix_length}")' in text
@@ -1993,6 +2005,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert '--group-id "$admins_group_id"' in text
     assert '--group-id "$management_vm_group_id"' in text
     assert '--group-id "$adguard_dns_group_id"' in text
+    assert '--group-id "$exit_node_users_group_id"' in text
     assert '--record "${public_zone_name}=${netbird_proxy_ip}"' in text
     assert '--record "*.${public_zone_name}=${netbird_proxy_ip}"' in text
     assert "NETBIRD_IP" in text
@@ -2350,6 +2363,11 @@ def test_adguard_install_uses_management_vm_dns_forwarder_for_netbird_dns():
 
     assert "setup-dns-forwarder.sh" in text
     assert 'bash "$WORKSPACE_ROOT/scripts/manager/setup-dns-forwarder.sh"' in text
+    assert "admins_group_id" in text
+    assert "exit_node_users_group_id" in text
+    assert '--group-id "$adguard_dns_group_id"' in text
+    assert '--group-id "$admins_group_id"' in text
+    assert '--group-id "$exit_node_users_group_id"' in text
     assert '--nameserver-ip "$mgmt_netbird_ip"' in text
     assert "--nameserver-port 5354" in text
     assert "Management VM NetBird IP" in text
@@ -2367,6 +2385,14 @@ def test_netbird_dns_zone_helper_manages_custom_zone_and_records():
     assert '"ttl": 300' in text
     assert "PUT" in text
     assert "POST" in text
+
+
+def test_netbird_dns_nameserver_helper_supports_multiple_groups():
+    text = NETBIRD_DNS_NAMESERVER_SCRIPT.read_text(encoding="utf-8")
+
+    assert 'parser.add_argument("--group-id", action="append", required=True)' in text
+    assert "blocked_groups" in text
+    assert '"groups": list(dict.fromkeys(args.group_id))' in text
 
 
 def test_dns_forwarder_restarts_when_port_forward_or_proxy_exits():
@@ -2417,6 +2443,10 @@ def test_netbird_network_policies_use_single_rule_per_policy():
     assert "adguard_dns_to_k8s_routers_tcp" in {name for name, _ in policy_blocks}
     assert "adguard_dns_to_management_vm" in {name for name, _ in policy_blocks}
     assert "adguard_dns_to_management_vm_tcp" in {name for name, _ in policy_blocks}
+    assert (
+        "sources       = [netbird_group.adguard_dns.id, netbird_group.admins.id, netbird_group.exit_node_users.id]"
+        in text
+    )
 
 
 def test_netbird_routing_peer_uses_pinned_image_tag():

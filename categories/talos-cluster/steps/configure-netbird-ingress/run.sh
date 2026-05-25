@@ -498,6 +498,7 @@ NB_LOG_LEVEL=info
 NB_INTERFACE_NAME=wt1
 NB_WIREGUARD_PORT=51821
 NB_NFTABLES_TABLE=netbird_exit
+NB_DISABLE_IPV6=true
 EOF
 chmod 600 /opt/netbird/hetzner-exit.env
 
@@ -506,12 +507,12 @@ docker rm -f netbird-hetzner-exit >/dev/null 2>&1 || true
 docker run -d \
   --name netbird-hetzner-exit \
   --restart unless-stopped \
-  --network host \
   --privileged \
   --cap-add NET_ADMIN \
   --cap-add SYS_ADMIN \
   --cap-add SYS_RESOURCE \
   --device /dev/net/tun \
+  --sysctl net.ipv4.ip_forward=1 \
   --env-file /opt/netbird/hetzner-exit.env \
   -v /var/lib/netbird-hetzner-exit:/var/lib/netbird \
   "$NETBIRD_IMAGE" >/dev/null
@@ -851,6 +852,68 @@ PY
   [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
 }
 
+disable_netbird_account_ipv6_overlay() {
+  local management_url="$1"
+  local token="$2"
+
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Disabling NetBird IPv6 overlay groups for IPv4-only Twinbox routes"
+  python3 - "$management_url" "$token" <<'PY'
+import json
+import sys
+import urllib.error
+import urllib.request
+
+management_url = sys.argv[1].rstrip("/")
+token = sys.argv[2]
+headers = {
+    "Authorization": f"Bearer {token}",
+    "Accept": "application/json",
+    "Content-Type": "application/json",
+}
+
+
+def request(method, path, payload=None):
+    body = json.dumps(payload).encode() if payload is not None else None
+    req = urllib.request.Request(
+        f"{management_url}{path}",
+        data=body,
+        headers=headers,
+        method=method,
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            raw = response.read().decode()
+            return json.loads(raw) if raw else None
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode(errors="replace")
+        raise SystemExit(f"NetBird API {method} {path} failed: HTTP {exc.code}: {detail}")
+
+
+accounts = request("GET", "/api/accounts")
+if not accounts:
+    raise SystemExit("NetBird API returned no accounts")
+
+account = accounts[0]
+settings = account.setdefault("settings", {})
+if settings.get("ipv6_enabled_groups") == []:
+    print(json.dumps({"action": "unchanged", "ipv6_enabled_groups": []}))
+    raise SystemExit(0)
+
+settings["ipv6_enabled_groups"] = []
+updated = request("PUT", f"/api/accounts/{account['id']}", account)
+print(
+    json.dumps(
+        {
+            "action": "updated",
+            "account_id": account["id"],
+            "ipv6_enabled_groups": updated.get("settings", {}).get("ipv6_enabled_groups"),
+        },
+        sort_keys=True,
+    )
+)
+PY
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
@@ -889,6 +952,7 @@ fi
 [[ -n "$netbird_token" ]] || fail "NetBird API token is required. Either provide it as input or ensure the bastion step generated a setup token."
 [[ -n "$netbird_management_url" ]] || fail "Could not determine NetBird management URL"
 [[ -f "$netbird_bastion_secret" ]] || fail "NetBird bastion secret not found at $netbird_bastion_secret"
+disable_netbird_account_ipv6_overlay "$netbird_management_url" "$netbird_token"
 netbird_proxy_domain="$(jq -r '.NETBIRD_PROXY_DOMAIN // empty' "$netbird_bastion_secret")"
 netbird_proxy_ip="$(jq -r '.NETBIRD_IP // empty' "$netbird_bastion_secret")"
 
@@ -1151,6 +1215,7 @@ zone_result="$(python3 "$WORKSPACE_ROOT/scripts/manager/netbird-dns-zone.py" \
   --group-id "$admins_group_id" \
   --group-id "$management_vm_group_id" \
   --group-id "$adguard_dns_group_id" \
+  --group-id "$exit_node_users_group_id" \
   --record "${public_zone_name}=${netbird_proxy_ip}" \
   --record "*.${public_zone_name}=${netbird_proxy_ip}")"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] $zone_result"

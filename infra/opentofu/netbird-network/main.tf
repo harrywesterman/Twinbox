@@ -264,7 +264,7 @@ resource "netbird_policy" "adguard_dns_to_k8s_routers" {
     enabled       = true
     bidirectional = false
     protocol      = "udp"
-    sources       = [netbird_group.adguard_dns.id]
+    sources       = [netbird_group.adguard_dns.id, netbird_group.admins.id, netbird_group.exit_node_users.id]
     destinations  = [netbird_group.k8s_routers.id]
     ports         = ["53"]
   }
@@ -281,7 +281,7 @@ resource "netbird_policy" "adguard_dns_to_k8s_routers_tcp" {
     enabled       = true
     bidirectional = false
     protocol      = "tcp"
-    sources       = [netbird_group.adguard_dns.id]
+    sources       = [netbird_group.adguard_dns.id, netbird_group.admins.id, netbird_group.exit_node_users.id]
     destinations  = [netbird_group.k8s_routers.id]
     ports         = ["53"]
   }

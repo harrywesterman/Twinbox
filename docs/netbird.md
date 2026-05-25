@@ -257,6 +257,10 @@ Network and policy details:
 - Kubernetes service route: discovered from the API server, falling back to `10.96.0.0/12`
 - Management VM LAN route: detected from the Management VM IP/interface and distributed to admins/exit node users
 - Hetzner exit route: `0.0.0.0/0`, distributed to admins/exit node users
+- IPv6 overlay groups are cleared because Twinbox currently declares IPv4-only
+  LAN and exit routes. Without this, NetBird clients can auto-pair the exit
+  route with `::/0` even though the Hetzner peer is not configured for IPv6
+  internet egress.
 - Route `groups`: proxy group
 - Route `peer_groups`: Kubernetes routing peer group
 - LAN and exit routes set `masquerade = true` and `skip_auto_apply = true`
@@ -576,6 +580,9 @@ In the NetBird client UI, route-capable devices should see two Twinbox routes:
 - the Management VM LAN CIDR, routed through `twinbox-mgmt-<cluster-slug>`
 - `0.0.0.0/0`, routed through `twinbox-<cluster-id>-hetzner-exit`
 
+Only the `0.0.0.0/0` route appears under the client's exit-node view. The
+Management VM LAN route is a normal network route, not an internet exit node.
+
 They are not applied automatically. On mobile, open NetBird, choose the route or
 exit node explicitly, and disable it again when finished.
 
@@ -608,6 +615,7 @@ docker exec netbird-hetzner-exit netbird status
 | Management VM is unreachable over NetBird | The Management VM peer is not enrolled or admin group policy is missing | Check `netbird status`, the `twinbox-netbird` container, NetBird peers, and admin policies. |
 | LAN or Hetzner exit route is visible but not used | Auto Apply is intentionally disabled | Manually select the LAN route or Hetzner exit node in the NetBird client. |
 | Hetzner exit route is missing | The separate bastion exit peer was not enrolled or is down | Check `docker ps --filter name=netbird-hetzner-exit`, NetBird peers, and `/api/routes`. |
+| Selecting the Hetzner exit route breaks internet | IPv6 overlay is still enabled for a group or the DNS nameserver is not distributed to admins/exit-node users | Check `/api/accounts` for empty `settings.ipv6_enabled_groups`, confirm the client no longer shows `::/0`, and verify `/api/dns/nameservers` includes the admin and exit-node user groups. |
 | DNS queries from peers fail (e.g. Android) | NetBird DNS nameserver points to the cluster IP (`10.96.x.x`), which is unreachable from Android's kernel WireGuard because it never updates `AllowedIPs`. Nameserver should point to the management VM NetBird IP:5354. | Check `/api/dns/nameservers` in the NetBird management API and verify the nameserver IP is the management VM's NetBird IP on port 5354. |
 | AdGuard is not blocking ads | The DNS forwarder is down or `kubectl port-forward` is stale | `sudo docker ps --filter name=twinbox-dns-forwarder` and `sudo docker logs twinbox-dns-forwarder --tail 30` |
 | `twinbox-dns-forwarder` fails to start | `kubectl` cannot reach the cluster or the AdGuard service is not deployed | Verify `KUBECONFIG` is set correctly and `kubectl -n adguard get svc adguard-dns` returns a valid ClusterIP |

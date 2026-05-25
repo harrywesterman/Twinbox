@@ -82,10 +82,14 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] AdGuard DNS service IP: $adguard_service_ip
 # Read from the netbird-network OpenTofu state (created by configure-netbird-ingress)
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Looking up AdGuard DNS NetBird group..."
 adguard_dns_group_id=""
+admins_group_id=""
+exit_node_users_group_id=""
 
 network_workdir="$MANAGER_DATA_DIR/opentofu/netbird-network-${cluster_id}"
 if [[ -d "$network_workdir" ]]; then
   adguard_dns_group_id="$(cd "$network_workdir" && tofu output -raw adguard_dns_group_id 2>/dev/null || true)"
+  admins_group_id="$(cd "$network_workdir" && tofu output -raw admins_group_id 2>/dev/null || true)"
+  exit_node_users_group_id="$(cd "$network_workdir" && tofu output -raw exit_node_users_group_id 2>/dev/null || true)"
 fi
 
 # Fallback: run OpenTofu from source
@@ -112,9 +116,13 @@ EOF
   tofu init
   tofu apply -auto-approve
   adguard_dns_group_id="$(tofu output -raw adguard_dns_group_id)"
+  admins_group_id="$(tofu output -raw admins_group_id)"
+  exit_node_users_group_id="$(tofu output -raw exit_node_users_group_id)"
 fi
 
 [[ -n "$adguard_dns_group_id" ]] || fail "Could not determine AdGuard DNS NetBird group ID"
+[[ -n "$admins_group_id" ]] || fail "Could not determine admins NetBird group ID"
+[[ -n "$exit_node_users_group_id" ]] || fail "Could not determine exit-node-users NetBird group ID"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] AdGuard DNS group ID: $adguard_dns_group_id"
 
 # --- Step 5: Configure the Management VM DNS forwarder ---
@@ -149,6 +157,8 @@ ns_result=$(python3 "$WORKSPACE_ROOT/scripts/manager/netbird-dns-nameserver.py" 
   --name "twinbox-${cluster_id}-adguard-dns" \
   --description "Twinbox AdGuard Home DNS" \
   --group-id "$adguard_dns_group_id" \
+  --group-id "$admins_group_id" \
+  --group-id "$exit_node_users_group_id" \
   --nameserver-ip "$mgmt_netbird_ip" \
   --nameserver-port 5354)
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] $ns_result"
