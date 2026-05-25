@@ -150,7 +150,7 @@ authentik_ensure_token
 authentik_setup_forward
 
 CODER_HOST="https://coder.${public_zone_name}"
-CODER_REDIRECT_URI="${CODER_HOST}/api/v2/users/oidc/callback"
+CODER_REDIRECT_URI="${CODER_HOST}/oauth/callback"
 
 coder_db_username="coder"
 coder_db_password="$(openssl rand -hex 24)"
