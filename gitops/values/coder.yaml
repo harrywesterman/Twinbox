@@ -19,6 +19,7 @@ coderd:
       value: "false"
   serviceSpec:
     type: ClusterIP
+    externalTrafficPolicy: "Cluster"
   builtinProviderServiceAccount:
     workspacePerms: true
     workspaceNamespaces:
