@@ -18,8 +18,7 @@ coderd:
     - name: CODER_OAUTH2_GITHUB_DEFAULT_PROVIDER_ENABLE
       value: "false"
   serviceSpec:
-    type: ClusterIP
-    externalTrafficPolicy: "Cluster"
+    type: NodePort
   builtinProviderServiceAccount:
     workspacePerms: true
     workspaceNamespaces:
