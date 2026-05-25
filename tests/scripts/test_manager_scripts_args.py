@@ -1137,6 +1137,7 @@ def test_manager_worker_image_includes_talos_image_factory_helper():
     assert "../../manager-api/src/lib/catalog-definitions.mjs" not in refresh_dashy_text
     assert "../../manager-api/src/lib/catalog-definitions.mjs" not in refresh_portal_text
     assert "apk add --no-cache bash ca-certificates curl docker-cli jq" in text
+    assert "iproute2" in text
     assert "COPY scripts/get-talos-image-factory.sh ./scripts/get-talos-image-factory.sh" in text
     assert "RUN chmod +x ./scripts/get-talos-image-factory.sh" in text
 
@@ -1919,9 +1920,11 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "netbird_host_resource_address()" in text
     assert "resolve_traefik_websecure_endpoint()" in text
     assert "read_pod_cidrs_json()" in text
+    assert "read_management_lan_cidrs_json()" in text
     assert "ipv4_in_cidrs_json()" in text
     assert "normalize_traefik_resource_address()" in text
     assert "ensure_netbird_proxy_peer()" in text
+    assert "ensure_netbird_bastion_exit_peer()" in text
     assert "wait_for_netbird_proxy_backend()" in text
     assert (
         'traefik_network_resource_address="$(netbird_host_resource_address "$traefik_resource_address")"'
@@ -1935,8 +1938,10 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "is a Kubernetes service DNS name; using a ready Traefik pod endpoint instead" in text
     assert 'traefik_target_port="8443"' in text
     assert 'pod_cidrs_json="$(read_pod_cidrs_json)"' in text
+    assert 'management_lan_cidrs_json="$(read_management_lan_cidrs_json "$cluster_json")"' in text
     assert '-var "traefik_resource_address=$traefik_network_resource_address"' in text
     assert '-var "pod_cidrs=${pod_cidrs_json}"' in text
+    assert '-var "management_lan_cidrs=${management_lan_cidrs_json}"' in text
     # The services block was removed; traefik_resource_address is now only passed to the network module
     assert "netbird-proxy-services-" not in text
     assert 'traefik_resource_address="traefik.traefik.svc.cluster.local"' not in text
@@ -1944,11 +1949,28 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "TRAEFIK_NETWORK_RESOURCE_ADDRESS" in text
     assert "TRAEFIK_TARGET_PORT" in text
     assert "POD_CIDRS" in text
+    assert "MANAGEMENT_LAN_CIDRS" in text
     assert "ADGUARD_DNS_GROUP_ID" in text
+    assert "MANAGEMENT_LAN_ROUTERS_GROUP_ID" in text
+    assert "BASTION_EXIT_ROUTERS_GROUP_ID" in text
+    assert "EXIT_NODE_USERS_GROUP_ID" in text
     assert "proxy_setup_key" in text
     assert "netbird-proxy-access" in text
+    assert "management_lan_router_setup_key" in text
+    assert "bastion_exit_router_setup_key" in text
+    assert "netbird-management-lan-router" in text
+    assert "netbird-bastion-exit-router" in text
     assert "netbirdio/netbird:${PINNED_NETBIRD_VERSION:-0.70.5}" in text
     assert "docker run -d" in text and "--name netbird-client" in text
+    assert "--name netbird-hetzner-exit" in text
+    assert "twinbox-${cluster_id}-hetzner-exit" in text
+    assert "/var/lib/netbird-hetzner-exit:/var/lib/netbird" in text
+    assert "NB_INTERFACE_NAME=wt1" in text
+    assert "NB_WIREGUARD_PORT=51821" in text
+    assert "NB_NFTABLES_TABLE=netbird_exit" in text
+    assert "node_prefix_length" in text
+    assert 'emit(f"{management_ip}/{prefix_length}")' in text
+    assert 'emit(f"{gateway_ip}/{prefix_length}")' in text
     assert "authentik_resolve_scope_mapping_id" in text
     assert '-var "property_mapping_ids=$property_mapping_ids_json"' in text
     assert '-var "authentik_url=$authentik_url"' not in text
@@ -2000,10 +2022,14 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     routing_peer_index = text.index("Deploying NetBird routing peers before enabling reverse proxy")
     backend_index = text.index('wait_for_traefik_reverse_proxy_backend "$traefik_resource_address"')
     proxy_peer_index = text.index('ensure_netbird_proxy_peer "$proxy_setup_key"')
+    exit_peer_index = text.index(
+        'ensure_netbird_bastion_exit_peer "$bastion_exit_router_setup_key"'
+    )
     proxy_backend_index = text.index("wait_for_netbird_proxy_backend \\")
     network_secret_index = text.index("Writing network secret for helper scripts")
     service_cidrs_index = text.index('service_cidrs_json="$(jq -n --arg cidr "$service_cidr"')
     pod_cidrs_index = text.index('pod_cidrs_json="$(read_pod_cidrs_json)"')
+    management_lan_index = text.index('management_lan_cidrs_json="$(read_management_lan_cidrs_json')
     normalize_traefik_index = text.index(
         'traefik_resource_address="$(normalize_traefik_resource_address'
     )
@@ -2023,7 +2049,13 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
         "netbird-proxy-services-"
     ) > text.index("Writing network secret for helper scripts")
     # network secret is written before routing peers, service creation, and the OIDC flow.
-    assert service_cidrs_index < pod_cidrs_index < normalize_traefik_index < auth_setup_index
+    assert (
+        service_cidrs_index
+        < pod_cidrs_index
+        < management_lan_index
+        < normalize_traefik_index
+        < auth_setup_index
+    )
     assert (
         auth_setup_index
         < network_index
@@ -2031,6 +2063,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
         < routing_peer_index
         < backend_index
         < proxy_peer_index
+        < exit_peer_index
         < proxy_backend_index
         < dns_index
         < authentik_service_index
@@ -2251,6 +2284,67 @@ def test_netbird_proxy_reuses_traefik_websecure_origin():
     )
 
 
+def test_netbird_lan_and_exit_routes_are_opt_in():
+    network_text = NETBIRD_NETWORK_MODULE_MAIN.read_text(encoding="utf-8")
+    vars_text = (REPO_ROOT / "infra" / "opentofu" / "netbird-network" / "variables.tf").read_text(
+        encoding="utf-8"
+    )
+    outputs_text = (REPO_ROOT / "infra" / "opentofu" / "netbird-network" / "outputs.tf").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'variable "management_lan_cidrs"' in vars_text
+    assert 'variable "exit_node_skip_auto_apply"' in vars_text
+    assert 'resource "netbird_group" "management_lan_routers"' in network_text
+    assert 'resource "netbird_group" "bastion_exit_routers"' in network_text
+    assert 'resource "netbird_group" "exit_node_users"' in network_text
+    assert 'name = "${local.name_prefix}-exit-node-users"' in network_text
+    assert 'resource "netbird_setup_key" "management_lan_router"' in network_text
+    assert 'resource "netbird_setup_key" "bastion_exit_router"' in network_text
+    assert 'output "management_lan_router_setup_key"' in outputs_text
+    assert 'output "bastion_exit_router_setup_key"' in outputs_text
+    assert 'output "exit_node_users_group_id"' in outputs_text
+
+    lan_route = re.search(
+        r'resource\s+"netbird_route"\s+"management_lan"\s+\{'
+        r'(.*?)(?=\nresource\s+"netbird_route"|\Z)',
+        network_text,
+        flags=re.DOTALL,
+    )
+    assert lan_route
+    lan_body = lan_route.group(1)
+    assert "for_each = toset(var.management_lan_cidrs)" in lan_body
+    assert (
+        "peer_groups     = [netbird_group.management_vm.id, netbird_group.management_lan_routers.id]"
+        in lan_body
+    )
+    assert (
+        "groups          = [netbird_group.admins.id, netbird_group.exit_node_users.id]" in lan_body
+    )
+    assert "masquerade      = true" in lan_body
+    assert "skip_auto_apply = var.exit_node_skip_auto_apply" in lan_body
+
+    exit_route = re.search(
+        r'resource\s+"netbird_route"\s+"hetzner_internet_exit"\s+\{'
+        r'(.*?)(?=\nresource\s+"netbird_policy"|\Z)',
+        network_text,
+        flags=re.DOTALL,
+    )
+    assert exit_route
+    exit_body = exit_route.group(1)
+    assert 'network         = "0.0.0.0/0"' in exit_body
+    assert "peer_groups     = [netbird_group.bastion_exit_routers.id]" in exit_body
+    assert (
+        "groups          = [netbird_group.admins.id, netbird_group.exit_node_users.id]" in exit_body
+    )
+    assert "masquerade      = true" in exit_body
+    assert "skip_auto_apply = var.exit_node_skip_auto_apply" in exit_body
+
+    assert 'protocol      = "icmp"' in network_text
+    assert "exit_node_users_to_management_lan_routers_icmp" in network_text
+    assert "exit_node_users_to_bastion_exit_routers_icmp" in network_text
+
+
 def test_adguard_install_uses_management_vm_dns_forwarder_for_netbird_dns():
     text = ADGUARD_STEP_SCRIPT.read_text(encoding="utf-8")
 
@@ -2293,6 +2387,9 @@ def test_netbird_admin_access_uses_reachable_host_docker_daemon():
     text = NETBIRD_ADMIN_ACCESS_STEP_SCRIPT.read_text(encoding="utf-8")
 
     assert "docker info >/dev/null 2>&1" in text
+    assert "netbird-management-lan-router-${cluster_id}.json" in text
+    assert "netbird-admin-access-${cluster_id}.json" in text
+    assert 'secret_file="$lan_router_secret"' in text
     assert "docker volume create twinbox-netbird" in text
     assert "--network host" in text
     assert "--cap-add NET_ADMIN" in text

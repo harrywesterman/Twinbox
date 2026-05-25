@@ -29,6 +29,18 @@ resource "netbird_group" "adguard_dns" {
   name = "${local.name_prefix}-adguard-dns"
 }
 
+resource "netbird_group" "management_lan_routers" {
+  name = "${local.name_prefix}-management-lan-routers"
+}
+
+resource "netbird_group" "bastion_exit_routers" {
+  name = "${local.name_prefix}-bastion-exit-routers"
+}
+
+resource "netbird_group" "exit_node_users" {
+  name = "${local.name_prefix}-exit-node-users"
+}
+
 resource "netbird_setup_key" "k8s_routers" {
   name                   = "${local.name_prefix}-k8s-routers"
   type                   = "reusable"
@@ -51,6 +63,17 @@ resource "netbird_setup_key" "management_vm" {
   revoked                = false
 }
 
+resource "netbird_setup_key" "management_lan_router" {
+  name                   = "${local.name_prefix}-management-lan-router"
+  type                   = "reusable"
+  expiry_seconds         = 0
+  usage_limit            = 1
+  allow_extra_dns_labels = true
+  auto_groups            = [netbird_group.management_vm.id, netbird_group.management_lan_routers.id]
+  ephemeral              = false
+  revoked                = false
+}
+
 resource "netbird_setup_key" "proxy" {
   name                   = "${local.name_prefix}-proxy"
   type                   = "reusable"
@@ -58,6 +81,17 @@ resource "netbird_setup_key" "proxy" {
   usage_limit            = 1
   allow_extra_dns_labels = true
   auto_groups            = [netbird_group.proxy.id]
+  ephemeral              = false
+  revoked                = false
+}
+
+resource "netbird_setup_key" "bastion_exit_router" {
+  name                   = "${local.name_prefix}-bastion-exit-router"
+  type                   = "reusable"
+  expiry_seconds         = 0
+  usage_limit            = 1
+  allow_extra_dns_labels = true
+  auto_groups            = [netbird_group.bastion_exit_routers.id]
   ephemeral              = false
   revoked                = false
 }
@@ -110,6 +144,32 @@ resource "netbird_route" "k8s_pods" {
   enabled     = true
 }
 
+resource "netbird_route" "management_lan" {
+  for_each = toset(var.management_lan_cidrs)
+
+  network_id      = netbird_network.twinbox.id
+  description     = "Management VM LAN CIDR ${each.key}"
+  network         = each.key
+  peer_groups     = [netbird_group.management_vm.id, netbird_group.management_lan_routers.id]
+  groups          = [netbird_group.admins.id, netbird_group.exit_node_users.id]
+  masquerade      = true
+  metric          = 9999
+  enabled         = true
+  skip_auto_apply = var.exit_node_skip_auto_apply
+}
+
+resource "netbird_route" "hetzner_internet_exit" {
+  network_id      = netbird_network.twinbox.id
+  description     = "Hetzner bastion internet exit node"
+  network         = "0.0.0.0/0"
+  peer_groups     = [netbird_group.bastion_exit_routers.id]
+  groups          = [netbird_group.admins.id, netbird_group.exit_node_users.id]
+  masquerade      = true
+  metric          = 9999
+  enabled         = true
+  skip_auto_apply = var.exit_node_skip_auto_apply
+}
+
 resource "netbird_policy" "admin_to_management_vm_ssh" {
   name        = "${local.name_prefix}-admin-to-management-vm-ssh"
   description = "Allow Twinbox admins to reach the Management VM SSH service over NetBird"
@@ -158,6 +218,38 @@ resource "netbird_policy" "admin_to_management_vm_api" {
     sources       = [netbird_group.admins.id]
     destinations  = [netbird_group.management_vm.id]
     ports         = [tostring(var.management_vm_api_port)]
+  }
+}
+
+resource "netbird_policy" "exit_node_users_to_management_lan_routers_icmp" {
+  name        = "${local.name_prefix}-exit-node-users-to-management-lan-routers-icmp"
+  description = "Allow route users to select the Management VM LAN route"
+  enabled     = true
+
+  rule {
+    name          = "icmp"
+    action        = "accept"
+    enabled       = true
+    bidirectional = true
+    protocol      = "icmp"
+    sources       = [netbird_group.admins.id, netbird_group.exit_node_users.id]
+    destinations  = [netbird_group.management_vm.id, netbird_group.management_lan_routers.id]
+  }
+}
+
+resource "netbird_policy" "exit_node_users_to_bastion_exit_routers_icmp" {
+  name        = "${local.name_prefix}-exit-node-users-to-bastion-exit-routers-icmp"
+  description = "Allow route users to select the Hetzner internet exit route"
+  enabled     = true
+
+  rule {
+    name          = "icmp"
+    action        = "accept"
+    enabled       = true
+    bidirectional = true
+    protocol      = "icmp"
+    sources       = [netbird_group.admins.id, netbird_group.exit_node_users.id]
+    destinations  = [netbird_group.bastion_exit_routers.id]
   }
 }
 
