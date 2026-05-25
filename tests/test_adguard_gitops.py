@@ -118,15 +118,23 @@ def test_configmap_dns_settings_are_valid_for_netbird_clients():
     assert {"domain": "*.bierineenweek.nl", "answer": "188.34.166.172"} in dns_config["rewrites"]
 
 
-def test_ingressroute_exists():
-    ir = yaml.safe_load((GITOPS_DIR / "ingressroute.yaml").read_text())
-    assert ir["kind"] == "IngressRoute"
-    assert ir["metadata"]["name"] == "adguard-netbird"
+def test_ingressroute_has_both_entrypoints():
+    docs = list(yaml.safe_load_all((GITOPS_DIR / "ingressroute.yaml").read_text()))
+    assert len(docs) == 2
+    names = {d["metadata"]["name"] for d in docs}
+    assert names == {"adguard", "adguard-netbird"}
 
 
-def test_ingressroute_uses_webnetbird():
-    ir = yaml.safe_load((GITOPS_DIR / "ingressroute.yaml").read_text())
-    assert "webnetbird" in ir["spec"]["entryPoints"]
+def test_ingressroute_websecure_has_tls():
+    docs = list(yaml.safe_load_all((GITOPS_DIR / "ingressroute.yaml").read_text()))
+    ir = next(d for d in docs if d["spec"]["entryPoints"] == ["websecure"])
+    assert ir["spec"]["tls"] == {}
+
+
+def test_ingressroute_netbird_no_tls():
+    docs = list(yaml.safe_load_all((GITOPS_DIR / "ingressroute.yaml").read_text()))
+    ir = next(d for d in docs if d["spec"]["entryPoints"] == ["webnetbird"])
+    assert "tls" not in ir["spec"]
 
 
 def test_kustomization_resources():
