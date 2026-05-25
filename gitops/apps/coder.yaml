@@ -35,6 +35,12 @@ spec:
                   name: CODER_OIDC_ISSUER_URL
                   value: https://authentik.__ZONE_NAME__/application/o/coder/
           - target:
+              kind: Service
+              name: coderd
+            patch: |-
+              - op: remove
+                path: /spec/externalTrafficPolicy
+          - target:
               kind: IngressRoute
               name: coder
             patch: |-
