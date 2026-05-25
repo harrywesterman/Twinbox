@@ -30,15 +30,14 @@ def _request(method: str, url: str, token: str, data: dict | None = None) -> dic
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Create or update a NetBird DNS nameserver group"
-    )
+    parser = argparse.ArgumentParser(description="Create or update a NetBird DNS nameserver group")
     parser.add_argument("--management-url", required=True)
     parser.add_argument("--token", required=True)
     parser.add_argument("--name", required=True)
     parser.add_argument("--description", default="")
-    parser.add_argument("--group-id", required=True)
+    parser.add_argument("--group-id", action="append", required=True)
     parser.add_argument("--nameserver-ip", required=True)
+    parser.add_argument("--nameserver-port", type=int, default=53)
     args = parser.parse_args()
 
     management_url = args.management_url.rstrip("/")
@@ -47,14 +46,17 @@ def main():
     settings_url = f"{management_url}/api/dns/settings"
     settings = _request("GET", settings_url, args.token)
     disabled_groups = settings.get("disabled_management_groups", [])
-    if args.group_id in disabled_groups:
+    blocked_groups = [group_id for group_id in args.group_id if group_id in disabled_groups]
+    if blocked_groups:
         print(
-            json.dumps({
-                "error": (
-                    f"Group {args.group_id} is in disabled_management_groups. "
-                    "Enable DNS management for this group in NetBird settings first."
-                )
-            }),
+            json.dumps(
+                {
+                    "error": (
+                        f"Groups {', '.join(blocked_groups)} are in disabled_management_groups. "
+                        "Enable DNS management for these groups in NetBird settings first."
+                    )
+                }
+            ),
             file=sys.stderr,
         )
         sys.exit(1)
@@ -67,11 +69,11 @@ def main():
             {
                 "ip": args.nameserver_ip,
                 "ns_type": "udp",
-                "port": 53,
+                "port": args.nameserver_port,
             }
         ],
         "enabled": True,
-        "groups": [args.group_id],
+        "groups": list(dict.fromkeys(args.group_id)),
         "primary": True,
         "domains": [],
         "search_domains_enabled": False,
@@ -95,6 +97,7 @@ def main():
         "action": action,
         "nameserver_group_id": result.get("id"),
         "nameserver_ip": args.nameserver_ip,
+        "nameserver_port": args.nameserver_port,
     }
     print(json.dumps(output))
 

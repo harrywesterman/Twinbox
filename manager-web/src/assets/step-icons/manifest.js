@@ -233,6 +233,12 @@ export const STEP_ICON_MANIFEST = [
     officialSourceType: "project-repository",
     officialSourceUrl: "https://github.com/flannel-io/flannel",
   }),
+  iconEntry({
+    stepId: "install-adguard",
+    isAppOrPlatform: true,
+    officialSourceType: "project-repository",
+    officialSourceUrl: "https://github.com/AdguardTeam/AdGuardHome",
+  }),
 ];
 
 for (const entry of STEP_ICON_MANIFEST) {

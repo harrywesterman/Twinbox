@@ -349,7 +349,8 @@ After the Talos/Cilium bootstrap, platform services install in this order:
 | 22 | `install-dashy-dashboard` | Legacy admin launcher |
 | 23 | `install-management-consoles` | Proxmox, Longhorn, SeaweedFS UIs |
 | 24 | `install-pgadmin4` | PostgreSQL management |
-| 25+ | App bundles / individual apps | User applications via Argo CD |
+| 25 | `install-adguard` | AdGuard Home DNS with NetBird nameserver push, DNS forwarder on management VM |
+| 26+ | App bundles / individual apps | User applications via Argo CD |
 
 ### Ingress Configuration
 

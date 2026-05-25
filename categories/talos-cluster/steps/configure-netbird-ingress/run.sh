@@ -106,6 +106,157 @@ read_pod_cidrs_json() {
   printf '%s\n' "$cidrs_json"
 }
 
+read_management_lan_cidrs_json() {
+  local cluster_json="$1"
+  local configured_cidrs
+  local management_ip
+  local gateway_ip
+  local node_prefix_length
+
+  configured_cidrs="$(printf '%s' "$STEP_INPUTS_JSON" | jq -c '.management_lan_cidrs // empty')"
+  if [[ -n "$configured_cidrs" && "$configured_cidrs" != "null" ]]; then
+    if ! printf '%s' "$configured_cidrs" | jq -e 'type == "array" and all(.[]; type == "string" and length > 0)' >/dev/null; then
+      fail "management_lan_cidrs must be a JSON array of CIDR strings"
+    fi
+    printf '%s\n' "$configured_cidrs"
+    return 0
+  fi
+
+  management_ip="${MANAGEMENT_VM_IP:-}"
+  if [[ -z "$management_ip" ]]; then
+    management_ip="$(printf '%s' "$cluster_json" | jq -r '.management_ip // .outputs.management_ip // .metadata.management_ip // empty')"
+  fi
+  gateway_ip="$(printf '%s' "$cluster_json" | jq -r '.gateway_ip // .outputs.gateway_ip // .metadata.gateway_ip // empty')"
+  node_prefix_length="$(printf '%s' "$cluster_json" | jq -r '.node_prefix_length // .outputs.node_prefix_length // .metadata.node_prefix_length // 24')"
+
+  python3 - "$management_ip" "$gateway_ip" "$node_prefix_length" <<'PY'
+import ipaddress
+import json
+import subprocess
+import sys
+
+management_ip = sys.argv[1]
+gateway_ip = sys.argv[2]
+try:
+    prefix_length = int(sys.argv[3])
+except (IndexError, ValueError):
+    prefix_length = 24
+if prefix_length < 1 or prefix_length > 32:
+    prefix_length = 24
+
+def emit(cidr):
+    print(json.dumps([str(ipaddress.ip_network(cidr, strict=False))]))
+    raise SystemExit(0)
+
+def matching_interface_cidr(ip_text):
+    if not ip_text:
+        return ""
+    try:
+        target = ipaddress.ip_address(ip_text)
+    except ValueError:
+        return ""
+    try:
+        output = subprocess.check_output(["ip", "-j", "addr"], text=True, stderr=subprocess.DEVNULL)
+        interfaces = json.loads(output)
+    except Exception:
+        return ""
+    for iface in interfaces:
+        for addr in iface.get("addr_info", []):
+            if addr.get("family") != "inet":
+                continue
+            local = addr.get("local")
+            prefixlen = addr.get("prefixlen")
+            if local == ip_text and prefixlen is not None:
+                return f"{local}/{prefixlen}"
+            try:
+                network = ipaddress.ip_network(f"{local}/{prefixlen}", strict=False)
+            except Exception:
+                continue
+            if target in network:
+                return str(network)
+    return ""
+
+cidr = matching_interface_cidr(management_ip)
+if cidr:
+    emit(cidr)
+
+if management_ip:
+    emit(f"{management_ip}/{prefix_length}")
+
+if gateway_ip:
+    emit(f"{gateway_ip}/{prefix_length}")
+
+try:
+    route = subprocess.check_output(["ip", "route", "get", "1.1.1.1"], text=True, stderr=subprocess.DEVNULL)
+except Exception:
+    route = ""
+parts = route.split()
+if "src" in parts:
+    route_ip = parts[parts.index("src") + 1]
+    cidr = matching_interface_cidr(route_ip)
+    if cidr:
+        emit(cidr)
+    emit(f"{route_ip}/{prefix_length}")
+
+raise SystemExit("Could not determine Management VM LAN CIDR")
+PY
+}
+
+ipv4_in_cidrs_json() {
+  local address="$1"
+  local cidrs_json="$2"
+
+  python3 - "$address" "$cidrs_json" <<'PY'
+import ipaddress
+import json
+import sys
+
+address = sys.argv[1]
+try:
+    ip = ipaddress.ip_address(address)
+    cidrs = json.loads(sys.argv[2])
+except Exception:
+    raise SystemExit(1)
+
+for cidr in cidrs:
+    try:
+        if ip in ipaddress.ip_network(cidr, strict=False):
+            raise SystemExit(0)
+    except ValueError:
+        continue
+raise SystemExit(1)
+PY
+}
+
+normalize_traefik_resource_address() {
+  local requested_address="$1"
+  local service_cidrs="$2"
+  local pod_cidrs="$3"
+
+  if [[ -z "$requested_address" ]]; then
+    resolve_traefik_websecure_endpoint
+    return
+  fi
+
+  case "$requested_address" in
+    traefik.traefik.svc.cluster.local|traefik-netbird.traefik.svc.cluster.local|*.svc|*.svc.cluster.local)
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird Traefik target ${requested_address} is a Kubernetes service DNS name; using a ready Traefik pod endpoint instead" >&2
+      resolve_traefik_websecure_endpoint
+      return
+      ;;
+  esac
+
+  if [[ "$requested_address" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] \
+    && ipv4_in_cidrs_json "$requested_address" "$service_cidrs" \
+    && ! ipv4_in_cidrs_json "$requested_address" "$pod_cidrs"; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird Traefik target ${requested_address} is in the Kubernetes service CIDR; using a ready Traefik pod endpoint instead" >&2
+    resolve_traefik_websecure_endpoint
+    return
+  fi
+
+  printf '%s\n' "$requested_address"
+}
+
 wait_for_public_oidc_discovery() {
   local issuer_url="$1"
   local discovery_url="${issuer_url%/}/.well-known/openid-configuration"
@@ -290,6 +441,95 @@ REMOTE
   then
     [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
     fail "Failed to start NetBird reverse proxy peer on the bastion"
+  fi
+
+  [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
+}
+
+ensure_netbird_bastion_exit_peer() {
+  local setup_key="$1"
+  local ssh_key_path="$MANAGER_DATA_DIR/ssh/netbird-${cluster_id}/id_ed25519"
+  local temp_ssh_key=""
+  local image="netbirdio/netbird:${PINNED_NETBIRD_VERSION:-0.70.5}"
+  local hostname="twinbox-${cluster_id}-hetzner-exit"
+  local management_url_q
+  local hostname_q
+  local image_q
+
+  if [[ ! -f "$ssh_key_path" ]]; then
+    if jq -e '.SSH_PRIVATE_KEY // empty' "$netbird_bastion_secret" >/dev/null; then
+      temp_ssh_key="$(mktemp)"
+      jq -r '.SSH_PRIVATE_KEY' "$netbird_bastion_secret" >"$temp_ssh_key"
+      chmod 600 "$temp_ssh_key"
+      ssh_key_path="$temp_ssh_key"
+    fi
+  fi
+
+  if [[ ! -f "$ssh_key_path" || -z "$netbird_proxy_ip" ]] || ! command -v ssh >/dev/null 2>&1; then
+    [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
+    fail "NetBird bastion SSH is unavailable; cannot start the Hetzner exit peer"
+  fi
+
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Ensuring NetBird Hetzner exit peer is running on the bastion"
+  if ! printf '%s' "$setup_key" | ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 \
+    -i "$ssh_key_path" root@"$netbird_proxy_ip" \
+    'mkdir -p /opt/netbird && umask 077 && cat > /opt/netbird/hetzner-exit.setup-key'; then
+    [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
+    fail "Failed to upload NetBird Hetzner exit setup key to the bastion"
+  fi
+
+  printf -v management_url_q '%q' "$netbird_management_url"
+  printf -v hostname_q '%q' "$hostname"
+  printf -v image_q '%q' "$image"
+
+  if ! ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 \
+    -i "$ssh_key_path" root@"$netbird_proxy_ip" \
+    "NB_MANAGEMENT_URL=$management_url_q NB_HOSTNAME=$hostname_q NETBIRD_IMAGE=$image_q bash -s" <<'REMOTE'
+set -euo pipefail
+
+setup_key="$(cat /opt/netbird/hetzner-exit.setup-key)"
+modprobe tun 2>/dev/null || true
+mkdir -p /var/lib/netbird-hetzner-exit /opt/netbird
+cat > /opt/netbird/hetzner-exit.env <<EOF
+NB_SETUP_KEY=${setup_key}
+NB_MANAGEMENT_URL=${NB_MANAGEMENT_URL}
+NB_HOSTNAME=${NB_HOSTNAME}
+NB_LOG_LEVEL=info
+NB_INTERFACE_NAME=wt1
+NB_WIREGUARD_PORT=51821
+NB_NFTABLES_TABLE=netbird_exit
+NB_DISABLE_IPV6=true
+EOF
+chmod 600 /opt/netbird/hetzner-exit.env
+
+docker pull "$NETBIRD_IMAGE" >/dev/null
+docker rm -f netbird-hetzner-exit >/dev/null 2>&1 || true
+docker run -d \
+  --name netbird-hetzner-exit \
+  --restart unless-stopped \
+  --privileged \
+  --cap-add NET_ADMIN \
+  --cap-add SYS_ADMIN \
+  --cap-add SYS_RESOURCE \
+  --device /dev/net/tun \
+  --sysctl net.ipv4.ip_forward=1 \
+  --env-file /opt/netbird/hetzner-exit.env \
+  -v /var/lib/netbird-hetzner-exit:/var/lib/netbird \
+  "$NETBIRD_IMAGE" >/dev/null
+
+for i in $(seq 1 30); do
+  if docker exec netbird-hetzner-exit netbird status --check ready >/dev/null 2>&1; then
+    exit 0
+  fi
+  sleep 2
+done
+
+docker logs --tail 80 netbird-hetzner-exit >&2 || true
+exit 1
+REMOTE
+  then
+    [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
+    fail "Failed to start NetBird Hetzner exit peer on the bastion"
   fi
 
   [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
@@ -612,6 +852,68 @@ PY
   [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
 }
 
+disable_netbird_account_ipv6_overlay() {
+  local management_url="$1"
+  local token="$2"
+
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Disabling NetBird IPv6 overlay groups for IPv4-only Twinbox routes"
+  python3 - "$management_url" "$token" <<'PY'
+import json
+import sys
+import urllib.error
+import urllib.request
+
+management_url = sys.argv[1].rstrip("/")
+token = sys.argv[2]
+headers = {
+    "Authorization": f"Bearer {token}",
+    "Accept": "application/json",
+    "Content-Type": "application/json",
+}
+
+
+def request(method, path, payload=None):
+    body = json.dumps(payload).encode() if payload is not None else None
+    req = urllib.request.Request(
+        f"{management_url}{path}",
+        data=body,
+        headers=headers,
+        method=method,
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            raw = response.read().decode()
+            return json.loads(raw) if raw else None
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode(errors="replace")
+        raise SystemExit(f"NetBird API {method} {path} failed: HTTP {exc.code}: {detail}")
+
+
+accounts = request("GET", "/api/accounts")
+if not accounts:
+    raise SystemExit("NetBird API returned no accounts")
+
+account = accounts[0]
+settings = account.setdefault("settings", {})
+if settings.get("ipv6_enabled_groups") == []:
+    print(json.dumps({"action": "unchanged", "ipv6_enabled_groups": []}))
+    raise SystemExit(0)
+
+settings["ipv6_enabled_groups"] = []
+updated = request("PUT", f"/api/accounts/{account['id']}", account)
+print(
+    json.dumps(
+        {
+            "action": "updated",
+            "account_id": account["id"],
+            "ipv6_enabled_groups": updated.get("settings", {}).get("ipv6_enabled_groups"),
+        },
+        sort_keys=True,
+    )
+)
+PY
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
@@ -650,6 +952,7 @@ fi
 [[ -n "$netbird_token" ]] || fail "NetBird API token is required. Either provide it as input or ensure the bastion step generated a setup token."
 [[ -n "$netbird_management_url" ]] || fail "Could not determine NetBird management URL"
 [[ -f "$netbird_bastion_secret" ]] || fail "NetBird bastion secret not found at $netbird_bastion_secret"
+disable_netbird_account_ipv6_overlay "$netbird_management_url" "$netbird_token"
 netbird_proxy_domain="$(jq -r '.NETBIRD_PROXY_DOMAIN // empty' "$netbird_bastion_secret")"
 netbird_proxy_ip="$(jq -r '.NETBIRD_IP // empty' "$netbird_bastion_secret")"
 
@@ -661,18 +964,17 @@ fi
 
 [[ -n "$netbird_proxy_ip" ]] || fail "NetBird bastion secret does not contain NETBIRD_IP"
 
-if [[ -z "$traefik_resource_address" ]]; then
-  traefik_resource_address="$(resolve_traefik_websecure_endpoint)"
-fi
-traefik_network_resource_address="$(netbird_host_resource_address "$traefik_resource_address")"
-traefik_target_port="8443"
-
 service_cidr="$(kubectl -n kube-system get pod -l component=kube-apiserver -o json 2>/dev/null | jq -r '.items[0].spec.containers[0].command[] | select(startswith("--service-cluster-ip-range=")) | sub("^--service-cluster-ip-range="; "")' || true)"
 if [[ -z "$service_cidr" ]]; then
   service_cidr="10.96.0.0/12"
 fi
 service_cidrs_json="$(jq -n --arg cidr "$service_cidr" '[$cidr]')"
 pod_cidrs_json="$(read_pod_cidrs_json)"
+management_lan_cidrs_json="$(read_management_lan_cidrs_json "$cluster_json")"
+
+traefik_resource_address="$(normalize_traefik_resource_address "$traefik_resource_address" "$service_cidrs_json" "$pod_cidrs_json")"
+traefik_network_resource_address="$(netbird_host_resource_address "$traefik_resource_address")"
+traefik_target_port="8443"
 
 authentik_public_url="${TWINBOX_AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
 authentik_domain="${authentik_public_url#https://}"
@@ -741,22 +1043,31 @@ tofu apply -auto-approve -no-color \
   -var "cluster_id=$cluster_id" \
   -var "traefik_resource_address=$traefik_network_resource_address" \
   -var "service_cidrs=${service_cidrs_json}" \
-  -var "pod_cidrs=${pod_cidrs_json}"
+  -var "pod_cidrs=${pod_cidrs_json}" \
+  -var "management_lan_cidrs=${management_lan_cidrs_json}"
 
 k8s_setup_key="$(tofu output -raw -no-color k8s_setup_key)"
 management_vm_setup_key="$(tofu output -raw -no-color management_vm_setup_key)"
+management_lan_router_setup_key="$(tofu output -raw -no-color management_lan_router_setup_key)"
 proxy_setup_key="$(tofu output -raw -no-color proxy_setup_key)"
+bastion_exit_router_setup_key="$(tofu output -raw -no-color bastion_exit_router_setup_key)"
 admins_group_id="$(tofu output -raw -no-color admins_group_id)"
 management_vm_group_id="$(tofu output -raw -no-color management_vm_group_id)"
 k8s_routers_group_id="$(tofu output -raw -no-color k8s_routers_group_id)"
 proxy_group_id="$(tofu output -raw -no-color proxy_group_id)"
+adguard_dns_group_id="$(tofu output -raw -no-color adguard_dns_group_id)"
+management_lan_routers_group_id="$(tofu output -raw -no-color management_lan_routers_group_id)"
+bastion_exit_routers_group_id="$(tofu output -raw -no-color bastion_exit_routers_group_id)"
+exit_node_users_group_id="$(tofu output -raw -no-color exit_node_users_group_id)"
 traefik_resource_id="$(tofu output -raw -no-color traefik_resource_id)"
 
 secrets_dir="/opt/twinbox/bootstrap/secrets/global"
 mkdir -p "$secrets_dir"
 routing_secret="$secrets_dir/netbird-routing-peers-${cluster_id}.json"
 admin_secret="$secrets_dir/netbird-admin-access-${cluster_id}.json"
+management_lan_router_secret="$secrets_dir/netbird-management-lan-router-${cluster_id}.json"
 proxy_secret="$secrets_dir/netbird-proxy-access-${cluster_id}.json"
+bastion_exit_router_secret="$secrets_dir/netbird-bastion-exit-router-${cluster_id}.json"
 network_secret="$secrets_dir/netbird-network-${cluster_id}.json"
 
 jq -n \
@@ -772,13 +1083,27 @@ jq -n \
   '{NB_SETUP_KEY: $setup_key, NB_MANAGEMENT_URL: $management_url, CLUSTER_ID: $cluster_id}' >"$admin_secret"
 
 jq -n \
+  --arg setup_key "$management_lan_router_setup_key" \
+  --arg management_url "$netbird_management_url" \
+  --arg hostname "twinbox-mgmt-${cluster_slug}" \
+  --arg cluster_id "$cluster_id" \
+  '{NB_SETUP_KEY: $setup_key, NB_MANAGEMENT_URL: $management_url, NB_HOSTNAME: $hostname, CLUSTER_ID: $cluster_id}' >"$management_lan_router_secret"
+
+jq -n \
   --arg setup_key "$proxy_setup_key" \
   --arg management_url "$netbird_management_url" \
   --arg hostname "twinbox-${cluster_id}-proxy" \
   --arg cluster_id "$cluster_id" \
   '{NB_SETUP_KEY: $setup_key, NB_MANAGEMENT_URL: $management_url, NB_HOSTNAME: $hostname, CLUSTER_ID: $cluster_id}' >"$proxy_secret"
 
-chmod 600 "$routing_secret" "$admin_secret" "$proxy_secret"
+jq -n \
+  --arg setup_key "$bastion_exit_router_setup_key" \
+  --arg management_url "$netbird_management_url" \
+  --arg hostname "twinbox-${cluster_id}-hetzner-exit" \
+  --arg cluster_id "$cluster_id" \
+  '{NB_SETUP_KEY: $setup_key, NB_MANAGEMENT_URL: $management_url, NB_HOSTNAME: $hostname, CLUSTER_ID: $cluster_id}' >"$bastion_exit_router_secret"
+
+chmod 600 "$routing_secret" "$admin_secret" "$management_lan_router_secret" "$proxy_secret" "$bastion_exit_router_secret"
 
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "netbird-routing-peers" \
@@ -791,8 +1116,18 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --required-keys "NB_SETUP_KEY,NB_MANAGEMENT_URL"
 
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+  --secret-name "netbird-management-lan-router" \
+  --json-file "$management_lan_router_secret" \
+  --required-keys "NB_SETUP_KEY,NB_MANAGEMENT_URL,NB_HOSTNAME"
+
+bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "netbird-proxy-access" \
   --json-file "$proxy_secret" \
+  --required-keys "NB_SETUP_KEY,NB_MANAGEMENT_URL,NB_HOSTNAME"
+
+bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+  --secret-name "netbird-bastion-exit-router" \
+  --json-file "$bastion_exit_router_secret" \
   --required-keys "NB_SETUP_KEY,NB_MANAGEMENT_URL,NB_HOSTNAME"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Writing network secret for helper scripts"
@@ -803,10 +1138,15 @@ jq -n \
   --arg traefik_target_port "$traefik_target_port" \
   --arg traefik_resource_id "$traefik_resource_id" \
   --argjson pod_cidrs "$pod_cidrs_json" \
+  --argjson management_lan_cidrs "$management_lan_cidrs_json" \
   --arg admins_group_id "$admins_group_id" \
   --arg management_vm_group_id "$management_vm_group_id" \
   --arg k8s_routers_group_id "$k8s_routers_group_id" \
   --arg proxy_group_id "$proxy_group_id" \
+  --arg adguard_dns_group_id "$adguard_dns_group_id" \
+  --arg management_lan_routers_group_id "$management_lan_routers_group_id" \
+  --arg bastion_exit_routers_group_id "$bastion_exit_routers_group_id" \
+  --arg exit_node_users_group_id "$exit_node_users_group_id" \
   --arg cluster_id "$cluster_id" \
   '{
     NETBIRD_MANAGEMENT_URL: $management_url,
@@ -815,10 +1155,15 @@ jq -n \
     TRAEFIK_TARGET_PORT: $traefik_target_port,
     TRAEFIK_RESOURCE_ID: $traefik_resource_id,
     POD_CIDRS: $pod_cidrs,
+    MANAGEMENT_LAN_CIDRS: $management_lan_cidrs,
     ADMINS_GROUP_ID: $admins_group_id,
     MANAGEMENT_VM_GROUP_ID: $management_vm_group_id,
     K8S_ROUTERS_GROUP_ID: $k8s_routers_group_id,
     PROXY_GROUP_ID: $proxy_group_id,
+    ADGUARD_DNS_GROUP_ID: $adguard_dns_group_id,
+    MANAGEMENT_LAN_ROUTERS_GROUP_ID: $management_lan_routers_group_id,
+    BASTION_EXIT_ROUTERS_GROUP_ID: $bastion_exit_routers_group_id,
+    EXIT_NODE_USERS_GROUP_ID: $exit_node_users_group_id,
     CLUSTER_ID: $cluster_id
   }' >"$network_secret"
 chmod 600 "$network_secret"
@@ -832,6 +1177,7 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
 wait_for_netbird_routing_peer
 wait_for_traefik_reverse_proxy_backend "$traefik_resource_address"
 ensure_netbird_proxy_peer "$proxy_setup_key"
+ensure_netbird_bastion_exit_peer "$bastion_exit_router_setup_key"
 wait_for_netbird_proxy_backend \
   "$traefik_resource_address" \
   "$traefik_target_port" \
@@ -859,6 +1205,20 @@ spec:
         - ${netbird_proxy_ip}
       recordTTL: 300
 EOF
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating NetBird custom DNS zone for app domains"
+zone_result="$(python3 "$WORKSPACE_ROOT/scripts/manager/netbird-dns-zone.py" \
+  --management-url "$netbird_management_url" \
+  --token "$netbird_token" \
+  --zone-name "Twinbox ${public_zone_name}" \
+  --zone-domain "$public_zone_name" \
+  --group-id "$admins_group_id" \
+  --group-id "$management_vm_group_id" \
+  --group-id "$adguard_dns_group_id" \
+  --group-id "$exit_node_users_group_id" \
+  --record "${public_zone_name}=${netbird_proxy_ip}" \
+  --record "*.${public_zone_name}=${netbird_proxy_ip}")"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] $zone_result"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating NetBird reverse proxy service for Authentik (required for OIDC verification)"
 bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
@@ -903,6 +1263,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     --arg traefik_target_port "$traefik_target_port" \
     --arg traefik_resource_id "$traefik_resource_id" \
     --argjson pod_cidrs "$pod_cidrs_json" \
+    --argjson management_lan_cidrs "$management_lan_cidrs_json" \
     --arg cluster_id "$cluster_id" \
     '{
       status: $status,
@@ -914,6 +1275,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
         traefik_target_port: $traefik_target_port,
         traefik_resource_id: $traefik_resource_id,
         pod_cidrs: $pod_cidrs,
+        management_lan_cidrs: $management_lan_cidrs,
         cluster_id: $cluster_id
       }
     }' >"$STEP_RESULT_FILE"
