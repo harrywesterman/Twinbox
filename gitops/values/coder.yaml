@@ -19,9 +19,9 @@ coderd:
       value: "false"
   serviceSpec:
     type: ClusterIP
+  builtinProviderServiceAccount:
+    workspacePerms: true
+    workspaceNamespaces:
+      - name: coder-workspaces
 ingress:
   enable: false
-serviceAccount:
-  workspacePerms: true
-  workspaceNamespaces:
-    - name: coder-workspaces
