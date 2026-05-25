@@ -49,6 +49,8 @@ N8N_APP = REPO_ROOT / "gitops" / "apps" / "n8n.yaml"
 HEDGEDOC_APP = REPO_ROOT / "gitops" / "apps" / "hedgedoc.yaml"
 PAPERLESS_APP = REPO_ROOT / "gitops" / "apps" / "paperless.yaml"
 PIXELFED_APP = REPO_ROOT / "gitops" / "apps" / "pixelfed.yaml"
+CODER_APP = REPO_ROOT / "gitops" / "apps" / "coder.yaml"
+CODER_VALUES = REPO_ROOT / "gitops" / "values" / "coder.yaml"
 OUTLINE_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "outline" / "kustomization.yaml"
 OPENWEBUI_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "openwebui" / "kustomization.yaml"
 N8N_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "n8n" / "kustomization.yaml"
@@ -1247,6 +1249,33 @@ def test_apply_argocd_application_helper_applies_and_waits_for_health():
     assert "--no-wait" in text
     assert ".resource_profile // empty" in text
     assert "(.worker_count // 0)" in text
+
+
+def test_coder_app_injects_zone_specific_helm_values():
+    app = yaml.safe_load(CODER_APP.read_text(encoding="utf-8"))
+    values = yaml.safe_load(CODER_VALUES.read_text(encoding="utf-8"))
+
+    helm = app["spec"]["sources"][0]["helm"]
+    parameters = {item["name"]: item["value"] for item in helm["parameters"]}
+    env = values["coder"]["env"]
+
+    assert helm["valueFiles"] == ["$values/gitops/values/coder.yaml"]
+    assert env[4]["name"] == "CODER_ACCESS_URL"
+    assert env[5]["name"] == "CODER_OIDC_ISSUER_URL"
+    assert env[4]["value"] == "https://coder.__ZONE_NAME__"
+    assert env[5]["value"] == "https://authentik.__ZONE_NAME__/application/o/coder/"
+    assert parameters["coder.env[4].value"] == "https://coder.__ZONE_NAME__"
+    assert parameters["coder.env[5].value"] == (
+        "https://authentik.__ZONE_NAME__/application/o/coder/"
+    )
+    assert values["coder"]["service"]["type"] == "NodePort"
+    assert values["coder"]["serviceAccount"]["extraRules"] == [
+        {
+            "apiGroups": ["metrics.k8s.io"],
+            "resources": ["pods"],
+            "verbs": ["get", "list", "watch"],
+        }
+    ]
 
 
 def test_stirling_pdf_waits_for_real_kubernetes_readiness():
