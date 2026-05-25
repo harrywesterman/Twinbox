@@ -47,13 +47,5 @@ data:
         url: https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt
         name: AdGuard DNS filter
         id: 1
+    session_ttl: 720h
     theme: auto
-    http_session:
-      - ip: 10.0.0.0/8
-        user_agent: ""
-      - ip: 172.16.0.0/12
-        user_agent: ""
-      - ip: 192.168.0.0/16
-        user_agent: ""
-      - ip: 100.64.0.0/10
-        user_agent: ""
