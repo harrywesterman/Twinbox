@@ -41,8 +41,13 @@ if command -v kubectl >/dev/null 2>&1; then
     sleep 5
   done
 
+  public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
+  adguard_rendered_manifest="$(mktemp)"
+  sed "s/__ZONE_NAME__/${public_zone_name}/g" \
+    "$WORKSPACE_ROOT/gitops/apps/adguard.yaml" >"$adguard_rendered_manifest"
+
   bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
-    --manifest "$WORKSPACE_ROOT/gitops/apps/adguard.yaml" \
+    --manifest "$adguard_rendered_manifest" \
     --application "adguard" \
     --destination-namespace "argocd"
 else

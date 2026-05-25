@@ -5,8 +5,9 @@ metadata:
   namespace: adguard
 data:
   AdGuardHome.yaml: |
-    bind_host: 0.0.0.0
-    bind_port: 3000
+    http:
+      address: 0.0.0.0:3000
+      session_ttl: 720h
     users:
       - name: admin
         password: $2b$12$BouBSJO/uUdwzyV3oxebouVskhtxb4Ccm54RLdnHNlnQB3cbRaRda
@@ -47,5 +48,4 @@ data:
         url: https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt
         name: AdGuard DNS filter
         id: 1
-    session_ttl: 720h
     theme: auto
