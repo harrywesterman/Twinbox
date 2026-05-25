@@ -19,9 +19,9 @@ coder:
     - name: CODER_OAUTH2_GITHUB_DEFAULT_PROVIDER_ENABLE
       value: "false"
     - name: CODER_ACCESS_URL
-      value: https://coder.__ZONE_NAME__
+      value: https://coder.bierineenweek.nl
     - name: CODER_OIDC_ISSUER_URL
-      value: https://authentik.__ZONE_NAME__/application/o/coder/
+      value: https://authentik.bierineenweek.nl/application/o/coder/
   resources:
     requests:
       cpu: 500m
