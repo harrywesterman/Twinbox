@@ -1,0 +1,97 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: mailu-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            twinbox.io/domain-ready: "true"
+            twinbox.io/app-mailu: "enabled"
+  template:
+    metadata:
+      name: mailu
+    spec:
+      project: default
+      sources:
+        - repoURL: https://mailu.github.io/helm-charts
+          chart: mailu
+          targetRevision: "2.7.1"
+          helm:
+            valueFiles:
+              - $values/gitops/values/mailu.yaml
+            values: |
+              domain: "{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+              hostnames:
+                - "mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+              initialAccount:
+                username: "{{or (index .metadata.annotations "twinbox.io/mailu-admin-localpart") "admin"}}"
+                domain: "{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+              externalRelay:
+                host: "[mailu-relay-egress.netbird.svc.cluster.local]:2525"
+              dmarc:
+                rua: "{{or (index .metadata.annotations "twinbox.io/mailu-dmarc-rua-localpart") "dmarc"}}"
+              persistence:
+                size: "{{or (index .metadata.annotations "twinbox.io/mailu-storage-size") "100Gi"}}"
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          ref: values
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          path: gitops/platform-apps/mailu
+          kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: mailu-relay-egress
+                patch: |-
+                  - op: replace
+                    path: /data/RELAY_TARGET_HOST
+                    value: "{{index .metadata.annotations "twinbox.io/mailu-relay-host"}}"
+              - target:
+                  kind: IngressRoute
+                  name: mailu
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: mailu-netbird
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: mailu-wiredoor
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: mailu-tailscale
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: mailu
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        managedNamespaceMetadata:
+          labels:
+            pod-security.kubernetes.io/enforce: baseline
+            pod-security.kubernetes.io/audit: baseline
+            pod-security.kubernetes.io/warn: baseline
+        syncOptions:
+          - CreateNamespace=true

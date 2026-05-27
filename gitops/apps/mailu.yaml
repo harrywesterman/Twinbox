@@ -1,0 +1,82 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mailu
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://mailu.github.io/helm-charts
+      chart: mailu
+      targetRevision: "2.7.1"
+      helm:
+        valueFiles:
+          - $values/gitops/values/mailu.yaml
+        values: |
+          domain: "__ZONE_NAME__"
+          hostnames:
+            - "mail.__ZONE_NAME__"
+          initialAccount:
+            username: "admin"
+            domain: "__ZONE_NAME__"
+          externalRelay:
+            host: "[mailu-relay-egress.netbird.svc.cluster.local]:2525"
+          dmarc:
+            rua: dmarc
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      ref: values
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      path: gitops/platform-apps/mailu
+      kustomize:
+        patches:
+          - target:
+              kind: ConfigMap
+              name: mailu-relay-egress
+            patch: |-
+              - op: replace
+                path: /data/RELAY_TARGET_HOST
+                value: "__MAILU_RELAY_TARGET_HOST__"
+          - target:
+              kind: IngressRoute
+              name: mailu
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`mail.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: mailu-netbird
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`mail.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: mailu-wiredoor
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`mail.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: mailu-tailscale
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`mail.__ZONE_NAME__`)
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mailu
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: baseline
+        pod-security.kubernetes.io/audit: baseline
+        pod-security.kubernetes.io/warn: baseline
+    syncOptions:
+      - CreateNamespace=true

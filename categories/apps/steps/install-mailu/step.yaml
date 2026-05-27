@@ -1,0 +1,60 @@
+id: install-mailu
+title: Install Mailu
+type: action
+journey_stage: setup
+summary: Self-hosted email with Mailu on Kubernetes and Postfix on the NetBird bastion.
+explanation: Installs Mailu for the cluster public domain, publishes the admin and webmail UI at mail.<domain>, configures DNS records, and uses the NetBird bastion as the public SMTP edge.
+side_help: Use this when you want Twinbox to host email for the selected public domain. PTR/rDNS still has to be configured at the IP provider.
+inputs:
+  - id: admin_localpart
+    type: string
+    label: Admin local part
+    default: admin
+    required: false
+    placeholder: admin
+  - id: admin_password
+    type: string
+    label: Admin password
+    required: false
+    placeholder: Generate automatically
+  - id: storage_size
+    type: string
+    label: Mail storage size
+    default: 100Gi
+    required: false
+    placeholder: 100Gi
+  - id: dmarc_policy
+    type: string
+    label: DMARC policy
+    default: quarantine
+    required: false
+    options:
+      - value: none
+        label: none
+      - value: quarantine
+        label: quarantine
+      - value: reject
+        label: reject
+  - id: dmarc_rua_localpart
+    type: string
+    label: DMARC report mailbox
+    default: dmarc
+    required: false
+    placeholder: dmarc
+dashy:
+  items:
+    - section: Platform
+      title: Mailu
+      description: Email administration and webmail
+      icon: fas fa-envelope
+      url_template: https://mail.__ZONE_NAME__/admin
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/apps/steps/install-mailu/run.sh

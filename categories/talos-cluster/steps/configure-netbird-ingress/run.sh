@@ -1051,6 +1051,7 @@ management_vm_setup_key="$(tofu output -raw -no-color management_vm_setup_key)"
 management_lan_router_setup_key="$(tofu output -raw -no-color management_lan_router_setup_key)"
 proxy_setup_key="$(tofu output -raw -no-color proxy_setup_key)"
 bastion_exit_router_setup_key="$(tofu output -raw -no-color bastion_exit_router_setup_key)"
+mailu_relay_egress_setup_key="$(tofu output -raw -no-color mailu_relay_egress_setup_key)"
 admins_group_id="$(tofu output -raw -no-color admins_group_id)"
 management_vm_group_id="$(tofu output -raw -no-color management_vm_group_id)"
 k8s_routers_group_id="$(tofu output -raw -no-color k8s_routers_group_id)"
@@ -1058,6 +1059,7 @@ proxy_group_id="$(tofu output -raw -no-color proxy_group_id)"
 adguard_dns_group_id="$(tofu output -raw -no-color adguard_dns_group_id)"
 management_lan_routers_group_id="$(tofu output -raw -no-color management_lan_routers_group_id)"
 bastion_exit_routers_group_id="$(tofu output -raw -no-color bastion_exit_routers_group_id)"
+mailu_relay_egress_group_id="$(tofu output -raw -no-color mailu_relay_egress_group_id)"
 exit_node_users_group_id="$(tofu output -raw -no-color exit_node_users_group_id)"
 traefik_resource_id="$(tofu output -raw -no-color traefik_resource_id)"
 
@@ -1068,6 +1070,7 @@ admin_secret="$secrets_dir/netbird-admin-access-${cluster_id}.json"
 management_lan_router_secret="$secrets_dir/netbird-management-lan-router-${cluster_id}.json"
 proxy_secret="$secrets_dir/netbird-proxy-access-${cluster_id}.json"
 bastion_exit_router_secret="$secrets_dir/netbird-bastion-exit-router-${cluster_id}.json"
+mailu_relay_egress_secret="$secrets_dir/netbird-mailu-relay-egress-${cluster_id}.json"
 network_secret="$secrets_dir/netbird-network-${cluster_id}.json"
 
 jq -n \
@@ -1103,7 +1106,14 @@ jq -n \
   --arg cluster_id "$cluster_id" \
   '{NB_SETUP_KEY: $setup_key, NB_MANAGEMENT_URL: $management_url, NB_HOSTNAME: $hostname, CLUSTER_ID: $cluster_id}' >"$bastion_exit_router_secret"
 
-chmod 600 "$routing_secret" "$admin_secret" "$management_lan_router_secret" "$proxy_secret" "$bastion_exit_router_secret"
+jq -n \
+  --arg setup_key "$mailu_relay_egress_setup_key" \
+  --arg management_url "$netbird_management_url" \
+  --arg hostname "twinbox-${cluster_id}-mailu-relay-egress" \
+  --arg cluster_id "$cluster_id" \
+  '{NB_SETUP_KEY: $setup_key, NB_MANAGEMENT_URL: $management_url, NB_HOSTNAME: $hostname, CLUSTER_ID: $cluster_id}' >"$mailu_relay_egress_secret"
+
+chmod 600 "$routing_secret" "$admin_secret" "$management_lan_router_secret" "$proxy_secret" "$bastion_exit_router_secret" "$mailu_relay_egress_secret"
 
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "netbird-routing-peers" \
@@ -1130,6 +1140,11 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --json-file "$bastion_exit_router_secret" \
   --required-keys "NB_SETUP_KEY,NB_MANAGEMENT_URL,NB_HOSTNAME"
 
+bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+  --secret-name "netbird-mailu-relay-egress" \
+  --json-file "$mailu_relay_egress_secret" \
+  --required-keys "NB_SETUP_KEY,NB_MANAGEMENT_URL,NB_HOSTNAME"
+
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Writing network secret for helper scripts"
 jq -n \
   --arg management_url "$netbird_management_url" \
@@ -1146,6 +1161,7 @@ jq -n \
   --arg adguard_dns_group_id "$adguard_dns_group_id" \
   --arg management_lan_routers_group_id "$management_lan_routers_group_id" \
   --arg bastion_exit_routers_group_id "$bastion_exit_routers_group_id" \
+  --arg mailu_relay_egress_group_id "$mailu_relay_egress_group_id" \
   --arg exit_node_users_group_id "$exit_node_users_group_id" \
   --arg cluster_id "$cluster_id" \
   '{
@@ -1163,6 +1179,7 @@ jq -n \
     ADGUARD_DNS_GROUP_ID: $adguard_dns_group_id,
     MANAGEMENT_LAN_ROUTERS_GROUP_ID: $management_lan_routers_group_id,
     BASTION_EXIT_ROUTERS_GROUP_ID: $bastion_exit_routers_group_id,
+    MAILU_RELAY_EGRESS_GROUP_ID: $mailu_relay_egress_group_id,
     EXIT_NODE_USERS_GROUP_ID: $exit_node_users_group_id,
     CLUSTER_ID: $cluster_id
   }' >"$network_secret"

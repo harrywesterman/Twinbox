@@ -1,0 +1,152 @@
+mailuVersion: "2024.06.51"
+
+hostnames: []
+domain: ""
+timezone: "Etc/UTC"
+postmaster: postmaster
+recipientDelimiter: "+"
+
+existingSecret: mailu-runtime
+
+initialAccount:
+  enabled: true
+  username: admin
+  domain: ""
+  existingSecret: mailu-runtime
+  existingSecretPasswordKey: initial-admin-password
+  mode: ifmissing
+
+api:
+  enabled: true
+  existingSecret: mailu-runtime
+  existingSecretTokenKey: api-token
+  webPath: /api
+
+dmarc:
+  rua: dmarc
+  ruf: ""
+
+limits:
+  messageSizeLimitInMegabytes: 50
+  authRatelimit:
+    ip: 60/hour
+    ipv4Mask: 24
+    ipv6Mask: 56
+    user: 100/day
+    exemptionLength: 86400
+    exemption: ""
+  messageRatelimit:
+    value: 200/day
+    exemption: ""
+
+externalRelay:
+  host: ""
+  existingSecret: mailu-relay
+  usernameKey: relay-username
+  passwordKey: relay-password
+  networks: []
+
+ingress:
+  enabled: false
+  tls: false
+  realIpHeader: ""
+  realIpFrom: ""
+
+front:
+  hostPort:
+    enabled: false
+  externalService:
+    enabled: false
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+admin:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+postfix:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+dovecot:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+rspamd:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+
+clamav:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 3Gi
+
+webmail:
+  enabled: true
+  uri: /webmail
+  type: roundcube
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: true
+      storageClass: longhorn-single
+      size: 8Gi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+persistence:
+  single_pvc: true
+  size: 100Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClass: longhorn-single
+
+networkPolicy:
+  enabled: false

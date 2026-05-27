@@ -23,6 +23,7 @@ categories/apps/
     ├── install-immich/
     ├── install-jitsi/
     ├── install-karakeep/
+    ├── install-mailu/
     ├── install-n8n/
     ├── install-nextcloud/
     ├── install-opencloud/
@@ -48,6 +49,7 @@ Each app step contains a `step.yaml` manifest and a runner script:
 | `install-immich` | Photo and video backup solution |
 | `install-jitsi` | Video conferencing with OpenID Connect |
 | `install-karakeep` | Bookmark and web archiving tool |
+| `install-mailu` | Self-hosted email with Mailu and bastion Postfix |
 | `install-n8n` | Workflow automation platform |
 | `install-nextcloud` | Self-hosted file sync and collaboration |
 | `install-opencloud` | Open source collaboration platform |

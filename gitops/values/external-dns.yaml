@@ -12,11 +12,13 @@ domainFilters:
 managedRecordTypes:
   - A
   - CNAME
+  - MX
   - TXT
 
 extraArgs:
   - --managed-record-types=A
   - --managed-record-types=CNAME
+  - --managed-record-types=MX
   - --managed-record-types=TXT
 
 env:

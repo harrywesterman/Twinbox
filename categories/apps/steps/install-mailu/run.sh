@@ -1,0 +1,548 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"
+: "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"
+MANAGER_DATA_DIR="${MANAGER_DATA_DIR:-/data}"
+STEP_INPUTS_JSON="${STEP_INPUTS_JSON:-{}}"
+
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
+
+log() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
+
+fail() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
+  exit 1
+}
+
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || fail "$1 not found"
+}
+
+wait_for_resource() {
+  local namespace="$1"
+  local kind="$2"
+  local name="$3"
+  local condition="$4"
+  local label="$5"
+
+  log "Waiting for ${label}"
+  kubectl -n "$namespace" wait --for="condition=${condition}" "${kind}/${name}" --timeout=10m
+}
+
+wait_for_selector() {
+  local namespace="$1"
+  local kind="$2"
+  local selector="$3"
+  local condition="$4"
+  local label="$5"
+
+  log "Waiting for ${label}"
+  kubectl -n "$namespace" wait --for="condition=${condition}" "$kind" -l "$selector" --timeout=10m
+}
+
+wait_for_statefulsets_ready() {
+  local namespace="$1"
+  local selector="$2"
+  local label="$3"
+  local attempts=120
+  local attempt=1
+
+  while true; do
+    local status_json not_ready
+    status_json="$(kubectl -n "$namespace" get statefulset -l "$selector" -o json 2>/dev/null || true)"
+    if jq -e '.items | length > 0' >/dev/null 2>&1 <<<"$status_json"; then
+      not_ready="$(
+        jq -r '
+          [
+            .items[]
+            | select((.spec.replicas // 0) != (.status.readyReplicas // 0))
+            | .metadata.name
+          ]
+          | join(",")
+        ' <<<"$status_json"
+      )"
+      if [[ -z "$not_ready" ]]; then
+        log "${label} are ready"
+        return 0
+      fi
+      log "Waiting for ${label}: ${not_ready}"
+    else
+      log "Waiting for ${label} to appear"
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      fail "${label} did not become ready"
+    fi
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
+find_netbird_bastion_secret() {
+  local cluster_id="$1"
+  local candidate
+
+  for candidate in \
+    "/opt/twinbox/bootstrap/secrets/global/netbird-bastion-${cluster_id}.json" \
+    "${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}/secrets/global/netbird-bastion-${cluster_id}.json"; do
+    if [[ -f "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  ls -t "${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"/secrets/global/netbird-bastion-*.json 2>/dev/null | head -n1
+}
+
+write_bastion_ssh_key() {
+  local secret_file="$1"
+  local cluster_id="$2"
+  local key_content
+  local key_file
+
+  key_content="$(jq -r '.SSH_PRIVATE_KEY // empty' "$secret_file")"
+  if [[ -n "$key_content" ]]; then
+    key_file="$(mktemp "${TMPDIR:-/tmp}/mailu-bastion-key-XXXXXX")"
+    printf '%s\n' "$key_content" >"$key_file"
+    chmod 600 "$key_file"
+    printf '%s\n' "$key_file"
+    return 0
+  fi
+
+  key_file="$MANAGER_DATA_DIR/ssh/netbird-${cluster_id}/id_ed25519"
+  [[ -f "$key_file" ]] || fail "NetBird bastion SSH key not found; provision NetBird bastion with a generated key"
+  printf '%s\n' "$key_file"
+}
+
+openbao_existing_value() {
+  local secret_name="$1"
+  local property="$2"
+  local json
+
+  json="$(openbao_read_global_secret_json "$secret_name" 2>/dev/null || true)"
+  if [[ -n "$json" ]]; then
+    jq -r --arg property "$property" '.[$property] // empty' <<<"$json"
+  fi
+}
+
+random_hex() {
+  openssl rand -hex "$1"
+}
+
+validate_storage_size() {
+  local value="$1"
+  [[ "$value" =~ ^[0-9]+(Gi|Mi|Ti)$ ]] || fail "storage_size must look like 100Gi, 512Mi, or 1Ti"
+}
+
+normalize_localpart() {
+  local value="$1"
+  [[ "$value" =~ ^[A-Za-z0-9._%+-]+$ ]] || fail "localpart contains unsupported characters: $value"
+  printf '%s\n' "$value"
+}
+
+resolve_admin_pod() {
+  kubectl -n mailu get pods \
+    -l app.kubernetes.io/instance=mailu,app.kubernetes.io/component=admin \
+    -o json |
+    jq -r '.items[] | select((.status.phase // "") == "Running") | .metadata.name' |
+    head -n1
+}
+
+extract_dkim_from_export() {
+  jq -c -f "$WORKSPACE_ROOT/scripts/manager/mailu-dns-export-to-dkim.jq"
+}
+
+apply_mail_dns_records() {
+  local mail_domain="$1"
+  local mail_hostname="$2"
+  local bastion_ip="$3"
+  local dkim_name="$4"
+  local dkim_value="$5"
+  local dmarc_policy="$6"
+  local dmarc_rua_localpart="$7"
+
+  local dmarc_value="v=DMARC1; p=${dmarc_policy}; rua=mailto:${dmarc_rua_localpart}@${mail_domain}; adkim=s; aspf=s"
+
+  jq -n \
+    --arg mail_hostname "$mail_hostname" \
+    --arg bastion_ip "$bastion_ip" \
+    --arg mail_domain "$mail_domain" \
+    --arg dmarc_value "$dmarc_value" \
+    --arg dkim_name "$dkim_name" \
+    --arg dkim_value "$dkim_value" \
+    '{
+      apiVersion: "externaldns.k8s.io/v1alpha1",
+      kind: "DNSEndpoint",
+      metadata: {
+        name: "mailu-mail-dns",
+        namespace: "external-dns"
+      },
+      spec: {
+        endpoints: [
+          {
+            dnsName: $mail_hostname,
+            recordType: "A",
+            targets: [$bastion_ip],
+            recordTTL: 300
+          },
+          {
+            dnsName: $mail_domain,
+            recordType: "MX",
+            targets: ["10 \($mail_hostname)."],
+            recordTTL: 300
+          },
+          {
+            dnsName: $mail_domain,
+            recordType: "TXT",
+            targets: ["v=spf1 mx -all"],
+            recordTTL: 300
+          },
+          {
+            dnsName: "_dmarc.\($mail_domain)",
+            recordType: "TXT",
+            targets: [$dmarc_value],
+            recordTTL: 300
+          },
+          {
+            dnsName: $dkim_name,
+            recordType: "TXT",
+            targets: [$dkim_value],
+            recordTTL: 300
+          }
+        ]
+      }
+    }' | kubectl apply -f -
+}
+
+ssh_bastion() {
+  local bastion_ip="$1"
+  local ssh_key_file="$2"
+  shift 2
+
+  ssh -o StrictHostKeyChecking=accept-new \
+    -o UserKnownHostsFile=/dev/null \
+    -o BatchMode=yes \
+    -o ConnectTimeout=10 \
+    -i "$ssh_key_file" \
+    "root@${bastion_ip}" \
+    "$@"
+}
+
+discover_bastion_netbird_ip() {
+  local bastion_ip="$1"
+  local ssh_key_file="$2"
+
+  ssh_bastion "$bastion_ip" "$ssh_key_file" 'bash -s' <<'REMOTE'
+set -euo pipefail
+docker exec netbird-client netbird status --check ready >/dev/null
+netbird_ip="$(docker exec netbird-client netbird ip 2>/dev/null | awk '/^[0-9]+\./ {split($1,a,"/"); print a[1]; exit}')"
+if [[ -z "$netbird_ip" ]]; then
+  netbird_ip="$(docker exec netbird-client sh -lc "ip -o -4 addr show | awk '\$2 ~ /^(wt|nb|netbird)/ {split(\$4,a,\"/\"); print a[1]; exit}'" 2>/dev/null || true)"
+fi
+[[ -n "$netbird_ip" ]] || {
+  echo "Could not discover NetBird overlay IP from netbird-client" >&2
+  exit 1
+}
+printf '%s\n' "$netbird_ip"
+REMOTE
+}
+
+verify_bastion_mailu_path() {
+  local bastion_ip="$1"
+  local ssh_key_file="$2"
+  local mailu_front_address="$3"
+  local mailu_front_port="$4"
+  local relay_host="$5"
+
+  log "Verifying bastion NetBird route to Mailu front"
+  ssh_bastion "$bastion_ip" "$ssh_key_file" 'bash -s' <<REMOTE
+set -euo pipefail
+docker exec netbird-client netbird status --check ready >/dev/null
+ip route get ${mailu_front_address} >/dev/null
+timeout 5 bash -c '</dev/tcp/${mailu_front_address}/${mailu_front_port}'
+if ! ip -o -4 addr show | awk '{print \$4}' | grep -Eq '^${relay_host}/'; then
+  echo "Relay host ${relay_host} is not configured on the bastion host" >&2
+  exit 1
+fi
+REMOTE
+}
+
+verify_mailu_relay_egress_path() {
+  local relay_host="$1"
+  local relay_port="$2"
+  local egress_pod
+
+  log "Verifying Mailu relay egress path to bastion"
+  kubectl -n netbird wait \
+    --for=condition=Available \
+    deployment/mailu-relay-egress \
+    --timeout=10m
+
+  egress_pod="$(
+    kubectl -n netbird get pods \
+      -l app.kubernetes.io/name=mailu-relay-egress \
+      -o jsonpath='{.items[0].metadata.name}'
+  )"
+  [[ -n "$egress_pod" ]] || fail "Could not find Mailu relay egress pod"
+
+  kubectl -n netbird exec "$egress_pod" -c netbird -- netbird status --check ready >/dev/null
+  kubectl -n netbird exec "$egress_pod" -c probe -- nc -z -w 5 "$relay_host" "$relay_port"
+
+  kubectl -n mailu run mailu-relay-egress-check \
+    --rm \
+    -i \
+    --restart=Never \
+    --image=busybox:1.36 \
+    --command -- nc -z -w 5 mailu-relay-egress.netbird.svc.cluster.local 2525
+}
+
+export KUBECONFIG="$KUBECONFIG_FILE"
+require_cmd jq
+require_cmd kubectl
+require_cmd openssl
+require_cmd ssh
+
+cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
+cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
+cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
+cluster_scope_id="$(printf '%s' "$cluster_json" | jq -r '.cluster_instance_id // .instance_id // .id')"
+cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty')"
+
+[[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
+[[ -n "$cluster_scope_id" ]] || fail "Could not determine cluster scope ID from context"
+[[ -n "$cluster_dns_domain" ]] || fail "Could not determine cluster DNS domain; run choose-ingress-route first"
+
+public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
+[[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
+
+admin_localpart="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.admin_localpart // "admin"')"
+admin_localpart="$(normalize_localpart "$admin_localpart")"
+admin_password_input="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.admin_password // empty')"
+storage_size="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.storage_size // "100Gi"')"
+dmarc_policy="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.dmarc_policy // "quarantine"')"
+dmarc_rua_localpart="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.dmarc_rua_localpart // "dmarc"')"
+validate_storage_size "$storage_size"
+normalize_localpart "$dmarc_rua_localpart" >/dev/null
+case "$dmarc_policy" in
+  none|quarantine|reject) ;;
+  *) fail "dmarc_policy must be none, quarantine, or reject" ;;
+esac
+
+mail_domain="$public_zone_name"
+mail_hostname="mail.${public_zone_name}"
+admin_url="https://${mail_hostname}/admin"
+webmail_url="https://${mail_hostname}/webmail"
+
+netbird_bastion_secret="$(find_netbird_bastion_secret "$cluster_id")"
+[[ -n "$netbird_bastion_secret" && -f "$netbird_bastion_secret" ]] || fail "NetBird bastion secret not found; provision NetBird bastion first"
+
+bastion_ip="$(jq -r '.NETBIRD_IP // empty' "$netbird_bastion_secret")"
+mailu_relay_host="$(jq -r '.NETBIRD_RELAY_HOST // .NETBIRD_PRIVATE_IP // empty' "$netbird_bastion_secret")"
+[[ -n "$bastion_ip" ]] || fail "NetBird bastion secret is missing NETBIRD_IP"
+
+ssh_key_file="$(write_bastion_ssh_key "$netbird_bastion_secret" "$cluster_id")"
+trap '[[ "$ssh_key_file" == /tmp/mailu-bastion-key-* ]] && rm -f "$ssh_key_file" || true' EXIT
+
+if [[ -z "$mailu_relay_host" ]]; then
+  log "Discovering bastion NetBird overlay IP for Mailu relay"
+  mailu_relay_host="$(discover_bastion_netbird_ip "$bastion_ip" "$ssh_key_file")" || fail "Could not discover existing bastion NetBird peer IP; run/repair configure-netbird-ingress first"
+fi
+[[ "$mailu_relay_host" != "$bastion_ip" ]] || fail "Refusing to use public bastion IP as Mailu relay host; expected NetBird/private address"
+[[ -n "$(openbao_existing_value netbird-mailu-relay-egress NB_SETUP_KEY)" ]] || fail "NetBird Mailu relay egress setup key not found; rerun configure-netbird-ingress before installing Mailu"
+
+secrets_dir="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}/secrets/global"
+mkdir -p "$secrets_dir"
+runtime_secret_file="${secrets_dir}/mailu-runtime-${cluster_id}.json"
+relay_secret_file="${secrets_dir}/mailu-relay-${cluster_id}.json"
+dns_secret_file="${secrets_dir}/mailu-dns-${cluster_id}.json"
+trap 'rm -f "$runtime_secret_file" "$relay_secret_file" "$dns_secret_file"; [[ "$ssh_key_file" == /tmp/mailu-bastion-key-* ]] && rm -f "$ssh_key_file" || true' EXIT
+
+secret_key="$(openbao_existing_value mailu-runtime secret-key)"
+api_token="$(openbao_existing_value mailu-runtime api-token)"
+admin_password="$(openbao_existing_value mailu-runtime initial-admin-password)"
+relay_username="$(openbao_existing_value mailu-relay relay-username)"
+relay_password="$(openbao_existing_value mailu-relay relay-password)"
+
+[[ -n "$secret_key" ]] || secret_key="$(random_hex 24)"
+[[ -n "$api_token" ]] || api_token="$(random_hex 24)"
+if [[ -n "$admin_password_input" ]]; then
+  admin_password="$admin_password_input"
+fi
+[[ -n "$admin_password" ]] || admin_password="$(random_hex 18)"
+[[ -n "$relay_username" ]] || relay_username="mailu-${cluster_id}"
+[[ -n "$relay_password" ]] || relay_password="$(random_hex 24)"
+
+jq -n \
+  --arg secret_key "$secret_key" \
+  --arg api_token "$api_token" \
+  --arg initial_admin_password "$admin_password" \
+  '{
+    "secret-key": $secret_key,
+    "api-token": $api_token,
+    "initial-admin-password": $initial_admin_password
+  }' >"$runtime_secret_file"
+chmod 600 "$runtime_secret_file"
+
+bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+  --secret-name "mailu-runtime" \
+  --json-file "$runtime_secret_file" \
+  --required-keys "secret-key,api-token,initial-admin-password"
+
+jq -n \
+  --arg relay_username "$relay_username" \
+  --arg relay_password "$relay_password" \
+  '{
+    "relay-username": $relay_username,
+    "relay-password": $relay_password
+  }' >"$relay_secret_file"
+chmod 600 "$relay_secret_file"
+
+bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+  --secret-name "mailu-relay" \
+  --json-file "$relay_secret_file" \
+  --required-keys "relay-username,relay-password"
+
+log "Annotating Argo CD cluster secret with Mailu render values"
+kubectl -n argocd annotate secret in-cluster-local \
+  "twinbox.io/mailu-relay-host=${mailu_relay_host}" \
+  "twinbox.io/mailu-admin-localpart=${admin_localpart}" \
+  "twinbox.io/mailu-storage-size=${storage_size}" \
+  "twinbox.io/mailu-dmarc-rua-localpart=${dmarc_rua_localpart}" \
+  --overwrite
+
+log "Applying Mailu Argo CD application"
+bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+  --manifest "$WORKSPACE_ROOT/gitops/apps/mailu.yaml" \
+  --application "mailu" \
+  --destination-namespace "mailu"
+
+wait_for_resource mailu externalsecret mailu-runtime Ready "Mailu runtime ExternalSecret"
+wait_for_resource mailu externalsecret mailu-relay Ready "Mailu relay ExternalSecret"
+wait_for_resource netbird externalsecret mailu-relay-egress Ready "Mailu relay egress ExternalSecret"
+wait_for_selector mailu deployment "app.kubernetes.io/instance=mailu" Available "Mailu deployments"
+wait_for_resource netbird deployment mailu-relay-egress Available "Mailu relay egress deployment"
+wait_for_statefulsets_ready mailu "app.kubernetes.io/instance=mailu" "Mailu statefulsets"
+
+mailu_front_address="$(kubectl -n mailu get svc mailu-front -o jsonpath='{.spec.clusterIP}')"
+[[ -n "$mailu_front_address" && "$mailu_front_address" != "None" ]] || fail "Could not determine mailu-front ClusterIP"
+
+log "Configuring bastion Postfix edge"
+bash "$WORKSPACE_ROOT/scripts/manager/configure-bastion-mailu-postfix.sh" \
+  --bastion-ip "$bastion_ip" \
+  --ssh-key-file "$ssh_key_file" \
+  --mail-domain "$mail_domain" \
+  --mail-hostname "$mail_hostname" \
+  --mailu-front-address "$mailu_front_address" \
+  --mailu-front-port 25 \
+  --relay-listen-address "$mailu_relay_host" \
+  --relay-listen-port 2525 \
+  --relay-username "$relay_username" \
+  --relay-secret-file "$relay_secret_file" \
+  --cluster-id "$cluster_id"
+
+verify_bastion_mailu_path "$bastion_ip" "$ssh_key_file" "$mailu_front_address" 25 "$mailu_relay_host"
+verify_mailu_relay_egress_path "$mailu_relay_host" 2525
+
+admin_pod="$(resolve_admin_pod)"
+[[ -n "$admin_pod" ]] || fail "Could not find a running Mailu admin pod"
+
+log "Ensuring Mailu domain and DKIM"
+dns_export_json="$(kubectl -n mailu exec "$admin_pod" -- flask mailu config-export --dns --json domain 2>/dev/null || true)"
+dkim_record_json="$(printf '%s' "$dns_export_json" | extract_dkim_from_export)"
+if [[ -z "$dkim_record_json" || "$dkim_record_json" == "null" ]]; then
+  kubectl -n mailu exec "$admin_pod" -- flask mailu domain "$mail_domain" >/dev/null 2>&1 || true
+  cat <<EOF | kubectl -n mailu exec -i "$admin_pod" -- flask mailu config-import --update - >/dev/null
+domain:
+  - name: ${mail_domain}
+    dkim_key: -generate-
+EOF
+  dns_export_json="$(kubectl -n mailu exec "$admin_pod" -- flask mailu config-export --dns --json domain)"
+  dkim_record_json="$(printf '%s' "$dns_export_json" | extract_dkim_from_export)"
+fi
+
+[[ -n "$dkim_record_json" && "$dkim_record_json" != "null" ]] || fail "Mailu did not export a structured DKIM DNS record"
+dkim_txt_name="$(jq -r '.name // empty' <<<"$dkim_record_json")"
+dkim_value="$(jq -r '.value // empty' <<<"$dkim_record_json")"
+[[ -n "$dkim_txt_name" && -n "$dkim_value" ]] || fail "Mailu DKIM DNS export is missing name or value"
+if [[ "$dkim_txt_name" != *"$mail_domain" ]]; then
+  dkim_txt_name="${dkim_txt_name}.${mail_domain}"
+fi
+dkim_selector="${dkim_txt_name%%._domainkey.*}"
+
+log "Applying Mailu DNS records"
+apply_mail_dns_records "$mail_domain" "$mail_hostname" "$bastion_ip" "$dkim_txt_name" "$dkim_value" "$dmarc_policy" "$dmarc_rua_localpart"
+
+dmarc_txt_value="v=DMARC1; p=${dmarc_policy}; rua=mailto:${dmarc_rua_localpart}@${mail_domain}; adkim=s; aspf=s"
+jq -n \
+  --arg mail_domain "$mail_domain" \
+  --arg mail_hostname "$mail_hostname" \
+  --arg dkim_selector "$dkim_selector" \
+  --arg dkim_txt_name "$dkim_txt_name" \
+  --arg dkim_txt_value "$dkim_value" \
+  --arg spf_txt_name "$mail_domain" \
+  --arg spf_txt_value "v=spf1 mx -all" \
+  --arg dmarc_txt_name "_dmarc.${mail_domain}" \
+  --arg dmarc_txt_value "$dmarc_txt_value" \
+  --arg mx_name "$mail_domain" \
+  --arg mx_value "10 ${mail_hostname}." \
+  '{
+    mail_domain: $mail_domain,
+    mail_hostname: $mail_hostname,
+    dkim_selector: $dkim_selector,
+    dkim_txt_name: $dkim_txt_name,
+    dkim_txt_value: $dkim_txt_value,
+    spf_txt_name: $spf_txt_name,
+    spf_txt_value: $spf_txt_value,
+    dmarc_txt_name: $dmarc_txt_name,
+    dmarc_txt_value: $dmarc_txt_value,
+    mx_name: $mx_name,
+    mx_value: $mx_value
+  }' >"$dns_secret_file"
+chmod 600 "$dns_secret_file"
+
+bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+  --secret-name "mailu-dns" \
+  --json-file "$dns_secret_file" \
+  --required-keys "mail_domain,mail_hostname,dkim_selector,dkim_txt_name,dkim_txt_value,spf_txt_name,spf_txt_value,dmarc_txt_name,dmarc_txt_value,mx_name,mx_value"
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "mailu" \
+  --service-domain "$mail_hostname" \
+  --service-path /
+
+ptr_required="${bastion_ip} -> ${mail_hostname}"
+log "Mailu installed. Create/verify PTR: ${ptr_required}"
+log "Run an external deliverability/open-relay check before using this for production mail."
+
+if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
+  jq -n \
+    --arg mail_domain "$mail_domain" \
+    --arg mail_hostname "$mail_hostname" \
+    --arg admin_url "$admin_url" \
+    --arg webmail_url "$webmail_url" \
+    --arg ptr_required "$ptr_required" \
+    --arg bastion_postfix_status "configured" \
+    --arg mailu_chart_version "2.7.1" \
+    --arg mailu_app_version "2024.06.51" \
+    --arg mailu_relay_host "$mailu_relay_host" \
+    --argjson dns_records_created '["A","MX","SPF","DMARC","DKIM"]' \
+    '{
+      mail_domain: $mail_domain,
+      mail_hostname: $mail_hostname,
+      admin_url: $admin_url,
+      webmail_url: $webmail_url,
+      dns_records_created: $dns_records_created,
+      ptr_required: $ptr_required,
+      bastion_postfix_status: $bastion_postfix_status,
+      mailu_chart_version: $mailu_chart_version,
+      mailu_app_version: $mailu_app_version,
+      mailu_relay_host: $mailu_relay_host
+    }' >"$STEP_RESULT_FILE"
+fi

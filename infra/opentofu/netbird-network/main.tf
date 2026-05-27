@@ -37,6 +37,10 @@ resource "netbird_group" "bastion_exit_routers" {
   name = "${local.name_prefix}-bastion-exit-routers"
 }
 
+resource "netbird_group" "mailu_relay_egress" {
+  name = "${local.name_prefix}-mailu-relay-egress"
+}
+
 resource "netbird_group" "exit_node_users" {
   name = "${local.name_prefix}-exit-node-users"
 }
@@ -92,6 +96,17 @@ resource "netbird_setup_key" "bastion_exit_router" {
   usage_limit            = 1
   allow_extra_dns_labels = true
   auto_groups            = [netbird_group.bastion_exit_routers.id]
+  ephemeral              = false
+  revoked                = false
+}
+
+resource "netbird_setup_key" "mailu_relay_egress" {
+  name                   = "${local.name_prefix}-mailu-relay-egress"
+  type                   = "reusable"
+  expiry_seconds         = 0
+  usage_limit            = 0
+  allow_extra_dns_labels = true
+  auto_groups            = [netbird_group.mailu_relay_egress.id]
   ephemeral              = false
   revoked                = false
 }
@@ -339,5 +354,22 @@ resource "netbird_policy" "proxy_to_traefik_https" {
       id   = netbird_network_resource.traefik.id
       type = local.traefik_resource_type
     }
+  }
+}
+
+resource "netbird_policy" "mailu_relay_egress_to_bastion_relay" {
+  name        = "${local.name_prefix}-mailu-relay-egress-to-bastion-relay"
+  description = "Allow Mailu relay egress peers to reach the bastion Postfix relay endpoint"
+  enabled     = true
+
+  rule {
+    name          = "smtp-relay"
+    action        = "accept"
+    enabled       = true
+    bidirectional = true
+    protocol      = "tcp"
+    sources       = [netbird_group.mailu_relay_egress.id]
+    destinations  = [netbird_group.proxy.id]
+    ports         = ["2525"]
   }
 }

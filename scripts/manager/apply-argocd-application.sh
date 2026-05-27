@@ -12,6 +12,7 @@ optional_app_names=(
   hedgedoc
   immich
   jitsi
+  mailu
   n8n
   nextcloud
   opencloud

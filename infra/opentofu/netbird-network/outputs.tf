@@ -29,6 +29,11 @@ output "bastion_exit_routers_group_id" {
   description = "NetBird group ID for Hetzner internet exit routing peers"
 }
 
+output "mailu_relay_egress_group_id" {
+  value       = netbird_group.mailu_relay_egress.id
+  description = "NetBird group ID for Mailu relay egress peers"
+}
+
 output "exit_node_users_group_id" {
   value       = netbird_group.exit_node_users.id
   description = "NetBird group ID for peers allowed to opt into Twinbox routes"
@@ -60,5 +65,10 @@ output "proxy_setup_key" {
 
 output "bastion_exit_router_setup_key" {
   value     = netbird_setup_key.bastion_exit_router.key
+  sensitive = true
+}
+
+output "mailu_relay_egress_setup_key" {
+  value     = netbird_setup_key.mailu_relay_egress.key
   sensitive = true
 }
