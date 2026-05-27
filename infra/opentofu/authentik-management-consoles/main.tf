@@ -37,11 +37,11 @@ locals {
       external_host = var.proxmox_external_host
       launch_url    = var.proxmox_external_host
     }
-    twinboxwizard = {
-      name          = "Twinbox Wizard"
-      slug          = "twinboxwizard"
-      external_host = var.twinboxwizard_external_host
-      launch_url    = var.twinboxwizard_external_host
+    webwizard = {
+      name          = "Web Wizard"
+      slug          = "webwizard"
+      external_host = var.webwizard_external_host
+      launch_url    = var.webwizard_external_host
     }
     seaweedfs = {
       name          = "SeaweedFS"

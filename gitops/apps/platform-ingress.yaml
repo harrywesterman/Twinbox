@@ -145,11 +145,11 @@ spec:
                   value: Host(`longhorn.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)
             - target:
                 kind: IngressRoute
-                name: twinboxwizard
+                name: webwizard
               patch: |-
                 - op: replace
                   path: /spec/routes/0/match
-                  value: Host(`twinboxwizard.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+                  value: Host(`webwizard.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
                 name: seaweedfs

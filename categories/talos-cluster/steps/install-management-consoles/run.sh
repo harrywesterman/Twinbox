@@ -202,7 +202,7 @@ for attempt in $(seq 1 120); do
   if kubectl -n traefik get ingressroute/traefik-dashboard >/dev/null 2>&1 && \
      kubectl -n longhorn-system get ingressroute/longhorn >/dev/null 2>&1 && \
      kubectl -n longhorn-system get ingressroute/proxmox >/dev/null 2>&1 && \
-     kubectl -n longhorn-system get ingressroute/twinboxwizard >/dev/null 2>&1 && \
+     kubectl -n longhorn-system get ingressroute/webwizard >/dev/null 2>&1 && \
      kubectl -n longhorn-system get ingressroute/seaweedfs >/dev/null 2>&1 && \
      kubectl -n longhorn-system get ingressroute/seaweedfs-admin >/dev/null 2>&1; then
     break
@@ -554,11 +554,11 @@ management_apps_json="$(
         launch_url: "https://proxmox.\($public_zone_name)"
       },
       {
-        key: "twinboxwizard",
-        name: "Twinbox Wizard",
-        slug: "twinboxwizard",
-        external_host: "https://twinboxwizard.\($public_zone_name)",
-        launch_url: "https://twinboxwizard.\($public_zone_name)"
+        key: "webwizard",
+        name: "Web Wizard",
+        slug: "webwizard",
+        external_host: "https://webwizard.\($public_zone_name)",
+        launch_url: "https://webwizard.\($public_zone_name)"
       },
       {
         key: "seaweedfs",
@@ -577,7 +577,7 @@ management_apps_json="$(
     ]'
 )"
 
-log_step "Provisioning Authentik proxy applications for Traefik, Longhorn, Hubble, Proxmox, Twinbox Wizard, and SeaweedFS"
+log_step "Provisioning Authentik proxy applications for Traefik, Longhorn, Hubble, Proxmox, Web Wizard, and SeaweedFS"
 
 provider_ids_json='{}'
 application_ids_json='{}'
@@ -642,7 +642,7 @@ traefik_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.traefik_dashbo
 longhorn_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.longhorn')"
 hubble_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.hubble')"
 proxmox_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.proxmox')"
-twinboxwizard_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.twinboxwizard')"
+webwizard_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.webwizard')"
 seaweedfs_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.seaweedfs')"
 seaweedfs_admin_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.seaweedfs_admin')"
 
@@ -650,7 +650,7 @@ seaweedfs_admin_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.seawee
 [[ "$longhorn_provider_id" != "null" && -n "$longhorn_provider_id" ]] || fail "Could not determine Longhorn provider ID"
 [[ "$hubble_provider_id" != "null" && -n "$hubble_provider_id" ]] || fail "Could not determine Hubble provider ID"
 [[ "$proxmox_provider_id" != "null" && -n "$proxmox_provider_id" ]] || fail "Could not determine Proxmox provider ID"
-[[ "$twinboxwizard_provider_id" != "null" && -n "$twinboxwizard_provider_id" ]] || fail "Could not determine Twinbox Wizard provider ID"
+[[ "$webwizard_provider_id" != "null" && -n "$webwizard_provider_id" ]] || fail "Could not determine Web Wizard provider ID"
 [[ "$seaweedfs_provider_id" != "null" && -n "$seaweedfs_provider_id" ]] || fail "Could not determine SeaweedFS provider ID"
 [[ "$seaweedfs_admin_provider_id" != "null" && -n "$seaweedfs_admin_provider_id" ]] || fail "Could not determine SeaweedFS admin provider ID"
 
@@ -663,8 +663,8 @@ current_providers="$(printf '%s' "$outpost_json" | jq -c '.results[] | select(.p
 log "Embedded Authentik outpost currently has $(jq -r 'length' <<<"$current_providers") proxy provider(s)"
 updated_providers="$(
   printf '%s\n' "$current_providers" \
-    | jq --arg traefik "$traefik_provider_id" --arg longhorn "$longhorn_provider_id" --arg hubble "$hubble_provider_id" --arg proxmox "$proxmox_provider_id" --arg twinboxwizard "$twinboxwizard_provider_id" --arg seaweedfs "$seaweedfs_provider_id" --arg seaweedfs_admin "$seaweedfs_admin_provider_id" '
-        . + [$traefik, $longhorn, $hubble, $proxmox, $twinboxwizard]
+    | jq --arg traefik "$traefik_provider_id" --arg longhorn "$longhorn_provider_id" --arg hubble "$hubble_provider_id" --arg proxmox "$proxmox_provider_id" --arg webwizard "$webwizard_provider_id" --arg seaweedfs "$seaweedfs_provider_id" --arg seaweedfs_admin "$seaweedfs_admin_provider_id" '
+        . + [$traefik, $longhorn, $hubble, $proxmox, $webwizard]
         + [$seaweedfs, $seaweedfs_admin]
         | map(tostring)
         | unique
@@ -720,7 +720,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     --arg longhorn_route "longhorn" \
     --arg hubble_route "hubble" \
     --arg proxmox_route "proxmox" \
-    --arg twinboxwizard_route "twinboxwizard" \
+    --arg webwizard_route "webwizard" \
     --arg seaweedfs_route "seaweedfs" \
     --arg seaweedfs_admin_route "seaweedfs-admin" \
     '{
@@ -728,7 +728,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
       longhorn_route: $longhorn_route,
       hubble_route: $hubble_route,
       proxmox_route: $proxmox_route,
-      twinboxwizard_route: $twinboxwizard_route,
+      webwizard_route: $webwizard_route,
       seaweedfs_route: $seaweedfs_route,
       seaweedfs_admin_route: $seaweedfs_admin_route
     }' >"$STEP_RESULT_FILE"
@@ -769,6 +769,6 @@ bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
   --service-path /
 
 bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
-  --service-name "twinboxwizard" \
-  --service-domain "twinboxwizard.$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")" \
+  --service-name "webwizard" \
+  --service-domain "webwizard.$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")" \
   --service-path /

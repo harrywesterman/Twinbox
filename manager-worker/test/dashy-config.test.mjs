@@ -21,10 +21,10 @@ function loadStep(stepId) {
 test("real step manifests normalize Dashy metadata", () => {
   const step = loadStep("install-management-consoles");
 
-  assert.equal(step.dashy.items.length, 3);
+  assert.equal(step.dashy.items.length, 4);
   assert.deepEqual(
     step.dashy.items.map((item) => item.title),
-    ["Proxmox", "SeaweedFS", "SeaweedFS Admin"]
+    ["Proxmox", "SeaweedFS", "SeaweedFS Admin", "Web Wizard"]
   );
 });
 
@@ -158,6 +158,7 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
     "Proxmox",
     "SeaweedFS",
     "SeaweedFS Admin",
+    "Web Wizard",
     "Twinbox Portal",
     "Velero UI",
     "pgAdmin 4",
@@ -235,7 +236,7 @@ test("buildDashyConfig uses local icon filenames from manager-web assets in work
     assert.equal(iconByTitle.get("Argo CD"), "install-argocd.svg");
     assert.equal(iconByTitle.get("Cloudflare"), "configure-cloudflare-dns.svg");
     assert.equal(iconByTitle.get("GitHub"), "github.svg");
-    assert(![...iconByTitle.values()].some((icon) => icon.includes("twinboxwizard.")));
+    assert(![...iconByTitle.values()].some((icon) => icon.includes("webwizard.")));
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

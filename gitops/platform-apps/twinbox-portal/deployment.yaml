@@ -39,7 +39,7 @@ spec:
             - name: PORTAL_DATA_DIR
               value: /data
             - name: PORTAL_MANAGER_BASE_URL
-              value: http://twinboxwizard.longhorn-system.svc.cluster.local:8080
+              value: http://webwizard.longhorn-system.svc.cluster.local:8080
           envFrom:
             - secretRef:
                 name: portal-bootstrap

@@ -1,18 +1,18 @@
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: twinboxwizard
+  name: webwizard
   namespace: longhorn-system
 spec:
   entryPoints:
     - websecure
   routes:
     - kind: Rule
-      match: Host(`twinboxwizard.__ZONE_NAME__`)
+      match: Host(`webwizard.__ZONE_NAME__`)
       middlewares:
         - name: authentik-forwardauth
       services:
         - kind: Service
-          name: twinboxwizard
+          name: webwizard
           port: 3000
   tls: {}

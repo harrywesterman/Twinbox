@@ -85,7 +85,7 @@ bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
 - `proxmox` (proxmox.example.com)
 - `seaweedfs` (app.seaweedfs.example.com)
 - `seaweedfs-admin` (admin.seaweedfs.example.com)
-- `twinboxwizard` (twinboxwizard.example.com)
+- `webwizard` (webwizard.example.com)
 
 ### 4. `configure-netbird-ingress/run.sh`
 

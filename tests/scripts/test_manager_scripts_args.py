@@ -4223,13 +4223,13 @@ def test_management_console_endpoints_target_the_right_hosts():
     seaweedfs_text = (
         REPO_ROOT / "gitops" / "platform" / "management-consoles" / "seaweedfs-endpoints.yaml"
     ).read_text(encoding="utf-8")
-    twinboxwizard_text = (
-        REPO_ROOT / "gitops" / "platform" / "management-consoles" / "twinboxwizard-endpoints.yaml"
+    webwizard_text = (
+        REPO_ROOT / "gitops" / "platform" / "management-consoles" / "webwizard-endpoints.yaml"
     ).read_text(encoding="utf-8")
 
-    assert "ip: 192.168.2.105" in proxmox_text
+    assert "ip: 192.168.2.70" in proxmox_text
     assert "ip: 192.168.2.70" in seaweedfs_text
-    assert "ip: 192.168.2.70" in twinboxwizard_text
+    assert "ip: 192.168.2.70" in webwizard_text
 
 
 def test_seaweedfs_admin_routes_to_the_admin_web_port():
