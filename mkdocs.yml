@@ -68,6 +68,7 @@ nav:
       - Cloudflare: cloudflare.md
       - Authentik: authentik.md
       - NetBird: netbird.md
+      - Mailu: mailu.md
       - Wiredoor bastion: wiredoor-bastion.md
       - CrowdSec: crowdsec.md
       - Ntfy: ntfy.md
