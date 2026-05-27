@@ -56,6 +56,12 @@ export const STEP_ICON_MANIFEST = [
     officialSourceUrl: "https://github.com/cloudnative-pg/cloudnative-pg",
   }),
   iconEntry({
+    stepId: "install-coder",
+    isAppOrPlatform: true,
+    officialSourceType: "project-repository",
+    officialSourceUrl: "https://github.com/coder/coder",
+  }),
+  iconEntry({
     stepId: "install-prometheus",
     isAppOrPlatform: true,
     officialSourceType: "project-repository",
@@ -133,6 +139,12 @@ export const STEP_ICON_MANIFEST = [
     officialSourceType: "twinbox-repository",
     officialSourceUrl:
       "https://github.com/harrywesterman/Twinbox/tree/main/categories/talos-cluster/steps/install-management-consoles",
+  }),
+  iconEntry({
+    stepId: "install-matrix",
+    isAppOrPlatform: true,
+    officialSourceType: "project-repository",
+    officialSourceUrl: "https://github.com/element-hq/element-meta",
   }),
   iconEntry({
     stepId: "install-velero-backup",
