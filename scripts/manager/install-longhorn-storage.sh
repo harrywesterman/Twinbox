@@ -274,6 +274,9 @@ wait_for_storage_class
 make_storage_class_default
 apply_longhorn_recurring_jobs
 
+log "Applying management VM and Proxmox endpoints for Longhorn"
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-management-endpoints.sh"
+
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \
     --arg cluster_id "$cluster_id" \

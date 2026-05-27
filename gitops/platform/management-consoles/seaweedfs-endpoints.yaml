@@ -5,7 +5,7 @@ metadata:
   namespace: longhorn-system
 subsets:
   - addresses:
-      - ip: 192.168.2.70
+      - ip: __MGMT_HOST_IP__
     ports:
       - name: s3
         port: 8333

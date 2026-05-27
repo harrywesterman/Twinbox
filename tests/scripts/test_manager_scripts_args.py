@@ -4216,7 +4216,7 @@ def test_argocd_config_does_not_exclude_managed_endpoints():
     assert "- EndpointSlice" in text
 
 
-def test_management_console_endpoints_target_the_right_hosts():
+def test_management_console_endpoints_use_placeholders():
     proxmox_text = (
         REPO_ROOT / "gitops" / "platform" / "management-consoles" / "proxmox-endpoints.yaml"
     ).read_text(encoding="utf-8")
@@ -4227,9 +4227,9 @@ def test_management_console_endpoints_target_the_right_hosts():
         REPO_ROOT / "gitops" / "platform" / "management-consoles" / "webwizard-endpoints.yaml"
     ).read_text(encoding="utf-8")
 
-    assert "ip: 192.168.2.70" in proxmox_text
-    assert "ip: 192.168.2.70" in seaweedfs_text
-    assert "ip: 192.168.2.70" in webwizard_text
+    assert "ip: __PROXMOX_HOST_IP__" in proxmox_text
+    assert "ip: __MGMT_HOST_IP__" in seaweedfs_text
+    assert "ip: __MGMT_HOST_IP__" in webwizard_text
 
 
 def test_seaweedfs_admin_routes_to_the_admin_web_port():
