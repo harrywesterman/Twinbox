@@ -14,6 +14,13 @@ side_help: >
   Twinbox automatically sets up the first NetBird admin account and generates
   a Personal Access Token for the next step.
 ingress_route: netbird
+dashy:
+  items:
+    - section: Platform
+      title: NetBird
+      description: Management dashboard and VPN mesh
+      icon: provision-netbird-bastion
+      url_template: https://netbird.__ZONE_NAME__
 inputs:
   - id: hcloud_token
     label: Hetzner API Token

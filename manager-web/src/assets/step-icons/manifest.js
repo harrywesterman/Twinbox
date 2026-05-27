@@ -251,6 +251,12 @@ export const STEP_ICON_MANIFEST = [
     officialSourceType: "project-repository",
     officialSourceUrl: "https://github.com/AdguardTeam/AdGuardHome",
   }),
+  iconEntry({
+    stepId: "provision-netbird-bastion",
+    isAppOrPlatform: true,
+    officialSourceType: "project-repository",
+    officialSourceUrl: "https://github.com/netbirdio/netbird",
+  }),
 ];
 
 for (const entry of STEP_ICON_MANIFEST) {
