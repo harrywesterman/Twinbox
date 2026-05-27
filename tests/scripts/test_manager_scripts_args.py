@@ -41,7 +41,6 @@ STIRLING_PDF_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "apps" / "steps" / "install-stirling-pdf" / "run.sh"
 )
 PIXELFED_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-pixelfed" / "run.sh"
-PUSH_CODER_TEMPLATE_SCRIPT = REPO_ROOT / "scripts" / "manager" / "push-coder-template.sh"
 TWINBOX_PORTAL_APP = REPO_ROOT / "gitops" / "apps" / "twinbox-portal.yaml"
 OUTLINE_APP = REPO_ROOT / "gitops" / "apps" / "outline.yaml"
 OUTLINE_OPTIONAL_APP = REPO_ROOT / "gitops" / "optional-apps" / "outline.yaml"
@@ -50,8 +49,6 @@ N8N_APP = REPO_ROOT / "gitops" / "apps" / "n8n.yaml"
 HEDGEDOC_APP = REPO_ROOT / "gitops" / "apps" / "hedgedoc.yaml"
 PAPERLESS_APP = REPO_ROOT / "gitops" / "apps" / "paperless.yaml"
 PIXELFED_APP = REPO_ROOT / "gitops" / "apps" / "pixelfed.yaml"
-CODER_APP = REPO_ROOT / "gitops" / "apps" / "coder.yaml"
-CODER_VALUES = REPO_ROOT / "gitops" / "values" / "coder.yaml"
 OUTLINE_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "outline" / "kustomization.yaml"
 OPENWEBUI_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "openwebui" / "kustomization.yaml"
 N8N_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "n8n" / "kustomization.yaml"
@@ -1135,7 +1132,6 @@ def test_manager_worker_image_includes_talos_image_factory_helper():
     assert "PINNED_TALOS_VERSION" in text
     assert "talosctl-linux-amd64" in text
     assert "COPY lib ./lib" in text
-    assert "COPY coder ./coder" in text
     assert "manager-api/src/lib/catalog-definitions.mjs" not in text
     assert "../../lib/catalog-definitions.mjs" in refresh_dashy_text
     assert "../../lib/catalog-definitions.mjs" in refresh_portal_text
@@ -1251,45 +1247,6 @@ def test_apply_argocd_application_helper_applies_and_waits_for_health():
     assert "--no-wait" in text
     assert ".resource_profile // empty" in text
     assert "(.worker_count // 0)" in text
-
-
-def test_coder_app_injects_zone_specific_helm_values():
-    app = yaml.safe_load(CODER_APP.read_text(encoding="utf-8"))
-    values = yaml.safe_load(CODER_VALUES.read_text(encoding="utf-8"))
-
-    helm = app["spec"]["sources"][0]["helm"]
-    parameters = {item["name"]: item["value"] for item in helm["parameters"]}
-    env = values["coder"]["env"]
-
-    assert helm["valueFiles"] == ["$values/gitops/values/coder.yaml"]
-    assert env[4]["name"] == "CODER_ACCESS_URL"
-    assert env[5]["name"] == "CODER_OIDC_ISSUER_URL"
-    assert env[4]["value"] == "https://coder.__ZONE_NAME__"
-    assert env[5]["value"] == "https://authentik.__ZONE_NAME__/application/o/coder/"
-    assert parameters["coder.env[4].value"] == "https://coder.__ZONE_NAME__"
-    assert parameters["coder.env[5].value"] == (
-        "https://authentik.__ZONE_NAME__/application/o/coder/"
-    )
-    assert values["coder"]["service"]["type"] == "ClusterIP"
-    assert values["coder"]["serviceAccount"]["extraRules"] == [
-        {
-            "apiGroups": ["metrics.k8s.io"],
-            "resources": ["pods"],
-            "verbs": ["get", "list", "watch"],
-        }
-    ]
-
-
-def test_push_coder_template_downloads_current_linux_cli_asset():
-    text = PUSH_CODER_TEMPLATE_SCRIPT.read_text(encoding="utf-8")
-
-    assert 'source "$WORKSPACE_ROOT/config/pinned-defaults.sh"' in text
-    assert '[[ -d "$TEMPLATE_DIR" ]]' in text
-    assert "PINNED_CODER_CHART_VERSION" in text
-    assert "Replacing Coder CLI" in text
-    assert "releases/download/v${coder_release_version}" in text
-    assert "coder_${coder_release_version}_linux_amd64.tar.gz" in text
-    assert "coder-linux-amd64.tar.gz" not in text
 
 
 def test_stirling_pdf_waits_for_real_kubernetes_readiness():
