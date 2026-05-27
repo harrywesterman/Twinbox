@@ -54,13 +54,13 @@ else
   fail "kubectl is required to install AdGuard Home"
 fi
 
-# --- Step 2: Wait for DaemonSet to be ready ---
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for AdGuard DaemonSet to be ready..."
+# --- Step 2: Wait for Deployment to be ready ---
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for AdGuard Deployment to be ready..."
 for i in $(seq 1 60); do
-  ready="$(kubectl get daemonset adguard -n adguard -o jsonpath='{.status.numberReady}' 2>/dev/null || echo "0")"
-  desired="$(kubectl get daemonset adguard -n adguard -o jsonpath='{.status.desiredNumberScheduled}' 2>/dev/null || echo "0")"
+  ready="$(kubectl get deployment adguard -n adguard -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")"
+  desired="$(kubectl get deployment adguard -n adguard -o jsonpath='{.status.replicas}' 2>/dev/null || echo "0")"
   if [[ "${ready:-0}" -gt 0 && "$ready" -eq "$desired" && "$desired" -gt 0 ]]; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] AdGuard DaemonSet is ready (${ready}/${desired} pods)"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] AdGuard Deployment is ready (${ready}/${desired} pods)"
     break
   fi
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] AdGuard not ready yet (attempt ${i}/60, ${ready:-0}/${desired:-0} pods)"

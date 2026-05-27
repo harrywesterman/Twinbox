@@ -13,37 +13,42 @@ def test_namespace_exists():
     assert ns["metadata"]["name"] == "adguard"
 
 
-def test_daemonset_exists():
-    ds = yaml.safe_load((GITOPS_DIR / "daemonset.yaml").read_text())
-    assert ds["kind"] == "DaemonSet"
-    assert ds["metadata"]["name"] == "adguard"
+def test_deployment_exists():
+    deploy = yaml.safe_load((GITOPS_DIR / "deployment.yaml").read_text())
+    assert deploy["kind"] == "Deployment"
+    assert deploy["metadata"]["name"] == "adguard"
 
 
-def test_daemonset_no_host_network():
-    ds = yaml.safe_load((GITOPS_DIR / "daemonset.yaml").read_text())
-    spec = ds["spec"]["template"]["spec"]
+def test_deployment_single_replica():
+    deploy = yaml.safe_load((GITOPS_DIR / "deployment.yaml").read_text())
+    assert deploy["spec"]["replicas"] == 1
+
+
+def test_deployment_no_host_network():
+    deploy = yaml.safe_load((GITOPS_DIR / "deployment.yaml").read_text())
+    spec = deploy["spec"]["template"]["spec"]
     assert spec.get("hostNetwork", False) is False
 
 
-def test_daemonset_uses_pinned_image():
-    ds = yaml.safe_load((GITOPS_DIR / "daemonset.yaml").read_text())
-    image = ds["spec"]["template"]["spec"]["containers"][0]["image"]
+def test_deployment_uses_pinned_image():
+    deploy = yaml.safe_load((GITOPS_DIR / "deployment.yaml").read_text())
+    image = deploy["spec"]["template"]["spec"]["containers"][0]["image"]
     assert "adguard/adguardhome" in image
     assert ":latest" not in image
     assert ":" in image
 
 
-def test_daemonset_dns_ports():
-    ds = yaml.safe_load((GITOPS_DIR / "daemonset.yaml").read_text())
-    ports = ds["spec"]["template"]["spec"]["containers"][0]["ports"]
+def test_deployment_dns_ports():
+    deploy = yaml.safe_load((GITOPS_DIR / "deployment.yaml").read_text())
+    ports = deploy["spec"]["template"]["spec"]["containers"][0]["ports"]
     port_numbers = [p["containerPort"] for p in ports]
     assert 53 in port_numbers
 
 
-def test_daemonset_config_mount():
-    ds = yaml.safe_load((GITOPS_DIR / "daemonset.yaml").read_text())
-    spec = ds["spec"]["template"]["spec"]
-    mounts = ds["spec"]["template"]["spec"]["containers"][0]["volumeMounts"]
+def test_deployment_config_mount():
+    deploy = yaml.safe_load((GITOPS_DIR / "deployment.yaml").read_text())
+    spec = deploy["spec"]["template"]["spec"]
+    mounts = deploy["spec"]["template"]["spec"]["containers"][0]["volumeMounts"]
     config_mounts = [m for m in mounts if m["mountPath"] == "/opt/adguardhome/conf"]
     assert len(config_mounts) == 1
     assert config_mounts[0]["name"] == "config"
@@ -51,9 +56,9 @@ def test_daemonset_config_mount():
     assert config_volumes[0] == {"name": "config", "emptyDir": {}}
 
 
-def test_daemonset_seeds_config_into_writable_volume():
-    ds = yaml.safe_load((GITOPS_DIR / "daemonset.yaml").read_text())
-    spec = ds["spec"]["template"]["spec"]
+def test_deployment_seeds_config_into_writable_volume():
+    deploy = yaml.safe_load((GITOPS_DIR / "deployment.yaml").read_text())
+    spec = deploy["spec"]["template"]["spec"]
     init_container = spec["initContainers"][0]
     assert init_container["name"] == "seed-config"
     assert init_container["image"] == "busybox:1.36"
@@ -68,9 +73,9 @@ def test_daemonset_seeds_config_into_writable_volume():
     )
 
 
-def test_daemonset_resources():
-    ds = yaml.safe_load((GITOPS_DIR / "daemonset.yaml").read_text())
-    resources = ds["spec"]["template"]["spec"]["containers"][0].get("resources", {})
+def test_deployment_resources():
+    deploy = yaml.safe_load((GITOPS_DIR / "deployment.yaml").read_text())
+    resources = deploy["spec"]["template"]["spec"]["containers"][0].get("resources", {})
     assert "requests" in resources
     assert "limits" in resources
 
@@ -142,7 +147,7 @@ def test_kustomization_resources():
     expected = [
         "namespace.yaml",
         "configmap.yaml",
-        "daemonset.yaml",
+        "deployment.yaml",
         "service.yaml",
         "ingressroute.yaml",
     ]
