@@ -400,48 +400,6 @@ const QUESTION_STEP_DEFS = [
     ],
   },
   {
-    id: "configure-netbird-ingress",
-    title: "Configure NetBird Ingress",
-    type: "action",
-    journey_stage: "setup",
-    ingress_route: "netbird",
-    summary: "Configure NetBird SSO, groups, setup keys, routes, and proxy targets.",
-    explanation:
-      "This step connects NetBird to Authentik for SSO, creates Twinbox NetBird groups and setup keys with OpenTofu, and records the routing peer credentials in OpenBao for GitOps deployment.",
-    side_help:
-      "Twinbox already created an admin account and token automatically in the bastion step. You can leave the token field empty in most cases.",
-    inputs: [
-      {
-        id: "netbird_token",
-        label: "NetBird API Token",
-        type: "string",
-        required: false,
-        help: "Personal access token from the self-hosted NetBird dashboard. If omitted, Twinbox reads the auto-generated token from the bastion step secrets.",
-      },
-      {
-        id: "netbird_management_url",
-        label: "NetBird Management URL",
-        type: "string",
-        required: false,
-        help: "Optional override, defaults to the NetBird VPS URL from the bastion step",
-      },
-      {
-        id: "traefik_resource_address",
-        label: "Traefik Resource Address",
-        type: "string",
-        required: false,
-        help: "Optional override, defaults to the Traefik ClusterIP when Kubernetes is reachable",
-      },
-      {
-        id: "proxy_services_json",
-        label: "Reverse Proxy Services JSON",
-        type: "string",
-        required: false,
-        help: 'Optional JSON array like [{"name":"portal","domain":"portal.example.com","path":"/"}]. These services will be created automatically during app installation. This form is for initial setup.',
-      },
-    ],
-  },
-  {
     id: "configure-cloudflare-tunnel",
     title: "Configure Cloudflare Tunnel",
     type: "action",

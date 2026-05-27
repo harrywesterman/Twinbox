@@ -58,6 +58,16 @@ test("app source defines a minimal wizard shell with guided input and step-by-st
     /Cluster name/,
     "expected the Talos questions to stop asking for the cluster name"
   );
+  assert.doesNotMatch(
+    questionFlow,
+    /Configure NetBird Ingress/,
+    "expected the wizard questions to skip the NetBird ingress input page"
+  );
+  assert.doesNotMatch(
+    questionFlow,
+    /NetBird API Token|NetBird Management URL|Traefik Resource Address|Reverse Proxy Services JSON/,
+    "expected the wizard questions to no longer expose the NetBird ingress form fields"
+  );
   assert.match(
     source,
     /showImportButton =\s*!isInstallPhase && !model\.completion && currentStep\?\.id !== "provision-nodes"/,
