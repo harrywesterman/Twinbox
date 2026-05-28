@@ -21,6 +21,16 @@ fail() {
   exit 1
 }
 
+require_json() {
+  local var_name="$1"
+  local json="$2"
+  if ! printf '%s' "$json" | jq -e '.' >/dev/null 2>&1; then
+    local len="${#json}"
+    local snippet="${json:0:120}"
+    fail "${var_name} is not valid JSON (length=${len}, starts: ${snippet})"
+  fi
+}
+
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail "$1 not found"
 }
@@ -309,6 +319,7 @@ require_cmd kubectl
 require_cmd openssl
 require_cmd ssh
 
+require_json STEP_CONTEXT_JSON "$STEP_CONTEXT_JSON"
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
@@ -322,6 +333,7 @@ cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty'
 public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
 
+require_json STEP_INPUTS_JSON "$STEP_INPUTS_JSON"
 admin_localpart="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.admin_localpart // "admin"')"
 admin_localpart="$(normalize_localpart "$admin_localpart")"
 admin_password_input="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.admin_password // empty')"
