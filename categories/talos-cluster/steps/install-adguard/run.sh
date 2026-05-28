@@ -133,13 +133,42 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] AdGuard DNS group ID: $adguard_dns_group_id
 # --- Step 5: Configure the Management VM DNS forwarder ---
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detecting Management VM NetBird IP..."
 mgmt_netbird_status=""
+mgmt_netbird_ip=""
 if command -v netbird >/dev/null 2>&1; then
+  mgmt_netbird_ip="$(netbird ip 2>/dev/null | awk '/^[0-9]+\./ {split($1,a,"/"); print a[1]; exit}' || true)"
   mgmt_netbird_status="$(netbird status 2>/dev/null || true)"
 fi
 if [[ -z "$mgmt_netbird_status" ]] && command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+  mgmt_netbird_ip="$(docker exec twinbox-netbird netbird ip 2>/dev/null | awk '/^[0-9]+\./ {split($1,a,"/"); print a[1]; exit}' || true)"
   mgmt_netbird_status="$(docker exec twinbox-netbird netbird status 2>/dev/null || true)"
 fi
-mgmt_netbird_ip="$(printf '%s\n' "$mgmt_netbird_status" | awk -F': ' '/NetBird IP:/ {print $2; exit}' | cut -d/ -f1)"
+if [[ -z "$mgmt_netbird_ip" ]]; then
+  mgmt_netbird_ip="$(printf '%s\n' "$mgmt_netbird_status" | awk -F': ' '/NetBird IP:/ {print $2; exit}' | cut -d/ -f1)"
+fi
+if [[ -z "$mgmt_netbird_ip" ]]; then
+  mgmt_netbird_ip="$(python3 - "$netbird_management_url" "$netbird_token" "twinbox-mgmt-${cluster_slug}" <<'PY' 2>/dev/null || true
+import json
+import sys
+import urllib.parse
+import urllib.request
+
+management_url, token, hostname = sys.argv[1], sys.argv[2], sys.argv[3]
+base_url = management_url.rstrip("/")
+if base_url.endswith("/api"):
+    base_url = base_url[:-4]
+url = f"{base_url}/api/peers?name={urllib.parse.quote(hostname)}"
+req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+with urllib.request.urlopen(req, timeout=10) as resp:
+    peers = json.loads(resp.read().decode())
+if isinstance(peers, dict):
+    peers = peers.get("peers") or peers.get("items") or []
+for peer in peers:
+    if peer.get("name") == hostname and peer.get("ip"):
+        print(str(peer["ip"]).split("/", 1)[0])
+        break
+PY
+)"
+fi
 [[ -n "$mgmt_netbird_ip" ]] || fail "Could not determine Management VM NetBird IP"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Management VM NetBird IP: $mgmt_netbird_ip"
 
