@@ -343,6 +343,7 @@ provider_payload="$(
       issuer_mode: "per_provider",
       include_claims_in_id_token: true,
       client_type: "confidential",
+      grant_types: ["authorization_code"],
       redirect_uris: [
         {
           matching_mode: "strict",

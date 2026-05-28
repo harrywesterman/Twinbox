@@ -119,6 +119,7 @@ def test_portal_step_and_secret_project_authentik_management_env():
     secret_text = _read(PORTAL_SECRET)
 
     assert '"AUTHENTIK_API_BASE": "$authentik_api_base"' in step_text
+    assert 'grant_types: ["authorization_code"]' in step_text
     assert (
         '--required-keys "PORTAL_BASE_URL,PORTAL_OIDC_CLIENT_ID,PORTAL_OIDC_ISSUER,PORTAL_SESSION_SECRET,AUTHENTIK_API_BASE"'
         in step_text

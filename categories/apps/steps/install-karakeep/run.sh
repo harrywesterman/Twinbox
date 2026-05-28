@@ -198,6 +198,7 @@ provider_payload="$(
       property_mappings: $property_mappings,
       include_claims_in_id_token: true,
       client_type: "confidential",
+      grant_types: ["authorization_code"],
       issuer_mode: "per_provider"
     }'
 )"

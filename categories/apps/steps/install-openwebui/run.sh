@@ -180,6 +180,7 @@ openwebui_provider_payload="$(
       client_id: $client_id,
       client_secret: $client_secret,
       client_type: "confidential",
+      grant_types: ["authorization_code"],
       issuer_mode: "per_provider",
       signing_key: $signing_key,
       property_mappings: $property_mappings,
