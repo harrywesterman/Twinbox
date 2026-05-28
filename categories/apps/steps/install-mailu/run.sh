@@ -35,10 +35,11 @@ require_json() {
   hexdump="$(printf '%s' "$hexdump" | tail -5)"
   log "WARN: ${var_name} initial parse failed (length=${len}) — attempting recovery"
   log "WARN: last20=[${last20}], hex_end=[${hexdump}]"
-  json="$(printf '%s' "$json" | jq -R 'sub("\\}\\}*$"; "}")' 2>/dev/null || printf '%s' "$json")"
-  if printf '%s' "$json" | jq -e '.' >/dev/null 2>&1; then
+  local stripped="${json%%\}*}"
+  stripped="${stripped}}"
+  if printf '%s' "$stripped" | jq -e '.' >/dev/null 2>&1; then
     log "WARN: recovered by stripping trailing braces — proceeding"
-    eval "${var_name}='${json}'"
+    printf -v "${var_name}" '%s' "$stripped"
     return 0
   fi
   fail "${var_name} is not valid JSON (length=${len}, hex_end=[${hexdump}], starts: ${snippet})"
