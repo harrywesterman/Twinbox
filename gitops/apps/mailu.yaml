@@ -43,9 +43,6 @@ spec:
                 value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
               - op: replace
                 path: /spec/routes/1/match
-                value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
-              - op: replace
-                path: /spec/routes/2/match
                 value: Host(`mail.__ZONE_NAME__`)
           - target:
               kind: IngressRoute
@@ -56,9 +53,6 @@ spec:
                 value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
               - op: replace
                 path: /spec/routes/1/match
-                value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
-              - op: replace
-                path: /spec/routes/2/match
                 value: Host(`mail.__ZONE_NAME__`)
           - target:
               kind: IngressRoute
@@ -69,9 +63,6 @@ spec:
                 value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
               - op: replace
                 path: /spec/routes/1/match
-                value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
-              - op: replace
-                path: /spec/routes/2/match
                 value: Host(`mail.__ZONE_NAME__`)
           - target:
               kind: IngressRoute
@@ -82,9 +73,6 @@ spec:
                 value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
               - op: replace
                 path: /spec/routes/1/match
-                value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
-              - op: replace
-                path: /spec/routes/2/match
                 value: Host(`mail.__ZONE_NAME__`)
   destination:
     server: https://kubernetes.default.svc

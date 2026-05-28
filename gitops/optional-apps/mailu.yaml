@@ -80,9 +80,6 @@ spec:
                     value: Host(`mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)
                   - op: replace
                     path: /spec/routes/1/match
-                    value: Host(`mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/webmail`)
-                  - op: replace
-                    path: /spec/routes/2/match
                     value: Host(`mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
               - target:
                   kind: IngressRoute
@@ -93,9 +90,6 @@ spec:
                     value: Host(`mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)
                   - op: replace
                     path: /spec/routes/1/match
-                    value: Host(`mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/webmail`)
-                  - op: replace
-                    path: /spec/routes/2/match
                     value: Host(`mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
               - target:
                   kind: IngressRoute
@@ -106,9 +100,6 @@ spec:
                     value: Host(`mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)
                   - op: replace
                     path: /spec/routes/1/match
-                    value: Host(`mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/webmail`)
-                  - op: replace
-                    path: /spec/routes/2/match
                     value: Host(`mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
               - target:
                   kind: IngressRoute
@@ -119,8 +110,7 @@ spec:
                     value: Host(`mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)
                   - op: replace
                     path: /spec/routes/1/match
-                    value: Host(`mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/webmail`)
-                  - op: replace
+                    value: Host(`mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
                     path: /spec/routes/2/match
                     value: Host(`mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
       destination:

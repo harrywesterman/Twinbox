@@ -116,7 +116,7 @@ def test_mailu_ingressroutes_target_mailu_front_only():
 
     for doc in docs:
         routes = doc["spec"]["routes"]
-        assert len(routes) == 3
+        assert len(routes) == 2
 
         outpost_route = routes[0]
         assert "PathPrefix" in outpost_route["match"] and "/outpost.goauthentik.io" in outpost_route["match"]
@@ -125,14 +125,7 @@ def test_mailu_ingressroutes_target_mailu_front_only():
         assert outpost_service["port"] == 80
         assert outpost_route.get("middlewares") is None
 
-        webmail_route = routes[1]
-        assert "PathPrefix" in webmail_route["match"] and "/webmail" in webmail_route["match"]
-        webmail_service = webmail_route["services"][0]
-        assert webmail_service["name"] == "mailu-front"
-        assert webmail_service["port"] == 80
-        assert webmail_route.get("middlewares") is None
-
-        catchall_route = routes[2]
+        catchall_route = routes[1]
         catchall_service = catchall_route["services"][0]
         assert catchall_service["name"] == "mailu-front"
         assert catchall_service["port"] == 80
