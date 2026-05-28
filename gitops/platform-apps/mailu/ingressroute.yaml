@@ -14,6 +14,12 @@ spec:
           name: mailu-front
           port: 80
     - kind: Rule
+      match: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
+      services:
+        - kind: Service
+          name: mailu-front
+          port: 80
+    - kind: Rule
       match: Host(`mail.__ZONE_NAME__`)
       middlewares:
         - name: authentik-forwardauth
@@ -34,6 +40,12 @@ spec:
   routes:
     - kind: Rule
       match: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
+      services:
+        - kind: Service
+          name: mailu-front
+          port: 80
+    - kind: Rule
+      match: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
       services:
         - kind: Service
           name: mailu-front
@@ -63,6 +75,12 @@ spec:
           name: mailu-front
           port: 80
     - kind: Rule
+      match: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
+      services:
+        - kind: Service
+          name: mailu-front
+          port: 80
+    - kind: Rule
       match: Host(`mail.__ZONE_NAME__`)
       middlewares:
         - name: authentik-forwardauth
@@ -82,6 +100,12 @@ spec:
   routes:
     - kind: Rule
       match: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
+      services:
+        - kind: Service
+          name: mailu-front
+          port: 80
+    - kind: Rule
+      match: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
       services:
         - kind: Service
           name: mailu-front

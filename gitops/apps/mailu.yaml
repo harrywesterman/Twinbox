@@ -2,7 +2,6 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: mailu
-  namespace: argocd
 spec:
   project: default
   sources:
@@ -17,35 +16,14 @@ spec:
           hostnames:
             - "mail.__ZONE_NAME__"
           initialAccount:
-            username: "admin"
             domain: "__ZONE_NAME__"
           externalRelay:
-            host: "[mailu-relay-egress.netbird.svc.cluster.local]:2525"
-          dmarc:
-            rua: dmarc
-          front:
-            nodeSelector:
-              twinbox.io/mailu-storage-node: "__MAILU_STORAGE_NODE__"
-          admin:
-            nodeSelector:
-              twinbox.io/mailu-storage-node: "__MAILU_STORAGE_NODE__"
-          postfix:
-            nodeSelector:
-              twinbox.io/mailu-storage-node: "__MAILU_STORAGE_NODE__"
-          dovecot:
-            nodeSelector:
-              twinbox.io/mailu-storage-node: "__MAILU_STORAGE_NODE__"
-          rspamd:
-            nodeSelector:
-              twinbox.io/mailu-storage-node: "__MAILU_STORAGE_NODE__"
-          webmail:
-            nodeSelector:
-              twinbox.io/mailu-storage-node: "__MAILU_STORAGE_NODE__"
-    - repoURL: __REPO_URL__
-      targetRevision: __TARGET_REVISION__
+            host: "__MAILU_RELAY_TARGET_HOST__"
+    - repoURL: https://github.com/harrywesterman/Twinbox.git
+      targetRevision: main
       ref: values
-    - repoURL: __REPO_URL__
-      targetRevision: __TARGET_REVISION__
+    - repoURL: https://github.com/harrywesterman/Twinbox.git
+      targetRevision: main
       path: gitops/platform-apps/mailu
       kustomize:
         patches:
@@ -65,6 +43,9 @@ spec:
                 value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
               - op: replace
                 path: /spec/routes/1/match
+                value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
+              - op: replace
+                path: /spec/routes/2/match
                 value: Host(`mail.__ZONE_NAME__`)
           - target:
               kind: IngressRoute
@@ -75,6 +56,9 @@ spec:
                 value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
               - op: replace
                 path: /spec/routes/1/match
+                value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
+              - op: replace
+                path: /spec/routes/2/match
                 value: Host(`mail.__ZONE_NAME__`)
           - target:
               kind: IngressRoute
@@ -85,6 +69,9 @@ spec:
                 value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
               - op: replace
                 path: /spec/routes/1/match
+                value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
+              - op: replace
+                path: /spec/routes/2/match
                 value: Host(`mail.__ZONE_NAME__`)
           - target:
               kind: IngressRoute
@@ -95,6 +82,9 @@ spec:
                 value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
               - op: replace
                 path: /spec/routes/1/match
+                value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
+              - op: replace
+                path: /spec/routes/2/match
                 value: Host(`mail.__ZONE_NAME__`)
   destination:
     server: https://kubernetes.default.svc
