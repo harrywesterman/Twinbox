@@ -11,3 +11,5 @@ resources:
   - relay-egress-config.yaml
   - relay-egress.yaml
   - ingressroute.yaml
+  - nginx-override-webmail.yaml
+  - nginx-override-webmail.yaml

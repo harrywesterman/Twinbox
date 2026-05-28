@@ -161,6 +161,7 @@ def test_mailu_step_and_scripts_are_wired():
 def test_mailu_relay_egress_resources_are_wired():
     kustomization = _load_yaml(MAILU_PLATFORM_DIR / "kustomization.yaml")
     assert "authentik-forwardauth-middleware.yaml" in kustomization["resources"]
+    assert "nginx-override-webmail.yaml" in kustomization["resources"]
     assert "externalsecret-certificates.yaml" in kustomization["resources"]
     assert "externalsecret-relay-egress.yaml" in kustomization["resources"]
     assert "relay-egress-config.yaml" in kustomization["resources"]
@@ -279,6 +280,22 @@ def test_netbird_network_defines_mailu_relay_egress_group_and_policy():
     assert 'ports         = ["2525"]' in main_tf
     assert 'output "mailu_relay_egress_setup_key"' in outputs_tf
     assert "netbird-mailu-relay-egress" in configure_script
+
+
+def test_mailu_nginx_override_removes_auth_request():
+    override = _load_yaml(MAILU_PLATFORM_DIR / "nginx-override-webmail.yaml")
+    assert override["metadata"]["name"] == "mailu-nginx-override-webmail"
+    assert override["metadata"]["namespace"] == "mailu"
+    conf = override["data"]["override-webmail-noauth.conf"]
+    assert "auth_request" not in conf
+    assert "location /webmail" in conf
+    assert "proxy_pass http://$webmail" in conf
+
+    values = _load_yaml(REPO_ROOT / "gitops" / "values" / "mailu.yaml")
+    vol_names = [v["name"] for v in values["front"]["extraVolumes"]]
+    assert "nginx-override-webmail" in vol_names
+    mount_names = [m["name"] for m in values["front"]["extraVolumeMounts"]]
+    assert "nginx-override-webmail" in mount_names
 
 
 def test_mailu_dkim_parser_uses_structured_record_name_and_value():

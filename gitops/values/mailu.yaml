@@ -71,6 +71,20 @@ front:
     limits:
       cpu: 500m
       memory: 512Mi
+  extraVolumes:
+    - name: nginx-override-webmail
+      configMap:
+        name: mailu-nginx-override-webmail
+  extraVolumeMounts:
+    - name: nginx-override-webmail
+      mountPath: /overrides/nginx
+  extraVolumes:
+    - name: nginx-override-webmail
+      configMap:
+        name: mailu-nginx-override-webmail
+  extraVolumeMounts:
+    - name: nginx-override-webmail
+      mountPath: /overrides/nginx
 
 admin:
   nodeSelector: {}
