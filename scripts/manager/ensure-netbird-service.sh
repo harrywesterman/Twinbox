@@ -132,17 +132,15 @@ NETBIRD_BASTION_SECRET="${TWINBOX_NETBIRD_BASTION_SECRET:-}"
 
 # Locate the bastion secret file
 if [[ -z "$NETBIRD_BASTION_SECRET" ]]; then
-  for candidate in \
-    "/opt/twinbox/bootstrap/secrets/global/netbird-bastion-${CLUSTER_ID}.json" \
-    "/opt/twinbox/bootstrap/secrets/global/netbird-bastion-*.json"; do
-    if [[ -f "$candidate" ]]; then
-      NETBIRD_BASTION_SECRET="$candidate"
-      break
-    fi
-  done
-  # If glob matched nothing, try the most recent one
-  if [[ -z "$NETBIRD_BASTION_SECRET" || ! -f "$NETBIRD_BASTION_SECRET" ]]; then
-    NETBIRD_BASTION_SECRET="$(ls -t /opt/twinbox/bootstrap/secrets/global/netbird-bastion-*.json 2>/dev/null | head -n1 || true)"
+  if [[ -n "$CLUSTER_ID" && -f "/opt/twinbox/bootstrap/secrets/global/netbird-bastion-${CLUSTER_ID}.json" ]]; then
+    NETBIRD_BASTION_SECRET="/opt/twinbox/bootstrap/secrets/global/netbird-bastion-${CLUSTER_ID}.json"
+  else
+    NETBIRD_BASTION_SECRET="$(find /opt/twinbox/bootstrap/secrets/global \
+      -maxdepth 1 \
+      -type f \
+      -name 'netbird-bastion-*.json' \
+      ! -name 'netbird-bastion-exit-router-*.json' \
+      -print 2>/dev/null | sort | tail -n1 || true)"
   fi
 fi
 
@@ -181,6 +179,10 @@ if [[ -z "$NETBIRD_TOKEN" ]]; then
 fi
 if [[ -z "$NETBIRD_URL" ]]; then
   log_skip "No NetBird URL found; skipping service creation (NetBird ingress route not selected)."
+  exit 0
+fi
+if [[ -z "$NETBIRD_PROXY_DOMAIN" ]]; then
+  log_skip "No NetBird proxy domain found; skipping service creation for ${SERVICE_NAME}."
   exit 0
 fi
 

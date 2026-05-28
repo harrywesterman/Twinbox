@@ -2012,6 +2012,8 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "NETBIRD_PROXY_DOMAIN" in text
     assert 'TWINBOX_NETBIRD_TOKEN="$netbird_token"' in text
     assert 'TWINBOX_NETBIRD_URL="$netbird_management_url"' in text
+    assert 'TWINBOX_NETBIRD_BASTION_SECRET="$netbird_bastion_secret"' in text
+    assert 'CLUSTER_ID="$cluster_id"' in text
     # The services block was removed; netbird_proxy_domain is no longer passed to tofu
     assert "wait_for_netbird_routing_peer" in text
     assert "wait_for_traefik_reverse_proxy_backend" in text
@@ -2107,6 +2109,8 @@ def test_ensure_netbird_service_uses_current_api_and_safe_skips():
     assert "NetBird network secret does not contain TRAEFIK_RESOURCE_ADDRESS" in text
     assert 'NETBIRD_TOKEN="${TWINBOX_NETBIRD_TOKEN:-${NETBIRD_TOKEN:-}}"' in text
     assert 'NETBIRD_URL="${TWINBOX_NETBIRD_URL:-${NETBIRD_URL:-}}"' in text
+    assert "! -name 'netbird-bastion-exit-router-*.json'" in text
+    assert "No NetBird proxy domain found" in text
     assert "Could not find TRAEFIK_RESOURCE_ID; service creation may fail" not in text
     assert "No NetBird reverse proxy cluster found" in text
     assert "NetBird domain creation returned HTTP" in text
