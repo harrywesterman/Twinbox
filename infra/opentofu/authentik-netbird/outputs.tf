@@ -14,6 +14,11 @@ output "client_secret" {
   sensitive   = true
 }
 
+output "provider_pk" {
+  description = "Authentik OAuth provider primary key for NetBird"
+  value       = authentik_provider_oauth2.netbird.id
+}
+
 output "issuer_url" {
   description = "OIDC issuer URL for NetBird"
   value       = "${trim(var.authentik_public_url, "/")}/application/o/${var.application_slug}/"

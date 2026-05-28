@@ -352,6 +352,31 @@ wait_for_public_oidc_authorize() {
   fail "Public Authentik authorize endpoint did not become reachable through NetBird proxy"
 }
 
+ensure_authentik_netbird_grant_types() {
+  local provider_pk="$1"
+  local response
+
+  [[ -n "$provider_pk" ]] || fail "Authentik NetBird provider ID is required to set grant types"
+
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Ensuring Authentik NetBird OAuth grant types"
+  response="$(
+    curl -fsS -X PATCH \
+      -H "Accept: application/json" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" \
+      --data '{"grant_types":["authorization_code","refresh_token"]}' \
+      "${AUTHENTIK_API_BASE}/providers/oauth2/${provider_pk}/"
+  )" || fail "Failed to update Authentik NetBird OAuth grant types"
+
+  if ! printf '%s' "$response" | jq -e '
+    (.grant_types // []) as $grant_types
+    | ($grant_types | index("authorization_code")) != null
+      and ($grant_types | index("refresh_token")) != null
+  ' >/dev/null; then
+    fail "Authentik NetBird OAuth provider did not report the expected grant types"
+  fi
+}
+
 netbird_host_resource_address() {
   local address="$1"
   if [[ "$address" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
@@ -1030,6 +1055,8 @@ tofu apply -auto-approve -no-color \
 netbird_oidc_client_id="$(tofu output -raw -no-color client_id)"
 netbird_oidc_client_secret="$(tofu output -raw -no-color client_secret)"
 netbird_oidc_issuer="$(tofu output -raw -no-color issuer_url)"
+netbird_oidc_provider_pk="$(tofu output -raw -no-color provider_pk)"
+ensure_authentik_netbird_grant_types "$netbird_oidc_provider_pk"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating NetBird groups, routing resources, and setup keys"
 network_workdir="$MANAGER_DATA_DIR/opentofu/netbird-network-${cluster_id}"

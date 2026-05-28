@@ -1914,6 +1914,10 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "seed_netbird_account_for_sso()" in text
     assert 'identity_provider_id="$(tofu output -raw -no-color identity_provider_id)"' in text
     assert 'seed_netbird_account_for_sso "$identity_provider_id" "$netbird_admin_email"' in text
+    assert "ensure_authentik_netbird_grant_types()" in text
+    assert 'netbird_oidc_provider_pk="$(tofu output -raw -no-color provider_pk)"' in text
+    assert 'ensure_authentik_netbird_grant_types "$netbird_oidc_provider_pk"' in text
+    assert '"grant_types":["authorization_code","refresh_token"]' in text
     assert 'glob.glob("/var/lib/docker/volumes/*/_data/store.db")' in text
     assert "Failed to seed NetBird account domain and SSO owner context" in text
     assert "settings_extra_user_approval_required = 0" in text
@@ -1997,6 +2001,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert 'variable "property_mapping_ids"' in vars_text
     assert "url = var.authentik_api_url" in providers_text
     assert 'trim(var.authentik_public_url, "/")' in outputs_text
+    assert 'output "provider_pk"' in outputs_text
 
     assert 'name: "authentik", domain: $authentik_domain, path: "/"' in text
     assert "netbird-wildcard-dns" in text

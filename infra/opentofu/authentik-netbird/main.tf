@@ -26,11 +26,11 @@ resource "random_password" "client_secret" {
 }
 
 resource "authentik_provider_oauth2" "netbird" {
-  name                 = var.application_name
-  client_id            = random_string.client_id.result
-  client_secret        = random_password.client_secret.result
-  authorization_flow   = data.authentik_flow.authorization.id
-  invalidation_flow    = data.authentik_flow.invalidation.id
+  name               = var.application_name
+  client_id          = random_string.client_id.result
+  client_secret      = random_password.client_secret.result
+  authorization_flow = data.authentik_flow.authorization.id
+  invalidation_flow  = data.authentik_flow.invalidation.id
   allowed_redirect_uris = [
     {
       matching_mode = "regex"
