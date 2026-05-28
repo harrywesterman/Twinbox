@@ -52,6 +52,11 @@ ingress:
   realIpHeader: ""
   realIpFrom: ""
 
+proxyAuth:
+  whitelist: "10.244.0.0/16"
+  header: "X-authentik-email"
+  create: "true"
+
 front:
   nodeSelector: {}
   hostPort:

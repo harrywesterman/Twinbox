@@ -50,6 +50,10 @@ def test_mailu_values_keep_mail_ports_internal_and_set_resources():
     assert values["persistence"]["accessModes"] == ["ReadWriteOnce"]
     assert values["tika"]["enabled"] is False
 
+    assert values["proxyAuth"]["create"] == "true"
+    assert values["proxyAuth"]["header"] == "X-authentik-email"
+    assert "10.244.0.0/16" in values["proxyAuth"]["whitelist"]
+
     for component in ("front", "admin", "postfix", "dovecot", "rspamd", "clamav", "webmail"):
         resources = values[component]["resources"]
         assert resources["requests"]
@@ -111,9 +115,21 @@ def test_mailu_ingressroutes_target_mailu_front_only():
     assert names == {"mailu", "mailu-netbird", "mailu-wiredoor", "mailu-tailscale"}
 
     for doc in docs:
-        service = doc["spec"]["routes"][0]["services"][0]
+        route = doc["spec"]["routes"][0]
+        service = route["services"][0]
         assert service["name"] == "mailu-front"
         assert service["port"] == 80
+        middlewares = route.get("middlewares", [])
+        assert any(mw["name"] == "authentik-forwardauth" for mw in middlewares)
+
+
+def test_mailu_authentik_forwardauth_middleware_exists():
+    middleware = _load_yaml(MAILU_PLATFORM_DIR / "authentik-forwardauth-middleware.yaml")
+    assert middleware["kind"] == "Middleware"
+    assert middleware["metadata"]["name"] == "authentik-forwardauth"
+    assert middleware["metadata"]["namespace"] == "mailu"
+    assert "authentik-server.authentik.svc.cluster.local" in middleware["spec"]["forwardAuth"]["address"]
+    assert "X-authentik-email" in middleware["spec"]["forwardAuth"]["authResponseHeaders"]
 
 
 def test_external_dns_allows_mx_records():
@@ -144,6 +160,7 @@ def test_mailu_step_and_scripts_are_wired():
 
 def test_mailu_relay_egress_resources_are_wired():
     kustomization = _load_yaml(MAILU_PLATFORM_DIR / "kustomization.yaml")
+    assert "authentik-forwardauth-middleware.yaml" in kustomization["resources"]
     assert "externalsecret-certificates.yaml" in kustomization["resources"]
     assert "externalsecret-relay-egress.yaml" in kustomization["resources"]
     assert "relay-egress-config.yaml" in kustomization["resources"]
