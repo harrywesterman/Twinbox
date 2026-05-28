@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mailu-nginx-override-webmail
+  namespace: mailu
+data:
+  override-webmail-noauth.conf: |
+    location = /webmail {
+      auth_request off;
+      rewrite ^(/webmail)$ $1/ permanent;
+    }
+    location ^~ /webmail/ {
+      auth_request off;
+      rewrite ^/webmail/(.*) /$1 break;
+      include /etc/nginx/proxy.conf;
+      proxy_pass http://$webmail;
+    }

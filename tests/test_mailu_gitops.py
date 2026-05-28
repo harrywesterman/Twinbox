@@ -133,6 +133,24 @@ def test_mailu_ingressroutes_target_mailu_front_only():
         assert any(mw["name"] == "authentik-forwardauth" for mw in middlewares)
 
 
+def test_mailu_nginx_override_disables_auth_request_for_webmail():
+    override = _load_yaml(MAILU_PLATFORM_DIR / "nginx-override-webmail.yaml")
+    assert override["metadata"]["name"] == "mailu-nginx-override-webmail"
+    assert override["metadata"]["namespace"] == "mailu"
+    conf = override["data"]["override-webmail-noauth.conf"]
+    assert "auth_request off" in conf
+    assert "location = /webmail" in conf
+    assert "location ^~ /webmail/" in conf
+    assert "proxy_pass http://$webmail" in conf
+
+    values = _load_yaml(REPO_ROOT / "gitops" / "values" / "mailu.yaml")
+    vol_names = [v["name"] for v in values["front"]["extraVolumes"]]
+    assert "nginx-override-webmail" in vol_names
+    mount_names = [m["name"] for m in values["front"]["extraVolumeMounts"]]
+    assert "nginx-override-webmail" in mount_names
+    assert "/overrides" in [m["mountPath"] for m in values["front"]["extraVolumeMounts"]]
+
+
 def test_mailu_authentik_forwardauth_middleware_exists():
     middleware = _load_yaml(MAILU_PLATFORM_DIR / "authentik-forwardauth-middleware.yaml")
     assert middleware["kind"] == "Middleware"
@@ -175,6 +193,7 @@ def test_mailu_relay_egress_resources_are_wired():
     assert "externalsecret-relay-egress.yaml" in kustomization["resources"]
     assert "relay-egress-config.yaml" in kustomization["resources"]
     assert "relay-egress.yaml" in kustomization["resources"]
+    assert "nginx-override-webmail.yaml" in kustomization["resources"]
 
     docs = list(yaml.safe_load_all((MAILU_PLATFORM_DIR / "relay-egress.yaml").read_text()))
     service = next(doc for doc in docs if doc["kind"] == "Service")
