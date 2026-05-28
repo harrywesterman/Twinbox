@@ -155,8 +155,14 @@ WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." &&
 # shellcheck disable=SC1091
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
 
-NETBIRD_TOKEN="$(jq -r '.NETBIRD_SETUP_TOKEN // empty' "$NETBIRD_BASTION_SECRET")"
-NETBIRD_URL="$(jq -r '.NETBIRD_URL // empty' "$NETBIRD_BASTION_SECRET")"
+NETBIRD_TOKEN="${TWINBOX_NETBIRD_TOKEN:-${NETBIRD_TOKEN:-}}"
+if [[ -z "$NETBIRD_TOKEN" ]]; then
+  NETBIRD_TOKEN="$(jq -r '.NETBIRD_SETUP_TOKEN // empty' "$NETBIRD_BASTION_SECRET")"
+fi
+NETBIRD_URL="${TWINBOX_NETBIRD_URL:-${NETBIRD_URL:-}}"
+if [[ -z "$NETBIRD_URL" ]]; then
+  NETBIRD_URL="$(jq -r '.NETBIRD_URL // empty' "$NETBIRD_BASTION_SECRET")"
+fi
 NETBIRD_FQDN="$(jq -r '.NETBIRD_FQDN // empty' "$NETBIRD_BASTION_SECRET")"
 NETBIRD_CLUSTER_ID="$(jq -r '.CLUSTER_ID // empty' "$NETBIRD_BASTION_SECRET")"
 NETBIRD_IP="$(jq -r '.NETBIRD_IP // empty' "$NETBIRD_BASTION_SECRET")"

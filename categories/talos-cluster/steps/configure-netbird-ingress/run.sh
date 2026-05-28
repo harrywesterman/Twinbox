@@ -1238,7 +1238,9 @@ zone_result="$(python3 "$WORKSPACE_ROOT/scripts/manager/netbird-dns-zone.py" \
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] $zone_result"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating NetBird reverse proxy service for Authentik (required for OIDC verification)"
-bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+TWINBOX_NETBIRD_TOKEN="$netbird_token" \
+TWINBOX_NETBIRD_URL="$netbird_management_url" \
+  bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
   --service-name "authentik" \
   --service-domain "$authentik_domain" \
   --service-path /
