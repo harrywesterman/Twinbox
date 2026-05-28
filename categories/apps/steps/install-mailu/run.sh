@@ -266,7 +266,7 @@ discover_bastion_netbird_ip() {
   ssh_bastion "$bastion_ip" "$ssh_key_file" 'bash -s' <<'REMOTE'
 set -euo pipefail
 docker exec netbird-client netbird status --check ready >/dev/null
-netbird_ip="$(docker exec netbird-client netbird ip 2>/dev/null | awk '/^[0-9]+\./ {split($1,a,"/"); print a[1]; exit}')"
+netbird_ip="$(docker exec netbird-client netbird status 2>/dev/null | awk '/NetBird IP:/ {gsub(/\/.*/, ""); print $NF; exit}')"
 if [[ -z "$netbird_ip" ]]; then
   netbird_ip="$(docker exec netbird-client sh -lc "ip -o -4 addr show | awk '\$2 ~ /^(wt|nb|netbird)/ {split(\$4,a,\"/\"); print a[1]; exit}'" 2>/dev/null || true)"
 fi

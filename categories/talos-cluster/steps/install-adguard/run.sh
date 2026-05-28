@@ -135,15 +135,15 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detecting Management VM NetBird IP..."
 mgmt_netbird_status=""
 mgmt_netbird_ip=""
 if command -v netbird >/dev/null 2>&1; then
-  mgmt_netbird_ip="$(netbird ip 2>/dev/null | awk '/^[0-9]+\./ {split($1,a,"/"); print a[1]; exit}' || true)"
+  mgmt_netbird_ip="$(netbird status 2>/dev/null | awk -F': ' '/NetBird IP:/ {print $2; exit}' | cut -d/ -f1 || true)"
   mgmt_netbird_status="$(netbird status 2>/dev/null || true)"
 fi
 if [[ -z "$mgmt_netbird_status" ]] && command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-  mgmt_netbird_ip="$(docker exec twinbox-netbird netbird ip 2>/dev/null | awk '/^[0-9]+\./ {split($1,a,"/"); print a[1]; exit}' || true)"
+  mgmt_netbird_ip="$(docker exec twinbox-netbird netbird status 2>/dev/null | awk -F': ' '/NetBird IP:/ {print $2; exit}' | cut -d/ -f1 || true)"
   mgmt_netbird_status="$(docker exec twinbox-netbird netbird status 2>/dev/null || true)"
 fi
 if [[ -z "$mgmt_netbird_ip" ]]; then
-  mgmt_netbird_ip="$(printf '%s\n' "$mgmt_netbird_status" | awk -F': ' '/NetBird IP:/ {print $2; exit}' | cut -d/ -f1)"
+  mgmt_netbird_ip="$(printf '%s\n' "$mgmt_netbird_status" | awk -F': ' '/NetBird IP:/ {print $2; exit}' | cut -d/ -f1 2>/dev/null || true)"
 fi
 if [[ -z "$mgmt_netbird_ip" ]]; then
   mgmt_netbird_ip="$(python3 - "$netbird_management_url" "$netbird_token" "twinbox-mgmt-${cluster_slug}" <<'PY' 2>/dev/null || true

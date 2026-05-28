@@ -2387,7 +2387,7 @@ def test_adguard_install_uses_management_vm_dns_forwarder_for_netbird_dns():
     assert '--nameserver-ip "$mgmt_netbird_ip"' in text
     assert "--nameserver-port 5354" in text
     assert "Management VM NetBird IP" in text
-    assert "netbird ip" in text
+    assert "netbird status" in text
     assert "/api/peers?name=" in text
     assert '"twinbox-mgmt-${cluster_slug}"' in text
 
