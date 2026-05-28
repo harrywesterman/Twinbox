@@ -227,8 +227,8 @@ generate_mailu_tls_secret_file() {
   local output_file="$2"
   local cert_file key_file
 
-  cert_file="$(mktemp "${TMPDIR:-/tmp}/mailu-cert-XXXXXX.crt")"
-  key_file="$(mktemp "${TMPDIR:-/tmp}/mailu-cert-XXXXXX.key")"
+  cert_file="$(mktemp "${TMPDIR:-/tmp}/mailu-cert-XXXXXX")"
+  key_file="$(mktemp "${TMPDIR:-/tmp}/mailu-key-XXXXXX")"
   openssl req -x509 \
     -newkey rsa:2048 \
     -nodes \
