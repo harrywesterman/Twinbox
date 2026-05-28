@@ -199,7 +199,7 @@ choose_mailu_storage_node() {
         .items[]
         | select(any(.status.conditions[]?; .type == "Ready" and .status == "True"))
         | select((.spec.unschedulable // false) == false)
-        | select((.metadata.labels["node-role.kubernetes.io/control-plane"] // "") == "")
+        | select((.metadata.labels | has("node-role.kubernetes.io/control-plane")) == false)
         | .metadata.name
       ' |
       head -n1
