@@ -27,7 +27,10 @@ require_json() {
   if ! printf '%s' "$json" | jq -e '.' >/dev/null 2>&1; then
     local len="${#json}"
     local snippet="${json:0:120}"
-    fail "${var_name} is not valid JSON (length=${len}, starts: ${snippet})"
+    local last20="${json: -20}"
+    local hexdump
+    hexdump="$(printf '%s' "$json" | xxd | tail -5 2>/dev/null || printf '%s' "$json" | od -c | tail -5)"
+    fail "${var_name} is not valid JSON (length=${len}, last20=[${last20}], hex_end=[${hexdump}], starts: ${snippet})"
   fi
 }
 
