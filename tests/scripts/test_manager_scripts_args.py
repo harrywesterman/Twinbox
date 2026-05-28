@@ -842,6 +842,9 @@ def test_user_apps_are_not_part_of_bootstrap_journey():
     assert setup_step_ids.index('"create-users-and-groups"') < setup_step_ids.index(
         '"provision-netbird-bastion"'
     )
+    assert setup_step_ids.index('"configure-netbird-admin-access"') < setup_step_ids.index(
+        '"install-adguard"'
+    )
 
 
 def test_crowdsec_step_seeds_bouncer_secret_and_applies_gitops_app():
