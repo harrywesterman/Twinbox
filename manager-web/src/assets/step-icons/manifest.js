@@ -252,6 +252,12 @@ export const STEP_ICON_MANIFEST = [
     officialSourceUrl: "https://github.com/AdguardTeam/AdGuardHome",
   }),
   iconEntry({
+    stepId: "install-mailu",
+    isAppOrPlatform: true,
+    officialSourceType: "project-repository",
+    officialSourceUrl: "https://github.com/Mailu/Mailu",
+  }),
+  iconEntry({
     stepId: "provision-netbird-bastion",
     isAppOrPlatform: true,
     officialSourceType: "project-repository",
