@@ -24,14 +24,24 @@ fail() {
 require_json() {
   local var_name="$1"
   local json="$2"
-  if ! printf '%s' "$json" | jq -e '.' >/dev/null 2>&1; then
-    local len="${#json}"
-    local snippet="${json:0:120}"
-    local last20="${json: -20}"
-    local hexdump
-    hexdump="$(printf '%s' "$json" | xxd | tail -5 2>/dev/null || printf '%s' "$json" | od -c | tail -5)"
-    fail "${var_name} is not valid JSON (length=${len}, last20=[${last20}], hex_end=[${hexdump}], starts: ${snippet})"
+  if printf '%s' "$json" | jq -e '.' >/dev/null 2>&1; then
+    return 0
   fi
+  local len="${#json}"
+  local snippet="${json:0:120}"
+  local last20="${json: -20}"
+  local hexdump
+  hexdump="$(printf '%s' "$json" | xxd 2>/dev/null || printf '%s' "$json" | od -c)"
+  hexdump="$(printf '%s' "$hexdump" | tail -5)"
+  log "WARN: ${var_name} initial parse failed (length=${len}) — attempting recovery"
+  log "WARN: last20=[${last20}], hex_end=[${hexdump}]"
+  json="$(printf '%s' "$json" | jq -R 'sub("\\}\\}*$"; "}")' 2>/dev/null || printf '%s' "$json")"
+  if printf '%s' "$json" | jq -e '.' >/dev/null 2>&1; then
+    log "WARN: recovered by stripping trailing braces — proceeding"
+    eval "${var_name}='${json}'"
+    return 0
+  fi
+  fail "${var_name} is not valid JSON (length=${len}, hex_end=[${hexdump}], starts: ${snippet})"
 }
 
 require_cmd() {
