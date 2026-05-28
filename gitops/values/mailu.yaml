@@ -77,14 +77,7 @@ front:
         name: mailu-nginx-override-webmail
   extraVolumeMounts:
     - name: nginx-override-webmail
-      mountPath: /overrides/nginx
-  extraVolumes:
-    - name: nginx-override-webmail
-      configMap:
-        name: mailu-nginx-override-webmail
-  extraVolumeMounts:
-    - name: nginx-override-webmail
-      mountPath: /overrides/nginx
+      mountPath: /overrides
 
 admin:
   nodeSelector: {}
