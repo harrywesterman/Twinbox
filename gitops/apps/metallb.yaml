@@ -8,7 +8,7 @@ spec:
   sources:
     - repoURL: https://metallb.github.io/metallb
       chart: metallb
-      targetRevision: "0.16.0"
+      targetRevision: "0.16.1"
       helm:
         valueFiles:
           - $values/gitops/values/metallb.yaml
