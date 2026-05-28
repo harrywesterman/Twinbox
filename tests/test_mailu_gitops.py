@@ -115,11 +115,21 @@ def test_mailu_ingressroutes_target_mailu_front_only():
     assert names == {"mailu", "mailu-netbird", "mailu-wiredoor", "mailu-tailscale"}
 
     for doc in docs:
-        route = doc["spec"]["routes"][0]
-        service = route["services"][0]
-        assert service["name"] == "mailu-front"
-        assert service["port"] == 80
-        middlewares = route.get("middlewares", [])
+        routes = doc["spec"]["routes"]
+        assert len(routes) == 2
+
+        webmail_route = routes[0]
+        assert "PathPrefix" in webmail_route["match"] and "/webmail" in webmail_route["match"]
+        webmail_service = webmail_route["services"][0]
+        assert webmail_service["name"] == "mailu-front"
+        assert webmail_service["port"] == 80
+        assert webmail_route.get("middlewares") is None
+
+        catchall_route = routes[1]
+        catchall_service = catchall_route["services"][0]
+        assert catchall_service["name"] == "mailu-front"
+        assert catchall_service["port"] == 80
+        middlewares = catchall_route.get("middlewares", [])
         assert any(mw["name"] == "authentik-forwardauth" for mw in middlewares)
 
 
@@ -288,7 +298,7 @@ def test_mailu_nginx_override_removes_auth_request():
     assert override["metadata"]["namespace"] == "mailu"
     conf = override["data"]["override-webmail-noauth.conf"]
     assert "auth_request" not in conf
-    assert "location /webmail" in conf
+    assert "location ^~ /webmail" in conf
     assert "proxy_pass http://$webmail" in conf
 
     values = _load_yaml(REPO_ROOT / "gitops" / "values" / "mailu.yaml")

@@ -5,7 +5,7 @@ metadata:
   namespace: mailu
 data:
   override-webmail-noauth.conf: |
-    location /webmail {
+    location ^~ /webmail {
       rewrite ^(/webmail)$ $1/ permanent;
       rewrite ^/webmail/(.*) /$1 break;
       include /etc/nginx/proxy.conf;

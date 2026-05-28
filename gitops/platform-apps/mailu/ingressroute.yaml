@@ -8,6 +8,12 @@ spec:
     - websecure
   routes:
     - kind: Rule
+      match: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
+      services:
+        - kind: Service
+          name: mailu-front
+          port: 80
+    - kind: Rule
       match: Host(`mail.__ZONE_NAME__`)
       middlewares:
         - name: authentik-forwardauth
@@ -27,6 +33,12 @@ spec:
     - webnetbird
   routes:
     - kind: Rule
+      match: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
+      services:
+        - kind: Service
+          name: mailu-front
+          port: 80
+    - kind: Rule
       match: Host(`mail.__ZONE_NAME__`)
       middlewares:
         - name: authentik-forwardauth
@@ -45,6 +57,12 @@ spec:
     - webwiredoor
   routes:
     - kind: Rule
+      match: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
+      services:
+        - kind: Service
+          name: mailu-front
+          port: 80
+    - kind: Rule
       match: Host(`mail.__ZONE_NAME__`)
       middlewares:
         - name: authentik-forwardauth
@@ -62,6 +80,12 @@ spec:
   entryPoints:
     - webtailscale
   routes:
+    - kind: Rule
+      match: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
+      services:
+        - kind: Service
+          name: mailu-front
+          port: 80
     - kind: Rule
       match: Host(`mail.__ZONE_NAME__`)
       middlewares:
