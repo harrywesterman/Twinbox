@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
+  - externalsecret-certificates.yaml
   - externalsecret-runtime.yaml
   - externalsecret-relay.yaml
   - externalsecret-relay-egress.yaml

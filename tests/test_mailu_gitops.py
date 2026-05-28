@@ -46,24 +46,38 @@ def test_mailu_values_keep_mail_ports_internal_and_set_resources():
     assert values["api"]["existingSecret"] == "mailu-runtime"
     assert values["externalRelay"]["existingSecret"] == "mailu-relay"
     assert values["persistence"]["storageClass"] == "longhorn-single"
+    assert values["persistence"]["single_pvc"] is True
+    assert values["persistence"]["accessModes"] == ["ReadWriteOnce"]
+    assert values["tika"]["enabled"] is False
 
     for component in ("front", "admin", "postfix", "dovecot", "rspamd", "clamav", "webmail"):
         resources = values[component]["resources"]
         assert resources["requests"]
         assert resources["limits"]
 
+    for component in ("front", "admin", "postfix", "dovecot", "rspamd", "webmail"):
+        assert values[component]["nodeSelector"] == {}
+
 
 def test_mailu_platform_externalsecrets_reference_openbao():
+    certificates = _load_yaml(MAILU_PLATFORM_DIR / "externalsecret-certificates.yaml")
     runtime = _load_yaml(MAILU_PLATFORM_DIR / "externalsecret-runtime.yaml")
     relay = _load_yaml(MAILU_PLATFORM_DIR / "externalsecret-relay.yaml")
     relay_egress = _load_yaml(MAILU_PLATFORM_DIR / "externalsecret-relay-egress.yaml")
+    assert certificates["metadata"]["namespace"] == "mailu"
     assert runtime["metadata"]["namespace"] == "mailu"
     assert relay["metadata"]["namespace"] == "mailu"
     assert relay_egress["metadata"]["namespace"] == "netbird"
+    assert certificates["spec"]["secretStoreRef"]["name"] == "openbao"
+    assert certificates["spec"]["target"]["name"] == "mailu-certificates"
+    assert certificates["spec"]["target"]["template"]["type"] == "kubernetes.io/tls"
     assert runtime["spec"]["secretStoreRef"]["name"] == "openbao"
     assert relay["spec"]["secretStoreRef"]["name"] == "openbao"
     assert relay_egress["spec"]["secretStoreRef"]["name"] == "openbao"
 
+    certificate_refs = {
+        item["secretKey"]: item["remoteRef"]["key"] for item in certificates["spec"]["data"]
+    }
     runtime_refs = {item["secretKey"]: item["remoteRef"]["key"] for item in runtime["spec"]["data"]}
     relay_refs = {item["secretKey"]: item["remoteRef"]["key"] for item in relay["spec"]["data"]}
     relay_egress_refs = {
@@ -73,6 +87,10 @@ def test_mailu_platform_externalsecrets_reference_openbao():
         "secret-key": "twinbox/global/mailu-runtime",
         "api-token": "twinbox/global/mailu-runtime",
         "initial-admin-password": "twinbox/global/mailu-runtime",
+    }
+    assert certificate_refs == {
+        "tls.crt": "twinbox/global/mailu-certificates",
+        "tls.key": "twinbox/global/mailu-certificates",
     }
     assert relay_refs == {
         "relay-username": "twinbox/global/mailu-relay",
@@ -126,6 +144,7 @@ def test_mailu_step_and_scripts_are_wired():
 
 def test_mailu_relay_egress_resources_are_wired():
     kustomization = _load_yaml(MAILU_PLATFORM_DIR / "kustomization.yaml")
+    assert "externalsecret-certificates.yaml" in kustomization["resources"]
     assert "externalsecret-relay-egress.yaml" in kustomization["resources"]
     assert "relay-egress-config.yaml" in kustomization["resources"]
     assert "relay-egress.yaml" in kustomization["resources"]
@@ -161,6 +180,19 @@ def test_mailu_relay_egress_resources_are_wired():
     assert "twinbox.io/mailu-relay-host" in appset_text
 
 
+def test_mailu_single_pvc_workloads_are_pinned_to_storage_node():
+    appset_text = (REPO_ROOT / "gitops" / "optional-apps" / "mailu.yaml").read_text(
+        encoding="utf-8"
+    )
+    direct_app_text = (REPO_ROOT / "gitops" / "apps" / "mailu.yaml").read_text(encoding="utf-8")
+
+    assert "twinbox.io/mailu-storage-node" in appset_text
+    assert "__MAILU_STORAGE_NODE__" in direct_app_text
+    for component in ("front", "admin", "postfix", "dovecot", "rspamd", "webmail"):
+        assert f"{component}:\n                nodeSelector:" in appset_text
+        assert f"{component}:\n            nodeSelector:" in direct_app_text
+
+
 def test_bastion_postfix_script_has_open_relay_guards():
     script = (REPO_ROOT / "scripts" / "manager" / "configure-bastion-mailu-postfix.sh").read_text(
         encoding="utf-8"
@@ -189,7 +221,12 @@ def test_mailu_installer_uses_private_relay_and_pre_dns_preflights():
     assert "verify_mailu_relay_egress_path" in script
     assert "mailu-relay-egress.netbird.svc.cluster.local" in script
     assert "wait_for_resource netbird externalsecret mailu-relay-egress Ready" in script
+    assert "wait_for_resource mailu externalsecret mailu-certificates Ready" in script
     assert "wait_for_resource netbird deployment mailu-relay-egress Available" in script
+    assert "choose_mailu_storage_node" in script
+    assert "twinbox.io/mailu-storage-node" in script
+    assert "generate_mailu_tls_secret_file" in script
+    assert "mailu-certificates" in script
     assert "--relay-password" not in script
     assert "--relay-secret-file" in script
     assert script.index('log "Applying Mailu DNS records"') > script.index(

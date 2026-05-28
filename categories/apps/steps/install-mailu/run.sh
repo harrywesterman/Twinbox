@@ -68,7 +68,14 @@ wait_for_selector() {
   local label="$5"
 
   log "Waiting for ${label}"
-  kubectl -n "$namespace" wait --for="condition=${condition}" "$kind" -l "$selector" --timeout=10m
+  if ! kubectl -n "$namespace" wait --for="condition=${condition}" "$kind" -l "$selector" --timeout=10m; then
+    log "Timed out waiting for ${label}; collecting diagnostics"
+    kubectl -n "$namespace" get pods -o wide || true
+    kubectl -n "$namespace" get pvc || true
+    kubectl -n "$namespace" get events --sort-by=.lastTimestamp | tail -80 || true
+    kubectl -n "$namespace" describe pods -l "$selector" || true
+    return 1
+  fi
 }
 
 wait_for_statefulsets_ready() {
@@ -158,6 +165,90 @@ openbao_existing_value() {
 
 random_hex() {
   openssl rand -hex "$1"
+}
+
+sanitize_label_value() {
+  local value="$1"
+  value="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_.-]+/-/g; s/^[^a-z0-9]+//; s/[^a-z0-9]+$//')"
+  value="${value:0:63}"
+  [[ -n "$value" ]] || value="mailu"
+  printf '%s\n' "$value"
+}
+
+choose_mailu_storage_node() {
+  local label_value="$1"
+  local existing_node candidate_node
+
+  existing_node="$(
+    kubectl get nodes -l "twinbox.io/mailu-storage-node=${label_value}" -o json |
+      jq -r '
+        .items[]
+        | select(any(.status.conditions[]?; .type == "Ready" and .status == "True"))
+        | .metadata.name
+      ' |
+      head -n1
+  )"
+  if [[ -n "$existing_node" ]]; then
+    printf '%s\n' "$existing_node"
+    return 0
+  fi
+
+  candidate_node="$(
+    kubectl get nodes -o json |
+      jq -r '
+        .items[]
+        | select(any(.status.conditions[]?; .type == "Ready" and .status == "True"))
+        | select((.spec.unschedulable // false) == false)
+        | select((.metadata.labels["node-role.kubernetes.io/control-plane"] // "") == "")
+        | .metadata.name
+      ' |
+      head -n1
+  )"
+  if [[ -z "$candidate_node" ]]; then
+    candidate_node="$(
+      kubectl get nodes -o json |
+        jq -r '
+          .items[]
+          | select(any(.status.conditions[]?; .type == "Ready" and .status == "True"))
+          | select((.spec.unschedulable // false) == false)
+          | .metadata.name
+        ' |
+        head -n1
+    )"
+  fi
+  [[ -n "$candidate_node" ]] || fail "No Ready schedulable node found for Mailu shared storage"
+
+  kubectl label node "$candidate_node" "twinbox.io/mailu-storage-node=${label_value}" --overwrite >/dev/null
+  printf '%s\n' "$candidate_node"
+}
+
+generate_mailu_tls_secret_file() {
+  local mail_hostname="$1"
+  local output_file="$2"
+  local cert_file key_file
+
+  cert_file="$(mktemp "${TMPDIR:-/tmp}/mailu-cert-XXXXXX.crt")"
+  key_file="$(mktemp "${TMPDIR:-/tmp}/mailu-cert-XXXXXX.key")"
+  openssl req -x509 \
+    -newkey rsa:2048 \
+    -nodes \
+    -sha256 \
+    -days 825 \
+    -subj "/CN=${mail_hostname}" \
+    -addext "subjectAltName=DNS:${mail_hostname}" \
+    -keyout "$key_file" \
+    -out "$cert_file" >/dev/null 2>&1
+  jq -n \
+    --arg mail_hostname "$mail_hostname" \
+    --rawfile tls_crt "$cert_file" \
+    --rawfile tls_key "$key_file" \
+    '{
+      "mail-hostname": $mail_hostname,
+      "tls.crt": $tls_crt,
+      "tls.key": $tls_key
+    }' >"$output_file"
+  chmod 600 "$output_file"
+  rm -f "$cert_file" "$key_file"
 }
 
 validate_storage_size() {
@@ -365,6 +456,7 @@ mail_domain="$public_zone_name"
 mail_hostname="mail.${public_zone_name}"
 admin_url="https://${mail_hostname}/admin"
 webmail_url="https://${mail_hostname}/webmail"
+mailu_storage_node_label="$(sanitize_label_value "$cluster_slug")"
 
 netbird_bastion_secret="$(find_netbird_bastion_secret "$cluster_id")"
 [[ -n "$netbird_bastion_secret" && -f "$netbird_bastion_secret" ]] || fail "NetBird bastion secret not found; provision NetBird bastion first"
@@ -387,14 +479,18 @@ secrets_dir="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}/secrets/global"
 mkdir -p "$secrets_dir"
 runtime_secret_file="${secrets_dir}/mailu-runtime-${cluster_id}.json"
 relay_secret_file="${secrets_dir}/mailu-relay-${cluster_id}.json"
+certificates_secret_file="${secrets_dir}/mailu-certificates-${cluster_id}.json"
 dns_secret_file="${secrets_dir}/mailu-dns-${cluster_id}.json"
-trap 'rm -f "$runtime_secret_file" "$relay_secret_file" "$dns_secret_file"; [[ "$ssh_key_file" == /tmp/mailu-bastion-key-* ]] && rm -f "$ssh_key_file" || true' EXIT
+trap 'rm -f "$runtime_secret_file" "$relay_secret_file" "$certificates_secret_file" "$dns_secret_file"; [[ "$ssh_key_file" == /tmp/mailu-bastion-key-* ]] && rm -f "$ssh_key_file" || true' EXIT
 
 secret_key="$(openbao_existing_value mailu-runtime secret-key)"
 api_token="$(openbao_existing_value mailu-runtime api-token)"
 admin_password="$(openbao_existing_value mailu-runtime initial-admin-password)"
 relay_username="$(openbao_existing_value mailu-relay relay-username)"
 relay_password="$(openbao_existing_value mailu-relay relay-password)"
+tls_crt="$(openbao_existing_value mailu-certificates tls.crt)"
+tls_key="$(openbao_existing_value mailu-certificates tls.key)"
+tls_cert_hostname="$(openbao_existing_value mailu-certificates mail-hostname)"
 
 [[ -n "$secret_key" ]] || secret_key="$(random_hex 24)"
 [[ -n "$api_token" ]] || api_token="$(random_hex 24)"
@@ -435,11 +531,36 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --json-file "$relay_secret_file" \
   --required-keys "relay-username,relay-password"
 
+if [[ -z "$tls_crt" || -z "$tls_key" || "$tls_cert_hostname" != "$mail_hostname" ]]; then
+  log "Generating internal Mailu TLS certificate"
+  generate_mailu_tls_secret_file "$mail_hostname" "$certificates_secret_file"
+else
+  jq -n \
+    --arg mail_hostname "$mail_hostname" \
+    --arg tls_crt "$tls_crt" \
+    --arg tls_key "$tls_key" \
+    '{
+      "mail-hostname": $mail_hostname,
+      "tls.crt": $tls_crt,
+      "tls.key": $tls_key
+    }' >"$certificates_secret_file"
+  chmod 600 "$certificates_secret_file"
+fi
+
+bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+  --secret-name "mailu-certificates" \
+  --json-file "$certificates_secret_file" \
+  --required-keys "mail-hostname,tls.crt,tls.key"
+
+mailu_storage_node="$(choose_mailu_storage_node "$mailu_storage_node_label")"
+log "Using ${mailu_storage_node} as Mailu shared-storage node"
+
 log "Annotating Argo CD cluster secret with Mailu render values"
 kubectl -n argocd annotate secret in-cluster-local \
   "twinbox.io/mailu-relay-host=${mailu_relay_host}" \
   "twinbox.io/mailu-admin-localpart=${admin_localpart}" \
   "twinbox.io/mailu-storage-size=${storage_size}" \
+  "twinbox.io/mailu-storage-node=${mailu_storage_node_label}" \
   "twinbox.io/mailu-dmarc-rua-localpart=${dmarc_rua_localpart}" \
   --overwrite
 
@@ -451,6 +572,7 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
 
 wait_for_resource mailu externalsecret mailu-runtime Ready "Mailu runtime ExternalSecret"
 wait_for_resource mailu externalsecret mailu-relay Ready "Mailu relay ExternalSecret"
+wait_for_resource mailu externalsecret mailu-certificates Ready "Mailu certificates ExternalSecret"
 wait_for_resource netbird externalsecret mailu-relay-egress Ready "Mailu relay egress ExternalSecret"
 wait_for_selector mailu deployment "app.kubernetes.io/instance=mailu" Available "Mailu deployments"
 wait_for_resource netbird deployment mailu-relay-egress Available "Mailu relay egress deployment"
@@ -558,6 +680,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     --arg mailu_chart_version "2.7.1" \
     --arg mailu_app_version "2024.06.51" \
     --arg mailu_relay_host "$mailu_relay_host" \
+    --arg mailu_storage_node "$mailu_storage_node" \
     --argjson dns_records_created '["A","MX","SPF","DMARC","DKIM"]' \
     '{
       mail_domain: $mail_domain,
@@ -569,6 +692,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
       bastion_postfix_status: $bastion_postfix_status,
       mailu_chart_version: $mailu_chart_version,
       mailu_app_version: $mailu_app_version,
-      mailu_relay_host: $mailu_relay_host
+      mailu_relay_host: $mailu_relay_host,
+      mailu_storage_node: $mailu_storage_node
     }' >"$STEP_RESULT_FILE"
 fi

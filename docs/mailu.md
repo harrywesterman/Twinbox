@@ -46,7 +46,7 @@ graph LR
 | **mailu-front** | Kubernetes Service | Internal SMTP/IMAP/submission endpoint |
 | **mailu-relay-egress** | Namespace `netbird` | NetBird client + HAProxy that forwards SMTP to the bastion overlay |
 | **Bastion Postfix** | NetBird bastion | Public SMTP edge on `25/tcp`, SASL-relay on `2525/tcp` (NetBird only) |
-| **External Secrets** | OpenBao → K8s | Mailu runtime, relay, and DNS secrets |
+| **External Secrets** | OpenBao -> K8s | Mailu runtime, internal TLS, relay, and DNS secrets |
 | **DNSEndpoint** | external-dns | Publishes MX, SPF, DKIM, DMARC records |
 | **Traefik IngressRoute** | Namespace `mailu` | HTTPS for `mail.<public-zone>` admin/Webmail UI |
 
@@ -58,6 +58,8 @@ graph LR
 - The NetBird bastion runs Postfix and exposes only public inbound SMTP on `25/tcp`.
 - Mailu sends outbound mail to `mailu-relay-egress.netbird.svc.cluster.local:2525`.
 - The `mailu-relay-egress` pod runs a dedicated NetBird client and HAProxy TCP forwarder to the bastion's NetBird overlay address on port `2525`.
+- Mailu v1 uses one `ReadWriteOnce` shared PVC. The installer labels one Ready worker node with `twinbox.io/mailu-storage-node=<cluster-slug>` and pins the shared-PVC Mailu workloads to that node to avoid Longhorn multi-attach failures.
+- Apache Tika full-text indexing is disabled in v1 to keep the first mail install small and reliable.
 
 ## DNS
 
@@ -101,6 +103,7 @@ OpenBao paths:
 | Path | Keys |
 |------|------|
 | `twinbox/global/mailu-runtime` | `secret-key`, `api-token`, `initial-admin-password` |
+| `twinbox/global/mailu-certificates` | `mail-hostname`, `tls.crt`, `tls.key` |
 | `twinbox/global/mailu-relay` | `relay-username`, `relay-password` |
 | `twinbox/global/mailu-dns` | `mail_domain`, `mail_hostname`, `dkim_selector`, `dkim_txt_name`, `dkim_txt_value`, `spf_txt_name`, `spf_txt_value`, `dmarc_txt_name`, `dmarc_txt_value`, `mx_name`, `mx_value` |
 | `twinbox/global/netbird-mailu-relay-egress` | `NB_SETUP_KEY`, `NB_MANAGEMENT_URL`, `NB_HOSTNAME` |
@@ -111,7 +114,7 @@ OpenBao paths:
 |----------|---------|
 | `gitops/optional-apps/mailu.yaml` | Opt-in ApplicationSet used by the app installer (canonical) |
 | `gitops/apps/mailu.yaml` | Direct/manual Application manifest for consistency |
-| `gitops/values/mailu.yaml` | Mailu defaults, disables host ports and chart ingress, enables Roundcube, sets resource limits |
+| `gitops/values/mailu.yaml` | Mailu defaults, disables host ports/chart ingress/Tika, enables Roundcube, sets resource limits |
 | `gitops/platform-apps/mailu/` | Namespace, ExternalSecrets, Traefik IngressRoutes, relay egress resources in `netbird` namespace |
 
 The installer annotates the Argo CD cluster secret before enabling the optional app. Annotations:
@@ -121,6 +124,7 @@ The installer annotates the Argo CD cluster secret before enabling the optional 
 | `twinbox.io/mailu-relay-host` | Patches the relay egress HAProxy target |
 | `twinbox.io/mailu-admin-localpart` | Admin account local part |
 | `twinbox.io/mailu-storage-size` | Persistent storage size |
+| `twinbox.io/mailu-storage-node` | Node selector value for shared-PVC Mailu workloads |
 | `twinbox.io/mailu-dmarc-rua-localpart` | DMARC RUA local part |
 
 ## Installer Flow
@@ -130,18 +134,19 @@ The installer annotates the Argo CD cluster secret before enabling the optional 
 1. Derives `public_zone_name`, `mail_domain`, and `mail_hostname`.
 2. Loads the NetBird bastion secret and SSH key.
 3. Discovers or validates the bastion NetBird overlay IP for the Mailu relay.
-4. Generates or reuses Mailu runtime and relay secrets.
+4. Generates or reuses Mailu runtime, internal TLS, and relay secrets.
 5. Syncs secrets to OpenBao.
-6. Annotates the Argo CD cluster secret with Mailu render values.
-7. Applies the Mailu Argo CD application.
-8. Waits for ExternalSecrets, deployments, and statefulsets.
-9. Discovers the `mailu-front` ClusterIP.
-10. Configures bastion Postfix.
-11. Verifies the bastion NetBird route and TCP connectivity to `mailu-front:25`.
-12. Verifies the in-cluster relay service and the egress pod's NetBird path to the bastion relay on `2525`.
-13. Exports Mailu DNS records and generates DKIM only when no existing DKIM record is present.
-14. Creates `DNSEndpoint` records.
-15. Writes step outputs, including the relay host and PTR action required.
+6. Labels a Ready worker node for Mailu shared storage.
+7. Annotates the Argo CD cluster secret with Mailu render values.
+8. Applies the Mailu Argo CD application.
+9. Waits for ExternalSecrets, deployments, and statefulsets.
+10. Discovers the `mailu-front` ClusterIP.
+11. Configures bastion Postfix.
+12. Verifies the bastion NetBird route and TCP connectivity to `mailu-front:25`.
+13. Verifies the in-cluster relay service and the egress pod's NetBird path to the bastion relay on `2525`.
+14. Exports Mailu DNS records and generates DKIM only when no existing DKIM record is present.
+15. Creates `DNSEndpoint` records.
+16. Writes step outputs, including the relay host, storage node, and PTR action required.
 
 DNS is intentionally created after the NetBird route, relay egress, and Postfix checks. A failed install should not publish MX records that point production mail at an unverified edge.
 
@@ -181,7 +186,7 @@ kubectl -n external-dns get dnsendpoint mailu-mail-dns
 
 | Symptom | Likely cause | Check |
 |---------|-------------|-------|
-| Mailu pods are pending or CrashLoopBackOff | External Secrets not synced, PVC not provisioned, or Longhorn not ready | `kubectl -n mailu get externalsecret` and `kubectl -n mailu get pvc` |
+| Mailu pods are pending or CrashLoopBackOff | External Secrets not synced, PVC not provisioned, storage-node label missing, or Longhorn not ready | `kubectl -n mailu get externalsecret`, `kubectl -n mailu get pvc`, and `kubectl get nodes -l twinbox.io/mailu-storage-node` |
 | Outbound mail is queued but not delivered | Relay egress pod is not connected to NetBird, or bastion Postfix relay is down | `kubectl -n netbird logs deployment/mailu-relay-egress` and verify NetBird peer status |
 | Public SMTP rejects inbound mail | DNS MX record not yet published, bastion Postfix not configured, or Hetzner firewall blocks `25/tcp` | `dig MX <zone>`, `ssh bastion postfix check`, check Hetzner firewall rules |
 | `mail.<zone>` does not load in browser | Traefik IngressRoute missing or certificate not issued | `kubectl -n mailu get ingressroute` and check cert-manager certificate status |

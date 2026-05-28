@@ -53,6 +53,7 @@ ingress:
   realIpFrom: ""
 
 front:
+  nodeSelector: {}
   hostPort:
     enabled: false
   externalService:
@@ -67,6 +68,7 @@ front:
       memory: 512Mi
 
 admin:
+  nodeSelector: {}
   resources:
     requests:
       cpu: 100m
@@ -76,6 +78,7 @@ admin:
       memory: 1Gi
 
 postfix:
+  nodeSelector: {}
   resources:
     requests:
       cpu: 100m
@@ -85,6 +88,7 @@ postfix:
       memory: 1Gi
 
 dovecot:
+  nodeSelector: {}
   resources:
     requests:
       cpu: 100m
@@ -94,6 +98,7 @@ dovecot:
       memory: 1Gi
 
 rspamd:
+  nodeSelector: {}
   resources:
     requests:
       cpu: 250m
@@ -115,6 +120,7 @@ webmail:
   enabled: true
   uri: /webmail
   type: roundcube
+  nodeSelector: {}
   resources:
     requests:
       cpu: 100m
@@ -147,6 +153,9 @@ persistence:
   accessModes:
     - ReadWriteOnce
   storageClass: longhorn-single
+
+tika:
+  enabled: false
 
 networkPolicy:
   enabled: false

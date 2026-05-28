@@ -20,6 +20,9 @@ the public mail hostname.
   forwarder to the bastion's existing NetBird overlay address on port `2525`.
 - The installer verifies the existing `netbird-client` peer on the bastion
   before publishing DNS records.
+- Mailu v1 uses one `ReadWriteOnce` shared PVC. The installer labels one Ready
+  worker node and pins shared-PVC Mailu workloads to that node.
+- Apache Tika full-text indexing is disabled for v1.
 
 ## GitOps Resources
 
@@ -29,8 +32,8 @@ the public mail hostname.
   consistency with existing app patterns. The installer uses
   `gitops/optional-apps/mailu.yaml`, which is the canonical path.
 - `gitops/values/mailu.yaml` contains Mailu defaults, disables host ports and
-  chart ingress, enables Roundcube webmail, and sets explicit resource requests
-  and limits.
+  chart ingress, disables Tika, enables Roundcube webmail, and sets explicit
+  resource requests and limits.
 - `gitops/platform-apps/mailu/` contains the Mailu namespace,
   Mailu ExternalSecrets, Traefik IngressRoutes, and explicitly namespaced
   Mailu relay egress resources in the privileged `netbird` namespace.
@@ -41,6 +44,7 @@ optional app. The ApplicationSet reads these annotations:
 - `twinbox.io/mailu-relay-host`
 - `twinbox.io/mailu-admin-localpart`
 - `twinbox.io/mailu-storage-size`
+- `twinbox.io/mailu-storage-node`
 - `twinbox.io/mailu-dmarc-rua-localpart`
 
 `twinbox.io/mailu-relay-host` patches the relay egress HAProxy target. Mailu
@@ -54,6 +58,10 @@ OpenBao paths:
   - `secret-key`
   - `api-token`
   - `initial-admin-password`
+- `twinbox/global/mailu-certificates`
+  - `mail-hostname`
+  - `tls.crt`
+  - `tls.key`
 - `twinbox/global/mailu-relay`
   - `relay-username`
   - `relay-password`
@@ -133,21 +141,23 @@ NetBird guardrails:
 1. Derives `public_zone_name`, `mail_domain`, and `mail_hostname`.
 2. Loads the NetBird bastion secret and SSH key.
 3. Discovers or validates the bastion NetBird overlay IP for the Mailu relay.
-4. Generates or reuses Mailu runtime and relay secrets.
+4. Generates or reuses Mailu runtime, internal TLS, and relay secrets.
 5. Syncs secrets to OpenBao.
-6. Annotates the Argo CD cluster secret with Mailu render values.
-7. Applies the Mailu Argo CD application.
-8. Waits for ExternalSecrets, deployments, and statefulsets.
-9. Discovers the `mailu-front` ClusterIP.
-10. Configures bastion Postfix.
-11. Verifies the bastion NetBird route and TCP connectivity to
+6. Labels one Ready worker node for Mailu shared storage.
+7. Annotates the Argo CD cluster secret with Mailu render values.
+8. Applies the Mailu Argo CD application.
+9. Waits for ExternalSecrets, deployments, and statefulsets.
+10. Discovers the `mailu-front` ClusterIP.
+11. Configures bastion Postfix.
+12. Verifies the bastion NetBird route and TCP connectivity to
     `mailu-front:25`.
-12. Verifies the in-cluster relay service and the egress pod's NetBird path to
+13. Verifies the in-cluster relay service and the egress pod's NetBird path to
     the bastion relay on `2525`.
-13. Exports Mailu DNS records and generates DKIM only when no existing DKIM
+14. Exports Mailu DNS records and generates DKIM only when no existing DKIM
     record is present.
-14. Creates `DNSEndpoint` records.
-15. Writes step outputs, including the relay host and PTR action required.
+15. Creates `DNSEndpoint` records.
+16. Writes step outputs, including the relay host, storage node, and PTR action
+    required.
 
 DNS is intentionally created after the NetBird route, relay egress, and Postfix
 checks. A failed install should not publish MX records that point production

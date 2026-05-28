@@ -38,6 +38,24 @@ spec:
                 rua: "{{or (index .metadata.annotations "twinbox.io/mailu-dmarc-rua-localpart") "dmarc"}}"
               persistence:
                 size: "{{or (index .metadata.annotations "twinbox.io/mailu-storage-size") "100Gi"}}"
+              front:
+                nodeSelector:
+                  twinbox.io/mailu-storage-node: "{{index .metadata.annotations "twinbox.io/mailu-storage-node"}}"
+              admin:
+                nodeSelector:
+                  twinbox.io/mailu-storage-node: "{{index .metadata.annotations "twinbox.io/mailu-storage-node"}}"
+              postfix:
+                nodeSelector:
+                  twinbox.io/mailu-storage-node: "{{index .metadata.annotations "twinbox.io/mailu-storage-node"}}"
+              dovecot:
+                nodeSelector:
+                  twinbox.io/mailu-storage-node: "{{index .metadata.annotations "twinbox.io/mailu-storage-node"}}"
+              rspamd:
+                nodeSelector:
+                  twinbox.io/mailu-storage-node: "{{index .metadata.annotations "twinbox.io/mailu-storage-node"}}"
+              webmail:
+                nodeSelector:
+                  twinbox.io/mailu-storage-node: "{{index .metadata.annotations "twinbox.io/mailu-storage-node"}}"
         - repoURL: https://github.com/harrywesterman/Twinbox.git
           targetRevision: main
           ref: values

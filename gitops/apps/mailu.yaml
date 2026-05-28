@@ -23,6 +23,24 @@ spec:
             host: "[mailu-relay-egress.netbird.svc.cluster.local]:2525"
           dmarc:
             rua: dmarc
+          front:
+            nodeSelector:
+              twinbox.io/mailu-storage-node: "__MAILU_STORAGE_NODE__"
+          admin:
+            nodeSelector:
+              twinbox.io/mailu-storage-node: "__MAILU_STORAGE_NODE__"
+          postfix:
+            nodeSelector:
+              twinbox.io/mailu-storage-node: "__MAILU_STORAGE_NODE__"
+          dovecot:
+            nodeSelector:
+              twinbox.io/mailu-storage-node: "__MAILU_STORAGE_NODE__"
+          rspamd:
+            nodeSelector:
+              twinbox.io/mailu-storage-node: "__MAILU_STORAGE_NODE__"
+          webmail:
+            nodeSelector:
+              twinbox.io/mailu-storage-node: "__MAILU_STORAGE_NODE__"
     - repoURL: __REPO_URL__
       targetRevision: __TARGET_REVISION__
       ref: values
