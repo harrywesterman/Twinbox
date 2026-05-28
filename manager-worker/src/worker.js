@@ -676,6 +676,38 @@ function resolveJobSecretRuntime(payload, clusterId = null) {
   };
 }
 
+function resolvePostRefreshSecretRuntime(
+  payload,
+  clusterId = null,
+  stepRuntime = emptySecretRuntime()
+) {
+  const cluster = payload?.context?.cluster || null;
+  if (!cluster?.metadata) {
+    return {
+      env: withKubeconfigAliases(stepRuntime.env),
+      redactions: [...(stepRuntime.redactions || [])],
+      strip_env: [...(stepRuntime.strip_env || [])],
+      cleanup() {},
+    };
+  }
+
+  const clusterRuntime = resolveJobSecretRuntime(cluster, clusterId);
+
+  return {
+    env: withKubeconfigAliases({
+      ...clusterRuntime.env,
+      ...stepRuntime.env,
+    }),
+    redactions: [...(clusterRuntime.redactions || []), ...(stepRuntime.redactions || [])],
+    strip_env: Array.from(
+      new Set([...(clusterRuntime.strip_env || []), ...(stepRuntime.strip_env || [])])
+    ),
+    cleanup() {
+      clusterRuntime.cleanup();
+    },
+  };
+}
+
 function loadPinnedDefaults() {
   const file = path.join(workspace, "config", "pinned-defaults.sh");
   if (!fs.existsSync(file)) {
@@ -1151,33 +1183,39 @@ async function handleRunStep(job) {
       clusterInstanceId || clusterId
     );
 
-    await refreshDashyConfig(
-      job.id,
-      stepId,
-      outputs?.cluster_id || clusterId,
-      outputs?.cluster_instance_id || clusterInstanceId,
-      secretRuntime.env,
-      redact,
-      secretRuntime.strip_env
-    );
-    await refreshPortalConfig(
-      job.id,
-      stepId,
-      outputs?.cluster_id || clusterId,
-      outputs?.cluster_instance_id || clusterInstanceId,
-      secretRuntime.env,
-      redact,
-      secretRuntime.strip_env
-    );
-    await refreshGrafanaDashboard(
-      job.id,
-      stepId,
-      outputs?.cluster_id || clusterId,
-      outputs?.cluster_instance_id || clusterInstanceId,
-      secretRuntime.env,
-      redact,
-      secretRuntime.strip_env
-    );
+    const postRefreshRuntime = resolvePostRefreshSecretRuntime(payload, clusterId, secretRuntime);
+    const postRefreshRedact = buildRedactor(postRefreshRuntime.redactions);
+    try {
+      await refreshDashyConfig(
+        job.id,
+        stepId,
+        outputs?.cluster_id || clusterId,
+        outputs?.cluster_instance_id || clusterInstanceId,
+        postRefreshRuntime.env,
+        postRefreshRedact,
+        postRefreshRuntime.strip_env
+      );
+      await refreshPortalConfig(
+        job.id,
+        stepId,
+        outputs?.cluster_id || clusterId,
+        outputs?.cluster_instance_id || clusterInstanceId,
+        postRefreshRuntime.env,
+        postRefreshRedact,
+        postRefreshRuntime.strip_env
+      );
+      await refreshGrafanaDashboard(
+        job.id,
+        stepId,
+        outputs?.cluster_id || clusterId,
+        outputs?.cluster_instance_id || clusterInstanceId,
+        postRefreshRuntime.env,
+        postRefreshRedact,
+        postRefreshRuntime.strip_env
+      );
+    } finally {
+      postRefreshRuntime.cleanup();
+    }
   } catch (err) {
     if (String(err?.message || "") === "job canceled") {
       updateStepState(

@@ -2867,6 +2867,10 @@ def test_grafana_worker_refreshes_dashboard_after_cluster_jobs():
     worker_text = WORKER_JS.read_text(encoding="utf-8")
 
     assert "refreshGrafanaDashboard(" in worker_text
+    assert "resolvePostRefreshSecretRuntime(" in worker_text
+    assert "buildClusterWorkerSecretBundle(cluster)" in worker_text
+    assert "withKubeconfigAliases({" in worker_text
+    assert "postRefreshRuntime.cleanup()" in worker_text
     assert "scripts/manager/refresh-grafana-dashboard.mjs" in worker_text
     assert "reconcileGrafanaDashboardsOnStartup" in worker_text
     assert "manager-worker-startup" in worker_text
