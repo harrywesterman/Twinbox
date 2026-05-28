@@ -328,4 +328,10 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --json-file "$argocd_cli_file" \
   --required-keys "ARGOCD_HOST,CLUSTER_ID"
 
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Ensuring NetBird reverse proxy service for Argo CD"
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "argocd" \
+  --service-domain "argocd.${public_zone_name}" \
+  --service-path /
+
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Argo CD Authentik configuration complete"
