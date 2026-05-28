@@ -119,7 +119,7 @@ def test_mailu_ingressroutes_target_mailu_front_only():
         assert len(routes) == 2
 
         webmail_route = routes[0]
-        assert "PathPrefix" in webmail_route["match"] and "/webmail" in webmail_route["match"]
+        assert "PathPrefix" in webmail_route["match"] and "/outpost.goauthentik.io" in webmail_route["match"]
         webmail_service = webmail_route["services"][0]
         assert webmail_service["name"] == "mailu-front"
         assert webmail_service["port"] == 80

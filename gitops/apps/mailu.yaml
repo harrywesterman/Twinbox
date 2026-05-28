@@ -62,7 +62,7 @@ spec:
             patch: |-
               - op: replace
                 path: /spec/routes/0/match
-                value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
+                value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
               - op: replace
                 path: /spec/routes/1/match
                 value: Host(`mail.__ZONE_NAME__`)
@@ -72,7 +72,7 @@ spec:
             patch: |-
               - op: replace
                 path: /spec/routes/0/match
-                value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
+                value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
               - op: replace
                 path: /spec/routes/1/match
                 value: Host(`mail.__ZONE_NAME__`)
@@ -82,7 +82,7 @@ spec:
             patch: |-
               - op: replace
                 path: /spec/routes/0/match
-                value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
+                value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
               - op: replace
                 path: /spec/routes/1/match
                 value: Host(`mail.__ZONE_NAME__`)
@@ -92,7 +92,7 @@ spec:
             patch: |-
               - op: replace
                 path: /spec/routes/0/match
-                value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
+                value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
               - op: replace
                 path: /spec/routes/1/match
                 value: Host(`mail.__ZONE_NAME__`)
