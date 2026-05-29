@@ -64,6 +64,8 @@ front:
   externalService:
     enabled: false
   replicaCount: 1
+  extraVolumes: []
+  extraVolumeMounts: []
   resources:
     requests:
       cpu: 100m
