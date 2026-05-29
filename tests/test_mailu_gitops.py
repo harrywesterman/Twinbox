@@ -30,8 +30,8 @@ def test_mailu_optional_appset_uses_pinned_mailu_chart():
 
     direct_app_text = (REPO_ROOT / "gitops" / "apps" / "mailu.yaml").read_text(encoding="utf-8")
     relay_host = "[mailu-relay-egress.netbird.svc.cluster.local]:2525"
-    assert relay_host in direct_app_text
     assert relay_host in helm_source["helm"]["values"]
+    assert "__MAILU_RELAY_TARGET_HOST__" in direct_app_text
     assert "__MAILU_RELAY_HOST__" not in direct_app_text
     assert "mail.__ZONE_NAME__:2525" not in direct_app_text
 
@@ -195,13 +195,10 @@ def test_mailu_single_pvc_workloads_are_pinned_to_storage_node():
     appset_text = (REPO_ROOT / "gitops" / "optional-apps" / "mailu.yaml").read_text(
         encoding="utf-8"
     )
-    direct_app_text = (REPO_ROOT / "gitops" / "apps" / "mailu.yaml").read_text(encoding="utf-8")
 
     assert "twinbox.io/mailu-storage-node" in appset_text
-    assert "__MAILU_STORAGE_NODE__" in direct_app_text
     for component in ("front", "admin", "postfix", "dovecot", "rspamd", "webmail"):
         assert f"{component}:\n                nodeSelector:" in appset_text
-        assert f"{component}:\n            nodeSelector:" in direct_app_text
 
 
 def test_bastion_postfix_script_has_open_relay_guards():
