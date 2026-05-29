@@ -106,3 +106,37 @@ services:
       - seaweedfs
     ports:
       - "23646:23646"
+
+  beszel:
+    image: henrygd/beszel:${BESZEL_VERSION:-0.18.7}
+    container_name: twinbox-beszel
+    restart: unless-stopped
+    environment:
+      - APP_URL=https://beszel.__ZONE_NAME__
+      - BESZEL_OIDC_ENABLED=${BESZEL_OIDC_ENABLED:-false}
+      - BESZEL_OIDC_PROVIDER_URL=${BESZEL_OIDC_PROVIDER_URL:-}
+      - BESZEL_OIDC_CLIENT_ID=${BESZEL_OIDC_CLIENT_ID:-}
+      - BESZEL_OIDC_CLIENT_SECRET=${BESZEL_OIDC_CLIENT_SECRET:-}
+      - BESZEL_AUTH_DISABLE_PASSWORD=${BESZEL_AUTH_DISABLE_PASSWORD:-false}
+    ports:
+      - "8090:8090"
+    volumes:
+      - /opt/twinbox/beszel/data:/beszel_data
+      - /opt/twinbox/beszel/socket:/beszel_socket
+
+  beszel-agent:
+    image: henrygd/beszel-agent:${BESZEL_VERSION:-0.18.7}
+    container_name: twinbox-beszel-agent
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /opt/twinbox/beszel/agent-data:/var/lib/beszel-agent
+      - /opt/twinbox/beszel/socket:/beszel_socket
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - LISTEN=/beszel_socket/beszel.sock
+      - HUB_URL=http://localhost:8090
+      - KEY=${BESZEL_AGENT_KEY:-}
+      - TOKEN=${BESZEL_AGENT_TOKEN:-}
+    depends_on:
+      - beszel

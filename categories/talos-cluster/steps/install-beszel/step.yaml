@@ -1,0 +1,34 @@
+id: install-beszel
+title: Install Beszel Monitoring
+type: action
+journey_stage: manage
+summary: Lightweight server monitoring with Docker stats, historical data, and alerts.
+explanation: >
+  Beszel monitors your Management VM and all Kubernetes cluster nodes.
+  It tracks CPU, memory, disk, network, and container usage with a
+  lightweight agent — no public internet exposure required.
+  Configure alerts for CPU, memory, disk, and system status in the
+  Beszel dashboard.
+side_help: >
+  Beszel uses a hub-and-agent architecture. The hub runs on the Management VM
+  and provides a web dashboard with OIDC login via Authentik. A local agent
+  monitors the Management VM itself, and a DaemonSet on the cluster monitors
+  all Kubernetes nodes.
+dashy:
+  items:
+    - section: Platform
+      title: Beszel
+      description: Server monitoring dashboard
+      icon: fas fa-heartbeat
+      url_template: https://beszel.__ZONE_NAME__
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/install-beszel/run.sh

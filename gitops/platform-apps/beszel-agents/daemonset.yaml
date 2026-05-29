@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: beszel-agent
+  namespace: beszel
+  labels:
+    app.kubernetes.io/name: beszel-agent
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: beszel-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: beszel-agent
+    spec:
+      hostNetwork: true
+      hostPID: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: agent
+          image: henrygd/beszel-agent:0.18.7
+          env:
+            - name: HUB_URL
+              value: "https://beszel.__ZONE_NAME__"
+            - name: KEY
+              valueFrom:
+                secretKeyRef:
+                  name: beszel-agent-credentials
+                  key: key
+            - name: TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: beszel-agent-credentials
+                  key: token
+            - name: CONTAINER_RUNTIME
+              value: "containerd"
+          volumeMounts:
+            - name: containerd-sock
+              mountPath: /run/containerd/containerd.sock
+              readOnly: true
+            - name: agent-data
+              mountPath: /var/lib/beszel-agent
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: containerd-sock
+          hostPath:
+            path: /run/containerd/containerd.sock
+        - name: agent-data
+          hostPath:
+            path: /var/lib/beszel-agent
+            type: DirectoryOrCreate
