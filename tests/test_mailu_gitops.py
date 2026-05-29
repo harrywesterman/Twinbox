@@ -50,9 +50,9 @@ def test_mailu_values_keep_mail_ports_internal_and_set_resources():
     assert values["persistence"]["accessModes"] == ["ReadWriteOnce"]
     assert values["tika"]["enabled"] is False
 
-    assert values["proxyAuth"]["create"] == "true"
-    assert values["proxyAuth"]["header"] == "X-authentik-email"
-    assert "10.244.0.0/16" in values["proxyAuth"]["whitelist"]
+    assert values["proxyAuth"]["create"] == "false"
+    assert values["proxyAuth"]["header"] == ""
+    assert values["proxyAuth"]["whitelist"] == ""
 
     for component in ("front", "admin", "postfix", "dovecot", "rspamd", "clamav", "webmail"):
         resources = values[component]["resources"]
@@ -116,48 +116,15 @@ def test_mailu_ingressroutes_target_mailu_front_only():
 
     for doc in docs:
         routes = doc["spec"]["routes"]
-        assert len(routes) == 2
+        assert len(routes) == 1
 
-        outpost_route = routes[0]
-        assert "PathPrefix" in outpost_route["match"] and "/outpost.goauthentik.io" in outpost_route["match"]
-        outpost_service = outpost_route["services"][0]
-        assert outpost_service["name"] == "mailu-front"
-        assert outpost_service["port"] == 80
-        assert outpost_route.get("middlewares") is None
-
-        catchall_route = routes[1]
-        catchall_service = catchall_route["services"][0]
-        assert catchall_service["name"] == "mailu-front"
-        assert catchall_service["port"] == 80
-        middlewares = catchall_route.get("middlewares", [])
-        assert any(mw["name"] == "authentik-forwardauth" for mw in middlewares)
-
-
-def test_mailu_nginx_override_disables_auth_request_for_webmail():
-    override = _load_yaml(MAILU_PLATFORM_DIR / "nginx-override-webmail.yaml")
-    assert override["metadata"]["name"] == "mailu-nginx-override-webmail"
-    assert override["metadata"]["namespace"] == "mailu"
-    conf = override["data"]["override-webmail-noauth.conf"]
-    assert "auth_request off" in conf
-    assert "location = /webmail" in conf
-    assert "location ^~ /webmail/" in conf
-    assert "proxy_pass http://$webmail" in conf
-
-    values = _load_yaml(REPO_ROOT / "gitops" / "values" / "mailu.yaml")
-    vol_names = [v["name"] for v in values["front"]["extraVolumes"]]
-    assert "nginx-override-webmail" in vol_names
-    mount_names = [m["name"] for m in values["front"]["extraVolumeMounts"]]
-    assert "nginx-override-webmail" in mount_names
-    assert "/overrides" in [m["mountPath"] for m in values["front"]["extraVolumeMounts"]]
-
-
-def test_mailu_authentik_forwardauth_middleware_exists():
-    middleware = _load_yaml(MAILU_PLATFORM_DIR / "authentik-forwardauth-middleware.yaml")
-    assert middleware["kind"] == "Middleware"
-    assert middleware["metadata"]["name"] == "authentik-forwardauth"
-    assert middleware["metadata"]["namespace"] == "mailu"
-    assert "authentik-server.authentik.svc.cluster.local" in middleware["spec"]["forwardAuth"]["address"]
-    assert "X-authentik-email" in middleware["spec"]["forwardAuth"]["authResponseHeaders"]
+        route = routes[0]
+        assert route["kind"] == "Rule"
+        assert "Host(`mail.__ZONE_NAME__`)" in route["match"]
+        service = route["services"][0]
+        assert service["name"] == "mailu-front"
+        assert service["port"] == 80
+        assert route.get("middlewares") is None
 
 
 def test_external_dns_allows_mx_records():
@@ -188,12 +155,10 @@ def test_mailu_step_and_scripts_are_wired():
 
 def test_mailu_relay_egress_resources_are_wired():
     kustomization = _load_yaml(MAILU_PLATFORM_DIR / "kustomization.yaml")
-    assert "authentik-forwardauth-middleware.yaml" in kustomization["resources"]
     assert "externalsecret-certificates.yaml" in kustomization["resources"]
     assert "externalsecret-relay-egress.yaml" in kustomization["resources"]
     assert "relay-egress-config.yaml" in kustomization["resources"]
     assert "relay-egress.yaml" in kustomization["resources"]
-    assert "nginx-override-webmail.yaml" in kustomization["resources"]
 
     docs = list(yaml.safe_load_all((MAILU_PLATFORM_DIR / "relay-egress.yaml").read_text()))
     service = next(doc for doc in docs if doc["kind"] == "Service")

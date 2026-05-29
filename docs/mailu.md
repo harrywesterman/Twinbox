@@ -60,6 +60,11 @@ graph LR
 - The `mailu-relay-egress` pod runs a dedicated NetBird client and HAProxy TCP forwarder to the bastion's NetBird overlay address on port `2525`.
 - Mailu v1 uses one `ReadWriteOnce` shared PVC. The installer labels one Ready worker node with `twinbox.io/mailu-storage-node=<cluster-slug>` and pins the shared-PVC Mailu workloads to that node to avoid Longhorn multi-attach failures.
 - Apache Tika full-text indexing is disabled in v1 to keep the first mail install small and reliable.
+- Mailu uses its own built-in login system for admin and webmail authentication.
+
+## Authentication
+
+Users authenticate directly through Mailu's admin UI. The initial admin credentials are set via the `initialAccount` Helm values during installation. The password is stored in OpenBao at `twinbox/global/mailu-runtime` (key: `initial-admin-password`) and materialized as a Kubernetes secret.
 
 ## DNS
 

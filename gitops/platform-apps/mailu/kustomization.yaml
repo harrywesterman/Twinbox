@@ -3,7 +3,6 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
-  - authentik-forwardauth-middleware.yaml
   - externalsecret-certificates.yaml
   - externalsecret-runtime.yaml
   - externalsecret-relay.yaml
@@ -11,4 +10,3 @@ resources:
   - relay-egress-config.yaml
   - relay-egress.yaml
   - ingressroute.yaml
-  - nginx-override-webmail.yaml
