@@ -4503,7 +4503,9 @@ def test_netbird_bastion_falls_back_to_cpx22_on_hetzner_capacity_errors():
     assert "Cleaning up partially created Hetzner resources before retrying with cpx22" in run_text
     assert "Retrying NetBird VPS OpenTofu configuration with cpx22" in run_text
     assert "Defaults to `cax11` and falls back once to `cpx22`" in docs_text
-    assert "If Hetzner returns `resource_unavailable` while placing the default `cax11`" in docs_text
+    assert (
+        "If Hetzner returns `resource_unavailable` while placing the default `cax11`" in docs_text
+    )
 
 
 def test_netbird_cloud_init_uses_exact_netbird_cert_and_tcp_passthrough():
