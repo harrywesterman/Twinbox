@@ -4491,6 +4491,21 @@ def test_netbird_bastion_provisioning_fetches_dns_credentials():
         assert removed not in netbird_vars_text
 
 
+def test_netbird_bastion_falls_back_to_cpx22_on_hetzner_capacity_errors():
+    step_text = NETBIRD_BASTION_STEP_MANIFEST.read_text(encoding="utf-8")
+    run_text = NETBIRD_BASTION_STEP_SCRIPT.read_text(encoding="utf-8")
+    docs_text = (REPO_ROOT / "docs" / "netbird.md").read_text(encoding="utf-8")
+
+    assert "default: cax11" in step_text
+    assert "cpx22" in step_text
+    assert "resource_unavailable" in run_text
+    assert "Hetzner placement for cax11 is unavailable; retrying once with cpx22" in run_text
+    assert "Cleaning up partially created Hetzner resources before retrying with cpx22" in run_text
+    assert "Retrying NetBird VPS OpenTofu configuration with cpx22" in run_text
+    assert "Defaults to `cax11` and falls back once to `cpx22`" in docs_text
+    assert "If Hetzner returns `resource_unavailable` while placing the default `cax11`" in docs_text
+
+
 def test_netbird_cloud_init_uses_exact_netbird_cert_and_tcp_passthrough():
     text = NETBIRD_CLOUD_INIT.read_text(encoding="utf-8")
 

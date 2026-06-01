@@ -246,6 +246,45 @@ delete_hcloud_resources_by_name "servers" "$legacy_server_name" "$server_name"
 delete_hcloud_resources_by_name "firewalls" "${legacy_server_name}-fw" "${server_name}-fw"
 delete_hcloud_resources_by_name "ssh_keys" "${legacy_server_name}-ssh-key" "${server_name}-ssh-key"
 
+apply_netbird_tofu() {
+  local server_type="$1"
+  local apply_log_file
+  local tofu_status
+
+  apply_log_file="$(mktemp "${TMPDIR:-/tmp}/netbird-tofu-apply-XXXXXX")"
+
+  if tofu apply -no-color -auto-approve -input=false \
+    -var "hcloud_token=$hcloud_token" \
+    -var "ssh_public_key=$ssh_public_key" \
+    -var "server_name=$server_name" \
+    -var "server_type=$server_type" \
+    -var "image=debian-13" \
+    -var "location=$hcloud_location" \
+    -var "netbird_fqdn=$netbird_fqdn" \
+    -var "netbird_proxy_domain=$netbird_proxy_domain" \
+    -var "public_zone_name=$public_zone_name" \
+    -var "netbird_admin_email=$netbird_admin_email" \
+    -var "netbird_version=${PINNED_NETBIRD_VERSION:-0.70.5}" \
+    -var "dns_provider=$dns_provider" \
+    -var "dns_api_token=$dns_api_token" \
+    -var "dns_api_secret=$dns_api_secret" \
+    2>&1 | tee "$apply_log_file"; then
+    rm -f "$apply_log_file"
+    return 0
+  fi
+
+  tofu_status=${PIPESTATUS[0]}
+  if [[ "$server_type" == "cax11" ]] && grep -q "resource_unavailable" "$apply_log_file"; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Hetzner placement for cax11 is unavailable; retrying once with cpx22" >&2
+    rm -f "$apply_log_file"
+    return 2
+  fi
+
+  cat "$apply_log_file" >&2
+  rm -f "$apply_log_file"
+  return "$tofu_status"
+}
+
 if [[ -z "$ssh_public_key" ]]; then
   ssh_key_dir="$MANAGER_DATA_DIR/ssh/netbird-${cluster_id}"
   mkdir -p "$ssh_key_dir"
@@ -267,21 +306,23 @@ cd "$tf_workdir"
 tofu init -no-color -input=false
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Applying NetBird VPS OpenTofu configuration"
-tofu apply -no-color -auto-approve -input=false \
-  -var "hcloud_token=$hcloud_token" \
-  -var "ssh_public_key=$ssh_public_key" \
-  -var "server_name=$server_name" \
-  -var "server_type=$hcloud_server_type" \
-  -var "image=debian-13" \
-  -var "location=$hcloud_location" \
-  -var "netbird_fqdn=$netbird_fqdn" \
-  -var "netbird_proxy_domain=$netbird_proxy_domain" \
-  -var "public_zone_name=$public_zone_name" \
-  -var "netbird_admin_email=$netbird_admin_email" \
-  -var "netbird_version=${PINNED_NETBIRD_VERSION:-0.70.5}" \
-  -var "dns_provider=$dns_provider" \
-  -var "dns_api_token=$dns_api_token" \
-  -var "dns_api_secret=$dns_api_secret"
+if apply_netbird_tofu "$hcloud_server_type"; then
+  :
+else
+  apply_status=$?
+  if [[ $apply_status -eq 2 ]]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Cleaning up partially created Hetzner resources before retrying with cpx22"
+    delete_hcloud_resources_by_name "servers" "$legacy_server_name" "$server_name"
+    delete_hcloud_resources_by_name "firewalls" "${legacy_server_name}-fw" "${server_name}-fw"
+    delete_hcloud_resources_by_name "ssh_keys" "${legacy_server_name}-ssh-key" "${server_name}-ssh-key"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Retrying NetBird VPS OpenTofu configuration with cpx22"
+    if ! apply_netbird_tofu "cpx22"; then
+      fail "NetBird bastion provisioning failed after retrying with cpx22. See the OpenTofu output above for details."
+    fi
+  else
+    fail "NetBird bastion provisioning failed. See the OpenTofu output above for details."
+  fi
+fi
 
 server_ipv4="$(tofu output -raw server_ipv4)"
 netbird_url="$(tofu output -raw netbird_url)"

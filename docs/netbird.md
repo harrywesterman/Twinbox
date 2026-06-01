@@ -144,13 +144,16 @@ Step: `provision-netbird-bastion`
 
 This step creates the Hetzner VPS and bootstraps the NetBird server stack.
 
+If Hetzner returns `resource_unavailable` while placing the default `cax11`
+server, Twinbox retries once with `cpx22`.
+
 Inputs:
 
 | Input | Required | Notes |
 | --- | --- | --- |
 | `hcloud_token` | Yes | Hetzner Cloud token with permissions to create servers, SSH keys, and firewalls. |
 | `hcloud_location` | No | Defaults to `fsn1`. |
-| `hcloud_server_type` | No | Defaults to `cax11`. |
+| `hcloud_server_type` | No | Defaults to `cax11` and falls back once to `cpx22` if Hetzner cannot place the default server. |
 | `netbird_admin_email` | Usually no | Falls back to the first admin email from `create-users-and-groups`. |
 | `ssh_public_key` | No | If omitted, Twinbox generates and stores an ed25519 key under `manager-data/ssh/netbird-<cluster-id>/`. |
 

@@ -38,7 +38,7 @@ inputs:
     type: string
     required: false
     default: cax11
-    help: "Server size: cax11 (ARM64, 2vCPU/4GB), cx22 (x86, 2vCPU/4GB)"
+    help: "Server size: cax11 (ARM64, 2vCPU/4GB), cpx22 (x86, 2vCPU/4GB). Twinbox retries once with cpx22 if cax11 placement is unavailable."
 secrets:
   files:
     KUBECONFIG_FILE:
