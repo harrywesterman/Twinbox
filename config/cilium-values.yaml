@@ -31,6 +31,9 @@ securityContext:
       - SYS_ADMIN
       - SYS_RESOURCE
 
+extraConfig:
+  endpoint-regen-interval: 5m0s
+
 operator:
   replicas: 1
 
