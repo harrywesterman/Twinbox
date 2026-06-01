@@ -941,12 +941,21 @@ write_node_patch() {
     echo "      port: 7445"
     echo "    hostDNS:"
     echo "      forwardKubeDNSToHost: false"
-    echo "cluster:"
-    echo "  network:"
-    echo "    cni:"
-    echo "      name: none"
-    echo "  proxy:"
-    echo "    disabled: true"
+echo "cluster:"
+echo "  network:"
+echo "    cni:"
+echo "      name: none"
+echo "  proxy:"
+echo "    disabled: true"
+if [[ "$type" == "controlplane" ]]; then
+  echo "  apiServer:"
+  echo "    resources:"
+  echo "      requests:"
+  echo "        cpu: 500m"
+  echo "        memory: 1Gi"
+  echo "      limits:"
+  echo "        memory: 2Gi"
+fi
   } > "$patch_file"
 }
 
@@ -1331,6 +1340,32 @@ bootstrap_cluster "$first_controlplane_ip"
 wait_for_kubernetes_rollout "daemonset/cilium" "kube-system" "Cilium DaemonSet"
 wait_for_kubernetes_rollout "deployment/cilium-operator" "kube-system" "Cilium operator"
 wait_for_kubernetes_rollout "deployment/coredns" "kube-system" "CoreDNS"
+
+patch_coredns_deployment() {
+  log "Patching CoreDNS with topology spread constraints"
+  kubectl --kubeconfig "$kubeconfig_file" patch deployment coredns -n kube-system --type merge -p '{
+    "spec": {
+      "template": {
+        "spec": {
+          "topologySpreadConstraints": [
+            {
+              "maxSkew": 1,
+              "topologyKey": "kubernetes.io/hostname",
+              "whenUnsatisfiable": "DoNotSchedule",
+              "labelSelector": {
+                "matchLabels": {
+                  "k8s-app": "kube-dns"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }'
+}
+patch_coredns_deployment
+
 if kubectl --kubeconfig "$kubeconfig_file" -n kube-system get ds kube-proxy >/dev/null 2>&1; then
   fail "kube-proxy daemonset should not exist in kube-proxy-free mode"
 fi
