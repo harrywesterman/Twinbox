@@ -26,4 +26,4 @@ oriented angle:
 - [Wizard guide](wizard-guide.md)
 - [Architecture](architecture.md)
 - [Configuration](configuration.md)
-
+- [Longhorn maintenance](longhorn-maintenance.md)

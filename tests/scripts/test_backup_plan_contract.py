@@ -29,6 +29,18 @@ def test_longhorn_uses_seaweedfs_backup_target_and_recurring_jobs():
     assert "name: twinbox-backup-daily" in script_text
     assert 'cron: "0 1 * * *"' in script_text
     assert "retain: 14" in script_text
+    assert "nodeDrainPolicy: allow-if-replica-is-stopped" in values_text
+    assert "detachManuallyAttachedVolumesWhenCordoned: true" in values_text
+
+
+def test_longhorn_maintenance_runbook_documents_the_upgrade_flow():
+    doc_text = (REPO_ROOT / "docs" / "longhorn-maintenance.md").read_text(encoding="utf-8")
+
+    assert "allow-if-replica-is-stopped" in doc_text
+    assert "detachManuallyAttachedVolumesWhenCordoned" in doc_text
+    assert "Upgrade Flow" in doc_text
+    assert "Preflight Checks" in doc_text
+    assert "one Talos node at a time" in doc_text
 
 
 def test_velero_has_daily_cluster_backup_schedule_with_30_day_ttl():

@@ -83,7 +83,7 @@ Derives the public zone name from the cluster ID and base domain. Used by steps 
 
 ### `install-longhorn-storage.sh`
 
-Installs Longhorn via Argo CD, sets `StorageClass/longhorn` as the default, configures SeaweedFS as the default Longhorn backup target, and installs recurring Longhorn snapshot/backup jobs.
+Installs Longhorn via Argo CD, sets `StorageClass/longhorn` as the default, configures SeaweedFS as the default Longhorn backup target, applies the Twinbox Longhorn drain policy for Talos upgrades, and installs recurring Longhorn snapshot/backup jobs.
 
 ### `install-secret-sync.sh`
 

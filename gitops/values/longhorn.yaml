@@ -6,6 +6,8 @@ global:
     twinbox.io/role: worker
 
 defaultSettings:
+  nodeDrainPolicy: allow-if-replica-is-stopped
+  detachManuallyAttachedVolumesWhenCordoned: true
   createDefaultDiskLabeledNodes: true
   systemManagedComponentsNodeSelector: twinbox.io/role=worker
   defaultReplicaCount: 2

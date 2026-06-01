@@ -768,7 +768,7 @@ def test_longhorn_step_installs_via_argocd_and_waits_for_health():
 
     assert "title: Install Longhorn Storage" in step_manifest_text
     assert (
-        "summary: Apply the Longhorn GitOps application, make its storage class the cluster default, and wait for it to become available."
+        "summary: Apply the Longhorn GitOps application, make its storage class the cluster default, and enable maintenance-friendly drain settings."
         in step_manifest_text
     )
     assert "runner:" in step_manifest_text
@@ -809,6 +809,8 @@ def test_longhorn_step_installs_via_argocd_and_waits_for_health():
     assert "is not the only default storage class" in helper_text
     assert "preUpgradeChecker:" in longhorn_values_text
     assert "jobEnabled: false" in longhorn_values_text
+    assert "nodeDrainPolicy: allow-if-replica-is-stopped" in longhorn_values_text
+    assert "detachManuallyAttachedVolumesWhenCordoned: true" in longhorn_values_text
     assert "global:" in longhorn_values_text
     assert "twinbox.io/role: worker" in longhorn_values_text
     assert "defaultReplicaCount: 2" in longhorn_values_text

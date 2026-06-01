@@ -220,6 +220,8 @@ Expected:
 - `StorageClass/longhorn` is marked as the default storage class
 - `Secret/longhorn-seaweedfs-backup` exists in `longhorn-system`
 - `RecurringJob/twinbox-snapshot-4h` and `RecurringJob/twinbox-backup-daily` exist in `longhorn-system`
+- Longhorn's node drain policy is set to `allow-if-replica-is-stopped`
+- Longhorn detaches manually attached volumes when a node is cordoned
 - worker nodes are labeled `twinbox.io/role=worker`
 - control-plane nodes are labeled `twinbox.io/role=control-plane`
 
