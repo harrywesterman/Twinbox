@@ -189,13 +189,13 @@ fi
 # Find the Traefik network resource ID from the network secret
 TRAEFIK_RESOURCE_ID=""
 TRAEFIK_RESOURCE_ADDRESS=""
-TRAEFIK_TARGET_PORT="8443"
+TRAEFIK_TARGET_PORT="443"
 if [[ -n "$NETBIRD_CLUSTER_ID" ]]; then
   NETWORK_SECRET="/opt/twinbox/bootstrap/secrets/global/netbird-network-${NETBIRD_CLUSTER_ID}.json"
   if [[ -f "$NETWORK_SECRET" ]]; then
     TRAEFIK_RESOURCE_ID="$(jq -r '.TRAEFIK_RESOURCE_ID // empty' "$NETWORK_SECRET")"
     TRAEFIK_RESOURCE_ADDRESS="$(jq -r '.TRAEFIK_RESOURCE_ADDRESS // empty' "$NETWORK_SECRET")"
-    TRAEFIK_TARGET_PORT="$(jq -r '.TRAEFIK_TARGET_PORT // "8443"' "$NETWORK_SECRET")"
+    TRAEFIK_TARGET_PORT="$(jq -r '.TRAEFIK_TARGET_PORT // "443"' "$NETWORK_SECRET")"
   fi
 fi
 

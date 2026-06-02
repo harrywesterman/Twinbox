@@ -348,7 +348,7 @@ resource "netbird_policy" "proxy_to_traefik_https" {
     bidirectional = true
     protocol      = "tcp"
     sources       = [data.netbird_group.all.id]
-    ports         = ["8443"]
+    ports         = ["443"]
 
     destination_resource = {
       id   = netbird_network_resource.traefik.id

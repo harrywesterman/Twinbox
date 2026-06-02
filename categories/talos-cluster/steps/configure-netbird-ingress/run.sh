@@ -76,21 +76,21 @@ wait_for_traefik_reverse_proxy_backend() {
   fail "${description} backend service ${service_name} did not become ready"
 }
 
-resolve_traefik_websecure_endpoint() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Resolving Traefik websecure pod endpoint for NetBird proxy" >&2
+resolve_traefik_cluster_ip() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Resolving Traefik ClusterIP and waiting for ready endpoints" >&2
+  local cluster_ip
   for i in $(seq 1 30); do
-    endpoint="$(
-      kubectl -n traefik get endpointslice -l kubernetes.io/service-name=traefik -o json 2>/dev/null \
-        | jq -r '[.items[].endpoints[]? | select(.conditions.ready != false) | .addresses[]?][0] // empty'
-    )"
-    if [[ -n "$endpoint" ]]; then
-      printf '%s\n' "$endpoint"
+    cluster_ip="$(kubectl -n traefik get svc traefik -o jsonpath='{.spec.clusterIP}' 2>/dev/null || true)"
+    if [[ -n "$cluster_ip" && "$cluster_ip" != "None" ]] \
+      && kubectl -n traefik get endpointslice -l kubernetes.io/service-name=traefik -o json 2>/dev/null \
+        | jq -e '([.items[].endpoints[]? | select(.conditions.ready != false)] | length) > 0' >/dev/null; then
+      printf '%s\n' "$cluster_ip"
       return 0
     fi
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Traefik websecure pod endpoint not ready yet (attempt ${i}/30)" >&2
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Traefik ClusterIP or endpoints not ready yet (attempt ${i}/30)" >&2
     sleep 5
   done
-  fail "Traefik websecure pod endpoint did not become ready"
+  fail "Traefik ClusterIP or endpoints did not become ready"
 }
 
 read_pod_cidrs_json() {
@@ -230,29 +230,23 @@ PY
 
 normalize_traefik_resource_address() {
   local requested_address="$1"
-  local service_cidrs="$2"
-  local pod_cidrs="$3"
 
   if [[ -z "$requested_address" ]]; then
-    resolve_traefik_websecure_endpoint
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Empty Traefik address; using Traefik ClusterIP" >&2
+    resolve_traefik_cluster_ip
     return
   fi
 
   case "$requested_address" in
-    traefik.traefik.svc.cluster.local|traefik-netbird.traefik.svc.cluster.local|*.svc|*.svc.cluster.local)
-      echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird Traefik target ${requested_address} is a Kubernetes service DNS name; using a ready Traefik pod endpoint instead" >&2
-      resolve_traefik_websecure_endpoint
+    *.svc|*.svc.cluster.local)
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Resolving ${requested_address} to ClusterIP via kubectl" >&2
+      local svc_name="${requested_address%%.*}"
+      local svc_ns
+      svc_ns="$(printf '%s' "$requested_address" | sed -n 's/^[^.]*\.\([^.]*\).*/\1/p')"
+      kubectl -n "${svc_ns:-traefik}" get svc "$svc_name" -o jsonpath='{.spec.clusterIP}' 2>/dev/null || resolve_traefik_cluster_ip
       return
       ;;
   esac
-
-  if [[ "$requested_address" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] \
-    && ipv4_in_cidrs_json "$requested_address" "$service_cidrs" \
-    && ! ipv4_in_cidrs_json "$requested_address" "$pod_cidrs"; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird Traefik target ${requested_address} is in the Kubernetes service CIDR; using a ready Traefik pod endpoint instead" >&2
-    resolve_traefik_websecure_endpoint
-    return
-  fi
 
   printf '%s\n' "$requested_address"
 }
@@ -997,9 +991,9 @@ service_cidrs_json="$(jq -n --arg cidr "$service_cidr" '[$cidr]')"
 pod_cidrs_json="$(read_pod_cidrs_json)"
 management_lan_cidrs_json="$(read_management_lan_cidrs_json "$cluster_json")"
 
-traefik_resource_address="$(normalize_traefik_resource_address "$traefik_resource_address" "$service_cidrs_json" "$pod_cidrs_json")"
+traefik_resource_address="$(normalize_traefik_resource_address "$traefik_resource_address")"
 traefik_network_resource_address="$(netbird_host_resource_address "$traefik_resource_address")"
-traefik_target_port="8443"
+traefik_target_port="443"
 
 authentik_public_url="${TWINBOX_AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
 authentik_domain="${authentik_public_url#https://}"

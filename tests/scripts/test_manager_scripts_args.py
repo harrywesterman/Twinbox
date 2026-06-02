@@ -1931,7 +1931,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "settings_extra_user_approval_required = 0" in text
     assert 'base64.b64encode(raw).decode().rstrip("=")' in text
     assert "netbird_host_resource_address()" in text
-    assert "resolve_traefik_websecure_endpoint()" in text
+    assert "resolve_traefik_cluster_ip()" in text
     assert "read_pod_cidrs_json()" in text
     assert "read_management_lan_cidrs_json()" in text
     assert "ipv4_in_cidrs_json()" in text
@@ -1944,12 +1944,12 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
         in text
     )
     assert (
-        'traefik_resource_address="$(normalize_traefik_resource_address "$traefik_resource_address" "$service_cidrs_json" "$pod_cidrs_json")"'
+        'traefik_resource_address="$(normalize_traefik_resource_address "$traefik_resource_address")"'
         in text
     )
-    assert "is in the Kubernetes service CIDR; using a ready Traefik pod endpoint instead" in text
-    assert "is a Kubernetes service DNS name; using a ready Traefik pod endpoint instead" in text
-    assert 'traefik_target_port="8443"' in text
+    assert "Resolving ${requested_address} to ClusterIP via kubectl" in text
+    assert "Empty Traefik address; using Traefik ClusterIP" in text
+    assert 'traefik_target_port="443"' in text
     assert 'pod_cidrs_json="$(read_pod_cidrs_json)"' in text
     assert 'management_lan_cidrs_json="$(read_management_lan_cidrs_json "$cluster_json")"' in text
     assert '-var "traefik_resource_address=$traefik_network_resource_address"' in text
@@ -1958,7 +1958,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     # The services block was removed; traefik_resource_address is now only passed to the network module
     assert "netbird-proxy-services-" not in text
     assert 'traefik_resource_address="traefik.traefik.svc.cluster.local"' not in text
-    assert "kubectl -n traefik get svc traefik -o jsonpath" not in text
+    assert "kubectl -n traefik get svc traefik -o jsonpath" in text
     assert "TRAEFIK_NETWORK_RESOURCE_ADDRESS" in text
     assert "TRAEFIK_TARGET_PORT" in text
     assert "POD_CIDRS" in text
@@ -2137,7 +2137,7 @@ def test_ensure_netbird_service_uses_current_api_and_safe_skips():
     assert "--argjson skip_tls_verify" in text
     assert "--argjson enabled" not in text
     assert "TRAEFIK_TARGET_PORT" in text
-    assert '.TRAEFIK_TARGET_PORT // "8443"' in text
+    assert '.TRAEFIK_TARGET_PORT // "443"' in text
     assert "port: $target_port" in text
     assert "port: 443" not in text
     assert 'protocol: "https"' in text
@@ -2267,8 +2267,8 @@ def test_netbird_proxy_reuses_traefik_websecure_origin():
     proxy_policy_body = proxy_policy.group(1)
     assert "sources       = [data.netbird_group.all.id]" in proxy_policy_body
     assert "sources       = [netbird_group.proxy.id]" not in proxy_policy_body
-    assert 'ports         = ["8443"]' in proxy_policy_body
-    assert 'ports         = ["443"]' not in proxy_policy_body
+    assert 'ports         = ["443"]' in proxy_policy_body
+    assert 'ports         = ["8443"]' not in proxy_policy_body
     assert 'ports         = ["8082"]' not in proxy_policy_body
     assert "type = local.traefik_resource_type" in proxy_policy_body
     assert "groups      = [data.netbird_group.all.id, netbird_group.proxy.id]" in network_text
@@ -2280,8 +2280,8 @@ def test_netbird_proxy_reuses_traefik_websecure_origin():
     assert "data.netbird_reverse_proxy_clusters.all.clusters[0].address" not in proxy_services_text
     assert 'variable "netbird_proxy_domain"' in proxy_services_vars_text
     assert "target_type = local.traefik_target_type" in proxy_services_text
-    assert "port        = 8443" in proxy_services_text
-    assert "port        = 443" not in proxy_services_text
+    assert "port        = 443" in proxy_services_text
+    assert "port        = 8443" not in proxy_services_text
     assert "port        = 8082" not in proxy_services_text
     assert 'protocol    = "https"' in proxy_services_text
     assert 'protocol    = "http"' not in proxy_services_text
