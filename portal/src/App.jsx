@@ -2795,6 +2795,7 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
   const [createBusy, setCreateBusy] = useState(false);
   const [groupBusy, setGroupBusy] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
+  const [passwordlessResetBusy, setPasswordlessResetBusy] = useState(false);
   const [formError, setFormError] = useState("");
   const [temporaryPassword, setTemporaryPassword] = useState(null);
 
@@ -2937,6 +2938,41 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
     }
   };
 
+  const restartPasswordlessOnboarding = async () => {
+    if (!viewModel.selectedUser) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Restart passwordless onboarding for ${viewModel.selectedUser.name}? Existing passkeys will be removed and replaced with a new temporary password.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setPasswordlessResetBusy(true);
+    setFormError("");
+    try {
+      const payload = await requestJson(
+        `/api/admin/users/${encodeURIComponent(viewModel.selectedUser.id)}/restart-passwordless-onboarding`,
+        {
+          method: "POST",
+        }
+      );
+      setTemporaryPassword({
+        password: payload.temporaryPassword,
+        user: payload.user,
+      });
+      await directoryState.reload();
+    } catch (error) {
+      setFormError(
+        error instanceof Error ? error.message : "Failed to restart passwordless onboarding."
+      );
+    } finally {
+      setPasswordlessResetBusy(false);
+    }
+  };
+
   if (directoryState.loading) {
     return (
       <Panel>
@@ -3007,8 +3043,8 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
             </strong>
             <code>{temporaryPassword.password}</code>
             <span>
-              Show this once to the user. After first login they should register a passkey in
-              Authentik.
+              Show this once to the user. It only works for onboarding: Authentik requires a passkey
+              during the first login and then expires this password.
             </span>
             <button
               type="button"
@@ -3092,7 +3128,8 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
                   {createBusy ? "Creating…" : "Create user"}
                 </button>
                 <span className="muted-copy">
-                  Twinbox will generate a temporary password and show it once.
+                  Twinbox will show a one-time onboarding password. The user must register a passkey
+                  during their first login.
                 </span>
               </div>
             </form>
@@ -3215,6 +3252,20 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
                   </div>
                 </>
               )}
+
+              <div className="hero-actions user-admin-status-actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={restartPasswordlessOnboarding}
+                  disabled={passwordlessResetBusy}
+                >
+                  {passwordlessResetBusy ? "Restarting…" : "Replace lost passkey"}
+                </button>
+                <span className="muted-copy">
+                  Removes existing passkeys and issues a new one-time onboarding password.
+                </span>
+              </div>
 
               <div className="hero-actions user-admin-status-actions">
                 <button

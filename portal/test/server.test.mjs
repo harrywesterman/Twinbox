@@ -16,6 +16,7 @@ const sessionSecret = "portal-test-secret";
 const fakeState = {
   users: [],
   groups: [],
+  webauthnDevices: [],
   nextUserId: 10,
 };
 const managerState = {
@@ -86,6 +87,7 @@ function seedAuthentikState() {
       users: ["3"],
     },
   ];
+  fakeState.webauthnDevices = [];
   fakeState.nextUserId = 10;
 }
 
@@ -275,6 +277,7 @@ const authentikServer = http.createServer(async (req, res) => {
       email: body.email || "",
       is_active: body.is_active !== false,
       type: "internal",
+      attributes: body.attributes || {},
     };
     fakeState.nextUserId += 1;
     fakeState.users.push(newUser);
@@ -364,7 +367,22 @@ const authentikServer = http.createServer(async (req, res) => {
   }
 
   if (req.method === "GET" && pathname === "/api/v3/authenticators/admin/webauthn/") {
-    sendJson(res, 200, { results: [] });
+    const userId = url.searchParams.get("user") || "";
+    sendJson(res, 200, {
+      results: fakeState.webauthnDevices.filter((device) => String(device.user) === userId),
+    });
+    return;
+  }
+
+  if (
+    req.method === "DELETE" &&
+    /^\/api\/v3\/authenticators\/admin\/webauthn\/[^/]+\/$/.test(pathname)
+  ) {
+    const deviceId = pathname.split("/").filter(Boolean).at(-1);
+    fakeState.webauthnDevices = fakeState.webauthnDevices.filter(
+      (device) => String(device.pk) !== String(deviceId)
+    );
+    sendNoContent(res);
     return;
   }
 
@@ -832,6 +850,9 @@ test("admin can create a user with a temporary password and approved groups", as
   assert.equal(created.payload.user.username, "mia");
   assert.deepEqual(created.payload.user.groupNames, ["employees"]);
 
+  const storedUser = fakeState.users.find((user) => user.username === "mia");
+  assert.equal(storedUser.attributes["twinbox.io/passwordless-onboarding"], true);
+
   const listing = await requestPortal("/api/admin/users", { cookie: adminCookie });
   assert.equal(listing.status, 200);
   assert(listing.payload.users.some((user) => user.username === "mia"));
@@ -840,6 +861,46 @@ test("admin can create a user with a temporary password and approved groups", as
   const newUser = listing.payload.users.find((user) => user.username === "mia");
   assert.equal(newUser.hasPasskey, false);
   assert(Array.isArray(listing.payload.groups));
+});
+
+test("admin can restart passwordless onboarding and replace existing passkeys", async () => {
+  seedAuthentikState();
+  fakeState.webauthnDevices = [
+    {
+      pk: "device-1",
+      user: "2",
+      name: "Alex passkey",
+    },
+  ];
+
+  const adminCookie = createSignedSessionCookie({
+    sub: "admin-1",
+    name: "Portal Admin",
+    email: "admin@example.com",
+    preferredUsername: "portal-admin",
+    groups: ["admins"],
+    isAdmin: true,
+  });
+
+  const restarted = await requestPortal("/api/admin/users/2/restart-passwordless-onboarding", {
+    method: "POST",
+    cookie: adminCookie,
+  });
+
+  assert.equal(restarted.status, 200);
+  assert.match(restarted.payload.temporaryPassword, /^Tbx-/);
+  assert.equal(fakeState.webauthnDevices.length, 0);
+
+  const storedUser = findUser("2");
+  assert.equal(storedUser.attributes["twinbox.io/passwordless-onboarding"], true);
+  assert.equal(storedUser.password, restarted.payload.temporaryPassword);
+});
+
+test("existing users are not automatically marked for passwordless onboarding", async () => {
+  seedAuthentikState();
+
+  assert.equal(findUser("1").attributes, undefined);
+  assert.equal(findUser("2").attributes, undefined);
 });
 
 test("admin can disable and reactivate a regular user", async () => {

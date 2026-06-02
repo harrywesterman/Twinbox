@@ -135,6 +135,9 @@ AUTHENTIK_STEP_MANIFEST = (
 AUTHENTIK_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-authentik-idp" / "run.sh"
 )
+AUTHENTIK_PASSWORDLESS_BLUEPRINT = (
+    REPO_ROOT / "gitops" / "apps" / "authentik" / "manifests" / "blueprint-passwordless.yaml"
+)
 AUTHENTIK_HEADLAMP_MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "authentik-headlamp" / "main.tf"
 AUTHENTIK_HEADLAMP_MODULE_VARS = (
     REPO_ROOT / "infra" / "opentofu" / "authentik-headlamp" / "variables.tf"
@@ -3980,19 +3983,32 @@ def test_authentik_database_cluster_spreads_pods_across_nodes():
 
 
 def test_authentik_passwordless_blueprint_uses_valid_instantiate_label():
-    manifest = yaml.safe_load(
-        (
-            REPO_ROOT
-            / "gitops"
-            / "apps"
-            / "authentik"
-            / "manifests"
-            / "blueprint-passwordless.yaml"
-        ).read_text(encoding="utf-8")
-    )
+    manifest = yaml.safe_load(AUTHENTIK_PASSWORDLESS_BLUEPRINT.read_text(encoding="utf-8"))
 
     labels = manifest["metadata"]["labels"]
     assert labels == {"blueprints.goauthentik.io/instantiate": "true"}
+
+
+def test_authentik_passwordless_blueprint_forces_portal_user_passkey_onboarding():
+    text = AUTHENTIK_PASSWORDLESS_BLUEPRINT.read_text(encoding="utf-8")
+
+    assert "name: twinbox-passwordless-onboarding-validation" in text
+    assert "not_configured_action: configure" in text
+    assert "configuration_stages:" in text
+    assert "- !KeyOf twinbox-webauthn-setup" in text
+    assert 'pending_user.attributes.get("twinbox.io/passwordless-onboarding") is True' in text
+    assert "WebAuthnDevice.objects.filter(user=pending_user, confirmed=True).exists()" in text
+    assert "pending_user.set_unusable_password()" in text
+    assert 'attributes.pop("twinbox.io/passwordless-onboarding", None)' in text
+    assert 'authenticator_attachment: ""' not in text
+    assert "last_auth_threshold: 0" not in text
+    assert "webauthn_stage: !KeyOf twinbox-passwordless-validation" in text
+    assert (
+        'stage: !Find [authentik_stages_password.passwordstage, [name, "default-authentication-password"]]'
+        in text
+    )
+    assert "policy_engine_mode: all" in text
+    assert "order: 40" in text
 
 
 def test_dashy_deployment_uses_a_published_image_tag():

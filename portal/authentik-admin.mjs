@@ -329,5 +329,8 @@ export function createAuthentikAdminClient({
         `/authenticators/admin/webauthn/?page_size=200&user=${encodeURIComponent(userId)}`
       );
     },
+    deleteWebAuthnDevice(deviceId) {
+      return request("DELETE", `/authenticators/admin/webauthn/${encodeURIComponent(deviceId)}/`);
+    },
   };
 }

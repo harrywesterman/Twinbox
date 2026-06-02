@@ -1195,6 +1195,9 @@ app.post("/api/admin/users", async (req, res) => {
       name: draft.name,
       ...(draft.email ? { email: draft.email } : {}),
       is_active: true,
+      attributes: {
+        "twinbox.io/passwordless-onboarding": true,
+      },
     });
 
     const createdUserId = resolveRecordId(createdUser);
@@ -1220,6 +1223,47 @@ app.post("/api/admin/users", async (req, res) => {
     res
       .status(error?.status || 500)
       .json({ error: error instanceof Error ? error.message : "failed to create user" });
+  }
+});
+
+app.post("/api/admin/users/:userId/restart-passwordless-onboarding", async (req, res) => {
+  const session = requireAdminSession(req, res);
+  if (!session) {
+    return;
+  }
+
+  try {
+    const client = getAuthentikAdminClient();
+    const userId = String(req.params.userId || "").trim();
+    const user = await getEligibleUserOrThrow(client, userId);
+    const devicesPayload = await client.listWebAuthnDevices(userId);
+
+    for (const device of readListPayload(devicesPayload)) {
+      const deviceId = resolveRecordId(device);
+      if (deviceId) {
+        await client.deleteWebAuthnDevice(deviceId);
+      }
+    }
+
+    const temporaryPassword = createTemporaryPassword();
+    await client.setPassword(userId, temporaryPassword);
+    await client.updateUser(userId, {
+      attributes: {
+        ...(user.attributes || {}),
+        "twinbox.io/passwordless-onboarding": true,
+      },
+    });
+
+    const config = await loadPortalConfig();
+    const directory = await loadUserAdminDirectory(config);
+    res.json({
+      user: buildUserResponse(directory, userId),
+      temporaryPassword,
+    });
+  } catch (error) {
+    res.status(error?.status || 500).json({
+      error: error instanceof Error ? error.message : "failed to restart passwordless onboarding",
+    });
   }
 });
 
