@@ -188,7 +188,7 @@ check_pause() {
 
 health_check() {
   log "Checking Talos, Kubernetes and Longhorn health"
-  talos health --control-plane-nodes "$controlplanes_csv" --worker-nodes "$workers_csv" --endpoints "$endpoint"
+  talos health --nodes "$endpoint" --control-plane-nodes "$controlplanes_csv" --worker-nodes "$workers_csv" --endpoints "$endpoint"
   kubectl wait --for=condition=Ready nodes --all --timeout=10m
   if kubectl get namespace longhorn-system >/dev/null 2>&1; then
     local degraded
