@@ -193,11 +193,24 @@ health_check() {
   talos health --nodes "$endpoint" --control-plane-nodes "$controlplanes_csv" --worker-nodes "$workers_csv" --endpoints "$endpoint"
   kubectl wait --for=condition=Ready nodes --all --timeout=10m
   if kubectl get namespace longhorn-system >/dev/null 2>&1; then
-    local degraded
+    wait_for_longhorn_health
+  fi
+}
+
+wait_for_longhorn_health() {
+  local degraded deadline
+  deadline=$((SECONDS + ${TWINBOX_LONGHORN_HEALTH_TIMEOUT_SECONDS:-900}))
+  while true; do
     degraded="$(kubectl -n longhorn-system get volumes.longhorn.io -o json |
       jq '[.items[] | select((.status.robustness // "") != "healthy")] | length')"
-    [[ "$degraded" == "0" ]] || fail "Longhorn has ${degraded} non-healthy volume(s)"
-  fi
+    if [[ "$degraded" == "0" ]]; then
+      log "Longhorn volumes are healthy"
+      return
+    fi
+    ((SECONDS < deadline)) || fail "Longhorn has ${degraded} non-healthy volume(s) after waiting"
+    log "Waiting for Longhorn volumes to become healthy: ${degraded} non-healthy volume(s)"
+    sleep "${TWINBOX_LONGHORN_HEALTH_POLL_SECONDS:-10}"
+  done
 }
 
 inspect() {
@@ -368,13 +381,13 @@ talos_upgrade() {
       patch_state ".checkpoints.talos += [\"$checkpoint\"]"
       check_pause
     done
-    enable_longhorn_worker_maintenance
     for node in $(jq -r '.[]' <<<"$workers_json"); do
       checkpoint="${target}:${node}"
       if jq -e --arg checkpoint "$checkpoint" '.checkpoints.talos | index($checkpoint)' "$state_file" >/dev/null; then
         log "Skipping completed Talos checkpoint ${checkpoint}"
         continue
       fi
+      enable_longhorn_worker_maintenance
       log "Upgrading Talos node ${node} to ${target}"
       TALOSCTL_BIN="$binary" talos upgrade --nodes "$node" --endpoints "$endpoint" --image "$installer" --wait
       health_check

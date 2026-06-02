@@ -132,9 +132,12 @@ def test_upgrade_script_keeps_safety_contracts():
     assert talos_upgrade_text.index("$(jq -r '.[]' <<<\"$controlplanes_json\")") < (
         talos_upgrade_text.index("enable_longhorn_worker_maintenance")
     )
-    assert talos_upgrade_text.index(
+    workers_upgrade_text = talos_upgrade_text[
+        talos_upgrade_text.index("$(jq -r '.[]' <<<\"$workers_json\")") :
+    ]
+    assert workers_upgrade_text.index(
         "enable_longhorn_worker_maintenance"
-    ) < talos_upgrade_text.index("$(jq -r '.[]' <<<\"$workers_json\")")
+    ) < workers_upgrade_text.index('TALOSCTL_BIN="$binary" talos upgrade')
     assert 'upgrade-k8s --to "$normalized" --dry-run' in text
     assert text.index('upgrade-k8s --to "$normalized" --dry-run') < text.index(
         'upgrade-k8s --to "$normalized" --nodes'
@@ -249,6 +252,7 @@ def _write_executable(path, text):
     [
         ("success", "talos_completed"),
         ("failure", "pending"),
+        ("health-failure", "pending"),
         ("pause", "paused"),
     ],
 )
@@ -313,6 +317,9 @@ case "$1" in
     if [[ "${FAIL_WORKER:-}" == "true" && "$*" == *"--nodes 10.0.0.21"* ]]; then
       exit 1
     fi
+    if [[ "$*" == *"--nodes 10.0.0.21"* ]]; then
+      : > "$TEST_WORKER_UPGRADED"
+    fi
     ;;
 esac
 """,
@@ -350,6 +357,10 @@ if [[ "$*" == *"patch settings.longhorn.io node-drain-policy"* ]]; then
   exit 0
 fi
 if [[ "$*" == *"get volumes.longhorn.io -o json"* ]]; then
+  if [[ "${FAIL_HEALTH:-}" == "true" && -f "$TEST_WORKER_UPGRADED" ]]; then
+    printf '{"items":[{"status":{"robustness":"degraded"}}]}'
+    exit 0
+  fi
   printf '{"items":[]}'
   exit 0
 fi
@@ -398,7 +409,10 @@ printf 'checksum  %s\\n' "$1"
                 "TEST_LOG": str(log_file),
                 "TEST_POLICY": str(policy_file),
                 "TEST_CORDON": str(cordon_file),
+                "TEST_WORKER_UPGRADED": str(root / "worker-upgraded.txt"),
                 "FAIL_WORKER": "true" if mode == "failure" else "",
+                "FAIL_HEALTH": "true" if mode == "health-failure" else "",
+                "TWINBOX_LONGHORN_HEALTH_TIMEOUT_SECONDS": "0",
             }
         )
         proc = subprocess.run(
@@ -418,7 +432,7 @@ printf 'checksum  %s\\n' "$1"
             text=True,
             check=False,
         )
-        if mode == "failure":
+        if mode in {"failure", "health-failure"}:
             assert proc.returncode != 0
         else:
             assert proc.returncode == 0, proc.stderr
