@@ -158,7 +158,7 @@ def test_upgrade_script_inspects_server_versions_and_builds_sequential_paths():
             """#!/bin/bash
 case "$1" in
   version) printf 'Client:\\n  Tag: v1.13.0\\nServer:\\n  Tag: v1.12.4\\n' ;;
-  get) printf '{"metadata":{"id":"qemu-guest-agent"}}\\n{"metadata":{"id":"iscsi-tools"}}\\n{"metadata":{"id":"util-linux-tools"}}\\n' ;;
+  get) printf '{"spec":{"metadata":{"name":"qemu-guest-agent"}}}\\n{"spec":{"metadata":{"name":"iscsi-tools"}}}\\n{"spec":{"metadata":{"name":"util-linux-tools"}}}\\n{"spec":{"metadata":{"name":"schematic"}}}\\n{"spec":{"metadata":{"name":"unexpected-extension"}}}\\n' ;;
   health) exit 0 ;;
   *) exit 0 ;;
 esac
@@ -210,6 +210,12 @@ esac
         assert proc.returncode == 0, proc.stderr
         state = json.loads((data_dir / "upgrade-state" / "cluster-test.json").read_text())
         assert state["inventory"]["nodes"][0]["version"] == "v1.12.4"
+        assert state["inventory"]["nodes"][0]["extensions"] == [
+            "siderolabs/iscsi-tools",
+            "siderolabs/qemu-guest-agent",
+            "siderolabs/unexpected-extension",
+            "siderolabs/util-linux-tools",
+        ]
         assert state["paths"]["talos"] == ["v1.13.3"]
         assert state["paths"]["kubernetes"] == ["v1.36.1"]
 

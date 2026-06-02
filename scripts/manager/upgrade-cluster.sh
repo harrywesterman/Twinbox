@@ -116,11 +116,15 @@ node_talos_version() {
 node_extensions() {
   local node="$1" output
   output="$(talos get extensions --nodes "$node" --endpoints "$endpoint" -o json 2>/dev/null || true)"
-  jq -cn --arg output "$output" '
-    ["qemu-guest-agent", "iscsi-tools", "util-linux-tools"]
-    | map(. as $extension | select($output | contains($extension)))
-    | map("siderolabs/" + .)
-  '
+  jq -sc '
+    [
+      .[]
+      | .spec.metadata.name // empty
+      | select(. != "schematic")
+      | if startswith("siderolabs/") then . else "siderolabs/" + . end
+    ]
+    | unique
+  ' <<<"$output"
 }
 
 kubernetes_version() {
