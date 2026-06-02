@@ -4579,6 +4579,15 @@ def test_netbird_cloud_init_uses_exact_netbird_cert_and_tcp_passthrough():
     assert "GOOGLE_APPLICATION_CREDENTIALS" not in text
     assert "google" not in text
     assert "HostSNI(`*`) && !HostSNI(`{netbird_domain}`)" in text
+    assert "run_netbird_wildcard_lego()" in text
+    assert "install_netbird_wildcard_certificate()" in text
+    assert "install_netbird_wildcard_renewal_timer()" in text
+    assert "goacme/lego:v4.27.0" in text
+    assert '--domains "$PUBLIC_ZONE_NAME"' in text
+    assert '--domains "*.$PUBLIC_ZONE_NAME"' in text
+    assert "renew --days 30" in text
+    assert "netbird-wildcard-certificate.timer" in text
+    assert "OnCalendar=daily" in text
     assert "tls.domains[0].main" in text
     assert '"traefik.http.routers.netbird-dashboard.tls.domains[0].main": netbird_domain' in text
     assert '"traefik.http.routers.netbird-backend.tls.domains[0].main": netbird_domain' in text
@@ -4595,9 +4604,9 @@ def test_netbird_cloud_init_uses_exact_netbird_cert_and_tcp_passthrough():
     assert "set_labels(netbird_server, server_tls_domain_labels)" in text
     assert "remove_label_keys(traefik, is_removed_http_wildcard_label)" in text
     assert "remove_label_keys(proxy, is_removed_http_wildcard_label)" in text
+    assert 'wildcard_volume = "/opt/netbird/certs/wildcard:/wildcard-certs:ro"' in text
+    assert '"NB_PROXY_WILDCARD_CERT_DIR": "/wildcard-certs"' in text
     assert "HostRegexp" not in text
-    assert "goacme/lego" not in text
-    assert '--domains "*.$PUBLIC_ZONE_NAME"' not in text
     assert "tls.domains[0].sans" not in text
     assert "certFile" not in text
     assert "keyFile" not in text

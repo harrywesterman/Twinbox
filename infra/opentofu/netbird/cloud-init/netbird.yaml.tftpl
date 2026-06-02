@@ -54,6 +54,145 @@ write_files:
         done
       }
 
+      run_netbird_wildcard_lego() {
+        local action="$1"
+        shift
+
+        case "$DNS_PROVIDER" in
+          cloudflare)
+            docker run --rm \
+              -e "CLOUDFLARE_DNS_API_TOKEN=$DNS_API_TOKEN" \
+              -v /opt/netbird/certs/lego:/data \
+              goacme/lego:v4.27.0 \
+              --path /data \
+              --email "$ADMIN_EMAIL" \
+              --dns "$DNS_PROVIDER" \
+              --domains "$PUBLIC_ZONE_NAME" \
+              --domains "*.$PUBLIC_ZONE_NAME" \
+              --accept-tos \
+              "$action" "$@"
+            ;;
+          aws)
+            docker run --rm \
+              -e "AWS_ACCESS_KEY_ID=$DNS_API_TOKEN" \
+              -e "AWS_SECRET_ACCESS_KEY=$DNS_API_SECRET" \
+              -v /opt/netbird/certs/lego:/data \
+              goacme/lego:v4.27.0 \
+              --path /data \
+              --email "$ADMIN_EMAIL" \
+              --dns "$DNS_PROVIDER" \
+              --domains "$PUBLIC_ZONE_NAME" \
+              --domains "*.$PUBLIC_ZONE_NAME" \
+              --accept-tos \
+              "$action" "$@"
+            ;;
+          digitalocean)
+            docker run --rm \
+              -e "DO_AUTH_TOKEN=$DNS_API_TOKEN" \
+              -e "DO_TOKEN=$DNS_API_TOKEN" \
+              -v /opt/netbird/certs/lego:/data \
+              goacme/lego:v4.27.0 \
+              --path /data \
+              --email "$ADMIN_EMAIL" \
+              --dns "$DNS_PROVIDER" \
+              --domains "$PUBLIC_ZONE_NAME" \
+              --domains "*.$PUBLIC_ZONE_NAME" \
+              --accept-tos \
+              "$action" "$@"
+            ;;
+          *)
+            echo "ERROR: DNS provider $DNS_PROVIDER is not supported for NetBird wildcard certificates." >&2
+            return 1
+            ;;
+        esac
+      }
+
+      install_netbird_wildcard_certificate() {
+        local cert_name="$PUBLIC_ZONE_NAME"
+        local cert_dir="/opt/netbird/certs/wildcard"
+        local lego_dir="/opt/netbird/certs/lego"
+        local lego_cert="$lego_dir/certificates/$cert_name.crt"
+        local lego_key="$lego_dir/certificates/$cert_name.key"
+        local cert_file="$cert_dir/$cert_name.crt"
+        local key_file="$cert_dir/$cert_name.key"
+
+        case "$DNS_PROVIDER" in
+          cloudflare|aws|digitalocean)
+            ;;
+          *)
+            echo "ERROR: DNS provider $DNS_PROVIDER is not supported for NetBird wildcard certificates." >&2
+            return 1
+            ;;
+        esac
+
+        install -d -m 0700 "$cert_dir" "$lego_dir"
+        set -a
+        # shellcheck disable=SC1091
+        source /opt/netbird/.dns-credentials
+        set +a
+
+        if [[ -s "$lego_cert" && -s "$lego_key" ]]; then
+          retry_netbird_step "Renew NetBird wildcard certificate" \
+            run_netbird_wildcard_lego renew --days 30
+        else
+          retry_netbird_step "Issue NetBird wildcard certificate" \
+            run_netbird_wildcard_lego run
+        fi
+
+        if [[ ! -s "$lego_cert" || ! -s "$lego_key" ]]; then
+          echo "ERROR: Lego did not produce the expected NetBird wildcard certificate files." >&2
+          return 1
+        fi
+
+        install -m 0644 "$lego_cert" "$cert_file.tmp"
+        install -m 0600 "$lego_key" "$key_file.tmp"
+        mv -f "$cert_file.tmp" "$cert_file"
+        mv -f "$key_file.tmp" "$key_file"
+      }
+
+      install_netbird_wildcard_renewal_timer() {
+        cat >/usr/local/sbin/renew-netbird-wildcard-certificate <<'EOF'
+      #!/usr/bin/env bash
+      set -euo pipefail
+      exec /root/bootstrap-netbird.sh --renew-wildcard-certificate
+      EOF
+        chmod 0755 /usr/local/sbin/renew-netbird-wildcard-certificate
+
+        cat >/etc/systemd/system/netbird-wildcard-certificate.service <<'EOF'
+      [Unit]
+      Description=Renew NetBird wildcard certificate
+      After=docker.service
+      Requires=docker.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/sbin/renew-netbird-wildcard-certificate
+      EOF
+
+        cat >/etc/systemd/system/netbird-wildcard-certificate.timer <<'EOF'
+      [Unit]
+      Description=Renew NetBird wildcard certificate daily
+
+      [Timer]
+      OnCalendar=daily
+      Persistent=true
+      RandomizedDelaySec=1h
+
+      [Install]
+      WantedBy=timers.target
+      EOF
+
+        systemctl daemon-reload
+        systemctl enable --now netbird-wildcard-certificate.timer
+      }
+
+      if [[ $# -gt 0 ]]; then
+        if [[ "$1" == "--renew-wildcard-certificate" ]]; then
+          install_netbird_wildcard_certificate
+          exit 0
+        fi
+      fi
+
       seed_netbird_account_domain() {
         local volume_dir
         local store_db
@@ -338,6 +477,10 @@ write_files:
           passthrough_rule = f"HostSNI(`*`) && !HostSNI(`{netbird_domain}`)"
           remove_label_keys(proxy, is_removed_http_wildcard_label)
           set_labels(proxy, {passthrough_label: passthrough_rule})
+          volumes = proxy.setdefault("volumes", [])
+          wildcard_volume = "/opt/netbird/certs/wildcard:/wildcard-certs:ro"
+          if isinstance(volumes, list) and wildcard_volume not in volumes:
+              volumes.append(wildcard_volume)
 
       # Add NB_SETUP_PAT_ENABLED to netbird-server
       if "netbird-server" in services:
@@ -383,6 +526,7 @@ write_files:
           "NB_PROXY_ACME_CERTIFICATES": "true",
           "NB_PROXY_ACME_CHALLENGE_TYPE": "tls-alpn-01",
           "NB_PROXY_CERTIFICATE_DIRECTORY": "/certs",
+          "NB_PROXY_WILDCARD_CERT_DIR": "/wildcard-certs",
       }
       seen = set()
       out = []
@@ -401,6 +545,8 @@ write_files:
       PY
       fi
 
+      install_netbird_wildcard_certificate
+      install_netbird_wildcard_renewal_timer
       retry_netbird_step "Pull NetBird compose images" docker compose pull
       docker compose up -d
 

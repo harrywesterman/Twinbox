@@ -179,6 +179,14 @@ The bastion Traefik dynamic file should contain only the TCP `pp-v2`
 serversTransport used by the passthrough service; it should not contain
 `tls.certificates` for `/certs/live/<zone>.crt`.
 
+The NetBird Reverse Proxy receives a separate DNS-01 wildcard certificate for
+`<public-zone>` and `*.<public-zone>`. It is mounted only in the `netbird-proxy`
+container at `/wildcard-certs` and enabled through
+`NB_PROXY_WILDCARD_CERT_DIR=/wildcard-certs`. NetBird matches app SNI hostnames
+against that certificate before ACME prefetch, so app installation does not
+issue one Let's Encrypt certificate per service. A daily systemd timer renews
+the wildcard certificate with `lego`; NetBird hot-reloads updated files.
+
 For greenfield bootstrap, the automated setup call is intentionally made over
 the bastion's internal Docker network with the public NetBird hostname in the
 `Host` header. `NETBIRD_URL` remains the public `https://netbird.<public-zone>`
