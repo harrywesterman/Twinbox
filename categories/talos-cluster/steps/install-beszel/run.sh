@@ -37,8 +37,23 @@ authentik_setup_forward
 
 AUTHENTIK_HOST="${AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
 beszel_application_slug="beszel"
-beszel_redirect_uri="https://beszel.${public_zone_name}/oauth/callback"
+beszel_redirect_uri="https://beszel.${public_zone_name}/api/oauth2-redirect"
 beszel_issuer_url="${AUTHENTIK_HOST%/}/application/o/${beszel_application_slug}/"
+
+# Create email_verified scope mapping (Authentik 2025.10+ defaults to false, Beszel needs true)
+beszel_scope_mapping_name="Beszel email_verified"
+existing_scope_mapping="$(authentik_api_get "/propertymappings/provider/scope/?name=$(printf '%s' "$beszel_scope_mapping_name" | jq -sRr @uri)")"
+beszel_scope_mapping_pk="$(jq -r '.results[0].pk // empty' <<<"$existing_scope_mapping")"
+if [[ -z "$beszel_scope_mapping_pk" ]]; then
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating email_verified scope mapping for Beszel"
+  beszel_scope_mapping_pk="$(authentik_api_write POST "/propertymappings/provider/scope/" "$(jq -n --arg name "$beszel_scope_mapping_name" --arg scope_name "email" '{
+    name: $name,
+    scope_name: $scope_name,
+    expression: "return { \"email_verified\": True }"
+  }')" | jq -r '.pk // .id // empty')"
+fi
+[[ -n "$beszel_scope_mapping_pk" ]] || echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: Could not create email_verified scope mapping for Beszel"
+
 secrets_dir="/opt/twinbox/bootstrap/secrets/global"
 mkdir -p "$secrets_dir"
 
@@ -117,14 +132,15 @@ provider_payload="$(
     --arg client_secret "$beszel_client_secret" \
     --arg redirect_uris "$beszel_redirect_uri" \
     --arg issuer_url "${AUTHENTIK_HOST%/}" \
+    --argjson scope_mappings "$(jq -n --arg pk "$beszel_scope_mapping_pk" 'if $pk != "" then [$pk] else [] end')" \
     '{
       name: $name,
       authorization_flow: "default-provider-authorization-implicit-consent",
       client_id: $client_id,
       client_secret: $client_secret,
-      redirect_uris: [$redirect_uris, $redirect_uris + "/"],
+      redirect_uris: [$redirect_uris],
       issuer_url: $issuer_url,
-      property_mappings: [],
+      property_mappings: $scope_mappings,
       include_claims_in_id_token: true,
       client_type: "confidential",
       grant_types: ["authorization_code"],
@@ -171,8 +187,8 @@ if command -v openbao_read_global_secret_json >/dev/null 2>&1; then
 fi
 
 if [[ -n "$existing_agent_secret_json" ]]; then
-  existing_key="$(jq -r '.BESZEL_AGENT_KEY // empty' <<<"$existing_agent_secret_json")"
-  existing_token="$(jq -r '.BESZEL_AGENT_TOKEN // empty' <<<"$existing_agent_secret_json")"
+  existing_key="$(jq -r '.key // empty' <<<"$existing_agent_secret_json")"
+  existing_token="$(jq -r '.token // empty' <<<"$existing_agent_secret_json")"
   if [[ -n "$existing_key" && -n "$existing_token" ]]; then
     beszel_agent_key="$existing_key"
     beszel_agent_token="$existing_token"
@@ -212,8 +228,8 @@ trap 'rm -f "$beszel_agent_secret_file"' EXIT
 
 cat >"$beszel_agent_secret_file" <<EOF
 {
-  "BESZEL_AGENT_KEY": "$beszel_agent_key",
-  "BESZEL_AGENT_TOKEN": "$beszel_agent_token",
+  "key": "$beszel_agent_key",
+  "token": "$beszel_agent_token",
   "CLUSTER_ID": "$cluster_id"
 }
 EOF
@@ -223,9 +239,15 @@ chmod 600 "$beszel_agent_secret_file"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "beszel-agent" \
   --json-file "$beszel_agent_secret_file" \
-  --required-keys "BESZEL_AGENT_KEY,BESZEL_AGENT_TOKEN"
+  --required-keys "key,token"
 
 rm -f "$beszel_agent_secret_file"
+
+# ---------------------------------------------------------------------------
+# Generate Beszel hub admin credentials
+# ---------------------------------------------------------------------------
+beszel_user_email="beszel-admin@${public_zone_name}"
+beszel_user_password="$(openssl rand -hex 24)"
 
 # ---------------------------------------------------------------------------
 # Write env vars to /opt/twinbox/.env for docker compose
@@ -244,9 +266,9 @@ if [[ -f "$env_file" ]]; then
 
   ensure_env_var "BESZEL_AGENT_KEY" "$beszel_agent_key"
   ensure_env_var "BESZEL_AGENT_TOKEN" "$beszel_agent_token"
-  ensure_env_var "BESZEL_OIDC_PROVIDER_URL" "$beszel_issuer_url"
-  ensure_env_var "BESZEL_OIDC_CLIENT_ID" "$beszel_client_id"
-  ensure_env_var "BESZEL_OIDC_CLIENT_SECRET" "$beszel_client_secret"
+  ensure_env_var "BESZEL_APP_URL" "https://beszel.${public_zone_name}"
+  ensure_env_var "BESZEL_USER_EMAIL" "$beszel_user_email"
+  ensure_env_var "BESZEL_USER_PASSWORD" "$beszel_user_password"
   ensure_env_var "BESZEL_VERSION" "${BESZEL_VERSION:-0.18.7}"
 fi
 
@@ -270,6 +292,67 @@ for i in $(seq 1 30); do
 done
 
 # ---------------------------------------------------------------------------
+# Configure OIDC in Beszel PocketBase via API
+# ---------------------------------------------------------------------------
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Configuring OIDC in Beszel PocketBase"
+beszel_pb_superuser_token=""
+if [[ -n "$beszel_user_email" && -n "$beszel_user_password" ]]; then
+  pb_auth_response="$(curl -sf -X POST http://localhost:8090/api/superusers/auth-with-password \
+    -H "Content-Type: application/json" \
+    -d "{\"identity\":\"${beszel_user_email}\",\"password\":\"${beszel_user_password}\"}" 2>/dev/null || \
+    curl -sf -X POST http://localhost:8090/api/admins/auth-with-password \
+    -H "Content-Type: application/json" \
+    -d "{\"identity\":\"${beszel_user_email}\",\"password\":\"${beszel_user_password}\"}" 2>/dev/null || true)"
+
+  beszel_pb_superuser_token="$(jq -r '.token // empty' <<<"$pb_auth_response")"
+fi
+
+if [[ -n "$beszel_pb_superuser_token" ]]; then
+  beszel_pb_auth_header="Authorization: Bearer ${beszel_pb_superuser_token}"
+
+  existing_collection="$(curl -sf http://localhost:8090/api/collections/users \
+    -H "${beszel_pb_auth_header}" 2>/dev/null || true)"
+
+  if [[ -n "$existing_collection" ]]; then
+    oauth_options="$(
+      jq -n \
+        --arg client_id "$beszel_client_id" \
+        --arg client_secret "$beszel_client_secret" \
+        --arg auth_url "${beszel_issuer_url}authorize/" \
+        --arg token_url "${beszel_issuer_url}token/" \
+        --arg userinfo_url "${beszel_issuer_url}userinfo/" \
+        '{
+          "allowOAuth2": true,
+          "enabledOAuth2Providers": [{
+            "name": "authentik",
+            "clientId": $client_id,
+            "clientSecret": $client_secret,
+            "authUrl": $auth_url,
+            "tokenUrl": $token_url,
+            "userInfoUrl": $userinfo_url
+          }]
+        }'
+    )"
+
+    updated_options="$(jq \
+      --argjson oauth "$oauth_options" \
+      '.options |= (. // {}) + $oauth' \
+      <<<"$existing_collection")"
+
+    curl -sf -X PATCH "http://localhost:8090/api/collections/users" \
+      -H "${beszel_pb_auth_header}" \
+      -H "Content-Type: application/json" \
+      -d "$updated_options" >/dev/null 2>&1 && \
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] OIDC configured in Beszel PocketBase" || \
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: Failed to configure OIDC in Beszel PocketBase"
+  else
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: Could not read PocketBase users collection"
+  fi
+else
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: Could not authenticate with Beszel PocketBase superuser API"
+fi
+
+# ---------------------------------------------------------------------------
 # Register NetBird reverse proxy service
 # ---------------------------------------------------------------------------
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Registering Beszel NetBird service"
@@ -279,14 +362,16 @@ bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
   --service-path /
 
 # ---------------------------------------------------------------------------
-# Deploy beszel-agent DaemonSet on cluster via Argo CD
+# Deploy beszel-agent DaemonSet on cluster via kubectl (not Argo CD,
+# because __ZONE_NAME__ must be resolved at runtime)
 # ---------------------------------------------------------------------------
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploying Beszel agent DaemonSet on cluster"
+
 kubectl delete application beszel-agents -n argocd --ignore-not-found=true 2>/dev/null || true
 
-bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
-  --manifest "$WORKSPACE_ROOT/gitops/apps/beszel-agents.yaml" \
-  --application "beszel-agents" \
-  --destination-namespace "beszel"
+beszel_agent_dir="$WORKSPACE_ROOT/gitops/platform-apps/beszel-agents"
+for f in namespace.yaml daemonset.yaml externalsecret.yaml; do
+  sed "s/__ZONE_NAME__/${public_zone_name}/g" "$beszel_agent_dir/$f" | kubectl apply -f -
+done
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Beszel monitoring installation complete"

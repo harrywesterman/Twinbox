@@ -40,6 +40,7 @@ const FIXED_SETUP_STEP_IDS = [
   "install-tempo",
   "install-alloy",
   "install-grafana",
+  "install-beszel",
   "install-wiredoor-gateway",
   "install-dashy-dashboard",
   "install-twinbox-portal",

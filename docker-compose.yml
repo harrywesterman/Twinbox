@@ -112,12 +112,11 @@ services:
     container_name: twinbox-beszel
     restart: unless-stopped
     environment:
-      - APP_URL=https://beszel.__ZONE_NAME__
-      - BESZEL_OIDC_ENABLED=${BESZEL_OIDC_ENABLED:-false}
-      - BESZEL_OIDC_PROVIDER_URL=${BESZEL_OIDC_PROVIDER_URL:-}
-      - BESZEL_OIDC_CLIENT_ID=${BESZEL_OIDC_CLIENT_ID:-}
-      - BESZEL_OIDC_CLIENT_SECRET=${BESZEL_OIDC_CLIENT_SECRET:-}
-      - BESZEL_AUTH_DISABLE_PASSWORD=${BESZEL_AUTH_DISABLE_PASSWORD:-false}
+      - APP_URL=${BESZEL_APP_URL:-}
+      - DISABLE_PASSWORD_AUTH=true
+      - USER_CREATION=true
+      - USER_EMAIL=${BESZEL_USER_EMAIL:-}
+      - USER_PASSWORD=${BESZEL_USER_PASSWORD:-}
     ports:
       - "8090:8090"
     volumes:

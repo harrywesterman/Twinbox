@@ -1,7 +1,7 @@
 id: install-beszel
 title: Install Beszel Monitoring
 type: action
-journey_stage: manage
+journey_stage: setup
 summary: Lightweight server monitoring with Docker stats, historical data, and alerts.
 explanation: >
   Beszel monitors your Management VM and all Kubernetes cluster nodes.
