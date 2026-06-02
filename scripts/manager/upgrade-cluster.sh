@@ -408,20 +408,19 @@ verify_longhorn_worker_preflight() {
         | .[]
         | select(any(.[]; .spec.nodeID == $node))
         | select(
-            ([.[] | select(
-              .spec.nodeID != $node
-              and .spec.active == true
-              and .spec.failedAt == ""
-              and .status.currentState == "running"
-              and .status.started == true
-            )] | length) == 0
+            any(.[]; .spec.nodeID == $node and (
+              .spec.active != true
+              or .spec.failedAt != ""
+              or .status.currentState != "running"
+              or .status.started != true
+            ))
           )
         | .[0].spec.volumeName
       ] | join(",")
     ' <<<"$replicas"
   )"
   [[ -z "$unsafe_replicas" ]] ||
-    fail "worker ${node} has Longhorn volume(s) without a healthy replica on another worker: ${unsafe_replicas}"
+    fail "worker ${node} has unhealthy Longhorn replica(s): ${unsafe_replicas}"
   log "Longhorn worker preflight passed for ${kubernetes_node} (${node})"
 }
 

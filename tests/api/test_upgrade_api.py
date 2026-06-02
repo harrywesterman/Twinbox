@@ -414,10 +414,10 @@ if [[ "$*" == *"get volumeattachments.longhorn.io -o json"* ]]; then
 fi
 if [[ "$*" == *"get replicas.longhorn.io -o json"* ]]; then
   if [[ "${FAIL_REPLICA:-}" == "true" ]]; then
-    printf '{"items":[{"spec":{"volumeName":"single-replica","nodeID":"talos-worker","active":true,"failedAt":""},"status":{"currentState":"running","started":true}}]}'
+    printf '{"items":[{"spec":{"volumeName":"failed-replica","nodeID":"talos-worker","active":true,"failedAt":"2026-06-02T00:00:00Z"},"status":{"currentState":"stopped","started":false}}]}'
     exit 0
   fi
-  printf '{"items":[]}'
+  printf '{"items":[{"spec":{"volumeName":"single-replica","nodeID":"talos-worker","active":true,"failedAt":""},"status":{"currentState":"running","started":true}}]}'
   exit 0
 fi
 if [[ "$1" == "wait" ]]; then

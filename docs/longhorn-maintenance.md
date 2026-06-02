@@ -38,7 +38,7 @@ Before starting a Talos upgrade, verify:
 
 - Longhorn is still using the Twinbox defaults in `gitops/values/longhorn.yaml`
 - no volume on the target node depends on a manually managed attachment
-- the cluster has enough healthy replicas on the remaining workers to tolerate one node being offline
+- replicas stored on the target worker are healthy before its controlled reboot
 
 Control-plane drains remain protected. Worker upgrades deliberately skip the drain and compensate
 by upgrading one node at a time and waiting for full health before continuing.
@@ -48,8 +48,9 @@ Longhorn volume health before maintenance and after every upgraded Talos node. A
 stops the run and leaves a resumable checkpoint.
 
 Before every worker reboot, the updater also verifies that the worker has no manually attached
-Longhorn volumes and that volumes with a replica on the worker still have a healthy running replica
-on another worker.
+Longhorn volumes and that replicas stored on the worker are healthy. A healthy single-replica
+volume is allowed in low-memory mode, with an accepted short workload interruption while its worker
+reboots.
 
 ## Control Plane Topology
 
