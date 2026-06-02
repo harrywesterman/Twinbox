@@ -1152,6 +1152,7 @@ function ClusterUpdatesAdminPage({ updatesState, onNavigate }) {
   const nodes = Array.isArray(data.inventory?.nodes) ? data.inventory.nodes : [];
   const talosReady = Boolean(data.inspected_at) && !active && data.status !== "inspection_failed";
   const kubernetesReady = ["talos_completed", "kubernetes_completed"].includes(data.status);
+  const longhornMaintenanceActive = data.longhorn_maintenance?.active === true;
 
   return (
     <div className="observability-layout">
@@ -1182,6 +1183,15 @@ function ClusterUpdatesAdminPage({ updatesState, onNavigate }) {
         </div>
         {updatesState.error || actionError || data.error ? (
           <div className="inline-error">{updatesState.error || actionError || data.error}</div>
+        ) : null}
+        {longhornMaintenanceActive ? (
+          <div className="inline-notice is-danger">
+            <strong>Tijdelijke Longhorn-maintenance actief</strong>
+            <span>
+              Worker-upgrades gebruiken tijdelijk <code>always-allow</code>. Workloads kunnen kort
+              offline zijn en een worker die niet terugkomt kan dataverlies veroorzaken.
+            </span>
+          </div>
         ) : null}
         <div className="observability-summary-strip">
           <div>
@@ -1239,7 +1249,7 @@ function ClusterUpdatesAdminPage({ updatesState, onNavigate }) {
             onClick={() =>
               runAction(
                 "talos",
-                "Start de Talos-update? Twinbox maakt eerst een etcd-snapshot en werkt daarna één node tegelijk bij."
+                "Start de Talos-update? Twinbox maakt eerst een etcd-snapshot en werkt daarna één node tegelijk bij. Tijdens worker-upgrades gebruikt Longhorn tijdelijk always-allow: workloads kunnen kort offline zijn en een worker die niet terugkomt kan dataverlies veroorzaken."
               )
             }
           >

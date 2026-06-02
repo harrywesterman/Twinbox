@@ -26,6 +26,10 @@ export function defaultUpgradeState(clusterId) {
       talos: [],
       kubernetes: [],
     },
+    longhorn_maintenance: {
+      active: false,
+      original_policy: null,
+    },
     updated_at: now(),
   };
 }

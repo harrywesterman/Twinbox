@@ -7,6 +7,8 @@ import time
 from pathlib import Path
 from urllib import error, request
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -73,6 +75,10 @@ def test_upgrade_endpoints_queue_jobs_and_lock_other_cluster_mutations():
             status, initial = _request_json(f"{base}/api/clusters/cluster-test/upgrades")
             assert status == 200
             assert initial["status"] == "idle"
+            assert initial["longhorn_maintenance"] == {
+                "active": False,
+                "original_policy": None,
+            }
 
             status, refresh = _request_json(
                 f"{base}/api/clusters/cluster-test/upgrades/refresh", method="POST"
@@ -115,19 +121,28 @@ def test_upgrade_endpoints_queue_jobs_and_lock_other_cluster_mutations():
 def test_upgrade_script_keeps_safety_contracts():
     text = (REPO_ROOT / "scripts" / "manager" / "upgrade-cluster.sh").read_text(encoding="utf-8")
     helper_text = (REPO_ROOT / "scripts" / "get-talos-image-factory.sh").read_text(encoding="utf-8")
+    portal_text = (REPO_ROOT / "portal" / "src" / "App.jsx").read_text(encoding="utf-8")
     assert "talos etcd snapshot" in text
     assert "--installer-only" in text
     assert "--output extensions" in text
     assert "siderolabs/qemu-guest-agent" in helper_text
     assert "siderolabs/iscsi-tools" in helper_text
     assert "siderolabs/util-linux-tools" in helper_text
-    assert text.index("$(jq -r '.[]' <<<\"$controlplanes_json\")") < text.index(
-        "$(jq -r '.[]' <<<\"$workers_json\")"
+    talos_upgrade_text = text[text.index("talos_upgrade() {") :]
+    assert talos_upgrade_text.index("$(jq -r '.[]' <<<\"$controlplanes_json\")") < (
+        talos_upgrade_text.index("enable_longhorn_worker_maintenance")
     )
+    assert talos_upgrade_text.index(
+        "enable_longhorn_worker_maintenance"
+    ) < talos_upgrade_text.index("$(jq -r '.[]' <<<\"$workers_json\")")
     assert 'upgrade-k8s --to "$normalized" --dry-run' in text
     assert text.index('upgrade-k8s --to "$normalized" --dry-run') < text.index(
         'upgrade-k8s --to "$normalized" --nodes'
     )
+    assert 'set_longhorn_policy "always-allow"' in text
+    assert "restore_longhorn_worker_maintenance" in text
+    assert "Tijdelijke Longhorn-maintenance actief" in portal_text
+    assert "een worker die niet terugkomt kan dataverlies veroorzaken" in portal_text
 
 
 def test_upgrade_script_inspects_server_versions_and_builds_sequential_paths():
@@ -227,3 +242,192 @@ esac
 def _write_executable(path, text):
     path.write_text(text, encoding="utf-8")
     path.chmod(0o755)
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected_status"),
+    [
+        ("success", "talos_completed"),
+        ("failure", "pending"),
+        ("pause", "paused"),
+    ],
+)
+def test_talos_worker_upgrade_temporarily_uses_and_restores_longhorn_always_allow(
+    mode, expected_status
+):
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        data_dir = root / "data"
+        bin_dir = root / "bin"
+        cluster_dir = data_dir / "clusters"
+        state_dir = data_dir / "upgrade-state"
+        cluster_dir.mkdir(parents=True)
+        state_dir.mkdir()
+        bin_dir.mkdir()
+        log_file = root / "calls.log"
+        policy_file = root / "longhorn-policy.txt"
+        cordon_file = root / "worker-cordoned.txt"
+        policy_file.write_text("allow-if-replica-is-stopped", encoding="utf-8")
+        cordon_file.write_text("true" if mode != "success" else "false", encoding="utf-8")
+        (cluster_dir / "cluster-test.json").write_text(
+            json.dumps(
+                {
+                    "id": "cluster-test",
+                    "controlplane_ips": ["10.0.0.11"],
+                    "worker_ips": ["10.0.0.21"],
+                }
+            ),
+            encoding="utf-8",
+        )
+        checkpoints = ["v1.13.3:10.0.0.11"] if mode != "success" else []
+        (state_dir / "cluster-test.json").write_text(
+            json.dumps(
+                {
+                    "cluster_id": "cluster-test",
+                    "phase": "talos",
+                    "status": "pending",
+                    "pause_requested": mode == "pause",
+                    "paths": {"talos": ["v1.13.3"], "kubernetes": []},
+                    "checkpoints": {"talos": checkpoints, "kubernetes": []},
+                    "longhorn_maintenance": {"active": False, "original_policy": None},
+                }
+            ),
+            encoding="utf-8",
+        )
+        talosconfig = root / "talosconfig"
+        kubeconfig = root / "kubeconfig"
+        talosconfig.write_text("context: test\n", encoding="utf-8")
+        kubeconfig.write_text("apiVersion: v1\n", encoding="utf-8")
+
+        fake_talosctl = bin_dir / "talosctl"
+        _write_executable(
+            fake_talosctl,
+            """#!/bin/bash
+set -euo pipefail
+printf 'talosctl %s\\n' "$*" >> "$TEST_LOG"
+case "$1" in
+  health) ;;
+  etcd) mkdir -p "$(dirname "$3")"; : > "$3" ;;
+  get) printf '{"spec":{"metadata":{"name":"qemu-guest-agent"}}}\\n{"spec":{"metadata":{"name":"iscsi-tools"}}}\\n{"spec":{"metadata":{"name":"util-linux-tools"}}}\\n' ;;
+  upgrade)
+    if [[ "${FAIL_WORKER:-}" == "true" && "$*" == *"--nodes 10.0.0.21"* ]]; then
+      exit 1
+    fi
+    ;;
+esac
+""",
+        )
+        _write_executable(
+            bin_dir / "kubectl",
+            """#!/bin/bash
+set -euo pipefail
+printf 'kubectl %s\\n' "$*" >> "$TEST_LOG"
+if [[ "$*" == "get namespace longhorn-system" ]]; then
+  exit 0
+fi
+if [[ "$*" == "get node 10.0.0.21 -o json" ]]; then
+  printf '{"spec":{"unschedulable":%s},"status":{"conditions":[{"type":"Ready","status":"True"}]}}' "$(cat "$TEST_CORDON")"
+  exit 0
+fi
+if [[ "$*" == "uncordon 10.0.0.21" ]]; then
+  printf 'false' > "$TEST_CORDON"
+  exit 0
+fi
+if [[ "$*" == *"get settings.longhorn.io node-drain-policy -o json"* ]]; then
+  printf '{"value":"%s"}' "$(cat "$TEST_POLICY")"
+  exit 0
+fi
+if [[ "$*" == *"patch settings.longhorn.io node-drain-policy"* ]]; then
+  if [[ "$*" == *"always-allow"* ]]; then
+    printf 'always-allow' > "$TEST_POLICY"
+  else
+    printf 'allow-if-replica-is-stopped' > "$TEST_POLICY"
+  fi
+  exit 0
+fi
+if [[ "$*" == *"get volumes.longhorn.io -o json"* ]]; then
+  printf '{"items":[]}'
+  exit 0
+fi
+if [[ "$1" == "wait" ]]; then
+  exit 0
+fi
+exit 1
+""",
+        )
+        _write_executable(
+            bin_dir / "curl",
+            f"""#!/bin/bash
+set -euo pipefail
+output=""
+previous=""
+for argument in "$@"; do
+  if [[ "$previous" == "-o" ]]; then output="$argument"; fi
+  previous="$argument"
+done
+url="${{@: -1}}"
+if [[ -n "$output" ]]; then
+  cp "{fake_talosctl}" "$output"
+elif [[ "$url" == *"/sha256sum.txt" ]]; then
+  printf 'checksum  talosctl-linux-amd64\\n'
+elif [[ "$url" == *"/schematics" ]]; then
+  cat >/dev/null
+  printf '{{"id":"schematic-test"}}'
+else
+  exit 1
+fi
+""",
+        )
+        _write_executable(
+            bin_dir / "sha256sum",
+            """#!/bin/bash
+printf 'checksum  %s\\n' "$1"
+""",
+        )
+        env = os.environ.copy()
+        env.update(
+            {
+                "PATH": f"{bin_dir}:{env.get('PATH', '')}",
+                "TWINBOX_TALOSCONFIG_FILE": str(talosconfig),
+                "TWINBOX_KUBECONFIG_FILE": str(kubeconfig),
+                "TWINBOX_TALOS_BACKUP_ROOT": str(root / "backups"),
+                "TEST_LOG": str(log_file),
+                "TEST_POLICY": str(policy_file),
+                "TEST_CORDON": str(cordon_file),
+                "FAIL_WORKER": "true" if mode == "failure" else "",
+            }
+        )
+        proc = subprocess.run(
+            [
+                "bash",
+                "scripts/manager/upgrade-cluster.sh",
+                "--phase",
+                "talos",
+                "--cluster-id",
+                "cluster-test",
+                "--data-dir",
+                str(data_dir),
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if mode == "failure":
+            assert proc.returncode != 0
+        else:
+            assert proc.returncode == 0, proc.stderr
+        state = json.loads((state_dir / "cluster-test.json").read_text(encoding="utf-8"))
+        calls = log_file.read_text(encoding="utf-8")
+        assert state["status"] == expected_status
+        assert state["longhorn_maintenance"] == {"active": False, "original_policy": None}
+        assert policy_file.read_text(encoding="utf-8") == "allow-if-replica-is-stopped"
+        assert calls.count("patch settings.longhorn.io node-drain-policy") == 2
+        if mode == "success":
+            assert calls.index("talosctl upgrade --nodes 10.0.0.11") < calls.index(
+                "patch settings.longhorn.io node-drain-policy"
+            )
+        else:
+            assert "talosctl upgrade --nodes 10.0.0.11" not in calls
+            assert "kubectl uncordon 10.0.0.21" in calls

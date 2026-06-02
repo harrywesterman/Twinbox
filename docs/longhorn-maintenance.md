@@ -13,6 +13,14 @@ Twinbox avoids that dead-end by making the default Longhorn behavior more upgrad
 
 That keeps normal maintenance working on small hardware while still protecting the common case where the node comes back after the upgrade.
 
+The Twinbox Portal Talos-upgrade flow temporarily changes `nodeDrainPolicy` to `always-allow`
+while upgrading worker nodes. This removes Longhorn's instance-manager PDB protection so a
+short maintenance drain can finish even when workloads need to go offline. The script restores
+`allow-if-replica-is-stopped` after the worker phase, on a safe pause, and after failures.
+
+`always-allow` is deliberately not the default. If a worker does not return after its drain,
+volumes with only one replica can lose data.
+
 ## Upgrade Flow
 
 Use the same pattern for every Talos node:

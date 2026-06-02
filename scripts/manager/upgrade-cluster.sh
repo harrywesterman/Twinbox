@@ -11,6 +11,7 @@ data_dir="${MANAGER_DATA_DIR:-/data}"
 talosconfig="${TWINBOX_TALOSCONFIG_FILE:-}"
 kubeconfig="${TWINBOX_KUBECONFIG_FILE:-${KUBECONFIG_FILE:-}}"
 state_file="${TWINBOX_UPGRADE_STATE_FILE:-}"
+talos_backup_root="${TWINBOX_TALOS_BACKUP_ROOT:-/opt/twinbox/bootstrap/backups/talos-etcd}"
 cluster_file=""
 
 usage() {
@@ -75,6 +76,7 @@ ensure_state() {
     upstream: null,
     paths: {talos: [], kubernetes: []},
     checkpoints: {talos: [], kubernetes: []},
+    longhorn_maintenance: {active: false, original_policy: null},
     updated_at: $updated_at
   }' >"$state_file"
 }
@@ -241,6 +243,81 @@ verify_extensions() {
     fail "Talos extensions on ${node} do not match the Twinbox Image Factory preset"
 }
 
+longhorn_policy() {
+  kubectl -n longhorn-system get settings.longhorn.io node-drain-policy -o json |
+    jq -r '.value'
+}
+
+set_longhorn_policy() {
+  local policy="$1"
+  kubectl -n longhorn-system patch settings.longhorn.io node-drain-policy \
+    --type=merge \
+    -p "{\"value\":\"${policy}\"}" >/dev/null
+}
+
+enable_longhorn_worker_maintenance() {
+  local active current original
+  if ! kubectl get namespace longhorn-system >/dev/null 2>&1; then
+    return
+  fi
+  active="$(jq -r '.longhorn_maintenance.active // false' "$state_file")"
+  current="$(longhorn_policy)"
+  original="$(jq -r '.longhorn_maintenance.original_policy // empty' "$state_file")"
+  if [[ "$active" != "true" ]]; then
+    original="$current"
+  fi
+  [[ -n "$original" ]] || fail "could not preserve the Longhorn node drain policy"
+  if [[ "$current" != "always-allow" ]]; then
+    log "Enabling temporary Longhorn worker maintenance policy: ${current} -> always-allow"
+    set_longhorn_policy "always-allow"
+  else
+    log "Temporary Longhorn worker maintenance policy is already active: always-allow"
+  fi
+  patch_state ".longhorn_maintenance = {active: true, original_policy: \"$original\"}"
+}
+
+restore_longhorn_worker_maintenance() {
+  local active original current
+  active="$(jq -r '.longhorn_maintenance.active // false' "$state_file")"
+  if [[ "$active" != "true" ]]; then
+    return
+  fi
+  original="$(jq -r '.longhorn_maintenance.original_policy // empty' "$state_file")"
+  [[ -n "$original" ]] || {
+    log "ERROR: cannot restore Longhorn worker maintenance policy: original policy is missing" >&2
+    return 1
+  }
+  current="$(longhorn_policy)"
+  if [[ "$current" != "$original" ]]; then
+    log "Restoring Longhorn worker maintenance policy: ${current} -> ${original}"
+    set_longhorn_policy "$original"
+  else
+    log "Longhorn worker maintenance policy is already restored: ${original}"
+  fi
+  patch_state '.longhorn_maintenance = {active: false, original_policy: null}'
+}
+
+uncordon_ready_workers() {
+  local node ready unschedulable
+  for node in $(jq -r '.[]' <<<"$workers_json"); do
+    ready="$(kubectl get node "$node" -o json |
+      jq -r '[.status.conditions[]? | select(.type == "Ready") | .status] | first // "False"')"
+    unschedulable="$(kubectl get node "$node" -o json | jq -r '.spec.unschedulable // false')"
+    if [[ "$ready" == "True" && "$unschedulable" == "true" ]]; then
+      log "Uncordoning ready worker left behind by an interrupted drain: ${node}"
+      kubectl uncordon "$node" >/dev/null
+    fi
+  done
+}
+
+cleanup_talos_upgrade() {
+  local exit_code=$?
+  trap - EXIT
+  restore_longhorn_worker_maintenance || true
+  uncordon_ready_workers || true
+  exit "$exit_code"
+}
+
 download_talosctl() {
   local version="$1" target_dir binary checksums expected actual
   target_dir="$(mktemp -d)"
@@ -257,8 +334,10 @@ download_talosctl() {
 
 talos_upgrade() {
   local target node installer helper binary checkpoint snapshot_dir snapshot
+  trap cleanup_talos_upgrade EXIT
+  uncordon_ready_workers
   health_check
-  snapshot_dir="/opt/twinbox/bootstrap/backups/talos-etcd/${cluster_id}"
+  snapshot_dir="${talos_backup_root}/${cluster_id}"
   mkdir -p "$snapshot_dir"
   snapshot="${snapshot_dir}/etcd-$(date -u '+%Y%m%dT%H%M%SZ').snapshot"
   log "Creating required etcd snapshot at ${snapshot}"
@@ -270,7 +349,7 @@ talos_upgrade() {
     installer="$(awk -F= '/^TALOS_IMAGE_INSTALLER=/{print $2}' <<<"$helper")"
     [[ -n "$installer" ]] || fail "failed to resolve installer for ${target}"
     binary="$(download_talosctl "$target")"
-    for node in $(jq -r '.[]' <<<"$controlplanes_json") $(jq -r '.[]' <<<"$workers_json"); do
+    for node in $(jq -r '.[]' <<<"$controlplanes_json"); do
       checkpoint="${target}:${node}"
       if jq -e --arg checkpoint "$checkpoint" '.checkpoints.talos | index($checkpoint)' "$state_file" >/dev/null; then
         log "Skipping completed Talos checkpoint ${checkpoint}"
@@ -282,6 +361,20 @@ talos_upgrade() {
       patch_state ".checkpoints.talos += [\"$checkpoint\"]"
       check_pause
     done
+    enable_longhorn_worker_maintenance
+    for node in $(jq -r '.[]' <<<"$workers_json"); do
+      checkpoint="${target}:${node}"
+      if jq -e --arg checkpoint "$checkpoint" '.checkpoints.talos | index($checkpoint)' "$state_file" >/dev/null; then
+        log "Skipping completed Talos checkpoint ${checkpoint}"
+        continue
+      fi
+      log "Upgrading Talos node ${node} to ${target}"
+      TALOSCTL_BIN="$binary" talos upgrade --nodes "$node" --endpoints "$endpoint" --image "$installer" --wait
+      health_check
+      patch_state ".checkpoints.talos += [\"$checkpoint\"]"
+      check_pause
+    done
+    restore_longhorn_worker_maintenance
     rm -rf "$(dirname "$binary")"
   done
   patch_state '.phase = "talos" | .status = "talos_completed" | .active_job_id = null | .resumable = false | .pause_requested = false'
