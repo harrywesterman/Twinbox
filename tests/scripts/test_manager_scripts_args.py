@@ -3970,7 +3970,7 @@ def test_authentik_database_cluster_spreads_pods_across_nodes():
         {
             "maxSkew": 1,
             "topologyKey": "kubernetes.io/hostname",
-            "whenUnsatisfiable": "DoNotSchedule",
+            "whenUnsatisfiable": "ScheduleAnyway",
             "labelSelector": {
                 "matchLabels": {
                     "cnpg.io/cluster": "authentik-db",
