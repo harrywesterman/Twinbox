@@ -110,7 +110,7 @@ semver() {
 node_talos_version() {
   local node="$1" output version
   output="$(talos version --nodes "$node" --endpoints "$endpoint" 2>&1)"
-  version="$(awk '/^Server:/{server=1; next} server {print}' <<<"$output" | semver || true)"
+  version="$(awk '/^Server:/{server=1; next} server && /^[[:space:]]*Tag:/{print $2; exit}' <<<"$output" | sed 's/^v//' || true)"
   [[ -n "$version" ]] || fail "could not read Talos server version for ${node}"
   printf '%s\n' "$version"
 }
