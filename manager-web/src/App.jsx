@@ -1541,11 +1541,24 @@ function App() {
   ]);
 
   async function pollJob(jobId, stepId) {
+    let consecutiveErrors = 0;
+    const maxConsecutiveErrors = 5;
     for (;;) {
-      const [jobData, logsData] = await Promise.all([
-        requestJson(`/api/jobs/${encodeURIComponent(jobId)}`),
-        requestJson(`/api/jobs/${encodeURIComponent(jobId)}/logs`),
-      ]);
+      let jobData, logsData;
+      try {
+        [jobData, logsData] = await Promise.all([
+          requestJson(`/api/jobs/${encodeURIComponent(jobId)}`),
+          requestJson(`/api/jobs/${encodeURIComponent(jobId)}/logs`),
+        ]);
+        consecutiveErrors = 0;
+      } catch (pollError) {
+        consecutiveErrors++;
+        if (consecutiveErrors > maxConsecutiveErrors) {
+          throw pollError;
+        }
+        await sleep(3000);
+        continue;
+      }
       const currentJob = normalizeJobResult(jobData);
 
       const latestLogs = logsData?.lines || [];
