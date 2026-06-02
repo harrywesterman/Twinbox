@@ -4,7 +4,7 @@ Twinbox keeps Longhorn on the worker nodes, but it also tunes the default drain 
 
 ## Why this matters
 
-Talos upgrades drain the node before the new OS image boots. On a Longhorn-backed cluster, the default drain policy can block that drain when the node still carries the last healthy replica of a volume.
+Talos upgrades normally drain the node before the new OS image boots. On a Longhorn-backed cluster, the default drain policy can block that drain when the node still carries the last healthy replica of a volume.
 
 Twinbox avoids that dead-end by making the default Longhorn behavior more upgrade-friendly:
 
@@ -14,8 +14,9 @@ Twinbox avoids that dead-end by making the default Longhorn behavior more upgrad
 That keeps normal maintenance working on small hardware while still protecting the common case where the node comes back after the upgrade.
 
 The Twinbox Portal Talos-upgrade flow temporarily changes `nodeDrainPolicy` to `always-allow`
-while upgrading worker nodes. This removes Longhorn's instance-manager PDB protection so a
-short maintenance drain can finish even when workloads need to go offline. The script restores
+while upgrading worker nodes. Worker upgrades also use Talos `--drain=false`, because singleton
+workloads such as OpenBao and CloudNativePG intentionally keep PDB protection enabled. The worker
+reboots directly, so workloads can be briefly unavailable. The script restores
 `allow-if-replica-is-stopped` after the worker phase, on a safe pause, and after failures.
 
 `always-allow` is deliberately not the default. If a worker does not return after its drain,
@@ -26,7 +27,7 @@ volumes with only one replica can lose data.
 Use the same pattern for every Talos node:
 
 1. Confirm the target node does not host a manually attached volume that should stay online during maintenance.
-2. Let Longhorn detach any manually attached volumes when the node is cordoned.
+2. Accept a short workload interruption while each worker reboots without a Kubernetes drain.
 3. Upgrade one Talos node at a time.
 4. Wait for the node to rejoin the cluster and for Longhorn instance-manager pods on that node to recover.
 5. Move to the next node only after the previous one is healthy again.
@@ -39,7 +40,8 @@ Before starting a Talos upgrade, verify:
 - no volume on the target node depends on a manually managed attachment
 - the cluster has enough healthy replicas on the remaining workers to tolerate one node being offline
 
-If a node still refuses to drain, stop and inspect the Longhorn volume placement before forcing the upgrade. The goal is to keep the upgrade safe and repeatable, not to bypass the safety model entirely.
+Control-plane drains remain protected. Worker upgrades deliberately skip the drain and compensate
+by upgrading one node at a time and waiting for full health before continuing.
 
 The Twinbox Portal admin page at `/admin/updates` applies this policy automatically. It checks
 Longhorn volume health before maintenance and after every upgraded Talos node. A non-healthy volume

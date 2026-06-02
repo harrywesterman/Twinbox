@@ -1189,7 +1189,8 @@ function ClusterUpdatesAdminPage({ updatesState, onNavigate }) {
             <strong>Tijdelijke Longhorn-maintenance actief</strong>
             <span>
               Worker-upgrades gebruiken tijdelijk <code>always-allow</code>. Workloads kunnen kort
-              offline zijn en een worker die niet terugkomt kan dataverlies veroorzaken.
+              offline zijn omdat workers zonder drain rebooten. Een worker die niet terugkomt kan
+              dataverlies veroorzaken.
             </span>
           </div>
         ) : null}
@@ -1249,7 +1250,7 @@ function ClusterUpdatesAdminPage({ updatesState, onNavigate }) {
             onClick={() =>
               runAction(
                 "talos",
-                "Start de Talos-update? Twinbox maakt eerst een etcd-snapshot en werkt daarna één node tegelijk bij. Tijdens worker-upgrades gebruikt Longhorn tijdelijk always-allow: workloads kunnen kort offline zijn en een worker die niet terugkomt kan dataverlies veroorzaken."
+                "Start de Talos-update? Twinbox maakt eerst een etcd-snapshot en werkt daarna één node tegelijk bij. Tijdens worker-upgrades gebruikt Longhorn tijdelijk always-allow en reboot de worker zonder drain: workloads kunnen kort offline zijn en een worker die niet terugkomt kan dataverlies veroorzaken."
               )
             }
           >

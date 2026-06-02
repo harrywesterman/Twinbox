@@ -388,8 +388,8 @@ talos_upgrade() {
         continue
       fi
       enable_longhorn_worker_maintenance
-      log "Upgrading Talos node ${node} to ${target}"
-      TALOSCTL_BIN="$binary" talos upgrade --nodes "$node" --endpoints "$endpoint" --image "$installer" --wait
+      log "Upgrading Talos worker ${node} to ${target} without draining workloads"
+      TALOSCTL_BIN="$binary" talos upgrade --nodes "$node" --endpoints "$endpoint" --image "$installer" --drain=false --wait
       health_check
       patch_state ".checkpoints.talos += [\"$checkpoint\"]"
       check_pause

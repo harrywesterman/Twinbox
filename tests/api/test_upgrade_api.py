@@ -138,6 +138,7 @@ def test_upgrade_script_keeps_safety_contracts():
     assert workers_upgrade_text.index(
         "enable_longhorn_worker_maintenance"
     ) < workers_upgrade_text.index('TALOSCTL_BIN="$binary" talos upgrade')
+    assert "--drain=false --wait" in workers_upgrade_text
     assert 'upgrade-k8s --to "$normalized" --dry-run' in text
     assert text.index('upgrade-k8s --to "$normalized" --dry-run') < text.index(
         'upgrade-k8s --to "$normalized" --nodes'
@@ -446,6 +447,8 @@ printf 'checksum  %s\\n' "$1"
             assert calls.index("talosctl upgrade --nodes 10.0.0.11") < calls.index(
                 "patch settings.longhorn.io node-drain-policy"
             )
+            assert "talosctl upgrade --nodes 10.0.0.21" in calls
+            assert "--drain=false --wait" in calls
         else:
             assert "talosctl upgrade --nodes 10.0.0.11" not in calls
             assert "kubectl uncordon talos-worker" in calls
