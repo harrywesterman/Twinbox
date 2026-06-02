@@ -126,6 +126,7 @@ write_files:
         esac
 
         install -d -m 0700 "$cert_dir" "$lego_dir"
+        chown 1000:1000 "$cert_dir"
         set -a
         # shellcheck disable=SC1091
         source /opt/netbird/.dns-credentials
@@ -146,6 +147,7 @@ write_files:
 
         install -m 0644 "$lego_cert" "$cert_file.tmp"
         install -m 0600 "$lego_key" "$key_file.tmp"
+        chown 1000:1000 "$cert_file.tmp" "$key_file.tmp"
         mv -f "$cert_file.tmp" "$cert_file"
         mv -f "$key_file.tmp" "$key_file"
       }

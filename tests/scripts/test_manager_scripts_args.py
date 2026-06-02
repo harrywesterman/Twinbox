@@ -4588,6 +4588,8 @@ def test_netbird_cloud_init_uses_exact_netbird_cert_and_tcp_passthrough():
     assert "renew --days 30" in text
     assert "netbird-wildcard-certificate.timer" in text
     assert "OnCalendar=daily" in text
+    assert 'chown 1000:1000 "$cert_dir"' in text
+    assert 'chown 1000:1000 "$cert_file.tmp" "$key_file.tmp"' in text
     assert "tls.domains[0].main" in text
     assert '"traefik.http.routers.netbird-dashboard.tls.domains[0].main": netbird_domain' in text
     assert '"traefik.http.routers.netbird-backend.tls.domains[0].main": netbird_domain' in text
