@@ -298,14 +298,21 @@ restore_longhorn_worker_maintenance() {
 }
 
 uncordon_ready_workers() {
-  local node ready unschedulable
+  local node kubernetes_node ready unschedulable
   for node in $(jq -r '.[]' <<<"$workers_json"); do
-    ready="$(kubectl get node "$node" -o json |
+    kubernetes_node="$(kubectl get nodes -o json |
+      jq -r --arg node "$node" '
+        .items[]
+        | select(any(.status.addresses[]?; .type == "InternalIP" and .address == $node))
+        | .metadata.name
+      ' | head -n1)"
+    [[ -n "$kubernetes_node" ]] || fail "could not resolve Kubernetes node name for worker ${node}"
+    ready="$(kubectl get node "$kubernetes_node" -o json |
       jq -r '[.status.conditions[]? | select(.type == "Ready") | .status] | first // "False"')"
-    unschedulable="$(kubectl get node "$node" -o json | jq -r '.spec.unschedulable // false')"
+    unschedulable="$(kubectl get node "$kubernetes_node" -o json | jq -r '.spec.unschedulable // false')"
     if [[ "$ready" == "True" && "$unschedulable" == "true" ]]; then
-      log "Uncordoning ready worker left behind by an interrupted drain: ${node}"
-      kubectl uncordon "$node" >/dev/null
+      log "Uncordoning ready worker left behind by an interrupted drain: ${kubernetes_node} (${node})"
+      kubectl uncordon "$kubernetes_node" >/dev/null
     fi
   done
 }

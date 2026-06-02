@@ -325,11 +325,15 @@ printf 'kubectl %s\\n' "$*" >> "$TEST_LOG"
 if [[ "$*" == "get namespace longhorn-system" ]]; then
   exit 0
 fi
-if [[ "$*" == "get node 10.0.0.21 -o json" ]]; then
+if [[ "$*" == "get nodes -o json" ]]; then
+  printf '{"items":[{"metadata":{"name":"talos-worker"},"status":{"addresses":[{"type":"InternalIP","address":"10.0.0.21"}]}}]}'
+  exit 0
+fi
+if [[ "$*" == "get node talos-worker -o json" ]]; then
   printf '{"spec":{"unschedulable":%s},"status":{"conditions":[{"type":"Ready","status":"True"}]}}' "$(cat "$TEST_CORDON")"
   exit 0
 fi
-if [[ "$*" == "uncordon 10.0.0.21" ]]; then
+if [[ "$*" == "uncordon talos-worker" ]]; then
   printf 'false' > "$TEST_CORDON"
   exit 0
 fi
@@ -430,4 +434,4 @@ printf 'checksum  %s\\n' "$1"
             )
         else:
             assert "talosctl upgrade --nodes 10.0.0.11" not in calls
-            assert "kubectl uncordon 10.0.0.21" in calls
+            assert "kubectl uncordon talos-worker" in calls
