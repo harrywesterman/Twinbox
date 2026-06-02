@@ -364,6 +364,8 @@ function updateUpgradeState(clusterId, patch) {
     status: "idle",
     paths: { talos: [], kubernetes: [] },
     checkpoints: { talos: [], kubernetes: [] },
+    topology: { controlplane_count: 0, mode: null, warning: null },
+    current_node: null,
   };
   const next = {
     ...current,

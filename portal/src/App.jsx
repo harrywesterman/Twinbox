@@ -1153,6 +1153,7 @@ function ClusterUpdatesAdminPage({ updatesState, onNavigate }) {
   const talosReady = Boolean(data.inspected_at) && !active && data.status !== "inspection_failed";
   const kubernetesReady = ["talos_completed", "kubernetes_completed"].includes(data.status);
   const longhornMaintenanceActive = data.longhorn_maintenance?.active === true;
+  const disruptiveMaintenance = data.topology?.mode === "disruptive-maintenance";
 
   return (
     <div className="observability-layout">
@@ -1194,6 +1195,16 @@ function ClusterUpdatesAdminPage({ updatesState, onNavigate }) {
             </span>
           </div>
         ) : null}
+        {data.topology?.warning ? (
+          <div className={`inline-notice ${disruptiveMaintenance ? "is-danger" : ""}`}>
+            <strong>
+              {disruptiveMaintenance
+                ? "Talos-update met gepland onderhoudsvenster"
+                : "Control-plane-topologie"}
+            </strong>
+            <span>{data.topology.warning}</span>
+          </div>
+        ) : null}
         <div className="observability-summary-strip">
           <div>
             <span>Status</span>
@@ -1211,6 +1222,12 @@ function ClusterUpdatesAdminPage({ updatesState, onNavigate }) {
             <span>Inspectie</span>
             <strong>{data.inspected_at || "Nog niet uitgevoerd"}</strong>
           </div>
+          {data.current_node ? (
+            <div>
+              <span>Actieve node</span>
+              <strong>{data.current_node}</strong>
+            </div>
+          ) : null}
         </div>
         <div className="observability-detail-grid cluster-update-grid">
           <article className="observability-detail-box">
@@ -1250,7 +1267,7 @@ function ClusterUpdatesAdminPage({ updatesState, onNavigate }) {
             onClick={() =>
               runAction(
                 "talos",
-                "Start de Talos-update? Twinbox maakt eerst een etcd-snapshot en werkt daarna één node tegelijk bij. Tijdens worker-upgrades gebruikt Longhorn tijdelijk always-allow en reboot de worker zonder drain: workloads kunnen kort offline zijn en een worker die niet terugkomt kan dataverlies veroorzaken."
+                `Start de Talos-update? Twinbox maakt eerst een etcd-snapshot en werkt daarna één node tegelijk bij.${disruptiveMaintenance ? " Met deze control-plane-topologie kunnen de Kubernetes API en portal tijdelijk offline zijn terwijl de Management VM doorgaat." : ""} Tijdens worker-upgrades gebruikt Longhorn tijdelijk always-allow en reboot de worker zonder drain: workloads kunnen kort offline zijn en een worker die niet terugkomt kan dataverlies veroorzaken.`
               )
             }
           >

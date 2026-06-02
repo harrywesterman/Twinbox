@@ -42,8 +42,10 @@ Reads and outputs the cluster JSON file from `manager-data/clusters/<cluster-id>
 
 Inspects and upgrades an existing cluster in explicit `inspect`, `talos`, and `kubernetes` phases.
 The Talos phase reuses the provisioning Image Factory preset, requires an etcd snapshot, upgrades
-control planes before workers, and records resumable node checkpoints. The Kubernetes phase previews
-each sequential minor update with `talosctl upgrade-k8s --dry-run`.
+control planes before workers, selects a reachable control-plane endpoint, and records resumable
+node checkpoints. One- and two-control-plane clusters are supported with a planned API downtime
+warning. Before worker reboots, the script checks Longhorn attachments and replica availability. The
+Kubernetes phase previews each sequential minor update with `talosctl upgrade-k8s --dry-run`.
 
 ## Networking
 

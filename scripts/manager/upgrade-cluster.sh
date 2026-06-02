@@ -76,6 +76,8 @@ ensure_state() {
     upstream: null,
     paths: {talos: [], kubernetes: []},
     checkpoints: {talos: [], kubernetes: []},
+    topology: {controlplane_count: 0, mode: null, warning: null},
+    current_node: null,
     longhorn_maintenance: {active: false, original_policy: null},
     updated_at: $updated_at
   }' >"$state_file"
@@ -99,10 +101,41 @@ endpoint="$(jq -r '.[0] // empty' <<<"$controlplanes_json")"
 nodes_csv="$(jq -r 'join(",")' <<<"$all_nodes_json")"
 controlplanes_csv="$(jq -r 'join(",")' <<<"$controlplanes_json")"
 workers_csv="$(jq -r 'join(",")' <<<"$workers_json")"
+controlplane_count="$(jq 'length' <<<"$controlplanes_json")"
+talosctl_bin="${TALOSCTL_BIN:-talosctl}"
+
+if ((controlplane_count <= 2)); then
+  topology_mode="disruptive-maintenance"
+  topology_warning="Talos-updates kunnen de Kubernetes API en portal tijdelijk onderbreken omdat dit cluster ${controlplane_count} control-plane node(s) heeft."
+elif ((controlplane_count % 2 == 0)); then
+  topology_mode="rolling"
+  topology_warning="Dit cluster heeft een even aantal control-plane nodes. Een oneven aantal biedt betere etcd-fouttolerantie."
+else
+  topology_mode="rolling"
+  topology_warning=""
+fi
+
+topology_json="$(
+  jq -cn \
+    --argjson controlplane_count "$controlplane_count" \
+    --arg mode "$topology_mode" \
+    --arg warning "$topology_warning" \
+    '{controlplane_count: $controlplane_count, mode: $mode, warning: (if $warning == "" then null else $warning end)}'
+)"
 
 talos() {
-  local binary="${TALOSCTL_BIN:-talosctl}"
-  "$binary" "$@" --talosconfig "$talosconfig"
+  "$talosctl_bin" "$@" --talosconfig "$talosconfig"
+}
+
+resolve_endpoint() {
+  local candidate
+  for candidate in $(jq -r '.[]' <<<"$controlplanes_json"); do
+    if talos version --nodes "$candidate" --endpoints "$candidate" >/dev/null 2>&1; then
+      endpoint="$candidate"
+      return
+    fi
+  done
+  return 1
 }
 
 semver() {
@@ -111,6 +144,7 @@ semver() {
 
 node_talos_version() {
   local node="$1" output version
+  resolve_endpoint || fail "no reachable control-plane endpoint found"
   output="$(talos version --nodes "$node" --endpoints "$endpoint" 2>&1)"
   version="$(awk '/^Server:/{server=1; next} server && /^[[:space:]]*Tag:/{print $2; exit}' <<<"$output" | sed 's/^v//' || true)"
   [[ -n "$version" ]] || fail "could not read Talos server version for ${node}"
@@ -119,6 +153,7 @@ node_talos_version() {
 
 node_extensions() {
   local node="$1" output
+  resolve_endpoint || fail "no reachable control-plane endpoint found"
   output="$(talos get extensions --nodes "$node" --endpoints "$endpoint" -o json 2>/dev/null || true)"
   jq -sc '
     [
@@ -188,13 +223,32 @@ check_pause() {
   fi
 }
 
-health_check() {
+verify_etcd_health() {
+  resolve_endpoint || return 1
+  talos etcd status --nodes "$endpoint" --endpoints "$endpoint" >/dev/null
+  talos etcd alarm list --nodes "$endpoint" --endpoints "$endpoint" |
+    awk 'NF { found = 1 } END { exit found ? 1 : 0 }'
+}
+
+health_check_once() {
+  resolve_endpoint || return 1
   log "Checking Talos, Kubernetes and Longhorn health"
   talos health --nodes "$endpoint" --control-plane-nodes "$controlplanes_csv" --worker-nodes "$workers_csv" --endpoints "$endpoint"
+  verify_etcd_health
   kubectl wait --for=condition=Ready nodes --all --timeout=10m
   if kubectl get namespace longhorn-system >/dev/null 2>&1; then
     wait_for_longhorn_health
   fi
+}
+
+health_check() {
+  local deadline
+  deadline=$((SECONDS + ${TWINBOX_CLUSTER_HEALTH_TIMEOUT_SECONDS:-900}))
+  until health_check_once; do
+    ((SECONDS < deadline)) || fail "cluster did not become healthy after waiting"
+    log "Waiting for the cluster to become healthy after maintenance"
+    sleep "${TWINBOX_CLUSTER_HEALTH_POLL_SECONDS:-10}"
+  done
 }
 
 wait_for_longhorn_health() {
@@ -214,7 +268,7 @@ wait_for_longhorn_health() {
 }
 
 inspect() {
-  local talos_releases latest_talos latest_kubernetes current_kubernetes inventory talos_path kube_path
+  local talos_releases latest_talos latest_kubernetes current_kubernetes inventory talos_path kube_path version_count
   log "Inspecting cluster versions and upstream stable releases"
   inventory="$(
     jq -cn --argjson cps "$controlplanes_json" --argjson workers "$workers_json" '$cps + $workers | .[]' |
@@ -226,6 +280,8 @@ inspect() {
           '{node: $node, role: $role, version: ("v" + $version), extensions: $extensions}'
       done | jq -sc '.'
   )"
+  version_count="$(jq '[.[].version] | unique | length' <<<"$inventory")"
+  [[ "$version_count" == "1" ]] || fail "Talos nodes do not run a uniform version"
   current_kubernetes="$(kubernetes_version)"
   talos_releases="$(latest_talos_releases)"
   latest_talos="$(jq -r 'sort_by(ltrimstr("v") | split(".") | map(tonumber)) | last' <<<"$talos_releases")"
@@ -243,7 +299,9 @@ inspect() {
     | .inspected_at = \"$(now)\"
     | .inventory = {nodes: $inventory, kubernetes_version: \"v${current_kubernetes}\"}
     | .upstream = {talos: \"$latest_talos\", kubernetes: \"$latest_kubernetes\", fetched_at: \"$(now)\"}
-    | .paths = {talos: $talos_path, kubernetes: $kube_path}"
+    | .paths = {talos: $talos_path, kubernetes: $kube_path}
+    | .topology = $topology_json
+    | .current_node = null"
   log "Inspection completed"
 }
 
@@ -310,15 +368,67 @@ restore_longhorn_worker_maintenance() {
   patch_state '.longhorn_maintenance = {active: false, original_policy: null}'
 }
 
+resolve_kubernetes_node() {
+  local node="$1"
+  kubectl get nodes -o json |
+    jq -r --arg node "$node" '
+      .items[]
+      | select(any(.status.addresses[]?; .type == "InternalIP" and .address == $node))
+      | .metadata.name
+    ' | head -n1
+}
+
+verify_longhorn_worker_preflight() {
+  local node="$1" kubernetes_node attachments replicas unsafe_attachments unsafe_replicas
+  if ! kubectl get namespace longhorn-system >/dev/null 2>&1; then
+    return
+  fi
+  kubernetes_node="$(resolve_kubernetes_node "$node")"
+  [[ -n "$kubernetes_node" ]] || fail "could not resolve Kubernetes node name for worker ${node}"
+  attachments="$(kubectl -n longhorn-system get volumeattachments.longhorn.io -o json)"
+  unsafe_attachments="$(
+    jq -r --arg node "$kubernetes_node" '
+      [
+        .items[]
+        | select(any(.spec.attachmentTickets[]?;
+            .nodeID == $node and .type != "csi-attacher"))
+        | .metadata.name
+      ] | join(",")
+    ' <<<"$attachments"
+  )"
+  [[ -z "$unsafe_attachments" ]] ||
+    fail "worker ${node} has manually attached Longhorn volume(s): ${unsafe_attachments}"
+
+  replicas="$(kubectl -n longhorn-system get replicas.longhorn.io -o json)"
+  unsafe_replicas="$(
+    jq -r --arg node "$kubernetes_node" '
+      [
+        .items
+        | group_by(.spec.volumeName)
+        | .[]
+        | select(any(.[]; .spec.nodeID == $node))
+        | select(
+            ([.[] | select(
+              .spec.nodeID != $node
+              and .spec.active == true
+              and .spec.failedAt == ""
+              and .status.currentState == "running"
+              and .status.started == true
+            )] | length) == 0
+          )
+        | .[0].spec.volumeName
+      ] | join(",")
+    ' <<<"$replicas"
+  )"
+  [[ -z "$unsafe_replicas" ]] ||
+    fail "worker ${node} has Longhorn volume(s) without a healthy replica on another worker: ${unsafe_replicas}"
+  log "Longhorn worker preflight passed for ${kubernetes_node} (${node})"
+}
+
 uncordon_ready_workers() {
   local node kubernetes_node ready unschedulable
   for node in $(jq -r '.[]' <<<"$workers_json"); do
-    kubernetes_node="$(kubectl get nodes -o json |
-      jq -r --arg node "$node" '
-        .items[]
-        | select(any(.status.addresses[]?; .type == "InternalIP" and .address == $node))
-        | .metadata.name
-      ' | head -n1)"
+    kubernetes_node="$(resolve_kubernetes_node "$node")"
     [[ -n "$kubernetes_node" ]] || fail "could not resolve Kubernetes node name for worker ${node}"
     ready="$(kubectl get node "$kubernetes_node" -o json |
       jq -r '[.status.conditions[]? | select(.type == "Ready") | .status] | first // "False"')"
@@ -335,6 +445,9 @@ cleanup_talos_upgrade() {
   trap - EXIT
   restore_longhorn_worker_maintenance || true
   uncordon_ready_workers || true
+  if [[ "$talosctl_bin" == /tmp/* ]]; then
+    rm -rf "$(dirname "$talosctl_bin")"
+  fi
   exit "$exit_code"
 }
 
@@ -352,8 +465,17 @@ download_talosctl() {
   printf '%s\n' "$binary"
 }
 
+activate_talosctl() {
+  local version="$1" previous_binary
+  previous_binary="$talosctl_bin"
+  talosctl_bin="$(download_talosctl "$version")"
+  if [[ "$previous_binary" == /tmp/* ]]; then
+    rm -rf "$(dirname "$previous_binary")"
+  fi
+}
+
 talos_upgrade() {
-  local target node installer helper binary checkpoint snapshot_dir snapshot
+  local target node installer helper checkpoint snapshot_dir snapshot source_version target_index target_count
   trap cleanup_talos_upgrade EXIT
   uncordon_ready_workers
   health_check
@@ -361,14 +483,20 @@ talos_upgrade() {
   mkdir -p "$snapshot_dir"
   snapshot="${snapshot_dir}/etcd-$(date -u '+%Y%m%dT%H%M%SZ').snapshot"
   log "Creating required etcd snapshot at ${snapshot}"
+  resolve_endpoint || fail "no reachable control-plane endpoint found"
   talos etcd snapshot "$snapshot" --nodes "$endpoint" --endpoints "$endpoint"
   for node in $(jq -r '.[]' <<<"$all_nodes_json"); do verify_extensions "$node"; done
+  source_version="$(jq -r '.inventory.nodes[0].version // empty' "$state_file")"
+  [[ -n "$source_version" ]] || fail "inspected Talos source version is missing"
+  activate_talosctl "$source_version"
 
+  target_index=0
+  target_count="$(jq '.paths.talos | length' "$state_file")"
   for target in $(jq -r '.paths.talos[]' "$state_file"); do
+    target_index=$((target_index + 1))
     helper="$("$WORKSPACE_ROOT/scripts/get-talos-image-factory.sh" --preset qemu-guest-agent --version "$target" --installer-only --output shell)"
     installer="$(awk -F= '/^TALOS_IMAGE_INSTALLER=/{print $2}' <<<"$helper")"
     [[ -n "$installer" ]] || fail "failed to resolve installer for ${target}"
-    binary="$(download_talosctl "$target")"
     for node in $(jq -r '.[]' <<<"$controlplanes_json"); do
       checkpoint="${target}:${node}"
       if jq -e --arg checkpoint "$checkpoint" '.checkpoints.talos | index($checkpoint)' "$state_file" >/dev/null; then
@@ -376,9 +504,11 @@ talos_upgrade() {
         continue
       fi
       log "Upgrading Talos node ${node} to ${target}"
-      TALOSCTL_BIN="$binary" talos upgrade --nodes "$node" --endpoints "$endpoint" --image "$installer" --wait
+      patch_state ".current_node = \"$node\""
+      resolve_endpoint || fail "no reachable control-plane endpoint found"
+      talos upgrade --nodes "$node" --endpoints "$endpoint" --image "$installer" --wait
       health_check
-      patch_state ".checkpoints.talos += [\"$checkpoint\"]"
+      patch_state ".checkpoints.talos += [\"$checkpoint\"] | .current_node = null"
       check_pause
     done
     for node in $(jq -r '.[]' <<<"$workers_json"); do
@@ -387,17 +517,22 @@ talos_upgrade() {
         log "Skipping completed Talos checkpoint ${checkpoint}"
         continue
       fi
+      verify_longhorn_worker_preflight "$node"
       enable_longhorn_worker_maintenance
       log "Upgrading Talos worker ${node} to ${target} without draining workloads"
-      TALOSCTL_BIN="$binary" talos upgrade --nodes "$node" --endpoints "$endpoint" --image "$installer" --drain=false --wait
+      patch_state ".current_node = \"$node\""
+      resolve_endpoint || fail "no reachable control-plane endpoint found"
+      talos upgrade --nodes "$node" --endpoints "$endpoint" --image "$installer" --drain=false --wait
       health_check
-      patch_state ".checkpoints.talos += [\"$checkpoint\"]"
+      patch_state ".checkpoints.talos += [\"$checkpoint\"] | .current_node = null"
       check_pause
     done
     restore_longhorn_worker_maintenance
-    rm -rf "$(dirname "$binary")"
+    if ((target_index < target_count)); then
+      activate_talosctl "$target"
+    fi
   done
-  patch_state '.phase = "talos" | .status = "talos_completed" | .active_job_id = null | .resumable = false | .pause_requested = false'
+  patch_state '.phase = "talos" | .status = "talos_completed" | .active_job_id = null | .resumable = false | .pause_requested = false | .current_node = null'
   log "Talos upgrade phase completed"
 }
 
@@ -418,7 +553,7 @@ kubernetes_upgrade() {
     patch_state ".checkpoints.kubernetes += [\"$target\"]"
     check_pause
   done
-  patch_state '.phase = "kubernetes" | .status = "kubernetes_completed" | .active_job_id = null | .resumable = false | .pause_requested = false'
+  patch_state '.phase = "kubernetes" | .status = "kubernetes_completed" | .active_job_id = null | .resumable = false | .pause_requested = false | .current_node = null'
   log "Kubernetes upgrade phase completed"
 }
 

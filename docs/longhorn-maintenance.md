@@ -47,6 +47,22 @@ The Twinbox Portal admin page at `/admin/updates` applies this policy automatica
 Longhorn volume health before maintenance and after every upgraded Talos node. A non-healthy volume
 stops the run and leaves a resumable checkpoint.
 
+Before every worker reboot, the updater also verifies that the worker has no manually attached
+Longhorn volumes and that volumes with a replica on the worker still have a healthy running replica
+on another worker.
+
+## Control Plane Topology
+
+Twinbox supports Talos upgrades with any configured control-plane count. Talos 1.13 lifecycle
+upgrades preserve node state and etcd membership, so every control-plane node can reboot in place.
+
+- With one or two control-plane nodes, the Kubernetes API and Twinbox Portal can be temporarily
+  unavailable while a control-plane node reboots. The Management VM continues the update.
+- With three or more control-plane nodes, Twinbox performs the same sequential flow as rolling
+  maintenance.
+- An odd number of control-plane nodes provides better etcd fault tolerance. Even counts remain
+  supported but show an informational warning.
+
 ## Recovery Rule
 
 If the target node comes back but Longhorn still reports replica churn or degraded volumes, wait for the cluster to stabilize before continuing the upgrade sequence. On a 3-worker cluster, the safest assumption is still one node at a time.
