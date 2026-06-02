@@ -1165,6 +1165,11 @@ test("portal image copies the Authentik admin helper into the runtime image", as
     /COPY authentik-admin\.mjs \.\/[\s\S]*CMD \["node", "server\.mjs"\]/,
     "expected the runtime image to include the portal helper module"
   );
+  assert.match(
+    dockerfile,
+    /@rolldown\/binding-linux-x64-musl@\$\(node -p "require\('rolldown\/package\.json'\)\.version"\)/,
+    "expected the Alpine build stage to install rolldown's musl binding"
+  );
 });
 
 test("portal app launches open in a new tab", async () => {
