@@ -95,6 +95,8 @@ all_nodes_json="$(jq -cn --argjson cps "$controlplanes_json" --argjson workers "
 endpoint="$(jq -r '.[0] // empty' <<<"$controlplanes_json")"
 [[ -n "$endpoint" ]] || fail "no control-plane endpoint found"
 nodes_csv="$(jq -r 'join(",")' <<<"$all_nodes_json")"
+controlplanes_csv="$(jq -r 'join(",")' <<<"$controlplanes_json")"
+workers_csv="$(jq -r 'join(",")' <<<"$workers_json")"
 
 talos() {
   local binary="${TALOSCTL_BIN:-talosctl}"
@@ -186,7 +188,7 @@ check_pause() {
 
 health_check() {
   log "Checking Talos, Kubernetes and Longhorn health"
-  talos health --nodes "$nodes_csv" --endpoints "$endpoint"
+  talos health --control-plane-nodes "$controlplanes_csv" --worker-nodes "$workers_csv" --endpoints "$endpoint"
   kubectl wait --for=condition=Ready nodes --all --timeout=10m
   if kubectl get namespace longhorn-system >/dev/null 2>&1; then
     local degraded

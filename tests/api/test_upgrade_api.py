@@ -159,7 +159,11 @@ def test_upgrade_script_inspects_server_versions_and_builds_sequential_paths():
 case "$1" in
   version) printf 'Client:\\n  Tag: v1.13.0\\nServer:\\n  Tag: v1.12.4\\n' ;;
   get) printf '{"spec":{"metadata":{"name":"qemu-guest-agent"}}}\\n{"spec":{"metadata":{"name":"iscsi-tools"}}}\\n{"spec":{"metadata":{"name":"util-linux-tools"}}}\\n{"spec":{"metadata":{"name":"schematic"}}}\\n{"spec":{"metadata":{"name":"unexpected-extension"}}}\\n' ;;
-  health) exit 0 ;;
+  health)
+    [[ "$*" != *"--nodes"* ]]
+    [[ "$*" == *"--control-plane-nodes 10.0.0.11"* ]]
+    [[ "$*" == *"--worker-nodes 10.0.0.21"* ]]
+    ;;
   *) exit 0 ;;
 esac
 """,
