@@ -4,6 +4,10 @@ global:
         name: authentik-bootstrap
   deploymentStrategy:
     type: Recreate
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
 
 blueprints:
   configMaps:
@@ -11,6 +15,10 @@ blueprints:
     - authentik-blueprint-passwordless
 
 server:
+  livenessProbe:
+    timeoutSeconds: 10
+  readinessProbe:
+    timeoutSeconds: 10
   startupProbe:
     failureThreshold: 180
     timeoutSeconds: 10
@@ -23,6 +31,10 @@ server:
       memory: 1Gi
 
 worker:
+  livenessProbe:
+    timeoutSeconds: 10
+  readinessProbe:
+    timeoutSeconds: 10
   startupProbe:
     failureThreshold: 180
     timeoutSeconds: 10

@@ -40,6 +40,14 @@ spec:
       cpu: "1"
       memory: 2Gi
 
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          cnpg.io/cluster: authentik-db
+
   postgresql:
     parameters:
       max_connections: "100"

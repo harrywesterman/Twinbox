@@ -3932,18 +3932,51 @@ def test_authentik_values_request_memory_for_server_and_worker():
         (REPO_ROOT / "gitops" / "apps" / "authentik" / "values.yaml").read_text(encoding="utf-8")
     )
 
+    assert values["global"]["topologySpreadConstraints"] == [
+        {
+            "maxSkew": 1,
+            "topologyKey": "kubernetes.io/hostname",
+            "whenUnsatisfiable": "DoNotSchedule",
+        }
+    ]
+    assert values["server"]["livenessProbe"]["timeoutSeconds"] == 10
+    assert values["server"]["readinessProbe"]["timeoutSeconds"] == 10
     assert values["server"]["startupProbe"]["failureThreshold"] == 180
     assert values["server"]["startupProbe"]["timeoutSeconds"] == 10
     assert values["server"]["resources"]["requests"]["memory"] == "512Mi"
     assert values["server"]["resources"]["limits"]["memory"] == "1Gi"
+    assert values["worker"]["livenessProbe"]["timeoutSeconds"] == 10
+    assert values["worker"]["readinessProbe"]["timeoutSeconds"] == 10
     assert values["worker"]["startupProbe"]["failureThreshold"] == 180
     assert values["worker"]["startupProbe"]["timeoutSeconds"] == 10
     assert values["worker"]["resources"]["requests"]["memory"] == "256Mi"
     assert values["worker"]["resources"]["limits"]["memory"] == "512Mi"
     assert values["authentik"]["existingSecret"]["secretName"] == "authentik-bootstrap"
     assert (
-        values["authentik"]["env"][0]["value"] == "authentik-db-pooler-rw-session.databases.svc.cluster.local"
+        values["authentik"]["env"][0]["value"]
+        == "authentik-db-pooler-rw-session.databases.svc.cluster.local"
     )
+
+
+def test_authentik_database_cluster_spreads_pods_across_nodes():
+    cluster = yaml.safe_load(AUTHENTIK_DB_CLUSTER.read_text(encoding="utf-8"))
+
+    assert cluster["metadata"]["name"] == "authentik-db"
+    assert cluster["spec"]["instances"] == 3
+    assert cluster["spec"]["topologySpreadConstraints"] == [
+        {
+            "maxSkew": 1,
+            "topologyKey": "kubernetes.io/hostname",
+            "whenUnsatisfiable": "DoNotSchedule",
+            "labelSelector": {
+                "matchLabels": {
+                    "cnpg.io/cluster": "authentik-db",
+                }
+            },
+        }
+    ]
+    assert cluster["spec"]["affinity"]["enablePodAntiAffinity"] is True
+    assert cluster["spec"]["affinity"]["topologyKey"] == "kubernetes.io/hostname"
 
 
 def test_authentik_passwordless_blueprint_uses_valid_instantiate_label():
