@@ -51,6 +51,11 @@ export function buildAdminNavigationItems({ isAdmin = false, zoneName = "" } = {
       label: "Observability",
     },
     {
+      id: "admin-cluster-updates",
+      path: "/admin/updates",
+      label: "Cluster updates",
+    },
+    {
       id: "admin-users",
       path: "/admin/users",
       label: "Users & groups",

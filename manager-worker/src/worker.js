@@ -21,6 +21,7 @@ const dirs = {
   completed: path.join(dataRoot, "queue", "completed"),
   stepState: path.join(dataRoot, "step-state"),
   stepResults: path.join(dataRoot, "step-results"),
+  upgradeState: path.join(dataRoot, "upgrade-state"),
 };
 
 const OBSERVABILITY_PROFILES = new Set(["full", "minimal", "off"]);
@@ -315,6 +316,28 @@ function recoverOrphanedRunningJobs() {
           observability_updated_at: now(),
         });
       }
+
+      if (
+        ["inspect_cluster_upgrades", "upgrade_talos", "upgrade_kubernetes"].includes(queued.type)
+      ) {
+        updateUpgradeState(
+          clusterIdForUpgradeJob(queued),
+          wasCancelRequested
+            ? {
+                status: "paused",
+                active_job_id: null,
+                pause_requested: false,
+                resumable: queued.type !== "inspect_cluster_upgrades",
+                error: null,
+              }
+            : {
+                status: queued.type === "inspect_cluster_upgrades" ? "inspection_failed" : "failed",
+                active_job_id: null,
+                resumable: queued.type !== "inspect_cluster_upgrades",
+                error: failureMessage,
+              }
+        );
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error || "unknown error");
       appendLog(jobId, `job recovery failed: ${message}`);
@@ -326,6 +349,30 @@ function recoverOrphanedRunningJobs() {
 
 function trimString(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function clusterIdForUpgradeJob(job) {
+  return job?.cluster_id || job?.payload?.cluster?.id || job?.payload?.context?.cluster?.id || null;
+}
+
+function updateUpgradeState(clusterId, patch) {
+  if (!clusterId) return null;
+  const file = path.join(dirs.upgradeState, `${clusterId}.json`);
+  const current = readJsonIfExists(file) || {
+    cluster_id: clusterId,
+    phase: "idle",
+    status: "idle",
+    paths: { talos: [], kubernetes: [] },
+    checkpoints: { talos: [], kubernetes: [] },
+  };
+  const next = {
+    ...current,
+    ...patch,
+    cluster_id: clusterId,
+    updated_at: now(),
+  };
+  writeJson(file, next);
+  return next;
 }
 
 function resolveFieldValue(record, ref) {
@@ -942,6 +989,61 @@ async function handleBootstrap(job) {
   await handleApply({ id: job.id, payload: cluster });
 }
 
+async function handleClusterUpgrade(job) {
+  const payload = job.payload || {};
+  const cluster = payload.cluster || payload.context?.cluster || payload;
+  const clusterId = cluster?.id || job.cluster_id || null;
+  const phase = trimString(payload.phase);
+  const secretRuntime = resolveJobSecretRuntime(payload, clusterId);
+  const redact = buildRedactor(secretRuntime.redactions);
+  const stateFile = path.join(dirs.upgradeState, `${clusterId}.json`);
+
+  if (!["inspect", "talos", "kubernetes"].includes(phase)) {
+    throw new Error(`unsupported cluster upgrade phase: ${phase}`);
+  }
+
+  updateUpgradeState(clusterId, {
+    phase,
+    status: phase === "inspect" ? "inspecting" : "running",
+    active_job_id: job.id,
+    last_job_id: job.id,
+    error: null,
+  });
+
+  try {
+    await runCommand(
+      job.id,
+      "bash",
+      [
+        "scripts/manager/upgrade-cluster.sh",
+        "--phase",
+        phase,
+        "--cluster-id",
+        clusterId,
+        "--data-dir",
+        dataRoot,
+      ],
+      withKubeconfigAliases({
+        ...secretRuntime.env,
+        TWINBOX_CLUSTER_ID: clusterId,
+        TWINBOX_UPGRADE_STATE_FILE: stateFile,
+      }),
+      redact,
+      secretRuntime.strip_env
+    );
+  } catch (error) {
+    updateUpgradeState(clusterId, {
+      status: phase === "inspect" ? "inspection_failed" : "failed",
+      active_job_id: null,
+      resumable: phase !== "inspect",
+      error: error.message,
+    });
+    throw error;
+  } finally {
+    secretRuntime.cleanup();
+  }
+}
+
 async function refreshDashyConfig(
   jobId,
   stepId,
@@ -1388,6 +1490,15 @@ async function handleJob(queueFile) {
       await handleBootstrap({ id: queued.id, payload: queued.payload });
     } else if (queued.type === "reconcile_observability") {
       await handleReconcileObservability({
+        id: queued.id,
+        payload: queued.payload,
+        cluster_id: queued.cluster_id,
+        cluster_instance_id: queued.cluster_instance_id,
+      });
+    } else if (
+      ["inspect_cluster_upgrades", "upgrade_talos", "upgrade_kubernetes"].includes(queued.type)
+    ) {
+      await handleClusterUpgrade({
         id: queued.id,
         payload: queued.payload,
         cluster_id: queued.cluster_id,

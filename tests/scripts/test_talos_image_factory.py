@@ -87,3 +87,44 @@ fi
 def test_pinned_defaults_do_not_hardcode_a_talos_schematic():
     text = PINNED_DEFAULTS.read_text(encoding="utf-8")
     assert "PINNED_TALOS_IMAGE_SCHEMATIC" not in text
+
+
+def test_installer_only_skips_iso_redirect_lookup():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        bin_dir = root / "bin"
+        bin_dir.mkdir()
+        calls = root / "curl-calls.txt"
+        fake_curl = bin_dir / "curl"
+        fake_curl.write_text(
+            f"""#!/bin/bash
+printf 'call\\n' >> "{calls}"
+cat >/dev/null
+printf '{{"id":"schematic-installer"}}'
+""",
+            encoding="utf-8",
+        )
+        fake_curl.chmod(0o755)
+        env = os.environ.copy()
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+        proc = subprocess.run(
+            [
+                str(SCRIPT_PATH),
+                "--preset",
+                "qemu-guest-agent",
+                "--installer-only",
+                "--output",
+                "shell",
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert proc.returncode == 0, proc.stderr
+        assert (
+            "TALOS_IMAGE_INSTALLER=factory.talos.dev/metal-installer/schematic-installer:"
+            in proc.stdout
+        )
+        assert calls.read_text(encoding="utf-8").splitlines() == ["call"]

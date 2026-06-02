@@ -21,6 +21,7 @@ const fakeState = {
 const managerState = {
   jobs: new Map(),
   clusters: new Map(),
+  upgrades: new Map(),
   nextJobId: 1,
 };
 const issuedAuthCodes = new Map();
@@ -484,6 +485,45 @@ const managerServer = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "GET" && pathname === "/api/clusters/cluster-test/upgrades") {
+    sendJson(
+      res,
+      200,
+      managerState.upgrades.get("cluster-test") || {
+        cluster_id: "cluster-test",
+        phase: "idle",
+        status: "idle",
+        paths: { talos: [], kubernetes: [] },
+        checkpoints: { talos: [], kubernetes: [] },
+      }
+    );
+    return;
+  }
+
+  if (
+    req.method === "POST" &&
+    /^\/api\/clusters\/cluster-test\/upgrades\/(refresh|talos|kubernetes|resume|pause)$/.test(
+      pathname
+    )
+  ) {
+    const action = pathname.split("/").at(-1);
+    const jobId = `job-${managerState.nextJobId}`;
+    managerState.nextJobId += 1;
+    const state = {
+      cluster_id: "cluster-test",
+      phase: action === "refresh" ? "inspect" : action,
+      status:
+        action === "pause" ? "pause_requested" : action === "refresh" ? "inspecting" : "pending",
+      active_job_id: jobId,
+      paths: { talos: ["v1.13.3"], kubernetes: ["v1.36.1"] },
+      checkpoints: { talos: [], kubernetes: [] },
+    };
+    managerState.upgrades.set("cluster-test", state);
+    managerState.jobs.set(jobId, { id: jobId, type: `upgrade_${action}`, status: "running" });
+    sendJson(res, action === "pause" ? 200 : 202, { job_id: jobId, state });
+    return;
+  }
+
   if (req.method === "POST" && /^\/api\/apps\/[^/]+\/(install|uninstall)$/.test(pathname)) {
     const stepId = pathname.split("/").filter(Boolean).at(-2);
     const action = pathname.endsWith("/uninstall") ? "uninstall" : "install";
@@ -718,6 +758,8 @@ test("admin endpoints require an authenticated admin session", async () => {
   assert.equal(unauthenticatedApps.status, 401);
   const unauthenticatedObservability = await requestPortal("/api/admin/observability");
   assert.equal(unauthenticatedObservability.status, 401);
+  const unauthenticatedUpdates = await requestPortal("/api/admin/updates");
+  assert.equal(unauthenticatedUpdates.status, 401);
 
   const memberCookie = createSignedSessionCookie({
     sub: "member-1",
@@ -738,6 +780,28 @@ test("admin endpoints require an authenticated admin session", async () => {
     cookie: memberCookie,
   });
   assert.equal(forbiddenObservability.status, 403);
+  const forbiddenUpdates = await requestPortal("/api/admin/updates", { cookie: memberCookie });
+  assert.equal(forbiddenUpdates.status, 403);
+});
+
+test("admin can inspect cluster updates and queue a refresh", async () => {
+  const adminCookie = createSignedSessionCookie({
+    sub: "admin-1",
+    name: "Portal Admin",
+    groups: ["admins"],
+    isAdmin: true,
+  });
+  const current = await requestPortal("/api/admin/updates", { cookie: adminCookie });
+  assert.equal(current.status, 200);
+  assert.equal(current.payload.cluster_id, "cluster-test");
+
+  const refresh = await requestPortal("/api/admin/updates/refresh", {
+    method: "POST",
+    cookie: adminCookie,
+  });
+  assert.equal(refresh.status, 202);
+  assert.match(refresh.payload.job_id, /^job-/);
+  assert.equal(refresh.payload.state.status, "inspecting");
 });
 
 test("admin can create a user with a temporary password and approved groups", async () => {

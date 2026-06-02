@@ -38,6 +38,13 @@ Bootstraps the Talos control plane after VMs are provisioned.
 
 Reads and outputs the cluster JSON file from `manager-data/clusters/<cluster-id>.json`. Used for state inspection.
 
+### `upgrade-cluster.sh`
+
+Inspects and upgrades an existing cluster in explicit `inspect`, `talos`, and `kubernetes` phases.
+The Talos phase reuses the provisioning Image Factory preset, requires an etcd snapshot, upgrades
+control planes before workers, and records resumable node checkpoints. The Kubernetes phase previews
+each sequential minor update with `talosctl upgrade-k8s --dry-run`.
+
 ## Networking
 
 ### `render-cilium-manifest.sh`

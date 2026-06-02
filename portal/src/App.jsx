@@ -354,6 +354,62 @@ function useObservabilityAdminData(enabled) {
   };
 }
 
+function useClusterUpdatesData(enabled) {
+  const [state, setState] = useState({
+    loading: false,
+    refreshing: false,
+    error: "",
+    data: null,
+  });
+
+  const load = useCallback(
+    async ({ silent = false } = {}) => {
+      if (!enabled) {
+        setState({ loading: false, refreshing: false, error: "", data: null });
+        return;
+      }
+      setState((current) => ({
+        ...current,
+        loading: current.data === null && !silent,
+        refreshing: current.data !== null || silent,
+        error: "",
+      }));
+      try {
+        const data = await requestJson("/api/admin/updates");
+        setState({ loading: false, refreshing: false, error: "", data });
+      } catch (error) {
+        setState((current) => ({
+          ...current,
+          loading: false,
+          refreshing: false,
+          error: error instanceof Error ? error.message : "Failed to load cluster updates.",
+        }));
+      }
+    },
+    [enabled]
+  );
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useEffect(() => {
+    if (
+      !enabled ||
+      !["inspecting", "pending", "running", "pause_requested"].includes(state.data?.status)
+    ) {
+      return undefined;
+    }
+    const timer = window.setInterval(() => load({ silent: true }), 2500);
+    return () => window.clearInterval(timer);
+  }, [enabled, load, state.data?.status]);
+
+  return {
+    ...state,
+    reload: useCallback((options) => load(options), [load]),
+  };
+}
+
 function SectionTitle({ eyebrow, title, description }) {
   return (
     <header className="section-title">
@@ -1007,6 +1063,223 @@ function LogViewport({
     </div>
   );
 }
+
+function UpgradeStepList({ title, steps = [], checkpoints = [], kind }) {
+  const completed = new Set(checkpoints);
+  return (
+    <article className="observability-detail-box">
+      <strong>{title}</strong>
+      {steps.length === 0 ? (
+        <p className="muted-copy">Geen update nodig.</p>
+      ) : (
+        <ul className="observability-mini-list">
+          {steps.map((step) => {
+            const prefix = kind === "talos" ? `${step}:` : step;
+            const done =
+              kind === "talos"
+                ? Array.from(completed).some((checkpoint) => checkpoint.startsWith(prefix))
+                : completed.has(step);
+            return (
+              <li key={step}>
+                {done ? "Afgerond" : "Gepland"}: {step}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </article>
+  );
+}
+
+function ClusterUpdatesAdminPage({ updatesState, onNavigate }) {
+  const data = updatesState.data || {};
+  const [jobLines, setJobLines] = useState([]);
+  const [actionError, setActionError] = useState("");
+  const [submitting, setSubmitting] = useState("");
+  const jobId = data.active_job_id || data.last_job_id || "";
+  const active = ["inspecting", "pending", "running", "pause_requested"].includes(data.status);
+
+  useEffect(() => {
+    if (!jobId) {
+      setJobLines([]);
+      return undefined;
+    }
+    let cancelled = false;
+    const loadLogs = async () => {
+      try {
+        const payload = await requestJson(
+          `/api/admin/updates/jobs/${encodeURIComponent(jobId)}/logs`
+        );
+        if (!cancelled) setJobLines(Array.isArray(payload?.lines) ? payload.lines : []);
+      } catch {
+        if (!cancelled) setJobLines([]);
+      }
+    };
+    loadLogs();
+    const timer = window.setInterval(loadLogs, active ? 1500 : 4000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [active, jobId]);
+
+  const runAction = async (action, confirmation = "") => {
+    if (confirmation && !window.confirm(confirmation)) return;
+    setSubmitting(action);
+    setActionError("");
+    try {
+      await requestJson(`/api/admin/updates/${action}`, { method: "POST", body: "{}" });
+      await updatesState.reload({ silent: true });
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Update action failed.");
+    } finally {
+      setSubmitting("");
+    }
+  };
+
+  if (updatesState.loading && !updatesState.data) {
+    return (
+      <Panel>
+        <SectionTitle
+          eyebrow="Admin"
+          title="Cluster updates"
+          description="Twinbox leest de huidige clusterversies."
+        />
+      </Panel>
+    );
+  }
+
+  const nodes = Array.isArray(data.inventory?.nodes) ? data.inventory.nodes : [];
+  const talosReady = Boolean(data.inspected_at) && !active && data.status !== "inspection_failed";
+  const kubernetesReady = ["talos_completed", "kubernetes_completed"].includes(data.status);
+
+  return (
+    <div className="observability-layout">
+      <Panel className="observability-shell">
+        <div className="observability-shell-head">
+          <SectionTitle
+            eyebrow="Admin"
+            title="Cluster updates"
+            description="Werk Talos eerst bij en start daarna de Kubernetes-migratie."
+          />
+          <div className="hero-actions observability-shell-actions">
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={active || submitting}
+              onClick={() => runAction("refresh")}
+            >
+              {submitting === "refresh" ? "Inspecteren…" : "Ververs status"}
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => onNavigate("/admin/apps")}
+            >
+              Terug naar admin
+            </button>
+          </div>
+        </div>
+        {updatesState.error || actionError || data.error ? (
+          <div className="inline-error">{updatesState.error || actionError || data.error}</div>
+        ) : null}
+        <div className="observability-summary-strip">
+          <div>
+            <span>Status</span>
+            <strong>{data.status || "idle"}</strong>
+          </div>
+          <div>
+            <span>Talos stabiel</span>
+            <strong>{data.upstream?.talos || "Nog ophalen"}</strong>
+          </div>
+          <div>
+            <span>Kubernetes stabiel</span>
+            <strong>{data.upstream?.kubernetes || "Nog ophalen"}</strong>
+          </div>
+          <div>
+            <span>Inspectie</span>
+            <strong>{data.inspected_at || "Nog niet uitgevoerd"}</strong>
+          </div>
+        </div>
+        <div className="observability-detail-grid cluster-update-grid">
+          <article className="observability-detail-box">
+            <strong>Draaiende versies</strong>
+            <ul className="observability-mini-list">
+              {nodes.map((node) => (
+                <li key={node.node}>
+                  {node.role}: {node.node} · {node.version}
+                </li>
+              ))}
+              <li>Kubernetes · {data.inventory?.kubernetes_version || "Nog ophalen"}</li>
+            </ul>
+          </article>
+          <UpgradeStepList
+            title="Talos-pad"
+            steps={data.paths?.talos}
+            checkpoints={data.checkpoints?.talos}
+            kind="talos"
+          />
+          <UpgradeStepList
+            title="Kubernetes-pad"
+            steps={data.paths?.kubernetes}
+            checkpoints={data.checkpoints?.kubernetes}
+            kind="kubernetes"
+          />
+        </div>
+        <LogViewport
+          className="admin-install-log-viewport"
+          lines={jobLines}
+          emptyLabel="Start een inspectie om de live output te zien."
+        />
+        <div className="hero-actions observability-shell-actions cluster-update-actions">
+          <button
+            type="button"
+            className="primary-button"
+            disabled={!talosReady || active || submitting}
+            onClick={() =>
+              runAction(
+                "talos",
+                "Start de Talos-update? Twinbox maakt eerst een etcd-snapshot en werkt daarna één node tegelijk bij."
+              )
+            }
+          >
+            Start Talos-update
+          </button>
+          <button
+            type="button"
+            className="primary-button"
+            disabled={!kubernetesReady || active || submitting}
+            onClick={() =>
+              runAction(
+                "kubernetes",
+                "Start de Kubernetes-update? Twinbox voert iedere tussenstap eerst als dry-run uit."
+              )
+            }
+          >
+            Start Kubernetes-update
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={!active || data.pause_requested || submitting}
+            onClick={() => runAction("pause")}
+          >
+            Pauzeer na huidige stap
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={!data.resumable || active || submitting}
+            onClick={() => runAction("resume")}
+          >
+            Hervat
+          </button>
+        </div>
+      </Panel>
+    </div>
+  );
+}
+
 function AdminAppsPage({ onNavigate, adminAppsState, installTarget }) {
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const appsState = adminAppsState || useAdminAppsData(true);
@@ -3015,9 +3288,12 @@ export default function App() {
     Boolean(sessionState.session?.isAdmin) && route.startsWith("/admin/apps");
   const observabilityAdminEnabled =
     Boolean(sessionState.session?.isAdmin) && route === "/admin/observability";
+  const clusterUpdatesAdminEnabled =
+    Boolean(sessionState.session?.isAdmin) && route === "/admin/updates";
   const userAdminState = useUserAdminData(userAdminEnabled);
   const adminAppsState = useAdminAppsData(adminAppsEnabled);
   const observabilityAdminState = useObservabilityAdminData(observabilityAdminEnabled);
+  const clusterUpdatesAdminState = useClusterUpdatesData(clusterUpdatesAdminEnabled);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -3170,6 +3446,9 @@ export default function App() {
             onNavigate={navigate}
           />
         ) : null}
+        {route === "/admin/updates" && isAdmin ? (
+          <ClusterUpdatesAdminPage updatesState={clusterUpdatesAdminState} onNavigate={navigate} />
+        ) : null}
         {route === "/admin/users" && isAdmin ? (
           <UserAdminPage config={config} directoryState={userAdminState} onNavigate={navigate} />
         ) : null}
@@ -3203,6 +3482,18 @@ export default function App() {
               eyebrow="Access denied"
               title="Admins only"
               description="Observability control is only available to the admins group."
+            />
+            <button type="button" className="secondary-button" onClick={() => navigate("/")}>
+              Back home
+            </button>
+          </Panel>
+        ) : null}
+        {route === "/admin/updates" && !isAdmin ? (
+          <Panel>
+            <SectionTitle
+              eyebrow="Access denied"
+              title="Admins only"
+              description="Cluster updates are only available to the admins group."
             />
             <button type="button" className="secondary-button" onClick={() => navigate("/")}>
               Back home

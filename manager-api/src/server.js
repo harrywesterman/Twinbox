@@ -35,6 +35,12 @@ import {
 } from "./lib/ip-allocation.js";
 import { cancelJob, queueJob } from "./lib/jobs.js";
 import {
+  assertNoUpgradeMaintenance,
+  isUpgradeMaintenanceActive,
+  readUpgradeState,
+  writeUpgradeState,
+} from "./lib/upgrades.js";
+import {
   buildProxmoxApiSecretBundle,
   buildClusterWorkerSecretBundle,
   mergeSecretBundles,
@@ -60,6 +66,36 @@ const dataFiles = buildDataFiles(dataRoot);
 Object.values(dirs).forEach((dir) => ensureDir(dir));
 
 app.use(express.json());
+
+app.use((req, res, next) => {
+  if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+    next();
+    return;
+  }
+  if (
+    req.path.includes("/upgrades") ||
+    req.path.endsWith("/cancel") ||
+    req.path === "/api/ip-availability" ||
+    req.path === "/api/clusters" ||
+    req.path === "/api/wizard/state"
+  ) {
+    next();
+    return;
+  }
+
+  const clusterPathMatch = req.path.match(/^\/api\/clusters\/([^/]+)/);
+  const clusterId =
+    (typeof req.params?.clusterId === "string" && req.params.clusterId) ||
+    (typeof req.body?.cluster_id === "string" && req.body.cluster_id) ||
+    (clusterPathMatch ? decodeURIComponent(clusterPathMatch[1]) : "") ||
+    "";
+  try {
+    assertNoUpgradeMaintenance(dirs, clusterId.trim());
+    next();
+  } catch (error) {
+    res.status(error?.status || 409).json({ error: error.message });
+  }
+});
 
 function parseNodeCount(value, fallback = 3) {
   const parsed = Number(value);
@@ -1835,6 +1871,122 @@ app.put("/api/clusters/:clusterId/observability", (req, res) => {
     return res.status(error?.status || 500).json({
       error: error instanceof Error ? error.message : "failed to update observability",
     });
+  }
+});
+
+function resolveUpgradeCluster(clusterId) {
+  const resolved = resolveRequestedCluster(clusterId);
+  if (!resolved.ok) {
+    const error = new Error(resolved.error || "cluster not found");
+    error.status = resolved.status || 404;
+    throw error;
+  }
+  return resolved.cluster;
+}
+
+function queueUpgradeJob(cluster, phase, type) {
+  const current = readUpgradeState(dirs, cluster.id);
+  if (isUpgradeMaintenanceActive(current)) {
+    const error = new Error(`cluster maintenance is already active (${current.phase})`);
+    error.status = 409;
+    throw error;
+  }
+
+  const payload = {
+    phase,
+    cluster,
+    secret_bundle: buildClusterWorkerSecretBundle(cluster),
+  };
+  const job = queueJob(dirs, type, cluster.id, payload);
+  const state = writeUpgradeState(dirs, cluster.id, {
+    phase,
+    status: phase === "inspect" ? "inspecting" : "pending",
+    active_job_id: job.id,
+    last_job_id: job.id,
+    pause_requested: false,
+    resumable: false,
+    error: null,
+  });
+  return { job, state };
+}
+
+app.get("/api/clusters/:clusterId/upgrades", (req, res) => {
+  try {
+    resolveUpgradeCluster(req.params.clusterId);
+    return res.json(readUpgradeState(dirs, req.params.clusterId));
+  } catch (error) {
+    return res.status(error?.status || 500).json({ error: error.message });
+  }
+});
+
+app.post("/api/clusters/:clusterId/upgrades/refresh", (req, res) => {
+  try {
+    const cluster = resolveUpgradeCluster(req.params.clusterId);
+    const { job, state } = queueUpgradeJob(cluster, "inspect", "inspect_cluster_upgrades");
+    return res.status(202).json({ job_id: job.id, state });
+  } catch (error) {
+    return res.status(error?.status || 500).json({ error: error.message });
+  }
+});
+
+app.post("/api/clusters/:clusterId/upgrades/talos", (req, res) => {
+  try {
+    const cluster = resolveUpgradeCluster(req.params.clusterId);
+    const current = readUpgradeState(dirs, cluster.id);
+    if (!current.inspected_at || current.status === "inspection_failed") {
+      return res.status(409).json({ error: "run a successful upgrade inspection first" });
+    }
+    const { job, state } = queueUpgradeJob(cluster, "talos", "upgrade_talos");
+    return res.status(202).json({ job_id: job.id, state });
+  } catch (error) {
+    return res.status(error?.status || 500).json({ error: error.message });
+  }
+});
+
+app.post("/api/clusters/:clusterId/upgrades/kubernetes", (req, res) => {
+  try {
+    const cluster = resolveUpgradeCluster(req.params.clusterId);
+    const current = readUpgradeState(dirs, cluster.id);
+    if (current.status !== "talos_completed" && current.status !== "kubernetes_completed") {
+      return res.status(409).json({ error: "complete the Talos upgrade first" });
+    }
+    const { job, state } = queueUpgradeJob(cluster, "kubernetes", "upgrade_kubernetes");
+    return res.status(202).json({ job_id: job.id, state });
+  } catch (error) {
+    return res.status(error?.status || 500).json({ error: error.message });
+  }
+});
+
+app.post("/api/clusters/:clusterId/upgrades/resume", (req, res) => {
+  try {
+    const cluster = resolveUpgradeCluster(req.params.clusterId);
+    const current = readUpgradeState(dirs, cluster.id);
+    if (!current.resumable || !["talos", "kubernetes"].includes(current.phase)) {
+      return res.status(409).json({ error: "there is no resumable upgrade phase" });
+    }
+    const type = current.phase === "talos" ? "upgrade_talos" : "upgrade_kubernetes";
+    const { job, state } = queueUpgradeJob(cluster, current.phase, type);
+    return res.status(202).json({ job_id: job.id, state });
+  } catch (error) {
+    return res.status(error?.status || 500).json({ error: error.message });
+  }
+});
+
+app.post("/api/clusters/:clusterId/upgrades/pause", (req, res) => {
+  try {
+    resolveUpgradeCluster(req.params.clusterId);
+    const current = readUpgradeState(dirs, req.params.clusterId);
+    if (!isUpgradeMaintenanceActive(current)) {
+      return res.status(409).json({ error: "no running maintenance phase to pause" });
+    }
+    return res.json(
+      writeUpgradeState(dirs, req.params.clusterId, {
+        status: "pause_requested",
+        pause_requested: true,
+      })
+    );
+  } catch (error) {
+    return res.status(error?.status || 500).json({ error: error.message });
   }
 });
 

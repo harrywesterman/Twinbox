@@ -117,6 +117,7 @@ export function buildDataDirs(dataRoot) {
     logs: path.join(dataRoot, "logs"),
     pending: path.join(dataRoot, "queue", "pending"),
     stepState: path.join(dataRoot, "step-state"),
+    upgradeState: path.join(dataRoot, "upgrade-state"),
   };
 }
 

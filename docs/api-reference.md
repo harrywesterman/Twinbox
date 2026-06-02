@@ -46,6 +46,37 @@ Request body: `{ cluster_instance_id }`
 
 Response (202): `{ cluster_id, cluster_instance_id, job_id }`
 
+## Cluster Updates
+
+Cluster updates are stored under `manager-data/upgrade-state/<cluster-id>.json`. While a Talos or
+Kubernetes phase is pending or running, other mutating cluster operations return HTTP `409`.
+
+### `GET /api/clusters/:clusterId/upgrades`
+
+Returns the live inventory, upstream stable versions, calculated paths, checkpoints and maintenance
+status.
+
+### `POST /api/clusters/:clusterId/upgrades/refresh`
+
+Queues a fresh inspection of Talos, Kubernetes and Longhorn health and upstream stable releases.
+
+### `POST /api/clusters/:clusterId/upgrades/talos`
+
+Queues the Talos phase after inspection. The worker snapshots etcd and upgrades one node at a time
+while preserving the Twinbox Image Factory extensions.
+
+### `POST /api/clusters/:clusterId/upgrades/kubernetes`
+
+Queues the Kubernetes phase after Talos completed successfully.
+
+### `POST /api/clusters/:clusterId/upgrades/pause`
+
+Requests a pause after the active safe checkpoint.
+
+### `POST /api/clusters/:clusterId/upgrades/resume`
+
+Resumes a paused or failed Talos or Kubernetes phase.
+
 ## Steps
 
 ### `POST /api/steps/:stepId/execute`
@@ -127,3 +158,4 @@ All data is stored as JSON files under `manager-data/`:
 - `queue/pending/<id>.json`, `queue/running/<id>.json`, `queue/completed/<id>.json`
 - `step-state/global/<stepId>.json`
 - `step-state/clusters/<scope>/<stepId>.json`
+- `upgrade-state/<cluster-id>.json`

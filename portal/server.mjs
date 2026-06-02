@@ -954,6 +954,71 @@ app.put("/api/admin/observability", async (req, res) => {
   }
 });
 
+app.get("/api/admin/updates", async (req, res) => {
+  const session = requireAdminSession(req, res);
+  if (!session) return;
+
+  try {
+    const { activeCluster } = await loadActiveClusterState();
+    res.json(
+      await requestManagerJson(`/api/clusters/${encodeURIComponent(activeCluster.id)}/upgrades`)
+    );
+  } catch (error) {
+    res.status(error?.status || 500).json({
+      error: error instanceof Error ? error.message : "failed to load cluster updates",
+    });
+  }
+});
+
+app.post("/api/admin/updates/:action", async (req, res) => {
+  const session = requireAdminSession(req, res);
+  if (!session) return;
+
+  const action = String(req.params.action || "").trim();
+  if (!["refresh", "talos", "kubernetes", "resume", "pause"].includes(action)) {
+    return res.status(404).json({ error: "unknown cluster update action" });
+  }
+
+  try {
+    const { activeCluster } = await loadActiveClusterState();
+    const result = await requestManagerJson(
+      `/api/clusters/${encodeURIComponent(activeCluster.id)}/upgrades/${action}`,
+      { method: "POST", body: req.body || {} }
+    );
+    res.status(action === "pause" ? 200 : 202).json(result);
+  } catch (error) {
+    res.status(error?.status || 500).json({
+      error: error instanceof Error ? error.message : "failed to update cluster",
+    });
+  }
+});
+
+app.get("/api/admin/updates/jobs/:jobId", async (req, res) => {
+  const session = requireAdminSession(req, res);
+  if (!session) return;
+
+  try {
+    res.json(await requestManagerJson(`/api/jobs/${encodeURIComponent(req.params.jobId)}`));
+  } catch (error) {
+    res.status(error?.status || 500).json({
+      error: error instanceof Error ? error.message : "failed to load update job",
+    });
+  }
+});
+
+app.get("/api/admin/updates/jobs/:jobId/logs", async (req, res) => {
+  const session = requireAdminSession(req, res);
+  if (!session) return;
+
+  try {
+    res.json(await requestManagerJson(`/api/jobs/${encodeURIComponent(req.params.jobId)}/logs`));
+  } catch (error) {
+    res.status(error?.status || 500).json({
+      error: error instanceof Error ? error.message : "failed to load update logs",
+    });
+  }
+});
+
 app.post("/api/admin/apps/:stepId/install", async (req, res) => {
   const session = requireAdminSession(req, res);
   if (!session) {

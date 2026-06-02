@@ -13,6 +13,7 @@ test("buildAdminNavigationItems shows the user admin route only for admins", () 
       label: "Management consoles",
     },
     { id: "admin-observability", path: "/admin/observability", label: "Observability" },
+    { id: "admin-cluster-updates", path: "/admin/updates", label: "Cluster updates" },
     { id: "admin-users", path: "/admin/users", label: "Users & groups" },
   ]);
 });

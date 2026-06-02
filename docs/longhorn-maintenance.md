@@ -33,6 +33,10 @@ Before starting a Talos upgrade, verify:
 
 If a node still refuses to drain, stop and inspect the Longhorn volume placement before forcing the upgrade. The goal is to keep the upgrade safe and repeatable, not to bypass the safety model entirely.
 
+The Twinbox Portal admin page at `/admin/updates` applies this policy automatically. It checks
+Longhorn volume health before maintenance and after every upgraded Talos node. A non-healthy volume
+stops the run and leaves a resumable checkpoint.
+
 ## Recovery Rule
 
 If the target node comes back but Longhorn still reports replica churn or degraded volumes, wait for the cluster to stabilize before continuing the upgrade sequence. On a 3-worker cluster, the safest assumption is still one node at a time.

@@ -7,7 +7,7 @@ source "$SCRIPT_DIR/../config/pinned-defaults.sh"
 
 usage() {
   cat <<'USAGE'
-Usage: get-talos-image-factory.sh [--preset vanilla|qemu-guest-agent] [--version vX.Y.Z] [--arch amd64] [--platform cloud-server] [--output id|url|shell|json]
+Usage: get-talos-image-factory.sh [--preset vanilla|qemu-guest-agent] [--version vX.Y.Z] [--arch amd64] [--platform cloud-server] [--installer-only] [--output id|url|shell|json|extensions]
 USAGE
 }
 
@@ -25,6 +25,7 @@ version="${PINNED_TALOS_VERSION}"
 arch="${PINNED_TALOS_IMAGE_ARCH}"
 platform="${PINNED_TALOS_IMAGE_PLATFORM}"
 output="shell"
+installer_only="false"
 extensions=()
 
 while [[ $# -gt 0 ]]; do
@@ -59,6 +60,10 @@ while [[ $# -gt 0 ]]; do
       output="$2"
       shift 2
       ;;
+    --installer-only)
+      installer_only="true"
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -82,6 +87,11 @@ case "$preset" in
     fail "Unknown preset: $preset"
     ;;
 esac
+
+if [[ "$output" == "extensions" ]]; then
+  printf '%s\n' "${extensions[@]}" | jq -Rsc 'split("\n") | map(select(length > 0))'
+  exit 0
+fi
 
 require_cmd curl
 require_cmd jq
@@ -116,9 +126,12 @@ schematic_id="$(printf '%s' "$response" | jq -r '.id // empty')"
 
 image_url="https://factory.talos.dev/image/${schematic_id}/${version}/metal-${arch}.iso"
 installer_image="factory.talos.dev/metal-installer/${schematic_id}:${version}"
-download_url="$(
-  curl -fsSL -o /dev/null -w '%{url_effective}' "$image_url"
-)"
+download_url=""
+if [[ "$installer_only" != "true" ]]; then
+  download_url="$(
+    curl -fsSL -o /dev/null -w '%{url_effective}' "$image_url"
+  )"
+fi
 
 case "$output" in
   id)
