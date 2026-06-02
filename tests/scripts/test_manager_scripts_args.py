@@ -3928,15 +3928,22 @@ def test_hedgedoc_database_cluster_is_right_sized_for_current_capacity():
 
 
 def test_authentik_values_request_memory_for_server_and_worker():
-    text = (REPO_ROOT / "gitops" / "apps" / "authentik" / "values.yaml").read_text(encoding="utf-8")
-    assert "server:" in text
-    assert "memory: 512Mi" in text
-    assert "limits:\n      memory: 1Gi" in text
-    assert "worker:" in text
-    assert "memory: 256Mi" in text
-    assert "limits:\n      memory: 512Mi" in text
-    assert "authentik:\n  existingSecret:" in text
-    assert "authentik-db-pooler-rw-session.databases.svc.cluster.local" in text
+    values = yaml.safe_load(
+        (REPO_ROOT / "gitops" / "apps" / "authentik" / "values.yaml").read_text(encoding="utf-8")
+    )
+
+    assert values["server"]["startupProbe"]["failureThreshold"] == 180
+    assert values["server"]["startupProbe"]["timeoutSeconds"] == 10
+    assert values["server"]["resources"]["requests"]["memory"] == "512Mi"
+    assert values["server"]["resources"]["limits"]["memory"] == "1Gi"
+    assert values["worker"]["startupProbe"]["failureThreshold"] == 180
+    assert values["worker"]["startupProbe"]["timeoutSeconds"] == 10
+    assert values["worker"]["resources"]["requests"]["memory"] == "256Mi"
+    assert values["worker"]["resources"]["limits"]["memory"] == "512Mi"
+    assert values["authentik"]["existingSecret"]["secretName"] == "authentik-bootstrap"
+    assert (
+        values["authentik"]["env"][0]["value"] == "authentik-db-pooler-rw-session.databases.svc.cluster.local"
+    )
 
 
 def test_authentik_passwordless_blueprint_uses_valid_instantiate_label():
@@ -4346,6 +4353,7 @@ def test_authentik_consumer_scripts_read_from_openbao():
     assert "authentik-auth.sh" in idp_text
     assert "authentik_ensure_token" in idp_text or "authentik_load_bootstrap_secret" in idp_text
     assert "authentik_ensure_default_provider_flows" in idp_text
+    assert "local attempts=360" in idp_text
     assert "create_flow_if_missing" not in idp_text
     assert "gitops/databases/immich" not in idp_text
     assert "immich-db" not in idp_text

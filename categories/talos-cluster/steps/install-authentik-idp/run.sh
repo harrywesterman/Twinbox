@@ -276,7 +276,9 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
 wait_for_deployment_rollout() {
   local deployment="$1"
   local label="${2:-$deployment}"
-  local attempts=120
+  # Authentik 2026.5 can take a long time to finish its first bootstrap.
+  # Give the deployment enough time to recover from the initial blueprints and migrations.
+  local attempts=360
   local attempt=1
   local status_json=""
   local desired_replicas=""

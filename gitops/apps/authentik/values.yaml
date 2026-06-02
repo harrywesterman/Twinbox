@@ -13,6 +13,7 @@ blueprints:
 server:
   startupProbe:
     failureThreshold: 180
+    timeoutSeconds: 10
   # Keep the default probe shape and only extend the bootstrap budget.
   resources:
     requests:
@@ -24,6 +25,7 @@ server:
 worker:
   startupProbe:
     failureThreshold: 180
+    timeoutSeconds: 10
   # Keep the default probe shape and only extend the bootstrap budget.
   resources:
     requests:
