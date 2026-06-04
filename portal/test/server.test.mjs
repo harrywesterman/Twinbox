@@ -663,7 +663,8 @@ test.before(async () => {
       authentikAdminUrl: "https://authentik.tst.example.com/if/admin/",
       authentikUserUrl:
         'https://authentik.tst.example.com/if/user/#/settings;{"page":"page-details"}',
-      authentikOtpUrl: 'https://authentik.tst.example.com/if/user/#/settings;{"page":"page-mfa"}',
+      authentikOtpUrl:
+        'https://authentik.tst.example.com/if/user/#/settings;{"page":"page-credentials","ak-user-settings-mfa-page":0}',
     },
     userAdmin: {
       manageableGroups: [
@@ -1043,7 +1044,7 @@ test("portal config exposes a single Apps section and image icons", async () => 
   );
   assert.equal(
     config.payload.settings.authentikOtpUrl,
-    'https://authentik.tst.example.com/if/user/#/settings;{"page":"page-mfa"}'
+    'https://authentik.tst.example.com/if/user/#/settings;{"page":"page-credentials","ak-user-settings-mfa-page":0}'
   );
   assert.deepEqual(config.payload.apps.find((card) => card.title === "Immich")?.mobileLinks, [
     {

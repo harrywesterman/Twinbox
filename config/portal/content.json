@@ -9,7 +9,7 @@
     "issueUrl": "https://github.com/harrywesterman/Twinbox/issues/new/choose",
     "authentikAdminUrl": "__AUTHENTIK_ADMIN_URL__",
     "authentikUserUrl": "__AUTHENTIK_USER_URL__#/settings;{\"page\":\"page-details\"}",
-    "authentikOtpUrl": "__AUTHENTIK_USER_URL__#/settings;{\"page\":\"page-mfa\"}"
+    "authentikOtpUrl": "__AUTHENTIK_USER_URL__#/settings;{\"page\":\"page-credentials\",\"ak-user-settings-mfa-page\":0}"
   },
   "userAdmin": {
     "eyebrow": "Admin",

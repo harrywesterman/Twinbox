@@ -73,7 +73,7 @@ test("buildPortalConfig keeps operator tools out of the user applications grid a
   );
   assert.equal(
     config.settings.authentikOtpUrl,
-    'https://authentik.tst.example.com/if/user/#/settings;{"page":"page-mfa"}'
+    'https://authentik.tst.example.com/if/user/#/settings;{"page":"page-credentials","ak-user-settings-mfa-page":0}'
   );
   assert.equal(config.observability.title, "Observability control");
   assert.equal(config.observability.profiles.minimal.summary, "Small-cluster mode");

@@ -925,20 +925,11 @@ function SettingsPage({ config, preferences, setPreferences, onSave, onNavigate 
       <div className="settings-links">
         <a
           className="link-card"
-          href={config?.settings?.authentikUserUrl || "#"}
-          target="_blank"
-          rel="noreferrer"
-        >
-          <strong>Set password</strong>
-          <span>Open the Authentik user self-service area.</span>
-        </a>
-        <a
-          className="link-card"
           href={config?.settings?.authentikOtpUrl || "#"}
           target="_blank"
           rel="noreferrer"
         >
-          <strong>Manage Authenticators</strong>
+          <strong>Manage MFA</strong>
           <span>Set up passkeys, TOTP, and other authentication methods.</span>
         </a>
         <a
