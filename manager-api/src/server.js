@@ -28,6 +28,7 @@ import {
   readJsonIfExists,
   writeJson,
 } from "./lib/common.js";
+import { createSourceAllowlistMiddleware, parseTrustedCidrs } from "./lib/source-allowlist.js";
 import {
   buildIpBlock,
   checkIpAvailability,
@@ -62,9 +63,11 @@ const dataRoot = process.env.MANAGER_DATA_DIR || "/data";
 const workspaceRoot = process.env.WORKSPACE_ROOT || process.cwd();
 const dirs = buildDataDirs(dataRoot);
 const dataFiles = buildDataFiles(dataRoot);
+const trustedSourceCidrs = parseTrustedCidrs(process.env.MANAGER_API_TRUSTED_CIDRS);
 
 Object.values(dirs).forEach((dir) => ensureDir(dir));
 
+app.use(createSourceAllowlistMiddleware({ trustedCidrs: trustedSourceCidrs }));
 app.use(express.json());
 
 app.use((req, res, next) => {

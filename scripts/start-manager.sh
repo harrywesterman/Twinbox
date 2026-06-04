@@ -75,6 +75,17 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 EOF
 }
 
+append_manager_api_source_allowlist() {
+  if grep -q '^MANAGER_API_TRUSTED_CIDRS=' .env; then
+    return 0
+  fi
+
+  cat >> .env <<'EOF'
+
+MANAGER_API_TRUSTED_CIDRS=127.0.0.1/32,::1/128,172.16.0.0/12,10.0.0.0/8
+EOF
+}
+
 remove_tool_version_envs() {
   local tmp_file=""
 
@@ -267,6 +278,11 @@ if [[ ! -f "${BOOTSTRAP_DIR}/bin/install-management-tools.sh" ]]; then
   chmod 0755 "${BOOTSTRAP_DIR}/bin/install-management-tools.sh"
 fi
 
+if [[ ! -f "${BOOTSTRAP_DIR}/bin/configure-manager-api-firewall.sh" ]]; then
+  curl -fsSL "${RAW_BASE_URL}/scripts/manager/configure-manager-api-firewall.sh" -o "${BOOTSTRAP_DIR}/bin/configure-manager-api-firewall.sh"
+  chmod 0755 "${BOOTSTRAP_DIR}/bin/configure-manager-api-firewall.sh"
+fi
+
 if [[ -x "${BOOTSTRAP_DIR}/bin/install-management-tools.sh" ]]; then
   sudo "${BOOTSTRAP_DIR}/bin/install-management-tools.sh" --env-file .env
 else
@@ -275,6 +291,7 @@ else
 fi
 
 append_secret_env_block
+append_manager_api_source_allowlist
 remove_tool_version_envs
 set -a
 # shellcheck disable=SC1091
@@ -288,6 +305,7 @@ fi
 
 docker compose pull
 docker compose up -d
+sudo "${BOOTSTRAP_DIR}/bin/configure-manager-api-firewall.sh"
 ensure_seaweedfs_bootstrap
 
 if [[ "$BOOTSTRAP_ONCE" -eq 1 ]]; then
