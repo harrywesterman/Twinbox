@@ -7,19 +7,12 @@ spec:
   instances: 3
   imageName: ghcr.io/cloudnative-pg/postgresql:16.4
 
-  backup:
-    retentionPolicy: "14d"
-    barmanObjectStore:
-      serverName: matrix-mas-db
-      destinationPath: s3://twinbox-velero/matrix-mas-db/
-      endpointURL: http://seaweedfs.longhorn-system.svc.cluster.local:8333
-      s3Credentials:
-        accessKeyId:
-          name: seaweedfs-backup-credentials
-          key: AWS_ACCESS_KEY_ID
-        secretAccessKey:
-          name: seaweedfs-backup-credentials
-          key: AWS_SECRET_ACCESS_KEY
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: matrix-mas-db-objectstore
+        serverName: matrix-mas-db
 
   bootstrap:
     initdb:

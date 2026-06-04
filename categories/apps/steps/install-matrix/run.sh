@@ -374,11 +374,13 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
 
 # Apply database manifests
 databases_namespace_manifest="$WORKSPACE_ROOT/gitops/databases/shared/namespace.yaml"
+matrix_synapse_db_objectstore_manifest="$WORKSPACE_ROOT/gitops/databases/matrix-synapse/objectstore.yaml"
 matrix_synapse_db_cluster_manifest="$WORKSPACE_ROOT/gitops/databases/matrix-synapse/cluster.yaml"
 matrix_synapse_db_externalsecret_manifest="$WORKSPACE_ROOT/gitops/databases/matrix-synapse/externalsecret.yaml"
 matrix_synapse_db_pooler_ro_manifest="$WORKSPACE_ROOT/gitops/databases/matrix-synapse/pooler-ro.yaml"
 matrix_synapse_db_pooler_rw_manifest="$WORKSPACE_ROOT/gitops/databases/matrix-synapse/pooler-rw.yaml"
 matrix_synapse_db_backup_manifest="$WORKSPACE_ROOT/gitops/databases/matrix-synapse/scheduled-backup.yaml"
+matrix_mas_db_objectstore_manifest="$WORKSPACE_ROOT/gitops/databases/matrix-mas/objectstore.yaml"
 matrix_mas_db_cluster_manifest="$WORKSPACE_ROOT/gitops/databases/matrix-mas/cluster.yaml"
 matrix_mas_db_externalsecret_manifest="$WORKSPACE_ROOT/gitops/databases/matrix-mas/externalsecret.yaml"
 matrix_mas_db_pooler_ro_manifest="$WORKSPACE_ROOT/gitops/databases/matrix-mas/pooler-ro.yaml"
@@ -387,11 +389,13 @@ matrix_mas_db_backup_manifest="$WORKSPACE_ROOT/gitops/databases/matrix-mas/sched
 
 log "Applying Matrix database manifests"
 kubectl apply -f "$databases_namespace_manifest"
+kubectl apply -f "$matrix_synapse_db_objectstore_manifest"
 kubectl apply -f "$matrix_synapse_db_cluster_manifest"
 kubectl apply -f "$matrix_synapse_db_externalsecret_manifest"
 kubectl apply -f "$matrix_synapse_db_pooler_ro_manifest"
 kubectl apply -f "$matrix_synapse_db_pooler_rw_manifest"
 kubectl apply -f "$matrix_synapse_db_backup_manifest"
+kubectl apply -f "$matrix_mas_db_objectstore_manifest"
 kubectl apply -f "$matrix_mas_db_cluster_manifest"
 kubectl apply -f "$matrix_mas_db_externalsecret_manifest"
 kubectl apply -f "$matrix_mas_db_pooler_ro_manifest"

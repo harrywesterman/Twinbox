@@ -1,0 +1,17 @@
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: matrix-mas-db-objectstore
+  namespace: databases
+spec:
+  retentionPolicy: "14d"
+  configuration:
+    destinationPath: s3://twinbox-velero/matrix-mas-db/
+    endpointURL: http://seaweedfs.longhorn-system.svc.cluster.local:8333
+    s3Credentials:
+      accessKeyId:
+        name: seaweedfs-backup-credentials
+        key: AWS_ACCESS_KEY_ID
+      secretAccessKey:
+        name: seaweedfs-backup-credentials
+        key: AWS_SECRET_ACCESS_KEY

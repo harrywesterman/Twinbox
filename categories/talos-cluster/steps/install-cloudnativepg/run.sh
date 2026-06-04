@@ -6,11 +6,16 @@ set -euo pipefail
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 manifest_path="$WORKSPACE_ROOT/gitops/apps/cloudnativepg.yaml"
+barman_cloud_plugin_manifest_path="$WORKSPACE_ROOT/gitops/apps/cloudnativepg-barman-cloud.yaml"
 databases_manifest_path="$WORKSPACE_ROOT/gitops/apps/databases.yaml"
 
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$manifest_path" \
   --application "cloudnativepg"
+
+bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+  --manifest "$barman_cloud_plugin_manifest_path" \
+  --application "cloudnativepg-barman-cloud"
 
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$databases_manifest_path" \

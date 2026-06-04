@@ -374,6 +374,7 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --required-keys "ZULIP_RABBITMQ_PASSWORD,ZULIP_RABBITMQ_ERLANG_COOKIE,ZULIP_REDIS_PASSWORD"
 
 databases_namespace_manifest="$WORKSPACE_ROOT/gitops/databases/shared/namespace.yaml"
+zulip_db_objectstore_manifest="$WORKSPACE_ROOT/gitops/databases/zulip/objectstore.yaml"
 zulip_db_cluster_manifest="$WORKSPACE_ROOT/gitops/databases/zulip/cluster.yaml"
 zulip_db_externalsecret_manifest="$WORKSPACE_ROOT/gitops/databases/zulip/externalsecret.yaml"
 zulip_db_pooler_ro_manifest="$WORKSPACE_ROOT/gitops/databases/zulip/pooler-ro.yaml"
@@ -382,6 +383,7 @@ zulip_db_backup_manifest="$WORKSPACE_ROOT/gitops/databases/zulip/scheduled-backu
 
 log "Applying Zulip database manifests"
 kubectl apply -f "$databases_namespace_manifest"
+kubectl apply -f "$zulip_db_objectstore_manifest"
 kubectl apply -f "$zulip_db_cluster_manifest"
 kubectl apply -f "$zulip_db_externalsecret_manifest"
 kubectl apply -f "$zulip_db_pooler_ro_manifest"

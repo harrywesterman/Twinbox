@@ -4,6 +4,9 @@ metadata:
   name: matrix-synapse-db-daily
   namespace: databases
 spec:
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
   schedule: "0 2 * * *"
   cluster:
     name: matrix-synapse-db

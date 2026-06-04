@@ -4,60 +4,71 @@ kind: Kustomization
 resources:
   - shared/namespace.yaml
   - longhorn-single-storageclass.yaml
+  - authentik/objectstore.yaml
   - authentik/cluster.yaml
   - authentik/externalsecret.yaml
   - authentik/pooler-ro.yaml
   - authentik/pooler-rw.yaml
   - authentik/pooler-rw-session.yaml
   - authentik/scheduled-backup.yaml
+  - immich/objectstore.yaml
   - immich/cluster.yaml
   - immich/externalsecret.yaml
   - immich/pooler-ro.yaml
   - immich/pooler-rw.yaml
   - immich/pooler-rw-session.yaml
   - immich/scheduled-backup.yaml
+  - coder/objectstore.yaml
   - coder/cluster.yaml
   - coder/externalsecret.yaml
   - coder/poolers.yaml
   - coder/scheduled-backup.yaml
+  - matrix-mas/objectstore.yaml
   - matrix-mas/cluster.yaml
   - matrix-mas/externalsecret.yaml
   - matrix-mas/pooler-ro.yaml
   - matrix-mas/pooler-rw.yaml
   - matrix-mas/scheduled-backup.yaml
+  - matrix-synapse/objectstore.yaml
   - matrix-synapse/cluster.yaml
   - matrix-synapse/externalsecret.yaml
   - matrix-synapse/pooler-ro.yaml
   - matrix-synapse/pooler-rw.yaml
   - matrix-synapse/scheduled-backup.yaml
+  - n8n/objectstore.yaml
   - n8n/cluster.yaml
   - n8n/externalsecret.yaml
   - n8n/pooler-ro.yaml
   - n8n/pooler-rw.yaml
   - n8n/pooler-rw-session.yaml
   - n8n/scheduled-backup.yaml
+  - hedgedoc/objectstore.yaml
   - hedgedoc/cluster.yaml
   - hedgedoc/externalsecret.yaml
   - hedgedoc/pooler-ro.yaml
   - hedgedoc/pooler-rw.yaml
   - hedgedoc/pooler-rw-session.yaml
   - hedgedoc/scheduled-backup.yaml
+  - paperless/objectstore.yaml
   - paperless/cluster.yaml
   - paperless/externalsecret.yaml
   - paperless/pooler-ro.yaml
   - paperless/pooler-rw.yaml
   - paperless/scheduled-backup.yaml
+  - vaultwarden/objectstore.yaml
   - vaultwarden/cluster.yaml
   - vaultwarden/externalsecret.yaml
   - vaultwarden/pooler-ro.yaml
   - vaultwarden/pooler-rw.yaml
   - vaultwarden/scheduled-backup.yaml
+  - pixelfed/objectstore.yaml
   - pixelfed/cluster.yaml
   - pixelfed/externalsecret.yaml
   - pixelfed/pooler-ro.yaml
   - pixelfed/pooler-rw.yaml
   - pixelfed/pooler-rw-session.yaml
   - pixelfed/scheduled-backup.yaml
+  - zulip/objectstore.yaml
   - zulip/cluster.yaml
   - zulip/externalsecret.yaml
   - zulip/pooler-ro.yaml

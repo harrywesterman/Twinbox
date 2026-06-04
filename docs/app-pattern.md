@@ -87,6 +87,7 @@ Each database gets:
 - A 3-node PostgreSQL Cluster with Longhorn storage
 - A read-write PgBouncer pooler
 - A read-only PgBouncer pooler
+- A Barman Cloud Plugin ObjectStore backed by SeaweedFS
 - A ScheduledBackup for daily backups
 - An ExternalSecret that pulls credentials from OpenBao
 
@@ -294,6 +295,9 @@ metadata:
   name: <app>-db-backup
   namespace: databases
 spec:
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
   schedule: "0 2 * * *"
   backupOwnerReference: self
   cluster:
@@ -544,12 +548,13 @@ Because Headlamp uses its own OIDC flow, it does not need the shared Traefik for
 
 ## Database Template Structure
 
-The template in `gitops/databases/_template/` contains four files that together define a complete database infrastructure:
+The template in `gitops/databases/_template/` contains five files that together define a complete database infrastructure:
 
 ### cluster.yaml
 
 Defines a 3-node PostgreSQL 16.4 Cluster with:
 - Longhorn storage (10Gi)
+- Barman Cloud Plugin WAL archiving through the matching ObjectStore
 - Resource limits (1 CPU, 2Gi memory per pod)
 - Pod anti-affinity for spreading across nodes
 - 100 max connections
@@ -570,11 +575,20 @@ Two PgBouncer poolers:
 - **ro pooler** — Read-only connections for reporting/analytics
 - Both: 2 instances, transaction pool mode, 200 max clients, 20 default pool size
 
+### objectstore.yaml
+
+Configures the Barman Cloud Plugin backup target:
+- Destination path: `s3://twinbox-velero/<app>-db/`
+- Endpoint: SeaweedFS on the Management VM
+- Credentials: `seaweedfs-backup-credentials`
+- Retention: 14 days
+
 ### scheduled-backup.yaml
 
 Daily backup at 02:00 UTC:
+- Method: Barman Cloud Plugin
 - Backup owner reference: `self` (deleted with the Cluster)
-- Storage via the default Velero backup location backed by SeaweedFS on the Management VM
+- Storage via the app's ObjectStore backed by SeaweedFS on the Management VM
 
 ## Volume Resize and Capacity Management
 

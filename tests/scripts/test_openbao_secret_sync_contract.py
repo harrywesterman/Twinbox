@@ -448,5 +448,9 @@ def test_pixelfed_step_and_secret_project_activitypub_and_bootstrap_keys():
     assert "property: PF_OIDC_PROFILE_URL" in secret_text
     assert "property: PF_OIDC_LOGOUT_URL" in secret_text
 
-    assert "destinationPath: s3://twinbox-velero/pixelfed-db/" in db_cluster_text
+    db_objectstore_text = (
+        REPO_ROOT / "gitops" / "databases" / "pixelfed" / "objectstore.yaml"
+    ).read_text(encoding="utf-8")
+    assert "barmanObjectName: pixelfed-db-objectstore" in db_cluster_text
+    assert "destinationPath: s3://twinbox-velero/pixelfed-db/" in db_objectstore_text
     assert "imageName: ghcr.io/cloudnative-pg/postgresql:16.4" in db_cluster_text

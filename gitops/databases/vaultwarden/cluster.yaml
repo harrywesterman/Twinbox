@@ -7,19 +7,12 @@ spec:
   instances: 3
   imageName: ghcr.io/cloudnative-pg/postgresql:16.4
 
-  backup:
-    retentionPolicy: "14d"
-    barmanObjectStore:
-      serverName: vaultwarden-db
-      destinationPath: s3://twinbox-velero/vaultwarden-db/
-      endpointURL: http://seaweedfs.longhorn-system.svc.cluster.local:8333
-      s3Credentials:
-        accessKeyId:
-          name: seaweedfs-backup-credentials
-          key: AWS_ACCESS_KEY_ID
-        secretAccessKey:
-          name: seaweedfs-backup-credentials
-          key: AWS_SECRET_ACCESS_KEY
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: vaultwarden-db-objectstore
+        serverName: vaultwarden-db
 
   bootstrap:
     initdb:

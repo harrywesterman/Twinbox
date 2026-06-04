@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
   - externalsecret.yaml
+  - objectstore.yaml
   - cluster.yaml
   - pooler-ro.yaml
   - pooler-rw.yaml

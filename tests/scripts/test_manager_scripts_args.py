@@ -3521,6 +3521,9 @@ def test_vaultwarden_manifests_use_postgresql_and_domain_limited_signups():
     cluster_text = (REPO_ROOT / "gitops" / "databases" / "vaultwarden" / "cluster.yaml").read_text(
         encoding="utf-8"
     )
+    objectstore_text = (
+        REPO_ROOT / "gitops" / "databases" / "vaultwarden" / "objectstore.yaml"
+    ).read_text(encoding="utf-8")
 
     assert "ghcr.io/dani-garcia/vaultwarden:1.36.0" in deployment_text
     assert "ghcr.io/dani-garcia/vaultwarden:latest" not in deployment_text
@@ -3531,7 +3534,8 @@ def test_vaultwarden_manifests_use_postgresql_and_domain_limited_signups():
     assert "VAULTWARDEN_ADMIN_TOKEN" in externalsecret_text
     assert "VAULTWARDEN_POSTGRESQL__USERNAME" in db_externalsecret_text
     assert "VAULTWARDEN_POSTGRESQL__PASSWORD" in db_externalsecret_text
-    assert "destinationPath: s3://twinbox-velero/vaultwarden-db/" in cluster_text
+    assert "barmanObjectName: vaultwarden-db-objectstore" in cluster_text
+    assert "destinationPath: s3://twinbox-velero/vaultwarden-db/" in objectstore_text
 
 
 def test_pixelfed_manifests_use_postgresql_and_longhorn_storage():
@@ -3551,6 +3555,9 @@ def test_pixelfed_manifests_use_postgresql_and_longhorn_storage():
     cluster_text = (REPO_ROOT / "gitops" / "databases" / "pixelfed" / "cluster.yaml").read_text(
         encoding="utf-8"
     )
+    objectstore_text = (
+        REPO_ROOT / "gitops" / "databases" / "pixelfed" / "objectstore.yaml"
+    ).read_text(encoding="utf-8")
 
     assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in step_text
     assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in step_text
@@ -3603,7 +3610,8 @@ def test_pixelfed_manifests_use_postgresql_and_longhorn_storage():
     assert "property: PF_OIDC_LOGOUT_URL" in externalsecret_text
     assert "property: PIXELFED_POSTGRESQL__USERNAME" in db_externalsecret_text
     assert "property: PIXELFED_POSTGRESQL__PASSWORD" in db_externalsecret_text
-    assert "destinationPath: s3://twinbox-velero/pixelfed-db/" in cluster_text
+    assert "barmanObjectName: pixelfed-db-objectstore" in cluster_text
+    assert "destinationPath: s3://twinbox-velero/pixelfed-db/" in objectstore_text
 
 
 def test_paperless_redis_manifest_runs_statelessly():
@@ -3648,32 +3656,40 @@ def test_cnpg_database_clusters_have_seaweedfs_backups():
     authentik_cluster_text = (
         REPO_ROOT / "gitops" / "databases" / "authentik" / "cluster.yaml"
     ).read_text(encoding="utf-8")
+    authentik_objectstore_text = (
+        REPO_ROOT / "gitops" / "databases" / "authentik" / "objectstore.yaml"
+    ).read_text(encoding="utf-8")
     immich_cluster_text = (
         REPO_ROOT / "gitops" / "databases" / "immich" / "cluster.yaml"
+    ).read_text(encoding="utf-8")
+    immich_objectstore_text = (
+        REPO_ROOT / "gitops" / "databases" / "immich" / "objectstore.yaml"
     ).read_text(encoding="utf-8")
     backup_secret_text = (
         REPO_ROOT / "gitops" / "databases" / "seaweedfs-backup-credentials.yaml"
     ).read_text(encoding="utf-8")
 
-    assert "backup:" in authentik_cluster_text
-    assert "destinationPath: s3://twinbox-velero/authentik-db/" in authentik_cluster_text
+    assert "barmanObjectName: authentik-db-objectstore" in authentik_cluster_text
+    assert "serverName: authentik-db" in authentik_cluster_text
+    assert "destinationPath: s3://twinbox-velero/authentik-db/" in authentik_objectstore_text
     assert (
         "endpointURL: http://seaweedfs.longhorn-system.svc.cluster.local:8333"
-        in authentik_cluster_text
+        in authentik_objectstore_text
     )
-    assert "name: seaweedfs-backup-credentials" in authentik_cluster_text
-    assert "key: AWS_ACCESS_KEY_ID" in authentik_cluster_text
-    assert "key: AWS_SECRET_ACCESS_KEY" in authentik_cluster_text
+    assert "name: seaweedfs-backup-credentials" in authentik_objectstore_text
+    assert "key: AWS_ACCESS_KEY_ID" in authentik_objectstore_text
+    assert "key: AWS_SECRET_ACCESS_KEY" in authentik_objectstore_text
 
-    assert "backup:" in immich_cluster_text
-    assert "destinationPath: s3://twinbox-velero/immich-db/" in immich_cluster_text
+    assert "barmanObjectName: immich-db-objectstore" in immich_cluster_text
+    assert "serverName: immich-db" in immich_cluster_text
+    assert "destinationPath: s3://twinbox-velero/immich-db/" in immich_objectstore_text
     assert (
         "endpointURL: http://seaweedfs.longhorn-system.svc.cluster.local:8333"
-        in immich_cluster_text
+        in immich_objectstore_text
     )
-    assert "name: seaweedfs-backup-credentials" in immich_cluster_text
-    assert "key: AWS_ACCESS_KEY_ID" in immich_cluster_text
-    assert "key: AWS_SECRET_ACCESS_KEY" in immich_cluster_text
+    assert "name: seaweedfs-backup-credentials" in immich_objectstore_text
+    assert "key: AWS_ACCESS_KEY_ID" in immich_objectstore_text
+    assert "key: AWS_SECRET_ACCESS_KEY" in immich_objectstore_text
 
     assert "name: seaweedfs-backup-credentials" in backup_secret_text
     assert "twinbox/global/velero" in backup_secret_text
@@ -3920,6 +3936,9 @@ def test_hedgedoc_database_cluster_is_right_sized_for_current_capacity():
     text = (REPO_ROOT / "gitops" / "databases" / "hedgedoc" / "cluster.yaml").read_text(
         encoding="utf-8"
     )
+    objectstore_text = (
+        REPO_ROOT / "gitops" / "databases" / "hedgedoc" / "objectstore.yaml"
+    ).read_text(encoding="utf-8")
 
     assert "name: hedgedoc-db" in text
     assert "instances: 2" in text
@@ -3930,7 +3949,8 @@ def test_hedgedoc_database_cluster_is_right_sized_for_current_capacity():
     assert "memory: 512Mi" in text
     assert 'shared_buffers: "64MB"' in text
     assert 'effective_cache_size: "192MB"' in text
-    assert "s3://twinbox-velero/hedgedoc-db/" in text
+    assert "barmanObjectName: hedgedoc-db-objectstore" in text
+    assert "s3://twinbox-velero/hedgedoc-db/" in objectstore_text
     assert "bootstrap:" in text
     assert "secret:" in text
     assert "name: hedgedoc-db-credentials" in text

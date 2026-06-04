@@ -7,6 +7,13 @@ spec:
   instances: 3
   imageName: ghcr.io/cloudnative-pg/postgresql:16.4
 
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: CHANGEME-db-objectstore
+        serverName: CHANGEME-db
+
   bootstrap:
     initdb:
       database: CHANGEME

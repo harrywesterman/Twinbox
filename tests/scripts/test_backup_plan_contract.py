@@ -62,14 +62,31 @@ def test_cloudnativepg_clusters_use_seaweedfs_and_14_day_retention():
 
     for path in cluster_files:
         text = path.read_text(encoding="utf-8")
-        assert 'retentionPolicy: "14d"' in text, path
-        assert "barmanObjectStore:" in text, path
-        assert "destinationPath: s3://twinbox-velero/" in text, path
-        assert "endpointURL: http://seaweedfs.longhorn-system.svc.cluster.local:8333" in text, path
-        assert "name: seaweedfs-backup-credentials" in text, path
+        cluster_name = path.parent.name
+        objectstore_text = (path.parent / "objectstore.yaml").read_text(encoding="utf-8")
+
+        assert "barmanObjectStore:" not in text, path
+        assert "plugins:" in text, path
+        assert "name: barman-cloud.cloudnative-pg.io" in text, path
+        assert "isWALArchiver: true" in text, path
+        assert f"barmanObjectName: {cluster_name}-db-objectstore" in text, path
+        assert f"serverName: {cluster_name}-db" in text, path
+
+        assert "apiVersion: barmancloud.cnpg.io/v1" in objectstore_text, path
+        assert "kind: ObjectStore" in objectstore_text, path
+        assert 'retentionPolicy: "14d"' in objectstore_text, path
+        assert "destinationPath: s3://twinbox-velero/" in objectstore_text, path
+        assert (
+            "endpointURL: http://seaweedfs.longhorn-system.svc.cluster.local:8333"
+            in objectstore_text
+        ), path
+        assert "name: seaweedfs-backup-credentials" in objectstore_text, path
 
     for path in database_root.glob("*/scheduled-backup.yaml"):
         text = path.read_text(encoding="utf-8")
+        assert "method: plugin" in text, path
+        assert "pluginConfiguration:" in text, path
+        assert "name: barman-cloud.cloudnative-pg.io" in text, path
         assert 'schedule: "0 2 * * *"' in text, path
 
 
