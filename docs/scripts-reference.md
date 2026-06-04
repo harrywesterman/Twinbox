@@ -99,7 +99,7 @@ Installs Longhorn via Argo CD, sets `StorageClass/longhorn` as the default, conf
 Bootstraps the management secrets layer for GitOps:
 
 - Applies the `external-secrets` and `openbao` Argo CD Applications
-- Renders OpenBao values file to `gitops/values/openbao.yaml` (seal key ID, replicas, Raft config)
+- Renders OpenBao values file to `gitops/values/openbao.yaml` (seal key ID, single-replica low-memory Raft config)
 - Seeds OpenBao static seal secret (`kubectl create secret`)
 - Bootstraps management JSON files (proxmox, traefik-dashboard, seal key)
 
@@ -113,7 +113,9 @@ Shared library for OpenBao lifecycle operations. Provides functions for:
 - Rendering OpenBao Helm values to `gitops/values/openbao.yaml` (`openbao_render_values_file`)
 - Seeding management bootstrap files
 - Seeding the OpenBao static seal Kubernetes secret
-- Initializing OpenBao and configuring Kubernetes auth
+- Initializing OpenBao and configuring Kubernetes auth without a stored reviewer JWT
+- Granting External Secrets the TokenReview RBAC needed for client-JWT reviewer auth
+- Repairing and validating `ClusterSecretStore/openbao`
 - Syncing global secrets from JSON files into OpenBao's KV store
 - Applying `ClusterSecretStore` and `ExternalSecret` resources
 

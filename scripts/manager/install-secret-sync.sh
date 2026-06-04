@@ -25,23 +25,7 @@ VELERO_SECRET_NAME="${VELERO_SECRET_NAME:-velero}"
 VELERO_SECRET_FILE="${VELERO_SECRET_FILE:-/opt/twinbox/bootstrap/secrets/global/velero.json}"
 
 detect_openbao_replicas() {
-  local control_plane_count
-  control_plane_count="$(
-    kubectl get nodes -o json | jq -r '
-      [.items[]
-        | select(
-            .metadata.labels["node-role.kubernetes.io/control-plane"] != null
-            or .metadata.labels["node-role.kubernetes.io/master"] != null
-          )
-      ] | length
-    '
-  )"
-
-  if [[ "$control_plane_count" =~ ^[0-9]+$ ]] && [[ "$control_plane_count" -ge 3 ]]; then
-    printf '3\n'
-  else
-    printf '1\n'
-  fi
+  printf '1\n'
 }
 
 while [[ $# -gt 0 ]]; do
@@ -151,10 +135,13 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
 
 openbao_pod="$(openbao_wait_for_server_pod)"
 openbao_initialize_if_needed "$openbao_pod"
-openbao_configure_auth_and_policy "$openbao_pod"
+openbao_repair_kubernetes_auth
+openbao_pod="$(openbao_wait_for_server_pod)"
 openbao_seed_secret_paths "$openbao_pod"
-openbao_apply_cluster_secret_store
 openbao_apply_bootstrap_external_secret
+openbao_force_cluster_secret_store_refresh
+openbao_wait_for_cluster_secret_store_ready
+openbao_wait_for_external_secret_ready "$TARGET_NAMESPACE" "$EXTERNAL_SECRET_NAME"
 openbao_wait_for_secret "$TARGET_SECRET_NAME" "$TARGET_NAMESPACE"
 
 if [[ -f "$VELERO_SECRET_FILE" ]]; then

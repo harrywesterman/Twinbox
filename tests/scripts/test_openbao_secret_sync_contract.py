@@ -3,6 +3,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SYNC_SCRIPT = REPO_ROOT / "scripts" / "manager" / "sync-openbao-global-secret.sh"
 OPENBAO_HELPER = REPO_ROOT / "scripts" / "manager" / "openbao-secret-sync.sh"
+UPGRADE_SCRIPT = REPO_ROOT / "scripts" / "manager" / "upgrade-cluster.sh"
 GRAFANA_STEP = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-grafana" / "run.sh"
 WIREDOOR_STEP = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-wiredoor-gateway" / "run.sh"
@@ -71,6 +72,42 @@ def test_openbao_global_secret_reads_use_active_service_port_forward():
     assert "/v1/kv/data/twinbox/global/${secret_name}" in read_function
     assert "openbao_wait_for_server_pod" not in read_function
     assert "bao kv get" not in read_function
+
+
+def test_openbao_kubernetes_auth_uses_external_secrets_client_jwt_reviewer():
+    text = _read(OPENBAO_HELPER)
+    configure_function = text.split("openbao_configure_auth_and_policy() {", 1)[1].split(
+        "openbao_seed_secret_paths() {", 1
+    )[0]
+
+    assert "token_reviewer_jwt" not in configure_function
+    assert "disable_local_ca_jwt=true" in configure_function
+    assert "bound_service_account_names=external-secrets" in configure_function
+    assert "bound_service_account_namespaces=external-secrets" in configure_function
+
+
+def test_openbao_repair_grants_external_secrets_tokenreview_and_validates_store():
+    text = _read(OPENBAO_HELPER)
+
+    assert "name: external-secrets-tokenreview" in text
+    assert "name: system:auth-delegator" in text
+    assert "kind: ClusterSecretStore" in text
+    assert "openbao_force_cluster_secret_store_refresh" in text
+    assert "openbao_wait_for_cluster_secret_store_ready" in text
+    assert "OpenBao Kubernetes auth is not ready" in text
+
+
+def test_upgrade_completion_runs_openbao_auth_gate_before_marking_completed():
+    text = _read(UPGRADE_SCRIPT)
+
+    assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in text
+    assert "openbao_secret_sync_health_gate" in text
+    assert text.index("openbao_secret_sync_health_gate") < text.index('status = "talos_completed"')
+    assert text.rindex("openbao_secret_sync_health_gate") < text.index(
+        'status = "kubernetes_completed"'
+    )
+    assert "authentik-bootstrap" in text
+    assert "authentik-db-credentials" in text
 
 
 def test_grafana_step_generates_and_syncs_an_oidc_secret():

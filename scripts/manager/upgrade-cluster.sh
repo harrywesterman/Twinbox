@@ -4,6 +4,8 @@ set -euo pipefail
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 # shellcheck disable=SC1091
 source "$WORKSPACE_ROOT/config/pinned-defaults.sh"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
 
 phase=""
 cluster_id="${TWINBOX_CLUSTER_ID:-}"
@@ -45,6 +47,7 @@ state_file="${state_file:-$data_dir/upgrade-state/${cluster_id}.json}"
 [[ -f "$kubeconfig" ]] || fail "kubeconfig not found"
 mkdir -p "$(dirname "$state_file")"
 export KUBECONFIG="$kubeconfig"
+export KUBECONFIG_FILE="$kubeconfig"
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail "missing command: $1"
@@ -249,6 +252,36 @@ health_check() {
     log "Waiting for the cluster to become healthy after maintenance"
     sleep "${TWINBOX_CLUSTER_HEALTH_POLL_SECONDS:-10}"
   done
+}
+
+openbao_upgrade_gate_fail() {
+  local message="$1"
+  patch_state ".status = \"failed\" | .error = \"$message\" | .active_job_id = null | .resumable = true | .current_node = null"
+  fail "$message"
+}
+
+openbao_secret_sync_health_gate() {
+  if ! kubectl get namespace "$OPENBAO_NAMESPACE" >/dev/null 2>&1; then
+    log "OpenBao namespace ${OPENBAO_NAMESPACE} is not installed; skipping OpenBao auth gate"
+    return
+  fi
+
+  log "Repairing and validating OpenBao Kubernetes auth"
+  if ! (openbao_repair_kubernetes_auth); then
+    openbao_upgrade_gate_fail "OpenBao Kubernetes auth is not ready"
+  fi
+
+  if kubectl -n authentik get externalsecret authentik-bootstrap >/dev/null 2>&1; then
+    if ! (openbao_wait_for_external_secret_ready authentik authentik-bootstrap); then
+      openbao_upgrade_gate_fail "OpenBao Kubernetes auth is not ready"
+    fi
+  fi
+
+  if kubectl -n databases get externalsecret authentik-db-credentials >/dev/null 2>&1; then
+    if ! (openbao_wait_for_external_secret_ready databases authentik-db-credentials); then
+      openbao_upgrade_gate_fail "OpenBao Kubernetes auth is not ready"
+    fi
+  fi
 }
 
 wait_for_longhorn_health() {
@@ -531,6 +564,7 @@ talos_upgrade() {
       activate_talosctl "$target"
     fi
   done
+  openbao_secret_sync_health_gate
   patch_state '.phase = "talos" | .status = "talos_completed" | .active_job_id = null | .resumable = false | .pause_requested = false | .current_node = null'
   log "Talos upgrade phase completed"
 }
@@ -552,6 +586,7 @@ kubernetes_upgrade() {
     patch_state ".checkpoints.kubernetes += [\"$target\"]"
     check_pause
   done
+  openbao_secret_sync_health_gate
   patch_state '.phase = "kubernetes" | .status = "kubernetes_completed" | .active_job_id = null | .resumable = false | .pause_requested = false | .current_node = null'
   log "Kubernetes upgrade phase completed"
 }

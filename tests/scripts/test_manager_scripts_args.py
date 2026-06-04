@@ -1187,6 +1187,12 @@ def test_install_secret_sync_renders_argocd_values_and_applies_secret_sync_manif
     assert "chart: openbao" in text
     assert 'targetRevision: "0.27.2"' in text
     assert "gitops/apps/openbao.yaml" not in text
+    assert "detect_openbao_replicas() {" in text
+    assert "printf '1\\n'" in text
+    assert "openbao_repair_kubernetes_auth" in text
+    assert (
+        'openbao_wait_for_external_secret_ready "$TARGET_NAMESPACE" "$EXTERNAL_SECRET_NAME"' in text
+    )
 
 
 def test_optional_app_helper_enables_labels_before_waiting_for_readiness():

@@ -282,9 +282,10 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `install-longhorn-storage` installs Longhorn, makes it the default storage class, and configures SeaweedFS S3 as Longhorn's default backup target. Longhorn is configured to run only on worker nodes so storage and CSI components stay off control planes. Twinbox also sets Longhorn's node drain policy to `allow-if-replica-is-stopped` and enables automatic detachment of manually attached volumes when a node is cordoned, which keeps Talos node upgrades workable on the small 3-worker cluster. New Longhorn PVCs inherit the default recurring job group, which creates snapshots every four hours and backups daily.
 - `install-secret-sync` installs:
   - External Secrets Operator
-  - OpenBao with Raft storage on Longhorn
+  - OpenBao with single-replica Raft storage on `longhorn-single`
   - `ClusterSecretStore/openbao`
   - `ExternalSecret/proxmox-bootstrap`
+- OpenBao Kubernetes auth uses the External Secrets service account JWT as the TokenReview reviewer instead of storing a static reviewer token. Twinbox grants the `external-secrets` service account `system:auth-delegator` and repairs/validates `ClusterSecretStore/openbao` after upgrade phases.
 - External Secrets Operator uses its own internal TLS bootstrap for the webhook via `certController`; this is separate from the ingress TLS stack and does not require a user-managed CA.
 - `install-cloudnativepg` installs the CloudNativePG operator with two replicas on Longhorn. The operator uses ServerSideApply for its CRDs.
 

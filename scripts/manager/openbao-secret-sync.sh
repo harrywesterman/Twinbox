@@ -355,14 +355,31 @@ POLICY
 
 bao write auth/kubernetes/config \
   kubernetes_host="https://${KUBERNETES_SERVICE_HOST:-kubernetes.default.svc}:${KUBERNETES_SERVICE_PORT_HTTPS:-${KUBERNETES_SERVICE_PORT:-443}}" \
-  token_reviewer_jwt=@/var/run/secrets/kubernetes.io/serviceaccount/token \
-  kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+  kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+  disable_local_ca_jwt=true
 
 bao write auth/kubernetes/role/external-secrets \
   bound_service_account_names=external-secrets \
   bound_service_account_namespaces=external-secrets \
   policies=eso-read \
   ttl=1h
+EOF
+}
+
+openbao_apply_external_secrets_tokenreview_rbac() {
+  cat <<EOF | kubectl apply -f - >/dev/null
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: external-secrets-tokenreview
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: external-secrets
+    namespace: ${OPERATOR_NAMESPACE}
 EOF
 }
 
@@ -436,6 +453,87 @@ spec:
             name: external-secrets
             namespace: ${OPERATOR_NAMESPACE}
 EOF
+}
+
+openbao_force_cluster_secret_store_refresh() {
+  kubectl annotate clustersecretstore "$CLUSTER_SECRET_STORE_NAME" \
+    "force-sync=$(date -u '+%Y%m%dT%H%M%SZ')" \
+    --overwrite >/dev/null
+}
+
+openbao_wait_for_cluster_secret_store_ready() {
+  local attempt=1
+  local attempts="${OPENBAO_CLUSTER_SECRET_STORE_READY_ATTEMPTS:-120}"
+  local condition reason message
+
+  while [[ "$attempt" -le "$attempts" ]]; do
+    condition="$(
+      kubectl get clustersecretstore "$CLUSTER_SECRET_STORE_NAME" -o json 2>/dev/null |
+        jq -r '[.status.conditions[]? | select(.type == "Ready") | .status] | first // "False"' 2>/dev/null || true
+    )"
+    if [[ "$condition" == "True" ]]; then
+      return 0
+    fi
+
+    reason="$(
+      kubectl get clustersecretstore "$CLUSTER_SECRET_STORE_NAME" -o json 2>/dev/null |
+        jq -r '[.status.conditions[]? | select(.type == "Ready") | .reason] | first // "not-ready"' 2>/dev/null || true
+    )"
+    message="$(
+      kubectl get clustersecretstore "$CLUSTER_SECRET_STORE_NAME" -o json 2>/dev/null |
+        jq -r '[.status.conditions[]? | select(.type == "Ready") | .message] | first // ""' 2>/dev/null || true
+    )"
+    openbao_log "Waiting for ClusterSecretStore/${CLUSTER_SECRET_STORE_NAME} Ready=True (${reason}${message:+: ${message}})"
+    sleep "${OPENBAO_CLUSTER_SECRET_STORE_READY_POLL_SECONDS:-5}"
+    attempt=$((attempt + 1))
+  done
+
+  openbao_fail "OpenBao Kubernetes auth is not ready: ClusterSecretStore/${CLUSTER_SECRET_STORE_NAME} did not become Ready"
+}
+
+openbao_wait_for_external_secret_ready() {
+  local namespace="$1"
+  local name="$2"
+  local attempt=1
+  local attempts="${OPENBAO_EXTERNAL_SECRET_READY_ATTEMPTS:-120}"
+  local condition reason message
+
+  while [[ "$attempt" -le "$attempts" ]]; do
+    condition="$(
+      kubectl -n "$namespace" get externalsecret "$name" -o json 2>/dev/null |
+        jq -r '[.status.conditions[]? | select(.type == "Ready") | .status] | first // "False"' 2>/dev/null || true
+    )"
+    if [[ "$condition" == "True" ]]; then
+      return 0
+    fi
+
+    reason="$(
+      kubectl -n "$namespace" get externalsecret "$name" -o json 2>/dev/null |
+        jq -r '[.status.conditions[]? | select(.type == "Ready") | .reason] | first // "not-ready"' 2>/dev/null || true
+    )"
+    message="$(
+      kubectl -n "$namespace" get externalsecret "$name" -o json 2>/dev/null |
+        jq -r '[.status.conditions[]? | select(.type == "Ready") | .message] | first // ""' 2>/dev/null || true
+    )"
+    openbao_log "Waiting for ExternalSecret/${name} in ${namespace} Ready=True (${reason}${message:+: ${message}})"
+    sleep "${OPENBAO_EXTERNAL_SECRET_READY_POLL_SECONDS:-5}"
+    attempt=$((attempt + 1))
+  done
+
+  openbao_fail "OpenBao Kubernetes auth is not ready: ExternalSecret/${name} in ${namespace} did not become Ready"
+}
+
+openbao_repair_kubernetes_auth() {
+  [[ -f "$OPENBAO_ROOT_TOKEN_FILE" ]] || openbao_fail "OpenBao Kubernetes auth is not ready: root token file not found at ${OPENBAO_ROOT_TOKEN_FILE}"
+  openbao_apply_external_secrets_tokenreview_rbac
+
+  local pod
+  pod="$(openbao_wait_for_server_pod)"
+  openbao_wait_for_unsealed "$pod"
+  openbao_configure_auth_and_policy "$pod"
+  openbao_apply_cluster_secret_store
+  openbao_force_cluster_secret_store_refresh
+  openbao_wait_for_cluster_secret_store_ready
 }
 
 openbao_apply_bootstrap_external_secret() {
