@@ -18,6 +18,7 @@ const fakeState = {
   groups: [],
   webauthnDevices: [],
   nextUserId: 10,
+  nextGroupId: 200,
 };
 const managerState = {
   jobs: new Map(),
@@ -89,6 +90,7 @@ function seedAuthentikState() {
   ];
   fakeState.webauthnDevices = [];
   fakeState.nextUserId = 10;
+  fakeState.nextGroupId = 200;
 }
 
 function createSignedSessionCookie(session) {
@@ -309,6 +311,22 @@ const authentikServer = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "DELETE" && /^\/api\/v3\/core\/users\/[^/]+\/$/.test(pathname)) {
+    const userId = pathname.split("/").filter(Boolean).at(-1);
+    const user = findUser(userId);
+    if (!user) {
+      sendJson(res, 404, { error: "user not found" });
+      return;
+    }
+    fakeState.users = fakeState.users.filter((entry) => entry.pk !== String(userId));
+    fakeState.groups = fakeState.groups.map((group) => ({
+      ...group,
+      users: group.users.filter((entry) => entry !== String(userId)),
+    }));
+    sendNoContent(res);
+    return;
+  }
+
   if (req.method === "POST" && /^\/api\/v3\/core\/users\/[^/]+\/set_password\/$/.test(pathname)) {
     const userId = pathname.split("/").filter(Boolean).at(-2);
     const user = findUser(userId);
@@ -327,6 +345,20 @@ const authentikServer = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "POST" && pathname === "/api/v3/core/groups/") {
+    const body = await readRequestBody(req);
+    const newGroup = {
+      pk: String(fakeState.nextGroupId),
+      name: body.name,
+      is_superuser: body.is_superuser === true,
+      users: [],
+    };
+    fakeState.nextGroupId += 1;
+    fakeState.groups.push(newGroup);
+    sendJson(res, 201, cloneGroup(newGroup));
+    return;
+  }
+
   if (req.method === "GET" && /^\/api\/v3\/core\/groups\/[^/]+\/$/.test(pathname)) {
     const groupId = pathname.split("/").filter(Boolean).at(-1);
     const group = findGroup(groupId);
@@ -334,6 +366,19 @@ const authentikServer = http.createServer(async (req, res) => {
       sendJson(res, 404, { error: "group not found" });
       return;
     }
+    sendJson(res, 200, cloneGroup(group));
+    return;
+  }
+
+  if (req.method === "PATCH" && /^\/api\/v3\/core\/groups\/[^/]+\/$/.test(pathname)) {
+    const groupId = pathname.split("/").filter(Boolean).at(-1);
+    const group = findGroup(groupId);
+    if (!group) {
+      sendJson(res, 404, { error: "group not found" });
+      return;
+    }
+    const body = await readRequestBody(req);
+    Object.assign(group, body);
     sendJson(res, 200, cloneGroup(group));
     return;
   }
@@ -668,6 +713,9 @@ test.before(async () => {
     },
     userAdmin: {
       manageableGroups: [
+        { name: "admins", label: "Admins" },
+        { name: "Twinbox app installations", label: "Twinbox app installations" },
+        { name: "Twinbox user management", label: "Twinbox user management" },
         { name: "employees", label: "Employees" },
         { name: "family", label: "Family" },
       ],
@@ -931,7 +979,7 @@ test("admin can disable and reactivate a regular user", async () => {
   assert.equal(enabled.payload.user.isActive, true);
 });
 
-test("group updates block privileged groups and allow approved memberships", async () => {
+test("group updates allow explicitly approved admin memberships", async () => {
   seedAuthentikState();
 
   const adminCookie = createSignedSessionCookie({
@@ -943,24 +991,160 @@ test("group updates block privileged groups and allow approved memberships", asy
     isAdmin: true,
   });
 
-  const blocked = await requestPortal("/api/admin/users/2/groups", {
-    method: "PUT",
-    cookie: adminCookie,
-    body: {
-      groupNames: ["admins"],
-    },
-  });
-  assert.equal(blocked.status, 400);
-
   const updated = await requestPortal("/api/admin/users/2/groups", {
     method: "PUT",
     cookie: adminCookie,
     body: {
-      groupNames: ["family"],
+      groupNames: ["admins", "family"],
     },
   });
   assert.equal(updated.status, 200);
-  assert.deepEqual(updated.payload.user.groupNames, ["family"]);
+  assert.deepEqual(updated.payload.user.groupNames, ["admins", "family"]);
+
+  const blocked = await requestPortal("/api/admin/users/2/groups", {
+    method: "PUT",
+    cookie: adminCookie,
+    body: {
+      groupNames: ["twinbox-automation-superusers"],
+    },
+  });
+  assert.equal(blocked.status, 400);
+});
+
+test("delegated app installers can use app endpoints but not user management", async () => {
+  seedAuthentikState();
+
+  const appManagerCookie = createSignedSessionCookie({
+    sub: "app-manager-1",
+    name: "App Manager",
+    email: "app-manager@example.com",
+    preferredUsername: "app-manager",
+    groups: ["Twinbox app installations"],
+    isAdmin: false,
+  });
+
+  const catalog = await requestPortal("/api/admin/apps/catalog", { cookie: appManagerCookie });
+  assert.equal(catalog.status, 200);
+
+  const queued = await requestPortal("/api/admin/apps/install-immich/install", {
+    method: "POST",
+    cookie: appManagerCookie,
+  });
+  assert.equal(queued.status, 202);
+
+  const appJob = await requestPortal(`/api/admin/apps/jobs/${queued.payload.job_id}`, {
+    cookie: appManagerCookie,
+  });
+  assert.equal(appJob.status, 200);
+  assert.equal(appJob.payload.payload.step_id, "install-immich");
+
+  const appLogs = await requestPortal(`/api/admin/apps/jobs/${queued.payload.job_id}/logs`, {
+    cookie: appManagerCookie,
+  });
+  assert.equal(appLogs.status, 200);
+
+  const upgradeJobId = "job-upgrade-secret";
+  managerState.jobs.set(upgradeJobId, {
+    id: upgradeJobId,
+    type: "upgrade_talos",
+    status: "running",
+    payload: {
+      step_id: "install-immich",
+    },
+  });
+
+  const blockedUpgradeJob = await requestPortal(`/api/admin/apps/jobs/${upgradeJobId}`, {
+    cookie: appManagerCookie,
+  });
+  assert.equal(blockedUpgradeJob.status, 403);
+
+  const blockedUpgradeLogs = await requestPortal(`/api/admin/apps/jobs/${upgradeJobId}/logs`, {
+    cookie: appManagerCookie,
+  });
+  assert.equal(blockedUpgradeLogs.status, 403);
+
+  const blockedUpgradeCancel = await requestPortal(`/api/admin/apps/jobs/${upgradeJobId}/cancel`, {
+    method: "POST",
+    cookie: appManagerCookie,
+  });
+  assert.equal(blockedUpgradeCancel.status, 403);
+  assert.equal(managerState.jobs.get(upgradeJobId).status, "running");
+
+  const users = await requestPortal("/api/admin/users", { cookie: appManagerCookie });
+  assert.equal(users.status, 403);
+
+  const observability = await requestPortal("/api/admin/observability", {
+    cookie: appManagerCookie,
+  });
+  assert.equal(observability.status, 403);
+});
+
+test("delegated user managers can manage users but not install apps", async () => {
+  seedAuthentikState();
+
+  const userManagerCookie = createSignedSessionCookie({
+    sub: "user-manager-1",
+    name: "User Manager",
+    email: "user-manager@example.com",
+    preferredUsername: "user-manager",
+    groups: ["Twinbox user management"],
+    isAdmin: false,
+  });
+
+  const created = await requestPortal("/api/admin/users", {
+    method: "POST",
+    cookie: userManagerCookie,
+    body: {
+      username: "noor",
+      name: "Noor Example",
+      email: "noor@example.com",
+      groupNames: ["Twinbox app installations"],
+    },
+  });
+  assert.equal(created.status, 201);
+  assert.deepEqual(created.payload.user.groupNames, ["Twinbox app installations"]);
+
+  const deleted = await requestPortal(`/api/admin/users/${created.payload.user.id}`, {
+    method: "DELETE",
+    cookie: userManagerCookie,
+  });
+  assert.equal(deleted.status, 200);
+  assert.equal(deleted.payload.ok, true);
+  assert.equal(
+    fakeState.users.some((user) => user.username === "noor"),
+    false
+  );
+
+  const catalog = await requestPortal("/api/admin/apps/catalog", { cookie: userManagerCookie });
+  assert.equal(catalog.status, 403);
+});
+
+test("user deletion blocks self and service accounts", async () => {
+  seedAuthentikState();
+
+  const adminCookie = createSignedSessionCookie({
+    sub: "admin-1",
+    name: "Portal Admin",
+    email: "admin@example.com",
+    preferredUsername: "portal-admin",
+    groups: ["admins"],
+    isAdmin: true,
+  });
+
+  const selfDelete = await requestPortal("/api/admin/users/1", {
+    method: "DELETE",
+    cookie: adminCookie,
+  });
+  assert.equal(selfDelete.status, 400);
+
+  const serviceAccountDelete = await requestPortal("/api/admin/users/3", {
+    method: "DELETE",
+    cookie: adminCookie,
+  });
+  assert.equal(serviceAccountDelete.status, 400);
+
+  assert(findUser("1"));
+  assert(findUser("3"));
 });
 
 test("admin can load the app catalog and queue an install job", async () => {
@@ -1031,6 +1215,9 @@ test("portal config exposes a single Apps section and image icons", async () => 
 
   const config = await requestPortal("/api/portal-config", { cookie: adminCookie });
   assert.equal(config.status, 200);
+  assert.equal(config.payload.session.isAdmin, true);
+  assert.equal(config.payload.session.canManageApps, true);
+  assert.equal(config.payload.session.canManageUsers, true);
   assert.equal(config.payload.apps.length, 2);
   assert.equal(config.payload.appSections.length, 1);
   assert.equal(config.payload.appSections[0].name, "Apps");

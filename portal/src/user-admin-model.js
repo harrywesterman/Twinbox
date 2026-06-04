@@ -34,39 +34,54 @@ function isVisibleUser(user) {
   return true;
 }
 
-export function buildAdminNavigationItems({ isAdmin = false, zoneName = "" } = {}) {
-  if (!isAdmin) {
+export function buildAdminNavigationItems({
+  isAdmin = false,
+  canManageApps = false,
+  canManageUsers = false,
+  zoneName = "",
+} = {}) {
+  if (!isAdmin && !canManageApps && !canManageUsers) {
     return [];
   }
 
-  const items = [
-    {
+  const items = [];
+
+  if (canManageApps) {
+    items.push({
       id: "admin-app-installs",
       path: "/admin/apps",
       label: "App installs",
-    },
-    {
-      id: "admin-observability",
-      path: "/admin/observability",
-      label: "Observability",
-    },
-    {
-      id: "admin-cluster-updates",
-      path: "/admin/updates",
-      label: "Cluster updates",
-    },
-    {
-      id: "admin-users",
-      path: "/admin/users",
-      label: "Users & groups",
-    },
-  ];
+    });
+  }
 
-  if (zoneName) {
-    items.splice(1, 0, {
+  if (isAdmin && zoneName) {
+    items.push({
       id: "admin-management-consoles",
       url: `https://admin.${zoneName}`,
       label: "Management consoles",
+    });
+  }
+
+  if (isAdmin) {
+    items.push(
+      {
+        id: "admin-observability",
+        path: "/admin/observability",
+        label: "Observability",
+      },
+      {
+        id: "admin-cluster-updates",
+        path: "/admin/updates",
+        label: "Cluster updates",
+      }
+    );
+  }
+
+  if (canManageUsers) {
+    items.push({
+      id: "admin-users",
+      path: "/admin/users",
+      label: "Users & groups",
     });
   }
 

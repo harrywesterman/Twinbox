@@ -17,7 +17,23 @@
     "description": "Voeg gebruikers toe, zet accounts uit, en koppel mensen aan vooraf goedgekeurde groepen zonder in de volledige Authentik-beheeromgeving te hoeven werken.",
     "emptyStateTitle": "Nog geen beheerbare groepen ingesteld",
     "emptyStateDescription": "Voeg in config/portal/content.json expliciet de zakelijke groepen toe die deze eenvoudige beheerpagina mag tonen en beheren.",
-    "manageableGroups": []
+    "manageableGroups": [
+      {
+        "name": "admins",
+        "label": "Admins",
+        "description": "Volledige Twinbox beheerrechten, inclusief alle adminpagina's en operatorconsoles."
+      },
+      {
+        "name": "Twinbox app installations",
+        "label": "Twinbox app installations",
+        "description": "Mag apps installeren en verwijderen via de Twinbox Portal appbeheerpagina."
+      },
+      {
+        "name": "Twinbox user management",
+        "label": "Twinbox user management",
+        "description": "Mag gebruikers aanmaken, verwijderen, activeren, deactiveren en aan beheerbare groepen koppelen."
+      }
+    ]
   },
   "observability": {
     "eyebrow": "Admin",

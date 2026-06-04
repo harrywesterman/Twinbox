@@ -34,6 +34,7 @@ data:
             - authentik_flows.view_flow
             - authentik_core.add_user
             - authentik_core.change_user
+            - authentik_core.delete_user
             - authentik_core.view_user
             - authentik_core.add_group
             - authentik_core.change_group

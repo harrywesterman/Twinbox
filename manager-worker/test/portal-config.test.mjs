@@ -65,7 +65,10 @@ test("buildPortalConfig keeps operator tools out of the user applications grid a
     "https://github.com/harrywesterman/Twinbox/issues/new/choose"
   );
   assert.equal(config.userAdmin.title, "Gebruikers en groepen");
-  assert.deepEqual(config.userAdmin.manageableGroups, []);
+  assert.deepEqual(
+    config.userAdmin.manageableGroups.map((group) => group.name),
+    ["admins", "Twinbox app installations", "Twinbox user management"]
+  );
   assert.equal(config.settings.authentikAdminUrl, "https://authentik.tst.example.com/if/admin/");
   assert.equal(
     config.settings.authentikUserUrl,

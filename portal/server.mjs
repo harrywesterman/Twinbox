@@ -32,6 +32,9 @@ const authentikApiBase = String(
   process.env.AUTHENTIK_API_BASE || DEFAULT_AUTHENTIK_API_BASE
 ).trim();
 const authentikApiToken = String(process.env.AUTHENTIK_API_TOKEN || "").trim();
+const APP_INSTALLATION_GROUP_NAME = "Twinbox app installations";
+const USER_MANAGEMENT_GROUP_NAME = "Twinbox user management";
+const APP_JOB_TYPES = new Set(["run_step", "uninstall_step"]);
 
 fs.mkdirSync(dataDir, { recursive: true });
 
@@ -385,6 +388,39 @@ async function loadActiveClusterState() {
   };
 }
 
+function collectAppStepIds(catalog = {}) {
+  const appCategory = (Array.isArray(catalog?.categories) ? catalog.categories : []).find(
+    (category) => category?.id === "apps"
+  );
+  return new Set(
+    (Array.isArray(appCategory?.steps) ? appCategory.steps : [])
+      .map((step) => String(step?.id || "").trim())
+      .filter(Boolean)
+  );
+}
+
+async function loadScopedAppJob(jobId) {
+  const normalizedJobId = String(jobId || "").trim();
+  const job = await requestManagerJson(`/api/jobs/${encodeURIComponent(normalizedJobId)}`);
+  const jobType = String(job?.type || "").trim();
+  const stepId = String(job?.payload?.step_id || job?.step_id || "").trim();
+
+  if (!APP_JOB_TYPES.has(jobType) || !stepId) {
+    const error = new Error("app job access required");
+    error.status = 403;
+    throw error;
+  }
+
+  const catalog = await requestManagerJson("/api/apps/catalog");
+  if (!collectAppStepIds(catalog).has(stepId)) {
+    const error = new Error("app job access required");
+    error.status = 403;
+    throw error;
+  }
+
+  return job;
+}
+
 function getOrigin(req) {
   const proto =
     String(req.headers["x-forwarded-proto"] || "http")
@@ -420,12 +456,47 @@ function requireAdminSession(req, res) {
     return null;
   }
 
-  if (!session.isAdmin) {
+  const capabilities = buildPortalCapabilities(session.groups);
+  if (!capabilities.isAdmin) {
     res.status(403).json({ error: "admin access required" });
     return null;
   }
 
-  return session;
+  return {
+    ...session,
+    ...capabilities,
+  };
+}
+
+function buildPortalCapabilities(groups = []) {
+  const groupSet = new Set(
+    (Array.isArray(groups) ? groups : []).map((value) => String(value || "").trim())
+  );
+  const isAdmin = groupSet.has("admins");
+
+  return {
+    isAdmin,
+    canManageApps: isAdmin || groupSet.has(APP_INSTALLATION_GROUP_NAME),
+    canManageUsers: isAdmin || groupSet.has(USER_MANAGEMENT_GROUP_NAME),
+  };
+}
+
+function requirePortalCapability(req, res, capability, message) {
+  const session = requireSession(req, res);
+  if (!session) {
+    return null;
+  }
+
+  const capabilities = buildPortalCapabilities(session.groups);
+  if (!capabilities[capability]) {
+    res.status(403).json({ error: message || "admin access required" });
+    return null;
+  }
+
+  return {
+    ...session,
+    ...capabilities,
+  };
 }
 
 function resolveRecordId(record) {
@@ -459,6 +530,41 @@ function getAuthentikAdminClient() {
   });
 }
 
+async function ensureConfiguredManageableGroups(client, config) {
+  const configuredGroups = normalizeManageableGroupsConfig(config?.userAdmin?.manageableGroups);
+  if (configuredGroups.length === 0) {
+    return;
+  }
+
+  const groups = readListPayload(await client.listGroups());
+  const groupsByName = new Map(
+    groups
+      .map((group) => [String(group?.name || "").trim(), group])
+      .filter(([name]) => Boolean(name))
+  );
+
+  for (const groupConfig of configuredGroups) {
+    const isAdminsGroup = groupConfig.name === "admins";
+    const existing = groupsByName.get(groupConfig.name);
+    const payload = {
+      name: groupConfig.name,
+      is_superuser: isAdminsGroup,
+    };
+
+    if (!existing) {
+      await client.createGroup(payload);
+      continue;
+    }
+
+    const groupId = resolveRecordId(existing);
+    if (!groupId || existing?.is_superuser === isAdminsGroup) {
+      continue;
+    }
+
+    await client.updateGroup(groupId, payload);
+  }
+}
+
 async function listAuthentikGroupsWithMembers(client) {
   const groups = readListPayload(await client.listGroups());
 
@@ -480,6 +586,7 @@ async function listAuthentikGroupsWithMembers(client) {
 
 async function loadUserAdminDirectory(config) {
   const client = getAuthentikAdminClient();
+  await ensureConfiguredManageableGroups(client, config);
   const [usersPayload, groupsWithMembers] = await Promise.all([
     client.listUsers(),
     listAuthentikGroupsWithMembers(client),
@@ -507,6 +614,35 @@ async function getEligibleUserOrThrow(client, userId) {
   }
 
   return user;
+}
+
+function isHiddenPortalUser(user = {}) {
+  const username = String(user?.username || "")
+    .trim()
+    .toLowerCase();
+  const name = String(user?.name || "")
+    .trim()
+    .toLowerCase();
+
+  return (
+    username === "akadmin" ||
+    username.startsWith("outpost-") ||
+    username.startsWith("ak-outpost-") ||
+    name.includes("default admin") ||
+    name.includes("embedded outpost service-account")
+  );
+}
+
+function isCurrentSessionUser(session = {}, user = {}) {
+  const userId = resolveRecordId(user);
+  const username = String(user?.username || "").trim();
+  const email = String(user?.email || "").trim();
+
+  return (
+    (userId && userId === String(session.sub || "").trim()) ||
+    (username && username === String(session.preferredUsername || "").trim()) ||
+    (email && email === String(session.email || "").trim())
+  );
 }
 
 function buildUserResponse(directory, userId) {
@@ -646,6 +782,7 @@ function buildSessionFromClaims(claims) {
   const groups = Array.isArray(claims?.groups)
     ? claims.groups.map((value) => String(value || "").trim()).filter(Boolean)
     : [];
+  const capabilities = buildPortalCapabilities(groups);
 
   return {
     sub: String(claims?.sub || "").trim(),
@@ -655,7 +792,7 @@ function buildSessionFromClaims(claims) {
     email: String(claims?.email || "").trim(),
     preferredUsername: String(claims?.preferred_username || "").trim(),
     groups,
-    isAdmin: groups.includes("admins"),
+    ...capabilities,
   };
 }
 
@@ -784,7 +921,10 @@ app.get("/api/session", (req, res) => {
   if (!session) {
     return res.status(401).json({ error: "not authenticated" });
   }
-  return res.json({ ok: true, session });
+  return res.json({
+    ok: true,
+    session: { ...session, ...buildPortalCapabilities(session.groups) },
+  });
 });
 
 app.get("/api/portal-config", async (req, res) => {
@@ -801,7 +941,7 @@ app.get("/api/portal-config", async (req, res) => {
         name: session.name,
         email: session.email,
         groups: session.groups,
-        isAdmin: session.isAdmin,
+        ...buildPortalCapabilities(session.groups),
       },
     });
   } catch (error) {
@@ -874,7 +1014,12 @@ app.put("/api/preferences", async (req, res) => {
 });
 
 app.get("/api/admin/groups", async (req, res) => {
-  const session = requireAdminSession(req, res);
+  const session = requirePortalCapability(
+    req,
+    res,
+    "canManageUsers",
+    "user management access required"
+  );
   if (!session) {
     return;
   }
@@ -894,7 +1039,12 @@ app.get("/api/admin/groups", async (req, res) => {
 });
 
 app.get("/api/admin/apps/catalog", async (req, res) => {
-  const session = requireAdminSession(req, res);
+  const session = requirePortalCapability(
+    req,
+    res,
+    "canManageApps",
+    "app installation access required"
+  );
   if (!session) {
     return;
   }
@@ -1020,7 +1170,12 @@ app.get("/api/admin/updates/jobs/:jobId/logs", async (req, res) => {
 });
 
 app.post("/api/admin/apps/:stepId/install", async (req, res) => {
-  const session = requireAdminSession(req, res);
+  const session = requirePortalCapability(
+    req,
+    res,
+    "canManageApps",
+    "app installation access required"
+  );
   if (!session) {
     return;
   }
@@ -1053,7 +1208,12 @@ app.post("/api/admin/apps/:stepId/install", async (req, res) => {
 });
 
 app.post("/api/admin/apps/:stepId/uninstall", async (req, res) => {
-  const session = requireAdminSession(req, res);
+  const session = requirePortalCapability(
+    req,
+    res,
+    "canManageApps",
+    "app installation access required"
+  );
   if (!session) {
     return;
   }
@@ -1086,13 +1246,18 @@ app.post("/api/admin/apps/:stepId/uninstall", async (req, res) => {
 });
 
 app.get("/api/admin/apps/jobs/:jobId", async (req, res) => {
-  const session = requireAdminSession(req, res);
+  const session = requirePortalCapability(
+    req,
+    res,
+    "canManageApps",
+    "app installation access required"
+  );
   if (!session) {
     return;
   }
 
   try {
-    const job = await requestManagerJson(`/api/jobs/${encodeURIComponent(req.params.jobId)}`);
+    const job = await loadScopedAppJob(req.params.jobId);
     res.json(job);
   } catch (error) {
     res
@@ -1102,12 +1267,18 @@ app.get("/api/admin/apps/jobs/:jobId", async (req, res) => {
 });
 
 app.get("/api/admin/apps/jobs/:jobId/logs", async (req, res) => {
-  const session = requireAdminSession(req, res);
+  const session = requirePortalCapability(
+    req,
+    res,
+    "canManageApps",
+    "app installation access required"
+  );
   if (!session) {
     return;
   }
 
   try {
+    await loadScopedAppJob(req.params.jobId);
     const logs = await requestManagerJson(`/api/jobs/${encodeURIComponent(req.params.jobId)}/logs`);
     res.json(logs);
   } catch (error) {
@@ -1118,12 +1289,18 @@ app.get("/api/admin/apps/jobs/:jobId/logs", async (req, res) => {
 });
 
 app.post("/api/admin/apps/jobs/:jobId/cancel", async (req, res) => {
-  const session = requireAdminSession(req, res);
+  const session = requirePortalCapability(
+    req,
+    res,
+    "canManageApps",
+    "app installation access required"
+  );
   if (!session) {
     return;
   }
 
   try {
+    await loadScopedAppJob(req.params.jobId);
     const result = await requestManagerJson(
       `/api/jobs/${encodeURIComponent(req.params.jobId)}/cancel`,
       {
@@ -1154,7 +1331,12 @@ async function enrichUsersWithPasskeyStatus(users, client) {
 }
 
 app.get("/api/admin/users", async (req, res) => {
-  const session = requireAdminSession(req, res);
+  const session = requirePortalCapability(
+    req,
+    res,
+    "canManageUsers",
+    "user management access required"
+  );
   if (!session) {
     return;
   }
@@ -1177,7 +1359,12 @@ app.get("/api/admin/users", async (req, res) => {
 });
 
 app.post("/api/admin/users", async (req, res) => {
-  const session = requireAdminSession(req, res);
+  const session = requirePortalCapability(
+    req,
+    res,
+    "canManageUsers",
+    "user management access required"
+  );
   if (!session) {
     return;
   }
@@ -1227,7 +1414,12 @@ app.post("/api/admin/users", async (req, res) => {
 });
 
 app.post("/api/admin/users/:userId/restart-passwordless-onboarding", async (req, res) => {
-  const session = requireAdminSession(req, res);
+  const session = requirePortalCapability(
+    req,
+    res,
+    "canManageUsers",
+    "user management access required"
+  );
   if (!session) {
     return;
   }
@@ -1268,7 +1460,12 @@ app.post("/api/admin/users/:userId/restart-passwordless-onboarding", async (req,
 });
 
 app.post("/api/admin/users/:userId/disable", async (req, res) => {
-  const session = requireAdminSession(req, res);
+  const session = requirePortalCapability(
+    req,
+    res,
+    "canManageUsers",
+    "user management access required"
+  );
   if (!session) {
     return;
   }
@@ -1290,7 +1487,12 @@ app.post("/api/admin/users/:userId/disable", async (req, res) => {
 });
 
 app.post("/api/admin/users/:userId/enable", async (req, res) => {
-  const session = requireAdminSession(req, res);
+  const session = requirePortalCapability(
+    req,
+    res,
+    "canManageUsers",
+    "user management access required"
+  );
   if (!session) {
     return;
   }
@@ -1312,7 +1514,12 @@ app.post("/api/admin/users/:userId/enable", async (req, res) => {
 });
 
 app.put("/api/admin/users/:userId/groups", async (req, res) => {
-  const session = requireAdminSession(req, res);
+  const session = requirePortalCapability(
+    req,
+    res,
+    "canManageUsers",
+    "user management access required"
+  );
   if (!session) {
     return;
   }
@@ -1350,6 +1557,43 @@ app.put("/api/admin/users/:userId/groups", async (req, res) => {
     res
       .status(error?.status || 500)
       .json({ error: error instanceof Error ? error.message : "failed to update groups" });
+  }
+});
+
+app.delete("/api/admin/users/:userId", async (req, res) => {
+  const session = requirePortalCapability(
+    req,
+    res,
+    "canManageUsers",
+    "user management access required"
+  );
+  if (!session) {
+    return;
+  }
+
+  try {
+    const client = getAuthentikAdminClient();
+    const userId = String(req.params.userId || "").trim();
+    const user = await getEligibleUserOrThrow(client, userId);
+
+    if (isHiddenPortalUser(user)) {
+      const error = new Error("system users cannot be deleted from the portal");
+      error.status = 400;
+      throw error;
+    }
+
+    if (isCurrentSessionUser(session, user)) {
+      const error = new Error("you cannot delete your own account");
+      error.status = 400;
+      throw error;
+    }
+
+    await client.deleteUser(userId);
+    res.json({ ok: true });
+  } catch (error) {
+    res
+      .status(error?.status || 500)
+      .json({ error: error instanceof Error ? error.message : "failed to delete user" });
   }
 });
 

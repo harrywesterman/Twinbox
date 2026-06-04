@@ -3,19 +3,33 @@ import assert from "node:assert/strict";
 
 import { buildAdminNavigationItems, buildUserAdminViewModel } from "../src/user-admin-model.js";
 
-test("buildAdminNavigationItems shows the user admin route only for admins", () => {
+test("buildAdminNavigationItems shows routes for delegated admin capabilities", () => {
   assert.equal(buildAdminNavigationItems({ isAdmin: false }).length, 0);
-  assert.deepEqual(buildAdminNavigationItems({ isAdmin: true, zoneName: "tst.example.com" }), [
+  assert.deepEqual(buildAdminNavigationItems({ canManageApps: true }), [
     { id: "admin-app-installs", path: "/admin/apps", label: "App installs" },
-    {
-      id: "admin-management-consoles",
-      url: "https://admin.tst.example.com",
-      label: "Management consoles",
-    },
-    { id: "admin-observability", path: "/admin/observability", label: "Observability" },
-    { id: "admin-cluster-updates", path: "/admin/updates", label: "Cluster updates" },
+  ]);
+  assert.deepEqual(buildAdminNavigationItems({ canManageUsers: true }), [
     { id: "admin-users", path: "/admin/users", label: "Users & groups" },
   ]);
+  assert.deepEqual(
+    buildAdminNavigationItems({
+      isAdmin: true,
+      canManageApps: true,
+      canManageUsers: true,
+      zoneName: "tst.example.com",
+    }),
+    [
+      { id: "admin-app-installs", path: "/admin/apps", label: "App installs" },
+      {
+        id: "admin-management-consoles",
+        url: "https://admin.tst.example.com",
+        label: "Management consoles",
+      },
+      { id: "admin-observability", path: "/admin/observability", label: "Observability" },
+      { id: "admin-cluster-updates", path: "/admin/updates", label: "Cluster updates" },
+      { id: "admin-users", path: "/admin/users", label: "Users & groups" },
+    ]
+  );
 });
 
 test("buildUserAdminViewModel returns the configured empty state when no groups are allowlisted", () => {

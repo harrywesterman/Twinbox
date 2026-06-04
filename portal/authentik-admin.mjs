@@ -66,20 +66,16 @@ export function blockedGroupReason(group = {}) {
   const name = trimString(group.name);
   const normalizedName = name.toLowerCase();
 
-  if (group?.is_superuser === true) {
-    return "superuser";
-  }
-
-  if (normalizedName === "admins") {
-    return "admins";
-  }
-
   if (/^twinbox-automation(?:-|$)/i.test(name)) {
     return "automation";
   }
 
   if (/service[- ]account/i.test(name)) {
     return "service-account";
+  }
+
+  if (group?.is_superuser === true && normalizedName !== "admins") {
+    return "superuser";
   }
 
   return "";
@@ -302,6 +298,9 @@ export function createAuthentikAdminClient({
     updateUser(userId, payload) {
       return request("PATCH", `/core/users/${encodeURIComponent(userId)}/`, { body: payload });
     },
+    deleteUser(userId) {
+      return request("DELETE", `/core/users/${encodeURIComponent(userId)}/`);
+    },
     setPassword(userId, password) {
       return request("POST", `/core/users/${encodeURIComponent(userId)}/set_password/`, {
         body: { password },
@@ -309,6 +308,12 @@ export function createAuthentikAdminClient({
     },
     listGroups() {
       return request("GET", "/core/groups/?page_size=200");
+    },
+    createGroup(payload) {
+      return request("POST", "/core/groups/", { body: payload });
+    },
+    updateGroup(groupId, payload) {
+      return request("PATCH", `/core/groups/${encodeURIComponent(groupId)}/`, { body: payload });
     },
     getGroup(groupId) {
       return request("GET", `/core/groups/${encodeURIComponent(groupId)}/`);

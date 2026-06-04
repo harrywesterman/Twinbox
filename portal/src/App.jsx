@@ -194,17 +194,14 @@ function useUserAdminData(enabled) {
       }));
 
       try {
-        const [usersPayload, groupsPayload] = await Promise.all([
-          requestJson("/api/admin/users"),
-          requestJson("/api/admin/groups"),
-        ]);
+        const usersPayload = await requestJson("/api/admin/users");
 
         setState({
           loading: false,
           refreshing: false,
           error: "",
           users: Array.isArray(usersPayload?.users) ? usersPayload.users : [],
-          groups: Array.isArray(groupsPayload?.groups) ? groupsPayload.groups : [],
+          groups: Array.isArray(usersPayload?.groups) ? usersPayload.groups : [],
         });
       } catch (error) {
         setState((current) => ({
@@ -584,12 +581,26 @@ function Panel({ className = "", children }) {
   return <section className={`panel ${className}`}>{children}</section>;
 }
 
-function MenuPopover({ visible, onNavigate, onLogout, onClose, isAdmin, zoneName }) {
+function MenuPopover({
+  visible,
+  onNavigate,
+  onLogout,
+  onClose,
+  isAdmin,
+  canManageApps,
+  canManageUsers,
+  zoneName,
+}) {
   if (!visible) {
     return null;
   }
 
-  const adminItems = buildAdminNavigationItems({ isAdmin, zoneName });
+  const adminItems = buildAdminNavigationItems({
+    isAdmin,
+    canManageApps,
+    canManageUsers,
+    zoneName,
+  });
 
   return (
     <div className="menu-popover" role="menu">
@@ -672,6 +683,8 @@ function PortalHeader({
   onMenuToggle,
   menuOpen,
   isAdmin,
+  canManageApps,
+  canManageUsers,
 }) {
   const zoneName = config?.portal?.zoneName || "";
 
@@ -702,11 +715,13 @@ function PortalHeader({
           onLogout={onLogout}
           onClose={onMenuToggle}
           isAdmin={isAdmin}
+          canManageApps={canManageApps}
+          canManageUsers={canManageUsers}
           zoneName={zoneName}
         />
         <div className="topbar-session">
           <strong>{session?.name || "User"}</strong>
-          <span>{isAdmin ? "Admins" : "Member"}</span>
+          <span>{isAdmin || canManageApps || canManageUsers ? "Admin tools" : "Member"}</span>
         </div>
       </div>
     </header>
@@ -2805,6 +2820,7 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
   const [groupBusy, setGroupBusy] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
   const [passwordlessResetBusy, setPasswordlessResetBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [formError, setFormError] = useState("");
   const [temporaryPassword, setTemporaryPassword] = useState(null);
 
@@ -2979,6 +2995,37 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
       );
     } finally {
       setPasswordlessResetBusy(false);
+    }
+  };
+
+  const deleteSelectedUser = async () => {
+    if (!viewModel.selectedUser) {
+      return;
+    }
+
+    const expected = viewModel.selectedUser.username;
+    const confirmed = window.prompt(
+      `Delete ${viewModel.selectedUser.name} permanently from Authentik?\n\nType ${expected} to confirm.`
+    );
+    if (confirmed !== expected) {
+      return;
+    }
+
+    setDeleteBusy(true);
+    setFormError("");
+    try {
+      await requestJson(`/api/admin/users/${encodeURIComponent(viewModel.selectedUser.id)}`, {
+        method: "DELETE",
+      });
+      setTemporaryPassword(null);
+      startTransition(() => {
+        setSelectedUserId("");
+      });
+      await directoryState.reload();
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Failed to delete user.");
+    } finally {
+      setDeleteBusy(false);
     }
   };
 
@@ -3293,6 +3340,20 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
                   Disabling keeps the account history intact and blocks new sign-ins.
                 </span>
               </div>
+
+              <div className="hero-actions user-admin-status-actions">
+                <button
+                  type="button"
+                  className="secondary-button is-destructive"
+                  onClick={deleteSelectedUser}
+                  disabled={deleteBusy}
+                >
+                  {deleteBusy ? "Deleting…" : "Delete user"}
+                </button>
+                <span className="muted-copy">
+                  Permanently removes this Authentik user after username confirmation.
+                </span>
+              </div>
             </>
           ) : (
             <div className="empty-card">
@@ -3353,9 +3414,10 @@ export default function App() {
   const [route, navigate] = useRoute();
   const { sessionState, configState, preferences, setPreferences, statusState, refreshStatus } =
     usePortalData();
-  const userAdminEnabled = Boolean(sessionState.session?.isAdmin) && route === "/admin/users";
+  const userAdminEnabled =
+    Boolean(sessionState.session?.canManageUsers) && route === "/admin/users";
   const adminAppsEnabled =
-    Boolean(sessionState.session?.isAdmin) && route.startsWith("/admin/apps");
+    Boolean(sessionState.session?.canManageApps) && route.startsWith("/admin/apps");
   const observabilityAdminEnabled =
     Boolean(sessionState.session?.isAdmin) && route === "/admin/observability";
   const clusterUpdatesAdminEnabled =
@@ -3390,6 +3452,8 @@ export default function App() {
   const session = sessionState.session;
   const config = configState.config;
   const isAdmin = Boolean(session?.isAdmin);
+  const canManageApps = Boolean(session?.canManageApps);
+  const canManageUsers = Boolean(session?.canManageUsers);
   const adminRedirectUrl = config?.settings?.authentikAdminUrl || "";
 
   const currentApp = useMemo(() => {
@@ -3480,6 +3544,8 @@ export default function App() {
         onMenuToggle={() => setMenuOpen((current) => !current)}
         menuOpen={menuOpen}
         isAdmin={isAdmin}
+        canManageApps={canManageApps}
+        canManageUsers={canManageUsers}
       />
 
       <section className="portal-content">
@@ -3502,7 +3568,7 @@ export default function App() {
         {route === "/status" ? (
           <StatusPage statusState={statusState} onRefresh={refreshStatus} onNavigate={navigate} />
         ) : null}
-        {route.startsWith("/admin/apps") && isAdmin ? (
+        {route.startsWith("/admin/apps") && canManageApps ? (
           <AdminAppsPage
             onNavigate={navigate}
             adminAppsState={adminAppsState}
@@ -3519,27 +3585,27 @@ export default function App() {
         {route === "/admin/updates" && isAdmin ? (
           <ClusterUpdatesAdminPage updatesState={clusterUpdatesAdminState} onNavigate={navigate} />
         ) : null}
-        {route === "/admin/users" && isAdmin ? (
+        {route === "/admin/users" && canManageUsers ? (
           <UserAdminPage config={config} directoryState={userAdminState} onNavigate={navigate} />
         ) : null}
-        {route === "/admin/users" && !isAdmin ? (
+        {route === "/admin/users" && !canManageUsers ? (
           <Panel>
             <SectionTitle
               eyebrow="Access denied"
-              title="Admins only"
-              description="User administration is only available to the admins group."
+              title="User managers only"
+              description="User administration is available to admins and the Twinbox user management group."
             />
             <button type="button" className="secondary-button" onClick={() => navigate("/")}>
               Back home
             </button>
           </Panel>
         ) : null}
-        {route.startsWith("/admin/apps") && !isAdmin ? (
+        {route.startsWith("/admin/apps") && !canManageApps ? (
           <Panel>
             <SectionTitle
               eyebrow="Access denied"
-              title="Admins only"
-              description="App installs are only available to the admins group."
+              title="App managers only"
+              description="App installs are available to admins and the Twinbox app installations group."
             />
             <button type="button" className="secondary-button" onClick={() => navigate("/")}>
               Back home
