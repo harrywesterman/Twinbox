@@ -114,6 +114,7 @@ services:
     environment:
       - APP_URL=${BESZEL_APP_URL:-}
       - DISABLE_PASSWORD_AUTH=true
+      - SHARE_ALL_SYSTEMS=true
       - USER_CREATION=true
       - USER_EMAIL=${BESZEL_USER_EMAIL:-}
       - USER_PASSWORD=${BESZEL_USER_PASSWORD:-}
@@ -122,6 +123,12 @@ services:
     volumes:
       - /opt/twinbox/beszel/data:/beszel_data
       - /opt/twinbox/beszel/socket:/beszel_socket
+    healthcheck:
+      test: ["/beszel", "health", "--url", "http://127.0.0.1:8090"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   beszel-agent:
     image: henrygd/beszel-agent:${BESZEL_VERSION:-0.18.7}
@@ -137,5 +144,7 @@ services:
       - HUB_URL=http://localhost:8090
       - KEY=${BESZEL_AGENT_KEY:-}
       - TOKEN=${BESZEL_AGENT_TOKEN:-}
+      - SYSTEM_NAME=twinbox-management-vm
     depends_on:
-      - beszel
+      beszel:
+        condition: service_healthy

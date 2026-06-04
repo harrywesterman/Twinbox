@@ -128,6 +128,12 @@ export const STEP_ICON_MANIFEST = [
     officialSourceUrl: "https://github.com/harrywesterman/Twinbox/tree/main/portal",
   }),
   iconEntry({
+    stepId: "install-beszel",
+    isAppOrPlatform: true,
+    officialSourceType: "project-repository",
+    officialSourceUrl: "https://github.com/henrygd/beszel",
+  }),
+  iconEntry({
     stepId: "install-ntfy",
     isAppOrPlatform: true,
     officialSourceType: "project-repository",

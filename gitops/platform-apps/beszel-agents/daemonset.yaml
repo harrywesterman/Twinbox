@@ -17,12 +17,18 @@ spec:
       hostNetwork: true
       hostPID: true
       dnsPolicy: ClusterFirstWithHostNet
+      tolerations:
+        - operator: Exists
+      terminationGracePeriodSeconds: 30
       containers:
         - name: agent
           image: henrygd/beszel-agent:0.18.7
           env:
             - name: HUB_URL
-              value: "https://beszel.__ZONE_NAME__"
+              valueFrom:
+                secretKeyRef:
+                  name: beszel-agent-credentials
+                  key: hub_url
             - name: KEY
               valueFrom:
                 secretKeyRef:
@@ -35,6 +41,13 @@ spec:
                   key: token
             - name: CONTAINER_RUNTIME
               value: "containerd"
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
           volumeMounts:
             - name: containerd-sock
               mountPath: /run/containerd/containerd.sock
@@ -51,6 +64,7 @@ spec:
         - name: containerd-sock
           hostPath:
             path: /run/containerd/containerd.sock
+            type: Socket
         - name: agent-data
           hostPath:
             path: /var/lib/beszel-agent
