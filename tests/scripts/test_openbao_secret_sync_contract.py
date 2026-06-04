@@ -28,9 +28,7 @@ BESZEL_STEP = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-be
 BESZEL_AGENT_SECRET = (
     REPO_ROOT / "gitops" / "platform-apps" / "beszel-agents" / "externalsecret.yaml"
 )
-BESZEL_AGENT_DAEMONSET = (
-    REPO_ROOT / "gitops" / "platform-apps" / "beszel-agents" / "daemonset.yaml"
-)
+BESZEL_AGENT_DAEMONSET = REPO_ROOT / "gitops" / "platform-apps" / "beszel-agents" / "daemonset.yaml"
 TALOS_CATEGORY = REPO_ROOT / "categories" / "talos-cluster" / "category.yaml"
 PIXELFED_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-pixelfed" / "run.sh"
 ZULIP_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-zulip" / "step.yaml"
@@ -191,8 +189,8 @@ def test_beszel_step_uses_hub_public_key_and_universal_token_secret():
     assert '"hub_url": "$beszel_app_url"' in text
     assert '--secret-name "beszel-agent"' in text
     assert '--required-keys "key,token,hub_url"' in text
-    assert 'kubectl delete application beszel-agents' not in text
-    assert 'kubectl apply -f -' not in text
+    assert "kubectl delete application beszel-agents" not in text
+    assert "kubectl apply -f -" not in text
 
     assert "secretKey: hub_url" in secret_text
     assert "property: hub_url" in secret_text

@@ -210,7 +210,12 @@ test("buildDashyConfig uses local icon filenames from manager-web assets in work
   const iconRoot = path.join(tempRoot, "manager-web", "src", "assets", "step-icons");
   fs.mkdirSync(iconRoot, { recursive: true });
 
-  for (const fileName of ["install-argocd.svg", "configure-cloudflare-dns.svg", "github.svg", "hetzner.svg"]) {
+  for (const fileName of [
+    "install-argocd.svg",
+    "configure-cloudflare-dns.svg",
+    "github.svg",
+    "hetzner.svg",
+  ]) {
     fs.copyFileSync(
       path.join(repoRoot, "manager-web", "src", "assets", "step-icons", fileName),
       path.join(iconRoot, fileName)
