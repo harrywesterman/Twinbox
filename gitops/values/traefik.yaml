@@ -84,20 +84,6 @@ ports:
     exposedPort: 8082
     protocol: TCP
 
-  webwiredoor:
-    port: 8081
-    expose:
-      default: true
-    exposedPort: 8081
-    protocol: TCP
-
-  webtailscale:
-    port: 8090
-    expose:
-      default: true
-    exposedPort: 8090
-    protocol: TCP
-
 api:
   dashboard: true
   insecure: true

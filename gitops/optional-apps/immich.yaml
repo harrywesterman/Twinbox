@@ -42,20 +42,6 @@ spec:
                   - op: replace
                     path: /spec/routes/0/match
                     value: Host(`immich.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
-                  name: immich-wiredoor
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`immich.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
-                  name: immich-tailscale
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`immich.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
         - repoURL: https://github.com/harrywesterman/Twinbox.git
           targetRevision: main
           path: gitops/databases/immich

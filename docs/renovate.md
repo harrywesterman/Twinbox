@@ -45,17 +45,14 @@ Renovate monitors the following Argo CD applications in `gitops/apps/`:
 - `karakeep`
 - `loki`
 - `longhorn`
-- `metallb`
 - `metrics-server`
 - `nextcloud`
 - `ntfy`
 - `openbao`
 - `prometheus` & `prometheus-minimal`
-- `tailscale`
 - `tempo`
 - `traefik`
 - `velero` & `velero-ui`
-- `wiredoor-gateway`
 - `zulip`
 
 ## Pull request workflow

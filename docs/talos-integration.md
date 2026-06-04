@@ -42,7 +42,7 @@ Talos lifecycle operations are triggered through the manager stack.
 36. `install-management-consoles` publishes Proxmox, Longhorn, and SeaweedFS web UIs behind Traefik with Authentik protection.
 37. `install-pgadmin4` deploys pgAdmin 4 with Longhorn-backed persistence and Authentik OIDC.
 38. `configure-argocd-oidc` configures Argo CD to use Authentik for SSO.
-39. Later wizard steps apply one Argo CD `Application` at a time for ingress configuration, NetBird, Wiredoor, Cloudflare, MetalLB, Tailscale, and user applications.
+39. Later wizard steps apply one Argo CD `Application` at a time for ingress configuration, NetBird, Cloudflare, and user applications.
 
 ## Ingress Configuration Steps
 
@@ -50,10 +50,7 @@ After the core platform, ingress routes are configured based on user choice:
 
 | Ingress | Steps | Description |
 |---------|-------|-------------|
-| **Wiredoor** | `provision-wiredoor-bastion` → `install-wiredoor-gateway` | Hetzner VM + WireGuard tunnel |
 | **Cloudflare Tunnel** | `configure-cloudflare-tunnel` | Outbound tunnel (prd-only on Free) |
-| **MetalLB** | `configure-metallb-ingress` | Bare-metal LB + port forwarding |
-| **Tailscale** | `configure-tailscale-ingress` | Mesh VPN |
 | **NetBird** | `provision-netbird-bastion` → `configure-netbird-ingress` → `install-netbird-routing-peers` → `configure-netbird-admin-access` | Self-hosted WireGuard VPN |
 
 ## Runtime Dependencies

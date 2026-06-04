@@ -390,12 +390,6 @@ function resolveFieldValue(record, ref) {
       password: ["password"],
       endpoint: ["endpoint"],
     },
-    "wiredoor-gateway": {
-      WIREDOOR_URL: ["WIREDOOR_URL", "username", "url"],
-      TOKEN: ["TOKEN", "password", "token"],
-      username: ["WIREDOOR_URL", "username", "url"],
-      password: ["TOKEN", "password", "token"],
-    },
     "traefik-dashboard": {
       username: ["username"],
       password: ["password"],

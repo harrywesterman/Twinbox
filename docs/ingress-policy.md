@@ -5,15 +5,11 @@ This policy is designed to work with the Cloudflare Free plan.
 
 ## Cluster Rules
 
-- `prd` may choose all four ingress routes:
-  - Wiredoor
+- `prd` may choose:
   - Cloudflare Tunnel
-  - MetalLB
-  - Tailscale
+  - NetBird
 - non-`prd` clusters may choose only:
-  - Wiredoor
-  - MetalLB
-  - Tailscale
+  - NetBird
 - Cloudflare Tunnel is **prd-only** on Cloudflare Free because delegated subdomain setup is Enterprise-only.
 
 ## Hostname Rules

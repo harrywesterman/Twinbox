@@ -356,15 +356,11 @@ function InputField({ stepId, input, value, onChange }) {
                   <span className="wizard-choice-card-index">{index + 1}</span>
                   <strong>{option.label}</strong>
                   <small>
-                    {option.value === "wiredoor"
-                      ? "Use your own Wiredoor bastion host."
-                      : option.value === "netbird"
-                        ? "Use your own NetBird bastion host."
-                        : option.value === "cloudflare-tunnel"
-                          ? "No public IP or router forwarding."
-                          : option.value === "metallb"
-                            ? "Use your LAN and router port forwarding."
-                            : "Use Tailscale or Headscale to reach the cluster."}
+                    {option.value === "netbird"
+                      ? "Use your own NetBird bastion host."
+                      : option.value === "cloudflare-tunnel"
+                        ? "No public IP or router forwarding."
+                        : "Use the selected ingress route."}
                   </small>
                 </button>
               );
@@ -698,66 +694,14 @@ const WIZARD_GUIDES = {
       "Pick the ingress route that matches your network. The wizard will only show the follow-up questions for the path you choose.",
     checklist: [
       "Read the short explanation for each route.",
-      "Pick option 1, 2, 3, 4, or 5.",
+      "Pick NetBird or Cloudflare Tunnel.",
       "Continue only with the follow-up questions for that route.",
     ],
     screenshotTitle: "Route choice",
-    screenshotLines: [
-      "1. Wiredoor",
-      "2. NetBird",
-      "3. Cloudflare Tunnel",
-      "4. MetalLB",
-      "5. Tailscale",
-    ],
+    screenshotLines: ["1. NetBird", "2. Cloudflare Tunnel"],
     helpLink: {
       label: "Wizard guide",
       href: "https://github.com/harrywesterman/twinbox/blob/main/docs/wizard-guide.md",
-    },
-  },
-  "provision-wiredoor-bastion": {
-    eyebrow: "Wiredoor setup",
-    title: "Create the Wiredoor bastion host",
-    intro:
-      "Twinbox needs a Hetzner Cloud VM that will run Wiredoor. This step asks for the Hetzner token and a few placement values, then it provisions the bastion automatically.",
-    checklist: [
-      "Create a Hetzner Cloud project.",
-      "Generate a Read & Write API token.",
-      "Choose the location and server type.",
-      "Paste your domain name and optional SSH key.",
-    ],
-    screenshotTitle: "How to get the token",
-    screenshotLines: [
-      "Open Hetzner Cloud",
-      "Go to Security → API Tokens",
-      "Create a Read & Write token",
-      "Copy the token once and save it safely",
-    ],
-    helpLink: {
-      label: "Hetzner Cloud",
-      href: "https://console.hetzner.cloud/",
-    },
-  },
-  "configure-wiredoor-ingress": {
-    eyebrow: "Wiredoor setup",
-    title: "Connect Twinbox to Wiredoor",
-    intro:
-      "This step connects your cluster to the bastion host you just created. You need the Wiredoor server URL, the API token, and an optional node name.",
-    checklist: [
-      "Open the Wiredoor admin screen.",
-      "Copy the server URL exactly as shown.",
-      "Create or reuse an API token.",
-      "Leave the node name blank if you want the default.",
-    ],
-    screenshotTitle: "Where to find it",
-    screenshotLines: [
-      "Wiredoor server URL",
-      "API token field",
-      "Optional node name",
-      "All values are pasted into Twinbox once",
-    ],
-    helpLink: {
-      label: "Wiredoor",
-      href: "https://wiredoor.net/",
     },
   },
   "configure-cloudflare-tunnel": {
@@ -783,27 +727,6 @@ const WIZARD_GUIDES = {
       href: "https://dash.cloudflare.com/profile/api-tokens",
     },
   },
-  "configure-cloudflare-dns": {
-    eyebrow: "Wiredoor DNS",
-    title: "Create the Wiredoor DNS A records",
-    intro:
-      "This step creates DNSEndpoint resources for the Wiredoor bastion hostnames. External DNS picks them up and creates the A records automatically. No token needed here; the provider was already configured in the Configure DNS step.",
-    checklist: [
-      "DNS provider is already configured.",
-      "Twinbox reads the Wiredoor IP from the bastion secrets.",
-      "A and wildcard records are created via external-dns.",
-    ],
-    screenshotTitle: "Wiredoor DNS records",
-    screenshotLines: [
-      "DNS provider already configured",
-      "Wiredoor IP from bastion secrets",
-      "Records created automatically via external-dns",
-    ],
-    helpLink: {
-      label: "External DNS documentation",
-      href: "https://github.com/kubernetes-sigs/external-dns",
-    },
-  },
   "configure-dns": {
     eyebrow: "DNS",
     title: "Configure automatic DNS management",
@@ -825,52 +748,6 @@ const WIZARD_GUIDES = {
     helpLink: {
       label: "External DNS documentation",
       href: "https://github.com/kubernetes-sigs/external-dns",
-    },
-  },
-  "configure-metallb-ingress": {
-    eyebrow: "MetalLB setup",
-    title: "Prepare the local network exposure",
-    intro:
-      "MetalLB needs an IP range, a public host name, and optional DynDNS details if your home IP changes. Twinbox uses those values to make the cluster reachable.",
-    checklist: [
-      "Reserve a free IP range on your local network.",
-      "Decide which public host name should point to the router.",
-      "Add DynDNS details only if your IP address changes over time.",
-      "Forward ports 80 and 443 on your router.",
-    ],
-    screenshotTitle: "What to prepare",
-    screenshotLines: [
-      "IP range for load balancers",
-      "Router public hostname",
-      "Optional DynDNS token",
-      "Port forwarding on the router",
-    ],
-    helpLink: {
-      label: "MetalLB",
-      href: "https://metallb.universe.tf/",
-    },
-  },
-  "configure-tailscale-ingress": {
-    eyebrow: "Tailscale setup",
-    title: "Connect the cluster to your tailnet",
-    intro:
-      "This step joins the cluster to Tailscale or Headscale. You need an auth key, and optionally a tag plus Headscale details.",
-    checklist: [
-      "Create a Tailscale auth key.",
-      "Add an ACL tag if you use one.",
-      "Only fill in Headscale if you self-host it.",
-      "Copy the values into Twinbox once.",
-    ],
-    screenshotTitle: "Tailscale admin screen",
-    screenshotLines: [
-      "Auth keys page",
-      "Optional tag field",
-      "Headscale URL and API key only when self-hosted",
-      "No public port forwarding required",
-    ],
-    helpLink: {
-      label: "Tailscale auth keys",
-      href: "https://login.tailscale.com/admin/settings/keys",
     },
   },
   "create-users-and-groups": {

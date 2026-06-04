@@ -83,7 +83,8 @@ export const STEP_ICON_MANIFEST = [
     stepId: "create-users-and-groups",
   }),
   iconEntry({
-    stepId: "configure-cloudflare-dns",
+    stepId: "configure-dns",
+    fileBase: "cloudflare",
   }),
   iconEntry({
     stepId: "install-whoami",
@@ -108,12 +109,6 @@ export const STEP_ICON_MANIFEST = [
     isAppOrPlatform: true,
     officialSourceType: "project-repository",
     officialSourceUrl: "https://github.com/pgadmin-org/pgadmin4",
-  }),
-  iconEntry({
-    stepId: "install-wiredoor-gateway",
-    isAppOrPlatform: true,
-    officialSourceType: "project-repository",
-    officialSourceUrl: "https://github.com/wiredoor/wiredoor",
   }),
   iconEntry({
     stepId: "install-dashy-dashboard",

@@ -111,11 +111,9 @@ App-specific Kubernetes manifests. Some are still rendered or applied directly b
 - `prometheus/` - Prometheus ingress and alert rules.
 - `searxng/` - SearXNG deployment, service, and ingress.
 - `stirling-pdf/` - Stirling PDF deployment, service, and ingress.
-- `tailscale/` - Tailscale secret wiring.
 - `twinbox-portal/` - Twinbox Portal deployment, service, ingress, config, and per-user preference storage.
 - `vaultwarden/` - Vaultwarden deployment, service, ingress, and database wiring.
 - `velero-ui/` - Velero UI namespace, ingress, and secret wiring.
-- `wiredoor-gateway/` - Wiredoor gateway secret wiring.
 - `zulip/` - Zulip deployment, service, ingress, and database wiring.
 
 ## `install.sh`

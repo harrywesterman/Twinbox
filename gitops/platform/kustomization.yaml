@@ -4,7 +4,6 @@ kind: Kustomization
 resources:
   - argocd/argocd-cm.yaml
   - argocd/argocd-rbac-cm.yaml
-  - argocd/argocd-wiredoor.yaml
   - argocd/externalsecret.yaml
   - authentik/namespace.yaml
   - authentik/ingressroute.yaml

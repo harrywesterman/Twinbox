@@ -32,20 +32,6 @@ spec:
                     path: /spec/routes/0/match
                     value: Host(`pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
               - target:
-                  kind: IngressRoute
-                  name: pixelfed-wiredoor
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
-                  name: pixelfed-tailscale
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
                   kind: Deployment
                   name: pixelfed
                 patch: |-

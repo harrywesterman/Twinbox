@@ -34,7 +34,6 @@
 
 - [Cloudflare](docs/cloudflare.md)
 - [NetBird VPN](docs/netbird.md)
-- [Wiredoor Bastion](docs/wiredoor-bastion.md)
 
 # Security
 

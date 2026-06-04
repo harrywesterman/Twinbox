@@ -14,36 +14,3 @@ spec:
           name: audiobookshelf
           port: 80
   tls: {}
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: audiobookshelf-wiredoor
-  namespace: audiobookshelf
-spec:
-  entryPoints:
-    - webwiredoor
-  routes:
-    - kind: Rule
-      match: Host(`audiobookshelf.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: audiobookshelf
-          port: 80
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: audiobookshelf-tailscale
-  namespace: audiobookshelf
-spec:
-  entryPoints:
-    - webtailscale
-  routes:
-    - kind: Rule
-      match: Host(`audiobookshelf.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: audiobookshelf
-          port: 80
-  tls: {}

@@ -14,38 +14,3 @@ spec:
           name: velero-ui
           port: 3000
   tls: {}
-
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: velero-ui-wiredoor
-  namespace: velero-ui
-spec:
-  entryPoints:
-    - webwiredoor
-  routes:
-    - kind: Rule
-      match: Host(`velero-ui.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: velero-ui
-          port: 3000
-
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: velero-ui-tailscale
-  namespace: velero-ui
-spec:
-  entryPoints:
-    - webtailscale
-  routes:
-    - kind: Rule
-      match: Host(`velero-ui.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: velero-ui
-          port: 3000
-  tls: {}

@@ -65,14 +65,9 @@ Use the UI to work through the setup steps. The exact order depends on your chos
 ### Ingress & Networking
 
 14. **Choose Ingress Route** (`choose-ingress-route`) — Select and configure your ingress strategy
-15. **Configure Wiredoor Bastion** (`provision-wiredoor-bastion`) — Hetzner WireGuard VPS *(if Wiredoor selected)*
-16. **Install Wiredoor Gateway** (`install-wiredoor-gateway`) — Cluster-side WireGuard *(if Wiredoor selected)*
-17. **Configure Cloudflare DNS** (`configure-cloudflare-dns`) — DNS records for Wiredoor *(if Cloudflare used)*
-18. **Configure Cloudflare Tunnel** (`configure-cloudflare-tunnel`) — Outbound tunnel *(if Cloudflare Tunnel selected, prd-only)*
-19. **Configure MetalLB Ingress** (`configure-metallb-ingress`) — Bare-metal LB *(if MetalLB selected)*
-20. **Configure Tailscale Ingress** (`configure-tailscale-ingress`) — Mesh VPN *(if Tailscale selected)*
-21. **Deploy NetBird Bastion** (`provision-netbird-bastion`) — Hetzner NetBird VPS *(if NetBird selected)*
-22. **Configure NetBird Ingress** (`configure-netbird-ingress`) — SSO, groups, setup keys *(if NetBird selected)*
+15. **Configure Cloudflare Tunnel** (`configure-cloudflare-tunnel`) — Outbound tunnel *(if Cloudflare Tunnel selected, prd-only)*
+16. **Deploy NetBird Bastion** (`provision-netbird-bastion`) — Hetzner NetBird VPS *(if NetBird selected)*
+17. **Configure NetBird Ingress** (`configure-netbird-ingress`) — SSO, groups, setup keys *(if NetBird selected)*
 23. **Install NetBird Routing Peers** (`install-netbird-routing-peers`) — K8s DaemonSet *(if NetBird selected)*
 24. **Configure NetBird Admin Access** (`configure-netbird-admin-access`) — Management VM enrollment *(if NetBird selected)*
 

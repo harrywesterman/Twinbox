@@ -40,7 +40,7 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
     loadStep("install-pgadmin4"),
     loadStep("install-twinbox-portal"),
     loadStep("install-velero-ui"),
-    loadStep("install-wiredoor-gateway"),
+    loadStep("provision-netbird-bastion"),
     loadStep("install-adguard"),
   ];
 
@@ -55,10 +55,7 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
     ["install-pgadmin4", { status: "succeeded", outputs: {} }],
     ["install-twinbox-portal", { status: "succeeded", outputs: {} }],
     ["install-velero-ui", { status: "succeeded", outputs: {} }],
-    [
-      "install-wiredoor-gateway",
-      { status: "succeeded", outputs: { wiredoor_url: "https://wiredoor.example.net" } },
-    ],
+    ["provision-netbird-bastion", { status: "succeeded", outputs: {} }],
     ["install-adguard", { status: "succeeded", outputs: {} }],
   ]);
 
@@ -126,11 +123,6 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   );
   assert(
     platformSection.items.some(
-      (item) => item.title === "Wiredoor" && item.url === "https://wiredoor.example.net"
-    )
-  );
-  assert(
-    platformSection.items.some(
       (item) => item.title === "AdGuard" && item.url === "https://adguard.tst.example.com"
     )
   );
@@ -162,7 +154,6 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
     "Twinbox Portal",
     "Velero UI",
     "pgAdmin 4",
-    "Wiredoor",
     "AdGuard",
     "Cloudflare",
     "GitHub",
@@ -210,12 +201,7 @@ test("buildDashyConfig uses local icon filenames from manager-web assets in work
   const iconRoot = path.join(tempRoot, "manager-web", "src", "assets", "step-icons");
   fs.mkdirSync(iconRoot, { recursive: true });
 
-  for (const fileName of [
-    "install-argocd.svg",
-    "configure-cloudflare-dns.svg",
-    "github.svg",
-    "hetzner.svg",
-  ]) {
+  for (const fileName of ["install-argocd.svg", "cloudflare.svg", "github.svg", "hetzner.svg"]) {
     fs.copyFileSync(
       path.join(repoRoot, "manager-web", "src", "assets", "step-icons", fileName),
       path.join(iconRoot, fileName)
@@ -239,7 +225,7 @@ test("buildDashyConfig uses local icon filenames from manager-web assets in work
       config.sections.flatMap((section) => section.items.map((item) => [item.title, item.icon]))
     );
     assert.equal(iconByTitle.get("Argo CD"), "install-argocd.svg");
-    assert.equal(iconByTitle.get("Cloudflare"), "configure-cloudflare-dns.svg");
+    assert.equal(iconByTitle.get("Cloudflare"), "cloudflare.svg");
     assert.equal(iconByTitle.get("GitHub"), "github.svg");
     assert(![...iconByTitle.values()].some((icon) => icon.includes("webwizard.")));
   } finally {

@@ -290,8 +290,6 @@ graph LR
 | `authentik.json` | Wizard | Seed-only; deleted after OpenBao sync |
 | `grafana-oidc.json` | Step script | Grafana OIDC config |
 | `pgadmin4-oidc.json` | Step script | pgAdmin OIDC config |
-| `wiredoor-gateway.json` | Step script | Wiredoor gateway token |
-| `wiredoor-bastion-<id>.json` | Step script | Wiredoor bastion credentials |
 | `cloudflare-<id>.json` | Step script | Cloudflare DNS/tunnel credentials |
 | `crowdsec.json` | Step script | CrowdSec bouncer key |
 | `ntfy.json` | Step script | Ntfy configuration |
@@ -358,10 +356,7 @@ After the core platform, ingress routes are configured based on user choice:
 
 | Route | Step | Description |
 |-------|------|-------------|
-| Wiredoor | `provision-wiredoor-bastion` + `install-wiredoor-gateway` | Hetzner VM + WireGuard tunnel |
 | Cloudflare Tunnel | `configure-cloudflare-tunnel` | Outbound tunnel to Cloudflare edge |
-| MetalLB | `configure-metallb-ingress` | Bare-metal LB + port forwarding |
-| Tailscale | `configure-tailscale-ingress` | Mesh VPN |
 | NetBird | `provision-netbird-bastion` + `configure-netbird-ingress` + `install-netbird-routing-peers` | Self-hosted WireGuard VPN + routing |
 
 ## Domain Flow
@@ -410,14 +405,11 @@ The local Argo cluster secret must exist before the domain-aware ApplicationSets
 graph TB
     subgraph Ingress["Ingress Layer"]
         CF["Cloudflare Tunnel<br/>(prd-only, Free plan)"]
-        WD["Wiredoor Bastion<br/>(Hetzner + WireGuard)"]
-        TS["Tailscale<br/>(Mesh VPN)"]
         NB["NetBird<br/>(Self-hosted VPN)"]
-        ML["MetalLB + Port Forward<br/>(Local network)"]
     end
 
     subgraph Routing["Cluster Routing"]
-        Traefik["Traefik<br/>websecure / webwiredoor"]
+        Traefik["Traefik<br/>websecure / webnetbird"]
         Auth["Authentik forwardAuth<br/>middleware"]
         OIDC["Native OIDC<br/>(Headlamp, Grafana, etc.)"]
     end
@@ -429,10 +421,7 @@ graph TB
     end
 
     CF -->|"HTTPS"| Traefik
-    WD -->|"HTTP (8081)"| Traefik
-    TS -->|"Tailscale IP"| Traefik
     NB -->|"NetBird route"| Traefik
-    ML -->|"80/443"| Traefik
 
     Traefik -->|"forwardAuth"| Auth
     Auth -->|"403 / Headers"| Traefik
@@ -444,12 +433,9 @@ graph TB
     OIDC -->|"Direct Auth"| Apps
 ```
 
-Traffic enters the cluster through one of four ingress strategies:
+Traffic enters the cluster through one of two supported ingress strategies:
 
-- **Wiredoor** — WireGuard tunnel to a Hetzner VPS. Traffic arrives on `webwiredoor` (port 8081). No third party sees traffic, no upload limits.
 - **Cloudflare Tunnel** — Outbound tunnel to Cloudflare edge. TLS terminated at Cloudflare. Free plan has 100MB upload limit. `prd`-only on Cloudflare Free.
-- **MetalLB + Port Forwarding** — Real IP on local network via MetalLB. Router forwards 80/443. Traefik handles Let's Encrypt directly.
-- **Tailscale** — Mesh VPN. Users connect via Tailscale client. No port forwarding, no public DNS needed.
 - **NetBird** — Self-hosted WireGuard VPN with SSO. Bastion VPS runs NetBird server + dashboard. Routing peers in Kubernetes forward traffic to Traefik.
 
 All strategies use the same `IngressRoute` structure; only `entryPoints` and `tls` differ. Domain names are projected at Argo CD render time from the cluster secret annotation.
@@ -492,7 +478,7 @@ graph TB
     NBAgent -->|"SSH / HTTP"| Manager
 ```
 
-NetBird provides a self-hosted VPN alternative to Wiredoor and Tailscale, with SSO integration via Authentik. The solution consists of four components:
+NetBird provides self-hosted VPN ingress with SSO integration via Authentik. The solution consists of four components:
 
 | Component | Role | Details |
 |-----------|------|---------|

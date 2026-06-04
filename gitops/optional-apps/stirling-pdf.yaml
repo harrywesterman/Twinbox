@@ -38,20 +38,6 @@ spec:
                 - op: replace
                   path: /spec/routes/0/match
                   value: Host(`stirling-pdf.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-            - target:
-                kind: IngressRoute
-                name: stirling-pdf-wiredoor
-              patch: |-
-                - op: replace
-                  path: /spec/routes/0/match
-                  value: Host(`stirling-pdf.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-            - target:
-                kind: IngressRoute
-                name: stirling-pdf-tailscale
-              patch: |-
-                - op: replace
-                  path: /spec/routes/0/match
-                  value: Host(`stirling-pdf.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
       destination:
         server: https://kubernetes.default.svc
         namespace: stirling-pdf

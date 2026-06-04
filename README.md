@@ -76,7 +76,7 @@ Twinbox installs a complete Kubernetes operations stack:
 | Kubernetes foundation  | Talos Linux, Cilium, Hubble                                   |
 | GitOps                 | Argo CD                                                       |
 | Storage and backups    | Longhorn, SeaweedFS, Velero                                   |
-| Ingress and access     | Traefik, MetalLB, Cloudflare Tunnel, NetBird, Wiredoor        |
+| Ingress and access     | Traefik, Cloudflare Tunnel, NetBird                           |
 | Identity and secrets   | Authentik, OpenBao, External Secrets Operator                 |
 | Databases              | CloudNativePG                                                 |
 | Observability          | Prometheus, Alertmanager, Grafana, Loki, Tempo, Grafana Alloy |

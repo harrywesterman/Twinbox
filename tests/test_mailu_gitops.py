@@ -112,7 +112,7 @@ def test_mailu_ingressroutes_target_mailu_front_only():
         yaml.safe_load_all((MAILU_PLATFORM_DIR / "ingressroute.yaml").read_text(encoding="utf-8"))
     )
     names = {doc["metadata"]["name"] for doc in docs}
-    assert names == {"mailu", "mailu-netbird", "mailu-wiredoor", "mailu-tailscale"}
+    assert names == {"mailu", "mailu-netbird"}
 
     for doc in docs:
         routes = doc["spec"]["routes"]

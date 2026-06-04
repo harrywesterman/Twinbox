@@ -14,36 +14,3 @@ spec:
           name: vaultwarden
           port: 80
   tls: {}
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: vaultwarden-wiredoor
-  namespace: vaultwarden
-spec:
-  entryPoints:
-    - webwiredoor
-  routes:
-    - kind: Rule
-      match: Host(`vaultwarden.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: vaultwarden
-          port: 80
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: vaultwarden-tailscale
-  namespace: vaultwarden
-spec:
-  entryPoints:
-    - webtailscale
-  routes:
-    - kind: Rule
-      match: Host(`vaultwarden.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: vaultwarden
-          port: 80
-  tls: {}

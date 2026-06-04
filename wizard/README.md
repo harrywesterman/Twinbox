@@ -41,7 +41,7 @@ make wizard-dev-run
 - **Cluster login password**: min 8 chars, upper + lower + special
 - **VM settings**: name, IP, netmask, DNS, disk size, memory (editable form)
 - **VMID/IP allocation**: auto-suggested, editable before proceeding
-- **Ingress choice**: select ingress method (MetalLB, Cloudflare Tunnel, Tailscale, etc.)
+- **Ingress choice**: select NetBird or Cloudflare Tunnel
 
 ## After Completion
 

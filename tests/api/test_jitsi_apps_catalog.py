@@ -136,7 +136,7 @@ def test_apps_catalog_exposes_jitsi_as_installable():
             "cluster-demo",
             slug="cluster-demo",
             dns_domain="example.com",
-            selected_ingress_route="wiredoor",
+            selected_ingress_route="netbird",
             updated_at="2026-04-19T00:00:00Z",
         )
         for step_id in (

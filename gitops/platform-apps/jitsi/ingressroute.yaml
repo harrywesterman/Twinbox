@@ -18,77 +18,11 @@ spec:
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: jitsi-wiredoor
-  namespace: jitsi
-spec:
-  entryPoints:
-    - webwiredoor
-  routes:
-    - kind: Rule
-      match: Host(`jitsi.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: jitsi-web
-          port: 80
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: jitsi-tailscale
-  namespace: jitsi
-spec:
-  entryPoints:
-    - webtailscale
-  routes:
-    - kind: Rule
-      match: Host(`jitsi.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: jitsi-web
-          port: 80
-  tls: {}
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
   name: auth-jitsi
   namespace: jitsi
 spec:
   entryPoints:
     - websecure
-  routes:
-    - kind: Rule
-      match: Host(`auth-jitsi.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: auth-jitsi
-          port: 3000
-  tls: {}
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: auth-jitsi-wiredoor
-  namespace: jitsi
-spec:
-  entryPoints:
-    - webwiredoor
-  routes:
-    - kind: Rule
-      match: Host(`auth-jitsi.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: auth-jitsi
-          port: 3000
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: auth-jitsi-tailscale
-  namespace: jitsi
-spec:
-  entryPoints:
-    - webtailscale
   routes:
     - kind: Rule
       match: Host(`auth-jitsi.__ZONE_NAME__`)

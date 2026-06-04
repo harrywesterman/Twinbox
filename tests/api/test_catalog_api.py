@@ -270,7 +270,7 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
             "cluster-demo",
             slug="cluster-demo",
             dns_domain="example.com",
-            selected_ingress_route="wiredoor",
+            selected_ingress_route="netbird",
             updated_at="2026-04-19T00:00:00Z",
         )
         for dependency in [
@@ -379,8 +379,8 @@ def test_catalog_endpoint_filters_ingress_routes_after_choice():
             json.dumps(
                 {
                     "status": "configured",
-                    "inputs": {"ingress_route": "wiredoor"},
-                    "outputs": {"selected_ingress_route": "wiredoor"},
+                    "inputs": {"ingress_route": "netbird"},
+                    "outputs": {"selected_ingress_route": "netbird"},
                 }
             ),
             encoding="utf-8",
@@ -396,14 +396,16 @@ def test_catalog_endpoint_filters_ingress_routes_after_choice():
             assert status == 200
             talos_step_ids = [step["id"] for step in body["categories"][0]["steps"]]
             assert "choose-ingress-route" in talos_step_ids
-            assert "configure-wiredoor-ingress" in talos_step_ids
-            assert "provision-wiredoor-bastion" in talos_step_ids
-            assert "configure-cloudflare-dns" in talos_step_ids
-            assert "install-wiredoor-gateway" in talos_step_ids
+            assert "provision-netbird-bastion" in talos_step_ids
+            assert "configure-netbird-ingress" in talos_step_ids
+            assert "install-netbird-routing-peers" in talos_step_ids
+            assert "configure-netbird-admin-access" in talos_step_ids
             assert "configure-cloudflare-tunnel" not in talos_step_ids
             assert "configure-metallb-ingress" not in talos_step_ids
             assert "configure-tailscale-ingress" not in talos_step_ids
-            assert "install-adguard" not in talos_step_ids
+            assert "configure-wiredoor-ingress" not in talos_step_ids
+            assert "provision-wiredoor-bastion" not in talos_step_ids
+            assert "install-wiredoor-gateway" not in talos_step_ids
         finally:
             proc.terminate()
             proc.wait(timeout=5)

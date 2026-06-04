@@ -31,20 +31,6 @@ spec:
               - op: replace
                 path: /spec/routes/0/match
                 value: Host(`openwebui.__ZONE_NAME__`)
-          - target:
-              kind: IngressRoute
-              name: openwebui-wiredoor
-            patch: |-
-              - op: replace
-                path: /spec/routes/0/match
-                value: Host(`openwebui.__ZONE_NAME__`)
-          - target:
-              kind: IngressRoute
-              name: openwebui-tailscale
-            patch: |-
-              - op: replace
-                path: /spec/routes/0/match
-                value: Host(`openwebui.__ZONE_NAME__`)
     - repoURL: __REPO_URL__
       targetRevision: __TARGET_REVISION__
       path: gitops/databases/openwebui

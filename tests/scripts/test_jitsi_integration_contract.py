@@ -196,8 +196,8 @@ def test_jitsi_platform_overlay_provides_broker_secret_sync_service_and_ingress(
     assert "Host(`auth-jitsi.__ZONE_NAME__`)" in ingress_text
     assert "name: jitsi-web" in ingress_text
     assert "name: auth-jitsi" in ingress_text
-    assert "webwiredoor" in ingress_text
-    assert "webtailscale" in ingress_text
+    assert "webwiredoor" not in ingress_text
+    assert "webtailscale" not in ingress_text
 
 
 def test_jitsi_openid_image_is_pinned_and_patched_for_room_scoped_short_lived_tokens():

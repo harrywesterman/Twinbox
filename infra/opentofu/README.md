@@ -13,13 +13,11 @@ OpenTofu modules for provisioning external infrastructure components used by Twi
 | `authentik-management-consoles/` | Authentik | Proxy applications for Traefik Dashboard and Longhorn in Authentik |
 | `authentik-netbird/` | Authentik + Random | NetBird OIDC application/client in Authentik |
 | `authentik-vaultwarden/` | Authentik | Proxy provider for Vaultwarden in Authentik |
-| `cloudflare/` | Cloudflare | DNS records (wiredoor + wildcard A records) |
 | `netbird/` | Hetzner Cloud | Self-hosted NetBird VPS with dashboard, server, Traefik, and proxy |
 | `netbird-idp/` | NetBird | Authentik identity provider registration in NetBird |
 | `netbird-network/` | NetBird | Twinbox groups, setup keys, network resource, router, and policies |
 | `netbird-proxy-services/` | NetBird | NetBird reverse proxy services targeting internal Traefik |
 | `talos-proxmox/` | Proxmox (bpg) | Talos Linux VMs on Proxmox VE |
-| `wiredoor/` | Hetzner Cloud | Wiredoor bastion VM with cloud-init bootstrap |
 
 ## Usage
 
@@ -36,13 +34,6 @@ tofu apply
 
 ## Module Details
 
-### cloudflare/
-
-Creates DNS records in a Cloudflare zone:
-
-- `wiredoor.<zone>` — A record pointing to the Wiredoor server
-- `*.<zone>` — Wildcard A record for all subdomains
-
 ### talos-proxmox/
 
 Creates Talos Linux VMs on Proxmox with:
@@ -53,16 +44,6 @@ Creates Talos Linux VMs on Proxmox with:
 - VM tagging for cluster identification
 
 See [talos-proxmox/README.md](talos-proxmox/README.md) for full variable reference.
-
-### wiredoor/
-
-Provisions a Hetzner Cloud VM running Wiredoor with:
-
-- Cloud-init bootstrap (Docker + Wiredoor install)
-- Firewall rules
-- SSH key management
-
-See [wiredoor/README.md](wiredoor/README.md) for details.
 
 ### netbird/
 

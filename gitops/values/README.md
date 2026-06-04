@@ -22,19 +22,16 @@ This directory contains Helm `values.yaml` files referenced by Argo CD `Applicat
 | `jitsi.yaml` | Jitsi | Video conferencing settings and OpenID |
 | `loki.yaml` | Loki | Log aggregation retention and resources |
 | `longhorn.yaml` | Longhorn | Distributed storage replica count and backups |
-| `metallb.yaml` | MetalLB | Load balancer IP pools and L2 advertisements |
 | `metrics-server.yaml` | Metrics Server | HPA metrics source configuration |
 | `nextcloud.yaml` | Nextcloud | File sync collaboration settings |
 | `ntfy.yaml` | ntfy | Push notification server configuration |
 | `openbao.yaml` | OpenBao | Secret management deployment settings |
 | `prometheus-minimal.yaml` | Prometheus | Minimal Prometheus scrape config |
 | `prometheus.yaml` | Prometheus | Full Prometheus, Alertmanager, exporters |
-| `tailscale.yaml` | Tailscale | VPN subnet router and exit node config |
 | `tempo.yaml` | Tempo | Trace storage resource limits and retention |
 | `traefik.yaml` | Traefik | Ingress controller settings and middleware |
 | `velero-ui.yaml` | Velero UI | Backup dashboard configuration |
 | `velero.yaml` | Velero | Backup schedules and SeaweedFS target |
-| `wiredoor-gateway.yaml` | Wiredoor | VPN gateway settings |
 | `zulip.yaml` | Zulip | Team chat deployment configuration |
 
 ## Usage

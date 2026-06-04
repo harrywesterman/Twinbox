@@ -670,12 +670,12 @@ reproduce browser HTTP/2 connection coalescing from `netbird.<public-zone>` to
 
 ## Comparison
 
-| Feature | Cloudflare Tunnel | Wiredoor | NetBird |
-| --- | --- | --- | --- |
-| Self-hosted control plane | No | Yes, simple bastion | Yes, Hetzner NetBird bastion |
-| Public app ingress | Yes | Yes | Yes, through NetBird Reverse Proxy |
-| Mesh VPN | No | No | Yes |
-| Authentik SSO for network access | No | No | Yes |
+| Feature | Cloudflare Tunnel | NetBird |
+| --- | --- | --- |
+| Self-hosted control plane | No | Yes, Hetzner NetBird bastion |
+| Public app ingress | Yes | Yes, through NetBird Reverse Proxy |
+| Mesh VPN | No | Yes |
+| Authentik SSO for network access | No | Yes |
 | Management VM private access | No | Limited to bastion model | Yes, via NetBird peer and policies |
 | Requires routing peer in cluster | No | No | Yes |
 

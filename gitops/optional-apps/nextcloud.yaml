@@ -242,35 +242,7 @@ spec:
                     value: Host(`nextcloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
               - target:
                   kind: IngressRoute
-                  name: nextcloud-wiredoor
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`nextcloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
-                  name: nextcloud-tailscale
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`nextcloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
                   name: collabora
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`nextcloud-collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
-                  name: collabora-wiredoor
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`nextcloud-collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
-                  name: collabora-tailscale
                 patch: |-
                   - op: replace
                     path: /spec/routes/0/match

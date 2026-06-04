@@ -14,36 +14,3 @@ spec:
           name: zulip
           port: 80
   tls: {}
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: zulip-wiredoor
-  namespace: zulip
-spec:
-  entryPoints:
-    - webwiredoor
-  routes:
-    - kind: Rule
-      match: Host(`zulip.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: zulip
-          port: 80
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: zulip-tailscale
-  namespace: zulip
-spec:
-  entryPoints:
-    - webtailscale
-  routes:
-    - kind: Rule
-      match: Host(`zulip.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: zulip
-          port: 80
-  tls: {}

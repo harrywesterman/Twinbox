@@ -64,7 +64,6 @@ bootstrap/secrets/
 │   ├── proxmox.json
 │   ├── traefik-dashboard.json
 │   ├── grafana-oidc-<cluster-id>.json  # Grafana OIDC plus admin credentials
-│   ├── wiredoor-gateway.json
 │   ├── velero.json
 │   ├── velero-ui.json
 │   └── authentik.json  # seed-only; deleted after sync into OpenBao
@@ -82,7 +81,6 @@ The API server resolves field values with aliases for known items:
 - **proxmox**: `host`, `port`, `username`/`user`, `password`, `endpoint`
 - **traefik-dashboard**: `username`, `password`, `users`
 - **grafana-oidc**: `GF_AUTH_DISABLE_LOGIN_FORM`, `GF_AUTH_OAUTH_AUTO_LOGIN`, `GF_AUTH_BASIC_ENABLED`, `GF_USERS_AUTO_ASSIGN_ORG_ROLE`, `GF_AUTH_GENERIC_OAUTH_ENABLED`, `GF_AUTH_GENERIC_OAUTH_NAME`, `GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP`, `GF_AUTH_GENERIC_OAUTH_CLIENT_ID`, `GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET`, `GF_AUTH_GENERIC_OAUTH_SCOPES`, `GF_AUTH_GENERIC_OAUTH_AUTH_URL`, `GF_AUTH_GENERIC_OAUTH_TOKEN_URL`, `GF_AUTH_GENERIC_OAUTH_API_URL`, `GF_SECURITY_ADMIN_USER`, `GF_SECURITY_ADMIN_PASSWORD`
-- **wiredoor-gateway**: `WIREDOOR_URL`/`url`, `TOKEN`/`token`
 - **velero-ui**: `pass_phrase`, `AUTH_SECRET_PASSPHRASE`, `BASIC_AUTH_ENABLED`, `OAUTH_AUTH_ENABLED`, `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`, `OAUTH_AUTHORIZATION_URL`, `OAUTH_TOKEN_URL`, `OAUTH_USER_INFO_URL`, `OAUTH_REDIRECT_URI`
 
 ## Environment Variables

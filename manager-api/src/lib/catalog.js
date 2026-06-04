@@ -160,20 +160,11 @@ function isAllowedIngressRoute(route, currentClusterOrSlug) {
     return false;
   }
 
-  if (!currentClusterOrSlug) {
-    return true;
-  }
-
   if (normalizedRoute === "cloudflare-tunnel") {
-    return isPrdCluster(currentClusterOrSlug);
+    return currentClusterOrSlug ? isPrdCluster(currentClusterOrSlug) : true;
   }
 
-  return (
-    normalizedRoute === "wiredoor" ||
-    normalizedRoute === "netbird" ||
-    normalizedRoute === "metallb" ||
-    normalizedRoute === "tailscale"
-  );
+  return normalizedRoute === "netbird";
 }
 
 function renderStepForCluster(step, clusterSlugHint) {

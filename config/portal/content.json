@@ -540,17 +540,6 @@
       "accent": "#2563eb",
       "category": "Admin"
     },
-    "Wiredoor": {
-      "summary": "Secure gateway access",
-      "description": "Use the secure gateway when you need remote access into the cluster.",
-      "capabilities": [
-        "Open the Wiredoor gateway",
-        "Manage remote ingress access",
-        "Work with the tunnel-style entry point"
-      ],
-      "accent": "#ef4444",
-      "category": "Admin"
-    },
     "Zulip": {
       "summary": "Team chat and discussion",
       "description": "Keep team conversations threaded, searchable, and easy to follow.",

@@ -83,11 +83,6 @@ function buildProjectUrlMap() {
       project_url: "https://www.pgadmin.org/",
       github_url: "https://github.com/pgadmin-org/pgadmin4",
     },
-    "install-wiredoor-gateway": {
-      icon: "🚪",
-      project_url: "https://github.com/harrywesterman/twinbox/blob/main/docs/configuration.md",
-      github_url: "https://github.com/harrywesterman/twinbox",
-    },
     "install-authentik-idp": {
       icon: "🪪",
       project_url: "https://goauthentik.io/",
@@ -103,10 +98,10 @@ function buildProjectUrlMap() {
       project_url: "https://github.com/harrywesterman/twinbox/blob/main/docs/wizard-guide.md",
       github_url: "https://github.com/harrywesterman/twinbox",
     },
-    "configure-cloudflare-dns": {
-      icon: "☁️",
-      project_url: "https://developers.cloudflare.com/dns/",
-      github_url: "https://github.com/cloudflare/cloudflare-docs",
+    "configure-dns": {
+      icon: "🌐",
+      project_url: "https://kubernetes-sigs.github.io/external-dns/",
+      github_url: "https://github.com/kubernetes-sigs/external-dns",
     },
     "install-dashy-dashboard": {
       icon: "🏁",
@@ -198,25 +193,10 @@ function buildProjectUrlMap() {
       project_url: "https://jitsi.org/",
       github_url: "https://github.com/jitsi/jitsi-meet",
     },
-    "configure-wiredoor-ingress": {
-      icon: "🚪",
-      project_url: "https://wiredoor.net/",
-      github_url: "https://github.com/wiredoor/wiredoor",
-    },
     "configure-cloudflare-tunnel": {
       icon: "🌐",
       project_url: "https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/",
       github_url: "https://github.com/cloudflare/cloudflared",
-    },
-    "configure-metallb-ingress": {
-      icon: "⚖️",
-      project_url: "https://metallb.universe.tf/",
-      github_url: "https://github.com/metallb/metallb",
-    },
-    "configure-tailscale-ingress": {
-      icon: "🔗",
-      project_url: "https://tailscale.com/",
-      github_url: "https://github.com/tailscale/tailscale",
     },
   };
 }

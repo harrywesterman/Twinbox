@@ -25,7 +25,7 @@ dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty')"
 public_zone_name="$(printf '%s' "$cluster_json" | jq -r '.public_zone_name // empty')"
 
 case "$ingress_route" in
-  wiredoor|cloudflare-tunnel|metallb|tailscale|netbird) ;;
+  cloudflare-tunnel|netbird) ;;
   *)
     fail "Unsupported ingress route: $ingress_route"
     ;;

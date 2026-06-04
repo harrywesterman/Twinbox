@@ -61,16 +61,12 @@ Start at the low end of the band and resize when the PVC usage alerts fire.
 
 Apps are exposed via **IngressRoute CRDs**, not via pod labels or annotations. Each app gets its own `IngressRoute` resource in `gitops/platform/<app>/ingressroute.yaml`.
 
-Twinbox supports four ingress strategies, chosen by the user during setup:
-
-**Wiredoor** — A self-hosted WireGuard-based tunnel to an external server (e.g. Hetzner VM). All traffic flows through the `webwiredoor` entryPoint (port 8081). Let's Encrypt certificates are managed by the Wiredoor server. No third party sees your traffic, and there are no upload limits.
+Twinbox supports two ingress strategies, chosen by the user during setup:
 
 **Cloudflare Tunnel** — An outbound tunnel from the cluster to Cloudflare's edge using `cloudflared`. All traffic flows through the `websecure` entryPoint. Cloudflare handles TLS termination and DDoS protection, but can see HTTP traffic. The free plan has a 100MB upload limit.
 On Cloudflare Free, Twinbox only offers this route for `prd` clusters. See [`docs/ingress-policy.md`](./ingress-policy.md) for the canonical ingress and hostname rules.
 
-**MetalLB + Port Forwarding** — MetalLB assigns a real IP on the local network to Traefik. The user configures port forwarding on their router (80/443). Traefik manages Let's Encrypt certificates directly via HTTP-01 challenge. Full control, zero external dependencies, no third party sees traffic.
-
-**Tailscale** — The cluster joins a Tailscale tailnet. Users connect by enabling Tailscale on their device. No port forwarding, no external VM, no public DNS needed. Access control via Tailscale ACLs. Can be self-hosted with Headscale for full control.
+**NetBird** — A self-hosted WireGuard VPN with Authentik SSO. Routing peers in Kubernetes forward traffic to Traefik through the NetBird reverse proxy path.
 
 All strategies use the same IngressRoute structure — only the `entryPoints` and `tls` fields differ. Domain names are projected at Argo render time from the local cluster secret annotation into the final Traefik match expressions.
 
@@ -111,7 +107,7 @@ Group filtering happens **in Authentik** via Policy Bindings on the Application,
 | 1 | `gitops/apps/<app>.yaml` | Argo CD Application with Helm chart and values reference |
 | 2 | `gitops/values/<app>.yaml` | Helm values: replicas, tolerations, PVC, app-specific config |
 | 3 | `gitops/databases/<app>/` | CloudNativePG Cluster + Pooler + ExternalSecret (optional, only for apps with Postgres) |
-| 4 | `gitops/platform/<app>/ingressroute.yaml` | Traefik IngressRoute for public and Wiredoor routes |
+| 4 | `gitops/platform/<app>/ingressroute.yaml` | Traefik IngressRoute for public routes |
 | 5 | `gitops/platform/<app>/middleware.yaml` | forwardAuth Middleware (optional, only for apps with Authentik) |
 | 6 | Authentik UI/API | Configure Application + Provider + Group Policy |
 
@@ -328,25 +324,6 @@ spec:
           name: <app-service-name>
           port: 80
   tls: {}
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: <app>-wiredoor
-  namespace: <app-namespace>
-spec:
-  entryPoints:
-    - webwiredoor
-  routes:
-    - kind: Rule
-      match: Host(`<app>.<selected-domain>`)
-      middlewares:
-        - name: authentik-forwardauth
-          namespace: authentik
-      services:
-        - kind: Service
-          name: <app-service-name>
-          port: 80
 ```
 
 ### Step 5: forwardAuth Middleware
@@ -506,22 +483,6 @@ spec:
           name: headlamp
           port: 80
   tls: {}
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: headlamp-wiredoor
-  namespace: kube-system
-spec:
-  entryPoints:
-    - webwiredoor
-  routes:
-    - kind: Rule
-      match: Host(`headlamp.<public-zone-name>`)
-      services:
-        - kind: Service
-          name: headlamp
-          port: 80
 ```
 
 ## Authentik OIDC Integration

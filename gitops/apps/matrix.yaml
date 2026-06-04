@@ -100,35 +100,7 @@ spec:
                     value: Host(`matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
               - target:
                   kind: IngressRoute
-                  name: matrix-wiredoor
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
-                  name: matrix-tailscale
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
                   name: chat
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`chat.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
-                  name: chat-wiredoor
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`chat.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
-                  name: chat-tailscale
                 patch: |-
                   - op: replace
                     path: /spec/routes/0/match
@@ -142,20 +114,6 @@ spec:
                     value: Host(`account.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
               - target:
                   kind: IngressRoute
-                  name: account-wiredoor
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`account.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
-                  name: account-tailscale
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`account.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
                   name: element-admin
                 patch: |-
                   - op: replace
@@ -163,35 +121,7 @@ spec:
                     value: Host(`element-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
               - target:
                   kind: IngressRoute
-                  name: element-admin-wiredoor
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`element-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
-                  name: element-admin-tailscale
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`element-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
                   name: mrtc
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
-                  name: mrtc-wiredoor
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
-                  name: mrtc-tailscale
                 patch: |-
                   - op: replace
                     path: /spec/routes/0/match

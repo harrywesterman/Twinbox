@@ -49,35 +49,7 @@ spec:
                     value: Host(`jitsi.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
               - target:
                   kind: IngressRoute
-                  name: jitsi-wiredoor
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`jitsi.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
-                  name: jitsi-tailscale
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`jitsi.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
                   name: auth-jitsi
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`auth-jitsi.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
-                  name: auth-jitsi-wiredoor
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`auth-jitsi.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
-                  name: auth-jitsi-tailscale
                 patch: |-
                   - op: replace
                     path: /spec/routes/0/match

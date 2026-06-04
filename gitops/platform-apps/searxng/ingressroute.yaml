@@ -14,36 +14,3 @@ spec:
           name: searxng
           port: 80
   tls: {}
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: searxng-wiredoor
-  namespace: searxng
-spec:
-  entryPoints:
-    - webwiredoor
-  routes:
-    - kind: Rule
-      match: Host(`searxng.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: searxng
-          port: 80
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: searxng-tailscale
-  namespace: searxng
-spec:
-  entryPoints:
-    - webtailscale
-  routes:
-    - kind: Rule
-      match: Host(`searxng.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: searxng
-          port: 80
-  tls: {}

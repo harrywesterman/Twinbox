@@ -74,20 +74,6 @@ spec:
                   - op: replace
                     path: /spec/routes/0/match
                     value: Host(`karakeep.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
-                  name: karakeep-wiredoor
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`karakeep.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-              - target:
-                  kind: IngressRoute
-                  name: karakeep-tailscale
-                patch: |-
-                  - op: replace
-                    path: /spec/routes/0/match
-                    value: Host(`karakeep.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
       destination:
         server: https://kubernetes.default.svc
         namespace: karakeep

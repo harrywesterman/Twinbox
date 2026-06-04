@@ -14,19 +14,3 @@ spec:
           name: prometheus-operated
           port: 9090
   tls: {}
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: prometheus-wiredoor
-  namespace: monitoring
-spec:
-  entryPoints:
-    - webwiredoor
-  routes:
-    - kind: Rule
-      match: Host(`prometheus.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: prometheus-operated
-          port: 9090

@@ -14,36 +14,3 @@ spec:
           name: karakeep
           port: 3000
   tls: {}
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: karakeep-wiredoor
-  namespace: karakeep
-spec:
-  entryPoints:
-    - webwiredoor
-  routes:
-    - kind: Rule
-      match: Host(`karakeep.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: karakeep
-          port: 3000
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: karakeep-tailscale
-  namespace: karakeep
-spec:
-  entryPoints:
-    - webtailscale
-  routes:
-    - kind: Rule
-      match: Host(`karakeep.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: karakeep
-          port: 3000
-  tls: {}

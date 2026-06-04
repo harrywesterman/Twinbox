@@ -14,36 +14,3 @@ spec:
           name: coder
           port: 80
   tls: {}
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: coder-wiredoor
-  namespace: coder
-spec:
-  entryPoints:
-    - webwiredoor
-  routes:
-    - kind: Rule
-      match: Host(`coder.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: coder
-          port: 80
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: coder-tailscale
-  namespace: coder
-spec:
-  entryPoints:
-    - webtailscale
-  routes:
-    - kind: Rule
-      match: Host(`coder.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: coder
-          port: 80
-  tls: {}

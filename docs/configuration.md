@@ -37,14 +37,12 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 - `/opt/twinbox/bootstrap/secrets/global/authentik.json` — seed-only; deleted after Authentik syncs into OpenBao
 - `/opt/twinbox/bootstrap/secrets/global/pgadmin4-oidc-<cluster-id>.json`
 - `/opt/twinbox/bootstrap/secrets/global/audiobookshelf.json`
-- `/opt/twinbox/bootstrap/secrets/global/wiredoor-gateway.json`
 - `/opt/twinbox/bootstrap/secrets/global/velero.json`
 - `/opt/twinbox/bootstrap/secrets/global/velero-ui.json`
 - `/opt/twinbox/bootstrap/secrets/global/management-backup.json`
 - `/opt/twinbox/bootstrap/secrets/global/argocd-cli.json`
 - `/opt/twinbox/bootstrap/secrets/global/twinbox-portal.json`
 - `/opt/twinbox/bootstrap/secrets/global/dashy-oidc-<cluster-id>.json`
-- `/opt/twinbox/bootstrap/secrets/global/wiredoor-bastion-<cluster-id>.json`
 - `/opt/twinbox/bootstrap/secrets/global/cloudflare-<cluster-id>.json`
 - `/opt/twinbox/bootstrap/secrets/global/crowdsec.json`
 - `/opt/twinbox/bootstrap/secrets/global/ntfy.json`
@@ -138,14 +136,6 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 }
 ```
 
-### `wiredoor-gateway.json`
-
-```json
-{
-  "WIREDOOR_URL": "https://wiredoor.example",
-  "TOKEN": "generated-token"
-}
-```
 
 ### `velero-ui.json`
 
@@ -307,11 +297,11 @@ Twinbox uses one base domain (`dns_domain`) for the cluster and derives a public
 
 1. **User input** — The user enters the base domain in the web wizard during `choose-ingress-route`.
 2. **Policy split** — The wizard stores the base domain and derives the public zone name as the base domain for `prd` or `slug.<dns_domain>` for other clusters.
-3. **OpenBao sync** — The ingress selection step syncs `ZONE_NAME`, `WIREDOOR_FQDN`, and `WILDCARD_FQDN` to OpenBao at `twinbox/global/cluster-hostnames`.
+3. **OpenBao sync** — The ingress selection step syncs the selected public zone metadata to OpenBao at `twinbox/global/cluster-hostnames`.
 4. **Argo cluster secret** — The ingress/domain step upserts a local Argo CD cluster secret in the `argocd` namespace and stores the derived public zone name as an annotation.
 5. **ApplicationSets** — The `platform-ingress`, `grafana`, and `ntfy` ApplicationSets read that annotation at render time and inject the derived hostnames into Kustomize patches or Helm values.
 6. **Kustomize render** — The `platform-ingress` ApplicationSet uses Kustomize to patch the live match expressions and start-page strings before sync.
-7. **Ingress-specific apps** — Wiredoor, MetalLB, and Tailscale reuse the slug-prefixed hostname model. Cloudflare Tunnel is only offered for `prd` on Cloudflare Free.
+7. **Ingress-specific apps** — NetBird uses the slug-prefixed hostname model for non-`prd` clusters. Cloudflare Tunnel is only offered for `prd` on Cloudflare Free.
 
 ### Namespace baseline
 
@@ -337,12 +327,10 @@ Current baseline namespaces:
 - `ntfy`
 - `openbao`
 - `pgadmin4`
-- `tailscale`
 - `traefik`
 - `twinbox-portal`
 - `velero`
 - `velero-ui`
-- `wiredoor`
 
 ### Affected services
 
@@ -374,14 +362,13 @@ The Dashy tile list itself is still not GitOps-static: Twinbox renders operator 
 gitops/platform/
 ├── kustomization.yaml          # Central Kustomize config for the shared platform shape
 ├── authentik/                  # IngressRoute, ExternalSecret, forwardAuth middleware
-├── argocd/                     # Argo CD ConfigMap, RBAC, Wiredoor config
+├── argocd/                     # Argo CD ConfigMap and RBAC
 ├── crowdsec/                   # Bouncer and LAPI ExternalSecrets
 ├── grafana/                    # ExternalSecret for admin + OIDC
 ├── headlamp/                   # IngressRoute, ExternalSecret for OIDC
 ├── hubble/                     # IngressRoute, forwardAuth for Hubble UI
 ├── management-consoles/        # Proxmox, Longhorn, SeaweedFS proxy routes
 ├── traefik/                    # Argo CD routes, dashboard auth, CrowdSec bouncer
-├── wiredoor-gateway/           # WireGuard gateway configuration
 ├── dashy/                      # Legacy admin launcher
 └── twinbox-portal/
     ├── portal-config (Secret)   # Runtime-generated portal configuration

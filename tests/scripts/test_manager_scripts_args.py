@@ -122,9 +122,6 @@ TRAEFIK_MANAGER_STEP_MANIFEST = (
 TRAEFIK_MANAGER_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-traefik-manager" / "run.sh"
 )
-CLOUDFLARE_STEP_MANIFEST = (
-    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "configure-cloudflare-dns" / "step.yaml"
-)
 INGRESS_POLICY_DOC = REPO_ROOT / "docs" / "ingress-policy.md"
 CHOOSE_INGRESS_ROUTE_RUN_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "choose-ingress-route" / "run.sh"
@@ -169,7 +166,6 @@ IMMICH_APP = REPO_ROOT / "gitops" / "apps" / "immich.yaml"
 KARAKEEP_APP = REPO_ROOT / "gitops" / "optional-apps" / "karakeep.yaml"
 NEXTCLOUD_OPTIONAL_APP = REPO_ROOT / "gitops" / "optional-apps" / "nextcloud.yaml"
 PGADMIN_APP = REPO_ROOT / "gitops" / "apps" / "pgadmin4.yaml"
-TAILSCALE_APP = REPO_ROOT / "gitops" / "apps" / "tailscale.yaml"
 PLATFORM_INGRESS_APP = REPO_ROOT / "gitops" / "apps" / "platform-ingress.yaml"
 PGADMIN_EXTERNALSECRET = REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "externalsecret.yaml"
 PGADMIN_SERVER_CONFIGMAP = REPO_ROOT / "gitops" / "platform-apps" / "pgadmin4" / "configmap.yaml"
@@ -202,17 +198,6 @@ GRAFANA_STEP_MANIFEST = (
 )
 GRAFANA_REFRESH_HELPER = REPO_ROOT / "scripts" / "manager" / "refresh-grafana-dashboard.mjs"
 WORKER_JS = REPO_ROOT / "manager-worker" / "src" / "worker.js"
-WIREDOOR_GATEWAY_STEP_MANIFEST = (
-    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-wiredoor-gateway" / "step.yaml"
-)
-WIREDOOR_BASTION_STEP_MANIFEST = (
-    REPO_ROOT
-    / "categories"
-    / "talos-cluster"
-    / "steps"
-    / "provision-wiredoor-bastion"
-    / "step.yaml"
-)
 NETBIRD_BASTION_STEP_MANIFEST = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "provision-netbird-bastion" / "step.yaml"
 )
@@ -276,14 +261,12 @@ STIRLING_PDF_DEPLOYMENT = (
     REPO_ROOT / "gitops" / "platform-apps" / "stirling-pdf" / "deployment.yaml"
 )
 GRAFANA_APP = REPO_ROOT / "gitops" / "apps" / "grafana.yaml"
-WIREDOOR_GATEWAY_APP = REPO_ROOT / "gitops" / "apps" / "wiredoor-gateway.yaml"
 DATABASES_APP = REPO_ROOT / "gitops" / "apps" / "databases.yaml"
 WHOAMI_DEPLOYMENT = REPO_ROOT / "gitops" / "platform-apps" / "whoami" / "deployment.yaml"
 HEADLAMP_VALUES = REPO_ROOT / "gitops" / "values" / "headlamp.yaml"
 LONGHORN_VALUES = REPO_ROOT / "gitops" / "values" / "longhorn.yaml"
 TRAEFIK_VALUES = REPO_ROOT / "gitops" / "values" / "traefik.yaml"
 CROWDSEC_VALUES = REPO_ROOT / "gitops" / "values" / "crowdsec.yaml"
-WIREDOOR_GATEWAY_VALUES = REPO_ROOT / "gitops" / "values" / "wiredoor-gateway.yaml"
 GRAFANA_VALUES = REPO_ROOT / "gitops" / "values" / "grafana.yaml"
 TRAEFIK_DASHBOARD_EXTERNALSECRET = (
     REPO_ROOT / "gitops" / "platform" / "traefik" / "traefik-dashboard-externalsecret.yaml"
@@ -298,7 +281,6 @@ ARGOCD_SERVER_TRANSPORT = (
     REPO_ROOT / "gitops" / "platform" / "traefik" / "argocd-server-transport.yaml"
 )
 ARGOCD_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "traefik" / "argocd-ingressroute.yaml"
-ARGOCD_WIREDOOR_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "argocd" / "argocd-wiredoor.yaml"
 WHOAMI_INGRESSROUTE = REPO_ROOT / "gitops" / "platform-apps" / "whoami" / "ingressroute.yaml"
 HEADLAMP_INGRESSROUTE = REPO_ROOT / "gitops" / "platform-apps" / "headlamp" / "ingressroute.yaml"
 FRESHRSS_INGRESSROUTE = REPO_ROOT / "gitops" / "platform-apps" / "freshrss" / "ingressroute.yaml"
@@ -307,12 +289,6 @@ VAULTWARDEN_INGRESSROUTE = (
 )
 GRAFANA_EXTERNALSECRET = REPO_ROOT / "gitops" / "platform-apps" / "grafana" / "externalsecret.yaml"
 GRAFANA_INGRESSROUTE = REPO_ROOT / "gitops" / "platform-apps" / "grafana" / "ingressroute.yaml"
-WIREDOOR_GATEWAY_EXTERNALSECRET = (
-    REPO_ROOT / "gitops" / "platform-apps" / "wiredoor-gateway" / "externalsecret.yaml"
-)
-WIREDOOR_GATEWAY_INGRESSROUTE = (
-    REPO_ROOT / "gitops" / "platform" / "argocd" / "argocd-wiredoor.yaml"
-)
 PINNED_DEFAULTS = REPO_ROOT / "config" / "pinned-defaults.sh"
 
 
@@ -470,10 +446,6 @@ def _longhorn_values_text() -> str:
     return LONGHORN_VALUES.read_text(encoding="utf-8")
 
 
-def _wiredoor_gateway_values_text() -> str:
-    return WIREDOOR_GATEWAY_VALUES.read_text(encoding="utf-8")
-
-
 def _traefik_dashboard_externalsecret_text() -> str:
     return TRAEFIK_DASHBOARD_EXTERNALSECRET.read_text(encoding="utf-8")
 
@@ -484,10 +456,6 @@ def _crowdsec_bouncer_externalsecret_text() -> str:
 
 def _traefik_crowdsec_bouncer_externalsecret_text() -> str:
     return TRAEFIK_CROWDSEC_BOUNCER_EXTERNALSECRET.read_text(encoding="utf-8")
-
-
-def _wiredoor_gateway_externalsecret_text() -> str:
-    return WIREDOOR_GATEWAY_EXTERNALSECRET.read_text(encoding="utf-8")
 
 
 def _headlamp_oidc_externalsecret_text() -> str:
@@ -506,10 +474,6 @@ def _crowdsec_app_text() -> str:
     return CROWDSEC_APP.read_text(encoding="utf-8")
 
 
-def _wiredoor_gateway_app_text() -> str:
-    return WIREDOOR_GATEWAY_APP.read_text(encoding="utf-8")
-
-
 def _grafana_externalsecret_text() -> str:
     return GRAFANA_EXTERNALSECRET.read_text(encoding="utf-8")
 
@@ -524,10 +488,6 @@ def _karakeep_app_text() -> str:
 
 def _pgadmin_app_text() -> str:
     return PGADMIN_APP.read_text(encoding="utf-8")
-
-
-def _tailscale_app_text() -> str:
-    return TAILSCALE_APP.read_text(encoding="utf-8")
 
 
 def test_apply_cluster_requires_proxmox_env():
@@ -1404,8 +1364,6 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     headlamp_text = HEADLAMP_STEP_MANIFEST.read_text(encoding="utf-8")
     grafana_text = GRAFANA_STEP_MANIFEST.read_text(encoding="utf-8")
     prometheus_text = PROMETHEUS_STEP_MANIFEST.read_text(encoding="utf-8")
-    wiredoor_text = WIREDOOR_GATEWAY_STEP_MANIFEST.read_text(encoding="utf-8")
-    wiredoor_bastion_text = WIREDOOR_BASTION_STEP_MANIFEST.read_text(encoding="utf-8")
     netbird_bastion_text = NETBIRD_BASTION_STEP_MANIFEST.read_text(encoding="utf-8")
 
     assert "install-flannel" not in argocd_text
@@ -1440,12 +1398,6 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
         "Cloudflare Tunnel is only available for prd clusters on Cloudflare Free"
         in choose_ingress_run_text
     )
-
-    assert "KUBECONFIG_FILE:" in wiredoor_text
-    assert "item: kubeconfig" in wiredoor_text
-    assert "script: categories/talos-cluster/steps/install-wiredoor-gateway/run.sh" in wiredoor_text
-
-    assert "ingress_route: wiredoor" in wiredoor_bastion_text
 
     assert "ingress_route: netbird" in netbird_bastion_text
     assert "zone_name" not in netbird_bastion_text
@@ -1547,7 +1499,6 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "PasswordExecCommand" in pgadmin_server_config_text
     assert "path: gitops/platform-apps/pgadmin4" in PGADMIN_APP.read_text(encoding="utf-8")
     assert "path: gitops/platform-apps/karakeep" in KARAKEEP_APP.read_text(encoding="utf-8")
-    assert "path: gitops/platform-apps/tailscale" in TAILSCALE_APP.read_text(encoding="utf-8")
 
     pgadmin_app_text = PLATFORM_INGRESS_APP.read_text(encoding="utf-8")
     assert "kind: ApplicationSet" in pgadmin_app_text
@@ -1757,18 +1708,6 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "Cloudflare Tunnel is **prd-only** on Cloudflare Free" in INGRESS_POLICY_DOC.read_text(
         encoding="utf-8"
     )
-
-    cloudflare_dns_run_text = (
-        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "configure-cloudflare-dns" / "run.sh"
-    ).read_text(encoding="utf-8")
-    assert "cluster-public-zone.sh" in cloudflare_dns_run_text
-    assert "twinbox_public_zone_name" in cloudflare_dns_run_text
-    assert "Public zone name:" in cloudflare_dns_run_text
-    assert "ZONE_NAME" in cloudflare_dns_run_text
-    assert "cluster-hostnames" in cloudflare_dns_run_text
-    assert "Creating DNSEndpoint resources" in cloudflare_dns_run_text
-    assert "wiredoor-dns" in cloudflare_dns_run_text
-    assert "external-dns" in cloudflare_dns_run_text
 
     netbird_bastion_run_text = NETBIRD_BASTION_STEP_SCRIPT.read_text(encoding="utf-8")
     assert "cluster-public-zone.sh" in netbird_bastion_run_text
@@ -2502,14 +2441,11 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     vaultwarden_run_text = VAULTWARDEN_STEP_SCRIPT.read_text(encoding="utf-8")
     vaultwarden_app_text = VAULTWARDEN_APP.read_text(encoding="utf-8")
     headlamp_app_text = HEADLAMP_APP.read_text(encoding="utf-8")
-    wiredoor_gateway_app_text = _wiredoor_gateway_app_text()
     traefik_values_text = _traefik_values_text()
     crowdsec_values_text = _crowdsec_values_text()
-    wiredoor_gateway_values_text = _wiredoor_gateway_values_text()
     traefik_externalsecret_text = _traefik_dashboard_externalsecret_text()
     crowdsec_bouncer_externalsecret_text = _crowdsec_bouncer_externalsecret_text()
     traefik_crowdsec_bouncer_externalsecret_text = _traefik_crowdsec_bouncer_externalsecret_text()
-    wiredoor_externalsecret_text = _wiredoor_gateway_externalsecret_text()
     headlamp_ingressroute_text = HEADLAMP_INGRESSROUTE.read_text(encoding="utf-8")
     authentik_ingressroute_text = (
         REPO_ROOT / "gitops" / "platform" / "authentik" / "ingressroute.yaml"
@@ -2518,7 +2454,6 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
         REPO_ROOT / "gitops" / "platform" / "authentik" / "cors-middleware.yaml"
     ).read_text(encoding="utf-8")
     grafana_ingressroute_text = GRAFANA_INGRESSROUTE.read_text(encoding="utf-8")
-    wiredoor_ingressroute_text = WIREDOOR_GATEWAY_INGRESSROUTE.read_text(encoding="utf-8")
 
     assert "chart: longhorn" in longhorn_app_text
     assert "__LONGHORN_VALUES__" in longhorn_app_text
@@ -2541,8 +2476,6 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "crowdsecurity/traefik" in crowdsec_values_text
     assert "podName: traefik-*" in crowdsec_values_text
     assert "program: traefik" in crowdsec_values_text
-    assert "existingSecret: wiredoor-gateway" in wiredoor_gateway_values_text
-    assert "token:" not in wiredoor_gateway_values_text
     assert "cluster-public-zone.sh" in freshrss_run_text
     assert "Could not determine cluster DNS domain" in freshrss_run_text
     assert (
@@ -2572,7 +2505,6 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     )
     assert "kind: Application" in headlamp_app_text
     assert "path: gitops/platform-apps/headlamp" in headlamp_app_text
-    assert "path: gitops/platform-apps/wiredoor-gateway" in wiredoor_gateway_app_text
     assert "middlewares:" in authentik_ingressroute_text
     assert "name: authentik-cors" in authentik_ingressroute_text
     assert "kind: Middleware" in authentik_cors_text
@@ -2585,7 +2517,6 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "Host(`grafana.__ZONE_NAME__`)" in grafana_ingressroute_text
     assert "Host(`hubble.__ZONE_NAME__`)" in HUBBLE_INGRESSROUTE.read_text(encoding="utf-8")
     assert "kind: Middleware" in HUBBLE_AUTHENTIK_FORWARDAUTH_MIDDLEWARE.read_text(encoding="utf-8")
-    assert "Host(`argocd.__ZONE_NAME__`)" in wiredoor_ingressroute_text
     assert "Host(`pgadmin4.__ZONE_NAME__`)" in PGADMIN_INGRESSROUTE.read_text(encoding="utf-8")
     assert "pgadmin4-data" in PGADMIN_PVC.read_text(encoding="utf-8")
     assert "pgadmin4-bootstrap" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
@@ -2688,13 +2619,6 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "name: openbao" in traefik_externalsecret_text
     assert "name: traefik-dashboard-auth" in traefik_externalsecret_text
     assert "secretKey: users" in traefik_externalsecret_text
-    assert "kind: ExternalSecret" in wiredoor_externalsecret_text
-    assert "kind: ClusterSecretStore" in wiredoor_externalsecret_text
-    assert "name: openbao" in wiredoor_externalsecret_text
-    assert "name: wiredoor-gateway" in wiredoor_externalsecret_text
-    assert "property: WIREDOOR_URL" in wiredoor_externalsecret_text
-    assert "property: TOKEN" in wiredoor_externalsecret_text
-    assert "secretKey: TOKEN" in wiredoor_externalsecret_text
 
 
 def test_optional_apps_route_steady_state_through_argocd_sources():
@@ -3045,7 +2969,7 @@ def test_prometheus_ingressroute_exposes_ui():
     assert "Host(`prometheus.__ZONE_NAME__`)" in text
     assert "prometheus-operated" in text
     assert "port: 9090" in text
-    assert "webwiredoor" in text
+    assert "webwiredoor" not in text
 
 
 def test_alertmanager_config_routes_to_ntfy():
@@ -3141,7 +3065,7 @@ def test_ntfy_ingressroute_exposes_ui():
     assert "Host(`ntfy.__ZONE_NAME__`)" in text
     assert "name: ntfy" in text
     assert "port: 80" in text
-    assert "webwiredoor" in text
+    assert "webwiredoor" not in text
 
 
 def test_argocd_ingressroute_uses_https_backend():
@@ -3153,17 +3077,6 @@ def test_argocd_ingressroute_uses_https_backend():
     assert "scheme: https" in text
     assert "serversTransport: argocd-server-transport" in text
     assert "websecure" in text
-
-
-def test_argocd_wiredoor_ingressroute_uses_https_backend():
-    text = ARGOCD_WIREDOOR_INGRESSROUTE.read_text(encoding="utf-8")
-    assert "kind: IngressRoute" in text
-    assert "Host(`argocd.__ZONE_NAME__`)" in text
-    assert "name: argocd-server" in text
-    assert "port: 443" in text
-    assert "scheme: https" in text
-    assert "serversTransport: argocd-server-transport" in text
-    assert "webwiredoor" in text
 
 
 def test_argocd_servers_transport_disables_backend_cert_verification():
@@ -3206,7 +3119,7 @@ def test_homepage_configmap_is_not_part_of_the_core_platform_overlay():
 def test_kustomization_includes_monitoring_resources():
     text = KUSTOMIZATION.read_text(encoding="utf-8")
     assert "argocd/argocd-cm.yaml" in text
-    assert "argocd/argocd-wiredoor.yaml" in text
+    assert "argocd/argocd-wiredoor.yaml" not in text
     assert "authentik/ingressroute.yaml" in text
     assert "hubble/ingressroute.yaml" in text
     assert "traefik/traefik-podmonitor.yaml" not in text
@@ -4074,8 +3987,8 @@ def test_dashy_argo_application_manages_the_platform_overlay():
     assert "kind: ApplicationSet" in text
     assert "name: dashy-set" in text
     assert "path: gitops/platform-apps/dashy" in text
-    assert "name: dashy-wiredoor" in text
-    assert "name: dashy-tailscale" in text
+    assert "name: dashy-wiredoor" not in text
+    assert "name: dashy-tailscale" not in text
     assert 'Host(`admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)' in text
     assert '.metadata.labels "twinbox.io/resource-profile"' in text
     assert 'dig "twinbox.io/resource-profile"' not in text
@@ -4107,8 +4020,8 @@ def test_karakeep_argo_application_manages_the_platform_overlay():
     assert "enabled: false" in text
     assert "path: gitops/platform-apps/karakeep" in text
     assert "CreateNamespace=true" in text
-    assert "name: karakeep-wiredoor" in text
-    assert "name: karakeep-tailscale" in text
+    assert "name: karakeep-wiredoor" not in text
+    assert "name: karakeep-tailscale" not in text
     assert "kind: Kustomization" in kustomization_text
     assert "namespace.yaml" in kustomization_text
     assert "externalsecret.yaml" in kustomization_text
@@ -4125,19 +4038,6 @@ def test_karakeep_argo_application_manages_the_platform_overlay():
     assert "twinbox/global/karakeep" in externalsecret_text
 
 
-def test_tailscale_argo_application_manages_the_platform_overlay():
-    text = _tailscale_app_text()
-    kustomization_text = (
-        REPO_ROOT / "gitops" / "platform-apps" / "tailscale" / "kustomization.yaml"
-    ).read_text(encoding="utf-8")
-
-    assert "kind: Application" in text
-    assert "path: gitops/platform-apps/tailscale" in text
-    assert "CreateNamespace=true" in text
-    assert "kind: Kustomization" in kustomization_text
-    assert "externalsecret.yaml" in kustomization_text
-
-
 def test_pgadmin4_argo_application_manages_the_platform_overlay():
     text = _pgadmin_app_text()
     kustomization_text = (
@@ -4147,8 +4047,8 @@ def test_pgadmin4_argo_application_manages_the_platform_overlay():
     assert "kind: Application" in text
     assert "path: gitops/platform-apps/pgadmin4" in text
     assert "CreateNamespace=true" in text
-    assert "name: pgadmin4-wiredoor" in text
-    assert "name: pgadmin4-tailscale" in text
+    assert "name: pgadmin4-wiredoor" not in text
+    assert "name: pgadmin4-tailscale" not in text
     assert "Host(`pgadmin4.__ZONE_NAME__`)" in text
     assert "kind: Kustomization" in kustomization_text
     assert "configmap.yaml" in kustomization_text

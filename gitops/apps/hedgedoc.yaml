@@ -34,20 +34,6 @@ spec:
               - op: replace
                 path: /spec/routes/0/match
                 value: Host(`hedgedoc.__ZONE_NAME__`)
-          - target:
-              kind: IngressRoute
-              name: hedgedoc-wiredoor
-            patch: |-
-              - op: replace
-                path: /spec/routes/0/match
-                value: Host(`hedgedoc.__ZONE_NAME__`)
-          - target:
-              kind: IngressRoute
-              name: hedgedoc-tailscale
-            patch: |-
-              - op: replace
-                path: /spec/routes/0/match
-                value: Host(`hedgedoc.__ZONE_NAME__`)
     - repoURL: __REPO_URL__
       targetRevision: __TARGET_REVISION__
       path: gitops/databases/hedgedoc

@@ -28,43 +28,6 @@ spec:
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: opencloud-wiredoor
-  namespace: opencloud
-spec:
-  entryPoints:
-    - webwiredoor
-  routes:
-    - kind: Rule
-      match: Host(`opencloud.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: opencloud
-          port: 9200
-          scheme: https
-          serversTransport: opencloud-insecure
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: opencloud-tailscale
-  namespace: opencloud
-spec:
-  entryPoints:
-    - webtailscale
-  routes:
-    - kind: Rule
-      match: Host(`opencloud.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: opencloud
-          port: 9200
-          scheme: https
-          serversTransport: opencloud-insecure
-  tls: {}
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
   name: collabora
   namespace: opencloud
 spec:
@@ -82,77 +45,11 @@ spec:
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: collabora-wiredoor
-  namespace: opencloud
-spec:
-  entryPoints:
-    - webwiredoor
-  routes:
-    - kind: Rule
-      match: Host(`opencloud-collabora.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: opencloud-collabora
-          port: 9980
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: collabora-tailscale
-  namespace: opencloud
-spec:
-  entryPoints:
-    - webtailscale
-  routes:
-    - kind: Rule
-      match: Host(`opencloud-collabora.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: opencloud-collabora
-          port: 9980
-  tls: {}
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
   name: wopiserver
   namespace: opencloud
 spec:
   entryPoints:
     - websecure
-  routes:
-    - kind: Rule
-      match: Host(`opencloud-wopiserver.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: opencloud-collaboration
-          port: 9300
-  tls: {}
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: wopiserver-wiredoor
-  namespace: opencloud
-spec:
-  entryPoints:
-    - webwiredoor
-  routes:
-    - kind: Rule
-      match: Host(`opencloud-wopiserver.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: opencloud-collaboration
-          port: 9300
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: wopiserver-tailscale
-  namespace: opencloud
-spec:
-  entryPoints:
-    - webtailscale
   routes:
     - kind: Rule
       match: Host(`opencloud-wopiserver.__ZONE_NAME__`)

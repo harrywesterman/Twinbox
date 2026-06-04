@@ -30,13 +30,6 @@ spec:
               - op: replace
                 path: /spec/routes/0/match
                 value: Host(`prometheus.__ZONE_NAME__`)
-          - target:
-              kind: IngressRoute
-              name: prometheus-wiredoor
-            patch: |-
-              - op: replace
-                path: /spec/routes/0/match
-                value: Host(`prometheus.__ZONE_NAME__`)
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring

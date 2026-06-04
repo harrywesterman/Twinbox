@@ -69,7 +69,6 @@ nav:
       - Authentik: authentik.md
       - NetBird: netbird.md
       - Mailu: mailu.md
-      - Wiredoor bastion: wiredoor-bastion.md
       - CrowdSec: crowdsec.md
       - Ntfy: ntfy.md
       - Argo CD image updater: argocd-image-updater.md

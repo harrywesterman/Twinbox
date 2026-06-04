@@ -25,20 +25,6 @@ spec:
             - op: replace
               path: /spec/routes/0/match
               value: Host(`searxng.__ZONE_NAME__`)
-        - target:
-            kind: IngressRoute
-            name: searxng-wiredoor
-          patch: |-
-            - op: replace
-              path: /spec/routes/0/match
-              value: Host(`searxng.__ZONE_NAME__`)
-        - target:
-            kind: IngressRoute
-            name: searxng-tailscale
-          patch: |-
-            - op: replace
-              path: /spec/routes/0/match
-              value: Host(`searxng.__ZONE_NAME__`)
   destination:
     server: https://kubernetes.default.svc
     namespace: searxng

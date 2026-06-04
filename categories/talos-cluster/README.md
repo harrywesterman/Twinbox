@@ -39,15 +39,9 @@ categories/talos-cluster/
 |------|-------------|
 | `choose-ingress-route` | Choose the ingress branch for this cluster |
 | `install-traefik` | Deploy Traefik ingress controller |
-| `configure-cloudflare-dns` | Configure Cloudflare DNS records |
 | `configure-cloudflare-tunnel` | Configure Cloudflare Tunnel for external access |
-| `configure-metallb-ingress` | Configure MetalLB load balancer for bare-metal ingress |
-| `configure-tailscale-ingress` | Configure Tailscale ingress and VPN access |
-| `configure-wiredoor-ingress` | Configure Wiredoor VPN ingress |
 | `configure-netbird-ingress` | Configure NetBird SSO, routing groups, and setup keys |
 | `provision-netbird-bastion` | Provision the self-hosted NetBird VPS |
-| `provision-wiredoor-bastion` | Provision the Wiredoor bastion host |
-| `install-wiredoor-gateway` | Deploy Wiredoor gateway into Kubernetes |
 | `install-netbird-routing-peers` | Deploy NetBird routing peers to Kubernetes |
 | `configure-netbird-admin-access` | Enroll the Management VM as a NetBird admin peer |
 

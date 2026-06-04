@@ -31,20 +31,6 @@ spec:
                   path: /spec/routes/0/match
                   value: Host(`admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
-                kind: IngressRoute
-                name: dashy-wiredoor
-              patch: |-
-                - op: replace
-                  path: /spec/routes/0/match
-                  value: Host(`admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-            - target:
-                kind: IngressRoute
-                name: dashy-tailscale
-              patch: |-
-                - op: replace
-                  path: /spec/routes/0/match
-                  value: Host(`admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-            - target:
                 kind: Deployment
                 name: dashy
               patch: |-

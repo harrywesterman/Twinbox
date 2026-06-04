@@ -5,11 +5,7 @@ SYNC_SCRIPT = REPO_ROOT / "scripts" / "manager" / "sync-openbao-global-secret.sh
 OPENBAO_HELPER = REPO_ROOT / "scripts" / "manager" / "openbao-secret-sync.sh"
 UPGRADE_SCRIPT = REPO_ROOT / "scripts" / "manager" / "upgrade-cluster.sh"
 GRAFANA_STEP = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-grafana" / "run.sh"
-WIREDOOR_STEP = (
-    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-wiredoor-gateway" / "run.sh"
-)
 GRAFANA_SECRET = REPO_ROOT / "gitops" / "platform" / "grafana" / "externalsecret.yaml"
-WIREDOOR_SECRET = REPO_ROOT / "gitops" / "apps" / "wiredoor-gateway-secret" / "externalsecret.yaml"
 TRAEFIK_SECRET = (
     REPO_ROOT / "gitops" / "platform" / "traefik" / "traefik-dashboard-externalsecret.yaml"
 )
@@ -142,20 +138,6 @@ def test_grafana_step_generates_and_syncs_an_oidc_secret():
     )
 
 
-def test_wiredoor_step_requires_url_generates_token_and_syncs_to_openbao():
-    text = _read(WIREDOOR_STEP)
-
-    assert 'mkdir -p "$(dirname "$wiredoor_secret_file")"' in text
-    assert 'if [[ ! -f "$wiredoor_secret_file" ]]; then' in text
-    assert 'wiredoor_url="${WIREDOOR_URL:-${TWINBOX_WIREDOOR_URL:-}}"' in text
-    assert "openssl rand -hex 24" in text
-    assert 'wiredoor_secret_file="$BOOTSTRAP_ROOT/secrets/global/wiredoor-gateway.json"' in text
-    assert "WIREDOOR_URL missing in $wiredoor_secret_file" in text
-    assert "scripts/manager/sync-openbao-global-secret.sh" in text
-    assert '--secret-name "wiredoor-gateway"' in text
-    assert '--required-keys "WIREDOOR_URL,TOKEN"' in text
-
-
 def test_portal_step_and_secret_project_authentik_management_env():
     step_text = _read(PORTAL_STEP)
     secret_text = _read(PORTAL_SECRET)
@@ -201,7 +183,6 @@ def test_beszel_step_uses_hub_public_key_and_universal_token_secret():
 
 def test_gitops_secret_consumers_now_reference_cluster_secret_store_openbao():
     grafana_text = _read(GRAFANA_SECRET)
-    wiredoor_text = _read(WIREDOOR_SECRET)
     traefik_text = _read(TRAEFIK_SECRET)
     crowdsec_bouncer_text = _read(CROWDSEC_BOUNCER_SECRET)
     crowdsec_lapi_text = _read(CROWDSEC_LAPI_SECRET)
@@ -214,11 +195,6 @@ def test_gitops_secret_consumers_now_reference_cluster_secret_store_openbao():
     assert "property: GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET" in grafana_text
     assert "property: GF_SECURITY_ADMIN_USER" in grafana_text
     assert "property: GF_SECURITY_ADMIN_PASSWORD" in grafana_text
-
-    assert "name: openbao" in wiredoor_text
-    assert "kind: ClusterSecretStore" in wiredoor_text
-    assert "property: WIREDOOR_URL" in wiredoor_text
-    assert "property: TOKEN" in wiredoor_text
 
     assert "name: openbao" in traefik_text
     assert "kind: ClusterSecretStore" in traefik_text

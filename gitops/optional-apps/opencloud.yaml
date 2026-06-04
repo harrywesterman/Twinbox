@@ -102,20 +102,6 @@ spec:
                   value: Host(`opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
-                name: opencloud-wiredoor
-              patch: |-
-                - op: replace
-                  path: /spec/routes/0/match
-                  value: Host(`opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-            - target:
-                kind: IngressRoute
-                name: opencloud-tailscale
-              patch: |-
-                - op: replace
-                  path: /spec/routes/0/match
-                  value: Host(`opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-            - target:
-                kind: IngressRoute
                 name: collabora
               patch: |-
                 - op: replace
@@ -123,35 +109,7 @@ spec:
                   value: Host(`opencloud-collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
-                name: collabora-wiredoor
-              patch: |-
-                - op: replace
-                  path: /spec/routes/0/match
-                  value: Host(`opencloud-collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-            - target:
-                kind: IngressRoute
-                name: collabora-tailscale
-              patch: |-
-                - op: replace
-                  path: /spec/routes/0/match
-                  value: Host(`opencloud-collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-            - target:
-                kind: IngressRoute
                 name: wopiserver
-              patch: |-
-                - op: replace
-                  path: /spec/routes/0/match
-                  value: Host(`opencloud-wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-            - target:
-                kind: IngressRoute
-                name: wopiserver-wiredoor
-              patch: |-
-                - op: replace
-                  path: /spec/routes/0/match
-                  value: Host(`opencloud-wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-            - target:
-                kind: IngressRoute
-                name: wopiserver-tailscale
               patch: |-
                 - op: replace
                   path: /spec/routes/0/match

@@ -31,20 +31,6 @@ spec:
                 - op: replace
                   path: /spec/routes/0/match
                   value: Host(`audiobookshelf.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-            - target:
-                kind: IngressRoute
-                name: audiobookshelf-wiredoor
-              patch: |-
-                - op: replace
-                  path: /spec/routes/0/match
-                  value: Host(`audiobookshelf.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
-            - target:
-                kind: IngressRoute
-                name: audiobookshelf-tailscale
-              patch: |-
-                - op: replace
-                  path: /spec/routes/0/match
-                  value: Host(`audiobookshelf.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
       destination:
         server: https://kubernetes.default.svc
         namespace: audiobookshelf

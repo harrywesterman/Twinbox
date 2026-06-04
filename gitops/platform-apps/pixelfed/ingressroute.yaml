@@ -14,36 +14,3 @@ spec:
           name: pixelfed
           port: 80
   tls: {}
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: pixelfed-wiredoor
-  namespace: pixelfed
-spec:
-  entryPoints:
-    - webwiredoor
-  routes:
-    - kind: Rule
-      match: Host(`pixelfed.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: pixelfed
-          port: 80
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: pixelfed-tailscale
-  namespace: pixelfed
-spec:
-  entryPoints:
-    - webtailscale
-  routes:
-    - kind: Rule
-      match: Host(`pixelfed.__ZONE_NAME__`)
-      services:
-        - kind: Service
-          name: pixelfed
-          port: 80
-  tls: {}
