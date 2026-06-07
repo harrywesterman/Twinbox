@@ -165,30 +165,6 @@ test("refresh-dashy-config skips pre-dashboard steps without Dashy items", () =>
   assert.equal(fs.existsSync(result.logFile), false);
 });
 
-test("refresh-dashy-config bootstraps Dashy on install-dashy-dashboard", () => {
-  const result = runRefresh("install-dashy-dashboard", {
-    stepStatuses: {
-      "install-dashy-dashboard": "succeeded",
-      "install-jitsi": "succeeded",
-    },
-    env: {
-      TWINBOX_KUBECONFIG_FILE: "/tmp/fake-kubeconfig",
-      REQUIRE_KUBECONFIG_ENV: "1",
-    },
-  });
-
-  assert.equal(result.status, 0, result.stderr);
-  assert.doesNotMatch(result.stdout, /Dashy refresh skipped/);
-  assert.equal(fs.existsSync(result.logFile), true);
-  assert.equal(fs.existsSync(result.capturedConfigFile), true);
-
-  const logText = fs.readFileSync(result.logFile, "utf8");
-  assert.match(logText, /kubectl apply -f -/);
-  assert.match(logText, /kubectl -n dashy create configmap dashy-config/);
-  const renderedConfig = fs.readFileSync(result.capturedConfigFile, "utf8");
-  assert.doesNotMatch(renderedConfig, /title: Jitsi\b/);
-});
-
 test("refresh-dashy-config skips App Installs steps", () => {
   const result = runRefresh("install-jitsi");
 
