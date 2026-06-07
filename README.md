@@ -88,7 +88,10 @@ Twinbox installs a complete Kubernetes operations stack:
 Install additional applications through the Twinbox Portal:
 
 - **Audiobookshelf** - audiobook and podcast server
+- **Coder** - A cloud development environment for your team.
 - **FreshRSS** - self-hosted RSS feed reader
+- **Mailu** - Self-hosted email with Mailu on Kubernetes and Postform on the NetBird bastion.
+- **Matrix Chat** - Federated chat with end-to-end encryption, so you control your conversations.
 - **HedgeDoc** - real-time collaborative markdown editor
 - **Immich** - photo and video backup
 - **Jitsi** - video conferencing with OpenID Connect
