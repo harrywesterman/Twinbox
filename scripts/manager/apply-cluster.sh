@@ -154,6 +154,7 @@ resolve_talos_image_assets
 
 download_talos_image() {
   local target_path="$1"
+  local tmpdir=""
   local tmp_compressed=""
   local tmp_image=""
 
@@ -165,13 +166,14 @@ download_talos_image() {
     return 0
   fi
 
-  tmp_compressed="$(mktemp "${image_cache_dir%/}/talos-image-XXXXXX.raw.xz")"
-  tmp_image="$(mktemp "${image_cache_dir%/}/talos-image-XXXXXX.img")"
+  tmpdir="$(mktemp -d "${image_cache_dir%/}/talos-image-XXXXXX")"
+  tmp_compressed="${tmpdir}/image.raw.xz"
+  tmp_image="${tmpdir}/image.img"
   log "Downloading Talos disk image to ${target_path}"
   curl -fsSL --retry 3 --retry-delay 2 --output "$tmp_compressed" "$image_disk_url"
   xz -dc "$tmp_compressed" > "$tmp_image"
   mv "$tmp_image" "$target_path"
-  rm -f "$tmp_compressed"
+  rm -rf "$tmpdir"
   talos_image_local_path="$target_path"
 }
 
@@ -940,6 +942,7 @@ write_node_patch() {
       echo "    node.longhorn.io/create-default-disk: \"true\""
     fi
     echo "  network:"
+    echo "    hostname: ${NAME}-${name}"
     [[ -n "$nameserver_block" ]] && printf '%s' "$nameserver_block"
     [[ -n "$search_domain_block" ]] && printf '%s' "$search_domain_block"
     echo "    interfaces:"

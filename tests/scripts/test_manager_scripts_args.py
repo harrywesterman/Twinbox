@@ -720,6 +720,15 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert '--set-string "k8sServicePort=6443"' in text
 
 
+def test_talos_node_hostname_matches_proxmox_vm_name():
+    script_text = _apply_cluster_text()
+    module_text = MODULE_MAIN.read_text(encoding="utf-8")
+
+    assert 'name      = "${var.cluster_name}-${each.key}"' in module_text
+    assert 'write_node_patch "$name" "$type" "$mac" "$patch_file"' in script_text
+    assert 'echo "    hostname: ${NAME}-${name}"' in script_text
+
+
 def test_longhorn_step_installs_via_argocd_and_waits_for_health():
     step_text = _longhorn_step_text()
     step_manifest_text = _longhorn_step_manifest_text()
