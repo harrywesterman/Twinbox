@@ -17,9 +17,9 @@ In the current Twinbox implementation, NetBird is used for four related paths:
 | --- | --- | --- |
 | NetBird bastion | Hetzner Cloud VPS | Runs the self-hosted NetBird server, dashboard, management API, embedded relay/proxy stack, Docker, and Traefik for the NetBird hostname. |
 | NetBird Reverse Proxy | Bastion Docker stack | Terminates public HTTPS for app hostnames such as `authentik.ZONE` and forwards requests into the NetBird network. |
-| NetBird network resources | NetBird management API | Defines the internal Traefik target, groups, setup keys, routes, and policies. |
+| NetBird network resources | NetBird management API | Defines the internal Traefik ClusterIP target, groups, setup keys, routes, and policies. |
 | Routing peer | Kubernetes namespace `netbird` | Runs `netbirdio/netbird:0.70.5` with privileged networking and forwards proxy traffic to the cluster service network. |
-| Traefik NetBird backend | Kubernetes service `traefik/traefik-netbird` | Headless service exposing Traefik's `webnetbird` entrypoint on port `8082`. |
+| Traefik NetBird backend | Kubernetes service `traefik/traefik` | Stable ClusterIP service exposing Traefik's `websecure` entrypoint on port `443`. |
 | Authentik OIDC app | Authentik | Lets NetBird use Twinbox Authentik as its identity provider. |
 | Management VM peer | Management VM | Enrolls the Management VM as `twinbox-mgmt-<cluster-slug>` for admin access and local LAN routing. |
 | Hetzner exit peer | NetBird bastion | Runs a separate Dockerized NetBird client named `twinbox-<cluster-id>-hetzner-exit` for opt-in internet exit traffic. |
@@ -37,14 +37,14 @@ flowchart LR
     end
 
     subgraph nb["NetBird network"]
-        resource["Network resource\ntraefik-netbird.traefik.svc.cluster.local"]
+        resource["Network resource\nTraefik ClusterIP"]
         route["Route\nKubernetes service CIDR"]
     end
 
     subgraph cluster["Twinbox Kubernetes cluster"]
         peer["netbird-routing-peer\nDeployment"]
-        svc["traefik-netbird\nheadless Service"]
-        traefik["Traefik webnetbird\nport 8082"]
+        svc["traefik\nClusterIP Service"]
+        traefik["Traefik websecure\nport 443"]
         apps["Twinbox apps"]
         authentik["Authentik"]
     end
@@ -111,7 +111,7 @@ during application installation by the `ensure-netbird-service.sh` helper. Each
 service targets the NetBird network resource for the internal Traefik backend:
 
 ```text
-traefik-netbird.traefik.svc.cluster.local:8082
+<traefik-cluster-ip>:443
 ```
 
 Services are created per-application as each `install-*` step runs, using the
@@ -119,12 +119,13 @@ helper script that reads credentials from the bastion secret. The
 `configure-netbird-ingress` step no longer creates services — only groups,
 routes, setup keys, and the Traefik resource.
 
-Inside Kubernetes, `gitops/platform/traefik/traefik-netbird-service.yaml`
-creates a headless service named `traefik-netbird`. That service selects the
-Traefik pods and forwards to the `webnetbird` entrypoint. Routes that must work
-through NetBird use that entrypoint; Authentik has a dedicated
-`authentik-netbird` IngressRoute so OIDC discovery is reachable before NetBird
-SSO is registered.
+Inside Kubernetes, NetBird targets Traefik's stable `traefik` ClusterIP service
+on the `websecure` entrypoint. This avoids pinning NetBird reverse proxy
+services to transient Traefik pod IPs, which would break when pods are replaced
+during Talos or Kubernetes upgrades. Because Twinbox runs Cilium in
+kube-proxy-free mode, `config/cilium-values.yaml` enables
+`bpf.lbExternalClusterIP` so NetBird-routed traffic can be load-balanced to
+ClusterIP services from outside the normal pod-to-service path.
 
 ## Wizard Flow
 
@@ -225,7 +226,7 @@ Inputs:
 | --- | --- | --- |
 | `netbird_token` | No | Uses `NETBIRD_SETUP_TOKEN` from the bastion secret when omitted. |
 | `netbird_management_url` | No | Uses `NETBIRD_URL` from the bastion secret when omitted. |
-| `traefik_resource_address` | No | Defaults to `traefik-netbird.traefik.svc.cluster.local`. |
+| `traefik_resource_address` | No | Defaults to the discovered Traefik ClusterIP. |
 | `proxy_services_json` | No | Extra reverse proxy services. Authentik is always included. Services are auto-created during application installation; this form is for initial setup only. |
 
 The step runs three OpenTofu modules:
@@ -264,7 +265,8 @@ Network and policy details:
 
 - NetBird network name: `twinbox-<cluster-id>`
 - Traefik resource: `twinbox-<cluster-id>-traefik`
-- Traefik resource address: `traefik-netbird.traefik.svc.cluster.local` by default
+- Traefik resource address: discovered Traefik ClusterIP by default
+- Traefik target port: `443` (`websecure`)
 - Kubernetes service route: discovered from the API server, falling back to `10.96.0.0/12`
 - Management VM LAN route: detected from the Management VM IP/interface and distributed to admins/exit node users
 - Hetzner exit route: `0.0.0.0/0`, distributed to admins/exit node users
@@ -275,7 +277,7 @@ Network and policy details:
 - Route `groups`: proxy group
 - Route `peer_groups`: Kubernetes routing peer group
 - LAN and exit routes set `masquerade = true` and `skip_auto_apply = true`
-- Reverse proxy policy: allows the NetBird `All` group to reach the Traefik resource on TCP `8082`
+- Reverse proxy policy: allows the NetBird `All` group to reach the Traefik resource on TCP `443`
 - Admin policies: allow the admins group to reach the Management VM group on SSH, manager web, and manager API ports
 - ICMP policies allow admin/exit node users to select the LAN and internet exit routes
 
@@ -382,8 +384,7 @@ gitops/platform/authentik/netbird-forwarded-headers-middleware.yaml
 
 The forwarded-header middleware forces `X-Forwarded-Proto=https` and
 `X-Forwarded-Port=443` for the NetBird path so Authentik emits public HTTPS OIDC
-URLs even though the in-cluster backend connection is plain HTTP on the
-`webnetbird` entrypoint.
+URLs even though the request entered through the NetBird reverse proxy path.
 
 ## DNS Nameserver Integration
 
@@ -506,11 +507,13 @@ kubectl -n netbird rollout status deployment/netbird-routing-peer
 ### Check the Traefik backend
 
 ```bash
-kubectl -n traefik get svc traefik-netbird
-kubectl -n traefik get endpointslice -l kubernetes.io/service-name=traefik-netbird
+kubectl -n traefik get svc traefik
+kubectl -n traefik get endpointslice -l kubernetes.io/service-name=traefik
+kubectl -n kube-system get configmap cilium-config -o jsonpath='{.data.bpf-lb-external-clusterip}'
 ```
 
-The service should expose port `8082` and have ready endpoints for Traefik pods.
+The service should expose port `443`, have ready endpoints for Traefik pods, and
+Cilium should report `true` for external ClusterIP load-balancing.
 
 ### Check NetBird API objects
 
@@ -618,7 +621,7 @@ docker exec netbird-hetzner-exit netbird status
 | Symptom | Likely cause | Check |
 | --- | --- | --- |
 | `netbird-routing-peer` is not created | Argo CD app was not applied or External Secrets is not ready | `kubectl -n argocd get app netbird-routing-peers` and `kubectl -n netbird get externalsecret` |
-| Routing peer starts but proxy cannot reach apps | Traefik NetBird backend has no endpoints or NetBird route/policy is missing | Check `traefik-netbird` EndpointSlices and NetBird `/api/routes`, `/api/policies`. |
+| Routing peer starts but proxy cannot reach apps | Traefik has no ready endpoints, the NetBird route/policy is missing, or Cilium external ClusterIP load-balancing is disabled | Check Traefik EndpointSlices, NetBird `/api/routes` and `/api/policies`, and `kubectl -n kube-system get configmap cilium-config -o jsonpath='{.data.bpf-lb-external-clusterip}'`. |
 | Authentik OIDC discovery fails | The `authentik-netbird` route, forwarded-header middleware, NetBird reverse proxy service, or routing peer is missing/stale | Fetch `https://authentik.<public-zone>/.well-known/openid-configuration` through the public NetBird path and compare NetBird proxy plus in-cluster Authentik logs. |
 | Browser lands on `https://authentik.<public-zone>/application/o/authorize/` and sees `404 page not found` | Bastion Traefik is terminating Authentik as HTTP instead of passing raw TLS to NetBird Reverse Proxy. The usual cause is that bastion Traefik serves a wildcard certificate for `netbird.<public-zone>`, allowing browser HTTP/2 connection coalescing. | Confirm the NetBird certificate has only `DNS:netbird.<public-zone>`, confirm there is no bastion HTTP wildcard router, and confirm `authentik.<public-zone>` uses the TCP passthrough route. |
 | Browser or strict `curl` shows a certificate error for NetBird | Let's Encrypt issuance is still pending or the exact hostname hit a temporary rate limit; the bastion may be serving Traefik's default self-signed certificate | Check `/var/log/cloud-init-output.log` on the bastion and retry after the rate-limit window. The install can continue if the NetBird setup token was created. |

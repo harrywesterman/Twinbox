@@ -500,7 +500,12 @@ The proxy domain is `<zone>` (e.g. `bierineenweek.nl`), not `proxy.<zone>`. Apps
 
 ### Proxy & Routing
 
-The proxy service targets a **NetBird resource** (the Traefik ClusterIP), not the upstream service directly. The eBPF-based wgProxy handles tunnel backhaul between the bastion and in-cluster services, allowing the NetBird server to route traffic to internal Traefik services on the proxy subnet `10.96.0.0/12`.
+The proxy service targets a **NetBird resource** (the Traefik ClusterIP), not
+the upstream service directly. The eBPF-based wgProxy handles tunnel backhaul
+between the bastion and in-cluster services, allowing the NetBird server to
+route traffic to internal Traefik services on the proxy subnet `10.96.0.0/12`.
+Because Twinbox runs Cilium in kube-proxy-free mode, `bpf.lbExternalClusterIP`
+must stay enabled so this routed traffic can reach ClusterIP services.
 
 ## App Bundle Architecture
 

@@ -698,6 +698,8 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert "ipam:" in values_text
     assert "mode: kubernetes" in values_text
     assert "kubeProxyReplacement: true" in values_text
+    assert "bpf:" in values_text
+    assert "lbExternalClusterIP: true" in values_text
     assert (
         "The bootstrap scripts override these values with the cluster VIP/API endpoint."
         in values_text
