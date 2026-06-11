@@ -1122,7 +1122,7 @@ def test_manager_worker_image_includes_talos_image_factory_helper():
     assert "../../lib/catalog-definitions.mjs" in refresh_portal_text
     assert "../../manager-api/src/lib/catalog-definitions.mjs" not in refresh_dashy_text
     assert "../../manager-api/src/lib/catalog-definitions.mjs" not in refresh_portal_text
-    assert "apk add --no-cache bash ca-certificates curl docker-cli jq" in text
+    assert "apk add --no-cache bash ca-certificates curl docker-cli docker-cli-compose jq" in text
     assert "iproute2" in text
     assert "COPY scripts/get-talos-image-factory.sh ./scripts/get-talos-image-factory.sh" in text
     assert "RUN chmod +x ./scripts/get-talos-image-factory.sh" in text

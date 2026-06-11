@@ -5,7 +5,7 @@ WORKDIR /opt/twinbox
 COPY config ./config
 
 RUN apk update \
-  && apk add --no-cache bash ca-certificates curl docker-cli jq iproute2 openssh-client openssl python3 tar xz sudo \
+  && apk add --no-cache bash ca-certificates curl docker-cli docker-cli-compose jq iproute2 openssh-client openssl python3 tar xz sudo \
   && . /opt/twinbox/config/pinned-defaults.sh \
   && curl -fsSL "https://github.com/siderolabs/talos/releases/download/${PINNED_TALOS_VERSION}/talosctl-linux-amd64" -o /tmp/talosctl \
   && curl -fsSL "https://github.com/opentofu/opentofu/releases/download/${PINNED_OPENTOFU_VERSION}/tofu_${PINNED_OPENTOFU_VERSION#v}_linux_amd64.tar.gz" -o /tmp/tofu.tar.gz \
