@@ -113,8 +113,24 @@ for attempt in $(seq 1 60); do
   sleep 2
 done
 
+ensure_beszel_superuser() {
+  docker exec twinbox-beszel /beszel superuser upsert "$beszel_user_email" "$beszel_user_password" >/dev/null
+}
+
+log "Ensuring Beszel PocketBase superuser"
+ensure_beszel_superuser
+
 beszel_authenticate_superuser() {
   local response token
+
+  response="$(curl -sf -X POST "${beszel_local_url}/api/collections/_superusers/auth-with-password" \
+    -H "Content-Type: application/json" \
+    -d "$(jq -cn --arg identity "$beszel_user_email" --arg password "$beszel_user_password" '{identity: $identity, password: $password}')" 2>/dev/null || true)"
+  token="$(jq -r '.token // empty' <<<"$response")"
+  if [[ -n "$token" ]]; then
+    printf '%s\n' "$token"
+    return 0
+  fi
 
   response="$(curl -sf -X POST "${beszel_local_url}/api/superusers/auth-with-password" \
     -H "Content-Type: application/json" \
