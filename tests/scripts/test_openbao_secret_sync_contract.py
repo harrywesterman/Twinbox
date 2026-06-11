@@ -180,6 +180,7 @@ def test_beszel_step_uses_hub_public_key_and_universal_token_secret():
     assert "kubectl delete application beszel-agents" not in text
     assert "kubectl apply -f -" not in text
 
+    assert "apiVersion: external-secrets.io/v1" in secret_text
     assert "secretKey: hub_url" in secret_text
     assert "property: hub_url" in secret_text
     assert "name: HUB_URL" in daemonset_text
