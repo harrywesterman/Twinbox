@@ -167,6 +167,9 @@ def test_beszel_step_uses_hub_public_key_and_universal_token_secret():
     assert 'beszel_local_url="${BESZEL_LOCAL_URL:-http://beszel:8090}"' in text
     assert "ensure_beszel_superuser" in text
     assert "/api/collections/_superusers/auth-with-password" in text
+    assert 'matching_mode: "strict"' in text
+    assert "url: $redirect_uri" in text
+    assert 'redirect_uri_type: "authorization"' in text
     assert 'beszel_api_get "/api/beszel/info"' in text
     assert "upsert_beszel_universal_token" in text
     assert "/api/collections/universal_tokens/records" in text

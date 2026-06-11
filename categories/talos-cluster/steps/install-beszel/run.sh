@@ -378,7 +378,7 @@ provider_payload="$(
     --arg name "Beszel Monitoring" \
     --arg client_id "$beszel_client_id" \
     --arg client_secret "$beszel_client_secret" \
-    --arg redirect_uris "$beszel_redirect_uri" \
+    --arg redirect_uri "$beszel_redirect_uri" \
     --arg authorization_flow "$authorization_flow_id" \
     --arg invalidation_flow "$invalidation_flow_id" \
     --arg signing_key "$signing_key_id" \
@@ -391,7 +391,11 @@ provider_payload="$(
       invalidation_flow: $invalidation_flow,
       client_id: $client_id,
       client_secret: $client_secret,
-      redirect_uris: [$redirect_uris],
+      redirect_uris: [{
+        matching_mode: "strict",
+        url: $redirect_uri,
+        redirect_uri_type: "authorization"
+      }],
       property_mappings: [$openid, $email, $profile],
       signing_key: $signing_key,
       include_claims_in_id_token: true,
