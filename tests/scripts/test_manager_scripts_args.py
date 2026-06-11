@@ -582,7 +582,9 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert "TALOS_IMAGE_DISK_URL=" in text
     assert "talosctl apply-config \\" in text
     assert '--endpoints "$ip" \\' in text
-    assert "Insecure Talos apply failed for ${ip}; retrying without --insecure" in text
+    assert "retrying with cluster talosconfig" in text
+    assert "Resetting Talos node ${ip} to retry config application from clean state" in text
+    assert "wait_for_talos_insecure" in text
     assert "AlreadyExists desc = etcd data directory is not empty" in text
     assert "talosctl bootstrap" in text
     assert 'bootstrap_mode = "dhcp-first"' in text

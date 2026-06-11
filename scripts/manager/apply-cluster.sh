@@ -1071,23 +1071,67 @@ generate_talos_configs() {
     ' <<<"$nodes_json")
 }
 
+wait_for_talos_insecure() {
+  local label="$1"
+  local candidate="$2"
+  local attempts=60
+
+  while [[ "$attempts" -gt 0 ]]; do
+    if talosctl version \
+      --insecure \
+      --nodes "$candidate" \
+      --endpoints "$candidate" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 5
+    attempts=$((attempts - 1))
+  done
+
+  fail "Timed out waiting for Talos API (insecure) on ${label} at ${candidate}"
+}
+
 apply_node_config() {
   local ip="$1"
   local config_file="$2"
+  local output=""
+
   log "Applying Talos config to ${ip} with --insecure"
-  if ! talosctl apply-config \
+  output="$(talosctl apply-config \
     --insecure \
     --nodes "$ip" \
     --endpoints "$ip" \
     --talosconfig "$talosconfig_file" \
-    --file "$config_file" 2>&1; then
-    log "Insecure Talos apply failed for ${ip}; retrying without --insecure"
-    talosctl apply-config \
+    --file "$config_file" 2>&1)" && return 0
+
+  if grep -q 'static hostname is already set' <<<"$output"; then
+    log "Node ${ip} already has a Talos config; retrying with cluster talosconfig"
+    if output="$(talosctl apply-config \
       --nodes "$ip" \
       --endpoints "$ip" \
       --talosconfig "$talosconfig_file" \
-      --file "$config_file"
+      --file "$config_file" 2>&1)"; then
+      return 0
+    fi
   fi
+
+  log "Resetting Talos node ${ip} to retry config application from clean state"
+  talosctl reset \
+    --insecure \
+    --nodes "$ip" \
+    --endpoints "$ip" \
+    --reboot \
+    --wait=false 2>&1 || true
+
+  log "Waiting for Talos node ${ip} to reboot and accept insecure connections"
+  wait_for_talos_insecure "node" "$ip"
+
+  log "Applying Talos config to ${ip} with --insecure after reset"
+  talosctl apply-config \
+    --insecure \
+    --nodes "$ip" \
+    --endpoints "$ip" \
+    --talosconfig "$talosconfig_file" \
+    --file "$config_file"
 }
 
 bootstrap_cluster() {
