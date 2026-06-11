@@ -33,6 +33,13 @@ def test_docker_compose_exposes_filesystem_secret_contract():
     assert "bitwarden" not in text
 
 
+def test_docker_compose_beszel_has_safe_app_url_fallback():
+    text = (REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+
+    assert "APP_URL=${BESZEL_APP_URL:-http://127.0.0.1:8090}" in text
+    assert "APP_URL=${BESZEL_APP_URL:-}" not in text
+
+
 def test_env_example_includes_filesystem_bootstrap_contract():
     text = (REPO_ROOT / ".env.example").read_text(encoding="utf-8")
 

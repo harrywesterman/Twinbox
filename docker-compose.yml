@@ -113,7 +113,7 @@ services:
     container_name: twinbox-beszel
     restart: unless-stopped
     environment:
-      - APP_URL=${BESZEL_APP_URL:-}
+      - APP_URL=${BESZEL_APP_URL:-http://127.0.0.1:8090}
       - DISABLE_PASSWORD_AUTH=true
       - SHARE_ALL_SYSTEMS=true
       - USER_CREATION=true
