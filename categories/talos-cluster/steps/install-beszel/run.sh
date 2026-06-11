@@ -7,6 +7,7 @@ set -euo pipefail
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 source "$WORKSPACE_ROOT/config/pinned-defaults.sh"
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
+source "$WORKSPACE_ROOT/scripts/manager/management-ip.sh"
 source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
 source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"
 
@@ -49,6 +50,7 @@ beszel_app_url="https://beszel.${public_zone_name}"
 beszel_local_url="${BESZEL_LOCAL_URL:-http://beszel:8090}"
 beszel_user_email="beszel-admin@${public_zone_name}"
 env_file="/opt/twinbox/.env"
+management_consoles_dir="$WORKSPACE_ROOT/gitops/platform/management-consoles"
 
 log "Installing Beszel Monitoring for zone: ${public_zone_name}"
 
@@ -97,6 +99,22 @@ set_env_var "BESZEL_APP_URL" "$beszel_app_url"
 set_env_var "BESZEL_USER_EMAIL" "$beszel_user_email"
 set_env_var "BESZEL_USER_PASSWORD" "$beszel_user_password"
 set_env_var "BESZEL_VERSION" "${BESZEL_VERSION:-${PINNED_BESZEL_VERSION:-0.18.7}}"
+
+apply_beszel_traefik_route() {
+  local management_ip
+
+  management_ip="${MANAGEMENT_VM_IP:-}"
+  if [[ -z "$management_ip" ]]; then
+    management_ip="$(resolve_management_vm_ip)" || fail "Unable to resolve Management VM IP for Beszel route"
+  fi
+
+  kubectl create namespace longhorn-system --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  kubectl apply -f "$management_consoles_dir/beszel-service.yaml" >/dev/null
+  sed "s/__MGMT_HOST_IP__/${management_ip}/g" \
+    "$management_consoles_dir/beszel-endpoints.yaml" | kubectl apply -f - >/dev/null
+  sed "s/__ZONE_NAME__/${public_zone_name}/g" \
+    "$management_consoles_dir/beszel-ingressroute.yaml" | kubectl apply -f - >/dev/null
+}
 
 log "Starting Beszel hub"
 (cd "$WORKSPACE_ROOT" && docker compose up -d beszel)
@@ -470,6 +488,9 @@ if [[ -n "$existing_collection" ]]; then
   beszel_api_write PATCH "/api/collections/users" "$updated_options" >/dev/null || \
     log "WARNING: Failed to configure OIDC provider in Beszel PocketBase"
 fi
+
+log "Configuring Beszel Traefik route"
+apply_beszel_traefik_route
 
 log "Registering Beszel NetBird service"
 bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \

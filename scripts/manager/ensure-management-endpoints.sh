@@ -18,7 +18,7 @@ fi
 proxmox_ip="${PROXMOX_HOST:-}"
 [[ -n "$proxmox_ip" ]] || fail "PROXMOX_HOST is required to render management endpoints"
 
-for endpoint_file in proxmox-endpoints.yaml seaweedfs-endpoints.yaml webwizard-endpoints.yaml; do
+for endpoint_file in proxmox-endpoints.yaml seaweedfs-endpoints.yaml webwizard-endpoints.yaml beszel-endpoints.yaml; do
   template="$PLATFORM_DIR/management-consoles/$endpoint_file"
   [[ -f "$template" ]] || fail "Endpoint template not found: $template"
 

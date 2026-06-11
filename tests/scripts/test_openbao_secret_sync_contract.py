@@ -165,6 +165,7 @@ def test_beszel_step_uses_hub_public_key_and_universal_token_secret():
     assert "beszel_public_key_from_file" in text
     assert "/opt/twinbox/beszel/data/id_ed25519" in text
     assert 'beszel_local_url="${BESZEL_LOCAL_URL:-http://beszel:8090}"' in text
+    assert 'source "$WORKSPACE_ROOT/scripts/manager/management-ip.sh"' in text
     assert "ensure_beszel_superuser" in text
     assert "/api/collections/_superusers/auth-with-password" in text
     assert 'matching_mode: "strict"' in text
@@ -178,7 +179,10 @@ def test_beszel_step_uses_hub_public_key_and_universal_token_secret():
     assert '--secret-name "beszel-agent"' in text
     assert '--required-keys "key,token,hub_url"' in text
     assert "kubectl delete application beszel-agents" not in text
-    assert "kubectl apply -f -" not in text
+    assert "apply_beszel_traefik_route" in text
+    assert "beszel-service.yaml" in text
+    assert "beszel-endpoints.yaml" in text
+    assert "beszel-ingressroute.yaml" in text
 
     assert "apiVersion: external-secrets.io/v1" in secret_text
     assert "secretKey: hub_url" in secret_text

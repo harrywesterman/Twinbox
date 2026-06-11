@@ -1,0 +1,16 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: beszel
+  namespace: longhorn-system
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`beszel.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: beszel
+          port: 8090
+  tls: {}

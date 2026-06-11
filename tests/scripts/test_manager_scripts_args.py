@@ -2265,6 +2265,8 @@ def test_netbird_proxy_reuses_traefik_websecure_origin():
     assert "clusterIP: None" in traefik_netbird_service_text
     assert "targetPort: webnetbird" in traefik_netbird_service_text
     assert "traefik/traefik-netbird-service.yaml" in platform_kustomization_text
+    assert "management-consoles/beszel-ingressroute.yaml" in platform_kustomization_text
+    assert "management-consoles/beszel-service.yaml" in platform_kustomization_text
 
     assert "name: authentik-netbird" in authentik_ingress_text
     netbird_route_text = authentik_ingress_text.split("name: authentik-netbird", 1)[1]
@@ -4264,10 +4266,38 @@ def test_management_console_endpoints_use_placeholders():
     webwizard_text = (
         REPO_ROOT / "gitops" / "platform" / "management-consoles" / "webwizard-endpoints.yaml"
     ).read_text(encoding="utf-8")
+    beszel_text = (
+        REPO_ROOT / "gitops" / "platform" / "management-consoles" / "beszel-endpoints.yaml"
+    ).read_text(encoding="utf-8")
+    endpoint_script_text = (
+        REPO_ROOT / "scripts" / "manager" / "ensure-management-endpoints.sh"
+    ).read_text(encoding="utf-8")
 
     assert "ip: __PROXMOX_HOST_IP__" in proxmox_text
     assert "ip: __MGMT_HOST_IP__" in seaweedfs_text
     assert "ip: __MGMT_HOST_IP__" in webwizard_text
+    assert "ip: __MGMT_HOST_IP__" in beszel_text
+    assert "beszel-endpoints.yaml" in endpoint_script_text
+
+
+def test_beszel_management_vm_route_uses_native_oidc_without_forwardauth():
+    ingress_text = (
+        REPO_ROOT / "gitops" / "platform" / "management-consoles" / "beszel-ingressroute.yaml"
+    ).read_text(encoding="utf-8")
+    service_text = (
+        REPO_ROOT / "gitops" / "platform" / "management-consoles" / "beszel-service.yaml"
+    ).read_text(encoding="utf-8")
+    platform_ingress_text = PLATFORM_INGRESS_APP.read_text(encoding="utf-8")
+
+    assert "Host(`beszel.__ZONE_NAME__`)" in ingress_text
+    assert "authentik-forwardauth" not in ingress_text
+    assert "port: 8090" in ingress_text
+    assert "port: 8090" in service_text
+    assert "name: beszel" in platform_ingress_text
+    assert (
+        'Host(`beszel.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)'
+        in platform_ingress_text
+    )
 
 
 def test_seaweedfs_admin_routes_to_the_admin_web_port():
