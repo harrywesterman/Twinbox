@@ -1245,8 +1245,8 @@ log_vm_node_map
 
 [[ -n "${image_disk_url:-}" ]] || fail "Talos disk image URL not resolved"
 validate_file_datastore_import_content "$FILE_DATASTORE"
-talos_image_local_path="$image_cache_dir/talos-${CLUSTER_ID}-${image_cache_key}.img"
-talos_image_file_name="talos-${CLUSTER_ID}-${image_cache_key}.img"
+talos_image_local_path="$image_cache_dir/talos-${CLUSTER_ID}-${image_cache_key}.raw"
+talos_image_file_name="talos-${CLUSTER_ID}-${image_cache_key}.raw"
 download_talos_image "$talos_image_local_path"
 target_nodes_json="$(jq -nc --arg proxmox_node "$PROXMOX_NODE" --argjson vm_node_map "$vm_node_map_json" '([ $proxmox_node ] + ($vm_node_map | to_entries | map(.value))) | unique')"
 log "Uploading Talos disk image to Proxmox nodes: $(jq -r 'join(", ")' <<<"$target_nodes_json")"

@@ -8,7 +8,7 @@ locals {
   }
 
   vm_host_map           = var.vm_node_map
-  talos_image_file_name = "talos-${var.cluster_slug}-${var.talos_image_cache_key}.img"
+  talos_image_file_name = "talos-${var.cluster_slug}-${var.talos_image_cache_key}.raw"
   talos_image_file_id   = "${var.file_datastore}:import/${local.talos_image_file_name}"
 }
 

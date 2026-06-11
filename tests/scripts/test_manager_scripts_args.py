@@ -610,10 +610,10 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert "Uploaded Talos disk image to ${node}/${datastore}" in text
     assert "Talos disk image not visible yet on ${node}/${datastore}; retrying in ${delay}s" in text
     assert (
-        'talos_image_local_path="$image_cache_dir/talos-${CLUSTER_ID}-${image_cache_key}.img"'
+        'talos_image_local_path="$image_cache_dir/talos-${CLUSTER_ID}-${image_cache_key}.raw"'
         in text
     )
-    assert 'talos_image_file_name="talos-${CLUSTER_ID}-${image_cache_key}.img"' in text
+    assert 'talos_image_file_name="talos-${CLUSTER_ID}-${image_cache_key}.raw"' in text
     assert "Removing legacy Talos ISO resources from OpenTofu state:" in text
     assert 'state rm "${legacy_addresses[@]}"' in text
     assert "controlplane_ipv4_addresses.value" in text
@@ -2846,7 +2846,7 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     assert "boot_from_disk" not in _module_variables_text()
     assert "vm_host_map = var.vm_node_map" in compact_main_text
     assert (
-        'talos_image_file_name = "talos-${var.cluster_slug}-${var.talos_image_cache_key}.img"'
+        'talos_image_file_name = "talos-${var.cluster_slug}-${var.talos_image_cache_key}.raw"'
         in compact_main_text
     )
     assert (
