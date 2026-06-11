@@ -361,7 +361,7 @@ create_or_update_application() {
   existing_app_json="$(find_application_json_by_slug "$beszel_application_slug")"
   existing_app_pk="$(jq -r '.pk // .id // empty' <<<"$existing_app_json")"
   if [[ -n "$existing_app_pk" ]]; then
-    authentik_api_write PATCH "/core/applications/${existing_app_pk}/" "$application_payload" >/dev/null
+    authentik_api_write PATCH "/core/applications/${beszel_application_slug}/" "$application_payload" >/dev/null
     printf '%s\n' "$existing_app_pk"
     return 0
   fi

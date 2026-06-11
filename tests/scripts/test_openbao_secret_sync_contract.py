@@ -171,6 +171,8 @@ def test_beszel_step_uses_hub_public_key_and_universal_token_secret():
     assert 'matching_mode: "strict"' in text
     assert "url: $redirect_uri" in text
     assert 'redirect_uri_type: "authorization"' in text
+    assert 'PATCH "/core/applications/${beszel_application_slug}/"' in text
+    assert 'PATCH "/core/applications/${existing_app_pk}/"' not in text
     assert 'beszel_api_get "/api/beszel/info"' in text
     assert "upsert_beszel_universal_token" in text
     assert "/api/collections/universal_tokens/records" in text
