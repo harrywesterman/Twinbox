@@ -31,6 +31,13 @@ spec:
                   path: /spec/routes/0/match
                   value: Host(`argocd.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
+                kind: IngressRoute
+                name: argocd-netbird
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`argocd.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
                 kind: ConfigMap
                 name: argocd-cm
               patch: |-
@@ -89,7 +96,21 @@ spec:
                   value: Host(`hubble.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
+                name: hubble-netbird
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`hubble.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
                 name: hubble-authentik-callback
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`hubble.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)
+            - target:
+                kind: IngressRoute
+                name: hubble-authentik-callback-netbird
               patch: |-
                 - op: replace
                   path: /spec/routes/0/match
@@ -103,7 +124,21 @@ spec:
                   value: Host(`traefik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))
             - target:
                 kind: IngressRoute
+                name: traefik-dashboard-netbird
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`traefik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))
+            - target:
+                kind: IngressRoute
                 name: traefik-authentik-callback
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`traefik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)
+            - target:
+                kind: IngressRoute
+                name: traefik-authentik-callback-netbird
               patch: |-
                 - op: replace
                   path: /spec/routes/0/match
@@ -117,7 +152,21 @@ spec:
                   value: Host(`longhorn.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
+                name: longhorn-netbird
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`longhorn.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
                 name: longhorn-authentik-callback
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`longhorn.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)
+            - target:
+                kind: IngressRoute
+                name: longhorn-authentik-callback-netbird
               patch: |-
                 - op: replace
                   path: /spec/routes/0/match
@@ -131,7 +180,21 @@ spec:
                   value: Host(`webwizard.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
+                name: webwizard-netbird
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`webwizard.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
                 name: seaweedfs
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`seaweedfs.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: seaweedfs-netbird
               patch: |-
                 - op: replace
                   path: /spec/routes/0/match
@@ -145,6 +208,13 @@ spec:
                   value: Host(`seaweedfs-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
+                name: seaweedfs-admin-netbird
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`seaweedfs-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
                 name: proxmox
               patch: |-
                 - op: replace
@@ -152,7 +222,21 @@ spec:
                   value: Host(`proxmox.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
+                name: proxmox-netbird
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`proxmox.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
                 name: beszel
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`beszel.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: beszel-netbird
               patch: |-
                 - op: replace
                   path: /spec/routes/0/match

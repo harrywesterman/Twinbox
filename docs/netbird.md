@@ -124,6 +124,11 @@ on the `webnetbird` entrypoint. This avoids pinning NetBird reverse proxy
 services to transient Traefik pod IPs, which would break when pods are replaced
 during Talos or Kubernetes upgrades. It also avoids the public `websecure`
 entrypoint middlewares, which are meant for Cloudflare/public browser traffic.
+Public app and console routes should therefore keep their existing
+`websecure` `IngressRoute` with `tls: {}` and define a matching
+`<name>-netbird` `IngressRoute` on `webnetbird` without `tls`. The two routes
+should use the same `Host(...)` match and backend service definition, and Argo
+CD host patches must cover both route names.
 Because Twinbox runs Cilium in kube-proxy-free mode,
 `config/cilium-values.yaml` enables `bpf.lbExternalClusterIP` and
 `socketLB.hostNamespaceOnly` so NetBird-forwarded packets inside the routing
@@ -629,7 +634,7 @@ docker exec netbird-hetzner-exit netbird status
 | Authentik OIDC discovery fails | The `authentik-netbird` route, forwarded-header middleware, NetBird reverse proxy service, or routing peer is missing/stale | Fetch `https://authentik.<public-zone>/.well-known/openid-configuration` through the public NetBird path and compare NetBird proxy plus in-cluster Authentik logs. |
 | Browser lands on `https://authentik.<public-zone>/application/o/authorize/` and sees `404 page not found` | Bastion Traefik is terminating Authentik as HTTP instead of passing raw TLS to NetBird Reverse Proxy. The usual cause is that bastion Traefik serves a wildcard certificate for `netbird.<public-zone>`, allowing browser HTTP/2 connection coalescing. | Confirm the NetBird certificate has only `DNS:netbird.<public-zone>`, confirm there is no bastion HTTP wildcard router, and confirm `authentik.<public-zone>` uses the TCP passthrough route. |
 | Browser or strict `curl` shows a certificate error for NetBird | Let's Encrypt issuance is still pending or the exact hostname hit a temporary rate limit; the bastion may be serving Traefik's default self-signed certificate | Check `/var/log/cloud-init-output.log` on the bastion and retry after the rate-limit window. The install can continue if the NetBird setup token was created. |
-| Public app hostname resolves but returns no app | Reverse proxy service is missing or targets the wrong Traefik resource (check `netbird-network-<cluster-id>.json`) | Check NetBird reverse proxy services and `netbird-network-<cluster-id>.json`. |
+| Public app hostname resolves but returns no app | Reverse proxy service is missing, targets the wrong Traefik resource, or Traefik has no matching `<app>-netbird` route on `webnetbird` | Check NetBird reverse proxy services, `netbird-network-<cluster-id>.json`, and the rendered `IngressRoute` objects for the app. |
 | Management VM is unreachable over NetBird | The Management VM peer is not enrolled or admin group policy is missing | Check `netbird status`, the `twinbox-netbird` container, NetBird peers, and admin policies. |
 | LAN or Hetzner exit route is visible but not used | Auto Apply is intentionally disabled | Manually select the LAN route or Hetzner exit node in the NetBird client. |
 | Hetzner exit route is missing | The separate bastion exit peer was not enrolled or is down | Check `docker ps --filter name=netbird-hetzner-exit`, NetBird peers, and `/api/routes`. |

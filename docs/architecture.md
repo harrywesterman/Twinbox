@@ -420,8 +420,8 @@ graph TB
         UserApps["User Apps<br/>(Nextcloud, Immich, etc.)"]
     end
 
-    CF -->|"HTTPS"| Traefik
-    NB -->|"NetBird route"| Traefik
+    CF -->|"HTTPS origin / websecure"| Traefik
+    NB -->|"HTTP 8082 / webnetbird"| Traefik
 
     Traefik -->|"forwardAuth"| Auth
     Auth -->|"403 / Headers"| Traefik
@@ -504,6 +504,10 @@ The proxy service targets a **NetBird resource** (the Traefik ClusterIP), not
 the upstream service directly. The eBPF-based wgProxy handles tunnel backhaul
 between the bastion and in-cluster services, allowing the NetBird server to
 route traffic to internal Traefik services on the proxy subnet `10.96.0.0/12`.
+Cloudflare or direct HTTPS origin traffic uses Traefik `websecure`; NetBird
+Reverse Proxy services use Traefik `webnetbird` on `8082/http`. Public apps and
+management consoles should define both route names so either ingress strategy
+works from a fresh GitOps install.
 Because Twinbox runs Cilium in kube-proxy-free mode, `bpf.lbExternalClusterIP`
 and `socketLB.hostNamespaceOnly` must stay enabled so NetBird-forwarded packets
 inside the routing peer pod can reach ClusterIP services through the lower

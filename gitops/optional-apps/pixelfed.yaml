@@ -32,6 +32,13 @@ spec:
                     path: /spec/routes/0/match
                     value: Host(`pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
               - target:
+                  kind: IngressRoute
+                  name: pixelfed-netbird
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`pixelfed.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
                   kind: Deployment
                   name: pixelfed
                 patch: |-

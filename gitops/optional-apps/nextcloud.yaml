@@ -242,7 +242,21 @@ spec:
                     value: Host(`nextcloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
               - target:
                   kind: IngressRoute
+                  name: nextcloud-netbird
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`nextcloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
                   name: collabora
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`nextcloud-collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: collabora-netbird
                 patch: |-
                   - op: replace
                     path: /spec/routes/0/match

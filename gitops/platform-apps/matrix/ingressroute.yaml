@@ -16,6 +16,23 @@ spec:
           port: 80
   tls: {}
 ---
+# Matrix (Synapse) - Public
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: matrix-netbird
+  namespace: matrix
+spec:
+  entryPoints:
+    - webnetbird
+  routes:
+    - kind: Rule
+      match: Host(`matrix.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: ess-synapse-haproxy
+          port: 80
+---
 # Element Web (Chat) - Public
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
@@ -33,6 +50,23 @@ spec:
           name: ess-element-web
           port: 80
   tls: {}
+---
+# Element Web (Chat) - Public
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: chat-netbird
+  namespace: matrix
+spec:
+  entryPoints:
+    - webnetbird
+  routes:
+    - kind: Rule
+      match: Host(`chat.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: ess-element-web
+          port: 80
 ---
 # MAS (Account) - Public
 apiVersion: traefik.io/v1alpha1
@@ -52,6 +86,23 @@ spec:
           port: 80
   tls: {}
 ---
+# MAS (Account) - Public
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: account-netbird
+  namespace: matrix
+spec:
+  entryPoints:
+    - webnetbird
+  routes:
+    - kind: Rule
+      match: Host(`account.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: ess-matrix-authentication-service
+          port: 80
+---
 # Element Admin - Public
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
@@ -70,6 +121,23 @@ spec:
           port: 80
   tls: {}
 ---
+# Element Admin - Public
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: element-admin-netbird
+  namespace: matrix
+spec:
+  entryPoints:
+    - webnetbird
+  routes:
+    - kind: Rule
+      match: Host(`element-admin.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: ess-element-admin
+          port: 80
+---
 # Matrix RTC (Element Call) - Public
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
@@ -87,3 +155,20 @@ spec:
           name: ess-matrix-rtc-sfu
           port: 443
   tls: {}
+---
+# Matrix RTC (Element Call) - Public
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: mrtc-netbird
+  namespace: matrix
+spec:
+  entryPoints:
+    - webnetbird
+  routes:
+    - kind: Rule
+      match: Host(`mrtc.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: ess-matrix-rtc-sfu
+          port: 443

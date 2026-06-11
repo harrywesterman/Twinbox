@@ -2200,7 +2200,7 @@ def test_netbird_service_hostnames_match_ingress_routes():
     ).read_text(encoding="utf-8")
 
 
-def test_netbird_proxy_reuses_traefik_websecure_origin():
+def test_netbird_proxy_uses_traefik_webnetbird_origin():
     network_text = NETBIRD_NETWORK_MODULE_MAIN.read_text(encoding="utf-8")
     proxy_services_text = NETBIRD_PROXY_SERVICES_MODULE_MAIN.read_text(encoding="utf-8")
     proxy_services_vars_text = NETBIRD_PROXY_SERVICES_MODULE_VARS.read_text(encoding="utf-8")

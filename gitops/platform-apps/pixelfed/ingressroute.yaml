@@ -14,3 +14,19 @@ spec:
           name: pixelfed
           port: 80
   tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: pixelfed-netbird
+  namespace: pixelfed
+spec:
+  entryPoints:
+    - webnetbird
+  routes:
+    - kind: Rule
+      match: Host(`pixelfed.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: pixelfed
+          port: 80

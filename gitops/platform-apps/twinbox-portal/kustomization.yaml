@@ -8,6 +8,7 @@ resources:
   - service.yaml
   - deployment.yaml
   - ingressroute.yaml
+  - ingressroute-netbird.yaml
 
 images:
   - name: ghcr.io/harrywesterman/twinbox-portal

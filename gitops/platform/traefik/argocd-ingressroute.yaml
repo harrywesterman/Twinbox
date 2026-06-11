@@ -19,3 +19,24 @@ spec:
           scheme: https
           serversTransport: argocd-server-transport
   tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: argocd-netbird
+  namespace: argocd
+spec:
+  entryPoints:
+    - webnetbird
+  routes:
+    - kind: Rule
+      match: Host(`argocd.__ZONE_NAME__`)
+      middlewares:
+        - name: argocd-login-returnurl-redirect
+          namespace: argocd
+      services:
+        - kind: Service
+          name: argocd-server
+          port: 443
+          scheme: https
+          serversTransport: argocd-server-transport

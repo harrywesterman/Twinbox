@@ -100,7 +100,21 @@ spec:
                     value: Host(`matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
               - target:
                   kind: IngressRoute
+                  name: matrix-netbird
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
                   name: chat
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`chat.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: chat-netbird
                 patch: |-
                   - op: replace
                     path: /spec/routes/0/match
@@ -114,6 +128,13 @@ spec:
                     value: Host(`account.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
               - target:
                   kind: IngressRoute
+                  name: account-netbird
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`account.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
                   name: element-admin
                 patch: |-
                   - op: replace
@@ -121,7 +142,21 @@ spec:
                     value: Host(`element-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
               - target:
                   kind: IngressRoute
+                  name: element-admin-netbird
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`element-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
                   name: mrtc
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: mrtc-netbird
                 patch: |-
                   - op: replace
                     path: /spec/routes/0/match
