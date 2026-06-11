@@ -11,7 +11,7 @@
   <img src="screenshots/intheliving.png" alt="Twinbox at home" width="800">
 </p>
 
-You can run awesome Open Source alternatives like NextCloud for your documents and Immich for you photos on your phones. Your email, your chats and much more is all hosted on your own servers. No more sharing of all your information with Big Tech. No data is ever leaving your personal servers. Twinbox is simple to install, even for non-technical people. It will update itself, and keep itself safe. 
+You can run awesome Open Source alternatives like NextCloud for your documents and Immich for your photos on your phones. Your email, chats, and much more are all hosted on your own servers. No more sharing of all your information with Big Tech. No data is ever leaving your personal servers. Twinbox is simple to install, even for non-technical people. It will update itself, and keep itself safe. 
 
 <p align="center">
   <img src="screenshots/phones.png" alt="Twinbox at home" width="800">
@@ -90,7 +90,7 @@ Install additional applications through the Twinbox Portal:
 - **Audiobookshelf** - audiobook and podcast server
 - **Coder** - A cloud development environment for your team.
 - **FreshRSS** - self-hosted RSS feed reader
-- **Mailu** - Self-hosted email with Mailu on Kubernetes and Postform on the NetBird bastion.
+- **Mailu** - Self-hosted email with Mailu on Kubernetes and Postfix on the NetBird bastion.
 - **Matrix Chat** - Federated chat with end-to-end encryption, so you control your conversations.
 - **HedgeDoc** - real-time collaborative markdown editor
 - **Immich** - photo and video backup
