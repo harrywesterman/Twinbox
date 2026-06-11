@@ -337,18 +337,18 @@ resource "netbird_policy" "adguard_dns_to_management_vm_tcp" {
 }
 
 resource "netbird_policy" "proxy_to_traefik_https" {
-  name        = "${local.name_prefix}-proxy-to-traefik-websecure"
-  description = "Allow NetBird reverse proxy traffic to reach the internal Traefik websecure entrypoint"
+  name        = "${local.name_prefix}-proxy-to-traefik-netbird"
+  description = "Allow NetBird reverse proxy traffic to reach the internal Traefik NetBird entrypoint"
   enabled     = true
 
   rule {
-    name          = "websecure"
+    name          = "webnetbird"
     action        = "accept"
     enabled       = true
     bidirectional = true
     protocol      = "tcp"
     sources       = [data.netbird_group.all.id]
-    ports         = ["443"]
+    ports         = ["8082"]
 
     destination_resource = {
       id   = netbird_network_resource.traefik.id

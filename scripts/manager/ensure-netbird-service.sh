@@ -190,12 +190,21 @@ fi
 TRAEFIK_RESOURCE_ID=""
 TRAEFIK_RESOURCE_ADDRESS=""
 TRAEFIK_TARGET_PORT="443"
+TRAEFIK_TARGET_PROTOCOL="https"
 if [[ -n "$NETBIRD_CLUSTER_ID" ]]; then
   NETWORK_SECRET="/opt/twinbox/bootstrap/secrets/global/netbird-network-${NETBIRD_CLUSTER_ID}.json"
   if [[ -f "$NETWORK_SECRET" ]]; then
     TRAEFIK_RESOURCE_ID="$(jq -r '.TRAEFIK_RESOURCE_ID // empty' "$NETWORK_SECRET")"
     TRAEFIK_RESOURCE_ADDRESS="$(jq -r '.TRAEFIK_RESOURCE_ADDRESS // empty' "$NETWORK_SECRET")"
     TRAEFIK_TARGET_PORT="$(jq -r '.TRAEFIK_TARGET_PORT // "443"' "$NETWORK_SECRET")"
+    TRAEFIK_TARGET_PROTOCOL="$(jq -r '.TRAEFIK_TARGET_PROTOCOL // empty' "$NETWORK_SECRET")"
+  fi
+fi
+if [[ -z "$TRAEFIK_TARGET_PROTOCOL" ]]; then
+  if [[ "$TRAEFIK_TARGET_PORT" == "8082" ]]; then
+    TRAEFIK_TARGET_PROTOCOL="http"
+  else
+    TRAEFIK_TARGET_PROTOCOL="https"
   fi
 fi
 
@@ -297,6 +306,11 @@ fi
 # Build the service JSON
 build_service_payload() {
   local service_id="$1"
+  local skip_tls_verify="false"
+
+  if [[ "$TRAEFIK_TARGET_PROTOCOL" == "https" ]]; then
+    skip_tls_verify="true"
+  fi
 
   jq -cn \
     --arg name "$SERVICE_NAME" \
@@ -305,9 +319,10 @@ build_service_payload() {
     --arg target_type "$TARGET_TYPE" \
     --arg host "$TRAEFIK_RESOURCE_ADDRESS" \
     --arg path "$SERVICE_PATH" \
+    --arg protocol "$TRAEFIK_TARGET_PROTOCOL" \
     --argjson target_port "$TRAEFIK_TARGET_PORT" \
     --argjson service_enabled "true" \
-    --argjson skip_tls_verify "true" \
+    --argjson skip_tls_verify "$skip_tls_verify" \
     '{
       name: $name,
       domain: $domain,
@@ -320,7 +335,7 @@ build_service_payload() {
         host: $host,
         path: $path,
         port: $target_port,
-        protocol: "https",
+        protocol: $protocol,
         options: {
           skip_tls_verify: $skip_tls_verify
         },

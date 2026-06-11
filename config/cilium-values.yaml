@@ -6,6 +6,10 @@ bpf:
   # NetBird routes reach Traefik through its stable ClusterIP from outside the
   # normal pod-to-service path.
   lbExternalClusterIP: true
+socketLB:
+  # NetBird forwards packets inside its pod namespace; bypass socket LB there so
+  # service VIP handling happens in the lower datapath.
+  hostNamespaceOnly: true
 # The bootstrap scripts override these values with the cluster VIP/API endpoint.
 # Keep a renderable fallback here, but do not rely on localhost during bootstrap.
 k8sServiceHost: localhost

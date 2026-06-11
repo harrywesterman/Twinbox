@@ -559,9 +559,10 @@ wait_for_netbird_proxy_backend() {
   local temp_ssh_key=""
   local endpoint="$1"
   local port="$2"
-  local host_header="$3"
-  local path="$4"
-  local url="https://${endpoint}:${port}${path}"
+  local protocol="$3"
+  local host_header="$4"
+  local path="$5"
+  local url="${protocol}://${endpoint}:${port}${path}"
   local url_q
   local host_header_q
 
@@ -578,7 +579,7 @@ wait_for_netbird_proxy_backend() {
   printf -v url_q '%q' "$url"
   printf -v host_header_q '%q' "$host_header"
 
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for NetBird proxy peer to reach Traefik websecure"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for NetBird proxy peer to reach Traefik ${protocol} backend"
   for i in $(seq 1 60); do
     if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 \
       -i "$ssh_key_path" root@"$netbird_proxy_ip" \
@@ -586,12 +587,12 @@ wait_for_netbird_proxy_backend() {
       [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
       return 0
     fi
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird proxy peer cannot reach Traefik websecure yet (attempt ${i}/60)"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird proxy peer cannot reach Traefik ${protocol} backend yet (attempt ${i}/60)"
     sleep 5
   done
 
   [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
-  fail "NetBird proxy peer could not reach Traefik websecure"
+  fail "NetBird proxy peer could not reach Traefik ${protocol} backend"
 }
 
 read_first_admin_email() {
@@ -993,7 +994,8 @@ management_lan_cidrs_json="$(read_management_lan_cidrs_json "$cluster_json")"
 
 traefik_resource_address="$(normalize_traefik_resource_address "$traefik_resource_address")"
 traefik_network_resource_address="$(netbird_host_resource_address "$traefik_resource_address")"
-traefik_target_port="443"
+traefik_target_port="8082"
+traefik_target_protocol="http"
 
 authentik_public_url="${TWINBOX_AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
 authentik_domain="${authentik_public_url#https://}"
@@ -1172,6 +1174,7 @@ jq -n \
   --arg traefik_address "$traefik_resource_address" \
   --arg traefik_network_resource_address "$traefik_network_resource_address" \
   --arg traefik_target_port "$traefik_target_port" \
+  --arg traefik_target_protocol "$traefik_target_protocol" \
   --arg traefik_resource_id "$traefik_resource_id" \
   --argjson pod_cidrs "$pod_cidrs_json" \
   --argjson management_lan_cidrs "$management_lan_cidrs_json" \
@@ -1190,6 +1193,7 @@ jq -n \
     TRAEFIK_RESOURCE_ADDRESS: $traefik_address,
     TRAEFIK_NETWORK_RESOURCE_ADDRESS: $traefik_network_resource_address,
     TRAEFIK_TARGET_PORT: $traefik_target_port,
+    TRAEFIK_TARGET_PROTOCOL: $traefik_target_protocol,
     TRAEFIK_RESOURCE_ID: $traefik_resource_id,
     POD_CIDRS: $pod_cidrs,
     MANAGEMENT_LAN_CIDRS: $management_lan_cidrs,
@@ -1219,6 +1223,7 @@ ensure_netbird_bastion_exit_peer "$bastion_exit_router_setup_key"
 wait_for_netbird_proxy_backend \
   "$traefik_resource_address" \
   "$traefik_target_port" \
+  "$traefik_target_protocol" \
   "$authentik_domain" \
   "/application/o/netbird/.well-known/openid-configuration"
 
@@ -1303,6 +1308,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     --arg traefik_resource_address "$traefik_resource_address" \
     --arg traefik_network_resource_address "$traefik_network_resource_address" \
     --arg traefik_target_port "$traefik_target_port" \
+    --arg traefik_target_protocol "$traefik_target_protocol" \
     --arg traefik_resource_id "$traefik_resource_id" \
     --argjson pod_cidrs "$pod_cidrs_json" \
     --argjson management_lan_cidrs "$management_lan_cidrs_json" \
@@ -1315,6 +1321,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
         traefik_resource_address: $traefik_resource_address,
         traefik_network_resource_address: $traefik_network_resource_address,
         traefik_target_port: $traefik_target_port,
+        traefik_target_protocol: $traefik_target_protocol,
         traefik_resource_id: $traefik_resource_id,
         pod_cidrs: $pod_cidrs,
         management_lan_cidrs: $management_lan_cidrs,
