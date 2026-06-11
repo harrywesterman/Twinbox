@@ -26,6 +26,8 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 
 `TWINBOX_HOST_REPO_ROOT` is the host runtime root used by the manager stack on the Management VM. The name is historical; it does not mean the host keeps a full repo checkout.
 
+`PROXMOX_FILE_DATASTORE` is the Proxmox datastore that Twinbox uses for Talos disk-image uploads during cluster provisioning. The setup wizard enables Proxmox `import` content on this datastore so OpenTofu can import the uploaded image into VM disks through the Proxmox API.
+
 ## Bootstrap File Layout
 
 ### Global bootstrap secrets

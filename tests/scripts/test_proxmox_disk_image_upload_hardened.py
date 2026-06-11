@@ -8,7 +8,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 APPLY_CLUSTER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "apply-cluster.sh"
 
 
-def test_talos_iso_upload_uses_direct_node_endpoints_and_continues_after_failure():
+def test_talos_disk_image_upload_uses_import_content_and_continues_after_failure():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         log_file = root / "upload.log"
@@ -20,14 +20,15 @@ def test_talos_iso_upload_uses_direct_node_endpoints_and_continues_after_failure
                 set -euo pipefail
 
                 LOG_FILE={shlex.quote(str(log_file))}
+                APPLY_CLUSTER_SCRIPT={shlex.quote(str(APPLY_CLUSTER_SCRIPT))}
                 : > "$LOG_FILE"
 
                 log() {{
-                  printf '%s\n' "$*" >> "$LOG_FILE"
+                  printf '%s\\n' "$*" >> "$LOG_FILE"
                 }}
 
                 fail() {{
-                  printf 'FAIL:%s\n' "$*" >> "$LOG_FILE"
+                  printf 'FAIL:%s\\n' "$*" >> "$LOG_FILE"
                   return 1
                 }}
 
@@ -42,11 +43,14 @@ def test_talos_iso_upload_uses_direct_node_endpoints_and_continues_after_failure
                 rm -f "$UPLOAD_MARKER_FILE"
 
                 HELPERS_FILE="$(mktemp)"
-                sed -n '173,481p' {shlex.quote(str(APPLY_CLUSTER_SCRIPT))} >"$HELPERS_FILE"
+                awk '
+                  /^proxmox_api_login\\(\\) \\{{/ {{ emit = 1 }}
+                  /^remove_legacy_talos_file_state\\(\\) \\{{/ {{ emit = 0 }}
+                  emit {{ print }}
+                ' "$APPLY_CLUSTER_SCRIPT" >"$HELPERS_FILE"
                 source "$HELPERS_FILE"
 
                 FAKE_CLUSTER_STATUS='{{"data":[{{"type":"node","name":"node-a","ip":"192.168.2.91"}},{{"type":"node","name":"node-b","ip":"192.168.2.92"}}]}}'
-                UPLOAD_URLS=()
 
                 curl() {{
                   local output_file=""
@@ -58,61 +62,63 @@ def test_talos_iso_upload_uses_direct_node_endpoints_and_continues_after_failure
                     if [[ "$prev" == "--output" ]]; then
                       output_file="$arg"
                     fi
+                    if [[ "$prev" == "--form" || "$prev" == "--header" ]]; then
+                      log "CURL_${{prev#--}}=$arg"
+                    fi
                     prev="$arg"
                   done
 
                   case "$url" in
                     */access/ticket)
-                      printf '%s\n' '{{"data":{{"ticket":"ticket","CSRFPreventionToken":"csrf"}}}}'
+                      printf '%s\\n' '{{"data":{{"ticket":"ticket","CSRFPreventionToken":"csrf"}}}}'
                       return 0
                       ;;
                     */cluster/status)
-                      printf '%s\n' "$FAKE_CLUSTER_STATUS"
+                      printf '%s\\n' "$FAKE_CLUSTER_STATUS"
                       return 0
                       ;;
                     */storage/local/content)
                       case "$url" in
                         *192.168.2.91*)
                           if [[ -f "$UPLOAD_MARKER_FILE" ]]; then
-                            printf '%s\n' '{{"data":[{{"volid":"local:iso/talos.iso","content":"iso"}}]}}'
+                            printf '%s\\n' '{{"data":[{{"volid":"local:import/talos-cluster.img","content":"import"}}]}}'
                           else
-                            printf '%s\n' '{{"data":[]}}'
+                            printf '%s\\n' '{{"data":[]}}'
                           fi
                           return 0
                           ;;
                         *192.168.2.92*)
-                          printf '%s\n' '{{"data":[]}}'
+                          printf '%s\\n' '{{"data":[]}}'
                           return 0
                           ;;
                       esac
                       ;;
                     */storage/local/upload)
-                      UPLOAD_URLS+=("$url")
                       log "UPLOAD_URL=$url"
                       if [[ "$url" == *192.168.2.92* ]]; then
                         return 52
                       fi
                       if [[ -n "$output_file" ]]; then
-                        printf '%s\n' '{{"data":"ok"}}' >"$output_file"
+                        printf '%s\\n' '{{"data":"ok"}}' >"$output_file"
                       fi
                       if [[ "$url" == *192.168.2.91* ]]; then
                         : > "$UPLOAD_MARKER_FILE"
                       fi
-                      printf '200\n'
+                      printf '200\\n'
                       return 0
                       ;;
                   esac
 
-                  printf 'unexpected curl url: %s\n' "$url" >&2
+                  printf 'unexpected curl url: %s\\n' "$url" >&2
                   return 1
                 }}
 
                 set +e
-                upload_talos_image_to_nodes "/tmp/talos.iso" "talos.iso" '["node-b","node-a"]'
+                upload_talos_image_to_nodes "/tmp/talos-cluster.img" "talos-cluster.img" '["node-b","node-a"]'
                 status=$?
                 set -e
 
-                printf 'STATUS=%s\n' "$status" >> "$LOG_FILE"
+                printf 'STATUS=%s\\n' "$status" >> "$LOG_FILE"
                 """
             ),
             encoding="utf-8",
@@ -131,10 +137,12 @@ def test_talos_iso_upload_uses_direct_node_endpoints_and_continues_after_failure
 
         log_text = log_file.read_text(encoding="utf-8")
         assert (
-            "Uploading Talos ISO directly to node-b/local via https://192.168.2.92:8006" in log_text
+            "Uploading Talos disk image directly to node-b/local via https://192.168.2.92:8006"
+            in log_text
         )
         assert (
-            "Uploading Talos ISO directly to node-a/local via https://192.168.2.91:8006" in log_text
+            "Uploading Talos disk image directly to node-a/local via https://192.168.2.91:8006"
+            in log_text
         )
         assert (
             "UPLOAD_URL=https://192.168.2.92:8006/api2/json/nodes/node-b/storage/local/upload"
@@ -144,14 +152,18 @@ def test_talos_iso_upload_uses_direct_node_endpoints_and_continues_after_failure
             "UPLOAD_URL=https://192.168.2.91:8006/api2/json/nodes/node-a/storage/local/upload"
             in log_text
         )
+        assert "CURL_header=Expect:" in log_text
+        assert "CURL_form=content=import" in log_text
         assert (
-            "ERROR: Talos ISO upload to node-b/local failed after 1 attempts (curl exit 52): no response body"
+            "ERROR: Talos disk image upload to node-b/local failed after 1 attempts (curl exit 52): no response body"
             in log_text
         )
-        assert "Verified Talos ISO on node-a/local: local:iso/talos.iso" in log_text
-        assert "Talos ISO upload summary: succeeded=node-a; failed=node-b" in log_text
         assert (
-            "Talos ISO upload failure: Talos ISO upload to node-b/local failed after 1 attempts (curl exit 52): no response body"
+            "Verified Talos disk image on node-a/local: local:import/talos-cluster.img" in log_text
+        )
+        assert "Talos disk image upload summary: succeeded=node-a; failed=node-b" in log_text
+        assert (
+            "Talos disk image upload failure: Talos disk image upload to node-b/local failed after 1 attempts (curl exit 52): no response body"
             in log_text
         )
         assert "STATUS=1" in log_text

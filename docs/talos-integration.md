@@ -8,7 +8,7 @@ Talos lifecycle operations are triggered through the manager stack.
 2. `manager-api` validates inputs and queues the job.
 3. `manager-worker` runs `scripts/manager/apply-cluster.sh`.
 4. The worker renders a per-cluster OpenTofu workspace.
-5. The worker downloads the Talos ISO locally and uploads it to each Proxmox node that will host a Talos VM.
+5. The worker downloads and decompresses the Talos disk image, uploads it as Proxmox `import` content on each node that will host a Talos VM, then asks OpenTofu to import that image directly into the VM disk through the Proxmox API.
 6. OpenTofu creates the VMs and applies the requested VM placement map.
 7. The worker discovers DHCP addresses, generates Talos configs, applies them with `talosctl`, and bootstraps the first control plane.
 8. Talos access files are stored as cluster-scoped bootstrap artifacts under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/`.

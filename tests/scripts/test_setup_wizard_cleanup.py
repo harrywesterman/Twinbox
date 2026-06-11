@@ -297,7 +297,7 @@ def test_setup_wizard_does_not_print_proxmox_api_credentials():
 def test_setup_wizard_grants_cloudinit_and_template_datastore_privileges():
     text = _wizard_text()
     assert (
-        "VM.Audit,VM.Monitor,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use"
+        "VM.Audit,VM.Monitor,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.Allocate,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use"
         in text
     )
 
@@ -463,11 +463,16 @@ def test_setup_wizard_creates_dedicated_limited_proxmox_api_user():
     assert "apply_acl_with_retry()" in text
     assert 'pveum role add "$PROXMOX_ROLE"' in text
     assert (
-        "VM.Audit,VM.Monitor,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use,Sys.Audit"
+        "VM.Audit,VM.Monitor,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.Allocate,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use,Sys.Audit,Sys.Modify"
         in text
     )
     assert 'pveum aclmod "$path" -user "$user" -role "$role" 2>&1' in text
     assert 'if ! apply_acl_with_retry "/sdn" "$PROXMOX_USER" "$PROXMOX_ROLE" 10 1; then' in text
+    assert "ensure_proxmox_import_content_type()" in text
+    assert 'pvesh get "/storage/${datastore}" --output-format json' in text
+    assert 'pvesm set "$datastore" --content "$next_content"' in text
+    assert "Enabling import content on Proxmox storage ${datastore}" in text
+    assert "create_proxmox_api_user\n    ensure_proxmox_import_content_type" in text
 
 
 def test_setup_wizard_supports_cluster_slug_selection_and_normalization():

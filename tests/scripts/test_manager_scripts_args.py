@@ -566,23 +566,20 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
         '"$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve -no-color -parallelism="$TOFU_PARALLELISM" -var-file="$tfvars_file"'
         in text
     )
-    assert 'PROXMOX_UPLOAD_MAX_ATTEMPTS="${PROXMOX_UPLOAD_MAX_ATTEMPTS:-5}"' in text
     assert "reboot_talos_node() {" not in text
     assert "talosctl reboot \\" not in text
     assert "Rebooting Talos nodes after disk-first switch" not in text
-    assert (
-        "Disk-first boot order applied; Talos nodes will boot from disk on the next cold VM restart"
-        in text
-    )
     assert "command -v talosctl" in text
     assert "export TF_IN_AUTOMATION=1" in text
     assert "export NO_COLOR=1" in text
     assert "command -v curl" in text
+    assert "command -v xz" in text
     assert "resolve_talos_image_assets()" in text
     assert "scripts/get-talos-image-factory.sh" in text
     assert "PINNED_TALOS_IMAGE_SCHEMATIC" not in text
     assert '--preset "${TALOS_IMAGE_PRESET:-qemu-guest-agent}"' not in text
     assert "TALOS_IMAGE_PRESET" in text
+    assert "TALOS_IMAGE_DISK_URL=" in text
     assert "talosctl apply-config \\" in text
     assert '--endpoints "$ip" \\' in text
     assert "Insecure Talos apply failed for ${ip}; retrying without --insecure" in text
@@ -593,22 +590,30 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert '!= "default"' not in text
     assert "TALOS_IMAGE_FACTORY_URL:-" not in text
     assert "TALOS_IMAGE_INSTALLER=" in text
-    assert "TALOS_IMAGE_DOWNLOAD_URL=" in text
-    assert "download_talos_image()" in text
-    assert 'talos_image_local_path="$image_cache_dir/talos-${image_cache_key}.iso"' in text
-    assert 'talos_image_file_name="talos-${image_cache_key}.iso"' in text
     assert "proxmox_api_login()" in text
+    assert "download_talos_image()" in text
+    assert 'xz -dc "$tmp_compressed" > "$tmp_image"' in text
     assert "proxmox_upload_talos_image()" in text
     assert "proxmox_verify_talos_image()" in text
     assert "proxmox_talos_image_present()" in text
     assert "upload_talos_image_to_nodes()" in text
     assert "remove_legacy_talos_file_state()" in text
-    assert 'PROXMOX_VERIFY_MAX_ATTEMPTS="${PROXMOX_VERIFY_MAX_ATTEMPTS:-5}"' in text
-    assert "Uploading Talos ISO to Proxmox nodes:" in text
-    assert "Uploaded Talos ISO to ${node}/${datastore}" in text
-    assert "Talos ISO not visible yet on ${node}/${datastore}; retrying in ${delay}s" in text
-    assert "Talos ISO not visible after upload on ${node}/${datastore}" in text
-    assert "Talos ISO already present on ${node}/${FILE_DATASTORE}: ${image_name}" in text
+    assert "Talos disk image URL not resolved" in text
+    assert "validate_file_datastore_import_content()" in text
+    assert 'validate_file_datastore_import_content "$FILE_DATASTORE"' in text
+    assert "must allow Import content for Talos disk-image provisioning" in text
+    assert '"${TF_VAR_proxmox_endpoint}/api2/json/storage/${datastore}"' in text
+    assert '--form "content=import"' in text
+    assert 'expected_volid="${datastore}:import/${image_name}"' in text
+    assert 'select(.volid == $volid and .content == "import")' in text
+    assert "Uploading Talos disk image to Proxmox nodes:" in text
+    assert "Uploaded Talos disk image to ${node}/${datastore}" in text
+    assert "Talos disk image not visible yet on ${node}/${datastore}; retrying in ${delay}s" in text
+    assert (
+        'talos_image_local_path="$image_cache_dir/talos-${CLUSTER_ID}-${image_cache_key}.img"'
+        in text
+    )
+    assert 'talos_image_file_name="talos-${CLUSTER_ID}-${image_cache_key}.img"' in text
     assert "Removing legacy Talos ISO resources from OpenTofu state:" in text
     assert 'state rm "${legacy_addresses[@]}"' in text
     assert "controlplane_ipv4_addresses.value" in text
@@ -644,19 +649,11 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert "json_array_from_csv()" in text
     assert 'json_array_from_csv "${DNS_SERVERS:-1.1.1.1,8.8.8.8}"' in text
     assert '--argjson prefix "${NODE_PREFIX_LENGTH:-24}"' in text
-    assert "content=iso" in text
-    assert "curl -ksS --show-error" in text
-    assert "CSRFPreventionToken" in text
-    assert "access/ticket" in text
-    assert "cluster/status" in text
     assert 'if ! existing_vm_ids_output="$(proxmox_get_all_vm_ids)"; then' in text
-    assert "storage/${datastore}/content" in text
     assert "Failed to obtain Proxmox API ticket" in text
-    assert "retrying in ${delay}s" in text
-    assert "failed permanently" in text
-    assert "failed after ${PROXMOX_UPLOAD_MAX_ATTEMPTS} attempts" in text
-    assert 'expected_volid="${datastore}:iso/${image_name}"' in text
-    assert 'select(.volid == $volid and .content == "iso")' in text
+    assert "talos_image_disk_url: $talos_image_disk_url" not in text
+    assert '--arg talos_image_disk_url "$image_disk_url"' not in text
+    assert "TALOS_IMAGE_DOWNLOAD_URL=" in text
 
 
 def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
@@ -1038,8 +1035,12 @@ def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
         'image_cache_key="${image_platform}-${image_arch}-${image_schematic}-${PINNED_TALOS_VERSION}"'
         in text
     )
-    assert "Downloading Talos ISO" in text
-    assert '--arg talos_image_local_path "$talos_image_local_path"' in text
+    assert "Talos disk image URL not resolved" in text
+    assert 'download_talos_image "$talos_image_local_path"' in text
+    assert (
+        'upload_talos_image_to_nodes "$talos_image_local_path" "$talos_image_file_name" "$target_nodes_json"'
+        in text
+    )
     assert "nodes: $nodes" in text
     assert "planned_controlplane_ips" in text
     assert "discovered_controlplane_ips" in text
@@ -2817,28 +2818,37 @@ def test_grafana_worker_refreshes_dashboard_after_cluster_jobs():
 def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     main_text = _module_text()
     outputs_text = _module_outputs_text()
+    compact_main_text = re.sub(r"\s+", " ", main_text)
     assert 'resource "proxmox_virtual_environment_vm" "node"' in main_text
     assert 'resource "proxmox_virtual_environment_file" "talos_nocloud"' not in main_text
     assert "talos_image_nodes" not in main_text
-    assert 'content_type = "iso"' not in main_text
+    assert 'resource "proxmox_virtual_environment_download_file" "talos"' not in main_text
+    assert "content_type" not in compact_main_text
+    assert "decompression_algorithm" not in compact_main_text
     assert "source_file {" not in main_text
     assert "path      = var.talos_image_local_path" not in main_text
     assert "node_name    = each.value" not in main_text
     assert 'machine   = "q35"' not in main_text
-    assert 'boot_order = var.boot_from_disk ? ["virtio0"] : ["ide2", "virtio0"]' in main_text
-    assert "cdrom {" in main_text
+    assert 'boot_order = ["virtio0"]' in main_text
+    assert "cdrom {" not in main_text
     assert 'dynamic "cdrom"' not in main_text
     assert "for_each = var.boot_from_disk ? [] : [1]" not in main_text
     assert "validation {" not in _module_variables_text()
-    assert "vm_host_map = var.vm_node_map" in main_text
-    assert 'talos_image_file_name = "talos-${var.talos_image_cache_key}.iso"' in main_text
+    assert "boot_from_disk" not in _module_variables_text()
+    assert "vm_host_map = var.vm_node_map" in compact_main_text
     assert (
-        'talos_image_file_id   = "${var.file_datastore}:iso/${local.talos_image_file_name}"'
-        in main_text
+        'talos_image_file_name = "talos-${var.cluster_slug}-${var.talos_image_cache_key}.img"'
+        in compact_main_text
     )
+    assert (
+        'talos_image_file_id = "${var.file_datastore}:import/${local.talos_image_file_name}"'
+        in compact_main_text
+    )
+    assert "talos_image_disk_url" not in _module_variables_text()
     assert "merge(" not in main_text
-    assert "file_id   = local.talos_image_file_id" in main_text
-    assert "node_name = local.vm_host_map[each.key]" in main_text
+    assert "import_from = local.talos_image_file_id" in compact_main_text
+    assert "node_name = local.vm_host_map[each.key]" in compact_main_text
+    assert "file_id = proxmox_virtual_environment_download_file.talos" not in compact_main_text
     assert "file_id      = proxmox_virtual_environment_file.talos_nocloud.id" not in main_text
     assert "remove_legacy_talos_file_state" not in main_text
     assert 'file_format  = "raw"' not in main_text

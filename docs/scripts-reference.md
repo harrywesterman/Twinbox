@@ -9,7 +9,7 @@ Scripts under `scripts/manager/` are executed by the `manager-worker` container.
 Main provisioning entry point. Creates Talos VMs on Proxmox using OpenTofu.
 
 - Creates a per-cluster OpenTofu workspace under `manager-data/clusters/<cluster-id>/iac/`
-- Downloads the pinned Talos ISO and uploads it to Proxmox storage
+- Downloads the pinned Talos disk image to Proxmox as `import` content and imports it into the Talos VM disk
 - Sizes control-plane VMs at `4 GB RAM / 10 GB disk` and gives workers a default `100%` disk budget from the free space shared across the three Proxmox hosts, with a slider to tune it up or down
 - Labels Talos nodes with `twinbox.io/role` so worker-only storage components can target the right machines
 - Renders VM configuration from the cluster JSON

@@ -7,9 +7,9 @@ locals {
     for name, node in var.nodes : name => node if node.type == "worker"
   }
 
-  vm_host_map = var.vm_node_map
-  talos_image_file_name = "talos-${var.talos_image_cache_key}.iso"
-  talos_image_file_id   = "${var.file_datastore}:iso/${local.talos_image_file_name}"
+  vm_host_map           = var.vm_node_map
+  talos_image_file_name = "talos-${var.cluster_slug}-${var.talos_image_cache_key}.img"
+  talos_image_file_id   = "${var.file_datastore}:import/${local.talos_image_file_name}"
 }
 
 resource "proxmox_virtual_environment_vm" "node" {
@@ -27,7 +27,7 @@ resource "proxmox_virtual_environment_vm" "node" {
     type  = "host"
   }
 
-  boot_order = var.boot_from_disk ? ["virtio0"] : ["ide2", "virtio0"]
+  boot_order = ["virtio0"]
 
   memory {
     dedicated = each.value.ram_mb
@@ -36,17 +36,11 @@ resource "proxmox_virtual_environment_vm" "node" {
 
   disk {
     datastore_id = var.vm_datastore
+    import_from  = local.talos_image_file_id
     interface    = "virtio0"
     size         = each.value.disk_gb
     iothread     = true
     discard      = "on"
-  }
-
-  # Keep the Talos ISO attached after bootstrap so the second apply only flips
-  # boot order and does not require the extra Proxmox privilege to change CD-ROM media.
-  cdrom {
-    interface = "ide2"
-    file_id   = local.talos_image_file_id
   }
 
   agent {
@@ -63,9 +57,8 @@ resource "proxmox_virtual_environment_vm" "node" {
     mac_address = each.value.mac
   }
 
-  # Talos nodes are rebooted explicitly from the provisioning script after the
-  # second apply. Keeping this false avoids waiting on long-running Proxmox
-  # reboot tasks that can time out on slower nodes.
+  # Keep VM updates from waiting on long-running Proxmox reboot tasks that can
+  # time out on slower nodes.
   reboot_after_update = false
 
   operating_system {

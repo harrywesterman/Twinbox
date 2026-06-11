@@ -31,7 +31,7 @@ cat > "{stdin_file}.$count"
 if printf '%s\\n' "$@" | grep -qx -- '-X' && printf '%s\\n' "$@" | grep -qx -- 'POST'; then
   printf '{{"id":"schematic123"}}'
 else
-  printf 'https://assets.factory.talos.dev/assets/final.iso'
+  printf 'https://assets.factory.talos.dev/assets/final.raw.xz'
 fi
 """,
             encoding="utf-8",
@@ -61,7 +61,11 @@ fi
         assert proc.returncode == 0, proc.stderr
         assert "TALOS_IMAGE_SCHEMATIC=schematic123" in proc.stdout
         assert (
-            "TALOS_IMAGE_FACTORY_URL=https://factory.talos.dev/image/schematic123/v1.9.2/metal-amd64.iso"
+            "TALOS_IMAGE_FACTORY_URL=https://factory.talos.dev/image/schematic123/v1.9.2/metal-amd64.raw.xz"
+            in proc.stdout
+        )
+        assert (
+            "TALOS_IMAGE_DISK_URL=https://assets.factory.talos.dev/assets/final.raw.xz"
             in proc.stdout
         )
         assert (
@@ -69,7 +73,7 @@ fi
             in proc.stdout
         )
         assert (
-            "TALOS_IMAGE_DOWNLOAD_URL=https://assets.factory.talos.dev/assets/final.iso"
+            "TALOS_IMAGE_DOWNLOAD_URL=https://assets.factory.talos.dev/assets/final.raw.xz"
             in proc.stdout
         )
 
@@ -81,7 +85,9 @@ fi
         assert "siderolabs/qemu-guest-agent" in curl_stdin_1
         assert "siderolabs/iscsi-tools" in curl_stdin_1
         assert "siderolabs/util-linux-tools" in curl_stdin_1
-        assert "https://factory.talos.dev/image/schematic123/v1.9.2/metal-amd64.iso" in curl_args_2
+        assert (
+            "https://factory.talos.dev/image/schematic123/v1.9.2/metal-amd64.raw.xz" in curl_args_2
+        )
 
 
 def test_pinned_defaults_do_not_hardcode_a_talos_schematic():
