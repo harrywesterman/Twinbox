@@ -1116,6 +1116,7 @@ def test_manager_worker_image_includes_talos_image_factory_helper():
 
     assert "PINNED_TALOS_VERSION" in text
     assert "talosctl-linux-amd64" in text
+    assert "COPY docker-compose.yml ./docker-compose.yml" in text
     assert "COPY lib ./lib" in text
     assert "manager-api/src/lib/catalog-definitions.mjs" not in text
     assert "../../lib/catalog-definitions.mjs" in refresh_dashy_text

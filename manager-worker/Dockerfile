@@ -3,6 +3,7 @@ FROM node:24-alpine
 WORKDIR /opt/twinbox
 
 COPY config ./config
+COPY docker-compose.yml ./docker-compose.yml
 
 RUN apk update \
   && apk add --no-cache bash ca-certificates curl docker-cli docker-cli-compose jq iproute2 openssh-client openssl python3 tar xz sudo \
