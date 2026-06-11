@@ -942,7 +942,6 @@ write_node_patch() {
       echo "    node.longhorn.io/create-default-disk: \"true\""
     fi
     echo "  network:"
-    echo "    hostname: ${NAME}-${name}"
     [[ -n "$nameserver_block" ]] && printf '%s' "$nameserver_block"
     [[ -n "$search_domain_block" ]] && printf '%s' "$search_domain_block"
     echo "    interfaces:"
@@ -1103,15 +1102,13 @@ apply_node_config() {
     --talosconfig "$talosconfig_file" \
     --file "$config_file" 2>&1)" && return 0
 
-  if grep -q 'static hostname is already set' <<<"$output"; then
-    log "Node ${ip} already has a Talos config; retrying with cluster talosconfig"
-    if output="$(talosctl apply-config \
-      --nodes "$ip" \
-      --endpoints "$ip" \
-      --talosconfig "$talosconfig_file" \
-      --file "$config_file" 2>&1)"; then
-      return 0
-    fi
+  log "Insecure Talos apply failed for ${ip}; retrying with cluster talosconfig"
+  if output="$(talosctl apply-config \
+    --nodes "$ip" \
+    --endpoints "$ip" \
+    --talosconfig "$talosconfig_file" \
+    --file "$config_file" 2>&1)"; then
+    return 0
   fi
 
   log "Resetting Talos node ${ip} to retry config application from clean state"
