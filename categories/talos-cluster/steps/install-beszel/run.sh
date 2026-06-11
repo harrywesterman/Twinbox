@@ -46,7 +46,7 @@ public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domai
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
 
 beszel_app_url="https://beszel.${public_zone_name}"
-beszel_local_url="http://127.0.0.1:8090"
+beszel_local_url="${BESZEL_LOCAL_URL:-http://beszel:8090}"
 beszel_user_email="beszel-admin@${public_zone_name}"
 env_file="/opt/twinbox/.env"
 
