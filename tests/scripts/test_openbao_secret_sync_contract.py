@@ -185,6 +185,9 @@ def test_beszel_step_uses_hub_public_key_and_universal_token_secret():
     assert "beszel-service.yaml" in text
     assert "beszel-endpoints.yaml" in text
     assert "beszel-ingressroute.yaml" in text
+    assert "gitops/apps/platform-ingress.yaml" in text
+    assert '--application "platform-ingress"' in text
+    assert '--destination-namespace "argocd"' in text
 
     assert "apiVersion: external-secrets.io/v1" in secret_text
     assert "secretKey: hub_url" in secret_text

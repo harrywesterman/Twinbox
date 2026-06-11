@@ -114,6 +114,11 @@ apply_beszel_traefik_route() {
     "$management_consoles_dir/beszel-endpoints.yaml" | kubectl apply -f - >/dev/null
   sed "s/__ZONE_NAME__/${public_zone_name}/g" \
     "$management_consoles_dir/beszel-ingressroute.yaml" | kubectl apply -f - >/dev/null
+
+  bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
+    --manifest "$WORKSPACE_ROOT/gitops/apps/platform-ingress.yaml" \
+    --application "platform-ingress" \
+    --destination-namespace "argocd"
 }
 
 log "Starting Beszel hub"
