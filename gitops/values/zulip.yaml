@@ -108,6 +108,12 @@ postSetup:
 postgresql:
   enabled: false
 
+startupProbe:
+  failureThreshold: 120
+  periodSeconds: 10
+  initialDelaySeconds: 10
+  timeoutSeconds: 10
+
 externalPostgresql:
   host: zulip-db-pooler-rw.databases.svc.cluster.local
   port: 5432

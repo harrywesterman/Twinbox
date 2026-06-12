@@ -40,6 +40,10 @@ spec:
                   existingSecretPasswordKey: rabbitmq-password
                   existingErlangSecret: zulip-runtime
                   existingSecretErlangKey: rabbitmq-erlang-cookie
+              memcached:
+                auth:
+                  existingPasswordSecret: zulip-runtime
+                  existingSecretPasswordKey: memcached-password
               redis:
                 auth:
                   existingSecret: zulip-runtime

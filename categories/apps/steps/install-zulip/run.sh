@@ -237,6 +237,7 @@ zulip_db_password="$(openssl rand -hex 24)"
 zulip_rabbitmq_password="$(openssl rand -hex 24)"
 zulip_rabbitmq_erlang_cookie="$(openssl rand -hex 24)"
 zulip_redis_password="$(openssl rand -hex 24)"
+zulip_memcached_password="$(openssl rand -hex 24)"
 secrets_dir="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}/secrets/global"
 zulip_secret_file="${secrets_dir}/zulip-oidc-${cluster_id}.json"
 zulip_runtime_secret_file="${secrets_dir}/zulip-runtime-${cluster_id}.json"
@@ -280,6 +281,7 @@ if [[ -n "$existing_zulip_runtime_secret_json" ]]; then
   existing_rabbitmq_password="$(jq -r '.ZULIP_RABBITMQ_PASSWORD // empty' <<<"$existing_zulip_runtime_secret_json")"
   existing_redis_password="$(jq -r '.ZULIP_REDIS_PASSWORD // empty' <<<"$existing_zulip_runtime_secret_json")"
   existing_erlang_cookie="$(jq -r '.ZULIP_RABBITMQ_ERLANG_COOKIE // empty' <<<"$existing_zulip_runtime_secret_json")"
+  existing_memcached_password="$(jq -r '.ZULIP_MEMCACHED_PASSWORD // empty' <<<"$existing_zulip_runtime_secret_json")"
   if [[ -n "$existing_rabbitmq_password" ]]; then
     zulip_rabbitmq_password="$existing_rabbitmq_password"
   fi
@@ -288,6 +290,9 @@ if [[ -n "$existing_zulip_runtime_secret_json" ]]; then
   fi
   if [[ -n "$existing_erlang_cookie" ]]; then
     zulip_rabbitmq_erlang_cookie="$existing_erlang_cookie"
+  fi
+  if [[ -n "$existing_memcached_password" ]]; then
+    zulip_memcached_password="$existing_memcached_password"
   fi
 fi
 
@@ -359,10 +364,12 @@ zulip_runtime_secret_json="$(
     --arg rabbitmq_password "$zulip_rabbitmq_password" \
     --arg redis_password "$zulip_redis_password" \
     --arg erlang_cookie "$zulip_rabbitmq_erlang_cookie" \
+    --arg memcached_password "$zulip_memcached_password" \
     '{
       ZULIP_RABBITMQ_PASSWORD: $rabbitmq_password,
       ZULIP_RABBITMQ_ERLANG_COOKIE: $erlang_cookie,
-      ZULIP_REDIS_PASSWORD: $redis_password
+      ZULIP_REDIS_PASSWORD: $redis_password,
+      ZULIP_MEMCACHED_PASSWORD: $memcached_password
     }'
 )"
 printf '%s\n' "$zulip_runtime_secret_json" >"$zulip_runtime_secret_file"
@@ -371,7 +378,7 @@ chmod 600 "$zulip_runtime_secret_file"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "zulip-runtime" \
   --json-file "$zulip_runtime_secret_file" \
-  --required-keys "ZULIP_RABBITMQ_PASSWORD,ZULIP_RABBITMQ_ERLANG_COOKIE,ZULIP_REDIS_PASSWORD"
+  --required-keys "ZULIP_RABBITMQ_PASSWORD,ZULIP_RABBITMQ_ERLANG_COOKIE,ZULIP_REDIS_PASSWORD,ZULIP_MEMCACHED_PASSWORD"
 
 databases_namespace_manifest="$WORKSPACE_ROOT/gitops/databases/shared/namespace.yaml"
 zulip_db_objectstore_manifest="$WORKSPACE_ROOT/gitops/databases/zulip/objectstore.yaml"

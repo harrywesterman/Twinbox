@@ -279,7 +279,7 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "sync-openbao-global-secret.sh" in run_text
     assert '--secret-name "zulip-runtime"' in run_text
     assert (
-        '--required-keys "ZULIP_RABBITMQ_PASSWORD,ZULIP_RABBITMQ_ERLANG_COOKIE,ZULIP_REDIS_PASSWORD"'
+        '--required-keys "ZULIP_RABBITMQ_PASSWORD,ZULIP_RABBITMQ_ERLANG_COOKIE,ZULIP_REDIS_PASSWORD,ZULIP_MEMCACHED_PASSWORD"'
         in run_text
     )
     assert "zulip_config_secret_json" in run_text
