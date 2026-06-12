@@ -20,6 +20,20 @@ zulip:
         secretKeyRef:
           name: zulip-config
           key: ZULIP_DEFAULT_REALM_OWNER_NAME
+    SETTING_EXTERNAL_HOST: zulip.bierineenweek.nl
+    SETTING_ZULIP_ADMINISTRATOR: admin@zulip.bierineenweek.nl
+    SECRETS_rabbitmq_password:
+      valueFrom:
+        secretKeyRef:
+          name: zulip-rabbitmq
+          key: rabbitmq-password
+    SECRETS_redis_password:
+      valueFrom:
+        secretKeyRef:
+          name: zulip-redis
+          key: redis-password
+    SETTING_MEMCACHED_USERNAME: ""
+    SECRETS_memcached_password: ""
   persistence:
     enabled: true
     accessMode: ReadWriteOnce
@@ -28,6 +42,11 @@ zulip:
 
 postSetup:
   scripts:
+    04-disable-sslmode.sh: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # Disable SSL mode for PostgreSQL (PgBouncer doesn't handle SSL correctly)
+      sed -i "s/REMOTE_POSTGRES_SSLMODE = 'prefer'/REMOTE_POSTGRES_SSLMODE = 'disable'/" /etc/zulip/settings.py
     05-patch-uwsgi.sh: |
       #!/usr/bin/env bash
       set -euo pipefail
@@ -38,7 +57,10 @@ postSetup:
       # initialize their Django application without being killed.
       sed -i 's/harakiri=55/harakiri=120/' /etc/zulip/uwsgi.ini
       # nginx uwsgi_read_timeout must always exceed harakiri.
-      sed -i 's/uwsgi_read_timeout 60s;/uwsgi_read_timeout 125s;/' /etc/nginx/zulip-include/proxy
+      sed -i 's/uwsgi_read_timeout 60s;/uwsgi_read_timeout 125s;/' /etc/nginx/uwsgi_params
+      # With lazy-apps=false the app is loaded before hook-post-fork runs,
+      # so chdir must point at the deployment directory from the start.
+      sed -i 's|^chdir=/|chdir=/home/zulip/deployments/current|' /etc/zulip/uwsgi.ini
     10-create-default-realm.sh: |
       #!/usr/bin/env bash
       set -euo pipefail
