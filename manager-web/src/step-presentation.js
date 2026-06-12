@@ -58,6 +58,11 @@ function buildProjectUrlMap() {
       project_url: "https://headlamp.dev/",
       github_url: "https://github.com/headlamp-k8s/headlamp",
     },
+    "install-browser-ssh": {
+      icon: "💻",
+      project_url: "https://docs.termix.site/",
+      github_url: "https://github.com/Termix-SSH/Termix",
+    },
     "install-grafana": {
       icon: "📈",
       project_url: "https://grafana.com/oss/grafana/",

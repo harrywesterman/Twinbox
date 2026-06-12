@@ -30,6 +30,7 @@ const FIXED_SETUP_STEP_IDS = [
   "install-adguard",
   "configure-argocd-oidc",
   "install-headlamp",
+  "install-browser-ssh",
   "install-prometheus",
   "install-loki",
   "install-tempo",

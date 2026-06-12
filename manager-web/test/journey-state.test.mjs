@@ -83,6 +83,20 @@ function buildCatalog(stepStatuses = {}) {
     ],
     ["choose-ingress-route", "Choose Ingress Route", { dependsOn: ["create-users-and-groups"] }],
     ["install-headlamp", "Install Headlamp", { dependsOn: ["install-traefik"] }],
+    [
+      "install-browser-ssh",
+      "Install Browser SSH",
+      {
+        dependsOn: [
+          "install-argocd",
+          "install-secret-sync",
+          "install-traefik",
+          "install-authentik-idp",
+          "create-users-and-groups",
+          "choose-ingress-route",
+        ],
+      },
+    ],
     ["install-prometheus", "Install Prometheus", { dependsOn: ["install-headlamp"] }],
     [
       "install-loki",
@@ -288,7 +302,7 @@ test("wizard model exposes a linear setup rail and guided actions", () => {
   });
 
   assert.equal(model.mode, "setup");
-  assert.equal(model.stepRail.length, 23);
+  assert.equal(model.stepRail.length, 24);
   const stepRailById = Object.fromEntries(model.stepRail.map((step) => [step.id, step]));
   assert.equal(stepRailById["provision-nodes"].title, "Deploy Talos Cluster");
   assert.equal(stepRailById["provision-nodes"].isCurrent, true);
@@ -298,6 +312,13 @@ test("wizard model exposes a linear setup rail and guided actions", () => {
   assert.match(stepRailById["provision-nodes"].positive_summary, /Twinbox stages/);
   assert.equal(stepRailById["install-cloudnativepg"].title, "Install CloudNativePG");
   assert.equal(stepRailById["install-cloudnativepg"].icon, "🐘");
+  assert.equal(stepRailById["install-browser-ssh"].title, "Install Browser SSH");
+  assert.equal(stepRailById["install-browser-ssh"].icon, "💻");
+  assert.equal(stepRailById["install-browser-ssh"].project_url, "https://docs.termix.site/");
+  assert.equal(
+    stepRailById["install-browser-ssh"].github_url,
+    "https://github.com/Termix-SSH/Termix"
+  );
   assert.equal(stepRailById["install-tempo"].title, "Install Tempo");
   assert.equal(stepRailById["install-tempo"].icon, "⏱️");
   assert.equal(stepRailById["install-alloy"].title, "Install Alloy");
@@ -307,7 +328,7 @@ test("wizard model exposes a linear setup rail and guided actions", () => {
   assert.equal(stepRailById["install-velero-ui"].title, "Install Velero UI");
   assert.equal(stepRailById["install-velero-ui"].icon, "🖥️");
   assert.equal(model.primaryAction.label, "Next");
-  assert.equal(model.progress.totalSteps, 23);
+  assert.equal(model.progress.totalSteps, 24);
   assert.equal(model.progress.completedSteps, 0);
   assert.equal(model.activity.runtime.currentStage, "Applying cluster plan");
   assert.equal(
@@ -399,6 +420,7 @@ test("wizard model switches to manage mode when setup flow is complete", () => {
         "install-cloudnativepg",
         "create-users-and-groups",
         "install-headlamp",
+        "install-browser-ssh",
         "install-prometheus",
         "install-loki",
         "install-tempo",
@@ -457,7 +479,7 @@ test("wizard model keeps manage-only steps out of the setup rail", () => {
     selectedStepId: "",
   });
 
-  assert.equal(model.stepRail.length, 23);
+  assert.equal(model.stepRail.length, 24);
   const setupStepIds = new Set(model.stepRail.map((step) => step.id));
   for (const id of [
     "provision-nodes",
@@ -471,6 +493,7 @@ test("wizard model keeps manage-only steps out of the setup rail", () => {
     "create-users-and-groups",
     "choose-ingress-route",
     "install-headlamp",
+    "install-browser-ssh",
     "install-prometheus",
     "install-dashy-dashboard",
     "install-twinbox-portal",

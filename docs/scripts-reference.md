@@ -66,6 +66,14 @@ Installs the Cloudtty operator with Helm and creates a default CloudShell instan
 
 Refreshes the shared `platform-ingress` Argo CD application so Traefik Manager is deployed as part of the shared platform overlay behind Authentik.
 
+### `setup-termix-authentik.sh`
+
+Configures the Termix Authentik OIDC provider, syncs the Termix bootstrap secret into OpenBao, and applies the Argo CD `Application` that deploys Termix into the cluster.
+
+### `setup-termix.sh`
+
+Signs in to Termix with the bootstrap admin password, creates the Management VM password credential and host entry, copies kubeconfig and Talos config into the Management VM home directory, and shares the host with the Browser SSH role.
+
 ### `install-prometheus.sh`
 
 Installs the kube-prometheus-stack GitOps app, which enables Prometheus, Alertmanager, node-exporter, and kube-state-metrics on Longhorn-backed storage.

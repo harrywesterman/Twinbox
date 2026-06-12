@@ -23,6 +23,17 @@ ARGO_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-argocd.sh"
 APPLY_ARGO_APP_SCRIPT = REPO_ROOT / "scripts" / "manager" / "apply-argocd-application.sh"
 RENDER_CILIUM_SCRIPT = REPO_ROOT / "scripts" / "manager" / "render-cilium-manifest.sh"
 CLOUDTTY_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-cloudtty.sh"
+TERMIX_STEP_MANIFEST = (
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-browser-ssh" / "step.yaml"
+)
+TERMIX_STEP_SCRIPT = (
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-browser-ssh" / "run.sh"
+)
+TERMIX_SETUP_AUTHENTIK_SCRIPT = REPO_ROOT / "scripts" / "manager" / "setup-termix-authentik.sh"
+TERMIX_SETUP_SCRIPT = REPO_ROOT / "scripts" / "manager" / "setup-termix.sh"
+TERMIX_DEPLOYMENT = REPO_ROOT / "gitops" / "platform-apps" / "termix" / "deployment.yaml"
+TERMIX_EXTERNALSECRET = REPO_ROOT / "gitops" / "platform-apps" / "termix" / "externalsecret.yaml"
+TERMIX_APP_MANIFEST = REPO_ROOT / "gitops" / "apps" / "termix.yaml"
 PROMETHEUS_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-prometheus.sh"
 RECONCILE_OBSERVABILITY_SCRIPT = REPO_ROOT / "scripts" / "manager" / "reconcile-observability.sh"
 TRAEFIK_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-traefik-manager.sh"
@@ -384,6 +395,30 @@ def _cilium_values_text() -> str:
 
 def _cloudtty_script_text() -> str:
     return CLOUDTTY_SCRIPT.read_text(encoding="utf-8")
+
+
+def _termix_step_manifest_text() -> str:
+    return TERMIX_STEP_MANIFEST.read_text(encoding="utf-8")
+
+
+def _termix_step_text() -> str:
+    return TERMIX_STEP_SCRIPT.read_text(encoding="utf-8")
+
+
+def _termix_setup_authentik_text() -> str:
+    return TERMIX_SETUP_AUTHENTIK_SCRIPT.read_text(encoding="utf-8")
+
+
+def _termix_setup_text() -> str:
+    return TERMIX_SETUP_SCRIPT.read_text(encoding="utf-8")
+
+
+def _termix_deployment_text() -> str:
+    return TERMIX_DEPLOYMENT.read_text(encoding="utf-8")
+
+
+def _termix_externalsecret_text() -> str:
+    return TERMIX_EXTERNALSECRET.read_text(encoding="utf-8")
 
 
 def _prometheus_script_text() -> str:
@@ -4206,6 +4241,75 @@ def test_cloudtty_platform_ingress_is_committed_to_gitops():
     assert 'PLATFORM_DIR="$WORKSPACE_ROOT/gitops/platform-apps/cloudtty"' in script_text
     assert 'kubectl apply -f "$PLATFORM_DIR/authentik-forwardauth-middleware.yaml"' in script_text
     assert 'kubectl apply -f "$rendered_ingressroute"' in script_text
+
+
+def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
+    step_manifest_text = _termix_step_manifest_text()
+    step_text = _termix_step_text()
+    setup_authentik_text = _termix_setup_authentik_text()
+    setup_text = _termix_setup_text()
+    deployment_text = _termix_deployment_text()
+    externalsecret_text = _termix_externalsecret_text()
+
+    assert "title: Install Browser SSH" in step_manifest_text
+    assert (
+        "summary: Provision Termix for admin-only browser SSH into the Management VM."
+        in step_manifest_text
+    )
+    assert "TWINBOX_TALOSCONFIG_FILE:" in step_manifest_text
+    assert "item: talosconfig" in step_manifest_text
+    assert "script: categories/talos-cluster/steps/install-browser-ssh/run.sh" in step_manifest_text
+    assert 'bash "$WORKSPACE_ROOT/scripts/manager/setup-termix-authentik.sh"' in step_text
+    assert 'bash "$WORKSPACE_ROOT/scripts/manager/setup-termix.sh"' in step_text
+
+    assert "redirect_uris: [" in setup_authentik_text
+    assert 'matching_mode: "strict"' in setup_authentik_text
+    assert "property_mappings: $property_mappings" in setup_authentik_text
+    assert "OIDC_SCOPES" in setup_authentik_text
+    assert "OIDC_ADMIN_GROUP" in setup_authentik_text
+    assert "OIDC_ALLOWED_USERS" in setup_authentik_text
+    assert "OIDC_ALLOW_REGISTRATION" in setup_authentik_text
+    assert "OIDC_FORCE_HTTPS" in setup_authentik_text
+    assert "SSH_PRIVATE_KEY" in setup_authentik_text
+    assert '--secret-name "termix"' in setup_authentik_text
+    assert (
+        '--required-keys "OIDC_CLIENT_ID,OIDC_CLIENT_SECRET,OIDC_ISSUER_URL,OIDC_AUTHORIZATION_URL,OIDC_TOKEN_URL,OIDC_USERINFO_URL,OIDC_SCOPES,OIDC_ADMIN_GROUP,OIDC_ALLOWED_USERS,OIDC_ALLOW_REGISTRATION,OIDC_FORCE_HTTPS,TERMIX_ADMIN_PASSWORD"'
+        in setup_authentik_text
+    )
+    assert '--application "termix"' in setup_authentik_text
+    assert '--destination-namespace "termix"' in setup_authentik_text
+    assert "--no-wait" in setup_authentik_text
+    assert "rollout restart deployment/termix" in setup_authentik_text
+
+    assert "TERMIX_ADMIN_PASSWORD" in setup_text
+    assert "users/setup-required" in setup_text
+    assert "setup_required == true" in setup_text
+    assert "users/login" in setup_text
+    assert "resolve_management_vm_ip" in setup_text
+    assert ".kube/config" in setup_text
+    assert ".talos/config" in setup_text
+    assert "Management VM Password" in setup_text
+    assert "browser-ssh" in setup_text
+    assert "Browser SSH" in setup_text
+    assert "/credentials" in setup_text
+    assert "/ssh/db/host" in setup_text
+    assert "/rbac/roles" in setup_text
+    assert "/rbac/users/" in setup_text
+    assert "/rbac/host/" in setup_text
+    assert 'authType: "credential"' in setup_text
+    assert "enableTerminal: true" in setup_text
+    assert "showTerminalInSidebar: true" in setup_text
+    assert "enableSsh: true" in setup_text
+
+    assert "OIDC_ALLOWED_USERS" in externalsecret_text
+    assert "OIDC_ALLOW_REGISTRATION" in externalsecret_text
+    assert "OIDC_FORCE_HTTPS" in externalsecret_text
+    assert "OIDC_ADMIN_GROUP" in externalsecret_text
+    assert "OIDC_SCOPES" in externalsecret_text
+    assert "TERMIX_SSH_PRIVATE_KEY" in externalsecret_text
+    assert "OIDC_ALLOWED_USERS" not in deployment_text
+    assert "OIDC_ALLOW_REGISTRATION" not in deployment_text
+    assert "OIDC_FORCE_HTTPS" not in deployment_text
 
 
 def test_platform_namespace_baseline_covers_shared_overlay_resources():

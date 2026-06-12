@@ -135,7 +135,7 @@ Scripts and step runners executed by `manager-worker`:
 **Networking**
 - `scripts/manager/render-cilium-manifest.sh` — Cilium bootstrap manifest
 - `scripts/manager/install-argocd.sh` — Argo CD installation
-- `scripts/manager/install-cloudtty.sh` — browser-based cluster shell
+- `scripts/manager/setup-termix-authentik.sh` and `scripts/manager/setup-termix.sh` — browser SSH into the Management VM
 - `scripts/manager/install-traefik-manager.sh` — Traefik Manager UI
 
 **Storage & Secrets**
@@ -341,7 +341,7 @@ After the Talos/Cilium bootstrap, platform services install in this order:
 | 16 | `install-management-backup` | Host cron: etcd snapshots + restic |
 | 17 | `install-crowdsec` | IDS + Traefik bouncer |
 | 18 | `install-ntfy` | Push notifications |
-| 19 | `install-cloudtty` | Browser-based cluster shell |
+| 19 | `install-browser-ssh` | Browser SSH to the Management VM |
 | 20 | `install-headlamp` | Kubernetes dashboard with OIDC |
 | 21 | `install-twinbox-portal` | User-facing app launcher |
 | 22 | `install-dashy-dashboard` | Legacy admin launcher |

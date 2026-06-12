@@ -173,6 +173,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-authentik-idp",
                 "create-users-and-groups",
                 "install-headlamp",
+                "install-browser-ssh",
                 "install-grafana",
                 "install-prometheus",
                 "install-pgadmin4",
@@ -197,6 +198,29 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert talos_steps["install-authentik-idp"]["title"] == "Install Authentik"
             assert talos_steps["create-users-and-groups"]["title"] == "Create Users and Groups"
             assert talos_steps["install-headlamp"]["title"] == "Install Headlamp"
+            assert talos_steps["install-browser-ssh"]["title"] == "Install Browser SSH"
+            assert (
+                talos_steps["install-browser-ssh"]["secrets"]["files"]["KUBECONFIG_FILE"]["item"]
+                == "kubeconfig"
+            )
+            assert (
+                talos_steps["install-browser-ssh"]["secrets"]["files"]["KUBECONFIG_FILE"][
+                    "attachment"
+                ]
+                == "kubeconfig"
+            )
+            assert (
+                talos_steps["install-browser-ssh"]["secrets"]["files"]["TWINBOX_TALOSCONFIG_FILE"][
+                    "item"
+                ]
+                == "talosconfig"
+            )
+            assert (
+                talos_steps["install-browser-ssh"]["secrets"]["files"]["TWINBOX_TALOSCONFIG_FILE"][
+                    "attachment"
+                ]
+                == "talosconfig"
+            )
             assert talos_steps["install-grafana"]["title"] == "Install Grafana"
             assert talos_steps["install-prometheus"]["title"] == "Install Prometheus"
             assert talos_steps["install-tempo"]["title"] == "Install Tempo"

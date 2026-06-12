@@ -47,10 +47,6 @@ spec:
               value: localhost
             - name: GUACD_PORT
               value: "4822"
-            - name: OIDC_ALLOWED_USERS
-              value: "*"
-            - name: OIDC_ALLOW_REGISTRATION
-              value: "true"
           envFrom:
             - secretRef:
                 name: termix-bootstrap

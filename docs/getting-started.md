@@ -79,7 +79,7 @@ Use the UI to work through the setup steps. The exact order depends on your chos
 28. **Install Management Backup** (`install-management-backup`) — Host cron jobs for etcd + restic
 29. **Install CrowdSec** (`install-crowdsec`) — IDS + Traefik bouncer
 30. **Install ntfy** (`install-ntfy`) — Push notifications for alerts
-31. **Install Cloudtty** (`install-cloudtty`) — Browser-based cluster shell
+31. **Install Browser SSH** (`install-browser-ssh`) — Termix browser shell to the Management VM
 
 ### User-Facing Services
 
