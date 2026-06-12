@@ -8,6 +8,7 @@ resources:
   - service.yaml
   - deployment.yaml
   - ingressroute.yaml
+  - netbird-forwarded-headers-middleware.yaml
   - ingressroute-netbird.yaml
 
 images:

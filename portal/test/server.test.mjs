@@ -1317,6 +1317,41 @@ test("login requests the reduced Authentik scope set", async () => {
   assert.equal(location.searchParams.get("scope"), "openid profile email");
 });
 
+test("login uses PORTAL_BASE_URL for OIDC redirects behind an HTTP proxy hop", async () => {
+  const previousBaseUrl = process.env.PORTAL_BASE_URL;
+  process.env.PORTAL_BASE_URL = "https://portal.example.test";
+
+  const moduleUrl = `${pathToFileURL(path.join(repoRoot, "portal", "server.mjs")).href}?base-url-test=${Date.now()}`;
+  const { app: baseUrlApp } = await import(moduleUrl);
+  const baseUrlServer = http.createServer(baseUrlApp);
+  const baseUrlOrigin = await startServer(baseUrlServer);
+
+  try {
+    const response = await fetch(`${baseUrlOrigin}/auth/login`, {
+      redirect: "manual",
+      headers: {
+        "X-Forwarded-Host": "portal.example.test",
+        "X-Forwarded-Proto": "http",
+      },
+    });
+
+    assert.equal(response.status, 302);
+    const location = new URL(response.headers.get("location"));
+    assert.equal(
+      location.searchParams.get("redirect_uri"),
+      "https://portal.example.test/auth/callback"
+    );
+    assert.match(response.headers.get("set-cookie") || "", /;\s*Secure\b/);
+  } finally {
+    await new Promise((resolve) => baseUrlServer.close(resolve));
+    if (previousBaseUrl === undefined) {
+      delete process.env.PORTAL_BASE_URL;
+    } else {
+      process.env.PORTAL_BASE_URL = previousBaseUrl;
+    }
+  }
+});
+
 test("auth callback succeeds even when the browser does not return the oauth cookie", async () => {
   const loginResponse = await fetch(`${portalOrigin}/auth/login?returnTo=%2Fadmin`, {
     redirect: "manual",

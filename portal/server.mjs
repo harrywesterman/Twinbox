@@ -26,6 +26,7 @@ const oauthStateTtlMs = 10 * 60 * 1000;
 const managerBaseUrl = String(process.env.PORTAL_MANAGER_BASE_URL || "http://manager-api:8080")
   .trim()
   .replace(/\/+$/, "");
+const publicBaseUrl = normalizeBaseUrl(process.env.PORTAL_BASE_URL || "");
 const issuer = String(process.env.PORTAL_OIDC_ISSUER || process.env.AUTHENTIK_ISSUER || "").trim();
 const clientId = String(process.env.PORTAL_OIDC_CLIENT_ID || "").trim();
 const authentikApiBase = String(
@@ -135,8 +136,29 @@ function readCookies(req) {
   }, {});
 }
 
+function normalizeBaseUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  const url = new URL(raw);
+  if (!["http:", "https:"].includes(url.protocol) || !url.host) {
+    throw new Error("PORTAL_BASE_URL must be an absolute http(s) URL");
+  }
+
+  return `${url.protocol}//${url.host}${url.pathname.replace(/\/+$/, "")}`;
+}
+
+function isSecureRequest(req) {
+  return (
+    publicBaseUrl.startsWith("https://") ||
+    String(req.headers["x-forwarded-proto"] || "").includes("https")
+  );
+}
+
 function cookieOptions(req, { maxAge = null } = {}) {
-  const secure = String(req.headers["x-forwarded-proto"] || "").includes("https");
+  const secure = isSecureRequest(req);
   return [
     "Path=/",
     "HttpOnly",
@@ -166,7 +188,7 @@ function clearCookie(res, req, name) {
       : res.getHeader("Set-Cookie")
         ? [res.getHeader("Set-Cookie")]
         : []),
-    `${name}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${String(req.headers["x-forwarded-proto"] || "").includes("https") ? "; Secure" : ""}`,
+    `${name}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${isSecureRequest(req) ? "; Secure" : ""}`,
   ]);
 }
 
@@ -422,6 +444,10 @@ async function loadScopedAppJob(jobId) {
 }
 
 function getOrigin(req) {
+  if (publicBaseUrl) {
+    return publicBaseUrl;
+  }
+
   const proto =
     String(req.headers["x-forwarded-proto"] || "http")
       .split(",")[0]

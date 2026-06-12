@@ -1,0 +1,14 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: twinbox-portal-netbird-forwarded-headers
+  namespace: twinbox-portal
+  annotations:
+    twinbox.io/description: >-
+      Keep Twinbox Portal OIDC callbacks on the public HTTPS origin behind
+      NetBird Reverse Proxy.
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Port: "443"
+      X-Forwarded-Proto: https
