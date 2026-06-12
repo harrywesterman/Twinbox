@@ -443,6 +443,26 @@ write_files:
               for key, value in updates.items():
                   labels[key] = value
 
+      def get_label(service, key):
+          labels = service.get("labels", [])
+          if isinstance(labels, list):
+              for item in labels:
+                  if "=" not in item:
+                      continue
+                  item_key, item_value = item.split("=", 1)
+                  if item_key == key:
+                      return item_value
+          elif isinstance(labels, dict):
+              return labels.get(key, "")
+          return ""
+
+      def append_csv_label_value(service, key, value):
+          existing = get_label(service, key)
+          parts = [part.strip() for part in existing.split(",") if part.strip()]
+          if value not in parts:
+              parts.append(value)
+          set_labels(service, {key: ",".join(parts)})
+
       def is_removed_http_wildcard_label(key):
           removed_prefixes = (
               "traefik.http.routers." + "wildcard.",
@@ -452,6 +472,16 @@ write_files:
           return key.startswith(removed_prefixes)
 
       remove_label_keys(traefik, is_removed_http_wildcard_label)
+
+      netbird_no_store_middleware = "netbird-no-store"
+      no_store_middleware_labels = {
+          "traefik.http.middlewares.netbird-no-store.headers.customresponseheaders.Cache-Control": (
+              "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+          ),
+          "traefik.http.middlewares.netbird-no-store.headers.customresponseheaders.Pragma": "no-cache",
+          "traefik.http.middlewares.netbird-no-store.headers.customresponseheaders.Expires": "0",
+      }
+      set_labels(traefik, no_store_middleware_labels)
 
       dashboard_tls_domain_labels = {
           "traefik.http.routers.netbird-dashboard.tls.domains[0].main": netbird_domain,
@@ -464,6 +494,11 @@ write_files:
       if dashboard:
           remove_label_keys(dashboard, lambda key: key.startswith("traefik.http.routers.netbird-dashboard.tls.domains["))
           set_labels(dashboard, dashboard_tls_domain_labels)
+          append_csv_label_value(
+              dashboard,
+              "traefik.http.routers.netbird-dashboard.middlewares",
+              netbird_no_store_middleware,
+          )
 
       netbird_server = services.get("netbird-server")
       if netbird_server:
@@ -472,6 +507,16 @@ write_files:
               or key.startswith("traefik.http.routers.netbird-grpc.tls.domains[")
           ))
           set_labels(netbird_server, server_tls_domain_labels)
+          append_csv_label_value(
+              netbird_server,
+              "traefik.http.routers.netbird-backend.middlewares",
+              netbird_no_store_middleware,
+          )
+          append_csv_label_value(
+              netbird_server,
+              "traefik.http.routers.netbird-grpc.middlewares",
+              netbird_no_store_middleware,
+          )
 
       proxy = services.get("proxy")
       if proxy:

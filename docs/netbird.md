@@ -186,6 +186,9 @@ There should be no `traefik.http.routers.wildcard`, `cluster-proxy`, or HTTP
 The bastion Traefik dynamic file should contain only the TCP `pp-v2`
 serversTransport used by the passthrough service; it should not contain
 `tls.certificates` for `/certs/live/<zone>.crt`.
+The bastion NetBird dashboard/API routers attach a `netbird-no-store`
+headers middleware so stale browser-cached 404 or auth responses are not reused
+after route or service changes.
 
 The NetBird Reverse Proxy receives a separate DNS-01 wildcard certificate for
 `<public-zone>` and `*.<public-zone>`. It is mounted only in the `netbird-proxy`

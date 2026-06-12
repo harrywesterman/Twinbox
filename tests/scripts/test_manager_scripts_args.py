@@ -4592,6 +4592,12 @@ def test_netbird_cloud_init_uses_exact_netbird_cert_and_tcp_passthrough():
     assert 'data.pop("tls", None)' in text
     assert 'data.pop("http", None)' in text
     assert 'pp_v2["proxyProtocol"] = {"version": 2}' in text
+    assert 'netbird_no_store_middleware = "netbird-no-store"' in text
+    assert "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0" in text
+    assert '"traefik.http.routers.netbird-dashboard.middlewares"' in text
+    assert '"traefik.http.routers.netbird-backend.middlewares"' in text
+    assert '"traefik.http.routers.netbird-grpc.middlewares"' in text
+    assert "append_csv_label_value" in text
     assert "dashboard_tls_domain_labels" in text
     assert "server_tls_domain_labels" in text
     assert "set_labels(dashboard, dashboard_tls_domain_labels)" in text
