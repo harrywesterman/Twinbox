@@ -983,6 +983,19 @@ fi
   } > "$patch_file"
 }
 
+append_hostname_config_patch() {
+  local name="$1"
+  local patch_file="$2"
+
+  {
+    echo "---"
+    echo "apiVersion: v1alpha1"
+    echo "kind: HostnameConfig"
+    echo "hostname: ${NAME}-${name}"
+    echo "auto: off"
+  } >> "$patch_file"
+}
+
 upsert_secret_artifact() {
   local item="$1"
   local attachment="$2"
@@ -1045,6 +1058,7 @@ generate_talos_configs() {
         echo "      contents: |"
         sed 's/^/        /' "$cilium_manifest_file"
       } >> "$controlplane_patch_file"
+      append_hostname_config_patch "$name" "$controlplane_patch_file"
       talosctl gen config "$NAME" "https://${VIP_IP}:6443" \
         --output-dir "$node_dir" \
         --with-secrets "$talos_secrets_file" \
@@ -1053,6 +1067,7 @@ generate_talos_configs() {
       config_file="$runtime_talos_dir/${name}-controlplane.yaml"
       cp "$node_dir/controlplane.yaml" "$config_file"
     else
+      append_hostname_config_patch "$name" "$patch_file"
       talosctl gen config "$NAME" "https://${VIP_IP}:6443" \
         --output-dir "$node_dir" \
         --with-secrets "$talos_secrets_file" \

@@ -732,7 +732,12 @@ def test_talos_node_hostname_matches_proxmox_vm_name():
 
     assert 'name      = "${var.cluster_name}-${each.key}"' in module_text
     assert 'write_node_patch "$name" "$type" "$mac" "$patch_file"' in script_text
-    # Hostname is handled by Talos auto: stable, not in the patch
+    assert "append_hostname_config_patch()" in script_text
+    assert 'echo "kind: HostnameConfig"' in script_text
+    assert 'echo "hostname: ${NAME}-${name}"' in script_text
+    assert 'echo "auto: off"' in script_text
+    assert 'append_hostname_config_patch "$name" "$controlplane_patch_file"' in script_text
+    assert 'append_hostname_config_patch "$name" "$patch_file"' in script_text
     assert 'echo "    hostname:' not in script_text
 
 
