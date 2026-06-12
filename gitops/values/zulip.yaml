@@ -35,6 +35,8 @@ zulip:
     SETTING_MEMCACHED_USERNAME: ""
     SECRETS_memcached_password: ""
     SETTING_LOADBALANCER_IPS: 10.244.0.0/16
+    SETTING_AUTHENTICATION_BACKENDS: >-
+      ("zproject.backends.EmailAuthBackend", "zproject.backends.GenericOpenIdConnectBackend")
   persistence:
     enabled: true
     accessMode: ReadWriteOnce
@@ -62,15 +64,6 @@ postSetup:
       # With lazy-apps=false the app is loaded before hook-post-fork runs,
       # so chdir must point at the deployment directory from the start.
       sed -i 's|^chdir=/|chdir=/home/zulip/deployments/current|' /etc/zulip/uwsgi.ini
-    07-enable-oidc.sh: |
-      #!/usr/bin/env bash
-      set -euo pipefail
-      # Add GenericOpenIdConnectBackend to AUTHENTICATION_BACKENDS
-      # if SOCIAL_AUTH_OIDC_ENABLED_IDPS is configured.
-      if grep -q "SOCIAL_AUTH_OIDC_ENABLED_IDPS" /etc/zulip/settings.py && \
-         ! grep -q "GenericOpenIdConnectBackend" /etc/zulip/settings.py; then
-        sed -i "s|AUTHENTICATION_BACKENDS = ('zproject.backends.EmailAuthBackend',)|AUTHENTICATION_BACKENDS = ('zproject.backends.EmailAuthBackend', 'zproject.backends.GenericOpenIdConnectBackend')|" /etc/zulip/settings.py
-      fi
     06-patch-nginx-trusted-proto.sh: |
       #!/usr/bin/env bash
       set -euo pipefail
