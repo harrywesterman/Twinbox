@@ -37,6 +37,7 @@ zulip:
     SETTING_LOADBALANCER_IPS: 10.244.0.0/16
     SETTING_AUTHENTICATION_BACKENDS: >-
       ("zproject.backends.EmailAuthBackend", "zproject.backends.GenericOpenIdConnectBackend")
+    SETTING_SOCIAL_AUTH_REDIRECT_IS_HTTPS: "True"
   persistence:
     enabled: true
     accessMode: ReadWriteOnce
