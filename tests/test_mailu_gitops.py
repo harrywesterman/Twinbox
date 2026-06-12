@@ -297,3 +297,28 @@ def test_mailu_dkim_parser_uses_structured_record_name_and_value():
     assert result.stdout.strip() == (
         f'{{"name":"customselector._domainkey.example.com","value":"{expected_value}"' + "}"
     )
+
+
+def test_mailu_dkim_parser_uses_mailu_dns_dkim_export():
+    fixture = {
+        "domain": [
+            {
+                "name": "example.com",
+                "dns_dkim": (
+                    f'dkim._domainkey.example.com. 600 IN TXT "v=DKIM1; k=rsa; p={"B" * 80}"'
+                ),
+            }
+        ]
+    }
+    parser = REPO_ROOT / "scripts" / "manager" / "mailu-dns-export-to-dkim.jq"
+    result = subprocess.run(
+        ["jq", "-c", "-f", str(parser)],
+        input=json.dumps(fixture),
+        text=True,
+        check=True,
+        capture_output=True,
+    )
+    expected_value = f"v=DKIM1; k=rsa; p={'B' * 80}"
+    assert result.stdout.strip() == (
+        f'{{"name":"dkim._domainkey.example.com","value":"{expected_value}"' + "}"
+    )
