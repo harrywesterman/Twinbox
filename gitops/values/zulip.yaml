@@ -28,6 +28,17 @@ zulip:
 
 postSetup:
   scripts:
+    05-patch-uwsgi.sh: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # Disable lazy loading — load all uwsgi workers at startup so that
+      # kubelet probes do not time out on the first request to a new worker.
+      sed -i 's/lazy-apps=true/lazy-apps=false/' /etc/zulip/uwsgi.ini
+      # Lengthen harakiri (max request time) so 6 workers can all
+      # initialize their Django application without being killed.
+      sed -i 's/harakiri=55/harakiri=120/' /etc/zulip/uwsgi.ini
+      # nginx uwsgi_read_timeout must always exceed harakiri.
+      sed -i 's/uwsgi_read_timeout 60s;/uwsgi_read_timeout 125s;/' /etc/nginx/zulip-include/proxy
     10-create-default-realm.sh: |
       #!/usr/bin/env bash
       set -euo pipefail
@@ -112,7 +123,7 @@ startupProbe:
   failureThreshold: 120
   periodSeconds: 10
   initialDelaySeconds: 10
-  timeoutSeconds: 10
+  timeoutSeconds: 60
 
 externalPostgresql:
   host: zulip-db-pooler-rw.databases.svc.cluster.local
