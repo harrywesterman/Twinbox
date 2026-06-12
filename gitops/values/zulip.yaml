@@ -32,8 +32,12 @@ zulip:
         secretKeyRef:
           name: zulip-redis
           key: redis-password
-    SETTING_MEMCACHED_USERNAME: ""
-    SECRETS_memcached_password: ""
+    SETTING_MEMCACHED_USERNAME: zulip@localhost
+    SECRETS_memcached_password:
+      valueFrom:
+        secretKeyRef:
+          name: zulip-memcached
+          key: memcached-password
     SETTING_LOADBALANCER_IPS: 10.244.0.0/16
     SETTING_AUTHENTICATION_BACKENDS: >-
       ("zproject.backends.EmailAuthBackend", "zproject.backends.GenericOpenIdConnectBackend")
@@ -43,6 +47,11 @@ zulip:
     accessMode: ReadWriteOnce
     size: 10Gi
     storageClass: longhorn
+
+memcached:
+  auth:
+    enabled: true
+    username: zulip@localhost
 
 postSetup:
   scripts:
