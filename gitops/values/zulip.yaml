@@ -34,7 +34,7 @@ zulip:
           key: redis-password
     SETTING_MEMCACHED_USERNAME: ""
     SECRETS_memcached_password: ""
-    SETTING_LOADBALANCER_IPS: 10.244.3.22,10.244.4.0/24
+    SETTING_LOADBALANCER_IPS: 10.244.0.0/16
   persistence:
     enabled: true
     accessMode: ReadWriteOnce
@@ -67,7 +67,7 @@ postSetup:
       set -euo pipefail
       # Add NetBird proxy CIDR to nginx trusted-proto and zulip.conf so
       # the proxy reverse headers are accepted from NetBird traffic.
-      NETBIRD_CIDR="10.244.4.0/24"
+      NETBIRD_CIDR="10.244.0.0/16"
       sed -i "s|    default 0;|    ${NETBIRD_CIDR} 1;\n    default 0;|" /etc/nginx/zulip-include/trusted-proto
       crudini --set /etc/zulip/zulip.conf loadbalancer ips "$(crudini --get /etc/zulip/zulip.conf loadbalancer ips),$NETBIRD_CIDR" 2>/dev/null || true
       nginx -s reload
