@@ -283,6 +283,11 @@ if [[ ! -f "${BOOTSTRAP_DIR}/bin/configure-manager-api-firewall.sh" ]]; then
   chmod 0755 "${BOOTSTRAP_DIR}/bin/configure-manager-api-firewall.sh"
 fi
 
+if [[ ! -f "${BOOTSTRAP_DIR}/bin/sync-manager-api-node-allowlist.sh" ]]; then
+  curl -fsSL "${RAW_BASE_URL}/scripts/manager/sync-manager-api-node-allowlist.sh" -o "${BOOTSTRAP_DIR}/bin/sync-manager-api-node-allowlist.sh"
+  chmod 0755 "${BOOTSTRAP_DIR}/bin/sync-manager-api-node-allowlist.sh"
+fi
+
 if [[ -x "${BOOTSTRAP_DIR}/bin/install-management-tools.sh" ]]; then
   sudo "${BOOTSTRAP_DIR}/bin/install-management-tools.sh" --env-file .env
 else
@@ -306,6 +311,7 @@ fi
 docker compose pull
 docker compose up -d
 sudo "${BOOTSTRAP_DIR}/bin/configure-manager-api-firewall.sh"
+sudo "${BOOTSTRAP_DIR}/bin/sync-manager-api-node-allowlist.sh"
 ensure_seaweedfs_bootstrap
 
 if [[ "$BOOTSTRAP_ONCE" -eq 1 ]]; then

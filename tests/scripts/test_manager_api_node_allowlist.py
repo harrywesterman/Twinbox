@@ -1,0 +1,147 @@
+import json
+import os
+import subprocess
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SCRIPT = REPO_ROOT / "scripts" / "manager" / "sync-manager-api-node-allowlist.sh"
+BASE_CIDRS = "127.0.0.1/32,::1/128,172.16.0.0/12,10.0.0.0/8"
+
+
+def _write_fake_kubectl(tmp_path: Path, node_ips: list[str]) -> Path:
+    payload = {
+        "items": [
+            {
+                "status": {
+                    "addresses": [
+                        {"type": "Hostname", "address": f"node-{index}"},
+                        {"type": "InternalIP", "address": ip},
+                    ]
+                }
+            }
+            for index, ip in enumerate(node_ips)
+        ]
+    }
+    kubectl = tmp_path / "kubectl"
+    kubectl.write_text(
+        f"#!/usr/bin/env bash\nset -euo pipefail\ncat <<'JSON'\n{json.dumps(payload)}\nJSON\n",
+        encoding="utf-8",
+    )
+    kubectl.chmod(0o755)
+    return kubectl
+
+
+def _run_sync(tmp_path: Path, env_file: Path, node_ips: list[str]) -> str:
+    kubeconfig = tmp_path / "kubeconfig"
+    kubeconfig.write_text("fake\n", encoding="utf-8")
+    kubectl = _write_fake_kubectl(tmp_path, node_ips)
+    env = {
+        **os.environ,
+        "KUBECTL_BIN": str(kubectl),
+        "KUBECONFIG": str(kubeconfig),
+    }
+    result = subprocess.run(
+        [
+            "bash",
+            str(SCRIPT),
+            "--env-file",
+            str(env_file),
+            "--workspace-root",
+            str(tmp_path),
+            "--skip-firewall",
+            "--skip-restart",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    return result.stderr
+
+
+def test_manager_api_defaults_do_not_trust_broad_lan_ranges():
+    for path in [
+        REPO_ROOT / ".env.example",
+        REPO_ROOT / "docker-compose.yml",
+        REPO_ROOT / "scripts" / "start-manager.sh",
+        REPO_ROOT / "scripts" / "manager" / "configure-manager-api-firewall.sh",
+        REPO_ROOT / "manager-api" / "src" / "lib" / "source-allowlist.js",
+    ]:
+        assert "192.168.0.0/16" not in path.read_text(encoding="utf-8")
+
+
+def test_sync_manager_api_node_allowlist_adds_talos_node_32s(tmp_path):
+    env_file = tmp_path / ".env"
+    env_file.write_text(f"MANAGER_API_TRUSTED_CIDRS={BASE_CIDRS}\n", encoding="utf-8")
+
+    _run_sync(tmp_path, env_file, ["192.168.2.234", "192.168.2.242"])
+
+    text = env_file.read_text(encoding="utf-8")
+    assert (f"MANAGER_API_TRUSTED_CIDRS={BASE_CIDRS},192.168.2.234/32,192.168.2.242/32") in text
+    assert "# BEGIN TWINBOX MANAGER API NODE ALLOWLIST" in text
+    assert "# TWINBOX_MANAGER_API_NODE_CIDRS=192.168.2.234/32,192.168.2.242/32" in text
+
+
+def test_sync_manager_api_node_allowlist_preserves_manual_cidrs(tmp_path):
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        f"MANAGER_API_TRUSTED_CIDRS={BASE_CIDRS},203.0.113.8/32\n",
+        encoding="utf-8",
+    )
+
+    _run_sync(tmp_path, env_file, ["192.168.2.234"])
+
+    text = env_file.read_text(encoding="utf-8")
+    assert (f"MANAGER_API_TRUSTED_CIDRS={BASE_CIDRS},203.0.113.8/32,192.168.2.234/32") in text
+
+
+def test_sync_manager_api_node_allowlist_replaces_old_managed_block(tmp_path):
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        f"""MANAGER_API_TRUSTED_CIDRS={BASE_CIDRS},203.0.113.8/32,192.168.2.100/32
+
+# BEGIN TWINBOX MANAGER API NODE ALLOWLIST
+# Managed by scripts/manager/sync-manager-api-node-allowlist.sh; do not edit this block.
+# TWINBOX_MANAGER_API_NODE_CIDRS=192.168.2.100/32
+# END TWINBOX MANAGER API NODE ALLOWLIST
+""",
+        encoding="utf-8",
+    )
+
+    _run_sync(tmp_path, env_file, ["192.168.2.234", "192.168.2.242"])
+
+    text = env_file.read_text(encoding="utf-8")
+    assert "192.168.2.100/32" not in text
+    assert text.count("# BEGIN TWINBOX MANAGER API NODE ALLOWLIST") == 1
+    assert (
+        f"MANAGER_API_TRUSTED_CIDRS={BASE_CIDRS},203.0.113.8/32,192.168.2.234/32,192.168.2.242/32"
+    ) in text
+
+
+def test_sync_manager_api_node_allowlist_missing_kubeconfig_is_noop(tmp_path):
+    env_file = tmp_path / ".env"
+    env_file.write_text(f"MANAGER_API_TRUSTED_CIDRS={BASE_CIDRS}\n", encoding="utf-8")
+    missing_kubeconfig = tmp_path / "missing-kubeconfig"
+
+    result = subprocess.run(
+        [
+            "bash",
+            str(SCRIPT),
+            "--env-file",
+            str(env_file),
+            "--workspace-root",
+            str(tmp_path),
+            "--kubeconfig",
+            str(missing_kubeconfig),
+            "--skip-firewall",
+            "--skip-restart",
+        ],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    assert "kubeconfig not found" in result.stderr
+    assert env_file.read_text(encoding="utf-8") == f"MANAGER_API_TRUSTED_CIDRS={BASE_CIDRS}\n"

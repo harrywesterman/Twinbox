@@ -2,6 +2,7 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+MANAGER_API_TRUSTED_CIDRS = "127.0.0.1/32,::1/128,172.16.0.0/12,10.0.0.0/8"
 
 
 def test_docker_compose_mounts_categories_and_host_cron_contract():
@@ -44,7 +45,7 @@ def test_env_example_includes_filesystem_bootstrap_contract():
     text = (REPO_ROOT / ".env.example").read_text(encoding="utf-8")
 
     assert "TWINBOX_HOST_REPO_ROOT=" in text
-    assert "MANAGER_API_TRUSTED_CIDRS=127.0.0.1/32,::1/128,172.16.0.0/12,10.0.0.0/8" in text
+    assert f"MANAGER_API_TRUSTED_CIDRS={MANAGER_API_TRUSTED_CIDRS}" in text
     assert "TWINBOX_SECRET_BACKEND=filesystem" in text
     assert "TWINBOX_BOOTSTRAP_DIR=/opt/twinbox/bootstrap" in text
     assert "TWINBOX_SECRET_ITEM_PREFIX=twinbox" in text
@@ -80,9 +81,10 @@ def test_start_manager_configures_manager_api_source_allowlist_firewall():
     text = (REPO_ROOT / "scripts" / "start-manager.sh").read_text(encoding="utf-8")
 
     assert "append_manager_api_source_allowlist" in text
-    assert "MANAGER_API_TRUSTED_CIDRS=127.0.0.1/32,::1/128,172.16.0.0/12,10.0.0.0/8" in text
+    assert f"MANAGER_API_TRUSTED_CIDRS={MANAGER_API_TRUSTED_CIDRS}" in text
     assert "configure-manager-api-firewall.sh" in text
     assert 'sudo "${BOOTSTRAP_DIR}/bin/configure-manager-api-firewall.sh"' in text
+    assert "sync-manager-api-node-allowlist.sh" in text
 
 
 def test_manager_api_firewall_limits_docker_published_port():
@@ -92,8 +94,10 @@ def test_manager_api_firewall_limits_docker_published_port():
 
     assert 'MANAGER_API_PORT="${MANAGER_API_PORT:-8080}"' in text
     assert 'MANAGER_API_TRUSTED_CIDRS="${MANAGER_API_TRUSTED_CIDRS:-' in text
+    assert MANAGER_API_TRUSTED_CIDRS in text
     assert 'ufw insert 1 allow from "$cidr" to any port "$MANAGER_API_PORT" proto tcp' in text
     assert 'ufw deny in to any port "$MANAGER_API_PORT" proto tcp' in text
     assert "DOCKER-USER" in text
     assert 'iptables -A "$CHAIN" -p tcp --dport "$MANAGER_API_PORT" -s "$cidr" -j RETURN' in text
     assert 'iptables -A "$CHAIN" -p tcp --dport "$MANAGER_API_PORT" -j DROP' in text
+    assert "192.168.0.0/16" not in text

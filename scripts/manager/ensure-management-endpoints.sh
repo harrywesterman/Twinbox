@@ -30,3 +30,7 @@ for endpoint_file in proxmox-endpoints.yaml seaweedfs-endpoints.yaml webwizard-e
   log "Applying ${endpoint_file} (proxmox=${proxmox_ip}, mgmt=${mgmt_ip})"
   kubectl apply -f - <<<"$rendered"
 done
+
+if [[ -x "$SCRIPT_DIR/sync-manager-api-node-allowlist.sh" ]]; then
+  "$SCRIPT_DIR/sync-manager-api-node-allowlist.sh" || log "manager-api node allowlist sync skipped or failed"
+fi
