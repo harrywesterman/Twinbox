@@ -21,6 +21,9 @@ PORTAL_STEP = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-twinbox-portal" / "run.sh"
 )
 BESZEL_STEP = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-beszel" / "run.sh"
+BESZEL_BASTION_AGENT_SCRIPT = (
+    REPO_ROOT / "scripts" / "manager" / "configure-bastion-beszel-agent.sh"
+)
 BESZEL_AGENT_SECRET = (
     REPO_ROOT / "gitops" / "platform-apps" / "beszel-agents" / "externalsecret.yaml"
 )
@@ -159,6 +162,7 @@ def test_portal_step_and_secret_project_authentik_management_env():
 
 def test_beszel_step_uses_hub_public_key_and_universal_token_secret():
     text = _read(BESZEL_STEP)
+    bastion_agent_text = _read(BESZEL_BASTION_AGENT_SCRIPT)
     secret_text = _read(BESZEL_AGENT_SECRET)
     daemonset_text = _read(BESZEL_AGENT_DAEMONSET)
 
@@ -178,6 +182,10 @@ def test_beszel_step_uses_hub_public_key_and_universal_token_secret():
     assert "/api/collections/universal_tokens/records" in text
     assert "openssl rand -hex 32" in text
     assert '"hub_url": "$beszel_app_url"' in text
+    assert "configure-bastion-beszel-agent.sh" in text
+    assert '--cluster-id "$cluster_id"' in text
+    assert '--agent-secret-file "$beszel_agent_secret_file"' in text
+    assert '--beszel-version "$beszel_version"' in text
     assert '--secret-name "beszel-agent"' in text
     assert '--required-keys "key,token,hub_url"' in text
     assert "kubectl delete application beszel-agents" not in text
@@ -195,6 +203,18 @@ def test_beszel_step_uses_hub_public_key_and_universal_token_secret():
     assert "name: HUB_URL" in daemonset_text
     assert "key: hub_url" in daemonset_text
     assert 'value: "https://beszel.__ZONE_NAME__"' not in daemonset_text
+
+    assert "PINNED_BESZEL_VERSION" in bastion_agent_text
+    assert "netbird-bastion-${CLUSTER_ID}.json" in bastion_agent_text
+    assert "No NetBird bastion secret found" in bastion_agent_text
+    assert "SSH_PRIVATE_KEY" in bastion_agent_text
+    assert "beszel-bastion-ssh-key" in bastion_agent_text
+    assert "SYSTEM_NAME=%s" in bastion_agent_text
+    assert "twinbox-netbird-bastion" in bastion_agent_text
+    assert "DISABLE_SSH=true" in bastion_agent_text
+    assert "image: henrygd/beszel-agent:${BESZEL_VERSION}" in bastion_agent_text
+    assert "network_mode: host" in bastion_agent_text
+    assert "/var/run/docker.sock:/var/run/docker.sock:ro" in bastion_agent_text
 
 
 def test_gitops_secret_consumers_now_reference_cluster_secret_store_openbao():

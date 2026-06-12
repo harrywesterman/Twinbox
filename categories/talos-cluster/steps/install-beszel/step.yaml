@@ -4,16 +4,18 @@ type: action
 journey_stage: setup
 summary: Lightweight server monitoring with Docker stats, historical data, and alerts.
 explanation: >
-  Beszel monitors your Management VM and all Kubernetes cluster nodes.
-  It tracks CPU, memory, disk, network, and container usage with a
-  lightweight agent — no public internet exposure required.
+  Beszel monitors your Management VM, all Kubernetes cluster nodes, and
+  the NetBird bastion when one is present. It tracks CPU, memory, disk,
+  network, and container usage with a lightweight agent — no public
+  internet exposure required.
   Configure alerts for CPU, memory, disk, and system status in the
   Beszel dashboard.
 side_help: >
   Beszel uses a hub-and-agent architecture. The hub runs on the Management VM
   and provides a web dashboard with OIDC login via Authentik. A local agent
   monitors the Management VM itself, and a DaemonSet on the cluster monitors
-  all Kubernetes nodes.
+  all Kubernetes nodes. When NetBird is selected, Twinbox also starts a
+  Dockerized agent on the bastion through its saved SSH credentials.
 dashy:
   items:
     - section: Platform

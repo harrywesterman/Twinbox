@@ -49,6 +49,7 @@ public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domai
 beszel_app_url="https://beszel.${public_zone_name}"
 beszel_local_url="${BESZEL_LOCAL_URL:-http://beszel:8090}"
 beszel_user_email="beszel-admin@${public_zone_name}"
+beszel_version="${BESZEL_VERSION:-${PINNED_BESZEL_VERSION:-0.18.7}}"
 env_file="/opt/twinbox/.env"
 management_consoles_dir="$WORKSPACE_ROOT/gitops/platform/management-consoles"
 
@@ -98,7 +99,7 @@ fi
 set_env_var "BESZEL_APP_URL" "$beszel_app_url"
 set_env_var "BESZEL_USER_EMAIL" "$beszel_user_email"
 set_env_var "BESZEL_USER_PASSWORD" "$beszel_user_password"
-set_env_var "BESZEL_VERSION" "${BESZEL_VERSION:-${PINNED_BESZEL_VERSION:-0.18.7}}"
+set_env_var "BESZEL_VERSION" "$beszel_version"
 
 apply_beszel_traefik_route() {
   local management_ip
@@ -502,6 +503,12 @@ bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
   --service-name "beszel" \
   --service-domain "beszel.${public_zone_name}" \
   --service-path /
+
+log "Configuring Beszel agent on NetBird bastion when available"
+bash "$WORKSPACE_ROOT/scripts/manager/configure-bastion-beszel-agent.sh" \
+  --cluster-id "$cluster_id" \
+  --agent-secret-file "$beszel_agent_secret_file" \
+  --beszel-version "$beszel_version"
 
 log "Deploying Beszel agent DaemonSet through Argo CD"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
