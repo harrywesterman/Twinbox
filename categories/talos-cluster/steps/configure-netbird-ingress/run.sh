@@ -465,6 +465,67 @@ REMOTE
   [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
 }
 
+discover_netbird_proxy_peer_ip() {
+  local ssh_key_path="$MANAGER_DATA_DIR/ssh/netbird-${cluster_id}/id_ed25519"
+  local temp_ssh_key=""
+  local netbird_ip
+
+  if [[ ! -f "$ssh_key_path" ]]; then
+    if jq -e '.SSH_PRIVATE_KEY // empty' "$netbird_bastion_secret" >/dev/null; then
+      temp_ssh_key="$(mktemp)"
+      jq -r '.SSH_PRIVATE_KEY' "$netbird_bastion_secret" >"$temp_ssh_key"
+      chmod 600 "$temp_ssh_key"
+      ssh_key_path="$temp_ssh_key"
+    fi
+  fi
+
+  if [[ ! -f "$ssh_key_path" || -z "$netbird_proxy_ip" ]] || ! command -v ssh >/dev/null 2>&1; then
+    [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
+    fail "NetBird bastion SSH is unavailable; cannot discover the bastion NetBird IP"
+  fi
+
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Discovering bastion NetBird peer IP"
+  if ! netbird_ip="$(
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 \
+      -i "$ssh_key_path" root@"$netbird_proxy_ip" \
+      'bash -s' <<'REMOTE'
+set -euo pipefail
+docker exec netbird-client netbird status --check ready >/dev/null
+netbird_ip="$(docker exec netbird-client netbird status 2>/dev/null | awk -F': ' '/NetBird IP:/ {print $2; exit}' | cut -d/ -f1)"
+if [[ -z "$netbird_ip" ]]; then
+  netbird_ip="$(docker exec netbird-client sh -lc "ip -o -4 addr show | awk '\$2 ~ /^(wt|nb|netbird)/ {split(\$4,a,\"/\"); print a[1]; exit}'" 2>/dev/null || true)"
+fi
+[[ -n "$netbird_ip" ]] || {
+  echo "Could not discover NetBird overlay IP from netbird-client" >&2
+  exit 1
+}
+printf '%s\n' "$netbird_ip"
+REMOTE
+  )"; then
+    [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
+    fail "Failed to discover the bastion NetBird IP"
+  fi
+
+  [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
+  [[ -n "$netbird_ip" ]] || fail "Bastion NetBird IP discovery returned an empty value"
+  printf '%s\n' "$netbird_ip"
+}
+
+persist_netbird_proxy_peer_ip() {
+  local bastion_netbird_ip="$1"
+  local tmp_file
+
+  [[ -n "$bastion_netbird_ip" ]] || fail "Cannot persist empty bastion NetBird IP"
+
+  tmp_file="$(mktemp)"
+  jq --arg netbird_private_ip "$bastion_netbird_ip" \
+    '. + {NETBIRD_PRIVATE_IP: $netbird_private_ip}' \
+    "$netbird_bastion_secret" >"$tmp_file"
+  mv "$tmp_file" "$netbird_bastion_secret"
+  chmod 600 "$netbird_bastion_secret"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Saved bastion NetBird peer IP to the bastion secret"
+}
+
 ensure_netbird_bastion_exit_peer() {
   local setup_key="$1"
   local ssh_key_path="$MANAGER_DATA_DIR/ssh/netbird-${cluster_id}/id_ed25519"
@@ -1075,6 +1136,7 @@ management_lan_router_setup_key="$(tofu output -raw -no-color management_lan_rou
 proxy_setup_key="$(tofu output -raw -no-color proxy_setup_key)"
 bastion_exit_router_setup_key="$(tofu output -raw -no-color bastion_exit_router_setup_key)"
 mailu_relay_egress_setup_key="$(tofu output -raw -no-color mailu_relay_egress_setup_key)"
+browser_ssh_setup_key="$(tofu output -raw -no-color browser_ssh_setup_key)"
 admins_group_id="$(tofu output -raw -no-color admins_group_id)"
 management_vm_group_id="$(tofu output -raw -no-color management_vm_group_id)"
 k8s_routers_group_id="$(tofu output -raw -no-color k8s_routers_group_id)"
@@ -1083,6 +1145,7 @@ adguard_dns_group_id="$(tofu output -raw -no-color adguard_dns_group_id)"
 management_lan_routers_group_id="$(tofu output -raw -no-color management_lan_routers_group_id)"
 bastion_exit_routers_group_id="$(tofu output -raw -no-color bastion_exit_routers_group_id)"
 mailu_relay_egress_group_id="$(tofu output -raw -no-color mailu_relay_egress_group_id)"
+browser_ssh_group_id="$(tofu output -raw -no-color browser_ssh_group_id)"
 exit_node_users_group_id="$(tofu output -raw -no-color exit_node_users_group_id)"
 traefik_resource_id="$(tofu output -raw -no-color traefik_resource_id)"
 
@@ -1094,6 +1157,7 @@ management_lan_router_secret="$secrets_dir/netbird-management-lan-router-${clust
 proxy_secret="$secrets_dir/netbird-proxy-access-${cluster_id}.json"
 bastion_exit_router_secret="$secrets_dir/netbird-bastion-exit-router-${cluster_id}.json"
 mailu_relay_egress_secret="$secrets_dir/netbird-mailu-relay-egress-${cluster_id}.json"
+browser_ssh_secret="$secrets_dir/netbird-browser-ssh-${cluster_id}.json"
 network_secret="$secrets_dir/netbird-network-${cluster_id}.json"
 
 jq -n \
@@ -1136,7 +1200,14 @@ jq -n \
   --arg cluster_id "$cluster_id" \
   '{NB_SETUP_KEY: $setup_key, NB_MANAGEMENT_URL: $management_url, NB_HOSTNAME: $hostname, CLUSTER_ID: $cluster_id}' >"$mailu_relay_egress_secret"
 
-chmod 600 "$routing_secret" "$admin_secret" "$management_lan_router_secret" "$proxy_secret" "$bastion_exit_router_secret" "$mailu_relay_egress_secret"
+jq -n \
+  --arg setup_key "$browser_ssh_setup_key" \
+  --arg management_url "$netbird_management_url" \
+  --arg hostname "twinbox-${cluster_id}-browser-ssh" \
+  --arg cluster_id "$cluster_id" \
+  '{NB_SETUP_KEY: $setup_key, NB_MANAGEMENT_URL: $management_url, NB_HOSTNAME: $hostname, CLUSTER_ID: $cluster_id}' >"$browser_ssh_secret"
+
+chmod 600 "$routing_secret" "$admin_secret" "$management_lan_router_secret" "$proxy_secret" "$bastion_exit_router_secret" "$mailu_relay_egress_secret" "$browser_ssh_secret"
 
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "netbird-routing-peers" \
@@ -1168,6 +1239,11 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --json-file "$mailu_relay_egress_secret" \
   --required-keys "NB_SETUP_KEY,NB_MANAGEMENT_URL,NB_HOSTNAME"
 
+bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+  --secret-name "netbird-browser-ssh" \
+  --json-file "$browser_ssh_secret" \
+  --required-keys "NB_SETUP_KEY,NB_MANAGEMENT_URL,NB_HOSTNAME"
+
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Writing network secret for helper scripts"
 jq -n \
   --arg management_url "$netbird_management_url" \
@@ -1186,6 +1262,7 @@ jq -n \
   --arg management_lan_routers_group_id "$management_lan_routers_group_id" \
   --arg bastion_exit_routers_group_id "$bastion_exit_routers_group_id" \
   --arg mailu_relay_egress_group_id "$mailu_relay_egress_group_id" \
+  --arg browser_ssh_group_id "$browser_ssh_group_id" \
   --arg exit_node_users_group_id "$exit_node_users_group_id" \
   --arg cluster_id "$cluster_id" \
   '{
@@ -1205,6 +1282,7 @@ jq -n \
     MANAGEMENT_LAN_ROUTERS_GROUP_ID: $management_lan_routers_group_id,
     BASTION_EXIT_ROUTERS_GROUP_ID: $bastion_exit_routers_group_id,
     MAILU_RELAY_EGRESS_GROUP_ID: $mailu_relay_egress_group_id,
+    BROWSER_SSH_GROUP_ID: $browser_ssh_group_id,
     EXIT_NODE_USERS_GROUP_ID: $exit_node_users_group_id,
     CLUSTER_ID: $cluster_id
   }' >"$network_secret"
@@ -1219,6 +1297,8 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
 wait_for_netbird_routing_peer
 wait_for_traefik_reverse_proxy_backend "$traefik_resource_address"
 ensure_netbird_proxy_peer "$proxy_setup_key"
+bastion_netbird_ip="$(discover_netbird_proxy_peer_ip)"
+persist_netbird_proxy_peer_ip "$bastion_netbird_ip"
 ensure_netbird_bastion_exit_peer "$bastion_exit_router_setup_key"
 wait_for_netbird_proxy_backend \
   "$traefik_resource_address" \

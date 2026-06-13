@@ -34,6 +34,11 @@ output "mailu_relay_egress_group_id" {
   description = "NetBird group ID for Mailu relay egress peers"
 }
 
+output "browser_ssh_group_id" {
+  value       = netbird_group.browser_ssh.id
+  description = "NetBird group ID for Termix Browser SSH peers"
+}
+
 output "exit_node_users_group_id" {
   value       = netbird_group.exit_node_users.id
   description = "NetBird group ID for peers allowed to opt into Twinbox routes"
@@ -70,5 +75,10 @@ output "bastion_exit_router_setup_key" {
 
 output "mailu_relay_egress_setup_key" {
   value     = netbird_setup_key.mailu_relay_egress.key
+  sensitive = true
+}
+
+output "browser_ssh_setup_key" {
+  value     = netbird_setup_key.browser_ssh.key
   sensitive = true
 }

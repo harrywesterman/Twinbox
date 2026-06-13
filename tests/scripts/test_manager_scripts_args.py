@@ -1940,6 +1940,8 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "ipv4_in_cidrs_json()" in text
     assert "normalize_traefik_resource_address()" in text
     assert "ensure_netbird_proxy_peer()" in text
+    assert "discover_netbird_proxy_peer_ip()" in text
+    assert "persist_netbird_proxy_peer_ip()" in text
     assert "ensure_netbird_bastion_exit_peer()" in text
     assert "wait_for_netbird_proxy_backend()" in text
     assert (
@@ -1971,13 +1973,17 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "ADGUARD_DNS_GROUP_ID" in text
     assert "MANAGEMENT_LAN_ROUTERS_GROUP_ID" in text
     assert "BASTION_EXIT_ROUTERS_GROUP_ID" in text
+    assert "BROWSER_SSH_GROUP_ID" in text
     assert "EXIT_NODE_USERS_GROUP_ID" in text
     assert "proxy_setup_key" in text
     assert "netbird-proxy-access" in text
     assert "management_lan_router_setup_key" in text
     assert "bastion_exit_router_setup_key" in text
+    assert "browser_ssh_setup_key" in text
     assert "netbird-management-lan-router" in text
     assert "netbird-bastion-exit-router" in text
+    assert "netbird-browser-ssh" in text
+    assert "NETBIRD_PRIVATE_IP" in text
     assert "netbirdio/netbird:${PINNED_NETBIRD_VERSION:-0.70.5}" in text
     assert "docker run -d" in text and "--name netbird-client" in text
     assert "--name netbird-hetzner-exit" in text
@@ -2057,6 +2063,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     routing_peer_index = text.index("Deploying NetBird routing peers before enabling reverse proxy")
     backend_index = text.index('wait_for_traefik_reverse_proxy_backend "$traefik_resource_address"')
     proxy_peer_index = text.index('ensure_netbird_proxy_peer "$proxy_setup_key"')
+    bastion_ip_index = text.index('bastion_netbird_ip="$(discover_netbird_proxy_peer_ip)"')
     exit_peer_index = text.index(
         'ensure_netbird_bastion_exit_peer "$bastion_exit_router_setup_key"'
     )
@@ -2098,6 +2105,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
         < routing_peer_index
         < backend_index
         < proxy_peer_index
+        < bastion_ip_index
         < exit_peer_index
         < proxy_backend_index
         < dns_index
