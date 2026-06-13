@@ -22,22 +22,6 @@ zulip:
           key: ZULIP_DEFAULT_REALM_OWNER_NAME
     SETTING_EXTERNAL_HOST: zulip.bierineenweek.nl
     SETTING_ZULIP_ADMINISTRATOR: admin@zulip.bierineenweek.nl
-    SECRETS_rabbitmq_password:
-      valueFrom:
-        secretKeyRef:
-          name: zulip-rabbitmq
-          key: rabbitmq-password
-    SECRETS_redis_password:
-      valueFrom:
-        secretKeyRef:
-          name: zulip-redis
-          key: redis-password
-    SETTING_MEMCACHED_USERNAME: zulip@localhost
-    SECRETS_memcached_password:
-      valueFrom:
-        secretKeyRef:
-          name: zulip-memcached
-          key: memcached-password
     SETTING_LOADBALANCER_IPS: 10.244.0.0/16
     SETTING_AUTHENTICATION_BACKENDS: >-
       ("zproject.backends.EmailAuthBackend", "zproject.backends.GenericOpenIdConnectBackend")

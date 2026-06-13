@@ -339,6 +339,10 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS:" in values_text
     assert "ZULIP_DEFAULT_REALM_OWNER_EMAIL:" in values_text
     assert "ZULIP_DEFAULT_REALM_OWNER_NAME:" in values_text
+    assert "SECRETS_rabbitmq_password:" not in values_text
+    assert "SECRETS_redis_password:" not in values_text
+    assert "SETTING_MEMCACHED_USERNAME:" not in values_text
+    assert "SECRETS_memcached_password:" not in values_text
     assert "containerSecurityContext:" in values_text
     assert "readOnlyRootFilesystem: false" in values_text
     assert "persistence:" in values_text
