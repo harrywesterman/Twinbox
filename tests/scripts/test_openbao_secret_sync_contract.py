@@ -302,6 +302,11 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
         'SETTING_ZULIP_ADMINISTRATOR: admin@{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
         in app_text
     )
+    expected_zulip_csrf_trusted_origins = (
+        "SETTING_CSRF_TRUSTED_ORIGINS: '[\"https://zulip."
+        '{{index .metadata.annotations "twinbox.io/public-zone-name"}}"]\''
+    )
+    assert expected_zulip_csrf_trusted_origins in app_text
     assert "ZULIP_AUTH_BACKENDS: GenericOpenIdConnectBackend" in app_text
     assert 'TRUST_GATEWAY_IP: "True"' in app_text
     assert "ZULIP_DEFAULT_REALM_OWNER_EMAIL:" not in app_text

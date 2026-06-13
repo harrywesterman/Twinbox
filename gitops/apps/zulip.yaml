@@ -29,6 +29,7 @@ spec:
                 environment:
                   SETTING_EXTERNAL_HOST: zulip.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
                   SETTING_ZULIP_ADMINISTRATOR: admin@{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                  SETTING_CSRF_TRUSTED_ORIGINS: '["https://zulip.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"]'
                   SETTING_SOCIAL_AUTH_OIDC_FULL_NAME_VALIDATED: "True"
                   ZULIP_AUTH_BACKENDS: GenericOpenIdConnectBackend
                   TRUST_GATEWAY_IP: "True"
