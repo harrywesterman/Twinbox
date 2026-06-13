@@ -311,6 +311,8 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert expected_zulip_csrf_trusted_origins in app_text
     assert expected_zulip_csrf_trusted_origins in optional_app_text
     assert "ZULIP_AUTH_BACKENDS: GenericOpenIdConnectBackend" in app_text
+    assert "ServerSideApply=true" in app_text
+    assert "ServerSideApply=true" in optional_app_text
     assert 'TRUST_GATEWAY_IP: "True"' in app_text
     assert "ZULIP_DEFAULT_REALM_OWNER_EMAIL:" not in app_text
     assert "ZULIP_DEFAULT_REALM_OWNER_NAME:" not in app_text
