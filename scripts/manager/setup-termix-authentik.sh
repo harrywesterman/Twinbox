@@ -376,6 +376,7 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$rendered_termix_app_manifest" \
   --application "termix" \
   --destination-namespace "termix" \
+  --skip-namespace-baseline \
   --no-wait \
   >/dev/null
 

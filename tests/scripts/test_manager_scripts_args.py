@@ -4368,6 +4368,7 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     )
     assert '--application "termix"' in setup_authentik_text
     assert '--destination-namespace "termix"' in setup_authentik_text
+    assert "--skip-namespace-baseline" in setup_authentik_text
     assert "--no-wait" in setup_authentik_text
     assert "rollout restart deployment/termix" in setup_authentik_text
     assert "managedNamespaceMetadata:" in app_manifest_text
