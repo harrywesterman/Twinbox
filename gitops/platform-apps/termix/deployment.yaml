@@ -103,7 +103,7 @@ spec:
             initialDelaySeconds: 15
             periodSeconds: 20
         - name: netbird
-          image: netbirdio/netbird:0.70.5
+          image: netbirdio/netbird:0.72.4
           imagePullPolicy: IfNotPresent
           env:
             - name: NB_SETUP_KEY

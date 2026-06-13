@@ -728,7 +728,7 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert 'if [[ -n "${CILIUM_K8S_SERVICE_HOST:-}" ]]; then' in helper_text
     assert 'if [[ -n "${CILIUM_K8S_SERVICE_PORT:-}" ]]; then' in helper_text
     assert "if ((${#helm_args[@]})); then" in helper_text
-    assert "PINNED_CILIUM_CHART_VERSION=1.19.3" in pinned_defaults_text
+    assert "PINNED_CILIUM_CHART_VERSION=1.19.4" in pinned_defaults_text
     assert "PINNED_CLOUDTTY_CHART_VERSION=0.8.9" in pinned_defaults_text
     assert "PINNED_TRAEFIK_MANAGER_IMAGE_TAG=v0.8.0" in pinned_defaults_text
     assert "ipam:" in values_text
@@ -3020,7 +3020,7 @@ def test_metrics_server_argocd_app_uses_official_chart():
     assert "name: metrics-server" in text
     assert "chart: metrics-server" in text
     assert "https://kubernetes-sigs.github.io/metrics-server/" in text
-    assert 'targetRevision: "3.13.0"' in text
+    assert 'targetRevision: "3.13.1"' in text
     assert "$values/gitops/values/metrics-server.yaml" in text
     assert "repoURL: __REPO_URL__" in text
     assert "targetRevision: __TARGET_REVISION__" in text
@@ -4426,7 +4426,7 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "NB_MANAGEMENT_URL" in externalsecret_text
     assert "NB_HOSTNAME" in externalsecret_text
     assert "name: netbird" in deployment_text
-    assert "image: netbirdio/netbird:0.70.5" in deployment_text
+    assert "image: netbirdio/netbird:0.72.4" in deployment_text
     assert "NB_SETUP_KEY" in deployment_text
     assert "NB_MANAGEMENT_URL" in deployment_text
     assert "NB_HOSTNAME" in deployment_text

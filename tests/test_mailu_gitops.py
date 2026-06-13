@@ -38,7 +38,7 @@ def test_mailu_optional_appset_uses_pinned_mailu_chart():
 
 def test_mailu_values_keep_mail_ports_internal_and_set_resources():
     values = _load_yaml(REPO_ROOT / "gitops" / "values" / "mailu.yaml")
-    assert values["mailuVersion"] == "2024.06.51"
+    assert values["mailuVersion"] == "2024.06.52"
     assert values["ingress"]["enabled"] is False
     assert values["front"]["hostPort"]["enabled"] is False
     assert values["front"]["externalService"]["enabled"] is False
@@ -173,9 +173,9 @@ def test_mailu_relay_egress_resources_are_wired():
         for container in deployment["spec"]["template"]["spec"]["containers"]
     }
     assert set(containers) == {"netbird", "haproxy", "probe"}
-    assert containers["netbird"]["image"] == "netbirdio/netbird:0.70.5"
-    assert containers["haproxy"]["image"] == "haproxy:3.0-alpine"
-    assert containers["probe"]["image"] == "busybox:1.36"
+    assert containers["netbird"]["image"] == "netbirdio/netbird:0.72.4"
+    assert containers["haproxy"]["image"] == "haproxy:3.0.23-alpine"
+    assert containers["probe"]["image"] == "busybox:1.36.1"
     assert containers["haproxy"]["resources"]["requests"]
     assert containers["probe"]["resources"]["limits"]
 
