@@ -79,6 +79,7 @@ output "mailu_relay_egress_setup_key" {
 }
 
 output "browser_ssh_setup_key" {
-  value     = netbird_setup_key.browser_ssh.key
-  sensitive = true
+  value       = netbird_setup_key.browser_ssh.key
+  description = "NetBird setup key for the Termix Browser SSH peer"
+  sensitive   = true
 }

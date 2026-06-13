@@ -2356,14 +2356,19 @@ def test_netbird_lan_and_exit_routes_are_opt_in():
 
     assert 'variable "management_lan_cidrs"' in vars_text
     assert 'variable "exit_node_skip_auto_apply"' in vars_text
+    assert 'variable "bastion_ssh_port"' in vars_text
     assert 'resource "netbird_group" "management_lan_routers"' in network_text
     assert 'resource "netbird_group" "bastion_exit_routers"' in network_text
+    assert 'resource "netbird_group" "browser_ssh"' in network_text
     assert 'resource "netbird_group" "exit_node_users"' in network_text
     assert 'name = "${local.name_prefix}-exit-node-users"' in network_text
     assert 'resource "netbird_setup_key" "management_lan_router"' in network_text
     assert 'resource "netbird_setup_key" "bastion_exit_router"' in network_text
+    assert 'resource "netbird_setup_key" "browser_ssh"' in network_text
     assert 'output "management_lan_router_setup_key"' in outputs_text
     assert 'output "bastion_exit_router_setup_key"' in outputs_text
+    assert 'output "browser_ssh_group_id"' in outputs_text
+    assert 'output "browser_ssh_setup_key"' in outputs_text
     assert 'output "exit_node_users_group_id"' in outputs_text
 
     lan_route = re.search(
@@ -2404,6 +2409,13 @@ def test_netbird_lan_and_exit_routes_are_opt_in():
     assert 'protocol      = "icmp"' in network_text
     assert "exit_node_users_to_management_lan_routers_icmp" in network_text
     assert "exit_node_users_to_bastion_exit_routers_icmp" in network_text
+    assert 'resource "netbird_policy" "admin_to_bastion_ssh"' in network_text
+    assert 'resource "netbird_policy" "browser_ssh_to_management_vm_ssh"' in network_text
+    assert 'resource "netbird_policy" "browser_ssh_to_bastion_ssh"' in network_text
+    assert "sources       = [netbird_group.browser_ssh.id]" in network_text
+    assert "destinations  = [netbird_group.proxy.id]" in network_text
+    assert "destinations  = [netbird_group.management_vm.id]" in network_text
+    assert "ports         = [tostring(var.bastion_ssh_port)]" in network_text
 
 
 def test_adguard_install_uses_management_vm_dns_forwarder_for_netbird_dns():
@@ -2494,6 +2506,9 @@ def test_netbird_network_policies_use_single_rule_per_policy():
     assert "adguard_dns_to_k8s_routers_tcp" in {name for name, _ in policy_blocks}
     assert "adguard_dns_to_management_vm" in {name for name, _ in policy_blocks}
     assert "adguard_dns_to_management_vm_tcp" in {name for name, _ in policy_blocks}
+    assert "admin_to_bastion_ssh" in {name for name, _ in policy_blocks}
+    assert "browser_ssh_to_management_vm_ssh" in {name for name, _ in policy_blocks}
+    assert "browser_ssh_to_bastion_ssh" in {name for name, _ in policy_blocks}
     assert (
         "sources       = [netbird_group.adguard_dns.id, netbird_group.admins.id, netbird_group.exit_node_users.id]"
         in text
@@ -2502,12 +2517,14 @@ def test_netbird_network_policies_use_single_rule_per_policy():
 
 def test_netbird_routing_peer_uses_pinned_image_tag():
     deployment_text = NETBIRD_ROUTING_PEER_DEPLOYMENT.read_text(encoding="utf-8")
+    termix_deployment_text = TERMIX_DEPLOYMENT.read_text(encoding="utf-8")
     pinned_defaults_text = PINNED_DEFAULTS.read_text(encoding="utf-8")
     pinned_match = re.search(r"^PINNED_NETBIRD_VERSION=(\S+)$", pinned_defaults_text, re.M)
 
     assert pinned_match
     assert "__NETBIRD_VERSION__" not in deployment_text
     assert f"image: netbirdio/netbird:{pinned_match.group(1)}" in deployment_text
+    assert f"image: netbirdio/netbird:{pinned_match.group(1)}" in termix_deployment_text
 
 
 def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
@@ -3405,9 +3422,9 @@ def test_forgejo_bootstrap_seeds_from_upstream_and_renders_github_defaults():
     bootstrap_text = (REPO_ROOT / "scripts" / "manager" / "bootstrap-forgejo.sh").read_text(
         encoding="utf-8"
     )
-    promote_text = (
-        REPO_ROOT / "scripts" / "manager" / "forgejo-promote-upstream.sh"
-    ).read_text(encoding="utf-8")
+    promote_text = (REPO_ROOT / "scripts" / "manager" / "forgejo-promote-upstream.sh").read_text(
+        encoding="utf-8"
+    )
 
     assert (
         "TWINBOX_UPSTREAM_GIT_REPO_URL:-https://github.com/harrywesterman/Twinbox.git"
@@ -3421,8 +3438,8 @@ def test_forgejo_bootstrap_seeds_from_upstream_and_renders_github_defaults():
         assert "commit_rendered_changes()" in text
         assert 'commit_rendered_changes "$' in text
         assert 'github_repo_url = "https://github.com/harrywesterman/Twinbox.git"' in text
-        assert 'line = line.replace(github_repo_url, repo_url)' in text
-        assert 'targetRevision:' in text
+        assert "line = line.replace(github_repo_url, repo_url)" in text
+        assert "targetRevision:" in text
         assert "__REPO_URL__" in text
         assert "__TARGET_REVISION__" in text
 
@@ -4311,7 +4328,7 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
 
     assert "title: Install Browser SSH" in step_manifest_text
     assert (
-        "summary: Provision Termix for admin-only browser SSH into the Management VM."
+        "summary: Provision Termix for admin-only browser SSH into the Management VM and bastion."
         in step_manifest_text
     )
     assert "TWINBOX_TALOSCONFIG_FILE:" in step_manifest_text
@@ -4344,9 +4361,19 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "setup_required == true" in setup_text
     assert "users/login" in setup_text
     assert "resolve_management_vm_ip" in setup_text
+    assert "netbird_bastion_secret" in setup_text
+    assert "NETBIRD_PRIVATE_IP" in setup_text
+    assert "SSH_PRIVATE_KEY is missing" in setup_text
+    assert "discover_management_netbird_ip" in setup_text
+    assert "discover_bastion_netbird_ip" in setup_text
+    assert "netbird_peer_ip_by_name" in setup_text
     assert ".kube/config" in setup_text
     assert ".talos/config" in setup_text
     assert "Management VM Password" in setup_text
+    assert "Bastion VM SSH Key" in setup_text
+    assert "Bastion VM" in setup_text
+    assert "Management VM NetBird IP" in setup_text
+    assert "Bastion NetBird IP" in setup_text
     assert "browser-ssh" in setup_text
     assert "Browser SSH" in setup_text
     assert "/credentials" in setup_text
@@ -4355,6 +4382,10 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "/rbac/users/" in setup_text
     assert "/rbac/host/" in setup_text
     assert 'authType: "credential"' in setup_text
+    assert 'authType: "key"' in setup_text
+    assert 'keyType: "auto"' in setup_text
+    assert "credentialId: ($credential_id | tonumber? // $credential_id)" in setup_text
+    assert "share_termix_host_with_browser_role" in setup_text
     assert "enableTerminal: true" in setup_text
     assert "showTerminalInSidebar: true" in setup_text
     assert "enableSsh: true" in setup_text
@@ -4365,6 +4396,20 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "OIDC_ADMIN_GROUP" in externalsecret_text
     assert "OIDC_SCOPES" in externalsecret_text
     assert "TERMIX_SSH_PRIVATE_KEY" in externalsecret_text
+    assert "twinbox/global/netbird-browser-ssh" in externalsecret_text
+    assert "NB_SETUP_KEY" in externalsecret_text
+    assert "NB_MANAGEMENT_URL" in externalsecret_text
+    assert "NB_HOSTNAME" in externalsecret_text
+    assert "name: netbird" in deployment_text
+    assert "image: netbirdio/netbird:0.70.5" in deployment_text
+    assert "NB_SETUP_KEY" in deployment_text
+    assert "NB_MANAGEMENT_URL" in deployment_text
+    assert "NB_HOSTNAME" in deployment_text
+    assert "mountPath: /var/lib/netbird" in deployment_text
+    assert "subPath: netbird-state" in deployment_text
+    assert "path: /dev/net/tun" in deployment_text
+    assert "privileged: true" in deployment_text
+    assert "runAsUser: 0" in deployment_text
     assert "OIDC_ALLOWED_USERS" not in deployment_text
     assert "OIDC_ALLOW_REGISTRATION" not in deployment_text
     assert "OIDC_FORCE_HTTPS" not in deployment_text
@@ -4514,17 +4559,23 @@ def test_forgejo_management_console_route_uses_native_oidc_and_dashy_tile():
     assert "title: Forgejo" in step_manifest_text
     assert "icon: forgejo" in step_manifest_text
     assert "https://forgejo.__ZONE_NAME__" in step_manifest_text
-    assert 'kubectl -n longhorn-system get ingressroute/forgejo' in step_script_text
+    assert "kubectl -n longhorn-system get ingressroute/forgejo" in step_script_text
     assert 'key: "forgejo"' not in step_script_text
     assert "forgejo_provider_id" not in step_script_text
     assert "Provisioning native Authentik OIDC login for Forgejo" in step_script_text
-    assert 'openbao_read_global_secret_json forgejo-oidc' in step_script_text
+    assert "openbao_read_global_secret_json forgejo-oidc" in step_script_text
     assert '--secret-name "forgejo-oidc"' in step_script_text
-    assert 'forgejo_redirect_uri="${forgejo_host}/user/oauth2/${forgejo_auth_name}/callback"' in step_script_text
-    assert 'forgejo_discovery_url="${forgejo_issuer_url}.well-known/openid-configuration"' in step_script_text
+    assert (
+        'forgejo_redirect_uri="${forgejo_host}/user/oauth2/${forgejo_auth_name}/callback"'
+        in step_script_text
+    )
+    assert (
+        'forgejo_discovery_url="${forgejo_issuer_url}.well-known/openid-configuration"'
+        in step_script_text
+    )
     assert 'create_or_update_oauth2_provider "$forgejo_provider_name"' in step_script_text
     assert '"/providers/oauth2/"' in step_script_text
-    assert "issuer_mode: \"per_provider\"" in step_script_text
+    assert 'issuer_mode: "per_provider"' in step_script_text
     assert "configure_forgejo_oidc_auth_source" in step_script_text
     assert "forgejo admin auth add-oauth" in step_script_text
     assert "forgejo admin auth update-oauth" in step_script_text
@@ -4534,7 +4585,7 @@ def test_forgejo_management_console_route_uses_native_oidc_and_dashy_tile():
     assert 'upsert_env_value "$env_file" "FORGEJO_ROOT_URL" "$forgejo_root_url"' in step_script_text
     assert "TWINBOX_HOST_RUNTIME_DIR" in step_script_text
     assert "forgejo_legacy_proxy_provider_id" in step_script_text
-    assert '[$traefik, $longhorn, $hubble, $proxmox, $webwizard, $forgejo]' not in step_script_text
+    assert "[$traefik, $longhorn, $hubble, $proxmox, $webwizard, $forgejo]" not in step_script_text
     assert '--service-name "forgejo"' in step_script_text
     assert (
         '--service-domain "forgejo.$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"'

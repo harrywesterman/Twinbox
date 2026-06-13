@@ -444,7 +444,7 @@ ensure_termix_host() {
       --arg name "$host_name" \
       --arg ip "$host_ip" \
       --arg username "$username" \
-      --argjson credential_id "$credential_id" \
+      --arg credential_id "$credential_id" \
       '{
         connectionType: "ssh",
         name: $name,
@@ -452,7 +452,7 @@ ensure_termix_host() {
         port: 22,
         username: $username,
         authType: "credential",
-        credentialId: $credential_id,
+        credentialId: ($credential_id | tonumber? // $credential_id),
         enableTerminal: true,
         showTerminalInSidebar: true,
         enableSsh: true
@@ -476,10 +476,10 @@ share_termix_host_with_browser_role() {
 
   share_payload="$(
     jq -n \
-      --argjson role_id "$browser_role_id" \
+      --arg role_id "$browser_role_id" \
       '{
         targetType: "role",
-        targetRoleId: $role_id,
+        targetRoleId: ($role_id | tonumber? // $role_id),
         permissionLevel: "view"
       }'
   )"
@@ -604,7 +604,7 @@ while IFS= read -r user_id; do
   fi
 
   assign_role_payload="$(
-    jq -n --argjson role_id "$browser_role_id" '{roleId: $role_id}'
+    jq -n --arg role_id "$browser_role_id" '{roleId: ($role_id | tonumber? // $role_id)}'
   )"
   termix_api_request POST "/rbac/users/${user_id}/roles" "$assign_role_payload" >/dev/null
 done <<<"$admin_user_ids"

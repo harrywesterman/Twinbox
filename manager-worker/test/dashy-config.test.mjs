@@ -21,10 +21,10 @@ function loadStep(stepId) {
 test("real step manifests normalize Dashy metadata", () => {
   const step = loadStep("install-management-consoles");
 
-  assert.equal(step.dashy.items.length, 4);
+  assert.equal(step.dashy.items.length, 5);
   assert.deepEqual(
     step.dashy.items.map((item) => item.title),
-    ["Proxmox", "SeaweedFS", "SeaweedFS Admin", "Web Wizard"]
+    ["Proxmox", "SeaweedFS", "SeaweedFS Admin", "Web Wizard", "Forgejo"]
   );
 });
 

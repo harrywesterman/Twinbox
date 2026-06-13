@@ -35,7 +35,7 @@ Talos lifecycle operations are triggered through the manager stack.
 29. `install-management-backup` installs host cron jobs on the Management VM for daily Talos etcd snapshots and daily `/opt/twinbox` restic backups to SeaweedFS.
 30. `install-crowdsec` deploys CrowdSec security engine and seeds the Traefik bouncer key into OpenBao.
 31. `install-ntfy` deploys the ntfy push notification service for cluster alerts.
-32. `install-browser-ssh` deploys Termix browser SSH access to the Management VM for admins.
+32. `install-browser-ssh` deploys Termix browser SSH access to the Management VM and bastion for admins.
 33. `install-headlamp` deploys the Kubernetes dashboard with native Authentik OIDC login.
 34. `install-twinbox-portal` renders the user portal config from step metadata and cluster state, writing it to `Secret/portal-config`.
 35. `install-dashy-dashboard` renders the legacy admin launcher config into `ConfigMap/dashy-config`.

@@ -72,7 +72,7 @@ Configures the Termix Authentik OIDC provider, syncs the Termix bootstrap secret
 
 ### `setup-termix.sh`
 
-Signs in to Termix with the bootstrap admin password, creates the Management VM password credential and host entry, copies kubeconfig and Talos config into the Management VM home directory, and shares the host with the Browser SSH role.
+Signs in to Termix with the bootstrap admin password, creates the Management VM password credential and bastion SSH key credential, creates host entries that use the hosts' NetBird peer IPs, copies kubeconfig and Talos config into the Management VM home directory, and shares both hosts with the Browser SSH role.
 
 ### `install-prometheus.sh`
 

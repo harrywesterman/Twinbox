@@ -116,7 +116,7 @@ def test_start_manager_bootstraps_forgejo_before_full_stack():
     assert 'append_env_value_if_missing "TWINBOX_FORGEJO_REPO_URL"' in text
     assert "runtime_services=(" in text
     assert "docker compose pull forgejo" in text
-    assert 'docker compose up -d forgejo' in text
+    assert "docker compose up -d forgejo" in text
     assert '"${BOOTSTRAP_DIR}/bin/bootstrap-forgejo.sh"' in text
     assert 'docker compose pull "${runtime_services[@]}"' in text
     assert 'docker compose up -d "${runtime_services[@]}"' in text
@@ -124,11 +124,20 @@ def test_start_manager_bootstraps_forgejo_before_full_stack():
     append_pos = text.index("\nappend_forgejo_env_block\n")
     forgejo_pull_pos = text.index("docker compose pull forgejo")
     forgejo_up_pos = text.index("docker compose up -d forgejo")
-    bootstrap_pos = text.index('if [[ "$forgejo_started" == "true" && -x "${BOOTSTRAP_DIR}/bin/bootstrap-forgejo.sh" ]]')
+    bootstrap_pos = text.index(
+        'if [[ "$forgejo_started" == "true" && -x "${BOOTSTRAP_DIR}/bin/bootstrap-forgejo.sh" ]]'
+    )
     runtime_pull_pos = text.index('docker compose pull "${runtime_services[@]}"')
     runtime_up_pos = text.index('docker compose up -d "${runtime_services[@]}"')
 
-    assert append_pos < forgejo_pull_pos < forgejo_up_pos < bootstrap_pos < runtime_pull_pos < runtime_up_pos
+    assert (
+        append_pos
+        < forgejo_pull_pos
+        < forgejo_up_pos
+        < bootstrap_pos
+        < runtime_pull_pos
+        < runtime_up_pos
+    )
 
 
 def test_manager_api_firewall_limits_docker_published_port():
