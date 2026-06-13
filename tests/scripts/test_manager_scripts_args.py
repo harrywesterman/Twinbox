@@ -34,6 +34,7 @@ TERMIX_SETUP_SCRIPT = REPO_ROOT / "scripts" / "manager" / "setup-termix.sh"
 TERMIX_DEPLOYMENT = REPO_ROOT / "gitops" / "platform-apps" / "termix" / "deployment.yaml"
 TERMIX_EXTERNALSECRET = REPO_ROOT / "gitops" / "platform-apps" / "termix" / "externalsecret.yaml"
 TERMIX_APP_MANIFEST = REPO_ROOT / "gitops" / "apps" / "termix.yaml"
+TERMIX_NAMESPACE = REPO_ROOT / "gitops" / "platform-apps" / "termix" / "namespace.yaml"
 PROMETHEUS_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-prometheus.sh"
 RECONCILE_OBSERVABILITY_SCRIPT = REPO_ROOT / "scripts" / "manager" / "reconcile-observability.sh"
 TRAEFIK_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-traefik-manager.sh"
@@ -4325,6 +4326,8 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     setup_text = _termix_setup_text()
     deployment_text = _termix_deployment_text()
     externalsecret_text = _termix_externalsecret_text()
+    app_manifest_text = TERMIX_APP_MANIFEST.read_text(encoding="utf-8")
+    namespace_text = TERMIX_NAMESPACE.read_text(encoding="utf-8")
 
     assert "title: Install Browser SSH" in step_manifest_text
     assert (
@@ -4367,6 +4370,13 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert '--destination-namespace "termix"' in setup_authentik_text
     assert "--no-wait" in setup_authentik_text
     assert "rollout restart deployment/termix" in setup_authentik_text
+    assert "managedNamespaceMetadata:" in app_manifest_text
+    assert "pod-security.kubernetes.io/enforce: privileged" in app_manifest_text
+    assert "pod-security.kubernetes.io/audit: privileged" in app_manifest_text
+    assert "pod-security.kubernetes.io/warn: privileged" in app_manifest_text
+    assert "pod-security.kubernetes.io/enforce: privileged" in namespace_text
+    assert "pod-security.kubernetes.io/audit: privileged" in namespace_text
+    assert "pod-security.kubernetes.io/warn: privileged" in namespace_text
 
     assert "TERMIX_ADMIN_PASSWORD" in setup_text
     assert "users/setup-required" in setup_text
