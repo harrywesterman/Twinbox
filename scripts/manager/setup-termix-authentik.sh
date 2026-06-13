@@ -353,7 +353,7 @@ termix_secret_payload="$(
     }'
 )"
 
-termix_secret_file="$(mktemp "${TMPDIR:-/tmp}/termix-secret-XXXXXX.json")"
+termix_secret_file="$(mktemp "${TMPDIR:-/tmp}/termix-secret-XXXXXX")"
 printf '%s' "$termix_secret_payload" >"$termix_secret_file"
 
 log "Storing Termix bootstrap secret in OpenBao"
