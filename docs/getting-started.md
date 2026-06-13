@@ -86,7 +86,7 @@ Use the UI to work through the setup steps. The exact order depends on your chos
 32. **Install Headlamp** (`install-headlamp`) — Kubernetes dashboard with OIDC
 33. **Install Twinbox Portal** (`install-twinbox-portal`) — User app launcher
 34. **Install Dashy Dashboard** (`install-dashy-dashboard`) — Legacy admin launcher
-35. **Install Management Consoles** (`install-management-consoles`) — Proxmox, Longhorn, SeaweedFS UIs
+35. **Install Management Consoles** (`install-management-consoles`) — Proxmox, Longhorn, Forgejo, SeaweedFS UIs
 36. **Install pgAdmin 4** (`install-pgadmin4`) — PostgreSQL management
 37. **Configure Argo CD OIDC** (`configure-argocd-oidc`) — Argo CD Authentik integration
 

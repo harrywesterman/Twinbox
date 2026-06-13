@@ -86,6 +86,40 @@ MANAGER_API_TRUSTED_CIDRS=127.0.0.1/32,::1/128,172.16.0.0/12,10.0.0.0/8
 EOF
 }
 
+append_env_value_if_missing() {
+  local key="$1"
+  local value="$2"
+
+  if grep -q "^${key}=" .env; then
+    return 0
+  fi
+
+  printf '%s=%s\n' "$key" "$value" >> .env
+}
+
+append_forgejo_env_block() {
+  local management_ip="${MANAGEMENT_VM_IP:-}"
+  local forgejo_port="${FORGEJO_HTTP_PORT:-3001}"
+  local forgejo_root_url=""
+  local forgejo_owner="${TWINBOX_FORGEJO_REPO_OWNER:-${FORGEJO_ADMIN_USER:-twinbox}}"
+  local forgejo_repo_name="${TWINBOX_FORGEJO_REPO_NAME:-Twinbox}"
+
+  if [[ -z "$management_ip" ]]; then
+    if ! management_ip="$(resolve_management_vm_ip)"; then
+      fail "Could not determine management VM IP"
+    fi
+  fi
+
+  forgejo_root_url="${FORGEJO_ROOT_URL:-http://${management_ip}:${forgejo_port}/}"
+
+  append_env_value_if_missing "FORGEJO_HTTP_PORT" "$forgejo_port"
+  append_env_value_if_missing "FORGEJO_ROOT_URL" "$forgejo_root_url"
+  append_env_value_if_missing "TWINBOX_UPSTREAM_GIT_REPO_URL" "https://github.com/harrywesterman/Twinbox.git"
+  append_env_value_if_missing "TWINBOX_FORGEJO_REPO_OWNER" "$forgejo_owner"
+  append_env_value_if_missing "TWINBOX_FORGEJO_REPO_NAME" "$forgejo_repo_name"
+  append_env_value_if_missing "TWINBOX_FORGEJO_REPO_URL" "${forgejo_root_url%/}/${forgejo_owner}/${forgejo_repo_name}.git"
+}
+
 remove_tool_version_envs() {
   local tmp_file=""
 
@@ -288,6 +322,16 @@ if [[ ! -f "${BOOTSTRAP_DIR}/bin/sync-manager-api-node-allowlist.sh" ]]; then
   chmod 0755 "${BOOTSTRAP_DIR}/bin/sync-manager-api-node-allowlist.sh"
 fi
 
+if [[ ! -f "${BOOTSTRAP_DIR}/bin/bootstrap-forgejo.sh" ]]; then
+  curl -fsSL "${RAW_BASE_URL}/scripts/manager/bootstrap-forgejo.sh" -o "${BOOTSTRAP_DIR}/bin/bootstrap-forgejo.sh"
+  chmod 0755 "${BOOTSTRAP_DIR}/bin/bootstrap-forgejo.sh"
+fi
+
+if [[ ! -f "${BOOTSTRAP_DIR}/bin/forgejo-promote-upstream.sh" ]]; then
+  curl -fsSL "${RAW_BASE_URL}/scripts/manager/forgejo-promote-upstream.sh" -o "${BOOTSTRAP_DIR}/bin/forgejo-promote-upstream.sh"
+  chmod 0755 "${BOOTSTRAP_DIR}/bin/forgejo-promote-upstream.sh"
+fi
+
 if [[ -x "${BOOTSTRAP_DIR}/bin/install-management-tools.sh" ]]; then
   sudo "${BOOTSTRAP_DIR}/bin/install-management-tools.sh" --env-file .env
 else
@@ -302,14 +346,52 @@ set -a
 # shellcheck disable=SC1091
 source .env
 set +a
+append_forgejo_env_block
+set -a
+# shellcheck disable=SC1091
+source .env
+set +a
 ensure_bootstrap_material
 
 if [[ ! -f docker-compose.yml ]]; then
   curl -fsSL "${RAW_BASE_URL}/docker-compose.yml" -o docker-compose.yml
 fi
 
-docker compose pull
-docker compose up -d
+runtime_services=(
+  manager-api
+  manager-worker
+  manager-web
+  seaweedfs
+  seaweedfs-admin
+  beszel
+  beszel-agent
+)
+
+forgejo_started="false"
+if ! docker compose pull forgejo; then
+  log "Forgejo image pull failed; trying to start any local image before falling back to GitHub source"
+fi
+if docker compose up -d forgejo; then
+  forgejo_started="true"
+else
+  log "Forgejo startup failed; continuing with GitHub source"
+fi
+
+if [[ "$forgejo_started" == "true" && -x "${BOOTSTRAP_DIR}/bin/bootstrap-forgejo.sh" ]]; then
+  log "Bootstrapping Forgejo"
+  if ! "${BOOTSTRAP_DIR}/bin/bootstrap-forgejo.sh"; then
+    log "Forgejo bootstrap failed; continuing with GitHub source"
+  else
+    set -a
+    # shellcheck disable=SC1091
+    source .env
+    set +a
+  fi
+fi
+
+docker compose pull "${runtime_services[@]}"
+docker compose up -d "${runtime_services[@]}"
+
 sudo "${BOOTSTRAP_DIR}/bin/configure-manager-api-firewall.sh"
 sudo "${BOOTSTRAP_DIR}/bin/sync-manager-api-node-allowlist.sh"
 ensure_seaweedfs_bootstrap

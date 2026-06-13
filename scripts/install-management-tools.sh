@@ -319,6 +319,19 @@ ensure_openssl() {
   apt-get install -y openssl >/dev/null
 }
 
+install_git() {
+  if command -v git >/dev/null 2>&1; then
+    log "git already installed: $(git --version 2>/dev/null || printf 'unknown version')"
+    return 0
+  fi
+
+  log "Installing git"
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -qq
+  apt-get install -y git >/dev/null
+  command -v git >/dev/null 2>&1 || fail "git install did not provide a git binary"
+}
+
 install_restic() {
   if command -v restic >/dev/null 2>&1; then
     log "restic already installed: $(restic version 2>/dev/null || printf 'unknown version')"
@@ -490,6 +503,7 @@ EOF
 
 ensure_talos_cpu_compatibility
 ensure_openssl
+install_git
 install_restic
 install_talosctl
 install_tofu

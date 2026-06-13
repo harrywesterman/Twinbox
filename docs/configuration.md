@@ -22,9 +22,23 @@ TWINBOX_TIME_SERVER=time.cloudflare.com
 MANAGEMENT_VM_IP=192.168.1.50
 TWINBOX_SECRET_TEMP_DIR=/tmp/twinbox-secrets
 TWINBOX_SECRET_CACHE_TTL_SEC=60
+FORGEJO_VERSION=15.0.3
+FORGEJO_HTTP_PORT=3001
+FORGEJO_ROOT_URL=http://192.168.1.50:3001/
+FORGEJO_ADMIN_USER=twinbox
+FORGEJO_ADMIN_EMAIL=admin@twinbox.local
+FORGEJO_ADMIN_PASSWORD=
+TWINBOX_UPSTREAM_GIT_REPO_URL=https://github.com/harrywesterman/Twinbox.git
+TWINBOX_FORGEJO_REPO_OWNER=twinbox
+TWINBOX_FORGEJO_REPO_NAME=Twinbox
+TWINBOX_FORGEJO_REPO_URL=http://192.168.1.50:3001/twinbox/Twinbox.git
 ```
 
 `TWINBOX_HOST_REPO_ROOT` is the host runtime root used by the manager stack on the Management VM. The name is historical; it does not mean the host keeps a full repo checkout.
+
+`TWINBOX_GIT_REPO_URL` stays pointed at GitHub in the repo defaults. During Management VM bootstrap, the Forgejo helper rewrites `/opt/twinbox/.env` so the manager stack can read from Forgejo instead of GitHub.
+
+Forgejo is exposed externally as `https://forgejo.<ZONE_NAME>` by the management console step. Traefik proxies that route directly to Forgejo; Forgejo itself uses native Authentik/OIDC login with callback `https://forgejo.<ZONE_NAME>/user/oauth2/authentik/callback`. The management console step persists the public `FORGEJO_ROOT_URL` in `/opt/twinbox/.env`, stores the OIDC client secret in OpenBao as `twinbox/global/forgejo-oidc`, and keeps the local admin account from `/opt/twinbox/bootstrap/secrets/global/forgejo.json` as break-glass access.
 
 `PROXMOX_FILE_DATASTORE` is the Proxmox datastore that Twinbox uses for Talos disk-image uploads during cluster provisioning. The setup wizard enables Proxmox `import` content on this datastore so OpenTofu can import the uploaded image into VM disks through the Proxmox API.
 
@@ -33,6 +47,7 @@ TWINBOX_SECRET_CACHE_TTL_SEC=60
 ### Global bootstrap secrets
 
 - `/opt/twinbox/bootstrap/secrets/global/proxmox.json`
+- `/opt/twinbox/bootstrap/secrets/global/forgejo.json`
 - `/opt/twinbox/bootstrap/secrets/global/traefik-dashboard.json`
 - `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json`
 - `/opt/twinbox/bootstrap/secrets/global/grafana-oidc-<cluster-id>.json`
@@ -351,6 +366,7 @@ All platform services use the runtime domain projection from the local Argo clus
 | ntfy | `ntfy.<ZONE_NAME>` |
 | SeaweedFS | `seaweedfs.<ZONE_NAME>` |
 | SeaweedFS Admin | `seaweedfs-admin.<ZONE_NAME>` |
+| Forgejo | `forgejo.<ZONE_NAME>` |
 | Proxmox (proxy) | `proxmox.<ZONE_NAME>` |
 
 Twinbox Portal is the default user landing page. It uses Authentik OIDC in the portal backend, stores per-user preferences in its own PVC-backed store, and renders the app catalog from step metadata plus the cluster step-state into `Secret/portal-config` at runtime.
@@ -369,7 +385,7 @@ gitops/platform/
 ├── grafana/                    # ExternalSecret for admin + OIDC
 ├── headlamp/                   # IngressRoute, ExternalSecret for OIDC
 ├── hubble/                     # IngressRoute, forwardAuth for Hubble UI
-├── management-consoles/        # Proxmox, Longhorn, SeaweedFS proxy routes
+├── management-consoles/        # Proxmox, Longhorn, Forgejo, SeaweedFS proxy routes
 ├── traefik/                    # Argo CD routes, dashboard auth, CrowdSec bouncer
 ├── dashy/                      # Legacy admin launcher
 └── twinbox-portal/

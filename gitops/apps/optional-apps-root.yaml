@@ -6,8 +6,8 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/harrywesterman/Twinbox.git
-    targetRevision: main
+    repoURL: __REPO_URL__
+    targetRevision: __TARGET_REVISION__
     path: gitops/optional-apps
   destination:
     server: https://kubernetes.default.svc

@@ -72,7 +72,7 @@ categories/talos-cluster/
 | `install-browser-ssh` | Deploy Termix browser SSH to the Management VM |
 | `install-twinbox-portal` | Deploy the Twinbox user portal |
 | `install-dashy-dashboard` | Deploy Dashy legacy admin launcher |
-| `install-management-consoles` | Deploy operator web consoles (SeaweedFS, etc.) |
+| `install-management-consoles` | Deploy operator web consoles (Forgejo, SeaweedFS, etc.) |
 | `install-ntfy` | Deploy ntfy push notifications |
 
 ### Backups

@@ -187,6 +187,20 @@ spec:
                   value: Host(`webwizard.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
+                name: forgejo
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`forgejo.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: forgejo-netbird
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`forgejo.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
                 name: seaweedfs
               patch: |-
                 - op: replace

@@ -2238,6 +2238,14 @@ def test_netbird_service_hostnames_match_ingress_routes():
         / "install-management-consoles"
         / "run.sh"
     ).read_text(encoding="utf-8")
+    assert '--service-name "forgejo"' in (
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-management-consoles"
+        / "run.sh"
+    ).read_text(encoding="utf-8")
 
 
 def test_netbird_proxy_uses_traefik_webnetbird_origin():
@@ -2307,6 +2315,8 @@ def test_netbird_proxy_uses_traefik_webnetbird_origin():
     assert "traefik/traefik-netbird-service.yaml" in platform_kustomization_text
     assert "management-consoles/beszel-ingressroute.yaml" in platform_kustomization_text
     assert "management-consoles/beszel-service.yaml" in platform_kustomization_text
+    assert "management-consoles/forgejo-ingressroute.yaml" in platform_kustomization_text
+    assert "management-consoles/forgejo-service.yaml" in platform_kustomization_text
 
     assert "name: authentik-netbird" in authentik_ingress_text
     netbird_route_text = authentik_ingress_text.split("name: authentik-netbird", 1)[1]
@@ -3358,6 +3368,18 @@ def test_optional_apps_root_and_redirected_manifests_are_present():
 
     assert "name: optional-apps-root" in root_text
     assert "path: gitops/optional-apps" in root_text
+    assert "repoURL: __REPO_URL__" in root_text
+    assert "targetRevision: __TARGET_REVISION__" in root_text
+
+    optional_manifests = sorted((REPO_ROOT / "gitops" / "optional-apps").glob("*.yaml"))
+    assert optional_manifests
+    for manifest in optional_manifests:
+        text = manifest.read_text(encoding="utf-8")
+        assert "__REPO_URL__" not in text, manifest
+        assert "__TARGET_REVISION__" not in text, manifest
+        assert "repoURL: https://github.com/harrywesterman/Twinbox.git" in text, manifest
+        assert "targetRevision: main" in text, manifest
+
     assert "kind: ApplicationSet" in jitsi_optional_text
     assert 'twinbox.io/app-jitsi: "enabled"' in jitsi_optional_text
     assert "kind: ApplicationSet" in opencloud_optional_text
@@ -3369,6 +3391,34 @@ def test_optional_apps_root_and_redirected_manifests_are_present():
     assert "kind: ApplicationSet" in karakeep_optional_text
     assert 'twinbox.io/app-karakeep: "enabled"' in karakeep_optional_text
     assert "path: gitops/platform-apps/karakeep" in karakeep_optional_text
+
+
+def test_forgejo_bootstrap_seeds_from_upstream_and_renders_github_defaults():
+    bootstrap_text = (REPO_ROOT / "scripts" / "manager" / "bootstrap-forgejo.sh").read_text(
+        encoding="utf-8"
+    )
+    promote_text = (
+        REPO_ROOT / "scripts" / "manager" / "forgejo-promote-upstream.sh"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        "TWINBOX_UPSTREAM_GIT_REPO_URL:-https://github.com/harrywesterman/Twinbox.git"
+        in bootstrap_text
+    )
+    assert "TWINBOX_FORGEJO_SEED_SOURCE_DIR" in bootstrap_text
+    assert 'seed_source="$(resolve_seed_source)"' in bootstrap_text
+    assert 'seed_repo_if_needed "$REPO_ROOT"' not in bootstrap_text
+
+    for text in (bootstrap_text, promote_text):
+        assert "commit_rendered_changes()" in text
+        assert 'commit_rendered_changes "$' in text
+        assert 'github_repo_url = "https://github.com/harrywesterman/Twinbox.git"' in text
+        assert 'line = line.replace(github_repo_url, repo_url)' in text
+        assert 'targetRevision:' in text
+        assert "__REPO_URL__" in text
+        assert "__TARGET_REVISION__" in text
+
+    assert '--force-with-lease forgejo "$promote_branch:refs/heads/$promote_branch"' in promote_text
 
 
 def test_optional_database_apps_patch_cloudnativepg_requests_by_resource_profile():
@@ -4375,6 +4425,9 @@ def test_management_console_endpoints_use_placeholders():
     webwizard_text = (
         REPO_ROOT / "gitops" / "platform" / "management-consoles" / "webwizard-endpoints.yaml"
     ).read_text(encoding="utf-8")
+    forgejo_text = (
+        REPO_ROOT / "gitops" / "platform" / "management-consoles" / "forgejo-endpoints.yaml"
+    ).read_text(encoding="utf-8")
     beszel_text = (
         REPO_ROOT / "gitops" / "platform" / "management-consoles" / "beszel-endpoints.yaml"
     ).read_text(encoding="utf-8")
@@ -4385,7 +4438,9 @@ def test_management_console_endpoints_use_placeholders():
     assert "ip: __PROXMOX_HOST_IP__" in proxmox_text
     assert "ip: __MGMT_HOST_IP__" in seaweedfs_text
     assert "ip: __MGMT_HOST_IP__" in webwizard_text
+    assert "ip: __MGMT_HOST_IP__" in forgejo_text
     assert "ip: __MGMT_HOST_IP__" in beszel_text
+    assert "forgejo-endpoints.yaml" in endpoint_script_text
     assert "beszel-endpoints.yaml" in endpoint_script_text
 
 
@@ -4407,6 +4462,83 @@ def test_beszel_management_vm_route_uses_native_oidc_without_forwardauth():
         'Host(`beszel.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)'
         in platform_ingress_text
     )
+
+
+def test_forgejo_management_console_route_uses_native_oidc_and_dashy_tile():
+    ingress_text = (
+        REPO_ROOT / "gitops" / "platform" / "management-consoles" / "forgejo-ingressroute.yaml"
+    ).read_text(encoding="utf-8")
+    service_text = (
+        REPO_ROOT / "gitops" / "platform" / "management-consoles" / "forgejo-service.yaml"
+    ).read_text(encoding="utf-8")
+    platform_ingress_text = PLATFORM_INGRESS_APP.read_text(encoding="utf-8")
+    platform_kustomization_text = KUSTOMIZATION.read_text(encoding="utf-8")
+    step_manifest_text = (
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-management-consoles"
+        / "step.yaml"
+    ).read_text(encoding="utf-8")
+    step_script_text = (
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-management-consoles"
+        / "run.sh"
+    ).read_text(encoding="utf-8")
+    dashy_config_text = (REPO_ROOT / "lib" / "dashy-config.mjs").read_text(encoding="utf-8")
+
+    assert "Host(`forgejo.__ZONE_NAME__`)" in ingress_text
+    assert "authentik-forwardauth" not in ingress_text
+    assert "name: forgejo-netbird" in ingress_text
+    assert "port: 3001" in ingress_text
+    assert "port: 3001" in service_text
+    assert "name: forgejo" in platform_ingress_text
+    assert (
+        'Host(`forgejo.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)'
+        in platform_ingress_text
+    )
+    assert "management-consoles/forgejo-ingressroute.yaml" in platform_kustomization_text
+    assert "management-consoles/forgejo-service.yaml" in platform_kustomization_text
+    assert "title: Forgejo" in step_manifest_text
+    assert "icon: forgejo" in step_manifest_text
+    assert "https://forgejo.__ZONE_NAME__" in step_manifest_text
+    assert 'kubectl -n longhorn-system get ingressroute/forgejo' in step_script_text
+    assert 'key: "forgejo"' not in step_script_text
+    assert "forgejo_provider_id" not in step_script_text
+    assert "Provisioning native Authentik OIDC login for Forgejo" in step_script_text
+    assert 'openbao_read_global_secret_json forgejo-oidc' in step_script_text
+    assert '--secret-name "forgejo-oidc"' in step_script_text
+    assert 'forgejo_redirect_uri="${forgejo_host}/user/oauth2/${forgejo_auth_name}/callback"' in step_script_text
+    assert 'forgejo_discovery_url="${forgejo_issuer_url}.well-known/openid-configuration"' in step_script_text
+    assert 'create_or_update_oauth2_provider "$forgejo_provider_name"' in step_script_text
+    assert '"/providers/oauth2/"' in step_script_text
+    assert "issuer_mode: \"per_provider\"" in step_script_text
+    assert "configure_forgejo_oidc_auth_source" in step_script_text
+    assert "forgejo admin auth add-oauth" in step_script_text
+    assert "forgejo admin auth update-oauth" in step_script_text
+    assert "--provider openidConnect" in step_script_text
+    assert '--auto-discover-url "$FORGEJO_OIDC_DISCOVERY_URL"' in step_script_text
+    assert '--scopes "openid email profile"' in step_script_text
+    assert 'upsert_env_value "$env_file" "FORGEJO_ROOT_URL" "$forgejo_root_url"' in step_script_text
+    assert "TWINBOX_HOST_RUNTIME_DIR" in step_script_text
+    assert "forgejo_legacy_proxy_provider_id" in step_script_text
+    assert '[$traefik, $longhorn, $hubble, $proxmox, $webwizard, $forgejo]' not in step_script_text
+    assert '--service-name "forgejo"' in step_script_text
+    assert (
+        '--service-domain "forgejo.$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"'
+        in step_script_text
+    )
+    assert '["Forgejo", "forgejo"]' in dashy_config_text
+    for icon_path in [
+        REPO_ROOT / "manager-web" / "src" / "assets" / "step-icons" / "forgejo.svg",
+        REPO_ROOT / "manager-web" / "public" / "assets" / "step-icons" / "forgejo.svg",
+        REPO_ROOT / "portal" / "public" / "assets" / "step-icons" / "forgejo.svg",
+    ]:
+        assert icon_path.exists()
 
 
 def test_seaweedfs_admin_routes_to_the_admin_web_port():

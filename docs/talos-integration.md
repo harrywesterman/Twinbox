@@ -39,7 +39,7 @@ Talos lifecycle operations are triggered through the manager stack.
 33. `install-headlamp` deploys the Kubernetes dashboard with native Authentik OIDC login.
 34. `install-twinbox-portal` renders the user portal config from step metadata and cluster state, writing it to `Secret/portal-config`.
 35. `install-dashy-dashboard` renders the legacy admin launcher config into `ConfigMap/dashy-config`.
-36. `install-management-consoles` publishes Proxmox, Longhorn, and SeaweedFS web UIs behind Traefik with Authentik protection.
+36. `install-management-consoles` publishes Proxmox, Longhorn, Forgejo, and SeaweedFS web UIs behind Traefik. Forgejo uses native Authentik/OIDC login; the other management consoles use Authentik proxy protection.
 37. `install-pgadmin4` deploys pgAdmin 4 with Longhorn-backed persistence and Authentik OIDC.
 38. `configure-argocd-oidc` configures Argo CD to use Authentik for SSO.
 39. Later wizard steps apply one Argo CD `Application` at a time for ingress configuration, NetBird, Cloudflare, and user applications.
