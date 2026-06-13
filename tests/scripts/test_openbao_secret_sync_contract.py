@@ -33,6 +33,7 @@ PIXELFED_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-pixelfed"
 ZULIP_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-zulip" / "step.yaml"
 ZULIP_RUN = REPO_ROOT / "categories" / "apps" / "steps" / "install-zulip" / "run.sh"
 ZULIP_APP = REPO_ROOT / "gitops" / "apps" / "zulip.yaml"
+ZULIP_OPTIONAL_APP = REPO_ROOT / "gitops" / "optional-apps" / "zulip.yaml"
 ZULIP_PLATFORM_DIR = REPO_ROOT / "gitops" / "platform-apps" / "zulip"
 ZULIP_RUNTIME_SECRET = ZULIP_PLATFORM_DIR / "runtime-externalsecret.yaml"
 ZULIP_VALUES = REPO_ROOT / "gitops" / "values" / "zulip.yaml"
@@ -265,6 +266,7 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     step_text = _read(ZULIP_STEP)
     run_text = _read(ZULIP_RUN)
     app_text = _read(ZULIP_APP)
+    optional_app_text = _read(ZULIP_OPTIONAL_APP)
     values_text = _read(ZULIP_VALUES)
     runtime_secret_text = _read(ZULIP_RUNTIME_SECRET)
     db_cluster_text = _read(ZULIP_DB_CLUSTER)
@@ -307,6 +309,7 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
         '{{index .metadata.annotations "twinbox.io/public-zone-name"}}"]\''
     )
     assert expected_zulip_csrf_trusted_origins in app_text
+    assert expected_zulip_csrf_trusted_origins in optional_app_text
     assert "ZULIP_AUTH_BACKENDS: GenericOpenIdConnectBackend" in app_text
     assert 'TRUST_GATEWAY_IP: "True"' in app_text
     assert "ZULIP_DEFAULT_REALM_OWNER_EMAIL:" not in app_text
@@ -334,6 +337,8 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS:" in values_text
     assert "ZULIP_DEFAULT_REALM_OWNER_EMAIL:" in values_text
     assert "ZULIP_DEFAULT_REALM_OWNER_NAME:" in values_text
+    assert "containerSecurityContext:" in values_text
+    assert "readOnlyRootFilesystem: false" in values_text
     assert "persistence:" in values_text
     assert "postSetup:" in values_text
     assert "10-create-default-realm.sh" in values_text

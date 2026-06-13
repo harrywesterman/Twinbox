@@ -52,6 +52,8 @@ memcached:
   auth:
     enabled: true
     username: zulip@localhost
+  containerSecurityContext:
+    readOnlyRootFilesystem: false
 
 postSetup:
   scripts:
