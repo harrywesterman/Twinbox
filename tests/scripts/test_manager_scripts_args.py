@@ -4346,6 +4346,10 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "OIDC_ALLOW_REGISTRATION" in setup_authentik_text
     assert "OIDC_FORCE_HTTPS" in setup_authentik_text
     assert "SSH_PRIVATE_KEY" in setup_authentik_text
+    assert "OAuth2 provider '${provider_name}' already exists" in setup_authentik_text
+    assert "Application '${application_slug}' already exists" in setup_authentik_text
+    assert ">&2" in setup_authentik_text
+    assert "provider: ($provider_pk | tonumber? // $provider_pk)" in setup_authentik_text
     assert '--secret-name "termix"' in setup_authentik_text
     assert (
         '--required-keys "OIDC_CLIENT_ID,OIDC_CLIENT_SECRET,OIDC_ISSUER_URL,OIDC_AUTHORIZATION_URL,OIDC_TOKEN_URL,OIDC_USERINFO_URL,OIDC_SCOPES,OIDC_ADMIN_GROUP,OIDC_ALLOWED_USERS,OIDC_ALLOW_REGISTRATION,OIDC_FORCE_HTTPS,TERMIX_ADMIN_PASSWORD"'

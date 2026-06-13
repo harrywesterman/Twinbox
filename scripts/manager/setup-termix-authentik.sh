@@ -133,13 +133,13 @@ create_or_update_oauth2_provider() {
 
   existing_pk="$(find_oauth2_provider_pk_by_name "$provider_name")"
   if [[ -n "$existing_pk" ]]; then
-    log "OAuth2 provider '${provider_name}' already exists (pk=${existing_pk}), updating"
+    log "OAuth2 provider '${provider_name}' already exists (pk=${existing_pk}), updating" >&2
     authentik_api_write PATCH "/providers/oauth2/${existing_pk}/" "$provider_payload" >/dev/null
     printf '%s\n' "$existing_pk"
     return 0
   fi
 
-  log "Creating OAuth2 provider '${provider_name}'"
+  log "Creating OAuth2 provider '${provider_name}'" >&2
   authentik_api_write POST "/providers/oauth2/" "$provider_payload" | jq -r '.pk // .id // empty'
 }
 
@@ -151,13 +151,13 @@ create_or_update_application() {
   existing_json="$(find_application_json_by_slug "$application_slug")"
   existing_pk="$(jq -r '.pk // .id // empty' <<<"${existing_json:-null}")"
   if [[ -n "$existing_pk" ]]; then
-    log "Application '${application_slug}' already exists (pk=${existing_pk}), updating"
+    log "Application '${application_slug}' already exists (pk=${existing_pk}), updating" >&2
     authentik_api_write PATCH "/core/applications/${application_slug}/" "$application_payload" >/dev/null
     printf '%s\n' "$existing_pk"
     return 0
   fi
 
-  log "Creating application '${application_slug}'"
+  log "Creating application '${application_slug}'" >&2
   authentik_api_write POST "/core/applications/" "$application_payload" | jq -r '.pk // .id // empty'
 }
 
@@ -309,7 +309,7 @@ application_payload="$(
       name: $name,
       slug: $slug,
       meta_launch_url: $launch_url,
-      provider: ($provider_pk | tonumber)
+      provider: ($provider_pk | tonumber? // $provider_pk)
     }'
 )"
 
