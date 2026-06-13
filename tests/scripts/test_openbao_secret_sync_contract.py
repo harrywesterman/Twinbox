@@ -376,6 +376,10 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "name: zulip-runtime" in runtime_secret_text
     assert "secretKey: rabbitmq-password" in runtime_secret_text
     assert "property: ZULIP_RABBITMQ_PASSWORD" in runtime_secret_text
+    assert "conversionStrategy: Default" in runtime_secret_text
+    assert "decodingStrategy: None" in runtime_secret_text
+    assert "metadataPolicy: None" in runtime_secret_text
+    assert "nullBytePolicy: Ignore" in runtime_secret_text
     assert "secretKey: redis-password" in runtime_secret_text
     assert "property: ZULIP_REDIS_PASSWORD" in runtime_secret_text
     assert "secretKey: rabbitmq-erlang-cookie" in runtime_secret_text
