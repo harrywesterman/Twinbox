@@ -4349,6 +4349,12 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "OAuth2 provider '${provider_name}' already exists" in setup_authentik_text
     assert "Application '${application_slug}' already exists" in setup_authentik_text
     assert ">&2" in setup_authentik_text
+    assert (
+        'authentik_api_get "/core/applications/${application_slug}/" 2>/dev/null || true'
+        in setup_authentik_text
+    )
+    assert '"/core/applications/?search=$(printf' in setup_authentik_text
+    assert '"/core/applications/?slug=$(printf' not in setup_authentik_text
     assert "provider: ($provider_pk | tonumber? // $provider_pk)" in setup_authentik_text
     assert 'mktemp "${TMPDIR:-/tmp}/termix-secret-XXXXXX"' in setup_authentik_text
     assert 'mktemp "${TMPDIR:-/tmp}/termix-secret-XXXXXX.json"' not in setup_authentik_text

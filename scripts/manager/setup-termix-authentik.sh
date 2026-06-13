@@ -119,11 +119,17 @@ find_application_json_by_slug() {
   local application_slug="$1"
   local response
 
-  response="$(authentik_api_get "/core/applications/?slug=$(printf '%s' "$application_slug" | jq -sRr @uri)")"
+  response="$(authentik_api_get "/core/applications/${application_slug}/" 2>/dev/null || true)"
+  if [[ -n "$response" ]]; then
+    printf '%s\n' "$response"
+    return 0
+  fi
+
+  response="$(authentik_api_get "/core/applications/?search=$(printf '%s' "$application_slug" | jq -sRr @uri)&page_size=200")"
   jq -c \
     --arg application_slug "$application_slug" \
     '.results[]?
-      | select((.slug // "") == $application_slug)' <<<"$response" | head -n1
+      | select((.slug // "") == $application_slug or (.pk // .id // "") == $application_slug)' <<<"$response" | head -n1
 }
 
 create_or_update_oauth2_provider() {
