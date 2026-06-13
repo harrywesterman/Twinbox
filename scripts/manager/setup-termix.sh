@@ -258,7 +258,7 @@ wait_for_termix() {
 
   log "Waiting for Termix to be ready"
   while [[ "$attempt" -le "$attempts" ]]; do
-    if curl -fsS "${TERMIX_URL}/users/database-health-check" >/dev/null 2>&1; then
+    if curl -fsS "${TERMIX_URL}/health" >/dev/null 2>&1; then
       log "Termix is ready"
       return 0
     fi

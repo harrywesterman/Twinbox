@@ -60,19 +60,19 @@ spec:
               mountPath: /app/data
           readinessProbe:
             httpGet:
-              path: /users/database-health-check
+              path: /health
               port: http
             initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /users/database-health-check
+              path: /health
               port: http
             initialDelaySeconds: 25
             periodSeconds: 20
           startupProbe:
             httpGet:
-              path: /users/database-health-check
+              path: /health
               port: http
             failureThreshold: 60
             periodSeconds: 5

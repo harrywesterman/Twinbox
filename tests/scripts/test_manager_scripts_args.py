@@ -4380,6 +4380,8 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "pod-security.kubernetes.io/warn: privileged" in namespace_text
 
     assert "TERMIX_ADMIN_PASSWORD" in setup_text
+    assert "${TERMIX_URL}/health" in setup_text
+    assert "${TERMIX_URL}/users/database-health-check" not in setup_text
     assert "users/setup-required" in setup_text
     assert "setup_required == true" in setup_text
     assert "users/login" in setup_text
@@ -4431,6 +4433,8 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "mountPath: /var/lib/netbird" in deployment_text
     assert "subPath: netbird-state" in deployment_text
     assert "path: /dev/net/tun" in deployment_text
+    assert "path: /health" in deployment_text
+    assert "path: /users/database-health-check" not in deployment_text
     assert "privileged: true" in deployment_text
     assert "runAsUser: 0" in deployment_text
     assert "OIDC_ALLOWED_USERS" not in deployment_text
