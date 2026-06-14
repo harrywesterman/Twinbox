@@ -666,7 +666,7 @@ wait_for_forgejo_cli() {
   fi
 
   while [[ "$attempt" -le "$attempts" ]]; do
-    if docker exec twinbox-forgejo forgejo admin auth list >/dev/null 2>&1; then
+    if docker exec -u git twinbox-forgejo bash -lc 'forgejo admin auth list' >/dev/null 2>&1; then
       return 0
     fi
     log "Waiting for Forgejo CLI (${attempt}/${attempts})"
@@ -681,7 +681,7 @@ forgejo_auth_source_id() {
   local output
 
   if ! output="$(
-    docker exec -e FORGEJO_OIDC_AUTH_NAME="$forgejo_auth_name" twinbox-forgejo sh -lc \
+    docker exec -u git -e FORGEJO_OIDC_AUTH_NAME="$forgejo_auth_name" twinbox-forgejo bash -lc \
       'forgejo admin auth list --vertical-bars 2>/dev/null || forgejo admin auth list'
   )"; then
     return 0
@@ -755,12 +755,13 @@ configure_forgejo_oidc_auth_source() {
   if [[ -n "$existing_id" ]]; then
     log "Updating Forgejo OIDC auth source ${forgejo_auth_name} (id=${existing_id})"
     docker exec \
+      -u git \
       -e FORGEJO_AUTH_SOURCE_ID="$existing_id" \
       -e FORGEJO_OIDC_AUTH_NAME="$forgejo_auth_name" \
       -e FORGEJO_OIDC_CLIENT_ID="$forgejo_oidc_client_id" \
       -e FORGEJO_OIDC_CLIENT_SECRET="$forgejo_oidc_client_secret" \
       -e FORGEJO_OIDC_DISCOVERY_URL="$forgejo_discovery_url" \
-      twinbox-forgejo sh -lc '
+      twinbox-forgejo bash -lc '
         forgejo admin auth update-oauth \
           --id "$FORGEJO_AUTH_SOURCE_ID" \
           --provider openidConnect \
@@ -777,11 +778,12 @@ configure_forgejo_oidc_auth_source() {
 
   log "Creating Forgejo OIDC auth source ${forgejo_auth_name}"
   docker exec \
+    -u git \
     -e FORGEJO_OIDC_AUTH_NAME="$forgejo_auth_name" \
     -e FORGEJO_OIDC_CLIENT_ID="$forgejo_oidc_client_id" \
     -e FORGEJO_OIDC_CLIENT_SECRET="$forgejo_oidc_client_secret" \
     -e FORGEJO_OIDC_DISCOVERY_URL="$forgejo_discovery_url" \
-    twinbox-forgejo sh -lc '
+    twinbox-forgejo bash -lc '
       forgejo admin auth add-oauth \
         --provider openidConnect \
         --name "$FORGEJO_OIDC_AUTH_NAME" \

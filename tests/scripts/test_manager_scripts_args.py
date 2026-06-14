@@ -3435,6 +3435,8 @@ def test_forgejo_bootstrap_seeds_from_upstream_and_renders_github_defaults():
     assert "TWINBOX_FORGEJO_SEED_SOURCE_DIR" in bootstrap_text
     assert 'seed_source="$(resolve_seed_source)"' in bootstrap_text
     assert 'seed_repo_if_needed "$REPO_ROOT"' not in bootstrap_text
+    assert "docker compose exec -T -u git forgejo bash -lc" in bootstrap_text
+    assert "docker compose exec -T forgejo sh -lc" not in bootstrap_text
 
     for text in (bootstrap_text, promote_text):
         assert "commit_rendered_changes()" in text
@@ -4625,6 +4627,8 @@ def test_forgejo_management_console_route_uses_native_oidc_and_dashy_tile():
     assert "forgejo admin auth add-oauth" in step_script_text
     assert "forgejo admin auth update-oauth" in step_script_text
     assert "--provider openidConnect" in step_script_text
+    assert "docker exec -u git twinbox-forgejo bash -lc" in step_script_text
+    assert "docker exec twinbox-forgejo sh -lc" not in step_script_text
     assert '--auto-discover-url "$FORGEJO_OIDC_DISCOVERY_URL"' in step_script_text
     assert '--scopes "openid email profile"' in step_script_text
     assert 'upsert_env_value "$env_file" "FORGEJO_ROOT_URL" "$forgejo_root_url"' in step_script_text

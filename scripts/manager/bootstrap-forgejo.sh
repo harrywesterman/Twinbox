@@ -143,13 +143,13 @@ PY
 ensure_admin_user() {
   local create_output=""
 
-  if docker compose exec -T forgejo sh -lc "forgejo admin user list --admin | grep -Fq '${FORGEJO_ADMIN_USER}'" >/dev/null 2>&1; then
+  if docker compose exec -T -u git forgejo bash -lc "forgejo admin user list --admin | grep -Fq '${FORGEJO_ADMIN_USER}'" >/dev/null 2>&1; then
     log "Forgejo admin user already exists: ${FORGEJO_ADMIN_USER}"
     return 0
   fi
 
   log "Creating Forgejo admin user: ${FORGEJO_ADMIN_USER}"
-  if ! create_output="$(docker compose exec -T forgejo sh -lc \
+  if ! create_output="$(docker compose exec -T -u git forgejo bash -lc \
     "forgejo admin user create --username '${FORGEJO_ADMIN_USER}' --password '${FORGEJO_ADMIN_PASSWORD}' --email '${FORGEJO_ADMIN_EMAIL}' --admin --must-change-password=false" 2>&1)"; then
     if grep -qiE 'already exists|is already taken|user exists' <<<"$create_output"; then
       log "Forgejo admin user already exists: ${FORGEJO_ADMIN_USER}"
