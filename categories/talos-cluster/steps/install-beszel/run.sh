@@ -50,7 +50,7 @@ beszel_app_url="https://beszel.${public_zone_name}"
 beszel_local_url="${BESZEL_LOCAL_URL:-http://beszel:8090}"
 beszel_user_email="beszel-admin@${public_zone_name}"
 beszel_version="${BESZEL_VERSION:-${PINNED_BESZEL_VERSION:-0.18.7}}"
-env_file="/opt/twinbox/.env"
+env_file="${TWINBOX_HOST_RUNTIME_DIR:-/host/opt/twinbox}/.env"
 management_consoles_dir="$WORKSPACE_ROOT/gitops/platform/management-consoles"
 
 log "Installing Beszel Monitoring for zone: ${public_zone_name}"
@@ -100,6 +100,11 @@ set_env_var "BESZEL_APP_URL" "$beszel_app_url"
 set_env_var "BESZEL_USER_EMAIL" "$beszel_user_email"
 set_env_var "BESZEL_USER_PASSWORD" "$beszel_user_password"
 set_env_var "BESZEL_VERSION" "$beszel_version"
+
+export BESZEL_APP_URL="$beszel_app_url"
+export BESZEL_USER_EMAIL="$beszel_user_email"
+export BESZEL_USER_PASSWORD="$beszel_user_password"
+export BESZEL_VERSION="$beszel_version"
 
 apply_beszel_traefik_route() {
   local management_ip
@@ -278,6 +283,9 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
 
 set_env_var "BESZEL_AGENT_KEY" "$beszel_public_key"
 set_env_var "BESZEL_AGENT_TOKEN" "$beszel_agent_token"
+
+export BESZEL_AGENT_KEY="$beszel_public_key"
+export BESZEL_AGENT_TOKEN="$beszel_agent_token"
 
 log "Starting Beszel Management VM agent"
 (cd "$WORKSPACE_ROOT" && docker compose up -d beszel-agent)
@@ -475,13 +483,14 @@ if [[ -n "$existing_collection" ]]; then
     jq -n \
       --arg client_id "$beszel_client_id" \
       --arg client_secret "$beszel_client_secret" \
-      --arg auth_url "${beszel_issuer_url}authorize/" \
-      --arg token_url "${beszel_issuer_url}token/" \
-      --arg userinfo_url "${beszel_issuer_url}userinfo/" \
+       --arg auth_url "${AUTHENTIK_HOST%/}/application/o/authorize/" \
+      --arg token_url "${AUTHENTIK_HOST%/}/application/o/token/" \
+      --arg userinfo_url "${AUTHENTIK_HOST%/}/application/o/userinfo/" \
       '{
         allowOAuth2: true,
         enabledOAuth2Providers: [{
-          name: "authentik",
+          name: "oidc",
+          displayName: "Authentik",
           clientId: $client_id,
           clientSecret: $client_secret,
           authUrl: $auth_url,
