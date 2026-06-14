@@ -858,7 +858,7 @@ app.get("/auth/login", async (req, res) => {
     authorizationUrl.searchParams.set("response_type", "code");
     authorizationUrl.searchParams.set("client_id", clientId);
     authorizationUrl.searchParams.set("redirect_uri", redirectUri);
-    authorizationUrl.searchParams.set("scope", "openid profile email");
+    authorizationUrl.searchParams.set("scope", "openid profile email groups");
     authorizationUrl.searchParams.set("state", state);
     authorizationUrl.searchParams.set("nonce", nonce);
     authorizationUrl.searchParams.set("code_challenge", codeChallenge);

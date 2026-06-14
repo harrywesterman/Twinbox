@@ -1314,7 +1314,7 @@ test("login requests the reduced Authentik scope set", async () => {
 
   assert.equal(response.status, 302);
   const location = new URL(response.headers.get("location"));
-  assert.equal(location.searchParams.get("scope"), "openid profile email");
+  assert.equal(location.searchParams.get("scope"), "openid profile email groups");
 });
 
 test("login uses PORTAL_BASE_URL for OIDC redirects behind an HTTP proxy hop", async () => {
