@@ -346,6 +346,38 @@ wait_for_public_oidc_authorize() {
   fail "Public Authentik authorize endpoint did not become reachable through NetBird proxy"
 }
 
+# Wait until the OIDC issuer host is resolvable through the same resolver that
+# OpenTofu (Go) will use. Docker's embedded DNS can lag behind NetBird's custom
+# DNS zone, causing tofu apply to fail with "no such host" even though curl
+# already reached the discovery endpoint via the glibc resolver.
+wait_for_oidc_issuer_dns() {
+  local issuer_url="$1"
+  local issuer_host
+  issuer_host="$(printf '%s' "$issuer_url" | sed -n 's|^https\?://\([^/]*\).*|\1|p')"
+  [[ -n "$issuer_host" ]] || return 0
+
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for OIDC issuer DNS resolution through container resolver: ${issuer_host}"
+  for i in $(seq 1 60); do
+    if python3 - "$issuer_host" <<'PY' >/dev/null 2>&1
+import socket
+import sys
+try:
+    socket.getaddrinfo(sys.argv[1], None)
+    sys.exit(0)
+except socket.gaierror:
+    sys.exit(1)
+PY
+    then
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] OIDC issuer DNS resolution is ready"
+      return 0
+    fi
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] OIDC issuer DNS not resolvable yet (attempt ${i}/60): ${issuer_host}"
+    sleep 5
+  done
+
+  fail "OIDC issuer DNS did not become resolvable through container resolver: ${issuer_host}"
+}
+
 ensure_authentik_netbird_grant_types() {
   local provider_pk="$1"
   local response
@@ -1362,6 +1394,11 @@ mkdir -p "$idp_workdir"
 cp -r "$WORKSPACE_ROOT/infra/opentofu/netbird-idp/"* "$idp_workdir/"
 cd "$idp_workdir"
 tofu init -input=false -no-color
+
+# OpenTofu uses Go's DNS resolver, which can still fail if Docker's embedded
+# DNS has not yet picked up NetBird's custom zone, even after curl succeeded.
+wait_for_oidc_issuer_dns "$netbird_oidc_issuer"
+
 tofu apply -auto-approve -no-color \
   -var "netbird_token=$netbird_token" \
   -var "netbird_management_url=$netbird_management_url" \
