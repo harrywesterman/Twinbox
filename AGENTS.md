@@ -54,6 +54,11 @@ Twinbox builds a Talos Linux Kubernetes cluster on Proxmox through a Management 
 - Do not wait passively for deployments to finish; start inspecting pod logs right away so you can spot stalls and failures early.
 - If Argo CD reports `Synced` but the live deployment is still stale, hard-refresh the application from the Management VM and re-check the deployment image before assuming GitHub is wrong.
 
+### SSH Authentication
+
+- Normal SSH to the Management VM and bastion is through Termix using short-lived certificates issued by [opkssh](https://github.com/openpubkey/opkssh) and gated by Authentik + MFA.
+- Break-glass credentials (Management VM password, bastion root SSH key) remain on the hosts but are not exposed in Termix after Phase 2/3. See `docs/operations.md`.
+
 ### Bastion Node
 
 - The bastion is a Hetzner VPS, root user. IP is dynamic — find it from the Management VM secrets:

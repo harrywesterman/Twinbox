@@ -717,9 +717,11 @@ hosts_payload="$(termix_api_request GET "/host/db/host")"
 mgmt_host_id="$(ensure_termix_opkssh_host "Management VM" "$mgmt_netbird_ip" "$MGMT_VM_USER" "$hosts_payload")"
 bastion_host_id="$(ensure_termix_opkssh_host "Bastion VM" "$bastion_netbird_ip" "root" "$hosts_payload")"
 
-# Phase 2+ : remove legacy static credentials from Termix once opkssh is validated.
-# In Phase 1 these lines are commented out to keep the password/key flows available.
-# delete_termix_credential_by_name "Management VM Password"
+# Phase 2: remove the Management VM password credential from Termix.
+# The password remains on the host as a break-glass backdoor.
+delete_termix_credential_by_name "Management VM Password"
+
+# Phase 3: remove the Bastion VM SSH key credential from Termix (uncomment after bastion opkssh is validated).
 # delete_termix_credential_by_name "Bastion VM SSH Key"
 
 log "Ensuring the Browser SSH role exists"
