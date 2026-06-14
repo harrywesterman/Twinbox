@@ -616,7 +616,7 @@ ensure_termix_opkssh_host() {
         ip: $ip,
         port: 22,
         username: $username,
-        authType: "OPKSSH",
+        authType: "opkssh",
         enableTerminal: true,
         showTerminalInSidebar: true,
         enableSsh: true

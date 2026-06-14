@@ -4429,6 +4429,8 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "/rbac/host/" in setup_text
     assert 'authType: "credential"' in setup_text
     assert 'authType: "key"' in setup_text
+    assert 'authType: "opkssh"' in setup_text
+    assert 'authType: "OPKSSH"' not in setup_text
     assert 'keyType: "auto"' in setup_text
     assert "credentialId: ($credential_id | tonumber? // $credential_id)" in setup_text
     assert "share_termix_host_with_browser_role" in setup_text
