@@ -338,6 +338,9 @@ setup_termix_forward() {
   local attempt=1
   local attempts=60
 
+  log "Waiting for Termix deployment to be ready for port-forwarding"
+  kubectl -n termix rollout status deployment/termix --timeout=5m >/dev/null 2>&1 || fail "Termix deployment did not become ready"
+
   if [[ -z "$port" ]]; then
     port="$(pick_termix_forward_port)"
   fi
