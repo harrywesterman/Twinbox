@@ -72,7 +72,9 @@ bastion_ssh_private_key="$(jq -r '.SSH_PRIVATE_KEY // empty' "$netbird_bastion_s
 [[ -n "$netbird_management_url" ]] || fail "NETBIRD_URL is missing from ${netbird_bastion_secret}"
 [[ -n "$netbird_token" ]] || fail "NETBIRD_SETUP_TOKEN is missing from ${netbird_bastion_secret}"
 [[ -n "$bastion_public_ip" ]] || fail "NETBIRD_IP is missing from ${netbird_bastion_secret}"
-[[ -n "$bastion_ssh_private_key" ]] || fail "SSH_PRIVATE_KEY is missing from ${netbird_bastion_secret}; cannot create the Termix bastion key credential"
+if [[ -z "$bastion_ssh_private_key" ]]; then
+  log "WARNING: SSH_PRIVATE_KEY is missing from ${netbird_bastion_secret}; the Termix bastion key credential will not be available"
+fi
 
 termix_secret_json=""
 if command -v openbao_read_global_secret_json >/dev/null 2>&1; then
@@ -104,7 +106,9 @@ read_management_vm_password() {
 }
 
 MANAGEMENT_VM_PASSWORD="$(read_management_vm_password || true)"
-[[ -n "$MANAGEMENT_VM_PASSWORD" ]] || fail "Could not read the Management VM password from ${LOGIN_SECRET_FILE}"
+if [[ -z "$MANAGEMENT_VM_PASSWORD" ]]; then
+  log "WARNING: Could not read the Management VM password from ${LOGIN_SECRET_FILE}; the Termix password credential will not be available"
+fi
 
 resolve_target_home() {
   local target_user="$1"
@@ -580,6 +584,73 @@ ensure_termix_host() {
   printf '%s\n' "$host_id"
 }
 
+ensure_termix_opkssh_host() {
+  local host_name="$1"
+  local host_ip="$2"
+  local username="$3"
+  local hosts_payload="$4"
+  local host_id
+  local host_payload
+  local host_response
+
+  host_id="$(
+    jq -r \
+      --arg host_name "$host_name" \
+      --arg host_ip "$host_ip" \
+      '.[]?
+        | select((.name // "") == $host_name or (.ip // "") == $host_ip)
+        | .id // empty' <<<"$hosts_payload" | head -n1
+  )"
+
+  host_payload="$(
+    jq -n \
+      --arg name "$host_name" \
+      --arg ip "$host_ip" \
+      --arg username "$username" \
+      '{
+        connectionType: "ssh",
+        name: $name,
+        ip: $ip,
+        port: 22,
+        username: $username,
+        authType: "OPKSSH",
+        enableTerminal: true,
+        showTerminalInSidebar: true,
+        enableSsh: true
+      }'
+  )"
+
+  if [[ -n "$host_id" ]]; then
+    termix_api_request PUT "/host/db/host/${host_id}" "$host_payload" >/dev/null
+  else
+    host_response="$(termix_api_request POST "/host/db/host" "$host_payload")"
+    host_id="$(jq -r '.id // ._id // empty' <<<"$host_response")"
+  fi
+
+  [[ -n "$host_id" ]] || fail "Could not determine the ${host_name} host ID"
+  printf '%s\n' "$host_id"
+}
+
+delete_termix_credential_by_name() {
+  local credential_name="$1"
+  local credentials_payload
+  local credential_id
+
+  credentials_payload="$(termix_api_request GET "/credentials")"
+  credential_id="$(
+    jq -r \
+      --arg name "$credential_name" \
+      '.credentials[]?
+        | select((.name // "") == $name)
+        | .id // empty' <<<"$credentials_payload" | head -n1
+  )"
+
+  if [[ -n "$credential_id" ]]; then
+    termix_api_request DELETE "/credentials/${credential_id}" >/dev/null
+    log "Deleted Termix credential: ${credential_name}"
+  fi
+}
+
 share_termix_host_with_browser_role() {
   local host_id="$1"
   local share_payload
@@ -641,29 +712,15 @@ mgmt_kubeconfig_target_home="$(resolve_target_home "$MGMT_VM_USER")"
 sync_local_config "$KUBECONFIG_FILE" "$mgmt_kubeconfig_target_home/.kube/config"
 sync_local_config "${TWINBOX_TALOSCONFIG_FILE:?missing TWINBOX_TALOSCONFIG_FILE}" "$mgmt_kubeconfig_target_home/.talos/config"
 
-log "Ensuring Termix credentials exist"
-credentials_payload="$(termix_api_request GET "/credentials")"
-mgmt_credential_id="$(
-  ensure_termix_credential \
-    "Management VM Password" \
-    "password" \
-    "$MGMT_VM_USER" \
-    "$MANAGEMENT_VM_PASSWORD" \
-    "Password credential for the Twinbox Management VM"
-)"
-bastion_credential_id="$(
-  ensure_termix_credential \
-    "Bastion VM SSH Key" \
-    "key" \
-    "root" \
-    "$bastion_ssh_private_key" \
-    "SSH key credential for the Twinbox NetBird bastion"
-)"
-
-log "Ensuring Termix SSH hosts exist"
+log "Ensuring Termix OPKSSH hosts exist"
 hosts_payload="$(termix_api_request GET "/host/db/host")"
-mgmt_host_id="$(ensure_termix_host "Management VM" "$mgmt_netbird_ip" "$MGMT_VM_USER" "$mgmt_credential_id")"
-bastion_host_id="$(ensure_termix_host "Bastion VM" "$bastion_netbird_ip" "root" "$bastion_credential_id")"
+mgmt_host_id="$(ensure_termix_opkssh_host "Management VM" "$mgmt_netbird_ip" "$MGMT_VM_USER" "$hosts_payload")"
+bastion_host_id="$(ensure_termix_opkssh_host "Bastion VM" "$bastion_netbird_ip" "root" "$hosts_payload")"
+
+# Phase 2+ : remove legacy static credentials from Termix once opkssh is validated.
+# In Phase 1 these lines are commented out to keep the password/key flows available.
+# delete_termix_credential_by_name "Management VM Password"
+# delete_termix_credential_by_name "Bastion VM SSH Key"
 
 log "Ensuring the Browser SSH role exists"
 roles_payload="$(termix_api_request GET "/rbac/roles")"

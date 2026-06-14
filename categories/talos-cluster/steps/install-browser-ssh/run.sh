@@ -7,5 +7,6 @@ set -euo pipefail
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 
+bash "$WORKSPACE_ROOT/scripts/manager/setup-opkssh-authentik.sh"
 bash "$WORKSPACE_ROOT/scripts/manager/setup-termix-authentik.sh"
 bash "$WORKSPACE_ROOT/scripts/manager/setup-termix.sh"

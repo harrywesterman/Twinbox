@@ -58,6 +58,9 @@ spec:
           volumeMounts:
             - name: termix-data
               mountPath: /app/data
+            - name: opkssh-config
+              mountPath: /app/data/.opk
+              readOnly: true
           readinessProbe:
             httpGet:
               path: /health
@@ -176,3 +179,9 @@ spec:
         - name: termix-data
           persistentVolumeClaim:
             claimName: termix-data
+        - name: opkssh-config
+          secret:
+            secretName: termix-opkssh-config
+            items:
+              - key: config.yml
+                path: config.yml
