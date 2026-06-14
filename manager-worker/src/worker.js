@@ -1260,7 +1260,7 @@ async function handleRunStep(job) {
         STEP_CONTEXT_JSON: JSON.stringify(context),
         STEP_RESULT_FILE: resultFile,
         TWINBOX_HOST_CRON_DIR: process.env.TWINBOX_HOST_CRON_DIR || "/host/etc/cron.d",
-        ...secretRuntime.env,
+        ...withKubeconfigAliases(secretRuntime.env),
       },
       redact,
       secretRuntime.strip_env

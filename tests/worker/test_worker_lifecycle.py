@@ -864,6 +864,145 @@ def test_worker_passes_secret_runtime_to_portal_refresh_after_uninstall():
             proc.wait(timeout=5)
 
 
+def test_worker_run_step_aliases_twinbox_kubeconfig_to_kubeconfig_file():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        data = root / "data"
+        workspace = root / "workspace"
+        bootstrap = workspace / "bootstrap"
+        bin_dir = root / "bin"
+        pending = data / "queue" / "pending"
+        jobs = data / "jobs"
+        logs = data / "logs"
+
+        for d in [
+            pending,
+            jobs,
+            logs,
+            data / "clusters",
+            workspace / "scripts" / "manager",
+            bootstrap / "secrets" / "global",
+            bootstrap / "secrets" / "cluster" / "cluster_test" / "kubeconfig",
+            bin_dir,
+        ]:
+            d.mkdir(parents=True, exist_ok=True)
+
+        _prepare_fake_toolchain(bin_dir)
+        _write_pinned_defaults(workspace)
+
+        (
+            bootstrap / "secrets" / "cluster" / "cluster_test" / "kubeconfig" / "kubeconfig"
+        ).write_text(
+            "apiVersion: v1\nkind: Config\nclusters: []\nusers: []\ncontexts: []\n",
+            encoding="utf-8",
+        )
+        (bootstrap / "secrets" / "global" / "proxmox.json").write_text(
+            json.dumps(
+                {
+                    "host": "192.168.1.10",
+                    "port": "8006",
+                    "username": "root@pam",
+                    "password": "super-secret",
+                    "endpoint": "https://192.168.1.10:8006",
+                }
+            ),
+            encoding="utf-8",
+        )
+        (workspace / "scripts" / "manager" / "kubeconfig-check.sh").write_text(
+            "#!/bin/bash\n"
+            "set -euo pipefail\n"
+            ': "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"\n'
+            ': "${TWINBOX_KUBECONFIG_FILE:?missing TWINBOX_KUBECONFIG_FILE}"\n'
+            'printf "%s" "$KUBECONFIG_FILE" > "$MANAGER_DATA_DIR/kubeconfig-file.txt"\n'
+            'printf "%s" "$TWINBOX_KUBECONFIG_FILE" > "$MANAGER_DATA_DIR/twinbox-kubeconfig-file.txt"\n',
+            encoding="utf-8",
+        )
+        (workspace / "scripts" / "manager" / "kubeconfig-check.sh").chmod(0o755)
+
+        payload = {
+            "step_id": "kubeconfig-check",
+            "step_type": "action",
+            "inputs": {},
+            "runner": {
+                "kind": "script",
+                "script": "scripts/manager/kubeconfig-check.sh",
+            },
+            "context": {
+                "cluster": {
+                    "id": "cluster_test",
+                    "name": "demo",
+                    "metadata": {
+                        "proxmox_node": "pve",
+                        "storage_pool": "local-lvm",
+                        "file_datastore": "local",
+                    },
+                }
+            },
+        }
+        job = {
+            "id": "job_kubeconfig_check",
+            "type": "run_step",
+            "cluster_id": "cluster_test",
+            "status": "pending",
+            "step": "queued",
+            "payload": payload,
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "started_at": None,
+            "finished_at": None,
+            "result": None,
+            "error": None,
+        }
+        (jobs / "job_kubeconfig_check.json").write_text(json.dumps(job))
+        (pending / "job_kubeconfig_check.json").write_text(
+            json.dumps(
+                {
+                    "id": "job_kubeconfig_check",
+                    "type": "run_step",
+                    "cluster_id": "cluster_test",
+                    "payload": payload,
+                    "queued_at": "2026-01-01T00:00:00Z",
+                }
+            )
+        )
+
+        env = os.environ.copy()
+        env["MANAGER_DATA_DIR"] = str(data)
+        env["WORKSPACE_ROOT"] = str(workspace)
+        env["TWINBOX_BOOTSTRAP_DIR"] = str(bootstrap)
+        env["WORKER_POLL_MS"] = "100"
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+        env["TWINBOX_SECRET_BACKEND"] = "filesystem"
+
+        proc = subprocess.Popen(
+            ["node", "manager-worker/src/worker.js"],
+            cwd=Path(__file__).resolve().parents[2],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        try:
+            _wait_until(
+                lambda: (data / "queue" / "completed" / "job_kubeconfig_check.json").exists()
+            )
+
+            updated_job = json.loads((jobs / "job_kubeconfig_check.json").read_text())
+            assert updated_job["status"] == "succeeded"
+
+            kubeconfig_file = (data / "kubeconfig-file.txt").read_text()
+            twinbox_kubeconfig_file = (data / "twinbox-kubeconfig-file.txt").read_text()
+            expected_path = str(
+                bootstrap / "secrets" / "cluster" / "cluster_test" / "kubeconfig" / "kubeconfig"
+            )
+            assert kubeconfig_file == expected_path
+            assert twinbox_kubeconfig_file == expected_path
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
 def test_worker_reconcile_observability_aliases_twinbox_kubeconfig_to_kubeconfig_file():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
