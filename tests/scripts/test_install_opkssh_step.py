@@ -8,12 +8,7 @@ WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
 class TestInstallOpksshStep(unittest.TestCase):
     def test_run_script_syntax(self):
         script = (
-            WORKSPACE_ROOT
-            / "categories"
-            / "talos-cluster"
-            / "steps"
-            / "install-opkssh"
-            / "run.sh"
+            WORKSPACE_ROOT / "categories" / "talos-cluster" / "steps" / "install-opkssh" / "run.sh"
         )
         result = subprocess.run(
             ["bash", "-n", str(script)],

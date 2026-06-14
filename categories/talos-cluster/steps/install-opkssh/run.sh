@@ -3,7 +3,6 @@
 set -euo pipefail
 
 : "${WORKSPACE_ROOT:?WORKSPACE_ROOT must be set}"
-: "${STEP_SECRETS_DIR:?STEP_SECRETS_DIR must be set}"
 
 # shellcheck source=scripts/manager/logging.sh
 source "${WORKSPACE_ROOT}/scripts/manager/logging.sh"
@@ -21,7 +20,11 @@ fi
 cluster_id="${TWINBOX_CLUSTER_ID:?TWINBOX_CLUSTER_ID must be set}"
 cluster_slug="${TWINBOX_CLUSTER_SLUG:?TWINBOX_CLUSTER_SLUG must be set}"
 
-netbird_bastion_secret="${STEP_SECRETS_DIR}/NETBIRD_BASTION_SECRET"
+netbird_bastion_secret="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}/secrets/global/netbird-bastion-${cluster_id}.json"
+if [[ ! -f "$netbird_bastion_secret" ]]; then
+  fail "NetBird bastion secret not found at ${netbird_bastion_secret}"
+fi
+
 bastion_ip="$(jq -r '.NETBIRD_IP // empty' "$netbird_bastion_secret")"
 bastion_ssh_private_key="$(jq -r '.SSH_PRIVATE_KEY // empty' "$netbird_bastion_secret")"
 

@@ -4335,12 +4335,13 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
 
     assert "title: Install Browser SSH" in step_manifest_text
     assert (
-        "summary: Provision Termix for admin-only browser SSH into the Management VM and bastion."
+        "summary: Provision Termix and the opkssh Authentik application for admin-only browser SSH into the Management VM and bastion."
         in step_manifest_text
     )
     assert "TWINBOX_TALOSCONFIG_FILE:" in step_manifest_text
     assert "item: talosconfig" in step_manifest_text
     assert "script: categories/talos-cluster/steps/install-browser-ssh/run.sh" in step_manifest_text
+    assert 'bash "$WORKSPACE_ROOT/scripts/manager/setup-opkssh-authentik.sh"' in step_text
     assert 'bash "$WORKSPACE_ROOT/scripts/manager/setup-termix-authentik.sh"' in step_text
     assert 'bash "$WORKSPACE_ROOT/scripts/manager/setup-termix.sh"' in step_text
 

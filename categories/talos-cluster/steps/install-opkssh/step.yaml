@@ -12,12 +12,6 @@ side_help: >
   Requires the opkssh Authentik application created by the browser-ssh step.
   The Management VM and bastion must be reachable via SSH and NetBird.
 inputs: []
-secrets:
-  files:
-    NETBIRD_BASTION_SECRET:
-      scope: global
-      item: netbird-bastion
-      format: json
 runner:
   kind: script
   script: categories/talos-cluster/steps/install-opkssh/run.sh
