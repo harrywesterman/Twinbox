@@ -11,6 +11,11 @@
     twinbox_management_time_server: "{{ lookup('env', 'TWINBOX_TIME_SERVER') | default('time.cloudflare.com', true) }}"
     twinbox_management_vm_ip: "{{ lookup('env', 'MANAGEMENT_VM_IP') | default('127.0.0.1', true) }}"
     twinbox_management_env_file: "{{ twinbox_runtime_root }}/.env"
+    opkssh_version: "0.14.0"
+    opkssh_sha256: "972719cb6dae736af80100fee0854fdd7289f419fc61b3dcace8409b2f043063"
+    opkssh_issuer_url: "{{ lookup('env', 'OPKSSH_ISSUER_URL') | default('', true) }}"
+    opkssh_client_id: "{{ lookup('env', 'OPKSSH_CLIENT_ID') | default('', true) }}"
+    opkssh_principal: "{{ lookup('env', 'OPKSSH_PRINCIPAL') | default('twinbox', true) }}"
     twinbox_bootstrap_ansible_dir: "{{ twinbox_bootstrap_root }}/ansible"
     twinbox_bootstrap_config_dir: "{{ twinbox_bootstrap_root }}/config"
     twinbox_bootstrap_bin_dir: "{{ twinbox_bootstrap_root }}/bin"
@@ -118,6 +123,84 @@
           X11Forwarding no
           AllowAgentForwarding yes
       notify: Restart ssh
+
+    - name: Ensure opkssh user and group exist
+      when: opkssh_issuer_url | length > 0 and opkssh_client_id | length > 0
+      block:
+        - name: Ensure opkssh group exists
+          ansible.builtin.group:
+            name: opksshuser
+            system: true
+            state: present
+
+        - name: Ensure opkssh user exists
+          ansible.builtin.user:
+            name: opksshuser
+            group: opksshuser
+            system: true
+            shell: /usr/sbin/nologin
+            home: /var/lib/opksshuser
+            createhome: true
+            state: present
+
+        - name: Ensure /etc/opk directory exists
+          ansible.builtin.file:
+            path: /etc/opk
+            state: directory
+            owner: root
+            group: opksshuser
+            mode: "0750"
+
+        - name: Download pinned opkssh binary
+          ansible.builtin.get_url:
+            url: "https://github.com/openpubkey/opkssh/releases/download/v{{ opkssh_version }}/opkssh-linux-amd64"
+            dest: /usr/local/bin/opkssh
+            mode: "0755"
+            owner: root
+            group: root
+            checksum: "sha256:{{ opkssh_sha256 }}"
+          notify: Restart ssh
+
+        - name: Render /etc/opk/providers
+          ansible.builtin.copy:
+            dest: /etc/opk/providers
+            owner: root
+            group: opksshuser
+            mode: "0640"
+            content: |
+              {{ opkssh_issuer_url }} {{ opkssh_client_id }} 16h
+          notify: Restart ssh
+
+        - name: Render /etc/opk/auth_id
+          ansible.builtin.copy:
+            dest: /etc/opk/auth_id
+            owner: root
+            group: opksshuser
+            mode: "0640"
+            content: |
+              {{ opkssh_principal }} oidc:groups:admins {{ opkssh_issuer_url }}
+          notify: Restart ssh
+
+        - name: Render opkssh sshd drop-in
+          ansible.builtin.copy:
+            dest: /etc/ssh/sshd_config.d/60-opk-ssh.conf
+            owner: root
+            group: root
+            mode: "0644"
+            content: |
+              AuthorizedKeysCommand /usr/local/bin/opkssh verify %u %k %t
+              AuthorizedKeysCommandUser opksshuser
+          notify: Restart ssh
+
+        - name: Run opkssh verify smoke test
+          ansible.builtin.command:
+            cmd: /usr/local/bin/opkssh verify --help
+          changed_when: false
+
+        - name: Run opkssh audit
+          ansible.builtin.command:
+            cmd: /usr/local/bin/opkssh audit
+          changed_when: false
 
     - name: Configure management VM time synchronization
       ansible.builtin.copy:

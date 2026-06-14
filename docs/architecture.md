@@ -344,6 +344,7 @@ After the Talos/Cilium bootstrap, platform services install in this order:
 | 17 | `install-crowdsec` | IDS + Traefik bouncer |
 | 18 | `install-ntfy` | Push notifications |
 | 19 | `install-browser-ssh` | Browser SSH to the Management VM and bastion |
+| 19a | `install-opkssh` | Authentik-MFA-gated SSH certificates for the Management VM and bastion |
 | 20 | `install-headlamp` | Kubernetes dashboard with OIDC |
 | 21 | `install-twinbox-portal` | User-facing app launcher |
 | 22 | `install-dashy-dashboard` | Legacy admin launcher |

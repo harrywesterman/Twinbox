@@ -69,7 +69,8 @@ categories/talos-cluster/
 |------|-------------|
 | `install-headlamp` | Deploy Headlamp Kubernetes dashboard |
 | `install-pgadmin4` | Deploy pgAdmin 4 for PostgreSQL administration |
-| `install-browser-ssh` | Deploy Termix browser SSH to the Management VM |
+| `install-browser-ssh` | Deploy Termix browser SSH and the opkssh Authentik OAuth2 app |
+| `install-opkssh` | Install opkssh on the Management VM and bastion for Authentik-MFA SSH certs |
 | `install-twinbox-portal` | Deploy the Twinbox user portal |
 | `install-dashy-dashboard` | Deploy Dashy legacy admin launcher |
 | `install-management-consoles` | Deploy operator web consoles (Forgejo, SeaweedFS, etc.) |
