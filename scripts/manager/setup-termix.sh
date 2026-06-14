@@ -643,7 +643,7 @@ delete_termix_credential_by_name() {
   credential_id="$(
     jq -r \
       --arg name "$credential_name" \
-      '.credentials[]?
+      '.[]?
         | select((.name // "") == $name)
         | .id // empty' <<<"$credentials_payload" | head -n1
   )"
