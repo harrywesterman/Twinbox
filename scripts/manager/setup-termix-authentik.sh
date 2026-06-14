@@ -167,6 +167,52 @@ create_or_update_application() {
   authentik_api_write POST "/core/applications/" "$application_payload" | jq -r '.pk // .id // empty'
 }
 
+find_scope_mapping_json_by_name_and_scope() {
+  local mapping_name="$1"
+  local scope_name="$2"
+  local response
+
+  response="$(authentik_api_get "/propertymappings/provider/scope/?page_size=200")"
+  jq -c \
+    --arg mapping_name "$mapping_name" \
+    --arg scope_name "$scope_name" \
+    '.results[]?
+      | select((.name // "") == $mapping_name and (.scope_name // "") == $scope_name)' <<<"$response" | head -n1
+}
+
+upsert_scope_mapping() {
+  local mapping_name="$1"
+  local scope_name="$2"
+  local description="$3"
+  local expression="$4"
+  local existing_json existing_pk payload
+
+  payload="$(
+    jq -n \
+      --arg name "$mapping_name" \
+      --arg scope_name "$scope_name" \
+      --arg description "$description" \
+      --arg expression "$expression" \
+      '{
+        name: $name,
+        scope_name: $scope_name,
+        description: $description,
+        expression: $expression
+      }'
+  )"
+
+  existing_json="$(find_scope_mapping_json_by_name_and_scope "$mapping_name" "$scope_name" || true)"
+  if [[ -n "$existing_json" ]]; then
+    existing_pk="$(jq -r '.pk // .id // empty' <<<"$existing_json")"
+    [[ -n "$existing_pk" ]] || fail "Could not determine Authentik scope mapping ID for ${mapping_name}"
+    authentik_api_write PATCH "/propertymappings/provider/scope/${existing_pk}/" "$payload" >/dev/null
+    printf '%s\n' "$existing_pk"
+    return 0
+  fi
+
+  authentik_api_write POST "/propertymappings/provider/scope/" "$payload" | jq -r '.pk // .id // empty'
+}
+
 find_policy_binding_pk() {
   local target_uuid="$1"
   local group_id="$2"
@@ -206,7 +252,17 @@ signing_key_id="$(authentik_resolve_signing_key_id)"
 openid_mapping_id="$(authentik_resolve_scope_mapping_id "openid")"
 email_mapping_id="$(authentik_resolve_scope_mapping_id "email")"
 profile_mapping_id="$(authentik_resolve_scope_mapping_id "profile")"
-groups_mapping_id="$(authentik_resolve_scope_mapping_id "groups")"
+groups_mapping_id="$(upsert_scope_mapping \
+  "Termix groups" \
+  "groups" \
+  "Expose Termix group membership" \
+  'groups = [group.name for group in request.user.ak_groups.all()]
+if request.user.is_superuser and "admins" not in groups:
+    groups.append("admins")
+return {
+    "groups": groups,
+}' \
+)"
 admins_group_id="$(authentik_find_group_id "admins")"
 
 [[ -n "$authorization_flow_id" ]] || fail "Could not resolve Authentik authorization flow ID"
@@ -383,6 +439,11 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
 if kubectl -n termix get deployment termix >/dev/null 2>&1; then
   kubectl -n termix rollout restart deployment/termix >/dev/null 2>&1 || true
 fi
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "termix" \
+  --service-domain "termix.${public_zone_name}" \
+  --service-path /
 
 log "===== Authentik OIDC Setup Complete ====="
 log "Termix URL: ${termix_host}"

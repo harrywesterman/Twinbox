@@ -33,6 +33,7 @@ TERMIX_SETUP_AUTHENTIK_SCRIPT = REPO_ROOT / "scripts" / "manager" / "setup-termi
 TERMIX_SETUP_SCRIPT = REPO_ROOT / "scripts" / "manager" / "setup-termix.sh"
 TERMIX_DEPLOYMENT = REPO_ROOT / "gitops" / "platform-apps" / "termix" / "deployment.yaml"
 TERMIX_EXTERNALSECRET = REPO_ROOT / "gitops" / "platform-apps" / "termix" / "externalsecret.yaml"
+TERMIX_INGRESSROUTE = REPO_ROOT / "gitops" / "platform-apps" / "termix" / "ingressroute.yaml"
 TERMIX_APP_MANIFEST = REPO_ROOT / "gitops" / "apps" / "termix.yaml"
 TERMIX_NAMESPACE = REPO_ROOT / "gitops" / "platform-apps" / "termix" / "namespace.yaml"
 PROMETHEUS_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-prometheus.sh"
@@ -4328,6 +4329,7 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     externalsecret_text = _termix_externalsecret_text()
     app_manifest_text = TERMIX_APP_MANIFEST.read_text(encoding="utf-8")
     namespace_text = TERMIX_NAMESPACE.read_text(encoding="utf-8")
+    ingressroute_text = TERMIX_INGRESSROUTE.read_text(encoding="utf-8")
 
     assert "title: Install Browser SSH" in step_manifest_text
     assert (
@@ -4343,6 +4345,12 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "redirect_uris: [" in setup_authentik_text
     assert 'matching_mode: "strict"' in setup_authentik_text
     assert "property_mappings: $property_mappings" in setup_authentik_text
+    assert "find_scope_mapping_json_by_name_and_scope()" in setup_authentik_text
+    assert "upsert_scope_mapping()" in setup_authentik_text
+    assert '"Termix groups"' in setup_authentik_text
+    assert '"Expose Termix group membership"' in setup_authentik_text
+    assert "groups = [group.name for group in request.user.ak_groups.all()]" in setup_authentik_text
+    assert 'if request.user.is_superuser and "admins" not in groups:' in setup_authentik_text
     assert "OIDC_SCOPES" in setup_authentik_text
     assert "OIDC_ADMIN_GROUP" in setup_authentik_text
     assert "OIDC_ALLOWED_USERS" in setup_authentik_text
@@ -4371,6 +4379,9 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "--skip-namespace-baseline" in setup_authentik_text
     assert "--no-wait" in setup_authentik_text
     assert "rollout restart deployment/termix" in setup_authentik_text
+    assert "ensure-netbird-service.sh" in setup_authentik_text
+    assert '--service-name "termix"' in setup_authentik_text
+    assert '--service-domain "termix.${public_zone_name}"' in setup_authentik_text
     assert "managedNamespaceMetadata:" in app_manifest_text
     assert "pod-security.kubernetes.io/enforce: privileged" in app_manifest_text
     assert "pod-security.kubernetes.io/audit: privileged" in app_manifest_text
@@ -4378,9 +4389,14 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "pod-security.kubernetes.io/enforce: privileged" in namespace_text
     assert "pod-security.kubernetes.io/audit: privileged" in namespace_text
     assert "pod-security.kubernetes.io/warn: privileged" in namespace_text
+    assert "authentik-forwardauth" not in ingressroute_text
 
     assert "TERMIX_ADMIN_PASSWORD" in setup_text
+    assert 'TERMIX_URL="${TERMIX_URL:-}"' in setup_text
+    assert "setup_termix_forward" in setup_text
+    assert 'kubectl -n termix port-forward "svc/termix" "${port}:80"' in setup_text
     assert "${TERMIX_URL}/health" in setup_text
+    assert "X-Electron-App: true" in setup_text
     assert "${TERMIX_URL}/users/database-health-check" not in setup_text
     assert "users/setup-required" in setup_text
     assert "setup_required == true" in setup_text
@@ -4388,6 +4404,7 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "resolve_management_vm_ip" in setup_text
     assert "netbird_bastion_secret" in setup_text
     assert "NETBIRD_PRIVATE_IP" in setup_text
+    assert "extract_first_ipv4" in setup_text
     assert "SSH_PRIVATE_KEY is missing" in setup_text
     assert "discover_management_netbird_ip" in setup_text
     assert "discover_bastion_netbird_ip" in setup_text
@@ -4402,7 +4419,8 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "browser-ssh" in setup_text
     assert "Browser SSH" in setup_text
     assert "/credentials" in setup_text
-    assert "/ssh/db/host" in setup_text
+    assert "/host/db/host" in setup_text
+    assert "/ssh/db/host" not in setup_text
     assert "/rbac/roles" in setup_text
     assert "/rbac/users/" in setup_text
     assert "/rbac/host/" in setup_text
@@ -4910,6 +4928,7 @@ def test_netbird_cloud_init_uses_exact_netbird_cert_and_tcp_passthrough():
     assert '"traefik.http.routers.netbird-grpc.tls.domains[0].main": netbird_domain' in text
     assert "/opt/netbird/traefik-dynamic.yaml:/opt/netbird/traefik-dynamic.yaml:ro" in text
     assert "--providers.file.filename=/opt/netbird/traefik-dynamic.yaml" in text
+    assert '"--providers.docker.network=": "--providers.docker.network=netbird_netbird"' in text
     assert "traefik-dynamic.yaml" in text
     assert 'data.pop("tls", None)' in text
     assert 'data.pop("http", None)' in text
@@ -4923,8 +4942,12 @@ def test_netbird_cloud_init_uses_exact_netbird_cert_and_tcp_passthrough():
     assert "dashboard_tls_domain_labels" in text
     assert "server_tls_domain_labels" in text
     assert "set_labels(dashboard, dashboard_tls_domain_labels)" in text
-    assert "set_labels(netbird_server, server_tls_domain_labels)" in text
+    assert (
+        "set_labels(netbird_server, {**server_tls_domain_labels, **no_store_middleware_labels})"
+        in text
+    )
     assert "remove_label_keys(traefik, is_removed_http_wildcard_label)" in text
+    assert 'key.startswith("traefik.http.middlewares.netbird-no-store.")' in text
     assert "remove_label_keys(proxy, is_removed_http_wildcard_label)" in text
     assert 'wildcard_volume = "/opt/netbird/certs/wildcard:/wildcard-certs:ro"' in text
     assert '"NB_PROXY_WILDCARD_CERT_DIR": "/wildcard-certs"' in text

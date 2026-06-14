@@ -11,7 +11,7 @@ source "$WORKSPACE_ROOT/scripts/manager/management-ip.sh"
 # shellcheck disable=SC1091
 source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
 
-TERMIX_URL="${TERMIX_URL:-http://termix.termix.svc.cluster.local:4090}"
+TERMIX_URL="${TERMIX_URL:-}"
 TERMIX_ADMIN_USER="${TERMIX_ADMIN_USER:-admin}"
 TERMIX_SECRET_NAME="${TERMIX_SECRET_NAME:-termix}"
 TERMIX_BROWSER_ROLE_NAME="${TERMIX_BROWSER_ROLE_NAME:-browser-ssh}"
@@ -29,13 +29,24 @@ export KUBECONFIG="$KUBECONFIG_FILE"
 
 command -v curl >/dev/null 2>&1 || fail "curl is required"
 command -v jq >/dev/null 2>&1 || fail "jq is required"
+command -v kubectl >/dev/null 2>&1 || fail "kubectl is required"
 command -v openssl >/dev/null 2>&1 || fail "openssl is required"
 command -v python3 >/dev/null 2>&1 || fail "python3 is required"
 command -v ssh >/dev/null 2>&1 || fail "ssh is required"
 
 tmp_files=()
+TERMIX_FORWARD_PID=""
+TERMIX_FORWARD_LOG=""
+TERMIX_FORWARD_PORT=""
+
 cleanup() {
   local path
+
+  if [[ -n "$TERMIX_FORWARD_PID" ]]; then
+    kill "$TERMIX_FORWARD_PID" >/dev/null 2>&1 || true
+    wait "$TERMIX_FORWARD_PID" >/dev/null 2>&1 || true
+  fi
+  [[ -n "$TERMIX_FORWARD_LOG" && -f "$TERMIX_FORWARD_LOG" ]] && rm -f "$TERMIX_FORWARD_LOG"
 
   for path in "${tmp_files[@]}"; do
     [[ -n "$path" && -f "$path" ]] && rm -f "$path"
@@ -148,6 +159,15 @@ sync_local_config() {
   log "Copied $(basename "$source_file") to ${target_file}"
 }
 
+extract_first_ipv4() {
+  awk '
+    match($0, /([0-9]{1,3}\.){3}[0-9]{1,3}/) {
+      print substr($0, RSTART, RLENGTH)
+      exit
+    }
+  '
+}
+
 netbird_peer_ip_by_name() {
   local hostname="$1"
 
@@ -193,7 +213,7 @@ discover_management_netbird_ip() {
     mgmt_netbird_ip="$(netbird_peer_ip_by_name "twinbox-mgmt-${cluster_slug}")"
   fi
 
-  printf '%s\n' "$mgmt_netbird_ip"
+  printf '%s\n' "$mgmt_netbird_ip" | extract_first_ipv4
 }
 
 write_bastion_ssh_key() {
@@ -210,7 +230,7 @@ discover_bastion_netbird_ip() {
   local bastion_netbird_ip
   local ssh_key_file
 
-  bastion_netbird_ip="$(jq -r '.NETBIRD_PRIVATE_IP // empty' "$netbird_bastion_secret")"
+  bastion_netbird_ip="$(jq -r '.NETBIRD_PRIVATE_IP // empty' "$netbird_bastion_secret" | extract_first_ipv4)"
   if [[ -n "$bastion_netbird_ip" ]]; then
     printf '%s\n' "$bastion_netbird_ip"
     return 0
@@ -234,6 +254,7 @@ fi
 printf '%s\n' "$netbird_ip"
 REMOTE
   )"
+  bastion_netbird_ip="$(printf '%s\n' "$bastion_netbird_ip" | extract_first_ipv4)"
 
   if [[ -z "$bastion_netbird_ip" ]]; then
     bastion_netbird_ip="$(netbird_peer_ip_by_name "twinbox-${cluster_id}-proxy")"
@@ -250,6 +271,93 @@ REMOTE
   fi
 
   printf '%s\n' "$bastion_netbird_ip"
+}
+
+termix_port_in_use() {
+  local port="$1"
+
+  if [[ -r /proc/net/tcp ]]; then
+    local port_hex
+    port_hex="$(printf '%04X' "$port")"
+    awk -v port_hex="$port_hex" '
+      NR > 1 {
+        split($2, address, ":")
+        if (toupper(address[2]) == port_hex) {
+          found = 1
+        }
+      }
+      END {
+        exit found ? 0 : 1
+      }
+    ' /proc/net/tcp /proc/net/tcp6 2>/dev/null
+    return $?
+  fi
+
+  if command -v ss >/dev/null 2>&1; then
+    ss -H -ltn 2>/dev/null | awk -v port=":${port}" '
+      $4 == port || $4 ~ port "$" {
+        found = 1
+      }
+      END {
+        exit found ? 0 : 1
+      }
+    '
+    return $?
+  fi
+
+  (echo >"/dev/tcp/127.0.0.1/${port}") >/dev/null 2>&1
+}
+
+pick_termix_forward_port() {
+  local attempt=1
+  local candidate
+
+  while [[ "$attempt" -le 200 ]]; do
+    candidate=$((20000 + RANDOM % 30000))
+    if ! termix_port_in_use "$candidate"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+    attempt=$((attempt + 1))
+  done
+
+  fail "Could not find a free local port for Termix port-forward"
+}
+
+setup_termix_forward() {
+  if [[ -n "$TERMIX_URL" ]]; then
+    return 0
+  fi
+
+  local requested_port="${TERMIX_LOCAL_FORWARD_PORT:-}"
+  local port="$requested_port"
+  local attempt=1
+  local attempts=60
+
+  if [[ -z "$port" ]]; then
+    port="$(pick_termix_forward_port)"
+  fi
+
+  TERMIX_FORWARD_LOG="$(mktemp "${TMPDIR:-/tmp}/termix-port-forward-XXXXXX")"
+  kubectl -n termix port-forward "svc/termix" "${port}:80" >"$TERMIX_FORWARD_LOG" 2>&1 &
+  TERMIX_FORWARD_PID="$!"
+
+  while [[ "$attempt" -le "$attempts" ]]; do
+    if curl -fsS "http://127.0.0.1:${port}/health" >/dev/null 2>&1; then
+      TERMIX_FORWARD_PORT="$port"
+      TERMIX_URL="http://127.0.0.1:${port}"
+      return 0
+    fi
+    if ! kill -0 "$TERMIX_FORWARD_PID" >/dev/null 2>&1; then
+      [[ -s "$TERMIX_FORWARD_LOG" ]] && tail -n 20 "$TERMIX_FORWARD_LOG" >&2
+      fail "Termix port-forward exited before ready"
+    fi
+    sleep 1
+    attempt=$((attempt + 1))
+  done
+
+  [[ -s "$TERMIX_FORWARD_LOG" ]] && tail -n 20 "$TERMIX_FORWARD_LOG" >&2
+  fail "Termix port-forward on 127.0.0.1:${port} did not become ready"
 }
 
 wait_for_termix() {
@@ -285,6 +393,7 @@ termix_public_request() {
         -X "$method" \
         -H "Accept: application/json" \
         -H "Content-Type: application/json" \
+        -H "X-Electron-App: true" \
         --data-binary "$payload" \
         -o "$response_file" \
         -w '%{http_code}' \
@@ -295,6 +404,7 @@ termix_public_request() {
       curl -sS \
         -X "$method" \
         -H "Accept: application/json" \
+        -H "X-Electron-App: true" \
         -o "$response_file" \
         -w '%{http_code}' \
         "${TERMIX_URL}${path}"
@@ -460,9 +570,9 @@ ensure_termix_host() {
   )"
 
   if [[ -n "$host_id" ]]; then
-    termix_api_request PUT "/ssh/db/host/${host_id}" "$host_payload" >/dev/null
+    termix_api_request PUT "/host/db/host/${host_id}" "$host_payload" >/dev/null
   else
-    host_response="$(termix_api_request POST "/ssh/db/host" "$host_payload")"
+    host_response="$(termix_api_request POST "/host/db/host" "$host_payload")"
     host_id="$(jq -r '.id // ._id // empty' <<<"$host_response")"
   fi
 
@@ -486,6 +596,7 @@ share_termix_host_with_browser_role() {
   termix_api_request POST "/rbac/host/${host_id}/share" "$share_payload" >/dev/null
 }
 
+setup_termix_forward
 wait_for_termix
 
 setup_required_payload="$(termix_public_request GET "/users/setup-required")"
@@ -550,7 +661,7 @@ bastion_credential_id="$(
 )"
 
 log "Ensuring Termix SSH hosts exist"
-hosts_payload="$(termix_api_request GET "/ssh/db/host")"
+hosts_payload="$(termix_api_request GET "/host/db/host")"
 mgmt_host_id="$(ensure_termix_host "Management VM" "$mgmt_netbird_ip" "$MGMT_VM_USER" "$mgmt_credential_id")"
 bastion_host_id="$(ensure_termix_host "Bastion VM" "$bastion_netbird_ip" "root" "$bastion_credential_id")"
 

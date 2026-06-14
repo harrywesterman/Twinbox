@@ -354,6 +354,7 @@ write_files:
       # Add DNS-01 challenge arguments to traefik command
       command = traefik.get("command", [])
       command_args = {
+          "--providers.docker.network=": "--providers.docker.network=netbird_netbird",
           "--certificatesresolvers.letsencrypt.acme.dnschallenge.provider=": (
               f"--certificatesresolvers.letsencrypt.acme.dnschallenge.provider={dns_provider}"
           ),
@@ -481,7 +482,10 @@ write_files:
           "traefik.http.middlewares.netbird-no-store.headers.customresponseheaders.Pragma": "no-cache",
           "traefik.http.middlewares.netbird-no-store.headers.customresponseheaders.Expires": "0",
       }
-      set_labels(traefik, no_store_middleware_labels)
+      remove_label_keys(
+          traefik,
+          lambda key: key.startswith("traefik.http.middlewares.netbird-no-store."),
+      )
 
       dashboard_tls_domain_labels = {
           "traefik.http.routers.netbird-dashboard.tls.domains[0].main": netbird_domain,
@@ -506,7 +510,7 @@ write_files:
               key.startswith("traefik.http.routers.netbird-backend.tls.domains[")
               or key.startswith("traefik.http.routers.netbird-grpc.tls.domains[")
           ))
-          set_labels(netbird_server, server_tls_domain_labels)
+          set_labels(netbird_server, {**server_tls_domain_labels, **no_store_middleware_labels})
           append_csv_label_value(
               netbird_server,
               "traefik.http.routers.netbird-backend.middlewares",
