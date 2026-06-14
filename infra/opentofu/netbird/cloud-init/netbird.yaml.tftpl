@@ -662,4 +662,31 @@ runcmd:
   - ufw allow 443/tcp
   - ufw allow 3478/udp
   - ufw --force enable
+%{ if opkssh_issuer_url != "" && opkssh_client_id != "" }
+  - |
+    set -euo pipefail
+    curl -fsSL https://github.com/openpubkey/opkssh/releases/download/v0.14.0/opkssh-linux-amd64 -o /tmp/opkssh
+    echo "972719cb6dae736af80100fee0854fdd7289f419fc61b3dcace8409b2f043063  /tmp/opkssh" | sha256sum -c -
+    install -o root -g root -m 0755 /tmp/opkssh /usr/local/bin/opkssh
+    rm -f /tmp/opkssh
+    groupadd -r opksshuser || true
+    useradd -r -g opksshuser -s /usr/sbin/nologin -d /var/lib/opksshuser -m opksshuser || true
+    mkdir -p /etc/opk
+    cat > /etc/opk/providers <<EOF
+    ${opkssh_issuer_url} ${opkssh_client_id} 16h
+    EOF
+    cat > /etc/opk/auth_id <<EOF
+    root oidc:groups:admins ${opkssh_issuer_url}
+    EOF
+    chown -R root:opksshuser /etc/opk
+    chmod 0750 /etc/opk
+    chmod 0640 /etc/opk/providers /etc/opk/auth_id
+    cat > /etc/ssh/sshd_config.d/60-opk-ssh.conf <<'SSHD'
+    AuthorizedKeysCommand /usr/local/bin/opkssh verify %u %k %t
+    AuthorizedKeysCommandUser opksshuser
+    SSHD
+    systemctl restart sshd || true
+    /usr/local/bin/opkssh verify --help >/dev/null
+    /usr/local/bin/opkssh audit
+%{ endif }
   - /root/bootstrap-netbird.sh

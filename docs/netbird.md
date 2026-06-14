@@ -390,16 +390,10 @@ the Termix pod. The sidecar reads the `twinbox/global/netbird-browser-ssh`
 secret through External Secrets, mounts `/dev/net/tun`, and stores its NetBird
 state under the existing Termix PVC at `/var/lib/netbird`.
 
-`setup-termix.sh` creates or updates two Termix host entries:
-
-| Host | Address | Credential |
-| --- | --- | --- |
-| Management VM | Management VM NetBird peer IP | Management VM password credential |
-| Bastion VM | Bastion `NETBIRD_PRIVATE_IP` | Bastion SSH key credential |
-
-The bastion entry is created only when `SSH_PRIVATE_KEY` exists in the bastion
-secret; otherwise the script fails clearly instead of creating an unusable
-host. Both host entries are shared with the Browser SSH role.
+`install-browser-ssh` also creates the `opkssh` Authentik OAuth2 application.
+The `install-opkssh` step then installs opkssh on the Management VM and bastion
+so that Termix hosts authenticate with Authentik + MFA SSH certificates. See
+`docs/termix.md` for the full Termix/opkssh documentation.
 
 ## GitOps Manifests
 

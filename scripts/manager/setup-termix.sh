@@ -721,8 +721,9 @@ bastion_host_id="$(ensure_termix_opkssh_host "Bastion VM" "$bastion_netbird_ip" 
 # The password remains on the host as a break-glass backdoor.
 delete_termix_credential_by_name "Management VM Password"
 
-# Phase 3: remove the Bastion VM SSH key credential from Termix (uncomment after bastion opkssh is validated).
-# delete_termix_credential_by_name "Bastion VM SSH Key"
+# Phase 3: remove the Bastion VM SSH key credential from Termix.
+# The key remains on the host/Hetzner as a break-glass backdoor.
+delete_termix_credential_by_name "Bastion VM SSH Key"
 
 log "Ensuring the Browser SSH role exists"
 roles_payload="$(termix_api_request GET "/rbac/roles")"
