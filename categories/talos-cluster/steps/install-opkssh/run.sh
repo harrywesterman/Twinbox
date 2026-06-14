@@ -66,13 +66,59 @@ update_env_file "OPKSSH_ISSUER_URL" "$OPKSSH_ISSUER_URL"
 update_env_file "OPKSSH_CLIENT_ID" "$OPKSSH_CLIENT_ID"
 update_env_file "OPKSSH_PRINCIPAL" "$mgmt_vm_user"
 
+# The worker container runs on the Management VM but has no pre-existing SSH
+# credential for the host's twinbox account. Generate a temporary key pair and
+# authorize it on the host filesystem (which is mounted at /home/twinbox), then
+# remove it again after the install so the key does not persist.
+mgmt_vm_ssh_key_file=""
+mgmt_vm_authorized_keys="/home/${mgmt_vm_user}/.ssh/authorized_keys"
+
+cleanup_mgmt_vm_key() {
+  if [[ -n "${mgmt_vm_ssh_key_file:-}" ]] && [[ -f "$mgmt_vm_ssh_key_file" ]]; then
+    local pub_key
+    pub_key="$(cat "${mgmt_vm_ssh_key_file}.pub" 2>/dev/null || true)"
+    if [[ -n "$pub_key" ]] && [[ -f "$mgmt_vm_authorized_keys" ]]; then
+      local owner tmp_keys
+      owner="$(stat -c '%U:%G' "$mgmt_vm_authorized_keys" 2>/dev/null || true)"
+      tmp_keys="$(mktemp)"
+      grep -vF "$pub_key" "$mgmt_vm_authorized_keys" > "$tmp_keys" || true
+      cat "$tmp_keys" > "$mgmt_vm_authorized_keys"
+      rm -f "$tmp_keys"
+      chmod 600 "$mgmt_vm_authorized_keys"
+      if [[ -n "$owner" ]]; then
+        chown "$owner" "$mgmt_vm_authorized_keys" 2>/dev/null || true
+      fi
+    fi
+    rm -f "$mgmt_vm_ssh_key_file" "${mgmt_vm_ssh_key_file}.pub"
+  fi
+}
+
+provision_mgmt_vm_key() {
+  local key_dir
+  key_dir="$(mktemp -d)"
+  local key_file="${key_dir}/id_ed25519"
+  ssh-keygen -t ed25519 -f "$key_file" -N "" -q
+  mkdir -p "$(dirname "$mgmt_vm_authorized_keys")"
+  chmod 700 "$(dirname "$mgmt_vm_authorized_keys")"
+  cat "${key_file}.pub" >> "$mgmt_vm_authorized_keys"
+  chmod 600 "$mgmt_vm_authorized_keys"
+  printf '%s' "$key_file"
+}
+
+trap cleanup_mgmt_vm_key EXIT
+
 log "Installing opkssh on Management VM (${mgmt_vm_ip})"
+mgmt_vm_ssh_key_file="$(provision_mgmt_vm_key)"
 OPKSSH_ISSUER_URL="$OPKSSH_ISSUER_URL" \
 OPKSSH_CLIENT_ID="$OPKSSH_CLIENT_ID" \
 OPKSSH_PRINCIPAL="$mgmt_vm_user" \
 bash "${WORKSPACE_ROOT}/scripts/manager/install-opkssh-on-host.sh" \
   --host "$mgmt_vm_ip" \
-  --user "$mgmt_vm_user"
+  --user "$mgmt_vm_user" \
+  --ssh-key "$mgmt_vm_ssh_key_file"
+
+cleanup_mgmt_vm_key
+trap - EXIT
 
 log "Installing opkssh on Bastion (${bastion_ip})"
 if [[ -n "$bastion_ssh_private_key" ]]; then

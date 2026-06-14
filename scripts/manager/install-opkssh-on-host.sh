@@ -75,15 +75,21 @@ set -euo pipefail
 
 OPKSSH_VERSION="${OPKSSH_VERSION}"
 OPKSSH_SHA256="${OPKSSH_SHA256}"
-ISSUER_URL="${OPKSSH_ISSUER_URL}"
+ISSUER_URL="${OPKSSH_ISSUER_URL%/}"
 CLIENT_ID="${OPKSSH_CLIENT_ID}"
 PRINCIPAL="${principal}"
+
+if [[ "\$(id -u)" -eq 0 ]]; then
+  SUDO=""
+else
+  SUDO="sudo"
+fi
 
 install_opkssh() {
   echo "Downloading opkssh binary..."
   curl -fsSL "https://github.com/openpubkey/opkssh/releases/download/v\${OPKSSH_VERSION}/opkssh-linux-amd64" -o /tmp/opkssh
   echo "\${OPKSSH_SHA256}  /tmp/opkssh" | sha256sum -c -
-  install -o root -g root -m 0755 /tmp/opkssh /usr/local/bin/opkssh
+  \${SUDO} install -o root -g root -m 0755 /tmp/opkssh /usr/local/bin/opkssh
   rm -f /tmp/opkssh
 }
 
@@ -100,41 +106,41 @@ else
 fi
 
 if ! id -u opksshuser >/dev/null 2>&1; then
-  groupadd -r opksshuser || true
-  useradd -r -g opksshuser -s /usr/sbin/nologin -d /var/lib/opksshuser -m opksshuser || true
+  \${SUDO} groupadd -r opksshuser || true
+  \${SUDO} useradd -r -g opksshuser -s /usr/sbin/nologin -d /var/lib/opksshuser -m opksshuser || true
 fi
 
-mkdir -p /etc/opk
-chown root:opksshuser /etc/opk
-chmod 0750 /etc/opk
+\${SUDO} mkdir -p /etc/opk
+\${SUDO} chown root:opksshuser /etc/opk
+\${SUDO} chmod 0750 /etc/opk
 
-cat > /etc/opk/providers <<EOF
+\${SUDO} tee /etc/opk/providers >/dev/null <<EOF
 \${ISSUER_URL} \${CLIENT_ID} 16h
 EOF
-chown root:opksshuser /etc/opk/providers
-chmod 0640 /etc/opk/providers
+\${SUDO} chown root:opksshuser /etc/opk/providers
+\${SUDO} chmod 0640 /etc/opk/providers
 
-cat > /etc/opk/auth_id <<EOF
+\${SUDO} tee /etc/opk/auth_id >/dev/null <<EOF
 \${PRINCIPAL} oidc:groups:admins \${ISSUER_URL}
 EOF
-chown root:opksshuser /etc/opk/auth_id
-chmod 0640 /etc/opk/auth_id
+\${SUDO} chown root:opksshuser /etc/opk/auth_id
+\${SUDO} chmod 0640 /etc/opk/auth_id
 
-cat > /etc/ssh/sshd_config.d/60-opk-ssh.conf <<'SSHD'
+\${SUDO} tee /etc/ssh/sshd_config.d/60-opk-ssh.conf >/dev/null <<'SSHD'
 AuthorizedKeysCommand /usr/local/bin/opkssh verify %u %k %t
 AuthorizedKeysCommandUser opksshuser
 SSHD
-chmod 0644 /etc/ssh/sshd_config.d/60-opk-ssh.conf
+\${SUDO} chmod 0644 /etc/ssh/sshd_config.d/60-opk-ssh.conf
 
 if command -v systemctl >/dev/null 2>&1; then
   if systemctl is-active sshd >/dev/null 2>&1 || systemctl is-active ssh >/dev/null 2>&1; then
-    systemctl restart sshd || systemctl restart ssh || true
+    \${SUDO} systemctl restart sshd || \${SUDO} systemctl restart ssh || true
   fi
 fi
 
 echo "Verifying opkssh installation..."
 /usr/local/bin/opkssh verify --help >/dev/null
-/usr/local/bin/opkssh audit
+\${SUDO} /usr/local/bin/opkssh audit
 REMOTE
 
 log "opkssh installation complete on ${user}@${host}"
