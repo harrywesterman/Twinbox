@@ -9,6 +9,17 @@ USAGE
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >&2; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
+array_contains() {
+  local needle="$1"
+  shift || true
+  local item=""
+
+  for item in "$@"; do
+    [[ "$item" == "$needle" ]] && return 0
+  done
+
+  return 1
+}
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -89,6 +100,7 @@ runtime_talos_dir="$talos_runtime_root/talos"
 talos_secrets_file="${TWINBOX_TALOS_SECRETS_FILE:-$runtime_talos_dir/secrets.yaml}"
 talosconfig_file="${TWINBOX_TALOSCONFIG_FILE:-$runtime_talos_dir/talosconfig}"
 kubeconfig_file="${TWINBOX_KUBECONFIG_FILE:-$runtime_talos_dir/kubeconfig}"
+bootstrap_secret_dir="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}/secrets/cluster/${CLUSTER_ID}"
 
 mkdir -p "$clusters_dir" "$cluster_dir" "$iac_dir" "$image_cache_dir" "$runtime_talos_dir"
 [[ -f "$cluster_file" ]] || fail "cluster not found: ${CLUSTER_ID}"
@@ -263,10 +275,12 @@ proxmox_get_all_vm_ids() {
 validate_vm_ids_available() {
   local planned_vms_json="$1"
   local existing_vm_ids=()
+  local managed_vm_ids=()
   local planned_vm_ids=()
   local vmid=""
   local conflicts=()
   local existing_vm_ids_output=""
+  local managed_vm_ids_output=""
 
   log "Checking for VM ID conflicts across the Proxmox cluster"
 
@@ -279,24 +293,50 @@ validate_vm_ids_available() {
     existing_vm_ids+=("$vmid")
   done <<<"$existing_vm_ids_output"
 
+  if managed_vm_ids_output="$(managed_vm_ids_from_state)"; then
+    while IFS= read -r vmid; do
+      [[ -n "$vmid" ]] || continue
+      managed_vm_ids+=("$vmid")
+    done <<<"$managed_vm_ids_output"
+  fi
+
   while IFS= read -r vmid; do
     [[ -n "$vmid" ]] || continue
     planned_vm_ids+=("$vmid")
   done < <(jq -r '.[].vmid' <<<"$planned_vms_json" | sort -n | uniq)
 
   for vmid in "${planned_vm_ids[@]}"; do
-    if printf '%s\n' "${existing_vm_ids[@]}" | grep -qx "$vmid"; then
+    if array_contains "$vmid" ${existing_vm_ids[@]+"${existing_vm_ids[@]}"}; then
+      if array_contains "$vmid" ${managed_vm_ids[@]+"${managed_vm_ids[@]}"}; then
+        continue
+      fi
       conflicts+=("$vmid")
     fi
   done
 
   if [[ ${#conflicts[@]} -gt 0 ]]; then
     local existing_list=""
-    existing_list="$(printf '%s\n' "${existing_vm_ids[@]}" | tr '\n' ' ')"
+    existing_list="$(printf '%s\n' ${existing_vm_ids[@]+"${existing_vm_ids[@]}"} | tr '\n' ' ')"
     fail "VM ID conflict: the following VM IDs are already in use in the Proxmox cluster: ${conflicts[*]}. Existing VM IDs: ${existing_list}"
   fi
 
+  if [[ ${#managed_vm_ids[@]} -gt 0 ]]; then
+    log "Ignoring VM IDs already managed by this cluster OpenTofu state: ${managed_vm_ids[*]}"
+  fi
+
   log "All planned VM IDs are available: ${planned_vm_ids[*]}"
+}
+
+managed_vm_ids_from_state() {
+  local state_file="${work_module_dir}/terraform.tfstate"
+
+  [[ -s "$state_file" ]] || return 0
+
+  jq -r '
+    .resources[]?
+    | select(.mode == "managed" and .type == "proxmox_virtual_environment_vm" and .name == "node")
+    | .instances[]?.attributes.vm_id // empty
+  ' "$state_file" 2>/dev/null | sort -n | uniq
 }
 
 validate_file_datastore_import_content() {
@@ -1011,6 +1051,20 @@ upsert_secret_artifact() {
     --source "$source_file"
 }
 
+restore_secret_artifact() {
+  local item="$1"
+  local attachment="$2"
+  local target_file="$3"
+  local source_file="${bootstrap_secret_dir}/${item}/${attachment}"
+
+  [[ ! -s "$target_file" ]] || return 0
+  [[ -s "$source_file" ]] || return 0
+
+  mkdir -p "$(dirname "$target_file")"
+  cp "$source_file" "$target_file"
+  log "Reusing existing ${item}/${attachment} artifact"
+}
+
 generate_talos_configs() {
   local base_dir="$runtime_talos_dir/base"
   local node_dir=""
@@ -1023,6 +1077,8 @@ generate_talos_configs() {
 
   rm -rf "$runtime_talos_dir/base" "$runtime_talos_dir/generated"
   mkdir -p "$base_dir" "$runtime_talos_dir/generated"
+
+  restore_secret_artifact "talos-secrets" "secrets.yaml" "$talos_secrets_file"
 
   if [[ -s "$talos_secrets_file" ]]; then
     log "Reusing Talos secrets at ${talos_secrets_file}"
@@ -1149,22 +1205,39 @@ apply_node_config() {
 bootstrap_cluster() {
   local first_cp_ip="$1"
   local bootstrap_output=""
+  local attempt=1
+  local max_attempts="${TALOS_BOOTSTRAP_MAX_ATTEMPTS:-60}"
+  local retry_delay="${TALOS_BOOTSTRAP_RETRY_DELAY_SECONDS:-5}"
+
   wait_for_talos_api "control plane" "$first_cp_ip"
-  log "Bootstrapping cluster from ${first_cp_ip}"
-  if ! bootstrap_output="$(
-    talosctl bootstrap \
-      --nodes "$first_cp_ip" \
-      --endpoints "$first_cp_ip" \
-      --talosconfig "$talosconfig_file" \
-      2>&1
-  )"; then
+
+  while true; do
+    log "Bootstrapping cluster from ${first_cp_ip}"
+    if bootstrap_output="$(
+      talosctl bootstrap \
+        --nodes "$first_cp_ip" \
+        --endpoints "$first_cp_ip" \
+        --talosconfig "$talosconfig_file" \
+        2>&1
+    )"; then
+      break
+    fi
+
     if grep -q 'AlreadyExists desc = etcd data directory is not empty' <<<"$bootstrap_output"; then
       log "Talos bootstrap already completed on ${first_cp_ip}; continuing"
-    else
-      printf '%s\n' "$bootstrap_output" >&2
-      return 1
+      break
     fi
-  fi
+
+    if grep -q 'bootstrap is not available yet' <<<"$bootstrap_output" && [[ "$attempt" -lt "$max_attempts" ]]; then
+      log "Talos bootstrap is not available yet on ${first_cp_ip}; retrying in ${retry_delay}s (attempt ${attempt}/${max_attempts})"
+      sleep "$retry_delay"
+      attempt=$((attempt + 1))
+      continue
+    fi
+
+    printf '%s\n' "$bootstrap_output" >&2
+    return 1
+  done
 
   log "Writing kubeconfig"
   talosctl kubeconfig "$kubeconfig_file" \
