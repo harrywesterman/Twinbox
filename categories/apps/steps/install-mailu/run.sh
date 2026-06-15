@@ -577,17 +577,19 @@ jq -n \
   --arg secret_key "$secret_key" \
   --arg api_token "$api_token" \
   --arg initial_admin_password "$admin_password" \
+  --arg mail_api_base_url "https://mail.${mail_domain}/api" \
   '{
     "secret-key": $secret_key,
     "api-token": $api_token,
-    "initial-admin-password": $initial_admin_password
+    "initial-admin-password": $initial_admin_password,
+    "MAILU_API_BASE_URL": $mail_api_base_url
   }' >"$runtime_secret_file"
 chmod 600 "$runtime_secret_file"
 
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "mailu-runtime" \
   --json-file "$runtime_secret_file" \
-  --required-keys "secret-key,api-token,initial-admin-password"
+  --required-keys "secret-key,api-token,initial-admin-password,MAILU_API_BASE_URL"
 
 jq -n \
   --arg relay_username "$relay_username" \
