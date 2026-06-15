@@ -59,7 +59,8 @@ spec:
             - name: termix-data
               mountPath: /app/data
             - name: opkssh-config
-              mountPath: /app/data/.opk
+              mountPath: /app/data/.opk/config.yml
+              subPath: config.yml
               readOnly: true
           readinessProbe:
             httpGet:
