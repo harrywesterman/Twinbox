@@ -13,6 +13,7 @@ import {
   normalizeManageableGroupsConfig,
   normalizeRequestedGroupNames,
 } from "./authentik-admin.mjs";
+import { createRandomMailboxPassword, isMailuInstalled, mailuCreateMailbox } from "./src/mailu-client.mjs";
 
 const app = express();
 const port = Number(process.env.PORT || 8080);
@@ -1425,6 +1426,25 @@ app.post("/api/admin/users", async (req, res) => {
       if (draft.groupNames.includes(group.name)) {
         await client.addUserToGroup(group.id, createdUserId);
       }
+    }
+
+    if (draft.email && isMailuInstalled()) {
+      const mailboxPassword = createRandomMailboxPassword();
+      mailuCreateMailbox({
+        email: draft.email,
+        rawPassword: mailboxPassword,
+        displayedName: draft.name || draft.username,
+      }).then(
+        (result) => {
+          if (result.ok) {
+            console.log(`Mailu mailbox created for ${draft.email}`);
+          } else {
+            console.warn(`Mailu mailbox not created for ${draft.email}: ${result.reason}`);
+          }
+        }
+      ).catch(
+        (err) => console.warn(`Mailu mailbox creation error for ${draft.email}:`, err.message)
+      );
     }
 
     const directoryAfter = await loadUserAdminDirectory(config);
