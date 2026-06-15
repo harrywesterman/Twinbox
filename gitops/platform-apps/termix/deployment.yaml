@@ -66,6 +66,10 @@ spec:
               mountPath: /app/dist/backend/backend/ssh/opkssh-auth.js
               subPath: opkssh-auth.js
               readOnly: true
+            - name: termix-patch
+              mountPath: /app/dist/backend/backend/database/routes/host.js
+              subPath: host.js
+              readOnly: true
           readinessProbe:
             httpGet:
               path: /health
