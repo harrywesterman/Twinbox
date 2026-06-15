@@ -11,6 +11,8 @@ WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
 # shellcheck disable=SC1091
 source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"
 
 log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
@@ -270,6 +272,72 @@ resolve_admin_pod() {
     head -n1
 }
 
+sync_mailu_mailboxes() {
+  local mail_domain="$1"
+  local api_token="$2"
+
+  if [[ -z "$api_token" ]]; then
+    log "No Mailu API token available; skipping mailbox sync"
+    return 0
+  fi
+
+  local api_base="https://mail.${mail_domain}/api/v1"
+  local users_json
+
+  log "Syncing Mailu mailboxes for existing Authentik users"
+
+  users_json="$(authentik_api_get "/core/users/" 2>/dev/null | jq '[.results[] | select(.email != null and .email != "") | {email, name, username}]')"
+  if [[ -z "$users_json" || "$users_json" == "null" || "$users_json" == "[]" ]]; then
+    log "No Authentik users with email addresses found; skipping mailbox sync"
+    return 0
+  fi
+
+  local total=0 created=0 existed=0 failed=0
+  total="$(jq length <<<"$users_json")"
+  log "Found ${total} Authentik user(s) with email to sync"
+
+  while IFS= read -r user_entry; do
+    local email name displayed
+    email="$(jq -r '.email' <<<"$user_entry")"
+    name="$(jq -r '.name // .username' <<<"$user_entry")"
+    displayed="${name:-$email}"
+
+    local check_status
+    check_status="$(curl -s -o /dev/null -w '%{http_code}' \
+      -H "Authorization: Bearer ${api_token}" \
+      "${api_base}/user/$(printf '%s' "$email" | python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip()))')" \
+      2>/dev/null || echo "000")"
+
+    if [[ "$check_status" == "200" ]]; then
+      existed=$((existed + 1))
+      log "  SKIP ${email}: mailbox already exists"
+      continue
+    fi
+
+    local raw_password
+    raw_password="$(python3 -c 'import secrets; print(secrets.token_hex(24))')"
+
+    local create_status
+    create_status="$(curl -s -o /dev/null -w '%{http_code}' \
+      -X POST \
+      -H "Authorization: Bearer ${api_token}" \
+      -H "Content-Type: application/json" \
+      -d "$(jq -n --arg email "$email" --arg pwd "$raw_password" --arg name "$displayed" \
+        '{email: $email, raw_password: $pwd, displayed_name: $name, enabled: true, enable_imap: true, enable_pop: false, spam_enabled: true}')" \
+      "${api_base}/user" 2>/dev/null || echo "000")"
+
+    if [[ "$create_status" == "200" ]]; then
+      created=$((created + 1))
+      log "  OK   ${email}: mailbox created"
+    else
+      failed=$((failed + 1))
+      log "  FAIL ${email}: HTTP ${create_status}"
+    fi
+  done < <(jq -c '.[]' <<<"$users_json")
+
+  log "Mailbox sync complete: ${total} total, ${created} created, ${existed} existed, ${failed} failed"
+}
+
 extract_dkim_from_export() {
   jq -c -f "$WORKSPACE_ROOT/scripts/manager/mailu-dns-export-to-dkim.jq"
 }
@@ -422,6 +490,7 @@ export KUBECONFIG="$KUBECONFIG_FILE"
 require_cmd jq
 require_cmd kubectl
 require_cmd openssl
+require_cmd python3
 require_cmd ssh
 
 require_json STEP_CONTEXT_JSON "$STEP_CONTEXT_JSON"
@@ -462,7 +531,10 @@ netbird_bastion_secret="$(find_netbird_bastion_secret "$cluster_id")"
 [[ -n "$netbird_bastion_secret" && -f "$netbird_bastion_secret" ]] || fail "NetBird bastion secret not found; provision NetBird bastion first"
 
 bastion_ip="$(jq -r '.NETBIRD_IP // empty' "$netbird_bastion_secret")"
-mailu_relay_host="$(jq -r '.NETBIRD_RELAY_HOST // .NETBIRD_PRIVATE_IP // empty' "$netbird_bastion_secret")"
+mailu_relay_host="$(jq -r '.NETBIRD_RELAY_HOST // empty' "$netbird_bastion_secret")"
+if [[ -z "$mailu_relay_host" ]]; then
+  mailu_relay_host="$(jq -r '.NETBIRD_PRIVATE_IP // empty' "$netbird_bastion_secret" | awk 'match($0, /([0-9]{1,3}\.){3}[0-9]{1,3}/) {print substr($0, RSTART, RLENGTH); exit}')"
+fi
 [[ -n "$bastion_ip" ]] || fail "NetBird bastion secret is missing NETBIRD_IP"
 
 ssh_key_file="$(write_bastion_ssh_key "$netbird_bastion_secret" "$cluster_id")"
@@ -626,6 +698,12 @@ dkim_selector="${dkim_txt_name%%._domainkey.*}"
 
 log "Applying Mailu DNS records"
 apply_mail_dns_records "$mail_domain" "$mail_hostname" "$bastion_ip" "$dkim_txt_name" "$dkim_value" "$dmarc_policy" "$dmarc_rua_localpart"
+
+log "Syncing existing Authentik users to Mailu"
+authentik_ensure_token
+authentik_setup_forward
+sync_mailu_mailboxes "$mail_domain" "$(jq -r '."api-token"' "$runtime_secret_file")"
+log "Mailu mailbox sync complete"
 
 dmarc_txt_value="v=DMARC1; p=${dmarc_policy}; rua=mailto:${dmarc_rua_localpart}@${mail_domain}; adkim=s; aspf=s"
 jq -n \
