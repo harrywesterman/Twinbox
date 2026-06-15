@@ -483,20 +483,22 @@ if [[ -n "$existing_collection" ]]; then
     jq -n \
       --arg client_id "$beszel_client_id" \
       --arg client_secret "$beszel_client_secret" \
-       --arg auth_url "${AUTHENTIK_HOST%/}/application/o/authorize/" \
+      --arg auth_url "${AUTHENTIK_HOST%/}/application/o/authorize/" \
       --arg token_url "${AUTHENTIK_HOST%/}/application/o/token/" \
       --arg userinfo_url "${AUTHENTIK_HOST%/}/application/o/userinfo/" \
       '{
-        allowOAuth2: true,
-        enabledOAuth2Providers: [{
-          name: "oidc",
-          displayName: "Authentik",
-          clientId: $client_id,
-          clientSecret: $client_secret,
-          authUrl: $auth_url,
-          tokenUrl: $token_url,
-          userInfoUrl: $userinfo_url
-        }]
+        oauth2: {
+          enabled: true,
+          providers: [{
+            name: "oidc",
+            displayName: "Authentik",
+            clientId: $client_id,
+            clientSecret: $client_secret,
+            authUrl: $auth_url,
+            tokenUrl: $token_url,
+            userInfoUrl: $userinfo_url
+          }]
+        }
       }'
   )"
   updated_options="$(jq --argjson oauth "$oauth_options" '.options |= (. // {}) + $oauth' <<<"$existing_collection")"

@@ -1144,3 +1144,9 @@ bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
   --service-name "forgejo" \
   --service-domain "forgejo.$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")" \
   --service-path /
+
+log_step "Synchronizing manager-api trusted sources"
+bash "$WORKSPACE_ROOT/scripts/manager/sync-manager-api-node-allowlist.sh" \
+  --kubeconfig "$KUBECONFIG_FILE" \
+  --workspace-root "$WORKSPACE_ROOT" \
+  || log "manager-api allowlist sync skipped or failed"

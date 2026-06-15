@@ -5,8 +5,9 @@ Twinbox builds a Talos Linux Kubernetes cluster on Proxmox through a Management 
 ## Rules
 
 - Stay on `main`; do not branch unless asked.
-- GitHub `main` is source of truth. 
-- The Management VM runs the Web Wizard in a couple of docker containers. They are built from github actions to GHCR. 
+- GitHub `main` is source of truth.
+- **Never hard-code fixed IP addresses or CIDR ranges in code, scripts, or configuration defaults. Always derive network addresses from runtime discovery, environment variables, or user-supplied configuration.**
+- The Management VM runs the Web Wizard in a couple of docker containers. They are built from github actions to GHCR.
 - Update the web wizard: Edit the code, check to MAIN in github, **wait for the docker build actions to complete successfully**, pull the new version of the docker images on the management VM. 
 - **Before refreshing the Management VM**, confirm the relevant GitHub Actions "Publish Docker Images" workflow succeeded for the pushed commit. Do not run `docker compose pull` until the new images are actually published.
 - Als je iets wijzigt dat op de Management VM draait, zet je het eerst in GitHub `main`, wacht je tot de Docker images succesvol zijn gebouwd, en pull je daarna pas de nieuwe images op de Management VM.

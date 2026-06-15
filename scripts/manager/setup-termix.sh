@@ -670,6 +670,29 @@ share_termix_host_with_browser_role() {
   termix_api_request POST "/rbac/host/${host_id}/share" "$share_payload" >/dev/null
 }
 
+ensure_browser_ssh_role_for_admins() {
+  local users_payload user_id user_roles_payload
+
+  users_payload="$(termix_api_request GET "/users/list")"
+  while IFS= read -r user_id; do
+    [[ -n "$user_id" ]] || continue
+    user_roles_payload="$(termix_api_request GET "/rbac/users/${user_id}/roles")"
+    if jq -e --arg role_name "$TERMIX_BROWSER_ROLE_NAME" '
+      any(.roles[]?; (.roleName // .name // "") == $role_name)
+    ' <<<"$user_roles_payload" >/dev/null 2>&1; then
+      continue
+    fi
+
+    assign_role_payload="$(
+      jq -n --arg role_id "$browser_role_id" '{roleId: ($role_id | tonumber? // $role_id)}'
+    )"
+    termix_api_request POST "/rbac/users/${user_id}/roles" "$assign_role_payload" >/dev/null
+    log "Assigned Browser SSH role to admin user ${user_id}"
+  done <<<"$(
+    jq -r '.users[]? | select(.isAdmin == true) | .id // empty' <<<"$users_payload"
+  )"
+}
+
 setup_termix_forward
 wait_for_termix
 
@@ -759,29 +782,7 @@ fi
 [[ -n "$browser_role_id" ]] || fail "Could not determine the Browser SSH role ID"
 
 log "Assigning the Browser SSH role to admin users"
-users_payload="$(termix_api_request GET "/users/list")"
-admin_user_ids="$(
-  jq -r '
-    .users[]?
-    | select(.isAdmin == true)
-    | .id // empty
-  ' <<<"$users_payload"
-)"
-
-while IFS= read -r user_id; do
-  [[ -n "$user_id" ]] || continue
-  user_roles_payload="$(termix_api_request GET "/rbac/users/${user_id}/roles")"
-  if jq -e --arg role_name "$TERMIX_BROWSER_ROLE_NAME" '
-    any(.roles[]?; (.roleName // .name // "") == $role_name or (.roleDisplayName // "") == "Browser SSH")
-  ' <<<"$user_roles_payload" >/dev/null 2>&1; then
-    continue
-  fi
-
-  assign_role_payload="$(
-    jq -n --arg role_id "$browser_role_id" '{roleId: ($role_id | tonumber? // $role_id)}'
-  )"
-  termix_api_request POST "/rbac/users/${user_id}/roles" "$assign_role_payload" >/dev/null
-done <<<"$admin_user_ids"
+ensure_browser_ssh_role_for_admins
 
 log "Sharing Browser SSH hosts with the Browser SSH role"
 share_termix_host_with_browser_role "$mgmt_host_id"

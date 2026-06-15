@@ -21,7 +21,7 @@ usage() {
   cat <<'USAGE'
 Usage: sync-manager-api-node-allowlist.sh [options]
 
-Synchronize MANAGER_API_TRUSTED_CIDRS with the current Talos node InternalIP /32s.
+Synchronize MANAGER_API_TRUSTED_CIDRS with the current Talos node InternalIP /32s and the management VM LAN CIDR.
 
 Options:
   --env-file PATH       Env file to update (default: /opt/twinbox/.env)
@@ -128,6 +128,30 @@ node_cidrs() {
     | awk '!seen[$0]++'
 }
 
+management_lan_cidr() {
+  local mgmt_ip="${MANAGEMENT_VM_IP:-}"
+  [[ -n "$mgmt_ip" ]] || return 0
+
+  local prefix=""
+  prefix="$(ip -o -f inet addr show 2>/dev/null | awk -v ip="$mgmt_ip" '
+    $0 ~ " inet " ip "/" {
+      n = split($4, parts, "/")
+      if (n == 2) {
+        print parts[2]
+        exit
+      }
+    }
+  ')"
+  [[ -n "$prefix" ]] || return 0
+
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$mgmt_ip" "$prefix" <<'PY'
+import sys, ipaddress
+print(str(ipaddress.ip_interface(f"{sys.argv[1]}/{sys.argv[2]}").network))
+PY
+  fi
+}
+
 replace_env_file() {
   local next_cidrs="$1"
   local managed_cidrs="$2"
@@ -197,7 +221,8 @@ current_file="$(mktemp)"
 manual_file="$(mktemp)"
 nodes_file="$(mktemp)"
 next_file="$(mktemp)"
-trap 'rm -f "$previous_file" "$current_file" "$manual_file" "$nodes_file" "$next_file"' EXIT
+mgmt_file="$(mktemp)"
+trap 'rm -f "$previous_file" "$current_file" "$manual_file" "$nodes_file" "$next_file" "$mgmt_file"' EXIT
 
 previous_managed_cidrs >"$previous_file"
 current_trusted_cidrs >"$current_file"
@@ -218,12 +243,20 @@ if [[ ! -s "$manual_file" ]]; then
   printf '%s\n' "$DEFAULT_MANAGER_API_TRUSTED_CIDRS" | split_csv >"$manual_file"
 fi
 
+management_lan_cidr >"$mgmt_file"
+if [[ -s "$mgmt_file" ]]; then
+  cat "$mgmt_file" >>"$manual_file"
+fi
+
 cat "$manual_file" "$nodes_file" | awk '!seen[$0]++' >"$next_file"
 next_cidrs="$(join_csv_file "$next_file")"
 managed_cidrs="$(join_csv_file "$nodes_file")"
 
 replace_env_file "$next_cidrs" "$managed_cidrs"
 log "updated manager-api trusted sources with Talos node CIDRs: ${managed_cidrs}"
+if [[ -s "$mgmt_file" ]]; then
+  log "updated manager-api trusted sources with management VM LAN CIDR: $(join_csv_file "$mgmt_file")"
+fi
 
 if [[ "$SKIP_FIREWALL" -ne 1 ]]; then
   apply_firewall

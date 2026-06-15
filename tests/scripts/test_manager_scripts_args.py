@@ -36,6 +36,9 @@ TERMIX_EXTERNALSECRET = REPO_ROOT / "gitops" / "platform-apps" / "termix" / "ext
 TERMIX_INGRESSROUTE = REPO_ROOT / "gitops" / "platform-apps" / "termix" / "ingressroute.yaml"
 TERMIX_APP_MANIFEST = REPO_ROOT / "gitops" / "apps" / "termix.yaml"
 TERMIX_NAMESPACE = REPO_ROOT / "gitops" / "platform-apps" / "termix" / "namespace.yaml"
+BESZEL_STEP_SCRIPT = (
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-beszel" / "run.sh"
+)
 PROMETHEUS_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-prometheus.sh"
 RECONCILE_OBSERVABILITY_SCRIPT = REPO_ROOT / "scripts" / "manager" / "reconcile-observability.sh"
 TRAEFIK_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-traefik-manager.sh"
@@ -4434,6 +4437,8 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert 'keyType: "auto"' in setup_text
     assert "credentialId: ($credential_id | tonumber? // $credential_id)" in setup_text
     assert "share_termix_host_with_browser_role" in setup_text
+    assert "ensure_browser_ssh_role_for_admins" in setup_text
+    assert ".isAdmin == true" in setup_text
     assert "enableTerminal: true" in setup_text
     assert "showTerminalInSidebar: true" in setup_text
     assert "enableSsh: true" in setup_text
@@ -4969,3 +4974,14 @@ def test_netbird_cloud_init_uses_exact_netbird_cert_and_tcp_passthrough():
     assert "traefik.http.serverstransports.proxy-insecure" not in text
     assert "NB_PROXY_ACME_CERTIFICATES" in text
     assert '"true"' in text
+
+
+def test_beszel_install_configures_pocketbase_oauth_options():
+    beszel_text = BESZEL_STEP_SCRIPT.read_text(encoding="utf-8")
+
+    assert "oauth2: {" in beszel_text
+    assert "enabled: true" in beszel_text
+    assert "providers: [" in beszel_text
+    assert "allowOAuth2" not in beszel_text
+    assert "enabledOAuth2Providers" not in beszel_text
+    assert "userInfoUrl: $userinfo_url" in beszel_text

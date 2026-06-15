@@ -31,6 +31,19 @@ def _write_fake_kubectl(tmp_path: Path, node_ips: list[str]) -> Path:
     return kubectl
 
 
+def _write_fake_ip(tmp_path: Path, mgmt_ip: str, prefix: int) -> Path:
+    ip_script = tmp_path / "ip"
+    ip_script.write_text(
+        f"#!/usr/bin/env bash\n"
+        f'if [[ "$*" == "-o -f inet addr show" ]]; then\n'
+        f"  echo '2: eth0    inet {mgmt_ip}/{prefix} brd {mgmt_ip.rsplit('.', 1)[0]}.255 scope global eth0'\n"
+        f"fi\n",
+        encoding="utf-8",
+    )
+    ip_script.chmod(0o755)
+    return ip_script
+
+
 def _run_sync(tmp_path: Path, env_file: Path, node_ips: list[str]) -> str:
     kubeconfig = tmp_path / "kubeconfig"
     kubeconfig.write_text("fake\n", encoding="utf-8")
@@ -145,3 +158,43 @@ def test_sync_manager_api_node_allowlist_missing_kubeconfig_is_noop(tmp_path):
 
     assert "kubeconfig not found" in result.stderr
     assert env_file.read_text(encoding="utf-8") == f"MANAGER_API_TRUSTED_CIDRS={BASE_CIDRS}\n"
+
+
+def test_sync_manager_api_node_allowlist_adds_management_lan_cidr(tmp_path):
+    env_file = tmp_path / ".env"
+    env_file.write_text(f"MANAGER_API_TRUSTED_CIDRS={BASE_CIDRS}\n", encoding="utf-8")
+
+    _write_fake_ip(tmp_path, "203.0.113.5", 24)
+    kubectl = _write_fake_kubectl(tmp_path, ["192.168.2.234"])
+    kubeconfig = tmp_path / "kubeconfig"
+    kubeconfig.write_text("fake\n", encoding="utf-8")
+
+    env = {
+        **os.environ,
+        "KUBECTL_BIN": str(kubectl),
+        "KUBECONFIG": str(kubeconfig),
+        "MANAGEMENT_VM_IP": "203.0.113.5",
+        "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}",
+    }
+    result = subprocess.run(
+        [
+            "bash",
+            str(SCRIPT),
+            "--env-file",
+            str(env_file),
+            "--workspace-root",
+            str(tmp_path),
+            "--skip-firewall",
+            "--skip-restart",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    assert "management VM LAN CIDR" in result.stderr
+    text = env_file.read_text(encoding="utf-8")
+    assert "203.0.113.0/24" in text
+    assert "192.168.2.234/32" in text
