@@ -20,6 +20,17 @@ class TestTermixOpksshRedirect(unittest.TestCase):
             text,
         )
 
+    def test_opkssh_oauth_redirect_forwards_state_cookie(self):
+        text = TERMIX_CONFIGMAP.read_text(encoding="utf-8")
+
+        self.assertIn("function rewriteOPKSSHCallbackCookies(value)", text)
+        self.assertIn('const setCookieHeader = response.headers["set-cookie"];', text)
+        self.assertIn(
+            'res.setHeader("set-cookie", rewriteOPKSSHCallbackCookies(setCookieHeader));',
+            text,
+        )
+        self.assertIn("res.setHeader(key, rewriteOPKSSHCallbackCookies(value));", text)
+
     def test_opkssh_provider_redirect_uri_stays_strict_https(self):
         text = OPKSSH_SETUP.read_text(encoding="utf-8")
 

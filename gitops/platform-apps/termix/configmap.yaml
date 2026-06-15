@@ -4414,6 +4414,20 @@ data:
         });
         return html;
     }
+    function rewriteOPKSSHCallbackCookies(value) {
+        // Rewrite cookies from OPKSSH's internal listener so they are scoped
+        // to the Termix proxy path instead of OPKSSH's internal path.
+        // The state cookie set by /login must survive to /login-callback.
+        const cookies = Array.isArray(value) ? value : [value];
+        return cookies.map((cookie) => {
+            return cookie
+                .replace(/;\s*domain=[^;]*/gi, "")
+                .replace(/;\s*path=[^;]*/gi, "; Path=/host/opkssh-callback/")
+                .concat(cookie.match(/;\s*path=/i)
+                ? ""
+                : "; Path=/host/opkssh-callback/");
+        });
+    }
     /**
      * @openapi
      * /host/opkssh-chooser/{requestId}:
@@ -4650,6 +4664,10 @@ data:
                         })();
                     if (isExternalRedirect) {
                         const oauthUrl = response.location;
+                        const setCookieHeader = response.headers["set-cookie"];
+                        if (setCookieHeader) {
+                            res.setHeader("set-cookie", rewriteOPKSSHCallbackCookies(setCookieHeader));
+                        }
                         try {
                             const parsed = new URL(oauthUrl);
                             const oauthState = parsed.searchParams.get("state");
@@ -4798,19 +4816,7 @@ data:
                     }
                 }
                 else if (key.toLowerCase() === "set-cookie") {
-                    // Rewrite cookies from OPKSSH's internal listener so they are scoped
-                    // to the Termix proxy path instead of OPKSSH's internal path.
-                    // The state cookie set by /login must survive to /login-callback.
-                    const cookies = Array.isArray(value) ? value : [value];
-                    const rewritten = cookies.map((cookie) => {
-                        return cookie
-                            .replace(/;\s*domain=[^;]*/gi, "")
-                            .replace(/;\s*path=[^;]*/gi, "; Path=/host/opkssh-callback/")
-                            .concat(cookie.match(/;\s*path=/i)
-                            ? ""
-                            : "; Path=/host/opkssh-callback/");
-                    });
-                    res.setHeader(key, rewritten);
+                    res.setHeader(key, rewriteOPKSSHCallbackCookies(value));
                 }
                 else {
                     res.setHeader(key, value);

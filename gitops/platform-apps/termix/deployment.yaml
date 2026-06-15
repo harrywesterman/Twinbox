@@ -17,7 +17,7 @@ spec:
       labels:
         app.kubernetes.io/name: termix
       annotations:
-        twinbox.dev/termix-patch-revision: "2026-06-15-opkssh-https-redirect"
+        twinbox.dev/termix-patch-revision: "2026-06-15-opkssh-https-redirect-cookie"
     spec:
       securityContext:
         fsGroup: 1000
