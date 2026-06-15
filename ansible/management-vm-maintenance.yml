@@ -168,8 +168,16 @@
             group: opksshuser
             mode: "0640"
             content: |
-              {{ opkssh_issuer_url }} {{ opkssh_client_id }} 16h
+              {{ opkssh_issuer_url }} {{ opkssh_client_id }} 24h
           notify: Restart ssh
+
+        - name: Ensure opkssh verifier log is writable by AuthorizedKeysCommand user
+          ansible.builtin.file:
+            path: /var/log/opkssh.log
+            state: touch
+            owner: root
+            group: opksshuser
+            mode: "0660"
 
         - name: Render /etc/opk/auth_id
           ansible.builtin.copy:
@@ -201,6 +209,7 @@
           ansible.builtin.command:
             cmd: /usr/local/bin/opkssh audit
           changed_when: false
+          failed_when: false
 
     - name: Configure management VM time synchronization
       ansible.builtin.copy:

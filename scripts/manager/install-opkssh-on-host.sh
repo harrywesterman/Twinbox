@@ -18,6 +18,7 @@ Environment variables:
   OPKSSH_ISSUER_URL   Authentik issuer URL for the opkssh application
   OPKSSH_CLIENT_ID    Authentik client ID for the opkssh application
   OPKSSH_PRINCIPAL    Linux user that Authentik admins may SSH as (default: derived from --user)
+  OPKSSH_EXPIRATION_POLICY  OPKSSH provider expiration policy (default: 24h)
   OPKSSH_VERSION      opkssh release version (default: ${OPKSSH_VERSION})
   OPKSSH_SHA256       Expected SHA256 of the binary (default: ${OPKSSH_SHA256})
 EOF
@@ -57,6 +58,11 @@ done
 [[ -n "${OPKSSH_CLIENT_ID:-}" ]] || fail "OPKSSH_CLIENT_ID is required"
 
 principal="${OPKSSH_PRINCIPAL:-$user}"
+expiration_policy="${OPKSSH_EXPIRATION_POLICY:-24h}"
+case "$expiration_policy" in
+  12h|24h|48h|1week|oidc|oidc-refreshed) ;;
+  *) fail "OPKSSH_EXPIRATION_POLICY must be one of: 12h, 24h, 48h, 1week, oidc, oidc-refreshed" ;;
+esac
 
 ssh_args=(
   -o "StrictHostKeyChecking=accept-new"
@@ -75,9 +81,10 @@ set -euo pipefail
 
 OPKSSH_VERSION="${OPKSSH_VERSION}"
 OPKSSH_SHA256="${OPKSSH_SHA256}"
-ISSUER_URL="${OPKSSH_ISSUER_URL%/}"
+ISSUER_URL="${OPKSSH_ISSUER_URL}"
 CLIENT_ID="${OPKSSH_CLIENT_ID}"
 PRINCIPAL="${principal}"
+EXPIRATION_POLICY="${expiration_policy}"
 
 if [[ "\$(id -u)" -eq 0 ]]; then
   SUDO=""
@@ -109,13 +116,16 @@ if ! id -u opksshuser >/dev/null 2>&1; then
   \${SUDO} groupadd -r opksshuser || true
   \${SUDO} useradd -r -g opksshuser -s /usr/sbin/nologin -d /var/lib/opksshuser -m opksshuser || true
 fi
+\${SUDO} touch /var/log/opkssh.log
+\${SUDO} chown root:opksshuser /var/log/opkssh.log
+\${SUDO} chmod 0660 /var/log/opkssh.log
 
 \${SUDO} mkdir -p /etc/opk
 \${SUDO} chown root:opksshuser /etc/opk
 \${SUDO} chmod 0750 /etc/opk
 
 \${SUDO} tee /etc/opk/providers >/dev/null <<EOF
-\${ISSUER_URL} \${CLIENT_ID} 16h
+\${ISSUER_URL} \${CLIENT_ID} \${EXPIRATION_POLICY}
 EOF
 \${SUDO} chown root:opksshuser /etc/opk/providers
 \${SUDO} chmod 0640 /etc/opk/providers
@@ -140,7 +150,9 @@ fi
 
 echo "Verifying opkssh installation..."
 /usr/local/bin/opkssh verify --help >/dev/null
-\${SUDO} /usr/local/bin/opkssh audit
+if ! \${SUDO} /usr/local/bin/opkssh audit; then
+  echo "WARN: opkssh audit failed; continuing because verify requires the provider issuer to match the OIDC issuer exactly." >&2
+fi
 REMOTE
 
 log "opkssh installation complete on ${user}@${host}"

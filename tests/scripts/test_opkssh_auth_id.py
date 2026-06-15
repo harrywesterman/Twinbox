@@ -1,7 +1,7 @@
 import re
 import unittest
 
-AUTH_ID_RE = re.compile(r"^(\S+)\s+(oidc:groups:\S+|\S+)\s+(https://.*/)$")
+AUTH_ID_RE = re.compile(r"^(\S+)\s+(oidc:groups:\S+|\S+)\s+(https://\S+)$")
 
 
 class TestOpksshAuthId(unittest.TestCase):
@@ -13,12 +13,12 @@ class TestOpksshAuthId(unittest.TestCase):
         line = "root oidc:groups:admins https://authentik.example.com/application/o/opkssh/"
         self.assertTrue(AUTH_ID_RE.match(line))
 
-    def test_invalid_missing_trailing_slash(self):
-        line = "twinbox oidc:groups:admins https://authentik.example.com/application/o/opkssh"
-        self.assertFalse(AUTH_ID_RE.match(line))
+    def test_generic_issuer_without_trailing_slash(self):
+        line = "twinbox oidc:groups:admins https://accounts.google.com"
+        self.assertTrue(AUTH_ID_RE.match(line))
 
     def test_invalid_principal(self):
-        line = " oidc:groups:admins https://authentik.example.com/application/o/opkssh/"
+        line = " oidc:groups:admins https://authentik.example.com/application/o/opkssh"
         self.assertFalse(AUTH_ID_RE.match(line))
 
 

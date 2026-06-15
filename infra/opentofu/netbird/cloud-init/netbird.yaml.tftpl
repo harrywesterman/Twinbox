@@ -672,8 +672,11 @@ runcmd:
     groupadd -r opksshuser || true
     useradd -r -g opksshuser -s /usr/sbin/nologin -d /var/lib/opksshuser -m opksshuser || true
     mkdir -p /etc/opk
+    touch /var/log/opkssh.log
+    chown root:opksshuser /var/log/opkssh.log
+    chmod 0660 /var/log/opkssh.log
     cat > /etc/opk/providers <<EOF
-    ${opkssh_issuer_url} ${opkssh_client_id} 16h
+    ${opkssh_issuer_url} ${opkssh_client_id} 24h
     EOF
     cat > /etc/opk/auth_id <<EOF
     root oidc:groups:admins ${opkssh_issuer_url}
@@ -687,6 +690,6 @@ runcmd:
     SSHD
     systemctl restart sshd || true
     /usr/local/bin/opkssh verify --help >/dev/null
-    /usr/local/bin/opkssh audit
+    /usr/local/bin/opkssh audit || true
 %{ endif }
   - /root/bootstrap-netbird.sh
