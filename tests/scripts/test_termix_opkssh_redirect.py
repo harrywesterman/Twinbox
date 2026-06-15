@@ -24,7 +24,9 @@ class TestTermixOpksshRedirect(unittest.TestCase):
         text = TERMIX_CONFIGMAP.read_text(encoding="utf-8")
 
         self.assertIn("function rewriteOPKSSHCallbackCookies(value)", text)
-        self.assertIn('const setCookieHeader = response.headers["set-cookie"];', text)
+        self.assertIn('const setCookieHeader = r.headers["set-cookie"];', text)
+        self.assertIn("setCookieHeader,", text)
+        self.assertIn("const setCookieHeader = response.setCookieHeader;", text)
         self.assertIn(
             'res.setHeader("set-cookie", rewriteOPKSSHCallbackCookies(setCookieHeader));',
             text,

@@ -4563,10 +4563,12 @@ data:
                     const ctHeader = r.headers["content-type"];
                     const ctRaw = Array.isArray(ctHeader) ? ctHeader[0] : ctHeader;
                     const contentType = typeof ctRaw === "string" ? ctRaw : "";
+                    const setCookieHeader = r.headers["set-cookie"];
                     const body = typeof r.data === "string" ? r.data : String(r.data ?? "");
                     return {
                         status: r.status,
                         location: typeof location === "string" ? location : undefined,
+                        setCookieHeader,
                         contentType,
                         body,
                         targetUrl: url,
@@ -4664,7 +4666,7 @@ data:
                         })();
                     if (isExternalRedirect) {
                         const oauthUrl = response.location;
-                        const setCookieHeader = response.headers["set-cookie"];
+                        const setCookieHeader = response.setCookieHeader;
                         if (setCookieHeader) {
                             res.setHeader("set-cookie", rewriteOPKSSHCallbackCookies(setCookieHeader));
                         }
