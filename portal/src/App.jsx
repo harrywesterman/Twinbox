@@ -2821,6 +2821,7 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
   const [statusBusy, setStatusBusy] = useState(false);
   const [passwordlessResetBusy, setPasswordlessResetBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [mailboxBusy, setMailboxBusy] = useState(false);
   const [formError, setFormError] = useState("");
   const [temporaryPassword, setTemporaryPassword] = useState(null);
 
@@ -3026,6 +3027,26 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
       setFormError(error instanceof Error ? error.message : "Failed to delete user.");
     } finally {
       setDeleteBusy(false);
+    }
+  };
+
+  const handleCreateMailbox = async () => {
+    if (!viewModel.selectedUser || !viewModel.selectedUser.email) {
+      return;
+    }
+
+    setMailboxBusy(true);
+    setFormError("");
+    try {
+      await requestJson(
+        `/api/admin/users/${encodeURIComponent(viewModel.selectedUser.id)}/create-mailbox`,
+        { method: "POST" }
+      );
+      setFormError(`${viewModel.selectedUser.email} mailbox is ready.`);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Failed to create mailbox.");
+    } finally {
+      setMailboxBusy(false);
     }
   };
 
@@ -3322,6 +3343,22 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
                   Removes existing passkeys and issues a new one-time onboarding password.
                 </span>
               </div>
+
+              {viewModel.selectedUser.email ? (
+                <div className="hero-actions user-admin-status-actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={handleCreateMailbox}
+                    disabled={mailboxBusy}
+                  >
+                    {mailboxBusy ? "Creating mailbox…" : "Create Mailu mailbox"}
+                  </button>
+                  <span className="muted-copy">
+                    Creates a mailbox for {viewModel.selectedUser.email} on the cluster Mailu server.
+                  </span>
+                </div>
+              ) : null}
 
               <div className="hero-actions user-admin-status-actions">
                 <button
