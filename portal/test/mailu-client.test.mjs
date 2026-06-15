@@ -74,7 +74,7 @@ test("createRandomMailboxPassword returns 48 hex chars", async () => {
   assert.notEqual(pwd, pwd2);
 });
 
-test("resolveMailuApiConfig returns correct base URL and token", async () => {
+test("resolveMailuApiConfig returns correct base URL and token with explicit env", async () => {
   process.env.MAILU_API_BASE_URL = "https://mail.test.example/api";
   process.env.MAILU_API_TOKEN = "test-token-abc";
   const { resolveMailuApiConfig } = await importMailuClient();
@@ -83,6 +83,28 @@ test("resolveMailuApiConfig returns correct base URL and token", async () => {
   assert.equal(cfg.token, "test-token-abc");
   delete process.env.MAILU_API_TOKEN;
   delete process.env.MAILU_API_BASE_URL;
+});
+
+test("resolveMailuApiConfig derives base URL from PORTAL_BASE_URL when MAILU_API_BASE_URL is unset", async () => {
+  process.env.PORTAL_BASE_URL = "https://portal.bierineenweek.nl";
+  process.env.MAILU_API_TOKEN = "test-token-abc";
+  delete process.env.MAILU_API_BASE_URL;
+  const { resolveMailuApiConfig } = await importMailuClient();
+  const cfg = resolveMailuApiConfig();
+  assert.equal(cfg.baseUrl, "https://mail.bierineenweek.nl/api/v1");
+  assert.equal(cfg.token, "test-token-abc");
+  delete process.env.MAILU_API_TOKEN;
+  delete process.env.PORTAL_BASE_URL;
+});
+
+test("resolveMailuApiConfig returns empty baseUrl when nothing is set", async () => {
+  delete process.env.MAILU_API_BASE_URL;
+  delete process.env.PORTAL_BASE_URL;
+  delete process.env.MAILU_API_TOKEN;
+  const { resolveMailuApiConfig } = await importMailuClient();
+  const cfg = resolveMailuApiConfig();
+  assert.equal(cfg.baseUrl, "/v1");
+  assert.equal(cfg.token, "");
 });
 
 test("isMailuInstalled returns true when token is set", async () => {

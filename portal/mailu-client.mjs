@@ -5,10 +5,20 @@ export function createRandomMailboxPassword() {
 }
 
 export function resolveMailuApiConfig() {
-  const baseUrl = String(process.env.MAILU_API_BASE_URL || "").trim();
+  const explicitBaseUrl = String(process.env.MAILU_API_BASE_URL || "").trim();
   const token = String(process.env.MAILU_API_TOKEN || "").trim();
+
+  let baseUrl = explicitBaseUrl;
+  if (!baseUrl) {
+    const portalBaseUrl = String(process.env.PORTAL_BASE_URL || "").trim();
+    if (portalBaseUrl) {
+      const zone = portalBaseUrl.replace(/^https?:\/\/portal\./, "");
+      baseUrl = `https://mail.${zone}/api`;
+    }
+  }
+
   return {
-    baseUrl: baseUrl.replace(/\/+$/, "") + "/v1",
+    baseUrl: (baseUrl || "").replace(/\/+$/, "") + "/v1",
     token,
   };
 }
