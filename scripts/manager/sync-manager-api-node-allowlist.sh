@@ -198,9 +198,7 @@ apply_firewall() {
     return 0
   fi
 
-  # shellcheck disable=SC1090
-  set -a; source "$ENV_FILE"; set +a
-  "$firewall_script"
+  MANAGER_API_TRUSTED_CIDRS="$next_cidrs" "$firewall_script"
 }
 
 restart_manager_api() {

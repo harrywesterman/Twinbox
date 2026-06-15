@@ -4982,6 +4982,7 @@ def test_beszel_install_configures_pocketbase_oauth_options():
     assert "oauth2: {" in beszel_text
     assert "enabled: true" in beszel_text
     assert "providers: [" in beszel_text
+    assert ".oauth2 = $oauth.oauth2" in beszel_text
     assert "allowOAuth2" not in beszel_text
     assert "enabledOAuth2Providers" not in beszel_text
     assert "userInfoUrl: $userinfo_url" in beszel_text

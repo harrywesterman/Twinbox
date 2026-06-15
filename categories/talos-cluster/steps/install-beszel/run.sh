@@ -501,7 +501,7 @@ if [[ -n "$existing_collection" ]]; then
         }
       }'
   )"
-  updated_options="$(jq --argjson oauth "$oauth_options" '.options |= (. // {}) + $oauth' <<<"$existing_collection")"
+  updated_options="$(jq --argjson oauth "$oauth_options" '.oauth2 = $oauth.oauth2' <<<"$existing_collection")"
   beszel_api_write PATCH "/api/collections/users" "$updated_options" >/dev/null || \
     log "WARNING: Failed to configure OIDC provider in Beszel PocketBase"
 fi
