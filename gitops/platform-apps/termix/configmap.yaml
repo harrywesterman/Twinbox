@@ -153,6 +153,12 @@ data:
         }
         return { ok: true };
     }
+    function normalizeRemoteRedirectOrigin(requestOrigin) {
+        if (process.env.OIDC_FORCE_HTTPS === "true") {
+            return requestOrigin.replace(/^http:/, "https:");
+        }
+        return requestOrigin;
+    }
     export async function startOPKSSHAuth(userId, hostId, hostname, ws, requestOrigin) {
         try {
             await ensureOPKConfigDir();
@@ -196,13 +202,15 @@ data:
             return "";
         }
         const requestId = randomUUID();
-        const remoteRedirectUri = `${requestOrigin}${OPKSSH_CALLBACK_PATH}`;
+        const remoteRedirectOrigin = normalizeRemoteRedirectOrigin(requestOrigin);
+        const remoteRedirectUri = `${remoteRedirectOrigin}${OPKSSH_CALLBACK_PATH}`;
         sshLogger.info("Starting OPKSSH auth session", {
             operation: "opkssh_start_auth_remote_redirect_uri",
             requestId,
             userId,
             hostId,
             requestOrigin,
+            remoteRedirectOrigin,
             remoteRedirectUri,
             providerAliases: (configCheck.providers || []).map((p) => p.alias),
         });
