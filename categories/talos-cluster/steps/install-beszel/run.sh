@@ -455,6 +455,11 @@ application_uuid="$(jq -r '.pk // .uuid // .id // empty' <<<"$application_json")
 [[ -n "$application_uuid" ]] || fail "Could not determine Authentik application UUID for Beszel"
 ensure_group_binding "$application_uuid" "$admins_group_id"
 
+# Fix: default email scope mapping returns email_verified: False, which
+# causes PocketBase to reject OAuth2 logins because the email field is
+# required but never populated. Patch it to return email_verified: True.
+authentik_ensure_email_verified_true
+
 beszel_oidc_secret_file="$(mktemp "${TMPDIR:-/tmp}/beszel-oidc-XXXXXX")"
 tmp_files+=("$beszel_oidc_secret_file")
 cat >"$beszel_oidc_secret_file" <<EOF
