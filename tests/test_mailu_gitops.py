@@ -50,9 +50,9 @@ def test_mailu_values_keep_mail_ports_internal_and_set_resources():
     assert values["persistence"]["accessModes"] == ["ReadWriteOnce"]
     assert values["tika"]["enabled"] is False
 
-    assert values["proxyAuth"]["create"] == "false"
-    assert values["proxyAuth"]["header"] == ""
-    assert values["proxyAuth"]["whitelist"] == ""
+    assert values["proxyAuth"]["create"] == "true"
+    assert values["proxyAuth"]["header"] == "X-authentik-email"
+    assert values["proxyAuth"]["whitelist"] == "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
 
     for component in ("front", "admin", "postfix", "dovecot", "rspamd", "clamav", "webmail"):
         resources = values[component]["resources"]
@@ -124,7 +124,7 @@ def test_mailu_ingressroutes_target_mailu_front_only():
         service = route["services"][0]
         assert service["name"] == "mailu-front"
         assert service["port"] == 80
-        assert route.get("middlewares") is None
+        assert route["middlewares"] == [{"name": "authentik-forwardauth"}]
 
 
 def test_external_dns_allows_mx_records():
@@ -220,7 +220,9 @@ def test_mailu_installer_uses_private_relay_and_pre_dns_preflights():
     script = (REPO_ROOT / "categories" / "apps" / "steps" / "install-mailu" / "run.sh").read_text(
         encoding="utf-8"
     )
-    assert ".NETBIRD_RELAY_HOST // .NETBIRD_PRIVATE_IP // empty" in script
+    assert "NETBIRD_RELAY_HOST" in script.split("mailu_relay_host=", 1)[1].splitlines()[0]
+    assert "NETBIRD_PRIVATE_IP" in script
+    assert "awk" in script and "match" in script
     assert ".NETBIRD_IP // empty" not in script.split("mailu_relay_host=", 1)[1].splitlines()[0]
     assert "Refusing to use public bastion IP as Mailu relay host" in script
     assert "netbird-mailu-relay-egress NB_SETUP_KEY" in script
