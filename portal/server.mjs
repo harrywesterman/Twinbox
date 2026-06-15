@@ -13,7 +13,7 @@ import {
   normalizeManageableGroupsConfig,
   normalizeRequestedGroupNames,
 } from "./authentik-admin.mjs";
-import { createRandomMailboxPassword, isMailuInstalled, mailuCreateMailbox } from "./src/mailu-client.mjs";
+import { createRandomMailboxPassword, isMailuInstalled, mailuCreateMailbox } from "./mailu-client.mjs";
 
 const app = express();
 const port = Number(process.env.PORT || 8080);

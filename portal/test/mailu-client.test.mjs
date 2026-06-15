@@ -51,7 +51,7 @@ function startMailuMock() {
 }
 
 async function importMailuClient() {
-  const moduleUrl = `${pathToFileURL(path.join(repoRoot, "portal", "src", "mailu-client.mjs")).href}?test=${Date.now()}`;
+  const moduleUrl = `${pathToFileURL(path.join(repoRoot, "portal", "mailu-client.mjs")).href}?test=${Date.now()}`;
   return import(moduleUrl);
 }
 
