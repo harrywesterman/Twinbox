@@ -1459,6 +1459,48 @@ app.post("/api/admin/users", async (req, res) => {
   }
 });
 
+app.post("/api/admin/users/:userId/create-mailbox", async (req, res) => {
+  const session = requirePortalCapability(
+    req, res, "canManageUsers", "user management access required"
+  );
+  if (!session) return;
+
+  try {
+    if (!isMailuInstalled()) {
+      return res.status(400).json({ error: "Mailu is not installed" });
+    }
+
+    const config = await loadPortalConfig();
+    const directory = await loadUserAdminDirectory(config);
+    const user = directory.users.find(
+      (u) => u.id === req.params.userId || u.pk === req.params.userId
+    );
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    if (!user.email) {
+      return res.status(400).json({ error: "User has no email address" });
+    }
+
+    const mailboxPassword = createRandomMailboxPassword();
+    const result = await mailuCreateMailbox({
+      email: user.email,
+      rawPassword: mailboxPassword,
+      displayedName: user.name || user.username,
+    });
+
+    if (result.ok) {
+      res.json({ ok: true, email: user.email });
+    } else if (result.reason === "already-exists") {
+      res.json({ ok: true, email: user.email, note: "Mailbox already exists" });
+    } else {
+      res.status(500).json({ error: `Failed to create mailbox: ${result.reason}` });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+  }
+});
+
 app.post("/api/admin/users/:userId/restart-passwordless-onboarding", async (req, res) => {
   const session = requirePortalCapability(
     req,
