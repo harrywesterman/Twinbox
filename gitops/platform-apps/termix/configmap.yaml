@@ -1,0 +1,8 @@
+apiVersion: v1
+data:
+  opkssh-auth.js: |
+$(cat /tmp/opkssh-auth-v231-patched.js | sed 's/^/    /')
+kind: ConfigMap
+metadata:
+  name: termix-patch
+  namespace: termix
