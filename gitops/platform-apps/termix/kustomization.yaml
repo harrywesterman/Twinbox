@@ -6,6 +6,5 @@ resources:
   - externalsecret.yaml
   - pvc.yaml
   - service.yaml
-  - configmap.yaml
   - deployment.yaml
   - ingressroute.yaml

@@ -23,8 +23,8 @@ spec:
           type: RuntimeDefault
       containers:
         - name: termix
-          image: ghcr.io/lukegus/termix:latest
-          imagePullPolicy: Always
+          image: ghcr.io/lukegus/termix:release-2.3.1
+          imagePullPolicy: IfNotPresent
           ports:
             - name: http
               containerPort: 4090
@@ -61,10 +61,6 @@ spec:
             - name: opkssh-config
               mountPath: /app/data/.opk/config.yml
               subPath: config.yml
-              readOnly: true
-            - name: termix-patch
-              mountPath: /app/dist/backend/backend/ssh/opkssh-auth.js
-              subPath: opkssh-auth.js
               readOnly: true
           readinessProbe:
             httpGet:
@@ -190,6 +186,3 @@ spec:
             items:
               - key: config.yml
                 path: config.yml
-        - name: termix-patch
-          configMap:
-            name: termix-patch
