@@ -112,19 +112,25 @@ def test_mailu_ingressroutes_target_mailu_front_only():
         yaml.safe_load_all((MAILU_PLATFORM_DIR / "ingressroute.yaml").read_text(encoding="utf-8"))
     )
     names = {doc["metadata"]["name"] for doc in docs}
-    assert names == {"mailu", "mailu-netbird"}
+    assert names == {"mailu", "mailu-netbird", "mailu-webmail-root"}
 
     for doc in docs:
         routes = doc["spec"]["routes"]
-        assert len(routes) == 1
+        assert 1 <= len(routes) <= 2
 
-        route = routes[0]
-        assert route["kind"] == "Rule"
-        assert "Host(`mail.__ZONE_NAME__`)" in route["match"]
-        service = route["services"][0]
-        assert service["name"] == "mailu-front"
-        assert service["port"] == 80
-        assert route["middlewares"] == [{"name": "authentik-forwardauth"}]
+        for route in routes:
+            assert route["kind"] == "Rule"
+            service = route["services"][0]
+            assert service["name"] == "mailu-front"
+            assert service["port"] == 80
+
+        webmail_routes = [r for r in routes if "/webmail" in r.get("match", "")]
+        for route in webmail_routes:
+            assert route["middlewares"] == [{"name": "authentik-forwardauth"}]
+
+        non_webmail = [r for r in routes if "/webmail" not in r.get("match", "")]
+        for route in non_webmail:
+            assert route.get("middlewares") is None
 
 
 def test_external_dns_allows_mx_records():

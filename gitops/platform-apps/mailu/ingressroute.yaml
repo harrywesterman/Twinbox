@@ -8,9 +8,15 @@ spec:
     - websecure
   routes:
     - kind: Rule
-      match: Host(`mail.__ZONE_NAME__`)
+      match: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
       middlewares:
         - name: authentik-forwardauth
+      services:
+        - kind: Service
+          name: mailu-front
+          port: 80
+    - kind: Rule
+      match: Host(`mail.__ZONE_NAME__`)
       services:
         - kind: Service
           name: mailu-front
@@ -27,10 +33,35 @@ spec:
     - webnetbird
   routes:
     - kind: Rule
-      match: Host(`mail.__ZONE_NAME__`)
+      match: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
       middlewares:
         - name: authentik-forwardauth
       services:
         - kind: Service
           name: mailu-front
           port: 80
+    - kind: Rule
+      match: Host(`mail.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: mailu-front
+          port: 80
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: mailu-webmail-root
+  namespace: mailu
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`__ZONE_NAME__`) && PathPrefix(`/webmail`)
+      middlewares:
+        - name: authentik-forwardauth
+      services:
+        - kind: Service
+          name: mailu-front
+          port: 80
+  tls: {}
