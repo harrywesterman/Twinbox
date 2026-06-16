@@ -40,6 +40,9 @@ spec:
             patch: |-
               - op: replace
                 path: /spec/routes/0/match
+                value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
+              - op: replace
+                path: /spec/routes/1/match
                 value: Host(`mail.__ZONE_NAME__`)
           - target:
               kind: IngressRoute
@@ -47,7 +50,17 @@ spec:
             patch: |-
               - op: replace
                 path: /spec/routes/0/match
+                value: Host(`mail.__ZONE_NAME__`) && PathPrefix(`/webmail`)
+              - op: replace
+                path: /spec/routes/1/match
                 value: Host(`mail.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: mailu-webmail-root
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`__ZONE_NAME__`) && PathPrefix(`/webmail`)
   destination:
     server: https://kubernetes.default.svc
     namespace: mailu
