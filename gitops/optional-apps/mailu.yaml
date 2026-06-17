@@ -78,9 +78,6 @@ spec:
                 patch: |-
                   - op: replace
                     path: /spec/routes/0/match
-                    value: Host(`mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/webmail`)
-                  - op: replace
-                    path: /spec/routes/1/match
                     value: Host(`mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
               - target:
                   kind: IngressRoute
@@ -88,9 +85,6 @@ spec:
                 patch: |-
                   - op: replace
                     path: /spec/routes/0/match
-                    value: Host(`mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/webmail`)
-                  - op: replace
-                    path: /spec/routes/1/match
                     value: Host(`mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
       destination:
         server: https://kubernetes.default.svc
