@@ -173,6 +173,11 @@ def test_beszel_step_uses_hub_public_key_and_universal_token_secret():
     assert 'source "$WORKSPACE_ROOT/scripts/manager/management-ip.sh"' in text
     assert "ensure_beszel_superuser" in text
     assert "/api/collections/_superusers/auth-with-password" in text
+    assert "cluster_scope_id=" in text
+    assert "read_first_admin_email" in text
+    assert "create-users-and-groups.json" in text
+    assert "beszel_upsert_user" in text
+    assert "Ensuring Beszel user for the first Authentik admin" in text
     assert 'matching_mode: "strict"' in text
     assert "url: $redirect_uri" in text
     assert 'redirect_uri_type: "authorization"' in text
@@ -181,6 +186,14 @@ def test_beszel_step_uses_hub_public_key_and_universal_token_secret():
     assert 'beszel_api_get "/api/beszel/info"' in text
     assert "upsert_beszel_universal_token" in text
     assert "/api/collections/universal_tokens/records" in text
+    assert "sync_beszel_system_users" in text
+    assert "/api/collections/users/records?perPage=500" in text
+    assert "/api/collections/systems/records?perPage=500" in text
+    assert 'PATCH "/api/collections/systems/records/${system_id}"' in text
+    assert "Reconciling Beszel user access to systems" in text
+    assert text.index("Starting Beszel Management VM agent") < text.index(
+        "Reconciling Beszel user access to systems"
+    )
     assert "openssl rand -hex 32" in text
     assert '"hub_url": "$beszel_app_url"' in text
     assert "configure-bastion-beszel-agent.sh" in text

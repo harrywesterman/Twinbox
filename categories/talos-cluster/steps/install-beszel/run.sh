@@ -38,6 +38,7 @@ urlencode() {
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
+cluster_scope_id="$(printf '%s' "$cluster_json" | jq -r '.cluster_instance_id // .instance_id // .id // empty')"
 cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty')"
 
 [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
@@ -51,6 +52,7 @@ beszel_local_url="${BESZEL_LOCAL_URL:-http://beszel:8090}"
 beszel_user_email="beszel-admin@${public_zone_name}"
 beszel_version="${BESZEL_VERSION:-${PINNED_BESZEL_VERSION:-0.18.7}}"
 env_file="${TWINBOX_HOST_RUNTIME_DIR:-/host/opt/twinbox}/.env"
+manager_data_dir="${MANAGER_DATA_DIR:-/data}"
 management_consoles_dir="$WORKSPACE_ROOT/gitops/platform/management-consoles"
 
 log "Installing Beszel Monitoring for zone: ${public_zone_name}"
@@ -197,6 +199,27 @@ beszel_api_write() {
     -d "$payload"
 }
 
+read_first_admin_email() {
+  local cluster_scope="$1"
+  local state_file email
+  local candidate_paths=(
+    "$manager_data_dir/step-state/clusters/${cluster_scope}/create-users-and-groups.json"
+    "$manager_data_dir/step-state/clusters/${cluster_id}/create-users-and-groups.json"
+    "$manager_data_dir/step-state/global/create-users-and-groups.json"
+  )
+
+  for state_file in "${candidate_paths[@]}"; do
+    [[ -f "$state_file" ]] || continue
+    email="$(jq -r '.inputs.email // .outputs.email // empty' "$state_file")"
+    if [[ -n "$email" ]]; then
+      printf '%s\n' "$email"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 beszel_public_key_from_file() {
   local private_key_path="/opt/twinbox/beszel/data/id_ed25519"
   if [[ -f "$private_key_path" ]]; then
@@ -210,35 +233,53 @@ if [[ -z "$beszel_public_key" ]]; then
 fi
 [[ -n "$beszel_public_key" ]] || fail "Could not determine Beszel hub public key"
 
-ensure_beszel_user() {
+beszel_upsert_user() {
+  local user_email="$1"
+  local user_password="$2"
+  local user_role="${3:-admin}"
   local encoded_filter response user_id payload
 
-  encoded_filter="$(urlencode "email = \"${beszel_user_email}\"")"
+  encoded_filter="$(urlencode "email = \"${user_email}\"")"
   response="$(beszel_api_get "/api/collections/users/records?filter=${encoded_filter}&perPage=1")"
   user_id="$(jq -r '.items[0].id // empty' <<<"$response")"
   if [[ -n "$user_id" ]]; then
+    payload="$(
+      jq -cn \
+        --arg role "$user_role" \
+        '{emailVisibility: true, verified: true, role: $role}'
+    )"
+    beszel_api_write PATCH "/api/collections/users/records/${user_id}" "$payload" >/dev/null
     printf '%s\n' "$user_id"
     return 0
   fi
 
   payload="$(
     jq -cn \
-      --arg email "$beszel_user_email" \
-      --arg password "$beszel_user_password" \
+      --arg email "$user_email" \
+      --arg password "$user_password" \
+      --arg role "$user_role" \
       '{
         email: $email,
         password: $password,
         passwordConfirm: $password,
         emailVisibility: true,
         verified: true,
-        role: "admin"
+        role: $role
       }'
   )"
   beszel_api_write POST "/api/collections/users/records" "$payload" | jq -r '.id // empty'
 }
 
-beszel_user_id="$(ensure_beszel_user)"
+beszel_user_id="$(beszel_upsert_user "$beszel_user_email" "$beszel_user_password" "admin")"
 [[ -n "$beszel_user_id" ]] || fail "Could not create or find Beszel automation user"
+
+first_admin_email="$(read_first_admin_email "$cluster_scope_id" || true)"
+if [[ -n "$first_admin_email" && "$first_admin_email" != "$beszel_user_email" ]]; then
+  first_admin_password="$(openssl rand -hex 24)"
+  log "Ensuring Beszel user for the first Authentik admin"
+  beszel_upsert_user "$first_admin_email" "$first_admin_password" "admin" >/dev/null
+  unset first_admin_password
+fi
 
 existing_agent_secret_json="$(openbao_read_global_secret_json beszel-agent 2>/dev/null || true)"
 beszel_agent_token="$(jq -r '.token // empty' <<<"$existing_agent_secret_json" 2>/dev/null || true)"
@@ -259,6 +300,33 @@ upsert_beszel_universal_token() {
   else
     beszel_api_write POST "/api/collections/universal_tokens/records" "$payload" >/dev/null
   fi
+}
+
+sync_beszel_system_users() {
+  local users_response user_ids_json systems_response system_record
+  local system_id current_users_json merged_users_json payload
+
+  users_response="$(beszel_api_get "/api/collections/users/records?perPage=500")"
+  user_ids_json="$(jq -c '[.items[]?.id] | unique' <<<"$users_response")"
+  if [[ "$(jq 'length' <<<"$user_ids_json")" -eq 0 ]]; then
+    log "WARNING: No Beszel users found to grant system access"
+    return 0
+  fi
+
+  systems_response="$(beszel_api_get "/api/collections/systems/records?perPage=500")"
+  while IFS= read -r system_record; do
+    system_id="$(jq -r '.id // empty' <<<"$system_record")"
+    [[ -n "$system_id" ]] || continue
+
+    current_users_json="$(jq -c '(.users // []) | unique' <<<"$system_record")"
+    merged_users_json="$(jq -c --argjson all_users "$user_ids_json" '[((.users // [])[]), ($all_users[])] | unique' <<<"$system_record")"
+    if [[ "$current_users_json" == "$merged_users_json" ]]; then
+      continue
+    fi
+
+    payload="$(jq -cn --argjson users "$merged_users_json" '{users: $users}')"
+    beszel_api_write PATCH "/api/collections/systems/records/${system_id}" "$payload" >/dev/null
+  done < <(jq -c '.items[]?' <<<"$systems_response")
 }
 
 log "Configuring Beszel universal agent token"
@@ -289,6 +357,9 @@ export BESZEL_AGENT_TOKEN="$beszel_agent_token"
 
 log "Starting Beszel Management VM agent"
 (cd "$WORKSPACE_ROOT" && docker compose up -d beszel-agent)
+
+log "Reconciling Beszel user access to systems"
+sync_beszel_system_users
 
 # ---------------------------------------------------------------------------
 # Authentik OIDC provider setup
@@ -532,5 +603,8 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --application "beszel-agents" \
   --destination-namespace "beszel" \
   --skip-namespace-baseline
+
+log "Reconciling Beszel user access after agent deployment"
+sync_beszel_system_users
 
 log "Beszel monitoring installation complete"
