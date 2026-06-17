@@ -175,6 +175,7 @@ relay_interface="$(ip -o -4 addr show | awk -v ip="$RELAY_LISTEN_ADDRESS" '{spli
 
 postconf -e "myhostname = bastion.${MAIL_DOMAIN}"
 postconf -e "myorigin = ${MAIL_DOMAIN}"
+postconf -e "smtpd_sasl_local_domain = ${MAIL_HOSTNAME}"
 postconf -e "inet_interfaces = all"
 postconf -e "inet_protocols = ipv4"
 postconf -e "mydestination = localhost"

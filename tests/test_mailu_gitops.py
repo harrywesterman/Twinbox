@@ -214,6 +214,7 @@ def test_bastion_postfix_script_has_open_relay_guards():
     assert "--relay-secret-file" in script
     assert "smtpd_tls_security_level=encrypt" in script
     assert "smtpd_tls_auth_only=yes" in script
+    assert "smtpd_sasl_local_domain = ${MAIL_HOSTNAME}" in script
     assert "Refusing to expose relay listener on public address" in script
     assert 'ufw deny in to any port "$RELAY_LISTEN_PORT" proto tcp' in script
 
