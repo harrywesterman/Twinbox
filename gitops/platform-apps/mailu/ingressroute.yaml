@@ -48,9 +48,20 @@ spec:
           port: 80
 ---
 apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: webmail-root-redirect
+  namespace: mailu
+spec:
+  redirectRegex:
+    regex: "^https?://__ZONE_NAME__/webmail(.*)"
+    replacement: "https://mail.__ZONE_NAME__/webmail${1}"
+    permanent: true
+---
+apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: mailu-webmail-root
+  name: mailu-webmail-root-redirect
   namespace: mailu
 spec:
   entryPoints:
@@ -59,7 +70,7 @@ spec:
     - kind: Rule
       match: Host(`__ZONE_NAME__`) && PathPrefix(`/webmail`)
       middlewares:
-        - name: authentik-forwardauth
+        - name: webmail-root-redirect
       services:
         - kind: Service
           name: mailu-front

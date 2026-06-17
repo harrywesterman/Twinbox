@@ -94,11 +94,18 @@ spec:
                     value: Host(`mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
               - target:
                   kind: IngressRoute
-                  name: mailu-webmail-root
+                  name: mailu-webmail-root-redirect
                 patch: |-
                   - op: replace
                     path: /spec/routes/0/match
                     value: Host(`{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/webmail`)
+              - target:
+                  kind: Middleware
+                  name: webmail-root-redirect
+                patch: |-
+                  - op: replace
+                    path: /spec/redirectRegex/replacement
+                    value: "https://mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/webmail${1}"
       destination:
         server: https://kubernetes.default.svc
         namespace: mailu

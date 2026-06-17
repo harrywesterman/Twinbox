@@ -516,7 +516,7 @@ discover_netbird_proxy_peer_ip() {
     fail "NetBird bastion SSH is unavailable; cannot discover the bastion NetBird IP"
   fi
 
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Discovering bastion NetBird peer IP"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Discovering bastion NetBird peer IP" >&2
   if ! netbird_ip="$(
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 \
       -i "$ssh_key_path" root@"$netbird_proxy_ip" \

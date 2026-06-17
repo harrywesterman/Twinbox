@@ -111,10 +111,12 @@ def test_mailu_ingressroutes_target_mailu_front_only():
     docs = list(
         yaml.safe_load_all((MAILU_PLATFORM_DIR / "ingressroute.yaml").read_text(encoding="utf-8"))
     )
-    names = {doc["metadata"]["name"] for doc in docs}
-    assert names == {"mailu", "mailu-netbird", "mailu-webmail-root"}
+    ingressroute_docs = [d for d in docs if d.get("kind") == "IngressRoute"]
+    names = {doc["metadata"]["name"] for doc in ingressroute_docs}
+    assert names == {"mailu", "mailu-netbird", "mailu-webmail-root-redirect"}
 
-    for doc in docs:
+    all_forward_auth_routes = []
+    for doc in ingressroute_docs:
         routes = doc["spec"]["routes"]
         assert 1 <= len(routes) <= 2
 
@@ -126,11 +128,17 @@ def test_mailu_ingressroutes_target_mailu_front_only():
 
         webmail_routes = [r for r in routes if "/webmail" in r.get("match", "")]
         for route in webmail_routes:
-            assert route["middlewares"] == [{"name": "authentik-forwardauth"}]
+            assert route.get("middlewares") is not None
+
+        forward_auth_routes = [r for r in webmail_routes
+                              if any(m.get("name") == "authentik-forwardauth" for m in r.get("middlewares", []))]
+        all_forward_auth_routes.extend(forward_auth_routes)
 
         non_webmail = [r for r in routes if "/webmail" not in r.get("match", "")]
         for route in non_webmail:
             assert route.get("middlewares") is None
+
+    assert all_forward_auth_routes, "At least one webmail route must use authentik-forwardauth"
 
 
 def test_external_dns_allows_mx_records():
