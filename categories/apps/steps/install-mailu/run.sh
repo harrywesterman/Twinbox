@@ -272,6 +272,75 @@ resolve_admin_pod() {
     head -n1
 }
 
+register_mailu_authentik_app() {
+  local public_zone_name="$1"
+
+  log "Registering Mailu in Authentik (proxy provider)"
+
+  authentik_ensure_token
+  authentik_setup_forward
+
+  authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
+  invalidation_flow_id="$(authentik_resolve_flow_id "default-provider-invalidation-flow" "invalidation")"
+
+  local provider_payload provider_pk app_pk policy_pk
+
+  provider_payload="$(jq -n \
+    --arg name "Mailu" \
+    --arg external_host "https://mail.${public_zone_name}" \
+    --arg authorization_flow "$authorization_flow_id" \
+    --arg invalidation_flow "$invalidation_flow_id" \
+    '{name: $name, external_host: $external_host, authorization_flow: $authorization_flow, invalidation_flow: $invalidation_flow, mode: "forward_single"}')"
+  provider_pk="$(authentik_api_request POST "/providers/proxy/" "$provider_payload" | jq -r ".pk // empty")"
+  if [[ -z "$provider_pk" || "$provider_pk" == "null" ]]; then
+    provider_pk="$(authentik_api_request GET "/providers/proxy/?name=Mailu" | jq -r ".results[0].pk // empty")"
+  fi
+  [[ -n "$provider_pk" && "$provider_pk" != "null" ]] || fail "Could not create Mailu Authentik proxy provider"
+
+  app_pk="$(authentik_api_request GET "/core/applications/mailu/" 2>/dev/null | jq -r ".pk // empty")"
+  if [[ -z "$app_pk" || "$app_pk" == "null" ]]; then
+    local app_payload
+    app_payload="$(jq -n \
+      --arg name "Mailu" \
+      --arg slug "mailu" \
+      --arg launch_url "https://mail.${public_zone_name}" \
+      --arg provider_pk "$provider_pk" \
+      '{name: $name, slug: $slug, meta_launch_url: $launch_url, provider: ($provider_pk | tonumber)}')"
+    app_pk="$(authentik_api_request POST "/core/applications/" "$app_payload" | jq -r ".pk // empty")"
+  fi
+  [[ -n "$app_pk" && "$app_pk" != "null" ]] || fail "Could not create Mailu Authentik application"
+
+  policy_pk="$(authentik_api_request GET "/policies/expression/?name=allow-all-authenticated" | jq -r ".results[0].pk // empty")"
+  if [[ -z "$policy_pk" || "$policy_pk" == "null" ]]; then
+    policy_pk="$(authentik_api_request POST "/policies/expression/" \
+      "{\"name\":\"allow-all-authenticated\",\"execution_logging\":false,\"expression\":\"return True\"}" | jq -r ".pk // empty")"
+  fi
+  [[ -n "$policy_pk" && "$policy_pk" != "null" ]] || fail "Could not create allow-all expression policy"
+
+  local existing_bindings
+  existing_bindings="$(authentik_api_request GET "/policies/bindings/?target=${app_pk}" | jq -r ".results[].pk // empty")"
+  while IFS= read -r bind_pk; do
+    [[ -n "$bind_pk" ]] && authentik_api_request DELETE "/policies/bindings/${bind_pk}/" >/dev/null 2>&1 || true
+  done <<<"$existing_bindings"
+
+  local binding_payload
+  binding_payload="$(jq -n --arg target "$app_pk" --arg policy "$policy_pk" '{target: $target, policy: $policy, order: 0, enabled: true}')"
+  authentik_api_request POST "/policies/bindings/" "$binding_payload" >/dev/null 2>&1 || fail "Could not create policy binding"
+
+  local outpost_id current_providers updated_providers
+  outpost_id="$(authentik_api_request GET "/outposts/instances/?name=authentik Embedded Outpost" | jq -r ".results[0].pk // empty")"
+  if [[ -n "$outpost_id" && "$outpost_id" != "null" ]]; then
+    current_providers="$(authentik_api_request GET "/outposts/instances/${outpost_id}/" | jq -c "[.providers[]]")"
+    if ! jq -e --arg pk "$provider_pk" "map(tostring) | index(\$pk) != null" <<<"$current_providers" >/dev/null 2>&1; then
+      updated_providers="$(jq -c --arg pk "$provider_pk" ". + [(\$pk | tonumber)] | unique" <<<"$current_providers")"
+      authentik_api_request PATCH "/outposts/instances/${outpost_id}/" "{\"providers\":$updated_providers}" >/dev/null 2>&1 || true
+    fi
+  fi
+
+  authentik_teardown_forward
+  log "Mailu registered in Authentik (webmail accessible to all authenticated users)"
+}
+
 sync_mailu_mailboxes() {
   local mail_domain="$1"
   local api_token="$2"
@@ -700,6 +769,8 @@ dkim_selector="${dkim_txt_name%%._domainkey.*}"
 
 log "Applying Mailu DNS records"
 apply_mail_dns_records "$mail_domain" "$mail_hostname" "$bastion_ip" "$dkim_txt_name" "$dkim_value" "$dmarc_policy" "$dmarc_rua_localpart"
+
+register_mailu_authentik_app "$mail_domain"
 
 log "Syncing existing Authentik users to Mailu"
 authentik_ensure_token
