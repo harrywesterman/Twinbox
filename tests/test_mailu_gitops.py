@@ -115,7 +115,6 @@ def test_mailu_ingressroutes_target_mailu_front_only():
     names = {doc["metadata"]["name"] for doc in ingressroute_docs}
     assert names == {"mailu", "mailu-netbird"}
 
-    all_forward_auth_routes = []
     for doc in ingressroute_docs:
         routes = doc["spec"]["routes"]
         assert len(routes) == 1

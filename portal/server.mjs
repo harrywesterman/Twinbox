@@ -13,7 +13,11 @@ import {
   normalizeManageableGroupsConfig,
   normalizeRequestedGroupNames,
 } from "./authentik-admin.mjs";
-import { createRandomMailboxPassword, isMailuInstalled, mailuCreateMailbox } from "./mailu-client.mjs";
+import {
+  createRandomMailboxPassword,
+  isMailuInstalled,
+  mailuCreateMailbox,
+} from "./mailu-client.mjs";
 
 const app = express();
 const port = Number(process.env.PORT || 8080);
@@ -1434,17 +1438,17 @@ app.post("/api/admin/users", async (req, res) => {
         email: draft.email,
         rawPassword: mailboxPassword,
         displayedName: draft.name || draft.username,
-      }).then(
-        (result) => {
+      })
+        .then((result) => {
           if (result.ok) {
             console.log(`Mailu mailbox created for ${draft.email}`);
           } else {
             console.warn(`Mailu mailbox not created for ${draft.email}: ${result.reason}`);
           }
-        }
-      ).catch(
-        (err) => console.warn(`Mailu mailbox creation error for ${draft.email}:`, err.message)
-      );
+        })
+        .catch((err) =>
+          console.warn(`Mailu mailbox creation error for ${draft.email}:`, err.message)
+        );
     }
 
     const directoryAfter = await loadUserAdminDirectory(config);
@@ -1461,7 +1465,10 @@ app.post("/api/admin/users", async (req, res) => {
 
 app.post("/api/admin/users/:userId/create-mailbox", async (req, res) => {
   const session = requirePortalCapability(
-    req, res, "canManageUsers", "user management access required"
+    req,
+    res,
+    "canManageUsers",
+    "user management access required"
   );
   if (!session) return;
 

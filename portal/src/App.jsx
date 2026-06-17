@@ -3355,7 +3355,8 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
                     {mailboxBusy ? "Creating mailbox…" : "Create Mailu mailbox"}
                   </button>
                   <span className="muted-copy">
-                    Creates a mailbox for {viewModel.selectedUser.email} on the cluster Mailu server.
+                    Creates a mailbox for {viewModel.selectedUser.email} on the cluster Mailu
+                    server.
                   </span>
                 </div>
               ) : null}

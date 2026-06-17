@@ -14,7 +14,9 @@ function startMailuMock() {
   return new Promise((resolve) => {
     mailuServer = http.createServer((req, res) => {
       lastRequest = { method: req.method, url: req.url, headers: req.headers, body: "" };
-      req.on("data", (chunk) => { lastRequest.body += chunk; });
+      req.on("data", (chunk) => {
+        lastRequest.body += chunk;
+      });
       req.on("end", () => {
         if (req.url === "/api/v1/user" && req.method === "POST") {
           try {
