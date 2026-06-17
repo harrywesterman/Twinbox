@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import os
 import re
@@ -232,6 +233,9 @@ NETBIRD_ADMIN_ACCESS_STEP_SCRIPT = (
     / "run.sh"
 )
 ENSURE_NETBIRD_SERVICE_SCRIPT = REPO_ROOT / "scripts" / "manager" / "ensure-netbird-service.sh"
+PATCH_NETBIRD_TRAEFIK_ALIAS_SCRIPT = (
+    REPO_ROOT / "scripts" / "manager" / "patch-netbird-traefik-alias.py"
+)
 AUTHENTIK_NETBIRD_MODULE_VARS = (
     REPO_ROOT / "infra" / "opentofu" / "authentik-netbird" / "variables.tf"
 )
@@ -2068,6 +2072,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     routing_peer_index = text.index("Deploying NetBird routing peers before enabling reverse proxy")
     backend_index = text.index('wait_for_traefik_reverse_proxy_backend "$traefik_resource_address"')
     proxy_peer_index = text.index('ensure_netbird_proxy_peer "$proxy_setup_key"')
+    alias_index = text.index('ensure_bastion_traefik_netbird_alias "$netbird_domain"')
     bastion_ip_index = text.index('bastion_netbird_ip="$(discover_netbird_proxy_peer_ip)"')
     exit_peer_index = text.index(
         'ensure_netbird_bastion_exit_peer "$bastion_exit_router_setup_key"'
@@ -2083,6 +2088,9 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     dns_index = text.index("Creating wildcard DNS record for NetBird proxy")
     discovery_index = text.index('wait_for_public_oidc_discovery "$netbird_oidc_issuer"')
     authentik_service_index = text.index("Creating NetBird reverse proxy service for Authentik")
+    netbird_service_index = text.index(
+        "Creating NetBird reverse proxy service for NetBird coalescing fallback"
+    )
     idp_index = text.index("Registering Authentik as NetBird identity provider")
 
     # The services block was removed; services are now created per-app by ensure-netbird-service.sh
@@ -2110,14 +2118,26 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
         < routing_peer_index
         < backend_index
         < proxy_peer_index
+        < alias_index
         < bastion_ip_index
         < exit_peer_index
         < proxy_backend_index
         < dns_index
         < authentik_service_index
+        < netbird_service_index
         < discovery_index
         < idp_index
     )
+    assert 'netbird_domain="netbird.${public_zone_name}"' in text
+    assert "patch-netbird-traefik-alias.py" in text
+    assert 'docker exec netbird-proxy getent hosts "$NETBIRD_DOMAIN"' in text
+    assert "--target-type cluster" in text
+    assert '--target-id "$netbird_domain"' in text
+    assert '--target-host "$netbird_domain"' in text
+    assert "--target-port 443" in text
+    assert "--target-protocol https" in text
+    assert "--target-direct-upstream true" in text
+    assert "--target-skip-tls-verify false" in text
 
 
 def test_ensure_netbird_service_uses_current_api_and_safe_skips():
@@ -2132,6 +2152,13 @@ def test_ensure_netbird_service_uses_current_api_and_safe_skips():
     assert '"${NETBIRD_REVERSE_PROXY_API}/services/"' not in text
     assert "normalize_netbird_collection" in text
     assert "--normalize-collection" in text
+    assert "--target-type" in text
+    assert "--target-id" in text
+    assert "--target-host" in text
+    assert "--target-port" in text
+    assert "--target-protocol" in text
+    assert "--target-direct-upstream" in text
+    assert "--target-skip-tls-verify" in text
     assert 'elif (.clusters | type) == "array" then .clusters' in text
     assert 'elif (.results | type) == "array" then .results' in text
     assert 'elif (.items | type) == "array" then .items' in text
@@ -2152,16 +2179,26 @@ def test_ensure_netbird_service_uses_current_api_and_safe_skips():
     assert "Could not find Traefik resource ${TRAEFIK_RESOURCE_ADDRESS}" not in text
     assert "--argjson service_enabled" in text
     assert "--argjson target_port" in text
+    assert "--argjson direct_upstream" in text
     assert "--argjson skip_tls_verify" in text
     assert "--arg protocol" in text
     assert "--argjson enabled" not in text
+    assert "TARGET_ID_OVERRIDE" in text
+    assert "TARGET_TYPE_OVERRIDE" in text
+    assert "TARGET_HOST_OVERRIDE" in text
+    assert "TARGET_DIRECT_UPSTREAM" in text
+    assert "TARGET_SKIP_TLS_VERIFY" in text
     assert "TRAEFIK_TARGET_PORT" in text
     assert "TRAEFIK_TARGET_PROTOCOL" in text
     assert '.TRAEFIK_TARGET_PORT // "443"' in text
     assert ".TRAEFIK_TARGET_PROTOCOL // empty" in text
+    assert "target_id: $target_id" in text
+    assert "target_type: $target_type" in text
+    assert "host: $host" in text
     assert "port: $target_port" in text
     assert "port: 443" not in text
     assert "protocol: $protocol" in text
+    assert "direct_upstream: $direct_upstream" in text
     assert "skip_tls_verify: $skip_tls_verify" in text
     assert 'TRAEFIK_TARGET_PROTOCOL="http"' in text
 
@@ -2200,6 +2237,58 @@ def test_ensure_netbird_service_normalizes_live_and_legacy_api_shapes():
     )
     assert normalize_netbird_collection({"domains": None}, "domains") == []
     assert normalize_netbird_collection("not-a-collection", "clusters") == []
+
+
+def test_netbird_traefik_alias_patcher_preserves_labels_and_adds_only_alias():
+    spec = importlib.util.spec_from_file_location(
+        "patch_netbird_traefik_alias",
+        PATCH_NETBIRD_TRAEFIK_ALIAS_SCRIPT,
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+
+    compose = {
+        "services": {
+            "traefik": {
+                "image": "traefik:v3",
+                "labels": [
+                    "traefik.http.routers.netbird-dashboard.rule=Host(`netbird.example.test`)",
+                    "traefik.http.routers.netbird-dashboard.tls=true",
+                ],
+                "networks": {
+                    "netbird": {"aliases": ["traefik"]},
+                    "default": {},
+                },
+            },
+            "proxy": {
+                "image": "netbirdio/netbird:0.70.5",
+                "labels": {
+                    "traefik.tcp.routers.proxy-passthrough.rule": (
+                        "HostSNI(`*`) && !HostSNI(`netbird.example.test`)"
+                    )
+                },
+            },
+        },
+        "networks": {"netbird": {}, "default": {}},
+    }
+    traefik_labels = list(compose["services"]["traefik"]["labels"])
+    proxy_yaml = yaml.safe_dump(compose["services"]["proxy"], sort_keys=False)
+
+    module.patch_compose_data(compose, "netbird.example.test")
+
+    assert compose["services"]["traefik"]["labels"] == traefik_labels
+    assert yaml.safe_dump(compose["services"]["proxy"], sort_keys=False) == proxy_yaml
+    assert compose["services"]["traefik"]["networks"]["netbird"]["aliases"] == [
+        "traefik",
+        "netbird.example.test",
+    ]
+    assert compose["services"]["traefik"]["networks"]["default"] == {}
+
+    once = yaml.safe_dump(compose, default_flow_style=False, sort_keys=False)
+    module.patch_compose_data(compose, "netbird.example.test")
+    twice = yaml.safe_dump(compose, default_flow_style=False, sort_keys=False)
+    assert twice == once
 
 
 def test_netbird_service_hostnames_match_ingress_routes():
@@ -4941,6 +5030,9 @@ def test_netbird_cloud_init_uses_exact_netbird_cert_and_tcp_passthrough():
     assert "/opt/netbird/traefik-dynamic.yaml:/opt/netbird/traefik-dynamic.yaml:ro" in text
     assert "--providers.file.filename=/opt/netbird/traefik-dynamic.yaml" in text
     assert '"--providers.docker.network=": "--providers.docker.network=netbird_netbird"' in text
+    assert "ensure_network_alias" in text
+    assert 'ensure_network_alias(traefik, "netbird", netbird_domain)' in text
+    assert 'entry.setdefault("aliases", [])' in text
     assert "traefik-dynamic.yaml" in text
     assert 'data.pop("tls", None)' in text
     assert 'data.pop("http", None)' in text

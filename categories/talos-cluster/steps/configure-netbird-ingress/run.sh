@@ -497,6 +497,63 @@ REMOTE
   [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
 }
 
+ensure_bastion_traefik_netbird_alias() {
+  local netbird_domain="$1"
+  local ssh_key_path="$MANAGER_DATA_DIR/ssh/netbird-${cluster_id}/id_ed25519"
+  local temp_ssh_key=""
+  local netbird_domain_q
+
+  if [[ ! -f "$ssh_key_path" ]]; then
+    if jq -e '.SSH_PRIVATE_KEY // empty' "$netbird_bastion_secret" >/dev/null; then
+      temp_ssh_key="$(mktemp)"
+      jq -r '.SSH_PRIVATE_KEY' "$netbird_bastion_secret" >"$temp_ssh_key"
+      chmod 600 "$temp_ssh_key"
+      ssh_key_path="$temp_ssh_key"
+    fi
+  fi
+
+  if [[ ! -f "$ssh_key_path" || -z "$netbird_proxy_ip" ]] || ! command -v ssh >/dev/null 2>&1; then
+    [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
+    fail "NetBird bastion SSH is unavailable; cannot configure the local NetBird Traefik alias"
+  fi
+
+  printf -v netbird_domain_q '%q' "$netbird_domain"
+
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Ensuring bastion Traefik resolves ${netbird_domain} on the local Docker network"
+  if ! ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 \
+    -i "$ssh_key_path" root@"$netbird_proxy_ip" \
+    "python3 - --compose-path /opt/netbird/docker-compose.yml --alias $netbird_domain_q --restart-traefik" \
+    <"$WORKSPACE_ROOT/scripts/manager/patch-netbird-traefik-alias.py"
+  then
+    [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
+    fail "Failed to configure the local NetBird Traefik alias on the bastion"
+  fi
+
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Verifying netbird-proxy can resolve ${netbird_domain} locally"
+  if ! ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 \
+    -i "$ssh_key_path" root@"$netbird_proxy_ip" \
+    "NETBIRD_DOMAIN=$netbird_domain_q bash -s" <<'REMOTE'
+set -euo pipefail
+
+for i in $(seq 1 30); do
+  if docker exec netbird-proxy getent hosts "$NETBIRD_DOMAIN" >/dev/null 2>&1; then
+    exit 0
+  fi
+  sleep 2
+done
+
+docker ps --format 'table {{.Names}}\t{{.Status}}' >&2 || true
+docker exec netbird-proxy getent hosts "$NETBIRD_DOMAIN" >&2 || true
+exit 1
+REMOTE
+  then
+    [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
+    fail "netbird-proxy could not resolve ${netbird_domain} on the local Docker network"
+  fi
+
+  [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
+}
+
 discover_netbird_proxy_peer_ip() {
   local ssh_key_path="$MANAGER_DATA_DIR/ssh/netbird-${cluster_id}/id_ed25519"
   local temp_ssh_key=""
@@ -1094,6 +1151,7 @@ authentik_public_url="${TWINBOX_AUTHENTIK_HOST:-https://authentik.${public_zone_
 authentik_domain="${authentik_public_url#https://}"
 authentik_domain="${authentik_domain#http://}"
 authentik_domain="${authentik_domain%%/*}"
+netbird_domain="netbird.${public_zone_name}"
 
 if [[ -n "$proxy_services_json" && "$proxy_services_json" != "null" ]]; then
   if ! printf '%s' "$proxy_services_json" | jq -e 'type == "array"' >/dev/null; then
@@ -1329,6 +1387,7 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
 wait_for_netbird_routing_peer
 wait_for_traefik_reverse_proxy_backend "$traefik_resource_address"
 ensure_netbird_proxy_peer "$proxy_setup_key"
+ensure_bastion_traefik_netbird_alias "$netbird_domain"
 bastion_netbird_ip="$(discover_netbird_proxy_peer_ip)"
 persist_netbird_proxy_peer_ip "$bastion_netbird_ip"
 ensure_netbird_bastion_exit_peer "$bastion_exit_router_setup_key"
@@ -1385,8 +1444,25 @@ CLUSTER_ID="$cluster_id" \
   --service-domain "$authentik_domain" \
   --service-path /
 
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating NetBird reverse proxy service for NetBird coalescing fallback"
+TWINBOX_NETBIRD_TOKEN="$netbird_token" \
+TWINBOX_NETBIRD_URL="$netbird_management_url" \
+TWINBOX_NETBIRD_BASTION_SECRET="$netbird_bastion_secret" \
+CLUSTER_ID="$cluster_id" \
+  bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "netbird" \
+  --service-domain "$netbird_domain" \
+  --service-path / \
+  --target-type cluster \
+  --target-id "$netbird_domain" \
+  --target-host "$netbird_domain" \
+  --target-port 443 \
+  --target-protocol https \
+  --target-direct-upstream true \
+  --target-skip-tls-verify false
+
 wait_for_public_oidc_discovery "$netbird_oidc_issuer"
-wait_for_public_oidc_authorize "$authentik_public_url" "$netbird_oidc_client_id" "https://netbird.${public_zone_name}/oauth2/callback"
+wait_for_public_oidc_authorize "$authentik_public_url" "$netbird_oidc_client_id" "https://${netbird_domain}/oauth2/callback"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Registering Authentik as NetBird identity provider"
 idp_workdir="$MANAGER_DATA_DIR/opentofu/netbird-idp-${cluster_id}"
