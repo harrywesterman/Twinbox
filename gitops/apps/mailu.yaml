@@ -66,6 +66,9 @@ spec:
               name: webmail-root-redirect
             patch: |-
               - op: replace
+                path: /spec/redirectRegex/regex
+                value: ^https?://__ZONE_NAME__/webmail(.*)
+              - op: replace
                 path: /spec/redirectRegex/replacement
                 value: "https://mail.__ZONE_NAME__/webmail${1}"
   destination:

@@ -104,6 +104,9 @@ spec:
                   name: webmail-root-redirect
                 patch: |-
                   - op: replace
+                    path: /spec/redirectRegex/regex
+                    value: ^https?://{{index .metadata.annotations "twinbox.io/public-zone-name"}}/webmail(.*)
+                  - op: replace
                     path: /spec/redirectRegex/replacement
                     value: "https://mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/webmail${1}"
       destination:
