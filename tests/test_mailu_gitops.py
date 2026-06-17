@@ -113,7 +113,7 @@ def test_mailu_ingressroutes_target_mailu_front_only():
     )
     ingressroute_docs = [d for d in docs if d.get("kind") == "IngressRoute"]
     names = {doc["metadata"]["name"] for doc in ingressroute_docs}
-    assert names == {"mailu", "mailu-netbird", "mailu-webmail-root-redirect"}
+    assert names == {"mailu", "mailu-netbird"}
 
     all_forward_auth_routes = []
     for doc in ingressroute_docs:

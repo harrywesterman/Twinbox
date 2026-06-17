@@ -54,23 +54,6 @@ spec:
               - op: replace
                 path: /spec/routes/1/match
                 value: Host(`mail.__ZONE_NAME__`)
-          - target:
-              kind: IngressRoute
-              name: mailu-webmail-root-redirect
-            patch: |-
-              - op: replace
-                path: /spec/routes/0/match
-                value: Host(`__ZONE_NAME__`) && PathPrefix(`/webmail`)
-          - target:
-              kind: Middleware
-              name: webmail-root-redirect
-            patch: |-
-              - op: replace
-                path: /spec/redirectRegex/regex
-                value: ^https?://__ZONE_NAME__/webmail(.*)
-              - op: replace
-                path: /spec/redirectRegex/replacement
-                value: "https://mail.__ZONE_NAME__/webmail${1}"
   destination:
     server: https://kubernetes.default.svc
     namespace: mailu
