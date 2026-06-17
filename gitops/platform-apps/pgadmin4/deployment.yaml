@@ -64,6 +64,7 @@ spec:
               PROXY_X_HOST_COUNT = 1
               PROXY_X_PORT_COUNT = 1
               PROXY_X_PREFIX_COUNT = 0
+              PROXY_X_FORWARDED_PROTO = True
               LOG_FILE = '/dev/null'
               EOF
               cat > /work/master-password-hook.sh <<'EOF'
