@@ -529,6 +529,7 @@ def test_outline_step_projects_a_real_oidc_backed_app():
     assert "image: docker.getoutline.com/outlinewiki/outline:1.7.1" in deployment_text
     assert "OIDC_ISSUER_URL" in deployment_text
     assert "OIDC_LOGOUT_URI" in deployment_text
+    assert "PROXY_HEADERS_TRUSTED" in deployment_text
     assert "requests:" in deployment_text
     assert "cpu: 500m" in deployment_text
     assert "memory: 512Mi" in deployment_text
