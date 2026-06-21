@@ -461,10 +461,10 @@ wait_for_named_resource_ready "databases" "cluster" "matrix-synapse-db" "Matrix 
 wait_for_named_resource_ready "databases" "cluster" "matrix-mas-db" "Matrix MAS CloudNativePG cluster"
 wait_for_named_resource_ready "databases" "externalsecret" "matrix-synapse-db-credentials" "Matrix Synapse database ExternalSecret"
 wait_for_named_resource_ready "databases" "externalsecret" "matrix-mas-db-credentials" "Matrix MAS database ExternalSecret"
-wait_for_named_resource_ready "databases" "pooler" "matrix-synapse-db-pooler-ro" "Matrix Synapse DB read-only pooler"
-wait_for_named_resource_ready "databases" "pooler" "matrix-synapse-db-pooler-rw" "Matrix Synapse DB read-write pooler"
-wait_for_named_resource_ready "databases" "pooler" "matrix-mas-db-pooler-ro" "Matrix MAS DB read-only pooler"
-wait_for_named_resource_ready "databases" "pooler" "matrix-mas-db-pooler-rw" "Matrix MAS DB read-write pooler"
+wait_for_deployment_rollout "databases" "matrix-synapse-db-pooler-ro" "Matrix Synapse DB read-only pooler"
+wait_for_deployment_rollout "databases" "matrix-synapse-db-pooler-rw" "Matrix Synapse DB read-write pooler"
+wait_for_deployment_rollout "databases" "matrix-mas-db-pooler-ro" "Matrix MAS DB read-only pooler"
+wait_for_deployment_rollout "databases" "matrix-mas-db-pooler-rw" "Matrix MAS DB read-write pooler"
 
 bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
   --app-id "matrix-synapse" \

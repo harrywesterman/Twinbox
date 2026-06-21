@@ -339,8 +339,8 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
         'wait_for_named_resource_ready "databases" "externalsecret" "zulip-db-credentials"'
         in run_text
     )
-    assert 'wait_for_named_resource_ready "databases" "pooler" "zulip-db-pooler-ro"' in run_text
-    assert 'wait_for_named_resource_ready "databases" "pooler" "zulip-db-pooler-rw"' in run_text
+    assert 'wait_for_deployment_rollout "databases" "zulip-db-pooler-ro"' in run_text
+    assert 'wait_for_deployment_rollout "databases" "zulip-db-pooler-rw"' in run_text
     assert 'wait_for_named_resource_ready "zulip" "externalsecret" "zulip-config"' in run_text
     assert (
         'wait_for_named_resource_ready "zulip" "externalsecret" "zulip-db-credentials"' in run_text

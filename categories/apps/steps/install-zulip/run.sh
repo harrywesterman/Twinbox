@@ -399,8 +399,8 @@ kubectl apply -f "$zulip_db_backup_manifest"
 
 wait_for_named_resource_ready "databases" "cluster" "zulip-db" "Zulip CloudNativePG cluster"
 wait_for_named_resource_ready "databases" "externalsecret" "zulip-db-credentials" "Zulip database ExternalSecret"
-wait_for_named_resource_ready "databases" "pooler" "zulip-db-pooler-ro" "Zulip read-only pooler"
-wait_for_named_resource_ready "databases" "pooler" "zulip-db-pooler-rw" "Zulip read-write pooler"
+wait_for_deployment_rollout "databases" "zulip-db-pooler-ro" "Zulip read-only pooler"
+wait_for_deployment_rollout "databases" "zulip-db-pooler-rw" "Zulip read-write pooler"
 
 bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
   --app-id "zulip" \
