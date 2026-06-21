@@ -29,11 +29,9 @@ spec:
               serverName: "matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
               synapse:
                 ingress:
-                  className: traefik-external
                   host: "matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
               elementWeb:
                 ingress:
-                  className: traefik-external
                   host: "chat.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
                 additional:
                   0-homeserver: |
@@ -46,7 +44,6 @@ spec:
                     }
               matrixAuthenticationService:
                 ingress:
-                  className: traefik-external
                   host: "account.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
                 additional:
                   0-oidc:
@@ -54,11 +51,9 @@ spec:
                     configSecretKey: oidc-upstream.yaml
               elementAdmin:
                 ingress:
-                  className: traefik-external
                   host: "element-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
               matrixRTC:
                 ingress:
-                  className: traefik-external
                   host: "mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
         - repoURL: __REPO_URL__
           targetRevision: __TARGET_REVISION__
