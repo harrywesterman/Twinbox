@@ -2,7 +2,7 @@ postgres:
   enabled: false
 
 ingress:
-  className: twinbox-disabled
+  enabled: false
 
 synapse:
   postgres:
