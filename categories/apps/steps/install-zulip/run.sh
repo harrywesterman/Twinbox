@@ -33,28 +33,28 @@ resolve_kubeconfig_file() {
   printf '%s\n' "$KUBECONFIG_FILE"
 }
 
-wait_for_resources_ready() {
+wait_for_named_resource_ready() {
   local namespace="$1"
   local kind="$2"
-  local condition="$3"
-  local label="$4"
+  local name="$3"
+  local label="${4:-$name}"
   local attempts=120
   local attempt=1
 
   while true; do
-    if kubectl -n "$namespace" get "$kind" -o name 2>/dev/null | grep -q .; then
-      if kubectl -n "$namespace" wait --for="condition=${condition}" "$kind" --all --timeout=5s >/dev/null 2>&1; then
-        log "${label} resources are ready"
+    if kubectl -n "$namespace" get "$kind" "$name" >/dev/null 2>&1; then
+      if kubectl -n "$namespace" wait --for="condition=Ready" "$kind" "$name" --timeout=5s >/dev/null 2>&1; then
+        log "${label} is ready"
         return 0
       fi
 
-      log "Waiting for ${label} resources to become ready"
+      log "Waiting for ${label} to become ready"
     else
-      log "Waiting for ${label} resources to appear"
+      log "Waiting for ${label} to appear"
     fi
 
     if [[ "$attempt" -ge "$attempts" ]]; then
-      fail "${label} resources did not become ready after ${attempts} attempts"
+      fail "${label} did not become ready after ${attempts} attempts"
     fi
 
     sleep 5
@@ -241,7 +241,7 @@ zulip_memcached_password="$(openssl rand -hex 24)"
 secrets_dir="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}/secrets/global"
 zulip_secret_file="${secrets_dir}/zulip-oidc-${cluster_id}.json"
 zulip_runtime_secret_file="${secrets_dir}/zulip-runtime-${cluster_id}.json"
-zulip_manifest_path="$WORKSPACE_ROOT/gitops/apps/zulip.yaml"
+zulip_manifest_path="$WORKSPACE_ROOT/gitops/optional-apps/zulip.yaml"
 trap 'rm -f "$zulip_secret_file" "$zulip_runtime_secret_file"' EXIT
 
 mkdir -p "$secrets_dir"
@@ -397,9 +397,10 @@ kubectl apply -f "$zulip_db_pooler_ro_manifest"
 kubectl apply -f "$zulip_db_pooler_rw_manifest"
 kubectl apply -f "$zulip_db_backup_manifest"
 
-wait_for_resources_ready "databases" "cluster" "Ready" "Zulip CloudNativePG cluster"
-wait_for_resources_ready "databases" "externalsecret" "Ready" "Zulip database ExternalSecret"
-wait_for_resources_ready "databases" "deployment" "Available" "Zulip pooler deployment"
+wait_for_named_resource_ready "databases" "cluster" "zulip-db" "Zulip CloudNativePG cluster"
+wait_for_named_resource_ready "databases" "externalsecret" "zulip-db-credentials" "Zulip database ExternalSecret"
+wait_for_named_resource_ready "databases" "pooler" "zulip-db-pooler-ro" "Zulip read-only pooler"
+wait_for_named_resource_ready "databases" "pooler" "zulip-db-pooler-rw" "Zulip read-write pooler"
 
 bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
   --app-id "zulip" \
@@ -465,7 +466,9 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$zulip_manifest_path" \
   --application "zulip"
 
-wait_for_resources_ready "zulip" "externalsecret" "Ready" "Zulip ExternalSecret"
+wait_for_named_resource_ready "zulip" "externalsecret" "zulip-config" "Zulip config ExternalSecret"
+wait_for_named_resource_ready "zulip" "externalsecret" "zulip-db-credentials" "Zulip database credentials ExternalSecret"
+wait_for_named_resource_ready "zulip" "externalsecret" "zulip-runtime" "Zulip runtime ExternalSecret"
 wait_for_statefulset_ready "zulip" "zulip-rabbitmq" "Zulip RabbitMQ"
 wait_for_statefulset_ready "zulip" "zulip-redis-master" "Zulip Redis master"
 wait_for_deployment_rollout "zulip" "zulip-memcached" "Zulip memcached"

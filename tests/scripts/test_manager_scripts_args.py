@@ -3541,12 +3541,8 @@ def test_argocd_cluster_secret_helper_resolves_pod_cidr_before_rendering_annotat
         encoding="utf-8"
     )
 
-    assert text.index('if [[ -z "$POD_CIDR" ]]; then') < text.index(
-        'existing_secret_json="$(kubectl -n argocd get secret "$SECRET_NAME" -o json 2>/dev/null || true)"'
-    )
-    assert text.index('if [[ -z "$POD_CIDR" ]]; then') < text.index(
-        '"twinbox.io/pod-cidr": $pod_cidr'
-    )
+    assert "10.244.0.0/16" not in text
+    assert "Could not determine pod CIDR from cluster nodes; pass --pod-cidr explicitly" in text
 
 
 def test_argocd_cluster_secret_helper_preserves_existing_resource_profile():

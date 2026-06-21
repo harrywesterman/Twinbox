@@ -1,4 +1,10 @@
+import os
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SYNC_SCRIPT = REPO_ROOT / "scripts" / "manager" / "sync-openbao-global-secret.sh"
@@ -53,6 +59,35 @@ REMOVED_PLACEHOLDER_STEP = (
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def _helm_template_zulip(chart_version: str) -> subprocess.CompletedProcess[str]:
+    helm = shutil.which("helm")
+    if helm is None:
+        pytest.skip("helm is not available")
+
+    env = os.environ.copy()
+    with tempfile.TemporaryDirectory() as docker_config:
+        env["DOCKER_CONFIG"] = docker_config
+        return subprocess.run(
+            [
+                helm,
+                "template",
+                "zulip",
+                "oci://ghcr.io/zulip/helm-charts/zulip",
+                "--version",
+                chart_version,
+                "-f",
+                str(ZULIP_VALUES),
+                "--namespace",
+                "zulip",
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
 
 
 def test_sync_openbao_global_secret_script_uses_port_forward_and_kv_v2_api():
@@ -297,6 +332,15 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
         '--required-keys "ZULIP_RABBITMQ_PASSWORD,ZULIP_RABBITMQ_ERLANG_COOKIE,ZULIP_REDIS_PASSWORD,ZULIP_MEMCACHED_PASSWORD"'
         in run_text
     )
+    assert "wait_for_named_resource_ready" in run_text
+    assert 'zulip_manifest_path="$WORKSPACE_ROOT/gitops/optional-apps/zulip.yaml"' in run_text
+    assert 'wait_for_named_resource_ready "databases" "cluster" "zulip-db"' in run_text
+    assert 'wait_for_named_resource_ready "databases" "externalsecret" "zulip-db-credentials"' in run_text
+    assert 'wait_for_named_resource_ready "databases" "pooler" "zulip-db-pooler-ro"' in run_text
+    assert 'wait_for_named_resource_ready "databases" "pooler" "zulip-db-pooler-rw"' in run_text
+    assert 'wait_for_named_resource_ready "zulip" "externalsecret" "zulip-config"' in run_text
+    assert 'wait_for_named_resource_ready "zulip" "externalsecret" "zulip-db-credentials"' in run_text
+    assert 'wait_for_named_resource_ready "zulip" "externalsecret" "zulip-runtime"' in run_text
     assert "zulip_config_secret_json" in run_text
     assert "zulip_runtime_secret_json" in run_text
     assert "LOADBALANCER_IPS" not in run_text
@@ -308,6 +352,7 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "repoURL: oci://ghcr.io/zulip/helm-charts/zulip" in app_text
     assert "path: ." in app_text
     assert 'targetRevision: "2.0.0"' in app_text
+    assert 'targetRevision: "2.0.0"' in optional_app_text
     assert "path: gitops/platform-apps/zulip" in app_text
     assert (
         'SETTING_EXTERNAL_HOST: zulip.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
@@ -324,9 +369,17 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert expected_zulip_csrf_trusted_origins in app_text
     assert expected_zulip_csrf_trusted_origins in optional_app_text
     assert "ZULIP_AUTH_BACKENDS: GenericOpenIdConnectBackend" in app_text
+    assert "ZULIP_AUTH_BACKENDS: GenericOpenIdConnectBackend" in optional_app_text
     assert "ServerSideApply=true" in app_text
     assert "ServerSideApply=true" in optional_app_text
-    assert 'TRUST_GATEWAY_IP: "True"' in app_text
+    assert 'TRUST_GATEWAY_IP: "True"' not in app_text
+    assert 'TRUST_GATEWAY_IP: "True"' not in optional_app_text
+    assert 'LOADBALANCER_IPS: "{{index .metadata.annotations "twinbox.io/pod-cidr"}}"' in app_text
+    assert 'LOADBALANCER_IPS: "{{index .metadata.annotations "twinbox.io/pod-cidr"}}"' in optional_app_text
+    assert "pod-cidr" in app_text
+    assert "pod-cidr" in optional_app_text
+    assert "SETTING_RUNNING_IN_HELM" not in app_text
+    assert "SETTING_RUNNING_IN_HELM" not in optional_app_text
     assert "ZULIP_DEFAULT_REALM_OWNER_EMAIL:" not in app_text
     assert "ZULIP_DEFAULT_REALM_OWNER_NAME:" not in app_text
     assert "existingPasswordSecret: zulip-runtime" in app_text
@@ -336,7 +389,14 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "existingSecret: zulip-runtime" in app_text
     assert "existingSecretPasswordKey: redis-password" in app_text
     assert "LOADBALANCER_IPS:" in app_text
-    assert "pod-cidr" in app_text
+    assert "LOADBALANCER_IPS:" in optional_app_text
+    assert "SETTING_LOADBALANCER_IPS" not in values_text
+    assert "SETTING_AUTHENTICATION_BACKENDS" not in values_text
+    assert "accessModes:" in values_text
+    assert "accessMode:" not in values_text
+    assert 'loadbalancer_ips="${LOADBALANCER_IPS:-}"' in values_text
+    assert 'crudini --set /etc/zulip/zulip.conf loadbalancer ips "$loadbalancer_ips"' in values_text
+    assert "LOADBALANCER_IPS is required" in values_text
     assert "__ZULIP_RABBITMQ_PASSWORD__" not in app_text
     assert "__ZULIP_REDIS_PASSWORD__" not in app_text
 
@@ -407,6 +467,11 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "OnboardingUserMessage" in run_text
     assert "Missing Zulip onboarding messages" in run_text
     assert "create-users-and-groups.json" in run_text
+
+
+def test_zulip_values_render_against_chart_2_0_0():
+    result = _helm_template_zulip("2.0.0")
+    assert result.returncode == 0, result.stderr
 
 
 def test_zulip_step_requests_kubeconfig_secret_injection():
