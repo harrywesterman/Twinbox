@@ -58,6 +58,7 @@ STIRLING_PDF_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "apps" / "steps" / "install-stirling-pdf" / "run.sh"
 )
 PIXELFED_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-pixelfed" / "run.sh"
+MATRIX_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-matrix" / "run.sh"
 TWINBOX_PORTAL_APP = REPO_ROOT / "gitops" / "apps" / "twinbox-portal.yaml"
 OUTLINE_APP = REPO_ROOT / "gitops" / "apps" / "outline.yaml"
 OUTLINE_OPTIONAL_APP = REPO_ROOT / "gitops" / "optional-apps" / "outline.yaml"
@@ -75,6 +76,10 @@ VAULTWARDEN_DB_KUSTOMIZATION = (
     REPO_ROOT / "gitops" / "databases" / "vaultwarden" / "kustomization.yaml"
 )
 PIXELFED_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "pixelfed" / "kustomization.yaml"
+MATRIX_APP_MANIFEST = REPO_ROOT / "gitops" / "apps" / "matrix.yaml"
+MATRIX_VALUES = REPO_ROOT / "gitops" / "values" / "matrix.yaml"
+MATRIX_INGRESSROUTE = REPO_ROOT / "gitops" / "platform-apps" / "matrix" / "ingressroute.yaml"
+MATRIX_EXTERNALSECRET = REPO_ROOT / "gitops" / "platform-apps" / "matrix" / "externalsecret.yaml"
 ARGO_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
 )
@@ -2348,6 +2353,105 @@ def test_netbird_service_hostnames_match_ingress_routes():
         / "install-management-consoles"
         / "run.sh"
     ).read_text(encoding="utf-8")
+
+
+def test_matrix_app_manifest_uses_supported_chart_values():
+    text = MATRIX_APP_MANIFEST.read_text(encoding="utf-8")
+
+    assert "releaseName: ess" in text
+    assert 'serverName: "matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"' in text
+    assert 'synapse:\n                ingress:\n                  host: "matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"' in text
+    assert 'elementWeb:\n                ingress:\n                  host: "chat.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"' in text
+    assert 'matrixAuthenticationService:\n                ingress:\n                  host: "account.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"' in text
+    assert "configSecret: matrix-config" in text
+    assert "configSecretKey: oidc-upstream.yaml" in text
+    assert 'elementAdmin:\n                ingress:\n                  host: "element-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"' in text
+    assert 'matrixRTC:\n                ingress:\n                  host: "mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"' in text
+    assert "extraEnv:" not in text
+    assert "valueFrom:" not in text
+    assert "ingress.enabled" not in text
+    assert "wellknownDelegation" not in text
+
+
+def test_matrix_values_disable_chart_ingress_and_well_known():
+    text = MATRIX_VALUES.read_text(encoding="utf-8")
+
+    assert "className: twinbox-disabled" in text
+    assert "wellKnownDelegation:\n  enabled: false" in text
+    assert "ingress.enabled" not in text
+    assert "wellknownDelegation" not in text
+
+
+def test_matrix_ingressroutes_target_chart_services():
+    text = MATRIX_INGRESSROUTE.read_text(encoding="utf-8")
+
+    assert "kind: IngressRoute" in text
+    assert "Host(`matrix.__ZONE_NAME__`)" in text
+    assert "Host(`chat.__ZONE_NAME__`)" in text
+    assert "Host(`account.__ZONE_NAME__`)" in text
+    assert "Host(`element-admin.__ZONE_NAME__`)" in text
+    assert "Host(`mrtc.__ZONE_NAME__`)" in text
+    assert "PathPrefix(`/sfu/get`)" in text
+    assert "PathPrefix(`/get_token`)" in text
+    assert "name: ess-synapse" in text
+    assert "name: ess-element-web" in text
+    assert "name: ess-matrix-authentication-service" in text
+    assert "name: ess-element-admin" in text
+    assert "name: ess-matrix-rtc-authorisation-service" in text
+    assert "name: ess-matrix-rtc-sfu" in text
+    assert "port: 8008" in text
+    assert "port: 8080" in text
+    assert "port: 7880" in text
+    assert "ess-synapse-haproxy" not in text
+    assert "port: 443" not in text
+
+
+def test_matrix_install_step_waits_on_specific_resources():
+    text = MATRIX_STEP_SCRIPT.read_text(encoding="utf-8")
+
+    assert "matrix_oidc_upstream_config=" in text
+    assert "MATRIX_OIDC_UPSTREAM_CONFIG" in text
+    assert "MATRIX_OIDC_ENABLED_IDPS" in text
+    assert 'wait_for_named_resource_ready "databases" "cluster" "matrix-synapse-db"' in text
+    assert 'wait_for_named_resource_ready "databases" "cluster" "matrix-mas-db"' in text
+    assert (
+        'wait_for_named_resource_ready "databases" "externalsecret" "matrix-synapse-db-credentials"'
+        in text
+    )
+    assert (
+        'wait_for_named_resource_ready "databases" "externalsecret" "matrix-mas-db-credentials"'
+        in text
+    )
+    assert (
+        'wait_for_named_resource_ready "matrix" "externalsecret" "matrix-config"' in text
+    )
+    assert (
+        'wait_for_named_resource_ready "matrix" "externalsecret" "matrix-synapse-db-credentials"'
+        in text
+    )
+    assert (
+        'wait_for_named_resource_ready "matrix" "externalsecret" "matrix-mas-db-credentials"'
+        in text
+    )
+    assert 'wait_for_named_resource_ready "matrix" "externalsecret" "matrix-runtime"' in text
+    assert 'wait_for_statefulset_ready "matrix" "ess-synapse-main"' in text
+    assert 'wait_for_deployment_rollout "matrix" "ess-haproxy"' in text
+    assert 'wait_for_deployment_rollout "matrix" "ess-matrix-rtc-authorisation-service"' in text
+    assert 'wait_for_resources_ready "databases" "cluster"' not in text
+    assert 'wait_for_resources_ready "databases" "externalsecret"' not in text
+    assert 'wait_for_resources_ready "matrix" "externalsecret"' not in text
+    assert 'wait_for_statefulset_ready "matrix" "ess-synapse"' not in text
+
+
+def test_matrix_external_secret_renders_oidc_upstream_config():
+    text = MATRIX_EXTERNALSECRET.read_text(encoding="utf-8")
+
+    assert "engineVersion: v2" in text
+    assert "type: Opaque" in text
+    assert "oidc-upstream.yaml: |-" in text
+    assert "MATRIX_OIDC_UPSTREAM_CONFIG" in text
+    assert "MAS_OIDC_CLIENT_ID" not in text
+    assert "MATRIX_OIDC_ENABLED_IDPS" not in text
 
 
 def test_netbird_proxy_uses_traefik_webnetbird_origin():

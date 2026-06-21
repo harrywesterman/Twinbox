@@ -12,8 +12,8 @@ spec:
       match: Host(`matrix.__ZONE_NAME__`)
       services:
         - kind: Service
-          name: ess-synapse-haproxy
-          port: 80
+          name: ess-synapse
+          port: 8008
   tls: {}
 ---
 # Matrix (Synapse) - Public
@@ -30,8 +30,8 @@ spec:
       match: Host(`matrix.__ZONE_NAME__`)
       services:
         - kind: Service
-          name: ess-synapse-haproxy
-          port: 80
+          name: ess-synapse
+          port: 8008
 ---
 # Element Web (Chat) - Public
 apiVersion: traefik.io/v1alpha1
@@ -83,7 +83,7 @@ spec:
       services:
         - kind: Service
           name: ess-matrix-authentication-service
-          port: 80
+          port: 8080
   tls: {}
 ---
 # MAS (Account) - Public
@@ -101,7 +101,7 @@ spec:
       services:
         - kind: Service
           name: ess-matrix-authentication-service
-          port: 80
+          port: 8080
 ---
 # Element Admin - Public
 apiVersion: traefik.io/v1alpha1
@@ -118,7 +118,7 @@ spec:
       services:
         - kind: Service
           name: ess-element-admin
-          port: 80
+          port: 8080
   tls: {}
 ---
 # Element Admin - Public
@@ -136,7 +136,7 @@ spec:
       services:
         - kind: Service
           name: ess-element-admin
-          port: 80
+          port: 8080
 ---
 # Matrix RTC (Element Call) - Public
 apiVersion: traefik.io/v1alpha1
@@ -149,11 +149,23 @@ spec:
     - websecure
   routes:
     - kind: Rule
-      match: Host(`mrtc.__ZONE_NAME__`)
+      match: Host(`mrtc.__ZONE_NAME__`) && PathPrefix(`/sfu/get`)
+      services:
+        - kind: Service
+          name: ess-matrix-rtc-authorisation-service
+          port: 8080
+    - kind: Rule
+      match: Host(`mrtc.__ZONE_NAME__`) && PathPrefix(`/get_token`)
+      services:
+        - kind: Service
+          name: ess-matrix-rtc-authorisation-service
+          port: 8080
+    - kind: Rule
+      match: Host(`mrtc.__ZONE_NAME__`) && PathPrefix(`/`) && !PathPrefix(`/sfu/get`) && !PathPrefix(`/get_token`)
       services:
         - kind: Service
           name: ess-matrix-rtc-sfu
-          port: 443
+          port: 7880
   tls: {}
 ---
 # Matrix RTC (Element Call) - Public
@@ -167,8 +179,20 @@ spec:
     - webnetbird
   routes:
     - kind: Rule
-      match: Host(`mrtc.__ZONE_NAME__`)
+      match: Host(`mrtc.__ZONE_NAME__`) && PathPrefix(`/sfu/get`)
+      services:
+        - kind: Service
+          name: ess-matrix-rtc-authorisation-service
+          port: 8080
+    - kind: Rule
+      match: Host(`mrtc.__ZONE_NAME__`) && PathPrefix(`/get_token`)
+      services:
+        - kind: Service
+          name: ess-matrix-rtc-authorisation-service
+          port: 8080
+    - kind: Rule
+      match: Host(`mrtc.__ZONE_NAME__`) && PathPrefix(`/`) && !PathPrefix(`/sfu/get`) && !PathPrefix(`/get_token`)
       services:
         - kind: Service
           name: ess-matrix-rtc-sfu
-          port: 443
+          port: 7880
