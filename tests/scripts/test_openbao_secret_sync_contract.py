@@ -335,11 +335,16 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "wait_for_named_resource_ready" in run_text
     assert 'zulip_manifest_path="$WORKSPACE_ROOT/gitops/optional-apps/zulip.yaml"' in run_text
     assert 'wait_for_named_resource_ready "databases" "cluster" "zulip-db"' in run_text
-    assert 'wait_for_named_resource_ready "databases" "externalsecret" "zulip-db-credentials"' in run_text
+    assert (
+        'wait_for_named_resource_ready "databases" "externalsecret" "zulip-db-credentials"'
+        in run_text
+    )
     assert 'wait_for_named_resource_ready "databases" "pooler" "zulip-db-pooler-ro"' in run_text
     assert 'wait_for_named_resource_ready "databases" "pooler" "zulip-db-pooler-rw"' in run_text
     assert 'wait_for_named_resource_ready "zulip" "externalsecret" "zulip-config"' in run_text
-    assert 'wait_for_named_resource_ready "zulip" "externalsecret" "zulip-db-credentials"' in run_text
+    assert (
+        'wait_for_named_resource_ready "zulip" "externalsecret" "zulip-db-credentials"' in run_text
+    )
     assert 'wait_for_named_resource_ready "zulip" "externalsecret" "zulip-runtime"' in run_text
     assert "zulip_config_secret_json" in run_text
     assert "zulip_runtime_secret_json" in run_text
@@ -375,7 +380,10 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert 'TRUST_GATEWAY_IP: "True"' not in app_text
     assert 'TRUST_GATEWAY_IP: "True"' not in optional_app_text
     assert 'LOADBALANCER_IPS: "{{index .metadata.annotations "twinbox.io/pod-cidr"}}"' in app_text
-    assert 'LOADBALANCER_IPS: "{{index .metadata.annotations "twinbox.io/pod-cidr"}}"' in optional_app_text
+    assert (
+        'LOADBALANCER_IPS: "{{index .metadata.annotations "twinbox.io/pod-cidr"}}"'
+        in optional_app_text
+    )
     assert "pod-cidr" in app_text
     assert "pod-cidr" in optional_app_text
     assert "SETTING_RUNNING_IN_HELM" not in app_text

@@ -2359,14 +2359,31 @@ def test_matrix_app_manifest_uses_supported_chart_values():
     text = MATRIX_APP_MANIFEST.read_text(encoding="utf-8")
 
     assert "releaseName: ess" in text
-    assert 'serverName: "matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"' in text
-    assert 'synapse:\n                ingress:\n                  host: "matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"' in text
-    assert 'elementWeb:\n                ingress:\n                  host: "chat.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"' in text
-    assert 'matrixAuthenticationService:\n                ingress:\n                  host: "account.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"' in text
+    assert (
+        'serverName: "matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"' in text
+    )
+    assert (
+        'synapse:\n                ingress:\n                  host: "matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"'
+        in text
+    )
+    assert (
+        'elementWeb:\n                ingress:\n                  host: "chat.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"'
+        in text
+    )
+    assert (
+        'matrixAuthenticationService:\n                ingress:\n                  host: "account.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"'
+        in text
+    )
     assert "configSecret: matrix-config" in text
     assert "configSecretKey: oidc-upstream.yaml" in text
-    assert 'elementAdmin:\n                ingress:\n                  host: "element-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"' in text
-    assert 'matrixRTC:\n                ingress:\n                  host: "mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"' in text
+    assert (
+        'elementAdmin:\n                ingress:\n                  host: "element-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"'
+        in text
+    )
+    assert (
+        'matrixRTC:\n                ingress:\n                  host: "mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"'
+        in text
+    )
     assert "extraEnv:" not in text
     assert "valueFrom:" not in text
     assert "ingress.enabled" not in text
@@ -2422,9 +2439,7 @@ def test_matrix_install_step_waits_on_specific_resources():
         'wait_for_named_resource_ready "databases" "externalsecret" "matrix-mas-db-credentials"'
         in text
     )
-    assert (
-        'wait_for_named_resource_ready "matrix" "externalsecret" "matrix-config"' in text
-    )
+    assert 'wait_for_named_resource_ready "matrix" "externalsecret" "matrix-config"' in text
     assert (
         'wait_for_named_resource_ready "matrix" "externalsecret" "matrix-synapse-db-credentials"'
         in text
