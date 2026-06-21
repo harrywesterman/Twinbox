@@ -4155,7 +4155,7 @@ def test_mastodon_step_applies_the_custom_app_and_bootstraps_admin_access():
     generate_alphanumeric_text = step_text.split("generate_alphanumeric() {", 1)[1].split(
         "generate_vapid_keys() {", 1
     )[0]
-    assert "node - \"$length\"" in generate_alphanumeric_text
+    assert 'node - "$length"' in generate_alphanumeric_text
     assert "head -c" not in generate_alphanumeric_text
 
     assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in step_text
@@ -4172,6 +4172,17 @@ def test_mastodon_step_applies_the_custom_app_and_bootstraps_admin_access():
         '--required-keys "MASTODON_POSTGRESQL__USERNAME,MASTODON_POSTGRESQL__PASSWORD,REDIS_PASSWORD,SECRET_KEY_BASE,OTP_SECRET,VAPID_PRIVATE_KEY,VAPID_PUBLIC_KEY,ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY,ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY,ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT,MASTODON_OIDC_CLIENT_ID,MASTODON_OIDC_CLIENT_SECRET,MASTODON_ADMIN_USERNAME,MASTODON_ADMIN_PASSWORD"'
         in step_text
     )
+    assert "gitops/platform-apps/mastodon/namespace.yaml" in step_text
+    assert "gitops/databases/shared/namespace.yaml" in step_text
+    assert "gitops/platform-apps/mastodon/externalsecret-runtime.yaml" in step_text
+    assert "gitops/platform-apps/mastodon/externalsecret-s3.yaml" in step_text
+    assert "gitops/databases/mastodon/externalsecret.yaml" in step_text
+    assert 'openbao_wait_for_external_secret_ready "mastodon" "mastodon-runtime"' in step_text
+    assert 'openbao_wait_for_secret "mastodon-runtime" "mastodon"' in step_text
+    assert (
+        'openbao_wait_for_external_secret_ready "databases" "mastodon-db-credentials"' in step_text
+    )
+    assert 'openbao_wait_for_secret "mastodon-db-credentials" "databases"' in step_text
     assert "render_template" in step_text
     assert "gitops/apps/mastodon.yaml" in step_text
     assert "apply-argocd-application.sh" in step_text

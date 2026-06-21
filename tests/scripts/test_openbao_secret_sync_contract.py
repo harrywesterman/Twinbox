@@ -559,6 +559,19 @@ def test_mastodon_step_bootstraps_runtime_and_admin_secret_via_openbao():
     assert "openbao_read_global_secret_json mastodon" in step_text
     assert "sync-openbao-global-secret.sh" in step_text
     assert '--secret-name "mastodon"' in step_text
+    assert "gitops/platform-apps/mastodon/namespace.yaml" in step_text
+    assert "gitops/databases/shared/namespace.yaml" in step_text
+    assert "gitops/platform-apps/mastodon/externalsecret-runtime.yaml" in step_text
+    assert "gitops/platform-apps/mastodon/externalsecret-s3.yaml" in step_text
+    assert "gitops/databases/mastodon/externalsecret.yaml" in step_text
+    assert 'openbao_wait_for_external_secret_ready "mastodon" "mastodon-runtime"' in step_text
+    assert 'openbao_wait_for_secret "mastodon-runtime" "mastodon"' in step_text
+    assert 'openbao_wait_for_external_secret_ready "mastodon" "mastodon-s3"' in step_text
+    assert 'openbao_wait_for_secret "mastodon-s3" "mastodon"' in step_text
+    assert (
+        'openbao_wait_for_external_secret_ready "databases" "mastodon-db-credentials"' in step_text
+    )
+    assert 'openbao_wait_for_secret "mastodon-db-credentials" "databases"' in step_text
     assert (
         '--required-keys "MASTODON_POSTGRESQL__USERNAME,MASTODON_POSTGRESQL__PASSWORD,REDIS_PASSWORD,SECRET_KEY_BASE,OTP_SECRET,VAPID_PRIVATE_KEY,VAPID_PUBLIC_KEY,ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY,ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY,ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT,MASTODON_OIDC_CLIENT_ID,MASTODON_OIDC_CLIENT_SECRET,MASTODON_ADMIN_USERNAME"'
         in step_text

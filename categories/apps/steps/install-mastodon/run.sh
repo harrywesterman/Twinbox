@@ -333,6 +333,20 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --json-file "$mastodon_secret_file" \
   --required-keys "MASTODON_POSTGRESQL__USERNAME,MASTODON_POSTGRESQL__PASSWORD,REDIS_PASSWORD,SECRET_KEY_BASE,OTP_SECRET,VAPID_PRIVATE_KEY,VAPID_PUBLIC_KEY,ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY,ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY,ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT,MASTODON_OIDC_CLIENT_ID,MASTODON_OIDC_CLIENT_SECRET,MASTODON_ADMIN_USERNAME"
 
+log "Applying Mastodon namespaces and ExternalSecrets"
+kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/mastodon/namespace.yaml" >/dev/null
+kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/shared/namespace.yaml" >/dev/null
+kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/mastodon/externalsecret-runtime.yaml" >/dev/null
+kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/mastodon/externalsecret-s3.yaml" >/dev/null
+kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/mastodon/externalsecret.yaml" >/dev/null
+
+openbao_wait_for_external_secret_ready "mastodon" "mastodon-runtime"
+openbao_wait_for_secret "mastodon-runtime" "mastodon"
+openbao_wait_for_external_secret_ready "mastodon" "mastodon-s3"
+openbao_wait_for_secret "mastodon-s3" "mastodon"
+openbao_wait_for_external_secret_ready "databases" "mastodon-db-credentials"
+openbao_wait_for_secret "mastodon-db-credentials" "databases"
+
 log "Provisioning Authentik OIDC client for Mastodon"
 authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
 invalidation_flow_id="$(authentik_resolve_flow_id "default-provider-invalidation-flow" "invalidation")"
