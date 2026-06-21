@@ -4151,6 +4151,13 @@ def test_mastodon_step_applies_the_custom_app_and_bootstraps_admin_access():
     assert "title: Install Mastodon" in step_manifest_text
     assert "icon: install-mastodon" in step_manifest_text
     assert "categories/apps/steps/install-mastodon/run.sh" in step_manifest_text
+
+    generate_alphanumeric_text = step_text.split("generate_alphanumeric() {", 1)[1].split(
+        "generate_vapid_keys() {", 1
+    )[0]
+    assert "node - \"$length\"" in generate_alphanumeric_text
+    assert "head -c" not in generate_alphanumeric_text
+
     assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in step_text
     assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in step_text
     assert "openbao_read_global_secret_json mastodon" in step_text

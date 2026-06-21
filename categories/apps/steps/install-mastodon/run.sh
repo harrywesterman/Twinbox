@@ -110,7 +110,23 @@ PY
 
 generate_alphanumeric() {
   local length="${1:-32}"
-  LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$length"
+  node - "$length" <<'NODE'
+const crypto = require('node:crypto');
+
+const length = Number(process.argv[2] || 32);
+const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const bytes = crypto.randomBytes(length);
+
+let output = '';
+for (const byte of bytes) {
+  if (output.length >= length) {
+    break;
+  }
+  output += alphabet[byte % alphabet.length];
+}
+
+process.stdout.write(output);
+NODE
 }
 
 generate_vapid_keys() {
