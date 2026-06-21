@@ -4187,6 +4187,11 @@ def test_mastodon_step_applies_the_custom_app_and_bootstraps_admin_access():
     assert "gitops/apps/mastodon.yaml" in step_text
     assert "apply-argocd-application.sh" in step_text
     assert '--application "mastodon"' in step_text
+    assert "wait_for_deployment_image" in step_text
+    assert "bundle" in step_text
+    assert "db:migrate" in step_text
+    assert "SKIP_POST_DEPLOYMENT_MIGRATIONS" not in step_text
+    assert 'kubectl -n mastodon logs "job/' in step_text
     assert "kubectl -n mastodon exec deployment/mastodon-web" in step_text
     assert "bin/tootctl" in step_text
     assert (
@@ -4209,6 +4214,7 @@ def test_mastodon_step_applies_the_custom_app_and_bootstraps_admin_access():
     assert "Host(`mastodon.__ZONE_NAME__`)" in app_text
     assert "mastodon-db-pooler-rw-session.databases.svc.cluster.local" in values_text
     assert "mastodon-redis.mastodon.svc.cluster.local" in values_text
+    assert "dbMigrate:\n      enabled: false" in values_text
     assert "mastodon-runtime" in runtime_secret_text
     assert "property: MASTODON_POSTGRESQL__PASSWORD" in runtime_secret_text
     assert "property: REDIS_PASSWORD" in runtime_secret_text

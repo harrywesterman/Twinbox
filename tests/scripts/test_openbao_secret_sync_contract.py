@@ -38,6 +38,7 @@ TALOS_CATEGORY = REPO_ROOT / "categories" / "talos-cluster" / "category.yaml"
 PIXELFED_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-pixelfed" / "run.sh"
 MASTODON_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-mastodon" / "run.sh"
 MASTODON_APP = REPO_ROOT / "gitops" / "apps" / "mastodon.yaml"
+MASTODON_VALUES = REPO_ROOT / "gitops" / "values" / "mastodon.yaml"
 MASTODON_RUNTIME_SECRET = (
     REPO_ROOT / "gitops" / "platform-apps" / "mastodon" / "externalsecret-runtime.yaml"
 )
@@ -551,6 +552,7 @@ def test_outline_step_projects_a_real_oidc_backed_app():
 def test_mastodon_step_bootstraps_runtime_and_admin_secret_via_openbao():
     step_text = _read(MASTODON_STEP)
     app_text = _read(MASTODON_APP)
+    values_text = _read(MASTODON_VALUES)
     runtime_secret_text = _read(MASTODON_RUNTIME_SECRET)
     db_secret_text = _read(MASTODON_DB_SECRET)
     db_cluster_text = _read(MASTODON_DB_CLUSTER)
@@ -580,6 +582,10 @@ def test_mastodon_step_bootstraps_runtime_and_admin_secret_via_openbao():
         '--required-keys "MASTODON_POSTGRESQL__USERNAME,MASTODON_POSTGRESQL__PASSWORD,REDIS_PASSWORD,SECRET_KEY_BASE,OTP_SECRET,VAPID_PRIVATE_KEY,VAPID_PUBLIC_KEY,ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY,ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY,ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT,MASTODON_OIDC_CLIENT_ID,MASTODON_OIDC_CLIENT_SECRET,MASTODON_ADMIN_USERNAME,MASTODON_ADMIN_PASSWORD"'
         in step_text
     )
+    assert "wait_for_deployment_image" in step_text
+    assert "bundle" in step_text
+    assert "db:migrate" in step_text
+    assert "SKIP_POST_DEPLOYMENT_MIGRATIONS" not in step_text
     assert "kubectl -n mastodon exec deployment/mastodon-web" in step_text
     assert "bin/tootctl" in step_text
     assert (
@@ -595,6 +601,7 @@ def test_mastodon_step_bootstraps_runtime_and_admin_secret_via_openbao():
     assert "path: gitops/databases/mastodon" in app_text
     assert "mastodon.__ZONE_NAME__" in app_text
     assert "authentik.__ZONE_NAME__/application/o/mastodon/" in app_text
+    assert "dbMigrate:\n      enabled: false" in values_text
     assert "mastodon-runtime" in runtime_secret_text
     assert "secretKey: password" in runtime_secret_text
     assert "property: MASTODON_POSTGRESQL__PASSWORD" in runtime_secret_text

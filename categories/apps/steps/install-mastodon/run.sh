@@ -90,6 +90,122 @@ wait_for_deployment_rollout() {
   done
 }
 
+wait_for_deployment_image() {
+  local namespace="$1"
+  local deployment="$2"
+  local label="${3:-$deployment}"
+  local attempts=120
+  local attempt=1
+
+  while true; do
+    local image=""
+    image="$(kubectl -n "$namespace" get deployment "$deployment" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)"
+    if [[ -n "$image" ]]; then
+      printf '%s\n' "$image"
+      return 0
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      fail "Timed out waiting for ${label} image"
+    fi
+
+    log "Waiting for ${label} image to appear (${attempt}/${attempts})"
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
+run_mastodon_db_migrate_job() {
+  local mastodon_image="$1"
+  local job_name="mastodon-db-migrate-$(date +%s)-$(openssl rand -hex 4)"
+  local attempts=120
+  local attempt=1
+
+  log "Running Mastodon database migrations"
+  kubectl apply -f - >/dev/null <<EOF
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ${job_name}
+  namespace: mastodon
+  labels:
+    app.kubernetes.io/name: mastodon-db-migrate
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      name: ${job_name}
+      labels:
+        app.kubernetes.io/name: mastodon-db-migrate
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: mastodon-db-migrate
+          image: "${mastodon_image}"
+          imagePullPolicy: IfNotPresent
+          command:
+            - bundle
+            - exec
+            - rake
+            - db:migrate
+          envFrom:
+            - secretRef:
+                name: mastodon-runtime
+          env:
+            - name: DB_HOST
+              value: mastodon-db-rw.databases.svc.cluster.local
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: mastodon
+            - name: DB_USER
+              value: mastodon
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: mastodon-runtime
+                  key: password
+            - name: REDIS_HOST
+              value: mastodon-redis.mastodon.svc.cluster.local
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_DRIVER
+              value: ruby
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mastodon-runtime
+                  key: REDIS_PASSWORD
+EOF
+
+  while true; do
+    local job_status_json complete failed
+    job_status_json="$(kubectl -n mastodon get job "$job_name" -o json 2>/dev/null || true)"
+    if [[ -n "$job_status_json" ]]; then
+      complete="$(jq -r '.status.conditions[]? | select(.type == "Complete" and .status == "True") | .type' <<<"$job_status_json" | head -n1)"
+      failed="$(jq -r '.status.conditions[]? | select(.type == "Failed" and .status == "True") | .type' <<<"$job_status_json" | head -n1)"
+      if [[ -n "$complete" ]]; then
+        log "Mastodon database migrations completed"
+        kubectl -n mastodon delete job "$job_name" --ignore-not-found >/dev/null
+        return 0
+      fi
+      if [[ -n "$failed" || "$(jq -r '.status.failed // 0' <<<"$job_status_json")" != "0" ]]; then
+        kubectl -n mastodon logs "job/${job_name}" >&2 || true
+        fail "Mastodon database migrations failed"
+      fi
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      kubectl -n mastodon logs "job/${job_name}" >&2 || true
+      fail "Timed out waiting for Mastodon database migrations"
+    fi
+
+    log "Waiting for Mastodon database migrations (${attempt}/${attempts})"
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
 render_template() {
   local template_file="$1"
   local rendered_file="$2"
@@ -432,6 +548,8 @@ wait_for_named_resource_ready "mastodon" "externalsecret" "mastodon-s3" "Mastodo
 wait_for_named_resource_ready "databases" "externalsecret" "mastodon-db-credentials" "Mastodon database ExternalSecret"
 wait_for_named_resource_ready "databases" "cluster" "mastodon-db" "Mastodon CloudNativePG cluster"
 wait_for_deployment_rollout "mastodon" "mastodon-redis" "Mastodon Redis"
+mastodon_web_image="$(wait_for_deployment_image "mastodon" "mastodon-web" "Mastodon web")"
+run_mastodon_db_migrate_job "$mastodon_web_image"
 wait_for_deployment_rollout "mastodon" "mastodon-web" "Mastodon web"
 wait_for_deployment_rollout "mastodon" "mastodon-streaming" "Mastodon streaming"
 wait_for_deployment_rollout "mastodon" "mastodon-sidekiq-all-queues" "Mastodon Sidekiq"

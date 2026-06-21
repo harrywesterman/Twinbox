@@ -9,7 +9,7 @@ mastodon:
     dbPrepare:
       enabled: false
     dbMigrate:
-      enabled: true
+      enabled: false
   locale: en
   singleUserMode: false
   authorizedFetch: false
