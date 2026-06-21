@@ -178,6 +178,12 @@ export const STEP_ICON_MANIFEST = [
     officialSourceUrl: "https://github.com/immich-app/immich",
   }),
   iconEntry({
+    stepId: "install-mastodon",
+    isAppOrPlatform: true,
+    officialSourceType: "project-repository",
+    officialSourceUrl: "https://github.com/mastodon/mastodon",
+  }),
+  iconEntry({
     stepId: "install-zulip",
     isAppOrPlatform: true,
     officialSourceType: "project-repository",

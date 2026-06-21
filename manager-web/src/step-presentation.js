@@ -158,6 +158,11 @@ function buildProjectUrlMap() {
       project_url: "https://pixelfed.org/",
       github_url: "https://github.com/pixelfed/pixelfed",
     },
+    "install-mastodon": {
+      icon: "🐘",
+      project_url: "https://joinmastodon.org/",
+      github_url: "https://github.com/mastodon/mastodon",
+    },
     "install-zulip": {
       icon: "💬",
       project_url: "https://zulip.com/",

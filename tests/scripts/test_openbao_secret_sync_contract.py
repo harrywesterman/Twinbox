@@ -36,6 +36,14 @@ BESZEL_AGENT_SECRET = (
 BESZEL_AGENT_DAEMONSET = REPO_ROOT / "gitops" / "platform-apps" / "beszel-agents" / "daemonset.yaml"
 TALOS_CATEGORY = REPO_ROOT / "categories" / "talos-cluster" / "category.yaml"
 PIXELFED_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-pixelfed" / "run.sh"
+MASTODON_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-mastodon" / "run.sh"
+MASTODON_APP = REPO_ROOT / "gitops" / "apps" / "mastodon.yaml"
+MASTODON_RUNTIME_SECRET = (
+    REPO_ROOT / "gitops" / "platform-apps" / "mastodon" / "externalsecret-runtime.yaml"
+)
+MASTODON_DB_SECRET = REPO_ROOT / "gitops" / "databases" / "mastodon" / "externalsecret.yaml"
+MASTODON_DB_CLUSTER = REPO_ROOT / "gitops" / "databases" / "mastodon" / "cluster.yaml"
+MASTODON_DB_OBJECTSTORE = REPO_ROOT / "gitops" / "databases" / "mastodon" / "objectstore.yaml"
 ZULIP_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-zulip" / "step.yaml"
 ZULIP_RUN = REPO_ROOT / "categories" / "apps" / "steps" / "install-zulip" / "run.sh"
 ZULIP_APP = REPO_ROOT / "gitops" / "apps" / "zulip.yaml"
@@ -532,6 +540,59 @@ def test_outline_step_projects_a_real_oidc_backed_app():
     assert "property: UTILS_SECRET" in secret_text
     assert "property: OIDC_CLIENT_ID" in secret_text
     assert "property: OIDC_CLIENT_SECRET" in secret_text
+    assert "imageName: ghcr.io/cloudnative-pg/postgresql:16.4" in db_cluster_text
+
+
+def test_mastodon_step_bootstraps_runtime_and_admin_secret_via_openbao():
+    step_text = _read(MASTODON_STEP)
+    app_text = _read(MASTODON_APP)
+    runtime_secret_text = _read(MASTODON_RUNTIME_SECRET)
+    db_secret_text = _read(MASTODON_DB_SECRET)
+    db_cluster_text = _read(MASTODON_DB_CLUSTER)
+    db_objectstore_text = _read(MASTODON_DB_OBJECTSTORE)
+
+    assert "openbao_read_global_secret_json mastodon" in step_text
+    assert "sync-openbao-global-secret.sh" in step_text
+    assert '--secret-name "mastodon"' in step_text
+    assert (
+        '--required-keys "MASTODON_POSTGRESQL__USERNAME,MASTODON_POSTGRESQL__PASSWORD,REDIS_PASSWORD,SECRET_KEY_BASE,OTP_SECRET,VAPID_PRIVATE_KEY,VAPID_PUBLIC_KEY,ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY,ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY,ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT,MASTODON_OIDC_CLIENT_ID,MASTODON_OIDC_CLIENT_SECRET,MASTODON_ADMIN_USERNAME"'
+        in step_text
+    )
+    assert (
+        '--required-keys "MASTODON_POSTGRESQL__USERNAME,MASTODON_POSTGRESQL__PASSWORD,REDIS_PASSWORD,SECRET_KEY_BASE,OTP_SECRET,VAPID_PRIVATE_KEY,VAPID_PUBLIC_KEY,ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY,ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY,ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT,MASTODON_OIDC_CLIENT_ID,MASTODON_OIDC_CLIENT_SECRET,MASTODON_ADMIN_USERNAME,MASTODON_ADMIN_PASSWORD"'
+        in step_text
+    )
+    assert "kubectl -n mastodon exec deployment/mastodon-web" in step_text
+    assert "bin/tootctl" in step_text
+    assert (
+        'accounts modify "$mastodon_admin_username" --approve --confirm --role Owner --reset-password'
+        in step_text
+    )
+    assert (
+        'accounts create "$mastodon_admin_username" --email "$mastodon_admin_email" --confirmed --role Owner --approve'
+        in step_text
+    )
+    assert "MASTODON_ADMIN_PASSWORD" in step_text
+    assert "path: gitops/platform-apps/mastodon" in app_text
+    assert "path: gitops/databases/mastodon" in app_text
+    assert "mastodon.__ZONE_NAME__" in app_text
+    assert "authentik.__ZONE_NAME__/application/o/mastodon/" in app_text
+    assert "mastodon-runtime" in runtime_secret_text
+    assert "secretKey: password" in runtime_secret_text
+    assert "property: MASTODON_POSTGRESQL__PASSWORD" in runtime_secret_text
+    assert "property: REDIS_PASSWORD" in runtime_secret_text
+    assert "property: SECRET_KEY_BASE" in runtime_secret_text
+    assert "property: OTP_SECRET" in runtime_secret_text
+    assert "property: VAPID_PRIVATE_KEY" in runtime_secret_text
+    assert "property: VAPID_PUBLIC_KEY" in runtime_secret_text
+    assert "property: ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY" in runtime_secret_text
+    assert "property: ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY" in runtime_secret_text
+    assert "property: ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT" in runtime_secret_text
+    assert "name: mastodon-db-credentials" in db_secret_text
+    assert "property: MASTODON_POSTGRESQL__USERNAME" in db_secret_text
+    assert "property: MASTODON_POSTGRESQL__PASSWORD" in db_secret_text
+    assert "barmanObjectName: mastodon-db-objectstore" in db_cluster_text
+    assert "destinationPath: s3://twinbox-velero/mastodon-db/" in db_objectstore_text
     assert "imageName: ghcr.io/cloudnative-pg/postgresql:16.4" in db_cluster_text
 
 

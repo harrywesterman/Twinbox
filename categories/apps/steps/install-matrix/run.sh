@@ -251,7 +251,7 @@ authentik_setup_forward
 AUTHENTIK_HOST="${AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
 matrix_host="https://matrix.${public_zone_name}"
 mas_host="https://account.${public_zone_name}"
-mas_redirect_uri="${mas_host}/oidc/callback/"
+mas_redirect_uri="${mas_host}/upstream/callback/${mas_oidc_provider_ulid}"
 mas_application_slug="matrix"
 mas_issuer_url="${AUTHENTIK_HOST%/}/application/o/${mas_application_slug}/"
 mas_client_id="$(openssl rand -hex 16)"
@@ -498,6 +498,7 @@ provider_payload="$(
     --arg invalidation_flow "$invalidation_flow_id" \
     --arg signing_key "$signing_key_id" \
     --arg redirect_uri "$mas_redirect_uri" \
+    --arg mas_host "$mas_host" \
     --argjson property_mappings "$(jq -cn \
       --arg openid "$openid_mapping_id" \
       --arg email "$email_mapping_id" \
@@ -514,6 +515,10 @@ provider_payload="$(
         {
           matching_mode: "strict",
           url: $redirect_uri
+        },
+        {
+          matching_mode: "strict",
+          url: ($mas_host + "/oidc/callback/")
         }
       ],
       property_mappings: $property_mappings,

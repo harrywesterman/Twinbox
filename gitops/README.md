@@ -102,6 +102,7 @@ App-specific Kubernetes manifests. Some are still rendered or applied directly b
 - `netbird-routing-peers/` - NetBird routing peer deployment.
 - `nextcloud/` - Nextcloud deployment, service, ingress, and database wiring.
 - `ntfy/` - ntfy ingress and kustomization.
+- `mastodon/` - Mastodon namespace, Redis, ingress, and secret wiring.
 - `opencloud/` - OpenCloud deployment, collaboration services, ingress, and bootstrap config.
 - `openwebui/` - OpenWebUI deployment, service, ingress, and PVC.
 - `outline/` - Outline deployment, service, ingress, and database wiring.

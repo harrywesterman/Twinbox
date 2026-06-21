@@ -381,6 +381,11 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
             assert openwebui["installable"] is True
             assert openwebui["app_state"] == "ready"
             assert openwebui["runner"]["script"] == "categories/apps/steps/install-openwebui/run.sh"
+            mastodon = next(step for step in apps if step["id"] == "install-mastodon")
+            assert mastodon["placeholder"] is False
+            assert mastodon["installable"] is True
+            assert mastodon["app_state"] == "ready"
+            assert mastodon["runner"]["script"] == "categories/apps/steps/install-mastodon/run.sh"
             pixelfed = next(step for step in apps if step["id"] == "install-pixelfed")
             assert pixelfed["placeholder"] is False
             assert pixelfed["installable"] is True

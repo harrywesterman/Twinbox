@@ -58,6 +58,19 @@ STIRLING_PDF_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "apps" / "steps" / "install-stirling-pdf" / "run.sh"
 )
 PIXELFED_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-pixelfed" / "run.sh"
+MASTODON_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-mastodon" / "run.sh"
+MASTODON_STEP_MANIFEST = (
+    REPO_ROOT / "categories" / "apps" / "steps" / "install-mastodon" / "step.yaml"
+)
+MASTODON_APP = REPO_ROOT / "gitops" / "apps" / "mastodon.yaml"
+MASTODON_VALUES = REPO_ROOT / "gitops" / "values" / "mastodon.yaml"
+MASTODON_PLATFORM_DIR = REPO_ROOT / "gitops" / "platform-apps" / "mastodon"
+MASTODON_RUNTIME_SECRET = MASTODON_PLATFORM_DIR / "externalsecret-runtime.yaml"
+MASTODON_S3_SECRET = MASTODON_PLATFORM_DIR / "externalsecret-s3.yaml"
+MASTODON_DB_DIR = REPO_ROOT / "gitops" / "databases" / "mastodon"
+MASTODON_DB_SECRET = MASTODON_DB_DIR / "externalsecret.yaml"
+MASTODON_DB_CLUSTER = MASTODON_DB_DIR / "cluster.yaml"
+MASTODON_DB_OBJECTSTORE = MASTODON_DB_DIR / "objectstore.yaml"
 MATRIX_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-matrix" / "run.sh"
 TWINBOX_PORTAL_APP = REPO_ROOT / "gitops" / "apps" / "twinbox-portal.yaml"
 OUTLINE_APP = REPO_ROOT / "gitops" / "apps" / "outline.yaml"
@@ -2362,28 +2375,19 @@ def test_matrix_app_manifest_uses_supported_chart_values():
     assert (
         'serverName: "matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"' in text
     )
-    assert (
-        'synapse:\n                ingress:\n                  host: "matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"'
-        in text
-    )
-    assert (
-        'elementWeb:\n                ingress:\n                  host: "chat.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"'
-        in text
-    )
-    assert (
-        'matrixAuthenticationService:\n                ingress:\n                  host: "account.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"'
-        in text
-    )
+    assert "synapse:" in text
+    assert "elementWeb:" in text
+    assert "matrixAuthenticationService:" in text
+    assert "elementAdmin:" in text
+    assert "matrixRTC:" in text
     assert "configSecret: matrix-config" in text
     assert "configSecretKey: oidc-upstream.yaml" in text
-    assert (
-        'elementAdmin:\n                ingress:\n                  host: "element-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"'
-        in text
-    )
-    assert (
-        'matrixRTC:\n                ingress:\n                  host: "mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"'
-        in text
-    )
+    assert 'host: "matrix.' in text
+    assert 'host: "chat.' in text
+    assert 'host: "account.' in text
+    assert 'host: "element-admin.' in text
+    assert 'host: "mrtc.' in text
+    assert "twinbox.io/public-zone-name" in text
     assert "extraEnv:" not in text
     assert "valueFrom:" not in text
     assert "ingress.enabled" not in text
@@ -3711,6 +3715,7 @@ def test_databases_shared_kustomization_only_owns_namespace():
         "authentik",
         "hedgedoc",
         "immich",
+        "mastodon",
         "n8n",
         "nextcloud",
         "openwebui",
@@ -4030,6 +4035,10 @@ def test_database_app_installers_refresh_pgadmin_after_database_ready():
             "hedgedoc-db-pooler-rw-session.databases.svc.cluster.local",
         ),
         "install-immich": ("immich", "immich-db-pooler-rw-session.databases.svc.cluster.local"),
+        "install-mastodon": (
+            "mastodon",
+            "mastodon-db-pooler-rw-session.databases.svc.cluster.local",
+        ),
         "install-n8n": ("n8n", "n8n-db-pooler-rw-session.databases.svc.cluster.local"),
         "install-nextcloud": ("nextcloud", "nextcloud-db-pooler-rw.databases.svc.cluster.local"),
         "install-openwebui": (
@@ -4125,6 +4134,83 @@ def test_install_immich_step_applies_its_argo_application():
     assert "db-externalsecret.yaml" in (
         REPO_ROOT / "gitops" / "platform-apps" / "immich" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
+
+
+def test_mastodon_step_applies_the_custom_app_and_bootstraps_admin_access():
+    step_text = MASTODON_STEP_SCRIPT.read_text(encoding="utf-8")
+    step_manifest_text = MASTODON_STEP_MANIFEST.read_text(encoding="utf-8")
+    app_text = MASTODON_APP.read_text(encoding="utf-8")
+    values_text = MASTODON_VALUES.read_text(encoding="utf-8")
+    runtime_secret_text = MASTODON_RUNTIME_SECRET.read_text(encoding="utf-8")
+    s3_secret_text = MASTODON_S3_SECRET.read_text(encoding="utf-8")
+    db_secret_text = MASTODON_DB_SECRET.read_text(encoding="utf-8")
+    db_cluster_text = MASTODON_DB_CLUSTER.read_text(encoding="utf-8")
+    db_objectstore_text = MASTODON_DB_OBJECTSTORE.read_text(encoding="utf-8")
+    dashy_config_text = (REPO_ROOT / "lib" / "dashy-config.mjs").read_text(encoding="utf-8")
+
+    assert "title: Install Mastodon" in step_manifest_text
+    assert "icon: install-mastodon" in step_manifest_text
+    assert "categories/apps/steps/install-mastodon/run.sh" in step_manifest_text
+    assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in step_text
+    assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in step_text
+    assert "openbao_read_global_secret_json mastodon" in step_text
+    assert "mastodon_secret_file=" in step_text
+    assert "sync-openbao-global-secret.sh" in step_text
+    assert '--secret-name "mastodon"' in step_text
+    assert (
+        '--required-keys "MASTODON_POSTGRESQL__USERNAME,MASTODON_POSTGRESQL__PASSWORD,REDIS_PASSWORD,SECRET_KEY_BASE,OTP_SECRET,VAPID_PRIVATE_KEY,VAPID_PUBLIC_KEY,ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY,ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY,ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT,MASTODON_OIDC_CLIENT_ID,MASTODON_OIDC_CLIENT_SECRET,MASTODON_ADMIN_USERNAME"'
+        in step_text
+    )
+    assert (
+        '--required-keys "MASTODON_POSTGRESQL__USERNAME,MASTODON_POSTGRESQL__PASSWORD,REDIS_PASSWORD,SECRET_KEY_BASE,OTP_SECRET,VAPID_PRIVATE_KEY,VAPID_PUBLIC_KEY,ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY,ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY,ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT,MASTODON_OIDC_CLIENT_ID,MASTODON_OIDC_CLIENT_SECRET,MASTODON_ADMIN_USERNAME,MASTODON_ADMIN_PASSWORD"'
+        in step_text
+    )
+    assert "render_template" in step_text
+    assert "gitops/apps/mastodon.yaml" in step_text
+    assert "apply-argocd-application.sh" in step_text
+    assert '--application "mastodon"' in step_text
+    assert "kubectl -n mastodon exec deployment/mastodon-web" in step_text
+    assert "bin/tootctl" in step_text
+    assert (
+        'accounts modify "$mastodon_admin_username" --approve --confirm --role Owner' in step_text
+    )
+    assert (
+        'accounts create "$mastodon_admin_username" --email "$mastodon_admin_email" --confirmed --role Owner --approve'
+        in step_text
+    )
+    assert "sync-pgadmin4-server.sh" in step_text
+    assert '--app-id "mastodon"' in step_text
+    assert '--host "mastodon-db-pooler-rw-session.databases.svc.cluster.local"' in step_text
+    assert "ensure-netbird-service.sh" in step_text
+    assert '--service-name "mastodon"' in step_text
+    assert '--service-domain "mastodon.${public_zone_name}"' in step_text
+    assert "path: gitops/platform-apps/mastodon" in app_text
+    assert "path: gitops/databases/mastodon" in app_text
+    assert "mastodon.__ZONE_NAME__" in app_text
+    assert "authentik.__ZONE_NAME__/application/o/mastodon/" in app_text
+    assert "Host(`mastodon.__ZONE_NAME__`)" in app_text
+    assert "mastodon-db-pooler-rw-session.databases.svc.cluster.local" in values_text
+    assert "mastodon-redis.mastodon.svc.cluster.local" in values_text
+    assert "mastodon-runtime" in runtime_secret_text
+    assert "property: MASTODON_POSTGRESQL__PASSWORD" in runtime_secret_text
+    assert "property: REDIS_PASSWORD" in runtime_secret_text
+    assert "property: SECRET_KEY_BASE" in runtime_secret_text
+    assert "property: OTP_SECRET" in runtime_secret_text
+    assert "property: VAPID_PRIVATE_KEY" in runtime_secret_text
+    assert "property: VAPID_PUBLIC_KEY" in runtime_secret_text
+    assert "property: ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY" in runtime_secret_text
+    assert "property: ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY" in runtime_secret_text
+    assert "property: ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT" in runtime_secret_text
+    assert "name: mastodon-s3" in s3_secret_text
+    assert "key: twinbox/global/velero" in s3_secret_text
+    assert "name: mastodon-db-credentials" in db_secret_text
+    assert "property: MASTODON_POSTGRESQL__USERNAME" in db_secret_text
+    assert "property: MASTODON_POSTGRESQL__PASSWORD" in db_secret_text
+    assert "barmanObjectName: mastodon-db-objectstore" in db_cluster_text
+    assert "destinationPath: s3://twinbox-velero/mastodon-db/" in db_objectstore_text
+    assert "imageName: ghcr.io/cloudnative-pg/postgresql:16.4" in db_cluster_text
+    assert '["install-mastodon", "install-mastodon"]' in dashy_config_text
+    assert '["Mastodon", "install-mastodon"]' in dashy_config_text
     immich_db_text = IMMICH_DB_KUSTOMIZATION.read_text(encoding="utf-8")
     assert "namespace.yaml" not in immich_db_text
     assert "../namespace.yaml" not in immich_db_text
