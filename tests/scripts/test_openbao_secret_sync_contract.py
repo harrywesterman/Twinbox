@@ -505,6 +505,7 @@ def test_outline_step_projects_a_real_oidc_backed_app():
     step_text = _read(OUTLINE_STEP)
     app_text = _read(OUTLINE_APP)
     deployment_text = _read(OUTLINE_DEPLOYMENT)
+    ingressroute_text = _read(OUTLINE_PLATFORM_DIR / "ingressroute.yaml")
     secret_text = _read(OUTLINE_SECRET)
     db_cluster_text = _read(OUTLINE_DB_CLUSTER)
 
@@ -530,6 +531,9 @@ def test_outline_step_projects_a_real_oidc_backed_app():
     assert "OIDC_ISSUER_URL" in deployment_text
     assert "OIDC_LOGOUT_URI" in deployment_text
     assert "PROXY_HEADERS_TRUSTED" in deployment_text
+    assert "outline-forwarded-headers" in ingressroute_text
+    forwarded_headers_text = _read(OUTLINE_PLATFORM_DIR / "forwarded-headers-middleware.yaml")
+    assert "X-Forwarded-Proto: https" in forwarded_headers_text
     assert "requests:" in deployment_text
     assert "cpu: 500m" in deployment_text
     assert "memory: 512Mi" in deployment_text
