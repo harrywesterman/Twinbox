@@ -118,6 +118,11 @@ postSetup:
           realm.video_chat_provider = desired_video_chat_provider
           update_fields.append("video_chat_provider")
 
+      # Allow any Authentik-authenticated user to sign up without invitation
+      if hasattr(realm, "invite_required") and realm.invite_required:
+          realm.invite_required = False
+          update_fields.append("invite_required")
+
       if update_fields:
           realm.save(update_fields=update_fields)
 
