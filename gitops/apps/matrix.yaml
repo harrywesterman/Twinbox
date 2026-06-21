@@ -27,6 +27,8 @@ spec:
               - $values/gitops/values/matrix.yaml
             values: |
               serverName: "matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+              ingress:
+                className: traefik-external
               synapse:
                 ingress:
                   host: "matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
