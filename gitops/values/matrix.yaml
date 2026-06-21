@@ -2,7 +2,7 @@ postgres:
   enabled: false
 
 ingress:
-  enabled: false
+  className: traefik-external
 
 synapse:
   postgres:
