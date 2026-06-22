@@ -280,6 +280,149 @@ def test_talos_disk_image_existing_import_must_match_local_size():
         assert "UNEXPECTED_URL=" not in log_text
 
 
+def test_talos_disk_image_verify_waits_for_uploaded_size_to_settle():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        log_file = root / "upload.log"
+        harness = root / "harness.sh"
+
+        harness.write_text(
+            textwrap.dedent(
+                f"""#!/usr/bin/env bash
+                set -euo pipefail
+
+                LOG_FILE={shlex.quote(str(log_file))}
+                APPLY_CLUSTER_SCRIPT={shlex.quote(str(APPLY_CLUSTER_SCRIPT))}
+                : > "$LOG_FILE"
+
+                log() {{
+                  printf '%s\\n' "$*" >> "$LOG_FILE"
+                }}
+
+                fail() {{
+                  printf 'FAIL:%s\\n' "$*" >> "$LOG_FILE"
+                  return 1
+                }}
+
+                file_size_bytes() {{
+                  wc -c < "$1" | tr -d '[:space:]'
+                }}
+
+                sleep() {{
+                  log "SLEEP=$1"
+                }}
+
+                export FILE_DATASTORE=local
+                export PROXMOX_UPLOAD_MAX_ATTEMPTS=1
+                export PROXMOX_VERIFY_MAX_ATTEMPTS=2
+                export PROXMOX_IMPORT_FREE_SPACE_BUFFER_BYTES=10
+                export PROXMOX_PORT=8006
+                export PROXMOX_USER=root@pam
+                export PROXMOX_PASSWORD=secret
+                export TF_VAR_proxmox_endpoint=https://pve1.local.westermanonline.com:8006
+                IMAGE_PATH="$PWD/talos-cluster.img"
+                printf 'talos-image-content\\n' > "$IMAGE_PATH"
+                IMAGE_SIZE="$(wc -c < "$IMAGE_PATH" | tr -d '[:space:]')"
+                UPLOAD_MARKER_FILE="$PWD/node-a-uploaded"
+                VERIFY_COUNT_FILE="$PWD/verify-count"
+                rm -f "$UPLOAD_MARKER_FILE" "$VERIFY_COUNT_FILE"
+
+                HELPERS_FILE="$(mktemp)"
+                awk '
+                  /^proxmox_api_login\\(\\) \\{{/ {{ emit = 1 }}
+                  /^remove_legacy_talos_file_state\\(\\) \\{{/ {{ emit = 0 }}
+                  emit {{ print }}
+                ' "$APPLY_CLUSTER_SCRIPT" >"$HELPERS_FILE"
+                source "$HELPERS_FILE"
+
+                FAKE_CLUSTER_STATUS='{{"data":[{{"type":"node","name":"node-a","ip":"192.168.2.91"}}]}}'
+
+                curl() {{
+                  local output_file=""
+                  local url="${{@: -1}}"
+                  local arg=""
+                  local prev=""
+
+                  for arg in "$@"; do
+                    if [[ "$prev" == "--output" ]]; then
+                      output_file="$arg"
+                    fi
+                    prev="$arg"
+                  done
+
+                  case "$url" in
+                    */access/ticket)
+                      printf '%s\\n' '{{"data":{{"ticket":"ticket","CSRFPreventionToken":"csrf"}}}}'
+                      return 0
+                      ;;
+                    */cluster/status)
+                      printf '%s\\n' "$FAKE_CLUSTER_STATUS"
+                      return 0
+                      ;;
+                    */storage/local/content)
+                      if [[ ! -f "$UPLOAD_MARKER_FILE" ]]; then
+                        printf '%s\\n' '{{"data":[]}}'
+                        return 0
+                      fi
+                      count=1
+                      if [[ -f "$VERIFY_COUNT_FILE" ]]; then
+                        count=$(( $(cat "$VERIFY_COUNT_FILE") + 1 ))
+                      fi
+                      printf '%s' "$count" > "$VERIFY_COUNT_FILE"
+                      if [[ "$count" -eq 1 ]]; then
+                        printf '%s\\n' '{{"data":[{{"volid":"local:import/talos-cluster.img","content":"import","size":1}}]}}'
+                      else
+                        printf '{{"data":[{{"volid":"local:import/talos-cluster.img","content":"import","size":%s}}]}}\\n' "$IMAGE_SIZE"
+                      fi
+                      return 0
+                      ;;
+                    */storage/local/status)
+                      printf '%s\\n' '{{"data":{{"avail":10737418240}}}}'
+                      return 0
+                      ;;
+                    */storage/local/upload)
+                      log "UPLOAD_URL=$url"
+                      if [[ -n "$output_file" ]]; then
+                        printf '%s\\n' '{{"data":"ok"}}' >"$output_file"
+                      fi
+                      : > "$UPLOAD_MARKER_FILE"
+                      printf '200\\n'
+                      return 0
+                      ;;
+                  esac
+
+                  printf 'unexpected curl url: %s\\n' "$url" >&2
+                  return 1
+                }}
+
+                upload_talos_image_to_nodes "$IMAGE_PATH" "talos-cluster.img" '["node-a"]'
+                """
+            ),
+            encoding="utf-8",
+        )
+        harness.chmod(0o755)
+
+        proc = subprocess.run(
+            ["bash", str(harness)],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert proc.returncode == 0, proc.stderr
+
+        log_text = log_file.read_text(encoding="utf-8")
+        assert (
+            "Talos disk image on node-a/local is 1 bytes, expected 20; retrying in 1s" in log_text
+        )
+        assert "SLEEP=1" in log_text
+        assert (
+            "Verified Talos disk image on node-a/local: local:import/talos-cluster.img" in log_text
+        )
+        assert "failed=none" in log_text
+
+
 def test_talos_disk_image_wrong_size_fails_before_upload():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)

@@ -531,9 +531,19 @@ proxmox_verify_talos_image() {
 
     if image_size="$(proxmox_talos_image_size "$node" "$datastore" "$image_name")"; then
       if [[ "$image_size" != "$expected_size_bytes" ]]; then
-        PROXMOX_TALOS_IMAGE_ERROR="Talos disk image on ${node}/${datastore} has unexpected size for ${expected_volid}: expected=${expected_size_bytes} bytes, actual=${image_size} bytes. Free space on ${node}/${datastore} and remove/re-upload the stale import image before retrying."
-        log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
-        return 1
+        if [[ "$attempt" -ge "$PROXMOX_VERIFY_MAX_ATTEMPTS" ]]; then
+          PROXMOX_TALOS_IMAGE_ERROR="Talos disk image on ${node}/${datastore} has unexpected size for ${expected_volid}: expected=${expected_size_bytes} bytes, actual=${image_size} bytes. Free space on ${node}/${datastore} and remove/re-upload the stale import image before retrying."
+          log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+          return 1
+        fi
+        local delay=$((2 ** (attempt - 1)))
+        if [[ "$delay" -gt 10 ]]; then
+          delay=10
+        fi
+        log "Talos disk image on ${node}/${datastore} is ${image_size} bytes, expected ${expected_size_bytes}; retrying in ${delay}s"
+        sleep "$delay"
+        attempt=$((attempt + 1))
+        continue
       fi
       log "Verified Talos disk image on ${node}/${datastore}: ${expected_volid} (${image_size} bytes)"
       PROXMOX_TALOS_IMAGE_ERROR=""
