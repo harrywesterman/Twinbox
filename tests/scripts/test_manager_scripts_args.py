@@ -658,6 +658,11 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert "proxmox_api_login()" in text
     assert "download_talos_image()" in text
     assert 'xz -dc "$tmp_compressed" > "$tmp_image"' in text
+    assert "PROXMOX_IMPORT_FREE_SPACE_BUFFER_BYTES" in text
+    assert "file_size_bytes()" in text
+    assert "proxmox_get_storage_status()" in text
+    assert "proxmox_talos_image_size()" in text
+    assert "proxmox_require_talos_upload_space()" in text
     assert "proxmox_upload_talos_image()" in text
     assert "proxmox_verify_talos_image()" in text
     assert "proxmox_talos_image_present()" in text
@@ -668,9 +673,14 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'validate_file_datastore_import_content "$FILE_DATASTORE"' in text
     assert "must allow Import content for Talos disk-image provisioning" in text
     assert '"${TF_VAR_proxmox_endpoint}/api2/json/storage/${datastore}"' in text
+    assert '"${node_endpoint}/api2/json/nodes/${node}/storage/${datastore}/status"' in text
     assert '--form "content=import"' in text
     assert 'expected_volid="${datastore}:import/${image_name}"' in text
     assert 'select(.volid == $volid and .content == "import")' in text
+    assert "stat -c '%s' \"$path\"" in text
+    assert 'file_size_bytes "$image_path"' in text
+    assert "has unexpected size for ${expected_volid}" in text
+    assert "has insufficient free space for Talos disk image upload" in text
     assert "Uploading Talos disk image to Proxmox nodes:" in text
     assert "Uploaded Talos disk image to ${node}/${datastore}" in text
     assert "Talos disk image not visible yet on ${node}/${datastore}; retrying in ${delay}s" in text

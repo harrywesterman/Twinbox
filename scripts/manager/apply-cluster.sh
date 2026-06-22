@@ -21,6 +21,12 @@ array_contains() {
   return 1
 }
 
+file_size_bytes() {
+  local path="$1"
+
+  stat -c '%s' "$path" 2>/dev/null || stat -f '%z' "$path"
+}
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MODULE_SOURCE="$WORKSPACE_ROOT/infra/opentofu/talos-proxmox"
@@ -53,6 +59,7 @@ export NO_COLOR=1
 TOFU_PARALLELISM="${TOFU_PARALLELISM:-1}"
 PROXMOX_UPLOAD_MAX_ATTEMPTS="${PROXMOX_UPLOAD_MAX_ATTEMPTS:-5}"
 PROXMOX_VERIFY_MAX_ATTEMPTS="${PROXMOX_VERIFY_MAX_ATTEMPTS:-5}"
+PROXMOX_IMPORT_FREE_SPACE_BUFFER_BYTES="${PROXMOX_IMPORT_FREE_SPACE_BUFFER_BYTES:-1073741824}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -369,6 +376,71 @@ proxmox_get_storage_content() {
     "${node_endpoint}/api2/json/nodes/${node}/storage/${datastore}/content"
 }
 
+proxmox_get_storage_status() {
+  local node="$1"
+  local datastore="$2"
+  local node_endpoint=""
+
+  node_endpoint="$(proxmox_node_endpoint "$node")"
+  proxmox_api_login
+  curl -ksS --fail \
+    --cookie "$PROXMOX_TICKET_COOKIE" \
+    --header "CSRFPreventionToken: ${PROXMOX_CSRF_TOKEN}" \
+    "${node_endpoint}/api2/json/nodes/${node}/storage/${datastore}/status"
+}
+
+proxmox_talos_image_size() {
+  local node="$1"
+  local datastore="$2"
+  local image_name="$3"
+  local expected_volid="${datastore}:import/${image_name}"
+  local content_json=""
+  local image_size=""
+
+  if ! content_json="$(proxmox_get_storage_content "$node" "$datastore")"; then
+    PROXMOX_TALOS_IMAGE_ERROR="Failed to read Proxmox storage content for ${node}/${datastore}"
+    return 2
+  fi
+
+  image_size="$(jq -r --arg volid "$expected_volid" '
+    [.data[]? | select(.volid == $volid and .content == "import") | (.size // empty)]
+    | .[0] // ""
+  ' <<<"$content_json")"
+
+  [[ -n "$image_size" ]] || return 1
+  printf '%s\n' "$image_size"
+}
+
+proxmox_require_talos_upload_space() {
+  local node="$1"
+  local datastore="$2"
+  local image_size_bytes="$3"
+  local storage_json=""
+  local available_bytes=""
+  local required_bytes=$((image_size_bytes + PROXMOX_IMPORT_FREE_SPACE_BUFFER_BYTES))
+
+  if ! storage_json="$(proxmox_get_storage_status "$node" "$datastore")"; then
+    PROXMOX_TALOS_IMAGE_ERROR="Failed to read Proxmox storage status for ${node}/${datastore}"
+    log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+    return 1
+  fi
+
+  available_bytes="$(jq -r '.data.avail // empty' <<<"$storage_json")"
+  if [[ ! "$available_bytes" =~ ^[0-9]+$ ]]; then
+    PROXMOX_TALOS_IMAGE_ERROR="Proxmox storage status for ${node}/${datastore} did not include available bytes"
+    log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+    return 1
+  fi
+
+  if (( available_bytes < required_bytes )); then
+    PROXMOX_TALOS_IMAGE_ERROR="Proxmox file datastore ${node}/${datastore} has insufficient free space for Talos disk image upload: available=${available_bytes} bytes, required=${required_bytes} bytes (image=${image_size_bytes} bytes plus ${PROXMOX_IMPORT_FREE_SPACE_BUFFER_BYTES} bytes buffer). Free space on ${node}/${datastore} or remove stale import/backup content before retrying."
+    log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+    return 1
+  fi
+
+  log "Proxmox file datastore ${node}/${datastore} has ${available_bytes} bytes available for Talos disk image upload"
+}
+
 proxmox_upload_talos_image() {
   local node="$1"
   local datastore="$2"
@@ -449,22 +521,31 @@ proxmox_verify_talos_image() {
   local node="$1"
   local datastore="$2"
   local image_name="$3"
+  local expected_size_bytes="$4"
   local expected_volid="${datastore}:import/${image_name}"
   local attempt=1
 
   while true; do
-    local content_json=""
+    local image_size=""
+    local status=0
 
-    if ! content_json="$(proxmox_get_storage_content "$node" "$datastore")"; then
-      PROXMOX_TALOS_IMAGE_ERROR="Failed to read Proxmox storage content for ${node}/${datastore}"
-      log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
-      return 1
-    fi
-
-    if jq -e --arg volid "$expected_volid" '.data[]? | select(.volid == $volid and .content == "import")' >/dev/null <<<"$content_json"; then
-      log "Verified Talos disk image on ${node}/${datastore}: ${expected_volid}"
+    if image_size="$(proxmox_talos_image_size "$node" "$datastore" "$image_name")"; then
+      if [[ "$image_size" != "$expected_size_bytes" ]]; then
+        PROXMOX_TALOS_IMAGE_ERROR="Talos disk image on ${node}/${datastore} has unexpected size for ${expected_volid}: expected=${expected_size_bytes} bytes, actual=${image_size} bytes. Free space on ${node}/${datastore} and remove/re-upload the stale import image before retrying."
+        log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+        return 1
+      fi
+      log "Verified Talos disk image on ${node}/${datastore}: ${expected_volid} (${image_size} bytes)"
       PROXMOX_TALOS_IMAGE_ERROR=""
       return 0
+    else
+      status=$?
+    fi
+
+    if [[ "$status" -ne 1 ]]; then
+      PROXMOX_TALOS_IMAGE_ERROR="${PROXMOX_TALOS_IMAGE_ERROR:-Failed to read Proxmox storage content for ${node}/${datastore}}"
+      log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+      return 1
     fi
 
     if [[ "$attempt" -ge "$PROXMOX_VERIFY_MAX_ATTEMPTS" ]]; then
@@ -488,27 +569,67 @@ proxmox_talos_image_present() {
   local node="$1"
   local datastore="$2"
   local image_name="$3"
+  local expected_size_bytes="$4"
   local expected_volid="${datastore}:import/${image_name}"
-  local content_json=""
+  local image_size=""
+  local status=0
 
-  content_json="$(proxmox_get_storage_content "$node" "$datastore")" || return 1
-  jq -e --arg volid "$expected_volid" '.data[]? | select(.volid == $volid and .content == "import")' >/dev/null <<<"$content_json"
+  if image_size="$(proxmox_talos_image_size "$node" "$datastore" "$image_name")"; then
+    if [[ "$image_size" == "$expected_size_bytes" ]]; then
+      return 0
+    fi
+    PROXMOX_TALOS_IMAGE_ERROR="Talos disk image on ${node}/${datastore} has unexpected size for ${expected_volid}: expected=${expected_size_bytes} bytes, actual=${image_size} bytes. Free space on ${node}/${datastore} and remove/re-upload the stale import image before retrying."
+    return 2
+  else
+    status=$?
+  fi
+
+  [[ "$status" -eq 1 ]] && return 1
+  PROXMOX_TALOS_IMAGE_ERROR="${PROXMOX_TALOS_IMAGE_ERROR:-Failed to read Proxmox storage content for ${node}/${datastore}}"
+  return 2
 }
 
 upload_talos_image_to_nodes() {
   local image_path="$1"
   local image_name="$2"
   local nodes_json="$3"
+  local expected_size_bytes=""
   local node=""
+  local image_status=0
   local success_nodes=()
   local failed_nodes=()
   local failure_messages=()
 
+  if ! expected_size_bytes="$(file_size_bytes "$image_path")"; then
+    PROXMOX_TALOS_IMAGE_ERROR="Failed to inspect local Talos disk image size: ${image_path}"
+    log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+    return 1
+  fi
+  if [[ ! "$expected_size_bytes" =~ ^[0-9]+$ ]]; then
+    PROXMOX_TALOS_IMAGE_ERROR="Local Talos disk image size is not numeric for ${image_path}: ${expected_size_bytes}"
+    log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+    return 1
+  fi
+
   while IFS= read -r node; do
     [[ -n "$node" ]] || continue
-    if proxmox_talos_image_present "$node" "$FILE_DATASTORE" "$image_name"; then
-      log "Talos disk image already present on ${node}/${FILE_DATASTORE}: ${image_name}"
+    PROXMOX_TALOS_IMAGE_ERROR=""
+    if proxmox_talos_image_present "$node" "$FILE_DATASTORE" "$image_name" "$expected_size_bytes"; then
+      log "Talos disk image already present on ${node}/${FILE_DATASTORE}: ${image_name} (${expected_size_bytes} bytes)"
       success_nodes+=("$node")
+      continue
+    else
+      image_status=$?
+    fi
+    if [[ "$image_status" -eq 2 ]]; then
+      failed_nodes+=("$node")
+      failure_messages+=("${PROXMOX_TALOS_IMAGE_ERROR:-Talos disk image validation failed for ${node}/${FILE_DATASTORE}}")
+      continue
+    fi
+    PROXMOX_TALOS_IMAGE_ERROR=""
+    if ! proxmox_require_talos_upload_space "$node" "$FILE_DATASTORE" "$expected_size_bytes"; then
+      failed_nodes+=("$node")
+      failure_messages+=("${PROXMOX_TALOS_IMAGE_ERROR:-Talos disk image upload preflight failed for ${node}/${FILE_DATASTORE}}")
       continue
     fi
     log "Uploading Talos disk image directly to ${node}/${FILE_DATASTORE} via $(proxmox_node_endpoint "$node")"
@@ -519,7 +640,7 @@ upload_talos_image_to_nodes() {
       continue
     fi
     PROXMOX_TALOS_IMAGE_ERROR=""
-    if ! proxmox_verify_talos_image "$node" "$FILE_DATASTORE" "$image_name"; then
+    if ! proxmox_verify_talos_image "$node" "$FILE_DATASTORE" "$image_name" "$expected_size_bytes"; then
       failed_nodes+=("$node")
       failure_messages+=("${PROXMOX_TALOS_IMAGE_ERROR:-Talos disk image verification failed for ${node}/${FILE_DATASTORE}}")
       continue
