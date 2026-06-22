@@ -4238,6 +4238,11 @@ def test_mastodon_step_applies_the_custom_app_and_bootstraps_admin_access():
     assert "property: MASTODON_POSTGRESQL__USERNAME" in db_secret_text
     assert "property: MASTODON_POSTGRESQL__PASSWORD" in db_secret_text
     assert "barmanObjectName: mastodon-db-objectstore" in db_cluster_text
+    assert "instances: 2" in db_cluster_text
+    assert "cpu: 100m" in db_cluster_text
+    assert "memory: 256Mi" in db_cluster_text
+    assert "cpu: 500m" in db_cluster_text
+    assert "memory: 1Gi" in db_cluster_text
     assert "destinationPath: s3://twinbox-velero/mastodon-db/" in db_objectstore_text
     assert "imageName: ghcr.io/cloudnative-pg/postgresql:16.4" in db_cluster_text
     assert '["install-mastodon", "install-mastodon"]' in dashy_config_text
