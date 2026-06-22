@@ -371,6 +371,7 @@ mastodon_active_record_encryption_key_derivation_salt="$(generate_alphanumeric 3
 mastodon_vapid_json="$(generate_vapid_keys)"
 mastodon_vapid_private_key="$(jq -r '.privateKey' <<<"$mastodon_vapid_json")"
 mastodon_vapid_public_key="$(jq -r '.publicKey' <<<"$mastodon_vapid_json")"
+mastodon_admin_password=""
 
 existing_mastodon_secret_json=""
 if command -v openbao_read_global_secret_json >/dev/null 2>&1; then

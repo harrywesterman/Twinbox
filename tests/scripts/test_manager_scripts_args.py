@@ -4165,6 +4165,7 @@ def test_mastodon_step_applies_the_custom_app_and_bootstraps_admin_access():
     assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in step_text
     assert "openbao_read_global_secret_json mastodon" in step_text
     assert "mastodon_secret_file=" in step_text
+    assert 'mastodon_admin_password=""' in step_text
     assert "sync-openbao-global-secret.sh" in step_text
     assert '--secret-name "mastodon"' in step_text
     assert (

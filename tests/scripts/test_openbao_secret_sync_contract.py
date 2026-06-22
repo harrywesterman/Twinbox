@@ -563,6 +563,7 @@ def test_mastodon_step_bootstraps_runtime_and_admin_secret_via_openbao():
     assert "openbao_read_global_secret_json mastodon" in step_text
     assert "sync-openbao-global-secret.sh" in step_text
     assert '--secret-name "mastodon"' in step_text
+    assert 'mastodon_admin_password=""' in step_text
     assert "gitops/platform-apps/mastodon/namespace.yaml" in step_text
     assert "gitops/databases/shared/namespace.yaml" in step_text
     assert "gitops/platform-apps/mastodon/externalsecret-runtime.yaml" in step_text
