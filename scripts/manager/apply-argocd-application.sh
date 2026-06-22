@@ -223,7 +223,7 @@ wait_for_application_ready() {
         return 0
       fi
 
-      if [[ "$sync_status" == "Synced" && "$operation_phase" != "Running" && "$operation_phase" != "Terminating" && "$health_status" == "Degraded" ]]; then
+      if [[ "$sync_status" == "Synced" && "$operation_phase" != "Running" && "$operation_phase" != "Terminating" && ( "$health_status" == "Unknown" || "$health_status" == "Degraded" ) ]]; then
         if ! has_unhealthy_resources <<<"$status_json"; then
           log "Application/${application} is Synced and has no unhealthy resources; accepting aggregate health=${health_status}"
           return 0

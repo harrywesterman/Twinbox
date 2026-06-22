@@ -1301,6 +1301,7 @@ def test_apply_argocd_application_helper_applies_and_waits_for_health():
     assert "Application/${application} compare/spec error:" in text
     assert "Application/${application} is Synced and Healthy" in text
     assert "Application/${application} is Synced and has no unhealthy resources" in text
+    assert '( "$health_status" == "Unknown" || "$health_status" == "Degraded" )' in text
     assert "has_unhealthy_resources()" in text
     assert "--skip-namespace-baseline" in text
     assert "Skipping namespace resource baseline for" in text
