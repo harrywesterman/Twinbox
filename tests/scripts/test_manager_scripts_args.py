@@ -64,6 +64,7 @@ MASTODON_STEP_MANIFEST = (
 )
 MASTODON_APP = REPO_ROOT / "gitops" / "apps" / "mastodon.yaml"
 MASTODON_VALUES = REPO_ROOT / "gitops" / "values" / "mastodon.yaml"
+MASTODON_NAMESPACE = REPO_ROOT / "gitops" / "platform-apps" / "mastodon" / "namespace.yaml"
 MASTODON_PLATFORM_DIR = REPO_ROOT / "gitops" / "platform-apps" / "mastodon"
 MASTODON_RUNTIME_SECRET = MASTODON_PLATFORM_DIR / "externalsecret-runtime.yaml"
 MASTODON_S3_SECRET = MASTODON_PLATFORM_DIR / "externalsecret-s3.yaml"
@@ -4141,6 +4142,7 @@ def test_mastodon_step_applies_the_custom_app_and_bootstraps_admin_access():
     step_manifest_text = MASTODON_STEP_MANIFEST.read_text(encoding="utf-8")
     app_text = MASTODON_APP.read_text(encoding="utf-8")
     values_text = MASTODON_VALUES.read_text(encoding="utf-8")
+    namespace_text = MASTODON_NAMESPACE.read_text(encoding="utf-8")
     runtime_secret_text = MASTODON_RUNTIME_SECRET.read_text(encoding="utf-8")
     s3_secret_text = MASTODON_S3_SECRET.read_text(encoding="utf-8")
     db_secret_text = MASTODON_DB_SECRET.read_text(encoding="utf-8")
@@ -4214,7 +4216,11 @@ def test_mastodon_step_applies_the_custom_app_and_bootstraps_admin_access():
     assert "Host(`mastodon.__ZONE_NAME__`)" in app_text
     assert "mastodon-db-pooler-rw-session.databases.svc.cluster.local" in values_text
     assert "mastodon-redis.mastodon.svc.cluster.local" in values_text
+    assert "elasticsearch:\n  enabled: false" in values_text
     assert "dbMigrate:\n      enabled: false" in values_text
+    assert "pod-security.kubernetes.io/enforce: baseline" in namespace_text
+    assert "pod-security.kubernetes.io/audit: baseline" in namespace_text
+    assert "pod-security.kubernetes.io/warn: baseline" in namespace_text
     assert "mastodon-runtime" in runtime_secret_text
     assert "property: MASTODON_POSTGRESQL__PASSWORD" in runtime_secret_text
     assert "property: REDIS_PASSWORD" in runtime_secret_text

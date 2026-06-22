@@ -39,6 +39,7 @@ PIXELFED_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-pixelfed"
 MASTODON_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-mastodon" / "run.sh"
 MASTODON_APP = REPO_ROOT / "gitops" / "apps" / "mastodon.yaml"
 MASTODON_VALUES = REPO_ROOT / "gitops" / "values" / "mastodon.yaml"
+MASTODON_NAMESPACE = REPO_ROOT / "gitops" / "platform-apps" / "mastodon" / "namespace.yaml"
 MASTODON_RUNTIME_SECRET = (
     REPO_ROOT / "gitops" / "platform-apps" / "mastodon" / "externalsecret-runtime.yaml"
 )
@@ -553,6 +554,7 @@ def test_mastodon_step_bootstraps_runtime_and_admin_secret_via_openbao():
     step_text = _read(MASTODON_STEP)
     app_text = _read(MASTODON_APP)
     values_text = _read(MASTODON_VALUES)
+    namespace_text = _read(MASTODON_NAMESPACE)
     runtime_secret_text = _read(MASTODON_RUNTIME_SECRET)
     db_secret_text = _read(MASTODON_DB_SECRET)
     db_cluster_text = _read(MASTODON_DB_CLUSTER)
@@ -601,7 +603,11 @@ def test_mastodon_step_bootstraps_runtime_and_admin_secret_via_openbao():
     assert "path: gitops/databases/mastodon" in app_text
     assert "mastodon.__ZONE_NAME__" in app_text
     assert "authentik.__ZONE_NAME__/application/o/mastodon/" in app_text
+    assert "elasticsearch:\n  enabled: false" in values_text
     assert "dbMigrate:\n      enabled: false" in values_text
+    assert "pod-security.kubernetes.io/enforce: baseline" in namespace_text
+    assert "pod-security.kubernetes.io/audit: baseline" in namespace_text
+    assert "pod-security.kubernetes.io/warn: baseline" in namespace_text
     assert "mastodon-runtime" in runtime_secret_text
     assert "secretKey: password" in runtime_secret_text
     assert "property: MASTODON_POSTGRESQL__PASSWORD" in runtime_secret_text

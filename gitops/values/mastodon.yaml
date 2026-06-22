@@ -34,6 +34,9 @@ mastodon:
     server: mailu-front.mailu.svc.cluster.local
     tls: false
 
+elasticsearch:
+  enabled: false
+
 postgresql:
   enabled: false
   auth:
