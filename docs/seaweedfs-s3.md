@@ -34,7 +34,7 @@ SeaweedFS exposes two browser-facing interfaces through Traefik:
 - `seaweedfs.__ZONE_NAME__` for the filer/standard web UI
 - `seaweedfs-admin.__ZONE_NAME__` for the admin UI
 
-Both routes use the shared Authentik forward-auth middleware.
+The SeaweedFS filer host also serves `/cache` without Authentik so Mastodon can load remote avatars and headers from public-read objects. The admin UI stays behind Authentik.
 
 ## Velero Integration
 

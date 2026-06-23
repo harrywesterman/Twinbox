@@ -8,6 +8,12 @@ spec:
     - websecure
   routes:
     - kind: Rule
+      match: Host(`seaweedfs.__ZONE_NAME__`) && PathPrefix(`/cache`)
+      services:
+        - kind: Service
+          name: seaweedfs
+          port: 8888
+    - kind: Rule
       match: Host(`seaweedfs.__ZONE_NAME__`)
       middlewares:
         - name: authentik-forwardauth
@@ -26,6 +32,12 @@ spec:
   entryPoints:
     - webnetbird
   routes:
+    - kind: Rule
+      match: Host(`seaweedfs.__ZONE_NAME__`) && PathPrefix(`/cache`)
+      services:
+        - kind: Service
+          name: seaweedfs
+          port: 8888
     - kind: Rule
       match: Host(`seaweedfs.__ZONE_NAME__`)
       middlewares:

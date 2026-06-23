@@ -5018,6 +5018,9 @@ def test_forgejo_management_console_route_uses_native_oidc_and_dashy_tile():
 
 def test_seaweedfs_admin_routes_to_the_admin_web_port():
     text = (
+        REPO_ROOT / "gitops" / "platform" / "management-consoles" / "seaweedfs-ingressroute.yaml"
+    ).read_text(encoding="utf-8")
+    admin_text = (
         REPO_ROOT
         / "gitops"
         / "platform"
@@ -5025,9 +5028,13 @@ def test_seaweedfs_admin_routes_to_the_admin_web_port():
         / "seaweedfs-admin-ingressroute.yaml"
     ).read_text(encoding="utf-8")
 
-    assert "name: seaweedfs" in text
-    assert "port: 23646" in text
-    assert "port: 8888" not in text
+    assert "PathPrefix(`/cache`)" in text
+    assert text.count("name: authentik-forwardauth") == 2
+    assert "port: 8888" in text
+    assert "port: 23646" not in text
+    assert "name: seaweedfs" in admin_text
+    assert "port: 23646" in admin_text
+    assert "port: 8888" not in admin_text
 
 
 def test_authentik_callback_ingressroutes_reference_the_authentik_namespace():
