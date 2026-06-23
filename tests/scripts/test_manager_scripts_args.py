@@ -5029,8 +5029,11 @@ def test_seaweedfs_admin_routes_to_the_admin_web_port():
     ).read_text(encoding="utf-8")
 
     assert "PathPrefix(`/cache`)" in text
+    assert "name: seaweedfs-cache-prefix" in text
+    assert "prefix: /mastodon" in text
     assert text.count("name: authentik-forwardauth") == 2
-    assert "port: 8888" in text
+    assert text.count("port: 8333") == 2
+    assert text.count("port: 8888") == 2
     assert "port: 23646" not in text
     assert "name: seaweedfs" in admin_text
     assert "port: 23646" in admin_text

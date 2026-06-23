@@ -1,4 +1,13 @@
 apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: seaweedfs-cache-prefix
+  namespace: longhorn-system
+spec:
+  addPrefix:
+    prefix: /mastodon
+---
+apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: seaweedfs
@@ -9,10 +18,12 @@ spec:
   routes:
     - kind: Rule
       match: Host(`seaweedfs.__ZONE_NAME__`) && PathPrefix(`/cache`)
+      middlewares:
+        - name: seaweedfs-cache-prefix
       services:
         - kind: Service
           name: seaweedfs
-          port: 8888
+          port: 8333
     - kind: Rule
       match: Host(`seaweedfs.__ZONE_NAME__`)
       middlewares:
@@ -34,10 +45,12 @@ spec:
   routes:
     - kind: Rule
       match: Host(`seaweedfs.__ZONE_NAME__`) && PathPrefix(`/cache`)
+      middlewares:
+        - name: seaweedfs-cache-prefix
       services:
         - kind: Service
           name: seaweedfs
-          port: 8888
+          port: 8333
     - kind: Rule
       match: Host(`seaweedfs.__ZONE_NAME__`)
       middlewares:
