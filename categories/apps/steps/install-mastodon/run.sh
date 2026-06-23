@@ -534,9 +534,7 @@ log "Applying Mastodon Argo CD application"
 render_template \
   "$WORKSPACE_ROOT/gitops/apps/mastodon.yaml" \
   "$mastodon_rendered_manifest" \
-  "__ZONE_NAME__=${public_zone_name}" \
-  "__MASTODON_OIDC_CLIENT_ID__=${mastodon_oidc_client_id}" \
-  "__MASTODON_OIDC_CLIENT_SECRET__=${mastodon_oidc_client_secret}"
+  "__ZONE_NAME__=${public_zone_name}"
 
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$mastodon_rendered_manifest" \

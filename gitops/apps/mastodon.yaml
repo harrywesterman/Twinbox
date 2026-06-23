@@ -22,18 +22,18 @@ spec:
               domain: mastodon.__ZONE_NAME__
               from_address: notifications@mastodon.__ZONE_NAME__
               reply_to: notifications@mastodon.__ZONE_NAME__
-            externalAuth:
-              oidc:
-                enabled: true
-                display_name: Authentik
-                issuer: https://authentik.__ZONE_NAME__/application/o/mastodon/
-                discovery: true
-                scope: openid,profile,email
-                uid_field: preferred_username
-                client_id: __MASTODON_OIDC_CLIENT_ID__
-                client_secret: __MASTODON_OIDC_CLIENT_SECRET__
-                redirect_uri: https://mastodon.__ZONE_NAME__/auth/auth/openid_connect/callback
-                assume_email_is_verified: true
+          externalAuth:
+            oidc:
+              enabled: true
+              display_name: Authentik
+              issuer: https://authentik.__ZONE_NAME__/application/o/mastodon/
+              discovery: true
+              scope: openid,profile,email
+              uid_field: preferred_username
+              client_id: from-mastodon-runtime-secret
+              client_secret: from-mastodon-runtime-secret
+              redirect_uri: https://mastodon.__ZONE_NAME__/auth/auth/openid_connect/callback
+              assume_email_is_verified: true
     - repoURL: __REPO_URL__
       targetRevision: __TARGET_REVISION__
       ref: values

@@ -611,7 +611,13 @@ def test_mastodon_step_bootstraps_runtime_and_admin_secret_via_openbao():
     assert "path: gitops/platform-apps/mastodon" in app_text
     assert "path: gitops/databases/mastodon" in app_text
     assert "mastodon.__ZONE_NAME__" in app_text
+    assert "\n          externalAuth:\n            oidc:" in app_text
+    assert "\n            externalAuth:" not in app_text
     assert "authentik.__ZONE_NAME__/application/o/mastodon/" in app_text
+    assert "client_id: from-mastodon-runtime-secret" in app_text
+    assert "client_secret: from-mastodon-runtime-secret" in app_text
+    assert "__MASTODON_OIDC_CLIENT_ID__" not in app_text
+    assert "__MASTODON_OIDC_CLIENT_SECRET__" not in app_text
     assert "elasticsearch:\n  enabled: false" in values_text
     assert "dbMigrate:\n      enabled: false" in values_text
     assert "pod-security.kubernetes.io/enforce: baseline" in namespace_text
@@ -635,6 +641,10 @@ def test_mastodon_step_bootstraps_runtime_and_admin_secret_via_openbao():
     assert "property: ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY" in runtime_secret_text
     assert "property: ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY" in runtime_secret_text
     assert "property: ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT" in runtime_secret_text
+    assert "secretKey: OIDC_CLIENT_ID" in runtime_secret_text
+    assert "property: MASTODON_OIDC_CLIENT_ID" in runtime_secret_text
+    assert "secretKey: OIDC_CLIENT_SECRET" in runtime_secret_text
+    assert "property: MASTODON_OIDC_CLIENT_SECRET" in runtime_secret_text
     assert "name: mastodon-db-credentials" in db_secret_text
     assert "property: MASTODON_POSTGRESQL__USERNAME" in db_secret_text
     assert "property: MASTODON_POSTGRESQL__PASSWORD" in db_secret_text
