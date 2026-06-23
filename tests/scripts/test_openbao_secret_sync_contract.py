@@ -40,7 +40,11 @@ MASTODON_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-mastodon"
 MASTODON_APP = REPO_ROOT / "gitops" / "apps" / "mastodon.yaml"
 MASTODON_VALUES = REPO_ROOT / "gitops" / "values" / "mastodon.yaml"
 MASTODON_NAMESPACE = REPO_ROOT / "gitops" / "platform-apps" / "mastodon" / "namespace.yaml"
+MASTODON_KUSTOMIZATION = REPO_ROOT / "gitops" / "platform-apps" / "mastodon" / "kustomization.yaml"
 MASTODON_INGRESSROUTE = REPO_ROOT / "gitops" / "platform-apps" / "mastodon" / "ingressroute.yaml"
+MASTODON_FORWARDED_HEADERS = (
+    REPO_ROOT / "gitops" / "platform-apps" / "mastodon" / "forwarded-headers-middleware.yaml"
+)
 MASTODON_RUNTIME_SECRET = (
     REPO_ROOT / "gitops" / "platform-apps" / "mastodon" / "externalsecret-runtime.yaml"
 )
@@ -556,7 +560,9 @@ def test_mastodon_step_bootstraps_runtime_and_admin_secret_via_openbao():
     app_text = _read(MASTODON_APP)
     values_text = _read(MASTODON_VALUES)
     namespace_text = _read(MASTODON_NAMESPACE)
+    kustomization_text = _read(MASTODON_KUSTOMIZATION)
     ingressroute_text = _read(MASTODON_INGRESSROUTE)
+    forwarded_headers_text = _read(MASTODON_FORWARDED_HEADERS)
     runtime_secret_text = _read(MASTODON_RUNTIME_SECRET)
     db_secret_text = _read(MASTODON_DB_SECRET)
     db_cluster_text = _read(MASTODON_DB_CLUSTER)
@@ -611,8 +617,13 @@ def test_mastodon_step_bootstraps_runtime_and_admin_secret_via_openbao():
     assert "pod-security.kubernetes.io/enforce: baseline" in namespace_text
     assert "pod-security.kubernetes.io/audit: baseline" in namespace_text
     assert "pod-security.kubernetes.io/warn: baseline" in namespace_text
+    assert "forwarded-headers-middleware.yaml" in kustomization_text
     assert ingressroute_text.count("name: mastodon-web\n          port: 3000") == 2
     assert "name: mastodon-web\n          port: 80" not in ingressroute_text
+    assert ingressroute_text.count("name: mastodon-netbird-forwarded-headers") == 2
+    assert "name: mastodon-netbird-forwarded-headers" in forwarded_headers_text
+    assert "X-Forwarded-Proto: https" in forwarded_headers_text
+    assert 'X-Forwarded-Port: "443"' in forwarded_headers_text
     assert "mastodon-runtime" in runtime_secret_text
     assert "secretKey: password" in runtime_secret_text
     assert "property: MASTODON_POSTGRESQL__PASSWORD" in runtime_secret_text

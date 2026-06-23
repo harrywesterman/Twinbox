@@ -7,3 +7,4 @@ resources:
   - externalsecret-s3.yaml
   - redis.yaml
   - ingressroute.yaml
+  - forwarded-headers-middleware.yaml
