@@ -38,11 +38,11 @@ class TestTermixOpksshRedirect(unittest.TestCase):
 
         self.assertIn('termix_host="https://termix.${public_zone_name}"', text)
         self.assertIn(
-            'opkssh_issuer_url="https://authentik.${public_zone_name}/application/o/opkssh"',
+            'opkssh_issuer_url="https://authentik.${public_zone_name}/application/o/opkssh/"',
             text,
         )
         self.assertNotIn(
-            'opkssh_issuer_url="https://authentik.${public_zone_name}/application/o/opkssh/"',
+            'opkssh_issuer_url="https://authentik.${public_zone_name}/application/o/opkssh"\n',
             text,
         )
         self.assertIn('opkssh_redirect_uri="${termix_host}/host/opkssh-callback"', text)
