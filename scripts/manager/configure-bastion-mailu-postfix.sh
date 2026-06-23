@@ -173,7 +173,7 @@ fi
 relay_interface="$(ip -o -4 addr show | awk -v ip="$RELAY_LISTEN_ADDRESS" '{split($4,a,"/"); if (a[1] == ip) {print $2; exit}}')"
 [[ -n "$relay_interface" ]] || fail "Relay listen address ${RELAY_LISTEN_ADDRESS} is not configured on the bastion"
 
-postconf -e "myhostname = bastion.${MAIL_DOMAIN}"
+postconf -e "myhostname = ${MAIL_HOSTNAME}"
 postconf -e "myorigin = ${MAIL_DOMAIN}"
 postconf -e "smtpd_sasl_local_domain = ${MAIL_HOSTNAME}"
 postconf -e "inet_interfaces = all"

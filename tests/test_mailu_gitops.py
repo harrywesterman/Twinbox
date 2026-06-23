@@ -147,6 +147,7 @@ def test_mailu_step_and_scripts_are_wired():
     assert step["id"] == "install-mailu"
     assert step["runner"]["script"] == "categories/apps/steps/install-mailu/run.sh"
     assert step["dashy"]["items"][0]["url_template"] == "https://mail.__ZONE_NAME__/admin"
+    assert "Twinbox now sets PTR/rDNS on Hetzner automatically" in step["side_help"]
 
     apply_script = (REPO_ROOT / "scripts" / "manager" / "apply-argocd-application.sh").read_text(
         encoding="utf-8"
@@ -214,6 +215,7 @@ def test_bastion_postfix_script_has_open_relay_guards():
     assert "smtpd_tls_security_level=encrypt" in script
     assert "smtpd_tls_auth_only=yes" in script
     assert "smtpd_sasl_local_domain = ${MAIL_HOSTNAME}" in script
+    assert 'postconf -e "myhostname = ${MAIL_HOSTNAME}"' in script
     assert "Refusing to expose relay listener on public address" in script
     assert 'ufw deny in to any port "$RELAY_LISTEN_PORT" proto tcp' in script
 
@@ -225,6 +227,7 @@ def test_mailu_installer_uses_private_relay_and_pre_dns_preflights():
     assert "NETBIRD_RELAY_HOST" in script.split("mailu_relay_host=", 1)[1].splitlines()[0]
     assert "NETBIRD_PRIVATE_IP" in script
     assert "awk" in script and "match" in script
+    assert "HCLOUD_TOKEN // empty" in script
     assert ".NETBIRD_IP // empty" not in script.split("mailu_relay_host=", 1)[1].splitlines()[0]
     assert "Refusing to use public bastion IP as Mailu relay host" in script
     assert "netbird-mailu-relay-egress NB_SETUP_KEY" in script
@@ -239,6 +242,14 @@ def test_mailu_installer_uses_private_relay_and_pre_dns_preflights():
     assert "twinbox.io/mailu-storage-node" in script
     assert "generate_mailu_tls_secret_file" in script
     assert "mailu-certificates" in script
+    assert "ensure-hetzner-rdns.py" in script
+    assert '--server-name "$server_name"' in script
+    assert '--fallback-server-name "$legacy_server_name"' in script
+    assert 'log "Configuring Hetzner PTR/rDNS for ${mail_hostname}"' in script
+    assert 'log "PTR/rDNS configured: ${bastion_ip} -> ${mail_hostname}"' in script
+    assert 'rdns_status="configured"' in script
+    assert "Mailu installed. PTR/rDNS configured:" in script
+    assert "Create/verify PTR" not in script
     assert "--relay-password" not in script
     assert "--relay-secret-file" in script
     assert script.index('log "Applying Mailu DNS records"') > script.index(
@@ -246,6 +257,9 @@ def test_mailu_installer_uses_private_relay_and_pre_dns_preflights():
     )
     assert script.index('log "Applying Mailu DNS records"') > script.index(
         'verify_mailu_relay_egress_path "$mailu_relay_host"'
+    )
+    assert script.index("ensure-hetzner-rdns.py") > script.index(
+        'apply_mail_dns_records "$mail_domain"'
     )
 
 

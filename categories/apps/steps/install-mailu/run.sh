@@ -600,11 +600,16 @@ netbird_bastion_secret="$(find_netbird_bastion_secret "$cluster_id")"
 [[ -n "$netbird_bastion_secret" && -f "$netbird_bastion_secret" ]] || fail "NetBird bastion secret not found; provision NetBird bastion first"
 
 bastion_ip="$(jq -r '.NETBIRD_IP // empty' "$netbird_bastion_secret")"
+hcloud_token="$(jq -r '.HCLOUD_TOKEN // empty' "$netbird_bastion_secret")"
 mailu_relay_host="$(jq -r '.NETBIRD_RELAY_HOST // empty' "$netbird_bastion_secret")"
 if [[ -z "$mailu_relay_host" ]]; then
   mailu_relay_host="$(jq -r '.NETBIRD_PRIVATE_IP // empty' "$netbird_bastion_secret" | awk 'match($0, /([0-9]{1,3}\.){3}[0-9]{1,3}/) {print substr($0, RSTART, RLENGTH); exit}')"
 fi
 [[ -n "$bastion_ip" ]] || fail "NetBird bastion secret is missing NETBIRD_IP"
+[[ -n "$hcloud_token" ]] || fail "NetBird bastion secret is missing HCLOUD_TOKEN"
+
+server_name="twinbox-${cluster_id}-netbird"
+legacy_server_name="netbird-${cluster_id}"
 
 ssh_key_file="$(write_bastion_ssh_key "$netbird_bastion_secret" "$cluster_id")"
 trap '[[ "$ssh_key_file" == /tmp/mailu-bastion-key-* ]] && rm -f "$ssh_key_file" || true' EXIT
@@ -770,6 +775,15 @@ dkim_selector="${dkim_txt_name%%._domainkey.*}"
 log "Applying Mailu DNS records"
 apply_mail_dns_records "$mail_domain" "$mail_hostname" "$bastion_ip" "$dkim_txt_name" "$dkim_value" "$dmarc_policy" "$dmarc_rua_localpart"
 
+log "Configuring Hetzner PTR/rDNS for ${mail_hostname}"
+HCLOUD_TOKEN="$hcloud_token" \
+  python3 "$WORKSPACE_ROOT/scripts/manager/ensure-hetzner-rdns.py" \
+  --server-name "$server_name" \
+  --fallback-server-name "$legacy_server_name" \
+  --ip "$bastion_ip" \
+  --ptr "$mail_hostname"
+log "PTR/rDNS configured: ${bastion_ip} -> ${mail_hostname}"
+
 register_mailu_authentik_app "$mail_domain"
 
 log "Syncing existing Authentik users to Mailu"
@@ -817,7 +831,8 @@ bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
   --service-path /
 
 ptr_required="${bastion_ip} -> ${mail_hostname}"
-log "Mailu installed. Create/verify PTR: ${ptr_required}"
+rdns_status="configured"
+log "Mailu installed. PTR/rDNS configured: ${ptr_required}"
 log "Run an external deliverability/open-relay check before using this for production mail."
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
@@ -827,6 +842,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     --arg admin_url "$admin_url" \
     --arg webmail_url "$webmail_url" \
     --arg ptr_required "$ptr_required" \
+    --arg rdns_status "$rdns_status" \
     --arg bastion_postfix_status "configured" \
     --arg mailu_chart_version "2.7.1" \
     --arg mailu_app_version "2024.06.51" \
@@ -840,6 +856,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
       webmail_url: $webmail_url,
       dns_records_created: $dns_records_created,
       ptr_required: $ptr_required,
+      rdns_status: $rdns_status,
       bastion_postfix_status: $bastion_postfix_status,
       mailu_chart_version: $mailu_chart_version,
       mailu_app_version: $mailu_app_version,
