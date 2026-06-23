@@ -5080,6 +5080,9 @@ def test_bootstrap_scripts_use_the_management_vm_ip_for_seaweedfs():
         "s3.bucket.create -name"
     )
     assert "SeaweedFS bucket ${SEAWEEDFS_BUCKET} was not created" in start_manager_text
+    assert "ensure_seaweedfs_data_dir()" in bootstrap_vm_text
+    assert 'install -d -m 0755 "$TARGET_DIR/seaweedfs/data"' in bootstrap_vm_text
+    assert 'sudo chown -R "$USER":"$USER" "$TARGET_DIR/seaweedfs/data"' in bootstrap_vm_text
 
 
 def test_authentik_consumer_scripts_read_from_openbao():
