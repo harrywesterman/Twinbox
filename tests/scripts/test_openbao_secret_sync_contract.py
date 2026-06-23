@@ -587,7 +587,7 @@ def test_mastodon_step_bootstraps_runtime_and_admin_secret_via_openbao():
     )
     assert "wait_for_deployment_image" in step_text
     assert "bundle" in step_text
-    assert "db:migrate" in step_text
+    assert "db:prepare" in step_text
     assert "SKIP_POST_DEPLOYMENT_MIGRATIONS" not in step_text
     assert "kubectl -n mastodon exec deployment/mastodon-web" in step_text
     assert "bin/tootctl" in step_text

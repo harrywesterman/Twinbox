@@ -147,7 +147,7 @@ spec:
             - bundle
             - exec
             - rake
-            - db:migrate
+            - db:prepare
           envFrom:
             - secretRef:
                 name: mastodon-runtime
