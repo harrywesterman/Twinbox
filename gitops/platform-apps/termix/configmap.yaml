@@ -1,5 +1,110 @@
 apiVersion: v1
 data:
+  termix-users-rbac-patch.mjs: |
+    import { readFile, writeFile } from "fs/promises";
+
+    const routePath = "/app/dist/backend/backend/database/routes/users.js";
+    const marker = "twinbox_browser_ssh_role_sync";
+
+    let source = await readFile(routePath, "utf8");
+    if (source.includes(marker)) {
+      console.log("Twinbox Termix users.js RBAC patch already applied");
+      process.exit(0);
+    }
+
+    const lines = (items) => items.join("\n");
+    const replacements = [
+      [
+        lines([
+          `        allowed_users: process.env.OIDC_ALLOWED_USERS || "",`,
+          `    };`,
+        ]),
+        lines([
+          `        allowed_users: process.env.OIDC_ALLOWED_USERS || "",`,
+          `        admin_group: process.env.OIDC_ADMIN_GROUP || "",`,
+          `    };`,
+        ]),
+      ],
+      [
+        lines([
+          `function isNonEmptyString(val) {`,
+          `    return typeof val === "string" && val.trim().length > 0;`,
+          `}`,
+        ]),
+        lines([
+          `function isNonEmptyString(val) {`,
+          `    return typeof val === "string" && val.trim().length > 0;`,
+          `}`,
+          `async function ensureTwinboxBrowserSshRole(userId) {`,
+          `    const roleName = process.env.TERMIX_BROWSER_ROLE_NAME || "browser-ssh";`,
+          `    const browserRole = await db`,
+          `        .select({ id: roles.id })`,
+          `        .from(roles)`,
+          `        .where(eq(roles.name, roleName))`,
+          `        .limit(1);`,
+          `    if (browserRole.length === 0) {`,
+          `        authLogger.warn("Twinbox Browser SSH role not found", {`,
+          `            operation: "${marker}_role_missing",`,
+          `            userId,`,
+          `            roleName,`,
+          `        });`,
+          `        return;`,
+          `    }`,
+          `    const existingRoles = await db`,
+          `        .select({ roleId: userRoles.roleId })`,
+          `        .from(userRoles)`,
+          `        .where(eq(userRoles.userId, userId));`,
+          `    if (existingRoles.some((row) => String(row.roleId) === String(browserRole[0].id))) {`,
+          `        return;`,
+          `    }`,
+          `    await db.insert(userRoles).values({`,
+          `        userId,`,
+          `        roleId: browserRole[0].id,`,
+          `        grantedBy: userId,`,
+          `    });`,
+          `    authLogger.info("Twinbox Browser SSH role assigned to OIDC admin", {`,
+          `        operation: "${marker}",`,
+          `        userId,`,
+          `        roleName,`,
+          `    });`,
+          `}`,
+        ]),
+      ],
+      [
+        lines([
+          `        try {`,
+          `            await authManager.authenticateOIDCUser(userRecord.id, deviceInfo.type);`,
+          `        }`,
+        ]),
+        lines([
+          `        if (userRecord.isAdmin) {`,
+          `            try {`,
+          `                await ensureTwinboxBrowserSshRole(userRecord.id);`,
+          `            }`,
+          `            catch (roleError) {`,
+          `                authLogger.error("Failed to assign Twinbox Browser SSH role to OIDC admin", roleError, {`,
+          `                    operation: "${marker}_failed",`,
+          `                    userId: userRecord.id,`,
+          `                });`,
+          `            }`,
+          `        }`,
+          `        try {`,
+          `            await authManager.authenticateOIDCUser(userRecord.id, deviceInfo.type);`,
+          `        }`,
+        ]),
+      ],
+    ];
+
+    for (const [from, to] of replacements) {
+      if (!source.includes(from)) {
+        throw new Error(`Twinbox Termix users.js RBAC patch target not found: ${from.slice(0, 80)}`);
+      }
+      source = source.replace(from, to);
+    }
+
+    await writeFile(routePath, source, "utf8");
+    console.log("Twinbox Termix users.js RBAC patch applied");
+
   opkssh-auth.js: |
     import { spawn, ChildProcess } from "child_process";
     import { randomUUID } from "crypto";

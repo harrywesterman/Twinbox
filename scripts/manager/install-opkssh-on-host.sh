@@ -57,6 +57,7 @@ done
 [[ -n "${OPKSSH_ISSUER_URL:-}" ]] || fail "OPKSSH_ISSUER_URL is required"
 [[ -n "${OPKSSH_CLIENT_ID:-}" ]] || fail "OPKSSH_CLIENT_ID is required"
 
+issuer_url="${OPKSSH_ISSUER_URL%/}"
 principal="${OPKSSH_PRINCIPAL:-$user}"
 expiration_policy="${OPKSSH_EXPIRATION_POLICY:-24h}"
 case "$expiration_policy" in
@@ -81,7 +82,7 @@ set -euo pipefail
 
 OPKSSH_VERSION="${OPKSSH_VERSION}"
 OPKSSH_SHA256="${OPKSSH_SHA256}"
-ISSUER_URL="${OPKSSH_ISSUER_URL}"
+ISSUER_URL="${issuer_url}"
 CLIENT_ID="${OPKSSH_CLIENT_ID}"
 PRINCIPAL="${principal}"
 EXPIRATION_POLICY="${expiration_policy}"

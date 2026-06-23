@@ -32,7 +32,7 @@ public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domai
 
 termix_host="https://termix.${public_zone_name}"
 opkssh_redirect_uri="${termix_host}/host/opkssh-callback"
-opkssh_issuer_url="https://authentik.${public_zone_name}/application/o/opkssh/"
+opkssh_issuer_url="https://authentik.${public_zone_name}/application/o/opkssh"
 opkssh_authorization_url="https://authentik.${public_zone_name}/application/o/authorize/"
 opkssh_token_url="https://authentik.${public_zone_name}/application/o/token/"
 opkssh_userinfo_url="https://authentik.${public_zone_name}/application/o/userinfo/"

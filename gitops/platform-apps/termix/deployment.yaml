@@ -17,7 +17,7 @@ spec:
       labels:
         app.kubernetes.io/name: termix
       annotations:
-        twinbox.dev/termix-patch-revision: "2026-06-15-opkssh-https-redirect-cookie-header"
+        twinbox.dev/termix-patch-revision: "2026-06-23-oidc-admin-browser-ssh-role"
     spec:
       securityContext:
         fsGroup: 1000
@@ -27,6 +27,13 @@ spec:
         - name: termix
           image: ghcr.io/lukegus/termix:release-2.3.1
           imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -lc
+          args:
+            - |
+              node /tmp/termix-users-rbac-patch.mjs
+              exec /entrypoint.sh
           ports:
             - name: http
               containerPort: 4090
@@ -46,6 +53,8 @@ spec:
               value: localhost
             - name: GUACD_PORT
               value: "4822"
+            - name: TERMIX_BROWSER_ROLE_NAME
+              value: browser-ssh
           envFrom:
             - secretRef:
                 name: termix-bootstrap
@@ -71,6 +80,10 @@ spec:
             - name: termix-patch
               mountPath: /app/dist/backend/backend/database/routes/host.js
               subPath: host.js
+              readOnly: true
+            - name: termix-patch
+              mountPath: /tmp/termix-users-rbac-patch.mjs
+              subPath: termix-users-rbac-patch.mjs
               readOnly: true
           readinessProbe:
             httpGet:

@@ -31,6 +31,19 @@ class TestSetupOpksshAuthentik(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, msg=result.stderr)
 
+    def test_opkssh_issuer_is_stored_without_trailing_slash(self):
+        script = WORKSPACE_ROOT / "scripts" / "manager" / "setup-opkssh-authentik.sh"
+        text = script.read_text(encoding="utf-8")
+
+        self.assertIn(
+            'opkssh_issuer_url="https://authentik.${public_zone_name}/application/o/opkssh"',
+            text,
+        )
+        self.assertNotIn(
+            'opkssh_issuer_url="https://authentik.${public_zone_name}/application/o/opkssh/"',
+            text,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

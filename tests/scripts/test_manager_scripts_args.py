@@ -32,6 +32,7 @@ TERMIX_STEP_SCRIPT = (
 )
 TERMIX_SETUP_AUTHENTIK_SCRIPT = REPO_ROOT / "scripts" / "manager" / "setup-termix-authentik.sh"
 TERMIX_SETUP_SCRIPT = REPO_ROOT / "scripts" / "manager" / "setup-termix.sh"
+TERMIX_CONFIGMAP = REPO_ROOT / "gitops" / "platform-apps" / "termix" / "configmap.yaml"
 TERMIX_DEPLOYMENT = REPO_ROOT / "gitops" / "platform-apps" / "termix" / "deployment.yaml"
 TERMIX_EXTERNALSECRET = REPO_ROOT / "gitops" / "platform-apps" / "termix" / "externalsecret.yaml"
 TERMIX_INGRESSROUTE = REPO_ROOT / "gitops" / "platform-apps" / "termix" / "ingressroute.yaml"
@@ -4678,6 +4679,7 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     setup_authentik_text = _termix_setup_authentik_text()
     setup_text = _termix_setup_text()
     deployment_text = _termix_deployment_text()
+    configmap_text = TERMIX_CONFIGMAP.read_text(encoding="utf-8")
     externalsecret_text = _termix_externalsecret_text()
     app_manifest_text = TERMIX_APP_MANIFEST.read_text(encoding="utf-8")
     namespace_text = TERMIX_NAMESPACE.read_text(encoding="utf-8")
@@ -4790,6 +4792,12 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "showTerminalInSidebar: true" in setup_text
     assert "enableSsh: true" in setup_text
 
+    assert "termix-users-rbac-patch.mjs" in configmap_text
+    assert "process.env.OIDC_ADMIN_GROUP" in configmap_text
+    assert 'process.env.TERMIX_BROWSER_ROLE_NAME || "browser-ssh"' in configmap_text
+    assert "Twinbox Browser SSH role assigned to OIDC admin" in configmap_text
+    assert "twinbox_browser_ssh_role_sync" in configmap_text
+
     assert "OIDC_ALLOWED_USERS" in externalsecret_text
     assert "OIDC_ALLOW_REGISTRATION" in externalsecret_text
     assert "OIDC_FORCE_HTTPS" in externalsecret_text
@@ -4801,6 +4809,10 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "NB_MANAGEMENT_URL" in externalsecret_text
     assert "NB_HOSTNAME" in externalsecret_text
     assert "name: netbird" in deployment_text
+    assert "node /tmp/termix-users-rbac-patch.mjs" in deployment_text
+    assert "exec /entrypoint.sh" in deployment_text
+    assert "TERMIX_BROWSER_ROLE_NAME" in deployment_text
+    assert "subPath: termix-users-rbac-patch.mjs" in deployment_text
     assert "image: netbirdio/netbird:0.72.4" in deployment_text
     assert "NB_SETUP_KEY" in deployment_text
     assert "NB_MANAGEMENT_URL" in deployment_text

@@ -36,7 +36,8 @@ class TestInstallOpksshStep(unittest.TestCase):
 
         self.assertIn('expiration_policy="${OPKSSH_EXPIRATION_POLICY:-24h}"', text)
         self.assertIn("12h|24h|48h|1week|oidc|oidc-refreshed", text)
-        self.assertIn('ISSUER_URL="${OPKSSH_ISSUER_URL}"', text)
+        self.assertIn('issuer_url="${OPKSSH_ISSUER_URL%/}"', text)
+        self.assertIn('ISSUER_URL="${issuer_url}"', text)
         self.assertIn("\\${ISSUER_URL} \\${CLIENT_ID} \\${EXPIRATION_POLICY}", text)
         self.assertNotIn("\\${ISSUER_URL} \\${CLIENT_ID} 16h", text)
         self.assertIn("/var/log/opkssh.log", text)

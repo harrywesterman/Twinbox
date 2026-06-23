@@ -37,6 +37,14 @@ class TestTermixOpksshRedirect(unittest.TestCase):
         text = OPKSSH_SETUP.read_text(encoding="utf-8")
 
         self.assertIn('termix_host="https://termix.${public_zone_name}"', text)
+        self.assertIn(
+            'opkssh_issuer_url="https://authentik.${public_zone_name}/application/o/opkssh"',
+            text,
+        )
+        self.assertNotIn(
+            'opkssh_issuer_url="https://authentik.${public_zone_name}/application/o/opkssh/"',
+            text,
+        )
         self.assertIn('opkssh_redirect_uri="${termix_host}/host/opkssh-callback"', text)
         self.assertNotRegex(
             text,
@@ -50,6 +58,8 @@ class TestTermixOpksshRedirect(unittest.TestCase):
         self.assertIn("termix-patch", text)
         self.assertIn("subPath: opkssh-auth.js", text)
         self.assertIn("subPath: host.js", text)
+        self.assertIn("subPath: termix-users-rbac-patch.mjs", text)
+        self.assertIn("node /tmp/termix-users-rbac-patch.mjs", text)
 
 
 if __name__ == "__main__":
