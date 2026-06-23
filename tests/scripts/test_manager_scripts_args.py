@@ -4214,7 +4214,7 @@ def test_mastodon_step_applies_the_custom_app_and_bootstraps_admin_access():
     assert '--application "mastodon"' in step_text
     assert "wait_for_deployment_image" in step_text
     assert "bundle" in step_text
-    assert "db:prepare" in step_text
+    assert "db:migrate db:seed" in step_text
     assert "SKIP_POST_DEPLOYMENT_MIGRATIONS" not in step_text
     assert 'kubectl -n mastodon logs "job/' in step_text
     assert "kubectl -n mastodon exec deployment/mastodon-web" in step_text

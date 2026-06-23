@@ -144,10 +144,9 @@ spec:
           image: "${mastodon_image}"
           imagePullPolicy: IfNotPresent
           command:
-            - bundle
-            - exec
-            - rake
-            - db:prepare
+            - sh
+            - -c
+            - bundle exec rake db:migrate db:seed
           envFrom:
             - secretRef:
                 name: mastodon-runtime
