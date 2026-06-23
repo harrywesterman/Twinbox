@@ -1975,8 +1975,10 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert 'base64.b64encode(raw).decode().rstrip("=")' in text
     assert "netbird_host_resource_address()" in text
     assert "resolve_traefik_cluster_ip()" in text
+    assert "read_service_cidrs_json()" in text
     assert "read_pod_cidrs_json()" in text
     assert "read_management_lan_cidrs_json()" in text
+    assert "read_json_string_array_input()" in text
     assert "ipv4_in_cidrs_json()" in text
     assert "normalize_traefik_resource_address()" in text
     assert "ensure_netbird_proxy_peer()" in text
@@ -1996,6 +1998,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "Empty Traefik address; using Traefik ClusterIP" in text
     assert 'traefik_target_port="8082"' in text
     assert 'traefik_target_protocol="http"' in text
+    assert 'service_cidrs_json="$(read_service_cidrs_json)"' in text
     assert 'pod_cidrs_json="$(read_pod_cidrs_json)"' in text
     assert 'management_lan_cidrs_json="$(read_management_lan_cidrs_json "$cluster_json")"' in text
     assert '-var "traefik_resource_address=$traefik_network_resource_address"' in text
@@ -2110,7 +2113,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     )
     proxy_backend_index = text.index("wait_for_netbird_proxy_backend \\")
     network_secret_index = text.index("Writing network secret for helper scripts")
-    service_cidrs_index = text.index('service_cidrs_json="$(jq -n --arg cidr "$service_cidr"')
+    service_cidrs_index = text.index('service_cidrs_json="$(read_service_cidrs_json)"')
     pod_cidrs_index = text.index('pod_cidrs_json="$(read_pod_cidrs_json)"')
     management_lan_index = text.index('management_lan_cidrs_json="$(read_management_lan_cidrs_json')
     normalize_traefik_index = text.index(
@@ -2161,7 +2164,13 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     )
     assert 'netbird_domain="netbird.${public_zone_name}"' in text
     assert "patch-netbird-traefik-alias.py" in text
-    assert 'docker exec netbird-proxy getent hosts "$NETBIRD_DOMAIN"' in text
+    assert 'docker compose "${compose_args[@]}" ps -q "$service_name"' in text
+    assert 'docker compose ps -q "$service_name"' in text
+    assert "verify_netbird_proxy_alias()" in text
+    assert "docker inspect -f '{{.Id}}'" in text
+    assert "getent hosts" not in text
+    assert "10.96.0.0/12" not in text
+    assert "10.244.0.0/16" not in text
     assert "--target-type cluster" in text
     assert '--target-id "$netbird_domain"' in text
     assert '--target-host "$netbird_domain"' in text
