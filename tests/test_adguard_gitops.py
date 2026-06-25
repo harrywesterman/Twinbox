@@ -61,7 +61,7 @@ def test_deployment_seeds_config_into_writable_volume():
     spec = deploy["spec"]["template"]["spec"]
     init_container = spec["initContainers"][0]
     assert init_container["name"] == "seed-config"
-    assert init_container["image"] == "busybox:1.36.1"
+    assert init_container["image"] == "busybox:1.38.0"
     assert any(m["name"] == "config-seed" and m["readOnly"] for m in init_container["volumeMounts"])
     assert any(
         m["name"] == "config" and m["mountPath"] == "/opt/adguardhome/conf"

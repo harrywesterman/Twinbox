@@ -74,4 +74,4 @@ resources:
   - zulip/pooler-ro.yaml
   - zulip/pooler-rw.yaml
   - zulip/scheduled-backup.yaml
-  - seaweedfs-backup-credentials.yaml
+  - shared/seaweedfs-backup-credentials.yaml

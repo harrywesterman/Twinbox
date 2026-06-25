@@ -175,9 +175,9 @@ def test_mailu_relay_egress_resources_are_wired():
         for container in deployment["spec"]["template"]["spec"]["containers"]
     }
     assert set(containers) == {"netbird", "haproxy", "probe"}
-    assert containers["netbird"]["image"] == "netbirdio/netbird:0.72.4"
-    assert containers["haproxy"]["image"] == "haproxy:3.0.23-alpine"
-    assert containers["probe"]["image"] == "busybox:1.36.1"
+    assert containers["netbird"]["image"] == "netbirdio/netbird:0.73.2"
+    assert containers["haproxy"]["image"] == "haproxy:3.4.0-alpine"
+    assert containers["probe"]["image"] == "busybox:1.38.0"
     assert containers["haproxy"]["resources"]["requests"]
     assert containers["probe"]["resources"]["limits"]
 

@@ -55,10 +55,19 @@ def test_velero_has_daily_cluster_backup_schedule_with_30_day_ttl():
 
 def test_cloudnativepg_clusters_use_seaweedfs_and_14_day_retention():
     database_root = REPO_ROOT / "gitops" / "databases"
+    shared_kustomization_text = (database_root / "shared" / "kustomization.yaml").read_text(
+        encoding="utf-8"
+    )
+    backup_secret_text = (database_root / "shared" / "seaweedfs-backup-credentials.yaml").read_text(
+        encoding="utf-8"
+    )
     cluster_files = [
         path for path in database_root.glob("*/cluster.yaml") if path.parent.name != "_template"
     ]
     assert cluster_files
+    assert "seaweedfs-backup-credentials.yaml" in shared_kustomization_text
+    assert "name: seaweedfs-backup-credentials" in backup_secret_text
+    assert "twinbox/global/velero" in backup_secret_text
 
     for path in cluster_files:
         text = path.read_text(encoding="utf-8")

@@ -767,7 +767,7 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert 'if [[ -n "${CILIUM_K8S_SERVICE_HOST:-}" ]]; then' in helper_text
     assert 'if [[ -n "${CILIUM_K8S_SERVICE_PORT:-}" ]]; then' in helper_text
     assert "if ((${#helm_args[@]})); then" in helper_text
-    assert "PINNED_CILIUM_CHART_VERSION=1.19.4" in pinned_defaults_text
+    assert "PINNED_CILIUM_CHART_VERSION=1.19.5" in pinned_defaults_text
     assert "PINNED_CLOUDTTY_CHART_VERSION=0.8.9" in pinned_defaults_text
     assert "PINNED_TRAEFIK_MANAGER_IMAGE_TAG=v0.8.0" in pinned_defaults_text
     assert "ipam:" in values_text
@@ -1243,7 +1243,7 @@ def test_install_secret_sync_renders_argocd_values_and_applies_secret_sync_manif
     assert "--no-wait" in text
     assert "repoURL: https://openbao.github.io/openbao-helm" in text
     assert "chart: openbao" in text
-    assert 'targetRevision: "0.27.2"' in text
+    assert 'targetRevision: "0.28.4"' in text
     assert "gitops/apps/openbao.yaml" not in text
     assert "detect_openbao_replicas() {" in text
     assert "printf '1\\n'" in text
@@ -2028,7 +2028,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "netbird-bastion-exit-router" in text
     assert "netbird-browser-ssh" in text
     assert "NETBIRD_PRIVATE_IP" in text
-    assert "netbirdio/netbird:${PINNED_NETBIRD_VERSION:-0.70.5}" in text
+    assert "netbirdio/netbird:${PINNED_NETBIRD_VERSION:-0.73.2}" in text
     assert "docker run -d" in text and "--name netbird-client" in text
     assert "--name netbird-hetzner-exit" in text
     assert "twinbox-${cluster_id}-hetzner-exit" in text
@@ -2859,7 +2859,7 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "Host(`pgadmin4.__ZONE_NAME__`)" in PGADMIN_INGRESSROUTE.read_text(encoding="utf-8")
     assert "pgadmin4-data" in PGADMIN_PVC.read_text(encoding="utf-8")
     assert "pgadmin4-bootstrap" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
-    assert "dpage/pgadmin4:9.15" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
+    assert "dpage/pgadmin4:9.16" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
     assert "master-password-hook.sh" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
     assert "mountPath: /config" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
     assert "pgadmin4-servers.json" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
@@ -3966,7 +3966,7 @@ def test_cnpg_database_clusters_have_seaweedfs_backups():
         REPO_ROOT / "gitops" / "databases" / "immich" / "objectstore.yaml"
     ).read_text(encoding="utf-8")
     backup_secret_text = (
-        REPO_ROOT / "gitops" / "databases" / "seaweedfs-backup-credentials.yaml"
+        REPO_ROOT / "gitops" / "databases" / "shared" / "seaweedfs-backup-credentials.yaml"
     ).read_text(encoding="utf-8")
 
     assert "barmanObjectName: authentik-db-objectstore" in authentik_cluster_text
@@ -4341,7 +4341,7 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert "kind: ApplicationSet" in optional_app_text
     assert "name: nextcloud-set" in optional_app_text
     assert 'twinbox.io/app-nextcloud: "enabled"' in optional_app_text
-    assert 'targetRevision: "9.1.0"' in optional_app_text
+    assert 'targetRevision: "9.1.3"' in optional_app_text
     assert "path: gitops/platform-apps/nextcloud" in optional_app_text
     assert "path: gitops/databases/nextcloud" in optional_app_text
     assert "name: nextcloud-well-known-redirect" in optional_app_text
@@ -4813,7 +4813,7 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "exec /entrypoint.sh" in deployment_text
     assert "TERMIX_BROWSER_ROLE_NAME" in deployment_text
     assert "subPath: termix-users-rbac-patch.mjs" in deployment_text
-    assert "image: netbirdio/netbird:0.72.4" in deployment_text
+    assert "image: netbirdio/netbird:0.73.2" in deployment_text
     assert "NB_SETUP_KEY" in deployment_text
     assert "NB_MANAGEMENT_URL" in deployment_text
     assert "NB_HOSTNAME" in deployment_text
