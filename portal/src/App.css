@@ -1833,6 +1833,61 @@ a {
   min-width: 120px;
 }
 
+.work-order-row {
+  display: grid;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.work-order-row-head,
+.work-order-llm-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.work-order-row-head .muted-copy,
+.work-order-llm-line .muted-copy {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.work-order-llm {
+  display: grid;
+  gap: 8px;
+  padding-left: 2px;
+}
+
+.work-order-summary {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.work-order-summary summary {
+  cursor: pointer;
+  padding: 8px 10px;
+  color: var(--muted-strong);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.work-order-summary pre {
+  margin: 0;
+  padding: 0 10px 10px;
+  color: var(--muted-strong);
+  font: 0.82rem/1.5 var(--body-font);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.event-message {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 .approval-row {
   border-color: var(--accent);
 }

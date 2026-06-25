@@ -3570,6 +3570,27 @@ function AgentAvatar({ avatar, size = 40 }) {
   );
 }
 
+function WorkOrderLlmTrace({ trace }) {
+  if (!trace) return null;
+
+  const detailText = trace.error || trace.model || "Nog geen modelinformatie";
+
+  return (
+    <div className="work-order-llm">
+      <div className="work-order-llm-line">
+        <span className={`status-chip ${trace.tone}`}>{trace.label}</span>
+        <span className="muted-copy">{detailText}</span>
+      </div>
+      {trace.hasSummary ? (
+        <details className="work-order-summary">
+          <summary>Bekijk LLM samenvatting</summary>
+          <pre>{trace.summary}</pre>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
 function AgentsAdminPage({ agentsState }) {
   const [endpointDraft, setEndpointDraft] = useState({
     displayName: "",
@@ -3910,14 +3931,17 @@ function AgentsAdminPage({ agentsState }) {
           <div className="agents-work-order-list">
             {viewModel.workOrders.slice(0, 10).map((wo) => (
               <article key={wo.id} className="work-order-row">
-                <span
-                  className={`status-chip ${wo.status === "completed" ? "is-live" : wo.status === "failed" || wo.status === "canceled" ? "is-bad" : wo.status === "approval_required" ? "is-accent" : "is-neutral"}`}
-                >
-                  {wo.status}
-                </span>
-                <strong>{wo.title}</strong>
-                <span className="muted-copy">{wo.type}</span>
-                <span className="muted-copy">{new Date(wo.createdAt).toLocaleString()}</span>
+                <div className="work-order-row-head">
+                  <span
+                    className={`status-chip ${wo.status === "completed" || wo.status === "proposal_ready" ? "is-live" : wo.status === "failed" || wo.status === "canceled" ? "is-bad" : wo.status === "approval_required" ? "is-accent" : "is-neutral"}`}
+                  >
+                    {wo.status}
+                  </span>
+                  <strong>{wo.title}</strong>
+                  <span className="muted-copy">{wo.type}</span>
+                  <span className="muted-copy">{new Date(wo.createdAt).toLocaleString()}</span>
+                </div>
+                <WorkOrderLlmTrace trace={wo.llmTrace} />
               </article>
             ))}
           </div>
@@ -3981,6 +4005,7 @@ function AgentsAdminPage({ agentsState }) {
                 <strong>{event.title}</strong>
                 <span className="muted-copy">{event.agentId}</span>
                 <span className="muted-copy">{new Date(event.timestamp).toLocaleString()}</span>
+                {event.message ? <span className="event-message">{event.message}</span> : null}
               </div>
             ))}
           </div>

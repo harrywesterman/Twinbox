@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildAgentAdminViewModel,
   buildProviderHealthLabel,
+  buildWorkOrderLlmTrace,
   groupEventsByWorkOrder,
 } from "../src/agent-admin-model.js";
 
@@ -51,6 +52,11 @@ test("buildAgentAdminViewModel with agents and provider", () => {
         id: "wo_1",
         status: "approval_required",
         approval: { status: "pending" },
+        result: {
+          llmStatus: "ok",
+          llmModel: "local-model",
+          llmSummary: "Alles gezond.",
+        },
       },
     ],
     agentTokenConfigured: true,
@@ -62,7 +68,21 @@ test("buildAgentAdminViewModel with agents and provider", () => {
   assert.equal(vm.teamSummary.totalAgents, 2);
   assert.equal(vm.teamSummary.activeWorkOrders, 1);
   assert.equal(vm.workOrders[0].hasPendingApproval, true);
+  assert.equal(vm.workOrders[0].llmTrace.usedLlm, true);
+  assert.equal(vm.workOrders[0].llmTrace.label, "LLM gebruikt");
+  assert.equal(vm.workOrders[0].llmTrace.model, "local-model");
+  assert.equal(vm.workOrders[0].llmTrace.summary, "Alles gezond.");
   assert.equal(vm.events.length, 1);
+});
+
+test("buildWorkOrderLlmTrace labels LLM states", () => {
+  assert.equal(buildWorkOrderLlmTrace({ result: { llmStatus: "unconfigured" } }).label, "Geen LLM");
+  assert.equal(
+    buildWorkOrderLlmTrace({ result: { llmStatus: "error", llmError: "timeout" } }).tone,
+    "is-bad"
+  );
+  assert.equal(buildWorkOrderLlmTrace({ status: "investigating" }).status, "pending");
+  assert.equal(buildWorkOrderLlmTrace({ status: "completed" }).status, "unavailable");
 });
 
 test("buildProviderHealthLabel handles null", () => {
