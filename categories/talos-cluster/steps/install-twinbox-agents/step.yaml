@@ -1,0 +1,18 @@
+id: install-twinbox-agents
+title: Install AI Beheerteam
+type: action
+journey_stage: setup
+summary: Install the Twinbox AI beheerteam service and wire its internal token into the Portal.
+explanation: Twinbox deploys the read-only AI beheerteam service through Argo CD, stores the internal service token in OpenBao, and materializes that token for both the agents service and the Portal. The local LLM endpoint itself is configured later from the Portal.
+side_help: This installs the agent runtime only. Configure your local OpenAI-compatible endpoint from the Portal admin page after the service is ready.
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/install-twinbox-agents/run.sh

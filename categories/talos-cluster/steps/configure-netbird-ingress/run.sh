@@ -93,15 +93,60 @@ resolve_traefik_cluster_ip() {
   fail "Traefik ClusterIP or endpoints did not become ready"
 }
 
-read_pod_cidrs_json() {
+validate_json_string_array() {
+  local configured_json="$1"
+  local label="$2"
+  if ! printf '%s' "$configured_json" | jq -e 'type == "array" and all(.[]; type == "string" and length > 0)' >/dev/null; then
+    fail "${label} must be a JSON array of CIDR strings"
+  fi
+}
+
+read_json_string_array_input() {
+  local input_id="$1"
+  local label="$2"
+  local configured_json
+
+  configured_json="$(printf '%s' "$STEP_INPUTS_JSON" | jq -c --arg input_id "$input_id" '.[$input_id] // empty')"
+  if [[ -z "$configured_json" || "$configured_json" == "null" ]]; then
+    return 1
+  fi
+
+  validate_json_string_array "$configured_json" "$label"
+  printf '%s\n' "$configured_json"
+}
+
+read_service_cidrs_json() {
   local cidrs_json
+
+  if read_json_string_array_input "service_cidrs" "service_cidrs"; then
+    return 0
+  fi
+
   cidrs_json="$(
-    kubectl get nodes -o json 2>/dev/null \
-      | jq -c '[.items[] | (.spec.podCIDRs[]? // .spec.podCIDR?)] | map(select(. != null and . != "")) | unique' \
+    kubectl -n kube-system get pod -l component=kube-apiserver -o json 2>/dev/null \
+      | jq -c '[.items[].spec.containers[]?.command[]? | select(startswith("--service-cluster-ip-range=")) | sub("^--service-cluster-ip-range="; "") | split(",")[] | select(. != "")] | unique' \
       || true
   )"
   if [[ -z "$cidrs_json" || "$cidrs_json" == "[]" || "$cidrs_json" == "null" ]]; then
-    cidrs_json='["10.244.0.0/16"]'
+    fail "Could not determine Kubernetes service CIDRs from kube-apiserver pods; pass service_cidrs explicitly"
+  fi
+  printf '%s\n' "$cidrs_json"
+}
+
+read_pod_cidrs_json() {
+  local cidrs_json
+
+  if read_json_string_array_input "pod_cidrs" "pod_cidrs"; then
+    return 0
+  fi
+
+  cidrs_json="$(
+    kubectl get nodes -o json 2>/dev/null \
+      | jq -c '[.items[] | ((.spec.podCIDRs // [])[]?, .spec.podCIDR?) | select(. != null and . != "")] | unique' \
+      || true
+  )"
+  if [[ -z "$cidrs_json" || "$cidrs_json" == "[]" || "$cidrs_json" == "null" ]]; then
+    fail "Could not determine Kubernetes pod CIDRs from cluster nodes; pass pod_cidrs explicitly"
   fi
   printf '%s\n' "$cidrs_json"
 }
@@ -115,9 +160,7 @@ read_management_lan_cidrs_json() {
 
   configured_cidrs="$(printf '%s' "$STEP_INPUTS_JSON" | jq -c '.management_lan_cidrs // empty')"
   if [[ -n "$configured_cidrs" && "$configured_cidrs" != "null" ]]; then
-    if ! printf '%s' "$configured_cidrs" | jq -e 'type == "array" and all(.[]; type == "string" and length > 0)' >/dev/null; then
-      fail "management_lan_cidrs must be a JSON array of CIDR strings"
-    fi
+    validate_json_string_array "$configured_cidrs" "management_lan_cidrs"
     printf '%s\n' "$configured_cidrs"
     return 0
   fi
@@ -497,6 +540,155 @@ REMOTE
   [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
 }
 
+ensure_bastion_traefik_netbird_alias() {
+  local netbird_domain="$1"
+  local ssh_key_path="$MANAGER_DATA_DIR/ssh/netbird-${cluster_id}/id_ed25519"
+  local temp_ssh_key=""
+  local netbird_domain_q
+
+  if [[ ! -f "$ssh_key_path" ]]; then
+    if jq -e '.SSH_PRIVATE_KEY // empty' "$netbird_bastion_secret" >/dev/null; then
+      temp_ssh_key="$(mktemp)"
+      jq -r '.SSH_PRIVATE_KEY' "$netbird_bastion_secret" >"$temp_ssh_key"
+      chmod 600 "$temp_ssh_key"
+      ssh_key_path="$temp_ssh_key"
+    fi
+  fi
+
+  if [[ ! -f "$ssh_key_path" || -z "$netbird_proxy_ip" ]] || ! command -v ssh >/dev/null 2>&1; then
+    [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
+    fail "NetBird bastion SSH is unavailable; cannot configure the local NetBird Traefik alias"
+  fi
+
+  printf -v netbird_domain_q '%q' "$netbird_domain"
+
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Ensuring bastion Traefik resolves ${netbird_domain} on the local Docker network"
+  if ! ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 \
+    -i "$ssh_key_path" root@"$netbird_proxy_ip" \
+    "python3 - --compose-path /opt/netbird/docker-compose.yml --alias $netbird_domain_q --restart-traefik" \
+    <"$WORKSPACE_ROOT/scripts/manager/patch-netbird-traefik-alias.py"
+  then
+    [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
+    fail "Failed to configure the local NetBird Traefik alias on the bastion"
+  fi
+
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Verifying netbird-proxy can resolve ${netbird_domain} locally"
+  if ! ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 \
+    -i "$ssh_key_path" root@"$netbird_proxy_ip" \
+    "NETBIRD_DOMAIN=$netbird_domain_q bash -s" <<'REMOTE'
+set -euo pipefail
+
+compose_file="/opt/netbird/docker-compose.yml"
+compose_args=()
+if [[ -f "$compose_file" ]]; then
+  compose_args=(-f "$compose_file")
+fi
+
+resolve_container_id() {
+  local service_name="$1"
+  local fallback_name="$2"
+  local container_id=""
+
+  if [[ ${#compose_args[@]} -gt 0 ]]; then
+    container_id="$(docker compose "${compose_args[@]}" ps -q "$service_name" 2>/dev/null || true)"
+  else
+    container_id="$(docker compose ps -q "$service_name" 2>/dev/null || true)"
+  fi
+  if [[ -z "$container_id" ]]; then
+    container_id="$(docker inspect -f '{{.Id}}' "$fallback_name" 2>/dev/null || true)"
+  fi
+  printf '%s\n' "$container_id"
+}
+
+verify_netbird_proxy_alias() {
+  local proxy_container="$1"
+  local traefik_container="$2"
+
+  [[ -n "$proxy_container" && -n "$traefik_container" ]] || return 1
+
+  python3 - "$NETBIRD_DOMAIN" "$proxy_container" "$traefik_container" <<'PY'
+import json
+import subprocess
+import sys
+
+netbird_domain, proxy_container, traefik_container = sys.argv[1:4]
+
+
+def inspect_container(container):
+    output = subprocess.check_output(["docker", "inspect", container], text=True)
+    return json.loads(output)[0]
+
+
+proxy = inspect_container(proxy_container)
+traefik = inspect_container(traefik_container)
+proxy_networks = set(proxy.get("NetworkSettings", {}).get("Networks", {}).keys())
+traefik_networks = traefik.get("NetworkSettings", {}).get("Networks", {})
+shared_networks = sorted(proxy_networks.intersection(traefik_networks.keys()))
+
+for network_name in shared_networks:
+    aliases = traefik_networks[network_name].get("Aliases") or []
+    if netbird_domain in aliases:
+        print(f"{netbird_domain} is a Traefik alias on shared Docker network {network_name}.")
+        raise SystemExit(0)
+
+raise SystemExit(1)
+PY
+}
+
+for i in $(seq 1 30); do
+  proxy_container="$(resolve_container_id proxy netbird-proxy)"
+  traefik_container="$(resolve_container_id traefik netbird-traefik)"
+  if verify_netbird_proxy_alias "$proxy_container" "$traefik_container"; then
+    exit 0
+  fi
+  sleep 2
+done
+
+docker ps --format 'table {{.Names}}\t{{.Status}}' >&2 || true
+python3 - "$NETBIRD_DOMAIN" "$(resolve_container_id proxy netbird-proxy)" "$(resolve_container_id traefik netbird-traefik)" <<'PY' >&2 || true
+import json
+import subprocess
+import sys
+
+netbird_domain, proxy_container, traefik_container = sys.argv[1:4]
+
+
+def inspect_container(label, container):
+    if not container:
+        print(f"{label}: <not found>")
+        return {}
+    try:
+        output = subprocess.check_output(["docker", "inspect", container], text=True)
+    except subprocess.CalledProcessError as exc:
+        print(f"{label}: docker inspect failed: {exc}")
+        return {}
+    info = json.loads(output)[0]
+    name = info.get("Name", "").lstrip("/")
+    networks = info.get("NetworkSettings", {}).get("Networks", {})
+    print(f"{label}: {name or container}")
+    for network_name, details in sorted(networks.items()):
+        aliases = details.get("Aliases") or []
+        alias_text = ", ".join(aliases) if aliases else "<none>"
+        print(f"  network={network_name} aliases={alias_text}")
+    return networks
+
+
+proxy_networks = inspect_container("netbird-proxy", proxy_container)
+traefik_networks = inspect_container("netbird-traefik", traefik_container)
+shared = sorted(set(proxy_networks).intersection(traefik_networks))
+print(f"expected Traefik alias: {netbird_domain}")
+print(f"shared networks: {', '.join(shared) if shared else '<none>'}")
+PY
+exit 1
+REMOTE
+  then
+    [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
+    fail "netbird-proxy could not resolve ${netbird_domain} on the local Docker network"
+  fi
+
+  [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
+}
+
 discover_netbird_proxy_peer_ip() {
   local ssh_key_path="$MANAGER_DATA_DIR/ssh/netbird-${cluster_id}/id_ed25519"
   local temp_ssh_key=""
@@ -516,7 +708,7 @@ discover_netbird_proxy_peer_ip() {
     fail "NetBird bastion SSH is unavailable; cannot discover the bastion NetBird IP"
   fi
 
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Discovering bastion NetBird peer IP"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Discovering bastion NetBird peer IP" >&2
   if ! netbird_ip="$(
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 \
       -i "$ssh_key_path" root@"$netbird_proxy_ip" \
@@ -1077,11 +1269,7 @@ fi
 
 [[ -n "$netbird_proxy_ip" ]] || fail "NetBird bastion secret does not contain NETBIRD_IP"
 
-service_cidr="$(kubectl -n kube-system get pod -l component=kube-apiserver -o json 2>/dev/null | jq -r '.items[0].spec.containers[0].command[] | select(startswith("--service-cluster-ip-range=")) | sub("^--service-cluster-ip-range="; "")' || true)"
-if [[ -z "$service_cidr" ]]; then
-  service_cidr="10.96.0.0/12"
-fi
-service_cidrs_json="$(jq -n --arg cidr "$service_cidr" '[$cidr]')"
+service_cidrs_json="$(read_service_cidrs_json)"
 pod_cidrs_json="$(read_pod_cidrs_json)"
 management_lan_cidrs_json="$(read_management_lan_cidrs_json "$cluster_json")"
 
@@ -1094,6 +1282,7 @@ authentik_public_url="${TWINBOX_AUTHENTIK_HOST:-https://authentik.${public_zone_
 authentik_domain="${authentik_public_url#https://}"
 authentik_domain="${authentik_domain#http://}"
 authentik_domain="${authentik_domain%%/*}"
+netbird_domain="netbird.${public_zone_name}"
 
 if [[ -n "$proxy_services_json" && "$proxy_services_json" != "null" ]]; then
   if ! printf '%s' "$proxy_services_json" | jq -e 'type == "array"' >/dev/null; then
@@ -1329,6 +1518,7 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
 wait_for_netbird_routing_peer
 wait_for_traefik_reverse_proxy_backend "$traefik_resource_address"
 ensure_netbird_proxy_peer "$proxy_setup_key"
+ensure_bastion_traefik_netbird_alias "$netbird_domain"
 bastion_netbird_ip="$(discover_netbird_proxy_peer_ip)"
 persist_netbird_proxy_peer_ip "$bastion_netbird_ip"
 ensure_netbird_bastion_exit_peer "$bastion_exit_router_setup_key"
@@ -1385,8 +1575,25 @@ CLUSTER_ID="$cluster_id" \
   --service-domain "$authentik_domain" \
   --service-path /
 
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating NetBird reverse proxy service for NetBird coalescing fallback"
+TWINBOX_NETBIRD_TOKEN="$netbird_token" \
+TWINBOX_NETBIRD_URL="$netbird_management_url" \
+TWINBOX_NETBIRD_BASTION_SECRET="$netbird_bastion_secret" \
+CLUSTER_ID="$cluster_id" \
+  bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "netbird" \
+  --service-domain "$netbird_domain" \
+  --service-path / \
+  --target-type cluster \
+  --target-id "$netbird_domain" \
+  --target-host "$netbird_domain" \
+  --target-port 443 \
+  --target-protocol https \
+  --target-direct-upstream true \
+  --target-skip-tls-verify false
+
 wait_for_public_oidc_discovery "$netbird_oidc_issuer"
-wait_for_public_oidc_authorize "$authentik_public_url" "$netbird_oidc_client_id" "https://netbird.${public_zone_name}/oauth2/callback"
+wait_for_public_oidc_authorize "$authentik_public_url" "$netbird_oidc_client_id" "https://${netbird_domain}/oauth2/callback"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Registering Authentik as NetBird identity provider"
 idp_workdir="$MANAGER_DATA_DIR/opentofu/netbird-idp-${cluster_id}"

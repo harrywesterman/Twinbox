@@ -116,6 +116,7 @@ spec:
             - /bin/sh
             - -ec
             - |
+              RELAY_TARGET_HOST="$(printf '%s' "${RELAY_TARGET_HOST}" | tr -d '\n\r')"
               cat >/tmp/haproxy.cfg <<EOF
               global
                 log stdout format raw local0

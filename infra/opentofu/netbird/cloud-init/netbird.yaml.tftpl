@@ -393,6 +393,41 @@ write_files:
               if volume not in volumes:
                   volumes.append(volume)
 
+      def ensure_network_alias(service, network_name, alias):
+          networks = service.get("networks")
+          if networks is None:
+              networks = {}
+              service["networks"] = networks
+          if isinstance(networks, list):
+              next_networks = {}
+              for item in networks:
+                  if isinstance(item, str):
+                      next_networks.setdefault(item, {})
+                  elif isinstance(item, dict):
+                      for key, value in item.items():
+                          next_networks[key] = value or {}
+              networks = next_networks
+              service["networks"] = networks
+          if isinstance(networks, dict):
+              entry = networks.get(network_name)
+              if entry is None:
+                  entry = {}
+                  networks[network_name] = entry
+              elif isinstance(entry, list):
+                  entry = {"aliases": entry}
+                  networks[network_name] = entry
+              elif not isinstance(entry, dict):
+                  entry = {}
+                  networks[network_name] = entry
+              aliases = entry.setdefault("aliases", [])
+              if not isinstance(aliases, list):
+                  aliases = [aliases]
+                  entry["aliases"] = aliases
+              if alias not in aliases:
+                  aliases.append(alias)
+
+      ensure_network_alias(traefik, "netbird", netbird_domain)
+
       # Add DNS provider environment variables to traefik
       env = traefik.setdefault("environment", [])
       if isinstance(env, list):
@@ -672,8 +707,11 @@ runcmd:
     groupadd -r opksshuser || true
     useradd -r -g opksshuser -s /usr/sbin/nologin -d /var/lib/opksshuser -m opksshuser || true
     mkdir -p /etc/opk
+    touch /var/log/opkssh.log
+    chown root:opksshuser /var/log/opkssh.log
+    chmod 0660 /var/log/opkssh.log
     cat > /etc/opk/providers <<EOF
-    ${opkssh_issuer_url} ${opkssh_client_id} 16h
+    ${opkssh_issuer_url} ${opkssh_client_id} 24h
     EOF
     cat > /etc/opk/auth_id <<EOF
     root oidc:groups:admins ${opkssh_issuer_url}
@@ -687,6 +725,6 @@ runcmd:
     SSHD
     systemctl restart sshd || true
     /usr/local/bin/opkssh verify --help >/dev/null
-    /usr/local/bin/opkssh audit
+    /usr/local/bin/opkssh audit || true
 %{ endif }
   - /root/bootstrap-netbird.sh

@@ -1,0 +1,14 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: pgadmin4-netbird-forwarded-headers
+  namespace: pgadmin4
+  annotations:
+    twinbox.io/description: >-
+      Keep pgAdmin4 OAuth2 redirect URIs on the public HTTPS origin behind
+      NetBird Reverse Proxy.
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Port: "443"
+      X-Forwarded-Proto: https

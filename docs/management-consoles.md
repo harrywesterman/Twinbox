@@ -1,6 +1,6 @@
 # Management Consoles
 
-The `install-management-consoles` step publishes operator web consoles and wires them into Authentik. It runs after the portal and Dashy are online so the Traefik, Longhorn, Proxmox, Forgejo, and SeaweedFS web UIs can be published. Proxmox, Longhorn, Hubble, Web Wizard, and SeaweedFS use Authentik proxy applications; Forgejo uses native Authentik OIDC login inside Forgejo.
+The `install-management-consoles` step publishes operator web consoles and wires them into Authentik. It runs after the portal and Dashy are online so the Traefik, Longhorn, Proxmox, Forgejo, and SeaweedFS web UIs can be published. Proxmox, Longhorn, Hubble, Web Wizard, and the SeaweedFS UI use Authentik proxy applications; SeaweedFS also exposes `/cache` anonymously for Mastodon media by rewriting it to the `mastodon` bucket on the S3 endpoint. Forgejo uses native Authentik OIDC login inside Forgejo.
 
 ## Architecture
 

@@ -22,13 +22,11 @@ zulip:
           key: ZULIP_DEFAULT_REALM_OWNER_NAME
     SETTING_EXTERNAL_HOST: zulip.bierineenweek.nl
     SETTING_ZULIP_ADMINISTRATOR: admin@zulip.bierineenweek.nl
-    SETTING_LOADBALANCER_IPS: 10.244.0.0/16
-    SETTING_AUTHENTICATION_BACKENDS: >-
-      ("zproject.backends.EmailAuthBackend", "zproject.backends.GenericOpenIdConnectBackend")
     SETTING_SOCIAL_AUTH_REDIRECT_IS_HTTPS: "True"
   persistence:
     enabled: true
-    accessMode: ReadWriteOnce
+    accessModes:
+      - ReadWriteOnce
     size: 10Gi
     storageClass: longhorn
 
@@ -64,11 +62,24 @@ postSetup:
     06-patch-nginx-trusted-proto.sh: |
       #!/usr/bin/env bash
       set -euo pipefail
-      # Add NetBird proxy CIDR to nginx trusted-proto and zulip.conf so
-      # the proxy reverse headers are accepted from NetBird traffic.
-      NETBIRD_CIDR="10.244.0.0/16"
-      sed -i "s|    default 0;|    ${NETBIRD_CIDR} 1;\n    default 0;|" /etc/nginx/zulip-include/trusted-proto
-      crudini --set /etc/zulip/zulip.conf loadbalancer ips "$(crudini --get /etc/zulip/zulip.conf loadbalancer ips),$NETBIRD_CIDR" 2>/dev/null || true
+      # Keep nginx trusted-proto aligned with the runtime load balancer CIDRs used by Zulip.
+      loadbalancer_ips="${LOADBALANCER_IPS:-}"
+      if [[ -z "$loadbalancer_ips" ]]; then
+        echo "LOADBALANCER_IPS is required" >&2
+        exit 1
+      fi
+      trusted_proto_entries="$(
+        printf '%s\n' "$loadbalancer_ips" \
+          | tr ',' '\n' \
+          | awk '{
+              gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
+              if (length($0)) {
+                printf "    %s 1;\n", $0
+              }
+            }'
+      )"
+      sed -i "s|    default 0;|${trusted_proto_entries}    default 0;|" /etc/nginx/zulip-include/trusted-proto
+      crudini --set /etc/zulip/zulip.conf loadbalancer ips "$loadbalancer_ips"
       nginx -s reload
     10-create-default-realm.sh: |
       #!/usr/bin/env bash
@@ -106,6 +117,11 @@ postSetup:
       if realm.video_chat_provider != desired_video_chat_provider:
           realm.video_chat_provider = desired_video_chat_provider
           update_fields.append("video_chat_provider")
+
+      # Allow any Authentik-authenticated user to sign up without invitation
+      if hasattr(realm, "invite_required") and realm.invite_required:
+          realm.invite_required = False
+          update_fields.append("invite_required")
 
       if update_fields:
           realm.save(update_fields=update_fields)
