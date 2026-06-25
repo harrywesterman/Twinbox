@@ -28,6 +28,7 @@ jobs:
             manager-web/package-lock.json
             manager-worker/package-lock.json
             portal/package-lock.json
+            twinbox-agents/package-lock.json
 
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -44,6 +45,7 @@ jobs:
           npm ci --prefix manager-web
           npm ci --prefix manager-worker
           npm ci --prefix portal
+          npm ci --prefix twinbox-agents
 
       - name: Audit dependencies
         run: |
@@ -52,6 +54,7 @@ jobs:
           npm audit --audit-level=high --prefix manager-web
           npm audit --audit-level=high --prefix manager-worker
           npm audit --audit-level=high --prefix portal
+          npm audit --audit-level=high --prefix twinbox-agents
 
       - name: Lint and format check
         run: |
@@ -59,22 +62,25 @@ jobs:
           npm run lint --prefix manager-web
           npm run lint --prefix manager-worker
           npm run lint --prefix portal
+          npm run lint --prefix twinbox-agents
           npm run lint
           npm run format:check --prefix manager-api
           npm run format:check --prefix manager-web
           npm run format:check --prefix manager-worker
           npm run format:check --prefix portal
+          npm run format:check --prefix twinbox-agents
           npm run format:check
           ruff check tests/
           ruff format --check tests/
 
       - name: Static checks
         run: |
-          bash -n wizard/setup-wizard.sh scripts/manager/create-talos-vms.sh scripts/manager/bootstrap-talos.sh scripts/manager/collect-state.sh categories/talos-cluster/steps/install-twinbox-portal/run.sh
+          bash -n wizard/setup-wizard.sh scripts/manager/create-talos-vms.sh scripts/manager/bootstrap-talos.sh scripts/manager/collect-state.sh categories/talos-cluster/steps/install-twinbox-portal/run.sh categories/talos-cluster/steps/install-twinbox-agents/run.sh scripts/manager/sync-twinbox-agents-config.sh
           node --check manager-api/src/server.js
           node --check manager-worker/src/worker.js
           node --check manager-worker/src/refresh-portal-config.mjs
           node --check portal/server.mjs
+          node --check twinbox-agents/src/*.mjs
 
       - name: Portal build
         run: npm run build --prefix portal
@@ -94,4 +100,5 @@ jobs:
           node --test manager-web/test/*.mjs
           node --test manager-worker/test/*.mjs
           node --test portal/test/*.mjs
+          node --test twinbox-agents/test/*.mjs
           python -m pytest -q tests

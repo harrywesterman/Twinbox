@@ -7,6 +7,9 @@ set -euo pipefail
 
 usage() {
   echo "Usage: $0 --service-name <name> --service-domain <domain> [--service-path /]" >&2
+  echo "          [--target-type <host|domain|cluster>] [--target-id <id>]" >&2
+  echo "          [--target-host <host>] [--target-port <port>] [--target-protocol <http|https>]" >&2
+  echo "          [--target-direct-upstream <true|false>] [--target-skip-tls-verify <true|false>]" >&2
   echo "       $0 --normalize-collection <field> < json" >&2
   exit 1
 }
@@ -15,6 +18,13 @@ SERVICE_NAME=""
 SERVICE_DOMAIN=""
 SERVICE_PATH="/"
 NORMALIZE_COLLECTION_FIELD=""
+TARGET_TYPE_OVERRIDE=""
+TARGET_ID_OVERRIDE=""
+TARGET_HOST_OVERRIDE=""
+TARGET_PORT_OVERRIDE=""
+TARGET_PROTOCOL_OVERRIDE=""
+TARGET_DIRECT_UPSTREAM_OVERRIDE=""
+TARGET_SKIP_TLS_VERIFY_OVERRIDE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -22,6 +32,13 @@ while [[ $# -gt 0 ]]; do
     --service-domain) SERVICE_DOMAIN="$2"; shift 2 ;;
     --service-path)  SERVICE_PATH="$2"; shift 2 ;;
     --normalize-collection) NORMALIZE_COLLECTION_FIELD="$2"; shift 2 ;;
+    --target-type) TARGET_TYPE_OVERRIDE="$2"; shift 2 ;;
+    --target-id) TARGET_ID_OVERRIDE="$2"; shift 2 ;;
+    --target-host) TARGET_HOST_OVERRIDE="$2"; shift 2 ;;
+    --target-port) TARGET_PORT_OVERRIDE="$2"; shift 2 ;;
+    --target-protocol) TARGET_PROTOCOL_OVERRIDE="$2"; shift 2 ;;
+    --target-direct-upstream) TARGET_DIRECT_UPSTREAM_OVERRIDE="$2"; shift 2 ;;
+    --target-skip-tls-verify) TARGET_SKIP_TLS_VERIFY_OVERRIDE="$2"; shift 2 ;;
     *) usage ;;
   esac
 done
@@ -190,23 +207,85 @@ fi
 TRAEFIK_RESOURCE_ID=""
 TRAEFIK_RESOURCE_ADDRESS=""
 TRAEFIK_TARGET_PORT="443"
+TRAEFIK_TARGET_PROTOCOL="https"
 if [[ -n "$NETBIRD_CLUSTER_ID" ]]; then
   NETWORK_SECRET="/opt/twinbox/bootstrap/secrets/global/netbird-network-${NETBIRD_CLUSTER_ID}.json"
   if [[ -f "$NETWORK_SECRET" ]]; then
     TRAEFIK_RESOURCE_ID="$(jq -r '.TRAEFIK_RESOURCE_ID // empty' "$NETWORK_SECRET")"
     TRAEFIK_RESOURCE_ADDRESS="$(jq -r '.TRAEFIK_RESOURCE_ADDRESS // empty' "$NETWORK_SECRET")"
     TRAEFIK_TARGET_PORT="$(jq -r '.TRAEFIK_TARGET_PORT // "443"' "$NETWORK_SECRET")"
+    TRAEFIK_TARGET_PROTOCOL="$(jq -r '.TRAEFIK_TARGET_PROTOCOL // empty' "$NETWORK_SECRET")"
+  fi
+fi
+if [[ -z "$TRAEFIK_TARGET_PROTOCOL" ]]; then
+  if [[ "$TRAEFIK_TARGET_PORT" == "8082" ]]; then
+    TRAEFIK_TARGET_PROTOCOL="http"
+  else
+    TRAEFIK_TARGET_PROTOCOL="https"
   fi
 fi
 
-if [[ -z "$TRAEFIK_RESOURCE_ID" ]]; then
+TARGET_ID="${TARGET_ID_OVERRIDE:-$TRAEFIK_RESOURCE_ID}"
+TARGET_HOST="${TARGET_HOST_OVERRIDE:-$TRAEFIK_RESOURCE_ADDRESS}"
+TARGET_PORT="${TARGET_PORT_OVERRIDE:-$TRAEFIK_TARGET_PORT}"
+TARGET_PROTOCOL="${TARGET_PROTOCOL_OVERRIDE:-$TRAEFIK_TARGET_PROTOCOL}"
+TARGET_DIRECT_UPSTREAM="${TARGET_DIRECT_UPSTREAM_OVERRIDE:-false}"
+if [[ -n "$TARGET_SKIP_TLS_VERIFY_OVERRIDE" ]]; then
+  TARGET_SKIP_TLS_VERIFY="$TARGET_SKIP_TLS_VERIFY_OVERRIDE"
+elif [[ "$TARGET_PROTOCOL" == "https" ]]; then
+  TARGET_SKIP_TLS_VERIFY="true"
+else
+  TARGET_SKIP_TLS_VERIFY="false"
+fi
+
+if [[ -n "$TARGET_TYPE_OVERRIDE" ]]; then
+  TARGET_TYPE="$TARGET_TYPE_OVERRIDE"
+elif [[ "$TARGET_HOST" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+  TARGET_TYPE="host"
+else
+  TARGET_TYPE="domain"
+fi
+
+if [[ -z "$TARGET_ID" ]]; then
   log_skip "NetBird network secret not ready; skipping service creation for ${SERVICE_NAME}."
   exit 0
 fi
-if [[ -z "$TRAEFIK_RESOURCE_ADDRESS" ]]; then
+if [[ -z "$TARGET_HOST" ]]; then
   log_skip "NetBird network secret does not contain TRAEFIK_RESOURCE_ADDRESS; skipping service creation for ${SERVICE_NAME}."
   exit 0
 fi
+case "$TARGET_TYPE" in
+  host|domain|cluster) ;;
+  *)
+    log_skip "NetBird target type ${TARGET_TYPE} is not supported; skipping service creation for ${SERVICE_NAME}."
+    exit 0
+    ;;
+esac
+case "$TARGET_PROTOCOL" in
+  http|https) ;;
+  *)
+    log_skip "NetBird target protocol ${TARGET_PROTOCOL} is not supported; skipping service creation for ${SERVICE_NAME}."
+    exit 0
+    ;;
+esac
+if [[ ! "$TARGET_PORT" =~ ^[0-9]+$ ]] || (( TARGET_PORT < 1 || TARGET_PORT > 65535 )); then
+  log_skip "NetBird target port ${TARGET_PORT} is invalid; skipping service creation for ${SERVICE_NAME}."
+  exit 0
+fi
+case "$TARGET_DIRECT_UPSTREAM" in
+  true|false) ;;
+  *)
+    log_skip "NetBird target direct_upstream value ${TARGET_DIRECT_UPSTREAM} is invalid; skipping service creation for ${SERVICE_NAME}."
+    exit 0
+    ;;
+esac
+case "$TARGET_SKIP_TLS_VERIFY" in
+  true|false) ;;
+  *)
+    log_skip "NetBird target skip_tls_verify value ${TARGET_SKIP_TLS_VERIFY} is invalid; skipping service creation for ${SERVICE_NAME}."
+    exit 0
+    ;;
+esac
 
 # 1. Find the proxy cluster by domain
 find_proxy_cluster() {
@@ -287,27 +366,19 @@ EXISTING_SERVICE_ID="$(check_existing_service || true)"
 # 3. Build the service payload. The network step creates the Traefik resource
 # and writes its ID to the network secret; the live cluster resources endpoint
 # can be unavailable on some NetBird versions, so do not re-discover it here.
-# Determine target type (host vs domain)
-if [[ "$TRAEFIK_RESOURCE_ADDRESS" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-  TARGET_TYPE="host"
-else
-  TARGET_TYPE="domain"
-fi
-
-# Build the service JSON
 build_service_payload() {
-  local service_id="$1"
-
   jq -cn \
     --arg name "$SERVICE_NAME" \
     --arg domain "$SERVICE_DOMAIN" \
-    --arg target_id "$TRAEFIK_RESOURCE_ID" \
+    --arg target_id "$TARGET_ID" \
     --arg target_type "$TARGET_TYPE" \
-    --arg host "$TRAEFIK_RESOURCE_ADDRESS" \
+    --arg host "$TARGET_HOST" \
     --arg path "$SERVICE_PATH" \
-    --argjson target_port "$TRAEFIK_TARGET_PORT" \
+    --arg protocol "$TARGET_PROTOCOL" \
+    --argjson target_port "$TARGET_PORT" \
     --argjson service_enabled "true" \
-    --argjson skip_tls_verify "true" \
+    --argjson direct_upstream "$TARGET_DIRECT_UPSTREAM" \
+    --argjson skip_tls_verify "$TARGET_SKIP_TLS_VERIFY" \
     '{
       name: $name,
       domain: $domain,
@@ -320,8 +391,9 @@ build_service_payload() {
         host: $host,
         path: $path,
         port: $target_port,
-        protocol: "https",
+        protocol: $protocol,
         options: {
+          direct_upstream: $direct_upstream,
           skip_tls_verify: $skip_tls_verify
         },
         enabled: $service_enabled

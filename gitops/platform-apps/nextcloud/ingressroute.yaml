@@ -24,3 +24,29 @@ spec:
               secure: true
               httpOnly: true
   tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: nextcloud-netbird
+  namespace: nextcloud
+spec:
+  entryPoints:
+    - webnetbird
+  routes:
+    - kind: Rule
+      match: Host(`nextcloud.__ZONE_NAME__`)
+      middlewares:
+        - name: nextcloud-well-known-redirect
+        - name: nextcloud-well-known-webfinger
+        - name: nextcloud-well-known-host-meta
+        - name: nextcloud-well-known-host-meta-json
+      services:
+        - kind: Service
+          name: nextcloud
+          port: 8080
+          sticky:
+            cookie:
+              name: NCROLES
+              secure: true
+              httpOnly: true

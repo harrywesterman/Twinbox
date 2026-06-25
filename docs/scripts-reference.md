@@ -9,7 +9,7 @@ Scripts under `scripts/manager/` are executed by the `manager-worker` container.
 Main provisioning entry point. Creates Talos VMs on Proxmox using OpenTofu.
 
 - Creates a per-cluster OpenTofu workspace under `manager-data/clusters/<cluster-id>/iac/`
-- Downloads the pinned Talos ISO and uploads it to Proxmox storage
+- Downloads the pinned Talos disk image to Proxmox as `import` content and imports it into the Talos VM disk
 - Sizes control-plane VMs at `4 GB RAM / 10 GB disk` and gives workers a default `100%` disk budget from the free space shared across the three Proxmox hosts, with a slider to tune it up or down
 - Labels Talos nodes with `twinbox.io/role` so worker-only storage components can target the right machines
 - Renders VM configuration from the cluster JSON
@@ -65,6 +65,14 @@ Installs the Cloudtty operator with Helm and creates a default CloudShell instan
 ### `install-traefik-manager.sh`
 
 Refreshes the shared `platform-ingress` Argo CD application so Traefik Manager is deployed as part of the shared platform overlay behind Authentik.
+
+### `setup-termix-authentik.sh`
+
+Configures the Termix Authentik OIDC provider, syncs the Termix bootstrap secret into OpenBao, and applies the Argo CD `Application` that deploys Termix into the cluster.
+
+### `setup-termix.sh`
+
+Signs in to Termix with the bootstrap admin password, creates the Management VM password credential and bastion SSH key credential, creates host entries that use the hosts' NetBird peer IPs, copies kubeconfig and Talos config into the Management VM home directory, and shares both hosts with the Browser SSH role.
 
 ### `install-prometheus.sh`
 

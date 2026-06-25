@@ -117,6 +117,45 @@ extract_authentik_identifier() {
   jq -er '.pk // .uuid // .id // empty' <<<"$payload" 2>/dev/null || true
 }
 
+upsert_scope_mapping() {
+  local mapping_name="$1"
+  local scope_name="$2"
+  local description="$3"
+  local expression="$4"
+  local existing_json existing_pk payload
+
+  payload="$(
+    jq -n \
+      --arg name "$mapping_name" \
+      --arg scope_name "$scope_name" \
+      --arg description "$description" \
+      --arg expression "$expression" \
+      '{
+        name: $name,
+        scope_name: $scope_name,
+        description: $description,
+        expression: $expression
+      }'
+  )"
+
+  existing_json="$(authentik_api_get "/propertymappings/provider/scope/?page_size=200" \
+    | jq -c \
+      --arg mapping_name "$mapping_name" \
+      --arg scope_name "$scope_name" \
+      '.results[]? | select((.name // "") == $mapping_name and (.scope_name // "") == $scope_name)' \
+    | head -n1 || true)"
+
+  if [[ -n "$existing_json" ]]; then
+    existing_pk="$(jq -r '.pk // .id // empty' <<<"$existing_json")"
+    [[ -n "$existing_pk" ]] || fail "Could not determine scope mapping PK for ${mapping_name}"
+    authentik_api_write PATCH "/propertymappings/provider/scope/${existing_pk}/" "$payload" >/dev/null
+    printf '%s\n' "$existing_pk"
+    return 0
+  fi
+
+  authentik_api_write POST "/propertymappings/provider/scope/" "$payload" | jq -r '.pk // .id // empty'
+}
+
 create_or_update_provider() {
   local provider_payload="$1"
   local search_response existing_pk response_json
@@ -193,12 +232,24 @@ openid_mapping_id="$(resolve_scope_mapping_id "openid")"
 email_mapping_id="$(resolve_scope_mapping_id "email")"
 profile_mapping_id="$(resolve_scope_mapping_id "profile")"
 signing_key_id="$(authentik_resolve_signing_key_id)"
+groups_mapping_id="$(upsert_scope_mapping \
+  "Twinbox Portal groups" \
+  "groups" \
+  "Expose Twinbox Portal group membership" \
+  'groups = [group.name for group in request.user.ak_groups.all()]
+if request.user.is_superuser and "admins" not in groups:
+    groups.append("admins")
+return {
+    "groups": groups,
+}' \
+)"
 
 [[ -n "$authorization_flow_id" ]] || fail "Could not resolve Authentik authorization flow ID"
 [[ -n "$invalidation_flow_id" ]] || fail "Could not resolve Authentik invalidation flow ID"
 [[ -n "$openid_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for openid"
 [[ -n "$email_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for email"
 [[ -n "$profile_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for profile"
+[[ -n "$groups_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for groups"
 [[ -n "$signing_key_id" ]] || fail "Could not resolve Authentik signing key ID"
 
 property_mapping_ids_json="$(
@@ -206,7 +257,8 @@ property_mapping_ids_json="$(
     --arg openid "$openid_mapping_id" \
     --arg email "$email_mapping_id" \
     --arg profile "$profile_mapping_id" \
-    '[$openid, $email, $profile]'
+    --arg groups "$groups_mapping_id" \
+    '[$openid, $email, $profile, $groups]'
 )"
 
 portal_redirect_regex="$(printf '%s' "$portal_host/auth/callback" | sed 's/[.[\*^$()+?{|]/\\&/g; s/\//\\\//g')"

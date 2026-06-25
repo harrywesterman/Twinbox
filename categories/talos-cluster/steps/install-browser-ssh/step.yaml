@@ -1,0 +1,30 @@
+id: install-browser-ssh
+title: Install Browser SSH
+type: action
+journey_stage: setup
+summary: Provision Termix and the opkssh Authentik application for admin-only browser SSH into the Management VM and bastion.
+explanation: Twinbox deploys Termix as the admin browser shell so members of the Authentik admins group can open SSH sessions to the Management VM and NetBird bastion over their NetBird peer IPs. The step creates the opkssh OAuth2 application in Authentik (used by Termix to mint short-lived, MFA-gated SSH certificates), wires Termix into Authentik OIDC, enrolls a Termix NetBird sidecar, and copies the cluster kubeconfig and Talos config into place for browser use on the Management VM.
+side_help: This lands you on the Management VM or bastion, not a Talos node. From the Management VM you can work with kubectl, talosctl, and the host-side tools that live there.
+dashy:
+  items:
+    - section: Platform
+      title: Browser SSH
+      description: Management and bastion terminals
+      icon: fas fa-terminal
+      url_template: https://termix.__ZONE_NAME__
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+    TWINBOX_TALOSCONFIG_FILE:
+      scope: cluster
+      item: talosconfig
+      attachment: talosconfig
+      format: file
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/install-browser-ssh/run.sh

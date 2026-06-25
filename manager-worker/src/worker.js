@@ -1260,7 +1260,7 @@ async function handleRunStep(job) {
         STEP_CONTEXT_JSON: JSON.stringify(context),
         STEP_RESULT_FILE: resultFile,
         TWINBOX_HOST_CRON_DIR: process.env.TWINBOX_HOST_CRON_DIR || "/host/etc/cron.d",
-        ...secretRuntime.env,
+        ...withKubeconfigAliases(secretRuntime.env),
       },
       redact,
       secretRuntime.strip_env
@@ -1469,6 +1469,39 @@ async function handleUninstallStep(job) {
   }
 }
 
+async function handleSyncAgentConfig(job) {
+  const scriptPath = path.join(workspace, "scripts/manager/sync-twinbox-agents-config.sh");
+  if (!fs.existsSync(scriptPath)) {
+    throw new Error(`sync_agent_config script not found: ${scriptPath}`);
+  }
+  const clusterId = job.cluster_id || job.payload?.cluster_id || job.payload?.cluster?.id || "";
+  const clusterInstanceId =
+    job.cluster_instance_id ||
+    job.payload?.cluster_instance_id ||
+    job.payload?.cluster?.cluster_instance_id ||
+    job.payload?.cluster?.instance_id ||
+    "";
+
+  await runCommand(
+    job.id,
+    "bash",
+    [scriptPath],
+    {
+      MANAGER_DATA_DIR: dataRoot,
+      WORKSPACE_ROOT: workspace,
+      TWINBOX_CLUSTER_ID: clusterId,
+      TWINBOX_CLUSTER_INSTANCE_ID: clusterInstanceId,
+    },
+    (line) => {
+      const redacted = line
+        .replace(/TWINBOX_AGENT_INTERNAL_TOKEN=\S+/g, "TWINBOX_AGENT_INTERNAL_TOKEN=***")
+        .replace(/OPENAI_API_KEY=\S+/g, "OPENAI_API_KEY=***");
+      return redacted;
+    },
+    []
+  );
+}
+
 async function handleJob(queueFile) {
   const queued = readJson(queueFile);
   const runningFile = path.join(dirs.running, path.basename(queueFile));
@@ -1509,6 +1542,13 @@ async function handleJob(queueFile) {
       });
     } else if (queued.type === "uninstall_step") {
       await handleUninstallStep({
+        id: queued.id,
+        payload: queued.payload,
+        cluster_id: queued.cluster_id,
+        cluster_instance_id: queued.cluster_instance_id,
+      });
+    } else if (queued.type === "sync_agent_config") {
+      await handleSyncAgentConfig({
         id: queued.id,
         payload: queued.payload,
         cluster_id: queued.cluster_id,

@@ -1,6 +1,6 @@
 # Architecture
 
-Twinbox runs on a Proxmox cluster to deliver a production-grade Kubernetes platform. The system is built from five layers: a Proxmox bootstrap wizard, a Management VM that runs the control plane, a Talos Linux Kubernetes cluster, a GitOps-managed application platform, and a suite of infrastructure services (NetBird, Traefik, Cilium, etc.).
+Twinbox runs on a Proxmox cluster to deliver a production-grade Kubernetes platform. The system is built from five layers: a Proxmox bootstrap wizard, a Management VM that runs the control plane, a Talos Linux Kubernetes cluster, a GitOps-managed application platform, and a suite of infrastructure services (NetBird, Traefik, Cilium, Forgejo, etc.).
 
 ```mermaid
 graph TB
@@ -16,6 +16,7 @@ graph TB
                 Web["manager-web<br/>Port 3000"]
                 API["manager-api<br/>Port 8080"]
                 Worker["manager-worker"]
+                Forgejo["Forgejo<br/>Port 3001"]
                 SeaweedFS["SeaweedFS<br/>S3:8333 / Filer:8888"]
             end
             Bootstrap["/opt/twinbox/bootstrap<br/>Secrets & Configs"]
@@ -106,6 +107,7 @@ Runs on the Management VM as Docker Compose services:
 | `manager-web` | `3000` | React wizard UI |
 | `manager-api` | `8080` | REST API for catalog, jobs, state |
 | `manager-worker` | — | Queue polling and job execution |
+| `forgejo` | `3001` | Local GitOps promotion gate for Twinbox repo |
 | `seaweedfs` | `8333` / `8888` | S3-compatible object store for backups |
 | `seaweedfs-admin` | `23646` | SeaweedFS admin dashboard |
 
@@ -135,7 +137,7 @@ Scripts and step runners executed by `manager-worker`:
 **Networking**
 - `scripts/manager/render-cilium-manifest.sh` — Cilium bootstrap manifest
 - `scripts/manager/install-argocd.sh` — Argo CD installation
-- `scripts/manager/install-cloudtty.sh` — browser-based cluster shell
+- `scripts/manager/setup-termix-authentik.sh` and `scripts/manager/setup-termix.sh` — browser SSH into the Management VM and bastion over NetBird
 - `scripts/manager/install-traefik-manager.sh` — Traefik Manager UI
 
 **Storage & Secrets**
@@ -341,11 +343,12 @@ After the Talos/Cilium bootstrap, platform services install in this order:
 | 16 | `install-management-backup` | Host cron: etcd snapshots + restic |
 | 17 | `install-crowdsec` | IDS + Traefik bouncer |
 | 18 | `install-ntfy` | Push notifications |
-| 19 | `install-cloudtty` | Browser-based cluster shell |
+| 19 | `install-browser-ssh` | Browser SSH to the Management VM and bastion |
+| 19a | `install-opkssh` | Authentik-MFA-gated SSH certificates for the Management VM and bastion |
 | 20 | `install-headlamp` | Kubernetes dashboard with OIDC |
 | 21 | `install-twinbox-portal` | User-facing app launcher |
 | 22 | `install-dashy-dashboard` | Legacy admin launcher |
-| 23 | `install-management-consoles` | Proxmox, Longhorn, SeaweedFS UIs |
+| 23 | `install-management-consoles` | Proxmox, Longhorn, Forgejo, SeaweedFS UIs |
 | 24 | `install-pgadmin4` | PostgreSQL management |
 | 25 | `install-adguard` | AdGuard Home DNS with NetBird nameserver push, DNS forwarder on management VM |
 | 26+ | App bundles / individual apps | User applications via Argo CD |
@@ -397,6 +400,7 @@ The local Argo cluster secret must exist before the domain-aware ApplicationSets
 | ntfy | `ntfy.<ZONE_NAME>` |
 | SeaweedFS | `seaweedfs.<ZONE_NAME>` |
 | SeaweedFS Admin | `seaweedfs-admin.<ZONE_NAME>` |
+| Forgejo | `forgejo.<ZONE_NAME>` |
 | Proxmox (proxy) | `proxmox.<ZONE_NAME>` |
 
 ## Data Flow
@@ -420,8 +424,8 @@ graph TB
         UserApps["User Apps<br/>(Nextcloud, Immich, etc.)"]
     end
 
-    CF -->|"HTTPS"| Traefik
-    NB -->|"NetBird route"| Traefik
+    CF -->|"HTTPS origin / websecure"| Traefik
+    NB -->|"HTTP 8082 / webnetbird"| Traefik
 
     Traefik -->|"forwardAuth"| Auth
     Auth -->|"403 / Headers"| Traefik
@@ -500,7 +504,18 @@ The proxy domain is `<zone>` (e.g. `bierineenweek.nl`), not `proxy.<zone>`. Apps
 
 ### Proxy & Routing
 
-The proxy service targets a **NetBird resource** (the Traefik ClusterIP), not the upstream service directly. The eBPF-based wgProxy handles tunnel backhaul between the bastion and in-cluster services, allowing the NetBird server to route traffic to internal Traefik services on the proxy subnet `10.96.0.0/12`.
+The proxy service targets a **NetBird resource** (the Traefik ClusterIP), not
+the upstream service directly. The eBPF-based wgProxy handles tunnel backhaul
+between the bastion and in-cluster services, allowing the NetBird server to
+route traffic to internal Traefik services on the proxy subnet `10.96.0.0/12`.
+Cloudflare or direct HTTPS origin traffic uses Traefik `websecure`; NetBird
+Reverse Proxy services use Traefik `webnetbird` on `8082/http`. Public apps and
+management consoles should define both route names so either ingress strategy
+works from a fresh GitOps install.
+Because Twinbox runs Cilium in kube-proxy-free mode, `bpf.lbExternalClusterIP`
+and `socketLB.hostNamespaceOnly` must stay enabled so NetBird-forwarded packets
+inside the routing peer pod can reach ClusterIP services through the lower
+datapath.
 
 ## App Bundle Architecture
 
@@ -617,7 +632,7 @@ Apps installed through the App Installs flow are rendered in the portal catalog 
 - Queue recovery marks orphaned `running` jobs as failed on worker startup.
 - Step state is cluster-scoped for Talos cluster journeys.
 - Talos configs and kubeconfigs are runtime artifacts, not canonical files under `manager-data/`.
-- Management VM edits under `/opt/twinbox` are temporary runtime changes unless they are committed and pushed back to GitHub `main`.
+- Management VM edits under `/opt/twinbox` are temporary runtime changes unless they are promoted through Forgejo or pushed back to GitHub `main`.
 - OpenBao uses static auto-unseal material stored on the Management VM for zero-touch restarts.
 - The Management VM runs SeaweedFS in Docker as the default S3 target for Velero, Longhorn, CloudNativePG, Talos etcd snapshots, and `/opt/twinbox` backups.
 - The Management VM does not need a Twinbox repository checkout; cloud-init seeds `/opt/twinbox` runtime and bootstrap data, while the manager images carry the executable step catalog.

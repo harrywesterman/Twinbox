@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: twinbox-agents-ingress
+  namespace: twinbox-agents
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: twinbox-agents
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: twinbox-portal
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: twinbox-agents
+      ports:
+        - protocol: TCP
+          port: 8080

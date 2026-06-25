@@ -12,6 +12,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 COPY server.mjs ./
 COPY authentik-admin.mjs ./
+COPY mailu-client.mjs ./
 COPY --from=build /app/dist ./dist
 EXPOSE 8080
 CMD ["node", "server.mjs"]

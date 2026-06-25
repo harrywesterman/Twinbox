@@ -1,11 +1,71 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
+  "extends": ["config:recommended"],
+  "enabledManagers": [
+    "argocd",
+    "dockerfile",
+    "docker-compose",
+    "npm",
+    "github-actions",
+    "regex"
   ],
   "argocd": {
+    "managerFilePatterns": ["/gitops/apps/.*\\.yaml$/"]
+  },
+  "dockerfile": {
     "managerFilePatterns": [
-      "/gitops/apps/.*\\.yaml$/"
+      "/(^|/)Dockerfile$/",
+      "/(^|/)Dockerfile\\.[a-z]+$/"
     ]
-  }
+  },
+  "docker-compose": {
+    "managerFilePatterns": ["/(^|/)docker-compose\\.ya?ml$/"]
+  },
+  "npm": {
+    "managerFilePatterns": ["/(^|\\/)package\\.json$/"]
+  },
+  "customManagers": [
+    {
+      "description": "PINNED_*_VERSION vars in config/pinned-defaults.sh",
+      "fileMatch": ["(^|/)config/pinned-defaults\\.sh$"],
+      "matchStrings": [
+        "PINNED_(?<depName>[A-Z_0-9]+)_VERSION=(?<currentValue>v?[0-9.]+)"
+      ],
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "description": "Image tags in gitops/values/*.yaml and gitops/apps/authentik/values.yaml",
+      "fileMatch": ["(^|/)gitops/(values|apps)/.*\\.yaml$"],
+      "matchStringsStrategy": "any",
+      "matchStrings": [
+        "image:\\s*[\"']?(?<depName>[^:\"'\\s]+):(?<currentValue>[^\"'\\s]+)[\"']?",
+        "mailuVersion:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?"
+      ]
+    },
+    {
+      "description": "Image tags in gitops/platform-apps/*/deployment.yaml",
+      "fileMatch": [
+        "(^|/)gitops/platform-apps/.+/(deployment|statefulset|daemonset|job|cronjob)\\.yaml$"
+      ],
+      "matchStrings": ["image:\\s*[\"']?(?<depName>[^:\"'\\s]+):(?<currentValue>[^\"'\\s]+)[\"']?"]
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Group all patches and minors for twinbox/k8s apps into one PR per app",
+      "matchDatasources": ["github-releases", "docker", "helm"],
+      "groupName": "{{manager}} {{depName}} updates",
+      "groupSlug": "{{manager}}-{{depName}}"
+    },
+    {
+      "description": "Limit concurrent PRs to keep CI signal clear",
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "prConcurrentLimit": 4
+    },
+    {
+      "description": "Schedule weekly batch to avoid mid-day surprise PRs",
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "schedule": ["before 06:00 on monday"]
+    }
+  ]
 }

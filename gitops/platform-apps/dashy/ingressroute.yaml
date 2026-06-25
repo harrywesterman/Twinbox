@@ -14,3 +14,19 @@ spec:
           name: dashy
           port: 80
   tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: dashy-netbird
+  namespace: dashy
+spec:
+  entryPoints:
+    - webnetbird
+  routes:
+    - kind: Rule
+      match: Host(`admin.__ZONE_NAME__`)
+      services:
+        - kind: Service
+          name: dashy
+          port: 80

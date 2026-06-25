@@ -8,7 +8,7 @@ spec:
   sources:
     - repoURL: https://prometheus-community.github.io/helm-charts
       chart: kube-prometheus-stack
-      targetRevision: "86.2.0"
+      targetRevision: "86.2.2"
       helm:
         valueFiles:
           - $values/gitops/values/prometheus-minimal.yaml
@@ -26,6 +26,13 @@ spec:
           - target:
               kind: IngressRoute
               name: prometheus
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`prometheus.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: prometheus-netbird
             patch: |-
               - op: replace
                 path: /spec/routes/0/match

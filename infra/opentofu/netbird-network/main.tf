@@ -41,6 +41,10 @@ resource "netbird_group" "mailu_relay_egress" {
   name = "${local.name_prefix}-mailu-relay-egress"
 }
 
+resource "netbird_group" "browser_ssh" {
+  name = "${local.name_prefix}-browser-ssh"
+}
+
 resource "netbird_group" "exit_node_users" {
   name = "${local.name_prefix}-exit-node-users"
 }
@@ -107,6 +111,17 @@ resource "netbird_setup_key" "mailu_relay_egress" {
   usage_limit            = 0
   allow_extra_dns_labels = true
   auto_groups            = [netbird_group.mailu_relay_egress.id]
+  ephemeral              = false
+  revoked                = false
+}
+
+resource "netbird_setup_key" "browser_ssh" {
+  name                   = "${local.name_prefix}-browser-ssh"
+  type                   = "reusable"
+  expiry_seconds         = 0
+  usage_limit            = 1
+  allow_extra_dns_labels = true
+  auto_groups            = [netbird_group.browser_ssh.id]
   ephemeral              = false
   revoked                = false
 }
@@ -236,6 +251,57 @@ resource "netbird_policy" "admin_to_management_vm_api" {
   }
 }
 
+resource "netbird_policy" "admin_to_bastion_ssh" {
+  name        = "${local.name_prefix}-admin-to-bastion-ssh"
+  description = "Allow Twinbox admins to reach the bastion SSH service over NetBird"
+  enabled     = true
+
+  rule {
+    name          = "ssh"
+    action        = "accept"
+    enabled       = true
+    bidirectional = true
+    protocol      = "tcp"
+    sources       = [netbird_group.admins.id]
+    destinations  = [netbird_group.proxy.id]
+    ports         = [tostring(var.bastion_ssh_port)]
+  }
+}
+
+resource "netbird_policy" "browser_ssh_to_management_vm_ssh" {
+  name        = "${local.name_prefix}-browser-ssh-to-management-vm-ssh"
+  description = "Allow the Termix Browser SSH peer to reach the Management VM SSH service"
+  enabled     = true
+
+  rule {
+    name          = "ssh"
+    action        = "accept"
+    enabled       = true
+    bidirectional = true
+    protocol      = "tcp"
+    sources       = [netbird_group.browser_ssh.id]
+    destinations  = [netbird_group.management_vm.id]
+    ports         = [tostring(var.management_vm_ssh_port)]
+  }
+}
+
+resource "netbird_policy" "browser_ssh_to_bastion_ssh" {
+  name        = "${local.name_prefix}-browser-ssh-to-bastion-ssh"
+  description = "Allow the Termix Browser SSH peer to reach the bastion SSH service"
+  enabled     = true
+
+  rule {
+    name          = "ssh"
+    action        = "accept"
+    enabled       = true
+    bidirectional = true
+    protocol      = "tcp"
+    sources       = [netbird_group.browser_ssh.id]
+    destinations  = [netbird_group.proxy.id]
+    ports         = [tostring(var.bastion_ssh_port)]
+  }
+}
+
 resource "netbird_policy" "exit_node_users_to_management_lan_routers_icmp" {
   name        = "${local.name_prefix}-exit-node-users-to-management-lan-routers-icmp"
   description = "Allow route users to select the Management VM LAN route"
@@ -337,18 +403,18 @@ resource "netbird_policy" "adguard_dns_to_management_vm_tcp" {
 }
 
 resource "netbird_policy" "proxy_to_traefik_https" {
-  name        = "${local.name_prefix}-proxy-to-traefik-websecure"
-  description = "Allow NetBird reverse proxy traffic to reach the internal Traefik websecure entrypoint"
+  name        = "${local.name_prefix}-proxy-to-traefik-netbird"
+  description = "Allow NetBird reverse proxy traffic to reach the internal Traefik NetBird entrypoint"
   enabled     = true
 
   rule {
-    name          = "websecure"
+    name          = "webnetbird"
     action        = "accept"
     enabled       = true
     bidirectional = true
     protocol      = "tcp"
     sources       = [data.netbird_group.all.id]
-    ports         = ["443"]
+    ports         = ["8082"]
 
     destination_resource = {
       id   = netbird_network_resource.traefik.id

@@ -64,10 +64,6 @@ variable "talos_version" {
   type = string
 }
 
-variable "talos_image_local_path" {
-  type = string
-}
-
 variable "talos_image_cache_key" {
   type = string
 }
@@ -87,9 +83,4 @@ variable "nodes" {
     disk_gb = number
     mac     = string
   }))
-}
-
-variable "boot_from_disk" {
-  type    = bool
-  default = false
 }

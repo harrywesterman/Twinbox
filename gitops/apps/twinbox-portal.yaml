@@ -3,12 +3,6 @@ kind: Application
 metadata:
   name: twinbox-portal
   namespace: argocd
-  annotations:
-    argocd-image-updater.argoproj.io/image-list: "portal=ghcr.io/harrywesterman/twinbox-portal"
-    argocd-image-updater.argoproj.io/portal.kustomize.image-name: "ghcr.io/harrywesterman/twinbox-portal"
-    argocd-image-updater.argoproj.io/portal.update-strategy: "newest-build"
-    argocd-image-updater.argoproj.io/portal.allow-tags: "regexp:^sha-[0-9a-f]+$"
-    argocd-image-updater.argoproj.io/write-back-method: "argocd"
 spec:
   project: default
   ignoreDifferences:
@@ -27,6 +21,13 @@ spec:
         - target:
             kind: IngressRoute
             name: twinbox-portal
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`portal.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: twinbox-portal-netbird
           patch: |-
             - op: replace
               path: /spec/routes/0/match

@@ -66,9 +66,9 @@ Twinbox supports two ingress strategies, chosen by the user during setup:
 **Cloudflare Tunnel** — An outbound tunnel from the cluster to Cloudflare's edge using `cloudflared`. All traffic flows through the `websecure` entryPoint. Cloudflare handles TLS termination and DDoS protection, but can see HTTP traffic. The free plan has a 100MB upload limit.
 On Cloudflare Free, Twinbox only offers this route for `prd` clusters. See [`docs/ingress-policy.md`](./ingress-policy.md) for the canonical ingress and hostname rules.
 
-**NetBird** — A self-hosted WireGuard VPN with Authentik SSO. Routing peers in Kubernetes forward traffic to Traefik through the NetBird reverse proxy path.
+**NetBird** — A self-hosted WireGuard VPN with Authentik SSO. Routing peers in Kubernetes forward traffic to Traefik through the NetBird reverse proxy path on the `webnetbird` entryPoint.
 
-All strategies use the same IngressRoute structure — only the `entryPoints` and `tls` fields differ. Domain names are projected at Argo render time from the local cluster secret annotation into the final Traefik match expressions.
+Public apps generally define two matching `IngressRoute` resources: `<app>` on `websecure` with `tls: {}` for Cloudflare Tunnel or direct HTTPS origin traffic, and `<app>-netbird` on `webnetbird` without `tls` for NetBird Reverse Proxy traffic to Traefik port `8082/http`. Domain names are projected at Argo render time from the local cluster secret annotation into the final Traefik match expressions, and Argo host patches should cover both route names.
 
 ### CloudNativePG — PostgreSQL
 
@@ -324,6 +324,25 @@ spec:
           name: <app-service-name>
           port: 80
   tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: <app>-netbird
+  namespace: <app-namespace>
+spec:
+  entryPoints:
+    - webnetbird
+  routes:
+    - kind: Rule
+      match: Host(`<app>.<selected-domain>`)
+      middlewares:
+        - name: authentik-forwardauth
+          namespace: authentik
+      services:
+        - kind: Service
+          name: <app-service-name>
+          port: 80
 ```
 
 ### Step 5: forwardAuth Middleware
@@ -483,6 +502,22 @@ spec:
           name: headlamp
           port: 80
   tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: headlamp-netbird
+  namespace: kube-system
+spec:
+  entryPoints:
+    - webnetbird
+  routes:
+    - kind: Rule
+      match: Host(`headlamp.<public-zone-name>`)
+      services:
+        - kind: Service
+          name: headlamp
+          port: 80
 ```
 
 ## Authentik OIDC Integration
