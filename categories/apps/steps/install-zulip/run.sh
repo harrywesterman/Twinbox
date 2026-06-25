@@ -137,6 +137,7 @@ export KUBECONFIG="$KUBECONFIG_FILE"
 command -v kubectl >/dev/null 2>&1 || fail "kubectl not found"
 command -v jq >/dev/null 2>&1 || fail "jq not found"
 command -v openssl >/dev/null 2>&1 || fail "openssl not found"
+command -v curl >/dev/null 2>&1 || fail "curl not found"
 
 find_oauth2_provider_pk_by_name() {
   local provider_name="$1"
@@ -229,6 +230,12 @@ zulip_host="https://zulip.${public_zone_name}"
 zulip_redirect_uri="${zulip_host}/complete/oidc/"
 zulip_application_slug="zulip"
 zulip_issuer_url="${AUTHENTIK_HOST%/}/application/o/${zulip_application_slug}/"
+zulip_agent_base_url="${ZULIP_AGENT_BASE_URL:-http://zulip.zulip.svc.cluster.local}"
+zulip_provisioning_base_url="${ZULIP_PROVISIONING_BASE_URL:-http://127.0.0.1}"
+zulip_agent_stream="${ZULIP_AGENT_STREAM:-Twinbox AI}"
+zulip_agent_bot_short_name="${ZULIP_AGENT_BOT_SHORT_NAME:-olivia-ops}"
+zulip_agent_bot_full_name="${ZULIP_AGENT_BOT_FULL_NAME:-Olivia Ops}"
+agents_namespace="${AGENTS_NAMESPACE:-twinbox-agents}"
 zulip_client_id="$(openssl rand -hex 16)"
 zulip_client_secret="$(openssl rand -hex 24)"
 zulip_secret_key="$(openssl rand -hex 32)"
@@ -241,6 +248,7 @@ zulip_memcached_password="$(openssl rand -hex 24)"
 secrets_dir="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}/secrets/global"
 zulip_secret_file="${secrets_dir}/zulip-oidc-${cluster_id}.json"
 zulip_runtime_secret_file="${secrets_dir}/zulip-runtime-${cluster_id}.json"
+agents_secret_file="${secrets_dir}/twinbox-agents.json"
 zulip_manifest_path="$WORKSPACE_ROOT/gitops/optional-apps/zulip.yaml"
 trap 'rm -f "$zulip_secret_file" "$zulip_runtime_secret_file"' EXIT
 
@@ -567,6 +575,206 @@ su zulip -c '/home/zulip/deployments/current/manage.py shell -c \"\$(cat /tmp/ve
   log "Zulip bootstrap verified"
 }
 
+read_zulip_owner_api_credentials() {
+  local pod_name="$1"
+  local owner_email="$2"
+
+  kubectl -n zulip exec -i "$pod_name" -- env OWNER_EMAIL="$owner_email" bash -s <<'POD_SCRIPT'
+set -euo pipefail
+: "${OWNER_EMAIL:?missing OWNER_EMAIL}"
+: "${SECRETS_postgres_password:?missing database password}"
+: "${SETTING_REMOTE_POSTGRES_HOST:?missing database host}"
+: "${CONFIG_postgresql__database_user:?missing database user}"
+: "${CONFIG_postgresql__database_name:?missing database name}"
+field_separator="$(printf "\t")"
+owner_email_sql="$(printf '%s' "$OWNER_EMAIL" | sed "s/'/''/g")"
+PGPASSWORD="$SECRETS_postgres_password" psql \
+  -h "$SETTING_REMOTE_POSTGRES_HOST" \
+  -p "${SETTING_REMOTE_POSTGRES_PORT:-5432}" \
+  -U "$CONFIG_postgresql__database_user" \
+  -d "$CONFIG_postgresql__database_name" \
+  -v ON_ERROR_STOP=1 \
+  -tA \
+  -F "$field_separator" \
+  -c "SELECT delivery_email, api_key FROM zerver_userprofile WHERE lower(delivery_email) = lower('${owner_email_sql}') AND is_active = true AND is_bot = false ORDER BY id LIMIT 1;"
+POD_SCRIPT
+}
+
+sync_zulip_bot_to_agents_secret() {
+  local bot_email="$1"
+  local bot_api_key="$2"
+  local current_agents_secret_json tmp_agents_secret_json
+
+  tmp_agents_secret_json="$(mktemp "${TMPDIR:-/tmp}/twinbox-agents-zulip-XXXXXX")"
+
+  if [[ -s "$agents_secret_file" ]]; then
+    cp "$agents_secret_file" "$tmp_agents_secret_json"
+  else
+    current_agents_secret_json=""
+    if command -v openbao_read_global_secret_json >/dev/null 2>&1; then
+      current_agents_secret_json="$(openbao_read_global_secret_json twinbox-agents 2>/dev/null || true)"
+    fi
+    if [[ -n "$current_agents_secret_json" ]]; then
+      printf '%s\n' "$current_agents_secret_json" >"$tmp_agents_secret_json"
+    else
+      printf '{}\n' >"$tmp_agents_secret_json"
+    fi
+  fi
+
+  jq -e 'type == "object"' "$tmp_agents_secret_json" >/dev/null \
+    || fail "Existing Twinbox agents secret is not a JSON object"
+
+  jq \
+    --arg base_url "$zulip_agent_base_url" \
+    --arg bot_email "$bot_email" \
+    --arg bot_api_key "$bot_api_key" \
+    --arg stream "$zulip_agent_stream" \
+    '. + {
+      ZULIP_BASE_URL: $base_url,
+      ZULIP_BOT_EMAIL: $bot_email,
+      ZULIP_BOT_API_KEY: $bot_api_key,
+      ZULIP_STREAM: $stream
+    }' \
+    "$tmp_agents_secret_json" >"${tmp_agents_secret_json}.next"
+
+  mv "${tmp_agents_secret_json}.next" "$agents_secret_file"
+  rm -f "$tmp_agents_secret_json"
+  chmod 600 "$agents_secret_file"
+
+  bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+    --secret-name "twinbox-agents" \
+    --json-file "$agents_secret_file" \
+    --required-keys "ZULIP_BASE_URL,ZULIP_BOT_EMAIL,ZULIP_BOT_API_KEY,ZULIP_STREAM"
+}
+
+refresh_twinbox_agents_zulip_secret() {
+  if kubectl -n "$agents_namespace" get externalsecret/twinbox-agents-runtime >/dev/null 2>&1; then
+    local refresh_stamp
+    refresh_stamp="$(date +%s)"
+    kubectl -n "$agents_namespace" annotate externalsecret/twinbox-agents-runtime \
+      twinbox.io/force-sync="$refresh_stamp" --overwrite >/dev/null 2>&1 || true
+    kubectl -n "$agents_namespace" wait \
+      --for=condition=Ready externalsecret/twinbox-agents-runtime \
+      --timeout=10m
+  fi
+
+  if kubectl -n "$agents_namespace" get deployment/twinbox-agents >/dev/null 2>&1; then
+    kubectl -n "$agents_namespace" rollout restart deployment/twinbox-agents
+    kubectl -n "$agents_namespace" rollout status deployment/twinbox-agents --timeout=10m
+  fi
+}
+
+ensure_zulip_agent_bot() {
+  local pod_name owner_credentials owner_auth_email owner_api_key
+  local subscriptions_json subscription_response bots_json bot_json
+  local bot_email bot_api_key create_response
+
+  pod_name="$(find_statefulset_pod "zulip" "zulip")"
+  [[ -n "$pod_name" ]] || fail "Could not find a running Zulip pod for agent bot setup"
+
+  owner_credentials="$(read_zulip_owner_api_credentials "$pod_name" "$zulip_default_realm_owner_email")"
+  owner_auth_email="$(printf '%s\n' "$owner_credentials" | awk -F '\t' 'NF >= 2 {print $1; exit}')"
+  owner_api_key="$(printf '%s\n' "$owner_credentials" | awk -F '\t' 'NF >= 2 {print $2; exit}')"
+  [[ -n "$owner_auth_email" && -n "$owner_api_key" ]] \
+    || fail "Could not resolve Zulip realm owner API credentials"
+
+  log "Ensuring Zulip stream ${zulip_agent_stream} exists for Twinbox agents"
+  subscriptions_json="$(
+    jq -cn \
+      --arg name "$zulip_agent_stream" \
+      --arg description "AI beheerteam work order reports from Olivia Ops." \
+      '[{name: $name, description: $description}]'
+  )"
+  subscription_response="$(
+    kubectl -n zulip exec "$pod_name" -- env \
+      OWNER_AUTH_EMAIL="$owner_auth_email" \
+      OWNER_API_KEY="$owner_api_key" \
+      ZULIP_API_BASE_URL="$zulip_provisioning_base_url" \
+      SUBSCRIPTIONS_JSON="$subscriptions_json" \
+      bash -lc '
+set -euo pipefail
+curl -fsS \
+  -u "${OWNER_AUTH_EMAIL}:${OWNER_API_KEY}" \
+  --data-urlencode "subscriptions=${SUBSCRIPTIONS_JSON}" \
+  "${ZULIP_API_BASE_URL%/}/api/v1/users/me/subscriptions"
+'
+  )" || fail "Could not ensure Zulip stream ${zulip_agent_stream}"
+  jq -e '.result == "success"' >/dev/null <<<"$subscription_response" \
+    || fail "Zulip stream setup failed"
+
+  bots_json="$(
+    kubectl -n zulip exec "$pod_name" -- env \
+      OWNER_AUTH_EMAIL="$owner_auth_email" \
+      OWNER_API_KEY="$owner_api_key" \
+      ZULIP_API_BASE_URL="$zulip_provisioning_base_url" \
+      bash -lc '
+set -euo pipefail
+curl -fsS -u "${OWNER_AUTH_EMAIL}:${OWNER_API_KEY}" "${ZULIP_API_BASE_URL%/}/api/v1/bots"
+'
+  )" || fail "Could not list Zulip bots"
+  bot_json="$(
+    jq -c \
+      --arg prefix "${zulip_agent_bot_short_name}-bot@" \
+      '.bots[]? | select((.username // "") | startswith($prefix))' \
+      <<<"$bots_json" | head -n1
+  )"
+
+  if [[ -z "$bot_json" ]]; then
+    log "Creating Zulip bot ${zulip_agent_bot_full_name} for Twinbox agents"
+    create_response="$(
+      kubectl -n zulip exec "$pod_name" -- env \
+        OWNER_AUTH_EMAIL="$owner_auth_email" \
+        OWNER_API_KEY="$owner_api_key" \
+        ZULIP_API_BASE_URL="$zulip_provisioning_base_url" \
+        BOT_SHORT_NAME="$zulip_agent_bot_short_name" \
+        BOT_FULL_NAME="$zulip_agent_bot_full_name" \
+        BOT_STREAM="$zulip_agent_stream" \
+        bash -lc '
+set -euo pipefail
+curl -fsS \
+  -u "${OWNER_AUTH_EMAIL}:${OWNER_API_KEY}" \
+  -X POST \
+  --data-urlencode "short_name=${BOT_SHORT_NAME}" \
+  --data-urlencode "full_name=${BOT_FULL_NAME}" \
+  --data-urlencode "bot_type=1" \
+  --data-urlencode "default_sending_stream=${BOT_STREAM}" \
+  "${ZULIP_API_BASE_URL%/}/api/v1/bots"
+'
+    )" || fail "Could not create Zulip bot ${zulip_agent_bot_full_name}"
+    jq -e '.result == "success"' >/dev/null <<<"$create_response" \
+      || fail "Zulip bot creation failed"
+
+    bots_json="$(
+      kubectl -n zulip exec "$pod_name" -- env \
+        OWNER_AUTH_EMAIL="$owner_auth_email" \
+        OWNER_API_KEY="$owner_api_key" \
+        ZULIP_API_BASE_URL="$zulip_provisioning_base_url" \
+        bash -lc '
+set -euo pipefail
+curl -fsS -u "${OWNER_AUTH_EMAIL}:${OWNER_API_KEY}" "${ZULIP_API_BASE_URL%/}/api/v1/bots"
+'
+    )" || fail "Could not list Zulip bots after creation"
+    bot_json="$(
+      jq -c \
+        --arg prefix "${zulip_agent_bot_short_name}-bot@" \
+        '.bots[]? | select((.username // "") | startswith($prefix))' \
+        <<<"$bots_json" | head -n1
+    )"
+  else
+    log "Reusing existing Zulip bot ${zulip_agent_bot_full_name}"
+  fi
+
+  bot_email="$(jq -r '.username // empty' <<<"$bot_json")"
+  bot_api_key="$(jq -r '.api_key // empty' <<<"$bot_json")"
+  [[ -n "$bot_email" && -n "$bot_api_key" ]] \
+    || fail "Could not resolve Zulip bot credentials for Twinbox agents"
+
+  log "Syncing Zulip bot credentials into Twinbox agents runtime secret"
+  sync_zulip_bot_to_agents_secret "$bot_email" "$bot_api_key"
+  refresh_twinbox_agents_zulip_secret
+  log "Twinbox agents Zulip integration is configured for stream ${zulip_agent_stream}"
+}
+
 ensure_zulip_bootstrap_streams() {
   local pod_name bootstrap_script
 
@@ -700,6 +908,7 @@ zulip_realm_pod="$(find_statefulset_pod "zulip" "zulip")"
 wait_for_zulip_realm "$zulip_realm_pod"
 ensure_zulip_bootstrap_streams
 verify_zulip_bootstrap
+ensure_zulip_agent_bot
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \
@@ -708,12 +917,14 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     --arg host "$zulip_host" \
     --arg database "zulip-db" \
     --arg provider_pk "$provider_pk" \
+    --arg agent_stream "$zulip_agent_stream" \
     '{
       application: $application,
       manifest_path: $manifest_path,
       host: $host,
       database: $database,
-      provider_pk: $provider_pk
+      provider_pk: $provider_pk,
+      agent_stream: $agent_stream
     }' >"$STEP_RESULT_FILE"
 fi
 

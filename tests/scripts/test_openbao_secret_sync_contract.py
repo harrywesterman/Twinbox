@@ -363,6 +363,29 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert 'wait_for_named_resource_ready "zulip" "externalsecret" "zulip-runtime"' in run_text
     assert "zulip_config_secret_json" in run_text
     assert "zulip_runtime_secret_json" in run_text
+    assert "ensure_zulip_agent_bot" in run_text
+    assert "read_zulip_owner_api_credentials" in run_text
+    assert "SELECT delivery_email, api_key FROM zerver_userprofile" in run_text
+    assert "sync_zulip_bot_to_agents_secret" in run_text
+    assert 'zulip_agent_stream="${ZULIP_AGENT_STREAM:-Twinbox AI}"' in run_text
+    assert (
+        'zulip_agent_base_url="${ZULIP_AGENT_BASE_URL:-http://zulip.zulip.svc.cluster.local}"'
+        in run_text
+    )
+    assert (
+        'zulip_provisioning_base_url="${ZULIP_PROVISIONING_BASE_URL:-http://127.0.0.1}"' in run_text
+    )
+    assert "/api/v1/users/me/subscriptions" in run_text
+    assert "/api/v1/bots" in run_text
+    assert "ZULIP_BASE_URL: $base_url" in run_text
+    assert "ZULIP_BOT_EMAIL: $bot_email" in run_text
+    assert "ZULIP_BOT_API_KEY: $bot_api_key" in run_text
+    assert '--secret-name "twinbox-agents"' in run_text
+    assert (
+        '--required-keys "ZULIP_BASE_URL,ZULIP_BOT_EMAIL,ZULIP_BOT_API_KEY,ZULIP_STREAM"'
+        in run_text
+    )
+    assert "rollout restart deployment/twinbox-agents" in run_text
     assert "LOADBALANCER_IPS" not in run_text
     assert "__ZULIP_RABBITMQ_PASSWORD__" not in run_text
     assert "__ZULIP_REDIS_PASSWORD__" not in run_text

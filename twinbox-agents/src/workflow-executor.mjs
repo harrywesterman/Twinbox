@@ -208,12 +208,31 @@ function createWorkflowExecutor(deps) {
     if (typeof postCoordinatorMessage !== "function") return;
     try {
       const content = buildZulipMessage(workOrder, summaryResult);
-      await postCoordinatorMessage({
+      const result = await postCoordinatorMessage({
         topic: "AI beheerteam",
         content,
       });
+      if (result?.skipped) {
+        appendEvent(workOrder.id, {
+          agentId: "olivia-ops",
+          title: "Zulip overgeslagen",
+          message: "Zulip integration is not configured.",
+        });
+        return;
+      }
+      appendEvent(workOrder.id, {
+        agentId: "olivia-ops",
+        title: "Zulip bericht geplaatst",
+        message: "Olivia Ops posted the work order summary to Zulip.",
+        metadata: { topic: "AI beheerteam" },
+      });
     } catch {
-      // Zulip failures are non-blocking
+      appendEvent(workOrder.id, {
+        agentId: "olivia-ops",
+        severity: "warning",
+        title: "Zulip bericht mislukt",
+        message: "Olivia Ops could not post the work order summary to Zulip.",
+      });
     }
   }
 

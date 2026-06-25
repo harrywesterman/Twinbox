@@ -442,6 +442,9 @@ test("executor calls Zulip when postCoordinatorMessage is provided", async () =>
   assert.ok(zulipContent.includes("Olivia Ops"));
   assert.ok(zulipContent.includes(wo.id));
   assert.ok(zulipContent.includes("karel-kubernetes") || zulipContent.includes("Karel"));
+
+  const events = eventStore.listEvents({});
+  assert.ok(events.some((event) => event.title === "Zulip bericht geplaatst"));
 });
 
 test("executor does not call Zulip when postCoordinatorMessage is not provided", async () => {
@@ -475,4 +478,77 @@ test("executor does not call Zulip when postCoordinatorMessage is not provided",
   const result = await executor.executeWorkOrder(wo);
   assert.ok(result);
   assert.equal(result.status, "proposal_ready");
+});
+
+test("executor records skipped Zulip integration", async () => {
+  const dataDir = tempDir();
+  const eventStore = createEventStore(dataDir);
+  const workOrderStore = createWorkOrderStore(dataDir);
+  const wo = makeWorkOrder(dataDir, { type: "backup_health_check" });
+
+  const executor = createWorkflowExecutor({
+    eventStore,
+    workOrderStore,
+    getK8sUnhealthyPods: async () => [],
+    getK8sWarningEvents: async () => [],
+    getK8sNodes: async () => [],
+    getK8sCnpgClusters: async () => [],
+    getK8sScheduledBackups: async () => [],
+    getK8sVeleroBackups: async () => [],
+    getK8sLonghornJobs: async () => [],
+    getArgocdApps: async () => [],
+    getArgocdWarnings: async () => [],
+    getManagerProxmox: async () => [],
+    getManagerHealth: async () => ({ status: "ok" }),
+    createChatCompletion: async () => ({
+      choices: [{ message: { content: "Alles ok." } }],
+      model: "test",
+    }),
+    getProviderConfig: () => ({ baseUrl: "http://test/v1", model: "test" }),
+    getApiKey: () => "test-key",
+    postCoordinatorMessage: async () => ({ skipped: true }),
+  });
+
+  await executor.executeWorkOrder(wo);
+
+  const events = eventStore.listEvents({});
+  assert.ok(events.some((event) => event.title === "Zulip overgeslagen"));
+});
+
+test("executor records failed Zulip post without failing work order", async () => {
+  const dataDir = tempDir();
+  const eventStore = createEventStore(dataDir);
+  const workOrderStore = createWorkOrderStore(dataDir);
+  const wo = makeWorkOrder(dataDir, { type: "backup_health_check" });
+
+  const executor = createWorkflowExecutor({
+    eventStore,
+    workOrderStore,
+    getK8sUnhealthyPods: async () => [],
+    getK8sWarningEvents: async () => [],
+    getK8sNodes: async () => [],
+    getK8sCnpgClusters: async () => [],
+    getK8sScheduledBackups: async () => [],
+    getK8sVeleroBackups: async () => [],
+    getK8sLonghornJobs: async () => [],
+    getArgocdApps: async () => [],
+    getArgocdWarnings: async () => [],
+    getManagerProxmox: async () => [],
+    getManagerHealth: async () => ({ status: "ok" }),
+    createChatCompletion: async () => ({
+      choices: [{ message: { content: "Alles ok." } }],
+      model: "test",
+    }),
+    getProviderConfig: () => ({ baseUrl: "http://test/v1", model: "test" }),
+    getApiKey: () => "test-key",
+    postCoordinatorMessage: async () => {
+      throw new Error("zulip down");
+    },
+  });
+
+  const result = await executor.executeWorkOrder(wo);
+  assert.equal(result.status, "proposal_ready");
+
+  const events = eventStore.listEvents({});
+  assert.ok(events.some((event) => event.title === "Zulip bericht mislukt"));
 });

@@ -149,7 +149,7 @@ The AI beheerteam is installed from the Web Wizard step **Install AI Beheerteam*
 
 **Degraded mode:** If `TWINBOX_AGENT_INTERNAL_TOKEN` is not configured in the Portal, the panel shows a degraded state. Work orders are still created but the agent service is unavailable.
 
-Zulip integration is optional. When configured, Olivia Ops posts a short Dutch summary to the configured stream after each completed work order.
+Zulip integration is automatic once Zulip has been installed. The Zulip install step creates or reuses an `Olivia Ops` bot, stores its API key in OpenBao under the `twinbox-agents` runtime secret, and refreshes the `twinbox-agents` deployment. After that, Olivia Ops posts a short Dutch summary to the `Twinbox AI` stream after each completed work order.
 
 ## Customization
 
