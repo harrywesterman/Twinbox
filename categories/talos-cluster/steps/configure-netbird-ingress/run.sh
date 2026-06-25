@@ -421,6 +421,40 @@ PY
   fail "OIDC issuer DNS did not become resolvable through container resolver: ${issuer_host}"
 }
 
+apply_netbird_identity_provider_with_retry() {
+  local max_attempts=12
+  local attempt
+  local apply_log
+
+  for attempt in $(seq 1 "$max_attempts"); do
+    apply_log="$(mktemp "${TMPDIR:-/tmp}/netbird-idp-apply-XXXXXX")"
+    if tofu apply -auto-approve -no-color \
+      -var "netbird_token=$netbird_token" \
+      -var "netbird_management_url=$netbird_management_url" \
+      -var "client_id=$netbird_oidc_client_id" \
+      -var "client_secret=$netbird_oidc_client_secret" \
+      -var "issuer=$netbird_oidc_issuer" 2>&1 | tee "$apply_log"; then
+      rm -f "$apply_log"
+      return 0
+    fi
+
+    if grep -Eq "identity provider issuer is unreachable|no such host|Temporary failure in name resolution|i/o timeout|context deadline exceeded" "$apply_log"; then
+      rm -f "$apply_log"
+      if [[ "$attempt" -lt "$max_attempts" ]]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird identity provider issuer validation is not ready yet (attempt ${attempt}/${max_attempts}); retrying"
+        wait_for_oidc_issuer_dns "$netbird_oidc_issuer"
+        sleep 5
+        continue
+      fi
+
+      fail "NetBird identity provider issuer validation did not become ready after ${max_attempts} attempts"
+    fi
+
+    rm -f "$apply_log"
+    return 1
+  done
+}
+
 ensure_authentik_netbird_grant_types() {
   local provider_pk="$1"
   local response
@@ -1605,13 +1639,7 @@ tofu init -input=false -no-color
 # OpenTofu uses Go's DNS resolver, which can still fail if Docker's embedded
 # DNS has not yet picked up NetBird's custom zone, even after curl succeeded.
 wait_for_oidc_issuer_dns "$netbird_oidc_issuer"
-
-tofu apply -auto-approve -no-color \
-  -var "netbird_token=$netbird_token" \
-  -var "netbird_management_url=$netbird_management_url" \
-  -var "client_id=$netbird_oidc_client_id" \
-  -var "client_secret=$netbird_oidc_client_secret" \
-  -var "issuer=$netbird_oidc_issuer"
+apply_netbird_identity_provider_with_retry
 identity_provider_id="$(tofu output -raw -no-color identity_provider_id)"
 
 seed_netbird_account_for_sso "$identity_provider_id" "$netbird_admin_email"

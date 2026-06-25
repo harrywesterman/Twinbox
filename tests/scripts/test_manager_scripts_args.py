@@ -2097,6 +2097,11 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "Public Authentik authorize endpoint not ready yet" in text
     assert 'curl -fsS --connect-timeout 5 --max-time 15 "$discovery_url"' in text
     assert "Continuing NetBird configuration; browser SSO will be healthy once public TLS" in text
+    assert "apply_netbird_identity_provider_with_retry()" in text
+    assert 'mktemp "${TMPDIR:-/tmp}/netbird-idp-apply-XXXXXX"' in text
+    assert "identity provider issuer is unreachable|no such host" in text
+    assert "NetBird identity provider issuer validation is not ready yet" in text
+    assert "NetBird identity provider issuer validation did not become ready" in text
     assert (
         'fail "Public Authentik OIDC discovery did not become reachable through NetBird proxy'
         not in text
@@ -2127,6 +2132,8 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
         "Creating NetBird reverse proxy service for NetBird coalescing fallback"
     )
     idp_index = text.index("Registering Authentik as NetBird identity provider")
+    idp_dns_index = text.rindex('wait_for_oidc_issuer_dns "$netbird_oidc_issuer"')
+    idp_apply_index = text.rindex("apply_netbird_identity_provider_with_retry")
 
     # The services block was removed; services are now created per-app by ensure-netbird-service.sh
     assert "Creating NetBird reverse proxy services" not in text or text.index(
@@ -2162,6 +2169,8 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
         < netbird_service_index
         < discovery_index
         < idp_index
+        < idp_dns_index
+        < idp_apply_index
     )
     assert 'netbird_domain="netbird.${public_zone_name}"' in text
     assert "patch-netbird-traefik-alias.py" in text
