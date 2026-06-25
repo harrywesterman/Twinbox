@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mastodon-redis
+  namespace: mastodon
+  labels:
+    app.kubernetes.io/name: mastodon-redis
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mastodon-redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mastodon-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:8.4-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mastodon-runtime
+                  key: REDIS_PASSWORD
+          command:
+            - sh
+            - -ec
+            - exec redis-server --save "" --appendonly no --requirepass "$REDIS_PASSWORD"
+          ports:
+            - name: redis
+              containerPort: 6379
+          readinessProbe:
+            tcpSocket:
+              port: redis
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: redis
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+      volumes:
+        - name: redis-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mastodon-redis
+  namespace: mastodon
+  labels:
+    app.kubernetes.io/name: mastodon-redis
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: mastodon-redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis

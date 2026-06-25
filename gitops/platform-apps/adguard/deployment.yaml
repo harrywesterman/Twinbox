@@ -15,7 +15,7 @@ spec:
     spec:
       initContainers:
         - name: seed-config
-          image: busybox:1.36
+          image: busybox:1.36.1
           command:
             - sh
             - -c
@@ -28,7 +28,7 @@ spec:
               mountPath: /opt/adguardhome/conf
       containers:
         - name: adguard
-          image: adguard/adguardhome:v0.107.74
+          image: adguard/adguardhome:v0.107.77
           imagePullPolicy: IfNotPresent
           ports:
             - name: dns-udp

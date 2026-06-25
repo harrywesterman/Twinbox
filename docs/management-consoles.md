@@ -1,6 +1,6 @@
 # Management Consoles
 
-The `install-management-consoles` step publishes operator web consoles and wires them into Authentik. It runs after the portal and Dashy are online so the Traefik, Longhorn, Proxmox, and SeaweedFS web UIs can be published, registered as Authentik proxy applications, and protected with the shared admin policy.
+The `install-management-consoles` step publishes operator web consoles and wires them into Authentik. It runs after the portal and Dashy are online so the Traefik, Longhorn, Proxmox, Forgejo, and SeaweedFS web UIs can be published. Proxmox, Longhorn, Hubble, Web Wizard, and the SeaweedFS UI use Authentik proxy applications; SeaweedFS also exposes `/cache` anonymously for Mastodon media by rewriting it to the `mastodon` bucket on the S3 endpoint. Forgejo uses native Authentik OIDC login inside Forgejo.
 
 ## Architecture
 
@@ -13,27 +13,33 @@ graph LR
     subgraph Cluster["Kubernetes Cluster"]
         Traefik["Traefik"]
         Auth["Authentik forwardAuth"]
+        OIDC["Authentik OIDC"]
         subgraph Consoles["Management Consoles"]
             ProxmoxUI["Proxmox Proxy"]
             LonghornUI["Longhorn UI"]
             SeaweedFS["SeaweedFS Filer"]
             SeaweedFSAdmin["SeaweedFS Admin"]
+            ForgejoUI["Forgejo"]
         end
     end
 
     subgraph ManagementVM["Management VM"]
         ProxmoxHost["Proxmox Host"]
         SeaweedFSSrv["SeaweedFS"]
+        ForgejoSrv["Forgejo"]
     end
 
     Browser -->|"https://proxmox.<ZONE_NAME>"| Traefik
     Browser -->|"https://seaweedfs.<ZONE_NAME>"| Traefik
-    Traefik -->|"forwardAuth"| Auth
+    Browser -->|"https://forgejo.<ZONE_NAME>"| Traefik
+    Traefik -->|"forwardAuth for proxy apps"| Auth
     Auth -->|"200 + headers"| Traefik
     Traefik -->|"Proxy"| Consoles
+    ForgejoUI -->|"OIDC login"| OIDC
     ProxmoxUI -->|"HTTPS"| ProxmoxHost
     SeaweedFS -->|"HTTP"| SeaweedFSSrv
     SeaweedFSAdmin -->|"HTTP"| SeaweedFSSrv
+    ForgejoUI -->|"HTTP"| ForgejoSrv
 ```
 
 ## Published Consoles
@@ -43,8 +49,9 @@ graph LR
 | Proxmox | `https://proxmox.<ZONE_NAME>` | Proxmox host API | Authentik |
 | SeaweedFS Filer | `https://seaweedfs.<ZONE_NAME>` | SeaweedFS filer UI | Authentik |
 | SeaweedFS Admin | `https://seaweedfs-admin.<ZONE_NAME>` | SeaweedFS admin dashboard | Authentik |
+| Forgejo | `https://forgejo.<ZONE_NAME>` | Forgejo on Management VM port 3001 | Native Authentik OIDC in Forgejo |
 | Longhorn UI | `https://longhorn.<ZONE_NAME>` | Longhorn frontend service | Authentik |
-| Twinbox Wizard | `https://wizard.<ZONE_NAME>` | Management VM port 3000 | Authentik |
+| Twinbox Wizard | `https://webwizard.<ZONE_NAME>` | Management VM port 3000 | Authentik |
 
 ## How It Works
 
@@ -105,6 +112,33 @@ subsets:
       - port: 8888
 ```
 
+### Forgejo Proxy And Login
+
+Forgejo runs in Docker on the Management VM. The console proxies to the Management VM port `3001`:
+
+```yaml
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: forgejo
+  namespace: longhorn-system
+subsets:
+  - addresses:
+      - ip: <MANAGEMENT_VM_IP>
+    ports:
+      - port: 3001
+```
+
+Access to `https://forgejo.<ZONE_NAME>` is proxied by Traefik without the `authentik-forwardauth` middleware. Forgejo owns the login flow and shows a native Authentik/OIDC login button. The Authentik application slug is `forgejo`, the Forgejo auth source is named `authentik`, and the callback URL is:
+
+```text
+https://forgejo.<ZONE_NAME>/user/oauth2/authentik/callback
+```
+
+The management console step creates or updates the Authentik OAuth2 provider, stores the client credentials in OpenBao under `twinbox/global/forgejo-oidc`, sets `FORGEJO_ROOT_URL=https://forgejo.<ZONE_NAME>/` in `/opt/twinbox/.env`, recreates the Forgejo container, and then configures the Forgejo auth source with `forgejo admin auth add-oauth` or `forgejo admin auth update-oauth`.
+
+The bootstrap helper still creates a local Forgejo admin account and stores the generated password in `/opt/twinbox/bootstrap/secrets/global/forgejo.json`. Treat that account as break-glass access for bootstrap or OIDC incidents.
+
 ### Longhorn UI
 
 Longhorn UI runs inside the cluster. The console uses the standard Longhorn frontend service:
@@ -115,12 +149,14 @@ kubectl -n longhorn-system get svc longhorn-frontend
 
 ## Authentik Integration
 
-Each console is registered as an Authentik proxy application:
+Most consoles are registered as Authentik proxy applications:
 
 1. **Application** — Created in Authentik with the console URL
 2. **Provider** — Proxy provider pointing at the internal service
 3. **Policy** — Group policy restricting access to the `admins` group
 4. **Middleware** — Traefik `forwardAuth` middleware referencing the Authentik outpost
+
+Forgejo is the exception: it is registered as an Authentik OAuth2/OpenID Connect provider and application, restricted to the `admins` group, and then configured as a Forgejo authentication source.
 
 ## Installation
 
@@ -235,7 +271,7 @@ kubectl -n traefik exec deploy/traefik -- wget -qO- http://<endpoint-ip>:<port>
 
 ### Authentik login loop
 
-If the console keeps redirecting to Authentik and back:
+If a proxy-authenticated console keeps redirecting to Authentik and back:
 
 1. Verify the Authentik application URL matches the IngressRoute host
 2. Check that the provider redirect URI includes the callback path
@@ -246,9 +282,17 @@ kubectl -n authentik get application <console-name> -o yaml
 kubectl -n traefik get middleware authentik-forwardauth -o yaml
 ```
 
+For Forgejo OIDC, verify the auth source and callback instead:
+
+```bash
+docker exec twinbox-forgejo forgejo admin auth list --vertical-bars
+kubectl -n longhorn-system get ingressroute forgejo -o yaml
+```
+
 ## Security Notes
 
-- All consoles are protected by Authentik forwardAuth
+- Proxy consoles are protected by Authentik forwardAuth
+- Forgejo is protected by native Authentik OIDC login in Forgejo
 - Only members of the `admins` group can access them
 - Proxmox proxy uses `insecureSkipVerify` because Proxmox uses a self-signed certificate
 - SeaweedFS admin console has full write access to the object store

@@ -16,6 +16,14 @@ test("source allowlist accepts localhost and configured CIDRs", () => {
   assert.equal(isSourceAllowed("10.42.3.9", trustedCidrs), true);
 });
 
+test("source allowlist defaults include cluster and docker private ranges only", () => {
+  const trustedCidrs = parseTrustedCidrs();
+
+  assert.equal(isSourceAllowed("10.244.2.224", trustedCidrs), true);
+  assert.equal(isSourceAllowed("172.18.0.1", trustedCidrs), true);
+  assert.equal(isSourceAllowed("192.168.2.70", trustedCidrs), false);
+});
+
 test("source allowlist rejects addresses outside configured CIDRs", () => {
   const trustedCidrs = parseTrustedCidrs("127.0.0.1/32,10.42.0.0/16");
 

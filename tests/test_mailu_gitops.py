@@ -38,7 +38,7 @@ def test_mailu_optional_appset_uses_pinned_mailu_chart():
 
 def test_mailu_values_keep_mail_ports_internal_and_set_resources():
     values = _load_yaml(REPO_ROOT / "gitops" / "values" / "mailu.yaml")
-    assert values["mailuVersion"] == "2024.06.51"
+    assert values["mailuVersion"] == "2024.06.52"
     assert values["ingress"]["enabled"] is False
     assert values["front"]["hostPort"]["enabled"] is False
     assert values["front"]["externalService"]["enabled"] is False
@@ -50,9 +50,9 @@ def test_mailu_values_keep_mail_ports_internal_and_set_resources():
     assert values["persistence"]["accessModes"] == ["ReadWriteOnce"]
     assert values["tika"]["enabled"] is False
 
-    assert values["proxyAuth"]["create"] == "false"
-    assert values["proxyAuth"]["header"] == ""
-    assert values["proxyAuth"]["whitelist"] == ""
+    assert values["proxyAuth"]["create"] == "true"
+    assert values["proxyAuth"]["header"] == "X-authentik-email"
+    assert values["proxyAuth"]["whitelist"] == "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
 
     for component in ("front", "admin", "postfix", "dovecot", "rspamd", "clamav", "webmail"):
         resources = values[component]["resources"]
@@ -111,10 +111,11 @@ def test_mailu_ingressroutes_target_mailu_front_only():
     docs = list(
         yaml.safe_load_all((MAILU_PLATFORM_DIR / "ingressroute.yaml").read_text(encoding="utf-8"))
     )
-    names = {doc["metadata"]["name"] for doc in docs}
+    ingressroute_docs = [d for d in docs if d.get("kind") == "IngressRoute"]
+    names = {doc["metadata"]["name"] for doc in ingressroute_docs}
     assert names == {"mailu", "mailu-netbird"}
 
-    for doc in docs:
+    for doc in ingressroute_docs:
         routes = doc["spec"]["routes"]
         assert len(routes) == 1
 
@@ -124,7 +125,7 @@ def test_mailu_ingressroutes_target_mailu_front_only():
         service = route["services"][0]
         assert service["name"] == "mailu-front"
         assert service["port"] == 80
-        assert route.get("middlewares") is None
+        assert route["middlewares"] == [{"name": "authentik-forwardauth"}]
 
 
 def test_external_dns_allows_mx_records():
@@ -146,6 +147,7 @@ def test_mailu_step_and_scripts_are_wired():
     assert step["id"] == "install-mailu"
     assert step["runner"]["script"] == "categories/apps/steps/install-mailu/run.sh"
     assert step["dashy"]["items"][0]["url_template"] == "https://mail.__ZONE_NAME__/admin"
+    assert "Twinbox now sets PTR/rDNS on Hetzner automatically" in step["side_help"]
 
     apply_script = (REPO_ROOT / "scripts" / "manager" / "apply-argocd-application.sh").read_text(
         encoding="utf-8"
@@ -173,9 +175,9 @@ def test_mailu_relay_egress_resources_are_wired():
         for container in deployment["spec"]["template"]["spec"]["containers"]
     }
     assert set(containers) == {"netbird", "haproxy", "probe"}
-    assert containers["netbird"]["image"] == "netbirdio/netbird:0.70.5"
-    assert containers["haproxy"]["image"] == "haproxy:3.0-alpine"
-    assert containers["probe"]["image"] == "busybox:1.36"
+    assert containers["netbird"]["image"] == "netbirdio/netbird:0.72.4"
+    assert containers["haproxy"]["image"] == "haproxy:3.0.23-alpine"
+    assert containers["probe"]["image"] == "busybox:1.36.1"
     assert containers["haproxy"]["resources"]["requests"]
     assert containers["probe"]["resources"]["limits"]
 
@@ -212,6 +214,8 @@ def test_bastion_postfix_script_has_open_relay_guards():
     assert "--relay-secret-file" in script
     assert "smtpd_tls_security_level=encrypt" in script
     assert "smtpd_tls_auth_only=yes" in script
+    assert "smtpd_sasl_local_domain = ${MAIL_HOSTNAME}" in script
+    assert 'postconf -e "myhostname = ${MAIL_HOSTNAME}"' in script
     assert "Refusing to expose relay listener on public address" in script
     assert 'ufw deny in to any port "$RELAY_LISTEN_PORT" proto tcp' in script
 
@@ -220,7 +224,10 @@ def test_mailu_installer_uses_private_relay_and_pre_dns_preflights():
     script = (REPO_ROOT / "categories" / "apps" / "steps" / "install-mailu" / "run.sh").read_text(
         encoding="utf-8"
     )
-    assert ".NETBIRD_RELAY_HOST // .NETBIRD_PRIVATE_IP // empty" in script
+    assert "NETBIRD_RELAY_HOST" in script.split("mailu_relay_host=", 1)[1].splitlines()[0]
+    assert "NETBIRD_PRIVATE_IP" in script
+    assert "awk" in script and "match" in script
+    assert "HCLOUD_TOKEN // empty" in script
     assert ".NETBIRD_IP // empty" not in script.split("mailu_relay_host=", 1)[1].splitlines()[0]
     assert "Refusing to use public bastion IP as Mailu relay host" in script
     assert "netbird-mailu-relay-egress NB_SETUP_KEY" in script
@@ -235,6 +242,14 @@ def test_mailu_installer_uses_private_relay_and_pre_dns_preflights():
     assert "twinbox.io/mailu-storage-node" in script
     assert "generate_mailu_tls_secret_file" in script
     assert "mailu-certificates" in script
+    assert "ensure-hetzner-rdns.py" in script
+    assert '--server-name "$server_name"' in script
+    assert '--fallback-server-name "$legacy_server_name"' in script
+    assert 'log "Configuring Hetzner PTR/rDNS for ${mail_hostname}"' in script
+    assert 'log "PTR/rDNS configured: ${bastion_ip} -> ${mail_hostname}"' in script
+    assert 'rdns_status="configured"' in script
+    assert "Mailu installed. PTR/rDNS configured:" in script
+    assert "Create/verify PTR" not in script
     assert "--relay-password" not in script
     assert "--relay-secret-file" in script
     assert script.index('log "Applying Mailu DNS records"') > script.index(
@@ -242,6 +257,9 @@ def test_mailu_installer_uses_private_relay_and_pre_dns_preflights():
     )
     assert script.index('log "Applying Mailu DNS records"') > script.index(
         'verify_mailu_relay_egress_path "$mailu_relay_host"'
+    )
+    assert script.index("ensure-hetzner-rdns.py") > script.index(
+        'apply_mail_dns_records "$mail_domain"'
     )
 
 
@@ -296,4 +314,29 @@ def test_mailu_dkim_parser_uses_structured_record_name_and_value():
     expected_value = f"v=DKIM1; k=rsa; p={'A' * 80}"
     assert result.stdout.strip() == (
         f'{{"name":"customselector._domainkey.example.com","value":"{expected_value}"' + "}"
+    )
+
+
+def test_mailu_dkim_parser_uses_mailu_dns_dkim_export():
+    fixture = {
+        "domain": [
+            {
+                "name": "example.com",
+                "dns_dkim": (
+                    f'dkim._domainkey.example.com. 600 IN TXT "v=DKIM1; k=rsa; p={"B" * 80}"'
+                ),
+            }
+        ]
+    }
+    parser = REPO_ROOT / "scripts" / "manager" / "mailu-dns-export-to-dkim.jq"
+    result = subprocess.run(
+        ["jq", "-c", "-f", str(parser)],
+        input=json.dumps(fixture),
+        text=True,
+        check=True,
+        capture_output=True,
+    )
+    expected_value = f"v=DKIM1; k=rsa; p={'B' * 80}"
+    assert result.stdout.strip() == (
+        f'{{"name":"dkim._domainkey.example.com","value":"{expected_value}"' + "}"
     )

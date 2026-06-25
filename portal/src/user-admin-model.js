@@ -73,6 +73,11 @@ export function buildAdminNavigationItems({
         id: "admin-cluster-updates",
         path: "/admin/updates",
         label: "Cluster updates",
+      },
+      {
+        id: "admin-agents",
+        path: "/admin/agents",
+        label: "AI beheerteam",
       }
     );
   }

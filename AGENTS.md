@@ -5,10 +5,15 @@ Twinbox builds a Talos Linux Kubernetes cluster on Proxmox through a Management 
 ## Rules
 
 - Stay on `main`; do not branch unless asked.
-- GitHub `main` is source of truth. 
-- The Management VM runs the Web Wizard in a couple of docker containers. They are built from github actions to GHCR. 
-- Update the web wizard: Edit the code, check to MAIN in github, **wait for the docker build actions to complete successfully**, pull the new version of the docker images on the management VM. 
-- **Before refreshing the Management VM**, confirm the relevant GitHub Actions "Publish Docker Images" workflow succeeded for the pushed commit. Do not run `docker compose pull` until the new images are actually published.
+- GitHub `main` is source of truth.
+- **Never hard-code fixed IP addresses or CIDR ranges in code, scripts, or configuration defaults. Always derive network addresses from runtime discovery, environment variables, or user-supplied configuration.**
+- The Management VM runs the Web Wizard in a couple of docker containers. They are built from github actions to GHCR.
+- **When changing code that runs on the Management VM:**
+  1. Edit the code
+  2. Commit and push to `main`
+  3. **Wait** for the GitHub Actions "Publish Docker Images" workflow to complete successfully
+  4. Only then run `docker compose pull && docker compose up -d` on the Management VM
+- **Never skip step 3.** If you push and immediately try to pull, you'll get stale images. Always confirm the workflow succeeded first.
 - Als je iets wijzigt dat op de Management VM draait, zet je het eerst in GitHub `main`, wacht je tot de Docker images succesvol zijn gebouwd, en pull je daarna pas de nieuwe images op de Management VM.
 - Use `apply_patch`, small scoped edits, `docker compose`, and `python3` on macOS.
 - Do not revert unrelated/user changes.
@@ -53,6 +58,11 @@ Twinbox builds a Talos Linux Kubernetes cluster on Proxmox through a Management 
 - Debug host state under `/opt/twinbox`; debug executable code inside the relevant container.
 - Do not wait passively for deployments to finish; start inspecting pod logs right away so you can spot stalls and failures early.
 - If Argo CD reports `Synced` but the live deployment is still stale, hard-refresh the application from the Management VM and re-check the deployment image before assuming GitHub is wrong.
+
+### SSH Authentication
+
+- Normal SSH to the Management VM and bastion is through Termix using short-lived certificates issued by [opkssh](https://github.com/openpubkey/opkssh) and gated by Authentik + MFA.
+- Break-glass credentials (Management VM password, bastion root SSH key) remain on the hosts but are not exposed in Termix after Phase 2/3. See `docs/operations.md`.
 
 ### Bastion Node
 

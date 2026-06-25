@@ -1,4 +1,4 @@
-mailuVersion: "2024.06.51"
+mailuVersion: "2024.06.52"
 
 hostnames: []
 domain: ""
@@ -53,9 +53,9 @@ ingress:
   realIpFrom: "10.244.0.0/16"
 
 proxyAuth:
-  whitelist: ""
-  header: ""
-  create: "false"
+  whitelist: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+  header: "X-authentik-email"
+  create: "true"
 
 front:
   nodeSelector: {}

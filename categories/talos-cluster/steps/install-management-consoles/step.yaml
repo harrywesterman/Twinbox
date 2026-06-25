@@ -27,6 +27,11 @@ dashy:
       description: Cluster setup wizard
       icon: install-web-wizard
       url_template: https://webwizard.__ZONE_NAME__
+    - section: Platform
+      title: Forgejo
+      description: Local GitOps promotion gate
+      icon: forgejo
+      url_template: https://forgejo.__ZONE_NAME__
 inputs: []
 secrets:
   files:

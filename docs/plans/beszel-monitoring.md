@@ -6,7 +6,7 @@ Integreer [Beszel](https://beszel.dev) (lichtgewicht server monitoring met Docke
 
 Beszel heeft twee componenten:
 - **Hub** — PocketBase web dashboard (draait op Management VM)
-- **Agent** — Lichtgewicht Go binary per host (Management VM + K8s nodes)
+- **Agent** — Lichtgewicht Go binary per host (Management VM + K8s nodes + NetBird bastion)
 
 Keuzes gemaakt met @harrywesterman:
 - ✅ **Zero-config** (Optie B): geen per-app YAML — Beszel ontdekt alle containers automatisch via Docker/containerd sockets
@@ -24,6 +24,7 @@ Keuzes gemaakt met @harrywesterman:
 | `config/pinned-defaults.sh` | WIJZIG — voeg `BESZEL_VERSION=0.18.7` toe |
 | `docker-compose.yml` | WIJZIG — voeg `beszel` en `beszel-agent` services toe |
 | `config/beszel-env.sh` | NIEUW — helper voor key/token generatie en OIDC vars |
+| `scripts/manager/configure-bastion-beszel-agent.sh` | NIEUW — installeer de Beszel agent op de NetBird bastion |
 | `categories/talos-cluster/steps/install-beszel/step.yaml` | NIEUW |
 | `categories/talos-cluster/steps/install-beszel/run.sh` | NIEUW |
 | `gitops/platform-apps/beszel-agents/namespace.yaml` | NIEUW |
@@ -79,6 +80,22 @@ Voeg twee services toe:
   - `KEY="${BESZEL_AGENT_KEY}"`
   - `TOKEN=${BESZEL_AGENT_TOKEN}`
 - Depends on: `beszel`
+
+**`beszel-agent`** (remote agent voor NetBird bastion):
+- Wordt idempotent via SSH uitgerold naar `/opt/twinbox/beszel-agent`
+- Image: `henrygd/beszel-agent:${BESZEL_VERSION:-0.18.7}`
+- Container name: `twinbox-beszel-bastion-agent`
+- Restart: `unless-stopped`
+- Network mode: `host`
+- Volumes:
+  - `/opt/twinbox/beszel-agent/data:/var/lib/beszel-agent`
+  - `/var/run/docker.sock:/var/run/docker.sock:ro`
+- Environment via root-only `agent.env`:
+  - `HUB_URL=https://beszel.<zone>`
+  - `KEY="${BESZEL_AGENT_KEY}"`
+  - `TOKEN=${BESZEL_AGENT_TOKEN}`
+  - `SYSTEM_NAME=twinbox-netbird-bastion`
+  - `DISABLE_SSH=true`
 
 ### Nieuwe env vars
 
@@ -193,19 +210,21 @@ Haalt `key` en `token` uit OpenBao (ge-sync via `sync-openbao-global-secret.sh`)
 id: install-beszel
 title: Install Beszel Monitoring
 type: action
-journey_stage: manage
+journey_stage: setup
 summary: Lightweight server monitoring with Docker stats, historical data, and alerts.
 explanation: >
-  Beszel monitors your Management VM and all Kubernetes cluster nodes.
-  It tracks CPU, memory, disk, network, and container usage with a
-  lightweight agent — no public internet exposure required.
+  Beszel monitors your Management VM, all Kubernetes cluster nodes, and
+  the NetBird bastion when one is present. It tracks CPU, memory, disk,
+  network, and container usage with a lightweight agent — no public
+  internet exposure required.
   Configure alerts for CPU, memory, disk, and system status in the
   Beszel dashboard.
 side_help: >
   Beszel uses a hub-and-agent architecture. The hub runs on the Management VM
   and provides a web dashboard with OIDC login via Authentik. A local agent
   monitors the Management VM itself, and a DaemonSet on the cluster monitors
-  all Kubernetes nodes.
+  all Kubernetes nodes. When NetBird is selected, Twinbox also starts a
+  Dockerized agent on the bastion through its saved SSH credentials.
 dashy:
   items:
     - section: Platform
@@ -259,7 +278,15 @@ Het script doet:
      --service-domain "beszel.$(cluster_public_zone)"
    ```
 
-7. **Argo CD Application deployen** voor de DaemonSet:
+7. **Bastion agent configureren** als NetBird is geselecteerd:
+   ```bash
+   bash "$WORKSPACE_ROOT/scripts/manager/configure-bastion-beszel-agent.sh" \
+     --cluster-id "$cluster_id" \
+     --agent-secret-file "$beszel_agent_secret_file" \
+     --beszel-version "$beszel_version"
+   ```
+
+8. **Argo CD Application deployen** voor de DaemonSet:
    ```bash
    bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
      --app-name beszel-agents \

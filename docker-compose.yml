@@ -49,6 +49,9 @@ services:
       - TWINBOX_TIME_SERVER=${TWINBOX_TIME_SERVER:-time.cloudflare.com}
       - TWINBOX_SECRET_TEMP_DIR=${TWINBOX_SECRET_TEMP_DIR:-/tmp/twinbox-secrets}
       - TWINBOX_SECRET_CACHE_TTL_SEC=${TWINBOX_SECRET_CACHE_TTL_SEC:-60}
+      - TWINBOX_HOST_RUNTIME_DIR=${TWINBOX_HOST_RUNTIME_DIR:-/host/opt/twinbox}
+      - TWINBOX_GIT_REPO_URL=${TWINBOX_GIT_REPO_URL:-https://github.com/harrywesterman/Twinbox.git}
+      - TWINBOX_GIT_TARGET_REVISION=${TWINBOX_GIT_TARGET_REVISION:-main}
       - MANAGEMENT_VM_IP=${MANAGEMENT_VM_IP:-}
       - PROXMOX_NODE=${PROXMOX_NODE:-pve}
       - PROXMOX_STORAGE_POOL=${PROXMOX_STORAGE_POOL:-local-lvm}
@@ -64,6 +67,7 @@ services:
       - /opt/twinbox/manager-data:/data
       - /opt/twinbox/bootstrap:/opt/twinbox/bootstrap
       - /etc/cron.d:/host/etc/cron.d
+      - /opt/twinbox:/host/opt/twinbox
       - /home/twinbox:/home/twinbox
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
@@ -78,8 +82,32 @@ services:
     ports:
       - "3000:80"
 
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:${FORGEJO_VERSION:-15.0.3}
+    container_name: twinbox-forgejo
+    restart: unless-stopped
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - FORGEJO__server__DOMAIN=${MANAGEMENT_VM_IP:-localhost}
+      - FORGEJO__server__ROOT_URL=${FORGEJO_ROOT_URL:-http://localhost:3001/}
+      - FORGEJO__server__HTTP_PORT=3000
+      - FORGEJO__service__DISABLE_REGISTRATION=true
+      - FORGEJO__repository__DEFAULT_PUSH_CREATE_PRIVATE=false
+      - FORGEJO__repository__DEFAULT_BRANCH=main
+      - FORGEJO__repository__ENABLE_PUSH_CREATE_USER=true
+      - FORGEJO__oauth2_client__ENABLE_AUTO_REGISTRATION=true
+      - FORGEJO__actions__ENABLED=false
+      - FORGEJO__security__INSTALL_LOCK=true
+    volumes:
+      - /opt/twinbox/forgejo:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "${FORGEJO_HTTP_PORT:-3001}:3000"
+
   seaweedfs:
-    image: chrislusf/seaweedfs:4.31
+    image: chrislusf/seaweedfs:4.33
     container_name: twinbox-seaweedfs
     restart: unless-stopped
     environment:
@@ -96,7 +124,7 @@ services:
       - "8888:8888"
 
   seaweedfs-admin:
-    image: chrislusf/seaweedfs:4.31
+    image: chrislusf/seaweedfs:4.33
     container_name: twinbox-seaweedfs-admin
     restart: unless-stopped
     command:
@@ -113,7 +141,7 @@ services:
     container_name: twinbox-beszel
     restart: unless-stopped
     environment:
-      - APP_URL=${BESZEL_APP_URL:-}
+      - APP_URL=${BESZEL_APP_URL:-http://127.0.0.1:8090}
       - DISABLE_PASSWORD_AUTH=true
       - SHARE_ALL_SYSTEMS=true
       - USER_CREATION=true

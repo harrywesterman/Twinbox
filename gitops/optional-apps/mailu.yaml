@@ -26,6 +26,7 @@ spec:
             valueFiles:
               - $values/gitops/values/mailu.yaml
             values: |
+              subnet: "{{or (index .metadata.annotations "twinbox.io/pod-cidr") "10.244.0.0/16"}}"
               domain: "{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
               hostnames:
                 - "mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"

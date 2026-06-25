@@ -62,6 +62,8 @@ spec:
               value: Authentik
             - name: OIDC_SCOPES
               value: openid profile email
+            - name: PROXY_HEADERS_TRUSTED
+              value: "true"
           resources:
             requests:
               cpu: 500m

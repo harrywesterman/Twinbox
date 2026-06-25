@@ -11,6 +11,8 @@ WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../
 source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
 # shellcheck disable=SC1091
 source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"
 
 log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
@@ -270,6 +272,141 @@ resolve_admin_pod() {
     head -n1
 }
 
+register_mailu_authentik_app() {
+  local public_zone_name="$1"
+
+  log "Registering Mailu in Authentik (proxy provider)"
+
+  authentik_ensure_token
+  authentik_setup_forward
+
+  authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
+  invalidation_flow_id="$(authentik_resolve_flow_id "default-provider-invalidation-flow" "invalidation")"
+
+  local provider_payload provider_pk app_pk policy_pk
+
+  provider_payload="$(jq -n \
+    --arg name "Mailu" \
+    --arg external_host "https://mail.${public_zone_name}" \
+    --arg authorization_flow "$authorization_flow_id" \
+    --arg invalidation_flow "$invalidation_flow_id" \
+    '{name: $name, external_host: $external_host, authorization_flow: $authorization_flow, invalidation_flow: $invalidation_flow, mode: "forward_single"}')"
+  provider_pk="$(authentik_api_request POST "/providers/proxy/" "$provider_payload" | jq -r ".pk // empty")"
+  if [[ -z "$provider_pk" || "$provider_pk" == "null" ]]; then
+    provider_pk="$(authentik_api_request GET "/providers/proxy/?name=Mailu" | jq -r ".results[0].pk // empty")"
+  fi
+  [[ -n "$provider_pk" && "$provider_pk" != "null" ]] || fail "Could not create Mailu Authentik proxy provider"
+
+  app_pk="$(authentik_api_request GET "/core/applications/mailu/" 2>/dev/null | jq -r ".pk // empty")"
+  if [[ -z "$app_pk" || "$app_pk" == "null" ]]; then
+    local app_payload
+    app_payload="$(jq -n \
+      --arg name "Mailu" \
+      --arg slug "mailu" \
+      --arg launch_url "https://mail.${public_zone_name}" \
+      --arg provider_pk "$provider_pk" \
+      '{name: $name, slug: $slug, meta_launch_url: $launch_url, provider: ($provider_pk | tonumber)}')"
+    app_pk="$(authentik_api_request POST "/core/applications/" "$app_payload" | jq -r ".pk // empty")"
+  fi
+  [[ -n "$app_pk" && "$app_pk" != "null" ]] || fail "Could not create Mailu Authentik application"
+
+  policy_pk="$(authentik_api_request GET "/policies/expression/?name=allow-all-authenticated" | jq -r ".results[0].pk // empty")"
+  if [[ -z "$policy_pk" || "$policy_pk" == "null" ]]; then
+    policy_pk="$(authentik_api_request POST "/policies/expression/" \
+      "{\"name\":\"allow-all-authenticated\",\"execution_logging\":false,\"expression\":\"return True\"}" | jq -r ".pk // empty")"
+  fi
+  [[ -n "$policy_pk" && "$policy_pk" != "null" ]] || fail "Could not create allow-all expression policy"
+
+  local existing_bindings
+  existing_bindings="$(authentik_api_request GET "/policies/bindings/?target=${app_pk}" | jq -r ".results[].pk // empty")"
+  while IFS= read -r bind_pk; do
+    [[ -n "$bind_pk" ]] && authentik_api_request DELETE "/policies/bindings/${bind_pk}/" >/dev/null 2>&1 || true
+  done <<<"$existing_bindings"
+
+  local binding_payload
+  binding_payload="$(jq -n --arg target "$app_pk" --arg policy "$policy_pk" '{target: $target, policy: $policy, order: 0, enabled: true}')"
+  authentik_api_request POST "/policies/bindings/" "$binding_payload" >/dev/null 2>&1 || fail "Could not create policy binding"
+
+  local outpost_id current_providers updated_providers
+  outpost_id="$(authentik_api_request GET "/outposts/instances/?name=authentik Embedded Outpost" | jq -r ".results[0].pk // empty")"
+  if [[ -n "$outpost_id" && "$outpost_id" != "null" ]]; then
+    current_providers="$(authentik_api_request GET "/outposts/instances/${outpost_id}/" | jq -c "[.providers[]]")"
+    if ! jq -e --arg pk "$provider_pk" "map(tostring) | index(\$pk) != null" <<<"$current_providers" >/dev/null 2>&1; then
+      updated_providers="$(jq -c --arg pk "$provider_pk" ". + [(\$pk | tonumber)] | unique" <<<"$current_providers")"
+      authentik_api_request PATCH "/outposts/instances/${outpost_id}/" "{\"providers\":$updated_providers}" >/dev/null 2>&1 || true
+    fi
+  fi
+
+  authentik_teardown_forward
+  log "Mailu registered in Authentik (webmail accessible to all authenticated users)"
+}
+
+sync_mailu_mailboxes() {
+  local mail_domain="$1"
+  local api_token="$2"
+
+  if [[ -z "$api_token" ]]; then
+    log "No Mailu API token available; skipping mailbox sync"
+    return 0
+  fi
+
+  local api_base="https://mail.${mail_domain}/api/v1"
+  local users_json
+
+  log "Syncing Mailu mailboxes for existing Authentik users"
+
+  users_json="$(authentik_api_get "/core/users/" 2>/dev/null | jq '[.results[] | select(.email != null and .email != "") | {email, name, username}]')"
+  if [[ -z "$users_json" || "$users_json" == "null" || "$users_json" == "[]" ]]; then
+    log "No Authentik users with email addresses found; skipping mailbox sync"
+    return 0
+  fi
+
+  local total=0 created=0 existed=0 failed=0
+  total="$(jq length <<<"$users_json")"
+  log "Found ${total} Authentik user(s) with email to sync"
+
+  while IFS= read -r user_entry; do
+    local email name displayed
+    email="$(jq -r '.email' <<<"$user_entry")"
+    name="$(jq -r '.name // .username' <<<"$user_entry")"
+    displayed="${name:-$email}"
+
+    local check_status
+    check_status="$(curl -s -o /dev/null -w '%{http_code}' \
+      -H "Authorization: Bearer ${api_token}" \
+      "${api_base}/user/$(printf '%s' "$email" | python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip()))')" \
+      2>/dev/null || echo "000")"
+
+    if [[ "$check_status" == "200" ]]; then
+      existed=$((existed + 1))
+      log "  SKIP ${email}: mailbox already exists"
+      continue
+    fi
+
+    local raw_password
+    raw_password="$(python3 -c 'import secrets; print(secrets.token_hex(24))')"
+
+    local create_status
+    create_status="$(curl -s -o /dev/null -w '%{http_code}' \
+      -X POST \
+      -H "Authorization: Bearer ${api_token}" \
+      -H "Content-Type: application/json" \
+      -d "$(jq -n --arg email "$email" --arg pwd "$raw_password" --arg name "$displayed" \
+        '{email: $email, raw_password: $pwd, displayed_name: $name, enabled: true, enable_imap: true, enable_pop: false, spam_enabled: true}')" \
+      "${api_base}/user" 2>/dev/null || echo "000")"
+
+    if [[ "$create_status" == "200" ]]; then
+      created=$((created + 1))
+      log "  OK   ${email}: mailbox created"
+    else
+      failed=$((failed + 1))
+      log "  FAIL ${email}: HTTP ${create_status}"
+    fi
+  done < <(jq -c '.[]' <<<"$users_json")
+
+  log "Mailbox sync complete: ${total} total, ${created} created, ${existed} existed, ${failed} failed"
+}
+
 extract_dkim_from_export() {
   jq -c -f "$WORKSPACE_ROOT/scripts/manager/mailu-dns-export-to-dkim.jq"
 }
@@ -422,6 +559,7 @@ export KUBECONFIG="$KUBECONFIG_FILE"
 require_cmd jq
 require_cmd kubectl
 require_cmd openssl
+require_cmd python3
 require_cmd ssh
 
 require_json STEP_CONTEXT_JSON "$STEP_CONTEXT_JSON"
@@ -462,8 +600,16 @@ netbird_bastion_secret="$(find_netbird_bastion_secret "$cluster_id")"
 [[ -n "$netbird_bastion_secret" && -f "$netbird_bastion_secret" ]] || fail "NetBird bastion secret not found; provision NetBird bastion first"
 
 bastion_ip="$(jq -r '.NETBIRD_IP // empty' "$netbird_bastion_secret")"
-mailu_relay_host="$(jq -r '.NETBIRD_RELAY_HOST // .NETBIRD_PRIVATE_IP // empty' "$netbird_bastion_secret")"
+hcloud_token="$(jq -r '.HCLOUD_TOKEN // empty' "$netbird_bastion_secret")"
+mailu_relay_host="$(jq -r '.NETBIRD_RELAY_HOST // empty' "$netbird_bastion_secret")"
+if [[ -z "$mailu_relay_host" ]]; then
+  mailu_relay_host="$(jq -r '.NETBIRD_PRIVATE_IP // empty' "$netbird_bastion_secret" | awk 'match($0, /([0-9]{1,3}\.){3}[0-9]{1,3}/) {print substr($0, RSTART, RLENGTH); exit}')"
+fi
 [[ -n "$bastion_ip" ]] || fail "NetBird bastion secret is missing NETBIRD_IP"
+[[ -n "$hcloud_token" ]] || fail "NetBird bastion secret is missing HCLOUD_TOKEN"
+
+server_name="twinbox-${cluster_id}-netbird"
+legacy_server_name="netbird-${cluster_id}"
 
 ssh_key_file="$(write_bastion_ssh_key "$netbird_bastion_secret" "$cluster_id")"
 trap '[[ "$ssh_key_file" == /tmp/mailu-bastion-key-* ]] && rm -f "$ssh_key_file" || true' EXIT
@@ -505,17 +651,19 @@ jq -n \
   --arg secret_key "$secret_key" \
   --arg api_token "$api_token" \
   --arg initial_admin_password "$admin_password" \
+  --arg mail_api_base_url "https://mail.${mail_domain}/api" \
   '{
     "secret-key": $secret_key,
     "api-token": $api_token,
-    "initial-admin-password": $initial_admin_password
+    "initial-admin-password": $initial_admin_password,
+    "MAILU_API_BASE_URL": $mail_api_base_url
   }' >"$runtime_secret_file"
 chmod 600 "$runtime_secret_file"
 
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "mailu-runtime" \
   --json-file "$runtime_secret_file" \
-  --required-keys "secret-key,api-token,initial-admin-password"
+  --required-keys "secret-key,api-token,initial-admin-password,MAILU_API_BASE_URL"
 
 jq -n \
   --arg relay_username "$relay_username" \
@@ -627,6 +775,23 @@ dkim_selector="${dkim_txt_name%%._domainkey.*}"
 log "Applying Mailu DNS records"
 apply_mail_dns_records "$mail_domain" "$mail_hostname" "$bastion_ip" "$dkim_txt_name" "$dkim_value" "$dmarc_policy" "$dmarc_rua_localpart"
 
+log "Configuring Hetzner PTR/rDNS for ${mail_hostname}"
+HCLOUD_TOKEN="$hcloud_token" \
+  python3 "$WORKSPACE_ROOT/scripts/manager/ensure-hetzner-rdns.py" \
+  --server-name "$server_name" \
+  --fallback-server-name "$legacy_server_name" \
+  --ip "$bastion_ip" \
+  --ptr "$mail_hostname"
+log "PTR/rDNS configured: ${bastion_ip} -> ${mail_hostname}"
+
+register_mailu_authentik_app "$mail_domain"
+
+log "Syncing existing Authentik users to Mailu"
+authentik_ensure_token
+authentik_setup_forward
+sync_mailu_mailboxes "$mail_domain" "$(jq -r '."api-token"' "$runtime_secret_file")"
+log "Mailu mailbox sync complete"
+
 dmarc_txt_value="v=DMARC1; p=${dmarc_policy}; rua=mailto:${dmarc_rua_localpart}@${mail_domain}; adkim=s; aspf=s"
 jq -n \
   --arg mail_domain "$mail_domain" \
@@ -666,7 +831,8 @@ bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
   --service-path /
 
 ptr_required="${bastion_ip} -> ${mail_hostname}"
-log "Mailu installed. Create/verify PTR: ${ptr_required}"
+rdns_status="configured"
+log "Mailu installed. PTR/rDNS configured: ${ptr_required}"
 log "Run an external deliverability/open-relay check before using this for production mail."
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
@@ -676,6 +842,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     --arg admin_url "$admin_url" \
     --arg webmail_url "$webmail_url" \
     --arg ptr_required "$ptr_required" \
+    --arg rdns_status "$rdns_status" \
     --arg bastion_postfix_status "configured" \
     --arg mailu_chart_version "2.7.1" \
     --arg mailu_app_version "2024.06.51" \
@@ -689,6 +856,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
       webmail_url: $webmail_url,
       dns_records_created: $dns_records_created,
       ptr_required: $ptr_required,
+      rdns_status: $rdns_status,
       bastion_postfix_status: $bastion_postfix_status,
       mailu_chart_version: $mailu_chart_version,
       mailu_app_version: $mailu_app_version,

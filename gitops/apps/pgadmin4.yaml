@@ -18,6 +18,13 @@ spec:
             - op: replace
               path: /spec/routes/0/match
               value: Host(`pgadmin4.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: pgadmin4-netbird
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`pgadmin4.__ZONE_NAME__`)
   destination:
     server: https://kubernetes.default.svc
     namespace: pgadmin4

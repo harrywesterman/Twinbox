@@ -1,0 +1,25 @@
+id: install-mastodon
+title: Install Mastodon
+type: action
+journey_stage: setup
+summary: Launch a federated social network with your own identity and moderation.
+explanation: Mastodon gives Twinbox a public ActivityPub publishing surface. People can post, follow, reply, boost, and share media while the cluster keeps identity, storage, and moderation under your control.
+side_help: Useful when you want a social space you own instead of handing the whole experience to a third-party platform.
+dashy:
+  items:
+    - section: Apps
+      title: Mastodon
+      description: Federated social publishing
+      icon: install-mastodon
+      url_template: https://mastodon.__ZONE_NAME__
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/apps/steps/install-mastodon/run.sh

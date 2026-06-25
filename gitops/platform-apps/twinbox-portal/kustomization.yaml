@@ -4,11 +4,14 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - externalsecret.yaml
+  - agents-externalsecret.yaml
   - pvc.yaml
   - service.yaml
   - deployment.yaml
   - ingressroute.yaml
+  - netbird-forwarded-headers-middleware.yaml
+  - ingressroute-netbird.yaml
 
 images:
   - name: ghcr.io/harrywesterman/twinbox-portal
-    newTag: sha-97d5cda46732712f0b7abb71aaffbbbf894b8b30
+    newTag: latest

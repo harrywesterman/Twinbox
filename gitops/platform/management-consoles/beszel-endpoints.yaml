@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: beszel
+  namespace: longhorn-system
+subsets:
+  - addresses:
+      - ip: __MGMT_HOST_IP__
+    ports:
+      - name: http
+        port: 8090
+        protocol: TCP

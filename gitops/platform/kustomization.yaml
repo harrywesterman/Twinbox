@@ -31,6 +31,10 @@ resources:
   - management-consoles/proxmox-server-transport.yaml
   - management-consoles/webwizard-ingressroute.yaml
   - management-consoles/webwizard-service.yaml
+  - management-consoles/forgejo-ingressroute.yaml
+  - management-consoles/forgejo-service.yaml
   - management-consoles/seaweedfs-ingressroute.yaml
   - management-consoles/seaweedfs-admin-ingressroute.yaml
   - management-consoles/seaweedfs-service.yaml
+  - management-consoles/beszel-ingressroute.yaml
+  - management-consoles/beszel-service.yaml

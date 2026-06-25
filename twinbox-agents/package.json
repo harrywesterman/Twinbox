@@ -1,0 +1,25 @@
+{
+  "name": "twinbox-agents",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/server.mjs",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@kubernetes/client-node": "^1.0.0",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.4.0",
+    "eslint-config-prettier": "^10.0.0",
+    "globals": "^17.6.0",
+    "prettier": "^3.0.0"
+  }
+}

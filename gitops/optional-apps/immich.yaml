@@ -42,6 +42,13 @@ spec:
                   - op: replace
                     path: /spec/routes/0/match
                     value: Host(`immich.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: immich-netbird
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`immich.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
         - repoURL: https://github.com/harrywesterman/Twinbox.git
           targetRevision: main
           path: gitops/databases/immich
@@ -54,10 +61,10 @@ spec:
                 patch: |-
                   - op: replace
                     path: /spec/resources/requests/cpu
-                    value: '{{ if eq (index .metadata.labels "twinbox.io/resource-profile") "small" }}250m{{ else if eq (index .metadata.labels "twinbox.io/resource-profile") "large" }}1{{ else }}500m{{ end }}'
+                    value: '{{ if eq (index .metadata.labels "twinbox.io/resource-profile") "small" }}100m{{ else if eq (index .metadata.labels "twinbox.io/resource-profile") "large" }}500m{{ else }}250m{{ end }}'
                   - op: replace
                     path: /spec/resources/requests/memory
-                    value: '{{ if eq (index .metadata.labels "twinbox.io/resource-profile") "small" }}512Mi{{ else if eq (index .metadata.labels "twinbox.io/resource-profile") "large" }}2Gi{{ else }}1Gi{{ end }}'
+                    value: '{{ if eq (index .metadata.labels "twinbox.io/resource-profile") "small" }}256Mi{{ else if eq (index .metadata.labels "twinbox.io/resource-profile") "large" }}1Gi{{ else }}512Mi{{ end }}'
       destination:
         server: https://kubernetes.default.svc
         namespace: immich

@@ -354,6 +354,7 @@ write_files:
       # Add DNS-01 challenge arguments to traefik command
       command = traefik.get("command", [])
       command_args = {
+          "--providers.docker.network=": "--providers.docker.network=netbird_netbird",
           "--certificatesresolvers.letsencrypt.acme.dnschallenge.provider=": (
               f"--certificatesresolvers.letsencrypt.acme.dnschallenge.provider={dns_provider}"
           ),
@@ -391,6 +392,41 @@ write_files:
           for volume in (cert_volume, dynamic_volume):
               if volume not in volumes:
                   volumes.append(volume)
+
+      def ensure_network_alias(service, network_name, alias):
+          networks = service.get("networks")
+          if networks is None:
+              networks = {}
+              service["networks"] = networks
+          if isinstance(networks, list):
+              next_networks = {}
+              for item in networks:
+                  if isinstance(item, str):
+                      next_networks.setdefault(item, {})
+                  elif isinstance(item, dict):
+                      for key, value in item.items():
+                          next_networks[key] = value or {}
+              networks = next_networks
+              service["networks"] = networks
+          if isinstance(networks, dict):
+              entry = networks.get(network_name)
+              if entry is None:
+                  entry = {}
+                  networks[network_name] = entry
+              elif isinstance(entry, list):
+                  entry = {"aliases": entry}
+                  networks[network_name] = entry
+              elif not isinstance(entry, dict):
+                  entry = {}
+                  networks[network_name] = entry
+              aliases = entry.setdefault("aliases", [])
+              if not isinstance(aliases, list):
+                  aliases = [aliases]
+                  entry["aliases"] = aliases
+              if alias not in aliases:
+                  aliases.append(alias)
+
+      ensure_network_alias(traefik, "netbird", netbird_domain)
 
       # Add DNS provider environment variables to traefik
       env = traefik.setdefault("environment", [])
@@ -443,6 +479,26 @@ write_files:
               for key, value in updates.items():
                   labels[key] = value
 
+      def get_label(service, key):
+          labels = service.get("labels", [])
+          if isinstance(labels, list):
+              for item in labels:
+                  if "=" not in item:
+                      continue
+                  item_key, item_value = item.split("=", 1)
+                  if item_key == key:
+                      return item_value
+          elif isinstance(labels, dict):
+              return labels.get(key, "")
+          return ""
+
+      def append_csv_label_value(service, key, value):
+          existing = get_label(service, key)
+          parts = [part.strip() for part in existing.split(",") if part.strip()]
+          if value not in parts:
+              parts.append(value)
+          set_labels(service, {key: ",".join(parts)})
+
       def is_removed_http_wildcard_label(key):
           removed_prefixes = (
               "traefik.http.routers." + "wildcard.",
@@ -452,6 +508,19 @@ write_files:
           return key.startswith(removed_prefixes)
 
       remove_label_keys(traefik, is_removed_http_wildcard_label)
+
+      netbird_no_store_middleware = "netbird-no-store"
+      no_store_middleware_labels = {
+          "traefik.http.middlewares.netbird-no-store.headers.customresponseheaders.Cache-Control": (
+              "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+          ),
+          "traefik.http.middlewares.netbird-no-store.headers.customresponseheaders.Pragma": "no-cache",
+          "traefik.http.middlewares.netbird-no-store.headers.customresponseheaders.Expires": "0",
+      }
+      remove_label_keys(
+          traefik,
+          lambda key: key.startswith("traefik.http.middlewares.netbird-no-store."),
+      )
 
       dashboard_tls_domain_labels = {
           "traefik.http.routers.netbird-dashboard.tls.domains[0].main": netbird_domain,
@@ -464,6 +533,11 @@ write_files:
       if dashboard:
           remove_label_keys(dashboard, lambda key: key.startswith("traefik.http.routers.netbird-dashboard.tls.domains["))
           set_labels(dashboard, dashboard_tls_domain_labels)
+          append_csv_label_value(
+              dashboard,
+              "traefik.http.routers.netbird-dashboard.middlewares",
+              netbird_no_store_middleware,
+          )
 
       netbird_server = services.get("netbird-server")
       if netbird_server:
@@ -471,7 +545,17 @@ write_files:
               key.startswith("traefik.http.routers.netbird-backend.tls.domains[")
               or key.startswith("traefik.http.routers.netbird-grpc.tls.domains[")
           ))
-          set_labels(netbird_server, server_tls_domain_labels)
+          set_labels(netbird_server, {**server_tls_domain_labels, **no_store_middleware_labels})
+          append_csv_label_value(
+              netbird_server,
+              "traefik.http.routers.netbird-backend.middlewares",
+              netbird_no_store_middleware,
+          )
+          append_csv_label_value(
+              netbird_server,
+              "traefik.http.routers.netbird-grpc.middlewares",
+              netbird_no_store_middleware,
+          )
 
       proxy = services.get("proxy")
       if proxy:
@@ -613,4 +697,34 @@ runcmd:
   - ufw allow 443/tcp
   - ufw allow 3478/udp
   - ufw --force enable
+%{ if opkssh_issuer_url != "" && opkssh_client_id != "" }
+  - |
+    set -euo pipefail
+    curl -fsSL https://github.com/openpubkey/opkssh/releases/download/v0.14.0/opkssh-linux-amd64 -o /tmp/opkssh
+    echo "972719cb6dae736af80100fee0854fdd7289f419fc61b3dcace8409b2f043063  /tmp/opkssh" | sha256sum -c -
+    install -o root -g root -m 0755 /tmp/opkssh /usr/local/bin/opkssh
+    rm -f /tmp/opkssh
+    groupadd -r opksshuser || true
+    useradd -r -g opksshuser -s /usr/sbin/nologin -d /var/lib/opksshuser -m opksshuser || true
+    mkdir -p /etc/opk
+    touch /var/log/opkssh.log
+    chown root:opksshuser /var/log/opkssh.log
+    chmod 0660 /var/log/opkssh.log
+    cat > /etc/opk/providers <<EOF
+    ${opkssh_issuer_url} ${opkssh_client_id} 24h
+    EOF
+    cat > /etc/opk/auth_id <<EOF
+    root oidc:groups:admins ${opkssh_issuer_url}
+    EOF
+    chown -R root:opksshuser /etc/opk
+    chmod 0750 /etc/opk
+    chmod 0640 /etc/opk/providers /etc/opk/auth_id
+    cat > /etc/ssh/sshd_config.d/60-opk-ssh.conf <<'SSHD'
+    AuthorizedKeysCommand /usr/local/bin/opkssh verify %u %k %t
+    AuthorizedKeysCommandUser opksshuser
+    SSHD
+    systemctl restart sshd || true
+    /usr/local/bin/opkssh verify --help >/dev/null
+    /usr/local/bin/opkssh audit || true
+%{ endif }
   - /root/bootstrap-netbird.sh

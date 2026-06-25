@@ -49,7 +49,21 @@ spec:
                     value: Host(`jitsi.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
               - target:
                   kind: IngressRoute
+                  name: jitsi-netbird
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`jitsi.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
                   name: auth-jitsi
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`auth-jitsi.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: auth-jitsi-netbird
                 patch: |-
                   - op: replace
                     path: /spec/routes/0/match

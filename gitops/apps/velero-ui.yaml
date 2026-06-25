@@ -27,6 +27,13 @@ spec:
               - op: replace
                 path: /spec/routes/0/match
                 value: Host(`velero-ui.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: velero-ui-netbird
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`velero-ui.__ZONE_NAME__`)
   destination:
     server: https://kubernetes.default.svc
     namespace: velero-ui

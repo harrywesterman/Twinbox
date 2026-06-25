@@ -202,6 +202,23 @@ Expected:
 - Grafana provisions the Prometheus, Loki, and Tempo datasources
 - The seeded Managed Kubernetes Overview, Twinbox Nodes, Twinbox Workloads, Twinbox Control Plane, Twinbox Storage, Twinbox Logs & Events, Twinbox Logs Detail, Twinbox Network, and Twinbox Traefik dashboard ConfigMaps exist and are discovered by the sidecar
 
+### `install-beszel`
+
+```bash
+kubectl --kubeconfig <kubeconfig> get application -n argocd beszel-agents
+kubectl --kubeconfig <kubeconfig> get pods -n beszel
+ssh twinbox@<management-vm-ip> 'sudo -n docker inspect -f "{{.State.Status}}" twinbox-beszel-agent'
+# If NetBird is selected, connect to the bastion with the saved netbird-bastion secret and run:
+docker inspect -f '{{.State.Status}}' twinbox-beszel-bastion-agent
+```
+
+Expected:
+
+- `Application/beszel-agents` is synced and healthy
+- Beszel agent pods are running on all Kubernetes nodes
+- The Management VM agent container is running
+- When a NetBird bastion exists, `twinbox-beszel-bastion-agent` is running and the Beszel UI shows `twinbox-netbird-bastion`
+
 ### `install-longhorn-storage`
 
 ```bash

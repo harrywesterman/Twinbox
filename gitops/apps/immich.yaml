@@ -29,6 +29,13 @@ spec:
               - op: replace
                 path: /spec/routes/0/match
                 value: Host(`immich.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: immich-netbird
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`immich.__ZONE_NAME__`)
     - repoURL: __REPO_URL__
       targetRevision: __TARGET_REVISION__
       path: gitops/databases/immich
