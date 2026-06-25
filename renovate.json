@@ -177,10 +177,11 @@
         "(^|/)config/pinned-defaults\\.sh$"
       ],
       "datasourceTemplate": "docker",
+      "registryUrlTemplate": "https://codeberg.org",
       "matchStrings": [
         "PINNED_FORGEJO_VERSION=(?<currentValue>[0-9.]+)"
       ],
-      "depNameTemplate": "codeberg.org/forgejo/forgejo",
+      "depNameTemplate": "forgejo/forgejo",
       "customType": "regex"
     },
     {
@@ -205,6 +206,14 @@
         "image:\\s*[\"']?(?<depName>[^:\"'\\s]+):(?<currentValue>[^\"'\\s]+)[\"']?"
       ],
       "customType": "regex"
+    }
+  ],
+  "hostRules": [
+    {
+      "description": "codeberg.org container registry (OCI, token auth)",
+      "hostType": "docker",
+      "matchHost": "codeberg.org",
+      "concurrentRequestLimit": 1
     }
   ],
   "packageRules": [
