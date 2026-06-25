@@ -92,14 +92,14 @@
       "datasourceTemplate": "helm",
       "registryUrlTemplate": "https://helm.cilium.io",
       "matchStrings": ["PINNED_CILIUM_CHART_VERSION=(?<currentValue>[0-9.]+)"],
-      "depNameTemplate": "cilium/cilium"
+      "depNameTemplate": "cilium"
     },
     {
       "fileMatch": ["(^|/)config/pinned-defaults\\.sh$"],
       "datasourceTemplate": "helm",
       "registryUrlTemplate": "https://cloudtty.github.io/cloudtty",
       "matchStrings": ["PINNED_CLOUDTTY_CHART_VERSION=(?<currentValue>[0-9.]+)"],
-      "depNameTemplate": "cloudtty/cloudtty"
+      "depNameTemplate": "cloudtty"
     },
     {
       "fileMatch": ["(^|/)config/pinned-defaults\\.sh$"],
@@ -123,13 +123,7 @@
         "image:\\s*[\"']?(?<depName>[^:\"'\\s]+):(?<currentValue>[^\"'\\s]+)[\"']?"
       ]
     },
-    {
-      "description": "mailuVersion in gitops/values/mailu.yaml",
-      "fileMatch": ["(^|/)gitops/values/mailu\\.yaml$"],
-      "datasourceTemplate": "docker",
-      "matchStrings": ["mailuVersion:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?"],
-      "depNameTemplate": "ghcr.io/mailu/mailu"
-    },
+
     {
       "description": "Image tags in gitops/platform-apps/*/workload yamls",
       "fileMatch": [
@@ -140,6 +134,12 @@
     }
   ],
   "packageRules": [
+    {
+      "description": "Skip private registry docker.getoutline.com (no public access)",
+      "matchDatasources": ["docker"],
+      "matchDepNames": ["docker.getoutline.com/**"],
+      "enabled": false
+    },
     {
       "description": "Group all patches and minors for twinbox/k8s apps into one PR per app",
       "matchDatasources": ["github-releases", "docker", "helm"],
