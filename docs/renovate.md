@@ -4,12 +4,19 @@ Renovate is configured on this repository to automatically open pull requests wh
 
 ## What is scanned
 
-Renovate runs with the `config:recommended` preset plus an explicit Argo CD manager that watches `gitops/apps/*.yaml`.
+Renovate runs with the `config:recommended` preset plus:
 
 | File type | Manager | What gets updated |
 |-----------|---------|-------------------|
-| `gitops/apps/*.yaml` | `argocd` | Helm chart `targetRevision` fields (e.g. `traefik`, `prometheus`, `immich`, `authentik`) |
-| `package.json` / `requirements.txt` / etc. | built-in | Node, Python, and other ecosystem dependencies |
+| `gitops/apps/*.yaml` | `argocd` | Helm chart `targetRevision` fields |
+| `gitops/optional-apps/*.yaml` | `argocd` | Optional Helm chart versions |
+| `gitops/databases/*.yaml` | `argocd` | Database Helm chart versions |
+| `config/pinned-defaults.sh` | `regex` | PINNED_*_VERSION vars (GitHub releases) |
+| `gitops/values/*.yaml`, `gitops/apps/*/values.yaml` | `regex` | Docker image tags in Helm values |
+| `gitops/platform-apps/*/*.yaml` | `regex` | Docker image tags in K8s manifests |
+| `package.json` | `npm` | Node.js dependencies |
+| `Dockerfile*` | `dockerfile` | Base image tags |
+| `.github/workflows/*` | `github-actions` | Action versions |
 
 ## Argo CD Helm chart updates
 
@@ -29,7 +36,7 @@ When Renovate detects a newer chart version, it opens a PR that bumps the `targe
 
 ### Current chart coverage
 
-Renovate monitors the following Argo CD applications in `gitops/apps/`:
+Renovate monitors the following Argo CD applications in `gitops/apps/`, `gitops/optional-apps/`, and `gitops/databases/`:
 
 - `alloy`
 - `argocd-image-updater`
@@ -46,7 +53,7 @@ Renovate monitors the following Argo CD applications in `gitops/apps/`:
 - `loki`
 - `longhorn`
 - `metrics-server`
-- `nextcloud`
+- `nextcloud` (optional)
 - `ntfy`
 - `openbao`
 - `prometheus` & `prometheus-minimal`
@@ -63,23 +70,11 @@ Renovate monitors the following Argo CD applications in `gitops/apps/`:
 
 ## Configuration
 
-The configuration lives in `renovate.json`:
+The configuration lives in `renovate.json`. It uses:
 
-```json
-{
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
-  ],
-  "argocd": {
-    "fileMatch": [
-      "gitops/apps/.*\\.yaml$"
-    ]
-  }
-}
-```
-
-To add more paths, extend the `argocd.fileMatch` array.
+- **`argocd` manager**: watches `gitops/apps/`, `gitops/optional-apps/`, and `gitops/databases/` for Helm chart `targetRevision` bumps
+- **`regex` managers**: scan `config/pinned-defaults.sh` for pinned infra versions, `gitops/values/` for Docker image overrides, and `gitops/platform-apps/` for inline image tags in workload manifests
+- **`npm` / `dockerfile` / `github-actions`**: standard ecosystem managers
 
 ## Verification
 

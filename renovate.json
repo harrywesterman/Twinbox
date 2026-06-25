@@ -10,7 +10,11 @@
     "regex"
   ],
   "argocd": {
-    "managerFilePatterns": ["/gitops/apps/.*\\.yaml$/"]
+    "managerFilePatterns": [
+      "/gitops/apps/.*\\.yaml$/",
+      "/gitops/optional-apps/.*\\.yaml$/",
+      "/gitops/databases/.*\\.yaml$/"
+    ]
   },
   "dockerfile": {
     "managerFilePatterns": [
@@ -28,25 +32,83 @@
     {
       "description": "PINNED_*_VERSION vars in config/pinned-defaults.sh",
       "fileMatch": ["(^|/)config/pinned-defaults\\.sh$"],
+      "matchStringsStrategy": "any",
+      "datasourceTemplate": "github-releases",
       "matchStrings": [
-        "PINNED_(?<depName>[A-Z_0-9]+)_VERSION=(?<currentValue>v?[0-9.]+)"
+        "PINNED_TALOS_VERSION=(?<currentValue>v?[0-9.]+)"
       ],
-      "datasourceTemplate": "github-releases"
+      "depNameTemplate": "siderolabs/talos"
+    },
+    {
+      "fileMatch": ["(^|/)config/pinned-defaults\\.sh$"],
+      "datasourceTemplate": "github-releases",
+      "matchStrings": ["PINNED_OPENTOFU_VERSION=(?<currentValue>v?[0-9.]+)"],
+      "depNameTemplate": "opentofu/opentofu"
+    },
+    {
+      "fileMatch": ["(^|/)config/pinned-defaults\\.sh$"],
+      "datasourceTemplate": "github-releases",
+      "matchStrings": ["PINNED_K9S_VERSION=(?<currentValue>v?[0-9.]+)"],
+      "depNameTemplate": "derailed/k9s"
+    },
+    {
+      "fileMatch": ["(^|/)config/pinned-defaults\\.sh$"],
+      "datasourceTemplate": "github-releases",
+      "matchStrings": ["PINNED_KUBECTL_VERSION=(?<currentValue>v?[0-9.]+)"],
+      "depNameTemplate": "kubernetes/kubernetes"
+    },
+    {
+      "fileMatch": ["(^|/)config/pinned-defaults\\.sh$"],
+      "datasourceTemplate": "github-releases",
+      "matchStrings": ["PINNED_HELM_VERSION=(?<currentValue>v?[0-9.]+)"],
+      "depNameTemplate": "helm/helm"
+    },
+    {
+      "fileMatch": ["(^|/)config/pinned-defaults\\.sh$"],
+      "datasourceTemplate": "github-releases",
+      "matchStrings": ["PINNED_ARGOCD_VERSION=(?<currentValue>v?[0-9.]+)"],
+      "depNameTemplate": "argoproj/argo-cd"
+    },
+    {
+      "fileMatch": ["(^|/)config/pinned-defaults\\.sh$"],
+      "datasourceTemplate": "github-releases",
+      "matchStrings": ["PINNED_BESZEL_VERSION=(?<currentValue>v?[0-9.]+)"],
+      "depNameTemplate": "henrygd/beszel"
+    },
+    {
+      "fileMatch": ["(^|/)config/pinned-defaults\\.sh$"],
+      "datasourceTemplate": "github-releases",
+      "matchStrings": ["PINNED_NETBIRD_VERSION=(?<currentValue>v?[0-9.]+)"],
+      "depNameTemplate": "netbirdio/netbird"
+    },
+    {
+      "fileMatch": ["(^|/)config/pinned-defaults\\.sh$"],
+      "datasourceTemplate": "github-releases",
+      "matchStrings": ["PINNED_ADGUARD_HOME_VERSION=(?<currentValue>v?[0-9.]+)"],
+      "depNameTemplate": "AdguardTeam/AdGuardHome"
     },
     {
       "description": "Image tags in gitops/values/*.yaml and gitops/apps/authentik/values.yaml",
       "fileMatch": ["(^|/)gitops/(values|apps)/.*\\.yaml$"],
       "matchStringsStrategy": "any",
+      "datasourceTemplate": "docker",
       "matchStrings": [
-        "image:\\s*[\"']?(?<depName>[^:\"'\\s]+):(?<currentValue>[^\"'\\s]+)[\"']?",
-        "mailuVersion:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?"
+        "image:\\s*[\"']?(?<depName>[^:\"'\\s]+):(?<currentValue>[^\"'\\s]+)[\"']?"
       ]
     },
     {
-      "description": "Image tags in gitops/platform-apps/*/deployment.yaml",
+      "description": "mailuVersion in gitops/values/mailu.yaml",
+      "fileMatch": ["(^|/)gitops/values/mailu\\.yaml$"],
+      "datasourceTemplate": "docker",
+      "matchStrings": ["mailuVersion:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?"],
+      "depNameTemplate": "ghcr.io/mailu/mailu"
+    },
+    {
+      "description": "Image tags in gitops/platform-apps/*/workload yamls",
       "fileMatch": [
-        "(^|/)gitops/platform-apps/.+/(deployment|statefulset|daemonset|job|cronjob)\\.yaml$"
+        "(^|/)gitops/platform-apps/.+/(deployment|statefulset|daemonset|job|cronjob|redis|valkey|workers|document-converters|manifest|relay-egress)\\.yaml$"
       ],
+      "datasourceTemplate": "docker",
       "matchStrings": ["image:\\s*[\"']?(?<depName>[^:\"'\\s]+):(?<currentValue>[^\"'\\s]+)[\"']?"]
     }
   ],
