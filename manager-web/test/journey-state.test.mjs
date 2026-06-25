@@ -126,6 +126,7 @@ function buildCatalog(stepStatuses = {}) {
       "Install Twinbox Portal",
       { dependsOn: ["install-dashy-dashboard"] },
     ],
+    ["install-twinbox-agents", "Install AI Beheerteam", { dependsOn: ["install-twinbox-portal"] }],
     [
       "install-management-consoles",
       "Install Management consoles",
@@ -303,7 +304,7 @@ test("wizard model exposes a linear setup rail and guided actions", () => {
   });
 
   assert.equal(model.mode, "setup");
-  assert.equal(model.stepRail.length, 24);
+  assert.equal(model.stepRail.length, 25);
   const stepRailById = Object.fromEntries(model.stepRail.map((step) => [step.id, step]));
   assert.equal(stepRailById["provision-nodes"].title, "Deploy Talos Cluster");
   assert.equal(stepRailById["provision-nodes"].isCurrent, true);
@@ -326,10 +327,12 @@ test("wizard model exposes a linear setup rail and guided actions", () => {
   assert.equal(stepRailById["install-alloy"].icon, "🧵");
   assert.equal(stepRailById["install-pgadmin4"].title, "Install pgAdmin 4");
   assert.equal(stepRailById["install-pgadmin4"].icon, "🗃️");
+  assert.equal(stepRailById["install-twinbox-agents"].title, "Install AI Beheerteam");
+  assert.equal(stepRailById["install-twinbox-agents"].icon, "🤖");
   assert.equal(stepRailById["install-velero-ui"].title, "Install Velero UI");
   assert.equal(stepRailById["install-velero-ui"].icon, "🖥️");
   assert.equal(model.primaryAction.label, "Next");
-  assert.equal(model.progress.totalSteps, 24);
+  assert.equal(model.progress.totalSteps, 25);
   assert.equal(model.progress.completedSteps, 0);
   assert.equal(model.activity.runtime.currentStage, "Applying cluster plan");
   assert.equal(
@@ -430,6 +433,7 @@ test("wizard model switches to manage mode when setup flow is complete", () => {
         "install-pgadmin4",
         "install-dashy-dashboard",
         "install-twinbox-portal",
+        "install-twinbox-agents",
         "install-management-consoles",
         "install-ntfy",
         "install-velero-backup",
@@ -480,7 +484,7 @@ test("wizard model keeps manage-only steps out of the setup rail", () => {
     selectedStepId: "",
   });
 
-  assert.equal(model.stepRail.length, 24);
+  assert.equal(model.stepRail.length, 25);
   const setupStepIds = new Set(model.stepRail.map((step) => step.id));
   for (const id of [
     "provision-nodes",
@@ -498,6 +502,7 @@ test("wizard model keeps manage-only steps out of the setup rail", () => {
     "install-prometheus",
     "install-dashy-dashboard",
     "install-twinbox-portal",
+    "install-twinbox-agents",
     "install-ntfy",
     "install-management-consoles",
     "install-velero-backup",

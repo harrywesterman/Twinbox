@@ -903,6 +903,12 @@ def test_user_apps_are_not_part_of_bootstrap_journey():
     assert setup_step_ids.index('"configure-netbird-admin-access"') < setup_step_ids.index(
         '"install-adguard"'
     )
+    assert setup_step_ids.index('"install-twinbox-portal"') < setup_step_ids.index(
+        '"install-twinbox-agents"'
+    )
+    assert setup_step_ids.index('"install-twinbox-agents"') < setup_step_ids.index(
+        '"install-management-consoles"'
+    )
 
 
 def test_crowdsec_step_seeds_bouncer_secret_and_applies_gitops_app():

@@ -118,6 +118,11 @@ function buildProjectUrlMap() {
       project_url: "https://github.com/harrywesterman/twinbox/blob/main/docs/configuration.md",
       github_url: "https://github.com/harrywesterman/twinbox",
     },
+    "install-twinbox-agents": {
+      icon: "🤖",
+      project_url: "https://github.com/harrywesterman/twinbox/blob/main/docs/plans",
+      github_url: "https://github.com/harrywesterman/twinbox",
+    },
     "install-ntfy": {
       icon: "🔔",
       project_url: "https://ntfy.sh/",
