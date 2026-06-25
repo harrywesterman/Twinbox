@@ -128,6 +128,28 @@ remove_tool_version_envs() {
   mv "$tmp_file" .env
 }
 
+refresh_bootstrap_file() {
+  local source_url="$1"
+  local target_file="$2"
+  local mode="${3:-0644}"
+  local tmp_file=""
+
+  tmp_file="$(mktemp)"
+  if curl -fsSL "$source_url" -o "$tmp_file"; then
+    install -m "$mode" "$tmp_file" "$target_file"
+    rm -f "$tmp_file"
+    return 0
+  fi
+
+  rm -f "$tmp_file"
+  if [[ -f "$target_file" ]]; then
+    log "Could not refresh ${target_file}; using cached copy"
+    return 0
+  fi
+
+  return 1
+}
+
 ensure_bootstrap_material() {
   local secret_dir="${BOOTSTRAP_DIR}/secrets/global"
   local openbao_seal_dir="${BOOTSTRAP_DIR}/openbao/seal"
@@ -312,15 +334,15 @@ if [[ ! -f "${BOOTSTRAP_DIR}/bin/install-management-tools.sh" ]]; then
   chmod 0755 "${BOOTSTRAP_DIR}/bin/install-management-tools.sh"
 fi
 
-if [[ ! -f "${BOOTSTRAP_DIR}/bin/configure-manager-api-firewall.sh" ]]; then
-  curl -fsSL "${RAW_BASE_URL}/scripts/manager/configure-manager-api-firewall.sh" -o "${BOOTSTRAP_DIR}/bin/configure-manager-api-firewall.sh"
-  chmod 0755 "${BOOTSTRAP_DIR}/bin/configure-manager-api-firewall.sh"
-fi
+refresh_bootstrap_file \
+  "${RAW_BASE_URL}/scripts/manager/configure-manager-api-firewall.sh" \
+  "${BOOTSTRAP_DIR}/bin/configure-manager-api-firewall.sh" \
+  0755
 
-if [[ ! -f "${BOOTSTRAP_DIR}/bin/sync-manager-api-node-allowlist.sh" ]]; then
-  curl -fsSL "${RAW_BASE_URL}/scripts/manager/sync-manager-api-node-allowlist.sh" -o "${BOOTSTRAP_DIR}/bin/sync-manager-api-node-allowlist.sh"
-  chmod 0755 "${BOOTSTRAP_DIR}/bin/sync-manager-api-node-allowlist.sh"
-fi
+refresh_bootstrap_file \
+  "${RAW_BASE_URL}/scripts/manager/sync-manager-api-node-allowlist.sh" \
+  "${BOOTSTRAP_DIR}/bin/sync-manager-api-node-allowlist.sh" \
+  0755
 
 if [[ ! -f "${BOOTSTRAP_DIR}/bin/bootstrap-forgejo.sh" ]]; then
   curl -fsSL "${RAW_BASE_URL}/scripts/manager/bootstrap-forgejo.sh" -o "${BOOTSTRAP_DIR}/bin/bootstrap-forgejo.sh"

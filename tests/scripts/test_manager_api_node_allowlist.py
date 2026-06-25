@@ -8,7 +8,7 @@ SCRIPT = REPO_ROOT / "scripts" / "manager" / "sync-manager-api-node-allowlist.sh
 BASE_CIDRS = "127.0.0.1/32,::1/128,172.16.0.0/12,10.0.0.0/8"
 
 
-def _write_fake_kubectl(tmp_path: Path, node_ips: list[str]) -> Path:
+def _write_fake_kubectl(tmp_path: Path, node_ips: list[str], args_file: Path | None = None) -> Path:
     payload = {
         "items": [
             {
@@ -23,8 +23,12 @@ def _write_fake_kubectl(tmp_path: Path, node_ips: list[str]) -> Path:
         ]
     }
     kubectl = tmp_path / "kubectl"
+    record_args = f'printf "%s\\n" "$*" > "{args_file}"\n' if args_file is not None else ""
     kubectl.write_text(
-        f"#!/usr/bin/env bash\nset -euo pipefail\ncat <<'JSON'\n{json.dumps(payload)}\nJSON\n",
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        f"{record_args}"
+        f"cat <<'JSON'\n{json.dumps(payload)}\nJSON\n",
         encoding="utf-8",
     )
     kubectl.chmod(0o755)
@@ -198,3 +202,121 @@ def test_sync_manager_api_node_allowlist_adds_management_lan_cidr(tmp_path):
     text = env_file.read_text(encoding="utf-8")
     assert "203.0.113.0/24" in text
     assert "192.168.2.234/32" in text
+
+
+def test_sync_manager_api_node_allowlist_reads_management_ip_from_env_file(tmp_path):
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        f"MANAGER_API_TRUSTED_CIDRS={BASE_CIDRS}\nMANAGEMENT_VM_IP=203.0.113.5\n",
+        encoding="utf-8",
+    )
+
+    _write_fake_ip(tmp_path, "203.0.113.5", 24)
+    kubectl = _write_fake_kubectl(tmp_path, [])
+    kubeconfig = tmp_path / "kubeconfig"
+    kubeconfig.write_text("fake\n", encoding="utf-8")
+
+    env = {
+        **os.environ,
+        "KUBECTL_BIN": str(kubectl),
+        "KUBECONFIG": str(kubeconfig),
+        "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}",
+    }
+    result = subprocess.run(
+        [
+            "bash",
+            str(SCRIPT),
+            "--env-file",
+            str(env_file),
+            "--workspace-root",
+            str(tmp_path),
+            "--skip-firewall",
+            "--skip-restart",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    assert "management VM LAN CIDR" in result.stderr
+    text = env_file.read_text(encoding="utf-8")
+    assert f"MANAGER_API_TRUSTED_CIDRS={BASE_CIDRS},203.0.113.0/24" in text
+    assert "# BEGIN TWINBOX MANAGER API NODE ALLOWLIST" not in text
+
+
+def test_sync_manager_api_node_allowlist_uses_host_runtime_env_by_default(tmp_path):
+    host_runtime_dir = tmp_path / "host" / "opt" / "twinbox"
+    host_runtime_dir.mkdir(parents=True)
+    env_file = host_runtime_dir / ".env"
+    env_file.write_text(f"MANAGER_API_TRUSTED_CIDRS={BASE_CIDRS}\n", encoding="utf-8")
+
+    kubeconfig = tmp_path / "kubeconfig"
+    kubeconfig.write_text("fake\n", encoding="utf-8")
+    kubectl = _write_fake_kubectl(tmp_path, ["192.168.2.234"])
+
+    env = {
+        **os.environ,
+        "KUBECTL_BIN": str(kubectl),
+        "KUBECONFIG": str(kubeconfig),
+        "TWINBOX_HOST_RUNTIME_DIR": str(host_runtime_dir),
+    }
+    subprocess.run(
+        [
+            "bash",
+            str(SCRIPT),
+            "--skip-firewall",
+            "--skip-restart",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    text = env_file.read_text(encoding="utf-8")
+    assert "192.168.2.234/32" in text
+
+
+def test_sync_manager_api_node_allowlist_discovers_cluster_kubeconfig(tmp_path):
+    env_file = tmp_path / ".env"
+    bootstrap_dir = tmp_path / "bootstrap"
+    kubeconfig = bootstrap_dir / "secrets" / "cluster" / "prd" / "kubeconfig" / "kubeconfig"
+    kubeconfig.parent.mkdir(parents=True)
+    kubeconfig.write_text("fake\n", encoding="utf-8")
+    env_file.write_text(
+        f"MANAGER_API_TRUSTED_CIDRS={BASE_CIDRS}\nTWINBOX_BOOTSTRAP_DIR={bootstrap_dir}\n",
+        encoding="utf-8",
+    )
+    args_file = tmp_path / "kubectl.args"
+    kubectl = _write_fake_kubectl(tmp_path, ["192.168.2.242"], args_file=args_file)
+
+    env = {
+        **os.environ,
+        "KUBECTL_BIN": str(kubectl),
+    }
+    env.pop("KUBECONFIG", None)
+    env.pop("KUBECONFIG_FILE", None)
+
+    subprocess.run(
+        [
+            "bash",
+            str(SCRIPT),
+            "--env-file",
+            str(env_file),
+            "--workspace-root",
+            str(tmp_path),
+            "--skip-firewall",
+            "--skip-restart",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    assert f"--kubeconfig {kubeconfig}" in args_file.read_text(encoding="utf-8")
+    assert "192.168.2.242/32" in env_file.read_text(encoding="utf-8")

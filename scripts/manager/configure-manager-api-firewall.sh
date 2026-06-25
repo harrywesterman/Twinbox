@@ -41,10 +41,12 @@ configure_ufw() {
   fi
 
   while IFS= read -r cidr; do
-    ufw insert 1 allow from "$cidr" to any port "$MANAGER_API_PORT" proto tcp >/dev/null || true
+    if ! ufw insert 1 allow from "$cidr" to any port "$MANAGER_API_PORT" proto tcp >/dev/null 2>&1; then
+      ufw allow from "$cidr" to any port "$MANAGER_API_PORT" proto tcp >/dev/null 2>&1 || true
+    fi
   done < <(split_cidrs)
-  ufw deny in to any port "$MANAGER_API_PORT" proto tcp >/dev/null || true
-  ufw reload >/dev/null || true
+  ufw deny in to any port "$MANAGER_API_PORT" proto tcp >/dev/null 2>&1 || true
+  ufw reload >/dev/null 2>&1 || true
 }
 
 ensure_docker_user_jump() {

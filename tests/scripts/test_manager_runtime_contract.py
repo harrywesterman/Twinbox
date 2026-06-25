@@ -101,12 +101,15 @@ def test_bootstrap_scripts_materialize_filesystem_secret_tree_and_openbao_seal_f
 
 def test_start_manager_configures_manager_api_source_allowlist_firewall():
     text = (REPO_ROOT / "scripts" / "start-manager.sh").read_text(encoding="utf-8")
+    worker_dockerfile = (REPO_ROOT / "manager-worker" / "Dockerfile").read_text(encoding="utf-8")
 
     assert "append_manager_api_source_allowlist" in text
     assert f"MANAGER_API_TRUSTED_CIDRS={MANAGER_API_TRUSTED_CIDRS}" in text
     assert "configure-manager-api-firewall.sh" in text
     assert 'sudo "${BOOTSTRAP_DIR}/bin/configure-manager-api-firewall.sh"' in text
     assert "sync-manager-api-node-allowlist.sh" in text
+    assert "apk add --no-cache" in worker_dockerfile
+    assert "iptables" in worker_dockerfile
 
 
 def test_start_manager_bootstraps_forgejo_before_full_stack():

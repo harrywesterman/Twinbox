@@ -1146,7 +1146,20 @@ bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
   --service-path /
 
 log_step "Synchronizing manager-api trusted sources"
+manager_api_sync_workspace_root="$WORKSPACE_ROOT"
+manager_api_sync_env_file=""
+manager_api_host_runtime_dir="${TWINBOX_HOST_RUNTIME_DIR:-/host/opt/twinbox}"
+if [[ -f "${manager_api_host_runtime_dir}/.env" && -f "${manager_api_host_runtime_dir}/docker-compose.yml" ]]; then
+  manager_api_sync_workspace_root="$manager_api_host_runtime_dir"
+  manager_api_sync_env_file="${manager_api_host_runtime_dir}/.env"
+fi
+manager_api_sync_args=(
+  --kubeconfig "$KUBECONFIG_FILE"
+  --workspace-root "$manager_api_sync_workspace_root"
+)
+if [[ -n "$manager_api_sync_env_file" ]]; then
+  manager_api_sync_args+=(--env-file "$manager_api_sync_env_file")
+fi
 bash "$WORKSPACE_ROOT/scripts/manager/sync-manager-api-node-allowlist.sh" \
-  --kubeconfig "$KUBECONFIG_FILE" \
-  --workspace-root "$WORKSPACE_ROOT" \
+  "${manager_api_sync_args[@]}" \
   || log "manager-api allowlist sync skipped or failed"
