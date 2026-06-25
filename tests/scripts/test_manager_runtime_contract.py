@@ -46,6 +46,7 @@ def test_docker_compose_exposes_filesystem_secret_contract():
     assert "- admin" in text
     assert "- -masters=seaweedfs:9333" in text
     assert "- -port=23646" in text
+    assert "- -volume.max=0" in text
     assert text.count('"23646:23646"') == 1
     seaweedfs_images = re.findall(r"image: chrislusf/seaweedfs:([0-9.]+)", text)
     assert seaweedfs_images
