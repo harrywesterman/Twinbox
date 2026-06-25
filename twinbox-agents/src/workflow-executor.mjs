@@ -280,8 +280,7 @@ function createWorkflowExecutor(deps) {
       });
     }
 
-    const finalStatus =
-      hasUnavailableData && summaryResult.llmStatus !== "ok" ? "degraded" : "proposal_ready";
+    const finalStatus = hasUnavailableData ? "degraded" : "proposal_ready";
 
     workOrderStore.updateWorkOrder(id, {
       status: finalStatus,
@@ -298,9 +297,13 @@ function createWorkflowExecutor(deps) {
     const updated = workOrderStore.getWorkOrder(id);
 
     const specialistId = findSpecialistForType(type);
+    const completionTitle =
+      finalStatus === "degraded"
+        ? "Onderzoek afgerond met aandachtspunten"
+        : "Geen kritieke problemen gevonden";
     appendEvent(id, {
       agentId: specialistId || "system",
-      title: "Geen kritieke problemen gevonden",
+      title: completionTitle,
       message: `Work order ${id} completed with status ${finalStatus}.`,
     });
 

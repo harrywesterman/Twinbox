@@ -1,4 +1,5 @@
 import * as k8s from "@kubernetes/client-node";
+import { getKubernetesListItems } from "./k8s-list-response.mjs";
 
 async function createKubernetesClients() {
   const kc = new k8s.KubeConfig();
@@ -17,7 +18,7 @@ async function listUnhealthyPods() {
     const { core } = await createKubernetesClients();
     const res = await core.listPodForAllNamespaces();
     const unhealthy = [];
-    for (const pod of res.body.items) {
+    for (const pod of getKubernetesListItems(res)) {
       if (pod.status?.phase === "Succeeded" || pod.status?.phase === "Failed") {
         continue;
       }
@@ -47,7 +48,7 @@ async function listRecentWarningEvents() {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const res = await core.listEventForAllNamespaces();
     const warnings = [];
-    for (const ev of res.body.items) {
+    for (const ev of getKubernetesListItems(res)) {
       if (ev.type !== "Warning") {
         continue;
       }
@@ -79,7 +80,7 @@ async function summarizeNodes() {
     const { core } = await createKubernetesClients();
     const res = await core.listNode();
     const nodes = [];
-    for (const node of res.body.items) {
+    for (const node of getKubernetesListItems(res)) {
       const ready = node.status?.conditions?.find((c) => c.type === "Ready");
       nodes.push({
         name: node.metadata?.name,
@@ -109,7 +110,7 @@ async function summarizeCloudNativePgClusters() {
       plural: "clusters",
     });
     const clusters = [];
-    for (const cluster of res.body.items) {
+    for (const cluster of getKubernetesListItems(res)) {
       clusters.push({
         name: cluster.metadata?.name,
         namespace: cluster.metadata?.namespace,
@@ -135,7 +136,7 @@ async function summarizeScheduledBackups() {
       plural: "scheduledbackups",
     });
     const backups = [];
-    for (const sb of res.body.items) {
+    for (const sb of getKubernetesListItems(res)) {
       backups.push({
         name: sb.metadata?.name,
         namespace: sb.metadata?.namespace,
@@ -161,7 +162,7 @@ async function summarizeVeleroBackups() {
       plural: "backups",
     });
     const backups = [];
-    for (const b of res.body.items) {
+    for (const b of getKubernetesListItems(res)) {
       backups.push({
         name: b.metadata?.name,
         namespace: b.metadata?.namespace,
@@ -189,7 +190,7 @@ async function summarizeLonghornRecurringJobs() {
       plural: "recurringjobs",
     });
     const jobs = [];
-    for (const j of res.body.items) {
+    for (const j of getKubernetesListItems(res)) {
       jobs.push({
         name: j.metadata?.name,
         namespace: j.metadata?.namespace,

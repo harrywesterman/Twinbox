@@ -1,4 +1,5 @@
 import * as k8s from "@kubernetes/client-node";
+import { getKubernetesListItems } from "./k8s-list-response.mjs";
 
 async function listArgocdApplications() {
   try {
@@ -11,7 +12,7 @@ async function listArgocdApplications() {
       plural: "applications",
     });
     const apps = [];
-    for (const app of res.body.items) {
+    for (const app of getKubernetesListItems(res)) {
       apps.push({
         name: app.metadata?.name,
         namespace: app.metadata?.namespace,
@@ -43,7 +44,7 @@ async function listArgocdWarningEvents() {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const res = await core.listNamespacedEvent({ namespace: "argocd" });
     const warnings = [];
-    for (const ev of res.body.items) {
+    for (const ev of getKubernetesListItems(res)) {
       if (ev.type !== "Warning") continue;
       const lastSeen = ev.metadata?.creationTimestamp
         ? new Date(ev.metadata.creationTimestamp).toISOString()

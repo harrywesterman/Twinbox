@@ -180,6 +180,45 @@ test("executor handles database_health_check", async () => {
   assert.equal(result.result.facts.cnpgClusters[0].name, "main-db");
 });
 
+test("executor keeps database health degraded when facts are unavailable but LLM responds", async () => {
+  const dataDir = tempDir();
+  const eventStore = createEventStore(dataDir);
+  const workOrderStore = createWorkOrderStore(dataDir);
+  const wo = makeWorkOrder(dataDir, { type: "database_health_check" });
+
+  const executor = createWorkflowExecutor({
+    eventStore,
+    workOrderStore,
+    getK8sUnhealthyPods: async () => [],
+    getK8sWarningEvents: async () => [],
+    getK8sNodes: async () => [],
+    getK8sCnpgClusters: async () => {
+      throw new Error("CNPG list response missing items");
+    },
+    getK8sScheduledBackups: async () => [{ name: "daily-backup", cluster: "main-db" }],
+    getK8sVeleroBackups: async () => [],
+    getK8sLonghornJobs: async () => [],
+    getArgocdApps: async () => [],
+    getArgocdWarnings: async () => [],
+    getManagerProxmox: async () => [],
+    getManagerHealth: async () => ({ status: "ok" }),
+    createChatCompletion: async () => ({
+      choices: [{ message: { content: "CNPG brondata is gedeeltelijk onbeschikbaar." } }],
+      model: "test-model",
+    }),
+    getProviderConfig: () => ({ baseUrl: "http://test/v1", model: "test-model" }),
+    getApiKey: () => null,
+  });
+
+  const result = await executor.executeWorkOrder(wo);
+  assert.equal(result.status, "degraded");
+  assert.equal(result.result.llmStatus, "ok");
+  assert.equal(result.result.facts.cnpgClusters.available, false);
+
+  const events = eventStore.listEvents({});
+  assert.ok(events.some((event) => event.title === "Onderzoek afgerond met aandachtspunten"));
+});
+
 test("executor handles gitops_health_check", async () => {
   const dataDir = tempDir();
   const eventStore = createEventStore(dataDir);
