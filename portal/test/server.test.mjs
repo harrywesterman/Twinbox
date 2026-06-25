@@ -655,6 +655,23 @@ const managerServer = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "POST" && pathname === "/api/agents/provider/test") {
+    sendJson(res, 502, { error: "provider test failed" });
+    return;
+  }
+
+  if (req.method === "GET" && pathname === "/api/agents/provider") {
+    sendJson(res, 200, {
+      config: {
+        displayName: "Local AI",
+        baseUrl: "http://local-ai.test/v1",
+        model: "local-model",
+      },
+      hasApiKey: false,
+    });
+    return;
+  }
+
   sendJson(res, 404, { error: `Unhandled fake manager route: ${req.method} ${pathname}` });
 });
 
@@ -1283,6 +1300,79 @@ test("admin can read and update observability state", async () => {
   assert.equal(updated.status, 202);
   assert.equal(updated.payload.observability_profile, "minimal");
   assert.equal(updated.payload.cluster.observability_profile, "minimal");
+});
+
+test("GET /api/admin/agents returns degraded when no agent token", async () => {
+  seedAuthentikState();
+
+  const adminCookie = createSignedSessionCookie({
+    sub: "admin-1",
+    name: "Portal Admin",
+    email: "admin@example.com",
+    preferredUsername: "portal-admin",
+    groups: ["admins"],
+    isAdmin: true,
+  });
+
+  const res = await requestPortal("/api/admin/agents", { cookie: adminCookie });
+  assert.equal(res.status, 200);
+  assert.equal(res.payload.degraded, true);
+});
+
+test("GET /api/admin/agents/events returns error when no agent token", async () => {
+  seedAuthentikState();
+
+  const adminCookie = createSignedSessionCookie({
+    sub: "admin-1",
+    name: "Portal Admin",
+    email: "admin@example.com",
+    preferredUsername: "portal-admin",
+    groups: ["admins"],
+    isAdmin: true,
+  });
+
+  const res = await requestPortal("/api/admin/agents/events", { cookie: adminCookie });
+  assert.equal(res.status, 503);
+});
+
+test("GET /api/admin/agents/providers reads manager provider config without agent token", async () => {
+  seedAuthentikState();
+
+  const adminCookie = createSignedSessionCookie({
+    sub: "admin-1",
+    name: "Portal Admin",
+    email: "admin@example.com",
+    preferredUsername: "portal-admin",
+    groups: ["admins"],
+    isAdmin: true,
+  });
+
+  const res = await requestPortal("/api/admin/agents/providers", { cookie: adminCookie });
+  assert.equal(res.status, 200);
+  assert.equal(res.payload.config.displayName, "Local AI");
+  assert.equal(res.payload.config.baseUrl, "http://local-ai.test/v1");
+  assert.equal(res.payload.config.model, "local-model");
+  assert.equal(res.payload.hasApiKey, false);
+});
+
+test("POST /api/admin/agents/providers/test with invalid url returns error", async () => {
+  seedAuthentikState();
+
+  const adminCookie = createSignedSessionCookie({
+    sub: "admin-1",
+    name: "Portal Admin",
+    email: "admin@example.com",
+    preferredUsername: "portal-admin",
+    groups: ["admins"],
+    isAdmin: true,
+  });
+
+  const res = await requestPortal("/api/admin/agents/providers/test", {
+    method: "POST",
+    cookie: adminCookie,
+    body: { baseUrl: "not-a-url", model: "test" },
+  });
+  assert.equal(res.status, 502);
 });
 
 test("admin path redirects to Authentik login", async () => {

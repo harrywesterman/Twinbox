@@ -27,6 +27,7 @@ test("buildAdminNavigationItems shows routes for delegated admin capabilities", 
       },
       { id: "admin-observability", path: "/admin/observability", label: "Observability" },
       { id: "admin-cluster-updates", path: "/admin/updates", label: "Cluster updates" },
+      { id: "admin-agents", path: "/admin/agents", label: "AI beheerteam" },
       { id: "admin-users", path: "/admin/users", label: "Users & groups" },
     ]
   );

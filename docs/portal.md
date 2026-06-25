@@ -133,6 +133,23 @@ The admin panel provides:
 - **Observability Profiles** — Switch between monitoring configurations
 - **Cluster Resources** — View node CPU/memory/disk usage
 - **Step Status** — See which wizard steps are completed, running, or failed
+- **AI Beheerteam** — Configure external LLM endpoint, view agent team, run health checks
+
+### AI Beheerteam (`/admin/agents`)
+
+The AI beheerteam is installed from the Web Wizard step **Install AI Beheerteam**. After that, `/admin/agents` is the admin panel for configuring and monitoring the `twinbox-agents` service. It requires admin access.
+
+**Endpoint setup:** Save and test an OpenAI-compatible LLM endpoint (e.g., omlx, Ollama, vLLM, LM Studio). The API key is stored separately from the config.
+
+**Agents:** Seven fixed agent profiles (Olivia Ops, Karel Kubernetes, Betty Backup, Peter Proxmox, Tara Talos, Sofia SQL, Gina GitOps) with distinct roles and avatars.
+
+**Work orders:** Quick actions for cluster, backup, Proxmox, database, and GitOps health checks. Each work order gathers facts, optionally summarizes via LLM, and saves results.
+
+**Approvals:** Pending work orders requiring approval are shown with approve/cancel buttons.
+
+**Degraded mode:** If `TWINBOX_AGENT_INTERNAL_TOKEN` is not configured in the Portal, the panel shows a degraded state. Work orders are still created but the agent service is unavailable.
+
+Zulip integration is optional. When configured, Olivia Ops posts a short Dutch summary to the configured stream after each completed work order.
 
 ## Customization
 

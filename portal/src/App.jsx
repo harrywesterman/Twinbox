@@ -20,6 +20,7 @@ import {
   resolveAdminCardIconUrl,
 } from "./admin-apps-install.js";
 import { buildAdminNavigationItems, buildUserAdminViewModel } from "./user-admin-model.js";
+import { buildAgentAdminViewModel, buildProviderHealthLabel } from "./agent-admin-model.js";
 
 function requestJson(url, options = {}) {
   return fetch(url, {
@@ -400,6 +401,90 @@ function useClusterUpdatesData(enabled) {
     const timer = window.setInterval(() => load({ silent: true }), 2500);
     return () => window.clearInterval(timer);
   }, [enabled, load, state.data?.status]);
+
+  return {
+    ...state,
+    reload: useCallback((options) => load(options), [load]),
+  };
+}
+
+function useAgentsAdminData(enabled) {
+  const [state, setState] = useState({
+    loading: false,
+    refreshing: false,
+    error: "",
+    agents: null,
+    providers: null,
+    events: [],
+    workOrders: [],
+    agentTokenConfigured: true,
+  });
+
+  const load = useCallback(
+    async ({ silent = false } = {}) => {
+      if (!enabled) {
+        setState({
+          loading: false,
+          refreshing: false,
+          error: "",
+          agents: null,
+          providers: null,
+          events: [],
+          workOrders: [],
+          agentTokenConfigured: true,
+        });
+        return;
+      }
+      setState((current) => ({
+        ...current,
+        loading: current.agents === null && !silent,
+        refreshing: current.agents !== null || silent,
+        error: "",
+      }));
+      try {
+        const [agents, providers, events, workOrders] = await Promise.all([
+          requestJson("/api/admin/agents").catch(() => ({
+            degraded: true,
+            error: "agent service unavailable",
+          })),
+          requestJson("/api/admin/agents/providers").catch(() => ({
+            config: null,
+            hasApiKey: false,
+          })),
+          requestJson("/api/admin/agents/events").catch(() => []),
+          requestJson("/api/admin/agents/work-orders").catch(() => []),
+        ]);
+        const isDegraded = agents?.degraded || providers?.degraded;
+        setState({
+          loading: false,
+          refreshing: false,
+          error: isDegraded ? agents?.error || providers?.error || "" : "",
+          agents: Array.isArray(agents) ? agents : agents?.degraded ? [] : [],
+          providers,
+          events: Array.isArray(events) ? events : [],
+          workOrders: Array.isArray(workOrders) ? workOrders : [],
+          agentTokenConfigured: !agents?.degraded,
+        });
+      } catch (error) {
+        setState((current) => ({
+          ...current,
+          loading: false,
+          refreshing: false,
+          error: error instanceof Error ? error.message : "Failed to load agent data.",
+          agents: [],
+          providers: null,
+          events: [],
+          workOrders: [],
+          agentTokenConfigured: false,
+        }));
+      }
+    },
+    [enabled]
+  );
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   return {
     ...state,
@@ -3448,6 +3533,468 @@ function StatusPage({ statusState, onRefresh, onNavigate }) {
   );
 }
 
+function AgentAvatar({ avatar, size = 40 }) {
+  const palette = avatar?.palette || "gray";
+  const initials = avatar?.initials || "??";
+  const paletteColors = {
+    purple: "#7c3aed",
+    green: "#059669",
+    orange: "#ea580c",
+    blue: "#2563eb",
+    indigo: "#4338ca",
+    pink: "#db2777",
+    teal: "#0d9488",
+    gray: "#6b7280",
+  };
+  const bg = paletteColors[palette] || paletteColors.gray;
+
+  return (
+    <span
+      className="agent-avatar"
+      style={{
+        width: size,
+        height: size,
+        backgroundColor: bg,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        borderRadius: "8px",
+        fontWeight: 700,
+        fontSize: size * 0.4,
+        color: "#fff",
+        flexShrink: 0,
+      }}
+    >
+      {initials}
+    </span>
+  );
+}
+
+function AgentsAdminPage({ agentsState }) {
+  const [endpointDraft, setEndpointDraft] = useState({
+    displayName: "",
+    baseUrl: "",
+    model: "",
+    apiKey: "",
+    keepSavedApiKey: false,
+    timeoutMs: 60000,
+  });
+  const [testResult, setTestResult] = useState(null);
+  const [testBusy, setTestBusy] = useState(false);
+  const [saveBusy, setSaveBusy] = useState(false);
+  const [pageError, setPageError] = useState("");
+  const [pageNotice, setPageNotice] = useState("");
+
+  const viewModel = useMemo(
+    () =>
+      buildAgentAdminViewModel({
+        agents: agentsState.agents,
+        providers: agentsState.providers,
+        events: agentsState.events,
+        workOrders: agentsState.workOrders,
+        agentTokenConfigured: agentsState.agentTokenConfigured,
+      }),
+    [agentsState]
+  );
+
+  const quickActions = [
+    { type: "cluster_health_check", label: "Cluster health check" },
+    { type: "backup_health_check", label: "Backup health check" },
+    { type: "proxmox_health_check", label: "Proxmox health check" },
+    { type: "database_health_check", label: "Database health check" },
+    { type: "gitops_health_check", label: "GitOps health check" },
+  ];
+
+  const runQuickAction = async (type) => {
+    setPageError("");
+    setPageNotice("");
+    try {
+      const result = await requestJson("/api/admin/agents/work-orders", {
+        method: "POST",
+        body: JSON.stringify({
+          type,
+          title: quickActions.find((a) => a.type === type)?.label || type,
+        }),
+      });
+      setPageNotice(`Work order ${result.id} created: ${result.title}`);
+      await agentsState.reload();
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : "Failed to create work order.");
+    }
+  };
+
+  const handleTestEndpoint = async () => {
+    if (!endpointDraft.baseUrl) return;
+    setTestBusy(true);
+    setTestResult(null);
+    setPageError("");
+    try {
+      const apiKey = endpointDraft.apiKey.trim();
+      const result = await requestJson("/api/admin/agents/providers/test", {
+        method: "POST",
+        body: JSON.stringify({
+          baseUrl: endpointDraft.baseUrl,
+          model: endpointDraft.model || "gpt-4o-mini",
+          apiKey: apiKey || undefined,
+          useStoredApiKey: !apiKey && endpointDraft.keepSavedApiKey,
+          timeoutMs: endpointDraft.timeoutMs || 60000,
+        }),
+      });
+      setTestResult(result);
+    } catch (error) {
+      setTestResult({ status: "error", message: error.message });
+    } finally {
+      setTestBusy(false);
+    }
+  };
+
+  const handleSaveEndpoint = async () => {
+    if (!endpointDraft.baseUrl || !endpointDraft.model) return;
+    setSaveBusy(true);
+    setPageError("");
+    setPageNotice("");
+    try {
+      const apiKey = endpointDraft.apiKey.trim();
+      await requestJson("/api/admin/agents/providers/openai-compatible", {
+        method: "POST",
+        body: JSON.stringify({
+          displayName: endpointDraft.displayName || "AI endpoint",
+          baseUrl: endpointDraft.baseUrl,
+          model: endpointDraft.model,
+          timeoutMs: endpointDraft.timeoutMs || 60000,
+          apiKey: apiKey || undefined,
+          apiKeyMode: apiKey ? "set" : endpointDraft.keepSavedApiKey ? "keep" : "clear",
+        }),
+      });
+      setPageNotice("AI endpoint saved successfully.");
+      setEndpointDraft((current) => ({ ...current, apiKey: "", keepSavedApiKey: false }));
+      await agentsState.reload();
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : "Failed to save endpoint.");
+    } finally {
+      setSaveBusy(false);
+    }
+  };
+
+  const handleApprove = async (workOrderId) => {
+    try {
+      await requestJson(`/api/admin/agents/work-orders/${workOrderId}/approve`, {
+        method: "POST",
+        body: JSON.stringify({ approver: "admin" }),
+      });
+      await agentsState.reload();
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : "Failed to approve.");
+    }
+  };
+
+  const handleCancel = async (workOrderId) => {
+    try {
+      await requestJson(`/api/admin/agents/work-orders/${workOrderId}/cancel`, {
+        method: "POST",
+        body: JSON.stringify({ actor: "admin" }),
+      });
+      await agentsState.reload();
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : "Failed to cancel.");
+    }
+  };
+
+  const pendingApprovals = viewModel.workOrders.filter((wo) => wo.hasPendingApproval);
+
+  if (agentsState.loading && !agentsState.agents) {
+    return (
+      <Panel>
+        <SectionTitle
+          eyebrow="Admin"
+          title="AI beheerteam"
+          description="Loading agent team status."
+        />
+        <p className="muted-copy">Reading the current agent state and team availability.</p>
+      </Panel>
+    );
+  }
+
+  return (
+    <div className="agents-layout">
+      <Panel className="agents-shell">
+        <div className="agents-shell-head">
+          <SectionTitle
+            eyebrow="Admin"
+            title="AI beheerteam"
+            description="Configure external AI endpoint and monitor the agent team."
+          />
+          <div className="hero-actions">
+            <button type="button" className="secondary-button" onClick={() => agentsState.reload()}>
+              {agentsState.refreshing ? "Refreshing…" : "Refresh"}
+            </button>
+          </div>
+        </div>
+
+        {viewModel.isDegraded ? (
+          <div className="inline-notice is-danger">
+            <strong>Agent service degraded</strong>
+            <span>
+              {agentsState.error || "Agent token not configured. The AI beheerteam is unavailable."}
+            </span>
+          </div>
+        ) : null}
+
+        {pageError ? (
+          <div className="inline-notice is-danger">
+            <strong>Error</strong>
+            <span>{pageError}</span>
+          </div>
+        ) : null}
+        {pageNotice ? (
+          <div className="inline-notice is-accent">
+            <strong>{pageNotice}</strong>
+          </div>
+        ) : null}
+
+        {/* AI endpoint setup */}
+        <div className="agents-endpoint-form">
+          <SectionTitle
+            eyebrow="Configuration"
+            title="AI endpoint"
+            description="Connect an external OpenAI-compatible LLM endpoint."
+          />
+          <div className="settings-form">
+            <label>
+              <span>Display name</span>
+              <input
+                type="text"
+                value={endpointDraft.displayName}
+                onChange={(e) => setEndpointDraft((d) => ({ ...d, displayName: e.target.value }))}
+                placeholder="Local AI endpoint"
+              />
+            </label>
+            <label>
+              <span>Base URL *</span>
+              <input
+                type="url"
+                value={endpointDraft.baseUrl}
+                onChange={(e) => setEndpointDraft((d) => ({ ...d, baseUrl: e.target.value }))}
+                placeholder="https://ai-node.example.local/v1"
+              />
+            </label>
+            <label>
+              <span>Model *</span>
+              <input
+                type="text"
+                value={endpointDraft.model}
+                onChange={(e) => setEndpointDraft((d) => ({ ...d, model: e.target.value }))}
+                placeholder="gpt-4o-mini"
+              />
+            </label>
+            <label>
+              <span>API key (optional)</span>
+              <input
+                type="password"
+                value={endpointDraft.apiKey}
+                onChange={(e) =>
+                  setEndpointDraft((d) => ({
+                    ...d,
+                    apiKey: e.target.value,
+                    keepSavedApiKey: e.target.value ? false : d.keepSavedApiKey,
+                  }))
+                }
+                placeholder="sk-..."
+              />
+            </label>
+            {viewModel.hasApiKey && !endpointDraft.apiKey ? (
+              <label className="agent-inline-check">
+                <input
+                  type="checkbox"
+                  checked={endpointDraft.keepSavedApiKey}
+                  onChange={(e) =>
+                    setEndpointDraft((d) => ({ ...d, keepSavedApiKey: e.target.checked }))
+                  }
+                />
+                <span>Bewaarde API key behouden</span>
+              </label>
+            ) : null}
+            <label>
+              <span>Timeout (ms)</span>
+              <input
+                type="number"
+                value={endpointDraft.timeoutMs}
+                onChange={(e) =>
+                  setEndpointDraft((d) => ({ ...d, timeoutMs: Number(e.target.value) }))
+                }
+              />
+            </label>
+            <div className="hero-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={handleTestEndpoint}
+                disabled={testBusy || !endpointDraft.baseUrl}
+              >
+                {testBusy ? "Testing…" : "Test endpoint"}
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={handleSaveEndpoint}
+                disabled={saveBusy || !endpointDraft.baseUrl || !endpointDraft.model}
+              >
+                {saveBusy ? "Saving…" : "Save endpoint"}
+              </button>
+            </div>
+            {testResult ? (
+              <div
+                className={`inline-notice ${testResult.status === "ok" ? "is-accent" : "is-danger"}`}
+              >
+                <strong>{testResult.status === "ok" ? "Connected" : "Failed"}</strong>
+                <span>
+                  {testResult.message || "Unknown result"}
+                  {testResult.latencyMs ? ` (${testResult.latencyMs}ms)` : ""}
+                </span>
+              </div>
+            ) : null}
+            {viewModel.provider ? (
+              <div className="inline-notice is-accent">
+                <strong>Current endpoint: {buildProviderHealthLabel(viewModel.provider)}</strong>
+                <span>API key: {viewModel.hasApiKey ? "Configured" : "Not set"}</span>
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Team floor */}
+        <SectionTitle
+          eyebrow="Team"
+          title={`${viewModel.teamSummary.totalAgents} agents`}
+          description={`${viewModel.teamSummary.activeWorkOrders} active work orders`}
+        />
+        <div className="agents-team-grid">
+          {viewModel.agents.map((agent) => (
+            <article key={agent.id} className="agent-card" title={agent.role}>
+              <AgentAvatar avatar={agent.avatar} />
+              <div className="agent-card-body">
+                <strong>{agent.displayName}</strong>
+                <span className="muted-copy">{agent.role}</span>
+                <p className="muted-copy">{agent.summary}</p>
+              </div>
+              <span className={`status-chip ${agent.status?.tone || "is-neutral"}`}>
+                {agent.status?.label || "Online"}
+              </span>
+            </article>
+          ))}
+        </div>
+
+        {/* Quick actions */}
+        <SectionTitle
+          eyebrow="Actions"
+          title="Work orders"
+          description="Start a health check or review status."
+        />
+        <div className="agents-work-orders">
+          <div className="hero-actions">
+            {quickActions.map((action) => (
+              <button
+                key={action.type}
+                type="button"
+                className="secondary-button"
+                onClick={() => runQuickAction(action.type)}
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Work order list */}
+        {viewModel.workOrders.length > 0 ? (
+          <div className="agents-work-order-list">
+            {viewModel.workOrders.slice(0, 10).map((wo) => (
+              <article key={wo.id} className="work-order-row">
+                <span
+                  className={`status-chip ${wo.status === "completed" ? "is-live" : wo.status === "failed" || wo.status === "canceled" ? "is-bad" : wo.status === "approval_required" ? "is-accent" : "is-neutral"}`}
+                >
+                  {wo.status}
+                </span>
+                <strong>{wo.title}</strong>
+                <span className="muted-copy">{wo.type}</span>
+                <span className="muted-copy">{new Date(wo.createdAt).toLocaleString()}</span>
+              </article>
+            ))}
+          </div>
+        ) : null}
+
+        {/* Approval queue */}
+        {pendingApprovals.length > 0 ? (
+          <div className="agents-approval-queue">
+            <SectionTitle
+              eyebrow="Approvals"
+              title={`${pendingApprovals.length} pending`}
+              description="Review and approve or cancel."
+            />
+            {pendingApprovals.map((wo) => (
+              <article key={wo.id} className="approval-row">
+                <strong>{wo.title}</strong>
+                <span className="muted-copy">{wo.type}</span>
+                {wo.approval ? (
+                  <div>
+                    <p className="muted-copy">
+                      Action: {wo.approval.action} - {wo.approval.risk}
+                    </p>
+                  </div>
+                ) : null}
+                <div className="hero-actions">
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={() => handleApprove(wo.id)}
+                  >
+                    Approve
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => handleCancel(wo.id)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : null}
+
+        {/* Event feed */}
+        {viewModel.events.length > 0 ? (
+          <div className="agents-event-feed">
+            <SectionTitle
+              eyebrow="Activity"
+              title="Recent events"
+              description="The latest agent activity."
+            />
+            {viewModel.events.slice(0, 20).map((event) => (
+              <div key={event.id} className="event-row">
+                <span
+                  className={`status-chip ${event.severity === "error" || event.severity === "critical" ? "is-bad" : event.severity === "warning" ? "is-accent" : "is-neutral"}`}
+                >
+                  {event.severity}
+                </span>
+                <strong>{event.title}</strong>
+                <span className="muted-copy">{event.agentId}</span>
+                <span className="muted-copy">{new Date(event.timestamp).toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="agents-event-feed">
+            <SectionTitle eyebrow="Activity" title="Recent events" description="No events yet." />
+            <p className="muted-copy">Create a work order to see agent activity here.</p>
+          </div>
+        )}
+      </Panel>
+    </div>
+  );
+}
+
 export default function App() {
   const [route, navigate] = useRoute();
   const { sessionState, configState, preferences, setPreferences, statusState, refreshStatus } =
@@ -3464,6 +4011,8 @@ export default function App() {
   const adminAppsState = useAdminAppsData(adminAppsEnabled);
   const observabilityAdminState = useObservabilityAdminData(observabilityAdminEnabled);
   const clusterUpdatesAdminState = useClusterUpdatesData(clusterUpdatesAdminEnabled);
+  const agentsAdminEnabled = Boolean(sessionState.session?.isAdmin) && route === "/admin/agents";
+  const agentsAdminState = useAgentsAdminData(agentsAdminEnabled);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -3623,6 +4172,9 @@ export default function App() {
         {route === "/admin/updates" && isAdmin ? (
           <ClusterUpdatesAdminPage updatesState={clusterUpdatesAdminState} onNavigate={navigate} />
         ) : null}
+        {route === "/admin/agents" && isAdmin ? (
+          <AgentsAdminPage agentsState={agentsAdminState} onNavigate={navigate} />
+        ) : null}
         {route === "/admin/users" && canManageUsers ? (
           <UserAdminPage config={config} directoryState={userAdminState} onNavigate={navigate} />
         ) : null}
@@ -3668,6 +4220,18 @@ export default function App() {
               eyebrow="Access denied"
               title="Admins only"
               description="Cluster updates are only available to the admins group."
+            />
+            <button type="button" className="secondary-button" onClick={() => navigate("/")}>
+              Back home
+            </button>
+          </Panel>
+        ) : null}
+        {route === "/admin/agents" && !isAdmin ? (
+          <Panel>
+            <SectionTitle
+              eyebrow="Access denied"
+              title="Admins only"
+              description="The AI beheerteam is only available to the admins group."
             />
             <button type="button" className="secondary-button" onClick={() => navigate("/")}>
               Back home

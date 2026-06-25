@@ -1,22 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: twinbox-portal
-  namespace: twinbox-portal
+  name: twinbox-agents
+  namespace: twinbox-agents
   labels:
-    app.kubernetes.io/name: twinbox-portal
+    app.kubernetes.io/name: twinbox-agents
 spec:
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      app.kubernetes.io/name: twinbox-portal
+      app.kubernetes.io/name: twinbox-agents
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: twinbox-portal
+        app.kubernetes.io/name: twinbox-agents
     spec:
+      serviceAccountName: twinbox-agents
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -25,28 +26,20 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: portal
-          image: ghcr.io/harrywesterman/twinbox-portal
+        - name: agents
+          image: ghcr.io/harrywesterman/twinbox-agents
           imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 8080
           env:
-            - name: PORT
-              value: "8080"
-            - name: PORTAL_CONFIG_PATH
-              value: /config/portal-config.json
-            - name: PORTAL_DATA_DIR
-              value: /data
-            - name: PORTAL_MANAGER_BASE_URL
-              value: http://webwizard.longhorn-system.svc.cluster.local:8080
-            - name: PORTAL_AGENTS_BASE_URL
-              value: http://twinbox-agents.twinbox-agents.svc.cluster.local
+            - name: AGENT_PROVIDER_CONFIG_PATH
+              value: /config/provider.json
           envFrom:
+            - configMapRef:
+                name: twinbox-agents-env
             - secretRef:
-                name: portal-bootstrap
-            - secretRef:
-                name: twinbox-agents-portal-runtime
+                name: twinbox-agents-runtime
                 optional: true
           readinessProbe:
             httpGet:
@@ -66,16 +59,30 @@ spec:
               port: http
             failureThreshold: 60
             periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           volumeMounts:
-            - name: portal-config
+            - name: twinbox-agents-data
+              mountPath: /data
+            - name: twinbox-agents-provider
               mountPath: /config
               readOnly: true
-            - name: portal-data
-              mountPath: /data
       volumes:
-        - name: portal-config
-          secret:
-            secretName: portal-config
-        - name: portal-data
+        - name: twinbox-agents-data
           persistentVolumeClaim:
-            claimName: portal-data
+            claimName: twinbox-agents-data
+        - name: twinbox-agents-provider
+          configMap:
+            name: twinbox-agents-provider
+            optional: true
