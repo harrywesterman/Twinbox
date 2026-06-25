@@ -319,6 +319,13 @@ def test_setup_wizard_collects_single_management_vm_form():
     assert '"Memory (MB):"    6 1 "$MGT_RAM"            6 20 10 0' in text
 
 
+def test_setup_wizard_defaults_management_vm_disk_to_120_gb():
+    text = _wizard_text()
+    assert text.count('MGT_DISK="120"') == 2
+    assert 'MGT_DISK="40"' not in text
+    assert 'qm resize "$MGT_ID" scsi0 "${MGT_DISK}G"' in text
+
+
 def test_setup_wizard_no_longer_generates_vip_or_talos_vm_names():
     text = _wizard_text()
     assert '_rows_names+=("twinbox-${CLUSTER_SLUG}-vip")' not in text
