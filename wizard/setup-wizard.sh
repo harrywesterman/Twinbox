@@ -1502,7 +1502,7 @@ runcmd:
   - install -m 0755 -d /opt/twinbox/bootstrap/openbao/seal
   - install -m 0755 -d /opt/twinbox/bootstrap/openbao/init
   - install -m 0755 -d /opt/twinbox/manager-data
-  - install -m 0755 -d /opt/twinbox/seaweedfs/data
+  - install -m 0755 -d -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /opt/twinbox/seaweedfs/data
   - python3 /tmp/twinbox-write-cluster-login-secret.py
   - python3 /tmp/twinbox-write-velero-secret.py
   - install -m 0600 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /tmp/twinbox.env.template ${TWINBOX_TARGET_DIR}/.env

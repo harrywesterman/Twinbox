@@ -1,0 +1,76 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mastodon
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://github.com/mastodon/chart.git
+      targetRevision: 32e2e30da1187450ea5e2845de028436a3deb40a
+      path: .
+      helm:
+        valueFiles:
+          - $values/gitops/values/mastodon.yaml
+        values: |-
+          mastodon:
+            local_domain: mastodon.__ZONE_NAME__
+            s3:
+              hostname: seaweedfs.__ZONE_NAME__
+              alias_host: seaweedfs.__ZONE_NAME__
+            smtp:
+              domain: mastodon.__ZONE_NAME__
+              from_address: notifications@mastodon.__ZONE_NAME__
+              reply_to: notifications@mastodon.__ZONE_NAME__
+          externalAuth:
+            oidc:
+              enabled: true
+              display_name: Authentik
+              issuer: https://authentik.__ZONE_NAME__/application/o/mastodon/
+              discovery: true
+              scope: openid,profile,email
+              uid_field: preferred_username
+              client_id: from-mastodon-runtime-secret
+              client_secret: from-mastodon-runtime-secret
+              redirect_uri: https://mastodon.__ZONE_NAME__/auth/auth/openid_connect/callback
+              assume_email_is_verified: true
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      ref: values
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      path: gitops/platform-apps/mastodon
+      kustomize:
+        patches:
+          - target:
+              kind: IngressRoute
+              name: mastodon
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`mastodon.__ZONE_NAME__`) && PathPrefix(`/api/v1/streaming`)
+              - op: replace
+                path: /spec/routes/1/match
+                value: Host(`mastodon.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: mastodon-netbird
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`mastodon.__ZONE_NAME__`) && PathPrefix(`/api/v1/streaming`)
+              - op: replace
+                path: /spec/routes/1/match
+                value: Host(`mastodon.__ZONE_NAME__`)
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      path: gitops/databases/mastodon
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mastodon
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

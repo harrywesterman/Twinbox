@@ -62,6 +62,35 @@ wait_for_resources_ready() {
   done
 }
 
+wait_for_named_resource_ready() {
+  local namespace="$1"
+  local kind="$2"
+  local name="$3"
+  local label="${4:-$name}"
+  local attempts=120
+  local attempt=1
+
+  while true; do
+    if kubectl -n "$namespace" get "$kind" "$name" >/dev/null 2>&1; then
+      if kubectl -n "$namespace" wait --for="condition=Ready" "$kind" "$name" --timeout=5s >/dev/null 2>&1; then
+        log "${label} is ready"
+        return 0
+      fi
+
+      log "Waiting for ${label} to become ready"
+    else
+      log "Waiting for ${label} to appear"
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      fail "${label} did not become ready after ${attempts} attempts"
+    fi
+
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
 wait_for_statefulset_ready() {
   local namespace="$1"
   local statefulset="$2"
@@ -222,7 +251,7 @@ authentik_setup_forward
 AUTHENTIK_HOST="${AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
 matrix_host="https://matrix.${public_zone_name}"
 mas_host="https://account.${public_zone_name}"
-mas_redirect_uri="${mas_host}/oidc/callback/"
+mas_redirect_uri="${mas_host}/upstream/callback/${mas_oidc_provider_ulid}"
 mas_application_slug="matrix"
 mas_issuer_url="${AUTHENTIK_HOST%/}/application/o/${mas_application_slug}/"
 mas_client_id="$(openssl rand -hex 16)"
@@ -295,12 +324,37 @@ if [[ -n "$existing_matrix_runtime_secret_json" ]]; then
   fi
 fi
 
+matrix_oidc_upstream_config="$(
+  cat <<EOF
+upstream_oauth2:
+  providers:
+    - id: "${mas_oidc_provider_ulid}"
+      issuer: "${mas_issuer_url}"
+      human_name: Authentik
+      client_id: "${mas_client_id}"
+      client_secret: "${mas_client_secret}"
+      token_endpoint_auth_method: client_secret_post
+      scope: "openid email profile"
+      claims_imports:
+        localpart:
+          action: force
+          template: "{{ user.preferred_username }}"
+        displayname:
+          action: suggest
+          template: "{{ user.name }}"
+        email:
+          action: suggest
+          template: "{{ user.email }}"
+EOF
+)"
+
 # Write OIDC secret
 matrix_oidc_secret_json="$(
   jq -n \
     --arg client_id "$mas_client_id" \
     --arg client_secret "$mas_client_secret" \
     --arg provider_ulid "$mas_oidc_provider_ulid" \
+    --arg upstream_config "$matrix_oidc_upstream_config" \
     --arg oidc_idps "$(jq -n \
       --arg oidc_url "$mas_issuer_url" \
       --arg display_name "Authentik" \
@@ -319,7 +373,8 @@ matrix_oidc_secret_json="$(
       MAS_OIDC_CLIENT_ID: $client_id,
       MAS_OIDC_CLIENT_SECRET: $client_secret,
       MAS_OIDC_PROVIDER_ULID: $provider_ulid,
-      MATRIX_OIDC_ENABLED_IDPS: $oidc_idps
+      MATRIX_OIDC_ENABLED_IDPS: $oidc_idps,
+      MATRIX_OIDC_UPSTREAM_CONFIG: $upstream_config
     }'
 )"
 printf '%s\n' "$matrix_oidc_secret_json" >"$matrix_oidc_secret_file"
@@ -328,7 +383,7 @@ chmod 600 "$matrix_oidc_secret_file"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "matrix-oidc" \
   --json-file "$matrix_oidc_secret_file" \
-  --required-keys "MAS_OIDC_CLIENT_ID,MAS_OIDC_CLIENT_SECRET,MATRIX_OIDC_ENABLED_IDPS"
+  --required-keys "MAS_OIDC_CLIENT_ID,MAS_OIDC_CLIENT_SECRET,MATRIX_OIDC_ENABLED_IDPS,MATRIX_OIDC_UPSTREAM_CONFIG"
 
 # Write DB secret
 matrix_db_secret_json="$(
@@ -402,10 +457,14 @@ kubectl apply -f "$matrix_mas_db_pooler_ro_manifest"
 kubectl apply -f "$matrix_mas_db_pooler_rw_manifest"
 kubectl apply -f "$matrix_mas_db_backup_manifest"
 
-wait_for_resources_ready "databases" "cluster" "Ready" "Matrix Synapse CloudNativePG cluster"
-wait_for_resources_ready "databases" "cluster" "Ready" "Matrix MAS CloudNativePG cluster"
-wait_for_resources_ready "databases" "externalsecret" "Ready" "Matrix database ExternalSecrets"
-wait_for_resources_ready "databases" "pooler" "Ready" "Matrix poolers"
+wait_for_named_resource_ready "databases" "cluster" "matrix-synapse-db" "Matrix Synapse CloudNativePG cluster"
+wait_for_named_resource_ready "databases" "cluster" "matrix-mas-db" "Matrix MAS CloudNativePG cluster"
+wait_for_named_resource_ready "databases" "externalsecret" "matrix-synapse-db-credentials" "Matrix Synapse database ExternalSecret"
+wait_for_named_resource_ready "databases" "externalsecret" "matrix-mas-db-credentials" "Matrix MAS database ExternalSecret"
+wait_for_deployment_rollout "databases" "matrix-synapse-db-pooler-ro" "Matrix Synapse DB read-only pooler"
+wait_for_deployment_rollout "databases" "matrix-synapse-db-pooler-rw" "Matrix Synapse DB read-write pooler"
+wait_for_deployment_rollout "databases" "matrix-mas-db-pooler-ro" "Matrix MAS DB read-only pooler"
+wait_for_deployment_rollout "databases" "matrix-mas-db-pooler-rw" "Matrix MAS DB read-write pooler"
 
 bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
   --app-id "matrix-synapse" \
@@ -439,6 +498,7 @@ provider_payload="$(
     --arg invalidation_flow "$invalidation_flow_id" \
     --arg signing_key "$signing_key_id" \
     --arg redirect_uri "$mas_redirect_uri" \
+    --arg mas_host "$mas_host" \
     --argjson property_mappings "$(jq -cn \
       --arg openid "$openid_mapping_id" \
       --arg email "$email_mapping_id" \
@@ -455,6 +515,10 @@ provider_payload="$(
         {
           matching_mode: "strict",
           url: $redirect_uri
+        },
+        {
+          matching_mode: "strict",
+          url: ($mas_host + "/oidc/callback/")
         }
       ],
       property_mappings: $property_mappings,
@@ -492,11 +556,16 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --application "matrix"
 
 # Wait for ESS resources
-wait_for_resources_ready "matrix" "externalsecret" "Ready" "Matrix ExternalSecrets"
-wait_for_statefulset_ready "matrix" "ess-synapse" "Matrix Synapse"
+wait_for_named_resource_ready "matrix" "externalsecret" "matrix-config" "Matrix configuration ExternalSecret"
+wait_for_named_resource_ready "matrix" "externalsecret" "matrix-synapse-db-credentials" "Matrix Synapse database ExternalSecret"
+wait_for_named_resource_ready "matrix" "externalsecret" "matrix-mas-db-credentials" "Matrix MAS database ExternalSecret"
+wait_for_named_resource_ready "matrix" "externalsecret" "matrix-runtime" "Matrix runtime ExternalSecret"
+wait_for_statefulset_ready "matrix" "ess-synapse-main" "Matrix Synapse"
+wait_for_deployment_rollout "matrix" "ess-haproxy" "Matrix Haproxy"
 wait_for_deployment_rollout "matrix" "ess-matrix-authentication-service" "Matrix MAS"
 wait_for_deployment_rollout "matrix" "ess-element-web" "Element Web"
 wait_for_deployment_rollout "matrix" "ess-element-admin" "Element Admin"
+wait_for_deployment_rollout "matrix" "ess-matrix-rtc-authorisation-service" "Matrix RTC Authorisation"
 wait_for_deployment_rollout "matrix" "ess-matrix-rtc-sfu" "Matrix RTC"
 
 # Write step result

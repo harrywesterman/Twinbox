@@ -114,7 +114,10 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     assert "      TALOS_ISO_FILE=${TALOS_ISO_FILE}" not in text
     assert "  - install -m 0755 -d /opt/twinbox/bootstrap/ansible" in text
     assert "  - install -m 0755 -d /opt/twinbox/manager-data" in text
-    assert "  - install -m 0755 -d /opt/twinbox/seaweedfs/data" in text
+    assert (
+        "  - install -m 0755 -d -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /opt/twinbox/seaweedfs/data"
+        in text
+    )
     assert (
         "  - install -m 0600 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /tmp/twinbox.env.template ${TWINBOX_TARGET_DIR}/.env"
         in text

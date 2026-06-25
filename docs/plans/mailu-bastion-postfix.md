@@ -98,12 +98,9 @@ Records:
 - `TXT _dmarc.<zone> -> v=DMARC1; p=<policy>; rua=mailto:<rua>@<zone>; adkim=s; aspf=s`
 - `TXT <Mailu selector>._domainkey.<zone> -> <Mailu exported DKIM value>`
 
-`external-dns` is configured to manage MX records. PTR/rDNS is not automated and
-must be configured at the IP owner as:
-
-```text
-<bastion IPv4> -> mail.<zone>
-```
+`external-dns` is configured to manage MX records. The installer also sets the
+Hetzner PTR/rDNS entry for the bastion IPv4 so it resolves back to
+`mail.<zone>`.
 
 ## Bastion Postfix
 
@@ -156,8 +153,9 @@ NetBird guardrails:
 14. Exports Mailu DNS records and generates DKIM only when no existing DKIM
     record is present.
 15. Creates `DNSEndpoint` records.
-16. Writes step outputs, including the relay host, storage node, and PTR action
-    required.
+16. Ensures the Hetzner PTR/rDNS entry for the bastion points at `mail.<zone>`.
+17. Writes step outputs, including the relay host, storage node, and PTR/rDNS
+    status.
 
 DNS is intentionally created after the NetBird route, relay egress, and Postfix
 checks. A failed install should not publish MX records that point production
@@ -179,5 +177,5 @@ helm template mailu mailu/mailu --version 2.7.1 --namespace mailu \
   --set externalRelay.host='[mailu-relay-egress.netbird.svc.cluster.local]:2525'
 ```
 
-Live production validation must also include public DNS checks, PTR/rDNS,
+Live production validation must still include public DNS propagation checks,
 Postfix `postfix check` on the bastion, and an external open-relay test.

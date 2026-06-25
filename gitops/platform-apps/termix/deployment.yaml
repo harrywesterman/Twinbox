@@ -16,6 +16,8 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: termix
+      annotations:
+        twinbox.dev/termix-patch-revision: "2026-06-23-oidc-admin-browser-ssh-role"
     spec:
       securityContext:
         fsGroup: 1000
@@ -23,8 +25,16 @@ spec:
           type: RuntimeDefault
       containers:
         - name: termix
-          image: ghcr.io/lukegus/termix:latest
-          imagePullPolicy: Always
+          image: ghcr.io/lukegus/termix:release-2.3.1
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -lc
+          args:
+            - |
+              export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH}"
+              node /tmp/termix-users-rbac-patch.mjs
+              exec /entrypoint.sh
           ports:
             - name: http
               containerPort: 4090
@@ -44,6 +54,8 @@ spec:
               value: localhost
             - name: GUACD_PORT
               value: "4822"
+            - name: TERMIX_BROWSER_ROLE_NAME
+              value: browser-ssh
           envFrom:
             - secretRef:
                 name: termix-bootstrap
@@ -59,7 +71,20 @@ spec:
             - name: termix-data
               mountPath: /app/data
             - name: opkssh-config
-              mountPath: /app/data/.opk
+              mountPath: /app/data/.opk/config.yml
+              subPath: config.yml
+              readOnly: true
+            - name: termix-patch
+              mountPath: /app/dist/backend/backend/ssh/opkssh-auth.js
+              subPath: opkssh-auth.js
+              readOnly: true
+            - name: termix-patch
+              mountPath: /app/dist/backend/backend/database/routes/host.js
+              subPath: host.js
+              readOnly: true
+            - name: termix-patch
+              mountPath: /tmp/termix-users-rbac-patch.mjs
+              subPath: termix-users-rbac-patch.mjs
               readOnly: true
           readinessProbe:
             httpGet:
@@ -185,3 +210,6 @@ spec:
             items:
               - key: config.yml
                 path: config.yml
+        - name: termix-patch
+          configMap:
+            name: termix-patch

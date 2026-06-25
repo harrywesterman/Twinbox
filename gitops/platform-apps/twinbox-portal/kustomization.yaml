@@ -4,6 +4,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - externalsecret.yaml
+  - agents-externalsecret.yaml
   - pvc.yaml
   - service.yaml
   - deployment.yaml

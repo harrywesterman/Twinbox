@@ -492,6 +492,25 @@ authentik_teardown_forward() {
   AUTHENTIK_FORWARD_PORT=""
 }
 
+authentik_ensure_email_verified_true() {
+  local email_mapping_id
+  email_mapping_id="$(authentik_resolve_scope_mapping_id "email")" || return 1
+  if [[ -z "$email_mapping_id" ]]; then
+    _authentik_log "WARNING: Could not resolve email scope mapping ID"
+    return 1
+  fi
+
+  _authentik_log "Patching email scope mapping ${email_mapping_id} to return email_verified: True"
+  kubectl exec -n authentik deploy/authentik-server -- \
+    python3 manage.py shell --command "
+from authentik.providers.oauth2.models import ScopeMapping
+count = ScopeMapping.objects.filter(pk='${email_mapping_id}').update(
+    expression='return {\\n    \\\"email\\\": request.user.email,\\n    \\\"email_verified\\\": True\\n}'
+)
+print(f'Patched {count} email scope mapping(s)')
+" >/dev/null 2>&1
+}
+
 if [[ -z "${_AUTHENTIK_FORWARD_TRAP_SET:-}" ]]; then
   trap 'authentik_teardown_forward' EXIT
   _AUTHENTIK_FORWARD_TRAP_SET=1

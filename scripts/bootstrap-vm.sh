@@ -148,6 +148,11 @@ PY
   fi
 }
 
+ensure_seaweedfs_data_dir() {
+  install -d -m 0755 "$TARGET_DIR/seaweedfs/data"
+  sudo chown -R "$USER":"$USER" "$TARGET_DIR/seaweedfs/data"
+}
+
 log() {
   printf '[bootstrap-vm] %s\n' "$1"
 }
@@ -184,6 +189,8 @@ if [[ ! -w "$TARGET_DIR" ]]; then
   log "Taking ownership of $TARGET_DIR for current user"
   sudo chown -R "$USER":"$USER" "$TARGET_DIR"
 fi
+
+ensure_seaweedfs_data_dir
 
 cd "$TARGET_DIR"
 
