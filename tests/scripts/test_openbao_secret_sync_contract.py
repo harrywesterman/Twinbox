@@ -368,10 +368,7 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "SELECT delivery_email, api_key FROM zerver_userprofile" in run_text
     assert "sync_zulip_bot_to_agents_secret" in run_text
     assert 'zulip_agent_stream="${ZULIP_AGENT_STREAM:-Twinbox AI}"' in run_text
-    assert (
-        'zulip_agent_base_url="${ZULIP_AGENT_BASE_URL:-http://zulip.zulip.svc.cluster.local}"'
-        in run_text
-    )
+    assert 'zulip_agent_base_url="${ZULIP_AGENT_BASE_URL:-$zulip_host}"' in run_text
     assert (
         'zulip_provisioning_base_url="${ZULIP_PROVISIONING_BASE_URL:-http://127.0.0.1}"' in run_text
     )

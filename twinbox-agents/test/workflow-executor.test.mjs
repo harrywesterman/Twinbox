@@ -550,5 +550,7 @@ test("executor records failed Zulip post without failing work order", async () =
   assert.equal(result.status, "proposal_ready");
 
   const events = eventStore.listEvents({});
-  assert.ok(events.some((event) => event.title === "Zulip bericht mislukt"));
+  const failureEvent = events.find((event) => event.title === "Zulip bericht mislukt");
+  assert.ok(failureEvent);
+  assert.equal(failureEvent.metadata.error, "zulip down");
 });

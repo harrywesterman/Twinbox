@@ -226,12 +226,13 @@ function createWorkflowExecutor(deps) {
         message: "Olivia Ops posted the work order summary to Zulip.",
         metadata: { topic: "AI beheerteam" },
       });
-    } catch {
+    } catch (err) {
       appendEvent(workOrder.id, {
         agentId: "olivia-ops",
         severity: "warning",
         title: "Zulip bericht mislukt",
         message: "Olivia Ops could not post the work order summary to Zulip.",
+        metadata: redactObject({ error: err?.message || String(err) }),
       });
     }
   }
