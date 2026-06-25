@@ -46,7 +46,7 @@ def test_docker_compose_exposes_filesystem_secret_contract():
     assert "- admin" in text
     assert "- -masters=seaweedfs:9333" in text
     assert "- -port=23646" in text
-    assert "- -volume.max=0" in text
+    assert "- -volume.max=${SEAWEEDFS_VOLUME_MAX:-100}" in text
     assert text.count('"23646:23646"') == 1
     seaweedfs_images = re.findall(r"image: chrislusf/seaweedfs:([0-9.]+)", text)
     assert seaweedfs_images
@@ -70,6 +70,7 @@ def test_env_example_includes_filesystem_bootstrap_contract():
     assert "TWINBOX_SECRET_BACKEND=filesystem" in text
     assert "TWINBOX_BOOTSTRAP_DIR=/opt/twinbox/bootstrap" in text
     assert "TWINBOX_SECRET_ITEM_PREFIX=twinbox" in text
+    assert "SEAWEEDFS_VOLUME_MAX=100" in text
     assert "TWINBOX_SECRET_TEMP_DIR=/tmp/twinbox-secrets" in text
     assert "TWINBOX_SECRET_CACHE_TTL_SEC=60" in text
     assert "vaultwarden" not in text.lower()

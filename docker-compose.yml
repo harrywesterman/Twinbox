@@ -116,7 +116,7 @@ services:
     command:
       - server
       - -dir=/data
-      - -volume.max=0
+      - -volume.max=${SEAWEEDFS_VOLUME_MAX:-100}
       - -s3
     volumes:
       - /opt/twinbox/seaweedfs/data:/data
