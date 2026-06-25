@@ -460,7 +460,7 @@ graph TB
 
     subgraph TwinboxCluster["Twinbox Kubernetes"]
         subgraph K8sWorkers["Worker Nodes"]
-            NBRP["NetBird Routing Peers<br/>(DaemonSet, privileged,<br/>image 0.70.5)"]
+            NBRP["NetBird Routing Peers<br/>(DaemonSet, privileged,<br/>image 0.73.2)"]
         end
         Traefik["Traefik<br/>ClusterIP Service"]
         Proxy["NetBird Proxy<br/>(wgProxy via eBPF)"]
@@ -488,7 +488,7 @@ NetBird provides self-hosted VPN ingress with SSO integration via Authentik. The
 |-----------|------|---------|
 | **Server** (`netbird-server`) | Management VM | Runs the NetBird server, dashboard, and embedded Traefik with Let's Encrypt. Serves the management API and dashboard at `https://netbird.<zone>`. |
 | **Proxy** (`netbird-proxy`) | In-cluster | Runs an eBPF-based wgProxy for tunnel backhaul. Targets the Traefik ClusterIP (not the upstream service directly). |
-| **Routing Peers** (`netbirdio/netbird:0.70.5`) | In-cluster (DaemonSet) | Deployed as a privileged DaemonSet across worker nodes. Image pinned in `config/pinned-defaults.sh` and `gitops/platform-apps/netbird-routing-peers/deployment.yaml`. |
+| **Routing Peers** (`netbirdio/netbird:0.73.2`) | In-cluster (DaemonSet) | Deployed as a privileged DaemonSet across worker nodes. Image pinned in `config/pinned-defaults.sh` and `gitops/platform-apps/netbird-routing-peers/deployment.yaml`. |
 | **Admin Agent** (`netbird-agent`) | Management VM | Enrolls the Management VM into the NetBird tailnet for admin access. |
 
 ### Setup Steps

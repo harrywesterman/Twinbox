@@ -43,7 +43,7 @@ CLI tools pinned in [`config/pinned-defaults.sh`](https://github.com/harrywester
 | Argo CD | `v3.3.9` |
 | Cilium chart | `1.19.3` |
 | Cloudtty chart | `0.8.9` |
-| NetBird | `0.70.5` |
+| NetBird | `0.73.2` |
 
 `restic` is installed from the Management VM package repositories for host backups and is not pinned in [`config/pinned-defaults.sh`](https://github.com/harrywesterman/Twinbox/blob/main/config/pinned-defaults.sh).
 

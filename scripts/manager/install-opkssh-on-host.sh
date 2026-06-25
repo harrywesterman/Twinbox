@@ -6,8 +6,8 @@ set -euo pipefail
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
 
-OPKSSH_VERSION="${OPKSSH_VERSION:-0.14.0}"
-OPKSSH_SHA256="${OPKSSH_SHA256:-972719cb6dae736af80100fee0854fdd7289f419fc61b3dcace8409b2f043063}"
+OPKSSH_VERSION="${OPKSSH_VERSION:-0.15.0}"
+OPKSSH_SHA256="${OPKSSH_SHA256:-8fab6eb86031d80da81e87817b3ede39f5cbc0ab0a4a9bf679312732c152d886}"
 
 usage() {
   cat <<EOF

@@ -459,7 +459,7 @@ ensure_netbird_proxy_peer() {
   local setup_key="$1"
   local ssh_key_path="$MANAGER_DATA_DIR/ssh/netbird-${cluster_id}/id_ed25519"
   local temp_ssh_key=""
-  local image="netbirdio/netbird:${PINNED_NETBIRD_VERSION:-0.70.5}"
+  local image="netbirdio/netbird:${PINNED_NETBIRD_VERSION:-0.73.2}"
   local hostname="twinbox-${cluster_id}-proxy"
   local management_url_q
   local hostname_q
@@ -754,7 +754,7 @@ ensure_netbird_bastion_exit_peer() {
   local setup_key="$1"
   local ssh_key_path="$MANAGER_DATA_DIR/ssh/netbird-${cluster_id}/id_ed25519"
   local temp_ssh_key=""
-  local image="netbirdio/netbird:${PINNED_NETBIRD_VERSION:-0.70.5}"
+  local image="netbirdio/netbird:${PINNED_NETBIRD_VERSION:-0.73.2}"
   local hostname="twinbox-${cluster_id}-hetzner-exit"
   local management_url_q
   local hostname_q

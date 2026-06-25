@@ -97,7 +97,7 @@ Twinbox builds a Talos Linux Kubernetes cluster on Proxmox through a Management 
 - Management server + embedded relay runs in one container (`netbird-server`), no separate coturn/signal.
 - Proxy container (`netbird-proxy`) runs eBPF wgProxy for tunnel backhaul to routing peers in-cluster.
 - Proxy service targets a **NetBird resource** (the Traefik ClusterIP), not the upstream service directly.
-- Routing peer container (`netbirdio/netbird:0.70.5`) runs in-cluster (namespace `netbird`), image pinned in both `config/pinned-defaults.sh` and `gitops/platform-apps/netbird-routing-peers/deployment.yaml`.
+- Routing peer container (`netbirdio/netbird:0.73.2`) runs in-cluster (namespace `netbird`), image pinned in both `config/pinned-defaults.sh` and `gitops/platform-apps/netbird-routing-peers/deployment.yaml`.
 - To force ExternalSecret refresh: add annotation `force-sync: "1"` to the ExternalSecret and delete/recreate the pod.
 - Route `10.96.0.0/12` has `groups=[proxy_group]`, `peer_groups=[k8s_routers_group]`.
 - The proxy domain is now `<zone>` (e.g. `bierineenweek.nl`), not `proxy.<zone>`. Apps are addressed as `<app>.<zone>`.

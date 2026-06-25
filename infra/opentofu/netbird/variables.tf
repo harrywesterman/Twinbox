@@ -62,7 +62,7 @@ variable "netbird_admin_email" {
 variable "netbird_version" {
   description = "NetBird Docker image version tag"
   type        = string
-  default     = "0.70.5"
+  default     = "0.73.2"
 }
 
 variable "allowed_ssh_cidrs" {

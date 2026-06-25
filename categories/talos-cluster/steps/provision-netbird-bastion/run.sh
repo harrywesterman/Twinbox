@@ -278,7 +278,7 @@ apply_netbird_tofu() {
     -var "netbird_proxy_domain=$netbird_proxy_domain" \
     -var "public_zone_name=$public_zone_name" \
     -var "netbird_admin_email=$netbird_admin_email" \
-    -var "netbird_version=${PINNED_NETBIRD_VERSION:-0.70.5}" \
+    -var "netbird_version=${PINNED_NETBIRD_VERSION:-0.73.2}" \
     -var "dns_provider=$dns_provider" \
     -var "dns_api_token=$dns_api_token" \
     -var "dns_api_secret=$dns_api_secret" \

@@ -19,7 +19,7 @@ In the current Twinbox implementation, NetBird is used for five related paths:
 | NetBird bastion | Hetzner Cloud VPS | Runs the self-hosted NetBird server, dashboard, management API, embedded relay/proxy stack, Docker, and Traefik for the NetBird hostname. |
 | NetBird Reverse Proxy | Bastion Docker stack | Terminates public HTTPS for app hostnames such as `authentik.ZONE` and forwards requests into the NetBird network. |
 | NetBird network resources | NetBird management API | Defines the internal Traefik ClusterIP target, groups, setup keys, routes, and policies. |
-| Routing peer | Kubernetes namespace `netbird` | Runs `netbirdio/netbird:0.70.5` with privileged networking and forwards proxy traffic to the cluster service network. |
+| Routing peer | Kubernetes namespace `netbird` | Runs `netbirdio/netbird:0.73.2` with privileged networking and forwards proxy traffic to the cluster service network. |
 | Traefik NetBird backend | Kubernetes service `traefik/traefik` | Stable ClusterIP service exposing Traefik's `webnetbird` entrypoint on port `8082`. |
 | Authentik OIDC app | Authentik | Lets NetBird use Twinbox Authentik as its identity provider. |
 | Management VM peer | Management VM | Enrolls the Management VM as `twinbox-mgmt-<cluster-slug>` for admin access and local LAN routing. |
@@ -385,7 +385,7 @@ NetBird client with host networking and a persistent Docker volume named
 
 Step: `install-browser-ssh`
 
-This deploys Termix and adds a privileged `netbirdio/netbird:0.70.5` sidecar to
+This deploys Termix and adds a privileged `netbirdio/netbird:0.73.2` sidecar to
 the Termix pod. The sidecar reads the `twinbox/global/netbird-browser-ssh`
 secret through External Secrets, mounts `/dev/net/tun`, and stores its NetBird
 state under the existing Termix PVC at `/var/lib/netbird`.
