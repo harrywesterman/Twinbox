@@ -26,7 +26,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: hedgedoc
-          image: quay.io/hedgedoc/hedgedoc:1.10.8
+          image: quay.io/hedgedoc/hedgedoc:1.11.0
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
