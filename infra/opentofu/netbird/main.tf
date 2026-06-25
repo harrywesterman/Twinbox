@@ -33,5 +33,7 @@ resource "hcloud_server" "netbird" {
     dns_provider         = var.dns_provider
     dns_api_token        = var.dns_api_token
     dns_api_secret       = var.dns_api_secret
+    opkssh_issuer_url    = var.opkssh_issuer_url
+    opkssh_client_id     = var.opkssh_client_id
   })
 }

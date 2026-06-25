@@ -40,7 +40,7 @@ Creates Talos Linux VMs on Proxmox with:
 
 - Per-node CPU, memory, and disk configuration
 - Static MAC addresses for DHCP reservation
-- Talos ISO attachment for initial bootstrap, disk boot after
+- Talos disk image download/import for immediate disk boot
 - VM tagging for cluster identification
 
 See [talos-proxmox/README.md](talos-proxmox/README.md) for full variable reference.

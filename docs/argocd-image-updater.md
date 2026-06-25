@@ -86,6 +86,8 @@ metadata:
 
 Twinbox defaults to `git` write-back to maintain the GitOps workflow.
 
+For Twinbox-owned applications, the preferred path is now Forgejo promotion and review rather than direct image-updater write-back to the source repo.
+
 ## Verification
 
 ```bash

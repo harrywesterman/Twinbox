@@ -92,7 +92,7 @@ if [[ -z "$POD_CIDR" ]]; then
   if [[ -n "$POD_CIDR" ]]; then
     POD_CIDR="$(tr ' ' ',' <<<"$POD_CIDR")"
   else
-    POD_CIDR="10.244.0.0/16"
+    fail "Could not determine pod CIDR from cluster nodes; pass --pod-cidr explicitly"
   fi
 fi
 

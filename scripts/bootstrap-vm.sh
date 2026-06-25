@@ -148,6 +148,11 @@ PY
   fi
 }
 
+ensure_seaweedfs_data_dir() {
+  install -d -m 0755 "$TARGET_DIR/seaweedfs/data"
+  sudo chown -R "$USER":"$USER" "$TARGET_DIR/seaweedfs/data"
+}
+
 log() {
   printf '[bootstrap-vm] %s\n' "$1"
 }
@@ -185,6 +190,8 @@ if [[ ! -w "$TARGET_DIR" ]]; then
   sudo chown -R "$USER":"$USER" "$TARGET_DIR"
 fi
 
+ensure_seaweedfs_data_dir
+
 cd "$TARGET_DIR"
 
 if [[ ! -f .env ]]; then
@@ -221,6 +228,20 @@ if [[ ! -f "${BOOTSTRAP_DIR}/bin/install-management-tools.sh" ]]; then
   sudo install -d -m 0755 "${BOOTSTRAP_DIR}/bin"
   curl -fsSL "${RAW_BASE_URL}/scripts/install-management-tools.sh" -o "${BOOTSTRAP_DIR}/bin/install-management-tools.sh"
   chmod 0755 "${BOOTSTRAP_DIR}/bin/install-management-tools.sh"
+fi
+
+if [[ ! -f "${BOOTSTRAP_DIR}/bin/bootstrap-forgejo.sh" ]]; then
+  log "Fetching Forgejo bootstrap helper into bootstrap tree"
+  sudo install -d -m 0755 "${BOOTSTRAP_DIR}/bin"
+  curl -fsSL "${RAW_BASE_URL}/scripts/manager/bootstrap-forgejo.sh" -o "${BOOTSTRAP_DIR}/bin/bootstrap-forgejo.sh"
+  chmod 0755 "${BOOTSTRAP_DIR}/bin/bootstrap-forgejo.sh"
+fi
+
+if [[ ! -f "${BOOTSTRAP_DIR}/bin/forgejo-promote-upstream.sh" ]]; then
+  log "Fetching Forgejo promotion helper into bootstrap tree"
+  sudo install -d -m 0755 "${BOOTSTRAP_DIR}/bin"
+  curl -fsSL "${RAW_BASE_URL}/scripts/manager/forgejo-promote-upstream.sh" -o "${BOOTSTRAP_DIR}/bin/forgejo-promote-upstream.sh"
+  chmod 0755 "${BOOTSTRAP_DIR}/bin/forgejo-promote-upstream.sh"
 fi
 
 if [[ -x "${BOOTSTRAP_DIR}/bin/install-management-tools.sh" ]]; then

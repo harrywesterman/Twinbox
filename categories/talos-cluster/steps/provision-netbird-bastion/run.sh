@@ -246,12 +246,26 @@ delete_hcloud_resources_by_name "servers" "$legacy_server_name" "$server_name"
 delete_hcloud_resources_by_name "firewalls" "${legacy_server_name}-fw" "${server_name}-fw"
 delete_hcloud_resources_by_name "ssh_keys" "${legacy_server_name}-ssh-key" "${server_name}-ssh-key"
 
+opkssh_issuer_url=""
+opkssh_client_id=""
+if command -v openbao_read_global_secret_json >/dev/null 2>&1; then
+  opkssh_secret_json="$(openbao_read_global_secret_json opkssh 2>/dev/null || true)"
+  opkssh_issuer_url="$(jq -r '.OIDC_ISSUER_URL // empty' <<<"${opkssh_secret_json:-null}")"
+  opkssh_client_id="$(jq -r '.OIDC_CLIENT_ID // empty' <<<"${opkssh_secret_json:-null}")"
+fi
+
 apply_netbird_tofu() {
   local server_type="$1"
   local apply_log_file
   local tofu_status
 
   apply_log_file="$(mktemp "${TMPDIR:-/tmp}/netbird-tofu-apply-XXXXXX")"
+
+  local opkssh_vars=()
+  if [[ -n "$opkssh_issuer_url" && -n "$opkssh_client_id" ]]; then
+    opkssh_vars+=( -var "opkssh_issuer_url=$opkssh_issuer_url" )
+    opkssh_vars+=( -var "opkssh_client_id=$opkssh_client_id" )
+  fi
 
   if tofu apply -no-color -auto-approve -input=false \
     -var "hcloud_token=$hcloud_token" \
@@ -268,6 +282,7 @@ apply_netbird_tofu() {
     -var "dns_provider=$dns_provider" \
     -var "dns_api_token=$dns_api_token" \
     -var "dns_api_secret=$dns_api_secret" \
+    "${opkssh_vars[@]}" \
     2>&1 | tee "$apply_log_file"; then
     rm -f "$apply_log_file"
     return 0

@@ -19,6 +19,13 @@ spec:
                 path: /spec/routes/0/match
                 value: Host(`pixelfed.__ZONE_NAME__`)
           - target:
+              kind: IngressRoute
+              name: pixelfed-netbird
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`pixelfed.__ZONE_NAME__`)
+          - target:
               kind: Deployment
               name: pixelfed
             patch: |-

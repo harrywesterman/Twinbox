@@ -1,0 +1,17 @@
+id: install-opkssh
+title: Install opkssh SSH Certificate Auth
+type: action
+journey_stage: setup
+summary: Configure opkssh on the Management VM and bastion for Authentik-MFA-gated SSH certificates.
+explanation: >
+  This step installs opkssh on the Management VM and the NetBird bastion.
+  It writes the Authentik OAuth2 provider configuration and group-to-principal mapping so that
+  users in the 'admins' group receive short-lived SSH certificates via Termix.
+  The existing password/key credentials remain on the hosts as break-glass until Phase 2/3.
+side_help: >
+  Requires the opkssh Authentik application created by the browser-ssh step.
+  The Management VM and bastion must be reachable via SSH and NetBird.
+inputs: []
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/install-opkssh/run.sh

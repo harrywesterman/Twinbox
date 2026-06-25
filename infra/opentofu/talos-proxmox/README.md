@@ -4,7 +4,7 @@ OpenTofu module for provisioning Talos Linux VMs on Proxmox VE.
 
 ## Overview
 
-This module creates Talos Linux virtual machines on Proxmox, supporting both control plane and worker node types. It handles VM creation with the Talos ISO attached for initial bootstrap and disk-based boot after installation.
+This module creates Talos Linux virtual machines on Proxmox, supporting both control plane and worker node types. The manager worker uploads a Talos bootable disk image as Proxmox `import` content on each target node, and this module imports it directly into the VM's first disk, so there is no ISO attach/detach step.
 
 Control plane and worker nodes are provisioned with fixed RAM equal to their assigned memory so Proxmox ballooning cannot pull them below their configured size.
 
@@ -33,10 +33,9 @@ Control plane and worker nodes are provisioned with fixed RAM equal to their ass
 | `cluster_slug` | Cluster slug used for tagging |
 | `proxmox_endpoint` | Proxmox API endpoint |
 | `vm_datastore` | Datastore for VM disks |
-| `file_datastore` | Datastore for ISO files |
+| `file_datastore` | Datastore for Talos disk image uploads; must allow Proxmox `import` content |
 | `bridge` | Proxmox network bridge |
 | `talos_version` | Talos version to deploy |
-| `boot_from_disk` | Boot from disk instead of ISO (set after bootstrap) |
 
 ## Outputs
 
@@ -52,7 +51,6 @@ Control plane and worker nodes are provisioned with fixed RAM equal to their ass
 
 ## Bootstrap Flow
 
-1. VMs are created with the Talos ISO attached (`ide2` CD-ROM).
-2. On first apply, boot order targets the ISO for Talos installation.
-3. After bootstrap, set `boot_from_disk = true` to flip boot order to `virtio0`.
-4. The ISO remains attached to avoid requiring extra Proxmox privileges for CD-ROM changes.
+1. The manager worker downloads and decompresses the Talos disk image, then uploads it as Proxmox `import` content on each target node.
+2. OpenTofu imports that image via the Proxmox API straight onto `virtio0` and the VM boots from disk immediately.
+3. The Talos machine config still points at the matching installer image for future installs or upgrades.

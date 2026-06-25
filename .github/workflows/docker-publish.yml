@@ -62,6 +62,9 @@ jobs:
             portal:
               - 'portal/**'
               - 'portal/Dockerfile'
+            twinbox_agents:
+              - 'twinbox-agents/**'
+              - 'twinbox-agents/Dockerfile'
             jitsi_openid:
               - 'images/jitsi-openid/**'
 
@@ -75,6 +78,7 @@ jobs:
           MANAGER_WORKER_CHANGED: ${{ steps.filter.outputs.manager_worker || 'false' }}
           MANAGER_WEB_CHANGED: ${{ steps.filter.outputs.manager_web || 'false' }}
           PORTAL_CHANGED: ${{ steps.filter.outputs.portal || 'false' }}
+          TWINBOX_AGENTS_CHANGED: ${{ steps.filter.outputs.twinbox_agents || 'false' }}
           JITSI_OPENID_CHANGED: ${{ steps.filter.outputs.jitsi_openid || 'false' }}
         run: |
           python3 - <<'PY'
@@ -128,6 +132,18 @@ jobs:
                   ]),
               },
               {
+                  "image_name": "twinbox-agents",
+                  "package_name": "twinbox-agents",
+                  "context": "./twinbox-agents",
+                  "dockerfile": "./twinbox-agents/Dockerfile",
+                  "tags": "\n".join([
+                      "type=raw,value=latest,enable={{is_default_branch}}",
+                      "type=raw,value=sha-${{ github.sha }},enable={{is_default_branch}}",
+                      "type=ref,event=tag",
+                      "type=sha",
+                  ]),
+              },
+              {
                   "image_name": "twinbox-jitsi-openid",
                   "package_name": "twinbox-manager-worker",
                   "context": "./images/jitsi-openid",
@@ -151,6 +167,7 @@ jobs:
               "twinbox-manager-worker": os.environ["MANAGER_WORKER_CHANGED"] == "true",
               "twinbox-manager-web": os.environ["MANAGER_WEB_CHANGED"] == "true",
               "twinbox-portal": os.environ["PORTAL_CHANGED"] == "true",
+              "twinbox-agents": os.environ["TWINBOX_AGENTS_CHANGED"] == "true",
               "twinbox-jitsi-openid": os.environ["JITSI_OPENID_CHANGED"] == "true",
           }
 

@@ -46,7 +46,21 @@ spec:
                     value: Host(`n8n.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
               - target:
                   kind: IngressRoute
+                  name: n8n-netbird
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`n8n.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
                   name: n8n-authentik-callback
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`n8n.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)
+              - target:
+                  kind: IngressRoute
+                  name: n8n-authentik-callback-netbird
                 patch: |-
                   - op: replace
                     path: /spec/routes/0/match
@@ -63,10 +77,10 @@ spec:
                 patch: |-
                   - op: replace
                     path: /spec/resources/requests/cpu
-                    value: '{{ if eq (index .metadata.labels "twinbox.io/resource-profile") "small" }}250m{{ else if eq (index .metadata.labels "twinbox.io/resource-profile") "large" }}1{{ else }}500m{{ end }}'
+                    value: '{{ if eq (index .metadata.labels "twinbox.io/resource-profile") "small" }}100m{{ else if eq (index .metadata.labels "twinbox.io/resource-profile") "large" }}500m{{ else }}250m{{ end }}'
                   - op: replace
                     path: /spec/resources/requests/memory
-                    value: '{{ if eq (index .metadata.labels "twinbox.io/resource-profile") "small" }}512Mi{{ else if eq (index .metadata.labels "twinbox.io/resource-profile") "large" }}2Gi{{ else }}1Gi{{ end }}'
+                    value: '{{ if eq (index .metadata.labels "twinbox.io/resource-profile") "small" }}256Mi{{ else if eq (index .metadata.labels "twinbox.io/resource-profile") "large" }}1Gi{{ else }}512Mi{{ end }}'
       destination:
         server: https://kubernetes.default.svc
         namespace: n8n

@@ -58,3 +58,9 @@ variable "management_vm_api_port" {
   type        = number
   default     = 8080
 }
+
+variable "bastion_ssh_port" {
+  description = "SSH port on the Twinbox NetBird bastion"
+  type        = number
+  default     = 22
+}
