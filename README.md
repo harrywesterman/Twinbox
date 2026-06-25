@@ -73,15 +73,17 @@ Twinbox installs a complete Kubernetes operations stack:
 
 | Area                   | Components                                                    |
 | ---------------------- | ------------------------------------------------------------- |
-| Kubernetes foundation  | Talos Linux, Cilium, Hubble                                   |
-| GitOps                 | Argo CD                                                       |
-| Storage and backups    | Longhorn, SeaweedFS, Velero                                   |
-| Ingress and access     | Traefik, Cloudflare Tunnel, NetBird                           |
-| Identity and secrets   | Authentik, OpenBao, External Secrets Operator                 |
-| Databases              | CloudNativePG                                                 |
-| Observability          | Prometheus, Alertmanager, Grafana, Loki, Tempo, Grafana Alloy |
+| Kubernetes foundation  | Talos Linux, Cilium, Hubble, Metrics Server                   |
+| GitOps and automation  | Argo CD, Argo CD Image Updater                                |
+| Storage and backups    | Longhorn, SeaweedFS, Velero, Velero UI, Barman Cloud          |
+| Ingress and networking | Traefik, Cloudflare Tunnel, NetBird, ExternalDNS              |
+| Identity and secrets   | Authentik, OpenBao, External Secrets Operator, Cert-Manager   |
+| Databases              | CloudNativePG, pgAdmin4                                       |
+| Observability          | Prometheus, Alertmanager, Grafana, Loki, Tempo, Grafana Alloy, Beszel |
+| Notifications          | ntfy                                                          |
+| DNS and ad blocking    | AdGuard Home                                                  |
 | Security               | CrowdSec with Traefik bouncer                                 |
-| User and admin portals | Twinbox Portal, Dashy                                         |
+| Admin consoles         | Twinbox Portal, Twinbox Agents, Dashy, Headlamp, Termix       |
 
 ## App Catalog
 
@@ -91,6 +93,7 @@ Install additional applications through the Twinbox Portal:
 - **Coder** - A cloud development environment for your team.
 - **FreshRSS** - self-hosted RSS feed reader
 - **Mailu** - Self-hosted email with Mailu on Kubernetes and Postfix on the NetBird bastion.
+- **Mastodon** - Federated social publishing platform
 - **Matrix Chat** - Federated chat with end-to-end encryption, so you control your conversations.
 - **HedgeDoc** - real-time collaborative markdown editor
 - **Immich** - photo and video backup
@@ -110,10 +113,7 @@ Install additional applications through the Twinbox Portal:
 
 ## Documentation
 
-- [User guide](https://harrywesterman.github.io/Twinbox/user-guide/) - prerequisites, bootstrap, web wizard, and platform overview
-- [Architecture](https://harrywesterman.github.io/Twinbox/architecture/) - system layers, runtime flow, and component responsibilities
-- [Configuration](https://harrywesterman.github.io/Twinbox/configuration/) - environment and platform configuration reference
-- [Troubleshooting](https://harrywesterman.github.io/Twinbox/troubleshooting/) - operational checks and recovery notes
+The full [Twinbox documentation](https://harrywesterman.github.io/Twinbox/) site covers everything from the getting started guide through deep dives on architecture, configuration, authentication, networking, storage, observability, and operations.
 
 ## Project Structure
 
@@ -123,12 +123,21 @@ Install additional applications through the Twinbox Portal:
 | `manager-web/`     | React web wizard on port `3000`                           |
 | `manager-api/`     | Manager API, catalog, validation, state, and job queueing |
 | `manager-worker/`  | Queue polling and job execution                           |
+| `scripts/`         | Bootstrap and maintenance scripts for the Management VM   |
 | `scripts/manager/` | Talos, Proxmox, Argo CD, OpenBao, and platform automation |
 | `categories/`      | Wizard step manifests and runners                         |
 | `gitops/`          | Argo CD applications, Helm values, and Kustomize overlays |
 | `portal/`          | Twinbox Portal                                            |
 | `config/`          | Pinned defaults, Cilium values, and portal content        |
+| `infra/`           | OpenTofu modules for NetBird, Authentik, Cloudflare, Talos |
+| `lib/`             | Shared Node.js modules for catalog, secrets, and config   |
+| `twinbox-agents/`  | In-cluster agent system source code                       |
+| `images/`          | Container image definitions (e.g. Jitsi OpenID)           |
+| `ansible/`         | Ansible playbooks for Management VM maintenance           |
+| `systemd/`         | Systemd service and timer units                           |
+| `tests/`           | Integration, contract, and unit tests                     |
 | `docs/`            | MkDocs user guide and technical reference                 |
+| `screenshots/`     | README and documentation screenshots                      |
 
 ## License
 
