@@ -467,7 +467,7 @@ spec:
     spec:
       containers:
         - name: tika
-          image: apache/tika:3.3.0.0-full
+          image: apache/tika:3.3.1.0-full
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
