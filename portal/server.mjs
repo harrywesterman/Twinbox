@@ -13,6 +13,11 @@ import {
   normalizeManageableGroupsConfig,
   normalizeRequestedGroupNames,
 } from "./authentik-admin.mjs";
+import {
+  createRandomMailboxPassword,
+  isMailuInstalled,
+  mailuCreateMailbox,
+} from "./mailu-client.mjs";
 
 const app = express();
 const port = Number(process.env.PORT || 8080);
@@ -33,6 +38,12 @@ const authentikApiBase = String(
   process.env.AUTHENTIK_API_BASE || DEFAULT_AUTHENTIK_API_BASE
 ).trim();
 const authentikApiToken = String(process.env.AUTHENTIK_API_TOKEN || "").trim();
+const agentsBaseUrl = String(
+  process.env.PORTAL_AGENTS_BASE_URL || "http://twinbox-agents.twinbox-agents.svc.cluster.local"
+)
+  .trim()
+  .replace(/\/+$/, "");
+const agentsInternalToken = String(process.env.TWINBOX_AGENT_INTERNAL_TOKEN || "").trim();
 const APP_INSTALLATION_GROUP_NAME = "Twinbox app installations";
 const USER_MANAGEMENT_GROUP_NAME = "Twinbox user management";
 const APP_JOB_TYPES = new Set(["run_step", "uninstall_step"]);
@@ -391,6 +402,54 @@ async function requestManagerJson(
   }
 
   return parsed;
+}
+
+function agentUrl(pathname) {
+  const normalizedPath = String(pathname || "").startsWith("/")
+    ? String(pathname || "")
+    : `/${String(pathname || "")}`;
+  return new URL(normalizedPath, `${agentsBaseUrl}/`).toString();
+}
+
+async function proxyAgentRequest(pathname, options = {}) {
+  if (!agentsInternalToken) {
+    const error = new Error("agent internal token is not configured");
+    error.status = 503;
+    throw error;
+  }
+  const init = {
+    method: options.method || "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${agentsInternalToken}`,
+      ...(options.headers || {}),
+    },
+  };
+  if (options.body !== undefined) {
+    init.body = typeof options.body === "string" ? options.body : JSON.stringify(options.body);
+  }
+  const response = await fetch(agentUrl(pathname), init);
+  const text = await response.text();
+  let parsed = null;
+  if (text) {
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      parsed = text;
+    }
+  }
+  if (!response.ok) {
+    const error = new Error(
+      parsed?.error || parsed?.message || text || `Agent request failed with ${response.status}`
+    );
+    error.status = response.status;
+    throw error;
+  }
+  return parsed;
+}
+
+async function proxyManagerJson(pathname, options = {}) {
+  return requestManagerJson(pathname, options);
 }
 
 async function loadActiveClusterState() {
@@ -1427,6 +1486,25 @@ app.post("/api/admin/users", async (req, res) => {
       }
     }
 
+    if (draft.email && isMailuInstalled()) {
+      const mailboxPassword = createRandomMailboxPassword();
+      mailuCreateMailbox({
+        email: draft.email,
+        rawPassword: mailboxPassword,
+        displayedName: draft.name || draft.username,
+      })
+        .then((result) => {
+          if (result.ok) {
+            console.log(`Mailu mailbox created for ${draft.email}`);
+          } else {
+            console.warn(`Mailu mailbox not created for ${draft.email}: ${result.reason}`);
+          }
+        })
+        .catch((err) =>
+          console.warn(`Mailu mailbox creation error for ${draft.email}:`, err.message)
+        );
+    }
+
     const directoryAfter = await loadUserAdminDirectory(config);
     res.status(201).json({
       user: buildUserResponse(directoryAfter, createdUserId),
@@ -1436,6 +1514,51 @@ app.post("/api/admin/users", async (req, res) => {
     res
       .status(error?.status || 500)
       .json({ error: error instanceof Error ? error.message : "failed to create user" });
+  }
+});
+
+app.post("/api/admin/users/:userId/create-mailbox", async (req, res) => {
+  const session = requirePortalCapability(
+    req,
+    res,
+    "canManageUsers",
+    "user management access required"
+  );
+  if (!session) return;
+
+  try {
+    if (!isMailuInstalled()) {
+      return res.status(400).json({ error: "Mailu is not installed" });
+    }
+
+    const config = await loadPortalConfig();
+    const directory = await loadUserAdminDirectory(config);
+    const user = directory.users.find(
+      (u) => u.id === req.params.userId || u.pk === req.params.userId
+    );
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    if (!user.email) {
+      return res.status(400).json({ error: "User has no email address" });
+    }
+
+    const mailboxPassword = createRandomMailboxPassword();
+    const result = await mailuCreateMailbox({
+      email: user.email,
+      rawPassword: mailboxPassword,
+      displayedName: user.name || user.username,
+    });
+
+    if (result.ok) {
+      res.json({ ok: true, email: user.email });
+    } else if (result.reason === "already-exists") {
+      res.json({ ok: true, email: user.email, note: "Mailbox already exists" });
+    } else {
+      res.status(500).json({ error: `Failed to create mailbox: ${result.reason}` });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
   }
 });
 
@@ -1722,6 +1845,119 @@ app.get("/admin/", (req, res) => {
 });
 
 app.use(express.static(distDir, { extensions: ["html"] }));
+
+app.get("/api/admin/agents", async (req, res) => {
+  if (!requireAdminSession(req, res)) return;
+  try {
+    const data = await proxyAgentRequest("/api/agents");
+    res.json(data);
+  } catch (error) {
+    if (error.status === 503) {
+      res.json({ degraded: true, error: "agent internal token is not configured" });
+      return;
+    }
+    res.status(error.status || 502).json({ error: error.message || "agent service unavailable" });
+  }
+});
+
+app.get("/api/admin/agents/events", async (req, res) => {
+  if (!requireAdminSession(req, res)) return;
+  try {
+    const query = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+    const data = await proxyAgentRequest(`/api/events${query}`);
+    res.json(data);
+  } catch (error) {
+    res.status(error.status || 502).json({ error: error.message || "agent service unavailable" });
+  }
+});
+
+app.get("/api/admin/agents/providers", async (req, res) => {
+  if (!requireAdminSession(req, res)) return;
+  try {
+    const data = await proxyManagerJson("/api/agents/provider");
+    res.json(data);
+  } catch (error) {
+    res.status(error.status || 502).json({ error: error.message || "provider state unavailable" });
+  }
+});
+
+app.post("/api/admin/agents/providers/openai-compatible", async (req, res) => {
+  if (!requireAdminSession(req, res)) return;
+  try {
+    const providerData = await proxyManagerJson("/api/agents/provider/openai-compatible", {
+      method: "POST",
+      body: req.body,
+    });
+    res.json(providerData);
+  } catch (error) {
+    res.status(error.status || 502).json({ error: error.message || "provider save failed" });
+  }
+});
+
+app.post("/api/admin/agents/providers/test", async (req, res) => {
+  if (!requireAdminSession(req, res)) return;
+  try {
+    const result = await proxyManagerJson("/api/agents/provider/test", {
+      method: "POST",
+      body: req.body,
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(error.status || 502).json({ error: error.message || "provider test failed" });
+  }
+});
+
+app.get("/api/admin/agents/work-orders", async (req, res) => {
+  if (!requireAdminSession(req, res)) return;
+  try {
+    const query = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+    const data = await proxyAgentRequest(`/api/work-orders${query}`);
+    res.json(data);
+  } catch (error) {
+    res.status(error.status || 502).json({ error: error.message || "agent service unavailable" });
+  }
+});
+
+app.post("/api/admin/agents/work-orders", async (req, res) => {
+  if (!requireAdminSession(req, res)) return;
+  try {
+    const data = await proxyAgentRequest("/api/work-orders", {
+      method: "POST",
+      body: req.body,
+    });
+    res.json(data);
+  } catch (error) {
+    res.status(error.status || 502).json({ error: error.message || "work order creation failed" });
+  }
+});
+
+app.post("/api/admin/agents/work-orders/:id/approve", async (req, res) => {
+  if (!requireAdminSession(req, res)) return;
+  try {
+    const data = await proxyAgentRequest(`/api/work-orders/${req.params.id}/approve`, {
+      method: "POST",
+      body: req.body,
+    });
+    res.json(data);
+  } catch (error) {
+    res.status(error.status || 502).json({ error: error.message || "work order approval failed" });
+  }
+});
+
+app.post("/api/admin/agents/work-orders/:id/cancel", async (req, res) => {
+  if (!requireAdminSession(req, res)) return;
+  try {
+    const data = await proxyAgentRequest(`/api/work-orders/${req.params.id}/cancel`, {
+      method: "POST",
+      body: req.body,
+    });
+    res.json(data);
+  } catch (error) {
+    res
+      .status(error.status || 502)
+      .json({ error: error.message || "work order cancellation failed" });
+  }
+});
 
 app.get(/.*/, async (req, res, next) => {
   if (req.path.startsWith("/api/") || req.path.startsWith("/auth/")) {

@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: twinbox-agents-env
+  namespace: twinbox-agents
+data:
+  MANAGER_API_BASE_URL: "http://webwizard.longhorn-system.svc.cluster.local:8080"
+  ZULIP_STREAM: "Twinbox AI"

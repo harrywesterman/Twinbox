@@ -128,10 +128,10 @@ spec:
                 patch: |-
                   - op: replace
                     path: /spec/resources/requests/cpu
-                    value: '{{ if eq (index .metadata.labels "twinbox.io/resource-profile") "small" }}100m{{ else if eq (index .metadata.labels "twinbox.io/resource-profile") "large" }}500m{{ else }}250m{{ end }}'
+                    value: '{{ if eq (index .metadata.labels "twinbox.io/resource-profile") "small" }}50m{{ else if eq (index .metadata.labels "twinbox.io/resource-profile") "large" }}250m{{ else }}100m{{ end }}'
                   - op: replace
                     path: /spec/resources/requests/memory
-                    value: '{{ if eq (index .metadata.labels "twinbox.io/resource-profile") "small" }}256Mi{{ else if eq (index .metadata.labels "twinbox.io/resource-profile") "large" }}1Gi{{ else }}512Mi{{ end }}'
+                    value: '{{ if eq (index .metadata.labels "twinbox.io/resource-profile") "small" }}128Mi{{ else if eq (index .metadata.labels "twinbox.io/resource-profile") "large" }}512Mi{{ else }}256Mi{{ end }}'
       destination:
         server: https://kubernetes.default.svc
         namespace: pixelfed

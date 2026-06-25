@@ -36,6 +36,18 @@ import {
 } from "./lib/ip-allocation.js";
 import { cancelJob, queueJob } from "./lib/jobs.js";
 import {
+  clearAgentEndpointSecret,
+  ensureAgentInternalToken,
+  hasAgentApiKey,
+  normalizeOpenAICompatibleProvider,
+  queueAgentConfigSyncForLatestCluster,
+  readAgentEndpointSecret,
+  readAgentProviderConfig,
+  resolveAgentProviderTestApiKey,
+  writeAgentEndpointSecret,
+  writeAgentProviderConfig,
+} from "./lib/agents.js";
+import {
   assertNoUpgradeMaintenance,
   isUpgradeMaintenanceActive,
   readUpgradeState,
@@ -2081,6 +2093,118 @@ app.put("/api/wizard/state", (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`manager-api listening on ${port}`);
+app.get("/api/agents/provider", (req, res) => {
+  const config = readAgentProviderConfig(dirs);
+  return res.json({
+    config,
+    hasApiKey: hasAgentApiKey(dirs),
+  });
 });
+
+app.post("/api/agents/provider/openai-compatible", (req, res) => {
+  try {
+    const { displayName, baseUrl, model, apiKey, apiKeyMode, timeoutMs } = req.body || {};
+    const normalized = normalizeOpenAICompatibleProvider({
+      displayName,
+      baseUrl,
+      model,
+      timeoutMs,
+    });
+
+    if (!normalized.ok) {
+      return res.status(400).json({ error: normalized.error });
+    }
+
+    writeAgentProviderConfig(dirs, normalized.value);
+
+    if (typeof apiKey === "string" && apiKey.trim()) {
+      writeAgentEndpointSecret(process.env, apiKey.trim());
+    } else if (apiKeyMode === "clear") {
+      clearAgentEndpointSecret(process.env);
+    }
+
+    ensureAgentInternalToken(process.env);
+    const job = queueAgentConfigSyncForLatestCluster(dirs);
+    return res.json({
+      ...normalized.value,
+      hasApiKey: hasAgentApiKey(dirs),
+      job_id: job.id,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : "failed to save provider config",
+    });
+  }
+});
+
+app.post("/api/agents/provider/test", async (req, res) => {
+  try {
+    const { baseUrl, model, apiKey, useStoredApiKey, timeoutMs } = req.body || {};
+    const resolvedApiKey = resolveAgentProviderTestApiKey(
+      { apiKey, useStoredApiKey },
+      useStoredApiKey === true ? readAgentEndpointSecret(dirs) : null
+    );
+
+    if (!baseUrl) {
+      return res.status(400).json({ error: "baseUrl is required" });
+    }
+
+    if (!model) {
+      return res.status(400).json({ error: "model is required" });
+    }
+
+    const url = `${baseUrl.replace(/\/+$/, "")}/models`;
+    const timeout = Number.isFinite(Number(timeoutMs)) ? Math.max(1000, Number(timeoutMs)) : 10000;
+    const start = Date.now();
+
+    let response;
+    try {
+      response = await fetch(url, {
+        headers: resolvedApiKey ? { Authorization: `Bearer ${resolvedApiKey}` } : {},
+        signal: AbortSignal.timeout(timeout),
+      });
+    } catch (fetchError) {
+      const latencyMs = Date.now() - start;
+      return res.json({
+        status: "error",
+        latencyMs,
+        message: fetchError instanceof Error ? fetchError.message : "connection failed",
+      });
+    }
+
+    const latencyMs = Date.now() - start;
+    if (response.ok) {
+      return res.json({ status: "ok", latencyMs, message: "Provider responded successfully" });
+    }
+    return res.json({
+      status: "error",
+      latencyMs,
+      message: `Provider returned HTTP ${response.status}`,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : "failed to test provider",
+    });
+  }
+});
+
+app.post("/api/agents/sync-config", (req, res) => {
+  try {
+    ensureAgentInternalToken(process.env);
+    const job = queueAgentConfigSyncForLatestCluster(dirs);
+    return res.json({ job_id: job.id });
+  } catch (error) {
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : "failed to queue agent config sync",
+    });
+  }
+});
+
+const isTestEnv = process.env.NODE_ENV === "test" || process.env.MANAGER_API_TEST === "true";
+if (!isTestEnv) {
+  app.listen(port, () => {
+    console.log(`manager-api listening on ${port}`);
+  });
+}
+
+export { app };

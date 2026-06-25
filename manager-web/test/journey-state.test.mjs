@@ -200,6 +200,7 @@ function buildCatalog(stepStatuses = {}) {
         ],
       },
     ],
+    ["install-mastodon", "Install Mastodon", { dependsOn: [] }],
     ["install-zulip", "Install Zulip", { dependsOn: [] }],
     ["install-paperless", "Install Paperless", { dependsOn: [] }],
     [

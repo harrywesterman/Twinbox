@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import os
 import re
@@ -31,6 +32,7 @@ TERMIX_STEP_SCRIPT = (
 )
 TERMIX_SETUP_AUTHENTIK_SCRIPT = REPO_ROOT / "scripts" / "manager" / "setup-termix-authentik.sh"
 TERMIX_SETUP_SCRIPT = REPO_ROOT / "scripts" / "manager" / "setup-termix.sh"
+TERMIX_CONFIGMAP = REPO_ROOT / "gitops" / "platform-apps" / "termix" / "configmap.yaml"
 TERMIX_DEPLOYMENT = REPO_ROOT / "gitops" / "platform-apps" / "termix" / "deployment.yaml"
 TERMIX_EXTERNALSECRET = REPO_ROOT / "gitops" / "platform-apps" / "termix" / "externalsecret.yaml"
 TERMIX_INGRESSROUTE = REPO_ROOT / "gitops" / "platform-apps" / "termix" / "ingressroute.yaml"
@@ -57,6 +59,21 @@ STIRLING_PDF_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "apps" / "steps" / "install-stirling-pdf" / "run.sh"
 )
 PIXELFED_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-pixelfed" / "run.sh"
+MASTODON_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-mastodon" / "run.sh"
+MASTODON_STEP_MANIFEST = (
+    REPO_ROOT / "categories" / "apps" / "steps" / "install-mastodon" / "step.yaml"
+)
+MASTODON_APP = REPO_ROOT / "gitops" / "apps" / "mastodon.yaml"
+MASTODON_VALUES = REPO_ROOT / "gitops" / "values" / "mastodon.yaml"
+MASTODON_NAMESPACE = REPO_ROOT / "gitops" / "platform-apps" / "mastodon" / "namespace.yaml"
+MASTODON_PLATFORM_DIR = REPO_ROOT / "gitops" / "platform-apps" / "mastodon"
+MASTODON_RUNTIME_SECRET = MASTODON_PLATFORM_DIR / "externalsecret-runtime.yaml"
+MASTODON_S3_SECRET = MASTODON_PLATFORM_DIR / "externalsecret-s3.yaml"
+MASTODON_DB_DIR = REPO_ROOT / "gitops" / "databases" / "mastodon"
+MASTODON_DB_SECRET = MASTODON_DB_DIR / "externalsecret.yaml"
+MASTODON_DB_CLUSTER = MASTODON_DB_DIR / "cluster.yaml"
+MASTODON_DB_OBJECTSTORE = MASTODON_DB_DIR / "objectstore.yaml"
+MATRIX_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-matrix" / "run.sh"
 TWINBOX_PORTAL_APP = REPO_ROOT / "gitops" / "apps" / "twinbox-portal.yaml"
 OUTLINE_APP = REPO_ROOT / "gitops" / "apps" / "outline.yaml"
 OUTLINE_OPTIONAL_APP = REPO_ROOT / "gitops" / "optional-apps" / "outline.yaml"
@@ -74,6 +91,10 @@ VAULTWARDEN_DB_KUSTOMIZATION = (
     REPO_ROOT / "gitops" / "databases" / "vaultwarden" / "kustomization.yaml"
 )
 PIXELFED_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "pixelfed" / "kustomization.yaml"
+MATRIX_APP_MANIFEST = REPO_ROOT / "gitops" / "apps" / "matrix.yaml"
+MATRIX_VALUES = REPO_ROOT / "gitops" / "values" / "matrix.yaml"
+MATRIX_INGRESSROUTE = REPO_ROOT / "gitops" / "platform-apps" / "matrix" / "ingressroute.yaml"
+MATRIX_EXTERNALSECRET = REPO_ROOT / "gitops" / "platform-apps" / "matrix" / "externalsecret.yaml"
 ARGO_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
 )
@@ -232,6 +253,9 @@ NETBIRD_ADMIN_ACCESS_STEP_SCRIPT = (
     / "run.sh"
 )
 ENSURE_NETBIRD_SERVICE_SCRIPT = REPO_ROOT / "scripts" / "manager" / "ensure-netbird-service.sh"
+PATCH_NETBIRD_TRAEFIK_ALIAS_SCRIPT = (
+    REPO_ROOT / "scripts" / "manager" / "patch-netbird-traefik-alias.py"
+)
 AUTHENTIK_NETBIRD_MODULE_VARS = (
     REPO_ROOT / "infra" / "opentofu" / "authentik-netbird" / "variables.tf"
 )
@@ -635,6 +659,11 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert "proxmox_api_login()" in text
     assert "download_talos_image()" in text
     assert 'xz -dc "$tmp_compressed" > "$tmp_image"' in text
+    assert "PROXMOX_IMPORT_FREE_SPACE_BUFFER_BYTES" in text
+    assert "file_size_bytes()" in text
+    assert "proxmox_get_storage_status()" in text
+    assert "proxmox_talos_image_size()" in text
+    assert "proxmox_require_talos_upload_space()" in text
     assert "proxmox_upload_talos_image()" in text
     assert "proxmox_verify_talos_image()" in text
     assert "proxmox_talos_image_present()" in text
@@ -645,9 +674,15 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'validate_file_datastore_import_content "$FILE_DATASTORE"' in text
     assert "must allow Import content for Talos disk-image provisioning" in text
     assert '"${TF_VAR_proxmox_endpoint}/api2/json/storage/${datastore}"' in text
+    assert '"${node_endpoint}/api2/json/nodes/${node}/storage/${datastore}/status"' in text
     assert '--form "content=import"' in text
     assert 'expected_volid="${datastore}:import/${image_name}"' in text
     assert 'select(.volid == $volid and .content == "import")' in text
+    assert "stat -c '%s' \"$path\"" in text
+    assert 'file_size_bytes "$image_path"' in text
+    assert "has unexpected size for ${expected_volid}" in text
+    assert "is ${image_size} bytes, expected ${expected_size_bytes}; retrying" in text
+    assert "has insufficient free space for Talos disk image upload" in text
     assert "Uploading Talos disk image to Proxmox nodes:" in text
     assert "Uploaded Talos disk image to ${node}/${datastore}" in text
     assert "Talos disk image not visible yet on ${node}/${datastore}; retrying in ${delay}s" in text
@@ -1278,6 +1313,7 @@ def test_apply_argocd_application_helper_applies_and_waits_for_health():
     assert "Application/${application} compare/spec error:" in text
     assert "Application/${application} is Synced and Healthy" in text
     assert "Application/${application} is Synced and has no unhealthy resources" in text
+    assert '( "$health_status" == "Unknown" || "$health_status" == "Degraded" )' in text
     assert "has_unhealthy_resources()" in text
     assert "--skip-namespace-baseline" in text
     assert "Skipping namespace resource baseline for" in text
@@ -1940,8 +1976,10 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert 'base64.b64encode(raw).decode().rstrip("=")' in text
     assert "netbird_host_resource_address()" in text
     assert "resolve_traefik_cluster_ip()" in text
+    assert "read_service_cidrs_json()" in text
     assert "read_pod_cidrs_json()" in text
     assert "read_management_lan_cidrs_json()" in text
+    assert "read_json_string_array_input()" in text
     assert "ipv4_in_cidrs_json()" in text
     assert "normalize_traefik_resource_address()" in text
     assert "ensure_netbird_proxy_peer()" in text
@@ -1961,6 +1999,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "Empty Traefik address; using Traefik ClusterIP" in text
     assert 'traefik_target_port="8082"' in text
     assert 'traefik_target_protocol="http"' in text
+    assert 'service_cidrs_json="$(read_service_cidrs_json)"' in text
     assert 'pod_cidrs_json="$(read_pod_cidrs_json)"' in text
     assert 'management_lan_cidrs_json="$(read_management_lan_cidrs_json "$cluster_json")"' in text
     assert '-var "traefik_resource_address=$traefik_network_resource_address"' in text
@@ -2068,13 +2107,14 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     routing_peer_index = text.index("Deploying NetBird routing peers before enabling reverse proxy")
     backend_index = text.index('wait_for_traefik_reverse_proxy_backend "$traefik_resource_address"')
     proxy_peer_index = text.index('ensure_netbird_proxy_peer "$proxy_setup_key"')
+    alias_index = text.index('ensure_bastion_traefik_netbird_alias "$netbird_domain"')
     bastion_ip_index = text.index('bastion_netbird_ip="$(discover_netbird_proxy_peer_ip)"')
     exit_peer_index = text.index(
         'ensure_netbird_bastion_exit_peer "$bastion_exit_router_setup_key"'
     )
     proxy_backend_index = text.index("wait_for_netbird_proxy_backend \\")
     network_secret_index = text.index("Writing network secret for helper scripts")
-    service_cidrs_index = text.index('service_cidrs_json="$(jq -n --arg cidr "$service_cidr"')
+    service_cidrs_index = text.index('service_cidrs_json="$(read_service_cidrs_json)"')
     pod_cidrs_index = text.index('pod_cidrs_json="$(read_pod_cidrs_json)"')
     management_lan_index = text.index('management_lan_cidrs_json="$(read_management_lan_cidrs_json')
     normalize_traefik_index = text.index(
@@ -2083,6 +2123,9 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     dns_index = text.index("Creating wildcard DNS record for NetBird proxy")
     discovery_index = text.index('wait_for_public_oidc_discovery "$netbird_oidc_issuer"')
     authentik_service_index = text.index("Creating NetBird reverse proxy service for Authentik")
+    netbird_service_index = text.index(
+        "Creating NetBird reverse proxy service for NetBird coalescing fallback"
+    )
     idp_index = text.index("Registering Authentik as NetBird identity provider")
 
     # The services block was removed; services are now created per-app by ensure-netbird-service.sh
@@ -2110,14 +2153,32 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
         < routing_peer_index
         < backend_index
         < proxy_peer_index
+        < alias_index
         < bastion_ip_index
         < exit_peer_index
         < proxy_backend_index
         < dns_index
         < authentik_service_index
+        < netbird_service_index
         < discovery_index
         < idp_index
     )
+    assert 'netbird_domain="netbird.${public_zone_name}"' in text
+    assert "patch-netbird-traefik-alias.py" in text
+    assert 'docker compose "${compose_args[@]}" ps -q "$service_name"' in text
+    assert 'docker compose ps -q "$service_name"' in text
+    assert "verify_netbird_proxy_alias()" in text
+    assert "docker inspect -f '{{.Id}}'" in text
+    assert "getent hosts" not in text
+    assert "10.96.0.0/12" not in text
+    assert "10.244.0.0/16" not in text
+    assert "--target-type cluster" in text
+    assert '--target-id "$netbird_domain"' in text
+    assert '--target-host "$netbird_domain"' in text
+    assert "--target-port 443" in text
+    assert "--target-protocol https" in text
+    assert "--target-direct-upstream true" in text
+    assert "--target-skip-tls-verify false" in text
 
 
 def test_ensure_netbird_service_uses_current_api_and_safe_skips():
@@ -2132,6 +2193,13 @@ def test_ensure_netbird_service_uses_current_api_and_safe_skips():
     assert '"${NETBIRD_REVERSE_PROXY_API}/services/"' not in text
     assert "normalize_netbird_collection" in text
     assert "--normalize-collection" in text
+    assert "--target-type" in text
+    assert "--target-id" in text
+    assert "--target-host" in text
+    assert "--target-port" in text
+    assert "--target-protocol" in text
+    assert "--target-direct-upstream" in text
+    assert "--target-skip-tls-verify" in text
     assert 'elif (.clusters | type) == "array" then .clusters' in text
     assert 'elif (.results | type) == "array" then .results' in text
     assert 'elif (.items | type) == "array" then .items' in text
@@ -2152,16 +2220,26 @@ def test_ensure_netbird_service_uses_current_api_and_safe_skips():
     assert "Could not find Traefik resource ${TRAEFIK_RESOURCE_ADDRESS}" not in text
     assert "--argjson service_enabled" in text
     assert "--argjson target_port" in text
+    assert "--argjson direct_upstream" in text
     assert "--argjson skip_tls_verify" in text
     assert "--arg protocol" in text
     assert "--argjson enabled" not in text
+    assert "TARGET_ID_OVERRIDE" in text
+    assert "TARGET_TYPE_OVERRIDE" in text
+    assert "TARGET_HOST_OVERRIDE" in text
+    assert "TARGET_DIRECT_UPSTREAM" in text
+    assert "TARGET_SKIP_TLS_VERIFY" in text
     assert "TRAEFIK_TARGET_PORT" in text
     assert "TRAEFIK_TARGET_PROTOCOL" in text
     assert '.TRAEFIK_TARGET_PORT // "443"' in text
     assert ".TRAEFIK_TARGET_PROTOCOL // empty" in text
+    assert "target_id: $target_id" in text
+    assert "target_type: $target_type" in text
+    assert "host: $host" in text
     assert "port: $target_port" in text
     assert "port: 443" not in text
     assert "protocol: $protocol" in text
+    assert "direct_upstream: $direct_upstream" in text
     assert "skip_tls_verify: $skip_tls_verify" in text
     assert 'TRAEFIK_TARGET_PROTOCOL="http"' in text
 
@@ -2200,6 +2278,58 @@ def test_ensure_netbird_service_normalizes_live_and_legacy_api_shapes():
     )
     assert normalize_netbird_collection({"domains": None}, "domains") == []
     assert normalize_netbird_collection("not-a-collection", "clusters") == []
+
+
+def test_netbird_traefik_alias_patcher_preserves_labels_and_adds_only_alias():
+    spec = importlib.util.spec_from_file_location(
+        "patch_netbird_traefik_alias",
+        PATCH_NETBIRD_TRAEFIK_ALIAS_SCRIPT,
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+
+    compose = {
+        "services": {
+            "traefik": {
+                "image": "traefik:v3",
+                "labels": [
+                    "traefik.http.routers.netbird-dashboard.rule=Host(`netbird.example.test`)",
+                    "traefik.http.routers.netbird-dashboard.tls=true",
+                ],
+                "networks": {
+                    "netbird": {"aliases": ["traefik"]},
+                    "default": {},
+                },
+            },
+            "proxy": {
+                "image": "netbirdio/netbird:0.70.5",
+                "labels": {
+                    "traefik.tcp.routers.proxy-passthrough.rule": (
+                        "HostSNI(`*`) && !HostSNI(`netbird.example.test`)"
+                    )
+                },
+            },
+        },
+        "networks": {"netbird": {}, "default": {}},
+    }
+    traefik_labels = list(compose["services"]["traefik"]["labels"])
+    proxy_yaml = yaml.safe_dump(compose["services"]["proxy"], sort_keys=False)
+
+    module.patch_compose_data(compose, "netbird.example.test")
+
+    assert compose["services"]["traefik"]["labels"] == traefik_labels
+    assert yaml.safe_dump(compose["services"]["proxy"], sort_keys=False) == proxy_yaml
+    assert compose["services"]["traefik"]["networks"]["netbird"]["aliases"] == [
+        "traefik",
+        "netbird.example.test",
+    ]
+    assert compose["services"]["traefik"]["networks"]["default"] == {}
+
+    once = yaml.safe_dump(compose, default_flow_style=False, sort_keys=False)
+    module.patch_compose_data(compose, "netbird.example.test")
+    twice = yaml.safe_dump(compose, default_flow_style=False, sort_keys=False)
+    assert twice == once
 
 
 def test_netbird_service_hostnames_match_ingress_routes():
@@ -2259,6 +2389,111 @@ def test_netbird_service_hostnames_match_ingress_routes():
         / "install-management-consoles"
         / "run.sh"
     ).read_text(encoding="utf-8")
+
+
+def test_matrix_app_manifest_uses_supported_chart_values():
+    text = MATRIX_APP_MANIFEST.read_text(encoding="utf-8")
+
+    assert "releaseName: ess" in text
+    assert (
+        'serverName: "matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"' in text
+    )
+    assert "synapse:" in text
+    assert "elementWeb:" in text
+    assert "matrixAuthenticationService:" in text
+    assert "elementAdmin:" in text
+    assert "matrixRTC:" in text
+    assert "configSecret: matrix-config" in text
+    assert "configSecretKey: oidc-upstream.yaml" in text
+    assert 'host: "matrix.' in text
+    assert 'host: "chat.' in text
+    assert 'host: "account.' in text
+    assert 'host: "element-admin.' in text
+    assert 'host: "mrtc.' in text
+    assert "twinbox.io/public-zone-name" in text
+    assert "extraEnv:" not in text
+    assert "valueFrom:" not in text
+    assert "ingress.enabled" not in text
+    assert "wellknownDelegation" not in text
+
+
+def test_matrix_values_disable_chart_ingress_and_well_known():
+    text = MATRIX_VALUES.read_text(encoding="utf-8")
+
+    assert "className: twinbox-disabled" in text
+    assert "wellKnownDelegation:\n  enabled: false" in text
+    assert "ingress.enabled" not in text
+    assert "wellknownDelegation" not in text
+
+
+def test_matrix_ingressroutes_target_chart_services():
+    text = MATRIX_INGRESSROUTE.read_text(encoding="utf-8")
+
+    assert "kind: IngressRoute" in text
+    assert "Host(`matrix.__ZONE_NAME__`)" in text
+    assert "Host(`chat.__ZONE_NAME__`)" in text
+    assert "Host(`account.__ZONE_NAME__`)" in text
+    assert "Host(`element-admin.__ZONE_NAME__`)" in text
+    assert "Host(`mrtc.__ZONE_NAME__`)" in text
+    assert "PathPrefix(`/sfu/get`)" in text
+    assert "PathPrefix(`/get_token`)" in text
+    assert "name: ess-synapse" in text
+    assert "name: ess-element-web" in text
+    assert "name: ess-matrix-authentication-service" in text
+    assert "name: ess-element-admin" in text
+    assert "name: ess-matrix-rtc-authorisation-service" in text
+    assert "name: ess-matrix-rtc-sfu" in text
+    assert "port: 8008" in text
+    assert "port: 8080" in text
+    assert "port: 7880" in text
+    assert "ess-synapse-haproxy" not in text
+    assert "port: 443" not in text
+
+
+def test_matrix_install_step_waits_on_specific_resources():
+    text = MATRIX_STEP_SCRIPT.read_text(encoding="utf-8")
+
+    assert "matrix_oidc_upstream_config=" in text
+    assert "MATRIX_OIDC_UPSTREAM_CONFIG" in text
+    assert "MATRIX_OIDC_ENABLED_IDPS" in text
+    assert 'wait_for_named_resource_ready "databases" "cluster" "matrix-synapse-db"' in text
+    assert 'wait_for_named_resource_ready "databases" "cluster" "matrix-mas-db"' in text
+    assert (
+        'wait_for_named_resource_ready "databases" "externalsecret" "matrix-synapse-db-credentials"'
+        in text
+    )
+    assert (
+        'wait_for_named_resource_ready "databases" "externalsecret" "matrix-mas-db-credentials"'
+        in text
+    )
+    assert 'wait_for_named_resource_ready "matrix" "externalsecret" "matrix-config"' in text
+    assert (
+        'wait_for_named_resource_ready "matrix" "externalsecret" "matrix-synapse-db-credentials"'
+        in text
+    )
+    assert (
+        'wait_for_named_resource_ready "matrix" "externalsecret" "matrix-mas-db-credentials"'
+        in text
+    )
+    assert 'wait_for_named_resource_ready "matrix" "externalsecret" "matrix-runtime"' in text
+    assert 'wait_for_statefulset_ready "matrix" "ess-synapse-main"' in text
+    assert 'wait_for_deployment_rollout "matrix" "ess-haproxy"' in text
+    assert 'wait_for_deployment_rollout "matrix" "ess-matrix-rtc-authorisation-service"' in text
+    assert 'wait_for_resources_ready "databases" "cluster"' not in text
+    assert 'wait_for_resources_ready "databases" "externalsecret"' not in text
+    assert 'wait_for_resources_ready "matrix" "externalsecret"' not in text
+    assert 'wait_for_statefulset_ready "matrix" "ess-synapse"' not in text
+
+
+def test_matrix_external_secret_renders_oidc_upstream_config():
+    text = MATRIX_EXTERNALSECRET.read_text(encoding="utf-8")
+
+    assert "engineVersion: v2" in text
+    assert "type: Opaque" in text
+    assert "oidc-upstream.yaml: |-" in text
+    assert "MATRIX_OIDC_UPSTREAM_CONFIG" in text
+    assert "MAS_OIDC_CLIENT_ID" not in text
+    assert "MATRIX_OIDC_ENABLED_IDPS" not in text
 
 
 def test_netbird_proxy_uses_traefik_webnetbird_origin():
@@ -3348,12 +3583,8 @@ def test_argocd_cluster_secret_helper_resolves_pod_cidr_before_rendering_annotat
         encoding="utf-8"
     )
 
-    assert text.index('if [[ -z "$POD_CIDR" ]]; then') < text.index(
-        'existing_secret_json="$(kubectl -n argocd get secret "$SECRET_NAME" -o json 2>/dev/null || true)"'
-    )
-    assert text.index('if [[ -z "$POD_CIDR" ]]; then') < text.index(
-        '"twinbox.io/pod-cidr": $pod_cidr'
-    )
+    assert "10.244.0.0/16" not in text
+    assert "Could not determine pod CIDR from cluster nodes; pass --pod-cidr explicitly" in text
 
 
 def test_argocd_cluster_secret_helper_preserves_existing_resource_profile():
@@ -3507,6 +3738,7 @@ def test_databases_shared_kustomization_only_owns_namespace():
         "authentik",
         "hedgedoc",
         "immich",
+        "mastodon",
         "n8n",
         "nextcloud",
         "openwebui",
@@ -3826,6 +4058,10 @@ def test_database_app_installers_refresh_pgadmin_after_database_ready():
             "hedgedoc-db-pooler-rw-session.databases.svc.cluster.local",
         ),
         "install-immich": ("immich", "immich-db-pooler-rw-session.databases.svc.cluster.local"),
+        "install-mastodon": (
+            "mastodon",
+            "mastodon-db-pooler-rw-session.databases.svc.cluster.local",
+        ),
         "install-n8n": ("n8n", "n8n-db-pooler-rw-session.databases.svc.cluster.local"),
         "install-nextcloud": ("nextcloud", "nextcloud-db-pooler-rw.databases.svc.cluster.local"),
         "install-openwebui": (
@@ -3921,6 +4157,118 @@ def test_install_immich_step_applies_its_argo_application():
     assert "db-externalsecret.yaml" in (
         REPO_ROOT / "gitops" / "platform-apps" / "immich" / "kustomization.yaml"
     ).read_text(encoding="utf-8")
+
+
+def test_mastodon_step_applies_the_custom_app_and_bootstraps_admin_access():
+    step_text = MASTODON_STEP_SCRIPT.read_text(encoding="utf-8")
+    step_manifest_text = MASTODON_STEP_MANIFEST.read_text(encoding="utf-8")
+    app_text = MASTODON_APP.read_text(encoding="utf-8")
+    values_text = MASTODON_VALUES.read_text(encoding="utf-8")
+    namespace_text = MASTODON_NAMESPACE.read_text(encoding="utf-8")
+    runtime_secret_text = MASTODON_RUNTIME_SECRET.read_text(encoding="utf-8")
+    s3_secret_text = MASTODON_S3_SECRET.read_text(encoding="utf-8")
+    db_secret_text = MASTODON_DB_SECRET.read_text(encoding="utf-8")
+    db_cluster_text = MASTODON_DB_CLUSTER.read_text(encoding="utf-8")
+    db_objectstore_text = MASTODON_DB_OBJECTSTORE.read_text(encoding="utf-8")
+    dashy_config_text = (REPO_ROOT / "lib" / "dashy-config.mjs").read_text(encoding="utf-8")
+
+    assert "title: Install Mastodon" in step_manifest_text
+    assert "icon: install-mastodon" in step_manifest_text
+    assert "categories/apps/steps/install-mastodon/run.sh" in step_manifest_text
+
+    generate_alphanumeric_text = step_text.split("generate_alphanumeric() {", 1)[1].split(
+        "generate_vapid_keys() {", 1
+    )[0]
+    assert 'node - "$length"' in generate_alphanumeric_text
+    assert "head -c" not in generate_alphanumeric_text
+
+    assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in step_text
+    assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in step_text
+    assert "openbao_read_global_secret_json mastodon" in step_text
+    assert "mastodon_secret_file=" in step_text
+    assert 'mastodon_admin_password=""' in step_text
+    assert "sync-openbao-global-secret.sh" in step_text
+    assert '--secret-name "mastodon"' in step_text
+    assert (
+        '--required-keys "MASTODON_POSTGRESQL__USERNAME,MASTODON_POSTGRESQL__PASSWORD,REDIS_PASSWORD,SECRET_KEY_BASE,OTP_SECRET,VAPID_PRIVATE_KEY,VAPID_PUBLIC_KEY,ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY,ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY,ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT,MASTODON_OIDC_CLIENT_ID,MASTODON_OIDC_CLIENT_SECRET,MASTODON_ADMIN_USERNAME"'
+        in step_text
+    )
+    assert (
+        '--required-keys "MASTODON_POSTGRESQL__USERNAME,MASTODON_POSTGRESQL__PASSWORD,REDIS_PASSWORD,SECRET_KEY_BASE,OTP_SECRET,VAPID_PRIVATE_KEY,VAPID_PUBLIC_KEY,ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY,ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY,ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT,MASTODON_OIDC_CLIENT_ID,MASTODON_OIDC_CLIENT_SECRET,MASTODON_ADMIN_USERNAME,MASTODON_ADMIN_PASSWORD"'
+        in step_text
+    )
+    assert "gitops/platform-apps/mastodon/namespace.yaml" in step_text
+    assert "gitops/databases/shared/namespace.yaml" in step_text
+    assert "gitops/platform-apps/mastodon/externalsecret-runtime.yaml" in step_text
+    assert "gitops/platform-apps/mastodon/externalsecret-s3.yaml" in step_text
+    assert "gitops/databases/mastodon/externalsecret.yaml" in step_text
+    assert 'openbao_wait_for_external_secret_ready "mastodon" "mastodon-runtime"' in step_text
+    assert 'openbao_wait_for_secret "mastodon-runtime" "mastodon"' in step_text
+    assert (
+        'openbao_wait_for_external_secret_ready "databases" "mastodon-db-credentials"' in step_text
+    )
+    assert 'openbao_wait_for_secret "mastodon-db-credentials" "databases"' in step_text
+    assert "render_template" in step_text
+    assert "gitops/apps/mastodon.yaml" in step_text
+    assert "apply-argocd-application.sh" in step_text
+    assert '--application "mastodon"' in step_text
+    assert "wait_for_deployment_image" in step_text
+    assert "bundle" in step_text
+    assert "db:migrate db:seed" in step_text
+    assert "SKIP_POST_DEPLOYMENT_MIGRATIONS" not in step_text
+    assert 'kubectl -n mastodon logs "job/' in step_text
+    assert "kubectl -n mastodon exec deployment/mastodon-web" in step_text
+    assert "bin/tootctl" in step_text
+    assert (
+        'accounts modify "$mastodon_admin_username" --approve --confirm --role Owner' in step_text
+    )
+    assert (
+        'accounts create "$mastodon_admin_username" --email "$mastodon_admin_email" --confirmed --role Owner --approve'
+        in step_text
+    )
+    assert "sync-pgadmin4-server.sh" in step_text
+    assert '--app-id "mastodon"' in step_text
+    assert '--host "mastodon-db-pooler-rw-session.databases.svc.cluster.local"' in step_text
+    assert "ensure-netbird-service.sh" in step_text
+    assert '--service-name "mastodon"' in step_text
+    assert '--service-domain "mastodon.${public_zone_name}"' in step_text
+    assert "path: gitops/platform-apps/mastodon" in app_text
+    assert "path: gitops/databases/mastodon" in app_text
+    assert "mastodon.__ZONE_NAME__" in app_text
+    assert "authentik.__ZONE_NAME__/application/o/mastodon/" in app_text
+    assert "Host(`mastodon.__ZONE_NAME__`)" in app_text
+    assert "mastodon-db-pooler-rw-session.databases.svc.cluster.local" in values_text
+    assert "mastodon-redis.mastodon.svc.cluster.local" in values_text
+    assert "elasticsearch:\n  enabled: false" in values_text
+    assert "dbMigrate:\n      enabled: false" in values_text
+    assert "pod-security.kubernetes.io/enforce: baseline" in namespace_text
+    assert "pod-security.kubernetes.io/audit: baseline" in namespace_text
+    assert "pod-security.kubernetes.io/warn: baseline" in namespace_text
+    assert "mastodon-runtime" in runtime_secret_text
+    assert "property: MASTODON_POSTGRESQL__PASSWORD" in runtime_secret_text
+    assert "property: REDIS_PASSWORD" in runtime_secret_text
+    assert "property: SECRET_KEY_BASE" in runtime_secret_text
+    assert "property: OTP_SECRET" in runtime_secret_text
+    assert "property: VAPID_PRIVATE_KEY" in runtime_secret_text
+    assert "property: VAPID_PUBLIC_KEY" in runtime_secret_text
+    assert "property: ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY" in runtime_secret_text
+    assert "property: ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY" in runtime_secret_text
+    assert "property: ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT" in runtime_secret_text
+    assert "name: mastodon-s3" in s3_secret_text
+    assert "key: twinbox/global/velero" in s3_secret_text
+    assert "name: mastodon-db-credentials" in db_secret_text
+    assert "property: MASTODON_POSTGRESQL__USERNAME" in db_secret_text
+    assert "property: MASTODON_POSTGRESQL__PASSWORD" in db_secret_text
+    assert "barmanObjectName: mastodon-db-objectstore" in db_cluster_text
+    assert "instances: 2" in db_cluster_text
+    assert "cpu: 100m" in db_cluster_text
+    assert "memory: 256Mi" in db_cluster_text
+    assert "cpu: 500m" in db_cluster_text
+    assert "memory: 1Gi" in db_cluster_text
+    assert "destinationPath: s3://twinbox-velero/mastodon-db/" in db_objectstore_text
+    assert "imageName: ghcr.io/cloudnative-pg/postgresql:16.4" in db_cluster_text
+    assert '["install-mastodon", "install-mastodon"]' in dashy_config_text
+    assert '["Mastodon", "install-mastodon"]' in dashy_config_text
     immich_db_text = IMMICH_DB_KUSTOMIZATION.read_text(encoding="utf-8")
     assert "namespace.yaml" not in immich_db_text
     assert "../namespace.yaml" not in immich_db_text
@@ -4331,6 +4679,7 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     setup_authentik_text = _termix_setup_authentik_text()
     setup_text = _termix_setup_text()
     deployment_text = _termix_deployment_text()
+    configmap_text = TERMIX_CONFIGMAP.read_text(encoding="utf-8")
     externalsecret_text = _termix_externalsecret_text()
     app_manifest_text = TERMIX_APP_MANIFEST.read_text(encoding="utf-8")
     namespace_text = TERMIX_NAMESPACE.read_text(encoding="utf-8")
@@ -4443,6 +4792,12 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "showTerminalInSidebar: true" in setup_text
     assert "enableSsh: true" in setup_text
 
+    assert "termix-users-rbac-patch.mjs" in configmap_text
+    assert "process.env.OIDC_ADMIN_GROUP" in configmap_text
+    assert 'process.env.TERMIX_BROWSER_ROLE_NAME || "browser-ssh"' in configmap_text
+    assert "Twinbox Browser SSH role assigned to OIDC admin" in configmap_text
+    assert "twinbox_browser_ssh_role_sync" in configmap_text
+
     assert "OIDC_ALLOWED_USERS" in externalsecret_text
     assert "OIDC_ALLOW_REGISTRATION" in externalsecret_text
     assert "OIDC_FORCE_HTTPS" in externalsecret_text
@@ -4454,6 +4809,10 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "NB_MANAGEMENT_URL" in externalsecret_text
     assert "NB_HOSTNAME" in externalsecret_text
     assert "name: netbird" in deployment_text
+    assert "node /tmp/termix-users-rbac-patch.mjs" in deployment_text
+    assert "exec /entrypoint.sh" in deployment_text
+    assert "TERMIX_BROWSER_ROLE_NAME" in deployment_text
+    assert "subPath: termix-users-rbac-patch.mjs" in deployment_text
     assert "image: netbirdio/netbird:0.72.4" in deployment_text
     assert "NB_SETUP_KEY" in deployment_text
     assert "NB_MANAGEMENT_URL" in deployment_text
@@ -4659,6 +5018,9 @@ def test_forgejo_management_console_route_uses_native_oidc_and_dashy_tile():
 
 def test_seaweedfs_admin_routes_to_the_admin_web_port():
     text = (
+        REPO_ROOT / "gitops" / "platform" / "management-consoles" / "seaweedfs-ingressroute.yaml"
+    ).read_text(encoding="utf-8")
+    admin_text = (
         REPO_ROOT
         / "gitops"
         / "platform"
@@ -4666,9 +5028,16 @@ def test_seaweedfs_admin_routes_to_the_admin_web_port():
         / "seaweedfs-admin-ingressroute.yaml"
     ).read_text(encoding="utf-8")
 
-    assert "name: seaweedfs" in text
-    assert "port: 23646" in text
-    assert "port: 8888" not in text
+    assert "PathPrefix(`/cache`)" in text
+    assert "name: seaweedfs-cache-prefix" in text
+    assert "prefix: /mastodon" in text
+    assert text.count("name: authentik-forwardauth") == 2
+    assert text.count("port: 8333") == 2
+    assert text.count("port: 8888") == 2
+    assert "port: 23646" not in text
+    assert "name: seaweedfs" in admin_text
+    assert "port: 23646" in admin_text
+    assert "port: 8888" not in admin_text
 
 
 def test_authentik_callback_ingressroutes_reference_the_authentik_namespace():
@@ -4721,6 +5090,9 @@ def test_bootstrap_scripts_use_the_management_vm_ip_for_seaweedfs():
         "s3.bucket.create -name"
     )
     assert "SeaweedFS bucket ${SEAWEEDFS_BUCKET} was not created" in start_manager_text
+    assert "ensure_seaweedfs_data_dir()" in bootstrap_vm_text
+    assert 'install -d -m 0755 "$TARGET_DIR/seaweedfs/data"' in bootstrap_vm_text
+    assert 'sudo chown -R "$USER":"$USER" "$TARGET_DIR/seaweedfs/data"' in bootstrap_vm_text
 
 
 def test_authentik_consumer_scripts_read_from_openbao():
@@ -4941,6 +5313,9 @@ def test_netbird_cloud_init_uses_exact_netbird_cert_and_tcp_passthrough():
     assert "/opt/netbird/traefik-dynamic.yaml:/opt/netbird/traefik-dynamic.yaml:ro" in text
     assert "--providers.file.filename=/opt/netbird/traefik-dynamic.yaml" in text
     assert '"--providers.docker.network=": "--providers.docker.network=netbird_netbird"' in text
+    assert "ensure_network_alias" in text
+    assert 'ensure_network_alias(traefik, "netbird", netbird_domain)' in text
+    assert 'entry.setdefault("aliases", [])' in text
     assert "traefik-dynamic.yaml" in text
     assert 'data.pop("tls", None)' in text
     assert 'data.pop("http", None)' in text

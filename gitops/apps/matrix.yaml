@@ -22,66 +22,38 @@ spec:
           path: .
           targetRevision: "26.5.1"
           helm:
+            releaseName: ess
             valueFiles:
               - $values/gitops/values/matrix.yaml
             values: |
               serverName: "matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+              synapse:
+                ingress:
+                  host: "matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
               elementWeb:
-                host: "chat.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+                ingress:
+                  host: "chat.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
                 additional:
-                  0-homeserver:
-                    config: |
-                      {
-                        "default_server_config": {
-                          "m.homeserver": {
-                            "base_url": "https://matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
-                          }
+                  0-homeserver: |
+                    {
+                      "default_server_config": {
+                        "m.homeserver": {
+                          "base_url": "https://matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
                         }
                       }
+                    }
               matrixAuthenticationService:
-                host: "account.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
-                extraEnv:
-                  - name: MAS_OIDC_CLIENT_ID
-                    valueFrom:
-                      secretKeyRef:
-                        name: matrix-config
-                        key: MAS_OIDC_CLIENT_ID
-                  - name: MAS_OIDC_CLIENT_SECRET
-                    valueFrom:
-                      secretKeyRef:
-                        name: matrix-config
-                        key: MAS_OIDC_CLIENT_SECRET
-                  - name: MAS_OIDC_PROVIDER_ULID
-                    valueFrom:
-                      secretKeyRef:
-                        name: matrix-config
-                        key: MAS_OIDC_PROVIDER_ULID
+                ingress:
+                  host: "account.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
                 additional:
                   0-oidc:
-                    config: |
-                      upstream_oauth2:
-                        providers:
-                          - id: "${MAS_OIDC_PROVIDER_ULID}"
-                            issuer: "https://authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
-                            human_name: Authentik
-                            client_id: "${MAS_OIDC_CLIENT_ID}"
-                            client_secret: "${MAS_OIDC_CLIENT_SECRET}"
-                            token_endpoint_auth_method: client_secret_post
-                            scope: "openid email profile"
-                            claims_imports:
-                              localpart:
-                                action: force
-                                template: "{{"{{"}} user.preferred_username {{"}}"}}"
-                              displayname:
-                                action: suggest
-                                template: "{{"{{"}} user.name {{"}}"}}"
-                              email:
-                                action: suggest
-                                template: "{{"{{"}} user.email {{"}}"}}"
+                    configSecret: matrix-config
+                    configSecretKey: oidc-upstream.yaml
               elementAdmin:
-                host: "element-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+                ingress:
+                  host: "element-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
               matrixRTC:
-                sfu:
+                ingress:
                   host: "mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
         - repoURL: __REPO_URL__
           targetRevision: __TARGET_REVISION__

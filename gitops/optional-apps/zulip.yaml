@@ -21,7 +21,7 @@ spec:
       sources:
         - repoURL: oci://ghcr.io/zulip/helm-charts/zulip
           path: .
-          targetRevision: "1.12.0"
+          targetRevision: "2.0.0"
           helm:
             valueFiles:
               - $values/gitops/values/zulip.yaml
@@ -33,8 +33,7 @@ spec:
                   SETTING_CSRF_TRUSTED_ORIGINS: '["https://zulip.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"]'
                   SETTING_SOCIAL_AUTH_OIDC_FULL_NAME_VALIDATED: "True"
                   ZULIP_AUTH_BACKENDS: GenericOpenIdConnectBackend
-                  TRUST_GATEWAY_IP: "True"
-                  LOADBALANCER_IPS: "{{default "10.244.0.0/16" (index .metadata.annotations "twinbox.io/pod-cidr")}}"
+                  LOADBALANCER_IPS: "{{index .metadata.annotations "twinbox.io/pod-cidr"}}"
               rabbitmq:
                 auth:
                   existingPasswordSecret: zulip-runtime

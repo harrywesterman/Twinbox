@@ -15,7 +15,7 @@ SeaweedFS runs on the Management VM alongside the Twinbox manager stack.
 | Bootstrap secret | `/opt/twinbox/bootstrap/secrets/global/velero.json` | Stores the S3 credentials, bucket, region, and endpoint |
 | K8s Service | `gitops/platform/management-consoles/seaweedfs-service.yaml` | Exposes SeaweedFS ports inside the cluster |
 | K8s Endpoints | `gitops/platform/management-consoles/seaweedfs-endpoints.yaml` | Points the cluster service at the Management VM IP |
-| Traefik IngressRoutes | `gitops/platform/management-consoles/seaweedfs-*.yaml` | Publishes the filer and admin UIs through Traefik |
+| Traefik IngressRoutes | `gitops/platform/management-consoles/seaweedfs-*.yaml` | Publishes the SeaweedFS admin UI and proxies Mastodon media URLs through Traefik |
 
 ## S3 Endpoint
 
@@ -34,7 +34,7 @@ SeaweedFS exposes two browser-facing interfaces through Traefik:
 - `seaweedfs.__ZONE_NAME__` for the filer/standard web UI
 - `seaweedfs-admin.__ZONE_NAME__` for the admin UI
 
-Both routes use the shared Authentik forward-auth middleware.
+The SeaweedFS filer host serves `/cache` without Authentik for Mastodon media, and Traefik prefixes the request with the `mastodon` bucket before it reaches the S3 endpoint on port `8333`. The admin UI stays behind Authentik.
 
 ## Velero Integration
 

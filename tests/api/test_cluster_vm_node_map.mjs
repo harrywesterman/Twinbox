@@ -188,7 +188,7 @@ test('cluster builder stores an automatic small resource profile for homelab def
     ...baseBody,
     worker_count: 3,
     cpu_cores: 4,
-    memory_mb: 10240,
+    memory_mb: 8192,
     vm_ip_map: {
       'cp-1': '192.168.1.61',
       'worker-1': '192.168.1.62',
@@ -207,7 +207,7 @@ test('cluster builder stores an automatic small resource profile for homelab def
   assert.equal(result.cluster.resource_profile, 'small');
   assert.equal(result.cluster.observability_profile, 'full');
   assert.equal(result.cluster.worker_cpu_total, 12);
-  assert.equal(result.cluster.worker_memory_total_mb, 30720);
+  assert.equal(result.cluster.worker_memory_total_mb, 24576);
   assert.match(result.cluster.resource_profile_reason, /12 worker CPU cores/);
 });
 
