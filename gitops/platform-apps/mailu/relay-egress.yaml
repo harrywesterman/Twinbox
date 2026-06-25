@@ -103,7 +103,7 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 6
         - name: haproxy
-          image: haproxy:3.0.23-alpine
+          image: haproxy:3.4.0-alpine
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
