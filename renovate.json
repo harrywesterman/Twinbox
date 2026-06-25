@@ -88,6 +88,33 @@
       "depNameTemplate": "AdguardTeam/AdGuardHome"
     },
     {
+      "fileMatch": ["(^|/)config/pinned-defaults\\.sh$"],
+      "datasourceTemplate": "helm",
+      "registryUrlTemplate": "https://helm.cilium.io",
+      "matchStrings": ["PINNED_CILIUM_CHART_VERSION=(?<currentValue>[0-9.]+)"],
+      "depNameTemplate": "cilium/cilium"
+    },
+    {
+      "fileMatch": ["(^|/)config/pinned-defaults\\.sh$"],
+      "datasourceTemplate": "helm",
+      "registryUrlTemplate": "https://cloudtty.github.io/cloudtty",
+      "matchStrings": ["PINNED_CLOUDTTY_CHART_VERSION=(?<currentValue>[0-9.]+)"],
+      "depNameTemplate": "cloudtty/cloudtty"
+    },
+    {
+      "fileMatch": ["(^|/)config/pinned-defaults\\.sh$"],
+      "datasourceTemplate": "helm",
+      "registryUrlTemplate": "https://helm.coder.com/v2",
+      "matchStrings": ["PINNED_CODER_CHART_VERSION=(?<currentValue>[0-9.]+)"],
+      "depNameTemplate": "coder"
+    },
+    {
+      "fileMatch": ["(^|/)config/pinned-defaults\\.sh$"],
+      "datasourceTemplate": "docker",
+      "matchStrings": ["PINNED_FORGEJO_VERSION=(?<currentValue>[0-9.]+)"],
+      "depNameTemplate": "codeberg.org/forgejo/forgejo"
+    },
+    {
       "description": "Image tags in gitops/values/*.yaml and gitops/apps/authentik/values.yaml",
       "fileMatch": ["(^|/)gitops/(values|apps)/.*\\.yaml$"],
       "matchStringsStrategy": "any",
