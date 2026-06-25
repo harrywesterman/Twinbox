@@ -78,7 +78,7 @@ spec:
               value: never
       containers:
         - name: opencloud
-          image: opencloudeu/opencloud-rolling:6.2.0
+          image: opencloudeu/opencloud-rolling:7.2.0
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
@@ -196,7 +196,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: collaboration
-          image: opencloudeu/opencloud-rolling:6.2.0
+          image: opencloudeu/opencloud-rolling:7.2.0
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
