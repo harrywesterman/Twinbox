@@ -88,3 +88,15 @@ variable "dns_api_secret" {
   sensitive   = true
   default     = ""
 }
+
+variable "opkssh_issuer_url" {
+  description = "Authentik issuer URL for opkssh (optional, enables opkssh install when set)"
+  type        = string
+  default     = ""
+}
+
+variable "opkssh_client_id" {
+  description = "Authentik client ID for opkssh (optional, enables opkssh install when set)"
+  type        = string
+  default     = ""
+}

@@ -15,3 +15,20 @@ spec:
         - name: api@internal
           kind: TraefikService
   tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-dashboard-netbird
+  namespace: traefik
+spec:
+  entryPoints:
+    - webnetbird
+  routes:
+    - match: Host(`traefik.__ZONE_NAME__`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))
+      kind: Rule
+      middlewares:
+        - name: authentik-forwardauth
+      services:
+        - name: api@internal
+          kind: TraefikService

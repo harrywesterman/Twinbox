@@ -124,7 +124,8 @@ response="$(
 schematic_id="$(printf '%s' "$response" | jq -r '.id // empty')"
 [[ -n "$schematic_id" ]] || fail "Factory response did not include an id"
 
-image_url="https://factory.talos.dev/image/${schematic_id}/${version}/metal-${arch}.iso"
+# Use the compressed bootable Talos disk image rather than the ISO installer path.
+image_url="https://factory.talos.dev/image/${schematic_id}/${version}/metal-${arch}.raw.xz"
 installer_image="factory.talos.dev/metal-installer/${schematic_id}:${version}"
 download_url=""
 if [[ "$installer_only" != "true" ]]; then
@@ -143,8 +144,9 @@ case "$output" in
   shell)
     printf 'TALOS_IMAGE_SCHEMATIC=%s\n' "$schematic_id"
     printf 'TALOS_IMAGE_FACTORY_URL=%s\n' "$image_url"
-    printf 'TALOS_IMAGE_INSTALLER=%s\n' "$installer_image"
+    printf 'TALOS_IMAGE_DISK_URL=%s\n' "$download_url"
     printf 'TALOS_IMAGE_DOWNLOAD_URL=%s\n' "$download_url"
+    printf 'TALOS_IMAGE_INSTALLER=%s\n' "$installer_image"
     ;;
   json)
     jq -n \
@@ -153,16 +155,17 @@ case "$output" in
       --arg arch "$arch" \
       --arg platform "$platform" \
       --arg url "$image_url" \
+      --arg disk_url "$download_url" \
       --arg installer_image "$installer_image" \
-      --arg download_url "$download_url" \
       '{
         schematic_id: $id,
         version: $version,
         arch: $arch,
         platform: $platform,
         image_url: $url,
+        disk_url: $disk_url,
         installer_image: $installer_image,
-        download_url: $download_url
+        download_url: $disk_url
       }'
     ;;
   *)

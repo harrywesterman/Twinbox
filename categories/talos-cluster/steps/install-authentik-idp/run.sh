@@ -386,7 +386,7 @@ fi
 # Uses the automation token directly (not the bootstrap token) since the blueprint
 # already set the key on the token object.
 wait_for_blueprint_service_account() {
-  local attempts=60
+  local attempts=120
   local attempt=1
 
   authentik_setup_forward

@@ -102,6 +102,13 @@ spec:
                   value: Host(`opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
+                name: opencloud-netbird
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`opencloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
                 name: collabora
               patch: |-
                 - op: replace
@@ -109,7 +116,21 @@ spec:
                   value: Host(`opencloud-collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
+                name: collabora-netbird
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`opencloud-collabora.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
                 name: wopiserver
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`opencloud-wopiserver.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: wopiserver-netbird
               patch: |-
                 - op: replace
                   path: /spec/routes/0/match

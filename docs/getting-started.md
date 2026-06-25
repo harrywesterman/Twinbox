@@ -79,14 +79,15 @@ Use the UI to work through the setup steps. The exact order depends on your chos
 28. **Install Management Backup** (`install-management-backup`) — Host cron jobs for etcd + restic
 29. **Install CrowdSec** (`install-crowdsec`) — IDS + Traefik bouncer
 30. **Install ntfy** (`install-ntfy`) — Push notifications for alerts
-31. **Install Cloudtty** (`install-cloudtty`) — Browser-based cluster shell
+31. **Install Browser SSH** (`install-browser-ssh`) — Termix browser shell to the Management VM and bastion, plus the opkssh Authentik app
+32. **Install opkssh** (`install-opkssh`) — Authentik + MFA SSH certificates for the Management VM and bastion
 
 ### User-Facing Services
 
 32. **Install Headlamp** (`install-headlamp`) — Kubernetes dashboard with OIDC
 33. **Install Twinbox Portal** (`install-twinbox-portal`) — User app launcher
 34. **Install Dashy Dashboard** (`install-dashy-dashboard`) — Legacy admin launcher
-35. **Install Management Consoles** (`install-management-consoles`) — Proxmox, Longhorn, SeaweedFS UIs
+35. **Install Management Consoles** (`install-management-consoles`) — Proxmox, Longhorn, Forgejo, SeaweedFS UIs
 36. **Install pgAdmin 4** (`install-pgadmin4`) — PostgreSQL management
 37. **Configure Argo CD OIDC** (`configure-argocd-oidc`) — Argo CD Authentik integration
 

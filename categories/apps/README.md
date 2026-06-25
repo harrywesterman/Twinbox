@@ -30,6 +30,7 @@ categories/apps/
     ├── install-openwebui/
     ├── install-outline/
     ├── install-paperless/
+    ├── install-mastodon/
     ├── install-pixelfed/
     ├── install-searxng/
     ├── install-stirling-pdf/
@@ -56,6 +57,7 @@ Each app step contains a `step.yaml` manifest and a runner script:
 | `install-openwebui` | AI chat interface and model management |
 | `install-outline` | Team knowledge base and wiki |
 | `install-paperless` | Document management and OCR |
+| `install-mastodon` | Federated social publishing |
 | `install-pixelfed` | Decentralized photo sharing (Instagram alternative) |
 | `install-searxng` | Privacy-respecting metasearch engine |
 | `install-stirling-pdf` | PDF manipulation and editing tools |

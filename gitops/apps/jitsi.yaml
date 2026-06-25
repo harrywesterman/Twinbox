@@ -36,7 +36,21 @@ spec:
                 value: Host(`jitsi.__ZONE_NAME__`)
           - target:
               kind: IngressRoute
+              name: jitsi-netbird
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`jitsi.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
               name: auth-jitsi
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`auth-jitsi.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: auth-jitsi-netbird
             patch: |-
               - op: replace
                 path: /spec/routes/0/match

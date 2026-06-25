@@ -18,10 +18,22 @@ spec:
             - op: replace
               path: /spec/routes/0/match
               value: Host(`termix.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: termix-netbird
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`termix.__ZONE_NAME__`)
   destination:
     server: https://kubernetes.default.svc
     namespace: termix
   syncPolicy:
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: privileged
+        pod-security.kubernetes.io/audit: privileged
+        pod-security.kubernetes.io/warn: privileged
     automated:
       prune: true
       selfHeal: true

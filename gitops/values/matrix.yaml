@@ -1,6 +1,9 @@
 postgres:
   enabled: false
 
+ingress:
+  className: twinbox-disabled
+
 synapse:
   postgres:
     host: matrix-synapse-db-pooler-rw.databases.svc.cluster.local
@@ -40,9 +43,5 @@ matrixRTC:
     enabled: true
     useStunToDiscoverPublicIP: true
 
-ingress:
+wellKnownDelegation:
   enabled: false
-
-wellknownDelegation:
-  ingress:
-    enabled: false

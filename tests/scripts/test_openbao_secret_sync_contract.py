@@ -1,4 +1,10 @@
+import os
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SYNC_SCRIPT = REPO_ROOT / "scripts" / "manager" / "sync-openbao-global-secret.sh"
@@ -21,15 +27,34 @@ PORTAL_STEP = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-twinbox-portal" / "run.sh"
 )
 BESZEL_STEP = REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-beszel" / "run.sh"
+BESZEL_BASTION_AGENT_SCRIPT = (
+    REPO_ROOT / "scripts" / "manager" / "configure-bastion-beszel-agent.sh"
+)
 BESZEL_AGENT_SECRET = (
     REPO_ROOT / "gitops" / "platform-apps" / "beszel-agents" / "externalsecret.yaml"
 )
 BESZEL_AGENT_DAEMONSET = REPO_ROOT / "gitops" / "platform-apps" / "beszel-agents" / "daemonset.yaml"
 TALOS_CATEGORY = REPO_ROOT / "categories" / "talos-cluster" / "category.yaml"
 PIXELFED_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-pixelfed" / "run.sh"
+MASTODON_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-mastodon" / "run.sh"
+MASTODON_APP = REPO_ROOT / "gitops" / "apps" / "mastodon.yaml"
+MASTODON_VALUES = REPO_ROOT / "gitops" / "values" / "mastodon.yaml"
+MASTODON_NAMESPACE = REPO_ROOT / "gitops" / "platform-apps" / "mastodon" / "namespace.yaml"
+MASTODON_KUSTOMIZATION = REPO_ROOT / "gitops" / "platform-apps" / "mastodon" / "kustomization.yaml"
+MASTODON_INGRESSROUTE = REPO_ROOT / "gitops" / "platform-apps" / "mastodon" / "ingressroute.yaml"
+MASTODON_FORWARDED_HEADERS = (
+    REPO_ROOT / "gitops" / "platform-apps" / "mastodon" / "forwarded-headers-middleware.yaml"
+)
+MASTODON_RUNTIME_SECRET = (
+    REPO_ROOT / "gitops" / "platform-apps" / "mastodon" / "externalsecret-runtime.yaml"
+)
+MASTODON_DB_SECRET = REPO_ROOT / "gitops" / "databases" / "mastodon" / "externalsecret.yaml"
+MASTODON_DB_CLUSTER = REPO_ROOT / "gitops" / "databases" / "mastodon" / "cluster.yaml"
+MASTODON_DB_OBJECTSTORE = REPO_ROOT / "gitops" / "databases" / "mastodon" / "objectstore.yaml"
 ZULIP_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-zulip" / "step.yaml"
 ZULIP_RUN = REPO_ROOT / "categories" / "apps" / "steps" / "install-zulip" / "run.sh"
 ZULIP_APP = REPO_ROOT / "gitops" / "apps" / "zulip.yaml"
+ZULIP_OPTIONAL_APP = REPO_ROOT / "gitops" / "optional-apps" / "zulip.yaml"
 ZULIP_PLATFORM_DIR = REPO_ROOT / "gitops" / "platform-apps" / "zulip"
 ZULIP_RUNTIME_SECRET = ZULIP_PLATFORM_DIR / "runtime-externalsecret.yaml"
 ZULIP_VALUES = REPO_ROOT / "gitops" / "values" / "zulip.yaml"
@@ -49,6 +74,35 @@ REMOVED_PLACEHOLDER_STEP = (
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def _helm_template_zulip(chart_version: str) -> subprocess.CompletedProcess[str]:
+    helm = shutil.which("helm")
+    if helm is None:
+        pytest.skip("helm is not available")
+
+    env = os.environ.copy()
+    with tempfile.TemporaryDirectory() as docker_config:
+        env["DOCKER_CONFIG"] = docker_config
+        return subprocess.run(
+            [
+                helm,
+                "template",
+                "zulip",
+                "oci://ghcr.io/zulip/helm-charts/zulip",
+                "--version",
+                chart_version,
+                "-f",
+                str(ZULIP_VALUES),
+                "--namespace",
+                "zulip",
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
 
 
 def test_sync_openbao_global_secret_script_uses_port_forward_and_kv_v2_api():
@@ -159,26 +213,72 @@ def test_portal_step_and_secret_project_authentik_management_env():
 
 def test_beszel_step_uses_hub_public_key_and_universal_token_secret():
     text = _read(BESZEL_STEP)
+    bastion_agent_text = _read(BESZEL_BASTION_AGENT_SCRIPT)
     secret_text = _read(BESZEL_AGENT_SECRET)
     daemonset_text = _read(BESZEL_AGENT_DAEMONSET)
 
     assert "beszel_public_key_from_file" in text
     assert "/opt/twinbox/beszel/data/id_ed25519" in text
+    assert 'beszel_local_url="${BESZEL_LOCAL_URL:-http://beszel:8090}"' in text
+    assert 'source "$WORKSPACE_ROOT/scripts/manager/management-ip.sh"' in text
+    assert "ensure_beszel_superuser" in text
+    assert "/api/collections/_superusers/auth-with-password" in text
+    assert "cluster_scope_id=" in text
+    assert "read_first_admin_email" in text
+    assert "create-users-and-groups.json" in text
+    assert "beszel_upsert_user" in text
+    assert "Ensuring Beszel user for the first Authentik admin" in text
+    assert 'matching_mode: "strict"' in text
+    assert "url: $redirect_uri" in text
+    assert 'redirect_uri_type: "authorization"' in text
+    assert 'PATCH "/core/applications/${beszel_application_slug}/"' in text
+    assert 'PATCH "/core/applications/${existing_app_pk}/"' not in text
     assert 'beszel_api_get "/api/beszel/info"' in text
     assert "upsert_beszel_universal_token" in text
     assert "/api/collections/universal_tokens/records" in text
+    assert "sync_beszel_system_users" in text
+    assert "/api/collections/users/records?perPage=500" in text
+    assert "/api/collections/systems/records?perPage=500" in text
+    assert 'PATCH "/api/collections/systems/records/${system_id}"' in text
+    assert "Reconciling Beszel user access to systems" in text
+    assert text.index("Starting Beszel Management VM agent") < text.index(
+        "Reconciling Beszel user access to systems"
+    )
     assert "openssl rand -hex 32" in text
     assert '"hub_url": "$beszel_app_url"' in text
+    assert "configure-bastion-beszel-agent.sh" in text
+    assert '--cluster-id "$cluster_id"' in text
+    assert '--agent-secret-file "$beszel_agent_secret_file"' in text
+    assert '--beszel-version "$beszel_version"' in text
     assert '--secret-name "beszel-agent"' in text
     assert '--required-keys "key,token,hub_url"' in text
     assert "kubectl delete application beszel-agents" not in text
-    assert "kubectl apply -f -" not in text
+    assert "apply_beszel_traefik_route" in text
+    assert "beszel-service.yaml" in text
+    assert "beszel-endpoints.yaml" in text
+    assert "beszel-ingressroute.yaml" in text
+    assert "gitops/apps/platform-ingress.yaml" in text
+    assert '--application "platform-ingress"' in text
+    assert '--destination-namespace "argocd"' in text
 
+    assert "apiVersion: external-secrets.io/v1" in secret_text
     assert "secretKey: hub_url" in secret_text
     assert "property: hub_url" in secret_text
     assert "name: HUB_URL" in daemonset_text
     assert "key: hub_url" in daemonset_text
     assert 'value: "https://beszel.__ZONE_NAME__"' not in daemonset_text
+
+    assert "PINNED_BESZEL_VERSION" in bastion_agent_text
+    assert "netbird-bastion-${CLUSTER_ID}.json" in bastion_agent_text
+    assert "No NetBird bastion secret found" in bastion_agent_text
+    assert "SSH_PRIVATE_KEY" in bastion_agent_text
+    assert "beszel-bastion-ssh-key" in bastion_agent_text
+    assert "SYSTEM_NAME=%s" in bastion_agent_text
+    assert "twinbox-netbird-bastion" in bastion_agent_text
+    assert "DISABLE_SSH=true" in bastion_agent_text
+    assert "image: henrygd/beszel-agent:${BESZEL_VERSION}" in bastion_agent_text
+    assert "network_mode: host" in bastion_agent_text
+    assert "/var/run/docker.sock:/var/run/docker.sock:ro" in bastion_agent_text
 
 
 def test_gitops_secret_consumers_now_reference_cluster_secret_store_openbao():
@@ -229,6 +329,7 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     step_text = _read(ZULIP_STEP)
     run_text = _read(ZULIP_RUN)
     app_text = _read(ZULIP_APP)
+    optional_app_text = _read(ZULIP_OPTIONAL_APP)
     values_text = _read(ZULIP_VALUES)
     runtime_secret_text = _read(ZULIP_RUNTIME_SECRET)
     db_cluster_text = _read(ZULIP_DB_CLUSTER)
@@ -243,9 +344,23 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "sync-openbao-global-secret.sh" in run_text
     assert '--secret-name "zulip-runtime"' in run_text
     assert (
-        '--required-keys "ZULIP_RABBITMQ_PASSWORD,ZULIP_RABBITMQ_ERLANG_COOKIE,ZULIP_REDIS_PASSWORD"'
+        '--required-keys "ZULIP_RABBITMQ_PASSWORD,ZULIP_RABBITMQ_ERLANG_COOKIE,ZULIP_REDIS_PASSWORD,ZULIP_MEMCACHED_PASSWORD"'
         in run_text
     )
+    assert "wait_for_named_resource_ready" in run_text
+    assert 'zulip_manifest_path="$WORKSPACE_ROOT/gitops/optional-apps/zulip.yaml"' in run_text
+    assert 'wait_for_named_resource_ready "databases" "cluster" "zulip-db"' in run_text
+    assert (
+        'wait_for_named_resource_ready "databases" "externalsecret" "zulip-db-credentials"'
+        in run_text
+    )
+    assert 'wait_for_deployment_rollout "databases" "zulip-db-pooler-ro"' in run_text
+    assert 'wait_for_deployment_rollout "databases" "zulip-db-pooler-rw"' in run_text
+    assert 'wait_for_named_resource_ready "zulip" "externalsecret" "zulip-config"' in run_text
+    assert (
+        'wait_for_named_resource_ready "zulip" "externalsecret" "zulip-db-credentials"' in run_text
+    )
+    assert 'wait_for_named_resource_ready "zulip" "externalsecret" "zulip-runtime"' in run_text
     assert "zulip_config_secret_json" in run_text
     assert "zulip_runtime_secret_json" in run_text
     assert "LOADBALANCER_IPS" not in run_text
@@ -257,6 +372,7 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "repoURL: oci://ghcr.io/zulip/helm-charts/zulip" in app_text
     assert "path: ." in app_text
     assert 'targetRevision: "2.0.0"' in app_text
+    assert 'targetRevision: "2.0.0"' in optional_app_text
     assert "path: gitops/platform-apps/zulip" in app_text
     assert (
         'SETTING_EXTERNAL_HOST: zulip.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
@@ -266,8 +382,27 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
         'SETTING_ZULIP_ADMINISTRATOR: admin@{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
         in app_text
     )
+    expected_zulip_csrf_trusted_origins = (
+        "SETTING_CSRF_TRUSTED_ORIGINS: '[\"https://zulip."
+        '{{index .metadata.annotations "twinbox.io/public-zone-name"}}"]\''
+    )
+    assert expected_zulip_csrf_trusted_origins in app_text
+    assert expected_zulip_csrf_trusted_origins in optional_app_text
     assert "ZULIP_AUTH_BACKENDS: GenericOpenIdConnectBackend" in app_text
-    assert 'TRUST_GATEWAY_IP: "True"' in app_text
+    assert "ZULIP_AUTH_BACKENDS: GenericOpenIdConnectBackend" in optional_app_text
+    assert "ServerSideApply=true" in app_text
+    assert "ServerSideApply=true" in optional_app_text
+    assert 'TRUST_GATEWAY_IP: "True"' not in app_text
+    assert 'TRUST_GATEWAY_IP: "True"' not in optional_app_text
+    assert 'LOADBALANCER_IPS: "{{index .metadata.annotations "twinbox.io/pod-cidr"}}"' in app_text
+    assert (
+        'LOADBALANCER_IPS: "{{index .metadata.annotations "twinbox.io/pod-cidr"}}"'
+        in optional_app_text
+    )
+    assert "pod-cidr" in app_text
+    assert "pod-cidr" in optional_app_text
+    assert "SETTING_RUNNING_IN_HELM" not in app_text
+    assert "SETTING_RUNNING_IN_HELM" not in optional_app_text
     assert "ZULIP_DEFAULT_REALM_OWNER_EMAIL:" not in app_text
     assert "ZULIP_DEFAULT_REALM_OWNER_NAME:" not in app_text
     assert "existingPasswordSecret: zulip-runtime" in app_text
@@ -277,7 +412,14 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "existingSecret: zulip-runtime" in app_text
     assert "existingSecretPasswordKey: redis-password" in app_text
     assert "LOADBALANCER_IPS:" in app_text
-    assert "pod-cidr" in app_text
+    assert "LOADBALANCER_IPS:" in optional_app_text
+    assert "SETTING_LOADBALANCER_IPS" not in values_text
+    assert "SETTING_AUTHENTICATION_BACKENDS" not in values_text
+    assert "accessModes:" in values_text
+    assert "accessMode:" not in values_text
+    assert 'loadbalancer_ips="${LOADBALANCER_IPS:-}"' in values_text
+    assert 'crudini --set /etc/zulip/zulip.conf loadbalancer ips "$loadbalancer_ips"' in values_text
+    assert "LOADBALANCER_IPS is required" in values_text
     assert "__ZULIP_RABBITMQ_PASSWORD__" not in app_text
     assert "__ZULIP_REDIS_PASSWORD__" not in app_text
 
@@ -293,6 +435,13 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS:" in values_text
     assert "ZULIP_DEFAULT_REALM_OWNER_EMAIL:" in values_text
     assert "ZULIP_DEFAULT_REALM_OWNER_NAME:" in values_text
+    assert "SECRETS_rabbitmq_password:" not in values_text
+    assert "SECRETS_redis_password:" not in values_text
+    assert "SETTING_MEMCACHED_USERNAME:" not in values_text
+    assert "SECRETS_memcached_password:" not in values_text
+    assert "usePasswordFiles: false" in values_text
+    assert "containerSecurityContext:" in values_text
+    assert "readOnlyRootFilesystem: false" in values_text
     assert "persistence:" in values_text
     assert "postSetup:" in values_text
     assert "10-create-default-realm.sh" in values_text
@@ -323,6 +472,10 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "name: zulip-runtime" in runtime_secret_text
     assert "secretKey: rabbitmq-password" in runtime_secret_text
     assert "property: ZULIP_RABBITMQ_PASSWORD" in runtime_secret_text
+    assert "conversionStrategy: Default" in runtime_secret_text
+    assert "decodingStrategy: None" in runtime_secret_text
+    assert "metadataPolicy: None" in runtime_secret_text
+    assert "nullBytePolicy: Ignore" in runtime_secret_text
     assert "secretKey: redis-password" in runtime_secret_text
     assert "property: ZULIP_REDIS_PASSWORD" in runtime_secret_text
     assert "secretKey: rabbitmq-erlang-cookie" in runtime_secret_text
@@ -337,6 +490,11 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "OnboardingUserMessage" in run_text
     assert "Missing Zulip onboarding messages" in run_text
     assert "create-users-and-groups.json" in run_text
+
+
+def test_zulip_values_render_against_chart_2_0_0():
+    result = _helm_template_zulip("2.0.0")
+    assert result.returncode == 0, result.stderr
 
 
 def test_zulip_step_requests_kubeconfig_secret_injection():
@@ -354,6 +512,7 @@ def test_outline_step_projects_a_real_oidc_backed_app():
     step_text = _read(OUTLINE_STEP)
     app_text = _read(OUTLINE_APP)
     deployment_text = _read(OUTLINE_DEPLOYMENT)
+    ingressroute_text = _read(OUTLINE_PLATFORM_DIR / "ingressroute.yaml")
     secret_text = _read(OUTLINE_SECRET)
     db_cluster_text = _read(OUTLINE_DB_CLUSTER)
 
@@ -378,6 +537,10 @@ def test_outline_step_projects_a_real_oidc_backed_app():
     assert "image: docker.getoutline.com/outlinewiki/outline:1.7.1" in deployment_text
     assert "OIDC_ISSUER_URL" in deployment_text
     assert "OIDC_LOGOUT_URI" in deployment_text
+    assert "PROXY_HEADERS_TRUSTED" in deployment_text
+    assert "outline-forwarded-headers" in ingressroute_text
+    forwarded_headers_text = _read(OUTLINE_PLATFORM_DIR / "forwarded-headers-middleware.yaml")
+    assert "X-Forwarded-Proto: https" in forwarded_headers_text
     assert "requests:" in deployment_text
     assert "cpu: 500m" in deployment_text
     assert "memory: 512Mi" in deployment_text
@@ -389,6 +552,109 @@ def test_outline_step_projects_a_real_oidc_backed_app():
     assert "property: UTILS_SECRET" in secret_text
     assert "property: OIDC_CLIENT_ID" in secret_text
     assert "property: OIDC_CLIENT_SECRET" in secret_text
+    assert "imageName: ghcr.io/cloudnative-pg/postgresql:16.4" in db_cluster_text
+
+
+def test_mastodon_step_bootstraps_runtime_and_admin_secret_via_openbao():
+    step_text = _read(MASTODON_STEP)
+    app_text = _read(MASTODON_APP)
+    values_text = _read(MASTODON_VALUES)
+    namespace_text = _read(MASTODON_NAMESPACE)
+    kustomization_text = _read(MASTODON_KUSTOMIZATION)
+    ingressroute_text = _read(MASTODON_INGRESSROUTE)
+    forwarded_headers_text = _read(MASTODON_FORWARDED_HEADERS)
+    runtime_secret_text = _read(MASTODON_RUNTIME_SECRET)
+    db_secret_text = _read(MASTODON_DB_SECRET)
+    db_cluster_text = _read(MASTODON_DB_CLUSTER)
+    db_objectstore_text = _read(MASTODON_DB_OBJECTSTORE)
+
+    assert "openbao_read_global_secret_json mastodon" in step_text
+    assert "sync-openbao-global-secret.sh" in step_text
+    assert '--secret-name "mastodon"' in step_text
+    assert 'mastodon_admin_password=""' in step_text
+    assert "gitops/platform-apps/mastodon/namespace.yaml" in step_text
+    assert "gitops/databases/shared/namespace.yaml" in step_text
+    assert "gitops/platform-apps/mastodon/externalsecret-runtime.yaml" in step_text
+    assert "gitops/platform-apps/mastodon/externalsecret-s3.yaml" in step_text
+    assert "gitops/databases/mastodon/externalsecret.yaml" in step_text
+    assert 'openbao_wait_for_external_secret_ready "mastodon" "mastodon-runtime"' in step_text
+    assert 'openbao_wait_for_secret "mastodon-runtime" "mastodon"' in step_text
+    assert 'openbao_wait_for_external_secret_ready "mastodon" "mastodon-s3"' in step_text
+    assert 'openbao_wait_for_secret "mastodon-s3" "mastodon"' in step_text
+    assert (
+        'openbao_wait_for_external_secret_ready "databases" "mastodon-db-credentials"' in step_text
+    )
+    assert 'openbao_wait_for_secret "mastodon-db-credentials" "databases"' in step_text
+    assert (
+        '--required-keys "MASTODON_POSTGRESQL__USERNAME,MASTODON_POSTGRESQL__PASSWORD,REDIS_PASSWORD,SECRET_KEY_BASE,OTP_SECRET,VAPID_PRIVATE_KEY,VAPID_PUBLIC_KEY,ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY,ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY,ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT,MASTODON_OIDC_CLIENT_ID,MASTODON_OIDC_CLIENT_SECRET,MASTODON_ADMIN_USERNAME"'
+        in step_text
+    )
+    assert (
+        '--required-keys "MASTODON_POSTGRESQL__USERNAME,MASTODON_POSTGRESQL__PASSWORD,REDIS_PASSWORD,SECRET_KEY_BASE,OTP_SECRET,VAPID_PRIVATE_KEY,VAPID_PUBLIC_KEY,ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY,ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY,ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT,MASTODON_OIDC_CLIENT_ID,MASTODON_OIDC_CLIENT_SECRET,MASTODON_ADMIN_USERNAME,MASTODON_ADMIN_PASSWORD"'
+        in step_text
+    )
+    assert "wait_for_deployment_image" in step_text
+    assert "bundle" in step_text
+    assert "db:migrate db:seed" in step_text
+    assert "SKIP_POST_DEPLOYMENT_MIGRATIONS" not in step_text
+    assert "kubectl -n mastodon exec deployment/mastodon-web" in step_text
+    assert "bin/tootctl" in step_text
+    assert (
+        'accounts modify "$mastodon_admin_username" --approve --confirm --role Owner --reset-password'
+        in step_text
+    )
+    assert (
+        'accounts create "$mastodon_admin_username" --email "$mastodon_admin_email" --confirmed --role Owner --approve'
+        in step_text
+    )
+    assert "MASTODON_ADMIN_PASSWORD" in step_text
+    assert "path: gitops/platform-apps/mastodon" in app_text
+    assert "path: gitops/databases/mastodon" in app_text
+    assert "mastodon.__ZONE_NAME__" in app_text
+    assert "\n          externalAuth:\n            oidc:" in app_text
+    assert "\n            externalAuth:" not in app_text
+    assert "authentik.__ZONE_NAME__/application/o/mastodon/" in app_text
+    assert "client_id: from-mastodon-runtime-secret" in app_text
+    assert "client_secret: from-mastodon-runtime-secret" in app_text
+    assert "__MASTODON_OIDC_CLIENT_ID__" not in app_text
+    assert "__MASTODON_OIDC_CLIENT_SECRET__" not in app_text
+    assert "elasticsearch:\n  enabled: false" in values_text
+    assert "dbMigrate:\n      enabled: false" in values_text
+    assert "pod-security.kubernetes.io/enforce: baseline" in namespace_text
+    assert "pod-security.kubernetes.io/audit: baseline" in namespace_text
+    assert "pod-security.kubernetes.io/warn: baseline" in namespace_text
+    assert "forwarded-headers-middleware.yaml" in kustomization_text
+    assert ingressroute_text.count("name: mastodon-web\n          port: 3000") == 2
+    assert "name: mastodon-web\n          port: 80" not in ingressroute_text
+    assert ingressroute_text.count("name: mastodon-netbird-forwarded-headers") == 2
+    assert "name: mastodon-netbird-forwarded-headers" in forwarded_headers_text
+    assert "X-Forwarded-Proto: https" in forwarded_headers_text
+    assert 'X-Forwarded-Port: "443"' in forwarded_headers_text
+    assert "mastodon-runtime" in runtime_secret_text
+    assert "secretKey: password" in runtime_secret_text
+    assert "property: MASTODON_POSTGRESQL__PASSWORD" in runtime_secret_text
+    assert "property: REDIS_PASSWORD" in runtime_secret_text
+    assert "property: SECRET_KEY_BASE" in runtime_secret_text
+    assert "property: OTP_SECRET" in runtime_secret_text
+    assert "property: VAPID_PRIVATE_KEY" in runtime_secret_text
+    assert "property: VAPID_PUBLIC_KEY" in runtime_secret_text
+    assert "property: ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY" in runtime_secret_text
+    assert "property: ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY" in runtime_secret_text
+    assert "property: ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT" in runtime_secret_text
+    assert "secretKey: OIDC_CLIENT_ID" in runtime_secret_text
+    assert "property: MASTODON_OIDC_CLIENT_ID" in runtime_secret_text
+    assert "secretKey: OIDC_CLIENT_SECRET" in runtime_secret_text
+    assert "property: MASTODON_OIDC_CLIENT_SECRET" in runtime_secret_text
+    assert "name: mastodon-db-credentials" in db_secret_text
+    assert "property: MASTODON_POSTGRESQL__USERNAME" in db_secret_text
+    assert "property: MASTODON_POSTGRESQL__PASSWORD" in db_secret_text
+    assert "barmanObjectName: mastodon-db-objectstore" in db_cluster_text
+    assert "instances: 2" in db_cluster_text
+    assert "cpu: 100m" in db_cluster_text
+    assert "memory: 256Mi" in db_cluster_text
+    assert "cpu: 500m" in db_cluster_text
+    assert "memory: 1Gi" in db_cluster_text
+    assert "destinationPath: s3://twinbox-velero/mastodon-db/" in db_objectstore_text
     assert "imageName: ghcr.io/cloudnative-pg/postgresql:16.4" in db_cluster_text
 
 

@@ -20,14 +20,67 @@ zulip:
         secretKeyRef:
           name: zulip-config
           key: ZULIP_DEFAULT_REALM_OWNER_NAME
+    SETTING_EXTERNAL_HOST: zulip.bierineenweek.nl
+    SETTING_ZULIP_ADMINISTRATOR: admin@zulip.bierineenweek.nl
+    SETTING_SOCIAL_AUTH_REDIRECT_IS_HTTPS: "True"
   persistence:
     enabled: true
-    accessMode: ReadWriteOnce
+    accessModes:
+      - ReadWriteOnce
     size: 10Gi
     storageClass: longhorn
 
+memcached:
+  auth:
+    enabled: true
+    username: zulip@localhost
+    usePasswordFiles: false
+  containerSecurityContext:
+    readOnlyRootFilesystem: false
+
 postSetup:
   scripts:
+    04-disable-sslmode.sh: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # Disable SSL mode for PostgreSQL (PgBouncer doesn't handle SSL correctly)
+      sed -i "s/REMOTE_POSTGRES_SSLMODE = 'prefer'/REMOTE_POSTGRES_SSLMODE = 'disable'/" /etc/zulip/settings.py
+    05-patch-uwsgi.sh: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # Disable lazy loading — load all uwsgi workers at startup so that
+      # kubelet probes do not time out on the first request to a new worker.
+      sed -i 's/lazy-apps=true/lazy-apps=false/' /etc/zulip/uwsgi.ini
+      # Lengthen harakiri (max request time) so 6 workers can all
+      # initialize their Django application without being killed.
+      sed -i 's/harakiri=55/harakiri=120/' /etc/zulip/uwsgi.ini
+      # nginx uwsgi_read_timeout must always exceed harakiri.
+      sed -i 's/uwsgi_read_timeout 60s;/uwsgi_read_timeout 125s;/' /etc/nginx/uwsgi_params
+      # With lazy-apps=false the app is loaded before hook-post-fork runs,
+      # so chdir must point at the deployment directory from the start.
+      sed -i 's|^chdir=/|chdir=/home/zulip/deployments/current|' /etc/zulip/uwsgi.ini
+    06-patch-nginx-trusted-proto.sh: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # Keep nginx trusted-proto aligned with the runtime load balancer CIDRs used by Zulip.
+      loadbalancer_ips="${LOADBALANCER_IPS:-}"
+      if [[ -z "$loadbalancer_ips" ]]; then
+        echo "LOADBALANCER_IPS is required" >&2
+        exit 1
+      fi
+      trusted_proto_entries="$(
+        printf '%s\n' "$loadbalancer_ips" \
+          | tr ',' '\n' \
+          | awk '{
+              gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
+              if (length($0)) {
+                printf "    %s 1;\n", $0
+              }
+            }'
+      )"
+      sed -i "s|    default 0;|${trusted_proto_entries}    default 0;|" /etc/nginx/zulip-include/trusted-proto
+      crudini --set /etc/zulip/zulip.conf loadbalancer ips "$loadbalancer_ips"
+      nginx -s reload
     10-create-default-realm.sh: |
       #!/usr/bin/env bash
       set -euo pipefail
@@ -64,6 +117,11 @@ postSetup:
       if realm.video_chat_provider != desired_video_chat_provider:
           realm.video_chat_provider = desired_video_chat_provider
           update_fields.append("video_chat_provider")
+
+      # Allow any Authentik-authenticated user to sign up without invitation
+      if hasattr(realm, "invite_required") and realm.invite_required:
+          realm.invite_required = False
+          update_fields.append("invite_required")
 
       if update_fields:
           realm.save(update_fields=update_fields)
@@ -107,6 +165,12 @@ postSetup:
 
 postgresql:
   enabled: false
+
+startupProbe:
+  failureThreshold: 120
+  periodSeconds: 10
+  initialDelaySeconds: 10
+  timeoutSeconds: 60
 
 externalPostgresql:
   host: zulip-db-pooler-rw.databases.svc.cluster.local

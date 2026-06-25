@@ -441,6 +441,17 @@
       "accent": "#06b6d4",
       "category": "Apps"
     },
+    "Mastodon": {
+      "summary": "Federated social publishing",
+      "description": "Share posts, images, and replies in a federated public square that stays under your control.",
+      "capabilities": [
+        "Publish posts and media",
+        "Browse federated timelines and follows",
+        "Keep moderation, identity, and storage under your own control"
+      ],
+      "accent": "#6364ff",
+      "category": "Apps"
+    },
     "Pixelfed": {
       "summary": "Federated photo sharing",
       "description": "Share photos and short posts in a private ActivityPub-enabled instance that stays inside Twinbox.",
@@ -607,6 +618,28 @@
       ],
       "accent": "#1e40af",
       "category": "Apps"
+    },
+    "Element": {
+      "summary": "Encrypted Matrix chat client",
+      "description": "Element is a Matrix-based end-to-end encrypted chat app for secure team communication.",
+      "capabilities": [
+        "Send encrypted messages with Matrix",
+        "Join public and private chat rooms",
+        "Communicate securely with end-to-end encryption"
+      ],
+      "accent": "#0dbd8b",
+      "category": "Apps"
+    },
+    "Element Admin": {
+      "summary": "Matrix admin console",
+      "description": "Admin interface for managing your Matrix homeserver — users, rooms, and federation.",
+      "capabilities": [
+        "Manage users and rooms",
+        "Monitor federation status",
+        "Control server-wide settings"
+      ],
+      "accent": "#7c3aed",
+      "category": "Admin"
     }
   }
 }

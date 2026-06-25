@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: twinbox-agents
+  namespace: twinbox-agents
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: twinbox-agents-readonly
+rules:
+  - apiGroups: [""]
+    resources:
+      - pods
+      - pods/status
+      - pods/log
+      - nodes
+      - nodes/status
+      - events
+      - namespaces
+      - persistentvolumeclaims
+    verbs: [get, list, watch]
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - replicasets
+      - statefulsets
+      - daemonsets
+    verbs: [get, list, watch]
+  - apiGroups: ["batch"]
+    resources:
+      - jobs
+      - cronjobs
+    verbs: [get, list, watch]
+  - apiGroups: ["argoproj.io"]
+    resources:
+      - applications
+    verbs: [get, list, watch]
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources:
+      - clusters
+      - scheduledbackups
+      - backups
+    verbs: [get, list, watch]
+  - apiGroups: ["velero.io"]
+    resources:
+      - backups
+      - schedules
+    verbs: [get, list, watch]
+  - apiGroups: ["longhorn.io"]
+    resources:
+      - recurringjobs
+      - volumes
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: twinbox-agents-readonly
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: twinbox-agents-readonly
+subjects:
+  - kind: ServiceAccount
+    name: twinbox-agents
+    namespace: twinbox-agents

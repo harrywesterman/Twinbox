@@ -25,7 +25,8 @@ scripts/
     ├── create-talos-vms.sh         # Create Talos VMs on Proxmox
     ├── diagnose-monitoring.sh      # Diagnose monitoring stack health
     ├── install-argocd.sh           # Install Argo CD
-    ├── install-cloudtty.sh         # Install Cloudtty and create a shell instance
+    ├── setup-termix-authentik.sh    # Configure Termix OIDC and the browser SSH app
+    ├── setup-termix.sh             # Bootstrap the Termix Management VM host access
     ├── install-longhorn-storage.sh # Install Longhorn storage
     ├── install-management-backup.sh # Install Management VM backup cron
     ├── install-prometheus.sh       # Install Prometheus monitoring stack
@@ -72,7 +73,8 @@ These scripts are executed by `manager-worker` during job processing. They are c
 | `create-talos-vms.sh` | Runs `tofu apply` to create Talos VMs on Proxmox. |
 | `diagnose-monitoring.sh` | Diagnoses Prometheus, Grafana, and Alloy health and connectivity. |
 | `install-argocd.sh` | Installs Argo CD into the cluster. |
-| `install-cloudtty.sh` | Installs Cloudtty and creates a browser-accessible cluster shell. |
+| `setup-termix-authentik.sh` | Configures Termix OIDC and publishes the browser SSH app. |
+| `setup-termix.sh` | Creates the Management VM host credential, host entry, and Browser SSH role. |
 | `install-longhorn-storage.sh` | Deploys Longhorn and sets the default StorageClass. |
 | `install-management-backup.sh` | Installs host cron jobs for Talos etcd snapshots and `/opt/twinbox` restic backups. |
 | `install-prometheus.sh` | Deploys Prometheus, Alertmanager, node-exporter, and kube-state-metrics. |

@@ -9,6 +9,23 @@ USAGE
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >&2; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
+array_contains() {
+  local needle="$1"
+  shift || true
+  local item=""
+
+  for item in "$@"; do
+    [[ "$item" == "$needle" ]] && return 0
+  done
+
+  return 1
+}
+
+file_size_bytes() {
+  local path="$1"
+
+  stat -c '%s' "$path" 2>/dev/null || stat -f '%z' "$path"
+}
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -29,6 +46,7 @@ export PROXMOX_PASSWORD
 
 command -v jq >/dev/null 2>&1 || fail "jq not found"
 command -v curl >/dev/null 2>&1 || fail "curl not found"
+command -v xz >/dev/null 2>&1 || fail "xz not found"
 TOFU_BIN="${TOFU_BIN:-tofu}"
 command -v "$TOFU_BIN" >/dev/null 2>&1 || fail "tofu not found"
 command -v talosctl >/dev/null 2>&1 || fail "talosctl not found"
@@ -41,6 +59,7 @@ export NO_COLOR=1
 TOFU_PARALLELISM="${TOFU_PARALLELISM:-1}"
 PROXMOX_UPLOAD_MAX_ATTEMPTS="${PROXMOX_UPLOAD_MAX_ATTEMPTS:-5}"
 PROXMOX_VERIFY_MAX_ATTEMPTS="${PROXMOX_VERIFY_MAX_ATTEMPTS:-5}"
+PROXMOX_IMPORT_FREE_SPACE_BUFFER_BYTES="${PROXMOX_IMPORT_FREE_SPACE_BUFFER_BYTES:-1073741824}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -88,6 +107,7 @@ runtime_talos_dir="$talos_runtime_root/talos"
 talos_secrets_file="${TWINBOX_TALOS_SECRETS_FILE:-$runtime_talos_dir/secrets.yaml}"
 talosconfig_file="${TWINBOX_TALOSCONFIG_FILE:-$runtime_talos_dir/talosconfig}"
 kubeconfig_file="${TWINBOX_KUBECONFIG_FILE:-$runtime_talos_dir/kubeconfig}"
+bootstrap_secret_dir="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}/secrets/cluster/${CLUSTER_ID}"
 
 mkdir -p "$clusters_dir" "$cluster_dir" "$iac_dir" "$image_cache_dir" "$runtime_talos_dir"
 [[ -f "$cluster_file" ]] || fail "cluster not found: ${CLUSTER_ID}"
@@ -134,14 +154,14 @@ resolve_talos_image_assets() {
       TALOS_IMAGE_SCHEMATIC=*)
         image_schematic="${line#TALOS_IMAGE_SCHEMATIC=}"
         ;;
-      TALOS_IMAGE_FACTORY_URL=*)
-        image_factory_url="${line#TALOS_IMAGE_FACTORY_URL=}"
-        ;;
       TALOS_IMAGE_INSTALLER=*)
         image_installer="${line#TALOS_IMAGE_INSTALLER=}"
         ;;
+      TALOS_IMAGE_DISK_URL=*)
+        image_disk_url="${line#TALOS_IMAGE_DISK_URL=}"
+        ;;
       TALOS_IMAGE_DOWNLOAD_URL=*)
-        image_download_url="${line#TALOS_IMAGE_DOWNLOAD_URL=}"
+        [[ -n "${image_disk_url:-}" ]] || image_disk_url="${line#TALOS_IMAGE_DOWNLOAD_URL=}"
         ;;
     esac
   done <<<"$helper_output"
@@ -153,20 +173,26 @@ resolve_talos_image_assets
 
 download_talos_image() {
   local target_path="$1"
+  local tmpdir=""
   local tmp_compressed=""
+  local tmp_image=""
 
-  [[ -n "${image_download_url:-}" ]] || fail "Talos download URL not resolved"
+  [[ -n "${image_disk_url:-}" ]] || fail "Talos disk image URL not resolved"
 
   if [[ -s "$target_path" ]]; then
-    log "Reusing cached Talos image at ${target_path}"
+    log "Reusing cached Talos disk image at ${target_path}"
     talos_image_local_path="$target_path"
     return 0
   fi
 
-  tmp_compressed="$(mktemp "${image_cache_dir%/}/talos-image-XXXXXX")"
-  log "Downloading Talos ISO to ${target_path}"
-  curl -fsSL --retry 3 --retry-delay 2 --output "$tmp_compressed" "$image_download_url"
-  mv "$tmp_compressed" "$target_path"
+  tmpdir="$(mktemp -d "${image_cache_dir%/}/talos-image-XXXXXX")"
+  tmp_compressed="${tmpdir}/image.raw.xz"
+  tmp_image="${tmpdir}/image.img"
+  log "Downloading Talos disk image to ${target_path}"
+  curl -fsSL --retry 3 --retry-delay 2 --output "$tmp_compressed" "$image_disk_url"
+  xz -dc "$tmp_compressed" > "$tmp_image"
+  mv "$tmp_image" "$target_path"
+  rm -rf "$tmpdir"
   talos_image_local_path="$target_path"
 }
 
@@ -256,10 +282,12 @@ proxmox_get_all_vm_ids() {
 validate_vm_ids_available() {
   local planned_vms_json="$1"
   local existing_vm_ids=()
+  local managed_vm_ids=()
   local planned_vm_ids=()
   local vmid=""
   local conflicts=()
   local existing_vm_ids_output=""
+  local managed_vm_ids_output=""
 
   log "Checking for VM ID conflicts across the Proxmox cluster"
 
@@ -272,24 +300,67 @@ validate_vm_ids_available() {
     existing_vm_ids+=("$vmid")
   done <<<"$existing_vm_ids_output"
 
+  if managed_vm_ids_output="$(managed_vm_ids_from_state)"; then
+    while IFS= read -r vmid; do
+      [[ -n "$vmid" ]] || continue
+      managed_vm_ids+=("$vmid")
+    done <<<"$managed_vm_ids_output"
+  fi
+
   while IFS= read -r vmid; do
     [[ -n "$vmid" ]] || continue
     planned_vm_ids+=("$vmid")
   done < <(jq -r '.[].vmid' <<<"$planned_vms_json" | sort -n | uniq)
 
   for vmid in "${planned_vm_ids[@]}"; do
-    if printf '%s\n' "${existing_vm_ids[@]}" | grep -qx "$vmid"; then
+    if array_contains "$vmid" ${existing_vm_ids[@]+"${existing_vm_ids[@]}"}; then
+      if array_contains "$vmid" ${managed_vm_ids[@]+"${managed_vm_ids[@]}"}; then
+        continue
+      fi
       conflicts+=("$vmid")
     fi
   done
 
   if [[ ${#conflicts[@]} -gt 0 ]]; then
     local existing_list=""
-    existing_list="$(printf '%s\n' "${existing_vm_ids[@]}" | tr '\n' ' ')"
+    existing_list="$(printf '%s\n' ${existing_vm_ids[@]+"${existing_vm_ids[@]}"} | tr '\n' ' ')"
     fail "VM ID conflict: the following VM IDs are already in use in the Proxmox cluster: ${conflicts[*]}. Existing VM IDs: ${existing_list}"
   fi
 
+  if [[ ${#managed_vm_ids[@]} -gt 0 ]]; then
+    log "Ignoring VM IDs already managed by this cluster OpenTofu state: ${managed_vm_ids[*]}"
+  fi
+
   log "All planned VM IDs are available: ${planned_vm_ids[*]}"
+}
+
+managed_vm_ids_from_state() {
+  local state_file="${work_module_dir}/terraform.tfstate"
+
+  [[ -s "$state_file" ]] || return 0
+
+  jq -r '
+    .resources[]?
+    | select(.mode == "managed" and .type == "proxmox_virtual_environment_vm" and .name == "node")
+    | .instances[]?.attributes.vm_id // empty
+  ' "$state_file" 2>/dev/null | sort -n | uniq
+}
+
+validate_file_datastore_import_content() {
+  local datastore="$1"
+  local storage_json=""
+  local content=""
+
+  proxmox_api_login
+  storage_json="$(curl -ksS --fail \
+    --cookie "$PROXMOX_TICKET_COOKIE" \
+    --header "CSRFPreventionToken: ${PROXMOX_CSRF_TOKEN}" \
+    "${TF_VAR_proxmox_endpoint}/api2/json/storage/${datastore}")" || fail "Failed to inspect Proxmox storage ${datastore}"
+
+  content="$(jq -r '.data.content // ""' <<<"$storage_json")"
+  if [[ ",${content}," != *",import,"* ]]; then
+    fail "Proxmox file datastore ${datastore} must allow Import content for Talos disk-image provisioning. Re-run the setup wizard or enable Import under Datacenter > Storage."
+  fi
 }
 
 proxmox_get_storage_content() {
@@ -303,6 +374,71 @@ proxmox_get_storage_content() {
     --cookie "$PROXMOX_TICKET_COOKIE" \
     --header "CSRFPreventionToken: ${PROXMOX_CSRF_TOKEN}" \
     "${node_endpoint}/api2/json/nodes/${node}/storage/${datastore}/content"
+}
+
+proxmox_get_storage_status() {
+  local node="$1"
+  local datastore="$2"
+  local node_endpoint=""
+
+  node_endpoint="$(proxmox_node_endpoint "$node")"
+  proxmox_api_login
+  curl -ksS --fail \
+    --cookie "$PROXMOX_TICKET_COOKIE" \
+    --header "CSRFPreventionToken: ${PROXMOX_CSRF_TOKEN}" \
+    "${node_endpoint}/api2/json/nodes/${node}/storage/${datastore}/status"
+}
+
+proxmox_talos_image_size() {
+  local node="$1"
+  local datastore="$2"
+  local image_name="$3"
+  local expected_volid="${datastore}:import/${image_name}"
+  local content_json=""
+  local image_size=""
+
+  if ! content_json="$(proxmox_get_storage_content "$node" "$datastore")"; then
+    PROXMOX_TALOS_IMAGE_ERROR="Failed to read Proxmox storage content for ${node}/${datastore}"
+    return 2
+  fi
+
+  image_size="$(jq -r --arg volid "$expected_volid" '
+    [.data[]? | select(.volid == $volid and .content == "import") | (.size // empty)]
+    | .[0] // ""
+  ' <<<"$content_json")"
+
+  [[ -n "$image_size" ]] || return 1
+  printf '%s\n' "$image_size"
+}
+
+proxmox_require_talos_upload_space() {
+  local node="$1"
+  local datastore="$2"
+  local image_size_bytes="$3"
+  local storage_json=""
+  local available_bytes=""
+  local required_bytes=$((image_size_bytes + PROXMOX_IMPORT_FREE_SPACE_BUFFER_BYTES))
+
+  if ! storage_json="$(proxmox_get_storage_status "$node" "$datastore")"; then
+    PROXMOX_TALOS_IMAGE_ERROR="Failed to read Proxmox storage status for ${node}/${datastore}"
+    log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+    return 1
+  fi
+
+  available_bytes="$(jq -r '.data.avail // empty' <<<"$storage_json")"
+  if [[ ! "$available_bytes" =~ ^[0-9]+$ ]]; then
+    PROXMOX_TALOS_IMAGE_ERROR="Proxmox storage status for ${node}/${datastore} did not include available bytes"
+    log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+    return 1
+  fi
+
+  if (( available_bytes < required_bytes )); then
+    PROXMOX_TALOS_IMAGE_ERROR="Proxmox file datastore ${node}/${datastore} has insufficient free space for Talos disk image upload: available=${available_bytes} bytes, required=${required_bytes} bytes (image=${image_size_bytes} bytes plus ${PROXMOX_IMPORT_FREE_SPACE_BUFFER_BYTES} bytes buffer). Free space on ${node}/${datastore} or remove stale import/backup content before retrying."
+    log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+    return 1
+  fi
+
+  log "Proxmox file datastore ${node}/${datastore} has ${available_bytes} bytes available for Talos disk image upload"
 }
 
 proxmox_upload_talos_image() {
@@ -333,7 +469,7 @@ proxmox_upload_talos_image() {
         --header "Expect:" \
         --cookie "$PROXMOX_TICKET_COOKIE" \
         --header "CSRFPreventionToken: ${PROXMOX_CSRF_TOKEN}" \
-        --form "content=iso" \
+        --form "content=import" \
         --form "filename=@${image_path};filename=${image_name}" \
         "$upload_url"
     )"; then
@@ -346,7 +482,7 @@ proxmox_upload_talos_image() {
     rm -f "$response_file"
 
     if [[ "$curl_exit" -eq 0 && "$http_code" == 2* ]]; then
-      log "Uploaded Talos ISO to ${node}/${datastore}"
+      log "Uploaded Talos disk image to ${node}/${datastore}"
       PROXMOX_TALOS_IMAGE_ERROR=""
       return 0
     fi
@@ -359,13 +495,13 @@ proxmox_upload_talos_image() {
     fi
 
     if [[ "$http_code" == 4* ]]; then
-      PROXMOX_TALOS_IMAGE_ERROR="Talos ISO upload to ${node}/${datastore} failed permanently (${reason}): ${response_body:-no response body}"
+      PROXMOX_TALOS_IMAGE_ERROR="Talos disk image upload to ${node}/${datastore} failed permanently (${reason}): ${response_body:-no response body}"
       log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
       return 1
     fi
 
     if [[ "$attempt" -ge "$PROXMOX_UPLOAD_MAX_ATTEMPTS" ]]; then
-      PROXMOX_TALOS_IMAGE_ERROR="Talos ISO upload to ${node}/${datastore} failed after ${PROXMOX_UPLOAD_MAX_ATTEMPTS} attempts (${reason}): ${response_body:-no response body}"
+      PROXMOX_TALOS_IMAGE_ERROR="Talos disk image upload to ${node}/${datastore} failed after ${PROXMOX_UPLOAD_MAX_ATTEMPTS} attempts (${reason}): ${response_body:-no response body}"
       log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
       return 1
     fi
@@ -375,7 +511,7 @@ proxmox_upload_talos_image() {
       delay=30
     fi
 
-    log "Talos ISO upload to ${node}/${datastore} failed (${reason}); retrying in ${delay}s"
+    log "Talos disk image upload to ${node}/${datastore} failed (${reason}); retrying in ${delay}s"
     sleep "$delay"
     attempt=$((attempt + 1))
   done
@@ -385,26 +521,45 @@ proxmox_verify_talos_image() {
   local node="$1"
   local datastore="$2"
   local image_name="$3"
-  local expected_volid="${datastore}:iso/${image_name}"
+  local expected_size_bytes="$4"
+  local expected_volid="${datastore}:import/${image_name}"
   local attempt=1
 
   while true; do
-    local content_json=""
+    local image_size=""
+    local status=0
 
-    if ! content_json="$(proxmox_get_storage_content "$node" "$datastore")"; then
-      PROXMOX_TALOS_IMAGE_ERROR="Failed to read Proxmox storage content for ${node}/${datastore}"
+    if image_size="$(proxmox_talos_image_size "$node" "$datastore" "$image_name")"; then
+      if [[ "$image_size" != "$expected_size_bytes" ]]; then
+        if [[ "$attempt" -ge "$PROXMOX_VERIFY_MAX_ATTEMPTS" ]]; then
+          PROXMOX_TALOS_IMAGE_ERROR="Talos disk image on ${node}/${datastore} has unexpected size for ${expected_volid}: expected=${expected_size_bytes} bytes, actual=${image_size} bytes. Free space on ${node}/${datastore} and remove/re-upload the stale import image before retrying."
+          log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+          return 1
+        fi
+        local delay=$((2 ** (attempt - 1)))
+        if [[ "$delay" -gt 10 ]]; then
+          delay=10
+        fi
+        log "Talos disk image on ${node}/${datastore} is ${image_size} bytes, expected ${expected_size_bytes}; retrying in ${delay}s"
+        sleep "$delay"
+        attempt=$((attempt + 1))
+        continue
+      fi
+      log "Verified Talos disk image on ${node}/${datastore}: ${expected_volid} (${image_size} bytes)"
+      PROXMOX_TALOS_IMAGE_ERROR=""
+      return 0
+    else
+      status=$?
+    fi
+
+    if [[ "$status" -ne 1 ]]; then
+      PROXMOX_TALOS_IMAGE_ERROR="${PROXMOX_TALOS_IMAGE_ERROR:-Failed to read Proxmox storage content for ${node}/${datastore}}"
       log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
       return 1
     fi
 
-    if jq -e --arg volid "$expected_volid" '.data[]? | select(.volid == $volid and .content == "iso")' >/dev/null <<<"$content_json"; then
-      log "Verified Talos ISO on ${node}/${datastore}: ${expected_volid}"
-      PROXMOX_TALOS_IMAGE_ERROR=""
-      return 0
-    fi
-
     if [[ "$attempt" -ge "$PROXMOX_VERIFY_MAX_ATTEMPTS" ]]; then
-      PROXMOX_TALOS_IMAGE_ERROR="Talos ISO not visible after upload on ${node}/${datastore}: ${expected_volid}"
+      PROXMOX_TALOS_IMAGE_ERROR="Talos disk image not visible after upload on ${node}/${datastore}: ${expected_volid}"
       log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
       return 1
     fi
@@ -414,7 +569,7 @@ proxmox_verify_talos_image() {
       delay=10
     fi
 
-    log "Talos ISO not visible yet on ${node}/${datastore}; retrying in ${delay}s"
+    log "Talos disk image not visible yet on ${node}/${datastore}; retrying in ${delay}s"
     sleep "$delay"
     attempt=$((attempt + 1))
   done
@@ -424,47 +579,87 @@ proxmox_talos_image_present() {
   local node="$1"
   local datastore="$2"
   local image_name="$3"
-  local expected_volid="${datastore}:iso/${image_name}"
-  local content_json=""
+  local expected_size_bytes="$4"
+  local expected_volid="${datastore}:import/${image_name}"
+  local image_size=""
+  local status=0
 
-  content_json="$(proxmox_get_storage_content "$node" "$datastore")" || return 1
-  jq -e --arg volid "$expected_volid" '.data[]? | select(.volid == $volid and .content == "iso")' >/dev/null <<<"$content_json"
+  if image_size="$(proxmox_talos_image_size "$node" "$datastore" "$image_name")"; then
+    if [[ "$image_size" == "$expected_size_bytes" ]]; then
+      return 0
+    fi
+    PROXMOX_TALOS_IMAGE_ERROR="Talos disk image on ${node}/${datastore} has unexpected size for ${expected_volid}: expected=${expected_size_bytes} bytes, actual=${image_size} bytes. Free space on ${node}/${datastore} and remove/re-upload the stale import image before retrying."
+    return 2
+  else
+    status=$?
+  fi
+
+  [[ "$status" -eq 1 ]] && return 1
+  PROXMOX_TALOS_IMAGE_ERROR="${PROXMOX_TALOS_IMAGE_ERROR:-Failed to read Proxmox storage content for ${node}/${datastore}}"
+  return 2
 }
 
 upload_talos_image_to_nodes() {
   local image_path="$1"
   local image_name="$2"
   local nodes_json="$3"
+  local expected_size_bytes=""
   local node=""
+  local image_status=0
   local success_nodes=()
   local failed_nodes=()
   local failure_messages=()
 
+  if ! expected_size_bytes="$(file_size_bytes "$image_path")"; then
+    PROXMOX_TALOS_IMAGE_ERROR="Failed to inspect local Talos disk image size: ${image_path}"
+    log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+    return 1
+  fi
+  if [[ ! "$expected_size_bytes" =~ ^[0-9]+$ ]]; then
+    PROXMOX_TALOS_IMAGE_ERROR="Local Talos disk image size is not numeric for ${image_path}: ${expected_size_bytes}"
+    log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+    return 1
+  fi
+
   while IFS= read -r node; do
     [[ -n "$node" ]] || continue
-    if proxmox_talos_image_present "$node" "$FILE_DATASTORE" "$image_name"; then
-      log "Talos ISO already present on ${node}/${FILE_DATASTORE}: ${image_name}"
+    PROXMOX_TALOS_IMAGE_ERROR=""
+    if proxmox_talos_image_present "$node" "$FILE_DATASTORE" "$image_name" "$expected_size_bytes"; then
+      log "Talos disk image already present on ${node}/${FILE_DATASTORE}: ${image_name} (${expected_size_bytes} bytes)"
       success_nodes+=("$node")
       continue
+    else
+      image_status=$?
     fi
-    log "Uploading Talos ISO directly to ${node}/${FILE_DATASTORE} via $(proxmox_node_endpoint "$node")"
+    if [[ "$image_status" -eq 2 ]]; then
+      failed_nodes+=("$node")
+      failure_messages+=("${PROXMOX_TALOS_IMAGE_ERROR:-Talos disk image validation failed for ${node}/${FILE_DATASTORE}}")
+      continue
+    fi
+    PROXMOX_TALOS_IMAGE_ERROR=""
+    if ! proxmox_require_talos_upload_space "$node" "$FILE_DATASTORE" "$expected_size_bytes"; then
+      failed_nodes+=("$node")
+      failure_messages+=("${PROXMOX_TALOS_IMAGE_ERROR:-Talos disk image upload preflight failed for ${node}/${FILE_DATASTORE}}")
+      continue
+    fi
+    log "Uploading Talos disk image directly to ${node}/${FILE_DATASTORE} via $(proxmox_node_endpoint "$node")"
     PROXMOX_TALOS_IMAGE_ERROR=""
     if ! proxmox_upload_talos_image "$node" "$FILE_DATASTORE" "$image_path" "$image_name"; then
       failed_nodes+=("$node")
-      failure_messages+=("${PROXMOX_TALOS_IMAGE_ERROR:-Talos ISO upload to ${node}/${FILE_DATASTORE} failed}")
+      failure_messages+=("${PROXMOX_TALOS_IMAGE_ERROR:-Talos disk image upload to ${node}/${FILE_DATASTORE} failed}")
       continue
     fi
     PROXMOX_TALOS_IMAGE_ERROR=""
-    if ! proxmox_verify_talos_image "$node" "$FILE_DATASTORE" "$image_name"; then
+    if ! proxmox_verify_talos_image "$node" "$FILE_DATASTORE" "$image_name" "$expected_size_bytes"; then
       failed_nodes+=("$node")
-      failure_messages+=("${PROXMOX_TALOS_IMAGE_ERROR:-Talos ISO verification failed for ${node}/${FILE_DATASTORE}}")
+      failure_messages+=("${PROXMOX_TALOS_IMAGE_ERROR:-Talos disk image verification failed for ${node}/${FILE_DATASTORE}}")
       continue
     fi
     success_nodes+=("$node")
   done < <(jq -r '.[]' <<<"$nodes_json")
 
   if [[ ${#failed_nodes[@]} -gt 0 ]]; then
-    log "Talos ISO upload summary: succeeded=${success_nodes[*]:-none}; failed=${failed_nodes[*]}"
+    log "Talos disk image upload summary: succeeded=${success_nodes[*]:-none}; failed=${failed_nodes[*]}"
     local failure_message=""
     local failure=""
     for failure in "${failure_messages[@]}"; do
@@ -472,12 +667,12 @@ upload_talos_image_to_nodes() {
     done
     while IFS= read -r failure; do
       [[ -n "$failure" ]] || continue
-      log "Talos ISO upload failure: ${failure}"
+      log "Talos disk image upload failure: ${failure}"
     done <<<"${failure_message%$'\n'}"
     return 1
   fi
 
-  log "Talos ISO upload summary: succeeded=${success_nodes[*]:-none}; failed=none"
+  log "Talos disk image upload summary: succeeded=${success_nodes[*]:-none}; failed=none"
 }
 
 remove_legacy_talos_file_state() {
@@ -959,6 +1154,19 @@ fi
   } > "$patch_file"
 }
 
+append_hostname_config_patch() {
+  local name="$1"
+  local patch_file="$2"
+
+  {
+    echo "---"
+    echo "apiVersion: v1alpha1"
+    echo "kind: HostnameConfig"
+    echo "hostname: ${NAME}-${name}"
+    echo "auto: off"
+  } >> "$patch_file"
+}
+
 upsert_secret_artifact() {
   local item="$1"
   local attachment="$2"
@@ -974,6 +1182,20 @@ upsert_secret_artifact() {
     --source "$source_file"
 }
 
+restore_secret_artifact() {
+  local item="$1"
+  local attachment="$2"
+  local target_file="$3"
+  local source_file="${bootstrap_secret_dir}/${item}/${attachment}"
+
+  [[ ! -s "$target_file" ]] || return 0
+  [[ -s "$source_file" ]] || return 0
+
+  mkdir -p "$(dirname "$target_file")"
+  cp "$source_file" "$target_file"
+  log "Reusing existing ${item}/${attachment} artifact"
+}
+
 generate_talos_configs() {
   local base_dir="$runtime_talos_dir/base"
   local node_dir=""
@@ -986,6 +1208,8 @@ generate_talos_configs() {
 
   rm -rf "$runtime_talos_dir/base" "$runtime_talos_dir/generated"
   mkdir -p "$base_dir" "$runtime_talos_dir/generated"
+
+  restore_secret_artifact "talos-secrets" "secrets.yaml" "$talos_secrets_file"
 
   if [[ -s "$talos_secrets_file" ]]; then
     log "Reusing Talos secrets at ${talos_secrets_file}"
@@ -1021,6 +1245,7 @@ generate_talos_configs() {
         echo "      contents: |"
         sed 's/^/        /' "$cilium_manifest_file"
       } >> "$controlplane_patch_file"
+      append_hostname_config_patch "$name" "$controlplane_patch_file"
       talosctl gen config "$NAME" "https://${VIP_IP}:6443" \
         --output-dir "$node_dir" \
         --with-secrets "$talos_secrets_file" \
@@ -1029,6 +1254,7 @@ generate_talos_configs() {
       config_file="$runtime_talos_dir/${name}-controlplane.yaml"
       cp "$node_dir/controlplane.yaml" "$config_file"
     else
+      append_hostname_config_patch "$name" "$patch_file"
       talosctl gen config "$NAME" "https://${VIP_IP}:6443" \
         --output-dir "$node_dir" \
         --with-secrets "$talos_secrets_file" \
@@ -1046,44 +1272,103 @@ generate_talos_configs() {
     ' <<<"$nodes_json")
 }
 
+wait_for_talos_insecure() {
+  local label="$1"
+  local candidate="$2"
+  local attempts=60
+
+  while [[ "$attempts" -gt 0 ]]; do
+    if talosctl version \
+      --insecure \
+      --nodes "$candidate" \
+      --endpoints "$candidate" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 5
+    attempts=$((attempts - 1))
+  done
+
+  fail "Timed out waiting for Talos API (insecure) on ${label} at ${candidate}"
+}
+
 apply_node_config() {
   local ip="$1"
   local config_file="$2"
+  local output=""
+
   log "Applying Talos config to ${ip} with --insecure"
-  if ! talosctl apply-config \
+  output="$(talosctl apply-config \
     --insecure \
     --nodes "$ip" \
     --endpoints "$ip" \
     --talosconfig "$talosconfig_file" \
-    --file "$config_file" 2>&1; then
-    log "Insecure Talos apply failed for ${ip}; retrying without --insecure"
-    talosctl apply-config \
-      --nodes "$ip" \
-      --endpoints "$ip" \
-      --talosconfig "$talosconfig_file" \
-      --file "$config_file"
+    --file "$config_file" 2>&1)" && return 0
+
+  log "Insecure Talos apply failed for ${ip}; retrying with cluster talosconfig"
+  if output="$(talosctl apply-config \
+    --nodes "$ip" \
+    --endpoints "$ip" \
+    --talosconfig "$talosconfig_file" \
+    --file "$config_file" 2>&1)"; then
+    return 0
   fi
+
+  log "Resetting Talos node ${ip} to retry config application from clean state"
+  talosctl reset \
+    --insecure \
+    --nodes "$ip" \
+    --endpoints "$ip" \
+    --reboot \
+    --wait=false 2>&1 || true
+
+  log "Waiting for Talos node ${ip} to reboot and accept insecure connections"
+  wait_for_talos_insecure "node" "$ip"
+
+  log "Applying Talos config to ${ip} with --insecure after reset"
+  talosctl apply-config \
+    --insecure \
+    --nodes "$ip" \
+    --endpoints "$ip" \
+    --talosconfig "$talosconfig_file" \
+    --file "$config_file"
 }
 
 bootstrap_cluster() {
   local first_cp_ip="$1"
   local bootstrap_output=""
+  local attempt=1
+  local max_attempts="${TALOS_BOOTSTRAP_MAX_ATTEMPTS:-60}"
+  local retry_delay="${TALOS_BOOTSTRAP_RETRY_DELAY_SECONDS:-5}"
+
   wait_for_talos_api "control plane" "$first_cp_ip"
-  log "Bootstrapping cluster from ${first_cp_ip}"
-  if ! bootstrap_output="$(
-    talosctl bootstrap \
-      --nodes "$first_cp_ip" \
-      --endpoints "$first_cp_ip" \
-      --talosconfig "$talosconfig_file" \
-      2>&1
-  )"; then
+
+  while true; do
+    log "Bootstrapping cluster from ${first_cp_ip}"
+    if bootstrap_output="$(
+      talosctl bootstrap \
+        --nodes "$first_cp_ip" \
+        --endpoints "$first_cp_ip" \
+        --talosconfig "$talosconfig_file" \
+        2>&1
+    )"; then
+      break
+    fi
+
     if grep -q 'AlreadyExists desc = etcd data directory is not empty' <<<"$bootstrap_output"; then
       log "Talos bootstrap already completed on ${first_cp_ip}; continuing"
-    else
-      printf '%s\n' "$bootstrap_output" >&2
-      return 1
+      break
     fi
-  fi
+
+    if grep -q 'bootstrap is not available yet' <<<"$bootstrap_output" && [[ "$attempt" -lt "$max_attempts" ]]; then
+      log "Talos bootstrap is not available yet on ${first_cp_ip}; retrying in ${retry_delay}s (attempt ${attempt}/${max_attempts})"
+      sleep "$retry_delay"
+      attempt=$((attempt + 1))
+      continue
+    fi
+
+    printf '%s\n' "$bootstrap_output" >&2
+    return 1
+  done
 
   log "Writing kubeconfig"
   talosctl kubeconfig "$kubeconfig_file" \
@@ -1177,9 +1462,6 @@ sync_user_talosconfig() {
   log "Copied talosconfig to ${target_talosconfig}"
 }
 
-talos_image_local_path="$image_cache_dir/talos-${image_cache_key}.iso"
-download_talos_image "$talos_image_local_path"
-talos_image_file_name="talos-${image_cache_key}.iso"
 cilium_bootstrap_dir="$runtime_talos_dir/cilium"
 cilium_manifest_file="$cilium_bootstrap_dir/cilium-bootstrap.yaml"
 render_cilium_manifest "$cilium_manifest_file"
@@ -1221,8 +1503,13 @@ fi
 validate_vm_node_map
 log_vm_node_map
 
+[[ -n "${image_disk_url:-}" ]] || fail "Talos disk image URL not resolved"
+validate_file_datastore_import_content "$FILE_DATASTORE"
+talos_image_local_path="$image_cache_dir/talos-${CLUSTER_ID}-${image_cache_key}.raw"
+talos_image_file_name="talos-${CLUSTER_ID}-${image_cache_key}.raw"
+download_talos_image "$talos_image_local_path"
 target_nodes_json="$(jq -nc --arg proxmox_node "$PROXMOX_NODE" --argjson vm_node_map "$vm_node_map_json" '([ $proxmox_node ] + ($vm_node_map | to_entries | map(.value))) | unique')"
-log "Uploading Talos ISO to Proxmox nodes: $(jq -r 'join(", ")' <<<"$target_nodes_json")"
+log "Uploading Talos disk image to Proxmox nodes: $(jq -r 'join(", ")' <<<"$target_nodes_json")"
 upload_talos_image_to_nodes "$talos_image_local_path" "$talos_image_file_name" "$target_nodes_json"
 
 if [[ -f "$work_module_dir/terraform.tfstate" ]]; then
@@ -1244,7 +1531,6 @@ jq -n \
   --arg cluster_endpoint "https://${VIP_IP}:6443" \
   --arg vip_ip "$VIP_IP" \
   --arg talos_version "$PINNED_TALOS_VERSION" \
-  --arg talos_image_local_path "$talos_image_local_path" \
   --arg talos_image_cache_key "$image_cache_key" \
   --argjson vm_node_map "$vm_node_map_json" \
   --argjson dns_servers "$(json_array_from_csv "${DNS_SERVERS:-1.1.1.1,8.8.8.8}")" \
@@ -1263,7 +1549,6 @@ jq -n \
     cluster_endpoint: $cluster_endpoint,
     vip_ip: $vip_ip,
     talos_version: $talos_version,
-    talos_image_local_path: $talos_image_local_path,
     talos_image_cache_key: $talos_image_cache_key,
     vm_node_map: $vm_node_map,
     install_disk: "'"$INSTALL_DISK"'",
@@ -1278,7 +1563,6 @@ log "Preparing OpenTofu module"
 "$TOFU_BIN" -chdir="$work_module_dir" init -input=false -no-color
 remove_legacy_talos_file_state "$work_module_dir"
 log "Creating Proxmox VMs"
-# File uploads are handled explicitly above so the provider only creates VMs.
 "$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve -no-color -parallelism="$TOFU_PARALLELISM" -var-file="$tfvars_file"
 
 tf_outputs_json="$("$TOFU_BIN" -chdir="$work_module_dir" output -json -no-color)"
@@ -1416,14 +1700,6 @@ done < <(jq -r '
     | [.key, .value.type, .value.ip]
     | @tsv
   ' <<<"$nodes_json")
-
-log "Switching to disk-first boot order"
-sync
-tmp_tfvars="$(mktemp)"
-jq '. + {boot_from_disk: true}' "$tfvars_file" > "$tmp_tfvars"
-mv "$tmp_tfvars" "$tfvars_file"
-"$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve -no-color -parallelism="$TOFU_PARALLELISM" -var-file="$tfvars_file"
-log "Disk-first boot order applied; Talos nodes will boot from disk on the next cold VM restart"
 
 tmp="$(mktemp)"
 jq \

@@ -196,13 +196,44 @@ wait_for_authentik_api_ready() {
 
 wait_for_authentik_api_ready
 
+command -v openssl >/dev/null 2>&1 || fail "Missing required command: openssl"
+
 AUTHENTIK_HOST="${AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
+forgejo_host="${FORGEJO_PUBLIC_URL:-https://forgejo.${public_zone_name}}"
+forgejo_host="${forgejo_host%/}"
+forgejo_root_url="${forgejo_host}/"
+forgejo_application_name="${FORGEJO_OIDC_APPLICATION_NAME:-Forgejo}"
+forgejo_application_slug="${FORGEJO_OIDC_APPLICATION_SLUG:-forgejo}"
+forgejo_provider_name="${FORGEJO_OIDC_PROVIDER_NAME:-Forgejo}"
+forgejo_auth_name="${FORGEJO_OIDC_AUTH_NAME:-authentik}"
+forgejo_oidc_client_id="$(openssl rand -hex 16)"
+forgejo_oidc_client_secret="$(openssl rand -hex 24)"
+
+existing_forgejo_oidc_secret_json=""
+if command -v openbao_read_global_secret_json >/dev/null 2>&1; then
+  existing_forgejo_oidc_secret_json="$(openbao_read_global_secret_json forgejo-oidc 2>/dev/null || true)"
+fi
+
+if [[ -n "$existing_forgejo_oidc_secret_json" ]]; then
+  existing_forgejo_oidc_client_id="$(jq -r '.FORGEJO_OIDC_CLIENT_ID // empty' <<<"$existing_forgejo_oidc_secret_json")"
+  existing_forgejo_oidc_client_secret="$(jq -r '.FORGEJO_OIDC_CLIENT_SECRET // empty' <<<"$existing_forgejo_oidc_secret_json")"
+  existing_forgejo_auth_name="$(jq -r '.FORGEJO_OIDC_AUTH_NAME // empty' <<<"$existing_forgejo_oidc_secret_json")"
+
+  [[ -n "$existing_forgejo_oidc_client_id" ]] && forgejo_oidc_client_id="$existing_forgejo_oidc_client_id"
+  [[ -n "$existing_forgejo_oidc_client_secret" ]] && forgejo_oidc_client_secret="$existing_forgejo_oidc_client_secret"
+  [[ -n "$existing_forgejo_auth_name" ]] && forgejo_auth_name="$existing_forgejo_auth_name"
+fi
+
+forgejo_redirect_uri="${forgejo_host}/user/oauth2/${forgejo_auth_name}/callback"
+forgejo_issuer_url="${AUTHENTIK_HOST%/}/application/o/${forgejo_application_slug}/"
+forgejo_discovery_url="${forgejo_issuer_url}.well-known/openid-configuration"
 
 for attempt in $(seq 1 120); do
   if kubectl -n traefik get ingressroute/traefik-dashboard >/dev/null 2>&1 && \
      kubectl -n longhorn-system get ingressroute/longhorn >/dev/null 2>&1 && \
      kubectl -n longhorn-system get ingressroute/proxmox >/dev/null 2>&1 && \
      kubectl -n longhorn-system get ingressroute/webwizard >/dev/null 2>&1 && \
+     kubectl -n longhorn-system get ingressroute/forgejo >/dev/null 2>&1 && \
      kubectl -n longhorn-system get ingressroute/seaweedfs >/dev/null 2>&1 && \
      kubectl -n longhorn-system get ingressroute/seaweedfs-admin >/dev/null 2>&1; then
     break
@@ -220,6 +251,20 @@ find_proxy_provider_pk_by_name() {
   local response
 
   authentik_get_json_context response "/providers/proxy/?page_size=100" "$provider_name" "$application_slug" "proxy provider" "lookup" "true" \
+    || return 0
+  jq -r \
+    --arg provider_name "$provider_name" \
+    'limit(1; .results[]?
+      | select((.name // "") == $provider_name)
+      | .pk // .id // .uuid // empty)' <<<"$response"
+}
+
+find_oauth2_provider_pk_by_name() {
+  local provider_name="$1"
+  local application_slug="${2:-}"
+  local response
+
+  authentik_get_json_context response "/providers/oauth2/?page_size=100" "$provider_name" "$application_slug" "oauth2 provider" "lookup" "true" \
     || return 0
   jq -r \
     --arg provider_name "$provider_name" \
@@ -448,6 +493,39 @@ create_or_update_proxy_provider() {
   AUTHENTIK_RESOURCE_ID="$existing_pk"
 }
 
+create_or_update_oauth2_provider() {
+  local provider_name="$1"
+  local application_slug="$2"
+  local provider_payload="$3"
+  local existing_pk response created_pk
+
+  existing_pk="$(find_oauth2_provider_pk_by_name "$provider_name" "$application_slug")"
+  if [[ -n "$existing_pk" ]]; then
+    log "Updating Authentik OAuth2 provider for ${provider_name} (provider=${existing_pk})"
+    authentik_write_or_fail_context response PATCH "/providers/oauth2/${existing_pk}/" "$provider_payload" "$provider_name" "$application_slug" "oauth2 provider" "update"
+    AUTHENTIK_RESOURCE_ID="$existing_pk"
+    return 0
+  fi
+
+  log "Creating Authentik OAuth2 provider for ${provider_name}"
+  if authentik_write_or_fail_context response POST "/providers/oauth2/" "$provider_payload" "$provider_name" "$application_slug" "oauth2 provider" "create" "true"; then
+    created_pk="$(extract_authentik_identifier "$response")"
+    if [[ -n "$created_pk" ]]; then
+      AUTHENTIK_RESOURCE_ID="$created_pk"
+      return 0
+    fi
+    log "Authentik OAuth2 provider create for ${provider_name} returned no identifier; checking by name"
+  else
+    log "Recovering Authentik OAuth2 provider for ${provider_name} after create failure by looking it up"
+  fi
+
+  existing_pk="$(find_oauth2_provider_pk_by_name "$provider_name" "$application_slug")"
+  [[ -n "$existing_pk" ]] || fail "Authentik did not return or expose an OAuth2 provider ID for ${provider_name}"
+  log "Recovered Authentik OAuth2 provider for ${provider_name} (provider=${existing_pk})"
+  authentik_write_or_fail_context response PATCH "/providers/oauth2/${existing_pk}/" "$provider_payload" "$provider_name" "$application_slug" "oauth2 provider" "reconcile"
+  AUTHENTIK_RESOURCE_ID="$existing_pk"
+}
+
 create_or_update_application() {
   local application_slug="$1"
   local application_name="$2"
@@ -513,13 +591,298 @@ ensure_group_binding() {
   log "Recovered Authentik admins binding for ${CURRENT_APP_NAME} after create failure (binding=${existing_pk})"
 }
 
+upsert_env_value() {
+  local env_file="$1"
+  local key="$2"
+  local value="$3"
+  local tmp_file
+
+  mkdir -p "$(dirname "$env_file")"
+  touch "$env_file"
+  chmod 0600 "$env_file" || true
+
+  tmp_file="$(mktemp)"
+  awk -v key="$key" -v value="$value" '
+    BEGIN { written = 0 }
+    $0 ~ "^[[:space:]]*#" { print; next }
+    index($0, key "=") == 1 {
+      print key "=" value
+      written = 1
+      next
+    }
+    { print }
+    END {
+      if (!written) {
+        print key "=" value
+      }
+    }
+  ' "$env_file" >"$tmp_file"
+  mv "$tmp_file" "$env_file"
+  chmod 0600 "$env_file" || true
+}
+
+persist_forgejo_root_url() {
+  local host_runtime_dir="${TWINBOX_HOST_RUNTIME_DIR:-/host/opt/twinbox}"
+  local env_file="${host_runtime_dir}/.env"
+
+  if [[ ! -d "$host_runtime_dir" ]]; then
+    log "Host runtime directory ${host_runtime_dir} is not mounted; cannot persist Forgejo public root URL"
+    return 1
+  fi
+
+  upsert_env_value "$env_file" "FORGEJO_ROOT_URL" "$forgejo_root_url"
+  log "Persisted Forgejo public root URL in ${env_file}"
+}
+
+recreate_forgejo_for_public_root_url() {
+  local host_runtime_dir="${TWINBOX_HOST_RUNTIME_DIR:-/host/opt/twinbox}"
+  local env_file="${host_runtime_dir}/.env"
+  local compose_file="${host_runtime_dir}/docker-compose.yml"
+
+  if ! command -v docker >/dev/null 2>&1; then
+    log "Docker CLI is unavailable; skipping Forgejo recreate after setting public root URL"
+    return 0
+  fi
+
+  export FORGEJO_ROOT_URL="$forgejo_root_url"
+  persist_forgejo_root_url || true
+
+  if [[ -f "$compose_file" && -f "$env_file" ]]; then
+    log "Recreating Forgejo with public root URL ${forgejo_root_url}"
+    docker compose --env-file "$env_file" -f "$compose_file" up -d --no-deps --force-recreate forgejo
+    return 0
+  fi
+
+  log "Host compose file not mounted; recreating Forgejo from workspace compose with current environment"
+  docker compose -f "$WORKSPACE_ROOT/docker-compose.yml" up -d --no-deps --force-recreate forgejo
+}
+
+wait_for_forgejo_cli() {
+  local attempt=1
+  local attempts=60
+
+  if ! command -v docker >/dev/null 2>&1; then
+    fail "Docker CLI is required to configure Forgejo OIDC"
+  fi
+
+  while [[ "$attempt" -le "$attempts" ]]; do
+    if docker exec -u git twinbox-forgejo bash -lc 'forgejo admin auth list' >/dev/null 2>&1; then
+      return 0
+    fi
+    log "Waiting for Forgejo CLI (${attempt}/${attempts})"
+    sleep 2
+    attempt=$((attempt + 1))
+  done
+
+  fail "Forgejo CLI did not become available"
+}
+
+forgejo_auth_source_id() {
+  local output
+
+  if ! output="$(
+    docker exec -u git -e FORGEJO_OIDC_AUTH_NAME="$forgejo_auth_name" twinbox-forgejo bash -lc \
+      'forgejo admin auth list --vertical-bars 2>/dev/null || forgejo admin auth list'
+  )"; then
+    return 0
+  fi
+
+  awk -v name="$forgejo_auth_name" '
+    /^[[:space:]]*$/ { next }
+    /^\+/ { next }
+    /^ID[[:space:]]/ { next }
+    {
+      line = $0
+      gsub(/^[ |]+|[ |]+$/, "", line)
+      if (index(line, "|") > 0) {
+        n = split(line, fields, "|")
+        for (i = 1; i <= n; i++) {
+          gsub(/^[[:space:]]+|[[:space:]]+$/, "", fields[i])
+        }
+        if (fields[2] == name) {
+          print fields[1]
+          exit
+        }
+        next
+      }
+      if ($2 == name) {
+        print $1
+        exit
+      }
+    }
+  ' <<<"$output"
+}
+
+sync_forgejo_oidc_secret() {
+  local secret_file
+  secret_file="$(mktemp "${TMPDIR:-/tmp}/forgejo-oidc-XXXXXX")"
+
+  jq -n \
+    --arg FORGEJO_OIDC_CLIENT_ID "$forgejo_oidc_client_id" \
+    --arg FORGEJO_OIDC_CLIENT_SECRET "$forgejo_oidc_client_secret" \
+    --arg FORGEJO_OIDC_AUTH_NAME "$forgejo_auth_name" \
+    --arg FORGEJO_OIDC_DISCOVERY_URL "$forgejo_discovery_url" \
+    --arg FORGEJO_OIDC_ISSUER_URL "$forgejo_issuer_url" \
+    --arg FORGEJO_OIDC_SCOPES "openid email profile" \
+    --arg FORGEJO_OIDC_REDIRECT_URI "$forgejo_redirect_uri" \
+    --arg FORGEJO_PUBLIC_URL "$forgejo_host" \
+    '{
+      FORGEJO_OIDC_CLIENT_ID: $FORGEJO_OIDC_CLIENT_ID,
+      FORGEJO_OIDC_CLIENT_SECRET: $FORGEJO_OIDC_CLIENT_SECRET,
+      FORGEJO_OIDC_AUTH_NAME: $FORGEJO_OIDC_AUTH_NAME,
+      FORGEJO_OIDC_DISCOVERY_URL: $FORGEJO_OIDC_DISCOVERY_URL,
+      FORGEJO_OIDC_ISSUER_URL: $FORGEJO_OIDC_ISSUER_URL,
+      FORGEJO_OIDC_SCOPES: $FORGEJO_OIDC_SCOPES,
+      FORGEJO_OIDC_REDIRECT_URI: $FORGEJO_OIDC_REDIRECT_URI,
+      FORGEJO_PUBLIC_URL: $FORGEJO_PUBLIC_URL
+    }' >"$secret_file"
+
+  log "Writing Forgejo OIDC client secret to OpenBao"
+  bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+    --secret-name "forgejo-oidc" \
+    --json-file "$secret_file" \
+    --required-keys "FORGEJO_OIDC_CLIENT_ID,FORGEJO_OIDC_CLIENT_SECRET,FORGEJO_OIDC_AUTH_NAME,FORGEJO_OIDC_DISCOVERY_URL,FORGEJO_OIDC_ISSUER_URL,FORGEJO_OIDC_SCOPES,FORGEJO_OIDC_REDIRECT_URI,FORGEJO_PUBLIC_URL"
+
+  rm -f "$secret_file"
+}
+
+configure_forgejo_oidc_auth_source() {
+  local existing_id
+
+  wait_for_forgejo_cli
+  existing_id="$(forgejo_auth_source_id)"
+
+  if [[ -n "$existing_id" ]]; then
+    log "Updating Forgejo OIDC auth source ${forgejo_auth_name} (id=${existing_id})"
+    docker exec \
+      -u git \
+      -e FORGEJO_AUTH_SOURCE_ID="$existing_id" \
+      -e FORGEJO_OIDC_AUTH_NAME="$forgejo_auth_name" \
+      -e FORGEJO_OIDC_CLIENT_ID="$forgejo_oidc_client_id" \
+      -e FORGEJO_OIDC_CLIENT_SECRET="$forgejo_oidc_client_secret" \
+      -e FORGEJO_OIDC_DISCOVERY_URL="$forgejo_discovery_url" \
+      twinbox-forgejo bash -lc '
+        forgejo admin auth update-oauth \
+          --id "$FORGEJO_AUTH_SOURCE_ID" \
+          --provider openidConnect \
+          --name "$FORGEJO_OIDC_AUTH_NAME" \
+          --key "$FORGEJO_OIDC_CLIENT_ID" \
+          --secret "$FORGEJO_OIDC_CLIENT_SECRET" \
+          --auto-discover-url "$FORGEJO_OIDC_DISCOVERY_URL" \
+          --scopes "openid email profile" \
+          --skip-local-2fa \
+          --allow-username-change
+      '
+    return 0
+  fi
+
+  log "Creating Forgejo OIDC auth source ${forgejo_auth_name}"
+  docker exec \
+    -u git \
+    -e FORGEJO_OIDC_AUTH_NAME="$forgejo_auth_name" \
+    -e FORGEJO_OIDC_CLIENT_ID="$forgejo_oidc_client_id" \
+    -e FORGEJO_OIDC_CLIENT_SECRET="$forgejo_oidc_client_secret" \
+    -e FORGEJO_OIDC_DISCOVERY_URL="$forgejo_discovery_url" \
+    twinbox-forgejo bash -lc '
+      forgejo admin auth add-oauth \
+        --provider openidConnect \
+        --name "$FORGEJO_OIDC_AUTH_NAME" \
+        --key "$FORGEJO_OIDC_CLIENT_ID" \
+        --secret "$FORGEJO_OIDC_CLIENT_SECRET" \
+        --auto-discover-url "$FORGEJO_OIDC_DISCOVERY_URL" \
+        --scopes "openid email profile" \
+        --skip-local-2fa \
+        --allow-username-change
+    '
+}
+
 authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
 invalidation_flow_id="$(authentik_resolve_flow_id "default-provider-invalidation-flow" "invalidation")"
 admins_group_id="$(authentik_find_group_id "admins")"
+openid_mapping_id="$(authentik_resolve_scope_mapping_id "openid")"
+email_mapping_id="$(authentik_resolve_scope_mapping_id "email")"
+profile_mapping_id="$(authentik_resolve_scope_mapping_id "profile")"
+signing_key_id="$(authentik_resolve_signing_key_id)"
 
 [[ -n "$authorization_flow_id" ]] || fail "Could not resolve Authentik authorization flow ID"
 [[ -n "$invalidation_flow_id" ]] || fail "Could not resolve Authentik invalidation flow ID"
 [[ -n "$admins_group_id" ]] || fail "Could not resolve Authentik admins group ID"
+[[ -n "$openid_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for openid"
+[[ -n "$email_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for email"
+[[ -n "$profile_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for profile"
+[[ -n "$signing_key_id" ]] || fail "Could not resolve Authentik signing key ID for ${AUTHENTIK_SIGNING_KEY_NAME}"
+
+property_mapping_ids_json="$(
+  jq -cn \
+    --arg openid "$openid_mapping_id" \
+    --arg email "$email_mapping_id" \
+    --arg profile "$profile_mapping_id" \
+    '[$openid, $email, $profile]'
+)"
+
+log_step "Provisioning native Authentik OIDC login for Forgejo"
+set_context "$forgejo_application_name" "$forgejo_application_slug" "oauth2 provider" "provision" ""
+forgejo_provider_payload="$(
+  jq -n \
+    --arg name "$forgejo_provider_name" \
+    --arg client_id "$forgejo_oidc_client_id" \
+    --arg client_secret "$forgejo_oidc_client_secret" \
+    --arg authorization_flow "$authorization_flow_id" \
+    --arg invalidation_flow "$invalidation_flow_id" \
+    --arg signing_key "$signing_key_id" \
+    --arg redirect_uri "$forgejo_redirect_uri" \
+    --argjson property_mappings "$property_mapping_ids_json" \
+    '{
+      name: $name,
+      client_id: $client_id,
+      client_secret: $client_secret,
+      authorization_flow: $authorization_flow,
+      invalidation_flow: $invalidation_flow,
+      signing_key: $signing_key,
+      redirect_uris: [
+        {
+          matching_mode: "strict",
+          url: $redirect_uri
+        }
+      ],
+      property_mappings: $property_mappings,
+      include_claims_in_id_token: true,
+      client_type: "confidential",
+      grant_types: ["authorization_code"],
+      issuer_mode: "per_provider"
+    }'
+)"
+AUTHENTIK_RESOURCE_ID=""
+create_or_update_oauth2_provider "$forgejo_provider_name" "$forgejo_application_slug" "$forgejo_provider_payload"
+forgejo_oidc_provider_id="$AUTHENTIK_RESOURCE_ID"
+[[ -n "$forgejo_oidc_provider_id" ]] || fail "Authentik did not return an OAuth2 provider ID for Forgejo"
+
+forgejo_application_payload="$(
+  jq -n \
+    --arg name "$forgejo_application_name" \
+    --arg slug "$forgejo_application_slug" \
+    --arg launch_url "$forgejo_host" \
+    --arg provider_pk "$forgejo_oidc_provider_id" \
+    '{
+      name: $name,
+      slug: $slug,
+      meta_launch_url: $launch_url,
+      provider: ($provider_pk | tonumber)
+    }'
+)"
+AUTHENTIK_RESOURCE_ID=""
+create_or_update_application "$forgejo_application_slug" "$forgejo_application_name" "$forgejo_application_payload"
+forgejo_application_id="$AUTHENTIK_RESOURCE_ID"
+[[ -n "$forgejo_application_id" ]] || fail "Authentik did not return an application ID for Forgejo"
+
+authentik_get_json_context forgejo_application_json "/core/applications/${forgejo_application_slug}/" "$forgejo_application_name" "$forgejo_application_slug" "application" "verify"
+forgejo_application_uuid="$(extract_authentik_identifier "$forgejo_application_json")"
+[[ -n "$forgejo_application_uuid" ]] || fail "Could not determine Authentik application UUID for Forgejo"
+ensure_group_binding "$forgejo_application_uuid" "$admins_group_id"
+sync_forgejo_oidc_secret
+recreate_forgejo_for_public_root_url
+configure_forgejo_oidc_auth_source
+clear_context
 
 management_apps_json="$(
   jq -nc \
@@ -660,13 +1023,15 @@ outpost_id="$(printf '%s' "$outpost_json" | jq -r '.results[] | select(.name == 
 [[ -n "$outpost_id" && "$outpost_id" != "null" ]] || fail "Could not find the embedded Authentik outpost"
 
 current_providers="$(printf '%s' "$outpost_json" | jq -c '.results[] | select(.pk == "'"$outpost_id"'") | .providers // []')"
+forgejo_legacy_proxy_provider_id="$(find_proxy_provider_pk_by_name "$forgejo_provider_name" "$forgejo_application_slug" || true)"
 log "Embedded Authentik outpost currently has $(jq -r 'length' <<<"$current_providers") proxy provider(s)"
 updated_providers="$(
   printf '%s\n' "$current_providers" \
-    | jq --arg traefik "$traefik_provider_id" --arg longhorn "$longhorn_provider_id" --arg hubble "$hubble_provider_id" --arg proxmox "$proxmox_provider_id" --arg webwizard "$webwizard_provider_id" --arg seaweedfs "$seaweedfs_provider_id" --arg seaweedfs_admin "$seaweedfs_admin_provider_id" '
-        . + [$traefik, $longhorn, $hubble, $proxmox, $webwizard]
+    | jq --arg traefik "$traefik_provider_id" --arg longhorn "$longhorn_provider_id" --arg hubble "$hubble_provider_id" --arg proxmox "$proxmox_provider_id" --arg webwizard "$webwizard_provider_id" --arg seaweedfs "$seaweedfs_provider_id" --arg seaweedfs_admin "$seaweedfs_admin_provider_id" --arg forgejo_legacy "$forgejo_legacy_proxy_provider_id" '
+        map(tostring)
+        | map(select($forgejo_legacy == "" or . != $forgejo_legacy))
+        | . + [$traefik, $longhorn, $hubble, $proxmox, $webwizard]
         + [$seaweedfs, $seaweedfs_admin]
-        | map(tostring)
         | unique
       '
 )"
@@ -721,6 +1086,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     --arg hubble_route "hubble" \
     --arg proxmox_route "proxmox" \
     --arg webwizard_route "webwizard" \
+    --arg forgejo_route "forgejo" \
     --arg seaweedfs_route "seaweedfs" \
     --arg seaweedfs_admin_route "seaweedfs-admin" \
     '{
@@ -729,6 +1095,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
       hubble_route: $hubble_route,
       proxmox_route: $proxmox_route,
       webwizard_route: $webwizard_route,
+      forgejo_route: $forgejo_route,
       seaweedfs_route: $seaweedfs_route,
       seaweedfs_admin_route: $seaweedfs_admin_route
     }' >"$STEP_RESULT_FILE"
@@ -772,3 +1139,14 @@ bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
   --service-name "webwizard" \
   --service-domain "webwizard.$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")" \
   --service-path /
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "forgejo" \
+  --service-domain "forgejo.$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")" \
+  --service-path /
+
+log_step "Synchronizing manager-api trusted sources"
+bash "$WORKSPACE_ROOT/scripts/manager/sync-manager-api-node-allowlist.sh" \
+  --kubeconfig "$KUBECONFIG_FILE" \
+  --workspace-root "$WORKSPACE_ROOT" \
+  || log "manager-api allowlist sync skipped or failed"

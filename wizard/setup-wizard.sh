@@ -1087,7 +1087,7 @@ EOF
 }
 
 create_proxmox_api_user() {
-  local proxmox_privs="VM.Audit,VM.Monitor,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use,Sys.Audit"
+  local proxmox_privs="VM.Audit,VM.Monitor,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.Allocate,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use,Sys.Audit,Sys.Modify"
   local create_err=""
   local role_err=""
   local last_err=""
@@ -1171,6 +1171,44 @@ create_proxmox_api_user() {
   done
   if ! apply_acl_with_retry "/sdn" "$PROXMOX_USER" "$PROXMOX_ROLE" 10 1; then
     msg_error "Failed to apply ACL /sdn for ${PROXMOX_USER}: ${last_err}"
+    return 1
+  fi
+}
+
+ensure_proxmox_import_content_type() {
+  local datastore="${PROXMOX_FILE_DATASTORE:-local}"
+  local storage_json=""
+  local current_content=""
+  local next_content=""
+
+  if ! storage_json=$(pvesh get "/storage/${datastore}" --output-format json 2>/dev/null); then
+    msg_error "Failed to inspect Proxmox storage ${datastore}."
+    return 1
+  fi
+
+  current_content="$(python3 -c '
+import json
+import sys
+
+payload = json.loads(sys.stdin.read() or "{}")
+data = payload.get("data", payload) if isinstance(payload, dict) else {}
+print(data.get("content", ""))
+' <<<"$storage_json")"
+
+  if [[ ",${current_content}," == *",import,"* ]]; then
+    log_event "Proxmox storage ${datastore} already allows import content"
+    return 0
+  fi
+
+  if [[ -n "$current_content" ]]; then
+    next_content="${current_content},import"
+  else
+    next_content="import"
+  fi
+
+  log_event "Enabling import content on Proxmox storage ${datastore}"
+  if ! pvesm set "$datastore" --content "$next_content" >/dev/null 2>&1; then
+    msg_error "Failed to enable import content on Proxmox storage ${datastore}."
     return 1
   fi
 }
@@ -1464,7 +1502,7 @@ runcmd:
   - install -m 0755 -d /opt/twinbox/bootstrap/openbao/seal
   - install -m 0755 -d /opt/twinbox/bootstrap/openbao/init
   - install -m 0755 -d /opt/twinbox/manager-data
-  - install -m 0755 -d /opt/twinbox/seaweedfs/data
+  - install -m 0755 -d -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /opt/twinbox/seaweedfs/data
   - python3 /tmp/twinbox-write-cluster-login-secret.py
   - python3 /tmp/twinbox-write-velero-secret.py
   - install -m 0600 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /tmp/twinbox.env.template ${TWINBOX_TARGET_DIR}/.env
@@ -1625,6 +1663,7 @@ run_installation_flow() {
     progress_update "Preparing" "Checking Proxmox access and VM settings"
     log_event "Building the management VM."
     create_proxmox_api_user
+    ensure_proxmox_import_content_type
     create_management_vm
     prepare_completion_message
   } 2>&1 | dialog \

@@ -158,6 +158,7 @@ cat >/etc/postfix/sasl/smtpd.conf <<'EOF'
 # Managed by Twinbox Mail. Do not edit by hand.
 pwcheck_method: auxprop
 auxprop_plugin: sasldb
+sasldb_path: /etc/sasldb2
 mech_list: PLAIN LOGIN
 EOF
 
@@ -174,6 +175,7 @@ relay_interface="$(ip -o -4 addr show | awk -v ip="$RELAY_LISTEN_ADDRESS" '{spli
 
 postconf -e "myhostname = ${MAIL_HOSTNAME}"
 postconf -e "myorigin = ${MAIL_DOMAIN}"
+postconf -e "smtpd_sasl_local_domain = ${MAIL_HOSTNAME}"
 postconf -e "inet_interfaces = all"
 postconf -e "inet_protocols = ipv4"
 postconf -e "mydestination = localhost"
@@ -203,7 +205,7 @@ cat >>/etc/postfix/master.cf <<EOF
 
 # BEGIN Twinbox Mail relay listener
 # Managed by Twinbox Mail. Do not edit by hand.
-${RELAY_LISTEN_ADDRESS}:${RELAY_LISTEN_PORT} inet n       -       y       -       -       smtpd
+${RELAY_LISTEN_ADDRESS}:${RELAY_LISTEN_PORT} inet n       -       -       -       -       smtpd
   -o syslog_name=postfix/twinbox-mailu-relay
   -o smtpd_sasl_auth_enable=yes
   -o smtpd_sasl_type=cyrus

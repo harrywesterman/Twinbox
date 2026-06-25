@@ -33,28 +33,28 @@ resolve_kubeconfig_file() {
   printf '%s\n' "$KUBECONFIG_FILE"
 }
 
-wait_for_resources_ready() {
+wait_for_named_resource_ready() {
   local namespace="$1"
   local kind="$2"
-  local condition="$3"
-  local label="$4"
+  local name="$3"
+  local label="${4:-$name}"
   local attempts=120
   local attempt=1
 
   while true; do
-    if kubectl -n "$namespace" get "$kind" -o name 2>/dev/null | grep -q .; then
-      if kubectl -n "$namespace" wait --for="condition=${condition}" "$kind" --all --timeout=5s >/dev/null 2>&1; then
-        log "${label} resources are ready"
+    if kubectl -n "$namespace" get "$kind" "$name" >/dev/null 2>&1; then
+      if kubectl -n "$namespace" wait --for="condition=Ready" "$kind" "$name" --timeout=5s >/dev/null 2>&1; then
+        log "${label} is ready"
         return 0
       fi
 
-      log "Waiting for ${label} resources to become ready"
+      log "Waiting for ${label} to become ready"
     else
-      log "Waiting for ${label} resources to appear"
+      log "Waiting for ${label} to appear"
     fi
 
     if [[ "$attempt" -ge "$attempts" ]]; then
-      fail "${label} resources did not become ready after ${attempts} attempts"
+      fail "${label} did not become ready after ${attempts} attempts"
     fi
 
     sleep 5
@@ -237,10 +237,11 @@ zulip_db_password="$(openssl rand -hex 24)"
 zulip_rabbitmq_password="$(openssl rand -hex 24)"
 zulip_rabbitmq_erlang_cookie="$(openssl rand -hex 24)"
 zulip_redis_password="$(openssl rand -hex 24)"
+zulip_memcached_password="$(openssl rand -hex 24)"
 secrets_dir="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}/secrets/global"
 zulip_secret_file="${secrets_dir}/zulip-oidc-${cluster_id}.json"
 zulip_runtime_secret_file="${secrets_dir}/zulip-runtime-${cluster_id}.json"
-zulip_manifest_path="$WORKSPACE_ROOT/gitops/apps/zulip.yaml"
+zulip_manifest_path="$WORKSPACE_ROOT/gitops/optional-apps/zulip.yaml"
 trap 'rm -f "$zulip_secret_file" "$zulip_runtime_secret_file"' EXIT
 
 mkdir -p "$secrets_dir"
@@ -280,6 +281,7 @@ if [[ -n "$existing_zulip_runtime_secret_json" ]]; then
   existing_rabbitmq_password="$(jq -r '.ZULIP_RABBITMQ_PASSWORD // empty' <<<"$existing_zulip_runtime_secret_json")"
   existing_redis_password="$(jq -r '.ZULIP_REDIS_PASSWORD // empty' <<<"$existing_zulip_runtime_secret_json")"
   existing_erlang_cookie="$(jq -r '.ZULIP_RABBITMQ_ERLANG_COOKIE // empty' <<<"$existing_zulip_runtime_secret_json")"
+  existing_memcached_password="$(jq -r '.ZULIP_MEMCACHED_PASSWORD // empty' <<<"$existing_zulip_runtime_secret_json")"
   if [[ -n "$existing_rabbitmq_password" ]]; then
     zulip_rabbitmq_password="$existing_rabbitmq_password"
   fi
@@ -288,6 +290,9 @@ if [[ -n "$existing_zulip_runtime_secret_json" ]]; then
   fi
   if [[ -n "$existing_erlang_cookie" ]]; then
     zulip_rabbitmq_erlang_cookie="$existing_erlang_cookie"
+  fi
+  if [[ -n "$existing_memcached_password" ]]; then
+    zulip_memcached_password="$existing_memcached_password"
   fi
 fi
 
@@ -359,10 +364,12 @@ zulip_runtime_secret_json="$(
     --arg rabbitmq_password "$zulip_rabbitmq_password" \
     --arg redis_password "$zulip_redis_password" \
     --arg erlang_cookie "$zulip_rabbitmq_erlang_cookie" \
+    --arg memcached_password "$zulip_memcached_password" \
     '{
       ZULIP_RABBITMQ_PASSWORD: $rabbitmq_password,
       ZULIP_RABBITMQ_ERLANG_COOKIE: $erlang_cookie,
-      ZULIP_REDIS_PASSWORD: $redis_password
+      ZULIP_REDIS_PASSWORD: $redis_password,
+      ZULIP_MEMCACHED_PASSWORD: $memcached_password
     }'
 )"
 printf '%s\n' "$zulip_runtime_secret_json" >"$zulip_runtime_secret_file"
@@ -371,7 +378,7 @@ chmod 600 "$zulip_runtime_secret_file"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "zulip-runtime" \
   --json-file "$zulip_runtime_secret_file" \
-  --required-keys "ZULIP_RABBITMQ_PASSWORD,ZULIP_RABBITMQ_ERLANG_COOKIE,ZULIP_REDIS_PASSWORD"
+  --required-keys "ZULIP_RABBITMQ_PASSWORD,ZULIP_RABBITMQ_ERLANG_COOKIE,ZULIP_REDIS_PASSWORD,ZULIP_MEMCACHED_PASSWORD"
 
 databases_namespace_manifest="$WORKSPACE_ROOT/gitops/databases/shared/namespace.yaml"
 zulip_db_objectstore_manifest="$WORKSPACE_ROOT/gitops/databases/zulip/objectstore.yaml"
@@ -390,9 +397,10 @@ kubectl apply -f "$zulip_db_pooler_ro_manifest"
 kubectl apply -f "$zulip_db_pooler_rw_manifest"
 kubectl apply -f "$zulip_db_backup_manifest"
 
-wait_for_resources_ready "databases" "cluster" "Ready" "Zulip CloudNativePG cluster"
-wait_for_resources_ready "databases" "externalsecret" "Ready" "Zulip database ExternalSecret"
-wait_for_resources_ready "databases" "deployment" "Available" "Zulip pooler deployment"
+wait_for_named_resource_ready "databases" "cluster" "zulip-db" "Zulip CloudNativePG cluster"
+wait_for_named_resource_ready "databases" "externalsecret" "zulip-db-credentials" "Zulip database ExternalSecret"
+wait_for_deployment_rollout "databases" "zulip-db-pooler-ro" "Zulip read-only pooler"
+wait_for_deployment_rollout "databases" "zulip-db-pooler-rw" "Zulip read-write pooler"
 
 bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
   --app-id "zulip" \
@@ -458,7 +466,9 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$zulip_manifest_path" \
   --application "zulip"
 
-wait_for_resources_ready "zulip" "externalsecret" "Ready" "Zulip ExternalSecret"
+wait_for_named_resource_ready "zulip" "externalsecret" "zulip-config" "Zulip config ExternalSecret"
+wait_for_named_resource_ready "zulip" "externalsecret" "zulip-db-credentials" "Zulip database credentials ExternalSecret"
+wait_for_named_resource_ready "zulip" "externalsecret" "zulip-runtime" "Zulip runtime ExternalSecret"
 wait_for_statefulset_ready "zulip" "zulip-rabbitmq" "Zulip RabbitMQ"
 wait_for_statefulset_ready "zulip" "zulip-redis-master" "Zulip Redis master"
 wait_for_deployment_rollout "zulip" "zulip-memcached" "Zulip memcached"

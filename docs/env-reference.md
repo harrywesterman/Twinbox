@@ -12,7 +12,7 @@ Complete reference for the `.env` file used by the Twinbox manager stack.
 | `PROXMOX_PASSWORD` | `change-me` | Proxmox API password (bootstrap only; canonical copy lives under `bootstrap/secrets/`) |
 | `PROXMOX_NODE` | `pve` | Default Proxmox node name |
 | `PROXMOX_STORAGE_POOL` | `local-lvm` | Storage pool for VM disks |
-| `PROXMOX_FILE_DATASTORE` | `local` | Datastore for ISO uploads and snippets |
+| `PROXMOX_FILE_DATASTORE` | `local` | Datastore for Talos disk-image uploads; the setup wizard enables Proxmox `import` content here |
 
 ## Talos
 

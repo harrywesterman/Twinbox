@@ -1,0 +1,14 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: outline-forwarded-headers
+  namespace: outline
+  annotations:
+    twinbox.io/description: >-
+      Ensure Outline receives correct X-Forwarded-Proto and X-Forwarded-Port
+      headers so its FORCE_HTTPS check sees HTTPS from the upstream proxy.
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Port: "443"
+      X-Forwarded-Proto: https
