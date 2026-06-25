@@ -21,7 +21,7 @@ spec:
         fsGroup: 999
       containers:
         - name: redis
-          image: redis:8.4-alpine
+          image: redis:8.8-alpine
           imagePullPolicy: IfNotPresent
           args:
             - redis-server
