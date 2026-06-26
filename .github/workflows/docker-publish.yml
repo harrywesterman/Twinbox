@@ -159,6 +159,7 @@ jobs:
           force_all = (
               os.environ["EVENT_NAME"] == "workflow_dispatch"
               or os.environ["GITHUB_REF"].startswith("refs/tags/v")
+              or os.environ["GITHUB_REF"] == "refs/heads/main"
               or os.environ["FORCE_ALL"] == "true"
           )
 
@@ -332,3 +333,107 @@ jobs:
               encoding="utf-8",
           )
           PY
+
+  update-refs:
+    needs: [publish]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute short SHA
+        id: sha
+        run: echo "short=sha-${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: Update all :latest references to pinned SHA tag
+        env:
+          SHORT_SHA: ${{ steps.sha.outputs.short }}
+        run: |
+          python3 << 'PYEOF'
+          import os
+
+          sha = os.environ['SHORT_SHA']
+
+          replacements = {
+              'gitops/platform-apps/twinbox-portal/kustomization.yaml': [
+                  ('newTag: latest', f'newTag: {sha}'),
+              ],
+              'gitops/platform-apps/twinbox-agents/kustomization.yaml': [
+                  ('newTag: latest', f'newTag: {sha}'),
+              ],
+              'gitops/platform-apps/dashy/deployment.yaml': [
+                  (
+                      'ghcr.io/harrywesterman/twinbox-manager-worker:latest',
+                      f'ghcr.io/harrywesterman/twinbox-manager-worker:{sha}',
+                  ),
+              ],
+              'gitops/platform-apps/jitsi/auth-deployment.yaml': [
+                  (
+                      'ghcr.io/harrywesterman/twinbox-manager-worker:jitsi-openid-latest',
+                      f'ghcr.io/harrywesterman/twinbox-manager-worker:jitsi-openid-{sha}',
+                  ),
+              ],
+              '.env.example': [
+                  ('TWINBOX_IMAGE_TAG=latest', f'TWINBOX_IMAGE_TAG={sha}'),
+              ],
+              'wizard/setup-wizard.sh': [
+                  ('TWINBOX_IMAGE_TAG="latest"', f'TWINBOX_IMAGE_TAG="{sha}"'),
+              ],
+              'scripts/manager/sync-manager-api-node-allowlist.sh': [
+                  (
+                      'TWINBOX_IMAGE_TAG:-latest}',
+                      f'TWINBOX_IMAGE_TAG:-{sha}}}',
+                  ),
+              ],
+              'scripts/manager-web-preview.sh': [
+                  (
+                      'TWINBOX_VM_PREVIEW_IMAGE_TAG:-latest}',
+                      f'TWINBOX_VM_PREVIEW_IMAGE_TAG:-{sha}}}',
+                  ),
+              ],
+              'tests/scripts/test_jitsi_integration_contract.py': [
+                  ('jitsi-openid-latest', f'jitsi-openid-{sha}'),
+              ],
+              'docs/troubleshooting.md': [
+                  ('twinbox-manager-api:latest', f'twinbox-manager-api:{sha}'),
+                  ('twinbox-manager-worker:latest', f'twinbox-manager-worker:{sha}'),
+                  ('twinbox-manager-web:latest', f'twinbox-manager-web:{sha}'),
+              ],
+              'docs/env-reference.md': [
+                  ('| `TWINBOX_IMAGE_TAG` | `latest` |', f'| `TWINBOX_IMAGE_TAG` | `{sha}` |'),
+              ],
+              'docs/configuration.md': [
+                  ('TWINBOX_IMAGE_TAG=latest', f'TWINBOX_IMAGE_TAG={sha}'),
+              ],
+          }
+
+          for filepath, patterns in replacements.items():
+              with open(filepath) as f:
+                  content = f.read()
+              for old, new in patterns:
+                  if old in content:
+                      content = content.replace(old, new)
+                      print(f"  {filepath}: replaced")
+
+              with open(filepath, 'w') as f:
+                  f.write(content)
+
+          print("Done")
+          PYEOF
+
+      - name: Commit and push if changed
+        run: |
+          if ! git diff --quiet --exit-code; then
+            git config user.name "twinbox-ci"
+            git config user.email "twinbox@twinbox.local"
+            git add -A
+            git commit -m "chore: bump image tags to ${{ steps.sha.outputs.short }} [skip ci]"
+            git push
+          else
+            echo "No changes to commit"
+          fi
