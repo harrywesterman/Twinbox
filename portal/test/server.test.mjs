@@ -1468,7 +1468,7 @@ test("auth callback succeeds even when the browser does not return the oauth coo
   assert.equal(redirectUrl.pathname, "/admin");
 });
 
-test("portal image copies the Authentik admin helper into the runtime image", async () => {
+test("portal image copies server helper modules into the runtime image", async () => {
   const dockerfile = await fs.promises.readFile(
     path.join(repoRoot, "portal", "Dockerfile"),
     "utf8"
@@ -1482,6 +1482,11 @@ test("portal image copies the Authentik admin helper into the runtime image", as
     dockerfile,
     /@rolldown\/binding-linux-x64-musl@\$\(node -p "require\('rolldown\/package\.json'\)\.version"\)/,
     "expected the Alpine build stage to install rolldown's musl binding"
+  );
+  assert.match(
+    dockerfile,
+    /COPY src\/it-department-model\.js \.\/src\/it-department-model\.js/,
+    "expected the runtime image to include the IT department scene model"
   );
 });
 
