@@ -18,6 +18,7 @@ import {
   isMailuInstalled,
   mailuCreateMailbox,
 } from "./mailu-client.mjs";
+import { buildItDepartmentScene } from "./src/it-department-model.js";
 
 const app = express();
 const port = Number(process.env.PORT || 8080);
@@ -1845,6 +1846,36 @@ app.get("/admin/", (req, res) => {
 });
 
 app.use(express.static(distDir, { extensions: ["html"] }));
+
+app.get("/api/it-department", async (req, res) => {
+  if (!requireSession(req, res)) return;
+
+  const fetchedAt = new Date().toISOString();
+
+  try {
+    const [agents, events, workOrders] = await Promise.all([
+      proxyAgentRequest("/api/agents"),
+      proxyAgentRequest("/api/events?limit=60"),
+      proxyAgentRequest("/api/work-orders?limit=40"),
+    ]);
+
+    res.json(
+      buildItDepartmentScene({
+        agents,
+        events,
+        workOrders,
+        fetchedAt,
+      })
+    );
+  } catch {
+    res.json(
+      buildItDepartmentScene({
+        degraded: true,
+        fetchedAt,
+      })
+    );
+  }
+});
 
 app.get("/api/admin/agents", async (req, res) => {
   if (!requireAdminSession(req, res)) return;

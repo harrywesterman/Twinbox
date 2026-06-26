@@ -3543,6 +3543,60 @@ function StatusPage({ statusState, onRefresh, onNavigate }) {
   );
 }
 
+function useItDepartmentScene() {
+  const [state, setState] = useState(() => ({
+    loading: true,
+    refreshing: false,
+    error: "",
+    scene: buildItDepartmentScene(),
+  }));
+  const mountedRef = useRef(false);
+
+  const load = useCallback(async ({ silent = false } = {}) => {
+    setState((current) => ({
+      ...current,
+      loading: current.loading && !silent,
+      refreshing: silent,
+      error: "",
+    }));
+
+    try {
+      const payload = await requestJson("/api/it-department");
+      const scene = payload?.agents ? payload : buildItDepartmentScene(payload || {});
+      if (!mountedRef.current) return;
+      setState({
+        loading: false,
+        refreshing: false,
+        error: "",
+        scene,
+      });
+    } catch (error) {
+      if (!mountedRef.current) return;
+      setState({
+        loading: false,
+        refreshing: false,
+        error: error instanceof Error ? error.message : "Failed to load IT department.",
+        scene: buildItDepartmentScene({ degraded: true }),
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    load();
+    const interval = window.setInterval(() => load({ silent: true }), 5000);
+    return () => {
+      mountedRef.current = false;
+      window.clearInterval(interval);
+    };
+  }, [load]);
+
+  return {
+    ...state,
+    reload: () => load({ silent: true }),
+  };
+}
+
 function PixelMonitor({ label = "ok" }) {
   return (
     <span className="pixel-monitor" aria-hidden="true">
@@ -3563,15 +3617,51 @@ function PixelDesk({ className = "", label = "sys" }) {
   );
 }
 
+function PixelBookshelf({ className = "" }) {
+  return (
+    <div className={`pixel-bookshelf ${className}`.trim()} aria-hidden="true">
+      <span />
+      <span />
+      <span />
+      <span />
+      <span />
+    </div>
+  );
+}
+
+function PixelPlant({ className = "" }) {
+  return (
+    <div className={`it-office-plant ${className}`.trim()} aria-hidden="true">
+      <span />
+      <span />
+      <span />
+      <span />
+    </div>
+  );
+}
+
+function PixelServerRack({ className = "" }) {
+  return (
+    <div className={`it-office-server-rack ${className}`.trim()} aria-hidden="true">
+      <span />
+      <span />
+      <span />
+      <span />
+    </div>
+  );
+}
+
 function PixelAgent({ agent }) {
   return (
     <article
-      className={`pixel-agent is-${agent.palette} faces-${agent.direction}`}
+      className={`pixel-agent is-${agent.palette} faces-${agent.direction} motion-${agent.motion}`}
       style={{
         "--agent-x": `${agent.x}%`,
         "--agent-y": `${agent.y}%`,
         "--agent-delay": `${agent.delay}s`,
         "--agent-z": agent.zIndex,
+        "--agent-walk-x": `${agent.walkX || 0}px`,
+        "--agent-walk-y": `${agent.walkY || 0}px`,
       }}
       aria-label={`${agent.displayName}, ${agent.role}, ${agent.activity} at ${agent.station}`}
       title={`${agent.displayName} - ${agent.role}`}
@@ -3600,67 +3690,84 @@ function PixelAgent({ agent }) {
 }
 
 function ItDepartmentPage() {
-  const scene = useMemo(() => buildItDepartmentScene(), []);
+  const { scene, loading, refreshing, error, reload } = useItDepartmentScene();
 
   return (
     <section className="it-department-page" aria-labelledby="it-department-title">
-      <div className="it-department-copy">
-        <p className="eyebrow">{scene.eyebrow}</p>
-        <h1 id="it-department-title">{scene.title}</h1>
-        <p>{scene.description}</p>
+      <div className="it-department-head">
+        <div className="it-department-copy">
+          <p className="eyebrow">{scene.eyebrow}</p>
+          <h1 id="it-department-title">{scene.title}</h1>
+          <p>{scene.description}</p>
+        </div>
+        <div className="it-office-livebar" aria-live="polite">
+          <span className={`it-live-light ${scene.degraded ? "is-offline" : "is-online"}`} />
+          <strong>{scene.liveLabel}</strong>
+          <span>{loading ? "loading" : `${scene.stats[1]?.value || 0} moving`}</span>
+          <button type="button" onClick={reload} disabled={refreshing}>
+            {refreshing ? "..." : "Refresh"}
+          </button>
+        </div>
       </div>
 
       <div
         className="it-office-stage"
         role="region"
-        aria-label="Pixel art office with the Twinbox IT department agents working at desks, server racks, and consoles."
+        aria-label="Top-down pixel art office with Twinbox AI agents moving around as IT staff."
       >
         <div className="it-office-map">
-          <div className="it-office-wall" aria-hidden="true">
-            <div className="it-office-sign">IT</div>
-            <div className="it-office-window">
-              <span />
-              <span />
-              <span />
-            </div>
-            <div className="it-office-status-board">
-              <span />
-              <span />
-              <span />
-            </div>
+          <div className="it-office-room room-main" aria-hidden="true" />
+          <div className="it-office-room room-break" aria-hidden="true" />
+          <div className="it-office-room room-server" aria-hidden="true" />
+          <div className="it-office-room room-meeting" aria-hidden="true" />
+          <div className="it-office-corridor" aria-hidden="true" />
+
+          <div className="it-office-sign" aria-hidden="true">
+            IT
           </div>
 
-          <div className="it-office-floor" aria-hidden="true" />
-          <div className="it-office-server-rack rack-left" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
-          <div className="it-office-server-rack rack-right" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
+          <PixelBookshelf className="shelf-left" />
+          <PixelBookshelf className="shelf-top" />
+          <PixelBookshelf className="shelf-right" />
+
           <PixelDesk className="desk-one" label="ops" />
           <PixelDesk className="desk-two" label="k8s" />
-          <PixelDesk className="desk-three" label="sql" />
+          <PixelDesk className="desk-three" label="tal" />
           <PixelDesk className="desk-four" label="git" />
+
+          <PixelServerRack className="rack-one" />
+          <PixelServerRack className="rack-two" />
+          <PixelServerRack className="rack-three" />
+
+          <div className="it-office-break-counter" aria-hidden="true">
+            <span className="pixel-vending" />
+            <span className="pixel-water" />
+            <span className="pixel-fridge" />
+          </div>
+
+          <div className="pixel-meeting-table" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+
           <div className="it-office-coffee" aria-hidden="true">
             <span className="coffee-machine" />
             <span className="coffee-steam one" />
             <span className="coffee-steam two" />
           </div>
-          <div className="it-office-plant plant-left" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </div>
-          <div className="it-office-plant plant-right" aria-hidden="true">
-            <span />
-            <span />
-            <span />
+
+          <PixelPlant className="plant-left" />
+          <PixelPlant className="plant-center" />
+          <PixelPlant className="plant-right" />
+
+          <div className="it-office-status-board" aria-hidden="true">
+            {scene.stats.map((stat) => (
+              <span key={stat.id}>
+                <strong>{stat.value}</strong>
+                {stat.label}
+              </span>
+            ))}
           </div>
 
           <div className="pixel-agent-layer">
@@ -3670,6 +3777,7 @@ function ItDepartmentPage() {
           </div>
         </div>
       </div>
+      {error ? <p className="it-office-error">{error}</p> : null}
     </section>
   );
 }
