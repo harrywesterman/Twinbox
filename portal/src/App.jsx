@@ -21,6 +21,7 @@ import {
 } from "./admin-apps-install.js";
 import { buildAdminNavigationItems, buildUserAdminViewModel } from "./user-admin-model.js";
 import { buildAgentAdminViewModel, buildProviderHealthLabel } from "./agent-admin-model.js";
+import { buildItDepartmentScene } from "./it-department-model.js";
 
 function requestJson(url, options = {}) {
   return fetch(url, {
@@ -697,6 +698,15 @@ function MenuPopover({
         }}
       >
         Settings
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          onNavigate("/it-department");
+          onClose();
+        }}
+      >
+        IT department
       </button>
       {adminItems.map((item) => (
         <button
@@ -3533,6 +3543,137 @@ function StatusPage({ statusState, onRefresh, onNavigate }) {
   );
 }
 
+function PixelMonitor({ label = "ok" }) {
+  return (
+    <span className="pixel-monitor" aria-hidden="true">
+      <span />
+      <span />
+      <span>{label}</span>
+    </span>
+  );
+}
+
+function PixelDesk({ className = "", label = "sys" }) {
+  return (
+    <div className={`pixel-desk ${className}`.trim()} aria-hidden="true">
+      <PixelMonitor label={label} />
+      <span className="pixel-keyboard" />
+      <span className="pixel-mug" />
+    </div>
+  );
+}
+
+function PixelAgent({ agent }) {
+  return (
+    <article
+      className={`pixel-agent is-${agent.palette} faces-${agent.direction}`}
+      style={{
+        "--agent-x": `${agent.x}%`,
+        "--agent-y": `${agent.y}%`,
+        "--agent-delay": `${agent.delay}s`,
+        "--agent-z": agent.zIndex,
+      }}
+      aria-label={`${agent.displayName}, ${agent.role}, ${agent.activity} at ${agent.station}`}
+      title={`${agent.displayName} - ${agent.role}`}
+    >
+      <div className="pixel-agent-bubble" aria-hidden="true">
+        <strong>{agent.displayName}</strong>
+        <span>{agent.activity}</span>
+      </div>
+      <span className="pixel-agent-shadow" aria-hidden="true" />
+      <span className="pixel-agent-sprite" aria-hidden="true">
+        <span className="pixel-agent-hair" />
+        <span className="pixel-agent-head" />
+        <span className="pixel-agent-face" />
+        <span className="pixel-agent-body" />
+        <span className="pixel-agent-badge">{agent.initials}</span>
+        <span className="pixel-agent-arm pixel-agent-arm-left" />
+        <span className="pixel-agent-arm pixel-agent-arm-right" />
+        <span className="pixel-agent-leg pixel-agent-leg-left" />
+        <span className="pixel-agent-leg pixel-agent-leg-right" />
+      </span>
+      <span className="pixel-agent-name" aria-hidden="true">
+        {agent.displayName}
+      </span>
+    </article>
+  );
+}
+
+function ItDepartmentPage() {
+  const scene = useMemo(() => buildItDepartmentScene(), []);
+
+  return (
+    <section className="it-department-page" aria-labelledby="it-department-title">
+      <div className="it-department-copy">
+        <p className="eyebrow">{scene.eyebrow}</p>
+        <h1 id="it-department-title">{scene.title}</h1>
+        <p>{scene.description}</p>
+      </div>
+
+      <div
+        className="it-office-stage"
+        role="region"
+        aria-label="Pixel art office with the Twinbox IT department agents working at desks, server racks, and consoles."
+      >
+        <div className="it-office-map">
+          <div className="it-office-wall" aria-hidden="true">
+            <div className="it-office-sign">IT</div>
+            <div className="it-office-window">
+              <span />
+              <span />
+              <span />
+            </div>
+            <div className="it-office-status-board">
+              <span />
+              <span />
+              <span />
+            </div>
+          </div>
+
+          <div className="it-office-floor" aria-hidden="true" />
+          <div className="it-office-server-rack rack-left" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="it-office-server-rack rack-right" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+          <PixelDesk className="desk-one" label="ops" />
+          <PixelDesk className="desk-two" label="k8s" />
+          <PixelDesk className="desk-three" label="sql" />
+          <PixelDesk className="desk-four" label="git" />
+          <div className="it-office-coffee" aria-hidden="true">
+            <span className="coffee-machine" />
+            <span className="coffee-steam one" />
+            <span className="coffee-steam two" />
+          </div>
+          <div className="it-office-plant plant-left" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="it-office-plant plant-right" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+
+          <div className="pixel-agent-layer">
+            {scene.agents.map((agent) => (
+              <PixelAgent key={agent.id} agent={agent} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function AgentAvatar({ avatar, size = 40 }) {
   const palette = avatar?.palette || "gray";
   const initials = avatar?.initials || "??";
@@ -4174,6 +4315,7 @@ export default function App() {
             onNavigate={navigate}
           />
         ) : null}
+        {route === "/it-department" ? <ItDepartmentPage /> : null}
         {route === "/intranet" ? (
           <IntranetPage links={config?.intranetLinks || []} onNavigate={navigate} />
         ) : null}
