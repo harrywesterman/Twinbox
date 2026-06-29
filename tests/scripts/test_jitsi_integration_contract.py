@@ -211,7 +211,7 @@ def test_jitsi_openid_image_is_pinned_and_patched_for_room_scoped_short_lived_to
     assert '"package_name": "twinbox-manager-worker"' in workflow_text
     assert '"context": "./images/jitsi-openid"' in workflow_text
     assert '"dockerfile": "./images/jitsi-openid/Dockerfile"' in workflow_text
-    assert "value=jitsi-openid-sha-ad89c77" in workflow_text
+    assert "value=jitsi-openid-latest" in workflow_text
     assert "type=sha,prefix=jitsi-openid-" in workflow_text
 
     assert "ARG JITSI_OPENID_REF=5a023e2eb51dfbeb551d04861c11f52e886b53d6" in dockerfile_text

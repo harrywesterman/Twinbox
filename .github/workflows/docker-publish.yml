@@ -397,7 +397,10 @@ jobs:
                   ),
               ],
               'tests/scripts/test_jitsi_integration_contract.py': [
-                  ('jitsi-openid-latest', f'jitsi-openid-{sha}'),
+                  (
+                      'ghcr.io/harrywesterman/twinbox-manager-worker:jitsi-openid-latest',
+                      f'ghcr.io/harrywesterman/twinbox-manager-worker:jitsi-openid-{sha}',
+                  ),
               ],
               'docs/troubleshooting.md': [
                   ('twinbox-manager-api:latest', f'twinbox-manager-api:{sha}'),
