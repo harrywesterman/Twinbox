@@ -65,12 +65,12 @@ netbird_bastion_secret="${SECRETS_DIR}/netbird-bastion-${cluster_id}.json"
 [[ -f "$netbird_bastion_secret" ]] || fail "NetBird bastion secret not found at ${netbird_bastion_secret}"
 
 netbird_management_url="$(jq -r '.NETBIRD_URL // empty' "$netbird_bastion_secret")"
-netbird_token="$(jq -r '.NETBIRD_SETUP_TOKEN // empty' "$netbird_bastion_secret")"
+netbird_token="$(jq -r '.NETBIRD_ADMIN_TOKEN // .NETBIRD_API_TOKEN // .NETBIRD_SETUP_TOKEN // empty' "$netbird_bastion_secret")"
 bastion_public_ip="$(jq -r '.NETBIRD_IP // empty' "$netbird_bastion_secret")"
 bastion_ssh_private_key="$(jq -r '.SSH_PRIVATE_KEY // empty' "$netbird_bastion_secret")"
 
 [[ -n "$netbird_management_url" ]] || fail "NETBIRD_URL is missing from ${netbird_bastion_secret}"
-[[ -n "$netbird_token" ]] || fail "NETBIRD_SETUP_TOKEN is missing from ${netbird_bastion_secret}"
+[[ -n "$netbird_token" ]] || fail "NETBIRD_ADMIN_TOKEN or NETBIRD_SETUP_TOKEN is missing from ${netbird_bastion_secret}"
 [[ -n "$bastion_public_ip" ]] || fail "NETBIRD_IP is missing from ${netbird_bastion_secret}"
 if [[ -z "$bastion_ssh_private_key" ]]; then
   log "WARNING: SSH_PRIVATE_KEY is missing from ${netbird_bastion_secret}; the Termix bastion key credential will not be available"

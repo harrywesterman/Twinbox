@@ -25,7 +25,7 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Installing AdGuard Home DNS for cluster: $c
 netbird_bastion_secret="/opt/twinbox/bootstrap/secrets/global/netbird-bastion-${cluster_id}.json"
 [[ -f "$netbird_bastion_secret" ]] || fail "NetBird bastion secret not found at $netbird_bastion_secret"
 netbird_management_url="$(jq -r '.NETBIRD_URL // empty' "$netbird_bastion_secret")"
-netbird_token="$(jq -r '.NETBIRD_SETUP_TOKEN // empty' "$netbird_bastion_secret")"
+netbird_token="$(jq -r '.NETBIRD_ADMIN_TOKEN // .NETBIRD_API_TOKEN // .NETBIRD_SETUP_TOKEN // empty' "$netbird_bastion_secret")"
 [[ -n "$netbird_management_url" ]] || fail "NetBird management URL not found in bastion secret"
 [[ -n "$netbird_token" ]] || fail "NetBird API token not found in bastion secret"
 

@@ -670,7 +670,7 @@ write_files:
           "name": "Twinbox Admin",
           "password": "'"$ADMIN_PASSWORD"'",
           "create_pat": true,
-          "pat_expire_in": 7
+          "pat_expire_in": ${admin_token_expire_days}
         }')"
 
       echo "$SETUP_RESPONSE" > "$SETUP_RESULT"

@@ -1284,11 +1284,11 @@ fi
 
 if [[ -z "$netbird_token" ]]; then
   if [[ -f "$netbird_bastion_secret" ]]; then
-    netbird_token="$(jq -r '.NETBIRD_SETUP_TOKEN // empty' "$netbird_bastion_secret")"
+    netbird_token="$(jq -r '.NETBIRD_ADMIN_TOKEN // .NETBIRD_API_TOKEN // .NETBIRD_SETUP_TOKEN // empty' "$netbird_bastion_secret")"
   fi
 fi
 
-[[ -n "$netbird_token" ]] || fail "NetBird API token is required. Either provide it as input or ensure the bastion step generated a setup token."
+[[ -n "$netbird_token" ]] || fail "NetBird API token is required. Either provide it as input or ensure the bastion step generated an API token."
 [[ -n "$netbird_management_url" ]] || fail "Could not determine NetBird management URL"
 [[ -f "$netbird_bastion_secret" ]] || fail "NetBird bastion secret not found at $netbird_bastion_secret"
 disable_netbird_account_ipv6_overlay "$netbird_management_url" "$netbird_token"

@@ -428,9 +428,12 @@ fi
 if echo "$setup_token_result" | jq -e '.personal_access_token' >/dev/null 2>&1; then
   netbird_setup_token="$(echo "$setup_token_result" | jq -r '.personal_access_token')"
   tmp_file="$(mktemp)"
-  jq --arg token "$netbird_setup_token" '. + {NETBIRD_SETUP_TOKEN: $token}' "$secret_file" >"$tmp_file"
+  jq --arg token "$netbird_setup_token" '. + {
+    NETBIRD_ADMIN_TOKEN: $token,
+    NETBIRD_SETUP_TOKEN: $token
+  }' "$secret_file" >"$tmp_file"
   mv "$tmp_file" "$secret_file"
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird setup token saved to secret file."
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] NetBird API token saved to secret file."
 else
   fail "No NetBird setup token found after bastion bootstrap. Check /var/log/cloud-init-output.log on the bastion host for the root cause."
 fi

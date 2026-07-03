@@ -59,6 +59,12 @@ variable "netbird_admin_email" {
   type        = string
 }
 
+variable "netbird_admin_token_expire_days" {
+  description = "Validity period, in days, for the NetBird automation Personal Access Token created during setup."
+  type        = number
+  default     = 3650
+}
+
 variable "netbird_version" {
   description = "NetBird Docker image version tag"
   type        = string

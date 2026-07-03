@@ -1858,6 +1858,7 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
         in (netbird_bastion_run_text)
     )
     assert "ssh-keygen -t ed25519" in netbird_bastion_run_text
+    assert "NETBIRD_ADMIN_TOKEN" in netbird_bastion_run_text
     assert "NETBIRD_SETUP_TOKEN" in netbird_bastion_run_text
     assert "manual NetBird API token" not in netbird_bastion_run_text
     assert "NetBird automated setup did not produce a Personal Access Token in time" in (
@@ -2221,15 +2222,24 @@ def test_ensure_netbird_service_uses_current_api_and_safe_skips():
     assert 'elif (.resources | type) == "array" then .resources' in text
     assert "NetBird network secret not ready; skipping service creation" in text
     assert "NetBird network secret does not contain TRAEFIK_RESOURCE_ADDRESS" in text
-    assert 'NETBIRD_TOKEN="${TWINBOX_NETBIRD_TOKEN:-${NETBIRD_TOKEN:-}}"' in text
+    assert 'NETBIRD_TOKEN="${TWINBOX_NETBIRD_TOKEN:-${NETBIRD_ADMIN_TOKEN:-' in text
+    assert '${NETBIRD_API_TOKEN:-${NETBIRD_TOKEN:-}}}}"' in text
+    assert ".NETBIRD_ADMIN_TOKEN // .NETBIRD_API_TOKEN // .NETBIRD_SETUP_TOKEN" in text
     assert 'NETBIRD_URL="${TWINBOX_NETBIRD_URL:-${NETBIRD_URL:-}}"' in text
     assert "! -name 'netbird-bastion-exit-router-*.json'" in text
     assert "No NetBird proxy domain found" in text
     assert "Could not find TRAEFIK_RESOURCE_ID; service creation may fail" not in text
     assert "No NetBird reverse proxy cluster found" in text
     assert "NetBird domain creation returned HTTP" in text
-    assert "NetBird service lookup failed; skipping service creation" in text
-    assert "response was not JSON; skipping service creation" in text
+    assert "NetBird service lookup failed for" in text
+    assert "response was not JSON for" in text
+    assert "fail_netbird()" in text
+    assert "Could not query NetBird reverse proxy clusters" in text
+    assert "Could not query NetBird reverse proxy services" in text
+    assert "NetBird POST returned HTTP" in text
+    assert "NetBird PUT returned HTTP" in text
+    assert "NetBird POST returned HTTP ${http_status:-<empty>}; skipping" not in text
+    assert "NetBird PUT returned HTTP ${http_status:-<empty>}; skipping" not in text
     assert "already targets ${existing_target_cluster}, expected ${NETBIRD_PROXY_DOMAIN}" in text
     assert "live cluster resources endpoint" in text
     assert "Could not find Traefik resource ${TRAEFIK_RESOURCE_ADDRESS}" not in text
@@ -5260,6 +5270,8 @@ def test_netbird_bastion_provisioning_fetches_dns_credentials():
         encoding="utf-8"
     )
     netbird_vars_text = NETBIRD_MODULE_VARS.read_text(encoding="utf-8")
+    netbird_main_text = NETBIRD_MODULE_MAIN.read_text(encoding="utf-8")
+    netbird_cloud_init_text = NETBIRD_CLOUD_INIT.read_text(encoding="utf-8")
 
     assert "external-dns-credentials" in text
     assert "dns_provider" in text
@@ -5284,6 +5296,12 @@ def test_netbird_bastion_provisioning_fetches_dns_credentials():
         assert removed not in question_flow_text
         assert removed not in external_dns_values_text
         assert removed not in netbird_vars_text
+
+    assert 'variable "netbird_admin_token_expire_days"' in netbird_vars_text
+    assert "default     = 3650" in netbird_vars_text
+    assert "admin_token_expire_days = var.netbird_admin_token_expire_days" in netbird_main_text
+    assert '"pat_expire_in": ${admin_token_expire_days}' in netbird_cloud_init_text
+    assert '"pat_expire_in": 7' not in netbird_cloud_init_text
 
 
 def test_netbird_bastion_falls_back_to_cpx22_on_hetzner_capacity_errors():

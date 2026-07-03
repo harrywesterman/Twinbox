@@ -208,7 +208,10 @@ URL stored for clients, but creating the initial personal access token does not
 depend on the public certificate already being trusted. After the token is
 written, cloud-init performs a public TLS healthcheck and logs a warning if
 Let's Encrypt issuance is still pending or temporarily rate-limited. That
-warning does not make this step fail; missing a setup token still does.
+warning does not make this step fail; missing the generated API token still
+does. The token validity is controlled by the OpenTofu
+`netbird_admin_token_expire_days` variable and defaults to a long-lived
+automation token.
 
 Runtime secret:
 
@@ -223,7 +226,8 @@ Important keys in that file:
 | `NETBIRD_IP` | Bastion public IPv4 address. |
 | `NETBIRD_URL` | Management URL, for example `https://netbird.example.com`. |
 | `NETBIRD_FQDN` | Dashboard/API FQDN (e.g. `netbird.example.com`). |
-| `NETBIRD_SETUP_TOKEN` | Personal access token from the bootstrap setup API. |
+| `NETBIRD_ADMIN_TOKEN` | Preferred long-lived Personal Access Token for Twinbox automation. |
+| `NETBIRD_SETUP_TOKEN` | Backwards-compatible copy of the bootstrap Personal Access Token. Prefer `NETBIRD_ADMIN_TOKEN` for runtime automation. |
 | `SSH_PRIVATE_KEY` | Present when Twinbox generated the bastion SSH key. |
 
 ### 3. Configure NetBird Ingress
@@ -237,7 +241,7 @@ Inputs:
 
 | Input | Required | Notes |
 | --- | --- | --- |
-| `netbird_token` | No | Uses `NETBIRD_SETUP_TOKEN` from the bastion secret when omitted. |
+| `netbird_token` | No | Uses `NETBIRD_ADMIN_TOKEN`, then `NETBIRD_API_TOKEN`, then `NETBIRD_SETUP_TOKEN` from the bastion secret when omitted. |
 | `netbird_management_url` | No | Uses `NETBIRD_URL` from the bastion secret when omitted. |
 | `traefik_resource_address` | No | Defaults to the discovered Traefik ClusterIP. |
 | `proxy_services_json` | No | Extra reverse proxy services. Authentik is always included. Services are auto-created during application installation; this form is for initial setup only. |
@@ -675,7 +679,8 @@ docker exec netbird-hetzner-exit netbird status
 | Routing peer starts but proxy cannot reach apps | Traefik has no ready endpoints, the NetBird route/policy is missing, or Cilium ClusterIP forwarding settings are disabled | Check Traefik EndpointSlices, NetBird `/api/routes` and `/api/policies`, plus `bpf-lb-external-clusterip` and `bpf-lb-sock-hostns-only` in `cilium-config`. |
 | Authentik OIDC discovery fails | The `authentik-netbird` route, forwarded-header middleware, NetBird reverse proxy service, or routing peer is missing/stale | Fetch `https://authentik.<public-zone>/.well-known/openid-configuration` through the public NetBird path and compare NetBird proxy plus in-cluster Authentik logs. |
 | Browser lands on `https://authentik.<public-zone>/application/o/authorize/` and sees `404 page not found` | Bastion Traefik is terminating Authentik as HTTP instead of passing raw TLS to NetBird Reverse Proxy. The usual cause is that bastion Traefik serves a wildcard certificate for `netbird.<public-zone>`, allowing browser HTTP/2 connection coalescing. | Confirm the NetBird certificate has only `DNS:netbird.<public-zone>`, confirm there is no bastion HTTP wildcard router, and confirm `authentik.<public-zone>` uses the TCP passthrough route. |
-| Browser or strict `curl` shows a certificate error for NetBird | Let's Encrypt issuance is still pending or the exact hostname hit a temporary rate limit; the bastion may be serving Traefik's default self-signed certificate | Check `/var/log/cloud-init-output.log` on the bastion and retry after the rate-limit window. The install can continue if the NetBird setup token was created. |
+| Browser or strict `curl` shows a certificate error for NetBird | Let's Encrypt issuance is still pending or the exact hostname hit a temporary rate limit; the bastion may be serving Traefik's default self-signed certificate | Check `/var/log/cloud-init-output.log` on the bastion and retry after the rate-limit window. The install can continue if the NetBird API token was created. |
+| App install fails while creating a NetBird reverse proxy service with HTTP `401` or `403` | The stored NetBird API token is expired, revoked, or not authorized. Older clusters may only have the short-lived bootstrap PAT in `NETBIRD_SETUP_TOKEN`. | Refresh the bastion secret with a valid `NETBIRD_ADMIN_TOKEN`, then rerun the app install step. `ensure-netbird-service.sh` intentionally fails hard on these errors so missing public services are not hidden behind a green job. |
 | Public app hostname resolves but returns no app | Reverse proxy service is missing, targets the wrong Traefik resource, or Traefik has no matching `<app>-netbird` route on `webnetbird` | Check NetBird reverse proxy services, `netbird-network-<cluster-id>.json`, and the rendered `IngressRoute` objects for the app. |
 | Management VM is unreachable over NetBird | The Management VM peer is not enrolled or admin group policy is missing | Check `netbird status`, the `twinbox-netbird` container, NetBird peers, and admin policies. |
 | Bastion SSH is unreachable over NetBird | The bastion `netbird-client` peer is not ready, the `proxy` group is missing, or the admin/browser SSH policy is missing | Check `docker exec netbird-client netbird status`, the bastion peer IP, and NetBird `/api/policies`. Public SSH remains open to avoid lockout. |
