@@ -157,7 +157,7 @@ base_url = management_url.rstrip("/")
 if base_url.endswith("/api"):
     base_url = base_url[:-4]
 url = f"{base_url}/api/peers?name={urllib.parse.quote(hostname)}"
-req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+req = urllib.request.Request(url, headers={"Authorization": f"Token {token}"})
 with urllib.request.urlopen(req, timeout=10) as resp:
     peers = json.loads(resp.read().decode())
 if isinstance(peers, dict):

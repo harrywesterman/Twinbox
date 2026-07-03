@@ -62,7 +62,7 @@ variable "netbird_admin_email" {
 variable "netbird_admin_token_expire_days" {
   description = "Validity period, in days, for the NetBird automation Personal Access Token created during setup."
   type        = number
-  default     = 3650
+  default     = 365
 }
 
 variable "netbird_version" {

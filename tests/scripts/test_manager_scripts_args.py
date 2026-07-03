@@ -2053,6 +2053,7 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "NB_NFTABLES_TABLE=netbird_exit" in text
     assert "NB_DISABLE_IPV6=true" in text
     assert "disable_netbird_account_ipv6_overlay" in text
+    assert '"Authorization": f"Token {token}"' in text
     assert '"ipv6_enabled_groups": []' in text
     assert "node_prefix_length" in text
     assert 'emit(f"{management_ip}/{prefix_length}")' in text
@@ -2205,6 +2206,8 @@ def test_ensure_netbird_service_uses_current_api_and_safe_skips():
     assert '"${NETBIRD_REVERSE_PROXY_API}/clusters"' in text
     assert '"${NETBIRD_REVERSE_PROXY_API}/domains"' in text
     assert '"${NETBIRD_REVERSE_PROXY_API}/services"' in text
+    assert "Authorization: Token ${NETBIRD_TOKEN}" in text
+    assert "Authorization: Bearer ${NETBIRD_TOKEN}" not in text
     assert '"${NETBIRD_REVERSE_PROXY_API}/domains/"' not in text
     assert '"${NETBIRD_REVERSE_PROXY_API}/services/"' not in text
     assert "normalize_netbird_collection" in text
@@ -2698,6 +2701,7 @@ def test_adguard_install_uses_management_vm_dns_forwarder_for_netbird_dns():
     assert "Management VM NetBird IP" in text
     assert "netbird status" in text
     assert "/api/peers?name=" in text
+    assert '"Authorization": f"Token {token}"' in text
     assert '"twinbox-mgmt-${cluster_slug}"' in text
 
 
@@ -2713,6 +2717,7 @@ def test_netbird_dns_zone_helper_manages_custom_zone_and_records():
     assert '"ttl": 300' in text
     assert "PUT" in text
     assert "POST" in text
+    assert '"Authorization": f"Token {token}"' in text
 
 
 def test_netbird_dns_nameserver_helper_supports_multiple_groups():
@@ -2721,6 +2726,7 @@ def test_netbird_dns_nameserver_helper_supports_multiple_groups():
     assert 'parser.add_argument("--group-id", action="append", required=True)' in text
     assert "blocked_groups" in text
     assert '"groups": list(dict.fromkeys(args.group_id))' in text
+    assert '"Authorization": f"Token {token}"' in text
 
 
 def test_dns_forwarder_restarts_when_port_forward_or_proxy_exits():
@@ -4788,6 +4794,7 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "extract_first_ipv4" in setup_text
     assert "SSH_PRIVATE_KEY is missing" in setup_text
     assert "discover_management_netbird_ip" in setup_text
+    assert '"Authorization": f"Token {token}"' in setup_text
     assert "discover_bastion_netbird_ip" in setup_text
     assert "netbird_peer_ip_by_name" in setup_text
     assert ".kube/config" in setup_text
@@ -5295,10 +5302,10 @@ def test_netbird_bastion_provisioning_fetches_dns_credentials():
         assert removed not in dns_step_run_text
         assert removed not in question_flow_text
         assert removed not in external_dns_values_text
-        assert removed not in netbird_vars_text
+    assert removed not in netbird_vars_text
 
     assert 'variable "netbird_admin_token_expire_days"' in netbird_vars_text
-    assert "default     = 3650" in netbird_vars_text
+    assert "default     = 365" in netbird_vars_text
     assert "admin_token_expire_days = var.netbird_admin_token_expire_days" in netbird_main_text
     assert '"pat_expire_in": ${admin_token_expire_days}' in netbird_cloud_init_text
     assert '"pat_expire_in": 7' not in netbird_cloud_init_text

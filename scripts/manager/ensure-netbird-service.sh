@@ -90,7 +90,7 @@ api_get() {
 
   tmp_file="$(mktemp)"
   http_status="$(curl -sS \
-    -H "Authorization: Bearer ${NETBIRD_TOKEN}" \
+    -H "Authorization: Token ${NETBIRD_TOKEN}" \
     -H "Accept: application/json" \
     -o "$tmp_file" \
     -w '%{http_code}' \
@@ -121,7 +121,7 @@ api_get_services() {
 
   tmp_file="$(mktemp)"
   http_status="$(curl -sS -G \
-    -H "Authorization: Bearer ${NETBIRD_TOKEN}" \
+    -H "Authorization: Token ${NETBIRD_TOKEN}" \
     -H "Accept: application/json" \
     --data-urlencode "domain=${SERVICE_DOMAIN}" \
     --data-urlencode "name=${SERVICE_NAME}" \
@@ -340,7 +340,7 @@ ensure_netbird_domain() {
   local http_status
   http_status="$(curl -sS \
     -X POST \
-    -H "Authorization: Bearer ${NETBIRD_TOKEN}" \
+    -H "Authorization: Token ${NETBIRD_TOKEN}" \
     -H "Accept: application/json" \
     -H "Content-Type: application/json" \
     --data "$(jq -cn --arg domain "$SERVICE_DOMAIN" --arg cluster "$NETBIRD_PROXY_DOMAIN" '{domain: $domain, target_cluster: $cluster}')" \
@@ -416,7 +416,7 @@ if [[ -n "$EXISTING_SERVICE_ID" ]]; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Updating existing NetBird service: ${SERVICE_NAME} (id: ${EXISTING_SERVICE_ID})"
   http_status="$(curl -sS \
     -X PUT \
-    -H "Authorization: Bearer ${NETBIRD_TOKEN}" \
+    -H "Authorization: Token ${NETBIRD_TOKEN}" \
     -H "Accept: application/json" \
     -H "Content-Type: application/json" \
     --data "$(build_service_payload "$EXISTING_SERVICE_ID")" \
@@ -431,7 +431,7 @@ else
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating NetBird reverse proxy service: ${SERVICE_NAME}"
   http_status="$(curl -sS \
     -X POST \
-    -H "Authorization: Bearer ${NETBIRD_TOKEN}" \
+    -H "Authorization: Token ${NETBIRD_TOKEN}" \
     -H "Accept: application/json" \
     -H "Content-Type: application/json" \
     --data "$(build_service_payload "")" \

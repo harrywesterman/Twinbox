@@ -1205,7 +1205,7 @@ import urllib.request
 management_url = sys.argv[1].rstrip("/")
 token = sys.argv[2]
 headers = {
-    "Authorization": f"Bearer {token}",
+    "Authorization": f"Token {token}",
     "Accept": "application/json",
     "Content-Type": "application/json",
 }

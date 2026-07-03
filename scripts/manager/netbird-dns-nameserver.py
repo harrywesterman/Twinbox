@@ -10,7 +10,7 @@ import urllib.request
 
 def _request(method: str, url: str, token: str, data: dict | None = None) -> dict:
     headers = {
-        "Authorization": f"Bearer {token}",
+        "Authorization": f"Token {token}",
         "Content-Type": "application/json",
     }
     body = json.dumps(data).encode() if data else None

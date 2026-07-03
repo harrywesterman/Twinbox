@@ -211,7 +211,8 @@ Let's Encrypt issuance is still pending or temporarily rate-limited. That
 warning does not make this step fail; missing the generated API token still
 does. The token validity is controlled by the OpenTofu
 `netbird_admin_token_expire_days` variable and defaults to a long-lived
-automation token.
+automation token using NetBird's maximum setup-PAT lifetime of 365 days.
+Plan to rotate `NETBIRD_ADMIN_TOKEN` before that yearly expiry.
 
 Runtime secret:
 
@@ -659,7 +660,7 @@ Check the route definitions through the management API:
 
 ```bash
 curl -fsS \
-  -H "Authorization: Bearer $NETBIRD_TOKEN" \
+  -H "Authorization: Token $NETBIRD_TOKEN" \
   https://netbird.<public-zone>/api/routes | jq
 ```
 
