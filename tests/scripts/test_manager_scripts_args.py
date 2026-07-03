@@ -4295,6 +4295,7 @@ def test_mastodon_step_applies_the_custom_app_and_bootstraps_admin_access():
 
 def test_immich_values_keep_valkey_storageclass_nested():
     text = (REPO_ROOT / "gitops" / "values" / "immich.yaml").read_text(encoding="utf-8")
+    assert "          tag: v3.0.0" in text
     assert "valkey:" in text
     assert "      storageClass: longhorn" in text
     assert "\n    storageClass: longhorn\n" not in text

@@ -181,7 +181,9 @@ def test_jitsi_platform_overlay_provides_broker_secret_sync_service_and_ingress(
 
     assert "kind: Deployment" in deployment_text
     assert "name: auth-jitsi" in deployment_text
-    assert "ghcr.io/harrywesterman/twinbox-manager-worker:jitsi-openid-sha-ad89c77" in deployment_text
+    assert (
+        "ghcr.io/harrywesterman/twinbox-manager-worker:jitsi-openid-sha-ad89c77" in deployment_text
+    )
     assert "name: jitsi-auth" in deployment_text
     assert 'value: "0.0.0.0:3000"' in deployment_text
     assert 'value: "openid profile email jitsi"' in deployment_text
