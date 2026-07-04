@@ -155,7 +155,21 @@ test("catalog exposes NetBird bastion without duplicate DNS, SSH, or Cloudflare 
     assert.ok(netbirdBastion, "expected provision-netbird-bastion in the catalog");
     assert.deepEqual(
       netbirdBastion.inputs.map((input) => input.id),
-      ["hcloud_token", "hcloud_location", "hcloud_server_type"]
+      [
+        "bastion_provider",
+        "hcloud_token",
+        "hcloud_location",
+        "hcloud_server_type",
+        "existing_bastion_mode",
+        "existing_bastion_public_ipv4",
+        "existing_bastion_ssh_host",
+        "existing_bastion_ssh_port",
+        "existing_bastion_ssh_user",
+        "existing_bastion_ssh_private_key",
+        "existing_bastion_os_family",
+        "existing_bastion_confirm_clean_host",
+        "existing_bastion_confirm_port_forwarding",
+      ]
     );
     assert.equal(netbirdBastion.secrets.files.KUBECONFIG_FILE.attachment, "kubeconfig");
     assert.match(netbirdBastion.side_help, /DNS provider configured earlier/);

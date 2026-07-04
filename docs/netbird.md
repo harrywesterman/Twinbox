@@ -10,13 +10,13 @@ In the current Twinbox implementation, NetBird is used for five related paths:
 - private administrator SSH access to the Management VM and bastion through NetBird peers
 - browser SSH to the Management VM and bastion through a Termix NetBird sidecar
 - opt-in local LAN access through the Management VM routing peer
-- opt-in internet exit through a separate Hetzner bastion routing peer
+- opt-in internet exit through a separate bastion routing peer
 
 ## Components
 
 | Component | Location | Purpose |
 | --- | --- | --- |
-| NetBird bastion | Hetzner Cloud VPS | Runs the self-hosted NetBird server, dashboard, management API, embedded relay/proxy stack, Docker, and Traefik for the NetBird hostname. |
+| NetBird bastion | Hetzner VPS or existing Debian/Ubuntu VM | Runs the self-hosted NetBird server, dashboard, management API, embedded relay/proxy stack, Docker, and Traefik for the NetBird hostname. |
 | NetBird Reverse Proxy | Bastion Docker stack | Terminates public HTTPS for app hostnames such as `authentik.ZONE` and forwards requests into the NetBird network. |
 | NetBird network resources | NetBird management API | Defines the internal Traefik ClusterIP target, groups, setup keys, routes, and policies. |
 | Routing peer | Kubernetes namespace `netbird` | Runs `netbirdio/netbird:0.73.2` with privileged networking and forwards proxy traffic to the cluster service network. |
@@ -25,13 +25,13 @@ In the current Twinbox implementation, NetBird is used for five related paths:
 | Management VM peer | Management VM | Enrolls the Management VM as `twinbox-mgmt-<cluster-slug>` for admin access and local LAN routing. |
 | Termix Browser SSH peer | Kubernetes namespace `termix` | Enrolls a privileged Termix sidecar as `twinbox-<cluster-id>-browser-ssh` so browser SSH reaches hosts over NetBird peer IPs. |
 | Bastion proxy peer | NetBird bastion | Existing host-network `netbird-client` peer in the `proxy` group. It is also the NetBird SSH destination for the bastion host. |
-| Hetzner exit peer | NetBird bastion | Runs a separate Dockerized NetBird client named `twinbox-<cluster-id>-hetzner-exit` for opt-in internet exit traffic. |
+| Bastion exit peer | NetBird bastion | Runs a separate Dockerized NetBird client named `twinbox-<cluster-id>-hetzner-exit` for opt-in internet exit traffic. |
 
 ```mermaid
 flowchart LR
     user["Browser or NetBird user"]
 
-    subgraph bastion["Hetzner NetBird bastion"]
+    subgraph bastion["NetBird bastion"]
         tls["Bastion Traefik\nnetbird.public-zone TLS"]
         passthrough["TCP passthrough\nall non-NetBird SNI"]
         proxy["NetBird Reverse Proxy"]
@@ -153,7 +153,9 @@ non-production clusters use the slug-prefixed zone model.
 
 Step: `provision-netbird-bastion`
 
-This step creates the Hetzner VPS and bootstraps the NetBird server stack.
+This step either creates a Hetzner VPS or bootstraps an existing Debian/Ubuntu
+VM as the NetBird bastion. The existing VM path also covers a local VM where
+SSH uses a LAN address and public DNS points at a router-forwarded public IPv4.
 
 If Hetzner returns `resource_unavailable` while placing the default `cax11`
 server, Twinbox retries once with `cpx22`.
@@ -162,26 +164,47 @@ Inputs:
 
 | Input | Required | Notes |
 | --- | --- | --- |
-| `hcloud_token` | Yes | Hetzner Cloud token with permissions to create servers, SSH keys, and firewalls. |
+| `bastion_provider` | Yes | `hetzner` by default. Use `existing-vm` for a VM you created yourself. |
+| `hcloud_token` | Hetzner only | Hetzner Cloud token with permissions to create servers, SSH keys, and firewalls. |
 | `hcloud_location` | No | Defaults to `fsn1`. |
 | `hcloud_server_type` | No | Defaults to `cax11` and falls back once to `cpx22` if Hetzner cannot place the default server. |
+| `existing_bastion_mode` | Existing VM only | `cloud-vm` or `local-port-forward`. |
+| `existing_bastion_public_ipv4` | Existing VM only | Public IPv4 used for DNS A records. |
+| `existing_bastion_ssh_host` | Existing VM only | SSH endpoint reachable from the Management VM; this may be a private LAN address for local mode. |
+| `existing_bastion_ssh_port` | Existing VM only | Defaults to `22`. SSH does not need to be publicly forwarded. |
+| `existing_bastion_ssh_user` | Existing VM only | `root` for this version. |
+| `existing_bastion_ssh_private_key` | Existing VM only | Private key used from the Management VM to bootstrap the host. |
+| `existing_bastion_confirm_clean_host` | Existing VM only | Must be `true`; Twinbox refuses unmanaged `/opt/netbird/docker-compose.yml`. |
+| `existing_bastion_confirm_port_forwarding` | Local VM only | Must be `true` after forwarding TCP `80`, TCP `443`, and UDP `3478` to the VM. |
 | `netbird_admin_email` | Usually no | Falls back to the first admin email from `create-users-and-groups`. |
 | `ssh_public_key` | No | If omitted, Twinbox generates and stores an ed25519 key under `manager-data/ssh/netbird-<cluster-id>/`. |
 
 The step:
 
 1. reads DNS provider credentials from the `external-dns-credentials` secret
-2. removes stale Hetzner resources with the same Twinbox names
-3. applies `infra/opentofu/netbird/`
+2. for Hetzner, removes stale resources and applies `infra/opentofu/netbird/`
+3. for existing VMs, SSHes to the supplied host and runs the shared bootstrap
 4. creates `netbird.<public-zone>` and `<public-zone>` (wildcard) `DNSEndpoint` records
-5. waits for cloud-init to finish on the bastion
+5. waits for cloud-init or the SSH bootstrap to finish on the bastion
 6. calls NetBird's automated setup API and stores the short-lived personal access token
 
-The bastion cloud-init config installs Docker, runs NetBird's upstream
+The shared bastion bootstrap installs Docker, runs NetBird's upstream
 `getting-started.sh`, patches the compose stack for Twinbox defaults, pins the
 NetBird image to `PINNED_NETBIRD_VERSION`, enables the reverse proxy, configures
-DNS-01 for the exact NetBird hostname, and opens `22/tcp`, `80/tcp`, `443/tcp`,
-and `3478/udp` with UFW.
+DNS-01 for the exact NetBird hostname, and writes a Twinbox ownership marker at
+`/opt/netbird/.twinbox-bastion.json`. Hetzner cloud-init enables UFW for SSH,
+HTTP, HTTPS, and STUN. Existing VM mode only adjusts UFW when it is already
+active; otherwise configure the provider firewall or router yourself.
+
+For a local VM with port forwarding:
+
+1. Reserve a stable LAN address for the bastion VM.
+2. Forward TCP `80`, TCP `443`, and UDP `3478` to the VM.
+3. Do not forward SSH unless you explicitly accept that exposure; Twinbox only
+   needs SSH from the Management VM.
+4. Confirm your ISP is not using CGNAT/DS-Lite for the public IPv4.
+5. Use `existing_bastion_public_ipv4` for DNS A records and
+   `existing_bastion_ssh_host` for the LAN SSH endpoint.
 
 The compose patch deliberately does not create a bastion HTTP wildcard router.
 There should be no `traefik.http.routers.wildcard`, `cluster-proxy`, or HTTP
@@ -225,6 +248,13 @@ Important keys in that file:
 | Key | Meaning |
 | --- | --- |
 | `NETBIRD_IP` | Bastion public IPv4 address. |
+| `BASTION_PROVIDER` | `hetzner` or `existing-vm`. |
+| `BASTION_MODE` | `cloud-vm` or `local-port-forward`. |
+| `BASTION_PUBLIC_IPV4` | Public IPv4 used for DNS A records; new readers prefer this over `NETBIRD_IP`. |
+| `BASTION_SSH_HOST` | SSH endpoint reachable from the Management VM. |
+| `BASTION_SSH_PORT` | SSH port, defaulting to `22` for old secrets. |
+| `BASTION_SSH_USER` | SSH user, defaulting to `root` for old secrets. |
+| `BASTION_RDNS_STATUS` | `configured` for automated Hetzner PTR/rDNS, or `manual-required` for BYO bastions. |
 | `NETBIRD_URL` | Management URL, for example `https://netbird.example.com`. |
 | `NETBIRD_FQDN` | Dashboard/API FQDN (e.g. `netbird.example.com`). |
 | `NETBIRD_ADMIN_TOKEN` | Preferred long-lived Personal Access Token for Twinbox automation. |
@@ -325,19 +355,20 @@ OpenBao:
 
 It then applies the `netbird-routing-peers` Argo CD application, waits for the
 routing peer deployment, waits for the Traefik NetBird backend endpoints, creates
-the wildcard DNS record, waits for public Authentik OIDC discovery through the
-NetBird proxy, and finally registers Authentik as the NetBird identity provider.
+the wildcard DNS record, waits for the wildcard DNS target to resolve publicly,
+waits for public Authentik OIDC discovery through the NetBird proxy, and finally
+registers Authentik as the NetBird identity provider.
 After the bastion `netbird-client` is ready, the step discovers its NetBird peer
 IP and persists it as `NETBIRD_PRIVATE_IP` in the bastion runtime secret for
 Termix and other automation.
 
 Reverse proxy services are created by each `install-*` step through the
 `ensure-netbird-service.sh` helper script rather than during this configuration
-step. Public OIDC discovery is allowed to
-log a warning and continue when public TLS or reverse-proxy reachability is not
-healthy yet, so the NetBird API configuration can still finish. Browser SSO is
-only healthy once the public NetBird path has a trusted certificate and can
-reach Authentik.
+step. Public DNS must resolve to the bastion before the steps continue. Public
+OIDC discovery is allowed to log a warning and continue when public TLS or
+reverse-proxy reachability is not healthy yet, so the NetBird API configuration
+can still finish. Browser SSO is only healthy once the public NetBird path has a
+trusted certificate and can reach Authentik.
 
 The step also seeds the NetBird account database over SSH so the account domain
 matches the Twinbox public zone and the first Authentik admin can become the SSO

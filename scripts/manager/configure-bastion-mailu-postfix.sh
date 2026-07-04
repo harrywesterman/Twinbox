@@ -5,6 +5,9 @@ usage() {
   cat >&2 <<'USAGE'
 Usage: configure-bastion-mailu-postfix.sh \
   --bastion-ip IP \
+  [--bastion-ssh-host HOST] \
+  [--bastion-ssh-port PORT] \
+  [--bastion-ssh-user USER] \
   --ssh-key-file PATH \
   --mail-domain DOMAIN \
   --mail-hostname HOSTNAME \
@@ -20,6 +23,9 @@ USAGE
 }
 
 BASTION_IP=""
+BASTION_SSH_HOST=""
+BASTION_SSH_PORT="22"
+BASTION_SSH_USER="root"
 SSH_KEY_FILE=""
 MAIL_DOMAIN=""
 MAIL_HOSTNAME=""
@@ -34,6 +40,9 @@ CLUSTER_ID=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --bastion-ip) BASTION_IP="$2"; shift 2 ;;
+    --bastion-ssh-host) BASTION_SSH_HOST="$2"; shift 2 ;;
+    --bastion-ssh-port) BASTION_SSH_PORT="$2"; shift 2 ;;
+    --bastion-ssh-user) BASTION_SSH_USER="$2"; shift 2 ;;
     --ssh-key-file) SSH_KEY_FILE="$2"; shift 2 ;;
     --mail-domain) MAIL_DOMAIN="$2"; shift 2 ;;
     --mail-hostname) MAIL_HOSTNAME="$2"; shift 2 ;;
@@ -49,6 +58,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "$BASTION_IP" ]] || usage
+[[ -n "$BASTION_SSH_HOST" ]] || BASTION_SSH_HOST="$BASTION_IP"
+[[ -n "$BASTION_SSH_PORT" && "$BASTION_SSH_PORT" =~ ^[0-9]+$ ]] || usage
+[[ -n "$BASTION_SSH_USER" ]] || usage
 [[ -n "$SSH_KEY_FILE" && -f "$SSH_KEY_FILE" ]] || usage
 [[ -n "$MAIL_DOMAIN" ]] || usage
 [[ -n "$MAIL_HOSTNAME" ]] || usage
@@ -86,6 +98,7 @@ ssh_opts=(
   -o StrictHostKeyChecking=accept-new
   -o UserKnownHostsFile=/dev/null
   -o ConnectTimeout=10
+  -p "$BASTION_SSH_PORT"
   -i "$SSH_KEY_FILE"
 )
 
@@ -105,7 +118,7 @@ remote_relay_password_file="/etc/postfix/twinbox-mailu/relay-password-${CLUSTER_
 remote_secret_uploaded=0
 cleanup_remote_secret() {
   if [[ "$remote_secret_uploaded" == "1" ]]; then
-    ssh "${ssh_opts[@]}" "root@${BASTION_IP}" "rm -f $(quote "$remote_relay_password_file")" >/dev/null 2>&1 || true
+    ssh "${ssh_opts[@]}" "${BASTION_SSH_USER}@${BASTION_SSH_HOST}" "rm -f $(quote "$remote_relay_password_file")" >/dev/null 2>&1 || true
   fi
 }
 trap cleanup_remote_secret EXIT
@@ -115,11 +128,11 @@ relay_password="$(jq -r '."relay-password" // empty' "$RELAY_SECRET_FILE")"
   echo "Relay secret file is missing relay-password" >&2
   exit 1
 }
-printf '%s' "$relay_password" | ssh "${ssh_opts[@]}" "root@${BASTION_IP}" "install -d -m 0750 /etc/postfix/twinbox-mailu && umask 077 && cat > $(quote "$remote_relay_password_file")"
+printf '%s' "$relay_password" | ssh "${ssh_opts[@]}" "${BASTION_SSH_USER}@${BASTION_SSH_HOST}" "install -d -m 0750 /etc/postfix/twinbox-mailu && umask 077 && cat > $(quote "$remote_relay_password_file")"
 remote_secret_uploaded=1
 unset relay_password
 
-ssh "${ssh_opts[@]}" "root@${BASTION_IP}" "${remote_env[*]} bash -s" <<'REMOTE'
+ssh "${ssh_opts[@]}" "${BASTION_SSH_USER}@${BASTION_SSH_HOST}" "${remote_env[*]} bash -s" <<'REMOTE'
 set -euo pipefail
 
 log() {

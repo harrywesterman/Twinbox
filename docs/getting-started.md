@@ -66,7 +66,7 @@ Use the UI to work through the setup steps. The exact order depends on your chos
 
 14. **Choose Ingress Route** (`choose-ingress-route`) — Select and configure your ingress strategy
 15. **Configure Cloudflare Tunnel** (`configure-cloudflare-tunnel`) — Outbound tunnel *(if Cloudflare Tunnel selected, prd-only)*
-16. **Deploy NetBird Bastion** (`provision-netbird-bastion`) — Hetzner NetBird VPS *(if NetBird selected)*
+16. **Deploy NetBird Bastion** (`provision-netbird-bastion`) — Hetzner or existing Debian/Ubuntu VM *(if NetBird selected)*
 17. **Configure NetBird Ingress** (`configure-netbird-ingress`) — SSO, groups, setup keys *(if NetBird selected)*
 23. **Install NetBird Routing Peers** (`install-netbird-routing-peers`) — K8s DaemonSet *(if NetBird selected)*
 24. **Configure NetBird Admin Access** (`configure-netbird-admin-access`) — Management VM enrollment *(if NetBird selected)*

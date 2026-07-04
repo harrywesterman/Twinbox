@@ -31,8 +31,14 @@ OPKSSH_CLIENT_ID="${OPKSSH_CLIENT_ID:-$(jq -r '.OIDC_CLIENT_ID // empty' <<<"${o
 netbird_bastion_secret="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}/secrets/global/netbird-bastion-${cluster_id}.json"
 [[ -f "$netbird_bastion_secret" ]] || fail "NetBird bastion secret not found at ${netbird_bastion_secret}"
 
-bastion_ip="$(jq -r '.NETBIRD_IP // empty' "$netbird_bastion_secret")"
+bastion_ip="$(jq -r '.BASTION_PUBLIC_IPV4 // .NETBIRD_IP // empty' "$netbird_bastion_secret")"
+bastion_ssh_host="$(jq -r '.BASTION_SSH_HOST // .NETBIRD_IP // empty' "$netbird_bastion_secret")"
+bastion_ssh_port="$(jq -r '.BASTION_SSH_PORT // "22"' "$netbird_bastion_secret")"
+bastion_ssh_user="$(jq -r '.BASTION_SSH_USER // "root"' "$netbird_bastion_secret")"
 bastion_ssh_private_key="$(jq -r '.SSH_PRIVATE_KEY // empty' "$netbird_bastion_secret")"
+[[ -n "$bastion_ssh_host" ]] || fail "NetBird bastion secret does not contain BASTION_SSH_HOST or NETBIRD_IP"
+[[ "$bastion_ssh_port" =~ ^[0-9]+$ ]] || fail "NetBird bastion secret contains invalid BASTION_SSH_PORT"
+[[ -n "$bastion_ssh_user" ]] || fail "NetBird bastion secret contains empty BASTION_SSH_USER"
 
 mgmt_vm_ip="${MANAGEMENT_VM_IP:-$(resolve_management_vm_ip)}"
 mgmt_vm_user="${MGMT_VM_USER:-twinbox}"
@@ -120,17 +126,18 @@ bash "${WORKSPACE_ROOT}/scripts/manager/install-opkssh-on-host.sh" \
 cleanup_mgmt_vm_key
 trap - EXIT
 
-log "Installing opkssh on Bastion (${bastion_ip})"
+log "Installing opkssh on Bastion (${bastion_ssh_host})"
 if [[ -n "$bastion_ssh_private_key" ]]; then
   key_file="$(mktemp)"
   printf '%s\n' "$bastion_ssh_private_key" >"$key_file"
   chmod 600 "$key_file"
   OPKSSH_ISSUER_URL="$OPKSSH_ISSUER_URL" \
   OPKSSH_CLIENT_ID="$OPKSSH_CLIENT_ID" \
-  OPKSSH_PRINCIPAL="root" \
+  OPKSSH_PRINCIPAL="$bastion_ssh_user" \
   bash "${WORKSPACE_ROOT}/scripts/manager/install-opkssh-on-host.sh" \
-    --host "$bastion_ip" \
-    --user root \
+    --host "$bastion_ssh_host" \
+    --user "$bastion_ssh_user" \
+    --port "$bastion_ssh_port" \
     --ssh-key "$key_file"
   rm -f "$key_file"
 else

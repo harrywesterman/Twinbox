@@ -78,7 +78,17 @@ The installer creates a `DNSEndpoint` named `mailu-mail-dns` in the `external-dn
 | `TXT _dmarc.<zone>` | `v=DMARC1; p=<policy>; rua=mailto:<rua>@<zone>; adkim=s; aspf=s` |
 | `TXT <selector>._domainkey.<zone>` | Mailu exported DKIM value |
 
-`external-dns` is configured to manage MX records. The installer also sets the Hetzner PTR/rDNS entry for the bastion IPv4 so it resolves back to `mail.<zone>`.
+`external-dns` is configured to manage MX records. The installer sets the
+Hetzner PTR/rDNS entry automatically only when the bastion secret says
+`BASTION_PROVIDER=hetzner` and contains `HCLOUD_TOKEN`. Existing cloud VMs and
+local port-forwarded VMs require manual PTR/rDNS; set `confirm_manual_rdns=true`
+only after you can create or verify `PTR <bastion public IPv4> -> mail.<zone>`
+and confirm that public TCP `25` reaches the bastion.
+
+Residential and small-office internet links are often poor direct-mail
+candidates: PTR/rDNS may be unavailable, inbound or outbound TCP `25` may be
+blocked, and IP reputation may hurt deliverability. An external SMTP relay is
+usually safer when those checks are not clean.
 
 ## Bastion Postfix
 
@@ -89,7 +99,8 @@ Key guardrails:
 - Public inbound SMTP accepts mail only for the configured Mailu domain.
 - Outbound relay on `2525` requires SASL authentication over TLS.
 - `2525` is bound to the NetBird/private address, not `0.0.0.0`.
-- The Hetzner firewall only opens `25/tcp`; it does not open `2525/tcp`.
+- Only the public SMTP port `25/tcp` should be exposed. The relay port `2525`
+  stays bound to the NetBird/private address.
 - Relay credentials are passed through a root-only temporary file, never as process arguments.
 
 NetBird guardrails:

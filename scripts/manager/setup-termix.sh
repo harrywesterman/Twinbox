@@ -66,12 +66,18 @@ netbird_bastion_secret="${SECRETS_DIR}/netbird-bastion-${cluster_id}.json"
 
 netbird_management_url="$(jq -r '.NETBIRD_URL // empty' "$netbird_bastion_secret")"
 netbird_token="$(jq -r '.NETBIRD_ADMIN_TOKEN // .NETBIRD_API_TOKEN // .NETBIRD_SETUP_TOKEN // empty' "$netbird_bastion_secret")"
-bastion_public_ip="$(jq -r '.NETBIRD_IP // empty' "$netbird_bastion_secret")"
+bastion_public_ip="$(jq -r '.BASTION_PUBLIC_IPV4 // .NETBIRD_IP // empty' "$netbird_bastion_secret")"
+bastion_ssh_host="$(jq -r '.BASTION_SSH_HOST // .NETBIRD_IP // empty' "$netbird_bastion_secret")"
+bastion_ssh_port="$(jq -r '.BASTION_SSH_PORT // "22"' "$netbird_bastion_secret")"
+bastion_ssh_user="$(jq -r '.BASTION_SSH_USER // "root"' "$netbird_bastion_secret")"
 bastion_ssh_private_key="$(jq -r '.SSH_PRIVATE_KEY // empty' "$netbird_bastion_secret")"
 
 [[ -n "$netbird_management_url" ]] || fail "NETBIRD_URL is missing from ${netbird_bastion_secret}"
 [[ -n "$netbird_token" ]] || fail "NETBIRD_ADMIN_TOKEN or NETBIRD_SETUP_TOKEN is missing from ${netbird_bastion_secret}"
-[[ -n "$bastion_public_ip" ]] || fail "NETBIRD_IP is missing from ${netbird_bastion_secret}"
+[[ -n "$bastion_public_ip" ]] || fail "BASTION_PUBLIC_IPV4 or NETBIRD_IP is missing from ${netbird_bastion_secret}"
+[[ -n "$bastion_ssh_host" ]] || fail "BASTION_SSH_HOST or NETBIRD_IP is missing from ${netbird_bastion_secret}"
+[[ "$bastion_ssh_port" =~ ^[0-9]+$ ]] || fail "BASTION_SSH_PORT is invalid in ${netbird_bastion_secret}"
+[[ -n "$bastion_ssh_user" ]] || fail "BASTION_SSH_USER is empty in ${netbird_bastion_secret}"
 if [[ -z "$bastion_ssh_private_key" ]]; then
   log "WARNING: SSH_PRIVATE_KEY is missing from ${netbird_bastion_secret}; the Termix bastion key credential will not be available"
 fi
@@ -246,8 +252,9 @@ discover_bastion_netbird_ip() {
       -o UserKnownHostsFile=/dev/null \
       -o BatchMode=yes \
       -o ConnectTimeout=10 \
+      -p "$bastion_ssh_port" \
       -i "$ssh_key_file" \
-      "root@${bastion_public_ip}" \
+      "${bastion_ssh_user}@${bastion_ssh_host}" \
       'bash -s' <<'REMOTE' 2>/dev/null || true
 set -euo pipefail
 docker exec netbird-client netbird status --check ready >/dev/null
@@ -741,7 +748,7 @@ sync_local_config "${TWINBOX_TALOSCONFIG_FILE:?missing TWINBOX_TALOSCONFIG_FILE}
 log "Ensuring Termix OPKSSH hosts exist"
 hosts_payload="$(termix_api_request GET "/host/db/host")"
 mgmt_host_id="$(ensure_termix_opkssh_host "Management VM" "$mgmt_netbird_ip" "$MGMT_VM_USER" "$hosts_payload")"
-bastion_host_id="$(ensure_termix_opkssh_host "Bastion VM" "$bastion_netbird_ip" "root" "$hosts_payload")"
+bastion_host_id="$(ensure_termix_opkssh_host "Bastion VM" "$bastion_netbird_ip" "$bastion_ssh_user" "$hosts_payload")"
 
 # Phase 2: remove the Management VM password credential from Termix.
 # The password remains on the host as a break-glass backdoor.

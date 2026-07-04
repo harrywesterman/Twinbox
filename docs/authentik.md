@@ -6,7 +6,7 @@ NetBird, and user applications.
 
 ## NetBird Login Flow
 
-When NetBird ingress is selected, NetBird itself runs on the Hetzner bastion at:
+When NetBird ingress is selected, NetBird itself runs on the NetBird bastion at:
 
 ```text
 https://netbird.<public-zone>

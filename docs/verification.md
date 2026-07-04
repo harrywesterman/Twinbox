@@ -460,14 +460,16 @@ Expected:
 ### `provision-netbird-bastion`
 
 ```bash
-ssh twinbox@<management-vm-ip> 'test -f /opt/twinbox/bootstrap/secrets/global/netbird.json'
-ssh twinbox@<management-vm-ip> 'jq -r ".NETBIRD_MANAGEMENT_URL" /opt/twinbox/bootstrap/secrets/global/netbird.json'
+ssh twinbox@<management-vm-ip> 'ls /opt/twinbox/bootstrap/secrets/global/netbird-bastion-*.json'
+ssh twinbox@<management-vm-ip> 'jq -r ".NETBIRD_URL, .BASTION_PROVIDER, (.BASTION_PUBLIC_IPV4 // .NETBIRD_IP)" /opt/twinbox/bootstrap/secrets/global/netbird-bastion-*.json'
 ```
 
 Expected:
 
-- `netbird.json` exists with management URL, setup key, and admin token
-- The Hetzner VM is reachable at the recorded management URL
+- `netbird-bastion-<cluster-id>.json` exists with management URL, setup key, admin token, provider, public IPv4, and SSH endpoint fields
+- `netbird.<zone>` resolves publicly to the recorded public IPv4 before bootstrap continues
+- The NetBird bastion is reachable at the recorded management URL
+- For local-port-forward mode, DNS points to the public IPv4 while SSH may use the private LAN endpoint
 
 ### OpenBao restart check
 

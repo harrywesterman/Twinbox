@@ -11,7 +11,7 @@ OPKSSH_SHA256="${OPKSSH_SHA256:-8fab6eb86031d80da81e87817b3ede39f5cbc0ab0a4a9bf6
 
 usage() {
   cat <<EOF
-Usage: $0 --host <HOST> --user <USER> [--ssh-key <KEY_FILE>]
+Usage: $0 --host <HOST> --user <USER> [--port <PORT>] [--ssh-key <KEY_FILE>]
 
 Install or update opkssh on a remote host and configure sshd to use it.
 Environment variables:
@@ -26,6 +26,7 @@ EOF
 
 host=""
 user=""
+port="22"
 ssh_key_file=""
 
 while [[ $# -gt 0 ]]; do
@@ -36,6 +37,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --user)
       user="${2:-}"
+      shift 2
+      ;;
+    --port)
+      port="${2:-}"
       shift 2
       ;;
     --ssh-key)
@@ -54,6 +59,7 @@ done
 
 [[ -n "$host" ]] || fail "--host is required"
 [[ -n "$user" ]] || fail "--user is required"
+[[ "$port" =~ ^[0-9]+$ ]] || fail "--port must be numeric"
 [[ -n "${OPKSSH_ISSUER_URL:-}" ]] || fail "OPKSSH_ISSUER_URL is required"
 [[ -n "${OPKSSH_CLIENT_ID:-}" ]] || fail "OPKSSH_CLIENT_ID is required"
 
@@ -70,6 +76,7 @@ ssh_args=(
   -o "UserKnownHostsFile=/dev/null"
   -o "BatchMode=yes"
   -o "ConnectTimeout=10"
+  -p "$port"
 )
 if [[ -n "$ssh_key_file" ]]; then
   ssh_args+=( -i "$ssh_key_file" )

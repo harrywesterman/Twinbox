@@ -474,24 +474,29 @@ apply_mail_dns_records() {
 }
 
 ssh_bastion() {
-  local bastion_ip="$1"
-  local ssh_key_file="$2"
-  shift 2
+  local bastion_ssh_host="$1"
+  local bastion_ssh_port="$2"
+  local bastion_ssh_user="$3"
+  local ssh_key_file="$4"
+  shift 4
 
   ssh -o StrictHostKeyChecking=accept-new \
     -o UserKnownHostsFile=/dev/null \
     -o BatchMode=yes \
     -o ConnectTimeout=10 \
+    -p "$bastion_ssh_port" \
     -i "$ssh_key_file" \
-    "root@${bastion_ip}" \
+    "${bastion_ssh_user}@${bastion_ssh_host}" \
     "$@"
 }
 
 discover_bastion_netbird_ip() {
-  local bastion_ip="$1"
-  local ssh_key_file="$2"
+  local bastion_ssh_host="$1"
+  local bastion_ssh_port="$2"
+  local bastion_ssh_user="$3"
+  local ssh_key_file="$4"
 
-  ssh_bastion "$bastion_ip" "$ssh_key_file" 'bash -s' <<'REMOTE'
+  ssh_bastion "$bastion_ssh_host" "$bastion_ssh_port" "$bastion_ssh_user" "$ssh_key_file" 'bash -s' <<'REMOTE'
 set -euo pipefail
 docker exec netbird-client netbird status --check ready >/dev/null
 netbird_ip="$(docker exec netbird-client netbird status 2>/dev/null | awk '/NetBird IP:/ {gsub(/\/.*/, ""); print $NF; exit}')"
@@ -507,14 +512,16 @@ REMOTE
 }
 
 verify_bastion_mailu_path() {
-  local bastion_ip="$1"
-  local ssh_key_file="$2"
-  local mailu_front_address="$3"
-  local mailu_front_port="$4"
-  local relay_host="$5"
+  local bastion_ssh_host="$1"
+  local bastion_ssh_port="$2"
+  local bastion_ssh_user="$3"
+  local ssh_key_file="$4"
+  local mailu_front_address="$5"
+  local mailu_front_port="$6"
+  local relay_host="$7"
 
   log "Verifying bastion NetBird route to Mailu front"
-  ssh_bastion "$bastion_ip" "$ssh_key_file" 'bash -s' <<REMOTE
+  ssh_bastion "$bastion_ssh_host" "$bastion_ssh_port" "$bastion_ssh_user" "$ssh_key_file" 'bash -s' <<REMOTE
 set -euo pipefail
 docker exec netbird-client netbird status --check ready >/dev/null
 ip route get ${mailu_front_address} >/dev/null
@@ -583,6 +590,7 @@ admin_password_input="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.admin_password
 storage_size="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.storage_size // "100Gi"')"
 dmarc_policy="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.dmarc_policy // "quarantine"')"
 dmarc_rua_localpart="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.dmarc_rua_localpart // "dmarc"')"
+confirm_manual_rdns="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.confirm_manual_rdns // .skip_rdns_automation_acknowledged // "false"')"
 validate_storage_size "$storage_size"
 normalize_localpart "$dmarc_rua_localpart" >/dev/null
 case "$dmarc_policy" in
@@ -599,14 +607,29 @@ mailu_storage_node_label="$(sanitize_label_value "$cluster_slug")"
 netbird_bastion_secret="$(find_netbird_bastion_secret "$cluster_id")"
 [[ -n "$netbird_bastion_secret" && -f "$netbird_bastion_secret" ]] || fail "NetBird bastion secret not found; provision NetBird bastion first"
 
-bastion_ip="$(jq -r '.NETBIRD_IP // empty' "$netbird_bastion_secret")"
+bastion_ip="$(jq -r '.BASTION_PUBLIC_IPV4 // .NETBIRD_IP // empty' "$netbird_bastion_secret")"
+bastion_ssh_host="$(jq -r '.BASTION_SSH_HOST // .NETBIRD_IP // empty' "$netbird_bastion_secret")"
+bastion_ssh_port="$(jq -r '.BASTION_SSH_PORT // "22"' "$netbird_bastion_secret")"
+bastion_ssh_user="$(jq -r '.BASTION_SSH_USER // "root"' "$netbird_bastion_secret")"
+bastion_provider="$(jq -r 'if .BASTION_PROVIDER then .BASTION_PROVIDER elif .HCLOUD_TOKEN then "hetzner" else "existing-vm" end' "$netbird_bastion_secret")"
 hcloud_token="$(jq -r '.HCLOUD_TOKEN // empty' "$netbird_bastion_secret")"
 mailu_relay_host="$(jq -r '.NETBIRD_RELAY_HOST // empty' "$netbird_bastion_secret")"
 if [[ -z "$mailu_relay_host" ]]; then
   mailu_relay_host="$(jq -r '.NETBIRD_PRIVATE_IP // empty' "$netbird_bastion_secret" | awk 'match($0, /([0-9]{1,3}\.){3}[0-9]{1,3}/) {print substr($0, RSTART, RLENGTH); exit}')"
 fi
-[[ -n "$bastion_ip" ]] || fail "NetBird bastion secret is missing NETBIRD_IP"
-[[ -n "$hcloud_token" ]] || fail "NetBird bastion secret is missing HCLOUD_TOKEN"
+[[ -n "$bastion_ip" ]] || fail "NetBird bastion secret is missing BASTION_PUBLIC_IPV4 or NETBIRD_IP"
+[[ -n "$bastion_ssh_host" ]] || fail "NetBird bastion secret is missing BASTION_SSH_HOST or NETBIRD_IP"
+[[ "$bastion_ssh_port" =~ ^[0-9]+$ ]] || fail "NetBird bastion secret contains invalid BASTION_SSH_PORT"
+[[ -n "$bastion_ssh_user" ]] || fail "NetBird bastion secret contains empty BASTION_SSH_USER"
+
+ptr_required="${bastion_ip} -> ${mail_hostname}"
+rdns_status="manual-required"
+if [[ "$bastion_provider" != "hetzner" || -z "$hcloud_token" ]]; then
+  if [[ "$confirm_manual_rdns" != "true" ]]; then
+    fail "Mailu on a non-Hetzner or non-automated bastion requires confirm_manual_rdns=true after you can create/verify PTR ${ptr_required} and confirm TCP 25 is allowed"
+  fi
+  log "PTR/rDNS automation is not available for bastion provider ${bastion_provider}; create/verify PTR ${ptr_required} manually"
+fi
 
 server_name="twinbox-${cluster_id}-netbird"
 legacy_server_name="netbird-${cluster_id}"
@@ -616,7 +639,7 @@ trap '[[ "$ssh_key_file" == /tmp/mailu-bastion-key-* ]] && rm -f "$ssh_key_file"
 
 if [[ -z "$mailu_relay_host" ]]; then
   log "Discovering bastion NetBird overlay IP for Mailu relay"
-  mailu_relay_host="$(discover_bastion_netbird_ip "$bastion_ip" "$ssh_key_file")" || fail "Could not discover existing bastion NetBird peer IP; run/repair configure-netbird-ingress first"
+  mailu_relay_host="$(discover_bastion_netbird_ip "$bastion_ssh_host" "$bastion_ssh_port" "$bastion_ssh_user" "$ssh_key_file")" || fail "Could not discover existing bastion NetBird peer IP; run/repair configure-netbird-ingress first"
 fi
 [[ "$mailu_relay_host" != "$bastion_ip" ]] || fail "Refusing to use public bastion IP as Mailu relay host; expected NetBird/private address"
 [[ -n "$(openbao_existing_value netbird-mailu-relay-egress NB_SETUP_KEY)" ]] || fail "NetBird Mailu relay egress setup key not found; rerun configure-netbird-ingress before installing Mailu"
@@ -732,6 +755,9 @@ mailu_front_address="$(kubectl -n mailu get svc mailu-front -o jsonpath='{.spec.
 log "Configuring bastion Postfix edge"
 bash "$WORKSPACE_ROOT/scripts/manager/configure-bastion-mailu-postfix.sh" \
   --bastion-ip "$bastion_ip" \
+  --bastion-ssh-host "$bastion_ssh_host" \
+  --bastion-ssh-port "$bastion_ssh_port" \
+  --bastion-ssh-user "$bastion_ssh_user" \
   --ssh-key-file "$ssh_key_file" \
   --mail-domain "$mail_domain" \
   --mail-hostname "$mail_hostname" \
@@ -743,7 +769,7 @@ bash "$WORKSPACE_ROOT/scripts/manager/configure-bastion-mailu-postfix.sh" \
   --relay-secret-file "$relay_secret_file" \
   --cluster-id "$cluster_id"
 
-verify_bastion_mailu_path "$bastion_ip" "$ssh_key_file" "$mailu_front_address" 25 "$mailu_relay_host"
+verify_bastion_mailu_path "$bastion_ssh_host" "$bastion_ssh_port" "$bastion_ssh_user" "$ssh_key_file" "$mailu_front_address" 25 "$mailu_relay_host"
 verify_mailu_relay_egress_path "$mailu_relay_host" 2525
 
 admin_pod="$(resolve_admin_pod)"
@@ -775,14 +801,17 @@ dkim_selector="${dkim_txt_name%%._domainkey.*}"
 log "Applying Mailu DNS records"
 apply_mail_dns_records "$mail_domain" "$mail_hostname" "$bastion_ip" "$dkim_txt_name" "$dkim_value" "$dmarc_policy" "$dmarc_rua_localpart"
 
-log "Configuring Hetzner PTR/rDNS for ${mail_hostname}"
-HCLOUD_TOKEN="$hcloud_token" \
-  python3 "$WORKSPACE_ROOT/scripts/manager/ensure-hetzner-rdns.py" \
-  --server-name "$server_name" \
-  --fallback-server-name "$legacy_server_name" \
-  --ip "$bastion_ip" \
-  --ptr "$mail_hostname"
-log "PTR/rDNS configured: ${bastion_ip} -> ${mail_hostname}"
+if [[ "$bastion_provider" == "hetzner" && -n "$hcloud_token" ]]; then
+  log "Configuring Hetzner PTR/rDNS for ${mail_hostname}"
+  HCLOUD_TOKEN="$hcloud_token" \
+    python3 "$WORKSPACE_ROOT/scripts/manager/ensure-hetzner-rdns.py" \
+    --server-name "$server_name" \
+    --fallback-server-name "$legacy_server_name" \
+    --ip "$bastion_ip" \
+    --ptr "$mail_hostname"
+  rdns_status="configured"
+  log "PTR/rDNS configured: ${bastion_ip} -> ${mail_hostname}"
+fi
 
 register_mailu_authentik_app "$mail_domain"
 
@@ -830,9 +859,11 @@ bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
   --service-domain "$mail_hostname" \
   --service-path /
 
-ptr_required="${bastion_ip} -> ${mail_hostname}"
-rdns_status="configured"
-log "Mailu installed. PTR/rDNS configured: ${ptr_required}"
+if [[ "$rdns_status" == "configured" ]]; then
+  log "Mailu installed. PTR/rDNS configured: ${ptr_required}"
+else
+  log "Mailu installed. Create/verify PTR manually: ${ptr_required}"
+fi
 log "Run an external deliverability/open-relay check before using this for production mail."
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then

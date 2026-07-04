@@ -68,13 +68,19 @@ if [[ ! -f "$BASTION_SECRET_FILE" ]]; then
   exit 0
 fi
 
-BASTION_IP="$(read_json_field "$BASTION_SECRET_FILE" NETBIRD_IP)"
+BASTION_IP="$(jq -r '.BASTION_PUBLIC_IPV4 // .NETBIRD_IP // empty' "$BASTION_SECRET_FILE")"
+BASTION_SSH_HOST="$(jq -r '.BASTION_SSH_HOST // .NETBIRD_IP // empty' "$BASTION_SECRET_FILE")"
+BASTION_SSH_PORT="$(jq -r '.BASTION_SSH_PORT // "22"' "$BASTION_SECRET_FILE")"
+BASTION_SSH_USER="$(jq -r '.BASTION_SSH_USER // "root"' "$BASTION_SECRET_FILE")"
 SSH_PRIVATE_KEY="$(read_json_field "$BASTION_SECRET_FILE" SSH_PRIVATE_KEY)"
 BESZEL_AGENT_KEY="$(read_json_field "$AGENT_SECRET_FILE" key)"
 BESZEL_AGENT_TOKEN="$(read_json_field "$AGENT_SECRET_FILE" token)"
 BESZEL_HUB_URL="$(read_json_field "$AGENT_SECRET_FILE" hub_url)"
 
-[[ -n "$BASTION_IP" ]] || fail "NetBird bastion secret does not contain NETBIRD_IP"
+[[ -n "$BASTION_IP" ]] || fail "NetBird bastion secret does not contain BASTION_PUBLIC_IPV4 or NETBIRD_IP"
+[[ -n "$BASTION_SSH_HOST" ]] || fail "NetBird bastion secret does not contain BASTION_SSH_HOST or NETBIRD_IP"
+[[ "$BASTION_SSH_PORT" =~ ^[0-9]+$ ]] || fail "NetBird bastion secret contains invalid BASTION_SSH_PORT"
+[[ -n "$BASTION_SSH_USER" ]] || fail "NetBird bastion secret contains empty BASTION_SSH_USER"
 [[ -n "$SSH_PRIVATE_KEY" ]] || fail "NetBird bastion secret does not contain SSH_PRIVATE_KEY"
 [[ -n "$BESZEL_AGENT_KEY" ]] || fail "Beszel agent secret does not contain key"
 [[ -n "$BESZEL_AGENT_TOKEN" ]] || fail "Beszel agent secret does not contain token"
@@ -111,13 +117,14 @@ ssh_opts=(
   -o StrictHostKeyChecking=accept-new
   -o UserKnownHostsFile=/dev/null
   -o ConnectTimeout=10
+  -p "$BASTION_SSH_PORT"
   -i "$ssh_key_file"
 )
 
-log "Configuring Beszel agent on NetBird bastion ${BASTION_IP}"
+log "Configuring Beszel agent on NetBird bastion ${BASTION_SSH_HOST}"
 
 remote_agent_dir_q="$(quote "$REMOTE_AGENT_DIR")"
-if ! ssh "${ssh_opts[@]}" "root@${BASTION_IP}" \
+if ! ssh "${ssh_opts[@]}" "${BASTION_SSH_USER}@${BASTION_SSH_HOST}" \
   "install -d -m 0700 ${remote_agent_dir_q} && umask 077 && cat > ${remote_agent_dir_q}/agent.env" \
   <"$agent_env_file"; then
   fail "Failed to upload Beszel agent environment to the NetBird bastion"
@@ -128,7 +135,7 @@ remote_env=(
   "REMOTE_AGENT_DIR=$(quote "$REMOTE_AGENT_DIR")"
 )
 
-ssh "${ssh_opts[@]}" "root@${BASTION_IP}" "${remote_env[*]} bash -s" <<'REMOTE'
+ssh "${ssh_opts[@]}" "${BASTION_SSH_USER}@${BASTION_SSH_HOST}" "${remote_env[*]} bash -s" <<'REMOTE'
 set -euo pipefail
 
 log() {

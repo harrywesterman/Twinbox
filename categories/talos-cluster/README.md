@@ -41,7 +41,7 @@ categories/talos-cluster/
 | `install-traefik` | Deploy Traefik ingress controller |
 | `configure-cloudflare-tunnel` | Configure Cloudflare Tunnel for external access |
 | `configure-netbird-ingress` | Configure NetBird SSO, routing groups, and setup keys |
-| `provision-netbird-bastion` | Provision the self-hosted NetBird VPS |
+| `provision-netbird-bastion` | Provision or bootstrap the self-hosted NetBird bastion |
 | `install-netbird-routing-peers` | Deploy NetBird routing peers to Kubernetes |
 | `configure-netbird-admin-access` | Enroll the Management VM as a NetBird admin peer |
 

@@ -493,7 +493,7 @@ NetBird provides self-hosted VPN ingress with SSO integration via Authentik. The
 
 ### Setup Steps
 
-1. **Bastion** (`provision-netbird-bastion`) — Provisions a Hetzner VM running the NetBird server, dashboard, and built-in Traefik with Let's Encrypt.
+1. **Bastion** (`provision-netbird-bastion`) — Provisions a Hetzner VM or bootstraps an existing Debian/Ubuntu VM running the NetBird server, dashboard, and built-in Traefik with Let's Encrypt.
 2. **Ingress Config** (`configure-netbird-ingress`) — Connects NetBird to Authentik for SSO, creates groups and setup keys via OpenTofu, and configures reverse proxy targets.
 3. **Routing Peers** (`install-netbird-routing-peers`) — Deploys NetBird agents in the Kubernetes cluster as a DaemonSet so the bastion can route traffic to internal Traefik services.
 4. **Admin Access** (`configure-netbird-admin-access`) — Enrolls the Management VM into the NetBird tailnet so admin devices can reach it securely.

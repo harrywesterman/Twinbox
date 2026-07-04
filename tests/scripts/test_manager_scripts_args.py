@@ -278,6 +278,12 @@ NETBIRD_MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "netbird" / "main.tf"
 NETBIRD_CLOUD_INIT = (
     REPO_ROOT / "infra" / "opentofu" / "netbird" / "cloud-init" / "netbird.yaml.tftpl"
 )
+NETBIRD_BASTION_BOOTSTRAP_TEMPLATE = (
+    REPO_ROOT / "scripts" / "manager" / "netbird-bastion-bootstrap-template.sh"
+)
+NETBIRD_BASTION_BOOTSTRAP_RENDERER = (
+    REPO_ROOT / "scripts" / "manager" / "render-netbird-bastion-bootstrap.py"
+)
 AUTHENTIK_INGRESSROUTE = REPO_ROOT / "gitops" / "platform" / "authentik" / "ingressroute.yaml"
 AUTHENTIK_NETBIRD_FORWARDED_HEADERS_MIDDLEWARE = (
     REPO_ROOT / "gitops" / "platform" / "authentik" / "netbird-forwarded-headers-middleware.yaml"
@@ -1832,10 +1838,27 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     )
     assert '-var "public_zone_name=$public_zone_name"' in netbird_bastion_run_text
     assert "external-dns" in netbird_bastion_run_text
+    assert "check-bastion-public-reachability.py" in netbird_bastion_run_text
+    assert 'wait_for_bastion_public_dns_records "$public_ipv4" "$netbird_fqdn"' in (
+        netbird_bastion_run_text
+    )
+    assert 'wait_for_bastion_public_dns_records "$server_ipv4" "$netbird_fqdn"' in (
+        netbird_bastion_run_text
+    )
     assert "command -v ssh >/dev/null" in netbird_bastion_run_text
     assert "command -v ssh-keygen >/dev/null" in netbird_bastion_run_text
     assert "command -v python3 >/dev/null" in netbird_bastion_run_text
+    assert "command -v scp >/dev/null" in netbird_bastion_run_text
     assert "OpenSSH client tools are available" in netbird_bastion_run_text
+    assert 'bastion_provider="$(printf' in netbird_bastion_run_text
+    assert "provision_existing_bastion()" in netbird_bastion_run_text
+    assert "render-netbird-bastion-bootstrap.py" in netbird_bastion_run_text
+    assert "netbird-bastion-bootstrap-template.sh" in netbird_bastion_run_text
+    assert "existing_bastion_public_ipv4 is required for existing-vm" in netbird_bastion_run_text
+    assert "existing_bastion_confirm_clean_host=true" in netbird_bastion_run_text
+    assert "BASTION_PROVIDER" in netbird_bastion_run_text
+    assert "BASTION_PUBLIC_IPV4" in netbird_bastion_run_text
+    assert "BASTION_SSH_HOST" in netbird_bastion_run_text
     assert 'server_name="twinbox-${cluster_id}-netbird"' in netbird_bastion_run_text
     assert "NetBird Hetzner resource prefix" in netbird_bastion_run_text
     # The step result includes cluster_id and secrets_path (netbird_proxy_domain was removed)
@@ -1911,6 +1934,7 @@ def test_netbird_cloud_init_escapes_shell_variables_for_templatefile():
     text = (
         REPO_ROOT / "infra" / "opentofu" / "netbird" / "cloud-init" / "netbird.yaml.tftpl"
     ).read_text(encoding="utf-8")
+    bootstrap_text = NETBIRD_BASTION_BOOTSTRAP_TEMPLATE.read_text(encoding="utf-8")
 
     assert "#cloud-config" in text
     assert "package_update: true" in text
@@ -1919,42 +1943,68 @@ def test_netbird_cloud_init_escapes_shell_variables_for_templatefile():
     assert "write_files" in text
     assert "bootstrap-netbird.sh" in text
     assert "/root/bootstrap-netbird.sh" in text
+    assert "netbird_bootstrap_script" in text
+    assert "/opt/netbird/.bootstrap.env" in text
     assert "ufw --force enable" in text
     assert "$${" not in text, "template should not contain $$ escapes"
     assert "${dns_env[@]}" not in text, "bash arrays must not be Terraform template expressions"
     assert "[@" not in text, "bash array expansions are invalid Terraform template expressions"
     assert "${NETBIRD_VERSION}" not in text, "bash var NETBIRD_VERSION must use $VAR not ${VAR}"
     assert "${volume_dir}" not in text, "bash vars must not be Terraform template expressions"
-    assert '"$NETBIRD_URL' in text or "'$NETBIRD_URL" in text
-    assert 'BOOTSTRAP_NETBIRD_URL="http://$NETBIRD_SERVER_IP"' in text
-    assert "docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}'" in text
-    assert '-H "Host: $NETBIRD_DOMAIN"' in text
-    assert '"$BOOTSTRAP_NETBIRD_URL/oauth2/.well-known/openid-configuration"' in text
-    assert 'curl -fsS -X POST "$BOOTSTRAP_NETBIRD_URL/api/setup"' in text
-    assert 'curl -fsS -X POST "$NETBIRD_URL/api/setup"' not in text
-    assert "Checking public NetBird TLS endpoint" in text
-    assert "Public NetBird TLS endpoint is ready" in text
-    assert "NetBird setup completed, but public TLS is not trusted or reachable yet" in text
-    assert "netbird-automated-setup.sh" not in text
-    assert 'export PUBLIC_ZONE_NAME="${public_zone_name}"' in text
-    assert "seed_netbird_account_domain()" in text
-    assert '"twinbox.internal"' in text
-    assert "private peer DNS domain" in text
-    assert "public_zone_name, setup_result = sys.argv" not in text
-    assert "settings_extra_user_approval_required = 0" in text
-    assert "domain_category = ?, is_domain_primary_account = 1" in text
-    assert "retry_netbird_step()" in text
-    assert "local max_attempts=8" in text
+    assert '"$NETBIRD_URL' in bootstrap_text or "'$NETBIRD_URL" in bootstrap_text
+    assert 'BOOTSTRAP_NETBIRD_URL="http://$NETBIRD_SERVER_IP"' in bootstrap_text
+    assert (
+        "docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}'"
+        in bootstrap_text
+    )
+    assert "/opt/netbird/.twinbox-bastion.json" in bootstrap_text
+    assert "Refusing to overwrite an unmanaged NetBird installation" in bootstrap_text
+
+
+def test_netbird_bastion_bootstrap_renderer_contract():
+    renderer_text = NETBIRD_BASTION_BOOTSTRAP_RENDERER.read_text(encoding="utf-8")
+    bootstrap_text = NETBIRD_BASTION_BOOTSTRAP_TEMPLATE.read_text(encoding="utf-8")
+
+    assert "--netbird-fqdn" in renderer_text
+    assert "--dns-api-token" in renderer_text
+    assert "bootstrap.env" in renderer_text
+    assert "dns-credentials" in renderer_text
+    assert "print(" not in renderer_text
+    assert "BOOTSTRAP_ENV" in bootstrap_text
+    assert "DNS_CREDENTIALS_FILE" in bootstrap_text
+    assert '-H "Host: $NETBIRD_DOMAIN"' in bootstrap_text
+    assert '"$BOOTSTRAP_NETBIRD_URL/oauth2/.well-known/openid-configuration"' in bootstrap_text
+    assert "Reusing existing NetBird setup result with personal access token." in bootstrap_text
+    assert bootstrap_text.index(
+        "Reusing existing NetBird setup result with personal access token."
+    ) < bootstrap_text.index('curl -fsS -X POST "$BOOTSTRAP_NETBIRD_URL/api/setup"')
+    assert 'curl -fsS -X POST "$BOOTSTRAP_NETBIRD_URL/api/setup"' in bootstrap_text
+    assert 'curl -fsS -X POST "$NETBIRD_URL/api/setup"' not in bootstrap_text
+    assert "Checking public NetBird TLS endpoint" in bootstrap_text
+    assert "Public NetBird TLS endpoint is ready" in bootstrap_text
+    assert (
+        "NetBird setup completed, but public TLS is not trusted or reachable yet" in bootstrap_text
+    )
+    assert "netbird-automated-setup.sh" not in bootstrap_text
+    assert "PUBLIC_ZONE_NAME" in bootstrap_text
+    assert "seed_netbird_account_domain()" in bootstrap_text
+    assert '"twinbox.internal"' in bootstrap_text
+    assert "private peer DNS domain" in bootstrap_text
+    assert "public_zone_name, setup_result = sys.argv" not in bootstrap_text
+    assert "settings_extra_user_approval_required = 0" in bootstrap_text
+    assert "domain_category = ?, is_domain_primary_account = 1" in bootstrap_text
+    assert "retry_netbird_step()" in bootstrap_text
+    assert "local max_attempts=8" in bootstrap_text
     assert (
         'retry_netbird_step "Start NetBird reverse proxy" $DOCKER_COMPOSE_COMMAND up -d proxy'
-        in (text)
+        in (bootstrap_text)
     )
     assert (
         'raise SystemExit("ERROR: Could not patch NetBird reverse proxy startup for retries.")'
-        in (text)
+        in (bootstrap_text)
     )
-    assert 'retry_netbird_step "Pull NetBird compose images" docker compose pull' in text
-    assert "docker compose pull || true" not in text
+    assert 'retry_netbird_step "Pull NetBird compose images" docker compose pull' in bootstrap_text
+    assert "docker compose pull || true" not in bootstrap_text
 
 
 def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
@@ -2076,6 +2126,9 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
 
     assert 'name: "authentik", domain: $authentik_domain, path: "/"' in text
     assert "netbird-wildcard-dns" in text
+    assert "check-bastion-public-reachability.py" in text
+    assert 'wait_for_bastion_public_dns_records "$netbird_proxy_ip"' in text
+    assert "twinbox-wildcard-check.${public_zone_name}" in text
     assert "netbird-dns-zone.py" in text
     assert '--zone-domain "$public_zone_name"' in text
     assert '--group-id "$admins_group_id"' in text
@@ -2085,6 +2138,10 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert '--record "${public_zone_name}=${netbird_proxy_ip}"' in text
     assert '--record "*.${public_zone_name}=${netbird_proxy_ip}"' in text
     assert "NETBIRD_IP" in text
+    assert "BASTION_PUBLIC_IPV4" in text
+    assert "BASTION_SSH_HOST" in text
+    assert "BASTION_SSH_PORT" in text
+    assert "BASTION_SSH_USER" in text
     assert "NETBIRD_PROXY_DOMAIN" in text
     assert 'TWINBOX_NETBIRD_TOKEN="$netbird_token"' in text
     assert 'TWINBOX_NETBIRD_URL="$netbird_management_url"' in text
@@ -5306,9 +5363,12 @@ def test_netbird_bastion_provisioning_fetches_dns_credentials():
 
     assert 'variable "netbird_admin_token_expire_days"' in netbird_vars_text
     assert "default     = 365" in netbird_vars_text
-    assert "admin_token_expire_days = var.netbird_admin_token_expire_days" in netbird_main_text
-    assert '"pat_expire_in": ${admin_token_expire_days}' in netbird_cloud_init_text
-    assert '"pat_expire_in": 7' not in netbird_cloud_init_text
+    assert "admin_token_expire_days" in netbird_main_text
+    assert "var.netbird_admin_token_expire_days" in netbird_main_text
+    bootstrap_text = NETBIRD_BASTION_BOOTSTRAP_TEMPLATE.read_text(encoding="utf-8")
+    assert "ADMIN_TOKEN_EXPIRE_DAYS=${admin_token_expire_days}" in netbird_cloud_init_text
+    assert '"pat_expire_in": ${ADMIN_TOKEN_EXPIRE_DAYS}' in bootstrap_text
+    assert '"pat_expire_in": 7' not in bootstrap_text
 
 
 def test_netbird_bastion_falls_back_to_cpx22_on_hetzner_capacity_errors():
@@ -5329,7 +5389,11 @@ def test_netbird_bastion_falls_back_to_cpx22_on_hetzner_capacity_errors():
 
 
 def test_netbird_cloud_init_uses_exact_netbird_cert_and_tcp_passthrough():
-    text = NETBIRD_CLOUD_INIT.read_text(encoding="utf-8")
+    text = (
+        NETBIRD_CLOUD_INIT.read_text(encoding="utf-8")
+        + "\n"
+        + NETBIRD_BASTION_BOOTSTRAP_TEMPLATE.read_text(encoding="utf-8")
+    )
 
     assert "DNS_PROVIDER" in text
     assert "DNS_API_TOKEN" in text

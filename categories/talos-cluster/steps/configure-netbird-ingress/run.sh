@@ -24,6 +24,30 @@ fail() {
   exit 1
 }
 
+wait_for_bastion_public_dns_records() {
+  local public_ipv4="$1"
+  shift
+  local record
+  local record_args=()
+  local output
+
+  for record in "$@"; do
+    record_args+=( --record "${record}=${public_ipv4}" )
+  done
+
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for public DNS records to resolve to ${public_ipv4}"
+  for i in $(seq 1 60); do
+    if output="$(python3 "$WORKSPACE_ROOT/scripts/manager/check-bastion-public-reachability.py" "${record_args[@]}" 2>&1)"; then
+      printf '%s\n' "$output"
+      return 0
+    fi
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Public DNS is not ready yet (attempt ${i}/60): ${output}"
+    sleep 5
+  done
+
+  fail "Public DNS records did not resolve to ${public_ipv4} in time"
+}
+
 wait_for_argocd_server() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for Argo CD server"
   for i in $(seq 1 30); do
@@ -508,14 +532,15 @@ ensure_netbird_proxy_peer() {
     fi
   fi
 
-  if [[ ! -f "$ssh_key_path" || -z "$netbird_proxy_ip" ]] || ! command -v ssh >/dev/null 2>&1; then
+  if [[ ! -f "$ssh_key_path" || -z "$bastion_ssh_host" ]] || ! command -v ssh >/dev/null 2>&1; then
     [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
     fail "NetBird bastion SSH is unavailable; cannot start the reverse proxy peer"
   fi
 
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Ensuring NetBird reverse proxy peer is running on the bastion"
   if ! printf '%s' "$setup_key" | ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 \
-    -i "$ssh_key_path" root@"$netbird_proxy_ip" \
+    -p "$bastion_ssh_port" \
+    -i "$ssh_key_path" "${bastion_ssh_user}@${bastion_ssh_host}" \
     'mkdir -p /opt/netbird && umask 077 && cat > /opt/netbird/proxy-client.setup-key'; then
     [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
     fail "Failed to upload NetBird proxy setup key to the bastion"
@@ -526,7 +551,8 @@ ensure_netbird_proxy_peer() {
   printf -v image_q '%q' "$image"
 
   if ! ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 \
-    -i "$ssh_key_path" root@"$netbird_proxy_ip" \
+    -p "$bastion_ssh_port" \
+    -i "$ssh_key_path" "${bastion_ssh_user}@${bastion_ssh_host}" \
     "NB_MANAGEMENT_URL=$management_url_q NB_HOSTNAME=$hostname_q NETBIRD_IMAGE=$image_q bash -s" <<'REMOTE'
 set -euo pipefail
 
@@ -589,7 +615,7 @@ ensure_bastion_traefik_netbird_alias() {
     fi
   fi
 
-  if [[ ! -f "$ssh_key_path" || -z "$netbird_proxy_ip" ]] || ! command -v ssh >/dev/null 2>&1; then
+  if [[ ! -f "$ssh_key_path" || -z "$bastion_ssh_host" ]] || ! command -v ssh >/dev/null 2>&1; then
     [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
     fail "NetBird bastion SSH is unavailable; cannot configure the local NetBird Traefik alias"
   fi
@@ -598,7 +624,8 @@ ensure_bastion_traefik_netbird_alias() {
 
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Ensuring bastion Traefik resolves ${netbird_domain} on the local Docker network"
   if ! ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 \
-    -i "$ssh_key_path" root@"$netbird_proxy_ip" \
+    -p "$bastion_ssh_port" \
+    -i "$ssh_key_path" "${bastion_ssh_user}@${bastion_ssh_host}" \
     "python3 - --compose-path /opt/netbird/docker-compose.yml --alias $netbird_domain_q --restart-traefik" \
     <"$WORKSPACE_ROOT/scripts/manager/patch-netbird-traefik-alias.py"
   then
@@ -608,7 +635,8 @@ ensure_bastion_traefik_netbird_alias() {
 
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Verifying netbird-proxy can resolve ${netbird_domain} locally"
   if ! ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 \
-    -i "$ssh_key_path" root@"$netbird_proxy_ip" \
+    -p "$bastion_ssh_port" \
+    -i "$ssh_key_path" "${bastion_ssh_user}@${bastion_ssh_host}" \
     "NETBIRD_DOMAIN=$netbird_domain_q bash -s" <<'REMOTE'
 set -euo pipefail
 
@@ -737,7 +765,7 @@ discover_netbird_proxy_peer_ip() {
     fi
   fi
 
-  if [[ ! -f "$ssh_key_path" || -z "$netbird_proxy_ip" ]] || ! command -v ssh >/dev/null 2>&1; then
+  if [[ ! -f "$ssh_key_path" || -z "$bastion_ssh_host" ]] || ! command -v ssh >/dev/null 2>&1; then
     [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
     fail "NetBird bastion SSH is unavailable; cannot discover the bastion NetBird IP"
   fi
@@ -745,7 +773,8 @@ discover_netbird_proxy_peer_ip() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Discovering bastion NetBird peer IP" >&2
   if ! netbird_ip="$(
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 \
-      -i "$ssh_key_path" root@"$netbird_proxy_ip" \
+      -p "$bastion_ssh_port" \
+      -i "$ssh_key_path" "${bastion_ssh_user}@${bastion_ssh_host}" \
       'bash -s' <<'REMOTE'
 set -euo pipefail
 docker exec netbird-client netbird status --check ready >/dev/null
@@ -803,14 +832,15 @@ ensure_netbird_bastion_exit_peer() {
     fi
   fi
 
-  if [[ ! -f "$ssh_key_path" || -z "$netbird_proxy_ip" ]] || ! command -v ssh >/dev/null 2>&1; then
+  if [[ ! -f "$ssh_key_path" || -z "$bastion_ssh_host" ]] || ! command -v ssh >/dev/null 2>&1; then
     [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
     fail "NetBird bastion SSH is unavailable; cannot start the Hetzner exit peer"
   fi
 
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Ensuring NetBird Hetzner exit peer is running on the bastion"
   if ! printf '%s' "$setup_key" | ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 \
-    -i "$ssh_key_path" root@"$netbird_proxy_ip" \
+    -p "$bastion_ssh_port" \
+    -i "$ssh_key_path" "${bastion_ssh_user}@${bastion_ssh_host}" \
     'mkdir -p /opt/netbird && umask 077 && cat > /opt/netbird/hetzner-exit.setup-key'; then
     [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
     fail "Failed to upload NetBird Hetzner exit setup key to the bastion"
@@ -821,7 +851,8 @@ ensure_netbird_bastion_exit_peer() {
   printf -v image_q '%q' "$image"
 
   if ! ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 \
-    -i "$ssh_key_path" root@"$netbird_proxy_ip" \
+    -p "$bastion_ssh_port" \
+    -i "$ssh_key_path" "${bastion_ssh_user}@${bastion_ssh_host}" \
     "NB_MANAGEMENT_URL=$management_url_q NB_HOSTNAME=$hostname_q NETBIRD_IMAGE=$image_q bash -s" <<'REMOTE'
 set -euo pipefail
 
@@ -901,7 +932,8 @@ wait_for_netbird_proxy_backend() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for NetBird proxy peer to reach Traefik ${protocol} backend"
   for i in $(seq 1 60); do
     if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 \
-      -i "$ssh_key_path" root@"$netbird_proxy_ip" \
+      -p "$bastion_ssh_port" \
+      -i "$ssh_key_path" "${bastion_ssh_user}@${bastion_ssh_host}" \
       "curl -kfsS --connect-timeout 5 --max-time 10 -H Host:$host_header_q $url_q >/dev/null"; then
       [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
       return 0
@@ -978,7 +1010,7 @@ seed_netbird_account_for_sso() {
     fi
   fi
 
-  if [[ ! -f "$ssh_key_path" || -z "$netbird_proxy_ip" ]] || ! command -v ssh >/dev/null 2>&1; then
+  if [[ ! -f "$ssh_key_path" || -z "$bastion_ssh_host" ]] || ! command -v ssh >/dev/null 2>&1; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: NetBird host SSH is unavailable; account domain and SSO owner preseed skipped." >&2
     [[ -z "$temp_ssh_key" ]] || rm -f "$temp_ssh_key"
     return 0
@@ -992,7 +1024,8 @@ seed_netbird_account_for_sso() {
 
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Seeding NetBird account domain and SSO owner context"
   if ! ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 \
-    -i "$ssh_key_path" root@"$netbird_proxy_ip" \
+    -p "$bastion_ssh_port" \
+    -i "$ssh_key_path" "${bastion_ssh_user}@${bastion_ssh_host}" \
     "PUBLIC_ZONE_NAME=$public_zone_q CLUSTER_ID=$cluster_id_q ADMIN_UID=$admin_uid_q CONNECTOR_ID=$identity_provider_id_q ADMIN_EMAIL=$admin_email_q python3 -" <<'PY'
 import base64
 import glob
@@ -1293,7 +1326,10 @@ fi
 [[ -f "$netbird_bastion_secret" ]] || fail "NetBird bastion secret not found at $netbird_bastion_secret"
 disable_netbird_account_ipv6_overlay "$netbird_management_url" "$netbird_token"
 netbird_proxy_domain="$(jq -r '.NETBIRD_PROXY_DOMAIN // empty' "$netbird_bastion_secret")"
-netbird_proxy_ip="$(jq -r '.NETBIRD_IP // empty' "$netbird_bastion_secret")"
+netbird_proxy_ip="$(jq -r '.BASTION_PUBLIC_IPV4 // .NETBIRD_IP // empty' "$netbird_bastion_secret")"
+bastion_ssh_host="$(jq -r '.BASTION_SSH_HOST // .NETBIRD_IP // empty' "$netbird_bastion_secret")"
+bastion_ssh_port="$(jq -r '.BASTION_SSH_PORT // "22"' "$netbird_bastion_secret")"
+bastion_ssh_user="$(jq -r '.BASTION_SSH_USER // "root"' "$netbird_bastion_secret")"
 
 # NETBIRD_PROXY_DOMAIN is now the zone itself (not proxy.<zone>).
 # Derive it from NETBIRD_FQDN when the bastion secret doesn't contain it.
@@ -1301,7 +1337,10 @@ if [[ -z "$netbird_proxy_domain" ]]; then
   netbird_proxy_domain="$(jq -r '.NETBIRD_FQDN // empty' "$netbird_bastion_secret" | sed 's/^netbird\.//')"
 fi
 
-[[ -n "$netbird_proxy_ip" ]] || fail "NetBird bastion secret does not contain NETBIRD_IP"
+[[ -n "$netbird_proxy_ip" ]] || fail "NetBird bastion secret does not contain BASTION_PUBLIC_IPV4 or NETBIRD_IP"
+[[ -n "$bastion_ssh_host" ]] || fail "NetBird bastion secret does not contain BASTION_SSH_HOST or NETBIRD_IP"
+[[ "$bastion_ssh_port" =~ ^[0-9]+$ ]] || fail "NetBird bastion secret contains invalid BASTION_SSH_PORT"
+[[ -n "$bastion_ssh_user" ]] || fail "NetBird bastion secret contains empty BASTION_SSH_USER"
 
 service_cidrs_json="$(read_service_cidrs_json)"
 pod_cidrs_json="$(read_pod_cidrs_json)"
@@ -1584,6 +1623,8 @@ spec:
         - ${netbird_proxy_ip}
       recordTTL: 300
 EOF
+
+wait_for_bastion_public_dns_records "$netbird_proxy_ip" "twinbox-wildcard-check.${public_zone_name}"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating NetBird custom DNS zone for app domains"
 zone_result="$(python3 "$WORKSPACE_ROOT/scripts/manager/netbird-dns-zone.py" \

@@ -2,17 +2,20 @@ id: provision-netbird-bastion
 title: Deploy NetBird Bastion Host
 type: action
 journey_stage: setup
-summary: Provision a self-hosted NetBird VPS on Hetzner Cloud.
+summary: Provision a self-hosted NetBird bastion.
 explanation: >
-  This step provisions a Hetzner Cloud VM running self-hosted NetBird with the
-  combined NetBird server, dashboard, built-in Traefik, and NetBird Reverse Proxy.
-  The VPS becomes the public frontend for NetBird and for proxying selected
-  Twinbox services back to the Kubernetes cluster through NetBird routing peers.
+  This step provisions or bootstraps a Linux bastion running self-hosted NetBird
+  with the combined NetBird server, dashboard, built-in Traefik, and NetBird
+  Reverse Proxy. The bastion becomes the public frontend for NetBird and for
+  proxying selected Twinbox services back to the Kubernetes cluster through
+  NetBird routing peers.
 side_help: >
-  You need a Hetzner Cloud API token. Twinbox uses the DNS provider configured
-  earlier to create netbird and proxy DNS records pointing at the new VPS.
-  Twinbox automatically sets up the first NetBird admin account and generates
-  a Personal Access Token for the next step.
+  Choose Hetzner for the fully automated VM path, or existing-vm when you
+  already have a clean Debian/Ubuntu VM reachable by SSH from the Management VM.
+  For a local VM with router port forwarding, SSH can use the LAN address while
+  DNS points at the public IPv4. Twinbox uses the DNS provider configured earlier
+  to create NetBird records and automatically generates a Personal Access Token
+  for the next step.
 ingress_route: netbird
 dashy:
   items:
@@ -22,11 +25,22 @@ dashy:
       icon: provision-netbird-bastion
       url_template: https://netbird.__ZONE_NAME__
 inputs:
+  - id: bastion_provider
+    label: Bastion Provider
+    type: string
+    required: true
+    default: hetzner
+    help: "Use hetzner to let Twinbox create the VM, or existing-vm to bootstrap a clean Debian/Ubuntu VM reachable over SSH from the Management VM."
+    options:
+      - label: Hetzner
+        value: hetzner
+      - label: Existing VM
+        value: existing-vm
   - id: hcloud_token
     label: Hetzner API Token
     type: string
-    required: true
-    help: Your Hetzner Cloud API token. Create one at https://console.hetzner.cloud/
+    required: false
+    help: Required only when Bastion Provider is hetzner. Create one at https://console.hetzner.cloud/
   - id: hcloud_location
     label: Server Location
     type: string
@@ -39,6 +53,77 @@ inputs:
     required: false
     default: cax11
     help: "Server size: cax11 (ARM64, 2vCPU/4GB), cpx22 (x86, 2vCPU/4GB). Twinbox retries once with cpx22 if cax11 placement is unavailable."
+  - id: existing_bastion_mode
+    label: Existing VM Mode
+    type: string
+    required: false
+    default: cloud-vm
+    help: "Use cloud-vm when the SSH host and public IPv4 are the same public VM. Use local-port-forward when SSH uses a private LAN address and router port forwarding exposes the public IPv4."
+    options:
+      - label: Cloud VM
+        value: cloud-vm
+      - label: Local port forwarding
+        value: local-port-forward
+  - id: existing_bastion_public_ipv4
+    label: Public IPv4
+    type: string
+    required: false
+    help: Required for existing-vm. DNS A records for netbird and wildcard services point to this public IPv4.
+  - id: existing_bastion_ssh_host
+    label: SSH Host
+    type: string
+    required: false
+    help: Required for existing-vm. Hostname or address reachable from the Management VM. Local VM mode may use a private LAN address here.
+  - id: existing_bastion_ssh_port
+    label: SSH Port
+    type: string
+    required: false
+    default: "22"
+    help: SSH port reachable from the Management VM. SSH does not need to be publicly forwarded.
+  - id: existing_bastion_ssh_user
+    label: SSH User
+    type: string
+    required: false
+    default: root
+    help: Existing VM bootstrap supports root SSH only in this version.
+  - id: existing_bastion_ssh_private_key
+    label: SSH Private Key
+    type: string
+    required: false
+    help: Private key used by the Management VM to connect to the existing bastion VM. Twinbox stores it in the bastion secret as break-glass/bootstrap material.
+  - id: existing_bastion_os_family
+    label: OS Family
+    type: string
+    required: false
+    default: debian
+    help: Debian or Ubuntu are supported for existing-vm bootstrap.
+    options:
+      - label: Debian
+        value: debian
+      - label: Ubuntu
+        value: ubuntu
+  - id: existing_bastion_confirm_clean_host
+    label: Confirm Clean Host
+    type: string
+    required: false
+    default: "false"
+    help: Set to true to confirm Twinbox may manage /opt/netbird on this dedicated VM. Existing unmanaged NetBird compose files are refused.
+    options:
+      - label: "false"
+        value: "false"
+      - label: "true"
+        value: "true"
+  - id: existing_bastion_confirm_port_forwarding
+    label: Confirm Port Forwarding
+    type: string
+    required: false
+    default: "false"
+    help: Required for local-port-forward mode. Confirm TCP 80/443 and UDP 3478 are forwarded to the VM; add TCP 25 only if Mailu will receive direct mail.
+    options:
+      - label: "false"
+        value: "false"
+      - label: "true"
+        value: "true"
 secrets:
   files:
     KUBECONFIG_FILE:
