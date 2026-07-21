@@ -16,7 +16,7 @@
     "jose": "^6.1.0",
     "express": "^5.1.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
