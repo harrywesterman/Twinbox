@@ -23,7 +23,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: paperless
-          image: ghcr.io/paperless-ngx/paperless-ngx:2.20.15
+          image: ghcr.io/paperless-ngx/paperless-ngx:3.0.4
           imagePullPolicy: IfNotPresent
           resources:
             requests:
