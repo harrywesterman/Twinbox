@@ -2,12 +2,14 @@
 
 import json
 import pathlib
+import re
 import subprocess
 
 import yaml
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 MAILU_PLATFORM_DIR = REPO_ROOT / "gitops" / "platform-apps" / "mailu"
+PINNED_DEFAULTS = REPO_ROOT / "config" / "pinned-defaults.sh"
 
 
 def _load_yaml(path):
@@ -176,7 +178,10 @@ def test_mailu_relay_egress_resources_are_wired():
         for container in deployment["spec"]["template"]["spec"]["containers"]
     }
     assert set(containers) == {"netbird", "haproxy", "probe"}
-    assert containers["netbird"]["image"] == "netbirdio/netbird:0.73.2"
+    pinned_defaults = PINNED_DEFAULTS.read_text(encoding="utf-8")
+    pinned_match = re.search(r"^PINNED_NETBIRD_VERSION=(\S+)$", pinned_defaults, re.M)
+    assert pinned_match
+    assert containers["netbird"]["image"] == f"netbirdio/netbird:{pinned_match.group(1)}"
     assert containers["haproxy"]["image"] == "haproxy:3.4.0-alpine"
     assert containers["probe"]["image"] == "busybox:1.38.0"
     assert containers["haproxy"]["resources"]["requests"]

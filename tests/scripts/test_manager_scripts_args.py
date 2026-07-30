@@ -4903,7 +4903,9 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "exec /entrypoint.sh" in deployment_text
     assert "TERMIX_BROWSER_ROLE_NAME" in deployment_text
     assert "subPath: termix-users-rbac-patch.mjs" in deployment_text
-    assert "image: netbirdio/netbird:0.73.2" in deployment_text
+    pinned_match = re.search(r"^PINNED_NETBIRD_VERSION=(\S+)$", _pinned_defaults_text(), re.M)
+    assert pinned_match
+    assert f"image: netbirdio/netbird:{pinned_match.group(1)}" in deployment_text
     assert "NB_SETUP_KEY" in deployment_text
     assert "NB_MANAGEMENT_URL" in deployment_text
     assert "NB_HOSTNAME" in deployment_text
