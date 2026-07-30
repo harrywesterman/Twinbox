@@ -13,7 +13,7 @@ annotations:
       image: ghcr.io/goauthentik/ldap:2026.5.3
       whitelisted: true
     - name: authentik-outpost-radius
-      image: ghcr.io/goauthentik/radius:2026.5.3
+      image: ghcr.io/goauthentik/radius:2026.5.6
       whitelisted: true
     - name: authentik-outpost-rac
       image: ghcr.io/goauthentik/rac:2026.5.3
