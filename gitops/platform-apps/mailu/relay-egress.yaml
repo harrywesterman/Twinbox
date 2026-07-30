@@ -41,7 +41,7 @@ spec:
       serviceAccountName: mailu-relay-egress
       containers:
         - name: netbird
-          image: netbirdio/netbird:0.73.2
+          image: netbirdio/netbird:0.76.0
           imagePullPolicy: IfNotPresent
           env:
             - name: NB_SETUP_KEY
