@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: vaultwarden
-          image: ghcr.io/dani-garcia/vaultwarden:1.36.0
+          image: ghcr.io/dani-garcia/vaultwarden:1.37.1
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
