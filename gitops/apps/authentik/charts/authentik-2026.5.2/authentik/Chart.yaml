@@ -4,7 +4,7 @@ annotations:
       description: upgrade to authentik 2026.5.2
   artifacthub.io/images: |
     - name: authentik
-      image: ghcr.io/goauthentik/server:2026.5.3
+      image: ghcr.io/goauthentik/server:2026.5.6
       whitelisted: true
     - name: authentik-outpost-proxy
       image: ghcr.io/goauthentik/proxy:2026.5.3
