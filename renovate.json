@@ -1,8 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
-  ],
+  "extends": ["config:recommended"],
   "enabledManagers": [
     "argocd",
     "dockerfile",
@@ -19,116 +17,75 @@
     ]
   },
   "dockerfile": {
-    "managerFilePatterns": [
-      "/(^|/)Dockerfile$/",
-      "/(^|/)Dockerfile\\.[a-z]+$/"
-    ]
+    "managerFilePatterns": ["/(^|/)Dockerfile$/", "/(^|/)Dockerfile\\.[a-z]+$/"]
   },
   "docker-compose": {
-    "managerFilePatterns": [
-      "/(^|/)docker-compose\\.ya?ml$/"
-    ]
+    "managerFilePatterns": ["/(^|/)docker-compose\\.ya?ml$/"]
   },
   "npm": {
-    "managerFilePatterns": [
-      "/(^|\\/)package\\.json$/"
-    ]
+    "managerFilePatterns": ["/(^|\\/)package\\.json$/"]
   },
   "customManagers": [
     {
       "customType": "regex",
       "description": "PINNED_*_VERSION vars in config/pinned-defaults.sh",
-      "fileMatch": [
-        "(^|/)config/pinned-defaults\\.sh$"
-      ],
+      "managerFilePatterns": ["/(^|/)config/pinned-defaults\\.sh$/"],
       "matchStringsStrategy": "any",
       "datasourceTemplate": "github-releases",
-      "matchStrings": [
-        "PINNED_TALOS_VERSION=(?<currentValue>v?[0-9.]+)"
-      ],
+      "matchStrings": ["PINNED_TALOS_VERSION=(?<currentValue>v?[0-9.]+)"],
       "depNameTemplate": "siderolabs/talos"
     },
     {
       "customType": "regex",
-      "fileMatch": [
-        "(^|/)config/pinned-defaults\\.sh$"
-      ],
+      "managerFilePatterns": ["/(^|/)config/pinned-defaults\\.sh$/"],
       "datasourceTemplate": "github-releases",
-      "matchStrings": [
-        "PINNED_OPENTOFU_VERSION=(?<currentValue>v?[0-9.]+)"
-      ],
+      "matchStrings": ["PINNED_OPENTOFU_VERSION=(?<currentValue>v?[0-9.]+)"],
       "depNameTemplate": "opentofu/opentofu"
     },
     {
-      "fileMatch": [
-        "(^|/)config/pinned-defaults\\.sh$"
-      ],
+      "managerFilePatterns": ["/(^|/)config/pinned-defaults\\.sh$/"],
       "datasourceTemplate": "github-releases",
-      "matchStrings": [
-        "PINNED_K9S_VERSION=(?<currentValue>v?[0-9.]+)"
-      ],
+      "matchStrings": ["PINNED_K9S_VERSION=(?<currentValue>v?[0-9.]+)"],
       "depNameTemplate": "derailed/k9s",
       "customType": "regex"
     },
     {
-      "fileMatch": [
-        "(^|/)config/pinned-defaults\\.sh$"
-      ],
+      "managerFilePatterns": ["/(^|/)config/pinned-defaults\\.sh$/"],
       "datasourceTemplate": "github-releases",
-      "matchStrings": [
-        "PINNED_KUBECTL_VERSION=(?<currentValue>v?[0-9.]+)"
-      ],
+      "matchStrings": ["PINNED_KUBECTL_VERSION=(?<currentValue>v?[0-9.]+)"],
       "depNameTemplate": "kubernetes/kubernetes",
       "customType": "regex"
     },
     {
-      "fileMatch": [
-        "(^|/)config/pinned-defaults\\.sh$"
-      ],
+      "managerFilePatterns": ["/(^|/)config/pinned-defaults\\.sh$/"],
       "datasourceTemplate": "github-releases",
-      "matchStrings": [
-        "PINNED_HELM_VERSION=(?<currentValue>v?[0-9.]+)"
-      ],
+      "matchStrings": ["PINNED_HELM_VERSION=(?<currentValue>v?[0-9.]+)"],
       "depNameTemplate": "helm/helm",
       "customType": "regex"
     },
     {
-      "fileMatch": [
-        "(^|/)config/pinned-defaults\\.sh$"
-      ],
+      "managerFilePatterns": ["/(^|/)config/pinned-defaults\\.sh$/"],
       "datasourceTemplate": "github-releases",
-      "matchStrings": [
-        "PINNED_ARGOCD_VERSION=(?<currentValue>v?[0-9.]+)"
-      ],
+      "matchStrings": ["PINNED_ARGOCD_VERSION=(?<currentValue>v?[0-9.]+)"],
       "depNameTemplate": "argoproj/argo-cd",
       "customType": "regex"
     },
     {
-      "fileMatch": [
-        "(^|/)config/pinned-defaults\\.sh$"
-      ],
+      "managerFilePatterns": ["/(^|/)config/pinned-defaults\\.sh$/"],
       "datasourceTemplate": "github-releases",
-      "matchStrings": [
-        "PINNED_BESZEL_VERSION=(?<currentValue>v?[0-9.]+)"
-      ],
+      "matchStrings": ["PINNED_BESZEL_VERSION=(?<currentValue>v?[0-9.]+)"],
       "depNameTemplate": "henrygd/beszel",
       "customType": "regex"
     },
     {
-      "fileMatch": [
-        "(^|/)config/pinned-defaults\\.sh$"
-      ],
+      "managerFilePatterns": ["/(^|/)config/pinned-defaults\\.sh$/"],
       "datasourceTemplate": "github-releases",
-      "matchStrings": [
-        "PINNED_NETBIRD_VERSION=(?<currentValue>v?[0-9.]+)"
-      ],
+      "matchStrings": ["PINNED_NETBIRD_VERSION=(?<currentValue>v?[0-9.]+)"],
       "depNameTemplate": "netbirdio/netbird",
       "customType": "regex"
     },
     {
-      "fileMatch": [
-        "(^|/)config/pinned-defaults\\.sh$"
-      ],
+      "managerFilePatterns": ["/(^|/)config/pinned-defaults\\.sh$/"],
       "datasourceTemplate": "github-releases",
       "matchStrings": [
         "PINNED_ADGUARD_HOME_VERSION=(?<currentValue>v?[0-9.]+)"
@@ -137,21 +94,15 @@
       "customType": "regex"
     },
     {
-      "fileMatch": [
-        "(^|/)config/pinned-defaults\\.sh$"
-      ],
+      "managerFilePatterns": ["/(^|/)config/pinned-defaults\\.sh$/"],
       "datasourceTemplate": "helm",
       "registryUrlTemplate": "https://helm.cilium.io",
-      "matchStrings": [
-        "PINNED_CILIUM_CHART_VERSION=(?<currentValue>[0-9.]+)"
-      ],
+      "matchStrings": ["PINNED_CILIUM_CHART_VERSION=(?<currentValue>[0-9.]+)"],
       "depNameTemplate": "cilium",
       "customType": "regex"
     },
     {
-      "fileMatch": [
-        "(^|/)config/pinned-defaults\\.sh$"
-      ],
+      "managerFilePatterns": ["/(^|/)config/pinned-defaults\\.sh$/"],
       "datasourceTemplate": "helm",
       "registryUrlTemplate": "https://cloudtty.github.io/cloudtty",
       "matchStrings": [
@@ -161,34 +112,24 @@
       "customType": "regex"
     },
     {
-      "fileMatch": [
-        "(^|/)config/pinned-defaults\\.sh$"
-      ],
+      "managerFilePatterns": ["/(^|/)config/pinned-defaults\\.sh$/"],
       "datasourceTemplate": "helm",
       "registryUrlTemplate": "https://helm.coder.com/v2",
-      "matchStrings": [
-        "PINNED_CODER_CHART_VERSION=(?<currentValue>[0-9.]+)"
-      ],
+      "matchStrings": ["PINNED_CODER_CHART_VERSION=(?<currentValue>[0-9.]+)"],
       "depNameTemplate": "coder",
       "customType": "regex"
     },
     {
-      "fileMatch": [
-        "(^|/)config/pinned-defaults\\.sh$"
-      ],
+      "managerFilePatterns": ["/(^|/)config/pinned-defaults\\.sh$/"],
       "datasourceTemplate": "docker",
       "registryUrlTemplate": "https://codeberg.org",
-      "matchStrings": [
-        "PINNED_FORGEJO_VERSION=(?<currentValue>[0-9.]+)"
-      ],
+      "matchStrings": ["PINNED_FORGEJO_VERSION=(?<currentValue>[0-9.]+)"],
       "depNameTemplate": "forgejo/forgejo",
       "customType": "regex"
     },
     {
       "description": "Image tags in gitops/values/*.yaml and gitops/apps/authentik/values.yaml",
-      "fileMatch": [
-        "(^|/)gitops/(values|apps)/.*\\.yaml$"
-      ],
+      "managerFilePatterns": ["/(^|/)gitops/(values|apps)/.*\\.yaml$/"],
       "matchStringsStrategy": "any",
       "datasourceTemplate": "docker",
       "matchStrings": [
@@ -198,8 +139,8 @@
     },
     {
       "description": "Image tags in gitops/platform-apps/*/workload yamls",
-      "fileMatch": [
-        "(^|/)gitops/platform-apps/.+/(deployment|statefulset|daemonset|job|cronjob|redis|valkey|workers|document-converters|manifest|relay-egress)\\.yaml$"
+      "managerFilePatterns": [
+        "/(^|/)gitops/platform-apps/.+/(deployment|statefulset|daemonset|job|cronjob|redis|valkey|workers|document-converters|manifest|relay-egress)\\.yaml$/"
       ],
       "datasourceTemplate": "docker",
       "matchStrings": [
@@ -219,43 +160,25 @@
   "packageRules": [
     {
       "description": "Skip private registry docker.getoutline.com (no public access)",
-      "matchDatasources": [
-        "docker"
-      ],
-      "matchDepNames": [
-        "docker.getoutline.com/**"
-      ],
+      "matchDatasources": ["docker"],
+      "matchDepNames": ["docker.getoutline.com/**"],
       "enabled": false
     },
     {
       "description": "Group all patches and minors for twinbox/k8s apps into one PR per app",
-      "matchDatasources": [
-        "github-releases",
-        "docker",
-        "helm"
-      ],
+      "matchDatasources": ["github-releases", "docker", "helm"],
       "groupName": "{{manager}} {{depName}} updates",
       "groupSlug": "{{manager}}-{{depName}}"
     },
     {
       "description": "Limit concurrent PRs to keep CI signal clear",
-      "matchUpdateTypes": [
-        "minor",
-        "patch",
-        "digest"
-      ],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
       "prConcurrentLimit": 4
     },
     {
       "description": "Schedule weekly batch to avoid mid-day surprise PRs",
-      "matchUpdateTypes": [
-        "minor",
-        "patch",
-        "digest"
-      ],
-      "schedule": [
-        "before 06:00 on monday"
-      ]
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "schedule": ["before 06:00 on monday"]
     }
   ]
 }
