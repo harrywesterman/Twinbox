@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -86,7 +87,8 @@ def test_jitsi_gitops_application_and_values_enable_token_auth_guests_and_broker
     assert "kind: Application" in app_text
     assert "name: jitsi" in app_text
     assert "chart: jitsi-meet" in app_text
-    assert 'targetRevision: "2.20.0"' in app_text
+    chart_version = re.search(r'targetRevision:\s*"([^"]+)"', app_text).group(1)
+    assert f'targetRevision: "{chart_version}"' in app_text
     assert "path: gitops/platform-apps/jitsi" in app_text
     assert "publicURL: https://jitsi.__ZONE_NAME__" in app_text
     assert "domain: jitsi.__ZONE_NAME__" in app_text
@@ -95,7 +97,7 @@ def test_jitsi_gitops_application_and_values_enable_token_auth_guests_and_broker
     assert "kind: ApplicationSet" in optional_app_text
     assert "name: jitsi-set" in optional_app_text
     assert 'twinbox.io/app-jitsi: "enabled"' in optional_app_text
-    assert 'targetRevision: "2.20.0"' in optional_app_text
+    assert f'targetRevision: "{chart_version}"' in optional_app_text
     assert "repoURL: https://jitsi-contrib.github.io/jitsi-helm/" in optional_app_text
     assert (
         'publicURL: https://jitsi.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'

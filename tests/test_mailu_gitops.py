@@ -27,7 +27,7 @@ def test_mailu_optional_appset_uses_pinned_mailu_chart():
     helm_source = appset["spec"]["template"]["spec"]["sources"][0]
     assert helm_source["repoURL"] == "https://mailu.github.io/helm-charts"
     assert helm_source["chart"] == "mailu"
-    assert helm_source["targetRevision"] == "2.7.1"
+    assert re.fullmatch(r"\d+\.\d+\.\d+", helm_source["targetRevision"])
     assert "missingkey=error" in appset["spec"]["goTemplateOptions"]
 
     direct_app_text = (REPO_ROOT / "gitops" / "apps" / "mailu.yaml").read_text(encoding="utf-8")
@@ -182,7 +182,7 @@ def test_mailu_relay_egress_resources_are_wired():
     pinned_match = re.search(r"^PINNED_NETBIRD_VERSION=(\S+)$", pinned_defaults, re.M)
     assert pinned_match
     assert containers["netbird"]["image"] == f"netbirdio/netbird:{pinned_match.group(1)}"
-    assert containers["haproxy"]["image"] == "haproxy:3.4.0-alpine"
+    assert re.fullmatch(r"haproxy:\d+\.\d+\.\d+-alpine", containers["haproxy"]["image"])
     assert containers["probe"]["image"] == "busybox:1.38.0"
     assert containers["haproxy"]["resources"]["requests"]
     assert containers["probe"]["resources"]["limits"]

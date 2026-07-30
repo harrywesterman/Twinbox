@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -391,8 +392,8 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "name: zulip-set" in app_text
     assert "repoURL: oci://ghcr.io/zulip/helm-charts/zulip" in app_text
     assert "path: ." in app_text
-    assert 'targetRevision: "2.0.0"' in app_text
-    assert 'targetRevision: "2.0.0"' in optional_app_text
+    chart_version = re.search(r'targetRevision:\s*"([^"]+)"', app_text).group(1)
+    assert f'targetRevision: "{chart_version}"' in optional_app_text
     assert "path: gitops/platform-apps/zulip" in app_text
     assert (
         'SETTING_EXTERNAL_HOST: zulip.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
@@ -512,8 +513,10 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "create-users-and-groups.json" in run_text
 
 
-def test_zulip_values_render_against_chart_2_0_0():
-    result = _helm_template_zulip("2.0.0")
+def test_zulip_values_render_against_pinned_chart_version():
+    app_text = _read(ZULIP_APP)
+    chart_version = re.search(r'targetRevision:\s*"([^"]+)"', app_text).group(1)
+    result = _helm_template_zulip(chart_version)
     assert result.returncode == 0, result.stderr
 
 

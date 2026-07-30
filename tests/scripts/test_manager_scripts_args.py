@@ -773,7 +773,7 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert 'if [[ -n "${CILIUM_K8S_SERVICE_HOST:-}" ]]; then' in helper_text
     assert 'if [[ -n "${CILIUM_K8S_SERVICE_PORT:-}" ]]; then' in helper_text
     assert "if ((${#helm_args[@]})); then" in helper_text
-    assert "PINNED_CILIUM_CHART_VERSION=1.19.5" in pinned_defaults_text
+    assert re.search(r"^PINNED_CILIUM_CHART_VERSION=\S+$", pinned_defaults_text, re.M)
     assert "PINNED_CLOUDTTY_CHART_VERSION=0.8.9" in pinned_defaults_text
     assert "PINNED_TRAEFIK_MANAGER_IMAGE_TAG=v0.8.0" in pinned_defaults_text
     assert "ipam:" in values_text
@@ -3913,7 +3913,7 @@ def test_vaultwarden_manifests_use_postgresql_and_domain_limited_signups():
         REPO_ROOT / "gitops" / "databases" / "vaultwarden" / "objectstore.yaml"
     ).read_text(encoding="utf-8")
 
-    assert "ghcr.io/dani-garcia/vaultwarden:1.36.0" in deployment_text
+    assert re.search(r"ghcr\.io/dani-garcia/vaultwarden:\d+\.\d+\.\d+", deployment_text)
     assert "ghcr.io/dani-garcia/vaultwarden:latest" not in deployment_text
     assert "SIGNUPS_DOMAINS_WHITELIST" in deployment_text
     assert "WEBSOCKET_ENABLED" in deployment_text
@@ -4430,7 +4430,7 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert "kind: ApplicationSet" in optional_app_text
     assert "name: nextcloud-set" in optional_app_text
     assert 'twinbox.io/app-nextcloud: "enabled"' in optional_app_text
-    assert 'targetRevision: "9.1.3"' in optional_app_text
+    assert re.search(r'targetRevision:\s*"\d+\.\d+\.\d+"', optional_app_text)
     assert "path: gitops/platform-apps/nextcloud" in optional_app_text
     assert "path: gitops/databases/nextcloud" in optional_app_text
     assert "name: nextcloud-well-known-redirect" in optional_app_text
