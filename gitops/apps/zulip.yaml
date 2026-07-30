@@ -20,7 +20,7 @@ spec:
       sources:
         - repoURL: oci://ghcr.io/zulip/helm-charts/zulip
           path: .
-          targetRevision: "2.0.0"
+          targetRevision: "2.1.0"
           helm:
             valueFiles:
               - $values/gitops/values/zulip.yaml
