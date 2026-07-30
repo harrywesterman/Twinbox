@@ -21,7 +21,7 @@ spec:
       sources:
         - repoURL: https://mailu.github.io/helm-charts
           chart: mailu
-          targetRevision: "2.7.1"
+          targetRevision: "2.7.3"
           helm:
             valueFiles:
               - $values/gitops/values/mailu.yaml
