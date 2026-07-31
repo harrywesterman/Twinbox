@@ -2872,6 +2872,7 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     vaultwarden_app_text = VAULTWARDEN_APP.read_text(encoding="utf-8")
     headlamp_app_text = HEADLAMP_APP.read_text(encoding="utf-8")
     traefik_values_text = _traefik_values_text()
+    traefik_values = yaml.safe_load(traefik_values_text)
     crowdsec_values_text = _crowdsec_values_text()
     traefik_externalsecret_text = _traefik_dashboard_externalsecret_text()
     crowdsec_bouncer_externalsecret_text = _crowdsec_bouncer_externalsecret_text()
@@ -2892,6 +2893,10 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "create: true" in external_secrets_values_text
     assert "enabled: trueß∑" not in traefik_values_text
     assert "enabled: true" in traefik_values_text
+    assert isinstance(traefik_values["providers"]["file"]["content"], dict)
+    assert "logs" not in traefik_values
+    assert traefik_values["log"]["level"] == "INFO"
+    assert traefik_values["accessLog"]["enabled"] is True
     assert "github.com/BetterCorp/cloudflarewarp" in traefik_values_text
     assert "version: v1.3.3" in traefik_values_text
     assert "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin" in traefik_values_text
