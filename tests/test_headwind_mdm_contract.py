@@ -66,10 +66,13 @@ def test_bootstrap_gate_changes_initial_admin_before_public_ingress():
     assert "PathPrefix(`/files/`)" in ingress
     assert "PathPrefix(`/rest/private/`)" not in ingress
     assert ".Values.ingress.managementHost" in ingress
-    assert 'await login("admin")' in reconciler
+    assert 'await initialLogin("admin")' in reconciler
+    assert "/rest/public/auth/login" in reconciler
+    assert "/rest/public/passwordReset/reset" in reconciler
+    assert "passwordResetToken" in reconciler
     assert "/rest/public/jwt/login" in reconciler
     assert "authorization: `Bearer ${session.token}`" in reconciler
-    assert "/rest/private/users/current" in reconciler
+    assert 'initialLogin("admin")' in reconciler
     assert "/rest/private/users/superadmin/password" not in reconciler
     assert "Twinbox Mobile" in (CHART / "templates" / "catalog-configmap.yaml").read_text(
         encoding="utf-8"

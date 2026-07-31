@@ -62,10 +62,54 @@ async function login(password) {
   }
 }
 
+async function initialLogin(password) {
+  try {
+    const response = await fetch(`${baseUrl}/rest/public/auth/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ login: "admin", password: md5(password) }),
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const user = await responseJson(response, "Headwind initial login");
+    if (!user || typeof user !== "object") {
+      return null;
+    }
+    return user;
+  } catch {
+    return null;
+  }
+}
+
+async function resetInitialPassword(user) {
+  if (!user.passwordResetToken) {
+    throw new Error("Headwind initial administrator login requires a password reset token");
+  }
+  await apiPublic("/rest/public/passwordReset/reset", {
+    method: "POST",
+    body: JSON.stringify({
+      passwordResetToken: user.passwordResetToken,
+      newPassword: md5(adminPassword),
+    }),
+  });
+}
+
+async function apiPublic(path, options = {}) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    ...options,
+    headers: {
+      "content-type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+  return responseJson(response, path);
+}
+
 async function authenticate() {
-  const initial = await login("admin");
+  const initial = await initialLogin("admin");
   if (initial) {
-    return { ...initial, usesInitialPassword: true };
+    return { initialUser: initial, usesInitialPassword: true };
   }
   const configured = await login(adminPassword);
   if (!configured) {
@@ -253,15 +297,7 @@ async function main() {
   }
   let session = await authenticate();
   if (bootstrap && session.usesInitialPassword) {
-    const currentUser = await api(session, "/rest/private/users/current");
-    await api(session, "/rest/private/users/current", {
-      method: "PUT",
-      body: JSON.stringify({
-        id: currentUser.id,
-        login: currentUser.login,
-        newPassword: md5(adminPassword),
-      }),
-    });
+    await resetInitialPassword(session.initialUser);
     session = await login(adminPassword);
     if (!session) {
       throw new Error("Headwind administrator credentials were rejected after the password update");
