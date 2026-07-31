@@ -5377,7 +5377,8 @@ def test_netbird_bastion_provisioning_fetches_dns_credentials():
     assert "var.netbird_admin_token_expire_days" in netbird_main_text
     bootstrap_text = NETBIRD_BASTION_BOOTSTRAP_TEMPLATE.read_text(encoding="utf-8")
     assert "ADMIN_TOKEN_EXPIRE_DAYS=${admin_token_expire_days}" in netbird_cloud_init_text
-    assert '"pat_expire_in": ${ADMIN_TOKEN_EXPIRE_DAYS}' in bootstrap_text
+    assert '"pat_expire_in": \'"$ADMIN_TOKEN_EXPIRE_DAYS"\'' in bootstrap_text
+    assert '"pat_expire_in": ${ADMIN_TOKEN_EXPIRE_DAYS}' not in bootstrap_text
     assert '"pat_expire_in": 7' not in bootstrap_text
 
 
