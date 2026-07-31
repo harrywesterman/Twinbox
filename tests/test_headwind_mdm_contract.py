@@ -67,7 +67,8 @@ def test_bootstrap_gate_changes_initial_admin_before_public_ingress():
     assert "PathPrefix(`/rest/private/`)" not in ingress
     assert ".Values.ingress.managementHost" in ingress
     assert 'await login("admin")' in reconciler
-    assert "/rest/private/users/superadmin/password" in reconciler
+    assert "/rest/private/users/current" in reconciler
+    assert "/rest/private/users/superadmin/password" not in reconciler
     assert "Twinbox Mobile" in (CHART / "templates" / "catalog-configmap.yaml").read_text(
         encoding="utf-8"
     )

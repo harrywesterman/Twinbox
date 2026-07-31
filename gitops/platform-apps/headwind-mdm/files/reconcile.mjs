@@ -255,7 +255,7 @@ async function main() {
   }
   const session = await authenticate();
   if (bootstrap && session.usesInitialPassword) {
-    await api(session, "/rest/private/users/superadmin/password", {
+    await api(session, "/rest/private/users/current", {
       method: "PUT",
       body: JSON.stringify({
         id: session.user.id,
