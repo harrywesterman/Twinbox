@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: headwind-mdm-catalog
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "headwind-mdm.labels" . | nindent 4 }}
+data:
+  catalog.json: |
+    {
+      "configurationName": "Twinbox Mobile",
+      "nativeApps": [
+        {
+          "name": "NetBird",
+          "packageId": "io.netbird.client",
+          "version": "v0.5.0",
+          "versionCode": 64,
+          "url": "https://github.com/netbirdio/android-client/releases/download/v0.5.0/netbird-v0.5.0.apk",
+          "sha256": "c2f2ef6bc6aece879383e5800090b75f04398464af33c4ba0c1d133243bc32ea",
+          "signer": "5e60a0abc611aab42b79737a2d2beb9ec712de98e75b82dfceadacda29e93d9f",
+          "runAfterInstall": true
+        },
+        {
+          "name": "Fennec F-Droid",
+          "packageId": "org.mozilla.fennec_fdroid",
+          "version": "152.0.4",
+          "versionCode": 1520420,
+          "url": "https://f-droid.org/repo/org.mozilla.fennec_fdroid_1520420.apk",
+          "sha256": "5d5fb49ca435222a6d96732cc605d4e4e5ab705d67c2d3c4107c92fe9136ec15",
+          "signer": "06665358efd8ba05be236a47a12cb0958d7d75dd939d77c2b31f5398537ebdc5",
+          "runAfterInstall": false
+        }
+      ],
+      "shortcuts": [
+        {"id": "portal", "application": "twinbox-portal", "name": "Twinbox Portal", "url": "{{ .Values.catalog.portalUrl }}", "required": true},
+        {"id": "audiobookshelf", "application": "audiobookshelf", "name": "Audiobookshelf", "url": "https://audiobookshelf.{{ .Values.catalog.zoneName }}"},
+        {"id": "freshrss", "application": "freshrss", "name": "FreshRSS", "url": "https://freshrss.{{ .Values.catalog.zoneName }}"},
+        {"id": "hedgedoc", "application": "hedgedoc", "name": "HedgeDoc", "url": "https://hedgedoc.{{ .Values.catalog.zoneName }}"},
+        {"id": "immich", "application": "immich", "name": "Immich", "url": "https://immich.{{ .Values.catalog.zoneName }}"},
+        {"id": "jitsi", "application": "jitsi", "name": "Jitsi", "url": "https://jitsi.{{ .Values.catalog.zoneName }}"},
+        {"id": "karakeep", "application": "karakeep", "name": "Karakeep", "url": "https://karakeep.{{ .Values.catalog.zoneName }}"},
+        {"id": "mailu", "application": "mailu", "name": "Mail", "url": "https://webmail.{{ .Values.catalog.zoneName }}"},
+        {"id": "n8n", "application": "n8n", "name": "n8n", "url": "https://n8n.{{ .Values.catalog.zoneName }}"},
+        {"id": "nextcloud", "application": "nextcloud", "name": "Nextcloud", "url": "https://nextcloud.{{ .Values.catalog.zoneName }}"},
+        {"id": "opencloud", "application": "opencloud", "name": "OpenCloud", "url": "https://opencloud.{{ .Values.catalog.zoneName }}"},
+        {"id": "openwebui", "application": "openwebui", "name": "Open WebUI", "url": "https://openwebui.{{ .Values.catalog.zoneName }}"},
+        {"id": "outline", "application": "outline", "name": "Outline", "url": "https://outline.{{ .Values.catalog.zoneName }}"},
+        {"id": "paperless", "application": "paperless", "name": "Paperless", "url": "https://paperless.{{ .Values.catalog.zoneName }}"},
+        {"id": "pixelfed", "application": "pixelfed", "name": "Pixelfed", "url": "https://pixelfed.{{ .Values.catalog.zoneName }}"},
+        {"id": "searxng", "application": "searxng", "name": "SearXNG", "url": "https://search.{{ .Values.catalog.zoneName }}"},
+        {"id": "stirling-pdf", "application": "stirling-pdf", "name": "Stirling PDF", "url": "https://stirling-pdf.{{ .Values.catalog.zoneName }}"},
+        {"id": "vaultwarden", "application": "vaultwarden", "name": "Vaultwarden", "url": "https://vaultwarden.{{ .Values.catalog.zoneName }}"},
+        {"id": "zulip", "application": "zulip", "name": "Zulip", "url": "https://zulip.{{ .Values.catalog.zoneName }}"}
+      ]
+    }
+  reconcile.mjs: |
+{{ .Files.Get "files/reconcile.mjs" | indent 4 }}

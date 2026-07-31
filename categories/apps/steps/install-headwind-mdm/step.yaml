@@ -1,0 +1,25 @@
+id: install-headwind-mdm
+title: Install Headwind MDM
+type: action
+journey_stage: setup
+summary: Manage corporate LineageOS phones with QR enrollment and a private MDM console.
+explanation: Headwind MDM is installed as a Twinbox GitOps application with Longhorn state, a dedicated CloudNativePG database, OpenBao-managed credentials, and a separate public enrollment host. During the first sync Twinbox replaces Headwind's initial admin password, creates the Twinbox Mobile policy and only then enables the public enrollment ingress. NetBird and a pinned browser are installed on enrolled phones; the user still completes NetBird SSO and Android's VPN confirmation once.
+side_help: "Use a factory-reset, corporate-owned LineageOS phone. The device is MDM-managed, but an unlocked bootloader still permits physical reflashing."
+dashy:
+  items:
+    - section: Platform
+      title: Headwind MDM
+      description: Private mobile device management console (NetBird)
+      icon: fas fa-mobile-screen-button
+      url_template: https://mdm-admin.__ZONE_NAME__
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/apps/steps/install-headwind-mdm/run.sh

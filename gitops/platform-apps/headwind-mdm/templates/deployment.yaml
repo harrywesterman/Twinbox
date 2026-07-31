@@ -1,0 +1,143 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: headwind-mdm
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "headwind-mdm.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "headwind-mdm.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "headwind-mdm.selectorLabels" . | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      # The upstream wrapper provisions Tomcat and writes the downloaded WAR,
+      # context configuration and runtime state on first boot. It currently
+      # requires its image-default user; privilege escalation remains disabled.
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: prepare-persistent-tomcat-paths
+          image: busybox:1.37.0
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-ec", "mkdir -p /data/work /data/context /data/webapps"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            runAsUser: 0
+            runAsGroup: 0
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      containers:
+        - name: headwind-mdm
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: HMDM_URL
+              value: {{ .Values.headwind.serverWarUrl | quote }}
+            - name: CLIENT_VERSION
+              value: {{ .Values.headwind.launcherVersion | quote }}
+            - name: HMDM_VARIANT
+              value: {{ .Values.headwind.clientVariant | quote }}
+            - name: SQL_HOST
+              value: {{ .Values.database.host | quote }}
+            - name: SQL_PORT
+              value: "5432"
+            - name: SQL_BASE
+              value: {{ .Values.database.name | quote }}
+            - name: SQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: headwind-mdm-runtime
+                  key: SQL_USER
+            - name: SQL_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: headwind-mdm-runtime
+                  key: SQL_PASSWORD
+            - name: SHARED_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: headwind-mdm-runtime
+                  key: SHARED_SECRET
+            - name: ADMIN_EMAIL
+              value: {{ printf "admin@%s" .Values.headwind.baseDomain | quote }}
+            - name: BASE_DOMAIN
+              value: {{ .Values.headwind.baseDomain | quote }}
+            - name: PROTOCOL
+              value: https
+            # Traefik terminates the trusted public certificate. The wrapper
+            # still requires a keystore for its HTTPS connector, which is
+            # supplied by this namespace-local certificate.
+            - name: HTTPS_CERT_PATH
+              value: /etc/hmdm-tls
+            - name: HTTPS_CERT
+              value: tls.crt
+            - name: HTTPS_FULLCHAIN
+              value: tls.crt
+            - name: HTTPS_PRIVKEY
+              value: tls.key
+            - name: HTTPS_LETSENCRYPT
+              value: "false"
+            - name: FORCE_RECONFIGURE
+              value: "false"
+          startupProbe:
+            tcpSocket:
+              port: http
+            failureThreshold: 120
+            periodSeconds: 5
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /usr/local/tomcat/work
+              subPath: work
+            - name: data
+              mountPath: /usr/local/tomcat/conf/Catalina/localhost
+              subPath: context
+            - name: data
+              mountPath: /usr/local/tomcat/webapps
+              subPath: webapps
+            - name: internal-tls
+              mountPath: /etc/hmdm-tls
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: headwind-mdm-data
+        - name: internal-tls
+          secret:
+            secretName: headwind-mdm-internal-tls

@@ -22,6 +22,10 @@ def _yaml_docs(path):
 def _ingressroute_docs():
     for base_dir in BASE_DIRS:
         for path in sorted(base_dir.rglob("*.yaml")):
+            # Helm templates are rendered separately; their Go template
+            # expressions are intentionally not parseable as raw YAML.
+            if "templates" in path.parts:
+                continue
             text = path.read_text(encoding="utf-8")
             if "kind: IngressRoute" not in text:
                 continue

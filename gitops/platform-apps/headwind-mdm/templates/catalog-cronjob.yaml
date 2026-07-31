@@ -1,0 +1,66 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: headwind-mdm-catalog-sync
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "headwind-mdm.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "11"
+spec:
+  schedule: "17 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            {{- include "headwind-mdm.selectorLabels" . | nindent 12 }}
+        spec:
+          serviceAccountName: headwind-mdm-catalog-sync
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: reconcile
+              image: {{ .Values.bootstrap.image }}
+              imagePullPolicy: IfNotPresent
+              command: ["node", "/config/reconcile.mjs"]
+              env:
+                - name: NODE_EXTRA_CA_CERTS
+                  value: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                - name: HEADWIND_INTERNAL_URL
+                  value: http://headwind-mdm:8080
+                - name: ADMIN_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: headwind-mdm-runtime
+                      key: ADMIN_PASSWORD
+                - name: DEVICE_ADMIN_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: headwind-mdm-runtime
+                      key: DEVICE_ADMIN_PASSWORD
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                {{- toYaml .Values.bootstrap.resources | nindent 16 }}
+              volumeMounts:
+                - name: config
+                  mountPath: /config
+                  readOnly: true
+          volumes:
+            - name: config
+              configMap:
+                name: headwind-mdm-catalog

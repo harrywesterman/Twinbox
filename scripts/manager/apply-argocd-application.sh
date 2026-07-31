@@ -9,6 +9,7 @@ source "$WORKSPACE_ROOT/config/pinned-defaults.sh"
 optional_app_names=(
   audiobookshelf
   freshrss
+  headwind-mdm
   hedgedoc
   immich
   jitsi
@@ -323,6 +324,10 @@ if is_optional_app "$APPLICATION_NAME"; then
   bash "$WORKSPACE_ROOT/scripts/manager/set-optional-app-state.sh" \
     --app "$APPLICATION_NAME" \
     --state enabled
+
+  if [[ "$APPLICATION_NAME" != "headwind-mdm" ]]; then
+    bash "$WORKSPACE_ROOT/scripts/manager/trigger-headwind-mobile-catalog-sync.sh" || true
+  fi
 fi
 
 kubectl annotate application "$APPLICATION_NAME" -n argocd argocd.argoproj.io/refresh=hard --overwrite >/dev/null 2>&1 || true

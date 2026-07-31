@@ -1,0 +1,60 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: headwind-mdm-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            twinbox.io/domain-ready: "true"
+            twinbox.io/app-headwind-mdm: "enabled"
+  template:
+    metadata:
+      name: headwind-mdm
+    spec:
+      project: default
+      sources:
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          path: gitops/platform-apps/headwind-mdm
+          helm:
+            releaseName: headwind-mdm
+            values: |
+              headwind:
+                baseDomain: mdm.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+              ingress:
+                enrollmentHost: mdm.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                managementHost: mdm-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+              catalog:
+                portalUrl: https://portal.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                zoneName: {{index .metadata.annotations "twinbox.io/public-zone-name"}}
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          path: gitops/databases/headwind-mdm
+          kustomize:
+            patches:
+              - target:
+                  group: postgresql.cnpg.io
+                  kind: Cluster
+                  name: headwind-mdm-db
+                patch: |-
+                  - op: replace
+                    path: /spec/resources/requests/cpu
+                    value: '{{ if eq (index .metadata.labels "twinbox.io/resource-profile") "small" }}50m{{ else if eq (index .metadata.labels "twinbox.io/resource-profile") "large" }}250m{{ else }}100m{{ end }}'
+                  - op: replace
+                    path: /spec/resources/requests/memory
+                    value: '{{ if eq (index .metadata.labels "twinbox.io/resource-profile") "small" }}128Mi{{ else if eq (index .metadata.labels "twinbox.io/resource-profile") "large" }}512Mi{{ else }}256Mi{{ end }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: headwind-mdm
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

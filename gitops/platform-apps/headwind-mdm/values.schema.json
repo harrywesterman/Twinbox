@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["image", "headwind", "database", "persistence", "ingress", "catalog"],
+  "properties": {
+    "image": {
+      "type": "object",
+      "required": ["repository", "tag"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "tag": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"}
+      }
+    },
+    "headwind": {
+      "type": "object",
+      "required": ["serverWarUrl", "launcherVersion", "clientVariant", "baseDomain"]
+    },
+    "database": {"type": "object", "required": ["host", "name"]},
+    "persistence": {"type": "object", "required": ["storageClass", "size"]},
+    "ingress": {"type": "object", "required": ["enrollmentHost", "managementHost"]},
+    "catalog": {"type": "object", "required": ["portalUrl", "zoneName"]}
+  }
+}

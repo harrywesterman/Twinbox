@@ -1,0 +1,14 @@
+apiVersion: v2
+name: headwind-mdm
+description: Twinbox-managed Headwind MDM deployment for corporate LineageOS devices
+type: application
+version: 0.1.0
+appVersion: "5.40.1"
+home: https://h-mdm.com/
+sources:
+  - https://github.com/h-mdm/hmdm-docker
+  - https://github.com/h-mdm/hmdm-server
+annotations:
+  artifacthub.io/changes: |
+    - kind: added
+      description: Initial Twinbox managed Headwind MDM chart.

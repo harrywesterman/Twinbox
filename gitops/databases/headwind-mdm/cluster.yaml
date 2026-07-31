@@ -1,0 +1,41 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: headwind-mdm-db
+  namespace: databases
+spec:
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.4
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: headwind-mdm-db-objectstore
+        serverName: headwind-mdm-db
+  bootstrap:
+    initdb:
+      database: hmdm
+      owner: hmdm
+      secret:
+        name: headwind-mdm-db-credentials
+  storage:
+    size: 10Gi
+    storageClass: longhorn-single
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  postgresql:
+    parameters:
+      max_connections: "100"
+      shared_buffers: "128MB"
+      effective_cache_size: "384MB"
+      work_mem: "4MB"
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
+  monitoring:
+    enablePodMonitor: true

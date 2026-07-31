@@ -22,13 +22,17 @@ fi
 platform_app_dir="$WORKSPACE_ROOT/gitops/platform-apps/$APP_NAME"
 database_app_dir="$WORKSPACE_ROOT/gitops/databases/$APP_NAME"
 needs_authentik_cleanup=false
+headwind_catalog_sync_required=false
 
 optional_app_names=(
   audiobookshelf
   freshrss
+  headwind-mdm
   hedgedoc
   immich
   jitsi
+  karakeep
+  mailu
   n8n
   nextcloud
   opencloud
@@ -71,6 +75,8 @@ if is_optional_app "$APP_NAME"; then
   bash "$WORKSPACE_ROOT/scripts/manager/set-optional-app-state.sh" \
     --app "$APP_NAME" \
     --state disabled
+
+  [[ "$APP_NAME" != "headwind-mdm" ]] && headwind_catalog_sync_required=true
 fi
 
 delete_authentik_application_by_slug() {
@@ -408,5 +414,9 @@ case "$APP_NAME" in
     delete_authentik_application_by_slug "loki"
     ;;
 esac
+
+if [[ "$headwind_catalog_sync_required" == "true" ]]; then
+  bash "$WORKSPACE_ROOT/scripts/manager/trigger-headwind-mobile-catalog-sync.sh" || true
+fi
 
 log "App ${APP_NAME} removed"

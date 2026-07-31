@@ -1,0 +1,52 @@
+# The Headwind Docker wrapper is deliberately pinned. It fetches the pinned
+# server WAR and launcher on its first start; those paths are persistent below.
+image:
+  repository: headwindmdm/hmdm
+  tag: "0.1.8"
+  pullPolicy: IfNotPresent
+
+namespace: headwind-mdm
+
+headwind:
+  serverWarUrl: https://h-mdm.com/files/hmdm-5.40.1-os.war
+  launcherVersion: "6.37"
+  clientVariant: os
+  baseDomain: mdm.invalid
+
+database:
+  host: headwind-mdm-db-pooler-rw.databases.svc.cluster.local
+  name: hmdm
+
+persistence:
+  storageClass: longhorn
+  size: 10Gi
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 768Mi
+  limits:
+    cpu: "1"
+    memory: 1536Mi
+
+bootstrap:
+  image: node:24.12.0-alpine
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+ingress:
+  # ApplicationSet substitutes both hosts from the selected cluster zone.
+  enrollmentHost: mdm.invalid
+  managementHost: mdm-admin.invalid
+
+catalog:
+  # ApplicationSet substitutes these values. APK artifacts are version-,
+  # signer- and SHA-256-pinned; the reconciler verifies the content before it
+  # admits a new native app to the Headwind configuration.
+  portalUrl: https://portal.invalid
+  zoneName: invalid

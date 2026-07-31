@@ -261,6 +261,9 @@ test("app catalog exposes apps while the wizard catalog keeps them out of sight"
     const freshrssCard = appCatalog.categories[0].steps.find(
       (step) => step.id === "install-freshrss"
     );
+    const headwindMdmCard = appCatalog.categories[0].steps.find(
+      (step) => step.id === "install-headwind-mdm"
+    );
     const vaultwardenCard = appCatalog.categories[0].steps.find(
       (step) => step.id === "install-vaultwarden"
     );
@@ -297,6 +300,14 @@ test("app catalog exposes apps while the wizard catalog keeps them out of sight"
     assert.equal(freshrssCard?.installable, true);
     assert.equal(freshrssCard?.app_state, "ready");
     assert.equal(freshrssCard?.runner?.script, "categories/apps/steps/install-freshrss/run.sh");
+    assert.equal(headwindMdmCard?.title, "Install Headwind MDM");
+    assert.equal(headwindMdmCard?.placeholder, false);
+    assert.equal(headwindMdmCard?.installable, true);
+    assert.equal(headwindMdmCard?.app_state, "ready");
+    assert.equal(
+      headwindMdmCard?.runner?.script,
+      "categories/apps/steps/install-headwind-mdm/run.sh"
+    );
     assert.equal(mijnBureauBundle?.title, "Mijn Bureau");
     assert.equal(mijnBureauBundle?.iconUrl, "/assets/step-icons/install-nextcloud.svg");
     assert.deepEqual(mijnBureauBundle?.apps, [

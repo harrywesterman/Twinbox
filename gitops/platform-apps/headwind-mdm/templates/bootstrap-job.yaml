@@ -1,0 +1,63 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: headwind-mdm-bootstrap
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "headwind-mdm.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: "10"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 1800
+  template:
+    metadata:
+      labels:
+        {{- include "headwind-mdm.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: headwind-mdm-bootstrap
+      automountServiceAccountToken: false
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: bootstrap
+          image: {{ .Values.bootstrap.image }}
+          imagePullPolicy: IfNotPresent
+          command: ["node", "/config/reconcile.mjs"]
+          env:
+            - name: HEADWIND_BOOTSTRAP
+              value: "true"
+            - name: HEADWIND_INTERNAL_URL
+              value: http://headwind-mdm:8080
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: headwind-mdm-runtime
+                  key: ADMIN_PASSWORD
+            - name: DEVICE_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: headwind-mdm-runtime
+                  key: DEVICE_ADMIN_PASSWORD
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml .Values.bootstrap.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: headwind-mdm-catalog
