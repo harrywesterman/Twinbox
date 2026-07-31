@@ -44,7 +44,7 @@ async function responseJson(response, path) {
 
 async function login(password) {
   try {
-    const response = await fetch(`${baseUrl}/rest/public/auth/login`, {
+    const response = await fetch(`${baseUrl}/rest/public/jwt/login`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ login: "admin", password: md5(password) }),
@@ -52,13 +52,11 @@ async function login(password) {
     if (!response.ok) {
       return null;
     }
-    const user = await responseJson(response, "Headwind login");
-    const setCookie = response.headers.get("set-cookie") || "";
-    const sessionCookie = setCookie.split(";")[0];
-    if (!sessionCookie || !user || typeof user !== "object") {
+    const token = await responseJson(response, "Headwind login");
+    if (!token?.id_token || typeof token.id_token !== "string") {
       return null;
     }
-    return { cookie: sessionCookie, user };
+    return { token: token.id_token };
   } catch {
     return null;
   }
@@ -80,7 +78,7 @@ async function api(session, path, options = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
     ...options,
     headers: {
-      cookie: session.cookie,
+      authorization: `Bearer ${session.token}`,
       "content-type": "application/json",
       ...(options.headers || {}),
     },
@@ -253,16 +251,21 @@ async function main() {
   if (!adminPassword || !deviceAdminPassword) {
     throw new Error("Headwind runtime secrets are missing");
   }
-  const session = await authenticate();
+  let session = await authenticate();
   if (bootstrap && session.usesInitialPassword) {
+    const currentUser = await api(session, "/rest/private/users/current");
     await api(session, "/rest/private/users/current", {
       method: "PUT",
       body: JSON.stringify({
-        id: session.user.id,
-        login: "admin",
+        id: currentUser.id,
+        login: currentUser.login,
         newPassword: md5(adminPassword),
       }),
     });
+    session = await login(adminPassword);
+    if (!session) {
+      throw new Error("Headwind administrator credentials were rejected after the password update");
+    }
   }
   await ensureConfiguration(session);
   await reconcileCatalog(session);
