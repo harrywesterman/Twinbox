@@ -4920,8 +4920,7 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "name: prepare-opkssh-directory" in deployment_text
     assert "image: ghcr.io/lukegus/termix:release-2.3.1" in deployment_text
     assert "mkdir -p /app/data/.opk" in deployment_text
-    assert "chown 1000:1000 /app/data/.opk" in deployment_text
-    assert "chmod 0700 /app/data/.opk" in deployment_text
+    assert "chmod 0770 /app/data/.opk" in deployment_text
     assert "mountPath: /app/data" in deployment_text
     assert "runAsUser: 0" in deployment_text
     assert "runAsGroup: 0" in deployment_text
