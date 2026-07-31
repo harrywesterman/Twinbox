@@ -12,10 +12,6 @@ function md5(value) {
   return createHash("md5").update(value).digest("hex").toUpperCase();
 }
 
-function sha256(value) {
-  return createHash("sha256").update(value).digest("hex");
-}
-
 function unwrap(value) {
   if (value && typeof value === "object") {
     return value.data ?? value.result ?? value.payload ?? value;
@@ -135,11 +131,11 @@ async function verifyArtifact(entry) {
   if (!response.ok || !response.body) {
     throw new Error(`Could not download ${entry.name} for SHA-256 verification`);
   }
-  const chunks = [];
+  const hash = createHash("sha256");
   for await (const chunk of response.body) {
-    chunks.push(chunk);
+    hash.update(chunk);
   }
-  const actual = sha256(Buffer.concat(chunks));
+  const actual = hash.digest("hex");
   if (actual !== entry.sha256) {
     throw new Error(`${entry.name} SHA-256 verification failed`);
   }
