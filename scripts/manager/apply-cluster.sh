@@ -58,7 +58,11 @@ export TF_IN_AUTOMATION=1
 export NO_COLOR=1
 TOFU_PARALLELISM="${TOFU_PARALLELISM:-1}"
 PROXMOX_UPLOAD_MAX_ATTEMPTS="${PROXMOX_UPLOAD_MAX_ATTEMPTS:-5}"
-PROXMOX_VERIFY_MAX_ATTEMPTS="${PROXMOX_VERIFY_MAX_ATTEMPTS:-5}"
+# Proxmox may report a successful upload before the imported raw image has
+# finished being written to its storage backend.  Keep polling long enough for
+# the slowest supported node instead of treating that in-progress write as a
+# corrupt import.
+PROXMOX_VERIFY_MAX_ATTEMPTS="${PROXMOX_VERIFY_MAX_ATTEMPTS:-12}"
 PROXMOX_IMPORT_FREE_SPACE_BUFFER_BYTES="${PROXMOX_IMPORT_FREE_SPACE_BUFFER_BYTES:-1073741824}"
 
 while [[ $# -gt 0 ]]; do

@@ -686,6 +686,7 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'select(.volid == $volid and .content == "import")' in text
     assert "stat -c '%s' \"$path\"" in text
     assert 'file_size_bytes "$image_path"' in text
+    assert 'PROXMOX_VERIFY_MAX_ATTEMPTS="${PROXMOX_VERIFY_MAX_ATTEMPTS:-12}"' in text
     assert "has unexpected size for ${expected_volid}" in text
     assert "is ${image_size} bytes, expected ${expected_size_bytes}; retrying" in text
     assert "has insufficient free space for Talos disk image upload" in text
