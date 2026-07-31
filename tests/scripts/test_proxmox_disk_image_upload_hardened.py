@@ -314,7 +314,7 @@ def test_talos_disk_image_verify_waits_for_uploaded_size_to_settle():
 
                 export FILE_DATASTORE=local
                 export PROXMOX_UPLOAD_MAX_ATTEMPTS=1
-                export PROXMOX_VERIFY_MAX_ATTEMPTS=12
+                export PROXMOX_VERIFY_MAX_ATTEMPTS=24
                 export PROXMOX_IMPORT_FREE_SPACE_BUFFER_BYTES=10
                 export PROXMOX_PORT=8006
                 export PROXMOX_USER=root@pam
@@ -369,7 +369,7 @@ def test_talos_disk_image_verify_waits_for_uploaded_size_to_settle():
                         count=$(( $(cat "$VERIFY_COUNT_FILE") + 1 ))
                       fi
                       printf '%s' "$count" > "$VERIFY_COUNT_FILE"
-                      if [[ "$count" -lt 8 ]]; then
+                      if [[ "$count" -lt 20 ]]; then
                         printf '%s\\n' '{{"data":[{{"volid":"local:import/talos-cluster.img","content":"import","size":1}}]}}'
                       else
                         printf '{{"data":[{{"volid":"local:import/talos-cluster.img","content":"import","size":%s}}]}}\\n' "$IMAGE_SIZE"

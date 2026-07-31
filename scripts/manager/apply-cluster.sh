@@ -59,10 +59,10 @@ export NO_COLOR=1
 TOFU_PARALLELISM="${TOFU_PARALLELISM:-1}"
 PROXMOX_UPLOAD_MAX_ATTEMPTS="${PROXMOX_UPLOAD_MAX_ATTEMPTS:-5}"
 # Proxmox may report a successful upload before the imported raw image has
-# finished being written to its storage backend.  Keep polling long enough for
+# finished being written to its storage backend. Keep polling long enough for
 # the slowest supported node instead of treating that in-progress write as a
-# corrupt import.
-PROXMOX_VERIFY_MAX_ATTEMPTS="${PROXMOX_VERIFY_MAX_ATTEMPTS:-12}"
+# corrupt import. This permits just over three minutes of settling time.
+PROXMOX_VERIFY_MAX_ATTEMPTS="${PROXMOX_VERIFY_MAX_ATTEMPTS:-24}"
 PROXMOX_IMPORT_FREE_SPACE_BUFFER_BYTES="${PROXMOX_IMPORT_FREE_SPACE_BUFFER_BYTES:-1073741824}"
 
 while [[ $# -gt 0 ]]; do
@@ -936,6 +936,14 @@ flatten_ipv4_candidates() {
   '
 }
 
+ensure_vip_is_not_dhcp_assigned() {
+  local candidates_json="$1"
+
+  if jq -e --arg vip "$VIP_IP" 'flatten | index($vip) != null' <<<"$candidates_json" >/dev/null; then
+    fail "Control-plane VIP ${VIP_IP} was assigned by DHCP to a VM. Reserve or exclude this address from DHCP, then retry from clean VMs."
+  fi
+}
+
 update_cluster_file() {
   local status="$1"
   local planned_controlplane_ips="$2"
@@ -1572,6 +1580,8 @@ log "Creating Proxmox VMs"
 tf_outputs_json="$("$TOFU_BIN" -chdir="$work_module_dir" output -json -no-color)"
 controlplane_ipv4_candidates_json="$(jq -c '.controlplane_ipv4_addresses.value // []' <<<"$tf_outputs_json")"
 worker_ipv4_candidates_json="$(jq -c '.worker_ipv4_addresses.value // []' <<<"$tf_outputs_json")"
+ensure_vip_is_not_dhcp_assigned "$controlplane_ipv4_candidates_json"
+ensure_vip_is_not_dhcp_assigned "$worker_ipv4_candidates_json"
 
 update_cluster_file "provisioned" "$planned_controlplane_ips_json" "$planned_worker_ips_json" "[]" "[]" "$controlplane_vm_ids_json" "$worker_vm_ids_json"
 

@@ -18,6 +18,7 @@ def test_docker_compose_mounts_categories_and_host_cron_contract():
     )
     assert "TWINBOX_GIT_TARGET_REVISION=${TWINBOX_GIT_TARGET_REVISION:-main}" in worker_block
     assert "TWINBOX_HOST_RUNTIME_DIR=${TWINBOX_HOST_RUNTIME_DIR:-/host/opt/twinbox}" in worker_block
+    assert "PROXMOX_VERIFY_MAX_ATTEMPTS=${PROXMOX_VERIFY_MAX_ATTEMPTS:-24}" in worker_block
     assert "TWINBOX_GIT_REPO_URL=" not in api_block
     assert "TWINBOX_GIT_TARGET_REVISION=" not in api_block
     assert "TWINBOX_SYNC_LOCAL_CLIENT_CONFIGS=true" in text
@@ -73,6 +74,7 @@ def test_env_example_includes_filesystem_bootstrap_contract():
     assert "SEAWEEDFS_VOLUME_MAX=100" in text
     assert "TWINBOX_SECRET_TEMP_DIR=/tmp/twinbox-secrets" in text
     assert "TWINBOX_SECRET_CACHE_TTL_SEC=60" in text
+    assert "PROXMOX_VERIFY_MAX_ATTEMPTS=24" in text
     assert "vaultwarden" not in text.lower()
     assert "bitwarden" not in text.lower()
 
