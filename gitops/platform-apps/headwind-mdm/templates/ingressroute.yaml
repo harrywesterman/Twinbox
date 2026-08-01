@@ -9,10 +9,10 @@ spec:
   entryPoints:
     - websecure
   routes:
-    # The public host intentionally excludes / and /rest/private. Devices need
-    # only their bootstrap/sync REST API and APK/file downloads.
+    # The QR URL stores its enrollment route in the URL fragment, so the
+    # browser first requests the Headwind UI at /. Keep private APIs closed.
     - kind: Rule
-      match: Host(`{{ .Values.ingress.enrollmentHost }}`) && (PathPrefix(`/rest/public/`) || PathPrefix(`/files/`))
+      match: Host(`{{ .Values.ingress.enrollmentHost }}`) && !PathPrefix(`/rest/private/`)
       services:
         - kind: Service
           name: headwind-mdm
