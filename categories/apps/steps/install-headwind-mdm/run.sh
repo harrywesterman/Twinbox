@@ -90,7 +90,10 @@ bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
 bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
   --service-name "headwind-mdm-enrollment" \
   --service-domain "mdm.${public_zone_name}" \
-  --service-path /
+  --service-path / \
+  --target-port 443 \
+  --target-protocol https \
+  --target-skip-tls-verify true
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \

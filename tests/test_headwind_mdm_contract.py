@@ -62,7 +62,7 @@ def test_bootstrap_gate_changes_initial_admin_before_public_ingress():
     assert 'argocd.argoproj.io/sync-wave: "10"' in bootstrap
     assert "ADMIN_PASSWORD" in bootstrap
     assert 'argocd.argoproj.io/sync-wave: "20"' in ingress
-    assert "- webnetbird" in ingress
+    assert "- websecure" in ingress
     assert "Path(`/`)" in ingress
     assert "PathPrefix(`/rest/private/`)" not in ingress
     assert ".Values.ingress.managementHost" in ingress
@@ -100,6 +100,8 @@ def test_headwind_uses_openbao_cnpg_backup_and_netbird_management_route():
     assert '--service-domain "mdm-admin.${public_zone_name}"' in runner
     assert '--service-name "headwind-mdm-enrollment"' in runner
     assert '--service-domain "mdm.${public_zone_name}"' in runner
+    assert '--target-port 443' in runner
+    assert '--target-protocol https' in runner
     assert "HEADWIND_SHARED_SECRET" in runner
 
 

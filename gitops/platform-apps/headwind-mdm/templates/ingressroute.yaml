@@ -7,7 +7,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "20"
 spec:
   entryPoints:
-    - webnetbird
+    - websecure
   routes:
     # The QR URL stores its enrollment route in the URL fragment, so the
     # browser first requests the Headwind UI at /. Keep private APIs closed
