@@ -84,6 +84,14 @@ bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
   --service-domain "mdm-admin.${public_zone_name}" \
   --service-path /
 
+# The wildcard DNS zone terminates at the NetBird reverse proxy. Register the
+# public enrollment hostname there as well; unlike the management hostname,
+# the Headwind route itself exposes only the device bootstrap/file paths.
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "headwind-mdm-enrollment" \
+  --service-domain "mdm.${public_zone_name}" \
+  --service-path /
+
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \
     --arg application "headwind-mdm" \
