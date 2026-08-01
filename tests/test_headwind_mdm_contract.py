@@ -63,7 +63,8 @@ def test_bootstrap_gate_changes_initial_admin_before_public_ingress():
     assert "ADMIN_PASSWORD" in bootstrap
     assert 'argocd.argoproj.io/sync-wave: "20"' in ingress
     assert "- webnetbird" in ingress
-    assert "!PathPrefix(`/rest/private/`)" in ingress
+    assert "Path(`/`)" in ingress
+    assert "PathPrefix(`/rest/private/`)" not in ingress
     assert ".Values.ingress.managementHost" in ingress
     assert 'await initialLogin("admin")' in reconciler
     assert "/rest/public/auth/login" in reconciler
