@@ -17,6 +17,7 @@ spec:
       labels:
         app.kubernetes.io/name: paperless
     spec:
+      enableServiceLinks: false
       securityContext:
         fsGroup: 1000
         seccompProfile:
