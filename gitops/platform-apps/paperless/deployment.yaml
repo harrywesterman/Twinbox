@@ -66,6 +66,10 @@ spec:
               value: "true"
             - name: PAPERLESS_SOCIALACCOUNT_ALLOW_SIGNUPS
               value: "true"
+            - name: PAPERLESS_SOCIAL_ACCOUNT_SYNC_GROUPS
+              value: "true"
+            - name: PAPERLESS_SOCIAL_ACCOUNT_SYNC_GROUPS_CLAIM
+              value: groups
             - name: PAPERLESS_ACCOUNT_DEFAULT_HTTP_PROTOCOL
               value: https
             - name: PAPERLESS_TIKA_ENABLED
