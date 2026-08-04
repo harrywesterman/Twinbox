@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nextcloud-eurooffice-data
+  namespace: nextcloud
+  labels:
+    app.kubernetes.io/name: nextcloud-eurooffice
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nextcloud-eurooffice-logs
+  namespace: nextcloud
+  labels:
+    app.kubernetes.io/name: nextcloud-eurooffice
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nextcloud-eurooffice-config
+  namespace: nextcloud
+  labels:
+    app.kubernetes.io/name: nextcloud-eurooffice
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 1Gi

@@ -5,7 +5,12 @@ resources:
   - namespace.yaml
   - admin-externalsecret.yaml
   - db-externalsecret.yaml
+  - eurooffice-externalsecret.yaml
   - redis-externalsecret.yaml
+  - eurooffice-pvc.yaml
+  - eurooffice-deployment.yaml
+  - eurooffice-service.yaml
   - middleware.yaml
   - ingressroute.yaml
   - collabora-ingressroute.yaml
+  - eurooffice-ingressroute.yaml

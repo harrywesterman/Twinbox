@@ -1,0 +1,166 @@
+"""Contract tests for the Euro-Office Nextcloud integration."""
+
+from pathlib import Path
+
+import yaml
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+PLATFORM_DIR = REPO_ROOT / "gitops" / "platform-apps" / "nextcloud"
+OPTIONAL_APP = REPO_ROOT / "gitops" / "optional-apps" / "nextcloud.yaml"
+INSTALL_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-nextcloud" / "run.sh"
+
+
+def _docs(path):
+    return [doc for doc in yaml.safe_load_all(path.read_text(encoding="utf-8")) if doc]
+
+
+def _platform_docs():
+    docs = []
+    for path in PLATFORM_DIR.glob("*.yaml"):
+        docs.extend(_docs(path))
+    return docs
+
+
+def _resource(kind, name):
+    return next(
+        doc
+        for doc in _platform_docs()
+        if doc.get("kind") == kind and doc.get("metadata", {}).get("name") == name
+    )
+
+
+def test_eurooffice_resources_are_declared_in_the_nextcloud_kustomization():
+    kustomization = yaml.safe_load(
+        (PLATFORM_DIR / "kustomization.yaml").read_text(encoding="utf-8")
+    )
+
+    assert kustomization["resources"] == [
+        "namespace.yaml",
+        "admin-externalsecret.yaml",
+        "db-externalsecret.yaml",
+        "eurooffice-externalsecret.yaml",
+        "redis-externalsecret.yaml",
+        "eurooffice-pvc.yaml",
+        "eurooffice-deployment.yaml",
+        "eurooffice-service.yaml",
+        "middleware.yaml",
+        "ingressroute.yaml",
+        "collabora-ingressroute.yaml",
+        "eurooffice-ingressroute.yaml",
+    ]
+
+
+def test_eurooffice_secret_uses_the_existing_nextcloud_openbao_secret():
+    external_secret = _resource("ExternalSecret", "nextcloud-eurooffice")
+
+    assert external_secret["spec"]["target"]["name"] == "nextcloud-eurooffice"
+    assert external_secret["spec"]["data"] == [
+        {
+            "secretKey": "jwt-secret",
+            "remoteRef": {
+                "key": "twinbox/global/nextcloud",
+                "property": "EUROOFFICE_JWT_SECRET",
+            },
+        }
+    ]
+
+
+def test_eurooffice_deployment_is_pinned_and_has_health_checks_and_storage():
+    deployment = _resource("Deployment", "nextcloud-eurooffice")
+    pod_spec = deployment["spec"]["template"]["spec"]
+    container = pod_spec["containers"][0]
+    env = {item["name"]: item for item in container["env"]}
+
+    assert deployment["spec"]["replicas"] == 1
+    assert deployment["spec"]["strategy"] == {"type": "Recreate"}
+    assert container["image"] == "ghcr.io/euro-office/documentserver:9.3.1"
+    assert env["JWT_ENABLED"]["value"] == "true"
+    assert env["JWT_HEADER"]["value"] == "AuthorizationJWT"
+    assert env["EXAMPLE_ENABLED"]["value"] == "false"
+    assert env["JWT_SECRET"]["valueFrom"]["secretKeyRef"] == {
+        "name": "nextcloud-eurooffice",
+        "key": "jwt-secret",
+    }
+    assert container["resources"] == {
+        "requests": {"cpu": "500m", "memory": "2Gi"},
+        "limits": {"cpu": "2", "memory": "4Gi"},
+    }
+
+    for probe_name in ("startupProbe", "readinessProbe", "livenessProbe"):
+        assert container[probe_name]["httpGet"] == {
+            "path": "/healthcheck",
+            "port": "http",
+        }
+
+    assert {item["mountPath"] for item in container["volumeMounts"]} == {
+        "/var/lib/euro-office/documentserver",
+        "/var/log/euro-office/documentserver",
+        "/etc/euro-office/documentserver",
+    }
+    assert {item["name"] for item in pod_spec["volumes"]} == {"data", "logs", "config"}
+    assert {volume["persistentVolumeClaim"]["claimName"] for volume in pod_spec["volumes"]} == {
+        "nextcloud-eurooffice-data",
+        "nextcloud-eurooffice-logs",
+        "nextcloud-eurooffice-config",
+    }
+
+
+def test_eurooffice_persistent_volumes_use_longhorn():
+    pvcs = [
+        doc
+        for doc in _platform_docs()
+        if doc.get("kind") == "PersistentVolumeClaim"
+        and doc.get("metadata", {}).get("name", "").startswith("nextcloud-eurooffice-")
+    ]
+
+    assert {pvc["metadata"]["name"] for pvc in pvcs} == {
+        "nextcloud-eurooffice-data",
+        "nextcloud-eurooffice-logs",
+        "nextcloud-eurooffice-config",
+    }
+    assert all(pvc["spec"]["storageClassName"] == "longhorn" for pvc in pvcs)
+
+
+def test_eurooffice_routes_are_public_and_netbird_mirrors():
+    routes = {
+        doc["metadata"]["name"]: doc
+        for doc in _platform_docs()
+        if doc.get("kind") == "IngressRoute"
+        and doc.get("metadata", {}).get("name") in {"eurooffice", "eurooffice-netbird"}
+    }
+
+    assert routes["eurooffice"]["spec"]["entryPoints"] == ["websecure"]
+    assert routes["eurooffice"]["spec"]["routes"][0] == {
+        "kind": "Rule",
+        "match": "Host(`nextcloud-eurooffice.__ZONE_NAME__`)",
+        "services": [{"name": "nextcloud-eurooffice", "port": 80}],
+    }
+    assert routes["eurooffice"]["spec"]["tls"] == {}
+    assert routes["eurooffice-netbird"]["spec"]["entryPoints"] == ["webnetbird"]
+    assert routes["eurooffice-netbird"]["spec"]["routes"] == routes["eurooffice"]["spec"]["routes"]
+    assert "tls" not in routes["eurooffice-netbird"]["spec"]
+
+
+def test_nextcloud_bootstrap_preserves_collabora_default_and_configures_eurooffice():
+    install_text = INSTALL_STEP.read_text(encoding="utf-8")
+    optional_app_text = OPTIONAL_APP.read_text(encoding="utf-8")
+
+    assert "EUROOFFICE_JWT_SECRET" in install_text
+    assert 'wait_for_deployment_rollout "nextcloud" "nextcloud-eurooffice"' in install_text
+    assert "php occ app:install eurooffice" in install_text
+    assert "php occ app:enable eurooffice" in install_text
+    assert "config:app:set eurooffice DocumentServerUrl" in install_text
+    assert "config:app:set eurooffice DocumentServerInternalUrl" in install_text
+    assert "config:app:set eurooffice StorageUrl" in install_text
+    assert "config:app:set eurooffice jwt_secret" in install_text
+    assert "config:app:set eurooffice jwt_header --value='AuthorizationJWT'" in install_text
+    assert "config:app:set eurooffice sameTab --value='false' --type=boolean" in install_text
+    assert "config:app:set eurooffice enableSharing --value='true' --type=boolean" in install_text
+    assert "config:app:set eurooffice preview --value='false' --type=boolean" in install_text
+    assert (
+        "config:app:set --value='https://nextcloud-collabora.${public_zone_name}' richdocuments wopi_url"
+        in install_text
+    )
+    assert '--service-domain "nextcloud-eurooffice.${public_zone_name}"' in install_text
+    assert "name: eurooffice" in optional_app_text
+    assert "name: eurooffice-netbird" in optional_app_text

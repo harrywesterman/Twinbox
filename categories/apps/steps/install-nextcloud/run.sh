@@ -271,6 +271,7 @@ nextcloud_db_password="$(openssl rand -hex 24)"
 nextcloud_redis_password="$(openssl rand -hex 24)"
 nextcloud_oidc_client_id="$(openssl rand -hex 16)"
 nextcloud_oidc_client_secret="$(openssl rand -hex 32)"
+nextcloud_eurooffice_jwt_secret="$(openssl rand -hex 32)"
 
 if [[ -n "$existing_nextcloud_secret_json" ]]; then
   nextcloud_admin_username="$(jq -r '.NEXTCLOUD_ADMIN_USERNAME // empty' <<<"$existing_nextcloud_secret_json" || true)"
@@ -280,6 +281,7 @@ if [[ -n "$existing_nextcloud_secret_json" ]]; then
   nextcloud_redis_password="$(jq -r '.NEXTCLOUD_REDIS_PASSWORD // empty' <<<"$existing_nextcloud_secret_json" || true)"
   nextcloud_oidc_client_id="$(jq -r '.NEXTCLOUD_OIDC_CLIENT_ID // empty' <<<"$existing_nextcloud_secret_json" || true)"
   nextcloud_oidc_client_secret="$(jq -r '.NEXTCLOUD_OIDC_CLIENT_SECRET // empty' <<<"$existing_nextcloud_secret_json" || true)"
+  nextcloud_eurooffice_jwt_secret="$(jq -r '.EUROOFFICE_JWT_SECRET // empty' <<<"$existing_nextcloud_secret_json" || true)"
 fi
 
 [[ -n "$nextcloud_admin_username" ]] || nextcloud_admin_username="admin"
@@ -289,6 +291,7 @@ fi
 [[ -n "$nextcloud_redis_password" ]] || nextcloud_redis_password="$(openssl rand -hex 24)"
 [[ -n "$nextcloud_oidc_client_id" ]] || nextcloud_oidc_client_id="$(openssl rand -hex 16)"
 [[ -n "$nextcloud_oidc_client_secret" ]] || nextcloud_oidc_client_secret="$(openssl rand -hex 32)"
+[[ -n "$nextcloud_eurooffice_jwt_secret" ]] || nextcloud_eurooffice_jwt_secret="$(openssl rand -hex 32)"
 
 nextcloud_secret_file="$(mktemp)"
 trap 'rm -f "$nextcloud_secret_file"' EXIT
@@ -300,6 +303,7 @@ jq -n \
   --arg nextcloud_redis_password "$nextcloud_redis_password" \
   --arg nextcloud_oidc_client_id "$nextcloud_oidc_client_id" \
   --arg nextcloud_oidc_client_secret "$nextcloud_oidc_client_secret" \
+  --arg eurooffice_jwt_secret "$nextcloud_eurooffice_jwt_secret" \
   '{
     "NEXTCLOUD_ADMIN_USERNAME": $nextcloud_admin_username,
     "NEXTCLOUD_ADMIN_PASSWORD": $nextcloud_admin_password,
@@ -307,7 +311,8 @@ jq -n \
     "NEXTCLOUD_POSTGRESQL__PASSWORD": $nextcloud_postgresql_password,
     "NEXTCLOUD_REDIS_PASSWORD": $nextcloud_redis_password,
     "NEXTCLOUD_OIDC_CLIENT_ID": $nextcloud_oidc_client_id,
-    "NEXTCLOUD_OIDC_CLIENT_SECRET": $nextcloud_oidc_client_secret
+    "NEXTCLOUD_OIDC_CLIENT_SECRET": $nextcloud_oidc_client_secret,
+    "EUROOFFICE_JWT_SECRET": $eurooffice_jwt_secret
   }' >"$nextcloud_secret_file"
 
 authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
@@ -437,11 +442,14 @@ log "Syncing Nextcloud bootstrap secret to OpenBao"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "nextcloud" \
   --json-file "$nextcloud_secret_file" \
-  --required-keys "NEXTCLOUD_ADMIN_USERNAME,NEXTCLOUD_ADMIN_PASSWORD,NEXTCLOUD_POSTGRESQL__USERNAME,NEXTCLOUD_POSTGRESQL__PASSWORD,NEXTCLOUD_REDIS_PASSWORD,NEXTCLOUD_OIDC_CLIENT_ID,NEXTCLOUD_OIDC_CLIENT_SECRET"
+  --required-keys "NEXTCLOUD_ADMIN_USERNAME,NEXTCLOUD_ADMIN_PASSWORD,NEXTCLOUD_POSTGRESQL__USERNAME,NEXTCLOUD_POSTGRESQL__PASSWORD,NEXTCLOUD_REDIS_PASSWORD,NEXTCLOUD_OIDC_CLIENT_ID,NEXTCLOUD_OIDC_CLIENT_SECRET,EUROOFFICE_JWT_SECRET"
 log "Applying Nextcloud Argo CD application"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$WORKSPACE_ROOT/gitops/optional-apps/nextcloud.yaml" \
   --application "nextcloud"
+
+log "Waiting for Euro-Office Document Server"
+wait_for_deployment_rollout "nextcloud" "nextcloud-eurooffice" "Euro-Office Document Server"
 
 bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
   --app-id "nextcloud" \
@@ -639,6 +647,7 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
 
   # Office
   php occ app:install richdocuments >/dev/null 2>&1 || true
+  php occ app:install eurooffice >/dev/null 2>&1 || true
   
   # Groupware
   php occ app:install calendar >/dev/null 2>&1 || true
@@ -656,6 +665,7 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
   
   # Enable all installed apps
   php occ app:enable richdocuments >/dev/null 2>&1 || true
+  php occ app:enable eurooffice >/dev/null
   php occ app:enable calendar >/dev/null 2>&1 || true
   php occ app:enable contacts >/dev/null 2>&1 || true
   php occ app:enable mail >/dev/null 2>&1 || true
@@ -672,6 +682,17 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-d
   "php occ config:system:set wopi_url --value='https://nextcloud-collabora.${public_zone_name}' --type=string" || true
 kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
   "php occ config:app:set --value='https://nextcloud-collabora.${public_zone_name}' richdocuments wopi_url && php occ richdocuments:activate-config" || true
+
+log "Configuring Euro-Office Document Server"
+kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
+  "php occ config:app:set eurooffice DocumentServerUrl --value='https://nextcloud-eurooffice.${public_zone_name}/' --type=string &&
+   php occ config:app:set eurooffice DocumentServerInternalUrl --value='http://nextcloud-eurooffice.nextcloud.svc.cluster.local/' --type=string &&
+   php occ config:app:set eurooffice StorageUrl --value='${NEXTCLOUD_HOST}/' --type=string &&
+   php occ config:app:set eurooffice jwt_secret --value='${nextcloud_eurooffice_jwt_secret}' --type=string &&
+   php occ config:app:set eurooffice jwt_header --value='AuthorizationJWT' --type=string &&
+   php occ config:app:set eurooffice sameTab --value='false' --type=boolean &&
+   php occ config:app:set eurooffice enableSharing --value='true' --type=boolean &&
+   php occ config:app:set eurooffice preview --value='false' --type=boolean"
 
 log "Configuring Nextcloud Talk STUN/TURN servers"
 kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
@@ -703,4 +724,9 @@ bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
 bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
   --service-name "nextcloud-collabora" \
   --service-domain "nextcloud-collabora.${public_zone_name}" \
+  --service-path /
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "nextcloud-eurooffice" \
+  --service-domain "nextcloud-eurooffice.${public_zone_name}" \
   --service-path /
