@@ -1230,7 +1230,7 @@ def test_opencloud_step_preserves_and_waits_for_nats_settings_before_collaborati
     for expected in [
         'opencloud_oc_events_endpoint="opencloud:9233"',
         'opencloud_oc_cache_store_nodes="opencloud:9233"',
-        'opencloud_collabora_proof_key="$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096)"',
+        'opencloud_collabora_proof_key="$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 2>/dev/null)"',
         '"COLLABORA_PROOF_KEY:opencloud_collabora_proof_key"',
         "COLLABORA_PROOF_KEY: $COLLABORA_PROOF_KEY",
         '"OC_EVENTS_ENDPOINT:opencloud_oc_events_endpoint"',
