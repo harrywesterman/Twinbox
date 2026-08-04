@@ -204,6 +204,13 @@ spec:
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: opencloud
+              topologyKey: kubernetes.io/hostname
       initContainers:
         - name: wait-for-opencloud-dependencies
           image: busybox:1.38.0

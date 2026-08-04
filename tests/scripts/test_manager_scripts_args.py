@@ -1144,6 +1144,15 @@ def test_opencloud_gitops_starts_collabora_with_its_native_entrypoint_and_waits_
     init_container = collaboration_spec["initContainers"][0]
     assert init_container["name"] == "wait-for-opencloud-dependencies"
     assert init_container["securityContext"]["runAsNonRoot"] is True
+    pod_affinity = collaboration_spec["affinity"]["podAffinity"][
+        "requiredDuringSchedulingIgnoredDuringExecution"
+    ]
+    assert pod_affinity == [
+        {
+            "labelSelector": {"matchLabels": {"app.kubernetes.io/name": "opencloud"}},
+            "topologyKey": "kubernetes.io/hostname",
+        }
+    ]
     wait_command = init_container["command"][-1]
     assert "nc -z -w 2 opencloud 9233" in wait_command
     assert "http://opencloud-collabora:9980/hosting/discovery" in wait_command
