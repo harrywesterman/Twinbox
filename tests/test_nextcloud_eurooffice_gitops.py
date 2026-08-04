@@ -74,6 +74,14 @@ def test_eurooffice_deployment_is_pinned_and_has_health_checks_and_storage():
     assert deployment["spec"]["replicas"] == 1
     assert deployment["spec"]["strategy"] == {"type": "Recreate"}
     assert container["image"] == "ghcr.io/euro-office/documentserver:v9.3.1"
+    assert pod_spec["initContainers"][0]["name"] == "initialize-config"
+    assert pod_spec["initContainers"][0]["command"] == [
+        "/bin/sh",
+        "-ec",
+        "if [ ! -f /mnt/eurooffice-config/local.json ]; then\n"
+        "  cp -a /etc/euro-office/documentserver/. /mnt/eurooffice-config/\n"
+        "fi\n",
+    ]
     assert env["JWT_ENABLED"]["value"] == "true"
     assert env["JWT_HEADER"]["value"] == "AuthorizationJWT"
     assert env["EXAMPLE_ENABLED"]["value"] == "false"
