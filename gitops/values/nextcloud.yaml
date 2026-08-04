@@ -152,11 +152,11 @@ externalRedis:
 
 collabora:
   enabled: true
+  securityContext:
+    privileged: true
   service:
     type: ClusterIP
   collabora:
-    securityContext:
-      privileged: true
     DONT_GEN_SSL_CERT: "true"
     extra_params: "--o:ssl.termination=true --o:ssl.enable=false"
     aliasgroups:

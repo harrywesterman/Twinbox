@@ -228,5 +228,6 @@ def test_collabora_is_privileged_for_document_jail_mounts():
     values = yaml.safe_load(NEXTCLOUD_VALUES.read_text(encoding="utf-8"))
     optional_app_text = OPTIONAL_APP.read_text(encoding="utf-8")
 
-    assert values["collabora"]["collabora"]["securityContext"] == {"privileged": True}
-    assert "securityContext:\n                    privileged: true" in optional_app_text
+    assert values["collabora"]["securityContext"] == {"privileged": True}
+    assert "securityContext" not in values["collabora"]["collabora"]
+    assert "securityContext:\n                  privileged: true" in optional_app_text
