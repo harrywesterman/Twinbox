@@ -1,12 +1,4 @@
 apiVersion: traefik.io/v1alpha1
-kind: ServersTransport
-metadata:
-  name: opencloud-insecure
-  namespace: opencloud
-spec:
-  insecureSkipVerify: true
----
-apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: opencloud
@@ -21,8 +13,6 @@ spec:
         - kind: Service
           name: opencloud
           port: 9200
-          scheme: https
-          serversTransport: opencloud-insecure
   tls: {}
 ---
 apiVersion: traefik.io/v1alpha1
@@ -40,8 +30,6 @@ spec:
         - kind: Service
           name: opencloud
           port: 9200
-          scheme: https
-          serversTransport: opencloud-insecure
 ---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
