@@ -1,4 +1,19 @@
 apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: opencloud-netbird-forwarded-headers
+  namespace: opencloud
+  annotations:
+    twinbox.io/description: >-
+      Keep OpenCloud and its collaboration endpoints on their public HTTPS
+      origins behind NetBird Reverse Proxy.
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Port: "443"
+      X-Forwarded-Proto: https
+---
+apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: opencloud
@@ -26,6 +41,8 @@ spec:
   routes:
     - kind: Rule
       match: Host(`opencloud.__ZONE_NAME__`)
+      middlewares:
+        - name: opencloud-netbird-forwarded-headers
       services:
         - kind: Service
           name: opencloud
@@ -59,6 +76,8 @@ spec:
   routes:
     - kind: Rule
       match: Host(`opencloud-collabora.__ZONE_NAME__`)
+      middlewares:
+        - name: opencloud-netbird-forwarded-headers
       services:
         - kind: Service
           name: opencloud-collabora
@@ -92,6 +111,8 @@ spec:
   routes:
     - kind: Rule
       match: Host(`opencloud-wopiserver.__ZONE_NAME__`)
+      middlewares:
+        - name: opencloud-netbird-forwarded-headers
       services:
         - kind: Service
           name: opencloud-collaboration

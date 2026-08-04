@@ -1143,6 +1143,18 @@ def test_opencloud_gitops_starts_collabora_with_its_native_entrypoint_and_waits_
     ingressroute = (REPO_ROOT / "gitops/platform-apps/opencloud/ingressroute.yaml").read_text()
     assert "scheme: https" not in ingressroute
     assert "serversTransport: opencloud-insecure" not in ingressroute
+    ingressroute_docs = list(yaml.safe_load_all(ingressroute))
+    forwarded_headers = ingressroute_docs[0]
+    assert forwarded_headers["kind"] == "Middleware"
+    assert forwarded_headers["spec"]["headers"]["customRequestHeaders"] == {
+        "X-Forwarded-Port": "443",
+        "X-Forwarded-Proto": "https",
+    }
+    for name in ("opencloud-netbird", "collabora-netbird", "wopiserver-netbird"):
+        route = next(doc for doc in ingressroute_docs if doc["metadata"]["name"] == name)
+        assert route["spec"]["routes"][0]["middlewares"] == [
+            {"name": "opencloud-netbird-forwarded-headers"}
+        ]
 
     collaboration_spec = deployments["opencloud-collaboration"]["spec"]["template"]["spec"]
     init_container = collaboration_spec["initContainers"][0]
