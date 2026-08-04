@@ -7,7 +7,11 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PLATFORM_DIR = REPO_ROOT / "gitops" / "platform-apps" / "nextcloud"
 OPTIONAL_APP = REPO_ROOT / "gitops" / "optional-apps" / "nextcloud.yaml"
+NEXTCLOUD_VALUES = REPO_ROOT / "gitops" / "values" / "nextcloud.yaml"
 INSTALL_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-nextcloud" / "run.sh"
+EUROOFFICE_ACTION_DIR = (
+    REPO_ROOT / "categories" / "apps" / "steps" / "install-nextcloud" / "eurooffice-file-action"
+)
 
 
 def _docs(path):
@@ -194,3 +198,33 @@ def test_nextcloud_bootstrap_preserves_collabora_default_and_configures_eurooffi
     assert '--service-domain "nextcloud-eurooffice.${public_zone_name}"' in install_text
     assert "name: eurooffice" in optional_app_text
     assert "name: eurooffice-netbird" in optional_app_text
+
+
+def test_nextcloud_bootstrap_installs_the_modern_eurooffice_file_action():
+    install_text = INSTALL_STEP.read_text(encoding="utf-8")
+    dockerfile_text = (REPO_ROOT / "manager-worker" / "Dockerfile").read_text(encoding="utf-8")
+    metadata = EUROOFFICE_ACTION_DIR / "appinfo" / "info.xml"
+    listener = EUROOFFICE_ACTION_DIR / "lib" / "Listener" / "LoadAdditionalListener.php"
+    source = EUROOFFICE_ACTION_DIR / "src" / "main.js"
+
+    assert metadata.exists()
+    assert "<id>twinbox_eurooffice_action</id>" in metadata.read_text(encoding="utf-8")
+    listener_text = listener.read_text(encoding="utf-8")
+    assert "LoadAdditionalScriptsEvent" in listener_text
+    assert "Util::addScript(Application::APP_ID, 'main', 'files')" in listener_text
+    source_text = source.read_text(encoding="utf-8")
+    assert "registerFileAction" in source_text
+    assert "id: 'twinbox-eurooffice-open'" in source_text
+    assert "Open in EuroOffice" in source_text
+    assert "npm ci" in dockerfile_text
+    assert "eurooffice-file-action" in dockerfile_text
+    assert "/var/www/html/custom_apps" in install_text
+    assert "php occ app:enable twinbox_eurooffice_action" in install_text
+
+
+def test_collabora_is_privileged_for_document_jail_mounts():
+    values = yaml.safe_load(NEXTCLOUD_VALUES.read_text(encoding="utf-8"))
+    optional_app_text = OPTIONAL_APP.read_text(encoding="utf-8")
+
+    assert values["collabora"]["collabora"]["securityContext"] == {"privileged": True}
+    assert "securityContext:\n                    privileged: true" in optional_app_text

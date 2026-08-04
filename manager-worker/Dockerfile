@@ -37,6 +37,11 @@ COPY scripts/manager ./scripts/manager
 COPY scripts/get-talos-image-factory.sh ./scripts/get-talos-image-factory.sh
 COPY manager-web/src/assets/step-icons ./manager-web/src/assets/step-icons
 
+RUN cd /opt/twinbox/categories/apps/steps/install-nextcloud/eurooffice-file-action \
+  && npm ci \
+  && npm run build \
+  && rm -rf node_modules
+
 RUN chmod +x ./scripts/manager/*.sh
 RUN chmod +x ./scripts/get-talos-image-factory.sh
 

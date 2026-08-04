@@ -652,6 +652,19 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-d
    php occ config:app:set eurooffice enableSharing --value='true' --type=string --no-interaction &&
    php occ config:app:set eurooffice preview --value='false' --type=string --no-interaction"
 
+log "Installing Twinbox EuroOffice Files action"
+tar -C "$WORKSPACE_ROOT/categories/apps/steps/install-nextcloud" -cf - eurooffice-file-action \
+  | kubectl exec -i -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc '
+    set -eu
+    cd /var/www/html/custom_apps
+    rm -rf twinbox_eurooffice_action
+    tar -xf -
+    mv eurooffice-file-action twinbox_eurooffice_action
+    chown -R www-data:www-data twinbox_eurooffice_action
+  '
+kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
+  "php occ app:enable twinbox_eurooffice_action >/dev/null"
+
 log "Configuring Nextcloud Talk STUN/TURN servers"
 kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
   "php occ config:system:set stun_servers --value='[\"turn.${public_zone_name}:3478\"]' --type=json" || true
