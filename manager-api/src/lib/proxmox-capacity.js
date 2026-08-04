@@ -5,6 +5,16 @@ function text(value) {
   return String(value || "").trim();
 }
 
+function isTwinboxVm(vm = {}) {
+  const name = text(vm.name || vm.vm_name).toLowerCase();
+  const tags = text(vm.tags)
+    .toLowerCase()
+    .split(/[;,]/)
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+  return name.startsWith("twinbox-") || tags.includes("twinbox");
+}
+
 function number(value, fallback = 0) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -208,10 +218,9 @@ export function validateProxmoxCapacity({
       0
     );
     const hostOverhead = Math.max(0, number(node?.mem) - runningVmUsage);
-    const configuredReservations = hostVms.reduce(
-      (total, vm) => total + number(vm.maxmem || vm.mem),
-      0
-    );
+    const configuredReservations = hostVms
+      .filter(isTwinboxVm)
+      .reduce((total, vm) => total + number(vm.maxmem || vm.mem), 0);
     const required = hostOverhead + configuredReservations + plannedMemory;
     const capacity = number(node?.maxmem);
     if (capacity <= 0 || required > capacity) {

@@ -76,6 +76,16 @@ function normalizeHostName(value) {
   return String(value || "").trim();
 }
 
+function isTwinboxVm(vm = {}) {
+  const name = normalizeHostName(vm?.name || vm?.vm_name).toLowerCase();
+  const tags = String(vm?.tags || "")
+    .toLowerCase()
+    .split(/[;,]/)
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+  return name.startsWith("twinbox-") || tags.includes("twinbox");
+}
+
 function getVmResourceNumber(value, divisor) {
   const resolved = toNumber(value, 0);
   return resolved > 0 ? resolved / divisor : 0;
@@ -599,10 +609,9 @@ export function buildProvisionHostCards(resources, currentValues = {}) {
         0,
         toNumber(entry?.mem, 0) / (1024 * 1024) - runningVmMemoryMb
       );
-      const configuredVmMemoryMb = hostVms.reduce(
-        (total, vm) => total + toNumber(vm?.maxmem || vm?.mem, 0) / (1024 * 1024),
-        0
-      );
+      const configuredVmMemoryMb = hostVms
+        .filter(isTwinboxVm)
+        .reduce((total, vm) => total + toNumber(vm?.maxmem || vm?.mem, 0) / (1024 * 1024), 0);
       const usedMemoryMb = hostOverheadMb + configuredVmMemoryMb;
       const totalDiskGb = toNumber(entry?.maxdisk, 0) / (1024 * 1024 * 1024);
       const usedDiskGb = toNumber(entry?.disk, 0) / (1024 * 1024 * 1024);

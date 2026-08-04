@@ -57,23 +57,46 @@ test("storage map rejects inactive or non-image storage", () => {
   assert.match(result.error, /not active VM-image storage/i);
 });
 
-test("capacity validation reserves configured RAM for running and stopped VMs", () => {
+test("capacity validation counts only Twinbox VM RAM reservations", () => {
   const result = validateProxmoxCapacity({
     cluster: cluster({
       vm_node_map: { "cp-1": "pve-a" },
-      vm_size_map: { "cp-1": { cpu: 2, memory_mb: 12288, disk_gb: 20 } },
+      vm_size_map: { "cp-1": { cpu: 2, memory_mb: 8192, disk_gb: 20 } },
       vm_storage_map: { "cp-1": "local-lvm" },
     }),
-    nodes: [{ node: "pve-a", maxmem: 16 * GB, mem: 2 * GB }],
+    nodes: [{ node: "pve-a", maxmem: 16 * GB, mem: 10 * GB }],
     vms: [
-      { node: "pve-a", vmid: 100, status: "running", mem: 2 * GB, maxmem: 4 * GB },
-      { node: "pve-a", vmid: 101, status: "stopped", mem: 0, maxmem: 2 * GB },
+      {
+        node: "pve-a",
+        name: "twinbox-demo-mgt",
+        tags: "twinbox;management",
+        vmid: 100,
+        status: "running",
+        mem: 2 * GB,
+        maxmem: 4 * GB,
+      },
+      {
+        node: "pve-a",
+        name: "twinbox-demo-old",
+        vmid: 101,
+        status: "stopped",
+        mem: 0,
+        maxmem: 2 * GB,
+      },
+      { node: "pve-a", name: "docker", vmid: 102, status: "stopped", mem: 0, maxmem: 8 * GB },
+      {
+        node: "pve-a",
+        name: "other-running",
+        vmid: 103,
+        status: "running",
+        mem: 8 * GB,
+        maxmem: 8 * GB,
+      },
     ],
     storages: [storage("pve-a", "local-lvm", 100)],
   });
 
-  assert.equal(result.ok, false);
-  assert.match(result.error, /Insufficient RAM on pve-a/);
+  assert.deepEqual(result, { ok: true });
 });
 
 test("shared storage capacity is counted once across hosts", () => {

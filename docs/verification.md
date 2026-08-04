@@ -116,7 +116,7 @@ Expected:
 - the generated Talos nodes carry `twinbox.io/role=control-plane` and `twinbox.io/role=worker` labels as appropriate
 - control-plane and worker VMs start with role-aware RAM and disk defaults, and preserve per-VM overrides from `vm_size_map`
 - every Talos system disk is created on the per-VM Proxmox datastore selected through `vm_storage_map`
-- provisioning rejects unavailable/non-image storage, host RAM overcommit, and datastore over-allocation before queueing the job
+- provisioning counts only Twinbox VM RAM reservations (other VMs are assumed stopped), and rejects unavailable/non-image storage, host RAM overcommit, and datastore over-allocation before queueing the job
 - the first step in a clean UI session remains `Deploy Talos Cluster`
 
 ### `install-prometheus`

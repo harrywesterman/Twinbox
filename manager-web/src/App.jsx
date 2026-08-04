@@ -662,7 +662,10 @@ function PlacementBoard({
               </div>
               <div className="wizard-placement-host-capacity">
                 <span>{Math.round(host.freeCpuCores)} CPU free</span>
-                <span>{formatMemoryMb(Math.max(0, host.freeMemoryAfterMb))} RAM remaining</span>
+                <span>
+                  {formatMemoryMb(Math.max(0, host.freeMemoryAfterMb))} RAM after Twinbox
+                  reservations
+                </span>
                 {(host.storages || []).map((storage) => (
                   <span key={storage.id}>
                     {storage.name}: {Math.max(0, Math.floor(storage.freeDiskAfterGb))} GB remaining

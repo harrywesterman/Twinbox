@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   buildAutomaticProvisionPlacementResult,
+  buildProvisionHostCards,
   buildProvisionPlacementBoard,
   buildProvisionVmPlan,
   buildProvisionScaleSummary,
@@ -165,6 +166,51 @@ test("placement board suggests a host-aware Talos VM layout", () => {
   assert.equal(board.vmSizeMap["cp-1"].disk_gb, 10);
   assert.equal(board.suggestedVmSizeMap["cp-1"].cpu, 2);
   assert.ok(board.suggestedVmSizeMap["worker-1"].disk_gb > 100);
+});
+
+test("placement RAM excludes non-Twinbox VM reservations", () => {
+  const cards = buildProvisionHostCards(
+    {
+      nodes: [
+        {
+          node: "pve-a",
+          status: "online",
+          maxmem: 16 * 1024 * 1024 * 1024,
+          mem: 10 * 1024 * 1024 * 1024,
+          maxdisk: 200 * 1024 * 1024 * 1024,
+          disk: 100 * 1024 * 1024 * 1024,
+          maxcpu: 8,
+          cpu: 0.1,
+        },
+      ],
+      vms: [
+        {
+          node: "pve-a",
+          name: "twinbox-demo-mgt",
+          tags: "twinbox;management",
+          status: "running",
+          mem: 2 * 1024 * 1024 * 1024,
+          maxmem: 4 * 1024 * 1024 * 1024,
+        },
+        { node: "pve-a", name: "docker", status: "stopped", maxmem: 8 * 1024 * 1024 * 1024 },
+      ],
+      storages: [
+        {
+          node: "pve-a",
+          storage: "local-lvm",
+          active: 1,
+          enabled: 1,
+          content: ["images"],
+          total: 200 * 1024 * 1024 * 1024,
+          used: 100 * 1024 * 1024 * 1024,
+          avail: 100 * 1024 * 1024 * 1024,
+        },
+      ],
+    },
+    { name: "demo", controlplane_count: 1, worker_count: 0, start_vmid: 200 }
+  );
+
+  assert.equal(cards[0].freeMemoryMb, 4096);
 });
 
 test("placement size maps fix control-plane CPU and keep worker CPU configurable", () => {
