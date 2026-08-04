@@ -80,8 +80,15 @@ def test_eurooffice_deployment_is_pinned_and_has_health_checks_and_storage():
         "-ec",
         "if [ ! -f /mnt/eurooffice-config/local.json ]; then\n"
         "  cp -a /etc/euro-office/documentserver/. /mnt/eurooffice-config/\n"
+        "fi\n"
+        "if [ ! -d /mnt/eurooffice-logs/adminpanel ]; then\n"
+        "  cp -a /var/log/euro-office/documentserver/. /mnt/eurooffice-logs/\n"
         "fi\n",
     ]
+    assert {item["mountPath"] for item in pod_spec["initContainers"][0]["volumeMounts"]} == {
+        "/mnt/eurooffice-config",
+        "/mnt/eurooffice-logs",
+    }
     assert env["JWT_ENABLED"]["value"] == "true"
     assert env["JWT_HEADER"]["value"] == "AuthorizationJWT"
     assert env["EXAMPLE_ENABLED"]["value"] == "false"

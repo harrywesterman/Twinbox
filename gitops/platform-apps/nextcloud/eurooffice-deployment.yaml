@@ -31,9 +31,14 @@ spec:
               if [ ! -f /mnt/eurooffice-config/local.json ]; then
                 cp -a /etc/euro-office/documentserver/. /mnt/eurooffice-config/
               fi
+              if [ ! -d /mnt/eurooffice-logs/adminpanel ]; then
+                cp -a /var/log/euro-office/documentserver/. /mnt/eurooffice-logs/
+              fi
           volumeMounts:
             - name: config
               mountPath: /mnt/eurooffice-config
+            - name: logs
+              mountPath: /mnt/eurooffice-logs
       containers:
         - name: eurooffice
           image: ghcr.io/euro-office/documentserver:v9.3.1
