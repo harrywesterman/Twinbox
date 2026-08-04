@@ -160,6 +160,7 @@ def test_nextcloud_bootstrap_preserves_collabora_default_and_configures_eurooffi
     install_text = INSTALL_STEP.read_text(encoding="utf-8")
     optional_app_text = OPTIONAL_APP.read_text(encoding="utf-8")
 
+    assert "init_success=false" in install_text
     assert "EUROOFFICE_JWT_SECRET" in install_text
     assert 'wait_for_deployment_rollout "nextcloud" "nextcloud-eurooffice"' in install_text
     assert "php occ app:install eurooffice" in install_text
