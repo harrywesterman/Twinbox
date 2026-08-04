@@ -469,66 +469,23 @@ if [[ -n "$pod" ]]; then
   fi
 fi
 
-log "Waiting for Nextcloud CronJob to be created"
-cronjob_attempts=60
-cronjob_attempt=1
-while ! kubectl -n nextcloud get cronjob nextcloud-cron &>/dev/null; do
-  log "Waiting for Nextcloud CronJob (${cronjob_attempt}/${cronjob_attempts})"
-  sleep 5
-  if [[ "$cronjob_attempt" -ge "$cronjob_attempts" ]]; then
-    fail "Timeout waiting for CronJob to be created. Debug with: kubectl -n nextcloud get cronjob"
-  fi
-  cronjob_attempt=$((cronjob_attempt + 1))
-done
-log "CronJob created"
-
 if [[ "$init_success" != "true" ]]; then
-  log "Triggering first CronJob run for initialization"
-  init_job_name="nextcloud-init-$(date +%s)"
-  kubectl -n nextcloud create job "${init_job_name}" --from=cronjob/nextcloud-cron --dry-run=client -o yaml | kubectl apply -f -
-fi
-
-max_retries=3
-retry_count=0
-if [[ "$init_success" != "true" ]]; then
-  init_success=false
-fi
-
-while [[ $retry_count -lt $max_retries ]]; do
-  if [[ "$init_success" == "true" ]]; then
-    break
-  fi
-
-  log "Waiting for Nextcloud initialization (attempt $((retry_count + 1))/${max_retries})"
-  
-  if kubectl -n nextcloud wait --for=condition=complete "job/${init_job_name}" --timeout=300s 2>/dev/null; then
-    log "CronJob completed successfully"
-    init_success=true
-    break
-  fi
-  
-  job_failed=$(kubectl -n nextcloud get job "${init_job_name}" -o jsonpath='{.status.failed}' 2>/dev/null || echo "0")
-  if [[ "$job_failed" != "0" && "$job_failed" != "" ]]; then
-    log "CronJob failed (attempt $((retry_count + 1))/${max_retries})"
-    retry_count=$((retry_count + 1))
-    if [[ $retry_count -lt $max_retries ]]; then
-      log "Retrying initialization..."
-      kubectl -n nextcloud delete job "${init_job_name}" --ignore-not-found
-      while kubectl -n nextcloud get job "${init_job_name}" &>/dev/null; do
-        sleep 1
-      done
-      kubectl -n nextcloud create job "${init_job_name}" --from=cronjob/nextcloud-cron --dry-run=client -o yaml | kubectl apply -f -
-      continue
-    else
-      fail "CronJob failed after ${max_retries} attempts. Debug with: kubectl -n nextcloud logs job/${init_job_name}"
-    fi
-  fi
-  
-  sleep 10
-done
-
-if [[ "$init_success" != "true" ]]; then
-  fail "Nextcloud initialization failed"
+  log "Installing Nextcloud"
+  kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
+    set -euo pipefail
+    cd /var/www/html
+    su -s /bin/bash www-data -c \"php occ maintenance:install \\
+      --database=pgsql \\
+      --database-host='nextcloud-db-pooler-rw.databases.svc.cluster.local' \\
+      --database-port='5432' \\
+      --database-name='nextcloud' \\
+      --database-user='${nextcloud_db_username}' \\
+      --database-pass='${nextcloud_db_password}' \\
+      --admin-user='${nextcloud_admin_username}' \\
+      --admin-pass='${nextcloud_admin_password}' \\
+      --data-dir='/var/www/html/data'\"
+  "
+  init_success=true
 fi
 
 log "Verifying Nextcloud installation status"
