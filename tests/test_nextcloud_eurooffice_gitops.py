@@ -175,9 +175,9 @@ def test_nextcloud_bootstrap_preserves_collabora_default_and_configures_eurooffi
         "--type=string >/dev/null 2>&1"
     ) in install_text
     assert "config:app:set eurooffice jwt_header --value='AuthorizationJWT'" in install_text
-    assert "config:app:set eurooffice sameTab --value='false' --type=boolean" in install_text
-    assert "config:app:set eurooffice enableSharing --value='true' --type=boolean" in install_text
-    assert "config:app:set eurooffice preview --value='false' --type=boolean" in install_text
+    assert "config:app:set eurooffice sameTab --value='false' --type=string" in install_text
+    assert "config:app:set eurooffice enableSharing --value='true' --type=string" in install_text
+    assert "config:app:set eurooffice preview --value='false' --type=string" in install_text
     assert (
         "config:app:set --value='https://nextcloud-collabora.${public_zone_name}' richdocuments wopi_url"
         in install_text
