@@ -227,11 +227,13 @@ def test_nextcloud_bootstrap_installs_the_modern_eurooffice_file_action():
 def test_collabora_is_privileged_for_document_jail_mounts():
     values = yaml.safe_load(NEXTCLOUD_VALUES.read_text(encoding="utf-8"))
     optional_app_text = OPTIONAL_APP.read_text(encoding="utf-8")
+    namespace = _resource("Namespace", "nextcloud")
 
     assert values["collabora"]["securityContext"] == {"privileged": True}
     assert "securityContext" not in values["collabora"]["collabora"]
     assert "securityContext:\n                  privileged: true" in optional_app_text
-    assert "managedNamespaceMetadata:" in optional_app_text
-    assert "pod-security.kubernetes.io/enforce: privileged" in optional_app_text
-    assert "pod-security.kubernetes.io/audit: privileged" in optional_app_text
-    assert "pod-security.kubernetes.io/warn: privileged" in optional_app_text
+    assert namespace["metadata"]["labels"] == {
+        "pod-security.kubernetes.io/enforce": "privileged",
+        "pod-security.kubernetes.io/audit": "privileged",
+        "pod-security.kubernetes.io/warn": "privileged",
+    }
