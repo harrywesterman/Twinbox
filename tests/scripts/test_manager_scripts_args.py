@@ -1156,6 +1156,17 @@ def test_opencloud_gitops_starts_collabora_with_its_native_entrypoint_and_waits_
     assert collaboration_env["MICRO_REGISTRY_ADDRESS"] == "opencloud:9233"
     assert collaboration_env["OC_EVENTS_ENDPOINT"] == "opencloud:9233"
     assert collaboration_env["OC_CACHE_STORE_NODES"] == "opencloud:9233"
+    assert collaboration_env["OC_CONFIG_DIR"] == "/opencloud/config"
+    assert collaboration_spec["containers"][0]["volumeMounts"] == [
+        {
+            "name": "config",
+            "mountPath": "/opencloud/config",
+            "readOnly": True,
+        }
+    ]
+    assert collaboration_spec["volumes"] == [
+        {"name": "config", "persistentVolumeClaim": {"claimName": "opencloud-config"}}
+    ]
 
     collabora = deployments["opencloud-collabora"]["spec"]["template"]["spec"]["containers"][0]
     assert "command" not in collabora

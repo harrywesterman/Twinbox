@@ -269,6 +269,8 @@ spec:
             periodSeconds: 20
             timeoutSeconds: 5
           env:
+            - name: OC_CONFIG_DIR
+              value: /opencloud/config
             - name: COLLABORATION_HTTP_ADDR
               value: 0.0.0.0:9300
             - name: COLLABORATION_GRPC_ADDR
@@ -333,6 +335,14 @@ spec:
                 secretKeyRef:
                   name: opencloud-bootstrap
                   key: COLLABORATION_CS3API_DATAGATEWAY_INSECURE
+          volumeMounts:
+            - name: config
+              mountPath: /opencloud/config
+              readOnly: true
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: opencloud-config
 ---
 apiVersion: apps/v1
 kind: Deployment
