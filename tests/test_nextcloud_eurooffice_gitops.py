@@ -73,7 +73,7 @@ def test_eurooffice_deployment_is_pinned_and_has_health_checks_and_storage():
 
     assert deployment["spec"]["replicas"] == 1
     assert deployment["spec"]["strategy"] == {"type": "Recreate"}
-    assert container["image"] == "ghcr.io/euro-office/documentserver:9.3.1"
+    assert container["image"] == "ghcr.io/euro-office/documentserver:v9.3.1"
     assert env["JWT_ENABLED"]["value"] == "true"
     assert env["JWT_HEADER"]["value"] == "AuthorizationJWT"
     assert env["EXAMPLE_ENABLED"]["value"] == "false"
