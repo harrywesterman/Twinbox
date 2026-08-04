@@ -68,6 +68,20 @@ spec:
                   path: /spec/routes/0/match
                   value: Host(`authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
+                kind: IngressRoute
+                name: authentik-opencloud-oidc-discovery
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && Path(`/.well-known/openid-configuration`)
+            - target:
+                kind: IngressRoute
+                name: authentik-opencloud-oidc-discovery-netbird
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && Path(`/.well-known/openid-configuration`)
+            - target:
                 kind: Middleware
                 name: authentik-cors
               patch: |-
