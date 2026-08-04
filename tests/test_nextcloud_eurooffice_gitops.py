@@ -219,7 +219,10 @@ def test_nextcloud_bootstrap_installs_the_modern_eurooffice_file_action():
     assert "LoadAdditionalScriptsEvent" in listener_text
     assert "use OCP\\EventDispatcher\\IEventListener;" in listener_text
     assert "class LoadAdditionalListener implements IEventListener" in listener_text
-    assert "Util::addScript(Application::APP_ID, 'main', 'files')" in listener_text
+    assert (
+        "Util::addScript(Application::APP_ID, 'twinbox_eurooffice_action-main', 'files')"
+        in listener_text
+    )
     source_text = source.read_text(encoding="utf-8")
     assert "registerFileAction" in source_text
     assert "id: 'twinbox-eurooffice-open'" in source_text

@@ -21,6 +21,6 @@ class LoadAdditionalListener implements IEventListener
             return;
         }
 
-        Util::addScript(Application::APP_ID, 'main', 'files');
+        Util::addScript(Application::APP_ID, 'twinbox_eurooffice_action-main', 'files');
     }
 }
