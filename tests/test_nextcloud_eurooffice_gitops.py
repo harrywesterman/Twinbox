@@ -231,3 +231,7 @@ def test_collabora_is_privileged_for_document_jail_mounts():
     assert values["collabora"]["securityContext"] == {"privileged": True}
     assert "securityContext" not in values["collabora"]["collabora"]
     assert "securityContext:\n                  privileged: true" in optional_app_text
+    assert "managedNamespaceMetadata:" in optional_app_text
+    assert "pod-security.kubernetes.io/enforce: privileged" in optional_app_text
+    assert "pod-security.kubernetes.io/audit: privileged" in optional_app_text
+    assert "pod-security.kubernetes.io/warn: privileged" in optional_app_text
