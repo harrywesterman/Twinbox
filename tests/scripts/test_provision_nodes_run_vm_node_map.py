@@ -66,6 +66,16 @@ def test_provision_nodes_uses_current_step_context_vm_node_map():
                     "cp-2": "new-b",
                     "worker-1": "new-c",
                 },
+                "vm_size_map": {
+                    "cp-1": {"cpu": 2, "memory_mb": 4096, "disk_gb": 20},
+                    "cp-2": {"cpu": 2, "memory_mb": 6144, "disk_gb": 30},
+                    "worker-1": {"cpu": 4, "memory_mb": 12288, "disk_gb": 80},
+                },
+                "vm_storage_map": {
+                    "cp-1": "local-lvm",
+                    "cp-2": "fast-zfs",
+                    "worker-1": "shared-ceph",
+                },
                 "metadata": {
                     "proxmox_node": "pve",
                     "storage_pool": "local-lvm",
@@ -106,6 +116,13 @@ def test_provision_nodes_uses_current_step_context_vm_node_map():
             "cp-1": "192.168.1.61",
             "cp-2": "192.168.1.62",
             "worker-1": "192.168.1.63",
+        }
+        assert "--vm-storage-map" in args
+        vm_storage_map_index = args.index("--vm-storage-map") + 1
+        assert json.loads(args[vm_storage_map_index]) == {
+            "cp-1": "local-lvm",
+            "cp-2": "fast-zfs",
+            "worker-1": "shared-ceph",
         }
         assert json.loads((data_dir / "clusters" / "tst.json").read_text(encoding="utf-8"))[
             "vm_node_map"

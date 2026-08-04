@@ -15,6 +15,7 @@ import {
   readJson,
   writeJson,
 } from "./common.js";
+import { normalizeVmStorageMap } from "./proxmox-capacity.js";
 
 const WORKER_DISK_MIN_GB = 10;
 const CONTROLPLANE_CPU_CORES = 2;
@@ -423,7 +424,7 @@ function normalizeVmSizeMap(rawMap, vmNames = [], cpuCores = 2, workerMemoryMb =
 export function buildClusterFromRequest(
   body,
   env,
-  { allowedVmHosts = [], clusterInstanceId = null } = {}
+  { allowedVmHosts = [], allowedVmStorages = [], clusterInstanceId = null } = {}
 ) {
   const parsedName = parseRequiredString(body.name, "name");
   const parsedBridge = parseRequiredString(body.bridge, "bridge");
@@ -469,6 +470,17 @@ export function buildClusterFromRequest(
     body.proxmox_node || env.PROXMOX_NODE || "pve",
     vmNames
   );
+  const preferredStorage =
+    String(body.storage_pool || env.PROXMOX_STORAGE_POOL || "local-lvm").trim() || "local-lvm";
+  const parsedVmStorageMap = parsedVmNodeMap.ok
+    ? normalizeVmStorageMap(
+        body.vm_storage_map,
+        vmNames,
+        parsedVmNodeMap.value,
+        allowedVmStorages,
+        preferredStorage
+      )
+    : { ok: false, error: parsedVmNodeMap.error };
 
   const validations = [
     parsedName,
@@ -487,6 +499,7 @@ export function buildClusterFromRequest(
     parsedVmIpMap,
     parsedVmSizeMap,
     parsedVmNodeMap.ok ? { ok: true } : { ok: false, error: parsedVmNodeMap.error },
+    parsedVmStorageMap,
   ];
 
   const failed = validations.find((value) => !value.ok);
@@ -502,7 +515,7 @@ export function buildClusterFromRequest(
   const clusterId = normalizedName.slug;
   const metadata = {
     proxmox_node: body.proxmox_node || env.PROXMOX_NODE || "pve",
-    storage_pool: body.storage_pool || env.PROXMOX_STORAGE_POOL || "local-lvm",
+    storage_pool: preferredStorage,
     file_datastore: body.file_datastore || env.PROXMOX_FILE_DATASTORE || "local",
     cluster_slug: normalizedName.slug,
     talos_image_preset: env.TALOS_IMAGE_PRESET || "qemu-guest-agent",
@@ -543,6 +556,7 @@ export function buildClusterFromRequest(
       vm_ip_map: parsedVmIpMap.value,
       vm_size_map: parsedVmSizeMap.value,
       vm_node_map: parsedVmNodeMap.value,
+      vm_storage_map: parsedVmStorageMap.value,
       status: "requested",
       observability_profile: "full",
       resource_profile: resourceProfile.resource_profile,

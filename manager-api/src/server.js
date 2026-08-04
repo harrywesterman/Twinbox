@@ -12,6 +12,7 @@ import {
   normalizeObservabilityProfile,
   persistCluster,
 } from "./lib/clusters.js";
+import { normalizeStorageResource, validateProxmoxCapacity } from "./lib/proxmox-capacity.js";
 import {
   buildAppCatalogResponse,
   buildCatalogResponse,
@@ -624,6 +625,34 @@ async function listClusterNodeResourcesViaProxmoxApi() {
   }
 }
 
+async function listClusterStorageResourcesViaProxmoxApi() {
+  const resolved = resolveSecretBundle(buildProxmoxApiSecretBundle());
+
+  try {
+    const username = resolved.env.PROXMOX_USER;
+    const password = resolved.env.PROXMOX_PASSWORD;
+    const proxmoxHost = resolved.env.PROXMOX_HOST;
+    if (!proxmoxHost || !username || !password) {
+      throw new Error("Unable to inspect Proxmox storage resources: missing API credentials");
+    }
+
+    const auth = proxmoxApiRequest("/api2/json/access/ticket", resolved.env, {
+      method: "POST",
+      body: new URLSearchParams({ username, password }),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+    const ticket = auth?.data?.ticket;
+    if (!ticket) throw new Error("Proxmox auth failed while reading storage resources");
+
+    const resources = proxmoxApiRequest("/api2/json/cluster/resources?type=storage", resolved.env, {
+      headers: { Cookie: `PVEAuthCookie=${ticket}` },
+    });
+    return (Array.isArray(resources?.data) ? resources.data : []).map(normalizeStorageResource);
+  } finally {
+    resolved.cleanup();
+  }
+}
+
 async function listClusterVmResourcesViaProxmoxApi() {
   const resolved = resolveSecretBundle(buildProxmoxApiSecretBundle());
 
@@ -690,7 +719,9 @@ async function listClusterVmResources() {
 
   try {
     const parsed = JSON.parse(result.stdout || "[]");
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((entry) => Number.isInteger(Number(entry?.vmid)))
+      : [];
   } catch (error) {
     throw new Error(
       `Failed to parse cluster VM resources: ${error instanceof Error ? error.message : "unknown error"}`,
@@ -783,13 +814,64 @@ async function listClusterNodeResources() {
 
   try {
     const parsed = JSON.parse(result.stdout || "[]");
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((entry) => !String(entry?.storage || "").trim())
+      : [];
   } catch (error) {
     throw new Error(
       `Failed to parse cluster node resources: ${error instanceof Error ? error.message : "unknown error"}`,
       { cause: error }
     );
   }
+}
+
+async function listClusterStorageResources() {
+  const resourcesBin = process.env.MANAGER_API_CLUSTER_RESOURCES_BIN || "pvesh";
+  const isDefaultResourcesBin = path.basename(resourcesBin) === "pvesh";
+  const args = isDefaultResourcesBin
+    ? ["get", "/cluster/resources", "--type", "storage", "--output-format", "json"]
+    : [];
+  const result = spawnSync(resourcesBin, args, { encoding: "utf8", timeout: 3000 });
+
+  if (result.error?.code === "ENOENT") {
+    if (isDefaultResourcesBin) return listClusterStorageResourcesViaProxmoxApi();
+    throw new Error(`Cluster resources command not found: ${resourcesBin}`);
+  }
+  if (result.status !== 0) {
+    throw new Error(
+      `Cluster storage lookup failed: ${(result.stderr || result.stdout || "").trim()}`
+    );
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(result.stdout || "[]");
+  } catch (error) {
+    throw new Error(
+      `Failed to parse cluster storage resources: ${error instanceof Error ? error.message : "unknown error"}`,
+      { cause: error }
+    );
+  }
+  const entries = Array.isArray(parsed) ? parsed : [];
+  const storages = entries.filter((entry) => String(entry?.storage || "").trim());
+  if (storages.length > 0) return storages.map(normalizeStorageResource);
+
+  const fallbackStorage = process.env.PROXMOX_STORAGE_POOL || "local-lvm";
+  return entries
+    .filter((entry) => String(entry?.node || entry?.name || entry?.id || "").trim())
+    .map((entry) =>
+      normalizeStorageResource({
+        node: entry.node || entry.name || entry.id,
+        storage: fallbackStorage,
+        content: "images",
+        active: 1,
+        enabled: 1,
+        shared: 0,
+        total: entry.maxdisk,
+        used: entry.disk,
+        avail: Math.max(0, Number(entry.maxdisk || 0) - Number(entry.disk || 0)),
+      })
+    );
 }
 
 async function listClusterNodeNames() {
@@ -807,7 +889,7 @@ async function listClusterNodeNames() {
   return names;
 }
 
-function summarizeClusterResources(resources, vmResources = []) {
+function summarizeClusterResources(resources, vmResources = [], storageResources = []) {
   const MB = 1024 * 1024;
   const GB = 1024 * 1024 * 1024;
   const nodes = Array.isArray(resources) ? resources : [];
@@ -867,6 +949,9 @@ function summarizeClusterResources(resources, vmResources = []) {
         activeVmCounts[String(entry?.node || entry?.name || entry?.id || "").trim()] || 0,
     })),
     vms,
+    storages: (Array.isArray(storageResources) ? storageResources : []).map(
+      normalizeStorageResource
+    ),
     summary,
   };
 }
@@ -1205,8 +1290,12 @@ app.get(/^\/api\/secrets\/.*$/, (req, res) => {
 
 app.get("/api/proxmox/cluster-resources", async (_, res) => {
   try {
-    const [nodes, vms] = await Promise.all([listClusterNodeResources(), listClusterVmResources()]);
-    return res.json(summarizeClusterResources(nodes, vms));
+    const [nodes, vms, storages] = await Promise.all([
+      listClusterNodeResources(),
+      listClusterVmResources(),
+      listClusterStorageResources(),
+    ]);
+    return res.json(summarizeClusterResources(nodes, vms, storages));
   } catch (error) {
     return res.status(500).json({
       error: error instanceof Error ? error.message : "failed to read cluster resources",
@@ -1629,7 +1718,17 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
 
   if (stepId === "provision-nodes") {
     try {
-      const allowedVmHosts = await listClusterNodeNames();
+      const [proxmoxNodes, proxmoxVms, proxmoxStorages] = await Promise.all([
+        listClusterNodeResources(),
+        listClusterVmResources(),
+        listClusterStorageResources(),
+      ]);
+      const allowedVmHosts = proxmoxNodes
+        .map((entry) => String(entry?.node || entry?.name || entry?.id || "").trim())
+        .filter(Boolean);
+      if (allowedVmHosts.length === 0) {
+        throw new Error("No Proxmox nodes available to validate VM placement");
+      }
 
       const requestedClusterFile = requestedClusterId
         ? path.join(dirs.clusters, `${requestedClusterId}.json`)
@@ -1656,15 +1755,28 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
           vm_ip_map: req.body?.vm_ip_map,
           vm_size_map: req.body?.vm_size_map,
           vm_node_map: req.body?.vm_node_map,
+          vm_storage_map: req.body?.vm_storage_map,
         },
         process.env,
         {
           allowedVmHosts,
+          allowedVmStorages: proxmoxStorages,
           clusterInstanceId: reuseProvisionClusterInstance ? requestedClusterInstanceId : null,
         }
       );
       if (!built.ok) {
         return res.status(400).json({ error: built.error });
+      }
+
+      const capacity = validateProxmoxCapacity({
+        cluster: built.cluster,
+        nodes: proxmoxNodes,
+        vms: proxmoxVms,
+        storages: proxmoxStorages,
+        existingCluster: reuseProvisionClusterInstance ? existingCluster : null,
+      });
+      if (!capacity.ok) {
+        return res.status(400).json({ error: capacity.error });
       }
 
       persistCluster(dirs, built.cluster);

@@ -60,8 +60,8 @@ def _start_api(data_dir: Path, port: int):
         """#!/bin/sh
 cat <<'EOF'
 [
-  {"node": "pve-a", "status": "online"},
-  {"node": "pve-b", "status": "online"}
+  {"node": "pve-a", "status": "online", "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0},
+  {"node": "pve-b", "status": "online", "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0}
 ]
 EOF
 """,
@@ -540,6 +540,28 @@ def test_execute_step_rejects_invalid_manifest_inputs():
             proc.wait(timeout=5)
 
 
+def test_proxmox_cluster_resources_exposes_vm_storage_capabilities():
+    with tempfile.TemporaryDirectory() as td:
+        data_dir = Path(td) / "data"
+        port = _find_free_port()
+        proc = _start_api(data_dir, port)
+        try:
+            base = f"http://127.0.0.1:{port}"
+            _wait_for_health(base)
+            status, body = _get_json(f"{base}/api/proxmox/cluster-resources")
+            assert status == 200
+            assert [storage["storage"] for storage in body["storages"]] == [
+                "local-lvm",
+                "local-lvm",
+            ]
+            assert all(storage["content"] == ["images"] for storage in body["storages"])
+            assert all(storage["active"] and storage["enabled"] for storage in body["storages"])
+            assert all(storage["avail"] == 1099511627776 for storage in body["storages"])
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
 def test_execute_step_persists_state_and_enqueues_run_step_job():
     with tempfile.TemporaryDirectory() as td:
         data_dir = Path(td) / "data"
@@ -605,6 +627,11 @@ def test_execute_step_persists_state_and_enqueues_run_step_job():
             assert cluster["worker_disk_gb"] == 192
             assert cluster["vm_size_map"]["worker-1"]["disk_gb"] == 192
             assert cluster["vm_size_map"]["worker-2"]["disk_gb"] == 192
+            assert cluster["vm_storage_map"] == {
+                "cp-1": "local-lvm",
+                "worker-1": "local-lvm",
+                "worker-2": "local-lvm",
+            }
 
             job = json.loads((data_dir / "jobs" / f"{body['job_id']}.json").read_text())
             assert job["type"] == "run_step"
@@ -625,8 +652,8 @@ def test_execute_step_rebuilds_provisioned_cluster_with_a_fresh_session():
             """#!/bin/sh
 cat <<'EOF'
 [
-  {"node": "pve-a", "status": "online"},
-  {"node": "pve-b", "status": "online"}
+  {"node": "pve-a", "status": "online", "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0},
+  {"node": "pve-b", "status": "online", "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0}
 ]
 EOF
 """,
@@ -748,8 +775,8 @@ def test_execute_step_accepts_manual_vm_ip_map_without_allocation_recheck():
             """#!/bin/sh
 cat <<'EOF'
 [
-  {"node": "pve-a", "status": "online"},
-  {"node": "pve-b", "status": "online"}
+  {"node": "pve-a", "status": "online", "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0},
+  {"node": "pve-b", "status": "online", "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0}
 ]
 EOF
 """,
@@ -831,8 +858,8 @@ def test_execute_step_retries_existing_provisioned_cluster_without_allocation_re
             """#!/bin/sh
 cat <<'EOF'
 [
-  {"node": "pve-a", "status": "online"},
-  {"node": "pve-b", "status": "online"}
+  {"node": "pve-a", "status": "online", "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0},
+  {"node": "pve-b", "status": "online", "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0}
 ]
 EOF
 """,

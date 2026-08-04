@@ -3282,6 +3282,12 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     assert "merge(" not in main_text
     assert "import_from = local.talos_image_file_id" in compact_main_text
     assert "node_name = local.vm_host_map[each.key]" in compact_main_text
+    assert "datastore_id = each.value.datastore_id" in compact_main_text
+    assert "datastore_id = string" in re.sub(r"\s+", " ", _module_variables_text())
+    assert 'variable "vm_datastore"' not in _module_variables_text()
+    assert '--vm-storage-map "$current_vm_storage_map"' in PROVISION_NODES_SCRIPT.read_text(
+        encoding="utf-8"
+    )
     assert "file_id = proxmox_virtual_environment_download_file.talos" not in compact_main_text
     assert "file_id      = proxmox_virtual_environment_file.talos_nocloud.id" not in main_text
     assert "remove_legacy_talos_file_state" not in main_text

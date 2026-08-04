@@ -275,8 +275,11 @@ function deriveWorkerDiskGb(
     0,
     Math.ceil(Math.max(0, toNumber(controlplaneCount, 0)) / hostCount) * CONTROLPLANE_DISK_GB
   );
+  const workersPerHost = Math.max(1, Math.ceil(Math.max(0, toNumber(workerCount, 0)) / hostCount));
   const freeDiskShares = hosts
-    .map((host) => Math.max(0, toNumber(host.freeDiskGb, 0) - controlplaneReserveGb))
+    .map(
+      (host) => Math.max(0, toNumber(host.freeDiskGb, 0) - controlplaneReserveGb) / workersPerHost
+    )
     .filter((value) => value > 0);
 
   if (freeDiskShares.length === 0 || workerCount <= 0) {
@@ -290,6 +293,13 @@ function deriveWorkerDiskGb(
 }
 
 function getPlacementVmSize(vm, workerDiskGb = WORKER_DISK_FALLBACK_GB) {
+  if (vm.hasSizeOverride) {
+    return {
+      cpu: vm.cpu,
+      memory_mb: Math.max(512, roundToStep(toNumber(vm.memory_mb, 512), 512)),
+      disk_gb: Math.max(WORKER_DISK_MIN_GB, roundToInteger(toNumber(vm.disk_gb, 10))),
+    };
+  }
   if (vm.type === "controlplane") {
     return {
       cpu: vm.cpu,
@@ -484,9 +494,24 @@ export function buildProvisionScaleSummary(
         summaryFallbackWorkerDiskGb)
       : summaryFallbackWorkerDiskGb;
 
-  const totalCpuCores = controlplaneCount * CONTROLPLANE_CPU_CORES + workerCount * cpuCores;
-  const totalWorkerMemoryMb = workerCount * workerMemoryMb;
-  const totalWorkerDiskGb = workerCount * workerDiskPerVm;
+  const sizes = Object.entries(sizeMap || {});
+  const sumRole = (prefix, field) =>
+    sizes.reduce(
+      (total, [name, size]) =>
+        name.startsWith(prefix) ? total + Math.max(0, toNumber(size?.[field], 0)) : total,
+      0
+    );
+  const totalCpuCores = sizes.reduce(
+    (total, [, size]) => total + Math.max(0, toNumber(size?.cpu, 0)),
+    0
+  );
+  const totalWorkerMemoryMb = sumRole("worker-", "memory_mb");
+  const totalWorkerDiskGb =
+    placementBoard.hostCards.length > 0 || Object.keys(currentValues?.vm_size_map || {}).length > 0
+      ? sumRole("worker-", "disk_gb")
+      : workerCount * workerDiskPerVm;
+  const totalControlplaneMemoryMb = sumRole("cp-", "memory_mb");
+  const totalControlplaneDiskGb = sumRole("cp-", "disk_gb");
 
   return {
     scale_percent: resolvedScale,
@@ -503,25 +528,21 @@ export function buildProvisionScaleSummary(
     total_cpu_cores: totalCpuCores,
     total_worker_memory_mb: totalWorkerMemoryMb,
     total_worker_disk_gb: totalWorkerDiskGb,
-    total_controlplane_memory_mb: controlplaneCount * CONTROLPLANE_MEMORY_MB,
-    total_controlplane_disk_gb: controlplaneCount * CONTROLPLANE_DISK_GB,
-    total_memory_mb: totalWorkerMemoryMb + controlplaneCount * CONTROLPLANE_MEMORY_MB,
-    total_disk_gb: totalWorkerDiskGb + controlplaneCount * CONTROLPLANE_DISK_GB,
+    total_controlplane_memory_mb: totalControlplaneMemoryMb,
+    total_controlplane_disk_gb: totalControlplaneDiskGb,
+    total_memory_mb: totalWorkerMemoryMb + totalControlplaneMemoryMb,
+    total_disk_gb: totalWorkerDiskGb + totalControlplaneDiskGb,
     capacity: resourceSummary,
     memory_share_percent:
       resourceSummary?.freeMemoryMb > 0
         ? Math.round(
-            ((totalWorkerMemoryMb + controlplaneCount * CONTROLPLANE_MEMORY_MB) /
-              resourceSummary.freeMemoryMb) *
-              100
+            ((totalWorkerMemoryMb + totalControlplaneMemoryMb) / resourceSummary.freeMemoryMb) * 100
           )
         : null,
     disk_share_percent:
       resourceSummary?.freeDiskGb > 0
         ? Math.round(
-            ((totalWorkerDiskGb + controlplaneCount * CONTROLPLANE_DISK_GB) /
-              resourceSummary.freeDiskGb) *
-              100
+            ((totalWorkerDiskGb + totalControlplaneDiskGb) / resourceSummary.freeDiskGb) * 100
           )
         : null,
     cpu_share_percent:
@@ -531,8 +552,29 @@ export function buildProvisionScaleSummary(
   };
 }
 
-export function buildProvisionHostCards(resources) {
+export function buildProvisionHostCards(resources, currentValues = {}) {
   const summary = summarizeProxmoxClusterResources(resources);
+  const resourceStorages = Array.isArray(resources?.storages) ? resources.storages : [];
+  const controlplaneCount = Math.max(
+    1,
+    roundToInteger(toNumber(currentValues.controlplane_count, 3))
+  );
+  const workerCount = Math.max(0, roundToInteger(toNumber(currentValues.worker_count, 3)));
+  const vmNames = [
+    ...Array.from({ length: controlplaneCount }, (_, index) => `cp-${index + 1}`),
+    ...Array.from({ length: workerCount }, (_, index) => `worker-${index + 1}`),
+  ];
+  const startVmid = Math.max(100, roundToInteger(toNumber(currentValues.start_vmid, 200)));
+  const clusterSlug = normalizeHostName(currentValues.name);
+  const clusterName = clusterSlug.startsWith("twinbox-") ? clusterSlug : `twinbox-${clusterSlug}`;
+  const targetVmName = (vm) => {
+    const name = normalizeHostName(vm?.name || vm?.vm_name);
+    const byName = vmNames.find((vmName) => name === `${clusterName}-${vmName}`);
+    if (byName) return byName;
+    if (name) return "";
+    const index = roundToInteger(toNumber(vm?.vmid, -1)) - startVmid;
+    return index >= 0 && index < vmNames.length ? vmNames[index] : "";
+  };
 
   return summary.nodes
     .map((entry, index) => {
@@ -540,7 +582,28 @@ export function buildProvisionHostCards(resources) {
         entry?.node || entry?.name || entry?.id || `host-${index + 1}`
       );
       const totalMemoryMb = toNumber(entry?.maxmem, 0) / (1024 * 1024);
-      const usedMemoryMb = toNumber(entry?.mem, 0) / (1024 * 1024);
+      const allHostVms = (Array.isArray(resources?.vms) ? resources.vms : []).filter(
+        (vm) => normalizeHostName(vm?.node) === name
+      );
+      const retryVms = allHostVms.filter((vm) => targetVmName(vm));
+      const hostVms = allHostVms.filter((vm) => !targetVmName(vm));
+      const runningVmMemoryMb = hostVms.reduce(
+        (total, vm) =>
+          total +
+          (String(vm?.status || "").toLowerCase() === "running"
+            ? toNumber(vm?.mem, 0) / (1024 * 1024)
+            : 0),
+        0
+      );
+      const hostOverheadMb = Math.max(
+        0,
+        toNumber(entry?.mem, 0) / (1024 * 1024) - runningVmMemoryMb
+      );
+      const configuredVmMemoryMb = hostVms.reduce(
+        (total, vm) => total + toNumber(vm?.maxmem || vm?.mem, 0) / (1024 * 1024),
+        0
+      );
+      const usedMemoryMb = hostOverheadMb + configuredVmMemoryMb;
       const totalDiskGb = toNumber(entry?.maxdisk, 0) / (1024 * 1024 * 1024);
       const usedDiskGb = toNumber(entry?.disk, 0) / (1024 * 1024 * 1024);
       const totalCpuCores = toNumber(entry?.maxcpu, 0);
@@ -549,6 +612,63 @@ export function buildProvisionHostCards(resources) {
         0,
         totalCpuCores
       );
+      const storages = resourceStorages
+        .filter((storage) => normalizeHostName(storage?.node) === name)
+        .map((storage) => {
+          const totalBytes = toNumber(storage?.total || storage?.maxdisk, 0);
+          const usedBytes = toNumber(storage?.used || storage?.disk, 0);
+          const availBytes = toNumber(storage?.avail, Math.max(0, totalBytes - usedBytes));
+          const content = Array.isArray(storage?.content)
+            ? storage.content
+            : String(storage?.content || "")
+                .split(",")
+                .map((value) => value.trim())
+                .filter(Boolean);
+          return {
+            id: normalizeHostName(storage?.storage || storage?.name || storage?.id),
+            name: normalizeHostName(storage?.storage || storage?.name || storage?.id),
+            active: storage?.active === undefined ? true : Boolean(Number(storage.active)),
+            enabled: storage?.enabled === undefined ? true : Boolean(Number(storage.enabled)),
+            shared: Boolean(Number(storage?.shared)),
+            content,
+            totalDiskGb: totalBytes / (1024 * 1024 * 1024),
+            usedDiskGb: usedBytes / (1024 * 1024 * 1024),
+            freeDiskGb: availBytes / (1024 * 1024 * 1024),
+          };
+        })
+        .filter(
+          (storage) =>
+            storage.id &&
+            storage.active &&
+            storage.enabled &&
+            storage.content.map((value) => String(value).toLowerCase()).includes("images")
+        );
+      if (storages.length === 0 && totalDiskGb > 0) {
+        storages.push({
+          id: normalizeHostName(entry?.storage_pool || "local-lvm"),
+          name: normalizeHostName(entry?.storage_pool || "local-lvm"),
+          active: true,
+          enabled: true,
+          shared: false,
+          content: ["images"],
+          totalDiskGb,
+          usedDiskGb,
+          freeDiskGb: Math.max(0, totalDiskGb - usedDiskGb),
+        });
+      }
+      for (const vm of retryVms) {
+        const vmName = targetVmName(vm);
+        const storageId = normalizeHostName(currentValues?.vm_storage_map?.[vmName]);
+        const storage = storages.find((candidate) => candidate.id === storageId);
+        if (storage) {
+          storage.freeDiskGb += getVmResourceNumber(vm?.maxdisk || vm?.disk, 1024 * 1024 * 1024);
+        }
+      }
+      const preferredStorage =
+        storages.find((storage) => storage.id === normalizeHostName(entry?.storage_pool)) ||
+        [...storages].sort(
+          (left, right) => right.freeDiskGb - left.freeDiskGb || left.id.localeCompare(right.id)
+        )[0];
 
       return {
         id: name,
@@ -558,9 +678,11 @@ export function buildProvisionHostCards(resources) {
         totalMemoryMb,
         usedMemoryMb,
         freeMemoryMb: Math.max(0, totalMemoryMb - usedMemoryMb),
-        totalDiskGb,
-        usedDiskGb,
-        freeDiskGb: Math.max(0, totalDiskGb - usedDiskGb),
+        totalDiskGb: preferredStorage?.totalDiskGb ?? totalDiskGb,
+        usedDiskGb: preferredStorage?.usedDiskGb ?? usedDiskGb,
+        freeDiskGb: preferredStorage?.freeDiskGb ?? Math.max(0, totalDiskGb - usedDiskGb),
+        storages,
+        preferredStorageId: preferredStorage?.id || "",
         totalCpuCores,
         usedCpuCores,
         freeCpuCores: Math.max(0, totalCpuCores - usedCpuCores),
@@ -636,34 +758,54 @@ export function buildProvisionVmPlan(stepInputs, currentValues = {}) {
     100,
     roundToInteger(toNumber(values.start_vmid, getInputDefault(stepInputs, "start_vmid", 200)))
   );
+  const currentSizeMap =
+    values.vm_size_map && typeof values.vm_size_map === "object" ? values.vm_size_map : {};
+  const resolveSize = (name, defaults) => {
+    const override = currentSizeMap?.[name];
+    if (!override || typeof override !== "object") return { ...defaults, hasSizeOverride: false };
+    return {
+      cpu: Math.max(1, roundToInteger(toNumber(override.cpu, defaults.cpu))),
+      memory_mb: Math.max(512, roundToStep(toNumber(override.memory_mb, defaults.memory_mb), 512)),
+      disk_gb: Math.max(10, roundToInteger(toNumber(override.disk_gb, defaults.disk_gb))),
+      hasSizeOverride: true,
+    };
+  };
 
   const plan = [];
   let vmid = startVmid;
 
   for (let index = 1; index <= controlplaneCount; index += 1) {
-    plan.push({
-      id: `cp-${index}`,
-      name: `cp-${index}`,
-      label: `Control plane ${index}`,
-      type: "controlplane",
-      vmid,
+    const name = `cp-${index}`;
+    const size = resolveSize(name, {
       cpu: CONTROLPLANE_CPU_CORES,
       memory_mb: CONTROLPLANE_MEMORY_MB,
       disk_gb: CONTROLPLANE_DISK_GB,
+    });
+    plan.push({
+      id: name,
+      name,
+      label: `Control plane ${index}`,
+      type: "controlplane",
+      vmid,
+      ...size,
     });
     vmid += 1;
   }
 
   for (let index = 1; index <= workerCount; index += 1) {
-    plan.push({
-      id: `worker-${index}`,
-      name: `worker-${index}`,
-      label: `Worker ${index}`,
-      type: "worker",
-      vmid,
+    const name = `worker-${index}`;
+    const size = resolveSize(name, {
       cpu: cpuCores,
       memory_mb: workerMemoryMb,
       disk_gb: WORKER_DISK_MIN_GB,
+    });
+    plan.push({
+      id: name,
+      name,
+      label: `Worker ${index}`,
+      type: "worker",
+      vmid,
+      ...size,
     });
     vmid += 1;
   }
@@ -684,7 +826,12 @@ function clonePlacementState(sourceState = new Map()) {
 }
 
 function hostCanFitVm(host, vm) {
-  return Math.max(0, toNumber(host?.freeDiskGb, 0)) >= Math.max(0, toNumber(vm?.disk_gb, 0));
+  return (
+    Math.max(0, toNumber(host?.freeMemoryMb, 0)) >= Math.max(0, toNumber(vm?.memory_mb, 0)) &&
+    Math.max(0, toNumber(host?.freeDiskGb, 0)) >= Math.max(0, toNumber(vm?.disk_gb, 0)) &&
+    Array.isArray(host?.storages) &&
+    host.storages.length > 0
+  );
 }
 
 function chooseBestHostForVm(vm, hostCards, _placementState = new Map(), resolveVmSize = null) {
@@ -805,12 +952,78 @@ function buildVmSizeMap(
   };
 }
 
+function chooseStorageForHost(host, requestedStorage = "") {
+  const storages = Array.isArray(host?.storages) ? host.storages : [];
+  const requested = normalizeHostName(requestedStorage);
+  if (requested && storages.some((storage) => storage.id === requested)) return requested;
+  if (host?.preferredStorageId) return host.preferredStorageId;
+  return (
+    [...storages].sort(
+      (left, right) => right.freeDiskGb - left.freeDiskGb || left.id.localeCompare(right.id)
+    )[0]?.id || ""
+  );
+}
+
+function buildVmStorageMap(vmPlan, hostLookup, vmNodeMap, currentStorageMap = {}) {
+  const result = {};
+  for (const vm of Array.isArray(vmPlan) ? vmPlan : []) {
+    const host = hostLookup.get(vmNodeMap?.[vm.name]);
+    if (!host) continue;
+    result[vm.name] = chooseStorageForHost(host, currentStorageMap?.[vm.name]);
+  }
+  return result;
+}
+
+function storageCapacityKey(host, storage) {
+  return storage?.shared ? `shared:${storage.id}` : `${host.id}:${storage?.id}`;
+}
+
+function decoratePlacementCapacity(hostCards, vmSizeMap, vmStorageMap) {
+  const reservations = new Map();
+  for (const host of hostCards) {
+    for (const vm of host.assignments || []) {
+      if (vm.isFixed) continue;
+      const storage = host.storages?.find((entry) => entry.id === vmStorageMap?.[vm.name]);
+      if (!storage) continue;
+      const key = storageCapacityKey(host, storage);
+      reservations.set(
+        key,
+        toNumber(reservations.get(key), 0) + toNumber(vmSizeMap?.[vm.name]?.disk_gb, 0)
+      );
+    }
+  }
+
+  return hostCards.map((host) => {
+    const reservedMemoryMb = (host.assignments || []).reduce(
+      (total, vm) => total + (vm.isFixed ? 0 : toNumber(vmSizeMap?.[vm.name]?.memory_mb, 0)),
+      0
+    );
+    return {
+      ...host,
+      reservedMemoryMb,
+      freeMemoryAfterMb: host.freeMemoryMb - reservedMemoryMb,
+      storages: (host.storages || []).map((storage) => {
+        const reservedDiskGb = toNumber(reservations.get(storageCapacityKey(host, storage)), 0);
+        return {
+          ...storage,
+          reservedDiskGb,
+          freeDiskAfterGb: storage.freeDiskGb - reservedDiskGb,
+        };
+      }),
+    };
+  });
+}
+
 export function buildProvisionPlacementBoard(stepInputs, currentValues = {}, resources = null) {
   const vmPlan = buildProvisionVmPlan(stepInputs, currentValues);
-  const hostCards = buildProvisionHostCards(resources);
+  const hostCards = buildProvisionHostCards(resources, currentValues);
   const autoPlacementHostCards = getAutomaticPlacementHostCards(hostCards);
   const currentMap =
     currentValues && typeof currentValues.vm_node_map === "object" ? currentValues.vm_node_map : {};
+  const currentStorageMap =
+    currentValues && typeof currentValues.vm_storage_map === "object"
+      ? currentValues.vm_storage_map
+      : {};
   const workerDiskPercent = currentValues?.worker_disk_percent ?? DEFAULT_WORKER_DISK_PERCENT;
   const suggestedWorkerDiskGb = deriveWorkerDiskGb(
     autoPlacementHostCards,
@@ -867,9 +1080,21 @@ export function buildProvisionPlacementBoard(stepInputs, currentValues = {}, res
     hostCards,
     currentMap,
     workerDiskPercent,
-    false,
+    true,
     currentPlacementState,
     suggestedWorkerDiskGb
+  );
+  const suggestedVmStorageMap = buildVmStorageMap(
+    vmPlan,
+    hostLookup,
+    suggestedPlacement.vmNodeMap,
+    {}
+  );
+  const vmStorageMap = buildVmStorageMap(
+    vmPlan,
+    hostLookup,
+    placement.vmNodeMap,
+    currentStorageMap
   );
 
   for (const vm of vmPlan) {
@@ -888,6 +1113,8 @@ export function buildProvisionPlacementBoard(stepInputs, currentValues = {}, res
       cpu: size.cpu,
       memory_mb: size.memory_mb,
       disk_gb: size.disk_gb,
+      storage_id: vmStorageMap[vm.name] || "",
+      storageOptions: hostLookup.get(hostId)?.storages || [],
       assignedHostId: hostId,
       assignedHostName: hostLookup.get(hostId)?.name || hostId || "Unassigned",
       assignmentSource: isUserSelected ? "user-selected" : hostId ? "suggested" : "unassigned",
@@ -905,16 +1132,48 @@ export function buildProvisionPlacementBoard(stepInputs, currentValues = {}, res
   return {
     vmPlan,
     managementVm,
-    hostCards: hostCards.map((host) => ({
-      ...host,
-      assignments: placementsByHost.get(host.id) || [],
-    })),
+    hostCards: decoratePlacementCapacity(
+      hostCards.map((host) => ({
+        ...host,
+        assignments: placementsByHost.get(host.id) || [],
+      })),
+      placement.vmSizeMap,
+      vmStorageMap
+    ),
     unassigned: placementsByHost.get("Unassigned") || [],
     suggestedVmNodeMap,
     suggestedVmSizeMap: suggestedPlacement.vmSizeMap,
+    suggestedVmStorageMap,
     vmNodeMap: placement.vmNodeMap,
     vmSizeMap: placement.vmSizeMap,
+    vmStorageMap,
   };
+}
+
+export function validateProvisionPlacementBoard(board) {
+  const errors = [];
+  const vmPlan = Array.isArray(board?.vmPlan) ? board.vmPlan : [];
+  for (const vm of vmPlan) {
+    const host = board?.vmNodeMap?.[vm.name];
+    const size = board?.vmSizeMap?.[vm.name];
+    const storage = board?.vmStorageMap?.[vm.name];
+    if (!host) errors.push(`${vm.label} has no Proxmox host.`);
+    if (!size || toNumber(size.memory_mb) < 512 || toNumber(size.disk_gb) < 10) {
+      errors.push(`${vm.label} has invalid RAM or disk sizing.`);
+    }
+    if (!storage) errors.push(`${vm.label} has no VM storage.`);
+  }
+  for (const host of board?.hostCards || []) {
+    if (toNumber(host.freeMemoryAfterMb) < 0) {
+      errors.push(`${host.name} does not have enough unreserved RAM.`);
+    }
+    for (const storage of host.storages || []) {
+      if (toNumber(storage.freeDiskAfterGb) < 0) {
+        errors.push(`${storage.name} on ${host.name} does not have enough free disk space.`);
+      }
+    }
+  }
+  return { ok: errors.length === 0, errors, error: errors[0] || "" };
 }
 
 function countAssignedPlacementEntries(vmNodeMap = {}) {
@@ -959,10 +1218,14 @@ export function buildAutomaticProvisionPlacementResult(
   currentValues = {},
   resources = null
 ) {
-  const normalizedDraft = currentValues && typeof currentValues === "object" ? currentValues : {};
+  const normalizedDraft =
+    currentValues && typeof currentValues === "object"
+      ? { ...currentValues, vm_node_map: {}, vm_size_map: {}, vm_storage_map: {} }
+      : {};
   const board = buildProvisionPlacementBoard(stepInputs, normalizedDraft, resources);
   const vmNodeMap = board.suggestedVmNodeMap || {};
   const vmSizeMap = board.suggestedVmSizeMap || {};
+  const vmStorageMap = board.suggestedVmStorageMap || {};
   const total = Array.isArray(board.vmPlan)
     ? board.vmPlan.filter((vm) => vm.type !== "management").length
     : 0;
@@ -974,6 +1237,7 @@ export function buildAutomaticProvisionPlacementResult(
     board,
     vm_node_map: vmNodeMap,
     vm_size_map: vmSizeMap,
+    vm_storage_map: vmStorageMap,
     assigned,
     unassigned,
     tone: placementMessage.tone,

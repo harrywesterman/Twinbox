@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 usage() {
   cat <<USAGE
-Usage: $0 --cluster-id ID --name NAME --controlplane-count N --worker-count N --cpu-cores N --memory-mb N --bridge BR --start-vmid ID --start-ip IP --vip-ip IP --node-prefix-length N --gateway-ip IP --dns-servers CSV --dns-domain NAME --vm-node-map JSON --vm-size-map JSON --vm-ip-map JSON --proxmox-node NODE --storage-pool POOL --file-datastore STORE --data-dir DIR
+Usage: $0 --cluster-id ID --name NAME --controlplane-count N --worker-count N --cpu-cores N --memory-mb N --bridge BR --start-vmid ID --start-ip IP --vip-ip IP --node-prefix-length N --gateway-ip IP --dns-servers CSV --dns-domain NAME --vm-node-map JSON --vm-size-map JSON --vm-storage-map JSON --vm-ip-map JSON --proxmox-node NODE --storage-pool POOL --file-datastore STORE --data-dir DIR
 USAGE
 }
 
@@ -84,6 +84,7 @@ while [[ $# -gt 0 ]]; do
     # --vm-node-map) shift 2 ;;
     --vm-node-map) VM_NODE_MAP="$2"; shift 2 ;;
     --vm-size-map) VM_SIZE_MAP="$2"; shift 2 ;;
+    --vm-storage-map) VM_STORAGE_MAP="$2"; shift 2 ;;
     --vm-ip-map) VM_IP_MAP="$2"; shift 2 ;;
     --proxmox-node) PROXMOX_NODE="$2"; shift 2 ;;
     --storage-pool) STORAGE_POOL="$2"; shift 2 ;;
@@ -786,6 +787,7 @@ generate_nodes_json() {
   local cpu=""
   local ram=""
   local disk=""
+  local datastore=""
 
   if [[ "$CP_COUNT" -gt 0 ]]; then
     for i in $(seq 1 "$CP_COUNT"); do
@@ -795,7 +797,9 @@ generate_nodes_json() {
       cpu="$(jq -r --arg key "$name" '.[$key].cpu // empty' <<<"$vm_size_map_json")"
       ram="$(jq -r --arg key "$name" '.[$key].memory_mb // empty' <<<"$vm_size_map_json")"
       disk="$(jq -r --arg key "$name" '.[$key].disk_gb // empty' <<<"$vm_size_map_json")"
+      datastore="$(jq -r --arg key "$name" '.[$key] // empty' <<<"$vm_storage_map_json")"
       [[ -n "$cpu" && -n "$ram" && -n "$disk" ]] || fail "Missing vm_size_map entry for ${name}"
+      [[ -n "$datastore" ]] || fail "Missing vm_storage_map entry for ${name}"
       mac="$(deterministic_mac "$current_vmid")"
       nodes_json="$(jq \
         --arg key "$name" \
@@ -806,7 +810,8 @@ generate_nodes_json() {
         --argjson cpu "$cpu" \
         --argjson ram "$ram" \
         --argjson disk "$disk" \
-        '. + {($key): {ip: $ip, type: $type, vmid: $vmid, cpu: $cpu, ram_mb: $ram, disk_gb: $disk, mac: $mac}}' \
+        --arg datastore "$datastore" \
+        '. + {($key): {ip: $ip, type: $type, vmid: $vmid, cpu: $cpu, ram_mb: $ram, disk_gb: $disk, datastore_id: $datastore, mac: $mac}}' \
         <<<"$nodes_json")"
       current_vmid=$((current_vmid + 1))
     done
@@ -820,7 +825,9 @@ generate_nodes_json() {
       cpu="$(jq -r --arg key "$name" '.[$key].cpu // empty' <<<"$vm_size_map_json")"
       ram="$(jq -r --arg key "$name" '.[$key].memory_mb // empty' <<<"$vm_size_map_json")"
       disk="$(jq -r --arg key "$name" '.[$key].disk_gb // empty' <<<"$vm_size_map_json")"
+      datastore="$(jq -r --arg key "$name" '.[$key] // empty' <<<"$vm_storage_map_json")"
       [[ -n "$cpu" && -n "$ram" && -n "$disk" ]] || fail "Missing vm_size_map entry for ${name}"
+      [[ -n "$datastore" ]] || fail "Missing vm_storage_map entry for ${name}"
       mac="$(deterministic_mac "$current_vmid")"
       nodes_json="$(jq \
         --arg key "$name" \
@@ -831,7 +838,8 @@ generate_nodes_json() {
         --argjson cpu "$cpu" \
         --argjson ram "$ram" \
         --argjson disk "$disk" \
-        '. + {($key): {ip: $ip, type: $type, vmid: $vmid, cpu: $cpu, ram_mb: $ram, disk_gb: $disk, mac: $mac}}' \
+        --arg datastore "$datastore" \
+        '. + {($key): {ip: $ip, type: $type, vmid: $vmid, cpu: $cpu, ram_mb: $ram, disk_gb: $disk, datastore_id: $datastore, mac: $mac}}' \
         <<<"$nodes_json")"
       current_vmid=$((current_vmid + 1))
     done
@@ -1490,6 +1498,16 @@ vm_size_map_json="$(normalize_json_object "$VM_SIZE_MAP")"
 if [[ "$(jq -r 'length' <<<"$vm_size_map_json")" -eq 0 ]]; then
   fail "vm_size_map for cluster ${CLUSTER_ID} is empty; pass a non-empty --vm-size-map from the current run"
 fi
+if [[ -z "${VM_STORAGE_MAP:-}" ]]; then
+  fail "Missing vm_storage_map for cluster ${CLUSTER_ID}; pass --vm-storage-map from the current run"
+fi
+if ! jq -e . >/dev/null 2>&1 <<<"$VM_STORAGE_MAP"; then
+  fail "vm_storage_map for cluster ${CLUSTER_ID} is not valid JSON: ${VM_STORAGE_MAP}"
+fi
+vm_storage_map_json="$(normalize_json_object "$VM_STORAGE_MAP")"
+if [[ "$(jq -r 'length' <<<"$vm_storage_map_json")" -eq 0 ]]; then
+  fail "vm_storage_map for cluster ${CLUSTER_ID} is empty"
+fi
 
 nodes_json="$(generate_nodes_json)"
 planned_controlplane_ips_json="$(node_array "ip" "controlplane")"
@@ -1534,7 +1552,6 @@ cp -R "$MODULE_SOURCE/." "$work_module_dir/"
 
 jq -n \
   --arg proxmox_node "$PROXMOX_NODE" \
-  --arg vm_datastore "$STORAGE_POOL" \
   --arg file_datastore "$FILE_DATASTORE" \
   --arg bridge "$BRIDGE" \
   --arg gateway "$GATEWAY_IP" \
@@ -1550,7 +1567,6 @@ jq -n \
   --argjson nodes "$nodes_json" \
   '{
     proxmox_node: $proxmox_node,
-    vm_datastore: $vm_datastore,
     file_datastore: $file_datastore,
     bridge: $bridge,
     gateway: $gateway,

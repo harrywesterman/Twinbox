@@ -30,7 +30,7 @@ Each step includes: `id`, `title`, `type`, `status`, `inputs`, `secrets`, `runne
 
 Creates a new cluster and queues provisioning. Validates VMID and IP allocation before persisting.
 
-Request body: `{ name, vip_ip, start_ip, controlplane_count, worker_count, start_vmid, vm_node_map, ... }`
+Request body: `{ name, vip_ip, start_ip, controlplane_count, worker_count, start_vmid, vm_node_map, vm_size_map, vm_storage_map, ... }`
 
 Response (202): `{ cluster_id, cluster_instance_id, job_id }`
 
@@ -146,7 +146,7 @@ Response: `{ start_vmid, vmid_block, start_ip, vip_ip, suggested_ips, gateway_ip
 
 ### `GET /api/proxmox/cluster-resources`
 
-Returns a summary of Proxmox node and VM resources: CPU, memory, disk totals, and per-node active VM counts.
+Returns Proxmox node, VM, and storage resources. Storage entries include the host, storage id, active/enabled state, supported content, shared/local flag, and total/used/available bytes. The provisioning wizard only offers active storages whose content includes `images`.
 
 ## Internal
 

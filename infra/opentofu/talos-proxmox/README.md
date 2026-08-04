@@ -28,11 +28,11 @@ Control plane and worker nodes are provisioned with fixed RAM equal to their ass
 
 | Variable | Description |
 |----------|-------------|
-| `nodes` | Map of node definitions (ip, type, vmid, cpu, ram_mb, disk_gb, mac) |
+| `nodes` | Map of node definitions (ip, type, vmid, cpu, ram_mb, disk_gb, datastore_id, mac) |
 | `cluster_name` | Cluster name prefix for VM names |
 | `cluster_slug` | Cluster slug used for tagging |
 | `proxmox_endpoint` | Proxmox API endpoint |
-| `vm_datastore` | Datastore for VM disks |
+| `nodes[*].datastore_id` | Per-VM datastore for the Talos system disk |
 | `file_datastore` | Datastore for Talos disk image uploads; must allow Proxmox `import` content |
 | `bridge` | Proxmox network bridge |
 | `talos_version` | Talos version to deploy |

@@ -100,8 +100,8 @@ def test_headwind_uses_openbao_cnpg_backup_and_netbird_management_route():
     assert '--service-domain "mdm-admin.${public_zone_name}"' in runner
     assert '--service-name "headwind-mdm-enrollment"' in runner
     assert '--service-domain "mdm.${public_zone_name}"' in runner
-    assert '--target-port 443' in runner
-    assert '--target-protocol https' in runner
+    assert "--target-port 443" in runner
+    assert "--target-protocol https" in runner
     assert "HEADWIND_SHARED_SECRET" in runner
 
 
