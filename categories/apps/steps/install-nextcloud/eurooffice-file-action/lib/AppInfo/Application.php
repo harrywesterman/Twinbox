@@ -7,19 +7,28 @@ namespace OCA\TwinboxEuroofficeAction\AppInfo;
 use OCA\Files\Event\LoadAdditionalScriptsEvent;
 use OCA\TwinboxEuroofficeAction\Listener\LoadAdditionalListener;
 use OCP\AppFramework\App;
-use OCP\EventDispatcher\IEventDispatcher;
+use OCP\AppFramework\Bootstrap\IBootContext;
+use OCP\AppFramework\Bootstrap\IBootstrap;
+use OCP\AppFramework\Bootstrap\IRegistrationContext;
 
-class Application extends App
+class Application extends App implements IBootstrap
 {
     public const APP_ID = 'twinbox_eurooffice_action';
 
     public function __construct(array $urlParams = [])
     {
         parent::__construct(self::APP_ID, $urlParams);
+    }
 
-        $this->getContainer()->get(IEventDispatcher::class)->addServiceListener(
+    public function register(IRegistrationContext $context): void
+    {
+        $context->registerEventListener(
             LoadAdditionalScriptsEvent::class,
             LoadAdditionalListener::class,
         );
+    }
+
+    public function boot(IBootContext $context): void
+    {
     }
 }

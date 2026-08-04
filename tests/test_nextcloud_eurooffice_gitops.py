@@ -204,11 +204,17 @@ def test_nextcloud_bootstrap_installs_the_modern_eurooffice_file_action():
     install_text = INSTALL_STEP.read_text(encoding="utf-8")
     dockerfile_text = (REPO_ROOT / "manager-worker" / "Dockerfile").read_text(encoding="utf-8")
     metadata = EUROOFFICE_ACTION_DIR / "appinfo" / "info.xml"
+    application = EUROOFFICE_ACTION_DIR / "lib" / "AppInfo" / "Application.php"
     listener = EUROOFFICE_ACTION_DIR / "lib" / "Listener" / "LoadAdditionalListener.php"
     source = EUROOFFICE_ACTION_DIR / "src" / "main.js"
 
     assert metadata.exists()
     assert "<id>twinbox_eurooffice_action</id>" in metadata.read_text(encoding="utf-8")
+    application_text = application.read_text(encoding="utf-8")
+    assert "implements IBootstrap" in application_text
+    assert "IRegistrationContext" in application_text
+    assert "registerEventListener(" in application_text
+    assert "LoadAdditionalScriptsEvent::class" in application_text
     listener_text = listener.read_text(encoding="utf-8")
     assert "LoadAdditionalScriptsEvent" in listener_text
     assert "use OCP\\EventDispatcher\\IEventListener;" in listener_text
