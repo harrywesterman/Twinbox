@@ -141,7 +141,10 @@ def test_authentik_exposes_opencloud_global_oidc_discovery_on_both_entrypoints()
         assert doc["spec"]["entryPoints"] == [entrypoint]
         route = doc["spec"]["routes"][0]
         assert "Path(`/.well-known/openid-configuration`)" in route["match"]
-        assert route["middlewares"] == [{"name": "opencloud-oidc-discovery"}]
+        assert route["middlewares"] == [
+            {"name": "authentik-netbird-forwarded-headers"},
+            {"name": "opencloud-oidc-discovery"},
+        ]
         assert route["services"] == [{"kind": "Service", "name": "authentik-server", "port": 80}]
 
     middleware = (

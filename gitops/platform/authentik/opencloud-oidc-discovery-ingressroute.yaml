@@ -10,6 +10,7 @@ spec:
     - kind: Rule
       match: Host(`authentik.__ZONE_NAME__`) && Path(`/.well-known/openid-configuration`)
       middlewares:
+        - name: authentik-netbird-forwarded-headers
         - name: opencloud-oidc-discovery
       services:
         - kind: Service
@@ -29,6 +30,7 @@ spec:
     - kind: Rule
       match: Host(`authentik.__ZONE_NAME__`) && Path(`/.well-known/openid-configuration`)
       middlewares:
+        - name: authentik-netbird-forwarded-headers
         - name: opencloud-oidc-discovery
       services:
         - kind: Service
