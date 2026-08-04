@@ -1107,6 +1107,7 @@ def test_opencloud_gitops_uses_schema_backed_writable_ldap_bootstrap():
     for secret_key in [
         "OC_EVENTS_ENDPOINT",
         "OC_CACHE_STORE_NODES",
+        "COLLABORA_PROOF_KEY",
         "OC_LDAP_INSECURE",
         "PROXY_AUTOPROVISION_ACCOUNTS",
         "PROXY_AUTOPROVISION_CLAIM_USERNAME",
@@ -1195,6 +1196,28 @@ def test_opencloud_gitops_starts_collabora_with_its_native_entrypoint_and_waits_
 
     collabora = deployments["opencloud-collabora"]["spec"]["template"]["spec"]["containers"][0]
     assert "command" not in collabora
+    assert collabora["env"][2] == {
+        "name": "aliasgroup1",
+        "value": "https://opencloud-wopiserver.__ZONE_NAME__:443",
+    }
+    assert collabora["volumeMounts"] == [
+        {
+            "name": "wopi-proof-key",
+            "mountPath": "/etc/coolwsd/proof_key",
+            "subPath": "proof_key",
+            "readOnly": True,
+        }
+    ]
+    assert deployments["opencloud-collabora"]["spec"]["template"]["spec"]["volumes"] == [
+        {
+            "name": "wopi-proof-key",
+            "secret": {
+                "secretName": "opencloud-bootstrap",
+                "defaultMode": 292,
+                "items": [{"key": "COLLABORA_PROOF_KEY", "path": "proof_key"}],
+            },
+        }
+    ]
     assert collabora["readinessProbe"]["httpGet"] == {
         "path": "/hosting/discovery",
         "port": "http",
@@ -1207,6 +1230,9 @@ def test_opencloud_step_preserves_and_waits_for_nats_settings_before_collaborati
     for expected in [
         'opencloud_oc_events_endpoint="opencloud:9233"',
         'opencloud_oc_cache_store_nodes="opencloud:9233"',
+        'opencloud_collabora_proof_key="$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096)"',
+        '"COLLABORA_PROOF_KEY:opencloud_collabora_proof_key"',
+        "COLLABORA_PROOF_KEY: $COLLABORA_PROOF_KEY",
         '"OC_EVENTS_ENDPOINT:opencloud_oc_events_endpoint"',
         '"OC_CACHE_STORE_NODES:opencloud_oc_cache_store_nodes"',
         "OC_EVENTS_ENDPOINT: $OC_EVENTS_ENDPOINT",
