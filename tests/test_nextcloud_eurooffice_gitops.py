@@ -170,7 +170,10 @@ def test_nextcloud_bootstrap_preserves_collabora_default_and_configures_eurooffi
     assert "config:app:set eurooffice DocumentServerUrl" in install_text
     assert "config:app:set eurooffice DocumentServerInternalUrl" in install_text
     assert "config:app:set eurooffice StorageUrl" in install_text
-    assert "config:app:set eurooffice jwt_secret" in install_text
+    assert (
+        "config:app:set eurooffice jwt_secret --value='${nextcloud_eurooffice_jwt_secret}' "
+        "--type=string >/dev/null 2>&1"
+    ) in install_text
     assert "config:app:set eurooffice jwt_header --value='AuthorizationJWT'" in install_text
     assert "config:app:set eurooffice sameTab --value='false' --type=boolean" in install_text
     assert "config:app:set eurooffice enableSharing --value='true' --type=boolean" in install_text

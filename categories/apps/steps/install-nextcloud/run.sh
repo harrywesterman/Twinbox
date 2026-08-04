@@ -646,7 +646,7 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-d
   "php occ config:app:set eurooffice DocumentServerUrl --value='https://nextcloud-eurooffice.${public_zone_name}/' --type=string &&
    php occ config:app:set eurooffice DocumentServerInternalUrl --value='http://nextcloud-eurooffice.nextcloud.svc.cluster.local/' --type=string &&
    php occ config:app:set eurooffice StorageUrl --value='${NEXTCLOUD_HOST}/' --type=string &&
-   php occ config:app:set eurooffice jwt_secret --value='${nextcloud_eurooffice_jwt_secret}' --type=string &&
+   php occ config:app:set eurooffice jwt_secret --value='${nextcloud_eurooffice_jwt_secret}' --type=string >/dev/null 2>&1 &&
    php occ config:app:set eurooffice jwt_header --value='AuthorizationJWT' --type=string &&
    php occ config:app:set eurooffice sameTab --value='false' --type=boolean &&
    php occ config:app:set eurooffice enableSharing --value='true' --type=boolean &&
