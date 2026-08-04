@@ -1105,6 +1105,8 @@ def test_opencloud_gitops_uses_schema_backed_writable_ldap_bootstrap():
     assert 'ldapsearch -H "$OC_LDAP_URI"' in deployment_text
 
     for secret_key in [
+        "OC_EVENTS_ENDPOINT",
+        "OC_CACHE_STORE_NODES",
         "OC_LDAP_INSECURE",
         "PROXY_AUTOPROVISION_ACCOUNTS",
         "PROXY_AUTOPROVISION_CLAIM_USERNAME",
@@ -1118,6 +1120,66 @@ def test_opencloud_gitops_uses_schema_backed_writable_ldap_bootstrap():
     ]:
         assert f"secretKey: {secret_key}" in externalsecret_text
         assert f"property: {secret_key}" in externalsecret_text
+
+
+def test_opencloud_gitops_starts_collabora_with_its_native_entrypoint_and_waits_for_dependencies():
+    deployment_text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "opencloud" / "deployment.yaml"
+    ).read_text(encoding="utf-8")
+    documents = list(yaml.safe_load_all(deployment_text))
+    deployments = {document["metadata"]["name"]: document for document in documents}
+
+    opencloud_env = {
+        item["name"]: item["value"]
+        for item in deployments["opencloud"]["spec"]["template"]["spec"]["containers"][0]["env"]
+        if "value" in item
+    }
+    assert opencloud_env["NATS_NATS_PORT"] == "9233"
+    assert opencloud_env["OC_INSECURE"] == "true"
+    assert opencloud_env["PROXY_TLS"] == "false"
+
+    collaboration_spec = deployments["opencloud-collaboration"]["spec"]["template"]["spec"]
+    init_container = collaboration_spec["initContainers"][0]
+    assert init_container["name"] == "wait-for-opencloud-dependencies"
+    assert init_container["securityContext"]["runAsNonRoot"] is True
+    wait_command = init_container["command"][-1]
+    assert "nc -z -w 2 opencloud 9233" in wait_command
+    assert "http://opencloud-collabora:9980/hosting/discovery" in wait_command
+
+    collaboration_env = {
+        item["name"]: item["value"]
+        for item in collaboration_spec["containers"][0]["env"]
+        if "value" in item
+    }
+    assert collaboration_env["MICRO_REGISTRY_ADDRESS"] == "opencloud:9233"
+    assert collaboration_env["OC_EVENTS_ENDPOINT"] == "opencloud:9233"
+    assert collaboration_env["OC_CACHE_STORE_NODES"] == "opencloud:9233"
+
+    collabora = deployments["opencloud-collabora"]["spec"]["template"]["spec"]["containers"][0]
+    assert "command" not in collabora
+    assert collabora["readinessProbe"]["httpGet"] == {
+        "path": "/hosting/discovery",
+        "port": "http",
+    }
+
+
+def test_opencloud_step_preserves_and_waits_for_nats_settings_before_collaboration():
+    text = OPENCLOUD_STEP_SCRIPT.read_text(encoding="utf-8")
+
+    for expected in [
+        'opencloud_oc_events_endpoint="opencloud:9233"',
+        'opencloud_oc_cache_store_nodes="opencloud:9233"',
+        '"OC_EVENTS_ENDPOINT:opencloud_oc_events_endpoint"',
+        '"OC_CACHE_STORE_NODES:opencloud_oc_cache_store_nodes"',
+        "OC_EVENTS_ENDPOINT: $OC_EVENTS_ENDPOINT",
+        "OC_CACHE_STORE_NODES: $OC_CACHE_STORE_NODES",
+        "OC_EVENTS_ENDPOINT,OC_CACHE_STORE_NODES",
+    ]:
+        assert expected in text
+
+    assert text.index('wait_for_deployment_rollout "opencloud" "opencloud-collabora"') < text.index(
+        'wait_for_deployment_rollout "opencloud" "opencloud-collaboration"'
+    )
 
 
 def test_opencloud_pvc_sizes_match_the_live_bound_volumes():

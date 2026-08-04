@@ -117,10 +117,20 @@ spec:
               value: /etc/opencloud/proxy.yaml
             - name: MICRO_REGISTRY_ADDRESS
               value: 127.0.0.1:9233
+            - name: OC_EVENTS_ENDPOINT
+              value: opencloud:9233
+            - name: OC_CACHE_STORE_NODES
+              value: opencloud:9233
             - name: OC_REVA_GATEWAY
               value: eu.opencloud.api.gateway
             - name: NATS_NATS_HOST
               value: 0.0.0.0
+            - name: NATS_NATS_PORT
+              value: "9233"
+            - name: OC_INSECURE
+              value: "true"
+            - name: PROXY_TLS
+              value: "false"
             - name: GATEWAY_GRPC_ADDR
               value: 0.0.0.0:9142
           readinessProbe:
@@ -194,6 +204,32 @@ spec:
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
+      initContainers:
+        - name: wait-for-opencloud-dependencies
+          image: busybox:1.38.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              until nc -z -w 2 opencloud 9233; do
+                echo "Waiting for OpenCloud NATS registry"
+                sleep 5
+              done
+              until wget -q -T 5 -O /dev/null http://opencloud-collabora:9980/hosting/discovery; do
+                echo "Waiting for Collabora discovery endpoint"
+                sleep 5
+              done
       containers:
         - name: collaboration
           image: opencloudeu/opencloud-rolling:7.3.0
@@ -252,10 +288,11 @@ spec:
             - name: OC_REVA_GATEWAY
               value: eu.opencloud.api.gateway
             - name: MICRO_REGISTRY_ADDRESS
-              valueFrom:
-                secretKeyRef:
-                  name: opencloud-bootstrap
-                  key: MICRO_REGISTRY_ADDRESS
+              value: opencloud:9233
+            - name: OC_EVENTS_ENDPOINT
+              value: opencloud:9233
+            - name: OC_CACHE_STORE_NODES
+              value: opencloud:9233
             - name: COLLABORATION_WOPI_SRC
               valueFrom:
                 secretKeyRef:
@@ -331,10 +368,6 @@ spec:
                 - SYS_ADMIN
             seccompProfile:
               type: Unconfined
-          command:
-            - /bin/bash
-            - -ec
-            - coolconfig generate-proof-key && /start-collabora-online.sh
           ports:
             - containerPort: 9980
               name: http
@@ -361,7 +394,8 @@ spec:
             - name: extra_params
               value: --o:ssl.enable=false --o:ssl.termination=true --o:net.frame_ancestors=https://opencloud.__ZONE_NAME__ https://opencloud-collabora.__ZONE_NAME__ https://opencloud-wopiserver.__ZONE_NAME__
           readinessProbe:
-            tcpSocket:
+            httpGet:
+              path: /hosting/discovery
               port: http
             initialDelaySeconds: 20
             periodSeconds: 10
