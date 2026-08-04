@@ -6,12 +6,21 @@ namespace OCA\TwinboxEuroofficeAction\Listener;
 
 use OCA\Files\Event\LoadAdditionalScriptsEvent;
 use OCA\TwinboxEuroofficeAction\AppInfo\Application;
+use OCP\EventDispatcher\Event;
+use OCP\EventDispatcher\IEventListener;
 use OCP\Util;
 
-class LoadAdditionalListener
+/**
+ * @template-implements IEventListener<LoadAdditionalScriptsEvent>
+ */
+class LoadAdditionalListener implements IEventListener
 {
-    public function handle(LoadAdditionalScriptsEvent $event): void
+    public function handle(Event $event): void
     {
+        if (!($event instanceof LoadAdditionalScriptsEvent)) {
+            return;
+        }
+
         Util::addScript(Application::APP_ID, 'main', 'files');
     }
 }
