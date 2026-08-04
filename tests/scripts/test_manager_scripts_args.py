@@ -825,6 +825,13 @@ def test_talos_node_hostname_matches_proxmox_vm_name():
     assert 'echo "    hostname:' not in script_text
 
 
+def test_talos_node_configs_enable_user_namespaces_for_document_jails():
+    script_text = _apply_cluster_text()
+
+    assert 'echo "  sysctls:"' in script_text
+    assert 'echo "    user.max_user_namespaces: \\"11255\\""' in script_text
+
+
 def test_longhorn_step_installs_via_argocd_and_waits_for_health():
     step_text = _longhorn_step_text()
     step_manifest_text = _longhorn_step_manifest_text()

@@ -1132,6 +1132,10 @@ write_node_patch() {
     if [[ "$type" == "worker" ]]; then
       echo "    node.longhorn.io/create-default-disk: \"true\""
     fi
+    # Collabora-based document servers create a user namespace for each jail.
+    # Talos defaults this kernel limit to zero, which prevents those editors from starting.
+    echo "  sysctls:"
+    echo "    user.max_user_namespaces: \"11255\""
     echo "  network:"
     [[ -n "$nameserver_block" ]] && printf '%s' "$nameserver_block"
     [[ -n "$search_domain_block" ]] && printf '%s' "$search_domain_block"
