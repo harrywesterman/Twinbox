@@ -233,6 +233,23 @@ def test_nextcloud_bootstrap_installs_the_modern_eurooffice_file_action():
     assert "php occ app:enable twinbox_eurooffice_action" in install_text
 
 
+def test_twinbox_companion_keeps_collabora_as_the_default_direct_editor():
+    application = EUROOFFICE_ACTION_DIR / "lib" / "AppInfo" / "Application.php"
+    listener = EUROOFFICE_ACTION_DIR / "lib" / "Listener" / "CollaboraDefaultListener.php"
+    adapter = EUROOFFICE_ACTION_DIR / "lib" / "DirectEditing" / "EuroOfficeDirectEditor.php"
+
+    application_text = application.read_text(encoding="utf-8")
+    assert "RegisterDirectEditorEvent::class" in application_text
+    assert "CollaboraDefaultListener::class" in application_text
+    assert listener.exists()
+    listener_text = listener.read_text(encoding="utf-8")
+    assert "getEditors()" in listener_text
+    assert "new EuroOfficeDirectEditor($editors['richdocuments'])" in listener_text
+    assert adapter.exists()
+    assert "implements IEditor" in adapter.read_text(encoding="utf-8")
+    assert "return 'eurooffice';" in adapter.read_text(encoding="utf-8")
+
+
 def test_collabora_is_privileged_for_document_jail_mounts():
     values = yaml.safe_load(NEXTCLOUD_VALUES.read_text(encoding="utf-8"))
     optional_app_text = OPTIONAL_APP.read_text(encoding="utf-8")
