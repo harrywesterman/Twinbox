@@ -499,6 +499,13 @@ test("NetBird bastion question flow uses external-dns values from the earlier DN
       "existing_bastion_confirm_port_forwarding",
     ]
   );
+  const serverType = netbirdBastion.inputs.find((input) => input.id === "hcloud_server_type");
+  assert.equal(serverType.default, "cax11");
+  assert.deepEqual(serverType.options, [
+    { label: "CAX11 — ARM64, 2 vCPU / 4 GB", value: "cax11" },
+    { label: "CPX12 — x86/AMD, 1 vCPU / 2 GB (light/test)", value: "cpx12" },
+    { label: "CPX22 — x86/AMD, 2 vCPU / 4 GB", value: "cpx22" },
+  ]);
   assert.match(netbirdBastion.side_help, /DNS provider configured earlier/);
   assert.doesNotMatch(netbirdBastion.side_help, /Cloudflare credentials/);
 

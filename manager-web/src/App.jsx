@@ -36,6 +36,7 @@ import {
   serializeUiState,
 } from "./journey.js";
 import { normalizeLogEntries } from "./install-logs.js";
+import { getInputOptions } from "./input-options.js";
 import { getQuestionSteps } from "./question-flow.js";
 import {
   isMissingClusterError,
@@ -373,6 +374,8 @@ function InputField({ stepId, input, value, onChange }) {
       );
     }
 
+    const selectOptions = getInputOptions(input, value);
+
     return (
       <label className="wizard-field" htmlFor={controlId}>
         <span className="wizard-field-label">{input.label}</span>
@@ -384,7 +387,7 @@ function InputField({ stepId, input, value, onChange }) {
           onChange={(event) => onChange(input.id, event.target.value)}
         >
           <option value="">Choose an option</option>
-          {input.options.map((option) => (
+          {selectOptions.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>

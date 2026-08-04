@@ -160,6 +160,14 @@ SSH uses a LAN address and public DNS points at a router-forwarded public IPv4.
 If Hetzner returns `resource_unavailable` while placing the default `cax11`
 server, Twinbox retries once with `cpx22`.
 
+The wizard offers `cax11`, `cpx12`, and `cpx22` as explicit server types. The
+`cpx12` has 1 vCPU, 2 GB RAM, and 40 GB storage, so it is intended for light
+or test installations with low bastion traffic. The bastion runs multiple
+NetBird, Traefik, and reverse-proxy components, so `cax11` remains the default
+with 2 vCPU and 4 GB RAM. An explicitly selected `cpx12` is passed through as
+selected; only a capacity failure for the default `cax11` triggers the
+`cpx22` retry.
+
 Inputs:
 
 | Input | Required | Notes |
@@ -167,7 +175,7 @@ Inputs:
 | `bastion_provider` | Yes | `hetzner` by default. Use `existing-vm` for a VM you created yourself. |
 | `hcloud_token` | Hetzner only | Hetzner Cloud token with permissions to create servers, SSH keys, and firewalls. |
 | `hcloud_location` | No | Defaults to `fsn1`. |
-| `hcloud_server_type` | No | Defaults to `cax11` and falls back once to `cpx22` if Hetzner cannot place the default server. |
+| `hcloud_server_type` | No | Choose `cax11` (default, ARM64, 2 vCPU/4 GB), `cpx12` (x86/AMD, 1 vCPU/2 GB for light/test use), or `cpx22` (x86/AMD, 2 vCPU/4 GB). Only an unavailable default `cax11` falls back once to `cpx22`. |
 | `existing_bastion_mode` | Existing VM only | `cloud-vm` or `local-port-forward`. |
 | `existing_bastion_public_ipv4` | Existing VM only | Public IPv4 used for DNS A records. |
 | `existing_bastion_ssh_host` | Existing VM only | SSH endpoint reachable from the Management VM; this may be a private LAN address for local mode. |

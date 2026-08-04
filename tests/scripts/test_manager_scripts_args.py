@@ -5399,17 +5399,41 @@ def test_netbird_bastion_falls_back_to_cpx22_on_hetzner_capacity_errors():
     step_text = NETBIRD_BASTION_STEP_MANIFEST.read_text(encoding="utf-8")
     run_text = NETBIRD_BASTION_STEP_SCRIPT.read_text(encoding="utf-8")
     docs_text = (REPO_ROOT / "docs" / "netbird.md").read_text(encoding="utf-8")
+    step_data = yaml.safe_load(step_text)
+    server_type_input = next(
+        input_definition
+        for input_definition in step_data["inputs"]
+        if input_definition["id"] == "hcloud_server_type"
+    )
 
     assert "default: cax11" in step_text
-    assert "cpx22" in step_text
+    assert server_type_input["default"] == "cax11"
+    assert server_type_input["options"] == [
+        {"label": "CAX11 — ARM64, 2 vCPU / 4 GB", "value": "cax11"},
+        {"label": "CPX12 — x86/AMD, 1 vCPU / 2 GB (light/test)", "value": "cpx12"},
+        {"label": "CPX22 — x86/AMD, 2 vCPU / 4 GB", "value": "cpx22"},
+    ]
     assert "resource_unavailable" in run_text
+    assert 'if [[ "$server_type" == "cax11" ]]' in run_text
+    assert '-var "server_type=$server_type"' in run_text
     assert "Hetzner placement for cax11 is unavailable; retrying once with cpx22" in run_text
     assert "Cleaning up partially created Hetzner resources before retrying with cpx22" in run_text
     assert "Retrying NetBird VPS OpenTofu configuration with cpx22" in run_text
-    assert "Defaults to `cax11` and falls back once to `cpx22`" in docs_text
+    assert "Choose `cax11` (default" in docs_text
+    assert "`cpx12` (x86/AMD, 1 vCPU/2 GB for light/test use)" in docs_text
+    assert "Only an unavailable default `cax11` falls back once to `cpx22`" in docs_text
     assert (
         "If Hetzner returns `resource_unavailable` while placing the default `cax11`" in docs_text
     )
+
+
+def test_saved_unknown_hcloud_server_type_is_preserved_in_the_dropdown():
+    input_options_text = (REPO_ROOT / "manager-web" / "src" / "input-options.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert "saved value" in input_options_text
+    assert "return [...options" in input_options_text
 
 
 def test_netbird_cloud_init_uses_exact_netbird_cert_and_tcp_passthrough():

@@ -171,6 +171,13 @@ test("catalog exposes NetBird bastion without duplicate DNS, SSH, or Cloudflare 
         "existing_bastion_confirm_port_forwarding",
       ]
     );
+    const serverType = netbirdBastion.inputs.find((input) => input.id === "hcloud_server_type");
+    assert.equal(serverType.default, "cax11");
+    assert.deepEqual(serverType.options, [
+      { label: "CAX11 — ARM64, 2 vCPU / 4 GB", value: "cax11" },
+      { label: "CPX12 — x86/AMD, 1 vCPU / 2 GB (light/test)", value: "cpx12" },
+      { label: "CPX22 — x86/AMD, 2 vCPU / 4 GB", value: "cpx22" },
+    ]);
     assert.equal(netbirdBastion.secrets.files.KUBECONFIG_FILE.attachment, "kubeconfig");
     assert.match(netbirdBastion.side_help, /DNS provider configured earlier/);
     assert.doesNotMatch(netbirdBastion.side_help, /Cloudflare credentials/);
