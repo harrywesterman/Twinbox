@@ -1137,6 +1137,8 @@ def test_opencloud_gitops_starts_collabora_with_its_native_entrypoint_and_waits_
     assert opencloud_env["NATS_NATS_PORT"] == "9233"
     assert opencloud_env["OC_INSECURE"] == "true"
     assert opencloud_env["PROXY_TLS"] == "false"
+    assert opencloud_env["OC_EVENTS_ENDPOINT"] == "127.0.0.1:9233"
+    assert opencloud_env["OC_CACHE_STORE_NODES"] == "127.0.0.1:9233"
 
     collaboration_spec = deployments["opencloud-collaboration"]["spec"]["template"]["spec"]
     init_container = collaboration_spec["initContainers"][0]

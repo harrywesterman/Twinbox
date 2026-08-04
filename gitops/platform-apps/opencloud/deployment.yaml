@@ -118,9 +118,9 @@ spec:
             - name: MICRO_REGISTRY_ADDRESS
               value: 127.0.0.1:9233
             - name: OC_EVENTS_ENDPOINT
-              value: opencloud:9233
+              value: 127.0.0.1:9233
             - name: OC_CACHE_STORE_NODES
-              value: opencloud:9233
+              value: 127.0.0.1:9233
             - name: OC_REVA_GATEWAY
               value: eu.opencloud.api.gateway
             - name: NATS_NATS_HOST
