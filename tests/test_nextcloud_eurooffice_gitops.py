@@ -47,6 +47,7 @@ def test_eurooffice_resources_are_declared_in_the_nextcloud_kustomization():
         "eurooffice-pvc.yaml",
         "eurooffice-deployment.yaml",
         "eurooffice-service.yaml",
+        "eurooffice-forwarded-headers-middleware.yaml",
         "middleware.yaml",
         "ingressroute.yaml",
         "collabora-ingressroute.yaml",
@@ -156,12 +157,26 @@ def test_eurooffice_routes_are_public_and_netbird_mirrors():
     assert routes["eurooffice"]["spec"]["routes"][0] == {
         "kind": "Rule",
         "match": "Host(`nextcloud-eurooffice.__ZONE_NAME__`)",
+        "middlewares": [{"name": "eurooffice-forwarded-headers"}],
         "services": [{"name": "nextcloud-eurooffice", "port": 80}],
     }
     assert routes["eurooffice"]["spec"]["tls"] == {}
     assert routes["eurooffice-netbird"]["spec"]["entryPoints"] == ["webnetbird"]
     assert routes["eurooffice-netbird"]["spec"]["routes"] == routes["eurooffice"]["spec"]["routes"]
     assert "tls" not in routes["eurooffice-netbird"]["spec"]
+
+
+def test_eurooffice_forwarded_headers_middleware_preserves_https_origin():
+    middleware = _resource("Middleware", "eurooffice-forwarded-headers")
+
+    assert middleware["spec"] == {
+        "headers": {
+            "customRequestHeaders": {
+                "X-Forwarded-Port": "443",
+                "X-Forwarded-Proto": "https",
+            }
+        }
+    }
 
 
 def test_nextcloud_bootstrap_preserves_collabora_default_and_configures_eurooffice():

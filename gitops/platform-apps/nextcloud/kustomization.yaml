@@ -10,6 +10,7 @@ resources:
   - eurooffice-pvc.yaml
   - eurooffice-deployment.yaml
   - eurooffice-service.yaml
+  - eurooffice-forwarded-headers-middleware.yaml
   - middleware.yaml
   - ingressroute.yaml
   - collabora-ingressroute.yaml
