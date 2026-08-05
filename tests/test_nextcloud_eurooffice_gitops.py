@@ -87,11 +87,13 @@ def test_eurooffice_deployment_is_pinned_and_has_health_checks_and_storage():
         "fi\n"
         "if [ ! -d /mnt/eurooffice-logs/adminpanel ]; then\n"
         "  cp -a /var/log/euro-office/documentserver/. /mnt/eurooffice-logs/\n"
-        "fi\n",
+        "fi\n"
+        "chown -R ds:ds /mnt/eurooffice-data\n",
     ]
     assert {item["mountPath"] for item in pod_spec["initContainers"][0]["volumeMounts"]} == {
         "/mnt/eurooffice-config",
         "/mnt/eurooffice-logs",
+        "/mnt/eurooffice-data",
     }
     assert env["JWT_ENABLED"]["value"] == "true"
     assert env["JWT_HEADER"]["value"] == "AuthorizationJWT"
