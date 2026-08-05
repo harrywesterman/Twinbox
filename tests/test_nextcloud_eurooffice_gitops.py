@@ -88,6 +88,8 @@ def test_eurooffice_deployment_is_pinned_and_has_health_checks_and_storage():
         "if [ ! -d /mnt/eurooffice-logs/adminpanel ]; then\n"
         "  cp -a /var/log/euro-office/documentserver/. /mnt/eurooffice-logs/\n"
         "fi\n"
+        "mkdir -p /mnt/eurooffice-data/App_Data\n"
+        "cp -a /var/lib/euro-office/documentserver/App_Data/. /mnt/eurooffice-data/App_Data/\n"
         "chown -R ds:ds /mnt/eurooffice-data\n",
     ]
     assert {item["mountPath"] for item in pod_spec["initContainers"][0]["volumeMounts"]} == {

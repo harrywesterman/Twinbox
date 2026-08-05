@@ -34,6 +34,8 @@ spec:
               if [ ! -d /mnt/eurooffice-logs/adminpanel ]; then
                 cp -a /var/log/euro-office/documentserver/. /mnt/eurooffice-logs/
               fi
+              mkdir -p /mnt/eurooffice-data/App_Data
+              cp -a /var/lib/euro-office/documentserver/App_Data/. /mnt/eurooffice-data/App_Data/
               chown -R ds:ds /mnt/eurooffice-data
           volumeMounts:
             - name: config
