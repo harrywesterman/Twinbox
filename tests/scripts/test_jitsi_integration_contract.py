@@ -183,8 +183,9 @@ def test_jitsi_platform_overlay_provides_broker_secret_sync_service_and_ingress(
 
     assert "kind: Deployment" in deployment_text
     assert "name: auth-jitsi" in deployment_text
-    assert (
-        "ghcr.io/harrywesterman/twinbox-manager-worker:jitsi-openid-sha-ad89c77" in deployment_text
+    assert re.search(
+        r"ghcr\.io/harrywesterman/twinbox-manager-worker:jitsi-openid-sha-[0-9a-f]{7}",
+        deployment_text,
     )
     assert "name: jitsi-auth" in deployment_text
     assert 'value: "0.0.0.0:3000"' in deployment_text
@@ -217,6 +218,8 @@ def test_jitsi_openid_image_is_pinned_and_patched_for_room_scoped_short_lived_to
     assert '"dockerfile": "./images/jitsi-openid/Dockerfile"' in workflow_text
     assert "value=jitsi-openid-latest" in workflow_text
     assert "type=sha,prefix=jitsi-openid-" in workflow_text
+    assert "Refresh pinned image references" in workflow_text
+    assert "jitsi-openid-(?:latest|sha-[0-9a-f]{7})" in workflow_text
 
     assert "ARG JITSI_OPENID_REF=5a023e2eb51dfbeb551d04861c11f52e886b53d6" in dockerfile_text
     assert "COPY 0001-room-scoped-short-lived-jwt.patch" in dockerfile_text

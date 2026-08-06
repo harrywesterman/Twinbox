@@ -350,12 +350,13 @@ jobs:
         id: sha
         run: echo "short=sha-${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
 
-      - name: Update all :latest references to pinned SHA tag
+      - name: Refresh pinned image references
         env:
           SHORT_SHA: ${{ steps.sha.outputs.short }}
         run: |
           python3 << 'PYEOF'
           import os
+          import re
 
           sha = os.environ['SHORT_SHA']
 
@@ -370,12 +371,6 @@ jobs:
                   (
                       'ghcr.io/harrywesterman/twinbox-manager-worker:latest',
                       f'ghcr.io/harrywesterman/twinbox-manager-worker:{sha}',
-                  ),
-              ],
-              'gitops/platform-apps/jitsi/auth-deployment.yaml': [
-                  (
-                      'ghcr.io/harrywesterman/twinbox-manager-worker:jitsi-openid-latest',
-                      f'ghcr.io/harrywesterman/twinbox-manager-worker:jitsi-openid-{sha}',
                   ),
               ],
               '.env.example': [
@@ -394,12 +389,6 @@ jobs:
                   (
                       'TWINBOX_VM_PREVIEW_IMAGE_TAG:-latest}',
                       f'TWINBOX_VM_PREVIEW_IMAGE_TAG:-{sha}}}',
-                  ),
-              ],
-              'tests/scripts/test_jitsi_integration_contract.py': [
-                  (
-                      'ghcr.io/harrywesterman/twinbox-manager-worker:jitsi-openid-latest',
-                      f'ghcr.io/harrywesterman/twinbox-manager-worker:jitsi-openid-{sha}',
                   ),
               ],
               'docs/troubleshooting.md': [
@@ -425,6 +414,19 @@ jobs:
 
               with open(filepath, 'w') as f:
                   f.write(content)
+
+          jitsi_deployment = 'gitops/platform-apps/jitsi/auth-deployment.yaml'
+          with open(jitsi_deployment) as f:
+              content = f.read()
+          content, replacements = re.subn(
+              r'ghcr\.io/harrywesterman/twinbox-manager-worker:jitsi-openid-(?:latest|sha-[0-9a-f]{7})',
+              f'ghcr.io/harrywesterman/twinbox-manager-worker:jitsi-openid-{sha}',
+              content,
+          )
+          if replacements:
+              with open(jitsi_deployment, 'w') as f:
+                  f.write(content)
+              print(f"  {jitsi_deployment}: refreshed Jitsi OpenID image pin")
 
           print("Done")
           PYEOF
