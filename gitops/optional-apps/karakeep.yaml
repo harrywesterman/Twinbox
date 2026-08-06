@@ -41,6 +41,32 @@ spec:
                         OAUTH_PROVIDER_NAME: Authentik
                         OAUTH_SCOPE: "openid email profile"
                         OAUTH_WELLKNOWN_URL: 'https://authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/application/o/karakeep/.well-known/openid-configuration'
+                      resources:
+                        requests:
+                          cpu: 500m
+                          memory: 512Mi
+                        limits:
+                          cpu: "1"
+                          memory: 1Gi
+                      probes:
+                        liveness:
+                          spec:
+                            initialDelaySeconds: 10
+                            timeoutSeconds: 5
+                        readiness:
+                          spec:
+                            initialDelaySeconds: 10
+                            timeoutSeconds: 5
+                        startup:
+                          enabled: true
+                          custom: true
+                          spec:
+                            failureThreshold: 30
+                            periodSeconds: 5
+                            timeoutSeconds: 5
+                            httpGet:
+                              path: /api/health
+                              port: 3000
                 # Chrome stays within the cluster's baseline PodSecurity policy by
                 # running without SYS_ADMIN and using the standard no-sandbox mode.
                 chrome:

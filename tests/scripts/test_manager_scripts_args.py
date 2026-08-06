@@ -4757,6 +4757,12 @@ def test_karakeep_argo_application_manages_the_platform_overlay():
     )
     assert "secrets:" in text
     assert "enabled: false" in text
+    assert "cpu: 500m" in text
+    assert "memory: 512Mi" in text
+    assert 'cpu: "1"' in text
+    assert "memory: 1Gi" in text
+    assert "startup:" in text
+    assert "failureThreshold: 30" in text
     assert "path: gitops/platform-apps/karakeep" in text
     assert "CreateNamespace=true" in text
     assert "name: karakeep-wiredoor" not in text
