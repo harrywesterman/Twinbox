@@ -1,0 +1,14 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: audiobookshelf-netbird-forwarded-headers
+  namespace: audiobookshelf
+  annotations:
+    twinbox.io/description: >-
+      Keep Audiobookshelf OpenID callbacks on the public HTTPS origin behind
+      NetBird Reverse Proxy.
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Port: "443"
+      X-Forwarded-Proto: https
