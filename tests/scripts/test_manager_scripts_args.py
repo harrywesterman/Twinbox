@@ -20,6 +20,7 @@ MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "main.tf"
 MODULE_OUTPUTS = REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "outputs.tf"
 INSTALL_SECRET_SYNC_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-secret-sync.sh"
 OPENBAO_SECRET_SYNC_HELPER = REPO_ROOT / "scripts" / "manager" / "sync-openbao-global-secret.sh"
+OPENBAO_VALUES_RENDERER = REPO_ROOT / "scripts" / "manager" / "openbao-secret-sync.sh"
 ARGO_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-argocd.sh"
 APPLY_ARGO_APP_SCRIPT = REPO_ROOT / "scripts" / "manager" / "apply-argocd-application.sh"
 RENDER_CILIUM_SCRIPT = REPO_ROOT / "scripts" / "manager" / "render-cilium-manifest.sh"
@@ -4258,6 +4259,7 @@ def test_loki_and_openbao_longhorn_sizes_are_right_sized():
     openbao_values_text = (REPO_ROOT / "gitops" / "values" / "openbao.yaml").read_text(
         encoding="utf-8"
     )
+    openbao_renderer_text = OPENBAO_VALUES_RENDERER.read_text(encoding="utf-8")
 
     assert "size: 10Gi" in loki_values_text
     assert "storageClass: longhorn-single" in loki_values_text
@@ -4266,6 +4268,9 @@ def test_loki_and_openbao_longhorn_sizes_are_right_sized():
     assert "size: 10Gi" in openbao_values_text
     assert "storageClass: longhorn-single" in openbao_values_text
     assert "size: 2Gi" not in openbao_values_text
+    for text in (openbao_values_text, openbao_renderer_text):
+        assert "requests:\n      cpu: 100m\n      memory: 512Mi" in text
+        assert "limits:\n      cpu: 500m\n      memory: 1Gi" in text
 
 
 def test_authentik_db_cluster_is_scaled_for_ha_capacity_without_storage_replication():
