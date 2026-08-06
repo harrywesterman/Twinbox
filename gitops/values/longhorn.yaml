@@ -11,6 +11,7 @@ defaultSettings:
   createDefaultDiskLabeledNodes: true
   systemManagedComponentsNodeSelector: twinbox.io/role=worker
   defaultReplicaCount: 2
+  replicaAutoBalance: least-effort
   # Twinbox defaults to two replicas for homelab HA without tripling every
   # single-pod PVC. Dedicated worker disks can run closer to full, but we still
   # keep a small free-space floor for snapshots and replica churn.

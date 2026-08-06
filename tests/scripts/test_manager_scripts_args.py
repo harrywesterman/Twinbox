@@ -886,6 +886,7 @@ def test_longhorn_step_installs_via_argocd_and_waits_for_health():
     assert "global:" in longhorn_values_text
     assert "twinbox.io/role: worker" in longhorn_values_text
     assert "defaultReplicaCount: 2" in longhorn_values_text
+    assert "replicaAutoBalance: least-effort" in longhorn_values_text
     assert "defaultClassReplicaCount: 2" in longhorn_values_text
     assert 'storageOverProvisioningPercentage: "300"' in longhorn_values_text
     assert 'storageReservedPercentageForDefaultDisk: "10"' in longhorn_values_text
