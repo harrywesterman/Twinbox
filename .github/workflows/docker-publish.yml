@@ -151,7 +151,7 @@ jobs:
                   "tags": "\n".join([
                       "type=raw,value=jitsi-openid-latest,enable={{is_default_branch}}",
                       "type=ref,event=tag,prefix=jitsi-openid-",
-                      "type=sha,prefix=jitsi-openid-",
+                      "type=sha,prefix=jitsi-openid-sha-",
                   ]),
               },
           ]
@@ -258,7 +258,7 @@ jobs:
       - name: Verify Jitsi broker image is publicly pullable
         if: matrix.image_name == 'twinbox-jitsi-openid' && github.ref == 'refs/heads/main'
         run: |
-          image_tag="jitsi-openid-${GITHUB_SHA:0:7}"
+          image_tag="jitsi-openid-sha-${GITHUB_SHA:0:7}"
           registry_token="$(
             curl --fail --silent --show-error \
               "https://ghcr.io/token?service=ghcr.io&scope=repository:harrywesterman/twinbox-manager-worker:pull" \
