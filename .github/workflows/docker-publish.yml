@@ -255,6 +255,30 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
+      - name: Make Jitsi broker package public
+        if: matrix.image_name == 'twinbox-jitsi-openid' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method PATCH "/user/packages/container/${{ matrix.package_name }}" \
+            -f visibility=public
+
+      - name: Verify Jitsi broker image is publicly pullable
+        if: matrix.image_name == 'twinbox-jitsi-openid' && github.ref == 'refs/heads/main'
+        run: |
+          image_tag="jitsi-openid-${GITHUB_SHA:0:7}"
+          registry_token="$(
+            curl --fail --silent --show-error \
+              "https://ghcr.io/token?service=ghcr.io&scope=repository:harrywesterman/twinbox-manager-worker:pull" \
+              | jq -r '.token'
+          )"
+          [[ -n "$registry_token" && "$registry_token" != "null" ]]
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${registry_token}" \
+            -H "Accept: application/vnd.oci.image.manifest.v1+json" \
+            "https://ghcr.io/v2/harrywesterman/twinbox-manager-worker/manifests/${image_tag}" \
+            >/dev/null
+
       - name: Record built image
         run: |
           mkdir -p built-images
