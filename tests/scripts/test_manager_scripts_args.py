@@ -2583,6 +2583,9 @@ def test_netbird_service_hostnames_match_ingress_routes():
     assert '--service-name "auth-jitsi"' in jitsi_text
     assert '--service-domain "auth-jitsi.${public_zone_name}"' in jitsi_text
     assert "jitsi-broker.${public_zone_name}" not in jitsi_text
+    assert matrix_text.index('mas_oidc_provider_ulid="$(python3') < matrix_text.index(
+        'mas_redirect_uri="${mas_host}/upstream/callback/${mas_oidc_provider_ulid}"'
+    )
     assert '--service-domain "nextcloud-collabora.${public_zone_name}"' in nextcloud_text
     for host in ["chat", "matrix", "element-admin", "account", "mrtc"]:
         assert f'--service-domain "{host}.${{public_zone_name}}"' in matrix_text
