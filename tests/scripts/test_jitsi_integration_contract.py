@@ -220,10 +220,9 @@ def test_jitsi_openid_image_is_pinned_and_patched_for_room_scoped_short_lived_to
     assert "type=sha,prefix=jitsi-openid-" in workflow_text
     assert "Refresh pinned image references" in workflow_text
     assert "jitsi-openid-(?:latest|sha-[0-9a-f]{7})" in workflow_text
-    assert "Make Jitsi broker package public" in workflow_text
-    assert "visibility=public" in workflow_text
     assert "Verify Jitsi broker image is publicly pullable" in workflow_text
     assert 'image_tag="jitsi-openid-${GITHUB_SHA:0:7}"' in workflow_text
+    assert "application/vnd.oci.image.index.v1+json" in workflow_text
 
     assert "ARG JITSI_OPENID_REF=5a023e2eb51dfbeb551d04861c11f52e886b53d6" in dockerfile_text
     assert "COPY 0001-room-scoped-short-lived-jwt.patch" in dockerfile_text
