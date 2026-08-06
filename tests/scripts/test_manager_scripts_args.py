@@ -2700,6 +2700,13 @@ def test_matrix_install_step_waits_on_specific_resources():
         in text
     )
     assert 'wait_for_named_resource_ready "matrix" "externalsecret" "matrix-runtime"' in text
+    assert 'kubectl apply -f "$matrix_namespace_manifest"' in text
+    assert 'kubectl apply -f "$matrix_config_externalsecret_manifest"' in text
+    assert 'kubectl apply -f "$matrix_db_externalsecret_manifest"' in text
+    assert 'kubectl apply -f "$matrix_runtime_externalsecret_manifest"' in text
+    assert text.index('kubectl apply -f "$matrix_runtime_externalsecret_manifest"') < text.index(
+        'bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh"'
+    )
     assert 'wait_for_statefulset_ready "matrix" "ess-synapse-main"' in text
     assert 'wait_for_deployment_rollout "matrix" "ess-haproxy"' in text
     assert 'wait_for_deployment_rollout "matrix" "ess-matrix-rtc-authorisation-service"' in text

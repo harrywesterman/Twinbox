@@ -441,6 +441,10 @@ matrix_mas_db_externalsecret_manifest="$WORKSPACE_ROOT/gitops/databases/matrix-m
 matrix_mas_db_pooler_ro_manifest="$WORKSPACE_ROOT/gitops/databases/matrix-mas/pooler-ro.yaml"
 matrix_mas_db_pooler_rw_manifest="$WORKSPACE_ROOT/gitops/databases/matrix-mas/pooler-rw.yaml"
 matrix_mas_db_backup_manifest="$WORKSPACE_ROOT/gitops/databases/matrix-mas/scheduled-backup.yaml"
+matrix_namespace_manifest="$WORKSPACE_ROOT/gitops/platform-apps/matrix/namespace.yaml"
+matrix_config_externalsecret_manifest="$WORKSPACE_ROOT/gitops/platform-apps/matrix/externalsecret.yaml"
+matrix_db_externalsecret_manifest="$WORKSPACE_ROOT/gitops/platform-apps/matrix/db-externalsecret.yaml"
+matrix_runtime_externalsecret_manifest="$WORKSPACE_ROOT/gitops/platform-apps/matrix/runtime-externalsecret.yaml"
 
 log "Applying Matrix database manifests"
 kubectl apply -f "$databases_namespace_manifest"
@@ -465,6 +469,17 @@ wait_for_deployment_rollout "databases" "matrix-synapse-db-pooler-ro" "Matrix Sy
 wait_for_deployment_rollout "databases" "matrix-synapse-db-pooler-rw" "Matrix Synapse DB read-write pooler"
 wait_for_deployment_rollout "databases" "matrix-mas-db-pooler-ro" "Matrix MAS DB read-only pooler"
 wait_for_deployment_rollout "databases" "matrix-mas-db-pooler-rw" "Matrix MAS DB read-write pooler"
+
+# ESS pre-install hooks require these secrets before Argo CD can sync the chart.
+log "Applying Matrix application secrets"
+kubectl apply -f "$matrix_namespace_manifest"
+kubectl apply -f "$matrix_config_externalsecret_manifest"
+kubectl apply -f "$matrix_db_externalsecret_manifest"
+kubectl apply -f "$matrix_runtime_externalsecret_manifest"
+wait_for_named_resource_ready "matrix" "externalsecret" "matrix-config" "Matrix configuration ExternalSecret"
+wait_for_named_resource_ready "matrix" "externalsecret" "matrix-synapse-db-credentials" "Matrix Synapse application DB ExternalSecret"
+wait_for_named_resource_ready "matrix" "externalsecret" "matrix-mas-db-credentials" "Matrix MAS application DB ExternalSecret"
+wait_for_named_resource_ready "matrix" "externalsecret" "matrix-runtime" "Matrix runtime ExternalSecret"
 
 bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
   --app-id "matrix-synapse" \
