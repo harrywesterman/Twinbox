@@ -14,6 +14,12 @@ test("app source defines a minimal wizard shell with guided input and step-by-st
   const questionFlow = await readFile(questionFlowPath, "utf8");
 
   assert.match(source, /className="wizard-shell"/, "expected the wizard shell");
+  assert.match(source, /wizard-runtime-tag/, "expected the manager image tag in the topbar");
+  assert.match(
+    source,
+    /Manager image \{visibleImageTag\}/,
+    "expected the image tag value to render"
+  );
   assert.match(source, /wizard-layout-minimal/, "expected a minimal wizard layout");
   assert.match(source, /wizard-flow-minimal/, "expected the stacked setup flow");
   assert.match(source, /className="wizard-start-screen"/, "expected a start screen");

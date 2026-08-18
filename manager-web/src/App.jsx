@@ -873,7 +873,9 @@ function getWizardGuide(stepId) {
   );
 }
 
-function renderTopBar({ onImportClick, showImportButton = true } = {}) {
+function renderTopBar({ imageTag = "", onImportClick, showImportButton = true } = {}) {
+  const visibleImageTag = String(imageTag || "").trim();
+
   return (
     <header className="wizard-topbar">
       <div className="wizard-brand-lockup">
@@ -887,6 +889,9 @@ function renderTopBar({ onImportClick, showImportButton = true } = {}) {
         <p className="wizard-kicker">Guided cluster bootstrap</p>
       </div>
       <div className="wizard-topbar-actions">
+        {visibleImageTag ? (
+          <span className="wizard-runtime-tag">Manager image {visibleImageTag}</span>
+        ) : null}
         {showImportButton ? (
           <button className="button button-secondary" type="button" onClick={onImportClick}>
             Load saved answers
@@ -2521,7 +2526,11 @@ function App() {
   if (!hasStarted) {
     return (
       <div className="wizard-shell wizard-shell-start">
-        {renderTopBar({ onImportClick: handleImportClick, showImportButton: false })}
+        {renderTopBar({
+          imageTag: health?.image_tag,
+          onImportClick: handleImportClick,
+          showImportButton: false,
+        })}
         {isBootstrapping || error || notice ? (
           <div className={`wizard-banner ${error ? "is-error" : "is-notice"}`}>
             <div>
@@ -2575,7 +2584,11 @@ function App() {
 
   return (
     <div className="wizard-shell">
-      {renderTopBar({ onImportClick: handleImportClick, showImportButton })}
+      {renderTopBar({
+        imageTag: health?.image_tag,
+        onImportClick: handleImportClick,
+        showImportButton,
+      })}
       {isBootstrapping || error || notice ? (
         <div className={`wizard-banner ${error ? "is-error" : "is-notice"}`}>
           <div>

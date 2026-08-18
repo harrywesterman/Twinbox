@@ -1266,7 +1266,7 @@ function parseSecretKeyPath(secretKeyPath) {
 }
 
 app.get("/api/health", (_, res) => {
-  res.json({ ok: true, time: now() });
+  res.json({ ok: true, time: now(), image_tag: process.env.TWINBOX_IMAGE_TAG || "unknown" });
 });
 
 app.get(/^\/api\/secrets\/.*$/, (req, res) => {
