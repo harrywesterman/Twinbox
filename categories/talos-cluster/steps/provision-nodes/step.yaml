@@ -2,7 +2,7 @@ id: provision-nodes
 title: Deploy Talos Cluster
 type: action
 summary: Install Talos Linux on separate VM's on the cluster.
-explanation: Talos Linux is the immutable, Kubernetes-focused operating system that Twinbox uses. We use OpenTofu, download the Talos image on demand, size the control plane and worker roles separately, land the VMs on Proxmox hosts, discover the DHCP addresses, apply Talos machine configs, bootstrap the first control plane, and materialize the resulting Talos access files from the management-local bootstrap secret tree.
+explanation: Talos Linux is the immutable, Kubernetes-focused operating system that Twinbox uses. We use OpenTofu, download the Talos image on demand, size the control plane and worker roles separately, attach static NoCloud network and Talos machine configuration to the VMs, bootstrap the first control plane, and materialize the resulting Talos access files from the management-local bootstrap secret tree.
 side_help: Talos Linux is a minimal, secure, API-driven operating system built specifically for running Kubernetes.
 dashy:
   items:

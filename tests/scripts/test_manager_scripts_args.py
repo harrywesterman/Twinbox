@@ -651,14 +651,9 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert '--preset "${TALOS_IMAGE_PRESET:-qemu-guest-agent}"' not in text
     assert "TALOS_IMAGE_PRESET" in text
     assert "TALOS_IMAGE_DISK_URL=" in text
-    assert "talosctl apply-config \\" in text
-    assert '--endpoints "$ip" \\' in text
-    assert "retrying with cluster talosconfig" in text
-    assert "Resetting Talos node ${ip} to retry config application from clean state" in text
-    assert "wait_for_talos_insecure" in text
     assert "AlreadyExists desc = etcd data directory is not empty" in text
     assert "talosctl bootstrap" in text
-    assert 'bootstrap_mode = "dhcp-first"' in text
+    assert 'bootstrap_mode = "static-nocloud"' in text
     assert '"/image/default/"' not in text
     assert '!= "default"' not in text
     assert "TALOS_IMAGE_FACTORY_URL:-" not in text
@@ -701,12 +696,13 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert 'talos_image_file_name="talos-${CLUSTER_ID}-${image_cache_key}.raw"' in text
     assert "Removing legacy Talos ISO resources from OpenTofu state:" in text
     assert 'state rm "${legacy_addresses[@]}"' in text
-    assert "controlplane_ipv4_addresses.value" in text
-    assert "worker_ipv4_addresses.value" in text
-    assert "flatten_ipv4_candidates" in text or "flatten | .[]" in text
-    assert "ensure_vip_is_not_dhcp_assigned" in text
-    assert "Control-plane VIP ${VIP_IP} was assigned by DHCP to a VM" in text
-    assert 'select(startswith("10.244.") | not)' in text
+    assert 'echo "        dhcp: false"' in text
+    assert 'echo "          - ${ip}/${NODE_PREFIX_LENGTH}"' in text
+    assert 'echo "            gateway: ${GATEWAY_IP}"' in text
+    assert (
+        'cp "$runtime_talos_dir/${name}-${type}.yaml" "$work_module_dir/talos-configs/${name}.yaml"'
+        in text
+    )
     assert "TF_VAR_proxmox_endpoint" in text
     assert "TF_VAR_proxmox_username" in text
     assert "TF_VAR_proxmox_password" in text
@@ -816,7 +812,7 @@ def test_talos_node_hostname_matches_proxmox_vm_name():
     module_text = MODULE_MAIN.read_text(encoding="utf-8")
 
     assert 'name      = "${var.cluster_name}-${each.key}"' in module_text
-    assert 'write_node_patch "$name" "$type" "$mac" "$patch_file"' in script_text
+    assert 'write_node_patch "$name" "$type" "$ip" "$mac" "$patch_file"' in script_text
     assert "append_hostname_config_patch()" in script_text
     assert 'echo "kind: HostnameConfig"' in script_text
     assert 'echo "hostname: ${NAME}-${name}"' in script_text
@@ -1268,7 +1264,7 @@ def test_opencloud_pvc_sizes_match_the_live_bound_volumes():
     assert pvc_text.count("storage: 50Gi") == 2
 
 
-def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
+def test_apply_cluster_renders_static_nocloud_talos_flow_and_tracks_iac_paths():
     text = _apply_cluster_text()
     assert 'helper_output="$("$WORKSPACE_ROOT/scripts/get-talos-image-factory.sh"' in text
     assert '--preset "$talos_image_preset"' in text
@@ -1289,14 +1285,10 @@ def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
     )
     assert "nodes: $nodes" in text
     assert "planned_controlplane_ips" in text
-    assert "discovered_controlplane_ips" in text
     assert "generate_talos_configs()" in text
-    assert "discover_node_ip()" in text
-    assert "Guest agent reported ${label} at ${candidate}" in text
-    assert "Discovering control plane DHCP addresses" in text
-    assert "Applying control plane Talos configs" in text
-    assert "Control planes are healthy; discovering worker DHCP addresses" in text
-    assert "Applying worker Talos configs" in text
+    assert 'echo "        dhcp: false"' in text
+    assert 'bootstrap_mode = "static-nocloud"' in text
+    assert "Waiting for workers at their configured static addresses" in text
     assert 'jq -Rn --arg csv "$csv"' in text
     assert 'split(",")' in text
     assert 'map(gsub("^\\\\s+|\\\\s+$"; ""))' in text
@@ -1315,14 +1307,11 @@ def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
     assert 'image_installer="${line#TALOS_IMAGE_INSTALLER=}"' in text
     assert "image_extensions=" not in text
     assert "TALOS_IMAGE_EXTENSIONS=" not in text
-    assert text.index("Applying control plane Talos configs") < text.index(
-        'bootstrap_cluster "$first_controlplane_ip"'
+    assert text.index("generate_talos_configs") < text.index(
+        '"$TOFU_BIN" -chdir="$work_module_dir" apply'
     )
     assert text.index('bootstrap_cluster "$first_controlplane_ip"') < text.index(
-        "Control planes are healthy; discovering worker DHCP addresses"
-    )
-    assert text.index("Control planes are healthy; discovering worker DHCP addresses") < text.index(
-        "Applying worker Talos configs"
+        "Waiting for workers at their configured static addresses"
     )
 
 
@@ -3399,14 +3388,15 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     outputs_text = _module_outputs_text()
     compact_main_text = re.sub(r"\s+", " ", main_text)
     assert 'resource "proxmox_virtual_environment_vm" "node"' in main_text
-    assert 'resource "proxmox_virtual_environment_file" "talos_nocloud"' not in main_text
+    assert 'resource "proxmox_virtual_environment_file" "talos_machine_config"' in main_text
+    assert 'resource "proxmox_virtual_environment_file" "network_config"' in main_text
     assert "talos_image_nodes" not in main_text
     assert 'resource "proxmox_virtual_environment_download_file" "talos"' not in main_text
-    assert "content_type" not in compact_main_text
+    assert 'content_type = "snippets"' in main_text
     assert "decompression_algorithm" not in compact_main_text
-    assert "source_file {" not in main_text
-    assert "path      = var.talos_image_local_path" not in main_text
-    assert "node_name    = each.value" not in main_text
+    assert 'path      = "${path.module}/talos-configs/${each.key}.yaml"' in main_text
+    assert "network_data_file_id" in main_text
+    assert "user_data_file_id" in main_text
     assert 'machine   = "q35"' not in main_text
     assert 'boot_order = ["virtio0"]' in main_text
     assert "cdrom {" not in main_text
@@ -3424,7 +3414,6 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
         in compact_main_text
     )
     assert "talos_image_disk_url" not in _module_variables_text()
-    assert "merge(" not in main_text
     assert "import_from = local.talos_image_file_id" in compact_main_text
     assert "node_name = local.vm_host_map[each.key]" in compact_main_text
     assert "datastore_id = each.value.datastore_id" in compact_main_text
@@ -3438,8 +3427,7 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     assert "remove_legacy_talos_file_state" not in main_text
     assert 'file_format  = "raw"' not in main_text
     assert "agent {" in main_text
-    assert "wait_for_ip {" in main_text
-    assert "ipv4 = true" in main_text
+    assert "wait_for_ip {" not in main_text
     assert "reboot_after_update = false" in main_text
     assert 'type = "std"' in main_text
     assert "talos_machine_configuration_apply" not in main_text
@@ -3447,8 +3435,8 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     assert "talos_cluster_kubeconfig" not in main_text
     assert 'output "controlplane_vm_ids"' in outputs_text
     assert 'output "worker_vm_ids"' in outputs_text
-    assert 'output "controlplane_ipv4_addresses"' in outputs_text
-    assert 'output "worker_ipv4_addresses"' in outputs_text
+    assert 'output "controlplane_ipv4_addresses"' not in outputs_text
+    assert 'output "worker_ipv4_addresses"' not in outputs_text
     assert 'output "kubeconfig"' not in outputs_text
 
 

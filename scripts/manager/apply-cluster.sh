@@ -858,10 +858,6 @@ node_array() {
   ' <<<"$nodes_json"
 }
 
-json_array_from_args() {
-  jq -nc '$ARGS.positional' --args "$@"
-}
-
 json_array_from_csv() {
   local csv="${1:-}"
 
@@ -932,26 +928,6 @@ log_vm_node_map() {
     ' <<<"$vm_node_map_json")
 }
 
-flatten_ipv4_candidates() {
-  jq -r '
-    flatten
-    | .[]
-    | select(type == "string")
-    | select(length > 0)
-    | select(startswith("127.") | not)
-    | select(startswith("169.254.") | not)
-    | select(startswith("10.244.") | not)
-  '
-}
-
-ensure_vip_is_not_dhcp_assigned() {
-  local candidates_json="$1"
-
-  if jq -e --arg vip "$VIP_IP" 'flatten | index($vip) != null' <<<"$candidates_json" >/dev/null; then
-    fail "Control-plane VIP ${VIP_IP} was assigned by DHCP to a VM. Reserve or exclude this address from DHCP, then retry from clean VMs."
-  fi
-}
-
 update_cluster_file() {
   local status="$1"
   local planned_controlplane_ips="$2"
@@ -985,46 +961,13 @@ update_cluster_file() {
       | .worker_ips = $worker_ips
       | .controlplane_vm_ids = $controlplane_vm_ids
       | .worker_vm_ids = $worker_vm_ids
-      | .bootstrap_mode = "dhcp-first"
+      | .bootstrap_mode = "static-nocloud"
       | del(.talos_config_dir)
       | del(.talosconfig_path)
       | del(.kubeconfig_path)
       | del(.last_error)
     ' "$cluster_file" > "$tmp"
   mv "$tmp" "$cluster_file"
-}
-
-discover_node_ip() {
-  local label="$1"
-  shift
-  local candidates=("$@")
-  local candidate=""
-  local attempts=60
-
-  for candidate in "${candidates[@]}"; do
-    [[ -n "$candidate" ]] || continue
-    log "Guest agent reported ${label} at ${candidate}"
-    printf '%s\n' "$candidate"
-    return 0
-  done
-
-  while [[ "$attempts" -gt 0 ]]; do
-    for candidate in "${candidates[@]}"; do
-      [[ -n "$candidate" ]] || continue
-      if talosctl version --insecure --nodes "$candidate" >/dev/null 2>&1; then
-        log "Discovered ${label} at ${candidate}"
-        printf '%s\n' "$candidate"
-        return 0
-      fi
-    done
-    if [[ ${#candidates[@]} -eq 0 ]]; then
-      break
-    fi
-    sleep 5
-    attempts=$((attempts - 1))
-  done
-
-  fail "Timed out waiting for ${label} to answer on ${candidate}"
 }
 
 wait_for_talos_api() {
@@ -1098,8 +1041,9 @@ wait_for_kubernetes_rollout() {
 write_node_patch() {
   local name="$1"
   local type="$2"
-  local mac="$3"
-  local patch_file="$4"
+  local ip="$3"
+  local mac="$4"
+  local patch_file="$5"
   local nameserver_block=""
   local search_domain_block=""
   local time_server="${TWINBOX_TIME_SERVER:-time.cloudflare.com}"
@@ -1142,7 +1086,12 @@ write_node_patch() {
     echo "    interfaces:"
     echo "      - deviceSelector:"
     echo "          hardwareAddr: ${mac}"
-    echo "        dhcp: true"
+    echo "        dhcp: false"
+    echo "        addresses:"
+    echo "          - ${ip}/${NODE_PREFIX_LENGTH}"
+    echo "        routes:"
+    echo "          - network: 0.0.0.0/0"
+    echo "            gateway: ${GATEWAY_IP}"
     if [[ "$type" == "controlplane" ]]; then
       echo "        vip:"
       echo "          ip: ${VIP_IP}"
@@ -1227,6 +1176,7 @@ generate_talos_configs() {
   local controlplane_patch_file=""
   local name=""
   local type=""
+  local ip=""
   local mac=""
   local config_file=""
 
@@ -1252,12 +1202,12 @@ generate_talos_configs() {
   upsert_secret_artifact "talos-secrets" "secrets.yaml" "$talos_secrets_file"
   upsert_secret_artifact "talosconfig" "talosconfig" "$talosconfig_file"
 
-  while IFS=$'\t' read -r name type mac; do
+  while IFS=$'\t' read -r name type ip mac; do
     [[ -n "$name" ]] || continue
     node_dir="$runtime_talos_dir/generated/$name"
     patch_file="$node_dir/patch.yaml"
     mkdir -p "$node_dir"
-    write_node_patch "$name" "$type" "$mac" "$patch_file"
+    write_node_patch "$name" "$type" "$ip" "$mac" "$patch_file"
 
     log "Generating Talos config for ${name}"
     if [[ "$type" == "controlplane" ]]; then
@@ -1291,70 +1241,9 @@ generate_talos_configs() {
       to_entries
       | sort_by(.key)
       | .[]
-      | [.key, .value.type, .value.mac]
+      | [.key, .value.type, .value.ip, .value.mac]
       | @tsv
     ' <<<"$nodes_json")
-}
-
-wait_for_talos_insecure() {
-  local label="$1"
-  local candidate="$2"
-  local attempts=60
-
-  while [[ "$attempts" -gt 0 ]]; do
-    if talosctl version \
-      --insecure \
-      --nodes "$candidate" \
-      --endpoints "$candidate" >/dev/null 2>&1; then
-      return 0
-    fi
-    sleep 5
-    attempts=$((attempts - 1))
-  done
-
-  fail "Timed out waiting for Talos API (insecure) on ${label} at ${candidate}"
-}
-
-apply_node_config() {
-  local ip="$1"
-  local config_file="$2"
-  local output=""
-
-  log "Applying Talos config to ${ip} with --insecure"
-  output="$(talosctl apply-config \
-    --insecure \
-    --nodes "$ip" \
-    --endpoints "$ip" \
-    --talosconfig "$talosconfig_file" \
-    --file "$config_file" 2>&1)" && return 0
-
-  log "Insecure Talos apply failed for ${ip}; retrying with cluster talosconfig"
-  if output="$(talosctl apply-config \
-    --nodes "$ip" \
-    --endpoints "$ip" \
-    --talosconfig "$talosconfig_file" \
-    --file "$config_file" 2>&1)"; then
-    return 0
-  fi
-
-  log "Resetting Talos node ${ip} to retry config application from clean state"
-  talosctl reset \
-    --insecure \
-    --nodes "$ip" \
-    --endpoints "$ip" \
-    --reboot \
-    --wait=false 2>&1 || true
-
-  log "Waiting for Talos node ${ip} to reboot and accept insecure connections"
-  wait_for_talos_insecure "node" "$ip"
-
-  log "Applying Talos config to ${ip} with --insecure after reset"
-  talosctl apply-config \
-    --insecure \
-    --nodes "$ip" \
-    --endpoints "$ip" \
-    --talosconfig "$talosconfig_file" \
-    --file "$config_file"
 }
 
 bootstrap_cluster() {
@@ -1518,6 +1407,7 @@ planned_controlplane_ips_json="$(node_array "ip" "controlplane")"
 planned_worker_ips_json="$(node_array "ip" "worker")"
 controlplane_vm_ids_json="$(node_array "vmid" "controlplane")"
 worker_vm_ids_json="$(node_array "vmid" "worker")"
+generate_talos_configs
 raw_vm_node_map="${VM_NODE_MAP:-}"
 # vm_node_map_json="$(normalize_json_object "${VM_NODE_MAP:-{}}")"
 
@@ -1553,6 +1443,17 @@ else
   mkdir -p "$work_module_dir"
 fi
 cp -R "$MODULE_SOURCE/." "$work_module_dir/"
+mkdir -p "$work_module_dir/talos-configs"
+while IFS=$'\t' read -r name type; do
+  [[ -n "$name" ]] || continue
+  cp "$runtime_talos_dir/${name}-${type}.yaml" "$work_module_dir/talos-configs/${name}.yaml"
+done < <(jq -r '
+    to_entries
+    | sort_by(.key)
+    | .[]
+    | [.key, .value.type]
+    | @tsv
+  ' <<<"$nodes_json")
 
 jq -n \
   --arg proxmox_node "$PROXMOX_NODE" \
@@ -1597,62 +1498,10 @@ remove_legacy_talos_file_state "$work_module_dir"
 log "Creating Proxmox VMs"
 "$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve -no-color -parallelism="$TOFU_PARALLELISM" -var-file="$tfvars_file"
 
-tf_outputs_json="$("$TOFU_BIN" -chdir="$work_module_dir" output -json -no-color)"
-controlplane_ipv4_candidates_json="$(jq -c '.controlplane_ipv4_addresses.value // []' <<<"$tf_outputs_json")"
-worker_ipv4_candidates_json="$(jq -c '.worker_ipv4_addresses.value // []' <<<"$tf_outputs_json")"
-ensure_vip_is_not_dhcp_assigned "$controlplane_ipv4_candidates_json"
-ensure_vip_is_not_dhcp_assigned "$worker_ipv4_candidates_json"
+update_cluster_file "provisioned" "$planned_controlplane_ips_json" "$planned_worker_ips_json" "$planned_controlplane_ips_json" "$planned_worker_ips_json" "$controlplane_vm_ids_json" "$worker_vm_ids_json"
 
-update_cluster_file "provisioned" "$planned_controlplane_ips_json" "$planned_worker_ips_json" "[]" "[]" "$controlplane_vm_ids_json" "$worker_vm_ids_json"
-
-generate_talos_configs
-
-log "Discovering control plane DHCP addresses"
-discovered_controlplane_ips_json="[]"
-discovered_controlplane_ips=()
-mapfile -t controlplane_actual_candidates < <(flatten_ipv4_candidates <<<"$controlplane_ipv4_candidates_json")
-controlplane_index=0
-
-while IFS=$'\t' read -r name type ip; do
-  [[ -n "$name" ]] || continue
-  [[ "$type" == "controlplane" ]] || continue
-  candidates=()
-  if [[ -n "${controlplane_actual_candidates[$controlplane_index]:-}" ]]; then
-    candidates+=("${controlplane_actual_candidates[$controlplane_index]}")
-  fi
-  candidates+=("$ip")
-  discovered_ip="$(discover_node_ip "$name" "${candidates[@]}")"
-  controlplane_index=$((controlplane_index + 1))
-  discovered_controlplane_ips+=("$discovered_ip")
-done < <(jq -r '
-    to_entries
-    | sort_by(.key)
-    | .[]
-    | [.key, .value.type, .value.ip]
-    | @tsv
-  ' <<<"$nodes_json")
-
-discovered_controlplane_ips_json="$(json_array_from_args "${discovered_controlplane_ips[@]}")"
-update_cluster_file "provisioned" "$planned_controlplane_ips_json" "$planned_worker_ips_json" "$discovered_controlplane_ips_json" "[]" "$controlplane_vm_ids_json" "$worker_vm_ids_json"
-
-log "Applying control plane Talos configs"
-controlplane_apply_index=0
-while IFS=$'\t' read -r name type ip; do
-  [[ -n "$name" ]] || continue
-  [[ "$type" == "controlplane" ]] || continue
-  discovered_ip="${discovered_controlplane_ips[$controlplane_apply_index]:-$ip}"
-  apply_node_config "$discovered_ip" "$runtime_talos_dir/${name}-controlplane.yaml"
-  controlplane_apply_index=$((controlplane_apply_index + 1))
-done < <(jq -r '
-    to_entries
-    | sort_by(.key)
-    | .[]
-    | [.key, .value.type, .value.ip]
-    | @tsv
-  ' <<<"$nodes_json")
-
-first_controlplane_ip="${discovered_controlplane_ips[0]:-}"
-[[ -n "$first_controlplane_ip" ]] || fail "No control plane IP discovered"
+first_controlplane_ip="$(jq -r '.[0] // empty' <<<"$planned_controlplane_ips_json")"
+[[ -n "$first_controlplane_ip" ]] || fail "No control plane IP configured"
 
 bootstrap_cluster "$first_controlplane_ip"
 wait_for_kubernetes_rollout "daemonset/cilium" "kube-system" "Cilium DaemonSet"
@@ -1692,41 +1541,10 @@ if [[ "${TWINBOX_SYNC_LOCAL_CLIENT_CONFIGS:-false}" == "true" ]]; then
   sync_user_kubeconfig "$kubeconfig_file"
 fi
 
-log "Control planes are healthy; discovering worker DHCP addresses"
-discovered_worker_ips_json="[]"
-discovered_worker_ips=()
-mapfile -t worker_actual_candidates < <(flatten_ipv4_candidates <<<"$worker_ipv4_candidates_json")
-worker_index=0
-
+log "Waiting for workers at their configured static addresses"
 while IFS=$'\t' read -r name type ip; do
-  [[ -n "$name" ]] || continue
-  [[ "$type" == "worker" ]] || continue
-  candidates=()
-  if [[ -n "${worker_actual_candidates[$worker_index]:-}" ]]; then
-    candidates+=("${worker_actual_candidates[$worker_index]}")
-  fi
-  candidates+=("$ip")
-  discovered_ip="$(discover_node_ip "$name" "${candidates[@]}")"
-  worker_index=$((worker_index + 1))
-  discovered_worker_ips+=("$discovered_ip")
-done < <(jq -r '
-    to_entries
-    | sort_by(.key)
-    | .[]
-    | [.key, .value.type, .value.ip]
-    | @tsv
-  ' <<<"$nodes_json")
-
-discovered_worker_ips_json="$(json_array_from_args "${discovered_worker_ips[@]}")"
-
-log "Applying worker Talos configs"
-worker_apply_index=0
-while IFS=$'\t' read -r name type ip; do
-  [[ -n "$name" ]] || continue
-  [[ "$type" == "worker" ]] || continue
-  discovered_ip="${discovered_worker_ips[$worker_apply_index]:-$ip}"
-  apply_node_config "$discovered_ip" "$runtime_talos_dir/${name}-worker.yaml"
-  worker_apply_index=$((worker_apply_index + 1))
+  [[ -n "$name" && "$type" == "worker" ]] || continue
+  wait_for_talos_api "$name" "$ip"
 done < <(jq -r '
     to_entries
     | sort_by(.key)
@@ -1741,8 +1559,8 @@ jq \
   --arg updated_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
   --argjson planned_controlplane_ips "$planned_controlplane_ips_json" \
   --argjson planned_worker_ips "$planned_worker_ips_json" \
-  --argjson discovered_controlplane_ips "$discovered_controlplane_ips_json" \
-  --argjson discovered_worker_ips "$discovered_worker_ips_json" \
+  --argjson discovered_controlplane_ips "$planned_controlplane_ips_json" \
+  --argjson discovered_worker_ips "$planned_worker_ips_json" \
   --argjson controlplane_vm_ids "$controlplane_vm_ids_json" \
   --argjson worker_vm_ids "$worker_vm_ids_json" \
   '
@@ -1756,7 +1574,7 @@ jq \
     | .worker_ips = $discovered_worker_ips
     | .controlplane_vm_ids = $controlplane_vm_ids
     | .worker_vm_ids = $worker_vm_ids
-    | .bootstrap_mode = "dhcp-first"
+    | .bootstrap_mode = "static-nocloud"
     | del(.talos_config_dir)
     | del(.talosconfig_path)
     | del(.kubeconfig_path)

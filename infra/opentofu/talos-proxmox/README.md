@@ -46,11 +46,10 @@ Control plane and worker nodes are provisioned with fixed RAM equal to their ass
 | `worker_ips` | List of worker node IPs |
 | `controlplane_vm_ids` | List of control plane VM IDs |
 | `worker_vm_ids` | List of worker VM IDs |
-| `controlplane_ipv4_addresses` | Control plane IPs from Proxmox agent |
-| `worker_ipv4_addresses` | Worker IPs from Proxmox agent |
 
 ## Bootstrap Flow
 
 1. The manager worker downloads and decompresses the Talos disk image, then uploads it as Proxmox `import` content on each target node.
-2. OpenTofu imports that image via the Proxmox API straight onto `virtio0` and the VM boots from disk immediately.
-3. The Talos machine config still points at the matching installer image for future installs or upgrades.
+2. OpenTofu uploads each rendered Talos machine configuration and its matching static NoCloud network configuration to the Proxmox host that runs the VM, then attaches both through the cloud-init disk.
+3. OpenTofu imports the image via the Proxmox API straight onto `virtio0`; Talos starts with its configured static address and does not require DHCP.
+4. The Talos machine config still points at the matching installer image for future installs or upgrades.
