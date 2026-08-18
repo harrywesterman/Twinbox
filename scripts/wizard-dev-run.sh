@@ -18,8 +18,8 @@ usage() {
   cat <<EOF
 Usage: $(basename "$0") [--target user@host] [--remote-dir /path] [--debug]
 
-Uploads the local Proxmox bootstrap wizard and runs it as root via sudo on
-the remote host with an interactive TTY, so whiptail keeps working.
+Uploads the local Proxmox bootstrap wizard and runs it as root on the remote
+host with an interactive TTY, so whiptail keeps working.
 EOF
 }
 
@@ -114,8 +114,8 @@ upload_and_run_remote() {
   echo "Uploading wizard to ${SSH_TARGET}:${REMOTE_SCRIPT_PATH}"
   ssh -n "${SSH_TARGET}" "mkdir -p ${quoted_remote_dir}"
   scp -q "${LOCAL_WIZARD_PATH}" "${SSH_TARGET}:${REMOTE_SCRIPT_PATH}" </dev/null
-  echo "Running wizard as root via sudo on ${SSH_TARGET}"
-  ssh -tt "${SSH_TARGET}" "sudo chmod +x ${quoted_remote_script} && sudo TERM=xterm-256color ${remote_bash} ${quoted_remote_script}"
+  echo "Running wizard as root on ${SSH_TARGET}"
+  ssh -tt "${SSH_TARGET}" "chmod +x ${quoted_remote_script} && TERM=xterm-256color ${remote_bash} ${quoted_remote_script}"
 }
 
 report_retained_remote_copy() {
