@@ -351,10 +351,14 @@ managed_vm_ids_from_state() {
   ' "$state_file" 2>/dev/null | sort -n | uniq
 }
 
-validate_file_datastore_import_content() {
+validate_file_datastore_content_types() {
   local datastore="$1"
   local storage_json=""
   local content=""
+  local missing_content=()
+  local required_content=("import" "snippets")
+  local content_item=""
+  local missing_list=""
 
   proxmox_api_login
   storage_json="$(curl -ksS --fail \
@@ -363,8 +367,15 @@ validate_file_datastore_import_content() {
     "${TF_VAR_proxmox_endpoint}/api2/json/storage/${datastore}")" || fail "Failed to inspect Proxmox storage ${datastore}"
 
   content="$(jq -r '.data.content // ""' <<<"$storage_json")"
-  if [[ ",${content}," != *",import,"* ]]; then
-    fail "Proxmox file datastore ${datastore} must allow Import content for Talos disk-image provisioning. Re-run the setup wizard or enable Import under Datacenter > Storage."
+  for content_item in "${required_content[@]}"; do
+    if [[ ",${content}," != *",${content_item},"* ]]; then
+      missing_content+=("$content_item")
+    fi
+  done
+
+  if [[ ${#missing_content[@]} -gt 0 ]]; then
+    missing_list="$(IFS=,; printf '%s' "${missing_content[*]}")"
+    fail "Proxmox file datastore ${datastore} must allow Import and Snippets content for Talos NoCloud provisioning. Missing content type(s): ${missing_list}. Re-run the setup wizard or enable Import and Snippets under Datacenter > Storage."
   fi
 }
 
@@ -1428,7 +1439,7 @@ validate_vm_node_map
 log_vm_node_map
 
 [[ -n "${image_disk_url:-}" ]] || fail "Talos disk image URL not resolved"
-validate_file_datastore_import_content "$FILE_DATASTORE"
+validate_file_datastore_content_types "$FILE_DATASTORE"
 talos_image_local_path="$image_cache_dir/talos-${CLUSTER_ID}-${image_cache_key}.raw"
 talos_image_file_name="talos-${CLUSTER_ID}-${image_cache_key}.raw"
 download_talos_image "$talos_image_local_path"

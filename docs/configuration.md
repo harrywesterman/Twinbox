@@ -41,7 +41,7 @@ TWINBOX_FORGEJO_REPO_URL=http://192.168.1.50:3001/twinbox/Twinbox.git
 
 Forgejo is exposed externally as `https://forgejo.<ZONE_NAME>` by the management console step. Traefik proxies that route directly to Forgejo; Forgejo itself uses native Authentik/OIDC login with callback `https://forgejo.<ZONE_NAME>/user/oauth2/authentik/callback`. The management console step persists the public `FORGEJO_ROOT_URL` in `/opt/twinbox/.env`, stores the OIDC client secret in OpenBao as `twinbox/global/forgejo-oidc`, and keeps the local admin account from `/opt/twinbox/bootstrap/secrets/global/forgejo.json` as break-glass access.
 
-`PROXMOX_FILE_DATASTORE` is the Proxmox datastore that Twinbox uses for Talos disk-image uploads during cluster provisioning. The setup wizard enables Proxmox `import` content on this datastore so OpenTofu can import the uploaded image into VM disks through the Proxmox API.
+`PROXMOX_FILE_DATASTORE` is the Proxmox datastore that Twinbox uses for Talos disk-image uploads and NoCloud snippets during cluster provisioning. The setup wizard enables Proxmox `import` and `snippets` content on this datastore so OpenTofu can import the uploaded image into VM disks and attach the generated static network data through the Proxmox API.
 
 ## Bootstrap File Layout
 

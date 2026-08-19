@@ -672,9 +672,10 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert "upload_talos_image_to_nodes()" in text
     assert "remove_legacy_talos_file_state()" in text
     assert "Talos disk image URL not resolved" in text
-    assert "validate_file_datastore_import_content()" in text
-    assert 'validate_file_datastore_import_content "$FILE_DATASTORE"' in text
-    assert "must allow Import content for Talos disk-image provisioning" in text
+    assert "validate_file_datastore_content_types()" in text
+    assert 'validate_file_datastore_content_types "$FILE_DATASTORE"' in text
+    assert 'local required_content=("import" "snippets")' in text
+    assert "must allow Import and Snippets content for Talos NoCloud provisioning" in text
     assert '"${TF_VAR_proxmox_endpoint}/api2/json/storage/${datastore}"' in text
     assert '"${node_endpoint}/api2/json/nodes/${node}/storage/${datastore}/status"' in text
     assert '--form "content=import"' in text
