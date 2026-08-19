@@ -43,20 +43,8 @@ resource "proxmox_virtual_environment_vm" "node" {
     discard      = "on"
   }
 
-  initialization {
-    datastore_id = each.value.datastore_id
-
-    dns {
-      domain  = var.dns_domain
-      servers = var.dns_servers
-    }
-
-    ip_config {
-      ipv4 {
-        address = "${each.value.ip}/${var.prefix}"
-        gateway = var.gateway
-      }
-    }
+  cdrom {
+    file_id = each.value.nocloud_iso_file_id
   }
 
   agent {

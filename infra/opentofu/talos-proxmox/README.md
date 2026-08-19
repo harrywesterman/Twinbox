@@ -4,9 +4,9 @@ OpenTofu module for provisioning Talos Linux VMs on Proxmox VE.
 
 ## Overview
 
-This module creates Talos Linux virtual machines on Proxmox, supporting both control plane and worker node types. The manager worker uploads a Talos bootable disk image as Proxmox `import` content on each target node, and this module imports it directly into the VM's first disk, so there is no ISO attach/detach step.
+This module creates Talos Linux virtual machines on Proxmox, supporting both control plane and worker node types. The manager worker uploads a Talos bootable disk image as Proxmox `import` content on each target node, and this module imports it directly into the VM's first disk.
 
-Static first-boot networking is configured through Proxmox's generated NoCloud initialization drive (`ip_config` plus DNS settings). Twinbox does not upload custom Proxmox snippets for Talos nodes, because Proxmox snippet uploads require SSH access to the target node.
+Static first-boot networking is configured through a per-node NoCloud `cidata` ISO that contains the Talos machine config and matching static `network-config`. The manager worker uploads those ISOs as normal Proxmox `iso` content through the Proxmox API. Twinbox does not upload custom Proxmox snippets for Talos nodes.
 
 Control plane and worker nodes are provisioned with fixed RAM equal to their assigned memory so Proxmox ballooning cannot pull them below their configured size.
 
@@ -28,14 +28,14 @@ Control plane and worker nodes are provisioned with fixed RAM equal to their ass
 
 | Variable | Description |
 |----------|-------------|
-| `nodes` | Map of node definitions (ip, type, vmid, cpu, ram_mb, disk_gb, datastore_id, mac) |
+| `nodes` | Map of node definitions (ip, type, vmid, cpu, ram_mb, disk_gb, datastore_id, mac, nocloud_iso_file_id) |
 | `cluster_name` | Cluster name prefix for VM names |
 | `cluster_slug` | Cluster slug used for tagging |
 | `proxmox_endpoint` | Proxmox API endpoint |
 | `nodes[*].datastore_id` | Per-VM datastore for the Talos system disk |
-| `file_datastore` | Datastore for Talos disk image uploads; must allow Proxmox `import` content |
+| `file_datastore` | Datastore for Talos disk image and NoCloud ISO uploads; must allow Proxmox `import` and `iso` content |
 | `bridge` | Proxmox network bridge |
-| `dns_domain` | Optional DNS search domain for the generated NoCloud initialization drive |
+| `dns_domain` | Optional DNS search domain for the Talos machine configs |
 | `talos_version` | Talos version to deploy |
 
 ## Outputs
@@ -51,7 +51,7 @@ Control plane and worker nodes are provisioned with fixed RAM equal to their ass
 ## Bootstrap Flow
 
 1. The manager worker downloads and decompresses the Talos disk image, then uploads it as Proxmox `import` content on each target node.
-2. OpenTofu imports the image via the Proxmox API straight onto `virtio0`, configures generated NoCloud network data with the requested static IP, and starts the VM.
-3. Talos boots in maintenance mode at the configured static address.
-4. The manager worker applies the full Talos machine config through the Talos maintenance API, then bootstraps Kubernetes.
+2. The manager worker renders full Talos machine configs, builds per-node `cidata` ISOs with static network config, and uploads those ISOs as Proxmox `iso` content on each target node.
+3. OpenTofu imports the Talos image via the Proxmox API straight onto `virtio0`, attaches the matching `cidata` ISO, and starts the VM.
+4. Talos reads its machine config and static network config during first boot, then the manager worker bootstraps Kubernetes through the configured static control-plane address.
 5. The Talos machine config still points at the matching installer image for future installs or upgrades.

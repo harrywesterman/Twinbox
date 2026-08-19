@@ -644,7 +644,10 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert "export TF_IN_AUTOMATION=1" in text
     assert "export NO_COLOR=1" in text
     assert "command -v curl" in text
+    assert "command -v python3" in text
     assert "command -v xz" in text
+    assert "command -v xorriso" in text
+    assert "command -v timeout" in text
     assert "resolve_talos_image_assets()" in text
     assert "scripts/get-talos-image-factory.sh" in text
     assert "PINNED_TALOS_IMAGE_SCHEMATIC" not in text
@@ -670,14 +673,26 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert "proxmox_verify_talos_image()" in text
     assert "proxmox_talos_image_present()" in text
     assert "upload_talos_image_to_nodes()" in text
+    assert "render_and_upload_nocloud_isos()" in text
+    assert "build_nocloud_iso()" in text
+    assert "cidata_content_hash()" in text
     assert "remove_legacy_talos_file_state()" in text
     assert "Talos disk image URL not resolved" in text
-    assert "validate_file_datastore_import_content()" in text
-    assert 'validate_file_datastore_import_content "$FILE_DATASTORE"' in text
-    assert "must allow Import content for Talos disk-image provisioning" in text
+    assert "validate_file_datastore_provisioning_content()" in text
+    assert 'validate_file_datastore_provisioning_content "$FILE_DATASTORE"' in text
+    assert (
+        "must allow ${missing[*]} content for Talos disk-image and NoCloud ISO provisioning" in text
+    )
     assert '"${TF_VAR_proxmox_endpoint}/api2/json/storage/${datastore}"' in text
     assert '"${node_endpoint}/api2/json/nodes/${node}/storage/${datastore}/status"' in text
     assert '--form "content=import"' in text
+    assert '--form "content=iso"' in text
+    assert "xorriso -as mkisofs" in text
+    assert "-volid cidata" in text
+    assert "network-config" in text
+    assert 'nocloud_iso_file_ids_json="$(render_and_upload_nocloud_isos)"' in text
+    assert "nocloud_iso_file_id" in text
+    assert 'update_cluster_file "vms-created"' in text
     assert 'expected_volid="${datastore}:import/${image_name}"' in text
     assert 'select(.volid == $volid and .content == "import")' in text
     assert "stat -c '%s' \"$path\"" in text
@@ -704,6 +719,10 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert "work_module_dir/talos-configs" not in text
     assert '"${DNS_DOMAIN:-}"' in text
     assert "dns_domain: $dns_domain" in text
+    assert 'timeout "$TALOS_API_CHECK_TIMEOUT_SECONDS" talosctl version' in text
+    assert "wait_for_talos_api_insecure()" not in text
+    assert "apply_talos_machine_configs()" not in text
+    assert "talosctl apply-config \\" not in text
     assert "TF_VAR_proxmox_endpoint" in text
     assert "TF_VAR_proxmox_username" in text
     assert "TF_VAR_proxmox_password" in text
@@ -1289,6 +1308,21 @@ def test_apply_cluster_renders_static_nocloud_talos_flow_and_tracks_iac_paths():
     assert "generate_talos_configs()" in text
     assert 'echo "        dhcp: false"' in text
     assert 'bootstrap_mode = "static-nocloud"' in text
+    assert "Generating NoCloud artifacts and uploading Talos cidata ISOs" in text
+    assert (
+        'cidata_hash="$(cidata_content_hash "$user_data_file" "$meta_data_file" "$network_config_file")"'
+        in text
+    )
+    assert 'iso_name="talos-${CLUSTER_ID}-${name}-${cidata_hash}.iso"' in text
+    assert 'file_id="${FILE_DATASTORE}:iso/${iso_name}"' in text
+    assert 'echo "    mac_address: \\"${mac}\\""' in text
+    assert 'echo "        address: ${ip}"' in text
+    assert 'echo "        netmask: ${netmask}"' in text
+    assert 'echo "        gateway: ${GATEWAY_IP}"' in text
+    assert (
+        "Talos machine configs are supplied at first boot through per-node NoCloud cidata ISOs"
+        in text
+    )
     assert "Waiting for workers at their configured static addresses" in text
     assert 'jq -Rn --arg csv "$csv"' in text
     assert 'split(",")' in text
@@ -1298,14 +1332,12 @@ def test_apply_cluster_renders_static_nocloud_talos_flow_and_tracks_iac_paths():
     assert 'vm_node_map_json="$(normalize_json_object "${VM_NODE_MAP:-{}}")"' in text
     assert '--argjson vm_node_map "$vm_node_map_json"' in text
     assert "wait_for_talos_api()" in text
-    assert "wait_for_talos_api_insecure()" in text
-    assert "apply_talos_machine_configs()" in text
-    assert "Timed out waiting for Talos maintenance API on ${label} at ${candidate}" in text
-    assert "Applying Talos machine configs at configured static addresses" in text
-    assert "Applying Talos machine config to ${name} at ${ip}" in text
-    assert "talosctl apply-config \\" in text
-    assert "--insecure \\" in text
-    assert '--file "$config_file"' in text
+    assert "wait_for_talos_api_insecure()" not in text
+    assert "apply_talos_machine_configs()" not in text
+    assert "Timed out waiting for Talos maintenance API on ${label} at ${candidate}" not in text
+    assert "Applying Talos machine configs at configured static addresses" not in text
+    assert "talosctl apply-config \\" not in text
+    assert "--insecure \\" not in text
     assert "bootstrap_cluster()" in text
     assert "sync_user_kubeconfig()" in text
     assert "sync_user_talosconfig()" in text
@@ -1316,10 +1348,13 @@ def test_apply_cluster_renders_static_nocloud_talos_flow_and_tracks_iac_paths():
     assert 'image_installer="${line#TALOS_IMAGE_INSTALLER=}"' in text
     assert "image_extensions=" not in text
     assert "TALOS_IMAGE_EXTENSIONS=" not in text
-    assert text.index("generate_talos_configs") < text.index(
+    assert text.index("generate_talos_configs\nraw_vm_node_map") < text.index(
+        'nocloud_iso_file_ids_json="$(render_and_upload_nocloud_isos)"'
+    )
+    assert text.index('nocloud_iso_file_ids_json="$(render_and_upload_nocloud_isos)"') < text.index(
         '"$TOFU_BIN" -chdir="$work_module_dir" apply'
     )
-    assert text.index("apply_talos_machine_configs\nbootstrap_cluster") < text.index(
+    assert text.index("Talos machine configs are supplied at first boot") < text.index(
         'bootstrap_cluster "$first_controlplane_ip"'
     )
     assert text.index('bootstrap_cluster "$first_controlplane_ip"') < text.index(
@@ -3405,17 +3440,20 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     assert 'resource "proxmox_virtual_environment_download_file" "talos"' not in main_text
     assert 'content_type = "snippets"' not in main_text
     assert "decompression_algorithm" not in compact_main_text
-    assert 'address = "${each.value.ip}/${var.prefix}"' in main_text
-    assert "gateway = var.gateway" in main_text
-    assert "domain  = var.dns_domain" in main_text
-    assert "servers = var.dns_servers" in main_text
+    assert "initialization {" not in main_text
+    assert "ip_config {" not in main_text
+    assert 'address = "${each.value.ip}/${var.prefix}"' not in main_text
+    assert "gateway = var.gateway" not in main_text
+    assert "domain  = var.dns_domain" not in main_text
+    assert "servers = var.dns_servers" not in main_text
     assert "network_data_file_id" not in main_text
     assert "user_data_file_id" not in main_text
     assert "wait_for_ip" in main_text
     assert "disabled = true" in main_text
     assert 'machine   = "q35"' not in main_text
     assert 'boot_order = ["virtio0"]' in main_text
-    assert "cdrom {" not in main_text
+    assert "cdrom {" in main_text
+    assert "file_id = each.value.nocloud_iso_file_id" in main_text
     assert 'dynamic "cdrom"' not in main_text
     assert "for_each = var.boot_from_disk ? [] : [1]" not in main_text
     assert "validation {" not in _module_variables_text()
@@ -3434,6 +3472,7 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     assert "node_name = local.vm_host_map[each.key]" in compact_main_text
     assert "datastore_id = each.value.datastore_id" in compact_main_text
     assert "datastore_id = string" in re.sub(r"\s+", " ", _module_variables_text())
+    assert "nocloud_iso_file_id = string" in re.sub(r"\s+", " ", _module_variables_text())
     assert 'variable "vm_datastore"' not in _module_variables_text()
     assert '--vm-storage-map "$current_vm_storage_map"' in PROVISION_NODES_SCRIPT.read_text(
         encoding="utf-8"
