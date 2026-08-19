@@ -6,7 +6,7 @@ OpenTofu module for provisioning Talos Linux VMs on Proxmox VE.
 
 This module creates Talos Linux virtual machines on Proxmox, supporting both control plane and worker node types. The manager worker uploads a Talos bootable disk image as Proxmox `import` content on each target node, and this module imports it directly into the VM's first disk.
 
-Static first-boot networking is configured through a per-node NoCloud `cidata` ISO that contains the Talos machine config and matching static `network-config`. The manager worker uploads those ISOs as normal Proxmox `iso` content through the Proxmox API. Twinbox does not upload custom Proxmox snippets for Talos nodes.
+Static first-boot networking is configured through a Talos NoCloud boot image plus a per-node NoCloud `cidata` ISO that contains the Talos machine config and matching static `network-config`. The Image Factory schematic includes the `talos.platform=nocloud` kernel argument, and the manager worker uploads those ISOs as normal Proxmox `iso` content through the Proxmox API. Twinbox does not upload custom Proxmox snippets for Talos nodes.
 
 Control plane and worker nodes are provisioned with fixed RAM equal to their assigned memory so Proxmox ballooning cannot pull them below their configured size.
 
@@ -50,7 +50,7 @@ Control plane and worker nodes are provisioned with fixed RAM equal to their ass
 
 ## Bootstrap Flow
 
-1. The manager worker downloads and decompresses the Talos disk image, then uploads it as Proxmox `import` content on each target node.
+1. The manager worker resolves an Image Factory schematic that explicitly bakes in `talos.platform=nocloud`, downloads and decompresses the Talos disk image, then uploads it as Proxmox `import` content on each target node.
 2. The manager worker renders full Talos machine configs, builds per-node `cidata` ISOs with static network config, and uploads those ISOs as Proxmox `iso` content on each target node.
 3. OpenTofu imports the Talos image via the Proxmox API straight onto `virtio0`, attaches the matching `cidata` ISO, and starts the VM.
 4. Talos reads its machine config and static network config during first boot, then the manager worker bootstraps Kubernetes through the configured static control-plane address.

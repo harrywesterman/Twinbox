@@ -3453,6 +3453,7 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     assert 'machine   = "q35"' not in main_text
     assert 'boot_order = ["virtio0"]' in main_text
     assert "cdrom {" in main_text
+    assert "enabled = true" in main_text
     assert "file_id = each.value.nocloud_iso_file_id" in main_text
     assert 'dynamic "cdrom"' not in main_text
     assert "for_each = var.boot_from_disk ? [] : [1]" not in main_text

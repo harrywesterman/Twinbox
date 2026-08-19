@@ -8,7 +8,7 @@ Talos lifecycle operations are triggered through the manager stack.
 2. `manager-api` validates inputs and queues the job.
 3. `manager-worker` runs `scripts/manager/apply-cluster.sh`.
 4. The worker renders a per-cluster OpenTofu workspace.
-5. The worker verifies that the configured Proxmox file datastore allows `import` and `iso` content, then downloads and decompresses the Talos NoCloud disk image.
+5. The worker verifies that the configured Proxmox file datastore allows `import` and `iso` content, then downloads and decompresses the Talos NoCloud disk image. The Image Factory schematic explicitly includes `talos.platform=nocloud` so Talos boots in the datasource mode that reads the attached `cidata` ISO.
 6. The worker uploads the disk image as Proxmox `import` content on each node that will host a Talos VM, then renders full Talos machine configs and per-node NoCloud `cidata` ISOs.
 7. The worker uploads each `cidata` ISO as normal Proxmox `iso` content on the node that will host the matching VM. Twinbox does not upload custom Proxmox snippets for Talos nodes.
 8. OpenTofu creates the VMs, applies the requested VM placement map, imports the Talos image directly into the VM disk through the Proxmox API, and attaches the matching `cidata` ISO.
