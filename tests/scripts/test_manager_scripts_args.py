@@ -672,10 +672,9 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert "upload_talos_image_to_nodes()" in text
     assert "remove_legacy_talos_file_state()" in text
     assert "Talos disk image URL not resolved" in text
-    assert "validate_file_datastore_content_types()" in text
-    assert 'validate_file_datastore_content_types "$FILE_DATASTORE"' in text
-    assert 'local required_content=("import" "snippets")' in text
-    assert "must allow Import and Snippets content for Talos NoCloud provisioning" in text
+    assert "validate_file_datastore_import_content()" in text
+    assert 'validate_file_datastore_import_content "$FILE_DATASTORE"' in text
+    assert "must allow Import content for Talos disk-image provisioning" in text
     assert '"${TF_VAR_proxmox_endpoint}/api2/json/storage/${datastore}"' in text
     assert '"${node_endpoint}/api2/json/nodes/${node}/storage/${datastore}/status"' in text
     assert '--form "content=import"' in text
@@ -695,15 +694,16 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
         in text
     )
     assert 'talos_image_file_name="talos-${CLUSTER_ID}-${image_cache_key}.raw"' in text
-    assert "Removing legacy Talos ISO resources from OpenTofu state:" in text
+    assert "Removing legacy Talos Proxmox file resources from OpenTofu state:" in text
+    assert "talos_machine_config" in text
+    assert "network_config" in text
     assert 'state rm "${legacy_addresses[@]}"' in text
     assert 'echo "        dhcp: false"' in text
     assert 'echo "          - ${ip}/${NODE_PREFIX_LENGTH}"' in text
     assert 'echo "            gateway: ${GATEWAY_IP}"' in text
-    assert (
-        'cp "$runtime_talos_dir/${name}-${type}.yaml" "$work_module_dir/talos-configs/${name}.yaml"'
-        in text
-    )
+    assert "work_module_dir/talos-configs" not in text
+    assert '"${DNS_DOMAIN:-}"' in text
+    assert "dns_domain: $dns_domain" in text
     assert "TF_VAR_proxmox_endpoint" in text
     assert "TF_VAR_proxmox_username" in text
     assert "TF_VAR_proxmox_password" in text
@@ -1298,6 +1298,14 @@ def test_apply_cluster_renders_static_nocloud_talos_flow_and_tracks_iac_paths():
     assert 'vm_node_map_json="$(normalize_json_object "${VM_NODE_MAP:-{}}")"' in text
     assert '--argjson vm_node_map "$vm_node_map_json"' in text
     assert "wait_for_talos_api()" in text
+    assert "wait_for_talos_api_insecure()" in text
+    assert "apply_talos_machine_configs()" in text
+    assert "Timed out waiting for Talos maintenance API on ${label} at ${candidate}" in text
+    assert "Applying Talos machine configs at configured static addresses" in text
+    assert "Applying Talos machine config to ${name} at ${ip}" in text
+    assert "talosctl apply-config \\" in text
+    assert "--insecure \\" in text
+    assert '--file "$config_file"' in text
     assert "bootstrap_cluster()" in text
     assert "sync_user_kubeconfig()" in text
     assert "sync_user_talosconfig()" in text
@@ -1310,6 +1318,9 @@ def test_apply_cluster_renders_static_nocloud_talos_flow_and_tracks_iac_paths():
     assert "TALOS_IMAGE_EXTENSIONS=" not in text
     assert text.index("generate_talos_configs") < text.index(
         '"$TOFU_BIN" -chdir="$work_module_dir" apply'
+    )
+    assert text.index("apply_talos_machine_configs\nbootstrap_cluster") < text.index(
+        'bootstrap_cluster "$first_controlplane_ip"'
     )
     assert text.index('bootstrap_cluster "$first_controlplane_ip"') < text.index(
         "Waiting for workers at their configured static addresses"
@@ -3389,15 +3400,19 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     outputs_text = _module_outputs_text()
     compact_main_text = re.sub(r"\s+", " ", main_text)
     assert 'resource "proxmox_virtual_environment_vm" "node"' in main_text
-    assert 'resource "proxmox_virtual_environment_file" "talos_machine_config"' in main_text
-    assert 'resource "proxmox_virtual_environment_file" "network_config"' in main_text
+    assert 'resource "proxmox_virtual_environment_file"' not in main_text
     assert "talos_image_nodes" not in main_text
     assert 'resource "proxmox_virtual_environment_download_file" "talos"' not in main_text
-    assert 'content_type = "snippets"' in main_text
+    assert 'content_type = "snippets"' not in main_text
     assert "decompression_algorithm" not in compact_main_text
-    assert 'path      = "${path.module}/talos-configs/${each.key}.yaml"' in main_text
-    assert "network_data_file_id" in main_text
-    assert "user_data_file_id" in main_text
+    assert 'address = "${each.value.ip}/${var.prefix}"' in main_text
+    assert "gateway = var.gateway" in main_text
+    assert "domain  = var.dns_domain" in main_text
+    assert "servers = var.dns_servers" in main_text
+    assert "network_data_file_id" not in main_text
+    assert "user_data_file_id" not in main_text
+    assert "wait_for_ip" in main_text
+    assert "disabled = true" in main_text
     assert 'machine   = "q35"' not in main_text
     assert 'boot_order = ["virtio0"]' in main_text
     assert "cdrom {" not in main_text
@@ -3428,7 +3443,6 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     assert "remove_legacy_talos_file_state" not in main_text
     assert 'file_format  = "raw"' not in main_text
     assert "agent {" in main_text
-    assert "wait_for_ip {" not in main_text
     assert "reboot_after_update = false" in main_text
     assert 'type = "std"' in main_text
     assert "talos_machine_configuration_apply" not in main_text

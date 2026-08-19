@@ -44,13 +44,27 @@ resource "proxmox_virtual_environment_vm" "node" {
   }
 
   initialization {
-    datastore_id         = each.value.datastore_id
-    user_data_file_id    = proxmox_virtual_environment_file.talos_machine_config[each.key].id
-    network_data_file_id = proxmox_virtual_environment_file.network_config[each.key].id
+    datastore_id = each.value.datastore_id
+
+    dns {
+      domain  = var.dns_domain
+      servers = var.dns_servers
+    }
+
+    ip_config {
+      ipv4 {
+        address = "${each.value.ip}/${var.prefix}"
+        gateway = var.gateway
+      }
+    }
   }
 
   agent {
     enabled = true
+
+    wait_for_ip {
+      disabled = true
+    }
   }
 
   network_device {
@@ -71,35 +85,5 @@ resource "proxmox_virtual_environment_vm" "node" {
 
   vga {
     type = "std"
-  }
-}
-
-resource "proxmox_virtual_environment_file" "talos_machine_config" {
-  for_each     = var.nodes
-  content_type = "snippets"
-  datastore_id = var.file_datastore
-  node_name    = local.vm_host_map[each.key]
-
-  source_file {
-    path      = "${path.module}/talos-configs/${each.key}.yaml"
-    file_name = "${var.cluster_slug}-${each.key}-user-data.yaml"
-  }
-}
-
-resource "proxmox_virtual_environment_file" "network_config" {
-  for_each     = var.nodes
-  content_type = "snippets"
-  datastore_id = var.file_datastore
-  node_name    = local.vm_host_map[each.key]
-
-  source_raw {
-    file_name = "${var.cluster_slug}-${each.key}-network-data.yaml"
-    data = templatefile("${path.module}/templates/network-data.tftpl", {
-      mac         = each.value.mac
-      ip          = each.value.ip
-      prefix      = var.prefix
-      gateway     = var.gateway
-      dns_servers = var.dns_servers
-    })
   }
 }

@@ -36,6 +36,11 @@ variable "dns_servers" {
   type = list(string)
 }
 
+variable "dns_domain" {
+  type    = string
+  default = ""
+}
+
 variable "prefix" {
   type = number
 }

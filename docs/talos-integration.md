@@ -8,10 +8,10 @@ Talos lifecycle operations are triggered through the manager stack.
 2. `manager-api` validates inputs and queues the job.
 3. `manager-worker` runs `scripts/manager/apply-cluster.sh`.
 4. The worker renders a per-cluster OpenTofu workspace.
-5. The worker verifies that the configured Proxmox file datastore allows both `import` and `snippets` content, then downloads and decompresses the Talos NoCloud disk image.
+5. The worker verifies that the configured Proxmox file datastore allows `import` content, then downloads and decompresses the Talos NoCloud disk image.
 6. The worker uploads the disk image as Proxmox `import` content on each node that will host a Talos VM, then asks OpenTofu to import that image directly into the VM disk through the Proxmox API.
-7. OpenTofu uploads the generated Talos machine configs and static NoCloud network data as Proxmox `snippets`, creates the VMs, and applies the requested VM placement map.
-8. The worker waits for the Talos API at the configured static addresses, applies configs with `talosctl`, and bootstraps the first control plane.
+7. OpenTofu creates the VMs, applies the requested VM placement map, and uses Proxmox-generated NoCloud initialization data for static IP, gateway, and DNS settings. Twinbox does not upload custom Proxmox snippets for Talos nodes.
+8. The worker waits for the Talos maintenance API at the configured static addresses, applies configs with `talosctl apply-config --insecure`, then bootstraps the first control plane.
 9. Talos access files are stored as cluster-scoped bootstrap artifacts under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/`.
 10. `provision-nodes` renders the pinned Cilium Helm chart against the cluster VIP/API endpoint and stores it under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/cilium/cilium-bootstrap.yaml`.
 11. The rendered Cilium manifest enables Hubble Relay and the Hubble UI so flow visibility is present as soon as Cilium comes up.

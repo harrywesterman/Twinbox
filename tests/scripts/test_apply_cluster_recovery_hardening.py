@@ -61,7 +61,7 @@ def test_validate_vm_ids_allows_ids_managed_by_existing_state():
                   /^array_contains\\(\\) \\{{/ {{ emit = 1 }}
                   /^SCRIPT_DIR=/ {{ emit = 0 }}
                   /^proxmox_get_all_vm_ids\\(\\) \\{{/ {{ emit = 1 }}
-                  /^validate_file_datastore_content_types\\(\\) \\{{/ {{ emit = 0 }}
+                  /^validate_file_datastore_import_content\\(\\) \\{{/ {{ emit = 0 }}
                   emit {{ print }}
                 ' "$APPLY_CLUSTER_SCRIPT" >"$HELPERS_FILE"
                 source "$HELPERS_FILE"

@@ -351,14 +351,10 @@ managed_vm_ids_from_state() {
   ' "$state_file" 2>/dev/null | sort -n | uniq
 }
 
-validate_file_datastore_content_types() {
+validate_file_datastore_import_content() {
   local datastore="$1"
   local storage_json=""
   local content=""
-  local missing_content=()
-  local required_content=("import" "snippets")
-  local content_item=""
-  local missing_list=""
 
   proxmox_api_login
   storage_json="$(curl -ksS --fail \
@@ -367,15 +363,8 @@ validate_file_datastore_content_types() {
     "${TF_VAR_proxmox_endpoint}/api2/json/storage/${datastore}")" || fail "Failed to inspect Proxmox storage ${datastore}"
 
   content="$(jq -r '.data.content // ""' <<<"$storage_json")"
-  for content_item in "${required_content[@]}"; do
-    if [[ ",${content}," != *",${content_item},"* ]]; then
-      missing_content+=("$content_item")
-    fi
-  done
-
-  if [[ ${#missing_content[@]} -gt 0 ]]; then
-    missing_list="$(IFS=,; printf '%s' "${missing_content[*]}")"
-    fail "Proxmox file datastore ${datastore} must allow Import and Snippets content for Talos NoCloud provisioning. Missing content type(s): ${missing_list}. Re-run the setup wizard or enable Import and Snippets under Datacenter > Storage."
+  if [[ ",${content}," != *",import,"* ]]; then
+    fail "Proxmox file datastore ${datastore} must allow Import content for Talos disk-image provisioning. Re-run the setup wizard or enable Import under Datacenter > Storage."
   fi
 }
 
@@ -701,7 +690,7 @@ remove_legacy_talos_file_state() {
     legacy_addresses+=("$address")
   done < <(
     "$TOFU_BIN" -chdir="$workdir" state list 2>/dev/null \
-      | grep '^proxmox_virtual_environment_file.talos_nocloud' \
+      | grep -E '^proxmox_virtual_environment_file\.(talos_nocloud|talos_machine_config|network_config)(\[|$)' \
       || true
   )
 
@@ -709,7 +698,7 @@ remove_legacy_talos_file_state() {
     return 0
   fi
 
-  log "Removing legacy Talos ISO resources from OpenTofu state: ${legacy_addresses[*]}"
+  log "Removing legacy Talos Proxmox file resources from OpenTofu state: ${legacy_addresses[*]}"
   "$TOFU_BIN" -chdir="$workdir" state rm "${legacy_addresses[@]}"
 }
 
@@ -998,6 +987,53 @@ wait_for_talos_api() {
   done
 
   fail "Timed out waiting for Talos API on ${label} at ${candidate}"
+}
+
+wait_for_talos_api_insecure() {
+  local label="$1"
+  local candidate="$2"
+  local attempts=60
+
+  while [[ "$attempts" -gt 0 ]]; do
+    if talosctl version \
+      --nodes "$candidate" \
+      --endpoints "$candidate" \
+      --insecure >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 5
+    attempts=$((attempts - 1))
+  done
+
+  fail "Timed out waiting for Talos maintenance API on ${label} at ${candidate}"
+}
+
+apply_talos_machine_configs() {
+  local name=""
+  local type=""
+  local ip=""
+  local config_file=""
+
+  log "Applying Talos machine configs at configured static addresses"
+  while IFS=$'\t' read -r name type ip; do
+    [[ -n "$name" ]] || continue
+    config_file="$runtime_talos_dir/${name}-${type}.yaml"
+    [[ -s "$config_file" ]] || fail "Talos machine config not found for ${name}: ${config_file}"
+
+    wait_for_talos_api_insecure "$name" "$ip"
+    log "Applying Talos machine config to ${name} at ${ip}"
+    talosctl apply-config \
+      --insecure \
+      --nodes "$ip" \
+      --endpoints "$ip" \
+      --file "$config_file"
+  done < <(jq -r '
+      to_entries
+      | sort_by(.key)
+      | .[]
+      | [.key, .value.type, .value.ip]
+      | @tsv
+    ' <<<"$nodes_json")
 }
 
 render_cilium_manifest() {
@@ -1439,7 +1475,7 @@ validate_vm_node_map
 log_vm_node_map
 
 [[ -n "${image_disk_url:-}" ]] || fail "Talos disk image URL not resolved"
-validate_file_datastore_content_types "$FILE_DATASTORE"
+validate_file_datastore_import_content "$FILE_DATASTORE"
 talos_image_local_path="$image_cache_dir/talos-${CLUSTER_ID}-${image_cache_key}.raw"
 talos_image_file_name="talos-${CLUSTER_ID}-${image_cache_key}.raw"
 download_talos_image "$talos_image_local_path"
@@ -1454,23 +1490,13 @@ else
   mkdir -p "$work_module_dir"
 fi
 cp -R "$MODULE_SOURCE/." "$work_module_dir/"
-mkdir -p "$work_module_dir/talos-configs"
-while IFS=$'\t' read -r name type; do
-  [[ -n "$name" ]] || continue
-  cp "$runtime_talos_dir/${name}-${type}.yaml" "$work_module_dir/talos-configs/${name}.yaml"
-done < <(jq -r '
-    to_entries
-    | sort_by(.key)
-    | .[]
-    | [.key, .value.type]
-    | @tsv
-  ' <<<"$nodes_json")
 
 jq -n \
   --arg proxmox_node "$PROXMOX_NODE" \
   --arg file_datastore "$FILE_DATASTORE" \
   --arg bridge "$BRIDGE" \
   --arg gateway "$GATEWAY_IP" \
+  --arg dns_domain "${DNS_DOMAIN:-}" \
   --arg cluster_name "$NAME" \
   --arg cluster_slug "$CLUSTER_ID" \
   --arg cluster_endpoint "https://${VIP_IP}:6443" \
@@ -1486,6 +1512,7 @@ jq -n \
     file_datastore: $file_datastore,
     bridge: $bridge,
     gateway: $gateway,
+    dns_domain: $dns_domain,
     dns_servers: $dns_servers,
     prefix: $prefix,
     cluster_name: $cluster_name,
@@ -1514,6 +1541,7 @@ update_cluster_file "provisioned" "$planned_controlplane_ips_json" "$planned_wor
 first_controlplane_ip="$(jq -r '.[0] // empty' <<<"$planned_controlplane_ips_json")"
 [[ -n "$first_controlplane_ip" ]] || fail "No control plane IP configured"
 
+apply_talos_machine_configs
 bootstrap_cluster "$first_controlplane_ip"
 wait_for_kubernetes_rollout "daemonset/cilium" "kube-system" "Cilium DaemonSet"
 wait_for_kubernetes_rollout "deployment/cilium-operator" "kube-system" "Cilium operator"
