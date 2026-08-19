@@ -5050,6 +5050,11 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "TERMIX_ADMIN_PASSWORD" in setup_text
     assert 'TERMIX_URL="${TERMIX_URL:-}"' in setup_text
     assert "setup_termix_forward" in setup_text
+    assert "wait_for_termix_deployment()" in setup_text
+    assert "kubectl -n termix get deployment/termix" in setup_text
+    assert setup_text.index("wait_for_termix_deployment") < setup_text.index(
+        "kubectl -n termix rollout status deployment/termix"
+    )
     assert 'kubectl -n termix port-forward "svc/termix" "${port}:80"' in setup_text
     assert "${TERMIX_URL}/health" in setup_text
     assert "X-Electron-App: true" in setup_text
