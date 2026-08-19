@@ -61,7 +61,7 @@ fi
         assert proc.returncode == 0, proc.stderr
         assert "TALOS_IMAGE_SCHEMATIC=schematic123" in proc.stdout
         assert (
-            "TALOS_IMAGE_FACTORY_URL=https://factory.talos.dev/image/schematic123/v1.9.2/metal-amd64.raw.xz"
+            "TALOS_IMAGE_FACTORY_URL=https://factory.talos.dev/image/schematic123/v1.9.2/nocloud-amd64.raw.xz"
             in proc.stdout
         )
         assert (
@@ -86,7 +86,8 @@ fi
         assert "siderolabs/iscsi-tools" in curl_stdin_1
         assert "siderolabs/util-linux-tools" in curl_stdin_1
         assert (
-            "https://factory.talos.dev/image/schematic123/v1.9.2/metal-amd64.raw.xz" in curl_args_2
+            "https://factory.talos.dev/image/schematic123/v1.9.2/nocloud-amd64.raw.xz"
+            in curl_args_2
         )
 
 

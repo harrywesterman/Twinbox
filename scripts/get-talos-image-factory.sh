@@ -7,7 +7,7 @@ source "$SCRIPT_DIR/../config/pinned-defaults.sh"
 
 usage() {
   cat <<'USAGE'
-Usage: get-talos-image-factory.sh [--preset vanilla|qemu-guest-agent] [--version vX.Y.Z] [--arch amd64] [--platform cloud-server] [--installer-only] [--output id|url|shell|json|extensions]
+Usage: get-talos-image-factory.sh [--preset vanilla|qemu-guest-agent] [--version vX.Y.Z] [--arch amd64] [--platform nocloud] [--installer-only] [--output id|url|shell|json|extensions]
 USAGE
 }
 
@@ -125,7 +125,7 @@ schematic_id="$(printf '%s' "$response" | jq -r '.id // empty')"
 [[ -n "$schematic_id" ]] || fail "Factory response did not include an id"
 
 # Use the compressed bootable Talos disk image rather than the ISO installer path.
-image_url="https://factory.talos.dev/image/${schematic_id}/${version}/metal-${arch}.raw.xz"
+image_url="https://factory.talos.dev/image/${schematic_id}/${version}/${platform}-${arch}.raw.xz"
 installer_image="factory.talos.dev/metal-installer/${schematic_id}:${version}"
 download_url=""
 if [[ "$installer_only" != "true" ]]; then
