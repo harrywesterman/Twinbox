@@ -3975,6 +3975,48 @@ def test_forgejo_bootstrap_seeds_from_upstream_and_renders_github_defaults():
 
 
 def test_optional_database_apps_patch_cloudnativepg_requests_by_resource_profile():
+    def parse_memory_quantity_mib(raw_value):
+        match = re.fullmatch(r"(\d+)(Mi|Gi|MB|GB)", raw_value)
+        assert match, f"Unsupported memory quantity: {raw_value}"
+        amount = int(match.group(1))
+        unit = match.group(2)
+        if unit == "Mi":
+            return amount
+        if unit == "Gi":
+            return amount * 1024
+        if unit == "MB":
+            return amount * 1000 / 1024
+        return amount * 1000 * 1000 / 1024
+
+    def extract_profile_memory_requests(appset_text):
+        appset = yaml.safe_load(appset_text)
+        for source in appset["spec"]["template"]["spec"]["sources"]:
+            for patch_entry in source.get("kustomize", {}).get("patches", []):
+                target = patch_entry.get("target", {})
+                if target.get("group") != "postgresql.cnpg.io" or target.get("kind") != "Cluster":
+                    continue
+                for operation in yaml.safe_load(patch_entry["patch"]):
+                    if operation.get("path") != "/spec/resources/requests/memory":
+                        continue
+                    match = re.fullmatch(
+                        r'\{\{ if eq \(index \.metadata\.labels "twinbox\.io/resource-profile"\) '
+                        r'"small" \}\}(?P<small>[^{}]+)'
+                        r'\{\{ else if eq \(index \.metadata\.labels "twinbox\.io/resource-profile"\) '
+                        r'"large" \}\}(?P<large>[^{}]+)'
+                        r"\{\{ else \}\}(?P<default>[^{}]+)\{\{ end \}\}",
+                        operation["value"],
+                    )
+                    if not match:
+                        match = re.fullmatch(
+                            r'\{\{ if eq \(index \.metadata\.labels "twinbox\.io/resource-profile"\) '
+                            r'"large" \}\}(?P<large>[^{}]+)'
+                            r"\{\{ else \}\}(?P<default>[^{}]+)\{\{ end \}\}",
+                            operation["value"],
+                        )
+                    assert match, "CloudNativePG memory request profile patch is malformed"
+                    return match.groupdict()
+        raise AssertionError("CloudNativePG memory request profile patch is missing")
+
     database_apps = [
         "hedgedoc",
         "immich",
@@ -3991,10 +4033,24 @@ def test_optional_database_apps_patch_cloudnativepg_requests_by_resource_profile
         text = (REPO_ROOT / "gitops" / "optional-apps" / f"{app_name}.yaml").read_text(
             encoding="utf-8"
         )
+        cluster = yaml.safe_load(
+            (REPO_ROOT / "gitops" / "databases" / app_name / "cluster.yaml").read_text(
+                encoding="utf-8"
+            )
+        )
+        profile_memory_requests = extract_profile_memory_requests(text)
+        shared_buffers = cluster["spec"]["postgresql"]["parameters"]["shared_buffers"]
+        shared_buffers_mib = parse_memory_quantity_mib(shared_buffers)
+
         assert "twinbox.io/resource-profile" in text
         assert "path: /spec/resources/requests/cpu" in text
         assert "path: /spec/resources/requests/memory" in text
         assert f"name: {app_name}-db" in text
+        for profile_name, memory_request in profile_memory_requests.items():
+            assert parse_memory_quantity_mib(memory_request) >= shared_buffers_mib, (
+                f"{app_name} {profile_name} memory request {memory_request} is lower than "
+                f"PostgreSQL shared_buffers {shared_buffers}"
+            )
 
 
 def test_dashy_appset_patches_requests_by_resource_profile():
