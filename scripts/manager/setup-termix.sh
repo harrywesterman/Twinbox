@@ -335,6 +335,21 @@ pick_termix_forward_port() {
   fail "Could not find a free local port for Termix port-forward"
 }
 
+wait_for_termix_deployment() {
+  local attempt=1
+  local attempts=120
+
+  while [[ "$attempt" -le "$attempts" ]]; do
+    if kubectl -n termix get deployment/termix >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+
+  fail "Termix deployment was not created within ${attempts} attempts"
+}
+
 setup_termix_forward() {
   if [[ -n "$TERMIX_URL" ]]; then
     return 0
@@ -346,6 +361,7 @@ setup_termix_forward() {
   local attempts=60
 
   log "Waiting for Termix deployment to be ready for port-forwarding"
+  wait_for_termix_deployment
   kubectl -n termix rollout status deployment/termix --timeout=5m >/dev/null 2>&1 || fail "Termix deployment did not become ready"
 
   if [[ -z "$port" ]]; then

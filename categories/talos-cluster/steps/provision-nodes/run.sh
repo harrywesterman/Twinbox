@@ -31,8 +31,6 @@ VM_NODE_MAP="$effective_vm_node_map" bash scripts/manager/apply-cluster.sh \
   --name "$(printf '%s' "$cluster_json" | jq -r '.name')" \
   --controlplane-count "$(printf '%s' "$cluster_json" | jq -r '.controlplane_count')" \
   --worker-count "$(printf '%s' "$cluster_json" | jq -r '.worker_count')" \
-  --cpu-cores "$(printf '%s' "$cluster_json" | jq -r '.cpu_cores')" \
-  --memory-mb "$(printf '%s' "$cluster_json" | jq -r '.memory_mb')" \
   --bridge "$(printf '%s' "$cluster_json" | jq -r '.bridge')" \
   --start-vmid "$(printf '%s' "$cluster_json" | jq -r '.start_vmid')" \
   --start-ip "$(printf '%s' "$cluster_json" | jq -r '.start_ip')" \
