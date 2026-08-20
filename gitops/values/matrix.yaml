@@ -4,6 +4,30 @@ postgres:
 ingress:
   className: twinbox-disabled
 
+initSecrets:
+  resources:
+    requests:
+      memory: 50Mi
+      cpu: 10m
+    limits:
+      memory: 200Mi
+
+deploymentMarkers:
+  resources:
+    requests:
+      memory: 50Mi
+      cpu: 10m
+    limits:
+      memory: 200Mi
+
+haproxy:
+  resources:
+    requests:
+      memory: 100Mi
+      cpu: 10m
+    limits:
+      memory: 200Mi
+
 synapse:
   postgres:
     host: matrix-synapse-db-pooler-rw.databases.svc.cluster.local

@@ -2688,6 +2688,20 @@ def test_matrix_values_disable_chart_ingress_and_well_known():
     assert "wellknownDelegation" not in text
 
 
+def test_matrix_haproxy_request_leaves_room_for_synapse_on_app_heavy_clusters():
+    values = yaml.safe_load(MATRIX_VALUES.read_text(encoding="utf-8"))
+
+    assert values["initSecrets"]["resources"]["requests"]["cpu"] == "10m"
+    assert values["initSecrets"]["resources"]["requests"]["memory"] == "50Mi"
+    assert values["initSecrets"]["resources"]["limits"]["memory"] == "200Mi"
+    assert values["haproxy"]["resources"]["requests"]["cpu"] == "10m"
+    assert values["haproxy"]["resources"]["requests"]["memory"] == "100Mi"
+    assert values["haproxy"]["resources"]["limits"]["memory"] == "200Mi"
+    assert values["deploymentMarkers"]["resources"]["requests"]["cpu"] == "10m"
+    assert values["deploymentMarkers"]["resources"]["requests"]["memory"] == "50Mi"
+    assert values["deploymentMarkers"]["resources"]["limits"]["memory"] == "200Mi"
+
+
 def test_matrix_ingressroutes_target_chart_services():
     text = MATRIX_INGRESSROUTE.read_text(encoding="utf-8")
 
@@ -4399,6 +4413,20 @@ def test_critical_cnpg_clusters_use_ha_instances_with_single_replica_storage():
     ).read_text(encoding="utf-8")
     assert "instances: 2" in pixelfed_cluster_text
     assert "storageClass: longhorn-single" in pixelfed_cluster_text
+
+
+def test_matrix_mas_db_keeps_cpu_request_small_enough_for_app_heavy_clusters():
+    cluster = yaml.safe_load(
+        (REPO_ROOT / "gitops" / "databases" / "matrix-mas" / "cluster.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert cluster["spec"]["instances"] == 3
+    assert cluster["spec"]["resources"]["requests"]["cpu"] == "100m"
+    assert cluster["spec"]["resources"]["requests"]["memory"] == "512Mi"
+    assert cluster["spec"]["resources"]["limits"]["cpu"] == "500m"
+    assert cluster["spec"]["resources"]["limits"]["memory"] == "1Gi"
 
 
 def test_database_app_installers_refresh_pgadmin_after_database_ready():
