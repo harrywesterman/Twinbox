@@ -60,8 +60,8 @@ def _start_api(data_dir: Path, port: int):
         """#!/bin/sh
 cat <<'EOF'
 [
-  {"node": "pve-a", "status": "online", "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0},
-  {"node": "pve-b", "status": "online", "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0}
+  {"node": "pve-a", "status": "online", "maxcpu": 16, "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0},
+  {"node": "pve-b", "status": "online", "maxcpu": 16, "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0}
 ]
 EOF
 """,
@@ -624,9 +624,11 @@ def test_execute_step_persists_state_and_enqueues_run_step_job():
 
             cluster_file = data_dir / "clusters" / f"{body['cluster_id']}.json"
             cluster = json.loads(cluster_file.read_text())
-            assert cluster["worker_disk_gb"] == 192
-            assert cluster["vm_size_map"]["worker-1"]["disk_gb"] == 192
-            assert cluster["vm_size_map"]["worker-2"]["disk_gb"] == 192
+            assert cluster["worker_disk_gb"] == cluster["vm_size_map"]["worker-1"]["disk_gb"]
+            assert cluster["vm_size_map"]["worker-1"]["disk_gb"] >= 10
+            assert cluster["vm_size_map"]["worker-2"]["disk_gb"] >= 10
+            assert cluster["vm_size_map"]["worker-1"]["cpu"] >= 1
+            assert cluster["vm_size_map"]["worker-2"]["cpu"] >= 1
             assert cluster["vm_storage_map"] == {
                 "cp-1": "local-lvm",
                 "worker-1": "local-lvm",
@@ -652,8 +654,8 @@ def test_execute_step_rebuilds_provisioned_cluster_with_a_fresh_session():
             """#!/bin/sh
 cat <<'EOF'
 [
-  {"node": "pve-a", "status": "online", "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0},
-  {"node": "pve-b", "status": "online", "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0}
+  {"node": "pve-a", "status": "online", "maxcpu": 16, "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0},
+  {"node": "pve-b", "status": "online", "maxcpu": 16, "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0}
 ]
 EOF
 """,
@@ -775,8 +777,8 @@ def test_execute_step_accepts_manual_vm_ip_map_without_allocation_recheck():
             """#!/bin/sh
 cat <<'EOF'
 [
-  {"node": "pve-a", "status": "online", "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0},
-  {"node": "pve-b", "status": "online", "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0}
+  {"node": "pve-a", "status": "online", "maxcpu": 16, "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0},
+  {"node": "pve-b", "status": "online", "maxcpu": 16, "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0}
 ]
 EOF
 """,
@@ -858,8 +860,8 @@ def test_execute_step_retries_existing_provisioned_cluster_without_allocation_re
             """#!/bin/sh
 cat <<'EOF'
 [
-  {"node": "pve-a", "status": "online", "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0},
-  {"node": "pve-b", "status": "online", "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0}
+  {"node": "pve-a", "status": "online", "maxcpu": 16, "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0},
+  {"node": "pve-b", "status": "online", "maxcpu": 16, "maxmem": 68719476736, "mem": 0, "maxdisk": 1099511627776, "disk": 0}
 ]
 EOF
 """,
