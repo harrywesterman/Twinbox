@@ -52,7 +52,7 @@ fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
 
 cluster_resource_profile() {
   local cluster_json="${STEP_CONTEXT_JSON:-}"
-  local resource_profile worker_count per_worker_cpu per_worker_memory total_cpu total_memory
+  local resource_profile total_cpu total_memory
 
   if [[ -z "$cluster_json" ]]; then
     printf 'standard\n'
@@ -73,11 +73,12 @@ cluster_resource_profile() {
       ;;
   esac
 
-  worker_count="$(jq -r '(.worker_count // 0)' <<<"$cluster_json")"
-  per_worker_cpu="$(jq -r '(.cpu_cores // 0)' <<<"$cluster_json")"
-  per_worker_memory="$(jq -r '(.memory_mb // 0)' <<<"$cluster_json")"
-  total_cpu="$(( per_worker_cpu * worker_count ))"
-  total_memory="$(( per_worker_memory * worker_count ))"
+  total_cpu="$(jq -r '(.worker_cpu_total // 0)' <<<"$cluster_json")"
+  total_memory="$(jq -r '(.worker_memory_total_mb // 0)' <<<"$cluster_json")"
+  if [[ "$total_cpu" -eq 0 || "$total_memory" -eq 0 ]]; then
+    printf 'small\n'
+    return 0
+  fi
 
   if [[ "$total_cpu" -ge 32 && "$total_memory" -ge 98304 ]]; then
     printf 'large\n'
