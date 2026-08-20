@@ -2700,6 +2700,9 @@ def test_matrix_haproxy_request_leaves_room_for_synapse_on_app_heavy_clusters():
     assert values["deploymentMarkers"]["resources"]["requests"]["cpu"] == "10m"
     assert values["deploymentMarkers"]["resources"]["requests"]["memory"] == "50Mi"
     assert values["deploymentMarkers"]["resources"]["limits"]["memory"] == "200Mi"
+    assert values["synapse"]["checkConfigHook"]["resources"]["requests"]["cpu"] == "10m"
+    assert values["synapse"]["checkConfigHook"]["resources"]["requests"]["memory"] == "50Mi"
+    assert values["synapse"]["checkConfigHook"]["resources"]["limits"]["memory"] == "200Mi"
 
 
 def test_matrix_ingressroutes_target_chart_services():
