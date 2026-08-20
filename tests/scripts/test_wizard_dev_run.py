@@ -91,6 +91,8 @@ def _write_fake_curl_cmd(bin_dir: Path) -> None:
         textwrap.dedent(
             """\
             #!/usr/bin/env python3
+            import json
+            import os
             import sys
 
             url = sys.argv[-1]
@@ -98,6 +100,15 @@ def _write_fake_curl_cmd(bin_dir: Path) -> None:
                 print('{"token":"test-token"}')
                 sys.exit(0)
             if "/manifests/" in url:
+                if os.environ.get("WIZARD_DEV_FAIL_MANIFESTS") == "1":
+                    sys.exit(1)
+                sys.exit(0)
+            if "api.github.com" in url:
+                conclusion = os.environ.get("WIZARD_DEV_FAKE_CI_CONCLUSION")
+                runs = []
+                if conclusion:
+                    runs.append({"name": "Publish Docker Images", "conclusion": conclusion})
+                print(json.dumps({"workflow_runs": runs}))
                 sys.exit(0)
 
             print(f"unexpected curl url: {url}", file=sys.stderr)
@@ -325,6 +336,107 @@ def test_wizard_dev_run_uploads_origin_main_wizard_with_matching_published_image
     assert "Manager images sha-abcdef1 are published" in proc.stderr
 
 
+def test_wizard_dev_run_falls_back_to_pinned_tag_when_ci_publish_failed(tmp_path: Path):
+    config_path = tmp_path / ".env.wizard.local"
+    config_path.write_text(
+        'WIZARD_DEV_SSH_TARGET="root@proxmox-dev"\nWIZARD_DEV_REMOTE_DIR="/root/twinbox-dev"\n',
+        encoding="utf-8",
+    )
+    bin_dir, log_path, ssh_count_path = _prepare_fake_remote_tools(tmp_path)
+    _write_fake_git_cmd(bin_dir)
+    _write_fake_curl_cmd(bin_dir)
+
+    origin_wizard = textwrap.dedent(
+        """\
+        #!/usr/bin/env bash
+        TWINBOX_IMAGE_TAG="sha-1111111"
+        echo origin-main-marker
+        """
+    )
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{bin_dir}:{env.get('PATH', '')}",
+            "WIZARD_DEV_CAPTURE_UPLOAD": "1",
+            "WIZARD_DEV_CONFIG_FILE": str(config_path),
+            "WIZARD_DEV_FAKE_CI_CONCLUSION": "failure",
+            "WIZARD_DEV_FAKE_ORIGIN_SHA": "abcdef1234567890",
+            "WIZARD_DEV_FAKE_ORIGIN_WIZARD": origin_wizard,
+            "WIZARD_DEV_LOG": str(log_path),
+            "WIZARD_DEV_REPO_ROOT": str(REPO_ROOT),
+            "WIZARD_DEV_SSH_COUNT": str(ssh_count_path),
+        }
+    )
+
+    proc = subprocess.run(
+        ["bash", str(RUNNER_PATH)],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    calls = _read_remote_log(tmp_path)
+    assert 'TWINBOX_IMAGE_TAG="sha-1111111"' in calls[1]["uploaded_content"]
+    assert "Using last published tag sha-1111111" in proc.stderr
+    assert "Waiting for manager images sha-abcdef1" not in proc.stderr
+
+
+def test_wizard_dev_run_falls_back_to_pinned_tag_when_images_never_published(
+    tmp_path: Path,
+):
+    config_path = tmp_path / ".env.wizard.local"
+    config_path.write_text(
+        (
+            'WIZARD_DEV_SSH_TARGET="root@proxmox-dev"\n'
+            'WIZARD_DEV_REMOTE_DIR="/root/twinbox-dev"\n'
+            'WIZARD_DEV_IMAGE_TAG_WAIT_TIMEOUT_SECONDS="1"\n'
+            'WIZARD_DEV_IMAGE_TAG_WAIT_INTERVAL_SECONDS="1"\n'
+        ),
+        encoding="utf-8",
+    )
+    bin_dir, log_path, ssh_count_path = _prepare_fake_remote_tools(tmp_path)
+    _write_fake_git_cmd(bin_dir)
+    _write_fake_curl_cmd(bin_dir)
+
+    origin_wizard = textwrap.dedent(
+        """\
+        #!/usr/bin/env bash
+        TWINBOX_IMAGE_TAG="sha-1111111"
+        echo origin-main-marker
+        """
+    )
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{bin_dir}:{env.get('PATH', '')}",
+            "WIZARD_DEV_CAPTURE_UPLOAD": "1",
+            "WIZARD_DEV_CONFIG_FILE": str(config_path),
+            "WIZARD_DEV_FAIL_MANIFESTS": "1",
+            "WIZARD_DEV_FAKE_ORIGIN_SHA": "abcdef1234567890",
+            "WIZARD_DEV_FAKE_ORIGIN_WIZARD": origin_wizard,
+            "WIZARD_DEV_LOG": str(log_path),
+            "WIZARD_DEV_REPO_ROOT": str(REPO_ROOT),
+            "WIZARD_DEV_SSH_COUNT": str(ssh_count_path),
+        }
+    )
+
+    proc = subprocess.run(
+        ["bash", str(RUNNER_PATH)],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    calls = _read_remote_log(tmp_path)
+    assert 'TWINBOX_IMAGE_TAG="sha-1111111"' in calls[1]["uploaded_content"]
+    assert "Using last published tag sha-1111111" in proc.stderr
+    assert "Waiting for manager images sha-abcdef1 to be published" in proc.stderr
+
+
 def test_wizard_dev_run_resolves_current_image_tag_without_mutating_checkout():
     text = RUNNER_PATH.read_text(encoding="utf-8")
 
@@ -336,4 +448,4 @@ def test_wizard_dev_run_resolves_current_image_tag_without_mutating_checkout():
     assert 'write_wizard_with_image_tag "$source_path" "$image_tag"' in text
     assert 'scp -q "${WIZARD_UPLOAD_PATH}"' in text
     assert 'git -C "$REPO_ROOT" merge --ff-only' not in text
-    assert "The wizard was not uploaded with the stale tag ${source_tag}" in text
+    assert "Using last published tag ${source_tag}" in text

@@ -159,6 +159,12 @@
   ],
   "packageRules": [
     {
+      "description": "Pin typescript to 5.x in eurooffice-file-action: TS 7 (native) lacks the JS compiler API required by @nextcloud/vite-config",
+      "matchPackageNames": ["typescript"],
+      "matchFileNames": ["categories/apps/steps/install-nextcloud/eurooffice-file-action/package.json"],
+      "enabled": false
+    },
+    {
       "description": "Skip private registry docker.getoutline.com (no public access)",
       "matchDatasources": ["docker"],
       "matchDepNames": ["docker.getoutline.com/**"],

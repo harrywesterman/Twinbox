@@ -10,6 +10,7 @@ DEFAULT_CONFIG_FILE="${REPO_ROOT}/.env.vm-preview.local"
 CONFIG_FILE="${WIZARD_DEV_CONFIG_FILE:-${DEFAULT_CONFIG_FILE}}"
 DEFAULT_REMOTE_DIR="/tmp/twinbox-dev"
 GHCR_OWNER=""
+GITHUB_REPO=""
 IMAGE_TAG_WAIT_TIMEOUT_SECONDS=""
 IMAGE_TAG_WAIT_INTERVAL_SECONDS=""
 WIZARD_SOURCE=""
@@ -49,6 +50,7 @@ load_config() {
   local env_target="${WIZARD_DEV_SSH_TARGET-}"
   local env_remote_dir="${WIZARD_DEV_REMOTE_DIR-}"
   local env_ghcr_owner="${WIZARD_DEV_GHCR_OWNER-}"
+  local env_github_repo="${WIZARD_DEV_GITHUB_REPO-}"
   local env_image_tag_wait_timeout="${WIZARD_DEV_IMAGE_TAG_WAIT_TIMEOUT_SECONDS-}"
   local env_image_tag_wait_interval="${WIZARD_DEV_IMAGE_TAG_WAIT_INTERVAL_SECONDS-}"
   local env_wizard_source="${WIZARD_DEV_SOURCE-}"
@@ -69,6 +71,9 @@ load_config() {
   if [[ -n "${env_ghcr_owner}" ]]; then
     WIZARD_DEV_GHCR_OWNER="${env_ghcr_owner}"
   fi
+  if [[ -n "${env_github_repo}" ]]; then
+    WIZARD_DEV_GITHUB_REPO="${env_github_repo}"
+  fi
   if [[ -n "${env_image_tag_wait_timeout}" ]]; then
     WIZARD_DEV_IMAGE_TAG_WAIT_TIMEOUT_SECONDS="${env_image_tag_wait_timeout}"
   fi
@@ -82,6 +87,7 @@ load_config() {
   SSH_TARGET="${WIZARD_DEV_SSH_TARGET:-}"
   REMOTE_DIR="${WIZARD_DEV_REMOTE_DIR:-${DEFAULT_REMOTE_DIR}}"
   GHCR_OWNER="${WIZARD_DEV_GHCR_OWNER:-harrywesterman}"
+  GITHUB_REPO="${WIZARD_DEV_GITHUB_REPO:-harrywesterman/Twinbox}"
   IMAGE_TAG_WAIT_TIMEOUT_SECONDS="${WIZARD_DEV_IMAGE_TAG_WAIT_TIMEOUT_SECONDS:-1200}"
   IMAGE_TAG_WAIT_INTERVAL_SECONDS="${WIZARD_DEV_IMAGE_TAG_WAIT_INTERVAL_SECONDS:-10}"
   WIZARD_SOURCE="${WIZARD_DEV_SOURCE:-origin-main}"
@@ -230,11 +236,36 @@ wait_for_manager_images() {
   return 1
 }
 
+ci_run_status_for_commit() {
+  local commit_sha="$1"
+  local api_url="https://api.github.com/repos/${GITHUB_REPO}/actions/runs?head_sha=${commit_sha}&per_page=10"
+
+  curl --silent --show-error --max-time 10 "$api_url" 2>/dev/null \
+    | python3 -c '
+import json
+import sys
+
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+
+if not isinstance(data, dict) or "workflow_runs" not in data:
+    sys.exit(0)
+
+for run in data["workflow_runs"]:
+    if run.get("name") == "Publish Docker Images":
+        print(run.get("conclusion") or run.get("status") or "")
+        break
+' || true
+}
+
 resolve_wizard_image_tag() {
   local source_path="$1"
   local source_sha="$2"
   local source_tag=""
   local expected_source_tag=""
+  local ci_status=""
 
   source_tag="$(extract_wizard_image_tag "$source_path")"
   [[ -n "$source_tag" ]] || die "Could not determine TWINBOX_IMAGE_TAG in ${source_path}"
@@ -243,12 +274,21 @@ resolve_wizard_image_tag() {
   if [[ -n "$source_sha" ]] \
     && ! commit_is_image_bump "$source_sha" \
     && [[ "$source_tag" != "$expected_source_tag" ]]; then
+    ci_status="$(ci_run_status_for_commit "$source_sha")"
+    if [[ "$ci_status" == "failure" || "$ci_status" == "cancelled" || "$ci_status" == "timed_out" ]]; then
+      echo "Warning: manager image publish for ${expected_source_tag} failed (CI status: ${ci_status}). Using last published tag ${source_tag}." >&2
+      printf '%s\n' "$source_tag"
+      return
+    fi
+
     if wait_for_manager_images "$expected_source_tag"; then
       printf '%s\n' "$expected_source_tag"
       return
     fi
 
-    die "Manager images ${expected_source_tag} were not published within ${IMAGE_TAG_WAIT_TIMEOUT_SECONDS}s. The wizard was not uploaded with the stale tag ${source_tag}."
+    echo "Warning: manager images ${expected_source_tag} were not published within ${IMAGE_TAG_WAIT_TIMEOUT_SECONDS}s. Using last published tag ${source_tag}." >&2
+    printf '%s\n' "$source_tag"
+    return
   fi
 
   printf '%s\n' "$source_tag"
