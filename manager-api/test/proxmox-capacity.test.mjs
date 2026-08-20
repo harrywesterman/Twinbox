@@ -57,7 +57,48 @@ test("storage map rejects inactive or non-image storage", () => {
   assert.match(result.error, /not active VM-image storage/i);
 });
 
-test("capacity validation counts only Twinbox VM RAM reservations", () => {
+test("capacity validation reserves running VM maxmem and management VM regardless of state", () => {
+  const result = validateProxmoxCapacity({
+    cluster: cluster({
+      vm_node_map: { "cp-1": "pve-a" },
+      vm_size_map: { "cp-1": { cpu: 2, memory_mb: 8192, disk_gb: 20 } },
+      vm_storage_map: { "cp-1": "local-lvm" },
+    }),
+    nodes: [{ node: "pve-a", maxmem: 32 * GB, mem: 0 }],
+    vms: [
+      {
+        node: "pve-a",
+        name: "twinbox-demo-mgt",
+        tags: "twinbox;management",
+        vmid: 100,
+        status: "stopped",
+        mem: 0,
+        maxmem: 8 * GB,
+      },
+      {
+        node: "pve-a",
+        name: "off-vm",
+        vmid: 101,
+        status: "stopped",
+        mem: 0,
+        maxmem: 32 * GB,
+      },
+      {
+        node: "pve-a",
+        name: "other-running",
+        vmid: 102,
+        status: "running",
+        mem: 4 * GB,
+        maxmem: 8 * GB,
+      },
+    ],
+    storages: [storage("pve-a", "local-lvm", 100)],
+  });
+
+  assert.deepEqual(result, { ok: true });
+});
+
+test("capacity validation fails when planned memory exceeds host capacity", () => {
   const result = validateProxmoxCapacity({
     cluster: cluster({
       vm_node_map: { "cp-1": "pve-a" },
@@ -77,15 +118,6 @@ test("capacity validation counts only Twinbox VM RAM reservations", () => {
       },
       {
         node: "pve-a",
-        name: "twinbox-demo-old",
-        vmid: 101,
-        status: "stopped",
-        mem: 0,
-        maxmem: 2 * GB,
-      },
-      { node: "pve-a", name: "docker", vmid: 102, status: "stopped", mem: 0, maxmem: 8 * GB },
-      {
-        node: "pve-a",
         name: "other-running",
         vmid: 103,
         status: "running",
@@ -96,7 +128,8 @@ test("capacity validation counts only Twinbox VM RAM reservations", () => {
     storages: [storage("pve-a", "local-lvm", 100)],
   });
 
-  assert.deepEqual(result, { ok: true });
+  assert.equal(result.ok, false);
+  assert.match(result.error, /Insufficient RAM on pve-a/);
 });
 
 test("shared storage capacity is counted once across hosts", () => {

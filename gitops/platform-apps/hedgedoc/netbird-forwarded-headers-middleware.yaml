@@ -1,0 +1,14 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: hedgedoc-netbird-forwarded-headers
+  namespace: hedgedoc
+  annotations:
+    twinbox.io/description: >-
+      Keep HedgeDoc OAuth2 sessions on the public HTTPS origin behind NetBird
+      Reverse Proxy.
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Port: "443"
+      X-Forwarded-Proto: https
