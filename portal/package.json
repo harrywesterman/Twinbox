@@ -13,7 +13,7 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "jose": "^6.1.0",
+    "jose": "^6.2.9",
     "express": "^5.1.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
