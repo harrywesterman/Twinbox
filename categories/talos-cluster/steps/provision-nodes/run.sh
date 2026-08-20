@@ -16,6 +16,7 @@ cluster_file="$MANAGER_DATA_DIR/clusters/${cluster_id}.json"
 current_vm_node_map="$(printf '%s' "$cluster_json" | jq -c '.vm_node_map // {}')"
 current_vm_ip_map="$(printf '%s' "$cluster_json" | jq -c '.vm_ip_map // {}')"
 current_vm_size_map="$(printf '%s' "$cluster_json" | jq -c '.vm_size_map // {}')"
+current_vm_storage_map="$(printf '%s' "$cluster_json" | jq -c '.vm_storage_map // {}')"
 effective_vm_node_map="$current_vm_node_map"
 effective_vm_node_map_source="step context"
 
@@ -30,8 +31,6 @@ VM_NODE_MAP="$effective_vm_node_map" bash scripts/manager/apply-cluster.sh \
   --name "$(printf '%s' "$cluster_json" | jq -r '.name')" \
   --controlplane-count "$(printf '%s' "$cluster_json" | jq -r '.controlplane_count')" \
   --worker-count "$(printf '%s' "$cluster_json" | jq -r '.worker_count')" \
-  --cpu-cores "$(printf '%s' "$cluster_json" | jq -r '.cpu_cores')" \
-  --memory-mb "$(printf '%s' "$cluster_json" | jq -r '.memory_mb')" \
   --bridge "$(printf '%s' "$cluster_json" | jq -r '.bridge')" \
   --start-vmid "$(printf '%s' "$cluster_json" | jq -r '.start_vmid')" \
   --start-ip "$(printf '%s' "$cluster_json" | jq -r '.start_ip')" \
@@ -42,6 +41,7 @@ VM_NODE_MAP="$effective_vm_node_map" bash scripts/manager/apply-cluster.sh \
   --dns-domain "$(printf '%s' "$cluster_json" | jq -r '.dns_domain')" \
   --vm-node-map "$effective_vm_node_map" \
   --vm-size-map "$current_vm_size_map" \
+  --vm-storage-map "$current_vm_storage_map" \
   --vm-ip-map "$current_vm_ip_map" \
   --proxmox-node "$(printf '%s' "$cluster_json" | jq -r '.metadata.proxmox_node')" \
   --storage-pool "$(printf '%s' "$cluster_json" | jq -r '.metadata.storage_pool')" \

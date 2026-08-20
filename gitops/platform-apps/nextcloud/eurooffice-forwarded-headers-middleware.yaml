@@ -1,0 +1,14 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: eurooffice-forwarded-headers
+  namespace: nextcloud
+  annotations:
+    twinbox.io/description: >-
+      Keep Euro-Office document and websocket URLs on the public HTTPS origin
+      behind the Traefik entrypoints.
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Port: "443"
+      X-Forwarded-Proto: https

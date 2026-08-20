@@ -251,7 +251,6 @@ authentik_setup_forward
 AUTHENTIK_HOST="${AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
 matrix_host="https://matrix.${public_zone_name}"
 mas_host="https://account.${public_zone_name}"
-mas_redirect_uri="${mas_host}/upstream/callback/${mas_oidc_provider_ulid}"
 mas_application_slug="matrix"
 mas_issuer_url="${AUTHENTIK_HOST%/}/application/o/${mas_application_slug}/"
 mas_client_id="$(openssl rand -hex 16)"
@@ -260,6 +259,7 @@ synapse_shared_secret="$(openssl rand -hex 32)"
 mas_encryption_secret="$(openssl rand -hex 32)"
 mas_signing_key="$(openssl genpkey -algorithm RSA -outform PEM -pkeyopt rsa_keygen_bits:2048 2>/dev/null)"
 mas_oidc_provider_ulid="$(python3 -c "import uuid; import time; ts = int(time.time() * 1000); ulid = format(ts, '012X') + uuid.uuid4().hex[:14].upper(); print(ulid)")"
+mas_redirect_uri="${mas_host}/upstream/callback/${mas_oidc_provider_ulid}"
 matrix_synapse_db_username="matrix_synapse"
 matrix_synapse_db_password="$(openssl rand -hex 24)"
 matrix_mas_db_username="matrix_mas"
@@ -383,7 +383,7 @@ chmod 600 "$matrix_oidc_secret_file"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "matrix-oidc" \
   --json-file "$matrix_oidc_secret_file" \
-  --required-keys "MAS_OIDC_CLIENT_ID,MAS_OIDC_CLIENT_SECRET,MATRIX_OIDC_ENABLED_IDPS,MATRIX_OIDC_UPSTREAM_CONFIG"
+  --required-keys "MAS_OIDC_CLIENT_ID,MAS_OIDC_CLIENT_SECRET,MAS_OIDC_PROVIDER_ULID,MATRIX_OIDC_ENABLED_IDPS,MATRIX_OIDC_UPSTREAM_CONFIG"
 
 # Write DB secret
 matrix_db_secret_json="$(
@@ -441,6 +441,10 @@ matrix_mas_db_externalsecret_manifest="$WORKSPACE_ROOT/gitops/databases/matrix-m
 matrix_mas_db_pooler_ro_manifest="$WORKSPACE_ROOT/gitops/databases/matrix-mas/pooler-ro.yaml"
 matrix_mas_db_pooler_rw_manifest="$WORKSPACE_ROOT/gitops/databases/matrix-mas/pooler-rw.yaml"
 matrix_mas_db_backup_manifest="$WORKSPACE_ROOT/gitops/databases/matrix-mas/scheduled-backup.yaml"
+matrix_namespace_manifest="$WORKSPACE_ROOT/gitops/platform-apps/matrix/namespace.yaml"
+matrix_config_externalsecret_manifest="$WORKSPACE_ROOT/gitops/platform-apps/matrix/externalsecret.yaml"
+matrix_db_externalsecret_manifest="$WORKSPACE_ROOT/gitops/platform-apps/matrix/db-externalsecret.yaml"
+matrix_runtime_externalsecret_manifest="$WORKSPACE_ROOT/gitops/platform-apps/matrix/runtime-externalsecret.yaml"
 
 log "Applying Matrix database manifests"
 kubectl apply -f "$databases_namespace_manifest"
@@ -465,6 +469,17 @@ wait_for_deployment_rollout "databases" "matrix-synapse-db-pooler-ro" "Matrix Sy
 wait_for_deployment_rollout "databases" "matrix-synapse-db-pooler-rw" "Matrix Synapse DB read-write pooler"
 wait_for_deployment_rollout "databases" "matrix-mas-db-pooler-ro" "Matrix MAS DB read-only pooler"
 wait_for_deployment_rollout "databases" "matrix-mas-db-pooler-rw" "Matrix MAS DB read-write pooler"
+
+# ESS pre-install hooks require these secrets before Argo CD can sync the chart.
+log "Applying Matrix application secrets"
+kubectl apply -f "$matrix_namespace_manifest"
+kubectl apply -f "$matrix_config_externalsecret_manifest"
+kubectl apply -f "$matrix_db_externalsecret_manifest"
+kubectl apply -f "$matrix_runtime_externalsecret_manifest"
+wait_for_named_resource_ready "matrix" "externalsecret" "matrix-config" "Matrix configuration ExternalSecret"
+wait_for_named_resource_ready "matrix" "externalsecret" "matrix-synapse-db-credentials" "Matrix Synapse application DB ExternalSecret"
+wait_for_named_resource_ready "matrix" "externalsecret" "matrix-mas-db-credentials" "Matrix MAS application DB ExternalSecret"
+wait_for_named_resource_ready "matrix" "externalsecret" "matrix-runtime" "Matrix runtime ExternalSecret"
 
 bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
   --app-id "matrix-synapse" \

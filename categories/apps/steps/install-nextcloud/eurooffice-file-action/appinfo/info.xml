@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+  <id>twinbox_eurooffice_action</id>
+  <name>Twinbox EuroOffice File Action</name>
+  <summary>Adds an explicit EuroOffice action to the Files menu</summary>
+  <description>Provides the modern Nextcloud Files action for opening supported documents in EuroOffice.</description>
+  <version>1.0.0</version>
+  <licence>agpl</licence>
+  <author mail="support@twinbox.nl">Twinbox</author>
+  <namespace>TwinboxEuroofficeAction</namespace>
+  <dependencies>
+    <nextcloud min-version="34" max-version="35" />
+  </dependencies>
+</info>

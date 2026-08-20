@@ -13,7 +13,8 @@ PROXMOX_NODE=pve
 PROXMOX_STORAGE_POOL=local-lvm
 PROXMOX_FILE_DATASTORE=local
 TALOS_IMAGE_PRESET=qemu-guest-agent
-TWINBOX_IMAGE_TAG=sha-ad89c77
+TALOS_IMAGE_PLATFORM=nocloud
+TWINBOX_IMAGE_TAG=sha-652a75b
 TWINBOX_HOST_REPO_ROOT=/opt/twinbox
 TWINBOX_SECRET_BACKEND=filesystem
 TWINBOX_BOOTSTRAP_DIR=/opt/twinbox/bootstrap
@@ -40,7 +41,7 @@ TWINBOX_FORGEJO_REPO_URL=http://192.168.1.50:3001/twinbox/Twinbox.git
 
 Forgejo is exposed externally as `https://forgejo.<ZONE_NAME>` by the management console step. Traefik proxies that route directly to Forgejo; Forgejo itself uses native Authentik/OIDC login with callback `https://forgejo.<ZONE_NAME>/user/oauth2/authentik/callback`. The management console step persists the public `FORGEJO_ROOT_URL` in `/opt/twinbox/.env`, stores the OIDC client secret in OpenBao as `twinbox/global/forgejo-oidc`, and keeps the local admin account from `/opt/twinbox/bootstrap/secrets/global/forgejo.json` as break-glass access.
 
-`PROXMOX_FILE_DATASTORE` is the Proxmox datastore that Twinbox uses for Talos disk-image uploads during cluster provisioning. The setup wizard enables Proxmox `import` content on this datastore so OpenTofu can import the uploaded image into VM disks through the Proxmox API.
+`PROXMOX_FILE_DATASTORE` is the Proxmox datastore that Twinbox uses for Talos disk-image and NoCloud ISO uploads during cluster provisioning. Talos node provisioning requires Proxmox `import` content so OpenTofu can import the uploaded image into VM disks, plus Proxmox `iso` content so the worker can attach per-node NoCloud `cidata` ISOs with Talos machine config and static network config. The greenfield setup wizard may also enable `snippets` content for the Management VM's local cloud-init user-data, but Talos node networking does not use custom snippet uploads.
 
 ## Bootstrap File Layout
 

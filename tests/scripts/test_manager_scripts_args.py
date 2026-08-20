@@ -20,6 +20,7 @@ MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "main.tf"
 MODULE_OUTPUTS = REPO_ROOT / "infra" / "opentofu" / "talos-proxmox" / "outputs.tf"
 INSTALL_SECRET_SYNC_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-secret-sync.sh"
 OPENBAO_SECRET_SYNC_HELPER = REPO_ROOT / "scripts" / "manager" / "sync-openbao-global-secret.sh"
+OPENBAO_VALUES_RENDERER = REPO_ROOT / "scripts" / "manager" / "openbao-secret-sync.sh"
 ARGO_MANAGER_SCRIPT = REPO_ROOT / "scripts" / "manager" / "install-argocd.sh"
 APPLY_ARGO_APP_SCRIPT = REPO_ROOT / "scripts" / "manager" / "apply-argocd-application.sh"
 RENDER_CILIUM_SCRIPT = REPO_ROOT / "scripts" / "manager" / "render-cilium-manifest.sh"
@@ -643,21 +644,19 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert "export TF_IN_AUTOMATION=1" in text
     assert "export NO_COLOR=1" in text
     assert "command -v curl" in text
+    assert "command -v python3" in text
     assert "command -v xz" in text
+    assert "command -v xorriso" in text
+    assert "command -v timeout" in text
     assert "resolve_talos_image_assets()" in text
     assert "scripts/get-talos-image-factory.sh" in text
     assert "PINNED_TALOS_IMAGE_SCHEMATIC" not in text
     assert '--preset "${TALOS_IMAGE_PRESET:-qemu-guest-agent}"' not in text
     assert "TALOS_IMAGE_PRESET" in text
     assert "TALOS_IMAGE_DISK_URL=" in text
-    assert "talosctl apply-config \\" in text
-    assert '--endpoints "$ip" \\' in text
-    assert "retrying with cluster talosconfig" in text
-    assert "Resetting Talos node ${ip} to retry config application from clean state" in text
-    assert "wait_for_talos_insecure" in text
     assert "AlreadyExists desc = etcd data directory is not empty" in text
     assert "talosctl bootstrap" in text
-    assert 'bootstrap_mode = "dhcp-first"' in text
+    assert 'bootstrap_mode = "static-nocloud"' in text
     assert '"/image/default/"' not in text
     assert '!= "default"' not in text
     assert "TALOS_IMAGE_FACTORY_URL:-" not in text
@@ -674,14 +673,26 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert "proxmox_verify_talos_image()" in text
     assert "proxmox_talos_image_present()" in text
     assert "upload_talos_image_to_nodes()" in text
+    assert "render_and_upload_nocloud_isos()" in text
+    assert "build_nocloud_iso()" in text
+    assert "cidata_content_hash()" in text
     assert "remove_legacy_talos_file_state()" in text
     assert "Talos disk image URL not resolved" in text
-    assert "validate_file_datastore_import_content()" in text
-    assert 'validate_file_datastore_import_content "$FILE_DATASTORE"' in text
-    assert "must allow Import content for Talos disk-image provisioning" in text
+    assert "validate_file_datastore_provisioning_content()" in text
+    assert 'validate_file_datastore_provisioning_content "$FILE_DATASTORE"' in text
+    assert (
+        "must allow ${missing[*]} content for Talos disk-image and NoCloud ISO provisioning" in text
+    )
     assert '"${TF_VAR_proxmox_endpoint}/api2/json/storage/${datastore}"' in text
     assert '"${node_endpoint}/api2/json/nodes/${node}/storage/${datastore}/status"' in text
     assert '--form "content=import"' in text
+    assert '--form "content=iso"' in text
+    assert "xorriso -as mkisofs" in text
+    assert "-volid cidata" in text
+    assert "network-config" in text
+    assert 'nocloud_iso_file_ids_json="$(render_and_upload_nocloud_isos)"' in text
+    assert "nocloud_iso_file_id" in text
+    assert 'update_cluster_file "vms-created"' in text
     assert 'expected_volid="${datastore}:import/${image_name}"' in text
     assert 'select(.volid == $volid and .content == "import")' in text
     assert "stat -c '%s' \"$path\"" in text
@@ -698,14 +709,20 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
         in text
     )
     assert 'talos_image_file_name="talos-${CLUSTER_ID}-${image_cache_key}.raw"' in text
-    assert "Removing legacy Talos ISO resources from OpenTofu state:" in text
+    assert "Removing legacy Talos Proxmox file resources from OpenTofu state:" in text
+    assert "talos_machine_config" in text
+    assert "network_config" in text
     assert 'state rm "${legacy_addresses[@]}"' in text
-    assert "controlplane_ipv4_addresses.value" in text
-    assert "worker_ipv4_addresses.value" in text
-    assert "flatten_ipv4_candidates" in text or "flatten | .[]" in text
-    assert "ensure_vip_is_not_dhcp_assigned" in text
-    assert "Control-plane VIP ${VIP_IP} was assigned by DHCP to a VM" in text
-    assert 'select(startswith("10.244.") | not)' in text
+    assert 'echo "        dhcp: false"' in text
+    assert 'echo "          - ${ip}/${NODE_PREFIX_LENGTH}"' in text
+    assert 'echo "            gateway: ${GATEWAY_IP}"' in text
+    assert "work_module_dir/talos-configs" not in text
+    assert '"${DNS_DOMAIN:-}"' in text
+    assert "dns_domain: $dns_domain" in text
+    assert 'timeout "$TALOS_API_CHECK_TIMEOUT_SECONDS" talosctl version' in text
+    assert "wait_for_talos_api_insecure()" not in text
+    assert "apply_talos_machine_configs()" not in text
+    assert "talosctl apply-config \\" not in text
     assert "TF_VAR_proxmox_endpoint" in text
     assert "TF_VAR_proxmox_username" in text
     assert "TF_VAR_proxmox_password" in text
@@ -815,7 +832,7 @@ def test_talos_node_hostname_matches_proxmox_vm_name():
     module_text = MODULE_MAIN.read_text(encoding="utf-8")
 
     assert 'name      = "${var.cluster_name}-${each.key}"' in module_text
-    assert 'write_node_patch "$name" "$type" "$mac" "$patch_file"' in script_text
+    assert 'write_node_patch "$name" "$type" "$ip" "$mac" "$patch_file"' in script_text
     assert "append_hostname_config_patch()" in script_text
     assert 'echo "kind: HostnameConfig"' in script_text
     assert 'echo "hostname: ${NAME}-${name}"' in script_text
@@ -823,6 +840,13 @@ def test_talos_node_hostname_matches_proxmox_vm_name():
     assert 'append_hostname_config_patch "$name" "$controlplane_patch_file"' in script_text
     assert 'append_hostname_config_patch "$name" "$patch_file"' in script_text
     assert 'echo "    hostname:' not in script_text
+
+
+def test_talos_node_configs_enable_user_namespaces_for_document_jails():
+    script_text = _apply_cluster_text()
+
+    assert 'echo "  sysctls:"' in script_text
+    assert 'echo "    user.max_user_namespaces: \\"11255\\""' in script_text
 
 
 def test_longhorn_step_installs_via_argocd_and_waits_for_health():
@@ -879,6 +903,7 @@ def test_longhorn_step_installs_via_argocd_and_waits_for_health():
     assert "global:" in longhorn_values_text
     assert "twinbox.io/role: worker" in longhorn_values_text
     assert "defaultReplicaCount: 2" in longhorn_values_text
+    assert "replicaAutoBalance: least-effort" in longhorn_values_text
     assert "defaultClassReplicaCount: 2" in longhorn_values_text
     assert 'storageOverProvisioningPercentage: "300"' in longhorn_values_text
     assert 'storageReservedPercentageForDefaultDisk: "10"' in longhorn_values_text
@@ -1074,12 +1099,12 @@ def test_opencloud_step_includes_offline_access_scope_mapping():
     assert "[$openid, $email, $profile, $roles, $offline_access]" in text
 
 
-def test_opencloud_step_uses_application_issuer_with_per_provider():
+def test_opencloud_step_uses_shared_authentik_issuer_for_all_clients():
     text = OPENCLOUD_STEP_SCRIPT.read_text(encoding="utf-8")
 
-    assert 'issuer_mode: "global"' not in text
-    assert 'issuer_mode: "per_provider"' in text
-    assert 'opencloud_oc_oidc_issuer="${AUTHENTIK_HOST}/application/o/opencloud/"' in text
+    assert text.count('issuer_mode: "global"') == 2
+    assert 'issuer_mode: "per_provider"' not in text
+    assert text.count('opencloud_oc_oidc_issuer="${AUTHENTIK_HOST}/"') == 2
 
 
 def test_opencloud_gitops_uses_schema_backed_writable_ldap_bootstrap():
@@ -1105,6 +1130,9 @@ def test_opencloud_gitops_uses_schema_backed_writable_ldap_bootstrap():
     assert 'ldapsearch -H "$OC_LDAP_URI"' in deployment_text
 
     for secret_key in [
+        "OC_EVENTS_ENDPOINT",
+        "OC_CACHE_STORE_NODES",
+        "COLLABORA_PROOF_KEY",
         "OC_LDAP_INSECURE",
         "PROXY_AUTOPROVISION_ACCOUNTS",
         "PROXY_AUTOPROVISION_CLAIM_USERNAME",
@@ -1120,6 +1148,129 @@ def test_opencloud_gitops_uses_schema_backed_writable_ldap_bootstrap():
         assert f"property: {secret_key}" in externalsecret_text
 
 
+def test_opencloud_gitops_starts_collabora_with_its_native_entrypoint_and_waits_for_dependencies():
+    deployment_text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "opencloud" / "deployment.yaml"
+    ).read_text(encoding="utf-8")
+    documents = list(yaml.safe_load_all(deployment_text))
+    deployments = {document["metadata"]["name"]: document for document in documents}
+
+    opencloud_env = {
+        item["name"]: item["value"]
+        for item in deployments["opencloud"]["spec"]["template"]["spec"]["containers"][0]["env"]
+        if "value" in item
+    }
+    assert opencloud_env["NATS_NATS_PORT"] == "9233"
+    assert opencloud_env["OC_INSECURE"] == "true"
+    assert opencloud_env["PROXY_TLS"] == "false"
+    assert opencloud_env["OC_EVENTS_ENDPOINT"] == "127.0.0.1:9233"
+    assert opencloud_env["OC_CACHE_STORE_NODES"] == "127.0.0.1:9233"
+
+    ingressroute = (REPO_ROOT / "gitops/platform-apps/opencloud/ingressroute.yaml").read_text()
+    assert "scheme: https" not in ingressroute
+    assert "serversTransport: opencloud-insecure" not in ingressroute
+    ingressroute_docs = list(yaml.safe_load_all(ingressroute))
+    forwarded_headers = ingressroute_docs[0]
+    assert forwarded_headers["kind"] == "Middleware"
+    assert forwarded_headers["spec"]["headers"]["customRequestHeaders"] == {
+        "X-Forwarded-Port": "443",
+        "X-Forwarded-Proto": "https",
+    }
+    for name in ("opencloud-netbird", "collabora-netbird", "wopiserver-netbird"):
+        route = next(doc for doc in ingressroute_docs if doc["metadata"]["name"] == name)
+        assert route["spec"]["routes"][0]["middlewares"] == [
+            {"name": "opencloud-netbird-forwarded-headers"}
+        ]
+
+    collaboration_spec = deployments["opencloud-collaboration"]["spec"]["template"]["spec"]
+    init_container = collaboration_spec["initContainers"][0]
+    assert init_container["name"] == "wait-for-opencloud-dependencies"
+    assert init_container["securityContext"]["runAsNonRoot"] is True
+    pod_affinity = collaboration_spec["affinity"]["podAffinity"][
+        "requiredDuringSchedulingIgnoredDuringExecution"
+    ]
+    assert pod_affinity == [
+        {
+            "labelSelector": {"matchLabels": {"app.kubernetes.io/name": "opencloud"}},
+            "topologyKey": "kubernetes.io/hostname",
+        }
+    ]
+    wait_command = init_container["command"][-1]
+    assert "nc -z -w 2 opencloud 9233" in wait_command
+    assert "http://opencloud-collabora:9980/hosting/discovery" in wait_command
+
+    collaboration_env = {
+        item["name"]: item["value"]
+        for item in collaboration_spec["containers"][0]["env"]
+        if "value" in item
+    }
+    assert collaboration_env["MICRO_REGISTRY_ADDRESS"] == "opencloud:9233"
+    assert collaboration_env["OC_EVENTS_ENDPOINT"] == "opencloud:9233"
+    assert collaboration_env["OC_CACHE_STORE_NODES"] == "opencloud:9233"
+    assert collaboration_env["OC_CONFIG_DIR"] == "/opencloud/config"
+    assert collaboration_spec["containers"][0]["volumeMounts"] == [
+        {
+            "name": "config",
+            "mountPath": "/opencloud/config",
+            "readOnly": True,
+        }
+    ]
+    assert collaboration_spec["volumes"] == [
+        {"name": "config", "persistentVolumeClaim": {"claimName": "opencloud-config"}}
+    ]
+
+    collabora = deployments["opencloud-collabora"]["spec"]["template"]["spec"]["containers"][0]
+    assert "command" not in collabora
+    assert collabora["env"][2] == {
+        "name": "aliasgroup1",
+        "value": "https://opencloud-wopiserver.__ZONE_NAME__:443",
+    }
+    assert collabora["volumeMounts"] == [
+        {
+            "name": "wopi-proof-key",
+            "mountPath": "/etc/coolwsd/proof_key",
+            "subPath": "proof_key",
+            "readOnly": True,
+        }
+    ]
+    assert deployments["opencloud-collabora"]["spec"]["template"]["spec"]["volumes"] == [
+        {
+            "name": "wopi-proof-key",
+            "secret": {
+                "secretName": "opencloud-bootstrap",
+                "defaultMode": 292,
+                "items": [{"key": "COLLABORA_PROOF_KEY", "path": "proof_key"}],
+            },
+        }
+    ]
+    assert collabora["readinessProbe"]["httpGet"] == {
+        "path": "/hosting/discovery",
+        "port": "http",
+    }
+
+
+def test_opencloud_step_preserves_and_waits_for_nats_settings_before_collaboration():
+    text = OPENCLOUD_STEP_SCRIPT.read_text(encoding="utf-8")
+
+    for expected in [
+        'opencloud_oc_events_endpoint="opencloud:9233"',
+        'opencloud_oc_cache_store_nodes="opencloud:9233"',
+        'opencloud_collabora_proof_key="$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 2>/dev/null)"',
+        '"COLLABORA_PROOF_KEY:opencloud_collabora_proof_key"',
+        "COLLABORA_PROOF_KEY: $COLLABORA_PROOF_KEY",
+        '"OC_EVENTS_ENDPOINT:opencloud_oc_events_endpoint"',
+        '"OC_CACHE_STORE_NODES:opencloud_oc_cache_store_nodes"',
+        "OC_EVENTS_ENDPOINT: $OC_EVENTS_ENDPOINT",
+        "OC_CACHE_STORE_NODES: $OC_CACHE_STORE_NODES",
+        "OC_EVENTS_ENDPOINT,OC_CACHE_STORE_NODES",
+    ]:
+        assert expected in text
+
+    assert text.index('wait_for_deployment_rollout "opencloud" "opencloud-collabora"') < text.index(
+        'wait_for_deployment_rollout "opencloud" "opencloud-collaboration"'
+    )
+
+
 def test_opencloud_pvc_sizes_match_the_live_bound_volumes():
     pvc_text = (REPO_ROOT / "gitops" / "platform-apps" / "opencloud" / "pvc.yaml").read_text(
         encoding="utf-8"
@@ -1133,7 +1284,7 @@ def test_opencloud_pvc_sizes_match_the_live_bound_volumes():
     assert pvc_text.count("storage: 50Gi") == 2
 
 
-def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
+def test_apply_cluster_renders_static_nocloud_talos_flow_and_tracks_iac_paths():
     text = _apply_cluster_text()
     assert 'helper_output="$("$WORKSPACE_ROOT/scripts/get-talos-image-factory.sh"' in text
     assert '--preset "$talos_image_preset"' in text
@@ -1154,14 +1305,25 @@ def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
     )
     assert "nodes: $nodes" in text
     assert "planned_controlplane_ips" in text
-    assert "discovered_controlplane_ips" in text
     assert "generate_talos_configs()" in text
-    assert "discover_node_ip()" in text
-    assert "Guest agent reported ${label} at ${candidate}" in text
-    assert "Discovering control plane DHCP addresses" in text
-    assert "Applying control plane Talos configs" in text
-    assert "Control planes are healthy; discovering worker DHCP addresses" in text
-    assert "Applying worker Talos configs" in text
+    assert 'echo "        dhcp: false"' in text
+    assert 'bootstrap_mode = "static-nocloud"' in text
+    assert "Generating NoCloud artifacts and uploading Talos cidata ISOs" in text
+    assert (
+        'cidata_hash="$(cidata_content_hash "$user_data_file" "$meta_data_file" "$network_config_file")"'
+        in text
+    )
+    assert 'iso_name="talos-${CLUSTER_ID}-${name}-${cidata_hash}.iso"' in text
+    assert 'file_id="${FILE_DATASTORE}:iso/${iso_name}"' in text
+    assert 'echo "    mac_address: \\"${mac}\\""' in text
+    assert 'echo "        address: ${ip}"' in text
+    assert 'echo "        netmask: ${netmask}"' in text
+    assert 'echo "        gateway: ${GATEWAY_IP}"' in text
+    assert (
+        "Talos machine configs are supplied at first boot through per-node NoCloud cidata ISOs"
+        in text
+    )
+    assert "Waiting for workers at their configured static addresses" in text
     assert 'jq -Rn --arg csv "$csv"' in text
     assert 'split(",")' in text
     assert 'map(gsub("^\\\\s+|\\\\s+$"; ""))' in text
@@ -1170,6 +1332,12 @@ def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
     assert 'vm_node_map_json="$(normalize_json_object "${VM_NODE_MAP:-{}}")"' in text
     assert '--argjson vm_node_map "$vm_node_map_json"' in text
     assert "wait_for_talos_api()" in text
+    assert "wait_for_talos_api_insecure()" not in text
+    assert "apply_talos_machine_configs()" not in text
+    assert "Timed out waiting for Talos maintenance API on ${label} at ${candidate}" not in text
+    assert "Applying Talos machine configs at configured static addresses" not in text
+    assert "talosctl apply-config \\" not in text
+    assert "--insecure \\" not in text
     assert "bootstrap_cluster()" in text
     assert "sync_user_kubeconfig()" in text
     assert "sync_user_talosconfig()" in text
@@ -1180,14 +1348,17 @@ def test_apply_cluster_renders_dhcp_first_talos_flow_and_tracks_iac_paths():
     assert 'image_installer="${line#TALOS_IMAGE_INSTALLER=}"' in text
     assert "image_extensions=" not in text
     assert "TALOS_IMAGE_EXTENSIONS=" not in text
-    assert text.index("Applying control plane Talos configs") < text.index(
+    assert text.index("generate_talos_configs\nraw_vm_node_map") < text.index(
+        'nocloud_iso_file_ids_json="$(render_and_upload_nocloud_isos)"'
+    )
+    assert text.index('nocloud_iso_file_ids_json="$(render_and_upload_nocloud_isos)"') < text.index(
+        '"$TOFU_BIN" -chdir="$work_module_dir" apply'
+    )
+    assert text.index("Talos machine configs are supplied at first boot") < text.index(
         'bootstrap_cluster "$first_controlplane_ip"'
     )
     assert text.index('bootstrap_cluster "$first_controlplane_ip"') < text.index(
-        "Control planes are healthy; discovering worker DHCP addresses"
-    )
-    assert text.index("Control planes are healthy; discovering worker DHCP addresses") < text.index(
-        "Applying worker Talos configs"
+        "Waiting for workers at their configured static addresses"
     )
 
 
@@ -1334,7 +1505,7 @@ def test_apply_argocd_application_helper_applies_and_waits_for_health():
     assert "Skipping namespace resource baseline for" in text
     assert "--no-wait" in text
     assert ".resource_profile // empty" in text
-    assert "(.worker_count // 0)" in text
+    assert "(.worker_cpu_total // 0)" in text
 
 
 def test_stirling_pdf_waits_for_real_kubernetes_readiness():
@@ -2450,6 +2621,9 @@ def test_netbird_service_hostnames_match_ingress_routes():
     assert '--service-name "auth-jitsi"' in jitsi_text
     assert '--service-domain "auth-jitsi.${public_zone_name}"' in jitsi_text
     assert "jitsi-broker.${public_zone_name}" not in jitsi_text
+    assert matrix_text.index('mas_oidc_provider_ulid="$(python3') < matrix_text.index(
+        'mas_redirect_uri="${mas_host}/upstream/callback/${mas_oidc_provider_ulid}"'
+    )
     assert '--service-domain "nextcloud-collabora.${public_zone_name}"' in nextcloud_text
     for host in ["chat", "matrix", "element-admin", "account", "mrtc"]:
         assert f'--service-domain "{host}.${{public_zone_name}}"' in matrix_text
@@ -2514,6 +2688,23 @@ def test_matrix_values_disable_chart_ingress_and_well_known():
     assert "wellknownDelegation" not in text
 
 
+def test_matrix_haproxy_request_leaves_room_for_synapse_on_app_heavy_clusters():
+    values = yaml.safe_load(MATRIX_VALUES.read_text(encoding="utf-8"))
+
+    assert values["initSecrets"]["resources"]["requests"]["cpu"] == "10m"
+    assert values["initSecrets"]["resources"]["requests"]["memory"] == "50Mi"
+    assert values["initSecrets"]["resources"]["limits"]["memory"] == "200Mi"
+    assert values["haproxy"]["resources"]["requests"]["cpu"] == "10m"
+    assert values["haproxy"]["resources"]["requests"]["memory"] == "100Mi"
+    assert values["haproxy"]["resources"]["limits"]["memory"] == "200Mi"
+    assert values["deploymentMarkers"]["resources"]["requests"]["cpu"] == "10m"
+    assert values["deploymentMarkers"]["resources"]["requests"]["memory"] == "50Mi"
+    assert values["deploymentMarkers"]["resources"]["limits"]["memory"] == "200Mi"
+    assert values["synapse"]["checkConfigHook"]["resources"]["requests"]["cpu"] == "10m"
+    assert values["synapse"]["checkConfigHook"]["resources"]["requests"]["memory"] == "50Mi"
+    assert values["synapse"]["checkConfigHook"]["resources"]["limits"]["memory"] == "200Mi"
+
+
 def test_matrix_ingressroutes_target_chart_services():
     text = MATRIX_INGRESSROUTE.read_text(encoding="utf-8")
 
@@ -2544,6 +2735,10 @@ def test_matrix_install_step_waits_on_specific_resources():
     assert "matrix_oidc_upstream_config=" in text
     assert "MATRIX_OIDC_UPSTREAM_CONFIG" in text
     assert "MATRIX_OIDC_ENABLED_IDPS" in text
+    assert (
+        '--required-keys "MAS_OIDC_CLIENT_ID,MAS_OIDC_CLIENT_SECRET,'
+        'MAS_OIDC_PROVIDER_ULID,MATRIX_OIDC_ENABLED_IDPS,MATRIX_OIDC_UPSTREAM_CONFIG"' in text
+    )
     assert 'wait_for_named_resource_ready "databases" "cluster" "matrix-synapse-db"' in text
     assert 'wait_for_named_resource_ready "databases" "cluster" "matrix-mas-db"' in text
     assert (
@@ -2564,6 +2759,13 @@ def test_matrix_install_step_waits_on_specific_resources():
         in text
     )
     assert 'wait_for_named_resource_ready "matrix" "externalsecret" "matrix-runtime"' in text
+    assert 'kubectl apply -f "$matrix_namespace_manifest"' in text
+    assert 'kubectl apply -f "$matrix_config_externalsecret_manifest"' in text
+    assert 'kubectl apply -f "$matrix_db_externalsecret_manifest"' in text
+    assert 'kubectl apply -f "$matrix_runtime_externalsecret_manifest"' in text
+    assert text.index('kubectl apply -f "$matrix_runtime_externalsecret_manifest"') < text.index(
+        'bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh"'
+    )
     assert 'wait_for_statefulset_ready "matrix" "ess-synapse-main"' in text
     assert 'wait_for_deployment_rollout "matrix" "ess-haproxy"' in text
     assert 'wait_for_deployment_rollout "matrix" "ess-matrix-rtc-authorisation-service"' in text
@@ -2872,6 +3074,7 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     vaultwarden_app_text = VAULTWARDEN_APP.read_text(encoding="utf-8")
     headlamp_app_text = HEADLAMP_APP.read_text(encoding="utf-8")
     traefik_values_text = _traefik_values_text()
+    traefik_values = yaml.safe_load(traefik_values_text)
     crowdsec_values_text = _crowdsec_values_text()
     traefik_externalsecret_text = _traefik_dashboard_externalsecret_text()
     crowdsec_bouncer_externalsecret_text = _crowdsec_bouncer_externalsecret_text()
@@ -2892,6 +3095,10 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "create: true" in external_secrets_values_text
     assert "enabled: trueß∑" not in traefik_values_text
     assert "enabled: true" in traefik_values_text
+    assert isinstance(traefik_values["providers"]["file"]["content"], dict)
+    assert "logs" not in traefik_values
+    assert traefik_values["log"]["level"] == "INFO"
+    assert traefik_values["accessLog"]["enabled"] is True
     assert "github.com/BetterCorp/cloudflarewarp" in traefik_values_text
     assert "version: v1.3.3" in traefik_values_text
     assert "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin" in traefik_values_text
@@ -3249,17 +3456,26 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     outputs_text = _module_outputs_text()
     compact_main_text = re.sub(r"\s+", " ", main_text)
     assert 'resource "proxmox_virtual_environment_vm" "node"' in main_text
-    assert 'resource "proxmox_virtual_environment_file" "talos_nocloud"' not in main_text
+    assert 'resource "proxmox_virtual_environment_file"' not in main_text
     assert "talos_image_nodes" not in main_text
     assert 'resource "proxmox_virtual_environment_download_file" "talos"' not in main_text
-    assert "content_type" not in compact_main_text
+    assert 'content_type = "snippets"' not in main_text
     assert "decompression_algorithm" not in compact_main_text
-    assert "source_file {" not in main_text
-    assert "path      = var.talos_image_local_path" not in main_text
-    assert "node_name    = each.value" not in main_text
+    assert "initialization {" not in main_text
+    assert "ip_config {" not in main_text
+    assert 'address = "${each.value.ip}/${var.prefix}"' not in main_text
+    assert "gateway = var.gateway" not in main_text
+    assert "domain  = var.dns_domain" not in main_text
+    assert "servers = var.dns_servers" not in main_text
+    assert "network_data_file_id" not in main_text
+    assert "user_data_file_id" not in main_text
+    assert "wait_for_ip" in main_text
+    assert "disabled = true" in main_text
     assert 'machine   = "q35"' not in main_text
     assert 'boot_order = ["virtio0"]' in main_text
-    assert "cdrom {" not in main_text
+    assert "cdrom {" in main_text
+    assert "enabled = true" in main_text
+    assert "file_id = each.value.nocloud_iso_file_id" in main_text
     assert 'dynamic "cdrom"' not in main_text
     assert "for_each = var.boot_from_disk ? [] : [1]" not in main_text
     assert "validation {" not in _module_variables_text()
@@ -3274,16 +3490,20 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
         in compact_main_text
     )
     assert "talos_image_disk_url" not in _module_variables_text()
-    assert "merge(" not in main_text
     assert "import_from = local.talos_image_file_id" in compact_main_text
     assert "node_name = local.vm_host_map[each.key]" in compact_main_text
+    assert "datastore_id = each.value.datastore_id" in compact_main_text
+    assert "datastore_id = string" in re.sub(r"\s+", " ", _module_variables_text())
+    assert "nocloud_iso_file_id = string" in re.sub(r"\s+", " ", _module_variables_text())
+    assert 'variable "vm_datastore"' not in _module_variables_text()
+    assert '--vm-storage-map "$current_vm_storage_map"' in PROVISION_NODES_SCRIPT.read_text(
+        encoding="utf-8"
+    )
     assert "file_id = proxmox_virtual_environment_download_file.talos" not in compact_main_text
     assert "file_id      = proxmox_virtual_environment_file.talos_nocloud.id" not in main_text
     assert "remove_legacy_talos_file_state" not in main_text
     assert 'file_format  = "raw"' not in main_text
     assert "agent {" in main_text
-    assert "wait_for_ip {" in main_text
-    assert "ipv4 = true" in main_text
     assert "reboot_after_update = false" in main_text
     assert 'type = "std"' in main_text
     assert "talos_machine_configuration_apply" not in main_text
@@ -3291,8 +3511,8 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     assert "talos_cluster_kubeconfig" not in main_text
     assert 'output "controlplane_vm_ids"' in outputs_text
     assert 'output "worker_vm_ids"' in outputs_text
-    assert 'output "controlplane_ipv4_addresses"' in outputs_text
-    assert 'output "worker_ipv4_addresses"' in outputs_text
+    assert 'output "controlplane_ipv4_addresses"' not in outputs_text
+    assert 'output "worker_ipv4_addresses"' not in outputs_text
     assert 'output "kubeconfig"' not in outputs_text
 
 
@@ -3776,6 +3996,48 @@ def test_forgejo_bootstrap_seeds_from_upstream_and_renders_github_defaults():
 
 
 def test_optional_database_apps_patch_cloudnativepg_requests_by_resource_profile():
+    def parse_memory_quantity_mib(raw_value):
+        match = re.fullmatch(r"(\d+)(Mi|Gi|MB|GB)", raw_value)
+        assert match, f"Unsupported memory quantity: {raw_value}"
+        amount = int(match.group(1))
+        unit = match.group(2)
+        if unit == "Mi":
+            return amount
+        if unit == "Gi":
+            return amount * 1024
+        if unit == "MB":
+            return amount * 1000 / 1024
+        return amount * 1000 * 1000 / 1024
+
+    def extract_profile_memory_requests(appset_text):
+        appset = yaml.safe_load(appset_text)
+        for source in appset["spec"]["template"]["spec"]["sources"]:
+            for patch_entry in source.get("kustomize", {}).get("patches", []):
+                target = patch_entry.get("target", {})
+                if target.get("group") != "postgresql.cnpg.io" or target.get("kind") != "Cluster":
+                    continue
+                for operation in yaml.safe_load(patch_entry["patch"]):
+                    if operation.get("path") != "/spec/resources/requests/memory":
+                        continue
+                    match = re.fullmatch(
+                        r'\{\{ if eq \(index \.metadata\.labels "twinbox\.io/resource-profile"\) '
+                        r'"small" \}\}(?P<small>[^{}]+)'
+                        r'\{\{ else if eq \(index \.metadata\.labels "twinbox\.io/resource-profile"\) '
+                        r'"large" \}\}(?P<large>[^{}]+)'
+                        r"\{\{ else \}\}(?P<default>[^{}]+)\{\{ end \}\}",
+                        operation["value"],
+                    )
+                    if not match:
+                        match = re.fullmatch(
+                            r'\{\{ if eq \(index \.metadata\.labels "twinbox\.io/resource-profile"\) '
+                            r'"large" \}\}(?P<large>[^{}]+)'
+                            r"\{\{ else \}\}(?P<default>[^{}]+)\{\{ end \}\}",
+                            operation["value"],
+                        )
+                    assert match, "CloudNativePG memory request profile patch is malformed"
+                    return match.groupdict()
+        raise AssertionError("CloudNativePG memory request profile patch is missing")
+
     database_apps = [
         "hedgedoc",
         "immich",
@@ -3792,10 +4054,24 @@ def test_optional_database_apps_patch_cloudnativepg_requests_by_resource_profile
         text = (REPO_ROOT / "gitops" / "optional-apps" / f"{app_name}.yaml").read_text(
             encoding="utf-8"
         )
+        cluster = yaml.safe_load(
+            (REPO_ROOT / "gitops" / "databases" / app_name / "cluster.yaml").read_text(
+                encoding="utf-8"
+            )
+        )
+        profile_memory_requests = extract_profile_memory_requests(text)
+        shared_buffers = cluster["spec"]["postgresql"]["parameters"]["shared_buffers"]
+        shared_buffers_mib = parse_memory_quantity_mib(shared_buffers)
+
         assert "twinbox.io/resource-profile" in text
         assert "path: /spec/resources/requests/cpu" in text
         assert "path: /spec/resources/requests/memory" in text
         assert f"name: {app_name}-db" in text
+        for profile_name, memory_request in profile_memory_requests.items():
+            assert parse_memory_quantity_mib(memory_request) >= shared_buffers_mib, (
+                f"{app_name} {profile_name} memory request {memory_request} is lower than "
+                f"PostgreSQL shared_buffers {shared_buffers}"
+            )
 
 
 def test_dashy_appset_patches_requests_by_resource_profile():
@@ -4103,6 +4379,7 @@ def test_loki_and_openbao_longhorn_sizes_are_right_sized():
     openbao_values_text = (REPO_ROOT / "gitops" / "values" / "openbao.yaml").read_text(
         encoding="utf-8"
     )
+    openbao_renderer_text = OPENBAO_VALUES_RENDERER.read_text(encoding="utf-8")
 
     assert "size: 10Gi" in loki_values_text
     assert "storageClass: longhorn-single" in loki_values_text
@@ -4111,6 +4388,9 @@ def test_loki_and_openbao_longhorn_sizes_are_right_sized():
     assert "size: 10Gi" in openbao_values_text
     assert "storageClass: longhorn-single" in openbao_values_text
     assert "size: 2Gi" not in openbao_values_text
+    for text in (openbao_values_text, openbao_renderer_text):
+        assert "requests:\n      cpu: 100m\n      memory: 512Mi" in text
+        assert "limits:\n      cpu: 500m\n      memory: 1Gi" in text
 
 
 def test_authentik_db_cluster_is_scaled_for_ha_capacity_without_storage_replication():
@@ -4140,6 +4420,20 @@ def test_critical_cnpg_clusters_use_ha_instances_with_single_replica_storage():
     ).read_text(encoding="utf-8")
     assert "instances: 2" in pixelfed_cluster_text
     assert "storageClass: longhorn-single" in pixelfed_cluster_text
+
+
+def test_matrix_mas_db_keeps_cpu_request_small_enough_for_app_heavy_clusters():
+    cluster = yaml.safe_load(
+        (REPO_ROOT / "gitops" / "databases" / "matrix-mas" / "cluster.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert cluster["spec"]["instances"] == 3
+    assert cluster["spec"]["resources"]["requests"]["cpu"] == "100m"
+    assert cluster["spec"]["resources"]["requests"]["memory"] == "512Mi"
+    assert cluster["spec"]["resources"]["limits"]["cpu"] == "500m"
+    assert cluster["spec"]["resources"]["limits"]["memory"] == "1Gi"
 
 
 def test_database_app_installers_refresh_pgadmin_after_database_ready():
@@ -4613,6 +4907,12 @@ def test_karakeep_argo_application_manages_the_platform_overlay():
     )
     assert "secrets:" in text
     assert "enabled: false" in text
+    assert "cpu: 500m" in text
+    assert "memory: 512Mi" in text
+    assert 'cpu: "1"' in text
+    assert "memory: 1Gi" in text
+    assert "startup:" in text
+    assert "failureThreshold: 30" in text
     assert "path: gitops/platform-apps/karakeep" in text
     assert "CreateNamespace=true" in text
     assert "name: karakeep-wiredoor" not in text
@@ -4841,6 +5141,11 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "TERMIX_ADMIN_PASSWORD" in setup_text
     assert 'TERMIX_URL="${TERMIX_URL:-}"' in setup_text
     assert "setup_termix_forward" in setup_text
+    assert "wait_for_termix_deployment()" in setup_text
+    assert "kubectl -n termix get deployment/termix" in setup_text
+    assert setup_text.index("wait_for_termix_deployment") < setup_text.index(
+        "kubectl -n termix rollout status deployment/termix"
+    )
     assert 'kubectl -n termix port-forward "svc/termix" "${port}:80"' in setup_text
     assert "${TERMIX_URL}/health" in setup_text
     assert "X-Electron-App: true" in setup_text
@@ -4912,6 +5217,13 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "NB_SETUP_KEY" in deployment_text
     assert "NB_MANAGEMENT_URL" in deployment_text
     assert "NB_HOSTNAME" in deployment_text
+    assert "name: prepare-opkssh-directory" in deployment_text
+    assert "image: ghcr.io/lukegus/termix:release-2.3.1" in deployment_text
+    assert "mkdir -p /app/data/.opk" in deployment_text
+    assert "chmod 0770 /app/data/.opk" in deployment_text
+    assert "mountPath: /app/data" in deployment_text
+    assert "runAsUser: 0" in deployment_text
+    assert "runAsGroup: 0" in deployment_text
     assert "mountPath: /var/lib/netbird" in deployment_text
     assert "subPath: netbird-state" in deployment_text
     assert "path: /dev/net/tun" in deployment_text
@@ -5372,7 +5684,8 @@ def test_netbird_bastion_provisioning_fetches_dns_credentials():
     assert "var.netbird_admin_token_expire_days" in netbird_main_text
     bootstrap_text = NETBIRD_BASTION_BOOTSTRAP_TEMPLATE.read_text(encoding="utf-8")
     assert "ADMIN_TOKEN_EXPIRE_DAYS=${admin_token_expire_days}" in netbird_cloud_init_text
-    assert '"pat_expire_in": ${ADMIN_TOKEN_EXPIRE_DAYS}' in bootstrap_text
+    assert '"pat_expire_in": \'"$ADMIN_TOKEN_EXPIRE_DAYS"\'' in bootstrap_text
+    assert '"pat_expire_in": ${ADMIN_TOKEN_EXPIRE_DAYS}' not in bootstrap_text
     assert '"pat_expire_in": 7' not in bootstrap_text
 
 
@@ -5380,17 +5693,41 @@ def test_netbird_bastion_falls_back_to_cpx22_on_hetzner_capacity_errors():
     step_text = NETBIRD_BASTION_STEP_MANIFEST.read_text(encoding="utf-8")
     run_text = NETBIRD_BASTION_STEP_SCRIPT.read_text(encoding="utf-8")
     docs_text = (REPO_ROOT / "docs" / "netbird.md").read_text(encoding="utf-8")
+    step_data = yaml.safe_load(step_text)
+    server_type_input = next(
+        input_definition
+        for input_definition in step_data["inputs"]
+        if input_definition["id"] == "hcloud_server_type"
+    )
 
     assert "default: cax11" in step_text
-    assert "cpx22" in step_text
+    assert server_type_input["default"] == "cax11"
+    assert server_type_input["options"] == [
+        {"label": "CAX11 — ARM64, 2 vCPU / 4 GB", "value": "cax11"},
+        {"label": "CPX12 — x86/AMD, 1 vCPU / 2 GB (light/test)", "value": "cpx12"},
+        {"label": "CPX22 — x86/AMD, 2 vCPU / 4 GB", "value": "cpx22"},
+    ]
     assert "resource_unavailable" in run_text
+    assert 'if [[ "$server_type" == "cax11" ]]' in run_text
+    assert '-var "server_type=$server_type"' in run_text
     assert "Hetzner placement for cax11 is unavailable; retrying once with cpx22" in run_text
     assert "Cleaning up partially created Hetzner resources before retrying with cpx22" in run_text
     assert "Retrying NetBird VPS OpenTofu configuration with cpx22" in run_text
-    assert "Defaults to `cax11` and falls back once to `cpx22`" in docs_text
+    assert "Choose `cax11` (default" in docs_text
+    assert "`cpx12` (x86/AMD, 1 vCPU/2 GB for light/test use)" in docs_text
+    assert "Only an unavailable default `cax11` falls back once to `cpx22`" in docs_text
     assert (
         "If Hetzner returns `resource_unavailable` while placing the default `cax11`" in docs_text
     )
+
+
+def test_saved_unknown_hcloud_server_type_is_preserved_in_the_dropdown():
+    input_options_text = (REPO_ROOT / "manager-web" / "src" / "input-options.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert "saved value" in input_options_text
+    assert "return [...options" in input_options_text
 
 
 def test_netbird_cloud_init_uses_exact_netbird_cert_and_tcp_passthrough():

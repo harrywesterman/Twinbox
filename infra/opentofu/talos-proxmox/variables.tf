@@ -20,10 +20,6 @@ variable "vm_node_map" {
   default = {}
 }
 
-variable "vm_datastore" {
-  type = string
-}
-
 variable "file_datastore" {
   type = string
 }
@@ -38,6 +34,11 @@ variable "gateway" {
 
 variable "dns_servers" {
   type = list(string)
+}
+
+variable "dns_domain" {
+  type    = string
+  default = ""
 }
 
 variable "prefix" {
@@ -75,12 +76,14 @@ variable "install_disk" {
 
 variable "nodes" {
   type = map(object({
-    ip      = string
-    type    = string
-    vmid    = number
-    cpu     = number
-    ram_mb  = number
-    disk_gb = number
-    mac     = string
+    ip                  = string
+    type                = string
+    vmid                = number
+    cpu                 = number
+    ram_mb              = number
+    disk_gb             = number
+    datastore_id        = string
+    mac                 = string
+    nocloud_iso_file_id = string
   }))
 }

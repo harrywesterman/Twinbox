@@ -332,7 +332,7 @@ if command -v openbao_read_global_secret_json >/dev/null 2>&1; then
 fi
 
 opencloud_oc_url="${OPENCLOUD_HOST}"
-opencloud_oc_oidc_issuer="${AUTHENTIK_HOST}/application/o/opencloud/"
+opencloud_oc_oidc_issuer="${AUTHENTIK_HOST}/"
 opencloud_web_edit_link="${AUTHENTIK_HOST}/if/user/"
 opencloud_oc_jwt_secret="$(openssl rand -hex 32)"
 opencloud_wopi_secret="$(openssl rand -hex 32)"
@@ -341,11 +341,14 @@ opencloud_idm_admin_password="$(openssl rand -hex 24)"
 opencloud_ldap_bind_password="$(openssl rand -hex 24)"
 opencloud_collabora_admin_password="$(openssl rand -hex 24)"
 opencloud_collabora_admin_user="admin"
+opencloud_collabora_proof_key="$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 2>/dev/null)"
 opencloud_collabora_domain="$COLLABORA_HOST"
 opencloud_companion_domain="$OPENCLOUD_HOST"
 opencloud_idp_domain="$AUTHENTIK_HOST"
 opencloud_reva_gateway="opencloud"
 opencloud_micro_registry_address="opencloud:9233"
+opencloud_oc_events_endpoint="opencloud:9233"
+opencloud_oc_cache_store_nodes="opencloud:9233"
 opencloud_collaboration_app_name="CollaboraOnline"
 opencloud_collaboration_app_product="Collabora"
 opencloud_collaboration_app_addr="$COLLABORA_HOST"
@@ -400,11 +403,14 @@ if [[ -n "$existing_opencloud_secret_json" ]]; then
     "OC_LDAP_BIND_PASSWORD:opencloud_ldap_bind_password" \
     "COLLABORA_ADMIN_PASSWORD:opencloud_collabora_admin_password" \
     "COLLABORA_ADMIN_USER:opencloud_collabora_admin_user" \
+    "COLLABORA_PROOF_KEY:opencloud_collabora_proof_key" \
     "COLLABORA_DOMAIN:opencloud_collabora_domain" \
     "COMPANION_DOMAIN:opencloud_companion_domain" \
     "IDP_DOMAIN:opencloud_idp_domain" \
     "OC_REVA_GATEWAY:opencloud_reva_gateway" \
     "MICRO_REGISTRY_ADDRESS:opencloud_micro_registry_address" \
+    "OC_EVENTS_ENDPOINT:opencloud_oc_events_endpoint" \
+    "OC_CACHE_STORE_NODES:opencloud_oc_cache_store_nodes" \
     "COLLABORATION_APP_NAME:opencloud_collaboration_app_name" \
     "COLLABORATION_APP_PRODUCT:opencloud_collaboration_app_product" \
     "COLLABORATION_APP_ADDR:opencloud_collaboration_app_addr" \
@@ -463,9 +469,10 @@ opencloud_collaboration_app_product="Collabora"
 opencloud_collaboration_app_addr="$COLLABORA_HOST"
 opencloud_collaboration_app_icon="${COLLABORA_HOST}/favicon.ico"
 
-# Use Authentik global issuer so all OpenCloud providers (web, android,
-# desktop, ios) issue tokens with the same issuer URL.
-opencloud_oc_oidc_issuer="${AUTHENTIK_HOST}/application/o/opencloud/"
+# Use Authentik's global issuer so all OpenCloud providers (web, android,
+# desktop, ios) issue tokens with the same issuer URL. OpenCloud Android
+# discovers this issuer through WebFinger but uses its own client ID.
+opencloud_oc_oidc_issuer="${AUTHENTIK_HOST}/"
 
 opencloud_secret_file="$(mktemp "${TMPDIR:-/tmp}/opencloud-bootstrap-XXXXXX")"
 opencloud_rendered_app_manifest="$(mktemp "${TMPDIR:-/tmp}/opencloud-application-XXXXXX")"
@@ -482,11 +489,14 @@ jq -n \
   --arg OC_LDAP_BIND_PASSWORD "$opencloud_ldap_bind_password" \
   --arg COLLABORA_ADMIN_PASSWORD "$opencloud_collabora_admin_password" \
   --arg COLLABORA_ADMIN_USER "$opencloud_collabora_admin_user" \
+  --arg COLLABORA_PROOF_KEY "$opencloud_collabora_proof_key" \
   --arg COLLABORA_DOMAIN "$opencloud_collabora_domain" \
   --arg COMPANION_DOMAIN "$opencloud_companion_domain" \
   --arg IDP_DOMAIN "$opencloud_idp_domain" \
   --arg OC_REVA_GATEWAY "$opencloud_reva_gateway" \
   --arg MICRO_REGISTRY_ADDRESS "$opencloud_micro_registry_address" \
+  --arg OC_EVENTS_ENDPOINT "$opencloud_oc_events_endpoint" \
+  --arg OC_CACHE_STORE_NODES "$opencloud_oc_cache_store_nodes" \
   --arg COLLABORATION_APP_NAME "$opencloud_collaboration_app_name" \
   --arg COLLABORATION_APP_PRODUCT "$opencloud_collaboration_app_product" \
   --arg COLLABORATION_APP_ADDR "$opencloud_collaboration_app_addr" \
@@ -539,11 +549,14 @@ jq -n \
     OC_LDAP_BIND_PASSWORD: $OC_LDAP_BIND_PASSWORD,
     COLLABORA_ADMIN_PASSWORD: $COLLABORA_ADMIN_PASSWORD,
     COLLABORA_ADMIN_USER: $COLLABORA_ADMIN_USER,
+    COLLABORA_PROOF_KEY: $COLLABORA_PROOF_KEY,
     COLLABORA_DOMAIN: $COLLABORA_DOMAIN,
     COMPANION_DOMAIN: $COMPANION_DOMAIN,
     IDP_DOMAIN: $IDP_DOMAIN,
     OC_REVA_GATEWAY: $OC_REVA_GATEWAY,
     MICRO_REGISTRY_ADDRESS: $MICRO_REGISTRY_ADDRESS,
+    OC_EVENTS_ENDPOINT: $OC_EVENTS_ENDPOINT,
+    OC_CACHE_STORE_NODES: $OC_CACHE_STORE_NODES,
     COLLABORATION_APP_NAME: $COLLABORATION_APP_NAME,
     COLLABORATION_APP_PRODUCT: $COLLABORATION_APP_PRODUCT,
     COLLABORATION_APP_ADDR: $COLLABORATION_APP_ADDR,
@@ -591,7 +604,7 @@ log "Writing OpenCloud bootstrap secret to OpenBao"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "opencloud" \
   --json-file "$opencloud_secret_file" \
-  --required-keys "OC_URL,OC_OIDC_ISSUER,WEB_OPTION_ACCOUNT_EDIT_LINK_HREF,OC_JWT_SECRET,COLLABORATION_WOPI_SECRET,COLLABORATION_WOPI_SRC,IDM_ADMIN_PASSWORD,OC_LDAP_BIND_PASSWORD,COLLABORA_ADMIN_PASSWORD,COLLABORA_ADMIN_USER,COLLABORA_DOMAIN,COMPANION_DOMAIN,IDP_DOMAIN,OC_REVA_GATEWAY,MICRO_REGISTRY_ADDRESS,COLLABORATION_APP_NAME,COLLABORATION_APP_PRODUCT,COLLABORATION_APP_ADDR,COLLABORATION_APP_ICON,COLLABORATION_APP_INSECURE,COLLABORATION_CS3API_DATAGATEWAY_INSECURE,OC_LDAP_BIND_DN,OC_LDAP_URI,OC_LDAP_USER_BASE_DN,OC_LDAP_GROUP_BASE_DN,OC_LDAP_USER_FILTER,OC_LDAP_USER_SCHEMA_ID,OC_LDAP_GROUP_SCHEMA_ID,OC_LDAP_DISABLE_USER_MECHANISM,OC_LDAP_SERVER_WRITE_ENABLED,GRAPH_LDAP_SERVER_UUID,GRAPH_LDAP_REFINT_ENABLED,OC_LDAP_INSECURE,PROXY_AUTOPROVISION_ACCOUNTS,PROXY_AUTOPROVISION_CLAIM_USERNAME,PROXY_USER_OIDC_CLAIM,PROXY_USER_CS3_CLAIM,PROXY_OIDC_REWRITE_WELLKNOWN,PROXY_ROLE_ASSIGNMENT_DRIVER,GRAPH_ASSIGN_DEFAULT_USER_ROLE,GRAPH_USERNAME_MATCH,OC_EXCLUDE_RUN_SERVICES,SEARCH_EXTRACTOR_TYPE,SEARCH_EXTRACTOR_TIKA_TIKA_URL,FRONTEND_FULL_TEXT_SEARCH_ENABLED,WEBFINGER_WEB_OIDC_CLIENT_ID,WEBFINGER_WEB_OIDC_CLIENT_SCOPES,WEBFINGER_DESKTOP_OIDC_CLIENT_ID,WEBFINGER_DESKTOP_OIDC_CLIENT_SCOPES,WEBFINGER_ANDROID_OIDC_CLIENT_ID,WEBFINGER_ANDROID_OIDC_CLIENT_SCOPES,WEBFINGER_IOS_OIDC_CLIENT_ID,WEBFINGER_IOS_OIDC_CLIENT_SCOPES,WEB_OIDC_CLIENT_ID,WEB_OIDC_SCOPE,INITIAL_ADMIN_PASSWORD"
+  --required-keys "OC_URL,OC_OIDC_ISSUER,WEB_OPTION_ACCOUNT_EDIT_LINK_HREF,OC_JWT_SECRET,COLLABORATION_WOPI_SECRET,COLLABORATION_WOPI_SRC,IDM_ADMIN_PASSWORD,OC_LDAP_BIND_PASSWORD,COLLABORA_ADMIN_PASSWORD,COLLABORA_ADMIN_USER,COLLABORA_PROOF_KEY,COLLABORA_DOMAIN,COMPANION_DOMAIN,IDP_DOMAIN,OC_REVA_GATEWAY,MICRO_REGISTRY_ADDRESS,OC_EVENTS_ENDPOINT,OC_CACHE_STORE_NODES,COLLABORATION_APP_NAME,COLLABORATION_APP_PRODUCT,COLLABORATION_APP_ADDR,COLLABORATION_APP_ICON,COLLABORATION_APP_INSECURE,COLLABORATION_CS3API_DATAGATEWAY_INSECURE,OC_LDAP_BIND_DN,OC_LDAP_URI,OC_LDAP_USER_BASE_DN,OC_LDAP_GROUP_BASE_DN,OC_LDAP_USER_FILTER,OC_LDAP_USER_SCHEMA_ID,OC_LDAP_GROUP_SCHEMA_ID,OC_LDAP_DISABLE_USER_MECHANISM,OC_LDAP_SERVER_WRITE_ENABLED,GRAPH_LDAP_SERVER_UUID,GRAPH_LDAP_REFINT_ENABLED,OC_LDAP_INSECURE,PROXY_AUTOPROVISION_ACCOUNTS,PROXY_AUTOPROVISION_CLAIM_USERNAME,PROXY_USER_OIDC_CLAIM,PROXY_USER_CS3_CLAIM,PROXY_OIDC_REWRITE_WELLKNOWN,PROXY_ROLE_ASSIGNMENT_DRIVER,GRAPH_ASSIGN_DEFAULT_USER_ROLE,GRAPH_USERNAME_MATCH,OC_EXCLUDE_RUN_SERVICES,SEARCH_EXTRACTOR_TYPE,SEARCH_EXTRACTOR_TIKA_TIKA_URL,FRONTEND_FULL_TEXT_SEARCH_ENABLED,WEBFINGER_WEB_OIDC_CLIENT_ID,WEBFINGER_WEB_OIDC_CLIENT_SCOPES,WEBFINGER_DESKTOP_OIDC_CLIENT_ID,WEBFINGER_DESKTOP_OIDC_CLIENT_SCOPES,WEBFINGER_ANDROID_OIDC_CLIENT_ID,WEBFINGER_ANDROID_OIDC_CLIENT_SCOPES,WEBFINGER_IOS_OIDC_CLIENT_ID,WEBFINGER_IOS_OIDC_CLIENT_SCOPES,WEB_OIDC_CLIENT_ID,WEB_OIDC_SCOPE,INITIAL_ADMIN_PASSWORD"
 
 authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
 invalidation_flow_id="$(authentik_resolve_flow_id "default-provider-invalidation-flow" "invalidation")"
@@ -667,7 +680,7 @@ opencloud_web_provider_payload="$(
       authorization_flow: $authorization_flow,
       invalidation_flow: $invalidation_flow,
       signing_key: $signing_key,
-      issuer_mode: "per_provider",
+      issuer_mode: "global",
       include_claims_in_id_token: true,
       property_mappings: $property_mappings,
       redirect_uris: [
@@ -753,7 +766,7 @@ for provider_name in "OpenCloud Desktop" "OpenCloud Android" "OpenCloud iOS" "Cy
         authorization_flow: $authorization_flow,
         invalidation_flow: $invalidation_flow,
       signing_key: $signing_key,
-      issuer_mode: "per_provider",
+      issuer_mode: "global",
       include_claims_in_id_token: true,
       property_mappings: $property_mappings,
       redirect_uris: $redirect_uris
@@ -792,8 +805,8 @@ wait_for_resources_ready "opencloud" "externalsecret" "Ready" "OpenCloud Externa
 wait_for_statefulset_ready "opencloud" "opencloud-ldap" "OpenCloud LDAP"
 wait_for_opencloud_ldap_directory
 wait_for_deployment_rollout "opencloud" "opencloud" "OpenCloud core"
-wait_for_deployment_rollout "opencloud" "opencloud-collaboration" "OpenCloud collaboration"
 wait_for_deployment_rollout "opencloud" "opencloud-collabora" "OpenCloud Collabora"
+wait_for_deployment_rollout "opencloud" "opencloud-collaboration" "OpenCloud collaboration"
 wait_for_deployment_rollout "opencloud" "opencloud-radicale" "OpenCloud Radicale"
 wait_for_deployment_rollout "opencloud" "opencloud-tika" "OpenCloud Tika"
 

@@ -128,3 +128,30 @@ def test_argocd_host_patches_cover_websecure_and_webnetbird_route_names():
                         assert ingressroute_patches[netbird_name] == patch_body, (
                             f"{path}: {netbird_name} host patch differs from {name}"
                         )
+
+
+def test_authentik_exposes_opencloud_global_oidc_discovery_on_both_entrypoints():
+    ingressroutes = {doc["metadata"]["name"]: doc for _, doc in _ingressroute_docs()}
+
+    for name, entrypoint in [
+        ("authentik-opencloud-oidc-discovery", "websecure"),
+        ("authentik-opencloud-oidc-discovery-netbird", "webnetbird"),
+    ]:
+        doc = ingressroutes[name]
+        assert doc["spec"]["entryPoints"] == [entrypoint]
+        route = doc["spec"]["routes"][0]
+        assert "Path(`/.well-known/openid-configuration`)" in route["match"]
+        assert route["middlewares"] == [
+            {"name": "authentik-netbird-forwarded-headers"},
+            {"name": "opencloud-oidc-discovery"},
+        ]
+        assert route["services"] == [{"kind": "Service", "name": "authentik-server", "port": 80}]
+
+    middleware = (
+        REPO_ROOT / "gitops" / "platform" / "authentik" / "opencloud-oidc-discovery-middleware.yaml"
+    )
+    middleware_doc = yaml.safe_load(middleware.read_text(encoding="utf-8"))
+    assert middleware_doc["spec"]["replacePathRegex"] == {
+        "regex": r"^/\.well-known/openid-configuration$",
+        "replacement": "/application/o/opencloud/.well-known/openid-configuration",
+    }

@@ -17,12 +17,34 @@ spec:
       labels:
         app.kubernetes.io/name: termix
       annotations:
-        twinbox.dev/termix-patch-revision: "2026-06-23-oidc-admin-browser-ssh-role"
+        twinbox.dev/termix-patch-revision: "2026-07-31-opkssh-directory-permissions"
     spec:
       securityContext:
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
+      initContainers:
+        - name: prepare-opkssh-directory
+          image: ghcr.io/lukegus/termix:release-2.3.1
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -lc
+          args:
+            - |
+              mkdir -p /app/data/.opk
+              chmod 0770 /app/data/.opk
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: termix-data
+              mountPath: /app/data
       containers:
         - name: termix
           image: ghcr.io/lukegus/termix:release-2.3.1

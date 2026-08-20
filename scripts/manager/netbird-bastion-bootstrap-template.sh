@@ -683,7 +683,7 @@ else
       "name": "Twinbox Admin",
       "password": "'"$ADMIN_PASSWORD"'",
       "create_pat": true,
-      "pat_expire_in": ${ADMIN_TOKEN_EXPIRE_DAYS}
+      "pat_expire_in": '"$ADMIN_TOKEN_EXPIRE_DAYS"'
     }')"
 
   echo "$SETUP_RESPONSE" > "$SETUP_RESULT"

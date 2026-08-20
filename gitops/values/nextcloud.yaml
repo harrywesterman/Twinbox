@@ -152,6 +152,8 @@ externalRedis:
 
 collabora:
   enabled: true
+  securityContext:
+    privileged: true
   service:
     type: ClusterIP
   collabora:

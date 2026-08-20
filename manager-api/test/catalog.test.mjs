@@ -171,6 +171,13 @@ test("catalog exposes NetBird bastion without duplicate DNS, SSH, or Cloudflare 
         "existing_bastion_confirm_port_forwarding",
       ]
     );
+    const serverType = netbirdBastion.inputs.find((input) => input.id === "hcloud_server_type");
+    assert.equal(serverType.default, "cax11");
+    assert.deepEqual(serverType.options, [
+      { label: "CAX11 — ARM64, 2 vCPU / 4 GB", value: "cax11" },
+      { label: "CPX12 — x86/AMD, 1 vCPU / 2 GB (light/test)", value: "cpx12" },
+      { label: "CPX22 — x86/AMD, 2 vCPU / 4 GB", value: "cpx22" },
+    ]);
     assert.equal(netbirdBastion.secrets.files.KUBECONFIG_FILE.attachment, "kubeconfig");
     assert.match(netbirdBastion.side_help, /DNS provider configured earlier/);
     assert.doesNotMatch(netbirdBastion.side_help, /Cloudflare credentials/);
@@ -273,6 +280,21 @@ test("app catalog exposes apps while the wizard catalog keeps them out of sight"
     const mijnBureauBundle = appCatalog.bundles.find((bundle) => bundle.id === "mijn-bureau");
     const openDeskBundle = appCatalog.bundles.find((bundle) => bundle.id === "opendesk");
     const laSuiteBundle = appCatalog.bundles.find((bundle) => bundle.id === "lasuite");
+    const twinboxDesktopBundle = appCatalog.bundles.find(
+      (bundle) => bundle.id === "twinbox-desktop"
+    );
+    for (const appId of [
+      "install-karakeep",
+      "install-mailu",
+      "install-mastodon",
+      "install-matrix",
+      "install-nextcloud",
+    ]) {
+      assert.ok(
+        twinboxDesktopBundle?.apps.includes(appId),
+        `twinbox-desktop bundle should include ${appId}`
+      );
+    }
     assert.equal(nextcloudCard?.title, "Install Nextcloud");
     assert.equal(nextcloudCard?.placeholder, false);
     assert.equal(nextcloudCard?.installable, true);

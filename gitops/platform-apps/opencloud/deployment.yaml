@@ -117,10 +117,20 @@ spec:
               value: /etc/opencloud/proxy.yaml
             - name: MICRO_REGISTRY_ADDRESS
               value: 127.0.0.1:9233
+            - name: OC_EVENTS_ENDPOINT
+              value: 127.0.0.1:9233
+            - name: OC_CACHE_STORE_NODES
+              value: 127.0.0.1:9233
             - name: OC_REVA_GATEWAY
               value: eu.opencloud.api.gateway
             - name: NATS_NATS_HOST
               value: 0.0.0.0
+            - name: NATS_NATS_PORT
+              value: "9233"
+            - name: OC_INSECURE
+              value: "true"
+            - name: PROXY_TLS
+              value: "false"
             - name: GATEWAY_GRPC_ADDR
               value: 0.0.0.0:9142
           readinessProbe:
@@ -194,6 +204,39 @@ spec:
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: opencloud
+              topologyKey: kubernetes.io/hostname
+      initContainers:
+        - name: wait-for-opencloud-dependencies
+          image: busybox:1.38.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              until nc -z -w 2 opencloud 9233; do
+                echo "Waiting for OpenCloud NATS registry"
+                sleep 5
+              done
+              until wget -q -T 5 -O /dev/null http://opencloud-collabora:9980/hosting/discovery; do
+                echo "Waiting for Collabora discovery endpoint"
+                sleep 5
+              done
       containers:
         - name: collaboration
           image: opencloudeu/opencloud-rolling:7.3.0
@@ -233,6 +276,8 @@ spec:
             periodSeconds: 20
             timeoutSeconds: 5
           env:
+            - name: OC_CONFIG_DIR
+              value: /opencloud/config
             - name: COLLABORATION_HTTP_ADDR
               value: 0.0.0.0:9300
             - name: COLLABORATION_GRPC_ADDR
@@ -252,10 +297,11 @@ spec:
             - name: OC_REVA_GATEWAY
               value: eu.opencloud.api.gateway
             - name: MICRO_REGISTRY_ADDRESS
-              valueFrom:
-                secretKeyRef:
-                  name: opencloud-bootstrap
-                  key: MICRO_REGISTRY_ADDRESS
+              value: opencloud:9233
+            - name: OC_EVENTS_ENDPOINT
+              value: opencloud:9233
+            - name: OC_CACHE_STORE_NODES
+              value: opencloud:9233
             - name: COLLABORATION_WOPI_SRC
               valueFrom:
                 secretKeyRef:
@@ -296,6 +342,14 @@ spec:
                 secretKeyRef:
                   name: opencloud-bootstrap
                   key: COLLABORATION_CS3API_DATAGATEWAY_INSECURE
+          volumeMounts:
+            - name: config
+              mountPath: /opencloud/config
+              readOnly: true
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: opencloud-config
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -331,10 +385,6 @@ spec:
                 - SYS_ADMIN
             seccompProfile:
               type: Unconfined
-          command:
-            - /bin/bash
-            - -ec
-            - coolconfig generate-proof-key && /start-collabora-online.sh
           ports:
             - containerPort: 9980
               name: http
@@ -353,15 +403,21 @@ spec:
                   name: opencloud-bootstrap
                   key: COLLABORA_ADMIN_PASSWORD
             - name: aliasgroup1
-              value: https://opencloud-wopiserver.__ZONE_NAME__
+              value: https://opencloud-wopiserver.__ZONE_NAME__:443
             - name: domain
               value: opencloud-wopiserver.__ZONE_NAME__
             - name: DONT_GEN_SSL_CERT
               value: "YES"
             - name: extra_params
               value: --o:ssl.enable=false --o:ssl.termination=true --o:net.frame_ancestors=https://opencloud.__ZONE_NAME__ https://opencloud-collabora.__ZONE_NAME__ https://opencloud-wopiserver.__ZONE_NAME__
+          volumeMounts:
+            - name: wopi-proof-key
+              mountPath: /etc/coolwsd/proof_key
+              subPath: proof_key
+              readOnly: true
           readinessProbe:
-            tcpSocket:
+            httpGet:
+              path: /hosting/discovery
               port: http
             initialDelaySeconds: 20
             periodSeconds: 10
@@ -372,6 +428,14 @@ spec:
             initialDelaySeconds: 60
             periodSeconds: 20
             timeoutSeconds: 5
+      volumes:
+        - name: wopi-proof-key
+          secret:
+            secretName: opencloud-bootstrap
+            defaultMode: 0444
+            items:
+              - key: COLLABORA_PROOF_KEY
+                path: proof_key
 ---
 apiVersion: apps/v1
 kind: Deployment
