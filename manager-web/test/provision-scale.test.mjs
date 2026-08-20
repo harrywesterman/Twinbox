@@ -3,12 +3,14 @@ import assert from "node:assert/strict";
 
 import {
   buildAutomaticProvisionPlacementResult,
+  buildProvisionHostCards,
   buildProvisionPlacementBoard,
   buildProvisionVmPlan,
   buildProvisionScaleSummary,
   buildScaledProvisionInputs,
   getProvisionNodeCount,
   formatMemoryMb,
+  validateProvisionPlacementBoard,
 } from "../src/provision-scale.js";
 
 const stepInputs = [
@@ -156,14 +158,59 @@ test("placement board suggests a host-aware Talos VM layout", () => {
   assert.equal(board.hostCards.length, 2);
   assert.equal(board.hostCards[0].activeVmCount, 1);
   assert.equal(board.hostCards[1].activeVmCount, 1);
-  assert.equal(Object.keys(board.vmNodeMap).length, 0);
+  assert.equal(Object.keys(board.vmNodeMap).length, 6);
   assert.equal(Object.keys(board.suggestedVmNodeMap).length, 6);
-  assert.equal(board.unassigned.length, 6);
-  assert.equal(board.hostCards[0].assignments.length, 0);
+  assert.equal(board.unassigned.length, 0);
+  assert.equal(board.hostCards[0].assignments.length, 3);
   assert.equal(board.vmSizeMap["cp-1"].cpu, 2);
   assert.equal(board.vmSizeMap["cp-1"].disk_gb, 10);
   assert.equal(board.suggestedVmSizeMap["cp-1"].cpu, 2);
   assert.ok(board.suggestedVmSizeMap["worker-1"].disk_gb > 100);
+});
+
+test("placement RAM excludes non-Twinbox VM reservations", () => {
+  const cards = buildProvisionHostCards(
+    {
+      nodes: [
+        {
+          node: "pve-a",
+          status: "online",
+          maxmem: 16 * 1024 * 1024 * 1024,
+          mem: 10 * 1024 * 1024 * 1024,
+          maxdisk: 200 * 1024 * 1024 * 1024,
+          disk: 100 * 1024 * 1024 * 1024,
+          maxcpu: 8,
+          cpu: 0.1,
+        },
+      ],
+      vms: [
+        {
+          node: "pve-a",
+          name: "twinbox-demo-mgt",
+          tags: "twinbox;management",
+          status: "running",
+          mem: 2 * 1024 * 1024 * 1024,
+          maxmem: 4 * 1024 * 1024 * 1024,
+        },
+        { node: "pve-a", name: "docker", status: "stopped", maxmem: 8 * 1024 * 1024 * 1024 },
+      ],
+      storages: [
+        {
+          node: "pve-a",
+          storage: "local-lvm",
+          active: 1,
+          enabled: 1,
+          content: ["images"],
+          total: 200 * 1024 * 1024 * 1024,
+          used: 100 * 1024 * 1024 * 1024,
+          avail: 100 * 1024 * 1024 * 1024,
+        },
+      ],
+    },
+    { name: "demo", controlplane_count: 1, worker_count: 0, start_vmid: 200 }
+  );
+
+  assert.equal(cards[0].freeMemoryMb, 4096);
 });
 
 test("placement size maps fix control-plane CPU and keep worker CPU configurable", () => {
@@ -349,7 +396,7 @@ test("placement board keeps manual placements while resuggesting the rest", () =
       .assignments.find((vm) => vm.name === "cp-1").assignmentSource,
     "user-selected"
   );
-  assert.equal(remixedBoard.vmNodeMap["worker-2"], undefined);
+  assert.equal(remixedBoard.vmNodeMap["worker-2"], "pve-a");
   assert.equal(
     remixedBoard.suggestedVmNodeMap["worker-2"],
     initialBoard.suggestedVmNodeMap["worker-2"]
@@ -668,6 +715,46 @@ test("automatic placement replaces stale manual placements with a fresh suggesti
   assert.equal(rerun.unassigned, fresh.unassigned);
 });
 
+test("automatic reset discards per-VM size and storage overrides", () => {
+  const resources = {
+    ...balancedPlacementResources,
+    nodes: balancedPlacementResources.nodes.map((node) => ({
+      ...node,
+      storage_pool: "local-lvm",
+    })),
+    storages: balancedPlacementResources.nodes.flatMap((node) => [
+      {
+        node: node.node,
+        storage: "local-lvm",
+        content: ["images"],
+        active: true,
+        enabled: true,
+        avail: 400 * 1024 ** 3,
+      },
+      {
+        node: node.node,
+        storage: "fast-zfs",
+        content: ["images"],
+        active: true,
+        enabled: true,
+        avail: 500 * 1024 ** 3,
+      },
+    ]),
+  };
+  const result = buildAutomaticProvisionPlacementResult(
+    stepInputs,
+    {
+      vm_size_map: { "cp-1": { cpu: 2, memory_mb: 16384, disk_gb: 200 } },
+      vm_storage_map: { "cp-1": "fast-zfs" },
+    },
+    resources
+  );
+
+  assert.equal(result.vm_size_map["cp-1"].memory_mb, 4096);
+  assert.equal(result.vm_size_map["cp-1"].disk_gb, 10);
+  assert.equal(result.vm_storage_map["cp-1"], "local-lvm");
+});
+
 test("worker disk follows the worker-disk slider share", () => {
   const board = buildProvisionPlacementBoard(
     stepInputs,
@@ -814,4 +901,114 @@ test("automatic placement preserves the pve1/pve2/pve3 pairing order", () => {
   assert.equal(board.suggestedVmNodeMap["worker-2"], "pve-b");
   assert.equal(board.suggestedVmNodeMap["worker-3"], "pve-c");
   assert.equal(board.hostCards.find((host) => host.id === "pve-b").assignments[0].isFixed, true);
+});
+
+test("manual RAM and disk overrides are preserved per control plane and worker", () => {
+  const board = buildProvisionPlacementBoard(
+    stepInputs,
+    {
+      controlplane_count: 1,
+      worker_count: 1,
+      vm_size_map: {
+        "cp-1": { cpu: 2, memory_mb: 6144, disk_gb: 30 },
+        "worker-1": { cpu: 2, memory_mb: 12288, disk_gb: 90 },
+      },
+    },
+    balancedPlacementResources
+  );
+
+  assert.deepEqual(board.vmSizeMap["cp-1"], { cpu: 2, memory_mb: 6144, disk_gb: 30 });
+  assert.deepEqual(board.vmSizeMap["worker-1"], { cpu: 2, memory_mb: 12288, disk_gb: 90 });
+});
+
+test("storage defaults prefer the configured host storage and survive manual selection", () => {
+  const resources = {
+    nodes: [
+      {
+        node: "pve-a",
+        storage_pool: "local-lvm",
+        status: "online",
+        maxmem: 32 * 1024 ** 3,
+        mem: 0,
+        maxdisk: 500 * 1024 ** 3,
+        disk: 0,
+      },
+    ],
+    vms: [],
+    storages: [
+      {
+        node: "pve-a",
+        storage: "local-lvm",
+        content: ["images"],
+        active: true,
+        enabled: true,
+        avail: 100 * 1024 ** 3,
+      },
+      {
+        node: "pve-a",
+        storage: "fast-zfs",
+        content: ["images"],
+        active: true,
+        enabled: true,
+        avail: 200 * 1024 ** 3,
+      },
+      {
+        node: "pve-a",
+        storage: "backup",
+        content: ["backup"],
+        active: true,
+        enabled: true,
+        avail: 500 * 1024 ** 3,
+      },
+    ],
+  };
+  const automatic = buildProvisionPlacementBoard(
+    stepInputs,
+    { controlplane_count: 1, worker_count: 0 },
+    resources
+  );
+  assert.equal(automatic.vmStorageMap["cp-1"], "local-lvm");
+  assert.deepEqual(
+    automatic.hostCards[0].storages.map((entry) => entry.id),
+    ["local-lvm", "fast-zfs"]
+  );
+
+  const manual = buildProvisionPlacementBoard(
+    stepInputs,
+    {
+      controlplane_count: 1,
+      worker_count: 0,
+      vm_node_map: { "cp-1": "pve-a" },
+      vm_storage_map: { "cp-1": "fast-zfs" },
+    },
+    resources
+  );
+  assert.equal(manual.vmStorageMap["cp-1"], "fast-zfs");
+});
+
+test("placement validation blocks RAM and datastore over-allocation", () => {
+  const board = buildProvisionPlacementBoard(
+    stepInputs,
+    {
+      controlplane_count: 1,
+      worker_count: 0,
+      vm_size_map: { "cp-1": { cpu: 2, memory_mb: 8192, disk_gb: 30 } },
+    },
+    {
+      nodes: [
+        {
+          node: "pve-a",
+          status: "online",
+          maxmem: 4 * 1024 ** 3,
+          mem: 0,
+          maxdisk: 20 * 1024 ** 3,
+          disk: 0,
+        },
+      ],
+      vms: [],
+    }
+  );
+  const validation = validateProvisionPlacementBoard(board);
+  assert.equal(validation.ok, false);
+  assert.match(validation.errors.join(" "), /no Proxmox host|RAM|disk/i);
 });

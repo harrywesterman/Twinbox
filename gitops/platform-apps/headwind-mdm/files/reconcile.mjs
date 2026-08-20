@@ -12,10 +12,6 @@ function md5(value) {
   return createHash("md5").update(value).digest("hex").toUpperCase();
 }
 
-function sha256(value) {
-  return createHash("sha256").update(value).digest("hex");
-}
-
 function unwrap(value) {
   if (value && typeof value === "object") {
     return value.data ?? value.result ?? value.payload ?? value;
@@ -44,6 +40,26 @@ async function responseJson(response, path) {
 
 async function login(password) {
   try {
+    const response = await fetch(`${baseUrl}/rest/public/jwt/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ login: "admin", password: md5(password) }),
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const token = await responseJson(response, "Headwind login");
+    if (!token?.id_token || typeof token.id_token !== "string") {
+      return null;
+    }
+    return { token: token.id_token };
+  } catch {
+    return null;
+  }
+}
+
+async function initialLogin(password) {
+  try {
     const response = await fetch(`${baseUrl}/rest/public/auth/login`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -52,22 +68,44 @@ async function login(password) {
     if (!response.ok) {
       return null;
     }
-    const user = await responseJson(response, "Headwind login");
-    const setCookie = response.headers.get("set-cookie") || "";
-    const sessionCookie = setCookie.split(";")[0];
-    if (!sessionCookie || !user || typeof user !== "object") {
+    const user = await responseJson(response, "Headwind initial login");
+    if (!user || typeof user !== "object") {
       return null;
     }
-    return { cookie: sessionCookie, user };
+    return user;
   } catch {
     return null;
   }
 }
 
+async function resetInitialPassword(user) {
+  if (!user.passwordResetToken) {
+    throw new Error("Headwind initial administrator login requires a password reset token");
+  }
+  await apiPublic("/rest/public/passwordReset/reset", {
+    method: "POST",
+    body: JSON.stringify({
+      passwordResetToken: user.passwordResetToken,
+      newPassword: md5(adminPassword),
+    }),
+  });
+}
+
+async function apiPublic(path, options = {}) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    ...options,
+    headers: {
+      "content-type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+  return responseJson(response, path);
+}
+
 async function authenticate() {
-  const initial = await login("admin");
+  const initial = await initialLogin("admin");
   if (initial) {
-    return { ...initial, usesInitialPassword: true };
+    return { initialUser: initial, usesInitialPassword: true };
   }
   const configured = await login(adminPassword);
   if (!configured) {
@@ -80,7 +118,7 @@ async function api(session, path, options = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
     ...options,
     headers: {
-      cookie: session.cookie,
+      authorization: `Bearer ${session.token}`,
       "content-type": "application/json",
       ...(options.headers || {}),
     },
@@ -93,11 +131,11 @@ async function verifyArtifact(entry) {
   if (!response.ok || !response.body) {
     throw new Error(`Could not download ${entry.name} for SHA-256 verification`);
   }
-  const chunks = [];
+  const hash = createHash("sha256");
   for await (const chunk of response.body) {
-    chunks.push(chunk);
+    hash.update(chunk);
   }
-  const actual = sha256(Buffer.concat(chunks));
+  const actual = hash.digest("hex");
   if (actual !== entry.sha256) {
     throw new Error(`${entry.name} SHA-256 verification failed`);
   }
@@ -253,16 +291,13 @@ async function main() {
   if (!adminPassword || !deviceAdminPassword) {
     throw new Error("Headwind runtime secrets are missing");
   }
-  const session = await authenticate();
+  let session = await authenticate();
   if (bootstrap && session.usesInitialPassword) {
-    await api(session, "/rest/private/users/superadmin/password", {
-      method: "PUT",
-      body: JSON.stringify({
-        id: session.user.id,
-        login: "admin",
-        newPassword: md5(adminPassword),
-      }),
-    });
+    await resetInitialPassword(session.initialUser);
+    session = await login(adminPassword);
+    if (!session) {
+      throw new Error("Headwind administrator credentials were rejected after the password update");
+    }
   }
   await ensureConfiguration(session);
   await reconcileCatalog(session);

@@ -114,8 +114,9 @@ Expected:
 - Cilium bootstrap manifest exists under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/cilium/cilium-bootstrap.yaml`
 - the Talos configs include inline Cilium manifests on all control-plane nodes
 - the generated Talos nodes carry `twinbox.io/role=control-plane` and `twinbox.io/role=worker` labels as appropriate
-- control-plane VMs are provisioned at `4 GB RAM / 10 GB disk`
-- worker VMs keep a larger storage budget that is derived from the selected Proxmox host's free disk space
+- control-plane and worker VMs start with role-aware RAM and disk defaults, and preserve per-VM overrides from `vm_size_map`
+- every Talos system disk is created on the per-VM Proxmox datastore selected through `vm_storage_map`
+- provisioning counts only Twinbox VM RAM reservations (other VMs are assumed stopped), and rejects unavailable/non-image storage, host RAM overcommit, and datastore over-allocation before queueing the job
 - the first step in a clean UI session remains `Deploy Talos Cluster`
 
 ### `install-prometheus`

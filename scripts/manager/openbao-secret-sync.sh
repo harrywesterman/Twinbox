@@ -163,6 +163,13 @@ ui:
 
 server:
   enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
   ha:
     enabled: true
     replicas: ${replicas}

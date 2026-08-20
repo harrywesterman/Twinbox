@@ -50,6 +50,7 @@ Twinbox builds a Talos Linux Kubernetes cluster on Proxmox through a Management 
   - `talosconfig/talosconfig`
 - On the Management VM, `/opt/twinbox/.env` is root-owned; when refreshing the stack there, run `docker compose` through `sudo` from `/opt/twinbox` instead of trying to read or edit that file as `twinbox`.
 - On the Management VM, `/opt/twinbox` is the live deployment workspace, not a git checkout; refresh it with `docker compose pull && docker compose up -d`, not `git pull`.
+- After the GitHub Actions `Publish Docker Images` workflow succeeds, update the root-owned `/opt/twinbox/.env` `TWINBOX_IMAGE_TAG` to the published short commit tag (`sha-<first-7-commit-chars>`, for example `sha-82a60a6`) before refreshing the stack. Use `sudo` for the edit and verify with `TWINBOX_IMAGE_TAG=sha-<tag> docker compose config --images`; otherwise `docker compose pull` can keep using the previous image tag.
 
 ## Debug
 

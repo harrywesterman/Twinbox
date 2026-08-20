@@ -1,3 +1,4 @@
+import json
 import shlex
 import subprocess
 import tempfile
@@ -278,6 +279,182 @@ def test_talos_disk_image_existing_import_must_match_local_size():
         log_text = log_file.read_text(encoding="utf-8")
         assert "Talos disk image already present on node-a/local: talos-cluster.img" in log_text
         assert "UNEXPECTED_URL=" not in log_text
+
+
+def test_talos_nocloud_cidata_iso_upload_uses_iso_content_and_static_network_config():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        log_file = root / "upload.log"
+        harness = root / "harness.sh"
+        iso_map_file = root / "iso-map.json"
+        talos_dir = root / "talos"
+
+        harness.write_text(
+            textwrap.dedent(
+                f"""#!/usr/bin/env bash
+                set -euo pipefail
+
+                LOG_FILE={shlex.quote(str(log_file))}
+                APPLY_CLUSTER_SCRIPT={shlex.quote(str(APPLY_CLUSTER_SCRIPT))}
+                : > "$LOG_FILE"
+
+                log() {{
+                  printf '%s\\n' "$*" >> "$LOG_FILE"
+                }}
+
+                fail() {{
+                  printf 'FAIL:%s\\n' "$*" >> "$LOG_FILE"
+                  return 1
+                }}
+
+                file_size_bytes() {{
+                  wc -c < "$1" | tr -d '[:space:]'
+                }}
+
+                export FILE_DATASTORE=local
+                export CLUSTER_ID=cluster-a
+                export NAME=demo
+                export NODE_PREFIX_LENGTH=24
+                export GATEWAY_IP=10.0.0.1
+                export PROXMOX_UPLOAD_MAX_ATTEMPTS=1
+                export PROXMOX_VERIFY_MAX_ATTEMPTS=1
+                export PROXMOX_PORT=8006
+                export PROXMOX_USER=root@pam
+                export PROXMOX_PASSWORD=secret
+                export TF_VAR_proxmox_endpoint=https://pve1.example.invalid:8006
+                runtime_talos_dir={shlex.quote(str(talos_dir))}
+                mkdir -p "$runtime_talos_dir"
+                printf 'machine:\\n  type: controlplane\\n' > "$runtime_talos_dir/cp-1-controlplane.yaml"
+                vm_node_map_json='{{"cp-1":"node-a"}}'
+                nodes_json='{{"cp-1":{{"type":"controlplane","ip":"10.0.0.11","mac":"52:54:00:00:00:c8"}}}}'
+                ISO_NAME_FILE="$PWD/iso-name"
+                ISO_SIZE_FILE="$PWD/iso-size"
+                rm -f "$ISO_NAME_FILE" "$ISO_SIZE_FILE"
+
+                HELPERS_FILE="$(mktemp)"
+                awk '
+                  /^proxmox_api_login\\(\\) \\{{/ {{ emit = 1 }}
+                  /^remove_legacy_talos_file_state\\(\\) \\{{/ {{ emit = 0 }}
+                  emit {{ print }}
+                ' "$APPLY_CLUSTER_SCRIPT" >"$HELPERS_FILE"
+                source "$HELPERS_FILE"
+
+                xorriso() {{
+                  local output_file=""
+                  local prev=""
+                  local arg=""
+                  for arg in "$@"; do
+                    if [[ "$prev" == "-output" ]]; then
+                      output_file="$arg"
+                    fi
+                    if [[ "$prev" == "-volid" ]]; then
+                      log "XORRISO_VOLID=$arg"
+                    fi
+                    prev="$arg"
+                  done
+                  [[ -n "$output_file" ]] || return 1
+                  cat user-data meta-data network-config > "$output_file"
+                }}
+
+                FAKE_CLUSTER_STATUS='{{"data":[{{"type":"node","name":"node-a","ip":"10.0.0.91"}}]}}'
+
+                curl() {{
+                  local output_file=""
+                  local url="${{@: -1}}"
+                  local arg=""
+                  local prev=""
+                  local upload_iso_name=""
+                  local upload_iso_path=""
+
+                  for arg in "$@"; do
+                    if [[ "$prev" == "--output" ]]; then
+                      output_file="$arg"
+                    fi
+                    if [[ "$prev" == "--form" || "$prev" == "--header" ]]; then
+                      log "CURL_${{prev#--}}=$arg"
+                    fi
+                    if [[ "$prev" == "--form" && "$arg" == filename=@* ]]; then
+                      upload_iso_path="${{arg#filename=@}}"
+                      upload_iso_path="${{upload_iso_path%%;filename=*}}"
+                      upload_iso_name="${{arg##*;filename=}}"
+                    fi
+                    prev="$arg"
+                  done
+
+                  case "$url" in
+                    */access/ticket)
+                      printf '%s\\n' '{{"data":{{"ticket":"ticket","CSRFPreventionToken":"csrf"}}}}'
+                      return 0
+                      ;;
+                    */cluster/status)
+                      printf '%s\\n' "$FAKE_CLUSTER_STATUS"
+                      return 0
+                      ;;
+                    */storage/local/content)
+                      if [[ -f "$ISO_NAME_FILE" ]]; then
+                        printf '{{"data":[{{"volid":"local:iso/%s","content":"iso","size":%s}}]}}\\n' "$(cat "$ISO_NAME_FILE")" "$(cat "$ISO_SIZE_FILE")"
+                      else
+                        printf '%s\\n' '{{"data":[]}}'
+                      fi
+                      return 0
+                      ;;
+                    */storage/local/upload)
+                      log "UPLOAD_URL=$url"
+                      [[ -n "$upload_iso_name" && -s "$upload_iso_path" ]] || return 1
+                      printf '%s' "$upload_iso_name" > "$ISO_NAME_FILE"
+                      wc -c < "$upload_iso_path" | tr -d '[:space:]' > "$ISO_SIZE_FILE"
+                      if [[ -n "$output_file" ]]; then
+                        printf '%s\\n' '{{"data":"ok"}}' >"$output_file"
+                      fi
+                      printf '200\\n'
+                      return 0
+                      ;;
+                  esac
+
+                  printf 'unexpected curl url: %s\\n' "$url" >&2
+                  return 1
+                }}
+
+                render_and_upload_nocloud_isos > {shlex.quote(str(iso_map_file))}
+                """
+            ),
+            encoding="utf-8",
+        )
+        harness.chmod(0o755)
+
+        proc = subprocess.run(
+            ["bash", str(harness)],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert proc.returncode == 0, proc.stderr
+
+        log_text = log_file.read_text(encoding="utf-8")
+        iso_map = json.loads(iso_map_file.read_text(encoding="utf-8"))
+        network_config = (talos_dir / "nocloud" / "cp-1" / "files" / "network-config").read_text(
+            encoding="utf-8"
+        )
+        user_data = (talos_dir / "nocloud" / "cp-1" / "files" / "user-data").read_text(
+            encoding="utf-8"
+        )
+
+        assert iso_map["cp-1"].startswith("local:iso/talos-cluster-a-cp-1-")
+        assert iso_map["cp-1"].endswith(".iso")
+        assert "XORRISO_VOLID=cidata" in log_text
+        assert "CURL_form=content=iso" in log_text
+        assert (
+            "UPLOAD_URL=https://10.0.0.91:8006/api2/json/nodes/node-a/storage/local/upload"
+            in log_text
+        )
+        assert "Verified Talos NoCloud cidata ISO on node-a/local" in log_text
+        assert "address: 10.0.0.11" in network_config
+        assert 'mac_address: "52:54:00:00:00:c8"' in network_config
+        assert "netmask: 255.255.255.0" in network_config
+        assert "gateway: 10.0.0.1" in network_config
+        assert "machine:" in user_data
 
 
 def test_talos_disk_image_verify_waits_for_uploaded_size_to_settle():
