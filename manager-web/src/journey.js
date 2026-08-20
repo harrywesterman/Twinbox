@@ -128,6 +128,11 @@ function buildStepRail(steps, activeStep) {
 }
 
 function buildHealthBadges({ health, activeStep, catalogErrors, cluster, mode }) {
+  const imageTag =
+    typeof health?.image_tag === "string" && health.image_tag.trim()
+      ? health.image_tag.trim()
+      : "unknown";
+
   return [
     {
       id: "health",
@@ -135,6 +140,13 @@ function buildHealthBadges({ health, activeStep, catalogErrors, cluster, mode })
       value: health?.ok ? "Online" : "Unavailable",
       chip: health?.ok ? "Healthy" : "Check API",
       tone: health?.ok ? "success" : "danger",
+    },
+    {
+      id: "manager-image",
+      label: "Manager image",
+      value: imageTag,
+      chip: /^sha-[0-9a-f]{7}$/i.test(imageTag) ? "Pinned" : "Unknown",
+      tone: /^sha-[0-9a-f]{7}$/i.test(imageTag) ? "success" : "warning",
     },
     {
       id: "mode",
