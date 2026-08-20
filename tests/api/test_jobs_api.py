@@ -63,8 +63,8 @@ exit 1
             """#!/bin/sh
 cat <<'EOF'
 [
-  {"node": "pve-a", "status": "online"},
-  {"node": "pve-b", "status": "online"}
+  {"node": "pve-a", "status": "online", "maxmem": 68719476736, "mem": 0, "maxcpu": 16, "maxdisk": 1099511627776, "disk": 0},
+  {"node": "pve-b", "status": "online", "maxmem": 68719476736, "mem": 0, "maxcpu": 16, "maxdisk": 1099511627776, "disk": 0}
 ]
 EOF
 """,

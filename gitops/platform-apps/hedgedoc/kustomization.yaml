@@ -7,4 +7,5 @@ resources:
   - externalsecret.yaml
   - deployment.yaml
   - service.yaml
+  - netbird-forwarded-headers-middleware.yaml
   - ingressroute.yaml

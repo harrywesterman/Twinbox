@@ -280,6 +280,21 @@ test("app catalog exposes apps while the wizard catalog keeps them out of sight"
     const mijnBureauBundle = appCatalog.bundles.find((bundle) => bundle.id === "mijn-bureau");
     const openDeskBundle = appCatalog.bundles.find((bundle) => bundle.id === "opendesk");
     const laSuiteBundle = appCatalog.bundles.find((bundle) => bundle.id === "lasuite");
+    const twinboxDesktopBundle = appCatalog.bundles.find(
+      (bundle) => bundle.id === "twinbox-desktop"
+    );
+    for (const appId of [
+      "install-karakeep",
+      "install-mailu",
+      "install-mastodon",
+      "install-matrix",
+      "install-nextcloud",
+    ]) {
+      assert.ok(
+        twinboxDesktopBundle?.apps.includes(appId),
+        `twinbox-desktop bundle should include ${appId}`
+      );
+    }
     assert.equal(nextcloudCard?.title, "Install Nextcloud");
     assert.equal(nextcloudCard?.placeholder, false);
     assert.equal(nextcloudCard?.installable, true);

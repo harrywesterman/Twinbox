@@ -1011,7 +1011,7 @@ apply_educated_defaults() {
   PROXMOX_NODE="$(hostname)"
   PROXMOX_STORAGE_POOL="local-lvm"
   PROXMOX_FILE_DATASTORE="local"
-  TWINBOX_IMAGE_TAG="sha-ad89c77"
+  TWINBOX_IMAGE_TAG="sha-652a75b"
 }
 
 run_apply_educated_defaults_with_gauge() {
@@ -1083,11 +1083,11 @@ EOF
   PROXMOX_NODE="$(hostname)"
   PROXMOX_STORAGE_POOL="local-lvm"
   PROXMOX_FILE_DATASTORE="local"
-  TWINBOX_IMAGE_TAG="sha-ad89c77"
+  TWINBOX_IMAGE_TAG="sha-652a75b"
 }
 
 create_proxmox_api_user() {
-  local proxmox_privs="VM.Audit,VM.Monitor,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.Allocate,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use,Sys.Audit,Sys.Modify"
+  local proxmox_privs="VM.Audit,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.Allocate,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use,Sys.Audit,Sys.Modify"
   local create_err=""
   local role_err=""
   local last_err=""
@@ -1175,11 +1175,15 @@ create_proxmox_api_user() {
   fi
 }
 
-ensure_proxmox_import_content_type() {
+ensure_proxmox_file_datastore_content_types() {
   local datastore="${PROXMOX_FILE_DATASTORE:-local}"
   local storage_json=""
   local current_content=""
   local next_content=""
+  local missing_content=()
+  local required_content=("import" "snippets")
+  local content_item=""
+  local missing_list=""
 
   if ! storage_json=$(pvesh get "/storage/${datastore}" --output-format json 2>/dev/null); then
     msg_error "Failed to inspect Proxmox storage ${datastore}."
@@ -1194,21 +1198,28 @@ payload = json.loads(sys.stdin.read() or "{}")
 data = payload.get("data", payload) if isinstance(payload, dict) else {}
 print(data.get("content", ""))
 ' <<<"$storage_json")"
+  next_content="$current_content"
 
-  if [[ ",${current_content}," == *",import,"* ]]; then
-    log_event "Proxmox storage ${datastore} already allows import content"
+  for content_item in "${required_content[@]}"; do
+    if [[ ",${current_content}," != *",${content_item},"* ]]; then
+      missing_content+=("$content_item")
+      if [[ -n "$next_content" ]]; then
+        next_content="${next_content},${content_item}"
+      else
+        next_content="$content_item"
+      fi
+    fi
+  done
+
+  if [[ ${#missing_content[@]} -eq 0 ]]; then
+    log_event "Proxmox storage ${datastore} already allows import and snippets content"
     return 0
   fi
 
-  if [[ -n "$current_content" ]]; then
-    next_content="${current_content},import"
-  else
-    next_content="import"
-  fi
-
-  log_event "Enabling import content on Proxmox storage ${datastore}"
+  missing_list="$(IFS=,; printf '%s' "${missing_content[*]}")"
+  log_event "Enabling ${missing_list} content on Proxmox storage ${datastore}"
   if ! pvesm set "$datastore" --content "$next_content" >/dev/null 2>&1; then
-    msg_error "Failed to enable import content on Proxmox storage ${datastore}."
+    msg_error "Failed to enable import and snippets content on Proxmox storage ${datastore}."
     return 1
   fi
 }
@@ -1663,7 +1674,7 @@ run_installation_flow() {
     progress_update "Preparing" "Checking Proxmox access and VM settings"
     log_event "Building the management VM."
     create_proxmox_api_user
-    ensure_proxmox_import_content_type
+    ensure_proxmox_file_datastore_content_types
     create_management_vm
     prepare_completion_message
   } 2>&1 | dialog \
