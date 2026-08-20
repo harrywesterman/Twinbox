@@ -1,0 +1,19 @@
+{
+  "name": "twinbox-eurooffice-file-action",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@nextcloud/files": "^4.0.0",
+    "@nextcloud/l10n": "^3.4.1",
+    "@nextcloud/router": "^3.1.0"
+  },
+  "devDependencies": {
+    "@nextcloud/vite-config": "2.4.0",
+    "typescript": "5.8.3",
+    "vite": "^6.4.1"
+  }
+}

@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nextcloud-eurooffice
+  namespace: nextcloud
+  labels:
+    app.kubernetes.io/name: nextcloud-eurooffice
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nextcloud-eurooffice
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nextcloud-eurooffice
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: initialize-config
+          image: ghcr.io/euro-office/documentserver:v9.3.1
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              if [ ! -f /mnt/eurooffice-config/local.json ]; then
+                cp -a /etc/euro-office/documentserver/. /mnt/eurooffice-config/
+              fi
+              if [ ! -d /mnt/eurooffice-logs/adminpanel ]; then
+                cp -a /var/log/euro-office/documentserver/. /mnt/eurooffice-logs/
+              fi
+              mkdir -p /mnt/eurooffice-data/App_Data
+              cp -a /var/lib/euro-office/documentserver/App_Data/. /mnt/eurooffice-data/App_Data/
+              chown -R ds:ds /mnt/eurooffice-data
+          volumeMounts:
+            - name: config
+              mountPath: /mnt/eurooffice-config
+            - name: logs
+              mountPath: /mnt/eurooffice-logs
+            - name: data
+              mountPath: /mnt/eurooffice-data
+      containers:
+        - name: eurooffice
+          image: ghcr.io/euro-office/documentserver:v9.3.1
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: JWT_ENABLED
+              value: "true"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: nextcloud-eurooffice
+                  key: jwt-secret
+            - name: JWT_HEADER
+              value: AuthorizationJWT
+            - name: EXAMPLE_ENABLED
+              value: "false"
+          ports:
+            - name: http
+              containerPort: 80
+          resources:
+            requests:
+              cpu: 500m
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          startupProbe:
+            httpGet:
+              path: /healthcheck
+              port: http
+            failureThreshold: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /healthcheck
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 6
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthcheck
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            failureThreshold: 6
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/euro-office/documentserver
+            - name: logs
+              mountPath: /var/log/euro-office/documentserver
+            - name: config
+              mountPath: /etc/euro-office/documentserver
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: nextcloud-eurooffice-data
+        - name: logs
+          persistentVolumeClaim:
+            claimName: nextcloud-eurooffice-logs
+        - name: config
+          persistentVolumeClaim:
+            claimName: nextcloud-eurooffice-config

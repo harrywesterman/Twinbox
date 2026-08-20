@@ -35,7 +35,7 @@ resource "proxmox_virtual_environment_vm" "node" {
   }
 
   disk {
-    datastore_id = var.vm_datastore
+    datastore_id = each.value.datastore_id
     import_from  = local.talos_image_file_id
     interface    = "virtio0"
     size         = each.value.disk_gb
@@ -43,11 +43,16 @@ resource "proxmox_virtual_environment_vm" "node" {
     discard      = "on"
   }
 
+  cdrom {
+    enabled = true
+    file_id = each.value.nocloud_iso_file_id
+  }
+
   agent {
     enabled = true
 
     wait_for_ip {
-      ipv4 = true
+      disabled = true
     }
   }
 

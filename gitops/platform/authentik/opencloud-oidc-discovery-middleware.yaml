@@ -1,0 +1,9 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: opencloud-oidc-discovery
+  namespace: authentik
+spec:
+  replacePathRegex:
+    regex: ^/\.well-known/openid-configuration$
+    replacement: /application/o/opencloud/.well-known/openid-configuration

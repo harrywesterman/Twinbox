@@ -52,7 +52,14 @@ inputs:
     type: string
     required: false
     default: cax11
-    help: "Server size: cax11 (ARM64, 2vCPU/4GB), cpx22 (x86, 2vCPU/4GB). Twinbox retries once with cpx22 if cax11 placement is unavailable."
+    help: "Choose cax11 for the default 2vCPU/4GB bastion. cpx12 is a 1vCPU/2GB x86/AMD option for light or test workloads; cpx22 provides 2vCPU/4GB x86/AMD. Twinbox retries once with cpx22 only when default cax11 placement is unavailable."
+    options:
+      - label: "CAX11 — ARM64, 2 vCPU / 4 GB"
+        value: cax11
+      - label: "CPX12 — x86/AMD, 1 vCPU / 2 GB (light/test)"
+        value: cpx12
+      - label: "CPX22 — x86/AMD, 2 vCPU / 4 GB"
+        value: cpx22
   - id: existing_bastion_mode
     label: Existing VM Mode
     type: string

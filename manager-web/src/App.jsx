@@ -3,11 +3,10 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import "./App.css";
 import heroIllustrationUrl from "./assets/hero-illustration.svg";
 import {
-  buildAutomaticProvisionPlacementResult,
   buildProvisionPlacementBoard,
-  buildScaledProvisionInputs,
   getProvisionNodeCount,
   formatMemoryMb,
+  validateProvisionPlacementBoard,
 } from "./provision-scale.js";
 import {
   buildProvisionVmIpMap,
@@ -35,6 +34,7 @@ import {
   serializeUiState,
 } from "./journey.js";
 import { normalizeLogEntries } from "./install-logs.js";
+import { getInputOptions } from "./input-options.js";
 import { getQuestionSteps } from "./question-flow.js";
 import {
   isMissingClusterError,
@@ -372,6 +372,8 @@ function InputField({ stepId, input, value, onChange }) {
       );
     }
 
+    const selectOptions = getInputOptions(input, value);
+
     return (
       <label className="wizard-field" htmlFor={controlId}>
         <span className="wizard-field-label">{input.label}</span>
@@ -383,7 +385,7 @@ function InputField({ stepId, input, value, onChange }) {
           onChange={(event) => onChange(input.id, event.target.value)}
         >
           <option value="">Choose an option</option>
-          {input.options.map((option) => (
+          {selectOptions.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
@@ -394,38 +396,6 @@ function InputField({ stepId, input, value, onChange }) {
       </label>
     );
   }
-
-  if (
-    stepId === "provision-nodes" &&
-    (input.id === "scale_percent" || input.id === "worker_disk_percent")
-  ) {
-    const numericValue = Number.isFinite(Number(value))
-      ? Number(value)
-      : Number.isFinite(Number(input.default))
-        ? Number(input.default)
-        : 90;
-
-    return (
-      <label className="wizard-field wizard-field-range" htmlFor={controlId}>
-        <span className="wizard-field-range-head">
-          <span className="wizard-field-label">{input.label}</span>
-          <strong className="wizard-field-range-value">{numericValue}%</strong>
-        </span>
-        <input
-          id={controlId}
-          type="range"
-          min={input.min}
-          max={input.max}
-          step={1}
-          value={numericValue}
-          onChange={(event) => onChange(input.id, event.target.valueAsNumber)}
-        />
-        <small>{helpText}</small>
-        <em>{defaultLabel}</em>
-      </label>
-    );
-  }
-
   const inputType = input.type === "integer" ? "number" : "text";
 
   const fieldClassName = isDnsDomainField
@@ -472,15 +442,7 @@ function InputField({ stepId, input, value, onChange }) {
   );
 }
 
-const PROVISION_VM_INPUT_IDS = [
-  "scale_percent",
-  "worker_disk_percent",
-  "controlplane_count",
-  "worker_count",
-  "cpu_cores",
-  "memory_mb",
-  "start_vmid",
-];
+const PROVISION_VM_INPUT_IDS = ["controlplane_count", "worker_count", "start_vmid"];
 
 const PROVISION_NETWORK_INPUT_IDS = [
   "bridge",
@@ -498,7 +460,15 @@ function getProvisionInputGroups(inputs = []) {
   };
 }
 
-function PlacementBoard({ board, draggingVmName, onDragStart, onDragEnd, onDropVm, onReset }) {
+function PlacementBoard({
+  board,
+  draggingVmName,
+  onDragStart,
+  onDragEnd,
+  onDropVm,
+  onReset,
+  onUpdateVm,
+}) {
   if (!board?.hostCards?.length) {
     return (
       <section className="wizard-placement-empty">
@@ -510,6 +480,111 @@ function PlacementBoard({ board, draggingVmName, onDragStart, onDragEnd, onDropV
     );
   }
 
+  const renderVmCard = (vm) => {
+    if (vm.isFixed) {
+      return (
+        <div
+          key={vm.id || vm.name}
+          className="wizard-vm-card is-fixed"
+          role="group"
+          aria-label={`${vm.label} on ${vm.hostName}`}
+        >
+          <span className="wizard-vm-card-title">{vm.label}</span>
+          <strong>{vm.name}</strong>
+          <small>
+            {vm.vmid != null ? `VMID ${vm.vmid}` : "VMID —"}
+            {vm.cpu ? ` | ${vm.cpu} CPU` : ""}
+            {vm.memory_mb != null ? ` | ${formatMemoryMb(vm.memory_mb)} RAM` : ""}
+            {vm.disk_gb != null ? ` | ${vm.disk_gb} GB disk` : ""}
+          </small>
+          <em>Fixed on this host and included in the resource budget.</em>
+        </div>
+      );
+    }
+
+    return (
+      <details
+        key={vm.name}
+        className={`wizard-vm-card ${draggingVmName === vm.name ? "is-dragging" : ""} ${vm.assignmentSource === "user-selected" ? "is-user-selected" : vm.assignmentSource === "suggested" ? "is-suggested" : "is-unassigned"}`}
+      >
+        <summary>
+          <span>
+            <span className="wizard-vm-card-title">{vm.label}</span>
+            <strong>{vm.name}</strong>
+            <small>
+              VMID {vm.vmid} | {vm.cpu} CPU | {formatMemoryMb(vm.memory_mb)} RAM | {vm.disk_gb} GB
+              disk | {vm.storage_id || "no storage"}
+            </small>
+          </span>
+          <button
+            className="wizard-vm-drag-handle"
+            type="button"
+            draggable
+            onDragStart={(event) => onDragStart(event, vm.name)}
+            onDragEnd={onDragEnd}
+            aria-label={`Drag ${vm.label} to another Proxmox host`}
+          >
+            Move
+          </button>
+        </summary>
+        <div className="wizard-vm-editor">
+          <label>
+            <span>Proxmox host</span>
+            <select
+              value={vm.assignedHostId || ""}
+              onChange={(event) => onUpdateVm(vm.name, "host", event.target.value)}
+            >
+              <option value="">Choose a host</option>
+              {board.hostCards.map((host) => (
+                <option key={host.id} value={host.id}>
+                  {host.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>RAM (GB)</span>
+            <input
+              type="number"
+              min="0.5"
+              max="1024"
+              step="0.5"
+              value={vm.memory_mb / 1024}
+              onChange={(event) =>
+                onUpdateVm(vm.name, "memory_mb", Math.round(event.target.valueAsNumber * 1024))
+              }
+            />
+          </label>
+          <label>
+            <span>System disk (GB)</span>
+            <input
+              type="number"
+              min="10"
+              max="8192"
+              step="1"
+              value={vm.disk_gb}
+              onChange={(event) => onUpdateVm(vm.name, "disk_gb", event.target.valueAsNumber)}
+            />
+          </label>
+          <label>
+            <span>Proxmox storage</span>
+            <select
+              value={vm.storage_id || ""}
+              onChange={(event) => onUpdateVm(vm.name, "storage", event.target.value)}
+            >
+              <option value="">Choose storage</option>
+              {(vm.storageOptions || []).map((storage) => (
+                <option key={storage.id} value={storage.id}>
+                  {storage.name} · {Math.floor(storage.freeDiskGb)} GB free
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </details>
+    );
+  };
+
   return (
     <section className="wizard-placement-board" aria-label="Cluster placement board">
       <div className="wizard-input-block-head">
@@ -518,8 +593,8 @@ function PlacementBoard({ board, draggingVmName, onDragStart, onDragEnd, onDropV
           <h3>Drag Talos VMs between Proxmox hosts</h3>
         </div>
         <div className="wizard-card-actions wizard-card-actions-inline">
-          <button className="button button-secondary" type="button" onClick={onReset}>
-            Automatic placement
+          <button className="button button-secondary" type="button" onClick={() => onReset()}>
+            Automatic placement: fill all VM settings
           </button>
         </div>
       </div>
@@ -545,60 +620,21 @@ function PlacementBoard({ board, draggingVmName, onDragStart, onDragEnd, onDropV
               </div>
               <div className="wizard-placement-host-capacity">
                 <span>{Math.round(host.freeCpuCores)} CPU free</span>
-                <span>{formatMemoryMb(host.freeMemoryMb)} free</span>
-                <span>{Math.round(host.freeDiskGb)} GB disk free</span>
+                <span>
+                  {formatMemoryMb(Math.max(0, host.freeMemoryAfterMb))} RAM after Twinbox
+                  reservations
+                </span>
+                {(host.storages || []).map((storage) => (
+                  <span key={storage.id}>
+                    {storage.name}: {Math.max(0, Math.floor(storage.freeDiskAfterGb))} GB remaining
+                  </span>
+                ))}
               </div>
             </header>
 
             <div className="wizard-placement-host-body">
               {host.assignments.length > 0 ? (
-                host.assignments.map((vm) => {
-                  if (vm.isFixed) {
-                    return (
-                      <div
-                        key={vm.id || vm.name}
-                        className="wizard-vm-card is-fixed"
-                        role="group"
-                        aria-label={`${vm.label} on ${host.name}`}
-                      >
-                        <span className="wizard-vm-card-title">{vm.label}</span>
-                        <strong>{vm.name}</strong>
-                        <small>
-                          {vm.vmid != null ? `VMID ${vm.vmid}` : "VMID —"}
-                          {vm.cpu ? ` | ${vm.cpu} CPU` : ""}
-                          {vm.memory_mb != null ? ` | ${formatMemoryMb(vm.memory_mb)} RAM` : ""}
-                          {vm.disk_gb != null ? ` | ${vm.disk_gb} GB disk` : ""}
-                        </small>
-                        <em>Fixed on this host and included in the resource budget.</em>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <button
-                      key={vm.name}
-                      className={`wizard-vm-card ${draggingVmName === vm.name ? "is-dragging" : ""} ${vm.assignmentSource === "user-selected" ? "is-user-selected" : vm.assignmentSource === "suggested" ? "is-suggested" : "is-unassigned"}`}
-                      type="button"
-                      draggable
-                      onDragStart={(event) => onDragStart(event, vm.name)}
-                      onDragEnd={onDragEnd}
-                    >
-                      <span className="wizard-vm-card-title">{vm.label}</span>
-                      <strong>{vm.name}</strong>
-                      <small>
-                        VMID {vm.vmid} | {vm.cpu} CPU | {formatMemoryMb(vm.memory_mb)} RAM |{" "}
-                        {vm.disk_gb} GB disk
-                      </small>
-                      <em>
-                        {vm.assignmentSource === "user-selected"
-                          ? `You placed this VM on ${host.name}.`
-                          : vm.assignmentSource === "suggested"
-                            ? "Suggested here to balance CPU, memory, and disk across the cluster."
-                            : "This VM is not assigned yet."}
-                      </em>
-                    </button>
-                  );
-                })
+                host.assignments.map(renderVmCard)
               ) : (
                 <p className="wizard-empty wizard-empty-inline">Drop a VM here.</p>
               )}
@@ -615,26 +651,7 @@ function PlacementBoard({ board, draggingVmName, onDragStart, onDragEnd, onDropV
               <span>Drag these VMs onto a Proxmox host</span>
             </div>
           </header>
-          <div className="wizard-placement-host-body">
-            {board.unassigned.map((vm) => (
-              <button
-                key={vm.name}
-                className={`wizard-vm-card ${draggingVmName === vm.name ? "is-dragging" : ""} ${vm.assignmentSource === "user-selected" ? "is-user-selected" : vm.assignmentSource === "suggested" ? "is-suggested" : "is-unassigned"}`}
-                type="button"
-                draggable
-                onDragStart={(event) => onDragStart(event, vm.name)}
-                onDragEnd={onDragEnd}
-              >
-                <span className="wizard-vm-card-title">{vm.label}</span>
-                <strong>{vm.name}</strong>
-                <small>
-                  VMID {vm.vmid} | {vm.cpu} CPU | {formatMemoryMb(vm.memory_mb)} RAM | {vm.disk_gb}{" "}
-                  GB disk
-                </small>
-                <em>Drag this VM onto a host to override the balanced suggestion.</em>
-              </button>
-            ))}
-          </div>
+          <div className="wizard-placement-host-body">{board.unassigned.map(renderVmCard)}</div>
         </article>
       ) : null}
     </section>
@@ -647,6 +664,25 @@ function hasPlacementAssignments(vmNodeMap) {
   }
 
   return Object.values(vmNodeMap).some((hostName) => String(hostName || "").trim().length > 0);
+}
+
+function pruneProvisionVmMaps(values = {}) {
+  const controlplaneCount = Math.max(1, Number(values.controlplane_count) || 1);
+  const workerCount = Math.max(0, Number(values.worker_count) || 0);
+  const names = new Set([
+    ...Array.from({ length: controlplaneCount }, (_, index) => `cp-${index + 1}`),
+    ...Array.from({ length: workerCount }, (_, index) => `worker-${index + 1}`),
+  ]);
+  const prune = (map) =>
+    Object.fromEntries(
+      Object.entries(map && typeof map === "object" ? map : {}).filter(([name]) => names.has(name))
+    );
+  return {
+    ...values,
+    vm_node_map: prune(values.vm_node_map),
+    vm_size_map: prune(values.vm_size_map),
+    vm_storage_map: prune(values.vm_storage_map),
+  };
 }
 
 function buildPlacementSuggestionKey(board) {
@@ -795,7 +831,9 @@ function getWizardGuide(stepId) {
   );
 }
 
-function renderTopBar({ onImportClick, showImportButton = true } = {}) {
+function renderTopBar({ imageTag = "", onImportClick, showImportButton = true } = {}) {
+  const visibleImageTag = String(imageTag || "").trim();
+
   return (
     <header className="wizard-topbar">
       <div className="wizard-brand-lockup">
@@ -809,6 +847,9 @@ function renderTopBar({ onImportClick, showImportButton = true } = {}) {
         <p className="wizard-kicker">Guided cluster bootstrap</p>
       </div>
       <div className="wizard-topbar-actions">
+        {visibleImageTag ? (
+          <span className="wizard-runtime-tag">Manager image {visibleImageTag}</span>
+        ) : null}
         {showImportButton ? (
           <button className="button button-secondary" type="button" onClick={onImportClick}>
             Load saved answers
@@ -1511,18 +1552,25 @@ function App() {
       }
 
       try {
-        const result = buildAutomaticProvisionPlacementResult(
-          currentStep.inputs || [],
-          draft,
-          proxmoxResources
-        );
+        const effectiveDraft =
+          draft && typeof draft === "object" ? draft : answersRef.current?.[currentStep.id] || {};
+        const placement = await requestJson("/api/proxmox/placement-plan", {
+          method: "POST",
+          body: JSON.stringify({
+            name: effectiveDraft.name,
+            controlplane_count: effectiveDraft.controlplane_count,
+            worker_count: effectiveDraft.worker_count,
+          }),
+        });
+        const assigned = Object.keys(placement?.vm_node_map || {}).length;
         updateProvisionDraft(currentStep.id, {
-          vm_node_map: result.vm_node_map,
-          vm_size_map: result.vm_size_map,
+          vm_node_map: placement.vm_node_map || {},
+          vm_size_map: placement.vm_size_map || {},
+          vm_storage_map: placement.vm_storage_map || {},
         });
         setPlacementStatus({
-          tone: result.tone,
-          message: result.message,
+          tone: "success",
+          message: `Automatic placement assigned all ${assigned} Talos VMs.`,
         });
       } catch (error) {
         const message =
@@ -1534,7 +1582,7 @@ function App() {
         });
       }
     },
-    [currentStep, proxmoxResources, updateProvisionDraft]
+    [currentStep, updateProvisionDraft]
   );
 
   async function applyProvisionIpHelp() {
@@ -1642,6 +1690,9 @@ function App() {
       const hasExplicitPlacement = hasPlacementAssignments(explicitPlacementMap);
       body.vm_node_map = hasExplicitPlacement ? placement.vmNodeMap : placement.suggestedVmNodeMap;
       body.vm_size_map = hasExplicitPlacement ? placement.vmSizeMap : placement.suggestedVmSizeMap;
+      body.vm_storage_map = hasExplicitPlacement
+        ? placement.vmStorageMap
+        : placement.suggestedVmStorageMap;
       body.vm_ip_map = buildProvisionVmIpMap(vmIpRows);
     }
 
@@ -1943,7 +1994,7 @@ function App() {
   }
 
   function updateAnswer(stepId, inputId, value) {
-    if (stepId === "provision-nodes" && inputId !== "scale_percent") {
+    if (stepId === "provision-nodes") {
       provisionDirtyFieldsRef.current.add(inputId);
     }
 
@@ -1956,23 +2007,9 @@ function App() {
         [inputId]: value,
       };
 
-      if (stepId === "provision-nodes" && inputId === "scale_percent") {
-        const currentScale = Number.isFinite(Number(value)) ? Number(value) : 90;
-        return {
-          ...current,
-          [stepId]: buildScaledProvisionInputs(
-            currentScale,
-            currentStep?.inputs || [],
-            nextStep,
-            provisionDirtyFieldsRef.current,
-            proxmoxResources
-          ),
-        };
-      }
-
       return {
         ...current,
-        [stepId]: nextStep,
+        [stepId]: stepId === "provision-nodes" ? pruneProvisionVmMaps(nextStep) : nextStep,
       };
     });
 
@@ -1986,16 +2023,59 @@ function App() {
       return;
     }
 
-    const currentMap =
-      currentDraft.vm_node_map && typeof currentDraft.vm_node_map === "object"
-        ? currentDraft.vm_node_map
-        : {};
+    updateVmConfiguration(vmName, "host", hostName);
+  }
 
-    updateAnswer(currentStep.id, "vm_node_map", {
-      ...currentMap,
-      [vmName]: hostName,
-    });
-    setPlacementStatus({ tone: "", message: "" });
+  function updateVmConfiguration(vmName, field, value) {
+    if (!vmName || currentStep?.id !== "provision-nodes") return;
+    const draft = answersRef.current?.[currentStep.id] || {};
+    const board = buildProvisionPlacementBoard(currentStep.inputs || [], draft, proxmoxResources);
+    const vm = board.vmPlan.find((entry) => entry.name === vmName);
+    if (!vm) return;
+
+    if (field === "host") {
+      const host = board.hostCards.find((entry) => entry.id === value);
+      const currentStorage = String(draft.vm_storage_map?.[vmName] || "");
+      const storageAvailable = host?.storages?.some((storage) => storage.id === currentStorage);
+      const nextStorage = storageAvailable ? currentStorage : host?.preferredStorageId || "";
+      updateProvisionDraft(currentStep.id, {
+        vm_node_map: { ...(draft.vm_node_map || {}), [vmName]: value },
+        vm_storage_map: { ...(draft.vm_storage_map || {}), [vmName]: nextStorage },
+      });
+      setPlacementStatus(
+        storageAvailable
+          ? { tone: "", message: "" }
+          : {
+              tone: "warning",
+              message: `${vm.label} now uses ${nextStorage || "no storage"} because the previous storage is unavailable on ${value}.`,
+            }
+      );
+      return;
+    }
+
+    if (field === "storage") {
+      updateProvisionDraft(currentStep.id, {
+        vm_storage_map: { ...(draft.vm_storage_map || {}), [vmName]: value },
+      });
+      setPlacementStatus({ tone: "", message: "" });
+      return;
+    }
+
+    if (field === "memory_mb" || field === "disk_gb") {
+      if (!Number.isFinite(Number(value))) return;
+      const currentSize = board.vmSizeMap?.[vmName] || {
+        cpu: vm.cpu,
+        memory_mb: vm.memory_mb,
+        disk_gb: vm.disk_gb,
+      };
+      updateProvisionDraft(currentStep.id, {
+        vm_size_map: {
+          ...(draft.vm_size_map || {}),
+          [vmName]: { ...currentSize, [field]: value },
+        },
+      });
+      setPlacementStatus({ tone: "", message: "" });
+    }
   }
 
   function handleExportAnswers() {
@@ -2242,6 +2322,10 @@ function App() {
     currentStep?.id === "provision-nodes"
       ? validateProvisionVmIpRows(provisionVmIpRows)
       : { ok: true, error: "", invalidRows: [], duplicateRows: [] };
+  const provisionPlacementValidation =
+    currentStep?.id === "provision-nodes"
+      ? validateProvisionPlacementBoard(placementBoard)
+      : { ok: true, error: "", errors: [] };
   const provisionIpCheckSummary =
     currentStep?.id === "provision-nodes" && provisionIpCheckState.checkedAt
       ? summarizeProvisionIpCheckResults(
@@ -2287,8 +2371,42 @@ function App() {
     placementSuggestionKey,
     placementStatus.message,
   ]);
+  useEffect(() => {
+    if (currentStep?.id !== "provision-nodes" || !placementBoard?.vmPlan?.length) return;
+    const currentStorageMap =
+      currentDraft.vm_storage_map && typeof currentDraft.vm_storage_map === "object"
+        ? currentDraft.vm_storage_map
+        : {};
+    const hasCurrentPlacement = hasPlacementAssignments(currentDraft.vm_node_map);
+    const effectiveStorageMap = hasCurrentPlacement
+      ? placementBoard.vmStorageMap
+      : placementBoard.suggestedVmStorageMap;
+    const effectiveNodeMap = hasCurrentPlacement
+      ? placementBoard.vmNodeMap
+      : placementBoard.suggestedVmNodeMap;
+    const isComplete = placementBoard.vmPlan.every(
+      (vm) =>
+        String(currentStorageMap[vm.name] || "") === String(effectiveStorageMap?.[vm.name] || "") &&
+        String(currentDraft.vm_node_map?.[vm.name] || "") ===
+          String(effectiveNodeMap?.[vm.name] || "")
+    );
+    if (!isComplete && Object.keys(effectiveStorageMap || {}).length > 0) {
+      updateProvisionDraft(currentStep.id, {
+        vm_node_map: effectiveNodeMap,
+        vm_storage_map: effectiveStorageMap,
+      });
+    }
+  }, [
+    currentDraft.vm_node_map,
+    currentDraft.vm_storage_map,
+    currentStep?.id,
+    placementBoard,
+    updateProvisionDraft,
+  ]);
   const provisionStepValid =
-    currentStep?.id === "provision-nodes" ? provisionVmIpValidation.ok : true;
+    currentStep?.id === "provision-nodes"
+      ? provisionVmIpValidation.ok && provisionPlacementValidation.ok
+      : true;
   const questionInputsValid = currentStep
     ? (currentStep.inputs || []).every((input) => hasRequiredValue(input, currentDraft[input.id]))
     : false;
@@ -2354,7 +2472,11 @@ function App() {
   if (!hasStarted) {
     return (
       <div className="wizard-shell wizard-shell-start">
-        {renderTopBar({ onImportClick: handleImportClick, showImportButton: false })}
+        {renderTopBar({
+          imageTag: health?.image_tag,
+          onImportClick: handleImportClick,
+          showImportButton: false,
+        })}
         {isBootstrapping || error || notice ? (
           <div className={`wizard-banner ${error ? "is-error" : "is-notice"}`}>
             <div>
@@ -2408,7 +2530,11 @@ function App() {
 
   return (
     <div className="wizard-shell">
-      {renderTopBar({ onImportClick: handleImportClick, showImportButton })}
+      {renderTopBar({
+        imageTag: health?.image_tag,
+        onImportClick: handleImportClick,
+        showImportButton,
+      })}
       {isBootstrapping || error || notice ? (
         <div className={`wizard-banner ${error ? "is-error" : "is-notice"}`}>
           <div>
@@ -2741,7 +2867,13 @@ function App() {
                         setDraggingVmName("");
                       }}
                       onReset={applyProvisionPlacementHelp}
+                      onUpdateVm={updateVmConfiguration}
                     />
+                    {!provisionPlacementValidation.ok ? (
+                      <p className="wizard-network-check-summary is-danger" aria-live="polite">
+                        {provisionPlacementValidation.error}
+                      </p>
+                    ) : null}
                     {placementStatus.message ? (
                       <p
                         className={`wizard-network-check-summary is-${placementStatus.tone || "neutral"}`}

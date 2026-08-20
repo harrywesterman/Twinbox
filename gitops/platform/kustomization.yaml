@@ -10,6 +10,8 @@ resources:
   - authentik/cors-middleware.yaml
   - authentik/forwardauth-middleware.yaml
   - authentik/netbird-forwarded-headers-middleware.yaml
+  - authentik/opencloud-oidc-discovery-middleware.yaml
+  - authentik/opencloud-oidc-discovery-ingressroute.yaml
   - hubble/authentik-forwardauth-middleware.yaml
   - hubble/ingressroute.yaml
   - hubble/authentik-callback-ingressroute.yaml

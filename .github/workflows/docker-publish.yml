@@ -151,7 +151,7 @@ jobs:
                   "tags": "\n".join([
                       "type=raw,value=jitsi-openid-latest,enable={{is_default_branch}}",
                       "type=ref,event=tag,prefix=jitsi-openid-",
-                      "type=sha,prefix=jitsi-openid-",
+                      "type=sha,prefix=jitsi-openid-sha-",
                   ]),
               },
           ]
@@ -255,6 +255,22 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
+      - name: Verify Jitsi broker image is publicly pullable
+        if: matrix.image_name == 'twinbox-jitsi-openid' && github.ref == 'refs/heads/main'
+        run: |
+          image_tag="jitsi-openid-sha-${GITHUB_SHA:0:7}"
+          registry_token="$(
+            curl --fail --silent --show-error \
+              "https://ghcr.io/token?service=ghcr.io&scope=repository:harrywesterman/twinbox-manager-worker:pull" \
+              | jq -r '.token'
+          )"
+          [[ -n "$registry_token" && "$registry_token" != "null" ]]
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${registry_token}" \
+            -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json" \
+            "https://ghcr.io/v2/harrywesterman/twinbox-manager-worker/manifests/${image_tag}" \
+            >/dev/null
+
       - name: Record built image
         run: |
           mkdir -p built-images
@@ -350,83 +366,126 @@ jobs:
         id: sha
         run: echo "short=sha-${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
 
-      - name: Update all :latest references to pinned SHA tag
+      - name: Refresh pinned image references
         env:
           SHORT_SHA: ${{ steps.sha.outputs.short }}
         run: |
           python3 << 'PYEOF'
           import os
+          import re
 
           sha = os.environ['SHORT_SHA']
 
           replacements = {
               'gitops/platform-apps/twinbox-portal/kustomization.yaml': [
-                  ('newTag: latest', f'newTag: {sha}'),
+                  (r'newTag: (?:latest|sha-[0-9a-f]{7})', f'newTag: {sha}'),
               ],
               'gitops/platform-apps/twinbox-agents/kustomization.yaml': [
-                  ('newTag: latest', f'newTag: {sha}'),
+                  (r'newTag: (?:latest|sha-[0-9a-f]{7})', f'newTag: {sha}'),
               ],
               'gitops/platform-apps/dashy/deployment.yaml': [
                   (
-                      'ghcr.io/harrywesterman/twinbox-manager-worker:latest',
+                      r'ghcr\.io/harrywesterman/twinbox-manager-worker:(?:latest|sha-[0-9a-f]{7})',
                       f'ghcr.io/harrywesterman/twinbox-manager-worker:{sha}',
                   ),
               ],
-              'gitops/platform-apps/jitsi/auth-deployment.yaml': [
-                  (
-                      'ghcr.io/harrywesterman/twinbox-manager-worker:jitsi-openid-latest',
-                      f'ghcr.io/harrywesterman/twinbox-manager-worker:jitsi-openid-{sha}',
-                  ),
-              ],
               '.env.example': [
-                  ('TWINBOX_IMAGE_TAG=latest', f'TWINBOX_IMAGE_TAG={sha}'),
+                  (r'TWINBOX_IMAGE_TAG=(?:latest|sha-[0-9a-f]{7})', f'TWINBOX_IMAGE_TAG={sha}'),
               ],
               'wizard/setup-wizard.sh': [
-                  ('TWINBOX_IMAGE_TAG="latest"', f'TWINBOX_IMAGE_TAG="{sha}"'),
+                  (r'TWINBOX_IMAGE_TAG="(?:latest|sha-[0-9a-f]{7})"', f'TWINBOX_IMAGE_TAG="{sha}"'),
               ],
               'scripts/manager/sync-manager-api-node-allowlist.sh': [
                   (
-                      'TWINBOX_IMAGE_TAG:-latest}',
+                      r'TWINBOX_IMAGE_TAG:-(?:latest|sha-[0-9a-f]{7})}',
                       f'TWINBOX_IMAGE_TAG:-{sha}}}',
                   ),
               ],
               'scripts/manager-web-preview.sh': [
                   (
-                      'TWINBOX_VM_PREVIEW_IMAGE_TAG:-latest}',
+                      r'TWINBOX_VM_PREVIEW_IMAGE_TAG:-(?:latest|sha-[0-9a-f]{7})}',
                       f'TWINBOX_VM_PREVIEW_IMAGE_TAG:-{sha}}}',
                   ),
               ],
-              'tests/scripts/test_jitsi_integration_contract.py': [
-                  (
-                      'ghcr.io/harrywesterman/twinbox-manager-worker:jitsi-openid-latest',
-                      f'ghcr.io/harrywesterman/twinbox-manager-worker:jitsi-openid-{sha}',
-                  ),
-              ],
               'docs/troubleshooting.md': [
-                  ('twinbox-manager-api:latest', f'twinbox-manager-api:{sha}'),
-                  ('twinbox-manager-worker:latest', f'twinbox-manager-worker:{sha}'),
-                  ('twinbox-manager-web:latest', f'twinbox-manager-web:{sha}'),
+                  (r'twinbox-manager-api:(?:latest|sha-[0-9a-f]{7})', f'twinbox-manager-api:{sha}'),
+                  (r'twinbox-manager-worker:(?:latest|sha-[0-9a-f]{7})', f'twinbox-manager-worker:{sha}'),
+                  (r'twinbox-manager-web:(?:latest|sha-[0-9a-f]{7})', f'twinbox-manager-web:{sha}'),
               ],
               'docs/env-reference.md': [
-                  ('| `TWINBOX_IMAGE_TAG` | `latest` |', f'| `TWINBOX_IMAGE_TAG` | `{sha}` |'),
+                  (
+                      r'\| `TWINBOX_IMAGE_TAG` \| `(?:latest|sha-[0-9a-f]{7})` \|',
+                      f'| `TWINBOX_IMAGE_TAG` | `{sha}` |',
+                  ),
               ],
               'docs/configuration.md': [
-                  ('TWINBOX_IMAGE_TAG=latest', f'TWINBOX_IMAGE_TAG={sha}'),
+                  (r'TWINBOX_IMAGE_TAG=(?:latest|sha-[0-9a-f]{7})', f'TWINBOX_IMAGE_TAG={sha}'),
               ],
           }
 
           for filepath, patterns in replacements.items():
               with open(filepath) as f:
                   content = f.read()
-              for old, new in patterns:
-                  if old in content:
-                      content = content.replace(old, new)
-                      print(f"  {filepath}: replaced")
+              for pattern, new in patterns:
+                  content, count = re.subn(pattern, new, content)
+                  if count:
+                      print(f"  {filepath}: replaced {count} reference(s)")
 
               with open(filepath, 'w') as f:
                   f.write(content)
 
+          jitsi_deployment = 'gitops/platform-apps/jitsi/auth-deployment.yaml'
+          with open(jitsi_deployment) as f:
+              content = f.read()
+          content, replacements = re.subn(
+              r'ghcr\.io/harrywesterman/twinbox-manager-worker:jitsi-openid-(?:latest|sha-[0-9a-f]{7})',
+              f'ghcr.io/harrywesterman/twinbox-manager-worker:jitsi-openid-{sha}',
+              content,
+          )
+          if replacements:
+              with open(jitsi_deployment, 'w') as f:
+                  f.write(content)
+              print(f"  {jitsi_deployment}: refreshed Jitsi OpenID image pin")
+
           print("Done")
+
+          expected = {
+              '.env.example': [
+                  f'TWINBOX_IMAGE_TAG={sha}',
+              ],
+              'wizard/setup-wizard.sh': [
+                  f'TWINBOX_IMAGE_TAG="{sha}"',
+              ],
+              'scripts/manager/sync-manager-api-node-allowlist.sh': [
+                  f'TWINBOX_IMAGE_TAG:-{sha}}}',
+              ],
+              'scripts/manager-web-preview.sh': [
+                  f'TWINBOX_VM_PREVIEW_IMAGE_TAG:-{sha}}}',
+              ],
+              'docs/troubleshooting.md': [
+                  f'twinbox-manager-api:{sha}',
+                  f'twinbox-manager-worker:{sha}',
+                  f'twinbox-manager-web:{sha}',
+              ],
+              'docs/env-reference.md': [
+                  f'| `TWINBOX_IMAGE_TAG` | `{sha}` |',
+              ],
+              'docs/configuration.md': [
+                  f'TWINBOX_IMAGE_TAG={sha}',
+              ],
+          }
+          failures = []
+          for filepath, needles in expected.items():
+              with open(filepath) as f:
+                  content = f.read()
+              for needle in needles:
+                  if needle not in content:
+                      failures.append(f'{filepath}: missing {needle}')
+          if failures:
+              print('Pinned image reference validation failed:')
+              for failure in failures:
+                  print(f'  {failure}')
+              raise SystemExit(1)
           PYEOF
 
       - name: Commit and push if changed

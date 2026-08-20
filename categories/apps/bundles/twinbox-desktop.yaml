@@ -35,6 +35,18 @@ description: >
   **Audiobookshelf** — Self-hosted audiobook and podcast server with mobile apps.
 
   **Pixelfed** — Federated image sharing, a privacy-first alternative to Instagram.
+
+  **Stirling PDF** — PDF manipulation and editing tools with a clean web UI.
+
+  **Karakeep** — Save and organise interesting links, articles, and ideas into your own searchable knowledge archive.
+
+  **Mailu** — Self-hosted email with webmail, admin UI, and your own SMTP edge on the bastion.
+
+  **Mastodon** — A federated social network you own, with your own identity and moderation.
+
+  **Matrix** — End-to-end encrypted federated chat with the Element Server Suite.
+
+  **Nextcloud** — Your own private cloud for files, calendars, and collaboration.
 apps:
   - install-opencloud
   - install-outline
@@ -47,3 +59,8 @@ apps:
   - install-audiobookshelf
   - install-pixelfed
   - install-stirling-pdf
+  - install-karakeep
+  - install-mailu
+  - install-mastodon
+  - install-matrix
+  - install-nextcloud

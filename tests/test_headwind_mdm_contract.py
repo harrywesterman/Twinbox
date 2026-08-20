@@ -62,12 +62,18 @@ def test_bootstrap_gate_changes_initial_admin_before_public_ingress():
     assert 'argocd.argoproj.io/sync-wave: "10"' in bootstrap
     assert "ADMIN_PASSWORD" in bootstrap
     assert 'argocd.argoproj.io/sync-wave: "20"' in ingress
-    assert "PathPrefix(`/rest/public/`)" in ingress
-    assert "PathPrefix(`/files/`)" in ingress
+    assert "- websecure" in ingress
+    assert "Path(`/`)" in ingress
     assert "PathPrefix(`/rest/private/`)" not in ingress
     assert ".Values.ingress.managementHost" in ingress
-    assert 'await login("admin")' in reconciler
-    assert "/rest/private/users/superadmin/password" in reconciler
+    assert 'await initialLogin("admin")' in reconciler
+    assert "/rest/public/auth/login" in reconciler
+    assert "/rest/public/passwordReset/reset" in reconciler
+    assert "passwordResetToken" in reconciler
+    assert "/rest/public/jwt/login" in reconciler
+    assert "authorization: `Bearer ${session.token}`" in reconciler
+    assert 'initialLogin("admin")' in reconciler
+    assert "/rest/private/users/superadmin/password" not in reconciler
     assert "Twinbox Mobile" in (CHART / "templates" / "catalog-configmap.yaml").read_text(
         encoding="utf-8"
     )
@@ -92,6 +98,10 @@ def test_headwind_uses_openbao_cnpg_backup_and_netbird_management_route():
     assert "kind: ScheduledBackup" in backup
     assert '--service-name "headwind-mdm"' in runner
     assert '--service-domain "mdm-admin.${public_zone_name}"' in runner
+    assert '--service-name "headwind-mdm-enrollment"' in runner
+    assert '--service-domain "mdm.${public_zone_name}"' in runner
+    assert "--target-port 443" in runner
+    assert "--target-protocol https" in runner
     assert "HEADWIND_SHARED_SECRET" in runner
 
 
