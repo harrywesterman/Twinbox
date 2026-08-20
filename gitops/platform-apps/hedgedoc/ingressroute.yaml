@@ -26,6 +26,8 @@ spec:
   routes:
     - kind: Rule
       match: Host(`hedgedoc.__ZONE_NAME__`)
+      middlewares:
+        - name: hedgedoc-netbird-forwarded-headers
       services:
         - kind: Service
           name: hedgedoc

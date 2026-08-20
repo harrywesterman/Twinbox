@@ -23,7 +23,7 @@
 bash <(curl -fsSL https://raw.githubusercontent.com/harrywesterman/twinbox/main/wizard/setup-wizard.sh)
 ```
 
-For local development of the wizard itself:
+For running the wizard from this checkout against a Proxmox host:
 
 ```bash
 cp .env.wizard.local.example .env.wizard.local
@@ -31,7 +31,13 @@ cp .env.wizard.local.example .env.wizard.local
 make wizard-dev-run
 ```
 
-The dev runner uploads only the current local `wizard/setup-wizard.sh` to the Proxmox host and starts that copy over SSH with an interactive TTY. It does not sync other unpushed repository changes into the eventual Management VM clone.
+The dev runner fetches `origin/main`, uploads that `wizard/setup-wizard.sh` to the Proxmox host, and starts the uploaded copy over SSH with an interactive TTY. Before uploading, it patches the temporary copy with the matching published manager image tag. If `origin/main` has just moved and the images for that commit are still being published, the runner waits instead of starting a stale image.
+
+To test unpushed wizard changes deliberately, run:
+
+```bash
+WIZARD_DEV_SOURCE=local make wizard-dev-run
+```
 
 ## Validate Management VM
 

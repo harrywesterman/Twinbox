@@ -14,7 +14,7 @@ help:
 	@echo "  lint-fix         - Auto-fix lint issues"
 	@echo "  format           - Format code (JS + Python)"
 	@echo "  format-check     - Check formatting"
-	@echo "  wizard-dev-run   - Upload local wizard to Proxmox and run it via SSH"
+	@echo "  wizard-dev-run   - Upload current origin/main wizard to Proxmox and run it via SSH"
 
 install:
 	pip install -e .
