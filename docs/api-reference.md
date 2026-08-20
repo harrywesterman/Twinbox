@@ -6,7 +6,7 @@ The `manager-api` service runs an Express server on port 8080. All endpoints ret
 
 ### `GET /api/health`
 
-Returns `{ ok: true, time: "..." }`.
+Returns `{ ok: true, time: "...", image_tag: "sha-..." }`.
 
 ## Catalog
 

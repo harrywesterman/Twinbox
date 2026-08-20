@@ -1,3 +1,7 @@
+import shlex
+import subprocess
+import tempfile
+import textwrap
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -6,6 +10,72 @@ WIZARD_PATH = REPO_ROOT / "wizard" / "setup-wizard.sh"
 
 def _wizard_text() -> str:
     return WIZARD_PATH.read_text(encoding="utf-8")
+
+
+def test_setup_wizard_preserves_existing_file_datastore_content_when_enabling_snippets():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        log_file = root / "wizard.log"
+        pvesm_args_file = root / "pvesm.args"
+        harness = root / "harness.sh"
+        harness.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+
+                WIZARD_PATH={shlex.quote(str(WIZARD_PATH))}
+                LOG_FILE={shlex.quote(str(log_file))}
+                PVESM_ARGS_FILE={shlex.quote(str(pvesm_args_file))}
+
+                pvesh() {{
+                  printf '%s\\n' '{{"data":{{"content":"backup,import,iso,vztmpl"}}}}'
+                }}
+
+                pvesm() {{
+                  printf '%s\\n' "$*" > "$PVESM_ARGS_FILE"
+                }}
+
+                log_event() {{
+                  printf 'LOG:%s\\n' "$*" >> "$LOG_FILE"
+                }}
+
+                msg_error() {{
+                  printf 'ERROR:%s\\n' "$*" >> "$LOG_FILE"
+                  return 1
+                }}
+
+                awk '
+                  /^ensure_proxmox_file_datastore_content_types\\(\\) \\{{/ {{ emit = 1 }}
+                  emit {{ print }}
+                  emit && /^\\}}$/ {{ exit }}
+                ' "$WIZARD_PATH" > helper.sh
+                source helper.sh
+
+                PROXMOX_FILE_DATASTORE=local
+                ensure_proxmox_file_datastore_content_types
+                """
+            ),
+            encoding="utf-8",
+        )
+        harness.chmod(0o755)
+
+        proc = subprocess.run(
+            ["bash", str(harness)],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert proc.returncode == 0, proc.stderr
+        assert "LOG:Enabling snippets content on Proxmox storage local" in log_file.read_text(
+            encoding="utf-8"
+        )
+        assert (
+            pvesm_args_file.read_text(encoding="utf-8").strip()
+            == "set local --content backup,import,iso,vztmpl,snippets"
+        )
 
 
 def test_setup_wizard_registers_exit_cleanup_trap():
@@ -300,7 +370,7 @@ def test_setup_wizard_does_not_print_proxmox_api_credentials():
 def test_setup_wizard_grants_cloudinit_and_template_datastore_privileges():
     text = _wizard_text()
     assert (
-        "VM.Audit,VM.Monitor,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.Allocate,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use"
+        "VM.Audit,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.Allocate,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use"
         in text
     )
 
@@ -473,16 +543,19 @@ def test_setup_wizard_creates_dedicated_limited_proxmox_api_user():
     assert "apply_acl_with_retry()" in text
     assert 'pveum role add "$PROXMOX_ROLE"' in text
     assert (
-        "VM.Audit,VM.Monitor,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.Allocate,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use,Sys.Audit,Sys.Modify"
+        "VM.Audit,VM.Allocate,VM.Config.CPU,VM.Config.Disk,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Config.HWType,VM.Config.Cloudinit,VM.PowerMgmt,Datastore.Allocate,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,SDN.Use,Sys.Audit,Sys.Modify"
         in text
     )
     assert 'pveum aclmod "$path" -user "$user" -role "$role" 2>&1' in text
     assert 'if ! apply_acl_with_retry "/sdn" "$PROXMOX_USER" "$PROXMOX_ROLE" 10 1; then' in text
-    assert "ensure_proxmox_import_content_type()" in text
+    assert "ensure_proxmox_file_datastore_content_types()" in text
     assert 'pvesh get "/storage/${datastore}" --output-format json' in text
     assert 'pvesm set "$datastore" --content "$next_content"' in text
-    assert "Enabling import content on Proxmox storage ${datastore}" in text
-    assert "create_proxmox_api_user\n    ensure_proxmox_import_content_type" in text
+    assert 'next_content="$current_content"' in text
+    assert 'local required_content=("import" "snippets")' in text
+    assert "already allows import and snippets content" in text
+    assert "Enabling ${missing_list} content on Proxmox storage ${datastore}" in text
+    assert "create_proxmox_api_user\n    ensure_proxmox_file_datastore_content_types" in text
 
 
 def test_setup_wizard_supports_cluster_slug_selection_and_normalization():
