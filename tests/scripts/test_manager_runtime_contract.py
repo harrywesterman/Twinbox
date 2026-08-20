@@ -11,6 +11,7 @@ def test_docker_compose_mounts_categories_and_host_cron_contract():
     worker_block = text.split("  manager-worker:", 1)[1].split("\n  manager-web:", 1)[0]
 
     assert "WORKSPACE_ROOT=/opt/twinbox" in text
+    assert "TWINBOX_IMAGE_TAG=${TWINBOX_IMAGE_TAG:-unknown}" in api_block
     assert "MANAGER_API_TRUSTED_CIDRS=${MANAGER_API_TRUSTED_CIDRS:-" in text
     assert (
         "TWINBOX_GIT_REPO_URL=${TWINBOX_GIT_REPO_URL:-https://github.com/harrywesterman/Twinbox.git}"
