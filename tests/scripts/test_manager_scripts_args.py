@@ -2735,6 +2735,10 @@ def test_matrix_install_step_waits_on_specific_resources():
     assert "matrix_oidc_upstream_config=" in text
     assert "MATRIX_OIDC_UPSTREAM_CONFIG" in text
     assert "MATRIX_OIDC_ENABLED_IDPS" in text
+    assert (
+        '--required-keys "MAS_OIDC_CLIENT_ID,MAS_OIDC_CLIENT_SECRET,'
+        'MAS_OIDC_PROVIDER_ULID,MATRIX_OIDC_ENABLED_IDPS,MATRIX_OIDC_UPSTREAM_CONFIG"' in text
+    )
     assert 'wait_for_named_resource_ready "databases" "cluster" "matrix-synapse-db"' in text
     assert 'wait_for_named_resource_ready "databases" "cluster" "matrix-mas-db"' in text
     assert (
