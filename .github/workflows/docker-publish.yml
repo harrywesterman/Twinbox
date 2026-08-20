@@ -378,55 +378,58 @@ jobs:
 
           replacements = {
               'gitops/platform-apps/twinbox-portal/kustomization.yaml': [
-                  ('newTag: latest', f'newTag: {sha}'),
+                  (r'newTag: (?:latest|sha-[0-9a-f]{7})', f'newTag: {sha}'),
               ],
               'gitops/platform-apps/twinbox-agents/kustomization.yaml': [
-                  ('newTag: latest', f'newTag: {sha}'),
+                  (r'newTag: (?:latest|sha-[0-9a-f]{7})', f'newTag: {sha}'),
               ],
               'gitops/platform-apps/dashy/deployment.yaml': [
                   (
-                      'ghcr.io/harrywesterman/twinbox-manager-worker:latest',
+                      r'ghcr\.io/harrywesterman/twinbox-manager-worker:(?:latest|sha-[0-9a-f]{7})',
                       f'ghcr.io/harrywesterman/twinbox-manager-worker:{sha}',
                   ),
               ],
               '.env.example': [
-                  ('TWINBOX_IMAGE_TAG=latest', f'TWINBOX_IMAGE_TAG={sha}'),
+                  (r'TWINBOX_IMAGE_TAG=(?:latest|sha-[0-9a-f]{7})', f'TWINBOX_IMAGE_TAG={sha}'),
               ],
               'wizard/setup-wizard.sh': [
-                  ('TWINBOX_IMAGE_TAG="latest"', f'TWINBOX_IMAGE_TAG="{sha}"'),
+                  (r'TWINBOX_IMAGE_TAG="(?:latest|sha-[0-9a-f]{7})"', f'TWINBOX_IMAGE_TAG="{sha}"'),
               ],
               'scripts/manager/sync-manager-api-node-allowlist.sh': [
                   (
-                      'TWINBOX_IMAGE_TAG:-latest}',
+                      r'TWINBOX_IMAGE_TAG:-(?:latest|sha-[0-9a-f]{7})}',
                       f'TWINBOX_IMAGE_TAG:-{sha}}}',
                   ),
               ],
               'scripts/manager-web-preview.sh': [
                   (
-                      'TWINBOX_VM_PREVIEW_IMAGE_TAG:-latest}',
+                      r'TWINBOX_VM_PREVIEW_IMAGE_TAG:-(?:latest|sha-[0-9a-f]{7})}',
                       f'TWINBOX_VM_PREVIEW_IMAGE_TAG:-{sha}}}',
                   ),
               ],
               'docs/troubleshooting.md': [
-                  ('twinbox-manager-api:latest', f'twinbox-manager-api:{sha}'),
-                  ('twinbox-manager-worker:latest', f'twinbox-manager-worker:{sha}'),
-                  ('twinbox-manager-web:latest', f'twinbox-manager-web:{sha}'),
+                  (r'twinbox-manager-api:(?:latest|sha-[0-9a-f]{7})', f'twinbox-manager-api:{sha}'),
+                  (r'twinbox-manager-worker:(?:latest|sha-[0-9a-f]{7})', f'twinbox-manager-worker:{sha}'),
+                  (r'twinbox-manager-web:(?:latest|sha-[0-9a-f]{7})', f'twinbox-manager-web:{sha}'),
               ],
               'docs/env-reference.md': [
-                  ('| `TWINBOX_IMAGE_TAG` | `latest` |', f'| `TWINBOX_IMAGE_TAG` | `{sha}` |'),
+                  (
+                      r'\| `TWINBOX_IMAGE_TAG` \| `(?:latest|sha-[0-9a-f]{7})` \|',
+                      f'| `TWINBOX_IMAGE_TAG` | `{sha}` |',
+                  ),
               ],
               'docs/configuration.md': [
-                  ('TWINBOX_IMAGE_TAG=latest', f'TWINBOX_IMAGE_TAG={sha}'),
+                  (r'TWINBOX_IMAGE_TAG=(?:latest|sha-[0-9a-f]{7})', f'TWINBOX_IMAGE_TAG={sha}'),
               ],
           }
 
           for filepath, patterns in replacements.items():
               with open(filepath) as f:
                   content = f.read()
-              for old, new in patterns:
-                  if old in content:
-                      content = content.replace(old, new)
-                      print(f"  {filepath}: replaced")
+              for pattern, new in patterns:
+                  content, count = re.subn(pattern, new, content)
+                  if count:
+                      print(f"  {filepath}: replaced {count} reference(s)")
 
               with open(filepath, 'w') as f:
                   f.write(content)
@@ -445,6 +448,44 @@ jobs:
               print(f"  {jitsi_deployment}: refreshed Jitsi OpenID image pin")
 
           print("Done")
+
+          expected = {
+              '.env.example': [
+                  f'TWINBOX_IMAGE_TAG={sha}',
+              ],
+              'wizard/setup-wizard.sh': [
+                  f'TWINBOX_IMAGE_TAG="{sha}"',
+              ],
+              'scripts/manager/sync-manager-api-node-allowlist.sh': [
+                  f'TWINBOX_IMAGE_TAG:-{sha}}}',
+              ],
+              'scripts/manager-web-preview.sh': [
+                  f'TWINBOX_VM_PREVIEW_IMAGE_TAG:-{sha}}}',
+              ],
+              'docs/troubleshooting.md': [
+                  f'twinbox-manager-api:{sha}',
+                  f'twinbox-manager-worker:{sha}',
+                  f'twinbox-manager-web:{sha}',
+              ],
+              'docs/env-reference.md': [
+                  f'| `TWINBOX_IMAGE_TAG` | `{sha}` |',
+              ],
+              'docs/configuration.md': [
+                  f'TWINBOX_IMAGE_TAG={sha}',
+              ],
+          }
+          failures = []
+          for filepath, needles in expected.items():
+              with open(filepath) as f:
+                  content = f.read()
+              for needle in needles:
+                  if needle not in content:
+                      failures.append(f'{filepath}: missing {needle}')
+          if failures:
+              print('Pinned image reference validation failed:')
+              for failure in failures:
+                  print(f'  {failure}')
+              raise SystemExit(1)
           PYEOF
 
       - name: Commit and push if changed
