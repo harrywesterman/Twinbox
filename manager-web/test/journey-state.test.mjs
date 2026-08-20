@@ -396,7 +396,7 @@ test("wizard model advances to the next step when the active step is done", () =
     }),
     logs: [],
     cluster: { id: "cluster_demo", status: "provisioned" },
-    health: { ok: true },
+    health: { ok: true, image_tag: "sha-abcdef1" },
     error: "",
     busy: false,
     selectedStepId: "provision-nodes",
@@ -407,6 +407,16 @@ test("wizard model advances to the next step when the active step is done", () =
   assert.equal(model.primaryAction.label, "Next");
   assert.equal(model.progress.completedSteps, 1);
   assert.equal(model.healthBadges.find((badge) => badge.id === "cluster").value, "cluster_demo");
+  assert.deepEqual(
+    model.healthBadges.find((badge) => badge.id === "manager-image"),
+    {
+      id: "manager-image",
+      label: "Manager image",
+      value: "sha-abcdef1",
+      chip: "Pinned",
+      tone: "success",
+    }
+  );
   assert.equal(stepRailById["install-argocd"].icon, "🔁");
 });
 

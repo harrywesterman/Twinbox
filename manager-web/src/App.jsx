@@ -3,9 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import "./App.css";
 import heroIllustrationUrl from "./assets/hero-illustration.svg";
 import {
-  buildAutomaticProvisionPlacementResult,
   buildProvisionPlacementBoard,
-  buildScaledProvisionInputs,
   getProvisionNodeCount,
   formatMemoryMb,
   validateProvisionPlacementBoard,
@@ -398,38 +396,6 @@ function InputField({ stepId, input, value, onChange }) {
       </label>
     );
   }
-
-  if (
-    stepId === "provision-nodes" &&
-    (input.id === "scale_percent" || input.id === "worker_disk_percent")
-  ) {
-    const numericValue = Number.isFinite(Number(value))
-      ? Number(value)
-      : Number.isFinite(Number(input.default))
-        ? Number(input.default)
-        : 90;
-
-    return (
-      <label className="wizard-field wizard-field-range" htmlFor={controlId}>
-        <span className="wizard-field-range-head">
-          <span className="wizard-field-label">{input.label}</span>
-          <strong className="wizard-field-range-value">{numericValue}%</strong>
-        </span>
-        <input
-          id={controlId}
-          type="range"
-          min={input.min}
-          max={input.max}
-          step={1}
-          value={numericValue}
-          onChange={(event) => onChange(input.id, event.target.valueAsNumber)}
-        />
-        <small>{helpText}</small>
-        <em>{defaultLabel}</em>
-      </label>
-    );
-  }
-
   const inputType = input.type === "integer" ? "number" : "text";
 
   const fieldClassName = isDnsDomainField
@@ -476,15 +442,7 @@ function InputField({ stepId, input, value, onChange }) {
   );
 }
 
-const PROVISION_VM_INPUT_IDS = [
-  "scale_percent",
-  "worker_disk_percent",
-  "controlplane_count",
-  "worker_count",
-  "cpu_cores",
-  "memory_mb",
-  "start_vmid",
-];
+const PROVISION_VM_INPUT_IDS = ["controlplane_count", "worker_count", "start_vmid"];
 
 const PROVISION_NETWORK_INPUT_IDS = [
   "bridge",
@@ -873,7 +831,9 @@ function getWizardGuide(stepId) {
   );
 }
 
-function renderTopBar({ onImportClick, showImportButton = true } = {}) {
+function renderTopBar({ imageTag = "", onImportClick, showImportButton = true } = {}) {
+  const visibleImageTag = String(imageTag || "").trim();
+
   return (
     <header className="wizard-topbar">
       <div className="wizard-brand-lockup">
@@ -887,6 +847,9 @@ function renderTopBar({ onImportClick, showImportButton = true } = {}) {
         <p className="wizard-kicker">Guided cluster bootstrap</p>
       </div>
       <div className="wizard-topbar-actions">
+        {visibleImageTag ? (
+          <span className="wizard-runtime-tag">Manager image {visibleImageTag}</span>
+        ) : null}
         {showImportButton ? (
           <button className="button button-secondary" type="button" onClick={onImportClick}>
             Load saved answers
@@ -1591,19 +1554,23 @@ function App() {
       try {
         const effectiveDraft =
           draft && typeof draft === "object" ? draft : answersRef.current?.[currentStep.id] || {};
-        const result = buildAutomaticProvisionPlacementResult(
-          currentStep.inputs || [],
-          effectiveDraft,
-          proxmoxResources
-        );
+        const placement = await requestJson("/api/proxmox/placement-plan", {
+          method: "POST",
+          body: JSON.stringify({
+            name: effectiveDraft.name,
+            controlplane_count: effectiveDraft.controlplane_count,
+            worker_count: effectiveDraft.worker_count,
+          }),
+        });
+        const assigned = Object.keys(placement?.vm_node_map || {}).length;
         updateProvisionDraft(currentStep.id, {
-          vm_node_map: result.vm_node_map,
-          vm_size_map: {},
-          vm_storage_map: result.vm_storage_map,
+          vm_node_map: placement.vm_node_map || {},
+          vm_size_map: placement.vm_size_map || {},
+          vm_storage_map: placement.vm_storage_map || {},
         });
         setPlacementStatus({
-          tone: result.tone,
-          message: result.message,
+          tone: "success",
+          message: `Automatic placement assigned all ${assigned} Talos VMs.`,
         });
       } catch (error) {
         const message =
@@ -1615,7 +1582,7 @@ function App() {
         });
       }
     },
-    [currentStep, proxmoxResources, updateProvisionDraft]
+    [currentStep, updateProvisionDraft]
   );
 
   async function applyProvisionIpHelp() {
@@ -2027,7 +1994,7 @@ function App() {
   }
 
   function updateAnswer(stepId, inputId, value) {
-    if (stepId === "provision-nodes" && inputId !== "scale_percent") {
+    if (stepId === "provision-nodes") {
       provisionDirtyFieldsRef.current.add(inputId);
     }
 
@@ -2039,22 +2006,6 @@ function App() {
         ...currentStep,
         [inputId]: value,
       };
-
-      if (stepId === "provision-nodes" && inputId === "scale_percent") {
-        const currentScale = Number.isFinite(Number(value)) ? Number(value) : 90;
-        return {
-          ...current,
-          [stepId]: pruneProvisionVmMaps(
-            buildScaledProvisionInputs(
-              currentScale,
-              currentStep?.inputs || [],
-              nextStep,
-              provisionDirtyFieldsRef.current,
-              proxmoxResources
-            )
-          ),
-        };
-      }
 
       return {
         ...current,
@@ -2521,7 +2472,11 @@ function App() {
   if (!hasStarted) {
     return (
       <div className="wizard-shell wizard-shell-start">
-        {renderTopBar({ onImportClick: handleImportClick, showImportButton: false })}
+        {renderTopBar({
+          imageTag: health?.image_tag,
+          onImportClick: handleImportClick,
+          showImportButton: false,
+        })}
         {isBootstrapping || error || notice ? (
           <div className={`wizard-banner ${error ? "is-error" : "is-notice"}`}>
             <div>
@@ -2575,7 +2530,11 @@ function App() {
 
   return (
     <div className="wizard-shell">
-      {renderTopBar({ onImportClick: handleImportClick, showImportButton })}
+      {renderTopBar({
+        imageTag: health?.image_tag,
+        onImportClick: handleImportClick,
+        showImportButton,
+      })}
       {isBootstrapping || error || notice ? (
         <div className={`wizard-banner ${error ? "is-error" : "is-notice"}`}>
           <div>
