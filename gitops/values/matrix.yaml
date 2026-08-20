@@ -29,6 +29,13 @@ haproxy:
       memory: 200Mi
 
 synapse:
+  checkConfigHook:
+    resources:
+      requests:
+        memory: 50Mi
+        cpu: 10m
+      limits:
+        memory: 200Mi
   postgres:
     host: matrix-synapse-db-pooler-rw.databases.svc.cluster.local
     port: 5432

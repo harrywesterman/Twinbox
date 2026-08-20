@@ -1505,7 +1505,7 @@ def test_apply_argocd_application_helper_applies_and_waits_for_health():
     assert "Skipping namespace resource baseline for" in text
     assert "--no-wait" in text
     assert ".resource_profile // empty" in text
-    assert "(.worker_count // 0)" in text
+    assert "(.worker_cpu_total // 0)" in text
 
 
 def test_stirling_pdf_waits_for_real_kubernetes_readiness():
@@ -2700,6 +2700,9 @@ def test_matrix_haproxy_request_leaves_room_for_synapse_on_app_heavy_clusters():
     assert values["deploymentMarkers"]["resources"]["requests"]["cpu"] == "10m"
     assert values["deploymentMarkers"]["resources"]["requests"]["memory"] == "50Mi"
     assert values["deploymentMarkers"]["resources"]["limits"]["memory"] == "200Mi"
+    assert values["synapse"]["checkConfigHook"]["resources"]["requests"]["cpu"] == "10m"
+    assert values["synapse"]["checkConfigHook"]["resources"]["requests"]["memory"] == "50Mi"
+    assert values["synapse"]["checkConfigHook"]["resources"]["limits"]["memory"] == "200Mi"
 
 
 def test_matrix_ingressroutes_target_chart_services():
@@ -2732,6 +2735,10 @@ def test_matrix_install_step_waits_on_specific_resources():
     assert "matrix_oidc_upstream_config=" in text
     assert "MATRIX_OIDC_UPSTREAM_CONFIG" in text
     assert "MATRIX_OIDC_ENABLED_IDPS" in text
+    assert (
+        '--required-keys "MAS_OIDC_CLIENT_ID,MAS_OIDC_CLIENT_SECRET,'
+        'MAS_OIDC_PROVIDER_ULID,MATRIX_OIDC_ENABLED_IDPS,MATRIX_OIDC_UPSTREAM_CONFIG"' in text
+    )
     assert 'wait_for_named_resource_ready "databases" "cluster" "matrix-synapse-db"' in text
     assert 'wait_for_named_resource_ready "databases" "cluster" "matrix-mas-db"' in text
     assert (
