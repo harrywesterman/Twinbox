@@ -22,7 +22,7 @@ providers:
   file:
     enabled: true
     watch: true
-    content: |
+    content:
       http:
         middlewares:
           cloudflarewarp:
@@ -92,11 +92,11 @@ ingressRoute:
   dashboard:
     enabled: false
 
-logs:
-  general:
-    level: INFO
-  access:
-    enabled: true
+log:
+  level: INFO
+
+accessLog:
+  enabled: true
 
 metrics:
   prometheus:

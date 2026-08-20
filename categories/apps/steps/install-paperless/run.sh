@@ -155,6 +155,59 @@ create_or_update_application() {
   authentik_api_write POST "/core/applications/" "$application_payload" | jq -r '.pk // .id // empty'
 }
 
+find_scope_mapping_json_by_name_and_scope() {
+  local mapping_name="$1"
+  local scope_name="$2"
+  local response
+
+  response="$(authentik_api_get "/propertymappings/provider/scope/?page_size=200")"
+  jq -c \
+    --arg mapping_name "$mapping_name" \
+    --arg scope_name "$scope_name" \
+    '.results[]?
+      | select((.name // "") == $mapping_name and (.scope_name // "") == $scope_name)' \
+    <<<"$response" | head -n1
+}
+
+upsert_scope_mapping() {
+  local mapping_name="$1"
+  local scope_name="$2"
+  local description="$3"
+  local expression="$4"
+  local existing_json existing_pk payload
+
+  payload="$(
+    jq -n \
+      --arg name "$mapping_name" \
+      --arg scope_name "$scope_name" \
+      --arg description "$description" \
+      --arg expression "$expression" \
+      '{
+        name: $name,
+        scope_name: $scope_name,
+        description: $description,
+        expression: $expression
+      }'
+  )"
+
+  existing_json="$(find_scope_mapping_json_by_name_and_scope "$mapping_name" "$scope_name" || true)"
+  if [[ -n "$existing_json" ]]; then
+    existing_pk="$(jq -r '.pk // .id // empty' <<<"$existing_json")"
+    [[ -n "$existing_pk" ]] || fail "Could not determine Authentik scope mapping ID for ${mapping_name}"
+    authentik_api_write PATCH "/propertymappings/provider/scope/${existing_pk}/" "$payload" >/dev/null
+    printf '%s\n' "$existing_pk"
+    return 0
+  fi
+
+  authentik_api_write POST "/propertymappings/provider/scope/" "$payload" | jq -r '.pk // .id // empty'
+}
+
+ensure_paperless_admin_group() {
+  log "Ensuring Paperless admins group has all global permissions"
+  kubectl -n paperless exec deploy/paperless -- python3 manage.py shell -c \
+    'from django.contrib.auth.models import Group, Permission; group, _ = Group.objects.get_or_create(name="admins"); group.permissions.set(Permission.objects.all()); print(f"Paperless admins group ready with {group.permissions.count()} permissions")'
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
@@ -234,7 +287,7 @@ paperless_socialaccount_providers="$(
             }
           }
         ],
-        SCOPE: ["openid", "profile", "email"]
+        SCOPE: ["openid", "profile", "email", "groups"]
       }
     }'
 )"
@@ -278,6 +331,12 @@ invalidation_flow_id="$(authentik_resolve_flow_id "default-provider-invalidation
 openid_mapping_id="$(authentik_resolve_scope_mapping_id "openid")"
 email_mapping_id="$(authentik_resolve_scope_mapping_id "email")"
 profile_mapping_id="$(authentik_resolve_scope_mapping_id "profile")"
+paperless_groups_mapping_id="$(upsert_scope_mapping \
+  "Paperless administrators groups" \
+  "paperless-groups" \
+  "Expose the Twinbox admins group to Paperless-ngx" \
+  'return ["admins"] if ak_is_group_member(request.user, name="admins") else []' \
+)"
 signing_key_id="$(authentik_resolve_signing_key_id)"
 
 [[ -n "$authorization_flow_id" ]] || fail "Could not resolve Authentik authorization flow ID"
@@ -285,6 +344,7 @@ signing_key_id="$(authentik_resolve_signing_key_id)"
 [[ -n "$openid_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for openid"
 [[ -n "$email_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for email"
 [[ -n "$profile_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for profile"
+[[ -n "$paperless_groups_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for Paperless groups"
 [[ -n "$signing_key_id" ]] || fail "Could not resolve Authentik signing key ID for ${AUTHENTIK_SIGNING_KEY_NAME}"
 
 property_mappings_json="$(
@@ -292,7 +352,8 @@ property_mappings_json="$(
     --arg openid "$openid_mapping_id" \
     --arg email "$email_mapping_id" \
     --arg profile "$profile_mapping_id" \
-    '[$openid, $email, $profile]'
+    --arg groups "$paperless_groups_mapping_id" \
+    '[$openid, $email, $profile, $groups]'
 )"
 
 provider_payload="$(
@@ -361,6 +422,8 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
 bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
   --app-id "paperless" \
   --host "paperless-db-pooler-rw.databases.svc.cluster.local"
+
+ensure_paperless_admin_group
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \

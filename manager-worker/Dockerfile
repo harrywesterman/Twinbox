@@ -6,7 +6,7 @@ COPY config ./config
 COPY docker-compose.yml ./docker-compose.yml
 
 RUN apk update \
-  && apk add --no-cache bash ca-certificates curl docker-cli docker-cli-compose iptables jq iproute2 openssh-client openssl python3 tar xz sudo \
+  && apk add --no-cache bash ca-certificates curl docker-cli docker-cli-compose iptables jq iproute2 openssh-client openssl python3 tar xorriso xz sudo \
   && . /opt/twinbox/config/pinned-defaults.sh \
   && curl -fsSL "https://github.com/siderolabs/talos/releases/download/${PINNED_TALOS_VERSION}/talosctl-linux-amd64" -o /tmp/talosctl \
   && curl -fsSL "https://github.com/opentofu/opentofu/releases/download/${PINNED_OPENTOFU_VERSION}/tofu_${PINNED_OPENTOFU_VERSION#v}_linux_amd64.tar.gz" -o /tmp/tofu.tar.gz \
@@ -36,6 +36,11 @@ COPY gitops ./gitops
 COPY scripts/manager ./scripts/manager
 COPY scripts/get-talos-image-factory.sh ./scripts/get-talos-image-factory.sh
 COPY manager-web/src/assets/step-icons ./manager-web/src/assets/step-icons
+
+RUN cd /opt/twinbox/categories/apps/steps/install-nextcloud/eurooffice-file-action \
+  && npm ci \
+  && npm run build \
+  && rm -rf node_modules
 
 RUN chmod +x ./scripts/manager/*.sh
 RUN chmod +x ./scripts/get-talos-image-factory.sh

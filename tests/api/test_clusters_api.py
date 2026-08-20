@@ -68,9 +68,9 @@ def test_create_cluster_missing_required_fields():
             """#!/bin/sh
 cat <<'EOF'
 [
-  {"node": "pve-a", "status": "online", "vmid": 200},
-  {"node": "pve-b", "status": "online", "vmid": 201},
-  {"node": "pve-c", "status": "online", "vmid": 350}
+  {"node": "pve-a", "status": "online", "vmid": 200, "maxmem": 68719476736, "mem": 0, "maxcpu": 16, "maxdisk": 1099511627776, "disk": 0},
+  {"node": "pve-b", "status": "online", "vmid": 201, "maxmem": 68719476736, "mem": 0, "maxcpu": 16, "maxdisk": 1099511627776, "disk": 0},
+  {"node": "pve-c", "status": "online", "vmid": 350, "maxmem": 68719476736, "mem": 0, "maxcpu": 16, "maxdisk": 1099511627776, "disk": 0}
 ]
 EOF
 """,
@@ -112,8 +112,8 @@ def test_create_cluster_enqueues_job_and_persists_files():
             """#!/bin/sh
 cat <<'EOF'
 [
-  {"node": "pve-a", "status": "online"},
-  {"node": "pve-b", "status": "online"}
+  {"node": "pve-a", "status": "online", "maxmem": 68719476736, "mem": 0, "maxcpu": 16, "maxdisk": 1099511627776, "disk": 0},
+  {"node": "pve-b", "status": "online", "maxmem": 68719476736, "mem": 0, "maxcpu": 16, "maxdisk": 1099511627776, "disk": 0}
 ]
 EOF
 """,
@@ -178,8 +178,8 @@ EOF
             assert cluster["metadata"]["talos_image_preset"] == "qemu-guest-agent"
             assert cluster["vm_node_map"] == {
                 "cp-1": "pve-a",
-                "worker-1": "pve-b",
-                "worker-2": "pve-a",
+                "worker-1": "pve-a",
+                "worker-2": "pve-b",
             }
             assert cluster["metadata"]["secret_refs"]["proxmox"]["scope"] == "global"
             assert cluster["metadata"]["secret_refs"]["proxmox"]["item"] == "proxmox"
@@ -221,8 +221,8 @@ def test_bootstrap_cluster_rejects_cluster_instance_mismatch():
             """#!/bin/sh
 cat <<'EOF'
 [
-  {"node": "pve-a", "status": "online"},
-  {"node": "pve-b", "status": "online"}
+  {"node": "pve-a", "status": "online", "maxmem": 68719476736, "mem": 0, "maxcpu": 16, "maxdisk": 1099511627776, "disk": 0},
+  {"node": "pve-b", "status": "online", "maxmem": 68719476736, "mem": 0, "maxcpu": 16, "maxdisk": 1099511627776, "disk": 0}
 ]
 EOF
 """,
@@ -340,7 +340,7 @@ def test_update_cluster_observability_persists_profile_and_queues_job():
             proc.wait(timeout=5)
 
 
-def test_create_cluster_rejects_unknown_vm_hosts():
+def test_create_cluster_ignores_client_vm_node_map_and_computes_placement():
     with tempfile.TemporaryDirectory() as td:
         data_dir = Path(td) / "data"
         ping_mock = Path(td) / "mock-ping.sh"
@@ -351,8 +351,8 @@ def test_create_cluster_rejects_unknown_vm_hosts():
             """#!/bin/sh
 cat <<'EOF'
 [
-  {"node": "pve-a", "status": "online"},
-  {"node": "pve-b", "status": "online"}
+  {"node": "pve-a", "status": "online", "maxmem": 68719476736, "mem": 0, "maxcpu": 16, "maxdisk": 1099511627776, "disk": 0},
+  {"node": "pve-b", "status": "online", "maxmem": 68719476736, "mem": 0, "maxcpu": 16, "maxdisk": 1099511627776, "disk": 0}
 ]
 EOF
 """,
@@ -398,8 +398,13 @@ EOF
                 },
             }
             status, body = _post_json(f"http://127.0.0.1:{port}/api/clusters", payload)
-            assert status == 400
-            assert "unknown Proxmox host" in body["error"]
+            assert status == 202
+            cluster = json.loads((data_dir / "clusters" / f"{body['cluster_id']}.json").read_text())
+            assert cluster["vm_node_map"] == {
+                "cp-1": "pve-a",
+                "worker-1": "pve-a",
+                "worker-2": "pve-b",
+            }
         finally:
             proc.terminate()
             proc.wait(timeout=5)
@@ -513,8 +518,8 @@ def test_ip_suggestions_uses_cluster_slug_for_name_suggestion():
             """#!/bin/sh
 cat <<'EOF'
 [
-  {"node": "pve-a", "status": "online"},
-  {"node": "pve-b", "status": "online"}
+  {"node": "pve-a", "status": "online", "maxmem": 68719476736, "mem": 0, "maxcpu": 16, "maxdisk": 1099511627776, "disk": 0},
+  {"node": "pve-b", "status": "online", "maxmem": 68719476736, "mem": 0, "maxcpu": 16, "maxdisk": 1099511627776, "disk": 0}
 ]
 EOF
 """,
@@ -563,8 +568,8 @@ def test_ip_suggestions_filters_container_dns_and_placeholder_domain():
             """#!/bin/sh
 cat <<'EOF'
 [
-  {"node": "pve-a", "status": "online"},
-  {"node": "pve-b", "status": "online"}
+  {"node": "pve-a", "status": "online", "maxmem": 68719476736, "mem": 0, "maxcpu": 16, "maxdisk": 1099511627776, "disk": 0},
+  {"node": "pve-b", "status": "online", "maxmem": 68719476736, "mem": 0, "maxcpu": 16, "maxdisk": 1099511627776, "disk": 0}
 ]
 EOF
 """,
@@ -635,8 +640,8 @@ def test_create_cluster_accepts_empty_dns_domain():
             """#!/bin/sh
 cat <<'EOF'
 [
-  {"node": "pve-a", "status": "online"},
-  {"node": "pve-b", "status": "online"}
+  {"node": "pve-a", "status": "online", "maxmem": 68719476736, "mem": 0, "maxcpu": 16, "maxdisk": 1099511627776, "disk": 0},
+  {"node": "pve-b", "status": "online", "maxmem": 68719476736, "mem": 0, "maxcpu": 16, "maxdisk": 1099511627776, "disk": 0}
 ]
 EOF
 """,
@@ -707,8 +712,8 @@ esac
             """#!/bin/sh
 cat <<'EOF'
 [
-  {"node": "pve-a", "status": "online", "vmid": 200},
-  {"node": "pve-b", "status": "online", "vmid": 201}
+  {"node": "pve-a", "status": "online", "vmid": 200, "maxmem": 68719476736, "mem": 0, "maxcpu": 16, "maxdisk": 1099511627776, "disk": 0},
+  {"node": "pve-b", "status": "online", "vmid": 201, "maxmem": 68719476736, "mem": 0, "maxcpu": 16, "maxdisk": 1099511627776, "disk": 0}
 ]
 EOF
 """,
@@ -795,8 +800,8 @@ def test_create_cluster_rejects_invalid_static_network_inputs():
             """#!/bin/sh
 cat <<'EOF'
 [
-  {"node": "pve-a", "status": "online"},
-  {"node": "pve-b", "status": "online"}
+  {"node": "pve-a", "status": "online", "maxmem": 68719476736, "mem": 0, "maxcpu": 16, "maxdisk": 1099511627776, "disk": 0},
+  {"node": "pve-b", "status": "online", "maxmem": 68719476736, "mem": 0, "maxcpu": 16, "maxdisk": 1099511627776, "disk": 0}
 ]
 EOF
 """,

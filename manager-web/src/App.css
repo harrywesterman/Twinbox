@@ -1325,12 +1325,69 @@
   border: 1px solid rgba(148, 163, 184, 0.18);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.94));
   text-align: left;
-  cursor: grab;
   appearance: none;
 }
 
-.wizard-vm-card:active {
+.wizard-vm-card summary {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.wizard-vm-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.wizard-vm-card summary > span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.wizard-vm-drag-handle {
+  padding: 6px 9px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.96);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: grab;
+}
+
+.wizard-vm-drag-handle:active {
   cursor: grabbing;
+}
+
+.wizard-vm-editor {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.wizard-vm-editor label {
+  display: grid;
+  gap: 5px;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+}
+
+.wizard-vm-editor input,
+.wizard-vm-editor select {
+  min-width: 0;
+  width: 100%;
+  padding: 8px 9px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink-1);
+  font: inherit;
 }
 
 .wizard-vm-card.is-dragging {
@@ -1441,6 +1498,20 @@
 .wizard-status.is-live {
   background: rgba(20, 184, 166, 0.14);
   color: #0f766e;
+}
+
+.wizard-runtime-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .wizard-health-strip {

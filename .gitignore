@@ -8,6 +8,7 @@ node_modules/
 dist/
 build/
 site/
+/categories/apps/steps/install-nextcloud/eurooffice-file-action/js/
 
 __pycache__/
 *.py[cod]
