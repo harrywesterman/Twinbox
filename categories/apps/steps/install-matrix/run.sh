@@ -383,7 +383,7 @@ chmod 600 "$matrix_oidc_secret_file"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "matrix-oidc" \
   --json-file "$matrix_oidc_secret_file" \
-  --required-keys "MAS_OIDC_CLIENT_ID,MAS_OIDC_CLIENT_SECRET,MATRIX_OIDC_ENABLED_IDPS,MATRIX_OIDC_UPSTREAM_CONFIG"
+  --required-keys "MAS_OIDC_CLIENT_ID,MAS_OIDC_CLIENT_SECRET,MAS_OIDC_PROVIDER_ULID,MATRIX_OIDC_ENABLED_IDPS,MATRIX_OIDC_UPSTREAM_CONFIG"
 
 # Write DB secret
 matrix_db_secret_json="$(

@@ -17,8 +17,8 @@ import {
 } from "./common.js";
 import { normalizeVmStorageMap } from "./proxmox-capacity.js";
 
-const WORKER_DISK_MIN_GB = 10;
-const CONTROLPLANE_CPU_CORES = 2;
+const CONTROLPLANE_MEMORY_MB = 5120;
+const CONTROLPLANE_DISK_GB = 10;
 const OBSERVABILITY_PROFILES = new Set(["full", "minimal", "off"]);
 const RESOURCE_PROFILES = new Set(["small", "standard", "large"]);
 const STANDARD_WORKER_CPU_CORES = 16;
@@ -68,36 +68,19 @@ export function normalizeResourceProfile(rawProfile) {
   return "standard";
 }
 
-function summarizeWorkerCapacity(workerCount, cpuCores, workerMemoryMb, vmSizeMap = {}) {
+export function deriveClusterResourceProfile({ vm_size_map: vmSizeMap = {} } = {}) {
   const workerEntries = Object.entries(vmSizeMap || {}).filter(([name]) =>
     String(name || "").startsWith("worker-")
   );
+  const capacity = workerEntries.reduce(
+    (summary, [, value]) => ({
+      cpu: summary.cpu + (Number(value?.cpu) || 0),
+      memoryMb: summary.memoryMb + (Number(value?.memory_mb) || 0),
+    }),
+    { cpu: 0, memoryMb: 0 }
+  );
 
-  if (workerEntries.length > 0) {
-    return workerEntries.reduce(
-      (summary, [, value]) => ({
-        cpu: summary.cpu + (Number(value?.cpu) || 0),
-        memoryMb: summary.memoryMb + (Number(value?.memory_mb) || 0),
-      }),
-      { cpu: 0, memoryMb: 0 }
-    );
-  }
-
-  return {
-    cpu: Math.max(0, Number(workerCount) || 0) * Math.max(0, Number(cpuCores) || 0),
-    memoryMb: Math.max(0, Number(workerCount) || 0) * Math.max(0, Number(workerMemoryMb) || 0),
-  };
-}
-
-export function deriveClusterResourceProfile({
-  worker_count: workerCount,
-  cpu_cores: cpuCores,
-  memory_mb: workerMemoryMb,
-  vm_size_map: vmSizeMap = {},
-} = {}) {
-  const capacity = summarizeWorkerCapacity(workerCount, cpuCores, workerMemoryMb, vmSizeMap);
   let resourceProfile = "small";
-
   if (capacity.cpu >= LARGE_WORKER_CPU_CORES && capacity.memoryMb >= LARGE_WORKER_MEMORY_MB) {
     resourceProfile = "large";
   } else if (
@@ -151,67 +134,16 @@ function buildAllowedHostLookup(allowedHosts = []) {
   return lookup;
 }
 
-function buildDefaultVmNodeMap(
-  controlplaneCount,
-  workerCount,
-  allowedHosts = [],
-  fallbackHost = "pve"
-) {
-  const hostList = Array.isArray(allowedHosts)
-    ? allowedHosts.map((host) => String(host || "").trim()).filter(Boolean)
+function normalizeVmNodeMap(rawMap, allowedHosts = [], vmNames = []) {
+  const vmNameList = Array.isArray(vmNames)
+    ? vmNames.map((name) => String(name || "").trim()).filter(Boolean)
     : [];
-  const placementHosts =
-    hostList.length > 0 ? hostList : [String(fallbackHost || "").trim() || "pve"];
-  const vmNodeMap = {};
-  const vmNames = [];
-
-  for (let index = 1; index <= Math.max(1, Number(controlplaneCount) || 0); index += 1) {
-    vmNames.push(`cp-${index}`);
+  if (vmNameList.length === 0) {
+    return { ok: false, error: "vm_node_map cannot be built without VM names" };
   }
-  for (let index = 1; index <= Math.max(0, Number(workerCount) || 0); index += 1) {
-    vmNames.push(`worker-${index}`);
-  }
-
-  for (let index = 0; index < vmNames.length; index += 1) {
-    vmNodeMap[vmNames[index]] = placementHosts[index % placementHosts.length];
-  }
-
-  return vmNodeMap;
-}
-
-function buildDefaultVmSizeMap(controlplaneCount, workerCount, cpuCores, workerMemoryMb) {
-  const vmSizeMap = {};
-  const workerDiskGb = WORKER_DISK_MIN_GB;
-
-  for (let index = 1; index <= Math.max(1, Number(controlplaneCount) || 0); index += 1) {
-    vmSizeMap[`cp-${index}`] = {
-      cpu: CONTROLPLANE_CPU_CORES,
-      memory_mb: 5120,
-      disk_gb: 10,
-    };
-  }
-
-  for (let index = 1; index <= Math.max(0, Number(workerCount) || 0); index += 1) {
-    vmSizeMap[`worker-${index}`] = {
-      cpu: cpuCores,
-      memory_mb: workerMemoryMb,
-      disk_gb: workerDiskGb,
-    };
-  }
-
-  return vmSizeMap;
-}
-
-function normalizeVmNodeMap(rawMap, allowedHosts = [], fallbackHost = "pve", vmNames = []) {
-  const defaultMap = buildDefaultVmNodeMap(
-    vmNames.filter((name) => String(name).startsWith("cp-")).length,
-    vmNames.filter((name) => String(name).startsWith("worker-")).length,
-    allowedHosts,
-    fallbackHost
-  );
 
   if (rawMap === null || rawMap === undefined || rawMap === "") {
-    return { ok: true, value: defaultMap };
+    return { ok: false, error: "vm_node_map is required" };
   }
 
   let candidate = rawMap;
@@ -228,37 +160,30 @@ function normalizeVmNodeMap(rawMap, allowedHosts = [], fallbackHost = "pve", vmN
   }
 
   const allowedHostLookup = buildAllowedHostLookup(allowedHosts);
-  const normalized = { ...defaultMap };
+  const normalized = {};
 
-  for (const [vmName, hostName] of Object.entries(candidate)) {
-    const normalizedVmName = String(vmName || "").trim();
-    if (!normalizedVmName) {
-      continue;
-    }
-
-    const normalizedHostName = String(hostName || "").trim();
-    if (!normalizedHostName) {
-      return { ok: false, error: `vm_node_map entry ${normalizedVmName} must map to a host name` };
+  for (const vmName of vmNameList) {
+    const hostName = String(candidate[vmName] ?? "").trim();
+    if (!hostName) {
+      return { ok: false, error: `vm_node_map is missing an entry for ${vmName}` };
     }
 
     const resolvedHost =
-      allowedHostLookup.size > 0
-        ? allowedHostLookup.get(normalizedHostName.toLowerCase())
-        : normalizedHostName;
+      allowedHostLookup.size > 0 ? allowedHostLookup.get(hostName.toLowerCase()) : hostName;
 
     if (allowedHostLookup.size > 0 && !resolvedHost) {
       return {
         ok: false,
-        error: `vm_node_map references unknown Proxmox host ${normalizedHostName}`,
+        error: `vm_node_map references unknown Proxmox host ${hostName}`,
       };
     }
 
-    normalized[normalizedVmName] = resolvedHost;
+    normalized[vmName] = resolvedHost;
   }
 
-  for (const vmName of vmNames) {
-    if (!Object.prototype.hasOwnProperty.call(normalized, vmName)) {
-      normalized[vmName] = defaultMap[vmName];
+  for (const key of Object.keys(candidate)) {
+    if (!vmNameList.includes(String(key || "").trim())) {
+      return { ok: false, error: `vm_node_map contains unknown VM ${String(key || "").trim()}` };
     }
   }
 
@@ -340,7 +265,15 @@ function normalizeVmIpMap(rawMap, vmNames = [], fallbackStartIp = "") {
   return { ok: true, value: normalized };
 }
 
-function normalizeVmSizeMap(rawMap, vmNames = [], cpuCores = 2, workerMemoryMb = 10240) {
+function parsePositiveInteger(value, field) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return { ok: false, error: `${field} must be a positive integer` };
+  }
+  return { ok: true, value: parsed };
+}
+
+function normalizeVmSizeMap(rawMap, vmNames = []) {
   const vmNameList = Array.isArray(vmNames)
     ? vmNames.map((name) => String(name || "").trim()).filter(Boolean)
     : [];
@@ -348,15 +281,8 @@ function normalizeVmSizeMap(rawMap, vmNames = [], cpuCores = 2, workerMemoryMb =
     return { ok: false, error: "vm_size_map cannot be built without VM names" };
   }
 
-  const defaultMap = buildDefaultVmSizeMap(
-    vmNameList.filter((name) => name.startsWith("cp-")).length,
-    vmNameList.filter((name) => name.startsWith("worker-")).length,
-    cpuCores,
-    workerMemoryMb
-  );
-
   if (rawMap === null || rawMap === undefined || rawMap === "") {
-    return { ok: true, value: defaultMap };
+    return { ok: false, error: "vm_size_map is required" };
   }
 
   let candidate = rawMap;
@@ -372,49 +298,31 @@ function normalizeVmSizeMap(rawMap, vmNames = [], cpuCores = 2, workerMemoryMb =
     return { ok: false, error: "vm_size_map must be an object" };
   }
 
-  const normalized = { ...defaultMap };
-  const seenKeys = new Set();
+  const normalized = {};
 
-  for (const [vmName, value] of Object.entries(candidate)) {
-    const normalizedVmName = String(vmName || "").trim();
-    if (!normalizedVmName) {
-      continue;
-    }
-    if (!vmNameList.includes(normalizedVmName)) {
-      return { ok: false, error: `vm_size_map contains unknown VM ${normalizedVmName}` };
-    }
+  for (const vmName of vmNameList) {
+    const value = candidate[vmName];
     if (!value || typeof value !== "object" || Array.isArray(value)) {
-      return { ok: false, error: `vm_size_map entry ${normalizedVmName} must be an object` };
+      return { ok: false, error: `vm_size_map is missing an entry for ${vmName}` };
     }
 
-    const parsedCpu = parseIntInRange(value.cpu, `vm_size_map.${normalizedVmName}.cpu`, 1, 64);
-    const parsedMemory = parseIntInRange(
-      value.memory_mb,
-      `vm_size_map.${normalizedVmName}.memory_mb`,
-      512,
-      1048576
-    );
-    const parsedDisk = parseIntInRange(
-      value.disk_gb,
-      `vm_size_map.${normalizedVmName}.disk_gb`,
-      10,
-      8192
-    );
+    const parsedCpu = parsePositiveInteger(value.cpu, `vm_size_map.${vmName}.cpu`);
+    const parsedMemory = parsePositiveInteger(value.memory_mb, `vm_size_map.${vmName}.memory_mb`);
+    const parsedDisk = parsePositiveInteger(value.disk_gb, `vm_size_map.${vmName}.disk_gb`);
     if (!parsedCpu.ok) return { ok: false, error: parsedCpu.error };
     if (!parsedMemory.ok) return { ok: false, error: parsedMemory.error };
     if (!parsedDisk.ok) return { ok: false, error: parsedDisk.error };
 
-    normalized[normalizedVmName] = {
+    normalized[vmName] = {
       cpu: parsedCpu.value,
       memory_mb: parsedMemory.value,
       disk_gb: parsedDisk.value,
     };
-    seenKeys.add(normalizedVmName);
   }
 
-  for (const vmName of vmNameList) {
-    if (!seenKeys.has(vmName)) {
-      normalized[vmName] = defaultMap[vmName];
+  for (const key of Object.keys(candidate)) {
+    if (!vmNameList.includes(String(key || "").trim())) {
+      return { ok: false, error: `vm_size_map contains unknown VM ${String(key || "").trim()}` };
     }
   }
 
@@ -430,14 +338,6 @@ export function buildClusterFromRequest(
   const parsedBridge = parseRequiredString(body.bridge, "bridge");
   const parsedControlplanes = parseIntInRange(body.controlplane_count, "controlplane_count", 1, 15);
   const parsedWorkers = parseIntInRange(body.worker_count, "worker_count", 0, 200);
-  const parsedCpu = parseIntInRange(body.cpu_cores, "cpu_cores", 1, 64);
-  const parsedMemory = parseIntInRange(body.memory_mb, "memory_mb", 512, 1048576);
-  const parsedWorkerDiskPercent = parseIntInRange(
-    body.worker_disk_percent ?? 100,
-    "worker_disk_percent",
-    10,
-    100
-  );
   const parsedStartVmid = parseIntInRange(body.start_vmid, "start_vmid", 100, 999999);
   const parsedVipIp = parseIPv4(body.vip_ip, "vip_ip");
   const parsedNodePrefixLength = parseIntInRange(
@@ -458,18 +358,8 @@ export function buildClusterFromRequest(
     vmNames,
     String(body.start_ip || "").trim()
   );
-  const parsedVmSizeMap = normalizeVmSizeMap(
-    body.vm_size_map,
-    vmNames,
-    parsedCpu.value,
-    parsedMemory.value
-  );
-  const parsedVmNodeMap = normalizeVmNodeMap(
-    body.vm_node_map,
-    allowedVmHosts,
-    body.proxmox_node || env.PROXMOX_NODE || "pve",
-    vmNames
-  );
+  const parsedVmSizeMap = normalizeVmSizeMap(body.vm_size_map, vmNames);
+  const parsedVmNodeMap = normalizeVmNodeMap(body.vm_node_map, allowedVmHosts, vmNames);
   const preferredStorage =
     String(body.storage_pool || env.PROXMOX_STORAGE_POOL || "local-lvm").trim() || "local-lvm";
   const parsedVmStorageMap = parsedVmNodeMap.ok
@@ -487,9 +377,6 @@ export function buildClusterFromRequest(
     parsedBridge,
     parsedControlplanes,
     parsedWorkers,
-    parsedCpu,
-    parsedMemory,
-    parsedWorkerDiskPercent,
     parsedStartVmid,
     parsedVipIp,
     parsedNodePrefixLength,
@@ -519,13 +406,10 @@ export function buildClusterFromRequest(
     file_datastore: body.file_datastore || env.PROXMOX_FILE_DATASTORE || "local",
     cluster_slug: normalizedName.slug,
     talos_image_preset: env.TALOS_IMAGE_PRESET || "qemu-guest-agent",
-    talos_image_platform: env.TALOS_IMAGE_PLATFORM || "cloud-server",
+    talos_image_platform: env.TALOS_IMAGE_PLATFORM || "nocloud",
     talos_image_arch: env.TALOS_IMAGE_ARCH || "amd64",
   };
   const resourceProfile = deriveClusterResourceProfile({
-    worker_count: parsedWorkers.value,
-    cpu_cores: parsedCpu.value,
-    memory_mb: parsedMemory.value,
     vm_size_map: parsedVmSizeMap.value,
   });
 
@@ -538,13 +422,10 @@ export function buildClusterFromRequest(
       name: normalizedName.name,
       controlplane_count: parsedControlplanes.value,
       worker_count: parsedWorkers.value,
-      cpu_cores: parsedCpu.value,
-      memory_mb: parsedMemory.value,
-      worker_disk_percent: parsedWorkerDiskPercent.value,
-      controlplane_memory_mb: 5120,
-      controlplane_disk_gb: 10,
-      worker_memory_mb: parsedMemory.value,
-      worker_disk_gb: parsedVmSizeMap.value["worker-1"]?.disk_gb ?? 100,
+      controlplane_memory_mb: CONTROLPLANE_MEMORY_MB,
+      controlplane_disk_gb: CONTROLPLANE_DISK_GB,
+      worker_memory_mb: parsedVmSizeMap.value["worker-1"]?.memory_mb ?? 0,
+      worker_disk_gb: parsedVmSizeMap.value["worker-1"]?.disk_gb ?? 0,
       bridge: parsedBridge.value,
       start_vmid: parsedStartVmid.value,
       vip_ip: parsedVipIp.value,

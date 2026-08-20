@@ -46,7 +46,10 @@ export PROXMOX_PASSWORD
 
 command -v jq >/dev/null 2>&1 || fail "jq not found"
 command -v curl >/dev/null 2>&1 || fail "curl not found"
+command -v python3 >/dev/null 2>&1 || fail "python3 not found"
 command -v xz >/dev/null 2>&1 || fail "xz not found"
+command -v xorriso >/dev/null 2>&1 || fail "xorriso not found"
+command -v timeout >/dev/null 2>&1 || fail "timeout not found"
 TOFU_BIN="${TOFU_BIN:-tofu}"
 command -v "$TOFU_BIN" >/dev/null 2>&1 || fail "tofu not found"
 command -v talosctl >/dev/null 2>&1 || fail "talosctl not found"
@@ -64,6 +67,7 @@ PROXMOX_UPLOAD_MAX_ATTEMPTS="${PROXMOX_UPLOAD_MAX_ATTEMPTS:-5}"
 # corrupt import. This permits just over three minutes of settling time.
 PROXMOX_VERIFY_MAX_ATTEMPTS="${PROXMOX_VERIFY_MAX_ATTEMPTS:-24}"
 PROXMOX_IMPORT_FREE_SPACE_BUFFER_BYTES="${PROXMOX_IMPORT_FREE_SPACE_BUFFER_BYTES:-1073741824}"
+TALOS_API_CHECK_TIMEOUT_SECONDS="${TALOS_API_CHECK_TIMEOUT_SECONDS:-10}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -351,10 +355,13 @@ managed_vm_ids_from_state() {
   ' "$state_file" 2>/dev/null | sort -n | uniq
 }
 
-validate_file_datastore_import_content() {
+validate_file_datastore_content() {
   local datastore="$1"
+  shift
   local storage_json=""
   local content=""
+  local required=""
+  local missing=()
 
   proxmox_api_login
   storage_json="$(curl -ksS --fail \
@@ -363,9 +370,23 @@ validate_file_datastore_import_content() {
     "${TF_VAR_proxmox_endpoint}/api2/json/storage/${datastore}")" || fail "Failed to inspect Proxmox storage ${datastore}"
 
   content="$(jq -r '.data.content // ""' <<<"$storage_json")"
-  if [[ ",${content}," != *",import,"* ]]; then
-    fail "Proxmox file datastore ${datastore} must allow Import content for Talos disk-image provisioning. Re-run the setup wizard or enable Import under Datacenter > Storage."
+  for required in "$@"; do
+    if [[ ",${content}," != *",${required},"* ]]; then
+      missing+=("$required")
+    fi
+  done
+
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    fail "Proxmox file datastore ${datastore} must allow ${missing[*]} content for Talos disk-image and NoCloud ISO provisioning. Re-run the setup wizard or enable the missing content types under Datacenter > Storage."
   fi
+}
+
+validate_file_datastore_import_content() {
+  validate_file_datastore_content "$1" import
+}
+
+validate_file_datastore_provisioning_content() {
+  validate_file_datastore_content "$1" import iso
 }
 
 proxmox_get_storage_content() {
@@ -680,6 +701,345 @@ upload_talos_image_to_nodes() {
   log "Talos disk image upload summary: succeeded=${success_nodes[*]:-none}; failed=none"
 }
 
+urlencode() {
+  python3 - "$1" <<'PY'
+import sys
+import urllib.parse
+
+print(urllib.parse.quote(sys.argv[1], safe=""))
+PY
+}
+
+cidata_content_hash() {
+  python3 - "$@" <<'PY'
+import hashlib
+import pathlib
+import sys
+
+digest = hashlib.sha256()
+for raw_path in sys.argv[1:]:
+    path = pathlib.Path(raw_path)
+    digest.update(path.name.encode("utf-8"))
+    digest.update(b"\0")
+    digest.update(path.read_bytes())
+    digest.update(b"\0")
+print(digest.hexdigest()[:16])
+PY
+}
+
+prefix_to_netmask() {
+  python3 - "$1" <<'PY'
+import ipaddress
+import sys
+
+print(ipaddress.IPv4Network(f"0.0.0.0/{sys.argv[1]}").netmask)
+PY
+}
+
+render_nocloud_network_config() {
+  local output_file="$1"
+  local ip="$2"
+  local mac="$3"
+  local netmask=""
+
+  netmask="$(prefix_to_netmask "${NODE_PREFIX_LENGTH:-24}")"
+  {
+    echo "version: 1"
+    echo "config:"
+    echo "  - type: physical"
+    echo "    name: eth0"
+    echo "    mac_address: \"${mac}\""
+    echo "    subnets:"
+    echo "      - type: static"
+    echo "        address: ${ip}"
+    echo "        netmask: ${netmask}"
+    echo "        gateway: ${GATEWAY_IP}"
+  } > "$output_file"
+}
+
+build_nocloud_iso() {
+  local name="$1"
+  local type="$2"
+  local ip="$3"
+  local mac="$4"
+  local config_file="$runtime_talos_dir/${name}-${type}.yaml"
+  local node_dir="$runtime_talos_dir/nocloud/${name}"
+  local files_dir="$node_dir/files"
+  local user_data_file="$files_dir/user-data"
+  local meta_data_file="$files_dir/meta-data"
+  local network_config_file="$files_dir/network-config"
+  local cidata_hash=""
+  local iso_name=""
+  local iso_path=""
+
+  [[ -s "$config_file" ]] || fail "Talos machine config not found for ${name}: ${config_file}"
+
+  rm -rf "$files_dir"
+  mkdir -p "$files_dir"
+  cp "$config_file" "$user_data_file"
+  {
+    echo "instance-id: ${NAME}-${name}"
+    echo "local-hostname: ${NAME}-${name}"
+  } > "$meta_data_file"
+  render_nocloud_network_config "$network_config_file" "$ip" "$mac"
+
+  cidata_hash="$(cidata_content_hash "$user_data_file" "$meta_data_file" "$network_config_file")"
+  iso_name="talos-${CLUSTER_ID}-${name}-${cidata_hash}.iso"
+  iso_path="$node_dir/${iso_name}"
+  (
+    cd "$files_dir"
+    xorriso -as mkisofs -output "$iso_path" -volid cidata -joliet -rock user-data meta-data network-config >/dev/null
+  ) || fail "Failed to build NoCloud cidata ISO for ${name}"
+
+  printf '%s\t%s\n' "$iso_path" "$iso_name"
+}
+
+proxmox_storage_file_size() {
+  local node="$1"
+  local datastore="$2"
+  local content_type="$3"
+  local file_name="$4"
+  local expected_volid="${datastore}:${content_type}/${file_name}"
+  local content_json=""
+  local file_size=""
+
+  if ! content_json="$(proxmox_get_storage_content "$node" "$datastore")"; then
+    PROXMOX_TALOS_IMAGE_ERROR="Failed to read Proxmox storage content for ${node}/${datastore}"
+    return 2
+  fi
+
+  file_size="$(jq -r --arg volid "$expected_volid" --arg content "$content_type" '
+    [.data[]? | select(.volid == $volid and .content == $content) | (.size // empty)]
+    | .[0] // ""
+  ' <<<"$content_json")"
+
+  [[ -n "$file_size" ]] || return 1
+  printf '%s\n' "$file_size"
+}
+
+proxmox_delete_storage_file() {
+  local node="$1"
+  local datastore="$2"
+  local volid="$3"
+  local node_endpoint=""
+  local encoded_volid=""
+
+  node_endpoint="$(proxmox_node_endpoint "$node")"
+  encoded_volid="$(urlencode "$volid")"
+  proxmox_api_login
+  curl -ksS --fail \
+    --request DELETE \
+    --cookie "$PROXMOX_TICKET_COOKIE" \
+    --header "CSRFPreventionToken: ${PROXMOX_CSRF_TOKEN}" \
+    "${node_endpoint}/api2/json/nodes/${node}/storage/${datastore}/content/${encoded_volid}" >/dev/null
+}
+
+proxmox_upload_cidata_iso() {
+  local node="$1"
+  local datastore="$2"
+  local iso_path="$3"
+  local iso_name="$4"
+  local node_endpoint=""
+  local upload_url=""
+  local attempt=1
+
+  node_endpoint="$(proxmox_node_endpoint "$node")"
+  upload_url="${node_endpoint}/api2/json/nodes/${node}/storage/${datastore}/upload"
+
+  while true; do
+    proxmox_api_login
+
+    local response_file=""
+    local response_body=""
+    local http_code=""
+    local curl_exit=0
+    response_file="$(mktemp)"
+
+    if http_code="$(
+      curl -ksS --show-error \
+        --output "$response_file" \
+        --write-out '%{http_code}' \
+        --header "Expect:" \
+        --cookie "$PROXMOX_TICKET_COOKIE" \
+        --header "CSRFPreventionToken: ${PROXMOX_CSRF_TOKEN}" \
+        --form "content=iso" \
+        --form "filename=@${iso_path};filename=${iso_name}" \
+        "$upload_url"
+    )"; then
+      curl_exit=0
+    else
+      curl_exit=$?
+    fi
+
+    response_body="$(tr -d '\r' <"$response_file" | head -c 500 || true)"
+    rm -f "$response_file"
+
+    if [[ "$curl_exit" -eq 0 && "$http_code" == 2* ]]; then
+      log "Uploaded Talos NoCloud cidata ISO to ${node}/${datastore}: ${iso_name}"
+      PROXMOX_TALOS_IMAGE_ERROR=""
+      return 0
+    fi
+
+    local reason=""
+    if [[ "$curl_exit" -ne 0 ]]; then
+      reason="curl exit ${curl_exit}"
+    else
+      reason="HTTP ${http_code}"
+    fi
+
+    if [[ "$http_code" == 4* ]]; then
+      PROXMOX_TALOS_IMAGE_ERROR="Talos NoCloud cidata ISO upload to ${node}/${datastore} failed permanently (${reason}): ${response_body:-no response body}"
+      log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+      return 1
+    fi
+
+    if [[ "$attempt" -ge "$PROXMOX_UPLOAD_MAX_ATTEMPTS" ]]; then
+      PROXMOX_TALOS_IMAGE_ERROR="Talos NoCloud cidata ISO upload to ${node}/${datastore} failed after ${PROXMOX_UPLOAD_MAX_ATTEMPTS} attempts (${reason}): ${response_body:-no response body}"
+      log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+      return 1
+    fi
+
+    local delay=$((2 ** (attempt - 1)))
+    if [[ "$delay" -gt 30 ]]; then
+      delay=30
+    fi
+
+    log "Talos NoCloud cidata ISO upload to ${node}/${datastore} failed (${reason}); retrying in ${delay}s"
+    sleep "$delay"
+    attempt=$((attempt + 1))
+  done
+}
+
+proxmox_verify_cidata_iso() {
+  local node="$1"
+  local datastore="$2"
+  local iso_name="$3"
+  local expected_size_bytes="$4"
+  local expected_volid="${datastore}:iso/${iso_name}"
+  local attempt=1
+
+  while true; do
+    local iso_size=""
+    local status=0
+
+    if iso_size="$(proxmox_storage_file_size "$node" "$datastore" iso "$iso_name")"; then
+      if [[ "$iso_size" != "$expected_size_bytes" ]]; then
+        if [[ "$attempt" -ge "$PROXMOX_VERIFY_MAX_ATTEMPTS" ]]; then
+          PROXMOX_TALOS_IMAGE_ERROR="Talos NoCloud cidata ISO on ${node}/${datastore} has unexpected size for ${expected_volid}: expected=${expected_size_bytes} bytes, actual=${iso_size} bytes."
+          log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+          return 1
+        fi
+        local delay=$((2 ** (attempt - 1)))
+        if [[ "$delay" -gt 10 ]]; then
+          delay=10
+        fi
+        log "Talos NoCloud cidata ISO on ${node}/${datastore} is ${iso_size} bytes, expected ${expected_size_bytes}; retrying in ${delay}s"
+        sleep "$delay"
+        attempt=$((attempt + 1))
+        continue
+      fi
+      log "Verified Talos NoCloud cidata ISO on ${node}/${datastore}: ${expected_volid} (${iso_size} bytes)"
+      PROXMOX_TALOS_IMAGE_ERROR=""
+      return 0
+    else
+      status=$?
+    fi
+
+    if [[ "$status" -ne 1 ]]; then
+      PROXMOX_TALOS_IMAGE_ERROR="${PROXMOX_TALOS_IMAGE_ERROR:-Failed to read Proxmox storage content for ${node}/${datastore}}"
+      log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+      return 1
+    fi
+
+    if [[ "$attempt" -ge "$PROXMOX_VERIFY_MAX_ATTEMPTS" ]]; then
+      PROXMOX_TALOS_IMAGE_ERROR="Talos NoCloud cidata ISO not visible after upload on ${node}/${datastore}: ${expected_volid}"
+      log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+      return 1
+    fi
+
+    local delay=$((2 ** (attempt - 1)))
+    if [[ "$delay" -gt 10 ]]; then
+      delay=10
+    fi
+
+    log "Talos NoCloud cidata ISO not visible yet on ${node}/${datastore}; retrying in ${delay}s"
+    sleep "$delay"
+    attempt=$((attempt + 1))
+  done
+}
+
+proxmox_ensure_cidata_iso_uploaded() {
+  local node="$1"
+  local datastore="$2"
+  local iso_path="$3"
+  local iso_name="$4"
+  local expected_size_bytes=""
+  local existing_size=""
+  local existing_status=0
+  local expected_volid="${datastore}:iso/${iso_name}"
+
+  if ! expected_size_bytes="$(file_size_bytes "$iso_path")"; then
+    PROXMOX_TALOS_IMAGE_ERROR="Failed to inspect local Talos NoCloud cidata ISO size: ${iso_path}"
+    log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR}"
+    return 1
+  fi
+
+  if existing_size="$(proxmox_storage_file_size "$node" "$datastore" iso "$iso_name")"; then
+    if [[ "$existing_size" == "$expected_size_bytes" ]]; then
+      log "Talos NoCloud cidata ISO already present on ${node}/${datastore}: ${expected_volid} (${existing_size} bytes)"
+      PROXMOX_TALOS_IMAGE_ERROR=""
+      return 0
+    fi
+
+    log "Deleting stale Talos NoCloud cidata ISO on ${node}/${datastore}: ${expected_volid} (${existing_size} bytes, expected ${expected_size_bytes})"
+    proxmox_delete_storage_file "$node" "$datastore" "$expected_volid" || return 1
+  else
+    existing_status=$?
+    if [[ "$existing_status" -ne 1 ]]; then
+      log "ERROR: ${PROXMOX_TALOS_IMAGE_ERROR:-Failed to inspect Talos NoCloud cidata ISO on ${node}/${datastore}}"
+      return 1
+    fi
+  fi
+
+  log "Uploading Talos NoCloud cidata ISO directly to ${node}/${datastore} via $(proxmox_node_endpoint "$node")"
+  proxmox_upload_cidata_iso "$node" "$datastore" "$iso_path" "$iso_name" || return 1
+  proxmox_verify_cidata_iso "$node" "$datastore" "$iso_name" "$expected_size_bytes"
+}
+
+render_and_upload_nocloud_isos() {
+  local iso_map="{}"
+  local name=""
+  local type=""
+  local ip=""
+  local mac=""
+  local host=""
+  local iso_spec=""
+  local iso_path=""
+  local iso_name=""
+  local file_id=""
+
+  while IFS=$'\t' read -r name type ip mac host; do
+    [[ -n "$name" ]] || continue
+    [[ -n "$host" ]] || fail "Missing vm_node_map entry for ${name}"
+
+    iso_spec="$(build_nocloud_iso "$name" "$type" "$ip" "$mac")"
+    IFS=$'\t' read -r iso_path iso_name <<<"$iso_spec"
+    [[ -s "$iso_path" && -n "$iso_name" ]] || fail "NoCloud cidata ISO was not generated for ${name}"
+
+    proxmox_ensure_cidata_iso_uploaded "$host" "$FILE_DATASTORE" "$iso_path" "$iso_name"
+    file_id="${FILE_DATASTORE}:iso/${iso_name}"
+    iso_map="$(jq -c --arg key "$name" --arg file_id "$file_id" '. + {($key): $file_id}' <<<"$iso_map")"
+  done < <(jq -r --argjson vm_node_map "$vm_node_map_json" '
+      to_entries
+      | sort_by(.key)
+      | .[]
+      | [.key, .value.type, .value.ip, .value.mac, ($vm_node_map[.key] // "")]
+      | @tsv
+    ' <<<"$nodes_json")
+
+  printf '%s\n' "$iso_map"
+}
+
 remove_legacy_talos_file_state() {
   local workdir="$1"
   local legacy_addresses=()
@@ -690,7 +1050,7 @@ remove_legacy_talos_file_state() {
     legacy_addresses+=("$address")
   done < <(
     "$TOFU_BIN" -chdir="$workdir" state list 2>/dev/null \
-      | grep '^proxmox_virtual_environment_file.talos_nocloud' \
+      | grep -E '^proxmox_virtual_environment_file\.(talos_nocloud|talos_machine_config|network_config)(\[|$)' \
       || true
   )
 
@@ -698,7 +1058,7 @@ remove_legacy_talos_file_state() {
     return 0
   fi
 
-  log "Removing legacy Talos ISO resources from OpenTofu state: ${legacy_addresses[*]}"
+  log "Removing legacy Talos Proxmox file resources from OpenTofu state: ${legacy_addresses[*]}"
   "$TOFU_BIN" -chdir="$workdir" state rm "${legacy_addresses[@]}"
 }
 
@@ -858,10 +1218,6 @@ node_array() {
   ' <<<"$nodes_json"
 }
 
-json_array_from_args() {
-  jq -nc '$ARGS.positional' --args "$@"
-}
-
 json_array_from_csv() {
   local csv="${1:-}"
 
@@ -932,26 +1288,6 @@ log_vm_node_map() {
     ' <<<"$vm_node_map_json")
 }
 
-flatten_ipv4_candidates() {
-  jq -r '
-    flatten
-    | .[]
-    | select(type == "string")
-    | select(length > 0)
-    | select(startswith("127.") | not)
-    | select(startswith("169.254.") | not)
-    | select(startswith("10.244.") | not)
-  '
-}
-
-ensure_vip_is_not_dhcp_assigned() {
-  local candidates_json="$1"
-
-  if jq -e --arg vip "$VIP_IP" 'flatten | index($vip) != null' <<<"$candidates_json" >/dev/null; then
-    fail "Control-plane VIP ${VIP_IP} was assigned by DHCP to a VM. Reserve or exclude this address from DHCP, then retry from clean VMs."
-  fi
-}
-
 update_cluster_file() {
   local status="$1"
   local planned_controlplane_ips="$2"
@@ -985,7 +1321,7 @@ update_cluster_file() {
       | .worker_ips = $worker_ips
       | .controlplane_vm_ids = $controlplane_vm_ids
       | .worker_vm_ids = $worker_vm_ids
-      | .bootstrap_mode = "dhcp-first"
+      | .bootstrap_mode = "static-nocloud"
       | del(.talos_config_dir)
       | del(.talosconfig_path)
       | del(.kubeconfig_path)
@@ -994,46 +1330,13 @@ update_cluster_file() {
   mv "$tmp" "$cluster_file"
 }
 
-discover_node_ip() {
-  local label="$1"
-  shift
-  local candidates=("$@")
-  local candidate=""
-  local attempts=60
-
-  for candidate in "${candidates[@]}"; do
-    [[ -n "$candidate" ]] || continue
-    log "Guest agent reported ${label} at ${candidate}"
-    printf '%s\n' "$candidate"
-    return 0
-  done
-
-  while [[ "$attempts" -gt 0 ]]; do
-    for candidate in "${candidates[@]}"; do
-      [[ -n "$candidate" ]] || continue
-      if talosctl version --insecure --nodes "$candidate" >/dev/null 2>&1; then
-        log "Discovered ${label} at ${candidate}"
-        printf '%s\n' "$candidate"
-        return 0
-      fi
-    done
-    if [[ ${#candidates[@]} -eq 0 ]]; then
-      break
-    fi
-    sleep 5
-    attempts=$((attempts - 1))
-  done
-
-  fail "Timed out waiting for ${label} to answer on ${candidate}"
-}
-
 wait_for_talos_api() {
   local label="$1"
   local candidate="$2"
   local attempts=60
 
   while [[ "$attempts" -gt 0 ]]; do
-    if talosctl version \
+    if timeout "$TALOS_API_CHECK_TIMEOUT_SECONDS" talosctl version \
       --nodes "$candidate" \
       --endpoints "$candidate" \
       --talosconfig "$talosconfig_file" >/dev/null 2>&1; then
@@ -1098,8 +1401,9 @@ wait_for_kubernetes_rollout() {
 write_node_patch() {
   local name="$1"
   local type="$2"
-  local mac="$3"
-  local patch_file="$4"
+  local ip="$3"
+  local mac="$4"
+  local patch_file="$5"
   local nameserver_block=""
   local search_domain_block=""
   local time_server="${TWINBOX_TIME_SERVER:-time.cloudflare.com}"
@@ -1142,7 +1446,12 @@ write_node_patch() {
     echo "    interfaces:"
     echo "      - deviceSelector:"
     echo "          hardwareAddr: ${mac}"
-    echo "        dhcp: true"
+    echo "        dhcp: false"
+    echo "        addresses:"
+    echo "          - ${ip}/${NODE_PREFIX_LENGTH}"
+    echo "        routes:"
+    echo "          - network: 0.0.0.0/0"
+    echo "            gateway: ${GATEWAY_IP}"
     if [[ "$type" == "controlplane" ]]; then
       echo "        vip:"
       echo "          ip: ${VIP_IP}"
@@ -1227,6 +1536,7 @@ generate_talos_configs() {
   local controlplane_patch_file=""
   local name=""
   local type=""
+  local ip=""
   local mac=""
   local config_file=""
 
@@ -1252,12 +1562,12 @@ generate_talos_configs() {
   upsert_secret_artifact "talos-secrets" "secrets.yaml" "$talos_secrets_file"
   upsert_secret_artifact "talosconfig" "talosconfig" "$talosconfig_file"
 
-  while IFS=$'\t' read -r name type mac; do
+  while IFS=$'\t' read -r name type ip mac; do
     [[ -n "$name" ]] || continue
     node_dir="$runtime_talos_dir/generated/$name"
     patch_file="$node_dir/patch.yaml"
     mkdir -p "$node_dir"
-    write_node_patch "$name" "$type" "$mac" "$patch_file"
+    write_node_patch "$name" "$type" "$ip" "$mac" "$patch_file"
 
     log "Generating Talos config for ${name}"
     if [[ "$type" == "controlplane" ]]; then
@@ -1291,70 +1601,9 @@ generate_talos_configs() {
       to_entries
       | sort_by(.key)
       | .[]
-      | [.key, .value.type, .value.mac]
+      | [.key, .value.type, .value.ip, .value.mac]
       | @tsv
     ' <<<"$nodes_json")
-}
-
-wait_for_talos_insecure() {
-  local label="$1"
-  local candidate="$2"
-  local attempts=60
-
-  while [[ "$attempts" -gt 0 ]]; do
-    if talosctl version \
-      --insecure \
-      --nodes "$candidate" \
-      --endpoints "$candidate" >/dev/null 2>&1; then
-      return 0
-    fi
-    sleep 5
-    attempts=$((attempts - 1))
-  done
-
-  fail "Timed out waiting for Talos API (insecure) on ${label} at ${candidate}"
-}
-
-apply_node_config() {
-  local ip="$1"
-  local config_file="$2"
-  local output=""
-
-  log "Applying Talos config to ${ip} with --insecure"
-  output="$(talosctl apply-config \
-    --insecure \
-    --nodes "$ip" \
-    --endpoints "$ip" \
-    --talosconfig "$talosconfig_file" \
-    --file "$config_file" 2>&1)" && return 0
-
-  log "Insecure Talos apply failed for ${ip}; retrying with cluster talosconfig"
-  if output="$(talosctl apply-config \
-    --nodes "$ip" \
-    --endpoints "$ip" \
-    --talosconfig "$talosconfig_file" \
-    --file "$config_file" 2>&1)"; then
-    return 0
-  fi
-
-  log "Resetting Talos node ${ip} to retry config application from clean state"
-  talosctl reset \
-    --insecure \
-    --nodes "$ip" \
-    --endpoints "$ip" \
-    --reboot \
-    --wait=false 2>&1 || true
-
-  log "Waiting for Talos node ${ip} to reboot and accept insecure connections"
-  wait_for_talos_insecure "node" "$ip"
-
-  log "Applying Talos config to ${ip} with --insecure after reset"
-  talosctl apply-config \
-    --insecure \
-    --nodes "$ip" \
-    --endpoints "$ip" \
-    --talosconfig "$talosconfig_file" \
-    --file "$config_file"
 }
 
 bootstrap_cluster() {
@@ -1518,6 +1767,7 @@ planned_controlplane_ips_json="$(node_array "ip" "controlplane")"
 planned_worker_ips_json="$(node_array "ip" "worker")"
 controlplane_vm_ids_json="$(node_array "vmid" "controlplane")"
 worker_vm_ids_json="$(node_array "vmid" "worker")"
+generate_talos_configs
 raw_vm_node_map="${VM_NODE_MAP:-}"
 # vm_node_map_json="$(normalize_json_object "${VM_NODE_MAP:-{}}")"
 
@@ -1538,13 +1788,26 @@ validate_vm_node_map
 log_vm_node_map
 
 [[ -n "${image_disk_url:-}" ]] || fail "Talos disk image URL not resolved"
-validate_file_datastore_import_content "$FILE_DATASTORE"
+validate_file_datastore_provisioning_content "$FILE_DATASTORE"
 talos_image_local_path="$image_cache_dir/talos-${CLUSTER_ID}-${image_cache_key}.raw"
 talos_image_file_name="talos-${CLUSTER_ID}-${image_cache_key}.raw"
 download_talos_image "$talos_image_local_path"
 target_nodes_json="$(jq -nc --arg proxmox_node "$PROXMOX_NODE" --argjson vm_node_map "$vm_node_map_json" '([ $proxmox_node ] + ($vm_node_map | to_entries | map(.value))) | unique')"
 log "Uploading Talos disk image to Proxmox nodes: $(jq -r 'join(", ")' <<<"$target_nodes_json")"
 upload_talos_image_to_nodes "$talos_image_local_path" "$talos_image_file_name" "$target_nodes_json"
+log "Generating NoCloud artifacts and uploading Talos cidata ISOs"
+nocloud_iso_file_ids_json="$(render_and_upload_nocloud_isos)"
+nodes_json="$(
+  jq -c --argjson nocloud_iso_file_ids "$nocloud_iso_file_ids_json" '
+    with_entries(
+      if ($nocloud_iso_file_ids[.key] // "") == "" then
+        error("missing NoCloud cidata ISO file ID for " + .key)
+      else
+        .value.nocloud_iso_file_id = $nocloud_iso_file_ids[.key]
+      end
+    )
+  ' <<<"$nodes_json"
+)"
 
 if [[ -f "$work_module_dir/terraform.tfstate" ]]; then
   log "Reusing existing OpenTofu workspace at ${work_module_dir}"
@@ -1559,6 +1822,7 @@ jq -n \
   --arg file_datastore "$FILE_DATASTORE" \
   --arg bridge "$BRIDGE" \
   --arg gateway "$GATEWAY_IP" \
+  --arg dns_domain "${DNS_DOMAIN:-}" \
   --arg cluster_name "$NAME" \
   --arg cluster_slug "$CLUSTER_ID" \
   --arg cluster_endpoint "https://${VIP_IP}:6443" \
@@ -1574,6 +1838,7 @@ jq -n \
     file_datastore: $file_datastore,
     bridge: $bridge,
     gateway: $gateway,
+    dns_domain: $dns_domain,
     dns_servers: $dns_servers,
     prefix: $prefix,
     cluster_name: $cluster_name,
@@ -1597,63 +1862,12 @@ remove_legacy_talos_file_state "$work_module_dir"
 log "Creating Proxmox VMs"
 "$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve -no-color -parallelism="$TOFU_PARALLELISM" -var-file="$tfvars_file"
 
-tf_outputs_json="$("$TOFU_BIN" -chdir="$work_module_dir" output -json -no-color)"
-controlplane_ipv4_candidates_json="$(jq -c '.controlplane_ipv4_addresses.value // []' <<<"$tf_outputs_json")"
-worker_ipv4_candidates_json="$(jq -c '.worker_ipv4_addresses.value // []' <<<"$tf_outputs_json")"
-ensure_vip_is_not_dhcp_assigned "$controlplane_ipv4_candidates_json"
-ensure_vip_is_not_dhcp_assigned "$worker_ipv4_candidates_json"
+update_cluster_file "vms-created" "$planned_controlplane_ips_json" "$planned_worker_ips_json" "$planned_controlplane_ips_json" "$planned_worker_ips_json" "$controlplane_vm_ids_json" "$worker_vm_ids_json"
 
-update_cluster_file "provisioned" "$planned_controlplane_ips_json" "$planned_worker_ips_json" "[]" "[]" "$controlplane_vm_ids_json" "$worker_vm_ids_json"
+first_controlplane_ip="$(jq -r '.[0] // empty' <<<"$planned_controlplane_ips_json")"
+[[ -n "$first_controlplane_ip" ]] || fail "No control plane IP configured"
 
-generate_talos_configs
-
-log "Discovering control plane DHCP addresses"
-discovered_controlplane_ips_json="[]"
-discovered_controlplane_ips=()
-mapfile -t controlplane_actual_candidates < <(flatten_ipv4_candidates <<<"$controlplane_ipv4_candidates_json")
-controlplane_index=0
-
-while IFS=$'\t' read -r name type ip; do
-  [[ -n "$name" ]] || continue
-  [[ "$type" == "controlplane" ]] || continue
-  candidates=()
-  if [[ -n "${controlplane_actual_candidates[$controlplane_index]:-}" ]]; then
-    candidates+=("${controlplane_actual_candidates[$controlplane_index]}")
-  fi
-  candidates+=("$ip")
-  discovered_ip="$(discover_node_ip "$name" "${candidates[@]}")"
-  controlplane_index=$((controlplane_index + 1))
-  discovered_controlplane_ips+=("$discovered_ip")
-done < <(jq -r '
-    to_entries
-    | sort_by(.key)
-    | .[]
-    | [.key, .value.type, .value.ip]
-    | @tsv
-  ' <<<"$nodes_json")
-
-discovered_controlplane_ips_json="$(json_array_from_args "${discovered_controlplane_ips[@]}")"
-update_cluster_file "provisioned" "$planned_controlplane_ips_json" "$planned_worker_ips_json" "$discovered_controlplane_ips_json" "[]" "$controlplane_vm_ids_json" "$worker_vm_ids_json"
-
-log "Applying control plane Talos configs"
-controlplane_apply_index=0
-while IFS=$'\t' read -r name type ip; do
-  [[ -n "$name" ]] || continue
-  [[ "$type" == "controlplane" ]] || continue
-  discovered_ip="${discovered_controlplane_ips[$controlplane_apply_index]:-$ip}"
-  apply_node_config "$discovered_ip" "$runtime_talos_dir/${name}-controlplane.yaml"
-  controlplane_apply_index=$((controlplane_apply_index + 1))
-done < <(jq -r '
-    to_entries
-    | sort_by(.key)
-    | .[]
-    | [.key, .value.type, .value.ip]
-    | @tsv
-  ' <<<"$nodes_json")
-
-first_controlplane_ip="${discovered_controlplane_ips[0]:-}"
-[[ -n "$first_controlplane_ip" ]] || fail "No control plane IP discovered"
-
+log "Talos machine configs are supplied at first boot through per-node NoCloud cidata ISOs"
 bootstrap_cluster "$first_controlplane_ip"
 wait_for_kubernetes_rollout "daemonset/cilium" "kube-system" "Cilium DaemonSet"
 wait_for_kubernetes_rollout "deployment/cilium-operator" "kube-system" "Cilium operator"
@@ -1692,41 +1906,10 @@ if [[ "${TWINBOX_SYNC_LOCAL_CLIENT_CONFIGS:-false}" == "true" ]]; then
   sync_user_kubeconfig "$kubeconfig_file"
 fi
 
-log "Control planes are healthy; discovering worker DHCP addresses"
-discovered_worker_ips_json="[]"
-discovered_worker_ips=()
-mapfile -t worker_actual_candidates < <(flatten_ipv4_candidates <<<"$worker_ipv4_candidates_json")
-worker_index=0
-
+log "Waiting for workers at their configured static addresses"
 while IFS=$'\t' read -r name type ip; do
-  [[ -n "$name" ]] || continue
-  [[ "$type" == "worker" ]] || continue
-  candidates=()
-  if [[ -n "${worker_actual_candidates[$worker_index]:-}" ]]; then
-    candidates+=("${worker_actual_candidates[$worker_index]}")
-  fi
-  candidates+=("$ip")
-  discovered_ip="$(discover_node_ip "$name" "${candidates[@]}")"
-  worker_index=$((worker_index + 1))
-  discovered_worker_ips+=("$discovered_ip")
-done < <(jq -r '
-    to_entries
-    | sort_by(.key)
-    | .[]
-    | [.key, .value.type, .value.ip]
-    | @tsv
-  ' <<<"$nodes_json")
-
-discovered_worker_ips_json="$(json_array_from_args "${discovered_worker_ips[@]}")"
-
-log "Applying worker Talos configs"
-worker_apply_index=0
-while IFS=$'\t' read -r name type ip; do
-  [[ -n "$name" ]] || continue
-  [[ "$type" == "worker" ]] || continue
-  discovered_ip="${discovered_worker_ips[$worker_apply_index]:-$ip}"
-  apply_node_config "$discovered_ip" "$runtime_talos_dir/${name}-worker.yaml"
-  worker_apply_index=$((worker_apply_index + 1))
+  [[ -n "$name" && "$type" == "worker" ]] || continue
+  wait_for_talos_api "$name" "$ip"
 done < <(jq -r '
     to_entries
     | sort_by(.key)
@@ -1741,8 +1924,8 @@ jq \
   --arg updated_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
   --argjson planned_controlplane_ips "$planned_controlplane_ips_json" \
   --argjson planned_worker_ips "$planned_worker_ips_json" \
-  --argjson discovered_controlplane_ips "$discovered_controlplane_ips_json" \
-  --argjson discovered_worker_ips "$discovered_worker_ips_json" \
+  --argjson discovered_controlplane_ips "$planned_controlplane_ips_json" \
+  --argjson discovered_worker_ips "$planned_worker_ips_json" \
   --argjson controlplane_vm_ids "$controlplane_vm_ids_json" \
   --argjson worker_vm_ids "$worker_vm_ids_json" \
   '
@@ -1756,7 +1939,7 @@ jq \
     | .worker_ips = $discovered_worker_ips
     | .controlplane_vm_ids = $controlplane_vm_ids
     | .worker_vm_ids = $worker_vm_ids
-    | .bootstrap_mode = "dhcp-first"
+    | .bootstrap_mode = "static-nocloud"
     | del(.talos_config_dir)
     | del(.talosconfig_path)
     | del(.kubeconfig_path)
