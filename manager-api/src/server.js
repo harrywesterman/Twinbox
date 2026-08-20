@@ -9,10 +9,12 @@ import {
   buildClusterFromRequest,
   ensureClusterResourceProfile,
   normalizeClusterName,
+  normalizeClusterSlug,
   normalizeObservabilityProfile,
   persistCluster,
 } from "./lib/clusters.js";
 import { normalizeStorageResource, validateProxmoxCapacity } from "./lib/proxmox-capacity.js";
+import { computePlacement } from "./lib/placement.js";
 import {
   buildAppCatalogResponse,
   buildCatalogResponse,
@@ -874,21 +876,6 @@ async function listClusterStorageResources() {
     );
 }
 
-async function listClusterNodeNames() {
-  const resources = await listClusterNodeResources();
-  const names = Array.isArray(resources)
-    ? resources
-        .map((entry) => String(entry?.node || entry?.name || entry?.id || "").trim())
-        .filter(Boolean)
-    : [];
-
-  if (names.length === 0) {
-    throw new Error("No Proxmox nodes available to validate VM placement");
-  }
-
-  return names;
-}
-
 function summarizeClusterResources(resources, vmResources = [], storageResources = []) {
   const MB = 1024 * 1024;
   const GB = 1024 * 1024 * 1024;
@@ -1266,7 +1253,7 @@ function parseSecretKeyPath(secretKeyPath) {
 }
 
 app.get("/api/health", (_, res) => {
-  res.json({ ok: true, time: now() });
+  res.json({ ok: true, time: now(), image_tag: process.env.TWINBOX_IMAGE_TAG || "unknown" });
 });
 
 app.get(/^\/api\/secrets\/.*$/, (req, res) => {
@@ -1299,6 +1286,32 @@ app.get("/api/proxmox/cluster-resources", async (_, res) => {
   } catch (error) {
     return res.status(500).json({
       error: error instanceof Error ? error.message : "failed to read cluster resources",
+    });
+  }
+});
+
+app.post("/api/proxmox/placement-plan", async (req, res) => {
+  try {
+    const [nodes, vms, storages] = await Promise.all([
+      listClusterNodeResources(),
+      listClusterVmResources(),
+      listClusterStorageResources(),
+    ]);
+    const placement = computePlacement({
+      nodes,
+      vms,
+      storages,
+      controlplaneCount: Number(req.body?.controlplane_count ?? 3),
+      workerCount: Number(req.body?.worker_count ?? 0),
+      clusterName: req.body?.name ? `twinbox-${normalizeClusterSlug(req.body.name)}` : "",
+    });
+    if (!placement.ok) {
+      return res.status(400).json({ error: placement.error });
+    }
+    return res.json(placement);
+  } catch (error) {
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : "failed to compute placement",
     });
   }
 });
@@ -1616,8 +1629,43 @@ app.post("/api/ip-availability", async (req, res) => {
 app.post("/api/clusters", async (req, res) => {
   const body = req.body || {};
   try {
-    const allowedVmHosts = await listClusterNodeNames();
-    const built = buildClusterFromRequest(body, process.env, { allowedVmHosts });
+    const [proxmoxNodes, proxmoxVms, proxmoxStorages] = await Promise.all([
+      listClusterNodeResources(),
+      listClusterVmResources(),
+      listClusterStorageResources(),
+    ]);
+    const allowedVmHosts = proxmoxNodes
+      .map((entry) => String(entry?.node || entry?.name || entry?.id || "").trim())
+      .filter(Boolean);
+    if (allowedVmHosts.length === 0) {
+      return res.status(400).json({ error: "No Proxmox nodes available to place VMs" });
+    }
+
+    const placement = computePlacement({
+      nodes: proxmoxNodes,
+      vms: proxmoxVms,
+      storages: proxmoxStorages,
+      controlplaneCount: Number(body.controlplane_count ?? 3),
+      workerCount: Number(body.worker_count ?? 0),
+      clusterName: body.name ? `twinbox-${normalizeClusterSlug(body.name)}` : "",
+    });
+    if (!placement.ok) {
+      return res.status(400).json({ error: placement.error });
+    }
+
+    const built = buildClusterFromRequest(
+      {
+        ...body,
+        vm_node_map: placement.vmNodeMap,
+        vm_size_map: placement.vmSizeMap,
+        vm_storage_map: placement.vmStorageMap,
+      },
+      process.env,
+      {
+        allowedVmHosts,
+        allowedVmStorages: proxmoxStorages,
+      }
+    );
     if (!built.ok) {
       return res.status(400).json({ error: built.error });
     }
@@ -1749,13 +1797,25 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
         requestedClusterInstanceId
       );
 
+      const placement = computePlacement({
+        nodes: proxmoxNodes,
+        vms: proxmoxVms,
+        storages: proxmoxStorages,
+        controlplaneCount: Number(validated.value.controlplane_count ?? 3),
+        workerCount: Number(validated.value.worker_count ?? 0),
+        clusterName: `twinbox-${normalizeClusterSlug(validated.value.name)}`,
+      });
+      if (!placement.ok) {
+        return res.status(400).json({ error: placement.error });
+      }
+
       const built = buildClusterFromRequest(
         {
           ...validated.value,
           vm_ip_map: req.body?.vm_ip_map,
-          vm_size_map: req.body?.vm_size_map,
-          vm_node_map: req.body?.vm_node_map,
-          vm_storage_map: req.body?.vm_storage_map,
+          vm_size_map: placement.vmSizeMap,
+          vm_node_map: placement.vmNodeMap,
+          vm_storage_map: placement.vmStorageMap,
         },
         process.env,
         {
