@@ -2,7 +2,7 @@ id: provision-nodes
 title: Deploy Talos Cluster
 type: action
 summary: Install Talos Linux on separate VM's on the cluster.
-explanation: Talos Linux is the immutable, Kubernetes-focused operating system that Twinbox uses. We use OpenTofu, download the Talos image on demand, size the control plane and worker roles separately, land the VMs on Proxmox hosts, discover the DHCP addresses, apply Talos machine configs, bootstrap the first control plane, and materialize the resulting Talos access files from the management-local bootstrap secret tree.
+explanation: Talos Linux is the immutable, Kubernetes-focused operating system that Twinbox uses. We use OpenTofu, download the Talos image on demand, size the control plane and worker roles separately, attach static NoCloud network and Talos machine configuration to the VMs, bootstrap the first control plane, and materialize the resulting Talos access files from the management-local bootstrap secret tree.
 side_help: Talos Linux is a minimal, secure, API-driven operating system built specifically for running Kubernetes.
 dashy:
   items:
@@ -12,22 +12,6 @@ dashy:
       icon: fas fa-network-wired
       url_template: https://hubble.__ZONE_NAME__
 inputs:
-  - id: scale_percent
-    label: Cluster scale
-    type: integer
-    required: true
-    min: 0
-    max: 100
-    default: 90
-    help: Scale the VM footprint from 0 to 100 percent. The default reserves room on all three Proxmox hosts.
-  - id: worker_disk_percent
-    label: Worker disk
-    type: integer
-    required: true
-    min: 10
-    max: 100
-    default: 80
-    help: Set the worker disk size as a share of the free worker-host disk. Twinbox starts at 100 percent of the space shared across the three Proxmox hosts.
   - id: name
     label: Cluster name
     type: string
@@ -50,22 +34,6 @@ inputs:
     max: 200
     default: 3
     help: Current API range is 0 to 200. The default gives each Proxmox host one worker.
-  - id: cpu_cores
-    label: CPU cores
-    type: integer
-    required: true
-    min: 1
-    max: 64
-    default: 4
-    help: Worker CPU allocation. Control planes stay fixed at 2 vCPU, while workers use this value.
-  - id: memory_mb
-    label: Memory MB
-    type: integer
-    required: true
-    min: 512
-    max: 1048576
-    default: 8192
-    help: Worker memory allocation. Control planes stay fixed at 4096 MB, while workers default to 8192 MB unless you change the slider.
   - id: bridge
     label: Bridge
     type: string
