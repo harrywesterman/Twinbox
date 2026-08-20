@@ -12,21 +12,21 @@ Complete reference for the `.env` file used by the Twinbox manager stack.
 | `PROXMOX_PASSWORD` | `change-me` | Proxmox API password (bootstrap only; canonical copy lives under `bootstrap/secrets/`) |
 | `PROXMOX_NODE` | `pve` | Default Proxmox node name |
 | `PROXMOX_STORAGE_POOL` | `local-lvm` | Storage pool for VM disks |
-| `PROXMOX_FILE_DATASTORE` | `local` | Datastore for Talos disk-image uploads; the setup wizard enables Proxmox `import` content here |
+| `PROXMOX_FILE_DATASTORE` | `local` | Datastore for Talos disk-image and NoCloud ISO uploads; Talos provisioning requires Proxmox `import` and `iso` content here, while the greenfield setup wizard may also enable `snippets` for the Management VM cloud-init file |
 
 ## Talos
 
 | Variable | Example | Description |
 |----------|---------|-------------|
 | `TALOS_IMAGE_PRESET` | `qemu-guest-agent` | Talos image factory preset applied to generated machine configs. Common values: `qemu-guest-agent` (enables the QEMU guest agent for Proxmox VM management), or empty for no preset. |
-| `TALOS_IMAGE_PLATFORM` | `cloud-server` | Talos image platform selector (e.g. `cloud-server`, `metal`) |
+| `TALOS_IMAGE_PLATFORM` | `nocloud` | Talos image platform selector for the bootable disk image. Twinbox defaults to `nocloud` and bakes the matching `talos.platform=nocloud` kernel argument into the Image Factory schematic so the attached per-node `cidata` ISO is applied before the Talos API is contacted. |
 | `TALOS_IMAGE_ARCH` | `amd64` | Talos image architecture (`amd64` or `arm64`) |
 
 ## Image
 
 | Variable | Example | Description |
 |----------|---------|-------------|
-| `TWINBOX_IMAGE_TAG` | `sha-ad89c77` | GHCR image tag for all three manager services |
+| `TWINBOX_IMAGE_TAG` | `sha-652a75b` | GHCR image tag for all three manager services |
 
 ## Pinned Tool Versions
 

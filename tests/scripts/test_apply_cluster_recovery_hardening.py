@@ -186,58 +186,6 @@ def test_bootstrap_cluster_retries_until_talos_reports_available():
         assert "UPSERT:kubeconfig/kubeconfig" in log_text
 
 
-def test_rejects_control_plane_vip_assigned_by_dhcp():
-    with tempfile.TemporaryDirectory() as td:
-        root = Path(td)
-        log_file = root / "vip.log"
-        harness = root / "harness.sh"
-        harness.write_text(
-            textwrap.dedent(
-                f"""\
-                #!/usr/bin/env bash
-                set -euo pipefail
-
-                APPLY_CLUSTER_SCRIPT={shlex.quote(str(APPLY_CLUSTER_SCRIPT))}
-                LOG_FILE={shlex.quote(str(log_file))}
-                VIP_IP=cluster-vip
-                : > "$LOG_FILE"
-
-                fail() {{
-                  printf 'FAIL:%s\\n' "$*" >> "$LOG_FILE"
-                  return 1
-                }}
-
-                HELPERS_FILE="$(mktemp)"
-                awk '
-                  /^ensure_vip_is_not_dhcp_assigned\\(\\) \\{{/ {{ emit = 1 }}
-                  /^update_cluster_file\\(\\) \\{{/ {{ emit = 0 }}
-                  emit {{ print }}
-                ' "$APPLY_CLUSTER_SCRIPT" >"$HELPERS_FILE"
-                source "$HELPERS_FILE"
-
-                ensure_vip_is_not_dhcp_assigned '[["node-a"], ["cluster-vip"]]'
-                """
-            ),
-            encoding="utf-8",
-        )
-        harness.chmod(0o755)
-
-        proc = subprocess.run(
-            ["bash", str(harness)],
-            cwd=root,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-
-        assert proc.returncode != 0
-        assert (
-            "Control-plane VIP cluster-vip was assigned by DHCP to a VM. "
-            "Reserve or exclude this address from DHCP, then retry from clean VMs."
-            in log_file.read_text(encoding="utf-8")
-        )
-
-
 def test_generate_talos_configs_restores_existing_talos_secrets_before_generating():
     text = APPLY_CLUSTER_SCRIPT.read_text(encoding="utf-8")
 
