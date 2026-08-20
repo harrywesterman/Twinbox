@@ -93,7 +93,7 @@ Use the UI to work through the setup steps. The exact order depends on your chos
 
 ### Application Bundles (optional)
 
-38. **Twinbox Desktop** — OpenCloud, Outline, HedgeDoc, Zulip, Jitsi, Paperless, Immich, SearXNG, Audiobookshelf, Pixelfed, Stirling PDF
+38. **Twinbox Desktop** — OpenCloud, Outline, HedgeDoc, Zulip, Jitsi, Paperless, Immich, SearXNG, Audiobookshelf, Pixelfed, Stirling PDF, Karakeep, Mailu, Mastodon, Matrix, Nextcloud
 39. **Mijn Bureau** — Nextcloud, Outline, Jitsi
 40. **La Suite** — Outline, Nextcloud, Zulip, Jitsi
 41. **openDesk** — OpenCloud, Nextcloud, Zulip, Jitsi
