@@ -5,14 +5,15 @@ function text(value) {
   return String(value || "").trim();
 }
 
-function isTwinboxVm(vm = {}) {
-  const name = text(vm.name || vm.vm_name).toLowerCase();
-  const tags = text(vm.tags)
-    .toLowerCase()
-    .split(/[;,]/)
-    .map((tag) => tag.trim())
-    .filter(Boolean);
-  return name.startsWith("twinbox-") || tags.includes("twinbox");
+export function isManagementVm(vm = {}) {
+  const name = text(vm.name || vm.vm_name || vm.id).toLowerCase();
+  const tags = text(vm.tags).toLowerCase();
+  return tags.includes("management") || name.endsWith("-mgt") || name.endsWith("mgt");
+}
+
+export function findManagementVm(vms = []) {
+  const list = Array.isArray(vms) ? vms : [];
+  return list.find(isManagementVm) || null;
 }
 
 function number(value, fallback = 0) {
@@ -213,15 +214,25 @@ export function validateProxmoxCapacity({
   for (const [host, plannedMemory] of plannedMemoryByHost) {
     const node = nodeLookup.get(host);
     const hostVms = existingVms.filter((vm) => text(vm.node) === host);
-    const runningVmUsage = hostVms.reduce(
-      (total, vm) => total + (text(vm.status).toLowerCase() === "running" ? number(vm.mem) : 0),
-      0
-    );
-    const hostOverhead = Math.max(0, number(node?.mem) - runningVmUsage);
-    const configuredReservations = hostVms
-      .filter(isTwinboxVm)
-      .reduce((total, vm) => total + number(vm.maxmem || vm.mem), 0);
-    const required = hostOverhead + configuredReservations + plannedMemory;
+    let runningMemCurrent = 0;
+    let reservedMem = 0;
+
+    for (const vm of hostVms) {
+      const running = text(vm.status || vm.qmpstatus).toLowerCase() === "running";
+      const configuredMem = number(vm.maxmem) > 0 ? number(vm.maxmem) : number(vm.mem);
+      if (isManagementVm(vm)) {
+        reservedMem += configuredMem;
+        if (running) runningMemCurrent += number(vm.mem);
+        continue;
+      }
+      if (running) {
+        runningMemCurrent += number(vm.mem);
+        reservedMem += configuredMem;
+      }
+    }
+
+    const hostOverhead = Math.max(0, number(node?.mem) - runningMemCurrent);
+    const required = hostOverhead + reservedMem + plannedMemory;
     const capacity = number(node?.maxmem);
     if (capacity <= 0 || required > capacity) {
       return {

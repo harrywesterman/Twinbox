@@ -61,7 +61,7 @@ fi
         assert proc.returncode == 0, proc.stderr
         assert "TALOS_IMAGE_SCHEMATIC=schematic123" in proc.stdout
         assert (
-            "TALOS_IMAGE_FACTORY_URL=https://factory.talos.dev/image/schematic123/v1.9.2/metal-amd64.raw.xz"
+            "TALOS_IMAGE_FACTORY_URL=https://factory.talos.dev/image/schematic123/v1.9.2/nocloud-amd64.raw.xz"
             in proc.stdout
         )
         assert (
@@ -85,8 +85,11 @@ fi
         assert "siderolabs/qemu-guest-agent" in curl_stdin_1
         assert "siderolabs/iscsi-tools" in curl_stdin_1
         assert "siderolabs/util-linux-tools" in curl_stdin_1
+        assert "extraKernelArgs:" in curl_stdin_1
+        assert "talos.platform=nocloud" in curl_stdin_1
         assert (
-            "https://factory.talos.dev/image/schematic123/v1.9.2/metal-amd64.raw.xz" in curl_args_2
+            "https://factory.talos.dev/image/schematic123/v1.9.2/nocloud-amd64.raw.xz"
+            in curl_args_2
         )
 
 
@@ -134,3 +137,39 @@ printf '{{"id":"schematic-installer"}}'
             in proc.stdout
         )
         assert calls.read_text(encoding="utf-8").splitlines() == ["call"]
+
+
+def test_invalid_talos_image_platform_is_rejected_before_factory_call():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        bin_dir = root / "bin"
+        bin_dir.mkdir()
+        calls = root / "curl-calls.txt"
+        fake_curl = bin_dir / "curl"
+        fake_curl.write_text(
+            f"""#!/bin/bash
+printf 'call\\n' >> "{calls}"
+printf '{{"id":"unexpected"}}'
+""",
+            encoding="utf-8",
+        )
+        fake_curl.chmod(0o755)
+        env = os.environ.copy()
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+        proc = subprocess.run(
+            [
+                str(SCRIPT_PATH),
+                "--platform",
+                "nocloud: bad",
+                "--output",
+                "shell",
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert proc.returncode != 0
+        assert "Invalid Talos image platform" in proc.stderr
+        assert not calls.exists()
