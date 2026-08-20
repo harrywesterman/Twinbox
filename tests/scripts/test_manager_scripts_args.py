@@ -1505,7 +1505,7 @@ def test_apply_argocd_application_helper_applies_and_waits_for_health():
     assert "Skipping namespace resource baseline for" in text
     assert "--no-wait" in text
     assert ".resource_profile // empty" in text
-    assert "(.worker_count // 0)" in text
+    assert "(.worker_cpu_total // 0)" in text
 
 
 def test_stirling_pdf_waits_for_real_kubernetes_readiness():
