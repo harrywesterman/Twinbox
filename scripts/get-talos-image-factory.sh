@@ -7,7 +7,7 @@ source "$SCRIPT_DIR/../config/pinned-defaults.sh"
 
 usage() {
   cat <<'USAGE'
-Usage: get-talos-image-factory.sh [--preset vanilla|qemu-guest-agent] [--version vX.Y.Z] [--arch amd64] [--platform cloud-server] [--installer-only] [--output id|url|shell|json|extensions]
+Usage: get-talos-image-factory.sh [--preset vanilla|qemu-guest-agent] [--version vX.Y.Z] [--arch amd64] [--platform nocloud] [--installer-only] [--output id|url|shell|json|extensions]
 USAGE
 }
 
@@ -96,21 +96,23 @@ fi
 require_cmd curl
 require_cmd jq
 
+if [[ ! "$platform" =~ ^[A-Za-z0-9][A-Za-z0-9_-]*$ ]]; then
+  fail "Invalid Talos image platform: ${platform}"
+fi
+
 payload="$(
-  if [[ "${#extensions[@]}" -eq 0 ]]; then
-    cat <<'EOF'
-customization: {}
-EOF
-  else
-    {
-      printf 'customization:\n'
+  {
+    printf 'customization:\n'
+    printf '  extraKernelArgs:\n'
+    printf '    - talos.platform=%s\n' "$platform"
+    if [[ "${#extensions[@]}" -gt 0 ]]; then
       printf '  systemExtensions:\n'
       printf '    officialExtensions:\n'
       for extension in "${extensions[@]}"; do
         printf '      - %s\n' "$extension"
       done
-    }
-  fi
+    fi
+  }
 )"
 
 response="$(
@@ -125,7 +127,7 @@ schematic_id="$(printf '%s' "$response" | jq -r '.id // empty')"
 [[ -n "$schematic_id" ]] || fail "Factory response did not include an id"
 
 # Use the compressed bootable Talos disk image rather than the ISO installer path.
-image_url="https://factory.talos.dev/image/${schematic_id}/${version}/metal-${arch}.raw.xz"
+image_url="https://factory.talos.dev/image/${schematic_id}/${version}/${platform}-${arch}.raw.xz"
 installer_image="factory.talos.dev/metal-installer/${schematic_id}:${version}"
 download_url=""
 if [[ "$installer_only" != "true" ]]; then

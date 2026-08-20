@@ -56,7 +56,7 @@ scripts/
 | `install-management-tools.sh` | Installs `talosctl`, `tofu`, `kubectl`, `helm`, and `restic` with versions pinned from `config/pinned-defaults.sh` where applicable. |
 | `management-vm-maintenance.sh` | Installs `ansible-core` if needed and runs the Management VM maintenance playbook from the bootstrap tree. The playbook keeps the VM on the pinned NTP server, Docker, and the management tools. |
 | `manager-web-preview.sh` | Dev helper for previewing `manager-web`. |
-| `wizard-dev-run.sh` | Dev helper for running the setup wizard locally. |
+| `wizard-dev-run.sh` | Dev helper that uploads the current `origin/main` setup wizard with the matching published manager image tag. |
 
 ## `manager/` Scripts
 

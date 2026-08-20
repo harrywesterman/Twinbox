@@ -73,7 +73,7 @@ Bundles group related apps into curated sets:
 | **Mijn Bureau** | Nextcloud, OnlyOffice, Zulip |
 | **openDesk** | OpenCloud, Collabora, SearXNG |
 | **La Suite** | Immich, Paperless, HedgeDoc |
-| **Twinbox Desktop** | FreshRSS, Karakeep, Vaultwarden |
+| **Twinbox Desktop** | OpenCloud, Outline, HedgeDoc, Zulip, Jitsi, Paperless, Immich, SearXNG, Audiobookshelf, Pixelfed, Stirling PDF, Karakeep, Mailu, Mastodon, Matrix, Nextcloud |
 
 ## Deployment Pattern
 
