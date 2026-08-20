@@ -19,14 +19,14 @@ Complete reference for the `.env` file used by the Twinbox manager stack.
 | Variable | Example | Description |
 |----------|---------|-------------|
 | `TALOS_IMAGE_PRESET` | `qemu-guest-agent` | Talos image factory preset applied to generated machine configs. Common values: `qemu-guest-agent` (enables the QEMU guest agent for Proxmox VM management), or empty for no preset. |
-| `TALOS_IMAGE_PLATFORM` | `nocloud` | Talos image platform selector for the bootable disk image. Twinbox defaults to `nocloud` so the attached per-node `cidata` ISO is applied before the Talos API is contacted. |
+| `TALOS_IMAGE_PLATFORM` | `nocloud` | Talos image platform selector for the bootable disk image. Twinbox defaults to `nocloud` and bakes the matching `talos.platform=nocloud` kernel argument into the Image Factory schematic so the attached per-node `cidata` ISO is applied before the Talos API is contacted. |
 | `TALOS_IMAGE_ARCH` | `amd64` | Talos image architecture (`amd64` or `arm64`) |
 
 ## Image
 
 | Variable | Example | Description |
 |----------|---------|-------------|
-| `TWINBOX_IMAGE_TAG` | `sha-da3e7be` | GHCR image tag for all three manager services |
+| `TWINBOX_IMAGE_TAG` | `sha-652a75b` | GHCR image tag for all three manager services |
 
 ## Pinned Tool Versions
 

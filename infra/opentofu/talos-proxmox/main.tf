@@ -44,6 +44,7 @@ resource "proxmox_virtual_environment_vm" "node" {
   }
 
   cdrom {
+    enabled = true
     file_id = each.value.nocloud_iso_file_id
   }
 

@@ -72,6 +72,9 @@ spec:
                 chrome:
                   containers:
                     chrome:
+                      image:
+                        repository: docker.io/zenika/alpine-chrome
+                        tag: "124"
                       args:
                         - --remote-debugging-address=0.0.0.0
                         - --remote-debugging-port=9222

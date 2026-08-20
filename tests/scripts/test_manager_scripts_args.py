@@ -1505,7 +1505,7 @@ def test_apply_argocd_application_helper_applies_and_waits_for_health():
     assert "Skipping namespace resource baseline for" in text
     assert "--no-wait" in text
     assert ".resource_profile // empty" in text
-    assert "(.worker_count // 0)" in text
+    assert "(.worker_cpu_total // 0)" in text
 
 
 def test_stirling_pdf_waits_for_real_kubernetes_readiness():
@@ -2688,6 +2688,23 @@ def test_matrix_values_disable_chart_ingress_and_well_known():
     assert "wellknownDelegation" not in text
 
 
+def test_matrix_haproxy_request_leaves_room_for_synapse_on_app_heavy_clusters():
+    values = yaml.safe_load(MATRIX_VALUES.read_text(encoding="utf-8"))
+
+    assert values["initSecrets"]["resources"]["requests"]["cpu"] == "10m"
+    assert values["initSecrets"]["resources"]["requests"]["memory"] == "50Mi"
+    assert values["initSecrets"]["resources"]["limits"]["memory"] == "200Mi"
+    assert values["haproxy"]["resources"]["requests"]["cpu"] == "10m"
+    assert values["haproxy"]["resources"]["requests"]["memory"] == "100Mi"
+    assert values["haproxy"]["resources"]["limits"]["memory"] == "200Mi"
+    assert values["deploymentMarkers"]["resources"]["requests"]["cpu"] == "10m"
+    assert values["deploymentMarkers"]["resources"]["requests"]["memory"] == "50Mi"
+    assert values["deploymentMarkers"]["resources"]["limits"]["memory"] == "200Mi"
+    assert values["synapse"]["checkConfigHook"]["resources"]["requests"]["cpu"] == "10m"
+    assert values["synapse"]["checkConfigHook"]["resources"]["requests"]["memory"] == "50Mi"
+    assert values["synapse"]["checkConfigHook"]["resources"]["limits"]["memory"] == "200Mi"
+
+
 def test_matrix_ingressroutes_target_chart_services():
     text = MATRIX_INGRESSROUTE.read_text(encoding="utf-8")
 
@@ -2718,6 +2735,10 @@ def test_matrix_install_step_waits_on_specific_resources():
     assert "matrix_oidc_upstream_config=" in text
     assert "MATRIX_OIDC_UPSTREAM_CONFIG" in text
     assert "MATRIX_OIDC_ENABLED_IDPS" in text
+    assert (
+        '--required-keys "MAS_OIDC_CLIENT_ID,MAS_OIDC_CLIENT_SECRET,'
+        'MAS_OIDC_PROVIDER_ULID,MATRIX_OIDC_ENABLED_IDPS,MATRIX_OIDC_UPSTREAM_CONFIG"' in text
+    )
     assert 'wait_for_named_resource_ready "databases" "cluster" "matrix-synapse-db"' in text
     assert 'wait_for_named_resource_ready "databases" "cluster" "matrix-mas-db"' in text
     assert (
@@ -3453,6 +3474,7 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
     assert 'machine   = "q35"' not in main_text
     assert 'boot_order = ["virtio0"]' in main_text
     assert "cdrom {" in main_text
+    assert "enabled = true" in main_text
     assert "file_id = each.value.nocloud_iso_file_id" in main_text
     assert 'dynamic "cdrom"' not in main_text
     assert "for_each = var.boot_from_disk ? [] : [1]" not in main_text
@@ -3974,6 +3996,48 @@ def test_forgejo_bootstrap_seeds_from_upstream_and_renders_github_defaults():
 
 
 def test_optional_database_apps_patch_cloudnativepg_requests_by_resource_profile():
+    def parse_memory_quantity_mib(raw_value):
+        match = re.fullmatch(r"(\d+)(Mi|Gi|MB|GB)", raw_value)
+        assert match, f"Unsupported memory quantity: {raw_value}"
+        amount = int(match.group(1))
+        unit = match.group(2)
+        if unit == "Mi":
+            return amount
+        if unit == "Gi":
+            return amount * 1024
+        if unit == "MB":
+            return amount * 1000 / 1024
+        return amount * 1000 * 1000 / 1024
+
+    def extract_profile_memory_requests(appset_text):
+        appset = yaml.safe_load(appset_text)
+        for source in appset["spec"]["template"]["spec"]["sources"]:
+            for patch_entry in source.get("kustomize", {}).get("patches", []):
+                target = patch_entry.get("target", {})
+                if target.get("group") != "postgresql.cnpg.io" or target.get("kind") != "Cluster":
+                    continue
+                for operation in yaml.safe_load(patch_entry["patch"]):
+                    if operation.get("path") != "/spec/resources/requests/memory":
+                        continue
+                    match = re.fullmatch(
+                        r'\{\{ if eq \(index \.metadata\.labels "twinbox\.io/resource-profile"\) '
+                        r'"small" \}\}(?P<small>[^{}]+)'
+                        r'\{\{ else if eq \(index \.metadata\.labels "twinbox\.io/resource-profile"\) '
+                        r'"large" \}\}(?P<large>[^{}]+)'
+                        r"\{\{ else \}\}(?P<default>[^{}]+)\{\{ end \}\}",
+                        operation["value"],
+                    )
+                    if not match:
+                        match = re.fullmatch(
+                            r'\{\{ if eq \(index \.metadata\.labels "twinbox\.io/resource-profile"\) '
+                            r'"large" \}\}(?P<large>[^{}]+)'
+                            r"\{\{ else \}\}(?P<default>[^{}]+)\{\{ end \}\}",
+                            operation["value"],
+                        )
+                    assert match, "CloudNativePG memory request profile patch is malformed"
+                    return match.groupdict()
+        raise AssertionError("CloudNativePG memory request profile patch is missing")
+
     database_apps = [
         "hedgedoc",
         "immich",
@@ -3990,10 +4054,24 @@ def test_optional_database_apps_patch_cloudnativepg_requests_by_resource_profile
         text = (REPO_ROOT / "gitops" / "optional-apps" / f"{app_name}.yaml").read_text(
             encoding="utf-8"
         )
+        cluster = yaml.safe_load(
+            (REPO_ROOT / "gitops" / "databases" / app_name / "cluster.yaml").read_text(
+                encoding="utf-8"
+            )
+        )
+        profile_memory_requests = extract_profile_memory_requests(text)
+        shared_buffers = cluster["spec"]["postgresql"]["parameters"]["shared_buffers"]
+        shared_buffers_mib = parse_memory_quantity_mib(shared_buffers)
+
         assert "twinbox.io/resource-profile" in text
         assert "path: /spec/resources/requests/cpu" in text
         assert "path: /spec/resources/requests/memory" in text
         assert f"name: {app_name}-db" in text
+        for profile_name, memory_request in profile_memory_requests.items():
+            assert parse_memory_quantity_mib(memory_request) >= shared_buffers_mib, (
+                f"{app_name} {profile_name} memory request {memory_request} is lower than "
+                f"PostgreSQL shared_buffers {shared_buffers}"
+            )
 
 
 def test_dashy_appset_patches_requests_by_resource_profile():
@@ -4342,6 +4420,20 @@ def test_critical_cnpg_clusters_use_ha_instances_with_single_replica_storage():
     ).read_text(encoding="utf-8")
     assert "instances: 2" in pixelfed_cluster_text
     assert "storageClass: longhorn-single" in pixelfed_cluster_text
+
+
+def test_matrix_mas_db_keeps_cpu_request_small_enough_for_app_heavy_clusters():
+    cluster = yaml.safe_load(
+        (REPO_ROOT / "gitops" / "databases" / "matrix-mas" / "cluster.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert cluster["spec"]["instances"] == 3
+    assert cluster["spec"]["resources"]["requests"]["cpu"] == "100m"
+    assert cluster["spec"]["resources"]["requests"]["memory"] == "512Mi"
+    assert cluster["spec"]["resources"]["limits"]["cpu"] == "500m"
+    assert cluster["spec"]["resources"]["limits"]["memory"] == "1Gi"
 
 
 def test_database_app_installers_refresh_pgadmin_after_database_ready():
@@ -5049,6 +5141,11 @@ def test_termix_browser_ssh_step_bootstraps_role_based_management_vm_access():
     assert "TERMIX_ADMIN_PASSWORD" in setup_text
     assert 'TERMIX_URL="${TERMIX_URL:-}"' in setup_text
     assert "setup_termix_forward" in setup_text
+    assert "wait_for_termix_deployment()" in setup_text
+    assert "kubectl -n termix get deployment/termix" in setup_text
+    assert setup_text.index("wait_for_termix_deployment") < setup_text.index(
+        "kubectl -n termix rollout status deployment/termix"
+    )
     assert 'kubectl -n termix port-forward "svc/termix" "${port}:80"' in setup_text
     assert "${TERMIX_URL}/health" in setup_text
     assert "X-Electron-App: true" in setup_text

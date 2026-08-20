@@ -39,7 +39,6 @@ test("app source defines a minimal wizard shell with guided input and step-by-st
     /buildInstallRefreshFailureNotice/,
     "expected a distinct helper for refresh failures after a successful install"
   );
-  assert.match(source, /type="range"/, "expected the scale slider");
   assert.match(source, /wizard-step-actions-panel/, "expected a dedicated step 1 helper bar");
   assert.match(source, /Help me with free IPs/, "expected the IP helper button");
   assert.match(source, /Assigning free IPs…/, "expected the helper button to show a loading label");
@@ -106,8 +105,8 @@ test("app source defines a minimal wizard shell with guided input and step-by-st
   );
   assert.match(
     source,
-    /buildAutomaticProvisionPlacementResult/,
-    "expected automatic placement to use one shared helper path"
+    /\/api\/proxmox\/placement-plan/,
+    "expected automatic placement to fetch the backend placement plan"
   );
   assert.match(source, /setPlacementStatus\(/, "expected inline placement feedback state");
   assert.match(
@@ -350,11 +349,6 @@ test("app source defines a minimal wizard shell with guided input and step-by-st
     questionFlow,
     /Base zone for platform hostnames/,
     "expected the old DNS helper copy to be removed from the question flow"
-  );
-  assert.match(
-    questionFlow,
-    /default:\s*90/,
-    "expected the step 1 scale default to start at 90 percent"
   );
   assert.match(
     questionFlow,

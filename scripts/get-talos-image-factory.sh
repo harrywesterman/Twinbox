@@ -96,21 +96,23 @@ fi
 require_cmd curl
 require_cmd jq
 
+if [[ ! "$platform" =~ ^[A-Za-z0-9][A-Za-z0-9_-]*$ ]]; then
+  fail "Invalid Talos image platform: ${platform}"
+fi
+
 payload="$(
-  if [[ "${#extensions[@]}" -eq 0 ]]; then
-    cat <<'EOF'
-customization: {}
-EOF
-  else
-    {
-      printf 'customization:\n'
+  {
+    printf 'customization:\n'
+    printf '  extraKernelArgs:\n'
+    printf '    - talos.platform=%s\n' "$platform"
+    if [[ "${#extensions[@]}" -gt 0 ]]; then
       printf '  systemExtensions:\n'
       printf '    officialExtensions:\n'
       for extension in "${extensions[@]}"; do
         printf '      - %s\n' "$extension"
       done
-    }
-  fi
+    fi
+  }
 )"
 
 response="$(
