@@ -1565,11 +1565,11 @@ function App() {
             worker_count: effectiveDraft.worker_count,
           }),
         });
-        const assigned = Object.keys(placement?.vm_node_map || {}).length;
+        const assigned = Object.keys(placement?.vmNodeMap || placement?.vm_node_map || {}).length;
         updateProvisionDraft(currentStep.id, {
-          vm_node_map: placement.vm_node_map || {},
-          vm_size_map: placement.vm_size_map || {},
-          vm_storage_map: placement.vm_storage_map || {},
+          vm_node_map: placement.vmNodeMap || placement.vm_node_map || {},
+          vm_size_map: placement.vmSizeMap || placement.vm_size_map || {},
+          vm_storage_map: placement.vmStorageMap || placement.vm_storage_map || {},
         });
         setPlacementStatus({
           tone: "success",
