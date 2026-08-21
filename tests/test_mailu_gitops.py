@@ -360,3 +360,34 @@ def test_mailu_dkim_parser_uses_mailu_dns_dkim_export():
     assert result.stdout.strip() == (
         f'{{"name":"dkim._domainkey.example.com","value":"{expected_value}"' + "}"
     )
+
+
+def test_mailu_installer_chooses_storage_node_by_capacity_and_disk():
+    script = (
+        REPO_ROOT / "categories" / "apps" / "steps" / "install-mailu" / "run.sh"
+    ).read_text(encoding="utf-8")
+
+    # Must-fit budget names are wired into the chooser.
+    assert "MAILU_PINNED_POD_SLOTS:-8" in script
+    assert "MAILU_PINNED_CPU_MILLI:-1000" in script
+    assert "MAILU_PINNED_MEM_MIB:-2048" in script
+
+    # Selection reads Longhorn storage, with ephemeral-storage fallback.
+    assert "nodes.longhorn.io" in script
+    assert "storageAvailable" in script
+    assert "ephemeral-storage" in script
+
+
+def test_mailu_installer_rejects_full_nodes_and_fails_loudly():
+    script = (
+        REPO_ROOT / "categories" / "apps" / "steps" / "install-mailu" / "run.sh"
+    ).read_text(encoding="utf-8")
+
+    # A node that cannot fit the pinned set is skipped, never silently chosen.
+    assert "rejected:" in script
+    assert "free_pods" in script
+    assert "free_cpu" in script
+    assert "free_mem" in script
+
+    # If nothing fits the installer fails with a clear diagnostic.
+    assert "No Ready schedulable worker has capacity to host Mailu" in script
