@@ -90,6 +90,11 @@ test("app source defines a minimal wizard shell with guided input and step-by-st
   assert.match(source, /hasPlacementAssignments/, "expected the step 1 auto-placement guard");
   assert.match(
     source,
+    /placementEditedRef\.current/,
+    "expected auto-placement to skip only when the user manually edited placements this session"
+  );
+  assert.match(
+    source,
     /buildPlacementSuggestionKey/,
     "expected a stable suggestion key for automatic placement"
   );

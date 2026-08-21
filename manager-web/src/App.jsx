@@ -944,6 +944,7 @@ function App() {
   const [wizardStateCanSave, setWizardStateCanSave] = useState(false);
   const saveWizardStateTimerRef = useRef(null);
   const placementSuggestionKeyRef = useRef("");
+  const placementEditedRef = useRef(false);
   const wizardPhaseRef = useRef(initialWizardPhase);
 
   useEffect(() => {
@@ -1551,6 +1552,8 @@ function App() {
         return;
       }
 
+      placementEditedRef.current = false;
+
       try {
         const effectiveDraft =
           draft && typeof draft === "object" ? draft : answersRef.current?.[currentStep.id] || {};
@@ -2023,6 +2026,7 @@ function App() {
       return;
     }
 
+    placementEditedRef.current = true;
     updateVmConfiguration(vmName, "host", hostName);
   }
 
@@ -2032,6 +2036,8 @@ function App() {
     const board = buildProvisionPlacementBoard(currentStep.inputs || [], draft, proxmoxResources);
     const vm = board.vmPlan.find((entry) => entry.name === vmName);
     if (!vm) return;
+
+    placementEditedRef.current = true;
 
     if (field === "host") {
       const host = board.hostCards.find((entry) => entry.id === value);
@@ -2188,6 +2194,7 @@ function App() {
     provisionSuggestionKeyRef.current = "";
     provisionSuggestionSnapshotRef.current = {};
     placementSuggestionKeyRef.current = "";
+    placementEditedRef.current = false;
     clearInstallStepLogs();
 
     requestJson("/api/wizard/state", {
@@ -2246,6 +2253,7 @@ function App() {
       });
       setPlacementStatus({ tone: "", message: "" });
       placementSuggestionKeyRef.current = "";
+      placementEditedRef.current = false;
       provisionSuggestionKeyRef.current = "";
       provisionSuggestionSnapshotRef.current = {};
       provisionDirtyFieldsRef.current = new Set();
@@ -2351,7 +2359,7 @@ function App() {
       return;
     }
 
-    if (hasPlacementAssignments(currentDraft.vm_node_map)) {
+    if (placementEditedRef.current) {
       return;
     }
 
