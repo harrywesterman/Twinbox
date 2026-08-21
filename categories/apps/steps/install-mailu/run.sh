@@ -302,7 +302,7 @@ choose_mailu_storage_node() {
     fi
 
     if [[ -n "$reason" ]]; then
-      log "Mailu storage-node candidate ${node} rejected:${reason} (disk_mi=${free_disk})"
+      log "Mailu storage-node candidate ${node} rejected:${reason} (disk_mi=${free_disk})" >&2
       continue
     fi
 
@@ -310,14 +310,14 @@ choose_mailu_storage_node() {
       best_disk="$free_disk"
       best_node="$node"
     fi
-    log "Mailu storage-node candidate ${node} fits: disk_mi=${free_disk}, pods_free=${free_pods}, cpu_milli_free=${free_cpu}, mem_mi_free=${free_mem}"
+    log "Mailu storage-node candidate ${node} fits: disk_mi=${free_disk}, pods_free=${free_pods}, cpu_milli_free=${free_cpu}, mem_mi_free=${free_mem}" >&2
   done
 
   if [[ -z "$best_node" ]]; then
     fail "No Ready schedulable worker has capacity to host Mailu. Required: pods>=${required_pod_slots}, cpu>=${required_cpu_milli}m, mem>=${required_mem_mi}Mi. See per-candidate log lines above. Free disk space or move workloads off full workers before retrying."
   fi
 
-  log "Choosing ${best_node} as Mailu storage node (free disk ${best_disk} Mi)"
+  log "Choosing ${best_node} as Mailu storage node (free disk ${best_disk} Mi)" >&2
   kubectl label node "$best_node" "twinbox.io/mailu-storage-node=${label_value}" --overwrite >/dev/null
   printf '%s\n' "$best_node"
 }
