@@ -281,6 +281,7 @@ choose_mailu_storage_node() {
         kubectl -n longhorn-system get "nodes.longhorn.io/$node" -o json |
           jq '[.status.diskStatus[]?.storageAvailable // 0] | add // 0'
       )"
+      free_disk="$(mem_to_mib "$free_disk")"
     else
       free_disk="$(
         kubectl get "nodes/$node" -o jsonpath='{.status.allocatable.ephemeral-storage}' 2>/dev/null
@@ -316,7 +317,7 @@ choose_mailu_storage_node() {
     fail "No Ready schedulable worker has capacity to host Mailu. Required: pods>=${required_pod_slots}, cpu>=${required_cpu_milli}m, mem>=${required_mem_mi}Mi. See per-candidate log lines above. Free disk space or move workloads off full workers before retrying."
   fi
 
-  log "Choosing ${best_node} as Mailu storage node (free disk ${best_disk} bytes)"
+  log "Choosing ${best_node} as Mailu storage node (free disk ${best_disk} Mi)"
   kubectl label node "$best_node" "twinbox.io/mailu-storage-node=${label_value}" --overwrite >/dev/null
   printf '%s\n' "$best_node"
 }
