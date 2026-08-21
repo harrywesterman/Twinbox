@@ -259,11 +259,11 @@ choose_mailu_storage_node() {
                          | if endswith("m") then (. | rtrimstr("m") | tonumber)
                            else (tonumber * 1000) end ] | add // 0 ),
           mem_mi: ( [ $reqs[] | .memory? // "0"
-                      | if endswith("Ki") then (. | rtrimstr("Ki") | tonumber / 1024)
-                        elif endswith("Mi") then (. | rtrimstr("Mi") | tonumber)
-                        elif endswith("Gi") then (. | rtrimstr("Gi") | tonumber * 1024)
-                        elif endswith("Ti") then (. | rtrimstr("Ti") | tonumber * 1024 * 1024)
-                        else (tonumber / 1024 / 1024) end ] | add // 0 )
+                      | if endswith("Ki") then (. | rtrimstr("Ki") | tonumber / 1024 | floor)
+                        elif endswith("Mi") then (. | rtrimstr("Mi") | tonumber | floor)
+                        elif endswith("Gi") then (. | rtrimstr("Gi") | tonumber * 1024 | floor)
+                        elif endswith("Ti") then (. | rtrimstr("Ti") | tonumber * 1024 * 1024 | floor)
+                        else (tonumber / 1024 / 1024 | floor) end ] | add // 0 )
         }
     ')"
 
@@ -286,6 +286,7 @@ choose_mailu_storage_node() {
         kubectl get "nodes/$node" -o jsonpath='{.status.allocatable.ephemeral-storage}' 2>/dev/null
       )"
       free_disk="${free_disk:-0}"
+      free_disk="$(mem_to_mib "$free_disk")"
     fi
 
     reason=""
