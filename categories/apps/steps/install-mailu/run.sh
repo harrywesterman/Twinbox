@@ -177,10 +177,32 @@ sanitize_label_value() {
   printf '%s\n' "$value"
 }
 
+# Parse a k8s CPU quantity to milli-cores ("750m" -> 750, "2" -> 2000, "0.5" -> 500).
+cpu_to_millicores() {
+  local value="$1"
+  python3 -c 'import re,sys; v=sys.argv[1]; m=re.match(r"^(\d+(?:\.\d+)?)m?$", v)
+if not m: sys.exit(f"unparseable cpu: {v}")
+n=float(m.group(1)); print(int(n) if v.endswith("m") else int(n*1000))' "$value"
+}
+
+# Parse a k8s memory quantity to Mi ("128Mi" -> 128, "1Gi" -> 1024, "22025760Ki" -> 21509).
+mem_to_mib() {
+  local value="$1"
+  python3 -c 'import re,sys; v=sys.argv[1]; m=re.match(r"^(\d+(?:\.\d+)?)([KMG]i?|)$", v)
+if not m: sys.exit(f"unparseable memory: {v}")
+n=float(m.group(1)); unit=m.group(2)
+mul={"":1,"K":10**3,"Ki":2**10,"M":10**6,"Mi":2**20,"G":10**9,"Gi":2**30}.get(unit,1)
+print(int(n*mul//(2**20)))' "$value"
+}
+
 choose_mailu_storage_node() {
   local label_value="$1"
-  local existing_node candidate_node
+  local existing_node candidates_json pods_json alloc_json
+  local node used_cpu used_mem used_pods alloc_cpu alloc_mem alloc_pods
+  local free_cpu free_mem free_pods free_disk best_node best_disk reason
+  local required_pod_slots required_cpu_milli required_mem_mi
 
+  # Idempotent: reuse an existing Ready storage node for this cluster.
   existing_node="$(
     kubectl get nodes -l "twinbox.io/mailu-storage-node=${label_value}" -o json |
       jq -r '
@@ -195,33 +217,107 @@ choose_mailu_storage_node() {
     return 0
   fi
 
-  candidate_node="$(
-    kubectl get nodes -o json |
-      jq -r '
-        .items[]
-        | select(any(.status.conditions[]?; .type == "Ready" and .status == "True"))
-        | select((.spec.unschedulable // false) == false)
-        | select((.metadata.labels | has("node-role.kubernetes.io/control-plane")) == false)
-        | .metadata.name
-      ' |
-      head -n1
-  )"
-  if [[ -z "$candidate_node" ]]; then
-    candidate_node="$(
-      kubectl get nodes -o json |
-        jq -r '
-          .items[]
-          | select(any(.status.conditions[]?; .type == "Ready" and .status == "True"))
-          | select((.spec.unschedulable // false) == false)
-          | .metadata.name
-        ' |
-        head -n1
-    )"
-  fi
-  [[ -n "$candidate_node" ]] || fail "No Ready schedulable node found for Mailu shared storage"
+  # Must-fit budget for the pinned Mailu workloads (front/admin/postfix/dovecot/rspamd/webmail).
+  required_pod_slots="${MAILU_PINNED_POD_SLOTS:-8}"
+  required_cpu_milli="${MAILU_PINNED_CPU_MILLI:-1000}"
+  required_mem_mi="${MAILU_PINNED_MEM_MIB:-2048}"
 
-  kubectl label node "$candidate_node" "twinbox.io/mailu-storage-node=${label_value}" --overwrite >/dev/null
-  printf '%s\n' "$candidate_node"
+  candidates_json="$(kubectl get nodes -o json)"
+  pods_json="$(kubectl get pods -A -o json)"
+
+  best_node=""
+  best_disk=-1
+
+  for node in $(
+    printf '%s' "$candidates_json" | jq -r '
+      .items[]
+      | select(any(.status.conditions[]?; .type == "Ready" and .status == "True"))
+      | select((.spec.unschedulable // false) == false)
+      | select((.metadata.labels | has("node-role.kubernetes.io/control-plane")) == false)
+      | .metadata.name
+    '
+  ); do
+    alloc_json="$(printf '%s' "$candidates_json" | jq -c --arg n "$node" '
+      .items[] | select(.metadata.name == $n) | .status.allocatable
+    ')"
+
+    alloc_cpu="$(printf '%s' "$alloc_json" | jq -r '.cpu // "0"')"
+    alloc_mem="$(printf '%s' "$alloc_json" | jq -r '.memory // "0"')"
+    alloc_pods="$(printf '%s' "$alloc_json" | jq -r '.pods // "0"')"
+    alloc_cpu="$(cpu_to_millicores "$alloc_cpu")"
+    alloc_mem="$(mem_to_mib "$alloc_mem")"
+
+    used_json="$(printf '%s' "$pods_json" | jq -c --arg n "$node" '
+      [ .items[]
+        | select((.spec.nodeName // "") == $n)
+        | .spec.containers[]?
+        | .resources.requests
+      ] as $reqs
+      | {
+          pods: ([ .items[] | select((.spec.nodeName // "") == $n) ] | length),
+          cpu_milli: ( [ $reqs[] | .cpu? // "0"
+                         | if endswith("m") then (. | rtrimstr("m") | tonumber)
+                           else (tonumber * 1000) end ] | add // 0 ),
+          mem_mi: ( [ $reqs[] | .memory? // "0"
+                      | if endswith("Ki") then (. | rtrimstr("Ki") | tonumber / 1024)
+                        elif endswith("Mi") then (. | rtrimstr("Mi") | tonumber)
+                        elif endswith("Gi") then (. | rtrimstr("Gi") | tonumber * 1024)
+                        elif endswith("Ti") then (. | rtrimstr("Ti") | tonumber * 1024 * 1024)
+                        else (tonumber / 1024 / 1024) end ] | add // 0 )
+        }
+    ')"
+
+    used_pods="$(printf '%s' "$used_json" | jq -r '.pods')"
+    used_cpu="$(printf '%s' "$used_json" | jq -r '.cpu_milli')"
+    used_mem="$(printf '%s' "$used_json" | jq -r '.mem_mi')"
+
+    free_pods=$((alloc_pods - used_pods))
+    free_cpu=$((alloc_cpu - used_cpu))
+    free_mem=$((alloc_mem - used_mem))
+
+    # Prefer Longhorn's true storage availability; fall back to ephemeral-storage.
+    if kubectl -n longhorn-system get "nodes.longhorn.io/$node" >/dev/null 2>&1; then
+      free_disk="$(
+        kubectl -n longhorn-system get "nodes.longhorn.io/$node" -o json |
+          jq '[.status.diskStatus[]?.storageAvailable // 0] | add // 0'
+      )"
+    else
+      free_disk="$(
+        kubectl get "nodes/$node" -o jsonpath='{.status.allocatable.ephemeral-storage}' 2>/dev/null
+      )"
+      free_disk="${free_disk:-0}"
+    fi
+
+    reason=""
+    if [[ "$free_pods" -lt "$required_pod_slots" ]]; then
+      reason="${reason} pods free=${free_pods}<${required_pod_slots}"
+    fi
+    if [[ "$free_cpu" -lt "$required_cpu_milli" ]]; then
+      reason="${reason} cpu_milli free=${free_cpu}<${required_cpu_milli}"
+    fi
+    if [[ "$free_mem" -lt "$required_mem_mi" ]]; then
+      reason="${reason} mem_mi free=${free_mem}<${required_mem_mi}"
+    fi
+
+    if [[ -n "$reason" ]]; then
+      log "Mailu storage-node candidate ${node} rejected:${reason} (disk_mi=${free_disk})"
+      continue
+    fi
+
+    if [[ "$free_disk" -gt "$best_disk" ]]; then
+      best_disk="$free_disk"
+      best_node="$node"
+    fi
+    log "Mailu storage-node candidate ${node} fits: disk_mi=${free_disk}, pods_free=${free_pods}, cpu_milli_free=${free_cpu}, mem_mi_free=${free_mem}"
+  done
+
+  if [[ -z "$best_node" ]]; then
+    fail "No Ready schedulable worker has capacity to host Mailu. Required: pods>=${required_pod_slots}, cpu>=${required_cpu_milli}m, mem>=${required_mem_mi}Mi. See per-candidate log lines above. Free disk space or move workloads off full workers before retrying."
+  fi
+
+  log "Choosing ${best_node} as Mailu storage node (free disk ${best_disk} bytes)"
+  kubectl label node "$best_node" "twinbox.io/mailu-storage-node=${label_value}" --overwrite >/dev/null
+  printf '%s\n' "$best_node"
 }
 
 generate_mailu_tls_secret_file() {
