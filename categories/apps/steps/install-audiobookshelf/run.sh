@@ -241,6 +241,8 @@ AUDIOBOOKSHELF_TOKEN_URL="${AUTHENTIK_HOST%/}/application/o/token/"
 AUDIOBOOKSHELF_USERINFO_URL="${AUTHENTIK_HOST%/}/application/o/userinfo/"
 AUDIOBOOKSHELF_JWKS_URL="${AUTHENTIK_HOST%/}/application/o/audiobookshelf/jwks/"
 AUDIOBOOKSHELF_MOBILE_REDIRECT_URIS='["audiobookshelf://oauth"]'
+AUDIOBOOKSHELF_LIBRARY_NAME="${AUDIOBOOKSHELF_LIBRARY_NAME:-mijn}"
+AUDIOBOOKSHELF_LIBRARY_PATH="${AUDIOBOOKSHELF_LIBRARY_PATH:-/data/library}"
 
 existing_audiobookshelf_secret_json=""
 if command -v openbao_read_global_secret_json >/dev/null 2>&1; then
@@ -479,6 +481,33 @@ curl -fsS \
   -H "Authorization: Bearer ${audiobookshelf_api_token}" \
   -H "Content-Type: application/json" \
   -d "$auth_settings_payload" >/dev/null
+
+log "Provisioning Audiobookshelf library on persistent storage"
+kubectl -n audiobookshelf exec "deploy/audiobookshelf" -- mkdir -p "$AUDIOBOOKSHELF_LIBRARY_PATH"
+
+libraries_json="$(curl -fsS "$ABS_BASE_URL/api/libraries" -H "Authorization: Bearer ${audiobookshelf_api_token}")"
+library_on_persistent_path="$(
+  jq -c '[.libraries[]? | select(any(.folders[]?; ((.fullPath // .path) // "") | startswith("/data/")))][0] // empty' <<<"$libraries_json"
+)"
+if [[ -z "$library_on_persistent_path" ]]; then
+  log "Creating Audiobookshelf podcast library ${AUDIOBOOKSHELF_LIBRARY_NAME} on ${AUDIOBOOKSHELF_LIBRARY_PATH}"
+  curl -fsS \
+    -X POST "$ABS_BASE_URL/api/libraries" \
+    -H "Authorization: Bearer ${audiobookshelf_api_token}" \
+    -H "Content-Type: application/json" \
+    -d "$(
+      jq -n \
+        --arg name "$AUDIOBOOKSHELF_LIBRARY_NAME" \
+        --arg full_path "$AUDIOBOOKSHELF_LIBRARY_PATH" \
+        '{
+          name: $name,
+          mediaType: "podcast",
+          folders: [{ fullPath: $full_path }]
+        }'
+    )" >/dev/null
+else
+  log "Audiobookshelf library already on persistent storage"
+fi
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \

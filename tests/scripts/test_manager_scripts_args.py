@@ -53,6 +53,9 @@ OPENWEBUI_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-o
 N8N_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-n8n" / "run.sh"
 HEDGEDOC_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-hedgedoc" / "run.sh"
 PAPERLESS_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-paperless" / "run.sh"
+AUDIOBOOKSHELF_STEP_SCRIPT = (
+    REPO_ROOT / "categories" / "apps" / "steps" / "install-audiobookshelf" / "run.sh"
+)
 VAULTWARDEN_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "apps" / "steps" / "install-vaultwarden" / "run.sh"
 )
@@ -4317,6 +4320,21 @@ def test_paperless_deployment_uses_reasonable_resources():
     assert "cpu: 250m" in deployment_text
     assert 'cpu: "1"' in deployment_text
     assert "failureThreshold: 120" in deployment_text
+
+
+def test_install_audiobookshelf_provisions_library_on_persistent_storage():
+    text = AUDIOBOOKSHELF_STEP_SCRIPT.read_text(encoding="utf-8")
+
+    assert 'AUDIOBOOKSHELF_LIBRARY_NAME="${AUDIOBOOKSHELF_LIBRARY_NAME:-mijn}"' in text
+    assert 'AUDIOBOOKSHELF_LIBRARY_PATH="${AUDIOBOOKSHELF_LIBRARY_PATH:-/data/library}"' in text
+    assert (
+        'kubectl -n audiobookshelf exec "deploy/audiobookshelf" -- mkdir -p "$AUDIOBOOKSHELF_LIBRARY_PATH"'
+        in text
+    )
+    assert 'startswith("/data/")' in text
+    assert 'X POST "$ABS_BASE_URL/api/libraries"' in text
+    assert 'mediaType: "podcast"' in text
+    assert "Audiobookshelf library already on persistent storage" in text
 
 
 def test_cnpg_database_clusters_have_seaweedfs_backups():
