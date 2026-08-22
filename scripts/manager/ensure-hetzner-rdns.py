@@ -12,7 +12,6 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-
 API_BASE_URL = "https://api.hetzner.cloud/v1"
 LIST_PAGE_SIZE = 50
 ACTION_POLL_SECONDS = 2
@@ -23,6 +22,14 @@ PTR_VERIFY_SECONDS = 2
 
 class HetznerError(RuntimeError):
     """Raised when the Hetzner API returns an error or a lookup fails."""
+
+
+class HetznerHttpError(HetznerError):
+    """Raised when the Hetzner API returns a non-2xx HTTP response."""
+
+    def __init__(self, status: int, message: str):
+        super().__init__(message)
+        self.status = status
 
 
 def _api_error_message(exc: urllib.error.HTTPError, method: str, url: str) -> str:
@@ -57,7 +64,7 @@ def _request_json(
         with urllib.request.urlopen(request, timeout=30) as response:
             raw = response.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
-        raise HetznerError(_api_error_message(exc, method, url)) from exc
+        raise HetznerHttpError(exc.code, _api_error_message(exc, method, url)) from exc
 
     if not raw:
         return {}
@@ -102,9 +109,7 @@ def _get_server_by_name(token: str, server_name: str) -> dict[str, object] | Non
     if not server_name:
         return None
 
-    query = urllib.parse.urlencode(
-        {"name": server_name, "page": 1, "per_page": LIST_PAGE_SIZE}
-    )
+    query = urllib.parse.urlencode({"name": server_name, "page": 1, "per_page": LIST_PAGE_SIZE})
     response = _request_json("GET", f"/servers?{query}", token)
     servers = response.get("servers", [])
     if not isinstance(servers, list) or not servers:
@@ -151,7 +156,9 @@ def _resolve_server(
 ) -> dict[str, object]:
     mismatched_candidates: list[tuple[str, dict[str, object]]] = []
     for candidate_name in (server_name, fallback_server_name):
-        if not candidate_name or any(existing_name == candidate_name for existing_name, _ in mismatched_candidates):
+        if not candidate_name or any(
+            existing_name == candidate_name for existing_name, _ in mismatched_candidates
+        ):
             continue
         server = _get_server_by_name(token, candidate_name)
         if server is None:
@@ -182,7 +189,16 @@ def _resolve_server(
 
 def _wait_for_action(server_id: int, action_id: int, token: str) -> dict[str, object]:
     for _ in range(ACTION_POLL_ATTEMPTS):
-        response = _request_json("GET", f"/servers/{server_id}/actions/{action_id}", token)
+        try:
+            response = _request_json("GET", f"/servers/{server_id}/actions/{action_id}", token)
+        except HetznerHttpError as exc:
+            if exc.status == 404:
+                # Instant actions (e.g. change_dns_ptr) can complete and be evicted
+                # before the first poll, so the action no longer exists. Verification
+                # below against the server's actual dns_ptr is the source of truth.
+                print("INFO: action no longer present; relying on server dns_ptr verification")
+                return {}
+            raise
         action = response.get("action", {})
         if not isinstance(action, dict):
             action = {}
@@ -204,13 +220,15 @@ def _verify_dns_ptr(server_id: int, ip: str, ptr: str, token: str) -> dict[str, 
     for _ in range(PTR_VERIFY_ATTEMPTS):
         response = _request_json("GET", f"/servers/{server_id}", token)
         server = response.get("server", response)
-        if isinstance(server, dict) and _server_ipv4(server) == ip and _server_ipv4_ptr(server) == ptr:
+        if (
+            isinstance(server, dict)
+            and _server_ipv4(server) == ip
+            and _server_ipv4_ptr(server) == ptr
+        ):
             return server
         time.sleep(PTR_VERIFY_SECONDS)
 
-    raise HetznerError(
-        f"Hetzner PTR for server {server_id} did not settle on {ptr} for IPv4 {ip}"
-    )
+    raise HetznerError(f"Hetzner PTR for server {server_id} did not settle on {ptr} for IPv4 {ip}")
 
 
 def ensure_hetzner_rdns(
@@ -275,4 +293,4 @@ if __name__ == "__main__":
         raise SystemExit(main())
     except HetznerError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
-        raise SystemExit(1)
+        raise SystemExit(1) from exc

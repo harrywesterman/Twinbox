@@ -201,6 +201,136 @@ def test_falls_back_to_ipv4_lookup_when_name_lookup_misses(monkeypatch):
     assert len(requests) == 3
 
 
+def test_succeeds_when_poll_404s_for_instant_action(monkeypatch):
+    helper = _load_helper_module()
+    server = {
+        "id": 42,
+        "name": "twinbox-abc-netbird",
+        "public_net": {
+            "ipv4": {
+                "ip": "203.0.113.10",
+                "dns_ptr": "static.10.113.0.203.clients.your-server.de",
+            }
+        },
+    }
+    updated_server = {
+        "id": 42,
+        "name": "twinbox-abc-netbird",
+        "public_net": {
+            "ipv4": {
+                "ip": "203.0.113.10",
+                "dns_ptr": "mail.example.com",
+            }
+        },
+    }
+    requests = []
+
+    def fake_urlopen(request, timeout=30):
+        requests.append(request)
+        parsed = urllib.parse.urlparse(request.full_url)
+        if len(requests) == 1:
+            return _FakeResponse({"servers": [server], "meta": {"pagination": {"last_page": 1}}})
+        if len(requests) == 2:
+            assert request.get_method() == "POST"
+            return _FakeResponse({"action": {"id": 7, "status": "running"}})
+        if len(requests) == 3:
+            assert parsed.path == "/v1/servers/42/actions/7"
+            raise _fake_http_error(
+                request.full_url,
+                code=404,
+                payload={"error": {"code": "not_found", "message": "action not found"}},
+            )
+        if len(requests) == 4:
+            assert parsed.path == "/v1/servers/42"
+            return _FakeResponse({"server": updated_server})
+        raise AssertionError(f"unexpected request {request.full_url}")
+
+    monkeypatch.setenv("HCLOUD_TOKEN", "secret-token")
+    monkeypatch.setattr(helper.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(helper.time, "sleep", lambda *_: None)
+
+    exit_code = helper.main(
+        [
+            "--server-name",
+            "twinbox-abc-netbird",
+            "--fallback-server-name",
+            "netbird-abc",
+            "--ip",
+            "203.0.113.10",
+            "--ptr",
+            "mail.example.com",
+        ]
+    )
+
+    assert exit_code == 0
+    assert len(requests) == 4
+
+
+def test_poll_404_does_not_swallow_verification_failure(monkeypatch):
+    helper = _load_helper_module()
+    server = {
+        "id": 42,
+        "name": "twinbox-abc-netbird",
+        "public_net": {
+            "ipv4": {
+                "ip": "203.0.113.10",
+                "dns_ptr": "static.10.113.0.203.clients.your-server.de",
+            }
+        },
+    }
+    unchanged_server = {
+        "id": 42,
+        "name": "twinbox-abc-netbird",
+        "public_net": {
+            "ipv4": {
+                "ip": "203.0.113.10",
+                "dns_ptr": "static.10.113.0.203.clients.your-server.de",
+            }
+        },
+    }
+    requests = []
+
+    def fake_urlopen(request, timeout=30):
+        requests.append(request)
+        parsed = urllib.parse.urlparse(request.full_url)
+        if len(requests) == 1:
+            return _FakeResponse({"servers": [server], "meta": {"pagination": {"last_page": 1}}})
+        if len(requests) == 2:
+            return _FakeResponse({"action": {"id": 7, "status": "running"}})
+        if len(requests) == 3:
+            raise _fake_http_error(
+                request.full_url,
+                code=404,
+                payload={"error": {"code": "not_found", "message": "action not found"}},
+            )
+        if len(requests) >= 4 and parsed.path == "/v1/servers/42":
+            return _FakeResponse({"server": unchanged_server})
+        raise AssertionError(f"unexpected request {request.full_url}")
+
+    monkeypatch.setenv("HCLOUD_TOKEN", "secret-token")
+    monkeypatch.setattr(helper.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(helper.time, "sleep", lambda *_: None)
+
+    with pytest.raises(helper.HetznerError) as exc_info:
+        helper.main(
+            [
+                "--server-name",
+                "twinbox-abc-netbird",
+                "--fallback-server-name",
+                "netbird-abc",
+                "--ip",
+                "203.0.113.10",
+                "--ptr",
+                "mail.example.com",
+            ]
+        )
+
+    message = str(exc_info.value)
+    assert "did not settle" in message
+    assert "action not found" not in message
+    assert len(requests) > 4
+
+
 def test_name_lookup_ip_mismatch_fails_without_leaking_token(monkeypatch):
     helper = _load_helper_module()
     server = {
