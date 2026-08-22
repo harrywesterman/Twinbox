@@ -409,13 +409,15 @@ register_mailu_authentik_app() {
     --arg authorization_flow "$authorization_flow_id" \
     --arg invalidation_flow "$invalidation_flow_id" \
     '{name: $name, external_host: $external_host, authorization_flow: $authorization_flow, invalidation_flow: $invalidation_flow, mode: "forward_single"}')"
-  provider_pk="$(authentik_api_request POST "/providers/proxy/" "$provider_payload" | jq -r ".pk // empty")"
+  provider_pk="$(authentik_api_request GET "/providers/proxy/" \
+    | jq -r '.results[]? | select(.name == "Mailu") | .pk // empty' | head -n1)"
   if [[ -z "$provider_pk" || "$provider_pk" == "null" ]]; then
-    provider_pk="$(authentik_api_request GET "/providers/proxy/?name=Mailu" | jq -r ".results[0].pk // empty")"
+    provider_pk="$(authentik_api_request POST "/providers/proxy/" "$provider_payload" | jq -r ".pk // empty")"
   fi
   [[ -n "$provider_pk" && "$provider_pk" != "null" ]] || fail "Could not create Mailu Authentik proxy provider"
 
-  app_pk="$(authentik_api_request GET "/core/applications/mailu/" 2>/dev/null | jq -r ".pk // empty")"
+  app_pk="$(authentik_api_request GET "/core/applications/" \
+    | jq -r '.results[]? | select(.slug == "mailu") | .pk // empty' | head -n1)"
   if [[ -z "$app_pk" || "$app_pk" == "null" ]]; then
     local app_payload
     app_payload="$(jq -n \
@@ -428,7 +430,8 @@ register_mailu_authentik_app() {
   fi
   [[ -n "$app_pk" && "$app_pk" != "null" ]] || fail "Could not create Mailu Authentik application"
 
-  policy_pk="$(authentik_api_request GET "/policies/expression/?name=allow-all-authenticated" | jq -r ".results[0].pk // empty")"
+  policy_pk="$(authentik_api_request GET "/policies/expression/" \
+    | jq -r '.results[]? | select(.name == "allow-all-authenticated") | .pk // empty' | head -n1)"
   if [[ -z "$policy_pk" || "$policy_pk" == "null" ]]; then
     policy_pk="$(authentik_api_request POST "/policies/expression/" \
       "{\"name\":\"allow-all-authenticated\",\"execution_logging\":false,\"expression\":\"return True\"}" | jq -r ".pk // empty")"
@@ -446,7 +449,8 @@ register_mailu_authentik_app() {
   authentik_api_request POST "/policies/bindings/" "$binding_payload" >/dev/null 2>&1 || fail "Could not create policy binding"
 
   local outpost_id current_providers updated_providers
-  outpost_id="$(authentik_api_request GET "/outposts/instances/?name=authentik Embedded Outpost" | jq -r ".results[0].pk // empty")"
+  outpost_id="$(authentik_api_request GET "/outposts/instances/" \
+    | jq -r '.results[]? | select(.name == "authentik Embedded Outpost") | .pk // empty' | head -n1)"
   if [[ -n "$outpost_id" && "$outpost_id" != "null" ]]; then
     current_providers="$(authentik_api_request GET "/outposts/instances/${outpost_id}/" | jq -c "[.providers[]]")"
     if ! jq -e --arg pk "$provider_pk" "map(tostring) | index(\$pk) != null" <<<"$current_providers" >/dev/null 2>&1; then

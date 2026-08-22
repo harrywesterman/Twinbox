@@ -412,3 +412,28 @@ def test_mailu_installer_rejects_full_nodes_and_fails_loudly():
 
     # If nothing fits the installer fails with a clear diagnostic.
     assert "No Ready schedulable worker has capacity to host Mailu" in script
+
+
+def test_mailu_installer_authentik_registration_is_idempotent_and_match_by_name():
+    script = (REPO_ROOT / "categories" / "apps" / "steps" / "install-mailu" / "run.sh").read_text(
+        encoding="utf-8"
+    )
+
+    # Provider/app/policy lookups are GET-first and matched by name, so a partial
+    # previous run (provider already created) does not fail the POST with 400.
+    assert 'authentik_api_request GET "/providers/proxy/"' in script
+    assert 'select(.name == "Mailu")' in script
+    assert 'authentik_api_request GET "/core/applications/"' in script
+    assert 'select(.slug == "mailu")' in script
+    assert 'authentik_api_request GET "/policies/expression/"' in script
+    assert 'select(.name == "allow-all-authenticated")' in script
+    assert 'authentik_api_request GET "/outposts/instances/"' in script
+    assert 'select(.name == "authentik Embedded Outpost")' in script
+
+    # GET lookups must appear before the matching POST create in the script body.
+    get_index = script.index('authentik_api_request GET "/providers/proxy/"')
+    post_index = script.index('authentik_api_request POST "/providers/proxy/"')
+    assert get_index < post_index
+    app_get_index = script.index('authentik_api_request GET "/core/applications/"')
+    app_post_index = script.index('authentik_api_request POST "/core/applications/"')
+    assert app_get_index < app_post_index
