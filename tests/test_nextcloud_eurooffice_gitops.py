@@ -106,7 +106,7 @@ def test_eurooffice_deployment_is_pinned_and_has_health_checks_and_storage():
         "key": "jwt-secret",
     }
     assert container["resources"] == {
-        "requests": {"cpu": "500m", "memory": "2Gi"},
+        "requests": {"cpu": "100m", "memory": "2Gi"},
         "limits": {"cpu": "2", "memory": "4Gi"},
     }
 
