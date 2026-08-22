@@ -438,9 +438,10 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "SETTING_AUTHENTICATION_BACKENDS" not in values_text
     assert "accessModes:" in values_text
     assert "accessMode:" not in values_text
-    assert 'loadbalancer_ips="${LOADBALANCER_IPS:-}"' in values_text
-    assert 'crudini --set /etc/zulip/zulip.conf loadbalancer ips "$loadbalancer_ips"' in values_text
-    assert "LOADBALANCER_IPS is required" in values_text
+    assert "06-patch-nginx-trusted-proto" not in values_text
+    assert "trusted_proto_entries" not in values_text
+    assert "livenessProbe:" in values_text
+    assert "failureThreshold: 15" in values_text
     assert "__ZULIP_RABBITMQ_PASSWORD__" not in app_text
     assert "__ZULIP_REDIS_PASSWORD__" not in app_text
 

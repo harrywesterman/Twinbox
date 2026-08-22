@@ -59,28 +59,6 @@ postSetup:
       # With lazy-apps=false the app is loaded before hook-post-fork runs,
       # so chdir must point at the deployment directory from the start.
       sed -i 's|^chdir=/|chdir=/home/zulip/deployments/current|' /etc/zulip/uwsgi.ini
-    06-patch-nginx-trusted-proto.sh: |
-      #!/usr/bin/env bash
-      set -euo pipefail
-      # Keep nginx trusted-proto aligned with the runtime load balancer CIDRs used by Zulip.
-      loadbalancer_ips="${LOADBALANCER_IPS:-}"
-      if [[ -z "$loadbalancer_ips" ]]; then
-        echo "LOADBALANCER_IPS is required" >&2
-        exit 1
-      fi
-      trusted_proto_entries="$(
-        printf '%s\n' "$loadbalancer_ips" \
-          | tr ',' '\n' \
-          | awk '{
-              gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
-              if (length($0)) {
-                printf "    %s 1;\n", $0
-              }
-            }'
-      )"
-      sed -i "s|    default 0;|${trusted_proto_entries}    default 0;|" /etc/nginx/zulip-include/trusted-proto
-      crudini --set /etc/zulip/zulip.conf loadbalancer ips "$loadbalancer_ips"
-      nginx -s reload
     10-create-default-realm.sh: |
       #!/usr/bin/env bash
       set -euo pipefail
@@ -171,6 +149,17 @@ startupProbe:
   periodSeconds: 10
   initialDelaySeconds: 10
   timeoutSeconds: 60
+
+livenessProbe:
+  # /health does a memcached roundtrip. bmemcached has a known intermittent
+  # protocol race (struct.error) that can briefly 500 /health even though
+  # memcached itself is healthy. A low failureThreshold would let that
+  # transient blip kill the pod and trigger a ~10-minute full re-config
+  # restart. Tolerate it so a memcached blip does not take Zulip down.
+  failureThreshold: 15
+  periodSeconds: 10
+  initialDelaySeconds: 10
+  timeoutSeconds: 10
 
 externalPostgresql:
   host: zulip-db-pooler-rw.databases.svc.cluster.local
