@@ -77,6 +77,18 @@ front:
 
 admin:
   nodeSelector: {}
+  initContainers:
+    - name: wait-for-redis
+      image: busybox:1.38.0
+      imagePullPolicy: IfNotPresent
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          echo "waiting for Mailu Redis at {{ include "mailu.redis.serviceFqdn" . }}:{{ include "mailu.redis.port" . }}"
+          until nc -z -w 3 {{ include "mailu.redis.serviceFqdn" . }} {{ include "mailu.redis.port" . }}; do
+            sleep 2
+          done
+          echo "Mailu Redis is up"
   resources:
     requests:
       cpu: 100m

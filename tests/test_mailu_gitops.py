@@ -65,6 +65,20 @@ def test_mailu_values_keep_mail_ports_internal_and_set_resources():
         assert values[component]["nodeSelector"] == {}
 
 
+def test_mailu_admin_waits_for_redis_before_boot():
+    values = _load_yaml(REPO_ROOT / "gitops" / "values" / "mailu.yaml")
+    init_containers = values["admin"]["initContainers"]
+    assert any(container["name"] == "wait-for-redis" for container in init_containers)
+    wait = next(c for c in init_containers if c["name"] == "wait-for-redis")
+    assert wait["image"] == "busybox:1.38.0"
+    assert wait["command"] == ["/bin/sh", "-c"]
+    raw_args = " ".join(wait["args"])
+    assert 'include "mailu.redis.serviceFqdn"' in raw_args
+    assert 'include "mailu.redis.port"' in raw_args
+    assert "nc -z -w 3" in raw_args
+    assert "until" in raw_args
+
+
 def test_mailu_platform_externalsecrets_reference_openbao():
     certificates = _load_yaml(MAILU_PLATFORM_DIR / "externalsecret-certificates.yaml")
     runtime = _load_yaml(MAILU_PLATFORM_DIR / "externalsecret-runtime.yaml")
@@ -251,6 +265,13 @@ def test_mailu_installer_uses_private_relay_and_pre_dns_preflights():
     assert "wait_for_resource netbird externalsecret mailu-relay-egress Ready" in script
     assert "wait_for_resource mailu externalsecret mailu-certificates Ready" in script
     assert "wait_for_resource netbird deployment mailu-relay-egress Available" in script
+    assert "ensure_mailu_admin_initialized" in script
+    assert "flask db upgrade" in script
+    assert "--mode ifmissing" in script
+    assert "internal/rspamd/local_domains" in script
+    assert script.index("ensure_mailu_admin_initialized") < script.index(
+        'wait_for_selector mailu deployment "app.kubernetes.io/instance=mailu" Available'
+    )
     assert "choose_mailu_storage_node" in script
     assert "twinbox.io/mailu-storage-node" in script
     assert "generate_mailu_tls_secret_file" in script
@@ -363,9 +384,9 @@ def test_mailu_dkim_parser_uses_mailu_dns_dkim_export():
 
 
 def test_mailu_installer_chooses_storage_node_by_capacity_and_disk():
-    script = (
-        REPO_ROOT / "categories" / "apps" / "steps" / "install-mailu" / "run.sh"
-    ).read_text(encoding="utf-8")
+    script = (REPO_ROOT / "categories" / "apps" / "steps" / "install-mailu" / "run.sh").read_text(
+        encoding="utf-8"
+    )
 
     # Must-fit budget names are wired into the chooser.
     assert "MAILU_PINNED_POD_SLOTS:-8" in script
@@ -379,9 +400,9 @@ def test_mailu_installer_chooses_storage_node_by_capacity_and_disk():
 
 
 def test_mailu_installer_rejects_full_nodes_and_fails_loudly():
-    script = (
-        REPO_ROOT / "categories" / "apps" / "steps" / "install-mailu" / "run.sh"
-    ).read_text(encoding="utf-8")
+    script = (REPO_ROOT / "categories" / "apps" / "steps" / "install-mailu" / "run.sh").read_text(
+        encoding="utf-8"
+    )
 
     # A node that cannot fit the pinned set is skipped, never silently chosen.
     assert "rejected:" in script

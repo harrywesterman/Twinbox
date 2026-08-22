@@ -370,6 +370,26 @@ resolve_admin_pod() {
     head -n1
 }
 
+ensure_mailu_admin_initialized() {
+  local admin_pod
+
+  log "Waiting for Mailu admin deployment"
+  kubectl -n mailu wait --for=condition=Available deployment/mailu-admin --timeout=10m
+
+  admin_pod="$(resolve_admin_pod)"
+  [[ -n "$admin_pod" ]] || fail "Could not find a running Mailu admin pod"
+
+  log "Checking Mailu admin database schema"
+  if ! kubectl -n mailu exec "$admin_pod" -- \
+    python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/internal/rspamd/local_domains', timeout=5)" >/dev/null 2>&1; then
+    log "Mailu admin database schema missing; running flask db upgrade"
+    kubectl -n mailu exec "$admin_pod" -- flask db upgrade >/dev/null 2>&1 || true
+    log "Creating initial Mailu admin account (if missing)"
+    kubectl -n mailu exec "$admin_pod" -- \
+      flask mailu admin "$admin_localpart" "$mail_domain" "$admin_password" --mode ifmissing >/dev/null 2>&1 || true
+  fi
+}
+
 register_mailu_authentik_app() {
   local public_zone_name="$1"
 
@@ -843,6 +863,7 @@ wait_for_resource mailu externalsecret mailu-runtime Ready "Mailu runtime Extern
 wait_for_resource mailu externalsecret mailu-relay Ready "Mailu relay ExternalSecret"
 wait_for_resource mailu externalsecret mailu-certificates Ready "Mailu certificates ExternalSecret"
 wait_for_resource netbird externalsecret mailu-relay-egress Ready "Mailu relay egress ExternalSecret"
+ensure_mailu_admin_initialized
 wait_for_selector mailu deployment "app.kubernetes.io/instance=mailu" Available "Mailu deployments"
 wait_for_resource netbird deployment mailu-relay-egress Available "Mailu relay egress deployment"
 wait_for_statefulsets_ready mailu "app.kubernetes.io/instance=mailu" "Mailu statefulsets"
