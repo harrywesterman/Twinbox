@@ -21,7 +21,7 @@ spec:
       sources:
         - repoURL: https://jitsi-contrib.github.io/jitsi-helm/
           chart: jitsi-meet
-          targetRevision: "3.3.0"
+          targetRevision: "3.4.0"
           helm:
             valueFiles:
               - $values/gitops/values/jitsi.yaml
