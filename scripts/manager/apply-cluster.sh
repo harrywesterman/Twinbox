@@ -1404,6 +1404,7 @@ write_node_patch() {
   local ip="$3"
   local mac="$4"
   local patch_file="$5"
+  local cpu_cores="${6:-0}"
   local nameserver_block=""
   local search_domain_block=""
   local time_server="${TWINBOX_TIME_SERVER:-time.cloudflare.com}"
@@ -1435,6 +1436,27 @@ write_node_patch() {
     echo "    twinbox.io/role: ${role_label}"
     if [[ "$type" == "worker" ]]; then
       echo "    node.longhorn.io/create-default-disk: \"true\""
+    fi
+    # Worker nodes run many small pods; the Talos default of 110 maxPods caps a
+    # high-core worker (e.g. 10 cores) while CPU/memory are still free. Derive a
+    # per-node limit from its vCPU count so small workers keep the safe default
+    # and larger ones scale up. Override explicitly via TWINBOX_MAX_PODS.
+    # maxPods must live under kubelet.extraConfig (a KubeletConfiguration
+    # override); a bare kubelet.maxPods key is rejected by Talos config parsing.
+    if [[ "$type" == "worker" ]]; then
+      local node_max_pods="${TWINBOX_MAX_PODS:-}"
+      if [[ -z "$node_max_pods" ]]; then
+        node_max_pods="$(( cpu_cores * 15 ))"
+        if (( node_max_pods < 110 )); then
+          node_max_pods=110
+        fi
+      fi
+      if [[ ! "$node_max_pods" =~ ^[0-9]+$ ]]; then
+        fail "TWINBOX_MAX_PODS must be a non-negative integer, got: ${node_max_pods}"
+      fi
+      echo "  kubelet:"
+      echo "    extraConfig:"
+      echo "      maxPods: ${node_max_pods}"
     fi
     # Collabora-based document servers create a user namespace for each jail.
     # Talos defaults this kernel limit to zero, which prevents those editors from starting.
@@ -1562,12 +1584,12 @@ generate_talos_configs() {
   upsert_secret_artifact "talos-secrets" "secrets.yaml" "$talos_secrets_file"
   upsert_secret_artifact "talosconfig" "talosconfig" "$talosconfig_file"
 
-  while IFS=$'\t' read -r name type ip mac; do
+  while IFS=$'\t' read -r name type ip mac cpu; do
     [[ -n "$name" ]] || continue
     node_dir="$runtime_talos_dir/generated/$name"
     patch_file="$node_dir/patch.yaml"
     mkdir -p "$node_dir"
-    write_node_patch "$name" "$type" "$ip" "$mac" "$patch_file"
+    write_node_patch "$name" "$type" "$ip" "$mac" "$patch_file" "$cpu"
 
     log "Generating Talos config for ${name}"
     if [[ "$type" == "controlplane" ]]; then
@@ -1601,7 +1623,7 @@ generate_talos_configs() {
       to_entries
       | sort_by(.key)
       | .[]
-      | [.key, .value.type, .value.ip, .value.mac]
+      | [.key, .value.type, .value.ip, .value.mac, (.value.cpu // 0)]
       | @tsv
     ' <<<"$nodes_json")
 }

@@ -835,7 +835,9 @@ def test_talos_node_hostname_matches_proxmox_vm_name():
     module_text = MODULE_MAIN.read_text(encoding="utf-8")
 
     assert 'name      = "${var.cluster_name}-${each.key}"' in module_text
-    assert 'write_node_patch "$name" "$type" "$ip" "$mac" "$patch_file"' in script_text
+    assert 'write_node_patch "$name" "$type" "$ip" "$mac" "$patch_file" "$cpu"' in script_text
+    assert "read -r name type ip mac cpu" in script_text
+    assert "(.value.cpu // 0)" in script_text
     assert "append_hostname_config_patch()" in script_text
     assert 'echo "kind: HostnameConfig"' in script_text
     assert 'echo "hostname: ${NAME}-${name}"' in script_text
@@ -850,6 +852,75 @@ def test_talos_node_configs_enable_user_namespaces_for_document_jails():
 
     assert 'echo "  sysctls:"' in script_text
     assert 'echo "    user.max_user_namespaces: \\"11255\\""' in script_text
+
+
+def test_talos_worker_max_pods_scales_with_vcpu_and_allows_override():
+    script_text = _apply_cluster_text()
+
+    # Derived per worker: max(110, vcpu * 15) so small workers keep the Talos
+    # default while high-core workers scale up. Overridable via TWINBOX_MAX_PODS.
+    assert 'local node_max_pods="${TWINBOX_MAX_PODS:-}"' in script_text
+    assert 'node_max_pods="$(( cpu_cores * 15 ))"' in script_text
+    assert "if (( node_max_pods < 110 )); then" in script_text
+    assert "TWINBOX_MAX_PODS must be a non-negative integer" in script_text
+    # maxPods must be emitted as a KubeletConfiguration override; a bare
+    # kubelet.maxPods key is rejected by Talos config parsing.
+    assert 'echo "  kubelet:"' in script_text
+    assert 'echo "    extraConfig:"' in script_text
+    assert 'echo "      maxPods: ${node_max_pods}"' in script_text
+    assert 'echo "    maxPods: ${node_max_pods}"' not in script_text
+
+
+def test_write_node_patch_emits_valid_extraconfig_maxpods():
+    """Executes the real write_node_patch from apply-cluster.sh and validates YAML.
+
+    Regression guard: a bare ``machine.kubelet.maxPods`` key is rejected by Talos
+    config parsing (``talosctl gen config`` fails with ``unknown keys``), so the
+    patch must emit ``machine.kubelet.extraConfig.maxPods`` instead.
+    """
+    script_text = _apply_cluster_text()
+
+    def extract_function(name):
+        start = script_text.index(f"{name}() {{")
+        end = script_text.index("append_hostname_config_patch() {")
+        return script_text[start:end]
+
+    func = extract_function("write_node_patch")
+
+    harness_prefix = (
+        'fail() { echo "ERROR: $*" >&2; exit 1; }\n'
+        'DNS_SERVERS=""\n'
+        'DNS_DOMAIN=""\n'
+        'TWINBOX_TIME_SERVER="time.cloudflare.com"\n'
+    )
+
+    def run(cores, override=None):
+        script = (
+            f"{harness_prefix}{func}\nwrite_node_patch w1 worker 10.0.0.1 aa /tmp/wp.yaml {cores}\n"
+        )
+        env = os.environ.copy()
+        if override:
+            env["TWINBOX_MAX_PODS"] = override
+        proc = subprocess.run(
+            ["bash", "-c", script],
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        assert proc.returncode == 0, f"stderr: {proc.stderr}\nstdout: {proc.stdout}"
+        return yaml.safe_load(open("/tmp/wp.yaml").read())
+
+    patch = run(10)
+    assert patch["machine"]["kubelet"]["extraConfig"]["maxPods"] == 150
+
+    patch = run(2)
+    assert patch["machine"]["kubelet"]["extraConfig"]["maxPods"] == 110
+
+    patch = run(16)
+    assert patch["machine"]["kubelet"]["extraConfig"]["maxPods"] == 240
+
+    patch = run(10, override="200")
+    assert patch["machine"]["kubelet"]["extraConfig"]["maxPods"] == 200
 
 
 def test_longhorn_step_installs_via_argocd_and_waits_for_health():
