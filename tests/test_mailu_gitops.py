@@ -80,7 +80,9 @@ def test_mailu_postfix_greets_with_distinct_hostname_to_avoid_loop_detection():
     assert len(hosts) >= 2
     assert hosts[0].startswith("mailu.{{")
     assert hosts[0] == hosts[1].replace("mail.{{", "mailu.{{")
-    assert "smtpd_banner" not in values.get("postfix", {}).get("overrides", {}).get("postfix.cf", "")
+    assert "smtpd_banner" not in values.get("postfix", {}).get("overrides", {}).get(
+        "postfix.cf", ""
+    )
 
 
 def test_mailu_admin_waits_for_redis_before_boot():
