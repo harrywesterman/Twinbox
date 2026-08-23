@@ -1448,6 +1448,11 @@ a {
     background-color 160ms ease;
 }
 
+.user-list-row.as-card {
+  cursor: default;
+  align-items: center;
+}
+
 .user-list-row:hover,
 .user-list-row.is-selected {
   border-color: rgba(45, 212, 191, 0.34);

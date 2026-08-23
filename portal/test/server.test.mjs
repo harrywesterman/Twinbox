@@ -698,10 +698,111 @@ const managerServer = http.createServer(async (req, res) => {
   sendJson(res, 404, { error: `Unhandled fake manager route: ${req.method} ${pathname}` });
 });
 
+const mailuState = {
+  tokens: [
+    {
+      id: "tok-alex",
+      email: "alex@example.com",
+      comment: "Apple Mail",
+      AuthorizedIP: [],
+      Created: "2026-08-23 10:00:00",
+    },
+    {
+      id: "tok-nextcloud",
+      email: "alex@example.com",
+      comment: "Nextcloud Mail",
+      AuthorizedIP: [],
+      Created: "2026-08-23 10:30:00",
+    },
+  ],
+  requests: [],
+  nextTokenId: 2,
+};
+
+function resetMailuState() {
+  mailuState.tokens = [
+    {
+      id: "tok-alex",
+      email: "alex@example.com",
+      comment: "Apple Mail",
+      AuthorizedIP: [],
+      Created: "2026-08-23 10:00:00",
+    },
+    {
+      id: "tok-nextcloud",
+      email: "alex@example.com",
+      comment: "Nextcloud Mail",
+      AuthorizedIP: [],
+      Created: "2026-08-23 10:30:00",
+    },
+  ];
+  mailuState.requests = [];
+  mailuState.nextTokenId = 2;
+}
+
+const mailuServer = http.createServer(async (req, res) => {
+  const url = new URL(req.url || "/", "http://127.0.0.1");
+  const pathname = url.pathname;
+  mailuState.requests.push({ method: req.method, pathname });
+
+  if (req.headers.authorization !== "Bearer mailu-test-token") {
+    sendJson(res, 401, { error: "unauthorized" });
+    return;
+  }
+
+  if (req.method === "GET" && pathname.startsWith("/api/v1/user/")) {
+    const email = decodeURIComponent(pathname.split("/").at(-1) || "");
+    if (["admin@example.com", "alex@example.com"].includes(email)) {
+      sendJson(res, 200, { email });
+      return;
+    }
+    sendJson(res, 404, { error: "not found" });
+    return;
+  }
+
+  if (req.method === "GET" && pathname.startsWith("/api/v1/token/user/")) {
+    const email = decodeURIComponent(pathname.split("/").at(-1) || "");
+    sendJson(
+      res,
+      200,
+      mailuState.tokens.filter((token) => token.email === email)
+    );
+    return;
+  }
+
+  if (req.method === "POST" && pathname.startsWith("/api/v1/token/user/")) {
+    const email = decodeURIComponent(pathname.split("/").at(-1) || "");
+    const body = await readRequestBody(req);
+    const token = {
+      id: `tok-${mailuState.nextTokenId}`,
+      email,
+      comment: body.comment || "Mail client",
+      AuthorizedIP: Array.isArray(body.AuthorizedIP) ? body.AuthorizedIP : [],
+      Created: "2026-08-23 11:00:00",
+      token: "one-time-mail-token",
+    };
+    mailuState.nextTokenId += 1;
+    mailuState.tokens.push({ ...token });
+    sendJson(res, 200, token);
+    return;
+  }
+
+  if (req.method === "DELETE" && pathname.startsWith("/api/v1/token/")) {
+    const tokenId = decodeURIComponent(pathname.split("/").at(-1) || "");
+    const beforeCount = mailuState.tokens.length;
+    mailuState.tokens = mailuState.tokens.filter((token) => token.id !== tokenId);
+    sendJson(res, beforeCount === mailuState.tokens.length ? 404 : 200, { ok: true });
+    return;
+  }
+
+  sendJson(res, 404, { error: `Unhandled fake Mailu route: ${req.method} ${pathname}` });
+});
+
 let portalServer;
 let portalOrigin = "";
 let authentikServerOrigin = "";
 let managerServerOrigin = "";
+let mailuServerOrigin = "";
 
 async function startServer(server) {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -832,6 +933,7 @@ test.before(async () => {
 
   authentikServerOrigin = await startServer(authentikServer);
   managerServerOrigin = await startServer(managerServer);
+  mailuServerOrigin = await startServer(mailuServer);
   process.env.NODE_ENV = "test";
   process.env.PORTAL_CONFIG_PATH = configPath;
   process.env.PORTAL_DATA_DIR = dataDir;
@@ -841,6 +943,9 @@ test.before(async () => {
   process.env.AUTHENTIK_API_TOKEN = "portal-token";
   process.env.AUTHENTIK_API_BASE = `${authentikServerOrigin}/api/v3`;
   process.env.PORTAL_MANAGER_BASE_URL = managerServerOrigin;
+  process.env.MAILU_PUBLIC_HOST = "mail.tst.example.com";
+  process.env.MAILU_API_BASE_URL = `${mailuServerOrigin}/api`;
+  process.env.MAILU_API_TOKEN = "mailu-test-token";
 
   const moduleUrl = `${pathToFileURL(path.join(repoRoot, "portal", "server.mjs")).href}?test=${Date.now()}`;
   const { app } = await import(moduleUrl);
@@ -852,6 +957,7 @@ test.after(async () => {
   await new Promise((resolve) => portalServer.close(resolve));
   await new Promise((resolve) => authentikServer.close(resolve));
   await new Promise((resolve) => managerServer.close(resolve));
+  await new Promise((resolve) => mailuServer.close(resolve));
   fs.rmSync(workspaceRoot, { recursive: true, force: true });
 });
 
@@ -905,6 +1011,102 @@ test("status endpoint includes simple cluster pressure for signed-in users", asy
   assert.equal(status.payload.pressure.summary.level, "very-busy");
   assert.equal(status.payload.pressure.summary.label, "Heel druk");
   assert.equal(status.payload.pressure.signals[0].label, "Rekenen");
+});
+
+test("mail settings require a signed-in user and expose client settings", async () => {
+  resetMailuState();
+
+  const unauthenticated = await requestPortal("/api/mail/settings");
+  assert.equal(unauthenticated.status, 401);
+
+  const memberCookie = createSignedSessionCookie({
+    sub: "member-1",
+    name: "Alex Example",
+    email: "alex@example.com",
+    preferredUsername: "alex",
+    groups: ["employees"],
+    isAdmin: false,
+  });
+  const settings = await requestPortal("/api/mail/settings", { cookie: memberCookie });
+
+  assert.equal(settings.status, 200);
+  assert.equal(settings.payload.installed, true);
+  assert.equal(settings.payload.email, "alex@example.com");
+  assert.equal(settings.payload.username, "alex@example.com");
+  assert.deepEqual(settings.payload.imap, {
+    host: "mail.tst.example.com",
+    port: 993,
+    security: "SSL/TLS",
+  });
+  assert.deepEqual(settings.payload.smtp, {
+    host: "mail.tst.example.com",
+    port: 587,
+    security: "STARTTLS",
+  });
+});
+
+test("mail token endpoints create and revoke tokens for the session mailbox only", async () => {
+  resetMailuState();
+  const memberCookie = createSignedSessionCookie({
+    sub: "member-1",
+    name: "Alex Example",
+    email: "alex@example.com",
+    preferredUsername: "alex",
+    groups: ["employees"],
+    isAdmin: false,
+  });
+
+  const listing = await requestPortal("/api/mail/tokens", { cookie: memberCookie });
+  assert.equal(listing.status, 200);
+  assert.equal(listing.payload.email, "alex@example.com");
+  assert.deepEqual(
+    listing.payload.tokens.map((token) => token.id),
+    ["tok-alex"]
+  );
+
+  const created = await requestPortal("/api/mail/tokens", {
+    method: "POST",
+    cookie: memberCookie,
+    body: { email: "admin@example.com", comment: "Android Mail" },
+  });
+  assert.equal(created.status, 201);
+  assert.equal(created.payload.email, "alex@example.com");
+  assert.equal(created.payload.token, "one-time-mail-token");
+  assert.equal(created.payload.record.email, "alex@example.com");
+  assert.equal(created.payload.record.comment, "Android Mail");
+  assert.equal(
+    mailuState.requests.some(
+      (request) =>
+        request.method === "POST" && request.pathname === "/api/v1/token/user/alex%40example.com"
+    ),
+    true
+  );
+  assert.equal(
+    mailuState.requests.some((request) => request.pathname.includes("admin%40example.com")),
+    false
+  );
+
+  const forbiddenDelete = await requestPortal("/api/mail/tokens/tok-other", {
+    method: "DELETE",
+    cookie: memberCookie,
+  });
+  assert.equal(forbiddenDelete.status, 404);
+
+  const protectedDelete = await requestPortal("/api/mail/tokens/tok-nextcloud", {
+    method: "DELETE",
+    cookie: memberCookie,
+  });
+  assert.equal(protectedDelete.status, 403);
+
+  const deleted = await requestPortal("/api/mail/tokens/tok-alex", {
+    method: "DELETE",
+    cookie: memberCookie,
+  });
+  assert.equal(deleted.status, 200);
+  assert.deepEqual(
+    mailuState.tokens.map((token) => token.id),
+    ["tok-nextcloud", "tok-2"]
+  );
 });
 
 test("admin can inspect cluster updates and queue a refresh", async () => {

@@ -261,6 +261,23 @@ def test_nextcloud_bootstrap_installs_the_modern_eurooffice_file_action():
     assert "php occ app:enable twinbox_eurooffice_action" in install_text
 
 
+def test_nextcloud_mail_uses_per_user_mailu_tokens():
+    install_text = INSTALL_STEP.read_text(encoding="utf-8")
+
+    assert "command -v python3" in install_text
+    assert "configure_nextcloud_mail_accounts \"$public_zone_name\"" in install_text
+    assert "Skipping Nextcloud Mail account sync because Mailu is not installed yet" in install_text
+    assert 'fail "Nextcloud Mail account sync failed for ${failed} user(s)"' in install_text
+    assert "mailu_create_auth_token" in install_text
+    assert "/token/user/" in install_text
+    assert "Nextcloud Mail" in install_text
+    assert "php occ mail:account:create" in install_text
+    assert "$(printf '%q' \"$mail_hostname\") 993 ssl" in install_text
+    assert "$(printf '%q' \"$mail_hostname\") 587 tls" in install_text
+    assert "mail:account:export" in install_text
+    assert "masterPassword" not in install_text
+
+
 def test_twinbox_companion_keeps_collabora_as_the_default_direct_editor():
     application = EUROOFFICE_ACTION_DIR / "lib" / "AppInfo" / "Application.php"
     listener = EUROOFFICE_ACTION_DIR / "lib" / "Listener" / "CollaboraDefaultListener.php"

@@ -886,6 +886,8 @@ bash "$WORKSPACE_ROOT/scripts/manager/configure-bastion-mailu-postfix.sh" \
   --mail-hostname "$mail_hostname" \
   --mailu-front-address "$mailu_front_address" \
   --mailu-front-port 25 \
+  --client-imaps-port 993 \
+  --client-submission-port 587 \
   --relay-listen-address "$mailu_relay_host" \
   --relay-listen-port 2525 \
   --relay-username "$relay_username" \
@@ -995,6 +997,8 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     --arg mail_hostname "$mail_hostname" \
     --arg admin_url "$admin_url" \
     --arg webmail_url "$webmail_url" \
+    --arg imap_host "$mail_hostname" \
+    --arg smtp_host "$mail_hostname" \
     --arg ptr_required "$ptr_required" \
     --arg rdns_status "$rdns_status" \
     --arg bastion_postfix_status "configured" \
@@ -1008,6 +1012,16 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
       mail_hostname: $mail_hostname,
       admin_url: $admin_url,
       webmail_url: $webmail_url,
+      imap: {
+        host: $imap_host,
+        port: 993,
+        security: "SSL/TLS"
+      },
+      smtp: {
+        host: $smtp_host,
+        port: 587,
+        security: "STARTTLS"
+      },
       dns_records_created: $dns_records_created,
       ptr_required: $ptr_required,
       rdns_status: $rdns_status,

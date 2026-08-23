@@ -13,6 +13,8 @@ Usage: configure-bastion-mailu-postfix.sh \
   --mail-hostname HOSTNAME \
   --mailu-front-address ADDRESS \
   [--mailu-front-port 25] \
+  [--client-imaps-port 993] \
+  [--client-submission-port 587] \
   --relay-listen-address ADDRESS \
   [--relay-listen-port 2525] \
   --relay-username USERNAME \
@@ -31,6 +33,8 @@ MAIL_DOMAIN=""
 MAIL_HOSTNAME=""
 MAILU_FRONT_ADDRESS=""
 MAILU_FRONT_PORT="25"
+CLIENT_IMAPS_PORT="993"
+CLIENT_SUBMISSION_PORT="587"
 RELAY_LISTEN_ADDRESS=""
 RELAY_LISTEN_PORT="2525"
 RELAY_USERNAME=""
@@ -48,6 +52,8 @@ while [[ $# -gt 0 ]]; do
     --mail-hostname) MAIL_HOSTNAME="$2"; shift 2 ;;
     --mailu-front-address) MAILU_FRONT_ADDRESS="$2"; shift 2 ;;
     --mailu-front-port) MAILU_FRONT_PORT="$2"; shift 2 ;;
+    --client-imaps-port) CLIENT_IMAPS_PORT="$2"; shift 2 ;;
+    --client-submission-port) CLIENT_SUBMISSION_PORT="$2"; shift 2 ;;
     --relay-listen-address) RELAY_LISTEN_ADDRESS="$2"; shift 2 ;;
     --relay-listen-port) RELAY_LISTEN_PORT="$2"; shift 2 ;;
     --relay-username) RELAY_USERNAME="$2"; shift 2 ;;
@@ -66,6 +72,8 @@ done
 [[ -n "$MAIL_HOSTNAME" ]] || usage
 [[ -n "$MAILU_FRONT_ADDRESS" ]] || usage
 [[ -n "$MAILU_FRONT_PORT" ]] || usage
+[[ -n "$CLIENT_IMAPS_PORT" ]] || usage
+[[ -n "$CLIENT_SUBMISSION_PORT" ]] || usage
 [[ -n "$RELAY_LISTEN_ADDRESS" ]] || usage
 [[ -n "$RELAY_LISTEN_PORT" ]] || usage
 [[ -n "$RELAY_USERNAME" ]] || usage
@@ -78,7 +86,7 @@ esac
 case "$MAIL_HOSTNAME" in
   *[!A-Za-z0-9.-]*|.*|*.) echo "Invalid mail hostname: $MAIL_HOSTNAME" >&2; exit 1 ;;
 esac
-case "$MAILU_FRONT_PORT:$RELAY_LISTEN_PORT" in
+case "$MAILU_FRONT_PORT:$CLIENT_IMAPS_PORT:$CLIENT_SUBMISSION_PORT:$RELAY_LISTEN_PORT" in
   *[!0-9:]*|:*) echo "Invalid port" >&2; exit 1 ;;
 esac
 case "$RELAY_LISTEN_ADDRESS" in
@@ -107,6 +115,8 @@ remote_env=(
   "MAIL_HOSTNAME=$(quote "$MAIL_HOSTNAME")"
   "MAILU_FRONT_ADDRESS=$(quote "$MAILU_FRONT_ADDRESS")"
   "MAILU_FRONT_PORT=$(quote "$MAILU_FRONT_PORT")"
+  "CLIENT_IMAPS_PORT=$(quote "$CLIENT_IMAPS_PORT")"
+  "CLIENT_SUBMISSION_PORT=$(quote "$CLIENT_SUBMISSION_PORT")"
   "RELAY_LISTEN_ADDRESS=$(quote "$RELAY_LISTEN_ADDRESS")"
   "RELAY_LISTEN_PORT=$(quote "$RELAY_LISTEN_PORT")"
   "RELAY_USERNAME=$(quote "$RELAY_USERNAME")"
@@ -149,10 +159,11 @@ trap 'rm -f "$RELAY_PASSWORD_FILE"' EXIT
 echo "postfix postfix/main_mailer_type string Internet Site" | debconf-set-selections
 echo "postfix postfix/mailname string ${MAIL_HOSTNAME}" | debconf-set-selections
 apt-get update -y >/dev/null
-apt-get install -y postfix libsasl2-modules sasl2-bin ca-certificates ssl-cert swaks >/dev/null
+apt-get install -y postfix libsasl2-modules sasl2-bin ca-certificates ssl-cert swaks socat >/dev/null
 
 install -d -m 0750 /etc/postfix/twinbox-mailu
 install -d -m 0755 /etc/postfix/sasl
+install -d -m 0755 /etc/systemd/system
 
 cat >/etc/postfix/twinbox-mailu/relay_domains <<EOF
 # Managed by Twinbox Mail. Do not edit by hand.
@@ -242,7 +253,30 @@ postfix check
 systemctl enable postfix >/dev/null
 systemctl restart postfix
 
+for client_port in "$CLIENT_IMAPS_PORT" "$CLIENT_SUBMISSION_PORT"; do
+  service_name="twinbox-mailu-client-${client_port}"
+  cat >"/etc/systemd/system/${service_name}.service" <<EOF
+[Unit]
+Description=Twinbox Mailu client TCP forward ${client_port}
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/socat TCP-LISTEN:${client_port},fork,reuseaddr TCP:${MAILU_FRONT_ADDRESS}:${client_port}
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl enable "${service_name}" >/dev/null
+  systemctl restart "${service_name}"
+done
+
 ufw allow 25/tcp >/dev/null || true
+ufw allow "$CLIENT_IMAPS_PORT"/tcp >/dev/null || true
+ufw allow "$CLIENT_SUBMISSION_PORT"/tcp >/dev/null || true
 ufw allow in on "$relay_interface" to "$RELAY_LISTEN_ADDRESS" port "$RELAY_LISTEN_PORT" proto tcp >/dev/null || true
 ufw deny in to any port "$RELAY_LISTEN_PORT" proto tcp >/dev/null || true
 ufw reload >/dev/null || true
@@ -252,4 +286,5 @@ if ss -ltn | awk '{print $4}' | grep -Eq '(^|:)0\.0\.0\.0:'"${RELAY_LISTEN_PORT}
 fi
 
 log "Twinbox Mail Postfix edge configured for ${MAIL_DOMAIN} via ${MAILU_FRONT_ADDRESS}:${MAILU_FRONT_PORT}"
+log "Twinbox Mail client ports forwarded on ${CLIENT_IMAPS_PORT} and ${CLIENT_SUBMISSION_PORT}"
 REMOTE

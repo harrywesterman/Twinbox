@@ -46,7 +46,8 @@ def test_mailu_values_keep_mail_ports_internal_and_set_resources():
     assert values["front"]["externalService"]["enabled"] is False
 
     admin_extra_env = {item["name"]: item["value"] for item in values["admin"]["extraEnvVars"]}
-    assert admin_extra_env["PORTS"] == "25,80,443,465,993,995,4190"
+    assert admin_extra_env["PORTS"] == "25,80,443,465,587,993,995,4190"
+    assert values["authRequireTokens"] is True
     assert values["api"]["enabled"] is True
     assert values["api"]["existingSecret"] == "mailu-runtime"
     assert values["externalRelay"]["existingSecret"] == "mailu-relay"
@@ -269,12 +270,17 @@ def test_bastion_postfix_script_has_open_relay_guards():
     assert "--bastion-ssh-host" in script
     assert "--bastion-ssh-port" in script
     assert "--bastion-ssh-user" in script
+    assert "--client-imaps-port" in script
+    assert "--client-submission-port" in script
     assert "${BASTION_SSH_USER}@${BASTION_SSH_HOST}" in script
     assert "smtpd_tls_security_level=encrypt" in script
     assert "smtpd_tls_auth_only=yes" in script
     assert "smtpd_sasl_local_domain = ${MAIL_HOSTNAME}" in script
     assert 'postconf -e "myhostname = ${MAIL_HOSTNAME}"' in script
     assert "Refusing to expose relay listener on public address" in script
+    assert "socat TCP-LISTEN:${client_port},fork,reuseaddr TCP:${MAILU_FRONT_ADDRESS}:${client_port}" in script
+    assert 'ufw allow "$CLIENT_IMAPS_PORT"/tcp' in script
+    assert 'ufw allow "$CLIENT_SUBMISSION_PORT"/tcp' in script
     assert 'ufw deny in to any port "$RELAY_LISTEN_PORT" proto tcp' in script
 
 
@@ -320,6 +326,10 @@ def test_mailu_installer_uses_private_relay_and_pre_dns_preflights():
     assert "Create/verify PTR" in script
     assert "--relay-password" not in script
     assert "--relay-secret-file" in script
+    assert "--client-imaps-port 993" in script
+    assert "--client-submission-port 587" in script
+    assert '"SSL/TLS"' in script
+    assert '"STARTTLS"' in script
     manual_rdns_gate = (
         "Mailu on a non-Hetzner or non-automated bastion requires confirm_manual_rdns=true"
     )

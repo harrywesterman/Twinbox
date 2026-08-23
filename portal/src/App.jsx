@@ -702,6 +702,15 @@ function MenuPopover({
       <button
         type="button"
         onClick={() => {
+          onNavigate("/mail");
+          onClose();
+        }}
+      >
+        Mail
+      </button>
+      <button
+        type="button"
+        onClick={() => {
           onNavigate("/it-department");
           onClose();
         }}
@@ -1057,6 +1066,233 @@ function SettingsPage({ config, preferences, setPreferences, onSave, onNavigate 
         Back home
       </button>
     </Panel>
+  );
+}
+
+function MailClientPage({ onNavigate }) {
+  const [mailState, setMailState] = useState({
+    loading: true,
+    settings: null,
+    tokens: [],
+    error: "",
+  });
+  const [comment, setComment] = useState("Apple Mail");
+  const [busy, setBusy] = useState(false);
+  const [createdToken, setCreatedToken] = useState(null);
+
+  const loadMailState = useCallback(async () => {
+    setMailState((current) => ({ ...current, loading: true, error: "" }));
+    try {
+      const settings = await requestJson("/api/mail/settings");
+      let tokens = [];
+      if (settings.installed) {
+        const tokenPayload = await requestJson("/api/mail/tokens");
+        tokens = tokenPayload.tokens || [];
+      }
+      setMailState({ loading: false, settings, tokens, error: "" });
+    } catch (error) {
+      setMailState({
+        loading: false,
+        settings: null,
+        tokens: [],
+        error: error instanceof Error ? error.message : "Failed to load mail settings.",
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMailState();
+  }, [loadMailState]);
+
+  const createToken = async (event) => {
+    event.preventDefault();
+    setBusy(true);
+    setCreatedToken(null);
+    setMailState((current) => ({ ...current, error: "" }));
+    try {
+      const payload = await requestJson("/api/mail/tokens", {
+        method: "POST",
+        body: JSON.stringify({ comment }),
+      });
+      setCreatedToken(payload);
+      await loadMailState();
+    } catch (error) {
+      setMailState((current) => ({
+        ...current,
+        error: error instanceof Error ? error.message : "Failed to create mail app password.",
+      }));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const deleteToken = async (tokenId) => {
+    setBusy(true);
+    setMailState((current) => ({ ...current, error: "" }));
+    try {
+      await requestJson(`/api/mail/tokens/${encodeURIComponent(tokenId)}`, {
+        method: "DELETE",
+      });
+      await loadMailState();
+    } catch (error) {
+      setMailState((current) => ({
+        ...current,
+        error: error instanceof Error ? error.message : "Failed to revoke mail app password.",
+      }));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (mailState.loading) {
+    return (
+      <Panel>
+        <SectionTitle
+          eyebrow="Mail"
+          title="Mail client settings"
+          description="Loading your mailbox settings."
+        />
+      </Panel>
+    );
+  }
+
+  const settings = mailState.settings;
+
+  return (
+    <div className="settings-layout">
+      <Panel>
+        <SectionTitle
+          eyebrow="Mail"
+          title="Mail client settings"
+          description="Create app passwords for Apple Mail, Android Mail, Thunderbird, or another IMAP client."
+        />
+        <div className="hero-actions">
+          <button type="button" className="secondary-button" onClick={() => onNavigate("/")}>
+            Back home
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={loadMailState}
+            disabled={busy}
+          >
+            Refresh
+          </button>
+        </div>
+        {mailState.error ? (
+          <div className="inline-notice is-danger">
+            <strong>Mail needs attention.</strong>
+            <span>{mailState.error}</span>
+          </div>
+        ) : null}
+        {settings && !settings.installed ? (
+          <div className="inline-notice">
+            <strong>Mailu is not installed yet.</strong>
+            <span>Install Mailu first, then come back here to create app passwords.</span>
+          </div>
+        ) : null}
+        {createdToken ? (
+          <div className="inline-notice is-accent">
+            <strong>
+              New mail app password for {createdToken.record?.comment || "mail client"}
+            </strong>
+            <code>{createdToken.token}</code>
+            <span>This password is shown once. Use your full email address as the username.</span>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => setCreatedToken(null)}
+            >
+              Hide password
+            </button>
+          </div>
+        ) : null}
+      </Panel>
+
+      {settings?.installed ? (
+        <Panel>
+          <SectionTitle
+            eyebrow={settings.email}
+            title="Connection details"
+            description="Use these settings in your mail app together with an app password."
+          />
+          <div className="user-admin-profile">
+            <div>
+              <span>Username</span>
+              <strong>{settings.username}</strong>
+            </div>
+            <div>
+              <span>IMAP</span>
+              <strong>
+                {settings.imap.host}:{settings.imap.port} {settings.imap.security}
+              </strong>
+            </div>
+            <div>
+              <span>SMTP</span>
+              <strong>
+                {settings.smtp.host}:{settings.smtp.port} {settings.smtp.security}
+              </strong>
+            </div>
+          </div>
+
+          <form className="user-admin-form" onSubmit={createToken}>
+            <label>
+              <span>App password label</span>
+              <input
+                type="text"
+                value={comment}
+                onChange={(event) => setComment(event.target.value)}
+                placeholder="Apple Mail Mac mini"
+                required
+              />
+            </label>
+            <div className="hero-actions">
+              <button type="submit" className="primary-button" disabled={busy}>
+                {busy ? "Creating..." : "New app password"}
+              </button>
+              <span className="muted-copy">
+                Nextcloud Mail uses its own hidden token and is not affected by these passwords.
+              </span>
+            </div>
+          </form>
+        </Panel>
+      ) : null}
+
+      {settings?.installed ? (
+        <Panel>
+          <SectionTitle
+            eyebrow="Access"
+            title="Existing app passwords"
+            description="Revoke a password when a device is retired or lost."
+          />
+          <div className="user-admin-list">
+            {mailState.tokens.length === 0 ? (
+              <div className="empty-card">
+                <strong>No app passwords yet</strong>
+                <span>Create one when you configure a mail app.</span>
+              </div>
+            ) : (
+              mailState.tokens.map((token) => (
+                <div key={token.id} className="user-list-row as-card">
+                  <span className="user-list-copy">
+                    <strong>{token.comment || "Mail client"}</strong>
+                    <span>{token.createdAt || "No creation date available"}</span>
+                  </span>
+                  <button
+                    type="button"
+                    className="secondary-button is-destructive"
+                    onClick={() => deleteToken(token.id)}
+                    disabled={busy}
+                  >
+                    Revoke
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </Panel>
+      ) : null}
+    </div>
   );
 }
 
@@ -4547,6 +4783,7 @@ export default function App() {
             onNavigate={navigate}
           />
         ) : null}
+        {route === "/mail" ? <MailClientPage onNavigate={navigate} /> : null}
         {route === "/it-department" ? <ItDepartmentPage /> : null}
         {route === "/intranet" ? (
           <IntranetPage links={config?.intranetLinks || []} onNavigate={navigate} />

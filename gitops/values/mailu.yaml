@@ -5,6 +5,7 @@ domain: ""
 timezone: "Etc/UTC"
 postmaster: postmaster
 recipientDelimiter: "+"
+authRequireTokens: true
 sessionTimeout: 43200
 
 existingSecret: mailu-runtime
@@ -80,7 +81,7 @@ admin:
   nodeSelector: {}
   extraEnvVars:
     - name: PORTS
-      value: "25,80,443,465,993,995,4190"
+      value: "25,80,443,465,587,993,995,4190"
   initContainers:
     - name: wait-for-redis
       image: busybox:1.38.0

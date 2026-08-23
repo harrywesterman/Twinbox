@@ -16,7 +16,11 @@ import {
 import {
   createRandomMailboxPassword,
   isMailuInstalled,
+  mailuCheckMailboxExists,
   mailuCreateMailbox,
+  mailuCreateUserToken,
+  mailuDeleteUserToken,
+  mailuListUserTokens,
 } from "./mailu-client.mjs";
 import { buildItDepartmentScene } from "./src/it-department-model.js";
 
@@ -48,6 +52,7 @@ const agentsInternalToken = String(process.env.TWINBOX_AGENT_INTERNAL_TOKEN || "
 const APP_INSTALLATION_GROUP_NAME = "Twinbox app installations";
 const USER_MANAGEMENT_GROUP_NAME = "Twinbox user management";
 const APP_JOB_TYPES = new Set(["run_step", "uninstall_step"]);
+const protectedMailuTokenComments = new Set(["Nextcloud Mail"]);
 
 fs.mkdirSync(dataDir, { recursive: true });
 
@@ -731,6 +736,55 @@ function isCurrentSessionUser(session = {}, user = {}) {
   );
 }
 
+function resolveMailHostname() {
+  const explicitBaseUrl = String(process.env.MAILU_PUBLIC_HOST || "").trim();
+  if (explicitBaseUrl) {
+    return explicitBaseUrl.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  }
+  if (publicBaseUrl) {
+    return publicBaseUrl.replace(/^https?:\/\/portal\./, "mail.").replace(/\/.*$/, "");
+  }
+  const apiBase = String(process.env.MAILU_API_BASE_URL || "").trim();
+  if (apiBase) {
+    return apiBase
+      .replace(/^https?:\/\//, "")
+      .replace(/\/api.*$/, "")
+      .replace(/\/.*$/, "");
+  }
+  return "";
+}
+
+function buildMailClientSettings(email) {
+  const host = resolveMailHostname();
+  return {
+    email,
+    username: email,
+    imap: {
+      host,
+      port: 993,
+      security: "SSL/TLS",
+    },
+    smtp: {
+      host,
+      port: 587,
+      security: "STARTTLS",
+    },
+  };
+}
+
+function requireSessionEmail(session, res) {
+  const email = String(session?.email || "").trim();
+  if (!email) {
+    res.status(400).json({ error: "your Authentik account has no email address" });
+    return "";
+  }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    res.status(400).json({ error: "your Authentik email address is invalid" });
+    return "";
+  }
+  return email;
+}
+
 function buildUserResponse(directory, userId) {
   const user = (directory?.users || []).find((entry) => entry.id === String(userId).trim());
   if (!user) {
@@ -1035,6 +1089,120 @@ app.get("/api/portal-config", async (req, res) => {
       .status(500)
       .json({ error: error instanceof Error ? error.message : "failed to load portal config" });
   }
+});
+
+app.get("/api/mail/settings", async (req, res) => {
+  const session = requireSession(req, res);
+  if (!session) {
+    return;
+  }
+
+  const email = requireSessionEmail(session, res);
+  if (!email) {
+    return;
+  }
+
+  res.json({
+    installed: isMailuInstalled(),
+    ...buildMailClientSettings(email),
+  });
+});
+
+app.get("/api/mail/tokens", async (req, res) => {
+  const session = requireSession(req, res);
+  if (!session) {
+    return;
+  }
+
+  const email = requireSessionEmail(session, res);
+  if (!email) {
+    return;
+  }
+
+  if (!isMailuInstalled()) {
+    return res.status(400).json({ error: "Mailu is not installed" });
+  }
+
+  const result = await mailuListUserTokens(email);
+  if (!result.ok) {
+    return res.status(502).json({ error: `Failed to list Mailu tokens: ${result.reason}` });
+  }
+
+  res.json({
+    email,
+    tokens: result.tokens.filter((token) => !protectedMailuTokenComments.has(token.comment)),
+  });
+});
+
+app.post("/api/mail/tokens", async (req, res) => {
+  const session = requireSession(req, res);
+  if (!session) {
+    return;
+  }
+
+  const email = requireSessionEmail(session, res);
+  if (!email) {
+    return;
+  }
+
+  if (!isMailuInstalled()) {
+    return res.status(400).json({ error: "Mailu is not installed" });
+  }
+
+  const comment = String(req.body?.comment || "Mail client")
+    .trim()
+    .slice(0, 80);
+  const mailboxExists = await mailuCheckMailboxExists(email);
+  if (!mailboxExists) {
+    return res.status(404).json({ error: "Mailu mailbox does not exist for your email address" });
+  }
+
+  const result = await mailuCreateUserToken({
+    email,
+    comment: comment || "Mail client",
+  });
+  if (!result.ok || !result.token) {
+    return res.status(502).json({ error: `Failed to create Mailu token: ${result.reason}` });
+  }
+
+  res.status(201).json({
+    ...buildMailClientSettings(email),
+    token: result.token,
+    record: result.record,
+  });
+});
+
+app.delete("/api/mail/tokens/:tokenId", async (req, res) => {
+  const session = requireSession(req, res);
+  if (!session) {
+    return;
+  }
+
+  const email = requireSessionEmail(session, res);
+  if (!email) {
+    return;
+  }
+
+  if (!isMailuInstalled()) {
+    return res.status(400).json({ error: "Mailu is not installed" });
+  }
+
+  const result = await mailuDeleteUserToken({
+    email,
+    tokenId: req.params.tokenId,
+    protectedComments: [...protectedMailuTokenComments],
+  });
+  if (result.reason === "not-found") {
+    return res.status(404).json({ error: "Mailu token not found for your mailbox" });
+  }
+  if (result.reason === "protected-token") {
+    return res.status(403).json({ error: "This Mailu token is managed by Twinbox" });
+  }
+  if (!result.ok) {
+    return res.status(502).json({ error: `Failed to delete Mailu token: ${result.reason}` });
+  }
+
+  res.json({ ok: true });
 });
 
 app.get("/api/preferences", async (req, res) => {

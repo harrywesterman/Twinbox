@@ -225,6 +225,133 @@ create_or_update_application() {
   authentik_api_write POST "/core/applications/" "$application_payload" | jq -r '.pk // .id // empty'
 }
 
+mailu_api_request() {
+  local method="$1"
+  local path="$2"
+  local body="${3:-}"
+  local api_token api_base response_file status
+
+  api_token="$(openbao_read_global_secret_json mailu-runtime 2>/dev/null | jq -r '."api-token" // empty' || true)"
+  [[ -n "$api_token" ]] || fail "Mailu API token not found; install Mailu before configuring Nextcloud Mail"
+
+  api_base="https://mail.${public_zone_name}/api/v1"
+  response_file="$(mktemp)"
+  if [[ -n "$body" ]]; then
+    status="$(curl -sS -o "$response_file" -w '%{http_code}' \
+      -X "$method" \
+      -H "Authorization: Bearer ${api_token}" \
+      -H "Content-Type: application/json" \
+      -d "$body" \
+      "${api_base}${path}" || echo "000")"
+  else
+    status="$(curl -sS -o "$response_file" -w '%{http_code}' \
+      -X "$method" \
+      -H "Authorization: Bearer ${api_token}" \
+      "${api_base}${path}" || echo "000")"
+  fi
+
+  if [[ ! "$status" =~ ^2 ]]; then
+    local body_snippet
+    body_snippet="$(head -c 240 "$response_file" 2>/dev/null || true)"
+    rm -f "$response_file"
+    fail "Mailu API ${method} ${path} failed with HTTP ${status}: ${body_snippet}"
+  fi
+
+  cat "$response_file"
+  rm -f "$response_file"
+}
+
+mailu_create_auth_token() {
+  local email="$1"
+  local comment="$2"
+  local payload
+
+  payload="$(jq -n --arg comment "$comment" '{comment: $comment, AuthorizedIP: []}')"
+  mailu_api_request POST "/token/user/$(printf '%s' "$email" | python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip()))')" "$payload" |
+    jq -r '.token // empty'
+}
+
+nextcloud_occ() {
+  kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c "cd /var/www/html && php occ $*"
+}
+
+nextcloud_user_exists() {
+  local username="$1"
+  kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
+    "cd /var/www/html && php occ user:info $(printf '%q' "$username") >/dev/null 2>&1"
+}
+
+nextcloud_mail_account_exists() {
+  local username="$1"
+  local email="$2"
+  kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
+    "cd /var/www/html && php occ mail:account:export $(printf '%q' "$username") 2>/dev/null | grep -F -- $(printf '%q' "$email") >/dev/null"
+}
+
+configure_nextcloud_mail_accounts() {
+  local mail_domain="$1"
+  local mail_hostname="mail.${mail_domain}"
+  local api_token users_json total configured skipped failed
+
+  log "Configuring Nextcloud Mail accounts for existing Nextcloud users"
+  api_token="$(openbao_read_global_secret_json mailu-runtime 2>/dev/null | jq -r '."api-token" // empty' || true)"
+  if [[ -z "$api_token" ]]; then
+    log "Skipping Nextcloud Mail account sync because Mailu is not installed yet"
+    return 0
+  fi
+
+  users_json="$(authentik_api_get "/core/users/?page_size=200" 2>/dev/null | jq '[.results[] | select(.email != null and .email != "") | {email, name, username}]')"
+  total="$(jq length <<<"$users_json")"
+  configured=0
+  skipped=0
+  failed=0
+
+  while IFS= read -r user_entry; do
+    local email username name mail_token
+    email="$(jq -r '.email' <<<"$user_entry")"
+    username="$(jq -r '.username // empty' <<<"$user_entry")"
+    name="$(jq -r '.name // .username // .email' <<<"$user_entry")"
+
+    if [[ -z "$username" || "$email" != *@${mail_domain} ]]; then
+      skipped=$((skipped + 1))
+      continue
+    fi
+
+    if ! nextcloud_user_exists "$username"; then
+      log "  SKIP ${email}: Nextcloud user ${username} does not exist yet"
+      skipped=$((skipped + 1))
+      continue
+    fi
+
+    if nextcloud_mail_account_exists "$username" "$email"; then
+      log "  SKIP ${email}: Nextcloud Mail account already exists"
+      skipped=$((skipped + 1))
+      continue
+    fi
+
+    mail_token="$(mailu_create_auth_token "$email" "Nextcloud Mail")"
+    if [[ -z "$mail_token" ]]; then
+      log "  FAIL ${email}: Mailu did not return a Nextcloud Mail token"
+      failed=$((failed + 1))
+      continue
+    fi
+
+    if kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
+      "cd /var/www/html && php occ mail:account:create $(printf '%q' "$username") $(printf '%q' "$name") $(printf '%q' "$email") $(printf '%q' "$mail_hostname") 993 ssl $(printf '%q' "$email") $(printf '%q' "$mail_token") $(printf '%q' "$mail_hostname") 587 tls $(printf '%q' "$email") $(printf '%q' "$mail_token") password >/dev/null"; then
+      configured=$((configured + 1))
+      log "  OK   ${email}: Nextcloud Mail account configured"
+    else
+      failed=$((failed + 1))
+      log "  FAIL ${email}: Nextcloud Mail account creation failed"
+    fi
+  done < <(jq -c '.[]' <<<"$users_json")
+
+  log "Nextcloud Mail account sync complete: ${total} total, ${configured} configured, ${skipped} skipped, ${failed} failed"
+  if ((failed > 0)); then
+    fail "Nextcloud Mail account sync failed for ${failed} user(s)"
+  fi
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
@@ -252,6 +379,7 @@ export KUBECONFIG="$KUBECONFIG_FILE"
 command -v kubectl >/dev/null 2>&1 || fail "kubectl not found"
 command -v jq >/dev/null 2>&1 || fail "jq not found"
 command -v openssl >/dev/null 2>&1 || fail "openssl not found"
+command -v python3 >/dev/null 2>&1 || fail "python3 not found"
 
 authentik_ensure_token
 authentik_setup_forward
@@ -634,6 +762,8 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
   php occ app:enable photos >/dev/null 2>&1 || true
   php occ app:enable activity >/dev/null 2>&1 || true
 "
+
+configure_nextcloud_mail_accounts "$public_zone_name"
 
 log "Configuring Collabora WOPI URL"
 kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \

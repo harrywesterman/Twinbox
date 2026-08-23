@@ -38,6 +38,45 @@ function startMailuMock() {
         } else if (req.url.startsWith("/api/v1/user/") && req.method === "GET") {
           res.writeHead(404, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ code: 404, message: "Not found" }));
+        } else if (req.url === "/api/v1/token/user/admin%40test.com" && req.method === "GET") {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify([
+              {
+                id: "tok-1",
+                email: "admin@test.com",
+                comment: "Apple Mail",
+                AuthorizedIP: [],
+                Created: "2026-08-23 10:00:00",
+              },
+              {
+                id: "tok-nextcloud",
+                email: "admin@test.com",
+                comment: "Nextcloud Mail",
+                AuthorizedIP: [],
+                Created: "2026-08-23 10:30:00",
+              },
+            ])
+          );
+        } else if (req.url === "/api/v1/token/user/admin%40test.com" && req.method === "POST") {
+          const payload = JSON.parse(lastRequest.body);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              id: "tok-2",
+              email: "admin@test.com",
+              comment: payload.comment,
+              AuthorizedIP: payload.AuthorizedIP,
+              Created: "2026-08-23 11:00:00",
+              token: "secret-token",
+            })
+          );
+        } else if (req.url === "/api/v1/token/user/nobody%40test.com" && req.method === "GET") {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify([]));
+        } else if (req.url === "/api/v1/token/tok-1" && req.method === "DELETE") {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ code: 200 }));
         } else {
           res.writeHead(404);
           res.end("{}");
@@ -180,4 +219,95 @@ test("mailuCheckMailboxExists returns false for missing", async () => {
   const { mailuCheckMailboxExists } = await importMailuClient();
   const result = await mailuCheckMailboxExists("nobody@test.com");
   assert.equal(result, false);
+});
+
+test("mailuListUserTokens normalizes records without exposing token secrets", async () => {
+  process.env.MAILU_API_BASE_URL = mailuApiBase;
+  process.env.MAILU_API_TOKEN = "test-token";
+  const { mailuListUserTokens } = await importMailuClient();
+  const result = await mailuListUserTokens("admin@test.com");
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.tokens, [
+    {
+      id: "tok-1",
+      email: "admin@test.com",
+      comment: "Apple Mail",
+      authorizedIp: [],
+      createdAt: "2026-08-23 10:00:00",
+      updatedAt: "",
+    },
+    {
+      id: "tok-nextcloud",
+      email: "admin@test.com",
+      comment: "Nextcloud Mail",
+      authorizedIp: [],
+      createdAt: "2026-08-23 10:30:00",
+      updatedAt: "",
+    },
+  ]);
+  assert.equal("token" in result.tokens[0], false);
+  assert.equal(lastRequest.method, "GET");
+  assert.equal(lastRequest.url, "/api/v1/token/user/admin%40test.com");
+});
+
+test("mailuCreateUserToken returns the one-time token and normalized record", async () => {
+  process.env.MAILU_API_BASE_URL = mailuApiBase;
+  process.env.MAILU_API_TOKEN = "test-token";
+  const { mailuCreateUserToken } = await importMailuClient();
+  const result = await mailuCreateUserToken({
+    email: "admin@test.com",
+    comment: "Thunderbird",
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.token, "secret-token");
+  assert.equal(result.record.id, "tok-2");
+  assert.equal(result.record.comment, "Thunderbird");
+  assert.equal(lastRequest.method, "POST");
+  assert.equal(lastRequest.url, "/api/v1/token/user/admin%40test.com");
+  assert.deepEqual(JSON.parse(lastRequest.body), { comment: "Thunderbird", AuthorizedIP: [] });
+});
+
+test("mailuDeleteUserToken refuses tokens that are not listed for the user", async () => {
+  process.env.MAILU_API_BASE_URL = mailuApiBase;
+  process.env.MAILU_API_TOKEN = "test-token";
+  const { mailuDeleteUserToken } = await importMailuClient();
+  const result = await mailuDeleteUserToken({
+    email: "admin@test.com",
+    tokenId: "tok-missing",
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "not-found");
+  assert.equal(lastRequest.method, "GET");
+});
+
+test("mailuDeleteUserToken deletes a listed token", async () => {
+  process.env.MAILU_API_BASE_URL = mailuApiBase;
+  process.env.MAILU_API_TOKEN = "test-token";
+  const { mailuDeleteUserToken } = await importMailuClient();
+  const result = await mailuDeleteUserToken({
+    email: "admin@test.com",
+    tokenId: "tok-1",
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(lastRequest.method, "DELETE");
+  assert.equal(lastRequest.url, "/api/v1/token/tok-1");
+});
+
+test("mailuDeleteUserToken refuses protected tokens", async () => {
+  process.env.MAILU_API_BASE_URL = mailuApiBase;
+  process.env.MAILU_API_TOKEN = "test-token";
+  const { mailuDeleteUserToken } = await importMailuClient();
+  const result = await mailuDeleteUserToken({
+    email: "admin@test.com",
+    tokenId: "tok-nextcloud",
+    protectedComments: ["Nextcloud Mail"],
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "protected-token");
+  assert.equal(lastRequest.method, "GET");
 });
