@@ -1,3 +1,7 @@
+global:
+  security:
+    allowInsecureImages: true
+
 zulip:
   environment:
     SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS:
@@ -71,6 +75,12 @@ zulip:
     storageClass: longhorn
 
 memcached:
+  fips:
+    openssl: off
+  image:
+    registry: registry-1.docker.io
+    repository: bitnamilegacy/memcached
+    tag: 1.6.39-debian-12-r0
   auth:
     enabled: true
     username: zulip@localhost

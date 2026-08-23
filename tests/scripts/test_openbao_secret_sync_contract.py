@@ -499,6 +499,11 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "SECRETS_redis_password:" not in values_text
     assert "SETTING_MEMCACHED_USERNAME:" not in values_text
     assert "SECRETS_memcached_password:" not in values_text
+    assert "repository: bitnamilegacy/memcached" in values_text
+    assert "tag: 1.6.39-debian-12-r0" in values_text
+    assert "tag: latest" not in values_text
+    assert "allowInsecureImages: true" in values_text
+    assert "openssl: off" in values_text
     assert "usePasswordFiles: false" in values_text
     assert "containerSecurityContext:" in values_text
     assert "readOnlyRootFilesystem: false" in values_text
