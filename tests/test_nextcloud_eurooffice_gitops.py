@@ -265,7 +265,7 @@ def test_nextcloud_mail_uses_per_user_mailu_tokens():
     install_text = INSTALL_STEP.read_text(encoding="utf-8")
 
     assert "command -v python3" in install_text
-    assert "configure_nextcloud_mail_accounts \"$public_zone_name\"" in install_text
+    assert 'configure_nextcloud_mail_accounts "$public_zone_name"' in install_text
     assert "Skipping Nextcloud Mail account sync because Mailu is not installed yet" in install_text
     assert 'fail "Nextcloud Mail account sync failed for ${failed} user(s)"' in install_text
     assert "mailu_create_auth_token" in install_text

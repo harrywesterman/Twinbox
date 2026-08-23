@@ -278,7 +278,10 @@ def test_bastion_postfix_script_has_open_relay_guards():
     assert "smtpd_sasl_local_domain = ${MAIL_HOSTNAME}" in script
     assert 'postconf -e "myhostname = ${MAIL_HOSTNAME}"' in script
     assert "Refusing to expose relay listener on public address" in script
-    assert "socat TCP-LISTEN:${client_port},fork,reuseaddr TCP:${MAILU_FRONT_ADDRESS}:${client_port}" in script
+    assert (
+        "socat TCP-LISTEN:${client_port},fork,reuseaddr TCP:${MAILU_FRONT_ADDRESS}:${client_port}"
+        in script
+    )
     assert 'ufw allow "$CLIENT_IMAPS_PORT"/tcp' in script
     assert 'ufw allow "$CLIENT_SUBMISSION_PORT"/tcp' in script
     assert 'ufw deny in to any port "$RELAY_LISTEN_PORT" proto tcp' in script
