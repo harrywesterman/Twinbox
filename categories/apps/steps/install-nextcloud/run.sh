@@ -457,7 +457,7 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
 
 log "Checking whether Nextcloud is already installed"
 init_success=false
-pod=$(kubectl -n nextcloud get pods -l app.kubernetes.io/name=nextcloud -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+pod=$(kubectl -n nextcloud get pods -l app.kubernetes.io/name=nextcloud,app.kubernetes.io/component=app -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 if [[ -n "$pod" ]]; then
   status_json=$(kubectl -n nextcloud exec "$pod" -- php -r 'echo file_get_contents("http://localhost/status.php");' 2>/dev/null || true)
   if [[ "$status_json" =~ \"installed\":(true|false) ]]; then
@@ -492,7 +492,7 @@ log "Verifying Nextcloud installation status"
 verify_attempts=30
 verify_attempt=1
 while [[ $verify_attempt -le $verify_attempts ]]; do
-  pod=$(kubectl -n nextcloud get pods -l app.kubernetes.io/name=nextcloud -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+  pod=$(kubectl -n nextcloud get pods -l app.kubernetes.io/name=nextcloud,app.kubernetes.io/component=app -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
   if [[ -n "$pod" ]]; then
     status_json=$(kubectl -n nextcloud exec "$pod" -- php -r 'echo file_get_contents("http://localhost/status.php");' 2>/dev/null || true)
     if [[ "$status_json" =~ \"installed\":(true|false) ]]; then

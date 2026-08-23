@@ -219,6 +219,13 @@ def test_nextcloud_bootstrap_preserves_collabora_default_and_configures_eurooffi
     assert "name: eurooffice-netbird" in optional_app_text
 
 
+def test_nextcloud_installed_status_check_targets_the_app_pod_not_the_cron_pod():
+    install_text = INSTALL_STEP.read_text(encoding="utf-8")
+
+    assert install_text.count("app.kubernetes.io/name=nextcloud,app.kubernetes.io/component=app") == 2
+    assert "get pods -l app.kubernetes.io/name=nextcloud -o jsonpath" not in install_text
+
+
 def test_nextcloud_bootstrap_installs_the_modern_eurooffice_file_action():
     install_text = INSTALL_STEP.read_text(encoding="utf-8")
     dockerfile_text = (REPO_ROOT / "manager-worker" / "Dockerfile").read_text(encoding="utf-8")
