@@ -102,6 +102,8 @@ admin:
 
 postfix:
   nodeSelector: {}
+  updateStrategy:
+    type: Recreate
   overrides:
     postfix.cf: |
       smtpd_banner = mailu-internal ESMTP ready

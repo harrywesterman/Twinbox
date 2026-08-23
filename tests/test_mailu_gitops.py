@@ -73,6 +73,7 @@ def test_mailu_postfix_greets_with_distinct_hostname_to_avoid_loop_detection():
     overrides = values["postfix"]["overrides"]["postfix.cf"]
     assert "smtpd_banner" in overrides
     assert "mail.bierineenweek.nl" not in overrides
+    assert values["postfix"]["updateStrategy"]["type"] == "Recreate"
 
 
 def test_mailu_admin_waits_for_redis_before_boot():
