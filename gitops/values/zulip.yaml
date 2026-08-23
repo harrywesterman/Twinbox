@@ -76,7 +76,7 @@ zulip:
 
 memcached:
   fips:
-    openssl: off
+    openssl: "off"
   image:
     registry: registry-1.docker.io
     repository: bitnamilegacy/memcached
