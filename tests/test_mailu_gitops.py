@@ -68,6 +68,13 @@ def test_mailu_values_keep_mail_ports_internal_and_set_resources():
         assert values[component]["nodeSelector"] == {}
 
 
+def test_mailu_postfix_greets_with_distinct_hostname_to_avoid_loop_detection():
+    values = _load_yaml(REPO_ROOT / "gitops" / "values" / "mailu.yaml")
+    overrides = values["postfix"]["overrides"]["postfix.cf"]
+    assert "smtpd_banner" in overrides
+    assert "mail.bierineenweek.nl" not in overrides
+
+
 def test_mailu_admin_waits_for_redis_before_boot():
     values = _load_yaml(REPO_ROOT / "gitops" / "values" / "mailu.yaml")
     init_containers = values["admin"]["initContainers"]

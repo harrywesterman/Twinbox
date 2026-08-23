@@ -102,6 +102,9 @@ admin:
 
 postfix:
   nodeSelector: {}
+  overrides:
+    postfix.cf: |
+      smtpd_banner = mailu-internal ESMTP ready
   resources:
     requests:
       cpu: 100m
