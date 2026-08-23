@@ -516,6 +516,29 @@ const managerServer = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "GET" && pathname === "/api/clusters/cluster-test/pressure") {
+    sendJson(res, 200, {
+      summary: {
+        level: "very-busy",
+        label: "Heel druk",
+        percent: 96,
+        generatedAt: "2026-08-23T18:15:00.000Z",
+        degraded: false,
+      },
+      signals: [
+        {
+          id: "compute",
+          label: "Rekenen",
+          level: "very-busy",
+          levelLabel: "Heel druk",
+          percent: 96,
+        },
+      ],
+      errors: [],
+    });
+    return;
+  }
+
   if (req.method === "PUT" && pathname === "/api/clusters/cluster-test/observability") {
     const body = await readRequestBody(req);
     const profile = ["minimal", "full", "off"].includes(
@@ -866,6 +889,22 @@ test("admin endpoints require an authenticated admin session", async () => {
   assert.equal(forbiddenObservability.status, 403);
   const forbiddenUpdates = await requestPortal("/api/admin/updates", { cookie: memberCookie });
   assert.equal(forbiddenUpdates.status, 403);
+});
+
+test("status endpoint includes simple cluster pressure for signed-in users", async () => {
+  const memberCookie = createSignedSessionCookie({
+    sub: "member-1",
+    name: "Regular Member",
+    groups: ["employees"],
+    isAdmin: false,
+  });
+
+  const status = await requestPortal("/api/status", { cookie: memberCookie });
+
+  assert.equal(status.status, 200);
+  assert.equal(status.payload.pressure.summary.level, "very-busy");
+  assert.equal(status.payload.pressure.summary.label, "Heel druk");
+  assert.equal(status.payload.pressure.signals[0].label, "Rekenen");
 });
 
 test("admin can inspect cluster updates and queue a refresh", async () => {

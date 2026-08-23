@@ -8,11 +8,13 @@ import {
   buildBootstrapPayload,
   buildClusterFromRequest,
   ensureClusterResourceProfile,
+  loadCluster,
   normalizeClusterName,
   normalizeClusterSlug,
   normalizeObservabilityProfile,
   persistCluster,
 } from "./lib/clusters.js";
+import { buildClusterPressureSummary } from "./lib/cluster-pressure.js";
 import { normalizeStorageResource, validateProxmoxCapacity } from "./lib/proxmox-capacity.js";
 import { computePlacement } from "./lib/placement.js";
 import {
@@ -941,6 +943,98 @@ function summarizeClusterResources(resources, vmResources = [], storageResources
     ),
     summary,
   };
+}
+
+function runKubectl(kubeconfigPath, args, { optional = false } = {}) {
+  const kubectlBin = process.env.MANAGER_API_KUBECTL_BIN || "kubectl";
+  const result = spawnSync(kubectlBin, ["--kubeconfig", kubeconfigPath, ...args], {
+    encoding: "utf8",
+    timeout: 5000,
+  });
+
+  if (result.error?.code === "ENOENT") {
+    if (optional) return { ok: false, error: `kubectl not found: ${kubectlBin}` };
+    throw new Error(`kubectl not found: ${kubectlBin}`);
+  }
+  if (result.error) {
+    if (optional) return { ok: false, error: result.error.message };
+    throw result.error;
+  }
+  if (result.status !== 0) {
+    const message =
+      (result.stderr || result.stdout || "").trim() || `kubectl ${args.join(" ")} failed`;
+    if (optional) return { ok: false, error: message };
+    throw new Error(message);
+  }
+
+  return { ok: true, stdout: result.stdout || "" };
+}
+
+function runKubectlJson(kubeconfigPath, args, { optional = false } = {}) {
+  const result = runKubectl(kubeconfigPath, args, { optional });
+  if (!result.ok) return { ok: false, error: result.error };
+  try {
+    return { ok: true, data: JSON.parse(result.stdout || "{}") };
+  } catch (error) {
+    const message = `failed to parse kubectl ${args.join(" ")}: ${
+      error instanceof Error ? error.message : "unknown error"
+    }`;
+    if (optional) return { ok: false, error: message };
+    throw new Error(message, { cause: error });
+  }
+}
+
+function resolveClusterKubeconfigPath(cluster) {
+  const secretBundle = buildClusterWorkerSecretBundle(cluster);
+  const kubeconfigRef = secretBundle.files.TWINBOX_KUBECONFIG_FILE;
+  if (!kubeconfigRef) {
+    throw new Error("cluster kubeconfig secret reference is missing");
+  }
+  return resolveAttachmentPath(process.env, kubeconfigRef, { clusterId: cluster.id });
+}
+
+function readClusterPressure(cluster) {
+  const kubeconfigPath = resolveClusterKubeconfigPath(cluster);
+  if (!fs.existsSync(kubeconfigPath)) {
+    const error = new Error(`cluster kubeconfig not found: ${kubeconfigPath}`);
+    error.status = 404;
+    throw error;
+  }
+
+  const errors = [];
+  const required = [
+    ["nodes", ["get", "nodes", "-o", "json"]],
+    ["pods", ["get", "pods", "-A", "-o", "json"]],
+    ["events", ["get", "events", "-A", "--field-selector", "type=Warning", "-o", "json"]],
+  ].reduce((accumulator, [key, args]) => {
+    accumulator[key] = runKubectlJson(kubeconfigPath, args).data;
+    return accumulator;
+  }, {});
+
+  const topNodesResult = runKubectl(kubeconfigPath, ["top", "nodes"], { optional: true });
+  if (!topNodesResult.ok) errors.push(topNodesResult.error);
+
+  const longhornNodesResult = runKubectlJson(
+    kubeconfigPath,
+    ["-n", "longhorn-system", "get", "nodes.longhorn.io", "-o", "json"],
+    { optional: true }
+  );
+  if (!longhornNodesResult.ok) errors.push(longhornNodesResult.error);
+
+  const longhornVolumesResult = runKubectlJson(
+    kubeconfigPath,
+    ["-n", "longhorn-system", "get", "volumes.longhorn.io", "-o", "json"],
+    { optional: true }
+  );
+  if (!longhornVolumesResult.ok) errors.push(longhornVolumesResult.error);
+
+  return buildClusterPressureSummary({
+    ...required,
+    topNodes: topNodesResult.stdout || "",
+    longhornNodes: longhornNodesResult.data || {},
+    longhornVolumes: longhornVolumesResult.data || {},
+    errors,
+  });
 }
 
 async function findFreeVmidBlock(nodeCount) {
@@ -2004,6 +2098,17 @@ app.get("/api/clusters/:clusterId", (req, res) => {
     return res.status(404).json({ error: "cluster not found" });
   }
   return res.json(ensureClusterResourceProfile(readJson(file)));
+});
+
+app.get("/api/clusters/:clusterId/pressure", (req, res) => {
+  try {
+    const cluster = ensureClusterResourceProfile(loadCluster(dirs, req.params.clusterId));
+    return res.json(readClusterPressure(cluster));
+  } catch (error) {
+    return res.status(error?.status || 500).json({
+      error: error instanceof Error ? error.message : "failed to read cluster pressure",
+    });
+  }
 });
 
 app.put("/api/clusters/:clusterId/observability", (req, res) => {

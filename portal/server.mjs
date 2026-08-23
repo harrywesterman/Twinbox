@@ -1824,10 +1824,22 @@ app.get("/api/status", async (req, res) => {
         };
       })
     );
+    let pressure = null;
+    let pressureError = "";
+    try {
+      const { activeCluster } = await loadActiveClusterState();
+      pressure = await requestManagerJson(
+        `/api/clusters/${encodeURIComponent(activeCluster.id)}/pressure`
+      );
+    } catch (error) {
+      pressureError = error instanceof Error ? error.message : "cluster pressure is not available";
+    }
 
     res.json({
       summary: buildStatusSummary(results),
       checks: results,
+      pressure,
+      pressureError,
       generatedAt: new Date().toISOString(),
     });
   } catch (error) {

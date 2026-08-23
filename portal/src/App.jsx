@@ -3500,46 +3500,170 @@ function UserAdminPage({ config, directoryState, onNavigate }) {
   );
 }
 
+const PRESSURE_LEVEL_COPY = {
+  quiet: {
+    title: "Rustig",
+    copy: "Twinbox heeft ademruimte.",
+  },
+  busy: {
+    title: "Bezig",
+    copy: "Er gebeurt wat, maar het voelt normaal.",
+  },
+  loaded: {
+    title: "Druk",
+    copy: "Het cluster moet opletten.",
+  },
+  "very-busy": {
+    title: "Heel druk",
+    copy: "De machinekamer is benauwd.",
+  },
+  full: {
+    title: "Vol",
+    copy: "Twinbox zit tegen de rand.",
+  },
+  unknown: {
+    title: "Onbekend",
+    copy: "De druktemeter kon net niet lezen.",
+  },
+};
+
+function pressureLevel(value) {
+  return PRESSURE_LEVEL_COPY[value] ? value : "unknown";
+}
+
+function formatStatusTime(value) {
+  const date = new Date(value || "");
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function PressureOffice({ level }) {
+  return (
+    <div className={`pressure-office is-${pressureLevel(level)}`} aria-hidden="true">
+      <div className="pressure-office-wall">
+        <span className="pressure-office-clock" />
+        <div className="pressure-office-board">
+          <span />
+          <span />
+          <span />
+        </div>
+      </div>
+      <div className="pressure-office-floor">
+        <div className="pressure-office-desk is-left">
+          <PixelMonitor label="cpu" />
+          <span />
+        </div>
+        <div className="pressure-office-rack">
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
+        <div className="pressure-office-desk is-right">
+          <PixelMonitor label="ram" />
+          <span />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StatusPage({ statusState, onRefresh, onNavigate }) {
   const data = statusState.data;
+  const pressure = data?.pressure;
+  const level = pressureLevel(pressure?.summary?.level);
+  const levelCopy = PRESSURE_LEVEL_COPY[level];
+  const measuredAt = formatStatusTime(pressure?.summary?.generatedAt || data?.generatedAt);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      onRefresh();
+    }, 30000);
+    return () => window.clearInterval(timer);
+  }, [onRefresh]);
+
   return (
-    <Panel>
-      <SectionTitle
-        eyebrow="Cluster status"
-        title="High-level health"
-        description="A user-friendly view of the core platform services."
-      />
-      <div className="status-summary">
-        <div>
-          <strong>{data?.summary?.label || "Status is not loaded yet"}</strong>
-          <span>
-            {data?.summary
-              ? `${data.summary.healthy}/${data.summary.total} checks healthy`
-              : "Tap refresh to load the current view."}
-          </span>
+    <div className="cluster-pressure-page">
+      <Panel className={`cluster-pressure-hero is-${level}`}>
+        <div className="cluster-pressure-copy">
+          <SectionTitle
+            eyebrow="Cluster status"
+            title="Hoe druk is Twinbox?"
+            description="Een simpele druktemeter voor rekenen, geheugen, opslag en gedoe."
+          />
+          <div className="pressure-verdict">
+            <span>Nu</span>
+            <strong>{pressure?.summary?.label || levelCopy.title}</strong>
+            <p>{levelCopy.copy}</p>
+          </div>
+          <div className="status-meta-row">
+            <span>{measuredAt ? `Laatst gemeten ${measuredAt}` : "Nog niet gemeten"}</span>
+            {pressure?.summary?.degraded || data?.pressureError ? (
+              <span>Metingen deels onbekend</span>
+            ) : null}
+          </div>
+          <div className="hero-actions">
+            <button type="button" className="secondary-button" onClick={onRefresh}>
+              {statusState.loading ? "Verversing..." : "Refresh"}
+            </button>
+            <button type="button" className="secondary-button" onClick={() => onNavigate("/")}>
+              Terug
+            </button>
+          </div>
         </div>
-        <div className="hero-actions">
-          <button type="button" className="secondary-button" onClick={onRefresh}>
-            Refresh
-          </button>
-          <button type="button" className="secondary-button" onClick={() => onNavigate("/")}>
-            Back home
-          </button>
+        <PressureOffice level={level} />
+      </Panel>
+
+      <Panel className="pressure-signal-panel">
+        <div className="pressure-signal-grid">
+          {(pressure?.signals || []).map((signalItem) => (
+            <article
+              key={signalItem.id}
+              className={`pressure-signal is-${pressureLevel(signalItem.level)}`}
+            >
+              <span>{signalItem.label}</span>
+              <strong>{signalItem.levelLabel}</strong>
+              <div className="pressure-signal-bar" aria-hidden="true">
+                <span style={{ width: `${signalItem.percent}%` }} />
+              </div>
+            </article>
+          ))}
+          {!pressure?.signals?.length ? (
+            <article className="pressure-signal is-unknown">
+              <span>Druktemeter</span>
+              <strong>Onbekend</strong>
+              <div className="pressure-signal-bar" aria-hidden="true">
+                <span style={{ width: "0%" }} />
+              </div>
+            </article>
+          ) : null}
         </div>
-      </div>
-      <div className="status-grid">
-        {(data?.checks || []).map((check) => (
-          <article key={check.title} className={`status-card ${badgeTone(check.ok)}`}>
-            <div className="status-card-head">
-              <strong>{check.title}</strong>
-              <span className="status-chip">{check.ok ? "healthy" : "attention"}</span>
-            </div>
-            <p>{check.description}</p>
-            <span>{check.note}</span>
-          </article>
-        ))}
-      </div>
-    </Panel>
+      </Panel>
+
+      {(data?.checks || []).length > 0 ? (
+        <Panel>
+          <SectionTitle
+            eyebrow="Bereikbaarheid"
+            title={data?.summary?.label || "Health checks"}
+            description="Losse servicechecks blijven hieronder beschikbaar."
+          />
+          <div className="status-grid">
+            {(data?.checks || []).map((check) => (
+              <article key={check.title} className={`status-card ${badgeTone(check.ok)}`}>
+                <div className="status-card-head">
+                  <strong>{check.title}</strong>
+                  <span className="status-chip">{check.ok ? "healthy" : "attention"}</span>
+                </div>
+                <p>{check.description}</p>
+                <span>{check.note}</span>
+              </article>
+            ))}
+          </div>
+        </Panel>
+      ) : null}
+    </div>
   );
 }
 
