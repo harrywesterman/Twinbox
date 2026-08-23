@@ -3644,7 +3644,7 @@ def test_metrics_server_argocd_app_uses_official_chart():
     assert "name: metrics-server" in text
     assert "chart: metrics-server" in text
     assert "https://kubernetes-sigs.github.io/metrics-server/" in text
-    assert 'targetRevision: "3.13.1"' in text
+    assert 'targetRevision: "3.14.0"' in text
     assert "$values/gitops/values/metrics-server.yaml" in text
     assert "repoURL: __REPO_URL__" in text
     assert "targetRevision: __TARGET_REVISION__" in text
