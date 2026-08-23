@@ -945,10 +945,13 @@ function summarizeClusterResources(resources, vmResources = [], storageResources
   };
 }
 
+const KUBECTL_MAX_BUFFER_BYTES = 32 * 1024 * 1024;
+
 function runKubectl(kubeconfigPath, args, { optional = false } = {}) {
   const kubectlBin = process.env.MANAGER_API_KUBECTL_BIN || "kubectl";
   const result = spawnSync(kubectlBin, ["--kubeconfig", kubeconfigPath, ...args], {
     encoding: "utf8",
+    maxBuffer: KUBECTL_MAX_BUFFER_BYTES,
     timeout: 5000,
   });
 
