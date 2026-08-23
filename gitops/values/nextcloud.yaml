@@ -28,6 +28,22 @@ cronjob:
     successfulJobsHistoryLimit: 3
     failedJobsHistoryLimit: 5
     backoffLimit: 1
+    # The cronjob pod mounts the same RWO PVC (nextcloud-nextcloud) as the
+    # main Nextcloud pod, so it must land on the same node.
+    affinity:
+      podAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                    - nextcloud
+                - key: app.kubernetes.io/component
+                  operator: In
+                  values:
+                    - app
+            topologyKey: kubernetes.io/hostname
     command:
       - /bin/sh
       - -lc

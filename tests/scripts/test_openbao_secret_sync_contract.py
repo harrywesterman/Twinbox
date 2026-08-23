@@ -658,6 +658,9 @@ def test_mastodon_step_bootstraps_runtime_and_admin_secret_via_openbao():
     assert "secretKey: password" in runtime_secret_text
     assert "property: MASTODON_POSTGRESQL__PASSWORD" in runtime_secret_text
     assert "property: REDIS_PASSWORD" in runtime_secret_text
+    # The helm chart media-remove CronJob reads the lowercase key; mirror it.
+    assert "secretKey: redis-password" in runtime_secret_text
+    assert "property: REDIS_PASSWORD" in runtime_secret_text
     assert "property: SECRET_KEY_BASE" in runtime_secret_text
     assert "property: OTP_SECRET" in runtime_secret_text
     assert "property: VAPID_PRIVATE_KEY" in runtime_secret_text

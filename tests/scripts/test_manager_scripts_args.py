@@ -4354,6 +4354,12 @@ def test_pixelfed_manifests_use_postgresql_and_longhorn_storage():
     assert "barmanObjectName: pixelfed-db-objectstore" in cluster_text
     assert "destinationPath: s3://twinbox-velero/pixelfed-db/" in objectstore_text
 
+    # Worker and scheduler mount the same RWO pixelfed-data PVC as the main pod,
+    # so they must be pinned to the same node via podAffinity.
+    assert workers_text.count("podAffinity:") == 2
+    assert workers_text.count("app.kubernetes.io/name") >= 3
+    assert workers_text.count("topologyKey: kubernetes.io/hostname") == 2
+
 
 def test_paperless_redis_manifest_runs_statelessly():
     redis_text = (REPO_ROOT / "gitops" / "platform-apps" / "paperless" / "redis.yaml").read_text(
@@ -4572,6 +4578,22 @@ def test_nextcloud_db_cluster_uses_future_install_capacity():
     )
     assert "instances: 2" in text
     assert "storageClass: longhorn-single" in text
+
+
+def test_nextcloud_cronjob_pins_to_the_app_node_for_rwo_volume():
+    values_text = (REPO_ROOT / "gitops" / "values" / "nextcloud.yaml").read_text(encoding="utf-8")
+    optional_app_text = (REPO_ROOT / "gitops" / "optional-apps" / "nextcloud.yaml").read_text(
+        encoding="utf-8"
+    )
+
+    # The nextcloud-cron pod mounts the same RWO PVC as the main Nextcloud pod,
+    # so it must be scheduled on the same node via podAffinity.
+    for text in (values_text, optional_app_text):
+        assert "affinity:" in text
+        assert "podAffinity:" in text
+        assert "requiredDuringSchedulingIgnoredDuringExecution" in text
+        assert "topologyKey: kubernetes.io/hostname" in text
+        assert "app.kubernetes.io/component" in text
 
 
 def test_authentik_db_storageclass_uses_single_replica():

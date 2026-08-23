@@ -17,6 +17,16 @@ spec:
       labels:
         app.kubernetes.io/name: pixelfed-worker
     spec:
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                      - pixelfed
+              topologyKey: kubernetes.io/hostname
       containers:
         - name: pixelfed-worker
           image: ghcr.io/jippi/docker-pixelfed:nightly-2026-05-10-staging-apache-8.4-bookworm
@@ -195,6 +205,16 @@ spec:
       labels:
         app.kubernetes.io/name: pixelfed-scheduler
     spec:
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                      - pixelfed
+              topologyKey: kubernetes.io/hostname
       containers:
         - name: pixelfed-scheduler
           image: ghcr.io/jippi/docker-pixelfed:nightly-2026-05-10-staging-apache-8.4-bookworm

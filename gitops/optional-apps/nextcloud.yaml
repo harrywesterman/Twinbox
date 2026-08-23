@@ -54,6 +54,20 @@ spec:
                   successfulJobsHistoryLimit: 3
                   failedJobsHistoryLimit: 5
                   backoffLimit: 1
+                  affinity:
+                    podAffinity:
+                      requiredDuringSchedulingIgnoredDuringExecution:
+                        - labelSelector:
+                            matchExpressions:
+                              - key: app.kubernetes.io/name
+                                operator: In
+                                values:
+                                  - nextcloud
+                              - key: app.kubernetes.io/component
+                                operator: In
+                                values:
+                                  - app
+                          topologyKey: kubernetes.io/hostname
                   command:
                     - /bin/sh
                     - -lc
