@@ -84,7 +84,7 @@ spec:
               mountPath: /work
       containers:
         - name: pgadmin4
-          image: dpage/pgadmin4:9.16
+          image: dpage/pgadmin4:9.17
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
