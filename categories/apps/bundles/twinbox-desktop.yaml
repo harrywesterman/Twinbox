@@ -22,6 +22,8 @@ description: >
 
   **HedgeDoc** — Real-time collaborative markdown editor for meeting notes and brainstorms.
 
+  **Mailu** — Self-hosted email with webmail, admin UI, and your own SMTP edge on the bastion.
+
   **Zulip** — Threaded team chat with powerful topic-based organisation.
 
   **Jitsi** — Private video conferencing with screen sharing, no accounts needed.
@@ -40,8 +42,6 @@ description: >
 
   **Karakeep** — Save and organise interesting links, articles, and ideas into your own searchable knowledge archive.
 
-  **Mailu** — Self-hosted email with webmail, admin UI, and your own SMTP edge on the bastion.
-
   **Mastodon** — A federated social network you own, with your own identity and moderation.
 
   **Matrix** — End-to-end encrypted federated chat with the Element Server Suite.
@@ -51,6 +51,7 @@ apps:
   - install-opencloud
   - install-outline
   - install-hedgedoc
+  - install-mailu
   - install-zulip
   - install-jitsi
   - install-paperless
@@ -60,7 +61,6 @@ apps:
   - install-pixelfed
   - install-stirling-pdf
   - install-karakeep
-  - install-mailu
   - install-mastodon
   - install-matrix
   - install-nextcloud

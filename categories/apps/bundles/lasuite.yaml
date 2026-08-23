@@ -31,6 +31,8 @@ description: >
 
   **Nextcloud** — Secure file sync and share with collaboration tools.
 
+  **Mailu** — Self-hosted email with webmail, admin UI, and your own SMTP edge on the bastion.
+
   **Zulip** — Threaded team chat with powerful topic-based organisation.
 
   **Matrix** — Federated chat with end-to-end encryption and Element client.
@@ -60,6 +62,7 @@ description: >
 apps:
   - install-outline
   - install-nextcloud
+  - install-mailu
   - install-zulip
   - install-matrix
   - install-jitsi

@@ -194,6 +194,17 @@ create_or_update_application() {
   authentik_api_write POST "/core/applications/" "$application_payload" | jq -r '.pk // .id // empty'
 }
 
+openbao_existing_value() {
+  local secret_name="$1"
+  local property="$2"
+  local json
+
+  json="$(openbao_read_global_secret_json "$secret_name" 2>/dev/null || true)"
+  if [[ -n "$json" ]]; then
+    jq -r --arg property "$property" '.[$property] // empty' <<<"$json"
+  fi
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
@@ -253,6 +264,19 @@ zulip_manifest_path="$WORKSPACE_ROOT/gitops/optional-apps/zulip.yaml"
 trap 'rm -f "$zulip_secret_file" "$zulip_runtime_secret_file"' EXIT
 
 mkdir -p "$secrets_dir"
+
+zulip_email_host="mailu-relay-egress.netbird.svc.cluster.local"
+zulip_email_port="2525"
+zulip_email_use_tls="True"
+zulip_email_host_user="$(openbao_existing_value mailu-relay relay-username)"
+zulip_email_password="$(openbao_existing_value mailu-relay relay-password)"
+zulip_noreply_email_address="noreply@${public_zone_name}"
+zulip_tokenized_noreply_email_address="noreply+%s@${public_zone_name}"
+zulip_add_tokens_to_noreply_address="True"
+
+if [[ -z "$zulip_email_host_user" || -z "$zulip_email_password" ]]; then
+  fail "Mailu relay credentials not found in OpenBao secret mailu-relay; install Mailu before configuring Zulip email"
+fi
 
 existing_zulip_secret_json=""
 if command -v openbao_read_global_secret_json >/dev/null 2>&1; then
@@ -347,6 +371,14 @@ zulip_config_secret_json="$(
     --arg db_password "$zulip_db_password" \
     --arg owner_email "$zulip_default_realm_owner_email" \
     --arg owner_name "$zulip_default_realm_owner_name" \
+    --arg email_host "$zulip_email_host" \
+    --arg email_port "$zulip_email_port" \
+    --arg email_use_tls "$zulip_email_use_tls" \
+    --arg email_host_user "$zulip_email_host_user" \
+    --arg email_password "$zulip_email_password" \
+    --arg noreply_email_address "$zulip_noreply_email_address" \
+    --arg tokenized_noreply_email_address "$zulip_tokenized_noreply_email_address" \
+    --arg add_tokens_to_noreply_address "$zulip_add_tokens_to_noreply_address" \
     --arg oidc_idps "$zulip_oidc_idps_literal" \
     '{
       SECRETS_secret_key: $secret_key,
@@ -356,6 +388,14 @@ zulip_config_secret_json="$(
       ZULIP_POSTGRESQL__PASSWORD: $db_password,
       ZULIP_DEFAULT_REALM_OWNER_EMAIL: $owner_email,
       ZULIP_DEFAULT_REALM_OWNER_NAME: $owner_name,
+      SETTING_EMAIL_HOST: $email_host,
+      SETTING_EMAIL_PORT: $email_port,
+      SETTING_EMAIL_USE_TLS: $email_use_tls,
+      SETTING_EMAIL_HOST_USER: $email_host_user,
+      SECRETS_email_password: $email_password,
+      SETTING_NOREPLY_EMAIL_ADDRESS: $noreply_email_address,
+      SETTING_TOKENIZED_NOREPLY_EMAIL_ADDRESS: $tokenized_noreply_email_address,
+      SETTING_ADD_TOKENS_TO_NOREPLY_ADDRESS: $add_tokens_to_noreply_address,
       SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS: $oidc_idps
     }'
 )"
@@ -365,7 +405,7 @@ chmod 600 "$zulip_secret_file"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "zulip-oidc" \
   --json-file "$zulip_secret_file" \
-  --required-keys "SECRETS_secret_key,SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS,ZULIP_POSTGRESQL__USERNAME,ZULIP_POSTGRESQL__PASSWORD"
+  --required-keys "SECRETS_secret_key,SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS,ZULIP_POSTGRESQL__USERNAME,ZULIP_POSTGRESQL__PASSWORD,SETTING_EMAIL_HOST,SETTING_EMAIL_PORT,SETTING_EMAIL_USE_TLS,SETTING_EMAIL_HOST_USER,SECRETS_email_password,SETTING_NOREPLY_EMAIL_ADDRESS,SETTING_TOKENIZED_NOREPLY_EMAIL_ADDRESS,SETTING_ADD_TOKENS_TO_NOREPLY_ADDRESS"
 
 zulip_runtime_secret_json="$(
   jq -n \
@@ -573,6 +613,58 @@ VERIFYEOF
 su zulip -c '/home/zulip/deployments/current/manage.py shell -c \"\$(cat /tmp/verify-bootstrap.py)\"'
 " >/dev/null
   log "Zulip bootstrap verified"
+}
+
+verify_zulip_email_config() {
+  local pod_name missing_keys
+  local required_email_keys_json
+
+  required_email_keys_json="$(
+    jq -cn '[
+      "SETTING_EMAIL_HOST",
+      "SETTING_EMAIL_PORT",
+      "SETTING_EMAIL_USE_TLS",
+      "SETTING_EMAIL_HOST_USER",
+      "SECRETS_email_password",
+      "SETTING_NOREPLY_EMAIL_ADDRESS",
+      "SETTING_TOKENIZED_NOREPLY_EMAIL_ADDRESS",
+      "SETTING_ADD_TOKENS_TO_NOREPLY_ADDRESS"
+    ]'
+  )"
+
+  missing_keys="$(
+    kubectl -n zulip get secret zulip-config -o json |
+      jq -r --argjson required "$required_email_keys_json" '
+        . as $secret
+        | [
+            $required[]
+            | select(($secret.data[.] // "") == "")
+          ]
+        | join(",")
+      '
+  )"
+  if [[ -n "$missing_keys" ]]; then
+    fail "Zulip email configuration is missing expected secret keys: ${missing_keys}"
+  fi
+
+  kubectl -n netbird get service mailu-relay-egress >/dev/null 2>&1 \
+    || fail "Mailu relay egress service not found; install or repair Mailu before using Zulip email"
+
+  log "Zulip email configuration keys are present"
+
+  if [[ "${ZULIP_SEND_TEST_EMAIL:-false}" != "true" ]]; then
+    log "Skipping Zulip test email; set ZULIP_SEND_TEST_EMAIL=true to send one to ${zulip_default_realm_owner_email}"
+    return 0
+  fi
+
+  pod_name="$(find_statefulset_pod "zulip" "zulip")"
+  [[ -n "$pod_name" ]] || fail "Could not find a running Zulip pod for test email"
+  kubectl -n zulip exec "$pod_name" -- env TEST_EMAIL="$zulip_default_realm_owner_email" bash -lc '
+set -euo pipefail
+cd /home/zulip/deployments/current
+su zulip -c "./manage.py send_test_email \"${TEST_EMAIL}\""
+' >/dev/null
+  log "Zulip test email sent to ${zulip_default_realm_owner_email}"
 }
 
 read_zulip_owner_api_credentials() {
@@ -908,6 +1000,7 @@ zulip_realm_pod="$(find_statefulset_pod "zulip" "zulip")"
 wait_for_zulip_realm "$zulip_realm_pod"
 ensure_zulip_bootstrap_streams
 verify_zulip_bootstrap
+verify_zulip_email_config
 ensure_zulip_agent_bot
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then

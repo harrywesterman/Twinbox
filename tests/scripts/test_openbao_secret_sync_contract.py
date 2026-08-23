@@ -57,6 +57,7 @@ ZULIP_RUN = REPO_ROOT / "categories" / "apps" / "steps" / "install-zulip" / "run
 ZULIP_APP = REPO_ROOT / "gitops" / "apps" / "zulip.yaml"
 ZULIP_OPTIONAL_APP = REPO_ROOT / "gitops" / "optional-apps" / "zulip.yaml"
 ZULIP_PLATFORM_DIR = REPO_ROOT / "gitops" / "platform-apps" / "zulip"
+ZULIP_CONFIG_SECRET = ZULIP_PLATFORM_DIR / "externalsecret.yaml"
 ZULIP_RUNTIME_SECRET = ZULIP_PLATFORM_DIR / "runtime-externalsecret.yaml"
 ZULIP_VALUES = REPO_ROOT / "gitops" / "values" / "zulip.yaml"
 ZULIP_DB_CLUSTER = REPO_ROOT / "gitops" / "databases" / "zulip" / "cluster.yaml"
@@ -332,14 +333,28 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     app_text = _read(ZULIP_APP)
     optional_app_text = _read(ZULIP_OPTIONAL_APP)
     values_text = _read(ZULIP_VALUES)
+    config_secret_text = _read(ZULIP_CONFIG_SECRET)
     runtime_secret_text = _read(ZULIP_RUNTIME_SECRET)
     db_cluster_text = _read(ZULIP_DB_CLUSTER)
+    zulip_email_keys = [
+        "SETTING_EMAIL_HOST",
+        "SETTING_EMAIL_PORT",
+        "SETTING_EMAIL_USE_TLS",
+        "SETTING_EMAIL_HOST_USER",
+        "SECRETS_email_password",
+        "SETTING_NOREPLY_EMAIL_ADDRESS",
+        "SETTING_TOKENIZED_NOREPLY_EMAIL_ADDRESS",
+        "SETTING_ADD_TOKENS_TO_NOREPLY_ADDRESS",
+    ]
 
     assert "Placeholder step" not in step_text
     assert "categories/apps/steps/install-zulip/run.sh" in step_text
     assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in run_text
     assert 'source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"' in run_text
     assert 'mkdir -p "$secrets_dir"' in run_text
+    assert "openbao_existing_value mailu-relay relay-username" in run_text
+    assert "openbao_existing_value mailu-relay relay-password" in run_text
+    assert "Mailu relay credentials not found in OpenBao secret mailu-relay" in run_text
     assert "zulip_runtime_secret_file=" in run_text
     assert "openbao_read_global_secret_json zulip-runtime" in run_text
     assert "sync-openbao-global-secret.sh" in run_text
@@ -387,6 +402,22 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "LOADBALANCER_IPS" not in run_text
     assert "__ZULIP_RABBITMQ_PASSWORD__" not in run_text
     assert "__ZULIP_REDIS_PASSWORD__" not in run_text
+    assert "verify_zulip_email_config" in run_text
+    assert "mailu-relay-egress.netbird.svc.cluster.local" in run_text
+    assert "kubectl -n netbird get service mailu-relay-egress" in run_text
+    assert "ZULIP_SEND_TEST_EMAIL" in run_text
+    assert "send_test_email" in run_text
+    for key in zulip_email_keys:
+        assert key in run_text
+    assert (
+        "--required-keys "
+        '"SECRETS_secret_key,SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS,'
+        "ZULIP_POSTGRESQL__USERNAME,ZULIP_POSTGRESQL__PASSWORD,"
+        "SETTING_EMAIL_HOST,SETTING_EMAIL_PORT,SETTING_EMAIL_USE_TLS,"
+        "SETTING_EMAIL_HOST_USER,SECRETS_email_password,SETTING_NOREPLY_EMAIL_ADDRESS,"
+        "SETTING_TOKENIZED_NOREPLY_EMAIL_ADDRESS,SETTING_ADD_TOKENS_TO_NOREPLY_ADDRESS"
+        '"' in run_text
+    )
 
     assert "kind: ApplicationSet" in app_text
     assert "name: zulip-set" in app_text
@@ -444,6 +475,10 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "failureThreshold: 15" in values_text
     assert "__ZULIP_RABBITMQ_PASSWORD__" not in app_text
     assert "__ZULIP_REDIS_PASSWORD__" not in app_text
+    for appset_text in [app_text, optional_app_text]:
+        assert "SECRETS_email_password" not in appset_text
+        assert "relay-password" not in appset_text
+        assert "mailu-relay-egress.netbird.svc.cluster.local" not in appset_text
 
     assert "size: 10Gi" in values_text
     assert "postgresql:" in values_text
@@ -457,6 +492,9 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS:" in values_text
     assert "ZULIP_DEFAULT_REALM_OWNER_EMAIL:" in values_text
     assert "ZULIP_DEFAULT_REALM_OWNER_NAME:" in values_text
+    for key in zulip_email_keys:
+        assert f"{key}:" in values_text
+        assert f"key: {key}" in values_text
     assert "SECRETS_rabbitmq_password:" not in values_text
     assert "SECRETS_redis_password:" not in values_text
     assert "SETTING_MEMCACHED_USERNAME:" not in values_text
@@ -491,6 +529,12 @@ def test_zulip_step_is_backed_by_a_real_runner_and_gitops_resources():
     assert "missing_default_streams" in values_text
     assert "missing_streams" in values_text
     assert "imageName: ghcr.io/cloudnative-pg/postgresql:16.4" in db_cluster_text
+    assert "name: zulip-config" in config_secret_text
+    for key in zulip_email_keys:
+        assert f"secretKey: {key}" in config_secret_text
+        assert f"property: {key}" in config_secret_text
+    assert "key: twinbox/global/zulip-oidc" in config_secret_text
+    assert "relay-password" not in config_secret_text
     assert "name: zulip-runtime" in runtime_secret_text
     assert "secretKey: rabbitmq-password" in runtime_secret_text
     assert "property: ZULIP_RABBITMQ_PASSWORD" in runtime_secret_text

@@ -342,6 +342,7 @@ test("app catalog exposes apps while the wizard catalog keeps them out of sight"
     assert.deepEqual(openDeskBundle?.apps, [
       "install-opencloud",
       "install-nextcloud",
+      "install-mailu",
       "install-zulip",
       "install-jitsi",
     ]);
@@ -350,10 +351,18 @@ test("app catalog exposes apps while the wizard catalog keeps them out of sight"
     assert.deepEqual(laSuiteBundle?.apps, [
       "install-outline",
       "install-nextcloud",
+      "install-mailu",
       "install-zulip",
       "install-matrix",
       "install-jitsi",
     ]);
+    for (const bundle of [openDeskBundle, laSuiteBundle, twinboxDesktopBundle]) {
+      assert.ok(bundle);
+      assert.ok(
+        bundle.apps.indexOf("install-mailu") < bundle.apps.indexOf("install-zulip"),
+        `${bundle.id} should install Mailu before Zulip`
+      );
+    }
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

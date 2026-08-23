@@ -70,10 +70,10 @@ Bundles group related apps into curated sets:
 
 | Bundle | Apps Included |
 |--------|---------------|
-| **Mijn Bureau** | Nextcloud, OnlyOffice, Zulip |
-| **openDesk** | OpenCloud, Collabora, SearXNG |
-| **La Suite** | Immich, Paperless, HedgeDoc |
-| **Twinbox Desktop** | OpenCloud, Outline, HedgeDoc, Zulip, Jitsi, Paperless, Immich, SearXNG, Audiobookshelf, Pixelfed, Stirling PDF, Karakeep, Mailu, Mastodon, Matrix, Nextcloud |
+| **Mijn Bureau** | Nextcloud, Outline, Jitsi |
+| **openDesk** | OpenCloud, Nextcloud, Mailu, Zulip, Jitsi |
+| **La Suite** | Outline, Nextcloud, Mailu, Zulip, Matrix, Jitsi |
+| **Twinbox Desktop** | OpenCloud, Outline, HedgeDoc, Mailu, Zulip, Jitsi, Paperless, Immich, SearXNG, Audiobookshelf, Pixelfed, Stirling PDF, Karakeep, Mastodon, Matrix, Nextcloud |
 
 ## Deployment Pattern
 

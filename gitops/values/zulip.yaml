@@ -20,6 +20,46 @@ zulip:
         secretKeyRef:
           name: zulip-config
           key: ZULIP_DEFAULT_REALM_OWNER_NAME
+    SETTING_EMAIL_HOST:
+      valueFrom:
+        secretKeyRef:
+          name: zulip-config
+          key: SETTING_EMAIL_HOST
+    SETTING_EMAIL_PORT:
+      valueFrom:
+        secretKeyRef:
+          name: zulip-config
+          key: SETTING_EMAIL_PORT
+    SETTING_EMAIL_USE_TLS:
+      valueFrom:
+        secretKeyRef:
+          name: zulip-config
+          key: SETTING_EMAIL_USE_TLS
+    SETTING_EMAIL_HOST_USER:
+      valueFrom:
+        secretKeyRef:
+          name: zulip-config
+          key: SETTING_EMAIL_HOST_USER
+    SECRETS_email_password:
+      valueFrom:
+        secretKeyRef:
+          name: zulip-config
+          key: SECRETS_email_password
+    SETTING_NOREPLY_EMAIL_ADDRESS:
+      valueFrom:
+        secretKeyRef:
+          name: zulip-config
+          key: SETTING_NOREPLY_EMAIL_ADDRESS
+    SETTING_TOKENIZED_NOREPLY_EMAIL_ADDRESS:
+      valueFrom:
+        secretKeyRef:
+          name: zulip-config
+          key: SETTING_TOKENIZED_NOREPLY_EMAIL_ADDRESS
+    SETTING_ADD_TOKENS_TO_NOREPLY_ADDRESS:
+      valueFrom:
+        secretKeyRef:
+          name: zulip-config
+          key: SETTING_ADD_TOKENS_TO_NOREPLY_ADDRESS
     SETTING_EXTERNAL_HOST: zulip.bierineenweek.nl
     SETTING_ZULIP_ADMINISTRATOR: admin@zulip.bierineenweek.nl
     SETTING_SOCIAL_AUTH_REDIRECT_IS_HTTPS: "True"

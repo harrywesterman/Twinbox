@@ -31,6 +31,8 @@ description: >
 
   **Nextcloud** — Secure file sync and share with collaboration tools.
 
+  **Mailu** — Self-hosted email with webmail, admin UI, and your own SMTP edge on the bastion.
+
   **Zulip** — Threaded team chat with powerful topic-based organisation.
 
   **Jitsi** — Private video conferencing with screen sharing, no accounts needed.
@@ -64,5 +66,6 @@ description: >
 apps:
   - install-opencloud
   - install-nextcloud
+  - install-mailu
   - install-zulip
   - install-jitsi
