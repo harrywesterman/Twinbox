@@ -14,4 +14,4 @@ resources:
 
 images:
   - name: ghcr.io/harrywesterman/twinbox-portal
-    newTag: sha-26a6b9d
+    newTag: sha-e723597
