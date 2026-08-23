@@ -12,7 +12,7 @@
     "@nextcloud/router": "^3.1.0"
   },
   "devDependencies": {
-    "@nextcloud/vite-config": "2.4.0",
+    "@nextcloud/vite-config": "2.5.4",
     "typescript": "5.8.3",
     "vite": "^6.4.1"
   }
