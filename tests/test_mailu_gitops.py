@@ -58,6 +58,7 @@ def test_mailu_values_keep_mail_ports_internal_and_set_resources():
     assert values["proxyAuth"]["create"] == "true"
     assert values["proxyAuth"]["header"] == "X-authentik-email"
     assert values["proxyAuth"]["whitelist"] == "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+    assert values["sessionTimeout"] == 43200
 
     for component in ("front", "admin", "postfix", "dovecot", "rspamd", "clamav", "webmail"):
         resources = values[component]["resources"]

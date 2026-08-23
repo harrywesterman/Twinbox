@@ -5,6 +5,7 @@ domain: ""
 timezone: "Etc/UTC"
 postmaster: postmaster
 recipientDelimiter: "+"
+sessionTimeout: 43200
 
 existingSecret: mailu-runtime
 
