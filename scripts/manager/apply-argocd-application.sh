@@ -122,7 +122,7 @@ namespace_resource_baseline() {
         limit_cpu="2000m"
         ;;
       *)
-        request_cpu="150m"
+        request_cpu="75m"
         request_memory="256Mi"
         limit_cpu="1000m"
         ;;
@@ -140,7 +140,7 @@ namespace_resource_baseline() {
         limit_cpu="1000m"
         ;;
       *)
-        request_cpu="50m"
+        request_cpu="25m"
         request_memory="128Mi"
         limit_cpu="500m"
         ;;

@@ -43,7 +43,7 @@ spec:
                         OAUTH_WELLKNOWN_URL: 'https://authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/application/o/karakeep/.well-known/openid-configuration'
                       resources:
                         requests:
-                          cpu: 500m
+                          cpu: 100m
                           memory: 512Mi
                         limits:
                           cpu: "1"
@@ -91,6 +91,13 @@ spec:
                         runAsNonRoot: true
                         runAsUser: 1000
                         runAsGroup: 1000
+                      resources:
+                        requests:
+                          cpu: 100m
+                          memory: 100Mi
+                        limits:
+                          cpu: "1"
+                          memory: 1Gi
         - repoURL: https://github.com/harrywesterman/Twinbox.git
           targetRevision: main
           path: gitops/platform-apps/karakeep

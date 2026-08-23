@@ -566,7 +566,7 @@ def test_outline_step_projects_a_real_oidc_backed_app():
     forwarded_headers_text = _read(OUTLINE_PLATFORM_DIR / "forwarded-headers-middleware.yaml")
     assert "X-Forwarded-Proto: https" in forwarded_headers_text
     assert "requests:" in deployment_text
-    assert "cpu: 500m" in deployment_text
+    assert "cpu: 100m" in deployment_text
     assert "memory: 512Mi" in deployment_text
     assert 'cpu: "1"' in deployment_text
     assert "memory: 1Gi" in deployment_text

@@ -121,7 +121,7 @@ rspamd:
   nodeSelector: {}
   resources:
     requests:
-      cpu: 250m
+      cpu: 100m
       memory: 512Mi
     limits:
       cpu: "2"
@@ -130,7 +130,7 @@ rspamd:
 clamav:
   resources:
     requests:
-      cpu: 250m
+      cpu: 100m
       memory: 1Gi
     limits:
       cpu: "2"

@@ -3615,7 +3615,7 @@ def test_prometheus_values_configures_alertmanager_and_storage():
     assert "enabled: false" in text
     assert "storageClassName: longhorn-single" in text
     assert "memory: 1Gi" in text
-    assert "cpu: 500m" in text
+    assert "cpu: 250m" in text
     assert "memory: 2Gi" in text
     assert "cpu: 2000m" in text
     assert "kube-state-metrics:" in text
@@ -4317,7 +4317,7 @@ def test_paperless_deployment_uses_reasonable_resources():
     assert "resources:" in deployment_text
     assert "memory: 512Mi" in deployment_text
     assert "memory: 1Gi" in deployment_text
-    assert "cpu: 250m" in deployment_text
+    assert "cpu: 100m" in deployment_text
     assert 'cpu: "1"' in deployment_text
     assert "failureThreshold: 120" in deployment_text
 
@@ -4925,7 +4925,7 @@ def test_karakeep_argo_application_manages_the_platform_overlay():
     )
     assert "secrets:" in text
     assert "enabled: false" in text
-    assert "cpu: 500m" in text
+    assert "cpu: 100m" in text
     assert "memory: 512Mi" in text
     assert 'cpu: "1"' in text
     assert "memory: 1Gi" in text
