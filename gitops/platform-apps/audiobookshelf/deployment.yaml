@@ -21,6 +21,12 @@ spec:
         - name: audiobookshelf
           image: ghcr.io/advplyr/audiobookshelf:2.36.0
           imagePullPolicy: Always
+          command:
+            - tini
+            - --
+            - sh
+            - -lc
+            - node /opt/twinbox/patch-oidc-admin-permissions.mjs && exec node index.js
           ports:
             - name: http
               containerPort: 13378
@@ -54,9 +60,16 @@ spec:
             failureThreshold: 60
             periodSeconds: 5
           volumeMounts:
+            - name: oidc-admin-permissions-patch
+              mountPath: /opt/twinbox/patch-oidc-admin-permissions.mjs
+              subPath: patch-oidc-admin-permissions.mjs
+              readOnly: true
             - name: audiobookshelf-data
               mountPath: /data
       volumes:
+        - name: oidc-admin-permissions-patch
+          configMap:
+            name: audiobookshelf-oidc-admin-permissions-patch
         - name: audiobookshelf-data
           persistentVolumeClaim:
             claimName: audiobookshelf-data

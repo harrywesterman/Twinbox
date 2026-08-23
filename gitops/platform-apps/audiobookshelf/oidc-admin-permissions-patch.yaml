@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: audiobookshelf-oidc-admin-permissions-patch
+  namespace: audiobookshelf
+  labels:
+    app.kubernetes.io/name: audiobookshelf
+data:
+  patch-oidc-admin-permissions.mjs: |
+    import fs from "node:fs";
+
+    const strategyPath = "/app/server/auth/OidcAuthStrategy.js";
+    const source = fs.readFileSync(strategyPath, "utf8");
+
+    const original = `      if (user.type !== userType) {
+        Logger.info(\`[OidcAuth] openid callback: Updating user "\${user.username}" type to "\${userType}" from "\${user.type}"\`)
+        user.type = userType
+        await user.save()
+      }`;
+
+    const patched = `      let hasTwinboxPermissionUpdates = false
+      if (user.type !== userType) {
+        Logger.info(\`[OidcAuth] openid callback: Updating user "\${user.username}" type to "\${userType}" from "\${user.type}"\`)
+        user.type = userType
+        hasTwinboxPermissionUpdates = true
+      }
+
+      if (userType === 'admin') {
+        const adminPermissions = Database.userModel.getDefaultPermissionsForUserType('admin')
+        const currentPermissions = user.permissions || {}
+        const nextPermissions = {
+          ...currentPermissions,
+          ...adminPermissions,
+          delete: currentPermissions.delete === true
+        }
+
+        if (JSON.stringify(currentPermissions) !== JSON.stringify(nextPermissions)) {
+          Logger.info(\`[OidcAuth] openid callback: Applying admin permissions for user "\${user.username}"\`)
+          user.permissions = nextPermissions
+          user.changed('permissions', true)
+          hasTwinboxPermissionUpdates = true
+        }
+      }
+
+      if (hasTwinboxPermissionUpdates) {
+        await user.save()
+      }`;
+
+    if (source.includes(patched)) {
+      console.log("Twinbox Audiobookshelf OIDC admin permissions patch already applied");
+      process.exit(0);
+    }
+
+    if (!source.includes(original)) {
+      console.error("Could not find Audiobookshelf OIDC group update block to patch");
+      process.exit(1);
+    }
+
+    fs.writeFileSync(strategyPath, source.replace(original, patched));
+    console.log("Applied Twinbox Audiobookshelf OIDC admin permissions patch");

@@ -6,5 +6,6 @@ resources:
   - pvc.yaml
   - service.yaml
   - deployment.yaml
+  - oidc-admin-permissions-patch.yaml
   - ingressroute.yaml
   - netbird-forwarded-headers-middleware.yaml
