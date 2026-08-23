@@ -1,0 +1,14 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: mailu-netbird-forwarded-headers
+  namespace: mailu
+  annotations:
+    twinbox.io/description: >-
+      Keep Mailu and Authentik callbacks on the public HTTPS origin behind
+      NetBird Reverse Proxy.
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Port: "443"
+      X-Forwarded-Proto: https

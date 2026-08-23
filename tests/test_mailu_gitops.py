@@ -147,9 +147,11 @@ def test_mailu_ingressroutes_target_mailu_front_only():
     docs = list(
         yaml.safe_load_all((MAILU_PLATFORM_DIR / "ingressroute.yaml").read_text(encoding="utf-8"))
     )
+    kustomization = _load_yaml(MAILU_PLATFORM_DIR / "kustomization.yaml")
     ingressroute_docs = [d for d in docs if d.get("kind") == "IngressRoute"]
     names = {doc["metadata"]["name"] for doc in ingressroute_docs}
     assert names == {"mailu", "mailu-netbird"}
+    assert "netbird-forwarded-headers-middleware.yaml" in kustomization["resources"]
 
     for doc in ingressroute_docs:
         routes = doc["spec"]["routes"]
@@ -161,7 +163,19 @@ def test_mailu_ingressroutes_target_mailu_front_only():
         service = route["services"][0]
         assert service["name"] == "mailu-front"
         assert service["port"] == 80
-        assert route["middlewares"] == [{"name": "authentik-forwardauth"}]
+        if doc["metadata"]["name"] == "mailu-netbird":
+            assert route["middlewares"] == [
+                {"name": "mailu-netbird-forwarded-headers"},
+                {"name": "authentik-forwardauth"},
+            ]
+        else:
+            assert route["middlewares"] == [{"name": "authentik-forwardauth"}]
+
+    middleware = _load_yaml(MAILU_PLATFORM_DIR / "netbird-forwarded-headers-middleware.yaml")
+    assert middleware["metadata"]["name"] == "mailu-netbird-forwarded-headers"
+    headers = middleware["spec"]["headers"]["customRequestHeaders"]
+    assert headers["X-Forwarded-Proto"] == "https"
+    assert headers["X-Forwarded-Port"] == "443"
 
 
 def test_external_dns_allows_mx_records():

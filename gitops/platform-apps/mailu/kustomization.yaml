@@ -11,3 +11,4 @@ resources:
   - relay-egress.yaml
   - ingressroute.yaml
   - authentik-forwardauth-middleware.yaml
+  - netbird-forwarded-headers-middleware.yaml

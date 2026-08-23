@@ -29,6 +29,7 @@ spec:
     - kind: Rule
       match: Host(`mail.__ZONE_NAME__`)
       middlewares:
+        - name: mailu-netbird-forwarded-headers
         - name: authentik-forwardauth
       services:
         - kind: Service
