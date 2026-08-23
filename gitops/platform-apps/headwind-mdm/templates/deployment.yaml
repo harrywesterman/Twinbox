@@ -26,7 +26,7 @@ spec:
           type: RuntimeDefault
       initContainers:
         - name: prepare-persistent-tomcat-paths
-          image: busybox:1.37.0
+          image: busybox:1.38.0
           imagePullPolicy: IfNotPresent
           command: ["sh", "-ec", "mkdir -p /data/work /data/context /data/webapps"]
           securityContext:

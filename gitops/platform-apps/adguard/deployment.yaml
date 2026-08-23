@@ -28,7 +28,7 @@ spec:
               mountPath: /opt/adguardhome/conf
       containers:
         - name: adguard
-          image: adguard/adguardhome:v0.107.78
+          image: adguard/adguardhome:v0.107.79
           imagePullPolicy: IfNotPresent
           ports:
             - name: dns-udp
