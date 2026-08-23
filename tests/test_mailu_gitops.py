@@ -69,11 +69,17 @@ def test_mailu_values_keep_mail_ports_internal_and_set_resources():
 
 
 def test_mailu_postfix_greets_with_distinct_hostname_to_avoid_loop_detection():
+    appset = _load_yaml(REPO_ROOT / "gitops" / "optional-apps" / "mailu.yaml")
     values = _load_yaml(REPO_ROOT / "gitops" / "values" / "mailu.yaml")
-    overrides = values["postfix"]["overrides"]["postfix.cf"]
-    assert "smtpd_banner" in overrides
-    assert "mail.bierineenweek.nl" not in overrides
-    assert values["postfix"]["updateStrategy"]["type"] == "Recreate"
+    helm_values = appset["spec"]["template"]["spec"]["sources"][0]["helm"]["values"]
+
+    hostnames = re.search(r"hostnames:\n(  - .+\n)+", helm_values)
+    assert hostnames, "hostnames block not found"
+    hosts = re.findall(r'^  - "([^"]+)"', hostnames.group(0), re.MULTILINE)
+    assert len(hosts) >= 2
+    assert hosts[0].startswith("mailu.{{")
+    assert hosts[0] == hosts[1].replace("mail.{{", "mailu.{{")
+    assert "smtpd_banner" not in values.get("postfix", {}).get("overrides", {}).get("postfix.cf", "")
 
 
 def test_mailu_admin_waits_for_redis_before_boot():

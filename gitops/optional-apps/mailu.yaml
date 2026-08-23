@@ -29,6 +29,7 @@ spec:
               subnet: "{{or (index .metadata.annotations "twinbox.io/pod-cidr") "10.244.0.0/16"}}"
               domain: "{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
               hostnames:
+                - "mailu.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
                 - "mail.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
               initialAccount:
                 username: "{{or (index .metadata.annotations "twinbox.io/mailu-admin-localpart") "admin"}}"
