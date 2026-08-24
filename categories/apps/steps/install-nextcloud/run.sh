@@ -412,7 +412,6 @@ find_outpost_json_by_name() {
 create_or_update_ldap_outpost() {
   local provider_pk="$1"
   local service_connection_pk existing_json existing_pk default_config payload
-  local outpost_authentik_host="http://authentik-server.authentik.svc.cluster.local/"
 
   service_connection_pk="$(find_kubernetes_service_connection_pk)"
   if [[ -z "$service_connection_pk" ]]; then
@@ -424,8 +423,6 @@ create_or_update_ldap_outpost() {
   payload="$(
     jq -n \
       --arg service_connection "$service_connection_pk" \
-      --arg authentik_host "$outpost_authentik_host" \
-      --arg authentik_host_browser "${AUTHENTIK_HOST%/}/" \
       --argjson provider_pk "$provider_pk" \
       --argjson config "$default_config" \
       '{
@@ -433,10 +430,7 @@ create_or_update_ldap_outpost() {
         type: "ldap",
         providers: [$provider_pk],
         service_connection: $service_connection,
-        config: ($config + {
-          authentik_host: $authentik_host,
-          authentik_host_browser: $authentik_host_browser
-        })
+        config: $config
       }'
   )"
 
@@ -757,22 +751,6 @@ sync_authentik_nextcloud_ldap_uids() {
   done < <(jq -c '.[]' <<<"$users_json")
 
   log "Synced nextcloudUid for ${total} Authentik user(s)"
-}
-
-disable_existing_nextcloud_ldap_configs() {
-  log "Temporarily disabling existing Nextcloud LDAP configs before OIDC user-id guard"
-  kubectl exec -i -n nextcloud deploy/nextcloud -c nextcloud -- sh -s <<'SH'
-set -e
-cd /var/www/html
-
-if ! php occ app:list --output=json | php -r '$j=json_decode(stream_get_contents(STDIN), true); exit(isset($j["enabled"]["user_ldap"]) ? 0 : 1);'; then
-  exit 0
-fi
-
-for config_id in $({ php occ ldap:show-config 2>/dev/null || true; } | awk -F'|' '$2 ~ /Configuration/ {gsub(/[[:space:]]/, "", $3); if ($3 != "") print $3}'); do
-  php occ ldap:set-config "$config_id" ldapConfigurationActive "0" >/dev/null || true
-done
-SH
 }
 
 configure_nextcloud_ldap_backend() {
@@ -1271,7 +1249,6 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
 "
 
 sync_authentik_nextcloud_ldap_uids
-disable_existing_nextcloud_ldap_configs
 assert_nextcloud_user_ids_match_authentik
 configure_nextcloud_ldap_backend "$nextcloud_ldap_bind_dn" "$nextcloud_ldap_bind_password" "$nextcloud_ldap_base_dn"
 
