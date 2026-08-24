@@ -5429,6 +5429,38 @@ def test_management_console_endpoints_use_placeholders():
     assert "beszel-endpoints.yaml" in endpoint_script_text
 
 
+def test_management_console_step_resynchronizes_endpoints_after_services_exist():
+    step_text = (
+        REPO_ROOT
+        / "categories"
+        / "talos-cluster"
+        / "steps"
+        / "install-management-consoles"
+        / "run.sh"
+    ).read_text(encoding="utf-8")
+    route_wait = "kubectl -n longhorn-system get ingressroute/webwizard"
+    endpoint_sync = 'bash "$WORKSPACE_ROOT/scripts/manager/ensure-management-endpoints.sh"'
+    authentik_lookup = "find_proxy_provider_pk_by_name()"
+    assert route_wait in step_text
+    assert 'log_step "Synchronizing management console endpoints"' in step_text
+    assert endpoint_sync in step_text
+    assert step_text.index(route_wait) < step_text.index(endpoint_sync)
+    assert step_text.index(endpoint_sync) < step_text.index(authentik_lookup)
+
+
+def test_management_console_endpoint_sync_verifies_rendered_endpoints():
+    endpoint_script_text = (
+        REPO_ROOT / "scripts" / "manager" / "ensure-management-endpoints.sh"
+    ).read_text(encoding="utf-8")
+
+    assert "for endpoint_name in proxmox seaweedfs webwizard forgejo beszel" in endpoint_script_text
+    assert "kubectl -n longhorn-system get endpoints" in endpoint_script_text
+    assert (
+        "Endpoint ${endpoint_name} has no ready addresses or ports after apply"
+        in endpoint_script_text
+    )
+
+
 def test_beszel_management_vm_route_uses_native_oidc_without_forwardauth():
     ingress_text = (
         REPO_ROOT / "gitops" / "platform" / "management-consoles" / "beszel-ingressroute.yaml"

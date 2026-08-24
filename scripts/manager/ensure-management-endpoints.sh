@@ -31,6 +31,18 @@ for endpoint_file in proxmox-endpoints.yaml seaweedfs-endpoints.yaml webwizard-e
   kubectl apply -f - <<<"$rendered"
 done
 
+for endpoint_name in proxmox seaweedfs webwizard forgejo beszel; do
+  status="$(
+    kubectl -n longhorn-system get endpoints "$endpoint_name" -o json \
+      | jq -r '
+          ([.subsets[]?.addresses[]?] | length) as $addresses
+          | ([.subsets[]?.ports[]?] | length) as $ports
+          | if $addresses > 0 and $ports > 0 then "ready" else "empty" end
+        '
+  )"
+  [[ "$status" == "ready" ]] || fail "Endpoint ${endpoint_name} has no ready addresses or ports after apply"
+done
+
 if [[ -x "$SCRIPT_DIR/sync-manager-api-node-allowlist.sh" ]]; then
   "$SCRIPT_DIR/sync-manager-api-node-allowlist.sh" || log "manager-api node allowlist sync skipped or failed"
 fi

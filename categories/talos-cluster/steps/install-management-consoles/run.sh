@@ -245,6 +245,9 @@ for attempt in $(seq 1 120); do
   sleep 5
 done
 
+log_step "Synchronizing management console endpoints"
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-management-endpoints.sh"
+
 find_proxy_provider_pk_by_name() {
   local provider_name="$1"
   local application_slug="${2:-}"
