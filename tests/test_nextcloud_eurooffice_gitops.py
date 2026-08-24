@@ -309,6 +309,11 @@ def test_nextcloud_bootstrap_configures_authentik_ldap_directory_for_contacts():
     assert "restart_nextcloud_ldap_outpost" in install_text
     assert "rollout restart deployment/ak-outpost-nextcloud-ldap" in install_text
     assert "rollout status deployment/ak-outpost-nextcloud-ldap" in install_text
+    assert (
+        'ldap_bind_flow_id="$(authentik_resolve_flow_id "default-authentication-flow" "authentication")"'
+        in install_text
+    )
+    assert '--arg authorization_flow "$ldap_bind_flow_id"' in install_text
     assert "resolve_nextcloud_oidc_local_id_config" in install_text
     assert "config:list user_oidc --output=json" in install_text
     assert "provider-${id}-mappingUid" not in install_text

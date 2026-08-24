@@ -957,11 +957,13 @@ jq -n \
 
 authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
 invalidation_flow_id="$(authentik_resolve_flow_id "default-provider-invalidation-flow" "invalidation")"
+ldap_bind_flow_id="$(authentik_resolve_flow_id "default-authentication-flow" "authentication")"
 openid_mapping_id="$(authentik_resolve_scope_mapping_id "openid")"
 email_mapping_id="$(authentik_resolve_scope_mapping_id "email")"
 signing_key_id="$(authentik_resolve_signing_key_id)"
 [[ -n "$authorization_flow_id" ]] || fail "Could not resolve Authentik authorization flow ID"
 [[ -n "$invalidation_flow_id" ]] || fail "Could not resolve Authentik invalidation flow ID"
+[[ -n "$ldap_bind_flow_id" ]] || fail "Could not resolve Authentik LDAP bind flow ID"
 [[ -n "$openid_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for openid"
 [[ -n "$email_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for email"
 [[ -n "$signing_key_id" ]] || fail "Could not resolve Authentik signing key ID for ${AUTHENTIK_SIGNING_KEY_NAME}"
@@ -1081,7 +1083,7 @@ application_json="$(find_application_json_by_slug "nextcloud")"
 ldap_provider_payload="$(
   jq -n \
     --arg name "nextcloud-ldap" \
-    --arg authorization_flow "$authorization_flow_id" \
+    --arg authorization_flow "$ldap_bind_flow_id" \
     --arg invalidation_flow "$invalidation_flow_id" \
     --arg base_dn "$nextcloud_ldap_base_dn" \
     '{
