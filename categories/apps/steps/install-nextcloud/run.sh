@@ -295,11 +295,39 @@ nextcloud_user_exists() {
     "cd /var/www/html && php occ user:info $(printf '%q' "$username") >/dev/null 2>&1"
 }
 
-nextcloud_mail_account_exists() {
+nextcloud_user_id_for_mail_account() {
   local username="$1"
   local email="$2"
+  local users_json candidate candidate_email
+
+  if [[ -n "$username" ]] && nextcloud_user_exists "$username"; then
+    printf '%s\n' "$username"
+    return 0
+  fi
+
+  users_json="$(nextcloud_occ "user:list --output=json" 2>/dev/null || true)"
+  if [[ -z "$users_json" ]] || ! jq -e . >/dev/null 2>&1 <<<"$users_json"; then
+    return 0
+  fi
+
+  while IFS= read -r candidate; do
+    [[ -n "$candidate" ]] || continue
+    candidate_email="$(
+      nextcloud_occ "user:info $(printf '%q' "$candidate") --output=json" 2>/dev/null |
+        jq -r '.email // empty' || true
+    )"
+    if [[ "${candidate_email,,}" == "${email,,}" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done < <(jq -r 'keys[]' <<<"$users_json")
+}
+
+nextcloud_mail_account_exists() {
+  local user_id="$1"
+  local email="$2"
   kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
-    "cd /var/www/html && php occ mail:account:export $(printf '%q' "$username") 2>/dev/null | grep -F -- $(printf '%q' "$email") >/dev/null"
+    "cd /var/www/html && php occ mail:account:export $(printf '%q' "$user_id") 2>/dev/null | grep -F -- $(printf '%q' "$email") >/dev/null"
 }
 
 configure_nextcloud_mail_accounts() {
@@ -326,7 +354,7 @@ configure_nextcloud_mail_accounts() {
   failed=0
 
   while IFS= read -r user_entry; do
-    local email username name mail_token
+    local email username name nextcloud_user_id mail_token
     email="$(jq -r '.email' <<<"$user_entry")"
     username="$(jq -r '.username // empty' <<<"$user_entry")"
     name="$(jq -r '.name // .username // .email' <<<"$user_entry")"
@@ -336,13 +364,14 @@ configure_nextcloud_mail_accounts() {
       continue
     fi
 
-    if ! nextcloud_user_exists "$username"; then
-      log "  SKIP ${email}: Nextcloud user ${username} does not exist yet"
+    nextcloud_user_id="$(nextcloud_user_id_for_mail_account "$username" "$email")"
+    if [[ -z "$nextcloud_user_id" ]]; then
+      log "  SKIP ${email}: Nextcloud user with this email does not exist yet"
       skipped=$((skipped + 1))
       continue
     fi
 
-    if nextcloud_mail_account_exists "$username" "$email"; then
+    if nextcloud_mail_account_exists "$nextcloud_user_id" "$email"; then
       log "  SKIP ${email}: Nextcloud Mail account already exists"
       skipped=$((skipped + 1))
       continue
@@ -356,7 +385,7 @@ configure_nextcloud_mail_accounts() {
     fi
 
     if kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
-      "cd /var/www/html && php occ mail:account:create $(printf '%q' "$username") $(printf '%q' "$name") $(printf '%q' "$email") $(printf '%q' "$imap_hostname") $(printf '%q' "$imap_port") $(printf '%q' "$imap_security") $(printf '%q' "$email") $(printf '%q' "$mail_token") $(printf '%q' "$smtp_hostname") $(printf '%q' "$smtp_port") $(printf '%q' "$smtp_security") $(printf '%q' "$email") $(printf '%q' "$mail_token") password >/dev/null"; then
+      "cd /var/www/html && php occ mail:account:create $(printf '%q' "$nextcloud_user_id") $(printf '%q' "$name") $(printf '%q' "$email") $(printf '%q' "$imap_hostname") $(printf '%q' "$imap_port") $(printf '%q' "$imap_security") $(printf '%q' "$email") $(printf '%q' "$mail_token") $(printf '%q' "$smtp_hostname") $(printf '%q' "$smtp_port") $(printf '%q' "$smtp_security") $(printf '%q' "$email") $(printf '%q' "$mail_token") password >/dev/null"; then
       configured=$((configured + 1))
       log "  OK   ${email}: Nextcloud Mail account configured"
     else

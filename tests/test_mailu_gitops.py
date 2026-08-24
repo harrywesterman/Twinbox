@@ -312,6 +312,9 @@ def test_mailu_installer_uses_private_relay_and_pre_dns_preflights():
     assert "flask db upgrade" in script
     assert "--mode ifmissing" in script
     assert "internal/rspamd/local_domains" in script
+    assert "http://127.0.0.1:8080/api/v1" in script
+    assert "https://mail.${mail_domain}/api/v1" not in script
+    assert 'env MAILU_API_TOKEN="$api_token"' in script
     assert script.index("ensure_mailu_admin_initialized") < script.index(
         'wait_for_selector mailu deployment "app.kubernetes.io/instance=mailu" Available'
     )

@@ -472,7 +472,6 @@ sync_mailu_mailboxes() {
     return 0
   fi
 
-  local api_base="https://mail.${mail_domain}/api/v1"
   local users_json
 
   log "Syncing Mailu mailboxes for existing Authentik users"
@@ -493,11 +492,21 @@ sync_mailu_mailboxes() {
     name="$(jq -r '.name // .username' <<<"$user_entry")"
     displayed="${name:-$email}"
 
+    local encoded_email
+    encoded_email="$(printf '%s' "$email" | python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip()))')"
+
     local check_status
-    check_status="$(curl -s -o /dev/null -w '%{http_code}' \
-      -H "Authorization: Bearer ${api_token}" \
-      "${api_base}/user/$(printf '%s' "$email" | python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip()))')" \
-      2>/dev/null || echo "000")"
+    check_status="$(kubectl -n mailu exec deploy/mailu-admin -c admin -- \
+      env MAILU_API_TOKEN="$api_token" MAILU_API_PATH="/user/${encoded_email}" \
+      sh -s <<'SH' 2>/dev/null || echo "000"
+set -eu
+response_file="$(mktemp)"
+trap 'rm -f "$response_file"' EXIT
+curl -sS -o "$response_file" -w '%{http_code}' \
+  -H "Authorization: Bearer ${MAILU_API_TOKEN}" \
+  "http://127.0.0.1:8080/api/v1${MAILU_API_PATH}"
+SH
+    )"
 
     if [[ "$check_status" == "200" ]]; then
       existed=$((existed + 1))
@@ -508,14 +517,30 @@ sync_mailu_mailboxes() {
     local raw_password
     raw_password="$(python3 -c 'import secrets; print(secrets.token_hex(24))')"
 
+    local create_payload_b64
+    create_payload_b64="$(
+      jq -n --arg email "$email" --arg pwd "$raw_password" --arg name "$displayed" \
+        '{email: $email, raw_password: $pwd, displayed_name: $name, enabled: true, enable_imap: true, enable_pop: false, spam_enabled: true}' |
+        base64 | tr -d '\n'
+    )"
+
     local create_status
-    create_status="$(curl -s -o /dev/null -w '%{http_code}' \
-      -X POST \
-      -H "Authorization: Bearer ${api_token}" \
-      -H "Content-Type: application/json" \
-      -d "$(jq -n --arg email "$email" --arg pwd "$raw_password" --arg name "$displayed" \
-        '{email: $email, raw_password: $pwd, displayed_name: $name, enabled: true, enable_imap: true, enable_pop: false, spam_enabled: true}')" \
-      "${api_base}/user" 2>/dev/null || echo "000")"
+    create_status="$(kubectl -n mailu exec deploy/mailu-admin -c admin -- \
+      env MAILU_API_TOKEN="$api_token" MAILU_API_BODY_B64="$create_payload_b64" \
+      sh -s <<'SH' 2>/dev/null || echo "000"
+set -eu
+response_file="$(mktemp)"
+body_file="$(mktemp)"
+trap 'rm -f "$response_file" "$body_file"' EXIT
+printf '%s' "$MAILU_API_BODY_B64" | base64 -d >"$body_file"
+curl -sS -o "$response_file" -w '%{http_code}' \
+  -X POST \
+  -H "Authorization: Bearer ${MAILU_API_TOKEN}" \
+  -H "Content-Type: application/json" \
+  --data-binary "@${body_file}" \
+  "http://127.0.0.1:8080/api/v1/user"
+SH
+    )"
 
     if [[ "$create_status" == "200" ]]; then
       created=$((created + 1))

@@ -271,7 +271,12 @@ def test_nextcloud_mail_uses_per_user_mailu_tokens():
     assert "mailu_create_auth_token" in install_text
     assert "/tokenuser/" in install_text
     assert "Nextcloud Mail" in install_text
+    assert "nextcloud_user_id_for_mail_account" in install_text
+    assert "user:list --output=json" in install_text
+    assert "user:info $(printf '%q' \"$candidate\") --output=json" in install_text
+    assert "Nextcloud user with this email does not exist yet" in install_text
     assert "php occ mail:account:create" in install_text
+    assert "mail:account:create $(printf '%q' \"$nextcloud_user_id\")" in install_text
     assert 'imap_hostname="mailu-dovecot.mailu.svc.cluster.local"' in install_text
     assert 'imap_port="143"' in install_text
     assert 'imap_security="none"' in install_text
