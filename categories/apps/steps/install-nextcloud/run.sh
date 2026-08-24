@@ -336,6 +336,23 @@ create_or_update_ldap_bind_user() {
   printf '%s\n' "$existing_pk"
 }
 
+update_authentik_user_nextcloud_uid() {
+  local user_json="$1"
+  local nextcloud_uid="$2"
+  local user_pk current_user_json payload
+
+  user_pk="$(jq -r '.pk // empty' <<<"$user_json")"
+  [[ -n "$user_pk" ]] || fail "Could not determine Authentik user ID while setting nextcloudUid"
+  current_user_json="$(authentik_api_get "/core/users/${user_pk}/")"
+
+  payload="$(
+    jq -c \
+      --arg nextcloud_uid "$nextcloud_uid" \
+      '{attributes: ((.attributes // {}) + {nextcloudUid: $nextcloud_uid})}' <<<"$current_user_json"
+  )"
+  authentik_api_write PATCH "/core/users/${user_pk}/" "$payload" >/dev/null
+}
+
 assign_ldap_search_permission() {
   local role_pk="$1"
   local user_pk="$2"
@@ -576,9 +593,11 @@ configure_nextcloud_mail_accounts() {
 }
 
 assert_nextcloud_user_ids_match_authentik() {
-  local users_json nextcloud_users_json auth_entry auth_username auth_email existing_id existing_email
+  local oidc_config provider_id mapping_uid users_json nextcloud_users_json auth_entry auth_username auth_email mapped_uid expected_id existing_id existing_email
 
-  users_json="$(authentik_api_get "/core/users/?page_size=200" 2>/dev/null | jq -c '[.results[]? | select((.type // "") != "service_account" and (.email // "") != "" and (.username // "") != "") | {username, email}]')"
+  oidc_config="$(resolve_nextcloud_oidc_local_id_config)"
+  IFS=$'\t' read -r provider_id mapping_uid <<<"$oidc_config"
+  users_json="$(authentik_api_get "/core/users/?page_size=200" 2>/dev/null | jq -c '[.results[]? | select((.type // "") != "service_account" and (.email // "") != "" and (.username // "") != "") | {username, email, uid}]')"
   nextcloud_users_json="$(kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c "cd /var/www/html && php occ user:list --output=json" 2>/dev/null || true)"
   if ! jq -e 'type == "object"' >/dev/null 2>&1 <<<"$nextcloud_users_json"; then
     log "Warning: Could not inspect existing Nextcloud users before LDAP activation"
@@ -588,8 +607,11 @@ assert_nextcloud_user_ids_match_authentik() {
   while IFS= read -r auth_entry; do
     auth_username="$(jq -r '.username' <<<"$auth_entry")"
     auth_email="$(jq -r '.email' <<<"$auth_entry")"
+    mapped_uid="$(authentik_user_mapped_uid_value "$auth_entry" "$mapping_uid")"
+    [[ -n "$mapped_uid" ]] || fail "Could not derive ${mapping_uid} for Authentik user ${auth_username}"
+    expected_id="$(compute_nextcloud_oidc_local_id "$provider_id" "$mapped_uid")"
 
-    if jq -e --arg username "$auth_username" 'has($username)' >/dev/null <<<"$nextcloud_users_json"; then
+    if jq -e --arg expected_id "$expected_id" 'has($expected_id)' >/dev/null <<<"$nextcloud_users_json"; then
       continue
     fi
 
@@ -601,7 +623,7 @@ assert_nextcloud_user_ids_match_authentik() {
           jq -r '.email // empty' 2>/dev/null || true
       )"
       if [[ -n "$existing_email" && "$existing_email" == "$auth_email" ]]; then
-        fail "Existing Nextcloud user ${existing_id} has Authentik email ${auth_email}, but Authentik username is ${auth_username}; stopping before LDAP activation to avoid account duplication"
+        fail "Existing Nextcloud user ${existing_id} has Authentik email ${auth_email}, but the OIDC-compatible LDAP nextcloudUid for ${auth_username} is ${expected_id}; stopping before LDAP activation to avoid account duplication"
       fi
     done < <(jq -r 'keys[]' <<<"$nextcloud_users_json")
   done < <(jq -c '.[]' <<<"$users_json")
@@ -630,6 +652,105 @@ wait_for_nextcloud_ldap_outpost() {
     sleep 5
     attempt=$((attempt + 1))
   done
+}
+
+resolve_nextcloud_oidc_local_id_config() {
+  local app_config_json config_line provider_id mapping_uid unique_uid
+
+  app_config_json="$(
+    kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
+      "cd /var/www/html && php occ config:list user_oidc --output=json"
+  )"
+
+  config_line="$(
+    jq -r \
+      --arg client_id "$nextcloud_oidc_client_id" \
+      '
+      (.apps.user_oidc // {}) as $cfg
+      | [($cfg | keys[] | capture("^provider-(?<id>[0-9]+)-mappingUid$")?.id)] as $ids
+      | ($ids | unique | sort_by(tonumber)) as $sorted_ids
+      | $sorted_ids[]
+      | . as $id
+      | select(
+          (($cfg["provider-\($id)-clientId"] // $cfg["provider-\($id)-clientid"] // "") == $client_id)
+          or (($cfg["provider-\($id)-identifier"] // $cfg["provider-\($id)-providerIdentifier"] // "") == "nextcloud")
+          or (($sorted_ids | length) == 1)
+        )
+      | [$id, ($cfg["provider-\($id)-mappingUid"] // ""), ($cfg["provider-\($id)-uniqueUid"] // "")]
+      | @tsv
+      ' <<<"$app_config_json" | head -n1
+  )"
+  [[ -n "$config_line" ]] || fail "Could not resolve Nextcloud user_oidc provider config for nextcloud"
+
+  IFS=$'\t' read -r provider_id mapping_uid unique_uid <<<"$config_line"
+  [[ -n "$provider_id" ]] || fail "Could not resolve Nextcloud user_oidc provider ID"
+  [[ -n "$mapping_uid" ]] || fail "Could not resolve Nextcloud user_oidc mappingUid for provider ${provider_id}"
+  if [[ "$unique_uid" != "1" && "$unique_uid" != "true" ]]; then
+    fail "Nextcloud user_oidc provider ${provider_id} does not have uniqueUid enabled; refusing to calculate LDAP-compatible user IDs"
+  fi
+
+  printf '%s\t%s\n' "$provider_id" "$mapping_uid"
+}
+
+authentik_user_mapped_uid_value() {
+  local user_json="$1"
+  local mapping_uid="$2"
+
+  case "$mapping_uid" in
+    preferred_username | username)
+      jq -r '.username // empty' <<<"$user_json"
+      ;;
+    email)
+      jq -r '.email // empty' <<<"$user_json"
+      ;;
+    sub | uid)
+      jq -r '.uid // empty' <<<"$user_json"
+      ;;
+    *)
+      fail "Unsupported Nextcloud user_oidc mappingUid ${mapping_uid}; add a safe LDAP nextcloudUid mapping before enabling LDAP"
+      ;;
+  esac
+}
+
+compute_nextcloud_oidc_local_id() {
+  local provider_id="$1"
+  local mapped_uid="$2"
+
+  python3 - "$provider_id" "$mapped_uid" <<'PY'
+import hashlib
+import sys
+
+provider_id = sys.argv[1]
+mapped_uid = sys.argv[2]
+print(hashlib.sha256(f"{provider_id}_0_{mapped_uid}".encode()).hexdigest())
+PY
+}
+
+sync_authentik_nextcloud_ldap_uids() {
+  local oidc_config provider_id mapping_uid users_json user_entry mapped_uid nextcloud_uid username email
+  local total=0
+
+  oidc_config="$(resolve_nextcloud_oidc_local_id_config)"
+  IFS=$'\t' read -r provider_id mapping_uid <<<"$oidc_config"
+
+  log "Syncing Authentik nextcloudUid attributes from Nextcloud user_oidc provider ${provider_id} (${mapping_uid})"
+  users_json="$(
+    authentik_api_get "/core/users/?page_size=200" 2>/dev/null |
+      jq -c '[.results[]? | select((.type // "") != "service_account" and (.email // "") != "" and (.username // "") != "")]'
+  )"
+
+  while IFS= read -r user_entry; do
+    username="$(jq -r '.username // empty' <<<"$user_entry")"
+    email="$(jq -r '.email // empty' <<<"$user_entry")"
+    mapped_uid="$(authentik_user_mapped_uid_value "$user_entry" "$mapping_uid")"
+    [[ -n "$mapped_uid" ]] || fail "Could not derive ${mapping_uid} for Authentik user ${username:-$email}"
+
+    nextcloud_uid="$(compute_nextcloud_oidc_local_id "$provider_id" "$mapped_uid")"
+    update_authentik_user_nextcloud_uid "$user_entry" "$nextcloud_uid"
+    total=$((total + 1))
+  done < <(jq -c '.[]' <<<"$users_json")
+
+  log "Synced nextcloudUid for ${total} Authentik user(s)"
 }
 
 configure_nextcloud_ldap_backend() {
@@ -678,8 +799,8 @@ php occ ldap:set-config "$config_id" ldapBaseUsers "ou=users,$NEXTCLOUD_LDAP_BAS
 php occ ldap:set-config "$config_id" ldapBaseGroups "ou=groups,$NEXTCLOUD_LDAP_BASE_DN" >/dev/null
 php occ ldap:set-config "$config_id" ldapUserFilterObjectclass "user" >/dev/null
 php occ ldap:set-config "$config_id" ldapGroupFilterObjectclass "group" >/dev/null
-php occ ldap:set-config "$config_id" ldapExpertUsernameAttr "uid" >/dev/null
-php occ ldap:set-config "$config_id" ldapExpertUUIDUserAttr "uid" >/dev/null
+php occ ldap:set-config "$config_id" ldapExpertUsernameAttr "nextcloudUid" >/dev/null
+php occ ldap:set-config "$config_id" ldapExpertUUIDUserAttr "nextcloudUid" >/dev/null
 php occ ldap:set-config "$config_id" ldapExpertUUIDGroupAttr "gidNumber" >/dev/null
 php occ ldap:set-config "$config_id" ldapUserDisplayName "name" >/dev/null
 php occ ldap:set-config "$config_id" ldapGroupDisplayName "cn" >/dev/null
@@ -1067,7 +1188,7 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
   cd /var/www/html
   php occ app:install user_oidc >/dev/null 2>&1 || true
   php occ app:enable user_oidc >/dev/null
-  php occ config:app:set --type=string --value=0 user_oidc allow_multiple_user_backends
+  php occ config:app:set --type=string --value=1 user_oidc allow_multiple_user_backends
   php occ user_oidc:provider nextcloud \
     --clientid='${nextcloud_oidc_client_id}' \
     --clientsecret='${nextcloud_oidc_client_secret}' \
@@ -1096,7 +1217,7 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
   set -euo pipefail
   cd /var/www/html
 
-  if [[ ! -d custom_apps/oidc_groups_mapping/appinfo ]]; then
+  if [ ! -d custom_apps/oidc_groups_mapping/appinfo ]; then
     tmp_dir=\"\$(mktemp -d)\"
     trap 'rm -rf \"\$tmp_dir\"' EXIT
     wget -qO \"\$tmp_dir/oidc_groups_mapping.tar.gz\" '${oidc_groups_mapping_release_url}'
@@ -1126,6 +1247,7 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
   }' >/dev/null
 "
 
+sync_authentik_nextcloud_ldap_uids
 assert_nextcloud_user_ids_match_authentik
 configure_nextcloud_ldap_backend "$nextcloud_ldap_bind_dn" "$nextcloud_ldap_bind_password" "$nextcloud_ldap_base_dn"
 

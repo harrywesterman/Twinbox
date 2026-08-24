@@ -4819,7 +4819,12 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert '\\"claimPath\\": \\"groups\\"' in text
     assert '\\"admins\\": \\"admin\\"' in text
     assert "--group-provisioning='1'" in text
+    assert "config:app:set --type=string --value=1 user_oidc allow_multiple_user_backends" in text
     assert "config:app:set --type=string --value=1 user_oidc provider-1-groupProvisioning" in text
+    assert "sync_authentik_nextcloud_ldap_uids" in text
+    assert "nextcloudUid" in text
+    assert "if [ ! -d custom_apps/oidc_groups_mapping/appinfo ]; then" in text
+    assert "if [[ ! -d custom_apps/oidc_groups_mapping/appinfo ]]; then" not in text
     assert "NEXTCLOUD_OIDC_REDIRECT_URI_PRETTY" in text
     assert "NEXTCLOUD_OIDC_LOGOUT_URI_PRETTY" in text
     assert "NEXTCLOUD_OIDC_BACKCHANNEL_URI_PRETTY" in text
