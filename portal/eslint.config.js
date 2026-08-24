@@ -32,7 +32,7 @@ export default [
     },
   },
   {
-    files: ["server.mjs", "mailu-client.mjs"],
+    files: ["server.mjs", "mailu-client.mjs", "mail-profile.mjs"],
     languageOptions: {
       globals: globals.node,
       ecmaVersion: 2024,

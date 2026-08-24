@@ -51,6 +51,20 @@ function requestJson(url, options = {}) {
   });
 }
 
+function filenameFromContentDisposition(header, fallback) {
+  const match = String(header || "").match(/filename="?([^";]+)"?/i);
+  return match?.[1] || fallback;
+}
+
+function downloadBlob(filename, blob) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 function sleep(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
@@ -1078,6 +1092,7 @@ function MailClientPage({ onNavigate }) {
   });
   const [comment, setComment] = useState("Apple Mail");
   const [busy, setBusy] = useState(false);
+  const [profileBusy, setProfileBusy] = useState(false);
   const [createdToken, setCreatedToken] = useState(null);
 
   const loadMailState = useCallback(async () => {
@@ -1141,6 +1156,43 @@ function MailClientPage({ onNavigate }) {
       }));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const downloadAppleProfile = async () => {
+    setProfileBusy(true);
+    setCreatedToken(null);
+    setMailState((current) => ({ ...current, error: "" }));
+    try {
+      const response = await fetch("/api/mail/apple-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comment: comment || "Apple Mail" }),
+      });
+      const contentType = response.headers.get("Content-Type") || "";
+      if (!response.ok) {
+        let body = null;
+        if (contentType.includes("application/json")) {
+          body = await response.json();
+        } else {
+          body = await response.text();
+        }
+        throw new Error(body?.error || body || `Request failed with ${response.status}`);
+      }
+      const blob = await response.blob();
+      const filename = filenameFromContentDisposition(
+        response.headers.get("Content-Disposition"),
+        "twinbox-mail.mobileconfig"
+      );
+      downloadBlob(filename, blob);
+      await loadMailState();
+    } catch (error) {
+      setMailState((current) => ({
+        ...current,
+        error: error instanceof Error ? error.message : "Failed to download Apple Mail profile.",
+      }));
+    } finally {
+      setProfileBusy(false);
     }
   };
 
@@ -1247,12 +1299,24 @@ function MailClientPage({ onNavigate }) {
               />
             </label>
             <div className="hero-actions">
-              <button type="submit" className="primary-button" disabled={busy}>
+              <button type="submit" className="primary-button" disabled={busy || profileBusy}>
                 {busy ? "Creating..." : "New app password"}
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={downloadAppleProfile}
+                disabled={busy || profileBusy}
+              >
+                {profileBusy ? "Preparing..." : "Download Apple Mail profile"}
               </button>
               <span className="muted-copy">
                 Nextcloud Mail uses its own hidden token and is not affected by these passwords.
               </span>
+            </div>
+            <div className="inline-notice">
+              <strong>Apple Mail profile contains an app password.</strong>
+              <span>Install it on your Mac, then remove the downloaded profile file.</span>
             </div>
           </form>
         </Panel>

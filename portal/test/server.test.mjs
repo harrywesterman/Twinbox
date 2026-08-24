@@ -832,6 +832,7 @@ async function requestPortal(pathname, { method = "GET", body, cookie } = {}) {
 
   return {
     status: response.status,
+    headers: response.headers,
     payload,
   };
 }
@@ -1106,6 +1107,86 @@ test("mail token endpoints create and revoke tokens for the session mailbox only
   assert.deepEqual(
     mailuState.tokens.map((token) => token.id),
     ["tok-nextcloud", "tok-2"]
+  );
+});
+
+test("apple mail profile endpoint creates a session-scoped token and returns mobileconfig", async () => {
+  resetMailuState();
+
+  const unauthenticated = await requestPortal("/api/mail/apple-profile", {
+    method: "POST",
+    body: { comment: "Apple Mail MacBook" },
+  });
+  assert.equal(unauthenticated.status, 401);
+
+  const previousToken = process.env.MAILU_API_TOKEN;
+  process.env.MAILU_API_TOKEN = "";
+  const memberCookie = createSignedSessionCookie({
+    sub: "member-1",
+    name: 'Alex & "Mac" <User>',
+    email: "alex@example.com",
+    preferredUsername: "alex",
+    groups: ["employees"],
+    isAdmin: false,
+  });
+  const notInstalled = await requestPortal("/api/mail/apple-profile", {
+    method: "POST",
+    cookie: memberCookie,
+    body: { comment: "Apple Mail MacBook" },
+  });
+  assert.equal(notInstalled.status, 400);
+  assert.equal(notInstalled.payload.error, "Mailu is not installed");
+  process.env.MAILU_API_TOKEN = previousToken;
+
+  const profile = await requestPortal("/api/mail/apple-profile", {
+    method: "POST",
+    cookie: memberCookie,
+    body: { email: "admin@example.com", comment: "Apple Mail MacBook & iMac" },
+  });
+
+  assert.equal(profile.status, 201);
+  assert.match(profile.headers.get("content-type"), /^application\/x-apple-aspen-config(;|$)/);
+  assert.equal(
+    profile.headers.get("content-disposition"),
+    'attachment; filename="twinbox-mail-alex-example.com.mobileconfig"'
+  );
+  assert.equal(profile.headers.get("cache-control"), "no-store");
+  assert.match(profile.payload, /<key>PayloadType<\/key>\s+<string>Configuration<\/string>/);
+  assert.match(
+    profile.payload,
+    /<key>PayloadType<\/key>\s+<string>com\.apple\.mail\.managed<\/string>/
+  );
+  assert.match(profile.payload, /Alex &amp; &quot;Mac&quot; &lt;User&gt;/);
+  assert.match(profile.payload, /<key>EmailAddress<\/key>\s+<string>alex@example\.com<\/string>/);
+  assert.match(
+    profile.payload,
+    /<key>IncomingMailServerHostName<\/key>\s+<string>mail\.tst\.example\.com<\/string>/
+  );
+  assert.match(
+    profile.payload,
+    /<key>IncomingMailServerPortNumber<\/key>\s+<integer>993<\/integer>/
+  );
+  assert.match(
+    profile.payload,
+    /<key>OutgoingMailServerHostName<\/key>\s+<string>mail\.tst\.example\.com<\/string>/
+  );
+  assert.match(
+    profile.payload,
+    /<key>OutgoingMailServerPortNumber<\/key>\s+<integer>587<\/integer>/
+  );
+  assert.match(
+    profile.payload,
+    /<key>IncomingPassword<\/key>\s+<string>one-time-mail-token<\/string>/
+  );
+  assert.match(
+    profile.payload,
+    /<key>OutgoingPassword<\/key>\s+<string>one-time-mail-token<\/string>/
+  );
+  assert.equal(mailuState.tokens.at(-1).email, "alex@example.com");
+  assert.equal(mailuState.tokens.at(-1).comment, "Apple Mail MacBook & iMac");
+  assert.equal(
+    mailuState.requests.some((request) => request.pathname.includes("admin%40example.com")),
+    false
   );
 });
 

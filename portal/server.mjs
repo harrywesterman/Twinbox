@@ -22,6 +22,11 @@ import {
   mailuDeleteUserToken,
   mailuListUserTokens,
 } from "./mailu-client.mjs";
+import {
+  APPLE_MAIL_PROFILE_CONTENT_TYPE,
+  buildAppleMailProfile,
+  buildAppleMailProfileFilename,
+} from "./mail-profile.mjs";
 import { buildItDepartmentScene } from "./src/it-department-model.js";
 
 const app = express();
@@ -1170,6 +1175,53 @@ app.post("/api/mail/tokens", async (req, res) => {
     token: result.token,
     record: result.record,
   });
+});
+
+app.post("/api/mail/apple-profile", async (req, res) => {
+  const session = requireSession(req, res);
+  if (!session) {
+    return;
+  }
+
+  const email = requireSessionEmail(session, res);
+  if (!email) {
+    return;
+  }
+
+  if (!isMailuInstalled()) {
+    return res.status(400).json({ error: "Mailu is not installed" });
+  }
+
+  const comment = String(req.body?.comment || "Apple Mail")
+    .trim()
+    .slice(0, 80);
+  const mailboxExists = await mailuCheckMailboxExists(email);
+  if (!mailboxExists) {
+    return res.status(404).json({ error: "Mailu mailbox does not exist for your email address" });
+  }
+
+  const result = await mailuCreateUserToken({
+    email,
+    comment: comment || "Apple Mail",
+  });
+  if (!result.ok || !result.token) {
+    return res.status(502).json({ error: `Failed to create Mailu token: ${result.reason}` });
+  }
+
+  const settings = buildMailClientSettings(email);
+  const profile = buildAppleMailProfile({
+    email,
+    displayName: session.name || session.preferredUsername || email,
+    imap: settings.imap,
+    smtp: settings.smtp,
+    password: result.token,
+  });
+  const filename = buildAppleMailProfileFilename(email);
+
+  res.setHeader("Content-Type", `${APPLE_MAIL_PROFILE_CONTENT_TYPE}; charset=utf-8`);
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.setHeader("Cache-Control", "no-store");
+  res.status(201).send(profile);
 });
 
 app.delete("/api/mail/tokens/:tokenId", async (req, res) => {
