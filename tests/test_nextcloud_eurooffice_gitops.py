@@ -326,6 +326,10 @@ def test_nextcloud_bootstrap_configures_authentik_ldap_directory_for_contacts():
     assert (
         'php occ ldap:set-config "$config_id" ldapExpertUUIDUserAttr "nextcloudUid"' in install_text
     )
+    assert (
+        'php occ ldap:set-config "$config_id" ldapLoginFilter "(&(objectclass=user)(nextcloudUid=%uid))"'
+        in install_text
+    )
     assert 'php occ ldap:set-config "$config_id" ldapExpertUsernameAttr "uid"' not in install_text
     assert 'php occ ldap:set-config "$config_id" ldapExpertUUIDUserAttr "uid"' not in install_text
     assert (
