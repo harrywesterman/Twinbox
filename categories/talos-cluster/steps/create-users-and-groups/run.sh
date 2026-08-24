@@ -8,6 +8,8 @@ set -euo pipefail
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 export KUBECONFIG="$KUBECONFIG_FILE"
 # shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
+# shellcheck disable=SC1091
 source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
 # shellcheck disable=SC1091
 source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"
@@ -244,7 +246,15 @@ authentik_add_user_to_group() {
 
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
+cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
+cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty')"
+public_zone_name="$(printf '%s' "$cluster_json" | jq -r '.public_zone_name // empty')"
 [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
+[[ -n "$cluster_dns_domain" ]] || fail "Could not determine cluster DNS domain; run choose-ingress-route first"
+if [[ -z "$public_zone_name" ]]; then
+  public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
+fi
+[[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
 [[ -f "$LOGIN_SECRET_FILE" ]] || fail "Wizard login secret not found at $LOGIN_SECRET_FILE"
 
 LOGIN_PASSWORD="$(jq -r '.password // .PASSWORD // empty' "$LOGIN_SECRET_FILE")"
@@ -252,11 +262,11 @@ LOGIN_PASSWORD="$(jq -r '.password // .PASSWORD // empty' "$LOGIN_SECRET_FILE")"
 
 FULL_NAME="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.full_name // empty')"
 USERNAME="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.username // empty')"
-EMAIL="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.email // empty')"
 ADMIN_GROUP_NAME="admins"
 
 [[ -n "$FULL_NAME" ]] || fail "full_name is required"
 [[ -n "$USERNAME" ]] || fail "username is required"
+EMAIL="${USERNAME}@${public_zone_name}"
 
 authentik_ensure_token
 authentik_setup_forward

@@ -225,6 +225,9 @@ HEADLAMP_OIDC_EXTERNALSECRET = (
 CREATE_USERS_STEP_MANIFEST = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "create-users-and-groups" / "step.yaml"
 )
+CREATE_USERS_RUN_SCRIPT = (
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "create-users-and-groups" / "run.sh"
+)
 CHOOSE_INGRESS_ROUTE_STEP_MANIFEST = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "choose-ingress-route" / "step.yaml"
 )
@@ -1767,9 +1770,11 @@ def test_app_step_manifests_chain_the_linear_gitops_flow():
     assert "KUBECONFIG_FILE:" in netbird_bastion_text
     assert "item: kubeconfig" in netbird_bastion_text
     create_users_text = CREATE_USERS_STEP_MANIFEST.read_text(encoding="utf-8")
-    assert "id: email" in create_users_text
-    assert "required: true" in create_users_text
-    assert "NetBird setup" in create_users_text
+    assert "id: email" not in create_users_text
+    assert "Email address" not in create_users_text
+    create_users_run_text = CREATE_USERS_RUN_SCRIPT.read_text(encoding="utf-8")
+    assert "cluster-public-zone.sh" in create_users_run_text
+    assert 'EMAIL="${USERNAME}@${public_zone_name}"' in create_users_run_text
 
     assert "cluster_dns_domain" in authentik_run_text
     assert "public_zone_name" in authentik_run_text
