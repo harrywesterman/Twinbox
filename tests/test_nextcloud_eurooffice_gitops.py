@@ -304,29 +304,12 @@ def test_nextcloud_bootstrap_configures_authentik_ldap_directory_for_contacts():
     assert "NEXTCLOUD_LDAP_BASE_DN" in install_text
     assert "ak-outpost-nextcloud-ldap.authentik.svc.cluster.local" in install_text
     assert "wait_for_nextcloud_ldap_outpost" in install_text
-    assert "resolve_nextcloud_oidc_local_id_config" in install_text
-    assert "config:list user_oidc --output=json" in install_text
-    assert "provider-${id}-mappingUid" not in install_text
-    assert "provider-\\($id)-mappingUid" in install_text
-    assert "compute_nextcloud_oidc_local_id" in install_text
-    assert "hashlib.sha256" in install_text
-    assert "sync_authentik_nextcloud_ldap_uids" in install_text
-    assert "nextcloudUid" in install_text
-    assert "update_authentik_user_nextcloud_uid" in install_text
     assert "assert_nextcloud_user_ids_match_authentik" in install_text
-    assert "OIDC-compatible LDAP nextcloudUid" in install_text
-    assert "but Authentik username is" not in install_text
     assert "php -m | grep -Eiq '^ldap$'" in install_text
     assert "php occ app:enable user_ldap" in install_text
     assert 'php occ ldap:set-config "$config_id" ldapHost' in install_text
-    assert (
-        'php occ ldap:set-config "$config_id" ldapExpertUsernameAttr "nextcloudUid"' in install_text
-    )
-    assert (
-        'php occ ldap:set-config "$config_id" ldapExpertUUIDUserAttr "nextcloudUid"' in install_text
-    )
-    assert 'php occ ldap:set-config "$config_id" ldapExpertUsernameAttr "uid"' not in install_text
-    assert 'php occ ldap:set-config "$config_id" ldapExpertUUIDUserAttr "uid"' not in install_text
+    assert 'php occ ldap:set-config "$config_id" ldapExpertUsernameAttr "uid"' in install_text
+    assert 'php occ ldap:set-config "$config_id" ldapExpertUUIDUserAttr "uid"' in install_text
     assert (
         'php occ ldap:set-config "$config_id" ldapExpertUUIDGroupAttr "gidNumber"' in install_text
     )
@@ -339,10 +322,6 @@ def test_nextcloud_bootstrap_configures_authentik_ldap_directory_for_contacts():
     assert (
         "NEXTCLOUD_LDAP_BIND_USERNAME,NEXTCLOUD_LDAP_BIND_PASSWORD,NEXTCLOUD_LDAP_BASE_DN"
         in install_text
-    )
-    assert "sync_authentik_nextcloud_ldap_uids" in install_text
-    assert install_text.rindex("sync_authentik_nextcloud_ldap_uids") < install_text.rindex(
-        'configure_nextcloud_ldap_backend "$nextcloud_ldap_bind_dn"'
     )
 
 
