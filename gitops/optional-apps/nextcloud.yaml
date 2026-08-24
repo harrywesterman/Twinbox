@@ -152,16 +152,19 @@ spec:
                     $CONFIG = array (
                       'overwrite.cli.url' => 'https://nextcloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}',
                     );
-                externalDatabase:
+              internalDatabase:
+                enabled: false
+
+              externalDatabase:
+                enabled: true
+                type: postgresql
+                host: nextcloud-db-pooler-rw.databases.svc.cluster.local
+                database: nextcloud
+                existingSecret:
                   enabled: true
-                  type: postgresql
-                  host: nextcloud-db-pooler-rw.databases.svc.cluster.local
-                  database: nextcloud
-                  existingSecret:
-                    enabled: true
-                    secretName: nextcloud-db-credentials
-                    usernameKey: username
-                    passwordKey: password
+                  secretName: nextcloud-db-credentials
+                  usernameKey: username
+                  passwordKey: password
 
               redis:
                 enabled: true

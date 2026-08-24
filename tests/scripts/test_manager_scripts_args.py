@@ -4585,6 +4585,29 @@ def test_nextcloud_db_cluster_uses_future_install_capacity():
     assert "storageClass: longhorn-single" in text
 
 
+def test_nextcloud_values_use_top_level_external_postgres_database():
+    values = yaml.safe_load((REPO_ROOT / "gitops" / "values" / "nextcloud.yaml").read_text())
+    optional_app = yaml.safe_load(NEXTCLOUD_OPTIONAL_APP.read_text(encoding="utf-8"))
+    helm_values_text = optional_app["spec"]["template"]["spec"]["sources"][0]["helm"]["values"]
+    rendered_values = yaml.safe_load(helm_values_text)
+
+    for config in (values, rendered_values):
+        assert config["internalDatabase"]["enabled"] is False
+        assert config["externalDatabase"] == {
+            "enabled": True,
+            "type": "postgresql",
+            "host": "nextcloud-db-pooler-rw.databases.svc.cluster.local",
+            "database": "nextcloud",
+            "existingSecret": {
+                "enabled": True,
+                "secretName": "nextcloud-db-credentials",
+                "usernameKey": "username",
+                "passwordKey": "password",
+            },
+        }
+        assert "externalDatabase" not in config["nextcloud"]
+
+
 def test_nextcloud_cronjob_pins_to_the_app_node_for_rwo_volume():
     values_text = (REPO_ROOT / "gitops" / "values" / "nextcloud.yaml").read_text(encoding="utf-8")
     optional_app_text = (REPO_ROOT / "gitops" / "optional-apps" / "nextcloud.yaml").read_text(
