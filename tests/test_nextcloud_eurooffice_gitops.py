@@ -285,46 +285,6 @@ def test_nextcloud_mail_uses_per_user_mailu_tokens():
     assert "masterPassword" not in install_text
 
 
-def test_nextcloud_bootstrap_configures_authentik_ldap_directory_for_contacts():
-    install_text = INSTALL_STEP.read_text(encoding="utf-8")
-
-    assert 'find_ldap_provider_pk_by_name "nextcloud-ldap"' in install_text
-    assert 'find_application_json_by_slug "nextcloud-ldap"' in install_text
-    assert 'name: "nextcloud-ldap"' in install_text
-    assert 'type: "ldap"' in install_text
-    assert "base_dn: $base_dn" in install_text
-    assert 'search_mode: "cached"' in install_text
-    assert 'bind_mode: "cached"' in install_text
-    assert 'path: "nextcloud"' in install_text
-    assert 'type: "service_account"' in install_text
-    assert "search_full_directory" in install_text
-    assert "authentik_providers_ldap.ldapprovider" in install_text
-    assert "NEXTCLOUD_LDAP_BIND_USERNAME" in install_text
-    assert "NEXTCLOUD_LDAP_BIND_PASSWORD" in install_text
-    assert "NEXTCLOUD_LDAP_BASE_DN" in install_text
-    assert "ak-outpost-nextcloud-ldap.authentik.svc.cluster.local" in install_text
-    assert "wait_for_nextcloud_ldap_outpost" in install_text
-    assert "assert_nextcloud_user_ids_match_authentik" in install_text
-    assert "php -m | grep -Eiq '^ldap$'" in install_text
-    assert "php occ app:enable user_ldap" in install_text
-    assert 'php occ ldap:set-config "$config_id" ldapHost' in install_text
-    assert 'php occ ldap:set-config "$config_id" ldapExpertUsernameAttr "uid"' in install_text
-    assert 'php occ ldap:set-config "$config_id" ldapExpertUUIDUserAttr "uid"' in install_text
-    assert (
-        'php occ ldap:set-config "$config_id" ldapExpertUUIDGroupAttr "gidNumber"' in install_text
-    )
-    assert 'php occ ldap:set-config "$config_id" ldapEmailAttribute "mail"' in install_text
-    assert 'php occ ldap:set-config "$config_id" ldapGroupMemberAssocAttr "member"' in install_text
-    assert 'php occ ldap:set-config "$config_id" ldapConfigurationActive "1"' in install_text
-    assert 'php occ ldap:test-config "$config_id"' in install_text
-    assert 'php occ config:app:set dav system_addressbook_exposed --value="yes"' in install_text
-    assert "php occ dav:sync-system-addressbook" in install_text
-    assert (
-        "NEXTCLOUD_LDAP_BIND_USERNAME,NEXTCLOUD_LDAP_BIND_PASSWORD,NEXTCLOUD_LDAP_BASE_DN"
-        in install_text
-    )
-
-
 def test_twinbox_companion_keeps_collabora_as_the_default_direct_editor():
     application = EUROOFFICE_ACTION_DIR / "lib" / "AppInfo" / "Application.php"
     listener = EUROOFFICE_ACTION_DIR / "lib" / "Listener" / "CollaboraDefaultListener.php"

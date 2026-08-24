@@ -136,18 +136,6 @@ find_oauth2_provider_pk_by_name() {
       | .pk // .id // empty' <<<"$response" | head -n1
 }
 
-find_ldap_provider_pk_by_name() {
-  local provider_name="$1"
-  local response
-
-  response="$(authentik_api_get "/providers/ldap/?page_size=200")"
-  jq -r \
-    --arg provider_name "$provider_name" \
-    '.results[]?
-      | select((.name // "") == $provider_name)
-      | .pk // .id // empty' <<<"$response" | head -n1
-}
-
 find_application_json_by_slug() {
   local application_slug="$1"
   local response
@@ -235,198 +223,6 @@ create_or_update_application() {
   fi
 
   authentik_api_write POST "/core/applications/" "$application_payload" | jq -r '.pk // .id // empty'
-}
-
-create_or_update_ldap_provider() {
-  local provider_payload="$1"
-  local existing_pk
-
-  existing_pk="$(find_ldap_provider_pk_by_name "nextcloud-ldap")"
-  if [[ -n "$existing_pk" ]]; then
-    authentik_api_write PATCH "/providers/ldap/${existing_pk}/" "$provider_payload" >/dev/null
-    printf '%s\n' "$existing_pk"
-    return 0
-  fi
-
-  authentik_api_write POST "/providers/ldap/" "$provider_payload" | jq -r '.pk // .id // empty'
-}
-
-create_or_update_ldap_application() {
-  local application_payload="$1"
-  local existing_json existing_pk
-
-  existing_json="$(find_application_json_by_slug "nextcloud-ldap" || true)"
-  existing_pk=""
-  if [[ -n "$existing_json" ]]; then
-    existing_pk="$(jq -r '.pk // .id // empty' <<<"$existing_json")"
-  fi
-  if [[ -n "$existing_pk" ]]; then
-    authentik_api_write PATCH "/core/applications/nextcloud-ldap/" "$application_payload" >/dev/null
-    printf '%s\n' "$existing_pk"
-    return 0
-  fi
-
-  authentik_api_write POST "/core/applications/" "$application_payload" | jq -r '.pk // .id // empty'
-}
-
-find_role_pk_by_name() {
-  local role_name="$1"
-  local response
-
-  response="$(authentik_api_get "/rbac/roles/?page_size=200")"
-  jq -r \
-    --arg role_name "$role_name" \
-    '.results[]?
-      | select((.name // "") == $role_name)
-      | .pk // empty' <<<"$response" | head -n1
-}
-
-create_or_update_ldap_search_role() {
-  local role_name="nextcloud-ldap-search"
-  local existing_pk
-
-  existing_pk="$(find_role_pk_by_name "$role_name")"
-  if [[ -n "$existing_pk" ]]; then
-    printf '%s\n' "$existing_pk"
-    return 0
-  fi
-
-  authentik_api_write POST "/rbac/roles/" "$(jq -n --arg name "$role_name" '{name: $name}')" | jq -r '.pk // empty'
-}
-
-find_user_json_by_username() {
-  local username="$1"
-  local response
-
-  response="$(authentik_api_get "/core/users/?page_size=200&search=${username}")"
-  jq -c \
-    --arg username "$username" \
-    '.results[]?
-      | select((.username // "") == $username)' <<<"$response" | head -n1
-}
-
-create_or_update_ldap_bind_user() {
-  local username="$1"
-  local password="$2"
-  local existing_json existing_pk payload
-
-  payload="$(
-    jq -n \
-      --arg username "$username" \
-      '{
-        username: $username,
-        name: "Nextcloud LDAP Bind",
-        path: "nextcloud",
-        type: "service_account",
-        is_active: true
-      }'
-  )"
-
-  existing_json="$(find_user_json_by_username "$username" || true)"
-  if [[ -n "$existing_json" ]]; then
-    existing_pk="$(jq -r '.pk // empty' <<<"$existing_json")"
-    [[ -n "$existing_pk" ]] || fail "Could not determine Authentik user ID for ${username}"
-    authentik_api_write PATCH "/core/users/${existing_pk}/" "$payload" >/dev/null
-  else
-    existing_pk="$(authentik_api_write POST "/core/users/" "$payload" | jq -r '.pk // empty')"
-  fi
-
-  [[ -n "$existing_pk" ]] || fail "Authentik did not return a user ID for ${username}"
-  authentik_api_write POST "/core/users/${existing_pk}/set_password/" "$(jq -n --arg password "$password" '{password: $password}')" >/dev/null
-  printf '%s\n' "$existing_pk"
-}
-
-assign_ldap_search_permission() {
-  local role_pk="$1"
-  local user_pk="$2"
-  local provider_pk="$3"
-  local role_response has_role permission_response
-
-  role_response="$(authentik_api_get "/rbac/roles/?users=${user_pk}&page_size=200")"
-  has_role="$(
-    jq -r \
-      --arg role_pk "$role_pk" \
-      'any(.results[]?; (.pk // "") == $role_pk)' <<<"$role_response"
-  )"
-  if [[ "$has_role" != "true" ]]; then
-    authentik_api_write POST "/rbac/roles/${role_pk}/add_user/" "$(jq -n --argjson pk "$user_pk" '{pk: $pk}')" >/dev/null
-  fi
-
-  permission_response="$(authentik_api_get "/rbac/permissions/?codename=search_full_directory&content_type__app_label=authentik_providers_ldap&content_type__model=ldapprovider&page_size=100")"
-  if ! jq -e '.results[]? | select((.codename // "") == "search_full_directory")' >/dev/null <<<"$permission_response"; then
-    fail "Authentik permission search_full_directory for LDAP providers was not found"
-  fi
-
-  authentik_api_write POST "/rbac/permissions/assigned_by_roles/${role_pk}/assign/" "$(
-    jq -n \
-      --arg provider_pk "$provider_pk" \
-      '{
-        permissions: ["search_full_directory"],
-        model: "authentik_providers_ldap.ldapprovider",
-        object_pk: $provider_pk
-      }'
-  )" >/dev/null
-}
-
-find_kubernetes_service_connection_pk() {
-  local response
-
-  response="$(authentik_api_get "/outposts/service_connections/kubernetes/?local=true&page_size=100")"
-  jq -r '.results[]? | select(.local == true) | .pk // empty' <<<"$response" | head -n1
-}
-
-create_local_kubernetes_service_connection() {
-  authentik_api_write POST "/outposts/service_connections/kubernetes/" "$(
-    jq -n '{name: "Local Kubernetes", local: true, verify_ssl: true}'
-  )" | jq -r '.pk // empty'
-}
-
-find_outpost_json_by_name() {
-  local outpost_name="$1"
-  local response
-
-  response="$(authentik_api_get "/outposts/instances/?page_size=200")"
-  jq -c \
-    --arg outpost_name "$outpost_name" \
-    '.results[]?
-      | select((.name // "") == $outpost_name)' <<<"$response" | head -n1
-}
-
-create_or_update_ldap_outpost() {
-  local provider_pk="$1"
-  local service_connection_pk existing_json existing_pk default_config payload
-
-  service_connection_pk="$(find_kubernetes_service_connection_pk)"
-  if [[ -z "$service_connection_pk" ]]; then
-    service_connection_pk="$(create_local_kubernetes_service_connection)"
-  fi
-  [[ -n "$service_connection_pk" ]] || fail "Could not create or resolve a local Authentik Kubernetes service connection"
-
-  default_config="$(authentik_api_get "/outposts/instances/default_settings/" | jq -c '.config // {}')"
-  payload="$(
-    jq -n \
-      --arg service_connection "$service_connection_pk" \
-      --argjson provider_pk "$provider_pk" \
-      --argjson config "$default_config" \
-      '{
-        name: "nextcloud-ldap",
-        type: "ldap",
-        providers: [$provider_pk],
-        service_connection: $service_connection,
-        config: $config
-      }'
-  )"
-
-  existing_json="$(find_outpost_json_by_name "nextcloud-ldap" || true)"
-  if [[ -n "$existing_json" ]]; then
-    existing_pk="$(jq -r '.pk // empty' <<<"$existing_json")"
-    [[ -n "$existing_pk" ]] || fail "Could not determine Authentik outpost ID for nextcloud-ldap"
-    authentik_api_write PATCH "/outposts/instances/${existing_pk}/" "$payload" >/dev/null
-    printf '%s\n' "$existing_pk"
-    return 0
-  fi
-
-  authentik_api_write POST "/outposts/instances/" "$payload" | jq -r '.pk // empty'
 }
 
 mailu_api_request() {
@@ -575,124 +371,6 @@ configure_nextcloud_mail_accounts() {
   fi
 }
 
-assert_nextcloud_user_ids_match_authentik() {
-  local users_json nextcloud_users_json auth_entry auth_username auth_email existing_id existing_email
-
-  users_json="$(authentik_api_get "/core/users/?page_size=200" 2>/dev/null | jq -c '[.results[]? | select((.type // "") != "service_account" and (.email // "") != "" and (.username // "") != "") | {username, email}]')"
-  nextcloud_users_json="$(kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c "cd /var/www/html && php occ user:list --output=json" 2>/dev/null || true)"
-  if ! jq -e 'type == "object"' >/dev/null 2>&1 <<<"$nextcloud_users_json"; then
-    log "Warning: Could not inspect existing Nextcloud users before LDAP activation"
-    return 0
-  fi
-
-  while IFS= read -r auth_entry; do
-    auth_username="$(jq -r '.username' <<<"$auth_entry")"
-    auth_email="$(jq -r '.email' <<<"$auth_entry")"
-
-    if jq -e --arg username "$auth_username" 'has($username)' >/dev/null <<<"$nextcloud_users_json"; then
-      continue
-    fi
-
-    while IFS= read -r existing_id; do
-      [[ "$existing_id" != "$nextcloud_admin_username" ]] || continue
-      existing_email="$(
-        kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
-          "cd /var/www/html && php occ user:info $(printf '%q' "$existing_id") --output=json" 2>/dev/null |
-          jq -r '.email // empty' 2>/dev/null || true
-      )"
-      if [[ -n "$existing_email" && "$existing_email" == "$auth_email" ]]; then
-        fail "Existing Nextcloud user ${existing_id} has Authentik email ${auth_email}, but Authentik username is ${auth_username}; stopping before LDAP activation to avoid account duplication"
-      fi
-    done < <(jq -r 'keys[]' <<<"$nextcloud_users_json")
-  done < <(jq -c '.[]' <<<"$users_json")
-}
-
-wait_for_nextcloud_ldap_outpost() {
-  local attempts=120
-  local attempt=1
-
-  while true; do
-    if kubectl -n authentik get svc ak-outpost-nextcloud-ldap >/dev/null 2>&1; then
-      if kubectl -n authentik get endpoints ak-outpost-nextcloud-ldap -o json 2>/dev/null |
-        jq -e '[.subsets[]?.addresses[]?] | length > 0' >/dev/null; then
-        log "Authentik Nextcloud LDAP outpost is ready"
-        return 0
-      fi
-      log "Waiting for Authentik Nextcloud LDAP outpost endpoints (${attempt}/${attempts})"
-    else
-      log "Waiting for Authentik Nextcloud LDAP outpost service (${attempt}/${attempts})"
-    fi
-
-    if [[ "$attempt" -ge "$attempts" ]]; then
-      fail "Timed out waiting for Authentik Nextcloud LDAP outpost"
-    fi
-
-    sleep 5
-    attempt=$((attempt + 1))
-  done
-}
-
-configure_nextcloud_ldap_backend() {
-  local ldap_bind_dn="$1"
-  local ldap_bind_password="$2"
-  local ldap_base_dn="$3"
-
-  log "Configuring Nextcloud LDAP backend for Authentik directory"
-  kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- \
-    env \
-      NEXTCLOUD_LDAP_BIND_DN="$ldap_bind_dn" \
-      NEXTCLOUD_LDAP_BIND_PASSWORD="$ldap_bind_password" \
-      NEXTCLOUD_LDAP_BASE_DN="$ldap_base_dn" \
-    sh -s <<'SH'
-set -euo pipefail
-cd /var/www/html
-
-if ! php -m | grep -Eiq '^ldap$'; then
-  echo "Nextcloud image does not have the PHP LDAP extension enabled; user_ldap cannot be configured" >&2
-  exit 1
-fi
-
-php occ app:install user_ldap >/dev/null 2>&1 || true
-php occ app:enable user_ldap >/dev/null
-
-config_id=""
-for candidate in $({ php occ ldap:show-config 2>/dev/null || true; } | awk -F'|' '$2 ~ /Configuration/ {gsub(/[[:space:]]/, "", $3); if ($3 != "") print $3}'); do
-  candidate_base="$(php occ ldap:show-config "$candidate" 2>/dev/null | awk -F'|' '$2 ~ /^[[:space:]]*ldapBase[[:space:]]*$/ {gsub(/^[[:space:]]+|[[:space:]]+$/, "", $3); print $3; exit}')"
-  if [ "$candidate_base" = "$NEXTCLOUD_LDAP_BASE_DN" ]; then
-    config_id="$candidate"
-    break
-  fi
-done
-
-if [ -z "$config_id" ]; then
-  config_id="$(php occ ldap:create-empty-config | grep -Eo 's[0-9]+' | head -n1)"
-fi
-[ -n "$config_id" ] || { echo "Could not create or locate a Nextcloud LDAP config ID" >&2; exit 1; }
-
-php occ ldap:set-config "$config_id" ldapHost "ak-outpost-nextcloud-ldap.authentik.svc.cluster.local" >/dev/null
-php occ ldap:set-config "$config_id" ldapPort "389" >/dev/null
-php occ ldap:set-config "$config_id" ldapAgentName "$NEXTCLOUD_LDAP_BIND_DN" >/dev/null
-php occ ldap:set-config "$config_id" ldapAgentPassword "$NEXTCLOUD_LDAP_BIND_PASSWORD" >/dev/null
-php occ ldap:set-config "$config_id" ldapBase "$NEXTCLOUD_LDAP_BASE_DN" >/dev/null
-php occ ldap:set-config "$config_id" ldapBaseUsers "ou=users,$NEXTCLOUD_LDAP_BASE_DN" >/dev/null
-php occ ldap:set-config "$config_id" ldapBaseGroups "ou=groups,$NEXTCLOUD_LDAP_BASE_DN" >/dev/null
-php occ ldap:set-config "$config_id" ldapUserFilterObjectclass "user" >/dev/null
-php occ ldap:set-config "$config_id" ldapGroupFilterObjectclass "group" >/dev/null
-php occ ldap:set-config "$config_id" ldapExpertUsernameAttr "uid" >/dev/null
-php occ ldap:set-config "$config_id" ldapExpertUUIDUserAttr "uid" >/dev/null
-php occ ldap:set-config "$config_id" ldapExpertUUIDGroupAttr "gidNumber" >/dev/null
-php occ ldap:set-config "$config_id" ldapUserDisplayName "name" >/dev/null
-php occ ldap:set-config "$config_id" ldapGroupDisplayName "cn" >/dev/null
-php occ ldap:set-config "$config_id" ldapEmailAttribute "mail" >/dev/null
-php occ ldap:set-config "$config_id" ldapGroupMemberAssocAttr "member" >/dev/null
-php occ ldap:set-config "$config_id" ldapConfigurationActive "1" >/dev/null
-
-php occ ldap:test-config "$config_id"
-php occ config:app:set dav system_addressbook_exposed --value="yes" >/dev/null
-php occ dav:sync-system-addressbook >/dev/null 2>&1 || true
-SH
-}
-
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
@@ -741,9 +419,6 @@ nextcloud_redis_password="$(openssl rand -hex 24)"
 nextcloud_oidc_client_id="$(openssl rand -hex 16)"
 nextcloud_oidc_client_secret="$(openssl rand -hex 32)"
 nextcloud_eurooffice_jwt_secret="$(openssl rand -hex 32)"
-nextcloud_ldap_bind_username="nextcloud-ldap-bind"
-nextcloud_ldap_bind_password="$(openssl rand -hex 24)"
-nextcloud_ldap_base_dn="ou=nextcloud,dc=ldap,dc=goauthentik,dc=io"
 
 if [[ -n "$existing_nextcloud_secret_json" ]]; then
   nextcloud_admin_username="$(jq -r '.NEXTCLOUD_ADMIN_USERNAME // empty' <<<"$existing_nextcloud_secret_json" || true)"
@@ -754,9 +429,6 @@ if [[ -n "$existing_nextcloud_secret_json" ]]; then
   nextcloud_oidc_client_id="$(jq -r '.NEXTCLOUD_OIDC_CLIENT_ID // empty' <<<"$existing_nextcloud_secret_json" || true)"
   nextcloud_oidc_client_secret="$(jq -r '.NEXTCLOUD_OIDC_CLIENT_SECRET // empty' <<<"$existing_nextcloud_secret_json" || true)"
   nextcloud_eurooffice_jwt_secret="$(jq -r '.EUROOFFICE_JWT_SECRET // empty' <<<"$existing_nextcloud_secret_json" || true)"
-  nextcloud_ldap_bind_username="$(jq -r '.NEXTCLOUD_LDAP_BIND_USERNAME // empty' <<<"$existing_nextcloud_secret_json" || true)"
-  nextcloud_ldap_bind_password="$(jq -r '.NEXTCLOUD_LDAP_BIND_PASSWORD // empty' <<<"$existing_nextcloud_secret_json" || true)"
-  nextcloud_ldap_base_dn="$(jq -r '.NEXTCLOUD_LDAP_BASE_DN // empty' <<<"$existing_nextcloud_secret_json" || true)"
 fi
 
 [[ -n "$nextcloud_admin_username" ]] || nextcloud_admin_username="admin"
@@ -767,10 +439,6 @@ fi
 [[ -n "$nextcloud_oidc_client_id" ]] || nextcloud_oidc_client_id="$(openssl rand -hex 16)"
 [[ -n "$nextcloud_oidc_client_secret" ]] || nextcloud_oidc_client_secret="$(openssl rand -hex 32)"
 [[ -n "$nextcloud_eurooffice_jwt_secret" ]] || nextcloud_eurooffice_jwt_secret="$(openssl rand -hex 32)"
-[[ -n "$nextcloud_ldap_bind_username" ]] || nextcloud_ldap_bind_username="nextcloud-ldap-bind"
-[[ -n "$nextcloud_ldap_bind_password" ]] || nextcloud_ldap_bind_password="$(openssl rand -hex 24)"
-[[ -n "$nextcloud_ldap_base_dn" ]] || nextcloud_ldap_base_dn="ou=nextcloud,dc=ldap,dc=goauthentik,dc=io"
-nextcloud_ldap_bind_dn="cn=${nextcloud_ldap_bind_username},ou=users,${nextcloud_ldap_base_dn}"
 
 nextcloud_secret_file="$(mktemp)"
 trap 'rm -f "$nextcloud_secret_file"' EXIT
@@ -783,9 +451,6 @@ jq -n \
   --arg nextcloud_oidc_client_id "$nextcloud_oidc_client_id" \
   --arg nextcloud_oidc_client_secret "$nextcloud_oidc_client_secret" \
   --arg eurooffice_jwt_secret "$nextcloud_eurooffice_jwt_secret" \
-  --arg nextcloud_ldap_bind_username "$nextcloud_ldap_bind_username" \
-  --arg nextcloud_ldap_bind_password "$nextcloud_ldap_bind_password" \
-  --arg nextcloud_ldap_base_dn "$nextcloud_ldap_base_dn" \
   '{
     "NEXTCLOUD_ADMIN_USERNAME": $nextcloud_admin_username,
     "NEXTCLOUD_ADMIN_PASSWORD": $nextcloud_admin_password,
@@ -794,10 +459,7 @@ jq -n \
     "NEXTCLOUD_REDIS_PASSWORD": $nextcloud_redis_password,
     "NEXTCLOUD_OIDC_CLIENT_ID": $nextcloud_oidc_client_id,
     "NEXTCLOUD_OIDC_CLIENT_SECRET": $nextcloud_oidc_client_secret,
-    "EUROOFFICE_JWT_SECRET": $eurooffice_jwt_secret,
-    "NEXTCLOUD_LDAP_BIND_USERNAME": $nextcloud_ldap_bind_username,
-    "NEXTCLOUD_LDAP_BIND_PASSWORD": $nextcloud_ldap_bind_password,
-    "NEXTCLOUD_LDAP_BASE_DN": $nextcloud_ldap_base_dn
+    "EUROOFFICE_JWT_SECRET": $eurooffice_jwt_secret
   }' >"$nextcloud_secret_file"
 
 authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
@@ -923,58 +585,15 @@ application_pk="$(create_or_update_application "$application_payload")"
 application_json="$(find_application_json_by_slug "nextcloud")"
 [[ -n "$application_json" ]] || fail "Could not determine Authentik application JSON for Nextcloud"
 
-ldap_provider_payload="$(
-  jq -n \
-    --arg name "nextcloud-ldap" \
-    --arg authorization_flow "$authorization_flow_id" \
-    --arg invalidation_flow "$invalidation_flow_id" \
-    --arg base_dn "$nextcloud_ldap_base_dn" \
-    '{
-      name: $name,
-      authorization_flow: $authorization_flow,
-      invalidation_flow: $invalidation_flow,
-      base_dn: $base_dn,
-      search_mode: "cached",
-      bind_mode: "cached",
-      mfa_support: false
-    }'
-)"
-ldap_provider_pk="$(create_or_update_ldap_provider "$ldap_provider_payload")"
-[[ -n "$ldap_provider_pk" ]] || fail "Authentik did not return a provider ID for nextcloud-ldap"
-
-ldap_application_payload="$(
-  jq -n \
-    --arg name "nextcloud-ldap" \
-    --arg slug "nextcloud-ldap" \
-    --arg provider_pk "$ldap_provider_pk" \
-    '{
-      name: $name,
-      slug: $slug,
-      provider: ($provider_pk | tonumber)
-    }'
-)"
-ldap_application_pk="$(create_or_update_ldap_application "$ldap_application_payload")"
-[[ -n "$ldap_application_pk" ]] || fail "Authentik did not return an application ID for nextcloud-ldap"
-
-ldap_bind_user_pk="$(create_or_update_ldap_bind_user "$nextcloud_ldap_bind_username" "$nextcloud_ldap_bind_password")"
-ldap_search_role_pk="$(create_or_update_ldap_search_role)"
-[[ -n "$ldap_search_role_pk" ]] || fail "Authentik did not return a role ID for nextcloud-ldap-search"
-assign_ldap_search_permission "$ldap_search_role_pk" "$ldap_bind_user_pk" "$ldap_provider_pk"
-
-ldap_outpost_pk="$(create_or_update_ldap_outpost "$ldap_provider_pk")"
-[[ -n "$ldap_outpost_pk" ]] || fail "Authentik did not return an outpost ID for nextcloud-ldap"
-
 log "Syncing Nextcloud bootstrap secret to OpenBao"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "nextcloud" \
   --json-file "$nextcloud_secret_file" \
-  --required-keys "NEXTCLOUD_ADMIN_USERNAME,NEXTCLOUD_ADMIN_PASSWORD,NEXTCLOUD_POSTGRESQL__USERNAME,NEXTCLOUD_POSTGRESQL__PASSWORD,NEXTCLOUD_REDIS_PASSWORD,NEXTCLOUD_OIDC_CLIENT_ID,NEXTCLOUD_OIDC_CLIENT_SECRET,EUROOFFICE_JWT_SECRET,NEXTCLOUD_LDAP_BIND_USERNAME,NEXTCLOUD_LDAP_BIND_PASSWORD,NEXTCLOUD_LDAP_BASE_DN"
+  --required-keys "NEXTCLOUD_ADMIN_USERNAME,NEXTCLOUD_ADMIN_PASSWORD,NEXTCLOUD_POSTGRESQL__USERNAME,NEXTCLOUD_POSTGRESQL__PASSWORD,NEXTCLOUD_REDIS_PASSWORD,NEXTCLOUD_OIDC_CLIENT_ID,NEXTCLOUD_OIDC_CLIENT_SECRET,EUROOFFICE_JWT_SECRET"
 log "Applying Nextcloud Argo CD application"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$WORKSPACE_ROOT/gitops/optional-apps/nextcloud.yaml" \
   --application "nextcloud"
-
-wait_for_nextcloud_ldap_outpost
 
 log "Waiting for Euro-Office Document Server"
 wait_for_deployment_rollout "nextcloud" "nextcloud-eurooffice" "Euro-Office Document Server"
@@ -1125,9 +744,6 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
     ]
   }' >/dev/null
 "
-
-assert_nextcloud_user_ids_match_authentik
-configure_nextcloud_ldap_backend "$nextcloud_ldap_bind_dn" "$nextcloud_ldap_bind_password" "$nextcloud_ldap_base_dn"
 
 log "Installing recommended Nextcloud apps"
 kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
