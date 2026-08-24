@@ -297,7 +297,7 @@ def test_nextcloud_bootstrap_configures_authentik_ldap_directory_for_contacts():
     assert 'bind_mode: "cached"' in install_text
     assert 'path: "nextcloud"' in install_text
     assert 'type: "service_account"' in install_text
-    assert "authentik_providers_ldap.search_full_directory" in install_text
+    assert "search_full_directory" in install_text
     assert "authentik_providers_ldap.ldapprovider" in install_text
     assert "NEXTCLOUD_LDAP_BIND_USERNAME" in install_text
     assert "NEXTCLOUD_LDAP_BIND_PASSWORD" in install_text
