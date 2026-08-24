@@ -361,7 +361,7 @@ assign_ldap_search_permission() {
     jq -n \
       --arg provider_pk "$provider_pk" \
       '{
-        permissions: ["search_full_directory"],
+        permissions: ["authentik_providers_ldap.search_full_directory"],
         model: "authentik_providers_ldap.ldapprovider",
         object_pk: $provider_pk
       }'
