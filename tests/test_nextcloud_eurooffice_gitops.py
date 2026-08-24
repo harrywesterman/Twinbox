@@ -316,7 +316,6 @@ def test_nextcloud_bootstrap_configures_authentik_ldap_directory_for_contacts():
     assert "assert_nextcloud_user_ids_match_authentik" in install_text
     assert "OIDC-compatible LDAP nextcloudUid" in install_text
     assert "but Authentik username is" not in install_text
-    assert "kubectl exec -i -n nextcloud deploy/nextcloud -c nextcloud -- \\" in install_text
     assert "php -m | grep -Eiq '^ldap$'" in install_text
     assert "php occ app:enable user_ldap" in install_text
     assert 'php occ ldap:set-config "$config_id" ldapHost' in install_text

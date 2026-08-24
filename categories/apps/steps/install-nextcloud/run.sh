@@ -759,7 +759,7 @@ configure_nextcloud_ldap_backend() {
   local ldap_base_dn="$3"
 
   log "Configuring Nextcloud LDAP backend for Authentik directory"
-  kubectl exec -i -n nextcloud deploy/nextcloud -c nextcloud -- \
+  kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- \
     env \
       NEXTCLOUD_LDAP_BIND_DN="$ldap_bind_dn" \
       NEXTCLOUD_LDAP_BIND_PASSWORD="$ldap_bind_password" \
