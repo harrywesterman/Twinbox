@@ -760,7 +760,7 @@ const mailuServer = http.createServer(async (req, res) => {
     return;
   }
 
-  if (req.method === "GET" && pathname.startsWith("/api/v1/token/user/")) {
+  if (req.method === "GET" && pathname.startsWith("/api/v1/tokenuser/")) {
     const email = decodeURIComponent(pathname.split("/").at(-1) || "");
     sendJson(
       res,
@@ -770,7 +770,7 @@ const mailuServer = http.createServer(async (req, res) => {
     return;
   }
 
-  if (req.method === "POST" && pathname.startsWith("/api/v1/token/user/")) {
+  if (req.method === "POST" && pathname.startsWith("/api/v1/tokenuser/")) {
     const email = decodeURIComponent(pathname.split("/").at(-1) || "");
     const body = await readRequestBody(req);
     const token = {
@@ -1078,7 +1078,7 @@ test("mail token endpoints create and revoke tokens for the session mailbox only
   assert.equal(
     mailuState.requests.some(
       (request) =>
-        request.method === "POST" && request.pathname === "/api/v1/token/user/alex%40example.com"
+        request.method === "POST" && request.pathname === "/api/v1/tokenuser/alex%40example.com"
     ),
     true
   );

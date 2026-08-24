@@ -99,7 +99,7 @@ export async function mailuListUserTokens(email) {
   }
 
   try {
-    const response = await fetch(`${baseUrl}/token/user/${encodeURIComponent(email)}`, {
+    const response = await fetch(`${baseUrl}/tokenuser/${encodeURIComponent(email)}`, {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -132,7 +132,7 @@ export async function mailuCreateUserToken({ email, comment, authorizedIp = [] }
   });
 
   try {
-    const response = await fetch(`${baseUrl}/token/user/${encodeURIComponent(email)}`, {
+    const response = await fetch(`${baseUrl}/tokenuser/${encodeURIComponent(email)}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

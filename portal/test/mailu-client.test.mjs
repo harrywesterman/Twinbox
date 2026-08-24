@@ -38,7 +38,7 @@ function startMailuMock() {
         } else if (req.url.startsWith("/api/v1/user/") && req.method === "GET") {
           res.writeHead(404, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ code: 404, message: "Not found" }));
-        } else if (req.url === "/api/v1/token/user/admin%40test.com" && req.method === "GET") {
+        } else if (req.url === "/api/v1/tokenuser/admin%40test.com" && req.method === "GET") {
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(
             JSON.stringify([
@@ -58,7 +58,7 @@ function startMailuMock() {
               },
             ])
           );
-        } else if (req.url === "/api/v1/token/user/admin%40test.com" && req.method === "POST") {
+        } else if (req.url === "/api/v1/tokenuser/admin%40test.com" && req.method === "POST") {
           const payload = JSON.parse(lastRequest.body);
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(
@@ -71,7 +71,7 @@ function startMailuMock() {
               token: "secret-token",
             })
           );
-        } else if (req.url === "/api/v1/token/user/nobody%40test.com" && req.method === "GET") {
+        } else if (req.url === "/api/v1/tokenuser/nobody%40test.com" && req.method === "GET") {
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify([]));
         } else if (req.url === "/api/v1/token/tok-1" && req.method === "DELETE") {
@@ -248,7 +248,7 @@ test("mailuListUserTokens normalizes records without exposing token secrets", as
   ]);
   assert.equal("token" in result.tokens[0], false);
   assert.equal(lastRequest.method, "GET");
-  assert.equal(lastRequest.url, "/api/v1/token/user/admin%40test.com");
+  assert.equal(lastRequest.url, "/api/v1/tokenuser/admin%40test.com");
 });
 
 test("mailuCreateUserToken returns the one-time token and normalized record", async () => {
@@ -265,7 +265,7 @@ test("mailuCreateUserToken returns the one-time token and normalized record", as
   assert.equal(result.record.id, "tok-2");
   assert.equal(result.record.comment, "Thunderbird");
   assert.equal(lastRequest.method, "POST");
-  assert.equal(lastRequest.url, "/api/v1/token/user/admin%40test.com");
+  assert.equal(lastRequest.url, "/api/v1/tokenuser/admin%40test.com");
   assert.deepEqual(JSON.parse(lastRequest.body), { comment: "Thunderbird", AuthorizedIP: [] });
 });
 
