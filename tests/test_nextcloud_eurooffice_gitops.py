@@ -269,11 +269,18 @@ def test_nextcloud_mail_uses_per_user_mailu_tokens():
     assert "Skipping Nextcloud Mail account sync because Mailu is not installed yet" in install_text
     assert 'fail "Nextcloud Mail account sync failed for ${failed} user(s)"' in install_text
     assert "mailu_create_auth_token" in install_text
-    assert "/token/user/" in install_text
+    assert "/tokenuser/" in install_text
     assert "Nextcloud Mail" in install_text
     assert "php occ mail:account:create" in install_text
-    assert "$(printf '%q' \"$mail_hostname\") 993 ssl" in install_text
-    assert "$(printf '%q' \"$mail_hostname\") 587 tls" in install_text
+    assert 'imap_hostname="mailu-dovecot.mailu.svc.cluster.local"' in install_text
+    assert 'imap_port="143"' in install_text
+    assert 'imap_security="none"' in install_text
+    assert 'smtp_hostname="mailu-front.mailu.svc.cluster.local"' in install_text
+    assert 'smtp_port="10025"' in install_text
+    assert 'smtp_security="none"' in install_text
+    assert "mail.${mail_domain}" not in install_text
+    assert " 993 ssl " not in install_text
+    assert " 587 tls " not in install_text
     assert "mail:account:export" in install_text
     assert "masterPassword" not in install_text
 

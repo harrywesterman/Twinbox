@@ -229,36 +229,50 @@ mailu_api_request() {
   local method="$1"
   local path="$2"
   local body="${3:-}"
-  local api_token api_base response_file status
+  local api_token body_b64 output status response
 
   api_token="$(openbao_read_global_secret_json mailu-runtime 2>/dev/null | jq -r '."api-token" // empty' || true)"
   [[ -n "$api_token" ]] || fail "Mailu API token not found; install Mailu before configuring Nextcloud Mail"
 
-  api_base="https://mail.${public_zone_name}/api/v1"
-  response_file="$(mktemp)"
-  if [[ -n "$body" ]]; then
-    status="$(curl -sS -o "$response_file" -w '%{http_code}' \
-      -X "$method" \
-      -H "Authorization: Bearer ${api_token}" \
-      -H "Content-Type: application/json" \
-      -d "$body" \
-      "${api_base}${path}" || echo "000")"
-  else
-    status="$(curl -sS -o "$response_file" -w '%{http_code}' \
-      -X "$method" \
-      -H "Authorization: Bearer ${api_token}" \
-      "${api_base}${path}" || echo "000")"
+  body_b64="$(printf '%s' "$body" | base64 | tr -d '\n')"
+  if ! output="$(kubectl exec -n mailu deploy/mailu-admin -c admin -- \
+    env MAILU_API_METHOD="$method" MAILU_API_PATH="$path" MAILU_API_BODY_B64="$body_b64" \
+    sh -s <<'SH'
+set -eu
+api_base="http://127.0.0.1:8080/api/v1"
+response_file="$(mktemp)"
+body_file="$(mktemp)"
+trap 'rm -f "$response_file" "$body_file"' EXIT
+printf '%s' "${MAILU_API_BODY_B64}" | base64 -d >"$body_file"
+if [ -s "$body_file" ]; then
+  status="$(curl -sS -o "$response_file" -w '%{http_code}' \
+    -X "${MAILU_API_METHOD}" \
+    -H "Authorization: Bearer ${API_TOKEN}" \
+    -H "Content-Type: application/json" \
+    --data-binary "@${body_file}" \
+    "${api_base}${MAILU_API_PATH}" || echo "000")"
+else
+  status="$(curl -sS -o "$response_file" -w '%{http_code}' \
+    -X "${MAILU_API_METHOD}" \
+    -H "Authorization: Bearer ${API_TOKEN}" \
+    "${api_base}${MAILU_API_PATH}" || echo "000")"
+  fi
+printf 'STATUS:%s\n' "$status"
+cat "$response_file"
+SH
+  )"; then
+    fail "Mailu API ${method} ${path} failed inside mailu-admin"
   fi
 
+  status="$(sed -n '1s/^STATUS://p' <<<"$output")"
+  response="$(sed '1d' <<<"$output")"
   if [[ ! "$status" =~ ^2 ]]; then
     local body_snippet
-    body_snippet="$(head -c 240 "$response_file" 2>/dev/null || true)"
-    rm -f "$response_file"
+    body_snippet="$(head -c 240 <<<"$response" 2>/dev/null || true)"
     fail "Mailu API ${method} ${path} failed with HTTP ${status}: ${body_snippet}"
   fi
 
-  cat "$response_file"
-  rm -f "$response_file"
+  printf '%s\n' "$response"
 }
 
 mailu_create_auth_token() {
@@ -267,7 +281,7 @@ mailu_create_auth_token() {
   local payload
 
   payload="$(jq -n --arg comment "$comment" '{comment: $comment, AuthorizedIP: []}')"
-  mailu_api_request POST "/token/user/$(printf '%s' "$email" | python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip()))')" "$payload" |
+  mailu_api_request POST "/tokenuser/$(printf '%s' "$email" | python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip()))')" "$payload" |
     jq -r '.token // empty'
 }
 
@@ -290,7 +304,12 @@ nextcloud_mail_account_exists() {
 
 configure_nextcloud_mail_accounts() {
   local mail_domain="$1"
-  local mail_hostname="mail.${mail_domain}"
+  local imap_hostname="mailu-dovecot.mailu.svc.cluster.local"
+  local imap_port="143"
+  local imap_security="none"
+  local smtp_hostname="mailu-front.mailu.svc.cluster.local"
+  local smtp_port="10025"
+  local smtp_security="none"
   local api_token users_json total configured skipped failed
 
   log "Configuring Nextcloud Mail accounts for existing Nextcloud users"
@@ -337,7 +356,7 @@ configure_nextcloud_mail_accounts() {
     fi
 
     if kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
-      "cd /var/www/html && php occ mail:account:create $(printf '%q' "$username") $(printf '%q' "$name") $(printf '%q' "$email") $(printf '%q' "$mail_hostname") 993 ssl $(printf '%q' "$email") $(printf '%q' "$mail_token") $(printf '%q' "$mail_hostname") 587 tls $(printf '%q' "$email") $(printf '%q' "$mail_token") password >/dev/null"; then
+      "cd /var/www/html && php occ mail:account:create $(printf '%q' "$username") $(printf '%q' "$name") $(printf '%q' "$email") $(printf '%q' "$imap_hostname") $(printf '%q' "$imap_port") $(printf '%q' "$imap_security") $(printf '%q' "$email") $(printf '%q' "$mail_token") $(printf '%q' "$smtp_hostname") $(printf '%q' "$smtp_port") $(printf '%q' "$smtp_security") $(printf '%q' "$email") $(printf '%q' "$mail_token") password >/dev/null"; then
       configured=$((configured + 1))
       log "  OK   ${email}: Nextcloud Mail account configured"
     else
