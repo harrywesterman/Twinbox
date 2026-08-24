@@ -660,6 +660,17 @@ wait_for_nextcloud_ldap_outpost() {
   done
 }
 
+restart_nextcloud_ldap_outpost() {
+  if ! kubectl -n authentik get deployment ak-outpost-nextcloud-ldap >/dev/null 2>&1; then
+    log "Authentik Nextcloud LDAP outpost deployment is not present yet; skipping restart"
+    return 0
+  fi
+
+  log "Restarting Authentik Nextcloud LDAP outpost to load the latest managed configuration"
+  kubectl -n authentik rollout restart deployment/ak-outpost-nextcloud-ldap >/dev/null
+  kubectl -n authentik rollout status deployment/ak-outpost-nextcloud-ldap --timeout=180s >/dev/null
+}
+
 resolve_nextcloud_oidc_local_id_config() {
   local app_config_json config_line provider_id mapping_uid unique_uid
 
@@ -1118,6 +1129,8 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$WORKSPACE_ROOT/gitops/optional-apps/nextcloud.yaml" \
   --application "nextcloud"
 
+wait_for_nextcloud_ldap_outpost
+restart_nextcloud_ldap_outpost
 wait_for_nextcloud_ldap_outpost
 
 log "Waiting for Euro-Office Document Server"
