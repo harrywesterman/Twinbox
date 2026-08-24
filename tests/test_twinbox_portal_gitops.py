@@ -54,6 +54,14 @@ def test_portal_netbird_route_forces_public_https_forwarded_headers():
     assert headers["X-Forwarded-Port"] == "443"
 
 
+def test_portal_uses_internal_mailu_api_service():
+    deployment = _load_yaml(PORTAL_DIR / "deployment.yaml")
+    container = deployment["spec"]["template"]["spec"]["containers"][0]
+    env = {entry["name"]: entry["value"] for entry in container["env"]}
+
+    assert env["MAILU_API_BASE_URL"] == "http://mailu-front.mailu.svc.cluster.local/api"
+
+
 def test_portal_argocd_app_patches_both_ingressroutes():
     app = _load_yaml(REPO_ROOT / "gitops" / "apps" / "twinbox-portal.yaml")
     patches = app["spec"]["source"]["kustomize"]["patches"]

@@ -42,6 +42,8 @@ spec:
               value: http://webwizard.longhorn-system.svc.cluster.local:8080
             - name: PORTAL_AGENTS_BASE_URL
               value: http://twinbox-agents.twinbox-agents.svc.cluster.local
+            - name: MAILU_API_BASE_URL
+              value: http://mailu-front.mailu.svc.cluster.local/api
           envFrom:
             - secretRef:
                 name: portal-bootstrap
