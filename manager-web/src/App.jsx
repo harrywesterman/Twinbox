@@ -794,15 +794,9 @@ const WIZARD_GUIDES = {
     checklist: [
       "Enter the full name you want to see in the UI.",
       "Choose a login name you will remember.",
-      "Add an email address if you want recovery support.",
     ],
     screenshotTitle: "User account details",
-    screenshotLines: [
-      "Full name",
-      "Login name",
-      "Optional email address",
-      "This becomes the first admin account",
-    ],
+    screenshotLines: ["Full name", "Login name", "This becomes the first admin account"],
     helpLink: {
       label: "Authentik",
       href: "https://goauthentik.io/",

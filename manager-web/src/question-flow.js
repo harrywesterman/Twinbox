@@ -177,7 +177,7 @@ const QUESTION_STEP_DEFS = [
     summary: "Create the first Authentik user and admin group.",
     explanation: "This page collects the first account details Twinbox will use for Authentik.",
     side_help:
-      "Use this page to create the account you will use to sign in to Authentik and the protected applications later. Twinbox also uses this email for NetBird setup and Let's Encrypt certificate notices.",
+      "Use this page to create the account you will use to sign in to Authentik and the protected applications later.",
     inputs: [
       {
         id: "full_name",
@@ -192,13 +192,6 @@ const QUESTION_STEP_DEFS = [
         type: "string",
         required: true,
         help: "Authentik username for the first user.",
-      },
-      {
-        id: "email",
-        label: "Email address",
-        type: "string",
-        required: true,
-        help: "Email address for account recovery, NetBird setup, and Let's Encrypt certificate notices.",
       },
     ],
   },

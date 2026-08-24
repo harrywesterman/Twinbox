@@ -480,6 +480,11 @@ test("NetBird bastion question flow uses external-dns values from the earlier DN
     { label: "NetBird", value: "netbird" },
   ]);
   assert.ok(createUsers, "expected the shared account step in the question flow");
+  assert.deepEqual(
+    createUsers.inputs.map((input) => input.id),
+    ["full_name", "username"],
+    "expected the first user form to omit an email field"
+  );
   assert.ok(netbirdBastion, "expected the NetBird bastion step in the NetBird route");
   assert.ok(
     steps.findIndex((step) => step.id === "create-users-and-groups") <
@@ -514,8 +519,11 @@ test("NetBird bastion question flow uses external-dns values from the earlier DN
   assert.match(netbirdBastion.side_help, /DNS provider configured earlier/);
   assert.doesNotMatch(netbirdBastion.side_help, /Cloudflare credentials/);
 
-  assert.equal(createUsers.inputs.find((input) => input.id === "email")?.required, true);
-  assert.match(createUsers.side_help, /NetBird setup/);
+  assert.equal(
+    createUsers.inputs.find((input) => input.id === "email"),
+    undefined
+  );
+  assert.doesNotMatch(createUsers.side_help, /email|NetBird setup|Let's Encrypt/i);
 });
 
 test("vite and document metadata still support relative hosting", async () => {
