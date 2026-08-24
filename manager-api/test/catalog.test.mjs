@@ -181,7 +181,12 @@ test("catalog exposes NetBird bastion without duplicate DNS, SSH, or Cloudflare 
     assert.equal(netbirdBastion.secrets.files.KUBECONFIG_FILE.attachment, "kubeconfig");
     assert.match(netbirdBastion.side_help, /DNS provider configured earlier/);
     assert.doesNotMatch(netbirdBastion.side_help, /Cloudflare credentials/);
-    assert.equal(createUsers.inputs.find((input) => input.id === "email")?.required, true);
+    assert.equal(createUsers.inputs.find((input) => input.id === "full_name")?.required, true);
+    assert.equal(createUsers.inputs.find((input) => input.id === "username")?.required, true);
+    assert.equal(
+      createUsers.inputs.find((input) => input.id === "email"),
+      undefined
+    );
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
