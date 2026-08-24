@@ -1011,7 +1011,7 @@ apply_educated_defaults() {
   PROXMOX_NODE="$(hostname)"
   PROXMOX_STORAGE_POOL="local-lvm"
   PROXMOX_FILE_DATASTORE="local"
-  TWINBOX_IMAGE_TAG="sha-0e8fa04"
+  TWINBOX_IMAGE_TAG="sha-6d9470d"
 }
 
 run_apply_educated_defaults_with_gauge() {
@@ -1083,7 +1083,7 @@ EOF
   PROXMOX_NODE="$(hostname)"
   PROXMOX_STORAGE_POOL="local-lvm"
   PROXMOX_FILE_DATASTORE="local"
-  TWINBOX_IMAGE_TAG="sha-0e8fa04"
+  TWINBOX_IMAGE_TAG="sha-6d9470d"
 }
 
 create_proxmox_api_user() {
