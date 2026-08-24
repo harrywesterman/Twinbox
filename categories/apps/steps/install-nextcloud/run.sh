@@ -799,7 +799,6 @@ php occ ldap:set-config "$config_id" ldapBaseUsers "ou=users,$NEXTCLOUD_LDAP_BAS
 php occ ldap:set-config "$config_id" ldapBaseGroups "ou=groups,$NEXTCLOUD_LDAP_BASE_DN" >/dev/null
 php occ ldap:set-config "$config_id" ldapUserFilterObjectclass "user" >/dev/null
 php occ ldap:set-config "$config_id" ldapGroupFilterObjectclass "group" >/dev/null
-php occ ldap:set-config "$config_id" ldapLoginFilter "(&(objectclass=user)(nextcloudUid=%uid))" >/dev/null
 php occ ldap:set-config "$config_id" ldapExpertUsernameAttr "nextcloudUid" >/dev/null
 php occ ldap:set-config "$config_id" ldapExpertUUIDUserAttr "nextcloudUid" >/dev/null
 php occ ldap:set-config "$config_id" ldapExpertUUIDGroupAttr "gidNumber" >/dev/null
