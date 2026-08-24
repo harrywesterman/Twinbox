@@ -1802,6 +1802,11 @@ test("portal image copies server helper modules into the runtime image", async (
   );
   assert.match(
     dockerfile,
+    /COPY mail-profile\.mjs \.\//,
+    "expected the runtime image to include the Apple Mail profile builder"
+  );
+  assert.match(
+    dockerfile,
     /@rolldown\/binding-linux-x64-musl@\$\(node -p "require\('rolldown\/package\.json'\)\.version"\)/,
     "expected the Alpine build stage to install rolldown's musl binding"
   );

@@ -12,6 +12,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 COPY server.mjs ./
 COPY authentik-admin.mjs ./
+COPY mail-profile.mjs ./
 COPY mailu-client.mjs ./
 COPY src/it-department-model.js ./src/it-department-model.js
 COPY --from=build /app/dist ./dist
