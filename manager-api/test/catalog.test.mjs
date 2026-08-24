@@ -278,6 +278,7 @@ test("app catalog exposes apps while the wizard catalog keeps them out of sight"
       (step) => step.id === "install-hedgedoc"
     );
     const mijnBureauBundle = appCatalog.bundles.find((bundle) => bundle.id === "mijn-bureau");
+    const nextcloudBundle = appCatalog.bundles.find((bundle) => bundle.id === "nextcloud");
     const openDeskBundle = appCatalog.bundles.find((bundle) => bundle.id === "opendesk");
     const laSuiteBundle = appCatalog.bundles.find((bundle) => bundle.id === "lasuite");
     const twinboxDesktopBundle = appCatalog.bundles.find(
@@ -288,13 +289,13 @@ test("app catalog exposes apps while the wizard catalog keeps them out of sight"
       "install-mailu",
       "install-mastodon",
       "install-matrix",
-      "install-nextcloud",
     ]) {
       assert.ok(
         twinboxDesktopBundle?.apps.includes(appId),
         `twinbox-desktop bundle should include ${appId}`
       );
     }
+    assert.equal(twinboxDesktopBundle?.apps.includes("install-nextcloud"), false);
     assert.equal(nextcloudCard?.title, "Install Nextcloud");
     assert.equal(nextcloudCard?.placeholder, false);
     assert.equal(nextcloudCard?.installable, true);
@@ -337,6 +338,9 @@ test("app catalog exposes apps while the wizard catalog keeps them out of sight"
       "install-outline",
       "install-jitsi",
     ]);
+    assert.equal(nextcloudBundle?.title, "Nextcloud");
+    assert.equal(nextcloudBundle?.iconUrl, "/assets/step-icons/install-nextcloud.svg");
+    assert.deepEqual(nextcloudBundle?.apps, ["install-mailu", "install-nextcloud"]);
     assert.equal(openDeskBundle?.title, "openDesk");
     assert.equal(openDeskBundle?.iconUrl, "/assets/step-icons/install-opencloud.svg");
     assert.deepEqual(openDeskBundle?.apps, [
@@ -363,6 +367,12 @@ test("app catalog exposes apps while the wizard catalog keeps them out of sight"
         `${bundle.id} should install Mailu before Zulip`
       );
     }
+    assert.ok(nextcloudBundle);
+    assert.ok(
+      nextcloudBundle.apps.indexOf("install-mailu") <
+        nextcloudBundle.apps.indexOf("install-nextcloud"),
+      "nextcloud bundle should install Mailu before Nextcloud"
+    );
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

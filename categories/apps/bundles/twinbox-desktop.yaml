@@ -45,8 +45,6 @@ description: >
   **Mastodon** — A federated social network you own, with your own identity and moderation.
 
   **Matrix** — End-to-end encrypted federated chat with the Element Server Suite.
-
-  **Nextcloud** — Your own private cloud for files, calendars, and collaboration.
 apps:
   - install-opencloud
   - install-outline
@@ -63,4 +61,3 @@ apps:
   - install-karakeep
   - install-mastodon
   - install-matrix
-  - install-nextcloud

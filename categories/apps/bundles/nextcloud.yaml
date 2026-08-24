@@ -1,0 +1,22 @@
+id: nextcloud
+title: Nextcloud
+summary: Private cloud bundle for email, files, calendars, contacts, and collaboration.
+iconUrl: /assets/step-icons/install-nextcloud.svg
+iconAlt: Nextcloud bundle icon
+description: >
+  Nextcloud combines self-hosted files, calendars, contacts, and collaboration
+  tools with Mailu email on your own Twinbox infrastructure.
+
+  Every app in this bundle is deployed through Argo CD GitOps, giving you full
+  control over updates, configuration, and data ownership. No external cloud
+  dependencies - everything stays inside your Twinbox Kubernetes cluster, behind
+  your own ingress and authentication.
+
+  **Whats included**
+
+  **Mailu** - Self-hosted email with webmail, admin UI, and your own SMTP edge on the bastion.
+
+  **Nextcloud** - Your own private cloud for files, calendars, contacts, and collaboration.
+apps:
+  - install-mailu
+  - install-nextcloud
