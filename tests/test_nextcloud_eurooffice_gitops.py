@@ -295,6 +295,8 @@ def test_nextcloud_bootstrap_configures_authentik_ldap_directory_for_contacts():
     assert "base_dn: $base_dn" in install_text
     assert 'search_mode: "cached"' in install_text
     assert 'bind_mode: "cached"' in install_text
+    assert "http://authentik-server.authentik.svc.cluster.local/" in install_text
+    assert "authentik_host_browser" in install_text
     assert 'path: "nextcloud"' in install_text
     assert 'type: "service_account"' in install_text
     assert "authentik_providers_ldap.search_full_directory" in install_text
@@ -346,7 +348,12 @@ def test_nextcloud_bootstrap_configures_authentik_ldap_directory_for_contacts():
         in install_text
     )
     assert "sync_authentik_nextcloud_ldap_uids" in install_text
+    assert "disable_existing_nextcloud_ldap_configs" in install_text
+    assert 'php occ ldap:set-config "$config_id" ldapConfigurationActive "0"' in install_text
     assert install_text.rindex("sync_authentik_nextcloud_ldap_uids") < install_text.rindex(
+        "disable_existing_nextcloud_ldap_configs"
+    )
+    assert install_text.rindex("disable_existing_nextcloud_ldap_configs") < install_text.rindex(
         'configure_nextcloud_ldap_backend "$nextcloud_ldap_bind_dn"'
     )
 
