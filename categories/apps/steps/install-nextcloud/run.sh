@@ -831,6 +831,8 @@ php occ ldap:set-config "$config_id" ldapBase "$NEXTCLOUD_LDAP_BASE_DN" >/dev/nu
 php occ ldap:set-config "$config_id" ldapBaseUsers "ou=users,$NEXTCLOUD_LDAP_BASE_DN" >/dev/null
 php occ ldap:set-config "$config_id" ldapBaseGroups "ou=groups,$NEXTCLOUD_LDAP_BASE_DN" >/dev/null
 php occ ldap:set-config "$config_id" ldapUserFilterObjectclass "user" >/dev/null
+php occ ldap:set-config "$config_id" ldapUserFilter "(&(objectclass=user)(nextcloudUid=*))" >/dev/null
+php occ ldap:set-config "$config_id" ldapUserFilterMode "1" >/dev/null
 php occ ldap:set-config "$config_id" ldapGroupFilterObjectclass "group" >/dev/null
 php occ ldap:set-config "$config_id" ldapLoginFilter "(&(objectclass=user)(nextcloudUid=%uid))" >/dev/null
 php occ ldap:set-config "$config_id" ldapExpertUsernameAttr "nextcloudUid" >/dev/null
@@ -843,6 +845,28 @@ php occ ldap:set-config "$config_id" ldapGroupMemberAssocAttr "member" >/dev/nul
 php occ ldap:set-config "$config_id" ldapConfigurationActive "1" >/dev/null
 
 php occ ldap:test-config "$config_id"
+if ! users_json="$(php occ user:list --output=json)"; then
+  php occ ldap:set-config "$config_id" ldapConfigurationActive "0" >/dev/null || true
+  echo "Nextcloud user listing failed after LDAP activation; LDAP config was disabled again" >&2
+  exit 1
+fi
+if ! printf '%s' "$users_json" | php -r '
+  $users = json_decode(stream_get_contents(STDIN), true);
+  if (!is_array($users)) {
+    fwrite(STDERR, "Could not parse Nextcloud user list after LDAP activation\n");
+    exit(1);
+  }
+  foreach (array_keys($users) as $id) {
+    if (preg_match("/^(.+)_[0-9a-f]{4}$/i", $id, $matches) && array_key_exists($matches[1], $users)) {
+      fwrite(STDERR, "LDAP activation created duplicate Nextcloud user " . $id . " for existing user " . $matches[1] . "\n");
+      exit(1);
+    }
+  }
+'; then
+  php occ ldap:set-config "$config_id" ldapConfigurationActive "0" >/dev/null || true
+  echo "Nextcloud LDAP config was disabled again to avoid account duplication" >&2
+  exit 1
+fi
 php occ config:app:set dav system_addressbook_exposed --value="yes" >/dev/null
 php occ dav:sync-system-addressbook >/dev/null 2>&1 || true
 SH

@@ -340,6 +340,11 @@ def test_nextcloud_bootstrap_configures_authentik_ldap_directory_for_contacts():
         'php occ ldap:set-config "$config_id" ldapLoginFilter "(&(objectclass=user)(nextcloudUid=%uid))"'
         in install_text
     )
+    assert (
+        'php occ ldap:set-config "$config_id" ldapUserFilter "(&(objectclass=user)(nextcloudUid=*))"'
+        in install_text
+    )
+    assert 'php occ ldap:set-config "$config_id" ldapUserFilterMode "1"' in install_text
     assert 'php occ ldap:set-config "$config_id" ldapExpertUsernameAttr "uid"' not in install_text
     assert 'php occ ldap:set-config "$config_id" ldapExpertUUIDUserAttr "uid"' not in install_text
     assert (
@@ -349,6 +354,8 @@ def test_nextcloud_bootstrap_configures_authentik_ldap_directory_for_contacts():
     assert 'php occ ldap:set-config "$config_id" ldapGroupMemberAssocAttr "member"' in install_text
     assert 'php occ ldap:set-config "$config_id" ldapConfigurationActive "1"' in install_text
     assert 'php occ ldap:test-config "$config_id"' in install_text
+    assert "LDAP activation created duplicate Nextcloud user" in install_text
+    assert "Nextcloud LDAP config was disabled again to avoid account duplication" in install_text
     assert 'php occ config:app:set dav system_addressbook_exposed --value="yes"' in install_text
     assert "php occ dav:sync-system-addressbook" in install_text
     assert (
