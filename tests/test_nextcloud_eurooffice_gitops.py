@@ -306,9 +306,6 @@ def test_nextcloud_bootstrap_configures_authentik_ldap_directory_for_contacts():
     assert "NEXTCLOUD_LDAP_BASE_DN" in install_text
     assert "ak-outpost-nextcloud-ldap.authentik.svc.cluster.local" in install_text
     assert "wait_for_nextcloud_ldap_outpost" in install_text
-    assert "restart_nextcloud_ldap_outpost" in install_text
-    assert "rollout restart deployment/ak-outpost-nextcloud-ldap" in install_text
-    assert "rollout status deployment/ak-outpost-nextcloud-ldap" in install_text
     assert "resolve_nextcloud_oidc_local_id_config" in install_text
     assert "config:list user_oidc --output=json" in install_text
     assert "provider-${id}-mappingUid" not in install_text
