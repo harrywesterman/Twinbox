@@ -4613,10 +4613,13 @@ def test_nextcloud_cronjob_pins_to_the_app_node_for_rwo_volume():
     optional_app_text = (REPO_ROOT / "gitops" / "optional-apps" / "nextcloud.yaml").read_text(
         encoding="utf-8"
     )
+    admin_sync_cronjob_text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "nextcloud" / "admin-sync-cronjob.yaml"
+    ).read_text(encoding="utf-8")
 
     # The nextcloud-cron pod mounts the same RWO PVC as the main Nextcloud pod,
     # so it must be scheduled on the same node via podAffinity.
-    for text in (values_text, optional_app_text):
+    for text in (values_text, optional_app_text, admin_sync_cronjob_text):
         assert "affinity:" in text
         assert "podAffinity:" in text
         assert "requiredDuringSchedulingIgnoredDuringExecution" in text
@@ -4815,6 +4818,18 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
         encoding="utf-8"
     )
     optional_app_text = NEXTCLOUD_OPTIONAL_APP.read_text(encoding="utf-8")
+    sync_script_text = (REPO_ROOT / "scripts" / "manager" / "sync-nextcloud-admins.sh").read_text(
+        encoding="utf-8"
+    )
+    nextcloud_kustomization_text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "nextcloud" / "kustomization.yaml"
+    ).read_text(encoding="utf-8")
+    admin_sync_cronjob_text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "nextcloud" / "admin-sync-cronjob.yaml"
+    ).read_text(encoding="utf-8")
+    admin_sync_externalsecret_text = (
+        REPO_ROOT / "gitops" / "platform-apps" / "nextcloud" / "admin-sync-externalsecret.yaml"
+    ).read_text(encoding="utf-8")
 
     assert "gitops/optional-apps/nextcloud.yaml" in text
     assert 'bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \\' in text
@@ -4837,11 +4852,16 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert "app:enable -f oidc_groups_mapping" in text
     assert "oidc-groups:set" in text
     assert "admins-to-admin" in text
+    assert "nextcloud_groups = list(groups)" in text
+    assert '"nextcloud_groups": nextcloud_groups' in text
     assert r"tmp_dir=\"\$(mktemp -d)\"" in text
     assert "trap 'rm -rf \\\"\\$tmp_dir\\\"' EXIT" in text
     assert '\\"claimPath\\": \\"groups\\"' in text
     assert '\\"admins\\": \\"admin\\"' in text
     assert "--group-provisioning='1'" in text
+    assert "--mapping-groups='nextcloud_groups'" in text
+    assert "scripts/manager/sync-nextcloud-admins.sh" in text
+    assert 'env AUTHENTIK_API_TOKEN="$AUTHENTIK_TOKEN"' in text
     assert "config:app:set --type=string --value=1 user_oidc provider-1-groupProvisioning" in text
     assert "NEXTCLOUD_OIDC_REDIRECT_URI_PRETTY" in text
     assert "NEXTCLOUD_OIDC_LOGOUT_URI_PRETTY" in text
@@ -4871,6 +4891,23 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert "path: gitops/databases/nextcloud" in optional_app_text
     assert "name: nextcloud-well-known-redirect" in optional_app_text
     assert "name: nextcloud-db" in optional_app_text
+    assert "NEXTCLOUD_BREAK_GLASS_USER" in sync_script_text
+    assert "$userId === $breakGlassUser" in sync_script_text
+    assert "$backend !== 'user_oidc'" in sync_script_text
+    assert "group:adduser" in sync_script_text
+    assert "group:removeuser" in sync_script_text
+    assert "Authorization: Bearer " in sync_script_text
+    assert "admin-sync-externalsecret.yaml" in nextcloud_kustomization_text
+    assert "admin-sync-configmap.yaml" in nextcloud_kustomization_text
+    assert "admin-sync-cronjob.yaml" in nextcloud_kustomization_text
+    assert "kind: CronJob" in admin_sync_cronjob_text
+    assert 'schedule: "*/15 * * * *"' in admin_sync_cronjob_text
+    assert "claimName: nextcloud-nextcloud" in admin_sync_cronjob_text
+    assert "secretKeyRef:" in admin_sync_cronjob_text
+    assert "AUTHENTIK_API_TOKEN" in admin_sync_cronjob_text
+    assert "valueFrom:" in admin_sync_cronjob_text
+    assert "key: twinbox/global/authentik" in admin_sync_externalsecret_text
+    assert "property: AUTHENTIK_API_TOKEN" in admin_sync_externalsecret_text
 
 
 def test_hedgedoc_database_cluster_is_right_sized_for_current_capacity():

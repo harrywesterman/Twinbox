@@ -4,6 +4,9 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - admin-externalsecret.yaml
+  - admin-sync-externalsecret.yaml
+  - admin-sync-configmap.yaml
+  - admin-sync-cronjob.yaml
   - db-externalsecret.yaml
   - eurooffice-externalsecret.yaml
   - redis-externalsecret.yaml

@@ -41,6 +41,9 @@ def test_eurooffice_resources_are_declared_in_the_nextcloud_kustomization():
     assert kustomization["resources"] == [
         "namespace.yaml",
         "admin-externalsecret.yaml",
+        "admin-sync-externalsecret.yaml",
+        "admin-sync-configmap.yaml",
+        "admin-sync-cronjob.yaml",
         "db-externalsecret.yaml",
         "eurooffice-externalsecret.yaml",
         "redis-externalsecret.yaml",

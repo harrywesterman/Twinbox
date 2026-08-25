@@ -521,12 +521,14 @@ nextcloud_groups_mapping_id="$(upsert_scope_mapping \
   "groups" \
   "Expose Nextcloud group membership" \
   'groups = [group.name for group in request.user.ak_groups.all()]
-if ak_is_group_member(request.user, name="admins") and "admin" not in groups:
-    groups.append("admin")
-if request.user.is_superuser and "admin" not in groups:
-    groups.append("admin")
+nextcloud_groups = list(groups)
+if ak_is_group_member(request.user, name="admins") and "admin" not in nextcloud_groups:
+    nextcloud_groups.append("admin")
+if request.user.is_superuser and "admin" not in nextcloud_groups:
+    nextcloud_groups.append("admin")
 return {
     "groups": groups,
+    "nextcloud_groups": nextcloud_groups,
 }' \
 )"
 [[ -n "$nextcloud_groups_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for Nextcloud groups"
@@ -726,7 +728,7 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
     --mapping-display-name='name' \
     --mapping-email='email' \
     --mapping-uid='preferred_username' \
-    --mapping-groups='groups' \
+    --mapping-groups='nextcloud_groups' \
     --group-provisioning='1' \
     --group-restrict-login-to-whitelist='0' \
     --unique-uid='1' \
@@ -772,6 +774,18 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
       }
     ]
   }' >/dev/null
+"
+
+log "Reconciling Nextcloud admin group from Authentik admins"
+kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- \
+  env AUTHENTIK_API_TOKEN="$AUTHENTIK_TOKEN" AUTHENTIK_API_BASE="http://authentik-server.authentik.svc.cluster.local/api/v3" \
+  sh -lc "
+  set -euo pipefail
+  install -m 0755 /dev/stdin /tmp/sync-nextcloud-admins.sh <<'SYNC'
+$(cat "$WORKSPACE_ROOT/scripts/manager/sync-nextcloud-admins.sh")
+SYNC
+  su -s /bin/bash www-data -c /tmp/sync-nextcloud-admins.sh
+  rm -f /tmp/sync-nextcloud-admins.sh
 "
 
 log "Installing recommended Nextcloud apps"
