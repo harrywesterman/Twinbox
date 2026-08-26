@@ -45,8 +45,8 @@ def test_mailu_values_keep_mail_ports_internal_and_set_resources():
     assert values["front"]["hostPort"]["enabled"] is False
     assert values["front"]["externalService"]["enabled"] is False
 
-    admin_extra_env = {item["name"]: item["value"] for item in values["admin"]["extraEnvVars"]}
-    assert admin_extra_env["PORTS"] == "25,80,443,465,587,993,995,4190"
+    front_extra_env = {item["name"]: item["value"] for item in values["front"]["extraEnvVars"]}
+    assert front_extra_env["PORTS"] == "25,80,443,465,587,993,995,4190"
     assert values["authRequireTokens"] is True
     assert values["api"]["enabled"] is True
     assert values["api"]["existingSecret"] == "mailu-runtime"
