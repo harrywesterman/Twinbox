@@ -82,7 +82,7 @@ export function buildAppleMailProfile({
       <key>OutgoingMailServerPortNumber</key>
       <integer>${Number(outgoing.port)}</integer>
       <key>OutgoingMailServerUseSSL</key>
-      <true/>
+      <false/>
       <key>OutgoingMailServerUsername</key>
       <string>${escapeXml(accountEmail)}</string>
       <key>OutgoingPassword</key>

@@ -19,7 +19,7 @@ test("buildAppleMailProfile renders escaped Apple Mail plist settings", () => {
   assert.match(profile, /<key>IncomingMailServerPortNumber<\/key>\s+<integer>993<\/integer>/);
   assert.match(profile, /<key>OutgoingMailServerPortNumber<\/key>\s+<integer>587<\/integer>/);
   assert.match(profile, /<key>IncomingMailServerUseSSL<\/key>\s+<true\/>/);
-  assert.match(profile, /<key>OutgoingMailServerUseSSL<\/key>\s+<true\/>/);
+  assert.match(profile, /<key>OutgoingMailServerUseSSL<\/key>\s+<false\/>/);
   assert.match(profile, /Alex &amp; &quot;Mail&quot; &lt;User&gt;/);
   assert.match(profile, /secret &amp; &lt;token&gt; &quot;quoted&quot;/);
   assert.match(profile, /11111111-1111-4111-8111-111111111111/);
