@@ -187,11 +187,13 @@ def test_external_dns_allows_mx_records():
     assert "--managed-record-types=MX" in values["extraArgs"]
 
 
-def test_netbird_firewall_allows_public_smtp_but_not_relay_port():
+def test_netbird_firewall_allows_public_mail_client_ports_but_not_relay_port():
     firewall = (REPO_ROOT / "infra" / "opentofu" / "netbird" / "firewall.tf").read_text(
         encoding="utf-8"
     )
     assert 'port       = "25"' in firewall
+    assert 'port       = "587"' in firewall
+    assert 'port       = "993"' in firewall
     assert 'port       = "2525"' not in firewall
 
 
@@ -325,12 +327,12 @@ def test_mailu_installer_uses_private_relay_and_pre_dns_preflights():
     assert "write_mailu_tls_secret_file_from_bastion" in script
     assert "/opt/netbird/certs/wildcard/${public_zone_name}.crt" in script
     assert "/opt/netbird/certs/wildcard/${public_zone_name}.key" in script
-    assert "</dev/null >\"$cert_file\"" in script
-    assert "</dev/null >\"$key_file\"" in script
-    assert "-checkhost \"$mail_hostname\"" in script
-    assert script.index('log "Copying the NetBird wildcard TLS certificate for Mailu"') > script.index(
-        'ssh_key_file="$(write_bastion_ssh_key'
-    )
+    assert '</dev/null >"$cert_file"' in script
+    assert '</dev/null >"$key_file"' in script
+    assert '-checkhost "$mail_hostname"' in script
+    assert script.index(
+        'log "Copying the NetBird wildcard TLS certificate for Mailu"'
+    ) > script.index('ssh_key_file="$(write_bastion_ssh_key')
     assert "mailu-certificates" in script
     assert "ensure-hetzner-rdns.py" in script
     assert '--server-name "$server_name"' in script

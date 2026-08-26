@@ -20,6 +20,20 @@ resource "hcloud_firewall" "netbird" {
   rule {
     direction  = "in"
     protocol   = "tcp"
+    port       = "587"
+    source_ips = ["0.0.0.0/0", "::/0"]
+  }
+
+  rule {
+    direction  = "in"
+    protocol   = "tcp"
+    port       = "993"
+    source_ips = ["0.0.0.0/0", "::/0"]
+  }
+
+  rule {
+    direction  = "in"
+    protocol   = "tcp"
     port       = "80"
     source_ips = ["0.0.0.0/0", "::/0"]
   }
