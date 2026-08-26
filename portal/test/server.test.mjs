@@ -1172,7 +1172,7 @@ test("apple mail profile endpoint creates a session-scoped token and returns mob
   );
   assert.match(
     profile.payload,
-    /<key>OutgoingMailServerPortNumber<\/key>\s+<integer>465<\/integer>/
+    /<key>OutgoingMailServerPortNumber<\/key>\s+<integer>587<\/integer>/
   );
   assert.match(profile.payload, /<key>OutgoingMailServerUseSSL<\/key>\s+<true\/>/);
   assert.match(

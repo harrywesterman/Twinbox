@@ -39,7 +39,7 @@ export function buildAppleMailProfile({
   const outgoing = smtp || {};
   const secret = String(password || "");
   const name = String(displayName || accountEmail).trim() || accountEmail;
-  const outgoingUsesSsl = outgoing.security === "SSL/TLS";
+  const outgoingUsesSsl = Boolean(outgoing.useSsl ?? outgoing.security === "SSL/TLS");
   const identifier = `nl.twinbox.mail.${safeIdentifierPart(accountEmail)}`;
 
   if (!accountEmail || !incoming.host || !incoming.port || !outgoing.host || !outgoing.port) {
