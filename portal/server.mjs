@@ -1213,7 +1213,8 @@ app.post("/api/mail/apple-profile", async (req, res) => {
     email,
     displayName: session.name || session.preferredUsername || email,
     imap: settings.imap,
-    smtp: settings.smtp,
+    // Apple Mail profiles have no STARTTLS setting; use Mailu's implicit TLS port.
+    smtp: { ...settings.smtp, port: 465, security: "SSL/TLS" },
     password: result.token,
   });
   const filename = buildAppleMailProfileFilename(email);
