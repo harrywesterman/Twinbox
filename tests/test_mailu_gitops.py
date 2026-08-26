@@ -42,12 +42,13 @@ def test_mailu_values_keep_mail_ports_internal_and_set_resources():
     values = _load_yaml(REPO_ROOT / "gitops" / "values" / "mailu.yaml")
     assert values["mailuVersion"] == "2024.06.52"
     assert values["ingress"]["enabled"] is False
-    assert values["ingress"]["tlsFlavorOverride"] == "cert"
+    assert values["ingress"]["tlsFlavorOverride"] == "mail"
     assert values["front"]["hostPort"]["enabled"] is False
     assert values["front"]["externalService"]["enabled"] is False
 
     front_extra_env = {item["name"]: item["value"] for item in values["front"]["extraEnvVars"]}
     assert front_extra_env["PORTS"] == "25,80,443,465,587,993,995,4190"
+    assert values["front"]["podAnnotations"]["twinbox.io/mailu-front-config-revision"] == "1"
     assert values["authRequireTokens"] is True
     assert values["api"]["enabled"] is True
     assert values["api"]["existingSecret"] == "mailu-runtime"

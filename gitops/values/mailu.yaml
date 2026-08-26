@@ -51,7 +51,7 @@ externalRelay:
 ingress:
   enabled: false
   tls: false
-  tlsFlavorOverride: cert
+  tlsFlavorOverride: mail
   realIpHeader: "X-Forwarded-For"
   realIpFrom: "10.244.0.0/16"
 
@@ -62,6 +62,8 @@ proxyAuth:
 
 front:
   nodeSelector: {}
+  podAnnotations:
+    twinbox.io/mailu-front-config-revision: "1"
   extraEnvVars:
     - name: PORTS
       value: "25,80,443,465,587,993,995,4190"
