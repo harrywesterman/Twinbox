@@ -322,22 +322,26 @@ choose_mailu_storage_node() {
   printf '%s\n' "$best_node"
 }
 
-generate_mailu_tls_secret_file() {
+write_mailu_tls_secret_file_from_bastion() {
   local mail_hostname="$1"
-  local output_file="$2"
+  local public_zone_name="$2"
+  local bastion_ssh_host="$3"
+  local bastion_ssh_port="$4"
+  local bastion_ssh_user="$5"
+  local ssh_key_file="$6"
+  local output_file="$7"
   local cert_file key_file
 
   cert_file="$(mktemp "${TMPDIR:-/tmp}/mailu-cert-XXXXXX")"
   key_file="$(mktemp "${TMPDIR:-/tmp}/mailu-key-XXXXXX")"
-  openssl req -x509 \
-    -newkey rsa:2048 \
-    -nodes \
-    -sha256 \
-    -days 825 \
-    -subj "/CN=${mail_hostname}" \
-    -addext "subjectAltName=DNS:${mail_hostname}" \
-    -keyout "$key_file" \
-    -out "$cert_file" >/dev/null 2>&1
+  ssh_bastion "$bastion_ssh_host" "$bastion_ssh_port" "$bastion_ssh_user" "$ssh_key_file" \
+    "cat /opt/netbird/certs/wildcard/${public_zone_name}.crt" >"$cert_file"
+  ssh_bastion "$bastion_ssh_host" "$bastion_ssh_port" "$bastion_ssh_user" "$ssh_key_file" \
+    "cat /opt/netbird/certs/wildcard/${public_zone_name}.key" >"$key_file"
+  openssl x509 -in "$cert_file" -noout -checkhost "$mail_hostname" >/dev/null
+  cmp -s \
+    <(openssl x509 -in "$cert_file" -pubkey -noout | openssl pkey -pubin -pubout) \
+    <(openssl pkey -in "$key_file" -pubout)
   jq -n \
     --arg mail_hostname "$mail_hostname" \
     --rawfile tls_crt "$cert_file" \
@@ -804,10 +808,6 @@ api_token="$(openbao_existing_value mailu-runtime api-token)"
 admin_password="$(openbao_existing_value mailu-runtime initial-admin-password)"
 relay_username="$(openbao_existing_value mailu-relay relay-username)"
 relay_password="$(openbao_existing_value mailu-relay relay-password)"
-tls_crt="$(openbao_existing_value mailu-certificates tls.crt)"
-tls_key="$(openbao_existing_value mailu-certificates tls.key)"
-tls_cert_hostname="$(openbao_existing_value mailu-certificates mail-hostname)"
-
 [[ -n "$secret_key" ]] || secret_key="$(random_hex 24)"
 [[ -n "$api_token" ]] || api_token="$(random_hex 24)"
 if [[ -n "$admin_password_input" ]]; then
@@ -849,21 +849,10 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --json-file "$relay_secret_file" \
   --required-keys "relay-username,relay-password"
 
-if [[ -z "$tls_crt" || -z "$tls_key" || "$tls_cert_hostname" != "$mail_hostname" ]]; then
-  log "Generating internal Mailu TLS certificate"
-  generate_mailu_tls_secret_file "$mail_hostname" "$certificates_secret_file"
-else
-  jq -n \
-    --arg mail_hostname "$mail_hostname" \
-    --arg tls_crt "$tls_crt" \
-    --arg tls_key "$tls_key" \
-    '{
-      "mail-hostname": $mail_hostname,
-      "tls.crt": $tls_crt,
-      "tls.key": $tls_key
-    }' >"$certificates_secret_file"
-  chmod 600 "$certificates_secret_file"
-fi
+log "Copying the NetBird wildcard TLS certificate for Mailu"
+write_mailu_tls_secret_file_from_bastion \
+  "$mail_hostname" "$public_zone_name" "$bastion_ssh_host" "$bastion_ssh_port" \
+  "$bastion_ssh_user" "$ssh_key_file" "$certificates_secret_file"
 
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "mailu-certificates" \

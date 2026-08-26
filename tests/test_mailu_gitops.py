@@ -322,7 +322,13 @@ def test_mailu_installer_uses_private_relay_and_pre_dns_preflights():
     )
     assert "choose_mailu_storage_node" in script
     assert "twinbox.io/mailu-storage-node" in script
-    assert "generate_mailu_tls_secret_file" in script
+    assert "write_mailu_tls_secret_file_from_bastion" in script
+    assert "/opt/netbird/certs/wildcard/${public_zone_name}.crt" in script
+    assert "/opt/netbird/certs/wildcard/${public_zone_name}.key" in script
+    assert "-checkhost \"$mail_hostname\"" in script
+    assert script.index('log "Copying the NetBird wildcard TLS certificate for Mailu"') > script.index(
+        'ssh_key_file="$(write_bastion_ssh_key'
+    )
     assert "mailu-certificates" in script
     assert "ensure-hetzner-rdns.py" in script
     assert '--server-name "$server_name"' in script
