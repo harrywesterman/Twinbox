@@ -42,6 +42,7 @@ def test_mailu_values_keep_mail_ports_internal_and_set_resources():
     values = _load_yaml(REPO_ROOT / "gitops" / "values" / "mailu.yaml")
     assert values["mailuVersion"] == "2024.06.52"
     assert values["ingress"]["enabled"] is False
+    assert values["ingress"]["tlsFlavorOverride"] == "cert"
     assert values["front"]["hostPort"]["enabled"] is False
     assert values["front"]["externalService"]["enabled"] is False
 

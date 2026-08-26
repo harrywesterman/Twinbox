@@ -51,6 +51,7 @@ externalRelay:
 ingress:
   enabled: false
   tls: false
+  tlsFlavorOverride: cert
   realIpHeader: "X-Forwarded-For"
   realIpFrom: "10.244.0.0/16"
 
