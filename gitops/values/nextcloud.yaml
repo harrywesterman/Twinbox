@@ -62,6 +62,14 @@ cronjob:
           secretKeyRef:
             name: nextcloud-db-credentials
             key: password
+      TWINBOX_MAIL_DOMAIN: __ZONE_NAME__
+      TWINBOX_MAILU_API_BASE: http://mailu-front.mailu.svc.cluster.local/api/v1
+      TWINBOX_MAILU_API_TOKEN:
+        valueFrom:
+          secretKeyRef:
+            name: nextcloud-mailu-runtime
+            key: api-token
+            optional: true
 
 livenessProbe:
   enabled: true
@@ -102,6 +110,14 @@ nextcloud:
         secretKeyRef:
           name: nextcloud-db-credentials
           key: password
+    TWINBOX_MAIL_DOMAIN: __ZONE_NAME__
+    TWINBOX_MAILU_API_BASE: http://mailu-front.mailu.svc.cluster.local/api/v1
+    TWINBOX_MAILU_API_TOKEN:
+      valueFrom:
+        secretKeyRef:
+          name: nextcloud-mailu-runtime
+          key: api-token
+          optional: true
   defaultConfigs:
     .htaccess: true
     apps.config.php: true

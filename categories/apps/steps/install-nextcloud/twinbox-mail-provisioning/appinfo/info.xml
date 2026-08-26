@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+  <id>twinbox_mail_provisioning</id>
+  <name>Twinbox Mail Provisioning</name>
+  <summary>Connects Twinbox Mailu mailboxes to Nextcloud Mail for OIDC users</summary>
+  <description>Queues an idempotent Nextcloud Mail account provisioning job when a Twinbox OIDC user logs in.</description>
+  <version>1.0.0</version>
+  <licence>agpl</licence>
+  <author mail="support@twinbox.nl">Twinbox</author>
+  <namespace>TwinboxMailProvisioning</namespace>
+  <dependencies>
+    <nextcloud min-version="34" max-version="35" />
+  </dependencies>
+</info>

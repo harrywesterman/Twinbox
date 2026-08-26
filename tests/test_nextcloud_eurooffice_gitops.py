@@ -12,6 +12,9 @@ INSTALL_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-nextcloud"
 EUROOFFICE_ACTION_DIR = (
     REPO_ROOT / "categories" / "apps" / "steps" / "install-nextcloud" / "eurooffice-file-action"
 )
+MAIL_PROVISIONING_DIR = (
+    REPO_ROOT / "categories" / "apps" / "steps" / "install-nextcloud" / "twinbox-mail-provisioning"
+)
 
 
 def _docs(path):
@@ -44,6 +47,7 @@ def test_eurooffice_resources_are_declared_in_the_nextcloud_kustomization():
         "admin-sync-externalsecret.yaml",
         "admin-sync-configmap.yaml",
         "admin-sync-cronjob.yaml",
+        "mailu-runtime-externalsecret.yaml",
         "db-externalsecret.yaml",
         "eurooffice-externalsecret.yaml",
         "redis-externalsecret.yaml",
@@ -272,6 +276,9 @@ def test_nextcloud_mail_uses_per_user_mailu_tokens():
     assert "Skipping Nextcloud Mail account sync because Mailu is not installed yet" in install_text
     assert 'fail "Nextcloud Mail account sync failed for ${failed} user(s)"' in install_text
     assert "mailu_create_auth_token" in install_text
+    assert "MAILU_API_TOKEN" in install_text
+    assert "Authorization: Bearer ${MAILU_API_TOKEN}" in install_text
+    assert "Authorization: Bearer ${API_TOKEN}" not in install_text
     assert "/tokenuser/" in install_text
     assert "Nextcloud Mail" in install_text
     assert "nextcloud_user_id_for_mail_account" in install_text
@@ -291,6 +298,91 @@ def test_nextcloud_mail_uses_per_user_mailu_tokens():
     assert " 587 tls " not in install_text
     assert "mail:account:export" in install_text
     assert "masterPassword" not in install_text
+
+
+def test_nextcloud_mail_provisioning_app_is_installed_and_listens_for_oidc_login():
+    install_text = INSTALL_STEP.read_text(encoding="utf-8")
+    metadata = MAIL_PROVISIONING_DIR / "appinfo" / "info.xml"
+    application = MAIL_PROVISIONING_DIR / "lib" / "AppInfo" / "Application.php"
+    listener = MAIL_PROVISIONING_DIR / "lib" / "Listener" / "UserLoggedInListener.php"
+    job = MAIL_PROVISIONING_DIR / "lib" / "BackgroundJob" / "ProvisionMailAccountJob.php"
+    provisioner = MAIL_PROVISIONING_DIR / "lib" / "Service" / "MailAccountProvisioner.php"
+    mailu_client = MAIL_PROVISIONING_DIR / "lib" / "Service" / "MailuClient.php"
+
+    assert metadata.exists()
+    assert "<id>twinbox_mail_provisioning</id>" in metadata.read_text(encoding="utf-8")
+    application_text = application.read_text(encoding="utf-8")
+    assert "UserLoggedInEvent::class" in application_text
+    assert "UserLoggedInListener::class" in application_text
+
+    listener_text = listener.read_text(encoding="utf-8")
+    assert "class UserLoggedInListener implements IEventListener" in listener_text
+    assert "IJobList" in listener_text
+    assert "ProvisionMailAccountJob::class" in listener_text
+    assert "TWINBOX_MAIL_DOMAIN" in listener_text
+    assert "getBackendClassName()" in listener_text
+    assert "user_oidc" in listener_text
+
+    job_text = job.read_text(encoding="utf-8")
+    assert "extends QueuedJob" in job_text
+    assert "parent::__construct($time)" in job_text
+    assert "MailAccountProvisioner" in job_text
+    assert "'exception' => $error" in job_text
+
+    provisioner_text = provisioner.read_text(encoding="utf-8")
+    assert "mail:account:export" in provisioner_text
+    assert "mail:account:create" in provisioner_text
+    assert "mailu-dovecot.mailu.svc.cluster.local" in provisioner_text
+    assert "mailu-front.mailu.svc.cluster.local" in provisioner_text
+    assert "10025" in provisioner_text
+    assert "993" not in provisioner_text
+    assert "587" not in provisioner_text
+
+    mailu_client_text = mailu_client.read_text(encoding="utf-8")
+    assert "TWINBOX_MAILU_API_BASE" in mailu_client_text
+    assert "TWINBOX_MAILU_API_TOKEN" in mailu_client_text
+    assert "/tokenuser/" in mailu_client_text
+    assert "Nextcloud Mail" in mailu_client_text
+
+    assert "twinbox-mail-provisioning" in install_text
+    assert "twinbox_mail_provisioning" in install_text
+    assert "php occ app:enable twinbox_mail_provisioning" in install_text
+
+
+def test_nextcloud_mail_provisioning_app_has_mailu_secret_wiring():
+    kustomization = yaml.safe_load(
+        (PLATFORM_DIR / "kustomization.yaml").read_text(encoding="utf-8")
+    )
+    external_secret = _resource("ExternalSecret", "nextcloud-mailu-runtime")
+    values = yaml.safe_load(NEXTCLOUD_VALUES.read_text(encoding="utf-8"))
+    optional_text = OPTIONAL_APP.read_text(encoding="utf-8")
+
+    assert "mailu-runtime-externalsecret.yaml" in kustomization["resources"]
+    assert external_secret["spec"]["target"]["name"] == "nextcloud-mailu-runtime"
+    assert external_secret["spec"]["data"] == [
+        {
+            "secretKey": "api-token",
+            "remoteRef": {
+                "key": "twinbox/global/mailu-runtime",
+                "property": "api-token",
+            },
+        }
+    ]
+
+    nextcloud_env = values["nextcloud"]["env"]
+    cron_env = values["cronjob"]["cronjob"]["env"]
+    for env in (nextcloud_env, cron_env):
+        assert env["TWINBOX_MAIL_DOMAIN"] == "__ZONE_NAME__"
+        assert env["TWINBOX_MAILU_API_BASE"] == "http://mailu-front.mailu.svc.cluster.local/api/v1"
+        assert env["TWINBOX_MAILU_API_TOKEN"]["valueFrom"]["secretKeyRef"] == {
+            "name": "nextcloud-mailu-runtime",
+            "key": "api-token",
+            "optional": True,
+        }
+
+    assert "TWINBOX_MAIL_DOMAIN: '{{index .metadata.annotations" in optional_text
+    assert "TWINBOX_MAILU_API_TOKEN:" in optional_text
+    assert "name: nextcloud-mailu-runtime" in optional_text
 
 
 def test_twinbox_companion_keeps_collabora_as_the_default_direct_editor():

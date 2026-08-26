@@ -4900,6 +4900,7 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert "admin-sync-externalsecret.yaml" in nextcloud_kustomization_text
     assert "admin-sync-configmap.yaml" in nextcloud_kustomization_text
     assert "admin-sync-cronjob.yaml" in nextcloud_kustomization_text
+    assert "mailu-runtime-externalsecret.yaml" in nextcloud_kustomization_text
     assert "kind: CronJob" in admin_sync_cronjob_text
     assert 'schedule: "*/15 * * * *"' in admin_sync_cronjob_text
     assert "claimName: nextcloud-nextcloud" in admin_sync_cronjob_text

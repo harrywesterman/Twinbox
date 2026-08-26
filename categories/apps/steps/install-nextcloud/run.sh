@@ -247,14 +247,14 @@ printf '%s' "${MAILU_API_BODY_B64}" | base64 -d >"$body_file"
 if [ -s "$body_file" ]; then
   status="$(curl -sS -o "$response_file" -w '%{http_code}' \
     -X "${MAILU_API_METHOD}" \
-    -H "Authorization: Bearer ${API_TOKEN}" \
+    -H "Authorization: Bearer ${MAILU_API_TOKEN}" \
     -H "Content-Type: application/json" \
     --data-binary "@${body_file}" \
     "${api_base}${MAILU_API_PATH}" || echo "000")"
 else
   status="$(curl -sS -o "$response_file" -w '%{http_code}' \
     -X "${MAILU_API_METHOD}" \
-    -H "Authorization: Bearer ${API_TOKEN}" \
+    -H "Authorization: Bearer ${MAILU_API_TOKEN}" \
     "${api_base}${MAILU_API_PATH}" || echo "000")"
   fi
 printf 'STATUS:%s\n' "$status"
@@ -856,6 +856,19 @@ tar -C "$WORKSPACE_ROOT/categories/apps/steps/install-nextcloud" -cf - eurooffic
   '
 kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
   "php occ app:enable twinbox_eurooffice_action >/dev/null"
+
+log "Installing Twinbox Mail provisioning app"
+tar -C "$WORKSPACE_ROOT/categories/apps/steps/install-nextcloud" -cf - twinbox-mail-provisioning \
+  | kubectl exec -i -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc '
+    set -eu
+    cd /var/www/html/custom_apps
+    rm -rf twinbox_mail_provisioning
+    tar -xf -
+    mv twinbox-mail-provisioning twinbox_mail_provisioning
+    chown -R www-data:www-data twinbox_mail_provisioning
+  '
+kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
+  "php occ app:enable twinbox_mail_provisioning >/dev/null"
 
 log "Configuring Nextcloud Talk STUN/TURN servers"
 kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
