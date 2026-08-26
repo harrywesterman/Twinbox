@@ -335,9 +335,9 @@ write_mailu_tls_secret_file_from_bastion() {
   cert_file="$(mktemp "${TMPDIR:-/tmp}/mailu-cert-XXXXXX")"
   key_file="$(mktemp "${TMPDIR:-/tmp}/mailu-key-XXXXXX")"
   ssh_bastion "$bastion_ssh_host" "$bastion_ssh_port" "$bastion_ssh_user" "$ssh_key_file" \
-    "cat /opt/netbird/certs/wildcard/${public_zone_name}.crt" >"$cert_file"
+    "cat /opt/netbird/certs/wildcard/${public_zone_name}.crt" </dev/null >"$cert_file"
   ssh_bastion "$bastion_ssh_host" "$bastion_ssh_port" "$bastion_ssh_user" "$ssh_key_file" \
-    "cat /opt/netbird/certs/wildcard/${public_zone_name}.key" >"$key_file"
+    "cat /opt/netbird/certs/wildcard/${public_zone_name}.key" </dev/null >"$key_file"
   openssl x509 -in "$cert_file" -noout -checkhost "$mail_hostname" >/dev/null
   cmp -s \
     <(openssl x509 -in "$cert_file" -pubkey -noout | openssl pkey -pubin -pubout) \
