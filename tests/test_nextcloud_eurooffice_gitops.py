@@ -44,9 +44,6 @@ def test_eurooffice_resources_are_declared_in_the_nextcloud_kustomization():
     assert kustomization["resources"] == [
         "namespace.yaml",
         "admin-externalsecret.yaml",
-        "admin-sync-externalsecret.yaml",
-        "admin-sync-configmap.yaml",
-        "admin-sync-cronjob.yaml",
         "mailu-runtime-externalsecret.yaml",
         "db-externalsecret.yaml",
         "eurooffice-externalsecret.yaml",
@@ -230,7 +227,7 @@ def test_nextcloud_installed_status_check_targets_the_app_pod_not_the_cron_pod()
     install_text = INSTALL_STEP.read_text(encoding="utf-8")
 
     assert (
-        install_text.count("app.kubernetes.io/name=nextcloud,app.kubernetes.io/component=app") == 2
+        install_text.count("app.kubernetes.io/name=nextcloud,app.kubernetes.io/component=app") >= 2
     )
     assert "get pods -l app.kubernetes.io/name=nextcloud -o jsonpath" not in install_text
 

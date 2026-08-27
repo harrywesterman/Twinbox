@@ -11,6 +11,8 @@ source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
 source "$WORKSPACE_ROOT/scripts/manager/openbao-secret-sync.sh"
 # shellcheck disable=SC1091
 source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/config/pinned-defaults.sh"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
@@ -289,6 +291,209 @@ nextcloud_occ() {
   kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c "cd /var/www/html && php occ $*"
 }
 
+install_nextcloud_scim() {
+  local pod installed_version release_url temp_dir tarball archive_list archive_entry actual_version
+
+  : "${PINNED_NEXTCLOUD_SCIM_SP_VERSION:?missing PINNED_NEXTCLOUD_SCIM_SP_VERSION}"
+  : "${PINNED_NEXTCLOUD_SCIM_SP_SHA256:?missing PINNED_NEXTCLOUD_SCIM_SP_SHA256}"
+  [[ "$PINNED_NEXTCLOUD_SCIM_SP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || \
+    fail "Invalid PINNED_NEXTCLOUD_SCIM_SP_VERSION: $PINNED_NEXTCLOUD_SCIM_SP_VERSION"
+  [[ "$PINNED_NEXTCLOUD_SCIM_SP_SHA256" =~ ^[0-9a-f]{64}$ ]] || \
+    fail "Invalid PINNED_NEXTCLOUD_SCIM_SP_SHA256"
+
+  pod="$(kubectl -n nextcloud get pod -l app.kubernetes.io/name=nextcloud,app.kubernetes.io/component=app -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+  [[ -n "$pod" ]] || fail "Could not determine the Nextcloud pod for scim_sp installation"
+  installed_version="$(
+    kubectl exec -n nextcloud "$pod" -c nextcloud -- php /var/www/html/occ app:list --output=json 2>/dev/null |
+      jq -r '.enabled.scim_sp // .disabled.scim_sp // empty' || true
+  )"
+  if [[ "$installed_version" == "$PINNED_NEXTCLOUD_SCIM_SP_VERSION" ]]; then
+    log "scim_sp $installed_version is already installed"
+    kubectl exec -n nextcloud "$pod" -c nextcloud -- \
+      php /var/www/html/occ app:enable -f scim_sp >/dev/null
+    return 0
+  fi
+
+  release_url="https://github.com/harrywesterman/nextcloud-scim-sp/releases/download/v${PINNED_NEXTCLOUD_SCIM_SP_VERSION}/scim_sp.tar.gz"
+  temp_dir="$(mktemp -d)"
+  tarball="$temp_dir/scim_sp.tar.gz"
+  log "Downloading pinned scim_sp v${PINNED_NEXTCLOUD_SCIM_SP_VERSION} release"
+  if ! curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location --retry 3 \
+    --output "$tarball" "$release_url"; then
+    rm -rf "$temp_dir"
+    fail "Could not download pinned scim_sp release"
+  fi
+  if ! printf '%s  %s\n' "$PINNED_NEXTCLOUD_SCIM_SP_SHA256" "$tarball" | sha256sum -c - >/dev/null; then
+    rm -rf "$temp_dir"
+    fail "scim_sp release checksum verification failed"
+  fi
+  archive_list="$temp_dir/archive.list"
+  if ! tar -tzf "$tarball" >"$archive_list" || [[ ! -s "$archive_list" ]]; then
+    rm -rf "$temp_dir"
+    fail "scim_sp release is not a readable non-empty tarball"
+  fi
+  while IFS= read -r archive_entry; do
+    if [[ -z "$archive_entry" || "$archive_entry" != scim_sp/* || "$archive_entry" == /* || "$archive_entry" == *"../"* ]]; then
+      rm -rf "$temp_dir"
+      fail "scim_sp release contains an unsafe archive path"
+    fi
+  done <"$archive_list"
+
+  log "Installing scim_sp $PINNED_NEXTCLOUD_SCIM_SP_VERSION into the Nextcloud PVC"
+  kubectl cp "$tarball" "nextcloud/$pod:/tmp/scim_sp.tar.gz" -c nextcloud >/dev/null
+  # The inner variables belong to the shell running inside the Nextcloud pod.
+  # shellcheck disable=SC2016
+  if ! kubectl exec -n nextcloud "$pod" -c nextcloud -- \
+    env EXPECTED_SCIM_VERSION="$PINNED_NEXTCLOUD_SCIM_SP_VERSION" sh -lc '
+    set -euo pipefail
+    apps_dir=/var/www/html/custom_apps
+    staging_dir="$apps_dir/.scim_sp.next"
+    previous_dir="$apps_dir/.scim_sp.previous"
+    rm -rf "$staging_dir" "$previous_dir"
+    mkdir -p "$staging_dir"
+    tar -xzf /tmp/scim_sp.tar.gz -C "$staging_dir" --strip-components=1
+    test -f "$staging_dir/appinfo/info.xml"
+    grep -Fq "<version>${EXPECTED_SCIM_VERSION}</version>" "$staging_dir/appinfo/info.xml"
+    chown -R www-data:www-data "$staging_dir"
+    if [ -d "$apps_dir/scim_sp" ]; then
+      mv "$apps_dir/scim_sp" "$previous_dir"
+    fi
+    mv "$staging_dir" "$apps_dir/scim_sp"
+    if ! su -s /bin/bash www-data -c "cd /var/www/html && php occ upgrade --no-interaction && php occ app:enable -f scim_sp" >/dev/null; then
+      rm -rf "$apps_dir/scim_sp"
+      if [ -d "$previous_dir" ]; then
+        mv "$previous_dir" "$apps_dir/scim_sp"
+      fi
+      exit 1
+    fi
+    rm -rf "$previous_dir"
+    rm -f /tmp/scim_sp.tar.gz
+  '; then
+    rm -rf "$temp_dir"
+    fail "Could not install scim_sp in Nextcloud"
+  fi
+  rm -rf "$temp_dir"
+
+  kubectl -n nextcloud rollout restart deployment/nextcloud >/dev/null
+  wait_for_deployment_rollout nextcloud nextcloud "Nextcloud after scim_sp update"
+  pod="$(kubectl -n nextcloud get pod -l app.kubernetes.io/name=nextcloud,app.kubernetes.io/component=app -o jsonpath='{.items[0].metadata.name}')"
+  actual_version="$(
+    kubectl exec -n nextcloud "$pod" -c nextcloud -- php /var/www/html/occ app:list --output=json |
+      jq -r '.enabled.scim_sp // empty'
+  )"
+  [[ "$actual_version" == "$PINNED_NEXTCLOUD_SCIM_SP_VERSION" ]] || \
+    fail "scim_sp version mismatch after installation: expected $PINNED_NEXTCLOUD_SCIM_SP_VERSION, got ${actual_version:-missing}"
+  log "scim_sp $actual_version installed and enabled"
+}
+
+provision_nextcloud_scim() {
+  local pod scim_url existing_scim_token scim_token user_mapping_pk group_mapping_pk trusted_domain
+
+  pod="$(kubectl -n nextcloud get pod -l app.kubernetes.io/name=nextcloud,app.kubernetes.io/component=app -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+  [[ -n "$pod" ]] || fail "Could not determine the Nextcloud pod for SCIM provisioning"
+
+  log "Provisioning Authentik for the installed scim_sp app"
+
+  # Ensure the in-cluster SCIM URL host is a trusted domain.
+  scim_url="http://nextcloud.nextcloud.svc.cluster.local:8080/index.php/apps/scim_sp/scim/v2"
+  for trusted_domain in nextcloud.nextcloud.svc.cluster.local nextcloud.nextcloud.svc.cluster.local:8080; do
+    if ! kubectl exec -n nextcloud "$pod" -c nextcloud -- php /var/www/html/occ config:system:get trusted_domains 2>/dev/null | grep -Fxq "$trusted_domain"; then
+      local td_idx
+      td_idx="$(kubectl exec -n nextcloud "$pod" -c nextcloud -- php /var/www/html/occ config:system:get trusted_domains 2>/dev/null | grep -c . || true)"
+      kubectl exec -n nextcloud "$pod" -c nextcloud -- php /var/www/html/occ \
+        config:system:set trusted_domains "$td_idx" --value="$trusted_domain" >/dev/null
+    fi
+  done
+
+  # SCIM token: read or create twinbox/global/nextcloud-scim in OpenBao.
+  existing_scim_token="$(openbao_read_global_secret_json nextcloud-scim 2>/dev/null | jq -r '.NEXTCLOUD_SCIM_TOKEN // empty' || true)"
+  if [[ -n "$existing_scim_token" ]]; then
+    scim_token="$existing_scim_token"
+    log "Reusing NEXTCLOUD_SCIM_TOKEN from OpenBao twinbox/global/nextcloud-scim"
+  else
+    scim_token="$(openssl rand -hex 48)"
+    (
+      local scim_token_file
+      scim_token_file="$(mktemp)"
+      trap 'rm -f "$scim_token_file"' EXIT
+      jq -n --arg token "$scim_token" '{NEXTCLOUD_SCIM_TOKEN: $token}' >"$scim_token_file"
+      bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+        --secret-name "nextcloud-scim" \
+        --json-file "$scim_token_file" \
+        --required-keys "NEXTCLOUD_SCIM_TOKEN"
+    )
+    log "Generated NEW NEXTCLOUD_SCIM_TOKEN -> OpenBao twinbox/global/nextcloud-scim"
+  fi
+
+  # Set the scim_sp token in Nextcloud (idempotent).
+  printf '%s' "$scim_token" | kubectl exec -i -n nextcloud "$pod" -c nextcloud -- \
+    php /var/www/html/occ scim_sp:token:set authentik --token-stdin >/dev/null
+  log "scim_sp token 'authentik' set in Nextcloud"
+
+  # Default SCIM property mappings (by name).
+  user_mapping_pk="$(authentik_api_get "/propertymappings/provider/scim/?page_size=100" | jq -r --arg n 'authentik default SCIM Mapping: User' '.results | map(select(.name == $n)) | .[0].pk // empty')"
+  group_mapping_pk="$(authentik_api_get "/propertymappings/provider/scim/?page_size=100" | jq -r --arg n 'authentik default SCIM Mapping: Group' '.results | map(select(.name == $n)) | .[0].pk // empty')"
+  [[ -n "$user_mapping_pk" ]] || fail "Default SCIM User property mapping not found by name"
+  [[ -n "$group_mapping_pk" ]] || fail "Default SCIM Group property mapping not found by name"
+
+  # Create or reconcile the "Nextcloud SCIM" provider.
+  local provider_json provider_pk app_json app_pk app_primary final_bc sync_baseline
+  provider_json="$(
+    jq -c -n \
+      --arg name "Nextcloud SCIM" \
+      --arg url "$scim_url" \
+      --arg token "$scim_token" \
+      --arg um "$user_mapping_pk" \
+      --arg gm "$group_mapping_pk" \
+      '{name: $name, url: $url, token: $token, compatibility_mode: "default", exclude_users_service_account: true, property_mappings: [$um], property_mappings_group: [$gm]}'
+  )"
+  provider_pk="$(authentik_api_get "/providers/scim/?page_size=100" | jq -r --arg n 'Nextcloud SCIM' '.results | map(select(.name == $n)) | .[0].pk // empty')"
+  if [[ -z "$provider_pk" ]]; then
+    provider_pk="$(authentik_api_write POST "/providers/scim/" "$provider_json" | jq -r '.pk')"
+    log "Created Authentik SCIM provider 'Nextcloud SCIM' (pk $provider_pk)"
+  else
+    authentik_api_write PATCH "/providers/scim/${provider_pk}/" "$provider_json" >/dev/null
+    log "Reconciled Authentik SCIM provider 'Nextcloud SCIM' (pk $provider_pk)"
+  fi
+
+  # Bind as backchannel on the nextcloud application, preserving the OIDC primary.
+  app_json="$(authentik_api_get "/core/applications/nextcloud/")"
+  app_pk="$(jq -r '.pk' <<<"$app_json")"
+  app_primary="$(jq -r '.provider' <<<"$app_json")"
+  if jq -e --argjson pk "$provider_pk" '.backchannel_providers | index($pk)' <<<"$app_json" >/dev/null 2>&1; then
+    log "SCIM provider $provider_pk already bound as backchannel on application $app_pk"
+  else
+    final_bc="$(jq -c --argjson add "$provider_pk" '.backchannel_providers + [$add] | unique' <<<"$app_json")"
+    authentik_api_write PATCH "/core/applications/${app_pk}/" "{\"backchannel_providers\": ${final_bc}}" >/dev/null
+    log "Bound SCIM provider $provider_pk as backchannel on application $app_pk (primary provider $app_primary untouched)"
+  fi
+
+  # admins -> admin group map (protected break-glass 'admin' is never removed).
+  kubectl exec -n nextcloud "$pod" -c nextcloud -- \
+    php /var/www/html/occ scim_sp:group-map:set admins admin --allow-protected >/dev/null
+  log "SCIM group-map set: admins -> admin (allow-protected)"
+
+  # Trigger a full sync and wait for confirmation.
+  sync_baseline="$(authentik_api_get "/providers/scim/${provider_pk}/sync/status/" | jq -r '.last_successful_sync // "none"')"
+  log "Triggering SCIM sync (baseline last_successful_sync=$sync_baseline)"
+  if ! timeout 90 kubectl exec -n authentik deploy/authentik-worker -- ak scim_sync "Nextcloud SCIM" >/dev/null 2>&1; then
+    kubectl exec -n authentik deploy/authentik-worker -- ak shell -c \
+      "from authentik.providers.scim.models import SCIMProvider; p = SCIMProvider.objects.get(pk=${provider_pk}); [s.send() for s in p.schedules.all()]" >/dev/null 2>&1
+    log "SCIM sync dispatched via schedule.send() (ak scim_sync get_result unavailable)"
+  fi
+  for _ in $(seq 1 45); do
+    local sync_status sync_last
+    sync_status="$(authentik_api_get "/providers/scim/${provider_pk}/sync/status/" 2>/dev/null || true)"
+    sync_last="$(jq -r '.last_successful_sync // "none"' <<<"$sync_status" 2>/dev/null || echo none)"
+    if [[ "$sync_last" != "none" && "$sync_last" != "$sync_baseline" ]]; then
+      log "SCIM sync completed: last_successful_sync=$sync_last"
+      return 0
+    fi
+    sleep 2
+  done
+  fail "SCIM sync not confirmed complete within 90s"
+}
+
 nextcloud_user_exists() {
   local username="$1"
   kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
@@ -433,7 +638,6 @@ authentik_ensure_token
 authentik_setup_forward
 
 AUTHENTIK_HOST="${AUTHENTIK_HOST:-https://authentik.${public_zone_name}}"
-oidc_groups_mapping_release_url="https://github.com/strobelpierre/nextcloud_oidc_groups_mapping/releases/latest/download/oidc_groups_mapping.tar.gz"
 
 existing_nextcloud_secret_json=""
 if command -v openbao_read_global_secret_json >/dev/null 2>&1; then
@@ -729,64 +933,22 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
     --mapping-email='email' \
     --mapping-uid='preferred_username' \
     --mapping-groups='nextcloud_groups' \
-    --group-provisioning='1' \
+    --group-provisioning='0' \
     --group-restrict-login-to-whitelist='0' \
     --unique-uid='1' \
     --check-bearer='0' \
     --bearer-provisioning='0' \
     --send-id-token-hint='1' \
     --resolve-nested-claims='1'
-  # user_oidc does not always persist the provider's group provisioning toggle
-  # through the provider CLI, so write the app config explicitly as well.
-  php occ config:app:set --type=string --value=1 user_oidc provider-1-groupProvisioning
+  php occ config:app:set --type=string --value=0 user_oidc provider-1-groupProvisioning
+  php occ app:disable oidc_groups_mapping >/dev/null 2>&1 || true
 "
 
-log "Installing Nextcloud OIDC groups mapping"
-kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
-  set -euo pipefail
-  cd /var/www/html
+install_nextcloud_scim
 
-  if [[ ! -d custom_apps/oidc_groups_mapping/appinfo ]]; then
-    tmp_dir=\"\$(mktemp -d)\"
-    trap 'rm -rf \"\$tmp_dir\"' EXIT
-    wget -qO \"\$tmp_dir/oidc_groups_mapping.tar.gz\" '${oidc_groups_mapping_release_url}'
-    tar -xzf \"\$tmp_dir/oidc_groups_mapping.tar.gz\" -C \"\$tmp_dir\"
-    rm -rf custom_apps/oidc_groups_mapping
-    mv \"\$tmp_dir/oidc_groups_mapping\" custom_apps/oidc_groups_mapping
-  fi
-
-  php occ app:enable -f oidc_groups_mapping >/dev/null
-  php occ oidc-groups:set '{
-    \"version\": 1,
-    \"mode\": \"additive\",
-    \"rules\": [
-      {
-        \"id\": \"admins-to-admin\",
-        \"type\": \"map\",
-        \"enabled\": true,
-        \"claimPath\": \"groups\",
-        \"config\": {
-          \"values\": {
-            \"admins\": \"admin\"
-          },
-          \"unmappedPolicy\": \"ignore\"
-        }
-      }
-    ]
-  }' >/dev/null
-"
-
-log "Reconciling Nextcloud admin group from Authentik admins"
-kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- \
-  env AUTHENTIK_API_TOKEN="$AUTHENTIK_TOKEN" AUTHENTIK_API_BASE="http://authentik-server.authentik.svc.cluster.local/api/v3" \
-  sh -lc "
-  set -euo pipefail
-  install -m 0755 /dev/stdin /tmp/sync-nextcloud-admins.sh <<'SYNC'
-$(cat "$WORKSPACE_ROOT/scripts/manager/sync-nextcloud-admins.sh")
-SYNC
-  su -s /bin/bash www-data -c /tmp/sync-nextcloud-admins.sh
-  rm -f /tmp/sync-nextcloud-admins.sh
-"
+log "Provisioning SCIM group ownership (scim_sp)"
+# SCIM (scim_sp) is the single writer for Nextcloud groups from now on.
+provision_nextcloud_scim
 
 log "Installing recommended Nextcloud apps"
 kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
