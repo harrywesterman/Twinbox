@@ -275,6 +275,7 @@ def test_nextcloud_mail_uses_per_user_mailu_tokens():
     assert "mailu_create_auth_token" in install_text
     assert "MAILU_API_TOKEN" in install_text
     assert 'env MAILU_API_TOKEN="$api_token"' in install_text
+    assert "kubectl exec -i -n mailu deploy/mailu-admin -c admin" in install_text
     assert "Authorization: Bearer ${MAILU_API_TOKEN}" in install_text
     assert "Authorization: Bearer ${API_TOKEN}" not in install_text
     assert "/tokenuser/" in install_text
