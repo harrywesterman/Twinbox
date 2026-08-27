@@ -477,9 +477,10 @@ provision_nextcloud_scim() {
   sync_baseline="$(authentik_api_get "/providers/scim/${provider_pk}/sync/status/" | jq -r '.last_successful_sync // "none"')"
   log "Triggering SCIM sync (baseline last_successful_sync=$sync_baseline)"
   if ! timeout 90 kubectl exec -n authentik deploy/authentik-worker -- ak scim_sync "Nextcloud SCIM" >/dev/null 2>&1; then
-    kubectl exec -n authentik deploy/authentik-worker -- ak shell -c \
-      "from authentik.providers.scim.models import SCIMProvider; p = SCIMProvider.objects.get(pk=${provider_pk}); [s.send() for s in p.schedules.all()]" >/dev/null 2>&1
-    log "SCIM sync dispatched via schedule.send() (ak scim_sync get_result unavailable)"
+    # Current Authentik releases enqueue the task successfully but can exit 1
+    # afterwards when the CLI result backend raises ResultMissing. The status
+    # endpoint below is the authoritative completion check.
+    log "SCIM sync command returned before a result was available; waiting for provider status"
   fi
   for _ in $(seq 1 45); do
     local sync_status sync_last
