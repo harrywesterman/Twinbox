@@ -238,7 +238,7 @@ mailu_api_request() {
 
   body_b64="$(printf '%s' "$body" | base64 | tr -d '\n')"
   if ! output="$(kubectl exec -n mailu deploy/mailu-admin -c admin -- \
-    env MAILU_API_METHOD="$method" MAILU_API_PATH="$path" MAILU_API_BODY_B64="$body_b64" \
+    env MAILU_API_TOKEN="$api_token" MAILU_API_METHOD="$method" MAILU_API_PATH="$path" MAILU_API_BODY_B64="$body_b64" \
     sh -s <<'SH'
 set -eu
 api_base="http://127.0.0.1:8080/api/v1"
