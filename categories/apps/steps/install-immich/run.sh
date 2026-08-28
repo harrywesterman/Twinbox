@@ -252,6 +252,38 @@ ensure_group_binding() {
   authentik_api_write POST "/policies/bindings/" "$binding_payload" >/dev/null
 }
 
+ensure_policy_binding() {
+  local target_uuid="$1"
+  local policy_id="$2"
+  local binding_payload existing_pk
+
+  binding_payload="$(
+    jq -n \
+      --arg target_uuid "$target_uuid" \
+      --arg policy_id "$policy_id" \
+      '{target: $target_uuid, policy: $policy_id, order: 0, enabled: true}'
+  )"
+
+  existing_pk="$(authentik_api_get "/policies/bindings/?page_size=200" | jq -r --arg target_uuid "$target_uuid" --arg policy_id "$policy_id" '.results[]? | select((.target // "") == $target_uuid and (.policy // "") == $policy_id) | .pk // .id // empty' | head -n1)"
+  if [[ -n "$existing_pk" ]]; then
+    authentik_api_write PATCH "/policies/bindings/${existing_pk}/" "$binding_payload" >/dev/null
+    return 0
+  fi
+
+  authentik_api_write POST "/policies/bindings/" "$binding_payload" >/dev/null
+}
+
+find_or_create_allow_all_policy() {
+  local policy_pk
+  policy_pk="$(authentik_api_get "/policies/expression/?page_size=200" | jq -r '.results[]? | select(.name == "allow-all-authenticated") | .pk // empty' | head -n1)"
+  if [[ -n "$policy_pk" ]]; then
+    printf '%s\n' "$policy_pk"
+    return 0
+  fi
+
+  authentik_api_write POST "/policies/expression/" '{"name":"allow-all-authenticated","execution_logging":false,"expression":"return True"}' | jq -r '.pk // empty'
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
@@ -498,6 +530,7 @@ application_json="$(find_application_json_by_slug "immich")"
 application_uuid="$(jq -r '.pk // .uuid // .id // empty' <<<"$application_json")"
 [[ -n "$application_uuid" ]] || fail "Could not determine Authentik application UUID for Immich"
 ensure_group_binding "$application_uuid" "$admins_group_id"
+ensure_policy_binding "$application_uuid" "$(find_or_create_allow_all_policy)"
 
 log "Writing Immich bootstrap secret to OpenBao"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
