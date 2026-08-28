@@ -4367,6 +4367,16 @@ def test_pixelfed_manifests_use_postgresql_and_longhorn_storage():
     assert "PF_OIDC_LOGOUT_URL" in deployment_text
     assert "- horizon" in workers_text
     assert "- schedule:work" in workers_text
+    assert "mountPath: /var/www/storage" in deployment_text
+    assert "mountPath: /var/www/bootstrap/cache" in deployment_text
+    assert "mountPath: /var/www/storage" in workers_text
+    assert "mountPath: /var/www/bootstrap/cache" in workers_text
+    assert "/var/www/html/storage" not in deployment_text
+    assert "/var/www/html/storage" not in workers_text
+    assert "fsGroup: 33" in deployment_text
+    assert workers_text.count("fsGroup: 33") == 2
+    assert deployment_text.count("emptyDir: {}") == 1
+    assert workers_text.count("emptyDir: {}") == 2
     assert "name: pixelfed-bootstrap" in externalsecret_text
     assert "secretKey: APP_KEY" in externalsecret_text
     assert "property: APP_KEY" in externalsecret_text

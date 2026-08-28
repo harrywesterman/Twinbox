@@ -17,6 +17,9 @@ spec:
       labels:
         app.kubernetes.io/name: pixelfed-worker
     spec:
+      securityContext:
+        fsGroup: 33
+        fsGroupChangePolicy: OnRootMismatch
       affinity:
         podAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -175,16 +178,15 @@ spec:
             timeoutSeconds: 10
           volumeMounts:
             - name: pixelfed-data
-              mountPath: /var/www/html/storage
+              mountPath: /var/www/storage
             - name: pixelfed-cache
-              mountPath: /var/www/html/bootstrap/cache
+              mountPath: /var/www/bootstrap/cache
       volumes:
         - name: pixelfed-data
           persistentVolumeClaim:
             claimName: pixelfed-data
         - name: pixelfed-cache
-          persistentVolumeClaim:
-            claimName: pixelfed-data
+          emptyDir: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -205,6 +207,9 @@ spec:
       labels:
         app.kubernetes.io/name: pixelfed-scheduler
     spec:
+      securityContext:
+        fsGroup: 33
+        fsGroupChangePolicy: OnRootMismatch
       affinity:
         podAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -345,13 +350,12 @@ spec:
               value: 01-permissions.sh
           volumeMounts:
             - name: pixelfed-data
-              mountPath: /var/www/html/storage
+              mountPath: /var/www/storage
             - name: pixelfed-cache
-              mountPath: /var/www/html/bootstrap/cache
+              mountPath: /var/www/bootstrap/cache
       volumes:
         - name: pixelfed-data
           persistentVolumeClaim:
             claimName: pixelfed-data
         - name: pixelfed-cache
-          persistentVolumeClaim:
-            claimName: pixelfed-data
+          emptyDir: {}

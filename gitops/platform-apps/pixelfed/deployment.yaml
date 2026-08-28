@@ -17,6 +17,9 @@ spec:
       labels:
         app.kubernetes.io/name: pixelfed
     spec:
+      securityContext:
+        fsGroup: 33
+        fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: pixelfed
           image: ghcr.io/jippi/docker-pixelfed:nightly-2026-05-10-staging-apache-8.4-bookworm
@@ -215,13 +218,12 @@ spec:
             periodSeconds: 5
           volumeMounts:
             - name: pixelfed-data
-              mountPath: /var/www/html/storage
+              mountPath: /var/www/storage
             - name: pixelfed-cache
-              mountPath: /var/www/html/bootstrap/cache
+              mountPath: /var/www/bootstrap/cache
       volumes:
         - name: pixelfed-data
           persistentVolumeClaim:
             claimName: pixelfed-data
         - name: pixelfed-cache
-          persistentVolumeClaim:
-            claimName: pixelfed-data
+          emptyDir: {}
