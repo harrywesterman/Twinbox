@@ -3,8 +3,8 @@
       xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
   <id>twinbox_mail_provisioning</id>
   <name>Twinbox Mail Provisioning</name>
-  <summary>Connects Twinbox Mailu mailboxes to Nextcloud Mail for OIDC users</summary>
-  <description>Queues an idempotent Nextcloud Mail account provisioning job when a Twinbox OIDC user logs in.</description>
+  <summary>Connects Twinbox Mailu mailboxes to Nextcloud Mail for Twinbox users</summary>
+  <description>Creates an idempotent Nextcloud Mail account for Twinbox users when they log in.</description>
   <version>1.0.0</version>
   <licence>agpl</licence>
   <author mail="support@twinbox.nl">Twinbox</author>

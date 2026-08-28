@@ -299,7 +299,7 @@ def test_nextcloud_mail_uses_per_user_mailu_tokens():
     assert "masterPassword" not in install_text
 
 
-def test_nextcloud_mail_provisioning_app_is_installed_and_listens_for_oidc_login():
+def test_nextcloud_mail_provisioning_app_is_installed_and_listens_for_login():
     install_text = INSTALL_STEP.read_text(encoding="utf-8")
     metadata = MAIL_PROVISIONING_DIR / "appinfo" / "info.xml"
     application = MAIL_PROVISIONING_DIR / "lib" / "AppInfo" / "Application.php"
@@ -317,10 +317,13 @@ def test_nextcloud_mail_provisioning_app_is_installed_and_listens_for_oidc_login
     listener_text = listener.read_text(encoding="utf-8")
     assert "class UserLoggedInListener implements IEventListener" in listener_text
     assert "IJobList" in listener_text
+    assert "MailAccountProvisioner" in listener_text
+    assert "Immediate Twinbox Mail provisioning failed; queued retry" in listener_text
     assert "ProvisionMailAccountJob::class" in listener_text
     assert "TWINBOX_MAIL_DOMAIN" in listener_text
-    assert "getBackendClassName()" in listener_text
-    assert "user_oidc" in listener_text
+    assert "getBackendClassName()" not in listener_text
+    assert "user_oidc" not in listener_text
+    assert "$user->getUID() === 'admin'" in listener_text
 
     job_text = job.read_text(encoding="utf-8")
     assert "extends QueuedJob" in job_text
@@ -368,19 +371,24 @@ def test_nextcloud_mail_provisioning_app_has_mailu_secret_wiring():
         }
     ]
 
-    nextcloud_env = values["nextcloud"]["env"]
-    cron_env = values["cronjob"]["cronjob"]["env"]
-    for env in (nextcloud_env, cron_env):
-        assert env["TWINBOX_MAIL_DOMAIN"] == "__ZONE_NAME__"
-        assert env["TWINBOX_MAILU_API_BASE"] == "http://mailu-front.mailu.svc.cluster.local/api/v1"
-        assert env["TWINBOX_MAILU_API_TOKEN"]["valueFrom"]["secretKeyRef"] == {
-            "name": "nextcloud-mailu-runtime",
-            "key": "api-token",
-            "optional": True,
-        }
+    nextcloud_env = {entry["name"]: entry for entry in values["nextcloud"]["extraEnv"]}
+    assert "env" not in values["nextcloud"]
+    assert "env" not in values["cronjob"]["cronjob"]
+    assert nextcloud_env["TWINBOX_MAIL_DOMAIN"]["value"] == "__ZONE_NAME__"
+    assert (
+        nextcloud_env["TWINBOX_MAILU_API_BASE"]["value"]
+        == "http://mailu-front.mailu.svc.cluster.local/api/v1"
+    )
+    assert nextcloud_env["TWINBOX_MAILU_API_TOKEN"]["valueFrom"]["secretKeyRef"] == {
+        "name": "nextcloud-mailu-runtime",
+        "key": "api-token",
+        "optional": True,
+    }
 
-    assert "TWINBOX_MAIL_DOMAIN: '{{index .metadata.annotations" in optional_text
-    assert "TWINBOX_MAILU_API_TOKEN:" in optional_text
+    assert "extraEnv:" in optional_text
+    assert "- name: TWINBOX_MAIL_DOMAIN" in optional_text
+    assert "value: '{{index .metadata.annotations" in optional_text
+    assert "- name: TWINBOX_MAILU_API_TOKEN" in optional_text
     assert "name: nextcloud-mailu-runtime" in optional_text
 
 

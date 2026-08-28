@@ -73,27 +73,6 @@ spec:
                     - -lc
                     - |-
                       exec /cron.sh
-                  env:
-                    POSTGRES_DB: nextcloud
-                    POSTGRES_HOST: nextcloud-db-pooler-rw.databases.svc.cluster.local
-                    POSTGRES_USER:
-                      valueFrom:
-                        secretKeyRef:
-                          name: nextcloud-db-credentials
-                          key: username
-                    POSTGRES_PASSWORD:
-                      valueFrom:
-                        secretKeyRef:
-                          name: nextcloud-db-credentials
-                          key: password
-                    TWINBOX_MAIL_DOMAIN: '{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
-                    TWINBOX_MAILU_API_BASE: http://mailu-front.mailu.svc.cluster.local/api/v1
-                    TWINBOX_MAILU_API_TOKEN:
-                      valueFrom:
-                        secretKeyRef:
-                          name: nextcloud-mailu-runtime
-                          key: api-token
-                          optional: true
 
               livenessProbe:
                 enabled: true
@@ -120,23 +99,12 @@ spec:
                   secretName: nextcloud-admin
                   usernameKey: username
                   passwordKey: password
-                env:
-                  POSTGRES_DB: nextcloud
-                  POSTGRES_HOST: nextcloud-db-pooler-rw.databases.svc.cluster.local
-                  APACHE_SERVER_NAME: nextcloud.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
-                  POSTGRES_USER:
-                    valueFrom:
-                      secretKeyRef:
-                        name: nextcloud-db-credentials
-                        key: username
-                  POSTGRES_PASSWORD:
-                    valueFrom:
-                      secretKeyRef:
-                        name: nextcloud-db-credentials
-                        key: password
-                  TWINBOX_MAIL_DOMAIN: '{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
-                  TWINBOX_MAILU_API_BASE: http://mailu-front.mailu.svc.cluster.local/api/v1
-                  TWINBOX_MAILU_API_TOKEN:
+                extraEnv:
+                  - name: TWINBOX_MAIL_DOMAIN
+                    value: '{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
+                  - name: TWINBOX_MAILU_API_BASE
+                    value: http://mailu-front.mailu.svc.cluster.local/api/v1
+                  - name: TWINBOX_MAILU_API_TOKEN
                     valueFrom:
                       secretKeyRef:
                         name: nextcloud-mailu-runtime
