@@ -72,7 +72,12 @@ elementAdmin:
 matrixRTC:
   sfu:
     enabled: true
-    useStunToDiscoverPublicIP: true
+    # Advertise the node IP (Host IP mode) instead of the STUN-discovered
+    # public IP. The cluster sits behind a home router whose RTC NodePorts
+    # (30001/TCP, 30002/UDP) are not forwarded from the internet, so a
+    # public IP candidate is unreachable for clients on the same LAN
+    # (hairpin NAT fails for macOS mDNS-obfuscated host candidates).
+    useStunToDiscoverPublicIP: false
 
 wellKnownDelegation:
   enabled: true
