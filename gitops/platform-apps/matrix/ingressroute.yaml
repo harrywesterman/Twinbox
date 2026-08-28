@@ -9,6 +9,12 @@ spec:
     - websecure
   routes:
     - kind: Rule
+      match: Host(`matrix.__ZONE_NAME__`) && PathPrefix(`/.well-known/matrix`)
+      services:
+        - kind: Service
+          name: ess-well-known
+          port: 8010
+    - kind: Rule
       match: Host(`matrix.__ZONE_NAME__`)
       services:
         - kind: Service
@@ -27,6 +33,12 @@ spec:
     - webnetbird
   routes:
     - kind: Rule
+      match: Host(`matrix.__ZONE_NAME__`) && PathPrefix(`/.well-known/matrix`)
+      services:
+        - kind: Service
+          name: ess-well-known
+          port: 8010
+    - kind: Rule
       match: Host(`matrix.__ZONE_NAME__`)
       services:
         - kind: Service
@@ -43,6 +55,12 @@ spec:
   entryPoints:
     - websecure
   routes:
+    - kind: Rule
+      match: Host(`chat.__ZONE_NAME__`) && PathPrefix(`/.well-known/matrix`)
+      services:
+        - kind: Service
+          name: ess-well-known
+          port: 8010
     - kind: Rule
       match: Host(`chat.__ZONE_NAME__`)
       services:
@@ -61,6 +79,12 @@ spec:
   entryPoints:
     - webnetbird
   routes:
+    - kind: Rule
+      match: Host(`chat.__ZONE_NAME__`) && PathPrefix(`/.well-known/matrix`)
+      services:
+        - kind: Service
+          name: ess-well-known
+          port: 8010
     - kind: Rule
       match: Host(`chat.__ZONE_NAME__`)
       services:

@@ -2758,11 +2758,11 @@ def test_matrix_app_manifest_uses_supported_chart_values():
     assert "wellknownDelegation" not in text
 
 
-def test_matrix_values_disable_chart_ingress_and_well_known():
+def test_matrix_values_disable_chart_ingress_but_enable_well_known():
     text = MATRIX_VALUES.read_text(encoding="utf-8")
 
     assert "className: twinbox-disabled" in text
-    assert "wellKnownDelegation:\n  enabled: false" in text
+    assert "wellKnownDelegation:\n  enabled: true" in text
     assert "ingress.enabled" not in text
     assert "wellknownDelegation" not in text
 
@@ -2804,6 +2804,9 @@ def test_matrix_ingressroutes_target_chart_services():
     assert "port: 8008" in text
     assert "port: 8080" in text
     assert "port: 7880" in text
+    assert "name: ess-well-known" in text
+    assert "port: 8010" in text
+    assert "PathPrefix(`/.well-known/matrix`)" in text
     assert "ess-synapse-haproxy" not in text
     assert "port: 443" not in text
 

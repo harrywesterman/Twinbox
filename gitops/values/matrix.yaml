@@ -75,4 +75,4 @@ matrixRTC:
     useStunToDiscoverPublicIP: true
 
 wellKnownDelegation:
-  enabled: false
+  enabled: true
