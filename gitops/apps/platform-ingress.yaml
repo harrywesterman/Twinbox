@@ -219,14 +219,14 @@ spec:
               patch: |-
                 - op: replace
                   path: /spec/routes/0/match
-                  value: Host(`seaweedfs.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+                  value: Host(`seaweedfs.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/cache`)
             - target:
                 kind: IngressRoute
                 name: seaweedfs-netbird
               patch: |-
                 - op: replace
                   path: /spec/routes/0/match
-                  value: Host(`seaweedfs.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+                  value: Host(`seaweedfs.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/cache`)
             - target:
                 kind: IngressRoute
                 name: seaweedfs-admin

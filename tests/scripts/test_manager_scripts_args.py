@@ -5693,14 +5693,27 @@ def test_seaweedfs_admin_routes_to_the_admin_web_port():
 
     assert "PathPrefix(`/cache`)" in text
     assert "name: seaweedfs-cache-prefix" in text
-    assert "prefix: /mastodon" in text
+    assert "prefix: /buckets/mastodon" in text
     assert text.count("name: authentik-forwardauth") == 2
-    assert text.count("port: 8333") == 2
-    assert text.count("port: 8888") == 2
+    assert text.count("port: 8333") == 0
+    assert text.count("port: 8888") == 4
     assert "port: 23646" not in text
     assert "name: seaweedfs" in admin_text
     assert "port: 23646" in admin_text
     assert "port: 8888" not in admin_text
+
+
+def test_platform_ingress_keeps_seaweedfs_cache_route_specific():
+    text = (REPO_ROOT / "gitops" / "apps" / "platform-ingress.yaml").read_text(encoding="utf-8")
+
+    assert (
+        'value: Host(`seaweedfs.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/cache`)'
+        in text
+    )
+    assert (
+        'value: Host(`seaweedfs.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)\n'
+        not in text
+    )
 
 
 def test_authentik_callback_ingressroutes_reference_the_authentik_namespace():

@@ -21,7 +21,7 @@ mastodon:
     existingSecret: mastodon-s3
     bucket: mastodon
     endpoint: http://seaweedfs.longhorn-system.svc.cluster.local:8333
-    protocol: http
+    protocol: https
     region: seaweedfs
     permission: public-read
   smtp:

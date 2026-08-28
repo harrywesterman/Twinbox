@@ -688,6 +688,7 @@ def test_mastodon_step_bootstraps_runtime_and_admin_secret_via_openbao():
     assert "path: gitops/databases/mastodon" in app_text
     assert "mastodon.__ZONE_NAME__" in app_text
     assert "\n          externalAuth:\n            oidc:" in app_text
+    assert "protocol: https" in values_text
     assert "\n            externalAuth:" not in app_text
     assert "authentik.__ZONE_NAME__/application/o/mastodon/" in app_text
     assert "client_id: from-mastodon-runtime-secret" in app_text
