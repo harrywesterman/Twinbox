@@ -49,6 +49,9 @@ spec:
                   0-oidc:
                     configSecret: matrix-config
                     configSecretKey: oidc-upstream.yaml
+                  1-policy:
+                    configSecret: matrix-config
+                    configSecretKey: policy.yaml
               elementAdmin:
                 ingress:
                   host: "element-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"

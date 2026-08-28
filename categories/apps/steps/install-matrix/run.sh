@@ -245,6 +245,20 @@ if [[ -f "$create_users_state_file" ]]; then
   fi
 fi
 
+# The owner account is the MAS admin (can request Synapse/MAS admin scopes in
+# Element Admin). Authentik's preferred_username (and thus the MAS localpart)
+# equals the email local-part of the owner account.
+matrix_admin_username="${matrix_default_owner_email%@*}"
+[[ -n "$matrix_admin_username" ]] || fail "Could not determine Matrix admin username"
+matrix_policy_config="$(
+  cat <<EOF
+policy:
+  data:
+    admin_users:
+      - "${matrix_admin_username}"
+EOF
+)"
+
 authentik_ensure_token
 authentik_setup_forward
 
@@ -369,12 +383,14 @@ matrix_oidc_secret_json="$(
           auto_signup: true
         }
       }')" \
+    --arg policy_config "$matrix_policy_config" \
     '{
       MAS_OIDC_CLIENT_ID: $client_id,
       MAS_OIDC_CLIENT_SECRET: $client_secret,
       MAS_OIDC_PROVIDER_ULID: $provider_ulid,
       MATRIX_OIDC_ENABLED_IDPS: $oidc_idps,
-      MATRIX_OIDC_UPSTREAM_CONFIG: $upstream_config
+      MATRIX_OIDC_UPSTREAM_CONFIG: $upstream_config,
+      MATRIX_POLICY_CONFIG: $policy_config
     }'
 )"
 printf '%s\n' "$matrix_oidc_secret_json" >"$matrix_oidc_secret_file"
@@ -383,7 +399,7 @@ chmod 600 "$matrix_oidc_secret_file"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "matrix-oidc" \
   --json-file "$matrix_oidc_secret_file" \
-  --required-keys "MAS_OIDC_CLIENT_ID,MAS_OIDC_CLIENT_SECRET,MAS_OIDC_PROVIDER_ULID,MATRIX_OIDC_ENABLED_IDPS,MATRIX_OIDC_UPSTREAM_CONFIG"
+  --required-keys "MAS_OIDC_CLIENT_ID,MAS_OIDC_CLIENT_SECRET,MAS_OIDC_PROVIDER_ULID,MATRIX_OIDC_ENABLED_IDPS,MATRIX_OIDC_UPSTREAM_CONFIG,MATRIX_POLICY_CONFIG"
 
 # Write DB secret
 matrix_db_secret_json="$(
