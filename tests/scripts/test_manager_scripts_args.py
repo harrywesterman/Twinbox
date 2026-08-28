@@ -4749,9 +4749,12 @@ def test_mastodon_step_applies_the_custom_app_and_bootstraps_admin_access():
     assert "gitops/databases/shared/namespace.yaml" in step_text
     assert "gitops/platform-apps/mastodon/externalsecret-runtime.yaml" in step_text
     assert "gitops/platform-apps/mastodon/externalsecret-s3.yaml" in step_text
+    assert "gitops/platform-apps/mastodon/externalsecret-smtp.yaml" in step_text
     assert "gitops/databases/mastodon/externalsecret.yaml" in step_text
     assert 'openbao_wait_for_external_secret_ready "mastodon" "mastodon-runtime"' in step_text
     assert 'openbao_wait_for_secret "mastodon-runtime" "mastodon"' in step_text
+    assert 'openbao_wait_for_external_secret_ready "mastodon" "mastodon-smtp"' in step_text
+    assert 'openbao_wait_for_secret "mastodon-smtp" "mastodon"' in step_text
     assert (
         'openbao_wait_for_external_secret_ready "databases" "mastodon-db-credentials"' in step_text
     )

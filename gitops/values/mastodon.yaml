@@ -30,8 +30,8 @@ mastodon:
     enable_starttls: "auto"
     existingSecret: mastodon-smtp
     openssl_verify_mode: none
-    port: 25
-    server: mailu-front.mailu.svc.cluster.local
+    port: 2525
+    server: mailu-relay-egress.netbird.svc.cluster.local
     tls: false
 
 elasticsearch:

@@ -454,12 +454,15 @@ kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/mastodon/namespace.yaml" 
 kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/shared/namespace.yaml" >/dev/null
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/mastodon/externalsecret-runtime.yaml" >/dev/null
 kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/mastodon/externalsecret-s3.yaml" >/dev/null
+kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/mastodon/externalsecret-smtp.yaml" >/dev/null
 kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/mastodon/externalsecret.yaml" >/dev/null
 
 openbao_wait_for_external_secret_ready "mastodon" "mastodon-runtime"
 openbao_wait_for_secret "mastodon-runtime" "mastodon"
 openbao_wait_for_external_secret_ready "mastodon" "mastodon-s3"
 openbao_wait_for_secret "mastodon-s3" "mastodon"
+openbao_wait_for_external_secret_ready "mastodon" "mastodon-smtp"
+openbao_wait_for_secret "mastodon-smtp" "mastodon"
 openbao_wait_for_external_secret_ready "databases" "mastodon-db-credentials"
 openbao_wait_for_secret "mastodon-db-credentials" "databases"
 
@@ -543,6 +546,7 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
 
 wait_for_named_resource_ready "mastodon" "externalsecret" "mastodon-runtime" "Mastodon runtime ExternalSecret"
 wait_for_named_resource_ready "mastodon" "externalsecret" "mastodon-s3" "Mastodon S3 ExternalSecret"
+wait_for_named_resource_ready "mastodon" "externalsecret" "mastodon-smtp" "Mastodon SMTP ExternalSecret"
 wait_for_named_resource_ready "databases" "externalsecret" "mastodon-db-credentials" "Mastodon database ExternalSecret"
 wait_for_named_resource_ready "databases" "cluster" "mastodon-db" "Mastodon CloudNativePG cluster"
 wait_for_deployment_rollout "mastodon" "mastodon-redis" "Mastodon Redis"

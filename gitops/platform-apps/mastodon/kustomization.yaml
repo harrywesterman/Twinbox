@@ -5,6 +5,7 @@ resources:
   - namespace.yaml
   - externalsecret-runtime.yaml
   - externalsecret-s3.yaml
+  - externalsecret-smtp.yaml
   - redis.yaml
   - ingressroute.yaml
   - forwarded-headers-middleware.yaml
