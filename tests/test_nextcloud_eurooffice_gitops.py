@@ -232,6 +232,18 @@ def test_nextcloud_installed_status_check_targets_the_app_pod_not_the_cron_pod()
     assert "get pods -l app.kubernetes.io/name=nextcloud -o jsonpath" not in install_text
 
 
+def test_nextcloud_bootstrap_allowlists_cluster_pod_cidrs_in_bruteforce_protection():
+    install_text = INSTALL_STEP.read_text(encoding="utf-8")
+
+    assert "Allowlisting cluster pod CIDRs in Nextcloud brute-force protection" in install_text
+    assert "config:app:set bruteForce whitelist_" in install_text
+    assert "kubectl get nodes -o json" in install_text
+    assert "spec.podCIDRs" in install_text
+    assert "spec.podCIDR" in install_text
+    assert "brute-force allowlist not configured" in install_text
+    assert "10.244.0.0/16" not in install_text
+
+
 def test_nextcloud_bootstrap_installs_the_modern_eurooffice_file_action():
     install_text = INSTALL_STEP.read_text(encoding="utf-8")
     dockerfile_text = (REPO_ROOT / "manager-worker" / "Dockerfile").read_text(encoding="utf-8")

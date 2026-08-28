@@ -916,6 +916,28 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
   php occ config:system:set redis --value='host:nextcloud-redis-master,port:6379' --type=string
 "
 
+log "Allowlisting cluster pod CIDRs in Nextcloud brute-force protection"
+# All NetBird traffic reaches the cluster through in-cluster routing peers, so
+# Nextcloud sees every NetBird client as a pod IP. Brute-force protection keys
+# on that shared source IP, and a single throttled client then blocks logins for
+# everyone. Derive the pod CIDRs from the nodes at runtime and let Nextcloud
+# bypass brute-force throttling for the pod network.
+pod_cidrs_json="$(
+  kubectl get nodes -o json 2>/dev/null \
+    | jq -c '[.items[] | ((.spec.podCIDRs // [])[]?, .spec.podCIDR?) | select(. != null and . != "")] | unique' \
+    || true
+)"
+if [[ -n "$pod_cidrs_json" && "$pod_cidrs_json" != "[]" && "$pod_cidrs_json" != "null" ]]; then
+  kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
+    set -euo pipefail
+    cd /var/www/html
+    $(printf '%s' "$pod_cidrs_json" | jq -r 'to_entries[] | "php occ config:app:set bruteForce whitelist_\(.key) --value=\(.value) --type=string"')
+  "
+  log "Nextcloud brute-force allowlist configured for cluster pod CIDRs"
+else
+  log "Warning: could not determine cluster pod CIDRs; Nextcloud brute-force allowlist not configured"
+fi
+
 log "Bootstrapping Nextcloud user_oidc"
 kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
   set -euo pipefail
