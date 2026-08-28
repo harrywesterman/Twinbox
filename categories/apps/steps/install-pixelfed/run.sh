@@ -136,25 +136,15 @@ find_policy_binding_pk() {
       | .pk // .id // empty' <<<"$response" | head -n1
 }
 
-ensure_group_binding() {
+delete_group_binding() {
   local target_uuid="$1"
   local group_id="$2"
-  local binding_payload existing_pk
-
-  binding_payload="$(
-    jq -n \
-      --arg target_uuid "$target_uuid" \
-      --arg group_id "$group_id" \
-      '{target: $target_uuid, group: $group_id, order: 1, enabled: true}'
-  )"
+  local existing_pk
 
   existing_pk="$(find_policy_binding_pk "$target_uuid" "$group_id")"
   if [[ -n "$existing_pk" ]]; then
-    authentik_api_write PATCH "/policies/bindings/${existing_pk}/" "$binding_payload" >/dev/null
-    return 0
+    authentik_api_write DELETE "/policies/bindings/${existing_pk}/" >/dev/null
   fi
-
-  authentik_api_write POST "/policies/bindings/" "$binding_payload" >/dev/null
 }
 
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
@@ -236,7 +226,6 @@ signing_key_id="$(authentik_resolve_signing_key_id)"
 [[ -n "$openid_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for openid"
 [[ -n "$email_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for email"
 [[ -n "$profile_mapping_id" ]] || fail "Could not resolve Authentik scope mapping ID for profile"
-[[ -n "$admins_group_id" ]] || fail "Could not resolve Authentik admins group ID"
 [[ -n "$signing_key_id" ]] || fail "Could not resolve Authentik signing key ID"
 
 property_mapping_ids_json="$(
@@ -298,7 +287,9 @@ application_pk="$(create_or_update_application "$application_payload")"
 application_json="$(find_application_json_by_slug "$pixelfed_sso_application_slug")"
 application_uuid="$(jq -r '.pk // .uuid // .id // empty' <<<"$application_json")"
 [[ -n "$application_uuid" ]] || fail "Could not determine Authentik application UUID for Pixelfed"
-ensure_group_binding "$application_uuid" "$admins_group_id"
+if [[ -n "$admins_group_id" ]]; then
+  delete_group_binding "$application_uuid" "$admins_group_id"
+fi
 
 jq -n \
   --arg APP_KEY "$pixelfed_app_key" \

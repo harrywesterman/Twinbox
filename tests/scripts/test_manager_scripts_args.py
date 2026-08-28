@@ -4342,6 +4342,10 @@ def test_pixelfed_manifests_use_postgresql_and_longhorn_storage():
     assert "php artisan instance:actor" in step_text
     assert "php artisan passport:keys --force" in step_text
     assert "Provisioning Authentik OIDC client for Pixelfed" in step_text
+    assert "delete_group_binding()" in step_text
+    assert 'delete_group_binding "$application_uuid" "$admins_group_id"' in step_text
+    assert 'ensure_group_binding "$application_uuid" "$admins_group_id"' not in step_text
+    assert "Could not resolve Authentik admins group ID" not in step_text
 
     assert (
         "ghcr.io/jippi/docker-pixelfed:nightly-2026-05-10-staging-apache-8.4-bookworm"
