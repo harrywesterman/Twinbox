@@ -20,6 +20,21 @@ spec:
       securityContext:
         fsGroup: 33
         fsGroupChangePolicy: OnRootMismatch
+      initContainers:
+        - name: prepare-pixelfed-storage
+          image: ghcr.io/jippi/docker-pixelfed:nightly-2026-05-10-staging-apache-8.4-bookworm
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -lc
+            - mkdir -p /var/www/storage /var/www/bootstrap/cache && chown -R 33:33 /var/www/storage /var/www/bootstrap/cache
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: pixelfed-data
+              mountPath: /var/www/storage
+            - name: pixelfed-cache
+              mountPath: /var/www/bootstrap/cache
       affinity:
         podAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -156,6 +171,8 @@ spec:
               value: "false"
             - name: INSTANCE_CONTACT_EMAIL
               value: "admin@pixelfed.__ZONE_NAME__"
+            - name: ENTRYPOINT_SKIP_SCRIPTS
+              value: 01-permissions.sh
           readinessProbe:
             exec:
               command:
@@ -208,6 +225,21 @@ spec:
       securityContext:
         fsGroup: 33
         fsGroupChangePolicy: OnRootMismatch
+      initContainers:
+        - name: prepare-pixelfed-storage
+          image: ghcr.io/jippi/docker-pixelfed:nightly-2026-05-10-staging-apache-8.4-bookworm
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -lc
+            - mkdir -p /var/www/storage /var/www/bootstrap/cache && chown -R 33:33 /var/www/storage /var/www/bootstrap/cache
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: pixelfed-data
+              mountPath: /var/www/storage
+            - name: pixelfed-cache
+              mountPath: /var/www/bootstrap/cache
       affinity:
         podAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -344,6 +376,8 @@ spec:
               value: "false"
             - name: INSTANCE_CONTACT_EMAIL
               value: "admin@pixelfed.__ZONE_NAME__"
+            - name: ENTRYPOINT_SKIP_SCRIPTS
+              value: 01-permissions.sh
           volumeMounts:
             - name: pixelfed-data
               mountPath: /var/www/storage
