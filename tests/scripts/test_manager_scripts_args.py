@@ -5691,7 +5691,15 @@ def test_seaweedfs_admin_routes_to_the_admin_web_port():
         / "seaweedfs-admin-ingressroute.yaml"
     ).read_text(encoding="utf-8")
 
-    assert "PathPrefix(`/cache`)" in text
+    for media_prefix in (
+        "/accounts",
+        "/cache",
+        "/custom_emojis",
+        "/media_attachments",
+        "/preview_cards",
+        "/site_uploads",
+    ):
+        assert f"PathPrefix(`{media_prefix}`)" in text
     assert "name: seaweedfs-cache-prefix" in text
     assert "prefix: /buckets/mastodon" in text
     assert text.count("name: authentik-forwardauth") == 2
@@ -5703,13 +5711,18 @@ def test_seaweedfs_admin_routes_to_the_admin_web_port():
     assert "port: 8888" not in admin_text
 
 
-def test_platform_ingress_keeps_seaweedfs_cache_route_specific():
+def test_platform_ingress_keeps_seaweedfs_media_route_specific():
     text = (REPO_ROOT / "gitops" / "apps" / "platform-ingress.yaml").read_text(encoding="utf-8")
 
-    assert (
-        'value: Host(`seaweedfs.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/cache`)'
-        in text
-    )
+    for media_prefix in (
+        "/accounts",
+        "/cache",
+        "/custom_emojis",
+        "/media_attachments",
+        "/preview_cards",
+        "/site_uploads",
+    ):
+        assert f"PathPrefix(`{media_prefix}`)" in text
     assert (
         'value: Host(`seaweedfs.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)\n'
         not in text

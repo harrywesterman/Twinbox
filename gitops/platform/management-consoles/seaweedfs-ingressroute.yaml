@@ -17,7 +17,7 @@ spec:
     - websecure
   routes:
     - kind: Rule
-      match: Host(`seaweedfs.__ZONE_NAME__`) && PathPrefix(`/cache`)
+      match: Host(`seaweedfs.__ZONE_NAME__`) && (PathPrefix(`/accounts`) || PathPrefix(`/cache`) || PathPrefix(`/custom_emojis`) || PathPrefix(`/media_attachments`) || PathPrefix(`/preview_cards`) || PathPrefix(`/site_uploads`))
       middlewares:
         - name: seaweedfs-cache-prefix
       services:
@@ -44,7 +44,7 @@ spec:
     - webnetbird
   routes:
     - kind: Rule
-      match: Host(`seaweedfs.__ZONE_NAME__`) && PathPrefix(`/cache`)
+      match: Host(`seaweedfs.__ZONE_NAME__`) && (PathPrefix(`/accounts`) || PathPrefix(`/cache`) || PathPrefix(`/custom_emojis`) || PathPrefix(`/media_attachments`) || PathPrefix(`/preview_cards`) || PathPrefix(`/site_uploads`))
       middlewares:
         - name: seaweedfs-cache-prefix
       services:
