@@ -156,14 +156,26 @@ spec:
                 patch: |-
                   - op: replace
                     path: /spec/routes/0/match
-                    value: Host(`mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+                    value: Host(`mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/sfu/get`)
+                  - op: replace
+                    path: /spec/routes/1/match
+                    value: Host(`mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/get_token`)
+                  - op: replace
+                    path: /spec/routes/2/match
+                    value: Host(`mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/`) && !PathPrefix(`/sfu/get`) && !PathPrefix(`/get_token`)
               - target:
                   kind: IngressRoute
                   name: mrtc-netbird
                 patch: |-
                   - op: replace
                     path: /spec/routes/0/match
-                    value: Host(`mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+                    value: Host(`mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/sfu/get`)
+                  - op: replace
+                    path: /spec/routes/1/match
+                    value: Host(`mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/get_token`)
+                  - op: replace
+                    path: /spec/routes/2/match
+                    value: Host(`mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/`) && !PathPrefix(`/sfu/get`) && !PathPrefix(`/get_token`)
       destination:
         server: https://kubernetes.default.svc
         namespace: matrix
