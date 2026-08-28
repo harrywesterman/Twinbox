@@ -79,6 +79,20 @@ spec:
                     value: Host(`matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
               - target:
                   kind: IngressRoute
+                  name: matrix-well-known
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/.well-known/matrix`)
+              - target:
+                  kind: IngressRoute
+                  name: matrix-well-known-netbird
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`matrix.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/.well-known/matrix`)
+              - target:
+                  kind: IngressRoute
                   name: chat
                 patch: |-
                   - op: replace
@@ -91,6 +105,20 @@ spec:
                   - op: replace
                     path: /spec/routes/0/match
                     value: Host(`chat.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: chat-well-known
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`chat.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/.well-known/matrix`)
+              - target:
+                  kind: IngressRoute
+                  name: chat-well-known-netbird
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`chat.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/.well-known/matrix`)
               - target:
                   kind: IngressRoute
                   name: account

@@ -7,3 +7,4 @@ resources:
   - db-externalsecret.yaml
   - runtime-externalsecret.yaml
   - ingressroute.yaml
+  - well-known.yaml

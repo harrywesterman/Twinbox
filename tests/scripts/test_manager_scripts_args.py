@@ -98,6 +98,9 @@ PIXELFED_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "pixelfed" / "k
 MATRIX_APP_MANIFEST = REPO_ROOT / "gitops" / "apps" / "matrix.yaml"
 MATRIX_VALUES = REPO_ROOT / "gitops" / "values" / "matrix.yaml"
 MATRIX_INGRESSROUTE = REPO_ROOT / "gitops" / "platform-apps" / "matrix" / "ingressroute.yaml"
+MATRIX_WELLKNOWN_INGRESSROUTE = (
+    REPO_ROOT / "gitops" / "platform-apps" / "matrix" / "well-known.yaml"
+)
 MATRIX_EXTERNALSECRET = REPO_ROOT / "gitops" / "platform-apps" / "matrix" / "externalsecret.yaml"
 ARGO_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-argocd" / "run.sh"
@@ -2804,11 +2807,22 @@ def test_matrix_ingressroutes_target_chart_services():
     assert "port: 8008" in text
     assert "port: 8080" in text
     assert "port: 7880" in text
+    assert "ess-synapse-haproxy" not in text
+    assert "port: 443" not in text
+
+
+def test_matrix_wellknown_ingressroutes_target_wellknown_service():
+    text = MATRIX_WELLKNOWN_INGRESSROUTE.read_text(encoding="utf-8")
+
+    assert text.count("kind: IngressRoute") == 4
+    assert "name: matrix-well-known" in text
+    assert "name: matrix-well-known-netbird" in text
+    assert "name: chat-well-known" in text
+    assert "name: chat-well-known-netbird" in text
     assert "name: ess-well-known" in text
     assert "port: 8010" in text
     assert "PathPrefix(`/.well-known/matrix`)" in text
-    assert "ess-synapse-haproxy" not in text
-    assert "port: 443" not in text
+    assert text.count("PathPrefix(`/.well-known/matrix`)") == 4
 
 
 def test_matrix_install_step_waits_on_specific_resources():
