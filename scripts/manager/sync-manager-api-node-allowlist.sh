@@ -310,7 +310,7 @@ run_firewall_helper_container() {
   if [[ -z "$helper_image" ]]; then
     helper_image="$(docker inspect -f '{{.Config.Image}}' twinbox-manager-worker 2>/dev/null || true)"
   fi
-  helper_image="${helper_image:-ghcr.io/harrywesterman/twinbox-manager-worker:${TWINBOX_IMAGE_TAG:-sha-72b9341}}"
+  helper_image="${helper_image:-ghcr.io/harrywesterman/twinbox-manager-worker:${TWINBOX_IMAGE_TAG:-sha-034745e}}"
 
   log "applying manager-api firewall through privileged host-network helper"
   docker run --rm \
