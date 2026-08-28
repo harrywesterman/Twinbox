@@ -936,7 +936,7 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
     --mapping-groups='nextcloud_groups' \
     --group-provisioning='0' \
     --group-restrict-login-to-whitelist='0' \
-    --unique-uid='1' \
+    --unique-uid='0' \
     --check-bearer='0' \
     --bearer-provisioning='0' \
     --send-id-token-hint='1' \

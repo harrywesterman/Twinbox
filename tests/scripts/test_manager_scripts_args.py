@@ -4850,6 +4850,7 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert "config:app:set --type=string --value=0 user_oidc provider-1-groupProvisioning" in text
     assert "app:disable oidc_groups_mapping" in text
     assert "--mapping-groups='nextcloud_groups'" in text
+    assert "--unique-uid='0'" in text
     assert "provision_nextcloud_scim" in text
     assert "install_nextcloud_scim" in text
     assert "PINNED_NEXTCLOUD_SCIM_SP_VERSION" in text
