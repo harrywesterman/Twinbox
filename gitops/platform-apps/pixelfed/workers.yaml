@@ -156,8 +156,6 @@ spec:
               value: "false"
             - name: INSTANCE_CONTACT_EMAIL
               value: "admin@pixelfed.__ZONE_NAME__"
-            - name: ENTRYPOINT_SKIP_SCRIPTS
-              value: 01-permissions.sh
           readinessProbe:
             exec:
               command:
@@ -346,8 +344,6 @@ spec:
               value: "false"
             - name: INSTANCE_CONTACT_EMAIL
               value: "admin@pixelfed.__ZONE_NAME__"
-            - name: ENTRYPOINT_SKIP_SCRIPTS
-              value: 01-permissions.sh
           volumeMounts:
             - name: pixelfed-data
               mountPath: /var/www/storage

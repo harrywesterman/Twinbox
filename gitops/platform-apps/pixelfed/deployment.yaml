@@ -135,8 +135,6 @@ spec:
               value: Pixelfed
             - name: INSTANCE_CONTACT_EMAIL
               value: "admin@pixelfed.__ZONE_NAME__"
-            - name: ENTRYPOINT_SKIP_SCRIPTS
-              value: 01-permissions.sh
             - name: PHP_POST_MAX_SIZE
               value: 500M
             - name: PHP_UPLOAD_MAX_FILE_SIZE

@@ -4377,6 +4377,8 @@ def test_pixelfed_manifests_use_postgresql_and_longhorn_storage():
     assert workers_text.count("fsGroup: 33") == 2
     assert deployment_text.count("emptyDir: {}") == 1
     assert workers_text.count("emptyDir: {}") == 2
+    assert "ENTRYPOINT_SKIP_SCRIPTS" not in deployment_text
+    assert "ENTRYPOINT_SKIP_SCRIPTS" not in workers_text
     assert "name: pixelfed-bootstrap" in externalsecret_text
     assert "secretKey: APP_KEY" in externalsecret_text
     assert "property: APP_KEY" in externalsecret_text
