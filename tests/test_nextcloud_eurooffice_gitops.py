@@ -267,6 +267,7 @@ def test_nextcloud_bootstrap_installs_the_modern_eurooffice_file_action():
 
 def test_nextcloud_mail_uses_per_user_mailu_tokens():
     install_text = INSTALL_STEP.read_text(encoding="utf-8")
+    values = yaml.safe_load(NEXTCLOUD_VALUES.read_text(encoding="utf-8"))
 
     assert "command -v python3" in install_text
     assert 'configure_nextcloud_mail_accounts "$public_zone_name"' in install_text
@@ -291,12 +292,15 @@ def test_nextcloud_mail_uses_per_user_mailu_tokens():
     assert 'imap_security="none"' in install_text
     assert 'smtp_hostname="mailu-front.mailu.svc.cluster.local"' in install_text
     assert 'smtp_port="10025"' in install_text
-    assert 'smtp_security="none"' in install_text
+    assert 'smtp_security="tls"' in install_text
     assert "mail.${mail_domain}" not in install_text
     assert " 993 ssl " not in install_text
     assert " 587 tls " not in install_text
     assert "mail:account:export" in install_text
     assert "masterPassword" not in install_text
+    assert (
+        "'app.mail.verify-tls-peer' => false" in values["nextcloud"]["configs"]["mail.config.php"]
+    )
 
 
 def test_nextcloud_mail_provisioning_app_is_installed_and_listens_for_login():
@@ -337,6 +341,7 @@ def test_nextcloud_mail_provisioning_app_is_installed_and_listens_for_login():
     assert "mailu-dovecot.mailu.svc.cluster.local" in provisioner_text
     assert "mailu-front.mailu.svc.cluster.local" in provisioner_text
     assert "10025" in provisioner_text
+    assert "'tls'" in provisioner_text
     assert "993" not in provisioner_text
     assert "587" not in provisioner_text
 

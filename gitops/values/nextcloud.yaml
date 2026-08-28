@@ -107,6 +107,11 @@ nextcloud:
         ),
         'forwarded_for_headers' => array('HTTP_X_FORWARDED_FOR'),
       );
+    mail.config.php: |-
+      <?php
+      $CONFIG = array (
+        'app.mail.verify-tls-peer' => false,
+      );
     overwrite.config.php: |
       <?php
       $CONFIG = array (

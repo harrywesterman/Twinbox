@@ -64,7 +64,7 @@ class MailAccountProvisioner
             $token,
             'mailu-front.mailu.svc.cluster.local',
             '10025',
-            'none',
+            'tls',
             $email,
             $token,
             'password',

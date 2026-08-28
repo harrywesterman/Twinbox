@@ -543,7 +543,7 @@ configure_nextcloud_mail_accounts() {
   local imap_security="none"
   local smtp_hostname="mailu-front.mailu.svc.cluster.local"
   local smtp_port="10025"
-  local smtp_security="none"
+  local smtp_security="tls"
   local api_token users_json total configured skipped failed
 
   log "Configuring Nextcloud Mail accounts for existing Nextcloud users"
