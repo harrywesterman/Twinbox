@@ -223,6 +223,15 @@ def test_nextcloud_bootstrap_preserves_collabora_default_and_configures_eurooffi
     assert "name: eurooffice-netbird" in optional_app_text
 
 
+def test_nextcloud_bootstrap_installs_talk_under_its_spreed_app_id():
+    install_text = INSTALL_STEP.read_text(encoding="utf-8")
+
+    assert "php occ app:install spreed >/dev/null 2>&1 || true" in install_text
+    assert "php occ app:enable spreed >/dev/null 2>&1 || true" in install_text
+    assert "app:install talk" not in install_text
+    assert "app:enable talk" not in install_text
+
+
 def test_nextcloud_installed_status_check_targets_the_app_pod_not_the_cron_pod():
     install_text = INSTALL_STEP.read_text(encoding="utf-8")
 

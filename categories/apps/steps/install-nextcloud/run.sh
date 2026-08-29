@@ -988,7 +988,7 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
   php occ app:install mail >/dev/null 2>&1 || true
   
   # Productivity
-  php occ app:install talk >/dev/null 2>&1 || true
+  php occ app:install spreed >/dev/null 2>&1 || true
   php occ app:install deck >/dev/null 2>&1 || true
   php occ app:install notes >/dev/null 2>&1 || true
   php occ app:install tables >/dev/null 2>&1 || true
@@ -1002,7 +1002,7 @@ kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- sh -lc "
   php occ app:enable calendar >/dev/null 2>&1 || true
   php occ app:enable contacts >/dev/null 2>&1 || true
   php occ app:enable mail >/dev/null 2>&1 || true
-  php occ app:enable talk >/dev/null 2>&1 || true
+  php occ app:enable spreed >/dev/null 2>&1 || true
   php occ app:enable deck >/dev/null 2>&1 || true
   php occ app:enable notes >/dev/null 2>&1 || true
   php occ app:enable tables >/dev/null 2>&1 || true
