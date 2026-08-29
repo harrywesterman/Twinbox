@@ -1103,7 +1103,7 @@ nextcloud_occ "config:app:set --value='yes' --type=string talk signaling" || tru
 nextcloud_occ "talk:signaling:add --verify https://signaling.${public_zone_name}/ ${talk_signaling_secret}" || true
 nextcloud_occ "talk:turn:add turns talk-turn.${public_zone_name} tcp --secret ${talk_turn_secret}" || true
 nextcloud_occ "talk:stun:add talk-turn.${public_zone_name}:3478" || true
-nextcloud_occ "config:app:set talk recording_servers --value='[{\"server\": \"https://recording.${public_zone_name}/\", \"secret\": \"${talk_recording_secret}\"}]' --type=json" || true
+nextcloud_occ "config:app:set talk recording_servers --value='[{\"server\": \"https://recording.${public_zone_name}/\", \"secret\": \"${talk_recording_secret}\"}]' --type=string" || true
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \
