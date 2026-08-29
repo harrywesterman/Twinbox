@@ -2876,8 +2876,8 @@ def test_matrix_install_step_waits_on_specific_resources():
     # external-dns secret (never a token literal in the repo).
     assert "external-dns-credentials" in text
     assert "twinbox\\.io/dns-provider" in text
-    assert "then \"cloudflare\"" in text
-    assert "--secret-name \"cloudflare-token\"" in text
+    assert 'then "cloudflare"' in text
+    assert '--secret-name "cloudflare-token"' in text
     assert "CLOUDFLARE_API_TOKEN" in text
     assert "jq -n --arg token" in text
     assert 'wait_for_statefulset_ready "matrix" "ess-synapse-main"' in text
