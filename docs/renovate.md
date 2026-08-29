@@ -89,6 +89,11 @@ Renovate monitors the following Argo CD applications in `gitops/apps/`, `gitops/
 | Root `package-lock.json` maintenance | Monday before 06:00 | Root package contains development tooling only |
 | GitHub Actions digest updates in `verify.yml` | Weekdays before 06:00 | Initial digest pinning remains manual |
 
+Security updates bypass the normal schedule. Important runtime Helm chart patch updates for
+`external-secrets`, `jitsi-meet`, `kube-prometheus-stack`, `openbao`, and `traefik` are also
+raised faster: Renovate may open or update those patch PRs before 06:00 on weekdays. They
+are not auto-merged by this rule; CI must pass and a human still reviews the runtime impact.
+
 The following updates are never auto-merged:
 
 - npm runtime dependencies, major versions, prereleases, and dependencies currently on

@@ -209,6 +209,20 @@
       "schedule": ["before 06:00 on monday"]
     },
     {
+      "description": "Raise critical runtime patch updates every weekday",
+      "matchDatasources": ["helm"],
+      "matchPackageNames": [
+        "external-secrets",
+        "jitsi-meet",
+        "kube-prometheus-stack",
+        "openbao",
+        "traefik"
+      ],
+      "matchUpdateTypes": ["patch"],
+      "schedule": ["before 06:00 every weekday"],
+      "automerge": false
+    },
+    {
       "description": "Keep runtime lock file maintenance manual",
       "matchManagers": ["npm"],
       "matchUpdateTypes": ["lockFileMaintenance"],

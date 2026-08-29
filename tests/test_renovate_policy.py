@@ -94,6 +94,23 @@ def test_security_updates_are_immediate_and_assigned():
     assert alerts["minimumReleaseAge"] is None
 
 
+def test_critical_runtime_patch_updates_are_raised_daily_without_automerge():
+    config = _config()
+    rule = _rule(config, "Raise critical runtime patch updates every weekday")
+
+    assert rule["matchDatasources"] == ["helm"]
+    assert set(rule["matchPackageNames"]) == {
+        "external-secrets",
+        "jitsi-meet",
+        "kube-prometheus-stack",
+        "openbao",
+        "traefik",
+    }
+    assert rule["matchUpdateTypes"] == ["patch"]
+    assert rule["schedule"] == ["before 06:00 every weekday"]
+    assert rule["automerge"] is False
+
+
 def test_dependabot_version_updates_are_disabled():
     assert not DEPENDABOT_CONFIG.exists()
 
