@@ -18,5 +18,5 @@ spec:
       services:
         - name: ess-matrix-rtc-sfu-turn-tls
           port: 30003
-      tls:
-        passthrough: true
+  tls:
+    passthrough: true
