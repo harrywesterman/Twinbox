@@ -264,9 +264,9 @@ def test_nextcloud_hpb_signaling_server_is_deployed_and_routed():
     env = {item["name"]: item for item in container["env"]}
     assert container["image"] == "strukturag/nextcloud-spreed-signaling:2.1.1"
     assert env["HTTP_LISTEN"]["value"] == "0.0.0.0:8080"
-    assert env["BACKENDS"]["value"] == "backend-1"
-    assert env["BACKEND_BACKEND_1_URLS"]["value"] == "https://nextcloud.__ZONE_NAME__"
-    assert env["BACKEND_BACKEND_1_SHARED_SECRET"]["valueFrom"]["secretKeyRef"] == {
+    assert env["BACKENDS"]["value"] == "backend1"
+    assert env["BACKEND_BACKEND1_URLS"]["value"] == "https://nextcloud.__ZONE_NAME__"
+    assert env["BACKEND_BACKEND1_SHARED_SECRET"]["valueFrom"]["secretKeyRef"] == {
         "name": "nextcloud-signaling-config",
         "key": "signaling-secret",
     }

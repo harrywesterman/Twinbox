@@ -25,10 +25,10 @@ spec:
             - name: HTTP_LISTEN
               value: 0.0.0.0:8080
             - name: BACKENDS
-              value: backend-1
-            - name: BACKEND_BACKEND_1_URLS
+              value: backend1
+            - name: BACKEND_BACKEND1_URLS
               value: https://nextcloud.__ZONE_NAME__
-            - name: BACKEND_BACKEND_1_SHARED_SECRET
+            - name: BACKEND_BACKEND1_SHARED_SECRET
               valueFrom:
                 secretKeyRef:
                   name: nextcloud-signaling-config
