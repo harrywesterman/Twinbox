@@ -2,6 +2,12 @@
 
 Renovate is configured on this repository to automatically open pull requests when dependencies are outdated. It scans the codebase for version pins and proposes updates through GitHub PRs.
 
+Renovate is the repository's only dependency update bot. Dependabot version updates are
+disabled by keeping `.github/dependabot.yml` absent. GitHub Dependabot alerts remain enabled
+as a read-only vulnerability source, but Dependabot security updates remain disabled so that
+Dependabot does not create pull requests. Renovate reads the alerts and creates the security
+PRs described below.
+
 ## What is scanned
 
 Renovate runs with the `config:recommended` preset plus:

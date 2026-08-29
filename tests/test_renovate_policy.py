@@ -4,6 +4,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RENOVATE_CONFIG = REPO_ROOT / "renovate.json"
+DEPENDABOT_CONFIG = REPO_ROOT / ".github" / "dependabot.yml"
 WORKFLOWS_DIR = REPO_ROOT / ".github" / "workflows"
 
 
@@ -91,6 +92,10 @@ def test_security_updates_are_immediate_and_assigned():
     assert alerts["assignees"] == ["harrywesterman"]
     assert alerts["schedule"] == []
     assert alerts["minimumReleaseAge"] is None
+
+
+def test_dependabot_version_updates_are_disabled():
+    assert not DEPENDABOT_CONFIG.exists()
 
 
 def test_only_publish_workflow_can_write_repository_contents():
