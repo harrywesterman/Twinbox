@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nextcloud-recording
+  namespace: nextcloud
+spec:
+  selector:
+    app.kubernetes.io/name: nextcloud-recording
+  ports:
+    - name: http
+      port: 1234
+      targetPort: 1234

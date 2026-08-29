@@ -1,0 +1,21 @@
+# Nextcloud Talk TURN-TLS media path
+# Passes the raw TLS connection through to the coturn pod, which terminates
+# TURN-TLS with its own certificate (talk-turn.<zone>).
+# Clients reach this via talk-turn.<zone>:443 -> bastion Traefik (SNI passthrough)
+# -> NetBird proxy TLS service -> cluster Traefik websecure (443).
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: nextcloud-talk-turn
+  namespace: nextcloud
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: HostSNI(`talk-turn.__ZONE_NAME__`)
+      priority: 10
+      services:
+        - name: nextcloud-coturn
+          port: 443
+  tls:
+    passthrough: true

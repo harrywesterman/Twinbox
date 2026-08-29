@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nextcloud-coturn
+  namespace: nextcloud
+data:
+  turnserver.conf: |
+    listening-port=3478
+    tls-listening-port=443
+    fingerprint
+    use-auth-secret
+    realm=twinbox
+    no-cli
+    no-multicast-peers
+    log-file=stdout
+    min-port=49160
+    max-port=49200
+    cert=/etc/coturn/tls/tls.crt
+    pkey=/etc/coturn/tls/tls.key

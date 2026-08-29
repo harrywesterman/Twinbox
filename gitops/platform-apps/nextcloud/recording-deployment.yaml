@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nextcloud-recording
+  namespace: nextcloud
+  labels:
+    app.kubernetes.io/name: nextcloud-recording
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nextcloud-recording
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nextcloud-recording
+    spec:
+      securityContext:
+        fsGroup: 122
+        fsGroupChangePolicy: "OnRootMismatch"
+        runAsUser: 122
+        runAsGroup: 122
+        runAsNonRoot: true
+      containers:
+        - name: recording
+          image: ghcr.io/nextcloud-releases/aio-talk-recording:20260825_084538
+          ports:
+            - containerPort: 1234
+              name: http
+          env:
+            - name: NC_DOMAIN
+              value: nextcloud.__ZONE_NAME__
+            - name: HPB_DOMAIN
+              value: signaling.__ZONE_NAME__
+            - name: HPB_PROTOCOL
+              value: https
+            - name: HPB_PATH
+              value: ""
+            - name: RECORDING_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: nextcloud-recording-config
+                  key: recording-secret
+            - name: INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: nextcloud-recording-config
+                  key: internal-secret
+            - name: TZ
+              value: Europe/Amsterdam
+          volumeMounts:
+            - name: recordings
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2
+              memory: 2Gi
+      volumes:
+        - name: recordings
+          persistentVolumeClaim:
+            claimName: nextcloud-recording

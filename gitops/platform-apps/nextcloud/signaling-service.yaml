@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nextcloud-signaling
+  namespace: nextcloud
+spec:
+  selector:
+    app.kubernetes.io/name: nextcloud-signaling
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nextcloud-signaling
+  namespace: nextcloud
+  labels:
+    app.kubernetes.io/name: nextcloud-signaling
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nextcloud-signaling
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nextcloud-signaling
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: signaling
+          image: strukturag/nextcloud-spreed-signaling:2.1.1
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: HTTP_LISTEN
+              value: 0.0.0.0:8080
+            - name: BACKENDS
+              value: backend-1
+            - name: BACKEND_BACKEND_1_URLS
+              value: https://nextcloud.__ZONE_NAME__
+            - name: BACKEND_BACKEND_1_SHARED_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: nextcloud-signaling-config
+                  key: signaling-secret
+            - name: INTERNAL_SHARED_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nextcloud-signaling-config
+                  key: internal-secret
+            - name: HASH_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nextcloud-signaling-config
+                  key: session-hash-key
+            - name: BLOCK_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nextcloud-signaling-config
+                  key: session-block-key
+            - name: NATS_URL
+              value: nats://nextcloud-nats.nextcloud.svc.cluster.local:4222
+            - name: SKIP_VERIFY
+              value: "false"
+          readinessProbe:
+            httpGet:
+              path: /api/v1/stats
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/v1/stats
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

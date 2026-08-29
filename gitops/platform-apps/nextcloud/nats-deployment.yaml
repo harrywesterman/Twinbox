@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nextcloud-nats
+  namespace: nextcloud
+  labels:
+    app.kubernetes.io/name: nextcloud-nats
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nextcloud-nats
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nextcloud-nats
+    spec:
+      containers:
+        - name: nats
+          image: nats:2.10.26
+          ports:
+            - containerPort: 4222
+              name: client
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi

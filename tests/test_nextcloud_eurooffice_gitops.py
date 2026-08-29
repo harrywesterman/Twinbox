@@ -56,6 +56,23 @@ def test_eurooffice_resources_are_declared_in_the_nextcloud_kustomization():
         "ingressroute.yaml",
         "collabora-ingressroute.yaml",
         "eurooffice-ingressroute.yaml",
+        "signaling-externalsecret.yaml",
+        "signaling-deployment.yaml",
+        "signaling-service.yaml",
+        "signaling-ingressroute.yaml",
+        "coturn-externalsecret.yaml",
+        "coturn-configmap.yaml",
+        "coturn-deployment.yaml",
+        "coturn-service.yaml",
+        "coturn-turn-certificate.yaml",
+        "coturn-turn-ingressroutetcp.yaml",
+        "nats-deployment.yaml",
+        "nats-service.yaml",
+        "recording-externalsecret.yaml",
+        "recording-deployment.yaml",
+        "recording-service.yaml",
+        "recording-pvc.yaml",
+        "recording-ingressroute.yaml",
     ]
 
 
@@ -230,6 +247,182 @@ def test_nextcloud_bootstrap_installs_talk_under_its_spreed_app_id():
     assert "php occ app:enable spreed >/dev/null 2>&1 || true" in install_text
     assert "app:install talk" not in install_text
     assert "app:enable talk" not in install_text
+
+
+def test_nextcloud_hpb_signaling_server_is_deployed_and_routed():
+    deployment = _resource("Deployment", "nextcloud-signaling")
+    service = _resource("Service", "nextcloud-signaling")
+    external_secret = _resource("ExternalSecret", "nextcloud-signaling-config")
+    routes = {
+        doc["metadata"]["name"]: doc
+        for doc in _platform_docs()
+        if doc.get("kind") == "IngressRoute"
+        and doc.get("metadata", {}).get("name") in {"signaling", "signaling-netbird"}
+    }
+
+    container = deployment["spec"]["template"]["spec"]["containers"][0]
+    env = {item["name"]: item for item in container["env"]}
+    assert container["image"] == "strukturag/nextcloud-spreed-signaling:2.1.1"
+    assert env["HTTP_LISTEN"]["value"] == "0.0.0.0:8080"
+    assert env["BACKENDS"]["value"] == "backend-1"
+    assert env["BACKEND_BACKEND_1_URLS"]["value"] == "https://nextcloud.__ZONE_NAME__"
+    assert env["BACKEND_BACKEND_1_SHARED_SECRET"]["valueFrom"]["secretKeyRef"] == {
+        "name": "nextcloud-signaling-config",
+        "key": "signaling-secret",
+    }
+    assert env["INTERNAL_SHARED_SECRET_KEY"]["valueFrom"]["secretKeyRef"]["key"] == (
+        "internal-secret"
+    )
+    assert env["NATS_URL"]["value"] == "nats://nextcloud-nats.nextcloud.svc.cluster.local:4222"
+
+    assert service["spec"]["ports"] == [{"name": "http", "port": 8080, "targetPort": 8080}]
+    assert external_secret["spec"]["target"]["name"] == "nextcloud-signaling-config"
+    assert routes["signaling"]["spec"]["entryPoints"] == ["websecure"]
+    assert routes["signaling-netbird"]["spec"]["entryPoints"] == ["webnetbird"]
+    assert routes["signaling"]["spec"]["routes"][0] == {
+        "kind": "Rule",
+        "match": "Host(`signaling.__ZONE_NAME__`)",
+        "services": [{"kind": "Service", "name": "nextcloud-signaling", "port": 8080}],
+    }
+
+
+def test_nextcloud_hpb_coturn_serves_turn_tls_on_443_with_dedicated_cert():
+    deployment = _resource("Deployment", "nextcloud-coturn")
+    service = _resource("Service", "nextcloud-coturn")
+    certificate = _resource("Certificate", "nextcloud-talk-turn-tls")
+    route = _resource("IngressRouteTCP", "nextcloud-talk-turn")
+
+    container = deployment["spec"]["template"]["spec"]["containers"][0]
+    env = {item["name"]: item for item in container["env"]}
+    assert container["image"] == "coturn/coturn:4.17.2"
+    assert '--static-auth-secret="${TURN_STATIC_AUTH_SECRET}"' in " ".join(container["command"])
+    assert env["TURN_STATIC_AUTH_SECRET"]["valueFrom"]["secretKeyRef"] == {
+        "name": "nextcloud-turn-config",
+        "key": "static-auth-secret",
+    }
+    assert {volume["name"] for volume in deployment["spec"]["template"]["spec"]["volumes"]} == {
+        "config",
+        "tls",
+    }
+
+    assert service["spec"]["ports"] == [
+        {"name": "turns", "port": 443, "targetPort": 443},
+        {"name": "turn-tcp", "port": 3478, "targetPort": 3478},
+        {"name": "turn-udp", "port": 3478, "targetPort": 3478, "protocol": "UDP"},
+    ]
+    assert certificate["spec"]["dnsNames"] == ["talk-turn.__ZONE_NAME__"]
+    assert route["spec"]["routes"] == [
+        {
+            "match": "HostSNI(`talk-turn.__ZONE_NAME__`)",
+            "priority": 10,
+            "services": [{"name": "nextcloud-coturn", "port": 443}],
+        }
+    ]
+    assert route["spec"]["tls"] == {"passthrough": True}
+    assert route["spec"]["entryPoints"] == ["websecure"]
+
+
+def test_nextcloud_hpb_recording_backend_is_deployed_and_routed():
+    deployment = _resource("Deployment", "nextcloud-recording")
+    service = _resource("Service", "nextcloud-recording")
+    pvc = _resource("PersistentVolumeClaim", "nextcloud-recording")
+    external_secret = _resource("ExternalSecret", "nextcloud-recording-config")
+    routes = {
+        doc["metadata"]["name"]: doc
+        for doc in _platform_docs()
+        if doc.get("kind") == "IngressRoute"
+        and doc.get("metadata", {}).get("name") in {"recording", "recording-netbird"}
+    }
+
+    container = deployment["spec"]["template"]["spec"]["containers"][0]
+    env = {item["name"]: item for item in container["env"]}
+    assert container["image"] == "ghcr.io/nextcloud-releases/aio-talk-recording:20260825_084538"
+    assert env["NC_DOMAIN"]["value"] == "nextcloud.__ZONE_NAME__"
+    assert env["HPB_DOMAIN"]["value"] == "signaling.__ZONE_NAME__"
+    assert env["HPB_PROTOCOL"]["value"] == "https"
+    assert env["RECORDING_SECRET"]["valueFrom"]["secretKeyRef"] == {
+        "name": "nextcloud-recording-config",
+        "key": "recording-secret",
+    }
+    assert env["INTERNAL_SECRET"]["valueFrom"]["secretKeyRef"]["key"] == "internal-secret"
+    assert pvc["spec"]["storageClassName"] == "longhorn"
+
+    assert service["spec"]["ports"] == [{"name": "http", "port": 1234, "targetPort": 1234}]
+    assert external_secret["spec"]["target"]["name"] == "nextcloud-recording-config"
+    assert routes["recording"]["spec"]["routes"][0] == {
+        "kind": "Rule",
+        "match": "Host(`recording.__ZONE_NAME__`)",
+        "services": [{"kind": "Service", "name": "nextcloud-recording", "port": 1234}],
+    }
+
+
+def test_nextcloud_hpb_secrets_come_from_openbao_talk_runtime():
+    for name in (
+        "nextcloud-signaling-config",
+        "nextcloud-turn-config",
+        "nextcloud-recording-config",
+    ):
+        external_secret = _resource("ExternalSecret", name)
+        assert external_secret["spec"]["secretStoreRef"] == {
+            "name": "openbao",
+            "kind": "ClusterSecretStore",
+        }
+        assert all(
+            entry["remoteRef"]["key"] == "twinbox/global/nextcloud-talk-runtime"
+            for entry in external_secret["spec"]["data"]
+        )
+
+    signaling = _resource("ExternalSecret", "nextcloud-signaling-config")
+    assert {entry["secretKey"] for entry in signaling["spec"]["data"]} == {
+        "signaling-secret",
+        "internal-secret",
+        "session-hash-key",
+        "session-block-key",
+    }
+    turn = _resource("ExternalSecret", "nextcloud-turn-config")
+    assert turn["spec"]["data"] == [
+        {
+            "secretKey": "static-auth-secret",
+            "remoteRef": {
+                "key": "twinbox/global/nextcloud-talk-runtime",
+                "property": "TALK_TURN_SECRET",
+            },
+        }
+    ]
+
+
+def test_nextcloud_hpb_bootstrap_provisions_secrets_configures_talk_and_netbird():
+    install_text = INSTALL_STEP.read_text(encoding="utf-8")
+    optional_app_text = OPTIONAL_APP.read_text(encoding="utf-8")
+
+    assert "Provisioning Nextcloud Talk HPB runtime secrets" in install_text
+    assert "nextcloud-talk-runtime" in install_text
+    assert (
+        '--required-keys "TALK_SIGNALING_SECRET,TALK_INTERNAL_SECRET,TALK_SESSION_HASHKEY,TALK_SESSION_BLOCKKEY,TALK_TURN_SECRET,TALK_RECORDING_SECRET"'
+        in install_text
+    )
+    assert (
+        "talk:signaling:add --verify https://signaling.${public_zone_name}/ ${talk_signaling_secret}"
+        in install_text
+    )
+    assert (
+        "talk:turn:add turns talk-turn.${public_zone_name} tcp --secret ${talk_turn_secret}"
+        in install_text
+    )
+    assert "talk:stun:add talk-turn.${public_zone_name}:3478" in install_text
+    assert "stun_servers --value='[\\\"talk-turn.${public_zone_name}:3478\\\"]'" in install_text
+    assert "recording_servers" in install_text
+    assert '--service-name "nextcloud-signaling"' in install_text
+    assert '--service-name "nextcloud-talk-turn"' in install_text
+    assert '--service-mode "tls"' in install_text
+
+    assert "name: signaling" in optional_app_text
+    assert "name: signaling-netbird" in optional_app_text
+    assert "name: recording" in optional_app_text
+    assert "name: nextcloud-talk-turn" in optional_app_text
+    assert "value: Host(`signaling.{{index .metadata.annotations" in optional_app_text
+    assert "value: HostSNI(`talk-turn.{{index .metadata.annotations" in optional_app_text
+    assert "path: /spec/template/spec/containers/0/env/2/value" in optional_app_text
 
 
 def test_nextcloud_installed_status_check_targets_the_app_pod_not_the_cron_pod():

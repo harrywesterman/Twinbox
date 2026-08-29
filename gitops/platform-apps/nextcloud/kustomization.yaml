@@ -16,3 +16,20 @@ resources:
   - ingressroute.yaml
   - collabora-ingressroute.yaml
   - eurooffice-ingressroute.yaml
+  - signaling-externalsecret.yaml
+  - signaling-deployment.yaml
+  - signaling-service.yaml
+  - signaling-ingressroute.yaml
+  - coturn-externalsecret.yaml
+  - coturn-configmap.yaml
+  - coturn-deployment.yaml
+  - coturn-service.yaml
+  - coturn-turn-certificate.yaml
+  - coturn-turn-ingressroutetcp.yaml
+  - nats-deployment.yaml
+  - nats-service.yaml
+  - recording-externalsecret.yaml
+  - recording-deployment.yaml
+  - recording-service.yaml
+  - recording-pvc.yaml
+  - recording-ingressroute.yaml

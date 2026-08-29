@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: nextcloud-talk-turn-tls
+  namespace: nextcloud
+spec:
+  secretName: nextcloud-talk-turn-tls
+  issuerRef:
+    name: letsencrypt-cloudflare
+    kind: ClusterIssuer
+  dnsNames:
+    - talk-turn.__ZONE_NAME__

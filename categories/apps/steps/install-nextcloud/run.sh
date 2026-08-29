@@ -826,6 +826,45 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "nextcloud" \
   --json-file "$nextcloud_secret_file" \
   --required-keys "NEXTCLOUD_ADMIN_USERNAME,NEXTCLOUD_ADMIN_PASSWORD,NEXTCLOUD_POSTGRESQL__USERNAME,NEXTCLOUD_POSTGRESQL__PASSWORD,NEXTCLOUD_REDIS_PASSWORD,NEXTCLOUD_OIDC_CLIENT_ID,NEXTCLOUD_OIDC_CLIENT_SECRET,EUROOFFICE_JWT_SECRET"
+
+log "Provisioning Nextcloud Talk HPB runtime secrets"
+talk_runtime_secret_json="$(openbao_read_global_secret_json nextcloud-talk-runtime 2>/dev/null || true)"
+talk_signaling_secret="$(jq -r '.TALK_SIGNALING_SECRET // empty' <<<"$talk_runtime_secret_json" 2>/dev/null || true)"
+[[ -n "$talk_signaling_secret" ]] || talk_signaling_secret="$(openssl rand -hex 32)"
+talk_internal_secret="$(jq -r '.TALK_INTERNAL_SECRET // empty' <<<"$talk_runtime_secret_json" 2>/dev/null || true)"
+[[ -n "$talk_internal_secret" ]] || talk_internal_secret="$(openssl rand -hex 32)"
+talk_session_hashkey="$(jq -r '.TALK_SESSION_HASHKEY // empty' <<<"$talk_runtime_secret_json" 2>/dev/null || true)"
+[[ -n "$talk_session_hashkey" ]] || talk_session_hashkey="$(openssl rand -hex 32)"
+talk_session_blockkey="$(jq -r '.TALK_SESSION_BLOCKKEY // empty' <<<"$talk_runtime_secret_json" 2>/dev/null || true)"
+[[ -n "$talk_session_blockkey" ]] || talk_session_blockkey="$(openssl rand -hex 32)"
+talk_turn_secret="$(jq -r '.TALK_TURN_SECRET // empty' <<<"$talk_runtime_secret_json" 2>/dev/null || true)"
+[[ -n "$talk_turn_secret" ]] || talk_turn_secret="$(openssl rand -hex 32)"
+talk_recording_secret="$(jq -r '.TALK_RECORDING_SECRET // empty' <<<"$talk_runtime_secret_json" 2>/dev/null || true)"
+[[ -n "$talk_recording_secret" ]] || talk_recording_secret="$(openssl rand -hex 32)"
+
+talk_runtime_secret_file="$(mktemp)"
+trap 'rm -f "$talk_runtime_secret_file"' EXIT
+jq -n \
+  --arg signaling "$talk_signaling_secret" \
+  --arg internal "$talk_internal_secret" \
+  --arg hashkey "$talk_session_hashkey" \
+  --arg blockkey "$talk_session_blockkey" \
+  --arg turn "$talk_turn_secret" \
+  --arg recording "$talk_recording_secret" \
+  '{
+    TALK_SIGNALING_SECRET: $signaling,
+    TALK_INTERNAL_SECRET: $internal,
+    TALK_SESSION_HASHKEY: $hashkey,
+    TALK_SESSION_BLOCKKEY: $blockkey,
+    TALK_TURN_SECRET: $turn,
+    TALK_RECORDING_SECRET: $recording
+  }' >"$talk_runtime_secret_file"
+bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+  --secret-name "nextcloud-talk-runtime" \
+  --json-file "$talk_runtime_secret_file" \
+  --required-keys "TALK_SIGNALING_SECRET,TALK_INTERNAL_SECRET,TALK_SESSION_HASHKEY,TALK_SESSION_BLOCKKEY,TALK_TURN_SECRET,TALK_RECORDING_SECRET"
+rm -f "$talk_runtime_secret_file"
+
 log "Applying Nextcloud Argo CD application"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$WORKSPACE_ROOT/gitops/optional-apps/nextcloud.yaml" \
@@ -1055,11 +1094,16 @@ tar -C "$WORKSPACE_ROOT/categories/apps/steps/install-nextcloud" -cf - twinbox-m
 kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
   "php occ app:enable twinbox_mail_provisioning >/dev/null"
 
-log "Configuring Nextcloud Talk STUN/TURN servers"
-kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
-  "php occ config:system:set stun_servers --value='[\"turn.${public_zone_name}:3478\"]' --type=json" || true
-kubectl exec -n nextcloud deploy/nextcloud -c nextcloud -- su -s /bin/bash www-data -c \
-  "php occ config:app:set --value='yes' --type=string talk signaling" || true
+log "Configuring Nextcloud Talk HPB (signaling, TURN, recording)"
+wait_for_deployment_rollout "nextcloud" "nextcloud-signaling" "Nextcloud Talk signaling server" || true
+wait_for_deployment_rollout "nextcloud" "nextcloud-coturn" "Nextcloud Talk coturn" || true
+wait_for_deployment_rollout "nextcloud" "nextcloud-recording" "Nextcloud Talk recording backend" || true
+nextcloud_occ "config:system:set stun_servers --value='[\"talk-turn.${public_zone_name}:3478\"]' --type=json" || true
+nextcloud_occ "config:app:set --value='yes' --type=string talk signaling" || true
+nextcloud_occ "talk:signaling:add --verify https://signaling.${public_zone_name}/ ${talk_signaling_secret}" || true
+nextcloud_occ "talk:turn:add turns talk-turn.${public_zone_name} tcp --secret ${talk_turn_secret}" || true
+nextcloud_occ "talk:stun:add talk-turn.${public_zone_name}:3478" || true
+nextcloud_occ "config:app:set talk recording_servers --value='[{\"server\": \"https://recording.${public_zone_name}/\", \"secret\": \"${talk_recording_secret}\"}]' --type=json" || true
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \
@@ -1091,3 +1135,24 @@ bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
   --service-name "nextcloud-eurooffice" \
   --service-domain "nextcloud-eurooffice.${public_zone_name}" \
   --service-path /
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "nextcloud-signaling" \
+  --service-domain "signaling.${public_zone_name}" \
+  --service-path /
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "nextcloud-recording" \
+  --service-domain "recording.${public_zone_name}" \
+  --service-path /
+
+# TURN-TLS media path for Talk: clients connect to talk-turn.<zone>:443 (looks
+# like HTTPS), which the bastion Traefik SNI-passes through to the NetBird
+# proxy. Expose it as a TLS-mode service like the Matrix TURN.
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "nextcloud-talk-turn" \
+  --service-domain "talk-turn.${public_zone_name}" \
+  --service-mode "tls" \
+  --listen-port 8443 \
+  --target-port 443 \
+  --target-protocol "tls"

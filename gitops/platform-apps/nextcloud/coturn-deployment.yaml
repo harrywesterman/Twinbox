@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nextcloud-coturn
+  namespace: nextcloud
+  labels:
+    app.kubernetes.io/name: nextcloud-coturn
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nextcloud-coturn
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nextcloud-coturn
+    spec:
+      containers:
+        - name: coturn
+          image: coturn/coturn:4.17.2
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              exec turnserver -c /etc/coturn/turnserver.conf \
+                --static-auth-secret="${TURN_STATIC_AUTH_SECRET}"
+          env:
+            - name: TURN_STATIC_AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: nextcloud-turn-config
+                  key: static-auth-secret
+          ports:
+            - containerPort: 3478
+              name: turn
+              protocol: UDP
+            - containerPort: 3478
+              name: turn-tcp
+              protocol: TCP
+            - containerPort: 443
+              name: turns
+              protocol: TCP
+          volumeMounts:
+            - name: config
+              mountPath: /etc/coturn
+            - name: tls
+              mountPath: /etc/coturn/tls
+              readOnly: true
+          readinessProbe:
+            tcpSocket:
+              port: 443
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 443
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      volumes:
+        - name: config
+          configMap:
+            name: nextcloud-coturn
+        - name: tls
+          secret:
+            secretName: nextcloud-talk-turn-tls
