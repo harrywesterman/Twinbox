@@ -1,6 +1,25 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "timezone": "Europe/Amsterdam",
+  "automergeType": "pr",
+  "automergeStrategy": "squash",
+  "platformAutomerge": true,
+  "ignoreTests": false,
+  "ignoreUnstable": true,
+  "rebaseWhen": "behind-base-branch",
+  "prConcurrentLimit": 4,
+  "assignees": ["harrywesterman"],
+  "lockFileMaintenance": {
+    "enabled": true
+  },
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "addLabels": ["security"],
+    "assignees": ["harrywesterman"],
+    "schedule": [],
+    "minimumReleaseAge": null
+  },
   "enabledManagers": [
     "argocd",
     "dockerfile",
@@ -177,14 +196,53 @@
       "groupSlug": "{{manager}}-{{depName}}"
     },
     {
-      "description": "Limit concurrent PRs to keep CI signal clear",
-      "matchUpdateTypes": ["minor", "patch", "digest"],
-      "prConcurrentLimit": 4
+      "description": "Schedule manually reviewed updates in the weekly maintenance window",
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin",
+        "digest",
+        "pinDigest",
+        "lockFileMaintenance"
+      ],
+      "schedule": ["before 06:00 on monday"]
     },
     {
-      "description": "Schedule weekly batch to avoid mid-day surprise PRs",
-      "matchUpdateTypes": ["minor", "patch", "digest"],
-      "schedule": ["before 06:00 on monday"]
+      "description": "Keep runtime lock file maintenance manual",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["lockFileMaintenance"],
+      "matchFileNames": ["**/package-lock.json", "!package-lock.json"],
+      "groupName": "Runtime lock file maintenance",
+      "automerge": false
+    },
+    {
+      "description": "Automerge stable npm development updates",
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchCurrentVersion": "!/^0/",
+      "minimumReleaseAge": "14 days",
+      "internalChecksFilter": "strict",
+      "schedule": ["before 06:00 every weekday"],
+      "automerge": true
+    },
+    {
+      "description": "Automerge root tooling lock file maintenance",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["lockFileMaintenance"],
+      "matchFileNames": ["package-lock.json"],
+      "groupName": "Root tooling lock file maintenance",
+      "schedule": ["before 06:00 on monday"],
+      "automerge": true
+    },
+    {
+      "description": "Automerge Verify workflow action digests",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["digest"],
+      "matchFileNames": [".github/workflows/verify.yml"],
+      "schedule": ["before 06:00 every weekday"],
+      "automerge": true
     }
   ]
 }

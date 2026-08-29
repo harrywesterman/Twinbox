@@ -64,9 +64,64 @@ Renovate monitors the following Argo CD applications in `gitops/apps/`, `gitops/
 
 ## Pull request workflow
 
-- Renovate creates **individual PRs** per dependency update.
-- PRs are **not auto-merged** — every change must be reviewed and approved manually.
-- The PR description includes release notes and a diff of the version change.
+- Renovate creates individual or dependency-grouped PRs and includes release notes and a
+  version diff.
+- Only the explicit low-risk allowlist below is auto-merged. All other updates remain open
+  for manual review.
+- Auto-merge always uses a pull request and squash merge. Renovate never pushes an update
+  branch directly to `main`.
+- GitHub only completes auto-merge after the required `Verify / verify` check succeeds and
+  the PR branch is up to date with `main`.
+- Renovate rebases eligible PRs that fall behind. A PR remains open for manual handling when
+  CI fails or a conflict cannot be resolved automatically.
+
+### Automatic update allowlist
+
+| Update | Schedule | Additional guard |
+|--------|----------|------------------|
+| Stable npm `devDependencies` patch/minor | Weekdays before 06:00 | Current version must be 1.0.0 or newer; release must be at least 14 days old |
+| Root `package-lock.json` maintenance | Monday before 06:00 | Root package contains development tooling only |
+| GitHub Actions digest updates in `verify.yml` | Weekdays before 06:00 | Initial digest pinning remains manual |
+
+The following updates are never auto-merged:
+
+- npm runtime dependencies, major versions, prereleases, and dependencies currently on
+  `0.x`
+- nested lockfiles for Manager API/Web/Worker, Portal, Twinbox Agents, and app actions
+- Dockerfiles and Docker Compose images
+- Helm charts, Argo CD applications, third-party GitOps images, and vendored charts
+- Talos, Kubernetes, Cilium, and all other versions in `config/pinned-defaults.sh`
+- GitHub Actions changes outside `.github/workflows/verify.yml`, including the image publish
+  and Pages workflows
+
+GitHub vulnerability alerts bypass the normal schedule and minimum release age. Renovate
+labels these PRs `security` and assigns them to `harrywesterman`. A security update only
+auto-merges when it also matches the low-risk allowlist; all other security updates remain
+manual.
+
+### Repository safeguards
+
+The `main` ruleset requires pull requests, the `verify` status check, and an up-to-date
+branch. Repository auto-merge is enabled. GitHub Actions has a ruleset bypass so the
+`Publish Docker Images` workflow can write its generated `[skip ci]` image-reference commit.
+
+GitHub applies this bypass to the GitHub Actions actor, not to one workflow file. A contract
+test therefore enforces that `docker-publish.yml` is the only workflow with
+`contents: write`. Treat any new workflow write permission as a security-sensitive manual
+change.
+
+Every push to `main`, including a Renovate merge, still rebuilds the Twinbox images and
+refreshes the repository image pins. Portal, Agents, Dashy, and the Jitsi broker can restart
+through Argo CD. The Management VM is not refreshed automatically; continue to wait for a
+successful `Publish Docker Images` run and explicitly update its image tag before pulling the
+stack.
+
+### Rollout and expansion
+
+Evaluate the policy after at least two weeks and at least ten successful automatic merges.
+Review failed PRs, conflicts, regressions, publish results, and Argo CD health. Expanding the
+allowlist, especially to runtime or GitOps updates, requires a separate reviewed policy
+change.
 
 ## Configuration
 
@@ -75,6 +130,13 @@ The configuration lives in `renovate.json`. It uses:
 - **`argocd` manager**: watches `gitops/apps/`, `gitops/optional-apps/`, and `gitops/databases/` for Helm chart `targetRevision` bumps
 - **`regex` managers**: scan `config/pinned-defaults.sh` for pinned infra versions, `gitops/values/` for Docker image overrides, and `gitops/platform-apps/` for inline image tags in workload manifests
 - **`npm` / `dockerfile` / `github-actions`**: standard ecosystem managers
+
+Validate policy changes with:
+
+```bash
+python3 -m pytest -q tests/test_renovate_policy.py
+npx --yes --package renovate renovate-config-validator renovate.json
+```
 
 ## Verification
 
