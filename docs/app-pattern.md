@@ -294,7 +294,7 @@ spec:
   method: plugin
   pluginConfiguration:
     name: barman-cloud.cloudnative-pg.io
-  schedule: "0 2 * * 0"
+  schedule: "0 2 * * 1"
   backupOwnerReference: self
   cluster:
     name: <app>-db
