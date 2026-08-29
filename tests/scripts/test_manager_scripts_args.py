@@ -2532,6 +2532,8 @@ def test_ensure_netbird_service_uses_current_api_and_safe_skips():
     assert "--target-protocol" in text
     assert "--target-direct-upstream" in text
     assert "--target-skip-tls-verify" in text
+    assert "--service-mode" in text
+    assert "--listen-port" in text
     assert 'elif (.clusters | type) == "array" then .clusters' in text
     assert 'elif (.results | type) == "array" then .results' in text
     assert 'elif (.items | type) == "array" then .items' in text
@@ -2709,6 +2711,9 @@ def test_netbird_service_hostnames_match_ingress_routes():
     assert '--service-domain "nextcloud-collabora.${public_zone_name}"' in nextcloud_text
     for host in ["chat", "matrix", "element-admin", "account", "mrtc"]:
         assert f'--service-domain "{host}.${{public_zone_name}}"' in matrix_text
+    assert '--service-domain "turn.${public_zone_name}"' in matrix_text
+    assert '--service-mode "tls"' in matrix_text
+    assert '--target-protocol "tls"' in matrix_text
     assert '--service-domain "loki.${public_zone_name}"' in loki_text
     assert '--service-domain "velero-ui.${public_zone_name}"' in velero_text
     assert '--service-name "argocd"' in argocd_text

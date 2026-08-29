@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: matrix-turn-tls
+  namespace: matrix
+spec:
+  secretName: matrix-turn-tls
+  issuerRef:
+    name: letsencrypt-cloudflare
+    kind: ClusterIssuer
+  dnsNames:
+    - turn.__ZONE_NAME__

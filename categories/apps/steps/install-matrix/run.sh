@@ -645,4 +645,17 @@ bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
   --service-domain "mrtc.${public_zone_name}" \
   --service-path /
 
+# TURN-TLS media path: clients connect to turn.<zone>:443 (looks like HTTPS),
+# which the bastion Traefik SNI-passes through to the NetBird proxy. Expose it
+# as a TLS-mode service on the proxy main port (8443) targeting the cluster
+# Traefik websecure entrypoint, where an IngressRouteTCP passes the connection
+# to the SFU's turn-tls port.
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "matrix-rtc-turn" \
+  --service-domain "turn.${public_zone_name}" \
+  --service-mode "tls" \
+  --listen-port 8443 \
+  --target-port 443 \
+  --target-protocol "tls"
+
 log "Matrix chat installation complete"

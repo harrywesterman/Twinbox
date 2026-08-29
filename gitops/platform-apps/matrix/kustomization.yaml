@@ -8,3 +8,5 @@ resources:
   - runtime-externalsecret.yaml
   - ingressroute.yaml
   - well-known.yaml
+  - turn-certificate.yaml
+  - turn-ingressroutetcp.yaml

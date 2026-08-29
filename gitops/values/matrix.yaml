@@ -78,6 +78,14 @@ matrixRTC:
     # public IP candidate is unreachable for clients on the same LAN
     # (hairpin NAT fails for macOS mDNS-obfuscated host candidates).
     useStunToDiscoverPublicIP: false
+    exposedServices:
+      turnTLS:
+        enabled: true
+        # Advertised to clients as turn.<zone>:443 so media can traverse the
+        # NetBird proxy on port 443 (looks like HTTPS) for off-LAN callers.
+        # domain is templated per-zone in the ApplicationSet inline values.
+        tlsTerminationOnPod: true
+        tlsSecret: matrix-turn-tls
 
 wellKnownDelegation:
   enabled: true

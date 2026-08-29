@@ -58,6 +58,10 @@ spec:
               matrixRTC:
                 ingress:
                   host: "mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
+                sfu:
+                  exposedServices:
+                    turnTLS:
+                      domain: "turn.{{index .metadata.annotations "twinbox.io/public-zone-name"}}"
         - repoURL: __REPO_URL__
           targetRevision: __TARGET_REVISION__
           ref: values
@@ -176,6 +180,20 @@ spec:
                   - op: replace
                     path: /spec/routes/2/match
                     value: Host(`mrtc.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/`) && !PathPrefix(`/sfu/get`) && !PathPrefix(`/get_token`)
+              - target:
+                  kind: IngressRouteTCP
+                  name: matrix-turn-tls
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: HostSNI(`turn.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: Certificate
+                  name: matrix-turn-tls
+                patch: |-
+                  - op: replace
+                    path: /spec/dnsNames/0
+                    value: turn.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
       destination:
         server: https://kubernetes.default.svc
         namespace: matrix

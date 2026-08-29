@@ -1,0 +1,22 @@
+# Matrix RTC TURN-TLS
+# Terminates nothing: passes the raw TLS connection through to the SFU pod,
+# which terminates TURN-TLS with its own certificate (turn.<zone>).
+# Clients reach this via turn.<zone>:443 -> bastion Traefik (SNI passthrough)
+# -> NetBird proxy TLS service -> cluster Traefik websecure (443).
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: matrix-turn-tls
+  namespace: matrix
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: HostSNI(`turn.__ZONE_NAME__`)
+      priority: 10
+      services:
+        - name: ess-matrix-rtc-sfu-turn-tls
+          port: 30003
+      tls:
+        passthrough: true

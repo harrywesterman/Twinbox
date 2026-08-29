@@ -7,8 +7,9 @@ set -euo pipefail
 
 usage() {
   echo "Usage: $0 --service-name <name> --service-domain <domain> [--service-path /]" >&2
+  echo "          [--service-mode <http|tcp|udp|tls>] [--listen-port <port>]" >&2
   echo "          [--target-type <host|domain|cluster>] [--target-id <id>]" >&2
-  echo "          [--target-host <host>] [--target-port <port>] [--target-protocol <http|https>]" >&2
+  echo "          [--target-host <host>] [--target-port <port>] [--target-protocol <http|https|tls>]" >&2
   echo "          [--target-direct-upstream <true|false>] [--target-skip-tls-verify <true|false>]" >&2
   echo "       $0 --normalize-collection <field> < json" >&2
   exit 1
@@ -17,6 +18,8 @@ usage() {
 SERVICE_NAME=""
 SERVICE_DOMAIN=""
 SERVICE_PATH="/"
+SERVICE_MODE="http"
+LISTEN_PORT=""
 NORMALIZE_COLLECTION_FIELD=""
 TARGET_TYPE_OVERRIDE=""
 TARGET_ID_OVERRIDE=""
@@ -31,6 +34,8 @@ while [[ $# -gt 0 ]]; do
     --service-name)  SERVICE_NAME="$2"; shift 2 ;;
     --service-domain) SERVICE_DOMAIN="$2"; shift 2 ;;
     --service-path)  SERVICE_PATH="$2"; shift 2 ;;
+    --service-mode)  SERVICE_MODE="$2"; shift 2 ;;
+    --listen-port)   LISTEN_PORT="$2"; shift 2 ;;
     --normalize-collection) NORMALIZE_COLLECTION_FIELD="$2"; shift 2 ;;
     --target-type) TARGET_TYPE_OVERRIDE="$2"; shift 2 ;;
     --target-id) TARGET_ID_OVERRIDE="$2"; shift 2 ;;
@@ -267,7 +272,7 @@ case "$TARGET_TYPE" in
     ;;
 esac
 case "$TARGET_PROTOCOL" in
-  http|https) ;;
+  http|https|tls) ;;
   *)
     log_skip "NetBird target protocol ${TARGET_PROTOCOL} is not supported; skipping service creation for ${SERVICE_NAME}."
     exit 0
@@ -371,6 +376,20 @@ EXISTING_SERVICE_ID="$(check_existing_service)" || fail_netbird "Could not query
 # and writes its ID to the network secret; the live cluster resources endpoint
 # can be unavailable on some NetBird versions, so do not re-discover it here.
 build_service_payload() {
+  local mode_listen_json="{}"
+  if [[ "$SERVICE_MODE" != "http" ]]; then
+    if [[ -n "$LISTEN_PORT" ]]; then
+      mode_listen_json="$(jq -cn \
+        --arg mode "$SERVICE_MODE" \
+        --argjson listen_port "$LISTEN_PORT" \
+        '{mode: $mode, listen_port: $listen_port}')"
+    else
+      mode_listen_json="$(jq -cn \
+        --arg mode "$SERVICE_MODE" \
+        '{mode: $mode}')"
+    fi
+  fi
+
   jq -cn \
     --arg name "$SERVICE_NAME" \
     --arg domain "$SERVICE_DOMAIN" \
@@ -383,6 +402,7 @@ build_service_payload() {
     --argjson service_enabled "true" \
     --argjson direct_upstream "$TARGET_DIRECT_UPSTREAM" \
     --argjson skip_tls_verify "$TARGET_SKIP_TLS_VERIFY" \
+    --argjson mode_listen "$mode_listen_json" \
     '{
       name: $name,
       domain: $domain,
@@ -408,7 +428,7 @@ build_service_payload() {
         pin_auth: { enabled: false },
         bearer_auth: { enabled: false }
       }
-    }'
+    } * $mode_listen'
 }
 
 # 4. Create or update the service
