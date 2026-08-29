@@ -17,8 +17,8 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
-        runAsUser: 1000
-        runAsGroup: 1000
+        runAsUser: 850
+        runAsGroup: 850
       containers:
         - name: signaling
           image: strukturag/nextcloud-spreed-signaling:2.1.1
