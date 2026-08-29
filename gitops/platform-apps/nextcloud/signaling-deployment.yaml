@@ -53,14 +53,12 @@ spec:
             - name: SKIP_VERIFY
               value: "false"
           readinessProbe:
-            httpGet:
-              path: /api/v1/stats
+            tcpSocket:
               port: http
             initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
-            httpGet:
-              path: /api/v1/stats
+            tcpSocket:
               port: http
             initialDelaySeconds: 30
             periodSeconds: 20
