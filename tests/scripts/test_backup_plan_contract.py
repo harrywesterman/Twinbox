@@ -92,7 +92,7 @@ def test_cloudnativepg_clusters_use_seaweedfs_and_14_day_retention():
         ), path
         assert "name: seaweedfs-backup-credentials" in objectstore_text, path
 
-    schedule_re = re.compile(r'^\s*schedule: "0 2 \* \* ([1-7])"$', re.MULTILINE)
+    schedule_re = re.compile(r'^\s*schedule: "0 0 2 \* \* ([1-7])"$', re.MULTILINE)
     days_used = set()
     for path in database_root.glob("*/scheduled-backup.yaml"):
         text = path.read_text(encoding="utf-8")
