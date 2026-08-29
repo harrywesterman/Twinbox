@@ -12,8 +12,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - kind: Rule
-      match: HostSNI(`turn.__ZONE_NAME__`)
+    - match: HostSNI(`turn.__ZONE_NAME__`)
       priority: 10
       services:
         - name: ess-matrix-rtc-sfu-turn-tls
