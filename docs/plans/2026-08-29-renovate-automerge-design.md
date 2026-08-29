@@ -19,7 +19,8 @@ auto-merge if they independently match the allowlist.
 GitHub protects `main` with required pull requests, a strict required status check, and a
 dedicated write deploy key bypass for the generated image-reference commit. The private key
 is exposed only to the `update-refs` job. A contract test ensures only the Docker publish
-workflow has repository content write permission.
+workflow has repository content write permission. Repository administrators retain the
+existing direct-`main` bypass; Renovate receives no bypass.
 
 ## Operational boundary
 

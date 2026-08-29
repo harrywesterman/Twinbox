@@ -112,6 +112,10 @@ passed to the `update-refs` checkout. A contract test also enforces that
 deploy key together and treat any additional workflow write permission as a
 security-sensitive manual change.
 
+Repository administrators retain the existing direct-`main` bypass required by the Twinbox
+maintenance workflow. Renovate has no bypass and must always satisfy the pull-request and
+`verify` rules.
+
 Every push to `main`, including a Renovate merge, still rebuilds the Twinbox images and
 refreshes the repository image pins. Portal, Agents, Dashy, and the Jitsi broker can restart
 through Argo CD. The Management VM is not refreshed automatically; continue to wait for a
