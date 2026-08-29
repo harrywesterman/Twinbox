@@ -15,10 +15,6 @@ spec:
       labels:
         app.kubernetes.io/name: nextcloud-signaling
     spec:
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 850
-        runAsGroup: 850
       containers:
         - name: signaling
           image: strukturag/nextcloud-spreed-signaling:2.1.1
