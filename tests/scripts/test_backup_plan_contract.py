@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -91,12 +92,21 @@ def test_cloudnativepg_clusters_use_seaweedfs_and_14_day_retention():
         ), path
         assert "name: seaweedfs-backup-credentials" in objectstore_text, path
 
+    schedule_re = re.compile(r'^\s*schedule: "0 2 \* \* ([0-7])"$', re.MULTILINE)
+    days_used = set()
     for path in database_root.glob("*/scheduled-backup.yaml"):
         text = path.read_text(encoding="utf-8")
         assert "method: plugin" in text, path
         assert "pluginConfiguration:" in text, path
         assert "name: barman-cloud.cloudnative-pg.io" in text, path
-        assert 'schedule: "0 2 * * *"' in text, path
+        match = schedule_re.search(text)
+        assert match, f"expected a weekly base backup schedule in {path}"
+        days_used.add(int(match.group(1)))
+
+    expected_days = {0, 1, 2, 3, 4, 5, 6}
+    assert days_used == expected_days, (
+        f"expected staggered weekly base backups, got {sorted(days_used)}"
+    )
 
 
 def test_management_vm_backup_installs_host_cron_without_embedding_secrets():

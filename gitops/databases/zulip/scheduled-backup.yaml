@@ -1,12 +1,12 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: zulip-db-daily
+  name: zulip-db-backup
   namespace: databases
 spec:
   method: plugin
   pluginConfiguration:
     name: barman-cloud.cloudnative-pg.io
-  schedule: "0 2 * * *"
+  schedule: "0 2 * * 5"
   cluster:
     name: zulip-db

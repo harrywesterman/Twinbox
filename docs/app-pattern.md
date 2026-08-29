@@ -283,7 +283,7 @@ spec:
 
 Use the `-rw-session` service only for apps that depend on session-bound PostgreSQL behavior such as advisory locks or long-lived server-side coordination. Authentik is the first cluster app that needs this exception.
 
-**scheduled-backup.yaml** — Daily backup:
+**scheduled-backup.yaml** — Weekly base backup:
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
@@ -294,11 +294,13 @@ spec:
   method: plugin
   pluginConfiguration:
     name: barman-cloud.cloudnative-pg.io
-  schedule: "0 2 * * *"
+  schedule: "0 2 * * 0"
   backupOwnerReference: self
   cluster:
     name: <app>-db
 ```
+
+Base backups are weekly and spread across the week (one or two databases per day) so they never all run at once against the local SeaweedFS bucket. Continuous WAL archiving (`isWALArchiver: true` on the Cluster) already provides point-in-time recovery with minute-level RPO, so the base backup only sets the recovery baseline; the ObjectStore `retentionPolicy: "14d"` covers several base backups plus the WAL replay window.
 
 ### Step 4: IngressRoute
 
