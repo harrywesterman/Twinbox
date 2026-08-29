@@ -17,9 +17,9 @@ privileged workflow changes remain manual. Security updates are raised immediate
 auto-merge if they independently match the allowlist.
 
 GitHub protects `main` with required pull requests, a strict required status check, and a
-GitHub Actions bypass for the generated image-reference commit. Because that bypass is
-actor-wide, a contract test ensures only the Docker publish workflow has repository content
-write permission.
+dedicated write deploy key bypass for the generated image-reference commit. The private key
+is exposed only to the `update-refs` job. A contract test ensures only the Docker publish
+workflow has repository content write permission.
 
 ## Operational boundary
 

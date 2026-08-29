@@ -101,3 +101,11 @@ def test_only_publish_workflow_can_write_repository_contents():
             writers.append(workflow.name)
 
     assert writers == ["docker-publish.yml"]
+
+
+def test_image_reference_push_uses_the_dedicated_deploy_key():
+    workflow = (WORKFLOWS_DIR / "docker-publish.yml").read_text(encoding="utf-8")
+    update_refs = workflow.split("  update-refs:", maxsplit=1)[1]
+
+    assert "ssh-key: ${{ secrets.TWINBOX_IMAGE_REFS_DEPLOY_KEY }}" in update_refs
+    assert "token: ${{ secrets.GITHUB_TOKEN }}" not in update_refs

@@ -102,13 +102,15 @@ manual.
 ### Repository safeguards
 
 The `main` ruleset requires pull requests, the `verify` status check, and an up-to-date
-branch. Repository auto-merge is enabled. GitHub Actions has a ruleset bypass so the
+branch. Repository auto-merge is enabled. A dedicated deploy key has a ruleset bypass so the
 `Publish Docker Images` workflow can write its generated `[skip ci]` image-reference commit.
 
-GitHub applies this bypass to the GitHub Actions actor, not to one workflow file. A contract
-test therefore enforces that `docker-publish.yml` is the only workflow with
-`contents: write`. Treat any new workflow write permission as a security-sensitive manual
-change.
+The bypass belongs to the dedicated write deploy key `Twinbox image refs workflow`. Its
+private key is stored only in the Actions secret `TWINBOX_IMAGE_REFS_DEPLOY_KEY` and is only
+passed to the `update-refs` checkout. A contract test also enforces that
+`docker-publish.yml` is the only workflow with `contents: write`. Rotate both halves of the
+deploy key together and treat any additional workflow write permission as a
+security-sensitive manual change.
 
 Every push to `main`, including a Renovate merge, still rebuilds the Twinbox images and
 refreshes the repository image pins. Portal, Agents, Dashy, and the Jitsi broker can restart
