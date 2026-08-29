@@ -282,8 +282,9 @@ secrets_dir="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}/secrets/global"
 matrix_oidc_secret_file="${secrets_dir}/matrix-oidc-${cluster_id}.json"
 matrix_db_secret_file="${secrets_dir}/matrix-db-${cluster_id}.json"
 matrix_runtime_secret_file="${secrets_dir}/matrix-runtime-${cluster_id}.json"
+cloudflare_secret_file="${secrets_dir}/cloudflare-token.json"
 matrix_manifest_path="$WORKSPACE_ROOT/gitops/apps/matrix.yaml"
-trap 'rm -f "$matrix_oidc_secret_file" "$matrix_db_secret_file" "$matrix_runtime_secret_file"' EXIT
+trap 'rm -f "$matrix_oidc_secret_file" "$matrix_db_secret_file" "$matrix_runtime_secret_file" "$cloudflare_secret_file"' EXIT
 
 mkdir -p "$secrets_dir"
 
@@ -442,6 +443,34 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "matrix-runtime" \
   --json-file "$matrix_runtime_secret_file" \
   --required-keys "MATRIX_SYNAPSE_SHARED_SECRET,MATRIX_MAS_ENCRYPTION_SECRET"
+
+# Provision the Cloudflare API token to OpenBao for the cert-manager
+# letsencrypt-cloudflare ClusterIssuer (TURN-TLS certificate for turn.<zone>).
+# The token already lives in the external-dns-credentials secret from the
+# configure-dns step; it is read at runtime and never stored in the repo.
+if kubectl get secret external-dns-credentials -n external-dns >/dev/null 2>&1; then
+  dns_provider_annotation="$(
+    kubectl get secret external-dns-credentials -n external-dns -o jsonpath='{.metadata.annotations.twinbox\.io/dns-provider}' 2>/dev/null || true
+  )"
+  dns_provider="${dns_provider_annotation:-$(
+    kubectl get secret external-dns-credentials -n external-dns -o json 2>/dev/null \
+      | jq -r 'if (.data.token != null) then "cloudflare" elif (.data["access-key"] != null) then "aws" else "unknown" end'
+  )}"
+  if [[ "$dns_provider" == "cloudflare" ]]; then
+    cloudflare_api_token="$(
+      kubectl get secret external-dns-credentials -n external-dns -o jsonpath='{.data.token}' 2>/dev/null | base64 -d || true
+    )"
+    if [[ -n "$cloudflare_api_token" ]]; then
+      jq -n --arg token "$cloudflare_api_token" '{CLOUDFLARE_API_TOKEN: $token}' >"$cloudflare_secret_file"
+      chmod 600 "$cloudflare_secret_file"
+      bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+        --secret-name "cloudflare-token" \
+        --json-file "$cloudflare_secret_file" \
+        --required-keys "CLOUDFLARE_API_TOKEN"
+      rm -f "$cloudflare_secret_file"
+    fi
+  fi
+fi
 
 # Apply database manifests
 databases_namespace_manifest="$WORKSPACE_ROOT/gitops/databases/shared/namespace.yaml"

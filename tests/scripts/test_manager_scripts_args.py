@@ -2872,6 +2872,14 @@ def test_matrix_install_step_waits_on_specific_resources():
     assert text.index('kubectl apply -f "$matrix_runtime_externalsecret_manifest"') < text.index(
         'bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh"'
     )
+    # TURN-TLS: provision the Cloudflare token to OpenBao from the existing
+    # external-dns secret (never a token literal in the repo).
+    assert "external-dns-credentials" in text
+    assert "twinbox\\.io/dns-provider" in text
+    assert "then \"cloudflare\"" in text
+    assert "--secret-name \"cloudflare-token\"" in text
+    assert "CLOUDFLARE_API_TOKEN" in text
+    assert "jq -n --arg token" in text
     assert 'wait_for_statefulset_ready "matrix" "ess-synapse-main"' in text
     assert 'wait_for_deployment_rollout "matrix" "ess-haproxy"' in text
     assert 'wait_for_deployment_rollout "matrix" "ess-matrix-rtc-authorisation-service"' in text
