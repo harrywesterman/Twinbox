@@ -1666,7 +1666,7 @@ def test_argo_bootstrap_script_installs_argocd_without_root_application_tree():
         in text
     )
     assert (
-        'kubectl apply --server-side --force-conflicts --validate=false -n argocd -f "https://raw.githubusercontent.com/argoproj/argo-cd/v${ARGOCD_VERSION}/manifests/ha/install.yaml"'
+        'kubectl apply --server-side --force-conflicts --validate=false -n argocd -f "https://raw.githubusercontent.com/argoproj/argo-cd/v${ARGOCD_VERSION}/manifests/install.yaml"'
         in text
     )
     assert "control_plane_tolerations" in text

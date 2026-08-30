@@ -135,7 +135,7 @@ log "Creating argocd namespace"
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply --validate=false -f -
 
 log "Installing Argo CD v${ARGOCD_VERSION}"
-retry 3 10 kubectl apply --server-side --force-conflicts --validate=false -n argocd -f "https://raw.githubusercontent.com/argoproj/argo-cd/v${ARGOCD_VERSION}/manifests/ha/install.yaml"
+retry 3 10 kubectl apply --server-side --force-conflicts --validate=false -n argocd -f "https://raw.githubusercontent.com/argoproj/argo-cd/v${ARGOCD_VERSION}/manifests/install.yaml"
 
 patch_argocd_workload_tolerations
 patch_argocd_workload_probes
