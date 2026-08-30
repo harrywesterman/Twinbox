@@ -300,7 +300,7 @@ spec:
     name: <app>-db
 ```
 
-Base backups are weekly and spread across the week (one or two databases per day) so they never all run at once against the local SeaweedFS bucket. The schedule is a six-field cron (`second minute hour day-of-month month day-of-week`) with weekdays 1-7, so `"0 0 2 * * 1"` means 02:00:00 on Monday. Continuous WAL archiving (`isWALArchiver: true` on the Cluster) already provides point-in-time recovery with minute-level RPO, so the base backup only sets the recovery baseline; the ObjectStore `retentionPolicy: "14d"` covers several base backups plus the WAL replay window.
+Base backups are weekly and spread across the week (one or two databases per day) so they never all run at once against the local SeaweedFS bucket. The schedule is a six-field cron (`second minute hour day-of-month month day-of-week`) in CloudNativePG's format, so `"0 0 2 * * 1"` means 02:00:00 on day 1. CloudNativePG only accepts weekdays 1-6 (Sunday is not expressible), so pick a weekday when adding a new database. Continuous WAL archiving (`isWALArchiver: true` on the Cluster) already provides point-in-time recovery with minute-level RPO, so the base backup only sets the recovery baseline; the ObjectStore `retentionPolicy: "14d"` covers several base backups plus the WAL replay window.
 
 ### Step 4: IngressRoute
 
