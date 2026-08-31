@@ -4352,6 +4352,7 @@ def test_penpot_helm_values_render_with_openbao_backed_secrets():
     backend_env = {
         item["name"]: item for item in backend["spec"]["template"]["spec"]["containers"][0]["env"]
     }
+    backend_resources = backend["spec"]["template"]["spec"]["containers"][0]["resources"]
     frontend = next(
         item
         for item in manifests
@@ -4383,6 +4384,9 @@ def test_penpot_helm_values_render_with_openbao_backed_secrets():
         "key": "PENPOT_OIDC_CLIENT_SECRET",
     }
     assert backend_env["PENPOT_TELEMETRY_ENABLED"]["value"] == "false"
+    assert backend_env["JAVA_TOOL_OPTIONS"]["value"] == "-Xms512m -Xmx1536m"
+    assert backend_resources["requests"]["memory"] == "1Gi"
+    assert backend_resources["limits"]["memory"] == "2Gi"
     required_pod_affinity = frontend_affinity["podAffinity"][
         "requiredDuringSchedulingIgnoredDuringExecution"
     ]
