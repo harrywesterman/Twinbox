@@ -5,7 +5,6 @@ resources:
   - namespace.yaml
   - pvc.yaml
   - externalsecret.yaml
-  - redis-pvc.yaml
   - redis.yaml
   - deployment.yaml
   - service.yaml
