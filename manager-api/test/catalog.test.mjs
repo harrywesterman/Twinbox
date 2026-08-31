@@ -282,6 +282,7 @@ test("app catalog exposes apps while the wizard catalog keeps them out of sight"
     const hedgedocCard = appCatalog.categories[0].steps.find(
       (step) => step.id === "install-hedgedoc"
     );
+    const penpotCard = appCatalog.categories[0].steps.find((step) => step.id === "install-penpot");
     const mijnBureauBundle = appCatalog.bundles.find((bundle) => bundle.id === "mijn-bureau");
     const nextcloudBundle = appCatalog.bundles.find((bundle) => bundle.id === "nextcloud");
     const openDeskBundle = appCatalog.bundles.find((bundle) => bundle.id === "opendesk");
@@ -323,6 +324,10 @@ test("app catalog exposes apps while the wizard catalog keeps them out of sight"
     assert.equal(hedgedocCard?.placeholder, false);
     assert.equal(hedgedocCard?.installable, true);
     assert.equal(hedgedocCard?.runner?.script, "categories/apps/steps/install-hedgedoc/run.sh");
+    assert.equal(penpotCard?.title, "Install Penpot");
+    assert.equal(penpotCard?.placeholder, false);
+    assert.equal(penpotCard?.installable, true);
+    assert.equal(penpotCard?.runner?.script, "categories/apps/steps/install-penpot/run.sh");
     assert.equal(freshrssCard?.title, "Install FreshRSS");
     assert.equal(freshrssCard?.placeholder, false);
     assert.equal(freshrssCard?.installable, true);

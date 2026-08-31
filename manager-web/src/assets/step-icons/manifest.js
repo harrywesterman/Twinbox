@@ -220,6 +220,12 @@ export const STEP_ICON_MANIFEST = [
     officialSourceUrl: "https://github.com/open-webui/open-webui",
   }),
   iconEntry({
+    stepId: "install-penpot",
+    isAppOrPlatform: true,
+    officialSourceType: "project-repository",
+    officialSourceUrl: "https://github.com/penpot/penpot",
+  }),
+  iconEntry({
     stepId: "install-audiobookshelf",
     isAppOrPlatform: true,
     officialSourceType: "project-repository",

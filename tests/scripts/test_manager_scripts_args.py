@@ -2,10 +2,12 @@ import importlib.util
 import json
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 
+import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -52,6 +54,7 @@ OUTLINE_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-out
 OPENWEBUI_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-openwebui" / "run.sh"
 N8N_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-n8n" / "run.sh"
 HEDGEDOC_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-hedgedoc" / "run.sh"
+PENPOT_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-penpot" / "run.sh"
 PAPERLESS_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-paperless" / "run.sh"
 AUDIOBOOKSHELF_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "apps" / "steps" / "install-audiobookshelf" / "run.sh"
@@ -84,12 +87,15 @@ OUTLINE_OPTIONAL_APP = REPO_ROOT / "gitops" / "optional-apps" / "outline.yaml"
 OPENWEBUI_APP = REPO_ROOT / "gitops" / "apps" / "openwebui.yaml"
 N8N_APP = REPO_ROOT / "gitops" / "apps" / "n8n.yaml"
 HEDGEDOC_APP = REPO_ROOT / "gitops" / "apps" / "hedgedoc.yaml"
+PENPOT_APP = REPO_ROOT / "gitops" / "apps" / "penpot.yaml"
+PENPOT_VALUES = REPO_ROOT / "gitops" / "values" / "penpot.yaml"
 PAPERLESS_APP = REPO_ROOT / "gitops" / "apps" / "paperless.yaml"
 PIXELFED_APP = REPO_ROOT / "gitops" / "apps" / "pixelfed.yaml"
 OUTLINE_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "outline" / "kustomization.yaml"
 OPENWEBUI_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "openwebui" / "kustomization.yaml"
 N8N_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "n8n" / "kustomization.yaml"
 HEDGEDOC_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "hedgedoc" / "kustomization.yaml"
+PENPOT_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "penpot" / "kustomization.yaml"
 PAPERLESS_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "paperless" / "kustomization.yaml"
 VAULTWARDEN_DB_KUSTOMIZATION = (
     REPO_ROOT / "gitops" / "databases" / "vaultwarden" / "kustomization.yaml"
@@ -3380,6 +3386,7 @@ def test_optional_apps_route_steady_state_through_argocd_sources():
         "openwebui": (OPENWEBUI_APP, OPENWEBUI_DB_KUSTOMIZATION),
         "n8n": (N8N_APP, N8N_DB_KUSTOMIZATION),
         "hedgedoc": (HEDGEDOC_APP, HEDGEDOC_DB_KUSTOMIZATION),
+        "penpot": (PENPOT_APP, PENPOT_DB_KUSTOMIZATION),
         "paperless": (PAPERLESS_APP, PAPERLESS_DB_KUSTOMIZATION),
         "vaultwarden": (VAULTWARDEN_APP, VAULTWARDEN_DB_KUSTOMIZATION),
         "pixelfed": (PIXELFED_APP, PIXELFED_DB_KUSTOMIZATION),
@@ -3405,6 +3412,11 @@ def test_optional_apps_route_steady_state_through_argocd_sources():
             "apply-argocd-application.sh",
             '--application "hedgedoc"',
             "gitops/apps/hedgedoc.yaml",
+        ],
+        PENPOT_STEP_SCRIPT: [
+            "apply-argocd-application.sh",
+            '--application "penpot"',
+            "gitops/apps/penpot.yaml",
         ],
         PAPERLESS_STEP_SCRIPT: [
             "apply-argocd-application.sh",
@@ -3439,6 +3451,10 @@ def test_optional_apps_route_steady_state_through_argocd_sources():
         HEDGEDOC_STEP_SCRIPT: [
             'kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/hedgedoc/namespace.yaml"',
             'kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/hedgedoc/cluster.yaml"',
+        ],
+        PENPOT_STEP_SCRIPT: [
+            'kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/penpot/namespace.yaml"',
+            'kubectl apply -k "$WORKSPACE_ROOT/gitops/databases/penpot"',
         ],
         PAPERLESS_STEP_SCRIPT: [
             'kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/paperless/namespace.yaml"',
@@ -3492,6 +3508,7 @@ def test_optional_apps_resource_profile_lookups_use_index_on_labels():
         REPO_ROOT / "gitops" / "optional-apps" / "nextcloud.yaml",
         REPO_ROOT / "gitops" / "optional-apps" / "outline.yaml",
         REPO_ROOT / "gitops" / "optional-apps" / "paperless.yaml",
+        REPO_ROOT / "gitops" / "optional-apps" / "penpot.yaml",
         REPO_ROOT / "gitops" / "optional-apps" / "pixelfed.yaml",
         REPO_ROOT / "gitops" / "optional-apps" / "openwebui.yaml",
         REPO_ROOT / "gitops" / "optional-apps" / "vaultwarden.yaml",
@@ -4162,6 +4179,7 @@ def test_optional_database_apps_patch_cloudnativepg_requests_by_resource_profile
         "openwebui",
         "outline",
         "paperless",
+        "penpot",
         "pixelfed",
         "vaultwarden",
     ]
@@ -4227,6 +4245,7 @@ def test_databases_shared_kustomization_only_owns_namespace():
         "openwebui",
         "outline",
         "paperless",
+        "penpot",
         "pixelfed",
         "vaultwarden",
         "zulip",
@@ -4285,10 +4304,98 @@ def test_database_app_overlays_do_not_carry_namespace_manifests():
         "openwebui",
         "outline",
         "paperless",
+        "penpot",
         "pixelfed",
         "vaultwarden",
     ]:
         assert not (REPO_ROOT / "gitops" / "databases" / app_name / "namespace.yaml").exists()
+
+
+def test_penpot_helm_values_render_with_openbao_backed_secrets():
+    helm = shutil.which("helm")
+    if helm is None:
+        pytest.skip("helm is not available")
+
+    result = subprocess.run(
+        [
+            helm,
+            "template",
+            "penpot",
+            "penpot/penpot",
+            "--version",
+            "1.9.0",
+            "--namespace",
+            "penpot",
+            "-f",
+            str(PENPOT_VALUES),
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    manifests = [item for item in yaml.safe_load_all(result.stdout) if item]
+    assert any(
+        item["kind"] == "PersistentVolumeClaim" and item["metadata"]["name"] == "penpot-data-assets"
+        for item in manifests
+    )
+
+    backend = next(
+        item
+        for item in manifests
+        if item["kind"] == "Deployment" and item["metadata"]["name"] == "penpot-backend"
+    )
+    backend_env = {
+        item["name"]: item for item in backend["spec"]["template"]["spec"]["containers"][0]["env"]
+    }
+    frontend = next(
+        item
+        for item in manifests
+        if item["kind"] == "Deployment" and item["metadata"]["name"] == "penpot-frontend"
+    )
+    frontend_affinity = frontend["spec"]["template"]["spec"]["affinity"]
+
+    assert backend_env["PENPOT_SECRET_KEY"]["valueFrom"]["secretKeyRef"] == {
+        "name": "penpot-bootstrap",
+        "key": "PENPOT_SECRET_KEY",
+    }
+    assert backend_env["PENPOT_DATABASE_URI"]["value"] == (
+        "postgresql://penpot-db-pooler-rw.databases.svc.cluster.local:5432/penpot"
+    )
+    assert backend_env["PENPOT_DATABASE_USERNAME"]["valueFrom"]["secretKeyRef"] == {
+        "name": "penpot-bootstrap",
+        "key": "PENPOT_POSTGRESQL__USERNAME",
+    }
+    assert backend_env["PENPOT_DATABASE_PASSWORD"]["valueFrom"]["secretKeyRef"] == {
+        "name": "penpot-bootstrap",
+        "key": "PENPOT_POSTGRESQL__PASSWORD",
+    }
+    assert backend_env["PENPOT_OIDC_CLIENT_ID"]["valueFrom"]["secretKeyRef"] == {
+        "name": "penpot-bootstrap",
+        "key": "PENPOT_OIDC_CLIENT_ID",
+    }
+    assert backend_env["PENPOT_OIDC_CLIENT_SECRET"]["valueFrom"]["secretKeyRef"] == {
+        "name": "penpot-bootstrap",
+        "key": "PENPOT_OIDC_CLIENT_SECRET",
+    }
+    assert backend_env["PENPOT_TELEMETRY_ENABLED"]["value"] == "false"
+    required_pod_affinity = frontend_affinity["podAffinity"][
+        "requiredDuringSchedulingIgnoredDuringExecution"
+    ]
+    assert required_pod_affinity == [
+        {
+            "labelSelector": {
+                "matchLabels": {
+                    "app.kubernetes.io/name": "penpot-backend",
+                    "app.kubernetes.io/instance": "penpot",
+                }
+            },
+            "topologyKey": "kubernetes.io/hostname",
+        }
+    ]
+    assert "kmZ96pAxhTgk3HZvvBkPeVTspGBneKVLEpO" not in result.stdout
 
 
 def test_vaultwarden_manifests_use_postgresql_and_domain_limited_signups():
@@ -4611,6 +4718,7 @@ def test_database_app_installers_refresh_pgadmin_after_database_ready():
         ),
         "install-outline": ("outline", "outline-db-pooler-rw-session.databases.svc.cluster.local"),
         "install-paperless": ("paperless", "paperless-db-pooler-rw.databases.svc.cluster.local"),
+        "install-penpot": ("penpot", "penpot-db-pooler-rw.databases.svc.cluster.local"),
         "install-pixelfed": (
             "pixelfed",
             "pixelfed-db-pooler-rw-session.databases.svc.cluster.local",
@@ -5938,7 +6046,7 @@ def test_uninstall_authentik_cleanup_sets_forward_before_app_cleanup():
     )
 
     app_detection_index = text.index(
-        "immich|nextcloud|audiobookshelf|karakeep|outline|openwebui|hedgedoc|paperless|vaultwarden|jitsi|opencloud|zulip|pixelfed|headlamp|twinbox-portal"
+        "immich|nextcloud|audiobookshelf|karakeep|outline|openwebui|hedgedoc|paperless|penpot|vaultwarden|jitsi|opencloud|zulip|pixelfed|headlamp|twinbox-portal"
     )
     setup_condition_index = text.index('if [[ "$needs_authentik_cleanup" == "true" ]]')
     setup_forward_index = text.index("authentik_setup_forward", setup_condition_index)

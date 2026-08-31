@@ -1,0 +1,101 @@
+config:
+  publicUri: https://penpot.__ZONE_NAME__
+  flags: "disable-registration disable-login-with-password enable-login-with-oidc enable-oidc-registration enable-log-emails enable-access-tokens enable-webhooks enable-mcp"
+  existingSecret: penpot-bootstrap
+  secretKeys:
+    apiSecretKey: PENPOT_SECRET_KEY
+  telemetryEnabled: false
+  postgresql:
+    host: penpot-db-pooler-rw.databases.svc.cluster.local
+    port: 5432
+    username: penpot
+    database: penpot
+    existingSecret: penpot-bootstrap
+    secretKeys:
+      usernameKey: PENPOT_POSTGRESQL__USERNAME
+      passwordKey: PENPOT_POSTGRESQL__PASSWORD
+  redis:
+    host: penpot-valkey
+    port: 6379
+    database: "0"
+  objectsStorage:
+    storageBackend: fs
+    filesystem:
+      directory: /opt/data/assets
+  fileDataBackend: legacy-db
+  providers:
+    oidc:
+      enabled: true
+      baseURI: https://authentik.__ZONE_NAME__/application/o/penpot/
+      roles: ""
+      rolesAttribute: ""
+      scopes: "openid profile email"
+    existingSecret: penpot-bootstrap
+    secretKeys:
+      oidcClientIDKey: PENPOT_OIDC_CLIENT_ID
+      oidcClientSecretKey: PENPOT_OIDC_CLIENT_SECRET
+
+backend:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+frontend:
+  replicaCount: 1
+  affinity:
+    podAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: penpot-backend
+              app.kubernetes.io/instance: penpot
+          topologyKey: kubernetes.io/hostname
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+exporter:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+mcp:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+persistence:
+  assets:
+    enabled: true
+    storageClass: longhorn
+    size: 20Gi
+    accessModes:
+      - ReadWriteOnce
+
+ingress:
+  enabled: false
+
+gateway:
+  enabled: false
+
+route:
+  enabled: false

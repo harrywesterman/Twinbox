@@ -114,4 +114,5 @@ test("step icon manifest keeps the wizard icon set complete and paired", async (
   assert.ok(seen.has("install-beszel"), "expected a branded Beszel icon");
   assert.ok(seen.has("install-mastodon"), "expected a Mastodon SVG replacement");
   assert.ok(seen.has("install-zulip"), "expected a Zulip SVG replacement");
+  assert.ok(seen.has("install-penpot"), "expected a Penpot SVG replacement");
 });

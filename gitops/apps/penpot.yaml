@@ -1,0 +1,48 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: penpot
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://helm.penpot.app
+      chart: penpot
+      targetRevision: "1.9.0"
+      helm:
+        valueFiles:
+          - $values/gitops/values/penpot.yaml
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      ref: values
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      path: gitops/platform-apps/penpot
+      kustomize:
+        patches:
+          - target:
+              kind: IngressRoute
+              name: penpot
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`penpot.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: penpot-netbird
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`penpot.__ZONE_NAME__`)
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      path: gitops/databases/penpot
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: penpot
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

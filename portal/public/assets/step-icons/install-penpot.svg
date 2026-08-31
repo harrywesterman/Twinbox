@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title">
+  <title id="title">Penpot</title>
+  <rect width="96" height="96" rx="20" fill="#111827"/>
+  <path d="M28 20h28c8.8 0 16 7.2 16 16s-7.2 16-16 16H44v24H28V20Z" fill="#ff5a7a"/>
+  <path d="M44 36h11.5c2.5 0 4.5-2 4.5-4.5S58 27 55.5 27H44v9Z" fill="#fff"/>
+  <path d="M44 52h13c7.7 0 14 6.3 14 14S64.7 80 57 80H44V52Z" fill="#00d7a7"/>
+  <path d="M56 65.5a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z" fill="#111827"/>
+</svg>

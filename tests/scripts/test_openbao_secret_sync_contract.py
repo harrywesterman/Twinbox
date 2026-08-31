@@ -69,6 +69,13 @@ OUTLINE_PLATFORM_DIR = REPO_ROOT / "gitops" / "platform-apps" / "outline"
 OUTLINE_DEPLOYMENT = OUTLINE_PLATFORM_DIR / "deployment.yaml"
 OUTLINE_SECRET = OUTLINE_PLATFORM_DIR / "externalsecret.yaml"
 OUTLINE_DB_CLUSTER = REPO_ROOT / "gitops" / "databases" / "outline" / "cluster.yaml"
+PENPOT_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-penpot" / "run.sh"
+PENPOT_APP = REPO_ROOT / "gitops" / "apps" / "penpot.yaml"
+PENPOT_OPTIONAL_APP = REPO_ROOT / "gitops" / "optional-apps" / "penpot.yaml"
+PENPOT_VALUES = REPO_ROOT / "gitops" / "values" / "penpot.yaml"
+PENPOT_PLATFORM_DIR = REPO_ROOT / "gitops" / "platform-apps" / "penpot"
+PENPOT_SECRET = PENPOT_PLATFORM_DIR / "externalsecret.yaml"
+PENPOT_DB_CLUSTER = REPO_ROOT / "gitops" / "databases" / "penpot" / "cluster.yaml"
 REMOVED_PLACEHOLDER_STEP = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-vaultwarden-app" / "step.yaml"
 )
@@ -625,6 +632,52 @@ def test_outline_step_projects_a_real_oidc_backed_app():
     assert "property: UTILS_SECRET" in secret_text
     assert "property: OIDC_CLIENT_ID" in secret_text
     assert "property: OIDC_CLIENT_SECRET" in secret_text
+    assert "imageName: ghcr.io/cloudnative-pg/postgresql:16.4" in db_cluster_text
+
+
+def test_penpot_step_projects_a_real_oidc_backed_app():
+    step_text = _read(PENPOT_STEP)
+    app_text = _read(PENPOT_APP)
+    optional_app_text = _read(PENPOT_OPTIONAL_APP)
+    values_text = _read(PENPOT_VALUES)
+    ingressroute_text = _read(PENPOT_PLATFORM_DIR / "ingressroute.yaml")
+    secret_text = _read(PENPOT_SECRET)
+    db_cluster_text = _read(PENPOT_DB_CLUSTER)
+
+    assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in step_text
+    assert "openbao_read_global_secret_json penpot" in step_text
+    assert '--secret-name "penpot"' in step_text
+    assert (
+        '--required-keys "PENPOT_POSTGRESQL__USERNAME,PENPOT_POSTGRESQL__PASSWORD,PENPOT_SECRET_KEY,PENPOT_OIDC_CLIENT_ID,PENPOT_OIDC_CLIENT_SECRET"'
+        in step_text
+    )
+    assert "create_or_update_provider()" in step_text
+    assert 'penpot_application_slug="penpot"' in step_text
+    assert "https://penpot.${public_zone_name}/api/auth/oidc/callback" in step_text
+    assert "https://penpot.${public_zone_name}/api/auth/oauth/oidc/callback" in step_text
+    assert 'sed "s/__ZONE_NAME__/${public_zone_name}/g"' in step_text
+    assert "apply-argocd-application.sh" in step_text
+    assert '--application "penpot"' in step_text
+    assert "sync-pgadmin4-server.sh" in step_text
+    assert '--host "penpot-db-pooler-rw.databases.svc.cluster.local"' in step_text
+    assert "ensure-netbird-service.sh" in step_text
+    assert "https://helm.penpot.app" in app_text
+    assert 'targetRevision: "1.9.0"' in app_text
+    assert "path: gitops/platform-apps/penpot" in app_text
+    assert "path: gitops/databases/penpot" in app_text
+    assert "kind: ApplicationSet" in optional_app_text
+    assert 'twinbox.io/app-penpot: "enabled"' in optional_app_text
+    assert "https://penpot.{{index .metadata.annotations" in optional_app_text
+    assert "https://authentik.{{index .metadata.annotations" in optional_app_text
+    assert "name: penpot-netbird" in ingressroute_text
+    assert "webnetbird" in ingressroute_text
+    assert "property: PENPOT_SECRET_KEY" in secret_text
+    assert "property: PENPOT_OIDC_CLIENT_ID" in secret_text
+    assert "property: PENPOT_OIDC_CLIENT_SECRET" in secret_text
+    assert "enable-login-with-oidc" in values_text
+    assert "enable-oidc-registration" in values_text
+    assert "disable-login-with-password" in values_text
+    assert "telemetryEnabled: false" in values_text
     assert "imageName: ghcr.io/cloudnative-pg/postgresql:16.4" in db_cluster_text
 
 

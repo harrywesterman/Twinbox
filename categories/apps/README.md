@@ -57,6 +57,7 @@ Each app step contains a `step.yaml` manifest and a runner script:
 | `install-openwebui` | AI chat interface and model management |
 | `install-outline` | Team knowledge base and wiki |
 | `install-paperless` | Document management and OCR |
+| `install-penpot` | Open-source design and prototyping platform |
 | `install-mastodon` | Federated social publishing |
 | `install-pixelfed` | Decentralized photo sharing (Instagram alternative) |
 | `install-searxng` | Privacy-respecting metasearch engine |

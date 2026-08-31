@@ -39,6 +39,7 @@ optional_app_names=(
   openwebui
   outline
   paperless
+  penpot
   pixelfed
   searxng
   stirling-pdf
@@ -309,6 +310,11 @@ cleanup_app_specific_state() {
       delete_authentik_application_by_slug "paperless"
       delete_openbao_global_secret "paperless"
       ;;
+    penpot)
+      delete_authentik_provider_by_name "Penpot"
+      delete_authentik_application_by_slug "penpot"
+      delete_openbao_global_secret "penpot"
+      ;;
     vaultwarden)
       delete_authentik_provider_by_name "Vaultwarden"
       delete_authentik_application_by_slug "vaultwarden"
@@ -359,7 +365,7 @@ cleanup_app_specific_state() {
 }
 
 case "$APP_NAME" in
-  n8n|immich|nextcloud|audiobookshelf|karakeep|outline|openwebui|hedgedoc|paperless|vaultwarden|jitsi|opencloud|zulip|pixelfed|headlamp|twinbox-portal)
+  n8n|immich|nextcloud|audiobookshelf|karakeep|outline|openwebui|hedgedoc|paperless|penpot|vaultwarden|jitsi|opencloud|zulip|pixelfed|headlamp|twinbox-portal)
     needs_authentik_cleanup=true
     ;;
   grafana|loki)

@@ -21,6 +21,7 @@ optional_app_names=(
   outline
   paperless
   karakeep
+  penpot
   pixelfed
   searxng
   stirling-pdf

@@ -1,0 +1,163 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: penpot-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            twinbox.io/domain-ready: "true"
+            twinbox.io/app-penpot: "enabled"
+  template:
+    metadata:
+      name: penpot
+    spec:
+      project: default
+      sources:
+        - repoURL: https://helm.penpot.app
+          chart: penpot
+          targetRevision: "1.9.0"
+          helm:
+            values: |-
+              config:
+                publicUri: https://penpot.{{index .metadata.annotations "twinbox.io/public-zone-name"}}
+                flags: "disable-registration disable-login-with-password enable-login-with-oidc enable-oidc-registration enable-log-emails enable-access-tokens enable-webhooks enable-mcp"
+                existingSecret: penpot-bootstrap
+                secretKeys:
+                  apiSecretKey: PENPOT_SECRET_KEY
+                telemetryEnabled: false
+                postgresql:
+                  host: penpot-db-pooler-rw.databases.svc.cluster.local
+                  port: 5432
+                  username: penpot
+                  database: penpot
+                  existingSecret: penpot-bootstrap
+                  secretKeys:
+                    usernameKey: PENPOT_POSTGRESQL__USERNAME
+                    passwordKey: PENPOT_POSTGRESQL__PASSWORD
+                redis:
+                  host: penpot-valkey
+                  port: 6379
+                  database: "0"
+                objectsStorage:
+                  storageBackend: fs
+                  filesystem:
+                    directory: /opt/data/assets
+                fileDataBackend: legacy-db
+                providers:
+                  oidc:
+                    enabled: true
+                    baseURI: https://authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/application/o/penpot/
+                    roles: ""
+                    rolesAttribute: ""
+                    scopes: "openid profile email"
+                  existingSecret: penpot-bootstrap
+                  secretKeys:
+                    oidcClientIDKey: PENPOT_OIDC_CLIENT_ID
+                    oidcClientSecretKey: PENPOT_OIDC_CLIENT_SECRET
+              backend:
+                replicaCount: 1
+                resources:
+                  requests:
+                    cpu: 250m
+                    memory: 512Mi
+                  limits:
+                    cpu: "1"
+                    memory: 1Gi
+              frontend:
+                replicaCount: 1
+                affinity:
+                  podAffinity:
+                    requiredDuringSchedulingIgnoredDuringExecution:
+                      - labelSelector:
+                          matchLabels:
+                            app.kubernetes.io/name: penpot-backend
+                            app.kubernetes.io/instance: penpot
+                        topologyKey: kubernetes.io/hostname
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 256Mi
+                  limits:
+                    cpu: 500m
+                    memory: 512Mi
+              exporter:
+                replicaCount: 1
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 256Mi
+                  limits:
+                    cpu: 500m
+                    memory: 512Mi
+              mcp:
+                replicaCount: 1
+                resources:
+                  requests:
+                    cpu: 50m
+                    memory: 128Mi
+                  limits:
+                    cpu: 250m
+                    memory: 256Mi
+              persistence:
+                assets:
+                  enabled: true
+                  storageClass: longhorn
+                  size: 20Gi
+                  accessModes:
+                    - ReadWriteOnce
+              ingress:
+                enabled: false
+              gateway:
+                enabled: false
+              route:
+                enabled: false
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          path: gitops/platform-apps/penpot
+          kustomize:
+            patches:
+              - target:
+                  kind: IngressRoute
+                  name: penpot
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`penpot.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: penpot-netbird
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`penpot.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          path: gitops/databases/penpot
+          kustomize:
+            patches:
+              - target:
+                  group: postgresql.cnpg.io
+                  kind: Cluster
+                  name: penpot-db
+                patch: |-
+                  - op: replace
+                    path: /spec/resources/requests/cpu
+                    value: '{{ if eq (index .metadata.labels "twinbox.io/resource-profile") "small" }}100m{{ else if eq (index .metadata.labels "twinbox.io/resource-profile") "large" }}500m{{ else }}250m{{ end }}'
+                  - op: replace
+                    path: /spec/resources/requests/memory
+                    value: '{{ if eq (index .metadata.labels "twinbox.io/resource-profile") "small" }}256Mi{{ else if eq (index .metadata.labels "twinbox.io/resource-profile") "large" }}1Gi{{ else }}512Mi{{ end }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: penpot
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
