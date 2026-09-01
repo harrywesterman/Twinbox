@@ -18,6 +18,7 @@ categories/apps/
 │   └── twinbox-desktop.yaml
 └── steps/              # Individual app install steps
     ├── install-audiobookshelf/
+    ├── install-copyparty/
     ├── install-freshrss/
     ├── install-hedgedoc/
     ├── install-immich/
@@ -45,6 +46,7 @@ Each app step contains a `step.yaml` manifest and a runner script:
 | Step | Description |
 |------|-------------|
 | `install-audiobookshelf` | Audiobook and podcast server |
+| `install-copyparty` | Browser-based file server |
 | `install-freshrss` | Self-hosted RSS feed aggregator |
 | `install-hedgedoc` | Collaborative real-time markdown editor |
 | `install-immich` | Photo and video backup solution |

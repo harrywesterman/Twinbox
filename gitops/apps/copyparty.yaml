@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: copyparty
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __TARGET_REVISION__
+    path: gitops/platform-apps/copyparty
+    kustomize:
+      patches:
+        - target:
+            kind: IngressRoute
+            name: copyparty
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`copyparty.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: copyparty-netbird
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`copyparty.__ZONE_NAME__`)
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: copyparty
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

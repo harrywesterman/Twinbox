@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: copyparty
+  namespace: copyparty
+  labels:
+    app.kubernetes.io/name: copyparty
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: copyparty
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: copyparty
+    spec:
+      enableServiceLinks: false
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: copyparty
+          image: ghcr.io/9001/copyparty-ac:1.20.21
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+          args:
+            - |
+              python3 - <<'PY' > /cfg/copyparty.conf
+              import os
+              from pathlib import Path
+
+              template = Path("/cfg-template/copyparty.conf.tpl").read_text()
+              for key in (
+                  "COPYPARTY_ADMIN_USERNAME",
+                  "COPYPARTY_ADMIN_PASSWORD",
+                  "COPYPARTY_FKEY_SALT",
+                  "COPYPARTY_DKEY_SALT",
+              ):
+                  template = template.replace("${" + key + "}", os.environ[key])
+              print(template, end="")
+              PY
+              exec copyparty -c /cfg/copyparty.conf
+          envFrom:
+            - secretRef:
+                name: copyparty-config
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          ports:
+            - name: http
+              containerPort: 3923
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /?reset=/._
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /?reset=/._
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 3
+          startupProbe:
+            httpGet:
+              path: /?reset=/._
+              port: http
+            failureThreshold: 60
+            periodSeconds: 5
+            timeoutSeconds: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: copyparty-config-template
+              mountPath: /cfg-template
+              readOnly: true
+            - name: copyparty-data
+              mountPath: /cfg
+              subPath: cfg
+            - name: copyparty-data
+              mountPath: /w/data
+              subPath: data
+      volumes:
+        - name: copyparty-config-template
+          configMap:
+            name: copyparty-config-template
+        - name: copyparty-data
+          persistentVolumeClaim:
+            claimName: copyparty-data

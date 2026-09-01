@@ -375,6 +375,11 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
                 audiobookshelf["runner"]["script"]
                 == "categories/apps/steps/install-audiobookshelf/run.sh"
             )
+            copyparty = next(step for step in apps if step["id"] == "install-copyparty")
+            assert copyparty["placeholder"] is False
+            assert copyparty["installable"] is True
+            assert copyparty["app_state"] == "ready"
+            assert copyparty["runner"]["script"] == "categories/apps/steps/install-copyparty/run.sh"
             assert vaultwarden["placeholder"] is False
             assert vaultwarden["installable"] is True
             assert vaultwarden["app_state"] == "ready"

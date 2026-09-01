@@ -1,0 +1,37 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: copyparty
+  namespace: copyparty
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`copyparty.__ZONE_NAME__`)
+      middlewares:
+        - name: authentik-forwardauth
+      services:
+        - kind: Service
+          name: copyparty
+          port: 80
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: copyparty-netbird
+  namespace: copyparty
+spec:
+  entryPoints:
+    - webnetbird
+  routes:
+    - kind: Rule
+      match: Host(`copyparty.__ZONE_NAME__`)
+      middlewares:
+        - name: copyparty-netbird-forwarded-headers
+        - name: authentik-forwardauth
+      services:
+        - kind: Service
+          name: copyparty
+          port: 80

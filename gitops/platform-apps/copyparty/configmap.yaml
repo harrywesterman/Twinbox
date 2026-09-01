@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: copyparty-config-template
+  namespace: copyparty
+  labels:
+    app.kubernetes.io/name: copyparty
+data:
+  copyparty.conf.tpl: |
+    [global]
+      p: 3923
+      hist: /cfg/hist
+      no-robots
+      rproxy: 1
+      e2dsa
+      e2ts
+      no-ansi
+      xff-src: lan
+      xff-hdr: x-forwarded-for
+      fk-salt: ${COPYPARTY_FKEY_SALT}
+      dk-salt: ${COPYPARTY_DKEY_SALT}
+
+    [accounts]
+      ${COPYPARTY_ADMIN_USERNAME}: ${COPYPARTY_ADMIN_PASSWORD}
+
+    [/]
+      /w/data
+      accs:
+        A: ${COPYPARTY_ADMIN_USERNAME}
+      flags:
+        e2ds

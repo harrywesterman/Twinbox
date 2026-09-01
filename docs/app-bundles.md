@@ -115,6 +115,8 @@ apps:
 
 Bundles are purely a UI convenience. They do not create any shared infrastructure or dependencies between apps.
 
+Standalone apps such as copyparty can be installed individually without being part of a bundle. This keeps file-sharing tools opt-in for users who explicitly want a browser-based upload and download area.
+
 ## Government Workspace Bundles
 
 ### Mijn Bureau

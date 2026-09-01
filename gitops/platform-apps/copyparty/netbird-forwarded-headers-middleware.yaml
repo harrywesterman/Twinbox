@@ -1,0 +1,13 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: copyparty-netbird-forwarded-headers
+  namespace: copyparty
+  annotations:
+    twinbox.io/description: >-
+      Keep copyparty on the public HTTPS origin behind NetBird Reverse Proxy.
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Port: "443"
+      X-Forwarded-Proto: https

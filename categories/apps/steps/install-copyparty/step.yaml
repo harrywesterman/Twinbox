@@ -1,0 +1,25 @@
+id: install-copyparty
+title: Install copyparty
+type: action
+journey_stage: setup
+summary: Share and manage files through a fast self-hosted web file server.
+explanation: copyparty is a lightweight file server for uploads, downloads, WebDAV, media browsing, and quick file sharing. Twinbox runs it on your own cluster, stores files on Longhorn, and protects access with Authentik.
+side_help: Useful when you want a simple private drop zone or browser-based file share without installing a full collaboration suite.
+dashy:
+  items:
+    - section: Platform
+      title: copyparty
+      description: Web file server
+      icon: fas fa-folder-open
+      url_template: https://copyparty.__ZONE_NAME__
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/apps/steps/install-copyparty/run.sh

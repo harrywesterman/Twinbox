@@ -1,0 +1,49 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: copyparty-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            twinbox.io/domain-ready: "true"
+            twinbox.io/app-copyparty: "enabled"
+  template:
+    metadata:
+      name: copyparty
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/harrywesterman/Twinbox.git
+        targetRevision: main
+        path: gitops/platform-apps/copyparty
+        kustomize:
+          patches:
+            - target:
+                kind: IngressRoute
+                name: copyparty
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`copyparty.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: copyparty-netbird
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`copyparty.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: copyparty
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
