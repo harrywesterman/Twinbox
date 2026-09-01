@@ -48,6 +48,7 @@ def test_copyparty_platform_manifests_are_openbao_backed_and_persistent():
     assert container["image"] == "ghcr.io/9001/copyparty-ac:1.20.21"
     assert container["ports"] == [{"name": "http", "containerPort": 3923}]
     assert container["envFrom"] == [{"secretRef": {"name": "copyparty-config"}}]
+    assert "exec python3 -m copyparty -c /cfg/copyparty.conf" in container["args"][0]
     assert container["resources"]["requests"]
     assert container["resources"]["limits"]
 

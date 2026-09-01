@@ -9,6 +9,7 @@ source "$WORKSPACE_ROOT/config/pinned-defaults.sh"
 optional_app_names=(
   affine
   audiobookshelf
+  copyparty
   freshrss
   headwind-mdm
   hedgedoc

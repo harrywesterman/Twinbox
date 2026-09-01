@@ -4072,6 +4072,27 @@ def test_optional_app_state_helper_labels_the_argocd_cluster_secret():
     assert "kubectl -n argocd label secret" in text
 
 
+def test_apply_argocd_application_knows_all_optional_appsets():
+    script_text = APPLY_ARGO_APP_SCRIPT.read_text(encoding="utf-8")
+    optional_list = re.search(
+        r"optional_app_names=\(\n(?P<body>.*?)\n\)",
+        script_text,
+        re.DOTALL,
+    )
+    assert optional_list is not None
+
+    listed_apps = {
+        line.strip()
+        for line in optional_list.group("body").splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    }
+    manifest_apps = {
+        manifest.stem for manifest in (REPO_ROOT / "gitops" / "optional-apps").glob("*.yaml")
+    }
+
+    assert listed_apps == manifest_apps
+
+
 def test_optional_apps_root_and_redirected_manifests_are_present():
     root_text = (REPO_ROOT / "gitops" / "apps" / "optional-apps-root.yaml").read_text(
         encoding="utf-8"

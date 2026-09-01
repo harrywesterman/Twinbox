@@ -44,7 +44,7 @@ spec:
                   template = template.replace("${" + key + "}", os.environ[key])
               print(template, end="")
               PY
-              exec copyparty -c /cfg/copyparty.conf
+              exec python3 -m copyparty -c /cfg/copyparty.conf
           envFrom:
             - secretRef:
                 name: copyparty-config
