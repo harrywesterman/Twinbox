@@ -20,6 +20,8 @@ description: >
 
   **Outline** — A fast, collaborative knowledge base for your team wiki and documentation.
 
+  **AFFiNE** — A visual workspace for notes, docs, whiteboards, and planning.
+
   **HedgeDoc** — Real-time collaborative markdown editor for meeting notes and brainstorms.
 
   **Mailu** — Self-hosted email with webmail, admin UI, and your own SMTP edge on the bastion.
@@ -48,6 +50,7 @@ description: >
 apps:
   - install-opencloud
   - install-outline
+  - install-affine
   - install-hedgedoc
   - install-mailu
   - install-zulip

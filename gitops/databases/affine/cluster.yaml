@@ -1,0 +1,52 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: affine-db
+  namespace: databases
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.4
+
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: affine-db-objectstore
+        serverName: affine-db
+
+  bootstrap:
+    initdb:
+      database: affine
+      owner: affine
+      secret:
+        name: affine-db-credentials
+      postInitApplicationSQL:
+        - CREATE EXTENSION vector;
+
+  storage:
+    size: 20Gi
+    storageClass: longhorn-single
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+  postgresql:
+    parameters:
+      max_connections: "100"
+      shared_buffers: "256MB"
+      effective_cache_size: "768MB"
+      work_mem: "4MB"
+
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
+
+  monitoring:
+    enablePodMonitor: true

@@ -7,6 +7,7 @@ WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 source "$WORKSPACE_ROOT/config/pinned-defaults.sh"
 
 optional_app_names=(
+  affine
   audiobookshelf
   freshrss
   headwind-mdm

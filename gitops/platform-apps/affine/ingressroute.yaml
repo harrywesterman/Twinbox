@@ -1,0 +1,38 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: affine
+  namespace: affine
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    app.kubernetes.io/name: affine
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`affine.__ZONE_NAME__`)
+      kind: Rule
+      services:
+        - name: affine
+          port: 3010
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: affine-netbird
+  namespace: affine
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    app.kubernetes.io/name: affine
+spec:
+  entryPoints:
+    - webnetbird
+  routes:
+    - match: Host(`affine.__ZONE_NAME__`)
+      kind: Rule
+      services:
+        - name: affine
+          port: 3010

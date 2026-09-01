@@ -1,0 +1,17 @@
+id: affine
+title: AFFiNE
+summary: Self-hosted documents, whiteboards, and planning in one private workspace.
+iconUrl: /assets/step-icons/install-outline.svg
+iconAlt: AFFiNE bundle icon
+description: >
+  AFFiNE gives you a self-hosted workspace for writing documents, sketching on
+  whiteboards, and organising projects inside your own Twinbox cluster.
+
+  It runs through Argo CD GitOps, stores content in Twinbox-managed PostgreSQL
+  and persistent storage, and uses Authentik for shared sign-in.
+
+  **Whats included**
+
+  **AFFiNE** — Documents, whiteboards, and planning in one private workspace.
+apps:
+  - install-affine

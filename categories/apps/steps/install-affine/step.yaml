@@ -1,0 +1,25 @@
+id: install-affine
+title: Install AFFiNE
+type: action
+journey_stage: setup
+summary: A private workspace for notes, docs, whiteboards, and planning.
+explanation: AFFiNE combines documents, whiteboards, and structured workspaces in one self-hosted app. Your team can write, sketch, organise plans, and keep knowledge inside your own Twinbox cluster with shared authentication.
+side_help: Useful when you want a Notion- and Miro-like workspace with local data ownership.
+dashy:
+  items:
+    - section: Apps
+      title: AFFiNE
+      description: Docs and whiteboards
+      icon: fas fa-pen-nib
+      url_template: https://affine.__ZONE_NAME__
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/apps/steps/install-affine/run.sh

@@ -1,0 +1,65 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: affine-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            twinbox.io/domain-ready: "true"
+            twinbox.io/app-affine: "enabled"
+  template:
+    metadata:
+      name: affine
+    spec:
+      project: default
+      sources:
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          path: gitops/platform-apps/affine
+          kustomize:
+            patches:
+              - target:
+                  kind: IngressRoute
+                  name: affine
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`affine.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+              - target:
+                  kind: IngressRoute
+                  name: affine-netbird
+                patch: |-
+                  - op: replace
+                    path: /spec/routes/0/match
+                    value: Host(`affine.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+        - repoURL: https://github.com/harrywesterman/Twinbox.git
+          targetRevision: main
+          path: gitops/databases/affine
+          kustomize:
+            patches:
+              - target:
+                  group: postgresql.cnpg.io
+                  kind: Cluster
+                  name: affine-db
+                patch: |-
+                  - op: replace
+                    path: /spec/resources/requests/cpu
+                    value: '{{ if eq (index .metadata.labels "twinbox.io/resource-profile") "small" }}100m{{ else if eq (index .metadata.labels "twinbox.io/resource-profile") "large" }}500m{{ else }}250m{{ end }}'
+                  - op: replace
+                    path: /spec/resources/requests/memory
+                    value: '{{ if eq (index .metadata.labels "twinbox.io/resource-profile") "small" }}256Mi{{ else if eq (index .metadata.labels "twinbox.io/resource-profile") "large" }}1Gi{{ else }}512Mi{{ end }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: affine
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

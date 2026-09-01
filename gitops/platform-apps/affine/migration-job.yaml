@@ -1,0 +1,118 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: affine-migration
+  namespace: affine
+  labels:
+    app.kubernetes.io/name: affine
+    app.kubernetes.io/component: migration
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: affine
+        app.kubernetes.io/component: migration
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: prepare-config
+          image: busybox:1.36.1
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - mkdir -p /affine-data/config /affine-data/storage && cp /affine-config-template/config.json /affine-data/config/config.json
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - name: affine-storage
+              mountPath: /affine-data
+            - name: affine-config-template
+              mountPath: /affine-config-template
+      containers:
+        - name: affine-migration
+          image: ghcr.io/toeverything/affine:stable
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - node ./scripts/self-host-predeploy.js
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: affine-bootstrap
+                  key: DATABASE_URL
+            - name: AFFINE_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: affine-bootstrap
+                  key: AFFINE_PRIVATE_KEY
+            - name: OAUTH_OIDC_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: affine-bootstrap
+                  key: OAUTH_OIDC_CLIENT_ID
+            - name: OAUTH_OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: affine-bootstrap
+                  key: OAUTH_OIDC_CLIENT_SECRET
+            - name: REDIS_SERVER_HOST
+              value: affine-redis
+            - name: AFFINE_INDEXER_ENABLED
+              value: "false"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: affine-storage
+              mountPath: /root/.affine/storage
+              subPath: storage
+            - name: affine-config
+              mountPath: /root/.affine/config
+              subPath: config
+      volumes:
+        - name: affine-storage
+          persistentVolumeClaim:
+            claimName: affine-storage
+        - name: affine-config
+          persistentVolumeClaim:
+            claimName: affine-storage
+        - name: affine-config-template
+          secret:
+            secretName: affine-bootstrap
+            items:
+              - key: config.json
+                path: config.json

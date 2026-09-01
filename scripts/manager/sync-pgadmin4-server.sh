@@ -105,6 +105,7 @@ done
 USERNAME="${USERNAME:-$APP_ID}"
 SHARED_USERNAME="${SHARED_USERNAME:-$USERNAME}"
 SERVER_NAME="${SERVER_NAME:-$(case "$APP_ID" in
+  affine) printf '%s\n' 'CloudNativePG - AFFiNE' ;;
   openwebui) printf '%s\n' 'CloudNativePG - OpenWebUI' ;;
   hedgedoc) printf '%s\n' 'CloudNativePG - HedgeDoc' ;;
   immich) printf '%s\n' 'CloudNativePG - Immich' ;;
@@ -118,6 +119,7 @@ SERVER_NAME="${SERVER_NAME:-$(case "$APP_ID" in
   *) printf 'CloudNativePG - %s\n' "$APP_ID" ;;
 esac)}"
 COMMENT="${COMMENT:-$(case "$APP_ID" in
+  affine) printf '%s\n' 'CloudNativePG pooler for the AFFiNE cluster' ;;
   openwebui) printf '%s\n' 'CloudNativePG pooler for the OpenWebUI cluster' ;;
   hedgedoc) printf '%s\n' 'CloudNativePG pooler for the HedgeDoc cluster' ;;
   immich) printf '%s\n' 'CloudNativePG pooler for the Immich cluster' ;;

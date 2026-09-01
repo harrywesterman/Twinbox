@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: affine
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      path: gitops/platform-apps/affine
+      kustomize:
+        patches:
+          - target:
+              kind: IngressRoute
+              name: affine
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`affine.__ZONE_NAME__`)
+          - target:
+              kind: IngressRoute
+              name: affine-netbird
+            patch: |-
+              - op: replace
+                path: /spec/routes/0/match
+                value: Host(`affine.__ZONE_NAME__`)
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      path: gitops/databases/affine
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: affine
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

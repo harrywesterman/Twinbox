@@ -63,6 +63,14 @@ ZULIP_VALUES = REPO_ROOT / "gitops" / "values" / "zulip.yaml"
 ZULIP_DB_CLUSTER = REPO_ROOT / "gitops" / "databases" / "zulip" / "cluster.yaml"
 PIXELFED_SECRET = REPO_ROOT / "gitops" / "platform-apps" / "pixelfed" / "externalsecret.yaml"
 PIXELFED_DB_CLUSTER = REPO_ROOT / "gitops" / "databases" / "pixelfed" / "cluster.yaml"
+AFFINE_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-affine" / "run.sh"
+AFFINE_APP = REPO_ROOT / "gitops" / "apps" / "affine.yaml"
+AFFINE_OPTIONAL_APP = REPO_ROOT / "gitops" / "optional-apps" / "affine.yaml"
+AFFINE_PLATFORM_DIR = REPO_ROOT / "gitops" / "platform-apps" / "affine"
+AFFINE_DEPLOYMENT = AFFINE_PLATFORM_DIR / "deployment.yaml"
+AFFINE_MIGRATION_JOB = AFFINE_PLATFORM_DIR / "migration-job.yaml"
+AFFINE_SECRET = AFFINE_PLATFORM_DIR / "externalsecret.yaml"
+AFFINE_DB_CLUSTER = REPO_ROOT / "gitops" / "databases" / "affine" / "cluster.yaml"
 OUTLINE_STEP = REPO_ROOT / "categories" / "apps" / "steps" / "install-outline" / "run.sh"
 OUTLINE_APP = REPO_ROOT / "gitops" / "apps" / "outline.yaml"
 OUTLINE_PLATFORM_DIR = REPO_ROOT / "gitops" / "platform-apps" / "outline"
@@ -633,6 +641,58 @@ def test_outline_step_projects_a_real_oidc_backed_app():
     assert "property: OIDC_CLIENT_ID" in secret_text
     assert "property: OIDC_CLIENT_SECRET" in secret_text
     assert "imageName: ghcr.io/cloudnative-pg/postgresql:16.4" in db_cluster_text
+
+
+def test_affine_step_projects_pgvector_oidc_backed_app():
+    step_text = _read(AFFINE_STEP)
+    app_text = _read(AFFINE_APP)
+    optional_app_text = _read(AFFINE_OPTIONAL_APP)
+    deployment_text = _read(AFFINE_DEPLOYMENT)
+    migration_text = _read(AFFINE_MIGRATION_JOB)
+    ingressroute_text = _read(AFFINE_PLATFORM_DIR / "ingressroute.yaml")
+    secret_text = _read(AFFINE_SECRET)
+    db_cluster_text = _read(AFFINE_DB_CLUSTER)
+
+    assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in step_text
+    assert "openbao_read_global_secret_json affine" in step_text
+    assert '--secret-name "affine"' in step_text
+    assert (
+        '--required-keys "AFFINE_POSTGRESQL__USERNAME,AFFINE_POSTGRESQL__PASSWORD,DATABASE_URL,AFFINE_PRIVATE_KEY,OAUTH_OIDC_CLIENT_ID,OAUTH_OIDC_CLIENT_SECRET,AFFINE_SERVER_EXTERNAL_URL,AFFINE_SERVER_HOST,OAUTH_OIDC_ISSUER"'
+        in step_text
+    )
+    assert "create_or_update_provider()" in step_text
+    assert 'slug "affine"' in step_text
+    assert 'AFFINE_REDIRECT_URI="${AFFINE_HOST}/oauth/callback"' in step_text
+    assert 'sed "s/__ZONE_NAME__/${public_zone_name}/g"' in step_text
+    assert "apply-argocd-application.sh" in step_text
+    assert '--application "affine"' in step_text
+    assert "sync-pgadmin4-server.sh" in step_text
+    assert '--host "affine-db-pooler-rw-session.databases.svc.cluster.local"' in step_text
+    assert "ensure-netbird-service.sh" in step_text
+    assert "path: gitops/platform-apps/affine" in app_text
+    assert "path: gitops/databases/affine" in app_text
+    assert "kind: ApplicationSet" in optional_app_text
+    assert 'twinbox.io/app-affine: "enabled"' in optional_app_text
+    assert "image: ghcr.io/toeverything/affine:stable" in deployment_text
+    assert "AFFINE_INDEXER_ENABLED" in deployment_text
+    assert "secretName: affine-bootstrap" in deployment_text
+    assert "prepare-config" in deployment_text
+    assert "subPath: storage" in deployment_text
+    assert "subPath: config" in deployment_text
+    assert "node ./scripts/self-host-predeploy.js" in migration_text
+    assert "argocd.argoproj.io/hook: Sync" in migration_text
+    assert "name: affine-netbird" in ingressroute_text
+    assert "webnetbird" in ingressroute_text
+    assert "engineVersion: v2" in secret_text
+    assert "config.json" in secret_text
+    assert "providers.oidc" in secret_text
+    assert "property: DATABASE_URL" in secret_text
+    assert "property: AFFINE_PRIVATE_KEY" in secret_text
+    assert "property: OAUTH_OIDC_CLIENT_ID" in secret_text
+    assert "property: OAUTH_OIDC_CLIENT_SECRET" in secret_text
+    assert "property: OAUTH_OIDC_ISSUER" in secret_text
+    assert "imageName: ghcr.io/cloudnative-pg/postgresql:16.4" in db_cluster_text
+    assert "CREATE EXTENSION vector;" in db_cluster_text
 
 
 def test_penpot_step_projects_a_real_oidc_backed_app():

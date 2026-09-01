@@ -81,7 +81,9 @@ MASTODON_DB_SECRET = MASTODON_DB_DIR / "externalsecret.yaml"
 MASTODON_DB_CLUSTER = MASTODON_DB_DIR / "cluster.yaml"
 MASTODON_DB_OBJECTSTORE = MASTODON_DB_DIR / "objectstore.yaml"
 MATRIX_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-matrix" / "run.sh"
+AFFINE_STEP_SCRIPT = REPO_ROOT / "categories" / "apps" / "steps" / "install-affine" / "run.sh"
 TWINBOX_PORTAL_APP = REPO_ROOT / "gitops" / "apps" / "twinbox-portal.yaml"
+AFFINE_APP = REPO_ROOT / "gitops" / "apps" / "affine.yaml"
 OUTLINE_APP = REPO_ROOT / "gitops" / "apps" / "outline.yaml"
 OUTLINE_OPTIONAL_APP = REPO_ROOT / "gitops" / "optional-apps" / "outline.yaml"
 OPENWEBUI_APP = REPO_ROOT / "gitops" / "apps" / "openwebui.yaml"
@@ -92,6 +94,7 @@ PENPOT_VALUES = REPO_ROOT / "gitops" / "values" / "penpot.yaml"
 PAPERLESS_APP = REPO_ROOT / "gitops" / "apps" / "paperless.yaml"
 PIXELFED_APP = REPO_ROOT / "gitops" / "apps" / "pixelfed.yaml"
 OUTLINE_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "outline" / "kustomization.yaml"
+AFFINE_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "affine" / "kustomization.yaml"
 OPENWEBUI_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "openwebui" / "kustomization.yaml"
 N8N_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "n8n" / "kustomization.yaml"
 HEDGEDOC_DB_KUSTOMIZATION = REPO_ROOT / "gitops" / "databases" / "hedgedoc" / "kustomization.yaml"
@@ -3382,6 +3385,7 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
 
 def test_optional_apps_route_steady_state_through_argocd_sources():
     app_expectations = {
+        "affine": (AFFINE_APP, AFFINE_DB_KUSTOMIZATION),
         "outline": (OUTLINE_APP, OUTLINE_DB_KUSTOMIZATION),
         "openwebui": (OPENWEBUI_APP, OPENWEBUI_DB_KUSTOMIZATION),
         "n8n": (N8N_APP, N8N_DB_KUSTOMIZATION),
@@ -3393,6 +3397,11 @@ def test_optional_apps_route_steady_state_through_argocd_sources():
     }
 
     step_expectations = {
+        AFFINE_STEP_SCRIPT: [
+            "apply-argocd-application.sh",
+            '--application "affine"',
+            "gitops/apps/affine.yaml",
+        ],
         OUTLINE_STEP_SCRIPT: [
             "apply-argocd-application.sh",
             '--application "outline"',
@@ -3436,6 +3445,10 @@ def test_optional_apps_route_steady_state_through_argocd_sources():
     }
 
     forbidden_snippets = {
+        AFFINE_STEP_SCRIPT: [
+            'kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/affine/cluster.yaml"',
+            'kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/affine/namespace.yaml"',
+        ],
         OUTLINE_STEP_SCRIPT: [
             'kubectl apply -f "$WORKSPACE_ROOT/gitops/databases/namespace.yaml"',
             'kubectl apply -f "$WORKSPACE_ROOT/gitops/platform-apps/outline/namespace.yaml"',
@@ -3502,6 +3515,7 @@ def test_optional_apps_route_steady_state_through_argocd_sources():
 
 def test_optional_apps_resource_profile_lookups_use_index_on_labels():
     manifest_paths = [
+        REPO_ROOT / "gitops" / "optional-apps" / "affine.yaml",
         REPO_ROOT / "gitops" / "optional-apps" / "hedgedoc.yaml",
         REPO_ROOT / "gitops" / "optional-apps" / "immich.yaml",
         REPO_ROOT / "gitops" / "optional-apps" / "n8n.yaml",
@@ -4172,6 +4186,7 @@ def test_optional_database_apps_patch_cloudnativepg_requests_by_resource_profile
         raise AssertionError("CloudNativePG memory request profile patch is missing")
 
     database_apps = [
+        "affine",
         "hedgedoc",
         "immich",
         "n8n",

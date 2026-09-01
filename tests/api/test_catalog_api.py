@@ -335,19 +335,37 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
             assert body["errors"] == []
             bundle_ids = [bundle["id"] for bundle in body["bundles"]]
             assert sorted(bundle_ids) == [
+                "affine",
                 "lasuite",
                 "mijn-bureau",
                 "nextcloud",
                 "opendesk",
                 "twinbox-desktop",
             ]
-            assert body["bundles"][0]["iconUrl"] == "/assets/step-icons/install-outline.svg"
-            assert body["bundles"][1]["iconUrl"] == "/assets/step-icons/install-nextcloud.svg"
-            assert body["bundles"][2]["iconUrl"] == "/assets/step-icons/install-nextcloud.svg"
-            assert body["bundles"][2]["apps"] == ["install-mailu", "install-nextcloud"]
-            assert body["bundles"][3]["iconUrl"] == "/assets/step-icons/install-opencloud.svg"
-            assert body["bundles"][4]["iconUrl"] == "/assets/step-icons/install-outline.svg"
+            bundles_by_id = {bundle["id"]: bundle for bundle in body["bundles"]}
+            assert bundles_by_id["affine"]["apps"] == ["install-affine"]
+            assert bundles_by_id["lasuite"]["iconUrl"] == "/assets/step-icons/install-outline.svg"
+            assert (
+                bundles_by_id["mijn-bureau"]["iconUrl"]
+                == "/assets/step-icons/install-nextcloud.svg"
+            )
+            assert (
+                bundles_by_id["nextcloud"]["iconUrl"] == "/assets/step-icons/install-nextcloud.svg"
+            )
+            assert bundles_by_id["nextcloud"]["apps"] == ["install-mailu", "install-nextcloud"]
+            assert (
+                bundles_by_id["opendesk"]["iconUrl"] == "/assets/step-icons/install-opencloud.svg"
+            )
+            assert (
+                bundles_by_id["twinbox-desktop"]["iconUrl"]
+                == "/assets/step-icons/install-outline.svg"
+            )
             apps = body["categories"][0]["steps"]
+            affine = next(step for step in apps if step["id"] == "install-affine")
+            assert affine["placeholder"] is False
+            assert affine["installable"] is True
+            assert affine["app_state"] == "ready"
+            assert affine["runner"]["script"] == "categories/apps/steps/install-affine/run.sh"
             audiobookshelf = next(step for step in apps if step["id"] == "install-audiobookshelf")
             vaultwarden = next(step for step in apps if step["id"] == "install-vaultwarden")
             assert audiobookshelf["placeholder"] is False

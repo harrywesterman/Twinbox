@@ -171,6 +171,21 @@ data:
             "sslmode": "prefer"
           },
           "Comment": "CloudNativePG pooler for the Outline cluster"
+        },
+        "12": {
+          "Name": "CloudNativePG - AFFiNE",
+          "Group": "Shared Servers",
+          "Host": "affine-db-pooler-rw-session.databases.svc.cluster.local",
+          "Port": 5432,
+          "MaintenanceDB": "postgres",
+          "Username": "affine",
+          "SharedUsername": "affine",
+          "PasswordExecCommand": "printf %s \"$PGADMIN_AFFINE_DB_PASSWORD\"",
+          "Shared": true,
+          "ConnectionParameters": {
+            "sslmode": "prefer"
+          },
+          "Comment": "CloudNativePG pooler for the AFFiNE cluster"
         }
       }
     }
