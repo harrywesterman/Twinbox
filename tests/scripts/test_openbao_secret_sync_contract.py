@@ -657,7 +657,7 @@ def test_affine_step_projects_pgvector_oidc_backed_app():
     assert "openbao_read_global_secret_json affine" in step_text
     assert '--secret-name "affine"' in step_text
     assert (
-        '--required-keys "AFFINE_POSTGRESQL__USERNAME,AFFINE_POSTGRESQL__PASSWORD,DATABASE_URL,AFFINE_PRIVATE_KEY,OAUTH_OIDC_CLIENT_ID,OAUTH_OIDC_CLIENT_SECRET,AFFINE_SERVER_EXTERNAL_URL,AFFINE_SERVER_HOST,OAUTH_OIDC_ISSUER"'
+        '--required-keys "AFFINE_POSTGRESQL__USERNAME,AFFINE_POSTGRESQL__PASSWORD,DATABASE_URL,OAUTH_OIDC_CLIENT_ID,OAUTH_OIDC_CLIENT_SECRET,AFFINE_SERVER_EXTERNAL_URL,AFFINE_SERVER_HOST,OAUTH_OIDC_ISSUER"'
         in step_text
     )
     assert "create_or_update_provider()" in step_text
@@ -687,7 +687,8 @@ def test_affine_step_projects_pgvector_oidc_backed_app():
     assert "config.json" in secret_text
     assert "providers.oidc" in secret_text
     assert "property: DATABASE_URL" in secret_text
-    assert "property: AFFINE_PRIVATE_KEY" in secret_text
+    assert "AFFINE_PRIVATE_KEY" not in deployment_text
+    assert "AFFINE_PRIVATE_KEY" not in secret_text
     assert "property: OAUTH_OIDC_CLIENT_ID" in secret_text
     assert "property: OAUTH_OIDC_CLIENT_SECRET" in secret_text
     assert "property: OAUTH_OIDC_ISSUER" in secret_text

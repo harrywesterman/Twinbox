@@ -70,11 +70,6 @@ spec:
                 secretKeyRef:
                   name: affine-bootstrap
                   key: DATABASE_URL
-            - name: AFFINE_PRIVATE_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: affine-bootstrap
-                  key: AFFINE_PRIVATE_KEY
             - name: OAUTH_OIDC_CLIENT_ID
               valueFrom:
                 secretKeyRef:

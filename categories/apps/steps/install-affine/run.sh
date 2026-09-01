@@ -107,7 +107,6 @@ AUTHENTIK_ISSUER="https://authentik.${public_zone_name}/application/o/affine/"
 
 affine_db_username="affine"
 affine_db_password="$(openssl rand -hex 24)"
-affine_private_key="$(openssl rand -hex 32)"
 affine_oauth_client_id="$(openssl rand -hex 16)"
 affine_oauth_client_secret="$(openssl rand -hex 24)"
 affine_database_url="postgresql://${affine_db_username}:${affine_db_password}@affine-db-pooler-rw-session.databases.svc.cluster.local:5432/affine"
@@ -122,14 +121,12 @@ if [[ -n "$existing_affine_secret_json" ]]; then
   existing_db_username="$(jq -r '.AFFINE_POSTGRESQL__USERNAME // empty' <<<"$existing_affine_secret_json")"
   existing_db_password="$(jq -r '.AFFINE_POSTGRESQL__PASSWORD // empty' <<<"$existing_affine_secret_json")"
   existing_database_url="$(jq -r '.DATABASE_URL // empty' <<<"$existing_affine_secret_json")"
-  existing_private_key="$(jq -r '.AFFINE_PRIVATE_KEY // empty' <<<"$existing_affine_secret_json")"
   existing_oauth_client_id="$(jq -r '.OAUTH_OIDC_CLIENT_ID // empty' <<<"$existing_affine_secret_json")"
   existing_oauth_client_secret="$(jq -r '.OAUTH_OIDC_CLIENT_SECRET // empty' <<<"$existing_affine_secret_json")"
 
   [[ -n "$existing_db_username" ]] && affine_db_username="$existing_db_username"
   [[ -n "$existing_db_password" ]] && affine_db_password="$existing_db_password"
   [[ -n "$existing_database_url" ]] && affine_database_url="$existing_database_url"
-  [[ -n "$existing_private_key" ]] && affine_private_key="$existing_private_key"
   [[ -n "$existing_oauth_client_id" ]] && affine_oauth_client_id="$existing_oauth_client_id"
   [[ -n "$existing_oauth_client_secret" ]] && affine_oauth_client_secret="$existing_oauth_client_secret"
 fi
@@ -142,7 +139,6 @@ jq -n \
   --arg AFFINE_POSTGRESQL__USERNAME "$affine_db_username" \
   --arg AFFINE_POSTGRESQL__PASSWORD "$affine_db_password" \
   --arg DATABASE_URL "$affine_database_url" \
-  --arg AFFINE_PRIVATE_KEY "$affine_private_key" \
   --arg OAUTH_OIDC_CLIENT_ID "$affine_oauth_client_id" \
   --arg OAUTH_OIDC_CLIENT_SECRET "$affine_oauth_client_secret" \
   --arg AFFINE_SERVER_EXTERNAL_URL "$AFFINE_HOST" \
@@ -152,7 +148,6 @@ jq -n \
     AFFINE_POSTGRESQL__USERNAME: $AFFINE_POSTGRESQL__USERNAME,
     AFFINE_POSTGRESQL__PASSWORD: $AFFINE_POSTGRESQL__PASSWORD,
     DATABASE_URL: $DATABASE_URL,
-    AFFINE_PRIVATE_KEY: $AFFINE_PRIVATE_KEY,
     OAUTH_OIDC_CLIENT_ID: $OAUTH_OIDC_CLIENT_ID,
     OAUTH_OIDC_CLIENT_SECRET: $OAUTH_OIDC_CLIENT_SECRET,
     AFFINE_SERVER_EXTERNAL_URL: $AFFINE_SERVER_EXTERNAL_URL,
@@ -164,7 +159,7 @@ log "Writing AFFiNE bootstrap secret to OpenBao"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "affine" \
   --json-file "$affine_secret_file" \
-  --required-keys "AFFINE_POSTGRESQL__USERNAME,AFFINE_POSTGRESQL__PASSWORD,DATABASE_URL,AFFINE_PRIVATE_KEY,OAUTH_OIDC_CLIENT_ID,OAUTH_OIDC_CLIENT_SECRET,AFFINE_SERVER_EXTERNAL_URL,AFFINE_SERVER_HOST,OAUTH_OIDC_ISSUER"
+  --required-keys "AFFINE_POSTGRESQL__USERNAME,AFFINE_POSTGRESQL__PASSWORD,DATABASE_URL,OAUTH_OIDC_CLIENT_ID,OAUTH_OIDC_CLIENT_SECRET,AFFINE_SERVER_EXTERNAL_URL,AFFINE_SERVER_HOST,OAUTH_OIDC_ISSUER"
 
 log "Provisioning Authentik OIDC client for AFFiNE"
 authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
