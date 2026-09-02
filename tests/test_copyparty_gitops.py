@@ -120,7 +120,8 @@ def test_copyparty_runner_bootstraps_secret_and_optional_app():
     assert 'source "$WORKSPACE_ROOT/scripts/manager/authentik-auth.sh"' in script
     assert "openbao_read_global_secret_json copyparty" in script
     assert '--secret-name "copyparty"' in script
-    assert '"/core/applications/?slug=$(printf' in script
+    assert '"/core/applications/${application_slug}/"' in script
+    assert '"/core/applications/?search=$(printf' in script
     assert "&page_size=200" in script
     assert (
         "COPYPARTY_ADMIN_USERNAME,COPYPARTY_ADMIN_PASSWORD,COPYPARTY_FKEY_SALT,COPYPARTY_DKEY_SALT"
