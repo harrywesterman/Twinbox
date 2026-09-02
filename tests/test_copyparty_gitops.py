@@ -49,6 +49,12 @@ def test_copyparty_platform_manifests_are_openbao_backed_and_persistent():
     assert container["ports"] == [{"name": "http", "containerPort": 3923}]
     assert container["envFrom"] == [{"secretRef": {"name": "copyparty-config"}}]
     assert "exec python3 -m copyparty -c /cfg/copyparty.conf" in container["args"][0]
+    assert (
+        deployment["spec"]["template"]["metadata"]["annotations"][
+            "twinbox.io/copyparty-config-revision"
+        ]
+        == "idp-auth-v1"
+    )
     assert container["resources"]["requests"]
     assert container["resources"]["limits"]
 
@@ -76,9 +82,10 @@ def test_copyparty_platform_manifests_are_openbao_backed_and_persistent():
     }
 
     config_template = configmap["data"]["copyparty.conf.tpl"]
-    assert "[accounts]" in config_template
-    assert "${COPYPARTY_ADMIN_USERNAME}: ${COPYPARTY_ADMIN_PASSWORD}" in config_template
-    assert "A: ${COPYPARTY_ADMIN_USERNAME}" in config_template
+    assert "[accounts]" not in config_template
+    assert "idp-h-usr: X-authentik-username" in config_template
+    assert "idp-h-grp: X-authentik-groups" in config_template
+    assert "A: *" in config_template
     assert "rproxy: 1" in config_template
     assert "rw: *" not in config_template
 

@@ -17,15 +17,14 @@ data:
       no-ansi
       xff-src: lan
       xff-hdr: x-forwarded-for
+      idp-h-usr: X-authentik-username
+      idp-h-grp: X-authentik-groups
       fk-salt: ${COPYPARTY_FKEY_SALT}
       dk-salt: ${COPYPARTY_DKEY_SALT}
-
-    [accounts]
-      ${COPYPARTY_ADMIN_USERNAME}: ${COPYPARTY_ADMIN_PASSWORD}
 
     [/]
       /w/data
       accs:
-        A: ${COPYPARTY_ADMIN_USERNAME}
+        A: *
       flags:
         e2ds
