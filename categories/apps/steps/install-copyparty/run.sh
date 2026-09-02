@@ -148,7 +148,7 @@ find_application_json_by_slug() {
   local application_slug="$1"
   local response
 
-  response="$(authentik_api_get "/core/applications/?slug=$(printf '%s' "$application_slug" | jq -sRr @uri)")"
+  response="$(authentik_api_get "/core/applications/?slug=$(printf '%s' "$application_slug" | jq -sRr @uri)&page_size=200")"
   jq -c \
     --arg application_slug "$application_slug" \
     '.results[]?
