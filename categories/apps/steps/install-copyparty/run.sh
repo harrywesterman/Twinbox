@@ -221,6 +221,32 @@ ensure_group_binding() {
   authentik_api_write POST "/policies/bindings/" "$binding_payload" >/dev/null
 }
 
+ensure_provider_on_embedded_outpost() {
+  local provider_pk="$1"
+  local outpost_response outpost_id current_providers updated_providers
+
+  outpost_response="$(authentik_api_get "/outposts/instances/?page_size=100")"
+  outpost_id="$(
+    jq -r '.results[]? | select((.name // "") == "authentik Embedded Outpost") | .pk // .id // empty' \
+      <<<"$outpost_response" | head -n1
+  )"
+  [[ -n "$outpost_id" ]] || fail "Could not find the embedded Authentik outpost"
+
+  current_providers="$(
+    jq -c --arg outpost_id "$outpost_id" \
+      '.results[]? | select(((.pk // .id // "") | tostring) == $outpost_id) | .providers // []' \
+      <<<"$outpost_response"
+  )"
+
+  if ! jq -e --arg provider_pk "$provider_pk" 'map(tostring) | index($provider_pk) != null' \
+    <<<"$current_providers" >/dev/null 2>&1; then
+    log "Attaching copyparty proxy provider to the embedded Authentik outpost"
+    updated_providers="$(jq -c --argjson provider_pk "$provider_pk" '. + [$provider_pk] | map(tostring) | unique' <<<"$current_providers")"
+    authentik_api_write PATCH "/outposts/instances/${outpost_id}/" \
+      "$(jq -n --argjson providers "$updated_providers" '{providers: $providers}')" >/dev/null
+  fi
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
@@ -333,6 +359,7 @@ if [[ -n "$admins_group_id" ]]; then
 else
   log "Authentik admins group not found; copyparty remains available to authenticated users"
 fi
+ensure_provider_on_embedded_outpost "$provider_pk"
 
 log "Applying copyparty Argo CD application"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
@@ -344,3 +371,8 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
 wait_for_resource_ready "copyparty" "externalsecret/copyparty-config" "Ready" "copyparty ExternalSecret"
 wait_for_pvc_bound "copyparty" "copyparty-data" "copyparty data PVC"
 wait_for_deployment_rollout "copyparty" "copyparty" "copyparty application"
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "copyparty" \
+  --service-domain "copyparty.${public_zone_name}" \
+  --service-path /

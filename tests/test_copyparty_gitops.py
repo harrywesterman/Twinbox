@@ -125,8 +125,14 @@ def test_copyparty_runner_bootstraps_secret_and_optional_app():
         in script
     )
     assert 'create_or_update_proxy_provider "copyparty"' in script
+    assert "ensure_provider_on_embedded_outpost" in script
+    assert '"/outposts/instances/?page_size=100"' in script
+    assert "authentik Embedded Outpost" in script
     assert '--manifest "$WORKSPACE_ROOT/gitops/optional-apps/copyparty.yaml"' in script
     assert '--application "copyparty"' in script
     assert 'wait_for_resource_ready "copyparty" "externalsecret/copyparty-config"' in script
     assert 'wait_for_pvc_bound "copyparty" "copyparty-data"' in script
     assert 'wait_for_deployment_rollout "copyparty" "copyparty"' in script
+    assert 'ensure-netbird-service.sh" \\' in script
+    assert '--service-name "copyparty"' in script
+    assert '--service-domain "copyparty.${public_zone_name}"' in script
