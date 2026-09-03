@@ -6,23 +6,30 @@ COPY config ./config
 COPY docker-compose.yml ./docker-compose.yml
 
 RUN apk update \
-  && apk add --no-cache bash ca-certificates curl docker-cli docker-cli-compose iptables jq iproute2 openssh-client openssl python3 tar xorriso xz sudo \
+  && apk add --no-cache bash ca-certificates coreutils curl docker-cli docker-cli-compose iptables jq iproute2 netcat-openbsd openssh-client openssl python3 tar xorriso xz sudo \
   && . /opt/twinbox/config/pinned-defaults.sh \
   && curl -fsSL "https://github.com/siderolabs/talos/releases/download/${PINNED_TALOS_VERSION}/talosctl-linux-amd64" -o /tmp/talosctl \
   && curl -fsSL "https://github.com/opentofu/opentofu/releases/download/${PINNED_OPENTOFU_VERSION}/tofu_${PINNED_OPENTOFU_VERSION#v}_linux_amd64.tar.gz" -o /tmp/tofu.tar.gz \
   && curl -fsSL "https://dl.k8s.io/release/${PINNED_KUBECTL_VERSION}/bin/linux/amd64/kubectl" -o /tmp/kubectl \
   && curl -fsSL "https://get.helm.sh/helm-${PINNED_HELM_VERSION}-linux-amd64.tar.gz" -o /tmp/helm.tar.gz \
+  && curl -fsSL "https://github.com/coder/coder/releases/download/v${PINNED_CODER_CHART_VERSION}/coder_${PINNED_CODER_CHART_VERSION}_linux_amd64.tar.gz" -o /tmp/coder.tar.gz \
+  && curl -fsSL "https://github.com/coder/coder/releases/download/v${PINNED_CODER_CHART_VERSION}/coder_${PINNED_CODER_CHART_VERSION}_checksums.txt" -o /tmp/coder_checksums.txt \
+  && coder_sha256="$(awk -v file="coder_${PINNED_CODER_CHART_VERSION}_linux_amd64.tar.gz" '$2 == file {print $1}' /tmp/coder_checksums.txt)" \
+  && echo "${coder_sha256}  /tmp/coder.tar.gz" | sha256sum -c - \
   && tar -xzf /tmp/tofu.tar.gz -C /tmp \
   && tar -xzf /tmp/helm.tar.gz -C /tmp \
+  && tar -xzf /tmp/coder.tar.gz -C /tmp coder \
   && install -m 0755 /tmp/talosctl /usr/local/bin/talosctl \
   && install -m 0755 /tmp/tofu /usr/local/bin/tofu \
   && install -m 0755 /tmp/kubectl /usr/local/bin/kubectl \
   && install -m 0755 /tmp/linux-amd64/helm /usr/local/bin/helm \
+  && install -m 0755 /tmp/coder /usr/local/bin/coder \
   && chmod +x /usr/local/bin/talosctl \
   && chmod +x /usr/local/bin/tofu \
   && chmod +x /usr/local/bin/kubectl \
   && chmod +x /usr/local/bin/helm \
-  && rm -rf /tmp/talosctl /tmp/tofu /tmp/tofu.tar.gz /tmp/kubectl /tmp/helm.tar.gz /tmp/linux-amd64
+  && chmod +x /usr/local/bin/coder \
+  && rm -rf /tmp/talosctl /tmp/tofu /tmp/tofu.tar.gz /tmp/kubectl /tmp/helm.tar.gz /tmp/linux-amd64 /tmp/coder /tmp/coder.tar.gz /tmp/coder_checksums.txt
 
 COPY manager-worker/package.json ./manager-worker/package.json
 COPY manager-worker/package-lock.json ./manager-worker/package-lock.json

@@ -29,9 +29,11 @@ cluster_dns_domain="$(printf '%s' "$cluster_json" | jq -r '.dns_domain // empty'
 
 public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
 [[ -n "$public_zone_name" ]] || fail "Could not determine public zone name"
+public_zone_regex="$(printf '%s' "$public_zone_name" | sed 's/[.]/[.]/g')"
 
 termix_host="https://termix.${public_zone_name}"
 opkssh_redirect_uri="${termix_host}/host/opkssh-callback"
+opkssh_coder_redirect_uri_regex="^https://coder[.]${public_zone_regex}/.*callback.*$"
 opkssh_issuer_url="https://authentik.${public_zone_name}/application/o/opkssh/"
 opkssh_authorization_url="https://authentik.${public_zone_name}/application/o/authorize/"
 opkssh_token_url="https://authentik.${public_zone_name}/application/o/token/"
@@ -270,6 +272,7 @@ provider_payload="$(
     --arg invalidation_flow "$invalidation_flow_id" \
     --arg signing_key "$signing_key_id" \
     --arg redirect_uri "$opkssh_redirect_uri" \
+    --arg coder_redirect_uri_regex "$opkssh_coder_redirect_uri_regex" \
     --argjson property_mappings "$property_mapping_ids_json" \
     '{
       name: $name,
@@ -282,6 +285,10 @@ provider_payload="$(
         {
           matching_mode: "strict",
           url: $redirect_uri
+        },
+        {
+          matching_mode: "regex",
+          url: $coder_redirect_uri_regex
         }
       ],
       property_mappings: $property_mappings,

@@ -39,6 +39,11 @@ output "browser_ssh_group_id" {
   description = "NetBird group ID for Termix Browser SSH peers"
 }
 
+output "dev_workspaces_group_id" {
+  value       = netbird_group.dev_workspaces.id
+  description = "NetBird group ID for Twinbox development workspace peers"
+}
+
 output "exit_node_users_group_id" {
   value       = netbird_group.exit_node_users.id
   description = "NetBird group ID for peers allowed to opt into Twinbox routes"
@@ -81,5 +86,11 @@ output "mailu_relay_egress_setup_key" {
 output "browser_ssh_setup_key" {
   value       = netbird_setup_key.browser_ssh.key
   description = "NetBird setup key for the Termix Browser SSH peer"
+  sensitive   = true
+}
+
+output "dev_workspaces_setup_key" {
+  value       = netbird_setup_key.dev_workspaces.key
+  description = "NetBird setup key for Twinbox development workspace peers"
   sensitive   = true
 }

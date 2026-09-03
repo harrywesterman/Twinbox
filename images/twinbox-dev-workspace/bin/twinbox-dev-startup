@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+log() { printf '[twinbox-dev] %s\n' "$*" >&2; }
+
+repo_dir="${TWINBOX_REPO_DIR:-/home/coder/code/Twinbox}"
+repo_url="${TWINBOX_REPO_URL:-https://github.com/harrywesterman/Twinbox.git}"
+skill_source="/opt/twinbox-agent-skills"
+opkssh_config_source="${TWINBOX_OPKSSH_CONFIG_SOURCE:-/opt/twinbox-opkssh/config.yml}"
+
+mkdir -p "$HOME/.local/share/code-server" "$HOME/.cache" "$HOME/.config" "$HOME/.ssh" "$HOME/.kube" "$HOME/.opk" "$HOME/code"
+chmod 700 "$HOME/.ssh" "$HOME/.kube" "$HOME/.opk"
+
+install_skill_link() {
+  local target="$1"
+
+  mkdir -p "$(dirname "$target")"
+  if [[ -e "$target" && ! -L "$target" ]]; then
+    log "Keeping existing non-symlink skill directory at ${target}"
+    return 0
+  fi
+
+  ln -sfn "$skill_source" "$target"
+}
+
+install_agent_skills() {
+  if [[ ! -d "$skill_source" ]]; then
+    log "Bundled skill source is missing at ${skill_source}"
+    return 0
+  fi
+
+  install_skill_link "$HOME/.agents/skills"
+  install_skill_link "$HOME/.codex/skills"
+  install_skill_link "$HOME/.config/opencode/skills"
+}
+
+install_opkssh_config() {
+  if [[ ! -f "$opkssh_config_source" ]]; then
+    log "opkssh config source is missing at ${opkssh_config_source}"
+    return 0
+  fi
+
+  ln -sfn "$opkssh_config_source" "$HOME/.opk/config.yml"
+}
+
+install_agent_skills
+install_opkssh_config
+
+tb kubeconfig >/dev/null || true
+tb ssh-config >/dev/null || true
+
+if [[ ! -d "$repo_dir/.git" ]]; then
+  log "Cloning Twinbox into ${repo_dir}"
+  mkdir -p "$(dirname "$repo_dir")"
+  git clone "$repo_url" "$repo_dir"
+elif git -C "$repo_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  log "Twinbox checkout already exists; fetching without changing local files"
+  git -C "$repo_dir" fetch --prune origin || true
+fi
+
+if ! pgrep -u "$(id -u)" -f "code-server.*--port 13337" >/dev/null 2>&1; then
+  log "Starting code-server"
+  code-server \
+    --auth none \
+    --bind-addr 127.0.0.1:13337 \
+    --disable-telemetry \
+    "$repo_dir" >"$HOME/.local/share/code-server/twinbox.log" 2>&1 &
+fi
+
+if ! pgrep -u "$(id -u)" -f "opencode web.*4096" >/dev/null 2>&1; then
+  log "Starting OpenCode Web"
+  OPENCODE_SERVER_PASSWORD="${OPENCODE_SERVER_PASSWORD:-unused-behind-coder-owner-app}" \
+    opencode web --hostname 127.0.0.1 --port 4096 >"$HOME/.cache/opencode-web.log" 2>&1 &
+fi
+
+if ! pgrep -u "$(id -u)" -f "twinbox-ssh-login" >/dev/null 2>&1; then
+  log "Starting Twinbox SSH login broker"
+  twinbox-ssh-login >"$HOME/.cache/twinbox-ssh-login.log" 2>&1 &
+fi
+
+log "Twinbox checkout: ${repo_dir}"
+log "Shared Codex/OpenCode skills: ${skill_source}"
+log "Workspace startup complete"

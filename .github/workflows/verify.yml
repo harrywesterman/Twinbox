@@ -75,7 +75,8 @@ jobs:
 
       - name: Static checks
         run: |
-          bash -n wizard/setup-wizard.sh scripts/manager/create-talos-vms.sh scripts/manager/bootstrap-talos.sh scripts/manager/collect-state.sh categories/talos-cluster/steps/install-twinbox-portal/run.sh categories/talos-cluster/steps/install-twinbox-agents/run.sh scripts/manager/sync-twinbox-agents-config.sh
+          bash -n wizard/setup-wizard.sh scripts/manager/create-talos-vms.sh scripts/manager/bootstrap-talos.sh scripts/manager/collect-state.sh categories/talos-cluster/steps/install-twinbox-portal/run.sh categories/talos-cluster/steps/install-twinbox-agents/run.sh categories/apps/steps/install-coder/run.sh scripts/manager/sync-twinbox-agents-config.sh images/twinbox-dev-workspace/bin/tb images/twinbox-dev-workspace/bin/twinbox-dev-startup
+          python -m py_compile images/twinbox-dev-workspace/bin/twinbox-ssh-login
           node --check manager-api/src/server.js
           node --check manager-worker/src/worker.js
           node --check manager-worker/src/refresh-portal-config.mjs

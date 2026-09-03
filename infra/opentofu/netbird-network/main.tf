@@ -45,6 +45,10 @@ resource "netbird_group" "browser_ssh" {
   name = "${local.name_prefix}-browser-ssh"
 }
 
+resource "netbird_group" "dev_workspaces" {
+  name = "${local.name_prefix}-dev-workspaces"
+}
+
 resource "netbird_group" "exit_node_users" {
   name = "${local.name_prefix}-exit-node-users"
 }
@@ -122,6 +126,17 @@ resource "netbird_setup_key" "browser_ssh" {
   usage_limit            = 1
   allow_extra_dns_labels = true
   auto_groups            = [netbird_group.browser_ssh.id]
+  ephemeral              = false
+  revoked                = false
+}
+
+resource "netbird_setup_key" "dev_workspaces" {
+  name                   = "${local.name_prefix}-dev-workspaces"
+  type                   = "reusable"
+  expiry_seconds         = 0
+  usage_limit            = 0
+  allow_extra_dns_labels = true
+  auto_groups            = [netbird_group.dev_workspaces.id]
   ephemeral              = false
   revoked                = false
 }
@@ -297,6 +312,74 @@ resource "netbird_policy" "browser_ssh_to_bastion_ssh" {
     bidirectional = true
     protocol      = "tcp"
     sources       = [netbird_group.browser_ssh.id]
+    destinations  = [netbird_group.proxy.id]
+    ports         = [tostring(var.bastion_ssh_port)]
+  }
+}
+
+resource "netbird_policy" "dev_workspaces_to_management_vm_ssh" {
+  name        = "${local.name_prefix}-dev-workspaces-to-management-vm-ssh"
+  description = "Allow Twinbox development workspaces to reach the Management VM SSH service"
+  enabled     = true
+
+  rule {
+    name          = "ssh"
+    action        = "accept"
+    enabled       = true
+    bidirectional = true
+    protocol      = "tcp"
+    sources       = [netbird_group.dev_workspaces.id]
+    destinations  = [netbird_group.management_vm.id]
+    ports         = [tostring(var.management_vm_ssh_port)]
+  }
+}
+
+resource "netbird_policy" "dev_workspaces_to_management_vm_web" {
+  name        = "${local.name_prefix}-dev-workspaces-to-management-vm-web"
+  description = "Allow Twinbox development workspaces to reach the Management VM web service"
+  enabled     = true
+
+  rule {
+    name          = "manager-web"
+    action        = "accept"
+    enabled       = true
+    bidirectional = true
+    protocol      = "tcp"
+    sources       = [netbird_group.dev_workspaces.id]
+    destinations  = [netbird_group.management_vm.id]
+    ports         = [tostring(var.management_vm_web_port)]
+  }
+}
+
+resource "netbird_policy" "dev_workspaces_to_management_vm_api" {
+  name        = "${local.name_prefix}-dev-workspaces-to-management-vm-api"
+  description = "Allow Twinbox development workspaces to reach the Management VM API service"
+  enabled     = true
+
+  rule {
+    name          = "manager-api"
+    action        = "accept"
+    enabled       = true
+    bidirectional = true
+    protocol      = "tcp"
+    sources       = [netbird_group.dev_workspaces.id]
+    destinations  = [netbird_group.management_vm.id]
+    ports         = [tostring(var.management_vm_api_port)]
+  }
+}
+
+resource "netbird_policy" "dev_workspaces_to_bastion_ssh" {
+  name        = "${local.name_prefix}-dev-workspaces-to-bastion-ssh"
+  description = "Allow Twinbox development workspaces to reach the bastion SSH service"
+  enabled     = true
+
+  rule {
+    name          = "ssh"
+    action        = "accept"
+    enabled       = true
+    bidirectional = true
+    protocol      = "tcp"
+    sources       = [netbird_group.dev_workspaces.id]
     destinations  = [netbird_group.proxy.id]
     ports         = [tostring(var.bastion_ssh_port)]
   }

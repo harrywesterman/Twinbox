@@ -2340,15 +2340,18 @@ def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():
     assert "MANAGEMENT_LAN_ROUTERS_GROUP_ID" in text
     assert "BASTION_EXIT_ROUTERS_GROUP_ID" in text
     assert "BROWSER_SSH_GROUP_ID" in text
+    assert "DEV_WORKSPACES_GROUP_ID" in text
     assert "EXIT_NODE_USERS_GROUP_ID" in text
     assert "proxy_setup_key" in text
     assert "netbird-proxy-access" in text
     assert "management_lan_router_setup_key" in text
     assert "bastion_exit_router_setup_key" in text
     assert "browser_ssh_setup_key" in text
+    assert "dev_workspaces_setup_key" in text
     assert "netbird-management-lan-router" in text
     assert "netbird-bastion-exit-router" in text
     assert "netbird-browser-ssh" in text
+    assert "netbird-dev-workspaces" in text
     assert "NETBIRD_PRIVATE_IP" in text
     assert "netbirdio/netbird:${PINNED_NETBIRD_VERSION:-0.73.2}" in text
     assert "docker run -d" in text and "--name netbird-client" in text
@@ -3015,15 +3018,19 @@ def test_netbird_lan_and_exit_routes_are_opt_in():
     assert 'resource "netbird_group" "management_lan_routers"' in network_text
     assert 'resource "netbird_group" "bastion_exit_routers"' in network_text
     assert 'resource "netbird_group" "browser_ssh"' in network_text
+    assert 'resource "netbird_group" "dev_workspaces"' in network_text
     assert 'resource "netbird_group" "exit_node_users"' in network_text
     assert 'name = "${local.name_prefix}-exit-node-users"' in network_text
     assert 'resource "netbird_setup_key" "management_lan_router"' in network_text
     assert 'resource "netbird_setup_key" "bastion_exit_router"' in network_text
     assert 'resource "netbird_setup_key" "browser_ssh"' in network_text
+    assert 'resource "netbird_setup_key" "dev_workspaces"' in network_text
     assert 'output "management_lan_router_setup_key"' in outputs_text
     assert 'output "bastion_exit_router_setup_key"' in outputs_text
     assert 'output "browser_ssh_group_id"' in outputs_text
     assert 'output "browser_ssh_setup_key"' in outputs_text
+    assert 'output "dev_workspaces_group_id"' in outputs_text
+    assert 'output "dev_workspaces_setup_key"' in outputs_text
     assert 'output "exit_node_users_group_id"' in outputs_text
 
     lan_route = re.search(

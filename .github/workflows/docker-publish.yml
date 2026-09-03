@@ -67,6 +67,9 @@ jobs:
               - 'twinbox-agents/Dockerfile'
             jitsi_openid:
               - 'images/jitsi-openid/**'
+            twinbox_dev_workspace:
+              - 'images/twinbox-dev-workspace/**'
+              - 'infra/coder/templates/twinbox-development/**'
 
       - name: Select images to build
         id: select
@@ -80,6 +83,7 @@ jobs:
           PORTAL_CHANGED: ${{ steps.filter.outputs.portal || 'false' }}
           TWINBOX_AGENTS_CHANGED: ${{ steps.filter.outputs.twinbox_agents || 'false' }}
           JITSI_OPENID_CHANGED: ${{ steps.filter.outputs.jitsi_openid || 'false' }}
+          TWINBOX_DEV_WORKSPACE_CHANGED: ${{ steps.filter.outputs.twinbox_dev_workspace || 'false' }}
         run: |
           python3 - <<'PY'
           import json
@@ -154,6 +158,16 @@ jobs:
                       "type=sha,prefix=jitsi-openid-sha-",
                   ]),
               },
+              {
+                  "image_name": "twinbox-dev-workspace",
+                  "package_name": "twinbox-dev-workspace",
+                  "context": "./images/twinbox-dev-workspace",
+                  "dockerfile": "./images/twinbox-dev-workspace/Dockerfile",
+                  "tags": "\n".join([
+                      "type=raw,value=latest,enable={{is_default_branch}}",
+                      "type=sha",
+                  ]),
+              },
           ]
 
           force_all = (
@@ -170,6 +184,7 @@ jobs:
               "twinbox-portal": os.environ["PORTAL_CHANGED"] == "true",
               "twinbox-agents": os.environ["TWINBOX_AGENTS_CHANGED"] == "true",
               "twinbox-jitsi-openid": os.environ["JITSI_OPENID_CHANGED"] == "true",
+              "twinbox-dev-workspace": os.environ["TWINBOX_DEV_WORKSPACE_CHANGED"] == "true",
           }
 
           selected = images if force_all else [

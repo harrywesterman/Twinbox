@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+import html
+import os
+import re
+import subprocess
+import threading
+import urllib.error
+import urllib.parse
+import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+PORT = int(os.environ.get("TWINBOX_SSH_LOGIN_PORT", "11110"))
+DEFAULT_CALLBACK_PORTS = [3000, 10001]
+STATE = {
+    "process": None,
+    "url": "",
+    "log": [],
+    "status": "idle",
+    "callback_ports": list(DEFAULT_CALLBACK_PORTS),
+}
+
+
+def append_log(line):
+    STATE["log"].append(line.rstrip())
+    STATE["log"] = STATE["log"][-80:]
+
+
+def public_origin(headers):
+    proto = headers.get("X-Forwarded-Proto") or "https"
+    host = headers.get("X-Forwarded-Host") or headers.get("Host")
+    if not host:
+        return ""
+    if not re.fullmatch(r"[A-Za-z0-9._:-]+", host):
+        return ""
+    return f"{proto}://{host}"
+
+
+def remember_callback_ports(line):
+    ports = []
+    for match in re.finditer(r"(?:127[.]0[.]0[.]1|localhost):([0-9]{2,5})", line):
+        port = int(match.group(1))
+        if 1 <= port <= 65535 and port not in ports:
+            ports.append(port)
+    if ports:
+        STATE["callback_ports"] = ports + [
+            port for port in DEFAULT_CALLBACK_PORTS if port not in ports
+        ]
+
+
+def read_stream(stream):
+    for raw in iter(stream.readline, ""):
+        line = raw.rstrip()
+        append_log(line)
+        remember_callback_ports(line)
+        match = re.search(r"https?://\S+", line)
+        if match and not STATE["url"]:
+            STATE["url"] = match.group(0).rstrip(").,")
+    stream.close()
+
+
+def wait_for_process(proc):
+    rc = proc.wait()
+    STATE["status"] = "complete" if rc == 0 else f"failed ({rc})"
+
+
+def start_login(origin):
+    if STATE["process"] and STATE["process"].poll() is None:
+        return
+    if not origin:
+        STATE["status"] = "failed: missing or invalid public host"
+        return
+    STATE.update({"url": "", "log": [], "status": "starting"})
+    STATE["callback_ports"] = list(DEFAULT_CALLBACK_PORTS)
+    redirect_uri = f"{origin}/callback"
+    cmd = [
+        "opkssh",
+        "login",
+        "authentik",
+        "--configure",
+        "--disable-browser-open",
+        "--config-path",
+        os.path.expanduser("~/.opk/config.yml"),
+        "--remote-redirect-uri",
+        redirect_uri,
+    ]
+    proc = subprocess.Popen(
+        cmd,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    STATE["process"] = proc
+    STATE["status"] = "waiting for browser login"
+    threading.Thread(target=read_stream, args=(proc.stdout,), daemon=True).start()
+    threading.Thread(target=read_stream, args=(proc.stderr,), daemon=True).start()
+    threading.Thread(target=wait_for_process, args=(proc,), daemon=True).start()
+
+
+def forward_callback(path):
+    parsed = urllib.parse.urlparse(path)
+    target_path = f"/login-callback?{parsed.query}" if parsed.query else "/login-callback"
+    errors = []
+    for port in STATE["callback_ports"]:
+        url = f"http://127.0.0.1:{port}{target_path}"
+        try:
+            with urllib.request.urlopen(url, timeout=10) as response:
+                return response.status, response.read()
+        except urllib.error.HTTPError as exc:
+            return exc.code, exc.read()
+        except Exception as exc:
+            errors.append(f"{port}: {exc}")
+    raise RuntimeError("; ".join(errors))
+
+
+class Handler(BaseHTTPRequestHandler):
+    def send_html(self, body):
+        encoded = body.encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
+
+    def do_GET(self):
+        if self.path == "/healthz":
+            self.send_response(204)
+            self.end_headers()
+            return
+        if self.path.startswith("/login"):
+            start_login(public_origin(self.headers))
+            self.send_response(303)
+            self.send_header("Location", "/")
+            self.end_headers()
+            return
+        if self.path.startswith("/callback"):
+            try:
+                status, body = forward_callback(self.path)
+                self.send_response(status)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(body)
+            except Exception as exc:
+                self.send_error(502, f"Could not forward opkssh callback: {exc}")
+            return
+
+        login_url = STATE["url"]
+        link = (
+            f'<p><a href="{html.escape(login_url)}" target="_blank" rel="noopener">Continue Authentik login</a></p>'
+            if login_url
+            else '<p><a href="/login">Start SSH login</a></p>'
+        )
+        log_lines = "\n".join(html.escape(line) for line in STATE["log"])
+        self.send_html(
+            "<!doctype html><html><head><meta charset='utf-8'>"
+            "<meta http-equiv='refresh' content='3'>"
+            "<title>Twinbox SSH Login</title>"
+            "<style>body{font-family:system-ui,sans-serif;max-width:900px;margin:40px auto;padding:0 20px;line-height:1.45}"
+            "pre{background:#111;color:#eee;padding:16px;border-radius:6px;overflow:auto}</style>"
+            "</head><body><h1>Twinbox SSH Login</h1>"
+            f"<p>Status: {html.escape(STATE['status'])}</p>{link}"
+            "<p>After MFA completes, use <code>tb ssh management</code>, <code>tb talos</code>, or <code>tb compose</code> in the terminal.</p>"
+            f"<pre>{log_lines}</pre></body></html>"
+        )
+
+    def log_message(self, fmt, *args):
+        return
+
+
+if __name__ == "__main__":
+    server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    server.serve_forever()

@@ -46,6 +46,10 @@ class TestTermixOpksshRedirect(unittest.TestCase):
             text,
         )
         self.assertIn('opkssh_redirect_uri="${termix_host}/host/opkssh-callback"', text)
+        self.assertIn(
+            'opkssh_coder_redirect_uri_regex="^https://coder[.]${public_zone_regex}/.*callback.*$"',
+            text,
+        )
         self.assertNotRegex(
             text,
             re.compile(r'url:\s*"http://termix|\bhttp://termix\.\$\{public_zone_name\}'),

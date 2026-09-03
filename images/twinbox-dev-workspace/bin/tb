@@ -1,0 +1,307 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: tb <command> [args...]
+
+Commands:
+  kubeconfig        Write ~/.kube/config for the in-cluster service account
+  ssh-config        Write ~/.ssh/config entries for Management VM and bastion
+  login             Show the browser SSH login app instructions
+  ssh <target>      SSH to management or bastion through the NetBird SOCKS proxy
+  mgmt [command]    Run a command on the Management VM
+  bastion [command] Run a command on the bastion
+  talos [args...]   Run talosctl on the Management VM with the Twinbox runtime talosconfig
+  compose [args...] Run docker compose in /opt/twinbox on the Management VM
+  proxmox METHOD PATH [BODY]
+                    Call the Proxmox API from the Management VM without copying credentials
+  netbird [args...] Run netbird command/API helpers on the Management VM
+  playwright-ui [dir]
+                    Start Playwright UI on port 9323
+  doctor            Check workspace access wiring
+EOF
+}
+
+fail() {
+  printf 'tb: %s\n' "$*" >&2
+  exit 1
+}
+
+quote_args() {
+  local quoted=()
+  local arg
+  for arg in "$@"; do
+    printf -v arg '%q' "$arg"
+    quoted+=("$arg")
+  done
+  printf '%s' "${quoted[*]}"
+}
+
+write_kubeconfig() {
+  local sa_dir="/var/run/secrets/kubernetes.io/serviceaccount"
+  local kube_dir="${HOME}/.kube"
+  local kubeconfig="${kube_dir}/config"
+
+  [[ -f "${sa_dir}/token" ]] || fail "service account token not found"
+  [[ -f "${sa_dir}/ca.crt" ]] || fail "service account CA not found"
+
+  mkdir -p "$kube_dir"
+  chmod 700 "$kube_dir"
+  cat >"$kubeconfig" <<EOF
+apiVersion: v1
+kind: Config
+clusters:
+- name: twinbox
+  cluster:
+    certificate-authority: ${sa_dir}/ca.crt
+    server: https://kubernetes.default.svc
+contexts:
+- name: twinbox
+  context:
+    cluster: twinbox
+    namespace: default
+    user: twinbox-dev-admin
+current-context: twinbox
+users:
+- name: twinbox-dev-admin
+  user:
+    tokenFile: ${sa_dir}/token
+EOF
+  chmod 600 "$kubeconfig"
+  printf '%s\n' "$kubeconfig"
+}
+
+write_ssh_config() {
+  local config="${HOME}/.ssh/config"
+  local mgmt_host="${TWINBOX_MANAGEMENT_VM_NETBIRD_IP:-}"
+  local mgmt_user="${TWINBOX_MANAGEMENT_VM_USER:-twinbox}"
+  local mgmt_port="${TWINBOX_MANAGEMENT_VM_SSH_PORT:-22}"
+  local bastion_host="${TWINBOX_BASTION_NETBIRD_IP:-}"
+  local bastion_user="${TWINBOX_BASTION_SSH_USER:-root}"
+  local bastion_port="${TWINBOX_BASTION_SSH_PORT:-22}"
+  local socks_host="${TWINBOX_NETBIRD_SOCKS_HOST:-127.0.0.1}"
+  local socks_port="${TWINBOX_NETBIRD_SOCKS_PORT:-1080}"
+
+  [[ -n "$mgmt_host" ]] || fail "TWINBOX_MANAGEMENT_VM_NETBIRD_IP is not set"
+  [[ -n "$bastion_host" ]] || fail "TWINBOX_BASTION_NETBIRD_IP is not set"
+
+  mkdir -p "$HOME/.ssh"
+  chmod 700 "$HOME/.ssh"
+  cat >"$config" <<EOF
+Host twinbox-management management
+  HostName ${mgmt_host}
+  User ${mgmt_user}
+  Port ${mgmt_port}
+  StrictHostKeyChecking accept-new
+  UserKnownHostsFile ${HOME}/.ssh/known_hosts
+  ProxyCommand nc -x ${socks_host}:${socks_port} %h %p
+
+Host twinbox-bastion bastion
+  HostName ${bastion_host}
+  User ${bastion_user}
+  Port ${bastion_port}
+  StrictHostKeyChecking accept-new
+  UserKnownHostsFile ${HOME}/.ssh/known_hosts
+  ProxyCommand nc -x ${socks_host}:${socks_port} %h %p
+EOF
+  chmod 600 "$config"
+  printf '%s\n' "$config"
+}
+
+ensure_ssh_material() {
+  [[ -f "$HOME/.ssh/id_ecdsa-cert.pub" || -f "$HOME/.ssh/id_ed25519-cert.pub" ]] && return 0
+  fail "no opkssh certificate found; open the Twinbox SSH Login Coder app or run: tb login"
+}
+
+target_host() {
+  case "${1:-}" in
+    management|mgmt|twinbox-management) printf 'twinbox-management\n' ;;
+    bastion|twinbox-bastion) printf 'twinbox-bastion\n' ;;
+    *) fail "unknown SSH target '${1:-}'; use management or bastion" ;;
+  esac
+}
+
+ssh_target() {
+  local target
+  target="$(target_host "$1")"
+  shift
+  ensure_ssh_material
+  ssh "$target" "$@"
+}
+
+remote_mgmt() {
+  ensure_ssh_material
+  ssh twinbox-management "$@"
+}
+
+remote_talos() {
+  ensure_ssh_material
+  ssh twinbox-management bash -s -- "${TWINBOX_CLUSTER_ID:-}" "$@" <<'REMOTE'
+set -euo pipefail
+
+bootstrap_dir="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
+cluster_id="${1:-}"
+shift || true
+
+if [[ -z "$cluster_id" ]]; then
+  secret_root="${bootstrap_dir}/secrets/cluster"
+  if sudo -n test -d "$secret_root"; then
+    cluster_id="$(
+      sudo -n find "$secret_root" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null \
+        | sort \
+        | head -n1
+    )"
+  fi
+fi
+
+talosconfig=""
+if [[ -n "$cluster_id" ]]; then
+  candidate="${bootstrap_dir}/secrets/cluster/${cluster_id}/talosconfig/talosconfig"
+  if sudo -n test -f "$candidate"; then
+    talosconfig="$candidate"
+  fi
+fi
+
+if [[ -z "$talosconfig" && -f /home/twinbox/.talos/config ]]; then
+  talosconfig="/home/twinbox/.talos/config"
+fi
+
+if [[ -z "$talosconfig" ]]; then
+  echo "tb: no Talos config found under ${bootstrap_dir}/secrets/cluster/<cluster-id>/talosconfig/talosconfig or /home/twinbox/.talos/config" >&2
+  exit 1
+fi
+
+exec sudo -n talosctl --talosconfig "$talosconfig" "$@"
+REMOTE
+}
+
+proxmox_api() {
+  local method="${1:-}"
+  local api_path="${2:-}"
+  local body="${3:-}"
+
+  [[ -n "$method" ]] || fail "METHOD is required"
+  [[ -n "$api_path" ]] || fail "PATH is required"
+  ensure_ssh_material
+  ssh twinbox-management python3 - "$method" "$api_path" "$body" <<'PY'
+import json
+import ssl
+import subprocess
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+
+method, api_path, body = sys.argv[1], sys.argv[2], sys.argv[3]
+secret_raw = subprocess.check_output(
+    ["sudo", "-n", "cat", "/opt/twinbox/bootstrap/secrets/global/proxmox.json"],
+    text=True,
+)
+secret = json.loads(secret_raw)
+endpoint = (secret.get("endpoint") or f"https://{secret['host']}:{secret.get('port', '8006')}").rstrip("/")
+username = secret["username"]
+password = secret["password"]
+
+ctx = ssl._create_unverified_context()
+ticket_payload = urllib.parse.urlencode({"username": username, "password": password}).encode()
+ticket_req = urllib.request.Request(
+    f"{endpoint}/api2/json/access/ticket",
+    data=ticket_payload,
+    method="POST",
+)
+with urllib.request.urlopen(ticket_req, context=ctx, timeout=20) as response:
+    ticket = json.loads(response.read().decode())["data"]
+
+headers = {"Cookie": f"PVEAuthCookie={ticket['ticket']}"}
+data = None
+if body:
+    headers["Content-Type"] = "application/json"
+    data = body.encode()
+if method.upper() not in {"GET", "POST", "PUT", "DELETE"}:
+    raise SystemExit(f"Unsupported method: {method}")
+if not api_path.startswith("/"):
+    api_path = "/" + api_path
+req = urllib.request.Request(
+    f"{endpoint}/api2/json{api_path}",
+    data=data,
+    headers=headers,
+    method=method.upper(),
+)
+if method.upper() in {"POST", "PUT", "DELETE"}:
+    req.add_header("CSRFPreventionToken", ticket["CSRFPreventionToken"])
+try:
+    with urllib.request.urlopen(req, context=ctx, timeout=30) as response:
+        print(response.read().decode())
+except urllib.error.HTTPError as exc:
+    print(exc.read().decode(), file=sys.stderr)
+    raise SystemExit(exc.code)
+PY
+}
+
+case "${1:-}" in
+  kubeconfig)
+    write_kubeconfig
+    ;;
+  ssh-config)
+    write_ssh_config
+    ;;
+  login)
+    cat <<'EOF'
+Open the "Twinbox SSH Login" app in Coder, start a login, and complete Authentik MFA.
+The resulting short-lived opkssh certificate is stored in ~/.ssh for this workspace.
+EOF
+    ;;
+  ssh)
+    shift
+    ssh_target "${1:-}" "${@:2}"
+    ;;
+  mgmt|management)
+    shift
+    remote_mgmt "$@"
+    ;;
+  bastion)
+    shift
+    ssh_target bastion "$@"
+    ;;
+  talos)
+    shift
+    remote_talos "$@"
+    ;;
+  compose)
+    shift
+    remote_mgmt "cd /opt/twinbox && sudo -n docker compose $(quote_args "$@")"
+    ;;
+  proxmox)
+    shift
+    proxmox_api "$@"
+    ;;
+  netbird)
+    shift
+    remote_mgmt "if command -v netbird >/dev/null 2>&1; then netbird $(quote_args "$@"); else sudo -n docker exec twinbox-netbird netbird $(quote_args "$@"); fi"
+    ;;
+  playwright-ui)
+    shift
+    cd "${1:-${TWINBOX_REPO_DIR:-/home/coder/code/Twinbox}}"
+    npx playwright test --ui --host 127.0.0.1 --port 9323
+    ;;
+  doctor)
+    write_kubeconfig >/dev/null
+    write_ssh_config >/dev/null
+    kubectl auth can-i '*' '*' >/dev/null && printf 'Kubernetes: ok\n'
+    nc -z -w 2 "${TWINBOX_NETBIRD_SOCKS_HOST:-127.0.0.1}" "${TWINBOX_NETBIRD_SOCKS_PORT:-1080}" \
+      && printf 'NetBird SOCKS: ok\n'
+    ensure_ssh_material
+    ssh twinbox-management true && printf 'Management VM SSH: ok\n'
+    ssh twinbox-bastion true && printf 'Bastion SSH: ok\n'
+    remote_talos version --client >/dev/null \
+      && printf 'Talos via Management VM: ok\n'
+    ;;
+  -h|--help|help|"")
+    usage
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac

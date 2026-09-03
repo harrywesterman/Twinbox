@@ -44,6 +44,19 @@ class TestSetupOpksshAuthentik(unittest.TestCase):
             text,
         )
 
+    def test_opkssh_allows_coder_workspace_login_callback(self):
+        script = WORKSPACE_ROOT / "scripts" / "manager" / "setup-opkssh-authentik.sh"
+        text = script.read_text(encoding="utf-8")
+
+        self.assertIn("public_zone_regex=", text)
+        self.assertIn("sed 's/[.]/[.]/g'", text)
+        self.assertIn(
+            'opkssh_coder_redirect_uri_regex="^https://coder[.]${public_zone_regex}/.*callback.*$"',
+            text,
+        )
+        self.assertIn('matching_mode: "regex"', text)
+        self.assertIn("coder_redirect_uri_regex", text)
+
 
 if __name__ == "__main__":
     unittest.main()
