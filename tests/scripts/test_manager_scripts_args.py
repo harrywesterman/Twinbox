@@ -2270,6 +2270,12 @@ def test_netbird_bastion_bootstrap_renderer_contract():
     )
     assert 'retry_netbird_step "Pull NetBird compose images" docker compose pull' in bootstrap_text
     assert "docker compose pull || true" not in bootstrap_text
+    assert "twinbox-netbird-proxy-healthcheck" in bootstrap_text
+    assert "twinbox-netbird-proxy-health.timer" in bootstrap_text
+    assert "PORTAL_HOST=portal.${PUBLIC_ZONE_NAME}" in bootstrap_text
+    assert "AUTHENTIK_HOST=authentik.${PUBLIC_ZONE_NAME}" in bootstrap_text
+    assert "docker compose restart proxy" in bootstrap_text
+    assert "10.97.189.205" not in bootstrap_text
 
 
 def test_netbird_ingress_uses_netbird_proxy_before_idp_registration():

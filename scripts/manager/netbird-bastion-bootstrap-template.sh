@@ -645,6 +645,68 @@ install_netbird_wildcard_renewal_timer
 retry_netbird_step "Pull NetBird compose images" docker compose pull
 docker compose up -d
 
+# Keep the reverse proxy self-healing after host or VM reboots. A healthy
+# container can still retain stale upstream connections to the cluster route.
+cat > /usr/local/sbin/twinbox-netbird-proxy-healthcheck <<'HEALTHCHECK'
+#!/usr/bin/env bash
+set -euo pipefail
+
+health_env=/opt/netbird/twinbox-proxy-health.env
+[[ -r "$health_env" ]] || exit 1
+# shellcheck disable=SC1091
+source "$health_env"
+
+check_host() {
+  local host="$1"
+  local status
+  status="$(curl -ksS --connect-timeout 5 --max-time 15 -o /dev/null -w '%{http_code}' "https://${host}/" || true)"
+  [[ "$status" =~ ^[23][0-9][0-9]$ ]]
+}
+
+if check_host "$PORTAL_HOST" && check_host "$AUTHENTIK_HOST"; then
+  exit 0
+fi
+
+cd /opt/netbird
+docker compose restart proxy >/dev/null
+sleep 3
+check_host "$PORTAL_HOST" && check_host "$AUTHENTIK_HOST"
+HEALTHCHECK
+chmod 0755 /usr/local/sbin/twinbox-netbird-proxy-healthcheck
+
+cat > /opt/netbird/twinbox-proxy-health.env <<EOF
+PORTAL_HOST=portal.${PUBLIC_ZONE_NAME}
+AUTHENTIK_HOST=authentik.${PUBLIC_ZONE_NAME}
+EOF
+chmod 0644 /opt/netbird/twinbox-proxy-health.env
+
+cat > /etc/systemd/system/twinbox-netbird-proxy-health.service <<'EOF'
+[Unit]
+Description=Check and recover the Twinbox NetBird reverse proxy
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/twinbox-netbird-proxy-healthcheck
+EOF
+
+cat > /etc/systemd/system/twinbox-netbird-proxy-health.timer <<'EOF'
+[Unit]
+Description=Periodic Twinbox NetBird reverse proxy healthcheck
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+Unit=twinbox-netbird-proxy-health.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now twinbox-netbird-proxy-health.timer
+
 NETBIRD_URL="https://$NETBIRD_DOMAIN"
 NETBIRD_SERVER_IP="$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' netbird-server)"
 if [[ -z "$NETBIRD_SERVER_IP" ]]; then
