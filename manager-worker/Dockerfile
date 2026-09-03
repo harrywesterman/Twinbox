@@ -18,7 +18,7 @@ RUN apk update \
   && echo "${coder_sha256}  /tmp/coder.tar.gz" | sha256sum -c - \
   && tar -xzf /tmp/tofu.tar.gz -C /tmp \
   && tar -xzf /tmp/helm.tar.gz -C /tmp \
-  && tar -xzf /tmp/coder.tar.gz -C /tmp coder \
+  && tar -xzf /tmp/coder.tar.gz -C /tmp ./coder \
   && install -m 0755 /tmp/talosctl /usr/local/bin/talosctl \
   && install -m 0755 /tmp/tofu /usr/local/bin/tofu \
   && install -m 0755 /tmp/kubectl /usr/local/bin/kubectl \

@@ -196,6 +196,7 @@ def test_manager_worker_ships_pinned_coder_cli_for_template_push():
 
     assert "coder_${PINNED_CODER_CHART_VERSION}_linux_amd64.tar.gz" in text
     assert "coder_${PINNED_CODER_CHART_VERSION}_checksums.txt" in text
+    assert "tar -xzf /tmp/coder.tar.gz -C /tmp ./coder" in text
     assert "install -m 0755 /tmp/coder /usr/local/bin/coder" in text
     assert "coreutils" in text
     assert "netcat-openbsd" in text
