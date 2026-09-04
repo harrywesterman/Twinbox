@@ -1,0 +1,45 @@
+id: install-proxmox-backup-server
+title: Install Proxmox Backup Server
+type: action
+journey_stage: setup
+summary: Provision a dedicated PBS 4 VM backed by the cluster S3 profile.
+explanation: Twinbox creates a 4 vCPU, 8 GiB RAM PBS VM with a 32 GiB system disk, a persistent local cache disk, a least-privilege backup token, and a daily Proxmox backup job.
+side_help: The S3 bucket contains the durable backup data. The PBS cache disk accelerates access and must be at least 64 GiB.
+depends_on:
+  - configure-backup-storage
+  - install-management-backup
+inputs:
+  - id: pbs_datastore
+    label: PBS Proxmox datastore
+    type: string
+    required: true
+  - id: pbs_cache_disk_gb
+    label: PBS cache disk (GiB)
+    type: integer
+    required: true
+    min: 64
+    default: 128
+  - id: pbs_ip
+    label: PBS VM IP
+    type: ipv4
+    required: true
+    help: A free static address in the runtime-discovered cluster subnet.
+secrets:
+  env:
+    PROXMOX_HOST: { scope: global, item: proxmox, field: host }
+    PROXMOX_PORT: { scope: global, item: proxmox, field: port }
+    PROXMOX_USER: { scope: global, item: proxmox, field: username }
+    PROXMOX_PASSWORD: { scope: global, item: proxmox, field: password }
+    NETBIRD_SETUP_KEY:
+      scope: cluster
+      item: netbird-backup-vms
+      field: NB_SETUP_KEY
+      optional: true
+    NETBIRD_MANAGEMENT_URL:
+      scope: cluster
+      item: netbird-backup-vms
+      field: NB_MANAGEMENT_URL
+      optional: true
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/install-proxmox-backup-server/run.sh

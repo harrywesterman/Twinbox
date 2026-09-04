@@ -49,6 +49,7 @@ const FIXED_SETUP_STEP_IDS = [
   "install-velero-backup",
   "install-velero-ui",
   "install-management-backup",
+  "install-proxmox-backup-server",
 ];
 
 const FIXED_SETUP_ORDER = new Map(FIXED_SETUP_STEP_IDS.map((id, index) => [id, index]));
